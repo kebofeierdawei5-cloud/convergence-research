@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/candidate-space-0.1.json",
+  "type":"object","additionalProperties":false,
+  "required":["schema_version","candidate_space_id","version","status","securities","drivers","features","state_dimensions","models","targets","horizons","metrics","exclusion_rules","parameter_spaces"],
+  "properties":{
+    "schema_version":{"const":"IIOS-CANDIDATE-SPACE-0.1"},
+    "candidate_space_id":{"type":"string","pattern":"^CS-[A-Z0-9_-]+$"},
+    "version":{"type":"string","pattern":"^\\d+\\.\\d+\\.\\d+$"},
+    "status":{"enum":["DRAFT","FROZEN","SUPERSEDED","INVALID"]},
+    "securities":{"type":"array","minItems":1,"items":{"type":"string"},"uniqueItems":true},
+    "drivers":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["driver_id","frequency","pit_fields","unit","source_classes"],"properties":{
+      "driver_id":{"type":"string"},"frequency":{"enum":["QUARTERLY","ANNUAL"]},"pit_fields":{"const":["value","known_at","published_at","provenance"]},"unit":{"type":"string"},"source_classes":{"type":"array","minItems":1,"items":{"type":"string"},"uniqueItems":true}
+    }}},
+    "features":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["feature_id","formula","lookback","pit_rule","missing_rule","transform_class"],"properties":{
+      "feature_id":{"type":"string"},"formula":{"type":"string","minLength":10},"lookback":{"type":"string"},"pit_rule":{"const":"ONLY_INFORMATION_AVAILABLE_AT_ORIGIN"},"missing_rule":{"type":"string","minLength":5},"transform_class":{"enum":["NONE","ROLLING_DETERMINISTIC","LEARNED_PIT_FIT"]}
+    }}},
+    "state_dimensions":{"type":"array","minItems":1,"items":{"type":"string"},"uniqueItems":true},
+    "models":{"type":"array","minItems":1,"items":{"type":"string"},"uniqueItems":true},
+    "targets":{"type":"array","minItems":1,"items":{"type":"string"},"uniqueItems":true},
+    "horizons":{"type":"array","minItems":1,"items":{"type":"string"},"uniqueItems":true},
+    "metrics":{"type":"array","minItems":1,"items":{"type":"string"},"uniqueItems":true},
+    "exclusion_rules":{"type":"array","items":{"type":"string"},"uniqueItems":true},
+    "parameter_spaces":{"type":"object"}
+  }
+}

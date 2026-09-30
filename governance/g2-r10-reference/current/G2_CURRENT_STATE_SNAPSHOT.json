@@ -1,0 +1,82 @@
+{
+  "snapshot_type": "IIOS_G2_CURRENT_STATE_SNAPSHOT",
+  "snapshot_version": "0.1",
+  "date": "2026-09-30",
+  "current_status": "FROZEN",
+  "frozen_object": {
+    "registry_id": "G2-NORMATIVE-0.9-RM7R-TR02B-F03FIX-CANDIDATE",
+    "revision": "F03FIX-4",
+    "sha256": "899f0b1b9f3619458e17be76ac43dd6e00b5397d0c12adb7b68e2479c7f51524",
+    "candidate_bytes_modified_during_freeze": false,
+    "freeze_as_external_state_transition": true
+  },
+  "freeze": {
+    "approval_id": "G2-RM7R-FREEZE-APPROVAL-001",
+    "approval_sha256": "f8fdb121f388645532f33db8a6a3f9a23aa5664cae1b450faeffa469a2973d5f",
+    "preflight_sha256": "961dc01b381a7baa4f384dccc9073b269909af7097607b29426fac23229cf6db",
+    "commit_sha256": "f7de620d1a8664ff87cfb4f4b7857818eee60f5fb4b0ce4bd112e390899a32b5",
+    "carrier_state_sha256": "828380414903519a7461dd67a91f4d6f6ba81a2fbb9697714f9c761eef7d8e6a",
+    "post_freeze_verification_sha256": "bb096fe54eaf68de84999eb0fd10fa846e737d6b3493718e45b16ab63af9d006",
+    "post_freeze_checks": "15/15"
+  },
+  "execution": {
+    "receipt_id": "RM3C-S7FIX-202-001",
+    "receipt_sha256": "4f674556f3ea6f7f8cd65ea1f8cbd1d88ce8c2d7964d7176591cd4e618c12d32",
+    "independent_verification_sha256": "29e5b20d2ebb6c7ea84d1ca341af0043cbeb2fef59901c7c5af8d95fd2d083a6",
+    "independent_replay_sha256": "fdb48d35d82df416065d59ce86f50cef20d853b78d969b4c187e2068a270e839",
+    "semantic_match": "202/202",
+    "side_effects": "NONE",
+    "scope_binding_sha256": "2cfa64af3f8da3e18d03604f881e77b3a483df8cb313e69d54aad6b74deb9549",
+    "suite_sha256": "766e6e20164e6d2280bc1b559acefb7b4dbea6b15f499440ec70feefece72edc",
+    "fixture_count": 202
+  },
+  "provenance_exception": {
+    "receipt_declared_scope_sha256": "d8e3b4daa8094fb11b40c22ccfb994ab7ec1f92da56856f3946d0302f22b4675",
+    "exact_bytes_recovered": false,
+    "classification": "RECEIPT_SINGLE_FIELD_METADATA_STALE",
+    "current_exact_scope_sha256": "2cfa64af3f8da3e18d03604f881e77b3a483df8cb313e69d54aad6b74deb9549",
+    "original_receipt_mutated": false,
+    "semantic_impact": "NONE"
+  },
+  "traceability": {
+    "status": "CLOSED_CURRENT_EXECUTION_UNIVERSE",
+    "clause_count": 45,
+    "closed_exact": 30,
+    "closed_governance_exemption": 15,
+    "previous_unresolved_declared_fixture_count": 38,
+    "recanonicalized_to_exact_current_ids": 26,
+    "current_unresolved_declared_fixture_count": 0,
+    "non_instantiated_adversarial_backlog_count": 12
+  },
+  "output_contract": {
+    "profile": "RFEC-STAGE-OUTPUT-1@0.3",
+    "sha256": "970c8a36a0aaf06abde946113401344a96996d77e2397bace99fb6b9ab968e",
+    "semantic_fields": [
+      "result",
+      "side_effect",
+      "commit_eligible",
+      "reservation_ref_unchanged"
+    ],
+    "stage_reason_are_diagnostic_only": true
+  },
+  "core_rules": [
+    "G2-ID-055",
+    "G2-ID-058",
+    "G2-ID-060",
+    "G2-ID-061",
+    "G2-ID-062",
+    "G2-ID-063",
+    "G2-ID-064",
+    "G2-ID-065",
+    "G2-ID-163",
+    "G2-ID-168",
+    "G2-ID-181",
+    "G2-ID-190",
+    "G2-ID-202"
+  ],
+  "future_change_rule": "Never edit frozen bytes in place; create successor candidate and repeat verification + explicit human approval + freeze commit.",
+  "final_package": {
+    "path": "/mnt/data/RM3C_FINAL_FROZEN_CARRIER_v0_1.zip",
+    "sha256": "bd5cbaf23c9029b46fafd19992029932431059de7424a08de48624aca5d431c8"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/research-epoch-0.1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version","epoch_id","version","epoch_type","status","parent_epoch_id","contamination","research_cleanliness","result_exposure","scope_refs"],
+  "properties": {
+    "schema_version": {"const": "IIOS-RESEARCH-EPOCH-0.1"},
+    "epoch_id": {"type": "string", "pattern": "^RE-[A-Z0-9_-]+$"},
+    "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+    "epoch_type": {"enum": ["EXPLORATORY","CONFIRMATORY","PROSPECTIVE"]},
+    "status": {"enum": ["DRAFT","FROZEN","SUPERSEDED","INVALID"]},
+    "parent_epoch_id": {"type": ["string","null"]},
+    "contamination": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status","parent_result_visibility","lineage_refs"],
+      "properties": {
+        "status": {"enum": ["UNEXPOSED","EXPOSED_PRIOR_RESULTS","EXPOSED_CURRENT_RESULTS","UNKNOWN"]},
+        "parent_result_visibility": {"enum": ["NONE","DESCRIPTIVE_ONLY","CONFIRMATORY","PRODUCTION"]},
+        "lineage_refs": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "research_cleanliness": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status","confirmatory_eligible","attestation_ref"],
+      "properties": {
+        "status": {"enum": ["CONTAMINATED","CLEAN_UNATTESTED","CLEAN_ATTESTED","UNKNOWN"]},
+        "confirmatory_eligible": {"type": "boolean"},
+        "attestation_ref": {"type": ["string","null"]}
+      }
+    },
+    "result_exposure": {
+      "type": "object", "additionalProperties": false,
+      "required": ["can_read_prior_results","can_read_current_oos_results","allowed_use"],
+      "properties": {
+        "can_read_prior_results": {"type": "boolean"},
+        "can_read_current_oos_results": {"type": "boolean"},
+        "allowed_use": {"enum": ["DEVELOPMENT_ONLY","DESCRIPTIVE_ONLY","CONFIRMATORY","PRODUCTION"]}
+      }
+    },
+    "scope_refs": {
+      "type": "object", "additionalProperties": false,
+      "required": ["research_plan_id","candidate_space_id","outer_universe_lock_id","purity_boundary_id"],
+      "properties": {
+        "research_plan_id": {"type": "string"},
+        "candidate_space_id": {"type": "string"},
+        "outer_universe_lock_id": {"type": "string"},
+        "purity_boundary_id": {"type": "string"}
+      }
+    }
+  }
+}

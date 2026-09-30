@@ -1,0 +1,17 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://iios.local/schema/outer-universe-lock-0.1.json",
+  "type":"object","additionalProperties":false,
+  "required":["schema_version","lock_id","version","status","origins","eligibility_policy","exclusion_record_policy"],
+  "properties":{
+    "schema_version":{"const":"IIOS-OUTER-UNIVERSE-LOCK-0.1"},
+    "lock_id":{"type":"string","pattern":"^OU-[A-Z0-9_-]+$"},
+    "version":{"type":"string","pattern":"^\\d+\\.\\d+\\.\\d+$"},
+    "status":{"enum":["DRAFT","FROZEN","SUPERSEDED","INVALID"]},
+    "origins":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["origin_id","origin_time","cutoff_rule","eligibility","scheduled_horizons"],"properties":{
+      "origin_id":{"type":"string"},"origin_time":{"type":"string","minLength":10},"cutoff_rule":{"const":"ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF"},"eligibility":{"enum":["SCHEDULED","UNAVAILABLE","EXCLUDED"]},"scheduled_horizons":{"type":"array","items":{"enum":["3M","6M","12M"]},"uniqueItems":true}
+    }}},
+    "eligibility_policy":{"const":"PRE_SCHEDULED_AND_IMMUTABLE_AFTER_FREEZE"},
+    "exclusion_record_policy":{"const":"RETAIN_ORIGIN_WITH_EXPLICIT_REASON_AND_NO_SILENT_DROP"}
+  }
+}

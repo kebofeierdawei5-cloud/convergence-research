@@ -1,0 +1,17 @@
+{
+  "record_type": "IIOS_G2_FROZEN_IDENTITY_REFERENCE",
+  "version": "0.1",
+  "status": "FROZEN",
+  "registry_id": "G2-NORMATIVE-0.9-RM7R-TR02B-F03FIX-CANDIDATE",
+  "revision": "F03FIX-4",
+  "frozen_carrier_sha256": "899f0b1b9f3619458e17be76ac43dd6e00b5397d0c12adb7b68e2479c7f51524",
+  "approval_id": "G2-RM7R-FREEZE-APPROVAL-001",
+  "approval_sha256": "f8fdb121f388645532f33db8a6a3f9a23aa5664cae1b450faeffa469a2973d5f",
+  "freeze_commit_sha256": "f7de620d1a8664ff87cfb4f4b7857818eee60f5fb4b0ce4bd112e390899a32b5",
+  "carrier_state_sha256": "828380414903519a7461dd67a91f4d6f6ba81a2fbb9697714f9c761eef7d8e6a",
+  "post_freeze_verification_sha256": "bb096fe54eaf68de84999eb0fd10fa846e737d6b3493718e45b16ab63af9d006",
+  "post_freeze_checks": "15/15",
+  "forecast_model_selection": "UNFROZEN",
+  "immutable": true,
+  "note": "This is a reference identity record. The exact frozen carrier payload is not vendored in this repository baseline because its final package bytes were unavailable in this runtime."
+}

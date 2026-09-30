@@ -1,0 +1,3097 @@
+{
+  "amendment_composition_rule_ref": "G2-ID-189",
+  "authority_hierarchy": [
+    "Normative Registry",
+    "Approved Policy/Parameter/Model revisions explicitly bound by the clause",
+    "Acceptance Evidence",
+    "Implementation notes"
+  ],
+  "authority_status": "CANDIDATE_NOT_FROZEN",
+  "candidate_clauses": [
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Reservation"
+      ],
+      "clause_id": "G2-ID-158",
+      "depends_on": [
+        "G03"
+      ],
+      "domain": "RFEC",
+      "normative_text": "RFEC governs eligibility evaluation for an already-established Reservation operation. Before eligibility evaluation, the requested operation MUST resolve to exactly one of CONSUME, RELEASE, VOID, ADJUST_DOWN, or ADJUST_UP. New Reservation creation is outside RFEC.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "RFEC Scope and Effect Classes",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-PS1",
+          "RFEC03-PS2",
+          "RFEC03-PS3"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-PS1-RP3",
+          "EV-SEM-RFEC03-PS2-RP3",
+          "EV-SEM-RFEC03-PS3-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "Reservation",
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-159",
+      "depends_on": [
+        "G03",
+        "G03-REPLAY"
+      ],
+      "domain": "RFEC / Reservation",
+      "normative_text": "An accepted Reservation used by RFEC MUST retain an immutable ReservationFulfillmentBasisManifest containing, at minimum, the exact AuthorizationRevision, DecisionRevision, AllocationPolicyRevision, PropagationPolicyRevision, and ArbitrationPolicyRevision used or explicitly bound for fulfillment eligibility, together with the manifest schema/profile revision. The manifest MUST NOT be silently amended.",
+      "obligation_bearer": "RESERVATION-ALLOCATION-OWNER",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Reservation Fulfillment Basis Manifest",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-HPOL1",
+          "RFEC03-HPOL2",
+          "RFEC03-HPOL3"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-HPOL1-RP3",
+          "EV-SEM-RFEC03-HPOL2-RP3",
+          "EV-SEM-RFEC03-HPOL3-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-REPLAY"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Policy"
+      ],
+      "clause_id": "G2-ID-160",
+      "depends_on": [
+        "G03-RESULT"
+      ],
+      "domain": "RFEC / Policy",
+      "normative_text": "For each RFEC evaluation, the ApplicableBasisSet and exact policy selection MUST be determinable without implementation-specific defaults. The input MUST either provide an authorized exact policy binding for each applicable BasisType or the applicable PolicySelectionAuthority and effective interval MUST deterministically resolve it. Missing, ambiguous, or unauthorized selection MUST produce NOT_EVALUATED before propagation arbitration.",
+      "obligation_bearer": "RFEC-POLICY-GOVERNOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Basis Applicability Set and Policy Selection",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-PS1",
+          "RFEC03-PS2",
+          "RFEC03-PS3",
+          "RFEC03-PS4",
+          "RFEC03-PS5",
+          "RFEC03-PS6"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-PS1-RP3",
+          "EV-SEM-RFEC03-PS2-RP3",
+          "EV-SEM-RFEC03-PS3-RP3",
+          "EV-SEM-RFEC03-PS4-RP3",
+          "EV-SEM-RFEC03-PS5-RP3",
+          "EV-SEM-RFEC03-PS6-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Lineage"
+      ],
+      "clause_id": "G2-ID-161",
+      "depends_on": [
+        "G03-WBR10"
+      ],
+      "domain": "RFEC / Lineage",
+      "normative_text": "The RFEC BasisChangeSet MUST be an accepted, ordered set of basis changes. Each change MUST identify BasisType, FromRevision, ToRevision, Reason, SemanticClass, EffectiveAt, RetroactivityScope, and LineagePosition. Within a BasisType stream, LineagePosition MUST be unique; a duplicate position is malformed semantic input and MUST produce REJECT.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Basis Change Set Integrity",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-WBR1",
+          "RFEC03-WBR2",
+          "RFEC03-WBR3",
+          "RFEC03-WBR4",
+          "RFEC03-WBR5",
+          "RFEC03-WBR6",
+          "RFEC03-WBR7",
+          "RFEC03-WBR8"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-WBR1-RP3",
+          "EV-SEM-RFEC03-WBR2-RP3",
+          "EV-SEM-RFEC03-WBR3-RP3",
+          "EV-SEM-RFEC03-WBR4-RP3",
+          "EV-SEM-RFEC03-WBR5-RP3",
+          "EV-SEM-RFEC03-WBR6-RP3",
+          "EV-SEM-RFEC03-WBR7-RP3",
+          "EV-SEM-RFEC03-WBR8-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-WBR10"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Lineage"
+      ],
+      "clause_id": "G2-ID-162",
+      "depends_on": [
+        "G03-WBR-REDUCTION"
+      ],
+      "domain": "RFEC / Lineage",
+      "normative_text": "RFEC MUST first reduce BasisChangeSet changes independently within each BasisType before cross-Basis arbitration. Ordering MUST follow EffectiveAt and then LineagePosition. A later change clears or replaces an earlier propagation effect only when an explicit accepted supersession relation identifies the earlier effect; otherwise the earlier effective blocking/re-evaluation effect remains effective.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Within-Basis Temporal Reduction",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-WBR1",
+          "RFEC03-WBR2",
+          "RFEC03-WBR3",
+          "RFEC03-WBR4",
+          "RFEC03-WBR5",
+          "RFEC03-WBR6",
+          "RFEC03-WBR7",
+          "RFEC03-WBR8",
+          "RFEC03-WBR9",
+          "RFEC03-WBR10"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-WBR1-RP3",
+          "EV-SEM-RFEC03-WBR2-RP3",
+          "EV-SEM-RFEC03-WBR3-RP3",
+          "EV-SEM-RFEC03-WBR4-RP3",
+          "EV-SEM-RFEC03-WBR5-RP3",
+          "EV-SEM-RFEC03-WBR6-RP3",
+          "EV-SEM-RFEC03-WBR7-RP3",
+          "EV-SEM-RFEC03-WBR8-RP3",
+          "EV-SEM-RFEC03-WBR9-RP3",
+          "EV-SEM-RFEC03-WBR10-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-WBR-REDUCTION"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Policy"
+      ],
+      "clause_id": "G2-ID-163",
+      "depends_on": [
+        "G03"
+      ],
+      "domain": "RFEC / Policy",
+      "normative_text": "Each applicable BasisType/effect pair MUST be evaluated under an exact approved PropagationPolicy revision. Reason labels MUST NOT directly determine behavior. The policy MUST resolve RequirementMode, SemanticClass interpretation, PropagationAction, and RetroactivityScope.",
+      "obligation_bearer": "RFEC-POLICY-GOVERNOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Typed Propagation Policy",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-PS1",
+          "RFEC03-PS2",
+          "RFEC03-PS3",
+          "RFEC03-PS4",
+          "RFEC03-PS5",
+          "RFEC03-PADM1",
+          "RFEC03-PADM2",
+          "RFEC03-PADM3",
+          "RFEC03-PADM4"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-PS1-RP3",
+          "EV-SEM-RFEC03-PS2-RP3",
+          "EV-SEM-RFEC03-PS3-RP3",
+          "EV-SEM-RFEC03-PS4-RP3",
+          "EV-SEM-RFEC03-PS5-RP3",
+          "EV-SEM-RFEC03-PADM1-RP3",
+          "EV-SEM-RFEC03-PADM2-RP3",
+          "EV-SEM-RFEC03-PADM3-RP3",
+          "EV-SEM-RFEC03-PADM4-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Eligibility"
+      ],
+      "clause_id": "G2-ID-164",
+      "depends_on": [
+        "G03"
+      ],
+      "domain": "RFEC / Eligibility",
+      "normative_text": "For an existing Reservation effect, RequirementMode MUST resolve exactly to CURRENT_REQUIRED, ISSUANCE_LOCKED, RE_EVALUATION_REQUIRED, or NOT_APPLICABLE. ISSUANCE_LOCKED means the accepted issuance basis remains sufficient for that effect unless an applicable retroactive prohibition or another explicitly declared typed propagation rule closes it. It MUST NOT be used for ADJUST_UP.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Requirement Mode and Existing Commitment",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-PS1",
+          "RFEC03-PS2",
+          "RFEC03-PS3",
+          "RFEC03-PS4",
+          "RFEC03-PS5",
+          "RFEC03-CBA1",
+          "RFEC03-CBA2",
+          "RFEC03-CBA3",
+          "RFEC03-CBA4"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-PS1-RP3",
+          "EV-SEM-RFEC03-PS2-RP3",
+          "EV-SEM-RFEC03-PS3-RP3",
+          "EV-SEM-RFEC03-PS4-RP3",
+          "EV-SEM-RFEC03-PS5-RP3",
+          "EV-SEM-RFEC03-CBA1-RP3",
+          "EV-SEM-RFEC03-CBA2-RP3",
+          "EV-SEM-RFEC03-CBA3-RP3",
+          "EV-SEM-RFEC03-CBA4-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Policy",
+        "Arbitration"
+      ],
+      "clause_id": "G2-ID-165",
+      "depends_on": [
+        "G03-RESULT"
+      ],
+      "domain": "RFEC / Arbitration",
+      "normative_text": "After all applicable BasisTypes have been reduced within-basis, their normalized propagation actions MUST be combined under one exact ArbitrationPolicy revision. For the approved candidate profile, action precedence is BLOCK > RE_EVALUATE > ALLOW. NOT_APPLICABLE is excluded from reduction and does not count as ALLOW.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Cross-Basis Arbitration",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-CBA1",
+          "RFEC03-CBA2",
+          "RFEC03-CBA3",
+          "RFEC03-CBA4",
+          "RFEC03-CBA5",
+          "RFEC03-CBA6",
+          "RFEC03-CBA7",
+          "RFEC03-CBA8",
+          "RFEC03-CBA9",
+          "RFEC03-CBA10",
+          "RFEC03-CBA11",
+          "RFEC03-CBA12"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-CBA1-RP3",
+          "EV-SEM-RFEC03-CBA2-RP3",
+          "EV-SEM-RFEC03-CBA3-RP3",
+          "EV-SEM-RFEC03-CBA4-RP3",
+          "EV-SEM-RFEC03-CBA5-RP3",
+          "EV-SEM-RFEC03-CBA6-RP3",
+          "EV-SEM-RFEC03-CBA7-RP3",
+          "EV-SEM-RFEC03-CBA8-RP3",
+          "EV-SEM-RFEC03-CBA9-RP3",
+          "EV-SEM-RFEC03-CBA10-RP3",
+          "EV-SEM-RFEC03-CBA11-RP3",
+          "EV-SEM-RFEC03-CBA12-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-RESULT"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Arbitration"
+      ],
+      "clause_id": "G2-ID-166",
+      "depends_on": [
+        "G03-EMPTY"
+      ],
+      "domain": "RFEC / Arbitration",
+      "normative_text": "If structural, authority, reservation-state, and required-policy completeness checks succeed and the applicable-basis set is empty because every supported BasisType is NOT_APPLICABLE, the propagation stage result MUST be ALLOW. An empty applicable set MUST NOT be represented as NOT_EVALUATED solely because no propagation policy applied.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Empty Applicable-Basis Set",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-EMP1",
+          "RFEC03-EMP2",
+          "RFEC03-EMP3",
+          "RFEC03-EMP4",
+          "RFEC03-EMP5",
+          "RFEC03-EMP6",
+          "RFEC03-EMP7",
+          "RFEC03-EMP8",
+          "RFEC03-EMP9",
+          "RFEC03-EMP10",
+          "RFEC03-EMP11",
+          "RFEC03-EMP12",
+          "RFEC03-EMP13",
+          "RFEC03-EMP14",
+          "RFEC03-EMP15"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-EMP1-RP3",
+          "EV-SEM-RFEC03-EMP2-RP3",
+          "EV-SEM-RFEC03-EMP3-RP3",
+          "EV-SEM-RFEC03-EMP4-RP3",
+          "EV-SEM-RFEC03-EMP5-RP3",
+          "EV-SEM-RFEC03-EMP6-RP3",
+          "EV-SEM-RFEC03-EMP7-RP3",
+          "EV-SEM-RFEC03-EMP8-RP3",
+          "EV-SEM-RFEC03-EMP9-RP3",
+          "EV-SEM-RFEC03-EMP10-RP3",
+          "EV-SEM-RFEC03-EMP11-RP3",
+          "EV-SEM-RFEC03-EMP12-RP3",
+          "EV-SEM-RFEC03-EMP13-RP3",
+          "EV-SEM-RFEC03-EMP14-RP3",
+          "EV-SEM-RFEC03-EMP15-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-EMPTY"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Validator"
+      ],
+      "clause_id": "G2-ID-167",
+      "depends_on": [
+        "G03-RESULT"
+      ],
+      "domain": "RFEC / Result",
+      "normative_text": "RFEC top-level result MUST be exactly one of ALLOW, BLOCK, REJECT, RE_EVALUATE, or NOT_EVALUATED. REJECT is reserved for structural, authority, operation-class, lifecycle-state, scope, or quantity invariants that are evaluated and violated. BLOCK is reserved for an evaluated operation that is currently ineligible. RE_EVALUATE is required for an accepted concurrency compare-set mismatch. NOT_EVALUATED is required when a mandatory prerequisite/policy/input cannot be evaluated. These result classes MUST NOT be selected by an unordered global precedence rule.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Closed Result Algebra and Stage Ownership",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-CBA1",
+          "RFEC03-CBA2",
+          "RFEC03-CBA3",
+          "RFEC03-ADJ1",
+          "RFEC03-ADJ2",
+          "RFEC03-ADJ3",
+          "RFEC03-ADJ4",
+          "RFEC03-ADJ5"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-CBA1-RP3",
+          "EV-SEM-RFEC03-CBA2-RP3",
+          "EV-SEM-RFEC03-CBA3-RP3",
+          "EV-SEM-RFEC03-ADJ1-RP3",
+          "EV-SEM-RFEC03-ADJ2-RP3",
+          "EV-SEM-RFEC03-ADJ3-RP3",
+          "EV-SEM-RFEC03-ADJ4-RP3",
+          "EV-SEM-RFEC03-ADJ5-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-RESULT"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-168",
+      "depends_on": [
+        "G03-RESULT",
+        "G03-CONC"
+      ],
+      "domain": "RFEC / Evaluation",
+      "normative_text": "RFEC evaluation MUST execute in the following semantic order: canonical-input validation; structural/scope/authority checks; Reservation operational-state check; required-policy/input completeness; within-BasisType temporal reduction; cross-Basis arbitration; fulfillment quantity/capacity checks; concurrency revalidation. A later stage MUST NOT bypass a failed earlier prerequisite. The exact stage that produces a result governs the result class.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Evaluation Stage Precedence",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-CMT1",
+          "RFEC03-CMT2",
+          "RFEC03-CMT3",
+          "RFEC03-CMT4",
+          "RFEC03-CMT5",
+          "RFEC03-CMT6",
+          "RFEC03-CMT7",
+          "RFEC03-CMT8",
+          "RFEC03-CBA1",
+          "RFEC03-CBA2",
+          "RFEC03-CBA3"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-CBA1-RP3",
+          "EV-SEM-RFEC03-CBA2-RP3",
+          "EV-SEM-RFEC03-CBA3-RP3",
+          "EV-SEM-RFEC03-CMT1-RP3",
+          "EV-SEM-RFEC03-CMT2-RP3",
+          "EV-SEM-RFEC03-CMT3-RP3",
+          "EV-SEM-RFEC03-CMT4-RP3",
+          "EV-SEM-RFEC03-CMT5-RP3",
+          "EV-SEM-RFEC03-CMT6-RP3",
+          "EV-SEM-RFEC03-CMT7-RP3",
+          "EV-SEM-RFEC03-CMT8-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-RESULT",
+          "G03-CONC"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Reservation"
+      ],
+      "clause_id": "G2-ID-169",
+      "depends_on": [
+        "G03-SIDE-EFFECT"
+      ],
+      "domain": "RFEC / Reservation",
+      "normative_text": "RFEC MUST receive a versioned Reservation operational-state classification from the Reservation/Allocation contract. A state classified as terminal for the requested ordinary effect MUST yield BLOCK before propagation evaluation. RFEC MUST NOT create or infer a new Reservation lifecycle state vocabulary. Any terminal-state mutation or cleanup event is governed outside RFEC.",
+      "obligation_bearer": "RESERVATION-ALLOCATION-OWNER",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Reservation Operational-State Gate",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-TERM1",
+          "RFEC03-TERM2",
+          "RFEC03-TERM3",
+          "RFEC03-TERM4",
+          "RFEC03-TERM5",
+          "RFEC03-TERM6",
+          "RFEC03-TERM7",
+          "RFEC03-TERM8",
+          "RFEC03-TERM9",
+          "RFEC03-TERM10",
+          "RFEC03-TERM11",
+          "RFEC03-TERM12",
+          "RFEC03-TERM13",
+          "RFEC03-TERM14",
+          "RFEC03-TERM15",
+          "RFEC03-TERM16",
+          "RFEC03-TERM17",
+          "RFEC03-TERM18",
+          "RFEC03-TERM19",
+          "RFEC03-TERM20"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-TERM1-RP3",
+          "EV-SEM-RFEC03-TERM2-RP3",
+          "EV-SEM-RFEC03-TERM3-RP3",
+          "EV-SEM-RFEC03-TERM4-RP3",
+          "EV-SEM-RFEC03-TERM5-RP3",
+          "EV-SEM-RFEC03-TERM6-RP3",
+          "EV-SEM-RFEC03-TERM7-RP3",
+          "EV-SEM-RFEC03-TERM8-RP3",
+          "EV-SEM-RFEC03-TERM9-RP3",
+          "EV-SEM-RFEC03-TERM10-RP3",
+          "EV-SEM-RFEC03-TERM11-RP3",
+          "EV-SEM-RFEC03-TERM12-RP3",
+          "EV-SEM-RFEC03-TERM13-RP3",
+          "EV-SEM-RFEC03-TERM14-RP3",
+          "EV-SEM-RFEC03-TERM15-RP3",
+          "EV-SEM-RFEC03-TERM16-RP3",
+          "EV-SEM-RFEC03-TERM17-RP3",
+          "EV-SEM-RFEC03-TERM18-RP3",
+          "EV-SEM-RFEC03-TERM19-RP3",
+          "EV-SEM-RFEC03-TERM20-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-SIDE-EFFECT"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Allocation"
+      ],
+      "clause_id": "G2-ID-170",
+      "depends_on": [
+        "G03-ADJUST"
+      ],
+      "domain": "RFEC / Allocation",
+      "normative_text": "An ADJUST request MUST be classified before propagation evaluation. A positive native-unit quantity delta MUST resolve to ADJUST_UP; a negative delta MUST resolve to ADJUST_DOWN; a zero delta or non-quantity allocation ADJUST MUST be REJECT unless a separate normative operation type explicitly applies. The resolver MUST be a total deterministic function over the supported ADJUST payload schema.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "ADJUST Direction Resolution",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-ADJ1",
+          "RFEC03-ADJ2",
+          "RFEC03-ADJ3",
+          "RFEC03-ADJ4",
+          "RFEC03-ADJ5",
+          "RFEC03-ADJ6",
+          "RFEC03-ADJ7",
+          "RFEC03-ADJ8",
+          "RFEC03-ADJ9",
+          "RFEC03-ADJ10",
+          "RFEC03-ADJ11",
+          "RFEC03-ADJ12",
+          "RFEC03-ADJ13",
+          "RFEC03-ADJ14",
+          "RFEC03-ADJ15"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-ADJ1-RP3",
+          "EV-SEM-RFEC03-ADJ2-RP3",
+          "EV-SEM-RFEC03-ADJ3-RP3",
+          "EV-SEM-RFEC03-ADJ4-RP3",
+          "EV-SEM-RFEC03-ADJ5-RP3",
+          "EV-SEM-RFEC03-ADJ6-RP3",
+          "EV-SEM-RFEC03-ADJ7-RP3",
+          "EV-SEM-RFEC03-ADJ8-RP3",
+          "EV-SEM-RFEC03-ADJ9-RP3",
+          "EV-SEM-RFEC03-ADJ10-RP3",
+          "EV-SEM-RFEC03-ADJ11-RP3",
+          "EV-SEM-RFEC03-ADJ12-RP3",
+          "EV-SEM-RFEC03-ADJ13-RP3",
+          "EV-SEM-RFEC03-ADJ14-RP3",
+          "EV-SEM-RFEC03-ADJ15-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-ADJUST"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Policy"
+      ],
+      "clause_id": "G2-ID-171",
+      "depends_on": [
+        "G03-RESULT"
+      ],
+      "domain": "RFEC / Policy",
+      "normative_text": "A PropagationPolicy bound to RFEC MUST pass an exact policy-admissibility validation before use. A policy that declares an unsupported RequirementMode, unsupported Action, incompatible mode/action pair, or an action prohibited by RFEC semantics MUST be considered inadmissible and MUST yield NOT_EVALUATED; it MUST NOT override an RFEC MUST or widen approved scope.",
+      "obligation_bearer": "RFEC-POLICY-GOVERNOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Policy Admissibility",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-PADM1",
+          "RFEC03-PADM2",
+          "RFEC03-PADM3",
+          "RFEC03-PADM4",
+          "RFEC03-PADM5",
+          "RFEC03-PADM6",
+          "RFEC03-PADM7",
+          "RFEC03-PADM8",
+          "RFEC03-PADM9",
+          "RFEC03-PADM10",
+          "RFEC03-PADM11",
+          "RFEC03-PADM12",
+          "RFEC03-PADM13",
+          "RFEC03-PADM14",
+          "RFEC03-PADM15"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-PADM1-RP3",
+          "EV-SEM-RFEC03-PADM2-RP3",
+          "EV-SEM-RFEC03-PADM3-RP3",
+          "EV-SEM-RFEC03-PADM4-RP3",
+          "EV-SEM-RFEC03-PADM5-RP3",
+          "EV-SEM-RFEC03-PADM6-RP3",
+          "EV-SEM-RFEC03-PADM7-RP3",
+          "EV-SEM-RFEC03-PADM8-RP3",
+          "EV-SEM-RFEC03-PADM9-RP3",
+          "EV-SEM-RFEC03-PADM10-RP3",
+          "EV-SEM-RFEC03-PADM11-RP3",
+          "EV-SEM-RFEC03-PADM12-RP3",
+          "EV-SEM-RFEC03-PADM13-RP3",
+          "EV-SEM-RFEC03-PADM14-RP3",
+          "EV-SEM-RFEC03-PADM15-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-RESULT",
+          "G03-ADJUST"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Execution"
+      ],
+      "clause_id": "G2-ID-172",
+      "depends_on": [
+        "G03-SIDE-EFFECT"
+      ],
+      "domain": "RFEC / Execution",
+      "normative_text": "RFEC is a pure eligibility evaluation. ALLOW is the only RFEC result that permits entry into a downstream state-changing allocation/governance commit. BLOCK, REJECT, RE_EVALUATE, and NOT_EVALUATED MUST produce no RFEC allocation event and no ordinary Reservation/capacity side effect. CLOSE and EXPIRE are not RFEC propagation actions.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Pure Eligibility and Side-Effect Barrier",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-TERM1",
+          "RFEC03-TERM2",
+          "RFEC03-TERM3",
+          "RFEC03-TERM4",
+          "RFEC03-TERM5",
+          "RFEC03-TERM6",
+          "RFEC03-CMT1",
+          "RFEC03-CMT2",
+          "RFEC03-CMT3",
+          "RFEC03-CMT4",
+          "RFEC03-CMT5",
+          "RFEC03-CMT6",
+          "RFEC03-CMT7",
+          "RFEC03-CMT8"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-TERM1-RP3",
+          "EV-SEM-RFEC03-TERM2-RP3",
+          "EV-SEM-RFEC03-TERM3-RP3",
+          "EV-SEM-RFEC03-TERM4-RP3",
+          "EV-SEM-RFEC03-TERM5-RP3",
+          "EV-SEM-RFEC03-TERM6-RP3",
+          "EV-SEM-RFEC03-CMT1-RP3",
+          "EV-SEM-RFEC03-CMT2-RP3",
+          "EV-SEM-RFEC03-CMT3-RP3",
+          "EV-SEM-RFEC03-CMT4-RP3",
+          "EV-SEM-RFEC03-CMT5-RP3",
+          "EV-SEM-RFEC03-CMT6-RP3",
+          "EV-SEM-RFEC03-CMT7-RP3",
+          "EV-SEM-RFEC03-CMT8-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-SIDE-EFFECT"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [
+        "G2-ID-139",
+        "G2-ID-140"
+      ],
+      "applies_to": [
+        "Concurrency",
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-173",
+      "depends_on": [
+        "G03-CONC"
+      ],
+      "domain": "Concurrency / RFEC",
+      "normative_text": "For a commit-capable RFEC operation, the concurrency baseline MUST be the exact check-time evaluation snapshot. The compare-set MUST cover, at minimum, ReservationRevision, AllocationRevision, all applicable Basis current-state tokens, all applicable BasisChangeSet boundaries, exact PropagationPolicy revisions, exact ArbitrationPolicy revision, and the Actor/Scope snapshot used by evaluation. An issuance basis revision is evidence for eligibility semantics but is not itself the check-time concurrency baseline.",
+      "obligation_bearer": "RFEC-CONCURRENCY-GATE",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Concurrency Evaluation Baseline",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-CMT1",
+          "RFEC03-CMT2",
+          "RFEC03-CMT3",
+          "RFEC03-CMT4",
+          "RFEC03-CMT5",
+          "RFEC03-CMT6",
+          "RFEC03-CMT7",
+          "RFEC03-CMT8",
+          "RFEC03-CMT9",
+          "RFEC03-CMT10",
+          "RFEC03-CMT11",
+          "RFEC03-CMT12",
+          "RFEC03-CMT13",
+          "RFEC03-CMT14",
+          "RFEC03-CMT15"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-CMT1-RP3",
+          "EV-SEM-RFEC03-CMT2-RP3",
+          "EV-SEM-RFEC03-CMT3-RP3",
+          "EV-SEM-RFEC03-CMT4-RP3",
+          "EV-SEM-RFEC03-CMT5-RP3",
+          "EV-SEM-RFEC03-CMT6-RP3",
+          "EV-SEM-RFEC03-CMT7-RP3",
+          "EV-SEM-RFEC03-CMT8-RP3",
+          "EV-SEM-RFEC03-CMT9-RP3",
+          "EV-SEM-RFEC03-CMT10-RP3",
+          "EV-SEM-RFEC03-CMT11-RP3",
+          "EV-SEM-RFEC03-CMT12-RP3",
+          "EV-SEM-RFEC03-CMT13-RP3",
+          "EV-SEM-RFEC03-CMT14-RP3",
+          "EV-SEM-RFEC03-CMT15-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-CONC"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [
+        "G2-ID-140"
+      ],
+      "applies_to": [
+        "Concurrency",
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-174",
+      "depends_on": [
+        "G03-CONC"
+      ],
+      "domain": "Concurrency / RFEC",
+      "normative_text": "If any value in the required RFEC compare-set differs between the check-time evaluation snapshot and the atomic commit-time current snapshot, the operation MUST return RE_EVALUATE, MUST append no allocation event, MUST apply no Reservation state delta, and MUST apply no capacity delta. The operation MUST NOT continue using the stale check result.",
+      "obligation_bearer": "RFEC-CONCURRENCY-GATE",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Concurrency Mismatch Result",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-CMT1",
+          "RFEC03-CMT2",
+          "RFEC03-CMT3",
+          "RFEC03-CMT4",
+          "RFEC03-CMT5",
+          "RFEC03-CMT6",
+          "RFEC03-CMT7",
+          "RFEC03-CMT8",
+          "RFEC03-CMT9",
+          "RFEC03-CMT10",
+          "RFEC03-CMT11",
+          "RFEC03-CMT12",
+          "RFEC03-CMT13",
+          "RFEC03-CMT14",
+          "RFEC03-CMT15",
+          "RFEC03-CMT16",
+          "RFEC03-CMT17",
+          "RFEC03-CMT18",
+          "RFEC03-CMT19",
+          "RFEC03-CMT20"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-CMT1-RP3",
+          "EV-SEM-RFEC03-CMT2-RP3",
+          "EV-SEM-RFEC03-CMT3-RP3",
+          "EV-SEM-RFEC03-CMT4-RP3",
+          "EV-SEM-RFEC03-CMT5-RP3",
+          "EV-SEM-RFEC03-CMT6-RP3",
+          "EV-SEM-RFEC03-CMT7-RP3",
+          "EV-SEM-RFEC03-CMT8-RP3",
+          "EV-SEM-RFEC03-CMT9-RP3",
+          "EV-SEM-RFEC03-CMT10-RP3",
+          "EV-SEM-RFEC03-CMT11-RP3",
+          "EV-SEM-RFEC03-CMT12-RP3",
+          "EV-SEM-RFEC03-CMT13-RP3",
+          "EV-SEM-RFEC03-CMT14-RP3",
+          "EV-SEM-RFEC03-CMT15-RP3",
+          "EV-SEM-RFEC03-CMT16-RP3",
+          "EV-SEM-RFEC03-CMT17-RP3",
+          "EV-SEM-RFEC03-CMT18-RP3",
+          "EV-SEM-RFEC03-CMT19-RP3",
+          "EV-SEM-RFEC03-CMT20-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-CONC"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [
+        "G2-ID-143",
+        "G2-ID-144",
+        "G2-ID-146"
+      ],
+      "applies_to": [
+        "Replay",
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-175",
+      "depends_on": [
+        "G03-REPLAY"
+      ],
+      "domain": "Replay / RFEC",
+      "normative_text": "Historical RFEC reconstruction MUST use an explicit TargetTime, KnowledgeCutoff, ExactAddressedRevision, exact Historical PolicyRevision bindings, and the HistoricalBasisChangeSet cut applicable under the reconstruction profile. Current later Policy or state changes MUST NOT silently replace the selected historical policy or accepted historical event state.",
+      "obligation_bearer": "RFEC-REPLAY-GATE",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Historical RFEC Context",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-HPOL1",
+          "RFEC03-HPOL2",
+          "RFEC03-HPOL3",
+          "RFEC03-HPOL4",
+          "RFEC03-HPOL5",
+          "RFEC03-HPOL6",
+          "RFEC03-HPOL7",
+          "RFEC03-HPOL8",
+          "RFEC03-HPOL9",
+          "RFEC03-HPOL10",
+          "RFEC03-HPOL11",
+          "RFEC03-HPOL12"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-HPOL1-RP3",
+          "EV-SEM-RFEC03-HPOL2-RP3",
+          "EV-SEM-RFEC03-HPOL3-RP3",
+          "EV-SEM-RFEC03-HPOL4-RP3",
+          "EV-SEM-RFEC03-HPOL5-RP3",
+          "EV-SEM-RFEC03-HPOL6-RP3",
+          "EV-SEM-RFEC03-HPOL7-RP3",
+          "EV-SEM-RFEC03-HPOL8-RP3",
+          "EV-SEM-RFEC03-HPOL9-RP3",
+          "EV-SEM-RFEC03-HPOL10-RP3",
+          "EV-SEM-RFEC03-HPOL11-RP3",
+          "EV-SEM-RFEC03-HPOL12-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-REPLAY"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [
+        "G2-ID-151",
+        "G2-ID-153"
+      ],
+      "applies_to": [
+        "Replay",
+        "Policy"
+      ],
+      "clause_id": "G2-ID-176",
+      "depends_on": [
+        "G03-REPLAY"
+      ],
+      "domain": "Replay / Policy",
+      "normative_text": "PropagationPolicy and ArbitrationPolicy revisions required for historical RFEC evaluation MUST be explicitly recoverable from the ReservationFulfillmentBasisManifest or the historical reconstruction binding. Replay MUST NOT resolve a missing historical policy by selecting the current/latest policy. If the required historical binding cannot be resolved, the RFEC rule is NOT_EVALUATED and the enclosing validator applies the frozen validator-result rules.",
+      "obligation_bearer": "VALIDATOR-GOVERNOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Historical Policy Binding",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-HPOL1",
+          "RFEC03-HPOL2",
+          "RFEC03-HPOL3",
+          "RFEC03-HPOL4",
+          "RFEC03-HPOL5",
+          "RFEC03-HPOL6",
+          "RFEC03-HPOL7",
+          "RFEC03-HPOL8",
+          "RFEC03-HPOL9",
+          "RFEC03-HPOL10"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-RFEC03-HPOL1-RP3",
+          "EV-SEM-RFEC03-HPOL2-RP3",
+          "EV-SEM-RFEC03-HPOL3-RP3",
+          "EV-SEM-RFEC03-HPOL4-RP3",
+          "EV-SEM-RFEC03-HPOL5-RP3",
+          "EV-SEM-RFEC03-HPOL6-RP3",
+          "EV-SEM-RFEC03-HPOL7-RP3",
+          "EV-SEM-RFEC03-HPOL8-RP3",
+          "EV-SEM-RFEC03-HPOL9-RP3",
+          "EV-SEM-RFEC03-HPOL10-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-REPLAY"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [
+        "G2-ID-064",
+        "G2-ID-068"
+      ],
+      "applies_to": [
+        "Authorization",
+        "Reservation"
+      ],
+      "clause_id": "G2-ID-177",
+      "depends_on": [
+        "G03-AUTH006"
+      ],
+      "domain": "Authorization / Reservation",
+      "normative_text": "An AUTH-006 replacement MUST NOT rebind an existing Reservation to the successor Authorization. Reservation.AuthorizationRef remains the accepted predecessor revision. Replacement-chain capacity continuity MUST be evaluated by the AUTH-006 contract and MUST count each outstanding commitment exactly once; no replacement path may expand the approved HumanDecision scope.",
+      "obligation_bearer": "AUTH006-REPLACEMENT-OWNER",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "AUTH-006 Replacement and Reservation Binding",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-AUTH61",
+          "RFEC03-AUTH62",
+          "RFEC03-AUTH63",
+          "RFEC03-AUTH64",
+          "RFEC03-AUTH65",
+          "RFEC03-AUTH66",
+          "RFEC03-AUTH67",
+          "RFEC03-AUTH68",
+          "RFEC03-AUTH69",
+          "RFEC03-AUTH610",
+          "RFEC03-AUTH611",
+          "RFEC03-AUTH612",
+          "RFEC03-AUTH613",
+          "RFEC03-AUTH614",
+          "RFEC03-AUTH615",
+          "RFEC03-AUTH616"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-RFEC03-AUTH61-RP3",
+          "EV-SEM-RFEC03-AUTH62-RP3",
+          "EV-SEM-RFEC03-AUTH63-RP3",
+          "EV-SEM-RFEC03-AUTH64-RP3",
+          "EV-SEM-RFEC03-AUTH65-RP3",
+          "EV-SEM-RFEC03-AUTH66-RP3",
+          "EV-SEM-RFEC03-AUTH67-RP3",
+          "EV-SEM-RFEC03-AUTH68-RP3",
+          "EV-SEM-RFEC03-AUTH69-RP3",
+          "EV-SEM-RFEC03-AUTH610-RP3",
+          "EV-SEM-RFEC03-AUTH611-RP3",
+          "EV-SEM-RFEC03-AUTH612-RP3",
+          "EV-SEM-RFEC03-AUTH613-RP3",
+          "EV-SEM-RFEC03-AUTH614-RP3",
+          "EV-SEM-RFEC03-AUTH615-RP3",
+          "EV-SEM-RFEC03-AUTH616-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-AUTH006"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [
+        "G2-ID-033"
+      ],
+      "applies_to": [
+        "Dependency",
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-178",
+      "depends_on": [
+        "G03"
+      ],
+      "domain": "Dependency / RFEC",
+      "normative_text": "For an already-accepted Reservation whose required basis was valid at Reservation acceptance, G2-ID-033 remains applicable to new permissions and new commitments. For an existing Reservation fulfillment effect, downstream closure due to later basis invalidation is determined by the exact RFEC RequirementMode and Typed PropagationPolicy. Where RFEC resolves ISSUANCE_LOCKED and no applicable RETROACTIVE_PROHIBITION exists, the later invalidity/supersession does not by itself terminate the established fulfillment path. This clause is an explicit amendment to the applicability of G2-ID-033 for existing Reservation fulfillment and MUST NOT be read as a textual clarification of the frozen clause.",
+      "obligation_bearer": "G2-REGISTRY-AUTHORITY",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Amendment — Established Reservation Fulfillment Exception",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-PS1",
+          "RFEC03-PS2",
+          "RFEC03-PS3",
+          "RFEC03-TERM1",
+          "RFEC03-TERM2",
+          "RFEC03-TERM3"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-PS1-RP3",
+          "EV-SEM-RFEC03-PS2-RP3",
+          "EV-SEM-RFEC03-PS3-RP3",
+          "EV-SEM-RFEC03-TERM1-RP3",
+          "EV-SEM-RFEC03-TERM2-RP3",
+          "EV-SEM-RFEC03-TERM3-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [
+        "G2-ID-140"
+      ],
+      "applies_to": [
+        "Concurrency",
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-179",
+      "depends_on": [
+        "G03-CONC"
+      ],
+      "domain": "Concurrency / RFEC",
+      "normative_text": "For RFEC commit semantics, an operation is stale for G2-ID-140 when its check-time evaluation snapshot no longer matches the required commit-time current snapshot. A difference between an issuance basis revision and current basis revision is not by itself a stale-operation condition when the exact RFEC policy resolves the effect as ISSUANCE_LOCKED. A required RFEC compare-set mismatch MUST follow G2-ID-174 and return RE_EVALUATE.",
+      "obligation_bearer": "RFEC-CONCURRENCY-GATE",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Amendment — RFEC Meaning of Stale Operation",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-CMT1",
+          "RFEC03-CMT2",
+          "RFEC03-CMT3",
+          "RFEC03-CMT4",
+          "RFEC03-CMT5",
+          "RFEC03-CMT6",
+          "RFEC03-CMT7",
+          "RFEC03-CMT8"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-CMT1-RP3",
+          "EV-SEM-RFEC03-CMT2-RP3",
+          "EV-SEM-RFEC03-CMT3-RP3",
+          "EV-SEM-RFEC03-CMT4-RP3",
+          "EV-SEM-RFEC03-CMT5-RP3",
+          "EV-SEM-RFEC03-CMT6-RP3",
+          "EV-SEM-RFEC03-CMT7-RP3",
+          "EV-SEM-RFEC03-CMT8-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-CONC"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [
+        "G2-ID-152",
+        "G2-ID-153"
+      ],
+      "applies_to": [
+        "Validator",
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-180",
+      "depends_on": [
+        "G03-RESULT"
+      ],
+      "domain": "Validator / Governance",
+      "normative_text": "RFEC is a required rule only when explicitly enumerated in the selected validation profile. Every RFEC validator result MUST identify the executed validation profile. If RFEC is required in the selected profile and a mandatory RFEC prerequisite or policy cannot be evaluated, the RFEC rule is NOT_EVALUATED and the enclosing validator top-level result MUST be INVALID under the frozen validator semantics.",
+      "obligation_bearer": "VALIDATOR-GOVERNOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Amendment — Validator Binding for RFEC",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "fixture_ids": [
+          "RFEC03-PADM1",
+          "RFEC03-PADM2",
+          "RFEC03-PADM3",
+          "RFEC03-PADM4",
+          "RFEC03-PADM5",
+          "RFEC03-PADM6",
+          "RFEC03-EMP1",
+          "RFEC03-EMP2",
+          "RFEC03-EMP3"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-SUITE-172-RP3",
+          "EV-SEM-RFEC03-EMP1-RP3",
+          "EV-SEM-RFEC03-EMP2-RP3",
+          "EV-SEM-RFEC03-EMP3-RP3",
+          "EV-SEM-RFEC03-PADM1-RP3",
+          "EV-SEM-RFEC03-PADM2-RP3",
+          "EV-SEM-RFEC03-PADM3-RP3",
+          "EV-SEM-RFEC03-PADM4-RP3",
+          "EV-SEM-RFEC03-PADM5-RP3",
+          "EV-SEM-RFEC03-PADM6-RP3",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": " RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "G03-RESULT"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "Governance"
+      ],
+      "clause_id": "G2-ID-181",
+      "depends_on": [],
+      "domain": "Governance",
+      "normative_text": "The G2 Clause Registry is the sole normative carrier for a G2 frozen or candidate registry revision. Human-readable clause documents, semantic contracts, test profiles, implementations, and acceptance reports are non-normative projections/evidence unless explicitly incorporated by a registered normative clause.",
+      "obligation_bearer": "G2-REGISTRY-AUTHORITY",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Normative Carrier and Authority",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-G2-ID-181-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-181"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-CLAUSE-181"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "Governance"
+      ],
+      "clause_id": "G2-ID-182",
+      "depends_on": [],
+      "domain": "Governance",
+      "normative_text": "A future candidate registry MUST preserve every inherited frozen clause body and identity as an immutable historical reference. A changed meaning MUST NOT reuse the historical clause identity/body in place. Any semantic change MUST be represented by a new candidate clause that explicitly declares AMENDS or SUPERSEDES relationships to the affected frozen clause(s).",
+      "obligation_bearer": "G2-REGISTRY-AUTHORITY",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Frozen Clause Lineage",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-G2-ID-182-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-182"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-CLAUSE-182"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "Governance",
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-183",
+      "depends_on": [],
+      "domain": "Governance",
+      "normative_text": "Every normative RFEC requirement MUST use the canonical clause-id namespace permitted by the registry, MUST be registered in the single normative carrier, and MUST declare source basis, applicability, status, obligation bearer, and traceability links. Unregistered RFEC prose MUST NOT be cited as normative acceptance evidence.",
+      "obligation_bearer": "G2-REGISTRY-AUTHORITY",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "RFEC Clause Registration",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-G2-ID-183-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-183"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-CLAUSE-183"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "Governance",
+        "Policy"
+      ],
+      "clause_id": "G2-ID-184",
+      "depends_on": [],
+      "domain": "Governance / Policy",
+      "normative_text": "PropagationPolicy and ArbitrationPolicy revisions used by permission-critical RFEC evaluation MUST be canonical revisioned policy objects approved under the G2 authority hierarchy, with stable identity, exact revision, approval status, and digest-bearing representation before they may satisfy a normative RFEC clause.",
+      "obligation_bearer": "RFEC-POLICY-GOVERNOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Canonical RFEC Policy Objects",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-G2-ID-184-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-184"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-CLAUSE-184"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "Governance",
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-185",
+      "depends_on": [],
+      "domain": "Governance / RFEC",
+      "normative_text": "ReservationFulfillmentBasisManifest and any persistent BasisChangeSet representation used for permission-critical replay MUST have an owner, schema/profile revision, stable identity, lineage semantics, and declared digest scope. The normative RFEC contract MUST reference these logical objects without prescribing a physical database representation.",
+      "obligation_bearer": "G2-REGISTRY-AUTHORITY",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "RFEC Basis Manifest and BasisChangeSet Object Governance",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-G2-ID-185-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-185"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-CLAUSE-185"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [
+        "G2-ID-131",
+        "G2-ID-132",
+        "G2-ID-133"
+      ],
+      "applies_to": [
+        "Governance",
+        "Digest"
+      ],
+      "clause_id": "G2-ID-186",
+      "depends_on": [],
+      "domain": "Governance / Digest",
+      "normative_text": "A new digest profile MUST NOT invalidate historical verification by omission. Each digest-covered object MUST retain or reference the exact digest profile under which its historical digest was created. Policy, ParameterSet, ReservationFulfillmentBasisManifest, and other permission-critical RFEC objects MUST have explicit digest-scope declarations before their digests may be required by RFEC governance clauses.",
+      "obligation_bearer": "DIGEST-GOVERNOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "RFEC Digest Profile and Historical Retention",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-G2-ID-186-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-186"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-CLAUSE-186"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [
+        "G2-ID-151",
+        "G2-ID-152",
+        "G2-ID-153"
+      ],
+      "applies_to": [
+        "Governance",
+        "Validator"
+      ],
+      "clause_id": "G2-ID-187",
+      "depends_on": [],
+      "domain": "Governance / Validator",
+      "normative_text": "Each normative RFEC obligation MUST name an accountable component/validator in the registry obligation-bearer map. RFEC MUST be explicitly classified as required or optional within each validation profile in which it appears. A result from an RFEC rule not included in the selected profile MUST not be cited as evidence for a required RFEC obligation.",
+      "obligation_bearer": "VALIDATOR-GOVERNOR",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "RFEC Obligation Bearers and Validation Profile",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-G2-ID-187-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-187"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-CLAUSE-187"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "Governance",
+        "Acceptance"
+      ],
+      "clause_id": "G2-ID-188",
+      "depends_on": [],
+      "domain": "Governance / Acceptance",
+      "normative_text": "Every normative RFEC clause MUST trace to at least one semantic invariant, at least one executable behavioral fixture, and its acceptance evidence through stable IDs. Test expected values, implementation output, and audit reports are evidence only; none may redefine normative semantics.",
+      "obligation_bearer": "G2-REGISTRY-AUTHORITY",
+      "source_basis": [
+        "RFEC-SEMANTIC-0.3.1",
+        "G03-SEMANTIC-DECISION-LOCK-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Clause-to-Evidence Traceability",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-G2-ID-188-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-188"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-CLAUSE-188"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "Normative Registry",
+        "Amendment Lineage"
+      ],
+      "clause_id": "G2-ID-189",
+      "depends_on": [
+        "G2-ID-182"
+      ],
+      "domain": "Governance",
+      "normative_text": "When more than one candidate amendment targets the same frozen clause within one candidate registry, all non-conflicting amendment obligations MUST compose conjunctively. If two amendments impose incompatible requirements on the same semantic point, the registry MUST identify the conflict explicitly and MUST declare which amendment supersedes the other; absent such explicit conflict resolution, the target amendment set MUST be treated as governance-incomplete and MUST NOT be used as freeze evidence.",
+      "obligation_bearer": "G2-REGISTRY-AUTHORITY",
+      "source_basis": [
+        "GOVERNANCE-REPAIR-v0.1"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Amendment Composition Rule",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-G2-ID-189-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-189"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-CLAUSE-189"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Observability"
+      ],
+      "clause_id": "G2-ID-190",
+      "depends_on": [
+        "G2-ID-167",
+        "G2-ID-188"
+      ],
+      "domain": "RFEC / Governance",
+      "normative_text": "RFEC evaluation stage labels are internal diagnostic trace values unless an exact separately versioned stage-output profile is normatively bound. Stage labels MUST NOT be used as an independent semantic-equality requirement when result, side-effect, and commit semantics are otherwise identical.",
+      "obligation_bearer": "G2-REGISTRY-AUTHORITY",
+      "source_basis": [
+        "GOVERNANCE-REPAIR-v0.1"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "RFEC Stage Observability Boundary",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-G2-ID-190-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-190"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-CLAUSE-190"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "Governance",
+        "Evidence"
+      ],
+      "clause_id": "G2-ID-191",
+      "depends_on": [
+        "G2-ID-183",
+        "G2-ID-188"
+      ],
+      "domain": "Governance / Evidence",
+      "normative_text": "Every governance validation claim cited as freeze evidence MUST be represented by an EV-GOV-2.0 receipt containing the exact subject identity, deterministic assertion, referenced artifact identities with SHA-256 hashes, verification method, creator identity, and an explicit independent-verification requirement. A self-check MUST NOT be the sole verification of its own receipt. A receipt MUST NOT be treated as independently verified while its status is READY_FOR_INDEPENDENT_VERIFICATION.",
+      "obligation_bearer": "GOVERNANCE-EVIDENCE-VERIFIER",
+      "source_basis": [
+        "GOVERNANCE-REPAIR-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Governance Evidence Receipt Contract",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001",
+          "EV-GOV-RM7R-VERIFIED-G2-ID-191-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-191",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-EVIDENCE-RECEIPT"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "Governance",
+        "Traceability"
+      ],
+      "clause_id": "G2-ID-192",
+      "depends_on": [
+        "G2-ID-188"
+      ],
+      "domain": "Governance / Traceability",
+      "normative_text": "Every normative governance clause MUST have at least one stable evidence receipt. A governance clause MAY have zero behavioral fixtures only when its traceability record explicitly marks governance_fixture_exemption=true and supplies a governance evidence receipt. Empty evidence_receipt_ids are prohibited for normative governance clauses.",
+      "obligation_bearer": "G2-REGISTRY-AUTHORITY",
+      "source_basis": [
+        "GOVERNANCE-REPAIR-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Governance Clause Evidence Coverage",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-G2-ID-192-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-192"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-CLAUSE-EVIDENCE-COVERAGE"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "Governance",
+        "Policy",
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-193",
+      "depends_on": [
+        "G2-ID-160",
+        "G2-ID-175"
+      ],
+      "domain": "Governance / Policy",
+      "normative_text": "SemanticProfileRevision used by a permission-critical policy-selection contract MUST resolve to a registered canonical SemanticProfile object with stable identity, exact revision, authority owner, approval reference, and applicable digest scope. An unresolved or unregistered SemanticProfileRevision MUST NOT satisfy policy-selection governance.",
+      "obligation_bearer": "RFEC-SEMANTIC-OWNER",
+      "source_basis": [
+        "GOVERNANCE-REPAIR-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "SemanticProfile Canonical Governance",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001",
+          "EV-GOV-RM7R-VERIFIED-G2-ID-193-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-193",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-SEMPROFILE"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "Governance",
+        "Registry"
+      ],
+      "clause_id": "G2-ID-194",
+      "depends_on": [
+        "G2-ID-182",
+        "G2-ID-188"
+      ],
+      "domain": "Governance / Registry",
+      "normative_text": "A candidate registry MUST declare its registry schema identity and version and MUST declare an explicit migration record whenever any top-level field changes type, structure, requiredness, or semantic shape relative to its parent registry. The migration MUST identify the parent schema, migration identifier and type, compatibility rule, and field-level mapping, and MUST preserve the parent value verbatim when a shape change is non-destructive. Silent top-level schema drift MUST block freeze.",
+      "obligation_bearer": "G2-REGISTRY-AUTHORITY",
+      "source_basis": [
+        "GOVERNANCE-REPAIR-v0.2"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Registry Schema and Metadata Migration",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-G2-ID-194-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-194"
+        ],
+        "notes": "Governance-only; no behavioral fixture required; evidence receipt required. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "GOV-SCHEMA-MIGRATION"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [
+        "G2-ID-170"
+      ],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-195",
+      "depends_on": [
+        "G2-ID-170"
+      ],
+      "domain": "RFEC",
+      "normative_text": "For any RFEC ADJUST request, delta MUST be a finite signed integer quantity expressed in the canonical native unit. A missing, null, non-numeric, non-finite, or non-integer delta is malformed canonical input and MUST resolve to REJECT before propagation evaluation. A zero integer delta MUST resolve to REJECT. A positive integer delta MUST derive effect class ADJUST_UP; a negative integer delta MUST derive effect class ADJUST_DOWN. When an effect class is supplied or declared, it MUST equal the derived effect class; any mismatch is malformed canonical input and MUST resolve to REJECT. No precedence rule permits a supplied effect class to override delta-derived effect class.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "DECISION-LOCK-DL-01",
+        "G2-DLR-0.1",
+        "G2-V0.6-EXTERNAL-AUDIT-REPAIR"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "ADJUST Canonical Numeric Domain and Effect Resolution",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001",
+          "EV-GOV-RM7R-VERIFIED-CLOSURE-G2-ID-195-001",
+          "EV-RP3-B5R4-RFEC07-ADJ-MISSING",
+          "EV-RP3-B5R4-RFEC07-ADJ-NONNUMERIC",
+          "EV-RP3-B5R4-RFEC07-ADJ-SIGN-CONFLICT-DOWN",
+          "EV-RP3-B5R4-RFEC07-ADJ-SIGN-CONFLICT-UP",
+          "EV-RP3-B5R4-RFEC07-ADJ-ZERO"
+        ],
+        "fixture_ids": [
+          "RFEC03-ADJ11",
+          "RFEC03-ADJ12",
+          "ADJ-SIGN-CONFLICT-UP",
+          "ADJ-SIGN-CONFLICT-DOWN",
+          "ADJ-ZERO",
+          "ADJ-MISSING",
+          "ADJ-NONNUMERIC"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-RFEC03-ADJ11-RP4",
+          "EV-SEM-RFEC03-ADJ12-RP4",
+          "EV-SEM-ADJ-SIGN-RP4",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": "Candidate amendment traceability. Referenced Batch 4/5 fixtures and receipts are reserved identifiers only; they are not supplied evidence and cannot satisfy freeze evidence yet. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "INV-ADJ-01",
+          "INV-ADJ-02",
+          "INV-ADJ-03"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [
+        "G2-ID-164"
+      ],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-196",
+      "depends_on": [
+        "G2-ID-164"
+      ],
+      "domain": "RFEC",
+      "normative_text": "When RequirementMode is CURRENT_REQUIRED, the evaluator MUST consume a canonical evaluation-time CurrentBasisStateSnapshot for each applicable BasisType/effect pair, keyed to the exact basis revision evaluated. The normalized basis-validity domain is {VALID, STALE, INVALID}; TERMINAL is not a basis-validity value and remains an operational Reservation state. VALID satisfies CURRENT_REQUIRED. STALE or INVALID fails the current-validity requirement and resolves to BLOCK unless an explicitly selected typed PropagationPolicy maps that current-state outcome to another permitted propagation action. A missing or unresolvable current-state snapshot MUST resolve to NOT_EVALUATED before propagation arbitration. Contradictory current-state snapshots for the same BasisType and basis revision are malformed input and MUST resolve to REJECT. The evaluation-time CurrentBasisStateSnapshot is semantically distinct from the commit-time concurrency compare-set and MUST NOT be used interchangeably with it.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "DECISION-LOCK-DL-02",
+        "G2-DLR-0.1",
+        "G2-V0.6-EXTERNAL-AUDIT-REPAIR"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "CURRENT_REQUIRED Current-State Binding",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001",
+          "EV-GOV-RM7R-VERIFIED-CLOSURE-G2-ID-196-001",
+          "EV-RP3-B5R4-RFEC07-CUR-CONTRADICTORY",
+          "EV-RP3-B5R4-RFEC07-CUR-INVALID",
+          "EV-RP3-B5R4-RFEC07-CUR-MISSING",
+          "EV-RP3-B5R4-RFEC07-CUR-STALE",
+          "EV-RP3-B5R4-RFEC07-CUR-VALID",
+          "EV-RP3-B5R4-RFEC07-CUR-VS-COMMIT-SNAPSHOT"
+        ],
+        "fixture_ids": [
+          "RFEC03-PS2",
+          "RFEC03-PS9",
+          "RFEC03-PS11",
+          "CURRENT-VALID",
+          "CURRENT-STALE",
+          "CURRENT-INVALID",
+          "CURRENT-MISSING",
+          "CURRENT-CONTRADICTORY",
+          "CURRENT-vs-COMMIT-SNAPSHOT"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-RFEC03-PS2-RP4",
+          "EV-SEM-RFEC03-PS9-RP4",
+          "EV-SEM-RFEC03-PS11-RP4",
+          "EV-SEM-CURRENT-STATE-RP4",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": "Candidate amendment traceability. Referenced Batch 4/5 fixtures and receipts are reserved identifiers only; they are not supplied evidence and cannot satisfy freeze evidence yet. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "INV-CUR-01",
+          "INV-CUR-02",
+          "INV-CUR-03",
+          "INV-CUR-04"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [
+        "G2-ID-160"
+      ],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-197",
+      "depends_on": [
+        "G2-ID-160"
+      ],
+      "domain": "RFEC",
+      "normative_text": "For each applicable BasisType/effect pair, policy selection MAY be established by either an authorized exact policy binding or an authorized PolicySelectionAuthority resolution over the applicable effective interval. If both paths are supplied, both MUST resolve to the same exact policy revision. If the two paths resolve to different revisions, or if either supplied path is unauthorized or unresolvable, policy selection MUST be NOT_EVALUATED and the evaluator MUST NOT silently fall back to the other path. If exactly one admissible path is present and complete, that path supplies the policy revision. Missing or otherwise ambiguous selection MUST be NOT_EVALUATED. No source-precedence rule permits one admissible path to silently override a conflicting second path.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "DECISION-LOCK-DL-03",
+        "G2-DLR-0.1",
+        "G2-V0.6-EXTERNAL-AUDIT-REPAIR"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Policy Selection Dual-Source Consistency",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-CLOSURE-G2-ID-197-001",
+          "EV-RP3-B5R4-RFEC07-PS-AUTHORITY-ONLY",
+          "EV-RP3-B5R4-RFEC07-PS-BOTH-DIFF",
+          "EV-RP3-B5R4-RFEC07-PS-BOTH-EXACT-UNAUTHORIZED",
+          "EV-RP3-B5R4-RFEC07-PS-BOTH-SAME",
+          "EV-RP3-B5R4-RFEC07-PS-EXACT-ONLY",
+          "EV-RP3-B5R5-PS-AUTHORITY-AMBIGUOUS",
+          "EV-RP3-B5R5-PS-BOTH-ONE-MISSING"
+        ],
+        "fixture_ids": [
+          "PS-EXACT-ONLY",
+          "PS-AUTHORITY-ONLY",
+          "PS-BOTH-SAME",
+          "PS-BOTH-DIFFERENT",
+          "PS-EXACT-UNAUTHORIZED",
+          "PS-AUTHORITY-AMBIGUOUS",
+          "PS-BOTH-ONE-MISSING"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-PS-DUALSOURCE-RP4"
+        ],
+        "notes": "Candidate amendment traceability. Referenced Batch 4/5 fixtures and receipts are reserved identifiers only; they are not supplied evidence and cannot satisfy freeze evidence yet. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "INV-POLSEL-01",
+          "INV-POLSEL-02",
+          "INV-POLSEL-03"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [
+        "G2-ID-175"
+      ],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-198",
+      "depends_on": [
+        "G2-ID-175"
+      ],
+      "domain": "RFEC",
+      "normative_text": "For historical RFEC evaluation, a complete historical policy binding MAY be supplied by the ReservationFulfillmentBasisManifest or by the historical-reconstruction policy binding. If both sources are present for the same historical evaluation, they MUST resolve to the same exact policy revision and exact addressed historical context. If they differ, or if either supplied source is incomplete or unavailable, historical policy resolution MUST be NOT_EVALUATED and the evaluator MUST NOT silently choose the other source. When only one complete source is present, it MAY be used only after the historical prerequisite requirements of the reconstruction profile are satisfied. Latest/current policy fallback is prohibited.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "DECISION-LOCK-DL-04",
+        "G2-DLR-0.1",
+        "G2-V0.6-EXTERNAL-AUDIT-REPAIR"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Historical Policy Dual-Source Consistency",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-CLOSURE-G2-ID-198-001",
+          "EV-RP3-B5R4-RFEC07-HPOL-BOTH-DIFF",
+          "EV-RP3-B5R4-RFEC07-HPOL-BOTH-SAME",
+          "EV-RP3-B5R4-RFEC07-HPOL-MANIFEST-ONLY",
+          "EV-RP3-B5R4-RFEC07-HPOL-MISSING-REVISION",
+          "EV-RP3-B5R4-RFEC07-HPOL-RECON-ONLY",
+          "EV-RP3-B5R5-HPOL-LATEST-FALLBACK",
+          "EV-RP3-B5R5-HPOL-UNAVAILABLE"
+        ],
+        "fixture_ids": [
+          "HPOL-MANIFEST-ONLY",
+          "HPOL-RECON-ONLY",
+          "HPOL-BOTH-SAME",
+          "HPOL-BOTH-DIFFERENT",
+          "HPOL-MISSING-REVISION",
+          "HPOL-UNAVAILABLE",
+          "HPOL-LATEST-FALLBACK"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-HPOL-DUALSOURCE-RP4"
+        ],
+        "notes": "Candidate amendment traceability. Referenced Batch 4/5 fixtures and receipts are reserved identifiers only; they are not supplied evidence and cannot satisfy freeze evidence yet. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "INV-HPOL-01",
+          "INV-HPOL-02",
+          "INV-HPOL-03"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [
+        "G2-ID-173"
+      ],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-199",
+      "depends_on": [
+        "G2-ID-173"
+      ],
+      "domain": "RFEC",
+      "normative_text": "For a commit-capable RFEC operation, the canonical sorted ApplicableBasisSet membership MUST be captured in the check-time snapshot and MUST be a member of the commit-time concurrency compare-set. Reordering the same set members does not change membership identity. Any addition or removal of an applicable BasisType between CHECK and COMMIT MUST constitute a compare-set mismatch and MUST resolve to RE_EVALUATE before any allocation, Reservation, capacity, or other side effect. Existing per-Basis current-state tokens, BasisChangeSet boundaries, policy revisions, and actor/scope snapshot remain independent compare-set members. A missing or unresolvable check-time ApplicableBasisSet snapshot MUST NOT be treated as equal by default.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "DECISION-LOCK-DL-05",
+        "G2-DLR-0.1",
+        "G2-V0.6-EXTERNAL-AUDIT-REPAIR"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "ApplicableBasisSet Membership as Concurrency Identity",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM7R-VERIFIED-CLOSURE-G2-ID-199-001",
+          "EV-RP3-B5R4-RFEC07-CONC-ADD-BASIS",
+          "EV-RP3-B5R4-RFEC07-CONC-REMOVE-BASIS",
+          "EV-RP3-B5R4-RFEC07-CONC-REORDER-BASIS",
+          "EV-RP3-B5R4-RFEC07-CONC-SAMESET-DIFF-TOKEN",
+          "EV-RP3-B5R5-CONC-SAME-MEMBERS-DIFF-REVISION"
+        ],
+        "fixture_ids": [
+          "CONC-ADD-BASIS",
+          "CONC-REMOVE-BASIS",
+          "CONC-REORDER-BASIS",
+          "CONC-SAME-MEMBERS-DIFF-TOKEN",
+          "CONC-SAME-MEMBERS-DIFF-REVISION"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-CONC-APPLICABILITYSET-RP4"
+        ],
+        "notes": "Candidate amendment traceability. Referenced Batch 4/5 fixtures and receipts are reserved identifiers only; they are not supplied evidence and cannot satisfy freeze evidence yet. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "INV-CONC-01",
+          "INV-CONC-02",
+          "INV-CONC-03"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [
+        "G2-ID-166"
+      ],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-200",
+      "depends_on": [
+        "G2-ID-166"
+      ],
+      "domain": "RFEC",
+      "normative_text": "In HISTORICAL_RECONSTRUCTION, the historical completeness prerequisites MUST be evaluated before the empty ApplicableBasisSet result is considered. TargetTime, KnowledgeCutoff, ExactAddressedRevision, ExactHistoricalPolicyRevisions, and the HistoricalBasisChangeSet cut MUST each be present or resolvable from canonical historical inputs required by the reconstruction profile. If any required prerequisite cannot be resolved, the result MUST be NOT_EVALUATED and the empty-set ALLOW rule is not reachable. Only after historical completeness, structural and authority checks, and applicability determination succeed may an ApplicableBasisSet containing no applicable BasisType resolve to ALLOW under the conditions defined by G2-ID-166. This clause does not establish a new ordering relation between KnowledgeCutoff and TargetTime; that remains outside this amendment set.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "DECISION-LOCK-DL-06",
+        "G2-DLR-0.1",
+        "G2-V0.6-EXTERNAL-AUDIT-REPAIR"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "Historical Completeness Precedes Empty Applicable-Basis Resolution",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001",
+          "EV-GOV-RM7R-VERIFIED-CLOSURE-G2-ID-200-001",
+          "EV-RP3-B5R4-RFEC07-HIST-EMPTY-COMPLETE",
+          "EV-RP3-B5R4-RFEC07-HIST-MISSING-EXACT",
+          "EV-RP3-B5R4-RFEC07-HIST-MISSING-POLICY",
+          "EV-RP3-B5R5-HIST-MISSING-CUT"
+        ],
+        "fixture_ids": [
+          "HIST-EMPTY-COMPLETE",
+          "RFEC03-WBR15",
+          "RFEC03-EMP10",
+          "RFEC03-EMP11",
+          "HIST-MISSING-EXACT",
+          "HIST-MISSING-POLICY",
+          "HIST-MISSING-CUT"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-HISTORICAL-PRECONDITION-RP4",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": "Candidate amendment traceability. Referenced Batch 4/5 fixtures and receipts are reserved identifiers only; they are not supplied evidence and cannot satisfy freeze evidence yet. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "INV-HIST-01",
+          "INV-HIST-02",
+          "INV-HIST-03"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [
+        "G2-ID-163",
+        "G2-ID-164"
+      ],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "RFEC",
+        "Policy",
+        "Eligibility"
+      ],
+      "clause_id": "G2-ID-201",
+      "depends_on": [
+        "G2-ID-163",
+        "G2-ID-164",
+        "G2-ID-168",
+        "G2-ID-171"
+      ],
+      "domain": "RFEC / Policy / Eligibility",
+      "normative_text": "When an exact PropagationPolicy resolves RequirementMode to RE_EVALUATION_REQUIRED, RequirementMode alone MUST NOT determine the RFEC top-level result. The evaluator MUST require a canonical evaluation-time CurrentBasisStateSnapshot for the affected BasisType. If that current-state input is missing, ambiguous, contradictory, or unresolvable, the result MUST be NOT_EVALUATED at the required-policy/input-completeness stage. If the current-state snapshot is present and valid, evaluation MUST proceed to within-BasisType reduction and reapply the same exact bound PropagationPolicy to the current state; the resulting normalized PropagationAction governs that BasisType and then participates in existing cross-Basis arbitration. Diagnostic fixture fields MUST NOT determine the normative result.",
+      "obligation_bearer": "RFEC-EVALUATOR",
+      "source_basis": [
+        "DECISION-LOCK-DL-08",
+        "G2-DLR-0.2",
+        "BATCH6_SEMANTIC_RECONCILIATION_v0_1"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "RE_EVALUATION_REQUIRED Completion Semantics",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001",
+          "EV-GOV-RM7R-VERIFIED-CLOSURE-G2-ID-201-001",
+          "EV-RP3-B5R5-REEVAL-DIAGNOSTIC-POLLUTION",
+          "EV-RP3-B5R5-REEVAL-MISSING-CURRENT",
+          "EV-RP3-B5R5-REEVAL-VALID-ALLOW",
+          "EV-RP3-B5R5-REEVAL-VALID-BLOCK"
+        ],
+        "fixture_ids": [
+          "RFEC03-PADM10",
+          "RFEC03-PADM11",
+          "RFEC03-PADM12",
+          "REEVAL-MISSING-CURRENT",
+          "REEVAL-VALID-ALLOW",
+          "REEVAL-VALID-BLOCK",
+          "REEVAL-DIAGNOSTIC-POLLUTION"
+        ],
+        "legacy_evidence_receipt_ids": [
+          "EV-SEM-RFEC03-PADM10-B6",
+          "EV-SEM-RFEC03-PADM11-B6",
+          "EV-SEM-RFEC03-PADM12-B6",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": "Receipts are reservation identifiers pending fresh packaged execution; not accepted as evidence until independently verified. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "INV-REEVAL-01",
+          "INV-REEVAL-02",
+          "INV-REEVAL-03"
+        ]
+      }
+    },
+    {
+      "amends_candidate_clauses": [],
+      "amends_frozen_clauses": [],
+      "applies_to": [
+        "Governance",
+        "ValidationProfile",
+        "Validator",
+        "RFEC"
+      ],
+      "clause_id": "G2-ID-202",
+      "depends_on": [
+        "G2-ID-180",
+        "G2-ID-187",
+        "G2-ID-182"
+      ],
+      "domain": "Governance / ValidationProfile",
+      "normative_text": "Every permission-critical ValidationProfile used for a required RFEC evaluation MUST be registered as a canonical ValidationProfile object with a unique typed identity consisting of object type, object id, version, and exact SHA-256. A ValidationProfile MUST NOT be treated as the historical identity of another profile merely because its semantic fields or digest are similar. A successor ValidationProfile MAY replace a predecessor only through an explicit authorization record that identifies exact predecessor and successor bytes, an applicable authority registered as a G2 obligation bearer, a deterministic semantic-comparison method, and an explicit scope migration. For execution authorization, the selected profile MUST bind exactly to the active registry revision, canonical input projection, execution fixture suite, policy catalog, semantic contract, and decision-lock register that will be consumed. Any identity, successor, or scope mismatch MUST fail closed and MUST NOT authorize execution.",
+      "obligation_bearer": "G2-REGISTRY-AUTHORITY",
+      "source_basis": [
+        "G2-V09-RM3A-CONTROLLED-REMEDIATION"
+      ],
+      "status": "CANDIDATE_NORMATIVE",
+      "title": "ValidationProfile Identity, Successor and Execution-Scope Binding",
+      "traceability_links": {
+        "evidence_receipt_ids": [
+          "EV-GOV-RM2B-EXECUTION-202-001",
+          "EV-GOV-RM7R-VERIFIED-G2-ID-202-001"
+        ],
+        "fixture_ids": [],
+        "governance_fixture_exemption": true,
+        "legacy_evidence_receipt_ids": [
+          "EV-GOV-V09-PROFILE-SUCCESSOR-001",
+          "EV-GOV-RM2B-EXECUTION-202-001"
+        ],
+        "notes": "Governance-only candidate clause; no runtime execution evidence generated in RM3A. RM7R canonical traceability refs replace ambiguous legacy receipt labels; legacy labels retained under legacy_evidence_receipt_ids.",
+        "semantic_invariant_ids": [
+          "V09-PROFILE-IDENTITY",
+          "V09-PROFILE-SUCCESSOR",
+          "V09-PROFILE-SCOPE"
+        ]
+      }
+    }
+  ],
+  "canonical_object_types": [
+    "ArbitrationPolicy",
+    "BasisChangeSet",
+    "NormativeRegistry",
+    "ParameterSet",
+    "Policy",
+    "PropagationPolicy",
+    "Reservation",
+    "ReservationFulfillmentBasisManifest",
+    "SemanticProfile",
+    "ValidationProfile"
+  ],
+  "clause_id_pattern": "^G2-ID-[0-9]{3}$",
+  "clause_registration_requirements": [
+    "clause_id",
+    "title",
+    "domain",
+    "status",
+    "normative_text",
+    "applies_to",
+    "amends_frozen_clauses",
+    "depends_on",
+    "source_basis",
+    "obligation_bearer",
+    "traceability_links"
+  ],
+  "digest_profiles": {
+    "cross_profile_reverification": "must use object-pinned historical profile; current profile must not reinterpret historical digest",
+    "current_candidate": {
+      "canonicalization_profile": "G2-CANON-2",
+      "profile_id": "G2-DIGEST-2",
+      "retention_required": true,
+      "used_for_objects_created_under": "G2-NORMATIVE-0.6-GOVFIX-0.1-CANDIDATE"
+    },
+    "historical": {
+      "canonicalization_profile": "G2-CANON-1",
+      "profile_id": "G2-DIGEST-1",
+      "retention_required": true,
+      "used_for_objects_created_under": "G2-NORMATIVE-0.4-FROZEN"
+    },
+    "object_profile_pinning_required": true
+  },
+  "digest_scopes": {
+    "ArbitrationPolicy": {
+      "declared": true,
+      "inherits": "Policy"
+    },
+    "BasisChangeSet": {
+      "declared_as_embedded": true,
+      "inherits_parent_scope": true
+    },
+    "ParameterSet": {
+      "declared": true,
+      "profiled_fields": [
+        "identity",
+        "revision",
+        "parameter_type",
+        "values",
+        "effective_interval",
+        "approval_ref"
+      ]
+    },
+    "Policy": {
+      "declared": true,
+      "profiled_fields": [
+        "identity",
+        "revision",
+        "policy_type",
+        "effective_interval",
+        "normative_rules",
+        "approval_ref"
+      ]
+    },
+    "PropagationPolicy": {
+      "declared": true,
+      "inherits": "Policy"
+    },
+    "Reservation": {
+      "declared": true,
+      "profiled_fields": [
+        "identity",
+        "revision",
+        "authorization_ref",
+        "basis_manifest_ref",
+        "reservation_state_ref",
+        "quantity_state_ref"
+      ]
+    },
+    "ReservationFulfillmentBasisManifest": {
+      "declared": true,
+      "profiled_fields": [
+        "reservation_ref",
+        "reservation_revision",
+        "authorization_revision",
+        "decision_revision",
+        "allocation_policy_revision",
+        "propagation_policy_revision",
+        "arbitration_policy_revision",
+        "schema_revision"
+      ]
+    },
+    "SemanticProfile": {
+      "declared": true,
+      "profiled_fields": [
+        "identity",
+        "revision",
+        "profile_type",
+        "semantic_rules",
+        "effective_interval",
+        "approval_ref"
+      ]
+    }
+  },
+  "evidence_receipt_contract": {
+    "artifact_hashes_must_be_recomputed_by_independent_verifier": true,
+    "independent_verification_required": true,
+    "receipt_digest_excludes_self_digest": true,
+    "required_fields": [
+      "receipt_id",
+      "subject_id",
+      "assertion_type",
+      "assertion",
+      "artifact_refs",
+      "source_hashes",
+      "verification_method",
+      "status",
+      "created_by",
+      "independent_verification_required"
+    ],
+    "schema": "EV-GOV-2.0",
+    "self_check_is_not_evidence": true,
+    "status_after_external_verification": "VERIFIED_INDEPENDENTLY",
+    "status_before_external_verification": "READY_FOR_INDEPENDENT_VERIFICATION"
+  },
+  "execution_context_inheritance": {
+    "execution_registry_id": "G2-NORMATIVE-0.9-RM3A-CANDIDATE",
+    "execution_registry_sha256": "60216f2215c27bbe513f4eae62a295e9f178da66ff022fefd6a228ae89ddf3b9",
+    "profile_execution_scope_authority": "PROFILE_EXECUTION_SCOPE_BINDING_v0_2.json",
+    "profile_execution_scope_sha256": "02ca94c064b3f939409c931e4a7ddec995e98c32a54ca52dc1f74a579305ed80",
+    "retroactive_rebind": false,
+    "rm5_child_is_traceability_only": true
+  },
+  "final_freeze_authority": {
+    "approval_authority": "G2-NORMATIVE-OWNER",
+    "approval_record_id": "G2-RM7R-FREEZE-APPROVAL-0.1",
+    "approval_status": "PENDING_EXPLICIT_OWNER_APPROVAL",
+    "freeze_event_id": null
+  },
+  "freeze_gate": "READY_FOR_EXPLICIT_OWNER_APPROVAL",
+  "freeze_rule": "This candidate is not frozen. Freeze requires independent verification, explicit owner approval, trusted event ordering, and exact final-byte hash binding.",
+  "fresh_execution_evidence_binding": {
+    "execution_context": {
+      "dlr_sha256": "6b147d60fcf7cbe6b887b22f4ded6895ba6913a197cd01ac8b8b24282ef38ae7",
+      "execution_universe": 202,
+      "executor_sha256": "ef7a6d33a2c97c15e4cfe23276cc3fffd94d87f581081097be3486f56361eb5c",
+      "policy_catalog_sha256": "bfdf516e6b83c4e8393b31500098ed96fccde6ced5bd6f2469509769e5a1d6e5",
+      "profile_sha256": "728597e81e5bcdc8388b4d7fe35da915516e895536d51b6ce5866e7334ed91a8",
+      "projection_sha256": "0e5752de5b7644efdc7399d2d9b5dddab476d4b167917b7ed22e35ca4eb434be",
+      "registry_id": "G2-NORMATIVE-0.9-RM3A-CANDIDATE",
+      "registry_sha256": "60216f2215c27bbe513f4eae62a295e9f178da66ff022fefd6a228ae89ddf3b9",
+      "semantic_contract_sha256": "9d096d5f4c9c01d429eaa53e5be753686136cd41ebcdd4eb35aca081c071c898",
+      "suite_sha256": "766e6e20164e6d2280bc1b559acefb7b4dbea6b15f499440ec70feefece72edc"
+    },
+    "independent_verification_id": "RM4-INDEPENDENT-VERIFICATION-202-001",
+    "independent_verification_sha256": "5dd6cb7389b5db231e1a31923ca39851c28cf9a9e2941055e978ed05635eddfa",
+    "receipt_id": "EV-GOV-RM2B-EXECUTION-202-001",
+    "receipt_sha256": "8d3d94af3fc3a0bfb90c7a9f10cf399c51b16bd22074855612f3b5e150d61854",
+    "traceability_rule": "Evidence is inherited into RM5 traceability only; execution bytes and execution scope remain bound to RM3A registry context and are not retroactively reauthored.",
+    "verification_scope": {
+      "commit_eligible": {
+        "match": 202,
+        "total": 202
+      },
+      "reason_vs_expected": {
+        "match": 102,
+        "total": 202
+      },
+      "side_effect": {
+        "match": 202,
+        "total": 202
+      },
+      "stage_vs_expected": {
+        "match": 123,
+        "total": 202
+      },
+      "top_level_result": {
+        "match": 202,
+        "total": 202
+      }
+    }
+  },
+  "frozen_lineage_policy": {
+    "amendment_relation_field": "amends_frozen_clauses",
+    "amendment_requires_new_clause_id": true,
+    "candidate_reuse_same_id_prohibited": true,
+    "frozen_clause_body_reuse": "verbatim historical reference only",
+    "frozen_parent_immutable": true,
+    "multi_amendment_rule": "G2-ID-189"
+  },
+  "governance_input_artifacts": {
+    "batch6_reconciliation": {
+      "path": "00_CONTROL/SOURCE_MATERIAL/BATCH6_SEMANTIC_RECONCILIATION_v0_1.md",
+      "sha256": "fc6f303e03827c33e2211c31f5f71f2416546c84adb4fa81abe7e9646fed9add"
+    },
+    "decision_lock_register": {
+      "id": "G2-DLR-0.3-RM3A",
+      "sha256": "6b147d60fcf7cbe6b887b22f4ded6895ba6913a197cd01ac8b8b24282ef38ae7",
+      "status": "REPAIR_DESIGN_LOCKED_FOR_RM3A"
+    },
+    "execution_authorization": {
+      "id": "G2-RM3C-PROFILE-EXEC-AUTH-003",
+      "sha256": "4883d7db79ab5e4e3bdae67a8d07792cc052e18222da3d409666e9436f1bd477",
+      "status": "APPROVED_OWNER_ATTESTED_NOT_EXTERNALLY_IDENTITY_VERIFIED"
+    },
+    "n06_adjudication_record": {
+      "path": "01_NORMATIVE/N06_ADJUDICATION_RECORD_v0_2.json"
+    },
+    "profile_scope_binding": {
+      "artifact": "PROFILE_EXECUTION_SCOPE_BINDING_v0_2.json",
+      "sha256": "02ca94c064b3f939409c931e4a7ddec995e98c32a54ca52dc1f74a579305ed80"
+    },
+    "profile_successor_authorization": {
+      "id": "G2-RM3A-PROFILE-SUCCESSOR-003",
+      "sha256": "db9791bfd25ad69031b544db6c5ef506a196b7c498b10d83c6c9e919985f2830",
+      "status": "APPROVED_OWNER_ATTESTED_NOT_EXTERNALLY_IDENTITY_VERIFIED"
+    },
+    "rm2b_execution_receipt": {
+      "id": "EV-GOV-RM2B-EXECUTION-202-001",
+      "sha256": "8d3d94af3fc3a0bfb90c7a9f10cf399c51b16bd22074855612f3b5e150d61854",
+      "status": "VERIFIED_INDEPENDENTLY"
+    },
+    "rm4_independent_verification": {
+      "id": "RM4-INDEPENDENT-VERIFICATION-202-001",
+      "sha256": "5dd6cb7389b5db231e1a31923ca39851c28cf9a9e2941055e978ed05635eddfa",
+      "status": "VERIFIED_INDEPENDENTLY"
+    },
+    "rm7r_parent_rm5_sha256": "5138e267900765ccb41841dc21694621f14b5d7c54d22cf297decefc5633c5da",
+    "validation_profile": {
+      "id": "RFEC-VALIDATION-PROFILE-RP3-R1@3",
+      "sha256": "728597e81e5bcdc8388b4d7fe35da915516e895536d51b6ce5866e7334ed91a8",
+      "version": "3"
+    },
+    "rm7r_governance_receipt_verification": {
+      "id": "RM7R_INDEPENDENT_GOVERNANCE_RECEIPT_VERIFICATION-v0.3",
+      "sha256": "7e24283b0b86f65d5d255fa7341ee3b3237439bf5ae14d65d86e60c41cb71d06",
+      "status": "PASS"
+    }
+  },
+  "governance_repair_delta": {
+    "execution_context_retroactively_rebound": false,
+    "execution_registry_context_sha256": "60216f2215c27bbe513f4eae62a295e9f178da66ff022fefd6a228ae89ddf3b9",
+    "expected_values_changed": false,
+    "fresh_execution_evidence_rebound": true,
+    "fresh_execution_receipt_id": "EV-GOV-RM2B-EXECUTION-202-001",
+    "fresh_independent_verification_id": "RM4-INDEPENDENT-VERIFICATION-202-001",
+    "normative_text_changed": false,
+    "parent_registry_immutable": true,
+    "revision_type": "SCHEMA_MIGRATION_METADATA_ONLY",
+    "semantic_rules_changed": false,
+    "traceability_carrier_is_this_revision": true,
+    "unresolved_fixture_ids_not_promoted": true,
+    "schema_migration_metadata_only": true,
+    "schema_migration_target": "F-03"
+  },
+  "inherited_frozen_clauses": {
+    "clause_count": 157,
+    "mutation": "NONE",
+    "registry_ref": "G2-NORMATIVE-0.4-FROZEN",
+    "sha256": "5399f216ebb96709876bf9a9ddd94c6d20ab809243290503df6ace35da4d61d8"
+  },
+  "non_normative_sources": [
+    "RFEC test fixtures",
+    "RFEC test policy catalogs",
+    "reference implementations",
+    "audit reports"
+  ],
+  "normative_authority": "G2-CLAUSE-REGISTRY",
+  "normative_carrier_policy": {
+    "authoritative_artifact": "G2_NORMATIVE_0_9_RM7R_TR02B_F03FIX_CANDIDATE.json",
+    "candidate_until_explicit_freeze_approval": true,
+    "single_carrier": true
+  },
+  "normative_encoding_source": {
+    "semantic_contract_id": "RFEC-SEMANTIC-0.3.1",
+    "semantic_contract_sha256": "9d096d5f4c9c01d429eaa53e5be753686136cd41ebcdd4eb35aca081c071c898"
+  },
+  "normative_repair_status": {
+    "N-06": "ACCEPTED_FOR_CANDIDATE",
+    "N-07": "ACCEPTED_FOR_CANDIDATE",
+    "N-08": "ACCEPTED_FOR_CANDIDATE",
+    "N-17": "ACCEPTED_FOR_CANDIDATE",
+    "N-18": "ACCEPTED_FOR_CANDIDATE"
+  },
+  "normative_text_changes": {
+    "N-06": "G2-ID-202 explicitly partitions G2-ID-196 vs G2-ID-201 by RequirementMode; contradictory CURRENT_REQUIRED -> REJECT, contradictory RE_EVALUATION_REQUIRED current input -> NOT_EVALUATED.",
+    "N-07": "Typed profile identity is exact and cross-type digest collision is prohibited.",
+    "N-08": "Profile successor requires explicit authorization, semantic comparison and exact scope.",
+    "N-17": "Schema deltas require an authorized migration record.",
+    "N-18": "Frozen authoritative state must be internally FROZEN-consistent."
+  },
+  "obligation_bearers": [
+    "G2-REGISTRY-AUTHORITY",
+    "RFEC-SEMANTIC-OWNER",
+    "RFEC-EVALUATOR",
+    "RFEC-POLICY-GOVERNOR",
+    "RFEC-CONCURRENCY-GATE",
+    "RFEC-REPLAY-GATE",
+    "RESERVATION-ALLOCATION-OWNER",
+    "AUTH006-REPLACEMENT-OWNER",
+    "DIGEST-GOVERNOR",
+    "VALIDATOR-GOVERNOR",
+    "GOVERNANCE-EVIDENCE-VERIFIER",
+    "G2-EVIDENCE-VERIFIER"
+  ],
+  "observability_contract": {
+    "current_status": "NON_NORMATIVE",
+    "normative_output_requires_profile": "RFEC-STAGE-OUTPUT-1",
+    "stage_labels": "INTERNAL_DIAGNOSTIC_BY_DEFAULT"
+  },
+  "parent_registry_sha256": "984cbab1635aeeca9e8577d7f37f0f5b8e6ea8bf2bd9ebabbd4048a3b907fd3d",
+  "parent_registry_version": "G2-NORMATIVE-0.9-RM7R-TR02B-MIGFIX02-CANDIDATE",
+  "policy_selection_contract": {
+    "latest_policy_fallback_prohibited": true,
+    "missing_or_ambiguous": "NOT_EVALUATED",
+    "required_bindings": [
+      "BasisType",
+      "EffectClass",
+      "PolicyRevision",
+      "EffectiveInterval",
+      "SemanticProfileRevision"
+    ],
+    "selection_authority": "RFEC-POLICY-GOVERNOR",
+    "semantic_profile_must_be_registered_canonical_object": true
+  },
+  "registry_id": "G2-NORMATIVE-0.9-RM7R-TR02B-F03FIX-CANDIDATE",
+  "registry_identity": {
+    "parent_registry_id": "G2-NORMATIVE-0.9-RM7R-TR02B-MIGFIX02-CANDIDATE",
+    "parent_registry_sha256": "984cbab1635aeeca9e8577d7f37f0f5b8e6ea8bf2bd9ebabbd4048a3b907fd3d",
+    "registry_id": "G2-NORMATIVE-0.9-RM7R-TR02B-F03FIX-CANDIDATE",
+    "revision": "F03FIX-1",
+    "self_hash_embedded": false,
+    "status": "CANDIDATE_NOT_FROZEN"
+  },
+  "registry_schema": {
+    "compatibility": "NON_TRANSPARENT; candidate clause relationship binding and decision-lock artifact binding introduced",
+    "migrated_fields": {
+      "candidate_clauses[*].amends_candidate_clauses": {
+        "current_type": "array<string>",
+        "default_parent_value": [],
+        "mapping_kind": "ADDITIVE_OPTIONAL_FIELD",
+        "parent_type": "ABSENT",
+        "purpose": "explicit candidate-to-candidate amendment/supersession lineage"
+      },
+      "governance_input_artifacts.decision_lock_register": {
+        "current_type": "object",
+        "mapping_kind": "ADDITIVE_REFERENCE",
+        "parent_type": "ABSENT",
+        "purpose": "exact semantic decision-lock provenance binding"
+      },
+      "carrier_level_migration_record": {
+        "migration_id": "G2-MIG-004-RM5-TO-RM7R-CARRIER-METADATA",
+        "migration_type": "EXPLICIT_CARRIER_METADATA_EVOLUTION",
+        "migration_scope": "G2-NORMATIVE-0.9-RM5-GOVERNANCE-CANDIDATE -> G2-NORMATIVE-0.9-RM7R-FREEZE-CANDIDATE",
+        "historical_transition_recorded_in": "G2-NORMATIVE-0.9-RM7R-TR02B-MIGFIX02-CANDIDATE",
+        "historical_source_parent": {
+          "registry_id": "G2-NORMATIVE-0.9-RM5-GOVERNANCE-CANDIDATE",
+          "sha256": "5138e267900765ccb41841dc21694621f14b5d7c54d22cf297decefc5633c5da"
+        },
+        "historical_target_registry": {
+          "registry_id": "G2-NORMATIVE-0.9-RM7R-FREEZE-CANDIDATE",
+          "sha256": "6ed411eb189ed64a7b9b8c01fa45d3cf333296162c9876384bdd688c14739f15"
+        },
+        "parent_schema": {
+          "schema_id": "G2-REGISTRY-SCHEMA",
+          "schema_version": "2.2"
+        },
+        "current_schema": {
+          "schema_id": "G2-REGISTRY-SCHEMA",
+          "schema_version": "2.2"
+        },
+        "compatibility": "NON_TRANSPARENT; explicit carrier-level metadata evolution is recorded without changing the RFEC semantic contract or normative clause bodies.",
+        "mapping_rule": "Every top-level field added between RM5 and RM7R is explicitly listed, and every top-level field whose nested structure or semantic shape changed is explicitly covered by a mapping that identifies the affected subpaths. validation_profile evolution is explicitly mapped, including preserved, replaced, added, and removed members. No unlisted parent-field or nested shape mutation is permitted by this record.",
+        "field_mappings": {
+          "execution_context_inheritance": {
+            "parent_type": "ABSENT",
+            "current_type": "object",
+            "mapping_kind": "ADDITIVE_TOP_LEVEL_FIELD",
+            "source_parent_value_preserved_verbatim": false,
+            "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT"
+          },
+          "final_freeze_authority": {
+            "parent_type": "ABSENT",
+            "current_type": "object",
+            "mapping_kind": "ADDITIVE_TOP_LEVEL_FIELD",
+            "source_parent_value_preserved_verbatim": false,
+            "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT"
+          },
+          "registry_identity": {
+            "parent_type": "ABSENT",
+            "current_type": "object",
+            "mapping_kind": "ADDITIVE_TOP_LEVEL_FIELD",
+            "source_parent_value_preserved_verbatim": false,
+            "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT"
+          },
+          "traceability_closure": {
+            "parent_type": "ABSENT",
+            "current_type": "object",
+            "mapping_kind": "ADDITIVE_TOP_LEVEL_FIELD",
+            "source_parent_value_preserved_verbatim": false,
+            "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT"
+          },
+          "traceability_resolution_register": {
+            "parent_type": "ABSENT",
+            "current_type": "object",
+            "mapping_kind": "ADDITIVE_TOP_LEVEL_FIELD",
+            "source_parent_value_preserved_verbatim": false,
+            "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT"
+          },
+          "validation_profile": {
+            "parent_type": "object",
+            "current_type": "object",
+            "mapping_kind": "RESHAPED_EXPLICIT_PROFILE_IDENTITY_EVOLUTION",
+            "source_parent_value_preserved_verbatim": false,
+            "preserved_parent_subpaths": {
+              "not_evaluated_is_not_validated_as_pass": true,
+              "rfec_required": true
+            },
+            "replaced_parent_values": {
+              "required_profile_id": {
+                "parent": "RFEC-VALIDATION-PROFILE-RP3-R1@2",
+                "current": "RFEC-VALIDATION-PROFILE-RP3-R1@3",
+                "current_sha256": "728597e81e5bcdc8388b4d7fe35da915516e895536d51b6ce5866e7334ed91a8"
+              }
+            },
+            "removed_parent_subpaths_preserved_in_record": {
+              "missing_required_prerequisite": "top-level INVALID through G2 validator semantics"
+            },
+            "added_current_subpaths": [
+              "identity_resolution",
+              "required_profile_sha256",
+              "scope_binding_artifact",
+              "scope_binding_sha256",
+              "successor_authorization_id",
+              "successor_authorization_sha256"
+            ],
+            "semantic_note": "The profile identity/scope transition is recorded as an explicit metadata evolution. This record does not change the profile value in the source or add new RFEC semantics."
+          },
+          "candidate_clauses[*].traceability_links": {
+            "parent_type": "object",
+            "current_type": "object",
+            "mapping_kind": "RESHAPED_NESTED_TRACEABILITY_METADATA",
+            "source_parent_value_preserved_verbatim": false,
+            "affected_subpaths": {
+              "candidate_clauses[*].traceability_links.legacy_evidence_receipt_ids": {
+                "parent_type": "ABSENT",
+                "current_type": "array<string>",
+                "mapping_kind": "ADDITIVE_NESTED_FIELD",
+                "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT",
+                "parent_evidence_receipt_ids_preserved_verbatim_in_current_legacy_field": true,
+                "applies_to_candidate_clause_count": 45
+              },
+              "candidate_clauses[*].traceability_links.evidence_receipt_ids": {
+                "parent_type": "array<string>",
+                "current_type": "array<string>",
+                "mapping_kind": "CANONICAL_REFERENCE_VALUE_REPLACEMENT_WITH_LEGACY_PRESERVATION",
+                "array_cardinality_change_is_data_not_schema": true,
+                "parent_values_preserved_verbatim_in_legacy_evidence_receipt_ids": true,
+                "applies_to_candidate_clause_count": 45
+              }
+            },
+            "unchanged_subpaths_preserved_verbatim": [
+              "candidate_clauses[*].traceability_links.fixture_ids",
+              "candidate_clauses[*].traceability_links.semantic_invariant_ids",
+              "candidate_clauses[*].normative_text"
+            ],
+            "semantic_note": "RM7R canonicalizes evidence receipt references while retaining every RM5 evidence_receipt_ids array verbatim under legacy_evidence_receipt_ids. The normative_text bodies are unchanged."
+          },
+          "governance_input_artifacts": {
+            "parent_type": "object",
+            "current_type": "object",
+            "mapping_kind": "RESHAPED_NESTED_GOVERNANCE_ARTIFACT_BINDINGS",
+            "source_parent_value_preserved_verbatim": false,
+            "affected_subpaths": {
+              "governance_input_artifacts.execution_authorization": {
+                "parent_type": "ABSENT",
+                "current_type": "object",
+                "mapping_kind": "ADDITIVE_NESTED_FIELD",
+                "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT"
+              },
+              "governance_input_artifacts.profile_scope_binding": {
+                "parent_type": "ABSENT",
+                "current_type": "object",
+                "mapping_kind": "ADDITIVE_NESTED_FIELD",
+                "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT"
+              },
+              "governance_input_artifacts.profile_successor_authorization": {
+                "parent_type": "ABSENT",
+                "current_type": "object",
+                "mapping_kind": "ADDITIVE_NESTED_FIELD",
+                "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT"
+              },
+              "governance_input_artifacts.rm7r_governance_receipt_verification": {
+                "parent_type": "ABSENT",
+                "current_type": "object",
+                "mapping_kind": "ADDITIVE_NESTED_FIELD",
+                "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT"
+              },
+              "governance_input_artifacts.rm7r_parent_rm5_sha256": {
+                "parent_type": "ABSENT",
+                "current_type": "string",
+                "mapping_kind": "ADDITIVE_NESTED_FIELD",
+                "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT"
+              },
+              "governance_input_artifacts.validation_profile": {
+                "parent_type": "ABSENT",
+                "current_type": "object",
+                "mapping_kind": "ADDITIVE_NESTED_FIELD",
+                "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT"
+              },
+              "governance_input_artifacts.decision_lock_register.status": {
+                "parent_type": "ABSENT",
+                "current_type": "string",
+                "mapping_kind": "ADDITIVE_NESTED_FIELD",
+                "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT"
+              },
+              "governance_input_artifacts.decision_lock_register.id": {
+                "parent_type": "string",
+                "current_type": "string",
+                "mapping_kind": "REFERENCE_ID_REPLACEMENT",
+                "parent_value_preserved_in_record": true,
+                "parent_value": "G2-DLR-0.2",
+                "current_value": "G2-DLR-0.3-RM3A"
+              },
+              "governance_input_artifacts.decision_lock_register.sha256": {
+                "parent_type": "string",
+                "current_type": "string",
+                "mapping_kind": "REFERENCE_HASH_REPLACEMENT",
+                "parent_value_preserved_in_record": true,
+                "parent_value": "c739fff9866a87e34306e6bd481026666548ccbbd9db8118fbdd03426c2953a0",
+                "current_value": "6b147d60fcf7cbe6b887b22f4ded6895ba6913a197cd01ac8b8b24282ef38ae7"
+              }
+            },
+            "unchanged_existing_artifact_entries_preserved_verbatim": [
+              "batch6_reconciliation",
+              "n06_adjudication_record",
+              "rm2b_execution_receipt",
+              "rm4_independent_verification"
+            ],
+            "semantic_note": "RM7R adds new governance authorization/profile/receipt bindings and enriches decision_lock_register status while replacing its reference identity. Existing non-target artifact entries remain verbatim."
+          }
+        },
+        "parent_value_preservation": {
+          "unchanged_parent_fields_must_remain_verbatim": true,
+          "non_destructive_added_fields_have_no_parent_value": true,
+          "added_nested_fields_have_no_parent_value": true,
+          "candidate_clause_parent_evidence_receipt_ids_preserved_verbatim_in_legacy_field": true,
+          "decision_lock_register_replaced_parent_values_preserved_in_migration_record": true,
+          "validation_profile_removed_value_preserved_in_migration_record": true
+        },
+        "unlisted_top_level_field_changes_permitted": false,
+        "retroactive_parent_mutation": false,
+        "execution_context_retroactive_rebind": false,
+        "expected_values_changed": false,
+        "normative_clause_bodies_changed": false,
+        "semantic_contract_changed": false,
+        "purpose": "Close F-04 by documenting the actual RM5 -> RM7R carrier-level schema/metadata evolution inside the successor candidate lineage without mutating RM5 or RM7R."
+      },
+      "lineage_reconciliation_record": {
+        "current_type": "object",
+        "mapping_kind": "ADDITIVE_TOP_LEVEL_FIELD",
+        "parent_type": "ABSENT",
+        "purpose": "Deterministically reconcile the inherited RM7R ancestor parent conflict for active lineage without mutating historical RM7R bytes.",
+        "source_parent_value_preserved_verbatim": false,
+        "parent_value_status": "NOT_APPLICABLE_PARENT_ABSENT",
+        "migration_id": "G2-MIG-005-F03-ANCESTOR-LINEAGE-RECONCILIATION",
+        "migration_type": "EXPLICIT_LINEAGE_METADATA_EVOLUTION",
+        "compatibility": "NON_DESTRUCTIVE_METADATA_ADDITION",
+        "field_mapping_scope": "F-03-RM7R-ANCESTOR-PARENT-CONFLICT",
+        "retroactive_parent_mutation": false
+      }
+    },
+    "migration_id": "G2-MIG-003-CANDIDATE-AMENDMENT-RELATION",
+    "migration_required": true,
+    "migration_type": "EXPLICIT_NESTED_SCHEMA_EVOLUTION",
+    "parent_schema": {
+      "schema_id": "G2-REGISTRY-SCHEMA",
+      "schema_version": "2.1"
+    },
+    "schema_id": "G2-REGISTRY-SCHEMA",
+    "schema_status": "CANDIDATE",
+    "schema_version": "2.2"
+  },
+  "registry_version": "0.9-RM7R-TR02B-F03FIX-1",
+  "rm5_traceability_policy": {
+    "behavioral_rule": "Fresh receipt may be added to evidence_receipt_ids only when at least one declared fixture is actually present in the 202 suite; full fixture sets receive EXACT_RESULT coverage, partial sets remain PARTIAL_RESULT coverage.",
+    "binding_mode": "INHERITED_VERIFIED_EXECUTION_EVIDENCE",
+    "current_traceability_registry_id": "G2-NORMATIVE-0.9-RM5-GOVERNANCE-CANDIDATE",
+    "fresh_receipt_id": "EV-GOV-RM2B-EXECUTION-202-001",
+    "fresh_verification_id": "RM4-INDEPENDENT-VERIFICATION-202-001",
+    "governance_rule": "Governance-only clauses require their own governance evidence. The execution receipt is supplementary only for G2-ID-191, G2-ID-193 and G2-ID-202.",
+    "historical_rule": "No historical Batch5 artifact is reauthenticated.",
+    "reserved_cases_rule": "Missing/reserved case IDs in G2-ID-195..201 remain explicitly unresolved and are never promoted to exact execution evidence.",
+    "source_execution_registry_id": "G2-NORMATIVE-0.9-RM3A-CANDIDATE",
+    "source_execution_registry_sha256": "60216f2215c27bbe513f4eae62a295e9f178da66ff022fefd6a228ae89ddf3b9",
+    "stage_reason_rule": "The RM5 rebuild does not upgrade clause evidence to stage/reason exactness where executor output differs from fixture expected stage/reason. Such dimensions remain open."
+  },
+  "schema_migration_contract": {
+    "must_preserve_parent_value_verbatim_for_shape_changes": true,
+    "required_fields": [
+      "schema_id",
+      "schema_version",
+      "parent_schema_version",
+      "migration_id",
+      "migration_type",
+      "compatibility",
+      "migrated_fields"
+    ],
+    "silent_shape_change_prohibited": true,
+    "top_level_schema_change_requires_explicit_migration": true,
+    "unknown_migration_id_blocks_freeze": true
+  },
+  "semantic_contract_immutable_binding": {
+    "change_allowed": false,
+    "id": "RFEC-SEMANTIC-0.3.1",
+    "sha256": "9d096d5f4c9c01d429eaa53e5be753686136cd41ebcdd4eb35aca081c071c898"
+  },
+  "semantic_profile_bindings": {
+    "RFEC-SEMANTIC-PROFILE-RP3@1": {
+      "approval_ref": "GOV-APPROVAL-RP3-SEMANTIC-PROFILE-001",
+      "digest": "f729c793721aab53f91681ddd3e2fade0999a24d35606c8d91e36bd182a05d0d",
+      "object_file": "SemanticProfile_RP3_1.json",
+      "object_type": "SemanticProfile"
+    }
+  },
+  "semantic_review_resolutions": {
+    "inherited_summary": "Historical v0.6 candidate statement preserved; no frozen review records deleted.",
+    "new_governance_resolutions": [
+      "GOV-09 amendment composition",
+      "GOV-10 stage observability",
+      "GOV-11 evidence receipt closure",
+      "GOV-12 governance coverage",
+      "GOV-13 SemanticProfile governance",
+      "GOV-14 registry schema migration",
+      "V0.7 DL-01 ADJUST numeric domain",
+      "V0.7 DL-02 CURRENT_REQUIRED",
+      "V0.7 DL-03 policy dual-source",
+      "V0.7 DL-04 historical policy dual-source",
+      "V0.7 DL-05 applicability-set identity",
+      "V0.7 DL-06 historical prerequisite ordering",
+      "V0.8 DL-08 RE_EVALUATION_REQUIRED completion semantics"
+    ],
+    "repair_rule": "V0.8 adds only the explicitly locked DL-08 completion semantics; no prior expected value is changed.",
+    "source_parent_value_verbatim": "Inherited v0.4 resolutions remain historical; v0.6 adds new candidate resolutions only; no deletion of frozen records."
+  },
+  "single_normative_carrier": true,
+  "status": "CANDIDATE",
+  "supersession_rule": "A successor registry becomes normative only through explicit authorization and freeze; predecessor identity and sha256 must be exact.",
+  "traceability_closure": {
+    "b5r4_receipt_index_sha256": "cb92ee7dd116733a06e954b71ee180a0bccae76573f2a361ef7f1d54c9b013fa",
+    "b5r5_dedicated_receipt_index_sha256": "86775ca63a67a457d027155e06bc4b46376c78791d103eeceed1364ded218aa1",
+    "dedicated_b5r5_exact_count": 10,
+    "method": "Rebuild every traceability declaration from the current final carrier only. Never convert ALIAS, RELATED, or legacy references into EXACT. A fixture is EXACT only when the declared fixture_id exists in the current 202-fixture suite. A receipt is EXACT only when its exact bytes are present in the active evidence set and the hash is recomputable. Governance invariant references remain unverifiable when no canonical invariant registry is supplied.",
+    "resolved_declared_fixture_count": 265,
+    "semantic_equivalence_basis": "45-clause semantic core is unchanged from RM5; affected inherited clauses also unchanged against G2-NORMATIVE-0.8-FROZEN where source evidence originated.",
+    "source_crosswalk_sha256": "5ccc89f961ee769a292ef798c28a2c73b3d82642d8f258c124f13b588a685788",
+    "status": "REBUILT_NOT_CLOSED",
+    "unresolved_declared_fixture_count": 38
+  },
+  "traceability_contract": {
+    "evidence_receipt_must_be_independently_verifiable": true,
+    "evidence_receipt_schema": "EV-GOV-2.0",
+    "fixture_requirement": "RFEC behavioral clauses MUST have >=1 executable fixture; governance-only clauses MAY have 0 fixtures only when governance_fixture_exemption is explicit.",
+    "governance_clause_evidence_allowed_without_fixture": true,
+    "governance_clause_evidence_required": true,
+    "placeholder_text_prohibited": true,
+    "required_per_normative_clause": [
+      "semantic_invariant_ids",
+      "evidence_receipt_ids"
+    ],
+    "stable_case_ids_required": true
+  },
+  "traceability_resolution_register": {
+    "artifact": "TR02_CANONICAL_TRACEABILITY_RESOLUTION_v0_1.json",
+    "canonical_active_receipt_count": 61,
+    "legacy_ref_unique_count": 172,
+    "sha256": "ccb493594b7163d01b1827f1fa2e0a0e7abd5da2511e61235227b624466e7ffa"
+  },
+  "validation_profile": {
+    "identity_resolution": "EXPLICIT_SUCCESSOR_BINDING_V2_TO_V3",
+    "not_evaluated_is_not_validated_as_pass": true,
+    "required_profile_id": "RFEC-VALIDATION-PROFILE-RP3-R1@3",
+    "required_profile_sha256": "728597e81e5bcdc8388b4d7fe35da915516e895536d51b6ce5866e7334ed91a8",
+    "rfec_required": true,
+    "scope_binding_artifact": "PROFILE_EXECUTION_SCOPE_BINDING_v0_2.json",
+    "scope_binding_sha256": "02ca94c064b3f939409c931e4a7ddec995e98c32a54ca52dc1f74a579305ed80",
+    "successor_authorization_id": "G2-RM3A-PROFILE-SUCCESSOR-003",
+    "successor_authorization_sha256": "db9791bfd25ad69031b544db6c5ef506a196b7c498b10d83c6c9e919985f2830"
+  },
+  "value_domains": {
+    "OperationEffectClass": {
+      "closed": true,
+      "source": "G2-ID-158",
+      "values": [
+        "CONSUME",
+        "RELEASE",
+        "VOID",
+        "ADJUST_DOWN",
+        "ADJUST_UP"
+      ]
+    },
+    "RFECResult": {
+      "closed": true,
+      "source": "G2-ID-167",
+      "values": [
+        "ALLOW",
+        "BLOCK",
+        "REJECT",
+        "RE_EVALUATE",
+        "NOT_EVALUATED"
+      ]
+    },
+    "SemanticClass": {
+      "closed": true,
+      "source": "G2-ID-163",
+      "unknown_value_handling": "REJECT_OR_NOT_EVALUATED_BY_POLICY_CONTEXT; never silently invent",
+      "values": [
+        "REVISIONAL_NON_RETROACTIVE",
+        "CURRENT_BASIS_STALE",
+        "RETROACTIVE_PROHIBITION",
+        "POTENTIAL_DEFECT_REEVALUATION"
+      ]
+    }
+  },
+  "lineage_reconciliation_record": {
+    "record_type": "F03_ANCESTOR_LINEAGE_RECONCILIATION",
+    "version": "0.1",
+    "status": "RESOLVED_FOR_ACTIVE_LINEAGE",
+    "scope": "RM7R_ANCESTOR_PARENT_CONFLICT_ONLY",
+    "historical_target": {
+      "registry_id": "G2-NORMATIVE-0.9-RM7R-FREEZE-CANDIDATE",
+      "registry_version": "0.9-RM7R-1",
+      "sha256": "6ed411eb189ed64a7b9b8c01fa45d3cf333296162c9876384bdd688c14739f15",
+      "immutable_historical_bytes": true
+    },
+    "observed_conflict": {
+      "top_level_parent": {
+        "field": "parent_registry_version",
+        "id": "G2-NORMATIVE-0.9-RM3A-CANDIDATE",
+        "sha256": "60216f2215c27bbe513f4eae62a295e9f178da66ff022fefd6a228ae89ddf3b9"
+      },
+      "registry_identity_parent": {
+        "field": "registry_identity.parent_registry_id",
+        "id": "G2-NORMATIVE-0.9-RM5-GOVERNANCE-CANDIDATE",
+        "sha256": "5138e267900765ccb41841dc21694621f14b5d7c54d22cf297decefc5633c5da"
+      },
+      "conflict": true
+    },
+    "canonical_lineage_resolution": {
+      "rm7r_immediate_parent_id": "G2-NORMATIVE-0.9-RM5-GOVERNANCE-CANDIDATE",
+      "rm7r_immediate_parent_sha256": "5138e267900765ccb41841dc21694621f14b5d7c54d22cf297decefc5633c5da",
+      "selected_evidence_sources": [
+        "RM7R.registry_identity.parent_registry_id",
+        "RM7R.registry_identity.parent_registry_sha256",
+        "RM7R.governance_input_artifacts.rm7r_parent_rm5_sha256",
+        "MIGFIX02.registry_schema.migrated_fields.carrier_level_migration_record"
+      ],
+      "supporting_migration_id": "G2-MIG-004-RM5-TO-RM7R-CARRIER-METADATA",
+      "resolved_chain": [
+        {
+          "id": "G2-NORMATIVE-0.9-RM3A-CANDIDATE",
+          "sha256": "60216f2215c27bbe513f4eae62a295e9f178da66ff022fefd6a228ae89ddf3b9",
+          "role": "RM7R_GRANDPARENT"
+        },
+        {
+          "id": "G2-NORMATIVE-0.9-RM5-GOVERNANCE-CANDIDATE",
+          "sha256": "5138e267900765ccb41841dc21694621f14b5d7c54d22cf297decefc5633c5da",
+          "role": "RM7R_IMMEDIATE_PARENT"
+        },
+        {
+          "id": "G2-NORMATIVE-0.9-RM7R-FREEZE-CANDIDATE",
+          "sha256": "6ed411eb189ed64a7b9b8c01fa45d3cf333296162c9876384bdd688c14739f15",
+          "role": "HISTORICAL_TARGET"
+        },
+        {
+          "id": "G2-NORMATIVE-0.9-RM7R-TR02B-MIGFIX02-CANDIDATE",
+          "sha256": "984cbab1635aeeca9e8577d7f37f0f5b8e6ea8bf2bd9ebabbd4048a3b907fd3d",
+          "role": "CURRENT_DIRECT_PARENT"
+        },
+        {
+          "id": "G2-NORMATIVE-0.9-RM7R-TR02B-F03FIX-CANDIDATE",
+          "sha256": null,
+          "role": "CURRENT_CANDIDATE"
+        }
+      ],
+      "historical_conflict_field_resolution": {
+        "field": "parent_registry_version",
+        "historical_value": "G2-NORMATIVE-0.9-RM3A-CANDIDATE",
+        "resolution": "HISTORICAL_STALE_DECLARATION_FOR_ACTIVE_LINEAGE",
+        "active_lineage_value": "G2-NORMATIVE-0.9-RM5-GOVERNANCE-CANDIDATE"
+      }
+    },
+    "resolution_invariants": {
+      "historical_rm7r_bytes_mutated": false,
+      "historical_rm5_bytes_mutated": false,
+      "retroactive_parent_mutation": false,
+      "current_direct_parent_binding_remains_exact": true,
+      "canonical_lineage_unique": true,
+      "conflicting_parent_claims_remaining_for_active_lineage": false
+    },
+    "adjudication_basis": [
+      "RM7R registry_identity parent id and sha256 exactly resolve to RM5.",
+      "RM7R governance_input_artifacts.rm7r_parent_rm5_sha256 exactly equals RM5 SHA-256.",
+      "RM5 itself declares RM3A as its parent with the same RM3A SHA-256 carried by RM7R top-level parent fields.",
+      "The explicit RM5-to-RM7R carrier migration record in MIGFIX02 binds RM5 as historical source and RM7R as target.",
+      "Therefore the unique historical chain supported by exact bytes is RM3A -> RM5 -> RM7R; the RM7R top-level parent_registry_version=RM3A value is retained only as an immutable historical conflict, not as the active immediate-parent interpretation."
+    ],
+    "no_normative_semantic_change": true
+  }
+}

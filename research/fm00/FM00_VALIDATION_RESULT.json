@@ -1,0 +1,31 @@
+{
+  "artifact_hashes": {
+    "candidate_space": "9497095bd6debecfa7bbe38d12149546d640d58a4efbd101599747afb7d2493f",
+    "epoch": "0b847d91f2304a2027bb6f6e16269f9f3d22daa56c3a4079d59205b0a3ef1692",
+    "outer_lock": "74e6e8d7528056214dcd7306bba7eb7257943f27c0bd27f287fbbf264da23da5",
+    "plan": "669f8909db75a1fc7af02801bbecac4630b06775087432b5daf3ba7837d80863",
+    "purity_boundary": "6a1391beefbbb152c8163b2890db190ee0914fafe18086d0b608925f44edc96e"
+  },
+  "findings": [],
+  "schema_hashes": {
+    "candidate_space": "0f29aacde99abc891c58d3eba719a898d0c9130e47bf0226575244aab11c0be9",
+    "epoch": "124be329cd8e2f25c20c8be516d08ea4d9f009a3a48fd1cf89001af1455e8d7c",
+    "outer_lock": "fdc1131a5336ebd57a29053a8a240f1e4f010ad0b1c60b816bab5b87db03dec3",
+    "plan": "3e62c30330b0afe5c949760fa250f73056fe0d6e606176d3de6152dcbe5e85e9",
+    "purity_boundary": "f06a85c09061488f083f2920ba242552bf6953c74b8deb4470b53f751ec0387b"
+  },
+  "semantic_summary": {
+    "candidate_space_status": "FROZEN",
+    "confirmatory_eligible": false,
+    "contamination": "EXPOSED_PRIOR_RESULTS",
+    "epoch_type": "EXPLORATORY",
+    "horizon_origin_counts": {
+      "12M": 8,
+      "3M": 11,
+      "6M": 10
+    },
+    "outer_origin_count": 11,
+    "production_router_allowed": false
+  },
+  "status": "PASS"
+}

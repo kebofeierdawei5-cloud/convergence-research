@@ -1,0 +1,8 @@
+{
+  "record_type": "IIOS_G2_EXTERNAL_PACKAGE_REFERENCE",
+  "version": "0.1",
+  "filename": "IIOS_M1_2_G2_R10_FINAL_v0.9.1.tar.gz",
+  "sha256": "462adf71419def6cb6fe4d196a018cc45b9a0b66149f00279c0ca6fa3f38f0f0",
+  "verification_status": "SUPPLIED_REFERENCE_NOT_REAUTHENTICATED_HERE",
+  "reason": "Exact external package bytes were not available in the current runtime at Git baseline creation."
+}

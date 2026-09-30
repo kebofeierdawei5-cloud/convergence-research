@@ -1,0 +1,29 @@
+{
+  "schema_version": "IIOS-RESEARCH-EPOCH-0.1",
+  "epoch_id": "RE-M12-EXP-CATL-20260930",
+  "version": "0.1.0",
+  "epoch_type": "EXPLORATORY",
+  "status": "FROZEN",
+  "parent_epoch_id": "RE-M10-M11-CATL-DEVELOPMENT",
+  "contamination": {
+    "status": "EXPOSED_PRIOR_RESULTS",
+    "parent_result_visibility": "DESCRIPTIVE_ONLY",
+    "lineage_refs": ["M1.0-BENCHMARK-OBSERVED", "M1.1-ROLLING-BACKTEST-OBSERVED"]
+  },
+  "research_cleanliness": {
+    "status": "CONTAMINATED",
+    "confirmatory_eligible": false,
+    "attestation_ref": null
+  },
+  "result_exposure": {
+    "can_read_prior_results": true,
+    "can_read_current_oos_results": false,
+    "allowed_use": "DEVELOPMENT_ONLY"
+  },
+  "scope_refs": {
+    "research_plan_id": "RP-M12-FM00-EXP-001",
+    "candidate_space_id": "CS-M12-FM00-CATL-001",
+    "outer_universe_lock_id": "OU-M12-FM00-CATL-001",
+    "purity_boundary_id": "EPB-M12-FM00-EXP-001"
+  }
+}

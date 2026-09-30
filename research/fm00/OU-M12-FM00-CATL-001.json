@@ -1,0 +1,21 @@
+{
+  "schema_version":"IIOS-OUTER-UNIVERSE-LOCK-0.1",
+  "lock_id":"OU-M12-FM00-CATL-001",
+  "version":"0.1.0",
+  "status":"FROZEN",
+  "origins":[
+    {"origin_id":"2023Q3","origin_time":"2023-09-30","cutoff_rule":"ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF","eligibility":"SCHEDULED","scheduled_horizons":["3M","6M","12M"]},
+    {"origin_id":"2023Q4","origin_time":"2023-12-31","cutoff_rule":"ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF","eligibility":"SCHEDULED","scheduled_horizons":["3M","6M","12M"]},
+    {"origin_id":"2024Q1","origin_time":"2024-03-31","cutoff_rule":"ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF","eligibility":"SCHEDULED","scheduled_horizons":["3M","6M","12M"]},
+    {"origin_id":"2024Q2","origin_time":"2024-06-30","cutoff_rule":"ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF","eligibility":"SCHEDULED","scheduled_horizons":["3M","6M","12M"]},
+    {"origin_id":"2024Q3","origin_time":"2024-09-30","cutoff_rule":"ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF","eligibility":"SCHEDULED","scheduled_horizons":["3M","6M","12M"]},
+    {"origin_id":"2024Q4","origin_time":"2024-12-31","cutoff_rule":"ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF","eligibility":"SCHEDULED","scheduled_horizons":["3M","6M","12M"]},
+    {"origin_id":"2025Q1","origin_time":"2025-03-31","cutoff_rule":"ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF","eligibility":"SCHEDULED","scheduled_horizons":["3M","6M","12M"]},
+    {"origin_id":"2025Q2","origin_time":"2025-06-30","cutoff_rule":"ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF","eligibility":"SCHEDULED","scheduled_horizons":["3M","6M","12M"]},
+    {"origin_id":"2025Q3","origin_time":"2025-09-30","cutoff_rule":"ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF","eligibility":"SCHEDULED","scheduled_horizons":["3M","6M"]},
+    {"origin_id":"2025Q4","origin_time":"2025-12-31","cutoff_rule":"ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF","eligibility":"SCHEDULED","scheduled_horizons":["3M","6M"]},
+    {"origin_id":"2026Q1","origin_time":"2026-03-31","cutoff_rule":"ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF","eligibility":"SCHEDULED","scheduled_horizons":["3M"]}
+  ],
+  "eligibility_policy":"PRE_SCHEDULED_AND_IMMUTABLE_AFTER_FREEZE",
+  "exclusion_record_policy":"RETAIN_ORIGIN_WITH_EXPLICIT_REASON_AND_NO_SILENT_DROP"
+}

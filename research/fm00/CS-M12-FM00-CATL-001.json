@@ -1,0 +1,36 @@
+{
+  "schema_version": "IIOS-CANDIDATE-SPACE-0.1",
+  "candidate_space_id": "CS-M12-FM00-CATL-001",
+  "version": "0.1.0",
+  "status": "FROZEN",
+  "securities": ["300750.SZ"],
+  "drivers": [
+    {"driver_id":"REVENUE","frequency":"QUARTERLY","pit_fields":["value","known_at","published_at","provenance"],"unit":"CNY","source_classes":["DIRECT_PERIODIC_FILING","DERIVED_H1_MINUS_Q1","DERIVED_ANNUAL_MINUS_Q1_Q2_Q3"]},
+    {"driver_id":"NET_PROFIT","frequency":"QUARTERLY","pit_fields":["value","known_at","published_at","provenance"],"unit":"CNY","source_classes":["DIRECT_PERIODIC_FILING","DERIVED_H1_MINUS_Q1","DERIVED_ANNUAL_MINUS_Q1_Q2_Q3"]}
+  ],
+  "features": [
+    {"feature_id":"YOY_GROWTH","formula":"(x_t / x_{t-4}) - 1","lookback":"4 quarters","pit_rule":"ONLY_INFORMATION_AVAILABLE_AT_ORIGIN","missing_rule":"UNKNOWN_IF_REQUIRED_HISTORY_MISSING","transform_class":"NONE"},
+    {"feature_id":"GROWTH_ACCELERATION","formula":"YOY_GROWTH_t - YOY_GROWTH_{t-1}","lookback":"5 quarters","pit_rule":"ONLY_INFORMATION_AVAILABLE_AT_ORIGIN","missing_rule":"UNKNOWN_IF_REQUIRED_HISTORY_MISSING","transform_class":"NONE"},
+    {"feature_id":"ROLLING_GROWTH_VOL","formula":"std(YOY_GROWTH_{t-k+1:t})","lookback":"8 quarters","pit_rule":"ONLY_INFORMATION_AVAILABLE_AT_ORIGIN","missing_rule":"UNKNOWN_IF_REQUIRED_HISTORY_MISSING","transform_class":"ROLLING_DETERMINISTIC"},
+    {"feature_id":"SEASONAL_DEVIATION","formula":"current_growth - historical_same_quarter_growth_mean","lookback":"available prior same-quarter history only","pit_rule":"ONLY_INFORMATION_AVAILABLE_AT_ORIGIN","missing_rule":"UNKNOWN_IF_INSUFFICIENT_SAME_QUARTER_HISTORY","transform_class":"LEARNED_PIT_FIT"},
+    {"feature_id":"MEAN_REVERSION_GAP","formula":"current_growth - PIT_fitted_growth_central_tendency","lookback":"PIT-defined rolling window","pit_rule":"ONLY_INFORMATION_AVAILABLE_AT_ORIGIN","missing_rule":"UNKNOWN_IF_FIT_UNAVAILABLE","transform_class":"LEARNED_PIT_FIT"},
+    {"feature_id":"SLOPE_STABILITY","formula":"dispersion_of_rolling_log_linear_slopes","lookback":"8 quarters","pit_rule":"ONLY_INFORMATION_AVAILABLE_AT_ORIGIN","missing_rule":"UNKNOWN_IF_INSUFFICIENT_HISTORY","transform_class":"ROLLING_DETERMINISTIC"}
+  ],
+  "state_dimensions": ["DIRECTION","MOMENTUM","VOLATILITY","SEASONALITY","MEAN_REVERSION_PRESSURE","STRUCTURAL_STABILITY","DATA_QUALITY"],
+  "models": ["SEASONAL_NAIVE","PERSISTENCE_YOY","TREND_LOG_LINEAR","MEAN_REVERSION_YOY"],
+  "targets": ["CATL_REVENUE","CATL_NET_PROFIT"],
+  "horizons": ["3M","6M","12M"],
+  "metrics": ["MAE","RMSE","sMAPE"],
+  "exclusion_rules": [
+    "MISSING_PIT_PROVENANCE",
+    "CONFLICTING_REVISION_AT_CUTOFF",
+    "INSUFFICIENT_LOOKBACK",
+    "UNKNOWN_DRIVER_STATE",
+    "UNVERIFIABLE_ACTUAL"
+  ],
+  "parameter_spaces": {
+    "rolling_window_quarters": [4,8],
+    "trend_min_history_quarters": [8],
+    "mean_reversion_central_tendency": ["PIT_ROLLING_MEAN"]
+  }
+}

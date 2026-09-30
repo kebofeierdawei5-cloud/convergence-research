@@ -1,0 +1,17 @@
+{
+  "schema_version":"IIOS-EVALUATION-PURITY-BOUNDARY-0.1",
+  "boundary_id":"EPB-M12-FM00-EXP-001",
+  "version":"0.1.0",
+  "status":"FROZEN",
+  "allowed_visibility":"DEVELOPMENT_ONLY",
+  "forbidden_inputs":[
+    "OUTCOME_AFTER_ORIGIN_CUTOFF",
+    "CURRENT_PRICE_NOT_AVAILABLE_AT_ORIGIN",
+    "POST_HOC_TUNED_THRESHOLD",
+    "POST_HOC_CHANGED_METRIC",
+    "POST_HOC_ORIGIN_EXCLUSION",
+    "RESULT_DERIVED_FEATURE"
+  ],
+  "outer_result_firewall":"OUTER_RESULTS_CANNOT_FLOW_BACK_INTO_SAME_EPOCH_TUNING",
+  "contamination_rule":"EXPOSURE_INHERITS_FORWARD_AND_CANNOT_BE_WASHED_BY_NEW_EPOCH_ID"
+}

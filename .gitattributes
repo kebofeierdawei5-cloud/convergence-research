@@ -1,0 +1,8 @@
+*.json text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.txt text eol=lf
+*.yaml text eol=lf
+*.tar.gz binary
+
+governance/g2-r10-reference/current/G2_CURRENT_STATE_SNAPSHOT.md whitespace=-trailing-space

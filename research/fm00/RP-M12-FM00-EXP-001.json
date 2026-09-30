@@ -1,0 +1,39 @@
+{
+  "schema_version": "IIOS-RESEARCH-PLAN-0.1",
+  "plan_id": "RP-M12-FM00-EXP-001",
+  "version": "0.1.0",
+  "epoch_id": "RE-M12-EXP-CATL-20260930",
+  "status": "FROZEN",
+  "objective": "建立 PIT-safe 的 Driver → Feature → State → Conditional Backtest 研究底座，并明确哪些模型选择可以进入后续研究。",
+  "research_question": "在同一历史预测目标与预测期内，经营驱动变量的方向、动量、波动、季节性、均值回归压力与结构稳定性是否解释不同预测方法的相对表现差异？",
+  "targets": [
+    {"target_id":"CATL_REVENUE","definition":"quarterly revenue level","unit":"CNY","horizons":["3M","6M","12M"]},
+    {"target_id":"CATL_NET_PROFIT","definition":"quarterly net profit level","unit":"CNY","horizons":["3M","6M","12M"]}
+  ],
+  "evaluation": {
+    "primary_metric": "MAE",
+    "secondary_metrics": ["RMSE","sMAPE"],
+    "pairwise_comparison_rule": "SAME_ORIGIN_UNIVERSE_SAME_TARGET_SAME_HORIZON_SAME_ACTUAL",
+    "independence_statement": "ROLLING_ORIGINS_ARE_NOT_ASSUMED_IID",
+    "insufficiency_outcome": "NO_SELECTION"
+  },
+  "selection_policy": {
+    "inner_selection_allowed": true,
+    "outer_selection_allowed": true,
+    "production_router_allowed": false,
+    "result_driven_tuning_same_epoch": false
+  },
+  "data_policy": {
+    "knowledge_mode": "HISTORICAL_RECONSTRUCTION",
+    "pit_required": true,
+    "current_price_allowed_in_forecast_inputs": false,
+    "future_actuals_allowed_in_feature_engineering": false,
+    "learned_transform_scope": "FIT_ONLY_WITHIN_PERMITTED_PIT_OR_INNER_BOUNDARY"
+  },
+  "amendment_policy": {
+    "result_driven_change_creates_new_epoch": true,
+    "frozen_candidate_space_immutable": true,
+    "frozen_plan_immutable": true,
+    "origin_exclusions_require_reason": true
+  }
+}
