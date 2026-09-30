@@ -169,31 +169,34 @@ FM-00 package artifact created locally:
 - SHA-256: `3dea6513288abc28aae8a6b79e0bb4815004bd77ab4a09cc266b25fcb171fbc2`
 - validation result: `/mnt/data/iios_m12_fm00_v0_1/FM00_VALIDATION_RESULT.json`
 
-## 9. Immediate next development step
+## 9. FM-01 current state
 
-Proceed to:
+`M1.2-FM-01 | Driver History Foundation` implementation is complete at the code-contract layer.
 
-`M1.2-FM-01 | Driver History Foundation`
+Implemented and tested:
+- machine-readable `DriverSeries` schema;
+- PIT resolver using `known_at` cutoff;
+- explicit revision sequencing;
+- same-snapshot conflict detection;
+- direct-vs-derived provenance enforcement;
+- deterministic H1-minus-Q1 derivation;
+- deterministic annual-minus-Q1-Q2-Q3 derivation;
+- parent lineage requirements;
+- deterministic dataset admission validator.
 
-Goal: turn available CATL historical Reality into a reusable PIT-aware `DriverSeries` layer for FM-02 and beyond.
+Current test status: `18/18 PASS`; `compileall PASS`.
 
-Minimum intended DriverSeries fields:
-- security_id
-- driver_id
-- period
-- value
-- unit
-- source_type
-- source_ref
-- known_at
-- published_at
-- transformation_type
-- provenance
-- quality_status
+CATL population status remains `BLOCKED_DATA_INGRESS`: the exact M1.1 historical source snapshot is not present in the FM-00 Git baseline. The repository therefore contains a zero-record CATL dataset placeholder plus an explicit blocking admission result. No numeric values are fabricated or substituted.
 
-FM-01 should preserve revision/provenance semantics and create a deterministic PIT-aware dataset that can be consumed by the Feature Builder.
+Target data coverage remains 2021Q1–2026Q2 (22 quarters) for `REVENUE` and `NET_PROFIT`.
 
-Do not jump directly to model selection before the Driver History / Feature layers are reliable.
+## 10. Immediate next development step
+
+First unblock the FM-01 data gate by materializing or recovering the exact hash-bound M1.1 CATL historical source snapshot. After exact source admission and independent PIT replay, proceed to:
+
+`M1.2-FM-02 | PIT Feature Builder`
+
+Do not jump to model selection before Driver History / Feature layers are reliable.
 
 ## 10. Engineering constitution for future agents
 

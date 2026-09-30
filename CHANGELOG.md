@@ -2,7 +2,8 @@
 
 ## [Unreleased]
 
-- Next active development task: `M1.2-FM-01 | Driver History Foundation`.
+- M1.2-FM-01 implementation foundation is PASS; CATL exact historical source ingress remains BLOCKED until an exact M1.1 snapshot is available.
+- Next active task after data admission: `M1.2-FM-02 | PIT Feature Builder`.
 
 ## [0.1.0] — 2026-09-30
 

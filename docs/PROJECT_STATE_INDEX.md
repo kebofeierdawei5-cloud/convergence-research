@@ -11,7 +11,7 @@ M1.2 Forecast Validation = ACTIVE
         ↓
 FM-00 Exploratory Research Epoch = PASS
         ↓
-FM-01 Driver History Foundation = NEXT
+FM-01 Driver History Foundation = IMPLEMENTATION PASS / DATA INGRESS BLOCKED
 ```
 
 ## Authority / continuity
@@ -32,6 +32,8 @@ FM-00 is exploratory and contaminated by prior exposed M1.0/M1.1 results. It can
 
 ## Next development task
 
-`M1.2-FM-01 | Driver History Foundation`
+`M1.2-FM-01` implementation is complete at the code-contract layer.
 
-Build a deterministic PIT-aware `DriverSeries` layer from available historical Reality, preserving `known_at`, `published_at`, revisions, provenance, and quality semantics.
+The remaining FM-01 data gate is blocked until the exact M1.1 CATL historical source snapshot is materialized. No values may be fabricated or inferred as a substitute.
+
+Next after admission: `M1.2-FM-02 | PIT Feature Builder`.

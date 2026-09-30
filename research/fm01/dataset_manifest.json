@@ -1,0 +1,28 @@
+{
+  "schema_version": "IIOS-DRIVER-HISTORY-MANIFEST-0.1",
+  "manifest_id": "DHM-M12-FM01-CATL-001",
+  "version": "0.1.0",
+  "status": "BLOCKED_DATA_INGRESS",
+  "security_id": "300750.SZ",
+  "drivers": ["REVENUE", "NET_PROFIT"],
+  "frequency": "QUARTERLY",
+  "coverage_target": {"start": "2021Q1", "end": "2026Q2", "expected_quarters": 22},
+  "required_pit_fields": ["value", "known_at", "published_at", "provenance", "source_ref", "revision"],
+  "allowed_provenance": [
+    "DIRECT_PERIODIC_FILING",
+    "DERIVED_H1_MINUS_Q1",
+    "DERIVED_ANNUAL_MINUS_Q1_Q2_Q3",
+    "OTHER_DERIVED"
+  ],
+  "data_status": {
+    "exact_source_snapshot_present": false,
+    "records_ingested": 0,
+    "records_verified": 0,
+    "reason": "The prior M1.1 dataset bytes are not present in the FM-00 Git baseline or current runtime. No CATL values are fabricated or reconstructed without the exact source snapshot."
+  },
+  "fail_closed_behavior": {
+    "missing_source": "BLOCK_DATA_READY_GATE",
+    "downstream_feature_use": "PROHIBIT_UNVERIFIED_DATA",
+    "fallback_to_llm_estimate": false
+  }
+}

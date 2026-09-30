@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/driver-series-0.1.json",
+  "title": "IIOS DriverSeries Record v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "record_id", "security_id", "driver_id", "period", "value",
+    "unit", "source_type", "source_ref", "source_date", "known_at", "published_at",
+    "transformation_type", "provenance", "revision", "status", "quality_status"
+  ],
+  "properties": {
+    "schema_version": {"const": "IIOS-DRIVER-SERIES-0.1"},
+    "record_id": {"type": "string", "pattern": "^DSR-[A-Z0-9._-]+$"},
+    "security_id": {"type": "string", "minLength": 1},
+    "driver_id": {"type": "string", "pattern": "^[A-Z0-9_]+$"},
+    "period": {"type": "string", "pattern": "^\\d{4}Q[1-4]$"},
+    "value": {"type": ["number", "null"], "description": "Null is allowed only for UNKNOWN/INVALID records."},
+    "unit": {"type": "string", "minLength": 1},
+    "source_type": {"enum": ["COMPANY_DISCLOSURE", "REGULATORY", "OTHER"]},
+    "source_ref": {"type": "string", "minLength": 1},
+    "source_date": {"type": "string", "format": "date"},
+    "known_at": {"type": "string", "format": "date-time"},
+    "published_at": {"type": "string", "format": "date-time"},
+    "transformation_type": {"enum": ["NONE", "H1_MINUS_Q1", "ANNUAL_MINUS_Q1_Q2_Q3", "OTHER_DETERMINISTIC"]},
+    "provenance": {"enum": ["DIRECT_PERIODIC_FILING", "DERIVED_H1_MINUS_Q1", "DERIVED_ANNUAL_MINUS_Q1_Q2_Q3", "OTHER_DERIVED"]},
+    "revision": {
+      "type": "object", "additionalProperties": false,
+      "required": ["revision_id", "sequence"],
+      "properties": {
+        "revision_id": {"type": "string", "minLength": 1},
+        "sequence": {"type": "integer", "minimum": 0}
+      }
+    },
+    "supersedes_record_id": {"type": ["string", "null"]},
+    "input_record_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "formula": {"type": ["string", "null"]},
+    "status": {"enum": ["VALID", "INVALID", "UNKNOWN"]},
+    "quality_status": {"enum": ["VERIFIED", "DERIVED_VERIFIED", "CONFLICT", "MISSING_SOURCE", "UNKNOWN"]}
+  }
+}

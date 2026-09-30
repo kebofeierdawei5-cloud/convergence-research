@@ -1,0 +1,17 @@
+{
+  "schema_version": "IIOS-FM01-DATASET-STATUS-0.1",
+  "dataset_id": "CATL-DRIVER-HISTORY-FM01-001",
+  "version": "0.1.0",
+  "status": "BLOCKED_DATA_INGRESS",
+  "security_id": "300750.SZ",
+  "drivers": ["REVENUE", "NET_PROFIT"],
+  "coverage_target": {"start": "2021Q1", "end": "2026Q2", "expected_quarters": 22},
+  "records_ingested": 0,
+  "records_verified": 0,
+  "source_snapshot": {
+    "required": true,
+    "present": false,
+    "reason": "The exact M1.1 historical source snapshot is not available in the FM-00 Git baseline."
+  },
+  "prohibition": "No numeric observation may be filled from memory, third-party inference, or LLM estimation solely to satisfy coverage."
+}

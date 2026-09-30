@@ -1,0 +1,17 @@
+{
+  "schema_version": "IIOS-FM01-ADMISSION-RESULT-0.1",
+  "status": "BLOCKED_DATA_INGRESS",
+  "manifest_id": "DHM-M12-FM01-CATL-001",
+  "dataset_path": "research/fm01/CATL_DRIVER_HISTORY.ndjson",
+  "record_count": 0,
+  "validation_findings": [],
+  "data_gate": {
+    "exact_source_snapshot_present": false,
+    "coverage_target": {
+      "start": "2021Q1",
+      "end": "2026Q2",
+      "expected_quarters": 22
+    },
+    "block_reason": "Exact M1.1 historical source snapshot is not present; no numeric CATL values may be fabricated or inferred as a substitute."
+  }
+}
