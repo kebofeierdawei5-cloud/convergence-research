@@ -1,0 +1,26 @@
+{
+  "schema_version": "IIOS-REMOTE-EXACT-LINEAGE-VERIFY-0.1",
+  "status": "PASS",
+  "repository": "kebofeierdawei5-cloud/convergence-research",
+  "verified_refs": {
+    "refs/heads/main": {
+      "sha": "d5b2fb3bac2f597c8c43b27c443a321350442fc4",
+      "type": "commit"
+    },
+    "refs/tags/m1.2-fm00-v0.1.0": {
+      "tag_object_sha": "aac0cccf596ee2703caedffc08f434be9e2dffed",
+      "type": "tag",
+      "target_commit_sha": "536e883bc873dbe7dd7383690a7a95a0f65591a7"
+    },
+    "refs/tags/m1.2-fm01-foundation-v0.1.0": {
+      "tag_object_sha": "36c8da2070e91be41c0574e6c9db54947080d478",
+      "type": "tag",
+      "target_commit_sha": "d5b2fb3bac2f597c8c43b27c443a321350442fc4"
+    }
+  },
+  "parent_check": {
+    "fm01_commit": "d5b2fb3bac2f597c8c43b27c443a321350442fc4",
+    "parent_commit": "536e883bc873dbe7dd7383690a7a95a0f65591a7"
+  },
+  "conclusion": "Remote refs match the exact local FM01 bundle lineage. No lineage rewrite was observed."
+}

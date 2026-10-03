@@ -1,0 +1,36 @@
+{
+  "schema_version": "IIOS-CANONICAL-ROOT-0.1",
+  "status": "PASS",
+  "canonical_repository": {
+    "owner": "kebofeierdawei5-cloud",
+    "repository": "kebofeierdawei5-cloud/convergence-research",
+    "repository_id": 1403126278,
+    "default_branch": "main",
+    "visibility": "public"
+  },
+  "exact_refs": {
+    "main": "d5b2fb3bac2f597c8c43b27c443a321350442fc4",
+    "m1.2-fm00-v0.1.0": {
+      "tag_object": "aac0cccf596ee2703caedffc08f434be9e2dffed",
+      "target_commit": "536e883bc873dbe7dd7383690a7a95a0f65591a7"
+    },
+    "m1.2-fm01-foundation-v0.1.0": {
+      "tag_object": "36c8da2070e91be41c0574e6c9db54947080d478",
+      "target_commit": "d5b2fb3bac2f597c8c43b27c443a321350442fc4"
+    }
+  },
+  "lineage": {
+    "fm00_commit": "536e883bc873dbe7dd7383690a7a95a0f65591a7",
+    "fm01_commit": "d5b2fb3bac2f597c8c43b27c443a321350442fc4",
+    "fm01_parent_verified": "536e883bc873dbe7dd7383690a7a95a0f65591a7"
+  },
+  "verification": {
+    "status": "PASS",
+    "method": [
+      "independent raw GitHub ref reads",
+      "independent raw GitHub commit read",
+      "independent annotated-tag object reads"
+    ],
+    "date": "2026-10-03"
+  }
+}
