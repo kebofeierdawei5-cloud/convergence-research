@@ -1,0 +1,25 @@
+{
+  "schema_version": "IIOS-FM00-GITHUB-ACTIONS-CLOSURE-0.1",
+  "status": "PASS",
+  "repository": "kebofeierdawei5-cloud/convergence-research",
+  "workflow": {
+    "name": "IIOS FM00 Baseline",
+    "workflow_id": 373906791,
+    "run_id": 37124212188,
+    "event": "push",
+    "head_commit": "1285506b47fa89802c6e85a1bd066b54f088e3b0",
+    "conclusion": "success"
+  },
+  "job": {
+    "id": 111206141430,
+    "name": "verify-fm00",
+    "conclusion": "success"
+  },
+  "assertions": {
+    "fm00_unit_tests": "8/8 PASS",
+    "fm00_validator": "PASS",
+    "compileall": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "note": "This receipt records the independent remote CI result for the canonical-root/CI carrier commit. It does not authorize production model selection."
+}

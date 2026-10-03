@@ -10,19 +10,23 @@ Date: 2026-10-03
 - Default branch: `main`
 - Visibility: `public`
 
-The repository is the sole canonical engineering root for IIOS M1.2+ development.
+This repository is the sole canonical engineering root for IIOS M1.2+ development.
 
 ## Exact lineage anchor
 
-The canonical `main` ref is anchored to the pre-existing exact FM-01 commit:
+The pre-existing exact FM-01 implementation commit is:
 
 `d5b2fb3bac2f597c8c43b27c443a321350442fc4`
 
-Its intended parent is the exact FM-00 baseline commit:
+Its exact parent is:
 
 `536e883bc873dbe7dd7383690a7a95a0f65591a7`
 
-The exact version tags are:
+The canonical `main` branch now descends from that exact FM-01 commit through the additive canonical-root/CI closure commit:
+
+`1285506b47fa89802c6e85a1bd066b54f088e3b0`
+
+The exact version tags remain immutable:
 
 - `m1.2-fm00-v0.1.0` → tag object `aac0cccf596ee2703caedffc08f434be9e2dffed` → commit `536e883bc873dbe7dd7383690a7a95a0f65591a7`
 - `m1.2-fm01-foundation-v0.1.0` → tag object `36c8da2070e91be41c0574e6c9db54947080d478` → commit `d5b2fb3bac2f597c8c43b27c443a321350442fc4`

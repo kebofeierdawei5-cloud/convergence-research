@@ -13,18 +13,32 @@ FM-00 exact Git baseline = 536e883...
         ↓
 FM-01 exact implementation baseline = d5b2fb3...
         ↓
-Remote exact lineage independently verified = PASS
+Canonical root + CI carrier = 1285506...
         ↓
-FM-00 GitHub Actions execution = PENDING
+FM-00 GitHub Actions = PASS
         ↓
 M1.2-DATA-00 / A02 = BLOCKED_PENDING_EXACT_RAW_DATA
 ```
 
 ## Exact canonical refs
 
-- `main` = `d5b2fb3bac2f597c8c43b27c443a321350442fc4`
+- `main` = `1285506b47fa89802c6e85a1bd066b54f088e3b0`
 - `m1.2-fm00-v0.1.0` = `aac0cccf596ee2703caedffc08f434be9e2dffed`
 - `m1.2-fm01-foundation-v0.1.0` = `36c8da2070e91be41c0574e6c9db54947080d478`
+
+## CI closure
+
+- Workflow: `IIOS FM00 Baseline`
+- Workflow run: `37124212188`
+- Head commit: `1285506b47fa89802c6e85a1bd066b54f088e3b0`
+- Event: `push`
+- Conclusion: `success`
+- Job: `verify-fm00`
+- Job ID: `111206141430`
+- FM00 unit tests: 8/8 PASS
+- FM00 validator: PASS, findings=[]
+- compileall: PASS
+- git diff --check: PASS
 
 ## Research boundary
 
@@ -36,7 +50,7 @@ Model selection remains unauthorized until the required data and evaluation gate
 
 ## Next gate
 
-Execute and independently verify the first GitHub Actions run for the canonical main commit. After CI closure, proceed to M1.2-DATA-00 / A02 exact raw-data admission.
+Proceed to M1.2-DATA-00 / A02 exact raw-data admission. Do not infer or fabricate missing PIT source bytes.
 
 ## Authority precedence
 
