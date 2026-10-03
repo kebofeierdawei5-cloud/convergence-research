@@ -166,6 +166,30 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
     forecast = case["forecast"]
     risk = case["risk"]
     portfolio = case["portfolio"]
+    if blockers:
+        position_raw = (portfolio or {}).get("position_pct", 0)
+        try:
+            position = dec(position_raw, "portfolio.position_pct")
+        except ValueError:
+            position = Decimal("0")
+        action = "HOLD" if position > 0 else "NO-BUY"
+        if str((case.get("thesis") or {}).get("status", "")).upper() == "BROKEN":
+            action = "EXIT" if position > 0 else "NO-BUY"
+        return {
+            "engine_version": ENGINE_VERSION,
+            "case_id": case["case_id"], "symbol": case["symbol"], "company": case["company"],
+            "cutoff_date": case["cutoff_date"], "validation": validation,
+            "gates": {"trust": str((case.get("trust") or {}).get("status", "UNKNOWN")).upper(),
+                      "new_buy_add_allowed": False, "evidence_pit": False,
+                      "forecast_ready": False, "valuation_ready": False},
+            "forecast": forecast,
+            "valuation": {},
+            "risk": risk,
+            "decision": {"action": action, "primary_reason": "VALIDATION_BLOCKED",
+                         "position_package_complete": False, "human_approval_required": True,
+                         "auto_execution": False},
+            "monitoring": case.get("monitoring") or [],
+        }
     current_price = dec(valuation["current_price"], "valuation.current_price")
     shares = dec(valuation["shares_outstanding"], "valuation.shares_outstanding")
     required_return = dec(valuation["required_return_pct"], "valuation.required_return_pct") / Decimal("100")
