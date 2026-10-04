@@ -126,7 +126,17 @@ def fetch_wayback_target() -> dict:
     try:
         info = requests.get("https://index.commoncrawl.org/collinfo.json", timeout=60, headers={"User-Agent": "Mozilla/5.0"})
         info.raise_for_status()
-        collections = [c for c in info.json() if str(c.get("id", "")).startswith("CC-MAIN-2026-")]
+        target_start = "20260601"
+        target_end = "20260731"
+        collections = []
+        for c in info.json():
+            cid = str(c.get("id", ""))
+            if not cid.startswith("CC-MAIN-2026-"):
+                continue
+            c_from = str(c.get("from", "")).replace("-", "")
+            c_to = str(c.get("to", "")).replace("-", "")
+            if (not c_from or c_from <= target_end) and (not c_to or c_to >= target_start):
+                collections.append(c)
         collections = sorted(collections, key=lambda c: str(c.get("id")), reverse=True)
         _record_attempt(attempts, "COMMONCRAWL_INDEX", status="OK", collection_count=len(collections))
     except Exception as exc:
@@ -258,7 +268,12 @@ def main() -> int:
         except Exception as exc:
             receipt["B"]={"status":"BLOCKED","reason":f"TUSHARE_COLLECTION_ERROR:{exc}"}
     else:
-        receipt["B"]={"status":"BLOCKED","reason":"TUSHARE_TOKEN_UNAVAILABLE"}
+        receipt["B"]={
+            "status":"BLOCKED",
+            "pit_admission":"BLOCKED_FREE_FIRST_ROUTE_NOT_MATERIALIZED",
+            "optional_vendor":{"provider":"TUSHARE","credential":"TUSHARE_TOKEN","status":"NOT_CONFIGURED"},
+            "reason":"No mandatory paid/vendor credential is available. B remains blocked only because the free-first PIT evidence bundle has not yet been materialized and admitted."
+        }
     receipt["status"]="PASS" if receipt["A"].get("status")=="PASS" and receipt["B"].get("pit_admission")=="PASS" else "BLOCKED"
     (root/"A02_RAW_MATERIALIZATION_RECEIPT.json").write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     print(json.dumps(receipt,ensure_ascii=False,indent=2))
