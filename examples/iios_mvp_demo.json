@@ -3,29 +3,77 @@
   "symbol": "DEMO.SZ",
   "company": "IIOS MVP Demo Company",
   "cutoff_date": "2026-09-30",
-  "thesis": {"status": "HEALTHY", "summary": "示例：高质量主业、现金流支持、估值存在一定安全边际；真实案例必须替换为证据支持的内容。"},
-  "trust": {"status": "PASS", "notes": "示例通过；真实案例必须完成诚信、治理、重大风险核查。"},
+  "thesis": {
+    "status": "HEALTHY",
+    "summary": "示例：高质量主业、现金流支持、估值存在一定安全边际；真实案例必须替换为证据支持的内容。"
+  },
+  "trust": {
+    "status": "PASS",
+    "notes": "示例通过；真实案例必须完成诚信、治理、重大风险核查。"
+  },
   "evidence": [
-    {"source": "issuer-report", "known_at": "2026-08-30", "claim": "periodic operating data"},
-    {"source": "exchange-filing", "known_at": "2026-09-15", "claim": "capital/share information"}
+    {
+      "source": "issuer-report",
+      "known_at": "2026-08-30",
+      "claim": "periodic operating data"
+    },
+    {
+      "source": "exchange-filing",
+      "known_at": "2026-09-15",
+      "claim": "capital/share information"
+    }
   ],
-  "reality": {"periods": [
-    {"period": "2025Q4", "value": 8200000000, "known_at": "2026-03-31", "source": "issuer-report"},
-    {"period": "2026Q1", "value": 9000000000, "known_at": "2026-04-30", "source": "issuer-report"},
-    {"period": "2026Q2", "value": 9500000000, "known_at": "2026-08-30", "source": "issuer-report"}
-  ]},
+  "reality": {
+    "periods": [
+      {
+        "period": "2025Q4",
+        "value": 8200000000,
+        "known_at": "2026-03-31",
+        "source": "issuer-report"
+      },
+      {
+        "period": "2026Q1",
+        "value": 9000000000,
+        "known_at": "2026-04-30",
+        "source": "issuer-report"
+      },
+      {
+        "period": "2026Q2",
+        "value": 9500000000,
+        "known_at": "2026-08-30",
+        "source": "issuer-report"
+      }
+    ]
+  },
   "forecast": {
     "origin": "2026-09-30",
     "method": "driver-based independent forecast",
     "prepared_using_current_price": false,
-    "assumptions": ["volume growth", "unit economics", "cash conversion"],
-    "bear": {"net_profit": 8000000000},
-    "base": {"net_profit": 10000000000},
-    "bull": {"net_profit": 12000000000}
+    "assumptions": [
+      "volume growth",
+      "unit economics",
+      "cash conversion"
+    ],
+    "bear": {
+      "net_profit": 8000000000
+    },
+    "base": {
+      "net_profit": 10000000000
+    },
+    "bull": {
+      "net_profit": 12000000000
+    }
   },
   "valuation": {
     "model": "forward_pe",
-    "model_selection": {"primary_model": "forward_pe", "economic_profile": "mature_cash_earning_business", "rationale": "示例主业以可持续盈利和现金流为核心，采用盈利倍数作为主模型。", "alternatives": ["dcf"]},
+    "model_selection": {
+      "primary_model": "forward_pe",
+      "economic_profile": "mature_cash_earning_business",
+      "rationale": "示例主业以可持续盈利和现金流为核心，采用盈利倍数作为主模型。",
+      "alternatives": [
+        "dcf"
+      ]
+    },
     "currency": "CNY",
     "current_price": 16.5,
     "shares_outstanding": 10000000000,
@@ -33,19 +81,40 @@
     "bear_multiple": 15,
     "base_multiple": 20,
     "bull_multiple": 25,
-    "market_implied_multiple": 20
+    "market_implied_multiple": 20,
+    "market_model_inputs": {
+      "forward_pe": {
+        "profit_low": 9500000000,
+        "profit_high": 10500000000
+      }
+    }
   },
   "risk": {
     "max_loss_pct": 30,
-    "thesis_breaks": ["核心产品竞争优势持续弱化", "现金流长期与利润背离", "治理/诚信出现新的硬性问题"]
+    "thesis_breaks": [
+      "核心产品竞争优势持续弱化",
+      "现金流长期与利润背离",
+      "治理/诚信出现新的硬性问题"
+    ]
   },
   "portfolio": {
     "position_pct": 0,
     "can_add": true,
-    "buy_add_package": {"entry_zone": "用户实战时填写价格区间", "initial_position_pct": 5, "target_position_pct": 10, "max_position_pct": 15}
+    "buy_add_package": {
+      "entry_zone": "用户实战时填写价格区间",
+      "initial_position_pct": 5,
+      "target_position_pct": 10,
+      "max_position_pct": 15
+    }
   },
   "monitoring": [
-    {"metric": "net profit", "condition": "quarterly actual materially below base path"},
-    {"metric": "cash conversion", "condition": "persistent deterioration"}
+    {
+      "metric": "net profit",
+      "condition": "quarterly actual materially below base path"
+    },
+    {
+      "metric": "cash conversion",
+      "condition": "persistent deterioration"
+    }
   ]
 }
