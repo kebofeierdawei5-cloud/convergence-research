@@ -13,9 +13,9 @@ B1 Investment Semantics v0.3 = PASS / FROZEN
         ↓
 P3/P4 Market Implied Expectation Infrastructure = FINAL PASS / CONDITIONAL
         ↓
-CORE-00 Scope Reset & Architecture Reconciliation = ACTIVE
+CORE-00 Scope Reset & Architecture Reconciliation = PASS / MERGED
         ↓
-CORE-01 Single Company Research Intake = NEXT
+CORE-01 Single Company Research Intake = ACTIVE
 ```
 
 ## Authority / continuity
@@ -62,12 +62,12 @@ A02 admission status:
 BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
 ```
 
-## Next development task
+## Current development task
 
-`CORE-00 | Scope Reset & Architecture Reconciliation`
+`CORE-01 | Single Company Research Intake`
 
-Acceptance requires the scope contract, machine isolation guard, status/index reconciliation and green CI.
+Acceptance requires deterministic case construction, PIT scope, identity honesty, audit hashes, schema validation, CLI generation and green CI.
 
-After CORE-00:
+After CORE-01:
 
-`CORE-01 | Single Company Research Intake`.
+`CORE-02 | Company Economic Core`.
