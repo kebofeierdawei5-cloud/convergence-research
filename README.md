@@ -6,17 +6,27 @@ This repository is the primary engineering continuity source for IIOS. Chat hist
 
 Version: `0.1.0`
 
-Current baseline:
+Current canonical state (2026-10-04):
 
 ```text
 G2 R10 Reference Governance Runtime = FROZEN
         ↓
-M1.2 Forecast Validation
+M1.2 Forecast Validation = FM-00 PASS / FM-01 foundation PASS
         ↓
-FM-00 Exploratory Research Epoch = PASS
+Investment Decision Core
         ↓
-Next: FM-01 Driver History Foundation
+Batch 1-B Company Value Core = MERGED
+        ↓
+Human-authoritative Valuation Model Selection = MERGED
+        ↓
+Batch 2 v0.1 = OPEN / RED-TEAM BLOCKED
+        ↓
+Next: Investment Core Contract v0.2
 ```
+
+Return hurdle: **positive expected return >15%**. No fixed 1–3 year holding period and no annualized-return core gate.
+
+Canonical reconciliation: `docs/iios/STATE_RECONCILIATION_2026-10-04.md`
 
 ### Repository boundaries
 
