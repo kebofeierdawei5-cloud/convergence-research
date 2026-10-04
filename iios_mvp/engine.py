@@ -38,9 +38,15 @@ def _date(value: Any, field: str) -> date:
 
 
 def validate_case(case: dict[str, Any]) -> list[str]:
+    # Any explicitly versioned investment-core case must use a supported
+    # contract; unknown/future versions MUST fail closed rather than entering
+    # the legacy v0.1.1 validator.
+    contract_version = case.get("contract_version")
+    if contract_version is not None and contract_version != "IIOS-INVESTMENT-CORE-0.2":
+        return [f"CORE-VERSION-EXACT:contract_version:unsupported investment-core contract {contract_version}"]
     # v0.2 cases MUST enter through the frozen contract validator. The legacy
     # MVP path remains available only for pre-v0.2 demo/replay compatibility.
-    if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.2":
+    if contract_version == "IIOS-INVESTMENT-CORE-0.2":
         from .investment_core_contract import validate_investment_core_case
         result = validate_investment_core_case(case)
         return [
@@ -363,6 +369,10 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_case(case: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.2":
+        # v0.2 has no production snapshot schema yet. Never persist an
+        # unimplemented v0.2 decision under the legacy 0.1.1 snapshot label.
+        raise ValueError("V02_SNAPSHOT_NOT_IMPLEMENTED")
     decision = decide(case)
     snapshot = {
         "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.1.1",
@@ -375,7 +385,18 @@ def run_case(case: dict[str, Any]) -> tuple[dict[str, Any], str]:
 
 
 def replay(snapshot: dict[str, Any]) -> dict[str, Any]:
-    fresh = decide(snapshot["input"])
+    input_case = snapshot["input"]
+    if input_case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.2":
+        # A v0.2 case cannot be replayed through the legacy snapshot schema.
+        return {
+            "snapshot_hash": snapshot.get("snapshot_hash"),
+            "engine_version": ENGINE_VERSION,
+            "replay_status": "FAIL",
+            "same_decision": False,
+            "integrity_status": "FAIL",
+            "reason": "V02_SNAPSHOT_SCHEMA_NOT_SUPPORTED",
+        }
+    fresh = decide(input_case)
     same = canonical_json(fresh) == canonical_json(snapshot["decision"])
     expected_hash = sha256_obj({
         "snapshot_schema": snapshot["snapshot_schema"],
