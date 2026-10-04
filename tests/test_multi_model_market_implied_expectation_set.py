@@ -138,7 +138,7 @@ def test_no_feasible_model_is_blocked_not_ambiguous():
     assert r.qualification == MIEQualification.BLOCKED
 
 def test_blocked_p4_mie_is_consumed_as_blocked_disposition():
-    blocked = make_mie(model_id='ddm-1', family=MarketModelFamily.DDM, qualification=MIEQualification.BLOCKED)
+    blocked = make_mie(model_id='ddm-1', family=MarketModelFamily.DDM, qualification=MIEQualification.BLOCKED, stability=StabilityState.UNSTABLE)
     r = MIEModelEvaluation.from_expectation(blocked)
     assert r.state.value == 'BLOCKED'
     assert r.expectation is None
