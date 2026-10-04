@@ -254,3 +254,68 @@ def test_extended_valuation_models():
     result = value_scenario(forecast, rnpv, "base", Decimal("10"))
     assert result["model"] == "rnpv"
     assert result["value_per_share"] > 0
+
+
+def test_model_suitability_returns_primary_secondary_and_cross_check():
+    from iios_mvp.valuation import assess_model_suitability, route_model
+    assessment = assess_model_suitability("cyclical")
+    assert assessment["ranked_models"][0]["model"] == "pb"
+    route = route_model("cyclical")
+    assert route["recommended_primary_model"] == "pb"
+    assert route["recommended_secondary_models"] == ["ev_ebitda"]
+    assert route["recommended_cross_check_models"] == ["dcf"]
+
+
+def test_primary_authoritative_aggregation_does_not_average_checks():
+    from decimal import Decimal
+    from iios_mvp.valuation import build_intrinsic_valuation
+    forecast = {s: {"net_profit": 100, "revenue": 1000} for s in ("bear", "base", "bull")}
+    valuation = {
+        "model_selection": {
+            "primary_model": "forward_pe",
+            "economic_profile": "mature_earnings",
+            "rationale": "normalized earnings are the primary value driver",
+            "secondary_models": ["dcf"],
+        },
+        "base_multiple": 10,
+        "bear_multiple": 8,
+        "bull_multiple": 12,
+        "model_inputs": {
+            "dcf": {
+                "base": {"fcf": [200, 200], "discount_rate": 0.10, "terminal_growth": 0.02},
+                "bear": {"fcf": [100, 100], "discount_rate": 0.12, "terminal_growth": 0.01},
+                "bull": {"fcf": [300, 300], "discount_rate": 0.09, "terminal_growth": 0.03},
+            }
+        },
+    }
+    result = build_intrinsic_valuation(forecast, valuation, Decimal("10"))
+    assert result["aggregation"]["method"] == "primary_authoritative_no_arbitrary_average"
+    assert result["aggregation"]["weights"] == {"forward_pe": 1.0}
+    assert result["intrinsic_value_per_share"] == 100.0
+    assert result["model_cross_check_dispersion"] is not None
+
+
+def test_explicit_model_weights_require_complete_models_and_sum_to_one():
+    from decimal import Decimal
+    from iios_mvp.valuation import build_intrinsic_valuation
+    forecast = {s: {"net_profit": 100, "revenue": 1000} for s in ("bear", "base", "bull")}
+    valuation = {
+        "model_selection": {
+            "primary_model": "forward_pe",
+            "economic_profile": "mature_earnings",
+            "rationale": "normalized earnings are the primary value driver",
+            "secondary_models": ["dcf"],
+        },
+        "base_multiple": 10, "bear_multiple": 8, "bull_multiple": 12,
+        "aggregation": {"model_weights": {"forward_pe": 0.7, "dcf": 0.3}},
+        "model_inputs": {
+            "dcf": {
+                "base": {"fcf": [200, 200], "discount_rate": 0.10, "terminal_growth": 0.02},
+                "bear": {"fcf": [100, 100], "discount_rate": 0.12, "terminal_growth": 0.01},
+                "bull": {"fcf": [300, 300], "discount_rate": 0.09, "terminal_growth": 0.03},
+            }
+        },
+    }
+    result = build_intrinsic_valuation(forecast, valuation, Decimal("10"))
+    assert result["aggregation"]["method"] == "explicit_weighted_average"
+    assert result["aggregation"]["weights"] == {"forward_pe": 0.7, "dcf": 0.3}
