@@ -64,12 +64,19 @@ def test_decision_grade_requires_full_qualification():
 def test_conditional_inverse_cannot_be_decision_grade():
     result = make(
         market_model=MarketModelFamily.DCF, model_id="dcf-1",
+        candidate_coverage=CandidateCoverageAssessment(
+            status=CandidateCoverageState.SUFFICIENT,
+            scope_basis="admitted_dcf_candidates_v0.2",
+            candidate_model_ids=("dcf-1", "ddm-1"),
+            evidence_ids=("ev-coverage",),
+            rationale="Decision scope includes the DCF candidate.",
+        ),
         representation=MIERepresentation.CONDITIONAL_IMPLIED_VARIABLE,
         economic_requirements=(req("fcf", "100", "CNY"),),
         assumption_set=(MIEAssumption(
             variable="growth", value=Decimal("0.05"), unit="ratio", basis="assumption",
             period="NTM", horizon="12M", accounting_basis="reported", evidence_ids=("ev-growth",)
-        ),), evidence_ids=("ev-var", "ev-growth"),
+        ),), evidence_ids=("ev-var", "ev-coverage", "ev-growth"),
     )
     assert result.qualification == MIEQualification.CONDITIONAL_ONLY
 
@@ -118,6 +125,58 @@ def test_pit_observation_basis_is_enforced():
 def test_caller_cannot_force_decision_grade_by_data_field():
     result = make(identifiability=IdentifiabilityState.AMBIGUOUS)
     assert result.qualification == MIEQualification.CONDITIONAL_ONLY
+
+
+def test_model_id_must_be_in_candidate_coverage():
+    result = make()
+    from iios_mvp.market_implied_expectation import MarketImpliedExpectation
+    forged = MarketImpliedExpectation(
+        expectation_id=result.expectation_id,
+        model_id=result.model_id,
+        market_model=result.market_model,
+        identifiability=result.identifiability,
+        stability=result.stability,
+        candidate_coverage=CandidateCoverageAssessment(
+            status=CandidateCoverageState.SUFFICIENT,
+            scope_basis="scope",
+            candidate_model_ids=("ps-1",),
+            evidence_ids=("ev-coverage",),
+            rationale="scope",
+        ),
+        representation=result.representation,
+        economic_requirements=result.economic_requirements,
+        observation_basis=result.observation_basis,
+        assumption_set=result.assumption_set,
+        evidence_sufficiency=result.evidence_sufficiency,
+        evidence_ids=result.evidence_ids,
+        qualification=result.qualification,
+        qualification_rationale=result.qualification_rationale,
+    )
+    with pytest.raises(ValueError, match="included in candidate coverage"):
+        forged.validate()
+
+
+def test_nested_evidence_must_be_in_top_level_provenance_closure():
+    result = make()
+    from iios_mvp.market_implied_expectation import MarketImpliedExpectation
+    forged = MarketImpliedExpectation(
+        expectation_id=result.expectation_id,
+        model_id=result.model_id,
+        market_model=result.market_model,
+        identifiability=result.identifiability,
+        stability=result.stability,
+        candidate_coverage=result.candidate_coverage,
+        representation=result.representation,
+        economic_requirements=(req(),),
+        observation_basis=result.observation_basis,
+        assumption_set=result.assumption_set,
+        evidence_sufficiency=result.evidence_sufficiency,
+        evidence_ids=("ev-coverage",),
+        qualification=result.qualification,
+        qualification_rationale=result.qualification_rationale,
+    )
+    with pytest.raises(ValueError, match="cover all nested evidence"):
+        forged.validate()
 
 
 def test_missing_evidence_blocks_even_when_other_states_pass():
@@ -207,3 +266,53 @@ def test_p4a_json_schema_rejects_unknown_top_level_field():
     assert list(validator.iter_errors(base)) == []
     forged = dict(base, market_implied_net_profit="forbidden")
     assert any("additional properties" in error.message.lower() for error in validator.iter_errors(forged))
+
+
+def test_p4a_json_schema_rejects_ambiguous_decision_grade():
+    schema_path = Path(__file__).resolve().parents[1] / "schemas" / "market_implied_expectation_v0.2.schema.json"
+    schema = json.loads(schema_path.read_text())
+    validator = Draft202012Validator(schema)
+    base = {
+        "expectation_id": "mie-ambiguous",
+        "model_id": "pe-1",
+        "market_model": "forward_pe",
+        "identifiability": "AMBIGUOUS",
+        "stability": "STABLE",
+        "candidate_coverage": {
+            "status": "SUFFICIENT",
+            "scope_basis": "scope",
+            "candidate_model_ids": ["pe-1", "ps-1"],
+            "evidence_ids": ["ev-coverage"],
+            "rationale": "scope"
+        },
+        "representation": "IMPLIED_RANGE",
+        "economic_requirements": [{
+            "economic_variable": "forward_eps",
+            "unit": "CNY/share",
+            "basis": "forward",
+            "period": "NTM",
+            "horizon": "12M",
+            "accounting_basis": "reported",
+            "role": "IMPLIED_PRIMARY",
+            "value": "10",
+            "evidence_ids": ["ev-var"]
+        }],
+        "observation_basis": {
+            "price_observation_id": "price-1",
+            "observation_date": "2026-10-04",
+            "cutoff_date": "2026-10-04",
+            "currency": "CNY",
+            "adjustment_semantics": "UNADJUSTED"
+        },
+        "assumption_set": [],
+        "evidence_sufficiency": {
+            "status": "SUFFICIENT",
+            "rationale": "present",
+            "evidence_ids": ["ev-var", "ev-coverage"]
+        },
+        "evidence_ids": ["ev-var", "ev-coverage"],
+        "qualification": "DECISION_GRADE",
+        "qualification_rationale": "forged"
+    }
+    assert any("does not match" in error.message.lower() or "not" in error.message.lower()
+               for error in validator.iter_errors(base))
