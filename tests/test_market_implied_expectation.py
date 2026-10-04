@@ -1,5 +1,7 @@
+import json
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
@@ -119,7 +121,7 @@ def test_caller_cannot_force_decision_grade_by_data_field():
 
 
 def test_missing_evidence_blocks_even_when_other_states_pass():
-    assert make(evidence_sufficiency=False).qualification == MIEQualification.BLOCKED
+    assert make(evidence_sufficiency=EvidenceSufficiencyAssessment(status=EvidenceSufficiencyState.INSUFFICIENT, rationale="incomplete", evidence_ids=("ev-var",))).qualification == MIEQualification.BLOCKED
 
 
 def test_requirement_point_and_range_are_mutually_exclusive():
@@ -129,8 +131,6 @@ def test_requirement_point_and_range_are_mutually_exclusive():
             accounting_basis="reported", role="IMPLIED_PRIMARY", value=Decimal("100"),
             range_low=Decimal("90"), range_high=Decimal("110"), evidence_ids=("e",)
         ).validate()
-from pathlib import Path
-import json
 from jsonschema import Draft202012Validator
 
 
@@ -168,7 +168,7 @@ def test_p4a_json_schema_rejects_unknown_top_level_field():
         "market_model": "forward_pe",
         "identifiability": "IDENTIFIABLE",
         "stability": "STABLE",
-        "candidate_coverage": "SUFFICIENT",
+        "candidate_coverage": {
         "representation": "IMPLIED_POINT",
         "economic_requirements": [{
             "economic_variable": "forward_eps",
@@ -189,7 +189,7 @@ def test_p4a_json_schema_rejects_unknown_top_level_field():
             "adjustment_semantics": "UNADJUSTED",
         },
         "assumption_set": [],
-        "evidence_sufficiency": True,
+        "evidence_sufficiency": {
         "evidence_ids": ["ev-var"],
         "qualification": "DECISION_GRADE",
         "qualification_rationale": "valid schema instance",
