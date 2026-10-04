@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .company_economic_core import build_company_economic_core, validate_company_economic_core
 from .engine import replay, render_markdown, run_case
 from .research_intake import build_research_case
 from .store import (
@@ -48,6 +49,40 @@ def cmd_intake(args: argparse.Namespace) -> int:
         print(json.dumps({"status": "CREATED", "research_case": str(path), "case_id": case["case_id"]}, ensure_ascii=False, indent=2))
     else:
         print(payload)
+    return 0
+
+
+def cmd_economic_core(args: argparse.Namespace) -> int:
+    payload = load_json(args.input)
+    required = ("case", "reality", "trust", "quality", "value_core", "value_driver_ranking")
+    missing = [key for key in required if key not in payload]
+    if missing:
+        raise ValueError(f"economic-core input missing required fields: {missing}")
+    core = build_company_economic_core(
+        payload["case"],
+        payload["reality"],
+        payload["trust"],
+        payload["quality"],
+        payload["value_core"],
+        payload["value_driver_ranking"],
+        generated_at=args.generated_at,
+    )
+    errors = validate_company_economic_core(core)
+    if errors:
+        raise ValueError("generated CORE-02 result failed validation: " + "; ".join(errors))
+    output = json.dumps(core, ensure_ascii=False, indent=2)
+    if args.out:
+        path = Path(args.out)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(output + "\n", encoding="utf-8", newline="\n")
+        print(json.dumps({
+            "status": core["status"],
+            "company_economic_core": str(path),
+            "case_id": core["case_id"],
+            "valuation_route": core["valuation_route"]["candidate_models"],
+        }, ensure_ascii=False, indent=2))
+    else:
+        print(output)
     return 0
 
 
@@ -126,6 +161,12 @@ def parser() -> argparse.ArgumentParser:
     intake.add_argument("--generated-at")
     intake.add_argument("--out")
     intake.set_defaults(func=cmd_intake)
+
+    economic_core = sub.add_parser("economic-core", help="build Company Economic Core from admitted evidence and explicit assessments")
+    economic_core.add_argument("input", help="JSON containing case + reality + trust + quality + value_core + value_driver_ranking")
+    economic_core.add_argument("--generated-at")
+    economic_core.add_argument("--out")
+    economic_core.set_defaults(func=cmd_economic_core)
 
     run = sub.add_parser("run", help="run one investment case")
     run.add_argument("case")
