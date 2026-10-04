@@ -126,7 +126,7 @@ P4-B acceptance: `docs/iios/P4B_FINAL_ACCEPTANCE_2026-10-04.md`
 P4-C is **FINAL PASS / MERGED**.
 
 - PR #12
-- pre-merge HEAD: `620977682155f5f633a5e1`
+- pre-merge HEAD: `620977682155f5f633f1dcd71ddbc6d71a2005e1`
 - merge commit: `b6bfb8df10a8ffee5f01154fbe4b47201f6048fe`
 - PR CI #143 / `37189169223`: SUCCESS
 - post-merge main Investment Core CI #144 / `37189193858`: SUCCESS

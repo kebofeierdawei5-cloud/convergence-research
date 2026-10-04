@@ -358,8 +358,6 @@ Purpose:
 
 Convert validated market-model interpretations into the economic requirements implied by the current price.
 
-P4 should not reopen P2-B domain design unless an implementation blocker is proven.
-
 Recommended sequence:
 
 ```
@@ -375,9 +373,6 @@ DCF / DDM conditional MIE — FINAL PASS
 P4-D
 SOTP / rNPV expectation extraction
         ↓
-P4-D
-SOTP / rNPV expectation extraction
-        ↓
 P4-E
 Multi-model expectation-set handling
         ↓
@@ -387,19 +382,10 @@ PIT / replay / fail-closed integration
 
 Core semantic rule:
 
-For each model preserve the economically correct variables.
-
-Examples:
-
-- PE → implied forward EPS / earnings;
-- PS → implied revenue;
-- EV/EBITDA → implied EBITDA + enterprise-value bridge;
-- DCF → explicitly labeled conditional implied FCF or a separately justified multidimensional feasible assumption set;
-- DDM → explicitly labeled conditional implied dividend or a separately justified multidimensional feasible assumption set;
-- SOTP → feasible segment / residual value construction;
-- rNPV → feasible pipeline value / probability / timing requirements.
-
-P4 must not manufacture generic implied net profit.
+- ratio families preserve their native economic variables;
+- DCF/DDM conditional inverses remain explicitly conditional;
+- SOTP/rNPV must preserve segment/residual or pipeline/probability/timing semantics;
+- generic `market_implied_net_profit` remains forbidden.
 
 ### P4-C Completion
 
@@ -407,19 +393,21 @@ P4 must not manufacture generic implied net profit.
 
 P4-C completed the DCF/DDM conditional MIE vertical slice on 2026-10-04.
 
-- PR #12
-- merge: `b6bfb8df10a8ffee5f01154fbe4b47201f6048fe`
-- pre-merge HEAD: `620977682155f5f633a5e1`
-- PR CI #143 / `37189169223`: SUCCESS
-- post-merge main Investment Core CI #144 / `37189193858`: SUCCESS
-- post-merge main FM00 #116 / `37189193862`: SUCCESS
-- final regression: 128 passed
-
 Semantic red line:
 
 `conditional inverse ≠ full feasible assumption space ≠ market truth`.
 
 DCF emits conditional implied `fcf`; DDM emits conditional implied `dividend`. The remaining model variables are explicit current conditioning/context inputs, not separately asserted market-implied outputs. All positive outputs remain `CONDITIONAL_IMPLIED_VARIABLE / CONDITIONAL_ONLY`.
+
+Evidence:
+
+- PR #12;
+- merge `b6bfb8df10a8ffee5f01154fbe4b47201f6048fe`;
+- pre-merge HEAD `620977682155f5f633f1dcd71ddbc6d71a2005e1`;
+- PR CI #143 / `37189169223`: SUCCESS;
+- post-merge main Investment Core CI #144 / `37189193858`: SUCCESS;
+- post-merge main FM00 #116 / `37189193862`: SUCCESS;
+- final regression: 128 passed.
 
 Next gate: **P4-D — SOTP / rNPV expectation extraction**.
 
@@ -714,45 +702,31 @@ The system is successful when the full chain is repeatable, auditable, and usefu
 
 ## 11. Current Next Step
 
-**P4-D should be the next implementation gate.**
+**P4-D is the next implementation gate.**
 
-Before writing broad P4 code, define the minimum model-semantic output required for:
+Implement the smallest SOTP/rNPV Market Implied Expectation vertical slice directly on the accepted P3-B typed domain and P4-A qualification boundary.
 
-- ratio models;
-- DCF;
-- DDM;
-- SOTP;
-- rNPV;
-- multi-model ambiguity.
+Preserve:
 
-Do this on top of the accepted P2-B/P3-A/P3-B objects, then implement the smallest end-to-end P4 vertical slice and red-team it before generalizing.
+- SOTP segment / residual semantics;
+- rNPV pipeline / probability / timing semantics;
+- candidate coverage and evidence sufficiency;
+- PIT and provenance;
+- fail-closed ambiguity / instability / insufficiency.
 
-This preserves the current successful development pattern:
-
-```
-frozen semantics
-        ↓
-typed boundary
-        ↓
-small deterministic implementation
-        ↓
-CI
-        ↓
-red-team
-        ↓
-acceptance
-        ↓
-next gate
-```
-
----
-
+Do not start P5 until P4-D, P4-E and P4-F close the remaining Market Implied Expectation path.
 ## 12. Canonical Current State
 
 As of 2026-10-04:
 
 - P4-B acceptance baseline / pre-state commit: `02d6a9a7dc9626ae3d82132d0152bdf65ebc16ec`
 - P4-B merge commit: `741b3fc0bff3a8da5e993f1a0c0aec25cb823420`
+- P4-C pre-merge HEAD: `620977682155f5f633f1dcd71ddbc6d71a2005e1`
+- P4-C merge commit: `b6bfb8df10a8ffee5f01154fbe4b47201f6048fe`
+- P4-C PR CI #143 / `37189169223`: SUCCESS
+- P4-C post-merge main Investment Core CI #144 / `37189193858`: SUCCESS
+- P4-C post-merge main FM00 #116 / `37189193862`: SUCCESS
+- P4-C final regression: 128 passed
 - Investment Core Contract v0.2: FROZEN / SEMANTIC PASS
 - P2-A: FINAL PASS / MERGED
 - P2-B: FINAL PASS / MERGED
@@ -764,7 +738,6 @@ As of 2026-10-04:
 - Independent audit: NOT STARTED
 - Batch 2 v0.1 PR #3: OPEN / RED-TEAM BLOCKED / NOT MERGED
 - M1.2 forecast research: separate track; CATL exact source admission remains blocked.
-
 ## 13. Continuity Rule
 
 When future work begins, first reconcile against this document and current Git `main`.

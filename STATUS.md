@@ -33,7 +33,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 P4-C is formally **FINAL PASS / MERGED** on canonical `main`.
 
 - PR #12: MERGED
-- pre-merge HEAD: `620977682155f5f633f1dcd32`
+- pre-merge HEAD: `620977682155f5f633f1dcd71ddbc6d71a2005e1`
 - merge commit: `b6bfb8df10a8ffee5f01154fbe4b47201f6048fe`
 - PR Investment Core CI #143 / `37189169223`: **SUCCESS**
 - PR FM00 CI #115 / `37189169218`: **SUCCESS**

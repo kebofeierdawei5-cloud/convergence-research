@@ -338,82 +338,100 @@ PR #3 / Batch 2 v0.1 remains blocked and untouched.
 
 ### P4 — Market Implied Expectation Engine
 
-Status: **ACTIVE — P4-A / P4-B / P4-C COMPLETE / P4-D NEXT**
+**ACTIVE — P4-A / P4-B / P4-C COMPLETE / P4-D NEXT**
 
-Macro planning authority: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026-10-04.md`.
+Purpose:
 
-P4-A completed deliverables:
+Convert validated market-model interpretations into the economic requirements implied by the current price.
 
-- MIE qualification contract;
-- typed MIE output boundary;
-- explicit conditionality representation;
-- typed candidate-coverage assessment;
-- typed evidence-sufficiency assessment;
-- provenance closure;
-- PIT observation binding;
-- cross-field JSON Schema hardening;
-- acceptance record: `docs/iios/P4A_FINAL_ACCEPTANCE_2026-10-04.md`.
+P4 should not reopen P2-B domain design unless an implementation blocker is proven.
 
-P4-B implementation deliverables:
-
-- ratio-family MIE extraction module: `iios_mvp/ratio_market_implied_expectation.py`;
-- ratio-family acceptance matrix: `docs/iios/P4B_RATIO_MIE_ACCEPTANCE_MATRIX_v0.2.md`;
-- typed output is the existing P4-A `MarketImpliedExpectation` object;
-- P3 feasible ranges are preserved exactly as `IMPLIED_RANGE`;
-- ambiguity, instability, insufficient evidence and insufficient candidate coverage remain fail-closed or conditional according to P4-A;
-- four supported families: forward PE / PS / PB / EV/EBITDA;
-- no P4-B inverse recalculation and no Expectation Gap / Expected Return / decision action.
-
-Next P4 decomposition:
+Recommended sequence:
 
 ```
-P4-A  Market Implied Expectation qualification contract
+P4-A
+Market Implied Expectation qualification contract — FINAL PASS
         ↓
-P4-B  Ratio-family MIE vertical slice
+P4-B
+Ratio-family MIE vertical slice — FINAL PASS
         ↓
-P4-C  DCF / DDM conditional MIE
+P4-C
+DCF / DDM conditional MIE — FINAL PASS
         ↓
-P4-D  SOTP / rNPV expectation extraction
+P4-D
+SOTP / rNPV expectation extraction
         ↓
-P4-E  multi-model expectation-set + ambiguity handling
+P4-E
+multi-model expectation-set + ambiguity handling
         ↓
-P4-F  PIT / replay / fail-closed integration
+P4-F
+PIT / replay / fail-closed integration
 ```
 
-P4-A is complete. P4-B must consume the P4-A qualified boundary and accepted P2-B / P3-A outputs rather than reopen their domain semantics.
+Core semantic rule:
 
-P3 IDENTIFIABLE is candidate-set-conditional. P4 must explicitly distinguish conditional inverse results from decision-grade Market Implied Expectation and must qualify candidate coverage before using uniqueness as evidence of market-model identification.
+For each model preserve the economically correct variables.
 
-For each identified / feasible model, produce the economic variables that the current price requires.
+Examples:
 
-Never collapse different model semantics into one generic “implied net profit”.
+- PE → implied forward EPS / earnings;
+- PS → implied revenue;
+- EV/EBITDA → implied EBITDA + enterprise-value bridge;
+- DCF → explicitly labeled conditional implied FCF or a separately justified multidimensional feasible assumption set;
+- DDM → explicitly labeled conditional implied dividend or a separately justified multidimensional feasible assumption set;
+- SOTP → feasible segment / residual value construction;
+- rNPV → feasible pipeline value / probability / timing requirements.
+
+P4 must not manufacture generic implied net profit.
+
+### P4-A — MIE Qualification Boundary
+
+Status: **FINAL PASS / MERGED**
+
+Acceptance: `docs/iios/P4A_FINAL_ACCEPTANCE_2026-10-04.md`.
+
+### P4-B — Ratio-family Market Implied Expectation
+
+Status: **FINAL PASS / MERGED**
+
+Acceptance: `docs/iios/P4B_FINAL_ACCEPTANCE_2026-10-04.md`.
 
 ### P4-C — DCF / DDM Conditional Market Implied Expectation
 
 Status: **FINAL PASS / MERGED**
 
-Consume P3-B DCF/DDM model-specific feasible solutions through the P4-A typed qualification boundary. Preserve conditional assumption semantics; do not collapse to generic implied net profit or promote conditional inversion to a full multidimensional feasible assumption set without explicit evidence and contract support.
+Implementation:
 
-Acceptance target:
+- `iios_mvp/dcf_ddm_conditional_market_implied_expectation.py`
+- `tests/test_dcf_ddm_conditional_market_implied_expectation.py`
+- `docs/iios/P4C_DCF_DDM_CONDITIONAL_MIE_ACCEPTANCE_MATRIX_v0.2.md`
+- `docs/iios/P4C_FINAL_ACCEPTANCE_2026-10-04.md`
 
-- DCF conditional implied FCF / assumption requirement;
-- DDM conditional implied dividend / assumption requirement;
-- explicit assumption set and provenance;
-- ambiguity / instability / insufficient evidence remain fail-closed;
-- no Expectation Gap / Expected Return implementation.
-
-Acceptance evidence: `docs/iios/P4C_FINAL_ACCEPTANCE_2026-10-04.md`.
-
-Implementation boundary:
+Semantic boundary:
 
 - DCF → conditional implied `fcf`;
 - DDM → conditional implied `dividend`;
-- current assumption/context slice is explicit and provenance-bound;
-- conditional output cannot qualify as decision-grade;
-- no full multidimensional feasible assumption-space claim;
-- no market-truth claim.
+- DCF conditioning/context: `growth`, `margin`, `reinvestment`, `terminal_value`, `discount_rate`;
+- DDM conditioning/context: `payout`, `growth`, `discount_rate`;
+- P3-B inverse is consumed, not recomputed;
+- output remains `CONDITIONAL_IMPLIED_VARIABLE / CONDITIONAL_ONLY`;
+- no full multidimensional feasible-assumption-space claim;
+- no market-truth claim;
+- no Expectation Gap / Expected Return implementation.
 
-**Next: P4-D — SOTP / rNPV expectation extraction.**
+Important interpretation boundary:
+
+The P3-B complex baseline mathematically inverts the primary variable using its supported price/valuation inputs. The remaining listed variables are explicit current model-required conditioning/context inputs and validation inputs, not separately market-implied outputs.
+
+Evidence:
+
+- PR #12 merged;
+- merge commit `b6bfb8df10a8ffee5f01154fbe4b47201f6048fe`;
+- pre-merge HEAD `620977682155f5f633f1dcd71ddbc6d71a2005e1`;
+- PR Investment Core CI #143 / `37189169223`: SUCCESS;
+- post-merge main Investment Core CI #144 / `37189193858`: SUCCESS;
+- post-merge main FM00 #116 / `37189193862`: SUCCESS;
+- final regression: 128 passed.
 
 ### P4-D — SOTP / rNPV Market Implied Expectation
 
