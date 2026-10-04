@@ -83,6 +83,14 @@ def _model_evaluation_from_dict(item: Mapping[str, Any]) -> tuple[str, str]:
         raise ValueError("P4-F model evaluation model_id is required")
     if state not in {x.value for x in MIEModelEvaluationState}:
         raise ValueError("P4-F model evaluation state is invalid")
+    expectation = item.get("expectation")
+    if state == MIEModelEvaluationState.MATERIALIZED.value:
+        if not isinstance(expectation, dict):
+            raise ValueError("P4-F MATERIALIZED evaluation requires expectation")
+        if expectation.get("model_id") != model_id:
+            raise ValueError("P4-F model evaluation model_id/expectation mismatch")
+    elif expectation is not None:
+        raise ValueError("P4-F non-materialized evaluation cannot carry expectation")
     return model_id, state
 
 def _expected_set_semantics(mie_set: Mapping[str, Any]) -> tuple[str, str]:
