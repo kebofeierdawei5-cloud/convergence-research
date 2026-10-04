@@ -58,7 +58,7 @@ MODEL_SUITABILITY = {
 }
 
 MODEL_ROUTE_FALLBACK = {
-    profile: tuple(sorted(scores, key=lambda model: (-score, model)))
+    profile: tuple(sorted(scores, key=lambda item: (-item[1], item[0])))
     for profile, scores in MODEL_SUITABILITY.items()
 }
 
