@@ -236,3 +236,87 @@ Those remain historical artifacts, not active roadmap state.
 When resuming IIOS work, start from this file plus the current repository/package artifacts.
 Treat the frozen G2 Governance Runtime as an immutable contract and FM-00 as the current active research-control layer.
 Next default task: `M1.2-FM-01 Driver History Foundation`.
+
+
+## 13. Investment Decision Core — 2026-10-04 architecture decisions
+
+### Human valuation-model selection is now the canonical company-side design
+
+After two rounds of red-team review, the system explicitly does NOT attempt to automatically determine a single "most appropriate" company valuation model at the current stage.
+
+Canonical chain:
+`Company Value Core Scan → Economic Profile → Candidate Valuation Models → HUMAN Primary Model Selection → IIOS Model Consistency Gate → Primary / Secondary / Cross-check → Independent Forecast → Intrinsic Valuation`
+
+Authority boundary:
+- IIOS owns value-core structure, economic classification, candidate-model generation, suitability ranking, validation, model consistency, calculations, and replay.
+- Human owns the final Primary Model, rationale, material Secondary/Cross-check choices, explicit override decisions, and final investment approval.
+- `selection_method=HUMAN` is required.
+- Missing primary model/rationale or invalid model selection fails closed.
+- Selecting outside the candidate set requires `override_reason`.
+- The Model Router is advisory only and must never silently replace the human-selected model.
+
+Rationale:
+The company-side valuation model is an investment judgment and is not always uniquely identifiable from currently available data. Do not spend the next milestone trying to turn the company-side Router into a black-box authority. Revisit automatic recommendation only after sufficient historical model-choice and outcome data exists.
+
+Implementation status:
+- PR #4 `refactor(iios): human-in-the-loop company valuation model selection` merged to `main`.
+- Merge commit: `af2a1a6a019872c76ee9a49c4e05c0702b0c7e20`.
+- Final MVP CI run #52 = SUCCESS.
+- FM00 CI run #51 = SUCCESS.
+- Human-selection contract: `docs/iios/HUMAN_VALUATION_MODEL_SELECTION_v1.0.md`.
+
+### Batch 2 v0.1 is RED-TEAM BLOCKED
+
+The current Batch 2 implementation must not be treated as a valid `Market Model Identification` implementation and must not be merged.
+
+What the existing code actually does:
+`Given Model + Given Human Operating Range + Current Price → Reverse Valuation`
+
+Why it is insufficient:
+- "Feasible" is determined mainly by whether the user supplied a mathematically valid range, not whether market observations support that model.
+- Identifiability is effectively driven by how many model inputs the user provides, not by observable market evidence.
+- Market model history / valuation behavior / price-fundamental relationship is not used.
+- Market-model inputs lack the required evidence/PIT/provenance contract.
+- `forecast` and `intrinsic` are not meaningfully used for market-model identification.
+- The current expectation-gap path is mathematically/semantically invalid for non-PE models and incorrect for PE because the derived quantity is EPS, not a market-implied value.
+- Current stability measures the width of a user-supplied range, not temporal/model/regime stability.
+- Current Probability/Payoff and Kelly sizing are only experimental primitives and are not frozen as final IIOS formulas.
+- Batch-2-specific tests were not part of the established MVP CI gate at the time of implementation.
+
+Therefore:
+- Preserve the reverse-solver logic only as a low-level `Market Reverse Valuation Primitive`.
+- Do not add more ad-hoc reverse solvers or thresholds to the current identification layer.
+- Redesign Batch 2 v0.2 from the data/identification question upward.
+
+### Canonical Market-side target
+
+The correct market-side problem is:
+`Market Observable Evidence → Candidate Market Models → Historical / Current Fit → Feasible Solution Set → Identifiability → Stability → Reverse Valuation → Market Implied Expectations → Expectation Gap`
+
+Target distinction:
+- Company valuation model = "How should IIOS value the company independently?" → Human-authoritative today.
+- Market valuation model = "What logic and expectations are embedded in the current market price?" → IIOS should progressively identify from evidence.
+
+Market Model Identification must not be inferred from user-declared model hypotheses alone.
+
+### Active workstream priority
+
+For the investment-decision MVP, the next task is NOT continued Batch-2 coding.
+
+Required sequence:
+1. Red-team/audit current Batch 2 definition and evidence requirements — completed 2026-10-04.
+2. Freeze the audit disposition: current Batch 2 v0.1 = BLOCKED; no merge.
+3. Design the smallest correct Batch 2 v0.2 around actual market-observable evidence and PIT/provenance.
+4. Only then implement and test the new market-model identification layer.
+5. Reconnect expectation gap → probability/payoff → risk → position sizing only after market implied expectation is semantically valid.
+
+Do not confuse this investment-core workstream with the separate M1.2 forecast-validation workstream; both remain active, but their contracts and gates must stay separate.
+
+## 14. Long-term memory / continuity rule update
+
+The 2026-10-04 investment-core decisions above supersede any earlier project notes that implied:
+- the company-side Model Router should automatically choose the authoritative Primary Model;
+- current Batch-2 v0.1 already performs true market model identification;
+- current Batch-2 expectation-gap, stability, or sizing outputs are production-grade.
+
+Repository continuity artifacts are the authoritative persistent record for these decisions. Chat discussion alone is not authoritative.
