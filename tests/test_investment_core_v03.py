@@ -63,7 +63,7 @@ def test_v03_return_math_separates_the_two_15_percent_policies():
     assert metrics["required_return_pass"] is True
     assert metrics["return_gate_pass"] is True
     assert metrics["expected_total_return"] == Decimal("0.42")
-    assert abs(metrics["expected_annualized_return"] - Decimal("0.191637...")) < Decimal("0.000001")
+    assert abs(metrics["expected_annualized_return"] - (Decimal("1.42").sqrt() - Decimal("1"))) < Decimal("0.000001")
     assert abs(metrics["margin_of_safety"] - (Decimal("15")/Decimal("115"))) < Decimal("0.000001")
 
 
@@ -101,6 +101,11 @@ def test_v03_watch_when_target_passes_but_entry_cushion_fails():
     c = case()
     c["return_gate"]["entry_price"] = "110"
     c["return_gate"]["entry_value_reference"] = "115"
+    c["return_gate"]["scenarios"] = {
+        "bear": {"probability": "0.2", "terminal_value_per_share": "140", "cash_distributions_per_share": "0", "probability_rationale": "watch bear"},
+        "base": {"probability": "0.5", "terminal_value_per_share": "160", "cash_distributions_per_share": "0", "probability_rationale": "watch base"},
+        "bull": {"probability": "0.3", "terminal_value_per_share": "180", "cash_distributions_per_share": "0", "probability_rationale": "watch bull"},
+    }
     result = decide(c)
     assert result["decision"]["action"] == "WATCH"
     assert result["decision"]["investability_status"] == "WATCH"
