@@ -376,7 +376,7 @@ def decide_v03(case: dict[str, Any]) -> dict[str, Any]:
         "position_package_complete": package_complete,
     }
     if metrics is not None:
-        output["return_metrics"] = metrics
+        output["return_metrics"] = _serialize_metrics(metrics)
     return output
 
 def assert_valid_v03_case(case: dict[str, Any]) -> None:
