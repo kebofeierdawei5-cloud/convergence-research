@@ -189,6 +189,10 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
     portfolio = case["portfolio"]
     if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.2":
         # Contract validation and legacy v0.1.1 decision semantics must never be mixed.
+        try:
+            v02_position = dec((case.get("portfolio") or {}).get("position_pct", 0), "portfolio.position_pct")
+        except ValueError:
+            v02_position = Decimal("0")
         return {
             "engine_version": ENGINE_VERSION,
             "case_id": case["case_id"], "symbol": case["symbol"], "company": case["company"],
@@ -200,7 +204,7 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
             "forecast": case.get("forecast") or {},
             "valuation": {},
             "risk": case.get("risk") or {},
-            "decision": {"action": "HOLD" if dec((case.get("portfolio") or {}).get("position_pct", 0), "portfolio.position_pct") > 0 else "NO-BUY",
+            "decision": {"action": "HOLD" if v02_position > 0 else "NO-BUY",
                          "primary_reason": "V02_ENGINE_NOT_IMPLEMENTED",
                          "position_package_complete": False, "human_approval_required": True,
                          "auto_execution": False},
