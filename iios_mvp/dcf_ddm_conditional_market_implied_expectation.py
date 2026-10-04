@@ -385,7 +385,7 @@ def build_dcf_ddm_conditional_market_implied_expectations(
                 assumptions,
             ),
         )
-        if output.qualification.value != "CONDITIONAL_ONLY":
+        if output.qualification.value not in {"CONDITIONAL_ONLY", "BLOCKED"}:
             raise ValueError("P4-C conditional inverse cannot become decision-grade")
         outputs.append(output)
 
