@@ -2,6 +2,8 @@
 
 ## Canonical State
 
+Continuity / macro plan: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026-10-04.md`
+
 - Current canonical `main` is the source of truth.
 - State Reconciliation: COMPLETE.
 - Investment Core Contract v0.2: **FROZEN / SEMANTIC PASS**.
