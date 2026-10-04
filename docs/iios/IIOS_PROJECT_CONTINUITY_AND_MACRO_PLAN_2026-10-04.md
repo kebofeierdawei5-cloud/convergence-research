@@ -352,7 +352,7 @@ The cases should exercise different economics and valuation paths.
 
 ### P4 — Market Implied Expectation Engine
 
-**Next critical gate**
+**ACTIVE / P4-A COMPLETE / P4-B NEXT**
 
 Purpose:
 
@@ -364,7 +364,7 @@ Recommended sequence:
 
 ```
 P4-A
-Market Implied Expectation qualification contract
+Market Implied Expectation qualification contract — FINAL PASS
         ↓
 P4-B
 Ratio-family MIE vertical slice
@@ -689,7 +689,7 @@ The system is successful when the full chain is repeatable, auditable, and usefu
 
 ## 11. Current Next Step
 
-**P4-A should be the next implementation gate.**
+**P4-B should be the next implementation gate.**
 
 Before writing broad P4 code, define the minimum model-semantic output required for:
 
@@ -726,13 +726,13 @@ next gate
 
 As of 2026-10-04:
 
-- Main HEAD: `ceae90f89f96f550645bc57a9b96528021e5ca9e`
+- Main HEAD: `30bd8f2a62a281c1fcdf66dbb6d4e7ed51002d17`
 - Investment Core Contract v0.2: FROZEN / SEMANTIC PASS
 - P2-A: FINAL PASS / MERGED
 - P2-B: FINAL PASS / MERGED
 - P3-A: FINAL PASS / MERGED
 - P3-B: FINAL PASS / MERGED
-- P4: NEXT / NOT STARTED
+- P4: ACTIVE / P4-A FINAL PASS / P4-B NEXT
 - Production investment decision kernel: NOT YET
 - Real-company acceptance: NOT STARTED
 - Independent audit: NOT STARTED
