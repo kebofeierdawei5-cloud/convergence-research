@@ -25,6 +25,7 @@
   },
   "valuation": {
     "model": "forward_pe",
+    "model_selection": {"primary_model": "forward_pe", "economic_profile": "mature_cash_earning_business", "rationale": "示例主业以可持续盈利和现金流为核心，采用盈利倍数作为主模型。", "alternatives": ["dcf"]},
     "currency": "CNY",
     "current_price": 16.5,
     "shares_outstanding": 10000000000,
