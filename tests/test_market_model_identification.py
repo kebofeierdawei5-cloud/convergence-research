@@ -327,7 +327,7 @@ def test_candidate_unknown_provenance_is_rejected():
         identify_market_models(base_input([bad], observations))
 
 def test_stability_observation_can_be_stable_without_selected_model():
-    from iios_mvp.market_model_domain import StabilityObservation
+    from iios_mvp.market_model_domain import StabilityObservation, StabilityState
     observation = StabilityObservation(
         perturbation_id="p1",
         perturbation="full historical set",
