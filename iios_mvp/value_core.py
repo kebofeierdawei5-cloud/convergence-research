@@ -176,7 +176,7 @@ def scan_company_value_core(company_value_core: dict[str, Any]) -> dict[str, Any
             **node,
             "derived_economic_profile": profile,
             "candidate_valuation_models": route["candidate_models"],
-            "recommended_primary_model": route["recommended_primary_model"],
+            "model_router_suggestion": route["candidate_models"][0],
             "independent_valuation_required": core,
             "core_value_reasons": _core_reason(node, profile) if core else ["SUPPORTING_VALUE_NODE"],
         })
@@ -206,7 +206,7 @@ def scan_company_value_core(company_value_core: dict[str, Any]) -> dict[str, Any
                 "node_type": node["node_type"],
                 "materiality": node["materiality"],
                 "derived_economic_profile": node["derived_economic_profile"],
-                "recommended_primary_model": node["recommended_primary_model"],
+                "model_router_suggestion": node["model_router_suggestion"],
                 "candidate_valuation_models": node["candidate_valuation_models"],
                 "independent_valuation_required": node["independent_valuation_required"],
                 "reasons": node["core_value_reasons"],

@@ -36,7 +36,7 @@ def test_tencent_value_core_is_mixed_and_scans_capital_intensive_ai_growth():
     assert result["value_structure"]["core_asset_count"] == 3
     growth = next(x for x in result["nodes"] if x["id"] == "growth")
     assert growth["derived_economic_profile"] == "enterprise_operating_business"
-    assert growth["recommended_primary_model"] == "ev_ebitda"
+    assert growth["model_router_suggestion"] == "ev_ebitda"
 
 
 def test_catl_value_core_is_mature_cash_earning_with_capex_reinvestment_visible():
@@ -49,7 +49,7 @@ def test_catl_value_core_is_mature_cash_earning_with_capex_reinvestment_visible(
     })
     assert result["status"] == "PASS"
     assert result["overall_economic_profile"] == "cash_flow_business"
-    assert result["model_route"]["recommended_primary_model"] == "dcf"
+    assert result["model_route"]["model_router_suggestion"] == "dcf"
 
 
 def test_kolun_value_core_is_mixed_and_requires_independent_pipeline_valuation():
@@ -70,9 +70,9 @@ def test_kolun_value_core_is_mixed_and_requires_independent_pipeline_valuation()
     assert result["overall_economic_profile"] == "mixed_segments"
     pipeline = next(x for x in result["core_assets"] if x["id"] == "pipeline")
     assert pipeline["derived_economic_profile"] == "innovative_drug_pipeline"
-    assert pipeline["recommended_primary_model"] == "rnpv"
+    assert pipeline["model_router_suggestion"] == "rnpv"
     assert "rnpv" in pipeline["candidate_valuation_models"]
-    assert result["model_route"]["recommended_primary_model"] == "sotp"
+    assert result["model_route"]["model_router_suggestion"] == "sotp"
     assert pipeline["independent_valuation_required"] is True
 
 

@@ -1,4 +1,4 @@
-# IIOS Batch 1-B｜Company Value Core Scan / Value Construction Map v1.0
+# IIOS Batch 1-B｜Company Value Core Scan / Value Construction Map v1.1
 
 ## Purpose
 
@@ -53,7 +53,7 @@ maturity uses MATURE / COMMERCIAL / DEVELOPMENT.
 
 - derived_economic_profile
 - candidate_valuation_models
-- recommended_primary_model
+- model_route（candidate models + suitability；不输出权威 primary selection）r_suggestion（仅提示，不具备决策权）
 - independent_valuation_required
 - core_value_reasons
 
@@ -69,7 +69,7 @@ maturity uses MATURE / COMMERCIAL / DEVELOPMENT.
 
 规则不由 LLM 自由决定：
 
-Company Value Core Scan = 结构化节点 + 固定经济属性分类规则 + 固定 Model Suitability Router。
+Company Value Core Scan = 结构化节点 + 固定经济属性分类规则 + 固定 Model Suitability Router（仅生成候选集与适配性排序，不选择最终主模型）。
 
 LLM 可以负责研究、证据解释和生成候选节点，但不能把未经结构化的自然语言结论直接当成确定性扫描结果。
 
