@@ -44,7 +44,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Evidence-domain and temporal-lineage red-team hardening was included before merge.
 - CORE-02 does not perform forecast, MIE, Expectation Gap or decision execution.
 
-## CORE-00 Active Boundary
+## CORE-00 Completed Boundary
 
 - Current execution gate: **CORE-00 Scope Reset & Architecture Reconciliation**
 - Investment Core = **single-company case + per-case evidence/PIT + decision**
