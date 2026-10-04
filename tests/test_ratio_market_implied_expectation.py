@@ -11,7 +11,7 @@ from iios_mvp.market_implied_expectation import (
     MIEQualification,
 )
 from iios_mvp.market_model_domain import CandidateMarketModel, MarketModelFamily, MarketObservableEvidence
-from iios_mvp.market_model_identification import MarketModelIdentificationInput, MarketValuationObservation, identify_market_models
+from iios_mvp.market_model_identification import CandidateEvaluation, MarketModelIdentificationInput, MarketValuationObservation, identify_market_models
 from iios_mvp.ratio_market_implied_expectation import build_ratio_market_implied_expectations
 
 
@@ -296,8 +296,7 @@ def test_nested_evidence_must_be_manifest_backed():
 
 
 def test_wrong_p3_solution_variable_is_rejected():
-    from dataclasses import replace
-    from iios_mvp.market_model_domain import FeasibleSolution, FeasibleSolutionSet, FeasibleSolutionStatus, ModelFit
+    from iios_mvp.market_model_domain import FeasibleSolution, FeasibleSolutionSet, FeasibleSolutionStatus
     pe = candidate("pe-1", MarketModelFamily.FORWARD_PE, "candidate-pe")
     inp = build_input((pe,), "forward_eps", ("5", "5", "5", "5", "5"), ("90", "95", "100", "105", "100"))
     p3 = identify_market_models(inp)
