@@ -319,3 +319,94 @@ def test_explicit_model_weights_require_complete_models_and_sum_to_one():
     result = build_intrinsic_valuation(forecast, valuation, Decimal("10"))
     assert result["aggregation"]["method"] == "explicit_weighted_average"
     assert result["aggregation"]["weights"] == {"forward_pe": 0.7, "dcf": 0.3}
+
+
+def test_rnpv_pipeline_assets_support_delay_and_asset_level_probability():
+    from decimal import Decimal
+    from iios_mvp.valuation import build_intrinsic_valuation
+    forecast = {s: {"net_profit": 1, "revenue": 1} for s in ("bear", "base", "bull")}
+    valuation = {
+        "model_selection": {
+            "primary_model": "rnpv",
+            "economic_profile": "innovative_drug_pipeline",
+            "rationale": "pipeline assets require risk-adjusted valuation",
+        },
+        "model_inputs": {
+            "rnpv": {
+                "base": {
+                    "discount_rate": 0.10,
+                    "pipeline": [
+                        {
+                            "name": "Drug-A",
+                            "launch_delay_periods": 1,
+                            "cash_flows": [100, 100],
+                            "probability_of_success": [0.5, 0.5],
+                        },
+                        {
+                            "name": "Drug-B",
+                            "cash_flows": [{"cash_flow": 50, "risk_adjust": False}],
+                            "probability_of_success": [0.8],
+                        },
+                    ],
+                },
+                "bear": {"discount_rate": 0.12, "pipeline": [{"name": "A", "cash_flows": [50], "probability_of_success": [0.4]}]},
+                "bull": {"discount_rate": 0.09, "pipeline": [{"name": "A", "cash_flows": [150], "probability_of_success": [0.7]}]},
+            }
+        },
+    }
+    result = build_intrinsic_valuation(forecast, valuation, Decimal("10"))
+    assert result["model_selection"]["primary_model"] == "rnpv"
+    assert result["model_status"]["rnpv"]["base_status"] == "PASS"
+    assert result["models"]["rnpv"]["base"]["drivers"]["asset_count"] == 2
+
+
+def test_sotp_supports_mixed_models_and_ownership():
+    from decimal import Decimal
+    from iios_mvp.valuation import build_intrinsic_valuation
+    forecast = {s: {"net_profit": 100, "revenue": 1000} for s in ("bear", "base", "bull")}
+    valuation = {
+        "model_selection": {
+            "primary_model": "sotp",
+            "economic_profile": "mixed_segments",
+            "rationale": "segments have materially different economic drivers",
+        },
+        "model_inputs": {
+            "sotp": {
+                "base": {
+                    "segments": [
+                        {"name": "mature", "model": "forward_pe", "net_profit": 100, "multiple": 10},
+                        {"name": "pipeline", "model": "rnpv", "cash_flows": [100], "probability_of_success": [0.5], "discount_rate": 0.1, "ownership_pct": 80},
+                    ]
+                },
+                "bear": {"segments": [{"name": "mature", "model": "forward_pe", "net_profit": 80, "multiple": 8}]},
+                "bull": {"segments": [{"name": "mature", "model": "forward_pe", "net_profit": 120, "multiple": 12}]},
+            }
+        },
+    }
+    result = build_intrinsic_valuation(forecast, valuation, Decimal("10"))
+    assert result["models"]["sotp"]["base"]["drivers"]["segment_count"] == 2
+    assert result["intrinsic_value_range"]["low"] < result["intrinsic_value_range"]["base"] < result["intrinsic_value_range"]["high"]
+
+
+def test_intrinsic_value_gate_fails_on_bad_scenario_order():
+    from iios_mvp.valuation import evaluate_intrinsic_value_gate
+    result = {
+        "model_selection": {"primary_model": "pb", "economic_profile": "cyclical", "rationale": "asset value"},
+        "scenarios": {"bear_value_per_share": 20, "base_value_per_share": 10, "bull_value_per_share": 30},
+        "model_status": {"pb": {"bear_status": "PASS", "base_status": "PASS", "bull_status": "PASS"}},
+        "aggregation": {"weights": {"pb": 1.0}},
+    }
+    gate = evaluate_intrinsic_value_gate(result)
+    assert gate["status"] == "BLOCKED"
+    assert "SCENARIO_ORDER_INVALID" in gate["blockers"]
+
+
+def test_intrinsic_value_gate_passes_valid_range():
+    from iios_mvp.valuation import evaluate_intrinsic_value_gate
+    result = {
+        "model_selection": {"primary_model": "pb", "economic_profile": "cyclical", "rationale": "asset value"},
+        "scenarios": {"bear_value_per_share": 8, "base_value_per_share": 12, "bull_value_per_share": 18},
+        "model_status": {"pb": {"bear_status": "PASS", "base_status": "PASS", "bull_status": "PASS"}},
+        "aggregation": {"weights": {"pb": 1.0}},
+    }
+    assert evaluate_intrinsic_value_gate(result)["status"] == "PASS"
