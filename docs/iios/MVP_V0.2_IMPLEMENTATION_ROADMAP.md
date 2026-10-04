@@ -313,24 +313,32 @@ The P3-A method is a deterministic baseline using historical observed-multiple r
 
 ### P3-B — Complex Model-Specific Market Model Identification
 
-Status: **NEXT**
+Status: **COMPLETE / FINAL PASS / MERGED**
 
-Implement model-specific feasible-solution, identifiability and stability logic for:
+Implemented directly on the P2-B typed domain:
 
-- DCF
-- DDM
-- SOTP
-- rNPV
+- DCF one-stage FCFF inverse baseline;
+- DDM Gordon-growth inverse baseline;
+- SOTP segment/residual inverse;
+- rNPV probability/timing pipeline-composition inverse;
+- historical/current model-specific fit;
+- non-empty model-specific Feasible Solution Sets;
+- conservative Identifiability;
+- complex-model date-level leave-one-out Stability;
+- observation evidence variable/unit binding;
+- fail-closed handling for missing / invalid / contradictory inputs.
 
-The same P2-B provenance, PIT and fail-closed boundaries remain mandatory.
+The complex-model stability perturbation unit is a complete historical date because each date contains multiple variables required by the model. The implementation deliberately remains a deterministic baseline rather than a calibrated universal statistical classifier.
+
+P3-B acceptance evidence: `docs/iios/P3B_COMPLEX_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`.
 
 Do not collapse these models into generic implied net profit or ratio arithmetic.
 
-P4 is blocked until P3-B produces valid market-model interpretations.
+PR #3 / Batch 2 v0.1 remains blocked and untouched.
 
 ### P4 — Market Implied Expectation Engine
 
-Status: **NOT STARTED**
+Status: **NEXT / NOT STARTED**
 
 For each identified / feasible model, produce the economic variables that the current price requires.
 
@@ -475,6 +483,7 @@ The core can be considered production-capable only when all of the following are
 - intrinsic value is deterministic and replayable;
 - market model interpretation is evidence-based;
 - feasible solution set / identifiability / stability are meaningful;
+- DCF / DDM / SOTP / rNPV market-model interpretation is model-semantic and evidence-backed;
 - market implied expectation is model-semantic correct;
 - expectation gap is economically coherent;
 - positive return >15% is computed under explicit assumptions;
