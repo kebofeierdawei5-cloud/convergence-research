@@ -187,6 +187,26 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
     forecast = case["forecast"]
     risk = case["risk"]
     portfolio = case["portfolio"]
+    if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.2":
+        # Contract validation and legacy v0.1.1 decision semantics must never be mixed.
+        return {
+            "engine_version": ENGINE_VERSION,
+            "case_id": case["case_id"], "symbol": case["symbol"], "company": case["company"],
+            "cutoff_date": case["cutoff_date"],
+            "validation": validation,
+            "gates": {"trust": str((case.get("trust") or {}).get("status", "UNKNOWN")).upper(),
+                      "new_buy_add_allowed": False, "evidence_pit": validation["status"] == "PASS",
+                      "forecast_ready": False, "valuation_ready": False},
+            "forecast": case.get("forecast") or {},
+            "valuation": {},
+            "risk": case.get("risk") or {},
+            "decision": {"action": "HOLD" if dec((case.get("portfolio") or {}).get("position_pct", 0), "portfolio.position_pct") > 0 else "NO-BUY",
+                         "primary_reason": "V02_ENGINE_NOT_IMPLEMENTED",
+                         "position_package_complete": False, "human_approval_required": True,
+                         "auto_execution": False},
+            "monitoring": case.get("monitoring") or [],
+        }
+
     if blockers:
         position_raw = (portfolio or {}).get("position_pct", 0)
         try:
