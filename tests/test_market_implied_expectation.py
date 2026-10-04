@@ -4,7 +4,10 @@ from decimal import Decimal
 import pytest
 
 from iios_mvp.market_implied_expectation import (
+    CandidateCoverageAssessment,
     CandidateCoverageState,
+    EvidenceSufficiencyAssessment,
+    EvidenceSufficiencyState,
     MIEAssumption,
     MIEEconomicRequirement,
     MIEObservationBasis,
@@ -34,9 +37,19 @@ def make(**overrides):
     args = dict(
         expectation_id="mie-1", model_id="pe-1", market_model=MarketModelFamily.FORWARD_PE,
         identifiability=IdentifiabilityState.IDENTIFIABLE, stability=StabilityState.STABLE,
-        candidate_coverage=CandidateCoverageState.SUFFICIENT, representation=MIERepresentation.IMPLIED_RANGE,
+        candidate_coverage=CandidateCoverageAssessment(
+            status=CandidateCoverageState.SUFFICIENT,
+            scope_basis="admitted_ratio_candidates_v0.2",
+            candidate_model_ids=("pe-1", "ps-1"),
+            evidence_ids=("ev-coverage",),
+            rationale="Decision scope explicitly enumerates the admitted candidate models.",
+        ), representation=MIERepresentation.IMPLIED_RANGE,
         economic_requirements=(req(),), observation_basis=obs_basis(), assumption_set=(),
-        evidence_sufficiency=True, evidence_ids=("ev-var",), qualification_rationale="valid",
+        evidence_sufficiency=EvidenceSufficiencyAssessment(
+            status=EvidenceSufficiencyState.SUFFICIENT,
+            rationale="All required MIE evidence is present.",
+            evidence_ids=("ev-var", "ev-coverage"),
+        ), evidence_ids=("ev-var", "ev-coverage"), qualification_rationale="valid",
     )
     args.update(overrides)
     return qualify_market_implied_expectation(**args)
@@ -69,9 +82,9 @@ def test_ambiguous_model_is_conditional_only():
     dict(identifiability=IdentifiabilityState.INSUFFICIENT_EVIDENCE),
     dict(stability=StabilityState.UNSTABLE),
     dict(stability=StabilityState.INSUFFICIENT_EVIDENCE),
-    dict(candidate_coverage=CandidateCoverageState.INSUFFICIENT),
-    dict(candidate_coverage=CandidateCoverageState.UNASSESSED),
-    dict(evidence_sufficiency=False),
+    dict(candidate_coverage=CandidateCoverageAssessment(status=CandidateCoverageState.INSUFFICIENT, scope_basis="insufficient-scope", candidate_model_ids=("pe-1",), evidence_ids=("ev-coverage",), rationale="Scope is known but incomplete."),
+    dict(candidate_coverage=CandidateCoverageAssessment(status=CandidateCoverageState.UNASSESSED, scope_basis="unassessed-scope", candidate_model_ids=("pe-1",), evidence_ids=("ev-coverage",), rationale="Coverage has not been assessed."),
+    dict(evidence_sufficiency=EvidenceSufficiencyAssessment(status=EvidenceSufficiencyState.INSUFFICIENT, rationale="Evidence set is incomplete.", evidence_ids=("ev-var",))),
 ])
 def test_unsupported_qualification_is_blocked(kwargs):
     assert make(**kwargs).qualification == MIEQualification.BLOCKED
