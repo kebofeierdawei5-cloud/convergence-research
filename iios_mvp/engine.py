@@ -7,8 +7,8 @@ import hashlib
 import json
 from typing import Any
 
-ENGINE_VERSION = "0.1.1"
-ACTIONS = ("BUY", "ADD", "HOLD", "REDUCE", "EXIT", "NO-BUY")
+ENGINE_VERSION = "0.3.0"
+ACTIONS = ("BUY", "ADD", "HOLD", "REDUCE", "EXIT", "NO-BUY", "WATCH", "REVIEW_REQUIRED")
 
 
 def canonical_json(value: Any) -> str:
@@ -42,10 +42,16 @@ def validate_case(case: dict[str, Any]) -> list[str]:
     # contract; unknown/future versions MUST fail closed rather than entering
     # the legacy v0.1.1 validator.
     contract_version = case.get("contract_version")
+    if contract_version == "IIOS-INVESTMENT-CORE-0.3":
+        from .investment_core_contract_v03 import validate_case_v03
+        result = validate_case_v03(case)
+        return [
+            f"{item['code']}:{item['path']}:{item['message']}"
+            for item in result["errors"]
+        ]
     if contract_version is not None and contract_version != "IIOS-INVESTMENT-CORE-0.2":
         return [f"CORE-VERSION-EXACT:contract_version:unsupported investment-core contract {contract_version}"]
-    # v0.2 cases MUST enter through the frozen contract validator. The legacy
-    # MVP path remains available only for pre-v0.2 demo/replay compatibility.
+    # v0.2 cases MUST enter through the frozen contract validator.
     if contract_version == "IIOS-INVESTMENT-CORE-0.2":
         from .investment_core_contract import validate_investment_core_case
         result = validate_investment_core_case(case)
@@ -188,6 +194,30 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
     case = deepcopy(case)
     blockers = validate_case(case)
     validation = {"status": "BLOCKED" if blockers else "PASS", "blockers": blockers}
+
+    if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.3":
+        from .investment_core_contract_v03 import decide_v03
+        proposal = decide_v03(case)
+        return {
+            "engine_version": ENGINE_VERSION,
+            "case_id": case["case_id"],
+            "symbol": case["symbol"],
+            "company": case["company"],
+            "cutoff_date": case["cutoff_date"],
+            "validation": validation,
+            "gates": proposal["gates"],
+            "return_metrics": proposal.get("return_metrics"),
+            "decision": {
+                "action": proposal["action"],
+                "decision_status": proposal["decision_status"],
+                "investability_status": proposal["investability_status"],
+                "primary_reason": proposal["primary_reason"],
+                "position_package_complete": proposal["position_package_complete"],
+                "human_approval_required": proposal["human_approval_required"],
+                "auto_execution": proposal["auto_execution"],
+            },
+            "monitoring": case.get("monitoring") or [],
+        }
 
     valuation = case["valuation"]
     forecast = case["forecast"]
@@ -369,6 +399,16 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_case(case: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.3":
+        decision = decide(case)
+        snapshot = {
+            "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.3.0",
+            "engine_version": ENGINE_VERSION,
+            "input": case,
+            "decision": decision,
+        }
+        snapshot["snapshot_hash"] = sha256_obj(snapshot)
+        return snapshot, snapshot["snapshot_hash"]
     if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.2":
         # v0.2 has no production snapshot schema yet. Never persist an
         # unimplemented v0.2 decision under the legacy 0.1.1 snapshot label.
@@ -386,6 +426,31 @@ def run_case(case: dict[str, Any]) -> tuple[dict[str, Any], str]:
 
 def replay(snapshot: dict[str, Any]) -> dict[str, Any]:
     input_case = snapshot["input"]
+    if input_case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.3":
+        if snapshot.get("snapshot_schema") != "IIOS-MVP-SNAPSHOT-0.3.0":
+            return {
+                "snapshot_hash": snapshot.get("snapshot_hash"),
+                "engine_version": ENGINE_VERSION,
+                "replay_status": "FAIL",
+                "same_decision": False,
+                "integrity_status": "FAIL",
+                "reason": "V03_SNAPSHOT_SCHEMA_NOT_SUPPORTED",
+            }
+        fresh = decide(input_case)
+        same = canonical_json(fresh) == canonical_json(snapshot["decision"])
+        expected_hash = sha256_obj({
+            "snapshot_schema": snapshot["snapshot_schema"],
+            "engine_version": snapshot["engine_version"],
+            "input": snapshot["input"],
+            "decision": snapshot["decision"],
+        })
+        return {
+            "snapshot_hash": snapshot.get("snapshot_hash"),
+            "engine_version": ENGINE_VERSION,
+            "replay_status": "PASS" if same and expected_hash == snapshot.get("snapshot_hash") else "FAIL",
+            "same_decision": same,
+            "integrity_status": "PASS" if expected_hash == snapshot.get("snapshot_hash") else "FAIL",
+        }
     if input_case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.2":
         # A v0.2 case cannot be replayed through the legacy snapshot schema.
         return {
@@ -415,6 +480,33 @@ def replay(snapshot: dict[str, Any]) -> dict[str, Any]:
 
 def render_markdown(snapshot: dict[str, Any]) -> str:
     d = snapshot["decision"]
+    if snapshot.get("snapshot_schema") == "IIOS-MVP-SNAPSHOT-0.3.0":
+        r = d.get("return_metrics") or {}
+        lines = [
+            f"# IIOS Investment Decision — {d['company']} ({d['symbol']})",
+            f"**Cutoff:** {d['cutoff_date']}  ",
+            f"**Action proposal:** **{d['decision']['action']}**  ",
+            f"**Reason:** {d['decision']['primary_reason']}",
+            "",
+            "## Decision",
+            f"- Status: {d['decision']['decision_status']}",
+            f"- Investability: {d['decision']['investability_status']}",
+            f"- Human approval required: {d['decision']['human_approval_required']}",
+            f"- Auto execution: {d['decision']['auto_execution']}",
+            "",
+            "## Return",
+            f"- Entry Return Cushion: {r.get('entry_return_cushion', 'UNAVAILABLE')}",
+            f"- Margin of Safety: {r.get('margin_of_safety', 'UNAVAILABLE')}",
+            f"- Expected Total Return: {r.get('expected_total_return', 'UNAVAILABLE')}",
+            f"- Expected Annualized Return: {r.get('expected_annualized_return', 'UNAVAILABLE')}",
+            f"- Fundamental Target Pass: {r.get('fundamental_target_pass', 'UNAVAILABLE')}",
+            f"- Required Return Pass: {r.get('required_return_pass', 'UNAVAILABLE')}",
+            "",
+            "## Human Boundary",
+            "- Final approval: Human.",
+            "- Automatic order placement: prohibited.",
+        ]
+        return "\n".join(lines) + "\n"
     v = d["valuation"]
     r = d["risk"]
     inp = snapshot["input"]
