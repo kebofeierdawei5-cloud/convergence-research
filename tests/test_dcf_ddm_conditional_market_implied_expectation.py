@@ -276,20 +276,26 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
 
 
 def test_unstable_p3_blocks_conditional_mie():
-    inp = dcf_input(current_price="4200")
-    modified = list(inp.observations)
-    for idx, item in enumerate(modified):
-        if item.observation_id.startswith("h22-"):
-            modified[idx] = cobs(
-                item.observation_id,
-                22,
-                "4200",
-                item.economic_variable,
-                str(item.economic_value),
-                item.basis,
-                item.unit,
-                item.evidence_ids[0],
+    inp = dcf_input()
+    modified = []
+    historical_prices = {"1": "2100", "8": "4200", "15": "4200", "22": "4200"}
+    for item in inp.observations:
+        if item.observation_id.startswith("h"):
+            day = item.observation_id.split("-", 1)[0][1:]
+            modified.append(
+                cobs(
+                    item.observation_id,
+                    int(day),
+                    historical_prices[day],
+                    item.economic_variable,
+                    str(item.economic_value),
+                    item.basis,
+                    item.unit,
+                    item.evidence_ids[0],
+                )
             )
+        else:
+            modified.append(item)
     unstable = MarketModelIdentificationInput(
         cutoff_date=inp.cutoff_date,
         current_observation_id=inp.current_observation_id,
@@ -299,6 +305,7 @@ def test_unstable_p3_blocks_conditional_mie():
     )
     p3 = identify_market_models(unstable)
     assert p3["stability"].state.value == "UNSTABLE"
+    assert p3["evaluations"][0].fit.status.value == "FEASIBLE"
     assert run(unstable)[0].qualification == MIEQualification.BLOCKED
 
 
