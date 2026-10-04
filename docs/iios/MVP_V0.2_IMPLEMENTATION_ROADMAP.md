@@ -292,22 +292,41 @@ Priority hardening areas:
 - dilution / per-share transmission
 - value-contribution transparency
 
-### P3 — Market Model Identification v0.2 production implementation
+### P3-A — Market Model Identification v0.2 ratio-family baseline
 
-Status: **NOT STARTED**
+Status: **COMPLETE / FINAL PASS / MERGED**
 
-Redesign Batch 2 from the contract, rather than extending PR #3.
+Implemented directly on the P2-B typed domain:
 
-Acceptance requires:
+- evidence-backed forward PE / PS / PB / EV-EBITDA fitting;
+- model-specific historical multiple constraints;
+- current consistency test;
+- model-specific feasible solution set;
+- conservative Identifiability;
+- leave-one-out historical Stability;
+- fail-closed behavior for insufficient evidence / ambiguity;
+- DCF / DDM / SOTP / rNPV remain explicitly unsupported rather than approximated.
 
-- observable evidence inputs
-- candidate model set
-- historical / current fit
-- explicit feasible solution set
-- conservative identifiability
-- stability across reasonable perturbations / regimes
-- model-specific reverse valuation
-- fail-closed when interpretation is ambiguous
+Acceptance evidence: `docs/iios/P3A_RATIO_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`.
+
+The P3-A method is a deterministic baseline using historical observed-multiple ranges. It is not yet a calibrated general-purpose statistical classifier of investor pricing behavior.
+
+### P3-B — Complex Model-Specific Market Model Identification
+
+Status: **NEXT**
+
+Implement model-specific feasible-solution, identifiability and stability logic for:
+
+- DCF
+- DDM
+- SOTP
+- rNPV
+
+The same P2-B provenance, PIT and fail-closed boundaries remain mandatory.
+
+Do not collapse these models into generic implied net profit or ratio arithmetic.
+
+P4 is blocked until P3-B produces valid market-model interpretations.
 
 ### P4 — Market Implied Expectation Engine
 
