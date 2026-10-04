@@ -5,6 +5,7 @@ on:
     paths:
       - "iios_mvp/**"
       - "tests/test_mvp.py"
+      - "tests/test_value_core.py"
       - "examples/**"
       - ".github/workflows/iios_mvp.yml"
   push:
