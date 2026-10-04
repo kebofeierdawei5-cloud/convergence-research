@@ -162,6 +162,39 @@ def test_cross_model_snapshot_basis_mismatch_is_rejected():
     with pytest.raises(ValueError, match='observation basis'):
         validate_p4f_snapshot(tampered)
 
+def _rehash_snapshot(snapshot):
+    import hashlib
+    def h(value):
+        return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')).hexdigest()
+    snapshot['mie_set_hash'] = h(snapshot['mie_set'])
+    snapshot['provenance_hash'] = h(snapshot['provenance_manifest'])
+    core = {k: snapshot[k] for k in ('snapshot_schema','p4f_version','case_id','cutoff_date','created_at','mie_set','provenance_manifest','mie_set_hash','provenance_hash')}
+    snapshot['snapshot_hash'] = h(core)
+    return snapshot
+
+
+def test_replay_rejects_expectation_on_non_materialized_disposition():
+    s=make_set(('pe-1',MarketModelFamily.FORWARD_PE,MIEQualification.DECISION_GRADE))
+    snap=build_p4f_snapshot(case_id='case-1',cutoff_date=CUTOFF,created_at=CREATED,mie_set=s,provenance_records=make_provenance(s))
+    tampered=json.loads(json.dumps(snap))
+    tampered['mie_set']['model_evaluations'][0]['state']='NO_FEASIBLE_SOLUTION'
+    _rehash_snapshot(tampered)
+    result=replay_p4f_snapshot(tampered)
+    assert result['replay_status'] == 'FAIL'
+    assert 'non-materialized evaluation cannot carry expectation' in result['reason']
+
+
+def test_replay_rejects_serialized_model_id_mismatch():
+    s=make_set(('pe-1',MarketModelFamily.FORWARD_PE,MIEQualification.DECISION_GRADE))
+    snap=build_p4f_snapshot(case_id='case-1',cutoff_date=CUTOFF,created_at=CREATED,mie_set=s,provenance_records=make_provenance(s))
+    tampered=json.loads(json.dumps(snap))
+    tampered['mie_set']['model_evaluations'][0]['expectation']['model_id']='forged-model'
+    _rehash_snapshot(tampered)
+    result=replay_p4f_snapshot(tampered)
+    assert result['replay_status'] == 'FAIL'
+    assert 'model_id/expectation mismatch' in result['reason']
+
+
 def test_schema_validates_snapshot():
     s=make_set(('pe-1',MarketModelFamily.FORWARD_PE,MIEQualification.DECISION_GRADE))
     snap=build_p4f_snapshot(case_id='case-1',cutoff_date=CUTOFF,created_at=CREATED,mie_set=s,provenance_records=make_provenance(s))
