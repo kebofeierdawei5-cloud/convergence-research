@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .company_economic_core import build_company_economic_core, validate_company_economic_core
+from .core03_market_expectation import build_core03_package, validate_core03_package
 from .engine import replay, render_markdown, run_case
 from .research_intake import build_research_case
 from .store import (
@@ -80,6 +81,40 @@ def cmd_economic_core(args: argparse.Namespace) -> int:
             "company_economic_core": str(path),
             "case_id": core["case_id"],
             "valuation_route": core["valuation_route"]["candidate_models"],
+        }, ensure_ascii=False, indent=2))
+    else:
+        print(output)
+    return 0
+
+
+def cmd_core03(args: argparse.Namespace) -> int:
+    payload = load_json(args.input)
+    required = ("core02_input", "forecast", "valuation_assumptions", "market_evidence")
+    missing = [key for key in required if key not in payload]
+    if missing:
+        raise ValueError(f"core03 input missing required fields: {missing}")
+    result = build_core03_package(
+        payload["core02_input"],
+        payload["forecast"],
+        payload["valuation_assumptions"],
+        payload["market_evidence"],
+        payload.get("forecast_evidence"),
+    )
+    errors = validate_core03_package(result)
+    if errors:
+        raise ValueError("generated CORE-03 result failed validation: " + "; ".join(errors))
+    output = json.dumps(result, ensure_ascii=False, indent=2)
+    if args.out:
+        path = Path(args.out)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(output + "\n", encoding="utf-8", newline="\n")
+        print(json.dumps({
+            "status": result["status"],
+            "core03": str(path),
+            "case_id": result["case_id"],
+            "valuation_status": result["company_valuation"]["status"],
+            "mie_status": result["p4f_market_implied_expectation"]["status"],
+            "expectation_gap_status": result["expectation_gap"]["status"],
         }, ensure_ascii=False, indent=2))
     else:
         print(output)
@@ -167,6 +202,11 @@ def parser() -> argparse.ArgumentParser:
     economic_core.add_argument("--generated-at")
     economic_core.add_argument("--out")
     economic_core.set_defaults(func=cmd_economic_core)
+
+    core03 = sub.add_parser("core03", help="run real-company CORE-03 forecast, valuation and P4-F MIE boundary")
+    core03.add_argument("input", help="JSON containing Core-02 input, independent forecast, valuation assumptions and market evidence")
+    core03.add_argument("--out")
+    core03.set_defaults(func=cmd_core03)
 
     run = sub.add_parser("run", help="run one investment case")
     run.add_argument("case")
