@@ -154,10 +154,37 @@ class MarketImpliedExpectation:
         return MIEQualification.DECISION_GRADE
 
 
-def qualify_market_implied_expectation(**kwargs: object) -> MarketImpliedExpectation:
+def qualify_market_implied_expectation(
+    *,
+    expectation_id: str,
+    model_id: str,
+    market_model: MarketModelFamily,
+    identifiability: IdentifiabilityState,
+    stability: StabilityState,
+    candidate_coverage: CandidateCoverageState,
+    representation: MIERepresentation,
+    economic_requirements: tuple[MIEEconomicRequirement, ...],
+    observation_basis: MIEObservationBasis,
+    assumption_set: tuple[MIEAssumption, ...],
+    evidence_sufficiency: bool,
+    evidence_ids: tuple[str, ...],
+    qualification_rationale: str,
+) -> MarketImpliedExpectation:
     draft = MarketImpliedExpectation(
-        **kwargs,
+        expectation_id=expectation_id,
+        model_id=model_id,
+        market_model=market_model,
+        identifiability=identifiability,
+        stability=stability,
+        candidate_coverage=candidate_coverage,
+        representation=representation,
+        economic_requirements=economic_requirements,
+        observation_basis=observation_basis,
+        assumption_set=assumption_set,
+        evidence_sufficiency=evidence_sufficiency,
+        evidence_ids=evidence_ids,
         qualification=MIEQualification.BLOCKED,
+        qualification_rationale=qualification_rationale,
     )
     result = MarketImpliedExpectation(
         expectation_id=draft.expectation_id,
