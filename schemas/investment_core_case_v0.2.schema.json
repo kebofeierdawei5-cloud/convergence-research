@@ -13,6 +13,8 @@
     "as_of_date",
     "cutoff_date",
     "current_price_observation",
+    "company_evidence_manifest",
+    "market_evidence_manifest",
     "trust",
     "reality",
     "forecast",
@@ -66,10 +68,8 @@
       ],
       "properties": {
         "price": {
-          "type": [
-            "number",
-            "string"
-          ]
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?$"
         },
         "currency": {
           "type": "string",
@@ -243,6 +243,30 @@
             "EXIT",
             "NO-BUY"
           ]
+        }
+      }
+    },
+    "company_evidence_manifest": {
+      "type": "object",
+      "required": [
+        "manifest_id"
+      ],
+      "properties": {
+        "manifest_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "market_evidence_manifest": {
+      "type": "object",
+      "required": [
+        "manifest_id"
+      ],
+      "properties": {
+        "manifest_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
