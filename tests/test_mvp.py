@@ -54,3 +54,74 @@ def test_missing_forecast_inputs_fail_closed():
     result = decide(case)
     assert result["validation"]["status"] == "BLOCKED"
     assert result["decision"]["action"] == "NO-BUY"
+
+
+
+def test_multiple_revisions_preserve_history_and_advance_current(tmp_path):
+    from iios_mvp.store import (
+        approve_revision, create_or_load_series, next_revision,
+        write_decision_revision, write_snapshot,
+    )
+
+    case1 = load_demo()
+    case1["cutoff_date"] = "2026-10-04"
+    snap1, h1 = run_case(case1)
+    write_snapshot(tmp_path, snap1)
+    series = create_or_load_series(tmp_path, "CN-A", case1["symbol"], case1["company"], "2026-10-04T00:00:00Z")
+    r1 = next_revision(tmp_path, series["decision_series_id"])
+    write_decision_revision(tmp_path, series["decision_series_id"], r1, snap1, h1[:16])
+    (tmp_path / f"{series['decision_series_id']}.index.json").write_text(json.dumps({"next_revision": 2}), encoding="utf-8")
+    d1 = f"{series['decision_series_id']}-r001"
+    assert approve_revision(tmp_path, d1, snap1, True, "approve r1")["current"] is True
+
+    case2 = load_demo()
+    case2["cutoff_date"] = "2026-10-05"
+    case2["valuation"]["current_price"] = 380
+    snap2, h2 = run_case(case2)
+    write_snapshot(tmp_path, snap2)
+    r2 = next_revision(tmp_path, series["decision_series_id"])
+    write_decision_revision(tmp_path, series["decision_series_id"], r2, snap2, h2[:16])
+    (tmp_path / f"{series['decision_series_id']}.index.json").write_text(json.dumps({"next_revision": 3}), encoding="utf-8")
+    d2 = f"{series['decision_series_id']}-r002"
+    assert approve_revision(tmp_path, d2, snap2, True, "approve r2")["current"] is True
+
+    current = json.loads((tmp_path / f"{series['decision_series_id']}.current.json").read_text())
+    assert current["current_approved_decision_id"] == d2
+    assert (tmp_path / f"{d1}.decision.json").exists()
+    assert (tmp_path / f"{d2}.decision.json").exists()
+    assert read_snapshot(tmp_path / f"{h1}.json")["snapshot_hash"] == h1
+    assert read_snapshot(tmp_path / f"{h2}.json")["snapshot_hash"] == h2
+
+
+def test_approval_cannot_bind_wrong_snapshot(tmp_path):
+    from iios_mvp.store import approve_revision, create_or_load_series, write_decision_revision, write_snapshot
+
+    snap1, h1 = run_case(load_demo())
+    snap2, h2 = run_case({**load_demo(), "cutoff_date": "2026-10-06"})
+    write_snapshot(tmp_path, snap1)
+    write_snapshot(tmp_path, snap2)
+    series = create_or_load_series(tmp_path, "CN-A", "300750", "CATL", "2026-10-04T00:00:00Z")
+    did = f"{series['decision_series_id']}-r001"
+    write_decision_revision(tmp_path, series["decision_series_id"], 1, snap1, h1[:16])
+    try:
+        approve_revision(tmp_path, did, snap2, True, "wrong snapshot")
+    except ValueError as exc:
+        assert "same snapshot" in str(exc)
+    else:
+        raise AssertionError("wrong snapshot approval was accepted")
+
+
+def test_trigger_contract_and_event_are_hashed_and_immutable(tmp_path):
+    from iios_mvp.store import write_trigger_contract, write_trigger_event
+
+    contract = {"trigger_id": "t1", "trigger_type": "PRICE", "metric": "market_price", "operator": "<=", "threshold": 350}
+    event = {"trigger_event_id": "e1", "event_type": "PRICE", "metric": "market_price", "value": 349.5}
+    cp = write_trigger_contract(tmp_path, "CN-A-300750-r001", contract)
+    ep = write_trigger_event(tmp_path, event)
+    assert cp.exists() and ep.exists()
+    c = json.loads(cp.read_text())
+    e = json.loads(ep.read_text())
+    assert len(c["trigger_hash"]) == 64
+    assert len(e["trigger_event_hash"]) == 64
+    write_trigger_contract(tmp_path, "CN-A-300750-r001", contract)
+    write_trigger_event(tmp_path, event)
