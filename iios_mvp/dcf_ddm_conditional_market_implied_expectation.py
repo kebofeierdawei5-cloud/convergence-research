@@ -24,6 +24,7 @@ from .market_model_domain import (
 from .market_model_identification import (
     CandidateEvaluation,
     MarketModelIdentificationInput,
+    MarketValuationObservation,
 )
 
 
@@ -117,7 +118,7 @@ def _validate_context(
 
 def _evidence_index(
     identification_input: MarketModelIdentificationInput,
-) -> dict[str, object]:
+) -> dict[str, MarketObservableEvidence]:
     indexed = {item.evidence_id: item for item in identification_input.evidence}
     if len(indexed) != len(identification_input.evidence):
         raise ValueError("duplicate evidence_id")
@@ -126,7 +127,7 @@ def _evidence_index(
 
 def _current_observation_group(
     identification_input: MarketModelIdentificationInput,
-) -> tuple[date, tuple[object, ...]]:
+) -> tuple[date, tuple[MarketValuationObservation, ...]]:
     anchor = next(
         item
         for item in identification_input.observations
@@ -142,7 +143,7 @@ def _current_observation_group(
     return anchor.observation_date, group
 
 
-def _latest_current_by_variable(group: Sequence[object]) -> dict[str, object]:
+def _latest_current_by_variable(group: Sequence[MarketValuationObservation]) -> dict[str, MarketValuationObservation]:
     latest: dict[str, object] = {}
     for item in group:
         existing = latest.get(item.economic_variable)
@@ -156,7 +157,7 @@ def _latest_current_by_variable(group: Sequence[object]) -> dict[str, object]:
 
 def _validate_observation_evidence(
     item: object,
-    evidence_index: Mapping[str, object],
+    evidence_index: Mapping[str, MarketObservableEvidence],
 ) -> None:
     for evidence_id in item.evidence_ids:
         evidence = evidence_index.get(evidence_id)
@@ -211,8 +212,8 @@ def _solution_for_complex(
 def _build_assumptions(
     *,
     family: MarketModelFamily,
-    current_group: Sequence[object],
-    evidence_index: Mapping[str, object],
+    current_group: Sequence[MarketValuationObservation],
+    evidence_index: Mapping[str, MarketObservableEvidence],
     period: str,
     horizon: str,
     accounting_basis: str,
