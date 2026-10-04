@@ -352,7 +352,7 @@ The cases should exercise different economics and valuation paths.
 
 ### P4 — Market Implied Expectation Engine
 
-**ACTIVE / P4-A COMPLETE / P4-B COMPLETE / P4-C COMPLETE / P4-D COMPLETE / P4-E COMPLETE / P4-F NEXT**
+**COMPLETE / P4-A COMPLETE / P4-B COMPLETE / P4-C COMPLETE / P4-D COMPLETE / P4-E COMPLETE / P4-F COMPLETE**
 
 Purpose:
 
@@ -433,7 +433,7 @@ Semantic red lines:
 - no generic implied net profit.
 - no decision-grade promotion through P4-D.
 
-Completed: **P4-E — multi-model expectation-set handling**. Next gate: **P4-F — PIT / replay / fail-closed MIE integration**.
+Completed: **P4-E — multi-model expectation-set handling**. Completed: **P4-F — PIT / replay / fail-closed MIE integration**. Next gate: **P5 — Semantic Expectation Gap + Return Gate**.
 
 ### P4-E Completion
 
@@ -464,6 +464,34 @@ Semantic boundary:
 - No Expectation Gap / Expected Return implementation is introduced.
 
 Next gate: **P4-F — PIT / replay / fail-closed MIE integration**.
+
+### P4-F Completion
+
+**FINAL PASS / MERGED**
+
+P4-F completed the PIT / provenance / immutable snapshot / replay / fail-closed boundary for the P4-A through P4-E Market Implied Expectation chain on 2026-10-04.
+
+Evidence:
+
+- PR #16
+- pre-merge HEAD `e498466549bc040085ddf46a2512a9208e3d7a12`
+- merge commit `9732f33d3b0163832d317661b8171046d93c6455`
+- PR Investment Core CI #164 / `37192169418`: SUCCESS
+- PR FM00 CI #141 / `37192169420`: SUCCESS
+- post-merge main Investment Core CI #165 / `37192209207`: SUCCESS
+- post-merge main FM00 #142 / `37192209217`: SUCCESS
+- final regression: 171 passed
+
+Semantic boundary:
+
+- every P4-E evidence ID is bound to explicit source provenance;
+- PIT is defined by observation date and `known_at` relative to cutoff;
+- snapshot is hash-addressed and immutable on disk;
+- replay revalidates snapshot integrity and P4-E semantics rather than trusting stored qualification;
+- any missing/stale/inconsistent provenance fails closed;
+- P4-F remains separate from the production v0.2 decision engine.
+
+Next gate: **P5 — Semantic Expectation Gap + Return Gate**.
 
 ### P5 — Semantic Expectation Gap + Return Gate
 

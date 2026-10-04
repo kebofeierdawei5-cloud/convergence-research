@@ -501,9 +501,36 @@ Evidence:
 
 ### P4-F — PIT / Replay / Fail-closed MIE Integration
 
-Status: **NEXT**
+Status: **FINAL PASS / MERGED**
 
-Bind P4-E to immutable case snapshots, exact PIT/provenance manifests, replay semantics and runtime fail-closed behavior. Do not begin P5 until this gate is closed.
+Implementation:
+
+- `iios_mvp/p4f_mie_snapshot.py`
+- `tests/test_p4f_mie_snapshot.py`
+- `schemas/p4f_mie_snapshot_v0.2.schema.json`
+- `docs/iios/P4F_PIT_REPLAY_FAILCLOSED_ACCEPTANCE_MATRIX_v0.2.md`
+- `docs/iios/P4F_FINAL_ACCEPTANCE_2026-10-04.md`
+
+Semantic boundary:
+
+- every P4-E referenced evidence ID resolves to explicit provenance;
+- PIT is enforced by both observation date and `known_at` relative to the snapshot cutoff;
+- post-cutoff capture does not create a PIT leak when `known_at` is pre-cutoff;
+- materialized MIE price observations are bound by exact ID/date/currency;
+- snapshot is hash-addressed, create-once and replayable;
+- replay rechecks integrity, provenance closure, PIT, price binding and P4-E resolution/qualification;
+- no Expectation Gap / Expected Return / decision implementation is included.
+
+Evidence:
+
+- PR #16 merged;
+- pre-merge HEAD `e498466549bc040085ddf46a2512a9208e3d7a12`;
+- merge `9732f33d3b0163832d317661b8171046d93c6455`;
+- PR Investment Core CI #164 / `37192169418`: SUCCESS;
+- PR FM00 CI #141 / `37192169420`: SUCCESS;
+- post-merge main Investment Core CI #165 / `37192209207`: SUCCESS;
+- post-merge main FM00 #142 / `37192209217`: SUCCESS;
+- final regression: 171 passed.
 
 ### P5 — Expectation Gap + Return Gate
 
