@@ -27,6 +27,42 @@ class CandidateCoverageState(str, Enum):
     UNASSESSED = "UNASSESSED"
 
 
+class EvidenceSufficiencyState(str, Enum):
+    SUFFICIENT = "SUFFICIENT"
+    INSUFFICIENT = "INSUFFICIENT"
+    UNASSESSED = "UNASSESSED"
+
+
+@dataclass(frozen=True)
+class CandidateCoverageAssessment:
+    status: CandidateCoverageState
+    scope_basis: str
+    candidate_model_ids: tuple[str, ...]
+    evidence_ids: tuple[str, ...]
+    rationale: str
+
+    def validate(self) -> None:
+        if not self.scope_basis or not self.rationale:
+            raise ValueError("candidate coverage scope_basis and rationale are required")
+        if not self.candidate_model_ids:
+            raise ValueError("candidate coverage candidate_model_ids are required")
+        if not self.evidence_ids:
+            raise ValueError("candidate coverage evidence_ids are required")
+
+
+@dataclass(frozen=True)
+class EvidenceSufficiencyAssessment:
+    status: EvidenceSufficiencyState
+    rationale: str
+    evidence_ids: tuple[str, ...]
+
+    def validate(self) -> None:
+        if not self.rationale:
+            raise ValueError("evidence sufficiency rationale is required")
+        if not self.evidence_ids:
+            raise ValueError("evidence sufficiency evidence_ids are required")
+
+
 @dataclass(frozen=True)
 class MIEEconomicRequirement:
     economic_variable: str
@@ -108,12 +144,12 @@ class MarketImpliedExpectation:
     market_model: MarketModelFamily
     identifiability: IdentifiabilityState
     stability: StabilityState
-    candidate_coverage: CandidateCoverageState
+    candidate_coverage: CandidateCoverageAssessment
     representation: MIERepresentation
     economic_requirements: tuple[MIEEconomicRequirement, ...]
     observation_basis: MIEObservationBasis
     assumption_set: tuple[MIEAssumption, ...]
-    evidence_sufficiency: bool
+    evidence_sufficiency: EvidenceSufficiencyAssessment
     evidence_ids: tuple[str, ...]
     qualification: MIEQualification
     qualification_rationale: str
@@ -123,13 +159,13 @@ class MarketImpliedExpectation:
             raise ValueError("expectation_id and model_id are required")
         if not self.economic_requirements:
             raise ValueError("economic_requirements are required")
+        self.candidate_coverage.validate()
+        self.evidence_sufficiency.validate()
         self.observation_basis.validate()
         for item in self.economic_requirements:
             item.validate()
         for item in self.assumption_set:
             item.validate()
-        if not self.evidence_sufficiency and self.qualification == MIEQualification.DECISION_GRADE:
-            raise ValueError("evidence insufficiency cannot be decision-grade")
         if not self.evidence_ids:
             raise ValueError("MIE evidence_ids are required")
         if not self.qualification_rationale:
@@ -139,9 +175,9 @@ class MarketImpliedExpectation:
             raise ValueError(f"qualification mismatch: expected {expected.value}, got {self.qualification.value}")
 
     def expected_qualification(self) -> MIEQualification:
-        if not self.evidence_sufficiency:
+        if self.evidence_sufficiency.status != EvidenceSufficiencyState.SUFFICIENT:
             return MIEQualification.BLOCKED
-        if self.candidate_coverage != CandidateCoverageState.SUFFICIENT:
+        if self.candidate_coverage.status != CandidateCoverageState.SUFFICIENT:
             return MIEQualification.BLOCKED
         if self.identifiability in {IdentifiabilityState.UNIDENTIFIABLE, IdentifiabilityState.INSUFFICIENT_EVIDENCE}:
             return MIEQualification.BLOCKED
@@ -161,12 +197,12 @@ def qualify_market_implied_expectation(
     market_model: MarketModelFamily,
     identifiability: IdentifiabilityState,
     stability: StabilityState,
-    candidate_coverage: CandidateCoverageState,
+    candidate_coverage: CandidateCoverageAssessment,
     representation: MIERepresentation,
     economic_requirements: tuple[MIEEconomicRequirement, ...],
     observation_basis: MIEObservationBasis,
     assumption_set: tuple[MIEAssumption, ...],
-    evidence_sufficiency: bool,
+    evidence_sufficiency: EvidenceSufficiencyAssessment,
     evidence_ids: tuple[str, ...],
     qualification_rationale: str,
 ) -> MarketImpliedExpectation:
