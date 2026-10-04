@@ -57,7 +57,7 @@ def valid_case():
             },
             "expected_value": "532",
             "expected_return_pct": "33",
-            "hurdle_pct": "15",
+            "hurdle_pct": 15,
             "hurdle_pass": True,
         },
         "risk": {"status": "PASS", "max_loss_pct": "20"},
