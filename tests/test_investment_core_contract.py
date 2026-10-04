@@ -113,8 +113,8 @@ def test_expected_return_is_recomputed():
 
 def test_exact_15_percent_fails_hurdle():
     case = valid_case()
-    case["return_gate"]["scenario_values"] = {"bear": "400", "base": "460", "bull": "520"}
-    case["return_gate"]["expected_value"] = "466"
+    case["return_gate"]["scenario_values"] = {"bear": "400", "base": "460", "bull": "500"}
+    case["return_gate"]["expected_value"] = "460"
     case["return_gate"]["expected_return_pct"] = "15"
     case["return_gate"]["hurdle_pass"] = False
     assert validate_investment_core_case(case)["status"] == "PASS"
