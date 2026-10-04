@@ -1,0 +1,82 @@
+{
+  "schema_version": "IIOS-A02-FREE-FIRST-SOURCE-MATRIX-0.1",
+  "date": "2026-10-04",
+  "policy": {
+    "paid_mandatory": false,
+    "tushare_token_mandatory": false,
+    "current_to_historical_substitution": false,
+    "retrieved_at_to_known_at_substitution": false,
+    "field_level_provenance_required": true
+  },
+  "fields": [
+    {
+      "field": "CSI800_membership",
+      "normative_source_class": "CSI_OFFICIAL",
+      "access_mode": "PUBLIC_HTTP",
+      "candidate_routes": [
+        "official CSI 000906 historical/static constituent files",
+        "official CSI 300 + CSI 500 constituent/adjustment evidence for deterministic reconstruction"
+      ],
+      "admission_condition": "effective_date + publication evidence + exact raw bytes or independently reproducible official source chain"
+    },
+    {
+      "field": "listing_delisting",
+      "normative_source_class": "EXCHANGE_OFFICIAL",
+      "access_mode": "PUBLIC_HTTP",
+      "candidate_routes": [
+        "SSE public stock/listing/disclosure pages",
+        "SZSE public stock/listing/disclosure pages",
+        "CNINFO public issuer disclosures"
+      ],
+      "admission_condition": "historical effective date and source publication must be reproducible"
+    },
+    {
+      "field": "ST_status",
+      "normative_source_class": "EXCHANGE_REGULATORY_ISSUER",
+      "access_mode": "PUBLIC_HTTP",
+      "candidate_routes": [
+        "SSE/SZSE risk-warning and issuer announcements",
+        "CNINFO public announcements",
+        "free historical API only as secondary replay/cross-check"
+      ],
+      "admission_condition": "historical status must be supported by publication/effective evidence; current ST state is insufficient"
+    },
+    {
+      "field": "common_equity",
+      "normative_source_class": "EXCHANGE_SECURITY_METADATA",
+      "access_mode": "PUBLIC_HTTP_OR_LOCAL_CAPTURE",
+      "candidate_routes": [
+        "SSE/SZSE security listings and instrument metadata",
+        "issuer/exchange disclosure"
+      ],
+      "admission_condition": "security type at origin must be independently reproducible"
+    },
+    {
+      "field": "CSI_industry",
+      "normative_source_class": "CSI_OFFICIAL",
+      "access_mode": "PUBLIC_HTTP",
+      "candidate_routes": [
+        "CSI official industry classification / index documentation",
+        "public historical CSI industry datasets as secondary reconciliation only"
+      ],
+      "admission_condition": "taxonomy version, historical effective interval and source-vintage/known_at evidence must be present"
+    },
+    {
+      "field": "identity",
+      "normative_source_class": "EXCHANGE_OFFICIAL",
+      "access_mode": "PUBLIC_HTTP",
+      "candidate_routes": [
+        "SSE/SZSE security listing metadata",
+        "CNINFO issuer identity/disclosure"
+      ],
+      "admission_condition": "stable security identity and code continuity must be reproducible"
+    }
+  ],
+  "secondary_public_reconciliation_candidate": {
+    "source": "SUFE public Chinese securities data documentation",
+    "url": "https://syzx.sufe.edu.cn/syzx/findb/hermesdit/zbsj/zgxg.htm",
+    "role": "SECONDARY_ONLY",
+    "reason": "The public documentation states historical equity-industry records include CSI industry classification, but it is not the normative CSI source and does not by itself establish PIT known_at for A02."
+  },
+  "current_status": "CAPABILITY_MATRIX_ONLY_NOT_ADMITTED"
+}
