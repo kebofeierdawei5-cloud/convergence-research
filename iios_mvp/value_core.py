@@ -206,7 +206,7 @@ def scan_company_value_core(company_value_core: dict[str, Any]) -> dict[str, Any
                 "node_type": node["node_type"],
                 "materiality": node["materiality"],
                 "derived_economic_profile": node["derived_economic_profile"],
-                "recommended_primary_model": node["recommended_primary_model"],
+                "model_router_suggestion": node["model_router_suggestion"],
                 "candidate_valuation_models": node["candidate_valuation_models"],
                 "independent_valuation_required": node["independent_valuation_required"],
                 "reasons": node["core_value_reasons"],
