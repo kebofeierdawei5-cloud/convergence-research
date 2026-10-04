@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### 2026-10-04 — B2 Data / Evidence / PIT Foundation
+
+- Added frozen Evidence Contract v0.1 and machine-readable Evidence Record schema.
+- Added frozen Source Registry v0.1 with free-first and non-mandatory paid-data policy.
+- Added frozen PIT Temporal Semantics v0.1 separating published_at, known_at, retrieved_at and effective intervals.
+- Added executable fail-closed A02 exact-admission preflight and negative-control tests.
+- Recorded the current A02 real-data state as BLOCKED because exact 000906cons.xls bytes and the PIT Security Master raw bundle are not independently materialized.
+- No A02 downstream parameterization or model selection is enabled by this change.
 ## [Unreleased]
 
 ### 2026-10-04 — State Reconciliation

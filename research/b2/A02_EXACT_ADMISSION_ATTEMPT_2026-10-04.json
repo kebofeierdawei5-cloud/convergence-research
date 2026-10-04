@@ -1,0 +1,73 @@
+{
+  "schema_version": "IIOS-B2-A02-EXACT-ADMISSION-0.1",
+  "attempt_id": "B2-A02-EXACT-ADMISSION-20261004-01",
+  "date": "2026-10-04",
+  "universe_id": "OU-M12-A02-CSI800-NONFIN-PIT-001",
+  "status": "BLOCKED_EXACT_BYTES_UNAVAILABLE",
+  "selection_permission": false,
+  "object_A": {
+    "terminal_control_target": {
+      "source_ref": "CSIINDEX:000906:OFFICIAL_CONSTITUENT_FILE",
+      "file_name": "000906cons.xls",
+      "expected_size_bytes": 169984,
+      "expected_sha256": "f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984",
+      "exact_bytes_materialized": false,
+      "independent_hash_verified": false
+    },
+    "historical_membership": {
+      "required_origins": [
+        "2023Q3",
+        "2023Q4",
+        "2024Q1",
+        "2024Q2",
+        "2024Q3",
+        "2024Q4",
+        "2025Q1",
+        "2025Q2",
+        "2025Q3",
+        "2025Q4",
+        "2026Q1"
+      ],
+      "exact_source_bundle_materialized": false,
+      "independent_replay_ready": false
+    }
+  },
+  "object_B": {
+    "pit_security_master_materialized": false,
+    "independent_hash_verified": false,
+    "required_fields": [
+      "security_identity",
+      "common_equity",
+      "listing_interval",
+      "delisting_interval",
+      "st_interval",
+      "industry_interval",
+      "known_at"
+    ],
+    "required_origins": [
+      "2023Q3",
+      "2023Q4",
+      "2024Q1",
+      "2024Q2",
+      "2024Q3",
+      "2024Q4",
+      "2025Q1",
+      "2025Q2",
+      "2025Q3",
+      "2025Q4",
+      "2026Q1"
+    ]
+  },
+  "environment_findings": [
+    "official_000906_url was not materialized in the current runtime",
+    "the previously declared external package was not independently materializable",
+    "no exact PIT security-master raw bundle is present in the accessible Library or repository"
+  ],
+  "fail_closed_basis": [
+    "declared SHA-256 is not byte verification",
+    "current CSI800 membership cannot substitute for historical PIT membership",
+    "effective dates cannot substitute for known_at without vintage/publication proof",
+    "no downstream A02 selection or FM-02/FM-03 parameterization is permitted"
+  ],
+  "next_transition": "SUPPLY_EXACT_RAW_BYTES_AND_PROVENANCE"
+}
