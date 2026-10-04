@@ -6,14 +6,10 @@ on:
     paths:
       - 'research/fm00/**'
       - '.github/workflows/iios_fm00.yml'
-      - 'docs/iios/**'
-      - 'manifests/iios/**'
   pull_request:
     paths:
       - 'research/fm00/**'
       - '.github/workflows/iios_fm00.yml'
-      - 'docs/iios/**'
-      - 'manifests/iios/**'
   workflow_dispatch:
 
 permissions:

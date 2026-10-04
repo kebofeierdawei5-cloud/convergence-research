@@ -18,6 +18,40 @@ Historical commits and acceptance records remain immutable evidence.
 
 ---
 
+## 0A. Current execution scope after second red-team
+
+The immediate Investment Core path is now governed by CORE-00:
+
+```
+CORE-00 Scope Reset
+    ↓
+CORE-01 Single Company Research Intake
+    ↓
+CORE-02 Company Economic Core
+    ↓
+CORE-03 Market Expectation + Expectation Gap
+    ↓
+CORE-04 Decision Kernel
+    ↓
+CORE-05 Immutable Decision / Replay / Real Case
+```
+
+A02 / CSI800 / CSI Industry historical-universe work is a separate Research Track.
+
+The distinction is:
+
+```
+Research Track
+  └─ cross-company universe / forecast research
+
+Investment Core
+  └─ one user-selected company + per-case PIT evidence + decision
+```
+
+Removing the universe dependency does not remove PIT. Historical single-company cases still require defensible `known_at <= cutoff` evidence.
+
+P3/P4 Market Implied Expectation infrastructure remains part of the Investment Core capability surface, but B1 v0.3 continues to make MIE explanatory/non-mandatory for BUY/ADD.
+
 ## 1. IIOS North Star
 
 IIOS is not primarily an equity research report generator.

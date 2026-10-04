@@ -3,7 +3,7 @@
 This file retains historical acceptance records below. For the active repair program, read `docs/iios/B0_AUTHORITY_AUDIT_FREEZE_2026-10-04.md` first.
 
 Active repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
-Active repair stage: **B0 PASS → B1 PASS → B2 Data/Evidence/PIT Foundation**
+Active repair stage: **B0 PASS → B1 PASS → CORE-00 Scope Reset & Architecture Reconciliation**
 P4-F is merged historical/conditional infrastructure; P5/P6 feature expansion remains paused.
 B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. The owner-approved distinction between (a) 15% BUY-entry threshold / safety-margin policy and (b) 1–3Y annualized target >=15% is now normative in v0.3.
 
@@ -22,6 +22,15 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Investment Core Contract v0.2: **HISTORICAL / LEGACY**.
 - Investment Core Contract v0.3: **FROZEN / B1 SEMANTIC PASS**.
 - Contract: `docs/iios/IIOS_INVESTMENT_CORE_CONTRACT_v0.3.md`
+
+## CORE-00 Active Boundary
+
+- Current execution gate: **CORE-00 Scope Reset & Architecture Reconciliation**
+- Investment Core = **single-company case + per-case evidence/PIT + decision**
+- A02 / CSI800 / CSI Industry / historical full-market universe = **Research Track only**
+- A02 completion is **not** an Investment Core release gate
+- Historical single-company cases still require defensible PIT `known_at` semantics
+- P3/P4 MIE infrastructure is retained; under B1 v0.3 MIE is explanatory/non-mandatory for BUY/ADD
 
 ## Investment Decision Core
 
@@ -263,7 +272,9 @@ B1 semantic package and runtime migration accepted on the repair line. Evidence:
 
 ## Immediate Next Engineering Step
 
-**B2 — Data / Evidence / PIT Foundation.**
+**CORE-00 — Scope Reset & Architecture Reconciliation.**
+
+The next Investment Core path is CORE-01 after CORE-00 acceptance. B2/A02 remains an independent Research Track.
 
 P4-A through P4-F are complete. P5 must compare economically equivalent independent variables against the P4 model-semantic market requirement, fail closed on incompatible or ambiguous interpretations, validate Bear/Base/Bull probabilities, and enforce strict positive Expected Return >15% before any decision layer.
 
