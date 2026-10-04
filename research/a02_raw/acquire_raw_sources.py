@@ -92,10 +92,20 @@ def main() -> int:
     try:
         r=requests.get(OFFICIAL_000906,timeout=90,headers={"User-Agent":"Mozilla/5.0"},allow_redirects=True)
         raw=r.content; digest=sha256_bytes(raw)
-        target=root/"A_CSI800_RAW"/"official_000906_000906cons.xls"; target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(raw)
-        ar={"requested_url":OFFICIAL_000906,"final_url":r.url,"retrieved_at":datetime.now(timezone.utc).isoformat(),"http_status":r.status_code,"size_bytes":len(raw),"sha256":digest,"expected_size_bytes":EXPECTED_000906_SIZE,"expected_sha256":EXPECTED_000906_SHA256,"size_match":len(raw)==EXPECTED_000906_SIZE,"sha256_match":digest==EXPECTED_000906_SHA256,"exact_bytes":True}
-        (target.parent/"official_000906_000906cons.xls.meta.json").write_text(json.dumps(ar,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-        receipt["A"]={"status":"PASS" if ar["size_match"] and ar["sha256_match"] else "BLOCKED","terminal":ar}
+        current=root/"A_CSI800_RAW"/"official_000906_current_20261004_000906cons.xls"; current.parent.mkdir(parents=True,exist_ok=True); current.write_bytes(raw)
+        ar={"requested_url":OFFICIAL_000906,"final_url":r.url,"retrieved_at":datetime.now(timezone.utc).isoformat(),"http_status":r.status_code,"size_bytes":len(raw),"sha256":digest,"expected_size_bytes":EXPECTED_000906_SIZE,"expected_sha256":EXPECTED_000906_SHA256,"size_match":len(raw)==EXPECTED_000906_SIZE,"sha256_match":digest==EXPECTED_000906_SHA256,"exact_bytes":True,"role":"CURRENT_SNAPSHOT_NOT_HISTORICAL_TARGET"}
+        (current.parent/"official_000906_current_20261004_000906cons.xls.meta.json").write_text(json.dumps(ar,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+        receipt["A"]={"status":"PASS" if ar["size_match"] and ar["sha256_match"] else "BLOCKED","terminal_current_snapshot":ar}
+        if receipt["A"]["status"] != "PASS":
+            historical=fetch_wayback_target()
+            receipt["A"]["wayback_attempt"]={k:v for k,v in historical.items() if k!="bytes"}
+            if historical.get("status")=="PASS":
+                hist=root/"A_CSI800_RAW"/"official_000906_historical_target_000906cons.xls"
+                hist.write_bytes(historical["bytes"])
+                hmeta={k:v for k,v in historical.items() if k!="bytes"}
+                (hist.parent/"official_000906_historical_target_000906cons.xls.meta.json").write_text(json.dumps(hmeta,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+                receipt["A"]["status"]="PASS"
+                receipt["A"]["terminal_historical_target"]=hmeta
     except Exception as exc:
         receipt["A"]={"status":"BLOCKED","reason":f"DOWNLOAD_ERROR:{exc}"}
     if args.tushare_token:
