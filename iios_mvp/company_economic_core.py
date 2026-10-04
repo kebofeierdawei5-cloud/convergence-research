@@ -12,6 +12,13 @@ CORE_VERSION = "IIOS-COMPANY-ECONOMIC-CORE-0.1"
 ASSESSMENT_VERSION = "IIOS-COMPANY-ECONOMIC-ASSESSMENT-0.1"
 
 VALID_EVIDENCE_STATUS = {"ADMITTED", "CONDITIONAL", "UNKNOWN", "BLOCKED"}
+VALID_PROVENANCE = {
+    "SOURCE_VINTAGE_VERIFIED",
+    "EVENT_PUBLICATION_VERIFIED",
+    "VENDOR_PIT_QUERY",
+    "DERIVED_FROM_ADMITTED_RAW",
+    "UNKNOWN",
+}
 VALID_ASSESSMENT_STATUS = {"PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"}
 REALITY_DOMAINS = {
     "corporate_disclosures",
@@ -118,6 +125,11 @@ def _validate_evidence_record(evidence: Any, index: int) -> dict[str, Any]:
         raise ValueError(f"evidence[{index}] missing required fields: {missing}")
     if evidence["status"] not in VALID_EVIDENCE_STATUS:
         raise ValueError(f"evidence[{index}].status unsupported")
+    if evidence["provenance_class"] not in VALID_PROVENANCE:
+        raise ValueError(f"evidence[{index}].provenance_class unsupported")
+    for field in ("evidence_id", "subject_id", "field_id", "claim_type", "source_ref", "artifact_id"):
+        if not str(evidence[field]).strip():
+            raise ValueError(f"evidence[{index}].{field} must be non-empty")
     if evidence["status"] != "ADMITTED":
         raise ValueError(
             f"evidence[{index}].status must be ADMITTED for CORE-02: "
@@ -261,10 +273,14 @@ def _validate_reality(reality: Any, evidence_ids: set[str], cutoff: str) -> dict
             raise ValueError(f"reality.facts[{i}].status unsupported: {status}")
         refs = _require_evidence_refs(fact["evidence_ids"], evidence_ids, f"reality.facts[{i}]")
         _date_leq(fact["observation_date"], cutoff, f"reality.facts[{i}].observation_date")
+        fact_id = str(fact["fact_id"]).strip()
+        field_id = str(fact["field_id"]).strip()
+        if not fact_id or not field_id:
+            raise ValueError(f"reality.facts[{i}].fact_id/field_id must be non-empty")
         normalized.append({
-            "fact_id": str(fact["fact_id"]).strip(),
+            "fact_id": fact_id,
             "domain": domain,
-            "field_id": str(fact["field_id"]).strip(),
+            "field_id": field_id,
             "value": fact["value"],
             "unit": str(fact["unit"]),
             "basis": str(fact["basis"]),
@@ -369,12 +385,17 @@ def _validate_value_driver_ranking(
         if materiality not in {"HIGH", "MEDIUM", "LOW"}:
             raise ValueError(f"value_driver_ranking[{i}].materiality unsupported")
         refs = _require_evidence_refs(row["evidence_ids"], evidence_ids, f"value_driver_ranking[{i}]")
+        driver_id = str(row["driver_id"]).strip()
+        name = str(row["name"]).strip()
+        mechanism = str(row["mechanism"]).strip()
+        if not driver_id or not name or not mechanism:
+            raise ValueError(f"value_driver_ranking[{i}].driver_id/name/mechanism must be non-empty")
         normalized.append({
-            "driver_id": str(row["driver_id"]).strip(),
-            "name": str(row["name"]).strip(),
+            "driver_id": driver_id,
+            "name": name,
             "rank": rank,
             "materiality": materiality,
-            "mechanism": str(row["mechanism"]).strip(),
+            "mechanism": mechanism,
             "economic_variables": variables,
             "evidence_ids": refs,
         })
@@ -546,6 +567,10 @@ def validate_company_economic_core(core: Any) -> list[str]:
             errors.append("VALUE_DRIVER_RANKING_INVALID")
     except (KeyError, TypeError, ValueError) as exc:
         errors.append(f"VALUE_CORE_INVALID:{exc}")
+    if not errors:
+        core_without_audit = {k: v for k, v in core.items() if k != "audit"}
+        if core["audit"]["core_sha256"] != _sha(core_without_audit):
+            errors.append("AUDIT_CORE_HASH_MISMATCH")
     return errors
 
 
