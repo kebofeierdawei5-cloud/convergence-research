@@ -25,7 +25,7 @@ def coverage(*ids, status=CandidateCoverageState.SUFFICIENT):
 def evidence(*ids, status=EvidenceSufficiencyState.SUFFICIENT):
     return EvidenceSufficiencyAssessment(status, 'P4-E evidence is sufficient for the stated dispositions.', tuple(f'evidence-{x}' for x in ids))
 
-def make_mie(*, model_id, family, qualification=MIEQualification.DECISION_GRADE, observation_id='price-100', conditional=False):
+def make_mie(*, model_id, family, qualification=MIEQualification.DECISION_GRADE, observation_id='price-100', conditional=False, stability=StabilityState.STABLE, identifiability=IdentifiabilityState.IDENTIFIABLE):
     req_var = 'forward_eps' if family == MarketModelFamily.FORWARD_PE else 'revenue' if family == MarketModelFamily.PS else 'fcf'
     req_role = 'IMPLIED_PRIMARY_CONDITIONAL_ON_ASSUMPTIONS' if conditional else 'IMPLIED_PRIMARY'
     rep = MIERepresentation.CONDITIONAL_IMPLIED_VARIABLE if conditional else MIERepresentation.IMPLIED_POINT
@@ -37,7 +37,7 @@ def make_mie(*, model_id, family, qualification=MIEQualification.DECISION_GRADE,
     local_ev = EvidenceSufficiencyAssessment(EvidenceSufficiencyState.SUFFICIENT, 'Local P4 evidence.', (f'local-evidence-{model_id}',))
     ids = (f'mie-evidence-{model_id}', f'local-coverage-{model_id}', f'local-evidence-{model_id}', *(() if not conditional else (f'assumption-{model_id}',)))
     return MarketImpliedExpectation(
-        f'mie-{model_id}', model_id, family, IdentifiabilityState.IDENTIFIABLE, StabilityState.STABLE,
+        f'mie-{model_id}', model_id, family, identifiability, stability,
         local_cov, rep, (requirement,),
         MIEObservationBasis(observation_id, CUTOFF, CUTOFF, 'CNY', 'UNADJUSTED'),
         assumptions, local_ev, ids, qualification, f'Fixture {model_id} qualification.',
