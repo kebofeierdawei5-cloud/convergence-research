@@ -620,7 +620,7 @@ def test_p3b_rnpv_model_specific_inverse_preserves_pipeline_probability_timing()
         ("candidate-rnpv",),
     )
     evidence = tuple(
-        complex_evidence("e-" + name, name, "CNY" if name in {"pipeline_value", "base_value"} else "ratio")
+        complex_evidence("e-" + name, name, "CNY" if name in {"pipeline_value", "base_value"} else None)
         for name in ("pipeline_value", "probability", "timing", "discount_rate", "base_value")
     )
     evidence = evidence + (complex_evidence("candidate-rnpv", "rnpv_candidate"),)
@@ -788,7 +788,7 @@ def test_p3b_rnpv_multi_pipeline_inverse_uses_observed_composition():
         ("candidate-rnpv-2",),
     )
     evidence = tuple(
-        complex_evidence("e-" + name, name, "CNY" if name in {"pipeline_value", "base_value"} else "ratio")
+        complex_evidence("e-" + name, name, "CNY" if name in {"pipeline_value", "base_value"} else None)
         for name in ("pipeline_value", "probability", "timing", "discount_rate", "base_value")
     ) + (complex_evidence("candidate-rnpv-2", "rnpv_candidate"),)
 
