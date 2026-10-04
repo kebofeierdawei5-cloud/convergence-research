@@ -103,6 +103,8 @@ The primary calculation MUST NOT use Σ p_s × AnnualizedReturn_s.
 
 fundamental_target_return_annualized = 15%
 
+For standard fundamental BUY/ADD, this target is a hard qualification condition: Expected Annualized Return_H MUST be >= 15%.
+
 Target Total Return_H = (1 + 15%)^H − 1
 
 Examples:
@@ -152,7 +154,7 @@ The v0.2 fields/logic RETURN_HURDLE, hurdle_pct and the old expected-return expr
 
 This draft does not yet freeze:
 - the exact construction methodology for Required Return;
-- whether the 1–3Y target is a hard BUY/ADD gate, a soft attractiveness target, or a strategy objective;
+- exception handling for a Human-authorized strategy-policy override to the 1–3Y target;
 - position sizing;
 - final MIE BUY-gate role;
 - monitoring triggers.
