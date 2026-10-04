@@ -15,7 +15,9 @@ P3/P4 Market Implied Expectation Infrastructure = FINAL PASS / CONDITIONAL
         ↓
 CORE-00 Scope Reset & Architecture Reconciliation = PASS / MERGED
         ↓
-CORE-01 Single Company Research Intake = ACTIVE
+CORE-01 Single Company Research Intake = PASS / MERGED
+        ↓
+CORE-02 Company Economic Core = ACTIVE
 ```
 
 ## Authority / continuity
@@ -64,10 +66,8 @@ BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
 
 ## Current development task
 
-`CORE-01 | Single Company Research Intake`
+`CORE-02 | Company Economic Core`
 
-Acceptance requires deterministic case construction, PIT scope, identity honesty, audit hashes, schema validation, CLI generation and green CI.
+CORE-01 is now merged and accepted. The next task is to consume admitted company-specific evidence and construct Reality / Trust / Quality / Value Core without introducing any CSI800/CSI Industry/A02 dependency.
 
-After CORE-01:
-
-`CORE-02 | Company Economic Core`.
+Acceptance must remain per-company and PIT-bound.
