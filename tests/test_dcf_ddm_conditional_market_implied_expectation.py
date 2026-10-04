@@ -16,6 +16,9 @@ from iios_mvp.market_model_domain import (
     FeasibleSolution,
     FeasibleSolutionSet,
     FeasibleSolutionStatus,
+    FitDiagnostic,
+    ModelFit,
+    ModelFitStatus,
     IdentifiabilityResult,
     StabilityObservation,
     StabilityResult,
@@ -266,11 +269,9 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
     ddm = ddm_candidate()
     dcf_inp = dcf_input(dcf, current_price="105", fcf_value="5")
     ddm_inp = ddm_input(ddm, id_prefix="ddm-", current_price="105")
-    dcf_p3 = identify_market_models(dcf_inp)
-    ddm_p3 = identify_market_models(ddm_inp)
     combined = MarketModelIdentificationInput(
         cutoff_date=CUTOFF,
-        current_observation_id="ddm-current-dividend",
+        current_observation_id="current-fcf",
         candidates=(dcf, ddm),
         observations=dcf_inp.observations + ddm_inp.observations,
         evidence=dcf_inp.evidence + tuple(
@@ -279,19 +280,68 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
             if item.evidence_id not in {e.evidence_id for e in dcf_inp.evidence}
         ),
     )
+    dcf_solution = FeasibleSolution(
+        economic_variable="fcf",
+        unit="CNY",
+        basis="typed-p3-fixture-dcf",
+        model_id="dcf-1",
+        value=Decimal("5"),
+        evidence_ids=("e-fcf-current",),
+    )
+    ddm_solution = FeasibleSolution(
+        economic_variable="dividend",
+        unit="CNY/share",
+        basis="typed-p3-fixture-ddm",
+        model_id="ddm-1",
+        value=Decimal("5"),
+        evidence_ids=("ddm-e-dividend-current",),
+    )
+    evaluations = (
+        CandidateEvaluation(
+            fit=ModelFit(
+                model_id="dcf-1",
+                status=ModelFitStatus.FEASIBLE,
+                diagnostics=(FitDiagnostic("fit-dcf", "typed", "PASS"),),
+                evidence_ids=("e-fcf-current",),
+                constraints=("typed-fixture",),
+            ),
+            feasible_solution_set=FeasibleSolutionSet(
+                model_id="dcf-1",
+                status=FeasibleSolutionStatus.NONEMPTY,
+                solutions=(dcf_solution,),
+                constraint_ids=("typed-fixture",),
+                evidence_ids=("e-fcf-current",),
+                basis="typed-p3-fixture",
+            ),
+        ),
+        CandidateEvaluation(
+            fit=ModelFit(
+                model_id="ddm-1",
+                status=ModelFitStatus.FEASIBLE,
+                diagnostics=(FitDiagnostic("fit-ddm", "typed", "PASS"),),
+                evidence_ids=("ddm-e-dividend-current",),
+                constraints=("typed-fixture",),
+            ),
+            feasible_solution_set=FeasibleSolutionSet(
+                model_id="ddm-1",
+                status=FeasibleSolutionStatus.NONEMPTY,
+                solutions=(ddm_solution,),
+                constraint_ids=("typed-fixture",),
+                evidence_ids=("ddm-e-dividend-current",),
+                basis="typed-p3-fixture",
+            ),
+        ),
+    )
     identification = {
         "status": "PASS",
         "method": "model_specific_inverse_v0.2",
-        "evaluations": dcf_p3["evaluations"] + ddm_p3["evaluations"],
+        "evaluations": evaluations,
         "identifiability": IdentifiabilityResult(
             state=IdentifiabilityState.AMBIGUOUS,
             feasible_model_ids=("dcf-1", "ddm-1"),
             selected_model_id=None,
             competing_model_ids=("dcf-1", "ddm-1"),
-            evidence_ids=tuple(sorted(set(
-                dcf_p3["identifiability"].evidence_ids
-                + ddm_p3["identifiability"].evidence_ids
-            ))),
+            evidence_ids=("e-fcf-current", "ddm-e-dividend-current"),
             rationale="Red-team typed ambiguity: both DCF and DDM remain materially feasible.",
         ),
         "stability": StabilityResult(
@@ -305,10 +355,7 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
                     selected_model_id=None,
                 ),
             ),
-            evidence_ids=tuple(sorted(set(
-                dcf_p3["stability"].evidence_ids
-                + ddm_p3["stability"].evidence_ids
-            ))),
+            evidence_ids=("e-fcf-current", "ddm-e-dividend-current"),
             rationale="Red-team typed stable ambiguity.",
         ),
     }
