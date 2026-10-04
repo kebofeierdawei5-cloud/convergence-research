@@ -145,7 +145,8 @@ def approve_revision(root: str | Path, decision_id: str, snapshot: dict[str, Any
     decision = _load_json(path)
     if not decision:
         raise ValueError("decision revision not found")
-    decision["decision_status"] = "HUMAN_APPROVED"
+    if decision.get("snapshot_hash") != snapshot.get("snapshot_hash"):
+        raise ValueError("decision revision and snapshot are not bound to the same snapshot")
     _atomic_create(store_root(root) / f"{decision_id}.approved.json", {
         "decision_id": decision_id,
         "approval_hash": _load_json(store_root(root) / f"{snapshot['snapshot_hash']}.human-approval.json")["approval_hash"],
