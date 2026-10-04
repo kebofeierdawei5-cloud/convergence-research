@@ -253,6 +253,7 @@ def build_core03_package(
     forecast: Mapping[str, Any],
     valuation_assumptions: Mapping[str, Any],
     market_evidence: Mapping[str, Any],
+    forecast_evidence: list[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     case = core02_input.get("case")
     if not isinstance(case, dict):
@@ -282,7 +283,18 @@ def build_core03_package(
     _validate_evidence_record(market_evidence, cutoff, "E008")
     if market_evidence.get("variable") != "current_share_count":
         raise ValueError("E008 must be current_share_count")
-    normalized_forecast = _validate_forecast(forecast, cutoff, set(core02["evidence_admission"]["evidence_ids"]) | {"E008"})
+    forecast_evidence = forecast_evidence or []
+    forecast_evidence_by_id = {}
+    for record in forecast_evidence:
+        record_id = str(record.get("evidence_id", "")).strip()
+        if not record_id:
+            raise ValueError("forecast evidence evidence_id is required")
+        _validate_evidence_record(record, cutoff, record_id)
+        forecast_evidence_by_id[record_id] = record
+    if len(forecast_evidence_by_id) != len(forecast_evidence):
+        raise ValueError("forecast evidence IDs must be unique")
+    admissible_forecast_ids = set(core02["evidence_admission"]["evidence_ids"]) | {"E008"} | set(forecast_evidence_by_id)
+    normalized_forecast = _validate_forecast(forecast, cutoff, admissible_forecast_ids)
 
     net_cash = _dec(valuation_assumptions.get("net_cash_bn_cny"), "valuation_assumptions.net_cash_bn_cny")
     shares = _dec(valuation_assumptions.get("shares_outstanding"), "valuation_assumptions.shares_outstanding")
@@ -400,6 +412,7 @@ def build_core03_package(
             "forecast": normalized_forecast,
             "valuation_assumptions": valuation_assumptions,
             "market_evidence": market_evidence,
+            "forecast_evidence": forecast_evidence,
         }),
         "generated_at": "2026-10-04T22:00:00+00:00",
     }
