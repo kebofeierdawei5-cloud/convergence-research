@@ -1,3 +1,29 @@
+# Historical Audit Notice — Tencent Core Scan Mapping
+
+> This document records a point-in-time audit performed before the current-main reconciliation.
+> It MUST be read as historical evidence, not as the current capability index.
+
+## Current-state correction
+
+The earlier audit conclusion that **Company Value Core was missing from main is superseded**.
+
+As of the reconciled 2026-10-04 state:
+
+- Batch 1-B Company Value Core Scan is merged into `main`.
+- Human-authoritative company valuation model selection is merged.
+- The remaining gap is evidence-backed discovery / hardening of the value map and the complete economic transmission chain.
+- Batch 2 v0.1 remains OPEN / RED-TEAM BLOCKED and is not current capability.
+
+For the canonical current state, see:
+
+`docs/iios/STATE_RECONCILIATION_2026-10-04.md`
+
+For the current development sequence, see:
+
+`docs/iios/MVP_V0.2_IMPLEMENTATION_ROADMAP.md`
+
+---
+
 
 # IIOS｜腾讯会话优化 → 当前开发代码逐项映射审计
 ## 2026-10-04 阶段性总结
@@ -444,3 +470,4 @@ Tencent Optimization Mapping
 只有通过这一链条，才允许开始 Batch 2 Market Model Identification。
 
 本文件是阶段性导航/审计记录，不替代 exact historical source，也不宣布任何未验证能力 PASS。
+
