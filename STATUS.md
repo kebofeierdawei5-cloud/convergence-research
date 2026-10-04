@@ -3,9 +3,9 @@
 This file retains historical acceptance records below. For the active repair program, read `docs/iios/B0_AUTHORITY_AUDIT_FREEZE_2026-10-04.md` first.
 
 Active repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
-Active repair stage: **B0 PASS → B1 Investment Semantics**
-P4-F is merged historical/conditional infrastructure; P5/P6 feature expansion is paused pending B1 semantic approval.
-The incumbent v0.2 statement `positive expected return >15%` is an historical baseline contract statement, not the repaired target definition. In particular, the owner has explicitly separated (a) 15% BUY-entry threshold / safety-margin policy and (b) 1–3Y annualized long-term target >=15%. These remain B1 items until formally contracted.
+Active repair stage: **B0 PASS → B1 PASS → B2 Data/Evidence/PIT Foundation**
+P4-F is merged historical/conditional infrastructure; P5/P6 feature expansion remains paused.
+B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. The owner-approved distinction between (a) 15% BUY-entry threshold / safety-margin policy and (b) 1–3Y annualized target >=15% is now normative in v0.3.
 
 ---
 
@@ -19,8 +19,9 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 
 - Current canonical `main` is the source of truth.
 - State Reconciliation: COMPLETE.
-- Investment Core Contract v0.2: **FROZEN / SEMANTIC PASS**.
-- Contract: `docs/iios/IIOS_INVESTMENT_CORE_CONTRACT_v0.2.md`
+- Investment Core Contract v0.2: **HISTORICAL / LEGACY**.
+- Investment Core Contract v0.3: **FROZEN / B1 SEMANTIC PASS**.
+- Contract: `docs/iios/IIOS_INVESTMENT_CORE_CONTRACT_v0.3.md`
 
 ## Investment Decision Core
 
@@ -40,6 +41,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - P4-D SOTP/rNPV MIE Vertical Slice: **FINAL PASS / MERGED**
 - P4-E Multi-model Market Implied Expectation Set: **FINAL PASS / MERGED**
 - P4-F PIT / Replay / Fail-closed MIE Integration: **FINAL PASS / MERGED**
+- B1 v0.3 return/decision runtime migration: **ACCEPTED / 190 TESTS PASS**
 - Production investment decision kernel: NOT YET
 
 ## P4-C Final Acceptance
@@ -144,14 +146,16 @@ Semantic boundary:
 - Replay independently validates integrity, PIT, provenance closure, price binding and P4-E resolution/qualification semantics and fails closed on any mismatch.
 - P4-F does not implement Expectation Gap, Expected Return or the production v0.2 decision engine.
 
-## Return Target
+## B1 Return / Decision Semantics
 
-Canonical hurdle: **positive expected return >15%**.
-
-- No fixed 1–3 year holding-period requirement.
-- No annualized-return requirement for the core gate.
-- Primary return metric, when valid scenario probabilities exist: probability-weighted expected value / entry price − 1.
-- Expected Return exactly 15% does not pass; it must be strictly greater than 15%.
+- BUY Entry Return Cushion threshold: **15%**, non-annualized.
+- Fundamental target: **1–3 year Expected Annualized Return >=15%** for standard fundamental BUY/ADD.
+- Expected Total Return_H and Expected Annualized Return_H are derived from probability-weighted terminal wealth.
+- Required Return is an independent annualized risk/opportunity-cost comparator.
+- The two 15% policies and Required Return are conjunctive, not additive.
+- Conventional Margin of Safety is distinct from the 15% return-form entry cushion.
+- UNKNOWN never silently becomes HOLD; unresolved material uncertainty routes to REVIEW_REQUIRED.
+- MIE is explanatory and non-mandatory for BUY/ADD in v0.3.
 
 ## P1 Contract Boundary
 
@@ -253,9 +257,13 @@ P4-A is formally **FINAL PASS** on canonical `main`.
 
 P4-A establishes the typed qualification boundary between P3 inverse interpretations and decision-grade Market Implied Expectation.
 
+## B1 Acceptance
+
+B1 semantic package and runtime migration accepted on the repair line. Evidence: `docs/iios/B1_CODE_MIGRATION_ACCEPTANCE_2026-10-04.md`; code red-team: `docs/iios/B1_CODE_MIGRATION_REDTEAM_v0.3.md`.
+
 ## Immediate Next Engineering Step
 
-**P5 / Semantic Expectation Gap + Return Gate.**
+**B2 — Data / Evidence / PIT Foundation.**
 
 P4-A through P4-F are complete. P5 must compare economically equivalent independent variables against the P4 model-semantic market requirement, fail closed on incompatible or ambiguous interpretations, validate Bear/Base/Bull probabilities, and enforce strict positive Expected Return >15% before any decision layer.
 
