@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -27,6 +28,20 @@ def _dec(value: Any, path: str) -> Decimal:
     if not value.is_finite():
         raise ValueError(f"{path} must be finite")
     return value
+
+
+def _date(value: Any, path: str) -> date:
+    try:
+        return date.fromisoformat(str(value))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{path} must be ISO date YYYY-MM-DD") from exc
+
+
+def _datetime(value: Any, path: str) -> datetime:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{path} must be ISO datetime") from exc
 
 def _required(obj: dict[str, Any], fields: tuple[str, ...], path: str, errors: list[dict[str, str]]) -> None:
     for field in fields:
@@ -155,6 +170,23 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
         return {"status": "BLOCKED", "errors": errors}
     if case["contract_version"] != CONTRACT_VERSION:
         errors.append(_err("V03-VERSION-EXACT", "contract_version", f"must equal {CONTRACT_VERSION}"))
+    try:
+        as_of = _date(case["as_of_date"], "as_of_date")
+        cutoff = _date(case["cutoff_date"], "cutoff_date")
+        if as_of > cutoff:
+            errors.append(_err("V03-ASOF-CUTOFF", "as_of_date", "as_of_date cannot be after cutoff_date"))
+    except ValueError as exc:
+        errors.append(_err("V03-DATE", "as_of_date/cutoff_date", str(exc)))
+        cutoff = None
+    try:
+        obs = _datetime(case["current_price_observation"]["observed_at"], "current_price_observation.observed_at")
+        known = _datetime(case["current_price_observation"]["known_at"], "current_price_observation.known_at")
+        if cutoff is not None and obs.date() > cutoff:
+            errors.append(_err("V03-PIT-PRICE", "current_price_observation.observed_at", "price observation occurs after cutoff_date"))
+        if cutoff is not None and known.date() > cutoff:
+            errors.append(_err("V03-PIT-PRICE-KNOWN-AT", "current_price_observation.known_at", "price became known after cutoff_date"))
+    except (KeyError, ValueError) as exc:
+        errors.append(_err("V03-PIT-PRICE", "current_price_observation", str(exc)))
     try:
         price = _dec(case["current_price_observation"]["price"], "current_price_observation.price")
         if price <= 0:
