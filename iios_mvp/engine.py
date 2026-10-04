@@ -198,6 +198,10 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
 
     from .valuation import build_intrinsic_valuation, select_model
     intrinsic = build_intrinsic_valuation(forecast, valuation, shares)
+    from .valuation import evaluate_intrinsic_value_gate
+    intrinsic_gate = evaluate_intrinsic_value_gate(intrinsic)
+    if intrinsic_gate["status"] != "PASS":
+        raise ValueError("intrinsic valuation gate blocked: " + "; ".join(intrinsic_gate["blockers"]))
     selection = intrinsic["model_selection"]
     primary_model = selection["primary_model"]
     scenarios = {
@@ -286,6 +290,7 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
             "model_status": intrinsic["model_status"],
             "model_cross_check_dispersion": intrinsic["model_cross_check_dispersion"],
             "aggregation": intrinsic["aggregation"],
+            "intrinsic_value_gate": intrinsic_gate,
             "expected_return_pct": pct(expected_return * 100),
             "required_return_pct": float(required_return * 100),
             "bear_loss_pct": pct(bear_loss * 100),
