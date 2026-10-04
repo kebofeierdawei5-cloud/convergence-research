@@ -196,9 +196,19 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
     required_return = dec(valuation["required_return_pct"], "valuation.required_return_pct") / Decimal("100")
     max_loss = dec(risk["max_loss_pct"], "risk.max_loss_pct") / Decimal("100")
 
-    scenarios = {s: _scenario(forecast, valuation, s, shares) for s in ("bear", "base", "bull")}
-    base_value = dec(scenarios["base"]["value_per_share"], "base_value")
-    bear_value = dec(scenarios["bear"]["value_per_share"], "bear_value")
+    from .valuation import build_intrinsic_valuation, select_model
+    intrinsic = build_intrinsic_valuation(forecast, valuation, shares)
+    selection = intrinsic["model_selection"]
+    primary_model = selection["primary_model"]
+    scenarios = {
+        s: {
+            "model": primary_model,
+            "value_per_share": intrinsic["scenarios"][f"{s}_value_per_share"],
+        }
+        for s in ("bear", "base", "bull")
+    }
+    base_value = dec(intrinsic["scenarios"]["base_value_per_share"], "base_value")
+    bear_value = dec(intrinsic["scenarios"]["bear_value_per_share"], "bear_value")
     expected_return = base_value / current_price - Decimal("1")
     bear_loss = bear_value / current_price - Decimal("1")
 
@@ -267,11 +277,15 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
         },
         "forecast": {s: forecast[s] for s in ("bear", "base", "bull")},
         "valuation": {
-            "model": (valuation.get("model_selection") or {}).get("primary_model") or valuation["model"],
-            "model_selection": (valuation.get("model_selection") or {}),
+            "model": primary_model,
+            "model_selection": selection,
             "current_price": float(current_price),
             "scenarios": scenarios,
             "intrinsic_value_per_share": float(base_value),
+            "intrinsic_value_range": intrinsic["intrinsic_value_range"],
+            "model_status": intrinsic["model_status"],
+            "model_cross_check_dispersion": intrinsic["model_cross_check_dispersion"],
+            "aggregation": intrinsic["aggregation"],
             "expected_return_pct": pct(expected_return * 100),
             "required_return_pct": float(required_return * 100),
             "bear_loss_pct": pct(bear_loss * 100),
