@@ -36,6 +36,11 @@ def test_position_bounds_fail_closed():
     with pytest.raises(ValueError):
         build_research_case("300750", "2026-10-04", "100.1")
 
+def test_position_100_is_schema_compatible():
+    case = build_research_case("300750", "2026-10-04", "100.0", generated_at="2026-10-04T00:00:00+00:00")
+    assert case["decision_context"]["current_position_pct"] == "100.0"
+    assert validate_research_case(case) == []
+
 def test_future_as_of_fails_closed():
     future = (date.today() + timedelta(days=1)).isoformat()
     with pytest.raises(ValueError, match="future"):
@@ -58,3 +63,8 @@ def test_schema_accepts_generated_case():
     schema = json.loads((ROOT / "schemas" / "research_case_v0.1.schema.json").read_text(encoding="utf-8"))
     errors = sorted(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(case), key=lambda e: e.path)
     assert errors == []
+
+def test_audit_hash_mismatch_fails_validation():
+    case = build_research_case("300750", "2026-10-04", "0", generated_at="2026-10-04T00:00:00+00:00")
+    case["audit"]["input_sha256"] = "0" * 64
+    assert "AUDIT_INPUT_HASH_MISMATCH" in validate_research_case(case)
