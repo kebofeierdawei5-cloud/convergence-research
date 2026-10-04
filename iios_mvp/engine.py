@@ -50,6 +50,12 @@ def validate_case(case: dict[str, Any]) -> list[str]:
 
     cutoff = _date(case["cutoff_date"], "cutoff_date")
     valuation = case.get("valuation") or {}
+    if case.get("company_value_core") is not None:
+        try:
+            from .value_core import scan_company_value_core
+            scan_company_value_core(case["company_value_core"])
+        except ValueError as exc:
+            blockers.append(f"VALUE_CORE_INVALID:{exc}")
     current_price = dec(valuation.get("current_price"), "valuation.current_price")
     if current_price <= 0:
         blockers.append("INVALID_CURRENT_PRICE")
@@ -196,6 +202,8 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
     required_return = dec(valuation["required_return_pct"], "valuation.required_return_pct") / Decimal("100")
     max_loss = dec(risk["max_loss_pct"], "risk.max_loss_pct") / Decimal("100")
 
+    from .value_core import scan_company_value_core
+    value_core_scan = scan_company_value_core(case["company_value_core"]) if case.get("company_value_core") is not None else None
     from .valuation import build_intrinsic_valuation, select_model
     intrinsic = build_intrinsic_valuation(forecast, valuation, shares)
     from .valuation import evaluate_intrinsic_value_gate
