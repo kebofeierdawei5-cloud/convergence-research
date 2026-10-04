@@ -1,3 +1,14 @@
+# B0 REPAIR OVERRIDE — 2026-10-04
+
+This file retains historical acceptance records below. For the active repair program, read `docs/iios/B0_AUTHORITY_AUDIT_FREEZE_2026-10-04.md` first.
+
+Active repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
+Active repair stage: **B0 PASS → B1 Investment Semantics**
+P4-F is merged historical/conditional infrastructure; P5/P6 feature expansion is paused pending B1 semantic approval.
+The incumbent v0.2 statement `positive expected return >15%` is an historical baseline contract statement, not the repaired target definition. In particular, the owner has explicitly separated (a) 15% BUY-entry threshold / safety-margin policy and (b) 1–3Y annualized long-term target >=15%. These remain B1 items until formally contracted.
+
+---
+
 # IIOS Project Status — 2026-10-04
 
 ## Canonical State
