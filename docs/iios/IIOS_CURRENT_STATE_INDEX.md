@@ -4,51 +4,91 @@ Snapshot: 2026-10-04
 
 ## Canonical State
 
-Current canonical `main` HEAD:
+Current canonical state is defined by:
 
-`93fefe0dcd513fd466d2319205c67f783cb54020`
+- current Git `main`
+- `docs/iios/STATE_RECONCILIATION_2026-10-04.md`
+- `docs/iios/IIOS_INVESTMENT_CORE_CONTRACT_v0.2.md`
+- this index
+- `STATUS.md`
 
-Canonical reconciliation:
+## Investment Core
 
-`docs/iios/STATE_RECONCILIATION_2026-10-04.md`
+Semantic contract:
 
-## Current Investment-Core State
+`docs/iios/IIOS_INVESTMENT_CORE_CONTRACT_v0.2.md`
+
+Status: **FROZEN / SEMANTIC PASS**
+
+Core chain:
 
 ```
-Initial MVP Decision Vertical Slice = MERGED
+Company / Industry Reality
         ↓
-Batch 1-B Company Value Core = MERGED
+Company Value Core
         ↓
-Human-authoritative Valuation Model Selection = MERGED
+Human Primary Valuation Model
         ↓
-Batch 2 v0.1 = OPEN / RED-TEAM BLOCKED
+Independent Forecast / Intrinsic Value
+        +
+Market Observable Evidence + Price
         ↓
-Next: Investment Core Contract v0.2
+Candidate Market Models
+        ↓
+Feasible Solution Set
+        ↓
+Identifiability + Stability
+        ↓
+Market Implied Expectation
+        ↓
+Semantic Expectation Gap
+        ↓
+Positive Expected Return >15%
+        ↓
+Trust / Thesis / Risk / Portfolio
+        ↓
+AI Proposal → Human Approval
 ```
 
-### Company-side valuation authority
+## Current Capability Boundary
 
-`Company Value Core → Candidate Models → HUMAN Primary Model → Consistency Gate → Intrinsic Value`
+Implemented / merged:
 
-Router is advisory only.
+- PIT / Trust / fail-closed foundation
+- Snapshot hash / Replay
+- Decision Series / Revision / Human Approval skeleton
+- Company Value Core structured scan
+- Candidate valuation model generation
+- Human-authoritative Primary Model selection
+- deterministic valuation calculators for supported models
 
-### Market-side target
+Not yet implemented as production capability:
 
-`Market Observable Evidence → Candidate Models → Historical/Current Fit → Feasible Solution Set → Identifiability → Stability → Reverse Valuation → Market Implied Expectation`
+- evidence-backed market-model identification
+- meaningful Feasible Solution Set
+- calibrated Identifiability
+- temporal / regime Stability
+- model-specific Market Implied Expectation
+- semantic Expectation Gap
+- frozen probability / edge / position-sizing policy
+- complete Execution Receipt / Trigger lifecycle
+- real-company acceptance / independent audit
 
-The current Batch 2 v0.1 implementation does not satisfy this contract and is not current capability.
+Batch 2 v0.1 PR #3 remains OPEN / RED-TEAM BLOCKED / NOT MERGED.
 
 ## Return Target
 
 **Positive expected return >15%.**
 
-No fixed 1–3 year holding period and no annualized-return requirement are part of the current core gate.
+No fixed 1–3 year holding period and no annualized-return core gate.
+
+For the primary Expected Return Gate, validated Bear/Base/Bull probabilities are required. No fabricated probability fallback is permitted.
 
 ## Forecast Research
 
 - FM-00 = PASS
 - FM-01 implementation foundation = PASS
-- FM-01 CATL data ingress = BLOCKED pending exact source snapshot
+- FM-01 CATL exact source ingress = BLOCKED pending exact source snapshot
 - FM-02 waits for exact source admission
 
 ## Authority Precedence
@@ -58,7 +98,3 @@ No fixed 1–3 year holding period and no annualized-return requirement are part
 3. Independent CI / execution evidence.
 4. Historical audit records as point-in-time records.
 5. Chat context.
-
-## Reconciliation Rule
-
-Historical state documents may remain as historical evidence, but must not be interpreted as the current state when they conflict with this index or the reconciliation artifact.
