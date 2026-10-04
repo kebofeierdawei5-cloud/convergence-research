@@ -101,7 +101,16 @@ P3-A evidence:
 - CI #96 / `37185092488` = SUCCESS
 - final acceptance: `docs/iios/P3A_RATIO_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`
 
-P3-B next: complex model-specific identification for DCF/DDM/SOTP/rNPV.
+P3-B evidence:
+
+- PR #8 merged to main
+- pre-merge HEAD `ee295b59c4ce59110da6496991b51dee9ec487a5`
+- CI #112 / `37186090902` = SUCCESS
+- 80 tests passed + compileall + schema + MVP run/replay
+- merge commit `77022db416f5b1d32c306f5d644e3642c0f5936b`
+- final acceptance: `docs/iios/P3B_COMPLEX_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`
+
+P4 is now the next engineering gate: Market Implied Expectation Engine.
 
 ## Return Target
 
