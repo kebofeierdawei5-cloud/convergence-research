@@ -506,9 +506,7 @@ def render_markdown(snapshot: dict[str, Any]) -> str:
             "- Final approval: Human.",
             "- Automatic order placement: prohibited.",
         ]
-        return "
-".join(lines) + "
-"
+        return "\n".join(lines) + "\n"
     v = d["valuation"]
     r = d["risk"]
     inp = snapshot["input"]
