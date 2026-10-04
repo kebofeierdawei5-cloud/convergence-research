@@ -143,6 +143,23 @@ def test_blocked_p4_mie_is_consumed_as_blocked_disposition():
     assert r.state.value == 'BLOCKED'
     assert r.expectation is None
 
+
+def test_materialized_evaluation_rejects_blocked_mie_direct_construction():
+    blocked = make_mie(model_id='ddm-1', family=MarketModelFamily.DDM, qualification=MIEQualification.BLOCKED, stability=StabilityState.UNSTABLE)
+    forged = MIEModelEvaluation('ddm-1', 'MATERIALIZED', blocked, blocked.evidence_ids, 'forged')
+    # Enum coercion is intentionally not part of the constructor; validate catches the semantic contradiction.
+    with pytest.raises(ValueError, match='MATERIALIZED evaluation cannot carry a BLOCKED MIE'):
+        forged.validate()
+
+
+def test_evaluation_order_is_canonicalized_for_deterministic_serialization():
+    pe = MIEModelEvaluation.from_expectation(make_mie(model_id='pe-1', family=MarketModelFamily.FORWARD_PE))
+    ps = MIEModelEvaluation.from_expectation(make_mie(model_id='ps-1', family=MarketModelFamily.PS))
+    a = aggregate([pe, ps], ('pe-1', 'ps-1'))
+    b = aggregate([ps, pe], ('pe-1', 'ps-1'))
+    assert a.model_evaluations[0].model_id == 'pe-1'
+    assert a.to_dict() == b.to_dict()
+
 def test_serialization_preserves_model_identity_and_validates_schema():
     r = aggregate([
         MIEModelEvaluation.from_expectation(make_mie(model_id='pe-1', family=MarketModelFamily.FORWARD_PE)),
