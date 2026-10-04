@@ -162,6 +162,17 @@ class MarketImpliedExpectation:
         self.candidate_coverage.validate()
         self.evidence_sufficiency.validate()
         self.observation_basis.validate()
+        if self.model_id not in self.candidate_coverage.candidate_model_ids:
+            raise ValueError("MIE model_id must be included in candidate coverage")
+        referenced_ids = set(self.evidence_ids)
+        required_ids = set(self.candidate_coverage.evidence_ids)
+        required_ids.update(self.evidence_sufficiency.evidence_ids)
+        for item in self.economic_requirements:
+            required_ids.update(item.evidence_ids)
+        for item in self.assumption_set:
+            required_ids.update(item.evidence_ids)
+        if not required_ids.issubset(referenced_ids):
+            raise ValueError("MIE evidence_ids must cover all nested evidence IDs")
         for item in self.economic_requirements:
             item.validate()
         for item in self.assumption_set:
