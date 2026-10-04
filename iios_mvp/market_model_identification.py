@@ -424,6 +424,10 @@ def _stability(
         if item.observation_id == inp.current_observation_id
     )
     current_observation_date = anchor.observation_date
+    current_observations = tuple(
+        item for item in inp.observations
+        if item.observation_date == current_observation_date
+    )
     historical = sorted(
         (item for item in inp.observations if item.observation_date < current_observation_date),
         key=lambda x: x.observation_date,
@@ -452,7 +456,7 @@ def _stability(
     ]
 
     for index, historical_window in enumerate(windows):
-        window_observations = tuple(historical_window) + (current,)
+        window_observations = tuple(historical_window) + current_observations
         evaluations = [
             _fit_candidate(candidate, window_observations, _evidence_index(inp.evidence), current_observation_date)
             for candidate in inp.candidates
