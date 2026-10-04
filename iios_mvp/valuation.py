@@ -16,21 +16,50 @@ SUPPORTED_MODELS = (
     "rnpv",
 )
 
-# Deterministic first-pass routing from structured economics. Human/LLM research
-# may still override the route, but an override must be explicitly justified.
-ECONOMIC_MODEL_ROUTES = {
-    "mature_cash_earning_business": ("forward_pe", "dcf", "ev_ebitda"),
-    "mature_earnings": ("forward_pe", "dcf", "ev_ebitda"),
-    "cash_flow_business": ("dcf", "forward_pe", "ev_ebitda"),
-    "dividend_financial": ("ddm", "pb"),
-    "financial": ("pb", "ddm"),
-    "cyclical_asset_heavy": ("pb", "ev_ebitda", "dcf"),
-    "cyclical": ("pb", "ev_ebitda", "forward_pe"),
-    "innovative_drug_commercial": ("ps", "rnpv", "sotp"),
-    "innovative_drug_pipeline": ("rnpv", "sotp", "ps"),
-    "mixed_segments": ("sotp", "dcf", "forward_pe"),
-    "enterprise_operating_business": ("ev_ebitda", "dcf", "forward_pe"),
-    "asset_heavy": ("pb", "sotp", "ev_ebitda"),
+# Deterministic economic-profile-to-model suitability map.
+# Scores are routing priors, not valuation outputs.
+MODEL_SUITABILITY = {
+    "mature_cash_earning_business": {
+        "forward_pe": 95, "dcf": 88, "ev_ebitda": 82, "sotp": 62, "pb": 45, "ddm": 55, "ps": 25, "rnpv": 10
+    },
+    "mature_earnings": {
+        "forward_pe": 95, "dcf": 88, "ev_ebitda": 82, "sotp": 60, "pb": 48, "ddm": 55, "ps": 20, "rnpv": 10
+    },
+    "cash_flow_business": {
+        "dcf": 95, "forward_pe": 88, "ev_ebitda": 85, "sotp": 58, "ddm": 52, "pb": 40, "ps": 25, "rnpv": 10
+    },
+    "dividend_financial": {
+        "ddm": 96, "pb": 92, "forward_pe": 78, "dcf": 72, "ev_ebitda": 40, "sotp": 55, "ps": 15, "rnpv": 5
+    },
+    "financial": {
+        "pb": 96, "ddm": 90, "forward_pe": 80, "dcf": 70, "sotp": 58, "ev_ebitda": 35, "ps": 10, "rnpv": 5
+    },
+    "cyclical_asset_heavy": {
+        "pb": 95, "ev_ebitda": 88, "dcf": 75, "forward_pe": 58, "sotp": 68, "ddm": 35, "ps": 25, "rnpv": 5
+    },
+    "cyclical": {
+        "pb": 92, "ev_ebitda": 90, "forward_pe": 62, "dcf": 70, "sotp": 55, "ddm": 30, "ps": 30, "rnpv": 5
+    },
+    "innovative_drug_commercial": {
+        "ps": 94, "rnpv": 90, "sotp": 88, "dcf": 70, "forward_pe": 45, "ev_ebitda": 38, "pb": 20, "ddm": 10
+    },
+    "innovative_drug_pipeline": {
+        "rnpv": 98, "sotp": 94, "ps": 58, "dcf": 45, "forward_pe": 18, "ev_ebitda": 12, "pb": 10, "ddm": 5
+    },
+    "mixed_segments": {
+        "sotp": 98, "dcf": 78, "forward_pe": 72, "ev_ebitda": 70, "ps": 55, "rnpv": 50, "pb": 45, "ddm": 35
+    },
+    "enterprise_operating_business": {
+        "ev_ebitda": 96, "dcf": 90, "forward_pe": 78, "sotp": 62, "pb": 42, "ps": 35, "ddm": 20, "rnpv": 10
+    },
+    "asset_heavy": {
+        "pb": 95, "sotp": 90, "ev_ebitda": 82, "dcf": 72, "forward_pe": 48, "ps": 20, "ddm": 20, "rnpv": 5
+    },
+}
+
+MODEL_ROUTE_FALLBACK = {
+    profile: tuple(sorted(scores, key=lambda model: (-score, model)))
+    for profile, scores in MODEL_SUITABILITY.items()
 }
 
 
@@ -41,15 +70,28 @@ def _positive(value: Any, field: str) -> Decimal:
     return x
 
 
-def route_model(economic_profile: str) -> dict[str, Any]:
+def assess_model_suitability(economic_profile: str) -> dict[str, Any]:
     profile = str(economic_profile or "").strip().lower()
-    candidates = ECONOMIC_MODEL_ROUTES.get(profile)
-    if not candidates:
-        raise ValueError(f"no deterministic model route for economic_profile: {economic_profile}")
+    scores = MODEL_SUITABILITY.get(profile)
+    if not scores:
+        raise ValueError(f"no deterministic model suitability profile for: {economic_profile}")
+    ranked = [
+        {"model": model, "score": score, "rank": rank + 1}
+        for rank, (model, score) in enumerate(sorted(scores.items(), key=lambda item: (-item[1], item[0])))
+    ]
+    return {"economic_profile": profile, "ranked_models": ranked}
+
+
+def route_model(economic_profile: str) -> dict[str, Any]:
+    assessment = assess_model_suitability(economic_profile)
+    ranked = assessment["ranked_models"]
     return {
-        "economic_profile": profile,
-        "recommended_primary_model": candidates[0],
-        "candidate_models": list(candidates),
+        "economic_profile": assessment["economic_profile"],
+        "recommended_primary_model": ranked[0]["model"],
+        "recommended_secondary_models": [x["model"] for x in ranked[1:2]],
+        "recommended_cross_check_models": [x["model"] for x in ranked[2:3]],
+        "candidate_models": [x["model"] for x in ranked[:4]],
+        "suitability": ranked,
     }
 
 
@@ -74,18 +116,34 @@ def select_model(valuation: dict[str, Any]) -> dict[str, Any]:
     rationale = selection.get("rationale")
     if not rationale:
         raise ValueError("valuation.model_selection.rationale is required")
-    alternatives = selection.get("alternatives") or []
-    for model in alternatives:
+
+    alternatives = list(selection.get("alternatives") or [])
+    secondary = list(selection.get("secondary_models") or routed["recommended_secondary_models"])
+    cross_checks = list(selection.get("cross_check_models") or [])
+
+    if not cross_checks and alternatives:
+        cross_checks = alternatives
+    if not selection.get("secondary_models") and not alternatives:
+        cross_checks = routed["recommended_cross_check_models"]
+
+    for model in secondary + cross_checks:
         if model not in SUPPORTED_MODELS:
-            raise ValueError(f"unsupported alternative valuation model: {model}")
+            raise ValueError(f"unsupported secondary/cross-check model: {model}")
+    if primary in secondary or primary in cross_checks:
+        raise ValueError("primary model cannot also be a secondary/cross-check model")
+    if set(secondary) & set(cross_checks):
+        raise ValueError("secondary and cross-check model sets must be disjoint")
 
     return {
         "primary_model": primary,
+        "secondary_models": secondary,
+        "cross_check_models": cross_checks,
         "economic_profile": routed["economic_profile"],
         "rationale": rationale,
         "alternatives": alternatives,
         "route_recommendation": routed["recommended_primary_model"],
         "route_candidates": routed["candidate_models"],
+        "suitability": routed["suitability"],
         "route_overridden": override,
         "override_reason": selection.get("override_reason"),
     }
@@ -96,9 +154,7 @@ def _pe(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shar
     multiple = _positive(valuation[f"{scenario}_multiple"], f"valuation.{scenario}_multiple")
     equity = profit * multiple
     return {
-        "model": "forward_pe",
-        "equity_value": float(equity),
-        "value_per_share": float(equity / shares),
+        "model": "forward_pe", "equity_value": float(equity), "value_per_share": float(equity / shares),
         "drivers": {"net_profit": float(profit), "multiple": float(multiple)},
     }
 
@@ -106,39 +162,22 @@ def _pe(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shar
 def _ps(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shares: Decimal) -> dict[str, Any]:
     inp = valuation.get("model_inputs", {}).get("ps", {})
     row = inp.get(scenario) or inp
-    revenue = _positive(
-        row.get("revenue", forecast[scenario].get("revenue")),
-        f"valuation.model_inputs.ps.{scenario}.revenue",
-    )
+    revenue = _positive(row.get("revenue", forecast[scenario].get("revenue")), f"valuation.model_inputs.ps.{scenario}.revenue")
     multiple = _positive(row.get("multiple", valuation.get(f"{scenario}_multiple")), f"valuation.ps.{scenario}.multiple")
     equity = revenue * multiple
-    return {
-        "model": "ps",
-        "equity_value": float(equity),
-        "value_per_share": float(equity / shares),
-        "drivers": {"revenue": float(revenue), "multiple": float(multiple)},
-    }
+    return {"model": "ps", "equity_value": float(equity), "value_per_share": float(equity / shares),
+            "drivers": {"revenue": float(revenue), "multiple": float(multiple)}}
 
 
 def _pb(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shares: Decimal) -> dict[str, Any]:
     inp = valuation.get("model_inputs", {}).get("pb", {})
     row = inp.get(scenario) or inp
-    book_equity = _positive(
-        row.get("book_equity"),
-        f"valuation.model_inputs.pb.{scenario}.book_equity",
-    )
+    book_equity = _positive(row.get("book_equity"), f"valuation.model_inputs.pb.{scenario}.book_equity")
     multiple = _positive(row.get("multiple"), f"valuation.model_inputs.pb.{scenario}.multiple")
     equity = book_equity * multiple
-    return {
-        "model": "pb",
-        "equity_value": float(equity),
-        "value_per_share": float(equity / shares),
-        "drivers": {
-            "book_equity": float(book_equity),
-            "multiple": float(multiple),
-            "book_value_basis": row.get("book_value_basis", "current"),
-        },
-    }
+    return {"model": "pb", "equity_value": float(equity), "value_per_share": float(equity / shares),
+            "drivers": {"book_equity": float(book_equity), "multiple": float(multiple),
+                        "book_value_basis": row.get("book_value_basis", "current")}}
 
 
 def _ev_ebitda(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shares: Decimal) -> dict[str, Any]:
@@ -147,20 +186,11 @@ def _ev_ebitda(forecast: dict[str, Any], valuation: dict[str, Any], scenario: st
     ebitda = _positive(row.get("ebitda"), f"valuation.model_inputs.ev_ebitda.{scenario}.ebitda")
     multiple = _positive(row.get("multiple"), f"valuation.model_inputs.ev_ebitda.{scenario}.multiple")
     net_debt = dec(row.get("net_debt", 0), f"valuation.model_inputs.ev_ebitda.{scenario}.net_debt")
-    enterprise_value = ebitda * multiple
-    equity = enterprise_value - net_debt
+    equity = ebitda * multiple - net_debt
     if equity <= 0:
         raise ValueError("EV/EBITDA implied equity value must be > 0")
-    return {
-        "model": "ev_ebitda",
-        "equity_value": float(equity),
-        "value_per_share": float(equity / shares),
-        "drivers": {
-            "ebitda": float(ebitda),
-            "multiple": float(multiple),
-            "net_debt": float(net_debt),
-        },
-    }
+    return {"model": "ev_ebitda", "equity_value": float(equity), "value_per_share": float(equity / shares),
+            "drivers": {"ebitda": float(ebitda), "multiple": float(multiple), "net_debt": float(net_debt)}}
 
 
 def _dcf(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shares: Decimal) -> dict[str, Any]:
@@ -182,12 +212,8 @@ def _dcf(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, sha
     equity = pv - net_debt
     if equity <= 0:
         raise ValueError("DCF implied equity value must be > 0")
-    return {
-        "model": "dcf",
-        "equity_value": float(equity),
-        "value_per_share": float(equity / shares),
-        "drivers": {"discount_rate": float(r), "terminal_growth": float(g), "net_debt": float(net_debt)},
-    }
+    return {"model": "dcf", "equity_value": float(equity), "value_per_share": float(equity / shares),
+            "drivers": {"discount_rate": float(r), "terminal_growth": float(g), "net_debt": float(net_debt)}}
 
 
 def _ddm(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shares: Decimal) -> dict[str, Any]:
@@ -199,13 +225,8 @@ def _ddm(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, sha
     if g < 0 or g >= r:
         raise ValueError("DDM growth must be >= 0 and < required_return")
     value = dividend * (Decimal("1") + g) / (r - g)
-    equity = value * shares
-    return {
-        "model": "ddm",
-        "equity_value": float(equity),
-        "value_per_share": float(value),
-        "drivers": {"dividend_per_share": float(dividend), "required_return": float(r), "growth": float(g)},
-    }
+    return {"model": "ddm", "equity_value": float(value * shares), "value_per_share": float(value),
+            "drivers": {"dividend_per_share": float(dividend), "required_return": float(r), "growth": float(g)}}
 
 
 def _rnpv(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shares: Decimal) -> dict[str, Any]:
@@ -214,10 +235,7 @@ def _rnpv(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, sh
     cash_flows = row.get("cash_flows")
     probabilities = row.get("probability_of_success")
     if not cash_flows or probabilities is None or len(cash_flows) != len(probabilities):
-        raise ValueError(
-            f"valuation.model_inputs.rnpv.{scenario}.cash_flows and probability_of_success "
-            "must have equal non-zero lengths"
-        )
+        raise ValueError(f"valuation.model_inputs.rnpv.{scenario}.cash_flows and probability_of_success must have equal non-zero lengths")
     discount_rate = _positive(row.get("discount_rate"), f"valuation.model_inputs.rnpv.{scenario}.discount_rate")
     pv = Decimal("0")
     for i, (cash_flow, probability) in enumerate(zip(cash_flows, probabilities), 1):
@@ -230,17 +248,9 @@ def _rnpv(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, sh
     equity = pv - net_debt
     if equity <= 0:
         raise ValueError("rNPV implied equity value must be > 0")
-    return {
-        "model": "rnpv",
-        "equity_value": float(equity),
-        "value_per_share": float(equity / shares),
-        "drivers": {
-            "discount_rate": float(discount_rate),
-            "periods": len(cash_flows),
-            "probability_method": "period_cash_flow_probability",
-            "net_debt": float(net_debt),
-        },
-    }
+    return {"model": "rnpv", "equity_value": float(equity), "value_per_share": float(equity / shares),
+            "drivers": {"discount_rate": float(discount_rate), "periods": len(cash_flows),
+                        "probability_method": "period_cash_flow_probability", "net_debt": float(net_debt)}}
 
 
 def _segment_value(segment: dict[str, Any]) -> Decimal:
@@ -253,8 +263,7 @@ def _segment_value(segment: dict[str, Any]) -> Decimal:
         return _positive(segment.get("book_equity"), "sotp.segment.book_equity") * _positive(segment.get("multiple"), "sotp.segment.multiple")
     if model == "ev_ebitda":
         ebitda = _positive(segment.get("ebitda"), "sotp.segment.ebitda")
-        multiple = _positive(segment.get("multiple"), "sotp.segment.multiple")
-        return ebitda * multiple - dec(segment.get("net_debt", 0), "sotp.segment.net_debt")
+        return ebitda * _positive(segment.get("multiple"), "sotp.segment.multiple") - dec(segment.get("net_debt", 0), "sotp.segment.net_debt")
     if model == "dcf":
         fcfs = segment.get("fcf") or []
         r = _positive(segment.get("discount_rate"), "sotp.segment.discount_rate")
@@ -299,25 +308,18 @@ def _sotp(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, sh
     if equity <= 0:
         raise ValueError("SOTP implied equity value must be > 0")
     return {
-        "model": "sotp",
-        "equity_value": float(equity),
-        "value_per_share": float(equity / shares),
-        "drivers": {
-            "segment_count": len(segments),
-            "other_assets": float(other),
-            "net_debt": float(net_debt),
-            "segment_models": [str(s.get("model")) for s in segments],
-        },
+        "model": "sotp", "equity_value": float(equity), "value_per_share": float(equity / shares),
+        "drivers": {"segment_count": len(segments), "other_assets": float(other), "net_debt": float(net_debt),
+                    "segment_models": [str(s.get("model")) for s in segments]},
     }
 
 
-def value_scenario(
-    forecast: dict[str, Any],
-    valuation: dict[str, Any],
-    scenario: str,
-    shares: Decimal,
-) -> dict[str, Any]:
+def value_scenario(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shares: Decimal) -> dict[str, Any]:
     model = select_model(valuation)["primary_model"]
+    return _value_by_model(forecast, valuation, model, scenario, shares)
+
+
+def _value_by_model(forecast: dict[str, Any], valuation: dict[str, Any], model: str, scenario: str, shares: Decimal) -> dict[str, Any]:
     if model == "forward_pe":
         return _pe(forecast, valuation, scenario, shares)
     if model == "dcf":
@@ -334,4 +336,100 @@ def value_scenario(
         return _ev_ebitda(forecast, valuation, scenario, shares)
     if model == "rnpv":
         return _rnpv(forecast, valuation, scenario, shares)
-    raise AssertionError(model)
+    raise ValueError(f"unsupported valuation model: {model}")
+
+
+def build_intrinsic_valuation(
+    forecast: dict[str, Any],
+    valuation: dict[str, Any],
+    shares: Decimal,
+) -> dict[str, Any]:
+    selection = select_model(valuation)
+    models = [selection["primary_model"]] + selection["secondary_models"] + selection["cross_check_models"]
+
+    scenario_values: dict[str, dict[str, dict[str, Any]]] = {}
+    model_status: dict[str, dict[str, Any]] = {}
+    for model in models:
+        model_status[model] = {"role": (
+            "primary" if model == selection["primary_model"]
+            else "secondary" if model in selection["secondary_models"]
+            else "cross_check"
+        )}
+        scenario_values[model] = {}
+        for scenario in ("bear", "base", "bull"):
+            try:
+                scenario_values[model][scenario] = _value_by_model(forecast, valuation, model, scenario, shares)
+                model_status[model][f"{scenario}_status"] = "PASS"
+            except (KeyError, TypeError, ValueError) as exc:
+                scenario_values[model][scenario] = None
+                model_status[model][f"{scenario}_status"] = f"BLOCKED:{exc}"
+
+    primary = selection["primary_model"]
+    if any(scenario_values[primary][s] is None for s in ("bear", "base", "bull")):
+        raise ValueError(f"primary valuation model {primary} cannot produce all Bear/Base/Bull values")
+
+    aggregation = valuation.get("aggregation") or {}
+    explicit_weights = aggregation.get("model_weights")
+    weights: dict[str, Decimal] = {}
+    if explicit_weights is not None:
+        for model, weight in explicit_weights.items():
+            if model not in models:
+                raise ValueError(f"aggregation weight references unused model: {model}")
+            w = dec(weight, f"valuation.aggregation.model_weights.{model}")
+            if w < 0:
+                raise ValueError("aggregation model weights must be >= 0")
+            weights[model] = w
+        total = sum(weights.values(), Decimal("0"))
+        if total != Decimal("1"):
+            raise ValueError("aggregation model weights must sum exactly to 1")
+        for model, weight in weights.items():
+            if weight > 0 and any(scenario_values[model][s] is None for s in ("bear", "base", "bull")):
+                raise ValueError(f"weighted model {model} is not fully valued")
+    else:
+        # No arbitrary averaging: primary is authoritative; other models are checks only.
+        weights = {primary: Decimal("1")}
+    
+    aggregated_scenarios = {}
+    for scenario in ("bear", "base", "bull"):
+        value = Decimal("0")
+        for model, weight in weights.items():
+            value += dec(scenario_values[model][scenario]["value_per_share"], f"{model}.{scenario}.value_per_share") * weight
+        aggregated_scenarios[scenario] = float(value)
+
+    scenario_range = {
+        "bear_value_per_share": aggregated_scenarios["bear"],
+        "base_value_per_share": aggregated_scenarios["base"],
+        "bull_value_per_share": aggregated_scenarios["bull"],
+        "low": aggregated_scenarios["bear"],
+        "high": aggregated_scenarios["bull"],
+    }
+
+    dispersion = None
+    base_values = [
+        scenario_values[model]["base"]["value_per_share"]
+        for model in models
+        if scenario_values[model].get("base") is not None
+    ]
+    if len(base_values) >= 2:
+        low = min(base_values)
+        high = max(base_values)
+        midpoint = (low + high) / 2
+        dispersion = {
+            "min_base_model_value": float(low),
+            "max_base_model_value": float(high),
+            "relative_dispersion_pct": float(((high - low) / midpoint) * 100) if midpoint else None,
+        }
+
+    return {
+        "model_selection": selection,
+        "models": scenario_values,
+        "model_status": model_status,
+        "aggregation": {
+            "method": "explicit_weighted_average" if explicit_weights is not None else "primary_authoritative_no_arbitrary_average",
+            "weights": {model: float(weight) for model, weight in weights.items()},
+        },
+        "scenarios": scenario_range,
+        "intrinsic_value_per_share": aggregated_scenarios["base"],
+        "intrinsic_value_range": {"low": aggregated_scenarios["bear"], "base": aggregated_scenarios["base"], "high": aggregated_scenarios["bull"]},
+        "model_cross_check_dispersion": dispersion,
+    }
