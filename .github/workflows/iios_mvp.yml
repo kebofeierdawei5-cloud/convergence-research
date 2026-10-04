@@ -9,6 +9,7 @@ on:
       - "tests/test_investment_core_contract.py"
       - "tests/test_market_model_domain.py"
       - "tests/test_market_model_identification.py"
+      - "tests/test_market_implied_expectation.py"
       - "examples/**"
       - "schemas/**"
       - ".github/workflows/iios_mvp.yml"
@@ -32,13 +33,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m compileall -q iios_mvp tests/test_mvp.py tests/test_investment_core_contract.py tests/test_market_model_domain.py tests/test_market_model_identification.py
-      - run: python -m pip install --disable-pip-version-check pytest
-      - run: python -m pytest -q tests/test_mvp.py tests/test_value_core.py tests/test_investment_core_contract.py tests/test_market_model_domain.py tests/test_market_model_identification.py
+      - run: python -m compileall -q iios_mvp tests/test_mvp.py tests/test_investment_core_contract.py tests/test_market_model_domain.py tests/test_market_model_identification.py tests/test_market_implied_expectation.py
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m pytest -q tests/test_mvp.py tests/test_value_core.py tests/test_investment_core_contract.py tests/test_market_model_domain.py tests/test_market_model_identification.py tests/test_market_implied_expectation.py
       - run: |
           python -m json.tool schemas/investment_core_case_v0.2.schema.json >/dev/null
           python -m json.tool schemas/market_model_domain_v0.2.schema.json >/dev/null
           python -m json.tool schemas/market_model_identification_v0.2.schema.json >/dev/null
+          python -m json.tool schemas/market_implied_expectation_v0.2.schema.json >/dev/null
       - run: PYTHONPATH=. python -m iios_mvp.cli run examples/iios_mvp_demo.json --out /tmp/iios-mvp
       - run: |
           snapshot=$(find /tmp/iios-mvp -maxdepth 1 -name '*.json' ! -name '*.series.json' ! -name '*.index.json' ! -name '*.decision.json' | head -n 1)
