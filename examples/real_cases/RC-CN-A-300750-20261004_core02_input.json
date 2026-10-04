@@ -1,0 +1,502 @@
+{
+  "case": {
+    "contract_version": "IIOS-RESEARCH-CASE-0.1",
+    "case_id": "RC-CN-A-300750-20261004",
+    "generator_version": "CORE-01-0.1",
+    "request": {
+      "market": "CN-A",
+      "symbol": "300750",
+      "as_of_date": "2026-10-04",
+      "current_position_pct": "0"
+    },
+    "security_identity": {
+      "status": "UNRESOLVED",
+      "market": "CN-A",
+      "symbol": "300750",
+      "venue_hint": "SZSE",
+      "venue_hint_is_evidence": false,
+      "resolution_basis_required": "PRIMARY_OFFICIAL"
+    },
+    "temporal_scope": {
+      "as_of_date": "2026-10-04",
+      "cutoff_date": "2026-10-04",
+      "mode": "CURRENT",
+      "pit_required": true,
+      "pit_rule": "known_at <= cutoff",
+      "current_state_substitution": "FORBIDDEN"
+    },
+    "decision_context": {
+      "current_position_pct": "0",
+      "position_basis": "CURRENT_PORTFOLIO_STATE"
+    },
+    "evidence_plan": [
+      {
+        "field_group": "security_identity",
+        "purpose": "Authoritatively resolve issuer identity, venue and security status.",
+        "priority": "P0",
+        "source_classes": [
+          "OFFICIAL_EXCHANGE",
+          "ISSUER_PRIMARY"
+        ],
+        "required_for_admission": true,
+        "pit_rule": "known_at <= cutoff",
+        "status": "PENDING"
+      },
+      {
+        "field_group": "market_price",
+        "purpose": "Bind decision price to the requested as-of/cutoff observation.",
+        "priority": "P0",
+        "source_classes": [
+          "OFFICIAL_EXCHANGE",
+          "REPRODUCIBLE_PUBLIC_DATA"
+        ],
+        "required_for_admission": true,
+        "pit_rule": "known_at <= cutoff",
+        "status": "PENDING"
+      },
+      {
+        "field_group": "corporate_disclosures",
+        "purpose": "Capture material filings, announcements and disclosure chronology.",
+        "priority": "P0",
+        "source_classes": [
+          "ISSUER_PRIMARY",
+          "OFFICIAL_EXCHANGE",
+          "REGULATOR_PRIMARY"
+        ],
+        "required_for_admission": true,
+        "pit_rule": "known_at <= cutoff",
+        "status": "PENDING"
+      },
+      {
+        "field_group": "business_reality",
+        "purpose": "Establish business mix, products, customers and material operating facts.",
+        "priority": "P0",
+        "source_classes": [
+          "ISSUER_PRIMARY",
+          "OFFICIAL_DATABASE"
+        ],
+        "required_for_admission": true,
+        "pit_rule": "known_at <= cutoff",
+        "status": "PENDING"
+      },
+      {
+        "field_group": "financial_reality",
+        "purpose": "Establish PIT financial reality and key operating/economic observations.",
+        "priority": "P0",
+        "source_classes": [
+          "ISSUER_PRIMARY",
+          "OFFICIAL_DATABASE"
+        ],
+        "required_for_admission": true,
+        "pit_rule": "known_at <= cutoff",
+        "status": "PENDING"
+      },
+      {
+        "field_group": "capital_structure",
+        "purpose": "Establish shares, ownership, dilution and other capital-structure facts.",
+        "priority": "P1",
+        "source_classes": [
+          "ISSUER_PRIMARY",
+          "OFFICIAL_EXCHANGE"
+        ],
+        "required_for_admission": true,
+        "pit_rule": "known_at <= cutoff",
+        "status": "PENDING"
+      },
+      {
+        "field_group": "trust_governance_events",
+        "purpose": "Check material governance, integrity, litigation and shareholder-risk evidence.",
+        "priority": "P0",
+        "source_classes": [
+          "REGULATOR_PRIMARY",
+          "OFFICIAL_EXCHANGE",
+          "ISSUER_PRIMARY"
+        ],
+        "required_for_admission": true,
+        "pit_rule": "known_at <= cutoff",
+        "status": "PENDING"
+      }
+    ],
+    "evidence": [
+      {
+        "evidence_id": "E001",
+        "subject_id": "RC-CN-A-300750-20261004",
+        "field_id": "security_identity.primary",
+        "claim_type": "OBSERVED_FACT",
+        "known_at": "2018-06-07",
+        "retrieved_at": "2018-06-07",
+        "source_ref": "https://www.szse.cn/disclosure/notice/company/t20180607_539221.html",
+        "artifact_id": "catl-20261004-E001-security-identity.txt",
+        "content_sha256": "724049917e924e702e6add00aac00464980a4d7db01430b7d1d85ac059e0816d",
+        "exact_bytes": true,
+        "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+        "status": "ADMITTED"
+      },
+      {
+        "evidence_id": "E002",
+        "subject_id": "RC-CN-A-300750-20261004",
+        "field_id": "market_price.close.2026-09-30",
+        "claim_type": "OBSERVED_FACT",
+        "known_at": "2026-09-30T21:28:59+08:00",
+        "retrieved_at": "2026-10-04",
+        "source_ref": "https://wap.stockstar.com/detail/RB2026093000037318",
+        "artifact_id": "catl-20261004-E002-market-price.txt",
+        "content_sha256": "bc7e358a8385554be498d6a2555b91c9f06812d6d5d6d38db31f9fcc00f01b18",
+        "exact_bytes": true,
+        "provenance_class": "EVENT_PUBLICATION_VERIFIED",
+        "status": "ADMITTED"
+      },
+      {
+        "evidence_id": "E003",
+        "subject_id": "RC-CN-A-300750-20261004",
+        "field_id": "corporate_disclosures.material.2026-09-30",
+        "claim_type": "OBSERVED_FACT",
+        "known_at": "2026-09-30",
+        "retrieved_at": "2026-10-04",
+        "source_ref": "https://static.cninfo.com.cn/finalpage/2026-10-01/1225592063.PDF",
+        "artifact_id": "catl-20261004-E003-corporate-disclosure.txt",
+        "content_sha256": "8721c0430b46e3215d6904a1b8a08e525166aba15e85b1e2c15d6777f7b4e67f",
+        "exact_bytes": true,
+        "provenance_class": "EVENT_PUBLICATION_VERIFIED",
+        "status": "ADMITTED"
+      },
+      {
+        "evidence_id": "E004",
+        "subject_id": "RC-CN-A-300750-20261004",
+        "field_id": "business_reality.operating_model",
+        "claim_type": "OBSERVED_FACT",
+        "known_at": "2026-07-24",
+        "retrieved_at": "2026-10-04",
+        "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
+        "artifact_id": "catl-20261004-E004-business-reality.txt",
+        "content_sha256": "4a99707c61cd33fb66e178452e0de6f7dcb167c3eeb7d5b30f0f79a03d55fc9e",
+        "exact_bytes": true,
+        "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+        "status": "ADMITTED"
+      },
+      {
+        "evidence_id": "E005",
+        "subject_id": "RC-CN-A-300750-20261004",
+        "field_id": "financial_reality.h1_2026",
+        "claim_type": "OBSERVED_FACT",
+        "known_at": "2026-07-24",
+        "retrieved_at": "2026-10-04",
+        "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
+        "artifact_id": "catl-20261004-E005-financial-reality.txt",
+        "content_sha256": "8acd40b9c61f7d89dd48d0a6c84706ec5ad2b5936f1b8514528c957448e3f923",
+        "exact_bytes": true,
+        "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+        "status": "ADMITTED"
+      },
+      {
+        "evidence_id": "E006",
+        "subject_id": "RC-CN-A-300750-20261004",
+        "field_id": "capital_structure.shareholders_h1_2026",
+        "claim_type": "OBSERVED_FACT",
+        "known_at": "2026-07-24",
+        "retrieved_at": "2026-10-04",
+        "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
+        "artifact_id": "catl-20261004-E006-capital-structure.txt",
+        "content_sha256": "207e2086130b3f65bfe121be87a188c9fe1ea4ea3273e96ce1d94c4ce50d3fc1",
+        "exact_bytes": true,
+        "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+        "status": "ADMITTED"
+      },
+      {
+        "evidence_id": "E007",
+        "subject_id": "RC-CN-A-300750-20261004",
+        "field_id": "trust_governance_events.related_party_guarantee",
+        "claim_type": "OBSERVED_FACT",
+        "known_at": "2026-09-30",
+        "retrieved_at": "2026-10-04",
+        "source_ref": "https://static.cninfo.com.cn/finalpage/2026-10-01/1225592063.PDF",
+        "artifact_id": "catl-20261004-E007-trust-governance.txt",
+        "content_sha256": "7ca8642ffd8fe3b9803f4a665ca521e0b2d8ae7fdebf8647774d482fe8ff34c2",
+        "exact_bytes": true,
+        "provenance_class": "EVENT_PUBLICATION_VERIFIED",
+        "status": "ADMITTED"
+      }
+    ],
+    "admission": {
+      "status": "EVIDENCE_PENDING",
+      "decision_ready": false,
+      "blockers": [
+        "SECURITY_IDENTITY_EVIDENCE_REQUIRED",
+        "MARKET_PRICE_EVIDENCE_REQUIRED",
+        "MANDATORY_COMPANY_EVIDENCE_PENDING"
+      ]
+    },
+    "audit": {
+      "input_sha256": "a6b6b6386a1c4158fb872e62a0d50959fdb4c71841e71f656202ea875c2795bd",
+      "evidence_plan_sha256": "cc6a50624cce90860865fbf085cb132202d41d8d1b7dfaccff474a53066c57ca",
+      "generated_at": "2026-10-04T22:00:00+08:00"
+    }
+  },
+  "reality": {
+    "facts": [
+      {
+        "fact_id": "F1",
+        "domain": "corporate_disclosures",
+        "field_id": "disclosure.related_party_guarantee",
+        "value": "Board approved related-party guarantee for Indonesia battery supply-chain project; related director recused",
+        "unit": "status",
+        "basis": "official 2026-09-30 disclosure",
+        "observation_date": "2026-09-30",
+        "evidence_ids": [
+          "E003"
+        ],
+        "status": "ESTABLISHED"
+      },
+      {
+        "fact_id": "F2",
+        "domain": "business_reality",
+        "field_id": "business.battery_systems",
+        "value": {
+          "power_battery_revenue_k_cny": 192124890,
+          "energy_storage_revenue_k_cny": 53260967,
+          "capacity_gwh": 525,
+          "under_construction_gwh": 764,
+          "utilization": 0.9486,
+          "output_gwh": 498
+        },
+        "unit": "mixed",
+        "basis": "2026 H1 annual report",
+        "observation_date": "2026-06-30",
+        "evidence_ids": [
+          "E004"
+        ],
+        "status": "ESTABLISHED"
+      },
+      {
+        "fact_id": "F3",
+        "domain": "financial_reality",
+        "field_id": "financial.h1_2026",
+        "value": {
+          "revenue_k_cny": 276916580,
+          "net_profit_attributable_k_cny": 43284002,
+          "operating_cash_flow_k_cny": 60216851,
+          "rd_k_cny": 11376545,
+          "capex_cash_k_cny": 25072772
+        },
+        "unit": "CNY_thousand",
+        "basis": "2026 H1 annual report",
+        "observation_date": "2026-06-30",
+        "evidence_ids": [
+          "E005"
+        ],
+        "status": "ESTABLISHED"
+      },
+      {
+        "fact_id": "F4",
+        "domain": "capital_structure",
+        "field_id": "capital.shareholders_h1_2026",
+        "value": {
+          "total_common_shareholders": 270033,
+          "controlling_shareholder_pct": 22.04,
+          "hkscc_pct": 19.33,
+          "huang_shilin_pct": 9.09,
+          "buyback_account_pct": 0.61
+        },
+        "unit": "mixed",
+        "basis": "2026 H1 annual report",
+        "observation_date": "2026-06-30",
+        "evidence_ids": [
+          "E006"
+        ],
+        "status": "ESTABLISHED"
+      }
+    ]
+  },
+  "trust": {
+    "dimensions": [
+      {
+        "dimension": "identity",
+        "status": "PASS",
+        "rationale": "Official SZSE listing notice binds issuer, venue and code 300750.",
+        "evidence_ids": [
+          "E001"
+        ]
+      },
+      {
+        "dimension": "disclosure_integrity",
+        "status": "CONDITIONAL",
+        "rationale": "Official disclosure evidence is internally specific and dated, but one case-level disclosure cannot establish a full historical integrity record.",
+        "evidence_ids": [
+          "E003"
+        ]
+      },
+      {
+        "dimension": "governance_integrity",
+        "status": "CONDITIONAL",
+        "rationale": "The related-party transaction shows independent-director review and recusal of the related director, but this is not a full governance-history screen.",
+        "evidence_ids": [
+          "E007"
+        ]
+      },
+      {
+        "dimension": "shareholder_treatment",
+        "status": "CONDITIONAL",
+        "rationale": "The documented related-party support has no guarantee fee and was stated not to harm minority shareholders, but a broader shareholder-treatment history remains unreviewed.",
+        "evidence_ids": [
+          "E007"
+        ]
+      }
+    ]
+  },
+  "quality": {
+    "dimensions": [
+      {
+        "dimension": "competitive_advantage",
+        "status": "CONDITIONAL",
+        "rationale": "The report describes supply-chain integration, resource positioning and a large multi-region production footprint; external competitor benchmarking is still required before PASS.",
+        "evidence_ids": [
+          "E004"
+        ]
+      },
+      {
+        "dimension": "incremental_return_on_capital",
+        "status": "UNKNOWN",
+        "rationale": "The required PIT inputs for a robust incremental ROIC bridge are not yet fully constructed in CORE-02.",
+        "evidence_ids": [
+          "E005"
+        ]
+      },
+      {
+        "dimension": "earnings_quality",
+        "status": "CONDITIONAL",
+        "rationale": "H1 revenue grew 54.8% and attributable profit 42.0%, while operating cash flow grew only 2.6%; the conversion and working-capital bridge requires deeper analysis.",
+        "evidence_ids": [
+          "E005"
+        ]
+      },
+      {
+        "dimension": "cash_flow_conversion",
+        "status": "CONDITIONAL",
+        "rationale": "Operating cash flow exceeded reported attributable profit in H1, but free cash flow and working-capital normalization are not yet fully established.",
+        "evidence_ids": [
+          "E005"
+        ]
+      },
+      {
+        "dimension": "balance_sheet_resilience",
+        "status": "PASS",
+        "rationale": "The report shows CNY 372.1bn cash against CNY 20.9bn short-term and CNY 74.3bn long-term borrowings at 2026-06-30.",
+        "evidence_ids": [
+          "E005"
+        ]
+      },
+      {
+        "dimension": "reinvestment_runway",
+        "status": "CONDITIONAL",
+        "rationale": "525 GWh capacity, 94.86% utilization and 764 GWh under construction show substantial operating scale and investment runway, while returns on the incremental footprint remain to be tested.",
+        "evidence_ids": [
+          "E004",
+          "E005"
+        ]
+      }
+    ]
+  },
+  "value_core": {
+    "version": "1.0",
+    "nodes": [
+      {
+        "id": "core_battery_systems",
+        "name": "Battery systems operating platform",
+        "node_type": "operating_business",
+        "materiality": "HIGH",
+        "ownership_pct": 100,
+        "assessment_basis": "2026 H1 report: battery-system revenue, capacity, utilization and geographic build-out",
+        "evidence_ids": [
+          "E004",
+          "E005"
+        ],
+        "economic_attributes": {
+          "earnings_stability": "HIGH",
+          "cash_flow_visibility": "MEDIUM",
+          "capital_intensity": "HIGH",
+          "cyclicality": "MEDIUM",
+          "asset_intensity": "MEDIUM",
+          "reinvestment_intensity": "HIGH",
+          "payout_characteristic": "MEDIUM",
+          "pipeline_optionality": "NONE",
+          "maturity": "COMMERCIAL"
+        }
+      },
+      {
+        "id": "resource_recycling",
+        "name": "Battery materials, recycling and mineral resources",
+        "node_type": "operating_business",
+        "materiality": "MEDIUM",
+        "ownership_pct": 100,
+        "assessment_basis": "2026 H1 report discloses battery materials/recycling/mineral-resource revenue and resource integration strategy",
+        "evidence_ids": [
+          "E004"
+        ],
+        "economic_attributes": {
+          "earnings_stability": "MEDIUM",
+          "cash_flow_visibility": "MEDIUM",
+          "capital_intensity": "HIGH",
+          "cyclicality": "HIGH",
+          "asset_intensity": "HIGH",
+          "reinvestment_intensity": "HIGH",
+          "payout_characteristic": "LOW",
+          "pipeline_optionality": "NONE",
+          "maturity": "COMMERCIAL"
+        }
+      }
+    ]
+  },
+  "value_driver_ranking": [
+    {
+      "driver_id": "D1",
+      "name": "电池系统规模 / 需求与交付",
+      "rank": 1,
+      "materiality": "HIGH",
+      "mechanism": "Volume, customer demand and capacity utilization drive battery-system revenue; operating leverage then transmits into gross/operating profit and cash generation.",
+      "economic_variables": [
+        "volume",
+        "revenue",
+        "operating_margin",
+        "fcf"
+      ],
+      "evidence_ids": [
+        "E004",
+        "E005"
+      ]
+    },
+    {
+      "driver_id": "D2",
+      "name": "单位经济性：价格 / 产品结构 / 毛利率",
+      "rank": 2,
+      "materiality": "HIGH",
+      "mechanism": "Product mix, pricing and input-cost pass-through determine gross margin and a large part of earnings sensitivity.",
+      "economic_variables": [
+        "price",
+        "product_mix",
+        "gross_margin",
+        "operating_margin"
+      ],
+      "evidence_ids": [
+        "E004",
+        "E005"
+      ]
+    },
+    {
+      "driver_id": "D3",
+      "name": "再投资效率：CAPEX → FCF → Incremental ROIC",
+      "rank": 3,
+      "materiality": "HIGH",
+      "mechanism": "New capacity and strategic resource investment require incremental returns sufficient to convert growth into durable FCF and economic profit.",
+      "economic_variables": [
+        "capex",
+        "depreciation_amortization",
+        "fcf",
+        "incremental_roic"
+      ],
+      "evidence_ids": [
+        "E004",
+        "E005"
+      ]
+    }
+  ]
+}
