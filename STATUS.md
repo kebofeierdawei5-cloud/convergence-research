@@ -24,6 +24,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - P3-B complex model-specific Market Model Identification baseline (DCF/DDM/SOTP/rNPV): **FINAL PASS / MERGED**
 - P3 capability classification: **conditional / candidate-set-bound baseline; not proof of unconditional true-market-model identification**
 - P4-A MIE Qualification Boundary: **FINAL PASS / MERGED**
+- P4-B Ratio-family MIE Vertical Slice: **FINAL PASS / MERGED**
 - Production investment decision kernel: NOT YET
 
 ## Return Target
@@ -105,6 +106,21 @@ P3-B is formally **FINAL PASS** on canonical `main`.
 - acceptance record: `docs/iios/P3B_COMPLEX_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`
 
 P3-B implements model-specific evidence-backed identification for DCF, DDM, SOTP and rNPV, including model-specific inverse constraints, feasible solution sets, conservative identifiability, and historical date-level leave-one-out stability. It does not implement P4 or semantic Expectation Gap / return calculation.
+
+## P4-B Final Acceptance
+
+P4-B is formally **FINAL PASS** on canonical `main`.
+
+- PR #11: MERGED
+- P4-B merge commit: `741b3fc0bff3a8da5e993f1a0c0aec25cb823420`
+- CI #131 / `37187856731`: **SUCCESS**
+- CI #99 / `37187856715`: **SUCCESS**
+- Post-merge main CI #133 / `37187900444`: **SUCCESS**
+- Post-merge main FM00 CI #101 / `37187900457`: **SUCCESS**
+- Final regression result: **114 passed**
+- Acceptance record: `docs/iios/P4B_FINAL_ACCEPTANCE_2026-10-04.md`
+
+P4-B materializes ratio-family P3 feasible ranges as P4-A model-semantic MIE outputs without recomputing the inverse or forcing ambiguous winners.
 
 ## P4-A Final Acceptance
 
