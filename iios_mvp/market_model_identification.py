@@ -425,7 +425,7 @@ def _stability(
     )
     current_observation_date = anchor.observation_date
     historical = sorted(
-        (item for item in inp.observations if item.observation_id != current.observation_id),
+        (item for item in inp.observations if item.observation_date < current_observation_date),
         key=lambda x: x.observation_date,
     )
 
