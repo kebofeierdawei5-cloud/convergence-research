@@ -338,7 +338,7 @@ PR #3 / Batch 2 v0.1 remains blocked and untouched.
 
 ### P4 — Market Implied Expectation Engine
 
-Status: **IN PROGRESS — P4-A COMPLETE / P4-B IMPLEMENTED / ACCEPTANCE PENDING**
+Status: **IN PROGRESS — P4-A COMPLETE / P4-B COMPLETE / P4-C NEXT**
 
 Macro planning authority: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026-10-04.md`.
 
@@ -387,6 +387,22 @@ P3 IDENTIFIABLE is candidate-set-conditional. P4 must explicitly distinguish con
 For each identified / feasible model, produce the economic variables that the current price requires.
 
 Never collapse different model semantics into one generic “implied net profit”.
+
+### P4-C — DCF / DDM Conditional Market Implied Expectation
+
+Status: **NEXT**
+
+Consume P3-B DCF/DDM model-specific feasible solutions through the P4-A typed qualification boundary. Preserve conditional assumption semantics; do not collapse to generic implied net profit or promote conditional inversion to a full multidimensional feasible assumption set without explicit evidence and contract support.
+
+Acceptance target:
+
+- DCF conditional implied FCF / assumption requirement;
+- DDM conditional implied dividend / assumption requirement;
+- explicit assumption set and provenance;
+- ambiguity / instability / insufficient evidence remain fail-closed;
+- no Expectation Gap / Expected Return implementation.
+
+Acceptance evidence to be created at completion.
 
 ### P5 — Expectation Gap + Return Gate
 
