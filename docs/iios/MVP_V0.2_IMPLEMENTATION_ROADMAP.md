@@ -345,11 +345,11 @@ Macro planning authority: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026
 Recommended first decomposition:
 
 ```
-P4-A  Model-semantic Market Implied Expectation contract
+P4-A  Market Implied Expectation qualification contract
         ↓
-P4-B  Ratio-family expectation extraction
+P4-B  Ratio-family MIE vertical slice
         ↓
-P4-C  DCF / DDM feasible assumption-set extraction
+P4-C  DCF / DDM conditional MIE
         ↓
 P4-D  SOTP / rNPV expectation extraction
         ↓
@@ -359,6 +359,8 @@ P4-F  PIT / replay / fail-closed integration
 ```
 
 P4 should consume the accepted P2-B / P3-A / P3-B outputs rather than reopen their domain semantics.
+
+P3 IDENTIFIABLE is candidate-set-conditional. P4 must explicitly distinguish conditional inverse results from decision-grade Market Implied Expectation and must qualify candidate coverage before using uniqueness as evidence of market-model identification.
 
 For each identified / feasible model, produce the economic variables that the current price requires.
 
@@ -503,8 +505,9 @@ The core can be considered production-capable only when all of the following are
 - intrinsic value is deterministic and replayable;
 - market model interpretation is evidence-based;
 - feasible solution set / identifiability / stability are meaningful;
-- DCF / DDM / SOTP / rNPV market-model interpretation is model-semantic and evidence-backed;
-- market implied expectation is model-semantic correct;
+ - DCF / DDM / SOTP / rNPV market-model interpretation is model-semantic and evidence-backed;
+- conditional inverse outputs are explicitly labeled and are not silently promoted to full multidimensional feasible assumption sets;
+ - market implied expectation is model-semantic correct and qualification-aware;
 - expectation gap is economically coherent;
 - positive return >15% is computed under explicit assumptions;
 - risk / thesis / trust gates are enforced;
