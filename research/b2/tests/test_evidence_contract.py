@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from research.b2.evidence_contract import (
     assert_pit,
@@ -55,7 +55,7 @@ class EvidenceContractTests(unittest.TestCase):
             "2025-01-01T00:00:00+08:00",
             "2025-02-01T00:00:00+08:00",
         ])
-        self.assertEqual(result, datetime(2025, 2, 1, tzinfo=timezone.utc))
+        self.assertEqual(result, datetime(2025, 2, 1, tzinfo=timezone(timedelta(hours=8))))
 
     def test_derived_requires_parents_and_transformation(self):
         item = evidence(
