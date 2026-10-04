@@ -726,7 +726,7 @@ next gate
 
 As of 2026-10-04:
 
-- Main HEAD: `30bd8f2a62a281c1fcdf66dbb6d4e7ed51002d17`
+- P4-A acceptance baseline commit: `30bd8f2a62a281c1fcdf66dbb6d4e7ed51002d17` (subsequent commits are documentation-only state updates)
 - Investment Core Contract v0.2: FROZEN / SEMANTIC PASS
 - P2-A: FINAL PASS / MERGED
 - P2-B: FINAL PASS / MERGED
