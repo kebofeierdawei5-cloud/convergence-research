@@ -45,14 +45,15 @@ def _case_and_evidence():
     return case
 
 
-def _assessment(dimensions, evidence_ids, status="PASS", prefix="assessment"):
+def _assessment(dimensions, evidence_ids, status="PASS", prefix="assessment", refs_by_dimension=None):
+    refs_by_dimension = refs_by_dimension or {dimension: [evidence_ids[0]] for dimension in dimensions}
     return {
         "dimensions": [
             {
                 "dimension": dimension,
                 "status": status,
                 "rationale": f"{prefix}:{dimension}",
-                "evidence_ids": [evidence_ids[0]],
+                "evidence_ids": refs_by_dimension[dimension],
             }
             for dimension in dimensions
         ]
@@ -111,8 +112,30 @@ def _inputs():
             },
         ]
     }
-    trust = _assessment(TRUST_DIMENSIONS, evidence_ids, prefix="trust")
-    quality = _assessment(QUALITY_DIMENSIONS, evidence_ids, prefix="quality")
+    trust = _assessment(
+        TRUST_DIMENSIONS,
+        evidence_ids,
+        prefix="trust",
+        refs_by_dimension={
+            "identity": [evidence_ids[0]],
+            "disclosure_integrity": [evidence_ids[2]],
+            "governance_integrity": [evidence_ids[6]],
+            "shareholder_treatment": [evidence_ids[6]],
+        },
+    )
+    quality = _assessment(
+        QUALITY_DIMENSIONS,
+        evidence_ids,
+        prefix="quality",
+        refs_by_dimension={
+            "competitive_advantage": [evidence_ids[3]],
+            "incremental_return_on_capital": [evidence_ids[4]],
+            "earnings_quality": [evidence_ids[4]],
+            "cash_flow_conversion": [evidence_ids[4]],
+            "balance_sheet_resilience": [evidence_ids[4], evidence_ids[5]],
+            "reinvestment_runway": [evidence_ids[3], evidence_ids[4]],
+        },
+    )
     value_core = {
         "version": "1.0",
         "nodes": [
@@ -225,6 +248,55 @@ def test_missing_required_evidence_domain_fails_closed():
     case["evidence"] = [row for row in case["evidence"] if not row["field_id"].startswith("financial_reality.")]
     inputs[0] = case
     with pytest.raises(ValueError, match="required evidence domains missing"):
+        build_company_economic_core(*inputs)
+
+
+def test_reality_evidence_must_match_reality_domain():
+    inputs = list(_inputs())
+    reality = dict(inputs[1])
+    reality["facts"] = [dict(row) for row in reality["facts"]]
+    reality["facts"][1]["evidence_ids"] = ["E1"]
+    inputs[1] = reality
+    with pytest.raises(ValueError, match="does not cover domain"):
+        build_company_economic_core(*inputs)
+
+
+def test_trust_and_quality_evidence_must_match_assessment_domain():
+    inputs = list(_inputs())
+    trust = {"dimensions": [dict(row) for row in inputs[2]["dimensions"]]}
+    trust["dimensions"][1]["evidence_ids"] = ["E1"]
+    inputs[2] = trust
+    with pytest.raises(ValueError, match="does not cover its required domain"):
+        build_company_economic_core(*inputs)
+
+    inputs = list(_inputs())
+    quality = {"dimensions": [dict(row) for row in inputs[3]["dimensions"]]}
+    quality["dimensions"][0]["evidence_ids"] = ["E1"]
+    inputs[3] = quality
+    with pytest.raises(ValueError, match="does not cover its required domain"):
+        build_company_economic_core(*inputs)
+
+
+def test_invalid_effective_interval_fails_closed():
+    inputs = list(_inputs())
+    case = dict(inputs[0])
+    case["evidence"] = [dict(row) for row in case["evidence"]]
+    case["evidence"][0]["effective_from"] = "2026-09-01T00:00:00+08:00"
+    case["evidence"][0]["effective_to"] = "2026-08-31T00:00:00+08:00"
+    inputs[0] = case
+    with pytest.raises(ValueError, match="effective_to"):
+        build_company_economic_core(*inputs)
+
+
+def test_derived_evidence_must_have_known_parent():
+    inputs = list(_inputs())
+    case = dict(inputs[0])
+    case["evidence"] = [dict(row) for row in case["evidence"]]
+    case["evidence"][0]["provenance_class"] = "DERIVED_FROM_ADMITTED_RAW"
+    case["evidence"][0]["parents"] = ["NOT-ADMITTED"]
+    case["evidence"][0]["transformation"] = {"type": "DERIVED"}
+    inputs[0] = case
+    with pytest.raises(ValueError, match="unknown parents"):
         build_company_economic_core(*inputs)
 
 
