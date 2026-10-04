@@ -671,8 +671,6 @@ def test_p3b_dcf_and_ddm_both_feasible_are_ambiguous():
     evidence = tuple(dcf_evidence) + (
         complex_evidence("e-dividend", "dividend", "CNY/share"),
         complex_evidence("e-payout", "payout", "ratio"),
-        complex_evidence("e-growth", "growth", "ratio"),
-        complex_evidence("e-discount_rate", "discount_rate", "ratio"),
         complex_evidence("candidate-dcf", "dcf_candidate"),
         complex_evidence("candidate-ddm", "ddm_candidate"),
     )
