@@ -1,0 +1,138 @@
+{
+  "case_input_path": "examples/real_cases/RC-CN-A-300750-20261004_core02_input.json",
+  "forecast": {
+    "version": "IIOS-INDEPENDENT-FORECAST-0.1",
+    "method": "BOTTOM_UP_DRIVER_SCENARIO",
+    "cutoff_date": "2026-10-04",
+    "years": [
+      2027,
+      2028,
+      2029
+    ],
+    "horizon_years": 3,
+    "probabilities": {
+      "bear": "0.25",
+      "base": "0.50",
+      "bull": "0.25"
+    },
+    "scenarios": {
+      "bear": {
+        "revenue_bn_cny": [
+          "600",
+          "640",
+          "680"
+        ],
+        "fcf_proxy_bn_cny": [
+          "62",
+          "66",
+          "72"
+        ],
+        "gross_margin_pct": [
+          "21.0",
+          "20.2",
+          "20.0"
+        ],
+        "incremental_roic_pct": [
+          "9.0",
+          "9.5",
+          "10.0"
+        ],
+        "evidence_ids": [
+          "E004",
+          "E005",
+          "E009"
+        ],
+        "rationale": "Demand/shipments continue to grow but price competition and high reinvestment keep gross margin and incremental returns under pressure; FCF conversion recovers only gradually."
+      },
+      "base": {
+        "revenue_bn_cny": [
+          "680",
+          "760",
+          "830"
+        ],
+        "fcf_proxy_bn_cny": [
+          "84",
+          "96",
+          "108"
+        ],
+        "gross_margin_pct": [
+          "22.0",
+          "22.5",
+          "22.5"
+        ],
+        "incremental_roic_pct": [
+          "13.0",
+          "14.0",
+          "15.0"
+        ],
+        "evidence_ids": [
+          "E004",
+          "E005",
+          "E009"
+        ],
+        "rationale": "Volume growth remains strong, storage expands mix, global production ramps, and unit economics stabilize; cash conversion improves as the CAPEX cycle matures."
+      },
+      "bull": {
+        "revenue_bn_cny": [
+          "750",
+          "850",
+          "950"
+        ],
+        "fcf_proxy_bn_cny": [
+          "105",
+          "128",
+          "150"
+        ],
+        "gross_margin_pct": [
+          "24.0",
+          "24.5",
+          "25.0"
+        ],
+        "incremental_roic_pct": [
+          "17.0",
+          "19.0",
+          "21.0"
+        ],
+        "evidence_ids": [
+          "E004",
+          "E005",
+          "E009"
+        ],
+        "rationale": "CATL retains strong global share, storage and new-technology products improve mix, and incremental factories achieve high utilization with superior returns."
+      }
+    },
+    "valuation_focus": "FCF_AND_INCREMENTAL_ROIC",
+    "independence_statement": "No broker consensus or paid commercial forecast is used; all future values are explicit analyst assumptions anchored to admitted company evidence."
+  },
+  "valuation_assumptions": {
+    "price_cny": "291.11",
+    "price_evidence_id": "E002",
+    "shares_outstanding": "4380630342",
+    "share_count_evidence_id": "E008",
+    "net_cash_bn_cny": "276.904623",
+    "net_cash_basis": "2026-06-30 cash less short-term and long-term borrowings; no post-cutoff current-state substitution",
+    "bear": {
+      "discount_rate": "0.10",
+      "terminal_growth": "0.02"
+    },
+    "base": {
+      "discount_rate": "0.09",
+      "terminal_growth": "0.025"
+    },
+    "bull": {
+      "discount_rate": "0.085",
+      "terminal_growth": "0.03"
+    }
+  },
+  "market_evidence": {
+    "evidence_id": "E008",
+    "known_at": "2026-09-29T23:59:00+08:00",
+    "retrieved_at": "2026-10-04T00:00:00+08:00",
+    "content_sha256": "70ca1ac344c869754b790f8ba1ed6087ede879c71fa848f651a59f5c71fe3be1",
+    "exact_bytes": true,
+    "source_ref": "https://static.cninfo.com.cn/finalpage/2026-09-29/1225589071.PDF",
+    "artifact_id": "catl-20261004-E008-current-share-count.txt",
+    "status": "ADMITTED",
+    "variable": "current_share_count"
+  }
+}
