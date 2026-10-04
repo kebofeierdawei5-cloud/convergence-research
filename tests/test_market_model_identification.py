@@ -898,3 +898,20 @@ def test_p3b_observation_evidence_variable_mismatch_is_rejected():
         identify_market_models(
             complex_input(candidate_item, rows, evidence, "current-dividend")
         )
+
+
+def test_p3b_dcf_date_level_perturbation_can_make_interpretation_unstable():
+    candidate_item = complex_candidate(
+        "dcf-unstable",
+        MarketModelFamily.DCF,
+        ("fcf", "growth", "margin", "reinvestment", "terminal_value", "discount_rate"),
+        ("candidate-dcf-unstable",),
+    )
+    observations, evidence = dcf_fixture(("2100", "4200", "4200", "4200", "2100"))
+    evidence = evidence + (complex_evidence("candidate-dcf-unstable", "dcf_candidate"),)
+    result = identify_market_models(
+        complex_input(candidate_item, observations, evidence, "current-fcf")
+    )
+    assert result["identifiability"].state.value == "IDENTIFIABLE"
+    assert result["evaluations"][0].fit.status.value == "FEASIBLE"
+    assert result["stability"].state.value == "UNSTABLE"
