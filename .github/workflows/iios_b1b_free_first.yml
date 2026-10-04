@@ -22,13 +22,20 @@ jobs:
           python-version: "3.12"
       - name: Install free-source clients
         run: |
-          python -m pip install --disable-pip-version-check requests==2.32.5 baostock==0.9.3 pandas==2.3.3 xlrd==2.0.2
+          python -m pip install --disable-pip-version-check requests==2.32.5 baostock==0.9.3 pandas==2.3.3 xlrd==2.0.2 pytest==8.4.2
+      - name: Run B1-B2 CSI pilot unit tests
+        run: python -m pytest -q tests/test_b1b_csi_industry_history_pilot.py
+
       - name: Materialize B1-B free-first evidence
         continue-on-error: true
         run: python research/a02_b1b/materialize_free_pit.py --out "$RUNNER_TEMP/b1b"
       - name: Run B1-B2 historical ST pilot
         continue-on-error: true
         run: python research/a02_b1b/st_history_pilot.py --out "$RUNNER_TEMP/b1b/st_pilot" --limit 50
+      - name: Run B1-B2 CSI security-level industry history pilot
+        continue-on-error: true
+        run: python research/a02_b1b/csi_industry_history_pilot.py --out "$RUNNER_TEMP/b1b/csi_industry_history" --page-size 100 --max-pages 200 --sleep-seconds 0.25
+
       - name: Hash captured evidence
         if: ${{ always() }}
         run: |
