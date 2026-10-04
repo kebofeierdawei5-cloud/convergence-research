@@ -19,15 +19,32 @@ HEADERS = {"User-Agent":"Mozilla/5.0 (IIOS-B1B-free-first)","Accept":"*/*"}
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
-def capture(session, method, url, out, params=None, headers=None):
-    r = session.request(method, url, params=params, headers=headers or HEADERS, timeout=90, allow_redirects=True)
-    body = r.content; out.parent.mkdir(parents=True, exist_ok=True); out.write_bytes(body)
+def capture(session, method, url, out, params=None, headers=None, retries=3):
+    last_error = None
+    for attempt in range(1, retries + 1):
+        try:
+            r = session.request(method, url, params=params, headers=headers or HEADERS, timeout=90, allow_redirects=True)
+            body = r.content
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(body)
+            return {
+                "requested_url": r.request.url, "final_url": r.url, "method": method,
+                "retrieved_at": datetime.now(timezone.utc).isoformat(), "http_status": r.status_code,
+                "content_type": r.headers.get("Content-Type"), "size_bytes": len(body),
+                "sha256": sha256(body), "exact_bytes": True, "source_class":"OFFICIAL_PUBLIC_HTTP",
+                "attempts": attempt,
+                "redirect_history":[{"status":h.status_code,"url":h.url,"location":h.headers.get("Location")} for h in r.history]
+            }
+        except requests.RequestException as exc:
+            last_error = str(exc)
     return {
-        "requested_url": r.request.url, "final_url": r.url, "method": method,
-        "retrieved_at": datetime.now(timezone.utc).isoformat(), "http_status": r.status_code,
-        "content_type": r.headers.get("Content-Type"), "size_bytes": len(body),
-        "sha256": sha256(body), "exact_bytes": True, "source_class":"OFFICIAL_PUBLIC_HTTP",
-        "redirect_history":[{"status":h.status_code,"url":h.url,"location":h.headers.get("Location")} for h in r.history]
+        "status": "BLOCKED_SOURCE_UNREACHABLE",
+        "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "url": url,
+        "exact_bytes": False,
+        "source_class": "OFFICIAL_PUBLIC_HTTP",
+        "error": last_error,
+        "attempts": retries,
     }
 
 def to_df(rs):
@@ -60,13 +77,24 @@ def main():
         "jsonCallBack":"jsonpCallback","isPagination":"true","stockCode":"","csrcCode":"","areaName":"","stockType":"1",
         "pageHelp.cacheSize":"1","pageHelp.beginPage":"1","pageHelp.pageSize":"10000","pageHelp.pageNo":"1","pageHelp.endPage":"1"},
         headers={**HEADERS,"Referer":"https://www.sse.com.cn/"})
-    off['records']['szse_stock_list']=capture(s,'GET',OFFICIAL_SZSE,root/'official'/'szse_stock_list.xlsx',params={"SHOWTYPE":"xlsx","CATALOGID":"1110","TABKEY":"tab1","random":str(random.random())},headers={**HEADERS,"Referer":"https://www.szse.cn/market/product/stock/list/index.html"})
+    szse = capture(s,'GET',OFFICIAL_SZSE,root/'official'/'szse_stock_list.xlsx',params={"SHOWTYPE":"xlsx","CATALOGID":"1110","TABKEY":"tab1","random":str(random.random())},headers={**HEADERS,"Referer":"https://www.szse.cn/market/product/stock/list/index.html"})
+    if szse.get("exact_bytes") is not True:
+        szse = capture(s,'GET',"https://www.szse.cn/api/report/ShowReport/data",root/'official'/'szse_stock_list.json',params={"SHOWTYPE":"JSON","CATALOGID":"1110","TABKEY":"tab1","PAGENO":"1","PAGESIZE":"10000","tab1PAGENO":"1","tab1PAGESIZE":"10000","random":str(random.random())},headers={**HEADERS,"Referer":"https://www.szse.cn/market/product/stock/list/index.html"})
+        szse["fallback_from"]="xlsx"
+    off['records']['szse_stock_list']=szse
     off['records']['sse_risk_plate']=capture(s,'GET','https://www.sse.com.cn/disclosure/listedinfo/riskplate/',root/'official'/'sse_risk_plate.html',headers={**HEADERS,"Referer":"https://www.sse.com.cn/"})
     off['records']['szse_company_notice']=capture(s,'GET','https://www.szse.cn/disclosure/notice/company/index.html',root/'official'/'szse_company_notice.html',headers={**HEADERS,"Referer":"https://www.szse.cn/"})
     csi=capture(s,'GET',CSI_STANDARD,root/'official'/'csi_industry_classification_standard.pdf',headers={**HEADERS,"Referer":"https://www.csindex.com.cn/"})
     off['records']['csi_industry_standard']={**csi,"field":"CSI_INDUSTRY_TAXONOMY","status":"STANDARD_ONLY","known_at":None}
     (root/'official'/'receipt.json').write_text(json.dumps(off,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-    secondary=capture_baostock(root)
+    try:
+        secondary = capture_baostock(root)
+    except Exception as exc:
+        secondary = {"provider":"BAOSTOCK","source_class":"FREE_SECONDARY_API","status":"BLOCKED","error":str(exc)}
+        (root/"secondary_baostock").mkdir(parents=True,exist_ok=True)
+        (root/"secondary_baostock"/"receipt.json").write_text(
+            json.dumps(secondary,ensure_ascii=False,indent=2)+"\n",encoding="utf-8"
+        )
     admission={
       "schema_version":"IIOS-A02-B1B-ADMISSION-0.1","overall":"BLOCKED",
       "free_first":True,"paid_mandatory":False,"current_to_historical_substitution":False,
