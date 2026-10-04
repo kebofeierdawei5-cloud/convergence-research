@@ -76,7 +76,7 @@ def test_conditional_inverse_cannot_be_decision_grade():
         assumption_set=(MIEAssumption(
             variable="growth", value=Decimal("0.05"), unit="ratio", basis="assumption",
             period="NTM", horizon="12M", accounting_basis="reported", evidence_ids=("ev-growth",)
-        ),), evidence_ids=("ev-var", "ev-growth"),
+        ),), evidence_ids=("ev-var", "ev-coverage", "ev-growth"),
     )
     assert result.qualification == MIEQualification.CONDITIONAL_ONLY
 
