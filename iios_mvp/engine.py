@@ -38,6 +38,21 @@ def _date(value: Any, field: str) -> date:
 
 
 def validate_case(case: dict[str, Any]) -> list[str]:
+    # Any explicitly versioned investment-core case must use a supported
+    # contract; unknown/future versions MUST fail closed rather than entering
+    # the legacy v0.1.1 validator.
+    contract_version = case.get("contract_version")
+    if contract_version is not None and contract_version != "IIOS-INVESTMENT-CORE-0.2":
+        return [f"CORE-VERSION-EXACT:contract_version:unsupported investment-core contract {contract_version}"]
+    # v0.2 cases MUST enter through the frozen contract validator. The legacy
+    # MVP path remains available only for pre-v0.2 demo/replay compatibility.
+    if contract_version == "IIOS-INVESTMENT-CORE-0.2":
+        from .investment_core_contract import validate_investment_core_case
+        result = validate_investment_core_case(case)
+        return [
+            f"{item['code']}:{item['path']}:{item['message']}"
+            for item in result["errors"]
+        ]
     blockers: list[str] = []
     required = {
         "case_id", "symbol", "company", "cutoff_date", "evidence", "trust",
@@ -178,6 +193,30 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
     forecast = case["forecast"]
     risk = case["risk"]
     portfolio = case["portfolio"]
+    if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.2":
+        # Contract validation and legacy v0.1.1 decision semantics must never be mixed.
+        try:
+            v02_position = dec((case.get("portfolio") or {}).get("position_pct", 0), "portfolio.position_pct")
+        except ValueError:
+            v02_position = Decimal("0")
+        return {
+            "engine_version": ENGINE_VERSION,
+            "case_id": case["case_id"], "symbol": case["symbol"], "company": case["company"],
+            "cutoff_date": case["cutoff_date"],
+            "validation": validation,
+            "gates": {"trust": str((case.get("trust") or {}).get("status", "UNKNOWN")).upper(),
+                      "new_buy_add_allowed": False, "evidence_pit": validation["status"] == "PASS",
+                      "forecast_ready": False, "valuation_ready": False},
+            "forecast": case.get("forecast") or {},
+            "valuation": {},
+            "risk": case.get("risk") or {},
+            "decision": {"action": "HOLD" if v02_position > 0 else "NO-BUY",
+                         "primary_reason": "V02_ENGINE_NOT_IMPLEMENTED",
+                         "position_package_complete": False, "human_approval_required": True,
+                         "auto_execution": False},
+            "monitoring": case.get("monitoring") or [],
+        }
+
     if blockers:
         position_raw = (portfolio or {}).get("position_pct", 0)
         try:
@@ -330,6 +369,10 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_case(case: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.2":
+        # v0.2 has no production snapshot schema yet. Never persist an
+        # unimplemented v0.2 decision under the legacy 0.1.1 snapshot label.
+        raise ValueError("V02_SNAPSHOT_NOT_IMPLEMENTED")
     decision = decide(case)
     snapshot = {
         "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.1.1",
@@ -342,7 +385,18 @@ def run_case(case: dict[str, Any]) -> tuple[dict[str, Any], str]:
 
 
 def replay(snapshot: dict[str, Any]) -> dict[str, Any]:
-    fresh = decide(snapshot["input"])
+    input_case = snapshot["input"]
+    if input_case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.2":
+        # A v0.2 case cannot be replayed through the legacy snapshot schema.
+        return {
+            "snapshot_hash": snapshot.get("snapshot_hash"),
+            "engine_version": ENGINE_VERSION,
+            "replay_status": "FAIL",
+            "same_decision": False,
+            "integrity_status": "FAIL",
+            "reason": "V02_SNAPSHOT_SCHEMA_NOT_SUPPORTED",
+        }
+    fresh = decide(input_case)
     same = canonical_json(fresh) == canonical_json(snapshot["decision"])
     expected_hash = sha256_obj({
         "snapshot_schema": snapshot["snapshot_schema"],
