@@ -17,6 +17,47 @@ Q_END = {
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
+
+def fetch_wayback_target() -> dict:
+    """Try Internet Archive captures until the frozen target bytes are matched."""
+    import urllib.parse
+    cdx_url = (
+        "https://web.archive.org/cdx/search/cdx?"
+        + urllib.parse.urlencode({
+            "url": OFFICIAL_000906,
+            "from": "2026",
+            "to": "2026",
+            "output": "json",
+            "filter": "statuscode:200",
+            "fl": "timestamp,original,digest,length",
+            "collapse": "digest",
+        })
+    )
+    cdx = requests.get(cdx_url, timeout=60, headers={"User-Agent": "Mozilla/5.0"})
+    cdx.raise_for_status()
+    rows = cdx.json()
+    attempts = []
+    if rows and isinstance(rows[0], list) and rows[0] and str(rows[0][0]).lower() == "timestamp":
+        rows = rows[1:]
+    for row in rows:
+        if not isinstance(row, list) or len(row) < 4:
+            continue
+        timestamp, original, digest, length = row[:4]
+        if str(length) != str(EXPECTED_000906_SIZE):
+            continue
+        archive_url = f"https://web.archive.org/web/{timestamp}id_/{original}"
+        try:
+            resp = requests.get(archive_url, timeout=90, headers={"User-Agent": "Mozilla/5.0"}, allow_redirects=True)
+            data = resp.content
+            got = sha256_bytes(data)
+            attempts.append({"timestamp": timestamp, "archive_url": archive_url, "http_status": resp.status_code, "size_bytes": len(data), "sha256": got, "expected_match": got == EXPECTED_000906_SHA256})
+            if len(data) == EXPECTED_000906_SIZE and got == EXPECTED_000906_SHA256:
+                return {"status": "PASS", "timestamp": timestamp, "archive_url": archive_url, "size_bytes": len(data), "sha256": got, "attempts": attempts, "bytes": data}
+        except Exception as exc:
+            attempts.append({"timestamp": timestamp, "archive_url": archive_url, "error": str(exc)})
+    return {"status": "BLOCKED", "attempts": attempts}
+
+
 def post_tushare(token: str, api_name: str, params: dict, fields: str, out: Path, timeout: int = 60) -> dict:
     payload = {"api_name": api_name, "token": token, "params": params, "fields": fields}
     started = datetime.now(timezone.utc).isoformat()
