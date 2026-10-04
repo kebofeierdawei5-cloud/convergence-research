@@ -17,6 +17,7 @@
 - P2-A machine schema + executable invariants: **FINAL PASS / MERGED**
 - P2-B Market Model Domain Foundation: **FINAL PASS / MERGED**
 - P3-A ratio-family Market Model Identification: **FINAL PASS / MERGED**
+- P3-B complex model-specific Market Model Identification (DCF/DDM/SOTP/rNPV): **FINAL PASS / MERGED**
 - Production investment decision kernel: NOT YET
 
 ## Return Target
@@ -84,15 +85,26 @@ P3-A is formally **FINAL PASS** on canonical `main`.
 - merge commit: `53bdde65c3bfa20d227d398259a2e0268bc4da5d`
 - acceptance record: `docs/iios/P3A_RATIO_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`
 
-P3-A implements deterministic evidence-backed identification for forward PE, PS, PB and EV/EBITDA. DCF/DDM/SOTP/rNPV remain fail-closed pending model-specific inverse solvers.
+P3-A implements deterministic evidence-backed identification for forward PE, PS, PB and EV/EBITDA.
+
+## P3-B Final Acceptance
+
+P3-B is formally **FINAL PASS** on canonical `main`.
+
+- PR #8: MERGED
+- pre-merge HEAD: `ee295b59c4ce59110da6496991b51dee9ec487a5`
+- CI run #112 / `37186090902`: **SUCCESS**
+- CI: **80 tests passed** + compileall + schema validation + MVP run/replay
+- merge commit: `77022db416f5b1d32c306f5d644e3642c0f5936b`
+- acceptance record: `docs/iios/P3B_COMPLEX_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`
+
+P3-B implements model-specific evidence-backed identification for DCF, DDM, SOTP and rNPV, including model-specific inverse constraints, feasible solution sets, conservative identifiability, and historical date-level leave-one-out stability. It does not implement P4 or semantic Expectation Gap / return calculation.
 
 ## Immediate Next Engineering Step
 
-**P3-B / Complex Model-Specific Market Model Identification.**
+**P4 / Market Implied Expectation Engine.**
 
-Implement DCF / DDM / SOTP / rNPV feasible-solution, identifiability and stability logic using the same typed domain and evidence boundary.
-
-Only then proceed to the P4 Market Implied Expectation Engine.
+Consume the now-validated model-specific market interpretations and produce the economic requirements implied by current price. Do not collapse DCF/DDM/SOTP/rNPV into generic implied net profit.
 
 P2-C Company Value Core hardening remains parallel where needed for real-company acceptance.
 
