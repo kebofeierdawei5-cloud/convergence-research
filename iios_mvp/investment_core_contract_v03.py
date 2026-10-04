@@ -356,7 +356,14 @@ def decide_v03(case: dict[str, Any]) -> dict[str, Any]:
         investability = "NOT_INVESTABLE"
 
     package = (case.get("portfolio") or {}).get("buy_add_package") or {}
-    package_fields = ("entry_zone", "initial_position_pct", "target_position_pct", "max_position_pct")
+    package_fields = (
+        "entry_zone",
+        "initial_position_pct",
+        "target_position_pct",
+        "max_position_pct",
+        "thesis_break_triggers",
+        "monitoring_triggers",
+    )
     package_complete = all(field in package for field in package_fields)
     if action in {"BUY", "ADD"} and not package_complete:
         action = "REVIEW_REQUIRED"
