@@ -194,7 +194,7 @@ Deliverables:
 
 ### P1 — Investment Core Contract v0.2
 
-Status: **NEXT**
+Status: **COMPLETE / FROZEN / SEMANTIC PASS**
 
 Freeze machine semantics before further Batch 2 implementation.
 
@@ -216,7 +216,44 @@ Must define:
 - fail-closed rules
 - version and replay semantics
 
-### P2 — Company Value Core v1.x hardening
+### P2-A — Investment Core Contract v0.2 machine schema / invariants
+
+Status: **FINAL PASS / MERGED**
+
+Completed deliverables:
+
+- JSON Schema for the v0.2 domain case
+- executable invariants and fail-closed validation
+- PIT / probability / semantic-gap / BUY-gate tests
+- legacy v0.1.1 market and decision-path isolation
+- unsupported contract-version fail-closed behavior
+- legacy snapshot / replay isolation
+- GitHub CI execution gate
+
+Acceptance evidence: `docs/iios/P2A_FINAL_ACCEPTANCE_2026-10-04.md`.
+
+P2-A is a contract/integration gate only; it is not the production v0.2 decision engine.
+
+### P2-B — Market Model Identification v0.2 foundation
+
+Status: **NEXT**
+
+Do not extend Batch 2 v0.1. Build the market-side foundation directly from the frozen contract.
+
+First establish canonical acceptance cases for materially different model families, then define the typed interfaces:
+
+`Market Observable Evidence → Candidate Models → Model-specific Evidence Requirements → Feasible Solution Set → Identifiability → Stability`
+
+P2-B acceptance should prove, with deterministic fixtures, that:
+
+- PE / PS / PB / EV-EBITDA use model-specific economic variables;
+- DCF / DDM / SOTP / rNPV do not collapse into implied net profit;
+- more than one materially feasible explanation remains `AMBIGUOUS`;
+- no feasible explanation yields `UNIDENTIFIABLE` / fail-closed;
+- perturbation or regime changes can make an interpretation `UNSTABLE`;
+- no P2-B output can force a BUY.
+
+### P2-C — Company Value Core v1.x hardening
 
 Status: **IMPLEMENTED BASE / NEEDS HARDENING**
 
@@ -247,7 +284,7 @@ Priority hardening areas:
 - dilution / per-share transmission
 - value-contribution transparency
 
-### P3 — Market Model Identification v0.2
+### P3 — Market Model Identification v0.2 production implementation
 
 Status: **NOT STARTED**
 
