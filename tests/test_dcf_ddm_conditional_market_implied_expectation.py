@@ -201,7 +201,7 @@ def ddm_input(
     evidence.append(complex_evidence(c.evidence_ids[0], "ddm_candidate", "identifier"))
     return MarketModelIdentificationInput(
         cutoff_date=CUTOFF,
-        current_observation_id="current-dividend",
+        current_observation_id=f"{id_prefix}current-dividend",
         candidates=(c,),
         observations=tuple(rows),
         evidence=tuple(evidence),
