@@ -374,7 +374,24 @@ def _identify(
         for evidence_id in evaluation.fit.evidence_ids
     )))
 
-    if len(feasible) == 1:
+    if len(feasible) >= 2:
+        result = IdentifiabilityResult(
+            state=IdentifiabilityState.AMBIGUOUS,
+            feasible_model_ids=feasible,
+            selected_model_id=None,
+            competing_model_ids=feasible[1:],
+            evidence_ids=evidence_ids,
+            rationale="Multiple candidate models remain materially feasible under the same evidence boundary.",
+    elif len(feasible) == 1 and insufficient:
+        result = IdentifiabilityResult(
+            state=IdentifiabilityState.INSUFFICIENT_EVIDENCE,
+            feasible_model_ids=feasible,
+            selected_model_id=None,
+            competing_model_ids=(),
+            evidence_ids=evidence_ids,
+            rationale="One candidate is feasible, but another candidate remains unevaluable; uniqueness cannot be established conservatively.",
+        )
+    elif len(feasible) == 1:
         result = IdentifiabilityResult(
             state=IdentifiabilityState.IDENTIFIABLE,
             feasible_model_ids=feasible,
@@ -383,14 +400,6 @@ def _identify(
             evidence_ids=evidence_ids,
             rationale="Exactly one candidate model has sufficient historical evidence and current consistency.",
         )
-    elif len(feasible) >= 2:
-        result = IdentifiabilityResult(
-            state=IdentifiabilityState.AMBIGUOUS,
-            feasible_model_ids=feasible,
-            selected_model_id=None,
-            competing_model_ids=feasible[1:],
-            evidence_ids=evidence_ids,
-            rationale="Multiple candidate models remain materially feasible under the same evidence boundary.",
         )
     elif insufficient:
         result = IdentifiabilityResult(
