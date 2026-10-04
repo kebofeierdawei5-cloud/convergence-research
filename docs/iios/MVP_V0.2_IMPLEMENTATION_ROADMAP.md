@@ -75,7 +75,7 @@ Current state is defined by:
 - valid multi-model Feasible Solution Set from historical/current observable evidence
 - calibrated Identifiability
 - temporal/regime Stability
-- general model-correct Market Implied Expectation
+- PIT-integrated, replayable Market Implied Expectation
 - general semantic Expectation Gap
 - frozen Probability / Odds / Edge / Position-sizing formulas
 - complete Execution Receipt / Trigger lifecycle
@@ -135,7 +135,7 @@ Reverse Valuation
 Market Implied Expectation
 ```
 
-This is the major missing semantic layer.
+The model-identification and MIE qualification layers are now implemented through P4-E. The remaining P4 work is PIT/replay/fail-closed integration.
 
 Market model identification must explain not merely which mathematical inverse can produce the current price, but which candidate market model is actually consistent with observed valuation behavior, relevant fundamentals, historical regime evidence, and current price.
 
@@ -465,9 +465,45 @@ Evidence:
 
 ### P4-E — Multi-model Market Implied Expectation Set
 
+Status: **FINAL PASS / MERGED**
+
+Implementation:
+
+- `iios_mvp/multi_model_market_implied_expectation_set.py`
+- `tests/test_multi_model_market_implied_expectation_set.py`
+- `schemas/market_implied_expectation_set_v0.2.schema.json`
+- `docs/iios/P4E_MULTI_MODEL_MIE_SET_ACCEPTANCE_MATRIX_v0.2.md`
+- `docs/iios/P4E_FINAL_ACCEPTANCE_2026-10-04.md`
+
+Semantic boundary:
+
+- one explicit evaluation disposition per globally admitted candidate model;
+- `MATERIALIZED` preserves the full P4 MIE artifact;
+- `NO_FEASIBLE_SOLUTION` means the candidate was evaluated and its feasible solution set is empty;
+- `BLOCKED` means the candidate cannot be resolved under current evidence/state;
+- multiple materialized models are `AMBIGUOUS / CONDITIONAL_ONLY` with no winner or model weight;
+- a unique model requires complete candidate coverage and explicit non-feasible dispositions for all alternatives;
+- blocked or insufficient coverage/evidence fails closed;
+- materialized expectations must share the exact same price/PIT observation basis;
+- evidence closure and canonical model-evaluation ordering are enforced;
+- no Expectation Gap / Expected Return and no generic `market_implied_net_profit`.
+
+Evidence:
+
+- PR #14 merged;
+- pre-merge HEAD `60e40bed89f96bcc30df4a31967ff55d84847423`;
+- merge `3c1b4944d715bbb0e4716bab3a0721c78f0f4157`;
+- PR Investment Core CI #155 / `37190663254`: SUCCESS;
+- PR FM00 CI #130 / `37190663258`: SUCCESS;
+- post-merge main Investment Core CI #157 / `37190695693`: SUCCESS;
+- post-merge main FM00 CI #132 / `37190695593`: SUCCESS;
+- final regression: 156 passed.
+
+### P4-F — PIT / Replay / Fail-closed MIE Integration
+
 Status: **NEXT**
 
-Consume P4-A through P4-D typed outputs and organize all feasible/conditional model explanations without forcing a winner.
+Bind P4-E to immutable case snapshots, exact PIT/provenance manifests, replay semantics and runtime fail-closed behavior. Do not begin P5 until this gate is closed.
 
 ### P5 — Expectation Gap + Return Gate
 

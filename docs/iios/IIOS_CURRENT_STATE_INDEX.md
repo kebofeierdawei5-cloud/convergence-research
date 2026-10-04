@@ -73,6 +73,7 @@ Implemented / merged:
 - P4-B Ratio-family Market Implied Expectation Vertical Slice (FINAL PASS / MERGED)
 - P4-C DCF/DDM Conditional Market Implied Expectation Vertical Slice (FINAL PASS / MERGED)
 - P4-D SOTP/rNPV Market Implied Expectation Vertical Slice (FINAL PASS / MERGED)
+- P4-E Multi-model Market Implied Expectation Set (FINAL PASS / MERGED)
 
 P2-A acceptance evidence:
 
@@ -83,8 +84,6 @@ P2-A acceptance evidence:
 
 Not yet implemented as production capability:
 
-- P4-E candidate-coverage-qualified multi-model expectation set
-- P4-E candidate-coverage-qualified multi-model expectation set
 - P4-F PIT/replay/fail-closed MIE integration
 - semantic Expectation Gap
 - production return gate integration
@@ -117,7 +116,7 @@ P3-B evidence:
 - merge commit `77022db416f5b1d32c306f5d644e3642c0f5936b`
 - final acceptance: `docs/iios/P3B_COMPLEX_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`
 
-P4 is the active engineering gate: P4-A through P4-D are complete; P4-E is next.
+P4 is the active engineering gate: P4-A through P4-E are complete; P4-F is next.
 
 P4-A acceptance: `docs/iios/P4A_FINAL_ACCEPTANCE_2026-10-04.md`
 P4-B acceptance: `docs/iios/P4B_FINAL_ACCEPTANCE_2026-10-04.md`
@@ -137,7 +136,7 @@ P4-C is **FINAL PASS / MERGED**.
 
 P4-C keeps DCF/DDM conditional outputs as `CONDITIONAL_IMPLIED_VARIABLE / CONDITIONAL_ONLY`; it does not claim a full multidimensional feasible assumption space or market truth.
 
-Next: **P4-D — SOTP / rNPV expectation extraction**.
+Completed: **P4-D — SOTP / rNPV expectation extraction**.
 
 ## P4-D Acceptance Evidence
 
@@ -153,7 +152,24 @@ P4-D is **FINAL PASS / MERGED**.
 
 P4-D keeps SOTP residual and rNPV pipeline requirements model-native and conditional. rNPV probability/timing are conditioning inputs only; no market-implied probability is emitted.
 
-Next: **P4-E — multi-model expectation-set handling**.
+Completed: **P4-E — multi-model expectation-set handling**. Next: **P4-F — PIT / replay / fail-closed MIE integration**.
+## P4-E Acceptance Evidence
+
+P4-E is **FINAL PASS / MERGED**.
+
+- PR #14
+- pre-merge HEAD `60e40bed89f96bcc30df4a31967ff55d84847423`
+- merge commit `3c1b4944d715bbb0e4716bab3a0721c78f0f4157`
+- PR Investment Core CI #155 / `37190663254`: SUCCESS
+- PR FM00 CI #130 / `37190663258`: SUCCESS
+- post-merge main Investment Core CI #157 / `37190695693`: SUCCESS
+- post-merge main FM00 #132 / `37190695593`: SUCCESS
+- final regression: 156 passed
+
+P4-E provides a candidate-complete typed expectation set over accepted P4-A through P4-D outputs. It preserves model identity and model-native economic variables, distinguishes `NO_FEASIBLE_SOLUTION` from `BLOCKED`, marks multiple surviving models as `AMBIGUOUS / CONDITIONAL_ONLY`, prevents unique claims under incomplete coverage, enforces exact observation-basis consistency and evidence closure, and performs no model selection, Expectation Gap, or Expected Return calculation.
+
+Next: **P4-F — PIT / replay / fail-closed MIE integration**.
+
 ## Return Target
 
 **Positive expected return >15%.**

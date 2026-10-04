@@ -352,7 +352,7 @@ The cases should exercise different economics and valuation paths.
 
 ### P4 — Market Implied Expectation Engine
 
-**ACTIVE / P4-A COMPLETE / P4-B COMPLETE / P4-C COMPLETE / P4-D COMPLETE / P4-E NEXT**
+**ACTIVE / P4-A COMPLETE / P4-B COMPLETE / P4-C COMPLETE / P4-D COMPLETE / P4-E COMPLETE / P4-F NEXT**
 
 Purpose:
 
@@ -409,7 +409,7 @@ Evidence:
 - post-merge main FM00 #116 / `37189193862`: SUCCESS;
 - final regression: 128 passed.
 
-Next gate: **P4-D — SOTP / rNPV expectation extraction**.
+Completed: **P4-D — SOTP / rNPV expectation extraction**.
 
 ### P4-D Completion
 
@@ -433,7 +433,37 @@ Semantic red lines:
 - no generic implied net profit.
 - no decision-grade promotion through P4-D.
 
-Next gate: **P4-E — multi-model expectation-set handling**.
+Completed: **P4-E — multi-model expectation-set handling**. Next gate: **P4-F — PIT / replay / fail-closed MIE integration**.
+
+### P4-E Completion
+
+**FINAL PASS / MERGED**
+
+P4-E completed the multi-model Market Implied Expectation Set + ambiguity-handling boundary on 2026-10-04.
+
+Evidence:
+
+- PR #14
+- pre-merge HEAD: `60e40bed89f96bcc30df4a31967ff55d84847423`
+- merge commit: `3c1b4944d715bbb0e4716bab3a0721c78f0f4157`
+- PR Investment Core CI #155 / `37190663254`: SUCCESS
+- PR FM00 CI #130 / `37190663258`: SUCCESS
+- post-merge main Investment Core CI #157 / `37190695693`: SUCCESS
+- post-merge main FM00 #132 / `37190695593`: SUCCESS
+- final regression: 156 passed
+
+Semantic boundary:
+
+- P4-E is an organization/qualification layer over accepted P4-A through P4-D typed MIE outputs; it does not recompute inverse valuation.
+- Every admitted candidate model gets exactly one explicit evaluation disposition.
+- `NO_FEASIBLE_SOLUTION` is distinct from `BLOCKED`, preventing an unevaluated candidate from masquerading as evidence for a unique model.
+- Two or more materialized models remain `AMBIGUOUS / CONDITIONAL_ONLY`; there is no winner, ranking, weighting, averaging, or cross-model pseudo-variable.
+- Any blocked candidate or insufficient candidate/evidence assessment fails closed.
+- All materialized MIEs share one exact price/PIT observation basis.
+- Set-level evidence closure and deterministic canonical model ordering are enforced.
+- No Expectation Gap / Expected Return implementation is introduced.
+
+Next gate: **P4-F — PIT / replay / fail-closed MIE integration**.
 
 ### P5 — Semantic Expectation Gap + Return Gate
 
