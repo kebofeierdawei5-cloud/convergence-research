@@ -61,6 +61,14 @@ Implemented / merged:
 - Candidate valuation model generation
 - Human-authoritative Primary Model selection
 - deterministic valuation calculators for supported models
+- P2-A Investment Core v0.2 machine schema + executable invariants (FINAL PASS / MERGED)
+
+P2-A acceptance evidence:
+
+- PR #5 merged to main
+- pre-merge HEAD `ec208f347fde64b08694d181d8ee8cf2f433e7ed`
+- CI #70 / `37183859358` = SUCCESS
+- final acceptance: `docs/iios/P2A_FINAL_ACCEPTANCE_2026-10-04.md`
 
 Not yet implemented as production capability:
 
@@ -74,7 +82,9 @@ Not yet implemented as production capability:
 - complete Execution Receipt / Trigger lifecycle
 - real-company acceptance / independent audit
 
-Batch 2 v0.1 PR #3 remains OPEN / RED-TEAM BLOCKED / NOT MERGED.
+Batch 2 v0.1 PR #3 remains OPEN / RED-TEAM BLOCKED / NOT MERGED and must not be extended as the next production layer.
+
+P2-B next: evidence-backed Market Model Identification v0.2 foundation.
 
 ## Return Target
 
