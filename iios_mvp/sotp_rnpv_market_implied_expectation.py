@@ -358,7 +358,7 @@ def _pipeline_requirements(
                 accounting_basis=accounting_basis,
                 role="IMPLIED_PIPELINE_CONDITIONAL_ON_OBSERVED_COMPOSITION",
                 value=implied_value,
-                evidence_ids=solution.evidence_ids,
+                evidence_ids=tuple(sorted(set(solution.evidence_ids + item.evidence_ids))),
             )
         )
     return tuple(requirements)
