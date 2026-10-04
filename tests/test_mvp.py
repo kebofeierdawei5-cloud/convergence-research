@@ -131,6 +131,7 @@ def test_valuation_model_selection_is_not_pe_only():
     from iios_mvp.valuation import select_model
     selection = select_model({
         "model_selection": {
+            "selection_method": "HUMAN",
             "primary_model": "dcf",
             "economic_profile": "cash_flow_business",
             "rationale": "cash flow is the principal economic value driver",
@@ -146,6 +147,7 @@ def test_dcf_intrinsic_value_is_deterministic():
     forecast = {s: {"net_profit": 1} for s in ("bear", "base", "bull")}
     valuation = {
         "model_selection": {
+            "selection_method": "HUMAN",
             "primary_model": "dcf",
             "economic_profile": "cash_flow_business",
             "rationale": "cash flow is the principal economic value driver",
@@ -174,6 +176,7 @@ def test_sotp_values_segments_independently():
     forecast = {s: {"net_profit": 1} for s in ("bear", "base", "bull")}
     valuation = {
         "model_selection": {
+            "selection_method": "HUMAN",
             "primary_model": "sotp",
             "economic_profile": "mixed_businesses",
             "rationale": "material businesses have different value drivers",
@@ -199,14 +202,15 @@ def test_extended_valuation_models():
     from decimal import Decimal
     from iios_mvp.valuation import route_model, value_scenario
 
-    assert route_model("innovative_drug_commercial")["recommended_primary_model"] == "ps"
-    assert route_model("cyclical")["recommended_primary_model"] == "pb"
-    assert route_model("innovative_drug_pipeline")["recommended_primary_model"] == "rnpv"
+    assert route_model("innovative_drug_commercial")["candidate_models"][0] == "ps"
+    assert route_model("cyclical")["candidate_models"][0] == "pb"
+    assert route_model("innovative_drug_pipeline")["candidate_models"][0] == "rnpv"
 
     forecast = {s: {"net_profit": 1, "revenue": 100} for s in ("bear", "base", "bull")}
 
     ps = {
         "model_selection": {
+            "selection_method": "HUMAN",
             "primary_model": "ps",
             "economic_profile": "innovative_drug_commercial",
             "rationale": "commercial-stage revenue is the current observable value driver",
@@ -217,6 +221,7 @@ def test_extended_valuation_models():
 
     pb = {
         "model_selection": {
+            "selection_method": "HUMAN",
             "primary_model": "pb",
             "economic_profile": "cyclical",
             "rationale": "cycle-normalized earnings are unstable and asset value is a key anchor",
@@ -227,6 +232,7 @@ def test_extended_valuation_models():
 
     ev = {
         "model_selection": {
+            "selection_method": "HUMAN",
             "primary_model": "ev_ebitda",
             "economic_profile": "enterprise_operating_business",
             "rationale": "capital structure-neutral operating earnings are the comparison basis",
@@ -237,6 +243,7 @@ def test_extended_valuation_models():
 
     rnpv = {
         "model_selection": {
+            "selection_method": "HUMAN",
             "primary_model": "rnpv",
             "economic_profile": "innovative_drug_pipeline",
             "rationale": "pipeline value depends on risk-adjusted future cash flows",
@@ -261,9 +268,9 @@ def test_model_suitability_returns_primary_secondary_and_cross_check():
     assessment = assess_model_suitability("cyclical")
     assert assessment["ranked_models"][0]["model"] == "pb"
     route = route_model("cyclical")
-    assert route["recommended_primary_model"] == "pb"
-    assert route["recommended_secondary_models"] == ["ev_ebitda"]
-    assert route["recommended_cross_check_models"] == ["dcf"]
+    assert route["candidate_models"][0] == "pb"
+    assert route["candidate_models"][1] == "ev_ebitda"
+    assert route["candidate_models"][2] == "dcf"
 
 
 def test_primary_authoritative_aggregation_does_not_average_checks():
@@ -272,6 +279,7 @@ def test_primary_authoritative_aggregation_does_not_average_checks():
     forecast = {s: {"net_profit": 100, "revenue": 1000} for s in ("bear", "base", "bull")}
     valuation = {
         "model_selection": {
+            "selection_method": "HUMAN",
             "primary_model": "forward_pe",
             "economic_profile": "mature_earnings",
             "rationale": "normalized earnings are the primary value driver",
@@ -301,6 +309,7 @@ def test_explicit_model_weights_require_complete_models_and_sum_to_one():
     forecast = {s: {"net_profit": 100, "revenue": 1000} for s in ("bear", "base", "bull")}
     valuation = {
         "model_selection": {
+            "selection_method": "HUMAN",
             "primary_model": "forward_pe",
             "economic_profile": "mature_earnings",
             "rationale": "normalized earnings are the primary value driver",
@@ -327,6 +336,7 @@ def test_rnpv_pipeline_assets_support_delay_and_asset_level_probability():
     forecast = {s: {"net_profit": 1, "revenue": 1} for s in ("bear", "base", "bull")}
     valuation = {
         "model_selection": {
+            "selection_method": "HUMAN",
             "primary_model": "rnpv",
             "economic_profile": "innovative_drug_pipeline",
             "rationale": "pipeline assets require risk-adjusted valuation",
@@ -366,6 +376,7 @@ def test_sotp_supports_mixed_models_and_ownership():
     forecast = {s: {"net_profit": 100, "revenue": 1000} for s in ("bear", "base", "bull")}
     valuation = {
         "model_selection": {
+            "selection_method": "HUMAN",
             "primary_model": "sotp",
             "economic_profile": "mixed_segments",
             "rationale": "segments have materially different economic drivers",
@@ -410,3 +421,22 @@ def test_intrinsic_value_gate_passes_valid_range():
         "aggregation": {"weights": {"pb": 1.0}},
     }
     assert evaluate_intrinsic_value_gate(result)["status"] == "PASS"
+
+
+def test_human_selection_is_required_and_router_is_advisory():
+    from iios_mvp.valuation import select_model, route_model
+    route = route_model("mature_cash_earning_business")
+    assert route["candidate_models"][0] == "forward_pe"
+    case = {"model_selection": {"primary_model": "dcf", "economic_profile": "mature_cash_earning_business", "rationale": "cash flow is the principal driver"}}
+    try:
+        select_model(case)
+    except ValueError as exc:
+        assert "selection_method" in str(exc)
+    else:
+        raise AssertionError("missing HUMAN selection method did not fail closed")
+
+
+def test_human_selection_can_override_advisory_candidates_with_reason():
+    from iios_mvp.valuation import select_model
+    result = select_model({"model_selection": {"selection_method": "HUMAN", "primary_model": "rnpv", "economic_profile": "mature_cash_earning_business", "rationale": "material contingent asset requires risk-adjusted valuation", "override_reason": "company economics include a material separately valued pipeline"}})
+    assert result["selection_outside_candidates"] is True
