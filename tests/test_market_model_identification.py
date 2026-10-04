@@ -237,10 +237,18 @@ def test_insufficient_history_is_not_called_unidentifiable():
 
 
 def test_dcf_is_explicitly_insufficient_until_model_specific_solver_exists():
-    dcf = candidate(
-        "dcf-1",
-        MarketModelFamily.DCF,
-        "fcf",
+    dcf = CandidateMarketModel(
+        model_id="dcf-1",
+        family=MarketModelFamily.DCF,
+        required_economic_variables=(
+            "fcf", "growth", "margin", "reinvestment", "terminal_value",
+        ),
+        required_observable_variables=(
+            "fcf", "growth", "margin", "reinvestment", "terminal_value",
+        ),
+        evidence_ids=("e1",),
+        admission_basis="test evidence-backed DCF candidate",
+        inverse_solvable=True,
     )
     observations = (
         MarketValuationObservation(
