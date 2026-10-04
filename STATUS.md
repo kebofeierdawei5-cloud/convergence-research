@@ -4,6 +4,8 @@
 
 Continuity / macro plan: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026-10-04.md`
 
+Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_REDTEAM_DEVELOPMENT_PLAN_2026-10-04.md`
+
 - Current canonical `main` is the source of truth.
 - State Reconciliation: COMPLETE.
 - Investment Core Contract v0.2: **FROZEN / SEMANTIC PASS**.
@@ -19,7 +21,8 @@ Continuity / macro plan: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026-
 - P2-A machine schema + executable invariants: **FINAL PASS / MERGED**
 - P2-B Market Model Domain Foundation: **FINAL PASS / MERGED**
 - P3-A ratio-family Market Model Identification: **FINAL PASS / MERGED**
-- P3-B complex model-specific Market Model Identification (DCF/DDM/SOTP/rNPV): **FINAL PASS / MERGED**
+- P3-B complex model-specific Market Model Identification baseline (DCF/DDM/SOTP/rNPV): **FINAL PASS / MERGED**
+- P3 capability classification: **conditional / candidate-set-bound baseline; not proof of unconditional true-market-model identification**
 - Production investment decision kernel: NOT YET
 
 ## Return Target
@@ -104,7 +107,9 @@ P3-B implements model-specific evidence-backed identification for DCF, DDM, SOTP
 
 ## Immediate Next Engineering Step
 
-**P4 / Market Implied Expectation Engine.**
+**P4-A / Market Implied Expectation Qualification Contract.**
+
+P3 outputs must first be qualified as candidate-set-conditional inverse interpretations before they can become decision-grade Market Implied Expectation.
 
 Consume the now-validated model-specific market interpretations and produce the economic requirements implied by current price. Do not collapse DCF/DDM/SOTP/rNPV into generic implied net profit.
 
