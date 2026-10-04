@@ -40,6 +40,27 @@ QUALITY_DIMENSIONS = (
     "balance_sheet_resilience",
     "reinvestment_runway",
 )
+DOMAIN_EVIDENCE_GROUPS = {
+    "corporate_disclosures": ("corporate_disclosures",),
+    "business_reality": ("business_reality",),
+    "financial_reality": ("financial_reality",),
+    "capital_structure": ("capital_structure",),
+}
+TRUST_EVIDENCE_GROUPS = {
+    "identity": ("security_identity",),
+    "disclosure_integrity": ("corporate_disclosures",),
+    "governance_integrity": ("trust_governance_events",),
+    "shareholder_treatment": ("trust_governance_events",),
+}
+QUALITY_EVIDENCE_GROUPS = {
+    "competitive_advantage": ("business_reality", "corporate_disclosures"),
+    "incremental_return_on_capital": ("financial_reality",),
+    "earnings_quality": ("financial_reality", "corporate_disclosures"),
+    "cash_flow_conversion": ("financial_reality",),
+    "balance_sheet_resilience": ("financial_reality", "capital_structure"),
+    "reinvestment_runway": ("business_reality", "financial_reality"),
+}
+
 ECONOMIC_VARIABLES = {
     "volume",
     "price",
@@ -150,6 +171,22 @@ def _validate_evidence_record(evidence: Any, index: int) -> dict[str, Any]:
         published_dt = _parse_temporal(published, f"evidence[{index}].published_at")
         if published_dt > known:
             raise ValueError(f"evidence[{index}].published_at cannot exceed known_at")
+    effective_from = evidence.get("effective_from")
+    effective_to = evidence.get("effective_to")
+    if effective_to and not effective_from:
+        raise ValueError(f"evidence[{index}].effective_to requires effective_from")
+    if effective_from and effective_to:
+        start = _parse_temporal(effective_from, f"evidence[{index}].effective_from")
+        end = _parse_temporal(effective_to, f"evidence[{index}].effective_to")
+        if end <= start:
+            raise ValueError(f"evidence[{index}].effective_to must be after effective_from")
+    if evidence["provenance_class"] == "DERIVED_FROM_ADMITTED_RAW":
+        parents = evidence.get("parents")
+        transform = evidence.get("transformation")
+        if not isinstance(parents, list) or not parents or any(not str(x).strip() for x in parents):
+            raise ValueError(f"evidence[{index}].parents are required for derived evidence")
+        if not isinstance(transform, dict) or transform.get("type") != "DERIVED":
+            raise ValueError(f"evidence[{index}].transformation.type=DERIVED is required")
     return dict(evidence)
 
 
@@ -182,6 +219,14 @@ def _admit_evidence(case: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[st
                 f"evidence[{i}] is not PIT-qualified: known_at exceeds cutoff"
             )
         admitted.append(evidence)
+
+    for evidence in admitted:
+        if evidence["provenance_class"] == "DERIVED_FROM_ADMITTED_RAW":
+            unknown_parents = sorted(set(evidence["parents"]) - ids)
+            if unknown_parents:
+                raise ValueError(
+                    f"derived evidence {evidence['evidence_id']} references unknown parents: {unknown_parents}"
+                )
 
     missing_groups = []
     for item in case["evidence_plan"]:
@@ -234,6 +279,14 @@ def _intake_plan(case: dict[str, Any]) -> list[tuple[str, str, str, tuple[str, .
     ]
 
 
+def _has_group_evidence(refs: list[str], evidence_by_id: dict[str, dict[str, Any]], groups: tuple[str, ...]) -> bool:
+    return any(
+        _evidence_field_matches(evidence_by_id[evidence_id], group)
+        for evidence_id in refs
+        for group in groups
+    )
+
+
 def _require_evidence_refs(
     refs: Any,
     evidence_ids: set[str],
@@ -250,7 +303,12 @@ def _require_evidence_refs(
     return normalized
 
 
-def _validate_reality(reality: Any, evidence_ids: set[str], cutoff: str) -> dict[str, Any]:
+def _validate_reality(
+    reality: Any,
+    evidence_ids: set[str],
+    evidence_by_id: dict[str, dict[str, Any]],
+    cutoff: str,
+) -> dict[str, Any]:
     if not isinstance(reality, dict):
         raise ValueError("reality must be an object")
     facts = reality.get("facts")
@@ -272,6 +330,10 @@ def _validate_reality(reality: Any, evidence_ids: set[str], cutoff: str) -> dict
         if status not in {"ESTABLISHED", "CONDITIONAL", "UNKNOWN"}:
             raise ValueError(f"reality.facts[{i}].status unsupported: {status}")
         refs = _require_evidence_refs(fact["evidence_ids"], evidence_ids, f"reality.facts[{i}]")
+        if not _has_group_evidence(refs, evidence_by_id, DOMAIN_EVIDENCE_GROUPS[domain]):
+            raise ValueError(
+                f"reality.facts[{i}] evidence does not cover domain {domain}"
+            )
         _date_leq(fact["observation_date"], cutoff, f"reality.facts[{i}].observation_date")
         fact_id = str(fact["fact_id"]).strip()
         field_id = str(fact["field_id"]).strip()
@@ -317,6 +379,8 @@ def _validate_assessment(
     key: str,
     dimensions: tuple[str, ...],
     evidence_ids: set[str],
+    evidence_by_id: dict[str, dict[str, Any]],
+    evidence_groups: dict[str, tuple[str, ...]],
 ) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"{key} must be an object")
@@ -341,6 +405,10 @@ def _validate_assessment(
         if not str(row["rationale"]).strip():
             raise ValueError(f"{key}.{dimension}.rationale must be non-empty")
         refs = _require_evidence_refs(row["evidence_ids"], evidence_ids, f"{key}.{dimension}")
+        if not _has_group_evidence(refs, evidence_by_id, evidence_groups[dimension]):
+            raise ValueError(
+                f"{key}.{dimension} evidence does not cover its required domain"
+            )
         by_name[dimension] = {
             "dimension": dimension,
             "status": status,
@@ -421,10 +489,17 @@ def build_company_economic_core(
 ) -> dict[str, Any]:
     admitted, manifest = _admit_evidence(case)
     evidence_ids = {x["evidence_id"] for x in admitted}
+    evidence_by_id = {x["evidence_id"]: x for x in admitted}
 
-    normalized_reality = _validate_reality(reality, evidence_ids, case["temporal_scope"]["cutoff_date"])
-    normalized_trust = _validate_assessment(trust, "trust", TRUST_DIMENSIONS, evidence_ids)
-    normalized_quality = _validate_assessment(quality, "quality", QUALITY_DIMENSIONS, evidence_ids)
+    normalized_reality = _validate_reality(
+        reality, evidence_ids, evidence_by_id, case["temporal_scope"]["cutoff_date"]
+    )
+    normalized_trust = _validate_assessment(
+        trust, "trust", TRUST_DIMENSIONS, evidence_ids, evidence_by_id, TRUST_EVIDENCE_GROUPS
+    )
+    normalized_quality = _validate_assessment(
+        quality, "quality", QUALITY_DIMENSIONS, evidence_ids, evidence_by_id, QUALITY_EVIDENCE_GROUPS
+    )
 
     if not isinstance(value_core, dict):
         raise ValueError("value_core must be an object")
@@ -432,7 +507,11 @@ def build_company_economic_core(
     if not isinstance(value_nodes, list) or not value_nodes:
         raise ValueError("value_core.nodes must be a non-empty list")
     for i, node in enumerate(value_nodes):
-        _require_evidence_refs(node.get("evidence_ids"), evidence_ids, f"value_core.nodes[{i}]")
+        refs = _require_evidence_refs(node.get("evidence_ids"), evidence_ids, f"value_core.nodes[{i}]")
+        if not _has_group_evidence(refs, evidence_by_id, ("business_reality", "financial_reality", "corporate_disclosures")):
+            raise ValueError(
+                f"value_core.nodes[{i}] must reference business/financial/disclosure evidence"
+            )
         if not str(node.get("assessment_basis", "")).strip():
             raise ValueError(f"value_core.nodes[{i}].assessment_basis is required")
     scanned_value_core = scan_company_value_core(value_core)
