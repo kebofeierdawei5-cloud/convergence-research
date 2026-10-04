@@ -338,7 +338,7 @@ PR #3 / Batch 2 v0.1 remains blocked and untouched.
 
 ### P4 — Market Implied Expectation Engine
 
-**ACTIVE — P4-A / P4-B / P4-C COMPLETE / P4-D NEXT**
+**ACTIVE — P4-A / P4-B / P4-C / P4-D COMPLETE / P4-E NEXT**
 
 Purpose:
 
@@ -359,7 +359,7 @@ P4-C
 DCF / DDM conditional MIE — FINAL PASS
         ↓
 P4-D
-SOTP / rNPV expectation extraction
+SOTP / rNPV expectation extraction — FINAL PASS
         ↓
 P4-E
 multi-model expectation-set + ambiguity handling
@@ -435,9 +435,39 @@ Evidence:
 
 ### P4-D — SOTP / rNPV Market Implied Expectation
 
+Status: **FINAL PASS / MERGED**
+
+Implementation:
+
+- `iios_mvp/sotp_rnpv_market_implied_expectation.py`
+- `tests/test_sotp_rnpv_market_implied_expectation.py`
+- `docs/iios/P4D_SOTP_RNPV_MIE_ACCEPTANCE_MATRIX_v0.2.md`
+- `docs/iios/P4D_FINAL_ACCEPTANCE_2026-10-04.md`
+
+Semantic boundary:
+
+- SOTP emits conditional implied `residual_value` given explicit current segment-value construction.
+- rNPV emits one conditional implied `pipeline_value` requirement per pipeline.
+- rNPV pipeline composition is preserved using observed current pipeline-value shares.
+- observed probability/timing/discount rate/base value are conditioning variables, not separately market-implied values.
+- conditional outputs remain `CONDITIONAL_IMPLIED_VARIABLE / CONDITIONAL_ONLY`.
+- P3-B inverse is consumed, not recomputed.
+
+Evidence:
+
+- PR #13 merged;
+- merge commit `13729e7493850cb513843567dd5ee263c2301f36`;
+- PR Investment Core CI #147 / `37189771181`: SUCCESS;
+- post-merge main Investment Core CI #148 / `37189797363`: SUCCESS;
+- final regression: 139 passed.
+
+**Next: P4-E — multi-model expectation-set + ambiguity handling.**
+
+### P4-E — Multi-model Market Implied Expectation Set
+
 Status: **NEXT**
 
-Consume P3-B SOTP/rNPV model-specific feasible solutions through the P4-A typed qualification boundary. Preserve segment/residual semantics for SOTP and pipeline/probability/timing semantics for rNPV. Do not collapse either family into generic implied net profit.
+Consume P4-A through P4-D typed outputs and organize all feasible/conditional model explanations without forcing a winner.
 
 ### P5 — Expectation Gap + Return Gate
 

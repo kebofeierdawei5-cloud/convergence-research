@@ -72,6 +72,7 @@ Implemented / merged:
 - P4-A Market Implied Expectation Qualification Boundary (FINAL PASS / MERGED)
 - P4-B Ratio-family Market Implied Expectation Vertical Slice (FINAL PASS / MERGED)
 - P4-C DCF/DDM Conditional Market Implied Expectation Vertical Slice (FINAL PASS / MERGED)
+- P4-D SOTP/rNPV Market Implied Expectation Vertical Slice (FINAL PASS / MERGED)
 
 P2-A acceptance evidence:
 
@@ -82,7 +83,7 @@ P2-A acceptance evidence:
 
 Not yet implemented as production capability:
 
-- P4-D SOTP/rNPV complex-model MIE extraction
+- P4-E candidate-coverage-qualified multi-model expectation set
 - P4-E candidate-coverage-qualified multi-model expectation set
 - P4-F PIT/replay/fail-closed MIE integration
 - semantic Expectation Gap
@@ -116,7 +117,7 @@ P3-B evidence:
 - merge commit `77022db416f5b1d32c306f5d644e3642c0f5936b`
 - final acceptance: `docs/iios/P3B_COMPLEX_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`
 
-P4 is the active engineering gate: P4-A, P4-B and P4-C are complete; P4-D is next.
+P4 is the active engineering gate: P4-A through P4-D are complete; P4-E is next.
 
 P4-A acceptance: `docs/iios/P4A_FINAL_ACCEPTANCE_2026-10-04.md`
 P4-B acceptance: `docs/iios/P4B_FINAL_ACCEPTANCE_2026-10-04.md`
@@ -138,6 +139,21 @@ P4-C keeps DCF/DDM conditional outputs as `CONDITIONAL_IMPLIED_VARIABLE / CONDIT
 
 Next: **P4-D — SOTP / rNPV expectation extraction**.
 
+## P4-D Acceptance Evidence
+
+P4-D is **FINAL PASS / MERGED**.
+
+- PR #13
+- pre-merge HEAD `dd3e2cc775677b63ee1d48cdd15940b03af1f498`
+- merge commit `13729e7493850cb513843567dd5ee263c2301f36`
+- PR CI #147 / `37189771181`: SUCCESS
+- post-merge main Investment Core CI #148 / `37189797363`: SUCCESS
+- post-merge main FM00 #122 / `37189797243`: SUCCESS
+- final regression: 139 passed
+
+P4-D keeps SOTP residual and rNPV pipeline requirements model-native and conditional. rNPV probability/timing are conditioning inputs only; no market-implied probability is emitted.
+
+Next: **P4-E — multi-model expectation-set handling**.
 ## Return Target
 
 **Positive expected return >15%.**

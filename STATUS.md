@@ -26,6 +26,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - P4-A MIE Qualification Boundary: **FINAL PASS / MERGED**
 - P4-B Ratio-family MIE Vertical Slice: **FINAL PASS / MERGED**
 - P4-C DCF/DDM Conditional MIE Vertical Slice: **FINAL PASS / MERGED**
+- P4-D SOTP/rNPV MIE Vertical Slice: **FINAL PASS / MERGED**
 - Production investment decision kernel: NOT YET
 
 ## P4-C Final Acceptance
@@ -53,6 +54,32 @@ Semantic boundary:
 
 Next gate: **P4-D — SOTP / rNPV expectation extraction**.
 
+## P4-D Final Acceptance
+
+P4-D is formally **FINAL PASS / MERGED** on canonical `main`.
+
+- PR #13: MERGED
+- pre-merge HEAD: `dd3e2cc775677b63ee1d48cdd15940b03af1f498`
+- merge commit: `13729e7493850cb513843567dd5ee263c2301f36`
+- PR Investment Core CI #147 / `37189771181`: **SUCCESS**
+- PR FM00 CI #121 / `37189771200`: **SUCCESS**
+- post-merge main Investment Core CI #148 / `37189797363`: **SUCCESS**
+- post-merge main FM00 CI #122 / `37189797243`: **SUCCESS**
+- final regression reported by CI: **139 passed**
+- acceptance matrix: `docs/iios/P4D_SOTP_RNPV_MIE_ACCEPTANCE_MATRIX_v0.2.md`
+- acceptance record: `docs/iios/P4D_FINAL_ACCEPTANCE_2026-10-04.md`
+
+Semantic boundary:
+
+- SOTP → implied `residual_value` conditional on explicit current segment-value construction;
+- rNPV → one implied `pipeline_value` requirement per pipeline, derived from the accepted P3-B total using observed current pipeline-value composition;
+- observed probability and timing remain conditioning inputs, never market-implied probabilities;
+- multiple pipelines remain separately represented;
+- all positive outputs remain `CONDITIONAL_IMPLIED_VARIABLE / CONDITIONAL_ONLY`;
+- no generic implied net profit;
+- no Expectation Gap / Expected Return implementation.
+
+Next gate: **P4-E — multi-model expectation-set handling**.
 ## Return Target
 
 Canonical hurdle: **positive expected return >15%**.
@@ -164,11 +191,21 @@ P4-A establishes the typed qualification boundary between P3 inverse interpretat
 
 ## Immediate Next Engineering Step
 
-**P4-D / SOTP-rNPV Market Implied Expectation vertical slice.**
+**P4-E / Multi-model Market Implied Expectation Set.**
 
-P4-D must consume the P3-B complex-model typed boundary and the P4-A qualification contract, preserving model-native segment / residual or pipeline / probability / timing semantics.
+P4-E must consume the accepted P4-A through P4-D typed outputs and organize multiple feasible/conditional market-model explanations without forcing a winner.
 
-Do not collapse SOTP/rNPV into generic implied net profit. Do not start P5 until the remaining P4 model families, multi-model expectation-set handling, and PIT/replay integration are complete.
+The expectation set must retain:
+
+- model identity and qualification;
+- model-native economic variables;
+- conditional assumptions/context;
+- candidate coverage;
+- evidence sufficiency;
+- identifiability and stability;
+- PIT/provenance.
+
+Do not calculate Expectation Gap or Expected Return until P4-F closes PIT/replay/fail-closed integration.
 
 P2-C Company Value Core hardening remains parallel where needed for real-company acceptance.
 

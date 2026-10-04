@@ -352,7 +352,7 @@ The cases should exercise different economics and valuation paths.
 
 ### P4 — Market Implied Expectation Engine
 
-**ACTIVE / P4-A COMPLETE / P4-B COMPLETE / P4-C COMPLETE / P4-D NEXT**
+**ACTIVE / P4-A COMPLETE / P4-B COMPLETE / P4-C COMPLETE / P4-D COMPLETE / P4-E NEXT**
 
 Purpose:
 
@@ -371,7 +371,7 @@ P4-C
 DCF / DDM conditional MIE — FINAL PASS
         ↓
 P4-D
-SOTP / rNPV expectation extraction
+SOTP / rNPV expectation extraction — FINAL PASS
         ↓
 P4-E
 Multi-model expectation-set handling
@@ -410,6 +410,30 @@ Evidence:
 - final regression: 128 passed.
 
 Next gate: **P4-D — SOTP / rNPV expectation extraction**.
+
+### P4-D Completion
+
+**FINAL PASS / MERGED**
+
+P4-D completed the SOTP/rNPV Market Implied Expectation vertical slice on 2026-10-04.
+
+- PR #13
+- merge: `13729e7493850cb513843567dd5ee263c2301f36`
+- pre-merge HEAD: `dd3e2cc775677b63ee1d48cdd15940b03af1f498`
+- PR Investment Core CI #147 / `37189771181`: SUCCESS
+- post-merge main Investment Core CI #148 / `37189797363`: SUCCESS
+- post-merge main FM00 #122 / `37189797243`: SUCCESS
+- final regression: 139 passed.
+
+Semantic red lines:
+
+- SOTP segment values are conditioning inputs; residual value is the conditional market requirement.
+- rNPV probability and timing are conditioning inputs, not market-implied probabilities.
+- rNPV pipeline requirements remain pipeline-specific.
+- no generic implied net profit.
+- no decision-grade promotion through P4-D.
+
+Next gate: **P4-E — multi-model expectation-set handling**.
 
 ### P5 — Semantic Expectation Gap + Return Gate
 
@@ -702,7 +726,7 @@ The system is successful when the full chain is repeatable, auditable, and usefu
 
 ## 11. Current Next Step
 
-**P4-D is the next implementation gate.**
+**P4-E is the next implementation gate.**
 
 Implement the smallest SOTP/rNPV Market Implied Expectation vertical slice directly on the accepted P3-B typed domain and P4-A qualification boundary.
 
@@ -714,7 +738,7 @@ Preserve:
 - PIT and provenance;
 - fail-closed ambiguity / instability / insufficiency.
 
-Do not start P5 until P4-D, P4-E and P4-F close the remaining Market Implied Expectation path.
+Do not start P5 until P4-E and P4-F close the remaining Market Implied Expectation path.
 ## 12. Canonical Current State
 
 As of 2026-10-04:
@@ -732,7 +756,7 @@ As of 2026-10-04:
 - P2-B: FINAL PASS / MERGED
 - P3-A: FINAL PASS / MERGED
 - P3-B: FINAL PASS / MERGED
-- P4: ACTIVE / P4-A FINAL PASS / P4-B FINAL PASS / P4-C FINAL PASS / P4-D NEXT
+- P4: ACTIVE / P4-A FINAL PASS / P4-B FINAL PASS / P4-C FINAL PASS / P4-D FINAL PASS / P4-E NEXT
 - Production investment decision kernel: NOT YET
 - Real-company acceptance: NOT STARTED
 - Independent audit: NOT STARTED
