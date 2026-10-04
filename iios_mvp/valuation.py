@@ -46,6 +46,9 @@ MODEL_SUITABILITY = {
     "innovative_drug_pipeline": {
         "rnpv": 98, "sotp": 94, "ps": 58, "dcf": 45, "forward_pe": 18, "ev_ebitda": 12, "pb": 10, "ddm": 5
     },
+    "mixed_businesses": {
+        "sotp": 98, "dcf": 78, "forward_pe": 72, "ev_ebitda": 70, "ps": 55, "rnpv": 50, "pb": 45, "ddm": 35
+    },
     "mixed_segments": {
         "sotp": 98, "dcf": 78, "forward_pe": 72, "ev_ebitda": 70, "ps": 55, "rnpv": 50, "pb": 45, "ddm": 35
     },
@@ -72,6 +75,8 @@ def _positive(value: Any, field: str) -> Decimal:
 
 def assess_model_suitability(economic_profile: str) -> dict[str, Any]:
     profile = str(economic_profile or "").strip().lower()
+    if profile == "mixed_businesses":
+        profile = "mixed_segments"
     scores = MODEL_SUITABILITY.get(profile)
     if not scores:
         raise ValueError(f"no deterministic model suitability profile for: {economic_profile}")
@@ -123,6 +128,9 @@ def select_model(valuation: dict[str, Any]) -> dict[str, Any]:
 
     if not cross_checks and alternatives:
         cross_checks = alternatives
+        secondary = [m for m in secondary if m not in cross_checks]
+        if not secondary:
+            secondary = [x["model"] for x in routed["suitability"] if x["model"] != primary and x["model"] not in cross_checks][:1]
     if not selection.get("secondary_models") and not alternatives:
         cross_checks = routed["recommended_cross_check_models"]
 
@@ -393,6 +401,8 @@ def _segment_value(segment: dict[str, Any]) -> Decimal:
 def _sotp(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shares: Decimal) -> dict[str, Any]:
     inp = valuation.get("model_inputs", {}).get("sotp", {})
     segments = inp.get(scenario) or inp.get("segments")
+    if isinstance(segments, dict):
+        segments = segments.get("segments")
     if not segments:
         raise ValueError(f"valuation.model_inputs.sotp.{scenario} is required")
     segment_values = []
