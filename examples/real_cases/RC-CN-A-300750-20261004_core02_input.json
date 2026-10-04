@@ -127,7 +127,7 @@
         "retrieved_at": "2018-06-07",
         "source_ref": "https://www.szse.cn/disclosure/notice/company/t20180607_539221.html",
         "artifact_id": "catl-20261004-E001-security-identity.txt",
-        "content_sha256": "724049917e924e702e6add00aac00464980a4d7db01430b7d1d85ac059e0816d",
+        "content_sha256": "c5764e7e47e8074887124f307273d58e0341dafce320d4a39d626e2f9a10f9bf",
         "exact_bytes": true,
         "provenance_class": "SOURCE_VINTAGE_VERIFIED",
         "status": "ADMITTED"
@@ -141,7 +141,7 @@
         "retrieved_at": "2026-10-04",
         "source_ref": "https://wap.stockstar.com/detail/RB2026093000037318",
         "artifact_id": "catl-20261004-E002-market-price.txt",
-        "content_sha256": "bc7e358a8385554be498d6a2555b91c9f06812d6d5d6d38db31f9fcc00f01b18",
+        "content_sha256": "839935152c4f1e852c7ad3e83282591eaeab48f176c00de31977cbf01a626346",
         "exact_bytes": true,
         "provenance_class": "EVENT_PUBLICATION_VERIFIED",
         "status": "ADMITTED"
@@ -155,7 +155,7 @@
         "retrieved_at": "2026-10-04",
         "source_ref": "https://static.cninfo.com.cn/finalpage/2026-10-01/1225592063.PDF",
         "artifact_id": "catl-20261004-E003-corporate-disclosure.txt",
-        "content_sha256": "8721c0430b46e3215d6904a1b8a08e525166aba15e85b1e2c15d6777f7b4e67f",
+        "content_sha256": "8e873770df3ef7ddc3c299578bbd0bd5aac6c237d490410413afcfcd9c3e66b1",
         "exact_bytes": true,
         "provenance_class": "EVENT_PUBLICATION_VERIFIED",
         "status": "ADMITTED"
@@ -169,7 +169,7 @@
         "retrieved_at": "2026-10-04",
         "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
         "artifact_id": "catl-20261004-E004-business-reality.txt",
-        "content_sha256": "4a99707c61cd33fb66e178452e0de6f7dcb167c3eeb7d5b30f0f79a03d55fc9e",
+        "content_sha256": "6ff413fedd9e98b36bfdbf2a3caf13ed35935101ac21c710702f67ec16ee8b9d",
         "exact_bytes": true,
         "provenance_class": "SOURCE_VINTAGE_VERIFIED",
         "status": "ADMITTED"
@@ -183,7 +183,7 @@
         "retrieved_at": "2026-10-04",
         "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
         "artifact_id": "catl-20261004-E005-financial-reality.txt",
-        "content_sha256": "8acd40b9c61f7d89dd48d0a6c84706ec5ad2b5936f1b8514528c957448e3f923",
+        "content_sha256": "edc92ca668aa0010d37e257fd7ee8ae22a01b9dbd8d9b642b88b6195c1498777",
         "exact_bytes": true,
         "provenance_class": "SOURCE_VINTAGE_VERIFIED",
         "status": "ADMITTED"
@@ -197,7 +197,7 @@
         "retrieved_at": "2026-10-04",
         "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
         "artifact_id": "catl-20261004-E006-capital-structure.txt",
-        "content_sha256": "207e2086130b3f65bfe121be87a188c9fe1ea4ea3273e96ce1d94c4ce50d3fc1",
+        "content_sha256": "fd0fb530c211fd625b27cc052e67281215fa178c364a5f81a382714265b74739",
         "exact_bytes": true,
         "provenance_class": "SOURCE_VINTAGE_VERIFIED",
         "status": "ADMITTED"
@@ -211,7 +211,7 @@
         "retrieved_at": "2026-10-04",
         "source_ref": "https://static.cninfo.com.cn/finalpage/2026-10-01/1225592063.PDF",
         "artifact_id": "catl-20261004-E007-trust-governance.txt",
-        "content_sha256": "7ca8642ffd8fe3b9803f4a665ca521e0b2d8ae7fdebf8647774d482fe8ff34c2",
+        "content_sha256": "087113f8174f754a3cb888f75551c0862d810e75f4cc1effd7d02c88ac60a440",
         "exact_bytes": true,
         "provenance_class": "EVENT_PUBLICATION_VERIFIED",
         "status": "ADMITTED"
