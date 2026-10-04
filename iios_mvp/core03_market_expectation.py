@@ -58,8 +58,15 @@ def _date(value: Any, field: str) -> date:
 
 
 def _dt(value: Any, field: str) -> datetime:
+    raw = str(value).strip()
+    if len(raw) == 10:
+        try:
+            d = date.fromisoformat(raw)
+        except ValueError as exc:
+            raise ValueError(f"{field} must be ISO date") from exc
+        return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
     try:
-        result = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        result = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError as exc:
         raise ValueError(f"{field} must be ISO datetime") from exc
     if result.tzinfo is None:
