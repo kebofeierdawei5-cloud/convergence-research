@@ -1,5 +1,7 @@
 # B2 / A02 Development Status — 2026-10-04
 
+> **CORE-00 scope classification:** this document is **Research Track only**. A02 remains independently recoverable work and is **not an Investment Core dependency or release gate**. B2 evidence/PIT semantics remain reusable for company-specific cases; the historical-universe/A02 application does not.
+
 ## Frozen baseline
 
 - B2 Evidence Contract + Source Registry + PIT Temporal Semantics: merged to `main`.

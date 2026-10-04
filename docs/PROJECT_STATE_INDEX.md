@@ -1,39 +1,73 @@
 # IIOS Project State Index
 
-Snapshot: 2026-09-30
+Snapshot: 2026-10-04
 
 ## Current canonical engineering state
 
-```text
+```
 G2 R10 Reference Governance Runtime = FROZEN
         ↓
-M1.2 Forecast Validation = ACTIVE
+B0 Repair = PASS
         ↓
-FM-00 Exploratory Research Epoch = PASS
+B1 Investment Semantics v0.3 = PASS / FROZEN
         ↓
-FM-01 Driver History Foundation = IMPLEMENTATION PASS / DATA INGRESS BLOCKED
+P3/P4 Market Implied Expectation Infrastructure = FINAL PASS / CONDITIONAL
+        ↓
+CORE-00 Scope Reset & Architecture Reconciliation = ACTIVE
+        ↓
+CORE-01 Single Company Research Intake = NEXT
 ```
 
 ## Authority / continuity
 
-1. Git repository: source, contracts, tests, ADRs, changelog, state indexes.
+1. Git repository `main): source, contracts, tests, ADRs, changelog, state indexes.
 2. Frozen governance artifact identity + evidence: `governance/g2-r10-reference/`.
-3. Research-control artifacts: `research/`.
-4. Long-term compact memory: `IIOS_LONG_TERM_MEMORY_2026-09-30.md`.
-5. Chat history is context only, not authoritative project state.
+3. Investment Core contract: `docs/iios/IIOS_INVESTMENT_CORE_CONTRACT_v0.3.md`.
+4. CORE-00 scope authority: `docs/iios/CORE_00_SCOPE_RECONCILIATION_v0.1.md`.
+5. Research-control artifacts: `research/`.
+6. Chat history is context only, not authoritative project state.
 
 ## Immutable boundary
 
-G2 frozen bytes are not modified by M1.2 research development. Governance changes require a successor candidate and a new freeze chain.
+G2 frozen bytes remain immutable. B2 v0.1 evidence/PIT artifacts remain historical engineering artifacts and are not rewritten by CORE-00.
 
-## Active research boundary
+## Investment Core boundary
 
-FM-00 is exploratory and contaminated by prior exposed M1.0/M1.1 results. It cannot produce clean confirmatory evidence or authorize a production router.
+Investment Core begins with a user-selected security and cutoff.
+
+Required research infrastructure:
+
+- Single-company evidence/PIT;
+- company reality / quality / value core;
+- independent forecast;
+- valuation;
+- risk / portfolio constraints;
+- decision semantics.
+
+Not required as an Investment Core entry/completion gate:
+
+- CSI800 historical membership;
+- CSI Industry historical classification;
+- full-market historical universe;
+- PIT Security Master for universe construction;
+- FINANCIAL / NON_FINANCIAL universe filtering.
+
+## Research Track boundary
+
+A02/CSI historical-universe reconstruction and FM forecast research remain valid independent workstreams.
+
+A02 admission status:
+
+```
+BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
+```
 
 ## Next development task
 
-`M1.2-FM-01` implementation is complete at the code-contract layer.
+`CORE-00 | Scope Reset & Architecture Reconciliation`
 
-The remaining FM-01 data gate is blocked until the exact M1.1 CATL historical source snapshot is materialized. No values may be fabricated or inferred as a substitute.
+Acceptance requires the scope contract, machine isolation guard, status/index reconciliation and green CI.
 
-Next after admission: `M1.2-FM-02 | PIT Feature Builder`.
+After CORE-00:
+
+`CORE-01 | Single Company Research Intake`.
