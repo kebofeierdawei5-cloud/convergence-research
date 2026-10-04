@@ -28,6 +28,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - P4-C DCF/DDM Conditional MIE Vertical Slice: **FINAL PASS / MERGED**
 - P4-D SOTP/rNPV MIE Vertical Slice: **FINAL PASS / MERGED**
 - P4-E Multi-model Market Implied Expectation Set: **FINAL PASS / MERGED**
+- P4-F PIT / Replay / Fail-closed MIE Integration: **FINAL PASS / MERGED**
 - Production investment decision kernel: NOT YET
 
 ## P4-C Final Acceptance
@@ -80,7 +81,7 @@ Semantic boundary:
 - no generic implied net profit;
 - no Expectation Gap / Expected Return implementation.
 
-Completed: P4-E. Next gate: **P4-F — PIT / replay / fail-closed MIE integration**.
+Completed: P4-E. See P4-F acceptance below.
 ## P4-E Final Acceptance
 
 P4-E is formally **FINAL PASS / MERGED** on canonical `main`.
@@ -106,6 +107,31 @@ Semantic boundary:
 - Materialized expectations must share the exact same price/PIT observation basis.
 - Evidence closure and deterministic model-evaluation ordering are enforced.
 - No Expectation Gap, Expected Return, or generic `market_implied_net_profit` is introduced.
+
+## P4-F Final Acceptance
+
+P4-F is formally **FINAL PASS / MERGED** on canonical `main`.
+
+- PR #16: MERGED
+- pre-merge HEAD: `e498466549bc040085ddf46a2512a9208e3d7a12`
+- merge commit: `9732f33d3b0163832d317661b8171046d93c6455`
+- PR Investment Core CI #164 / `37192169418`: **SUCCESS**
+- PR FM00 CI #141 / `37192169420`: **SUCCESS**
+- post-merge main Investment Core CI #165 / `37192209207`: **SUCCESS**
+- post-merge main FM00 CI #142 / `37192209217`: **SUCCESS**
+- final regression: **171 passed**
+- acceptance matrix: `docs/iios/P4F_PIT_REPLAY_FAILCLOSED_ACCEPTANCE_MATRIX_v0.2.md`
+- acceptance record: `docs/iios/P4F_FINAL_ACCEPTANCE_2026-10-04.md`
+
+Semantic boundary:
+
+- Every evidence ID referenced by the P4-E set is bound to explicit provenance: variable, unit, basis, observation date, `known_at`, source, source location, content SHA-256 and capture timestamp.
+- PIT requires `observation_date <= cutoff` and `known_at.date() <= cutoff`. Post-cutoff capture is allowed when the evidence was knowable before cutoff.
+- Each materialized MIE price observation ID is explicitly bound to `market_price` provenance with matching date and currency/unit.
+- All materialized MIEs in one snapshot must share the exact same observation basis and use the snapshot cutoff.
+- Snapshot identity is protected by MIE-set hash, provenance hash and final snapshot hash; disk persistence is create-once.
+- Replay independently validates integrity, PIT, provenance closure, price binding and P4-E resolution/qualification semantics and fails closed on any mismatch.
+- P4-F does not implement Expectation Gap, Expected Return or the production v0.2 decision engine.
 
 ## Return Target
 
@@ -218,9 +244,9 @@ P4-A establishes the typed qualification boundary between P3 inverse interpretat
 
 ## Immediate Next Engineering Step
 
-**P4-F / PIT + Replay + Fail-Closed Market Implied Expectation Integration.**
+**P5 / Semantic Expectation Gap + Return Gate.**
 
-P4-E is complete. P4-F must bind the multi-model expectation set to immutable case snapshots, exact PIT/provenance manifests, replay semantics, and fail-closed runtime integration before P5 can begin.
+P4-A through P4-F are complete. P5 must compare economically equivalent independent variables against the P4 model-semantic market requirement, fail closed on incompatible or ambiguous interpretations, validate Bear/Base/Bull probabilities, and enforce strict positive Expected Return >15% before any decision layer.
 
 P4-E must consume the accepted P4-A through P4-D typed outputs and organize multiple feasible/conditional market-model explanations without forcing a winner.
 

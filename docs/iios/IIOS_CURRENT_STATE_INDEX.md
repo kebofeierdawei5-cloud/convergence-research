@@ -74,6 +74,7 @@ Implemented / merged:
 - P4-C DCF/DDM Conditional Market Implied Expectation Vertical Slice (FINAL PASS / MERGED)
 - P4-D SOTP/rNPV Market Implied Expectation Vertical Slice (FINAL PASS / MERGED)
 - P4-E Multi-model Market Implied Expectation Set (FINAL PASS / MERGED)
+- P4-F PIT / Replay / Fail-closed MIE Integration (FINAL PASS / MERGED)
 
 P2-A acceptance evidence:
 
@@ -84,7 +85,6 @@ P2-A acceptance evidence:
 
 Not yet implemented as production capability:
 
-- P4-F PIT/replay/fail-closed MIE integration
 - semantic Expectation Gap
 - production return gate integration
 - frozen probability / edge / position-sizing policy
@@ -152,7 +152,7 @@ P4-D is **FINAL PASS / MERGED**.
 
 P4-D keeps SOTP residual and rNPV pipeline requirements model-native and conditional. rNPV probability/timing are conditioning inputs only; no market-implied probability is emitted.
 
-Completed: **P4-E — multi-model expectation-set handling**. Next: **P4-F — PIT / replay / fail-closed MIE integration**.
+Completed: **P4-E — multi-model expectation-set handling**. Completed: **P4-F — PIT / replay / fail-closed MIE integration**. Next: **P5 — Semantic Expectation Gap + Return Gate**.
 ## P4-E Acceptance Evidence
 
 P4-E is **FINAL PASS / MERGED**.
@@ -169,6 +169,23 @@ P4-E is **FINAL PASS / MERGED**.
 P4-E provides a candidate-complete typed expectation set over accepted P4-A through P4-D outputs. It preserves model identity and model-native economic variables, distinguishes `NO_FEASIBLE_SOLUTION` from `BLOCKED`, marks multiple surviving models as `AMBIGUOUS / CONDITIONAL_ONLY`, prevents unique claims under incomplete coverage, enforces exact observation-basis consistency and evidence closure, and performs no model selection, Expectation Gap, or Expected Return calculation.
 
 Next: **P4-F — PIT / replay / fail-closed MIE integration**.
+
+## P4-F Acceptance Evidence
+
+P4-F is **FINAL PASS / MERGED**.
+
+- PR #16
+- pre-merge HEAD `e498466549bc040085ddf46a2512a9208e3d7a12`
+- merge commit `9732f33d3b0163832d317661b8171046d93c6455`
+- PR Investment Core CI #164 / `37192169418`: SUCCESS
+- PR FM00 CI #141 / `37192169420`: SUCCESS
+- post-merge main Investment Core CI #165 / `37192209207`: SUCCESS
+- post-merge main FM00 CI #142 / `37192209217`: SUCCESS
+- final regression: 171 passed
+
+P4-F closes the PIT/provenance and immutable replay boundary around the P4-A through P4-E Market Implied Expectation path. It does not make the production v0.2 decision engine runnable and does not calculate Expectation Gap or Expected Return.
+
+Next: **P5 — Semantic Expectation Gap + Return Gate**.
 
 ## Return Target
 
