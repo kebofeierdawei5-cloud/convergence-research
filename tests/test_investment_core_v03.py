@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -206,3 +209,17 @@ def test_legacy_v02_contract_remains_supported_through_legacy_validator():
 def test_v03_schema_contract_is_explicitly_versioned():
     c = case()
     assert c["contract_version"] == "IIOS-INVESTMENT-CORE-0.3"
+
+def test_v03_jsonschema_accepts_valid_case():
+    import jsonschema
+    schema = json.loads(Path("schemas/investment_core_case_v0.3.schema.json").read_text())
+    jsonschema.validate(case(), schema)
+
+
+def test_v03_jsonschema_rejects_incomplete_buy_add_package():
+    import jsonschema
+    schema = json.loads(Path("schemas/investment_core_case_v0.3.schema.json").read_text())
+    invalid = case()
+    invalid["portfolio"]["buy_add_package"].pop("monitoring_triggers")
+    with __import__("pytest").raises(jsonschema.ValidationError):
+        jsonschema.validate(invalid, schema)
