@@ -6,6 +6,7 @@ on:
       - "iios_mvp/**"
       - "tests/test_mvp.py"
       - "tests/test_value_core.py"
+      - "tests/test_investment_core_contract.py"
       - "examples/**"
       - "schemas/**"
       - ".github/workflows/iios_mvp.yml"
@@ -26,7 +27,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m compileall -q iios_mvp tests/test_mvp.py
+      - run: python -m compileall -q iios_mvp tests/test_mvp.py tests/test_investment_core_contract.py
       - run: python -m pip install --disable-pip-version-check pytest
       - run: python -m pytest -q tests/test_mvp.py tests/test_value_core.py tests/test_investment_core_contract.py
       - run: python -m json.tool schemas/investment_core_case_v0.2.schema.json >/dev/null
