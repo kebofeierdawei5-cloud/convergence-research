@@ -266,8 +266,6 @@ class StabilityObservation:
     def validate(self) -> None:
         if not self.perturbation_id or not self.perturbation:
             raise ValueError("perturbation_id and perturbation are required")
-        if self.resulting_state == StabilityState.STABLE and self.selected_model_id is None:
-            raise ValueError("stable observation requires selected_model_id")
 
 
 @dataclass(frozen=True)
