@@ -37,6 +37,8 @@ def case() -> dict:
                 "initial_position_pct": "5",
                 "target_position_pct": "10",
                 "max_position_pct": "10",
+                "thesis_break_triggers": ["driver deterioration"],
+                "monitoring_triggers": ["quarterly results"],
             },
         },
         "thesis": {"status": "INTACT"},
