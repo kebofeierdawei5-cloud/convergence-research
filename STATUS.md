@@ -23,6 +23,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - P3-A ratio-family Market Model Identification: **FINAL PASS / MERGED**
 - P3-B complex model-specific Market Model Identification baseline (DCF/DDM/SOTP/rNPV): **FINAL PASS / MERGED**
 - P3 capability classification: **conditional / candidate-set-bound baseline; not proof of unconditional true-market-model identification**
+- P4-A MIE Qualification Boundary: **FINAL PASS / MERGED**
 - Production investment decision kernel: NOT YET
 
 ## Return Target
@@ -105,11 +106,25 @@ P3-B is formally **FINAL PASS** on canonical `main`.
 
 P3-B implements model-specific evidence-backed identification for DCF, DDM, SOTP and rNPV, including model-specific inverse constraints, feasible solution sets, conservative identifiability, and historical date-level leave-one-out stability. It does not implement P4 or semantic Expectation Gap / return calculation.
 
+## P4-A Final Acceptance
+
+P4-A is formally **FINAL PASS** on canonical `main`.
+
+- PR #9 merge: `b347df63270b0389c8bfc531ed05eed5a14c843e`
+- PR #9 CI #120 / `37187273721`: **SUCCESS**
+- PR #10 merge: `ff46b1ed30e8521041d30eb5d1cebd2e4d6ccad0`
+- PR #10 CI #125 / `37187410083`: **SUCCESS**
+- Final P4-A test result: **101 passed**
+- Post-merge main CI #126 / `37187434857`: **SUCCESS**
+- Acceptance record: `docs/iios/P4A_FINAL_ACCEPTANCE_2026-10-04.md`
+
+P4-A establishes the typed qualification boundary between P3 inverse interpretations and decision-grade Market Implied Expectation.
+
 ## Immediate Next Engineering Step
 
-**P4-A / Market Implied Expectation Qualification Contract.**
+**P4-B / Ratio-family Market Implied Expectation vertical slice.**
 
-P3 outputs must first be qualified as candidate-set-conditional inverse interpretations before they can become decision-grade Market Implied Expectation.
+P4-B must consume the P4-A qualified typed boundary and preserve model-native economic variables, PIT, provenance and candidate-coverage semantics.
 
 Consume the now-validated model-specific market interpretations and produce the economic requirements implied by current price. Do not collapse DCF/DDM/SOTP/rNPV into generic implied net profit.
 
