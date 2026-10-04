@@ -25,7 +25,33 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - P3 capability classification: **conditional / candidate-set-bound baseline; not proof of unconditional true-market-model identification**
 - P4-A MIE Qualification Boundary: **FINAL PASS / MERGED**
 - P4-B Ratio-family MIE Vertical Slice: **FINAL PASS / MERGED**
+- P4-C DCF/DDM Conditional MIE Vertical Slice: **FINAL PASS / MERGED**
 - Production investment decision kernel: NOT YET
+
+## P4-C Final Acceptance
+
+P4-C is formally **FINAL PASS / MERGED** on canonical `main`.
+
+- PR #12: MERGED
+- pre-merge HEAD: `620977682155f5f633f1dcd32`
+- merge commit: `b6bfb8df10a8ffee5f01154fbe4b47201f6048fe`
+- PR Investment Core CI #143 / `37189169223`: **SUCCESS**
+- PR FM00 CI #115 / `37189169218`: **SUCCESS**
+- post-merge main Investment Core CI #144 / `37189193858`: **SUCCESS**
+- post-merge main FM00 CI #116 / `37189193862`: **SUCCESS**
+- final regression: **128 passed**
+- acceptance: `docs/iios/P4C_FINAL_ACCEPTANCE_2026-10-04.md`
+
+Semantic boundary:
+
+- DCF → conditional implied `fcf`;
+- DDM → conditional implied `dividend`;
+- explicit current conditioning/context inputs are provenance-bound;
+- output remains `CONDITIONAL_IMPLIED_VARIABLE / CONDITIONAL_ONLY`;
+- no full multidimensional feasible assumption-space claim;
+- no market-truth claim.
+
+Next gate: **P4-D — SOTP / rNPV expectation extraction**.
 
 ## Return Target
 
@@ -138,11 +164,11 @@ P4-A establishes the typed qualification boundary between P3 inverse interpretat
 
 ## Immediate Next Engineering Step
 
-**P4-B / Ratio-family Market Implied Expectation vertical slice.**
+**P4-D / SOTP-rNPV Market Implied Expectation vertical slice.**
 
-P4-B must consume the P4-A qualified typed boundary and preserve model-native economic variables, PIT, provenance and candidate-coverage semantics.
+P4-D must consume the P3-B complex-model typed boundary and the P4-A qualification contract, preserving model-native segment / residual or pipeline / probability / timing semantics.
 
-Consume the now-validated model-specific market interpretations and produce the economic requirements implied by current price. Do not collapse DCF/DDM/SOTP/rNPV into generic implied net profit.
+Do not collapse SOTP/rNPV into generic implied net profit. Do not start P5 until the remaining P4 model families, multi-model expectation-set handling, and PIT/replay integration are complete.
 
 P2-C Company Value Core hardening remains parallel where needed for real-company acceptance.
 

@@ -71,6 +71,7 @@ Implemented / merged:
 - P3-B complex-model Market Model Identification baseline (FINAL PASS / MERGED)
 - P4-A Market Implied Expectation Qualification Boundary (FINAL PASS / MERGED)
 - P4-B Ratio-family Market Implied Expectation Vertical Slice (FINAL PASS / MERGED)
+- P4-C DCF/DDM Conditional Market Implied Expectation Vertical Slice (FINAL PASS / MERGED)
 
 P2-A acceptance evidence:
 
@@ -81,7 +82,7 @@ P2-A acceptance evidence:
 
 Not yet implemented as production capability:
 
-- P4-C/D complex-model MIE extraction
+- P4-D SOTP/rNPV complex-model MIE extraction
 - P4-E candidate-coverage-qualified multi-model expectation set
 - P4-F PIT/replay/fail-closed MIE integration
 - semantic Expectation Gap
@@ -115,10 +116,27 @@ P3-B evidence:
 - merge commit `77022db416f5b1d32c306f5d644e3642c0f5936b`
 - final acceptance: `docs/iios/P3B_COMPLEX_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`
 
-P4 is the active engineering gate: P4-A and P4-B are complete; P4-C is next.
+P4 is the active engineering gate: P4-A, P4-B and P4-C are complete; P4-D is next.
 
 P4-A acceptance: `docs/iios/P4A_FINAL_ACCEPTANCE_2026-10-04.md`
 P4-B acceptance: `docs/iios/P4B_FINAL_ACCEPTANCE_2026-10-04.md`
+
+## P4-C Acceptance Evidence
+
+P4-C is **FINAL PASS / MERGED**.
+
+- PR #12
+- pre-merge HEAD: `620977682155f5f633a5e1`
+- merge commit: `b6bfb8df10a8ffee5f01154fbe4b47201f6048fe`
+- PR CI #143 / `37189169223`: SUCCESS
+- post-merge main Investment Core CI #144 / `37189193858`: SUCCESS
+- post-merge main FM00 #116 / `37189193862`: SUCCESS
+- final regression: 128 passed
+- acceptance: `docs/iios/P4C_FINAL_ACCEPTANCE_2026-10-04.md`
+
+P4-C keeps DCF/DDM conditional outputs as `CONDITIONAL_IMPLIED_VARIABLE / CONDITIONAL_ONLY`; it does not claim a full multidimensional feasible assumption space or market truth.
+
+Next: **P4-D — SOTP / rNPV expectation extraction**.
 
 ## Return Target
 

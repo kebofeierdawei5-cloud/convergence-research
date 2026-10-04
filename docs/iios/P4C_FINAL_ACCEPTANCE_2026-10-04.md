@@ -9,10 +9,13 @@ Date: 2026-10-04
 ## Evidence Chain
 
 - PR #12: MERGED
-- P4-C merge commit: to be recorded after merge
-- pre-merge HEAD: `303f16005b0e761fbdd96fcd9d9461642be3fa9a`
-- CI: to be recorded after final red-team CI
-- Final regression count: to be recorded after final CI
+- P4-C pre-merge HEAD: `620977682155f5f633f1dcd81ddbc6d71a2005e1`
+- P4-C merge commit: `b6bfb8df10a8ffee5f01154fbe4b47201f6048fe`
+- PR Investment Core CI #143 / run `37189169223`: **SUCCESS**
+- PR FM00 CI #115 / run `37189169218`: **SUCCESS**
+- Post-merge main Investment Core CI #144 / run `37189193858`: **SUCCESS**
+- Post-merge main FM00 CI #116 / run `37189193862`: **SUCCESS**
+- Final regression: **128 passed**
 - Acceptance matrix: `docs/iios/P4C_DCF_DDM_CONDITIONAL_MIE_ACCEPTANCE_MATRIX_v0.2.md`
 
 ## Scope
@@ -33,10 +36,10 @@ It does not redesign the P2-B market-model domain.
 
 P4-C materializes a **conditional MIE slice**:
 
-- DCF -> implied `fcf` conditional on the explicit current assumption slice;
-- DDM -> implied `dividend` conditional on the explicit current assumption slice.
+- DCF → implied `fcf` conditional on the explicit current model-assumption slice;
+- DDM → implied `dividend` conditional on the explicit current model-assumption slice.
 
-DCF conditioning variables:
+DCF conditioning/context variables:
 
 - `growth`
 - `margin`
@@ -44,13 +47,19 @@ DCF conditioning variables:
 - `terminal_value`
 - `discount_rate`
 
-DDM conditioning variables:
+DDM conditioning/context variables:
 
 - `payout`
 - `growth`
 - `discount_rate`
 
 The P3-B inverse is not recomputed.
+
+### Important Interpretation Boundary
+
+P3-B's current DCF/DDM baseline mathematically inverts the primary variable using the model-supported price/valuation inputs; the other listed variables are explicit model-required current context and validation inputs. They are **not separately asserted by P4-C to be market-implied variables**.
+
+Accordingly, P4-C is a conditional requirement slice, not a simultaneous inverse of every DCF/DDM assumption.
 
 ## Critical Red-Line
 
@@ -63,12 +72,14 @@ P4-C does not claim:
 
 All outputs use:
 
-~~~
+```
 representation = CONDITIONAL_IMPLIED_VARIABLE
 qualification  = CONDITIONAL_ONLY
-~~~
+```
 
-even when P3 reports `IDENTIFIABLE + STABLE`.
+for positively materialized conditional slices, even when P3 reports `IDENTIFIABLE + STABLE`.
+
+Blocked upstream states remain fail-closed.
 
 ## Fail-Closed / Red-Team Behavior
 
@@ -84,13 +95,17 @@ The implementation rejects or blocks:
 - assumption evidence provenance / variable / unit mismatch;
 - P3 status/method tampering;
 - generic implied net profit;
-- any attempt to promote the conditional output to decision-grade.
+- any attempt to promote the conditional output to decision-grade;
+- cross-snapshot / cross-price test-fixture contamination.
+
+The final red-team regression passed **128 tests**.
 
 ## Explicit Non-Goals
 
 P4-C does not implement:
 
 - SOTP/rNPV MIE;
+- full multidimensional DCF/DDM feasible assumption-space inference;
 - multi-model expectation-set logic beyond emitting one conditional slice per feasible candidate;
 - Expectation Gap;
 - Expected Return;
@@ -103,10 +118,10 @@ P4-C does not implement:
 
 Then:
 
-~~~
+```
 P4-E multi-model expectation set
         ↓
 P4-F PIT/replay/fail-closed integration
         ↓
 P5 Expectation Gap → Expected Return >15%
-~~~
+```

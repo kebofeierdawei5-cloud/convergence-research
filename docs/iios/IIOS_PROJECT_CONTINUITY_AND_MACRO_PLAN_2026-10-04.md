@@ -352,7 +352,7 @@ The cases should exercise different economics and valuation paths.
 
 ### P4 — Market Implied Expectation Engine
 
-**ACTIVE / P4-A COMPLETE / P4-B NEXT**
+**ACTIVE / P4-A COMPLETE / P4-B COMPLETE / P4-C COMPLETE / P4-D NEXT**
 
 Purpose:
 
@@ -370,10 +370,10 @@ P4-B
 Ratio-family MIE vertical slice — FINAL PASS
         ↓
 P4-C
-Ratio-family MIE vertical slice
+DCF / DDM conditional MIE — FINAL PASS
         ↓
-P4-C
-DCF / DDM conditional MIE
+P4-D
+SOTP / rNPV expectation extraction
         ↓
 P4-D
 SOTP / rNPV expectation extraction
@@ -400,6 +400,28 @@ Examples:
 - rNPV → feasible pipeline value / probability / timing requirements.
 
 P4 must not manufacture generic implied net profit.
+
+### P4-C Completion
+
+**FINAL PASS / MERGED**
+
+P4-C completed the DCF/DDM conditional MIE vertical slice on 2026-10-04.
+
+- PR #12
+- merge: `b6bfb8df10a8ffee5f01154fbe4b47201f6048fe`
+- pre-merge HEAD: `620977682155f5f633a5e1`
+- PR CI #143 / `37189169223`: SUCCESS
+- post-merge main Investment Core CI #144 / `37189193858`: SUCCESS
+- post-merge main FM00 #116 / `37189193862`: SUCCESS
+- final regression: 128 passed
+
+Semantic red line:
+
+`conditional inverse ≠ full feasible assumption space ≠ market truth`.
+
+DCF emits conditional implied `fcf`; DDM emits conditional implied `dividend`. The remaining model variables are explicit current conditioning/context inputs, not separately asserted market-implied outputs. All positive outputs remain `CONDITIONAL_IMPLIED_VARIABLE / CONDITIONAL_ONLY`.
+
+Next gate: **P4-D — SOTP / rNPV expectation extraction**.
 
 ### P5 — Semantic Expectation Gap + Return Gate
 
@@ -692,7 +714,7 @@ The system is successful when the full chain is repeatable, auditable, and usefu
 
 ## 11. Current Next Step
 
-**P4-C should be the next implementation gate.**
+**P4-D should be the next implementation gate.**
 
 Before writing broad P4 code, define the minimum model-semantic output required for:
 
@@ -736,7 +758,7 @@ As of 2026-10-04:
 - P2-B: FINAL PASS / MERGED
 - P3-A: FINAL PASS / MERGED
 - P3-B: FINAL PASS / MERGED
-- P4: ACTIVE / P4-A FINAL PASS / P4-B FINAL PASS / P4-C NEXT
+- P4: ACTIVE / P4-A FINAL PASS / P4-B FINAL PASS / P4-C FINAL PASS / P4-D NEXT
 - Production investment decision kernel: NOT YET
 - Real-company acceptance: NOT STARTED
 - Independent audit: NOT STARTED

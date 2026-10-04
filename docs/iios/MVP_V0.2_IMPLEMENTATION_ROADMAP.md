@@ -338,7 +338,7 @@ PR #3 / Batch 2 v0.1 remains blocked and untouched.
 
 ### P4 — Market Implied Expectation Engine
 
-Status: **IN PROGRESS — P4-A COMPLETE / P4-B COMPLETE / P4-C NEXT**
+Status: **ACTIVE — P4-A / P4-B / P4-C COMPLETE / P4-D NEXT**
 
 Macro planning authority: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026-10-04.md`.
 
@@ -390,7 +390,7 @@ Never collapse different model semantics into one generic “implied net profit�
 
 ### P4-C — DCF / DDM Conditional Market Implied Expectation
 
-Status: **NEXT**
+Status: **FINAL PASS / MERGED**
 
 Consume P3-B DCF/DDM model-specific feasible solutions through the P4-A typed qualification boundary. Preserve conditional assumption semantics; do not collapse to generic implied net profit or promote conditional inversion to a full multidimensional feasible assumption set without explicit evidence and contract support.
 
@@ -402,7 +402,24 @@ Acceptance target:
 - ambiguity / instability / insufficient evidence remain fail-closed;
 - no Expectation Gap / Expected Return implementation.
 
-Acceptance evidence to be created at completion.
+Acceptance evidence: `docs/iios/P4C_FINAL_ACCEPTANCE_2026-10-04.md`.
+
+Implementation boundary:
+
+- DCF → conditional implied `fcf`;
+- DDM → conditional implied `dividend`;
+- current assumption/context slice is explicit and provenance-bound;
+- conditional output cannot qualify as decision-grade;
+- no full multidimensional feasible assumption-space claim;
+- no market-truth claim.
+
+**Next: P4-D — SOTP / rNPV expectation extraction.**
+
+### P4-D — SOTP / rNPV Market Implied Expectation
+
+Status: **NEXT**
+
+Consume P3-B SOTP/rNPV model-specific feasible solutions through the P4-A typed qualification boundary. Preserve segment/residual semantics for SOTP and pipeline/probability/timing semantics for rNPV. Do not collapse either family into generic implied net profit.
 
 ### P5 — Expectation Gap + Return Gate
 

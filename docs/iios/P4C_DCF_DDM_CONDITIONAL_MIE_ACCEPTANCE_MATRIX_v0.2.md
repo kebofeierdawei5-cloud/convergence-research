@@ -114,4 +114,4 @@ The key negative test is:
 
 > Even a single, stable, fully covered DCF/DDM candidate cannot become DECISION_GRADE through P4-C, because the output remains conditional on an observed assumption slice.
 
-A future multidimensional feasible assumption-space implementation would require a separate contract and evidence model. P4-C deliberately does not introduce one implicitly.
+P3-B's current DCF/DDM baseline mathematically inverts only the primary variable with its supported price/valuation inputs. The other listed DCF/DDM variables are explicit current model-required conditioning/context inputs, not separately market-implied outputs. A future multidimensional feasible assumption-space implementation would require a separate contract and evidence model. P4-C deliberately does not introduce one implicitly.
