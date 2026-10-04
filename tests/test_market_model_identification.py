@@ -217,7 +217,6 @@ def test_insufficient_history_is_not_called_unidentifiable():
     pe = candidate("pe-1", MarketModelFamily.FORWARD_PE, "forward_eps")
     observations = (
         obs("h1", 1, "100", "5", "forward_eps"),
-        obs("h2", 15, "120", "5", "forward_eps"),
         MarketValuationObservation(
             observation_id="current",
             observation_date=CUTOFF,
