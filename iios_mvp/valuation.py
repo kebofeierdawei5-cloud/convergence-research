@@ -88,51 +88,60 @@ def assess_model_suitability(economic_profile: str) -> dict[str, Any]:
 
 
 def route_model(economic_profile: str) -> dict[str, Any]:
+    """Generate model candidates and suitability priors; never selects the investment model."""
     assessment = assess_model_suitability(economic_profile)
     ranked = assessment["ranked_models"]
     return {
         "economic_profile": assessment["economic_profile"],
-        "recommended_primary_model": ranked[0]["model"],
-        "recommended_secondary_models": [x["model"] for x in ranked[1:2]],
-        "recommended_cross_check_models": [x["model"] for x in ranked[2:3]],
         "candidate_models": [x["model"] for x in ranked[:4]],
-        "suitability": ranked,
+        "model_suitability": ranked,
     }
 
 
 def select_model(valuation: dict[str, Any]) -> dict[str, Any]:
+    """Validate a human-selected company valuation model.
+
+    The router is advisory only. A primary model must be explicitly supplied by the
+    human decision trigger and accompanied by a rationale. An out-of-candidate
+    selection requires an explicit override reason.
+    """
     selection = valuation.get("model_selection") or {}
     economics = selection.get("economic_profile")
     if not economics:
         raise ValueError("valuation.model_selection.economic_profile is required")
+
     routed = route_model(economics)
-    explicit = selection.get("primary_model") or valuation.get("model")
-    primary = explicit or routed["recommended_primary_model"]
+    explicit = selection.get("primary_model")
+    if not explicit:
+        raise ValueError("valuation.model_selection.primary_model is required for HUMAN selection")
+    primary = str(explicit).strip().lower()
     if primary not in SUPPORTED_MODELS:
         raise ValueError(f"unsupported valuation model: {primary}")
 
-    override = primary != routed["recommended_primary_model"]
-    if override and not selection.get("override_reason"):
-        raise ValueError(
-            f"valuation model {primary} overrides routed model "
-            f"{routed['recommended_primary_model']} without override_reason"
-        )
+    selection_method = str(selection.get("selection_method", "")).strip().upper()
+    if selection_method != "HUMAN":
+        raise ValueError("valuation.model_selection.selection_method must be HUMAN")
 
     rationale = selection.get("rationale")
     if not rationale:
         raise ValueError("valuation.model_selection.rationale is required")
 
+    override = primary not in routed["candidate_models"]
+    override_reason = selection.get("override_reason")
+    if override and not override_reason:
+        raise ValueError(
+            f"valuation model {primary} is outside IIOS candidate models "
+            f"{routed['candidate_models']}; override_reason is required"
+        )
+
     alternatives = list(selection.get("alternatives") or [])
-    secondary = list(selection.get("secondary_models") or routed["recommended_secondary_models"])
+    secondary = list(selection.get("secondary_models") or [])
     cross_checks = list(selection.get("cross_check_models") or [])
 
-    if not cross_checks and alternatives:
-        cross_checks = alternatives
-        secondary = [m for m in secondary if m not in cross_checks]
-        if not secondary:
-            secondary = [x["model"] for x in routed["suitability"] if x["model"] != primary and x["model"] not in cross_checks][:1]
-    if not selection.get("secondary_models") and not alternatives:
-        cross_checks = routed["recommended_cross_check_models"]
+    if not secondary and not cross_checks:
+        ranked = [x["model"] for x in routed["model_suitability"] if x["model"] != primary]
+        secondary = ranked[:1]
+        cross_checks = ranked[1:2]
 
     for model in secondary + cross_checks:
         if model not in SUPPORTED_MODELS:
@@ -143,19 +152,18 @@ def select_model(valuation: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("secondary and cross-check model sets must be disjoint")
 
     return {
+        "selection_method": "HUMAN",
         "primary_model": primary,
         "secondary_models": secondary,
         "cross_check_models": cross_checks,
         "economic_profile": routed["economic_profile"],
         "rationale": rationale,
         "alternatives": alternatives,
-        "route_recommendation": routed["recommended_primary_model"],
-        "route_candidates": routed["candidate_models"],
-        "suitability": routed["suitability"],
-        "route_overridden": override,
-        "override_reason": selection.get("override_reason"),
+        "candidate_models": routed["candidate_models"],
+        "model_suitability": routed["model_suitability"],
+        "selection_outside_candidates": override,
+        "override_reason": override_reason,
     }
-
 
 def _pe(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shares: Decimal) -> dict[str, Any]:
     profit = _positive(forecast[scenario]["net_profit"], f"forecast.{scenario}.net_profit")
