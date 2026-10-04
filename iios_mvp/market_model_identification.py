@@ -306,7 +306,8 @@ def _solve_dcf_primary(
     growth = latest["growth"].economic_value
     margin = latest["margin"].economic_value
     reinvestment = latest["reinvestment"].economic_value
-    terminal_value = latest["terminal_value"].economic_value
+    terminal_value_observation = latest["terminal_value"]
+    terminal_value = terminal_value_observation.economic_value
     discount_rate = latest["discount_rate"].economic_value
 
     if fcf.economic_value <= 0 or terminal_value <= 0:
@@ -317,7 +318,7 @@ def _solve_dcf_primary(
         raise ValueError("DCF discount_rate must be > growth")
     _ratio_in_unit_interval(margin, "DCF margin")
     _ratio_in_unit_interval(reinvestment, "DCF reinvestment")
-    if fcf.unit != terminal_value.unit:
+    if fcf.unit != terminal_value_observation.unit:
         raise ValueError("DCF fcf and terminal_value units must match")
     if growth.as_tuple().exponent < -18 or discount_rate.as_tuple().exponent < -18:
         raise ValueError("DCF rate precision exceeds supported bound")
@@ -368,7 +369,8 @@ def _solve_ddm_primary(
         raise ValueError("DDM growth must be > -1")
     if discount_rate <= growth:
         raise ValueError("DDM discount_rate must be > growth")
-    price = _market_context(items)[0]
+    external_items = tuple(item for item in items if not item.economic_variable.startswith("_"))
+    price = _market_context(external_items)[0]
     implied_dividend = price * (discount_rate - growth) / (Decimal("1") + growth)
 
     diagnostics = {
@@ -418,7 +420,8 @@ def _solve_sotp_primary(
     if len(units) != 1:
         raise ValueError("SOTP segment units must match")
 
-    market_price, shares_outstanding, _ = _market_context(items)
+    external_items = tuple(item for item in items if not item.economic_variable.startswith("_"))
+    market_price, shares_outstanding, _ = _market_context(external_items)
     market_cap = market_price * shares_outstanding
     implied_residual = market_cap - segment_total
     return implied_residual, {
@@ -496,7 +499,8 @@ def _solve_rnpv_primary(
 
     if observed_risk_adjusted_value <= 0 or pipeline_total <= 0:
         raise ValueError("rNPV observed risk-adjusted pipeline value must be > 0")
-    market_price, shares_outstanding, net_debt = _market_context(items)
+    external_items = tuple(item for item in items if not item.economic_variable.startswith("_"))
+    market_price, shares_outstanding, net_debt = _market_context(external_items)
     enterprise_value = market_price * shares_outstanding + net_debt
     residual_value = enterprise_value - base_value
     if residual_value < Decimal("0"):
