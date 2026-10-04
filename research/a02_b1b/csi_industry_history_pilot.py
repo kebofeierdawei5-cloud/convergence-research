@@ -99,7 +99,7 @@ def post_json(
         url,
         json=payload,
         headers=HEADERS,
-        timeout=90,
+        timeout=15,
         allow_redirects=True,
     )
     meta = capture_response(
@@ -338,11 +338,13 @@ def probe_historical_parameters(
     )
 
     result: dict[str, Any] = {
-        "schema_version": "IIOS-A02-B1B2-CSI-HISTORICAL-PARAM-PROBE-0.1",
+        "schema_version": "IIOS-A02-B1B2-CSI-HISTORICAL-PARAM-PROBE-0.2",
         "provider": "CSI",
         "endpoint": CSI_SECURITY_INDUSTRY_SEARCH,
         "retrieved_at": utc_now(),
         "baseline": baseline_meta,
+        "discovery_origin": "2026Q1",
+        "candidate_parameters": ["date", "effectiveDate", "asOfDate", "queryDate"],
         "probes": [],
         "interpretation": {
             "historical_semantics_verified": False,
@@ -350,8 +352,54 @@ def probe_historical_parameters(
         },
     }
 
-    for origin, date_value in ORIGINS.items():
-        for parameter in ("date", "effectiveDate", "asOfDate", "queryDate"):
+    discovery_origin = "2026Q1"
+    discovery_date = ORIGINS[discovery_origin]
+    sensitive_parameters: list[str] = []
+
+    for parameter in result["candidate_parameters"]:
+        payload = dict(base_payload)
+        payload[parameter] = discovery_date
+        raw_path = probe_dir / f"{discovery_origin}_{parameter}.json"
+        meta = post_json(
+            session,
+            CSI_SECURITY_INDUSTRY_SEARCH,
+            payload,
+            raw_path,
+            source_class="OFFICIAL_PUBLIC_HTTP",
+        )
+        probe: dict[str, Any] = {
+            "origin": discovery_origin,
+            "requested_date": discovery_date,
+            "parameter": parameter,
+            "raw": meta,
+            "same_response_sha256_as_baseline": (
+                meta["sha256"] == baseline_meta["sha256"]
+            ),
+        }
+        try:
+            probe["rows"], probe["stats"] = parse_page(raw_path)
+            baseline_rows, baseline_stats = parse_page(base_path)
+            probe["same_normalized_rows_as_baseline"] = (
+                probe["rows"] == baseline_rows
+            )
+            probe["baseline_row_count"] = baseline_stats["row_count"]
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            probe["parse_error"] = str(exc)
+
+        if (
+            meta["sha256"] != baseline_meta["sha256"]
+            or probe.get("same_normalized_rows_as_baseline") is False
+        ):
+            probe["status"] = "DATE_SENSITIVITY_DETECTED_UNVERIFIED"
+            sensitive_parameters.append(parameter)
+        else:
+            probe["status"] = "NO_DATE_SENSITIVITY_OBSERVED"
+        result["probes"].append(probe)
+
+    for parameter in sensitive_parameters:
+        for origin, date_value in ORIGINS.items():
+            if origin == discovery_origin:
+                continue
             payload = dict(base_payload)
             payload[parameter] = date_value
             raw_path = probe_dir / f"{origin}_{parameter}.json"
@@ -362,7 +410,7 @@ def probe_historical_parameters(
                 raw_path,
                 source_class="OFFICIAL_PUBLIC_HTTP",
             )
-            probe: dict[str, Any] = {
+            probe = {
                 "origin": origin,
                 "requested_date": date_value,
                 "parameter": parameter,
@@ -371,7 +419,6 @@ def probe_historical_parameters(
                     meta["sha256"] == baseline_meta["sha256"]
                 ),
             }
-
             try:
                 probe["rows"], probe["stats"] = parse_page(raw_path)
                 baseline_rows, baseline_stats = parse_page(base_path)
@@ -381,7 +428,6 @@ def probe_historical_parameters(
                 probe["baseline_row_count"] = baseline_stats["row_count"]
             except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
                 probe["parse_error"] = str(exc)
-
             if (
                 meta["sha256"] != baseline_meta["sha256"]
                 or probe.get("same_normalized_rows_as_baseline") is False
@@ -391,23 +437,25 @@ def probe_historical_parameters(
                 probe["status"] = "NO_DATE_SENSITIVITY_OBSERVED"
             result["probes"].append(probe)
 
-    if all(p["status"] == "NO_DATE_SENSITIVITY_OBSERVED" for p in result["probes"]):
+    if not sensitive_parameters:
         result["interpretation"]["status"] = "BLOCKED_DATE_PARAMETER_NOT_EVIDENCED"
         result["interpretation"]["reason"] = (
-            "Candidate date parameters did not change the current endpoint response. "
-            "The public route therefore cannot be admitted as historical PIT evidence."
+            "Candidate date parameters did not change the current endpoint response "
+            "for the discovery origin. The public route cannot be admitted as "
+            "historical PIT evidence."
         )
     else:
         result["interpretation"]["status"] = (
             "BLOCKED_DATE_PARAMETER_SENSITIVITY_UNVERIFIED"
         )
         result["interpretation"]["reason"] = (
-            "At least one exploratory date parameter changed the response, but "
-            "no official source contract proving date semantics was identified."
+            "At least one exploratory date parameter changed the response. "
+            "The change is not sufficient to establish historical semantics or "
+            "source-side known_at without an official source contract."
         )
+        result["interpretation"]["sensitive_parameters"] = sensitive_parameters
 
     return result
-
 
 def build_admission(current: dict[str, Any], export: dict[str, Any], probe: dict[str, Any]) -> dict[str, Any]:
     current_ok = current.get("status") == "PASS_CURRENT_ONLY"
