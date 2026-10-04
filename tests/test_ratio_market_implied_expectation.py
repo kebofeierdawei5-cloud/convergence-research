@@ -293,3 +293,66 @@ def test_nested_evidence_must_be_manifest_backed():
     )
     with pytest.raises(ValueError, match="unknown evidence_id"):
         run(inp, evidence_sufficiency=bad)
+
+
+def test_wrong_p3_solution_variable_is_rejected():
+    from dataclasses import replace
+    from iios_mvp.market_model_domain import FeasibleSolution, FeasibleSolutionSet, FeasibleSolutionStatus, ModelFit
+    pe = candidate("pe-1", MarketModelFamily.FORWARD_PE, "candidate-pe")
+    inp = build_input((pe,), "forward_eps", ("5", "5", "5", "5", "5"), ("90", "95", "100", "105", "100"))
+    p3 = identify_market_models(inp)
+    evaluation = p3["evaluations"][0]
+    original = evaluation.feasible_solution_set
+    bad_solution = FeasibleSolution(
+        economic_variable="revenue",
+        unit=original.solutions[0].unit,
+        basis=original.solutions[0].basis,
+        model_id="pe-1",
+        range_low=original.solutions[0].range_low,
+        range_high=original.solutions[0].range_high,
+        evidence_ids=original.solutions[0].evidence_ids,
+    )
+    bad_set = FeasibleSolutionSet(
+        model_id=original.model_id,
+        status=FeasibleSolutionStatus.NONEMPTY,
+        solutions=(bad_solution,),
+        constraint_ids=original.constraint_ids,
+        evidence_ids=original.evidence_ids,
+        basis=original.basis,
+    )
+    bad_eval = CandidateEvaluation(
+        fit=evaluation.fit,
+        feasible_solution_set=bad_set,
+    )
+    bad_p3 = dict(p3, evaluations=(bad_eval,))
+    with pytest.raises(ValueError, match="solution variable mismatch"):
+        build_ratio_market_implied_expectations(
+            identification_input=inp,
+            identification=bad_p3,
+            candidate_coverage=coverage(inp),
+            evidence_sufficiency=evidence_sufficient(inp),
+            currency="CNY",
+            adjustment_semantics="UNADJUSTED",
+            period="NTM",
+            horizon="12M",
+            accounting_basis="reported",
+        )
+
+
+def test_invalid_p3_method_is_rejected():
+    pe = candidate("pe-1", MarketModelFamily.FORWARD_PE, "candidate-pe")
+    inp = build_input((pe,), "forward_eps", ("5", "5", "5", "5", "5"), ("90", "95", "100", "105", "100"))
+    p3 = identify_market_models(inp)
+    bad_p3 = dict(p3, method="legacy_inverse")
+    with pytest.raises(ValueError, match="accepted P3 model-specific inverse"):
+        build_ratio_market_implied_expectations(
+            identification_input=inp,
+            identification=bad_p3,
+            candidate_coverage=coverage(inp),
+            evidence_sufficiency=evidence_sufficient(inp),
+            currency="CNY",
+            adjustment_semantics="UNADJUSTED",
+            period="NTM",
+            horizon="12M",
+            accounting_basis="reported",
+        )
