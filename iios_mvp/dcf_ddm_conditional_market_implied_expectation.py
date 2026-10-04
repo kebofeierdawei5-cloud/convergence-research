@@ -19,6 +19,7 @@ from .market_model_domain import (
     IdentifiabilityResult,
     IdentifiabilityState,
     MarketModelFamily,
+    MarketObservableEvidence,
     StabilityResult,
 )
 from .market_model_identification import (
@@ -144,7 +145,7 @@ def _current_observation_group(
 
 
 def _latest_current_by_variable(group: Sequence[MarketValuationObservation]) -> dict[str, MarketValuationObservation]:
-    latest: dict[str, object] = {}
+    latest: dict[str, MarketValuationObservation] = {}
     for item in group:
         existing = latest.get(item.economic_variable)
         if existing is None or (item.known_at, item.observation_id) > (
@@ -156,7 +157,7 @@ def _latest_current_by_variable(group: Sequence[MarketValuationObservation]) -> 
 
 
 def _validate_observation_evidence(
-    item: object,
+    item: MarketValuationObservation,
     evidence_index: Mapping[str, MarketObservableEvidence],
 ) -> None:
     for evidence_id in item.evidence_ids:
