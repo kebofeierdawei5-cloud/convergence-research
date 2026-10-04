@@ -155,8 +155,8 @@ def dcf_input(
             rows.append(cobs(f"h{day}-{variable}", day, price, variable, value, basis, unit, eid))
             evidence.append(complex_evidence(eid, variable, unit))
     for variable, value, unit, basis in variables:
-        eid = f"{id_prefix}e-{variable}-current"
-        rows.append(cobs(f"{id_prefix}current-{variable}", None, current_price, variable, value, basis, unit, eid))
+        eid = f"e-{variable}-current"
+        rows.append(cobs(f"current-{variable}", None, current_price, variable, value, basis, unit, eid))
         evidence.append(complex_evidence(eid, variable, unit))
     evidence.append(complex_evidence(c.evidence_ids[0], "dcf_candidate", "identifier"))
     return MarketModelIdentificationInput(
@@ -189,8 +189,8 @@ def ddm_input(
             rows.append(cobs(f"{id_prefix}h{day}-{variable}", day, "105", variable, value, basis, unit, eid))
             evidence.append(complex_evidence(eid, variable, unit))
     for variable, value, unit, basis in variables:
-        eid = f"e-{variable}-current"
-        rows.append(cobs(f"current-{variable}", None, current_price, variable, value, basis, unit, eid))
+        eid = f"{id_prefix}e-{variable}-current"
+        rows.append(cobs(f"{id_prefix}current-{variable}", None, current_price, variable, value, basis, unit, eid))
         evidence.append(complex_evidence(eid, variable, unit))
     evidence.append(complex_evidence(c.evidence_ids[0], "ddm_candidate", "identifier"))
     return MarketModelIdentificationInput(
