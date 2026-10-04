@@ -1,60 +1,64 @@
 # IIOS Current-State Index
 
-Snapshot: 2026-10-03
+Snapshot: 2026-10-04
 
-## Current canonical engineering state
+## Canonical State
+
+Current canonical `main` HEAD:
+
+`93fefe0dcd513fd466d2319205c67f783cb54020`
+
+Canonical reconciliation:
+
+`docs/iios/STATE_RECONCILIATION_2026-10-04.md`
+
+## Current Investment-Core State
 
 ```
-R0 Governance = PASS
+Initial MVP Decision Vertical Slice = MERGED
         ↓
-Canonical Git root established
+Batch 1-B Company Value Core = MERGED
         ↓
-FM-00 exact Git baseline = 536e883...
+Human-authoritative Valuation Model Selection = MERGED
         ↓
-FM-01 exact implementation baseline = d5b2fb3...
+Batch 2 v0.1 = OPEN / RED-TEAM BLOCKED
         ↓
-Canonical root + CI carrier = 1285506...
-        ↓
-FM-00 GitHub Actions = PASS
-        ↓
-M1.2-DATA-00 / A02 = BLOCKED_PENDING_EXACT_RAW_DATA
+Next: Investment Core Contract v0.2
 ```
 
-## Exact canonical refs
+### Company-side valuation authority
 
-- `main` = `1285506b47fa89802c6e85a1bd066b54f088e3b0`
-- `m1.2-fm00-v0.1.0` = `aac0cccf596ee2703caedffc08f434be9e2dffed`
-- `m1.2-fm01-foundation-v0.1.0` = `36c8da2070e91be41c0574e6c9db54947080d478`
+`Company Value Core → Candidate Models → HUMAN Primary Model → Consistency Gate → Intrinsic Value`
 
-## CI closure
+Router is advisory only.
 
-- Workflow: `IIOS FM00 Baseline`
-- Workflow run: `37124212188`
-- Head commit: `1285506b47fa89802c6e85a1bd066b54f088e3b0`
-- Event: `push`
-- Conclusion: `success`
-- Job: `verify-fm00`
-- Job ID: `111206141430`
-- FM00 unit tests: 8/8 PASS
-- FM00 validator: PASS, findings=[]
-- compileall: PASS
-- git diff --check: PASS
+### Market-side target
 
-## Research boundary
+`Market Observable Evidence → Candidate Models → Historical/Current Fit → Feasible Solution Set → Identifiability → Stability → Reverse Valuation → Market Implied Expectation`
 
-FM00 remains exploratory and contaminated by prior exposed results. It does not establish forecast model validity or production-router eligibility.
+The current Batch 2 v0.1 implementation does not satisfy this contract and is not current capability.
 
-FM01 code-contract implementation is complete, while CATL population remains blocked until its exact M1.1 source snapshot is materialized and admitted under PIT controls.
+## Return Target
 
-Model selection remains unauthorized until the required data and evaluation gates are satisfied.
+**Positive expected return >15%.**
 
-## Next gate
+No fixed 1–3 year holding period and no annualized-return requirement are part of the current core gate.
 
-Proceed to M1.2-DATA-00 / A02 exact raw-data admission. Do not infer or fabricate missing PIT source bytes.
+## Forecast Research
 
-## Authority precedence
+- FM-00 = PASS
+- FM-01 implementation foundation = PASS
+- FM-01 CATL data ingress = BLOCKED pending exact source snapshot
+- FM-02 waits for exact source admission
+
+## Authority Precedence
 
 1. Frozen governance artifacts and accepted evidence chains.
-2. Canonical repository artifacts and exact Git history.
-3. Independent execution/verification receipts.
-4. Chat context only.
+2. Current canonical Git repository state.
+3. Independent CI / execution evidence.
+4. Historical audit records as point-in-time records.
+5. Chat context.
+
+## Reconciliation Rule
+
+Historical state documents may remain as historical evidence, but must not be interpreted as the current state when they conflict with this index or the reconciliation artifact.
