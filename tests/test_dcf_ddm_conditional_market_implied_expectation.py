@@ -270,7 +270,7 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
     ddm_p3 = identify_market_models(ddm_inp)
     combined = MarketModelIdentificationInput(
         cutoff_date=CUTOFF,
-        current_observation_id="current-fcf",
+        current_observation_id="ddm-current-dividend",
         candidates=(dcf, ddm),
         observations=dcf_inp.observations + ddm_inp.observations,
         evidence=dcf_inp.evidence + tuple(
