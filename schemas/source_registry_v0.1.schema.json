@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/source-registry-0.1.schema.json",
+  "title": "IIOS Source Registry v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "registry_version",
+    "policy",
+    "sources"
+  ],
+  "properties": {
+    "registry_version": {
+      "const": "IIOS-SOURCE-REGISTRY-0.1"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "free_first",
+        "paid_data_mandatory",
+        "authority_principle",
+        "current_state_substitution"
+      ],
+      "properties": {
+        "free_first": {
+          "const": true
+        },
+        "paid_data_mandatory": {
+          "const": false
+        },
+        "authority_principle": {
+          "const": "source_strength_not_majority_vote"
+        },
+        "current_state_substitution": {
+          "const": "FORBIDDEN"
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_ref",
+          "provider",
+          "role",
+          "access_class",
+          "authority_level",
+          "pit_capability",
+          "mandatory_for_production"
+        ],
+        "properties": {
+          "source_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "access_class": {
+            "enum": [
+              "FREE_PUBLIC",
+              "FREE_WITH_LIMITS",
+              "PAID_OPTIONAL",
+              "LOCAL_OPERATOR_SUPPLIED"
+            ]
+          },
+          "authority_level": {
+            "enum": [
+              "PRIMARY_OFFICIAL",
+              "PRIMARY_ISSUER",
+              "SECONDARY_VALIDATION",
+              "METHODOLOGY_ONLY"
+            ]
+          },
+          "pit_capability": {
+            "enum": [
+              "SOURCE_VINTAGE",
+              "EVENT_PUBLICATION",
+              "EXPLICIT_PIT_QUERY",
+              "CURRENT_ONLY",
+              "UNKNOWN"
+            ]
+          },
+          "mandatory_for_production": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
