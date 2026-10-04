@@ -217,7 +217,7 @@ def test_insufficient_identification_blocks_the_feasible_ratio_mie():
         cutoff_date=CUTOFF,
         current_observation_id=ps_inp.current_observation_id,
         candidates=ps_inp.candidates,
-        observations=ps_inp.observations[:2] + ps_inp.observations[-1:],
+        observations=ps_inp.observations[:1] + ps_inp.observations[-1:],
         evidence=tuple(item for item in ps_inp.evidence if item.evidence_id in {o.evidence_ids[0] for o in ps_inp.observations} | {ps.evidence_ids[0]}),
     )
     combined = MarketModelIdentificationInput(
