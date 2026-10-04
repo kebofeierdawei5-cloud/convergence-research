@@ -23,11 +23,63 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _record_attempt(attempts, source, **kw):
+    item = {"archive_provider": source}
+    item.update(kw)
+    attempts.append(item)
+
+
+def fetch_archive_pt_target(urls: list[str], attempts: list[dict]) -> dict:
+    """Search Arquivo.pt CDX and accept only exact frozen target bytes."""
+    import urllib.parse
+    for source_url in urls:
+        params = {
+            "url": source_url,
+            "from": "2026",
+            "to": "2026",
+            "output": "json",
+            "fields": "url,timestamp,status,digest,length",
+            "limit": 100,
+        }
+        cdx_url = "https://arquivo.pt/wayback/cdx?" + urllib.parse.urlencode(params)
+        try:
+            cdx = requests.get(cdx_url, timeout=60, headers={"User-Agent": "Mozilla/5.0"})
+            cdx.raise_for_status()
+            rows = cdx.json()
+            _record_attempt(attempts, "ARQUIVO_PT_CDX", source_url=source_url, cdx_status="OK", capture_count=len(rows) if isinstance(rows, list) else 0)
+        except Exception as exc:
+            _record_attempt(attempts, "ARQUIVO_PT_CDX", source_url=source_url, cdx_status="ERROR", cdx_error=str(exc))
+            continue
+        for row in rows if isinstance(rows, list) else []:
+            if not isinstance(row, dict):
+                continue
+            timestamp = str(row.get("timestamp", ""))
+            original = row.get("url") or source_url
+            try:
+                length = int(row.get("length", 0))
+            except (TypeError, ValueError):
+                length = 0
+            if length != EXPECTED_000906_SIZE:
+                continue
+            archive_url = f"https://arquivo.pt/noFrame/replay/{timestamp}id_/{original}"
+            try:
+                resp = requests.get(archive_url, timeout=90, headers={"User-Agent": "Mozilla/5.0"}, allow_redirects=True)
+                data = resp.content
+                got = sha256_bytes(data)
+                _record_attempt(attempts, "ARQUIVO_PT", source_url=source_url, timestamp=timestamp, archive_url=archive_url, http_status=resp.status_code, size_bytes=len(data), sha256=got, expected_match=(got == EXPECTED_000906_SHA256))
+                if len(data) == EXPECTED_000906_SIZE and got == EXPECTED_000906_SHA256:
+                    return {"status": "PASS", "timestamp": timestamp, "archive_url": archive_url, "size_bytes": len(data), "sha256": got, "bytes": data}
+            except Exception as exc:
+                _record_attempt(attempts, "ARQUIVO_PT", source_url=source_url, timestamp=timestamp, archive_url=archive_url, error=str(exc))
+    return {"status": "BLOCKED"}
+
+
 def fetch_wayback_target() -> dict:
-    """Try multiple legacy/current CSI URL variants; accept only exact frozen bytes."""
+    """Try multiple web archives; accept only exact frozen bytes."""
     import urllib.parse
     urls = [OFFICIAL_000906, *LEGACY_000906_URLS]
     attempts = []
+    # Internet Archive / Wayback.
     for source_url in urls:
         params = {
             "url": source_url,
@@ -45,11 +97,11 @@ def fetch_wayback_target() -> dict:
             rows = cdx.json()
             if rows and isinstance(rows[0], list) and rows[0] and str(rows[0][0]).lower() == "timestamp":
                 rows = rows[1:]
-            attempts.append({"source_url": source_url, "cdx_status": "OK", "capture_count": len(rows) if isinstance(rows, list) else 0})
+            _record_attempt(attempts, "WAYBACK_CDX", source_url=source_url, cdx_status="OK", capture_count=len(rows) if isinstance(rows, list) else 0)
         except Exception as exc:
-            attempts.append({"source_url": source_url, "cdx_status": "ERROR", "cdx_error": str(exc)})
+            _record_attempt(attempts, "WAYBACK_CDX", source_url=source_url, cdx_status="ERROR", cdx_error=str(exc))
             continue
-        for row in rows:
+        for row in rows if isinstance(rows, list) else []:
             if not isinstance(row, list) or len(row) < 4:
                 continue
             timestamp, original, digest, length = row[:4]
@@ -60,19 +112,76 @@ def fetch_wayback_target() -> dict:
                 resp = requests.get(archive_url, timeout=90, headers={"User-Agent": "Mozilla/5.0"}, allow_redirects=True)
                 data = resp.content
                 got = sha256_bytes(data)
-                attempts.append({
-                    "source_url": source_url,
-                    "timestamp": timestamp,
-                    "archive_url": archive_url,
-                    "http_status": resp.status_code,
-                    "size_bytes": len(data),
-                    "sha256": got,
-                    "expected_match": got == EXPECTED_000906_SHA256,
-                })
+                _record_attempt(attempts, "WAYBACK", source_url=source_url, timestamp=timestamp, archive_url=archive_url, http_status=resp.status_code, size_bytes=len(data), sha256=got, expected_match=(got == EXPECTED_000906_SHA256))
                 if len(data) == EXPECTED_000906_SIZE and got == EXPECTED_000906_SHA256:
-                    return {"status": "PASS", "timestamp": timestamp, "archive_url": archive_url, "size_bytes": len(data), "sha256": got, "attempts": attempts, "bytes": data}
+                    return {"status": "PASS", "timestamp": timestamp, "archive_url": archive_url, "size_bytes": len(data), "sha256": got, "bytes": data, "attempts": attempts}
             except Exception as exc:
-                attempts.append({"source_url": source_url, "timestamp": timestamp, "archive_url": archive_url, "error": str(exc)})
+                _record_attempt(attempts, "WAYBACK", source_url=source_url, timestamp=timestamp, archive_url=archive_url, error=str(exc))
+    # Arquivo.pt.
+    arquivo = fetch_archive_pt_target(urls, attempts)
+    if arquivo.get("status") == "PASS":
+        arquivo["attempts"] = attempts
+        return arquivo
+    # Common Crawl: discover recent 2026 collections and pull only indexed exact-URL records.
+    try:
+        info = requests.get("https://index.commoncrawl.org/collinfo.json", timeout=60, headers={"User-Agent": "Mozilla/5.0"})
+        info.raise_for_status()
+        collections = [c for c in info.json() if str(c.get("id", "")).startswith("CC-MAIN-2026-")]
+        collections = sorted(collections, key=lambda c: str(c.get("id")), reverse=True)
+        _record_attempt(attempts, "COMMONCRAWL_INDEX", status="OK", collection_count=len(collections))
+    except Exception as exc:
+        _record_attempt(attempts, "COMMONCRAWL_INDEX", status="ERROR", error=str(exc))
+        collections = []
+    for collection in collections:
+        index_id = str(collection.get("id"))
+        index_url = str(collection.get("cdx-api"))
+        if not index_url:
+            continue
+        for source_url in urls:
+            try:
+                params = {"url": source_url, "output": "json", "filter": "status:200", "collapse": "digest"}
+                cdx_resp = requests.get(index_url, params=params, timeout=60, headers={"User-Agent": "Mozilla/5.0"})
+                if cdx_resp.status_code != 200:
+                    _record_attempt(attempts, "COMMONCRAWL_CDX", collection=index_id, source_url=source_url, http_status=cdx_resp.status_code)
+                    continue
+                rows = [json.loads(line) for line in cdx_resp.text.splitlines() if line.strip()]
+                _record_attempt(attempts, "COMMONCRAWL_CDX", collection=index_id, source_url=source_url, http_status=cdx_resp.status_code, capture_count=len(rows))
+            except Exception as exc:
+                _record_attempt(attempts, "COMMONCRAWL_CDX", collection=index_id, source_url=source_url, error=str(exc))
+                continue
+            for row in rows:
+                try:
+                    length = int(row.get("length", 0))
+                    offset = int(row.get("offset", 0))
+                    filename = row["filename"]
+                    original = row.get("url", source_url)
+                    timestamp = row.get("timestamp")
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if length < 1:
+                    continue
+                warc_url = "https://data.commoncrawl.org/" + filename
+                try:
+                    resp = requests.get(warc_url, headers={"Range": f"bytes={offset}-{offset+length-1}", "User-Agent": "Mozilla/5.0"}, timeout=120)
+                    if resp.status_code not in (200, 206):
+                        _record_attempt(attempts, "COMMONCRAWL_RECORD", collection=index_id, original=original, timestamp=timestamp, http_status=resp.status_code)
+                        continue
+                    blob = resp.content
+                    try:
+                        import gzip
+                        blob = gzip.decompress(blob)
+                    except (OSError, EOFError):
+                        pass
+                    h1 = blob.find(b"\r\n\r\n")
+                    http_payload = blob[h1+4:] if h1 >= 0 else blob
+                    h2 = http_payload.find(b"\r\n\r\n")
+                    payload = http_payload[h2+4:] if h2 >= 0 else http_payload
+                    got = sha256_bytes(payload)
+                    _record_attempt(attempts, "COMMONCRAWL_RECORD", collection=index_id, original=original, timestamp=timestamp, http_status=resp.status_code, size_bytes=len(payload), sha256=got, expected_match=(got == EXPECTED_000906_SHA256))
+                    if len(payload) == EXPECTED_000906_SIZE and got == EXPECTED_000906_SHA256:
+                        return {"status": "PASS", "timestamp": timestamp, "archive_url": warc_url, "size_bytes": len(payload), "sha256": got, "bytes": payload, "attempts": attempts}
+                except Exception as exc:
+                    _record_attempt(attempts, "COMMONCRAWL_RECORD", collection=index_id, original=original, timestamp=timestamp, archive_url=warc_url, error=str(exc))
     return {"status": "BLOCKED", "attempts": attempts}
 
 def post_tushare(token: str, api_name: str, params: dict, fields: str, out: Path, timeout: int = 60) -> dict:
