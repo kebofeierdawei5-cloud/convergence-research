@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/evidence-record-0.1.schema.json",
+  "title": "IIOS Evidence Record v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidence_id",
+    "subject_id",
+    "field_id",
+    "claim_type",
+    "known_at",
+    "retrieved_at",
+    "source_ref",
+    "artifact_id",
+    "content_sha256",
+    "exact_bytes",
+    "provenance_class",
+    "status"
+  ],
+  "properties": {
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "field_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "value": {},
+    "unit": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "observation_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "period": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "published_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "known_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retrieved_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "effective_from": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "effective_to": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "source_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_version": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "source_locator": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "artifact_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "capture_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "exact_bytes": {
+      "const": true
+    },
+    "provenance_class": {
+      "enum": [
+        "SOURCE_VINTAGE_VERIFIED",
+        "EVENT_PUBLICATION_VERIFIED",
+        "VENDOR_PIT_QUERY",
+        "DERIVED_FROM_ADMITTED_RAW",
+        "UNKNOWN"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ADMITTED",
+        "CONDITIONAL",
+        "UNKNOWN",
+        "BLOCKED"
+      ]
+    },
+    "transformation": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "DIRECT",
+            "DERIVED"
+          ]
+        },
+        "code_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "code_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "formula_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "parents": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "quality_notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "license_status": {
+      "enum": [
+        "KNOWN_ALLOWED",
+        "KNOWN_RESTRICTED",
+        "UNKNOWN"
+      ]
+    }
+  }
+}
