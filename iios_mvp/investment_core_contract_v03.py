@@ -146,6 +146,22 @@ def validate_return_gate_v03(return_gate: Any, path: str = "return_gate") -> lis
         errors.append(_err("V03-INVARIANT-RETURN", path, str(exc)))
     return errors
 
+def _serialize_metrics(metrics: dict[str, Any]) -> dict[str, Any]:
+    """Convert exact Decimal metrics to JSON-stable strings without losing precision."""
+    out: dict[str, Any] = {}
+    for key, value in metrics.items():
+        if isinstance(value, Decimal):
+            out[key] = str(value)
+        elif isinstance(value, dict):
+            out[key] = {
+                subkey: (str(subvalue) if isinstance(subvalue, Decimal) else subvalue)
+                for subkey, subvalue in value.items()
+            }
+        else:
+            out[key] = value
+    return out
+
+
 def _position(case: dict[str, Any]) -> Decimal:
     return _dec((case.get("portfolio") or {}).get("position_pct", "0"), "portfolio.position_pct")
 
