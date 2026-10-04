@@ -85,4 +85,4 @@ Reason: prevents double counting.
 
 The proposed return mathematics is internally coherent and blocks the major known failure modes.
 
-The remaining owner-level policy question is whether the 1–3Y target annualized 15% is a hard BUY/ADD gate or a strategy-level target. That choice belongs in the Decision Semantics ADR and must not be inferred merely because the number equals the entry threshold.
+The target-gate ambiguity is resolved for the standard fundamental strategy: Expected Annualized Return_H >= 15% is a hard BUY/ADD qualification condition. A Human override, if ever permitted, must be explicit as a strategy-policy exception and cannot silently repurpose the entry threshold.
