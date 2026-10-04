@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/pit-temporal-semantics-0.1.schema.json",
+  "title": "IIOS PIT Temporal Semantics v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "timezone",
+    "dimensions",
+    "rules",
+    "fail_closed"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "IIOS-PIT-TEMPORAL-0.1"
+    },
+    "timezone": {
+      "const": "+08:00"
+    },
+    "dimensions": {
+      "const": [
+        "published_at",
+        "known_at",
+        "retrieved_at",
+        "effective_from",
+        "effective_to"
+      ]
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pit_knowledge",
+        "effective_interval",
+        "retrieval_substitution",
+        "derived_known_at",
+        "origin_cutoff"
+      ],
+      "properties": {
+        "pit_knowledge": {
+          "const": "known_at <= cutoff"
+        },
+        "effective_interval": {
+          "const": "effective_from <= cutoff AND (effective_to IS NULL OR cutoff < effective_to)"
+        },
+        "retrieval_substitution": {
+          "const": "FORBIDDEN"
+        },
+        "derived_known_at": {
+          "const": "max(parent known_at) unless a stricter frozen rule applies"
+        },
+        "origin_cutoff": {
+          "const": "quarter_end_23:59:59+08:00"
+        }
+      }
+    },
+    "fail_closed": {
+      "const": [
+        "missing_known_at",
+        "future_known_at",
+        "unresolved_conflict",
+        "hash_mismatch",
+        "missing_source_identity",
+        "current_state_substitution",
+        "incomplete_lineage"
+      ]
+    }
+  }
+}
