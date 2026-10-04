@@ -71,6 +71,8 @@ def test_kolun_value_core_is_mixed_and_requires_independent_pipeline_valuation()
     pipeline = next(x for x in result["core_assets"] if x["id"] == "pipeline")
     assert pipeline["derived_economic_profile"] == "innovative_drug_pipeline"
     assert pipeline["recommended_primary_model"] == "rnpv"
+    assert "rnpv" in pipeline["candidate_valuation_models"]
+    assert result["model_route"]["recommended_primary_model"] == "sotp"
     assert pipeline["independent_valuation_required"] is True
 
 
