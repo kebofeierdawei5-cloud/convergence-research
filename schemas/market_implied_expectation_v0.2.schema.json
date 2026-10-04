@@ -1,70 +1,344 @@
 {
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "$id":"https://iios.local/schemas/market-implied-expectation-0.2.schema.json",
-  "title":"IIOS Market Implied Expectation v0.2",
-  "type":"object",
-  "additionalProperties":false,
-  "required":["expectation_id","model_id","market_model","identifiability","stability","candidate_coverage","representation","economic_requirements","observation_basis","assumption_set","evidence_sufficiency","evidence_ids","qualification","qualification_rationale"],
-  "properties":{
-    "expectation_id":{"type":"string","minLength":1},
-    "model_id":{"type":"string","minLength":1},
-    "market_model":{"enum":["forward_pe","ps","pb","ev_ebitda","dcf","ddm","sotp","rnpv"]},
-    "identifiability":{"enum":["IDENTIFIABLE","AMBIGUOUS","UNIDENTIFIABLE","INSUFFICIENT_EVIDENCE"]},
-    "stability":{"enum":["STABLE","UNSTABLE","INSUFFICIENT_EVIDENCE"]},
-    "candidate_coverage":{"enum":["SUFFICIENT","INSUFFICIENT","UNASSESSED"]},
-    "representation":{"enum":["FULL_FEASIBLE_SET","IMPLIED_POINT","IMPLIED_RANGE","CONDITIONAL_IMPLIED_VARIABLE"]},
-    "economic_requirements":{
-      "type":"array","minItems":1,
-      "items":{
-        "type":"object","additionalProperties":false,
-        "required":["economic_variable","unit","basis","period","horizon","accounting_basis","role","evidence_ids"],
-        "properties":{
-          "economic_variable":{"type":"string","minLength":1},
-          "unit":{"type":"string","minLength":1},
-          "basis":{"type":"string","minLength":1},
-          "period":{"type":"string","minLength":1},
-          "horizon":{"type":"string","minLength":1},
-          "accounting_basis":{"type":"string","minLength":1},
-          "role":{"type":"string","minLength":1},
-          "value":{"type":["string","number"]},
-          "range_low":{"type":["string","number"]},
-          "range_high":{"type":["string","number"]},
-          "evidence_ids":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/market-implied-expectation-0.2.schema.json",
+  "title": "IIOS Market Implied Expectation v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "expectation_id",
+    "model_id",
+    "market_model",
+    "identifiability",
+    "stability",
+    "candidate_coverage",
+    "representation",
+    "economic_requirements",
+    "observation_basis",
+    "assumption_set",
+    "evidence_sufficiency",
+    "evidence_ids",
+    "qualification",
+    "qualification_rationale"
+  ],
+  "properties": {
+    "expectation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "market_model": {
+      "enum": [
+        "forward_pe",
+        "ps",
+        "pb",
+        "ev_ebitda",
+        "dcf",
+        "ddm",
+        "sotp",
+        "rnpv"
+      ]
+    },
+    "identifiability": {
+      "enum": [
+        "IDENTIFIABLE",
+        "AMBIGUOUS",
+        "UNIDENTIFIABLE",
+        "INSUFFICIENT_EVIDENCE"
+      ]
+    },
+    "stability": {
+      "enum": [
+        "STABLE",
+        "UNSTABLE",
+        "INSUFFICIENT_EVIDENCE"
+      ]
+    },
+    "candidate_coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "scope_basis",
+        "candidate_model_ids",
+        "evidence_ids",
+        "rationale"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "SUFFICIENT",
+            "INSUFFICIENT",
+            "UNASSESSED"
+          ]
         },
-        "oneOf":[{"required":["value"]},{"required":["range_low","range_high"]}]
-      }
-    },
-    "observation_basis":{
-      "type":"object","additionalProperties":false,
-      "required":["price_observation_id","observation_date","cutoff_date","currency","adjustment_semantics"],
-      "properties":{
-        "price_observation_id":{"type":"string","minLength":1},
-        "observation_date":{"type":"string","format":"date"},
-        "cutoff_date":{"type":"string","format":"date"},
-        "currency":{"type":"string","minLength":1},
-        "adjustment_semantics":{"type":"string","minLength":1}
-      }
-    },
-    "assumption_set":{
-      "type":"array",
-      "items":{
-        "type":"object","additionalProperties":false,
-        "required":["variable","value","unit","basis","period","horizon","accounting_basis","evidence_ids"],
-        "properties":{
-          "variable":{"type":"string","minLength":1},
-          "value":{"type":["string","number"]},
-          "unit":{"type":"string","minLength":1},
-          "basis":{"type":"string","minLength":1},
-          "period":{"type":"string","minLength":1},
-          "horizon":{"type":"string","minLength":1},
-          "accounting_basis":{"type":"string","minLength":1},
-          "evidence_ids":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}
+        "scope_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_model_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
-    "evidence_sufficiency":{"type":"boolean"},
-    "evidence_ids":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}},
-    "qualification":{"enum":["DECISION_GRADE","CONDITIONAL_ONLY","BLOCKED"]},
-    "qualification_rationale":{"type":"string","minLength":1}
+    "representation": {
+      "enum": [
+        "FULL_FEASIBLE_SET",
+        "IMPLIED_POINT",
+        "IMPLIED_RANGE",
+        "CONDITIONAL_IMPLIED_VARIABLE"
+      ]
+    },
+    "economic_requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "economic_variable",
+          "unit",
+          "basis",
+          "period",
+          "horizon",
+          "accounting_basis",
+          "role",
+          "evidence_ids"
+        ],
+        "properties": {
+          "economic_variable": {
+            "type": "string",
+            "minLength": 1,
+            "not": {
+              "const": "market_implied_net_profit"
+            }
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "basis": {
+            "type": "string",
+            "minLength": 1
+          },
+          "period": {
+            "type": "string",
+            "minLength": 1
+          },
+          "horizon": {
+            "type": "string",
+            "minLength": 1
+          },
+          "accounting_basis": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "range_low": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "range_high": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "evidence_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "value"
+            ]
+          },
+          {
+            "required": [
+              "range_low",
+              "range_high"
+            ]
+          }
+        ]
+      }
+    },
+    "observation_basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "price_observation_id",
+        "observation_date",
+        "cutoff_date",
+        "currency",
+        "adjustment_semantics"
+      ],
+      "properties": {
+        "price_observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "cutoff_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adjustment_semantics": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "assumption_set": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "variable",
+          "value",
+          "unit",
+          "basis",
+          "period",
+          "horizon",
+          "accounting_basis",
+          "evidence_ids"
+        ],
+        "properties": {
+          "variable": {
+            "type": "string",
+            "minLength": 1,
+            "not": {
+              "const": "market_implied_net_profit"
+            }
+          },
+          "value": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "basis": {
+            "type": "string",
+            "minLength": 1
+          },
+          "period": {
+            "type": "string",
+            "minLength": 1
+          },
+          "horizon": {
+            "type": "string",
+            "minLength": 1
+          },
+          "accounting_basis": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "evidence_sufficiency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "rationale",
+        "evidence_ids"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "SUFFICIENT",
+            "INSUFFICIENT",
+            "UNASSESSED"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "evidence_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "qualification": {
+      "enum": [
+        "DECISION_GRADE",
+        "CONDITIONAL_ONLY",
+        "BLOCKED"
+      ]
+    },
+    "qualification_rationale": {
+      "type": "string",
+      "minLength": 1
+    }
   }
 }
