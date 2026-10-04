@@ -7,7 +7,7 @@ import hashlib
 import json
 from typing import Any
 
-ENGINE_VERSION = "0.1.1"
+ENGINE_VERSION = "0.2.0"
 ACTIONS = ("BUY", "ADD", "HOLD", "REDUCE", "EXIT", "NO-BUY")
 
 
@@ -229,18 +229,34 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
     expected_return = base_value / current_price - Decimal("1")
     bear_loss = bear_value / current_price - Decimal("1")
 
-    implied_multiple = dec(valuation.get("market_implied_multiple", valuation["base_multiple"]), "valuation.market_implied_multiple")
-    market_cap = current_price * shares
-    implied_net_profit = market_cap / implied_multiple
-    forecast_net_profit = dec(forecast["base"]["net_profit"], "forecast.base.net_profit")
-    expectation_gap = forecast_net_profit / implied_net_profit - Decimal("1")
+    from .market_expectation import identify_market_model, compute_expectation_gap, compute_probability_payoff, compute_position_size
+    market_model = identify_market_model(valuation, forecast, intrinsic)
+    market_expectation = None
+    if market_model["status"] == "PASS" and market_model["identifiability"]["status"] == "IDENTIFIABLE":
+        candidate = market_model["market_model_set"][0]
+        lo, hi = candidate["implied_multiple_range"]
+        market_multiple = (Decimal(str(lo)) + Decimal(str(hi))) / Decimal("2")
+        if candidate["model"] == "forward_pe":
+            market_expectation = Decimal(str(current_price * shares / market_multiple / shares))
+        else:
+            market_expectation = Decimal(str(current_price))
+    if market_expectation is not None:
+        gap = compute_expectation_gap(current_price, base_value, market_expectation)
+        expectation_gap = Decimal(str(gap["expectation_gap_pct"])) / Decimal("100")
+    else:
+        expectation_gap = Decimal("0")
 
     trust_status = str(case["trust"].get("status", "UNKNOWN")).upper()
     thesis_status = str(case["thesis"].get("status", "WATCH")).upper()
     position = dec(portfolio.get("position_pct", 0), "portfolio.position_pct")
     can_add = bool(portfolio.get("can_add", True))
 
-    value_gap_pass = expected_return >= required_return and expectation_gap > 0 and bear_loss >= -max_loss
+    probability_payoff = None
+    position_size = None
+    if valuation.get("scenario_values"):
+        probability_payoff = compute_probability_payoff(valuation["scenario_values"], current_price)
+        position_size = compute_position_size(Decimal(str(probability_payoff["edge"])), Decimal(str(probability_payoff["win_probability"])), Decimal(str(probability_payoff["payoff_ratio"])), portfolio, risk)
+    value_gap_pass = (market_model["status"] == "PASS" and market_model["identifiability"]["status"] == "IDENTIFIABLE" and expected_return >= required_return and expectation_gap > 0 and bear_loss >= -max_loss and (probability_payoff is None or probability_payoff["edge"] > 0))
     new_buy_add_allowed = validation["status"] == "PASS" and trust_status == "PASS" and thesis_status != "BROKEN" and value_gap_pass
 
     if thesis_status == "BROKEN":
@@ -308,10 +324,10 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
             "expected_return_pct": pct(expected_return * 100),
             "required_return_pct": float(required_return * 100),
             "bear_loss_pct": pct(bear_loss * 100),
-            "market_implied_multiple": float(implied_multiple),
-            "market_implied_net_profit": float(implied_net_profit),
-            "base_forecast_net_profit": float(forecast_net_profit),
-            "expectation_gap_pct": pct(expectation_gap * 100),
+            "market_model_identification": market_model,
+            "expectation_gap": gap if market_expectation is not None else None,
+            "probability_payoff": probability_payoff,
+            "position_size": position_size,
         },
         "risk": {
             "max_loss_limit_pct": float(max_loss * 100),
