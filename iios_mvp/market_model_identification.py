@@ -382,6 +382,7 @@ def _identify(
             competing_model_ids=feasible[1:],
             evidence_ids=evidence_ids,
             rationale="Multiple candidate models remain materially feasible under the same evidence boundary.",
+        )
     elif len(feasible) == 1 and insufficient:
         result = IdentifiabilityResult(
             state=IdentifiabilityState.INSUFFICIENT_EVIDENCE,
@@ -399,7 +400,6 @@ def _identify(
             competing_model_ids=(),
             evidence_ids=evidence_ids,
             rationale="Exactly one candidate model has sufficient historical evidence and current consistency.",
-        )
         )
     elif insufficient:
         result = IdentifiabilityResult(
