@@ -368,7 +368,7 @@ def _solve_ddm_primary(
         raise ValueError("DDM growth must be > -1")
     if discount_rate <= growth:
         raise ValueError("DDM discount_rate must be > growth")
-    price = items[0].price
+    price = _market_context(items)[0]
     implied_dividend = price * (discount_rate - growth) / (Decimal("1") + growth)
 
     diagnostics = {
@@ -418,9 +418,8 @@ def _solve_sotp_primary(
     if len(units) != 1:
         raise ValueError("SOTP segment units must match")
 
-    market_cap = (
-        items[0].price * items[0].shares_outstanding
-    )
+    market_price, shares_outstanding, _ = _market_context(items)
+    market_cap = market_price * shares_outstanding
     implied_residual = market_cap - segment_total
     return implied_residual, {
         "segment_total": segment_total,
@@ -499,7 +498,8 @@ def _solve_rnpv_primary(
 
     if factor <= 0:
         raise ValueError("rNPV risk-adjusted factor must be > 0")
-    enterprise_value = items[0].price * items[0].shares_outstanding + items[0].net_debt
+    market_price, shares_outstanding, net_debt = _market_context(items)
+    enterprise_value = market_price * shares_outstanding + net_debt
     residual_value = enterprise_value - base_value
     if residual_value < Decimal("0"):
         raise ValueError("rNPV market value is below stated base_value")
@@ -517,17 +517,47 @@ def _solve_rnpv_primary(
     )))
 
 
+def _model_specific_items(
+    family: MarketModelFamily,
+    items: Sequence[MarketValuationObservation],
+) -> tuple[MarketValuationObservation, ...]:
+    allowed = set(COMPLEX_REQUIRED_OBSERVABLES[family])
+    if family == MarketModelFamily.SOTP:
+        allowed = {"segment_value"}
+    selected = tuple(
+        item for item in items
+        if item.economic_variable in allowed
+    )
+    if not selected:
+        raise LookupError(f"missing {family.value} model observations")
+    return selected
+
+
+def _market_context(
+    items: Sequence[MarketValuationObservation],
+) -> tuple[Decimal, Decimal, Decimal]:
+    prices = {item.price for item in items}
+    shares = {item.shares_outstanding for item in items}
+    net_debts = {item.net_debt for item in items}
+    if len(prices) != 1:
+        raise ValueError("model observations at the same date must share one market price")
+    if len(shares) != 1:
+        raise ValueError("model observations at the same date must share one share-count anchor")
+    if len(net_debts) != 1:
+        raise ValueError("model observations at the same date must share one net-debt anchor")
+    return next(iter(prices)), next(iter(shares)), next(iter(net_debts))
+
+
 def _solve_complex_primary(
     family: MarketModelFamily,
     items: Sequence[MarketValuationObservation],
 ) -> tuple[Decimal, dict[str, Decimal], tuple[str, ...]]:
-    price = items[0].price
-    shares = items[0].shares_outstanding
-    net_debt = items[0].net_debt
+    model_items = _model_specific_items(family, items)
+    price, shares, net_debt = _market_context(model_items)
 
     # The solver helpers accept price/shares/net debt as internal entries so
     # existing typed observations remain unchanged.
-    augmented = tuple(items) + (
+    augmented = model_items + (
         MarketValuationObservation(
             observation_id="__price",
             observation_date=items[0].observation_date,
