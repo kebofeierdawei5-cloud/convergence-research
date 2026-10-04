@@ -335,3 +335,46 @@ def test_stability_observation_can_be_stable_without_selected_model():
         selected_model_id=None,
     )
     observation.validate()
+
+def test_one_feasible_model_plus_unevaluable_competitor_is_insufficient_evidence():
+    pe = candidate("pe-1", MarketModelFamily.FORWARD_PE, "forward_eps")
+    dcf = CandidateMarketModel(
+        model_id="dcf-1",
+        family=MarketModelFamily.DCF,
+        required_economic_variables=(
+            "fcf", "growth", "margin", "reinvestment", "terminal_value",
+        ),
+        required_observable_variables=(
+            "fcf", "growth", "margin", "reinvestment", "terminal_value",
+        ),
+        evidence_ids=("e2",),
+        admission_basis="candidate DCF evidence exists but solver is not implemented",
+        inverse_solvable=True,
+    )
+    observations = (
+        obs("h1", 1, "100", "5", "forward_eps"),
+        obs("h2", 15, "120", "5", "forward_eps"),
+        obs("h3", 30, "140", "5", "forward_eps"),
+        MarketValuationObservation(
+            observation_id="current",
+            observation_date=CUTOFF,
+            known_at=KNOWN,
+            price=Decimal("125"),
+            shares_outstanding=Decimal("100"),
+            economic_variable="forward_eps",
+            economic_value=Decimal("5"),
+            unit="CNY/share",
+            basis="forward",
+            evidence_ids=("e1",),
+            source="test-fixture",
+        ),
+    )
+    result = identify_market_models(
+        base_input(
+            [pe, dcf],
+            observations,
+            [ev("e1", "forward_eps"), ev("e2", "fcf")],
+        )
+    )
+    assert result["identifiability"].state.value == "INSUFFICIENT_EVIDENCE"
+    assert result["identifiability"].selected_model_id is None
