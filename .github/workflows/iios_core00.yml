@@ -12,6 +12,8 @@ on:
       - "tests/test_core00_scope.py"
       - ".github/workflows/iios_core00.yml"
       - ".github/workflows/iios_mvp.yml"
+      - ".github/workflows/iios_fm00.yml"
+      - "docs/iios/CORE_00_ACCEPTANCE_2026-10-04.md"
   push:
     branches: [main]
     paths:
