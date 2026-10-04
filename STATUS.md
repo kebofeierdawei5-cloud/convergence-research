@@ -33,6 +33,18 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Trust / Quality fail closed; Value Core and drivers require evidence-domain binding
 - A02 / CSI800 / CSI Industry remain Research Track only
 
+## Real 300750 CORE-02 Run
+
+- Case: `RC-CN-A-300750-20261004`
+- Input: 300750 / As-of 2026-10-04 / Position 0%
+- Real evidence: 7 case-bound capture artifacts
+- CORE-02 CI real-case execution: **PASS**
+- Runtime output status: **CONDITIONAL**
+- Evidence admission: **7/7 ADMITTED**
+- Market observation bound to latest pre-cutoff trading day: 2026-09-30 close **291.11 CNY**
+- Quality remains CONDITIONAL because incremental ROIC and full earnings/cash-flow conversion bridges are not yet fully constructed.
+- No fabricated company name, forecast, valuation or decision was introduced.
+
 ## CORE-02 Completed Boundary
 
 - CORE-02 is **PASS / MERGED** on canonical `main`.
