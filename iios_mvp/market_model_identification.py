@@ -1084,27 +1084,62 @@ def _stability(
     )
     historical = sorted(
         (item for item in inp.observations if item.observation_date < current_observation_date),
-        key=lambda x: x.observation_date,
+        key=lambda x: (x.observation_date, x.known_at, x.observation_id),
     )
 
-    # Leave-one-out stability requires at least one admissible perturbed
-    # window in addition to the full historical window.
-    if len(historical) <= inp.stability_min_historical_points:
-        result = StabilityResult(
-            state=StabilityState.INSUFFICIENT_EVIDENCE,
-            assessment_method="leave_one_out_historical_window",
-            observations=(),
-            evidence_ids=full_ident.evidence_ids,
-            rationale=f"requires at least {inp.stability_min_historical_points} historical observations",
-        )
-        result.validate()
-        return result
-
-    windows = [historical]
-    for index in range(len(historical)):
-        remaining = historical[:index] + historical[index + 1:]
-        if len(remaining) >= inp.stability_min_historical_points:
-            windows.append(remaining)
+    # Complex models are multi-variable observations: a historical date is the
+    # perturbation unit. Dropping one row would create an artificial missing-
+    # variable failure rather than test temporal/regime stability.
+    date_grouped = any(candidate.family in COMPLEX_FAMILIES for candidate in inp.candidates)
+    if date_grouped:
+        grouped: dict[date, tuple[MarketValuationObservation, ...]] = {}
+        for item in historical:
+            grouped.setdefault(item.observation_date, tuple())
+            grouped[item.observation_date] = grouped[item.observation_date] + (item,)
+        perturbation_units = [
+            (observation_date, items)
+            for observation_date, items in sorted(grouped.items())
+        ]
+        unit_count = len(perturbation_units)
+        full_window = historical
+        if unit_count <= inp.stability_min_historical_points:
+            result = StabilityResult(
+                state=StabilityState.INSUFFICIENT_EVIDENCE,
+                assessment_method="leave_one_out_historical_date",
+                observations=(),
+                evidence_ids=full_ident.evidence_ids,
+                rationale=f"requires at least {inp.stability_min_historical_points} historical dates",
+            )
+            result.validate()
+            return result
+        windows = [full_window]
+        window_labels = ["full historical set"]
+        for observation_date, _items in perturbation_units:
+            remaining = tuple(
+                item for item in historical
+                if item.observation_date != observation_date
+            )
+            if len({item.observation_date for item in remaining}) >= inp.stability_min_historical_points:
+                windows.append(remaining)
+                window_labels.append(f"leave out historical date {observation_date.isoformat()}")
+    else:
+        if len(historical) <= inp.stability_min_historical_points:
+            result = StabilityResult(
+                state=StabilityState.INSUFFICIENT_EVIDENCE,
+                assessment_method="leave_one_out_historical_window",
+                observations=(),
+                evidence_ids=full_ident.evidence_ids,
+                rationale=f"requires at least {inp.stability_min_historical_points} historical observations",
+            )
+            result.validate()
+            return result
+        windows = [historical]
+        window_labels = ["full historical set"]
+        for index in range(len(historical)):
+            remaining = historical[:index] + historical[index + 1:]
+            if len(remaining) >= inp.stability_min_historical_points:
+                windows.append(remaining)
+                window_labels.append(f"leave out {historical[index].observation_id}")
 
     observations: list[StabilityObservation] = []
     state_signature: list[tuple[str, tuple[str, ...]]] = [
