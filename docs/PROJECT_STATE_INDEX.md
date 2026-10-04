@@ -20,7 +20,7 @@ CORE-01 Single Company Research Intake = NEXT
 
 ## Authority / continuity
 
-1. Git repository `main): source, contracts, tests, ADRs, changelog, state indexes.
+1. Git repository `main`: source, contracts, tests, ADRs, changelog, state indexes.
 2. Frozen governance artifact identity + evidence: `governance/g2-r10-reference/`.
 3. Investment Core contract: `docs/iios/IIOS_INVESTMENT_CORE_CONTRACT_v0.3.md`.
 4. CORE-00 scope authority: `docs/iios/CORE_00_SCOPE_RECONCILIATION_v0.1.md`.
