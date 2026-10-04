@@ -116,3 +116,71 @@ def test_requirement_point_and_range_are_mutually_exclusive():
             accounting_basis="reported", role="IMPLIED_PRIMARY", value=Decimal("100"),
             range_low=Decimal("90"), range_high=Decimal("110"), evidence_ids=("e",)
         ).validate()
+from pathlib import Path
+import json
+from jsonschema import Draft202012Validator
+
+
+def test_caller_supplied_decision_grade_field_is_rejected_at_typed_boundary():
+    from iios_mvp.market_implied_expectation import MarketImpliedExpectation
+
+    result = make()
+    forged = MarketImpliedExpectation(
+        expectation_id=result.expectation_id,
+        model_id=result.model_id,
+        market_model=result.market_model,
+        identifiability=IdentifiabilityState.AMBIGUOUS,
+        stability=result.stability,
+        candidate_coverage=result.candidate_coverage,
+        representation=result.representation,
+        economic_requirements=result.economic_requirements,
+        observation_basis=result.observation_basis,
+        assumption_set=result.assumption_set,
+        evidence_sufficiency=result.evidence_sufficiency,
+        evidence_ids=result.evidence_ids,
+        qualification=MIEQualification.DECISION_GRADE,
+        qualification_rationale="forged",
+    )
+    with pytest.raises(ValueError, match="qualification mismatch"):
+        forged.validate()
+
+
+def test_p4a_json_schema_rejects_unknown_top_level_field():
+    schema_path = Path(__file__).resolve().parents[1] / "schemas" / "market_implied_expectation_v0.2.schema.json"
+    schema = json.loads(schema_path.read_text())
+    validator = Draft202012Validator(schema)
+    base = {
+        "expectation_id": "mie-schema",
+        "model_id": "pe-1",
+        "market_model": "forward_pe",
+        "identifiability": "IDENTIFIABLE",
+        "stability": "STABLE",
+        "candidate_coverage": "SUFFICIENT",
+        "representation": "IMPLIED_POINT",
+        "economic_requirements": [{
+            "economic_variable": "forward_eps",
+            "unit": "CNY/share",
+            "basis": "forward",
+            "period": "NTM",
+            "horizon": "12M",
+            "accounting_basis": "reported",
+            "role": "IMPLIED_PRIMARY",
+            "value": "10",
+            "evidence_ids": ["ev-var"],
+        }],
+        "observation_basis": {
+            "price_observation_id": "price-1",
+            "observation_date": "2026-10-04",
+            "cutoff_date": "2026-10-04",
+            "currency": "CNY",
+            "adjustment_semantics": "UNADJUSTED",
+        },
+        "assumption_set": [],
+        "evidence_sufficiency": True,
+        "evidence_ids": ["ev-var"],
+        "qualification": "DECISION_GRADE",
+        "qualification_rationale": "valid schema instance",
+    }
+    assert list(validator.iter_errors(base)) == []
+    forged = dict(base, market_implied_net_profit="forbidden")
+    assert any("additional properties" in error.message.lower() for error in validator.iter_errors(forged))
