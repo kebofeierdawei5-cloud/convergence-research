@@ -409,11 +409,19 @@ def test_three_historical_points_without_leave_one_out_window_are_insufficient_f
     assert result["stability"].state.value == "INSUFFICIENT_EVIDENCE"
 
 
-def complex_evidence(eid: str, variable: str, unit: str = "CNY") -> MarketObservableEvidence:
+def complex_evidence(eid: str, variable: str, unit: str | None = None) -> MarketObservableEvidence:
+    resolved_unit = (
+        unit
+        if unit is not None
+        else "years" if variable == "timing"
+        else "CNY/share" if variable == "dividend"
+        else "ratio" if variable in {"probability", "growth", "discount_rate", "margin", "reinvestment", "payout"}
+        else "CNY"
+    )
     return MarketObservableEvidence(
         evidence_id=eid,
         variable=variable,
-        unit=unit,
+        unit=resolved_unit,
         basis="complex-model-fixture",
         observation_date=CUTOFF,
         known_at=KNOWN,
