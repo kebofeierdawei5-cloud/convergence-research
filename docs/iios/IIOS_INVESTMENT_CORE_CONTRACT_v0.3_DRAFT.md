@@ -166,3 +166,38 @@ These belong to subsequent B1 Decision Semantics / B5 / B6 contracts.
 PROPOSED — SEMANTIC SUCCESSOR DRAFT
 
 Implementation/schema changes require owner approval of the complete B1 semantic package.
+
+
+## 18. Decision semantics
+
+Supported actions:
+BUY / ADD / HOLD / REDUCE / EXIT / NO-BUY / WATCH / REVIEW_REQUIRED.
+
+HOLD is intentional retention of an existing position after current forward economics are assessed. It is never the default for UNKNOWN.
+
+REVIEW_REQUIRED is the action for unresolved material semantic, evidence, Trust, PIT, valuation, forecast or policy contradictions. It permits no new capital, no automatic execution and no automatic liquidation. Human review is required.
+
+Trust and Investability are distinct:
+- Trust asks whether company/evidence is reliable enough for capital commitment.
+- Investability asks whether the current opportunity is suitable under valuation, return, risk, liquidity, portfolio and execution constraints.
+
+Portfolio Constraint is a permission/position layer. It may block or cap allocation and may require reduction of an over-limit position, but it cannot change intrinsic value, Expected Return, Quality or Thesis.
+
+MIE is non-mandatory for BUY/ADD in v0.3. Its absence or ambiguity does not itself veto a direct company-side opportunity. A material qualified contradiction may trigger REVIEW_REQUIRED only under an explicit decision-policy materiality rule.
+
+Standard fundamental BUY/ADD return conditions are conjunctive:
+- Entry Return Cushion >= 15%;
+- Expected Annualized Return_H >= 15%;
+- Expected Annualized Return_H >= Required Return;
+- all mandatory Trust/PIT/forecast/valuation/risk/portfolio gates pass;
+- complete position package exists.
+
+No additive threshold is allowed. The two 15% values remain independent policies.
+
+Unknown semantics: UNKNOWN upstream states never silently become HOLD. Trust/Portfolio/Required Return/material Forecast UNKNOWN normally route to REVIEW_REQUIRED and block new capital. MIE UNKNOWN does not itself block BUY/ADD in v0.3.
+
+Current-position decisions use current forward economics and current decision price, not historical cost basis.
+
+Action precedence is deterministic and defined in B1 Decision Semantics ADR v0.3.
+
+Human override preserves the original AI decision and records the override field, reason, scope and timestamp. No action authorizes automatic trading.
