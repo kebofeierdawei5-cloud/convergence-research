@@ -13,7 +13,8 @@
 - Batch 1-B Company Value Core: MERGED
 - Human-authoritative Company Valuation Model Selection: MERGED
 - Batch 2 Market Model Identification v0.1: OPEN / RED-TEAM BLOCKED / NOT CURRENT CAPABILITY
-- Investment Core semantic contract v0.2: FROZEN
+- Investment Core semantic contract v0.2: FROZEN / SEMANTIC PASS
+- P2-A machine schema + executable invariants: **FINAL PASS / MERGED**
 - Production investment decision kernel: NOT YET
 
 ## Return Target
@@ -46,12 +47,30 @@ The frozen contract separates:
 - FM-02: WAITING FOR EXACT SOURCE ADMISSION
 - Production forecast router: FALSE
 
+## P2-A Final Acceptance
+
+P2-A is formally **FINAL PASS** on canonical `main`.
+
+- PR #5: MERGED
+- P2-A pre-merge HEAD: `ec208f347fde64b08694d181d8ee8cf2f433e7ed`
+- CI run #70 / `37183859358`: **SUCCESS**
+- merge commit: `203aed6ce22c5ed34dfa4aba4639de3dde0801b8`
+- acceptance record: `docs/iios/P2A_FINAL_ACCEPTANCE_2026-10-04.md`
+
+P2-A proves the machine-readable v0.2 Contract/invariants and legacy-isolation boundary. It does **not** make the v0.2 decision engine production-capable.
+
 ## Immediate Next Engineering Step
 
-Implement against the frozen Investment Core Contract v0.2.
+**P2-B / Market Model Identification v0.2 foundation.**
 
-First implementation target:
+Shortest path:
 
-**P2 / Market-side architecture preparation — evidence-backed Market Model Identification v0.2**, with Company Value Core hardening in parallel where it is necessary for real-company acceptance.
+`Market Observable Evidence
+→ Candidate Market Models
+→ Canonical Model-Specific Test Cases
+→ Feasible Solution Set Interface
+→ Conservative Identifiability / Stability Interfaces`
 
-Do not resume or merge the blocked Batch 2 v0.1 implementation.
+Then proceed to Market Implied Expectation → Expectation Gap → Return/Decision integration.
+
+Do not resume or merge the blocked Batch 2 v0.1 PR #3.
