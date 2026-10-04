@@ -137,12 +137,13 @@ def dcf_input(
     candidate_item: CandidateMarketModel | None = None,
     *,
     current_price: str = "2100",
+    fcf_value: str = "100",
 ) -> MarketModelIdentificationInput:
     c = candidate_item or dcf_candidate()
     rows: list[MarketValuationObservation] = []
     evidence: list[MarketObservableEvidence] = []
     variables = (
-        ("fcf", "100", "CNY", "fcff"),
+        ("fcf", fcf_value, "CNY", "fcff"),
         ("growth", "0.05", "ratio", "assumption"),
         ("margin", "0.40", "ratio", "assumption"),
         ("reinvestment", "0.25", "ratio", "assumption"),
@@ -258,7 +259,7 @@ def test_conditional_mie_does_not_claim_a_full_multidimensional_feasible_space()
 def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner():
     dcf = dcf_candidate()
     ddm = ddm_candidate()
-    dcf_inp = dcf_input(dcf, current_price="105")
+    dcf_inp = dcf_input(dcf, current_price="105", fcf_value="5")
     ddm_inp = ddm_input(ddm, id_prefix="ddm-", current_price="105")
     combined = MarketModelIdentificationInput(
         cutoff_date=CUTOFF,
