@@ -141,7 +141,7 @@
   },
   "market_evidence": {
     "evidence_id": "E008",
-    "known_at": "2026-09-29T23:59:00+08:00",
+    "known_at": "2026-09-29",
     "retrieved_at": "2026-10-04T00:00:00+08:00",
     "content_sha256": "70ca1ac344c869754b790f8ba1ed6087ede879c71fa848f651a59f5c71fe3be1",
     "exact_bytes": true,
@@ -153,7 +153,7 @@
   "forecast_evidence": [
     {
       "evidence_id": "E009",
-      "known_at": "2026-03-10T00:00:00+08:00",
+      "known_at": "2026-03-10",
       "retrieved_at": "2026-10-04T00:00:00+08:00",
       "content_sha256": "a6cde5bf99f836083cf4fcb15858c64ca4624a625ace4d3724241caedfafb71f",
       "exact_bytes": true,
@@ -164,7 +164,7 @@
     },
     {
       "evidence_id": "E010",
-      "known_at": "2026-07-24T00:00:00+08:00",
+      "known_at": "2026-07-24",
       "retrieved_at": "2026-10-04T00:00:00+08:00",
       "content_sha256": "ecf6e30e7f560e706bafd422af19308e1b8023b392d76f0b7f0028bd30ec7cca",
       "exact_bytes": true,
