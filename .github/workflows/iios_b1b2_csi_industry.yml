@@ -1,0 +1,65 @@
+name: IIOS B1B2 CSI Industry History Pilot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/iios_b1b2_csi_industry.yml"
+      - "research/a02_b1b/csi_industry_history_pilot.py"
+      - "tests/test_b1b_csi_industry_history_pilot.py"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  csi_industry:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install CSI pilot dependencies
+        run: |
+          python -m pip install --disable-pip-version-check requests==2.32.5 pytest==8.4.2
+
+      - name: Run CSI pilot unit tests
+        run: python -m pytest -q tests/test_b1b_csi_industry_history_pilot.py
+
+      - name: Materialize CSI current security-level route and historical parameter probes
+        continue-on-error: true
+        run: |
+          python research/a02_b1b/csi_industry_history_pilot.py \
+            --out "$RUNNER_TEMP/csi_industry_history" \
+            --page-size 100 \
+            --max-pages 200 \
+            --sleep-seconds 0.25
+
+      - name: Hash CSI pilot evidence
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/csi_industry_history"
+          cd "$RUNNER_TEMP/csi_industry_history"
+          find . -type f -print0 | sort -z | xargs -0 sha256sum > SHA256_MANIFEST.txt
+          printf "repository=%s\nrun_id=%s\nsha=%s\n" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_SHA" > GITHUB_RUN_CONTEXT.txt
+
+      - name: Upload CSI pilot evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: IIOS-B1B2-CSI-industry-history-${{ github.run_id }}
+          path: ${{ runner.temp }}/csi_industry_history
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Report CSI field admission
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          cat "$RUNNER_TEMP/csi_industry_history/CSI_INDUSTRY_FIELD_ADMISSION.json"
