@@ -1,0 +1,384 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/investment-core-case-0.3.schema.json",
+  "title": "IIOS Investment Core Case v0.3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "case_id",
+    "market",
+    "symbol",
+    "company",
+    "as_of_date",
+    "cutoff_date",
+    "current_price_observation",
+    "company_evidence_manifest",
+    "trust",
+    "reality",
+    "forecast",
+    "valuation",
+    "risk",
+    "portfolio",
+    "thesis",
+    "return_gate"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "IIOS-INVESTMENT-CORE-0.3"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "market": {
+      "type": "string",
+      "minLength": 1
+    },
+    "symbol": {
+      "type": "string",
+      "minLength": 1
+    },
+    "company": {
+      "type": "string",
+      "minLength": 1
+    },
+    "as_of_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "cutoff_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "current_price_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "price",
+        "currency",
+        "observed_at",
+        "known_at",
+        "source",
+        "adjustment_semantics"
+      ],
+      "properties": {
+        "price": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?$"
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "known_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adjustment_semantics": {
+          "enum": [
+            "UNADJUSTED",
+            "SPLIT_ADJUSTED",
+            "DIVIDEND_ADJUSTED",
+            "TOTAL_RETURN_ADJUSTED",
+            "OTHER_EXPLICIT"
+          ]
+        },
+        "adjustment_note": {
+          "type": "string"
+        }
+      }
+    },
+    "company_evidence_manifest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "manifest_id"
+      ],
+      "properties": {
+        "manifest_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "trust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PASS",
+            "REVALIDATION",
+            "FAIL",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "reality": {
+      "type": "object"
+    },
+    "forecast": {
+      "type": "object"
+    },
+    "valuation": {
+      "type": "object"
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "status",
+        "max_loss_pct"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "UNKNOWN"
+          ]
+        },
+        "max_loss_pct": {
+          "type": [
+            "string",
+            "number"
+          ]
+        }
+      }
+    },
+    "portfolio": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "position_pct",
+        "constraint_status"
+      ],
+      "properties": {
+        "position_pct": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "constraint_status": {
+          "enum": [
+            "PASS",
+            "BLOCKED",
+            "UNKNOWN"
+          ]
+        },
+        "can_add": {
+          "type": "boolean"
+        },
+        "buy_add_package": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "entry_zone",
+            "initial_position_pct",
+            "target_position_pct",
+            "max_position_pct",
+            "thesis_break_triggers",
+            "monitoring_triggers"
+          ]
+        }
+      }
+    },
+    "thesis": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "INTACT",
+            "WATCH",
+            "BROKEN",
+            "UNKNOWN"
+          ]
+        }
+      }
+    },
+    "return_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry_price",
+        "entry_value_reference",
+        "horizon_years",
+        "buy_entry_return_cushion_threshold",
+        "fundamental_target_annualized_return",
+        "required_return_annualized",
+        "scenarios"
+      ],
+      "properties": {
+        "entry_price": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "entry_value_reference": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "horizon_years": {
+          "type": "string",
+          "pattern": "^(1|1\\.[0-9]+|2|2\\.[0-9]+|3)$"
+        },
+        "buy_entry_return_cushion_threshold": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "fundamental_target_annualized_return": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "required_return_annualized": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "scenarios": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bear",
+            "base",
+            "bull"
+          ],
+          "properties": {
+            "bear": {
+              "$ref": "#/$defs/scenario"
+            },
+            "base": {
+              "$ref": "#/$defs/scenario"
+            },
+            "bull": {
+              "$ref": "#/$defs/scenario"
+            }
+          }
+        }
+      }
+    },
+    "market_implied_expectation": {
+      "type": "object"
+    },
+    "expectation_gap": {
+      "type": "object"
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "decision_status",
+        "investability_status",
+        "primary_reason",
+        "human_approval_required",
+        "auto_execution"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "BUY",
+            "ADD",
+            "HOLD",
+            "REDUCE",
+            "EXIT",
+            "NO-BUY",
+            "WATCH",
+            "REVIEW_REQUIRED"
+          ]
+        },
+        "decision_status": {
+          "enum": [
+            "READY",
+            "BLOCKED",
+            "REVIEW_REQUIRED",
+            "SUPERSEDED"
+          ]
+        },
+        "investability_status": {
+          "enum": [
+            "INVESTABLE",
+            "WATCH",
+            "NOT_INVESTABLE",
+            "UNKNOWN"
+          ]
+        },
+        "primary_reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "human_approval_required": {
+          "const": true
+        },
+        "auto_execution": {
+          "const": false
+        },
+        "position_package_complete": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probability",
+        "terminal_value_per_share",
+        "cash_distributions_per_share",
+        "probability_rationale"
+      ],
+      "properties": {
+        "probability": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "terminal_value_per_share": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "cash_distributions_per_share": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "probability_rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

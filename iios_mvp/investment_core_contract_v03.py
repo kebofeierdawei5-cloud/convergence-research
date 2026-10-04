@@ -1,0 +1,393 @@
+from __future__ import annotations
+
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
+from typing import Any
+
+CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
+BUY_ENTRY_RETURN_CUSHION_THRESHOLD = Decimal("0.15")
+FUNDAMENTAL_TARGET_ANNUALIZED_RETURN = Decimal("0.15")
+
+TRUST_STATES = {"PASS", "REVALIDATION", "FAIL", "UNKNOWN"}
+THESIS_STATES = {"INTACT", "WATCH", "BROKEN", "UNKNOWN"}
+RISK_STATES = {"PASS", "FAIL", "UNKNOWN"}
+PORTFOLIO_CONSTRAINT_STATES = {"PASS", "BLOCKED", "UNKNOWN"}
+INVESTABILITY_STATES = {"INVESTABLE", "WATCH", "NOT_INVESTABLE", "UNKNOWN"}
+DECISION_ACTIONS = {"BUY", "ADD", "HOLD", "REDUCE", "EXIT", "NO-BUY", "WATCH", "REVIEW_REQUIRED"}
+DECISION_STATUSES = {"READY", "BLOCKED", "REVIEW_REQUIRED", "SUPERSEDED"}
+SCENARIOS = ("bear", "base", "bull")
+
+def _err(code: str, path: str, message: str) -> dict[str, str]:
+    return {"code": code, "path": path, "message": message}
+
+def _dec(value: Any, path: str) -> Decimal:
+    try:
+        value = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError) as exc:
+        raise ValueError(f"{path} must be numeric") from exc
+    if not value.is_finite():
+        raise ValueError(f"{path} must be finite")
+    return value
+
+
+def _date(value: Any, path: str) -> date:
+    try:
+        return date.fromisoformat(str(value))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{path} must be ISO date YYYY-MM-DD") from exc
+
+
+def _datetime(value: Any, path: str) -> datetime:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{path} must be ISO datetime") from exc
+
+def _required(obj: dict[str, Any], fields: tuple[str, ...], path: str, errors: list[dict[str, str]]) -> None:
+    for field in fields:
+        if field not in obj or obj[field] is None:
+            errors.append(_err("V03-SCHEMA-REQUIRED", f"{path}.{field}", "required field is missing"))
+
+def _annualize(ratio: Decimal, horizon: Decimal) -> Decimal:
+    if ratio <= 0:
+        raise ValueError("terminal wealth / entry price must be > 0")
+    if horizon <= 0:
+        raise ValueError("horizon_years must be > 0")
+    return (ratio.ln() / horizon).exp() - Decimal("1")
+
+def calculate_return_metrics(return_gate: dict[str, Any]) -> dict[str, Any]:
+    entry = _dec(return_gate["entry_price"], "return_gate.entry_price")
+    entry_ref = _dec(return_gate["entry_value_reference"], "return_gate.entry_value_reference")
+    horizon = _dec(return_gate["horizon_years"], "return_gate.horizon_years")
+    threshold = _dec(return_gate["buy_entry_return_cushion_threshold"], "return_gate.buy_entry_return_cushion_threshold")
+    target = _dec(return_gate["fundamental_target_annualized_return"], "return_gate.fundamental_target_annualized_return")
+    rr = _dec(return_gate["required_return_annualized"], "return_gate.required_return_annualized")
+    if entry <= 0 or entry_ref <= 0:
+        raise ValueError("entry_price and entry_value_reference must be > 0")
+    if horizon < Decimal("1") or horizon > Decimal("3"):
+        raise ValueError("horizon_years must be within [1,3]")
+    if threshold != BUY_ENTRY_RETURN_CUSHION_THRESHOLD:
+        raise ValueError("buy_entry_return_cushion_threshold must equal 15%")
+    if target != FUNDAMENTAL_TARGET_ANNUALIZED_RETURN:
+        raise ValueError("fundamental_target_annualized_return must equal 15%")
+    if rr < Decimal("-1"):
+        raise ValueError("required_return_annualized must be >= -100%")
+
+    scenarios = return_gate["scenarios"]
+    probabilities = []
+    wealth = {}
+    for name in SCENARIOS:
+        item = scenarios[name]
+        p = _dec(item["probability"], f"return_gate.scenarios.{name}.probability")
+        terminal = _dec(item["terminal_value_per_share"], f"return_gate.scenarios.{name}.terminal_value_per_share")
+        distributions = _dec(item["cash_distributions_per_share"], f"return_gate.scenarios.{name}.cash_distributions_per_share")
+        rationale = str(item.get("probability_rationale", "")).strip()
+        if p < 0 or p > 1:
+            raise ValueError(f"return_gate.scenarios.{name}.probability must be in [0,1]")
+        if terminal < 0 or distributions < 0:
+            raise ValueError(f"return_gate.scenarios.{name} terminal value/distributions must be >= 0")
+        if not rationale:
+            raise ValueError(f"return_gate.scenarios.{name}.probability_rationale is required")
+        probabilities.append(p)
+        wealth[name] = terminal + distributions
+    if sum(probabilities, Decimal("0")) != Decimal("1"):
+        raise ValueError("scenario probabilities must sum exactly to 1")
+    expected_wealth = sum(
+        _dec(scenarios[name]["probability"], f"return_gate.scenarios.{name}.probability") * wealth[name]
+        for name in SCENARIOS
+    )
+    total_return = expected_wealth / entry - Decimal("1")
+    annualized_return = _annualize(expected_wealth / entry, horizon)
+    entry_cushion = entry_ref / entry - Decimal("1")
+    mos = Decimal("1") - (entry / entry_ref)
+    entry_pass = entry_cushion >= threshold
+    target_pass = annualized_return >= target
+    rr_pass = annualized_return >= rr
+
+    return {
+        "entry_return_cushion": entry_cushion,
+        "margin_of_safety": mos,
+        "scenario_terminal_wealth": wealth,
+        "expected_terminal_wealth": expected_wealth,
+        "expected_total_return": total_return,
+        "expected_annualized_return": annualized_return,
+        "buy_entry_return_cushion_pass": entry_pass,
+        "fundamental_target_pass": target_pass,
+        "required_return_pass": rr_pass,
+        "return_gate_pass": entry_pass and target_pass and rr_pass,
+    }
+
+def validate_return_gate_v03(return_gate: Any, path: str = "return_gate") -> list[dict[str, str]]:
+    errors: list[dict[str, str]] = []
+    if not isinstance(return_gate, dict):
+        return [_err("V03-SCHEMA-TYPE", path, "must be an object")]
+    fields = (
+        "entry_price", "entry_value_reference", "horizon_years",
+        "buy_entry_return_cushion_threshold", "fundamental_target_annualized_return",
+        "required_return_annualized", "scenarios",
+    )
+    _required(return_gate, fields, path, errors)
+    if errors:
+        return errors
+    scenarios = return_gate["scenarios"]
+    if not isinstance(scenarios, dict):
+        return [_err("V03-SCHEMA-TYPE", f"{path}.scenarios", "must be an object")]
+    for name in SCENARIOS:
+        item = scenarios.get(name)
+        if not isinstance(item, dict):
+            errors.append(_err("V03-SCHEMA-SCENARIO", f"{path}.scenarios.{name}", "must be an object"))
+            continue
+        _required(item, ("probability", "terminal_value_per_share", "cash_distributions_per_share", "probability_rationale"), f"{path}.scenarios.{name}", errors)
+    if errors:
+        return errors
+    try:
+        calculate_return_metrics(return_gate)
+    except ValueError as exc:
+        errors.append(_err("V03-INVARIANT-RETURN", path, str(exc)))
+    return errors
+
+def _serialize_metrics(metrics: dict[str, Any]) -> dict[str, Any]:
+    """Convert exact Decimal metrics to JSON-stable strings without losing precision."""
+    out: dict[str, Any] = {}
+    for key, value in metrics.items():
+        if isinstance(value, Decimal):
+            out[key] = str(value)
+        elif isinstance(value, dict):
+            out[key] = {
+                subkey: (str(subvalue) if isinstance(subvalue, Decimal) else subvalue)
+                for subkey, subvalue in value.items()
+            }
+        else:
+            out[key] = value
+    return out
+
+
+def _position(case: dict[str, Any]) -> Decimal:
+    return _dec((case.get("portfolio") or {}).get("position_pct", "0"), "portfolio.position_pct")
+
+def _portfolio_status(case: dict[str, Any]) -> str:
+    return str((case.get("portfolio") or {}).get("constraint_status", "UNKNOWN")).upper()
+
+def _risk_status(case: dict[str, Any]) -> str:
+    return str((case.get("risk") or {}).get("status", "UNKNOWN")).upper()
+
+def validate_case_v03(case: Any) -> dict[str, Any]:
+    errors: list[dict[str, str]] = []
+    if not isinstance(case, dict):
+        return {"status": "BLOCKED", "errors": [_err("V03-SCHEMA-TYPE", "$", "case must be an object")]}
+    required = (
+        "contract_version", "case_id", "market", "symbol", "company",
+        "as_of_date", "cutoff_date", "current_price_observation",
+        "company_evidence_manifest", "trust", "reality", "forecast",
+        "valuation", "risk", "portfolio", "thesis", "return_gate",
+    )
+    _required(case, required, "$", errors)
+    if errors:
+        return {"status": "BLOCKED", "errors": errors}
+    if case["contract_version"] != CONTRACT_VERSION:
+        errors.append(_err("V03-VERSION-EXACT", "contract_version", f"must equal {CONTRACT_VERSION}"))
+    try:
+        as_of = _date(case["as_of_date"], "as_of_date")
+        cutoff = _date(case["cutoff_date"], "cutoff_date")
+        if as_of > cutoff:
+            errors.append(_err("V03-ASOF-CUTOFF", "as_of_date", "as_of_date cannot be after cutoff_date"))
+    except ValueError as exc:
+        errors.append(_err("V03-DATE", "as_of_date/cutoff_date", str(exc)))
+        cutoff = None
+    try:
+        obs = _datetime(case["current_price_observation"]["observed_at"], "current_price_observation.observed_at")
+        known = _datetime(case["current_price_observation"]["known_at"], "current_price_observation.known_at")
+        if cutoff is not None and obs.date() > cutoff:
+            errors.append(_err("V03-PIT-PRICE", "current_price_observation.observed_at", "price observation occurs after cutoff_date"))
+        if cutoff is not None and known.date() > cutoff:
+            errors.append(_err("V03-PIT-PRICE-KNOWN-AT", "current_price_observation.known_at", "price became known after cutoff_date"))
+    except (KeyError, ValueError) as exc:
+        errors.append(_err("V03-PIT-PRICE", "current_price_observation", str(exc)))
+    try:
+        price = _dec(case["current_price_observation"]["price"], "current_price_observation.price")
+        if price <= 0:
+            errors.append(_err("V03-PRICE-POSITIVE", "current_price_observation.price", "must be > 0"))
+    except (KeyError, ValueError) as exc:
+        errors.append(_err("V03-PRICE", "current_price_observation.price", str(exc)))
+    try:
+        position = _position(case)
+        if position < 0 or position > 100:
+            errors.append(_err("V03-POSITION", "portfolio.position_pct", "must be within [0,100]"))
+    except ValueError as exc:
+        errors.append(_err("V03-POSITION", "portfolio.position_pct", str(exc)))
+    trust = case["trust"]
+    if not isinstance(trust, dict) or str(trust.get("status", "UNKNOWN")).upper() not in TRUST_STATES:
+        errors.append(_err("V03-TRUST", "trust.status", "invalid Trust state"))
+    thesis = case["thesis"]
+    if not isinstance(thesis, dict) or str(thesis.get("status", "UNKNOWN")).upper() not in THESIS_STATES:
+        errors.append(_err("V03-THESIS", "thesis.status", "invalid Thesis state"))
+    risk = case["risk"]
+    if not isinstance(risk, dict) or _risk_status(case) not in RISK_STATES:
+        errors.append(_err("V03-RISK", "risk.status", "invalid Risk state"))
+    portfolio = case["portfolio"]
+    if not isinstance(portfolio, dict) or _portfolio_status(case) not in PORTFOLIO_CONSTRAINT_STATES:
+        errors.append(_err("V03-PORTFOLIO", "portfolio.constraint_status", "invalid Portfolio Constraint state"))
+    errors.extend(validate_return_gate_v03(case["return_gate"]))
+    mie = case.get("market_implied_expectation")
+    if mie is not None and not isinstance(mie, dict):
+        errors.append(_err("V03-MIE-TYPE", "market_implied_expectation", "optional MIE must be an object when supplied"))
+    decision = case.get("decision")
+    if decision is not None:
+        if not isinstance(decision, dict):
+            errors.append(_err("V03-DECISION-TYPE", "decision", "must be an object"))
+        else:
+            action = str(decision.get("action", "")).upper()
+            status = str(decision.get("decision_status", "READY")).upper()
+            if action not in DECISION_ACTIONS:
+                errors.append(_err("V03-ACTION", "decision.action", f"invalid action: {action}"))
+            if status not in DECISION_STATUSES:
+                errors.append(_err("V03-DECISION-STATUS", "decision.decision_status", f"invalid status: {status}"))
+    return {"status": "PASS" if not errors else "BLOCKED", "errors": errors}
+
+def _investability(metrics: dict[str, Any], trust_status: str, portfolio_status: str, risk_status: str, thesis_status: str) -> str:
+    if trust_status == "UNKNOWN" or portfolio_status == "UNKNOWN" or risk_status == "UNKNOWN" or thesis_status == "UNKNOWN":
+        return "UNKNOWN"
+    if trust_status != "PASS":
+        return "NOT_INVESTABLE"
+    if thesis_status == "BROKEN":
+        return "NOT_INVESTABLE"
+    if portfolio_status != "PASS":
+        return "NOT_INVESTABLE"
+    if risk_status != "PASS":
+        return "NOT_INVESTABLE"
+    if metrics["return_gate_pass"]:
+        return "INVESTABLE"
+    if metrics["fundamental_target_pass"] and metrics["required_return_pass"] and not metrics["buy_entry_return_cushion_pass"]:
+        return "WATCH"
+    return "NOT_INVESTABLE"
+
+def decide_v03(case: dict[str, Any]) -> dict[str, Any]:
+    validation = validate_case_v03(case)
+    position = _position(case) if isinstance(case.get("portfolio"), dict) else Decimal("0")
+    trust_status = str((case.get("trust") or {}).get("status", "UNKNOWN")).upper()
+    thesis_status = str((case.get("thesis") or {}).get("status", "UNKNOWN")).upper()
+    risk_status = _risk_status(case)
+    portfolio_status = _portfolio_status(case)
+    metrics = None
+    if validation["status"] == "PASS":
+        try:
+            metrics = calculate_return_metrics(case["return_gate"])
+        except ValueError:
+            metrics = None
+    gates = {
+        "trust": trust_status,
+        "portfolio_constraint": portfolio_status,
+        "risk": risk_status,
+        "thesis": thesis_status,
+        "mie_required_for_buy_add": False,
+        "new_capital_allowed": False,
+    }
+    if metrics is None:
+        action = "REVIEW_REQUIRED"
+        status = "REVIEW_REQUIRED"
+        reason = "RETURN_OR_CASE_VALIDATION_UNRESOLVED"
+        investability = "UNKNOWN"
+    elif thesis_status == "BROKEN":
+        action = "EXIT" if position > 0 else "NO-BUY"
+        status = "READY"
+        reason = "THESIS_BROKEN"
+        investability = "NOT_INVESTABLE"
+    elif trust_status == "UNKNOWN":
+        action = "REVIEW_REQUIRED"
+        status = "REVIEW_REQUIRED"
+        reason = "TRUST_UNKNOWN"
+        investability = "UNKNOWN"
+    elif trust_status != "PASS":
+        action = "NO-BUY" if position == 0 else "REVIEW_REQUIRED"
+        status = "READY" if position == 0 else "REVIEW_REQUIRED"
+        reason = "TRUST_NOT_PASS_NEW_CAPITAL_BLOCKED"
+        investability = "NOT_INVESTABLE"
+    elif portfolio_status == "UNKNOWN":
+        action = "REVIEW_REQUIRED"
+        status = "REVIEW_REQUIRED"
+        reason = "PORTFOLIO_CONSTRAINT_UNKNOWN"
+        investability = "UNKNOWN"
+    elif portfolio_status == "BLOCKED":
+        action = "REDUCE" if position > 0 else "NO-BUY"
+        status = "READY"
+        reason = "PORTFOLIO_CONSTRAINT_BLOCKED"
+        investability = "NOT_INVESTABLE"
+    elif risk_status == "UNKNOWN":
+        action = "REVIEW_REQUIRED"
+        status = "REVIEW_REQUIRED"
+        reason = "RISK_UNKNOWN"
+        investability = "UNKNOWN"
+    elif risk_status == "FAIL":
+        action = "REDUCE" if position > 0 else "NO-BUY"
+        status = "READY"
+        reason = "RISK_GATE_FAILED"
+        investability = "NOT_INVESTABLE"
+    elif metrics["expected_annualized_return"] < 0:
+        action = "REDUCE" if position > 0 else "NO-BUY"
+        status = "READY"
+        reason = "NEGATIVE_EXPECTED_ANNUALIZED_RETURN"
+        investability = "NOT_INVESTABLE"
+    elif position == 0 and metrics["return_gate_pass"]:
+        action = "BUY"
+        status = "READY"
+        reason = "FUNDAMENTAL_RETURN_AND_ENTRY_GATES_PASS"
+        investability = "INVESTABLE"
+        gates["new_capital_allowed"] = True
+    elif position > 0 and metrics["return_gate_pass"] and bool((case.get("portfolio") or {}).get("can_add", True)):
+        action = "ADD"
+        status = "READY"
+        reason = "FUNDAMENTAL_RETURN_AND_ENTRY_GATES_PASS"
+        investability = "INVESTABLE"
+        gates["new_capital_allowed"] = True
+    elif position == 0 and metrics["fundamental_target_pass"] and metrics["required_return_pass"] and not metrics["buy_entry_return_cushion_pass"]:
+        action = "WATCH"
+        status = "READY"
+        reason = "ENTRY_PRICE_OUTSIDE_SAFE_ENTRY_ZONE"
+        investability = "WATCH"
+    elif position > 0 and metrics["expected_annualized_return"] >= 0:
+        action = "HOLD"
+        status = "READY"
+        reason = "CURRENT_OPPORTUNITY_DOES_NOT_JUSTIFY_NEW_CAPITAL"
+        investability = "NOT_INVESTABLE"
+    else:
+        action = "NO-BUY"
+        status = "READY"
+        reason = "FUNDAMENTAL_RETURN_OR_REQUIRED_RETURN_GATE_FAILED"
+        investability = "NOT_INVESTABLE"
+
+    package = (case.get("portfolio") or {}).get("buy_add_package") or {}
+    package_fields = (
+        "entry_zone",
+        "initial_position_pct",
+        "target_position_pct",
+        "max_position_pct",
+        "thesis_break_triggers",
+        "monitoring_triggers",
+    )
+    package_complete = all(field in package for field in package_fields)
+    if action in {"BUY", "ADD"} and not package_complete:
+        action = "REVIEW_REQUIRED"
+        status = "REVIEW_REQUIRED"
+        reason = "BUY_ADD_POSITION_PACKAGE_INCOMPLETE"
+        gates["new_capital_allowed"] = False
+
+    output = {
+        "contract_version": CONTRACT_VERSION,
+        "decision_status": status,
+        "investability_status": investability,
+        "action": action,
+        "primary_reason": reason,
+        "human_approval_required": True,
+        "auto_execution": False,
+        "gates": gates,
+        "position_package_complete": package_complete,
+    }
+    if metrics is not None:
+        output["return_metrics"] = _serialize_metrics(metrics)
+    return output
+
+def assert_valid_v03_case(case: dict[str, Any]) -> None:
+    result = validate_case_v03(case)
+    if result["status"] != "PASS":
+        summary = "; ".join(f'{e["code"]} {e["path"]}: {e["message"]}' for e in result["errors"])
+        raise ValueError(summary)

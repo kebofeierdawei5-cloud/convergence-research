@@ -1,3 +1,14 @@
+# B0 REPAIR OVERRIDE — 2026-10-04
+
+Active repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
+Active stage: **B0 PASS → B1 PASS → B2 Data/Evidence/PIT Foundation**
+
+This index retains the incumbent v0.2 and P4 acceptance records below for historical continuity. They do not override the B0 authority freeze. The incumbent return statement and P5 next-step text are superseded as the active repair target until B1 is approved.
+
+B1 v0.3 is now the active frozen Investment Core semantic contract. It separately defines BUY-entry threshold/safety cushion, 1–3Y annualized target, Expected Return, Required Return, Horizon, action semantics, Unknown/Trust/Investability/Portfolio boundaries and non-mandatory MIE.
+
+---
+
 # IIOS Current-State Index
 
 Continuity / macro development plan: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026-10-04.md`
@@ -20,9 +31,9 @@ Current canonical state is defined by:
 
 Semantic contract:
 
-`docs/iios/IIOS_INVESTMENT_CORE_CONTRACT_v0.2.md`
+`docs/iios/IIOS_INVESTMENT_CORE_CONTRACT_v0.3.md`
 
-Status: **FROZEN / SEMANTIC PASS**
+Status: **FROZEN / B1 SEMANTIC PASS**
 
 Core chain:
 
@@ -83,10 +94,16 @@ P2-A acceptance evidence:
 - CI #70 / `37183859358` = SUCCESS
 - final acceptance: `docs/iios/P2A_FINAL_ACCEPTANCE_2026-10-04.md`
 
+B1 implemented/accepted:
+
+- v0.3 return semantics runtime
+- v0.3 decision actions and Unknown/Trust/Investability/Portfolio behavior
+- deterministic snapshot/replay routing
+
 Not yet implemented as production capability:
 
-- semantic Expectation Gap
-- production return gate integration
+- complete company Reality/Quality/Value Core economic chain
+- full independent forecast contract
 - frozen probability / edge / position-sizing policy
 - complete Execution Receipt / Trigger lifecycle
 - real-company acceptance / independent audit
@@ -116,7 +133,7 @@ P3-B evidence:
 - merge commit `77022db416f5b1d32c306f5d644e3642c0f5936b`
 - final acceptance: `docs/iios/P3B_COMPLEX_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`
 
-P4 is the active engineering gate: P4-A through P4-E are complete; P4-F is next.
+P4-F remains retained as historical/conditional MIE infrastructure. It is not the active repair gate.
 
 P4-A acceptance: `docs/iios/P4A_FINAL_ACCEPTANCE_2026-10-04.md`
 P4-B acceptance: `docs/iios/P4B_FINAL_ACCEPTANCE_2026-10-04.md`
@@ -152,7 +169,7 @@ P4-D is **FINAL PASS / MERGED**.
 
 P4-D keeps SOTP residual and rNPV pipeline requirements model-native and conditional. rNPV probability/timing are conditioning inputs only; no market-implied probability is emitted.
 
-Completed: **P4-E — multi-model expectation-set handling**. Completed: **P4-F — PIT / replay / fail-closed MIE integration**. Next: **P5 — Semantic Expectation Gap + Return Gate**.
+Completed: **P4-E — multi-model expectation-set handling**. Completed: **P4-F — PIT / replay / fail-closed MIE integration**. Next: **B2 — Data / Evidence / PIT Foundation**.
 ## P4-E Acceptance Evidence
 
 P4-E is **FINAL PASS / MERGED**.
@@ -168,7 +185,7 @@ P4-E is **FINAL PASS / MERGED**.
 
 P4-E provides a candidate-complete typed expectation set over accepted P4-A through P4-D outputs. It preserves model identity and model-native economic variables, distinguishes `NO_FEASIBLE_SOLUTION` from `BLOCKED`, marks multiple surviving models as `AMBIGUOUS / CONDITIONAL_ONLY`, prevents unique claims under incomplete coverage, enforces exact observation-basis consistency and evidence closure, and performs no model selection, Expectation Gap, or Expected Return calculation.
 
-Next: **P4-F — PIT / replay / fail-closed MIE integration**.
+B1 complete. Next: **B2 — Data / Evidence / PIT Foundation**.
 
 ## P4-F Acceptance Evidence
 
@@ -187,13 +204,9 @@ P4-F closes the PIT/provenance and immutable replay boundary around the P4-A thr
 
 Next: **P5 — Semantic Expectation Gap + Return Gate**.
 
-## Return Target
+## B1 Return / Decision Semantics
 
-**Positive expected return >15%.**
-
-No fixed 1–3 year holding period and no annualized-return core gate.
-
-For the primary Expected Return Gate, validated Bear/Base/Bull probabilities are required. No fabricated probability fallback is permitted.
+The frozen v0.3 contract defines two separate 15% policies: a non-annualized 15% BUY-entry return cushion and a 15% 1–3Y annualized fundamental target. Required Return is independent and non-additive. UNKNOWN routes to REVIEW_REQUIRED, and MIE is non-mandatory for BUY/ADD.
 
 ## Forecast Research
 
