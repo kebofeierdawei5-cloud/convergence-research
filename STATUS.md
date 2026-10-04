@@ -3,7 +3,7 @@
 This file retains historical acceptance records below. For the active repair program, read `docs/iios/B0_AUTHORITY_AUDIT_FREEZE_2026-10-04.md` first.
 
 Active repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
-Active repair stage: **B0 PASS → B1 PASS → CORE-00 Scope Reset & Architecture Reconciliation**
+Active repair stage: **B0 PASS → B1 PASS → CORE-00 PASS → CORE-01 Single Company Research Intake**
 P4-F is merged historical/conditional infrastructure; P5/P6 feature expansion remains paused.
 B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. The owner-approved distinction between (a) 15% BUY-entry threshold / safety-margin policy and (b) 1–3Y annualized target >=15% is now normative in v0.3.
 
@@ -22,6 +22,15 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Investment Core Contract v0.2: **HISTORICAL / LEGACY**.
 - Investment Core Contract v0.3: **FROZEN / B1 SEMANTIC PASS**.
 - Contract: `docs/iios/IIOS_INVESTMENT_CORE_CONTRACT_v0.3.md`
+
+## CORE-01 Active Boundary
+
+- Current execution gate: **CORE-01 Single Company Research Intake**
+- Minimal user input: market + symbol + as-of/cutoff + current position
+- Output: deterministic, auditable single-company Research Case Envelope
+- Identity/price/factual fields are evidence-dependent; no fabricated company data
+- PIT is mandatory: `known_at <= cutoff`; current-state substitution is forbidden
+- A02 / CSI800 / CSI Industry remain Research Track only
 
 ## CORE-00 Active Boundary
 
@@ -272,9 +281,9 @@ B1 semantic package and runtime migration accepted on the repair line. Evidence:
 
 ## Immediate Next Engineering Step
 
-**CORE-00 — Scope Reset & Architecture Reconciliation.**
+**CORE-01 — Single Company Research Intake.**
 
-The next Investment Core path is CORE-01 after CORE-00 acceptance. B2/A02 remains an independent Research Track.
+CORE-00 is merged and accepted on canonical `main`. The current Investment Core path is now CORE-01. After CORE-01 acceptance, the next gate is CORE-02 Company Economic Core.
 
 P4-A through P4-F are complete. P5 must compare economically equivalent independent variables against the P4 model-semantic market requirement, fail closed on incompatible or ambiguous interpretations, validate Bear/Base/Bull probabilities, and enforce strict positive Expected Return >15% before any decision layer.
 
