@@ -9,6 +9,12 @@
       2029
     ],
     "horizon_years": 3,
+    "horizon_override": true,
+    "horizon_override_basis": [
+      "MAJOR_INDUSTRY_LEADER",
+      "MAJOR_INVESTMENT_CYCLE_OR_MAJOR_CAPEX"
+    ],
+    "horizon_selection_rationale": "CATL is a major industry leader and is in a major global capacity / capital-expenditure cycle; 3Y is an explicit case exception rather than the IIOS default horizon.",
     "probabilities": {
       "bear": "0.25",
       "base": "0.50",

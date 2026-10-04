@@ -54,10 +54,22 @@ The values are numerically equal but semantically independent.
 ## 4. Horizon
 
 Fundamental investment cases use:
-1 <= horizon_years <= 3
+1 <= horizon_years <= 3.
 
-H is selected per case according to thesis/economics.
-H is mandatory for annualized return.
+The normative default Decision / Expected Return reference horizon is H = 1 year.
+
+H remains an explicit case field. Default means policy default; the runtime MUST NOT silently invent, replace or upgrade a missing horizon.
+
+Rules:
+- H = 1 is the standard default case.
+- H may be selected above 1 and below 3 when the case has an explicit economic rationale.
+- H = 3 is an explicit exception only and MUST set horizon_override = true.
+- A 3Y override MUST record at least one qualifying basis: MAJOR_INDUSTRY_LEADER and/or MAJOR_INVESTMENT_CYCLE_OR_MAJOR_CAPEX.
+- horizon_selection_rationale is mandatory for every case.
+- horizon_override MUST be false for any H other than exactly 3.
+- A 3Y horizon is never implied merely because a valuation model uses a multi-year explicit forecast.
+
+H is the period over which expected investment outcome is evaluated. It is not a mandatory exit date.
 
 ## 5. Entry Return Cushion
 

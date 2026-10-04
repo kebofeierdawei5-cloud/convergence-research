@@ -49,6 +49,9 @@ def case() -> dict:
             "entry_price": "100",
             "entry_value_reference": "115",
             "horizon_years": "2",
+            "horizon_override": False,
+            "horizon_override_basis": [],
+            "horizon_selection_rationale": "Two-year case-specific evaluation horizon for a test fixture.",
             "buy_entry_return_cushion_threshold": "0.15",
             "fundamental_target_annualized_return": "0.15",
             "required_return_annualized": "0.10",
@@ -223,3 +226,57 @@ def test_v03_jsonschema_rejects_incomplete_buy_add_package():
     invalid["portfolio"]["buy_add_package"].pop("monitoring_triggers")
     with __import__("pytest").raises(jsonschema.ValidationError):
         jsonschema.validate(invalid, schema)
+
+def test_v03_default_horizon_is_one_year_and_not_an_implicit_three_year():
+    c = case()
+    c["return_gate"]["horizon_years"] = "1"
+    c["return_gate"]["horizon_override"] = False
+    c["return_gate"]["horizon_override_basis"] = []
+    c["return_gate"]["horizon_selection_rationale"] = "Use the IIOS default one-year decision horizon."
+    assert validate_case_v03(c)["status"] == "PASS"
+    metrics = calculate_return_metrics(c["return_gate"])
+    assert metrics["horizon_years"] == "1"
+    assert metrics["horizon_override"] is False
+
+
+def test_v03_three_year_requires_explicit_override_and_qualifying_basis():
+    c = case()
+    c["return_gate"]["horizon_years"] = "3"
+    c["return_gate"]["horizon_override"] = True
+    c["return_gate"]["horizon_override_basis"] = [
+        "MAJOR_INDUSTRY_LEADER",
+        "MAJOR_INVESTMENT_CYCLE_OR_MAJOR_CAPEX",
+    ]
+    c["return_gate"]["horizon_selection_rationale"] = "Three-year horizon is justified by major industry leadership and a major investment cycle."
+    assert validate_case_v03(c)["status"] == "PASS"
+
+
+def test_v03_three_year_without_override_fails_closed():
+    c = case()
+    c["return_gate"]["horizon_years"] = "3"
+    c["return_gate"]["horizon_override"] = False
+    c["return_gate"]["horizon_override_basis"] = []
+    c["return_gate"]["horizon_selection_rationale"] = "Attempted three-year horizon without exception."
+    result = validate_case_v03(c)
+    assert result["status"] == "BLOCKED"
+    assert any("horizon_override" in e["message"] for e in result["errors"])
+
+
+def test_v03_three_year_with_unqualified_basis_fails_closed():
+    c = case()
+    c["return_gate"]["horizon_years"] = "3"
+    c["return_gate"]["horizon_override"] = True
+    c["return_gate"]["horizon_override_basis"] = ["OTHER"]
+    c["return_gate"]["horizon_selection_rationale"] = "Attempted three-year horizon with unsupported reason."
+    result = validate_case_v03(c)
+    assert result["status"] == "BLOCKED"
+
+
+def test_v03_two_year_override_is_not_treated_as_a_three_year_exception():
+    c = case()
+    c["return_gate"]["horizon_years"] = "2"
+    c["return_gate"]["horizon_override"] = True
+    c["return_gate"]["horizon_override_basis"] = ["MAJOR_INDUSTRY_LEADER"]
+    c["return_gate"]["horizon_selection_rationale"] = "Attempted two-year override."
+    result = validate_case_v03(c)
+    assert result["status"] == "BLOCKED"

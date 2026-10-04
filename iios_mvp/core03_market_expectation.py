@@ -7,6 +7,7 @@ import json
 from typing import Any, Mapping
 
 from .company_economic_core import build_company_economic_core, validate_company_economic_core
+from .horizon_semantics import validate_horizon_selection
 from .multi_model_market_implied_expectation_set import (
     MIEModelEvaluation,
     MIEModelEvaluationState,
@@ -141,6 +142,16 @@ def _validate_forecast(forecast: Mapping[str, Any], cutoff: date, evidence_ids: 
         if not normalized[scenario]["rationale"]:
             raise ValueError(f"forecast.scenarios.{scenario}.rationale is required")
 
+    horizon_selection = validate_horizon_selection(
+        horizon_years=forecast.get("horizon_years"),
+        horizon_override=forecast.get("horizon_override"),
+        horizon_override_basis=forecast.get("horizon_override_basis"),
+        horizon_selection_rationale=forecast.get("horizon_selection_rationale"),
+        path="forecast",
+    )
+    forecast_horizon = _dec(horizon_selection["horizon_years"], "forecast.horizon_years")
+    if forecast_horizon != Decimal("3") or tuple(range(2027, 2030)) != FORECAST_YEARS:
+        raise ValueError("CORE-03 real case requires H=3 for the 2027-2029 forecast package")
     forecast_cutoff = _date(forecast.get("cutoff_date"), "forecast.cutoff_date")
     if forecast_cutoff != cutoff:
         raise ValueError("forecast.cutoff_date must equal case cutoff")
@@ -152,7 +163,10 @@ def _validate_forecast(forecast: Mapping[str, Any], cutoff: date, evidence_ids: 
         "probabilities": {s: str(_dec(probabilities[s], f"forecast.probabilities.{s}")) for s in SCENARIOS},
         "scenarios": normalized,
         "cash_flow_diagnostic": forecast.get("cash_flow_diagnostic") or {},
-        "horizon_years": str(_dec(forecast.get("horizon_years", 3), "forecast.horizon_years")),
+        "horizon_years": horizon_selection["horizon_years"],
+        "horizon_override": horizon_selection["horizon_override"],
+        "horizon_override_basis": horizon_selection["horizon_override_basis"],
+        "horizon_selection_rationale": horizon_selection["horizon_selection_rationale"],
         "valuation_focus": "FCF_AND_INCREMENTAL_ROIC",
     }
 
@@ -381,6 +395,14 @@ def build_core03_package(
             },
             "probability_weighted_value_per_share": str(expected_value),
             "expected_3y_cagr_at_current_price": str(expected_cagr),
+            "expected_annualized_return_at_horizon": str(expected_cagr),
+            "horizon_return_reference": {
+                "horizon_years": normalized_forecast["horizon_years"],
+                "horizon_override": normalized_forecast["horizon_override"],
+                "horizon_override_basis": normalized_forecast["horizon_override_basis"],
+                "horizon_selection_rationale": normalized_forecast["horizon_selection_rationale"],
+                "expected_annualized_return": str(expected_cagr),
+            },
             "current_price_cny": str(price),
             "base_upside_vs_price": str(base / price - Decimal("1")),
             "expected_value_upside_vs_price": str(expected_value / price - Decimal("1")),

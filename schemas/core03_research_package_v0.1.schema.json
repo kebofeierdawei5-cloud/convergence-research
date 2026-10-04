@@ -18,10 +18,24 @@
     "status":{"enum":["PASS","CONDITIONAL","BLOCKED"]},
     "research_question":{"type":"string","minLength":1},
     "core02_status":{"enum":["PASS","CONDITIONAL","BLOCKED"]},
-    "independent_forecast":{"type":"object"},
+    "independent_forecast":{
+      "type":"object",
+      "required":["horizon_years","horizon_override","horizon_override_basis","horizon_selection_rationale"],
+      "properties":{
+        "horizon_years":{"const":"3"},
+        "horizon_override":{"const":true},
+        "horizon_override_basis":{
+          "type":"array",
+          "minItems":1,
+          "uniqueItems":true,
+          "items":{"enum":["MAJOR_INDUSTRY_LEADER","MAJOR_INVESTMENT_CYCLE_OR_MAJOR_CAPEX"]}
+        },
+        "horizon_selection_rationale":{"type":"string","minLength":1}
+      }
+    },
     "company_valuation":{
       "type":"object",
-      "required":["status","primary_model","selection_authority","intrinsic_value_per_share","intrinsic_value_range","probability_weighted_value_per_share","expected_3y_cagr_at_current_price","current_price_cny","base_upside_vs_price","expected_value_upside_vs_price","engine_output"],
+      "required":["status","primary_model","selection_authority","intrinsic_value_per_share","intrinsic_value_range","probability_weighted_value_per_share","expected_3y_cagr_at_current_price","expected_annualized_return_at_horizon","horizon_return_reference","current_price_cny","base_upside_vs_price","expected_value_upside_vs_price","engine_output"],
       "properties":{
         "status":{"enum":["PASS","CONDITIONAL","BLOCKED"]},
         "primary_model":{"const":"dcf"},
@@ -30,6 +44,18 @@
         "intrinsic_value_range":{"type":"object"},
         "probability_weighted_value_per_share":{"type":"string"},
         "expected_3y_cagr_at_current_price":{"type":"string"},
+        "expected_annualized_return_at_horizon":{"type":"string"},
+        "horizon_return_reference":{
+          "type":"object",
+          "required":["horizon_years","horizon_override","horizon_override_basis","horizon_selection_rationale","expected_annualized_return"],
+          "properties":{
+            "horizon_years":{"const":"3"},
+            "horizon_override":{"const":true},
+            "horizon_override_basis":{"type":"array","minItems":1},
+            "horizon_selection_rationale":{"type":"string","minLength":1},
+            "expected_annualized_return":{"type":"string"}
+          }
+        },
         "current_price_cny":{"const":"291.11"},
         "base_upside_vs_price":{"type":"string"},
         "expected_value_upside_vs_price":{"type":"string"},
