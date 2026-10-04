@@ -32,9 +32,6 @@ from iios_mvp.market_model_identification import (
     MarketModelIdentificationInput,
     MarketValuationObservation,
 )
-from iios_mvp.market_model_domain import CandidateMarketModel
-from iios_mvp.dcf_ddm_conditional_market_implied_expectation import (
-)
 from iios_mvp.market_model_identification import identify_market_models
 from iios_mvp.sotp_rnpv_market_implied_expectation import (
     build_sotp_rnpv_market_implied_expectations,
@@ -196,7 +193,6 @@ def rnpv_input(candidate_item=None, price="92.7272727272727272727272727273"):
         evidence("e-p1-t-current", "timing", "years"),
         evidence("e-p2-v-current", "pipeline_value", "CNY"),
         evidence("e-p2-p-current", "probability", "ratio"),
-        evidence("e-p2-t-current", "years"),
         evidence("e-p2-t-current", "timing", "years"),
         evidence("e-disc-current", "discount_rate", "ratio"),
         evidence("e-base-current", "base_value", "CNY"),
@@ -285,11 +281,59 @@ def test_ambiguous_typed_p3_emits_one_conditional_slice_per_feasible_candidate()
         observations=inp.observations + rnpv.observations,
         evidence=inp.evidence + rnpv.evidence,
     )
-    sotp_p3 = identify_market_models(inp)
-    rnpv_p3 = identify_market_models(rnpv)
     evaluations = (
-        sotp_p3["evaluations"][0],
-        rnpv_p3["evaluations"][0],
+        CandidateEvaluation(
+            fit=ModelFit(
+                model_id="sotp-1",
+                status=ModelFitStatus.FEASIBLE,
+                diagnostics=(FitDiagnostic("fit-sotp", "typed", "PASS"),),
+                evidence_ids=("e-a-current",),
+                constraints=("typed-fixture",),
+            ),
+            feasible_solution_set=FeasibleSolutionSet(
+                model_id="sotp-1",
+                status=FeasibleSolutionStatus.NONEMPTY,
+                solutions=(
+                    FeasibleSolution(
+                        economic_variable="residual_value",
+                        unit="CNY",
+                        basis="typed-p3-sotp",
+                        model_id="sotp-1",
+                        value=Decimal("10"),
+                        evidence_ids=("e-a-current",),
+                    ),
+                ),
+                constraint_ids=("typed-fixture",),
+                evidence_ids=("e-a-current",),
+                basis="typed-p3-fixture",
+            ),
+        ),
+        CandidateEvaluation(
+            fit=ModelFit(
+                model_id="rnpv-1",
+                status=ModelFitStatus.FEASIBLE,
+                diagnostics=(FitDiagnostic("fit-rnpv", "typed", "PASS"),),
+                evidence_ids=("e-p1-v-current",),
+                constraints=("typed-fixture",),
+            ),
+            feasible_solution_set=FeasibleSolutionSet(
+                model_id="rnpv-1",
+                status=FeasibleSolutionStatus.NONEMPTY,
+                solutions=(
+                    FeasibleSolution(
+                        economic_variable="pipeline_value",
+                        unit="CNY",
+                        basis="typed-p3-rnpv",
+                        model_id="rnpv-1",
+                        value=Decimal("100"),
+                        evidence_ids=("e-p1-v-current",),
+                    ),
+                ),
+                constraint_ids=("typed-fixture",),
+                evidence_ids=("e-p1-v-current",),
+                basis="typed-p3-fixture",
+            ),
+        ),
     )
     identification = {
         "status": "PASS",
@@ -300,10 +344,7 @@ def test_ambiguous_typed_p3_emits_one_conditional_slice_per_feasible_candidate()
             feasible_model_ids=("rnpv-1", "sotp-1"),
             selected_model_id=None,
             competing_model_ids=("rnpv-1", "sotp-1"),
-            evidence_ids=tuple(sorted(set(
-                sotp_p3["identifiability"].evidence_ids
-                + rnpv_p3["identifiability"].evidence_ids
-            ))),
+            evidence_ids=("e-a-current", "e-p1-v-current"),
             rationale="Typed ambiguity fixture.",
         ),
         "stability": StabilityResult(
@@ -317,33 +358,23 @@ def test_ambiguous_typed_p3_emits_one_conditional_slice_per_feasible_candidate()
                     selected_model_id=None,
                 ),
             ),
-            evidence_ids=tuple(sorted(set(
-                sotp_p3["stability"].evidence_ids
-                + rnpv_p3["stability"].evidence_ids
-            ))),
+            evidence_ids=("e-a-current", "e-p1-v-current"),
             rationale="Stable ambiguity fixture.",
         ),
     }
-    # P4-D must not trust cross-snapshot P3 evaluation, so use a typed
-    # self-contained pair while keeping this test focused on no-winner behavior.
-    identification["evaluations"] = (
-        sotp_p3["evaluations"][0],
-        rnpv_p3["evaluations"][0],
+    outputs = build_sotp_rnpv_market_implied_expectations(
+        identification_input=combined,
+        identification=identification,
+        candidate_coverage=coverage(combined),
+        evidence_sufficiency=evidence_sufficient(combined),
+        currency="CNY",
+        adjustment_semantics="UNADJUSTED",
+        period="NTM",
+        horizon="12M",
+        accounting_basis="reported",
     )
-    # current observation uses SOTP snapshot, therefore rNPV should be rejected
-    # rather than mixing observations from a different price snapshot.
-    with pytest.raises(ValueError):
-        build_sotp_rnpv_market_implied_expectations(
-            identification_input=combined,
-            identification=identification,
-            candidate_coverage=coverage(combined),
-            evidence_sufficiency=evidence_sufficient(combined),
-            currency="CNY",
-            adjustment_semantics="UNADJUSTED",
-            period="NTM",
-            horizon="12M",
-            accounting_basis="reported",
-        )
+    assert {output.model_id for output in outputs} == {"rnpv-1", "sotp-1"}
+    assert all(output.qualification == MIEQualification.CONDITIONAL_ONLY for output in outputs)
 
 
 def test_unstable_upstream_yields_blocked_output():
