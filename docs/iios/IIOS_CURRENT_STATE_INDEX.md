@@ -70,6 +70,7 @@ Implemented / merged:
 - P3-A ratio-family Market Model Identification baseline (FINAL PASS / MERGED)
 - P3-B complex-model Market Model Identification baseline (FINAL PASS / MERGED)
 - P4-A Market Implied Expectation Qualification Boundary (FINAL PASS / MERGED)
+- P4-B Ratio-family Market Implied Expectation Vertical Slice (FINAL PASS / MERGED)
 
 P2-A acceptance evidence:
 
@@ -80,7 +81,6 @@ P2-A acceptance evidence:
 
 Not yet implemented as production capability:
 
-- P4-B Ratio-family MIE extraction
 - P4-C/D complex-model MIE extraction
 - P4-E candidate-coverage-qualified multi-model expectation set
 - P4-F PIT/replay/fail-closed MIE integration
@@ -115,9 +115,10 @@ P3-B evidence:
 - merge commit `77022db416f5b1d32c306f5d644e3642c0f5936b`
 - final acceptance: `docs/iios/P3B_COMPLEX_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`
 
-P4 is the active engineering gate: P4-A is complete and P4-B is next.
+P4 is the active engineering gate: P4-A and P4-B are complete; P4-C is next.
 
 P4-A acceptance: `docs/iios/P4A_FINAL_ACCEPTANCE_2026-10-04.md`
+P4-B acceptance: `docs/iios/P4B_FINAL_ACCEPTANCE_2026-10-04.md`
 
 ## Return Target
 
