@@ -27,6 +27,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - P4-B Ratio-family MIE Vertical Slice: **FINAL PASS / MERGED**
 - P4-C DCF/DDM Conditional MIE Vertical Slice: **FINAL PASS / MERGED**
 - P4-D SOTP/rNPV MIE Vertical Slice: **FINAL PASS / MERGED**
+- P4-E Multi-model Market Implied Expectation Set: **FINAL PASS / MERGED**
 - Production investment decision kernel: NOT YET
 
 ## P4-C Final Acceptance
@@ -52,7 +53,7 @@ Semantic boundary:
 - no full multidimensional feasible assumption-space claim;
 - no market-truth claim.
 
-Next gate: **P4-D — SOTP / rNPV expectation extraction**.
+Completed: P4-D. See P4-E acceptance below.
 
 ## P4-D Final Acceptance
 
@@ -79,7 +80,33 @@ Semantic boundary:
 - no generic implied net profit;
 - no Expectation Gap / Expected Return implementation.
 
-Next gate: **P4-E — multi-model expectation-set handling**.
+Completed: P4-E. Next gate: **P4-F — PIT / replay / fail-closed MIE integration**.
+## P4-E Final Acceptance
+
+P4-E is formally **FINAL PASS / MERGED** on canonical `main`.
+
+- PR #14: MERGED
+- pre-merge HEAD: `60e40bed89f96bcc30df4a31967ff55d84847423`
+- merge commit: `3c1b4944d715bbb0e4716bab3a0721c78f0f4157`
+- PR Investment Core CI #155 / `37190663254`: **SUCCESS**
+- PR FM00 CI #130 / `37190663258`: **SUCCESS**
+- post-merge main Investment Core CI #157 / `37190695693`: **SUCCESS**
+- post-merge main FM00 CI #132 / `37190695593`: **SUCCESS**
+- final regression: **156 passed**
+- acceptance matrix: `docs/iios/P4E_MULTI_MODEL_MIE_SET_ACCEPTANCE_MATRIX_v0.2.md`
+- acceptance record: `docs/iios/P4E_FINAL_ACCEPTANCE_2026-10-04.md`
+
+Semantic boundary:
+
+- P4-E aggregates accepted P4-A through P4-D MIE outputs; it does not recompute inverse valuation.
+- Every admitted candidate receives one explicit disposition: `MATERIALIZED`, `NO_FEASIBLE_SOLUTION`, or `BLOCKED`.
+- Multiple materialized models remain `AMBIGUOUS / CONDITIONAL_ONLY`; no winner, ranking, weighting, averaging, or cross-model pseudo-variable is created.
+- A unique model requires complete candidate coverage and explicit non-feasible dispositions for all alternatives.
+- Any blocked candidate or insufficient candidate/evidence assessment fails closed to `INSUFFICIENT_EVIDENCE / BLOCKED`.
+- Materialized expectations must share the exact same price/PIT observation basis.
+- Evidence closure and deterministic model-evaluation ordering are enforced.
+- No Expectation Gap, Expected Return, or generic `market_implied_net_profit` is introduced.
+
 ## Return Target
 
 Canonical hurdle: **positive expected return >15%**.
@@ -191,7 +218,9 @@ P4-A establishes the typed qualification boundary between P3 inverse interpretat
 
 ## Immediate Next Engineering Step
 
-**P4-E / Multi-model Market Implied Expectation Set.**
+**P4-F / PIT + Replay + Fail-Closed Market Implied Expectation Integration.**
+
+P4-E is complete. P4-F must bind the multi-model expectation set to immutable case snapshots, exact PIT/provenance manifests, replay semantics, and fail-closed runtime integration before P5 can begin.
 
 P4-E must consume the accepted P4-A through P4-D typed outputs and organize multiple feasible/conditional market-model explanations without forcing a winner.
 
