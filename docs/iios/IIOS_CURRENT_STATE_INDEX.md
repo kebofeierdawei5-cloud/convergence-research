@@ -63,6 +63,7 @@ Implemented / merged:
 - deterministic valuation calculators for supported models
 - P2-A Investment Core v0.2 machine schema + executable invariants (FINAL PASS / MERGED)
 - P2-B Market Model Domain Foundation (FINAL PASS / MERGED)
+- P3-A ratio-family Market Model Identification (FINAL PASS / MERGED)
 
 P2-A acceptance evidence:
 
@@ -73,7 +74,8 @@ P2-A acceptance evidence:
 
 Not yet implemented as production capability:
 
-- evidence-backed market-model identification
+- complex-model evidence-backed market-model identification (DCF/DDM/SOTP/rNPV)
+- broader/calibrated Market Model Identification beyond the P3-A ratio-family baseline
 - meaningful Feasible Solution Set
 - calibrated Identifiability
 - temporal / regime Stability
@@ -92,7 +94,14 @@ P2-B foundation evidence:
 - CI #73 / `37184109345` = SUCCESS
 - final acceptance: `docs/iios/P2B_FOUNDATION_ACCEPTANCE_2026-10-04.md`
 
-P3 next: evidence-backed Market Model Identification v0.2 production implementation.
+P3-A evidence:
+
+- PR #7 merged to main
+- pre-merge HEAD `fe03d27bdd4ac46125fff04c7d3405b8285d3139`
+- CI #96 / `37185092488` = SUCCESS
+- final acceptance: `docs/iios/P3A_RATIO_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`
+
+P3-B next: complex model-specific identification for DCF/DDM/SOTP/rNPV.
 
 ## Return Target
 
