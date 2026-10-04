@@ -102,7 +102,10 @@ def test_unique_feasible_model_is_identifiable_and_solution_is_model_semantic():
     assert solution.economic_variable == "forward_eps"
     assert solution.range_low == Decimal("4.464285714285714285714285714")
     assert solution.range_high == Decimal("6.25")
-    assert result["stability"].state.value == "STABLE", result["stability"].observations
+    assert result["stability"].state.value == "STABLE", tuple(
+        (o.perturbation_id, o.resulting_state.value, o.selected_model_id)
+        for o in result["stability"].observations
+    )
     assert len(result["stability"].observations) >= 2
 
 
