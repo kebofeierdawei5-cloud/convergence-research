@@ -84,8 +84,8 @@ def test_ambiguous_model_is_conditional_only():
     dict(identifiability=IdentifiabilityState.INSUFFICIENT_EVIDENCE),
     dict(stability=StabilityState.UNSTABLE),
     dict(stability=StabilityState.INSUFFICIENT_EVIDENCE),
-    dict(candidate_coverage=CandidateCoverageAssessment(status=CandidateCoverageState.INSUFFICIENT, scope_basis="insufficient-scope", candidate_model_ids=("pe-1",), evidence_ids=("ev-coverage",), rationale="Scope is known but incomplete."),
-    dict(candidate_coverage=CandidateCoverageAssessment(status=CandidateCoverageState.UNASSESSED, scope_basis="unassessed-scope", candidate_model_ids=("pe-1",), evidence_ids=("ev-coverage",), rationale="Coverage has not been assessed."),
+    dict(candidate_coverage=CandidateCoverageAssessment(status=CandidateCoverageState.INSUFFICIENT, scope_basis="insufficient-scope", candidate_model_ids=("pe-1",), evidence_ids=("ev-coverage",), rationale="Scope is known but incomplete.")),
+    dict(candidate_coverage=CandidateCoverageAssessment(status=CandidateCoverageState.UNASSESSED, scope_basis="unassessed-scope", candidate_model_ids=("pe-1",), evidence_ids=("ev-coverage",), rationale="Coverage has not been assessed.")),
     dict(evidence_sufficiency=EvidenceSufficiencyAssessment(status=EvidenceSufficiencyState.INSUFFICIENT, rationale="Evidence set is incomplete.", evidence_ids=("ev-var",))),
 ])
 def test_unsupported_qualification_is_blocked(kwargs):
