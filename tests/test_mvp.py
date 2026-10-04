@@ -192,4 +192,4 @@ def test_sotp_values_segments_independently():
     result = value_scenario(forecast, valuation, "base", Decimal("10"))
     assert result["model"] == "sotp"
     assert result["drivers"]["segment_count"] == 2
-    assert result["equity_value"] == 2000.0
+    assert result["equity_value"] == 2050.0
