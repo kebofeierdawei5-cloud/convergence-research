@@ -154,3 +154,12 @@ def test_v02_buy_requires_risk_pass():
     case["risk"]["status"] = "UNKNOWN"
     result = validate_investment_core_case(case)
     assert "CORE-GATE-BUY-RISK" in codes(result)
+
+
+def test_v02_engine_does_not_execute_legacy_decision_logic():
+    from iios_mvp.engine import decide
+    case = valid_case()
+    result = decide(case)
+    assert result["validation"]["status"] == "PASS"
+    assert result["decision"]["primary_reason"] == "V02_ENGINE_NOT_IMPLEMENTED"
+    assert result["decision"]["action"] == "NO-BUY"
