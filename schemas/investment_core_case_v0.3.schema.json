@@ -185,7 +185,15 @@
         },
         "buy_add_package": {
           "type": "object",
-          "additionalProperties": true
+          "additionalProperties": true,
+          "required": [
+            "entry_zone",
+            "initial_position_pct",
+            "target_position_pct",
+            "max_position_pct",
+            "thesis_break_triggers",
+            "monitoring_triggers"
+          ]
         }
       }
     },
