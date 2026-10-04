@@ -82,17 +82,19 @@ def test_v03_buy_requires_all_three_return_conditions():
     assert result["decision"]["auto_execution"] is False
 
 
-def test_v03_exact_15_annualized_target_passes():
+def test_v03_exact_15_annualized_target_is_inclusive():
     c = case()
-    # Adjust scenario wealth so expected annualized return is exactly 15% over 2 years.
+    # Equal scenario wealth makes expected wealth exactly 132.25 over H=2.
+    # sqrt(1.3225) - 1 = 15%, so the target comparison must pass at equality.
     c["return_gate"]["scenarios"] = {
-        "bear": {"probability": "0.2", "terminal_value_per_share": "115", "cash_distributions_per_share": "0", "probability_rationale": "exact boundary"},
+        "bear": {"probability": "0.2", "terminal_value_per_share": "132.25", "cash_distributions_per_share": "0", "probability_rationale": "exact boundary"},
         "base": {"probability": "0.5", "terminal_value_per_share": "132.25", "cash_distributions_per_share": "0", "probability_rationale": "exact boundary"},
         "bull": {"probability": "0.3", "terminal_value_per_share": "132.25", "cash_distributions_per_share": "0", "probability_rationale": "exact boundary"},
     }
-    # Expected wealth = 129.55, so this is intentionally not the exact 15% annualized boundary.
     metrics = calculate_return_metrics(c["return_gate"])
-    assert metrics["fundamental_target_pass"] is False
+    assert metrics["expected_total_return"] == Decimal("0.3225")
+    assert abs(metrics["expected_annualized_return"] - Decimal("0.15")) < Decimal("0.000001")
+    assert metrics["fundamental_target_pass"] is True
 
 
 def test_v03_watch_when_target_passes_but_entry_cushion_fails():
