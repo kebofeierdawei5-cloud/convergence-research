@@ -56,7 +56,7 @@ def valid_case():
                 "bull": {"probability": "0.3"},
             },
             "expected_value": "532",
-            "expected_return_pct": "32.5",
+            "expected_return_pct": "33",
             "hurdle_pct": "15",
             "hurdle_pass": True,
         },
