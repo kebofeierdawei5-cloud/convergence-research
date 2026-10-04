@@ -442,7 +442,9 @@ def _stability(
         key=lambda x: x.observation_date,
     )
 
-    if len(historical) < inp.stability_min_historical_points:
+    # Leave-one-out stability requires at least one admissible perturbed
+    # window in addition to the full historical window.
+    if len(historical) <= inp.stability_min_historical_points:
         result = StabilityResult(
             state=StabilityState.INSUFFICIENT_EVIDENCE,
             assessment_method="leave_one_out_historical_window",
