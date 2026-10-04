@@ -57,7 +57,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["status", "decision_ready", "blockers"],
       "properties": {
-        "status": {"enum": ["EVIDENCE_PENDING", "ADMITTED", "BLOCKED"]},
+        "status": {"enum": ["EVIDENCE_PENDING", "BLOCKED"]},
         "decision_ready": {"const": false},
         "blockers": {"type": "array", "items": {"type": "string"}}
       }
