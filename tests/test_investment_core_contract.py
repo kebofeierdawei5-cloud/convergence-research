@@ -117,6 +117,7 @@ def test_exact_15_percent_fails_hurdle():
     case["return_gate"]["expected_value"] = "460"
     case["return_gate"]["expected_return_pct"] = "15"
     case["return_gate"]["hurdle_pass"] = False
+    case["decision"]["action"] = "NO-BUY"
     assert validate_investment_core_case(case)["status"] == "PASS"
 
 
