@@ -133,6 +133,8 @@ def validate_case(case: dict[str, Any]) -> list[str]:
     except ValueError as exc:
         blockers.append(f"VALUATION_MODEL_SELECTION_INVALID:{exc}")
     model = str((valuation.get("model_selection") or {}).get("primary_model") or valuation.get("model") or "")
+    if valuation.get("market_model_inputs") is None:
+        blockers.append("MARKET_MODEL_INPUTS_MISSING")
     if model == "forward_pe":
         for scenario in ("bear", "base", "bull"):
             try:
