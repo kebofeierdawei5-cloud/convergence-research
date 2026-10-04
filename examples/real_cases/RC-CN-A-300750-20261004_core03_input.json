@@ -134,5 +134,18 @@
     "artifact_id": "catl-20261004-E008-current-share-count.txt",
     "status": "ADMITTED",
     "variable": "current_share_count"
-  }
+  },
+  "forecast_evidence": [
+    {
+      "evidence_id": "E009",
+      "known_at": "2026-03-10T00:00:00+08:00",
+      "retrieved_at": "2026-10-04T00:00:00+08:00",
+      "content_sha256": "a6cde5bf99f836083cf4fcb15858c64ca4624a625ace4d3724241caedfafb71f",
+      "exact_bytes": true,
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-03-10/1225002214.PDF",
+      "artifact_id": "catl-20261004-E009-2025-annual-anchor.txt",
+      "status": "ADMITTED",
+      "variable": "historical_forecast_anchor"
+    }
+  ]
 }
