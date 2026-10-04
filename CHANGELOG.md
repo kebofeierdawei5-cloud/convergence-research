@@ -2,8 +2,19 @@
 
 ## [Unreleased]
 
+### 2026-10-04 — State Reconciliation
+
+- Reconciled current Git state against stale status/index documentation.
+- Recorded current `main` and merged investment-core history.
+- Recorded Batch 2 v0.1 as OPEN / RED-TEAM BLOCKED and not a current capability.
+- Confirmed Human-authoritative company valuation model selection is merged.
+- Corrected the investment return hurdle semantics: positive return >15%; no fixed 1–3 year holding period and no annualized-return core gate.
+- Separated Investment Decision Core from M1.2 Forecast Research state.
+
+### 2026-09-30
+
 - M1.2-FM-01 implementation foundation is PASS; CATL exact historical source ingress remains BLOCKED until an exact M1.1 snapshot is available.
-- Next active task after data admission: `M1.2-FM-02 | PIT Feature Builder`.
+- Next active research task after data admission: M1.2-FM-02 PIT Feature Builder.
 
 ## [0.1.0] — 2026-09-30
 
