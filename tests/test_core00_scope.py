@@ -7,6 +7,7 @@ import re
 ROOT = Path(__file__).resolve().parents[1]
 CORE_DIR = ROOT / "iios_mvp"
 CORE_WORKFLOW = ROOT / ".github" / "workflows" / "iios_mvp.yml"
+FM00_WORKFLOW = ROOT / ".github" / "workflows" / "iios_fm00.yml"
 
 FORBIDDEN_CORE_REFERENCE_TOKENS = (
     "OU-M12-A02-CSI800-NONFIN-PIT-001",
@@ -39,3 +40,10 @@ def test_core_scope_contract_exists_and_sets_the_boundary() -> None:
     assert "MIE is explanatory/conditional infrastructure" in text
     assert "Historical case" in text
     assert "known_at <= cutoff" in text
+
+
+def test_research_fm00_workflow_is_not_bound_to_core_documentation() -> None:
+    text = FM00_WORKFLOW.read_text(encoding="utf-8")
+    assert "'docs/iios/**'" not in text
+    assert "'manifests/iios/**'" not in text
+    assert "research/fm00/**" in text
