@@ -125,6 +125,11 @@ def validate_case(case: dict[str, Any]) -> list[str]:
         selection = select_model(valuation)
         if selection["primary_model"] not in SUPPORTED_MODELS:
             blockers.append("UNSUPPORTED_VALUATION_MODEL")
+        if case.get("company_value_core") is not None:
+            from .value_core import scan_company_value_core
+            core_scan = scan_company_value_core(case["company_value_core"])
+            if selection["economic_profile"] != core_scan["overall_economic_profile"]:
+                blockers.append("VALUE_CORE_MODEL_PROFILE_MISMATCH")
     except ValueError as exc:
         blockers.append(f"VALUATION_MODEL_SELECTION_INVALID:{exc}")
     model = str((valuation.get("model_selection") or {}).get("primary_model") or valuation.get("model") or "")
@@ -288,6 +293,7 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
             "valuation_ready": not any(x.startswith(("INVALID_CURRENT_PRICE", "INVALID_SHARES", "INVALID_BASE", "UNSUPPORTED_MVP")) for x in blockers),
         },
         "forecast": {s: forecast[s] for s in ("bear", "base", "bull")},
+        "value_core_scan": value_core_scan,
         "valuation": {
             "model": primary_model,
             "model_selection": selection,
