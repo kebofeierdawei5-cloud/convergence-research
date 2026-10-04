@@ -529,7 +529,7 @@ def test_p3b_dcf_model_specific_inverse_is_identifiable_and_stable():
     solution = evaluation.feasible_solution_set.solutions[0]
     assert solution.economic_variable == "fcf"
     assert solution.value == Decimal("100")
-    assert result["stability"].state.value == "STABLE"
+    assert result["stability"].state.value == "STABLE", result["stability"]
 
 
 def test_p3b_ddm_model_specific_inverse_is_identifiable():
