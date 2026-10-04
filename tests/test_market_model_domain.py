@@ -33,7 +33,7 @@ def test_model_semantics_cover_all_frozen_families():
         MarketModelFamily.DCF: "fcf",
         MarketModelFamily.DDM: "dividend",
         MarketModelFamily.SOTP: "segment_value",
-        MarketModelFamily.RNVP: "pipeline_value",
+        MarketModelFamily.RNPV: "pipeline_value",
     }
     for family, variable in expected.items():
         economic, observable = semantic_variables_for_model(family)
