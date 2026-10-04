@@ -169,6 +169,12 @@ def test_p4a_json_schema_rejects_unknown_top_level_field():
         "identifiability": "IDENTIFIABLE",
         "stability": "STABLE",
         "candidate_coverage": {
+            "status": "SUFFICIENT",
+            "scope_basis": "admitted_ratio_candidates_v0.2",
+            "candidate_model_ids": ["pe-1", "ps-1"],
+            "evidence_ids": ["ev-coverage"],
+            "rationale": "Explicit candidate scope."
+        },
         "representation": "IMPLIED_POINT",
         "economic_requirements": [{
             "economic_variable": "forward_eps",
@@ -179,20 +185,24 @@ def test_p4a_json_schema_rejects_unknown_top_level_field():
             "accounting_basis": "reported",
             "role": "IMPLIED_PRIMARY",
             "value": "10",
-            "evidence_ids": ["ev-var"],
+            "evidence_ids": ["ev-var"]
         }],
         "observation_basis": {
             "price_observation_id": "price-1",
             "observation_date": "2026-10-04",
             "cutoff_date": "2026-10-04",
             "currency": "CNY",
-            "adjustment_semantics": "UNADJUSTED",
+            "adjustment_semantics": "UNADJUSTED"
         },
         "assumption_set": [],
         "evidence_sufficiency": {
-        "evidence_ids": ["ev-var"],
+            "status": "SUFFICIENT",
+            "rationale": "All required evidence is present.",
+            "evidence_ids": ["ev-var", "ev-coverage"]
+        },
+        "evidence_ids": ["ev-var", "ev-coverage"],
         "qualification": "DECISION_GRADE",
-        "qualification_rationale": "valid schema instance",
+        "qualification_rationale": "valid schema instance"
     }
     assert list(validator.iter_errors(base)) == []
     forged = dict(base, market_implied_net_profit="forbidden")
