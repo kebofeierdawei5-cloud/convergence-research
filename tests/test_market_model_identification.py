@@ -864,3 +864,37 @@ def test_p3b_unknown_observation_evidence_id_is_rejected():
         identify_market_models(
             complex_input(candidate_item, rows, evidence, "current-dividend")
         )
+
+
+def test_p3b_observation_evidence_variable_mismatch_is_rejected():
+    candidate_item = complex_candidate(
+        "ddm-mismatch",
+        MarketModelFamily.DDM,
+        ("dividend", "payout", "growth", "discount_rate"),
+        ("candidate-ddm",),
+    )
+    evidence = (
+        complex_evidence("e-dividend", "growth", "CNY/share"),
+        complex_evidence("e-payout", "payout", "ratio"),
+        complex_evidence("e-growth", "growth", "ratio"),
+        complex_evidence("e-discount_rate", "discount_rate", "ratio"),
+        complex_evidence("candidate-ddm", "ddm_candidate"),
+    )
+    rows = (
+        cobs("h1-dividend", 1, "105", "dividend", "5", "assumption", "CNY/share"),
+        cobs("h1-payout", 1, "105", "payout", "0.40", "assumption", "ratio"),
+        cobs("h1-growth", 1, "105", "growth", "0.05", "assumption", "ratio"),
+        cobs("h1-discount", 1, "105", "discount_rate", "0.10", "assumption", "ratio"),
+        cobs("h2-dividend", 15, "105", "dividend", "5", "assumption", "CNY/share"),
+        cobs("h2-payout", 15, "105", "payout", "0.40", "assumption", "ratio"),
+        cobs("h2-growth", 15, "105", "growth", "0.05", "assumption", "ratio"),
+        cobs("h2-discount", 15, "105", "discount_rate", "0.10", "assumption", "ratio"),
+        cobs("current-dividend", None, "105", "dividend", "5", "assumption", "CNY/share"),
+        cobs("current-payout", None, "105", "payout", "0.40", "assumption", "ratio"),
+        cobs("current-growth", None, "105", "growth", "0.05", "assumption", "ratio"),
+        cobs("current-discount", None, "105", "discount_rate", "0.10", "assumption", "ratio"),
+    )
+    with pytest.raises(ValueError, match="e-dividend"):
+        identify_market_models(
+            complex_input(candidate_item, rows, evidence, "current-dividend")
+        )
