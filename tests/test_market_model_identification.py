@@ -80,6 +80,7 @@ def test_unique_feasible_model_is_identifiable_and_solution_is_model_semantic():
         obs("h1", 1, "100", "5", "forward_eps"),
         obs("h2", 15, "120", "5", "forward_eps"),
         obs("h3", 30, "140", "5", "forward_eps"),
+        obs("h4", 29, "130", "5", "forward_eps"),
         MarketValuationObservation(
             observation_id="current",
             observation_date=CUTOFF,
@@ -102,6 +103,7 @@ def test_unique_feasible_model_is_identifiable_and_solution_is_model_semantic():
     assert solution.range_low == Decimal("4.464285714285714285714285714")
     assert solution.range_high == Decimal("6.25")
     assert result["stability"].state.value == "STABLE"
+    assert len(result["stability"].observations) >= 2
 
 
 def test_multiple_feasible_models_are_ambiguous():
@@ -378,3 +380,27 @@ def test_one_feasible_model_plus_unevaluable_competitor_is_insufficient_evidence
     )
     assert result["identifiability"].state.value == "INSUFFICIENT_EVIDENCE"
     assert result["identifiability"].selected_model_id is None
+
+def test_three_historical_points_without_leave_one_out_window_are_insufficient_for_stability():
+    pe = candidate("pe-1", MarketModelFamily.FORWARD_PE, "forward_eps")
+    observations = (
+        obs("h1", 1, "100", "5", "forward_eps"),
+        obs("h2", 15, "120", "5", "forward_eps"),
+        obs("h3", 30, "140", "5", "forward_eps"),
+        MarketValuationObservation(
+            observation_id="current",
+            observation_date=CUTOFF,
+            known_at=KNOWN,
+            price=Decimal("125"),
+            shares_outstanding=Decimal("100"),
+            economic_variable="forward_eps",
+            economic_value=Decimal("5"),
+            unit="CNY/share",
+            basis="forward",
+            evidence_ids=("e1",),
+            source="test-fixture",
+        ),
+    )
+    result = identify_market_models(base_input([pe], observations))
+    assert result["identifiability"].state.value == "IDENTIFIABLE"
+    assert result["stability"].state.value == "INSUFFICIENT_EVIDENCE"
