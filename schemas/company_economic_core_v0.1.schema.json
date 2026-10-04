@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/company-economic-core-0.1.schema.json",
+  "title": "IIOS Company Economic Core v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "assessment_version", "case_id", "market", "symbol",
+    "as_of_date", "cutoff_date", "status", "evidence_admission", "reality",
+    "trust", "quality", "value_core", "value_driver_ranking", "valuation_route", "audit"
+  ],
+  "properties": {
+    "schema_version": {"const": "IIOS-COMPANY-ECONOMIC-CORE-0.1"},
+    "assessment_version": {"const": "IIOS-COMPANY-ECONOMIC-ASSESSMENT-0.1"},
+    "case_id": {"type": "string", "minLength": 1},
+    "market": {"enum": ["CN-A", "HK"]},
+    "symbol": {"type": "string", "minLength": 1},
+    "as_of_date": {"type": "string", "format": "date"},
+    "cutoff_date": {"type": "string", "format": "date"},
+    "status": {"enum": ["PASS", "CONDITIONAL", "BLOCKED"]},
+    "evidence_admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "count", "evidence_ids", "by_field_group", "sha256"],
+      "properties": {
+        "status": {"const": "ADMITTED"},
+        "count": {"type": "integer", "minimum": 1},
+        "evidence_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "by_field_group": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1}
+          }
+        },
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "reality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "fact_count", "covered_domains", "facts"],
+      "properties": {
+        "status": {"enum": ["ESTABLISHED", "CONDITIONAL", "UNKNOWN"]},
+        "fact_count": {"type": "integer", "minimum": 1},
+        "covered_domains": {
+          "type": "array", "minItems": 4,
+          "items": {"enum": ["business_reality", "capital_structure", "corporate_disclosures", "financial_reality"]}
+        },
+        "facts": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fact_id", "domain", "field_id", "value", "unit", "basis", "observation_date", "evidence_ids", "status"],
+            "properties": {
+              "fact_id": {"type": "string", "minLength": 1},
+              "domain": {"enum": ["business_reality", "financial_reality", "capital_structure", "corporate_disclosures"]},
+              "field_id": {"type": "string", "minLength": 1},
+              "value": {},
+              "unit": {"type": "string"},
+              "basis": {"type": "string", "minLength": 1},
+              "observation_date": {"type": "string", "format": "date"},
+              "evidence_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+              "status": {"enum": ["ESTABLISHED", "CONDITIONAL", "UNKNOWN"]}
+            }
+          }
+        }
+      }
+    },
+    "trust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "dimensions"],
+      "properties": {
+        "status": {"enum": ["PASS", "CONDITIONAL", "BLOCKED"]},
+        "dimensions": {
+          "type": "array", "minItems": 4, "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["dimension", "status", "rationale", "evidence_ids"],
+            "properties": {
+              "dimension": {"enum": ["identity", "disclosure_integrity", "governance_integrity", "shareholder_treatment"]},
+              "status": {"enum": ["PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"]},
+              "rationale": {"type": "string", "minLength": 1},
+              "evidence_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+            }
+          }
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "dimensions"],
+      "properties": {
+        "status": {"enum": ["PASS", "CONDITIONAL", "BLOCKED"]},
+        "dimensions": {
+          "type": "array", "minItems": 6, "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["dimension", "status", "rationale", "evidence_ids"],
+            "properties": {
+              "dimension": {"enum": ["competitive_advantage", "incremental_return_on_capital", "earnings_quality", "cash_flow_conversion", "balance_sheet_resilience", "reinvestment_runway"]},
+              "status": {"enum": ["PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"]},
+              "rationale": {"type": "string", "minLength": 1},
+              "evidence_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+            }
+          }
+        }
+      }
+    },
+    "value_core": {
+      "type": "object",
+      "required": [
+        "schema_version", "status", "overall_economic_profile",
+        "profile_basis", "model_router_input", "model_route", "value_structure",
+        "nodes", "core_assets"
+      ],
+      "properties": {
+        "schema_version": {"const": "IIOS-VALUE-CORE-SCAN-1.0"},
+        "status": {"const": "PASS"},
+        "overall_economic_profile": {"type": "string", "minLength": 1},
+        "profile_basis": {"type": "string", "minLength": 1},
+        "model_router_input": {"type": "string", "minLength": 1},
+        "model_route": {"type": "object"},
+        "value_structure": {"type": "object"},
+        "nodes": {"type": "array", "minItems": 1},
+        "core_assets": {"type": "array", "minItems": 1}
+      }
+    },
+    "value_driver_ranking": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["driver_id", "name", "rank", "materiality", "mechanism", "economic_variables", "evidence_ids"],
+        "properties": {
+          "driver_id": {"type": "string", "minLength": 1},
+          "name": {"type": "string", "minLength": 1},
+          "rank": {"type": "integer", "minimum": 1},
+          "materiality": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+          "mechanism": {"type": "string", "minLength": 1},
+          "economic_variables": {
+            "type": "array", "minItems": 1,
+            "items": {
+              "enum": [
+                "volume", "price", "product_mix", "revenue", "gross_margin",
+                "operating_margin", "opex", "tax", "working_capital", "capex",
+                "depreciation_amortization", "fcf", "incremental_roic",
+                "net_debt", "share_count", "payout", "other"
+              ]
+            }
+          },
+          "evidence_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+        }
+      }
+    },
+    "valuation_route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "economic_profile", "candidate_models", "model_router_suggestion", "selection_authority"],
+      "properties": {
+        "status": {"const": "CANDIDATE_SET_ONLY"},
+        "economic_profile": {"type": "string", "minLength": 1},
+        "candidate_models": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "model_router_suggestion": {"type": "string", "minLength": 1},
+        "selection_authority": {"const": "HUMAN"}
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_sha256", "evidence_manifest_sha256", "generated_at", "core_sha256"],
+      "properties": {
+        "input_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "evidence_manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "generated_at": {"type": "string", "minLength": 1},
+        "core_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}
