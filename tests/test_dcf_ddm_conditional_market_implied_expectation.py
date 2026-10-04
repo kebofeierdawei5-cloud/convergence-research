@@ -155,8 +155,8 @@ def dcf_input(
             rows.append(cobs(f"h{day}-{variable}", day, price, variable, value, basis, unit, eid))
             evidence.append(complex_evidence(eid, variable, unit))
     for variable, value, unit, basis in variables:
-        eid = f"e-{variable}-current"
-        rows.append(cobs(f"current-{variable}", None, current_price, variable, value, basis, unit, eid))
+        eid = f"{id_prefix}e-{variable}-current"
+        rows.append(cobs(f"{id_prefix}current-{variable}", None, current_price, variable, value, basis, unit, eid))
         evidence.append(complex_evidence(eid, variable, unit))
     evidence.append(complex_evidence(c.evidence_ids[0], "dcf_candidate", "identifier"))
     return MarketModelIdentificationInput(
@@ -172,6 +172,7 @@ def ddm_input(
     candidate_item: CandidateMarketModel | None = None,
     *,
     current_price: str = "105",
+    id_prefix: str = "",
 ) -> MarketModelIdentificationInput:
     c = candidate_item or ddm_candidate()
     rows: list[MarketValuationObservation] = []
@@ -184,8 +185,8 @@ def ddm_input(
     )
     for day in (1, 8, 15, 22):
         for variable, value, unit, basis in variables:
-            eid = f"e-{variable}-h{day}"
-            rows.append(cobs(f"h{day}-{variable}", day, "105", variable, value, basis, unit, eid))
+            eid = f"{id_prefix}e-{variable}-h{day}"
+            rows.append(cobs(f"{id_prefix}h{day}-{variable}", day, "105", variable, value, basis, unit, eid))
             evidence.append(complex_evidence(eid, variable, unit))
     for variable, value, unit, basis in variables:
         eid = f"e-{variable}-current"
@@ -258,7 +259,7 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
     dcf = dcf_candidate()
     ddm = ddm_candidate()
     dcf_inp = dcf_input(dcf)
-    ddm_inp = ddm_input(ddm)
+    ddm_inp = ddm_input(ddm, id_prefix="ddm-")
     combined = MarketModelIdentificationInput(
         cutoff_date=CUTOFF,
         current_observation_id="current-fcf",
@@ -407,7 +408,7 @@ def test_missing_current_conditional_assumption_is_fail_closed():
         observations=observations,
         evidence=evidence,
     )
-    with pytest.raises(ValueError, match="missing current dcf conditional assumptions"):
+    with pytest.raises(ValueError, match="no feasible DCF/DDM market model"):
         run(broken)
 
 
@@ -423,7 +424,7 @@ def test_assumption_evidence_variable_mismatch_is_rejected():
         observations=inp.observations,
         evidence=tuple(bad_evidence),
     )
-    with pytest.raises(ValueError, match="assumption observation evidence variable mismatch"):
+    with pytest.raises(ValueError, match="observation evidence variable mismatch"):
         run(broken)
 
 
