@@ -499,7 +499,7 @@ def test_rnpv_pipeline_id_mismatch_is_rejected():
         observations=tuple(rows),
         evidence=inp.evidence,
     )
-    with pytest.raises(ValueError, match="P3"):
+    with pytest.raises(ValueError, match="no feasible SOTP/rNPV market model"):
         run(broken)
 
 
@@ -541,10 +541,11 @@ def test_unknown_provenance_is_rejected():
         observations=tuple(rows),
         evidence=inp.evidence,
     )
+    valid_p3 = identify_market_models(sotp_input())
     with pytest.raises(ValueError, match="unknown evidence_id"):
         build_sotp_rnpv_market_implied_expectations(
             identification_input=broken,
-            identification={"status": "BLOCKED"},
+            identification=valid_p3,
             candidate_coverage=coverage(broken),
             evidence_sufficiency=evidence_sufficient(broken),
             currency="CNY",
