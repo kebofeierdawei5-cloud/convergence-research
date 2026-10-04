@@ -95,6 +95,7 @@ def route_model(economic_profile: str) -> dict[str, Any]:
         "economic_profile": assessment["economic_profile"],
         "candidate_models": [x["model"] for x in ranked[:4]],
         "model_suitability": ranked,
+        "model_router_suggestion": ranked[0]["model"],
     }
 
 
