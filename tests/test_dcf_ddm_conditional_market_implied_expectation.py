@@ -16,6 +16,11 @@ from iios_mvp.market_model_domain import (
     FeasibleSolution,
     FeasibleSolutionSet,
     FeasibleSolutionStatus,
+    IdentifiabilityResult,
+    StabilityObservation,
+    StabilityResult,
+    IdentifiabilityState,
+    StabilityState,
     MarketModelFamily,
     MarketObservableEvidence,
 )
@@ -261,6 +266,8 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
     ddm = ddm_candidate()
     dcf_inp = dcf_input(dcf, current_price="105", fcf_value="5")
     ddm_inp = ddm_input(ddm, id_prefix="ddm-", current_price="105")
+    dcf_p3 = identify_market_models(dcf_inp)
+    ddm_p3 = identify_market_models(ddm_inp)
     combined = MarketModelIdentificationInput(
         cutoff_date=CUTOFF,
         current_observation_id="current-fcf",
@@ -272,7 +279,50 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
             if item.evidence_id not in {e.evidence_id for e in dcf_inp.evidence}
         ),
     )
-    outputs = run(combined)
+    identification = {
+        "status": "PASS",
+        "method": "model_specific_inverse_v0.2",
+        "evaluations": dcf_p3["evaluations"] + ddm_p3["evaluations"],
+        "identifiability": IdentifiabilityResult(
+            state=IdentifiabilityState.AMBIGUOUS,
+            feasible_model_ids=("dcf-1", "ddm-1"),
+            selected_model_id=None,
+            competing_model_ids=("dcf-1", "ddm-1"),
+            evidence_ids=tuple(sorted(set(
+                dcf_p3["identifiability"].evidence_ids
+                + ddm_p3["identifiability"].evidence_ids
+            ))),
+            rationale="Red-team typed ambiguity: both DCF and DDM remain materially feasible.",
+        ),
+        "stability": StabilityResult(
+            state=StabilityState.STABLE,
+            assessment_method="typed-fixture",
+            observations=(
+                StabilityObservation(
+                    perturbation_id="p4c-amb-1",
+                    perturbation="leave-one-date-out fixture",
+                    resulting_state=StabilityState.STABLE,
+                    selected_model_id=None,
+                ),
+            ),
+            evidence_ids=tuple(sorted(set(
+                dcf_p3["stability"].evidence_ids
+                + ddm_p3["stability"].evidence_ids
+            ))),
+            rationale="Red-team typed stable ambiguity.",
+        ),
+    }
+    outputs = build_dcf_ddm_conditional_market_implied_expectations(
+        identification_input=combined,
+        identification=identification,
+        candidate_coverage=coverage(combined),
+        evidence_sufficiency=evidence_sufficient(combined),
+        currency="CNY",
+        adjustment_semantics="UNADJUSTED",
+        period="NTM",
+        horizon="12M",
+        accounting_basis="reported",
+    )
     assert {output.model_id for output in outputs} == {"dcf-1", "ddm-1"}
     assert all(output.qualification == MIEQualification.CONDITIONAL_ONLY for output in outputs)
 
