@@ -92,8 +92,6 @@ class MarketValuationObservation:
             raise ValueError("unit, basis and source are required")
         if not self.evidence_ids:
             raise ValueError("evidence_ids are required")
-        if self.net_debt < 0 and self.net_debt == 0:
-            raise ValueError("net_debt numeric validation failed")
 
 
 @dataclass(frozen=True)
@@ -125,8 +123,14 @@ class MarketModelIdentificationInput:
         if self.current_observation_id not in set(observation_ids):
             raise ValueError("current_observation_id not found in observations")
 
+        evidence_ids = {item.evidence_id for item in self.evidence}
         for candidate in self.candidates:
             candidate.validate()
+            missing = set(candidate.evidence_ids) - evidence_ids
+            if missing:
+                raise ValueError(
+                    f"candidate {candidate.model_id} references unknown evidence_ids: {sorted(missing)}"
+                )
         for item in self.observations:
             item.validate(self.cutoff_date)
         for item in self.evidence:
@@ -151,8 +155,9 @@ def _multiple(observation: MarketValuationObservation, family: MarketModelFamily
 
 
 def _evidence_index(evidence: Iterable[MarketObservableEvidence]) -> dict[str, MarketObservableEvidence]:
-    indexed = {item.evidence_id: item for item in evidence}
-    if len(indexed) != len(tuple(evidence)):
+    evidence_items = tuple(evidence)
+    indexed = {item.evidence_id: item for item in evidence_items}
+    if len(indexed) != len(evidence_items):
         raise ValueError("duplicate evidence_id")
     return indexed
 
@@ -188,7 +193,7 @@ def _fit_candidate(
     candidate: CandidateMarketModel,
     observations: Sequence[MarketValuationObservation],
     evidence_index: Mapping[str, MarketObservableEvidence],
-    cutoff_date: date,
+    current_observation_date: date,
     required_historical_points: int = 2,
 ) -> CandidateEvaluation:
     if candidate.family in UNSUPPORTED_FAMILIES:
@@ -212,8 +217,28 @@ def _fit_candidate(
     if expected_variable is None:
         raise ValueError(f"no primary economic variable defined for {candidate.family.value}")
 
-    current = max(matched, key=lambda x: (x.observation_date, x.known_at))
-    historical = [item for item in matched if item.observation_id != current.observation_id]
+    current_candidates = [
+        item for item in matched
+        if item.observation_date == current_observation_date
+    ]
+    if not current_candidates:
+        diagnostic = FitDiagnostic(
+            diagnostic_id=f"{candidate.model_id}:current_coverage",
+            name="current_coverage",
+            status="INSUFFICIENT_EVIDENCE",
+            evidence_ids=_observation_evidence_ids(matched, evidence_index),
+            notes="No current-date observation exists for the candidate's economic variable.",
+        )
+        fit = ModelFit(
+            model_id=candidate.model_id,
+            status=ModelFitStatus.INSUFFICIENT_EVIDENCE,
+            diagnostics=(diagnostic,),
+            evidence_ids=diagnostic.evidence_ids,
+            constraints=("CURRENT_OBSERVATION_REQUIRED",),
+        )
+        return CandidateEvaluation(fit, None)
+    current = max(current_candidates, key=lambda x: (x.known_at, x.observation_id))
+    historical = [item for item in matched if item.observation_date < current_observation_date]
 
     all_ids = _observation_evidence_ids(matched, evidence_index)
     diagnostics: list[FitDiagnostic] = []
@@ -394,10 +419,11 @@ def _stability(
     full_evaluations: Sequence[CandidateEvaluation],
     full_ident: IdentifiabilityResult,
 ) -> StabilityResult:
-    current = next(
+    anchor = next(
         item for item in inp.observations
         if item.observation_id == inp.current_observation_id
     )
+    current_observation_date = anchor.observation_date
     historical = sorted(
         (item for item in inp.observations if item.observation_id != current.observation_id),
         key=lambda x: x.observation_date,
@@ -428,7 +454,7 @@ def _stability(
     for index, historical_window in enumerate(windows):
         window_observations = tuple(historical_window) + (current,)
         evaluations = [
-            _fit_candidate(candidate, window_observations, _evidence_index(inp.evidence), inp.cutoff_date)
+            _fit_candidate(candidate, window_observations, _evidence_index(inp.evidence), current_observation_date)
             for candidate in inp.candidates
         ]
         ident = _identify(evaluations)
@@ -476,7 +502,16 @@ def identify_market_models(inp: MarketModelIdentificationInput) -> dict[str, obj
     evidence_index = _evidence_index(inp.evidence)
 
     evaluations = [
-        _fit_candidate(candidate, inp.observations, evidence_index, inp.cutoff_date)
+        _fit_candidate(
+            candidate,
+            inp.observations,
+            evidence_index,
+            next(
+                item.observation_date
+                for item in inp.observations
+                if item.observation_id == inp.current_observation_id
+            ),
+        )
         for candidate in inp.candidates
     ]
     ident = _identify(evaluations)
