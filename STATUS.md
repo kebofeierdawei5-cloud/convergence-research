@@ -25,7 +25,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 
 ## CORE-01 Active Boundary
 
-- Current execution gate: **CORE-01 Single Company Research Intake**
+- Current execution gate: **CORE-02 Company Economic Core**
 - Minimal user input: market + symbol + as-of/cutoff + current position
 - Output: deterministic, auditable single-company Research Case Envelope
 - Identity/price/factual fields are evidence-dependent; no fabricated company data
@@ -40,6 +40,13 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - A02 completion is **not** an Investment Core release gate
 - Historical single-company cases still require defensible PIT `known_at` semantics
 - P3/P4 MIE infrastructure is retained; under B1 v0.3 MIE is explanatory/non-mandatory for BUY/ADD
+
+## CORE-01 Completed Boundary
+
+- CORE-01 is **PASS / MERGED** on canonical `main`.
+- Minimal input now creates a deterministic Research Case Envelope.
+- Evidence/identity/price remain evidence-dependent and cannot be fabricated.
+- PIT remains mandatory; historical current-state substitution is forbidden.
 
 ## Investment Decision Core
 
@@ -281,9 +288,9 @@ B1 semantic package and runtime migration accepted on the repair line. Evidence:
 
 ## Immediate Next Engineering Step
 
-**CORE-01 — Single Company Research Intake.**
+**CORE-02 — Company Economic Core.**
 
-CORE-00 is merged and accepted on canonical `main`. The current Investment Core path is now CORE-01. After CORE-01 acceptance, the next gate is CORE-02 Company Economic Core.
+CORE-00 and CORE-01 are merged and accepted on canonical `main`. The next Investment Core gate is CORE-02: admitted company evidence → Reality → Trust → Quality → Value Core → valuation-model route input.
 
 P4-A through P4-F are complete. P5 must compare economically equivalent independent variables against the P4 model-semantic market requirement, fail closed on incompatible or ambiguous interpretations, validate Bear/Base/Bull probabilities, and enforce strict positive Expected Return >15% before any decision layer.
 
