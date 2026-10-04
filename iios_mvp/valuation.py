@@ -229,9 +229,93 @@ def _ddm(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, sha
             "drivers": {"dividend_per_share": float(dividend), "required_return": float(r), "growth": float(g)}}
 
 
+def _rnpv_asset_value(asset: dict[str, Any], default_discount_rate: Decimal, prefix: str) -> tuple[Decimal, dict[str, Any]]:
+    cash_flows = asset.get("cash_flows") or []
+    if not cash_flows:
+        raise ValueError(f"{prefix}.cash_flows is required")
+
+    discount_rate = _positive(asset.get("discount_rate", default_discount_rate), f"{prefix}.discount_rate")
+    launch_delay = asset.get("launch_delay_periods", 0)
+    try:
+        launch_delay = int(launch_delay)
+    except (TypeError, ValueError):
+        raise ValueError(f"{prefix}.launch_delay_periods must be an integer")
+    if launch_delay < 0:
+        raise ValueError(f"{prefix}.launch_delay_periods must be >= 0")
+
+    probabilities = asset.get("probability_of_success", 1)
+    if isinstance(probabilities, list):
+        if len(probabilities) != len(cash_flows):
+            raise ValueError(f"{prefix}.probability_of_success length must equal cash_flows length")
+        probability_path = probabilities
+    else:
+        probability_path = [probabilities] * len(cash_flows)
+
+    pv = Decimal("0")
+    for i, (cf_item, probability) in enumerate(zip(cash_flows, probability_path), 1):
+        if isinstance(cf_item, dict):
+            cf = dec(cf_item.get("cash_flow"), f"{prefix}.cash_flows[{i-1}].cash_flow")
+            risk_adjust = bool(cf_item.get("risk_adjust", True))
+        else:
+            cf = dec(cf_item, f"{prefix}.cash_flows[{i-1}]")
+            risk_adjust = True
+
+        p = dec(probability, f"{prefix}.probability_of_success[{i-1}]")
+        if p < 0 or p > 1:
+            raise ValueError(f"{prefix}.probability_of_success must be between 0 and 1")
+
+        period = launch_delay + i
+        adjusted_cf = cf * p if risk_adjust else cf
+        pv += adjusted_cf / ((Decimal("1") + discount_rate) ** period)
+
+    return pv, {
+        "name": asset.get("name"),
+        "periods": len(cash_flows),
+        "launch_delay_periods": launch_delay,
+        "discount_rate": float(discount_rate),
+    }
+
+
 def _rnpv(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shares: Decimal) -> dict[str, Any]:
     inp = valuation.get("model_inputs", {}).get("rnpv", {})
     row = inp.get(scenario) or inp
+
+    pipeline = row.get("pipeline") or row.get("assets")
+    if pipeline:
+        default_discount_rate = _positive(row.get("discount_rate"), f"valuation.model_inputs.rnpv.{scenario}.discount_rate")
+        asset_values = []
+        pv = Decimal("0")
+        for index, asset in enumerate(pipeline):
+            if not isinstance(asset, dict):
+                raise ValueError(f"valuation.model_inputs.rnpv.{scenario}.pipeline[{index}] must be an object")
+            value, meta = _rnpv_asset_value(
+                asset, default_discount_rate,
+                f"valuation.model_inputs.rnpv.{scenario}.pipeline[{index}]",
+            )
+            pv += value
+            meta["pv"] = float(value)
+            asset_values.append(meta)
+
+        other_assets = dec(row.get("other_assets", 0), f"valuation.model_inputs.rnpv.{scenario}.other_assets")
+        net_debt = dec(row.get("net_debt", 0), f"valuation.model_inputs.rnpv.{scenario}.net_debt")
+        equity = pv + other_assets - net_debt
+        if equity <= 0:
+            raise ValueError("rNPV implied equity value must be > 0")
+        return {
+            "model": "rnpv",
+            "equity_value": float(equity),
+            "value_per_share": float(equity / shares),
+            "drivers": {
+                "asset_count": len(asset_values),
+                "discount_rate": float(default_discount_rate),
+                "other_assets": float(other_assets),
+                "net_debt": float(net_debt),
+                "assets": asset_values,
+                "probability_method": "asset_level_risk_adjusted_cash_flows",
+            },
+        }
+
+    # Backward-compatible legacy rNPV contract.
     cash_flows = row.get("cash_flows")
     probabilities = row.get("probability_of_success")
     if not cash_flows or probabilities is None or len(cash_flows) != len(probabilities):
@@ -252,19 +336,18 @@ def _rnpv(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, sh
             "drivers": {"discount_rate": float(discount_rate), "periods": len(cash_flows),
                         "probability_method": "period_cash_flow_probability", "net_debt": float(net_debt)}}
 
-
 def _segment_value(segment: dict[str, Any]) -> Decimal:
     model = segment.get("model")
     if model == "forward_pe":
-        return _positive(segment.get("net_profit"), "sotp.segment.net_profit") * _positive(segment.get("multiple"), "sotp.segment.multiple")
-    if model == "ps":
-        return _positive(segment.get("revenue"), "sotp.segment.revenue") * _positive(segment.get("multiple"), "sotp.segment.multiple")
-    if model == "pb":
-        return _positive(segment.get("book_equity"), "sotp.segment.book_equity") * _positive(segment.get("multiple"), "sotp.segment.multiple")
-    if model == "ev_ebitda":
+        value = _positive(segment.get("net_profit"), "sotp.segment.net_profit") * _positive(segment.get("multiple"), "sotp.segment.multiple")
+    elif model == "ps":
+        value = _positive(segment.get("revenue"), "sotp.segment.revenue") * _positive(segment.get("multiple"), "sotp.segment.multiple")
+    elif model == "pb":
+        value = _positive(segment.get("book_equity"), "sotp.segment.book_equity") * _positive(segment.get("multiple"), "sotp.segment.multiple")
+    elif model == "ev_ebitda":
         ebitda = _positive(segment.get("ebitda"), "sotp.segment.ebitda")
-        return ebitda * _positive(segment.get("multiple"), "sotp.segment.multiple") - dec(segment.get("net_debt", 0), "sotp.segment.net_debt")
-    if model == "dcf":
+        value = ebitda * _positive(segment.get("multiple"), "sotp.segment.multiple") - dec(segment.get("net_debt", 0), "sotp.segment.net_debt")
+    elif model == "dcf":
         fcfs = segment.get("fcf") or []
         r = _positive(segment.get("discount_rate"), "sotp.segment.discount_rate")
         g = dec(segment.get("terminal_growth"), "sotp.segment.terminal_growth")
@@ -272,47 +355,114 @@ def _segment_value(segment: dict[str, Any]) -> Decimal:
             raise ValueError("invalid SOTP DCF segment")
         pv = sum((dec(x, "sotp.segment.fcf") / ((Decimal("1") + r) ** i) for i, x in enumerate(fcfs, 1)), Decimal("0"))
         terminal = dec(fcfs[-1], "sotp.segment.fcf[-1]") * (Decimal("1") + g) / (r - g)
-        return pv + terminal / ((Decimal("1") + r) ** len(fcfs))
-    if model == "ddm":
+        value = pv + terminal / ((Decimal("1") + r) ** len(fcfs))
+    elif model == "ddm":
         d = _positive(segment.get("dividend_per_share"), "sotp.segment.dividend_per_share")
         r = _positive(segment.get("required_return"), "sotp.segment.required_return")
         g = dec(segment.get("growth"), "sotp.segment.growth")
         if g < 0 or g >= r:
             raise ValueError("invalid SOTP DDM segment")
-        return d * (Decimal("1") + g) / (r - g) * _positive(segment.get("shares"), "sotp.segment.shares")
-    if model == "rnpv":
+        value = d * (Decimal("1") + g) / (r - g) * _positive(segment.get("shares"), "sotp.segment.shares")
+    elif model == "rnpv":
         cash_flows = segment.get("cash_flows") or []
         probabilities = segment.get("probability_of_success")
         r = _positive(segment.get("discount_rate"), "sotp.segment.discount_rate")
-        if not cash_flows or probabilities is None or len(cash_flows) != len(probabilities):
+        if not cash_flows or probabilities is None:
             raise ValueError("invalid SOTP rNPV segment")
+        if not isinstance(probabilities, list):
+            probabilities = [probabilities] * len(cash_flows)
+        if len(cash_flows) != len(probabilities):
+            raise ValueError("invalid SOTP rNPV probability path")
         pv = Decimal("0")
+        delay = int(segment.get("launch_delay_periods", 0))
         for i, (cf, probability) in enumerate(zip(cash_flows, probabilities), 1):
             p = dec(probability, "sotp.segment.probability_of_success")
             if p < 0 or p > 1:
                 raise ValueError("invalid SOTP rNPV probability")
-            pv += dec(cf, "sotp.segment.cash_flow") * p / ((Decimal("1") + r) ** i)
-        return pv - dec(segment.get("net_debt", 0), "sotp.segment.net_debt")
-    raise ValueError(f"unsupported SOTP segment model: {model}")
+            pv += dec(cf, "sotp.segment.cash_flow") * p / ((Decimal("1") + r) ** (delay + i))
+        value = pv - dec(segment.get("net_debt", 0), "sotp.segment.net_debt")
+    else:
+        raise ValueError(f"unsupported SOTP segment model: {model}")
+
+    ownership = dec(segment.get("ownership_pct", 100), "sotp.segment.ownership_pct")
+    if ownership < 0 or ownership > 100:
+        raise ValueError("sotp.segment.ownership_pct must be between 0 and 100")
+    return value * ownership / Decimal("100")
 
 
 def _sotp(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shares: Decimal) -> dict[str, Any]:
     inp = valuation.get("model_inputs", {}).get("sotp", {})
-    segments = inp.get(scenario) or inp.get("segments") or []
+    segments = inp.get(scenario) or inp.get("segments")
     if not segments:
         raise ValueError(f"valuation.model_inputs.sotp.{scenario} is required")
-    gross = sum((_segment_value(s) for s in segments), Decimal("0"))
+    segment_values = []
+    gross = Decimal("0")
+    for index, segment in enumerate(segments):
+        value = _segment_value(segment)
+        gross += value
+        segment_values.append({
+            "name": segment.get("name", f"segment-{index + 1}"),
+            "model": segment.get("model"),
+            "ownership_pct": float(dec(segment.get("ownership_pct", 100), "sotp.segment.ownership_pct")),
+            "equity_value": float(value),
+        })
     net_debt = dec(inp.get("net_debt", 0), "valuation.model_inputs.sotp.net_debt")
     other = dec(inp.get("other_assets", 0), "valuation.model_inputs.sotp.other_assets")
     equity = gross + other - net_debt
     if equity <= 0:
         raise ValueError("SOTP implied equity value must be > 0")
     return {
-        "model": "sotp", "equity_value": float(equity), "value_per_share": float(equity / shares),
-        "drivers": {"segment_count": len(segments), "other_assets": float(other), "net_debt": float(net_debt),
-                    "segment_models": [str(s.get("model")) for s in segments]},
+        "model": "sotp",
+        "equity_value": float(equity),
+        "value_per_share": float(equity / shares),
+        "drivers": {
+            "segment_count": len(segment_values),
+            "other_assets": float(other),
+            "net_debt": float(net_debt),
+            "segments": segment_values,
+        },
     }
 
+
+def evaluate_intrinsic_value_gate(result: dict[str, Any]) -> dict[str, Any]:
+    blockers: list[str] = []
+    selection = result.get("model_selection") or {}
+    scenarios = result.get("scenarios") or {}
+    for key in ("bear_value_per_share", "base_value_per_share", "bull_value_per_share"):
+        value = scenarios.get(key)
+        if value is None:
+            blockers.append(f"MISSING_SCENARIO_VALUE:{key}")
+    if blockers:
+        return {"status": "BLOCKED", "blockers": blockers}
+
+    bear = dec(scenarios["bear_value_per_share"], "scenarios.bear")
+    base = dec(scenarios["base_value_per_share"], "scenarios.base")
+    bull = dec(scenarios["bull_value_per_share"], "scenarios.bull")
+    if not (bear <= base <= bull):
+        blockers.append("SCENARIO_ORDER_INVALID")
+    if bear <= 0 or base <= 0 or bull <= 0:
+        blockers.append("NON_POSITIVE_INTRINSIC_VALUE")
+
+    if not selection.get("primary_model"):
+        blockers.append("PRIMARY_MODEL_MISSING")
+    if not selection.get("economic_profile"):
+        blockers.append("ECONOMIC_PROFILE_MISSING")
+    if not selection.get("rationale"):
+        blockers.append("MODEL_SELECTION_RATIONALE_MISSING")
+
+    primary = selection.get("primary_model")
+    primary_status = (result.get("model_status") or {}).get(primary) or {}
+    for scenario in ("bear", "base", "bull"):
+        if primary_status.get(f"{scenario}_status") != "PASS":
+            blockers.append(f"PRIMARY_MODEL_{scenario.upper()}_NOT_PASS")
+
+    aggregation = result.get("aggregation") or {}
+    weights = aggregation.get("weights") or {}
+    total = sum((dec(v, f"aggregation.weights.{k}") for k, v in weights.items()), Decimal("0"))
+    if abs(total - Decimal("1")) > Decimal("0.0000001"):
+        blockers.append("AGGREGATION_WEIGHTS_NOT_ONE")
+
+    return {"status": "PASS" if not blockers else "BLOCKED", "blockers": blockers}
 
 def value_scenario(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shares: Decimal) -> dict[str, Any]:
     model = select_model(valuation)["primary_model"]
