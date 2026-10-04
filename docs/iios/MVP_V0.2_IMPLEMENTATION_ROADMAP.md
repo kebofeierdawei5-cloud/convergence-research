@@ -236,15 +236,23 @@ P2-A is a contract/integration gate only; it is not the production v0.2 decision
 
 ### P2-B — Market Model Identification v0.2 foundation
 
-Status: **NEXT**
+Status: **COMPLETE / FINAL PASS / MERGED**
 
 Do not extend Batch 2 v0.1. Build the market-side foundation directly from the frozen contract.
 
-First establish canonical acceptance cases for materially different model families, then define the typed interfaces:
+Completed foundation deliverables:
 
-`Market Observable Evidence → Candidate Models → Model-specific Evidence Requirements → Feasible Solution Set → Identifiability → Stability`
+- canonical P2-B Market Model Acceptance Matrix v0.2
+- typed MarketObservableEvidence / CandidateMarketModel / ModelFit / FeasibleSolutionSet / Identifiability / Stability objects
+- machine-readable market-model domain schema
+- deterministic foundation invariant tests
+- CI integration and replay regression preservation
 
-P2-B acceptance should prove, with deterministic fixtures, that:
+Acceptance evidence: `docs/iios/P2B_FOUNDATION_ACCEPTANCE_2026-10-04.md`.
+
+P3 now owns production implementation of the interfaces established here.
+
+P2-B acceptance proved, with deterministic fixtures, that:
 
 - PE / PS / PB / EV-EBITDA use model-specific economic variables;
 - DCF / DDM / SOTP / rNPV do not collapse into implied net profit;
