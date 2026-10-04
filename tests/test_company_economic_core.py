@@ -203,6 +203,7 @@ def test_post_cutoff_evidence_fails_closed():
     case = dict(inputs[0])
     case["evidence"] = [dict(row) for row in case["evidence"]]
     case["evidence"][0]["known_at"] = "2026-10-05T00:00:00+08:00"
+    case["evidence"][0]["retrieved_at"] = "2026-10-05T00:00:00+08:00"
     inputs[0] = case
     with pytest.raises(ValueError, match="PIT-qualified"):
         build_company_economic_core(*inputs)
