@@ -142,7 +142,7 @@ Examples:
 
 Thus 15% annualized over 1–3 years is not equivalent to a single 15% total-return hurdle.
 
-The target is a distinct strategic metric. Whether it is a hard BUY gate, a soft attractiveness target, or a portfolio objective belongs to the Decision Semantics ADR.
+The target is a distinct strategic metric. For the standard fundamental-investment strategy, B1 adopts it as a hard qualification condition for BUY/ADD: Expected Annualized Return_H MUST be >= 15%. This does not turn the target into the Entry Return Cushion, and a Human override must be explicitly labeled as a strategy-policy exception rather than silently weakening the target.
 
 ## 10. Required Return
 
@@ -186,7 +186,7 @@ Subject to Decision Semantics, B1 proposes:
 1. Entry Return Cushion >= 15%;
 2. valid scenario probabilities when probability-weighted Expected Return is used;
 3. Expected Annualized Return_H >= RR_annual;
-4. the fundamental target policy is satisfied if Decision Semantics designates it as a hard gate.
+4. Expected Annualized Return_H >= FUNDAMENTAL_TARGET_ANNUALIZED_RETURN for standard fundamental BUY/ADD.
 
 This is a conjunction, not an additive hurdle.
 
