@@ -125,3 +125,71 @@ def test_trigger_contract_and_event_are_hashed_and_immutable(tmp_path):
     assert len(e["trigger_event_hash"]) == 64
     write_trigger_contract(tmp_path, "CN-A-300750-r001", contract)
     write_trigger_event(tmp_path, event)
+
+
+def test_valuation_model_selection_is_not_pe_only():
+    from iios_mvp.valuation import select_model
+    selection = select_model({
+        "model_selection": {
+            "primary_model": "dcf",
+            "economic_profile": "cash_flow_business",
+            "rationale": "cash flow is the principal economic value driver",
+            "alternatives": ["forward_pe"],
+        }
+    })
+    assert selection["primary_model"] == "dcf"
+
+
+def test_dcf_intrinsic_value_is_deterministic():
+    from decimal import Decimal
+    from iios_mvp.valuation import value_scenario
+    forecast = {s: {"net_profit": 1} for s in ("bear", "base", "bull")}
+    valuation = {
+        "model_selection": {
+            "primary_model": "dcf",
+            "economic_profile": "cash_flow_business",
+            "rationale": "cash flow is the principal economic value driver",
+        },
+        "model_inputs": {
+            "dcf": {
+                "base": {
+                    "fcf": [100, 110, 121],
+                    "discount_rate": 0.10,
+                    "terminal_growth": 0.03,
+                },
+                "net_debt": 0,
+            }
+        },
+    }
+    a = value_scenario(forecast, valuation, "base", Decimal("10"))
+    b = value_scenario(forecast, valuation, "base", Decimal("10"))
+    assert a == b
+    assert a["model"] == "dcf"
+    assert a["value_per_share"] > 0
+
+
+def test_sotp_values_segments_independently():
+    from decimal import Decimal
+    from iios_mvp.valuation import value_scenario
+    forecast = {s: {"net_profit": 1} for s in ("bear", "base", "bull")}
+    valuation = {
+        "model_selection": {
+            "primary_model": "sotp",
+            "economic_profile": "mixed_businesses",
+            "rationale": "material businesses have different value drivers",
+        },
+        "model_inputs": {
+            "sotp": {
+                "base": [
+                    {"name": "mature", "model": "forward_pe", "net_profit": 100, "multiple": 10},
+                    {"name": "growth", "model": "forward_pe", "net_profit": 50, "multiple": 20},
+                ],
+                "net_debt": 50,
+                "other_assets": 100,
+            }
+        },
+    }
+    result = value_scenario(forecast, valuation, "base", Decimal("10"))
+    assert result["model"] == "sotp"
+    assert result["drivers"]["segment_count"] == 2
+    assert result["equity_value"] == 2000.0
