@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/core03-research-package-0.1.schema.json",
+  "title": "IIOS CORE-03 Real 300750 Package v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version","case_id","symbol","as_of_date","cutoff_date","status",
+    "research_question","core02_status","independent_forecast","company_valuation",
+    "p4f_market_implied_expectation","expectation_gap","b1_decision_constraint","audit"
+  ],
+  "properties": {
+    "schema_version":{"const":"IIOS-CORE-03-REAL-0.1"},
+    "case_id":{"const":"RC-CN-A-300750-20261004"},
+    "symbol":{"const":"300750"},
+    "as_of_date":{"type":"string","format":"date"},
+    "cutoff_date":{"type":"string","format":"date"},
+    "status":{"enum":["PASS","CONDITIONAL","BLOCKED"]},
+    "research_question":{"type":"string","minLength":1},
+    "core02_status":{"enum":["PASS","CONDITIONAL","BLOCKED"]},
+    "independent_forecast":{"type":"object"},
+    "company_valuation":{
+      "type":"object",
+      "required":["status","primary_model","selection_authority","intrinsic_value_per_share","intrinsic_value_range","probability_weighted_value_per_share","expected_3y_cagr_at_current_price","current_price_cny","base_upside_vs_price","expected_value_upside_vs_price","engine_output"],
+      "properties":{
+        "status":{"enum":["PASS","CONDITIONAL","BLOCKED"]},
+        "primary_model":{"const":"dcf"},
+        "selection_authority":{"const":"HUMAN"},
+        "intrinsic_value_per_share":{"type":"string"},
+        "intrinsic_value_range":{"type":"object"},
+        "probability_weighted_value_per_share":{"type":"string"},
+        "expected_3y_cagr_at_current_price":{"type":"string"},
+        "current_price_cny":{"const":"291.11"},
+        "base_upside_vs_price":{"type":"string"},
+        "expected_value_upside_vs_price":{"type":"string"},
+        "engine_output":{"type":"object"}
+      }
+    },
+    "p4f_market_implied_expectation":{
+      "type":"object",
+      "required":["status","resolution_state","qualification","snapshot_hash","reason","replay"],
+      "properties":{
+        "status":{"const":"BLOCKED"},
+        "resolution_state":{"const":"INSUFFICIENT_EVIDENCE"},
+        "qualification":{"const":"BLOCKED"},
+        "snapshot_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+        "reason":{"type":"string","minLength":1},
+        "replay":{"type":"object"}
+      }
+    },
+    "expectation_gap":{
+      "type":"object",
+      "required":["status","reason","not_substituted_by_intrinsic_upside"],
+      "properties":{
+        "status":{"const":"BLOCKED"},
+        "reason":{"type":"string","minLength":1},
+        "not_substituted_by_intrinsic_upside":{"const":true}
+      }
+    },
+    "b1_decision_constraint":{
+      "type":"object",
+      "required":["not_a_decision","expected_annualized_return_reference","fundamental_15pct_reference_pass"],
+      "properties":{
+        "not_a_decision":{"const":true},
+        "expected_annualized_return_reference":{"type":"string"},
+        "fundamental_15pct_reference_pass":{"type":"boolean"}
+      }
+    },
+    "audit":{
+      "type":"object",
+      "required":["input_sha256","generated_at","core_sha256"],
+      "properties":{
+        "input_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+        "generated_at":{"type":"string","minLength":1},
+        "core_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}
