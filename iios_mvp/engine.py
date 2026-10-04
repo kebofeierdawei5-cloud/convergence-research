@@ -38,6 +38,15 @@ def _date(value: Any, field: str) -> date:
 
 
 def validate_case(case: dict[str, Any]) -> list[str]:
+    # v0.2 cases MUST enter through the frozen contract validator. The legacy
+    # MVP path remains available only for pre-v0.2 demo/replay compatibility.
+    if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.2":
+        from .investment_core_contract import validate_investment_core_case
+        result = validate_investment_core_case(case)
+        return [
+            f"{item['code']}:{item['path']}:{item['message']}"
+            for item in result["errors"]
+        ]
     blockers: list[str] = []
     required = {
         "case_id", "symbol", "company", "cutoff_date", "evidence", "trust",
