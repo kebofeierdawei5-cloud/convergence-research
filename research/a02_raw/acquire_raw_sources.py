@@ -6,6 +6,11 @@ from pathlib import Path
 import requests
 
 OFFICIAL_000906 = "https://oss-ch.csindex.com.cn/static/html/csindex/public/uploads/file/autofile/cons/000906cons.xls"
+LEGACY_000906_URLS = [
+    "https://www.csindex.com.cn/csindex-home/uploads/file/autofile/cons/000906cons.xls",
+    "http://www.csindex.com.cn/csindex-home/uploads/file/autofile/cons/000906cons.xls",
+    "https://www.csindex.com.cn/csindex-home/uploads/file/autofile/cons/000906cons.xls?download=1",
+]
 EXPECTED_000906_SIZE = 169984
 EXPECTED_000906_SHA256 = "f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984"
 ORIGINS = ["2023Q3","2023Q4","2024Q1","2024Q2","2024Q3","2024Q4","2025Q1","2025Q2","2025Q3","2025Q4","2026Q1"]
@@ -19,44 +24,56 @@ def sha256_bytes(data: bytes) -> str:
 
 
 def fetch_wayback_target() -> dict:
-    """Try Internet Archive captures until the frozen target bytes are matched."""
+    """Try multiple legacy/current CSI URL variants; accept only exact frozen bytes."""
     import urllib.parse
-    cdx_url = (
-        "https://web.archive.org/cdx/search/cdx?"
-        + urllib.parse.urlencode({
-            "url": OFFICIAL_000906,
+    urls = [OFFICIAL_000906, *LEGACY_000906_URLS]
+    attempts = []
+    for source_url in urls:
+        params = {
+            "url": source_url,
             "from": "2026",
             "to": "2026",
             "output": "json",
             "filter": "statuscode:200",
             "fl": "timestamp,original,digest,length",
             "collapse": "digest",
-        })
-    )
-    cdx = requests.get(cdx_url, timeout=60, headers={"User-Agent": "Mozilla/5.0"})
-    cdx.raise_for_status()
-    rows = cdx.json()
-    attempts = []
-    if rows and isinstance(rows[0], list) and rows[0] and str(rows[0][0]).lower() == "timestamp":
-        rows = rows[1:]
-    for row in rows:
-        if not isinstance(row, list) or len(row) < 4:
-            continue
-        timestamp, original, digest, length = row[:4]
-        if str(length) != str(EXPECTED_000906_SIZE):
-            continue
-        archive_url = f"https://web.archive.org/web/{timestamp}id_/{original}"
+        }
+        cdx_url = "https://web.archive.org/cdx/search/cdx?" + urllib.parse.urlencode(params)
         try:
-            resp = requests.get(archive_url, timeout=90, headers={"User-Agent": "Mozilla/5.0"}, allow_redirects=True)
-            data = resp.content
-            got = sha256_bytes(data)
-            attempts.append({"timestamp": timestamp, "archive_url": archive_url, "http_status": resp.status_code, "size_bytes": len(data), "sha256": got, "expected_match": got == EXPECTED_000906_SHA256})
-            if len(data) == EXPECTED_000906_SIZE and got == EXPECTED_000906_SHA256:
-                return {"status": "PASS", "timestamp": timestamp, "archive_url": archive_url, "size_bytes": len(data), "sha256": got, "attempts": attempts, "bytes": data}
+            cdx = requests.get(cdx_url, timeout=60, headers={"User-Agent": "Mozilla/5.0"})
+            cdx.raise_for_status()
+            rows = cdx.json()
+            if rows and isinstance(rows[0], list) and rows[0] and str(rows[0][0]).lower() == "timestamp":
+                rows = rows[1:]
+            attempts.append({"source_url": source_url, "cdx_status": "OK", "capture_count": len(rows) if isinstance(rows, list) else 0})
         except Exception as exc:
-            attempts.append({"timestamp": timestamp, "archive_url": archive_url, "error": str(exc)})
+            attempts.append({"source_url": source_url, "cdx_status": "ERROR", "cdx_error": str(exc)})
+            continue
+        for row in rows:
+            if not isinstance(row, list) or len(row) < 4:
+                continue
+            timestamp, original, digest, length = row[:4]
+            if str(length) != str(EXPECTED_000906_SIZE):
+                continue
+            archive_url = f"https://web.archive.org/web/{timestamp}id_/{original}"
+            try:
+                resp = requests.get(archive_url, timeout=90, headers={"User-Agent": "Mozilla/5.0"}, allow_redirects=True)
+                data = resp.content
+                got = sha256_bytes(data)
+                attempts.append({
+                    "source_url": source_url,
+                    "timestamp": timestamp,
+                    "archive_url": archive_url,
+                    "http_status": resp.status_code,
+                    "size_bytes": len(data),
+                    "sha256": got,
+                    "expected_match": got == EXPECTED_000906_SHA256,
+                })
+                if len(data) == EXPECTED_000906_SIZE and got == EXPECTED_000906_SHA256:
+                    return {"status": "PASS", "timestamp": timestamp, "archive_url": archive_url, "size_bytes": len(data), "sha256": got, "attempts": attempts, "bytes": data}
+            except Exception as exc:
+                attempts.append({"source_url": source_url, "timestamp": timestamp, "archive_url": archive_url, "error": str(exc)})
     return {"status": "BLOCKED", "attempts": attempts}
-
 
 def post_tushare(token: str, api_name: str, params: dict, fields: str, out: Path, timeout: int = 60) -> dict:
     payload = {"api_name": api_name, "token": token, "params": params, "fields": fields}
