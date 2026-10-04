@@ -1,0 +1,201 @@
+from __future__ import annotations
+
+from copy import deepcopy
+from decimal import Decimal
+
+from iios_mvp.engine import decide, replay, run_case, validate_case
+from iios_mvp.investment_core_contract_v03 import calculate_return_metrics, validate_case_v03
+
+
+def case() -> dict:
+    return {
+        "contract_version": "IIOS-INVESTMENT-CORE-0.3",
+        "case_id": "V03-001",
+        "market": "CN-A",
+        "symbol": "300750",
+        "company": "CATL",
+        "as_of_date": "2026-10-04",
+        "cutoff_date": "2026-10-04",
+        "current_price_observation": {
+            "price": "100", "currency": "CNY",
+            "observed_at": "2026-10-04T15:00:00+08:00",
+            "known_at": "2026-10-04T15:00:00+08:00",
+            "source": "test", "adjustment_semantics": "UNADJUSTED",
+        },
+        "company_evidence_manifest": {"manifest_id": "company-v03-001"},
+        "trust": {"status": "PASS"},
+        "reality": {"status": "PASS"},
+        "forecast": {"status": "PASS"},
+        "valuation": {"status": "PASS", "primary_model": "DCF"},
+        "risk": {"status": "PASS", "max_loss_pct": "25"},
+        "portfolio": {
+            "position_pct": "0",
+            "constraint_status": "PASS",
+            "can_add": True,
+            "buy_add_package": {
+                "entry_zone": ["95", "100"],
+                "initial_position_pct": "5",
+                "target_position_pct": "10",
+                "max_position_pct": "10",
+            },
+        },
+        "thesis": {"status": "INTACT"},
+        "return_gate": {
+            "entry_price": "100",
+            "entry_value_reference": "115",
+            "horizon_years": "2",
+            "buy_entry_return_cushion_threshold": "0.15",
+            "fundamental_target_annualized_return": "0.15",
+            "required_return_annualized": "0.10",
+            "scenarios": {
+                "bear": {"probability": "0.2", "terminal_value_per_share": "90", "cash_distributions_per_share": "0", "probability_rationale": "test bear"},
+                "base": {"probability": "0.5", "terminal_value_per_share": "140", "cash_distributions_per_share": "0", "probability_rationale": "test base"},
+                "bull": {"probability": "0.3", "terminal_value_per_share": "180", "cash_distributions_per_share": "0", "probability_rationale": "test bull"},
+            },
+        },
+    }
+
+
+def test_v03_return_math_separates_the_two_15_percent_policies():
+    metrics = calculate_return_metrics(case()["return_gate"])
+    assert metrics["buy_entry_return_cushion"] == Decimal("0.15")
+    assert metrics["fundamental_target_pass"] is True
+    assert metrics["required_return_pass"] is True
+    assert metrics["return_gate_pass"] is True
+    assert metrics["expected_total_return"] == Decimal("0.42")
+    assert abs(metrics["expected_annualized_return"] - Decimal("0.191637...")) < Decimal("0.000001")
+    assert abs(metrics["margin_of_safety"] - (Decimal("15")/Decimal("115"))) < Decimal("0.000001")
+
+
+def test_v03_mie_is_optional():
+    c = case()
+    assert validate_case_v03(c)["status"] == "PASS"
+    assert not any(x.startswith("V03-MIE") for x in [e["code"] for e in validate_case_v03(c)["errors"]])
+
+
+def test_v03_buy_requires_all_three_return_conditions():
+    result = decide(case())
+    assert result["decision"]["action"] == "BUY"
+    assert result["decision"]["decision_status"] == "READY"
+    assert result["decision"]["investability_status"] == "INVESTABLE"
+    assert result["decision"]["human_approval_required"] is True
+    assert result["decision"]["auto_execution"] is False
+
+
+def test_v03_exact_15_annualized_target_is_inclusive():
+    c = case()
+    # Equal scenario wealth makes expected wealth exactly 132.25 over H=2.
+    # sqrt(1.3225) - 1 = 15%, so the target comparison must pass at equality.
+    c["return_gate"]["scenarios"] = {
+        "bear": {"probability": "0.2", "terminal_value_per_share": "132.25", "cash_distributions_per_share": "0", "probability_rationale": "exact boundary"},
+        "base": {"probability": "0.5", "terminal_value_per_share": "132.25", "cash_distributions_per_share": "0", "probability_rationale": "exact boundary"},
+        "bull": {"probability": "0.3", "terminal_value_per_share": "132.25", "cash_distributions_per_share": "0", "probability_rationale": "exact boundary"},
+    }
+    metrics = calculate_return_metrics(c["return_gate"])
+    assert metrics["expected_total_return"] == Decimal("0.3225")
+    assert abs(metrics["expected_annualized_return"] - Decimal("0.15")) < Decimal("0.000001")
+    assert metrics["fundamental_target_pass"] is True
+
+
+def test_v03_watch_when_target_passes_but_entry_cushion_fails():
+    c = case()
+    c["return_gate"]["entry_price"] = "110"
+    c["return_gate"]["entry_value_reference"] = "115"
+    result = decide(c)
+    assert result["decision"]["action"] == "WATCH"
+    assert result["decision"]["investability_status"] == "WATCH"
+
+
+def test_v03_no_buy_when_expected_annualized_return_below_target():
+    c = case()
+    c["return_gate"]["scenarios"] = {
+        "bear": {"probability": "0.2", "terminal_value_per_share": "80", "cash_distributions_per_share": "0", "probability_rationale": "low"},
+        "base": {"probability": "0.5", "terminal_value_per_share": "125", "cash_distributions_per_share": "0", "probability_rationale": "base"},
+        "bull": {"probability": "0.3", "terminal_value_per_share": "140", "cash_distributions_per_share": "0", "probability_rationale": "high"},
+    }
+    result = decide(c)
+    assert result["decision"]["action"] == "NO-BUY"
+
+
+def test_v03_unknown_never_becomes_hold():
+    c = case()
+    c["trust"]["status"] = "UNKNOWN"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    c["portfolio"]["position_pct"] = "5"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+
+
+def test_v03_trust_fail_does_not_auto_exit():
+    c = case()
+    c["portfolio"]["position_pct"] = "5"
+    c["trust"]["status"] = "FAIL"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+
+
+def test_v03_portfolio_block_can_reduce_existing_position():
+    c = case()
+    c["portfolio"]["position_pct"] = "15"
+    c["portfolio"]["constraint_status"] = "BLOCKED"
+    result = decide(c)
+    assert result["decision"]["action"] == "REDUCE"
+
+
+def test_v03_thesis_broken_exits_existing_position():
+    c = case()
+    c["portfolio"]["position_pct"] = "5"
+    c["thesis"]["status"] = "BROKEN"
+    result = decide(c)
+    assert result["decision"]["action"] == "EXIT"
+
+
+def test_v03_add_existing_position():
+    c = case()
+    c["portfolio"]["position_pct"] = "5"
+    result = decide(c)
+    assert result["decision"]["action"] == "ADD"
+
+
+def test_v03_hold_existing_when_return_is_positive_but_gate_fails():
+    c = case()
+    c["portfolio"]["position_pct"] = "5"
+    c["return_gate"]["entry_price"] = "130"
+    c["return_gate"]["entry_value_reference"] = "115"
+    result = decide(c)
+    assert result["decision"]["action"] == "HOLD"
+
+
+def test_v03_review_required_on_unresolved_return_input():
+    c = case()
+    del c["return_gate"]["required_return_annualized"]
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+
+
+def test_v03_pit_leak_blocks_decision():
+    c = case()
+    c["current_price_observation"]["known_at"] = "2026-10-05T09:00:00+08:00"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-PIT-PRICE-KNOWN-AT" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_replay_is_deterministic():
+    snap, digest = run_case(case())
+    assert digest == snap["snapshot_hash"]
+    replay_result = replay(snap)
+    assert replay_result["replay_status"] == "PASS"
+    assert replay_result["integrity_status"] == "PASS"
+
+
+def test_legacy_v02_contract_remains_supported_through_legacy_validator():
+    from tests.test_investment_core_contract import valid_case
+    c = valid_case()
+    assert validate_case(c) == []
+
+
+def test_v03_schema_contract_is_explicitly_versioned():
+    c = case()
+    assert c["contract_version"] == "IIOS-INVESTMENT-CORE-0.3"
