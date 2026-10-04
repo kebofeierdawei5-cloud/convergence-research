@@ -164,3 +164,38 @@ def test_v02_engine_does_not_execute_legacy_decision_logic():
     assert result["validation"]["status"] == "PASS"
     assert result["decision"]["primary_reason"] == "V02_ENGINE_NOT_IMPLEMENTED"
     assert result["decision"]["action"] == "NO-BUY"
+
+def test_engine_rejects_unsupported_explicit_contract_version():
+    from iios_mvp.engine import validate_case
+    case = valid_case()
+    case["contract_version"] = "IIOS-INVESTMENT-CORE-0.3"
+    blockers = validate_case(case)
+    assert blockers == [
+        "CORE-VERSION-EXACT:contract_version:unsupported investment-core contract IIOS-INVESTMENT-CORE-0.3"
+    ]
+
+
+def test_v02_cannot_enter_legacy_snapshot_schema():
+    from iios_mvp.engine import run_case
+    case = valid_case()
+    try:
+        run_case(case)
+    except ValueError as exc:
+        assert str(exc) == "V02_SNAPSHOT_NOT_IMPLEMENTED"
+    else:
+        raise AssertionError("v0.2 case must not create a legacy 0.1.1 snapshot")
+
+
+def test_legacy_snapshot_replay_rejects_v02_input():
+    from iios_mvp.engine import replay
+    case = valid_case()
+    result = replay({
+        "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.1.1",
+        "engine_version": "0.1.1",
+        "input": case,
+        "decision": {},
+        "snapshot_hash": "invalid",
+    })
+    assert result["replay_status"] == "FAIL"
+    assert result["integrity_status"] == "FAIL"
+    assert result["reason"] == "V02_SNAPSHOT_SCHEMA_NOT_SUPPORTED"
