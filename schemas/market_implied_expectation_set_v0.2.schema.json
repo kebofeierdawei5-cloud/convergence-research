@@ -1,0 +1,21 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","
+"$id":"https://iios.local/schemas/market-implied-expectation-set-0.2.schema.json",
+"title":"IIOS Multi-model Market Implied Expectation Set v0.2",
+"type":"object","additionalProperties":false,
+"required":["set_id","candidate_coverage","evidence_sufficiency","model_evaluations","resolution_state","qualification","qualification_rationale","evidence_ids"],
+"properties":{
+  "set_id":{"type":"string","minLength":1},
+  "candidate_coverage":{"type":"object","additionalProperties":false,"required":["status","scope_basis","candidate_model_ids","evidence_ids","rationale"],"properties":{"status":{"enum":["SUFFICIENT","INSUFFICIENT","UNASSESSED"]},"scope_basis":{"type":"string","minLength":1},"candidate_model_ids":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","minLength":1}},"evidence_ids":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}},"rationale":{"type":"string","minLength":1}}},
+  "evidence_sufficiency":{"type":"object","additionalProperties":false,"required":["status","rationale","evidence_ids"],"properties":{"status":{"enum":["SUFFICIENT","INSUFFICIENT","UNASSESSED"]},"rationale":{"type":"string","minLength":1},"evidence_ids":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}}},
+  "model_evaluations":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["model_id","state","evidence_ids","rationale"],"properties":{"model_id":{"type":"string","minLength":1},"state":{"enum":["MATERIALIZED","NO_FEASIBLE_SOLUTION","BLOCKED"]},"expectation":{"type":"object","additionalProperties":false,"required":["expectation_id","model_id","market_model","identifiability","stability","candidate_coverage","representation","economic_requirements","observation_basis","assumption_set","evidence_sufficiency","evidence_ids","qualification","qualification_rationale"],"properties":{"expectation_id":{"type":"string"},"model_id":{"type":"string"},"market_model":{"type":"string"},"identifiability":{"type":"string"},"stability":{"type":"string"},"candidate_coverage":{"type":"object"},"representation":{"type":"string"},"economic_requirements":{"type":"array"},"observation_basis":{"type":"object"},"assumption_set":{"type":"array"},"evidence_sufficiency":{"type":"object"},"evidence_ids":{"type":"array"},"qualification":{"type":"string"},"qualification_rationale":{"type":"string"}}},"evidence_ids":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}},"rationale":{"type":"string","minLength":1}},"allOf":[{"if":{"properties":{"state":{"const":"MATERIALIZED"}}},"then":{"required":["expectation"]}},{"if":{"properties":{"state":{"enum":["NO_FEASIBLE_SOLUTION","BLOCKED"]}}},"then":{"not":{"required":["expectation"]}}}]}},
+  "resolution_state":{"enum":["UNIQUE_MODEL","AMBIGUOUS","NO_FEASIBLE_MODEL","INSUFFICIENT_EVIDENCE"]},
+  "qualification":{"enum":["DECISION_GRADE","CONDITIONAL_ONLY","BLOCKED"]},
+  "qualification_rationale":{"type":"string","minLength":1},
+  "evidence_ids":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}
+},
+"allOf":[
+  {"if":{"properties":{"resolution_state":{"enum":["NO_FEASIBLE_MODEL","INSUFFICIENT_EVIDENCE"]}}},"then":{"properties":{"qualification":{"const":"BLOCKED"}}}},
+  {"if":{"properties":{"resolution_state":{"const":"AMBIGUOUS"}}},"then":{"properties":{"qualification":{"const":"CONDITIONAL_ONLY"}}}},
+  {"if":{"properties":{"qualification":{"const":"DECISION_GRADE"}}},"then":{"properties":{"resolution_state":{"const":"UNIQUE_MODEL"}}}}
+]
+}
