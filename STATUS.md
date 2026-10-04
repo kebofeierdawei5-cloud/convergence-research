@@ -16,6 +16,7 @@
 - Investment Core semantic contract v0.2: FROZEN / SEMANTIC PASS
 - P2-A machine schema + executable invariants: **FINAL PASS / MERGED**
 - P2-B Market Model Domain Foundation: **FINAL PASS / MERGED**
+- P3-A ratio-family Market Model Identification: **FINAL PASS / MERGED**
 - Production investment decision kernel: NOT YET
 
 ## Return Target
@@ -72,20 +73,26 @@ P2-B Foundation is formally **FINAL PASS** on canonical `main`.
 
 The foundation defines the canonical MarketObservableEvidence / CandidateMarketModel / ModelFit / FeasibleSolutionSet / Identifiability / Stability domain boundary. It does not implement production model identification.
 
+## P3-A Final Acceptance
+
+P3-A is formally **FINAL PASS** on canonical `main`.
+
+- PR #7: MERGED
+- pre-merge HEAD: `fe03d27bdd4ac46125fff04c7d3405b8285d3139`
+- CI run #96 / `37185092488`: **SUCCESS**
+- CI: compileall + 68 tests + schema validation + existing MVP run/replay
+- merge commit: `53bdde65c3bfa20d227d398259a2e0268bc4da5d`
+- acceptance record: `docs/iios/P3A_RATIO_IDENTIFICATION_ACCEPTANCE_2026-10-04.md`
+
+P3-A implements deterministic evidence-backed identification for forward PE, PS, PB and EV/EBITDA. DCF/DDM/SOTP/rNPV remain fail-closed pending model-specific inverse solvers.
+
 ## Immediate Next Engineering Step
 
-**P3 / Market Model Identification v0.2 production implementation.**
+**P3-B / Complex Model-Specific Market Model Identification.**
 
-Shortest path:
+Implement DCF / DDM / SOTP / rNPV feasible-solution, identifiability and stability logic using the same typed domain and evidence boundary.
 
-`Market Observable Evidence
-→ Candidate Models
-→ Historical / Current Fit
-→ Feasible Solution Set
-→ Identifiability
-→ Stability`
-
-Then proceed to Market Implied Expectation → Expectation Gap → Return/Decision integration.
+Only then proceed to the P4 Market Implied Expectation Engine.
 
 P2-C Company Value Core hardening remains parallel where needed for real-company acceptance.
 
