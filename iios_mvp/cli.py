@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .engine import replay, render_markdown, run_case
+from .research_intake import build_research_case
 from .store import (
     approve_revision,
     create_or_load_series,
@@ -29,6 +30,25 @@ def load_json(path: str) -> dict:
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def cmd_intake(args: argparse.Namespace) -> int:
+    case = build_research_case(
+        args.symbol,
+        args.as_of,
+        args.position,
+        market=args.market,
+        generated_at=args.generated_at,
+    )
+    payload = json.dumps(case, ensure_ascii=False, indent=2)
+    if args.out:
+        path = Path(args.out)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(payload + "\n", encoding="utf-8", newline="\n")
+        print(json.dumps({"status": "CREATED", "research_case": str(path), "case_id": case["case_id"]}, ensure_ascii=False, indent=2))
+    else:
+        print(payload)
+    return 0
 
 
 def cmd_run(args: argparse.Namespace) -> int:
@@ -97,6 +117,15 @@ def cmd_trigger_event(args: argparse.Namespace) -> int:
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="iios-mvp", description="IIOS v0.1.1 investment-decision kernel")
     sub = p.add_subparsers(dest="command", required=True)
+
+    intake = sub.add_parser("intake", help="create one single-company research case from minimal input")
+    intake.add_argument("symbol")
+    intake.add_argument("--market", default="CN-A")
+    intake.add_argument("--as-of", required=True)
+    intake.add_argument("--position", required=True)
+    intake.add_argument("--generated-at")
+    intake.add_argument("--out")
+    intake.set_defaults(func=cmd_intake)
 
     run = sub.add_parser("run", help="run one investment case")
     run.add_argument("case")
