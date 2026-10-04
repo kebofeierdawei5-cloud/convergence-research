@@ -1,321 +1,425 @@
-# IIOS MVP v0.2 — Macro Development Roadmap
+# IIOS Investment Core v0.2 — Reconciled Development Roadmap
+
+> Canonical planning document after the 2026-10-04 State Reconciliation.
+>
+> Historical v0.2 roadmap assumptions that conflict with this document are superseded for future engineering; historical commits remain immutable evidence.
 
 ## 1. North Star
 
-IIOS 的核心不是生成一份“估值报告”，而是把投资判断变成可复核、可执行的概率决策：
+IIOS 的核心不是生成一份“估值报告”，而是把真实公司的经营现实、市场价格与独立判断连接成一条可复核、可执行的投资决策链：
 
 ```
-Company Economics
-    ↓
-Valuation Model Router
-    ↓
+Company / Industry Reality
+        ↓
+Company Value Core
+        ↓
+Human Primary Valuation Model
+        ↓
 Independent Forecast
-    ↓
-Intrinsic Value
-    ↓
-Market Model Identification
-    ↓
-Market Implied Expectation
-    ↓
-Expectation Gap
-    ↓
-Win Probability + Payoff / Odds
-    ↓
-Risk / Margin of Safety
-    ↓
-BUY / ADD / HOLD / REDUCE / EXIT / NO-BUY
-    ↓
-Entry Price + Position Size
-    ↓
-Monitoring / Validation / Review
-```
-
-最终验收问题只有一个：
-
-> 给定一家真实公司、一个严格 PIT 的 As-of 日期和当前仓位，IIOS 是否能选择与公司经济学匹配的估值模型，得到更接近真实的内在价值；识别市场当前主要采用的估值模型及其隐含预期；判断两者之间是否存在可兑现的正收益预期差；再结合胜率、赔率、风险和组合约束决定“买不买、什么价格买、买多少”。
-
-## 2. Current Baseline Assessment
-
-### 已有且保留
-
-- PIT / Trust / Missing Evidence fail-closed 基础门。
-- Snapshot hash + Replay。
-- Decision Series / Revision / Human Approval / Current Projection 基础持久化。
-- Trigger Contract / Event 基础结构。
-- 既有 CLI / CI 骨架。
-- “AI 提案 ≠ Human 决策 ≠ Auto Execution”边界。
-
-### 必须重构
-
-现有引擎存在结构性问题：
-
-- 估值模型固定为 `forward_pe`。
-- 公司经济学没有驱动模型选择。
-- SOTP / DCF / DDM 等模型无法进入同一决策内核。
-- 市场隐含预期只实现了“价格 ÷ 倍数”的单一 PE 反推。
-- 没有真正的 Market Model Identification。
-- 没有 Feasible Solution Set / Identifiability / Stability 的机器语义。
-- 没有基于情景概率的胜率、赔率、Edge。
-- 仓位建议尚未由风险收益结构确定性计算。
-- 当前执行报告/Execution Receipt 尚未形成可验证的标准记录。
-
-因此，不能继续把 v0.1.1 的 PE-only 实现当作投资内核完成。
-
-## 3. Development Layers
-
-### Batch 0 — Baseline Closure & Product Contract
-
-目标：先把开发边界、版本和验收标准统一。
-
-交付：
-
-- 本路线图与 Core Decision Contract。
-- 清除当前 CI replay 误读问题。
-- 明确 `Engine / Schema / Prompt / Evidence / Revision / Report` 版本语义。
-- 确保旧的 Revision / Snapshot 不被新版本覆盖。
-
-验收：
-
-- compileall PASS。
-- 单元测试 PASS。
-- CLI run → persisted artifacts → replay PASS。
-- CI PASS。
-
-### Batch 1 — Valuation Model Router + Intrinsic Value Engine
-
-目标：从“PE 计算器”升级为“公司经济学 → 模型 → 估值”。
-
-首期模型族：
-
-- PE / earnings multiple。
-- DCF。
-- DDM。
-- SOTP。
-
-设计原则：
-
-```
-Company Economics
-       ↓
-Model Selection Evidence
-       ↓
-Primary Model + Alternative Models
-       ↓
-Deterministic Valuation
-```
-
-要求：
-
-- 不允许代码默认所有公司使用 PE。
-- 允许显式指定 primary model。
-- 可记录 model-selection rationale / confidence / alternatives。
-- SOTP 支持不同业务/资产独立价值后再汇总。
-- 模型缺失关键输入时 fail-closed。
-- 估值计算必须 deterministic。
-
-直接解决的历史问题：
-
-> 科伦药业的创新药、川宁生物、成熟输注/仿制药等不能再被强行塞入同一个 PE。
-
-### Batch 2 — Market Model Identification + Implied Expectation
-
-目标：回答“市场价格现在到底在定价什么”。
-
-统一结构：
-
-```
-Current Price
-   ↓
+        ↓
+Independent Intrinsic Value
+        +
+Market Observable Evidence + Current Price
+        ↓
 Candidate Market Models
-   ↓
-Model-specific Inversion
-   ↓
+        ↓
 Feasible Solution Set
-   ↓
+        ↓
+Identifiability + Stability
+        ↓
+Market Implied Expectation
+        ↓
+Expectation Gap
+        ↓
+Positive Return > 15%
+        ↓
+Trust / Thesis / Risk / Portfolio Constraints
+        ↓
+BUY / ADD / HOLD / REDUCE / EXIT / NO-BUY
+```
+
+The core comparison is:
+
+> **Independent view of company value / future economics vs. what the current market price requires.**
+
+The system should not force a fixed 1–3 year holding period and should not make annualized return >15% a mandatory core gate.
+
+## 2. Reconciled Current Baseline
+
+### Current main
+
+Current canonical branch: `main`
+
+Current state is defined by:
+
+- current Git `main`
+- `docs/iios/STATE_RECONCILIATION_2026-10-04.md`
+- `docs/iios/IIOS_CURRENT_STATE_INDEX.md`
+- `STATUS.md`
+
+### Already implemented on current main
+
+- PIT / Trust / fail-closed validation foundation
+- Snapshot hash + Replay
+- Decision Series / Revision / Human Approval skeleton
+- Company Value Core Scan / structured Value Construction Map
+- Economic attribute classification
+- Candidate valuation model generation
+- Human-authoritative Primary Model selection
+- Deterministic valuation calculators for the currently supported model families
+- Basic intrinsic-value aggregation / Bear-Base-Bull outputs
+
+### Explicitly not current capability
+
+- true evidence-based Market Model Identification
+- valid multi-model Feasible Solution Set from historical/current observable evidence
+- calibrated Identifiability
+- temporal/regime Stability
+- general model-correct Market Implied Expectation
+- general semantic Expectation Gap
+- frozen Probability / Odds / Edge / Position-sizing formulas
+- complete Execution Receipt / Trigger lifecycle
+- production real-company acceptance
+
+### Blocked work that must remain blocked
+
+PR #3 / Batch 2 v0.1 is **OPEN / RED-TEAM BLOCKED / NOT MERGED**.
+
+Do not extend or merge it as the next production layer.
+
+Its reverse-valuation routines may be retained only as low-level primitives after the v0.2 semantic contract is frozen.
+
+## 3. Core Architecture
+
+### 3.1 Company side
+
+```
+Reality
+  ↓
+Value Construction Map
+  ↓
+Economic Profile
+  ↓
+Candidate Valuation Models
+  ↓
+HUMAN Primary Model Selection
+  ↓
+Consistency Gate
+  ↓
+Independent Forecast
+  ↓
+Intrinsic Valuation
+```
+
+Model Router remains advisory.
+
+Human authority is mandatory for the Primary Model and rationale. An out-of-candidate model requires explicit override rationale.
+
+### 3.2 Market side
+
+```
+Market Observable Evidence
+  ↓
+Candidate Market Models
+  ↓
+Historical / Current Fit
+  ↓
+Feasible Solution Set
+  ↓
 Identifiability
-   ↓
+  ↓
 Stability
-   ↓
+  ↓
+Reverse Valuation
+  ↓
 Market Implied Expectation
 ```
 
-首期至少支持：
+This is the major missing semantic layer.
 
-- PE → implied earnings / EPS。
-- SOTP → implied residual segment value。
-- DCF / DDM → implied growth / terminal assumptions。
+Market model identification must explain not merely which mathematical inverse can produce the current price, but which candidate market model is actually consistent with observed valuation behavior, relevant fundamentals, historical regime evidence, and current price.
 
-原则：
+### 3.3 Expectation Gap
 
-- 市场模型不是拍脑袋选择。
-- 多模型都能解释价格时必须标记 ambiguous，而不是伪装成确定答案。
-- 可识别性不足时，Expectation Gap 必须降级，不能直接转成 BUY。
-- 市场隐含预期与独立预测必须使用相同经济变量比较。
+Expectation Gap is not a generic subtraction between two value numbers.
 
-### Batch 3 — Expectation Gap + Probability / Odds / Edge
+The comparison must use:
 
-目标：把“看起来便宜”升级成真正的正期望决策。
+- the same economic variable;
+- compatible accounting semantics;
+- the same relevant observation point;
+- compatible scenario / forecast definitions;
+- compatible valuation-model semantics.
 
-核心输出：
+Examples:
 
-- Expected Value / Expected Return。
-- Positive-return probability。
-- Hurdle-win probability。
-- Expected upside / expected downside。
-- Payoff Ratio / Odds。
-- Edge。
-- Required Return。
-- Max Loss。
-- Entry Ceiling。
-- Kelly-derived capped position recommendation。
+- PE: independent EPS / earnings vs market-implied EPS / earnings.
+- PS: independent revenue vs market-implied revenue.
+- EV/EBITDA: independent EBITDA vs market-implied EBITDA, with enterprise-value bridge.
+- PB: independent book equity vs market-implied book equity.
+- DCF / DDM: independent assumptions vs market-implied assumptions.
+- SOTP: independently valued segments vs market price's implied residual / segment valuation.
 
-最小决策逻辑：
+## 4. Return Hurdle
 
-```
-Independent View
-    vs
-Market Implied View
-    ↓
-Expectation Gap
-    ↓
-Probability
-    +
-Payoff / Odds
-    ↓
-Edge
-    ↓
-Risk Limits
-    ↓
-Position Size
-```
+Canonical investment hurdle:
 
-### Batch 4 — Decision Persistence / Execution Receipt / Publication
+> **Positive expected return > 15%.**
 
-目标：解决“后台到底有没有保存这一次标准化执行结果”的可见性问题。
+This is a return hurdle, not an annualized return hurdle.
 
-Canonical Execution Receipt 至少记录：
+Rules:
 
-- execution_id。
-- decision_series_id。
-- decision_revision。
-- as_of / cutoff。
-- engine / schema / prompt / evidence manifest versions.
-- input snapshot hash。
-- decision snapshot hash。
-- decision_id。
-- machine publication status。
-- human report status。
-- replay status。
-- execution status。
+- no mandatory 1–3 year holding period;
+- no mandatory annualized calculation;
+- do not invent a horizon merely to annualize a return;
+- any future holding-period or annualized-return analysis is supplemental unless separately promoted into a new contract.
 
-要求：
+The deterministic engine must eventually calculate the return definition appropriate to the selected valuation semantics and current investment decision, and must expose the exact input assumptions.
 
-> 每一次真实 run 都能通过 execution_id 独立回答“何时、对谁、在什么信息截止点、用什么版本、算出什么、保存在哪里、是否 replay 成功”。
+## 5. Development Order
 
-### Batch 5 — Human Report + Machine Publication + Trigger
+### P0 — State Reconciliation
 
-目标：把 Canonical Decision 变成可读、可接入、可持续监控的产品。
+Status: **COMPLETE / CURRENT**
 
-首屏：
+Deliverables:
 
-- BUY / ADD / HOLD / REDUCE / EXIT / NO-BUY。
-- 当前价格。
-- 内在价值。
-- Entry Ceiling。
-- 胜率。
-- 赔率。
-- Edge。
-- 最大风险。
-- 推荐仓位。
-- Thesis Break。
+- current main identity
+- merged / unmerged capability reconciliation
+- blocked PR reconciliation
+- return-hurdle correction
+- separation of investment core and M1.2 forecast research
+- canonical continuity documents
 
-正文：
+### P1 — Investment Core Contract v0.2
 
-- Thesis。
-- Trust & Evidence。
-- Reality。
-- Forecast。
-- Valuation / Model Selection。
-- Market Implied Expectation。
-- Expectation Gap。
-- Probability / Odds / Edge。
-- Decision / Position.
-- Monitoring / Triggers。
+Status: **NEXT**
 
-附录：
+Freeze machine semantics before further Batch 2 implementation.
 
-- PIT / versions / evidence manifest / snapshot / replay。
+Must define:
 
-### Batch 6 — Real Company Acceptance & Audit
+- current-price observation and PIT semantics
+- company reality / evidence contract
+- company value-core contract
+- human valuation-model selection
+- market-model candidate definition
+- fit / Feasible Solution Set
+- Identifiability
+- Stability
+- model-specific reverse valuation
+- model-specific Market Implied Expectation
+- semantic Expectation Gap
+- positive-return >15% gate
+- Trust / thesis / risk interaction
+- fail-closed rules
+- version and replay semantics
 
-至少用两个经济结构明显不同的真实案例：
+### P2 — Company Value Core v1.x hardening
 
-1. CATL：适合检验 earnings / cash-flow / cyclical valuation 路由。
-2. 科伦药业：必须检验 SOTP、成熟业务与创新药分部估值不能混用。
+Status: **IMPLEMENTED BASE / NEEDS HARDENING**
 
-每个案例都必须：
+Do not redesign the human-authority decision.
 
-- 严格 PIT。
-- 有证据来源与已知时间。
-- 有独立预测。
-- 有模型选择记录。
-- 有市场模型识别。
-- 有隐含预期。
-- 有 expectation gap。
-- 有概率 / odds / edge。
-- 有 buy/add/no-buy 与仓位。
-- 有 Execution Receipt。
-- 可 replay。
-
-## 4. What We Do Not Build Yet
-
-在上述主链完成前，不扩张：
-
-- Kafka / event bus / microservices。
-- 全市场实时扫描。
-- 自动交易。
-- CSI800 完整历史数据基础设施。
-- 多公司自动选股。
-- 复杂组合优化。
-- 为“治理完整”而添加与投资核心无关的安全层。
-- 用 LLM 自由决定确定性数值。
-
-## 5. Dependency Order
+Focus on the remaining gap:
 
 ```
-Batch 0
-  ↓
-Batch 1 Valuation
-  ↓
-Batch 2 Market Model
-  ↓
-Batch 3 Probability / Odds / Sizing
-  ↓
-Batch 4 Execution Receipt
-  ↓
-Batch 5 Report / Publication / Trigger
-  ↓
-Batch 6 Real Cases / Independent Audit
+Raw / evidence-backed company reality
+        ↓
+Structured business / asset nodes
+        ↓
+Economic attributes
+        ↓
+Value Construction Map
+        ↓
+Core Value Drivers
 ```
 
-任何批次未通过验收，不向后继续叠加新的“完成”声明。
+The existing scanner currently validates/classifies structured nodes; it does not fully discover the company value map from raw evidence.
 
-## 6. Definition of Done for the Investment Core
+Priority hardening areas:
 
-核心内核只有在以下条件同时成立后，才能称为“可用于真实投资决策”：
+- evidence linkage
+- capital intensity / reinvestment semantics
+- CAPEX → depreciation / amortization → FCF → incremental return on capital
+- capital allocation
+- dilution / per-share transmission
+- value-contribution transparency
 
-- 模型路由不是 PE-only。
-- 公司经济学能够解释模型选择。
-- 至少 PE / DCF / DDM / SOTP 可执行。
-- 市场模型能够显式识别并给出 implied expectation。
-- 多解时能识别 ambiguous / low-identifiability。
-- Expectation Gap 可用经济变量表示。
-- 胜率、赔率、Edge 可确定性计算。
-- 推荐仓位由概率、赔率、风险和组合约束共同决定。
-- 人工最终批准仍然独立。
-- 每次真实运行都有 Execution Receipt + Snapshot + Replay。
+### P3 — Market Model Identification v0.2
+
+Status: **NOT STARTED**
+
+Redesign Batch 2 from the contract, rather than extending PR #3.
+
+Acceptance requires:
+
+- observable evidence inputs
+- candidate model set
+- historical / current fit
+- explicit feasible solution set
+- conservative identifiability
+- stability across reasonable perturbations / regimes
+- model-specific reverse valuation
+- fail-closed when interpretation is ambiguous
+
+### P4 — Market Implied Expectation Engine
+
+Status: **NOT STARTED**
+
+For each identified / feasible model, produce the economic variables that the current price requires.
+
+Never collapse different model semantics into one generic “implied net profit”.
+
+### P5 — Expectation Gap + Return Gate
+
+Status: **NOT STARTED**
+
+Compute the gap between:
+
+```
+Independent Economic View
+        vs
+Market Implied Economic Requirement
+```
+
+Then determine whether the independently supported opportunity implies:
+
+> positive return >15%.
+
+Do not convert a merely ambiguous market interpretation into a BUY.
+
+### P6 — Decision Engine
+
+Status: **PARTIAL / NEEDS REWORK**
+
+Reconnect:
+
+```
+Trust
++ PIT
++ Thesis
++ Independent Value
++ Market Implied Expectation
++ Expectation Gap
++ Return >15%
++ Risk
++ Portfolio Constraints
+        ↓
+Action
+```
+
+The final decision remains deterministic where appropriate and requires Human Approval for execution.
+
+### P7 — Execution Receipt / Revision / Trigger Lifecycle
+
+Status: **PARTIAL / NEEDS COMPLETION**
+
+Complete the technical audit chain:
+
+```
+Run
+ ↓
+Snapshot
+ ↓
+Decision Revision
+ ↓
+Human Approval
+ ↓
+Current Projection
+ ↓
+Execution Receipt
+ ↓
+Monitoring / Trigger
+ ↓
+New Run / New Revision
+```
+
+No automatic order placement.
+
+### P8 — Real Company Acceptance
+
+Status: **NOT STARTED**
+
+At minimum:
+
+- CATL
+- 科伦药业
+
+Cases must exercise materially different economic structures and strict PIT evidence.
+
+### P9 — Independent Audit
+
+Status: **NOT STARTED**
+
+Audit:
+
+- semantic correctness
+- PIT correctness
+- market-model identification
+- value / expectation comparison
+- return gate
+- persistence / replay
+- fail-closed behavior
+- human authority boundary
+
+## 6. What We Do Not Build Yet
+
+Before P1–P8 close, do not expand into:
+
+- full-market scanning
+- auto trading
+- complex portfolio optimization
+- unnecessary microservice/event-bus infrastructure
+- unrelated governance layers
+- fabricated or commercial-data-dependent historical datasets
+- frozen Kelly / probability formulas without prior empirical validation
+
+M1.2 Forecast Research remains a separate track.
+
+## 7. Forecast Research Track
+
+```
+Exact Source Admission
+        ↓
+FM-02 PIT Feature Builder
+        ↓
+FM-03 State Engine
+        ↓
+FM-04 Conditional Backtest
+        ↓
+FM-05 Scope Freeze
+        ↓
+FM-07 Amendment Gate
+```
+
+Current status:
+
+- FM-00 PASS
+- FM-01 implementation foundation PASS
+- CATL exact source ingress BLOCKED
+
+The forecast-research track must not be used to mask missing investment-core semantics.
+
+## 8. Definition of Done — Investment Core
+
+The core can be considered production-capable only when all of the following are demonstrated:
+
+- company reality is evidence-backed and structured;
+- human-authoritative primary valuation model is explicit;
+- intrinsic value is deterministic and replayable;
+- market model interpretation is evidence-based;
+- feasible solution set / identifiability / stability are meaningful;
+- market implied expectation is model-semantic correct;
+- expectation gap is economically coherent;
+- positive return >15% is computed under explicit assumptions;
+- risk / thesis / trust gates are enforced;
+- human approval remains separate;
+- execution receipt, revision history and replay are complete;
+- at least two real companies pass acceptance;
+- an independent audit passes.
 
 ---
 
-**版本：v0.2 Roadmap**  
-**定位：开发总控基线，不直接作为运行时输入。**
+**Version: reconciled v0.2 roadmap — 2026-10-04**
