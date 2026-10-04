@@ -338,11 +338,23 @@ PR #3 / Batch 2 v0.1 remains blocked and untouched.
 
 ### P4 — Market Implied Expectation Engine
 
-Status: **NEXT / NOT STARTED**
+Status: **IN PROGRESS — P4-A COMPLETE / P4-B NEXT**
 
 Macro planning authority: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026-10-04.md`.
 
-Recommended first decomposition:
+P4-A completed deliverables:
+
+- MIE qualification contract;
+- typed MIE output boundary;
+- explicit conditionality representation;
+- typed candidate-coverage assessment;
+- typed evidence-sufficiency assessment;
+- provenance closure;
+- PIT observation binding;
+- cross-field JSON Schema hardening;
+- acceptance record: `docs/iios/P4A_FINAL_ACCEPTANCE_2026-10-04.md`.
+
+Next P4 decomposition:
 
 ```
 P4-A  Market Implied Expectation qualification contract
@@ -358,7 +370,7 @@ P4-E  multi-model expectation-set + ambiguity handling
 P4-F  PIT / replay / fail-closed integration
 ```
 
-P4 should consume the accepted P2-B / P3-A / P3-B outputs rather than reopen their domain semantics.
+P4-A is complete. P4-B must consume the P4-A qualified boundary and accepted P2-B / P3-A outputs rather than reopen their domain semantics.
 
 P3 IDENTIFIABLE is candidate-set-conditional. P4 must explicitly distinguish conditional inverse results from decision-grade Market Implied Expectation and must qualify candidate coverage before using uniqueness as evidence of market-model identification.
 
