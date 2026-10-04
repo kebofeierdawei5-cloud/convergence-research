@@ -47,7 +47,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["current_position_pct", "position_basis"],
       "properties": {
-        "current_position_pct": {"type": "string", "pattern": "^(100|[0-9]{1,2})(\.[0-9]+)?$"},
+        "current_position_pct": {"type": "string", "pattern": "^(100(?:\\.0+)?|(?:[0-9]|[1-9][0-9])(?:\\.[0-9]+)?)$"},
         "position_basis": {"const": "CURRENT_PORTFOLIO_STATE"}
       }
     },
