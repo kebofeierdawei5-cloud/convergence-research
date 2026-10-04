@@ -1,0 +1,137 @@
+{
+  "registry_version": "IIOS-SOURCE-REGISTRY-0.1",
+  "policy": {
+    "free_first": true,
+    "paid_data_mandatory": false,
+    "authority_principle": "source_strength_not_majority_vote",
+    "current_state_substitution": "FORBIDDEN"
+  },
+  "sources": [
+    {
+      "source_ref": "CSIINDEX:000906:OFFICIAL_CONSTITUENT_FILE",
+      "provider": "China Securities Index Co.",
+      "role": [
+        "CSI800_MEMBERSHIP_RAW",
+        "TERMINAL_CONTROL"
+      ],
+      "access_class": "FREE_PUBLIC",
+      "authority_level": "PRIMARY_OFFICIAL",
+      "pit_capability": "SOURCE_VINTAGE",
+      "mandatory_for_production": false,
+      "notes": "Exact bytes required before artifact admission; declared size/hash are validation targets only."
+    },
+    {
+      "source_ref": "CSIINDEX:OFFICIAL_ADJUSTMENT_NOTICE",
+      "provider": "China Securities Index Co.",
+      "role": [
+        "CSI800_HISTORICAL_EVENT"
+      ],
+      "access_class": "FREE_PUBLIC",
+      "authority_level": "PRIMARY_OFFICIAL",
+      "pit_capability": "EVENT_PUBLICATION",
+      "mandatory_for_production": false,
+      "notes": "Used with identifiable effective/publication evidence to reconstruct historical membership."
+    },
+    {
+      "source_ref": "SSE:COMPANY_ANNOUNCEMENT",
+      "provider": "Shanghai Stock Exchange",
+      "role": [
+        "ISSUER_DISCLOSURE",
+        "PUBLICATION_EVIDENCE"
+      ],
+      "access_class": "FREE_PUBLIC",
+      "authority_level": "PRIMARY_ISSUER",
+      "pit_capability": "EVENT_PUBLICATION",
+      "mandatory_for_production": true,
+      "notes": "Applicable to SSE-listed issuers; exact source capture is required for material facts."
+    },
+    {
+      "source_ref": "SZSE:COMPANY_ANNOUNCEMENT",
+      "provider": "Shenzhen Stock Exchange",
+      "role": [
+        "ISSUER_DISCLOSURE",
+        "PUBLICATION_EVIDENCE"
+      ],
+      "access_class": "FREE_PUBLIC",
+      "authority_level": "PRIMARY_ISSUER",
+      "pit_capability": "EVENT_PUBLICATION",
+      "mandatory_for_production": true,
+      "notes": "Applicable to SZSE-listed issuers; exact source capture is required for material facts."
+    },
+    {
+      "source_ref": "CNINFO:DISCLOSURE",
+      "provider": "CNINFO",
+      "role": [
+        "DISCLOSURE_MIRROR",
+        "SEARCH"
+      ],
+      "access_class": "FREE_PUBLIC",
+      "authority_level": "SECONDARY_VALIDATION",
+      "pit_capability": "EVENT_PUBLICATION",
+      "mandatory_for_production": false,
+      "notes": "Mirror/search aid; does not automatically outrank originating exchange or issuer evidence."
+    },
+    {
+      "source_ref": "TUSHARE:PUBLIC_API",
+      "provider": "Tushare",
+      "role": [
+        "STRUCTURED_SECONDARY",
+        "CROSS_CHECK"
+      ],
+      "access_class": "FREE_WITH_LIMITS",
+      "authority_level": "SECONDARY_VALIDATION",
+      "pit_capability": "EXPLICIT_PIT_QUERY",
+      "mandatory_for_production": false,
+      "notes": "Only admissible for fields/endpoints whose historical query semantics and request/response archive establish PIT provenance."
+    },
+    {
+      "source_ref": "JOINQUANT:HISTORICAL_EXPORT",
+      "provider": "JoinQuant",
+      "role": [
+        "SECONDARY_CROSS_CHECK"
+      ],
+      "access_class": "PAID_OPTIONAL",
+      "authority_level": "SECONDARY_VALIDATION",
+      "pit_capability": "EXPLICIT_PIT_QUERY",
+      "mandatory_for_production": false,
+      "notes": "Optional independent cross-check; never a hidden production dependency."
+    },
+    {
+      "source_ref": "IFIND:HISTORICAL_QUERY",
+      "provider": "iFinD",
+      "role": [
+        "SECURITY_MASTER_CROSS_CHECK"
+      ],
+      "access_class": "PAID_OPTIONAL",
+      "authority_level": "SECONDARY_VALIDATION",
+      "pit_capability": "EXPLICIT_PIT_QUERY",
+      "mandatory_for_production": false,
+      "notes": "Optional cross-check only when evidence envelope preserves cutoff/query provenance."
+    },
+    {
+      "source_ref": "QLIB:COLLECTOR_CACHE",
+      "provider": "Qlib",
+      "role": [
+        "RECONSTRUCTION_METHODOLOGY",
+        "IMPLEMENTATION_CROSS_CHECK"
+      ],
+      "access_class": "FREE_PUBLIC",
+      "authority_level": "METHODOLOGY_ONLY",
+      "pit_capability": "UNKNOWN",
+      "mandatory_for_production": false,
+      "notes": "Methodology/secondary implementation evidence; not normative unless source bytes and provenance are separately admitted."
+    },
+    {
+      "source_ref": "WESTOCK:CSI800_CURRENT",
+      "provider": "westock",
+      "role": [
+        "CURRENT_TERMINAL_CONTROL"
+      ],
+      "access_class": "FREE_PUBLIC",
+      "authority_level": "SECONDARY_VALIDATION",
+      "pit_capability": "CURRENT_ONLY",
+      "mandatory_for_production": false,
+      "notes": "Current control only; never back-applied to historical PIT."
+    }
+  ]
+}
