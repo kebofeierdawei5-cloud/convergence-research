@@ -169,8 +169,19 @@ def _observation_evidence_ids(
     ids: list[str] = []
     for observation in observations:
         for evidence_id in observation.evidence_ids:
-            if evidence_id not in evidence_index:
+            evidence = evidence_index.get(evidence_id)
+            if evidence is None:
                 raise ValueError(f"observation references unknown evidence_id: {evidence_id}")
+            if evidence.variable != observation.economic_variable:
+                raise ValueError(
+                    f"observation evidence variable mismatch: {evidence_id} "
+                    f"({evidence.variable} != {observation.economic_variable})"
+                )
+            if evidence.unit != observation.unit:
+                raise ValueError(
+                    f"observation evidence unit mismatch: {evidence_id} "
+                    f"({evidence.unit} != {observation.unit})"
+                )
             ids.append(evidence_id)
     return tuple(sorted(set(ids)))
 
