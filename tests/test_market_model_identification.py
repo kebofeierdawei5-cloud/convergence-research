@@ -212,7 +212,7 @@ def test_no_feasible_model_is_unidentifiable():
     )
     result = identify_market_models(base_input([pe], observations))
     assert result["identifiability"].state.value == "UNIDENTIFIABLE"
-    assert result["stability"].state.value in {"UNSTABLE", "STABLE"}
+    assert result["stability"].state.value == "INSUFFICIENT_EVIDENCE"
 
 
 def test_insufficient_history_is_not_called_unidentifiable():
