@@ -338,7 +338,7 @@ PR #3 / Batch 2 v0.1 remains blocked and untouched.
 
 ### P4 — Market Implied Expectation Engine
 
-Status: **IN PROGRESS — P4-A COMPLETE / P4-B NEXT**
+Status: **IN PROGRESS — P4-A COMPLETE / P4-B IMPLEMENTED / ACCEPTANCE PENDING**
 
 Macro planning authority: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026-10-04.md`.
 
@@ -353,6 +353,16 @@ P4-A completed deliverables:
 - PIT observation binding;
 - cross-field JSON Schema hardening;
 - acceptance record: `docs/iios/P4A_FINAL_ACCEPTANCE_2026-10-04.md`.
+
+P4-B implementation deliverables:
+
+- ratio-family MIE extraction module: `iios_mvp/ratio_market_implied_expectation.py`;
+- ratio-family acceptance matrix: `docs/iios/P4B_RATIO_MIE_ACCEPTANCE_MATRIX_v0.2.md`;
+- typed output is the existing P4-A `MarketImpliedExpectation` object;
+- P3 feasible ranges are preserved exactly as `IMPLIED_RANGE`;
+- ambiguity, instability, insufficient evidence and insufficient candidate coverage remain fail-closed or conditional according to P4-A;
+- four supported families: forward PE / PS / PB / EV/EBITDA;
+- no P4-B inverse recalculation and no Expectation Gap / Expected Return / decision action.
 
 Next P4 decomposition:
 
