@@ -404,6 +404,8 @@ def validate_investment_core_case(case: dict[str, Any]) -> dict[str, Any]:
             "as_of_date",
             "cutoff_date",
             "current_price_observation",
+            "company_evidence_manifest",
+            "market_evidence_manifest",
             "trust",
             "reality",
             "forecast",
@@ -438,6 +440,34 @@ def validate_investment_core_case(case: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(case[field], str) or not case[field].strip():
             errors.append(_err("CORE-INVARIANT-IDENTITY", field, "must be a non-empty string"))
 
+    for manifest_name in ("company_evidence_manifest", "market_evidence_manifest"):
+        if not isinstance(case[manifest_name], dict):
+            errors.append(_err("CORE-SCHEMA-TYPE", manifest_name, "must be an object"))
+        else:
+            _required(case[manifest_name], ("manifest_id",), manifest_name, errors)
+
+    valuation = case["valuation"]
+    if not isinstance(valuation, dict):
+        errors.append(_err("CORE-SCHEMA-TYPE", "valuation", "must be an object"))
+    else:
+        if "current_price" in valuation:
+            try:
+                if _decimal(valuation["current_price"], "valuation.current_price") != _decimal(case["current_price_observation"]["price"], "current_price_observation.price"):
+                    errors.append(_err(
+                        "CORE-INVARIANT-PRICE-SINGLE-SOURCE",
+                        "valuation.current_price",
+                        "must equal current_price_observation.price when supplied",
+                    ))
+            except ValueError as exc:
+                errors.append(_err("CORE-SCHEMA-NUMERIC", "valuation.current_price", str(exc)))
+        for field in ("required_return_pct", "market_implied_multiple", "market_implied_net_profit"):
+            if field in valuation:
+                errors.append(_err(
+                    "CORE-INVARIANT-NO-LEGACY-MARKET-SEMANTICS",
+                    f"valuation.{field}",
+                    "legacy v0.1.1 market/return field is forbidden in a v0.2 case",
+                ))
+
     price_errors = validate_price_observation(
         case["current_price_observation"],
         case["cutoff_date"],
@@ -461,6 +491,17 @@ def validate_investment_core_case(case: dict[str, Any]) -> dict[str, Any]:
             errors.append(_err("CORE-INVARIANT-THESIS", "thesis.status", f"invalid state: {status}"))
 
     errors.extend(validate_market_implied_expectation(case["market_implied_expectation"], case["cutoff_date"]))
+    try:
+        market_basis_date = str(case["market_implied_expectation"]["observation_basis"].get("price_observation_date"))
+        price_date = _datetime(case["current_price_observation"]["observed_at"], "current_price_observation.observed_at").date().isoformat()
+        if market_basis_date != price_date:
+            errors.append(_err(
+                "CORE-BIND-PRICE-OBSERVATION",
+                "market_implied_expectation.observation_basis.price_observation_date",
+                "must equal current_price_observation.observed_at date",
+            ))
+    except (KeyError, ValueError, AttributeError):
+        pass
     errors.extend(validate_expectation_gap(case["expectation_gap"]))
     errors.extend(validate_return_gate(case["return_gate"]))
 
@@ -510,7 +551,7 @@ def validate_investment_core_case(case: dict[str, Any]) -> dict[str, Any]:
                 errors.append(_err("CORE-GATE-BUY-MARKET-STABILITY", "decision.action", "BUY/ADD requires stable market interpretation"))
             if not hurdle_pass:
                 errors.append(_err("CORE-GATE-BUY-RETURN", "decision.action", "BUY/ADD requires Expected Return >15%"))
-            if risk_status not in {"PASS", "UNKNOWN"}:
+            if risk_status != "PASS":
                 errors.append(_err("CORE-GATE-BUY-RISK", "decision.action", "BUY/ADD requires risk status PASS"))
     return {"status": "PASS" if not errors else "BLOCKED", "errors": errors}
 
