@@ -1,5 +1,7 @@
 # IIOS Current-State Index
 
+Continuity / macro development plan: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026-10-04.md`
+
 Snapshot: 2026-10-04
 
 ## Canonical State
