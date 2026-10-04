@@ -166,7 +166,7 @@ def test_multiple_feasible_models_are_ambiguous():
             source="test-fixture",
         ),
         MarketValuationObservation(
-            observation_id="current",
+            observation_id="current-revenue",
             observation_date=CUTOFF,
             known_at=KNOWN,
             price=Decimal("13"),
@@ -181,7 +181,7 @@ def test_multiple_feasible_models_are_ambiguous():
     )
     result = identify_market_models(base_input(
         [pe, ps],
-        obs_pe[:-1] + tuple(obs_rev[:-1]) + (obs_rev[-1],),
+        obs_pe + obs_rev,
         [ev("e1", "forward_eps"), ev("e2", "revenue")]
     ))
     assert result["identifiability"].state.value == "AMBIGUOUS"
@@ -260,3 +260,60 @@ def test_dcf_is_explicitly_insufficient_until_model_specific_solver_exists():
     result = identify_market_models(base_input([dcf], observations, [ev("e1", "fcf")]))
     evaluation = result["evaluations"][0]
     assert evaluation.fit.status.value == "INSUFFICIENT_EVIDENCE"
+
+
+def test_historical_window_perturbation_can_make_model_unstable():
+    pe = candidate("pe-1", MarketModelFamily.FORWARD_PE, "forward_eps")
+    observations = (
+        obs("h1", 1, "100", "10", "forward_eps"),
+        obs("h2", 15, "200", "10", "forward_eps"),
+        obs("h3", 30, "300", "10", "forward_eps"),
+        MarketValuationObservation(
+            observation_id="current",
+            observation_date=CUTOFF,
+            known_at=KNOWN,
+            price=Decimal("250"),
+            shares_outstanding=Decimal("100"),
+            economic_variable="forward_eps",
+            economic_value=Decimal("10"),
+            unit="CNY/share",
+            basis="forward",
+            evidence_ids=("e1",),
+            source="test-fixture",
+        ),
+    )
+    result = identify_market_models(base_input([pe], observations))
+    assert result["identifiability"].state.value == "IDENTIFIABLE"
+    assert result["stability"].state.value == "UNSTABLE"
+
+
+def test_candidate_unknown_provenance_is_rejected():
+    bad = CandidateMarketModel(
+        model_id="pe-1",
+        family=MarketModelFamily.FORWARD_PE,
+        required_economic_variables=("forward_eps",),
+        required_observable_variables=("forward_eps",),
+        evidence_ids=("missing",),
+        admission_basis="bad provenance",
+        inverse_solvable=True,
+    )
+    observations = (
+        obs("h1", 1, "100", "5", "forward_eps"),
+        obs("h2", 15, "120", "5", "forward_eps"),
+        obs("h3", 30, "140", "5", "forward_eps"),
+        MarketValuationObservation(
+            observation_id="current",
+            observation_date=CUTOFF,
+            known_at=KNOWN,
+            price=Decimal("125"),
+            shares_outstanding=Decimal("100"),
+            economic_variable="forward_eps",
+            economic_value=Decimal("5"),
+            unit="CNY/share",
+            basis="forward",
+            evidence_ids=("e1",),
+            source="test-fixture",
+        ),
+    )
+    with pytest.raises(ValueError, match="unknown evidence_ids"):
+        identify_market_models(base_input([bad], observations))
