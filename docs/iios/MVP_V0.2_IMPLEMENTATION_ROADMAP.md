@@ -340,6 +340,26 @@ PR #3 / Batch 2 v0.1 remains blocked and untouched.
 
 Status: **NEXT / NOT STARTED**
 
+Macro planning authority: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026-10-04.md`.
+
+Recommended first decomposition:
+
+```
+P4-A  Model-semantic Market Implied Expectation contract
+        ↓
+P4-B  Ratio-family expectation extraction
+        ↓
+P4-C  DCF / DDM feasible assumption-set extraction
+        ↓
+P4-D  SOTP / rNPV expectation extraction
+        ↓
+P4-E  multi-model expectation-set + ambiguity handling
+        ↓
+P4-F  PIT / replay / fail-closed integration
+```
+
+P4 should consume the accepted P2-B / P3-A / P3-B outputs rather than reopen their domain semantics.
+
 For each identified / feasible model, produce the economic variables that the current price requires.
 
 Never collapse different model semantics into one generic “implied net profit”.
