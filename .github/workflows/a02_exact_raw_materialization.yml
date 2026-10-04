@@ -1,0 +1,56 @@
+name: A02 Exact Raw Materialization
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/a02_exact_raw_materialization.yml"
+      - "research/a02_raw/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  acquire:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONUNBUFFERED: "1"
+      TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check requests==2.32.5
+      - name: Materialize exact raw evidence
+        continue-on-error: true
+        run: python research/a02_raw/acquire_raw_sources.py --out "$RUNNER_TEMP/a02_raw" --tushare-token "$TUSHARE_TOKEN"
+      - name: Build deterministic file hashes
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/a02_raw"
+          find . -type f -print0 | sort -z | xargs -0 sha256sum > SHA256_MANIFEST.txt
+          printf 'repository=%s\nrun_id=%s\nsha=%s\n' "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_SHA" > GITHUB_RUN_CONTEXT.txt
+      - name: Upload immutable acquisition evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: A02-exact-raw-${{ github.run_id }}
+          path: ${{ runner.temp }}/a02_raw
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Fail closed unless both A and B admit
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, pathlib, sys
+          p=pathlib.Path('${{ runner.temp }}/a02_raw/A02_RAW_MATERIALIZATION_RECEIPT.json')
+          r=json.loads(p.read_text())
+          print(json.dumps(r, ensure_ascii=False, indent=2))
+          raise SystemExit(0 if r['status']=='PASS' else 4)
+          PY
