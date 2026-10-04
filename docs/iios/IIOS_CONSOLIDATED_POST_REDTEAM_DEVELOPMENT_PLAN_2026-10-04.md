@@ -1,3 +1,17 @@
+# B0 ACTIVE-PLAN NOTICE — 2026-10-04
+
+This document is retained as the consolidated post-red-team historical roadmap. **Its active execution sequence is superseded by the B0/B1 repair program.**
+
+Read first: `docs/iios/B0_AUTHORITY_AUDIT_FREEZE_2026-10-04.md`
+
+Current repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
+Current next gate: **B1 Investment Semantics v0.3**
+P4-F remains retained as conditional explanatory infrastructure. No new P5/P6 production decision capability is to be added until B7 validation of the repaired semantics.
+
+The roadmap below remains useful as historical design context and dependency evidence, but its old `P5`-first immediate-next-step wording must not be used to bypass B0/B1.
+
+---
+
 # IIOS Consolidated Post-Red-Team Development Plan — 2026-10-04
 
 ## 1. Consolidated audit conclusion
