@@ -3,7 +3,7 @@
 This file retains historical acceptance records below. For the active repair program, read `docs/iios/B0_AUTHORITY_AUDIT_FREEZE_2026-10-04.md` first.
 
 Active repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
-Active repair stage: **B0 PASS → B1 PASS → CORE-00 PASS → CORE-01 Single Company Research Intake**
+Active repair stage: **B0 PASS → B1 PASS → CORE-00 PASS → CORE-01 PASS → CORE-02 Company Economic Core PASS → CORE-03**
 P4-F is merged historical/conditional infrastructure; P5/P6 feature expansion remains paused.
 B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. The owner-approved distinction between (a) 15% BUY-entry threshold / safety-margin policy and (b) 1–3Y annualized target >=15% is now normative in v0.3.
 
@@ -23,14 +23,26 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Investment Core Contract v0.3: **FROZEN / B1 SEMANTIC PASS**.
 - Contract: `docs/iios/IIOS_INVESTMENT_CORE_CONTRACT_v0.3.md`
 
-## CORE-01 Active Boundary
+## CORE-02 Active Boundary
 
-- Current execution gate: **CORE-02 Company Economic Core**
-- Minimal user input: market + symbol + as-of/cutoff + current position
-- Output: deterministic, auditable single-company Research Case Envelope
-- Identity/price/factual fields are evidence-dependent; no fabricated company data
-- PIT is mandatory: `known_at <= cutoff`; current-state substitution is forbidden
+- Current execution gate: **CORE-03 Market Expectation + Expectation Gap**
+- CORE-02 is now PASS / MERGED on canonical `main`
+- Input: admitted company-specific evidence + explicit evidence-linked economic assessments
+- Output: PIT-bound Reality, Trust, Quality, Value Core, Value Driver Ranking and candidate valuation-model route
+- Evidence must be ADMITTED, case-bound, exact-byte backed and `known_at <= cutoff`
+- Trust / Quality fail closed; Value Core and drivers require evidence-domain binding
 - A02 / CSI800 / CSI Industry remain Research Track only
+
+## CORE-02 Completed Boundary
+
+- CORE-02 is **PASS / MERGED** on canonical `main`.
+- PR #29 / merge commit `2a1c376e2bf3c608ebdf88a95d8be5aeaf8580b9`.
+- Dedicated CORE-02 CI: run #6 / `37209264413` — SUCCESS.
+- CORE-02 regression: **30 passed**.
+- Investment Core CI: run #214 / `37209264423` — SUCCESS.
+- CORE-01 CI: run #10 / `37209264528` — SUCCESS.
+- Evidence-domain and temporal-lineage red-team hardening was included before merge.
+- CORE-02 does not perform forecast, MIE, Expectation Gap or decision execution.
 
 ## CORE-00 Active Boundary
 
@@ -288,7 +300,9 @@ B1 semantic package and runtime migration accepted on the repair line. Evidence:
 
 ## Immediate Next Engineering Step
 
-**CORE-02 — Company Economic Core.**
+**CORE-03 — Market Expectation + Expectation Gap.**
+
+CORE-02 is complete and canonical. CORE-03 must consume the admitted economic core, independent forecast and existing P4-F MIE set without bypassing PIT/provenance/replay.
 
 CORE-00 and CORE-01 are merged and accepted on canonical `main`. The next Investment Core gate is CORE-02: admitted company evidence → Reality → Trust → Quality → Value Core → valuation-model route input.
 
