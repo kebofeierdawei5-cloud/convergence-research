@@ -2,6 +2,8 @@
 
 Continuity / macro development plan: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026-10-04.md`
 
+Consolidated post-red-team execution plan: `docs/iios/IIOS_CONSOLIDATED_POST_REDTEAM_DEVELOPMENT_PLAN_2026-10-04.md`
+
 Snapshot: 2026-10-04
 
 ## Canonical State
@@ -65,7 +67,8 @@ Implemented / merged:
 - deterministic valuation calculators for supported models
 - P2-A Investment Core v0.2 machine schema + executable invariants (FINAL PASS / MERGED)
 - P2-B Market Model Domain Foundation (FINAL PASS / MERGED)
-- P3-A ratio-family Market Model Identification (FINAL PASS / MERGED)
+- P3-A ratio-family Market Model Identification baseline (FINAL PASS / MERGED)
+- P3-B complex-model Market Model Identification baseline (FINAL PASS / MERGED)
 
 P2-A acceptance evidence:
 
@@ -76,12 +79,11 @@ P2-A acceptance evidence:
 
 Not yet implemented as production capability:
 
-- complex-model evidence-backed market-model identification (DCF/DDM/SOTP/rNPV)
-- broader/calibrated Market Model Identification beyond the P3-A ratio-family baseline
-- meaningful Feasible Solution Set
-- calibrated Identifiability
-- temporal / regime Stability
-- model-specific Market Implied Expectation
+- decision-grade Market Implied Expectation qualification
+- sufficient candidate-coverage qualification for market-model interpretation
+- full multidimensional DCF/DDM feasible assumption-space inference
+- semantic Expectation Gap
+- production return gate integration
 - semantic Expectation Gap
 - frozen probability / edge / position-sizing policy
 - complete Execution Receipt / Trigger lifecycle
