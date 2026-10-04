@@ -48,8 +48,8 @@ def test_catl_value_core_is_mature_cash_earning_with_capex_reinvestment_visible(
         ],
     })
     assert result["status"] == "PASS"
-    assert result["overall_economic_profile"] == "enterprise_operating_business"
-    assert result["model_route"]["recommended_primary_model"] == "ev_ebitda"
+    assert result["overall_economic_profile"] == "cash_flow_business"
+    assert result["model_route"]["recommended_primary_model"] == "dcf"
 
 
 def test_kolun_value_core_is_mixed_and_requires_independent_pipeline_valuation():
