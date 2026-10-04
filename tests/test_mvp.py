@@ -193,3 +193,64 @@ def test_sotp_values_segments_independently():
     assert result["model"] == "sotp"
     assert result["drivers"]["segment_count"] == 2
     assert result["equity_value"] == 2050.0
+
+
+def test_extended_valuation_models():
+    from decimal import Decimal
+    from iios_mvp.valuation import route_model, value_scenario
+
+    assert route_model("innovative_drug_commercial")["recommended_primary_model"] == "ps"
+    assert route_model("cyclical")["recommended_primary_model"] == "pb"
+    assert route_model("innovative_drug_pipeline")["recommended_primary_model"] == "rnpv"
+
+    forecast = {s: {"net_profit": 1, "revenue": 100} for s in ("bear", "base", "bull")}
+
+    ps = {
+        "model_selection": {
+            "primary_model": "ps",
+            "economic_profile": "innovative_drug_commercial",
+            "rationale": "commercial-stage revenue is the current observable value driver",
+        },
+        "model_inputs": {"ps": {"base": {"revenue": 100, "multiple": 8}}},
+    }
+    assert value_scenario(forecast, ps, "base", Decimal("10"))["value_per_share"] == 80.0
+
+    pb = {
+        "model_selection": {
+            "primary_model": "pb",
+            "economic_profile": "cyclical",
+            "rationale": "cycle-normalized earnings are unstable and asset value is a key anchor",
+        },
+        "model_inputs": {"pb": {"base": {"book_equity": 500, "multiple": 1.2}}},
+    }
+    assert value_scenario(forecast, pb, "base", Decimal("10"))["value_per_share"] == 60.0
+
+    ev = {
+        "model_selection": {
+            "primary_model": "ev_ebitda",
+            "economic_profile": "enterprise_operating_business",
+            "rationale": "capital structure-neutral operating earnings are the comparison basis",
+        },
+        "model_inputs": {"ev_ebitda": {"base": {"ebitda": 100, "multiple": 10, "net_debt": 200}}},
+    }
+    assert value_scenario(forecast, ev, "base", Decimal("10"))["value_per_share"] == 80.0
+
+    rnpv = {
+        "model_selection": {
+            "primary_model": "rnpv",
+            "economic_profile": "innovative_drug_pipeline",
+            "rationale": "pipeline value depends on risk-adjusted future cash flows",
+        },
+        "model_inputs": {
+            "rnpv": {
+                "base": {
+                    "cash_flows": [100, 200],
+                    "probability_of_success": [0.5, 0.25],
+                    "discount_rate": 0.1,
+                }
+            }
+        },
+    }
+    result = value_scenario(forecast, rnpv, "base", Decimal("10"))
+    assert result["model"] == "rnpv"
+    assert result["value_per_share"] > 0
