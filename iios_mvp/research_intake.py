@@ -174,9 +174,20 @@ def validate_research_case(case: Any) -> list[str]:
     except ValueError as exc:
         errors.append(f"REQUEST_INVALID:{exc}")
         return errors
+    if cutoff > date.today():
+        errors.append("REQUEST_FUTURE_AS_OF")
     expected_id = f"RC-{market}-{symbol.replace('.', '-')}-{cutoff.strftime('%Y%m%d')}"
     if case["case_id"] != expected_id:
         errors.append("CASE_ID_NOT_DETERMINISTIC")
+
+    expected_input = {
+        "market": market,
+        "symbol": symbol,
+        "as_of_date": cutoff.isoformat(),
+        "current_position_pct": position,
+    }
+    if (case["audit"] or {}).get("input_sha256") != _sha(expected_input):
+        errors.append("AUDIT_INPUT_HASH_MISMATCH")
     temporal = case["temporal_scope"]
     if temporal.get("as_of_date") != cutoff.isoformat() or temporal.get("cutoff_date") != cutoff.isoformat():
         errors.append("TEMPORAL_SCOPE_MISMATCH")
@@ -196,13 +207,23 @@ def validate_research_case(case: Any) -> list[str]:
     if not isinstance(case["evidence_plan"], list) or len(case["evidence_plan"]) != len(EVIDENCE_PLAN):
         errors.append("EVIDENCE_PLAN_INCOMPLETE")
     else:
+        expected_groups = [item[0] for item in EVIDENCE_PLAN]
+        actual_groups = [str(item.get("field_group", "")) for item in case["evidence_plan"]]
+        if actual_groups != expected_groups:
+            errors.append("EVIDENCE_PLAN_ORDER_OR_IDENTITY_MISMATCH")
         for item in case["evidence_plan"]:
             if item.get("pit_rule") != "known_at <= cutoff" or item.get("required_for_admission") is not True:
                 errors.append("EVIDENCE_PLAN_PIT_OR_REQUIRED_FLAG_INVALID")
                 break
+        if (case["audit"] or {}).get("evidence_plan_sha256") != _sha(case["evidence_plan"]):
+            errors.append("AUDIT_PLAN_HASH_MISMATCH")
+    audit_generated = (case["audit"] or {}).get("generated_at")
+    try:
+        generated = datetime.fromisoformat(str(audit_generated).replace("Z", "+00:00"))
+        if generated.tzinfo is None:
+            errors.append("AUDIT_GENERATED_AT_NO_TIMEZONE")
+    except ValueError:
+        errors.append("AUDIT_GENERATED_AT_INVALID")
     return errors
 
-def is_decision_ready(case: dict[str, Any]) -> bool:
-    return not validate_research_case(case) and case.get("admission", {}).get("status") == "ADMITTED"
-
-__all__ = ["CONTRACT_VERSION","GENERATOR_VERSION","build_research_case","validate_research_case","is_decision_ready"]
+__all__ = ["CONTRACT_VERSION","GENERATOR_VERSION","build_research_case","validate_research_case"]
