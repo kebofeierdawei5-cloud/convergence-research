@@ -62,6 +62,7 @@ Implemented / merged:
 - Human-authoritative Primary Model selection
 - deterministic valuation calculators for supported models
 - P2-A Investment Core v0.2 machine schema + executable invariants (FINAL PASS / MERGED)
+- P2-B Market Model Domain Foundation (FINAL PASS / MERGED)
 
 P2-A acceptance evidence:
 
@@ -84,7 +85,14 @@ Not yet implemented as production capability:
 
 Batch 2 v0.1 PR #3 remains OPEN / RED-TEAM BLOCKED / NOT MERGED and must not be extended as the next production layer.
 
-P2-B next: evidence-backed Market Model Identification v0.2 foundation.
+P2-B foundation evidence:
+
+- PR #6 merged to main
+- pre-merge HEAD `5d2260264fe5769e69ea9ee47923b5514eba93b9`
+- CI #73 / `37184109345` = SUCCESS
+- final acceptance: `docs/iios/P2B_FOUNDATION_ACCEPTANCE_2026-10-04.md`
+
+P3 next: evidence-backed Market Model Identification v0.2 production implementation.
 
 ## Return Target
 
