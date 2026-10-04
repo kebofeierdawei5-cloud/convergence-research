@@ -3,7 +3,7 @@
 This file retains historical acceptance records below. For the active repair program, read `docs/iios/B0_AUTHORITY_AUDIT_FREEZE_2026-10-04.md` first.
 
 Active repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
-Active repair stage: **B0 PASS → B1 PASS → CORE-00 PASS → CORE-01 PASS → CORE-02 Company Economic Core PASS → CORE-03**
+Active repair stage: **B0 PASS → B1 PASS → CORE-00 PASS → CORE-01 PASS → CORE-02 PASS → CORE-03 Vertical Slice PASS / P4-F Closure BLOCKED**
 P4-F is merged historical/conditional infrastructure; P5/P6 feature expansion remains paused.
 B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. The owner-approved distinction between (a) 15% BUY-entry threshold / safety-margin policy and (b) 1–3Y annualized target >=15% is now normative in v0.3.
 
@@ -44,6 +44,20 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Market observation bound to latest pre-cutoff trading day: 2026-09-30 close **291.11 CNY**
 - Quality remains CONDITIONAL because incremental ROIC and full earnings/cash-flow conversion bridges are not yet fully constructed.
 - No fabricated company name, forecast, valuation or decision was introduced.
+
+## CORE-03 Real 300750
+
+- CORE-03 real-company vertical slice is **PASS / MERGED** on canonical `main`.
+- PR #31 / merge commit `e0662bb4efa5bfc40478240a0d9ef4bbcadb658a`.
+- Real case: `RC-CN-A-300750-20261004`.
+- Forecast: explicit independent Bear/Base/Bull 2027-2029 scenario package; no FM01 production router or broker consensus.
+- Valuation: human-selected DCF; Bear/Base/Bull values approximately 258.32 / 418.49 / 638.97 CNY per share.
+- Probability-weighted intrinsic value: approximately 433.57 CNY/share.
+- Implied 3-year CAGR from 291.11 CNY: approximately 14.20%.
+- P4-F: valid BLOCKED / INSUFFICIENT_EVIDENCE snapshot; replay PASS.
+- Expectation Gap: **BLOCKED** because qualified market-implied expectation is not yet available.
+- This block is intentional: intrinsic-value upside is not substituted for Expectation Gap.
+- Next sub-gate: per-company PIT market-model observation acquisition for P3/P4/P4-F closure.
 
 ## CORE-02 Completed Boundary
 
