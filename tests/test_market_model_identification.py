@@ -657,16 +657,16 @@ def test_p3b_dcf_and_ddm_both_feasible_are_ambiguous():
     rows = list(dcf_obs)
     for day in (1, 8, 15, 22):
         rows.extend((
-            cobs(f"ddm-{day}-dividend", day, "105", "dividend", "5", "assumption", "CNY/share"),
-            cobs(f"ddm-{day}-payout", day, "105", "payout", "0.40", "assumption", "ratio"),
-            cobs(f"ddm-{day}-growth", day, "105", "growth", "0.05", "assumption", "ratio"),
-            cobs(f"ddm-{day}-discount", day, "105", "discount_rate", "0.10", "assumption", "ratio"),
+            cobs(f"ddm-{day}-dividend", day, "2100", "dividend", "100", "assumption", "CNY/share"),
+            cobs(f"ddm-{day}-payout", day, "2100", "payout", "0.40", "assumption", "ratio"),
+            cobs(f"ddm-{day}-growth", day, "2100", "growth", "0.05", "assumption", "ratio"),
+            cobs(f"ddm-{day}-discount", day, "2100", "discount_rate", "0.10", "assumption", "ratio"),
         ))
     rows.extend((
-        cobs("ddm-current-dividend", None, "105", "dividend", "5", "assumption", "CNY/share"),
-        cobs("ddm-current-payout", None, "105", "payout", "0.40", "assumption", "ratio"),
-        cobs("ddm-current-growth", None, "105", "growth", "0.05", "assumption", "ratio"),
-        cobs("ddm-current-discount", None, "105", "discount_rate", "0.10", "assumption", "ratio"),
+        cobs("ddm-current-dividend", None, "2100", "dividend", "100", "assumption", "CNY/share"),
+        cobs("ddm-current-payout", None, "2100", "payout", "0.40", "assumption", "ratio"),
+        cobs("ddm-current-growth", None, "2100", "growth", "0.05", "assumption", "ratio"),
+        cobs("ddm-current-discount", None, "2100", "discount_rate", "0.10", "assumption", "ratio"),
     ))
     evidence = tuple(dcf_evidence) + (
         complex_evidence("e-dividend", "dividend", "CNY/share"),
@@ -733,12 +733,12 @@ def test_p3b_missing_complex_input_is_insufficient_evidence():
         complex_evidence("candidate-ddm", "ddm_candidate"),
     )
     rows = (
-        cobs("h1-dividend", 1, "105", "dividend", "5", "assumption", "CNY/share"),
-        cobs("h1-payout", 1, "105", "payout", "0.40", "assumption", "ratio"),
-        cobs("h1-growth", 1, "105", "growth", "0.05", "assumption", "ratio"),
-        cobs("current-dividend", None, "105", "dividend", "5", "assumption", "CNY/share"),
-        cobs("current-payout", None, "105", "payout", "0.40", "assumption", "ratio"),
-        cobs("current-growth", None, "105", "growth", "0.05", "assumption", "ratio"),
+        cobs("h1-dividend", 1, "2100", "dividend", "100", "assumption", "CNY/share"),
+        cobs("h1-payout", 1, "2100", "payout", "0.40", "assumption", "ratio"),
+        cobs("h1-growth", 1, "2100", "growth", "0.05", "assumption", "ratio"),
+        cobs("current-dividend", None, "2100", "dividend", "100", "assumption", "CNY/share"),
+        cobs("current-payout", None, "2100", "payout", "0.40", "assumption", "ratio"),
+        cobs("current-growth", None, "2100", "growth", "0.05", "assumption", "ratio"),
     )
     result = identify_market_models(
         complex_input(candidate_item, rows, evidence, "current-dividend")
