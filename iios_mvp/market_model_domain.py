@@ -127,9 +127,9 @@ class CandidateMarketModel:
             raise ValueError("required_observable_variables cannot be empty")
         if not self.admission_basis:
             raise ValueError("admission_basis is required")
-        if self.inverse_solvable and not self.evidence_ids:
+        if not self.evidence_ids:
             raise ValueError(
-                "inverse solvability alone cannot admit a candidate; evidence_ids are required"
+                "candidate market model admission requires evidence_ids; inverse solvability alone is insufficient"
             )
 
         expected_economic, expected_observable = MODEL_SEMANTICS[self.family]
