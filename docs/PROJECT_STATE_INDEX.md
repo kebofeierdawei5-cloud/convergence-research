@@ -19,7 +19,9 @@ CORE-01 Single Company Research Intake = PASS / MERGED
         ↓
 CORE-02 Company Economic Core = PASS / MERGED
         ↓
-CORE-03 Market Expectation + Expectation Gap = ACTIVE
+CORE-03 Real 300750 Vertical Slice = PASS / MERGED
+        ↓
+CORE-03 P4-F / Expectation Gap Closure = ACTIVE / BLOCKED
 ```
 
 ## Authority / continuity
@@ -70,7 +72,9 @@ BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
 
 `CORE-03 | Market Expectation + Expectation Gap`
 
-CORE-02 is now merged and accepted. It consumes admitted company-specific evidence and constructs Reality / Trust / Quality / Value Core / Value Driver Ranking plus a candidate valuation route.
+CORE-02 is merged and accepted. CORE-03 real 300750 vertical slice is also merged and accepted: independent forecast → human-selected DCF → P4-F MIE attempt → fail-closed Expectation Gap.
+
+CORE-03 current blocker is strictly the per-company PIT market-model observation set required to qualify P4-F. This is a data/evidence closure task, not a reason to activate CSI800/CSI Industry/A02.
 
 CORE-02 acceptance:
 - PR #29 merged;
@@ -81,3 +85,14 @@ CORE-02 acceptance:
 - CORE-01 CI run #10 / `37209264528`: SUCCESS.
 
 Acceptance remains per-company and PIT-bound. CORE-03 must consume this economic core and the existing P4-F MIE infrastructure without introducing universe-level dependencies.
+
+
+## CORE-03 Real 300750 acceptance
+
+- PR #31 merged; merge commit `e0662bb4efa5bfc40478240a0d9ef4bbcadb658a`.
+- CORE-03 CI run #7 / `37210940680`: SUCCESS.
+- Real forecast 2027-2029: independent bottom-up scenario package, no FM01 production router.
+- DCF: Bear/Base/Bull ~258.32 / 418.49 / 638.97 CNY per share; probability-weighted ~433.57; expected 3-year CAGR ~14.20% at 291.11 CNY.
+- P4-F: BLOCKED / INSUFFICIENT_EVIDENCE with replay PASS.
+- Expectation Gap: BLOCKED; intrinsic upside is not substituted.
+- Next sub-gate: acquire PIT market-model observations for this single company.
