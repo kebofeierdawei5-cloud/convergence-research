@@ -1,7 +1,7 @@
 # CORE-02 Company Economic Core — Acceptance Record
 
 Date: 2026-10-04
-Status: CANDIDATE FOR ACCEPTANCE
+Status: PASS / MERGED
 
 ## Scope
 
@@ -29,4 +29,23 @@ admitted company evidence → Reality → Trust → Quality → Value Core → V
 
 ## Evidence
 
-Pending dedicated CORE-02 CI and independent red-team review.
+- PR #29: MERGED
+- merge commit: `2a1c376e2bf3c608ebdf88a95d8be5aeaf8580b9`
+- CORE-02 CI run #6 / `37209264413`: SUCCESS
+- CORE-02 regression: **30 passed**
+- CORE-02 compileall: SUCCESS
+- CORE-02 JSON Schema validation: SUCCESS
+- CORE-01 CLI intake regression: SUCCESS
+- Investment Core CI run #214 / `37209264423`: SUCCESS
+- CORE-01 CI run #10 / `37209264528`: SUCCESS
+- Red-team hardening: evidence-domain binding, effective interval validation, derived-parent lineage validation, and Value Core evidence binding.
+- No CSI800 / CSI Industry / A02 dependency introduced.
+
+## Acceptance judgment
+
+**PASS** — CORE-02 is now canonical on `main`.
+
+Boundary remains strictly:
+admitted company evidence → Reality → Trust → Quality → Value Core / Value Driver Ranking → valuation route.
+
+It does not implement forecast, valuation execution, Market Implied Expectation, Expectation Gap or investment decision.
