@@ -1,7 +1,7 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path
-
-from __future__ import annotations
 
 from copy import deepcopy
 from decimal import Decimal
