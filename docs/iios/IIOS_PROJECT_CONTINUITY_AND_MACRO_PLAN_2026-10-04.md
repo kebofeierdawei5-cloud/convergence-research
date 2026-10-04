@@ -729,7 +729,8 @@ next gate
 
 As of 2026-10-04:
 
-- P4-A acceptance baseline commit: `30bd8f2a62a281c1fcdf66dbb6d4e7ed51002d17` (subsequent commits are documentation-only state updates)
+- P4-B acceptance baseline / pre-state commit: `02d6a9a7dc9626ae3d82132d0152bdf65ebc16ec`
+- P4-B merge commit: `741b3fc0bff3a8da5e993f1a0c0aec25cb823420`
 - Investment Core Contract v0.2: FROZEN / SEMANTIC PASS
 - P2-A: FINAL PASS / MERGED
 - P2-B: FINAL PASS / MERGED
