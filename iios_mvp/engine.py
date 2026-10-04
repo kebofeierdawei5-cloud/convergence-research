@@ -7,7 +7,7 @@ import hashlib
 import json
 from typing import Any
 
-ENGINE_VERSION = "0.1.0"
+ENGINE_VERSION = "0.1.1"
 ACTIONS = ("BUY", "ADD", "HOLD", "REDUCE", "EXIT", "NO-BUY")
 
 
@@ -297,7 +297,7 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
 def run_case(case: dict[str, Any]) -> tuple[dict[str, Any], str]:
     decision = decide(case)
     snapshot = {
-        "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.1",
+        "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.1.1",
         "engine_version": ENGINE_VERSION,
         "input": case,
         "decision": decision,
