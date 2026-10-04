@@ -1,3 +1,14 @@
+# B0 REPAIR OVERRIDE — 2026-10-04
+
+Active repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
+Active stage: **B0 PASS → B1 Investment Semantics v0.3**
+
+This index retains the incumbent v0.2 and P4 acceptance records below for historical continuity. They do not override the B0 authority freeze. The incumbent return statement and P5 next-step text are superseded as the active repair target until B1 is approved.
+
+B1 must separately contract: BUY-entry threshold / safety margin, 1–3Y annualized target, Expected Return, Required Return, Horizon, and the non-double-counting relationship among them.
+
+---
+
 # IIOS Current-State Index
 
 Continuity / macro development plan: `docs/iios/IIOS_PROJECT_CONTINUITY_AND_MACRO_PLAN_2026-10-04.md`
