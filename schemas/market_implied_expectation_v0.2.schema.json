@@ -340,5 +340,165 @@
       "type": "string",
       "minLength": 1
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "qualification": {
+            "const": "DECISION_GRADE"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "identifiability": {
+            "const": "IDENTIFIABLE"
+          },
+          "stability": {
+            "const": "STABLE"
+          },
+          "candidate_coverage": {
+            "properties": {
+              "status": {
+                "const": "SUFFICIENT"
+              }
+            }
+          },
+          "evidence_sufficiency": {
+            "properties": {
+              "status": {
+                "const": "SUFFICIENT"
+              }
+            }
+          },
+          "representation": {
+            "enum": [
+              "FULL_FEASIBLE_SET",
+              "IMPLIED_POINT",
+              "IMPLIED_RANGE"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "identifiability": {
+            "enum": [
+              "UNIDENTIFIABLE",
+              "INSUFFICIENT_EVIDENCE"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "qualification": {
+            "const": "BLOCKED"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "stability": {
+            "enum": [
+              "UNSTABLE",
+              "INSUFFICIENT_EVIDENCE"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "qualification": {
+            "const": "BLOCKED"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "candidate_coverage": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "INSUFFICIENT",
+                  "UNASSESSED"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "qualification": {
+            "const": "BLOCKED"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_sufficiency": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "INSUFFICIENT",
+                  "UNASSESSED"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "qualification": {
+            "const": "BLOCKED"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "representation": {
+            "const": "CONDITIONAL_IMPLIED_VARIABLE"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "qualification": {
+            "const": "CONDITIONAL_ONLY"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "identifiability": {
+            "const": "AMBIGUOUS"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "properties": {
+            "qualification": {
+              "const": "DECISION_GRADE"
+            }
+          }
+        }
+      }
+    }
+  ]
 }
