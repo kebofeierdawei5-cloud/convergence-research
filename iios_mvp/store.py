@@ -64,6 +64,13 @@ def _atomic_create(path: Path, payload: dict[str, Any]) -> Path:
     return path
 
 
+def _atomic_replace(path: Path, payload: dict[str, Any]) -> Path:
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    tmp.replace(path)
+    return path
+
+
 def decision_series_id(market: str, symbol: str) -> str:
     return f"{market.upper()}-{symbol.upper()}"
 
@@ -155,9 +162,19 @@ def approve_revision(root: str | Path, decision_id: str, snapshot: dict[str, Any
     current = _load_json(current_path)
     current["decision_series_id"] = decision["decision_series_id"]
     current["company_id"] = decision["decision_series_id"]
-    current["current_approved_decision_id"] = decision_id
-    current["current_decision_updated_at"] = snapshot["input"]["cutoff_date"]
-    _atomic_create(current_path, current)
+    current_id = current.get("current_approved_decision_id")
+    current_revision = 0
+    if current_id and "-r" in current_id:
+        try:
+            current_revision = int(current_id.rsplit("-r", 1)[1])
+        except ValueError:
+            current_revision = 0
+    revision = int(decision["revision"])
+    is_current = revision >= current_revision
+    if is_current:
+        current["current_approved_decision_id"] = decision_id
+        current["current_decision_updated_at"] = snapshot["input"]["cutoff_date"]
+        _atomic_replace(current_path, current)
     # Keep the revision immutable: publish a separate current projection rather than editing the revision.
     return {"decision_id": decision_id, "status": "HUMAN_APPROVED", "current": True}
 
