@@ -8,7 +8,8 @@ Date: 2026-10-04
 
 ## Evidence Chain
 
-- PR #11: merged after CI/red-team acceptance
+- PR #11: MERGED
+- P4-B merge commit: `741b3fc0bff3a8da5e993f1a0c0aec25cb823420`
 - P4-B pre-merge HEAD: `02d6a9a7dc9626ae3d82132d0152bdf65ebc16ec`
 - Investment Core CI #131 / `37187856731`: **SUCCESS**
 - FM00 CI #99 / `37187856715`: **SUCCESS**
