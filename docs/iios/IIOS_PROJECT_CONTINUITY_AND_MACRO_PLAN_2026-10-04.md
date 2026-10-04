@@ -276,12 +276,15 @@ P3-A/P3-B are deterministic identification baselines, not proof of actual invest
 
 Current candidate completeness is caller-supplied.
 
-No automatic statement should be made that the system has identified “the true market model” unless:
+P3 IDENTIFIABLE is therefore candidate-set-conditional. It must not be represented as proof that the market's true pricing model has been identified.
 
-- candidate coverage is sufficient;
+No MIE can be treated as decision-grade unless:
+
+- candidate coverage is sufficient for the decision context;
 - evidence materially distinguishes alternatives;
 - interpretation is stable;
-- provenance and PIT are valid.
+- provenance and PIT are valid;
+- conditional inverse results are explicitly labeled as conditional.
 
 ---
 
@@ -361,13 +364,13 @@ Recommended sequence:
 
 ```
 P4-A
-Market Implied Expectation typed output / contract
+Market Implied Expectation qualification contract
         ↓
 P4-B
-Ratio-family expectation extraction
+Ratio-family MIE vertical slice
         ↓
 P4-C
-DCF / DDM assumption-set extraction
+DCF / DDM conditional MIE
         ↓
 P4-D
 SOTP / rNPV expectation extraction
@@ -388,8 +391,8 @@ Examples:
 - PE → implied forward EPS / earnings;
 - PS → implied revenue;
 - EV/EBITDA → implied EBITDA + enterprise-value bridge;
-- DCF → feasible FCF / growth / margin / reinvestment / discount / terminal assumptions;
-- DDM → feasible dividend / payout / growth / discount assumptions;
+- DCF → explicitly labeled conditional implied FCF or a separately justified multidimensional feasible assumption set;
+- DDM → explicitly labeled conditional implied dividend or a separately justified multidimensional feasible assumption set;
 - SOTP → feasible segment / residual value construction;
 - rNPV → feasible pipeline value / probability / timing requirements.
 
@@ -723,7 +726,7 @@ next gate
 
 As of 2026-10-04:
 
-- Main HEAD: `767a7891ed2c786dd30e79f79b4200943f3d3283`
+- Main HEAD: `ceae90f89f96f550645bc57a9b96528021e5ca9e`
 - Investment Core Contract v0.2: FROZEN / SEMANTIC PASS
 - P2-A: FINAL PASS / MERGED
 - P2-B: FINAL PASS / MERGED
