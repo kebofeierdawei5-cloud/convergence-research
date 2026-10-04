@@ -367,6 +367,9 @@ P4-A
 Market Implied Expectation qualification contract — FINAL PASS
         ↓
 P4-B
+Ratio-family MIE vertical slice — FINAL PASS
+        ↓
+P4-C
 Ratio-family MIE vertical slice
         ↓
 P4-C
@@ -689,7 +692,7 @@ The system is successful when the full chain is repeatable, auditable, and usefu
 
 ## 11. Current Next Step
 
-**P4-B should be the next implementation gate.**
+**P4-C should be the next implementation gate.**
 
 Before writing broad P4 code, define the minimum model-semantic output required for:
 
@@ -732,7 +735,7 @@ As of 2026-10-04:
 - P2-B: FINAL PASS / MERGED
 - P3-A: FINAL PASS / MERGED
 - P3-B: FINAL PASS / MERGED
-- P4: ACTIVE / P4-A FINAL PASS / P4-B NEXT
+- P4: ACTIVE / P4-A FINAL PASS / P4-B FINAL PASS / P4-C NEXT
 - Production investment decision kernel: NOT YET
 - Real-company acceptance: NOT STARTED
 - Independent audit: NOT STARTED
