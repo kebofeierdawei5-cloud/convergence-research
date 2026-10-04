@@ -119,7 +119,7 @@
         "schema_version", "status", "overall_economic_profile",
         "profile_basis", "model_router_input", "model_route", "value_structure",
         "nodes", "core_assets"
-      },
+      ],
       "properties": {
         "schema_version": {"const": "IIOS-VALUE-CORE-SCAN-1.0"},
         "status": {"const": "PASS"},
