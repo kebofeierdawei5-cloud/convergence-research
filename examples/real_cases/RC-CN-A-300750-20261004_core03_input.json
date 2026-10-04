@@ -39,7 +39,8 @@
         "evidence_ids": [
           "E004",
           "E005",
-          "E009"
+          "E009",
+          "E010"
         ],
         "rationale": "Demand/shipments continue to grow but price competition and high reinvestment keep gross margin and incremental returns under pressure; FCF conversion recovers only gradually."
       },
@@ -67,7 +68,8 @@
         "evidence_ids": [
           "E004",
           "E005",
-          "E009"
+          "E009",
+          "E010"
         ],
         "rationale": "Volume growth remains strong, storage expands mix, global production ramps, and unit economics stabilize; cash conversion improves as the CAPEX cycle matures."
       },
@@ -95,13 +97,27 @@
         "evidence_ids": [
           "E004",
           "E005",
-          "E009"
+          "E009",
+          "E010"
         ],
         "rationale": "CATL retains strong global share, storage and new-technology products improve mix, and incremental factories achieve high utilization with superior returns."
       }
     },
     "valuation_focus": "FCF_AND_INCREMENTAL_ROIC",
-    "independence_statement": "No broker consensus or paid commercial forecast is used; all future values are explicit analyst assumptions anchored to admitted company evidence."
+    "independence_statement": "No broker consensus or paid commercial forecast is used; all future values are explicit analyst assumptions anchored to admitted company evidence.",
+    "cash_flow_diagnostic": {
+      "2025_fcf_proxy_bn_cny": "90.875424",
+      "2026_h1_fcf_proxy_bn_cny": "35.144079",
+      "2026_h1_net_profit_growth_pct": "41.98",
+      "2026_h1_operating_cash_flow_growth_pct": "2.61",
+      "four_working_capital_items_increase_bn_cny": "65.536707",
+      "interpretation": "Working-capital absorption is a material explanatory candidate for the H1 cash-flow/profit divergence, but not yet proven to be temporary; decomposition and normalization remain forecast validation tasks.",
+      "evidence_ids": [
+        "E005",
+        "E009",
+        "E010"
+      ]
+    }
   },
   "valuation_assumptions": {
     "price_cny": "291.11",
@@ -145,6 +161,17 @@
       "artifact_id": "catl-20261004-E009-2025-annual-anchor.txt",
       "status": "ADMITTED",
       "variable": "historical_forecast_anchor"
+    },
+    {
+      "evidence_id": "E010",
+      "known_at": "2026-07-24T00:00:00+08:00",
+      "retrieved_at": "2026-10-04T00:00:00+08:00",
+      "content_sha256": "ecf6e30e7f560e706bafd422af19308e1b8023b392d76f0b7f0028bd30ec7cca",
+      "exact_bytes": true,
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
+      "artifact_id": "catl-20261004-E010-working-capital-h1-2026.txt",
+      "status": "ADMITTED",
+      "variable": "working_capital_diagnostic"
     }
   ],
   "core02_input": {
