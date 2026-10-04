@@ -136,15 +136,24 @@ def test_capture_after_cutoff_is_allowed_because_pit_uses_known_at():
     assert replay_p4f_snapshot(snap)['replay_status'] == 'PASS'
 
 def test_cross_model_snapshot_basis_mismatch_is_rejected():
-    a=make_mie(model_id='pe-1',family=MarketModelFamily.FORWARD_PE,observation_id='price-1')
-    b=make_mie(model_id='ps-1',family=MarketModelFamily.PS,observation_id='price-2')
-    cov=CandidateCoverageAssessment(CandidateCoverageState.SUFFICIENT,'global',('pe-1','ps-1'),('gc1','gc2'),'global')
-    ev=EvidenceSufficiencyAssessment(EvidenceSufficiencyState.SUFFICIENT,'sufficient',('ge1','ge2'))
-    records=(MIEModelEvaluation.from_expectation(a),MIEModelEvaluation.from_expectation(b))
-    ids=set(cov.evidence_ids)|set(ev.evidence_ids)|set(a.evidence_ids)|set(b.evidence_ids)|{'price-1','price-2'}
-    s=build_multi_model_market_implied_expectation_set(set_id='s',candidate_coverage=cov,evidence_sufficiency=ev,model_evaluations=records,qualification_rationale='ambiguous',evidence_ids=tuple(sorted(ids)))
+    s=make_set(('pe-1',MarketModelFamily.FORWARD_PE,MIEQualification.DECISION_GRADE),
+               ('ps-1',MarketModelFamily.PS,MIEQualification.DECISION_GRADE))
+    snap=build_p4f_snapshot(case_id='case-1',cutoff_date=CUTOFF,created_at=CREATED,mie_set=s,provenance_records=make_provenance(s))
+    tampered=json.loads(json.dumps(snap))
+    evaluations=tampered['mie_set']['model_evaluations']
+    evaluations[1]['expectation']['observation_basis']['price_observation_id']='price-2'
+    evaluations[1]['expectation']['observation_basis']['observation_date']=CUTOFF.isoformat()
+    evaluations[1]['expectation']['observation_basis']['cutoff_date']=CUTOFF.isoformat()
+    provenance=tampered['provenance_manifest']
+    provenance.append({
+        'evidence_id':'price-2','variable':'market_price','unit':'CNY','basis':'fixture',
+        'observation_date':CUTOFF.isoformat(),'known_at':CREATED.isoformat(),
+        'source':'fixture-source','source_location':'fixture://price-2',
+        'content_sha256':'b'*64,'captured_at':CREATED.isoformat(),
+    })
+    provenance.sort(key=lambda x:x['evidence_id'])
     with pytest.raises(ValueError, match='observation basis'):
-        build_p4f_snapshot(case_id='case', cutoff_date=CUTOFF, created_at=CREATED, mie_set=s, provenance_records=make_provenance(s))
+        validate_p4f_snapshot(tampered)
 
 def test_schema_validates_snapshot():
     s=make_set(('pe-1',MarketModelFamily.FORWARD_PE,MIEQualification.DECISION_GRADE))
