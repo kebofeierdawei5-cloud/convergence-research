@@ -64,6 +64,13 @@ def test_decision_grade_requires_full_qualification():
 def test_conditional_inverse_cannot_be_decision_grade():
     result = make(
         market_model=MarketModelFamily.DCF, model_id="dcf-1",
+        candidate_coverage=CandidateCoverageAssessment(
+            status=CandidateCoverageState.SUFFICIENT,
+            scope_basis="admitted_dcf_candidates_v0.2",
+            candidate_model_ids=("dcf-1", "ddm-1"),
+            evidence_ids=("ev-coverage",),
+            rationale="Decision scope includes the DCF candidate.",
+        ),
         representation=MIERepresentation.CONDITIONAL_IMPLIED_VARIABLE,
         economic_requirements=(req("fcf", "100", "CNY"),),
         assumption_set=(MIEAssumption(
