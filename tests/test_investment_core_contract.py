@@ -165,13 +165,13 @@ def test_v02_engine_does_not_execute_legacy_decision_logic():
     assert result["decision"]["primary_reason"] == "V02_ENGINE_NOT_IMPLEMENTED"
     assert result["decision"]["action"] == "NO-BUY"
 
-def test_engine_rejects_unsupported_explicit_contract_version():
+def test_engine_rejects_unsupported_future_contract_version():
     from iios_mvp.engine import validate_case
     case = valid_case()
-    case["contract_version"] = "IIOS-INVESTMENT-CORE-0.3"
+    case["contract_version"] = "IIOS-INVESTMENT-CORE-0.4"
     blockers = validate_case(case)
     assert blockers == [
-        "CORE-VERSION-EXACT:contract_version:unsupported investment-core contract IIOS-INVESTMENT-CORE-0.3"
+        "CORE-VERSION-EXACT:contract_version:unsupported investment-core contract IIOS-INVESTMENT-CORE-0.4"
     ]
 
 
