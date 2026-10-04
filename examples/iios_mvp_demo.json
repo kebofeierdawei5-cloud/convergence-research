@@ -70,9 +70,7 @@
       "primary_model": "forward_pe",
       "economic_profile": "mature_cash_earning_business",
       "rationale": "示例主业以可持续盈利和现金流为核心，采用盈利倍数作为主模型。",
-      "alternatives": [
-        "dcf"
-      ]
+      "alternatives": []
     },
     "currency": "CNY",
     "current_price": 16.5,
@@ -86,6 +84,34 @@
       "forward_pe": {
         "profit_low": 9500000000,
         "profit_high": 10500000000
+      }
+    },
+    "model_inputs": {
+      "dcf": {
+        "bear": {
+          "fcf": [
+            8000000000,
+            8000000000
+          ],
+          "discount_rate": 0.12,
+          "terminal_growth": 0.02
+        },
+        "base": {
+          "fcf": [
+            10000000000,
+            10000000000
+          ],
+          "discount_rate": 0.1,
+          "terminal_growth": 0.03
+        },
+        "bull": {
+          "fcf": [
+            12000000000,
+            12000000000
+          ],
+          "discount_rate": 0.09,
+          "terminal_growth": 0.03
+        }
       }
     }
   },
