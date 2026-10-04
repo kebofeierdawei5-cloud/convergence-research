@@ -466,9 +466,8 @@ def _solve_rnpv_primary(
     if base_value < Decimal("0"):
         raise ValueError("rNPV base_value must be >= 0")
 
-    pipeline_rows = []
     pipeline_total = Decimal("0")
-    factor = Decimal("0")
+    observed_risk_adjusted_value = Decimal("0")
     evidence_ids: list[str] = []
     for pipe, probability, timing in zip(
         sorted(pipelines, key=lambda x: _parse_pipeline_basis(x.basis)),
@@ -489,25 +488,26 @@ def _solve_rnpv_primary(
         if denominator <= 0:
             raise ValueError("rNPV timing/discount rate gives invalid denominator")
         weight = probability.economic_value / denominator
-        factor += weight
+        observed_risk_adjusted_value += pipe.economic_value * weight
         pipeline_total += pipe.economic_value
-        pipeline_rows.append((pipeline_id, pipe.economic_value, weight))
         evidence_ids.extend(pipe.evidence_ids)
         evidence_ids.extend(probability.evidence_ids)
         evidence_ids.extend(timing.evidence_ids)
 
-    if factor <= 0:
-        raise ValueError("rNPV risk-adjusted factor must be > 0")
+    if observed_risk_adjusted_value <= 0 or pipeline_total <= 0:
+        raise ValueError("rNPV observed risk-adjusted pipeline value must be > 0")
     market_price, shares_outstanding, net_debt = _market_context(items)
     enterprise_value = market_price * shares_outstanding + net_debt
     residual_value = enterprise_value - base_value
     if residual_value < Decimal("0"):
         raise ValueError("rNPV market value is below stated base_value")
-    implied_pipeline_value = residual_value / factor
+    observed_composition_weight = observed_risk_adjusted_value / pipeline_total
+    implied_pipeline_value = residual_value / observed_composition_weight
 
     return implied_pipeline_value, {
         "observed_pipeline_total": pipeline_total,
-        "risk_adjusted_factor": factor,
+        "observed_risk_adjusted_pipeline_value": observed_risk_adjusted_value,
+        "observed_composition_weight": observed_composition_weight,
         "base_value": base_value,
         "implied_pipeline_value": implied_pipeline_value,
     }, tuple(sorted(set(
@@ -617,6 +617,8 @@ def _fit_complex_candidate(
     current_observation_date: date,
     required_historical_points: int = 2,
 ) -> CandidateEvaluation:
+    # Complex-model observations must remain evidence-backed just like P3-A.
+    _observation_evidence_ids(observations, evidence_index)
     historical, current_group = _complex_groups(observations, current_observation_date)
     candidate_evidence_ids = tuple(sorted(set(candidate.evidence_ids)))
     complex_required = COMPLEX_REQUIRED_OBSERVABLES[candidate.family]
