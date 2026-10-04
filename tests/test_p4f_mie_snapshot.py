@@ -152,6 +152,13 @@ def test_cross_model_snapshot_basis_mismatch_is_rejected():
         'content_sha256':'b'*64,'captured_at':CREATED.isoformat(),
     })
     provenance.sort(key=lambda x:x['evidence_id'])
+    def h(value):
+        import hashlib
+        return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')).hexdigest()
+    tampered['mie_set_hash']=h(tampered['mie_set'])
+    tampered['provenance_hash']=h(tampered['provenance_manifest'])
+    core={k:tampered[k] for k in ('snapshot_schema','p4f_version','case_id','cutoff_date','created_at','mie_set','provenance_manifest','mie_set_hash','provenance_hash')}
+    tampered['snapshot_hash']=h(core)
     with pytest.raises(ValueError, match='observation basis'):
         validate_p4f_snapshot(tampered)
 
