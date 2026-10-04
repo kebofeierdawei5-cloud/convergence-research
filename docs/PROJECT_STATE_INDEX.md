@@ -17,7 +17,9 @@ CORE-00 Scope Reset & Architecture Reconciliation = PASS / MERGED
         ↓
 CORE-01 Single Company Research Intake = PASS / MERGED
         ↓
-CORE-02 Company Economic Core = ACTIVE
+CORE-02 Company Economic Core = PASS / MERGED
+        ↓
+CORE-03 Market Expectation + Expectation Gap = ACTIVE
 ```
 
 ## Authority / continuity
@@ -66,8 +68,16 @@ BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
 
 ## Current development task
 
-`CORE-02 | Company Economic Core`
+`CORE-03 | Market Expectation + Expectation Gap`
 
-CORE-01 is now merged and accepted. The next task is to consume admitted company-specific evidence and construct Reality / Trust / Quality / Value Core without introducing any CSI800/CSI Industry/A02 dependency.
+CORE-02 is now merged and accepted. It consumes admitted company-specific evidence and constructs Reality / Trust / Quality / Value Core / Value Driver Ranking plus a candidate valuation route.
 
-Acceptance must remain per-company and PIT-bound.
+CORE-02 acceptance:
+- PR #29 merged;
+- merge commit `2a1c376e2bf3c608ebdf88a95d8be5aeaf8580b9`;
+- dedicated CI run #6 / `37209264413`: SUCCESS;
+- 30 CORE-02 regression tests passed;
+- Investment Core CI run #214 / `37209264423`: SUCCESS;
+- CORE-01 CI run #10 / `37209264528`: SUCCESS.
+
+Acceptance remains per-company and PIT-bound. CORE-03 must consume this economic core and the existing P4-F MIE infrastructure without introducing universe-level dependencies.
