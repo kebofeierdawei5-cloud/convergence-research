@@ -60,6 +60,8 @@ class MIEModelEvaluation:
                 raise ValueError("MATERIALIZED evaluation requires an expectation")
             if self.expectation.model_id != self.model_id:
                 raise ValueError("MIE model evaluation model_id/expectation mismatch")
+            if self.expectation.qualification == MIEQualification.BLOCKED:
+                raise ValueError("MATERIALIZED evaluation cannot carry a BLOCKED MIE")
             self.expectation.validate()
         elif self.expectation is not None:
             raise ValueError("non-materialized evaluation cannot carry an expectation")
@@ -151,7 +153,9 @@ class MultiModelMarketImpliedExpectationSet:
         }
 
 def build_multi_model_market_implied_expectation_set(*, set_id: str, candidate_coverage: CandidateCoverageAssessment, evidence_sufficiency: EvidenceSufficiencyAssessment, model_evaluations: Sequence[MIEModelEvaluation], qualification_rationale: str, evidence_ids: tuple[str, ...]) -> MultiModelMarketImpliedExpectationSet:
-    result = MultiModelMarketImpliedExpectationSet(set_id, candidate_coverage, evidence_sufficiency, tuple(model_evaluations), MIESetResolutionState.INSUFFICIENT_EVIDENCE, MIEQualification.BLOCKED, qualification_rationale, evidence_ids)
+    canonical_evaluations = tuple(sorted(model_evaluations, key=lambda item: item.model_id))
+    canonical_evidence_ids = tuple(sorted(set(evidence_ids)))
+    result = MultiModelMarketImpliedExpectationSet(set_id, candidate_coverage, evidence_sufficiency, canonical_evaluations, MIESetResolutionState.INSUFFICIENT_EVIDENCE, MIEQualification.BLOCKED, qualification_rationale, canonical_evidence_ids)
     result = MultiModelMarketImpliedExpectationSet(result.set_id, result.candidate_coverage, result.evidence_sufficiency, result.model_evaluations, result.expected_resolution(), MIEQualification.BLOCKED, result.qualification_rationale, result.evidence_ids)
     result = MultiModelMarketImpliedExpectationSet(result.set_id, result.candidate_coverage, result.evidence_sufficiency, result.model_evaluations, result.resolution_state, result.expected_qualification(), result.qualification_rationale, result.evidence_ids)
     result.validate()
