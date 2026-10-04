@@ -275,11 +275,12 @@ def test_historical_window_perturbation_can_make_model_unstable():
         obs("h1", 1, "100", "10", "forward_eps"),
         obs("h2", 15, "200", "10", "forward_eps"),
         obs("h3", 30, "300", "10", "forward_eps"),
+        obs("h4", 30, "300", "10", "forward_eps"),
         MarketValuationObservation(
             observation_id="current",
             observation_date=CUTOFF,
             known_at=KNOWN,
-            price=Decimal("250"),
+            price=Decimal("100"),
             shares_outstanding=Decimal("100"),
             economic_variable="forward_eps",
             economic_value=Decimal("10"),
@@ -324,3 +325,13 @@ def test_candidate_unknown_provenance_is_rejected():
     )
     with pytest.raises(ValueError, match="unknown evidence_ids"):
         identify_market_models(base_input([bad], observations))
+
+def test_stability_observation_can_be_stable_without_selected_model():
+    from iios_mvp.market_model_domain import StabilityObservation
+    observation = StabilityObservation(
+        perturbation_id="p1",
+        perturbation="full historical set",
+        resulting_state=StabilityState.STABLE,
+        selected_model_id=None,
+    )
+    observation.validate()
