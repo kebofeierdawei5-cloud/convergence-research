@@ -58,7 +58,7 @@ def case() -> dict:
 
 def test_v03_return_math_separates_the_two_15_percent_policies():
     metrics = calculate_return_metrics(case()["return_gate"])
-    assert metrics["buy_entry_return_cushion"] == Decimal("0.15")
+    assert metrics["entry_return_cushion"] == Decimal("0.15")
     assert metrics["fundamental_target_pass"] is True
     assert metrics["required_return_pass"] is True
     assert metrics["return_gate_pass"] is True
