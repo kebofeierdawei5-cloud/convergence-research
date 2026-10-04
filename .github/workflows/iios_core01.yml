@@ -1,0 +1,40 @@
+name: IIOS CORE-01 Single Company Intake
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/research_intake.py"
+      - "iios_mvp/cli.py"
+      - "schemas/research_case_v0.1.schema.json"
+      - "tests/test_research_intake.py"
+      - "docs/iios/CORE_01_SINGLE_COMPANY_INTAKE_v0.1.md"
+      - "docs/iios/CORE_01_ACCEPTANCE_2026-10-04.md"
+      - ".github/workflows/iios_core01.yml"
+  push:
+    branches: [main]
+    paths:
+      - "iios_mvp/research_intake.py"
+      - "iios_mvp/cli.py"
+      - "schemas/research_case_v0.1.schema.json"
+      - "tests/test_research_intake.py"
+      - "docs/iios/CORE_01_SINGLE_COMPANY_INTAKE_v0.1.md"
+      - "docs/iios/CORE_01_ACCEPTANCE_2026-10-04.md"
+      - ".github/workflows/iios_core01.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  core01:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q iios_mvp tests/test_research_intake.py
+      - run: python -m pytest -q tests/test_research_intake.py
+      - run: python -m json.tool schemas/research_case_v0.1.schema.json >/dev/null
+      - run: PYTHONPATH=. python -m iios_mvp.cli intake 300750 --as-of 2026-10-04 --position 0 --generated-at 2026-10-04T00:00:00+00:00
+      - run: git diff --check

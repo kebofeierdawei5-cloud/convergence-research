@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/research-case-0.1.schema.json",
+  "title": "IIOS Single Company Research Case v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "case_id", "generator_version", "request", "security_identity", "temporal_scope", "decision_context", "evidence_plan", "evidence", "admission", "audit"],
+  "properties": {
+    "contract_version": {"const": "IIOS-RESEARCH-CASE-0.1"},
+    "case_id": {"type": "string", "minLength": 1},
+    "generator_version": {"const": "CORE-01-0.1"},
+    "request": {
+      "type": "object", "additionalProperties": false,
+      "required": ["market", "symbol", "as_of_date", "current_position_pct"],
+      "properties": {
+        "market": {"enum": ["CN-A", "HK"]},
+        "symbol": {"type": "string", "minLength": 1},
+        "as_of_date": {"type": "string", "format": "date"},
+        "current_position_pct": {"type": ["string", "number"]}
+      }
+    },
+    "security_identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "market", "symbol", "venue_hint", "venue_hint_is_evidence", "resolution_basis_required"],
+      "properties": {
+        "status": {"enum": ["UNRESOLVED", "RESOLVED"]},
+        "market": {"enum": ["CN-A", "HK"]},
+        "symbol": {"type": "string", "minLength": 1},
+        "venue_hint": {"type": ["string", "null"]},
+        "venue_hint_is_evidence": {"const": false},
+        "resolution_basis_required": {"const": "PRIMARY_OFFICIAL"}
+      }
+    },
+    "temporal_scope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["as_of_date", "cutoff_date", "mode", "pit_required", "pit_rule", "current_state_substitution"],
+      "properties": {
+        "as_of_date": {"type": "string", "format": "date"},
+        "cutoff_date": {"type": "string", "format": "date"},
+        "mode": {"enum": ["CURRENT", "HISTORICAL"]},
+        "pit_required": {"const": true},
+        "pit_rule": {"const": "known_at <= cutoff"},
+        "current_state_substitution": {"const": "FORBIDDEN"}
+      }
+    },
+    "decision_context": {
+      "type": "object", "additionalProperties": false,
+      "required": ["current_position_pct", "position_basis"],
+      "properties": {
+        "current_position_pct": {"type": "string", "pattern": "^(100(?:\\.0+)?|(?:[0-9]|[1-9][0-9])(?:\\.[0-9]+)?)$"},
+        "position_basis": {"const": "CURRENT_PORTFOLIO_STATE"}
+      }
+    },
+    "evidence_plan": {"type": "array", "minItems": 7, "items": {"type": "object", "additionalProperties": true}},
+    "evidence": {"type": "array", "items": {"type": "object"}},
+    "admission": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "decision_ready", "blockers"],
+      "properties": {
+        "status": {"enum": ["EVIDENCE_PENDING", "BLOCKED"]},
+        "decision_ready": {"const": false},
+        "blockers": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "audit": {
+      "type": "object", "additionalProperties": false,
+      "required": ["input_sha256", "evidence_plan_sha256", "generated_at"],
+      "properties": {
+        "input_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "evidence_plan_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "generated_at": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}
