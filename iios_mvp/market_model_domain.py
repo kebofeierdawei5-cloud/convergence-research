@@ -15,7 +15,7 @@ class MarketModelFamily(str, Enum):
     DCF = "dcf"
     DDM = "ddm"
     SOTP = "sotp"
-    RNVP = "rnpv"
+    RNPV = "rnpv"
 
 
 class ModelFitStatus(str, Enum):
@@ -45,7 +45,7 @@ class StabilityState(str, Enum):
 
 
 MODEL_SEMANTICS: Mapping[MarketModelFamily, tuple[tuple[str, ...], tuple[str, ...]]] = {
-    MarketModelFamily.FORWARD_PE: (("forward_eps", "earnings"), ("forward_eps",)),
+    MarketModelFamily.FORWARD_PE: (("forward_eps",), ("forward_eps",)),
     MarketModelFamily.PS: (("revenue",), ("revenue",)),
     MarketModelFamily.PB: (("book_equity",), ("book_equity",)),
     MarketModelFamily.EV_EBITDA: (("ebitda", "enterprise_value"), ("ebitda", "enterprise_value")),
@@ -61,7 +61,7 @@ MODEL_SEMANTICS: Mapping[MarketModelFamily, tuple[tuple[str, ...], tuple[str, ..
         ("segment_value", "residual_value"),
         ("segment_value", "residual_value"),
     ),
-    MarketModelFamily.RNVP: (
+    MarketModelFamily.RNPV: (
         ("pipeline_value", "probability", "timing"),
         ("pipeline_value", "probability", "timing"),
     ),
