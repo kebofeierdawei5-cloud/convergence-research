@@ -114,15 +114,22 @@ def validate_case(case: dict[str, Any]) -> list[str]:
         blockers.append("INVALID_SHARES_OUTSTANDING")
     if required_return < 0:
         blockers.append("INVALID_REQUIRED_RETURN")
-    if str(valuation.get("model", "")) != "forward_pe":
-        blockers.append("UNSUPPORTED_MVP_VALUATION_MODEL")
-    for scenario in ("bear", "base", "bull"):
-        try:
-            multiple = dec(valuation.get(f"{scenario}_multiple"), f"valuation.{scenario}_multiple")
-        except ValueError:
-            multiple = Decimal("0")
-        if multiple <= 0:
-            blockers.append(f"INVALID_{scenario.upper()}_MULTIPLE")
+    try:
+        from .valuation import SUPPORTED_MODELS, select_model
+        selection = select_model(valuation)
+        if selection["primary_model"] not in SUPPORTED_MODELS:
+            blockers.append("UNSUPPORTED_VALUATION_MODEL")
+    except ValueError as exc:
+        blockers.append(f"VALUATION_MODEL_SELECTION_INVALID:{exc}")
+    model = str((valuation.get("model_selection") or {}).get("primary_model") or valuation.get("model") or "")
+    if model == "forward_pe":
+        for scenario in ("bear", "base", "bull"):
+            try:
+                multiple = dec(valuation.get(f"{scenario}_multiple"), f"valuation.{scenario}_multiple")
+            except ValueError:
+                multiple = Decimal("0")
+            if multiple <= 0:
+                blockers.append(f"INVALID_{scenario.upper()}_MULTIPLE")
 
     risk = case.get("risk") or {}
     try:
@@ -145,16 +152,10 @@ def validate_case(case: dict[str, Any]) -> list[str]:
 
 
 def _scenario(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str, shares: Decimal) -> dict[str, Any]:
-    net_profit = dec(forecast[scenario]["net_profit"], f"forecast.{scenario}.net_profit")
-    multiple = dec(valuation[f"{scenario}_multiple"], f"valuation.{scenario}_multiple")
-    equity_value = net_profit * multiple
-    per_share = equity_value / shares
-    return {
-        "net_profit": float(net_profit),
-        "multiple": float(multiple),
-        "equity_value": float(equity_value),
-        "value_per_share": float(per_share),
-    }
+    from .valuation import value_scenario
+    result = value_scenario(forecast, valuation, scenario, shares)
+    result["scenario"] = scenario
+    return result
 
 
 def decide(case: dict[str, Any]) -> dict[str, Any]:
@@ -266,7 +267,8 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
         },
         "forecast": {s: forecast[s] for s in ("bear", "base", "bull")},
         "valuation": {
-            "model": valuation["model"],
+            "model": (valuation.get("model_selection") or {}).get("primary_model") or valuation["model"],
+            "model_selection": (valuation.get("model_selection") or {}),
             "current_price": float(current_price),
             "scenarios": scenarios,
             "intrinsic_value_per_share": float(base_value),
