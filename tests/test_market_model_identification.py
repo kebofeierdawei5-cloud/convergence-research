@@ -237,7 +237,7 @@ def test_insufficient_history_is_not_called_unidentifiable():
     assert result["identifiability"].state.value == "INSUFFICIENT_EVIDENCE"
 
 
-def test_dcf_is_explicitly_insufficient_until_model_specific_solver_exists():
+def test_dcf_without_required_history_and_assumptions_is_insufficient():
     dcf = CandidateMarketModel(
         model_id="dcf-1",
         family=MarketModelFamily.DCF,
@@ -404,3 +404,368 @@ def test_three_historical_points_without_leave_one_out_window_are_insufficient_f
     result = identify_market_models(base_input([pe], observations))
     assert result["identifiability"].state.value == "IDENTIFIABLE"
     assert result["stability"].state.value == "INSUFFICIENT_EVIDENCE"
+
+
+def complex_evidence(eid: str, variable: str, unit: str = "CNY") -> MarketObservableEvidence:
+    return MarketObservableEvidence(
+        evidence_id=eid,
+        variable=variable,
+        unit=unit,
+        basis="complex-model-fixture",
+        observation_date=CUTOFF,
+        known_at=KNOWN,
+        source="test-fixture",
+        value=Decimal("1"),
+    )
+
+
+def complex_candidate(model_id: str, family: MarketModelFamily, variables: tuple[str, ...], evidence_ids: tuple[str, ...]) -> CandidateMarketModel:
+    return CandidateMarketModel(
+        model_id=model_id,
+        family=family,
+        required_economic_variables=variables,
+        required_observable_variables=variables,
+        evidence_ids=evidence_ids,
+        admission_basis="test evidence-backed complex-model candidate",
+        inverse_solvable=True,
+    )
+
+
+def cobs(
+    oid: str,
+    day: int | None,
+    price: str,
+    variable: str,
+    value: str,
+    basis: str,
+    unit: str = "CNY",
+    shares: str = "1",
+    net_debt: str = "0",
+) -> MarketValuationObservation:
+    obs_date = CUTOFF if day is None else date(2026, 9, day)
+    known_at = KNOWN if day is None else datetime(2026, 9, day, 2, tzinfo=timezone.utc)
+    return MarketValuationObservation(
+        observation_id=oid,
+        observation_date=obs_date,
+        known_at=known_at,
+        price=Decimal(price),
+        shares_outstanding=Decimal(shares),
+        economic_variable=variable,
+        economic_value=Decimal(value),
+        unit=unit,
+        basis=basis,
+        evidence_ids=(f"e-{variable}",),
+        source="test-fixture",
+        net_debt=Decimal(net_debt),
+    )
+
+
+def complex_input(
+    candidate_item: CandidateMarketModel,
+    observations: tuple[MarketValuationObservation, ...],
+    evidence: tuple[MarketObservableEvidence, ...],
+    anchor: str,
+    *additional_candidates: CandidateMarketModel,
+) -> MarketModelIdentificationInput:
+    return MarketModelIdentificationInput(
+        cutoff_date=CUTOFF,
+        current_observation_id=anchor,
+        candidates=(candidate_item,) + additional_candidates,
+        observations=observations,
+        evidence=evidence,
+    )
+
+
+def dcf_fixture(prices: tuple[str, ...]) -> tuple[tuple[MarketValuationObservation, ...], tuple[MarketObservableEvidence, ...]]:
+    variables = {
+        "fcf": "CNY",
+        "growth": "ratio",
+        "margin": "ratio",
+        "reinvestment": "ratio",
+        "terminal_value": "CNY",
+        "discount_rate": "ratio",
+    }
+    evidence = tuple(complex_evidence(f"e-{name}", name, unit) for name, unit in variables.items())
+    historical_days = (1, 8, 15, 22)
+    rows: list[MarketValuationObservation] = []
+    for day, price in zip(historical_days, prices[:-1]):
+        for variable, value, unit, basis in (
+            ("fcf", "100", "CNY", "fcff"),
+            ("growth", "0.05", "ratio", "assumption"),
+            ("margin", "0.40", "ratio", "assumption"),
+            ("reinvestment", "0.25", "ratio", "assumption"),
+            ("terminal_value", "2100", "CNY", "terminal"),
+            ("discount_rate", "0.10", "ratio", "assumption"),
+        ):
+            rows.append(cobs(f"h{day}-{variable}", day, price, variable, value, basis, unit))
+    current_price = prices[-1]
+    for variable, value, unit, basis in (
+        ("fcf", "100", "CNY", "fcff"),
+        ("growth", "0.05", "ratio", "assumption"),
+        ("margin", "0.40", "ratio", "assumption"),
+        ("reinvestment", "0.25", "ratio", "assumption"),
+        ("terminal_value", "2100", "CNY", "terminal"),
+        ("discount_rate", "0.10", "ratio", "assumption"),
+    ):
+        rows.append(cobs(f"current-{variable}", None, current_price, variable, value, basis, unit))
+    return tuple(rows), evidence
+
+
+def test_p3b_dcf_model_specific_inverse_is_identifiable_and_stable():
+    candidate_item = complex_candidate(
+        "dcf-1",
+        MarketModelFamily.DCF,
+        ("fcf", "growth", "margin", "reinvestment", "terminal_value", "discount_rate"),
+        ("candidate-dcf",),
+    )
+    observations, evidence = dcf_fixture(("2100", "2100", "2100", "2100", "2100"))
+    evidence = evidence + (complex_evidence("candidate-dcf", "dcf_candidate"),)
+    result = identify_market_models(
+        complex_input(candidate_item, observations, evidence, "current-fcf")
+    )
+    evaluation = result["evaluations"][0]
+    assert evaluation.fit.status.value == "FEASIBLE"
+    assert result["identifiability"].state.value == "IDENTIFIABLE"
+    solution = evaluation.feasible_solution_set.solutions[0]
+    assert solution.economic_variable == "fcf"
+    assert solution.value == Decimal("100")
+    assert result["stability"].state.value == "STABLE"
+
+
+def test_p3b_ddm_model_specific_inverse_is_identifiable():
+    candidate_item = complex_candidate(
+        "ddm-1",
+        MarketModelFamily.DDM,
+        ("dividend", "payout", "growth", "discount_rate"),
+        ("candidate-ddm",),
+    )
+    evidence = tuple(
+        complex_evidence("e-" + name, name, "CNY/share" if name == "dividend" else "ratio")
+        for name in ("dividend", "payout", "growth", "discount_rate")
+    )
+    evidence = evidence + (complex_evidence("candidate-ddm", "ddm_candidate"),)
+    rows: list[MarketValuationObservation] = []
+    for day in (1, 8, 15, 22):
+        for variable, value, unit in (
+            ("dividend", "5", "CNY/share"),
+            ("payout", "0.40", "ratio"),
+            ("growth", "0.05", "ratio"),
+            ("discount_rate", "0.10", "ratio"),
+        ):
+            rows.append(cobs(f"{day}-{variable}", day, "105", variable, value, "assumption", unit))
+    for variable, value, unit in (
+        ("dividend", "5", "CNY/share"),
+        ("payout", "0.40", "ratio"),
+        ("growth", "0.05", "ratio"),
+        ("discount_rate", "0.10", "ratio"),
+    ):
+        rows.append(cobs(f"current-{variable}", None, "105", variable, value, "assumption", unit))
+    result = identify_market_models(
+        complex_input(candidate_item, tuple(rows), evidence, "current-dividend")
+    )
+    assert result["evaluations"][0].fit.status.value == "FEASIBLE"
+    assert result["evaluations"][0].feasible_solution_set.solutions[0].value == Decimal("5")
+    assert result["identifiability"].state.value == "IDENTIFIABLE"
+
+
+def test_p3b_sotp_model_specific_inverse_preserves_segment_residual_semantics():
+    candidate_item = complex_candidate(
+        "sotp-1",
+        MarketModelFamily.SOTP,
+        ("segment_value", "residual_value"),
+        ("candidate-sotp",),
+    )
+    evidence = (
+        complex_evidence("e-segment_value", "segment_value", "CNY"),
+        complex_evidence("e-residual_value", "residual_value", "CNY"),
+        complex_evidence("candidate-sotp", "sotp_candidate"),
+    )
+    rows: list[MarketValuationObservation] = []
+    for day in (1, 8, 15, 22):
+        rows.extend((
+            cobs(f"{day}-seg-a", day, "110", "segment_value", "60", "segment:A"),
+            cobs(f"{day}-seg-b", day, "110", "segment_value", "40", "segment:B"),
+        ))
+    rows.extend((
+        cobs("current-seg-a", None, "110", "segment_value", "60", "segment:A"),
+        cobs("current-seg-b", None, "110", "segment_value", "40", "segment:B"),
+    ))
+    result = identify_market_models(
+        complex_input(candidate_item, tuple(rows), evidence, "current-seg-a")
+    )
+    evaluation = result["evaluations"][0]
+    assert evaluation.fit.status.value == "FEASIBLE"
+    solution = evaluation.feasible_solution_set.solutions[0]
+    assert solution.economic_variable == "residual_value"
+    assert solution.value == Decimal("10")
+    assert result["stability"].state.value == "STABLE"
+
+
+def test_p3b_rnpv_model_specific_inverse_preserves_pipeline_probability_timing():
+    candidate_item = complex_candidate(
+        "rnpv-1",
+        MarketModelFamily.RNPV,
+        ("pipeline_value", "probability", "timing", "discount_rate", "base_value"),
+        ("candidate-rnpv",),
+    )
+    evidence = tuple(
+        complex_evidence("e-" + name, name, "CNY" if name in {"pipeline_value", "base_value"} else "ratio")
+        for name in ("pipeline_value", "probability", "timing", "discount_rate", "base_value")
+    )
+    evidence = evidence + (complex_evidence("candidate-rnpv", "rnpv_candidate"),)
+    price = "92.7272727272727272727272727273"
+    rows: list[MarketValuationObservation] = []
+    for day in (1, 8, 15, 22):
+        rows.extend((
+            cobs(f"{day}-pipeline", day, price, "pipeline_value", "100", "pipeline:P1"),
+            cobs(f"{day}-probability", day, price, "probability", "0.80", "pipeline:P1", "ratio"),
+            cobs(f"{day}-timing", day, price, "timing", "1", "pipeline:P1", "years"),
+            cobs(f"{day}-discount", day, price, "discount_rate", "0.10", "assumption", "ratio"),
+            cobs(f"{day}-base", day, price, "base_value", "20", "base", "CNY"),
+        ))
+    rows.extend((
+        cobs("current-pipeline", None, price, "pipeline_value", "100", "pipeline:P1"),
+        cobs("current-probability", None, price, "probability", "0.80", "pipeline:P1", "ratio"),
+        cobs("current-timing", None, price, "timing", "1", "pipeline:P1", "years"),
+        cobs("current-discount", None, price, "discount_rate", "0.10", "assumption", "ratio"),
+        cobs("current-base", None, price, "base_value", "20", "base", "CNY"),
+    ))
+    result = identify_market_models(
+        complex_input(candidate_item, tuple(rows), evidence, "current-pipeline")
+    )
+    evaluation = result["evaluations"][0]
+    assert evaluation.fit.status.value == "FEASIBLE"
+    assert evaluation.feasible_solution_set.solutions[0].economic_variable == "pipeline_value"
+    assert evaluation.feasible_solution_set.solutions[0].value == Decimal("100.0000000000000000000000000000")
+    assert result["identifiability"].state.value == "IDENTIFIABLE"
+
+
+def test_p3b_dcf_and_ddm_both_feasible_are_ambiguous():
+    dcf = complex_candidate(
+        "dcf-1",
+        MarketModelFamily.DCF,
+        ("fcf", "growth", "margin", "reinvestment", "terminal_value", "discount_rate"),
+        ("candidate-dcf",),
+    )
+    ddm = complex_candidate(
+        "ddm-1",
+        MarketModelFamily.DDM,
+        ("dividend", "payout", "growth", "discount_rate"),
+        ("candidate-ddm",),
+    )
+    dcf_obs, dcf_evidence = dcf_fixture(("2100", "2100", "2100", "2100", "2100"))
+    rows = list(dcf_obs)
+    for day in (1, 8, 15, 22):
+        rows.extend((
+            cobs(f"ddm-{day}-dividend", day, "105", "dividend", "5", "assumption", "CNY/share"),
+            cobs(f"ddm-{day}-payout", day, "105", "payout", "0.40", "assumption", "ratio"),
+            cobs(f"ddm-{day}-growth", day, "105", "growth", "0.05", "assumption", "ratio"),
+            cobs(f"ddm-{day}-discount", day, "105", "discount_rate", "0.10", "assumption", "ratio"),
+        ))
+    rows.extend((
+        cobs("ddm-current-dividend", None, "105", "dividend", "5", "assumption", "CNY/share"),
+        cobs("ddm-current-payout", None, "105", "payout", "0.40", "assumption", "ratio"),
+        cobs("ddm-current-growth", None, "105", "growth", "0.05", "assumption", "ratio"),
+        cobs("ddm-current-discount", None, "105", "discount_rate", "0.10", "assumption", "ratio"),
+    ))
+    evidence = tuple(dcf_evidence) + (
+        complex_evidence("e-dividend", "dividend", "CNY/share"),
+        complex_evidence("e-payout", "payout", "ratio"),
+        complex_evidence("e-growth", "growth", "ratio"),
+        complex_evidence("e-discount_rate", "discount_rate", "ratio"),
+        complex_evidence("candidate-dcf", "dcf_candidate"),
+        complex_evidence("candidate-ddm", "ddm_candidate"),
+    )
+    result = identify_market_models(
+        MarketModelIdentificationInput(
+            cutoff_date=CUTOFF,
+            current_observation_id="current-fcf",
+            candidates=(dcf, ddm),
+            observations=tuple(rows),
+            evidence=evidence,
+        )
+    )
+    assert result["evaluations"][0].fit.status.value == "FEASIBLE"
+    assert result["evaluations"][1].fit.status.value == "FEASIBLE"
+    assert result["identifiability"].state.value == "AMBIGUOUS"
+    assert result["identifiability"].selected_model_id is None
+
+
+def test_p3b_invalid_dcf_discount_rate_vs_growth_is_infeasible():
+    candidate_item = complex_candidate(
+        "dcf-1",
+        MarketModelFamily.DCF,
+        ("fcf", "growth", "margin", "reinvestment", "terminal_value", "discount_rate"),
+        ("candidate-dcf",),
+    )
+    observations, evidence = dcf_fixture(("2100", "2100", "2100", "2100", "2100"))
+    invalid_rows = tuple(
+        item if item.economic_variable != "discount_rate"
+        else cobs(
+            item.observation_id,
+            None if item.observation_date == CUTOFF else item.observation_date.day,
+            str(item.price),
+            "discount_rate",
+            "0.03",
+            "assumption",
+            "ratio",
+        )
+        for item in observations
+    )
+    evidence = evidence + (complex_evidence("candidate-dcf", "dcf_candidate"),)
+    result = identify_market_models(
+        complex_input(candidate_item, invalid_rows, evidence, "current-fcf")
+    )
+    assert result["evaluations"][0].fit.status.value == "INFEASIBLE"
+
+
+def test_p3b_missing_complex_input_is_insufficient_evidence():
+    candidate_item = complex_candidate(
+        "ddm-1",
+        MarketModelFamily.DDM,
+        ("dividend", "payout", "growth", "discount_rate"),
+        ("candidate-ddm",),
+    )
+    evidence = (
+        complex_evidence("e-dividend", "dividend", "CNY/share"),
+        complex_evidence("e-payout", "payout", "ratio"),
+        complex_evidence("e-growth", "growth", "ratio"),
+        complex_evidence("candidate-ddm", "ddm_candidate"),
+    )
+    rows = (
+        cobs("h1-dividend", 1, "105", "dividend", "5", "assumption", "CNY/share"),
+        cobs("h1-payout", 1, "105", "payout", "0.40", "assumption", "ratio"),
+        cobs("h1-growth", 1, "105", "growth", "0.05", "assumption", "ratio"),
+        cobs("current-dividend", None, "105", "dividend", "5", "assumption", "CNY/share"),
+        cobs("current-payout", None, "105", "payout", "0.40", "assumption", "ratio"),
+        cobs("current-growth", None, "105", "growth", "0.05", "assumption", "ratio"),
+    )
+    result = identify_market_models(
+        complex_input(candidate_item, rows, evidence, "current-dividend")
+    )
+    assert result["identifiability"].state.value == "INSUFFICIENT_EVIDENCE"
+
+
+def test_p3b_sotp_duplicate_segment_is_infeasible():
+    candidate_item = complex_candidate(
+        "sotp-1",
+        MarketModelFamily.SOTP,
+        ("segment_value", "residual_value"),
+        ("candidate-sotp",),
+    )
+    evidence = (
+        complex_evidence("e-segment_value", "segment_value"),
+        complex_evidence("candidate-sotp", "sotp_candidate"),
+    )
+    rows = (
+        cobs("h1-a", 1, "110", "segment_value", "60", "segment:A"),
+        cobs("h1-a-dup", 1, "110", "segment_value", "40", "segment:A"),
+        cobs("h2-a", 15, "110", "segment_value", "60", "segment:A"),
+        cobs("h2-b", 15, "110", "segment_value", "40", "segment:B"),
+        cobs("current-a", None, "110", "segment_value", "60", "segment:A"),
+        cobs("current-b", None, "110", "segment_value", "40", "segment:B"),
+    )
+    result = identify_market_models(
+        complex_input(candidate_item, rows, evidence, "current-a")
+    )
+    assert result["evaluations"][0].fit.status.value == "INFEASIBLE"
