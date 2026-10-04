@@ -769,3 +769,97 @@ def test_p3b_sotp_duplicate_segment_is_infeasible():
         complex_input(candidate_item, rows, evidence, "current-a")
     )
     assert result["evaluations"][0].fit.status.value == "INFEASIBLE"
+
+
+def test_p3b_rnpv_multi_pipeline_inverse_uses_observed_composition():
+    candidate_item = complex_candidate(
+        "rnpv-2",
+        MarketModelFamily.RNPV,
+        ("pipeline_value", "probability", "timing", "discount_rate", "base_value"),
+        ("candidate-rnpv-2",),
+    )
+    evidence = tuple(
+        complex_evidence("e-" + name, name, "CNY" if name in {"pipeline_value", "base_value"} else "ratio")
+        for name in ("pipeline_value", "probability", "timing", "discount_rate", "base_value")
+    ) + (complex_evidence("candidate-rnpv-2", "rnpv_candidate"),)
+
+    risk_adjusted = (
+        Decimal("60") * Decimal("0.80") / (Decimal("1.10") ** Decimal("1"))
+        + Decimal("40") * Decimal("0.50") / (Decimal("1.10") ** Decimal("2"))
+    )
+    price = str(Decimal("20") + risk_adjusted)
+    rows: list[MarketValuationObservation] = []
+    for day in (1, 8, 15, 22):
+        rows.extend((
+            cobs(f"{day}-p1-value", day, price, "pipeline_value", "60", "pipeline:P1"),
+            cobs(f"{day}-p1-prob", day, price, "probability", "0.80", "pipeline:P1", "ratio"),
+            cobs(f"{day}-p1-time", day, price, "timing", "1", "pipeline:P1", "years"),
+            cobs(f"{day}-p2-value", day, price, "pipeline_value", "40", "pipeline:P2"),
+            cobs(f"{day}-p2-prob", day, price, "probability", "0.50", "pipeline:P2", "ratio"),
+            cobs(f"{day}-p2-time", day, price, "timing", "2", "pipeline:P2", "years"),
+            cobs(f"{day}-discount", day, price, "discount_rate", "0.10", "assumption", "ratio"),
+            cobs(f"{day}-base", day, price, "base_value", "20", "base", "CNY"),
+        ))
+    rows.extend((
+        cobs("current-p1-value", None, price, "pipeline_value", "60", "pipeline:P1"),
+        cobs("current-p1-prob", None, price, "probability", "0.80", "pipeline:P1", "ratio"),
+        cobs("current-p1-time", None, price, "timing", "1", "pipeline:P1", "years"),
+        cobs("current-p2-value", None, price, "pipeline_value", "40", "pipeline:P2"),
+        cobs("current-p2-prob", None, price, "probability", "0.50", "pipeline:P2", "ratio"),
+        cobs("current-p2-time", None, price, "timing", "2", "pipeline:P2", "years"),
+        cobs("current-discount", None, price, "discount_rate", "0.10", "assumption", "ratio"),
+        cobs("current-base", None, price, "base_value", "20", "base", "CNY"),
+    ))
+    result = identify_market_models(
+        complex_input(candidate_item, tuple(rows), evidence, "current-p1-value")
+    )
+    solution = result["evaluations"][0].feasible_solution_set.solutions[0]
+    assert result["evaluations"][0].fit.status.value == "FEASIBLE"
+    assert solution.value == Decimal("100")
+    assert result["identifiability"].state.value == "IDENTIFIABLE"
+
+
+def test_p3b_unknown_observation_evidence_id_is_rejected():
+    candidate_item = complex_candidate(
+        "ddm-unknown",
+        MarketModelFamily.DDM,
+        ("dividend", "payout", "growth", "discount_rate"),
+        ("candidate-ddm",),
+    )
+    evidence = (
+        complex_evidence("e-dividend", "dividend", "CNY/share"),
+        complex_evidence("e-payout", "payout", "ratio"),
+        complex_evidence("e-growth", "growth", "ratio"),
+        complex_evidence("e-discount_rate", "discount_rate", "ratio"),
+        complex_evidence("candidate-ddm", "ddm_candidate"),
+    )
+    rows = (
+        cobs("h1-dividend", 1, "105", "dividend", "5", "assumption", "CNY/share"),
+        cobs("h1-payout", 1, "105", "payout", "0.40", "assumption", "ratio"),
+        cobs("h1-growth", 1, "105", "growth", "0.05", "assumption", "ratio"),
+        cobs("h1-discount", 1, "105", "discount_rate", "0.10", "assumption", "ratio"),
+        cobs("h2-dividend", 15, "105", "dividend", "5", "assumption", "CNY/share"),
+        cobs("h2-payout", 15, "105", "payout", "0.40", "assumption", "ratio"),
+        cobs("h2-growth", 15, "105", "growth", "0.05", "assumption", "ratio"),
+        MarketValuationObservation(
+            observation_id="h2-discount",
+            observation_date=date(2026, 9, 15),
+            known_at=datetime(2026, 9, 15, 2, tzinfo=timezone.utc),
+            price=Decimal("105"),
+            shares_outstanding=Decimal("1"),
+            economic_variable="discount_rate",
+            economic_value=Decimal("0.10"),
+            unit="ratio",
+            basis="assumption",
+            evidence_ids=("missing-evidence",),
+            source="test-fixture",
+        ),
+        cobs("current-dividend", None, "105", "dividend", "5", "assumption", "CNY/share"),
+        cobs("current-payout", None, "105", "payout", "0.40", "assumption", "ratio"),
+        cobs("current-growth", None, "105", "growth", "0.05", "assumption", "ratio"),
+        cobs("current-discount", None, "105", "discount_rate", "0.10", "assumption", "ratio"),
+    )
+    with pytest.raises(ValueError, match="unknown evidence_id"):
+        identify_market_models(
+            complex_input(candidate_item, rows, evidence, "current-dividend")
+        )
