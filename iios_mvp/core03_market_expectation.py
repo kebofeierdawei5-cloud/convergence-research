@@ -30,7 +30,6 @@ CORE03_VERSION = "IIOS-CORE-03-REAL-0.1"
 FORECAST_VERSION = "IIOS-INDEPENDENT-FORECAST-0.1"
 SCENARIOS = ("bear", "base", "bull")
 FORECAST_YEARS = (2027, 2028, 2029)
-EXPECTED_SCENARIO_PROBABILITIES = {"bear": Decimal("0.25"), "base": Decimal("0.50"), "bull": Decimal("0.25")}
 
 
 def _canonical(value: Any) -> str:
@@ -101,8 +100,6 @@ def _validate_forecast(forecast: Mapping[str, Any], cutoff: date, evidence_ids: 
     if total != Decimal("1"):
         raise ValueError("forecast scenario probabilities must sum exactly to 1")
     for scenario in SCENARIOS:
-        if _dec(probabilities.get(scenario), f"forecast.probabilities.{scenario}") != EXPECTED_SCENARIO_PROBABILITIES[scenario]:
-            raise ValueError("CORE-03 real-case scenario probabilities are fixed at 25/50/25 for this baseline")
         if _dec(probabilities[scenario], f"forecast.probabilities.{scenario}") < 0:
             raise ValueError("scenario probability cannot be negative")
 
@@ -147,6 +144,7 @@ def _validate_forecast(forecast: Mapping[str, Any], cutoff: date, evidence_ids: 
         "years": list(FORECAST_YEARS),
         "probabilities": {s: str(_dec(probabilities[s], f"forecast.probabilities.{s}")) for s in SCENARIOS},
         "scenarios": normalized,
+        "cash_flow_diagnostic": forecast.get("cash_flow_diagnostic") or {},
         "horizon_years": str(_dec(forecast.get("horizon_years", 3), "forecast.horizon_years")),
         "valuation_focus": "FCF_AND_INCREMENTAL_ROIC",
     }
@@ -259,9 +257,6 @@ def build_core03_package(
     if not isinstance(case, dict):
         raise ValueError("core02_input.case is required")
     cutoff = _date(case["temporal_scope"]["cutoff_date"], "case.cutoff_date")
-    if case["case_id"] != "RC-CN-A-300750-20261004":
-        raise ValueError("CORE-03 real-case baseline is bound to 300750 / 2026-10-04")
-
     for record_id in ("E001", "E002", "E003", "E004", "E005", "E006", "E007"):
         record = next((x for x in case.get("evidence", []) if x.get("evidence_id") == record_id), None)
         if record is None:
@@ -351,7 +346,7 @@ def build_core03_package(
         case_id=case["case_id"],
         cutoff=cutoff,
         market_evidence=market_evidence,
-        candidate_models=["ev_ebitda", "dcf", "forward_pe", "sotp"],
+        candidate_models=core02["value_core"]["model_route"]["candidate_models"],
     )
 
     core_without_audit = {
