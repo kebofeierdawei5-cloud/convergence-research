@@ -1,7 +1,7 @@
 # IIOS B1 — Investment Semantics v0.3 Acceptance
 
 Date: 2026-10-04
-Status: APPROVED FOR IMPLEMENTATION MIGRATION
+Status: COMPLETE — SEMANTICS + RUNTIME MIGRATION ACCEPTED
 Baseline: B0 branch repair/b0-authority-audit-freeze-20261004
 Semantic branch: repair/b1-investment-semantics-v0.3-20261004
 
@@ -35,6 +35,19 @@ This acceptance authorizes semantic schema/code migration only. It does not clai
 
 Those are separately testable implementation/evidence questions.
 
-## Next step
+## Runtime acceptance
 
-Create a successor code-migration branch from this exact semantic head. The first migration slice must replace the single v0.2 return-hurdle semantics with explicit v0.3 fields and deterministic calculations, while preserving old v0.2 behavior only as immutable historical/legacy-isolation reference.
+The v0.3 implementation migration is accepted after exact-head CI evidence:
+- runtime/test head: cd4f510301a8a03d0884fe5d816384aef386921e;
+- final checked migration tip: cd4f510301a8a03d0884fe5d816384aef386921e;
+- 190/190 tests passed;
+- compileall passed;
+- schema JSON validation passed;
+- CLI run passed;
+- snapshot replay passed with same_decision=true and integrity_status=PASS;
+- code red-team recorded in docs/iios/B1_CODE_MIGRATION_REDTEAM_v0.3.md;
+- implementation acceptance recorded in docs/iios/B1_CODE_MIGRATION_ACCEPTANCE_2026-10-04.md.
+
+## Result
+
+B1 is complete. The next repair gate is B2 Data / Evidence / PIT Foundation. MIE remains non-mandatory and P5 feature expansion remains paused.
