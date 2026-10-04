@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
-from decimal import Decimal, InvalidOperation
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Iterable
 
 KNOWN_PROVENANCE = {
@@ -20,20 +19,13 @@ def parse_temporal(value: Any, field: str) -> datetime:
     try:
         if len(raw) == 10:
             d = date.fromisoformat(raw)
-            return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+            return datetime(d.year, d.month, d.day, tzinfo=timezone(timedelta(hours=8)))
         result = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError as exc:
         raise ValueError(f"{field} must be ISO-8601") from exc
     if result.tzinfo is None:
         raise ValueError(f"{field} must include an explicit timezone")
     return result
-
-
-def _decimal(value: Any, field: str) -> Decimal:
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, ValueError, TypeError) as exc:
-        raise ValueError(f"{field} must be numeric") from exc
 
 
 def pit_qualified(evidence: dict[str, Any], cutoff: Any) -> bool:
