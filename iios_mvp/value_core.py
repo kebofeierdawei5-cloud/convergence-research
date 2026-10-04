@@ -14,6 +14,7 @@ NODE_TYPES = {
     "cash",
     "debt",
     "minority_interest",
+    "financial",
 }
 ATTRIBUTE_FIELDS = (
     "earnings_stability",
@@ -47,7 +48,9 @@ def _materiality(value: Any, field: str) -> str:
 def classify_economic_profile(node: dict[str, Any]) -> str:
     kind = str(node["node_type"]).strip().lower()
     attrs = node["economic_attributes"]
-    maturity = _level(attrs["maturity"], "economic_attributes.maturity")
+    maturity = str(attrs["maturity"]).strip().upper()
+    if maturity not in {"MATURE", "COMMERCIAL", "DEVELOPMENT"}:
+        raise ValueError("economic_attributes.maturity must be MATURE/COMMERCIAL/DEVELOPMENT")
     pipeline = _level(attrs["pipeline_optionality"], "economic_attributes.pipeline_optionality")
     earnings = _level(attrs["earnings_stability"], "economic_attributes.earnings_stability")
     cash_flow = _level(attrs["cash_flow_visibility"], "economic_attributes.cash_flow_visibility")
