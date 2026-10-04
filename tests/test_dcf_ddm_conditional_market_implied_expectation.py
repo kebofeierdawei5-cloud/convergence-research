@@ -258,8 +258,8 @@ def test_conditional_mie_does_not_claim_a_full_multidimensional_feasible_space()
 def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner():
     dcf = dcf_candidate()
     ddm = ddm_candidate()
-    dcf_inp = dcf_input(dcf)
-    ddm_inp = ddm_input(ddm, id_prefix="ddm-")
+    dcf_inp = dcf_input(dcf, current_price="105")
+    ddm_inp = ddm_input(ddm, id_prefix="ddm-", current_price="105")
     combined = MarketModelIdentificationInput(
         cutoff_date=CUTOFF,
         current_observation_id="current-fcf",
