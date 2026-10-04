@@ -143,6 +143,7 @@ def _validate_mie_observation_and_evidence(mie_set: Mapping[str, Any], provenanc
             price = provenance.get(price_id)
             if price is None:
                 raise ValueError("P4-F price observation provenance is missing")
+            price.validate(cutoff_date)
             if price.variable != "market_price":
                 raise ValueError("P4-F price observation provenance must use variable=market_price")
             if price.observation_date != _parse_date(obs.get("observation_date"), "observation_basis.observation_date"):
