@@ -36,3 +36,5 @@ jobs:
           snapshot=$(find /tmp/iios-mvp -maxdepth 1 -name '*.json' ! -name '*.series.json' ! -name '*.index.json' ! -name '*.decision.json' | head -n 1)
           test -n "$snapshot"
           PYTHONPATH=. python -m iios_mvp.cli replay "$snapshot"
+
+# P2-A integration audit CI trigger
