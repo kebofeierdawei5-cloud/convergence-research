@@ -157,3 +157,57 @@ class CompanyEvidenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+def test_evidence_subject_must_match_case_id():
+    payload = b"subject"
+    digest = hashlib.sha256(payload).hexdigest()
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        (root / "source.txt").write_bytes(payload)
+        manifest = build_company_evidence_manifest(
+            case_id="CASE-A",
+            market="CN-A",
+            symbol="000005",
+            company="TESTCO",
+            cutoff_date="2026-10-05T09:30:00+08:00",
+            evidence=[{
+                **_evidence("EV-6", "security_identity.primary", digest, "2026-10-05T08:00:00+08:00"),
+                "subject_id": "OTHER-CASE",
+            }],
+            raw_artifacts=[{
+                "evidence_id":"EV-6",
+                "relative_path":"source.txt",
+                "expected_size_bytes":len(payload),
+                "expected_sha256":digest,
+            }],
+            required_field_groups=["security_identity"],
+            raw_root=root,
+        )
+    self.assertEqual(manifest["status"], "BLOCKED")
+    self.assertTrue(any("SUBJECT_CASE_MISMATCH" in item for item in manifest["validation_errors"]))
+
+
+def test_raw_artifact_hash_must_match_evidence_hash():
+    payload = b"hash-binding"
+    good_digest = hashlib.sha256(payload).hexdigest()
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        (root / "source.txt").write_bytes(payload)
+        manifest = build_company_evidence_manifest(
+            case_id="CASE-007",
+            market="CN-A",
+            symbol="000006",
+            company="TESTCO",
+            cutoff_date="2026-10-05T09:30:00+08:00",
+            evidence=[_evidence("EV-7", "market_price.close", good_digest, "2026-10-05T08:00:00+08:00")],
+            raw_artifacts=[{
+                "evidence_id":"EV-7",
+                "relative_path":"source.txt",
+                "expected_size_bytes":len(payload),
+                "expected_sha256":"1"*64,
+            }],
+            required_field_groups=["market_price"],
+            raw_root=root,
+        )
+    self.assertEqual(manifest["status"], "BLOCKED")
+    self.assertTrue(any("EVIDENCE_HASH_MISMATCH" in item for item in manifest["validation_errors"]))

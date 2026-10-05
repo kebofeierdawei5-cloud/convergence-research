@@ -103,6 +103,8 @@ def validate_company_evidence_manifest(
         item_errors = validate_evidence_record(item)
         errors.extend(f"EVIDENCE[{item.get('evidence_id', '?')}]:{x}" for x in item_errors)
         evidence_id = str(item.get("evidence_id", "")).strip()
+        if str(item.get("subject_id", "")).strip() != str(manifest["case_id"]).strip():
+            errors.append(f"EVIDENCE[{evidence_id or '?'}]:SUBJECT_CASE_MISMATCH")
         if evidence_id in evidence_ids and evidence_id:
             errors.append(f"DUPLICATE_EVIDENCE_ID:{evidence_id}")
         evidence_ids.add(evidence_id)
@@ -135,6 +137,9 @@ def validate_company_evidence_manifest(
         declared_ids.add(evidence_id)
         if evidence_id and evidence_id not in evidence_ids:
             errors.append(f"RAW_ARTIFACT_WITHOUT_EVIDENCE:{evidence_id}")
+        matching = next((item for item in evidence if str(item.get("evidence_id", "")).strip() == evidence_id), None)
+        if matching is not None and str(declaration.get("expected_sha256", "")).strip() != str(matching.get("content_sha256", "")).strip():
+            errors.append(f"RAW_ARTIFACT[{evidence_id}]:EVIDENCE_HASH_MISMATCH")
         if require_raw_verification:
             if raw_root is None:
                 errors.append("RAW_VERIFICATION_ROOT_REQUIRED")

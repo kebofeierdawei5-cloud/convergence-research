@@ -332,3 +332,12 @@ Repository continuity artifacts are the authoritative persistent record for thes
 - CATL 2027–2029 / ~14.20% is a CATL-specific 3Y Expected Return Reference, not the system default.
 - Shared semantic validator: iios_mvp/horizon_semantics.py.
 - This amendment is cross-module and must be reconciled across B1, CORE-03, valuation semantics and the future Decision Kernel.
+
+## 16. B2-A single-company Evidence/PIT foundation — 2026-10-05
+
+- PR #32 Horizon Semantics merged to main as merge commit a524390382044b9474c17f2712a2cef8adeb9612.
+- Horizon policy is H=1Y default; H=3 requires explicit override + qualifying basis; actual holding cycle remains 1–3Y.
+- B2-A is now the active Investment Core evidence track: single user-selected A-share/HK company, not CSI800/universe dependent.
+- B2-A introduces Company Evidence Manifest, raw-artifact exact-byte verifier, case-bound evidence, PIT known_at validation, required field-group coverage and immutable manifest hash.
+- A02/CSI800 remains Research Track only and is not an Investment Core release gate.
+- PR #33 is the current B2-A implementation PR; it must pass remote B2/test-mvp/scope checks before merge.
