@@ -1,3 +1,7 @@
+# HISTORICAL / SUPERSEDED — 2026-10-05
+
+This 2026-10-04 reconciliation is retained as an immutable historical audit record. It is NOT current project state. Its return-target wording and main SHA are superseded by B1 v0.3, CORE-04, and the current state index dated 2026-10-05.
+
 # IIOS State Reconciliation — 2026-10-04
 
 ## 1. Purpose
