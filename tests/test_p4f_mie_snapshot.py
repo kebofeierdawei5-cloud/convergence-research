@@ -198,5 +198,5 @@ def test_replay_rejects_serialized_model_id_mismatch():
 def test_schema_validates_snapshot():
     s=make_set(('pe-1',MarketModelFamily.FORWARD_PE,MIEQualification.DECISION_GRADE))
     snap=build_p4f_snapshot(case_id='case-1',cutoff_date=CUTOFF,created_at=CREATED,mie_set=s,provenance_records=make_provenance(s))
-    schema=json.loads(Path('schemas/p4f_mie_snapshot_v0.2.schema.json').read_text())
+    schema=json.loads(Path('schemas/p4f_mie_snapshot_v0.3.schema.json').read_text())
     Draft202012Validator(schema).validate(snap)
