@@ -1,0 +1,46 @@
+# P2.2 Canonical Entry Evaluation + Decision Admission v0.1
+
+P2.2 closes the structural gap between the P2.1 price-response engine and the IIOS investment decision.
+
+## Canonical chain
+
+P1.4 Decision State → P2.1 Canonical Price Response → P2.2 Canonical Entry Evaluation → P2.2 Decision Admission.
+
+P1.4 remains authoritative for Trust, thesis, risk, portfolio and current-price expectation-gap precedence. P2.2 is a subsequent capital-admission layer and cannot weaken EXIT/REDUCE or other higher-protection outcomes.
+
+## Canonical Entry Evaluation
+
+P2.2 recomputes the effective target-entry boundary from the canonical return/risk target and the P2.1 response. It records the P2.1 response ID/hash, P4-F snapshot hash, model/expectation identity, constraint type, inclusive/strict semantics, current-price eligibility and binding components.
+
+For normal cases with a canonical expectation_gap, the P2.1 target reference is derived from the same admitted market expectation and independent forecast references. This avoids a semantically divergent second reference.
+
+## Decision Admission
+
+BUY/ADD are the only actions constrained by the new price boundary.
+
+- BUY + decision-grade current-price eligible → BUY.
+- ADD + decision-grade current-price eligible → ADD.
+- BUY + current price outside the canonical boundary → WATCH.
+- ADD + current price outside the canonical boundary → HOLD.
+- BUY/ADD + unresolved decision-grade entry evaluation → REVIEW_REQUIRED.
+- CONDITIONAL_ONLY target-entry analysis is advisory and never becomes a capital gate.
+- EXIT/REDUCE/HOLD/WATCH/NO-BUY are not overridden by P2.2.
+
+The final decision exposes both the P1.4 pre-admission action and the P2.2 admission result.
+
+## PIT and replay
+
+P2.2 creates no new market evidence. It consumes the already PIT-bound P2.1 response. Canonical entry evaluation and decision admission have deterministic exact replay functions; tampering or input drift fails replay.
+
+
+## P2.1 / legacy compatibility boundary
+
+P2.1 is the canonical source whenever the upstream model family is admitted by P2.1. Existing \`forward_pe\`/\`ps\`/\`pb\` proportional cases that are still served by the frozen P2 engine use \`P2_LEGACY_COMPAT\` explicitly; they are never relabelled as P2.1. This compatibility path is version-bound.
+
+P2.2 binds its current price to the selected price-response reference price in both paths.
+
+## Legacy compatibility is not canonical admission
+
+A frozen P2 proportional response that is not supported by P2.1 is normalized only as `P2_LEGACY_COMPAT`. Its target boundary is preserved for backward-compatible output and replay, but its qualification is `COMPATIBILITY_ONLY` and it cannot confer P2.2 canonical admission. The pre-P1.4 action is therefore preserved rather than silently upgraded or downgraded.
+
+P2.1-supported model responses are the only price-response inputs that can produce `DECISION_GRADE` canonical entry admission.

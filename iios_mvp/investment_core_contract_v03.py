@@ -19,6 +19,11 @@ from .p2_1_canonical_price_response import (
     PRICE_RESPONSE_VERSION,
     build_canonical_price_response,
 )
+from .canonical_entry_evaluation import (
+    CANONICAL_ENTRY_EVALUATION_VERSION,
+    admit_decision,
+    build_canonical_entry_evaluation,
+)
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
 BUY_ENTRY_RETURN_CUSHION_THRESHOLD = Decimal("0.15")
@@ -741,11 +746,20 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
     p2_revalidation = None
     p2_target = None
     p2_1_price_response = None
+    canonical_entry_evaluation = None
+
     target_ref = (
         case.get("target_entry_price_reference")
         if isinstance(case.get("target_entry_price_reference"), dict)
         else None
     )
+    # Canonical expectation-gap cases reuse the same admitted MIE + forecast identity.
+    if target_ref is None and isinstance(case.get("expectation_gap"), dict):
+        target_ref = {
+            "market_expectation_id": case["expectation_gap"]["market_expectation_id"],
+            "independent_forecast_ref": case["expectation_gap"]["independent_forecast_ref"],
+        }
+
     if metrics is not None and target_ref is not None:
         try:
             if evidence_root_resolver is None:
@@ -775,12 +789,7 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
             )
             p2_revalidation = p2_1_price_response
         except (KeyError, TypeError, ValueError) as exc:
-            p2_1_price_response = {
-                "status": "REVIEW_REQUIRED",
-                "response_version": PRICE_RESPONSE_VERSION,
-                "reason": str(exc),
-                "candidate_price": str(metrics["target_entry_price"]),
-            }
+            p2_1_price_response = None
             p2_target = {
                 "status": "REVIEW_REQUIRED",
                 "target_entry_price": None,
@@ -791,17 +800,17 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
                 "target_entry_price_inclusive": False,
                 "reason": str(exc),
             }
-    elif metrics is not None and isinstance(case.get("expectation_gap"), dict):
+
+    if metrics is not None and isinstance(case.get("expectation_gap"), dict):
         try:
             if evidence_root_resolver is None:
                 raise ValueError("canonical evidence root resolver is required for P2 target-entry revalidation")
-            snapshot = evidence_root_resolver.resolve_p4f_snapshot(
-                case["market_implied_expectation_snapshot_ref"],
-                case_id=case["case_id"],
-                cutoff_date=_date(case["cutoff_date"], "cutoff_date"),
-            )
             p2_revalidation = revalidate_expectation_gap_at_price(
-                market_implied_expectation_snapshot=snapshot,
+                market_implied_expectation_snapshot=evidence_root_resolver.resolve_p4f_snapshot(
+                    case["market_implied_expectation_snapshot_ref"],
+                    case_id=case["case_id"],
+                    cutoff_date=_date(case["cutoff_date"], "cutoff_date"),
+                ),
                 current_price_observation=case["current_price_observation"],
                 candidate_price=metrics["target_entry_price"],
                 cutoff_date=case["cutoff_date"],
@@ -812,10 +821,11 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
                 independent_forecast_ref=case["expectation_gap"]["independent_forecast_ref"],
                 independent_forecast_resolver=independent_forecast_resolver,
             )
-            p2_target = combine_target_entry_price_v2(
-                return_target_entry_price=metrics["target_entry_price"],
-                revalidation=p2_revalidation,
-            )
+            if p2_target is None or p2_target.get("status") != "PASS":
+                p2_target = combine_target_entry_price_v2(
+                    return_target_entry_price=metrics["target_entry_price"],
+                    revalidation=p2_revalidation,
+                )
         except (KeyError, TypeError, ValueError) as exc:
             p2_revalidation = {
                 "status": "REVIEW_REQUIRED",
@@ -827,16 +837,116 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
                 ),
                 "candidate_price": str(metrics["target_entry_price"]),
             }
-            p2_target = {
-                "status": "REVIEW_REQUIRED",
-                "target_entry_price": None,
-                "return_target_entry_price": str(metrics["target_entry_price"]),
-                "expectation_gap_price_boundary": None,
-                "binding": "P2_PRICE_GAP_REVALIDATION_UNRESOLVED",
-                "price_constraint_type": None,
-                "target_entry_price_inclusive": False,
-                "reason": str(exc),
-            }
+
+    if metrics is not None:
+        try:
+            canonical_price_response = (
+                p2_1_price_response
+                if isinstance(p2_1_price_response, dict)
+                and p2_1_price_response.get("response_id") is not None
+                and p2_1_price_response.get("response_version") == PRICE_RESPONSE_VERSION
+                else p2_revalidation
+                if isinstance(p2_revalidation, dict)
+                and p2_revalidation.get("revalidation_id") is not None
+                and p2_revalidation.get("response_version", P2_PRICE_GAP_REVALIDATION_VERSION)
+                    == P2_PRICE_GAP_REVALIDATION_VERSION
+                else None
+            )
+            canonical_price_response_source = (
+                "P2.1_CANONICAL"
+                if canonical_price_response is p2_1_price_response
+                else "P2_LEGACY_COMPAT"
+                if canonical_price_response is p2_revalidation
+                else "P2.1_CANONICAL"
+            )
+            canonical_entry_evaluation = build_canonical_entry_evaluation(
+                current_price=current_price,
+                return_target_entry_price=metrics["target_entry_price"],
+                price_response=canonical_price_response,
+                price_response_source=canonical_price_response_source,
+                entry_reference_source=(
+                    "TARGET_ENTRY_REFERENCE"
+                    if isinstance(case.get("target_entry_price_reference"), dict)
+                    else "EXPECTATION_GAP"
+                    if isinstance(case.get("expectation_gap"), dict)
+                    else "NONE"
+                ),
+                market_expectation_id=(
+                    target_ref.get("market_expectation_id")
+                    if isinstance(target_ref, dict)
+                    else None
+                ),
+                independent_forecast_ref=(
+                    target_ref.get("independent_forecast_ref")
+                    if isinstance(target_ref, dict)
+                    else None
+                ),
+            )
+        except (KeyError, TypeError, ValueError):
+            # Keep the canonical evaluation itself schema-valid and replayable.
+            # Detailed P2.1 failure evidence remains in target_entry_price_p2_1_price_response.
+            canonical_entry_evaluation = build_canonical_entry_evaluation(
+                current_price=current_price,
+                return_target_entry_price=metrics["target_entry_price"],
+                price_response=None,
+                price_response_source=(
+                    "P2_LEGACY_COMPAT"
+                    if isinstance(p2_revalidation, dict)
+                    and p2_revalidation.get("revalidation_id") is not None
+                    else "P2.1_CANONICAL"
+                ),
+                entry_reference_source=(
+                    "TARGET_ENTRY_REFERENCE"
+                    if isinstance(case.get("target_entry_price_reference"), dict)
+                    else "EXPECTATION_GAP"
+                    if isinstance(case.get("expectation_gap"), dict)
+                    else "NONE"
+                ),
+                market_expectation_id=(
+                    target_ref.get("market_expectation_id")
+                    if isinstance(target_ref, dict)
+                    else None
+                ),
+                independent_forecast_ref=(
+                    target_ref.get("independent_forecast_ref")
+                    if isinstance(target_ref, dict)
+                    else None
+                ),
+            )
+
+    entry_admission = admit_decision(
+        pre_admission_action=state["action"],
+        pre_admission_status=("REVIEW_REQUIRED" if state["action"] == "REVIEW_REQUIRED" else "READY"),
+        pre_admission_reason=state["primary_reason"],
+        pre_admission_capital_effect=state["capital_effect"],
+        position_pct=position,
+        entry_evaluation=canonical_entry_evaluation,
+    )
+
+    action = entry_admission["action"]
+    status = entry_admission["decision_status"]
+    reason = entry_admission["primary_reason"]
+    investability = (
+        "UNKNOWN" if action == "REVIEW_REQUIRED"
+        else "INVESTABLE" if action in {"BUY", "ADD"}
+        else "WATCH" if action in {"HOLD", "WATCH"}
+        else "NOT_INVESTABLE"
+    )
+    gates["new_capital_allowed"] = entry_admission["new_capital_allowed"]
+    gates["decision_precedence_version"] = state["precedence_version"]
+    gates["decision_precedence_rule_id"] = state["precedence_rule_id"]
+    gates["decision_precedence_rank"] = state["precedence_rank"]
+    gates["decision_scope"] = state["decision_scope"]
+    gates["capital_effect"] = entry_admission["capital_effect"]
+    gates["decision_admission_status"] = entry_admission["status"]
+    gates["decision_admission_rule_id"] = entry_admission["rule_id"]
+    gates["canonical_entry_evaluation_status"] = (
+        canonical_entry_evaluation["status"] if canonical_entry_evaluation is not None else "SKIPPED"
+    )
+    gates["canonical_entry_price_eligible"] = (
+        canonical_entry_evaluation.get("current_price_eligible")
+        if canonical_entry_evaluation is not None else None
+    )
 
     if metrics is not None:
         gates["target_entry_price_for_return"] = str(metrics["target_entry_price_for_return"])
@@ -844,15 +954,10 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         gates["target_entry_price_for_entry_cushion"] = str(metrics["target_entry_price_for_entry_cushion"])
         gates["target_entry_price_for_risk"] = (
             str(metrics["target_entry_price_for_risk"])
-            if metrics["target_entry_price_for_risk"] is not None
-            else None
+            if metrics["target_entry_price_for_risk"] is not None else None
         )
-        gates["target_entry_price_v2_status"] = (
-            p2_target["status"] if p2_target is not None else "SKIPPED"
-        )
-        gates["target_entry_price_v2_binding"] = (
-            p2_target["binding"] if p2_target is not None else None
-        )
+        gates["target_entry_price_v2_status"] = p2_target["status"] if p2_target is not None else "SKIPPED"
+        gates["target_entry_price_v2_binding"] = p2_target["binding"] if p2_target is not None else None
         gates["target_entry_price_for_expectation_gap"] = (
             str(p2_target["expectation_gap_price_boundary"])
             if p2_target is not None and p2_target.get("expectation_gap_price_boundary") is not None
@@ -876,8 +981,7 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "position_package_complete": package_complete,
         "target_entry_price": (
             str(p2_target["target_entry_price"])
-            if p2_target is not None and p2_target.get("status") == "PASS"
-            else None
+            if p2_target is not None and p2_target.get("status") == "PASS" else None
         ),
         "target_entry_price_return_only": (
             _serialize_metrics(metrics)["target_entry_price"] if metrics is not None else None
@@ -890,20 +994,27 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
             else (_serialize_metrics(metrics)["target_entry_price_semantics"] if metrics is not None else None)
         ),
         "target_entry_price_requires_gap_revalidation": True if metrics is not None else None,
-        "target_entry_price_v2_version": (
-            P2_PRICE_GAP_REVALIDATION_VERSION if p2_target is not None else None
-        ),
+        "target_entry_price_v2_version": P2_PRICE_GAP_REVALIDATION_VERSION if p2_target is not None else None,
         "target_entry_price_v2": _serialize_nested(p2_target),
         "target_entry_price_gap_revalidation": _serialize_nested(p2_revalidation),
         "target_entry_price_p2_1_version": PRICE_RESPONSE_VERSION if p2_1_price_response is not None else None,
-        "target_entry_price_p2_1": _serialize_nested(p2_target) if target_ref is not None else None,
+        "target_entry_price_p2_1": _serialize_nested(p2_target) if p2_1_price_response is not None else None,
         "target_entry_price_p2_1_price_response": _serialize_nested(p2_1_price_response),
+        "canonical_entry_evaluation_version": (
+            CANONICAL_ENTRY_EVALUATION_VERSION if canonical_entry_evaluation is not None else None
+        ),
+        "canonical_entry_evaluation": _serialize_nested(canonical_entry_evaluation),
+        "decision_pre_admission_action": state["action"],
+        "decision_admission_version": entry_admission["admission_version"],
+        "decision_admission": _serialize_nested(entry_admission),
+        "decision_admission_status": entry_admission["status"],
+        "decision_admission_rule_id": entry_admission["rule_id"],
         "current_price": str(current_price) if current_price is not None else None,
         "decision_precedence_version": state["precedence_version"],
         "decision_precedence_rule_id": state["precedence_rule_id"],
         "decision_precedence_rank": state["precedence_rank"],
         "decision_scope": state["decision_scope"],
-        "capital_effect": state["capital_effect"],
+        "capital_effect": entry_admission["capital_effect"],
     }
     if metrics is not None:
         output["return_metrics"] = _serialize_metrics(metrics)
