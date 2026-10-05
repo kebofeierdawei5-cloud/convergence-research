@@ -210,7 +210,12 @@ def case(price="100", price_observation_id="price-1", thesis_status="INTACT") ->
         "reality": {"status": "PASS"},
         "forecast": {"status": "PASS"},
         "valuation": {"status": "PASS", "primary_model": "DCF"},
-        "risk": {"status": "PASS", "max_loss_pct": "25"},
+        "risk": {
+            "status": "PASS",
+            "max_loss_pct": "25",
+            "thesis_breaks": ["driver deterioration"],
+            "evidence_ids": ["req-pe-1"],
+        },
         "portfolio": {
             "position_pct": "0",
             "constraint_status": "PASS",
