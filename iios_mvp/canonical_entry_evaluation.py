@@ -5,7 +5,10 @@ import hashlib
 import json
 from typing import Any, Mapping
 
-from .price_dependent_expectation_gap import combine_target_entry_price_v2
+from .price_dependent_expectation_gap import (
+    P2_PRICE_GAP_REVALIDATION_VERSION,
+    combine_target_entry_price_v2,
+)
 from .p2_1_canonical_price_response import PRICE_RESPONSE_VERSION
 
 CANONICAL_ENTRY_EVALUATION_VERSION = "IIOS-P2.2-CANONICAL-ENTRY-EVALUATION-0.1"
@@ -40,14 +43,16 @@ def _evaluation_id(
     *,
     current_price: Decimal,
     return_target_entry_price: Decimal,
-    p2_1_response: Mapping[str, Any] | None,
+    price_response: Mapping[str, Any] | None,
+    price_response_source: str,
     entry_reference_source: str,
 ) -> str:
     return "p22-entry-evaluation-" + _hash({
         "version": CANONICAL_ENTRY_EVALUATION_VERSION,
         "current_price": str(current_price),
         "return_target_entry_price": str(return_target_entry_price),
-        "p2_1_response_hash": None if p2_1_response is None else _hash(p2_1_response),
+        "price_response_hash": None if price_response is None else _hash(price_response),
+        "price_response_source": price_response_source,
         "entry_reference_source": entry_reference_source,
     })
 
@@ -80,7 +85,8 @@ def build_canonical_entry_evaluation(
     *,
     current_price: Any,
     return_target_entry_price: Any,
-    p2_1_price_response: Mapping[str, Any] | None,
+    price_response: Mapping[str, Any] | None,
+    price_response_source: str = "P2.1_CANONICAL",
     entry_reference_source: str = "EXPECTATION_GAP",
     market_expectation_id: str | None = None,
     independent_forecast_ref: Mapping[str, Any] | None = None,
@@ -92,26 +98,29 @@ def build_canonical_entry_evaluation(
         raise ValueError("current_price must be > 0")
     if return_target <= 0:
         raise ValueError("return_target_entry_price must be > 0")
-    source = str(entry_reference_source or "NONE").upper()
+    entry_source = str(entry_reference_source or "NONE").upper()
+    response_source = str(price_response_source or "P2.1_CANONICAL").upper()
+    if response_source not in {"P2.1_CANONICAL", "P2_LEGACY_COMPAT"}:
+        raise ValueError(f"unsupported canonical price-response source: {response_source}")
 
     common = {
         "evaluation_version": CANONICAL_ENTRY_EVALUATION_VERSION,
         "current_price": str(current),
         "return_target_entry_price": str(return_target),
-        "entry_reference_source": source,
+        "entry_reference_source": entry_source,
         "market_expectation_id": market_expectation_id,
         "independent_forecast_ref": independent_forecast_ref,
-        "p2_1_response_version": (
+        "price_response_version": (
             str(p2_1_price_response.get("response_version"))
             if isinstance(p2_1_price_response, Mapping)
             and p2_1_price_response.get("response_version") is not None else None
         ),
-        "p2_1_response_id": (
+        "price_response_id": (
             str(p2_1_price_response.get("response_id"))
             if isinstance(p2_1_price_response, Mapping)
             and p2_1_price_response.get("response_id") is not None else None
         ),
-        "p2_1_response_hash": (
+        "price_response_hash": (
             _hash(p2_1_price_response)
             if isinstance(p2_1_price_response, Mapping) else None
         ),
@@ -132,14 +141,15 @@ def build_canonical_entry_evaluation(
         ),
     }
 
-    if not isinstance(p2_1_price_response, Mapping):
+    if not isinstance(price_response, Mapping):
         return {
             **common,
             "evaluation_id": _evaluation_id(
                 current_price=current,
                 return_target_entry_price=return_target,
-                p2_1_response=None,
-                entry_reference_source=source,
+                price_response=None,
+                price_response_source=response_source,
+                entry_reference_source=entry_source,
             ),
             "status": "REVIEW_REQUIRED",
             "qualification": "UNKNOWN",
@@ -152,14 +162,21 @@ def build_canonical_entry_evaluation(
             "reason": "canonical P2.1 price response is required for decision-grade entry admission",
         }
 
-    response = dict(p2_1_price_response)
-    if response.get("response_version") != PRICE_RESPONSE_VERSION:
+    response = dict(price_response)
+    response_version = str(response.get("response_version", ""))
+    if response_source == "P2.1_CANONICAL":
+        if response_version != PRICE_RESPONSE_VERSION:
+            raise ValueError(
+                "canonical entry evaluation requires exact P2.1 response version "
+                f"{PRICE_RESPONSE_VERSION}"
+            )
+    elif response_version != P2_PRICE_GAP_REVALIDATION_VERSION:
         raise ValueError(
-            "canonical entry evaluation requires exact P2.1 response version "
-            f"{PRICE_RESPONSE_VERSION}"
+            "P2 legacy compatibility requires exact P2 response version "
+            f"{P2_PRICE_GAP_REVALIDATION_VERSION}"
         )
 
-    candidate = _dec(response.get("candidate_price"), "p2_1_price_response.candidate_price")
+    candidate = _dec(response.get("candidate_price"), "price_response.candidate_price")
     if candidate != return_target:
         raise ValueError(
             "P2.1 candidate_price must equal the canonical return target-entry price"
@@ -174,7 +191,20 @@ def build_canonical_entry_evaluation(
             "P2.2 canonical current price must equal P2.1 reference_price"
         )
 
-    qualification = str(response.get("qualification", "")).upper()
+    reference_price = _dec(
+        response.get("reference_price"),
+        "price_response.reference_price",
+    )
+    if reference_price != current:
+        raise ValueError(
+            "P2.2 canonical current price must equal price-response reference_price"
+        )
+
+    qualification = str(
+        response.get("qualification", "DECISION_GRADE")
+        if response_source == "P2.1_CANONICAL"
+        else "DECISION_GRADE"
+    ).upper()
     if qualification not in {"DECISION_GRADE", "CONDITIONAL_ONLY"}:
         raise ValueError(
             "P2.1 response qualification must be DECISION_GRADE or CONDITIONAL_ONLY"
@@ -203,8 +233,9 @@ def build_canonical_entry_evaluation(
             "evaluation_id": _evaluation_id(
                 current_price=current,
                 return_target_entry_price=return_target,
-                p2_1_response=response,
-                entry_reference_source=source,
+                price_response=response,
+                price_response_source=response_source,
+                entry_reference_source=entry_source,
             ),
             "status": status,
             "qualification": qualification,
@@ -391,7 +422,8 @@ def replay_canonical_entry_evaluation(
     evaluation: Mapping[str, Any],
     current_price: Any,
     return_target_entry_price: Any,
-    p2_1_price_response: Mapping[str, Any] | None,
+    price_response: Mapping[str, Any] | None,
+    price_response_source: str = "P2.1_CANONICAL",
     entry_reference_source: str = "EXPECTATION_GAP",
     market_expectation_id: str | None = None,
     independent_forecast_ref: Mapping[str, Any] | None = None,
@@ -399,7 +431,8 @@ def replay_canonical_entry_evaluation(
     regenerated = build_canonical_entry_evaluation(
         current_price=current_price,
         return_target_entry_price=return_target_entry_price,
-        p2_1_price_response=p2_1_price_response,
+        price_response=price_response,
+        price_response_source=price_response_source,
         entry_reference_source=entry_reference_source,
         market_expectation_id=market_expectation_id,
         independent_forecast_ref=independent_forecast_ref,
