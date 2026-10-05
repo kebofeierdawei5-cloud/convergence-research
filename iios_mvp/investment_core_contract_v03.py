@@ -259,7 +259,7 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
         "contract_version", "case_id", "market", "symbol", "company",
         "as_of_date", "cutoff_date", "current_price_observation",
         "company_evidence_manifest", "trust", "reality", "forecast",
-        "valuation", "risk", "portfolio", "thesis", "return_gate", "expectation_gap",
+        "valuation", "risk", "portfolio", "thesis", "return_gate",
     )
     _required(case, required, "$", errors)
     if errors:
