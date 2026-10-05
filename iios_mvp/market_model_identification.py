@@ -756,7 +756,8 @@ def _fit_complex_candidate(
 
     historical_low = min(historical_primary)
     historical_high = max(historical_primary)
-    within_historical_range = historical_low <= current_primary <= historical_high
+    support_state = _support_state(current_primary, historical_low, historical_high)
+    within_historical_range = support_state == HistoricalSupportState.IN_RANGE
     all_evidence = tuple(sorted(set(
         historical_evidence
         + list(current_ids)
