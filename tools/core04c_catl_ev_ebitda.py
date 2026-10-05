@@ -96,7 +96,10 @@ def _report_text(path: Path, pages_1based: tuple[int, ...]) -> str:
 
 
 def _first_number(text: str, label: str) -> Decimal:
-    match = re.search(re.escape(label) + r"\s*(" + _NUM_RE.pattern + r")", text)
+    match = re.search(
+        re.escape(label) + r"(?:[^0-9\\-]|-(?![0-9])){0,120}?(" + _NUM_RE.pattern + r")",
+        text,
+    )
     if not match:
         raise ValueError(f"label not found: {label}")
     return Decimal(match.group(1).replace(",", ""))
