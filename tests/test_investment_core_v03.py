@@ -414,13 +414,15 @@ def test_v03_current_price_mismatch_blocks_decision():
     assert any("V03-CURRENT-PRICE-BIND" in x for x in result["validation"]["blockers"])
 
 
-def test_v03_missing_expectation_gap_blocks_new_capital_decision():
+def test_v03_missing_expectation_gap_does_not_block_company_side_buy():
     c = case()
     del c["expectation_gap"]
     result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
-    assert result["decision"]["action"] == "REVIEW_REQUIRED"
-    assert result["decision"]["primary_reason"] == "POSITIVE_EXPECTATION_GAP_UNRESOLVED"
+    assert result["decision"]["action"] == "BUY"
     assert result["validation"]["status"] == "PASS"
+    assert result["gates"]["expectation_gap_required_for_buy_add"] is False
+    assert result["gates"]["mie_policy"] == "OPTIONAL_EXPLANATORY"
+    assert result["decision"]["decision_admission_rule_id"] == "DA05_OPTIONAL_MIE_ENTRY_GATE_NOT_REQUIRED"
 
 
 def test_v03_unresolved_mie_snapshot_requires_review_for_new_position():
@@ -786,19 +788,6 @@ def test_v03_two_year_override_is_not_treated_as_a_three_year_exception():
 
 
 
-def test_v03_missing_mie_does_not_block_company_side_buy():
-    c = case()
-    del c["expectation_gap"]
-    result = decide(
-        c,
-        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
-        current_price_resolver=CURRENT_PRICE_REGISTRY,
-        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-    )
-    assert result["decision"]["action"] == "BUY"
-    assert result["gates"]["expectation_gap_required_for_buy_add"] is False
-    assert result["gates"]["mie_policy"] == "OPTIONAL_EXPLANATORY"
-    assert result["decision"]["decision_admission_rule_id"] == "DA05_OPTIONAL_MIE_ENTRY_GATE_NOT_REQUIRED"
 
 
 def test_v03_nonpositive_mie_gap_is_advisory_not_an_automatic_buy_veto():
