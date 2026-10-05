@@ -93,27 +93,13 @@ def _evidence_rows(data: dict[str, Any]) -> tuple[MarketObservableEvidence, ...]
                 },
             )
         )
-    bridge = {
-        "E011": ("market_price", "CNY/share", "2026-09-30 official SZSE EOD close", "2026-09-30", "2026-09-30T00:00:00+08:00"),
-        "E008": ("shares_outstanding", "shares", "existing CORE-03 current share-count bridge", "2026-09-29", "2026-09-29T00:00:00+08:00"),
-        "E005": ("net_debt", "CNY", "2026-06-30 cash less short-term and long-term borrowings", "2026-06-30", "2026-07-24T00:00:00+08:00"),
-    }
-    existing = {item.evidence_id for item in output}
-    for evidence_id, (variable, unit, basis, obs, known) in bridge.items():
-        if evidence_id in existing:
-            continue
-        output.append(
-            MarketObservableEvidence(
-                evidence_id=evidence_id,
-                variable=variable,
-                unit=unit,
-                basis=basis,
-                observation_date=date.fromisoformat(obs),
-                known_at=_dt(known),
-                source="RC-CN-A-300750-20261004 admitted bridge",
-                range_low=Decimal("0"),
-                range_high=Decimal("0"),
-            )
+    required_bridge_ids = {"E011", "E008", "E005"}
+    supplied_ids = {item.evidence_id for item in output}
+    missing = sorted(required_bridge_ids - supplied_ids)
+    if missing:
+        raise ValueError(
+            "P2.3 refuses to synthesize bridge evidence; missing admitted evidence: "
+            + ", ".join(missing)
         )
     return tuple(output)
 
@@ -142,6 +128,18 @@ def _provenance(data: dict[str, Any]) -> tuple[P4FProvenanceRecord, ...]:
     records: list[P4FProvenanceRecord] = []
     for row in sorted(data["evidence"], key=lambda x: str(x["evidence_id"])):
         metadata = row.get("metadata") or {}
+        content_sha = str(
+            metadata.get("source_sha256")
+            or metadata.get("content_sha256")
+            or ""
+        ).lower()
+        if len(content_sha) != 64 or any(ch not in "0123456789abcdef" for ch in content_sha):
+            raise ValueError(
+                f"{row['evidence_id']}: admitted source/content SHA-256 is required"
+            )
+        source = str(row.get("source") or "").strip()
+        if not source:
+            raise ValueError(f"{row['evidence_id']}: admitted source is required")
         records.append(
             P4FProvenanceRecord(
                 evidence_id=str(row["evidence_id"]),
@@ -150,13 +148,9 @@ def _provenance(data: dict[str, Any]) -> tuple[P4FProvenanceRecord, ...]:
                 basis=str(row["basis"]),
                 observation_date=date.fromisoformat(str(row["observation_date"])),
                 known_at=_dt(str(row["known_at"])),
-                source=str(row["source"]),
+                source=source,
                 source_location=f"admitted://{row['evidence_id']}",
-                content_sha256=str(
-                    metadata.get("source_sha256")
-                    or metadata.get("content_sha256")
-                    or "0" * 64
-                ),
+                content_sha256=content_sha,
                 captured_at=datetime(2026, 10, 5, 10, 0, tzinfo=timezone.utc),
                 value=_d(row["value"]),
             )
@@ -169,7 +163,18 @@ def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
     if data.get("case_id") != CASE_ID:
         raise ValueError("real P2.3 input case_id mismatch")
     receipt = data.get("source_receipt") or {}
-    if receipt.get("status") != "ADMITTED":
+    expected_receipt = {
+        "status": "ADMITTED",
+        "ci_run_id": 37261197564,
+        "artifact_id": 11324731141,
+        "artifact_sha256": "51e9e8c19404ef241383c99e0f9ed98bf3088fbe2b4a47778e9f5d79a26ee6c4",
+    }
+    for key, expected in expected_receipt.items():
+        if receipt.get(key) != expected:
+            raise ValueError(
+                f"CORE-04-C receipt mismatch for {key}: "
+                f"expected {expected!r}, got {receipt.get(key)!r}"
+            )
         raise ValueError("CORE-04-C receipt is not admitted")
     if data.get("status") != "EXECUTABLE_REAL_SLICE":
         raise ValueError("unexpected P3A real-slice input status")
