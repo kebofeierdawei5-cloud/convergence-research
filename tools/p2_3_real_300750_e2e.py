@@ -39,6 +39,7 @@ P23_VERSION = "IIOS-P2.3-REAL-300750-E2E-0.1"
 CASE_ID = "RC-CN-A-300750-20261004"
 CUTOFF = date(2026, 10, 4)
 MODEL_ID = "real-ev-ebitda-300750"
+RECEIPT_PATH = Path("research/core04c_catl_ev_ebitda_receipt_v0.2.json")
 
 
 def _dt(value: str) -> datetime:
@@ -158,38 +159,118 @@ def _provenance(data: dict[str, Any]) -> tuple[P4FProvenanceRecord, ...]:
     return tuple(records)
 
 
-def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
-    data = _load_json(input_path)
-    if data.get("case_id") != CASE_ID:
-        raise ValueError("real P2.3 input case_id mismatch")
-    receipt = data.get("source_receipt") or {}
-    expected_receipt = {
-        "status": "ADMITTED",
+def _load_and_validate_canonical_receipt(
+    input_receipt: dict[str, Any],
+) -> dict[str, Any]:
+    receipt = _load_json(RECEIPT_PATH)
+
+    expected = {
         "schema_version": "IIOS-CORE04C-CATL-EVEBITDA-RECEIPT-0.2",
         "case_id": CASE_ID,
+        "status": "ADMITTED",
+        "admission_engine": "CORE-04-A",
         "cutoff_date": CUTOFF.isoformat(),
     }
-    for key, expected in expected_receipt.items():
-        if receipt.get(key) != expected:
+    for key, value in expected.items():
+        if receipt.get(key) != value:
             raise ValueError(
-                f"CORE-04-C receipt mismatch for {key}: "
-                f"expected {expected!r}, got {receipt.get(key)!r}"
+                f"canonical CORE-04-C receipt mismatch for {key}: "
+                f"expected {value!r}, got {receipt.get(key)!r}"
             )
 
+    ci = receipt.get("ci")
+    if not isinstance(ci, dict):
+        raise ValueError("canonical CORE-04-C receipt missing ci object")
     expected_ci = {
         "workflow": "real-ev-ebitda",
         "run_id": 37261197564,
         "artifact_id": 11324731141,
+        "result": "SUCCESS",
         "artifact_sha256": "51e9e8c19404ef241383c99e0f9ed98bf3088fbe2b4a47778e9f5d79a26ee6c4",
     }
-    ci = receipt.get("ci") or {}
-    for key, expected in expected_ci.items():
-        if ci.get(key) != expected:
+    for key, value in expected_ci.items():
+        if ci.get(key) != value:
             raise ValueError(
-                f"CORE-04-C CI receipt mismatch for {key}: "
-                f"expected {expected!r}, got {ci.get(key)!r}"
+                f"canonical CORE-04-C CI receipt mismatch for {key}: "
+                f"expected {value!r}, got {ci.get(key)!r}"
             )
-        raise ValueError("CORE-04-C receipt is not admitted")
+
+    if input_receipt.get("status") != "ADMITTED":
+        raise ValueError("P2.3 input does not carry ADMITTED CORE-04-C linkage")
+    if input_receipt.get("path") != str(RECEIPT_PATH):
+        raise ValueError(
+            "P2.3 input source_receipt.path is not the canonical CORE-04-C receipt path"
+        )
+    if input_receipt.get("ci_run_id") != ci["run_id"]:
+        raise ValueError("P2.3 input ci_run_id does not match canonical receipt")
+    if input_receipt.get("artifact_sha256") != ci["artifact_sha256"]:
+        raise ValueError("P2.3 input artifact_sha256 does not match canonical receipt")
+
+    canonical_by_id = {
+        str(row["observation_id"]): row
+        for row in receipt.get("observations", [])
+    }
+    if len(canonical_by_id) != 3:
+        raise ValueError("canonical CORE-04-C receipt must contain exactly three observations")
+
+    return receipt
+
+
+def _validate_historical_observation_binding(
+    data: dict[str, Any],
+    receipt: dict[str, Any],
+) -> None:
+    rows = {
+        str(row["observation_id"]): row
+        for row in data.get("observations", [])
+    }
+    canonical_rows = {
+        str(row["observation_id"]): row
+        for row in receipt.get("observations", [])
+    }
+
+    missing = sorted(set(canonical_rows) - set(rows))
+    unexpected = sorted(set(rows) & set(canonical_rows) - set(canonical_rows))
+    if missing:
+        raise ValueError(
+            "P2.3 real input is missing canonical CORE-04-C observations: "
+            + ", ".join(missing)
+        )
+
+    for observation_id, canonical in canonical_rows.items():
+        row = rows[observation_id]
+        checks = {
+            "observation_date": str(row["observation_date"]) == str(canonical["observation_date"]),
+            "price": _d(row["price"]) == _d(canonical["price_cny_per_share"]),
+            "shares_outstanding": _d(row["shares_outstanding"]) == _d(canonical["shares_outstanding"]),
+            "net_debt": _d(row["net_debt"]) == _d(canonical["net_debt_cny"]),
+            "economic_value": _d(row["economic_value"]) == _d(canonical["ebitda_cny"]),
+            "basis": str(row["basis"]) == str(canonical["ebitda_basis"]),
+        }
+        if not all(checks.values()):
+            failed = [key for key, ok in checks.items() if not ok]
+            raise ValueError(
+                f"canonical CORE-04-C observation binding drift for "
+                f"{observation_id}: {failed}"
+            )
+
+        computed = _ev_ebitda(row)
+        canonical_multiple = _d(canonical["ev_ebitda"])
+        if computed != canonical_multiple:
+            raise ValueError(
+                f"canonical CORE-04-C EV/EBITDA arithmetic mismatch for "
+                f"{observation_id}: computed {computed}, receipt {canonical_multiple}"
+            )
+
+
+def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
+    data = _load_json(input_path)
+    if data.get("case_id") != CASE_ID:
+        raise ValueError("real P2.3 input case_id mismatch")
+    input_receipt = data.get("source_receipt") or {}
+    receipt = _load_and_validate_canonical_receipt(input_receipt)
+    _validate_historical_observation_binding(data, receipt)
+
     if data.get("status") != "EXECUTABLE_REAL_SLICE":
         raise ValueError("unexpected P3A real-slice input status")
 
@@ -297,6 +378,8 @@ def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
         "case_id": CASE_ID,
         "cutoff_date": CUTOFF.isoformat(),
         "core04c_receipt": receipt,
+        "core04c_receipt_path": str(RECEIPT_PATH),
+        "core04c_input_link": input_receipt,
         "real_current_observation": {
             "observation_id": current_id,
             "price": str(current_price),
