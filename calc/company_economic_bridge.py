@@ -348,6 +348,7 @@ def validate_company_economic_bridge(record: Any) -> list[str]:
     if record["investment_decision_effect"] != "NO_DIRECT_GATE_EFFECT":
         errors.append("INVESTMENT_DECISION_EFFECT_INVALID")
 
+    evidence_admission = record["evidence_admission"]
     if isinstance(evidence_admission, Mapping):
         evidence_ids = evidence_admission.get("evidence_ids")
         if (
