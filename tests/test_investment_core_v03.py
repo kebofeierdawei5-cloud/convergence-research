@@ -95,11 +95,11 @@ def market_implied_expectation_snapshot(price_observation_id="price-1") -> dict:
     )
     evidence_ids = sorted({
         "req-pe-1", "cov-pe-1", "suff-pe-1",
-        "price-1",
+        price_observation_id,
     })
     provenance = []
     for evidence_id in evidence_ids:
-        is_price = evidence_id == "price-1"
+        is_price = evidence_id == price_observation_id
         provenance.append(
             P4FProvenanceRecord(
                 evidence_id=evidence_id,
