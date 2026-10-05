@@ -164,6 +164,8 @@ def evaluate_decision_state(inputs: DecisionStateInputs) -> dict[str, Any]:
         can_add=bool(inputs.can_add),
         package_complete=bool(inputs.package_complete),
         return_metrics_ready=bool(inputs.return_metrics_ready),
+        mie_policy=str(inputs.mie_policy).upper(),
+        mie_material_contradiction=bool(inputs.mie_material_contradiction),
     )
 
     for rule in CANONICAL_DECISION_PRECEDENCE:
