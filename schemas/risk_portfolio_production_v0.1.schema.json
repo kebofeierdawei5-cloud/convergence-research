@@ -142,68 +142,72 @@
           ]
         },
         "buy_add_package": {
-          "type": [
-            "object",
-            "null"
-          ],
-          "additionalProperties": false,
-          "required": [
-            "entry_zone",
-            "initial_position_pct",
-            "target_position_pct",
-            "max_position_pct",
-            "thesis_break_triggers",
-            "monitoring_triggers"
-          ],
-          "properties": {
-            "entry_zone": {
-              "type": "array",
-              "minItems": 2,
-              "maxItems": 2
+          "anyOf": [
+            {
+              "type": "null"
             },
-            "initial_position_pct": {
-              "type": [
-                "string",
-                "number"
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "entry_zone",
+                "initial_position_pct",
+                "target_position_pct",
+                "max_position_pct",
+                "thesis_break_triggers",
+                "monitoring_triggers"
               ],
-              "minimum": 0,
-              "maximum": 100
-            },
-            "target_position_pct": {
-              "type": [
-                "string",
-                "number"
-              ],
-              "minimum": 0,
-              "maximum": 100
-            },
-            "max_position_pct": {
-              "type": [
-                "string",
-                "number"
-              ],
-              "minimum": 0,
-              "maximum": 100
-            },
-            "thesis_break_triggers": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "monitoring_triggers": {
-              "type": "array",
-              "minItems": 1,
-              "uniqueItems": true,
-              "items": {
-                "type": "string",
-                "minLength": 1
+              "properties": {
+                "entry_zone": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "initial_position_pct": {
+                  "type": [
+                    "string",
+                    "number"
+                  ],
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "target_position_pct": {
+                  "type": [
+                    "string",
+                    "number"
+                  ],
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "max_position_pct": {
+                  "type": [
+                    "string",
+                    "number"
+                  ],
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "thesis_break_triggers": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "monitoring_triggers": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
               }
             }
-          }
+          ]
         }
       }
     }
