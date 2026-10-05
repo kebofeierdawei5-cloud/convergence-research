@@ -16,13 +16,13 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 **A1-02 Capital Allocation + Trust/Governance Evidence Closure = PASS / MERGED**
 
-CORE-04 vertical decision closure is complete. A1 company-side evidence closure is now in progress.
+**A1-03 Quality Gate Integration = PASS / MERGED**
 
-Current next substantive batch:
+**A1 Company-side Evidence Closure = PASS / MERGED**
 
-**A1-03 Quality Gate Integration**
+CORE-04 vertical decision closure is complete. A1 company-side evidence closure is now complete.
 
-No new P3/P4/MIE model work is on the critical path.
+No P3/P4/MIE model work was added to A1.
 
 ## Canonical Investment Core
 
@@ -62,15 +62,19 @@ CSI800 / CSI Industry / historical-universe reconstruction and FM forecast resea
 
 ## A1 status
 
-A1-01 has established the deterministic CAPEX → D&A → FCF, Earnings → OCF → FCF, Working Capital and Incremental ROIC proxy layer for the real 300750 case. The bridge is CONDITIONAL and has no direct Decision Kernel gate effect.
+A1-01 established the deterministic CAPEX → D&A → FCF, Earnings → OCF → FCF, Working Capital and Incremental ROIC proxy layer for the real 300750 case. The bridge is CONDITIONAL and has no direct Decision Kernel gate effect.
 
-A1-01 established the deterministic economic bridge; A1-02 established the capital-allocation and Trust/Governance evidence bridge. Both are upstream evidence layers with no direct Decision Kernel gate effect.
+A1-02 established the deterministic capital-allocation and Trust/Governance evidence bridge. It is CONDITIONAL where the evidence does not establish broader economics, fairness or governance history.
 
-A1 remains incomplete until the closed company-side evidence is integrated into existing Quality semantics and tested end-to-end.
+A1-03 integrates both evidence bridges into the existing Quality / Trust / Quality Gate semantics with fail-closed status capping and no direct Decision Kernel semantic change.
+
+For the canonical 300750 case, A1 leaves Quality Gate = CONDITIONAL, Trust = CONDITIONAL, capital admission = FALSE, and decision_effect = NO_DIRECT_GATE_EFFECT.
 
 Acceptance records:
-- `docs/iios/A1_01_ACCEPTANCE_2026-10-05.md`
-- `docs/iios/A1_02_ACCEPTANCE_2026-10-05.md`
+- docs/iios/A1_01_ACCEPTANCE_2026-10-05.md
+- docs/iios/A1_02_ACCEPTANCE_2026-10-05.md
+- docs/iios/A1_03_QUALITY_GATE_INTEGRATION_v0.1.md
+- docs/iios/A1_ACCEPTANCE_2026-10-05.md
 
 ## Product gaps after CORE-04
 
