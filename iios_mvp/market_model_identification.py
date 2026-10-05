@@ -823,7 +823,11 @@ def _fit_complex_candidate(
         constraint_ids=(
             "MODEL_SPECIFIC_INVERSE",
             "MIN_HISTORICAL_DATES",
-            "CURRENT_IMPLIED_PRIMARY_WITHIN_HISTORICAL_RANGE",
+            *(
+                ("CURRENT_IMPLIED_PRIMARY_WITHIN_HISTORICAL_RANGE",)
+                if within_historical_range
+                else ()
+            ),
         ),
         evidence_ids=all_evidence,
         basis=(
