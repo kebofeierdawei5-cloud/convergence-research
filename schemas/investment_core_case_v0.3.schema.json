@@ -312,6 +312,7 @@
       "type": "object",
       "additionalProperties": true,
       "required": [
+        "price",
         "status",
         "gap_absolute",
         "gap_relative",
@@ -320,6 +321,12 @@
         "market_expectation"
       ],
       "properties": {
+        "price": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
         "status": {
           "enum": [
             "PASS",
