@@ -17,7 +17,7 @@ B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = PASS / MERGED. CATL Exist
 
 - B2-A merge commit: c8246ceaaad5e9b1cc02fe422723c39a441ea4f3.
 - B2 raw-artifact containment hardening merge commit: 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3.
-- Current canonical main baseline: 163509c67bd67946f0320b01ef976b5e1222bf21.
+- Canonical main ref: `main` is authoritative; the exact current SHA is intentionally not duplicated here to prevent continuity drift.
 - Existing CATL E001-E010 capture artifacts have passed technical B2 migration.
 - Source-quality gaps: E002 primary-price gap is CLOSED by supplementary evidence E011; E003/E007 remain P1 direct-primary disclosure gaps when material.
 - No secondary source is silently upgraded to primary evidence.
@@ -59,16 +59,20 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Quality remains CONDITIONAL because incremental ROIC and full earnings/cash-flow conversion bridges are not yet fully constructed.
 - No fabricated company name, forecast, valuation or decision was introduced.
 
-## P3-A Real 300750 EV/EBITDA Consumption — 2026-10-05
+## P3-A-RA / P4-B~P4-F Successor Work — 2026-10-05
 
-- Real CORE-04-C observations are now consumed by the existing P3-A ratio-family engine.
-- Historical admitted range: **13.668692085319408...x to 16.385451373010478...x**.
-- Existing CORE-03 current PIT bridge at 2026-09-30 produces **8.375536786732361...x**.
-- P3-A result: **INFEASIBLE / UNIDENTIFIABLE** because the current multiple is below the admitted historical range.
-- Stability: **INSUFFICIENT_EVIDENCE** because the current rule requires more than three historical points for leave-one-out stability.
-- P4-B: **FAIL-CLOSED / NO MIE MATERIALIZED**.
-- Real integration PR #57: merged as a6527e76968671bf09c609896bce87cc0eac41db; PR CI and post-merge main CI both **SUCCESS**, **238 tests passed**.
-- Audit note: current E008 share-count semantics are not yet formally reconciled with CORE-04-C historical “reported total share capital”; no decision-grade MIE claim is made from the current technical bridge.
+- PR #69: **OPEN / NOT MERGED**; it contains the corrected outside-historical-support semantics and downstream anti-bypass acceptance.
+- Latest P3-A-RA implementation checkpoint on PR #69: `26079a14f8d50ae8e8d1f589d06f2f0aec44341a`.
+- P3-A-RA is therefore not yet part of canonical `main`.
+
+## CORE-04 Production Decision Kernel — ACTIVE
+
+- Decision Semantics Reconciliation: **IMPLEMENTED / FROZEN FOR REVIEW**.
+- B1 v0.3 MIE role is explicitly **OPTIONAL_EXPLANATORY** for BUY/ADD.
+- Legacy MIE-mandatory rules are retained only behind explicit compatibility policy; CORE-04 v0.3 passes the optional policy explicitly.
+- Production kernel: `iios_mvp/decision_kernel_v03.py`.
+- Current merge candidate branch: `feature/core04-production-decision-kernel-20261005`.
+- Production decision kernel remains **NOT YET MERGED** pending red-team/CI.
 
 ## CORE-04-C Real 300750 Historical EV/EBITDA
 
@@ -358,12 +362,14 @@ B1 semantic package and runtime migration accepted on the repair line. Evidence:
 
 ## Immediate Next Engineering Step
 
-P3/P4 ratio-family integration — consume the admitted CORE-04-C 300750 EV/EBITDA observations in the existing market-model identification / MIE path. No new source acquisition is required for the completed CORE-04-C gate.
+**Decision Semantics Reconciliation → CORE-04 Production Decision Kernel**.
 
-1. Materialize the planned CATL source files as physical raw bytes.
-2. Recompute physical size + SHA-256 from the captured bytes.
-3. Populate Evidence Records only from those verified raw artifacts.
-4. Run the CATL company Evidence Manifest with known_at <= cutoff.
-5. Perform replay and fail-closed attacks before B3 Reality/Quality expansion.
+Next acceptance sequence:
+
+1. Freeze B1 v0.3 MIE optional semantics and remove runtime contradiction.
+2. Validate CORE-04 BUY/ADD/HOLD/REDUCE/EXIT/NO-BUY/WATCH/REVIEW_REQUIRED precedence.
+3. Run real 300750 decision-path regression without requiring MIE.
+4. Keep PR #69 separate and unresolved until owner merge.
+5. Update this status/index only through canonical merge commits.
 
 Do not resume CSI800/A02 for the Investment Core path. Do not reuse post-cutoff dynamic pages or historical .txt hashes as canonical raw evidence.
