@@ -358,9 +358,6 @@
         "cutoff_date": { "type": "string", "format": "date" },
         "mie_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
         "market_expectation_id": { "type": "string", "minLength": 1 },
-        "comparison_direction": {
-          "enum": ["HIGHER_IS_BETTER", "LOWER_IS_BETTER"]
-        },
         "independent_expectation": {
           "type": "object",
           "additionalProperties": false,
