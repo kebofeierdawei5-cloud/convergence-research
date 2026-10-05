@@ -8,6 +8,8 @@ import zipfile
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
+import subprocess
+import unicodedata
 from xml.etree import ElementTree as ET
 
 import fitz
