@@ -158,6 +158,19 @@
       "pit_capability": "SOURCE_VINTAGE",
       "mandatory_for_production": false,
       "notes": "Issuer-hosted public material; exact capture and defensible publication/vintage timing are required."
+    },
+    {
+      "source_ref": "SZSE:MARKET_DATA",
+      "provider": "Shenzhen Stock Exchange",
+      "role": [
+        "MARKET_PRICE",
+        "HISTORICAL_MARKET_DATA"
+      ],
+      "access_class": "FREE_PUBLIC",
+      "authority_level": "PRIMARY_OFFICIAL",
+      "pit_capability": "SOURCE_VINTAGE",
+      "mandatory_for_production": false,
+      "notes": "Official market-data lookup candidate for historical price observations; exact capture method, source response bytes and vintage must be archived before admission."
     }
   ]
 }
