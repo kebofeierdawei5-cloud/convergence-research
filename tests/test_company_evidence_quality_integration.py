@@ -106,6 +106,7 @@ def test_evidence_closes_missing_unknown_but_does_not_upgrade_known_conditional(
         interpretation="PASS",
         capital_status="PASS",
     )
+    capital["trust_revalidation"]["governance_integrity"]["status"] = "PASS"
     quality["dimensions"] = [
         dict(row) if row["dimension"] != "incremental_return_on_capital"
         else {**row, "status": "UNKNOWN"}
