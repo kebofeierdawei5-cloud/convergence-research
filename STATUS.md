@@ -22,7 +22,7 @@ B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = PASS / MERGED. CATL Exist
 - Source-quality gaps: E002 primary-price gap is CLOSED by supplementary evidence E011; E003/E007 remain P1 direct-primary disclosure gaps when material.
 - No secondary source is silently upgraded to primary evidence.
 - A02/CSI800 is Research Track only: its code is outside research/b2 and it must not execute from B2 CI.
-- E011 is bound to SZSE:MARKET_DATA and validated against a private operator raw vault: 231,394 bytes / SHA-256 349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2; 2026-09-30 300750 close = 291.11 CNY/share. Raw trading-information bytes are not published to the public repository; public CI remains fail-closed when the private vault is absent. Legacy E002 remains append-only. Next: consume the admitted CORE-04-C EV/EBITDA observations in the existing P3-A/P4 ratio-family market-model path. No historical universe/data platform is required.
+- E011 is bound to SZSE:MARKET_DATA and validated against a private operator raw vault: 231,394 bytes / SHA-256 349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2; 2026-09-30 300750 close = 291.11 CNY/share. Raw trading-information bytes are not published to the public repository; public CI remains fail-closed when the private vault is absent. Legacy E002 remains append-only. Next: use the consumed real EV/EBITDA slice to determine whether another independently evidenced ratio-family candidate can be admitted; no historical universe/data platform is required.
 
 
 ## Canonical State
@@ -58,6 +58,17 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Market observation bound to latest pre-cutoff trading day: 2026-09-30 close **291.11 CNY**
 - Quality remains CONDITIONAL because incremental ROIC and full earnings/cash-flow conversion bridges are not yet fully constructed.
 - No fabricated company name, forecast, valuation or decision was introduced.
+
+## P3-A Real 300750 EV/EBITDA Consumption — 2026-10-05
+
+- Real CORE-04-C observations are now consumed by the existing P3-A ratio-family engine.
+- Historical admitted range: **13.668692085319408...x to 16.385451373010478...x**.
+- Existing CORE-03 current PIT bridge at 2026-09-30 produces **8.375536786732361...x**.
+- P3-A result: **INFEASIBLE / UNIDENTIFIABLE** because the current multiple is below the admitted historical range.
+- Stability: **INSUFFICIENT_EVIDENCE** because the current rule requires more than three historical points for leave-one-out stability.
+- P4-B: **FAIL-CLOSED / NO MIE MATERIALIZED**.
+- Real integration PR #57: merged as a6527e76968671bf09c609896bce87cc0eac41db; PR CI and post-merge main CI both **SUCCESS**, **238 tests passed**.
+- Audit note: current E008 share-count semantics are not yet formally reconciled with CORE-04-C historical “reported total share capital”; no decision-grade MIE claim is made from the current technical bridge.
 
 ## CORE-04-C Real 300750 Historical EV/EBITDA
 
