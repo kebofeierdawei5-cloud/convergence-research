@@ -83,6 +83,7 @@ def test_outside_historical_support_is_not_model_infeasibility():
         obs("h1", 1, "100", "5", "forward_eps"),
         obs("h2", 15, "120", "5", "forward_eps"),
         obs("h3", 30, "140", "5", "forward_eps"),
+        obs("h4", 1, "130", "5", "forward_eps"),
         MarketValuationObservation(
             observation_id="current",
             observation_date=CUTOFF,
