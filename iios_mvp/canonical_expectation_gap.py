@@ -246,6 +246,8 @@ def evaluate_canonical_expectation_gap(
     current_price_observation: Mapping[str, Any],
     cutoff_date: Any,
     case_id: str,
+    market: str,
+    symbol: str,
     independent_forecast_resolver: CanonicalIndependentForecastResolver,
 ) -> dict[str, Any]:
     gap = _parse_gap(payload)
@@ -271,8 +273,8 @@ def evaluate_canonical_expectation_gap(
     independent_record = independent_forecast_resolver.resolve_independent_forecast(
         gap.independent_forecast_ref.to_dict(),
         case_id=case_id,
-        market=str(snapshot.get("market", "CN-A")),
-        symbol=str(snapshot.get("symbol", "")),
+        market=market,
+        symbol=symbol,
         cutoff_date=case_cutoff,
     )
     independent_payload = canonical_independent_expectation_from_record(independent_record)
@@ -294,7 +296,7 @@ def evaluate_canonical_expectation_gap(
 
     market_value, market_horizon_years, comparison_direction = _require_point_requirement(
         expectation=expectation,
-        independent=gap.independent_expectation,
+        independent=independent,
     )
     independent = {
         "variable_id": independent.variable_id,
