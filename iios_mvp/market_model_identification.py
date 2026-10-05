@@ -839,6 +839,14 @@ def _fit_complex_candidate(
     return CandidateEvaluation(fit, solution_set)
 
 
+def _support_state(current_value: Decimal, historical_low: Decimal, historical_high: Decimal) -> HistoricalSupportState:
+    if current_value < historical_low:
+        return HistoricalSupportState.BELOW_HISTORICAL_RANGE
+    if current_value > historical_high:
+        return HistoricalSupportState.ABOVE_HISTORICAL_RANGE
+    return HistoricalSupportState.IN_RANGE
+
+
 def _fit_candidate(
     candidate: CandidateMarketModel,
     observations: Sequence[MarketValuationObservation],
