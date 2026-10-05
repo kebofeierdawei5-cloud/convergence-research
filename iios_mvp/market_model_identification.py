@@ -774,19 +774,25 @@ def _fit_complex_candidate(
     diagnostics.append(FitDiagnostic(
         diagnostic_id=f"{candidate.model_id}:current_consistency",
         name="current_complex_model_consistency",
-        status="PASS" if within_historical_range else "INFEASIBLE",
+        status="PASS" if within_historical_range else "OUTSIDE_HISTORICAL_SUPPORT",
         evidence_ids=all_evidence,
-        notes=f"current_implied_{COMPLEX_PRIMARY_VARIABLE[candidate.family]}={current_primary}; within_historical_range={within_historical_range}",
+        notes=(
+            f"current_implied_{COMPLEX_PRIMARY_VARIABLE[candidate.family]}={current_primary}; "
+            f"historical_range=[{historical_low},{historical_high}]; support_state={support_state.value}"
+        ),
     ))
 
     if not within_historical_range:
         fit = ModelFit(
             model_id=candidate.model_id,
-            status=ModelFitStatus.INFEASIBLE,
+            status=ModelFitStatus.OUTSIDE_HISTORICAL_SUPPORT,
             diagnostics=tuple(diagnostics),
             evidence_ids=all_evidence,
             constraints=("CURRENT_IMPLIED_PRIMARY_WITHIN_HISTORICAL_RANGE",),
+            historical_support=support_state,
+            regime_interpretation=RegimeInterpretationState.POSSIBLE_REGIME_SHIFT,
         )
+        fit.validate()
         return CandidateEvaluation(fit, None)
 
     solution = FeasibleSolution(
@@ -836,6 +842,8 @@ def _fit_complex_candidate(
             "MIN_HISTORICAL_DATES",
             "CURRENT_IMPLIED_PRIMARY_WITHIN_HISTORICAL_RANGE",
         ),
+        historical_support=HistoricalSupportState.IN_RANGE,
+        regime_interpretation=RegimeInterpretationState.NOT_ASSESSED,
     )
     fit.validate()
     return CandidateEvaluation(fit, solution_set)
@@ -1246,7 +1254,7 @@ def identify_market_models(inp: MarketModelIdentificationInput) -> dict[str, obj
 
     return {
         "status": "PASS",
-        "method": "model_specific_inverse_v0.2",
+        "method": "model_specific_inverse_v0.3",
         "identifiability": ident,
         "stability": stability,
         "evaluations": tuple(evaluations),
