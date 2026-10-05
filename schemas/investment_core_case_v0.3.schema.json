@@ -305,41 +305,29 @@
         }
       }
     },
-    "market_implied_expectation": {
+    "market_implied_expectation_snapshot": {
       "type": "object",
       "required": [
-        "expectation_id",
-        "model_id",
-        "qualification",
-        "observation_basis",
-        "economic_requirements",
-        "evidence_ids"
+        "snapshot_schema",
+        "p4f_version",
+        "case_id",
+        "cutoff_date",
+        "mie_set",
+        "provenance_manifest",
+        "mie_set_hash",
+        "provenance_hash",
+        "snapshot_hash"
       ],
       "properties": {
-        "expectation_id": { "type": "string", "minLength": 1 },
-        "model_id": { "type": "string", "minLength": 1 },
-        "qualification": {
-          "enum": ["DECISION_GRADE", "CONDITIONAL_ONLY", "BLOCKED"]
-        },
-        "observation_basis": {
-          "type": "object",
-          "required": ["price_observation_id", "observation_date", "cutoff_date"],
-          "properties": {
-            "price_observation_id": { "type": "string", "minLength": 1 },
-            "observation_date": { "type": "string", "format": "date" },
-            "cutoff_date": { "type": "string", "format": "date" }
-          },
-          "additionalProperties": true
-        },
-        "economic_requirements": {
-          "type": "array",
-          "minItems": 1
-        },
-        "evidence_ids": {
-          "type": "array",
-          "minItems": 1,
-          "items": { "type": "string", "minLength": 1 }
-        }
+        "snapshot_schema": { "const": "IIOS-MIE-SNAPSHOT-0.2" },
+        "p4f_version": { "const": "P4-F-0.2" },
+        "case_id": { "type": "string", "minLength": 1 },
+        "cutoff_date": { "type": "string", "format": "date" },
+        "mie_set": { "type": "object" },
+        "provenance_manifest": { "type": "array", "minItems": 1 },
+        "mie_set_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "provenance_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
       },
       "additionalProperties": true
     },
@@ -352,49 +340,26 @@
         "price",
         "price_observation_id",
         "cutoff_date",
+        "mie_snapshot_hash",
         "market_expectation_id",
-        "market_expectation_hash",
         "comparison_direction",
         "independent_expectation"
       ],
       "properties": {
         "gap_id": { "type": "string", "minLength": 1 },
-        "evaluator_version": {
-          "const": "IIOS-EXPECTATION-GAP-0.1"
-        },
-        "price": {
-          "type": ["string", "number"]
-        },
-        "price_observation_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "cutoff_date": {
-          "type": "string",
-          "format": "date"
-        },
-        "market_expectation_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "market_expectation_hash": {
-          "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
-        },
+        "evaluator_version": { "const": "IIOS-EXPECTATION-GAP-0.1" },
+        "price": { "type": ["string", "number"] },
+        "price_observation_id": { "type": "string", "minLength": 1 },
+        "cutoff_date": { "type": "string", "format": "date" },
+        "mie_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "market_expectation_id": { "type": "string", "minLength": 1 },
         "comparison_direction": {
           "enum": ["HIGHER_IS_BETTER", "LOWER_IS_BETTER"]
         },
         "independent_expectation": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "variable_id",
-            "value",
-            "unit",
-            "basis",
-            "horizon_years",
-            "evidence_ids"
-          ],
+          "required": ["variable_id", "value", "unit", "basis", "horizon_years", "evidence_ids"],
           "properties": {
             "variable_id": { "type": "string", "minLength": 1 },
             "value": { "type": ["string", "number"] },
@@ -534,7 +499,7 @@
         "required": ["expectation_gap"]
       },
       "then": {
-        "required": ["market_implied_expectation"]
+        "required": ["market_implied_expectation_snapshot"]
       }
     },
     {
