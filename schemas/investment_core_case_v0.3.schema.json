@@ -61,7 +61,8 @@
         "observed_at",
         "known_at",
         "source",
-        "adjustment_semantics"
+        "adjustment_semantics",
+        "price_observation_admission_hash"
       ],
       "properties": {
         "price": {
@@ -99,6 +100,10 @@
         },
         "adjustment_note": {
           "type": "string"
+        },
+        "price_observation_admission_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         }
       }
     },
