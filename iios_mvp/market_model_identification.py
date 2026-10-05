@@ -948,7 +948,8 @@ def _fit_candidate(
     historical_low = min(multiples)
     historical_high = max(multiples)
     current_multiple = _multiple(current, candidate.family)
-    current_consistent = historical_low <= current_multiple <= historical_high
+    support_state = _support_state(current_multiple, historical_low, historical_high)
+    current_consistent = support_state == HistoricalSupportState.IN_RANGE
 
     diagnostics.append(FitDiagnostic(
         diagnostic_id=f"{candidate.model_id}:historical_range",
