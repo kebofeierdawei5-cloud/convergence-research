@@ -10,6 +10,7 @@ from pathlib import Path
 from core04c_catl_ev_ebitda import (
     parse_annual_ebitda,
     parse_balance_sheet,
+    parse_exact_h1_share_capital,
     parse_szse_market_snapshot,
     build_observation,
     sha256,
