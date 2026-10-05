@@ -134,6 +134,7 @@ def _admission_core(
 ) -> dict[str, Any]:
     if admission.status is not AdmissionStatus.ADMITTED or admission.observation is None:
         raise ValueError("canonical current price requires an ADMITTED market observation")
+    admission.validate()
     observation = admission.observation
     if price_evidence.variable != "market_price":
         raise ValueError("price_evidence.variable must be market_price")
@@ -216,7 +217,9 @@ def _validate_record(record: Mapping[str, Any]) -> None:
     if not str(record["case_id"]).strip() or not str(record["market"]).strip() or not str(record["symbol"]).strip():
         raise ValueError("canonical current price case/instrument identity is required")
     cutoff = _parse_date(record["cutoff_date"], "cutoff_date")
-    _parse_datetime(record["observed_at"], "observed_at")
+    observed_at = _parse_datetime(record["observed_at"], "observed_at")
+    if observed_at.date() > cutoff:
+        raise ValueError("canonical current price observed_at is after cutoff")
     known_at = _parse_datetime(record["known_at"], "known_at")
     if known_at.date() > cutoff:
         raise ValueError("canonical current price known_at is after cutoff")
@@ -249,7 +252,7 @@ def _validate_record(record: Mapping[str, Any]) -> None:
         raise ValueError("canonical current price admission record hash mismatch")
 
 
-def _validate_binding(
+def validate_current_price_binding(
     case_observation: Mapping[str, Any],
     record: Mapping[str, Any],
 ) -> None:
@@ -448,5 +451,5 @@ __all__ = [
     "FileSystemCanonicalCurrentPriceRegistry",
     "InMemoryCanonicalCurrentPriceRegistry",
     "admit_from_verified_market_observation",
-    "_validate_binding",
+    "validate_current_price_binding",
 ]
