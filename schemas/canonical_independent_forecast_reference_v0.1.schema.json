@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/canonical-independent-forecast-reference-0.1.schema.json",
+  "title": "IIOS Canonical Independent Forecast Reference v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "forecast_id",
+    "admission_record_hash"
+  ],
+  "properties": {
+    "forecast_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "admission_record_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
