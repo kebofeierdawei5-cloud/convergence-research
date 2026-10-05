@@ -29,9 +29,11 @@ A0 Governance / State Cleanup = PASS / MERGED
         ↓
 A1-01 Economic Evidence Bridge = PASS / MERGED
         ↓
+A1-02 Capital Allocation + Trust/Governance Evidence Closure = PASS / MERGED
+        ↓
 A1 Company-side Evidence Closure = IN PROGRESS
         ↓
-A1-02 Capital Allocation + Trust/Governance Evidence Closure = NEXT
+A1-03 Quality Gate Integration = NEXT
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
@@ -191,7 +193,15 @@ Completed sub-batch:
 
 A1-01 established the deterministic CAPEX → D&A → FCF, Earnings → OCF → FCF, Working Capital and Incremental ROIC proxy layer without changing Decision Kernel semantics.
 
-Next sub-batch:
-- **A1-02 Capital Allocation + Trust/Governance Evidence Closure**
+Completed sub-batches:
+- **A1-01 Economic Evidence Bridge = PASS / MERGED**
+- **A1-02 Capital Allocation + Trust/Governance Evidence Closure = PASS / MERGED**
 
-A1 is not complete until the remaining company-side evidence is closed and the resulting Quality state is explicitly integrated and tested.
+Acceptance records:
+- `docs/iios/A1_01_ACCEPTANCE_2026-10-05.md`
+- `docs/iios/A1_02_ACCEPTANCE_2026-10-05.md`
+
+Next sub-batch:
+- **A1-03 Quality Gate Integration**
+
+A1 is not complete until the remaining company-side evidence is integrated into the existing Quality semantics and tested end-to-end.
