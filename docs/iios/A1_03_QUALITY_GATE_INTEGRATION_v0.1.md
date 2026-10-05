@@ -11,21 +11,22 @@ This is a deterministic evidence constraint layer. It does not introduce a new s
 
 ## Core rule
 
-A1-03 uses a one-way status cap:
+A1-03 uses a two-step fail-closed rule:
 
-    Integrated Status = max(Existing Analytical Status, Closed Evidence Status)
+1. resolve an UNKNOWN that is explicitly caused by missing company-side evidence, when the mapped closed evidence now supplies PASS or CONDITIONAL;
+2. otherwise apply the status cap.
 
 Severity ordering:
 
     PASS < CONDITIONAL < UNKNOWN < BLOCKED
 
 Therefore:
-- evidence cannot upgrade a weaker existing analytical status;
-- evidence can downgrade an unjustifiably strong status;
-- BLOCKED evidence blocks the affected dimension;
-- UNKNOWN remains UNKNOWN when the underlying analytical state is weaker than the evidence.
+- an evidence-missing UNKNOWN may be resolved to the evidence status;
+- a known CONDITIONAL or PASS analytical state cannot be upgraded by this layer;
+- evidence can downgrade an unjustifiably strong PASS to CONDITIONAL/UNKNOWN/BLOCKED;
+- BLOCKED evidence blocks the affected dimension.
 
-This is deliberate fail-closed behavior.
+This distinction is required because A1-01 specifically closes an evidence-construction gap that previously forced incremental_return_on_capital to UNKNOWN. Resolving that UNKNOWN to CONDITIONAL is evidence closure, not optimistic scoring.
 
 ## Quality mapping
 
