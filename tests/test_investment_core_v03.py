@@ -211,6 +211,16 @@ def test_v03_positive_gap_but_price_above_target_is_watch_price():
     assert Decimal(result["decision"]["target_entry_price"]) < Decimal("101")
 
 
+
+def test_v03_target_entry_price_is_conditional_and_requires_gap_revalidation():
+    result = decide(case())
+    assert result["decision"]["target_entry_price_semantics"] == (
+        "CONDITIONAL_THRESHOLD_REQUIRES_EXPECTATION_GAP_REVALIDATION"
+    )
+    assert result["decision"]["target_entry_price_requires_gap_revalidation"] is True
+    assert result["gates"]["target_entry_price"] == result["decision"]["target_entry_price"]
+
+
 def test_v03_risk_cap_enters_target_entry_price_solver():
     c = case()
     c["risk"]["max_loss_pct"] = "5"
