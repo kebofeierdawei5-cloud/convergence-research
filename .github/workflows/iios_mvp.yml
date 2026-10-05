@@ -27,6 +27,9 @@ on:
       - "tests/test_price_dependent_expectation_gap.py"
       - "tests/test_p2_1_canonical_price_response.py"
       - "tests/test_canonical_entry_evaluation.py"
+      - "tests/test_p2_3_real_300750_e2e.py"
+      - "tools/p2_3_real_300750_e2e.py"
+      - "examples/real_cases/RC-CN-A-300750-20261004_ratio_mie_input.json"
       - "examples/**"
       - "schemas/**"
       - ".github/workflows/iios_mvp.yml"
@@ -45,6 +48,9 @@ on:
       - "tests/test_sotp_rnpv_market_implied_expectation.py"
       - "tests/test_multi_model_market_implied_expectation_set.py"
       - "tests/test_p4f_mie_snapshot.py"
+      - "tests/test_p2_3_real_300750_e2e.py"
+      - "tools/p2_3_real_300750_e2e.py"
+      - "examples/real_cases/RC-CN-A-300750-20261004_ratio_mie_input.json"
       - "examples/**"
       - "schemas/**"
       - ".github/workflows/iios_mvp.yml"
@@ -57,9 +63,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m compileall -q iios_mvp tests/test_mvp.py tests/test_investment_core_contract.py tests/test_investment_core_v03.py tests/test_market_model_domain.py tests/test_market_model_identification.py tests/test_market_implied_expectation.py tests/test_ratio_market_implied_expectation.py tests/test_dcf_ddm_conditional_market_implied_expectation.py tests/test_sotp_rnpv_market_implied_expectation.py tests/test_multi_model_market_implied_expectation_set.py tests/test_p4f_mie_snapshot.py tests/test_semantic_expectation_gap.py tests/test_core00_scope.py tests/test_research_intake.py tests/test_company_economic_core.py tests/test_p1_1_evidence_root_admission.py tests/test_canonical_current_price.py tests/test_canonical_independent_forecast.py tests/test_decision_state_machine_v01.py tests/test_price_dependent_expectation_gap.py tests/test_p2_1_canonical_price_response.py tests/test_canonical_entry_evaluation.py
+      - run: python -m compileall -q iios_mvp tests/test_mvp.py tests/test_investment_core_contract.py tests/test_investment_core_v03.py tests/test_market_model_domain.py tests/test_market_model_identification.py tests/test_market_implied_expectation.py tests/test_ratio_market_implied_expectation.py tests/test_dcf_ddm_conditional_market_implied_expectation.py tests/test_sotp_rnpv_market_implied_expectation.py tests/test_multi_model_market_implied_expectation_set.py tests/test_p4f_mie_snapshot.py tests/test_semantic_expectation_gap.py tests/test_core00_scope.py tests/test_research_intake.py tests/test_company_economic_core.py tests/test_p1_1_evidence_root_admission.py tests/test_canonical_current_price.py tests/test_canonical_independent_forecast.py tests/test_decision_state_machine_v01.py tests/test_price_dependent_expectation_gap.py tests/test_p2_1_canonical_price_response.py tests/test_canonical_entry_evaluation.py tests/test_p2_3_real_300750_e2e.py
       - run: python -m pip install --disable-pip-version-check pytest jsonschema
-      - run: python -m pytest -q tests/test_mvp.py tests/test_value_core.py tests/test_investment_core_contract.py tests/test_investment_core_v03.py tests/test_market_model_domain.py tests/test_market_model_identification.py tests/test_market_implied_expectation.py tests/test_ratio_market_implied_expectation.py tests/test_dcf_ddm_conditional_market_implied_expectation.py tests/test_sotp_rnpv_market_implied_expectation.py tests/test_multi_model_market_implied_expectation_set.py tests/test_p4f_mie_snapshot.py tests/test_semantic_expectation_gap.py tests/test_core00_scope.py tests/test_research_intake.py tests/test_company_economic_core.py tests/test_p1_1_evidence_root_admission.py tests/test_canonical_current_price.py tests/test_canonical_independent_forecast.py tests/test_decision_state_machine_v01.py tests/test_price_dependent_expectation_gap.py tests/test_p2_1_canonical_price_response.py tests/test_canonical_entry_evaluation.py
+      - run: python -m pytest -q tests/test_mvp.py tests/test_value_core.py tests/test_investment_core_contract.py tests/test_investment_core_v03.py tests/test_market_model_domain.py tests/test_market_model_identification.py tests/test_market_implied_expectation.py tests/test_ratio_market_implied_expectation.py tests/test_dcf_ddm_conditional_market_implied_expectation.py tests/test_sotp_rnpv_market_implied_expectation.py tests/test_multi_model_market_implied_expectation_set.py tests/test_p4f_mie_snapshot.py tests/test_semantic_expectation_gap.py tests/test_core00_scope.py tests/test_research_intake.py tests/test_company_economic_core.py tests/test_p1_1_evidence_root_admission.py tests/test_canonical_current_price.py tests/test_canonical_independent_forecast.py tests/test_decision_state_machine_v01.py tests/test_price_dependent_expectation_gap.py tests/test_p2_1_canonical_price_response.py tests/test_canonical_entry_evaluation.py tests/test_p2_3_real_300750_e2e.py
       - run: |
           python -m json.tool schemas/investment_core_case_v0.2.schema.json >/dev/null
           python -m json.tool schemas/investment_core_case_v0.3.schema.json >/dev/null
@@ -75,6 +81,34 @@ jobs:
           python -m json.tool schemas/price_dependent_expectation_gap_v0.1.schema.json >/dev/null
           python -m json.tool schemas/p2_1_canonical_price_response_v0.1.schema.json >/dev/null
           python -m json.tool schemas/canonical_entry_evaluation_v0.1.schema.json >/dev/null
+      - run: |
+          rm -rf /tmp/p2-3-real-300750
+          PYTHONPATH=. python tools/p2_3_real_300750_e2e.py             --input examples/real_cases/RC-CN-A-300750-20261004_ratio_mie_input.json             --out /tmp/p2-3-real-300750/result.json
+          python - <<'PY'
+          import json
+          from decimal import Decimal
+          p = "/tmp/p2-3-real-300750/result.json"
+          x = json.load(open(p, encoding="utf-8"))
+          assert x["case_id"] == "RC-CN-A-300750-20261004"
+          assert x["core04c_receipt"]["status"] == "ADMITTED"
+          assert x["p3a"]["evaluation_status"] == "INFEASIBLE"
+          assert x["p3a"]["identifiability"] == "UNIDENTIFIABLE"
+          assert x["p4b"]["status"] == "BLOCKED"
+          assert x["p4f"]["resolution_state"] == "NO_FEASIBLE_MODEL"
+          assert x["p4f"]["replay_status"] == "PASS"
+          assert x["p2_1"]["status"] == "BLOCKED"
+          assert x["p2_2"]["canonical_entry_evaluation"]["status"] == "REVIEW_REQUIRED"
+          assert x["final_state"] == "REVIEW_REQUIRED"
+          assert x["capital_admitted"] is False
+          assert x["real_current_observation"]["price"] == "291.11"
+          assert Decimal(x["real_current_observation"]["ev_ebitda"]) < Decimal("8.38")
+          print("P2_3_REAL_300750_E2E_OK")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iios-p2-3-real-300750-e2e
+          path: /tmp/p2-3-real-300750/
+          retention-days: 14
       - run: PYTHONPATH=. python -m iios_mvp.cli run examples/iios_mvp_demo.json --out /tmp/iios-mvp
       - run: |
           snapshot=$(find /tmp/iios-mvp -maxdepth 1 -name '*.json' ! -name '*.series.json' ! -name '*.index.json' ! -name '*.decision.json' | head -n 1)
