@@ -254,6 +254,16 @@ def _serialize_metrics(metrics: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _serialize_nested(value: Any) -> Any:
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(k): _serialize_nested(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_serialize_nested(v) for v in value]
+    return value
+
+
 def _position(case: dict[str, Any]) -> Decimal:
     return _dec((case.get("portfolio") or {}).get("position_pct", "0"), "portfolio.position_pct")
 
@@ -778,8 +788,8 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "target_entry_price_v2_version": (
             P2_PRICE_GAP_REVALIDATION_VERSION if p2_target is not None else None
         ),
-        "target_entry_price_v2": p2_target,
-        "target_entry_price_gap_revalidation": p2_revalidation,
+        "target_entry_price_v2": _serialize_nested(p2_target),
+        "target_entry_price_gap_revalidation": _serialize_nested(p2_revalidation),
         "current_price": str(current_price) if current_price is not None else None,
         "decision_precedence_version": state["precedence_version"],
         "decision_precedence_rule_id": state["precedence_rule_id"],
