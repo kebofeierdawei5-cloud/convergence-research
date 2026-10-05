@@ -1,0 +1,48 @@
+{
+  "schema_version": "IIOS-COMPANY-EVIDENCE-MANIFEST-0.1",
+  "case_id": "RC-CN-A-300750-20261004",
+  "market": "CN-A",
+  "symbol": "300750",
+  "company": "宁德时代",
+  "cutoff_date": "2026-10-04T23:59:59+08:00",
+  "required_field_groups": [
+    "market_price"
+  ],
+  "evidence": [
+    {
+      "evidence_id": "E011",
+      "subject_id": "RC-CN-A-300750-20261004",
+      "field_id": "market_price.close.2026-09-30",
+      "claim_type": "OBSERVED_FACT",
+      "value": 291.11,
+      "unit": "CNY/share",
+      "currency": "CNY",
+      "observation_date": "2026-09-30",
+      "known_at": "2026-09-30",
+      "retrieved_at": "2026-10-05T02:29:16.861938+00:00",
+      "source_ref": "SZSE:MARKET_DATA",
+      "source_locator": "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-09-30&txtEndDate=2026-09-30&archiveDate=2026-10-01&random=0.20261005",
+      "artifact_id": "E002_SZSE_primary_2026-09-30.xlsx",
+      "content_sha256": "349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2",
+      "exact_bytes": true,
+      "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+      "status": "ADMITTED",
+      "quality_notes": [
+        "Official SZSE EOD snapshot; raw bytes retained outside the public repository.",
+        "Located row: worksheet 股票行情, row 2234; 300750 / 宁德时代 / 今收 291.11."
+      ],
+      "license_status": "UNKNOWN"
+    }
+  ],
+  "raw_artifacts": [
+    {
+      "evidence_id": "E011",
+      "relative_path": "E002_SZSE_primary_2026-09-30.xlsx",
+      "expected_size_bytes": 231394,
+      "expected_sha256": "349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2"
+    }
+  ],
+  "audit": {
+    "manifest_sha256": "662804bd3f882b2d0b8ce17a73195f2d75a84e668442dbd00348072d624d28a0"
+  }
+}
