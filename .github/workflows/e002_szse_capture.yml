@@ -1,0 +1,77 @@
+name: E002 SZSE Primary Market Data Capture
+
+on:
+  push:
+    branches: ["e002-szse-primary-capture-20261005"]
+    paths:
+      - ".github/workflows/e002_szse_capture.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Capture official SZSE historical market data
+        env:
+          ENDPOINT: "https://www.szse.cn/api/market/ssjjhq/getHistoryData?cycleType=32&marketId=1&code=300750"
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse
+          curl --fail --silent --show-error --location --retry 3 --retry-all-errors             -H 'Accept: application/json, text/plain, */*'             -H 'Referer: https://www.szse.cn/market/trend/index.html'             -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/154 Safari/537.36'             "$ENDPOINT"             --output evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse/raw_response.json
+          python - <<'PY'
+          import hashlib, json, pathlib, datetime
+          root = pathlib.Path("evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse")
+          raw = (root / "raw_response.json").read_bytes()
+          obj = json.loads(raw.decode("utf-8"))
+          rows = obj.get("data") if isinstance(obj, dict) else None
+          if not isinstance(rows, list):
+              raise SystemExit(f"unexpected SZSE response shape: {type(obj).__name__}")
+          target = next((row for row in rows if isinstance(row, list) and row and str(row[0]).startswith("2026-09-30")), None)
+          if target is None:
+              raise SystemExit("2026-09-30 row not found in official SZSE response")
+          if len(target) < 3 or str(target[2]) != "291.11":
+              raise SystemExit(f"close mismatch for 2026-09-30: {target!r}")
+          receipt = {
+              "status": "PASS",
+              "source_ref": "SZSE:MARKET_DATA",
+              "source_url": "https://www.szse.cn/api/market/ssjjhq/getHistoryData?cycleType=32&marketId=1&code=300750",
+              "referer": "https://www.szse.cn/market/trend/index.html",
+              "http_method": "GET",
+              "retrieved_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "target": {
+                  "symbol": "300750",
+                  "observation_date": "2026-09-30",
+                  "close": target[2],
+                  "row": target
+              },
+              "capture": {
+                  "filename": "raw_response.json",
+                  "size_bytes": len(raw),
+                  "sha256": hashlib.sha256(raw).hexdigest()
+              },
+              "github_run": {
+                  "repository": "${{ github.repository }}",
+                  "run_id": "${{ github.run_id }}",
+                  "commit_sha": "${{ github.sha }}"
+              }
+          }
+          (root / "E002_primary_szse_receipt.json").write_text(
+              json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(receipt, ensure_ascii=False, indent=2))
+          PY
+      - name: Commit captured evidence to branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse
+          git commit -m "evidence: capture E002 2026-09-30 SZSE primary market data"
+          git push origin HEAD:e002-szse-primary-capture-20261005
