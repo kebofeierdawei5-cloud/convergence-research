@@ -25,12 +25,13 @@ CORE-04 Production Decision Kernel = PASS / MERGED
         ↓
 CORE-04 × 300750 Final Decision Chain = PASS / REVIEW_REQUIRED / NO NEW CAPITAL
         ↓
-A0 Governance / State Cleanup = IN EXECUTION
+A0 Governance / State Cleanup = PASS / MERGED
         ↓
 A1 Company-side Evidence Closure = NEXT
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
+A0 acceptance: `docs/iios/A0_ACCEPTANCE_2026-10-05.md`.
 
 ## 2. Investment Core capability boundary
 
