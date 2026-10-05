@@ -149,7 +149,7 @@
       "known_at": "2026-07-24",
       "retrieved_at": "2026-10-04T00:00:00+08:00",
       "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
-      "artifact_id": "catl-20261004-E010-working-capital-h1_2026.txt",
+      "artifact_id": "catl-20261004-E010-working-capital-h1-2026.txt",
       "content_sha256": "ecf6e30e7f560e706bafd422af19308e1b8023b392d76f0b7f0028bd30ec7cca",
       "exact_bytes": true,
       "provenance_class": "SOURCE_VINTAGE_VERIFIED",
@@ -219,6 +219,6 @@
     }
   ],
   "audit": {
-    "manifest_sha256": "2cf56e40c41e065ee6da521626c540e76e4aabe3c694751f0c97be8faf68bcc6"
+    "manifest_sha256": "0d5885854ed8faf3f2188c9739fab40bd079db1181d53d35b428f1f52b27b51c"
   }
 }
