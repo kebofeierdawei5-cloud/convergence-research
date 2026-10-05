@@ -183,6 +183,17 @@ def _statement_section(text: str, start_marker: str, end_marker: str) -> str:
     return text[start:end if end >= 0 else len(text)]
 
 
+def _balance_sheet_section(text: str) -> str:
+    start = text.find("2、合并资产负债表")
+    if start < 0:
+        start = text.find("合并资产负债表")
+    if start < 0:
+        raise ValueError("consolidated balance-sheet section not found")
+
+    end = text.find("3、合并利润表", start + 1)
+    return text[start:end if end >= 0 else len(text)]
+
+
 def parse_balance_sheet(
     path: Path,
     *,
