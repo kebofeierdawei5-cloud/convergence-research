@@ -30,7 +30,7 @@ jobs:
       - name: Capture, parse and admit PIT EV/EBITDA
         run: |
           rm -rf /tmp/core04c
-          mkdir -p /tmp/core04c/raw
+          mkdir -p /tmp/core04c/raw /tmp/core04c/out
           PYTHONPATH=. python tools/core04c_ev_ebitda.py \
             --download \
             --source-dir /tmp/core04c/raw \
