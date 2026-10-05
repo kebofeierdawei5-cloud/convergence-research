@@ -23,7 +23,7 @@ on:
       - "tests/test_p1_1_evidence_root_admission.py"
       - "tests/test_canonical_current_price.py"
       - "tests/test_canonical_independent_forecast.py"
-      - "tests/test_decision_state_machine_v01.py"
+      - "tests/test_decision_state_machine_v01.py tests/test_decision_kernel_v03.py"
       - "tests/test_price_dependent_expectation_gap.py"
       - "tests/test_p2_1_canonical_price_response.py"
       - "tests/test_canonical_entry_evaluation.py"
