@@ -181,6 +181,8 @@ class ModelFit:
     diagnostics: tuple[FitDiagnostic, ...]
     evidence_ids: tuple[str, ...]
     constraints: tuple[str, ...] = ()
+    historical_support: HistoricalSupportState = HistoricalSupportState.UNKNOWN
+    regime_interpretation: RegimeInterpretationState = RegimeInterpretationState.NOT_ASSESSED
 
     def validate(self) -> None:
         if not self.model_id:
