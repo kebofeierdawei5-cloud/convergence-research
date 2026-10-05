@@ -347,7 +347,6 @@
         "cutoff_date",
         "mie_snapshot_hash",
         "market_expectation_id",
-        "comparison_direction",
         "independent_expectation"
       ],
       "properties": {
