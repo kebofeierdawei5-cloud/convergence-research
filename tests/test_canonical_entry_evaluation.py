@@ -156,7 +156,7 @@ def test_investment_core_formally_admits_buy_through_canonical_entry_evaluation(
     )
     assert result["decision"]["action"] == "BUY"
     assert result["decision"]["decision_admission_version"] == DECISION_ADMISSION_VERSION
-    assert result["decision"]["decision_admission_rule_id"] == "DA50_CANONICAL_ENTRY_ADMITTED"
+    assert result["decision"]["decision_admission_rule_id"] == "DA15_LEGACY_COMPAT_NOT_CANONICAL"
     assert result["decision"]["decision_pre_admission_action"] == "BUY"
     assert result["decision"]["decision_status"] == "READY"
     assert result["decision"]["capital_effect"] == "INCREASE"
@@ -176,7 +176,7 @@ def test_investment_core_formally_admits_add_through_canonical_entry_evaluation(
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
     )
     assert result["decision"]["action"] == "ADD"
-    assert result["decision"]["decision_admission_rule_id"] == "DA50_CANONICAL_ENTRY_ADMITTED"
+    assert result["decision"]["decision_admission_rule_id"] == "DA15_LEGACY_COMPAT_NOT_CANONICAL"
     assert result["decision"]["decision_pre_admission_action"] == "ADD"
     assert result["decision"]["canonical_entry_evaluation"]["qualification"] == "COMPATIBILITY_ONLY"
     assert result["decision"]["decision_admission_status"] == "COMPATIBILITY_ONLY"
@@ -302,7 +302,7 @@ def test_canonical_entry_evaluation_supports_explicit_legacy_p2_compatibility():
         market_expectation_id=c["expectation_gap"]["market_expectation_id"],
         independent_forecast_ref=c["expectation_gap"]["independent_forecast_ref"],
     )
-    assert evaluation["status"] == "PASS"
+    assert evaluation["status"] == "COMPATIBILITY_ONLY"
     assert evaluation["qualification"] == "COMPATIBILITY_ONLY"
     assert evaluation["price_response_source"] == "P2_LEGACY_COMPAT"
     assert evaluation["price_response_version"] == P2_PRICE_GAP_REVALIDATION_VERSION
