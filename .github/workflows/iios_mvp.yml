@@ -71,6 +71,8 @@ jobs:
           python -m json.tool schemas/investment_core_case_v0.3.schema.json >/dev/null
           python -m json.tool schemas/market_model_domain_v0.2.schema.json >/dev/null
           python -m json.tool schemas/market_model_identification_v0.2.schema.json >/dev/null
+          python -m json.tool schemas/market_model_identification_v0.3.schema.json >/dev/null
+          python -m json.tool schemas/market_model_domain_v0.3.schema.json >/dev/null
           python -m json.tool schemas/market_implied_expectation_v0.2.schema.json >/dev/null
           python -m json.tool schemas/market_implied_expectation_set_v0.2.schema.json >/dev/null
           python -m json.tool schemas/p4f_mie_snapshot_v0.2.schema.json >/dev/null
@@ -91,8 +93,11 @@ jobs:
           x = json.load(open(p, encoding="utf-8"))
           assert x["case_id"] == "RC-CN-A-300750-20261004"
           assert x["core04c_receipt"]["status"] == "ADMITTED"
-          assert x["p3a"]["evaluation_status"] == "INFEASIBLE"
+          assert x["p3a"]["evaluation_status"] == "OUTSIDE_HISTORICAL_SUPPORT"
           assert x["p3a"]["identifiability"] == "UNIDENTIFIABLE"
+          assert x["p3a"]["historical_support"] == "BELOW_HISTORICAL_RANGE"
+          assert x["p3a"]["regime_interpretation"] == "POSSIBLE_REGIME_SHIFT"
+          assert x["p3a"]["stability_scope"] == "IDENTIFICATION_ONLY"
           assert x["p4b"]["status"] == "BLOCKED"
           assert x["p4f"]["resolution_state"] == "NO_FEASIBLE_MODEL"
           assert x["p4f"]["replay_status"] == "PASS"
