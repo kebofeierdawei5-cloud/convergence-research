@@ -1,8 +1,10 @@
 # IIOS Project State Index
 
+State classification: **CANONICAL**
 Snapshot: 2026-10-05
+Authority: this file is the **only canonical Current State Index**.
 
-## Current canonical engineering state
+## 1. Canonical state
 
 ```
 G2 R10 Reference Governance Runtime = FROZEN
@@ -11,100 +13,171 @@ B0 Repair = PASS
         ↓
 B1 Investment Semantics v0.3 = PASS / FROZEN
         ↓
-P3/P4 Market Implied Expectation Infrastructure = FINAL PASS / CONDITIONAL
+CORE-00 = PASS / MERGED
         ↓
-CORE-00 Scope Reset & Architecture Reconciliation = PASS / MERGED
-        ↓
-CORE-01 Single Company Research Intake = PASS / MERGED
+CORE-01 = PASS / MERGED
         ↓
 CORE-02 Company Economic Core = PASS / MERGED
         ↓
-CORE-03 Real 300750 Vertical Slice = PASS / MERGED
+CORE-03 Real 300750 = PASS / MERGED
         ↓
-CORE-04 Production Decision Kernel = MERGED / VERTICAL E2E PASS
+CORE-04 Production Decision Kernel = PASS / MERGED
         ↓
 CORE-04 × 300750 Final Decision Chain = PASS / REVIEW_REQUIRED / NO NEW CAPITAL
         ↓
-B2-A Single Company Evidence / PIT Foundation = PASS / MERGED
+A0 Governance / State Cleanup = IN EXECUTION
         ↓
-B2-A Scope Repair = PASS / MERGED
-        ↓
-CATL Existing Evidence Migration / Admission = PASS / TECHNICAL
-        ↓
-CATL Primary-Source Gap Supplementation = ACTIVE
+A1 Company-side Evidence Closure = NEXT
 ```
 
-## Authority / continuity
+Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
 
-1. Git repository `main`: source, contracts, tests, ADRs, changelog, state indexes.
-2. Frozen governance artifact identity + evidence: `governance/g2-r10-reference/`.
-3. Investment Core contract: `docs/iios/IIOS_INVESTMENT_CORE_CONTRACT_v0.3.md`.
-4. CORE-00 scope authority: `docs/iios/CORE_00_SCOPE_RECONCILIATION_v0.1.md`.
-5. Research-control artifacts: `research/`.
-6. Chat history is context only, not authoritative project state.
+## 2. Investment Core capability boundary
 
-## Immutable boundary
+```
+user-selected company + cutoff
+→ admitted PIT evidence
+→ Reality / Trust / Quality / Value Drivers / Thesis
+→ Primary Valuation
+→ Independent Forecast
+→ Return / Required Return
+→ Risk / Portfolio
+→ Optional MIE
+→ Decision
+```
 
-G2 frozen bytes remain immutable. B2 v0.1 evidence/PIT artifacts remain historical engineering artifacts and are not rewritten by CORE-00.
+The core decision boundary is implemented and has a real CATL/300750 E2E.
 
-## Investment Core boundary
-
-Investment Core begins with a user-selected security and cutoff.
-
-Required research infrastructure:
-
-- Single-company evidence/PIT;
-- company reality / quality / value core;
-- independent forecast;
-- valuation;
-- risk / portfolio constraints;
-- decision semantics.
-
-Not required as an Investment Core entry/completion gate:
+Not an Investment Core entry/completion gate:
 
 - CSI800 historical membership;
 - CSI Industry historical classification;
 - full-market historical universe;
 - PIT Security Master for universe construction;
-- FINANCIAL / NON_FINANCIAL universe filtering.
+- FM forecast research capability.
 
-## Research Track boundary
+Those remain separate Research Track capabilities.
 
-A02/CSI historical-universe reconstruction and FM forecast research remain valid independent workstreams.
+## 3. CORE-04 / 300750 canonical result
 
-A02 admission status:
+Case: `RC-CN-A-300750-20261004`
+
+- current PIT price: 291.11 CNY/share;
+- Reality: PASS;
+- Quality Gate: CONDITIONAL;
+- Value Driver: PASS;
+- Primary Valuation: PASS;
+- Independent Forecast: PASS;
+- Thesis Admission: ADMITTED;
+- Thesis: INTACT;
+- Trust: REVALIDATION;
+- H: 3Y with explicit Horizon Override;
+- MIE: OPTIONAL_EXPLANATORY and absent;
+- Expected Annualized Return: about 14.20%;
+- Required Return: 10%;
+- Risk: PASS;
+- final action: REVIEW_REQUIRED;
+- new capital: FALSE.
+
+This is an accepted system result, not a claim that the security should be bought.
+
+## 4. Current blockers
+
+### A1 — Company-side Evidence Closure
+
+Primary unresolved company-side gate:
+
+- incremental ROIC evidence;
+- earnings → OCF → FCF conversion;
+- CAPEX → D&A → FCF bridge;
+- working-capital normalization;
+- fuller Trust / governance revalidation.
+
+Quality remains CONDITIONAL until evidence supports a stronger state.
+
+### Productization
+
+The current Investment Core still needs production lifecycle work:
+
+- Decision Revision state transitions;
+- Human Approval / Current Projection;
+- Trigger lifecycle;
+- Monitoring / Validation;
+- Machine Publication;
+- Human Report / Report Quality Gate;
+- second-company acceptance;
+- final independent red-team.
+
+## 5. State classification
+
+### CANONICAL
+
+Only current accepted state on `main` is authoritative.
+
+Examples:
+- this file;
+- current `STATUS.md`;
+- production code / schemas / tests on `main`;
+- accepted milestone records explicitly referenced from this index.
+
+### HISTORICAL
+
+Immutable past-state material. It explains history but cannot define current capability.
+
+Known historical/superseded state records include:
+
+- `docs/iios/STATE_RECONCILIATION_2026-10-04.md`;
+- `docs/iios/IIOS_CURRENT_STATE_INDEX.md`;
+- `docs/iios/IIOS_CONSOLIDATED_POST_REDTEAM_DEVELOPMENT_PLAN_2026-10-04.md`;
+- pre-adjudication B1 proposal documents.
+
+### DIAGNOSTIC
+
+Non-authoritative experiments, probes, unmerged work and temporary validation artifacts.
+
+No diagnostic branch or PR is a current capability until merged to `main`.
+
+## 6. New-development gate
+
+Every new batch MUST begin from:
 
 ```
-BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
+canonical main
+    +
+docs/PROJECT_STATE_INDEX.md
 ```
 
-## Current development task
+Then:
 
-CORE-04 × 300750 final vertical decision-chain closure.
+1. verify current main SHA;
+2. verify the target batch is not already merged;
+3. read the relevant normative contract;
+4. create a fresh branch from current main;
+5. keep the PR scope inside the declared batch;
+6. merge only after CI evidence passes.
 
-- PR #69 P3-A-RA is MERGED into canonical `main` as `da6964ee6dd5a50b8696a46132448c205c463726`.
-- CORE-04 production-kernel work is now refreshed on top of that canonical main.
-- B1 v0.3 MIE semantics are consumed as `OPTIONAL_EXPLANATORY` in the new kernel.
-- Legacy MIE-mandatory decision behavior remains compatibility-only.
-- Target entry price is return/risk-first; MIE revalidation is an optional refinement when a qualified MIE reference exists.
+Never continue from a stale branch merely because it contains previous work.
 
-## CORE-03 Real 300750 acceptance
+## 7. Authority precedence
 
-- PR #31 merged; merge commit `e0662bb4efa5bfc40478240a0d9ef4bbcadb658a`.
-- CORE-03 CI run #7 / `37210940680`: SUCCESS.
-- Real forecast 2027-2029: independent bottom-up scenario package, no FM01 production router.
-- DCF: Bear/Base/Bull ~258.32 / 418.49 / 638.97 CNY per share; probability-weighted ~433.57; expected 3-year CAGR ~14.20% at 291.11 CNY.
-- P4-F: BLOCKED / INSUFFICIENT_EVIDENCE with replay PASS.
-- Expectation Gap: BLOCKED; intrinsic upside is not substituted.
-- Next sub-gate: acquire PIT market-model observations for this single company.
+```
+canonical main
+    >
+Current State Index
+    >
+normative contracts / schemas / production tests
+    >
+independent CI evidence
+    >
+historical records
+    >
+chat context
+```
 
+A diagnostic or historical record can identify a problem, but cannot promote itself into capability.
 
-## CORE-04 Decision Semantics Reconciliation
+## 8. Current next batch
 
-- B1 v0.3 MIE role is frozen as OPTIONAL_EXPLANATORY for BUY/ADD.
-- Missing / UNKNOWN / BLOCKED / AMBIGUOUS MIE does not by itself veto a company-side BUY/ADD opportunity.
-- Return/risk target-entry price is valid without mandatory MIE revalidation; qualified MIE may refine it when present.
-- Production kernel: `iios_mvp/decision_kernel_v03.py`.
-- Governance record: `docs/iios/CORE_04_DECISION_SEMANTICS_RECONCILIATION_v0.1.md`.
-- PR #70 is the current CORE-04 merge candidate; CI #450 and CORE-00 #187 PASS at HEAD `7d86d5595865ee90538e5260167db99d8`; PR remains not merged.
-- PR #69 P3-A-RA is merged and is now the canonical upstream P3/P4 semantic base.
+**A1 Company-side Evidence Closure**
+
+A0 does not add new investment capability. A1 is the next substantive Investment Core batch.
