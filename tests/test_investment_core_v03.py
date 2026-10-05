@@ -156,20 +156,27 @@ def test_v03_current_price_mismatch_blocks_decision():
     assert any("V03-CURRENT-PRICE-BIND" in x for x in result["validation"]["blockers"])
 
 
-def test_v03_missing_expectation_gap_blocks_decision():
+def test_v03_missing_expectation_gap_blocks_new_capital_decision():
     c = case()
     del c["expectation_gap"]
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
-    assert any("V03-EXPECTATION-GAP-REQUIRED" in x for x in result["validation"]["blockers"])
+    assert result["decision"]["primary_reason"] == "POSITIVE_EXPECTATION_GAP_UNRESOLVED"
+    assert result["validation"]["status"] == "PASS"
 
 
 def test_v03_blocked_expectation_gap_requires_review_for_new_position():
     c = case()
-    c["expectation_gap"] = {
+    c["expectation_gap"].update({
         "status": "BLOCKED",
-        "gap_relative": "0",
-    }
+        "gap_relative": None,
+        "gap_absolute": None,
+        "market_expectation": {
+            **c["expectation_gap"]["market_expectation"],
+            "qualification": "BLOCKED",
+            "resolution_state": "INSUFFICIENT_EVIDENCE",
+        },
+    })
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
 
@@ -194,10 +201,11 @@ def test_v03_missing_expectation_gap_does_not_block_thesis_broken_exit():
 
 def test_v03_negative_expectation_gap_is_no_buy():
     c = case()
-    c["expectation_gap"] = {
-        "status": "PASS",
-        "gap_relative": "-0.05",
-    }
+    c["expectation_gap"]["independent_expectation"]["value"] = "0.10"
+    c["expectation_gap"]["independent_expectation"]["basis"] = "2026A_to_2028E"
+    c["expectation_gap"]["market_expectation"]["basis"] = "2026A_to_2028E"
+    c["expectation_gap"]["gap_relative"] = "-0.3333333333333333333333333333"
+    c["expectation_gap"]["gap_absolute"] = "-0.05"
     result = decide(c)
     assert result["decision"]["action"] == "NO-BUY"
     assert result["decision"]["primary_reason"] == "NO_POSITIVE_EXPECTATION_GAP"
@@ -394,6 +402,7 @@ def test_v03_jsonschema_rejects_incomplete_buy_add_package():
 
 def test_v03_default_horizon_is_one_year_and_not_an_implicit_three_year():
     c = case()
+    del c["expectation_gap"]
     c["return_gate"]["horizon_years"] = "1"
     c["return_gate"]["horizon_override"] = False
     c["return_gate"]["horizon_override_basis"] = []
@@ -406,6 +415,7 @@ def test_v03_default_horizon_is_one_year_and_not_an_implicit_three_year():
 
 def test_v03_three_year_requires_explicit_override_and_qualifying_basis():
     c = case()
+    del c["expectation_gap"]
     c["return_gate"]["horizon_years"] = "3"
     c["return_gate"]["horizon_override"] = True
     c["return_gate"]["horizon_override_basis"] = [
