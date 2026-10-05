@@ -78,7 +78,7 @@
     },
     "stability": {
       "type": "object",
-      "required":["state","assessment_method","observations","evidence_ids","rationale"],
+      "required":["state","assessment_method","observations","evidence_ids","rationale","assessment_scope"],
       "properties": {
         "state":{"type":"string","enum":["STABLE","UNSTABLE","INSUFFICIENT_EVIDENCE"]},
         "assessment_method":{"type":"string","minLength":1},
