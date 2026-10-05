@@ -1,0 +1,171 @@
+{
+  "schema_version": "IIOS-CORE04C-EV-EBITDA-ADMISSION-RECEIPT-0.1",
+  "case_id": "RC-CN-A-300750-20261004",
+  "cutoff_date": "2026-10-04",
+  "status": "ADMITTED",
+  "model_family": "ev_ebitda",
+  "observation_basis": "PIT_LATEST_AVAILABLE_OR_TTM_WHERE_DISCLOSABLE",
+  "ci_run_id": 37261504704,
+  "ci_job_id": 111609522344,
+  "artifact_id": 11324627858,
+  "artifact_sha256": "00ca7f00bcf98153d31cbd4be036cb23626c52d3d3d9138d01e83d1f66109037",
+  "derivation_sha256": "ed476c7f2613c80ac67ab4e6a996c0737bb4ef15b4caf89f42f72ba9edb88e6e",
+  "admission_sha256": "743d999cca969170210df1c03fedc10cce3c1cc829795d59b798715f2ba6762b",
+  "source_receipt": [
+    {
+      "source_id": "SZSE-MKT-2026-07-27",
+      "role": "MARKET_PRICE_SNAPSHOT",
+      "observation_date": "2026-07-27",
+      "known_at": "2026-07-27T07:00:00+00:00",
+      "filename": "SZSE-MKT-2026-07-27.xlsx",
+      "size_bytes": 229585,
+      "sha256": "9276a39dbedc7025e9b081f254ac8666a6443fbc3d33574ec1273c00ff394cf5",
+      "exact_bytes": true
+    },
+    {
+      "source_id": "CNINFO-H1-2026",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2026-06-30",
+      "known_at": "2026-07-24T08:00:00+00:00",
+      "filename": "CNINFO-H1-2026.pdf",
+      "size_bytes": 1374568,
+      "sha256": "aa40daf911df40f56900dc5060dd7debe05a4fea43cd533474039a408e3b5aabcc",
+      "exact_bytes": true
+    },
+    {
+      "source_id": "SZSE-MKT-2026-04-17",
+      "role": "MARKET_PRICE_SNAPSHOT",
+      "observation_date": "2026-04-17",
+      "known_at": "2026-04-17T07:00:00+00:00",
+      "filename": "SZSE-MKT-2026-04-17.xlsx",
+      "size_bytes": 231969,
+      "sha256": "ff2f1a2c923c00a432a58c1b818dd82f520bd6652bc1a1618df47d4229054fed",
+      "exact_bytes": true
+    },
+    {
+      "source_id": "CNINFO-Q1-2026",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2026-03-31",
+      "known_at": "2026-04-16T08:00:00+00:00",
+      "filename": "CNINFO-Q1-2026.pdf",
+      "size_bytes": 537170,
+      "sha256": "32e4936e6dd68a89741a8167b4c4ae3f8b4bc7ef61d70f35b294e1cb0e46fbe8",
+      "exact_bytes": true
+    },
+    {
+      "source_id": "SZSE-MKT-2025-10-22",
+      "role": "MARKET_PRICE_SNAPSHOT",
+      "observation_date": "2025-10-22",
+      "known_at": "2025-10-22T07:00:00+00:00",
+      "filename": "SZSE-MKT-2025-10-22.xlsx",
+      "size_bytes": 230181,
+      "sha256": "2cdef106112dd3d2206ce2d91daa28583070d05bf173dbb53ca870570630af30",
+      "exact_bytes": true
+    },
+    {
+      "source_id": "CNINFO-Q3-2025",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2025-09-30",
+      "known_at": "2025-10-21T08:00:00+00:00",
+      "filename": "CNINFO-Q3-2025.pdf",
+      "size_bytes": 351045,
+      "sha256": "d099bc0054f4bf8624d34fffa2c82399b7d8e31cce8f84aab909955da9d84f50",
+      "exact_bytes": true
+    },
+    {
+      "source_id": "CNINFO-ANNUAL-2025",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2025-12-31",
+      "known_at": "2026-03-10T08:00:00+00:00",
+      "filename": "CNINFO-ANNUAL-2025.pdf",
+      "size_bytes": 2043710,
+      "sha256": "c15272977147dee7e6935a38ea0e4fd6855370aabb106f54cfe20f7cf6048ec9",
+      "exact_bytes": true
+    },
+    {
+      "source_id": "CNINFO-ANNUAL-2024",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2024-12-31",
+      "known_at": "2025-03-15T08:00:00+00:00",
+      "filename": "CNINFO-ANNUAL-2024.pdf",
+      "size_bytes": 2070073,
+      "sha256": "b4f1713d7b821eb076c102711d177fe942ccc2bc8dd171ae5d7a95799a65b0ad",
+      "exact_bytes": true
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "300750-ev-ebitda-2026-07-27",
+      "observation_date": "2026-07-27",
+      "price_cny_per_share": "400.00",
+      "shares_outstanding": "4626651000",
+      "market_cap_cny": "1850660400000.00",
+      "net_debt_cny": "-291182555000",
+      "enterprise_value_cny": "1559477845000.00",
+      "ebitda_cny": "139451341000",
+      "ebitda_basis": "TTM_EBITDA_H1_2026",
+      "ev_ebitda": "11.18295337869859566284127737",
+      "market_source_id": "SZSE-MKT-2026-07-27",
+      "balance_source_id": "CNINFO-H1-2026",
+      "ebitda_source_id": "CNINFO-H1-2026"
+    },
+    {
+      "observation_id": "300750-ev-ebitda-2026-04-17",
+      "observation_date": "2026-04-17",
+      "price_cny_per_share": "444.20",
+      "shares_outstanding": "4564063000",
+      "market_cap_cny": "2027356784600.00",
+      "net_debt_cny": "-285865524000",
+      "enterprise_value_cny": "1741491260600.00",
+      "ebitda_cny": "119197217000",
+      "ebitda_basis": "FY2025_EBITDA_LATEST_PIT",
+      "ev_ebitda": "14.61016711992529154434872418",
+      "market_source_id": "SZSE-MKT-2026-04-17",
+      "balance_source_id": "CNINFO-Q1-2026",
+      "ebitda_source_id": "CNINFO-ANNUAL-2025"
+    },
+    {
+      "observation_id": "300750-ev-ebitda-2025-10-22",
+      "observation_date": "2025-10-22",
+      "price_cny_per_share": "372.86",
+      "shares_outstanding": "4562854000",
+      "market_cap_cny": "1701305742440.00",
+      "net_debt_cny": "-238640390000",
+      "enterprise_value_cny": "1462665352440.00",
+      "ebitda_cny": "91999043000",
+      "ebitda_basis": "FY2024_EBITDA_LATEST_PIT",
+      "ev_ebitda": "15.89870182062654716962653622",
+      "market_source_id": "SZSE-MKT-2025-10-22",
+      "balance_source_id": "CNINFO-Q3-2025",
+      "ebitda_source_id": "CNINFO-ANNUAL-2024"
+    }
+  ],
+  "typed_admissions": [
+    {
+      "observation_id": "300750-ev-ebitda-2026-07-27",
+      "status": "ADMITTED",
+      "evidence_count": 4
+    },
+    {
+      "observation_id": "300750-ev-ebitda-2026-04-17",
+      "status": "ADMITTED",
+      "evidence_count": 4
+    },
+    {
+      "observation_id": "300750-ev-ebitda-2025-10-22",
+      "status": "ADMITTED",
+      "evidence_count": 4
+    }
+  ],
+  "acceptance_checks": {
+    "live_ci": "PASS",
+    "unit_tests": "8 passed",
+    "source_capture_count": 8,
+    "raw_bytes_rehashed_before_success": true,
+    "runtime_pit_order_check": true,
+    "typed_market_evidence_admission": true,
+    "json_reverification": true,
+    "ev_bridge_arithmetic": true,
+    "ev_ebitda_arithmetic": true
+  }
+}
