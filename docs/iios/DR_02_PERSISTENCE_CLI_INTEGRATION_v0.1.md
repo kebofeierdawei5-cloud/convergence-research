@@ -1,7 +1,7 @@
 # DR-02 — Persistence + CLI Integration v0.1
 
 Date: 2026-10-05
-Status: IMPLEMENTATION TARGET
+Status: ACCEPTED / CANONICAL
 
 ## Objective
 
@@ -63,4 +63,20 @@ The canonical CLI lifecycle is:
 
 ## Acceptance
 
-DR-02 is accepted only when dedicated persistence/CLI regressions and replay tests pass, canonical v0.3 behavior remains intact, and no historical lifecycle artifact becomes current authority.
+Canonical implementation is merged in PR #87, merge commit a4e493cc0c7f45647a02dd587f89fb7d98ee22e2.
+
+Accepted production behavior:
+- store.py delegates revision / approval / current projection semantics to DR-01 canonical contract;
+- revision index is advanced by write_decision_revision, not by CLI;
+- immutable canonical revision artifacts are persisted;
+- approval artifacts are immutable and exact-snapshot/revision bound;
+- rejected or older approvals do not replace current;
+- current projection is hash-protected and monotonic;
+- lifecycle replay verifies every historical revision against its snapshot;
+- CLI exposes lifecycle-replay.
+
+The available GitHub workflow connector did not expose a runtime result for PR #87 or the merge commit. Therefore CI telemetry is recorded as UNOBSERVED rather than claimed as PASS.
+
+Static canonical-main verification after merge confirmed all DR-02 production surfaces are present and the scope contains no Decision Precedence, valuation, forecast, P3/P4 or MIE change.
+
+**Canonical acceptance decision: DR-02 = MERGED / IMPLEMENTATION COMPLETE; CI telemetry = UNOBSERVED.**
