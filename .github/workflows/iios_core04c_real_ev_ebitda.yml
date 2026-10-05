@@ -5,6 +5,7 @@ on:
     paths:
       - "research/core04c_catl_sources_v0.2.json"
       - "tools/core04c_catl_ev_ebitda.py"
+      - "tools/core04c_fetch_and_parse.py"
       - "tests/test_core04c_catl_ev_ebitda.py"
       - "docs/iios/CORE_04C_CATL_EV_EBITDA_ACCEPTANCE_2026-10-05.md"
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - "research/core04c_catl_sources_v0.2.json"
       - "tools/core04c_catl_ev_ebitda.py"
+      - "tools/core04c_fetch_and_parse.py"
       - "tests/test_core04c_catl_ev_ebitda.py"
       - "docs/iios/CORE_04C_CATL_EV_EBITDA_ACCEPTANCE_2026-10-05.md"
 
@@ -31,3 +33,28 @@ jobs:
       - run: python -m pytest -q tests/test_core04c_catl_ev_ebitda.py
       - run: |
           python tools/core04c_fetch_and_parse.py             --manifest research/core04c_catl_sources_v0.2.json             --out /tmp/core04c/final
+      - run: |
+          python - <<'PY'
+          import json
+          from decimal import Decimal
+          from pathlib import Path
+          p = Path("/tmp/core04c/final/core04c_catl_ev_ebitda_observations.json")
+          x = json.loads(p.read_text())
+          assert x["status"] == "PASS / HISTORICAL OBSERVATIONS ADMITTED"
+          assert len(x["observations"]) == 3
+          expected = {
+              "CATL-EVEBITDA-2025-10-22": Decimal("16.38545137301047794594993776185258796659"),
+              "CATL-EVEBITDA-2026-04-17": Decimal("15.13029795485913064564250690517380116350"),
+              "CATL-EVEBITDA-2026-07-27": Decimal("13.66869208531940808651597964741072771858"),
+          }
+          for row in x["observations"]:
+              assert row["admission_status"] == "ADMITTED"
+              assert Decimal(row["ev_ebitda"]) == expected[row["observation_id"]]
+              assert row["source_hashes"]
+          print("CORE04C_REAL_EV_EBITDA_OK")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iios-core04c-catl-ev-ebitda-evidence
+          path: /tmp/core04c/final/
+          retention-days: 14
