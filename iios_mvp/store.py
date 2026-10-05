@@ -291,17 +291,21 @@ def replay_decision_lifecycle(
     series_prefix = revision["decision_series_id"] + "-r"
     revision_files = sorted(
         store_root(root).glob(f"{series_prefix}*.decision.json"),
-        key=lambda p: int(p.stem.rsplit("-r", 1)[1]),
+        key=lambda p: int(
+            p.name.removesuffix(".decision.json").rsplit("-r", 1)[1]
+        ),
     )
     if not revision_files:
         raise ValueError("decision revision history is empty")
     records = []
     for path in revision_files:
         record = _load_json(path)
+        if record["case_id"] != revision["case_id"]:
+            raise ValueError("decision revision history contains a different case_id")
         validate_decision_revision(
             record,
-            case_id=revision["case_id"],
-            cutoff_date=revision["cutoff_date"],
+            case_id=record["case_id"],
+            cutoff_date=record["cutoff_date"],
         )
         historical_snapshot = read_snapshot(
             snapshot_path(root, record["snapshot_hash"])
