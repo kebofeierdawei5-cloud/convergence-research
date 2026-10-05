@@ -160,7 +160,6 @@ def case() -> dict:
             "cutoff_date": "2026-10-04",
             "mie_snapshot_hash": market_implied_expectation_snapshot()["snapshot_hash"],
             "market_expectation_id": "mie-pe-1",
-            "comparison_direction": "HIGHER_IS_BETTER",
             "independent_expectation": {
                 "variable_id": "forward_eps",
                 "value": "12",
@@ -343,6 +342,14 @@ def test_v03_mie_id_tampering_fails_closed():
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("market_expectation_id" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_gap_cannot_override_canonical_mie_comparison_direction():
+    c = case()
+    c["expectation_gap"]["comparison_direction"] = "LOWER_IS_BETTER"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("unsupported fields" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_inline_market_expectation_is_rejected_by_canonical_boundary():
