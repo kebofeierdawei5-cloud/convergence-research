@@ -1,7 +1,7 @@
 # IIOS B1 — Decision Semantics ADR v0.3
 
 Date: 2026-10-04
-Status: PROPOSED FOR OWNER ADJUDICATION
+Status: FROZEN — IMPLEMENTED IN CORE-04
 Scope: Decision actions, Trust, Investability, Portfolio Constraint, Unknown and MIE role
 Parent: B1 Return Semantics v0.3
 
@@ -61,9 +61,11 @@ Portfolio BLOCKED prevents new allocation. A hard exposure breach can trigger RE
 
 ## 7. MIE role in v0.3
 
-Market Implied Expectation is explanatory market-side infrastructure, not a universal BUY gate.
+Market Implied Expectation is explanatory market-side infrastructure, not a universal BUY/ADD gate.
 
-MIE may strengthen, weaken or explain the investment thesis when it is qualified. Its absence or ambiguity does not automatically veto a direct company-side opportunity.
+MIE may strengthen, weaken or explain the investment thesis when it is qualified. Its absence, UNKNOWN, BLOCKED or AMBIGUOUS state does not automatically veto a direct company-side opportunity.
+
+A verified material contradiction MAY affect a decision only through an explicit versioned policy rule. CORE-04 v0.1 does not invent a contradiction threshold and therefore does not silently convert a non-positive/advisory gap into a veto.
 
 MIE must still obey provenance, PIT and semantic compatibility when present.
 
@@ -144,6 +146,6 @@ B1 Decision Semantics passes only when:
 
 ## 15. Status
 
-B1 Decision Semantics: PROPOSED — READY FOR OWNER ADJUDICATION
+B1 Decision Semantics v0.3: FROZEN — IMPLEMENTED.
 
-Implementation must wait for approval of the complete B1 semantic package.
+CORE-04 consumes this semantic contract through the versioned production decision kernel. Legacy decision-state behavior remains compatibility-only; Investment Core v0.3 explicitly uses OPTIONAL_EXPLANATORY MIE policy.

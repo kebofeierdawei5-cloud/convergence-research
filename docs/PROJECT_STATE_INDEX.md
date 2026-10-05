@@ -21,6 +21,8 @@ CORE-02 Company Economic Core = PASS / MERGED
         ↓
 CORE-03 Real 300750 Vertical Slice = PASS / MERGED
         ↓
+CORE-04 Production Decision Kernel = ACTIVE / CI PASS / NOT MERGED
+        ↓
 B2-A Single Company Evidence / PIT Foundation = PASS / MERGED
         ↓
 B2-A Scope Repair = PASS / MERGED
@@ -76,24 +78,13 @@ BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
 
 ## Current development task
 
-CATL Primary-Source Gap Supplementation
+Decision Semantics Reconciliation → CORE-04 Production Decision Kernel.
 
-CATL E001-E010 existing capture artifacts have passed B2 technical migration: physical capture bytes, size/SHA-256, case binding, PIT and manifest integrity all pass CI. The remaining work is limited to targeted source-quality gaps; no new historical-data platform is required.
-
-PR #32 Horizon Semantics is merged to main (a524390382044b9474c17f2712a2cef8adeb9612). Investment Core horizon semantics use H=1Y as the normative default; H=3 requires explicit case-level override evidence.
-
-CORE-00 through CORE-03 vertical execution are merged/accepted. P4-F remains valid infrastructure, but Expectation Gap is not forced ahead of Evidence/PIT closure.
-
-B2-A is PASS / MERGED:
-- PR #33 merged c8246ceaaad5e9b1cc02fe422723c39a441ea4f3;
-- B2 exact raw-byte, PIT, case-binding and required-group machinery is active;
-- PR #34 raw-root containment hardening merged 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3;
-- B2 CI passed after both changes.
-
-CATL Existing Evidence Migration / Admission is PASS / TECHNICAL for RC-CN-A-300750-20261004.
-E001-E010 are physically present and pass B2 byte/PIT/manifest validation. Source-quality is separately graded: E002 remains P0 primary-price gap; E003/E007 remain P1 direct-primary disclosure gaps if material to Trust/Governance. Secondary evidence is never silently upgraded to primary.
-
-Current canonical main baseline: 00fdf82a374ac46a5b99567b590e940d7220bd23.
+- PR #69 P3-A-RA is MERGED into canonical `main` as `da6964ee6dd5a50b8696a46132448c205c463726`.
+- CORE-04 production-kernel work is now refreshed on top of that canonical main.
+- B1 v0.3 MIE semantics are consumed as `OPTIONAL_EXPLANATORY` in the new kernel.
+- Legacy MIE-mandatory decision behavior remains compatibility-only.
+- Target entry price is return/risk-first; MIE revalidation is an optional refinement when a qualified MIE reference exists.
 
 ## CORE-03 Real 300750 acceptance
 
@@ -104,3 +95,14 @@ Current canonical main baseline: 00fdf82a374ac46a5b99567b590e940d7220bd23.
 - P4-F: BLOCKED / INSUFFICIENT_EVIDENCE with replay PASS.
 - Expectation Gap: BLOCKED; intrinsic upside is not substituted.
 - Next sub-gate: acquire PIT market-model observations for this single company.
+
+
+## CORE-04 Decision Semantics Reconciliation
+
+- B1 v0.3 MIE role is frozen as OPTIONAL_EXPLANATORY for BUY/ADD.
+- Missing / UNKNOWN / BLOCKED / AMBIGUOUS MIE does not by itself veto a company-side BUY/ADD opportunity.
+- Return/risk target-entry price is valid without mandatory MIE revalidation; qualified MIE may refine it when present.
+- Production kernel: `iios_mvp/decision_kernel_v03.py`.
+- Governance record: `docs/iios/CORE_04_DECISION_SEMANTICS_RECONCILIATION_v0.1.md`.
+- PR #70 is the current CORE-04 merge candidate; CI #450 and CORE-00 #187 PASS at HEAD `7d86d5595865ee90538e5260167db99d8`; PR remains not merged.
+- PR #69 P3-A-RA is merged and is now the canonical upstream P3/P4 semantic base.

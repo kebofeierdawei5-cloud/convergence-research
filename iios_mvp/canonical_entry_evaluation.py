@@ -422,8 +422,10 @@ def admit_decision(
     pre_admission_capital_effect: str,
     position_pct: Any,
     entry_evaluation: Mapping[str, Any] | None,
+    entry_evaluation_required: bool = True,
 ) -> dict[str, Any]:
     """Apply P2.2 after P1.4 without weakening higher-protection actions."""
+
     action = str(pre_admission_action).upper()
     base_status = str(pre_admission_status).upper()
     base_reason = str(pre_admission_reason)
@@ -446,6 +448,20 @@ def admit_decision(
                 if isinstance(entry_evaluation, Mapping)
                 else None
             ),
+        }
+
+    if not entry_evaluation_required:
+        return {
+            "admission_version": DECISION_ADMISSION_VERSION,
+            "status": "NOT_APPLICABLE",
+            "rule_id": "DA05_OPTIONAL_MIE_ENTRY_GATE_NOT_REQUIRED",
+            "pre_admission_action": action,
+            "action": action,
+            "decision_status": base_status,
+            "primary_reason": base_reason,
+            "capital_effect": base_capital_effect,
+            "new_capital_allowed": action in _FINAL_INCREASE_ACTIONS,
+            "evaluation_id": None,
         }
 
     if not isinstance(entry_evaluation, Mapping):
@@ -606,6 +622,7 @@ def replay_decision_admission(
     pre_admission_capital_effect: str,
     position_pct: Any,
     entry_evaluation: Mapping[str, Any] | None,
+    entry_evaluation_required: bool = True,
 ) -> dict[str, Any]:
     regenerated = admit_decision(
         pre_admission_action=pre_admission_action,
@@ -614,6 +631,7 @@ def replay_decision_admission(
         pre_admission_capital_effect=pre_admission_capital_effect,
         position_pct=position_pct,
         entry_evaluation=entry_evaluation,
+        entry_evaluation_required=entry_evaluation_required,
     )
     return {
         "replay_status": (

@@ -7,6 +7,8 @@ from typing import Any, Callable, Mapping, Sequence
 DECISION_PRECEDENCE_VERSION = "IIOS-DECISION-PRECEDENCE-0.1"
 
 PositionState = str  # NONE | EXISTING
+MIE_POLICY_MANDATORY = "MANDATORY"
+MIE_POLICY_OPTIONAL_EXPLANATORY = "OPTIONAL_EXPLANATORY"
 
 @dataclass(frozen=True)
 class DecisionRule:
@@ -89,6 +91,8 @@ class DecisionStateInputs:
     can_add: bool
     package_complete: bool
     return_metrics_ready: bool
+    mie_policy: str = MIE_POLICY_MANDATORY
+    mie_material_contradiction: bool = False
 
 
 def _hard_risk_failure(inputs: DecisionStateInputs) -> bool:
@@ -123,17 +127,17 @@ def _matches(rule: DecisionRule, inputs: DecisionStateInputs) -> bool:
         "NP30_RISK_UNKNOWN": new and inputs.risk_status == "UNKNOWN",
         "NP31_RISK_HARD_FAIL": new and hard_risk_failure,
         "NP40_EXPECTED_RETURN_NEGATIVE": new and negative_return,
-        "G00_GAP_UNRESOLVED_NEW": new and unresolved_gap,
-        "G10_GAP_NONPOSITIVE_NEW": new and inputs.gap_status == "PASS" and not inputs.gap_positive,
-        "R00_RETURN_QUALIFIED_NEW_PACKAGE_MISSING": new and inputs.gap_positive and inputs.return_gate_pass and not inputs.package_complete,
-        "R10_RETURN_QUALIFIED_NEW": new and inputs.gap_positive and inputs.return_gate_pass,
-        "R20_RETURN_NOT_QUALIFIED_NEW": new and inputs.gap_positive and not inputs.return_gate_pass,
-        "EP50_GAP_UNRESOLVED": pos and unresolved_gap,
-        "EP60_GAP_NONPOSITIVE_NEG_RETURN": pos and inputs.gap_status == "PASS" and not inputs.gap_positive and negative_return,
-        "EP70_GAP_NONPOSITIVE": pos and inputs.gap_status == "PASS" and not inputs.gap_positive,
-        "R30_RETURN_QUALIFIED_EXISTING_PACKAGE_MISSING": pos and inputs.gap_positive and inputs.return_gate_pass and inputs.can_add and not inputs.package_complete,
-        "R40_RETURN_QUALIFIED_EXISTING_ADD": pos and inputs.gap_positive and inputs.return_gate_pass and inputs.can_add,
-        "R50_RETURN_NOT_QUALIFIED_EXISTING": pos and inputs.gap_positive and not inputs.return_gate_pass,
+        "G00_GAP_UNRESOLVED_NEW": new and inputs.mie_policy == MIE_POLICY_MANDATORY and unresolved_gap,
+        "G10_GAP_NONPOSITIVE_NEW": new and (inputs.mie_material_contradiction or (inputs.mie_policy == MIE_POLICY_MANDATORY and inputs.gap_status == "PASS" and not inputs.gap_positive)),
+        "R00_RETURN_QUALIFIED_NEW_PACKAGE_MISSING": new and inputs.return_gate_pass and (inputs.gap_positive or inputs.mie_policy == MIE_POLICY_OPTIONAL_EXPLANATORY) and not inputs.package_complete,
+        "R10_RETURN_QUALIFIED_NEW": new and inputs.return_gate_pass and (inputs.gap_positive or inputs.mie_policy == MIE_POLICY_OPTIONAL_EXPLANATORY),
+        "R20_RETURN_NOT_QUALIFIED_NEW": new and not inputs.return_gate_pass and (inputs.gap_positive or inputs.mie_policy == MIE_POLICY_OPTIONAL_EXPLANATORY),
+        "EP50_GAP_UNRESOLVED": pos and inputs.mie_policy == MIE_POLICY_MANDATORY and unresolved_gap,
+        "EP60_GAP_NONPOSITIVE_NEG_RETURN": pos and (inputs.mie_material_contradiction or (inputs.mie_policy == MIE_POLICY_MANDATORY and inputs.gap_status == "PASS" and not inputs.gap_positive)) and negative_return,
+        "EP70_GAP_NONPOSITIVE": pos and (inputs.mie_material_contradiction or (inputs.mie_policy == MIE_POLICY_MANDATORY and inputs.gap_status == "PASS" and not inputs.gap_positive)),
+        "R30_RETURN_QUALIFIED_EXISTING_PACKAGE_MISSING": pos and inputs.return_gate_pass and inputs.can_add and (inputs.gap_positive or inputs.mie_policy == MIE_POLICY_OPTIONAL_EXPLANATORY) and not inputs.package_complete,
+        "R40_RETURN_QUALIFIED_EXISTING_ADD": pos and inputs.return_gate_pass and inputs.can_add and (inputs.gap_positive or inputs.mie_policy == MIE_POLICY_OPTIONAL_EXPLANATORY),
+        "R50_RETURN_NOT_QUALIFIED_EXISTING": pos and not inputs.return_gate_pass and (inputs.gap_positive or inputs.mie_policy == MIE_POLICY_OPTIONAL_EXPLANATORY),
         "R60_EXISTING_DEFAULT_HOLD": pos,
         "R70_NEW_DEFAULT_NO_BUY": new,
     }
@@ -160,6 +164,8 @@ def evaluate_decision_state(inputs: DecisionStateInputs) -> dict[str, Any]:
         can_add=bool(inputs.can_add),
         package_complete=bool(inputs.package_complete),
         return_metrics_ready=bool(inputs.return_metrics_ready),
+        mie_policy=str(inputs.mie_policy).upper(),
+        mie_material_contradiction=bool(inputs.mie_material_contradiction),
     )
 
     for rule in CANONICAL_DECISION_PRECEDENCE:
