@@ -265,15 +265,12 @@ def test_v03_missing_expectation_gap_blocks_new_capital_decision():
     assert result["validation"]["status"] == "PASS"
 
 
-def test_v03_blocked_expectation_gap_requires_review_for_new_position():
+def test_v03_unresolved_mie_snapshot_requires_review_for_new_position():
     c = case()
-    c["market_implied_expectation"]["identifiability"] = "UNIDENTIFIABLE"
-    c["market_implied_expectation"]["qualification"] = "BLOCKED"
-    c["expectation_gap"]["market_expectation_hash"] = market_implied_expectation_content_hash(
-        c["market_implied_expectation"]
-    )
+    c["expectation_gap"]["market_expectation_id"] = "mie-not-materialized"
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("must identify exactly one materialized MIE" in x for x in result["validation"]["blockers"])
 
 
 
