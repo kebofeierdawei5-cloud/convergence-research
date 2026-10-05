@@ -13,16 +13,15 @@ B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. T
 
 ## Current Active Stage — 2026-10-05
 
-B2-A = PASS / MERGED. B2-B = ACTIVE / BLOCKED_PENDING_RAW.
+B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = ACTIVE.
 
 - B2-A merge commit: c8246ceaaad5e9b1cc02fe422723c39a441ea4f3.
 - B2 raw-artifact containment hardening merge commit: 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3.
 - Current canonical main baseline: ead980d18b72e37d24d5ac6ccf5f88e857dd235b.
-- B2-B case: RC-CN-A-300750-20261004.
-- Source capture plan: examples/real_cases/RC-CN-A-300750-20261004_b2b_capture_plan.json.
-- The plan is executable and CI-validated, but remains BLOCKED_PENDING_RAW until physical source bytes are supplied and re-hashed.
-- Old CORE-03 .txt evidence hashes are not accepted as raw-source proof.
-- A02/CSI800 remains Research Track only and is non-blocking for Investment Core.
+- CATL evidence migration is deliberately paused until the scope repair closes.
+- Existing CATL E001-E010 capture artifacts are historical case evidence; they must be audited for source fidelity before any B2 admission.
+- A02/CSI800 is Research Track only: its code is outside research/b2 and it must not execute from B2 CI.
+- Next after scope repair: existing CATL Evidence migration/admission, not a new historical-data platform.
 
 
 ## Canonical State
@@ -37,7 +36,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Investment Core Contract v0.3: **FROZEN / B1 SEMANTIC PASS**.
 - Contract: `docs/iios/IIOS_INVESTMENT_CORE_CONTRACT_v0.3.md`
 
-## CORE-02 Active Boundary
+## Historical Reference — CORE-02 Active Boundary
 
 - Current execution gate: **CORE-03 Market Expectation + Expectation Gap**
 - CORE-02 is now PASS / MERGED on canonical `main`
@@ -59,7 +58,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Quality remains CONDITIONAL because incremental ROIC and full earnings/cash-flow conversion bridges are not yet fully constructed.
 - No fabricated company name, forecast, valuation or decision was introduced.
 
-## CORE-03 Real 300750
+## Historical Reference — CORE-03 Real 300750
 
 - CORE-03 real-company vertical slice is **PASS / MERGED** on canonical `main`.
 - PR #31 / merge commit `e0662bb4efa5bfc40478240a0d9ef4bbcadb658a`.
