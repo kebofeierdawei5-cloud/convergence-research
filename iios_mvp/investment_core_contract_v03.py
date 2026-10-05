@@ -414,6 +414,21 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
                 str(exc),
             )
         )
+    try:
+        raw_thesis_status = str(case["thesis"]["status"]).strip().upper()
+        admitted_thesis_status = str(
+            case["decision_upstream_admission"]["thesis_status"]
+        ).strip().upper()
+        if raw_thesis_status != admitted_thesis_status:
+            errors.append(
+                _err(
+                    "V03-THESIS-STATUS-DRIFT",
+                    "thesis.status",
+                    "thesis.status must equal decision_upstream_admission.thesis_status",
+                )
+            )
+    except (KeyError, TypeError):
+        pass
 
     try:
         observed_price = _dec(
