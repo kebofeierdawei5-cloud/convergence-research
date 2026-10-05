@@ -519,9 +519,6 @@ def test_invalid_p3_method_is_rejected():
             horizon="12M",
             accounting_basis="reported",
         )
-    assert len(outputs) == 1
-    assert outputs[0].qualification == MIEQualification.BLOCKED
-
 
 # Real CORE-04-C -> P3-A/P4-B integration
 import json
