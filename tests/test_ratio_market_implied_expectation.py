@@ -396,8 +396,7 @@ def test_unstable_identification_still_blocks_ratio_mie():
     assert p3["identifiability"].state.value == "IDENTIFIABLE"
     assert p3["identifiability"].selected_model_id == "ps-1"
     assert p3["stability"].state.value == "UNSTABLE"
-    with pytest.raises(ValueError, match=""):
-        build_ratio_market_implied_expectations(
+    outputs = build_ratio_market_implied_expectations(
             identification_input=inp,
             identification=p3,
             candidate_coverage=coverage(inp),
@@ -520,6 +519,8 @@ def test_invalid_p3_method_is_rejected():
             horizon="12M",
             accounting_basis="reported",
         )
+    assert len(outputs) == 1
+    assert outputs[0].qualification == MIEQualification.BLOCKED
 
 
 # Real CORE-04-C -> P3-A/P4-B integration
