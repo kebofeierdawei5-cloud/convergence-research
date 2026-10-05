@@ -94,6 +94,8 @@ Current blocker:
 
 A02/CSI800 remains Research Track only and is not part of the B2-B Investment Core gate.
 
+Current canonical main baseline: ead980d18b72e37d24d5ac6ccf5f88e857dd235b.
+
 ## CORE-03 Real 300750 acceptance
 
 - PR #31 merged; merge commit `e0662bb4efa5bfc40478240a0d9ef4bbcadb658a`.
