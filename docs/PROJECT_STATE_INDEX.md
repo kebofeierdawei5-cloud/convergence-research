@@ -21,7 +21,9 @@ CORE-02 Company Economic Core = PASS / MERGED
         ↓
 CORE-03 Real 300750 Vertical Slice = PASS / MERGED
         ↓
-CORE-04 Production Decision Kernel = ACTIVE / CI PASS / NOT MERGED
+CORE-04 Production Decision Kernel = MERGED / VERTICAL E2E PASS
+        ↓
+CORE-04 × 300750 Final Decision Chain = PASS / REVIEW_REQUIRED / NO NEW CAPITAL
         ↓
 B2-A Single Company Evidence / PIT Foundation = PASS / MERGED
         ↓
@@ -78,7 +80,7 @@ BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
 
 ## Current development task
 
-Decision Semantics Reconciliation → CORE-04 Production Decision Kernel.
+CORE-04 × 300750 final vertical decision-chain closure.
 
 - PR #69 P3-A-RA is MERGED into canonical `main` as `da6964ee6dd5a50b8696a46132448c205c463726`.
 - CORE-04 production-kernel work is now refreshed on top of that canonical main.
