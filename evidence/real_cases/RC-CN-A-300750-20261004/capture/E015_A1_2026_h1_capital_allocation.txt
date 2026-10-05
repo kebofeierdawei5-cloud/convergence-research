@@ -4,10 +4,10 @@ source_ref: https://static.cninfo.com.cn/finalpage/2026-07-25/1225441586.PDF
 source_vintage: 2026-07-25
 known_at: 2026-07-25T00:00:00+08:00
 observation_date: 2026-06-30
-unit: CNY / shares
+unit: CNY_thousand / shares
 
 2026 H1 interim capital allocation:
-interim_cash_dividend: 6492600307.64 CNY
+interim_cash_dividend: 6492600.30764 CNY_thousand
 interim_payout_ratio: 15.00% of H1 attributable net profit
 distribution_base_shares: 4598335875
 total_shares_before_excluding_repurchase_account: 4626654919
