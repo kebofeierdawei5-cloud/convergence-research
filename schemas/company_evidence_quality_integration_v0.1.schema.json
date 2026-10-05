@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/company-evidence-quality-integration-0.1.schema.json",
+  "title": "IIOS Company Evidence Quality Integration v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "cutoff_date",
+    "economic_bridge_status",
+    "capital_trust_bridge_status",
+    "quality",
+    "quality_gate",
+    "trust",
+    "decision_effect",
+    "audit"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "IIOS-COMPANY-EVIDENCE-QUALITY-INTEGRATION-0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cutoff_date": {
+      "type": "string",
+      "minLength": 1
+    },
+    "economic_bridge_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "incremental_roic",
+        "interpretation"
+      ],
+      "properties": {
+        "incremental_roic": {
+          "enum": [
+            "PASS",
+            "CONDITIONAL",
+            "UNKNOWN",
+            "BLOCKED"
+          ]
+        },
+        "interpretation": {
+          "enum": [
+            "PASS",
+            "CONDITIONAL",
+            "UNKNOWN",
+            "BLOCKED"
+          ]
+        }
+      }
+    },
+    "capital_trust_bridge_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capital_allocation",
+        "governance_integrity",
+        "shareholder_treatment",
+        "trust_revalidation"
+      ],
+      "properties": {
+        "capital_allocation": {
+          "enum": [
+            "PASS",
+            "CONDITIONAL",
+            "UNKNOWN",
+            "BLOCKED"
+          ]
+        },
+        "governance_integrity": {
+          "enum": [
+            "PASS",
+            "CONDITIONAL",
+            "UNKNOWN",
+            "BLOCKED"
+          ]
+        },
+        "shareholder_treatment": {
+          "enum": [
+            "PASS",
+            "CONDITIONAL",
+            "UNKNOWN",
+            "BLOCKED"
+          ]
+        },
+        "trust_revalidation": {
+          "enum": [
+            "PASS",
+            "CONDITIONAL",
+            "UNKNOWN",
+            "BLOCKED"
+          ]
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimensions"
+      ],
+      "properties": {
+        "dimensions": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "dimension",
+              "status",
+              "rationale",
+              "evidence_ids"
+            ],
+            "properties": {
+              "dimension": {
+                "enum": [
+                  "competitive_advantage",
+                  "incremental_return_on_capital",
+                  "earnings_quality",
+                  "cash_flow_conversion",
+                  "balance_sheet_resilience",
+                  "reinvestment_runway"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "PASS",
+                  "CONDITIONAL",
+                  "UNKNOWN",
+                  "BLOCKED"
+                ]
+              },
+              "rationale": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_ids": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "quality_gate": {
+      "type": "object"
+    },
+    "trust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "dimensions"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PASS",
+            "CONDITIONAL",
+            "UNKNOWN",
+            "BLOCKED"
+          ]
+        },
+        "dimensions": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "dimension",
+              "status",
+              "rationale",
+              "evidence_ids"
+            ],
+            "properties": {
+              "dimension": {
+                "enum": [
+                  "identity",
+                  "disclosure_integrity",
+                  "governance_integrity",
+                  "shareholder_treatment"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "PASS",
+                  "CONDITIONAL",
+                  "UNKNOWN",
+                  "BLOCKED"
+                ]
+              },
+              "rationale": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_ids": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "decision_effect": {
+      "const": "NO_DIRECT_GATE_EFFECT"
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_sha256",
+        "integration_sha256"
+      ],
+      "properties": {
+        "input_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "integration_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}
