@@ -127,7 +127,7 @@
   },
   "valuation_assumptions": {
     "price_cny": "291.11",
-    "price_evidence_id": "E002",
+    "price_evidence_id": "E011",
     "shares_outstanding": "4380630342",
     "share_count_evidence_id": "E008",
     "net_cash_bn_cny": "276.904623",
@@ -234,7 +234,7 @@
           ],
           "required_for_admission": true,
           "pit_rule": "known_at <= cutoff",
-          "status": "PENDING"
+          "status": "PASS"
         },
         {
           "field_group": "corporate_disclosures",
@@ -397,6 +397,30 @@
           "exact_bytes": true,
           "provenance_class": "EVENT_PUBLICATION_VERIFIED",
           "status": "ADMITTED"
+        },
+        {
+          "evidence_id": "E011",
+          "subject_id": "RC-CN-A-300750-20261004",
+          "field_id": "market_price.close.2026-09-30",
+          "claim_type": "OBSERVED_FACT",
+          "value": 291.11,
+          "unit": "CNY/share",
+          "currency": "CNY",
+          "observation_date": "2026-09-30",
+          "known_at": "2026-09-30",
+          "retrieved_at": "2026-10-05T02:29:16.861938+00:00",
+          "source_ref": "SZSE:MARKET_DATA",
+          "source_locator": "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-09-30&txtEndDate=2026-09-30&archiveDate=2026-10-01&random=0.20261005",
+          "artifact_id": "E002_SZSE_primary_2026-09-30.xlsx",
+          "content_sha256": "349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2",
+          "exact_bytes": true,
+          "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+          "status": "ADMITTED",
+          "quality_notes": [
+            "Official SZSE EOD snapshot; raw bytes retained outside the public repository.",
+            "Located row: worksheet 股票行情, row 2234; 300750 / 宁德时代 / 今收 291.11."
+          ],
+          "license_status": "UNKNOWN"
         }
       ],
       "admission": {
@@ -404,7 +428,6 @@
         "decision_ready": false,
         "blockers": [
           "SECURITY_IDENTITY_EVIDENCE_REQUIRED",
-          "MARKET_PRICE_EVIDENCE_REQUIRED",
           "MANDATORY_COMPANY_EVIDENCE_PENDING"
         ]
       },
@@ -681,5 +704,29 @@
         ]
       }
     ]
+  },
+  "price_evidence": {
+    "evidence_id": "E011",
+    "subject_id": "RC-CN-A-300750-20261004",
+    "field_id": "market_price.close.2026-09-30",
+    "claim_type": "OBSERVED_FACT",
+    "value": 291.11,
+    "unit": "CNY/share",
+    "currency": "CNY",
+    "observation_date": "2026-09-30",
+    "known_at": "2026-09-30",
+    "retrieved_at": "2026-10-05T02:29:16.861938+00:00",
+    "source_ref": "SZSE:MARKET_DATA",
+    "source_locator": "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-09-30&txtEndDate=2026-09-30&archiveDate=2026-10-01&random=0.20261005",
+    "artifact_id": "E002_SZSE_primary_2026-09-30.xlsx",
+    "content_sha256": "349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2",
+    "exact_bytes": true,
+    "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+    "status": "ADMITTED",
+    "quality_notes": [
+      "Official SZSE EOD snapshot; raw bytes retained outside the public repository.",
+      "Located row: worksheet 股票行情, row 2234; 300750 / 宁德时代 / 今收 291.11."
+    ],
+    "license_status": "UNKNOWN"
   }
 }
