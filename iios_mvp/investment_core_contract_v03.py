@@ -194,6 +194,8 @@ def calculate_return_metrics(
         "target_entry_price_for_risk": target_entry_price_for_risk,
         "target_entry_price": target_entry_price,
         "target_entry_price_binding": "MIN_OF_RETURN_REQUIRED_RETURN_ENTRY_CUSHION_AND_RISK_CAPS",
+        "target_entry_price_semantics": "CONDITIONAL_THRESHOLD_REQUIRES_EXPECTATION_GAP_REVALIDATION",
+        "target_entry_price_requires_gap_revalidation": True,
         "return_gate_pass": entry_pass and target_pass and rr_pass and risk_pass,
     }
 
@@ -635,6 +637,14 @@ def decide_v03(case: dict[str, Any]) -> dict[str, Any]:
         "position_package_complete": package_complete,
         "target_entry_price": (
             _serialize_metrics(metrics)["target_entry_price"] if metrics is not None else None
+        ),
+        "target_entry_price_semantics": (
+            _serialize_metrics(metrics)["target_entry_price_semantics"] if metrics is not None else None
+        ),
+        "target_entry_price_requires_gap_revalidation": (
+            _serialize_metrics(metrics)["target_entry_price_requires_gap_revalidation"]
+            if metrics is not None
+            else None
         ),
         "current_price": str(current_price) if current_price is not None else None,
     }
