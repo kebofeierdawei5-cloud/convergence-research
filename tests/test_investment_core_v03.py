@@ -297,6 +297,16 @@ def test_v03_inline_market_expectation_is_rejected_by_canonical_boundary():
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("unsupported fields" in x for x in result["validation"]["blockers"])
 
+def test_v03_mie_observation_semantics_bind_to_current_price_evidence():
+    c = case()
+    c["market_implied_expectation"]["observation_basis"]["adjustment_semantics"] = "DIVIDEND_ADJUSTED"
+    c["expectation_gap"]["market_expectation_hash"] = market_implied_expectation_content_hash(
+        c["market_implied_expectation"]
+    )
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("adjustment_semantics" in x for x in result["validation"]["blockers"])
+
 def test_v03_expectation_gap_price_binding_requires_revalidation():
     c = case()
     c["current_price_observation"]["price"] = "99"
