@@ -334,7 +334,7 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
     )
     identification = {
         "status": "PASS",
-        "method": "model_specific_inverse_v0.2",
+        "method": "model_specific_inverse_v0.3",
         "evaluations": evaluations,
         "identifiability": IdentifiabilityResult(
             state=IdentifiabilityState.AMBIGUOUS,
