@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
@@ -222,11 +223,28 @@ def run(inp, **kwargs):
     )
 
 
+def _with_current_price(inp, current_price: str):
+    current = Decimal(current_price)
+    return MarketModelIdentificationInput(
+        cutoff_date=inp.cutoff_date,
+        current_observation_id=inp.current_observation_id,
+        candidates=inp.candidates,
+        observations=tuple(
+            replace(item, price=current)
+            if item.observation_date == inp.cutoff_date
+            else item
+            for item in inp.observations
+        ),
+        evidence=inp.evidence,
+    )
+
+
 def test_outside_historical_support_stays_conditional_not_decision_grade():
-    for inp in (
-        sotp_input(price="220"),
-        rnpv_input(price="185.4545454545454545454545454"),
-    ):
+    cases = (
+        _with_current_price(sotp_input(), "220"),
+        _with_current_price(rnpv_input(), "185.4545454545454545454545454"),
+    )
+    for inp in cases:
         p3 = identify_market_models(inp)
         assert p3["identifiability"].state.value == "IDENTIFIABLE"
         evaluation = p3["evaluations"][0]
@@ -239,6 +257,7 @@ def test_outside_historical_support_stays_conditional_not_decision_grade():
         assert outputs
         assert all(x.qualification != MIEQualification.DECISION_GRADE for x in outputs)
         assert all(x.qualification == MIEQualification.CONDITIONAL_ONLY for x in outputs)
+
 
 def test_sotp_materializes_conditional_residual_and_segments():
     inp = sotp_input()
