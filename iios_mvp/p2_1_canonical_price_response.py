@@ -294,9 +294,6 @@ def _model_relation(
     family = str(expectation.get("market_model", "")).strip()
     variable = str(requirement.get("economic_variable", "")).strip()
     reference_low, reference_high = _reference_interval(requirement)
-    if reference_low == 0 or reference_high == 0:
-        raise ValueError("P2.1 market requirement cannot be zero")
-
     shares = _value_context(provenance, "shares_outstanding")
     ev_based = {
         MarketModelFamily.EV_EBITDA.value,
@@ -401,8 +398,6 @@ def _model_relation(
             raise ValueError("rNPV P2.1 observed pipeline total must be > 0")
         if not 0 <= probability <= 1:
             raise ValueError("rNPV P2.1 probability must be within [0,1]")
-        if timing < 0 or discount <= Decimal("-1"):
-            raise ValueError("rNPV P2.1 timing/discount assumptions are invalid")
         if timing < 0 or discount <= Decimal("-1"):
             raise ValueError("rNPV P2.1 timing/discount assumptions are invalid")
         weight = probability / ((Decimal("1") + discount) ** timing)
