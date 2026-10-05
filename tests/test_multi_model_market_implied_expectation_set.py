@@ -149,6 +149,20 @@ def test_no_feasible_model_is_blocked_not_ambiguous():
     assert r.resolution_state == MIESetResolutionState.NO_FEASIBLE_MODEL
     assert r.qualification == MIEQualification.BLOCKED
 
+def test_outside_support_overrides_a_materialized_decision_grade_model():
+    materialized = MIEModelEvaluation.from_expectation(
+        make_mie(model_id="pe-1", family=MarketModelFamily.FORWARD_PE)
+    )
+    outside = MIEModelEvaluation.outside_historical_support(
+        model_id="ps-1",
+        evidence_ids=("outside-ps",),
+        rationale="PS is identifiable but outside historical support.",
+    )
+    r = aggregate([materialized, outside], ("pe-1", "ps-1"))
+    assert r.resolution_state == MIESetResolutionState.NO_DECISION_GRADE_MODEL
+    assert r.qualification == MIEQualification.BLOCKED
+    assert not r.materialized_expectations() == ()
+
 def test_blocked_p4_mie_is_consumed_as_blocked_disposition():
     blocked = make_mie(model_id='ddm-1', family=MarketModelFamily.DDM, qualification=MIEQualification.BLOCKED, stability=StabilityState.UNSTABLE)
     r = MIEModelEvaluation.from_expectation(blocked)
