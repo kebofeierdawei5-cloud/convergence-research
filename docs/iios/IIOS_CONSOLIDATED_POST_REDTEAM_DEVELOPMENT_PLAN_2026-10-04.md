@@ -1,3 +1,7 @@
+# HISTORICAL / SUPERSEDED ROADMAP — 2026-10-05
+
+This document is retained as historical design context. Its old execution sequence is NOT current. Follow `docs/PROJECT_STATE_INDEX.md` and `docs/iios/A0_STATE_AUTHORITY_POLICY_v0.1.md` for current state and next work.
+
 # B0 ACTIVE-PLAN NOTICE — 2026-10-04
 
 This document is retained as the consolidated post-red-team historical roadmap. **Its active execution sequence is superseded by the B0/B1 repair program.**
