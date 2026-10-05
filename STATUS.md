@@ -4,7 +4,7 @@ This file retains historical acceptance records below. For the active repair pro
 
 Historical B0 repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
 Active repair stage: **B0 PASS → B1 PASS → CORE-00 PASS → CORE-01 PASS → CORE-02 PASS → CORE-03 PASS → CORE-04 VERTICAL E2E PASS**
-P4-F infrastructure is merged and semantically bounded; the current critical path is CORE-04 production decision closure, not further P4 expansion.
+P4-F infrastructure remains merged and semantically bounded; CORE-04 vertical decision closure is complete. Current critical path is company-side evidence hardening plus productization of revision/approval/monitoring/publication/report lifecycle, not further P3/P4 expansion.
 B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. The owner-approved distinction between (a) 15% BUY-entry threshold / safety-margin policy and (b) 1–3Y annualized target >=15% is now normative in v0.3.
 
 ---
@@ -39,7 +39,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 
 ## Historical Reference — CORE-02 Active Boundary
 
-- Current execution gate: **CORE-03 Market Expectation + Expectation Gap**
+- Current execution gate: **A0/A1 Company-side Evidence + Productization Readiness**
 - CORE-02 is now PASS / MERGED on canonical `main`
 - Input: admitted company-specific evidence + explicit evidence-linked economic assessments
 - Output: PIT-bound Reality, Trust, Quality, Value Core, Value Driver Ranking and candidate valuation-model route
@@ -73,7 +73,6 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - B1 v0.3 MIE role is explicitly **OPTIONAL_EXPLANATORY** for BUY/ADD.
 - Legacy MIE-mandatory rules are retained only behind explicit compatibility policy; CORE-04 v0.3 passes the optional policy explicitly.
 - Production kernel: `iios_mvp/decision_kernel_v03.py`.
-- Current merge candidate branch: `feature/core04-production-decision-kernel-20261005`.
 - PR #70 is **MERGED** into canonical `main` as `91f18cc1c8b4bdc6f80053462ec5e9ce7b89d0cb`.
 - Production decision kernel v0.2 and upstream Quality/Thesis admission are now canonical.
 - Final 300750 Decision E2E PR #73 is **MERGED** into canonical `main` as `2ebdb04b4a5f30056a6df500830eb443af09a7ec`.
