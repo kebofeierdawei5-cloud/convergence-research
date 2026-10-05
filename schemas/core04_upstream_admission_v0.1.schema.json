@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/core04-upstream-admission-0.1.schema.json",
+  "title": "IIOS CORE-04 Upstream Decision Admission v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_version",
+    "case_id",
+    "cutoff_date",
+    "reality_status",
+    "quality_gate_status",
+    "value_driver_status",
+    "valuation_status",
+    "forecast_status",
+    "thesis_status",
+    "thesis_admission_status",
+    "capital_admission_ready",
+    "quality_gate",
+    "thesis_admission",
+    "evidence_ids",
+    "admission_record_hash"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "IIOS-CORE-04-UPSTREAM-ADMISSION-0.1"
+    },
+    "policy_version": {
+      "const": "IIOS-DECISION-UPSTREAM-POLICY-0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cutoff_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "reality_status": {
+      "enum": [
+        "PASS",
+        "CONDITIONAL",
+        "UNKNOWN",
+        "BLOCKED"
+      ]
+    },
+    "quality_gate_status": {
+      "enum": [
+        "PASS",
+        "CONDITIONAL",
+        "UNKNOWN",
+        "BLOCKED"
+      ]
+    },
+    "value_driver_status": {
+      "enum": [
+        "PASS",
+        "CONDITIONAL",
+        "UNKNOWN",
+        "BLOCKED"
+      ]
+    },
+    "valuation_status": {
+      "enum": [
+        "PASS",
+        "CONDITIONAL",
+        "UNKNOWN",
+        "BLOCKED"
+      ]
+    },
+    "forecast_status": {
+      "enum": [
+        "PASS",
+        "CONDITIONAL",
+        "UNKNOWN",
+        "BLOCKED"
+      ]
+    },
+    "thesis_status": {
+      "enum": [
+        "INTACT",
+        "WATCH",
+        "BROKEN",
+        "UNKNOWN"
+      ]
+    },
+    "thesis_admission_status": {
+      "enum": [
+        "ADMITTED",
+        "BLOCKED",
+        "REVIEW_REQUIRED",
+        "UNKNOWN"
+      ]
+    },
+    "capital_admission_ready": {
+      "type": "boolean"
+    },
+    "quality_gate": {
+      "$ref": "./core04-quality-gate-0.1.schema.json"
+    },
+    "thesis_admission": {
+      "$ref": "./core04-thesis-admission-0.1.schema.json"
+    },
+    "evidence_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "admission_record_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

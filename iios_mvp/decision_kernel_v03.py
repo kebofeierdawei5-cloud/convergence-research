@@ -11,7 +11,7 @@ from .decision_state_machine_v01 import (
     evaluate_decision_state,
 )
 
-DECISION_KERNEL_VERSION = "IIOS-CORE-04-DECISION-KERNEL-0.1"
+DECISION_KERNEL_VERSION = "IIOS-CORE-04-DECISION-KERNEL-0.2"
 DECISION_KERNEL_POLICY_VERSION = "IIOS-DECISION-POLICY-0.3"
 
 
@@ -30,6 +30,12 @@ def evaluate_production_decision(
     validation_pass: bool,
     trust_status: str,
     thesis_status: str,
+    reality_status: str,
+    quality_gate_status: str,
+    value_driver_status: str,
+    valuation_status: str,
+    forecast_status: str,
+    thesis_admission_status: str,
     risk_status: str,
     portfolio_status: str,
     position_pct: Decimal,
@@ -59,6 +65,12 @@ def evaluate_production_decision(
             validation_pass=bool(validation_pass),
             trust_status=str(trust_status).upper(),
             thesis_status=str(thesis_status).upper(),
+            reality_status=str(reality_status).upper(),
+            quality_gate_status=str(quality_gate_status).upper(),
+            value_driver_status=str(value_driver_status).upper(),
+            valuation_status=str(valuation_status).upper(),
+            forecast_status=str(forecast_status).upper(),
+            thesis_admission_status=str(thesis_admission_status).upper(),
             risk_status=str(risk_status).upper(),
             portfolio_status=str(portfolio_status).upper(),
             position_pct=Decimal(position_pct),
@@ -84,6 +96,14 @@ def evaluate_production_decision(
         "decision_precedence_version": DECISION_PRECEDENCE_VERSION,
         "mie_policy": mie_policy,
         "mie_material_contradiction": bool(mie_material_contradiction),
+        "upstream_gate_status": {
+            "reality": str(reality_status).upper(),
+            "quality": str(quality_gate_status).upper(),
+            "value_driver": str(value_driver_status).upper(),
+            "valuation": str(valuation_status).upper(),
+            "forecast": str(forecast_status).upper(),
+            "thesis_admission": str(thesis_admission_status).upper(),
+        },
         "investability_status": _investability_for_action(action),
     }
 
