@@ -154,3 +154,39 @@ This batch does not:
 - replace human approval.
 
 The principal objective is to eliminate silent omission of upstream company-quality and thesis states from the canonical investment decision.
+
+
+## Verification checkpoint
+
+Acceptance head:
+`a6e1a0cd307139d1e4c41d7987d1716ca30dcd58`
+
+CI evidence:
+- IIOS Investment Core CI #465 — **PASS**
+- CORE-00 Scope Reconciliation #202 — **PASS**
+- Full pytest suite: **378 passed**
+- Compileall includes the new Quality/Thesis/upstream admission modules and real 300750 upstream-gate E2E.
+- JSON schema parsing includes all three new CORE-04 schemas.
+
+Real 300750 upstream-gate E2E:
+- Reality admission = PASS
+- Quality Gate = **CONDITIONAL**
+- Value Driver admission = PASS
+- Primary Valuation admission = PASS
+- Independent Forecast admission = PASS
+- Thesis Admission = **ADMITTED**
+- Thesis state = **INTACT**
+- Trust strict case = **REVALIDATION**
+- MIE = **OPTIONAL_EXPLANATORY**
+
+With Trust normalized to PASS only for diagnostic isolation, the production kernel returns:
+
+`REVIEW_REQUIRED / QUALITY_GATE_UNRESOLVED / capital=false`
+
+Strict Trust state remains higher precedence:
+
+`REVIEW_REQUIRED / TRUST_NOT_PASS_REQUIRES_REVIEW / capital=false`
+
+The 300750 Quality Gate is conditional because the current Core-02 evidence set still contains unresolved incremental ROIC and other conditional quality dimensions. This is now an explicit machine gate rather than a hidden omission.
+
+PR #72 remains OPEN / NOT MERGED; merge remains owner-controlled.
