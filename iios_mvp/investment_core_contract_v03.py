@@ -371,6 +371,19 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
                         "must equal the decision horizon selected by return_gate",
                     )
                 )
+            gap_price = _dec(expectation_gap["price"], "expectation_gap.price")
+            observed_price = _dec(
+                case["current_price_observation"]["price"],
+                "current_price_observation.price",
+            )
+            if gap_price != observed_price:
+                errors.append(
+                    _err(
+                        "V03-EXPECTATION-GAP-PRICE",
+                        "expectation_gap.price",
+                        "must equal current_price_observation.price; gap must be revalidated when price changes",
+                    )
+                )
         except ValueError as exc:
             errors.append(
                 _err(
