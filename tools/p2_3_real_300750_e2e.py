@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import date, datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, localcontext
 import json
 from pathlib import Path
 from typing import Any
@@ -244,6 +244,13 @@ def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
         row for row in data["observations"] if row["observation_id"] == current_id
     )
     current_price = _d(current_row["price"])
+    current_shares = _d(current_row["shares_outstanding"])
+    current_net_debt = _d(current_row["net_debt"])
+    current_ebitda = _d(current_row["economic_value"])
+    with localcontext() as ctx:
+        ctx.prec = 60
+        current_ev = current_price * current_shares + current_net_debt
+        current_multiple = current_ev / current_ebitda
     entry_evaluation = build_canonical_entry_evaluation(
         current_price=current_price,
         return_target_entry_price=current_price,
@@ -262,7 +269,11 @@ def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
         "real_current_observation": {
             "observation_id": current_id,
             "price": str(current_price),
-            "ev_ebitda": str(current_row["ev_ebitda"]),
+            "shares_outstanding": str(current_shares),
+            "net_debt": str(current_net_debt),
+            "ebitda": str(current_ebitda),
+            "enterprise_value": format(current_ev, "f"),
+            "ev_ebitda": format(current_multiple, "f"),
         },
         "p3a": {
             "status": identification["status"],
