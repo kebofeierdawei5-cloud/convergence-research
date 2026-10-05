@@ -21,6 +21,8 @@ CORE-02 Company Economic Core = PASS / MERGED
         ↓
 CORE-03 Real 300750 Vertical Slice = PASS / MERGED
         ↓
+CORE-04 Production Decision Kernel = ACTIVE / UNDER CI
+        ↓
 B2-A Single Company Evidence / PIT Foundation = PASS / MERGED
         ↓
 B2-A Scope Repair = PASS / MERGED
@@ -93,3 +95,14 @@ Decision Semantics Reconciliation → CORE-04 Production Decision Kernel.
 - P4-F: BLOCKED / INSUFFICIENT_EVIDENCE with replay PASS.
 - Expectation Gap: BLOCKED; intrinsic upside is not substituted.
 - Next sub-gate: acquire PIT market-model observations for this single company.
+
+
+## CORE-04 Decision Semantics Reconciliation
+
+- B1 v0.3 MIE role is frozen as OPTIONAL_EXPLANATORY for BUY/ADD.
+- Missing / UNKNOWN / BLOCKED / AMBIGUOUS MIE does not by itself veto a company-side BUY/ADD opportunity.
+- Return/risk target-entry price is valid without mandatory MIE revalidation; qualified MIE may refine it when present.
+- Production kernel: `iios_mvp/decision_kernel_v03.py`.
+- Governance record: `docs/iios/CORE_04_DECISION_SEMANTICS_RECONCILIATION_v0.1.md`.
+- PR #70 is the current CORE-04 merge candidate and is not yet merged.
+- PR #69 P3-A-RA remains independently open and not merged.
