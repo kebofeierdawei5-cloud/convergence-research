@@ -185,17 +185,23 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 ## 8. Current next batch
 
-**A1 Company-side Evidence Closure — IN PROGRESS**
+**A1 Company-side Evidence Closure = PASS / MERGED**
+
+A1 is complete as the current company-side evidence-closure milestone.
+
+Acceptance:
+- `docs/iios/A1_ACCEPTANCE_2026-10-05.md`
+
+The next development batch must be independently scoped from the canonical main. No new P3/P4/MIE model work is implied by A1 completion.
 
 Completed sub-batches:
 - **A1-01 Economic Evidence Bridge = PASS / MERGED**
 - **A1-02 Capital Allocation + Trust/Governance Evidence Closure = PASS / MERGED**
+- **A1-03 Quality Gate Integration = PASS / MERGED**
 
 Acceptance records:
 - `docs/iios/A1_01_ACCEPTANCE_2026-10-05.md`
 - `docs/iios/A1_02_ACCEPTANCE_2026-10-05.md`
+- `docs/iios/A1_ACCEPTANCE_2026-10-05.md`
 
-Next sub-batch:
-- **A1-03 Quality Gate Integration**
-
-A1 is not complete until the remaining company-side evidence is integrated into the existing Quality semantics and tested end-to-end.
+A1 is complete as the company-side evidence-closure milestone.
