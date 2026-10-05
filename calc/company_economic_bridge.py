@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import date
 from typing import Any, Mapping
 
 ECONOMIC_BRIDGE_VERSION = "IIOS-COMPANY-ECONOMIC-BRIDGE-0.1"
@@ -77,6 +78,14 @@ def _refs(value: Any, field: str) -> list[str]:
     return result
 
 
+def _parse_date(value: Any, field: str) -> date:
+    raw = str(value).strip()
+    try:
+        return date.fromisoformat(raw[:10])
+    except ValueError as exc:
+        raise ValueError(f"{field} must start with an ISO date") from exc
+
+
 def _period_core(period: Mapping[str, Any]) -> dict[str, Any]:
     missing = [field for field in REQUIRED_PERIOD_FIELDS if field not in period]
     if missing:
@@ -88,6 +97,10 @@ def _period_core(period: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("period_start and period_end must be non-empty")
 
     refs = _refs(period["evidence_ids"], "period.evidence_ids")
+    start = _parse_date(period["period_start"], "period.period_start")
+    end = _parse_date(period["period_end"], "period.period_end")
+    if end < start:
+        raise ValueError("period_end cannot precede period_start")
     for field in REQUIRED_PERIOD_FIELDS:
         if field in {"period_id", "period_start", "period_end", "evidence_ids", "wc_cash_inventory",
                      "wc_cash_receivables", "wc_cash_payables"}:
@@ -201,6 +214,7 @@ def build_company_economic_bridge(
     prior_period: Mapping[str, Any],
     current_period: Mapping[str, Any],
     generation_basis: str,
+    admitted_evidence_ids: list[str] | set[str],
 ) -> dict[str, Any]:
     if not str(case_id).strip():
         raise ValueError("case_id must be non-empty")
@@ -209,11 +223,28 @@ def build_company_economic_bridge(
     if not str(generation_basis).strip():
         raise ValueError("generation_basis must be non-empty")
 
+    admitted_refs = _refs(admitted_evidence_ids, "admitted_evidence_ids")
+    admitted_set = set(admitted_refs)
     prior = _period_metrics(prior_period)
     current = _period_metrics(current_period)
 
     if prior["period_start"] == current["period_start"] and prior["period_end"] == current["period_end"]:
         raise ValueError("prior_period and current_period cannot have identical period bounds")
+
+    cutoff_day = _parse_date(cutoff_date, "cutoff_date")
+    for name, period in (("prior_period", prior), ("current_period", current)):
+        if _parse_date(period["period_end"], f"{name}.period_end") > cutoff_day:
+            raise ValueError(f"{name}.period_end exceeds cutoff")
+        missing_evidence = sorted(set(period["evidence_ids"]) - admitted_set)
+        if missing_evidence:
+            raise ValueError(
+                f"{name} references evidence IDs not admitted by the supplied evidence set: {missing_evidence}"
+            )
+
+    if _parse_date(prior["period_end"], "prior_period.period_end") >= _parse_date(
+        current["period_end"], "current_period.period_end"
+    ):
+        raise ValueError("current_period must end after prior_period")
 
     delta_nopat = current["nopat_proxy"] - prior["nopat_proxy"]
     delta_invested_capital = current["invested_capital_proxy"] - prior["invested_capital_proxy"]
@@ -240,6 +271,7 @@ def build_company_economic_bridge(
         "prior_period": prior,
         "current_period": current,
         "generation_basis": generation_basis,
+        "admitted_evidence_ids": admitted_refs,
     }
 
     core = {
@@ -247,6 +279,11 @@ def build_company_economic_bridge(
         "case_id": case_id,
         "cutoff_date": cutoff_date,
         "generation_basis": generation_basis,
+        "evidence_admission": {
+            "status": "ADMITTED",
+            "evidence_ids": admitted_refs,
+            "sha256": _sha(admitted_refs),
+        },
         "periods": {
             "prior": prior,
             "current": current,
@@ -292,6 +329,7 @@ def validate_company_economic_bridge(record: Any) -> list[str]:
         "case_id",
         "cutoff_date",
         "generation_basis",
+        "evidence_admission",
         "periods",
         "deltas",
         "incremental_roic",
@@ -309,6 +347,27 @@ def validate_company_economic_bridge(record: Any) -> list[str]:
         errors.append("INTERPRETATION_STATUS_INVALID")
     if record["investment_decision_effect"] != "NO_DIRECT_GATE_EFFECT":
         errors.append("INVESTMENT_DECISION_EFFECT_INVALID")
+
+    if isinstance(evidence_admission, Mapping):
+        evidence_ids = evidence_admission.get("evidence_ids")
+        if (
+            not isinstance(evidence_ids, list)
+            or any(not isinstance(x, str) or not x.strip() for x in evidence_ids)
+            or len(evidence_ids) != len(set(evidence_ids))
+        ):
+            errors.append("EVIDENCE_ADMISSION_IDS_INVALID")
+        else:
+            expected_evidence_hash = _sha(evidence_ids)
+            if evidence_admission.get("sha256") != expected_evidence_hash:
+                errors.append("EVIDENCE_ADMISSION_HASH_MISMATCH")
+
+    evidence_admission = record["evidence_admission"]
+    if (
+        not isinstance(evidence_admission, Mapping)
+        or set(evidence_admission) != {"status", "evidence_ids", "sha256"}
+        or evidence_admission.get("status") != "ADMITTED"
+    ):
+        errors.append("EVIDENCE_ADMISSION_INVALID")
 
     periods = record["periods"]
     if not isinstance(periods, Mapping) or set(periods) != {"prior", "current"}:
@@ -354,6 +413,7 @@ def validate_company_economic_bridge(record: Any) -> list[str]:
             "prior_period": record["periods"]["prior"],
             "current_period": record["periods"]["current"],
             "generation_basis": record["generation_basis"],
+            "admitted_evidence_ids": record["evidence_admission"]["evidence_ids"],
         }
         if record["audit"]["input_sha256"] != _sha(expected_input):
             errors.append("AUDIT_INPUT_HASH_MISMATCH")
