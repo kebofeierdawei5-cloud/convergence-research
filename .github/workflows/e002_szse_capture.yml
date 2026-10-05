@@ -5,6 +5,10 @@ on:
     branches: ["e002-szse-primary-capture-20261005"]
     paths:
       - ".github/workflows/e002_szse_capture.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/e002_szse_capture.yml"
 
 permissions:
   contents: write
