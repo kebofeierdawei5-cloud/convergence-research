@@ -45,10 +45,10 @@ class CompanyEvidenceTests(unittest.TestCase):
                 cutoff_date="2026-10-05T09:30:00+08:00",
                 evidence=[_evidence("EV-1", "security_identity.primary", digest, "2026-10-04T09:00:00+08:00")],
                 raw_artifacts=[{
-                    "evidence_id":"EV-1",
-                    "relative_path":"security.txt",
-                    "expected_size_bytes":len(payload),
-                    "expected_sha256":digest,
+                    "evidence_id": "EV-1",
+                    "relative_path": "security.txt",
+                    "expected_size_bytes": len(payload),
+                    "expected_sha256": digest,
                 }],
                 required_field_groups=["security_identity"],
                 raw_root=root,
@@ -70,10 +70,10 @@ class CompanyEvidenceTests(unittest.TestCase):
                 cutoff_date="2026-10-05T09:30:00+08:00",
                 evidence=[_evidence("EV-2", "financial_reality.revenue", digest, "2026-10-06T00:00:00+08:00")],
                 raw_artifacts=[{
-                    "evidence_id":"EV-2",
-                    "relative_path":"source.txt",
-                    "expected_size_bytes":len(payload),
-                    "expected_sha256":digest,
+                    "evidence_id": "EV-2",
+                    "relative_path": "source.txt",
+                    "expected_size_bytes": len(payload),
+                    "expected_sha256": digest,
                 }],
                 required_field_groups=["financial_reality"],
                 raw_root=root,
@@ -95,10 +95,10 @@ class CompanyEvidenceTests(unittest.TestCase):
                 cutoff_date="2026-10-05T09:30:00+08:00",
                 evidence=[_evidence("EV-3", "market_price.close", good_digest, "2026-10-05T08:00:00+08:00")],
                 raw_artifacts=[{
-                    "evidence_id":"EV-3",
-                    "relative_path":"source.txt",
-                    "expected_size_bytes":len(payload),
-                    "expected_sha256":"0"*64,
+                    "evidence_id": "EV-3",
+                    "relative_path": "source.txt",
+                    "expected_size_bytes": len(payload),
+                    "expected_sha256": "0" * 64,
                 }],
                 required_field_groups=["market_price"],
                 raw_root=root,
@@ -120,10 +120,10 @@ class CompanyEvidenceTests(unittest.TestCase):
                 cutoff_date="2026-10-05T09:30:00+08:00",
                 evidence=[_evidence("EV-4", "security_identity.primary", digest, "2026-10-05T08:00:00+08:00")],
                 raw_artifacts=[{
-                    "evidence_id":"EV-4",
-                    "relative_path":"source.txt",
-                    "expected_size_bytes":len(payload),
-                    "expected_sha256":digest,
+                    "evidence_id": "EV-4",
+                    "relative_path": "source.txt",
+                    "expected_size_bytes": len(payload),
+                    "expected_sha256": digest,
                 }],
                 required_field_groups=list(REQUIRED_COMPANY_FIELD_GROUPS),
                 raw_root=root,
@@ -131,7 +131,7 @@ class CompanyEvidenceTests(unittest.TestCase):
         self.assertEqual(manifest["status"], "BLOCKED")
         self.assertTrue(any("REQUIRED_FIELD_GROUPS_UNCOVERED" in item for item in manifest["validation_errors"]))
 
-    def test_no_raw_root_cannot_prove_exact_bytes(self):
+    def test_no_raw_root_exact_admission_is_blocked(self):
         payload = b"metadata-only"
         digest = hashlib.sha256(payload).hexdigest()
         manifest = build_company_evidence_manifest(
@@ -142,21 +142,21 @@ class CompanyEvidenceTests(unittest.TestCase):
             cutoff_date="2026-10-05T09:30:00+08:00",
             evidence=[_evidence("EV-5", "security_identity.primary", digest, "2026-10-05T08:00:00+08:00")],
             raw_artifacts=[{
-                "evidence_id":"EV-5",
-                "relative_path":"source.txt",
-                "expected_size_bytes":len(payload),
-                "expected_sha256":digest,
+                "evidence_id": "EV-5",
+                "relative_path": "source.txt",
+                "expected_size_bytes": len(payload),
+                "expected_sha256": digest,
             }],
             required_field_groups=["security_identity"],
             raw_root=None,
         )
-        self.assertEqual(manifest["status"], "PASS")
-        errors = validate_company_evidence_manifest(manifest, raw_root=None, require_raw_verification=True)
+        errors = validate_company_evidence_manifest(
+            manifest,
+            raw_root=None,
+            require_raw_verification=True,
+        )
         self.assertIn("RAW_VERIFICATION_ROOT_REQUIRED", errors)
 
-
-if __name__ == "__main__":
-    unittest.main()
 
 def test_evidence_subject_must_match_case_id():
     payload = b"subject"
@@ -175,16 +175,16 @@ def test_evidence_subject_must_match_case_id():
                 "subject_id": "OTHER-CASE",
             }],
             raw_artifacts=[{
-                "evidence_id":"EV-6",
-                "relative_path":"source.txt",
-                "expected_size_bytes":len(payload),
-                "expected_sha256":digest,
+                "evidence_id": "EV-6",
+                "relative_path": "source.txt",
+                "expected_size_bytes": len(payload),
+                "expected_sha256": digest,
             }],
             required_field_groups=["security_identity"],
             raw_root=root,
         )
-    self.assertEqual(manifest["status"], "BLOCKED")
-    self.assertTrue(any("SUBJECT_CASE_MISMATCH" in item for item in manifest["validation_errors"]))
+    assert manifest["status"] == "BLOCKED"
+    assert any("SUBJECT_CASE_MISMATCH" in item for item in manifest["validation_errors"])
 
 
 def test_raw_artifact_hash_must_match_evidence_hash():
@@ -201,13 +201,17 @@ def test_raw_artifact_hash_must_match_evidence_hash():
             cutoff_date="2026-10-05T09:30:00+08:00",
             evidence=[_evidence("EV-7", "market_price.close", good_digest, "2026-10-05T08:00:00+08:00")],
             raw_artifacts=[{
-                "evidence_id":"EV-7",
-                "relative_path":"source.txt",
-                "expected_size_bytes":len(payload),
-                "expected_sha256":"1"*64,
+                "evidence_id": "EV-7",
+                "relative_path": "source.txt",
+                "expected_size_bytes": len(payload),
+                "expected_sha256": "1" * 64,
             }],
             required_field_groups=["market_price"],
             raw_root=root,
         )
-    self.assertEqual(manifest["status"], "BLOCKED")
-    self.assertTrue(any("EVIDENCE_HASH_MISMATCH" in item for item in manifest["validation_errors"]))
+    assert manifest["status"] == "BLOCKED"
+    assert any("EVIDENCE_HASH_MISMATCH" in item for item in manifest["validation_errors"])
+
+
+if __name__ == "__main__":
+    unittest.main()
