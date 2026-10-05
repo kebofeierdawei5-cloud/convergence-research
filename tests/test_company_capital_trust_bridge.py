@@ -93,9 +93,10 @@ def test_post_cutoff_observation_fails_closed():
         _build(observation_date="2026-10-05")
 
 
-def test_missing_control_fails_closed():
-    with pytest.raises(ValueError, match="must be true"):
-        _build(independent_director_review=False)
+def test_known_missing_control_is_conditional_not_parse_failure():
+    result = _build(independent_director_review=False)
+    assert result["trust_revalidation"]["status"] == "CONDITIONAL"
+    assert result["trust_revalidation"]["governance_integrity"]["non_related_director_vote_control"] is False
 
 
 def test_vote_control_requires_zero_against_and_abstain():
