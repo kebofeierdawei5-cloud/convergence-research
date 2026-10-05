@@ -1,7 +1,7 @@
 # A1-03 — Quality Gate Integration v0.1
 
 Date: 2026-10-05
-Status: IMPLEMENTATION TARGET
+State: ACCEPTED / CANONICAL
 
 ## Objective
 
@@ -104,9 +104,10 @@ A1-03 is accepted only when:
 7. case/cutoff bridge mismatches fail closed;
 8. tampering is detected by integration hash;
 9. schema validation passes;
-10. Investment Core CI remains PASS;
-11. no Decision Kernel semantic change occurs;
-12. no P3/P4/MIE model is added or modified.
+10. A1-03 dedicated CI run #9 is PASS;
+11. the stale state-authority regression observed in Investment Core CI #502 is corrected by the A1 final state-sync change;
+12. no Decision Kernel semantic change occurs;
+13. no P3/P4/MIE model is added or modified.
 
 ## Out of scope
 
@@ -119,6 +120,14 @@ A1-03 is accepted only when:
 - portfolio semantics;
 - Decision Kernel precedence changes.
 
-## Next A1 boundary
+## Final A1 boundary
 
-After A1-03, the company-side evidence loop is materially closed for the current single-company case, but the broader A1 acceptance still requires review of whether the integrated Quality / Trust states are sufficient for the canonical company-quality contract. That review should be an acceptance/red-team step, not another model-building batch.
+A1 company-side evidence closure is accepted for the current single-company case.
+
+The integrated 300750 result remains:
+- Quality Gate = CONDITIONAL;
+- Trust = CONDITIONAL;
+- capital_admission_pass = false;
+- decision_effect = NO_DIRECT_GATE_EFFECT.
+
+Further strengthening of company quality is an analytical revalidation task, not an A1 evidence-closure blocker.
