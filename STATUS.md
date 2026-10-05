@@ -10,7 +10,7 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 ## Current stage
 
-**A0 Governance / State Cleanup = EXECUTION**
+**A0 Governance / State Cleanup = PASS / MERGED**
 
 CORE-04 vertical decision closure is complete.
 
