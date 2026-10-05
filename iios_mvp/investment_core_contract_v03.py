@@ -788,7 +788,7 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
                 revalidation=p2_1_price_response,
             )
             p2_revalidation = p2_1_price_response
-        except (KeyError, TypeError, ValueError):
+        except (KeyError, TypeError, ValueError) as exc:
             p2_1_price_response = None
             p2_target = {
                 "status": "REVIEW_REQUIRED",
@@ -888,7 +888,13 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
             canonical_entry_evaluation = build_canonical_entry_evaluation(
                 current_price=current_price,
                 return_target_entry_price=metrics["target_entry_price"],
-                p2_1_price_response=None,
+                price_response=None,
+                price_response_source=(
+                    "P2_LEGACY_COMPAT"
+                    if isinstance(p2_revalidation, dict)
+                    and p2_revalidation.get("revalidation_id") is not None
+                    else "P2.1_CANONICAL"
+                ),
                 entry_reference_source=(
                     "TARGET_ENTRY_REFERENCE"
                     if isinstance(case.get("target_entry_price_reference"), dict)
