@@ -37,14 +37,14 @@ def _date(value: Any, field: str) -> date:
         raise ValueError(f"{field} must be YYYY-MM-DD") from exc
 
 
-def validate_case(case: dict[str, Any], *, evidence_root_resolver: Any | None = None) -> list[str]:
+def validate_case(case: dict[str, Any], *, evidence_root_resolver: Any | None = None, current_price_resolver: Any | None = None) -> list[str]:
     # Any explicitly versioned investment-core case must use a supported
     # contract; unknown/future versions MUST fail closed rather than entering
     # the legacy v0.1.1 validator.
     contract_version = case.get("contract_version")
     if contract_version == "IIOS-INVESTMENT-CORE-0.3":
         from .investment_core_contract_v03 import validate_case_v03
-        result = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver)
+        result = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver)
         return [
             f"{item['code']}:{item['path']}:{item['message']}"
             for item in result["errors"]
@@ -190,14 +190,14 @@ def _scenario(forecast: dict[str, Any], valuation: dict[str, Any], scenario: str
     return result
 
 
-def decide(case: dict[str, Any], *, evidence_root_resolver: Any | None = None) -> dict[str, Any]:
+def decide(case: dict[str, Any], *, evidence_root_resolver: Any | None = None, current_price_resolver: Any | None = None) -> dict[str, Any]:
     case = deepcopy(case)
-    blockers = validate_case(case, evidence_root_resolver=evidence_root_resolver)
+    blockers = validate_case(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver)
     validation = {"status": "BLOCKED" if blockers else "PASS", "blockers": blockers}
 
     if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.3":
         from .investment_core_contract_v03 import decide_v03
-        proposal = decide_v03(case, evidence_root_resolver=evidence_root_resolver)
+        proposal = decide_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver)
         return {
             "engine_version": ENGINE_VERSION,
             "case_id": case["case_id"],
@@ -404,9 +404,9 @@ def decide(case: dict[str, Any], *, evidence_root_resolver: Any | None = None) -
     }
 
 
-def run_case(case: dict[str, Any], *, evidence_root_resolver: Any | None = None) -> tuple[dict[str, Any], str]:
+def run_case(case: dict[str, Any], *, evidence_root_resolver: Any | None = None, current_price_resolver: Any | None = None) -> tuple[dict[str, Any], str]:
     if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.3":
-        decision = decide(case, evidence_root_resolver=evidence_root_resolver)
+        decision = decide(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver)
         snapshot = {
             "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.3.0",
             "engine_version": ENGINE_VERSION,
@@ -430,7 +430,7 @@ def run_case(case: dict[str, Any], *, evidence_root_resolver: Any | None = None)
     return snapshot, snapshot["snapshot_hash"]
 
 
-def replay(snapshot: dict[str, Any], *, evidence_root_resolver: Any | None = None) -> dict[str, Any]:
+def replay(snapshot: dict[str, Any], *, evidence_root_resolver: Any | None = None, current_price_resolver: Any | None = None) -> dict[str, Any]:
     input_case = snapshot["input"]
     if input_case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.3":
         if snapshot.get("snapshot_schema") != "IIOS-MVP-SNAPSHOT-0.3.0":
@@ -442,7 +442,7 @@ def replay(snapshot: dict[str, Any], *, evidence_root_resolver: Any | None = Non
                 "integrity_status": "FAIL",
                 "reason": "V03_SNAPSHOT_SCHEMA_NOT_SUPPORTED",
             }
-        fresh = decide(input_case, evidence_root_resolver=evidence_root_resolver)
+        fresh = decide(input_case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver)
         same = canonical_json(fresh) == canonical_json(snapshot["decision"])
         expected_hash = sha256_obj({
             "snapshot_schema": snapshot["snapshot_schema"],
