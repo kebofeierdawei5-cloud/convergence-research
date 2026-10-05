@@ -6,6 +6,7 @@ from typing import Any
 
 from .canonical_expectation_gap import evaluate_canonical_expectation_gap
 from .evidence_root_admission import EvidenceRootResolver
+from .canonical_current_price import CanonicalCurrentPriceResolver, validate_current_price_binding
 from .horizon_semantics import validate_horizon_selection
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
@@ -255,7 +256,7 @@ def _portfolio_status(case: dict[str, Any]) -> str:
 def _risk_status(case: dict[str, Any]) -> str:
     return str((case.get("risk") or {}).get("status", "UNKNOWN")).upper()
 
-def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None) -> dict[str, Any]:
+def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None) -> dict[str, Any]:
     errors: list[dict[str, str]] = []
     if not isinstance(case, dict):
         return {"status": "BLOCKED", "errors": [_err("V03-SCHEMA-TYPE", "$", "case must be an object")]}
@@ -301,6 +302,43 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
                 "price_observation_id is required for canonical price evidence",
             )
         )
+    if not str(case["current_price_observation"].get("price_observation_admission_hash", "")).strip():
+        errors.append(
+            _err(
+                "V03-PRICE-ADMISSION-HASH",
+                "current_price_observation.price_observation_admission_hash",
+                "price_observation_admission_hash is required for canonical price evidence",
+            )
+        )
+    if current_price_resolver is None:
+        errors.append(
+            _err(
+                "V03-PRICE-RESOLVER",
+                "current_price_observation",
+                "canonical current price resolver is required at runtime",
+            )
+        )
+    else:
+        try:
+            canonical_price = current_price_resolver.resolve_current_price(
+                {
+                    "price_observation_id": case["current_price_observation"].get("price_observation_id", ""),
+                    "admission_record_hash": case["current_price_observation"].get("price_observation_admission_hash", ""),
+                },
+                case_id=case["case_id"],
+                market=case["market"],
+                symbol=case["symbol"],
+                cutoff_date=cutoff,
+            )
+            validate_current_price_binding(case["current_price_observation"], canonical_price)
+        except (KeyError, TypeError, ValueError) as exc:
+            errors.append(
+                _err(
+                    "V03-PRICE-CANONICAL",
+                    "current_price_observation",
+                    str(exc),
+                )
+            )
     try:
         position = _position(case)
         if position < 0 or position > 100:
@@ -523,8 +561,8 @@ def _investability(
     return "WATCH"
 
 
-def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None) -> dict[str, Any]:
-    validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver)
+def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None) -> dict[str, Any]:
+    validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver)
     position = _position(case) if isinstance(case.get("portfolio"), dict) else Decimal("0")
     trust_status = str((case.get("trust") or {}).get("status", "UNKNOWN")).upper()
     thesis_status = str((case.get("thesis") or {}).get("status", "UNKNOWN")).upper()
