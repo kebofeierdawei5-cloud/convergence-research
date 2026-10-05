@@ -63,6 +63,7 @@ jobs:
           python -m json.tool schemas/market_implied_expectation_v0.2.schema.json >/dev/null
           python -m json.tool schemas/market_implied_expectation_set_v0.2.schema.json >/dev/null
           python -m json.tool schemas/p4f_mie_snapshot_v0.2.schema.json >/dev/null
+          python -m json.tool schemas/canonical_current_price_admission_v0.1.schema.json >/dev/null
       - run: PYTHONPATH=. python -m iios_mvp.cli run examples/iios_mvp_demo.json --out /tmp/iios-mvp
       - run: |
           snapshot=$(find /tmp/iios-mvp -maxdepth 1 -name '*.json' ! -name '*.series.json' ! -name '*.index.json' ! -name '*.decision.json' | head -n 1)
