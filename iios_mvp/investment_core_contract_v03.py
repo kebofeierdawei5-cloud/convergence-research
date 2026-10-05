@@ -469,7 +469,7 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
 
         if not precondition_failed:
             try:
-                _canonical_expectation_gap(expectation_gap, case, evidence_root_resolver=evidence_root_resolver)
+                _canonical_expectation_gap(expectation_gap, case, evidence_root_resolver=evidence_root_resolver, independent_forecast_resolver=independent_forecast_resolver)
             except ValueError as exc:
                 errors.append(
                     _err(
