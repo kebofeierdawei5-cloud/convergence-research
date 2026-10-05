@@ -154,6 +154,7 @@ def evaluate_decision_state(inputs: DecisionStateInputs) -> dict[str, Any]:
         risk_gate_pass=bool(inputs.risk_gate_pass),
         can_add=bool(inputs.can_add),
         package_complete=bool(inputs.package_complete),
+        return_metrics_ready=bool(inputs.return_metrics_ready),
     )
 
     for rule in CANONICAL_DECISION_PRECEDENCE:
