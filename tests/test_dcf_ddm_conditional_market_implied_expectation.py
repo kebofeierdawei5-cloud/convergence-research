@@ -374,38 +374,42 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
     assert all(output.qualification == MIEQualification.CONDITIONAL_ONLY for output in outputs)
 
 
-def test_unstable_p3_blocks_conditional_mie():
-    inp = dcf_input()
-    modified = []
-    historical_prices = {"1": "2100", "8": "4200", "15": "4200", "22": "4200"}
-    for item in inp.observations:
-        if item.observation_id.startswith("h"):
-            day = item.observation_id.split("-", 1)[0][1:]
-            modified.append(
+def test_unstable_identification_blocks_conditional_mie():
+    dcf = dcf_input()
+    dcf_modified = []
+    for item in dcf.observations:
+        if item.observation_id == "h1-discount_rate":
+            dcf_modified.append(
                 cobs(
                     item.observation_id,
-                    int(day),
-                    historical_prices[day],
+                    1,
+                    str(item.price),
                     item.economic_variable,
-                    str(item.economic_value),
+                    "0.03",
                     item.basis,
                     item.unit,
                     item.evidence_ids[0],
                 )
             )
         else:
-            modified.append(item)
-    unstable = MarketModelIdentificationInput(
-        cutoff_date=inp.cutoff_date,
-        current_observation_id=inp.current_observation_id,
-        candidates=inp.candidates,
-        observations=tuple(modified),
-        evidence=inp.evidence,
+            dcf_modified.append(item)
+
+    ddm = ddm_input()
+    combined = MarketModelIdentificationInput(
+        cutoff_date=CUTOFF,
+        current_observation_id="current-fcf",
+        candidates=(dcf.candidates[0], ddm.candidates[0]),
+        observations=tuple(dcf_modified) + tuple(ddm.observations),
+        evidence=tuple(dcf.evidence) + tuple(
+            item for item in ddm.evidence
+            if item.evidence_id not in {x.evidence_id for x in dcf.evidence}
+        ),
     )
-    p3 = identify_market_models(unstable)
+    p3 = identify_market_models(combined)
+    assert p3["identifiability"].state.value == "IDENTIFIABLE"
+    assert p3["identifiability"].selected_model_id == "ddm-1"
     assert p3["stability"].state.value == "UNSTABLE"
-    assert p3["evaluations"][0].fit.status.value == "FEASIBLE"
-    assert run(unstable)[0].qualification == MIEQualification.BLOCKED
+    assert run(combined)[0].qualification == MIEQualification.BLOCKED
 
 
 def test_insufficient_evidence_assessment_blocks_mie():
