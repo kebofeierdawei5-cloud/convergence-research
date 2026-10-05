@@ -18,6 +18,7 @@ on:
       - "schemas/evidence_record_v0.1.schema.json"
       - "schemas/source_registry_v0.1.schema.json"
       - "schemas/pit_temporal_semantics_v0.1.schema.json"
+      - "schemas/company_evidence_manifest_v0.1.schema.json"
       - "configs/source_registry_v0.1.json"
       - "docs/iios/B2_*.md"
       - ".github/workflows/iios_b2.yml"
@@ -50,6 +51,60 @@ jobs:
           python -m json.tool schemas/pit_temporal_semantics_v0.1.schema.json >/dev/null
           python -m json.tool schemas/company_evidence_manifest_v0.1.schema.json >/dev/null
           python -m jsonschema -i configs/source_registry_v0.1.json schemas/source_registry_v0.1.schema.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from jsonschema import Draft202012Validator
+          from referencing import Registry, Resource
+
+          schema_dir = Path("schemas")
+          manifest_schema = json.loads(
+              (schema_dir / "company_evidence_manifest_v0.1.schema.json").read_text()
+          )
+          evidence_schema = json.loads(
+              (schema_dir / "evidence_record_v0.1.schema.json").read_text()
+          )
+          registry = Registry().with_resource(
+              evidence_schema["$id"],
+              Resource.from_contents(evidence_schema),
+          )
+          validator = Draft202012Validator(manifest_schema, registry=registry)
+          validator.check_schema(manifest_schema)
+          fixture = {
+              "schema_version": "IIOS-COMPANY-EVIDENCE-MANIFEST-0.1",
+              "case_id": "SCHEMA-001",
+              "market": "CN-A",
+              "symbol": "000001",
+              "company": "TESTCO",
+              "cutoff_date": "2026-10-05T09:30:00+08:00",
+              "required_field_groups": ["security_identity"],
+              "evidence": [{
+                  "evidence_id": "EV-SCHEMA",
+                  "subject_id": "SCHEMA-001",
+                  "field_id": "security_identity.primary",
+                  "claim_type": "DIRECT_OBSERVATION",
+                  "value": "fixture",
+                  "known_at": "2026-10-05T08:00:00+08:00",
+                  "retrieved_at": "2026-10-05T09:00:00+08:00",
+                  "source_ref": "TEST:PRIMARY",
+                  "artifact_id": "ART-EV-SCHEMA",
+                  "content_sha256": "0" * 64,
+                  "exact_bytes": True,
+                  "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+                  "status": "ADMITTED"
+              }],
+              "raw_artifacts": [{
+                  "evidence_id": "EV-SCHEMA",
+                  "relative_path": "fixture.txt",
+                  "expected_size_bytes": 1,
+                  "expected_sha256": "0" * 64
+              }],
+              "audit": {"manifest_sha256": "0" * 64}
+          }
+          validator.validate(fixture)
+          print("company evidence manifest $ref resolution: PASS")
+          PY
       - name: Run single-company Evidence/PIT tests
         run: python -m pytest -q research/b2/tests/test_company_evidence.py research/b2/tests/test_evidence_contract.py
       - name: Prove A02 fails closed when exact bytes are absent
