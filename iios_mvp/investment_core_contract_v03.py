@@ -10,6 +10,7 @@ from .canonical_current_price import CanonicalCurrentPriceResolver, validate_cur
 from .canonical_independent_forecast import CanonicalIndependentForecastResolver
 from .horizon_semantics import validate_horizon_selection
 from .decision_kernel_v03 import evaluate_production_decision
+from .decision_upstream_admission_v03 import validate_decision_upstream_admission
 from .price_dependent_expectation_gap import (
     P2_PRICE_GAP_REVALIDATION_VERSION,
     combine_target_entry_price_v2,
@@ -290,7 +291,7 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
         "contract_version", "case_id", "market", "symbol", "company",
         "as_of_date", "cutoff_date", "current_price_observation",
         "company_evidence_manifest", "trust", "reality", "forecast",
-        "valuation", "risk", "portfolio", "thesis", "return_gate",
+        "valuation", "risk", "portfolio", "thesis", "decision_upstream_admission", "return_gate",
     )
     _required(case, required, "$", errors)
     if errors:
@@ -399,6 +400,20 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
     if not isinstance(portfolio, dict) or _portfolio_status(case) not in PORTFOLIO_CONSTRAINT_STATES:
         errors.append(_err("V03-PORTFOLIO", "portfolio.constraint_status", "invalid Portfolio Constraint state"))
     errors.extend(validate_return_gate_v03(case["return_gate"]))
+    try:
+        validate_decision_upstream_admission(
+            case["decision_upstream_admission"],
+            case_id=case["case_id"],
+            cutoff_date=case["cutoff_date"],
+        )
+    except (TypeError, ValueError) as exc:
+        errors.append(
+            _err(
+                "V03-UPSTREAM-ADMISSION",
+                "decision_upstream_admission",
+                str(exc),
+            )
+        )
 
     try:
         observed_price = _dec(
@@ -651,7 +666,20 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
     validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver, independent_forecast_resolver=independent_forecast_resolver)
     position = _position(case) if isinstance(case.get("portfolio"), dict) else Decimal("0")
     trust_status = str((case.get("trust") or {}).get("status", "UNKNOWN")).upper()
-    thesis_status = str((case.get("thesis") or {}).get("status", "UNKNOWN")).upper()
+    upstream = (
+        case.get("decision_upstream_admission")
+        if isinstance(case.get("decision_upstream_admission"), dict)
+        else {}
+    )
+    thesis_status = str(
+        upstream.get("thesis_status", (case.get("thesis") or {}).get("status", "UNKNOWN"))
+    ).upper()
+    reality_status = str(upstream.get("reality_status", "UNKNOWN")).upper()
+    quality_gate_status = str(upstream.get("quality_gate_status", "UNKNOWN")).upper()
+    value_driver_status = str(upstream.get("value_driver_status", "UNKNOWN")).upper()
+    valuation_status = str(upstream.get("valuation_status", "UNKNOWN")).upper()
+    forecast_status = str(upstream.get("forecast_status", "UNKNOWN")).upper()
+    thesis_admission_status = str(upstream.get("thesis_admission_status", "UNKNOWN")).upper()
     risk_status = _risk_status(case)
     portfolio_status = _portfolio_status(case)
     gap_status, gap_relative = _expectation_gap(case, evidence_root_resolver=evidence_root_resolver, independent_forecast_resolver=independent_forecast_resolver)
@@ -678,6 +706,13 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
 
     gates = {
         "trust": trust_status,
+        "reality": reality_status,
+        "quality_gate": quality_gate_status,
+        "value_driver": value_driver_status,
+        "valuation": valuation_status,
+        "forecast": forecast_status,
+        "thesis_admission": thesis_admission_status,
+        "upstream_capital_admission_ready": upstream.get("capital_admission_ready"),
         "horizon_years": metrics["horizon_years"] if metrics else None,
         "horizon_override": metrics["horizon_override"] if metrics else None,
         "horizon_override_basis": metrics["horizon_override_basis"] if metrics else [],
@@ -709,6 +744,12 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         validation_pass=validation["status"] == "PASS",
         trust_status=trust_status,
         thesis_status=thesis_status,
+        reality_status=reality_status,
+        quality_gate_status=quality_gate_status,
+        value_driver_status=value_driver_status,
+        valuation_status=valuation_status,
+        forecast_status=forecast_status,
+        thesis_admission_status=thesis_admission_status,
         risk_status=risk_status,
         portfolio_status=portfolio_status,
         position_pct=position,
@@ -981,6 +1022,7 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "human_approval_required": True,
         "auto_execution": False,
         "gates": gates,
+        "decision_upstream_admission": _serialize_nested(upstream),
         "position_package_complete": package_complete,
         "target_entry_price": (
             str(p2_target["target_entry_price"])
