@@ -12,11 +12,13 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 **A0 Governance / State Cleanup = PASS / MERGED**
 
-CORE-04 vertical decision closure is complete.
+**A1-01 Economic Evidence Bridge = PASS / MERGED**
+
+CORE-04 vertical decision closure is complete. A1 company-side evidence closure is now in progress.
 
 Current next substantive batch:
 
-**A1 Company-side Evidence Closure**
+**A1-02 Capital Allocation + Trust/Governance Evidence Closure**
 
 No new P3/P4/MIE model work is on the critical path.
 
@@ -55,6 +57,14 @@ The production Decision Kernel is merged and the real 300750 chain has passed E2
 Investment Core remains single-company and PIT-bound.
 
 CSI800 / CSI Industry / historical-universe reconstruction and FM forecast research remain separate Research Track workstreams and do not block the core.
+
+## A1 status
+
+A1-01 has established the deterministic CAPEX → D&A → FCF, Earnings → OCF → FCF, Working Capital and Incremental ROIC proxy layer for the real 300750 case. The bridge is CONDITIONAL and has no direct Decision Kernel gate effect.
+
+A1 remains incomplete until capital-allocation evidence, fuller Trust/Governance evidence, and explicit Quality Gate integration are closed.
+
+Acceptance record: `docs/iios/A1_01_ACCEPTANCE_2026-10-05.md`
 
 ## Product gaps after CORE-04
 
