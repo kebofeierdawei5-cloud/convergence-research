@@ -21,6 +21,8 @@ def test_b2_namespace_contains_no_a02_or_csi_research_track_code() -> None:
     for path in B2_DIR.rglob("*"):
         if not path.is_file() or path.suffix not in {".py", ".json", ".md", ".yml", ".yaml"}:
             continue
+        if path == Path(__file__):
+            continue
         text = path.read_text(encoding="utf-8")
         for token in FORBIDDEN_TOKENS:
             assert token not in text, f"forbidden research-track token {token!r} found in {path}"
