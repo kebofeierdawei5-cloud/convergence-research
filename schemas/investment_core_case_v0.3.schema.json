@@ -455,6 +455,18 @@
             "null"
           ]
         },
+        "target_entry_price_semantics": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_entry_price_requires_gap_revalidation": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "position_package_complete": {
           "type": "boolean"
         }
