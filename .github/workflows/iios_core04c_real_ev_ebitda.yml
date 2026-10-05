@@ -1,0 +1,33 @@
+name: IIOS CORE-04-C CATL EV EBITDA Real Parse
+
+on:
+  pull_request:
+    paths:
+      - "research/core04c_catl_sources_v0.2.json"
+      - "tools/core04c_catl_ev_ebitda.py"
+      - "tests/test_core04c_catl_ev_ebitda.py"
+      - "docs/iios/CORE_04C_CATL_EV_EBITDA_ACCEPTANCE_2026-10-05.md"
+  push:
+    branches: [main]
+    paths:
+      - "research/core04c_catl_sources_v0.2.json"
+      - "tools/core04c_catl_ev_ebitda.py"
+      - "tests/test_core04c_catl_ev_ebitda.py"
+      - "docs/iios/CORE_04C_CATL_EV_EBITDA_ACCEPTANCE_2026-10-05.md"
+
+permissions:
+  contents: read
+
+jobs:
+  real-ev-ebitda:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest pymupdf
+      - run: python -m compileall -q tools tests/test_core04c_catl_ev_ebitda.py
+      - run: python -m pytest -q tests/test_core04c_catl_ev_ebitda.py
+      - run: |
+          python tools/core04c_fetch_and_parse.py             --manifest research/core04c_catl_sources_v0.2.json             --out /tmp/core04c/final
