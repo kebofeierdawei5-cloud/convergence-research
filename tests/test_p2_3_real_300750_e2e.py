@@ -29,7 +29,7 @@ def test_p2_3_real_300750_replays_fail_closed_without_fabricating_mie(tmp_path: 
     assert result["p3a"]["stability_scope"] == "IDENTIFICATION_ONLY"
     assert result["p3a"]["historical_support"] == "BELOW_HISTORICAL_RANGE"
     assert result["p3a"]["regime_interpretation"] == "POSSIBLE_REGIME_SHIFT"
-    assert result["p3a"]["feasible_model_ids"] == ["catl-ev-ebitda"]
+    assert result["p3a"]["feasible_model_ids"] == ["real-ev-ebitda-300750"]
     assert Decimal(result["p3a"]["historical_range"]["low"]) == Decimal(
         "13.6686920853194080865159796474107277185842350664948830139214"
     )
