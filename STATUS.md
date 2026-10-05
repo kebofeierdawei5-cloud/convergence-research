@@ -22,7 +22,7 @@ B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = PASS / MERGED. CATL Exist
 - Source-quality gaps: E002 primary-price gap is CLOSED by supplementary evidence E011; E003/E007 remain P1 direct-primary disclosure gaps when material.
 - No secondary source is silently upgraded to primary evidence.
 - A02/CSI800 is Research Track only: its code is outside research/b2 and it must not execute from B2 CI.
-- E011 is bound to SZSE:MARKET_DATA and validated against a private operator raw vault: 231,394 bytes / SHA-256 349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2; 2026-09-30 300750 close = 291.11 CNY/share. Raw trading-information bytes are not published to the public repository; public CI remains fail-closed when the private vault is absent. Legacy E002 remains append-only. Next: CORE-03 / CORE-04. No historical universe/data platform is required.
+- E011 is bound to SZSE:MARKET_DATA and validated against a private operator raw vault: 231,394 bytes / SHA-256 349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2; 2026-09-30 300750 close = 291.11 CNY/share. Raw trading-information bytes are not published to the public repository; public CI remains fail-closed when the private vault is absent. Legacy E002 remains append-only. Next: consume the admitted CORE-04-C EV/EBITDA observations in the existing P3-A/P4 ratio-family market-model path. No historical universe/data platform is required.
 
 
 ## Canonical State
@@ -347,7 +347,7 @@ B1 semantic package and runtime migration accepted on the repair line. Evidence:
 
 ## Immediate Next Engineering Step
 
-B2-B — CATL Real Evidence Admission
+P3/P4 ratio-family integration — consume the admitted CORE-04-C 300750 EV/EBITDA observations in the existing market-model identification / MIE path. No new source acquisition is required for the completed CORE-04-C gate.
 
 1. Materialize the planned CATL source files as physical raw bytes.
 2. Recompute physical size + SHA-256 from the captured bytes.
