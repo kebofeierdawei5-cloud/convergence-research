@@ -421,14 +421,6 @@ def test_rnpv_affine_response_uses_frozen_observed_risk_weight():
 
 def test_pit_failure_is_fail_closed():
     req = _req("ebitda", "fixture-ev", value="10")
-    snapshot = _make_snapshot(
-        MarketModelFamily.EV_EBITDA,
-        req,
-        context=(
-            _prov("ctx-shares", "shares_outstanding", "model_context:model-ev_ebitda:shares_outstanding", value="10", unit="shares", known_at=datetime(2026, 10, 5, tzinfo=timezone.utc)),
-            _prov("ctx-net-debt", "net_debt", "model_context:model-ev_ebitda:net_debt", value="100"),
-        ),
-    )
     with pytest.raises(ValueError, match="known_at is after cutoff"):
         _make_snapshot(
             MarketModelFamily.EV_EBITDA,
