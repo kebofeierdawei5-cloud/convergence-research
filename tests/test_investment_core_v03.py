@@ -561,12 +561,10 @@ def test_v03_expectation_gap_price_binding_requires_revalidation():
     assert any("V03-EXPECTATION-GAP-PRICE" in x for x in result["validation"]["blockers"])
 
 
-def test_v03_target_entry_price_is_conditional_and_requires_gap_revalidation():
+def test_v03_target_entry_price_is_return_risk_first_and_mie_optional():
     result = decide(case(), evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
-    assert result["decision"]["target_entry_price_semantics"] == (
-        "P2_PRICE_DEPENDENT_EXPECTATION_GAP_REVALIDATED_CONDITIONAL_THRESHOLD"
-    )
-    assert result["decision"]["target_entry_price_requires_gap_revalidation"] is True
+    assert result["decision"]["target_entry_price_requires_gap_revalidation"] is False
+    assert result["decision"]["target_entry_price_semantics"].startswith("RETURN_RISK_THRESHOLD_ONLY")
     assert result["gates"]["target_entry_price"] == result["decision"]["target_entry_price"]
 
 
