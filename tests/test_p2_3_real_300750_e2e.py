@@ -23,9 +23,12 @@ def test_p2_3_real_300750_replays_fail_closed_without_fabricating_mie(tmp_path: 
         "8.37553678673236137719557663833711822315448858172586361642990"
     )
 
-    assert result["p3a"]["evaluation_status"] == "INFEASIBLE"
+    assert result["p3a"]["evaluation_status"] == "OUTSIDE_HISTORICAL_SUPPORT"
     assert result["p3a"]["identifiability"] == "UNIDENTIFIABLE"
     assert result["p3a"]["stability"] == "INSUFFICIENT_EVIDENCE"
+    assert result["p3a"]["stability_scope"] == "IDENTIFICATION_ONLY"
+    assert result["p3a"]["historical_support"] == "BELOW_HISTORICAL_RANGE"
+    assert result["p3a"]["regime_interpretation"] == "POSSIBLE_REGIME_SHIFT"
     assert result["p3a"]["feasible_model_ids"] == []
     assert Decimal(result["p3a"]["historical_range"]["low"]) == Decimal(
         "13.6686920853194080865159796474107277185842350664948830139214"
