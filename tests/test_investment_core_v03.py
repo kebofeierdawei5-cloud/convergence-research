@@ -783,3 +783,41 @@ def test_v03_two_year_override_is_not_treated_as_a_three_year_exception():
     c["return_gate"]["horizon_selection_rationale"] = "Attempted two-year override."
     result = validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["status"] == "BLOCKED"
+
+
+
+def test_v03_missing_mie_does_not_block_company_side_buy():
+    c = case()
+    del c["expectation_gap"]
+    result = decide(
+        c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        current_price_resolver=CURRENT_PRICE_REGISTRY,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+    )
+    assert result["decision"]["action"] == "BUY"
+    assert result["gates"]["expectation_gap_required_for_buy_add"] is False
+    assert result["gates"]["mie_policy"] == "OPTIONAL_EXPLANATORY"
+    assert result["decision"]["decision_admission_rule_id"] == "DA05_OPTIONAL_MIE_ENTRY_GATE_NOT_REQUIRED"
+
+
+def test_v03_nonpositive_mie_gap_is_advisory_not_an_automatic_buy_veto():
+    c = case()
+    c["expectation_gap"]["independent_forecast_ref"] = independent_forecast_ref(
+        value="8", forecast_id="forecast-v03-advisory-negative-gap"
+    )
+    result = decide(
+        c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        current_price_resolver=CURRENT_PRICE_REGISTRY,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+    )
+    assert result["decision"]["action"] == "BUY"
+    assert result["gates"]["expectation_gap_status"] == "PASS"
+    assert result["gates"]["positive_expectation_gap_pass"] is False
+
+
+def test_v03_target_entry_price_is_return_risk_first_and_mie_optional():
+    metrics = calculate_return_metrics(case()["return_gate"], max_loss_pct="25")
+    assert metrics["target_entry_price_requires_gap_revalidation"] is False
+    assert metrics["target_entry_price_semantics"].startswith("RETURN_RISK_THRESHOLD_ONLY")
