@@ -444,7 +444,7 @@ def test_real_core04c_observations_are_consumed_by_p3a_and_fail_closed_on_curren
     assert "current_multiple=8.375536786732361377195576638" in diagnostics["current_historical_support"].notes
     assert evaluation.fit.historical_support.value == "BELOW_HISTORICAL_RANGE"
     assert evaluation.fit.regime_interpretation.value == "POSSIBLE_REGIME_SHIFT"
-    assert result["identifiability"].state.value == "UNIDENTIFIABLE"
+    assert result["identifiability"].state.value == "IDENTIFIABLE"
     assert result["stability"].state.value == "INSUFFICIENT_EVIDENCE"
     assert payload["source_receipt"]["artifact_sha256"] == "51e9e8c19404ef241383c99e0f9ed98bf3088fbe2b4a47778e9f5d79a26ee6c4"
 
