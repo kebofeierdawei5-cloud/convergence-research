@@ -150,12 +150,8 @@ class CompanyEvidenceTests(unittest.TestCase):
             required_field_groups=["security_identity"],
             raw_root=None,
         )
-        errors = validate_company_evidence_manifest(
-            manifest,
-            raw_root=None,
-            require_raw_verification=True,
-        )
-        self.assertIn("RAW_VERIFICATION_ROOT_REQUIRED", errors)
+        self.assertEqual(manifest["status"], "BLOCKED")
+        self.assertIn("RAW_VERIFICATION_ROOT_REQUIRED", manifest["validation_errors"])
 
 
 def test_evidence_subject_must_match_case_id():
@@ -211,6 +207,71 @@ def test_raw_artifact_hash_must_match_evidence_hash():
         )
     assert manifest["status"] == "BLOCKED"
     assert any("EVIDENCE_HASH_MISMATCH" in item for item in manifest["validation_errors"])
+
+
+def test_raw_artifact_path_escape_is_blocked():
+    payload = b"outside-root"
+    digest = hashlib.sha256(payload).hexdigest()
+    with tempfile.TemporaryDirectory() as directory:
+        base = Path(directory)
+        root = base / "raw"
+        root.mkdir()
+        outside = base / "outside.txt"
+        outside.write_bytes(payload)
+        declaration = {
+            "evidence_id": "EV-8",
+            "relative_path": "../outside.txt",
+            "expected_size_bytes": len(payload),
+            "expected_sha256": digest,
+        }
+        from research.b2.company_evidence import verify_raw_artifact
+        result = verify_raw_artifact(root, declaration)
+    assert result["status"] == "BLOCKED"
+    assert result["reason"] == "RAW_ARTIFACT_PATH_ESCAPE"
+
+
+def test_absolute_path_escape_is_blocked():
+    payload = b"absolute-outside-root"
+    digest = hashlib.sha256(payload).hexdigest()
+    with tempfile.TemporaryDirectory() as directory:
+        base = Path(directory)
+        root = base / "raw"
+        root.mkdir()
+        outside = base / "outside.txt"
+        outside.write_bytes(payload)
+        declaration = {
+            "evidence_id": "EV-9",
+            "relative_path": str(outside),
+            "expected_size_bytes": len(payload),
+            "expected_sha256": digest,
+        }
+        from research.b2.company_evidence import verify_raw_artifact
+        result = verify_raw_artifact(root, declaration)
+    assert result["status"] == "BLOCKED"
+    assert result["reason"] == "RAW_ARTIFACT_PATH_ESCAPE"
+
+
+def test_symlink_escape_is_blocked():
+    payload = b"symlink-outside-root"
+    digest = hashlib.sha256(payload).hexdigest()
+    with tempfile.TemporaryDirectory() as directory:
+        base = Path(directory)
+        root = base / "raw"
+        root.mkdir()
+        outside = base / "outside.txt"
+        outside.write_bytes(payload)
+        link = root / "link.txt"
+        link.symlink_to(outside)
+        declaration = {
+            "evidence_id": "EV-10",
+            "relative_path": "link.txt",
+            "expected_size_bytes": len(payload),
+            "expected_sha256": digest,
+        }
+        from research.b2.company_evidence import verify_raw_artifact
+        result = verify_raw_artifact(root, declaration)
+    assert result["status"] == "BLOCKED"
+    assert result["reason"] == "RAW_ARTIFACT_PATH_ESCAPE"
 
 
 if __name__ == "__main__":
