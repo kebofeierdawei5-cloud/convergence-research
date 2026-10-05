@@ -222,6 +222,15 @@ def test_v03_risk_cap_enters_target_entry_price_solver():
     assert metrics["target_entry_price"] == metrics["target_entry_price_for_risk"]
 
 
+
+def test_v03_missing_risk_budget_fails_closed():
+    c = case()
+    del c["risk"]["max_loss_pct"]
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-RISK-MAX-LOSS-REQUIRED" in x for x in result["validation"]["blockers"])
+
+
 def test_v03_exact_15_annualized_target_is_inclusive():
     c = case()
     # Equal scenario wealth makes expected wealth exactly 132.25 over H=2.
