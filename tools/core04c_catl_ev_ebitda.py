@@ -87,10 +87,13 @@ def parse_szse_market_snapshot(
     raise ValueError(f"{path.name}: {symbol} on {expected_date} not found")
 
 
-def _report_text(path: Path, pages_1based: tuple[int, ...]) -> str:
+def _report_text(path: Path, pages_1based: tuple[int, ...] | None = None) -> str:
     doc = fitz.open(path)
+    page_numbers = pages_1based if pages_1based else tuple(range(1, doc.page_count + 1))
     parts = []
-    for page_no in pages_1based:
+    for page_no in page_numbers:
+        if not 1 <= page_no <= doc.page_count:
+            raise ValueError(f"{path.name}: page {page_no} outside 1..{doc.page_count}")
         parts.append(doc[page_no - 1].get_text("text"))
     return "\n".join(parts)
 
@@ -276,11 +279,11 @@ def main() -> int:
             "market_date": "2025-10-22",
             "market": "SZSE-MKT-2025-10-22.xlsx",
             "financial": "CNINFO-Q3-2025.pdf",
-            "financial_pages": (6, 7, 8),
+            "financial_pages": (),
             "financial_known_at": "2025-10-21T23:59:59+08:00",
             "ebitda": "CNINFO-FY2024-2025-03-15.pdf",
-            "ebitda_income_pages": (119,),
-            "ebitda_cashflow_pages": (201,),
+            "ebitda_income_pages": (),
+            "ebitda_cashflow_pages": (),
             "ebitda_year": 2024,
             "ebitda_known_at": "2025-03-15T23:59:59+08:00",
         },
@@ -288,11 +291,11 @@ def main() -> int:
             "market_date": "2026-04-17",
             "market": "SZSE-MKT-2026-04-17.xlsx",
             "financial": "CNINFO-Q1-2026.pdf",
-            "financial_pages": (5, 6, 7),
+            "financial_pages": (),
             "financial_known_at": "2026-04-16T23:59:59+08:00",
             "ebitda": "CNINFO-FY2025-2026-03-10.pdf",
-            "ebitda_income_pages": (116,),
-            "ebitda_cashflow_pages": (200,),
+            "ebitda_income_pages": (),
+            "ebitda_cashflow_pages": (),
             "ebitda_year": 2025,
             "ebitda_known_at": "2026-03-10T23:59:59+08:00",
         },
@@ -300,7 +303,7 @@ def main() -> int:
             "market_date": "2026-07-27",
             "market": "SZSE-MKT-2026-07-27.xlsx",
             "financial": "CNINFO-H1-2026.pdf",
-            "financial_pages": (73, 74, 75),
+            "financial_pages": (),
             "financial_known_at": "2026-07-24T23:59:59+08:00",
             "ebitda": "CNINFO-FY2025-2026-03-10.pdf",
             "ebitda_income_pages": (116,),
