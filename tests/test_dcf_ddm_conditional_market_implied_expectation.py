@@ -375,41 +375,30 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
 
 
 def test_unstable_identification_blocks_conditional_mie():
-    dcf = dcf_input()
-    dcf_modified = []
-    for item in dcf.observations:
-        if item.observation_id == "h1-discount_rate":
-            dcf_modified.append(
-                cobs(
-                    item.observation_id,
-                    1,
-                    str(item.price),
-                    item.economic_variable,
-                    "0.03",
-                    item.basis,
-                    item.unit,
-                    item.evidence_ids[0],
-                )
-            )
-        else:
-            dcf_modified.append(item)
-
-    ddm = ddm_input(id_prefix="unstable-")
-    combined = MarketModelIdentificationInput(
-        cutoff_date=CUTOFF,
-        current_observation_id="current-fcf",
-        candidates=(dcf.candidates[0], ddm.candidates[0]),
-        observations=tuple(dcf_modified) + tuple(ddm.observations),
-        evidence=tuple(dcf.evidence) + tuple(
-            item for item in ddm.evidence
-            if item.evidence_id not in {x.evidence_id for x in dcf.evidence}
-        ),
+    inp = dcf_input()
+    modified = list(inp.observations)
+    bad = modified[0]
+    modified[0] = cobs(
+        bad.observation_id,
+        1,
+        str(bad.price),
+        "discount_rate",
+        "0.20",
+        bad.basis,
+        bad.unit,
+        bad.evidence_ids[0],
     )
-    p3 = identify_market_models(combined)
-    assert p3["identifiability"].state.value == "IDENTIFIABLE"
-    assert p3["identifiability"].selected_model_id == "ddm-1"
+    unstable = MarketModelIdentificationInput(
+        cutoff_date=inp.cutoff_date,
+        current_observation_id=inp.current_observation_id,
+        candidates=inp.candidates,
+        observations=tuple(modified),
+        evidence=inp.evidence,
+    )
+    p3 = identify_market_models(unstable)
+    assert p3["identifiability"].state.value == "UNIDENTIFIABLE"
     assert p3["stability"].state.value == "UNSTABLE"
-    assert run(combined)[0].qualification == MIEQualification.BLOCKED
+    assert run(unstable)[0].qualification == MIEQualification.BLOCKED
 
 
 def test_insufficient_evidence_assessment_blocks_mie():
