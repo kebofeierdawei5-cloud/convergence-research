@@ -25,7 +25,9 @@ B2-A Single Company Evidence / PIT Foundation = PASS / MERGED
         ↓
 B2-A Scope Repair = PASS / MERGED
         ↓
-CATL Existing Evidence Migration / Admission = ACTIVE
+CATL Existing Evidence Migration / Admission = PASS / TECHNICAL
+        ↓
+CATL Primary-Source Gap Supplementation = ACTIVE
 ```
 
 ## Authority / continuity
@@ -74,9 +76,9 @@ BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
 
 ## Current development task
 
-CATL Existing Evidence Migration / Admission
+CATL Primary-Source Gap Supplementation
 
-Scope Repair is complete on canonical main. The next step is to validate the existing CATL E001-E010 capture artifacts against the B2 Evidence Manifest. No new acquisition platform is introduced.
+CATL E001-E010 existing capture artifacts have passed B2 technical migration: physical capture bytes, size/SHA-256, case binding, PIT and manifest integrity all pass CI. The remaining work is limited to targeted source-quality gaps; no new historical-data platform is required.
 
 PR #32 Horizon Semantics is merged to main (a524390382044b9474c17f2712a2cef8adeb9612). Investment Core horizon semantics use H=1Y as the normative default; H=3 requires explicit case-level override evidence.
 
@@ -88,10 +90,10 @@ B2-A is PASS / MERGED:
 - PR #34 raw-root containment hardening merged 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3;
 - B2 CI passed after both changes.
 
-CATL Existing Evidence Migration / Admission is active for RC-CN-A-300750-20261004.
-The existing E001-E010 capture artifacts are the migration input. B2 will verify physical capture bytes, PIT semantics, case binding and manifest integrity. Source-quality gaps remain a separate disposition and do not get silently promoted to primary evidence.
+CATL Existing Evidence Migration / Admission is PASS / TECHNICAL for RC-CN-A-300750-20261004.
+E001-E010 are physically present and pass B2 byte/PIT/manifest validation. Source-quality is separately graded: E002 remains P0 primary-price gap; E003/E007 remain P1 direct-primary disclosure gaps if material to Trust/Governance. Secondary evidence is never silently upgraded to primary.
 
-Current canonical main baseline: fa4a53bd5f88f8e25cc4c02614c9e765294afbb6.
+Current canonical main baseline: 00fdf82a374ac46a5b99567b590e940d7220bd23.
 
 ## CORE-03 Real 300750 acceptance
 
