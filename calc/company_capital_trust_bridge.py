@@ -103,8 +103,8 @@ def _input_core(payload: Mapping[str, Any]) -> dict[str, Any]:
         "independent_director_review",
         "related_director_recusal",
     ):
-        if payload[field] is not True:
-            raise ValueError(f"input.{field} must be true")
+        if not isinstance(payload[field], bool):
+            raise ValueError(f"input.{field} must be boolean")
 
     for field in (
         "non_related_director_for_votes",
@@ -132,9 +132,6 @@ def _input_core(payload: Mapping[str, Any]) -> dict[str, Any]:
     )
     if votes <= 0:
         raise ValueError("input.non_related_director votes cannot all be zero")
-    if payload["non_related_director_for_votes"] < 0:
-        raise ValueError("input.non_related_director_for_votes cannot be negative")
-
     return {**dict(payload), "evidence_ids": refs}
 
 
@@ -239,7 +236,7 @@ def build_company_capital_trust_bridge(
             "governance_integrity": {
                 "status": "CONDITIONAL",
                 "related_party_transactions_or_exposures_present": True,
-                "independent_director_review": payload["independent_director_review"],
+                        "independent_director_review": payload["independent_director_review"],
                 "related_director_recusal": payload["related_director_recusal"],
                 "non_related_director_vote_control": board_vote_control,
             },
