@@ -250,11 +250,11 @@ def test_outside_support_blocks_decision_grade_mie_even_when_identification_stab
 
 
 def test_unstable_identification_still_blocks_ratio_mie():
-    pe = candidate("pe-1", MarketModelFamily.FORWARD_PE, "candidate-pe")
+    ps = candidate("ps-1", MarketModelFamily.PS, "candidate-ps")
     inp = build_input(
-        (pe,),
-        "forward_eps",
-        ("10", "10", "10", "10", "10"),
+        (ps,),
+        "revenue",
+        ("100", "100", "100", "100", "100"),
         ("100", "100", "100", "100", "100"),
     )
     invalid = list(inp.observations)
@@ -283,8 +283,8 @@ def test_unstable_identification_still_blocks_ratio_mie():
     p3 = identify_market_models(unstable)
     assert p3["identifiability"].state.value == "UNIDENTIFIABLE"
     assert p3["stability"].state.value == "UNSTABLE"
-    outputs = run(unstable)
-    assert outputs[0].qualification == MIEQualification.BLOCKED
+    with pytest.raises(ValueError):
+        run(unstable)
 
 
 def test_insufficient_candidate_coverage_blocks_mie():
