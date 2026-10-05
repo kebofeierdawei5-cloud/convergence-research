@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/canonical-current-price-admission-0.1.schema.json",
+  "title": "IIOS Canonical Current Price Admission v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "admission_schema",
+    "status",
+    "case_id",
+    "market",
+    "symbol",
+    "cutoff_date",
+    "price_observation_id",
+    "market_observation_id",
+    "price",
+    "currency",
+    "observed_at",
+    "known_at",
+    "source",
+    "source_location",
+    "adjustment_semantics",
+    "price_evidence_content_sha256",
+    "price_evidence_exact_bytes",
+    "price_evidence_temporal_provenance",
+    "market_observation_evidence_ids",
+    "admission_record_hash"
+  ],
+  "properties": {
+    "admission_schema": {
+      "const": "IIOS-CURRENT-PRICE-OBSERVATION-ADMISSION-0.1"
+    },
+    "status": {
+      "const": "ADMITTED"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "market": {
+      "type": "string",
+      "minLength": 1
+    },
+    "symbol": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cutoff_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "price_observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "market_observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "price": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$"
+    },
+    "currency": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observed_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "known_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_location": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adjustment_semantics": {
+      "type": "string",
+      "minLength": 1
+    },
+    "price_evidence_content_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "price_evidence_exact_bytes": {
+      "const": true
+    },
+    "price_evidence_temporal_provenance": {
+      "enum": [
+        "SOURCE_VINTAGE",
+        "CONTEMPORANEOUS_PUBLICATION"
+      ]
+    },
+    "market_observation_evidence_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "admission_record_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
