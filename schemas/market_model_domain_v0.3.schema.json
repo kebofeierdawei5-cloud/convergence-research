@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/market_model_domain_v0.3.schema.json",
+  "title": "IIOS Market Model Identification Domain v0.3",
+  "type": "object",
+  "required": [
+    "candidate_market_model",
+    "model_fit",
+    "feasible_solution_set",
+    "identifiability",
+    "stability"
+  ],
+  "properties": {
+    "candidate_market_model": {
+      "type": "object",
+      "required": [
+        "model_id",
+        "family",
+        "required_economic_variables",
+        "required_observable_variables",
+        "evidence_ids",
+        "admission_basis",
+        "inverse_solvable"
+      ],
+      "properties": {
+        "model_id": {"type": "string", "minLength": 1},
+        "family": {
+          "type": "string",
+          "enum": ["forward_pe","ps","pb","ev_ebitda","dcf","ddm","sotp","rnpv"]
+        },
+        "required_economic_variables": {"type": "array", "minItems": 1, "items": {"type":"string"}},
+        "required_observable_variables": {"type": "array", "minItems": 1, "items": {"type":"string"}},
+        "evidence_ids": {"type": "array", "items": {"type":"string"}},
+        "admission_basis": {"type":"string", "minLength": 1},
+        "inverse_solvable": {"type":"boolean"}
+      },
+      "additionalProperties": false
+    },
+    "model_fit": {
+      "type": "object",
+      "required": ["model_id","status","diagnostics","evidence_ids"],
+      "properties": {
+        "model_id": {"type":"string","minLength":1},
+        "status": {"type":"string","enum":["FEASIBLE","INFEASIBLE","OUTSIDE_HISTORICAL_SUPPORT","INSUFFICIENT_EVIDENCE","CONTRADICTED"]},
+        "diagnostics": {"type":"array","minItems":1},
+        "evidence_ids": {"type":"array","items":{"type":"string"}},
+        "constraints": {"type":"array","items":{"type":"string"}}
+      },
+      "additionalProperties": false
+    },
+    "feasible_solution_set": {
+      "type":"object",
+      "required":["model_id","status","solutions","constraint_ids","evidence_ids","basis"],
+      "properties": {
+        "model_id":{"type":"string","minLength":1},
+        "status":{"type":"string","enum":["NONEMPTY","EMPTY","INSUFFICIENT_EVIDENCE"]},
+        "solutions":{"type":"array"},
+        "constraint_ids":{"type":"array","items":{"type":"string"}},
+        "evidence_ids":{"type":"array","items":{"type":"string"}},
+        "basis":{"type":"string","minLength":1}
+      },
+      "additionalProperties": false
+    },
+    "identifiability": {
+      "type":"object",
+      "required":["state","feasible_model_ids","competing_model_ids","evidence_ids","rationale"],
+      "properties": {
+        "state":{"type":"string","enum":["IDENTIFIABLE","AMBIGUOUS","UNIDENTIFIABLE","INSUFFICIENT_EVIDENCE"]},
+        "feasible_model_ids":{"type":"array","items":{"type":"string"}},
+        "selected_model_id":{"type":["string","null"]},
+        "competing_model_ids":{"type":"array","items":{"type":"string"}},
+        "evidence_ids":{"type":"array","items":{"type":"string"}},
+        "rationale":{"type":"string","minLength":1}
+      },
+      "additionalProperties": false
+    },
+    "stability": {
+      "type": "object",
+      "required":["state","assessment_method","observations","evidence_ids","rationale"],
+      "properties": {
+        "state":{"type":"string","enum":["STABLE","UNSTABLE","INSUFFICIENT_EVIDENCE"]},
+        "assessment_method":{"type":"string","minLength":1},
+        "observations":{"type":"array"},
+        "evidence_ids":{"type":"array","items":{"type":"string"}},
+        "rationale":{"type":"string","minLength":1},
+        "assessment_scope":{"const":"IDENTIFICATION_ONLY"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
