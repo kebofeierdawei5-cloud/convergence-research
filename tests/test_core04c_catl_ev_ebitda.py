@@ -46,3 +46,17 @@ def test_q3_net_debt_arithmetic():
     ])
     assert debt == Decimal("130381689000")
     assert debt - Decimal("324241586000") == Decimal("-193859897000")
+
+
+def test_wrapped_chinese_accounting_row_is_parsed():
+    from tools.core04c_catl_ev_ebitda import _row_first_number
+
+    text = "其中：利息费用 \\n 2,734,017 \\n 3,879,076"
+    assert _row_first_number(text, labels=("其中：利息费用",)) == Decimal("2734017")
+
+
+def test_wrapped_profit_total_row_is_parsed():
+    from tools.core04c_catl_ev_ebitda import _row_first_number
+
+    text = "四、利润总额（亏损总额以“－”号填 \\n列）\\n 89,526,545 63,182,039"
+    assert _row_first_number(text, labels=("四、利润总额",)) == Decimal("89526545")
