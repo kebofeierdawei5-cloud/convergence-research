@@ -1026,7 +1026,11 @@ def _fit_candidate(
         solutions=(solution,),
         constraint_ids=(
             "HISTORICAL_MULTIPLE_RANGE",
-            "CURRENT_MULTIPLE_WITHIN_HISTORICAL_RANGE",
+            *(
+                ("CURRENT_MULTIPLE_WITHIN_HISTORICAL_RANGE",)
+                if current_consistent
+                else ()
+            ),
         ),
         evidence_ids=all_ids,
         basis=f"current market price divided by historical {candidate.family.value} multiple range",
