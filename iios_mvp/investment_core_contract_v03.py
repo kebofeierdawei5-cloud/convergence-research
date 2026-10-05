@@ -459,7 +459,7 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
                             "target_entry_price_reference",
                             "canonical evidence root resolver is required at runtime",
                         ))
-                    elif not isinstance(mie_snapshot_ref, dict):
+                    elif not isinstance(case.get("market_implied_expectation_snapshot_ref"), dict):
                         errors.append(_err(
                             "V03-TARGET-ENTRY-REF-SNAPSHOT",
                             "market_implied_expectation_snapshot_ref",
