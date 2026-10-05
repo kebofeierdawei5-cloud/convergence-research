@@ -25,6 +25,7 @@ from .canonical_entry_evaluation import (
     admit_decision,
     build_canonical_entry_evaluation,
 )
+from .risk_portfolio_production_contract import build_risk_portfolio_contract, validate_risk_portfolio_contract
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
 BUY_ENTRY_RETURN_CUSHION_THRESHOLD = Decimal("0.15")
@@ -399,6 +400,16 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
     portfolio = case["portfolio"]
     if not isinstance(portfolio, dict) or _portfolio_status(case) not in PORTFOLIO_CONSTRAINT_STATES:
         errors.append(_err("V03-PORTFOLIO", "portfolio.constraint_status", "invalid Portfolio Constraint state"))
+    else:
+        try:
+            build_risk_portfolio_contract(
+                case_id=case["case_id"],
+                cutoff_date=case["cutoff_date"],
+                risk=risk,
+                portfolio=portfolio,
+            )
+        except (TypeError, ValueError) as exc:
+            errors.append(_err("V03-RISK-PORTFOLIO-CONTRACT", "risk/portfolio", str(exc)))
     errors.extend(validate_return_gate_v03(case["return_gate"]))
     try:
         validate_decision_upstream_admission(
@@ -701,7 +712,17 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
     gap_positive = gap_status == "PASS" and gap_relative is not None and gap_relative > 0
 
     metrics = None
+    risk_portfolio_contract = None
     if validation["status"] == "PASS":
+        try:
+            risk_portfolio_contract = build_risk_portfolio_contract(
+                case_id=case["case_id"],
+                cutoff_date=case["cutoff_date"],
+                risk=case["risk"],
+                portfolio=case["portfolio"],
+            )
+        except (TypeError, ValueError):
+            risk_portfolio_contract = None
         try:
             metrics = calculate_return_metrics(
                 case["return_gate"],
@@ -753,7 +774,7 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "monitoring_triggers",
     )
     package_complete = all(field in package for field in package_fields)
-    can_add = bool((case.get("portfolio") or {}).get("can_add", True))
+    can_add = bool((case.get("portfolio") or {}).get("can_add", False))
 
     state = evaluate_production_decision(
         validation_pass=validation["status"] == "PASS",
@@ -1077,6 +1098,7 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "decision_precedence_rank": state["precedence_rank"],
         "decision_scope": state["decision_scope"],
         "capital_effect": entry_admission["capital_effect"],
+        "risk_portfolio_contract": _serialize_nested(risk_portfolio_contract),
     }
     if metrics is not None:
         output["return_metrics"] = _serialize_metrics(metrics)
