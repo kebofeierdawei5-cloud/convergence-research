@@ -7,6 +7,11 @@ import re
 from typing import Any, Mapping
 
 from .market_implied_expectation import MIEQualification
+from .canonical_independent_forecast import (
+    CanonicalIndependentForecastReference,
+    CanonicalIndependentForecastResolver,
+    canonical_independent_expectation_from_record,
+)
 from .p4f_mie_snapshot import validate_p4f_snapshot
 from .semantic_expectation_gap import ComparisonDirection, evaluate_expectation_gap
 
@@ -42,7 +47,7 @@ class CanonicalExpectationGap:
     cutoff_date: date
     mie_snapshot_hash: str
     market_expectation_id: str
-    independent_expectation: IndependentExpectation
+    independent_forecast_ref: CanonicalIndependentForecastReference
 
     def validate(self) -> None:
         if not self.gap_id:
@@ -55,7 +60,7 @@ class CanonicalExpectationGap:
             raise ValueError("expectation gap evidence references are required")
         if not _SHA256_RE.fullmatch(self.mie_snapshot_hash):
             raise ValueError("mie_snapshot_hash must be 64 lowercase hex characters")
-        self.independent_expectation.validate()
+        self.independent_forecast_ref.validate()
 
 
 def _dec(value: Any, path: str) -> Decimal:
@@ -119,7 +124,7 @@ def _parse_gap(payload: Mapping[str, Any]) -> CanonicalExpectationGap:
             "cutoff_date",
             "mie_snapshot_hash",
             "market_expectation_id",
-            "independent_expectation",
+            "independent_forecast_ref",
         },
         allowed={
             "gap_id",
@@ -129,19 +134,13 @@ def _parse_gap(payload: Mapping[str, Any]) -> CanonicalExpectationGap:
             "cutoff_date",
             "mie_snapshot_hash",
             "market_expectation_id",
-            "independent_expectation",
+            "independent_forecast_ref",
         },
         path="expectation_gap",
     )
-    independent = payload["independent_expectation"]
-    if not isinstance(independent, Mapping):
-        raise ValueError("expectation_gap.independent_expectation must be an object")
-    _strict_keys(
-        independent,
-        required={"variable_id", "value", "unit", "basis", "horizon_years", "evidence_ids"},
-        allowed={"variable_id", "value", "unit", "basis", "horizon_years", "evidence_ids"},
-        path="expectation_gap.independent_expectation",
-    )
+    forecast_ref = payload["independent_forecast_ref"]
+    if not isinstance(forecast_ref, Mapping):
+        raise ValueError("expectation_gap.independent_forecast_ref must be an object")
     result = CanonicalExpectationGap(
         gap_id=str(payload["gap_id"]),
         evaluator_version=str(payload["evaluator_version"]),
@@ -150,13 +149,8 @@ def _parse_gap(payload: Mapping[str, Any]) -> CanonicalExpectationGap:
         cutoff_date=_parse_date(payload["cutoff_date"], "expectation_gap.cutoff_date"),
         mie_snapshot_hash=str(payload["mie_snapshot_hash"]),
         market_expectation_id=str(payload["market_expectation_id"]),
-        independent_expectation=IndependentExpectation(
-            variable_id=str(independent["variable_id"]),
-            value=_dec(independent["value"], "independent_expectation.value"),
-            unit=str(independent["unit"]),
-            basis=str(independent["basis"]),
-            horizon_years=_dec(independent["horizon_years"], "independent_expectation.horizon_years"),
-            evidence_ids=tuple(str(x) for x in independent["evidence_ids"]),
+        independent_forecast_ref=CanonicalIndependentForecastReference.from_mapping(
+            forecast_ref
         ),
     )
     result.validate()
@@ -252,6 +246,7 @@ def evaluate_canonical_expectation_gap(
     current_price_observation: Mapping[str, Any],
     cutoff_date: Any,
     case_id: str,
+    independent_forecast_resolver: CanonicalIndependentForecastResolver,
 ) -> dict[str, Any]:
     gap = _parse_gap(payload)
     snapshot = dict(market_implied_expectation_snapshot)
@@ -273,6 +268,23 @@ def evaluate_canonical_expectation_gap(
     if gap.price != _dec(current_price, "current_price_observation.price"):
         raise ValueError("expectation_gap.price must equal current_price_observation.price")
 
+    independent_record = independent_forecast_resolver.resolve_independent_forecast(
+        gap.independent_forecast_ref.to_dict(),
+        case_id=case_id,
+        market=str(snapshot.get("market", "CN-A")),
+        symbol=str(snapshot.get("symbol", "")),
+        cutoff_date=case_cutoff,
+    )
+    independent_payload = canonical_independent_expectation_from_record(independent_record)
+    independent = IndependentExpectation(
+        variable_id=independent_payload["variable_id"],
+        value=independent_payload["value"],
+        unit=independent_payload["unit"],
+        basis=independent_payload["basis"],
+        horizon_years=independent_payload["horizon_years"],
+        evidence_ids=independent_payload["evidence_ids"],
+    )
+
     expectation = _materialized_expectation(snapshot, gap.market_expectation_id)
     _require_snapshot_price_binding(
         snapshot=snapshot,
@@ -285,19 +297,19 @@ def evaluate_canonical_expectation_gap(
         independent=gap.independent_expectation,
     )
     independent = {
-        "variable_id": gap.independent_expectation.variable_id,
-        "value": gap.independent_expectation.value,
-        "unit": gap.independent_expectation.unit,
-        "basis": gap.independent_expectation.basis,
-        "horizon_years": str(gap.independent_expectation.horizon_years),
+        "variable_id": independent.variable_id,
+        "value": independent.value,
+        "unit": independent.unit,
+        "basis": independent.basis,
+        "horizon_years": str(independent.horizon_years),
     }
     market = {
         "qualification": MIEQualification.DECISION_GRADE.value,
         "resolution_state": "UNIQUE_MODEL",
-        "variable_id": gap.independent_expectation.variable_id,
+        "variable_id": independent.variable_id,
         "value": market_value,
-        "unit": gap.independent_expectation.unit,
-        "basis": gap.independent_expectation.basis,
+        "unit": independent.unit,
+        "basis": independent.basis,
         "horizon_years": str(market_horizon_years),
     }
     evaluated = evaluate_expectation_gap(
@@ -312,13 +324,16 @@ def evaluate_canonical_expectation_gap(
         "evaluator_version": gap.evaluator_version,
         "price": gap.price,
         "price_observation_id": gap.price_observation_id,
+        "independent_forecast_id": independent_record["forecast_id"],
+        "independent_forecast_version": independent_record["forecast_version"],
+        "independent_forecast_model_version": independent_record["model_version"],
         "cutoff_date": gap.cutoff_date,
         "mie_snapshot_hash": snapshot["snapshot_hash"],
         "market_expectation_id": gap.market_expectation_id,
         "mie_set_hash": snapshot["mie_set_hash"],
         "provenance_hash": snapshot["provenance_hash"],
-        "evidence_ids": tuple(sorted(set(gap.independent_expectation.evidence_ids) | set(snapshot["mie_set"].get("evidence_ids") or []))),
-        "independent_evidence_ids": tuple(sorted(gap.independent_expectation.evidence_ids)),
+        "evidence_ids": tuple(sorted(set(independent.evidence_ids) | set(snapshot["mie_set"].get("evidence_ids") or []))),
+        "independent_evidence_ids": tuple(sorted(independent.evidence_ids)),
         "mie_evidence_ids": tuple(sorted(snapshot["mie_set"].get("evidence_ids") or [])),
     }
 
