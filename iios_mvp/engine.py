@@ -233,6 +233,36 @@ def decide(case: dict[str, Any], *, evidence_root_resolver: Any | None = None, c
                 "target_entry_price_gap_revalidation": proposal.get(
                     "target_entry_price_gap_revalidation"
                 ),
+                "target_entry_price_p2_1_version": proposal.get(
+                    "target_entry_price_p2_1_version"
+                ),
+                "target_entry_price_p2_1": proposal.get(
+                    "target_entry_price_p2_1"
+                ),
+                "target_entry_price_p2_1_price_response": proposal.get(
+                    "target_entry_price_p2_1_price_response"
+                ),
+                "canonical_entry_evaluation_version": proposal.get(
+                    "canonical_entry_evaluation_version"
+                ),
+                "canonical_entry_evaluation": proposal.get(
+                    "canonical_entry_evaluation"
+                ),
+                "decision_pre_admission_action": proposal.get(
+                    "decision_pre_admission_action"
+                ),
+                "decision_admission_version": proposal.get(
+                    "decision_admission_version"
+                ),
+                "decision_admission": proposal.get(
+                    "decision_admission"
+                ),
+                "decision_admission_status": proposal.get(
+                    "decision_admission_status"
+                ),
+                "decision_admission_rule_id": proposal.get(
+                    "decision_admission_rule_id"
+                ),
                 "decision_precedence_version": proposal.get(
                     "decision_precedence_version"
                 ),
