@@ -264,7 +264,10 @@ def parse_annual_ebitda(
 ) -> dict[str, object]:
     full_text = _report_text(path, None)
     income = _statement_section(full_text, "3、合并利润表", "5、合并现金流量表")
-    cashflow = _statement_section(full_text, "5、合并现金流量表", "7、合并所有者权益变动表")
+    cashflow_start = full_text.find("现金流量表补充资料")
+    if cashflow_start < 0:
+        raise ValueError("现金流量表补充资料 section not found")
+    cashflow = full_text[cashflow_start:]
     profit_total = _row_first_number(income, labels=("四、利润总额",))
     interest_expense = _row_first_number(income, labels=("利息费用",))
     fixed_dep = _row_first_number(
