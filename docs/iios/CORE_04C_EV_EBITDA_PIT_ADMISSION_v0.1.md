@@ -5,67 +5,97 @@ Status: IMPLEMENTATION / LIVE CI VERIFICATION PENDING
 
 ## Objective
 
-Admit a minimum three-point historical EV/EBITDA observation set for CATL (300750.SZ) using exact-date SZSE market snapshots plus PIT-known financial report vintages.
+Admit a minimum three-point historical EV/EBITDA observation set for CATL (300750.SZ) using exact-date SZSE market snapshots plus PIT-known CNINFO financial report vintages.
 
 ## User Value
 
-CORE-04-C turns the captured public/free source set into actual model-observation evidence that P3 can consume. The result is a deterministic, replayable TTM EV/EBITDA series rather than a retrospective vendor multiple.
+CORE-04-C converts CORE-04-B public-source captures into actual deterministic valuation observations that can be consumed by model-identification work. It must never replace missing historical inputs with a current retrospective provider multiple.
 
 ## Product Surface
 
 `tools/core04c_ev_ebitda.py` performs:
 
-- exact-byte capture of 3 SZSE EOD snapshots and 5 CNINFO report vintages;
+- exact-byte capture of the declared SZSE EOD snapshots and CNINFO report vintages;
 - XLSX parsing for the 300750 close;
-- PDF parsing for profit, interest expense, depreciation/amortization and balance-sheet bridge inputs;
-- PIT TTM EBITDA construction;
-- standard interest-bearing net-debt bridge;
+- PDF parsing for consolidated profit, interest expense, depreciation/amortization and balance-sheet bridge inputs;
+- PIT validation of source `known_at` against each market observation date;
+- deterministic EBITDA selection:
+  - TTM where the report vintage supplies all required comparable-period components;
+  - otherwise the latest fully disclosed fiscal-year EBITDA known by the observation date;
 - enterprise value and EV/EBITDA calculation;
-- exact-byte SHA-256 re-verification before success;
+- SHA-256 re-verification of every exact source byte before success;
 - JSON derivation and admission receipts.
 
 ## PIT Construction
 
-For each market date:
+The three observations deliberately use different EBITDA bases because the quarterly CNINFO reports available at the older dates do not provide a complete depreciation/amortization supplement needed to construct a robust quarterly TTM EBITDA bridge.
 
-`TTM EBITDA = current period EBITDA + prior fiscal-year EBITDA - prior-year comparable period EBITDA`
+### 2026-07-27
 
-This is constructed only from report vintages whose `known_at` is on or before the market observation date.
+Use deterministic TTM EBITDA:
 
-The three target dates are:
+`TTM EBITDA = H1 2026 EBITDA + FY2025 EBITDA - H1 2025 comparable EBITDA`
 
-- 2026-07-27: H1 2026 + FY2025 - H1 2025.
-- 2026-04-17: Q1 2026 + FY2025 - Q1 2025.
-- 2025-10-22: 9M 2025 + FY2024 - 9M 2024.
+The H1 2026 report contains both current and prior-period supplemental depreciation/amortization inputs, so the TTM bridge can be completed without look-ahead.
 
-EBITDA is derived consistently as:
+### 2026-04-17
 
-`profit total + interest expense + depreciation/amortization`
+Use **FY2025 EBITDA — latest fully disclosed fiscal-year EBITDA known at the observation date**.
 
-Net debt is:
+The 2025 annual report was published before this market date. The Q1 2026 report does not expose the required cash-flow supplementary depreciation/amortization detail, so a synthetic Q1 TTM is not admitted.
+
+### 2025-10-22
+
+Use **FY2024 EBITDA — latest fully disclosed fiscal-year EBITDA known at the observation date**.
+
+The 2024 annual report was published before this market date. The Q3 2025 report does not expose the required cash-flow supplementary depreciation/amortization detail, so a synthetic Q3 TTM is not admitted.
+
+## Valuation Bridge
+
+`EV = price * shares_outstanding + net_debt`
+
+`EV / EBITDA = EV / EBITDA_basis`
+
+Net debt:
 
 `short-term borrowings + current portion of non-current liabilities + long-term borrowings + bonds + lease liabilities - cash - trading financial assets`
 
+Share count:
+
+`share capital (CNY thousand) * 1000`
+
+The bridge is a deterministic valuation construction, not a claim that the issuer reports the exact derived EBITDA or EV figure.
+
 ## Evidence Boundary
 
-The market price comes only from the exact-date SZSE snapshot. Current retrospective provider pages are not used.
+The market price is taken from the exact-date SZSE EOD snapshot.
 
-Derived EBITDA and net debt are treated as deterministic derivations with a dedicated derivation artifact containing the component source hashes and formula. They are not presented as direct issuer-disclosed EBITDA.
+Financial inputs are taken from the report vintage that was knowable at the observation date. Current retrospective provider pages, current consensus screens, or a later restatement of historical valuation multiples are not used.
+
+The admission receipt distinguishes:
+
+- direct market evidence;
+- source-vintage financial evidence;
+- deterministic derived EBITDA/net-debt evidence.
+
+Derived evidence hashes the immutable derivation artifact rather than presenting the derived number as a direct issuer observation.
 
 ## Test / Acceptance
 
-PASS requires:
+PASS requires all of the following:
 
 - unit tests green;
 - all declared source captures succeed with non-zero exact bytes and SHA-256;
 - the 300750 row is parsed from each exact-date SZSE snapshot;
-- all required financial rows are parsed from each PIT financial report;
-- every financial source used for a market observation has `known_at <= observation_date`;
-- all three EV and EBITDA values are strictly positive;
-- the generated admission receipt is JSON-valid;
+- required balance-sheet and financial-report fields are parsed from each selected CNINFO vintage;
+- every financial source used by an observation satisfies `known_at <= observation_date` in executable code;
+- TTM is constructed only when all required PIT comparable-period inputs are available;
+- otherwise the latest fully disclosed FY EBITDA is used and explicitly labeled;
+- EV and EBITDA are strictly positive;
+- generated derivation/admission JSON is valid;
 - exact source-byte hashes re-verify after parsing;
-- raw source bytes and derived receipts are retained in the CI artifact for audit/replay.
+- the CI artifact retains the raw captured source bytes and generated receipts for replay/audit.
 
 ## Out of Scope
 
-No MIE promotion, Expectation Gap, Expected Return, decision-state change, position sizing, CSI800/industry universe work, or automatic execution is introduced.
+No Market Implied Expectation promotion, Expectation Gap, Expected Return, decision-state change, position sizing, CSI800/industry universe work, or automatic execution is introduced.
