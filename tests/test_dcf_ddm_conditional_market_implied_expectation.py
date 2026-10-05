@@ -394,7 +394,7 @@ def test_unstable_identification_blocks_conditional_mie():
         else:
             dcf_modified.append(item)
 
-    ddm = ddm_input()
+    ddm = ddm_input(id_prefix="unstable-")
     combined = MarketModelIdentificationInput(
         cutoff_date=CUTOFF,
         current_observation_id="current-fcf",
