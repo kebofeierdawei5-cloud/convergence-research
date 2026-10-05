@@ -72,7 +72,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Legacy MIE-mandatory rules are retained only behind explicit compatibility policy; CORE-04 v0.3 passes the optional policy explicitly.
 - Production kernel: `iios_mvp/decision_kernel_v03.py`.
 - Current merge candidate branch: `feature/core04-production-decision-kernel-20261005`.
-- Production decision kernel remains **NOT YET MERGED** pending red-team/CI.
+- Production decision kernel CI and CORE-00 scope checks **PASS** at HEAD `7d86d5595865ee90538e5260167db99d8c6a29d8`; PR #70 remains **OPEN / NOT MERGED** pending owner merge decision.
 
 ## CORE-04-C Real 300750 Historical EV/EBITDA
 
