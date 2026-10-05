@@ -1,0 +1,45 @@
+name: IIOS CORE-04-B Public Source Capture
+
+on:
+  pull_request:
+    paths:
+      - "research/core04b_public_source_manifest_v0.1.json"
+      - "tools/public_source_capture.py"
+      - "tools/__init__.py"
+      - "tests/test_public_source_capture.py"
+      - "docs/iios/CORE_04B_PUBLIC_SOURCE_CAPTURE_v0.1.md"
+      - "docs/iios/CORE_04B_ACCEPTANCE_2026-10-05.md"
+      - "research/core04b_public_source_receipt_20261005.json"
+  push:
+    branches: [main]
+    paths:
+      - "research/core04b_public_source_manifest_v0.1.json"
+      - "tools/public_source_capture.py"
+      - "tools/__init__.py"
+      - "tests/test_public_source_capture.py"
+      - "docs/iios/CORE_04B_PUBLIC_SOURCE_CAPTURE_v0.1.md"
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest
+      - run: python -m compileall -q tools tests/test_public_source_capture.py
+      - run: python -m pytest -q tests/test_public_source_capture.py
+      - run: |
+          PYTHONPATH=. python tools/public_source_capture.py             --manifest research/core04b_public_source_manifest_v0.1.json             --out /tmp/core04b/capture_receipt.json
+      - run: python -m json.tool /tmp/core04b/capture_receipt.json >/dev/null
+      - run: python -m json.tool research/core04b_public_source_receipt_20261005.json >/dev/null
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: iios-core04b-public-source-receipt
+          path: /tmp/core04b/capture_receipt.json
+          retention-days: 7
