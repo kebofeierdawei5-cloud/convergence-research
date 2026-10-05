@@ -47,9 +47,18 @@ def _status(value: Any, field: str) -> str:
     return result
 
 
-def _cap(base_status: str, evidence_status: str) -> str:
+def _integrate_status(base_status: str, evidence_status: str) -> str:
+    """Resolve evidence-missing UNKNOWN, otherwise apply fail-closed cap.
+
+    UNKNOWN may be resolved only because the mapped A1 company evidence slice
+    exists. Known PASS / CONDITIONAL analytical states cannot be upgraded by
+    this integration layer.
+    """
     base = _status(base_status, "base_status")
     evidence = _status(evidence_status, "evidence_status")
+
+    if base == "UNKNOWN" and evidence in {"PASS", "CONDITIONAL"}:
+        return evidence
     return max((base, evidence), key=lambda value: STATUS_SEVERITY[value])
 
 
@@ -221,7 +230,7 @@ def integrate_company_evidence_into_quality(
     quality_rows["incremental_return_on_capital"] = _add_bridge_evidence(
         {
             **quality_rows["incremental_return_on_capital"],
-            "status": _cap(
+            "status": _integrate_status(
                 quality_rows["incremental_return_on_capital"]["status"],
                 evidence_roic_status,
             ),
@@ -374,15 +383,6 @@ def validate_company_evidence_quality_integration(
         cutoff_date=cutoff_date,
     )
 
-    if record["quality_gate"]["dimensions"] != record["quality"]["dimensions"]:
-        raise ValueError("company evidence quality/quality-gate drift")
-
-    trust = record["trust"]
-    if not isinstance(trust, Mapping) or not isinstance(trust.get("dimensions"), list):
-        raise ValueError("company evidence integration trust invalid")
-    if len(trust["dimensions"]) != len(TRUST_DIMENSIONS):
-        raise ValueError("company evidence integration trust cardinality invalid")
-
     audit = record["audit"]
     if not isinstance(audit, Mapping) or set(audit) != {"input_sha256", "integration_sha256"}:
         raise ValueError("company evidence integration audit invalid")
@@ -394,6 +394,21 @@ def validate_company_evidence_quality_integration(
             or any(c not in "0123456789abcdef" for c in value)
         ):
             raise ValueError(f"company evidence integration audit {field} invalid")
+
+    expected_integration_hash = _sha(
+        {key: value for key, value in record.items() if key != "audit"}
+    )
+    if audit["integration_sha256"] != expected_integration_hash:
+        raise ValueError("company evidence integration hash mismatch")
+
+    if record["quality_gate"]["dimensions"] != record["quality"]["dimensions"]:
+        raise ValueError("company evidence quality/quality-gate drift")
+
+    trust = record["trust"]
+    if not isinstance(trust, Mapping) or not isinstance(trust.get("dimensions"), list):
+        raise ValueError("company evidence integration trust invalid")
+    if len(trust["dimensions"]) != len(TRUST_DIMENSIONS):
+        raise ValueError("company evidence integration trust cardinality invalid")
 
     if record["economic_bridge_status"]["incremental_roic"] not in STATUS_SEVERITY:
         raise ValueError("economic bridge incremental_roic status invalid")
