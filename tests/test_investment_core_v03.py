@@ -265,6 +265,22 @@ def test_v03_return_math_separates_the_two_15_percent_policies():
     assert abs(metrics["margin_of_safety"] - (Decimal("15")/Decimal("115"))) < Decimal("0.000001")
 
 
+def test_v03_target_entry_reference_cannot_coexist_with_expectation_gap():
+    c = case()
+    c["target_entry_price_reference"] = {
+        "market_expectation_id": c["expectation_gap"]["market_expectation_id"],
+        "independent_forecast_ref": c["expectation_gap"]["independent_forecast_ref"],
+    }
+    result = decide(
+        c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        current_price_resolver=CURRENT_PRICE_REGISTRY,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+    )
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-TARGET-ENTRY-REF-CONFLICT" in x for x in result["validation"]["blockers"])
+
+
 def test_v03_canonical_gap_requires_runtime_evidence_root_resolver():
     c = case()
     result = decide(c)
