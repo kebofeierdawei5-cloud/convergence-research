@@ -61,6 +61,8 @@ class PriceResponseResult:
     candidate_value_high: Decimal
     affine_slope: Decimal
     affine_intercept: Decimal
+    affine_slope_high: Decimal
+    affine_intercept_high: Decimal
     assumption_fingerprint: str
     evidence_ids: tuple[str, ...]
     reason: str
@@ -100,6 +102,8 @@ class PriceResponseResult:
             "candidate_value_high": s(self.candidate_value_high),
             "affine_slope": s(self.affine_slope),
             "affine_intercept": s(self.affine_intercept),
+            "affine_slope_high": s(self.affine_slope_high),
+            "affine_intercept_high": s(self.affine_intercept_high),
             "assumption_fingerprint": self.assumption_fingerprint,
             "evidence_ids": list(self.evidence_ids),
             "reason": self.reason,
@@ -286,7 +290,7 @@ def _model_relation(
     reference_price: Decimal,
     candidate_price: Decimal,
     provenance: Mapping[str, Mapping[str, Any]],
-) -> tuple[str, str, Decimal, Decimal, Decimal, Decimal]:
+) -> tuple[str, str, Decimal, Decimal, Decimal, Decimal, Decimal, Decimal]:
     family = str(expectation.get("market_model", "")).strip()
     variable = str(requirement.get("economic_variable", "")).strip()
     reference_low, reference_high = _reference_interval(requirement)
@@ -318,6 +322,8 @@ def _model_relation(
             high_slope * candidate_price + high_intercept,
             low_slope,
             low_intercept,
+            high_slope,
+            high_intercept,
         )
 
     if family == MarketModelFamily.DCF.value:
@@ -331,7 +337,7 @@ def _model_relation(
         slope = shares * coefficient
         intercept = net_debt * coefficient
         value = slope * candidate_price + intercept
-        return "AFFINE", "DCF_IMPLIED_FCF_FROM_ENTERPRISE_VALUE_AND_FROZEN_ASSUMPTIONS", value, value, slope, intercept
+        return "AFFINE", "DCF_IMPLIED_FCF_FROM_ENTERPRISE_VALUE_AND_FROZEN_ASSUMPTIONS", value, value, slope, intercept, slope, intercept
 
     if family == MarketModelFamily.DDM.value:
         if variable != "dividend":
@@ -342,7 +348,7 @@ def _model_relation(
             raise ValueError("DDM P2.1 requires discount_rate > growth > -1")
         slope = (discount - growth) / (Decimal("1") + growth)
         value = slope * candidate_price
-        return "AFFINE", "DDM_IMPLIED_DIVIDEND_FROM_PRICE_AND_FROZEN_RATES", value, value, slope, Decimal("0")
+        return "AFFINE", "DDM_IMPLIED_DIVIDEND_FROM_PRICE_AND_FROZEN_RATES", value, value, slope, Decimal("0"), slope, Decimal("0")
 
     if family == MarketModelFamily.SOTP.value:
         if variable != "residual_value":
@@ -357,7 +363,7 @@ def _model_relation(
         slope = shares
         intercept = -segment_total
         value = slope * candidate_price + intercept
-        return "AFFINE", "SOTP_IMPLIED_RESIDUAL_VALUE_FROM_MARKET_CAP_AND_FROZEN_SEGMENTS", value, value, slope, intercept
+        return "AFFINE", "SOTP_IMPLIED_RESIDUAL_VALUE_FROM_MARKET_CAP_AND_FROZEN_SEGMENTS", value, value, slope, intercept, slope, intercept
 
     if family == MarketModelFamily.RNPV.value:
         if variable != "pipeline_value":
@@ -397,14 +403,41 @@ def _model_relation(
             raise ValueError("rNPV P2.1 probability must be within [0,1]")
         if timing < 0 or discount <= Decimal("-1"):
             raise ValueError("rNPV P2.1 timing/discount assumptions are invalid")
+        if timing < 0 or discount <= Decimal("-1"):
+            raise ValueError("rNPV P2.1 timing/discount assumptions are invalid")
         weight = probability / ((Decimal("1") + discount) ** timing)
         if weight <= 0:
             raise ValueError("rNPV P2.1 pipeline weight must be > 0")
+        weighted_total = Decimal("0")
+        for item in expectation.get("assumption_set") or []:
+            if item.get("variable") != "pipeline_value":
+                continue
+            item_basis = str(item.get("basis", ""))
+            if ":observed_composition_anchor" not in item_basis:
+                continue
+            item_id = item_basis.split(":", 2)[1]
+            p = _assumption_value(
+                expectation,
+                "probability",
+                f"pipeline:{item_id}:observed_probability_condition",
+            )
+            t = _assumption_value(
+                expectation,
+                "timing",
+                f"pipeline:{item_id}:observed_timing_condition",
+            )
+            if not 0 <= p <= 1 or t < 0:
+                raise ValueError("rNPV P2.1 pipeline probability/timing assumptions are invalid")
+            item_weight = p / ((Decimal("1") + discount) ** t)
+            weighted_total += _dec(item["value"], "rNPV pipeline_value assumption") * item_weight
+        observed_risk_adjusted_weight = weighted_total / observed_total
+        if observed_risk_adjusted_weight <= 0:
+            raise ValueError("rNPV P2.1 observed composition weight must be > 0")
         composition = pipeline_value / observed_total
-        slope = shares * composition / weight
-        intercept = (net_debt - base_value) * composition / weight
+        slope = shares * composition / observed_risk_adjusted_weight
+        intercept = (net_debt - base_value) * composition / observed_risk_adjusted_weight
         value = slope * candidate_price + intercept
-        return "AFFINE", "RNPV_IMPLIED_PIPELINE_VALUE_FROM_ENTERPRISE_VALUE_AND_FROZEN_COMPOSITION", value, value, slope, intercept
+        return "AFFINE", "RNPV_IMPLIED_PIPELINE_VALUE_FROM_ENTERPRISE_VALUE_AND_FROZEN_COMPOSITION", value, value, slope, intercept, slope, intercept
 
     raise ValueError(f"P2.1 unsupported model family: {family}")
 
@@ -473,7 +506,7 @@ def build_canonical_price_response(
     if missing:
         raise ValueError(f"P2.1 provenance missing evidence IDs: {sorted(missing)}")
 
-    form, formula_id, candidate_low, candidate_high, slope, intercept = _model_relation(
+    form, formula_id, candidate_low, candidate_high, slope_low, intercept_low, slope_high, intercept_high = _model_relation(
         expectation=expectation,
         requirement=requirement,
         reference_price=reference_price,
@@ -482,16 +515,30 @@ def build_canonical_price_response(
     )
     reference_low, reference_high = _reference_interval(requirement)
 
+    ref_form, _ref_formula, ref_low, ref_high, _ref_sl, _ref_il, _ref_sh, _ref_ih = _model_relation(
+        expectation=expectation,
+        requirement=requirement,
+        reference_price=reference_price,
+        candidate_price=reference_price,
+        provenance=provenance,
+    )
+    if ref_form != form or ref_low != reference_low or ref_high != reference_high:
+        raise ValueError("P2.1 canonical model response is inconsistent with the reference MIE at the canonical price")
+
     independent_value = independent["value"]
     if direction is ComparisonDirection.HIGHER_IS_BETTER:
         gap_abs = independent_value - candidate_high
         denom = abs(candidate_high)
-        boundary = (independent_value - (intercept if form == "AFFINE" else intercept)) / slope
+        if slope_high == 0:
+            raise ValueError("P2.1 high-endpoint response slope cannot be zero")
+        boundary = (independent_value - intercept_high) / slope_high
         positive = independent_value > candidate_high
     else:
         gap_abs = candidate_low - independent_value
         denom = abs(candidate_low)
-        boundary = (independent_value - intercept) / slope
+        if slope_low == 0:
+            raise ValueError("P2.1 low-endpoint response slope cannot be zero")
+        boundary = (independent_value - intercept_low) / slope_low
         positive = candidate_low > independent_value
 
     if denom == 0:
@@ -533,8 +580,10 @@ def build_canonical_price_response(
         reference_value_high=reference_high,
         candidate_value_low=candidate_low,
         candidate_value_high=candidate_high,
-        affine_slope=slope,
-        affine_intercept=intercept,
+        affine_slope=slope_low,
+        affine_intercept=intercept_low,
+        affine_slope_high=slope_high,
+        affine_intercept_high=intercept_high,
         assumption_fingerprint=_assumption_fingerprint(expectation),
         evidence_ids=response_evidence,
         reason=(
