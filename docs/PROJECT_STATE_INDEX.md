@@ -21,7 +21,7 @@ CORE-02 Company Economic Core = PASS / MERGED
         ↓
 CORE-03 Real 300750 Vertical Slice = PASS / MERGED
         ↓
-CORE-04 Production Decision Kernel = ACTIVE / UNDER CI
+CORE-04 Production Decision Kernel = ACTIVE / CI PASS / NOT MERGED
         ↓
 B2-A Single Company Evidence / PIT Foundation = PASS / MERGED
         ↓
@@ -104,5 +104,5 @@ Decision Semantics Reconciliation → CORE-04 Production Decision Kernel.
 - Return/risk target-entry price is valid without mandatory MIE revalidation; qualified MIE may refine it when present.
 - Production kernel: `iios_mvp/decision_kernel_v03.py`.
 - Governance record: `docs/iios/CORE_04_DECISION_SEMANTICS_RECONCILIATION_v0.1.md`.
-- PR #70 is the current CORE-04 merge candidate and is not yet merged.
+- PR #70 is the current CORE-04 merge candidate; CI #450 and CORE-00 #187 PASS at HEAD `7d86d5595865ee90538e5260167db99d8`; PR remains not merged.
 - PR #69 P3-A-RA remains independently open and not merged.
