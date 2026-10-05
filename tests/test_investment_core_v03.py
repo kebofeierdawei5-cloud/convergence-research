@@ -477,6 +477,7 @@ def test_v03_missing_expectation_gap_does_not_block_thesis_broken_exit():
     c = case()
     c["portfolio"]["position_pct"] = "5"
     c["thesis"]["status"] = "BROKEN"
+    c["decision_upstream_admission"]["thesis_status"] = "BROKEN"
     del c["expectation_gap"]
     result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "EXIT"
