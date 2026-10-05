@@ -77,6 +77,8 @@ jobs:
           python -m json.tool schemas/market_implied_expectation_v0.2.schema.json >/dev/null
           python -m json.tool schemas/market_implied_expectation_set_v0.2.schema.json >/dev/null
           python -m json.tool schemas/p4f_mie_snapshot_v0.2.schema.json >/dev/null
+          python -m json.tool schemas/p4f_mie_snapshot_v0.3.schema.json >/dev/null
+          python -m json.tool schemas/market_implied_expectation_set_v0.3.schema.json >/dev/null
           python -m json.tool schemas/canonical_current_price_admission_v0.1.schema.json >/dev/null
           python -m json.tool schemas/canonical_independent_forecast_admission_v0.1.schema.json >/dev/null
           python -m json.tool schemas/canonical_independent_forecast_reference_v0.1.schema.json >/dev/null
