@@ -435,12 +435,12 @@ def test_v03_unresolved_mie_snapshot_requires_review_for_new_position():
 
 
 
-def test_v03_missing_expectation_gap_does_not_block_existing_hold():
+def test_v03_missing_expectation_gap_does_not_block_existing_add():
     c = case()
     c["portfolio"]["position_pct"] = "5"
     del c["expectation_gap"]
     result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
-    assert result["decision"]["action"] == "HOLD"
+    assert result["decision"]["action"] == "ADD"
 
 
 def test_v03_missing_expectation_gap_does_not_block_thesis_broken_exit():
