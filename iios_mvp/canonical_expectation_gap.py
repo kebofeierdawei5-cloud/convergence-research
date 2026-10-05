@@ -1,26 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-import hashlib
-import json
 import re
 from typing import Any, Mapping
 
-from .market_implied_expectation import (
-    CandidateCoverageAssessment,
-    CandidateCoverageState,
-    EvidenceSufficiencyAssessment,
-    EvidenceSufficiencyState,
-    MIEAssumption,
-    MIEEconomicRequirement,
-    MIEObservationBasis,
-    MIEQualification,
-    MIERepresentation,
-    MarketImpliedExpectation,
-)
-from .market_model_domain import IdentifiabilityState, MarketModelFamily, StabilityState
+from .market_implied_expectation import MIEQualification
+from .p4f_mie_snapshot import validate_p4f_snapshot
 from .semantic_expectation_gap import ComparisonDirection, evaluate_expectation_gap
 
 CANONICAL_EXPECTATION_GAP_VERSION = "IIOS-EXPECTATION-GAP-0.1"
@@ -53,8 +40,8 @@ class CanonicalExpectationGap:
     price: Decimal
     price_observation_id: str
     cutoff_date: date
+    mie_snapshot_hash: str
     market_expectation_id: str
-    market_expectation_hash: str
     comparison_direction: ComparisonDirection
     independent_expectation: IndependentExpectation
 
@@ -65,10 +52,10 @@ class CanonicalExpectationGap:
             raise ValueError("canonical expectation gap evaluator_version mismatch")
         if self.price <= 0:
             raise ValueError("expectation gap price must be > 0")
-        if not self.price_observation_id or not self.market_expectation_id:
+        if not self.price_observation_id or not self.mie_snapshot_hash or not self.market_expectation_id:
             raise ValueError("expectation gap evidence references are required")
-        if not _SHA256_RE.fullmatch(self.market_expectation_hash):
-            raise ValueError("market_expectation_hash must be 64 lowercase hex characters")
+        if not _SHA256_RE.fullmatch(self.mie_snapshot_hash):
+            raise ValueError("mie_snapshot_hash must be 64 lowercase hex characters")
         self.independent_expectation.validate()
 
 
@@ -80,14 +67,6 @@ def _dec(value: Any, path: str) -> Decimal:
     if not result.is_finite():
         raise ValueError(f"{path} must be finite")
     return result
-
-
-def _canonical_json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-
-def market_implied_expectation_content_hash(payload: Mapping[str, Any]) -> str:
-    return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()
 
 
 def _strict_keys(payload: Mapping[str, Any], *, required: set[str], allowed: set[str], path: str) -> None:
@@ -106,178 +85,26 @@ def _parse_date(value: Any, path: str) -> date:
         raise ValueError(f"{path} must be ISO date") from exc
 
 
+def _parse_datetime(value: Any, path: str) -> datetime:
+    try:
+        result = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{path} must be ISO datetime") from exc
+    if result.tzinfo is None:
+        raise ValueError(f"{path} must be timezone-aware")
+    return result
+
+
 def _parse_horizon_years(value: Any, path: str) -> Decimal:
     text = str(value).strip().upper()
     match = _HORIZON_RE.fullmatch(text)
     if not match:
         raise ValueError(f"{path} must use canonical Y/M horizon notation")
     amount = _dec(match.group(1), path)
-    unit = match.group(2)
-    years = amount if unit == "Y" else amount / Decimal("12")
+    years = amount if match.group(2) == "Y" else amount / Decimal("12")
     if years <= 0:
         raise ValueError(f"{path} must be > 0")
     return years
-
-
-def _parse_mie(payload: Mapping[str, Any]) -> MarketImpliedExpectation:
-    if not isinstance(payload, Mapping):
-        raise ValueError("market_implied_expectation must be an object")
-
-    _strict_keys(
-        payload,
-        required={
-            "expectation_id",
-            "model_id",
-            "market_model",
-            "identifiability",
-            "stability",
-            "candidate_coverage",
-            "representation",
-            "economic_requirements",
-            "observation_basis",
-            "assumption_set",
-            "evidence_sufficiency",
-            "evidence_ids",
-            "qualification",
-            "qualification_rationale",
-        },
-        allowed={
-            "expectation_id",
-            "model_id",
-            "market_model",
-            "identifiability",
-            "stability",
-            "candidate_coverage",
-            "representation",
-            "economic_requirements",
-            "observation_basis",
-            "assumption_set",
-            "evidence_sufficiency",
-            "evidence_ids",
-            "qualification",
-            "qualification_rationale",
-        },
-        path="market_implied_expectation",
-    )
-
-    coverage = payload["candidate_coverage"]
-    if not isinstance(coverage, Mapping):
-        raise ValueError("market_implied_expectation.candidate_coverage must be an object")
-    _strict_keys(
-        coverage,
-        required={"status", "scope_basis", "candidate_model_ids", "evidence_ids", "rationale"},
-        allowed={"status", "scope_basis", "candidate_model_ids", "evidence_ids", "rationale"},
-        path="market_implied_expectation.candidate_coverage",
-    )
-
-    evidence_sufficiency = payload["evidence_sufficiency"]
-    if not isinstance(evidence_sufficiency, Mapping):
-        raise ValueError("market_implied_expectation.evidence_sufficiency must be an object")
-    _strict_keys(
-        evidence_sufficiency,
-        required={"status", "rationale", "evidence_ids"},
-        allowed={"status", "rationale", "evidence_ids"},
-        path="market_implied_expectation.evidence_sufficiency",
-    )
-
-    observation = payload["observation_basis"]
-    if not isinstance(observation, Mapping):
-        raise ValueError("market_implied_expectation.observation_basis must be an object")
-    _strict_keys(
-        observation,
-        required={"price_observation_id", "observation_date", "cutoff_date", "currency", "adjustment_semantics"},
-        allowed={"price_observation_id", "observation_date", "cutoff_date", "currency", "adjustment_semantics"},
-        path="market_implied_expectation.observation_basis",
-    )
-
-    requirements = []
-    for index, item in enumerate(payload["economic_requirements"]):
-        if not isinstance(item, Mapping):
-            raise ValueError(f"market_implied_expectation.economic_requirements[{index}] must be an object")
-        _strict_keys(
-            item,
-            required={"economic_variable", "unit", "basis", "period", "horizon", "accounting_basis", "role", "evidence_ids"},
-            allowed={
-                "economic_variable", "unit", "basis", "period", "horizon", "accounting_basis",
-                "role", "value", "range_low", "range_high", "evidence_ids"
-            },
-            path=f"market_implied_expectation.economic_requirements[{index}]",
-        )
-        requirements.append(
-            MIEEconomicRequirement(
-                economic_variable=str(item["economic_variable"]),
-                unit=str(item["unit"]),
-                basis=str(item["basis"]),
-                period=str(item["period"]),
-                horizon=str(item["horizon"]),
-                accounting_basis=str(item["accounting_basis"]),
-                role=str(item["role"]),
-                value=_dec(item["value"], f"economic_requirements[{index}].value") if "value" in item else None,
-                range_low=_dec(item["range_low"], f"economic_requirements[{index}].range_low") if "range_low" in item else None,
-                range_high=_dec(item["range_high"], f"economic_requirements[{index}].range_high") if "range_high" in item else None,
-                evidence_ids=tuple(str(x) for x in item["evidence_ids"]),
-            )
-        )
-
-    assumptions = []
-    for index, item in enumerate(payload["assumption_set"]):
-        if not isinstance(item, Mapping):
-            raise ValueError(f"market_implied_expectation.assumption_set[{index}] must be an object")
-        _strict_keys(
-            item,
-            required={"variable", "value", "unit", "basis", "period", "horizon", "accounting_basis", "evidence_ids"},
-            allowed={"variable", "value", "unit", "basis", "period", "horizon", "accounting_basis", "evidence_ids"},
-            path=f"market_implied_expectation.assumption_set[{index}]",
-        )
-        assumptions.append(
-            MIEAssumption(
-                variable=str(item["variable"]),
-                value=_dec(item["value"], f"assumption_set[{index}].value"),
-                unit=str(item["unit"]),
-                basis=str(item["basis"]),
-                period=str(item["period"]),
-                horizon=str(item["horizon"]),
-                accounting_basis=str(item["accounting_basis"]),
-                evidence_ids=tuple(str(x) for x in item["evidence_ids"]),
-            )
-        )
-
-    result = MarketImpliedExpectation(
-        expectation_id=str(payload["expectation_id"]),
-        model_id=str(payload["model_id"]),
-        market_model=MarketModelFamily(str(payload["market_model"])),
-        identifiability=IdentifiabilityState(str(payload["identifiability"])),
-        stability=StabilityState(str(payload["stability"])),
-        candidate_coverage=CandidateCoverageAssessment(
-            status=CandidateCoverageState(str(coverage["status"])),
-            scope_basis=str(coverage["scope_basis"]),
-            candidate_model_ids=tuple(str(x) for x in coverage["candidate_model_ids"]),
-            evidence_ids=tuple(str(x) for x in coverage["evidence_ids"]),
-            rationale=str(coverage["rationale"]),
-        ),
-        representation=MIERepresentation(str(payload["representation"])),
-        economic_requirements=tuple(requirements),
-        observation_basis=MIEObservationBasis(
-            price_observation_id=str(observation["price_observation_id"]),
-            observation_date=_parse_date(observation["observation_date"], "observation_basis.observation_date"),
-            cutoff_date=_parse_date(observation["cutoff_date"], "observation_basis.cutoff_date"),
-            currency=str(observation["currency"]),
-            adjustment_semantics=str(observation["adjustment_semantics"]),
-        ),
-        assumption_set=tuple(assumptions),
-        evidence_sufficiency=EvidenceSufficiencyAssessment(
-            status=EvidenceSufficiencyState(str(evidence_sufficiency["status"])),
-            rationale=str(evidence_sufficiency["rationale"]),
-            evidence_ids=tuple(str(x) for x in evidence_sufficiency["evidence_ids"]),
-        ),
-        evidence_ids=tuple(str(x) for x in payload["evidence_ids"]),
-        qualification=MIEQualification(str(payload["qualification"])),
-        qualification_rationale=str(payload["qualification_rationale"]),
-    )
-    result.validate()
-    if result.qualification != MIEQualification.DECISION_GRADE:
-        raise ValueError("market_implied_expectation is not decision-grade")
-    return result
 
 
 def _parse_gap(payload: Mapping[str, Any]) -> CanonicalExpectationGap:
@@ -291,8 +118,8 @@ def _parse_gap(payload: Mapping[str, Any]) -> CanonicalExpectationGap:
             "price",
             "price_observation_id",
             "cutoff_date",
+            "mie_snapshot_hash",
             "market_expectation_id",
-            "market_expectation_hash",
             "comparison_direction",
             "independent_expectation",
         },
@@ -302,8 +129,8 @@ def _parse_gap(payload: Mapping[str, Any]) -> CanonicalExpectationGap:
             "price",
             "price_observation_id",
             "cutoff_date",
+            "mie_snapshot_hash",
             "market_expectation_id",
-            "market_expectation_hash",
             "comparison_direction",
             "independent_expectation",
         },
@@ -324,8 +151,8 @@ def _parse_gap(payload: Mapping[str, Any]) -> CanonicalExpectationGap:
         price=_dec(payload["price"], "expectation_gap.price"),
         price_observation_id=str(payload["price_observation_id"]),
         cutoff_date=_parse_date(payload["cutoff_date"], "expectation_gap.cutoff_date"),
+        mie_snapshot_hash=str(payload["mie_snapshot_hash"]),
         market_expectation_id=str(payload["market_expectation_id"]),
-        market_expectation_hash=str(payload["market_expectation_hash"]),
         comparison_direction=ComparisonDirection(str(payload["comparison_direction"])),
         independent_expectation=IndependentExpectation(
             variable_id=str(independent["variable_id"]),
@@ -340,65 +167,123 @@ def _parse_gap(payload: Mapping[str, Any]) -> CanonicalExpectationGap:
     return result
 
 
-def evaluate_canonical_expectation_gap(
-    payload: Mapping[str, Any],
-    *,
-    market_implied_expectation_payload: Mapping[str, Any],
-    current_price: Any,
-    current_price_observation: Mapping[str, Any],
-    cutoff_date: Any,
-) -> dict[str, Any]:
-    gap = _parse_gap(payload)
-    mie = _parse_mie(market_implied_expectation_payload)
-
-    if gap.market_expectation_id != mie.expectation_id:
-        raise ValueError("expectation_gap.market_expectation_id does not match market_implied_expectation.expectation_id")
-    if gap.market_expectation_hash != market_implied_expectation_content_hash(market_implied_expectation_payload):
-        raise ValueError("expectation_gap.market_expectation_hash does not match canonical MIE content")
-    if gap.price != _dec(current_price, "current_price_observation.price"):
-        raise ValueError("expectation_gap.price must equal current_price_observation.price")
-    try:
-        observed_at = str(current_price_observation["observed_at"]).replace("Z", "+00:00")
-        observed_date = __import__("datetime").datetime.fromisoformat(observed_at).date()
-    except (KeyError, TypeError, ValueError) as exc:
-        raise ValueError("current_price_observation.observed_at is invalid") from exc
-    if mie.observation_basis.observation_date != observed_date:
-        raise ValueError("MIE observation_basis.observation_date must equal current_price_observation.observed_at date")
-    if mie.observation_basis.currency != str(current_price_observation.get("currency", "")):
-        raise ValueError("MIE observation_basis.currency must equal current_price_observation.currency")
-    if mie.observation_basis.adjustment_semantics != str(current_price_observation.get("adjustment_semantics", "")):
-        raise ValueError("MIE observation_basis.adjustment_semantics must equal current_price_observation.adjustment_semantics")
-    case_cutoff = _parse_date(cutoff_date, "cutoff_date")
-    if gap.cutoff_date != case_cutoff:
-        raise ValueError("expectation_gap.cutoff_date must equal case cutoff_date")
-    if mie.observation_basis.cutoff_date != case_cutoff:
-        raise ValueError("market_implied_expectation observation_basis.cutoff_date must equal case cutoff_date")
-    if gap.price_observation_id != mie.observation_basis.price_observation_id:
-        raise ValueError("expectation_gap.price_observation_id must equal MIE observation_basis.price_observation_id")
-
+def _materialized_expectation(snapshot: Mapping[str, Any], expectation_id: str) -> Mapping[str, Any]:
+    mie_set = snapshot.get("mie_set")
+    if not isinstance(mie_set, Mapping):
+        raise ValueError("P4-F snapshot mie_set is invalid")
+    if mie_set.get("resolution_state") != "UNIQUE_MODEL":
+        raise ValueError("P4-F snapshot must resolve to UNIQUE_MODEL for expectation gap")
+    if mie_set.get("qualification") != MIEQualification.DECISION_GRADE.value:
+        raise ValueError("P4-F snapshot must be DECISION_GRADE for expectation gap")
     matches = []
-    for item in mie.economic_requirements:
+    for evaluation in mie_set.get("model_evaluations") or []:
+        if evaluation.get("state") != "MATERIALIZED":
+            continue
+        expectation = evaluation.get("expectation")
+        if isinstance(expectation, Mapping) and expectation.get("expectation_id") == expectation_id:
+            matches.append(expectation)
+    if len(matches) != 1:
+        raise ValueError("expectation_gap.market_expectation_id must identify exactly one materialized MIE in snapshot")
+    return matches[0]
+
+
+def _require_snapshot_price_binding(
+    *,
+    snapshot: Mapping[str, Any],
+    expectation: Mapping[str, Any],
+    current_price_observation: Mapping[str, Any],
+) -> None:
+    observation = expectation.get("observation_basis")
+    if not isinstance(observation, Mapping):
+        raise ValueError("materialized MIE observation_basis is required")
+
+    observed_date = _parse_datetime(
+        current_price_observation.get("observed_at"),
+        "current_price_observation.observed_at",
+    ).date()
+    if observation.get("observation_date") != observed_date.isoformat():
+        raise ValueError("MIE observation_basis.observation_date must equal current_price_observation.observed_at date")
+    if observation.get("cutoff_date") != snapshot.get("cutoff_date"):
+        raise ValueError("MIE observation_basis.cutoff_date must equal snapshot.cutoff_date")
+    if observation.get("price_observation_id") != current_price_observation.get("price_observation_id"):
+        raise ValueError("MIE observation_basis.price_observation_id must equal current_price_observation.price_observation_id")
+    if observation.get("currency") != current_price_observation.get("currency"):
+        raise ValueError("MIE observation_basis.currency must equal current_price_observation.currency")
+    if observation.get("adjustment_semantics") != current_price_observation.get("adjustment_semantics"):
+        raise ValueError("MIE observation_basis.adjustment_semantics must equal current_price_observation.adjustment_semantics")
+
+
+def _require_point_requirement(
+    *,
+    expectation: Mapping[str, Any],
+    independent: IndependentExpectation,
+) -> tuple[Decimal, Decimal]:
+    requirements = expectation.get("economic_requirements") or []
+    matches = []
+    for item in requirements:
+        if not isinstance(item, Mapping):
+            continue
         try:
-            item_horizon_years = _parse_horizon_years(item.horizon, "market expectation horizon")
+            horizon_years = _parse_horizon_years(item.get("horizon"), "market expectation horizon")
         except ValueError:
             continue
         if (
-            item.economic_variable == gap.independent_expectation.variable_id
-            and item.unit == gap.independent_expectation.unit
-            and item.basis == gap.independent_expectation.basis
-            and item_horizon_years == gap.independent_expectation.horizon_years
+            item.get("economic_variable") == independent.variable_id
+            and item.get("unit") == independent.unit
+            and item.get("basis") == independent.basis
+            and horizon_years == independent.horizon_years
         ):
-            matches.append((item, item_horizon_years))
-
+            matches.append((item, horizon_years))
     if len(matches) != 1:
         raise ValueError(
-            "canonical MIE must contain exactly one point-valued economic requirement matching the independent expectation semantics"
+            "canonical P4-F MIE snapshot must contain exactly one point-valued economic requirement matching the independent expectation semantics"
         )
-
-    requirement, market_horizon_years = matches[0]
-    if requirement.value is None or requirement.range_low is not None or requirement.range_high is not None:
+    requirement, horizon_years = matches[0]
+    if "value" not in requirement or "range_low" in requirement or "range_high" in requirement:
         raise ValueError("expectation gap requires a point-valued MIE economic requirement")
+    return _dec(requirement["value"], "market_implied_expectation.economic_requirements.value"), horizon_years
 
+
+def evaluate_canonical_expectation_gap(
+    payload: Mapping[str, Any],
+    *,
+    market_implied_expectation_snapshot: Mapping[str, Any],
+    current_price: Any,
+    current_price_observation: Mapping[str, Any],
+    cutoff_date: Any,
+    case_id: str,
+) -> dict[str, Any]:
+    gap = _parse_gap(payload)
+    snapshot = dict(market_implied_expectation_snapshot)
+
+    try:
+        validate_p4f_snapshot(snapshot)
+    except ValueError as exc:
+        raise ValueError(f"invalid canonical P4-F MIE snapshot: {exc}") from exc
+
+    if snapshot.get("snapshot_hash") != gap.mie_snapshot_hash:
+        raise ValueError("expectation_gap.mie_snapshot_hash does not match canonical P4-F snapshot")
+    if snapshot.get("case_id") != case_id:
+        raise ValueError("P4-F snapshot.case_id must equal investment core case_id")
+    case_cutoff = _parse_date(cutoff_date, "cutoff_date")
+    if snapshot.get("cutoff_date") != case_cutoff.isoformat():
+        raise ValueError("P4-F snapshot.cutoff_date must equal case cutoff_date")
+    if gap.cutoff_date != case_cutoff:
+        raise ValueError("expectation_gap.cutoff_date must equal case cutoff_date")
+    if gap.price != _dec(current_price, "current_price_observation.price"):
+        raise ValueError("expectation_gap.price must equal current_price_observation.price")
+
+    expectation = _materialized_expectation(snapshot, gap.market_expectation_id)
+    _require_snapshot_price_binding(
+        snapshot=snapshot,
+        expectation=expectation,
+        current_price_observation=current_price_observation,
+    )
+
+    market_value, market_horizon_years = _require_point_requirement(
+        expectation=expectation,
+        independent=gap.independent_expectation,
+    )
     independent = {
         "variable_id": gap.independent_expectation.variable_id,
         "value": gap.independent_expectation.value,
@@ -407,12 +292,12 @@ def evaluate_canonical_expectation_gap(
         "horizon_years": str(gap.independent_expectation.horizon_years),
     }
     market = {
-        "qualification": mie.qualification.value,
+        "qualification": MIEQualification.DECISION_GRADE.value,
         "resolution_state": "UNIQUE_MODEL",
-        "variable_id": requirement.economic_variable,
-        "value": requirement.value,
-        "unit": requirement.unit,
-        "basis": requirement.basis,
+        "variable_id": gap.independent_expectation.variable_id,
+        "value": market_value,
+        "unit": gap.independent_expectation.unit,
+        "basis": gap.independent_expectation.basis,
         "horizon_years": str(market_horizon_years),
     }
     evaluated = evaluate_expectation_gap(
@@ -421,12 +306,6 @@ def evaluate_canonical_expectation_gap(
         comparison_direction=gap.comparison_direction.value,
     )
 
-    evidence_ids = set(gap.independent_expectation.evidence_ids)
-    evidence_ids.update(mie.evidence_ids)
-    requirement_ids = set(requirement.evidence_ids)
-    if not requirement_ids.issubset(set(mie.evidence_ids)):
-        raise ValueError("MIE requirement evidence is outside the MIE top-level evidence closure")
-
     return {
         **evaluated,
         "gap_id": gap.gap_id,
@@ -434,13 +313,13 @@ def evaluate_canonical_expectation_gap(
         "price": gap.price,
         "price_observation_id": gap.price_observation_id,
         "cutoff_date": gap.cutoff_date,
-        "market_expectation_id": mie.expectation_id,
-        "market_expectation_hash": gap.market_expectation_hash,
-        "market_model_id": mie.model_id,
-        "market_model": mie.market_model.value,
-        "evidence_ids": tuple(sorted(evidence_ids)),
+        "mie_snapshot_hash": snapshot["snapshot_hash"],
+        "market_expectation_id": gap.market_expectation_id,
+        "mie_set_hash": snapshot["mie_set_hash"],
+        "provenance_hash": snapshot["provenance_hash"],
+        "evidence_ids": tuple(sorted(set(gap.independent_expectation.evidence_ids) | set(snapshot["mie_set"].get("evidence_ids") or []))),
         "independent_evidence_ids": tuple(sorted(gap.independent_expectation.evidence_ids)),
-        "mie_evidence_ids": tuple(sorted(mie.evidence_ids)),
+        "mie_evidence_ids": tuple(sorted(snapshot["mie_set"].get("evidence_ids") or [])),
     }
 
 
@@ -449,5 +328,4 @@ __all__ = [
     "CanonicalExpectationGap",
     "IndependentExpectation",
     "evaluate_canonical_expectation_gap",
-    "market_implied_expectation_content_hash",
 ]
