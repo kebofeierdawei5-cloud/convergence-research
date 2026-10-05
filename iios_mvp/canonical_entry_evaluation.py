@@ -165,6 +165,15 @@ def build_canonical_entry_evaluation(
             "P2.1 candidate_price must equal the canonical return target-entry price"
         )
 
+    reference_price = _dec(
+        response.get("reference_price"),
+        "p2_1_price_response.reference_price",
+    )
+    if reference_price != current:
+        raise ValueError(
+            "P2.2 canonical current price must equal P2.1 reference_price"
+        )
+
     qualification = str(response.get("qualification", "")).upper()
     if qualification not in {"DECISION_GRADE", "CONDITIONAL_ONLY"}:
         raise ValueError(
@@ -357,7 +366,7 @@ def admit_decision(
             "pre_admission_action": action,
             "action": admitted_action,
             "decision_status": "READY",
-            "primary_reason": "CURRENT_PRICE_ABOVE_CANONICAL_ENTRY_BOUNDARY",
+            "primary_reason": "CURRENT_PRICE_OUTSIDE_CANONICAL_ENTRY_BOUNDARY",
             "capital_effect": "UNCHANGED",
             "new_capital_allowed": False,
             "evaluation_id": entry_evaluation.get("evaluation_id"),
