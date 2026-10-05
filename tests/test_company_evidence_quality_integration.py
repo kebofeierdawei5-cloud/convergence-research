@@ -99,7 +99,7 @@ def test_real_300750_evidence_closes_roic_unknown_but_not_to_pass():
     )
 
 
-def test_integration_never_upgrades_a_weaker_existing_status():
+def test_evidence_closes_missing_unknown_but_does_not_upgrade_known_conditional():
     quality, trust = _real_core02_inputs()
     economic, capital = _bridges(
         roic_status="PASS",
@@ -128,8 +128,30 @@ def test_integration_never_upgrades_a_weaker_existing_status():
 
     q = {row["dimension"]: row["status"] for row in result["quality"]["dimensions"]}
     t = {row["dimension"]: row["status"] for row in result["trust"]["dimensions"]}
-    assert q["incremental_return_on_capital"] == "UNKNOWN"
-    assert t["governance_integrity"] == "UNKNOWN"
+    assert q["incremental_return_on_capital"] == "PASS"
+    assert t["governance_integrity"] == "PASS"
+
+    quality, trust = _real_core02_inputs()
+    economic, capital = _bridges(
+        roic_status="PASS",
+        interpretation="PASS",
+        capital_status="PASS",
+    )
+    quality["dimensions"] = [
+        dict(row) if row["dimension"] != "cash_flow_conversion"
+        else {**row, "status": "CONDITIONAL"}
+        for row in quality["dimensions"]
+    ]
+    result = integrate_company_evidence_into_quality(
+        case_id=CASE_ID,
+        cutoff_date=CUTOFF,
+        quality=quality,
+        trust=trust,
+        economic_bridge=economic,
+        capital_trust_bridge=capital,
+    )
+    q = {row["dimension"]: row["status"] for row in result["quality"]["dimensions"]}
+    assert q["cash_flow_conversion"] == "CONDITIONAL"
 
 
 def test_blocked_evidence_caps_the_affected_quality_dimension_only():
