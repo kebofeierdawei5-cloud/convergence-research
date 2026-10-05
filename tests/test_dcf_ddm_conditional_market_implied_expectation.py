@@ -384,7 +384,7 @@ def test_unstable_identification_blocks_conditional_mie():
                 1,
                 str(item.price),
                 "discount_rate",
-                "0.20",
+                "0.03",
                 item.basis,
                 item.unit,
                 item.evidence_ids[0],
