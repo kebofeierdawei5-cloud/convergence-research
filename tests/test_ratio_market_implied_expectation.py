@@ -394,7 +394,7 @@ def test_unstable_identification_still_blocks_ratio_mie():
     )
     p3 = identify_market_models(inp)
     assert p3["identifiability"].state.value == "IDENTIFIABLE"
-    assert p3["identifiability"].selected_model_id == "ps-1"
+    assert p3["identifiability"].selected_model_id == "pe-1"
     assert p3["stability"].state.value == "UNSTABLE"
     outputs = build_ratio_market_implied_expectations(
             identification_input=inp,
