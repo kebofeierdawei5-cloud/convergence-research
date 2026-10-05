@@ -99,11 +99,12 @@ def test_known_missing_control_is_conditional_not_parse_failure():
     assert result["trust_revalidation"]["governance_integrity"]["non_related_director_vote_control"] is False
 
 
-def test_vote_control_requires_zero_against_and_abstain():
-    with pytest.raises(ValueError):
-        _build(non_related_director_against_votes=1)
-    with pytest.raises(ValueError):
-        _build(non_related_director_abstain_votes=1)
+def test_non_unanimous_vote_is_recorded_as_missing_control():
+    result = _build(non_related_director_against_votes=1)
+    assert result["trust_revalidation"]["governance_integrity"]["non_related_director_vote_control"] is False
+
+    result = _build(non_related_director_abstain_votes=1)
+    assert result["trust_revalidation"]["governance_integrity"]["non_related_director_vote_control"] is False
 
 
 def test_zero_project_investment_fails_closed():
