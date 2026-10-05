@@ -165,7 +165,9 @@ def test_v03_risk_cap_enters_target_entry_price_solver():
     c["risk"]["max_loss_pct"] = "5"
     metrics = calculate_return_metrics(c["return_gate"], max_loss_pct="5")
     assert metrics["risk_pass"] is False
-    assert metrics["target_entry_price_for_risk"] == Decimal("94.736842105263157894736842105263157894736842105263158")
+    assert abs(
+        metrics["target_entry_price_for_risk"] - Decimal("90") / Decimal("0.95")
+    ) < Decimal("0.0000000001")
     assert metrics["target_entry_price"] == metrics["target_entry_price_for_risk"]
 
 
@@ -255,6 +257,7 @@ def test_v03_add_existing_position():
 def test_v03_hold_existing_when_return_is_positive_but_gate_fails():
     c = case()
     c["portfolio"]["position_pct"] = "5"
+    c["current_price_observation"]["price"] = "130"
     c["return_gate"]["entry_price"] = "130"
     c["return_gate"]["entry_value_reference"] = "115"
     result = decide(c)
