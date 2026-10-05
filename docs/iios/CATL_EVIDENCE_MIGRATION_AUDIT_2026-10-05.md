@@ -1,6 +1,6 @@
 # CATL Existing Evidence Migration Audit — 2026-10-05
 
-Status: CANDIDATE FOR ACCEPTANCE
+Status: PASS / TECHNICAL — PARTIAL / SOURCE QUALITY
 
 ## Scope
 
@@ -20,7 +20,7 @@ Existing capture artifacts E001-E010 are preserved unchanged and bound to the B2
 - known_at / retrieved_at;
 - Evidence field group.
 
-The manifest must pass the B2 exact-byte verifier against the repository working tree and the PIT rule `known_at <= cutoff`.
+The manifest passed the B2 exact-byte verifier against the repository working tree and the PIT rule `known_at <= cutoff` in the merged CI run.
 
 ## Source-quality audit
 
