@@ -169,16 +169,15 @@ def _row_first_number(
             continue
 
         label_compact = re.sub(r"\s+", "", matched)
-        candidate = compact_line
         # CNINFO tables often wrap the numeric cells to the next line.
-        for extra in lines[index + 1 : index + 3]:
-            candidate += re.sub(r"\s+", "", extra)
-            if len(re.findall(_NUM_RE.pattern, candidate)) >= 1:
-                break
-
-        match = re.search(_NUM_RE.pattern, candidate[len(label_compact):])
-        if match:
-            return Decimal(match.group(0).replace(",", ""))
+        # Match line-by-line so adjacent year columns never concatenate.
+        for offset in range(0, 3):
+            candidate_line = re.sub(r"\s+", "", lines[index + offset])
+            if offset == 0:
+                candidate_line = candidate_line[len(label_compact):]
+            match = re.search(_NUM_RE.pattern, candidate_line)
+            if match:
+                return Decimal(match.group(0).replace(",", ""))
 
     raise ValueError(f"row not found for labels: {labels}")
 
