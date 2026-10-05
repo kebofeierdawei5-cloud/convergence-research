@@ -114,8 +114,7 @@ RP-01 Risk / Portfolio Production Contract is merged in canonical main:
 The available workflow interface did not expose a post-merge runtime CI record for independent verification in this session. Therefore RP-01 is recorded as MERGED / implementation-complete, not as independently CI-certified here.
 
 Remaining Investment Core productization:
-- Decision Revision state transitions;
-- Human Approval / Current Projection;
+- Persistence / CLI integration of Decision Revision, Human Approval and Current Projection;
 - Trigger lifecycle;
 - Monitoring / Validation;
 - Machine Publication;
@@ -201,11 +200,15 @@ A1 is complete as the current company-side evidence-closure milestone.
 
 RP-01 is implementation-complete on canonical main; runtime CI evidence was not independently observable through the available workflow interface in this session.
 
+**DR-01 Decision Revision / Human Approval Contract = PASS / MERGED**
+
+Canonical lifecycle semantics are frozen. Independent execution passed 8/8; GitHub Actions runtime telemetry was not exposed by the available workflow interface and is recorded as UNOBSERVED.
+
 Acceptance:
 - `docs/iios/A1_ACCEPTANCE_2026-10-05.md`
 - `docs/iios/RP_01_RISK_PORTFOLIO_PRODUCTION_CONTRACT_v0.1.md`
 
-The next development batch must be independently scoped from the canonical main. No new P3/P4/MIE model work is implied by A1 completion.
+The next development batch is **DR-02 Persistence + CLI Integration**. It must start from the resulting canonical main and this State Index. No new P3/P4/MIE model work is implied.
 
 Completed sub-batches:
 - **A1-01 Economic Evidence Bridge = PASS / MERGED**
