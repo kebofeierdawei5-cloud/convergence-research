@@ -481,6 +481,26 @@
           ],
           "additionalProperties": true
         },
+        "target_entry_price_p2_1_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_entry_price_p2_1": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        },
+        "target_entry_price_p2_1_price_response": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        },
         "position_package_complete": {
           "type": "boolean"
         },
@@ -625,6 +645,14 @@
       "then": {
         "required": [
           "market_implied_expectation_snapshot_ref"
+        ]
+      }
+    },
+    {
+      "not": {
+        "required": [
+          "expectation_gap",
+          "target_entry_price_reference"
         ]
       }
     },
