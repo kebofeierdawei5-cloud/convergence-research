@@ -54,8 +54,8 @@ def case() -> dict:
                 "variable_id": "eps_cagr",
                 "value": "0.20",
                 "unit": "ratio",
-                "basis": "2026A_to_2029E",
-                "horizon_years": "3",
+                "basis": "2026A_to_2028E",
+                "horizon_years": "2",
             },
             "market_expectation": {
                 "qualification": "DECISION_GRADE",
@@ -63,8 +63,8 @@ def case() -> dict:
                 "variable_id": "eps_cagr",
                 "value": "0.15",
                 "unit": "ratio",
-                "basis": "2026A_to_2029E",
-                "horizon_years": "3",
+                "basis": "2026A_to_2028E",
+                "horizon_years": "2",
             },
         },
         "return_gate": {
@@ -117,6 +117,17 @@ def test_v03_incompatible_canonical_gap_is_blocked():
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-EXPECTATION-GAP-CANONICAL" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_expectation_gap_horizon_must_match_decision_horizon():
+    c = case()
+    c["expectation_gap"]["independent_expectation"]["horizon_years"] = "3"
+    c["expectation_gap"]["market_expectation"]["horizon_years"] = "3"
+    c["expectation_gap"]["independent_expectation"]["basis"] = "2026A_to_2029E"
+    c["expectation_gap"]["market_expectation"]["basis"] = "2026A_to_2029E"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-EXPECTATION-GAP-HORIZON" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_buy_requires_all_three_return_conditions():
