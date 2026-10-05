@@ -1,0 +1,35 @@
+name: IIOS CORE-04-C Materialize Verified Source Bytes
+
+on:
+  pull_request:
+    paths:
+      - "research/core04c_source_manifest_v0.1.json"
+      - "tools/core04c_materialize.py"
+      - "docs/iios/CORE_04C_EV_EBITDA_PIT_ADMISSION_v0.1.md"
+  push:
+    branches: [main]
+    paths:
+      - "research/core04c_source_manifest_v0.1.json"
+      - "tools/core04c_materialize.py"
+      - "docs/iios/CORE_04C_EV_EBITDA_PIT_ADMISSION_v0.1.md"
+
+permissions:
+  contents: read
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m compileall -q tools
+      - run: |
+          python tools/core04c_materialize.py             --manifest research/core04c_source_manifest_v0.1.json             --out /tmp/core04c/raw
+      - run: python -m json.tool /tmp/core04c/raw/materialization_receipt.json >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iios-core04c-verified-source-bytes
+          path: /tmp/core04c/raw/
+          retention-days: 7
