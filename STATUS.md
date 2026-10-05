@@ -13,15 +13,16 @@ B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. T
 
 ## Current Active Stage — 2026-10-05
 
-B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = PASS / MERGED. CATL Existing Evidence Migration = ACTIVE.
+B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = PASS / MERGED. CATL Existing Evidence Migration = PASS / TECHNICAL. CATL Primary-Source Gap Supplementation = ACTIVE.
 
 - B2-A merge commit: c8246ceaaad5e9b1cc02fe422723c39a441ea4f3.
 - B2 raw-artifact containment hardening merge commit: 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3.
-- Current canonical main baseline: fa4a53bd5f88f8e25cc4c02614c9e765294afbb6.
-- Existing CATL E001-E010 capture artifacts are now the explicit B2 migration input.
-- Technical B2 admission is separated from source-quality grading; no secondary source is silently upgraded to primary evidence.
+- Current canonical main baseline: 00fdf82a374ac46a5b99567b590e940d7220bd23.
+- Existing CATL E001-E010 capture artifacts have passed technical B2 migration.
+- Source-quality gaps remain separate: E002 = P0 primary-price gap; E003/E007 = P1 direct-primary disclosure gaps when material.
+- No secondary source is silently upgraded to primary evidence.
 - A02/CSI800 is Research Track only: its code is outside research/b2 and it must not execute from B2 CI.
-- Next after scope repair: existing CATL Evidence migration/admission, not a new historical-data platform.
+- Next: targeted first-party supplementation for the material source gaps only; then return to CORE-03/CORE-04. No historical universe/data platform is required.
 
 
 ## Canonical State
