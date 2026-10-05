@@ -1,0 +1,16 @@
+IIOS A1-02 evidence capture E014_A1
+case_id: RC-CN-A-300750-20261004
+source_ref: https://static.cninfo.com.cn/finalpage/2026-03-10/1225002214.PDF
+source_vintage: 2026-03-10
+known_at: 2026-03-10T00:00:00+08:00
+observation_date: 2025-12-31
+unit: CNY_thousand
+
+2025 annual capital allocation:
+attributable_net_income_2025: 72201282
+cash_dividend_total_including_other_methods_2025: 36100640.88392 CNY_thousand
+annual_payout_ratio: 50.00%
+repurchased_shares_in_repurchase_account_at_plan_date: 31982306
+share_count_excluding_repurchase_account_for_distribution: 4531886650
+
+The annual report states that the proposed 2025 distribution uses 50% of attributable net profit and that no bonus shares or capital-reserve capitalization is proposed.

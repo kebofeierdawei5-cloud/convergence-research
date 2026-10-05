@@ -1,0 +1,18 @@
+IIOS A1-02 evidence capture E016_A1
+case_id: RC-CN-A-300750-20261004
+source_ref: https://static.cninfo.com.cn/finalpage/2026-10-01/1225592063.PDF
+source_vintage: 2026-10-01
+known_at: 2026-10-01T00:00:00+08:00
+observation_date: 2026-09-30
+unit: USD
+
+Related-party governance / capital commitment:
+indonesia_industry_chain_project_planned_total_investment_cap: 59.68 billion USD
+related_party_guarantee_cap_for_project_financing: 130 million USD
+guarantee_type: joint and several liability guarantee
+related_party_guarantee_subject: financing of Indonesia battery industry-chain project subsidiaries
+
+Governance controls disclosed:
+independent_director_special_meeting_review: APPROVED
+related_director_recusal: YES
+non_related_directors_vote: 8 FOR / 0 AGAINST / 0 ABSTAIN

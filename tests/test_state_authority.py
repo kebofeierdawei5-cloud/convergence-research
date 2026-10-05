@@ -9,7 +9,9 @@ def test_current_state_index_is_unique_and_canonical():
     text = index.read_text(encoding='utf-8')
     assert 'State classification: **CANONICAL**' in text
     assert 'only canonical Current State Index' in text
-    assert 'A1 Company-side Evidence Closure = NEXT' in text
+    assert 'A1 Company-side Evidence Closure — IN PROGRESS' in text
+    assert 'A1-01 Economic Evidence Bridge = PASS / MERGED' in text
+    assert 'A1-02 Capital Allocation + Trust/Governance Evidence Closure = NEXT' in text
 
 
 def test_status_is_summary_not_a_competing_state_authority():

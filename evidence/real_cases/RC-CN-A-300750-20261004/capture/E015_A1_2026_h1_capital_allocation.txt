@@ -1,0 +1,17 @@
+IIOS A1-02 evidence capture E015_A1
+case_id: RC-CN-A-300750-20261004
+source_ref: https://static.cninfo.com.cn/finalpage/2026-07-25/1225441586.PDF
+source_vintage: 2026-07-25
+known_at: 2026-07-25T00:00:00+08:00
+observation_date: 2026-06-30
+unit: CNY_thousand / shares
+
+2026 H1 interim capital allocation:
+interim_cash_dividend: 6492600.30764 CNY_thousand
+interim_payout_ratio: 15.00% of H1 attributable net profit
+distribution_base_shares: 4598335875
+total_shares_before_excluding_repurchase_account: 4626654919
+repurchase_account_shares_at_h1_end: 28319044
+repurchase_account_share_ratio: 0.61%
+bonus_shares: 0
+capital_reserve_capitalization: 0
