@@ -88,8 +88,26 @@ def parse_szse_market_snapshot(
 
 
 def _report_text(path: Path, pages_1based: tuple[int, ...] | None = None) -> str:
+    try:
+        rendered = subprocess.run(
+            ["pdftotext", "-layout", str(path), "-"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        doc = fitz.open(path)
+        rendered = "\n".join(page.get_text("text") for page in doc)
+
+    # pdftotext gives more stable Chinese table text on these CNINFO PDFs.
+    rendered = unicodedata.normalize("NFKC", rendered)
+    rendered = re.sub(r"(?<=[\u4e00-\u9fff])\\s+(?=[\u4e00-\u9fff])", "", rendered)
+
+    if not pages_1based:
+        return rendered
+
     doc = fitz.open(path)
-    page_numbers = pages_1based if pages_1based else tuple(range(1, doc.page_count + 1))
+    page_numbers = pages_1based
     parts = []
     for page_no in page_numbers:
         if not 1 <= page_no <= doc.page_count:
