@@ -427,6 +427,7 @@ def _canonical_expectation_gap(payload: Any, case: dict[str, Any]) -> dict[str, 
             payload,
             market_implied_expectation_payload=mie,
             current_price=case["current_price_observation"]["price"],
+            current_price_observation=case["current_price_observation"],
             cutoff_date=case["cutoff_date"],
         )
     except (KeyError, TypeError, ValueError) as exc:
