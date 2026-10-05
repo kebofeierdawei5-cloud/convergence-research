@@ -170,11 +170,16 @@ def _row_first_number(
 
         label_compact = re.sub(r"\s+", "", matched)
         # CNINFO tables often wrap the numeric cells to the next line.
-        # Match line-by-line so adjacent year columns never concatenate.
+        # Normalize only the label line; preserve numeric-column separators.
         for offset in range(0, 3):
-            candidate_line = re.sub(r"\s+", "", lines[index + offset])
+            raw_candidate = lines[index + offset].strip()
+            if not raw_candidate:
+                continue
             if offset == 0:
+                candidate_line = re.sub(r"\s+", "", raw_candidate)
                 candidate_line = candidate_line[len(label_compact):]
+            else:
+                candidate_line = raw_candidate
             match = re.search(_NUM_RE.pattern, candidate_line)
             if match:
                 return Decimal(match.group(0).replace(",", ""))
