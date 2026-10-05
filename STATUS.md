@@ -3,7 +3,7 @@
 This file retains historical acceptance records below. For the active repair program, read `docs/iios/B0_AUTHORITY_AUDIT_FREEZE_2026-10-04.md` first.
 
 Historical B0 repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
-Active repair stage: **B0 PASS → B1 PASS → CORE-00 PASS → CORE-01 PASS → CORE-02 PASS → CORE-03 PASS → CORE-04 ACTIVE**
+Active repair stage: **B0 PASS → B1 PASS → CORE-00 PASS → CORE-01 PASS → CORE-02 PASS → CORE-03 PASS → CORE-04 VERTICAL E2E PASS**
 P4-F infrastructure is merged and semantically bounded; the current critical path is CORE-04 production decision closure, not further P4 expansion.
 B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. The owner-approved distinction between (a) 15% BUY-entry threshold / safety-margin policy and (b) 1–3Y annualized target >=15% is now normative in v0.3.
 
@@ -65,14 +65,18 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - P3-A-RA / P4-B~P4-F outside-support semantics are now part of canonical `main`.
 - The merged PR preserves FEASIBLE + IDENTIFIABLE + BELOW_HISTORICAL_RANGE + POSSIBLE_REGIME_SHIFT for the real 300750 case, while P4-B/P4-F remain fail-closed.
 
-## CORE-04 Production Decision Kernel — ACTIVE
+## CORE-04 Production Decision Kernel — VERTICAL E2E PASS
 
-- Decision Semantics Reconciliation: **IMPLEMENTED / FROZEN FOR REVIEW**.
+- Decision Semantics Reconciliation: **IMPLEMENTED / FROZEN**.
+- Quality Gate + Thesis Admission: **IMPLEMENTED / CANONICAL**.
+- Real 300750 final Decision E2E: **PASS / REVIEW_REQUIRED / NO NEW CAPITAL**.
 - B1 v0.3 MIE role is explicitly **OPTIONAL_EXPLANATORY** for BUY/ADD.
 - Legacy MIE-mandatory rules are retained only behind explicit compatibility policy; CORE-04 v0.3 passes the optional policy explicitly.
 - Production kernel: `iios_mvp/decision_kernel_v03.py`.
 - Current merge candidate branch: `feature/core04-production-decision-kernel-20261005`.
-- Production decision kernel is **REFRESHED ON TOP OF CANONICAL MAIN**; code acceptance head `490e83d06c4c0b28e430ee3cbe279d5aa9e47ca8` passed Investment Core CI #455 and CORE-00 #192. PR #70 remains **OPEN / NOT MERGED** pending owner merge decision.
+- PR #70 is **MERGED** into canonical `main` as `91f18cc1c8b4bdc6f80053462ec5e9ce7b89d0cb`.
+- Production decision kernel v0.2 and upstream Quality/Thesis admission are now canonical.
+- Final 300750 Decision E2E PR #73 is the current merge candidate; its full chain is validated by Investment Core CI #468 and CORE-00 #205.
 
 ## CORE-04-C Real 300750 Historical EV/EBITDA
 
