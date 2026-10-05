@@ -1,4 +1,5 @@
 name: IIOS B2 Data Evidence PIT
+# Investment Core B2 is intentionally isolated from Research Track A02/CSI workflows.
 
 on:
   pull_request:
