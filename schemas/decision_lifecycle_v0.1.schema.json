@@ -93,5 +93,132 @@
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     }
+  },
+  "$defs": {
+    "human_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "decision_id",
+        "revision",
+        "revision_hash",
+        "snapshot_hash",
+        "approved",
+        "approval_status",
+        "note",
+        "approval_hash"
+      ],
+      "properties": {
+        "contract_version": {
+          "const": "IIOS-DECISION-LIFECYCLE-0.1"
+        },
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "revision_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "approved": {
+          "type": "boolean"
+        },
+        "approval_status": {
+          "enum": [
+            "HUMAN_APPROVED",
+            "HUMAN_REJECTED"
+          ]
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approval_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "current_projection": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contract_version",
+            "decision_series_id",
+            "current_decision_id",
+            "current_revision",
+            "snapshot_hash",
+            "approval_hash",
+            "projection_status",
+            "projection_hash"
+          ],
+          "properties": {
+            "contract_version": {
+              "const": "IIOS-DECISION-LIFECYCLE-0.1"
+            },
+            "decision_series_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "current_decision_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "current_revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "snapshot_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "approval_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "projection_status": {
+              "const": "CURRENT"
+            },
+            "projection_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "projection_status",
+            "candidate_decision_id",
+            "candidate_revision"
+          ],
+          "properties": {
+            "projection_status": {
+              "const": "UNCHANGED"
+            },
+            "candidate_decision_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "candidate_revision": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      ]
+    }
   }
 }
