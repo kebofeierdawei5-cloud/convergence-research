@@ -38,13 +38,15 @@
     },
     "model_fit": {
       "type": "object",
-      "required": ["model_id","status","diagnostics","evidence_ids"],
+      "required": ["model_id","status","diagnostics","evidence_ids","historical_support","regime_interpretation"],
       "properties": {
         "model_id": {"type":"string","minLength":1},
         "status": {"type":"string","enum":["FEASIBLE","INFEASIBLE","OUTSIDE_HISTORICAL_SUPPORT","INSUFFICIENT_EVIDENCE","CONTRADICTED"]},
         "diagnostics": {"type":"array","minItems":1},
         "evidence_ids": {"type":"array","items":{"type":"string"}},
-        "constraints": {"type":"array","items":{"type":"string"}}
+        "constraints": {"type":"array","items":{"type":"string"}},
+        "historical_support":{"type":"string","enum":["IN_RANGE","BELOW_HISTORICAL_RANGE","ABOVE_HISTORICAL_RANGE","UNKNOWN","INSUFFICIENT_EVIDENCE"]},
+        "regime_interpretation":{"type":"string","enum":["NOT_ASSESSED","POSSIBLE_REGIME_SHIFT","VERIFIED_REGIME_SHIFT","VERIFIED_MODEL_FAILURE"]}
       },
       "additionalProperties": false
     },
