@@ -302,10 +302,13 @@ class StabilityResult:
     observations: tuple[StabilityObservation, ...]
     evidence_ids: tuple[str, ...]
     rationale: str
+    assessment_scope: str = "IDENTIFICATION_ONLY"
 
     def validate(self) -> None:
         if not self.assessment_method or not self.rationale:
             raise ValueError("assessment_method and rationale are required")
+        if self.assessment_scope != "IDENTIFICATION_ONLY":
+            raise ValueError("unsupported stability assessment scope")
         if self.state == StabilityState.STABLE and not self.observations:
             raise ValueError("STABLE requires at least one perturbation/regime observation")
         for observation in self.observations:
