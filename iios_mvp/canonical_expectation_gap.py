@@ -253,6 +253,8 @@ def evaluate_canonical_expectation_gap(
     gap = _parse_gap(payload)
     snapshot = dict(market_implied_expectation_snapshot)
 
+    if independent_forecast_resolver is None:
+        raise ValueError("canonical independent forecast resolver is required for expectation gap")
     try:
         validate_p4f_snapshot(snapshot)
     except ValueError as exc:
@@ -298,7 +300,7 @@ def evaluate_canonical_expectation_gap(
         expectation=expectation,
         independent=independent,
     )
-    independent = {
+    independent_expectation_payload = {
         "variable_id": independent.variable_id,
         "value": independent.value,
         "unit": independent.unit,
@@ -315,7 +317,7 @@ def evaluate_canonical_expectation_gap(
         "horizon_years": str(market_horizon_years),
     }
     evaluated = evaluate_expectation_gap(
-        independent_expectation=independent,
+        independent_expectation=independent_expectation_payload,
         market_expectation=market,
         comparison_direction=comparison_direction.value,
     )
