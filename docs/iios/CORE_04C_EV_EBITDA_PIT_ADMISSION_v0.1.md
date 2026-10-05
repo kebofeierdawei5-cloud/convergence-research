@@ -1,7 +1,7 @@
 # CORE-04-C — 300750 Historical EV/EBITDA PIT Observation Admission v0.1
 
 Date: 2026-10-05
-Status: IMPLEMENTATION / LIVE CI VERIFICATION PENDING
+Status: FINAL ACCEPTED / LIVE CI PASS
 
 ## Objective
 
@@ -79,6 +79,27 @@ The admission receipt distinguishes:
 - deterministic derived EBITDA/net-debt evidence.
 
 Derived evidence hashes the immutable derivation artifact rather than presenting the derived number as a direct issuer observation.
+
+## Final Live Verification
+
+- CI run: `37261504704`
+- CI job: `111609522344`
+- CI result: **PASS**
+- Unit tests: **8 passed**
+- Live capture / parse / admission: **PASS**
+- JSON re-verification: **PASS**
+- Raw-source + receipts artifact: `11324627858`
+- Artifact ZIP SHA-256: `00ca7f00bcf98153d31cbd4be036cb23626c52d3d3d9138d01e83d1f66109037`
+- Derivation receipt SHA-256: `ed476c7f2613c80ac67ab4e6a996c0737bb4ef15b4caf89f42f72ba9edb88e6e`
+- Admission receipt SHA-256: `743d999cca969170210df1c03fedc10cce3c1cc829795d59b798715f2ba6762b`
+
+| Observation date | Price | EBITDA basis | EBITDA (CNY) | Net debt (CNY) | EV/EBITDA |
+|---|---:|---|---:|---:|---:|
+| 2026-07-27 | 400.00 | TTM H1 2026 | 139,451,341,000 | -291,182,555,000 | 11.182953x |
+| 2026-04-17 | 444.20 | FY2025 latest PIT | 119,197,217,000 | -285,865,524,000 | 14.610167x |
+| 2025-10-22 | 372.86 | FY2024 latest PIT | 91,999,043,000 | -238,640,390,000 | 15.898702x |
+
+The older two observations are deliberately **not** synthetic TTM values: the corresponding Q1/Q3 reports do not expose the complete depreciation/amortization supplement required for a robust PIT TTM bridge, so the implementation uses the latest fully disclosed FY EBITDA known by each observation date.
 
 ## Test / Acceptance
 
