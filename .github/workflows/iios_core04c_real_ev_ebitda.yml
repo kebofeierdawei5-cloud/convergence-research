@@ -31,8 +31,29 @@ jobs:
       - run: python -m pip install --disable-pip-version-check pytest pymupdf
       - run: python -m compileall -q tools tests/test_core04c_catl_ev_ebitda.py
       - run: python -m pytest -q tests/test_core04c_catl_ev_ebitda.py
-      - run: |
+      - id: parse
+        run: |
           PYTHONPATH=. python tools/core04c_fetch_and_parse.py             --manifest research/core04c_catl_sources_v0.2.json             --out /tmp/core04c/final
+        continue-on-error: true
+      - name: Inspect parser source context on failure
+        if: ${{ steps.parse.outcome == 'failure' }}
+        run: |
+          echo "=== FY2025 label probes ==="
+          pdftotext -layout /tmp/core04c/final/CNINFO-FY2025-2026-03-10.pdf - | grep -E -m 20 "利润|总额|固定资产折旧|使用权资产折旧|无形资产摊销|长期待摊" || true
+          echo "=== FY2024 label probes ==="
+          pdftotext -layout /tmp/core04c/final/CNINFO-FY2024-2025-03-15.pdf - | grep -E -m 20 "利润|总额|固定资产折旧|使用权资产折旧|无形资产摊销|长期待摊" || true
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: iios-core04c-catl-debug-raw-bundle
+          path: /tmp/core04c/final/
+          retention-days: 7
+      - name: Enforce real parse success
+        run: |
+          if [ "${{ steps.parse.outcome }}" != "success" ]; then
+            echo "CORE-04-C real parse failed"
+            exit 1
+          fi
       - run: |
           python - <<'PY'
           import json
