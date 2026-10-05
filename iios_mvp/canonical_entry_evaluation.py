@@ -139,6 +139,17 @@ def build_canonical_entry_evaluation(
             f"{response_source}"
         )
 
+    response = dict(price_response) if isinstance(price_response, Mapping) else None
+    if response is not None and response_source == "P2_LEGACY_COMPAT":
+        # The frozen P2 revalidation object predates an explicit response_version field.
+        # Normalize it here so the compatibility path is versioned, content-addressed,
+        # and cannot be relabelled as P2.1.
+        response.setdefault("response_version", P2_PRICE_GAP_REVALIDATION_VERSION)
+        response.setdefault("response_id", response.get("revalidation_id"))
+        response.setdefault("snapshot_hash", response.get("reference_snapshot_hash"))
+        response.setdefault("model_id", response.get("market_model"))
+        response.setdefault("expectation_id", market_expectation_id)
+
     common = {
         "evaluation_version": CANONICAL_ENTRY_EVALUATION_VERSION,
         "current_price": str(current),
@@ -148,58 +159,61 @@ def build_canonical_entry_evaluation(
         "independent_forecast_ref": independent_forecast_ref,
         "price_response_source": response_source,
         "price_response_version": (
-            str(price_response.get("response_version"))
-            if isinstance(price_response, Mapping)
-            and price_response.get("response_version") is not None
+            str(response.get("response_version"))
+            if isinstance(response, Mapping)
+            and response.get("response_version") is not None
             else None
         ),
         "price_response_id": (
-            str(price_response.get("response_id") or price_response.get("revalidation_id"))
-            if isinstance(price_response, Mapping)
+            str(response.get("response_id") or response.get("revalidation_id"))
+            if isinstance(response, Mapping)
             and (
-                price_response.get("response_id")
-                or price_response.get("revalidation_id")
+                response.get("response_id")
+                or response.get("revalidation_id")
             )
             is not None
             else None
         ),
         "price_response_hash": (
-            _hash(price_response)
-            if isinstance(price_response, Mapping)
+            _hash(response)
+            if isinstance(response, Mapping)
             else None
         ),
         "snapshot_hash": (
             str(
-                price_response.get("snapshot_hash")
-                or price_response.get("reference_snapshot_hash")
+                response.get("snapshot_hash")
+                or response.get("reference_snapshot_hash")
             )
-            if isinstance(price_response, Mapping)
+            if isinstance(response, Mapping)
             and (
-                price_response.get("snapshot_hash")
-                or price_response.get("reference_snapshot_hash")
+                response.get("snapshot_hash")
+                or response.get("reference_snapshot_hash")
             )
             is not None
             else None
         ),
         "model_id": (
             str(
-                price_response.get("model_id")
-                or price_response.get("market_model")
+                response.get("model_id")
+                or response.get("market_model")
             )
-            if isinstance(price_response, Mapping)
+            if isinstance(response, Mapping)
             and (
-                price_response.get("model_id")
-                or price_response.get("market_model")
+                response.get("model_id")
+                or response.get("market_model")
             )
             is not None
             else None
         ),
         "expectation_id": (
-            str(price_response.get("expectation_id"))
-            if isinstance(price_response, Mapping)
-            and price_response.get("expectation_id") is not None
-            else None
+            str(
+                response.get("expectation_id")
+                or market_expectation_id
+            )
+            if isinstance(response, Mapping)
+            else market_expectation_id
         ),
+    }
     }
 
     if not isinstance(price_response, Mapping):
@@ -226,7 +240,6 @@ def build_canonical_entry_evaluation(
             ),
         }
 
-    response = dict(price_response)
     response_version = str(response.get("response_version", ""))
     if response_source == "P2.1_CANONICAL":
         if response_version != PRICE_RESPONSE_VERSION:
