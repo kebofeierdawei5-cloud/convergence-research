@@ -25,7 +25,7 @@ from .semantic_expectation_gap import ComparisonDirection, evaluate_expectation_
 
 CANONICAL_EXPECTATION_GAP_VERSION = "IIOS-EXPECTATION-GAP-0.1"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-_HORIZON_RE = re.compile(r"^([0-9]+(?:\\.[0-9]+)?)(Y|M)$")
+_HORIZON_RE = re.compile(r"^([0-9]+(?:\.[0-9]+)?)(Y|M)$")
 
 
 @dataclass(frozen=True)
