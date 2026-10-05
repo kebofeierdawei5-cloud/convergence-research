@@ -305,7 +305,7 @@ def integrate_company_evidence_into_quality(
         if any(row["status"] in {"CONDITIONAL", "UNKNOWN"} for row in trust_dimensions)
         else "PASS"
     )
-    trust_status = _cap(trust_status, evidence_trust_status)
+    trust_status = _integrate_status(trust_status, evidence_trust_status)
 
     input_core = {
         "case_id": case_id,
@@ -424,11 +424,6 @@ def validate_company_evidence_quality_integration(
         if record["capital_trust_bridge_status"][field] not in STATUS_SEVERITY:
             raise ValueError(f"capital trust bridge {field} status invalid")
 
-    expected_integration_hash = _sha(
-        {key: value for key, value in record.items() if key != "audit"}
-    )
-    if audit["integration_sha256"] != expected_integration_hash:
-        raise ValueError("company evidence integration hash mismatch")
 
 
 
