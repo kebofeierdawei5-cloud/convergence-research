@@ -451,6 +451,7 @@ def build_core03_package(
             "forecast_evidence": forecast_evidence,
         }),
         "generated_at": "2026-10-04T22:00:00+00:00",
+        "price_evidence": price_evidence,
     }
     result = {**core_without_audit, "audit": audit}
     result["audit"]["core_sha256"] = _sha(core_without_audit)
