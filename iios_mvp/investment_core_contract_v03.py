@@ -787,6 +787,7 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
                 return_target_entry_price=metrics["target_entry_price"],
                 revalidation=p2_1_price_response,
             )
+            p2_revalidation = p2_1_price_response
         except (KeyError, TypeError, ValueError) as exc:
             p2_1_price_response = {
                 "status": "REVIEW_REQUIRED",
@@ -861,37 +862,31 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
                     else None
                 ),
             )
-        except (KeyError, TypeError, ValueError) as exc:
-            canonical_entry_evaluation = {
-                "evaluation_id": None,
-                "evaluation_version": CANONICAL_ENTRY_EVALUATION_VERSION,
-                "status": "REVIEW_REQUIRED",
-                "qualification": "UNKNOWN",
-                "current_price": str(current_price) if current_price is not None else None,
-                "return_target_entry_price": str(metrics["target_entry_price"]),
-                "entry_reference_source": (
+        except (KeyError, TypeError, ValueError):
+            # Keep the canonical evaluation itself schema-valid and replayable.
+            # Detailed P2.1 failure evidence remains in target_entry_price_p2_1_price_response.
+            canonical_entry_evaluation = build_canonical_entry_evaluation(
+                current_price=current_price,
+                return_target_entry_price=metrics["target_entry_price"],
+                p2_1_price_response=None,
+                entry_reference_source=(
                     "TARGET_ENTRY_REFERENCE"
                     if isinstance(case.get("target_entry_price_reference"), dict)
                     else "EXPECTATION_GAP"
                     if isinstance(case.get("expectation_gap"), dict)
                     else "NONE"
                 ),
-                "market_expectation_id": target_ref.get("market_expectation_id") if isinstance(target_ref, dict) else None,
-                "independent_forecast_ref": target_ref.get("independent_forecast_ref") if isinstance(target_ref, dict) else None,
-                "effective_target_entry_price": None,
-                "price_constraint_type": None,
-                "target_entry_price_inclusive": False,
-                "current_price_eligible": False,
-                "binding": "CANONICAL_ENTRY_EVALUATION_ERROR",
-                "binding_components": [],
-                "reason": str(exc),
-                "p2_1_response_version": PRICE_RESPONSE_VERSION if p2_1_price_response is not None else None,
-                "p2_1_response_id": p2_1_price_response.get("response_id") if isinstance(p2_1_price_response, dict) else None,
-                "p2_1_response_hash": None,
-                "snapshot_hash": p2_1_price_response.get("snapshot_hash") if isinstance(p2_1_price_response, dict) else None,
-                "model_id": p2_1_price_response.get("model_id") if isinstance(p2_1_price_response, dict) else None,
-                "expectation_id": p2_1_price_response.get("expectation_id") if isinstance(p2_1_price_response, dict) else None,
-            }
+                market_expectation_id=(
+                    target_ref.get("market_expectation_id")
+                    if isinstance(target_ref, dict)
+                    else None
+                ),
+                independent_forecast_ref=(
+                    target_ref.get("independent_forecast_ref")
+                    if isinstance(target_ref, dict)
+                    else None
+                ),
+            )
 
     entry_admission = admit_decision(
         pre_admission_action=state["action"],
