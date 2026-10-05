@@ -1,7 +1,7 @@
 # DR-01 — Decision Revision / Human Approval Lifecycle Contract v0.1
 
 Date: 2026-10-05
-Status: IMPLEMENTATION TARGET
+Status: ACCEPTED / CANONICAL
 
 ## Objective
 
@@ -25,4 +25,15 @@ This batch is the lifecycle contract only. Storage/CLI integration is intentiona
 
 ## Acceptance
 
-DR-01 is accepted when deterministic build/validation, snapshot binding, approval binding, monotonic projection and schema regressions pass.
+DR-01 acceptance evidence:
+- independent execution of the exact canonical module/test logic: 8 passed;
+- compileall: PASS;
+- revision schema JSON validation: PASS;
+- approval and current-projection schema definitions are covered by regression tests;
+- conflicting same-revision approval is rejected;
+- rejected/older revisions cannot replace current projection.
+
+GitHub Actions workflow: .github/workflows/iios_dr_01.yml.
+The available GitHub workflow connector did not expose a run for the relevant PR/merge commits during this session, so runtime telemetry is recorded as UNOBSERVED, not misrepresented as PASS.
+
+Canonical acceptance decision: DR-01 = PASS / MERGED, with CI telemetry limitation explicitly recorded.
