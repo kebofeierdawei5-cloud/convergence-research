@@ -67,7 +67,7 @@ def test_build_snapshot_closes_pit_provenance_and_hashes():
     s = make_set(('pe-1', MarketModelFamily.FORWARD_PE, MIEQualification.DECISION_GRADE))
     snap = build_p4f_snapshot(case_id='CN-A-300750', cutoff_date=CUTOFF, created_at=CREATED, mie_set=s, provenance_records=make_provenance(s))
     validate_p4f_snapshot(snap)
-    assert snap['snapshot_schema'] == 'IIOS-MIE-SNAPSHOT-0.2'
+    assert snap['snapshot_schema'] == 'IIOS-MIE-SNAPSHOT-0.3'
     assert len(snap['snapshot_hash']) == 64
     assert len(snap['mie_set_hash']) == 64
     assert len(snap['provenance_hash']) == 64
