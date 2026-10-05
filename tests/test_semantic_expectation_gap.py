@@ -92,7 +92,7 @@ def test_lower_is_better_reverses_gap_direction():
         comparison_direction=ComparisonDirection.LOWER_IS_BETTER.value,
     )
     assert result["status"] == ExpectationGapStatus.PASS.value
-    assert result["gap_absolute"] == pytest.approx(0.05)
+    assert result["gap_absolute"] == Decimal("0.05")
 
 
 def test_zero_market_requirement_is_rejected_for_relative_gap():
