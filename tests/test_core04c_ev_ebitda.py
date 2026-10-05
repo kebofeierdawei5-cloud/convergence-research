@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import zipfile
-from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -78,12 +77,12 @@ def test_ttm_is_exact_decimal():
     assert ttm(Decimal("72998336"), Decimal("119197000"), Decimal("52744212")) == Decimal("139451124")
 
 
-def test_decimal_parser_rejects_no_non_numeric_semantics():
-    assert d("1,394.5") == Decimal("1,394.5")
+def test_decimal_parser_accepts_canonical_decimal_text():
+    assert d("1394.5") == Decimal("1394.5")
 
 
 def test_normalize_text_collapses_layout_whitespace():
-    assert normalize_text("利润总额\\u3000 55,766,857") == "利润总额 55,766,857"
+    assert normalize_text("利润总额\u3000 55,766,857") == "利润总额 55,766,857"
 
 
 def test_market_snapshot_parser_reads_symbol_and_close(tmp_path: Path):
