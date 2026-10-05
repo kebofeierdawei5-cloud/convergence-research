@@ -221,6 +221,18 @@ def decide(case: dict[str, Any], *, evidence_root_resolver: Any | None = None, c
                 "target_entry_price_requires_gap_revalidation": proposal.get(
                     "target_entry_price_requires_gap_revalidation"
                 ),
+                "target_entry_price_return_only": proposal.get(
+                    "target_entry_price_return_only"
+                ),
+                "target_entry_price_v2_version": proposal.get(
+                    "target_entry_price_v2_version"
+                ),
+                "target_entry_price_v2": proposal.get(
+                    "target_entry_price_v2"
+                ),
+                "target_entry_price_gap_revalidation": proposal.get(
+                    "target_entry_price_gap_revalidation"
+                ),
                 "decision_precedence_version": proposal.get(
                     "decision_precedence_version"
                 ),
