@@ -301,7 +301,7 @@ def test_outside_historical_support_is_identifiable_not_unidentifiable():
         ),
     )
     result = identify_market_models(base_input([pe], observations))
-    assert result["identifiability"].state.value == "UNIDENTIFIABLE"
+    assert result["identifiability"].state.value == "IDENTIFIABLE"
     assert result["stability"].state.value == "INSUFFICIENT_EVIDENCE"
 
 
