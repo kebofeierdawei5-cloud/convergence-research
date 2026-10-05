@@ -412,8 +412,8 @@ def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
         model_id=MODEL_ID,
         evidence_ids=tuple(sorted(set(evaluation.fit.evidence_ids))),
         rationale=(
-            "Real P3-A evaluation found current implied EV/EBITDA "
-            "outside the admitted historical multiple range."
+            "Real P3-A evaluation found current EV/EBITDA outside the admitted "
+            "historical support range; this is not treated as proof of model failure."
         ),
     )
     mie_set = build_multi_model_market_implied_expectation_set(
@@ -487,7 +487,10 @@ def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
             "method": identification["method"],
             "identifiability": ident.state.value,
             "stability": stability.state.value,
+            "stability_scope": stability.assessment_scope,
             "feasible_model_ids": list(ident.feasible_model_ids),
+            "historical_support": evaluation.fit.historical_support.value,
+            "regime_interpretation": evaluation.fit.regime_interpretation.value,
             "evaluation_status": evaluation.fit.status.value,
             "historical_range": {
                 "low": format(
