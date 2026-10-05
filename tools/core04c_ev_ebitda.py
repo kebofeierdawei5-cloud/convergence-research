@@ -706,7 +706,7 @@ def main() -> int:
                 known_at=datetime.fromisoformat(str(next(r["known_at"] for r in capture_receipt if r["source_id"] == obs["ebitda_source_id"]))),
                 source="IIOS-DETERMINISTIC-DERIVATION",
                 source_location="research/core04c_derivation.json",
-                content_sha256="a" * 64,
+                content_sha256=derivation_sha,
                 exact_bytes=True,
                 status=AdmissionStatus.ADMITTED,
                 temporal_provenance=TemporalProvenance.SOURCE_VINTAGE,
