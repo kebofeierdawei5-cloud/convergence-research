@@ -452,12 +452,13 @@ def test_v03_missing_expectation_gap_does_not_block_thesis_broken_exit():
     assert result["decision"]["action"] == "EXIT"
 
 
-def test_v03_negative_expectation_gap_is_no_buy():
+def test_v03_negative_expectation_gap_is_advisory_without_explicit_material_contradiction():
     c = case()
     c["expectation_gap"]["independent_forecast_ref"] = independent_forecast_ref(value="8", forecast_id="forecast-v03-8")
     result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
-    assert result["decision"]["action"] == "NO-BUY"
-    assert result["decision"]["primary_reason"] == "NO_POSITIVE_EXPECTATION_GAP"
+    assert result["decision"]["action"] == "BUY"
+    assert result["gates"]["expectation_gap_status"] == "PASS"
+    assert result["gates"]["positive_expectation_gap_pass"] is False
 
 
 def test_v03_positive_gap_and_price_qualified_produces_buy():
