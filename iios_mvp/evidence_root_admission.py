@@ -229,8 +229,16 @@ class FileSystemEvidenceRootRegistry:
                 )
             except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
                 raise ValueError("existing evidence root admission record is unreadable") from exc
-            if _canonical_json(existing) != _canonical_json(admission):
-                raise ValueError("existing evidence root admission record conflicts with requested admission")
+            if not isinstance(existing, dict):
+                raise ValueError("existing evidence root admission record must be an object")
+            _validate_admission_record(existing)
+            if (
+                existing["root_id"] != root_id
+                or existing["content_sha256"] != content_sha256
+                or existing["case_id"] != snapshot["case_id"]
+                or _parse_date(existing["cutoff_date"], "admission.cutoff_date") != cutoff
+            ):
+                raise ValueError("existing evidence root admission record conflicts with requested artifact")
             return EvidenceRootReference(P4F_MIE_SNAPSHOT_ROOT_TYPE, root_id, content_sha256)
 
         try:
@@ -334,8 +342,16 @@ class InMemoryEvidenceRootRegistry:
         existing = self._artifacts.get(root_id)
         if existing is not None:
             existing_bytes, existing_admission = existing
-            if existing_bytes != artifact_bytes or _canonical_json(existing_admission) != _canonical_json(admission):
+            if existing_bytes != artifact_bytes:
                 raise ValueError("evidence root already admitted with different bytes")
+            _validate_admission_record(existing_admission)
+            if (
+                existing_admission["root_id"] != root_id
+                or existing_admission["content_sha256"] != content_sha256
+                or existing_admission["case_id"] != snapshot["case_id"]
+                or _parse_date(existing_admission["cutoff_date"], "admission.cutoff_date") != cutoff
+            ):
+                raise ValueError("existing evidence root admission record conflicts with requested artifact")
         else:
             self._artifacts[root_id] = (artifact_bytes, admission)
         return EvidenceRootReference(P4F_MIE_SNAPSHOT_ROOT_TYPE, root_id, content_sha256)
