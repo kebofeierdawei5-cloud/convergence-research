@@ -27,7 +27,11 @@ CORE-04 × 300750 Final Decision Chain = PASS / REVIEW_REQUIRED / NO NEW CAPITAL
         ↓
 A0 Governance / State Cleanup = PASS / MERGED
         ↓
-A1 Company-side Evidence Closure = NEXT
+A1-01 Economic Evidence Bridge = PASS / MERGED
+        ↓
+A1 Company-side Evidence Closure = IN PROGRESS
+        ↓
+A1-02 Capital Allocation + Trust/Governance Evidence Closure = NEXT
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
@@ -179,6 +183,15 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 ## 8. Current next batch
 
-**A1 Company-side Evidence Closure**
+**A1 Company-side Evidence Closure — IN PROGRESS**
 
-A0 does not add new investment capability. A1 is the next substantive Investment Core batch.
+Completed sub-batch:
+- **A1-01 Economic Evidence Bridge = PASS / MERGED**
+- Acceptance: `docs/iios/A1_01_ACCEPTANCE_2026-10-05.md`
+
+A1-01 established the deterministic CAPEX → D&A → FCF, Earnings → OCF → FCF, Working Capital and Incremental ROIC proxy layer without changing Decision Kernel semantics.
+
+Next sub-batch:
+- **A1-02 Capital Allocation + Trust/Governance Evidence Closure**
+
+A1 is not complete until the remaining company-side evidence is closed and the resulting Quality state is explicitly integrated and tested.
