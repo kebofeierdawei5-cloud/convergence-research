@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/core04-thesis-admission-0.1.schema.json",
+  "title": "IIOS CORE-04 Thesis Admission v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_version",
+    "policy",
+    "case_id",
+    "cutoff_date",
+    "status",
+    "statement",
+    "mechanism",
+    "key_driver_ids",
+    "falsifiers",
+    "monitoring_triggers",
+    "evidence_ids",
+    "known_at",
+    "prepared_without_current_price",
+    "admission_status",
+    "thesis_id",
+    "admission_record_hash"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "IIOS-CORE-04-THESIS-ADMISSION-0.1"
+    },
+    "policy_version": {
+      "const": "IIOS-THESIS-ADMISSION-POLICY-0.1"
+    },
+    "policy": {
+      "const": "EXPLICIT_EVIDENCE_BOUND_PRICE_INDEPENDENT_THESIS"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cutoff_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "enum": [
+        "INTACT",
+        "WATCH",
+        "BROKEN",
+        "UNKNOWN"
+      ]
+    },
+    "statement": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mechanism": {
+      "type": "string",
+      "minLength": 1
+    },
+    "key_driver_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "falsifiers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "monitoring_triggers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evidence_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "known_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prepared_without_current_price": {
+      "const": true
+    },
+    "admission_status": {
+      "const": "ADMITTED"
+    },
+    "thesis_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "admission_record_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
