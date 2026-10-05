@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from enum import Enum
 import re
 
-from .market_model_domain import MarketValuationObservation
+from .market_model_identification import MarketValuationObservation
 
 
 class AdmissionStatus(str, Enum):
