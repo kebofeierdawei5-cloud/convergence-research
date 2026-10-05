@@ -399,21 +399,22 @@ def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
     stability = identification["stability"]
     evaluation = identification["evaluations"][0]
 
-    if evaluation.fit.status.value == "FEASIBLE":
-        raise AssertionError("unexpected feasible EV/EBITDA model in real 300750 slice")
-    if ident.feasible_model_ids:
-        raise AssertionError("real 300750 case unexpectedly identified a feasible model")
+    if evaluation.fit.status.value != "FEASIBLE":
+        raise AssertionError("real 300750 EV/EBITDA model should remain mathematically feasible")
+    if ident.feasible_model_ids != (MODEL_ID,):
+        raise AssertionError("real 300750 EV/EBITDA model should remain uniquely identifiable")
 
     p4b_reason = (
-        "P4-B cannot materialize an EV/EBITDA MIE because P3-A "
-        "has no feasible model."
+        "P4-B cannot materialize a decision-grade EV/EBITDA MIE because "
+        "the identified model is outside the admitted historical support range."
     )
-    model_eval = MIEModelEvaluation.no_feasible_solution(
+    model_eval = MIEModelEvaluation.outside_historical_support(
         model_id=MODEL_ID,
         evidence_ids=tuple(sorted(set(evaluation.fit.evidence_ids))),
         rationale=(
-            "Real P3-A evaluation found current EV/EBITDA outside the admitted "
-            "historical support range; this is not treated as proof of model failure."
+            "Real P3-A evaluation found a mathematically feasible and uniquely "
+            "identifiable EV/EBITDA model whose current observation is outside "
+            "the historical support range; this does not prove model failure."
         ),
     )
     mie_set = build_multi_model_market_implied_expectation_set(
