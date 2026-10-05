@@ -454,6 +454,33 @@
             "null"
           ]
         },
+        "target_entry_price_return_only": {
+          "type": [
+            "string",
+            "number",
+            "null"
+          ]
+        },
+        "target_entry_price_v2_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_entry_price_v2": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        },
+        "target_entry_price_gap_revalidation": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        },
         "position_package_complete": {
           "type": "boolean"
         },
