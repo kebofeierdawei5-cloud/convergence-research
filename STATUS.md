@@ -13,7 +13,7 @@ B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. T
 
 ## Current Active Stage — 2026-10-05
 
-B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = PASS / MERGED. CATL Existing Evidence Migration = PASS / TECHNICAL. CATL Primary-Source Gap Supplementation = PASS / PRIMARY CAPTURED. CORE-03 = PASS / MERGED. CORE-04-A = PASS / MERGED. CORE-04-B = PASS / MERGED / LIVE CAPTURE VERIFIED. CORE-04-C = ACTIVE / DATA ADMISSION PENDING.
+B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = PASS / MERGED. CATL Existing Evidence Migration = PASS / TECHNICAL. CATL Primary-Source Gap Supplementation = PASS / PRIMARY CAPTURED. CORE-03 = PASS / MERGED. CORE-04-A = PASS / MERGED. CORE-04-B = PASS / MERGED / LIVE CAPTURE VERIFIED. CORE-04-C = PASS / PIT EV/EBITDA OBSERVATIONS ADMITTED.
 
 - B2-A merge commit: c8246ceaaad5e9b1cc02fe422723c39a441ea4f3.
 - B2 raw-artifact containment hardening merge commit: 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3.
@@ -338,9 +338,19 @@ P4-A establishes the typed qualification boundary between P3 inverse interpretat
 
 B1 semantic package and runtime migration accepted on the repair line. Evidence: `docs/iios/B1_CODE_MIGRATION_ACCEPTANCE_2026-10-04.md`; code red-team: `docs/iios/B1_CODE_MIGRATION_REDTEAM_v0.3.md`.
 
+## CORE-04-C Final Acceptance — 2026-10-05
+
+- PR #55: `CORE-04-C: admit 300750 PIT EV/EBITDA observations`.
+- CI run `37261504704` / job `111609522344`: **PASS**.
+- 8 unit tests passed; live source capture, parsing, PIT validation, typed admission and JSON re-verification all passed.
+- Three 300750.SZ historical EV/EBITDA observations were admitted: 2026-07-27 = **11.182953x** (TTM H1 2026), 2026-04-17 = **14.610167x** (FY2025 latest PIT), 2025-10-22 = **15.898702x** (FY2024 latest PIT).
+- Canonical receipt: `research/core04c_ev_ebitda_admission_receipt_v0.1.json`.
+- Final CI raw artifact: `11324627858`, ZIP SHA-256 `00ca7f00bcf98153d31cbd4be036cb23626c52d3d3d9138d01e83d1f66109037`.
+- CORE-04-C remains a data/observation gate only; MIE/Expectation Gap/decision logic is unchanged.
+
 ## Immediate Next Engineering Step
 
-B2-B — CATL Real Evidence Admission
+Consume the admitted 300750 EV/EBITDA observations in the existing P3-A/P4 ratio-family path
 
 1. Materialize the planned CATL source files as physical raw bytes.
 2. Recompute physical size + SHA-256 from the captured bytes.
