@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
@@ -222,6 +223,42 @@ def run(inp, **kwargs):
     )
 
 
+def _with_current_price(inp, current_price: str):
+    current = Decimal(current_price)
+    return MarketModelIdentificationInput(
+        cutoff_date=inp.cutoff_date,
+        current_observation_id=inp.current_observation_id,
+        candidates=inp.candidates,
+        observations=tuple(
+            replace(item, price=current)
+            if item.observation_date == inp.cutoff_date
+            else item
+            for item in inp.observations
+        ),
+        evidence=inp.evidence,
+    )
+
+
+def test_outside_historical_support_stays_conditional_not_decision_grade():
+    cases = (
+        _with_current_price(sotp_input(), "220"),
+        _with_current_price(rnpv_input(), "185.4545454545454545454545454"),
+    )
+    for inp in cases:
+        p3 = identify_market_models(inp)
+        assert p3["identifiability"].state.value == "IDENTIFIABLE"
+        evaluation = p3["evaluations"][0]
+        assert evaluation.fit.status.value == "FEASIBLE"
+        assert evaluation.fit.historical_support.value in {
+            "ABOVE_HISTORICAL_RANGE", "BELOW_HISTORICAL_RANGE"
+        }
+        assert evaluation.fit.regime_interpretation.value == "POSSIBLE_REGIME_SHIFT"
+        outputs = run(inp)
+        assert outputs
+        assert all(x.qualification != MIEQualification.DECISION_GRADE for x in outputs)
+        assert all(x.qualification == MIEQualification.CONDITIONAL_ONLY for x in outputs)
+
+
 def test_sotp_materializes_conditional_residual_and_segments():
     inp = sotp_input()
     p3 = identify_market_models(inp)
@@ -337,7 +374,7 @@ def test_ambiguous_typed_p3_emits_one_conditional_slice_per_feasible_candidate()
     )
     identification = {
         "status": "PASS",
-        "method": "model_specific_inverse_v0.2",
+        "method": "model_specific_inverse_v0.3",
         "evaluations": evaluations,
         "identifiability": IdentifiabilityResult(
             state=IdentifiabilityState.AMBIGUOUS,

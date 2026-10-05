@@ -37,7 +37,7 @@ def _ratio_evaluations(
 ) -> tuple[CandidateEvaluation, ...]:
     if identification.get("status") != "PASS":
         raise ValueError("P4-B requires a PASS P3 identification result")
-    if identification.get("method") != "model_specific_inverse_v0.2":
+    if identification.get("method") != "model_specific_inverse_v0.3":
         raise ValueError("P4-B requires the accepted P3 model-specific inverse method")
 
     evaluations = identification.get("evaluations")
@@ -94,6 +94,10 @@ def _solution_for_ratio(
 ) -> FeasibleSolution:
     if evaluation.fit.status.value != "FEASIBLE" or evaluation.feasible_solution_set is None:
         raise ValueError("P4-B requires a feasible P3 ratio solution")
+    if evaluation.fit.historical_support.value != "IN_RANGE":
+        raise ValueError(
+            "P4-B requires IN_RANGE historical support for decision-grade ratio MIE"
+        )
     if len(evaluation.feasible_solution_set.solutions) != 1:
         raise ValueError("P4-B ratio vertical slice requires exactly one P3 feasible solution")
     solution = evaluation.feasible_solution_set.solutions[0]

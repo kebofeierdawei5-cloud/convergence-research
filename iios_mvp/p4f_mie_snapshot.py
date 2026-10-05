@@ -16,8 +16,8 @@ from .multi_model_market_implied_expectation_set import (
     MultiModelMarketImpliedExpectationSet,
 )
 
-P4F_SNAPSHOT_SCHEMA = "IIOS-MIE-SNAPSHOT-0.2"
-P4F_VERSION = "P4-F-0.2"
+P4F_SNAPSHOT_SCHEMA = "IIOS-MIE-SNAPSHOT-0.3"
+P4F_VERSION = "P4-F-0.3"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 def _canonical_json(value: Any) -> str:
@@ -114,6 +114,8 @@ def _expected_set_semantics(mie_set: Mapping[str, Any]) -> tuple[str, str]:
     if coverage.get("status") != "SUFFICIENT" or sufficiency.get("status") != "SUFFICIENT":
         return MIESetResolutionState.INSUFFICIENT_EVIDENCE.value, MIEQualification.BLOCKED.value
     states = [x[1] for x in eval_pairs]
+    if MIEModelEvaluationState.OUTSIDE_HISTORICAL_SUPPORT.value in states:
+        return MIESetResolutionState.NO_DECISION_GRADE_MODEL.value, MIEQualification.BLOCKED.value
     if MIEModelEvaluationState.BLOCKED.value in states:
         return MIESetResolutionState.INSUFFICIENT_EVIDENCE.value, MIEQualification.BLOCKED.value
     materialized = states.count(MIEModelEvaluationState.MATERIALIZED.value)

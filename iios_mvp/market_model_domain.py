@@ -25,6 +25,21 @@ class ModelFitStatus(str, Enum):
     CONTRADICTED = "CONTRADICTED"
 
 
+class HistoricalSupportState(str, Enum):
+    IN_RANGE = "IN_RANGE"
+    BELOW_HISTORICAL_RANGE = "BELOW_HISTORICAL_RANGE"
+    ABOVE_HISTORICAL_RANGE = "ABOVE_HISTORICAL_RANGE"
+    UNKNOWN = "UNKNOWN"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+
+
+class RegimeInterpretationState(str, Enum):
+    NOT_ASSESSED = "NOT_ASSESSED"
+    POSSIBLE_REGIME_SHIFT = "POSSIBLE_REGIME_SHIFT"
+    VERIFIED_REGIME_SHIFT = "VERIFIED_REGIME_SHIFT"
+    VERIFIED_MODEL_FAILURE = "VERIFIED_MODEL_FAILURE"
+
+
 class FeasibleSolutionStatus(str, Enum):
     NONEMPTY = "NONEMPTY"
     EMPTY = "EMPTY"
@@ -165,6 +180,8 @@ class ModelFit:
     diagnostics: tuple[FitDiagnostic, ...]
     evidence_ids: tuple[str, ...]
     constraints: tuple[str, ...] = ()
+    historical_support: HistoricalSupportState = HistoricalSupportState.UNKNOWN
+    regime_interpretation: RegimeInterpretationState = RegimeInterpretationState.NOT_ASSESSED
 
     def validate(self) -> None:
         if not self.model_id:
@@ -175,6 +192,10 @@ class ModelFit:
             diagnostic.validate()
         if self.status == ModelFitStatus.FEASIBLE and not self.evidence_ids:
             raise ValueError("FEASIBLE model fit requires evidence_ids")
+        if self.status == ModelFitStatus.FEASIBLE and self.historical_support == HistoricalSupportState.INSUFFICIENT_EVIDENCE:
+            raise ValueError("FEASIBLE model fit cannot claim INSUFFICIENT_EVIDENCE historical support")
+        if self.status == ModelFitStatus.FEASIBLE and self.historical_support == HistoricalSupportState.UNKNOWN:
+            raise ValueError("FEASIBLE model fit requires a known historical support state")
 
 
 @dataclass(frozen=True)
@@ -275,10 +296,13 @@ class StabilityResult:
     observations: tuple[StabilityObservation, ...]
     evidence_ids: tuple[str, ...]
     rationale: str
+    assessment_scope: str = "IDENTIFICATION_ONLY"
 
     def validate(self) -> None:
         if not self.assessment_method or not self.rationale:
             raise ValueError("assessment_method and rationale are required")
+        if self.assessment_scope != "IDENTIFICATION_ONLY":
+            raise ValueError("unsupported stability assessment scope")
         if self.state == StabilityState.STABLE and not self.observations:
             raise ValueError("STABLE requires at least one perturbation/regime observation")
         for observation in self.observations:

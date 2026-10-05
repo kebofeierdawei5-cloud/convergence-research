@@ -132,10 +132,36 @@ def test_evidence_closure_is_enforced():
     with pytest.raises(ValueError, match='evidence_ids must cover'):
         build_multi_model_market_implied_expectation_set(set_id='set-1', candidate_coverage=coverage('pe-1'), evidence_sufficiency=evidence('pe-1'), model_evaluations=(r,), qualification_rationale='forged', evidence_ids=('only-one',))
 
+def test_outside_historical_support_is_blocked_not_no_feasible_model():
+    r = aggregate([
+        MIEModelEvaluation.outside_historical_support(
+            model_id="pe-1",
+            evidence_ids=("outside",),
+            rationale="P3 model is computable but current support is outside the historical envelope.",
+        )
+    ], ('pe-1',))
+    assert r.resolution_state == MIESetResolutionState.NO_DECISION_GRADE_MODEL
+    assert r.qualification == MIEQualification.BLOCKED
+
+
 def test_no_feasible_model_is_blocked_not_ambiguous():
     r = aggregate([MIEModelEvaluation.no_feasible_solution(model_id='pe-1', evidence_ids=('none',), rationale='No feasible PE solution.')], ('pe-1',))
     assert r.resolution_state == MIESetResolutionState.NO_FEASIBLE_MODEL
     assert r.qualification == MIEQualification.BLOCKED
+
+def test_outside_support_overrides_a_materialized_decision_grade_model():
+    materialized = MIEModelEvaluation.from_expectation(
+        make_mie(model_id="pe-1", family=MarketModelFamily.FORWARD_PE)
+    )
+    outside = MIEModelEvaluation.outside_historical_support(
+        model_id="ps-1",
+        evidence_ids=("outside-ps",),
+        rationale="PS is identifiable but outside historical support.",
+    )
+    r = aggregate([materialized, outside], ("pe-1", "ps-1"))
+    assert r.resolution_state == MIESetResolutionState.NO_DECISION_GRADE_MODEL
+    assert r.qualification == MIEQualification.BLOCKED
+    assert not r.materialized_expectations() == ()
 
 def test_blocked_p4_mie_is_consumed_as_blocked_disposition():
     blocked = make_mie(model_id='ddm-1', family=MarketModelFamily.DDM, qualification=MIEQualification.BLOCKED, stability=StabilityState.UNSTABLE)
@@ -169,7 +195,7 @@ def test_serialization_preserves_model_identity_and_validates_schema():
     assert payload['resolution_state'] == 'AMBIGUOUS'
     assert {x['model_id'] for x in payload['model_evaluations']} == {'pe-1','ps-1'}
     assert payload['qualification'] == 'CONDITIONAL_ONLY'
-    schema_path = Path('schemas/market_implied_expectation_set_v0.2.schema.json')
+    schema_path = Path('schemas/market_implied_expectation_set_v0.3.schema.json')
     schema = json.loads(schema_path.read_text())
     from jsonschema import Draft202012Validator
     Draft202012Validator(schema).validate(payload)

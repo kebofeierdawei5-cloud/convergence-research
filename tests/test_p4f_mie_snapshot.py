@@ -67,7 +67,7 @@ def test_build_snapshot_closes_pit_provenance_and_hashes():
     s = make_set(('pe-1', MarketModelFamily.FORWARD_PE, MIEQualification.DECISION_GRADE))
     snap = build_p4f_snapshot(case_id='CN-A-300750', cutoff_date=CUTOFF, created_at=CREATED, mie_set=s, provenance_records=make_provenance(s))
     validate_p4f_snapshot(snap)
-    assert snap['snapshot_schema'] == 'IIOS-MIE-SNAPSHOT-0.2'
+    assert snap['snapshot_schema'] == 'IIOS-MIE-SNAPSHOT-0.3'
     assert len(snap['snapshot_hash']) == 64
     assert len(snap['mie_set_hash']) == 64
     assert len(snap['provenance_hash']) == 64
@@ -173,6 +173,43 @@ def _rehash_snapshot(snapshot):
     return snapshot
 
 
+def test_outside_support_snapshot_replays_blocked_not_decision_grade():
+    cv = CandidateCoverageAssessment(
+        CandidateCoverageState.SUFFICIENT, "global-universe", ("pe-1",),
+        ("global-cov-pe-1",), "Global candidate coverage."
+    )
+    ev = EvidenceSufficiencyAssessment(
+        EvidenceSufficiencyState.SUFFICIENT, "Global evidence sufficiency.",
+        ("global-ev-pe-1",)
+    )
+    record = MIEModelEvaluation.outside_historical_support(
+        model_id="pe-1",
+        evidence_ids=("outside-pe-1",),
+        rationale="Identified P3 model is outside historical support.",
+    )
+    mie_set = build_multi_model_market_implied_expectation_set(
+        set_id="set-outside",
+        candidate_coverage=cv,
+        evidence_sufficiency=ev,
+        model_evaluations=(record,),
+        qualification_rationale="Outside-support acceptance fixture.",
+        evidence_ids=("global-cov-pe-1", "global-ev-pe-1", "outside-pe-1"),
+    )
+    assert mie_set.resolution_state.value == "NO_DECISION_GRADE_MODEL"
+    assert mie_set.qualification == MIEQualification.BLOCKED
+    snap = build_p4f_snapshot(
+        case_id="case-outside",
+        cutoff_date=CUTOFF,
+        created_at=CREATED,
+        mie_set=mie_set,
+        provenance_records=make_provenance(mie_set),
+    )
+    assert snap["mie_set"]["qualification"] == "BLOCKED"
+    assert snap["mie_set"]["resolution_state"] == "NO_DECISION_GRADE_MODEL"
+    replay = replay_p4f_snapshot(snap)
+    assert replay["replay_status"] == "PASS"
+    assert replay["semantic_status"] == "PASS"
+
 def test_replay_rejects_expectation_on_non_materialized_disposition():
     s=make_set(('pe-1',MarketModelFamily.FORWARD_PE,MIEQualification.DECISION_GRADE))
     snap=build_p4f_snapshot(case_id='case-1',cutoff_date=CUTOFF,created_at=CREATED,mie_set=s,provenance_records=make_provenance(s))
@@ -198,5 +235,5 @@ def test_replay_rejects_serialized_model_id_mismatch():
 def test_schema_validates_snapshot():
     s=make_set(('pe-1',MarketModelFamily.FORWARD_PE,MIEQualification.DECISION_GRADE))
     snap=build_p4f_snapshot(case_id='case-1',cutoff_date=CUTOFF,created_at=CREATED,mie_set=s,provenance_records=make_provenance(s))
-    schema=json.loads(Path('schemas/p4f_mie_snapshot_v0.2.schema.json').read_text())
+    schema=json.loads(Path('schemas/p4f_mie_snapshot_v0.3.schema.json').read_text())
     Draft202012Validator(schema).validate(snap)

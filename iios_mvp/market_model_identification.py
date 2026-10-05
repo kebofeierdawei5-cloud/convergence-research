@@ -11,6 +11,8 @@ from .market_model_domain import (
     FeasibleSolutionSet,
     FeasibleSolutionStatus,
     FitDiagnostic,
+    HistoricalSupportState,
+    RegimeInterpretationState,
     IdentifiabilityResult,
     IdentifiabilityState,
     MarketModelFamily,
@@ -652,6 +654,7 @@ def _fit_complex_candidate(
             diagnostics=(diagnostic,),
             evidence_ids=candidate_evidence_ids,
             constraints=("CURRENT_OBSERVATION_REQUIRED",),
+            historical_support=HistoricalSupportState.INSUFFICIENT_EVIDENCE,
         )
         return CandidateEvaluation(fit, None)
 
@@ -669,6 +672,7 @@ def _fit_complex_candidate(
             diagnostics=(diagnostic,),
             evidence_ids=candidate_evidence_ids,
             constraints=("MIN_HISTORICAL_DATES",),
+            historical_support=HistoricalSupportState.INSUFFICIENT_EVIDENCE,
         )
         return CandidateEvaluation(fit, None)
 
@@ -753,7 +757,8 @@ def _fit_complex_candidate(
 
     historical_low = min(historical_primary)
     historical_high = max(historical_primary)
-    within_historical_range = historical_low <= current_primary <= historical_high
+    support_state = _support_state(current_primary, historical_low, historical_high)
+    within_historical_range = support_state == HistoricalSupportState.IN_RANGE
     all_evidence = tuple(sorted(set(
         historical_evidence
         + list(current_ids)
@@ -770,20 +775,26 @@ def _fit_complex_candidate(
     diagnostics.append(FitDiagnostic(
         diagnostic_id=f"{candidate.model_id}:current_consistency",
         name="current_complex_model_consistency",
-        status="PASS" if within_historical_range else "INFEASIBLE",
+        status="PASS" if within_historical_range else "OUTSIDE_HISTORICAL_SUPPORT",
         evidence_ids=all_evidence,
-        notes=f"current_implied_{COMPLEX_PRIMARY_VARIABLE[candidate.family]}={current_primary}; within_historical_range={within_historical_range}",
+        notes=(
+            f"current_implied_{COMPLEX_PRIMARY_VARIABLE[candidate.family]}={current_primary}; "
+            f"historical_range=[{historical_low},{historical_high}]; support_state={support_state.value}"
+        ),
     ))
 
     if not within_historical_range:
-        fit = ModelFit(
-            model_id=candidate.model_id,
-            status=ModelFitStatus.INFEASIBLE,
-            diagnostics=tuple(diagnostics),
+        diagnostics[-1] = FitDiagnostic(
+            diagnostic_id=f"{candidate.model_id}:current_historical_support",
+            name="current_historical_support",
+            status="OUTSIDE_HISTORICAL_SUPPORT",
             evidence_ids=all_evidence,
-            constraints=("CURRENT_IMPLIED_PRIMARY_WITHIN_HISTORICAL_RANGE",),
+            notes=(
+                f"current_implied_{COMPLEX_PRIMARY_VARIABLE[candidate.family]}={current_primary}; "
+                f"historical_range=[{historical_low},{historical_high}]; support_state={support_state.value}"
+            ),
         )
-        return CandidateEvaluation(fit, None)
+
 
     solution = FeasibleSolution(
         economic_variable=COMPLEX_PRIMARY_VARIABLE[candidate.family],
@@ -812,7 +823,11 @@ def _fit_complex_candidate(
         constraint_ids=(
             "MODEL_SPECIFIC_INVERSE",
             "MIN_HISTORICAL_DATES",
-            "CURRENT_IMPLIED_PRIMARY_WITHIN_HISTORICAL_RANGE",
+            *(
+                ("CURRENT_IMPLIED_PRIMARY_WITHIN_HISTORICAL_RANGE",)
+                if within_historical_range
+                else ()
+            ),
         ),
         evidence_ids=all_evidence,
         basis=(
@@ -830,11 +845,29 @@ def _fit_complex_candidate(
         constraints=(
             "MODEL_SPECIFIC_INVERSE",
             "MIN_HISTORICAL_DATES",
-            "CURRENT_IMPLIED_PRIMARY_WITHIN_HISTORICAL_RANGE",
+            *(
+                ("CURRENT_IMPLIED_PRIMARY_WITHIN_HISTORICAL_RANGE",)
+                if within_historical_range
+                else ()
+            ),
+        ),
+        historical_support=support_state,
+        regime_interpretation=(
+            RegimeInterpretationState.NOT_ASSESSED
+            if within_historical_range
+            else RegimeInterpretationState.POSSIBLE_REGIME_SHIFT
         ),
     )
     fit.validate()
     return CandidateEvaluation(fit, solution_set)
+
+
+def _support_state(current_value: Decimal, historical_low: Decimal, historical_high: Decimal) -> HistoricalSupportState:
+    if current_value < historical_low:
+        return HistoricalSupportState.BELOW_HISTORICAL_RANGE
+    if current_value > historical_high:
+        return HistoricalSupportState.ABOVE_HISTORICAL_RANGE
+    return HistoricalSupportState.IN_RANGE
 
 
 def _fit_candidate(
@@ -913,6 +946,7 @@ def _fit_candidate(
             diagnostics=tuple(diagnostics),
             evidence_ids=all_ids,
             constraints=("MIN_HISTORICAL_POINTS",),
+            historical_support=HistoricalSupportState.INSUFFICIENT_EVIDENCE,
         )
         return CandidateEvaluation(fit, None)
 
@@ -937,7 +971,8 @@ def _fit_candidate(
     historical_low = min(multiples)
     historical_high = max(multiples)
     current_multiple = _multiple(current, candidate.family)
-    current_consistent = historical_low <= current_multiple <= historical_high
+    support_state = _support_state(current_multiple, historical_low, historical_high)
+    current_consistent = support_state == HistoricalSupportState.IN_RANGE
 
     diagnostics.append(FitDiagnostic(
         diagnostic_id=f"{candidate.model_id}:historical_range",
@@ -948,21 +983,26 @@ def _fit_candidate(
     ))
     diagnostics.append(FitDiagnostic(
         diagnostic_id=f"{candidate.model_id}:current_consistency",
-        name="current_consistency",
-        status="PASS" if current_consistent else "INFEASIBLE",
+        name="current_historical_support",
+        status="PASS" if current_consistent else "OUTSIDE_HISTORICAL_SUPPORT",
         evidence_ids=all_ids,
-        notes=f"current_multiple={current_multiple}; within_historical_range={current_consistent}",
+        notes=(
+            f"current_multiple={current_multiple}; historical_range="
+            f"[{historical_low},{historical_high}]; support_state={support_state.value}"
+        ),
     ))
 
     if not current_consistent:
-        fit = ModelFit(
-            model_id=candidate.model_id,
-            status=ModelFitStatus.INFEASIBLE,
-            diagnostics=tuple(diagnostics),
+        diagnostics[-1] = FitDiagnostic(
+            diagnostic_id=f"{candidate.model_id}:current_historical_support",
+            name="current_historical_support",
+            status="OUTSIDE_HISTORICAL_SUPPORT",
             evidence_ids=all_ids,
-            constraints=("CURRENT_MULTIPLE_WITHIN_HISTORICAL_RANGE",),
+            notes=(
+                f"current_multiple={current_multiple}; historical_range="
+                f"[{historical_low},{historical_high}]; support_state={support_state.value}"
+            ),
         )
-        return CandidateEvaluation(fit, None)
 
     price = current.price
     if candidate.family == MarketModelFamily.FORWARD_PE:
@@ -990,7 +1030,11 @@ def _fit_candidate(
         solutions=(solution,),
         constraint_ids=(
             "HISTORICAL_MULTIPLE_RANGE",
-            "CURRENT_MULTIPLE_WITHIN_HISTORICAL_RANGE",
+            *(
+                ("CURRENT_MULTIPLE_WITHIN_HISTORICAL_RANGE",)
+                if current_consistent
+                else ()
+            ),
         ),
         evidence_ids=all_ids,
         basis=f"current market price divided by historical {candidate.family.value} multiple range",
@@ -1004,7 +1048,17 @@ def _fit_candidate(
         evidence_ids=all_ids,
         constraints=(
             "MIN_HISTORICAL_POINTS",
-            "CURRENT_MULTIPLE_WITHIN_HISTORICAL_RANGE",
+            *(
+                ("CURRENT_MULTIPLE_WITHIN_HISTORICAL_RANGE",)
+                if current_consistent
+                else ()
+            ),
+        ),
+        historical_support=support_state,
+        regime_interpretation=(
+            RegimeInterpretationState.NOT_ASSESSED
+            if current_consistent
+            else RegimeInterpretationState.POSSIBLE_REGIME_SHIFT
         ),
     )
     fit.validate()
@@ -1073,7 +1127,10 @@ def _identify(
             selected_model_id=None,
             competing_model_ids=(),
             evidence_ids=evidence_ids,
-            rationale="All admitted candidates are infeasible under the current evidence and constraints.",
+            rationale=(
+                "No admitted candidate remains within the empirical historical-support boundary; "
+                "outside-support candidates are not thereby proven mathematically infeasible."
+            ),
         )
     result.validate()
     return result
@@ -1119,7 +1176,8 @@ def _stability(
                 assessment_method="leave_one_out_historical_date",
                 observations=(),
                 evidence_ids=full_ident.evidence_ids,
-                rationale=f"requires at least {inp.stability_min_historical_points} historical dates",
+                rationale=f"requires at least {inp.stability_min_historical_points} historical dates; "
+                "no model-validity or regime-shift stability claim is made",
             )
             result.validate()
             return result
@@ -1140,7 +1198,8 @@ def _stability(
                 assessment_method="leave_one_out_historical_window",
                 observations=(),
                 evidence_ids=full_ident.evidence_ids,
-                rationale=f"requires at least {inp.stability_min_historical_points} historical observations",
+                rationale=f"requires at least {inp.stability_min_historical_points} historical observations; "
+                "no model-validity or regime-shift stability claim is made",
             )
             result.validate()
             return result
@@ -1186,7 +1245,8 @@ def _stability(
         observations=tuple(observations),
         evidence_ids=full_ident.evidence_ids,
         rationale=(
-            "Market-model identifiability is invariant across the full and admissible leave-one-out historical windows."
+            "Market-model identifiability is invariant across the full and admissible leave-one-out historical windows; "
+            "this does not establish model-validity or historical-support stability."
             if stable else
             "Market-model identifiability changes under an admissible historical-window perturbation."
         ),
@@ -1225,7 +1285,7 @@ def identify_market_models(inp: MarketModelIdentificationInput) -> dict[str, obj
 
     return {
         "status": "PASS",
-        "method": "model_specific_inverse_v0.2",
+        "method": "model_specific_inverse_v0.3",
         "identifiability": ident,
         "stability": stability,
         "evaluations": tuple(evaluations),

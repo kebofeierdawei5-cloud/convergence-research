@@ -16,12 +16,14 @@ from .market_implied_expectation import (
 class MIEModelEvaluationState(str, Enum):
     MATERIALIZED = "MATERIALIZED"
     NO_FEASIBLE_SOLUTION = "NO_FEASIBLE_SOLUTION"
+    OUTSIDE_HISTORICAL_SUPPORT = "OUTSIDE_HISTORICAL_SUPPORT"
     BLOCKED = "BLOCKED"
 
 class MIESetResolutionState(str, Enum):
     UNIQUE_MODEL = "UNIQUE_MODEL"
     AMBIGUOUS = "AMBIGUOUS"
     NO_FEASIBLE_MODEL = "NO_FEASIBLE_MODEL"
+    NO_DECISION_GRADE_MODEL = "NO_DECISION_GRADE_MODEL"
     INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
 
 @dataclass(frozen=True)
@@ -47,6 +49,10 @@ class MIEModelEvaluation:
     @classmethod
     def no_feasible_solution(cls, *, model_id: str, evidence_ids: tuple[str, ...], rationale: str) -> "MIEModelEvaluation":
         return cls(model_id, MIEModelEvaluationState.NO_FEASIBLE_SOLUTION, None, evidence_ids, rationale)
+
+    @classmethod
+    def outside_historical_support(cls, *, model_id: str, evidence_ids: tuple[str, ...], rationale: str) -> "MIEModelEvaluation":
+        return cls(model_id, MIEModelEvaluationState.OUTSIDE_HISTORICAL_SUPPORT, None, evidence_ids, rationale)
 
     @classmethod
     def blocked(cls, *, model_id: str, evidence_ids: tuple[str, ...], rationale: str) -> "MIEModelEvaluation":
@@ -117,6 +123,8 @@ class MultiModelMarketImpliedExpectationSet:
             return MIESetResolutionState.INSUFFICIENT_EVIDENCE
         if self.evidence_sufficiency.status != EvidenceSufficiencyState.SUFFICIENT:
             return MIESetResolutionState.INSUFFICIENT_EVIDENCE
+        if any(item.state == MIEModelEvaluationState.OUTSIDE_HISTORICAL_SUPPORT for item in self.model_evaluations):
+            return MIESetResolutionState.NO_DECISION_GRADE_MODEL
         if any(item.state == MIEModelEvaluationState.BLOCKED for item in self.model_evaluations):
             return MIESetResolutionState.INSUFFICIENT_EVIDENCE
         count = sum(item.state == MIEModelEvaluationState.MATERIALIZED for item in self.model_evaluations)
@@ -127,7 +135,7 @@ class MultiModelMarketImpliedExpectationSet:
         return MIESetResolutionState.UNIQUE_MODEL
 
     def expected_qualification(self) -> MIEQualification:
-        if self.resolution_state in {MIESetResolutionState.INSUFFICIENT_EVIDENCE, MIESetResolutionState.NO_FEASIBLE_MODEL}:
+        if self.resolution_state in {MIESetResolutionState.INSUFFICIENT_EVIDENCE, MIESetResolutionState.NO_FEASIBLE_MODEL, MIESetResolutionState.NO_DECISION_GRADE_MODEL}:
             return MIEQualification.BLOCKED
         if self.resolution_state == MIESetResolutionState.AMBIGUOUS:
             return MIEQualification.CONDITIONAL_ONLY

@@ -61,7 +61,7 @@ def _typed_complex_evaluations(
 ) -> tuple[CandidateEvaluation, ...]:
     if identification.get("status") != "PASS":
         raise ValueError("P4-C requires a PASS P3 identification result")
-    if identification.get("method") != "model_specific_inverse_v0.2":
+    if identification.get("method") != "model_specific_inverse_v0.3":
         raise ValueError("P4-C requires the accepted P3 model-specific inverse method")
     if any(candidate.family not in COMPLEX_CONDITIONAL_FAMILIES for candidate in candidates):
         raise ValueError("P4-C accepts only DCF and DDM candidates")

@@ -233,16 +233,58 @@ def test_insufficient_identification_blocks_the_feasible_ratio_mie():
     assert outputs[0].qualification == MIEQualification.BLOCKED
 
 
-def test_unstable_p3_blocks_mie():
+def test_outside_support_blocks_decision_grade_mie_even_when_identification_stable():
     pe = candidate("pe-1", MarketModelFamily.FORWARD_PE, "candidate-pe")
     inp = build_input(
         (pe,),
         "forward_eps",
         ("10", "5", "5", "5", "10"),
+        ("100", "100", "100", "100", "90"),
+    )
+    p3 = identify_market_models(inp)
+    assert p3["identifiability"].state.value == "IDENTIFIABLE"
+    assert p3["stability"].state.value == "STABLE"
+    assert p3["evaluations"][0].fit.historical_support.value == "BELOW_HISTORICAL_RANGE"
+    with pytest.raises(ValueError, match="IN_RANGE historical support"):
+        run(inp)
+
+
+def test_unstable_identification_still_blocks_ratio_mie():
+    ev_ebitda = candidate("ev-ebitda-1", MarketModelFamily.EV_EBITDA, "candidate-ev-ebitda")
+    inp = build_input(
+        (ev_ebitda,),
+        "ebitda",
+        ("100", "100", "100", "100", "100"),
         ("100", "100", "100", "100", "100"),
     )
-    outputs = run(inp)
-    assert outputs[0].qualification == MIEQualification.BLOCKED
+    invalid = list(inp.observations)
+    bad = invalid[0]
+    invalid[0] = MarketValuationObservation(
+        observation_id=bad.observation_id,
+        observation_date=bad.observation_date,
+        known_at=bad.known_at,
+        price=bad.price,
+        shares_outstanding=bad.shares_outstanding,
+        economic_variable=bad.economic_variable,
+        economic_value=bad.economic_value,
+        unit=bad.unit,
+        basis=bad.basis,
+        evidence_ids=bad.evidence_ids,
+        source=bad.source,
+        net_debt=Decimal("-200"),
+    )
+    unstable = MarketModelIdentificationInput(
+        cutoff_date=inp.cutoff_date,
+        current_observation_id=inp.current_observation_id,
+        candidates=inp.candidates,
+        observations=tuple(invalid),
+        evidence=inp.evidence,
+    )
+    p3 = identify_market_models(unstable)
+    assert p3["identifiability"].state.value == "UNIDENTIFIABLE"
+    assert p3["stability"].state.value == "UNSTABLE"
+    with pytest.raises(ValueError):
+        run(unstable)
 
 
 def test_insufficient_candidate_coverage_blocks_mie():
@@ -356,7 +398,6 @@ def test_invalid_p3_method_is_rejected():
             accounting_basis="reported",
         )
 
-
 # Real CORE-04-C -> P3-A/P4-B integration
 import json
 from pathlib import Path
@@ -438,11 +479,13 @@ def test_real_core04c_observations_are_consumed_by_p3a_and_fail_closed_on_curren
     evaluation = result["evaluations"][0]
     diagnostics = {item.name: item for item in evaluation.fit.diagnostics}
 
-    assert evaluation.fit.status.value == "INFEASIBLE"
+    assert evaluation.fit.status.value == "FEASIBLE"
     assert diagnostics["historical_market_multiple_range"].status == "PASS"
-    assert diagnostics["current_consistency"].status == "INFEASIBLE"
-    assert "current_multiple=8.375536786732361377195576638" in diagnostics["current_consistency"].notes
-    assert result["identifiability"].state.value == "UNIDENTIFIABLE"
+    assert diagnostics["current_historical_support"].status == "OUTSIDE_HISTORICAL_SUPPORT"
+    assert "current_multiple=8.375536786732361377195576638" in diagnostics["current_historical_support"].notes
+    assert evaluation.fit.historical_support.value == "BELOW_HISTORICAL_RANGE"
+    assert evaluation.fit.regime_interpretation.value == "POSSIBLE_REGIME_SHIFT"
+    assert result["identifiability"].state.value == "IDENTIFIABLE"
     assert result["stability"].state.value == "INSUFFICIENT_EVIDENCE"
     assert payload["source_receipt"]["artifact_sha256"] == "51e9e8c19404ef241383c99e0f9ed98bf3088fbe2b4a47778e9f5d79a26ee6c4"
 
@@ -450,7 +493,7 @@ def test_real_core04c_observations_are_consumed_by_p3a_and_fail_closed_on_curren
 def test_real_core04c_p4b_does_not_materialize_mie_when_no_ratio_model_is_feasible():
     _, inp, coverage_obj, suff_obj = _real_300750_ratio_input()
     result = identify_market_models(inp)
-    with pytest.raises(ValueError, match="no feasible ratio market model"):
+    with pytest.raises(ValueError, match="IN_RANGE historical support"):
         build_ratio_market_implied_expectations(
             identification_input=inp,
             identification=result,
@@ -495,3 +538,15 @@ def test_real_current_ev_ebitda_is_exact_and_below_historical_lower_bound():
         for item in historical
     ]
     assert current_multiple < min(historical_multiples)
+
+
+def test_outside_historical_support_cannot_materialize_ratio_mie():
+    pe = candidate("pe-outside", MarketModelFamily.FORWARD_PE, "candidate-pe")
+    inp = build_input(
+        (pe,),
+        "forward_eps",
+        ("5", "5", "5", "5", "5"),
+        ("90", "95", "100", "105", "50"),
+    )
+    with pytest.raises(ValueError, match="IN_RANGE historical support"):
+        run(inp)

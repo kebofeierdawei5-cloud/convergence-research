@@ -226,6 +226,24 @@ def run(inp: MarketModelIdentificationInput, **kwargs):
     )
 
 
+def test_outside_historical_support_stays_conditional_not_decision_grade():
+    for inp in (
+        dcf_input(current_price="4200"),
+        ddm_input(current_price="210"),
+    ):
+        p3 = identify_market_models(inp)
+        assert p3["identifiability"].state.value == "IDENTIFIABLE"
+        evaluation = p3["evaluations"][0]
+        assert evaluation.fit.status.value == "FEASIBLE"
+        assert evaluation.fit.historical_support.value in {
+            "ABOVE_HISTORICAL_RANGE", "BELOW_HISTORICAL_RANGE"
+        }
+        assert evaluation.fit.regime_interpretation.value == "POSSIBLE_REGIME_SHIFT"
+        outputs = run(inp)
+        assert outputs
+        assert all(x.qualification != MIEQualification.DECISION_GRADE for x in outputs)
+        assert all(x.qualification == MIEQualification.CONDITIONAL_ONLY for x in outputs)
+
 def test_dcf_materializes_conditional_primary_and_explicit_assumptions():
     inp = dcf_input()
     p3 = identify_market_models(inp)
@@ -334,7 +352,7 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
     )
     identification = {
         "status": "PASS",
-        "method": "model_specific_inverse_v0.2",
+        "method": "model_specific_inverse_v0.3",
         "evaluations": evaluations,
         "identifiability": IdentifiabilityResult(
             state=IdentifiabilityState.AMBIGUOUS,
@@ -374,25 +392,21 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
     assert all(output.qualification == MIEQualification.CONDITIONAL_ONLY for output in outputs)
 
 
-def test_unstable_p3_blocks_conditional_mie():
+def test_unstable_identification_blocks_conditional_mie():
     inp = dcf_input()
     modified = []
-    historical_prices = {"1": "2100", "8": "4200", "15": "4200", "22": "4200"}
     for item in inp.observations:
-        if item.observation_id.startswith("h"):
-            day = item.observation_id.split("-", 1)[0][1:]
-            modified.append(
-                cobs(
-                    item.observation_id,
-                    int(day),
-                    historical_prices[day],
-                    item.economic_variable,
-                    str(item.economic_value),
-                    item.basis,
-                    item.unit,
-                    item.evidence_ids[0],
-                )
-            )
+        if item.observation_id == "h1-discount_rate":
+            modified.append(cobs(
+                item.observation_id,
+                1,
+                str(item.price),
+                "discount_rate",
+                "0.03",
+                item.basis,
+                item.unit,
+                item.evidence_ids[0],
+            ))
         else:
             modified.append(item)
     unstable = MarketModelIdentificationInput(
@@ -403,9 +417,10 @@ def test_unstable_p3_blocks_conditional_mie():
         evidence=inp.evidence,
     )
     p3 = identify_market_models(unstable)
+    assert p3["identifiability"].state.value == "UNIDENTIFIABLE"
     assert p3["stability"].state.value == "UNSTABLE"
-    assert p3["evaluations"][0].fit.status.value == "FEASIBLE"
-    assert run(unstable)[0].qualification == MIEQualification.BLOCKED
+    with pytest.raises(ValueError, match="no feasible DCF/DDM market model"):
+        run(unstable)
 
 
 def test_insufficient_evidence_assessment_blocks_mie():
