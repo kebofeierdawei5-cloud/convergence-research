@@ -1024,6 +1024,8 @@ def _fit_candidate(
             "MIN_HISTORICAL_POINTS",
             "CURRENT_MULTIPLE_WITHIN_HISTORICAL_RANGE",
         ),
+        historical_support=HistoricalSupportState.IN_RANGE,
+        regime_interpretation=RegimeInterpretationState.NOT_ASSESSED,
     )
     fit.validate()
     return CandidateEvaluation(fit, solution_set)
