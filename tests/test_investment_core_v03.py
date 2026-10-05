@@ -45,6 +45,11 @@ def case() -> dict:
             },
         },
         "thesis": {"status": "INTACT"},
+        "expectation_gap": {
+            "status": "PASS",
+            "gap_relative": "0.10",
+            "gap_absolute": "0.05",
+        },
         "return_gate": {
             "entry_price": "100",
             "entry_value_reference": "115",
@@ -90,6 +95,80 @@ def test_v03_buy_requires_all_three_return_conditions():
     assert result["decision"]["auto_execution"] is False
 
 
+def test_v03_target_entry_price_solver_returns_binding_price_cap():
+    metrics = calculate_return_metrics(case()["return_gate"], max_loss_pct="25")
+    # For this fixture, the 15% entry cushion is the tightest constraint:
+    # 115 / 1.15 = 100.
+    assert metrics["target_entry_price_for_entry_cushion"] == Decimal("100")
+    assert metrics["target_entry_price"] == Decimal("100")
+    assert metrics["risk_pass"] is True
+
+
+def test_v03_current_price_mismatch_blocks_decision():
+    c = case()
+    c["return_gate"]["entry_price"] = "90"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-CURRENT-PRICE-BIND" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_missing_expectation_gap_blocks_decision():
+    c = case()
+    del c["expectation_gap"]
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-EXPECTATION-GAP-REQUIRED" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_blocked_expectation_gap_requires_review_for_new_position():
+    c = case()
+    c["expectation_gap"] = {
+        "status": "BLOCKED",
+        "gap_relative": "0",
+    }
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+
+
+def test_v03_negative_expectation_gap_is_no_buy():
+    c = case()
+    c["expectation_gap"] = {
+        "status": "PASS",
+        "gap_relative": "-0.05",
+    }
+    result = decide(c)
+    assert result["decision"]["action"] == "NO-BUY"
+    assert result["decision"]["primary_reason"] == "NO_POSITIVE_EXPECTATION_GAP"
+
+
+def test_v03_positive_gap_and_price_qualified_produces_buy():
+    c = case()
+    c["current_price_observation"]["price"] = "99"
+    c["return_gate"]["entry_price"] = "99"
+    result = decide(c)
+    assert result["decision"]["action"] == "BUY"
+    assert Decimal(result["decision"]["target_entry_price"]) >= Decimal("99")
+
+
+def test_v03_positive_gap_but_price_above_target_is_watch_price():
+    c = case()
+    c["current_price_observation"]["price"] = "101"
+    c["return_gate"]["entry_price"] = "101"
+    result = decide(c)
+    assert result["decision"]["action"] == "WATCH"
+    assert result["decision"]["primary_reason"] == "CURRENT_PRICE_ABOVE_TARGET_ENTRY_PRICE"
+    assert Decimal(result["decision"]["target_entry_price"]) < Decimal("101")
+
+
+def test_v03_risk_cap_enters_target_entry_price_solver():
+    c = case()
+    c["risk"]["max_loss_pct"] = "5"
+    metrics = calculate_return_metrics(c["return_gate"], max_loss_pct="5")
+    assert metrics["risk_pass"] is False
+    assert metrics["target_entry_price_for_risk"] == Decimal("94.736842105263157894736842105263157894736842105263158")
+    assert metrics["target_entry_price"] == metrics["target_entry_price_for_risk"]
+
+
 def test_v03_exact_15_annualized_target_is_inclusive():
     c = case()
     # Equal scenario wealth makes expected wealth exactly 132.25 over H=2.
@@ -107,6 +186,7 @@ def test_v03_exact_15_annualized_target_is_inclusive():
 
 def test_v03_watch_when_target_passes_but_entry_cushion_fails():
     c = case()
+    c["current_price_observation"]["price"] = "110"
     c["return_gate"]["entry_price"] = "110"
     c["return_gate"]["entry_value_reference"] = "115"
     c["return_gate"]["scenarios"] = {
@@ -119,7 +199,7 @@ def test_v03_watch_when_target_passes_but_entry_cushion_fails():
     assert result["decision"]["investability_status"] == "WATCH"
 
 
-def test_v03_no_buy_when_expected_annualized_return_below_target():
+def test_v03_watch_price_when_expected_annualized_return_below_target():
     c = case()
     c["return_gate"]["scenarios"] = {
         "bear": {"probability": "0.2", "terminal_value_per_share": "80", "cash_distributions_per_share": "0", "probability_rationale": "low"},
@@ -127,7 +207,8 @@ def test_v03_no_buy_when_expected_annualized_return_below_target():
         "bull": {"probability": "0.3", "terminal_value_per_share": "140", "cash_distributions_per_share": "0", "probability_rationale": "high"},
     }
     result = decide(c)
-    assert result["decision"]["action"] == "NO-BUY"
+    assert result["decision"]["action"] == "WATCH"
+    assert result["decision"]["target_entry_price"] is not None
 
 
 def test_v03_unknown_never_becomes_hold():
