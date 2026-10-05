@@ -9,6 +9,8 @@ from decimal import Decimal
 
 from iios_mvp.canonical_expectation_gap import CANONICAL_EXPECTATION_GAP_VERSION
 from iios_mvp.evidence_root_admission import InMemoryEvidenceRootRegistry
+from iios_mvp.canonical_current_price import InMemoryCanonicalCurrentPriceRegistry
+from iios_mvp.market_observation_admission import AdmissionStatus, TemporalProvenance, VerifiedMarketEvidence, admit_market_valuation_observation
 from iios_mvp.engine import decide, replay, run_case, validate_case
 from iios_mvp.market_implied_expectation import (
     CandidateCoverageAssessment,
@@ -31,9 +33,10 @@ from iios_mvp.investment_core_contract_v03 import calculate_return_metrics, vali
 
 
 EVIDENCE_ROOT_REGISTRY = InMemoryEvidenceRootRegistry()
+CURRENT_PRICE_REGISTRY = InMemoryCanonicalCurrentPriceRegistry()
 
 
-def market_implied_expectation_snapshot() -> dict:
+def market_implied_expectation_snapshot(price_observation_id="price-1") -> dict:
     cutoff = date(2026, 10, 4)
     created = datetime(2026, 10, 4, 17, 10, tzinfo=timezone.utc)
     requirement = MIEEconomicRequirement(
@@ -69,7 +72,7 @@ def market_implied_expectation_snapshot() -> dict:
         representation=MIERepresentation.IMPLIED_POINT,
         economic_requirements=(requirement,),
         observation_basis=MIEObservationBasis(
-            price_observation_id="price-1",
+            price_observation_id=price_observation_id,
             observation_date=cutoff,
             cutoff_date=cutoff,
             currency="CNY",
@@ -120,7 +123,48 @@ def market_implied_expectation_snapshot() -> dict:
     )
 
 
-def case() -> dict:
+def current_price_ref(price="100", price_observation_id="price-1"):
+    cutoff = date(2026, 10, 4)
+    observed_at = datetime(2026, 10, 4, 15, 0, tzinfo=timezone.utc)
+    def ve(evidence_id, variable, value, unit):
+        return VerifiedMarketEvidence(
+            evidence_id=evidence_id,
+            variable=variable,
+            unit=unit,
+            basis="fixture-current-price",
+            observation_date=cutoff,
+            known_at=observed_at,
+            source="fixture-source",
+            source_location=f"fixture://{evidence_id}",
+            content_sha256="b" * 64,
+            exact_bytes=True,
+            status=AdmissionStatus.ADMITTED,
+            temporal_provenance=TemporalProvenance.SOURCE_VINTAGE,
+            value=Decimal(value),
+        )
+    price_evidence = ve(price_observation_id, "market_price", price, "CNY/share")
+    admission = admit_market_valuation_observation(
+        cutoff_date=cutoff,
+        observation_id=f"mkt-{price_observation_id}",
+        price_evidence=price_evidence,
+        shares_evidence=ve(f"{price_observation_id}-shares", "shares_outstanding", "1000000000", "shares"),
+        economic_evidence=ve(f"{price_observation_id}-ebitda", "ebitda", "100000000000", "CNY/share"),
+        net_debt_evidence=ve(f"{price_observation_id}-debt", "net_debt", "0", "CNY"),
+    )
+    return CURRENT_PRICE_REGISTRY.admit_current_price(
+        case_id="V03-001",
+        market="CN-A",
+        symbol="300750",
+        cutoff_date=cutoff,
+        admission=admission,
+        price_evidence=price_evidence,
+        observed_at=observed_at,
+        currency="CNY",
+        adjustment_semantics="UNADJUSTED",
+    ).to_dict()
+
+
+def case(price="100", price_observation_id="price-1") -> dict:
     return {
         "contract_version": "IIOS-INVESTMENT-CORE-0.3",
         "case_id": "V03-001",
@@ -130,10 +174,12 @@ def case() -> dict:
         "as_of_date": "2026-10-04",
         "cutoff_date": "2026-10-04",
         "current_price_observation": {
-            "price": "100", "price_observation_id": "price-1", "currency": "CNY",
-            "observed_at": "2026-10-04T15:00:00+08:00",
-            "known_at": "2026-10-04T15:00:00+08:00",
-            "source": "test", "adjustment_semantics": "UNADJUSTED",
+            "price": str(price), "price_observation_id": price_observation_id,
+            "price_observation_admission_hash": current_price_ref(price, price_observation_id)["admission_record_hash"],
+            "currency": "CNY",
+            "observed_at": "2026-10-04T15:00:00+00:00",
+            "known_at": "2026-10-04T15:00:00+00:00",
+            "source": "fixture-source", "adjustment_semantics": "UNADJUSTED",
         },
         "company_evidence_manifest": {"manifest_id": "company-v03-001"},
         "trust": {"status": "PASS"},
@@ -155,14 +201,14 @@ def case() -> dict:
             },
         },
         "thesis": {"status": "INTACT"},
-        "market_implied_expectation_snapshot_ref": EVIDENCE_ROOT_REGISTRY.admit_p4f_snapshot(market_implied_expectation_snapshot()).to_dict(),
+        "market_implied_expectation_snapshot_ref": EVIDENCE_ROOT_REGISTRY.admit_p4f_snapshot(market_implied_expectation_snapshot(price_observation_id)).to_dict(),
         "expectation_gap": {
             "gap_id": "gap-v01-001",
             "evaluator_version": CANONICAL_EXPECTATION_GAP_VERSION,
             "price": "100",
-            "price_observation_id": "price-1",
+            "price_observation_id": price_observation_id,
             "cutoff_date": "2026-10-04",
-            "mie_snapshot_hash": market_implied_expectation_snapshot()["snapshot_hash"],
+            "mie_snapshot_hash": market_implied_expectation_snapshot(price_observation_id)["snapshot_hash"],
             "market_expectation_id": "mie-pe-1",
             "independent_expectation": {
                 "variable_id": "forward_eps",
