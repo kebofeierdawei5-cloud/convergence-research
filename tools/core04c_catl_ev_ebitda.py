@@ -156,7 +156,7 @@ def _row_first_number(
 
     for label in labels:
         label_pattern = r"".join(
-            re.escape(ch) + r"\\s*" for ch in label
+            re.escape(ch) + r"\s*" for ch in label
             if not ch.isspace()
         )
         match = re.search(label_pattern, text)
