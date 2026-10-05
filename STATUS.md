@@ -2,7 +2,7 @@
 
 This file retains historical acceptance records below. For the active repair program, read `docs/iios/B0_AUTHORITY_AUDIT_FREEZE_2026-10-04.md` first.
 
-Active repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
+Historical B0 repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
 Active repair stage: **B0 PASS → B1 PASS → CORE-00 PASS → CORE-01 PASS → CORE-02 PASS → CORE-03 PASS → CORE-04 ACTIVE**
 P4-F infrastructure is merged and semantically bounded; the current critical path is CORE-04 production decision closure, not further P4 expansion.
 B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. The owner-approved distinction between (a) 15% BUY-entry threshold / safety-margin policy and (b) 1–3Y annualized target >=15% is now normative in v0.3.
@@ -61,9 +61,9 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 
 ## P3-A-RA / P4-B~P4-F Successor Work — 2026-10-05
 
-- PR #69: **OPEN / NOT MERGED**; it contains the corrected outside-historical-support semantics and downstream anti-bypass acceptance.
-- Latest P3-A-RA implementation checkpoint on PR #69: `26079a14f8d50ae8e8d1f589d06f2f0aec44341a`.
-- P3-A-RA is therefore not yet part of canonical `main`.
+- PR #69: **MERGED** into canonical `main` as `da6964ee6dd5a50b8696a46132448c205c463726`.
+- P3-A-RA / P4-B~P4-F outside-support semantics are now part of canonical `main`.
+- The merged PR preserves FEASIBLE + IDENTIFIABLE + BELOW_HISTORICAL_RANGE + POSSIBLE_REGIME_SHIFT for the real 300750 case, while P4-B/P4-F remain fail-closed.
 
 ## CORE-04 Production Decision Kernel — ACTIVE
 
@@ -72,7 +72,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Legacy MIE-mandatory rules are retained only behind explicit compatibility policy; CORE-04 v0.3 passes the optional policy explicitly.
 - Production kernel: `iios_mvp/decision_kernel_v03.py`.
 - Current merge candidate branch: `feature/core04-production-decision-kernel-20261005`.
-- Production decision kernel CI and CORE-00 scope checks **PASS** at HEAD `7d86d5595865ee90538e5260167db99d8c6a29d8`; PR #70 remains **OPEN / NOT MERGED** pending owner merge decision.
+- Production decision kernel is **REFRESHED ON TOP OF CANONICAL MAIN**; post-refresh CI is pending final verification. PR #70 remains **OPEN / NOT MERGED** pending owner merge decision.
 
 ## CORE-04-C Real 300750 Historical EV/EBITDA
 
@@ -369,7 +369,7 @@ Next acceptance sequence:
 1. Freeze B1 v0.3 MIE optional semantics and remove runtime contradiction.
 2. Validate CORE-04 BUY/ADD/HOLD/REDUCE/EXIT/NO-BUY/WATCH/REVIEW_REQUIRED precedence.
 3. Run real 300750 decision-path regression without requiring MIE.
-4. Keep PR #69 separate and unresolved until owner merge.
+4. PR #69 upstream semantic correction is now merged and is the canonical P3/P4 base for CORE-04 downstream validation.
 5. Update this status/index only through canonical merge commits.
 
 Do not resume CSI800/A02 for the Investment Core path. Do not reuse post-cutoff dynamic pages or historical .txt hashes as canonical raw evidence.

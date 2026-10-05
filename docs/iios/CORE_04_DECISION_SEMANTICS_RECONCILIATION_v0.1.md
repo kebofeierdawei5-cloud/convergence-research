@@ -71,9 +71,7 @@ Likewise, a verified MIE contradiction cannot become a veto unless an explicit v
 
 ## 8. Acceptance checkpoint
 
-- PR #70: OPEN / NOT MERGED.
-- HEAD: `7d86d5595865ee90538e5260167db99d8c6a29d8`.
-- IIOS Investment Core CI #450: PASS.
-- IIOS CORE-00 Scope Reconciliation #187: PASS.
-- Independent review checkpoint recorded on PR #70: review `5414885493`.
-- Merge remains an owner-controlled action.
+- PR #69: MERGED into canonical `main` as `da6964ee6dd5a50b8696a46132448c205c463726`.
+- PR #70: refreshed on top of that canonical main; post-refresh CI verification is the remaining acceptance step.
+- Pre-refresh acceptance review on PR #70: review `5414885493`.
+- Merge of PR #70 remains an owner-controlled action.

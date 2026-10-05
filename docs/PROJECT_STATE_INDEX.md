@@ -80,8 +80,8 @@ BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
 
 Decision Semantics Reconciliation → CORE-04 Production Decision Kernel.
 
-- PR #69 P3-A-RA remains OPEN / NOT MERGED; its exact implementation head is `26079a14f8d50ae8e8d1f589d06f2f0aec44341a`.
-- CORE-04 production-kernel work is intentionally based on canonical `main`, not on the unmerged PR #69 branch.
+- PR #69 P3-A-RA is MERGED into canonical `main` as `da6964ee6dd5a50b8696a46132448c205c463726`.
+- CORE-04 production-kernel work is now refreshed on top of that canonical main.
 - B1 v0.3 MIE semantics are consumed as `OPTIONAL_EXPLANATORY` in the new kernel.
 - Legacy MIE-mandatory decision behavior remains compatibility-only.
 - Target entry price is return/risk-first; MIE revalidation is an optional refinement when a qualified MIE reference exists.
@@ -105,4 +105,4 @@ Decision Semantics Reconciliation → CORE-04 Production Decision Kernel.
 - Production kernel: `iios_mvp/decision_kernel_v03.py`.
 - Governance record: `docs/iios/CORE_04_DECISION_SEMANTICS_RECONCILIATION_v0.1.md`.
 - PR #70 is the current CORE-04 merge candidate; CI #450 and CORE-00 #187 PASS at HEAD `7d86d5595865ee90538e5260167db99d8`; PR remains not merged.
-- PR #69 P3-A-RA remains independently open and not merged.
+- PR #69 P3-A-RA is merged and is now the canonical upstream P3/P4 semantic base.
