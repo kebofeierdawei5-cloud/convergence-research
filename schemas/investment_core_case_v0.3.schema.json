@@ -512,6 +512,38 @@
         }
       }
     },
+    "target_entry_price_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "market_expectation_id",
+        "independent_forecast_ref"
+      ],
+      "properties": {
+        "market_expectation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independent_forecast_ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "forecast_id",
+            "admission_record_hash"
+          ],
+          "properties": {
+            "forecast_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "admission_record_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
     "market_implied_expectation_snapshot_ref": {
       "type": "object",
       "additionalProperties": false,
@@ -576,6 +608,18 @@
       "if": {
         "required": [
           "expectation_gap"
+        ]
+      },
+      "then": {
+        "required": [
+          "market_implied_expectation_snapshot_ref"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "target_entry_price_reference"
         ]
       },
       "then": {
