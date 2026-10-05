@@ -584,6 +584,8 @@ def build_canonical_price_response(
     if denom == 0:
         raise ValueError("P2.1 candidate market value cannot be zero")
     gap_relative = gap_abs / denom
+    if boundary <= 0:
+        raise ValueError("P2.1 expectation-gap price boundary must be > 0")
 
     response = PriceResponseResult(
         response_id=_response_id(
