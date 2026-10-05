@@ -189,17 +189,17 @@ def test_real_300750_quality_gate_is_explicitly_propagated_to_kernel():
 
     result = decide_v03(case, current_price_resolver=registry)
 
-    assert result["validation"]["status"] == "PASS"
+    assert result["decision_status"] == "REVIEW_REQUIRED"
     assert result["gates"]["reality"] == "PASS"
     assert result["gates"]["quality_gate"] == "CONDITIONAL"
     assert result["gates"]["value_driver"] == "PASS"
     assert result["gates"]["valuation"] == "PASS"
     assert result["gates"]["forecast"] == "PASS"
     assert result["gates"]["thesis_admission"] == "ADMITTED"
-    assert result["decision"]["action"] == "REVIEW_REQUIRED"
-    assert result["decision"]["primary_reason"] == "QUALITY_GATE_UNRESOLVED"
-    assert result["decision"]["gates"]["new_capital_allowed"] is False
-    assert result["decision"]["mie_policy"] == "OPTIONAL_EXPLANATORY"
+    assert result["action"] == "REVIEW_REQUIRED"
+    assert result["primary_reason"] == "QUALITY_GATE_UNRESOLVED"
+    assert result["gates"]["new_capital_allowed"] is False
+    assert result["mie_policy"] == "OPTIONAL_EXPLANATORY"
 
 
 def test_real_300750_strict_trust_still_precedes_quality_gate():
@@ -209,6 +209,6 @@ def test_real_300750_strict_trust_still_precedes_quality_gate():
 
     result = decide_v03(case, current_price_resolver=registry)
 
-    assert result["decision"]["action"] == "REVIEW_REQUIRED"
-    assert result["decision"]["primary_reason"] == "TRUST_NOT_PASS_REQUIRES_REVIEW"
-    assert result["decision"]["gates"]["new_capital_allowed"] is False
+    assert result["action"] == "REVIEW_REQUIRED"
+    assert result["primary_reason"] == "TRUST_NOT_PASS_REQUIRES_REVIEW"
+    assert result["gates"]["new_capital_allowed"] is False
