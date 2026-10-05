@@ -438,7 +438,7 @@ def test_real_core04c_observations_are_consumed_by_p3a_and_fail_closed_on_curren
     evaluation = result["evaluations"][0]
     diagnostics = {item.name: item for item in evaluation.fit.diagnostics}
 
-    assert evaluation.fit.status.value == "OUTSIDE_HISTORICAL_SUPPORT"
+    assert evaluation.fit.status.value == "FEASIBLE"
     assert diagnostics["historical_market_multiple_range"].status == "PASS"
     assert diagnostics["current_historical_support"].status == "OUTSIDE_HISTORICAL_SUPPORT"
     assert "current_multiple=8.375536786732361377195576638" in diagnostics["current_historical_support"].notes
@@ -452,7 +452,7 @@ def test_real_core04c_observations_are_consumed_by_p3a_and_fail_closed_on_curren
 def test_real_core04c_p4b_does_not_materialize_mie_when_no_ratio_model_is_feasible():
     _, inp, coverage_obj, suff_obj = _real_300750_ratio_input()
     result = identify_market_models(inp)
-    with pytest.raises(ValueError, match="no feasible ratio market model"):
+    with pytest.raises(ValueError, match="IN_RANGE historical support"):
         build_ratio_market_implied_expectations(
             identification_input=inp,
             identification=result,
@@ -507,5 +507,5 @@ def test_outside_historical_support_cannot_materialize_ratio_mie():
         ("5", "5", "5", "5", "5"),
         ("90", "95", "100", "105", "50"),
     )
-    with pytest.raises(ValueError, match="no feasible ratio market model"):
+    with pytest.raises(ValueError, match="IN_RANGE historical support"):
         run(inp)
