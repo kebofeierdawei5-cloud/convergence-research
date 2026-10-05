@@ -1,5 +1,5 @@
 from datetime import date, datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, localcontext
 
 import pytest
 
@@ -355,3 +355,143 @@ def test_invalid_p3_method_is_rejected():
             horizon="12M",
             accounting_basis="reported",
         )
+
+
+# Real CORE-04-C -> P3-A/P4-B integration
+import json
+from pathlib import Path
+
+
+REAL_RATIO_INPUT_PATH = Path(__file__).resolve().parents[1] / "examples" / "real_cases" / "RC-CN-A-300750-20261004_ratio_mie_input.json"
+
+
+def _real_300750_ratio_input():
+    payload = json.loads(REAL_RATIO_INPUT_PATH.read_text(encoding="utf-8"))
+    observations = tuple(
+        MarketValuationObservation(
+            observation_id=item["observation_id"],
+            observation_date=date.fromisoformat(item["observation_date"]),
+            known_at=datetime.fromisoformat(item["known_at"]),
+            price=Decimal(item["price"]),
+            shares_outstanding=Decimal(item["shares_outstanding"]),
+            economic_variable=item["economic_variable"],
+            economic_value=Decimal(item["economic_value"]),
+            unit=item["unit"],
+            basis=item["basis"],
+            evidence_ids=tuple(item["evidence_ids"]),
+            source=item["source"],
+            net_debt=Decimal(item["net_debt"]),
+        )
+        for item in payload["observations"]
+    )
+    evidence = tuple(
+        MarketObservableEvidence(
+            evidence_id=item["evidence_id"],
+            variable=item["variable"],
+            unit=item["unit"],
+            basis=item["basis"],
+            observation_date=date.fromisoformat(item["observation_date"]),
+            known_at=datetime.fromisoformat(item["known_at"]),
+            source=item["source"],
+            value=Decimal(item["value"]),
+            metadata=item["metadata"],
+        )
+        for item in payload["evidence"]
+    )
+    candidate_payload = payload["candidate"]
+    candidate_obj = CandidateMarketModel(
+        model_id=candidate_payload["model_id"],
+        family=MarketModelFamily(candidate_payload["family"]),
+        required_economic_variables=tuple(candidate_payload["required_economic_variables"]),
+        required_observable_variables=tuple(candidate_payload["required_observable_variables"]),
+        evidence_ids=tuple(candidate_payload["evidence_ids"]),
+        admission_basis=candidate_payload["admission_basis"],
+        inverse_solvable=candidate_payload["inverse_solvable"],
+    )
+    inp = MarketModelIdentificationInput(
+        cutoff_date=date.fromisoformat(payload["cutoff_date"]),
+        current_observation_id="CATL-EVEBITDA-CURRENT-2026-09-30",
+        candidates=(candidate_obj,),
+        observations=observations,
+        evidence=evidence,
+    )
+    coverage_payload = payload["candidate_coverage"]
+    coverage_obj = CandidateCoverageAssessment(
+        status=CandidateCoverageState(coverage_payload["status"]),
+        scope_basis=coverage_payload["scope_basis"],
+        candidate_model_ids=tuple(coverage_payload["candidate_model_ids"]),
+        evidence_ids=tuple(coverage_payload["evidence_ids"]),
+        rationale=coverage_payload["rationale"],
+    )
+    suff_payload = payload["evidence_sufficiency"]
+    suff_obj = EvidenceSufficiencyAssessment(
+        status=EvidenceSufficiencyState(suff_payload["status"]),
+        rationale=suff_payload["rationale"],
+        evidence_ids=tuple(suff_payload["evidence_ids"]),
+    )
+    return payload, inp, coverage_obj, suff_obj
+
+
+def test_real_core04c_observations_are_consumed_by_p3a_and_fail_closed_on_current_range():
+    payload, inp, _, _ = _real_300750_ratio_input()
+    result = identify_market_models(inp)
+    evaluation = result["evaluations"][0]
+    diagnostics = {item.name: item for item in evaluation.fit.diagnostics}
+
+    assert evaluation.fit.status.value == "INFEASIBLE"
+    assert diagnostics["historical_market_multiple_range"].status == "PASS"
+    assert diagnostics["current_consistency"].status == "INFEASIBLE"
+    assert "current_multiple=8.375536786732361377195576638" in diagnostics["current_consistency"].notes
+    assert result["identifiability"].state.value == "UNIDENTIFIABLE"
+    assert result["stability"].state.value == "INSUFFICIENT_EVIDENCE"
+    assert payload["source_receipt"]["artifact_sha256"] == "51e9e8c19404ef241383c99e0f9ed98bf3088fbe2b4a47778e9f5d79a26ee6c4"
+
+
+def test_real_core04c_p4b_does_not_materialize_mie_when_no_ratio_model_is_feasible():
+    _, inp, coverage_obj, suff_obj = _real_300750_ratio_input()
+    result = identify_market_models(inp)
+    with pytest.raises(ValueError, match="no feasible ratio market model"):
+        build_ratio_market_implied_expectations(
+            identification_input=inp,
+            identification=result,
+            candidate_coverage=coverage_obj,
+            evidence_sufficiency=suff_obj,
+            currency="CNY",
+            adjustment_semantics="UNADJUSTED_CLOSE",
+            period="FY2025",
+            horizon="completed_fiscal_year",
+            accounting_basis="reported_completed_fiscal_year_EBITDA",
+        )
+
+
+def test_real_core04c_exact_historical_observations_and_pit_bindings_are_locked():
+    _, inp, _, _ = _real_300750_ratio_input()
+    assert [item.observation_id for item in inp.observations[:3]] == [
+        "CATL-EVEBITDA-2025-10-22",
+        "CATL-EVEBITDA-2026-04-17",
+        "CATL-EVEBITDA-2026-07-27",
+    ]
+    assert [item.economic_value for item in inp.observations[:3]] == [
+        Decimal("91999043000"),
+        Decimal("119197217000"),
+        Decimal("119197217000"),
+    ]
+    assert all(item.known_at.date() <= item.observation_date for item in inp.observations)
+    assert all(item.known_at.date() <= inp.cutoff_date for item in inp.observations)
+
+
+def test_real_current_ev_ebitda_is_exact_and_below_historical_lower_bound():
+    _, inp, _, _ = _real_300750_ratio_input()
+    current = next(item for item in inp.observations if item.observation_id == inp.current_observation_id)
+    current_multiple = (current.price * current.shares_outstanding + current.net_debt) / current.economic_value
+    assert current_multiple == Decimal("8.375536786732361377195576638")
+    with localcontext() as ctx:
+        ctx.prec = 80
+        exact_multiple = (current.price * current.shares_outstanding + current.net_debt) / current.economic_value
+    assert exact_multiple == Decimal("8.3755367867323613771955766383371182231544885817258636164299037283731213288310246")
+    historical = inp.observations[:3]
+    historical_multiples = [
+        (item.price * item.shares_outstanding + item.net_debt) / item.economic_value
+        for item in historical
+    ]
+    assert current_multiple < min(historical_multiples)

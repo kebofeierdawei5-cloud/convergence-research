@@ -1,0 +1,220 @@
+{
+  "schema_version": "IIOS-P3A-REAL-RATIO-CONSUMPTION-0.1",
+  "case_id": "RC-CN-A-300750-20261004",
+  "symbol": "300750",
+  "cutoff_date": "2026-10-04",
+  "status": "EXECUTABLE_REAL_SLICE",
+  "purpose": "Consume the three CORE-04-C admitted EV/EBITDA historical observations in the existing P3-A/P4-B path without introducing a new valuation definition or source.",
+  "source_receipt": {
+    "path": "research/core04c_catl_ev_ebitda_receipt_v0.2.json",
+    "status": "ADMITTED",
+    "ci_run_id": 37261197564,
+    "artifact_sha256": "51e9e8c19404ef241383c99e0f9ed98bf3088fbe2b4a47778e9f5d79a26ee6c4"
+  },
+  "observations": [
+    {
+      "observation_id": "CATL-EVEBITDA-2025-10-22",
+      "observation_date": "2025-10-22",
+      "known_at": "2025-10-22T16:00:00+08:00",
+      "price": "372.86",
+      "shares_outstanding": "4562854000",
+      "net_debt": "-193859897000",
+      "economic_variable": "ebitda",
+      "economic_value": "91999043000",
+      "unit": "CNY",
+      "basis": "FY2024 completed fiscal-year EBITDA",
+      "evidence_ids": ["CORE04C-EBITDA-2025-10-22"],
+      "source": "CORE-04-C admitted observation"
+    },
+    {
+      "observation_id": "CATL-EVEBITDA-2026-04-17",
+      "observation_date": "2026-04-17",
+      "known_at": "2026-04-17T16:00:00+08:00",
+      "price": "444.20",
+      "shares_outstanding": "4564063000",
+      "net_debt": "-223867376000",
+      "economic_variable": "ebitda",
+      "economic_value": "119197217000",
+      "unit": "CNY",
+      "basis": "FY2025 completed fiscal-year EBITDA",
+      "evidence_ids": ["CORE04C-EBITDA-2026-04-17"],
+      "source": "CORE-04-C admitted observation"
+    },
+    {
+      "observation_id": "CATL-EVEBITDA-2026-07-27",
+      "observation_date": "2026-07-27",
+      "known_at": "2026-07-27T16:00:00+08:00",
+      "price": "400.00",
+      "shares_outstanding": "4626654919",
+      "net_debt": "-221391911000",
+      "economic_variable": "ebitda",
+      "economic_value": "119197217000",
+      "unit": "CNY",
+      "basis": "FY2025 completed fiscal-year EBITDA",
+      "evidence_ids": ["CORE04C-EBITDA-2026-07-27"],
+      "source": "CORE-04-C admitted observation"
+    },
+    {
+      "observation_id": "CATL-EVEBITDA-CURRENT-2026-09-30",
+      "observation_date": "2026-09-30",
+      "known_at": "2026-09-30T16:00:00+08:00",
+      "price": "291.11",
+      "shares_outstanding": "4380630342",
+      "net_debt": "-276904623000",
+      "economic_variable": "ebitda",
+      "economic_value": "119197217000",
+      "unit": "CNY",
+      "basis": "FY2025 completed fiscal-year EBITDA",
+      "evidence_ids": ["CORE03-CURRENT-EBITDA-FY2025"],
+      "source": "CORE-03 admitted current market/financial bridge"
+    }
+  ],
+  "candidate": {
+    "model_id": "real-ev-ebitda-300750",
+    "family": "ev_ebitda",
+    "required_economic_variables": ["ebitda", "enterprise_value"],
+    "required_observable_variables": ["ebitda", "enterprise_value"],
+    "evidence_ids": [
+      "CORE04C-EBITDA-2025-10-22",
+      "CORE04C-EBITDA-2026-04-17",
+      "CORE04C-EBITDA-2026-07-27",
+      "CORE03-CURRENT-EBITDA-FY2025",
+      "E011",
+      "E008",
+      "E005"
+    ],
+    "admission_basis": "Explicit single-family real-company candidate using CORE-04-C admitted historical EV/EBITDA observations and the existing CORE-03 current PIT market/financial bridge.",
+    "inverse_solvable": true
+  },
+  "candidate_coverage": {
+    "status": "SUFFICIENT",
+    "scope_basis": "Single explicitly admitted EV/EBITDA candidate for this real-company slice; this is not a claim of full PE/PS/PB candidate coverage.",
+    "candidate_model_ids": ["real-ev-ebitda-300750"],
+    "evidence_ids": [
+      "CORE04C-EBITDA-2025-10-22",
+      "CORE04C-EBITDA-2026-04-17",
+      "CORE04C-EBITDA-2026-07-27",
+      "CORE03-CURRENT-EBITDA-FY2025",
+      "E011",
+      "E008",
+      "E005"
+    ],
+    "rationale": "The explicitly evaluated candidate is fully enumerated; universal ratio-family coverage remains outside this real-data slice."
+  },
+  "evidence_sufficiency": {
+    "status": "SUFFICIENT",
+    "rationale": "All numeric inputs used by the real EV/EBITDA slice are bound to existing admitted CORE-04-C or CORE-03 evidence. No retrospective vendor multiple is introduced.",
+    "evidence_ids": [
+      "CORE04C-EBITDA-2025-10-22",
+      "CORE04C-EBITDA-2026-04-17",
+      "CORE04C-EBITDA-2026-07-27",
+      "CORE03-CURRENT-EBITDA-FY2025",
+      "E011",
+      "E008",
+      "E005"
+    ]
+  },
+  "evidence": [
+    {
+      "evidence_id": "CORE04C-EBITDA-2025-10-22",
+      "variable": "ebitda",
+      "unit": "CNY",
+      "basis": "FY2024 completed fiscal-year EBITDA",
+      "observation_date": "2025-10-22",
+      "known_at": "2025-03-15T00:00:00+08:00",
+      "source": "CNINFO-FY2024-2025-03-15.pdf",
+      "value": "91999043000",
+      "metadata": {
+        "source_sha256": "b4f1713d7b821eb076c102711d177fe942ccc2bc8dd171ae5d7a95799a65b0ad",
+        "admission_source": "CORE-04-C"
+      }
+    },
+    {
+      "evidence_id": "CORE04C-EBITDA-2026-04-17",
+      "variable": "ebitda",
+      "unit": "CNY",
+      "basis": "FY2025 completed fiscal-year EBITDA",
+      "observation_date": "2026-04-17",
+      "known_at": "2026-03-10T00:00:00+08:00",
+      "source": "CNINFO-FY2025-2026-03-10.pdf",
+      "value": "119197217000",
+      "metadata": {
+        "source_sha256": "c15272977147dee7e6935a38ea0e4fd6855370aabb106f54cfe20f7cf6048ec9",
+        "admission_source": "CORE-04-C"
+      }
+    },
+    {
+      "evidence_id": "CORE04C-EBITDA-2026-07-27",
+      "variable": "ebitda",
+      "unit": "CNY",
+      "basis": "FY2025 completed fiscal-year EBITDA",
+      "observation_date": "2026-07-27",
+      "known_at": "2026-03-10T00:00:00+08:00",
+      "source": "CNINFO-FY2025-2026-03-10.pdf",
+      "value": "119197217000",
+      "metadata": {
+        "source_sha256": "c15272977147dee7e6935a38ea0e4fd6855370aabb106f54cfe20f7cf6048ec9",
+        "admission_source": "CORE-04-C"
+      }
+    },
+    {
+      "evidence_id": "CORE03-CURRENT-EBITDA-FY2025",
+      "variable": "ebitda",
+      "unit": "CNY",
+      "basis": "FY2025 completed fiscal-year EBITDA",
+      "observation_date": "2026-09-30",
+      "known_at": "2026-03-10T00:00:00+08:00",
+      "source": "CNINFO-FY2025-2026-03-10.pdf",
+      "value": "119197217000",
+      "metadata": {
+        "source_sha256": "c15272977147dee7e6935a38ea0e4fd6855370aabb106f54cfe20f7cf6048ec9",
+        "admission_source": "CORE-04-C/CORE-03 bridge"
+      }
+    },
+    {
+      "evidence_id": "E011",
+      "variable": "market_price",
+      "unit": "CNY/share",
+      "basis": "2026-09-30 official SZSE EOD close",
+      "observation_date": "2026-09-30",
+      "known_at": "2026-09-30T00:00:00+08:00",
+      "source": "SZSE:MARKET_DATA",
+      "value": "291.11",
+      "metadata": {
+        "content_sha256": "349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2",
+        "exact_bytes": "true",
+        "status": "ADMITTED"
+      }
+    },
+    {
+      "evidence_id": "E008",
+      "variable": "shares_outstanding",
+      "unit": "shares",
+      "basis": "existing CORE-03 current share-count bridge",
+      "observation_date": "2026-09-29",
+      "known_at": "2026-09-29T00:00:00+08:00",
+      "source": "CNINFO current share-count evidence",
+      "value": "4380630342",
+      "metadata": {
+        "content_sha256": "70ca1ac344c869754d790f8ba1ed6087ede879c71fa848f651a59f5c71fe3be1",
+        "exact_bytes": "true",
+        "status": "ADMITTED"
+      }
+    },
+    {
+      "evidence_id": "E005",
+      "variable": "net_debt",
+      "unit": "CNY",
+      "basis": "2026-06-30 cash less short-term and long-term borrowings",
+      "observation_date": "2026-06-30",
+      "known_at": "2026-07-24T00:00:00+08:00",
+      "source": "CATL 2026 H1 report / existing CORE-03 financial evidence",
+      "value": "-276904623000",
+      "metadata": {
+        "content_sha256": "edc92ca668aa0010d37e257fd7ee8ae22a01b9dbd8d9b642b88b6195c1498777",
+        "exact_bytes": "true",
+        "status": "ADMITTED"
+      }
+    }
+  ]
+}
