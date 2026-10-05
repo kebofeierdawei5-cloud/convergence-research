@@ -162,8 +162,6 @@ def _validate_record(record: Mapping[str, Any]) -> None:
     if known_at.date() > cutoff:
         raise ValueError("canonical independent forecast known_at is after cutoff")
     value = _parse_decimal(record["value"], "value")
-    if value <= 0:
-        raise ValueError("canonical independent forecast value must be > 0")
     _parse_horizon_years(record["horizon_years"], "horizon_years")
     if record["prepared_without_current_price"] is not True:
         raise ValueError(
