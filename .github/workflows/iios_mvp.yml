@@ -29,7 +29,6 @@ on:
       - "tests/test_canonical_entry_evaluation.py"
       - "tests/test_p2_3_real_300750_e2e.py"
       - "tools/p2_3_real_300750_e2e.py"
-      - "research/core04c_catl_ev_ebitda_receipt_v0.2.json"
       - "examples/real_cases/RC-CN-A-300750-20261004_ratio_mie_input.json"
       - "examples/**"
       - "schemas/**"
