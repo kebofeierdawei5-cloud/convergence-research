@@ -292,6 +292,14 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
             errors.append(_err("V03-PRICE-POSITIVE", "current_price_observation.price", "must be > 0"))
     except (KeyError, ValueError) as exc:
         errors.append(_err("V03-PRICE", "current_price_observation.price", str(exc)))
+    if not str(case["current_price_observation"].get("price_observation_id", "")).strip():
+        errors.append(
+            _err(
+                "V03-PRICE-OBSERVATION-ID",
+                "current_price_observation.price_observation_id",
+                "price_observation_id is required for canonical price evidence",
+            )
+        )
     try:
         position = _position(case)
         if position < 0 or position > 100:
@@ -402,9 +410,15 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
                     )
                 )
 
-    mie = case.get("market_implied_expectation")
-    if mie is not None and not isinstance(mie, dict):
-        errors.append(_err("V03-MIE-TYPE", "market_implied_expectation", "optional MIE must be an object when supplied"))
+    mie_snapshot = case.get("market_implied_expectation_snapshot")
+    if mie_snapshot is not None and not isinstance(mie_snapshot, dict):
+        errors.append(
+            _err(
+                "V03-MIE-SNAPSHOT-TYPE",
+                "market_implied_expectation_snapshot",
+                "canonical P4-F MIE snapshot must be an object when supplied",
+            )
+        )
     decision = case.get("decision")
     if decision is not None:
         if not isinstance(decision, dict):
@@ -421,7 +435,7 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
 def _canonical_expectation_gap(payload: Any, case: dict[str, Any]) -> dict[str, Any]:
     mie = case.get("market_implied_expectation_snapshot")
     if not isinstance(mie, dict):
-        raise ValueError("market_implied_expectation is required for a canonical expectation gap")
+        raise ValueError("market_implied_expectation_snapshot is required for a canonical expectation gap")
     try:
         return evaluate_canonical_expectation_gap(
             payload,
