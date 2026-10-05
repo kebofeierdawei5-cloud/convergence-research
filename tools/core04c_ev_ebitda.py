@@ -118,16 +118,47 @@ def numbers_after_label(line: str, label: str) -> list[Decimal]:
     return [Decimal(token.replace(",", "")) for token in NUMBER_RE.findall(tail)]
 
 
-def find_row_number(lines: list[str], label: str, occurrence: int = 0) -> Decimal:
-    seen = 0
-    for line in lines:
-        values = numbers_after_label(line, label)
-        if not values:
-            continue
-        if seen == occurrence:
-            return values[0]
-        seen += 1
-    raise LookupError(f"label not found with numeric value: {label}")
+def find_row_values(
+    lines: list[str],
+    label: str,
+    *,
+    min_numbers: int = 2,
+    start_index: int = 0,
+    max_scan: int | None = None,
+) -> list[Decimal]:
+    stop = len(lines) if max_scan is None else min(len(lines), start_index + max_scan)
+    for i in range(start_index, stop):
+        for candidate in (
+            lines[i],
+            lines[i] + " " + (lines[i + 1] if i + 1 < len(lines) else ""),
+        ):
+            values = numbers_after_label(candidate, label)
+            if len(values) >= min_numbers:
+                return values
+    raise LookupError(f"label not found with >= {min_numbers} numeric values: {label}")
+
+
+def find_row_number(
+    lines: list[str],
+    label: str,
+    *,
+    start_index: int = 0,
+    max_scan: int | None = None,
+) -> Decimal:
+    return find_row_values(
+        lines,
+        label,
+        min_numbers=2,
+        start_index=start_index,
+        max_scan=max_scan,
+    )[0]
+
+
+def _first_index(lines: list[str], marker: str) -> int:
+    for i, line in enumerate(lines):
+        if marker in line:
+            return i
+    raise LookupError(f"marker not found: {marker}")
 
 
 def extract_pdf_lines(path: Path) -> list[str]:
@@ -143,27 +174,23 @@ def extract_pdf_lines(path: Path) -> list[str]:
     return lines
 
 
-def parse_period_financials(path: Path, period: str) -> dict[str, Decimal]:
+def parse_period_financials(
+    path: Path,
+    period: str,
+    *,
+    include_ebitda: bool,
+) -> dict[str, Decimal]:
     lines = extract_pdf_lines(path)
-    # First numeric row after each label is the consolidated statement value.
-    profit_total = find_row_number(lines, "利润总额")
-    interest_expense = find_row_number(lines, "利息费用")
-    fixed_dep = find_row_number(lines, "固定资产折旧、油气资产折耗、生产性生物资产折旧")
-    rou_dep = find_row_number(lines, "使用权资产折旧")
-    intangible_amort = find_row_number(lines, "无形资产摊销")
-    lt_prepaid_amort = find_row_number(lines, "长期待摊费用摊销")
+    balance_start = _first_index(lines, "合并资产负债表")
+    cash = find_row_number(lines, "货币资金", start_index=balance_start, max_scan=120)
+    trading_assets = find_row_number(lines, "交易性金融资产", start_index=balance_start, max_scan=120)
+    short_borrowing = find_row_number(lines, "短期借款", start_index=balance_start, max_scan=120)
+    current_noncurrent = find_row_number(lines, "一年内到期的非流动负债", start_index=balance_start, max_scan=120)
+    long_borrowing = find_row_number(lines, "长期借款", start_index=balance_start, max_scan=120)
+    bonds = find_row_number(lines, "应付债券", start_index=balance_start, max_scan=120)
+    lease_liabilities = find_row_number(lines, "租赁负债", start_index=balance_start, max_scan=120)
+    share_capital = find_row_number(lines, "股本", start_index=balance_start, max_scan=120)
 
-    cash = find_row_number(lines, "货币资金")
-    trading_assets = find_row_number(lines, "交易性金融资产")
-    short_borrowing = find_row_number(lines, "短期借款")
-    current_noncurrent = find_row_number(lines, "一年内到期的非流动负债")
-    long_borrowing = find_row_number(lines, "长期借款")
-    bonds = find_row_number(lines, "应付债券")
-    lease_liabilities = find_row_number(lines, "租赁负债")
-    share_capital = find_row_number(lines, "股本")
-
-    depreciation_amortization = fixed_dep + rou_dep + intangible_amort + lt_prepaid_amort
-    ebitda = profit_total + interest_expense + depreciation_amortization
     interest_bearing_debt = (
         short_borrowing
         + current_noncurrent
@@ -173,15 +200,7 @@ def parse_period_financials(path: Path, period: str) -> dict[str, Decimal]:
     )
     net_debt = interest_bearing_debt - cash - trading_assets
 
-    return {
-        "profit_total_thousand_cny": profit_total,
-        "interest_expense_thousand_cny": interest_expense,
-        "fixed_dep_thousand_cny": fixed_dep,
-        "rou_dep_thousand_cny": rou_dep,
-        "intangible_amort_thousand_cny": intangible_amort,
-        "lt_prepaid_amort_thousand_cny": lt_prepaid_amort,
-        "depreciation_amortization_thousand_cny": depreciation_amortization,
-        "ebitda_thousand_cny": ebitda,
+    result: dict[str, Decimal] = {
         "cash_thousand_cny": cash,
         "trading_assets_thousand_cny": trading_assets,
         "short_borrowing_thousand_cny": short_borrowing,
@@ -194,6 +213,29 @@ def parse_period_financials(path: Path, period: str) -> dict[str, Decimal]:
         "share_capital_thousand_cny": share_capital,
         "period": Decimal("0"),
     }
+
+    if include_ebitda:
+        profit_start = _first_index(lines, "合并利润表")
+        profit_total = find_row_number(lines, "利润总额", start_index=profit_start, max_scan=80)
+        interest_expense = find_row_number(lines, "利息费用")
+        cashflow_start = _first_index(lines, "现金流量表补充资料")
+        fixed_dep = find_row_number(lines, "固定资产折旧", start_index=cashflow_start, max_scan=80)
+        rou_dep = find_row_number(lines, "使用权资产折旧", start_index=cashflow_start, max_scan=80)
+        intangible_amort = find_row_number(lines, "无形资产摊销", start_index=cashflow_start, max_scan=80)
+        lt_prepaid_amort = find_row_number(lines, "长期待摊费用摊销", start_index=cashflow_start, max_scan=80)
+        depreciation_amortization = fixed_dep + rou_dep + intangible_amort + lt_prepaid_amort
+        result.update({
+            "profit_total_thousand_cny": profit_total,
+            "interest_expense_thousand_cny": interest_expense,
+            "fixed_dep_thousand_cny": fixed_dep,
+            "rou_dep_thousand_cny": rou_dep,
+            "intangible_amort_thousand_cny": intangible_amort,
+            "lt_prepaid_amort_thousand_cny": lt_prepaid_amort,
+            "depreciation_amortization_thousand_cny": depreciation_amortization,
+            "ebitda_thousand_cny": profit_total + interest_expense + depreciation_amortization,
+        })
+
+    return result
 
 
 def d(value: Decimal | str | int) -> Decimal:
@@ -323,82 +365,60 @@ def source_map(receipt: list[dict[str, object]], source_dir: Path) -> dict[str, 
 
 
 def derive_case(source_paths: dict[str, Path]) -> dict[str, object]:
-    h1_2026 = parse_period_financials(source_paths["CNINFO-H1-2026"], "2026H1")
-    q1_2026 = parse_period_financials(source_paths["CNINFO-Q1-2026"], "2026Q1")
-    q3_2025 = parse_period_financials(source_paths["CNINFO-Q3-2025"], "2025Q3")
-    annual_2025 = parse_period_financials(source_paths["CNINFO-ANNUAL-2025"], "2025FY")
-    annual_2024 = parse_period_financials(source_paths["CNINFO-ANNUAL-2024"], "2024FY")
-
-    # The latest comparable EBITDA for each market date is TTM, derived only
-    # from report vintages knowable on or before that market observation.
-    ebitda_ttm_2026_07_27 = ttm(
-        h1_2026["ebitda_thousand_cny"],
-        annual_2025["ebitda_thousand_cny"],
-        h1_2026["depreciation_amortization_thousand_cny"] * Decimal("0") +
-        parse_period_financials(source_paths["CNINFO-H1-2026"], "2025H1")["ebitda_thousand_cny"]
+    h1_2026 = parse_period_financials(
+        source_paths["CNINFO-H1-2026"], "2026H1", include_ebitda=True
     )
-    # Re-derive the 2025H1 comparative from the same H1 report so no 2025H1
-    # standalone source is needed. The parser returns the first statement
-    # column; extract the second comparative is handled below via explicit row parser.
+    q1_2026 = parse_period_financials(
+        source_paths["CNINFO-Q1-2026"], "2026Q1", include_ebitda=False
+    )
+    q3_2025 = parse_period_financials(
+        source_paths["CNINFO-Q3-2025"], "2025Q3", include_ebitda=False
+    )
+    annual_2025 = parse_period_financials(
+        source_paths["CNINFO-ANNUAL-2025"], "2025FY", include_ebitda=True
+    )
+    annual_2024 = parse_period_financials(
+        source_paths["CNINFO-ANNUAL-2024"], "2024FY", include_ebitda=True
+    )
+
     h1_lines = extract_pdf_lines(source_paths["CNINFO-H1-2026"])
-    h1_profit_row = next(line for line in h1_lines if "利润总额" in line and len(numbers_after_label(line, "利润总额")) >= 2)
-    h1_interest_row = next(line for line in h1_lines if "利息费用" in line and len(numbers_after_label(line, "利息费用")) >= 2)
-    h1_fix_row = next(line for line in h1_lines if "固定资产折旧、油气资产折耗、生产性生物资产折旧" in line and len(numbers_after_label(line, "固定资产折旧、油气资产折耗、生产性生物资产折旧")) >= 2)
-    h1_rou_row = next(line for line in h1_lines if "使用权资产折旧" in line and len(numbers_after_label(line, "使用权资产折旧")) >= 2)
-    h1_int_row = next(line for line in h1_lines if "无形资产摊销" in line and len(numbers_after_label(line, "无形资产摊销")) >= 2)
-    h1_pre_row = next(line for line in h1_lines if "长期待摊费用摊销" in line and len(numbers_after_label(line, "长期待摊费用摊销")) >= 2)
-    h1_2025_ebitda = (
-        numbers_after_label(h1_profit_row, "利润总额")[1]
-        + numbers_after_label(h1_interest_row, "利息费用")[1]
-        + numbers_after_label(h1_fix_row, "固定资产折旧、油气资产折耗、生产性生物资产折旧")[1]
-        + numbers_after_label(h1_rou_row, "使用权资产折旧")[1]
-        + numbers_after_label(h1_int_row, "无形资产摊销")[1]
-        + numbers_after_label(h1_pre_row, "长期待摊费用摊销")[1]
-    )
-    ebitda_ttm_2026_07_27 = ttm(h1_2026["ebitda_thousand_cny"], annual_2025["ebitda_thousand_cny"], h1_2025_ebitda)
+    h1_start = _first_index(h1_lines, "现金流量表补充资料")
+    comparative_labels = [
+        "利润总额",
+        "利息费用",
+        "固定资产折旧",
+        "使用权资产折旧",
+        "无形资产摊销",
+        "长期待摊费用摊销",
+    ]
+    h1_comparatives: list[list[Decimal]] = []
+    for label in comparative_labels:
+        values = find_row_values(h1_lines, label, start_index=h1_start, max_scan=80)
+        if len(values) < 2:
+            raise LookupError(f"H1 comparative values unavailable for {label}")
+        h1_comparatives.append(values)
+    h1_2025_ebitda = sum(values[1] for values in h1_comparatives)
 
-    q1_2026_lines = extract_pdf_lines(source_paths["CNINFO-Q1-2026"])
-    # Q1 report's first and second values on the same rows are 2026Q1 and 2025Q1.
-    def comparative_ebitda(lines: list[str]) -> tuple[Decimal, Decimal]:
-        labels = [
-            "利润总额",
-            "利息费用",
-            "固定资产折旧、油气资产折耗、生产性生物资产折旧",
-            "使用权资产折旧",
-            "无形资产摊销",
-            "长期待摊费用摊销",
-        ]
-        rows = [next(line for line in lines if label in line and len(numbers_after_label(line, label)) >= 2) for label in labels]
-        first = sum((numbers_after_label(row, label)[0] for row, label in zip(rows, labels)), Decimal("0"))
-        second = sum((numbers_after_label(row, label)[1] for row, label in zip(rows, labels)), Decimal("0"))
-        return first, second
-
-    q1_cur, q1_prior = comparative_ebitda(q1_2026_lines)
-
-    q3_2025_lines = extract_pdf_lines(source_paths["CNINFO-Q3-2025"])
-    q3_2025_9m, q3_2024_9m = comparative_ebitda(q3_2025_lines)
-
-    ebitda_ttm_2026_04_17 = ttm(q1_cur, annual_2025["ebitda_thousand_cny"], q1_prior)
-    ebitda_ttm_2025_10_22 = ttm(q3_2025_9m, annual_2024["ebitda_thousand_cny"], q3_2024_9m)
+    ebitda_for_observation_thousand_cny = {
+        "2026-07-27": ttm(
+            h1_2026["ebitda_thousand_cny"],
+            annual_2025["ebitda_thousand_cny"],
+            h1_2025_ebitda,
+        ),
+        "2026-04-17": annual_2025["ebitda_thousand_cny"],
+        "2025-10-22": annual_2024["ebitda_thousand_cny"],
+    }
 
     return {
         "financial_sources": {
             "h1_2026": h1_2026,
-            "q1_2026": q1_2026,
-            "q3_2025": q3_2025,
+            "q1_2026_balance": q1_2026,
+            "q3_2025_balance": q3_2025,
             "annual_2025": annual_2025,
             "annual_2024": annual_2024,
             "h1_2025_comparative_ebitda_thousand_cny": h1_2025_ebitda,
-            "q1_2026_ebitda_thousand_cny": q1_cur,
-            "q1_2025_comparative_ebitda_thousand_cny": q1_prior,
-            "q3_2025_9m_ebitda_thousand_cny": q3_2025_9m,
-            "q3_2024_9m_comparative_ebitda_thousand_cny": q3_2024_9m,
         },
-        "ttm_ebitda_thousand_cny": {
-            "2026-07-27": ebitda_ttm_2026_07_27,
-            "2026-04-17": ebitda_ttm_2026_04_17,
-            "2025-10-22": ebitda_ttm_2025_10_22,
-        },
+        "ebitda_for_observation_thousand_cny": ebitda_for_observation_thousand_cny,
         "net_debt_thousand_cny": {
             "2026-07-27": h1_2026["net_debt_thousand_cny"],
             "2026-04-17": q1_2026["net_debt_thousand_cny"],
@@ -410,7 +430,6 @@ def derive_case(source_paths: dict[str, Path]) -> dict[str, object]:
             "2025-10-22": q3_2025["share_capital_thousand_cny"] * CNY_SCALE,
         },
     }
-
 
 def json_decimal(value: object) -> object:
     if isinstance(value, Decimal):
@@ -461,14 +480,14 @@ def main() -> int:
 
     observations: list[dict[str, object]] = []
     periods = [
-        ("2026-07-27", "CNINFO-H1-2026", "TTM_EBITDA_H1_2026", "SOURCE_VINTAGE"),
-        ("2026-04-17", "CNINFO-Q1-2026", "TTM_EBITDA_Q1_2026", "SOURCE_VINTAGE"),
-        ("2025-10-22", "CNINFO-Q3-2025", "TTM_EBITDA_Q3_2025", "SOURCE_VINTAGE"),
+        ("2026-07-27", "CNINFO-H1-2026", "CNINFO-H1-2026", "TTM_EBITDA_H1_2026", "SOURCE_VINTAGE"),
+        ("2026-04-17", "CNINFO-Q1-2026", "CNINFO-ANNUAL-2025", "FY2025_EBITDA_LATEST_PIT", "SOURCE_VINTAGE"),
+        ("2025-10-22", "CNINFO-Q3-2025", "CNINFO-ANNUAL-2024", "FY2024_EBITDA_LATEST_PIT", "SOURCE_VINTAGE"),
     ]
 
-    for obs_date, fin_source_id, ebitda_basis, temporal in periods:
+    for obs_date, balance_source_id, ebitda_source_id, ebitda_basis, temporal in periods:
         price = prices[obs_date]
-        ebitda = derived["ttm_ebitda_thousand_cny"][obs_date] * CNY_SCALE
+        ebitda = derived["ebitda_for_observation_thousand_cny"][obs_date] * CNY_SCALE
         net_debt = derived["net_debt_thousand_cny"][obs_date] * CNY_SCALE
         shares = derived["shares_outstanding"][obs_date]
         market_cap = price * shares
@@ -493,8 +512,10 @@ def main() -> int:
             "economic_variable": "ebitda",
             "unit": "CNY",
             "temporal_provenance": temporal,
-            "financial_source_id": fin_source_id,
-            "financial_source_sha256": next(r["sha256"] for r in capture_receipt if r["source_id"] == fin_source_id),
+            "balance_source_id": balance_source_id,
+            "balance_source_sha256": next(r["sha256"] for r in capture_receipt if r["source_id"] == balance_source_id),
+            "ebitda_source_id": ebitda_source_id,
+            "ebitda_source_sha256": next(r["sha256"] for r in capture_receipt if r["source_id"] == ebitda_source_id),
             "market_source_id": next(r["source_id"] for r in capture_receipt if r["observation_date"] == obs_date and r["role"] == "MARKET_PRICE_SNAPSHOT"),
             "market_source_sha256": next(r["sha256"] for r in capture_receipt if r["observation_date"] == obs_date and r["role"] == "MARKET_PRICE_SNAPSHOT"),
         })
@@ -520,7 +541,8 @@ def main() -> int:
     evidence_rows = []
     for obs in observations:
         obs_date = obs["observation_date"]
-        fin = next(r for r in capture_receipt if r["source_id"] == obs["financial_source_id"])
+        fin = next(r for r in capture_receipt if r["source_id"] == obs["balance_source_id"])
+        ebitda_fin = next(r for r in capture_receipt if r["source_id"] == obs["ebitda_source_id"])
         mkt = next(r for r in capture_receipt if r["source_id"] == obs["market_source_id"])
         evidence_rows.extend([
             {
@@ -559,7 +581,7 @@ def main() -> int:
                 "unit": "CNY",
                 "basis": obs["ebitda_basis"] + "_deterministic_derivation",
                 "observation_date": obs_date,
-                "known_at": fin["known_at"],
+                "known_at": ebitda_fin["known_at"],
                 "source": "IIOS-DETERMINISTIC-DERIVATION",
                 "source_location": "research/core04c_derivation.json",
                 "content_sha256": derivation_sha,
@@ -592,7 +614,7 @@ def main() -> int:
         "case_id": "RC-CN-A-300750-20261004",
         "cutoff_date": "2026-10-04",
         "model_family": "ev_ebitda",
-        "observation_basis": "PIT_TTM",
+        "observation_basis": "PIT_LATEST_AVAILABLE_OR_TTM_WHERE_DISCLOSABLE",
         "observations": observations,
         "evidence": evidence_rows,
         "derivation_artifact": {
