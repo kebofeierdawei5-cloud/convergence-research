@@ -376,18 +376,21 @@ def test_ambiguous_p3_yields_multiple_conditional_slices_without_forced_winner()
 
 def test_unstable_identification_blocks_conditional_mie():
     inp = dcf_input()
-    modified = list(inp.observations)
-    bad = modified[0]
-    modified[0] = cobs(
-        bad.observation_id,
-        1,
-        str(bad.price),
-        "discount_rate",
-        "0.20",
-        bad.basis,
-        bad.unit,
-        bad.evidence_ids[0],
-    )
+    modified = []
+    for item in inp.observations:
+        if item.observation_id == "h1-discount_rate":
+            modified.append(cobs(
+                item.observation_id,
+                1,
+                str(item.price),
+                "discount_rate",
+                "0.20",
+                item.basis,
+                item.unit,
+                item.evidence_ids[0],
+            ))
+        else:
+            modified.append(item)
     unstable = MarketModelIdentificationInput(
         cutoff_date=inp.cutoff_date,
         current_observation_id=inp.current_observation_id,
