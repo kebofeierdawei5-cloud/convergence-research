@@ -125,6 +125,9 @@ CATL_H1_2026 = _catl_period(
 )
 
 
+ADMITTED = sorted(set(CATL_H1_2025["evidence_ids"] + CATL_H1_2026["evidence_ids"]))
+
+
 def test_catl_h1_bridge_is_deterministic_and_auditable():
     result = build_company_economic_bridge(
         case_id="RC-CN-A-300750-20261004",
@@ -132,6 +135,7 @@ def test_catl_h1_bridge_is_deterministic_and_auditable():
         prior_period=CATL_H1_2025,
         current_period=CATL_H1_2026,
         generation_basis="Official CATL H1 2025/H1 2026 filings; comparable six-month periods; consolidated statements.",
+    admitted_evidence_ids=ADMITTED,
     )
 
     assert result["schema_version"] == ECONOMIC_BRIDGE_VERSION
@@ -167,6 +171,7 @@ def test_bridge_uses_consolidated_net_income_as_primary_cash_conversion_base():
         prior_period=CATL_H1_2025,
         current_period=CATL_H1_2026,
         generation_basis="fixture",
+    admitted_evidence_ids=ADMITTED,
     )
     assert result["periods"]["current"]["ocf_to_net_income"] == pytest.approx(60_216_851 / 47_030_638)
     assert result["periods"]["current"]["fcf_to_net_income"] == pytest.approx(35_144_079 / 47_030_638)
@@ -196,6 +201,7 @@ def test_incremental_roic_does_not_divide_by_non_positive_incremental_capital():
         prior_period=prior,
         current_period=current,
         generation_basis="fixture",
+    admitted_evidence_ids=ADMITTED,
     )
     assert result["incremental_roic"]["status"] == "UNKNOWN"
     assert result["incremental_roic"]["value"] is None
@@ -211,6 +217,7 @@ def test_missing_period_field_fails_closed():
             prior_period=CATL_H1_2025,
             current_period=period,
             generation_basis="fixture",
+        admitted_evidence_ids=ADMITTED,
         )
 
 
@@ -224,6 +231,7 @@ def test_duplicate_evidence_ids_fail_closed():
             prior_period=CATL_H1_2025,
             current_period=period,
             generation_basis="fixture",
+        admitted_evidence_ids=ADMITTED,
         )
 
 
@@ -234,6 +242,7 @@ def test_hash_tampering_is_detected():
         prior_period=CATL_H1_2025,
         current_period=CATL_H1_2026,
         generation_basis="fixture",
+    admitted_evidence_ids=ADMITTED,
     )
     result["periods"]["current"]["fcf_after_capex"] += 1
     assert "AUDIT_BRIDGE_HASH_MISMATCH" in validate_company_economic_bridge(result)
@@ -246,6 +255,7 @@ def test_schema_accepts_built_bridge():
         prior_period=CATL_H1_2025,
         current_period=CATL_H1_2026,
         generation_basis="fixture",
+    admitted_evidence_ids=ADMITTED,
     )
     schema = json.loads(
         (ROOT / "schemas" / "company_economic_bridge_v0.1.schema.json").read_text(
@@ -256,3 +266,17 @@ def test_schema_accepts_built_bridge():
         Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(result)
     )
     assert errors == []
+
+
+def test_unadmitted_evidence_reference_fails_closed():
+    current = dict(CATL_H1_2026)
+    current["evidence_ids"] = current["evidence_ids"] + ["NOT-ADMITTED"]
+    with pytest.raises(ValueError, match="not admitted"):
+        build_company_economic_bridge(
+            case_id="CASE",
+            cutoff_date="2026-10-04T23:59:59+08:00",
+            prior_period=CATL_H1_2025,
+            current_period=current,
+            generation_basis="fixture",
+            admitted_evidence_ids=ADMITTED,
+        )
