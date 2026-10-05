@@ -1,3 +1,7 @@
+# HISTORICAL / SUPERSEDED CONTINUITY PLAN — 2026-10-05
+
+This 2026-10-04 continuity document is preserved as historical development context. It is not the current state authority. Its old return-hurdle wording, CORE sequence, and current-status claims are superseded. Follow `docs/PROJECT_STATE_INDEX.md` and `docs/iios/A0_STATE_AUTHORITY_POLICY_v0.1.md`.
+
 # IIOS Project Continuity & Macro Development Plan — 2026-10-04
 
 ## 0. Purpose
