@@ -436,8 +436,14 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
                         symbol=case["symbol"],
                         cutoff_date=cutoff,
                     )
-                    gap_horizon = str(forecast_record["horizon_years"])
-                    if gap_horizon != decision_horizon:
+                    gap_horizon = _dec(
+                        forecast_record["horizon_years"],
+                        "canonical independent forecast.horizon_years",
+                    )
+                    if gap_horizon != _dec(
+                        decision_horizon,
+                        "return_gate.horizon_years",
+                    ):
                         errors.append(
                             _err(
                                 "V03-EXPECTATION-GAP-HORIZON",
