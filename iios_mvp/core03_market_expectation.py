@@ -211,6 +211,7 @@ def _build_blocked_p4f(
     case_id: str,
     cutoff: date,
     market_evidence: Mapping[str, Any],
+    price_evidence: Mapping[str, Any],
     candidate_models: list[str],
 ) -> dict[str, Any]:
     e = market_evidence
@@ -218,18 +219,18 @@ def _build_blocked_p4f(
         status=CandidateCoverageState.INSUFFICIENT,
         scope_basis="CORE-02 valuation route candidate set; historical/current market-model identification bundle not admitted for this case",
         candidate_model_ids=tuple(candidate_models),
-        evidence_ids=("E002",),
+        evidence_ids=(str(price_evidence["evidence_id"]),),
         rationale="Only the current price observation is admitted; model-specific historical observations needed for P3/P4 candidate coverage are absent.",
     )
     evidence_sufficiency = EvidenceSufficiencyAssessment(
         status=EvidenceSufficiencyState.INSUFFICIENT,
         rationale="No PIT market-model observation history is admitted for EV/EBITDA, DCF, forward PE or SOTP.",
-        evidence_ids=("E002",),
+        evidence_ids=(str(price_evidence["evidence_id"]),),
     )
     evaluations = tuple(
         MIEModelEvaluation.blocked(
             model_id=model,
-            evidence_ids=("E002",),
+            evidence_ids=(str(price_evidence["evidence_id"]),),
             rationale="Blocked at P4-F because candidate market-model evidence/history is insufficient; no implied requirement is materialized.",
         )
         for model in candidate_models
@@ -240,18 +241,18 @@ def _build_blocked_p4f(
         evidence_sufficiency=evidence_sufficiency,
         model_evaluations=evaluations,
         qualification_rationale="CORE-03 fail-closed MIE attempt: insufficient PIT market-model evidence.",
-        evidence_ids=("E002",),
+        evidence_ids=(str(price_evidence["evidence_id"]),),
     )
     provenance = P4FProvenanceRecord(
-        evidence_id="E002",
+        evidence_id=str(price_evidence["evidence_id"]),
         variable="market_price",
-        unit="CNY",
+        unit="CNY/share",
         basis="2026-09-30 close",
         observation_date=date(2026, 9, 30),
-        known_at=_dt(e["known_at"], "E002.known_at"),
-        source="证券之星",
-        source_location=e["source_ref"],
-        content_sha256=e["content_sha256"],
+        known_at=_dt(price_evidence["known_at"], f"{price_evidence['evidence_id']}.known_at"),
+        source=str(price_evidence.get("source_ref", "SZSE:MARKET_DATA")),
+        source_location=str(price_evidence.get("source_locator") or price_evidence["source_ref"]),
+        content_sha256=str(price_evidence["content_sha256"]),
         captured_at=datetime(2026, 10, 4, 22, 0, tzinfo=timezone.utc),
     )
     snapshot = build_p4f_snapshot(
@@ -272,6 +273,7 @@ def build_core03_package(
     forecast: Mapping[str, Any],
     valuation_assumptions: Mapping[str, Any],
     market_evidence: Mapping[str, Any],
+    price_evidence: Mapping[str, Any],
     forecast_evidence: list[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     case = core02_input.get("case")
@@ -299,6 +301,14 @@ def build_core03_package(
     _validate_evidence_record(market_evidence, cutoff, "E008")
     if market_evidence.get("variable") != "current_share_count":
         raise ValueError("E008 must be current_share_count")
+    price_evidence_id = str(valuation_assumptions.get("price_evidence_id", "")).strip()
+    if not price_evidence_id:
+        raise ValueError("valuation price_evidence_id is required")
+    _validate_evidence_record(price_evidence, cutoff, price_evidence_id)
+    if str(price_evidence.get("field_id", "")) != "market_price.close.2026-09-30":
+        raise ValueError(f"{price_evidence_id} must be the 2026-09-30 market close evidence")
+    if _dec(price_evidence.get("value"), f"{price_evidence_id}.value") != _dec(valuation_assumptions.get("price_cny"), "valuation_assumptions.price_cny"):
+        raise ValueError("valuation price must equal admitted price evidence value")
     forecast_evidence = forecast_evidence or []
     forecast_evidence_by_id = {}
     for record in forecast_evidence:
@@ -317,8 +327,8 @@ def build_core03_package(
     price = _dec(valuation_assumptions.get("price_cny"), "valuation_assumptions.price_cny")
     if net_cash <= 0 or shares <= 0 or price <= 0:
         raise ValueError("current market context must be positive")
-    if valuation_assumptions.get("price_evidence_id") != "E002":
-        raise ValueError("valuation price must bind to E002")
+    if valuation_assumptions.get("price_evidence_id") != price_evidence_id:
+        raise ValueError("valuation price_evidence_id must match the admitted price evidence")
     if valuation_assumptions.get("share_count_evidence_id") != "E008":
         raise ValueError("valuation share count must bind to E008")
 
@@ -367,6 +377,7 @@ def build_core03_package(
         case_id=case["case_id"],
         cutoff=cutoff,
         market_evidence=market_evidence,
+        price_evidence=price_evidence,
         candidate_models=core02["value_core"]["model_route"]["candidate_models"],
     )
 
@@ -436,6 +447,7 @@ def build_core03_package(
             "forecast": normalized_forecast,
             "valuation_assumptions": valuation_assumptions,
             "market_evidence": market_evidence,
+            "price_evidence": price_evidence,
             "forecast_evidence": forecast_evidence,
         }),
         "generated_at": "2026-10-04T22:00:00+00:00",
