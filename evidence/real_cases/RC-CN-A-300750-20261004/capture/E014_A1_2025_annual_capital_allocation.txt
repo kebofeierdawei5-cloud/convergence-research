@@ -8,7 +8,7 @@ unit: CNY_thousand
 
 2025 annual capital allocation:
 attributable_net_income_2025: 72201282
-cash_dividend_total_including_other_methods_2025: 36100640883.92 CNY
+cash_dividend_total_including_other_methods_2025: 36100640.88392 CNY_thousand
 annual_payout_ratio: 50.00%
 repurchased_shares_in_repurchase_account_at_plan_date: 31982306
 share_count_excluding_repurchase_account_for_distribution: 4531886650
