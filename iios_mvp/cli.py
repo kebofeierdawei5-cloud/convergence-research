@@ -15,6 +15,7 @@ from .store import (
     load_series,
     next_revision,
     read_snapshot,
+    replay_decision_lifecycle,
     write_decision_revision,
     write_human_approval,
     write_snapshot,
@@ -131,22 +132,23 @@ def cmd_run(args: argparse.Namespace) -> int:
     )
     revision = next_revision(args.out, series["decision_series_id"])
     decision_path = write_decision_revision(
-        args.out, series["decision_series_id"], revision, snapshot,
-        run_id=snapshot_hash[:16], trigger_event_id=args.trigger_event_id,
-    )
-    index_path = Path(args.out) / f"{series['decision_series_id']}.index.json"
-    index_path.write_text(
-        json.dumps({"next_revision": revision + 1}, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8", newline="\n"
+        args.out,
+        series["decision_series_id"],
+        revision,
+        snapshot,
+        run_id=snapshot_hash[:16],
+        trigger_event_id=args.trigger_event_id,
     )
     if args.format == "markdown":
         print(render_markdown(snapshot))
     else:
         print(json.dumps({
-            "snapshot": str(out), "snapshot_hash": snapshot_hash,
+            "snapshot": str(out),
+            "snapshot_hash": snapshot_hash,
             "decision_id": f"{series['decision_series_id']}-r{revision:03d}",
             "decision": snapshot["decision"]["decision"]["action"],
             "decision_revision": str(decision_path),
+            "next_revision": next_revision(args.out, series["decision_series_id"]),
             "engine_version": snapshot["engine_version"],
         }, ensure_ascii=False, indent=2))
     return 0
@@ -160,13 +162,22 @@ def cmd_replay(args: argparse.Namespace) -> int:
 
 def cmd_approve(args: argparse.Namespace) -> int:
     snapshot = read_snapshot(args.snapshot)
-    series = load_series(args.out, args.series_id) if args.series_id else {}
-    decision_id = args.decision_id
-    if not decision_id and series:
-        raise ValueError("decision_id is required when approving a revision")
-    if not decision_id:
-        raise ValueError("decision_id is required")
-    result = approve_revision(args.out, decision_id, snapshot, args.approved, args.note)
+    if args.series_id:
+        load_series(args.out, args.series_id)
+    result = approve_revision(
+        args.out,
+        args.decision_id,
+        snapshot,
+        args.approved,
+        args.note,
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
+
+def cmd_lifecycle_replay(args: argparse.Namespace) -> int:
+    result = replay_decision_lifecycle(args.out, args.decision_id)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
@@ -220,6 +231,11 @@ def parser() -> argparse.ArgumentParser:
     rp = sub.add_parser("replay", help="replay a frozen snapshot")
     rp.add_argument("snapshot")
     rp.set_defaults(func=cmd_replay)
+
+    lr = sub.add_parser("lifecycle-replay", help="replay and audit one canonical decision lifecycle")
+    lr.add_argument("decision_id")
+    lr.add_argument("--out", default="runs")
+    lr.set_defaults(func=cmd_lifecycle_replay)
 
     ap = sub.add_parser("approve", help="record separate human approval")
     ap.add_argument("snapshot")
