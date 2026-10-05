@@ -74,13 +74,38 @@ def test_same_revision_cannot_be_overwritten_by_conflicting_approval():
 
 
 def test_rejected_approval_does_not_replace_current():
-    rev=build_decision_revision(decision_series_id="CN-A-300750",revision=2,snapshot=snapshot("BUY"),run_id="run-2")
-    ap=build_human_approval(decision_revision=rev,approved=False,note="reject")
-    p=project_current_approval(previous={"current_revision":1,"current_decision_id":"CN-A-300750-r001"},decision_revision=rev,approval=ap)
+    rev1=build_decision_revision(decision_series_id="CN-A-300750",revision=1,snapshot=snapshot(),run_id="run-1")
+    ap1=build_human_approval(decision_revision=rev1,approved=True,note="r1")
+    current=project_current_approval(previous=None,decision_revision=rev1,approval=ap1)
+
+    rev2=build_decision_revision(decision_series_id="CN-A-300750",revision=2,snapshot=snapshot("BUY"),run_id="run-2")
+    ap2=build_human_approval(decision_revision=rev2,approved=False,note="reject")
+    p=project_current_approval(previous=current,decision_revision=rev2,approval=ap2)
     assert p["projection_status"]=="UNCHANGED"
     assert p["current_revision"]==1
+    assert p["current_decision_id"]=="CN-A-300750-r001"
 
-def test_revision_schema_accepts_record():
-    rev=build_decision_revision(decision_series_id="CN-A-300750",revision=1,snapshot=snapshot(),run_id="run-1")
-    schema=__import__("json").load(open("schemas/decision_lifecycle_v0.1.schema.json"))
+def test_revision_approval_projection_schema_accepts_records():
+    import json
+
+    schema=json.load(open("schemas/decision_lifecycle_v0.1.schema.json",encoding="utf-8"))
+    rev=build_decision_revision(
+        decision_series_id="CN-A-300750",
+        revision=1,
+        snapshot=snapshot(),
+        run_id="run-1",
+    )
+    approval=build_human_approval(
+        decision_revision=rev,
+        approved=True,
+        note="approve",
+    )
+    projection=project_current_approval(
+        previous=None,
+        decision_revision=rev,
+        approval=approval,
+    )
     assert list(Draft202012Validator(schema,format_checker=FormatChecker()).iter_errors(rev))==[]
+    assert list(Draft202012Validator(schema["$defs"]["human_approval"],format_checker=FormatChecker()).iter_errors(approval))==[]
+    assert list(Draft202012Validator(schema["$defs"]["current_projection"],format_checker=FormatChecker()).iter_errors(projection))==[]
+
