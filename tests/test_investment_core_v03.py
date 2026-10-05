@@ -46,6 +46,7 @@ def case() -> dict:
         },
         "thesis": {"status": "INTACT"},
         "expectation_gap": {
+            "price": "100",
             "status": "PASS",
             "gap_relative": "0.3333333333333333333333333333",
             "gap_absolute": "0.05",
@@ -215,6 +216,7 @@ def test_v03_positive_gap_and_price_qualified_produces_buy():
     c = case()
     c["current_price_observation"]["price"] = "99"
     c["return_gate"]["entry_price"] = "99"
+    c["expectation_gap"]["price"] = "99"
     result = decide(c)
     assert result["decision"]["action"] == "BUY"
     assert Decimal(result["decision"]["target_entry_price"]) >= Decimal("99")
@@ -224,11 +226,21 @@ def test_v03_positive_gap_but_price_above_target_is_watch_price():
     c = case()
     c["current_price_observation"]["price"] = "101"
     c["return_gate"]["entry_price"] = "101"
+    c["expectation_gap"]["price"] = "101"
     result = decide(c)
     assert result["decision"]["action"] == "WATCH"
     assert result["decision"]["primary_reason"] == "CURRENT_PRICE_ABOVE_TARGET_ENTRY_PRICE"
     assert Decimal(result["decision"]["target_entry_price"]) < Decimal("101")
 
+
+
+def test_v03_expectation_gap_price_binding_requires_revalidation():
+    c = case()
+    c["current_price_observation"]["price"] = "99"
+    c["return_gate"]["entry_price"] = "99"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-EXPECTATION-GAP-PRICE" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_target_entry_price_is_conditional_and_requires_gap_revalidation():
@@ -279,6 +291,7 @@ def test_v03_watch_when_target_passes_but_entry_cushion_fails():
     c = case()
     c["current_price_observation"]["price"] = "110"
     c["return_gate"]["entry_price"] = "110"
+    c["expectation_gap"]["price"] = "110"
     c["return_gate"]["entry_value_reference"] = "115"
     c["return_gate"]["scenarios"] = {
         "bear": {"probability": "0.2", "terminal_value_per_share": "140", "cash_distributions_per_share": "0", "probability_rationale": "watch bear"},
@@ -348,6 +361,7 @@ def test_v03_hold_existing_when_return_is_positive_but_gate_fails():
     c["portfolio"]["position_pct"] = "5"
     c["current_price_observation"]["price"] = "130"
     c["return_gate"]["entry_price"] = "130"
+    c["expectation_gap"]["price"] = "130"
     c["return_gate"]["entry_value_reference"] = "115"
     result = decide(c)
     assert result["decision"]["action"] == "HOLD"
