@@ -4,56 +4,117 @@ import json
 from pathlib import Path
 
 from copy import deepcopy
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from iios_mvp.canonical_expectation_gap import CANONICAL_EXPECTATION_GAP_VERSION, market_implied_expectation_content_hash
+from iios_mvp.canonical_expectation_gap import CANONICAL_EXPECTATION_GAP_VERSION
 from iios_mvp.engine import decide, replay, run_case, validate_case
+from iios_mvp.market_implied_expectation import (
+    CandidateCoverageAssessment,
+    CandidateCoverageState,
+    EvidenceSufficiencyAssessment,
+    EvidenceSufficiencyState,
+    MIEEconomicRequirement,
+    MIEObservationBasis,
+    MIEQualification,
+    MIERepresentation,
+    MarketImpliedExpectation,
+)
+from iios_mvp.market_model_domain import IdentifiabilityState, MarketModelFamily, StabilityState
+from iios_mvp.multi_model_market_implied_expectation_set import (
+    MIEModelEvaluation,
+    build_multi_model_market_implied_expectation_set,
+)
+from iios_mvp.p4f_mie_snapshot import P4FProvenanceRecord, build_p4f_snapshot
 from iios_mvp.investment_core_contract_v03 import calculate_return_metrics, validate_case_v03
 
 
-def market_implied_expectation() -> dict:
-    return {
-        "expectation_id": "mie-pe-1",
-        "model_id": "pe-1",
-        "market_model": "forward_pe",
-        "identifiability": "IDENTIFIABLE",
-        "stability": "STABLE",
-        "candidate_coverage": {
-            "status": "SUFFICIENT",
-            "scope_basis": "fixture-candidate-set",
-            "candidate_model_ids": ["pe-1"],
-            "evidence_ids": ["ev-coverage"],
-            "rationale": "The fixture has one admitted inverse-model candidate.",
-        },
-        "representation": "IMPLIED_POINT",
-        "economic_requirements": [{
-            "economic_variable": "forward_eps",
-            "unit": "CNY/share",
-            "basis": "2026A_to_2028E",
-            "period": "2028E",
-            "horizon": "24M",
-            "accounting_basis": "reported",
-            "role": "IMPLIED_PRIMARY",
-            "value": "10",
-            "evidence_ids": ["ev-var"],
-        }],
-        "observation_basis": {
-            "price_observation_id": "price-1",
-            "observation_date": "2026-10-04",
-            "cutoff_date": "2026-10-04",
-            "currency": "CNY",
-            "adjustment_semantics": "UNADJUSTED",
-        },
-        "assumption_set": [],
-        "evidence_sufficiency": {
-            "status": "SUFFICIENT",
-            "rationale": "Fixture MIE evidence is complete.",
-            "evidence_ids": ["ev-var", "ev-coverage"],
-        },
-        "evidence_ids": ["ev-var", "ev-coverage"],
-        "qualification": "DECISION_GRADE",
-        "qualification_rationale": "Fixture MIE is decision-grade.",
-    }
+def market_implied_expectation_snapshot() -> dict:
+    cutoff = date(2026, 10, 4)
+    created = datetime(2026, 10, 4, 17, 10, tzinfo=timezone.utc)
+    requirement = MIEEconomicRequirement(
+        economic_variable="forward_eps",
+        unit="CNY/share",
+        basis="2026A_to_2028E",
+        period="2028E",
+        horizon="24M",
+        accounting_basis="reported",
+        role="IMPLIED_PRIMARY",
+        value=Decimal("10"),
+        evidence_ids=("req-pe-1",),
+    )
+    coverage = CandidateCoverageAssessment(
+        status=CandidateCoverageState.SUFFICIENT,
+        scope_basis="fixture-candidate-set",
+        candidate_model_ids=("pe-1",),
+        evidence_ids=("cov-pe-1",),
+        rationale="The fixture has one admitted market-model candidate.",
+    )
+    sufficiency = EvidenceSufficiencyAssessment(
+        status=EvidenceSufficiencyState.SUFFICIENT,
+        rationale="Fixture MIE evidence is complete.",
+        evidence_ids=("suff-pe-1",),
+    )
+    mie = MarketImpliedExpectation(
+        expectation_id="mie-pe-1",
+        model_id="pe-1",
+        market_model=MarketModelFamily.FORWARD_PE,
+        identifiability=IdentifiabilityState.IDENTIFIABLE,
+        stability=StabilityState.STABLE,
+        candidate_coverage=coverage,
+        representation=MIERepresentation.IMPLIED_POINT,
+        economic_requirements=(requirement,),
+        observation_basis=MIEObservationBasis(
+            price_observation_id="price-1",
+            observation_date=cutoff,
+            cutoff_date=cutoff,
+            currency="CNY",
+            adjustment_semantics="UNADJUSTED",
+        ),
+        assumption_set=(),
+        evidence_sufficiency=sufficiency,
+        evidence_ids=("req-pe-1", "cov-pe-1", "suff-pe-1"),
+        qualification=MIEQualification.DECISION_GRADE,
+        qualification_rationale="Fixture MIE is decision-grade.",
+    )
+    model_evaluation = MIEModelEvaluation.from_expectation(mie)
+    mie_set = build_multi_model_market_implied_expectation_set(
+        set_id="set-v03-001",
+        candidate_coverage=coverage,
+        evidence_sufficiency=sufficiency,
+        model_evaluations=(model_evaluation,),
+        qualification_rationale="Fixture set resolves uniquely.",
+        evidence_ids=("req-pe-1", "cov-pe-1", "suff-pe-1"),
+    )
+    evidence_ids = sorted({
+        "req-pe-1", "cov-pe-1", "suff-pe-1",
+        "price-1",
+    })
+    provenance = []
+    for evidence_id in evidence_ids:
+        is_price = evidence_id == "price-1"
+        provenance.append(
+            P4FProvenanceRecord(
+                evidence_id=evidence_id,
+                variable="market_price" if is_price else "fixture_variable",
+                unit="CNY" if is_price else "CNY/share",
+                basis="fixture",
+                observation_date=cutoff,
+                known_at=datetime(2026, 10, 4, 16, 0, tzinfo=timezone.utc),
+                source="fixture-source",
+                source_location=f"fixture://{evidence_id}",
+                content_sha256="a" * 64,
+                captured_at=created,
+            )
+        )
+    return build_p4f_snapshot(
+        case_id="V03-001",
+        cutoff_date=cutoff,
+        created_at=created,
+        mie_set=mie_set,
+        provenance_records=provenance,
+    )
+
 
 def case() -> dict:
     return {
@@ -65,7 +126,7 @@ def case() -> dict:
         "as_of_date": "2026-10-04",
         "cutoff_date": "2026-10-04",
         "current_price_observation": {
-            "price": "100", "currency": "CNY",
+            "price": "100", "price_observation_id": "price-1", "currency": "CNY",
             "observed_at": "2026-10-04T15:00:00+08:00",
             "known_at": "2026-10-04T15:00:00+08:00",
             "source": "test", "adjustment_semantics": "UNADJUSTED",
@@ -90,15 +151,15 @@ def case() -> dict:
             },
         },
         "thesis": {"status": "INTACT"},
-        "market_implied_expectation": market_implied_expectation(),
+        "market_implied_expectation_snapshot": market_implied_expectation_snapshot(),
         "expectation_gap": {
             "gap_id": "gap-v01-001",
             "evaluator_version": CANONICAL_EXPECTATION_GAP_VERSION,
             "price": "100",
             "price_observation_id": "price-1",
             "cutoff_date": "2026-10-04",
+            "mie_snapshot_hash": market_implied_expectation_snapshot()["snapshot_hash"],
             "market_expectation_id": "mie-pe-1",
-            "market_expectation_hash": market_implied_expectation_content_hash(market_implied_expectation()),
             "comparison_direction": "HIGHER_IS_BETTER",
             "independent_expectation": {
                 "variable_id": "forward_eps",
@@ -153,15 +214,12 @@ def test_v03_forged_positive_gap_is_blocked():
     assert any("V03-EXPECTATION-GAP-CANONICAL" in x for x in result["validation"]["blockers"])
 
 
-def test_v03_incompatible_canonical_gap_is_blocked():
+def test_v03_snapshot_tampering_is_blocked():
     c = case()
-    c["market_implied_expectation"]["economic_requirements"][0]["unit"] = "CNY"
-    c["expectation_gap"]["market_expectation_hash"] = market_implied_expectation_content_hash(
-        c["market_implied_expectation"]
-    )
+    c["market_implied_expectation_snapshot"]["mie_set"]["model_evaluations"][0]["expectation"]["economic_requirements"][0]["value"] = "11"
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
-    assert any("V03-EXPECTATION-GAP-CANONICAL" in x for x in result["validation"]["blockers"])
+    assert any("invalid canonical P4-F MIE snapshot" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_expectation_gap_horizon_must_match_decision_horizon():
@@ -266,20 +324,20 @@ def test_v03_positive_gap_but_price_above_target_is_watch_price():
 
 
 
-def test_v03_missing_mie_with_gap_fails_closed():
+def test_v03_missing_mie_snapshot_with_gap_fails_closed():
     c = case()
-    del c["market_implied_expectation"]
+    del c["market_implied_expectation_snapshot"]
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
-    assert any("market_implied_expectation is required" in x for x in result["validation"]["blockers"])
+    assert any("market_implied_expectation_snapshot is required" in x for x in result["validation"]["blockers"])
 
 
-def test_v03_mie_hash_tampering_fails_closed():
+def test_v03_mie_snapshot_hash_binding_fails_closed():
     c = case()
-    c["market_implied_expectation"]["economic_requirements"][0]["value"] = "11"
+    c["expectation_gap"]["mie_snapshot_hash"] = "0" * 64
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
-    assert any("market_expectation_hash" in x for x in result["validation"]["blockers"])
+    assert any("mie_snapshot_hash" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_mie_id_tampering_fails_closed():
@@ -297,15 +355,12 @@ def test_v03_inline_market_expectation_is_rejected_by_canonical_boundary():
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("unsupported fields" in x for x in result["validation"]["blockers"])
 
-def test_v03_mie_observation_semantics_bind_to_current_price_evidence():
+def test_v03_price_observation_id_is_required():
     c = case()
-    c["market_implied_expectation"]["observation_basis"]["adjustment_semantics"] = "DIVIDEND_ADJUSTED"
-    c["expectation_gap"]["market_expectation_hash"] = market_implied_expectation_content_hash(
-        c["market_implied_expectation"]
-    )
+    del c["current_price_observation"]["price_observation_id"]
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
-    assert any("adjustment_semantics" in x for x in result["validation"]["blockers"])
+    assert any("V03-PRICE-OBSERVATION-ID" in x for x in result["validation"]["blockers"])
 
 def test_v03_expectation_gap_price_binding_requires_revalidation():
     c = case()
