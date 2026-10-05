@@ -142,7 +142,7 @@ def test_v03_return_math_separates_the_two_15_percent_policies():
     assert abs(metrics["margin_of_safety"] - (Decimal("15")/Decimal("115"))) < Decimal("0.000001")
 
 
-def test_v03_mie_is_optional_but_gap_is_canonical():
+def test_v03_mie_is_required_for_canonical_gap():
     c = case()
     assert validate_case_v03(c)["status"] == "PASS"
     assert not any(x.startswith("V03-MIE") for x in [e["code"] for e in validate_case_v03(c)["errors"]])
@@ -158,7 +158,10 @@ def test_v03_forged_positive_gap_is_blocked():
 
 def test_v03_incompatible_canonical_gap_is_blocked():
     c = case()
-    c["expectation_gap"]["market_expectation"]["unit"] = "CNY/share"
+    c["market_implied_expectation"]["economic_requirements"][0]["unit"] = "CNY"
+    c["expectation_gap"]["market_expectation_hash"] = market_implied_expectation_content_hash(
+        c["market_implied_expectation"]
+    )
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-EXPECTATION-GAP-CANONICAL" in x for x in result["validation"]["blockers"])
@@ -212,15 +215,15 @@ def test_v03_missing_expectation_gap_blocks_new_capital_decision():
 
 def test_v03_blocked_expectation_gap_requires_review_for_new_position():
     c = case()
+    c["market_implied_expectation"]["identifiability"] = "UNIDENTIFIABLE"
+    c["market_implied_expectation"]["qualification"] = "BLOCKED"
+    c["expectation_gap"]["market_expectation_hash"] = market_implied_expectation_content_hash(
+        c["market_implied_expectation"]
+    )
     c["expectation_gap"].update({
         "status": "BLOCKED",
         "gap_relative": None,
         "gap_absolute": None,
-        "market_expectation": {
-            **c["expectation_gap"]["market_expectation"],
-            "qualification": "BLOCKED",
-            "resolution_state": "INSUFFICIENT_EVIDENCE",
-        },
     })
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
@@ -246,11 +249,9 @@ def test_v03_missing_expectation_gap_does_not_block_thesis_broken_exit():
 
 def test_v03_negative_expectation_gap_is_no_buy():
     c = case()
-    c["expectation_gap"]["independent_expectation"]["value"] = "0.10"
-    c["expectation_gap"]["independent_expectation"]["basis"] = "2026A_to_2028E"
-    c["expectation_gap"]["market_expectation"]["basis"] = "2026A_to_2028E"
-    c["expectation_gap"]["gap_relative"] = "-0.3333333333333333333333333333"
-    c["expectation_gap"]["gap_absolute"] = "-0.05"
+    c["expectation_gap"]["independent_expectation"]["value"] = "8"
+    c["expectation_gap"]["gap_relative"] = "-0.2"
+    c["expectation_gap"]["gap_absolute"] = "-2"
     result = decide(c)
     assert result["decision"]["action"] == "NO-BUY"
     assert result["decision"]["primary_reason"] == "NO_POSITIVE_EXPECTATION_GAP"
@@ -277,6 +278,37 @@ def test_v03_positive_gap_but_price_above_target_is_watch_price():
     assert Decimal(result["decision"]["target_entry_price"]) < Decimal("101")
 
 
+
+def test_v03_missing_mie_with_gap_fails_closed():
+    c = case()
+    del c["market_implied_expectation"]
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("market_implied_expectation is required" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_mie_hash_tampering_fails_closed():
+    c = case()
+    c["market_implied_expectation"]["economic_requirements"][0]["value"] = "11"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("market_expectation_hash" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_mie_id_tampering_fails_closed():
+    c = case()
+    c["expectation_gap"]["market_expectation_id"] = "mie-forged"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("market_expectation_id" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_inline_market_expectation_is_rejected_by_canonical_boundary():
+    c = case()
+    c["expectation_gap"]["market_expectation"] = {"value": "999"}
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("unsupported fields" in x for x in result["validation"]["blockers"])
 
 def test_v03_expectation_gap_price_binding_requires_revalidation():
     c = case()
