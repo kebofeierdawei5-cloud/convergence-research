@@ -13,7 +13,7 @@ B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. T
 
 ## Current Active Stage — 2026-10-05
 
-B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = PASS / MERGED. CATL Existing Evidence Migration = PASS / TECHNICAL. CATL Primary-Source Gap Supplementation = PASS / PRIMARY CAPTURED. CORE-03 = PASS / MERGED. CORE-04-A = PASS / MERGED. CORE-04-B = PASS / MERGED / LIVE CAPTURE VERIFIED. CORE-04-C = ACTIVE / DATA ADMISSION PENDING.
+B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = PASS / MERGED. CATL Existing Evidence Migration = PASS / TECHNICAL. CATL Primary-Source Gap Supplementation = PASS / PRIMARY CAPTURED. CORE-03 = PASS / MERGED. CORE-04-A = PASS / MERGED. CORE-04-B = PASS / MERGED / LIVE CAPTURE VERIFIED. CORE-04-C = PASS / MERGED / HISTORICAL EV-EBITDA ADMISSION VERIFIED.
 
 - B2-A merge commit: c8246ceaaad5e9b1cc02fe422723c39a441ea4f3.
 - B2 raw-artifact containment hardening merge commit: 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3.
@@ -58,6 +58,13 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Market observation bound to latest pre-cutoff trading day: 2026-09-30 close **291.11 CNY**
 - Quality remains CONDITIONAL because incremental ROIC and full earnings/cash-flow conversion bridges are not yet fully constructed.
 - No fabricated company name, forecast, valuation or decision was introduced.
+
+## CORE-04-C Real 300750 Historical EV/EBITDA
+
+- Three historical observations admitted through CORE-04-A: 2025-10-22 = 16.3854513730104779459499377618525879665943916394869455326834x; 2026-04-17 = 15.1302979548591306456425069051738011634952852968035319146755x; 2026-07-27 = 13.6686920853194080865159796474107277185842350664948830139214x.
+- Evidence record: `docs/iios/CORE_04C_CATL_EV_EBITDA_EVIDENCE_2026-10-05.md`.
+- Method: historical close × reported total share capital + (interest-bearing debt − cash), divided by latest known completed fiscal-year EBITDA.
+- Forward PE remains separately blocked; no current consensus data has been back-filled into historical PIT observations.
 
 ## Historical Reference — CORE-03 Real 300750
 
