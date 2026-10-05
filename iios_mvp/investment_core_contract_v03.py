@@ -5,6 +5,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from .horizon_semantics import validate_horizon_selection
+from .semantic_expectation_gap import ComparisonDirection, evaluate_expectation_gap
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
 BUY_ENTRY_RETURN_CUSHION_THRESHOLD = Decimal("0.15")
@@ -337,35 +338,17 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
         pass
 
     expectation_gap = case.get("expectation_gap")
-    if not isinstance(expectation_gap, dict):
-        errors.append(
-            _err(
-                "V03-EXPECTATION-GAP-REQUIRED",
-                "expectation_gap",
-                "positive expectation gap result is required for the standard BUY/ADD strategy",
-            )
-        )
-    else:
-        gap_status = str(expectation_gap.get("status", "UNKNOWN")).upper()
-        if gap_status not in EXPECTATION_GAP_STATES:
+    if expectation_gap is not None:
+        try:
+            _canonical_expectation_gap(expectation_gap)
+        except ValueError as exc:
             errors.append(
                 _err(
-                    "V03-EXPECTATION-GAP-STATUS",
-                    "expectation_gap.status",
-                    f"invalid expectation gap status: {gap_status}",
+                    "V03-EXPECTATION-GAP-CANONICAL",
+                    "expectation_gap",
+                    str(exc),
                 )
             )
-        if gap_status == "PASS":
-            try:
-                _dec(expectation_gap["gap_relative"], "expectation_gap.gap_relative")
-            except (KeyError, ValueError) as exc:
-                errors.append(
-                    _err(
-                        "V03-EXPECTATION-GAP-VALUE",
-                        "expectation_gap.gap_relative",
-                        str(exc),
-                    )
-                )
 
     mie = case.get("market_implied_expectation")
     if mie is not None and not isinstance(mie, dict):
@@ -383,18 +366,60 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
                 errors.append(_err("V03-DECISION-STATUS", "decision.decision_status", f"invalid status: {status}"))
     return {"status": "PASS" if not errors else "BLOCKED", "errors": errors}
 
+def _canonical_expectation_gap(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ValueError("expectation_gap must be an object when supplied")
+    independent = payload.get("independent_expectation")
+    market = payload.get("market_expectation")
+    direction = str(payload.get("comparison_direction", "")).strip()
+    if not isinstance(independent, dict):
+        raise ValueError("expectation_gap.independent_expectation is required")
+    if not isinstance(market, dict):
+        raise ValueError("expectation_gap.market_expectation is required")
+    if not direction:
+        raise ValueError("expectation_gap.comparison_direction is required")
+    try:
+        evaluated = evaluate_expectation_gap(
+            independent_expectation=independent,
+            market_expectation=market,
+            comparison_direction=ComparisonDirection(direction).value,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError(str(exc)) from exc
+
+    declared_status = str(payload.get("status", "")).upper()
+    if declared_status != evaluated["status"]:
+        raise ValueError(
+            f"expectation_gap.status does not match canonical evaluation: "
+            f"declared {declared_status!r}, evaluated {evaluated['status']!r}"
+        )
+
+    for key in ("gap_absolute", "gap_relative"):
+        declared = payload.get(key)
+        evaluated_value = evaluated.get(key)
+        if evaluated_value is None:
+            if declared is not None:
+                raise ValueError(
+                    f"expectation_gap.{key} must be null when canonical evaluation is unresolved"
+                )
+            continue
+        if declared is None:
+            raise ValueError(f"expectation_gap.{key} is required for a resolved canonical gap")
+        if _dec(declared, f"expectation_gap.{key}") != evaluated_value:
+            raise ValueError(
+                f"expectation_gap.{key} does not match canonical evaluation"
+            )
+    return evaluated
+
+
 def _expectation_gap(case: dict[str, Any]) -> tuple[str, Decimal | None]:
     payload = case.get("expectation_gap")
-    if not isinstance(payload, dict):
+    if payload is None:
         return "UNKNOWN", None
-    status = str(payload.get("status", "UNKNOWN")).upper()
-    if status != "PASS":
-        return status, None
-    try:
-        gap = _dec(payload["gap_relative"], "expectation_gap.gap_relative")
-    except (KeyError, ValueError):
-        return "UNKNOWN", None
-    return status, gap
+    evaluated = _canonical_expectation_gap(payload)
+    status = str(evaluated["status"]).upper()
+    gap = evaluated.get("gap_relative")
+    return status, gap if isinstance(gap, Decimal) else None
 
 
 def _investability(
