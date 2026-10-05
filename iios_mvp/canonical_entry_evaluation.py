@@ -276,11 +276,12 @@ def build_canonical_entry_evaluation(
     qualification = (
         str(response.get("qualification", "DECISION_GRADE")).upper()
         if response_source == "P2.1_CANONICAL"
-        else "DECISION_GRADE"
+        else "COMPATIBILITY_ONLY"
     )
     if qualification not in {
         "DECISION_GRADE",
         "CONDITIONAL_ONLY",
+        "COMPATIBILITY_ONLY",
     }:
         raise ValueError(
             "canonical price response qualification must be "
@@ -315,6 +316,8 @@ def build_canonical_entry_evaluation(
             "PASS"
             if qualification == "DECISION_GRADE"
             else "CONDITIONAL_ONLY"
+            if qualification == "CONDITIONAL_ONLY"
+            else "COMPATIBILITY_ONLY"
         )
         return {
             **common,
@@ -350,6 +353,9 @@ def build_canonical_entry_evaluation(
                 if qualification == "DECISION_GRADE"
                 else "conditional-only price boundary is advisory "
                 "and cannot admit capital"
+                if qualification == "CONDITIONAL_ONLY"
+                else "legacy P2 compatibility boundary is retained for "
+                "backward compatibility and cannot confer canonical admission"
             ),
         }
 
@@ -480,6 +486,20 @@ def admit_decision(
         entry_evaluation.get("status", "UNKNOWN")
     ).upper()
 
+    if qualification == "COMPATIBILITY_ONLY":
+        return {
+            "admission_version": DECISION_ADMISSION_VERSION,
+            "status": "COMPATIBILITY_ONLY",
+            "rule_id": "DA15_LEGACY_COMPAT_NOT_CANONICAL",
+            "pre_admission_action": action,
+            "action": action,
+            "decision_status": base_status,
+            "primary_reason": base_reason,
+            "capital_effect": base_capital_effect,
+            "new_capital_allowed": action in _FINAL_INCREASE_ACTIONS,
+            "evaluation_id": entry_evaluation.get("evaluation_id"),
+        }
+
     if qualification == "CONDITIONAL_ONLY":
         return {
             "admission_version": DECISION_ADMISSION_VERSION,
@@ -494,7 +514,10 @@ def admit_decision(
             "evaluation_id": entry_evaluation.get("evaluation_id"),
         }
 
-    if evaluation_status in _ADMISSION_REVIEW_STATES or qualification != "DECISION_GRADE":
+    if (
+        qualification != "DECISION_GRADE"
+        or evaluation_status != "PASS"
+    ):
         return {
             "admission_version": DECISION_ADMISSION_VERSION,
             "status": "REVIEW_REQUIRED",
