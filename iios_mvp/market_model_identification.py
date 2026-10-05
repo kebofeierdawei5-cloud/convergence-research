@@ -11,6 +11,8 @@ from .market_model_domain import (
     FeasibleSolutionSet,
     FeasibleSolutionStatus,
     FitDiagnostic,
+    HistoricalSupportState,
+    RegimeInterpretationState,
     IdentifiabilityResult,
     IdentifiabilityState,
     MarketModelFamily,
