@@ -217,6 +217,10 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
                 "auto_execution": proposal["auto_execution"],
                 "current_price": proposal.get("current_price"),
                 "target_entry_price": proposal.get("target_entry_price"),
+                "target_entry_price_semantics": proposal.get("target_entry_price_semantics"),
+                "target_entry_price_requires_gap_revalidation": proposal.get(
+                    "target_entry_price_requires_gap_revalidation"
+                ),
             },
             "monitoring": case.get("monitoring") or [],
         }
