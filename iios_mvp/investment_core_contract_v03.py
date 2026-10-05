@@ -415,6 +415,13 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
     except (KeyError, ValueError):
         pass
 
+    if "target_entry_price_reference" in case and "expectation_gap" in case:
+        errors.append(_err(
+            "V03-TARGET-ENTRY-REF-CONFLICT",
+            "target_entry_price_reference",
+            "target_entry_price_reference and expectation_gap cannot coexist; "
+            "the target-entry MIE/forecast binding must use one canonical path",
+        ))
     target_entry_reference = case.get("target_entry_price_reference")
     if target_entry_reference is not None:
         if not isinstance(target_entry_reference, dict):
