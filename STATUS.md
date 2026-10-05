@@ -16,11 +16,13 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 **A1-02 Capital Allocation + Trust/Governance Evidence Closure = PASS / MERGED**
 
-CORE-04 vertical decision closure is complete. A1 company-side evidence closure is now in progress.
+CORE-04 vertical decision closure is complete.
 
-Current next substantive batch:
+**A1 Company-side Evidence Closure = PASS / MERGED**
 
-**A1-03 Quality Gate Integration**
+A1 is complete as the company-side evidence-closure engineering milestone. Current 300750 Quality remains CONDITIONAL and new capital remains FALSE.
+
+Current next work must be independently scoped from the canonical main.
 
 No new P3/P4/MIE model work is on the critical path.
 
@@ -62,13 +64,14 @@ CSI800 / CSI Industry / historical-universe reconstruction and FM forecast resea
 
 ## A1 status
 
-A1-01 has established the deterministic CAPEX → D&A → FCF, Earnings → OCF → FCF, Working Capital and Incremental ROIC proxy layer for the real 300750 case. The bridge is CONDITIONAL and has no direct Decision Kernel gate effect.
+A1 is PASS / MERGED as an engineering/evidence-closure milestone.
 
-A1-01 established the deterministic economic bridge; A1-02 established the capital-allocation and Trust/Governance evidence bridge. Both are upstream evidence layers with no direct Decision Kernel gate effect.
+A1-01 established the deterministic economic bridge; A1-02 established the capital-allocation and Trust/Governance evidence bridge; A1-03 integrated them into existing Quality and Trust semantics. These layers do not directly authorize capital.
 
-A1 remains incomplete until the closed company-side evidence is integrated into existing Quality semantics and tested end-to-end.
+For 300750, Quality Gate remains CONDITIONAL, Trust remains CONDITIONAL, and new capital remains FALSE.
 
-Acceptance records:
+Acceptance:
+- `docs/iios/A1_ACCEPTANCE_2026-10-05.md`
 - `docs/iios/A1_01_ACCEPTANCE_2026-10-05.md`
 - `docs/iios/A1_02_ACCEPTANCE_2026-10-05.md`
 
