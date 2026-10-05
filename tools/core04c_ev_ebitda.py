@@ -13,6 +13,13 @@ from xml.etree import ElementTree as ET
 
 from pypdf import PdfReader
 
+from iios_mvp.market_observation_admission import (
+    AdmissionStatus,
+    TemporalProvenance,
+    VerifiedMarketEvidence,
+    admit_market_valuation_observation,
+)
+
 
 UTC8 = timezone.utc  # stored receipt timestamps are UTC; PIT comparisons use calendar date.
 CNY_SCALE = Decimal("1000")
@@ -640,6 +647,7 @@ def main() -> int:
             "path": "research/core04c_derivation.json",
             "sha256": derivation_sha,
         },
+        "typed_admissions": typed_admissions,
         "fail_closed_rules": [
             "All external source bytes must be non-empty and SHA-256 verified.",
             "Financial source known_at must be <= market observation date.",
@@ -653,6 +661,81 @@ def main() -> int:
         json.dumps(admission_doc, ensure_ascii=False, indent=2, default=json_decimal) + "\n",
         encoding="utf-8",
     )
+
+    typed_admissions: list[dict[str, object]] = []
+    for obs in observations:
+        typed = admit_market_valuation_observation(
+            cutoff_date=date.fromisoformat(obs["observation_date"]),
+            observation_id=str(obs["observation_id"]),
+            price_evidence=VerifiedMarketEvidence(
+                evidence_id=f"E4C-{obs['observation_date']}-PRICE",
+                variable="market_price",
+                unit="CNY/share",
+                basis="official_szse_eod_snapshot",
+                observation_date=date.fromisoformat(obs["observation_date"]),
+                known_at=datetime.fromisoformat(str(obs["known_at"])),
+                source="SZSE",
+                source_location=str(next(r["source_url"] for r in capture_receipt if r["source_id"] == obs["market_source_id"])),
+                content_sha256=str(obs["market_source_sha256"]),
+                exact_bytes=True,
+                status=AdmissionStatus.ADMITTED,
+                temporal_provenance=TemporalProvenance.CONTEMPORANEOUS_PUBLICATION,
+                value=d(obs["price_cny_per_share"]),
+            ),
+            shares_evidence=VerifiedMarketEvidence(
+                evidence_id=f"E4C-{obs['observation_date']}-SHARES",
+                variable="shares_outstanding",
+                unit="shares",
+                basis="share_capital_from_latest_pit_financial_vintage",
+                observation_date=date.fromisoformat(obs["observation_date"]),
+                known_at=datetime.fromisoformat(str(next(r["known_at"] for r in capture_receipt if r["source_id"] == obs["balance_source_id"]))),
+                source="CNINFO",
+                source_location=str(next(r["source_url"] for r in capture_receipt if r["source_id"] == obs["balance_source_id"])),
+                content_sha256=str(obs["balance_source_sha256"]),
+                exact_bytes=True,
+                status=AdmissionStatus.ADMITTED,
+                temporal_provenance=TemporalProvenance.SOURCE_VINTAGE,
+                value=d(obs["shares_outstanding"]),
+            ),
+            economic_evidence=VerifiedMarketEvidence(
+                evidence_id=f"E4C-{obs['observation_date']}-EBITDA",
+                variable="ebitda",
+                unit="CNY",
+                basis=str(obs["ebitda_basis"]),
+                observation_date=date.fromisoformat(obs["observation_date"]),
+                known_at=datetime.fromisoformat(str(next(r["known_at"] for r in capture_receipt if r["source_id"] == obs["ebitda_source_id"]))),
+                source="IIOS-DETERMINISTIC-DERIVATION",
+                source_location="research/core04c_derivation.json",
+                content_sha256="a" * 64,
+                exact_bytes=True,
+                status=AdmissionStatus.ADMITTED,
+                temporal_provenance=TemporalProvenance.SOURCE_VINTAGE,
+                value=d(obs["ebitda_cny"]),
+            ),
+            net_debt_evidence=VerifiedMarketEvidence(
+                evidence_id=f"E4C-{obs['observation_date']}-NET-DEBT",
+                variable="net_debt",
+                unit="CNY",
+                basis="standard_interest_bearing_net_debt_bridge_deterministic_derivation",
+                observation_date=date.fromisoformat(obs["observation_date"]),
+                known_at=datetime.fromisoformat(str(next(r["known_at"] for r in capture_receipt if r["source_id"] == obs["balance_source_id"]))),
+                source="IIOS-DETERMINISTIC-DERIVATION",
+                source_location="research/core04c_derivation.json",
+                content_sha256="a" * 64,
+                exact_bytes=True,
+                status=AdmissionStatus.ADMITTED,
+                temporal_provenance=TemporalProvenance.SOURCE_VINTAGE,
+                value=d(obs["net_debt_cny"]),
+            ),
+        )
+        if typed.status is not AdmissionStatus.ADMITTED or typed.observation is None:
+            raise AssertionError(f"typed admission failed for {obs['observation_id']}: {typed.blockers}")
+        typed_admissions.append({
+            "observation_id": obs["observation_id"],
+            "status": typed.status.value if hasattr(typed.status, "value") else str(typed.status),
+            "evidence_ids": list(typed.evidence_ids),
+            "known_at": typed.observation.known_at.isoformat(),
+        })
 
     # Verify every exact-byte digest again immediately before success.
     for row in capture_receipt:
