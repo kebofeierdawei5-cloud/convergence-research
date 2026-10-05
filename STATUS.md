@@ -3,8 +3,8 @@
 This file retains historical acceptance records below. For the active repair program, read `docs/iios/B0_AUTHORITY_AUDIT_FREEZE_2026-10-04.md` first.
 
 Active repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
-Active repair stage: **B0 PASS → B1 PASS → CORE-00 PASS → CORE-01 PASS → CORE-02 PASS → CORE-03 Vertical Slice PASS / P4-F Closure BLOCKED**
-P4-F is merged historical/conditional infrastructure; P5/P6 feature expansion remains paused.
+Active repair stage: **B0 PASS → B1 PASS → CORE-00 PASS → CORE-01 PASS → CORE-02 PASS → CORE-03 PASS → CORE-04 ACTIVE**
+P4-F infrastructure is merged and semantically bounded; the current critical path is CORE-04 production decision closure, not further P4 expansion.
 B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. The owner-approved distinction between (a) 15% BUY-entry threshold / safety-margin policy and (b) 1–3Y annualized target >=15% is now normative in v0.3.
 
 ---
