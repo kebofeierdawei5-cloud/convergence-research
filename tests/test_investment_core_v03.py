@@ -267,7 +267,7 @@ def test_v03_return_math_separates_the_two_15_percent_policies():
 
 def test_v03_canonical_gap_requires_runtime_evidence_root_resolver():
     c = case()
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("canonical evidence root resolver is required" in x for x in result["validation"]["blockers"])
 
