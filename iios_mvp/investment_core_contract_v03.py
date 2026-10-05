@@ -788,13 +788,8 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
                 revalidation=p2_1_price_response,
             )
             p2_revalidation = p2_1_price_response
-        except (KeyError, TypeError, ValueError) as exc:
-            p2_1_price_response = {
-                "status": "REVIEW_REQUIRED",
-                "response_version": PRICE_RESPONSE_VERSION,
-                "reason": str(exc),
-                "candidate_price": str(metrics["target_entry_price"]),
-            }
+        except (KeyError, TypeError, ValueError):
+            p2_1_price_response = None
             p2_target = {
                 "status": "REVIEW_REQUIRED",
                 "target_entry_price": None,
@@ -826,6 +821,11 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
                 independent_forecast_ref=case["expectation_gap"]["independent_forecast_ref"],
                 independent_forecast_resolver=independent_forecast_resolver,
             )
+            if p2_target is None or p2_target.get("status") != "PASS":
+                p2_target = combine_target_entry_price_v2(
+                    return_target_entry_price=metrics["target_entry_price"],
+                    revalidation=p2_revalidation,
+                )
         except (KeyError, TypeError, ValueError) as exc:
             p2_revalidation = {
                 "status": "REVIEW_REQUIRED",
