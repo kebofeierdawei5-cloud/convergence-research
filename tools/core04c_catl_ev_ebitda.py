@@ -266,7 +266,7 @@ def parse_annual_ebitda(
     income = _statement_section(full_text, "3、合并利润表", "5、合并现金流量表")
     cashflow = _statement_section(full_text, "5、合并现金流量表", "7、合并所有者权益变动表")
     profit_total = _row_first_number(income, labels=("四、利润总额",))
-    interest_expense = _row_first_number(income, labels=("其中：利息费用",))
+    interest_expense = _row_first_number(income, labels=("利息费用",))
     fixed_dep = _row_first_number(
         cashflow, labels=("固定资产折旧", "固定资产折旧、油气资产折耗、生产性生物资产折旧")
     )
