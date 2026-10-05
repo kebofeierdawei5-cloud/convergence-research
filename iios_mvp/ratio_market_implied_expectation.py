@@ -37,7 +37,7 @@ def _ratio_evaluations(
 ) -> tuple[CandidateEvaluation, ...]:
     if identification.get("status") != "PASS":
         raise ValueError("P4-B requires a PASS P3 identification result")
-    if identification.get("method") != "model_specific_inverse_v0.2":
+    if identification.get("method") != "model_specific_inverse_v0.3":
         raise ValueError("P4-B requires the accepted P3 model-specific inverse method")
 
     evaluations = identification.get("evaluations")
