@@ -989,17 +989,16 @@ def _fit_candidate(
     ))
 
     if not current_consistent:
-        fit = ModelFit(
-            model_id=candidate.model_id,
-            status=ModelFitStatus.OUTSIDE_HISTORICAL_SUPPORT,
-            diagnostics=tuple(diagnostics),
+        diagnostics[-1] = FitDiagnostic(
+            diagnostic_id=f"{candidate.model_id}:current_historical_support",
+            name="current_historical_support",
+            status="OUTSIDE_HISTORICAL_SUPPORT",
             evidence_ids=all_ids,
-            constraints=("CURRENT_MULTIPLE_WITHIN_HISTORICAL_RANGE",),
-            historical_support=support_state,
-            regime_interpretation=RegimeInterpretationState.POSSIBLE_REGIME_SHIFT,
+            notes=(
+                f"current_multiple={current_multiple}; historical_range="
+                f"[{historical_low},{historical_high}]; support_state={support_state.value}"
+            ),
         )
-        fit.validate()
-        return CandidateEvaluation(fit, None)
 
     price = current.price
     if candidate.family == MarketModelFamily.FORWARD_PE:
