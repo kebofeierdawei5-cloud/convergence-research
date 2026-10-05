@@ -76,7 +76,9 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Current merge candidate branch: `feature/core04-production-decision-kernel-20261005`.
 - PR #70 is **MERGED** into canonical `main` as `91f18cc1c8b4bdc6f80053462ec5e9ce7b89d0cb`.
 - Production decision kernel v0.2 and upstream Quality/Thesis admission are now canonical.
-- Final 300750 Decision E2E PR #73 is the current merge candidate; its full chain is validated by Investment Core CI #468 and CORE-00 #205.
+- Final 300750 Decision E2E PR #73 is **MERGED** into canonical `main` as `2ebdb04b4a5f30056a6df500830eb443af09a7ec`.
+- Final vertical chain is validated by Investment Core CI #470 and CORE-00 #207; full pytest = **380 passed**.
+- Real 300750 final state: **REVIEW_REQUIRED / NO NEW CAPITAL**; default horizon remains 1Y and the case uses an explicit 3Y override.
 
 ## CORE-04-C Real 300750 Historical EV/EBITDA
 
