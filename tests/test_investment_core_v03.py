@@ -99,9 +99,6 @@ def case() -> dict:
             "cutoff_date": "2026-10-04",
             "market_expectation_id": "mie-pe-1",
             "market_expectation_hash": market_implied_expectation_content_hash(market_implied_expectation()),
-            "status": "PASS",
-            "gap_relative": "0.2",
-            "gap_absolute": "2",
             "comparison_direction": "HIGHER_IS_BETTER",
             "independent_expectation": {
                 "variable_id": "forward_eps",
@@ -220,11 +217,6 @@ def test_v03_blocked_expectation_gap_requires_review_for_new_position():
     c["expectation_gap"]["market_expectation_hash"] = market_implied_expectation_content_hash(
         c["market_implied_expectation"]
     )
-    c["expectation_gap"].update({
-        "status": "BLOCKED",
-        "gap_relative": None,
-        "gap_absolute": None,
-    })
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
 
@@ -250,8 +242,6 @@ def test_v03_missing_expectation_gap_does_not_block_thesis_broken_exit():
 def test_v03_negative_expectation_gap_is_no_buy():
     c = case()
     c["expectation_gap"]["independent_expectation"]["value"] = "8"
-    c["expectation_gap"]["gap_relative"] = "-0.2"
-    c["expectation_gap"]["gap_absolute"] = "-2"
     result = decide(c)
     assert result["decision"]["action"] == "NO-BUY"
     assert result["decision"]["primary_reason"] == "NO_POSITIVE_EXPECTATION_GAP"
