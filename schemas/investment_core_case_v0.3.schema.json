@@ -21,7 +21,8 @@
     "risk",
     "portfolio",
     "thesis",
-    "return_gate"
+    "return_gate",
+    "expectation_gap"
   ],
   "properties": {
     "contract_version": {
@@ -155,7 +156,9 @@
           "type": [
             "string",
             "number"
-          ]
+          ],
+          "minimum": 0,
+          "exclusiveMaximum": 100
         }
       }
     },
@@ -307,7 +310,29 @@
       "type": "object"
     },
     "expectation_gap": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "status",
+        "gap_relative"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PASS",
+            "BLOCKED",
+            "INCOMPATIBLE",
+            "AMBIGUOUS",
+            "UNKNOWN"
+          ]
+        },
+        "gap_relative": {
+          "type": [
+            "string",
+            "number"
+          ]
+        }
+      }
     },
     "decision": {
       "type": "object",
@@ -358,6 +383,20 @@
         },
         "auto_execution": {
           "const": false
+        },
+        "current_price": {
+          "type": [
+            "string",
+            "number",
+            "null"
+          ]
+        },
+        "target_entry_price": {
+          "type": [
+            "string",
+            "number",
+            "null"
+          ]
         },
         "position_package_complete": {
           "type": "boolean"
