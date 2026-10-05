@@ -77,6 +77,7 @@ def _forecast(registry, family, variable, value, basis, unit="CNY"):
             "case_id": "case-p21",
             "market": "CN",
             "symbol": "300750",
+            "cutoff_date": CUT.isoformat(),
             "forecast_id": f"forecast-{family}",
             "forecast_version": "v1",
             "model_version": "fixture-model",
