@@ -204,3 +204,39 @@ def test_repeated_evaluation_is_byte_level_equivalent():
     second = evaluate_decision_state(inputs)
     assert first == second
     assert first["precedence_version"] == DECISION_PRECEDENCE_VERSION
+
+
+
+def test_optional_mie_policy_does_not_block_new_capital_on_unknown_gap():
+    result = evaluate_decision_state(
+        base(
+            gap_status="UNKNOWN",
+            gap_positive=False,
+            mie_policy="OPTIONAL_EXPLANATORY",
+        )
+    )
+    assert result["action"] == "BUY"
+
+
+def test_optional_mie_policy_does_not_block_new_capital_on_nonpositive_advisory_gap():
+    result = evaluate_decision_state(
+        base(
+            gap_status="PASS",
+            gap_positive=False,
+            mie_policy="OPTIONAL_EXPLANATORY",
+        )
+    )
+    assert result["action"] == "BUY"
+
+
+def test_explicit_material_mie_contradiction_can_block_optional_policy():
+    result = evaluate_decision_state(
+        base(
+            gap_status="PASS",
+            gap_positive=False,
+            mie_policy="OPTIONAL_EXPLANATORY",
+            mie_material_contradiction=True,
+        )
+    )
+    assert result["action"] == "NO-BUY"
+    assert result["precedence_rule_id"] == "G10_GAP_NONPOSITIVE_NEW"
