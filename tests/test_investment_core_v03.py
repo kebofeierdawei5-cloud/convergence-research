@@ -31,6 +31,7 @@ from iios_mvp.multi_model_market_implied_expectation_set import (
 )
 from iios_mvp.p4f_mie_snapshot import P4FProvenanceRecord, build_p4f_snapshot
 from iios_mvp.investment_core_contract_v03 import calculate_return_metrics, validate_case_v03
+from iios_mvp.decision_upstream_admission_v03 import build_decision_upstream_admission
 
 
 EVIDENCE_ROOT_REGISTRY = InMemoryEvidenceRootRegistry()
@@ -224,6 +225,35 @@ def case(price="100", price_observation_id="price-1") -> dict:
             },
         },
         "thesis": {"status": "INTACT"},
+        "decision_upstream_admission": build_decision_upstream_admission(
+            case_id="V03-001",
+            cutoff_date="2026-10-04",
+            reality_status="PASS",
+            quality={
+                "dimensions": [
+                    {"dimension": "competitive_advantage", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
+                    {"dimension": "incremental_return_on_capital", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
+                    {"dimension": "earnings_quality", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
+                    {"dimension": "cash_flow_conversion", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
+                    {"dimension": "balance_sheet_resilience", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
+                    {"dimension": "reinvestment_runway", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
+                ]
+            },
+            value_driver_status="PASS",
+            valuation_status="PASS",
+            forecast_status="PASS",
+            thesis={
+                "status": "INTACT",
+                "statement": "fixture thesis",
+                "mechanism": "fixture mechanism",
+                "key_driver_ids": ["D1"],
+                "falsifiers": ["fixture falsifier"],
+                "monitoring_triggers": ["fixture trigger"],
+                "evidence_ids": ["req-pe-1"],
+                "known_at": "2026-10-04T12:00:00+00:00",
+                "prepared_without_current_price": True,
+            },
+        ),
         "market_implied_expectation_snapshot_ref": EVIDENCE_ROOT_REGISTRY.admit_p4f_snapshot(market_implied_expectation_snapshot(price_observation_id)).to_dict(),
         "expectation_gap": {
             "gap_id": "gap-v01-001",
