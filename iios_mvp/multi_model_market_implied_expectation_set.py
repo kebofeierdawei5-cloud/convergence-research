@@ -186,7 +186,7 @@ def _mie_to_dict(value: MarketImpliedExpectation) -> dict[str, Any]:
     }
 
 def _requirement_to_dict(value) -> dict[str, Any]:
-    payload = {"economic_variable": value.economic_variable, "unit": value.unit, "basis": value.basis, "period": value.period, "horizon": value.horizon, "accounting_basis": value.accounting_basis, "role": value.role, "evidence_ids": list(value.evidence_ids)}
+    payload = {"economic_variable": value.economic_variable, "unit": value.unit, "basis": value.basis, "period": value.period, "horizon": value.horizon, "accounting_basis": value.accounting_basis, "role": value.role, "comparison_direction": value.comparison_direction, "evidence_ids": list(value.evidence_ids)}
     if value.value is not None: payload["value"] = str(value.value)
     else: payload["range_low"] = str(value.range_low); payload["range_high"] = str(value.range_high)
     return payload
