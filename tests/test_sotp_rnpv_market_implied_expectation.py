@@ -337,7 +337,7 @@ def test_ambiguous_typed_p3_emits_one_conditional_slice_per_feasible_candidate()
     )
     identification = {
         "status": "PASS",
-        "method": "model_specific_inverse_v0.2",
+        "method": "model_specific_inverse_v0.3",
         "evaluations": evaluations,
         "identifiability": IdentifiabilityResult(
             state=IdentifiabilityState.AMBIGUOUS,
