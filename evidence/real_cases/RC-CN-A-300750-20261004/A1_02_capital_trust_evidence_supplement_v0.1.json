@@ -29,7 +29,7 @@
       "retrieved_at": "2026-10-05T00:00:00+08:00",
       "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-25/1225441586.PDF",
       "artifact_id": "catl-20261004-E015-A1-2026-h1-capital-allocation.txt",
-      "content_sha256": "f753907487f24ce1591e4322afd55953b77ed8f63dcb92ff25ab5c6527d4e596",
+      "content_sha256": "89378fdccf682b7609f8720791f5ce9c73e3adc883ce42e11928a92eb8825658",
       "exact_bytes": true,
       "provenance_class": "SOURCE_VINTAGE_VERIFIED",
       "status": "ADMITTED"
@@ -73,8 +73,8 @@
     {
       "evidence_id": "E015_A1",
       "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E015_A1_2026_h1_capital_allocation.txt",
-      "expected_size_bytes": 626,
-      "expected_sha256": "f753907487f24ce1591e4322afd55953b77ed8f63dcb92ff25ab5c6527d4e596"
+      "expected_size_bytes": 644,
+      "expected_sha256": "89378fdccf682b7609f8720791f5ce9c73e3adc883ce42e11928a92eb8825658"
     },
     {
       "evidence_id": "E016_A1",
@@ -90,6 +90,6 @@
     }
   ],
   "audit": {
-    "manifest_sha256": "be44e156496da3f1e123ed4f7c273ade4e4b40d2d2fde30a3aa31ad7fbc15cbe"
+    "manifest_sha256": "a9204500f83eee07aa418933719242a3952dabd85e4b884c87a0fa1c4c7d13c4"
   }
 }
