@@ -214,7 +214,6 @@ def build_canonical_entry_evaluation(
             else market_expectation_id
         ),
     }
-    }
 
     if not isinstance(price_response, Mapping):
         return {
