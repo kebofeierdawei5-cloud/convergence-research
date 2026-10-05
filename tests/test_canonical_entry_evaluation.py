@@ -91,7 +91,24 @@ def test_entry_evaluation_strict_upper_boundary_is_not_admissible():
     assert admission["rule_id"] == "DA40_NEW_CAPITAL_PRICE_INELIGIBLE"
 
 
-def test_decision_admission_downgrades_buy_when_current_price_exceeds_canonical_target():
+def test_decision_admission_can_downgrade_when_canonical_entry_boundary_rejects_price():
+    admission = admit_decision(
+        pre_admission_action="BUY", pre_admission_status="READY",
+        pre_admission_reason="BUY", pre_admission_capital_effect="INCREASE",
+        position_pct="0",
+        entry_evaluation={
+            "evaluation_id": "fixture",
+            "status": "PASS",
+            "qualification": "DECISION_GRADE",
+            "current_price_eligible": False,
+        },
+    )
+    assert admission["status"] == "BLOCKED"
+    assert admission["action"] == "WATCH"
+    assert admission["rule_id"] == "DA40_NEW_CAPITAL_PRICE_INELIGIBLE"
+
+
+def test_investment_core_formally_admits_buy_through_canonical_entry_evaluation():
     c = _decision_case(price="125")
     result = decide(
         c,
@@ -99,14 +116,14 @@ def test_decision_admission_downgrades_buy_when_current_price_exceeds_canonical_
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
     )
-    assert result["decision"]["action"] == "WATCH"
+    assert result["decision"]["action"] == "BUY"
     assert result["decision"]["decision_admission_version"] == DECISION_ADMISSION_VERSION
-    assert result["decision"]["decision_admission_rule_id"] == "DA40_NEW_CAPITAL_PRICE_INELIGIBLE"
+    assert result["decision"]["decision_admission_rule_id"] == "DA50_CANONICAL_ENTRY_ADMITTED"
     assert result["decision"]["decision_pre_admission_action"] == "BUY"
     assert result["decision"]["decision_status"] == "READY"
-    assert result["decision"]["capital_effect"] == "UNCHANGED"
-    assert result["decision"]["canonical_entry_evaluation"]["current_price_eligible"] is False
-    assert Decimal(result["decision"]["target_entry_price"]) == Decimal("120")
+    assert result["decision"]["capital_effect"] == "INCREASE"
+    assert result["decision"]["canonical_entry_evaluation"]["qualification"] == "DECISION_GRADE"
+    assert result["decision"]["canonical_entry_evaluation"]["current_price_eligible"] is True
 
 
 def test_decision_admission_downgrades_add_to_hold_for_existing_position():
@@ -120,6 +137,24 @@ def test_decision_admission_downgrades_add_to_hold_for_existing_position():
     assert result["decision"]["action"] == "HOLD"
     assert result["decision"]["decision_admission_rule_id"] == "DA41_EXISTING_POSITION_PRICE_INELIGIBLE"
     assert result["decision"]["decision_pre_admission_action"] == "ADD"
+
+
+def test_entry_evaluation_rejects_current_price_mismatch_with_p2_1_reference():
+    c = _decision_case()
+    response = _p2_1(c)
+    try:
+        build_canonical_entry_evaluation(
+            current_price="101",
+            return_target_entry_price="139",
+            p2_1_price_response=response,
+            entry_reference_source="EXPECTATION_GAP",
+            market_expectation_id="mie-pe-1",
+            independent_forecast_ref=c["expectation_gap"]["independent_forecast_ref"],
+        )
+    except ValueError as exc:
+        assert "must equal P2.1 reference_price" in str(exc)
+    else:
+        raise AssertionError("current/P2.1 reference mismatch must fail closed")
 
 
 def test_missing_entry_evaluation_fails_closed_for_buy_add():
