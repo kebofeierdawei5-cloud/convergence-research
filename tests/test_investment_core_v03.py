@@ -6,9 +6,54 @@ from pathlib import Path
 from copy import deepcopy
 from decimal import Decimal
 
+from iios_mvp.canonical_expectation_gap import CANONICAL_EXPECTATION_GAP_VERSION, market_implied_expectation_content_hash
 from iios_mvp.engine import decide, replay, run_case, validate_case
 from iios_mvp.investment_core_contract_v03 import calculate_return_metrics, validate_case_v03
 
+
+def market_implied_expectation() -> dict:
+    return {
+        "expectation_id": "mie-pe-1",
+        "model_id": "pe-1",
+        "market_model": "forward_pe",
+        "identifiability": "IDENTIFIABLE",
+        "stability": "STABLE",
+        "candidate_coverage": {
+            "status": "SUFFICIENT",
+            "scope_basis": "fixture-candidate-set",
+            "candidate_model_ids": ["pe-1"],
+            "evidence_ids": ["ev-coverage"],
+            "rationale": "The fixture has one admitted inverse-model candidate.",
+        },
+        "representation": "IMPLIED_POINT",
+        "economic_requirements": [{
+            "economic_variable": "forward_eps",
+            "unit": "CNY/share",
+            "basis": "2026A_to_2028E",
+            "period": "2028E",
+            "horizon": "24M",
+            "accounting_basis": "reported",
+            "role": "IMPLIED_PRIMARY",
+            "value": "10",
+            "evidence_ids": ["ev-var"],
+        }],
+        "observation_basis": {
+            "price_observation_id": "price-1",
+            "observation_date": "2026-10-04",
+            "cutoff_date": "2026-10-04",
+            "currency": "CNY",
+            "adjustment_semantics": "UNADJUSTED",
+        },
+        "assumption_set": [],
+        "evidence_sufficiency": {
+            "status": "SUFFICIENT",
+            "rationale": "Fixture MIE evidence is complete.",
+            "evidence_ids": ["ev-var", "ev-coverage"],
+        },
+        "evidence_ids": ["ev-var", "ev-coverage"],
+        "qualification": "DECISION_GRADE",
+        "qualification_rationale": "Fixture MIE is decision-grade.",
+    }
 
 def case() -> dict:
     return {
