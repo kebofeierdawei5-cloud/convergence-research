@@ -5,6 +5,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from .horizon_semantics import validate_horizon_selection
+from .semantic_expectation_gap import ComparisonDirection, evaluate_expectation_gap
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
 BUY_ENTRY_RETURN_CUSHION_THRESHOLD = Decimal("0.15")
@@ -17,6 +18,7 @@ PORTFOLIO_CONSTRAINT_STATES = {"PASS", "BLOCKED", "UNKNOWN"}
 INVESTABILITY_STATES = {"INVESTABLE", "WATCH", "NOT_INVESTABLE", "UNKNOWN"}
 DECISION_ACTIONS = {"BUY", "ADD", "HOLD", "REDUCE", "EXIT", "NO-BUY", "WATCH", "REVIEW_REQUIRED"}
 DECISION_STATUSES = {"READY", "BLOCKED", "REVIEW_REQUIRED", "SUPERSEDED"}
+EXPECTATION_GAP_STATES = {"PASS", "BLOCKED", "INCOMPATIBLE", "AMBIGUOUS", "UNKNOWN"}
 SCENARIOS = ("bear", "base", "bull")
 
 def _err(code: str, path: str, message: str) -> dict[str, str]:
@@ -57,7 +59,42 @@ def _annualize(ratio: Decimal, horizon: Decimal) -> Decimal:
         raise ValueError("horizon_years must be > 0")
     return (ratio.ln() / horizon).exp() - Decimal("1")
 
-def calculate_return_metrics(return_gate: dict[str, Any]) -> dict[str, Any]:
+
+def _compound_factor(annual_rate: Decimal, horizon: Decimal) -> Decimal:
+    factor_base = Decimal("1") + annual_rate
+    if factor_base <= 0:
+        raise ValueError("annual rate must be greater than -100%")
+    if horizon <= 0:
+        raise ValueError("horizon_years must be > 0")
+    return (factor_base.ln() * horizon).exp()
+
+
+def _price_cap_for_annualized_return(
+    expected_wealth: Decimal,
+    annual_rate: Decimal,
+    horizon: Decimal,
+) -> Decimal:
+    if annual_rate <= Decimal("-1"):
+        raise ValueError("annualized target/required return must be greater than -100%")
+    return expected_wealth / _compound_factor(annual_rate, horizon)
+
+
+def _price_cap_for_risk(
+    bear_wealth: Decimal,
+    max_loss_rate: Decimal | None,
+) -> Decimal | None:
+    if max_loss_rate is None:
+        return None
+    if max_loss_rate < Decimal("0") or max_loss_rate >= Decimal("1"):
+        raise ValueError("max_loss_pct must be within [0,100)")
+    return bear_wealth / (Decimal("1") - max_loss_rate)
+
+
+def calculate_return_metrics(
+    return_gate: dict[str, Any],
+    *,
+    max_loss_pct: Any | None = None,
+) -> dict[str, Any]:
     entry = _dec(return_gate["entry_price"], "return_gate.entry_price")
     entry_ref = _dec(return_gate["entry_value_reference"], "return_gate.entry_value_reference")
     horizon_selection = validate_horizon_selection(
@@ -77,8 +114,12 @@ def calculate_return_metrics(return_gate: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("buy_entry_return_cushion_threshold must equal 15%")
     if target != FUNDAMENTAL_TARGET_ANNUALIZED_RETURN:
         raise ValueError("fundamental_target_annualized_return must equal 15%")
-    if rr < Decimal("-1"):
-        raise ValueError("required_return_annualized must be >= -100%")
+    if rr <= Decimal("-1"):
+        raise ValueError("required_return_annualized must be > -100%")
+
+    risk_rate: Decimal | None = None
+    if max_loss_pct is not None:
+        risk_rate = _dec(max_loss_pct, "risk.max_loss_pct") / Decimal("100")
 
     scenarios = return_gate["scenarios"]
     probabilities = []
@@ -110,6 +151,26 @@ def calculate_return_metrics(return_gate: dict[str, Any]) -> dict[str, Any]:
     entry_pass = entry_cushion >= threshold
     target_pass = annualized_return >= target
     rr_pass = annualized_return >= rr
+    bear_return = wealth["bear"] / entry - Decimal("1")
+    risk_pass = True if risk_rate is None else bear_return >= -risk_rate
+
+    target_entry_price_for_return = _price_cap_for_annualized_return(
+        expected_wealth, target, horizon
+    )
+    target_entry_price_for_required_return = _price_cap_for_annualized_return(
+        expected_wealth, rr, horizon
+    )
+    target_entry_price_for_entry_cushion = entry_ref / (Decimal("1") + threshold)
+    target_entry_price_for_risk = _price_cap_for_risk(wealth["bear"], risk_rate)
+
+    price_caps = [
+        target_entry_price_for_return,
+        target_entry_price_for_required_return,
+        target_entry_price_for_entry_cushion,
+    ]
+    if target_entry_price_for_risk is not None:
+        price_caps.append(target_entry_price_for_risk)
+    target_entry_price = min(price_caps)
 
     return {
         "entry_return_cushion": entry_cushion,
@@ -125,7 +186,17 @@ def calculate_return_metrics(return_gate: dict[str, Any]) -> dict[str, Any]:
         "buy_entry_return_cushion_pass": entry_pass,
         "fundamental_target_pass": target_pass,
         "required_return_pass": rr_pass,
-        "return_gate_pass": entry_pass and target_pass and rr_pass,
+        "bear_return": bear_return,
+        "risk_pass": risk_pass,
+        "target_entry_price_for_return": target_entry_price_for_return,
+        "target_entry_price_for_required_return": target_entry_price_for_required_return,
+        "target_entry_price_for_entry_cushion": target_entry_price_for_entry_cushion,
+        "target_entry_price_for_risk": target_entry_price_for_risk,
+        "target_entry_price": target_entry_price,
+        "target_entry_price_binding": "MIN_OF_RETURN_REQUIRED_RETURN_ENTRY_CUSHION_AND_RISK_CAPS",
+        "target_entry_price_semantics": "CONDITIONAL_THRESHOLD_REQUIRES_EXPECTATION_GAP_REVALIDATION",
+        "target_entry_price_requires_gap_revalidation": True,
+        "return_gate_pass": entry_pass and target_pass and rr_pass and risk_pass,
     }
 
 def validate_return_gate_v03(return_gate: Any, path: str = "return_gate") -> list[dict[str, str]]:
@@ -236,10 +307,92 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
     risk = case["risk"]
     if not isinstance(risk, dict) or _risk_status(case) not in RISK_STATES:
         errors.append(_err("V03-RISK", "risk.status", "invalid Risk state"))
+    elif "max_loss_pct" not in risk or risk["max_loss_pct"] is None:
+        errors.append(
+            _err(
+                "V03-RISK-MAX-LOSS-REQUIRED",
+                "risk.max_loss_pct",
+                "max_loss_pct is required for v0.3 risk fail-closed semantics",
+            )
+        )
+    else:
+        try:
+            max_loss = _dec(risk["max_loss_pct"], "risk.max_loss_pct")
+            if max_loss < 0 or max_loss >= 100:
+                errors.append(_err("V03-RISK-MAX-LOSS", "risk.max_loss_pct", "must be within [0,100)"))
+        except ValueError as exc:
+            errors.append(_err("V03-RISK-MAX-LOSS", "risk.max_loss_pct", str(exc)))
     portfolio = case["portfolio"]
     if not isinstance(portfolio, dict) or _portfolio_status(case) not in PORTFOLIO_CONSTRAINT_STATES:
         errors.append(_err("V03-PORTFOLIO", "portfolio.constraint_status", "invalid Portfolio Constraint state"))
     errors.extend(validate_return_gate_v03(case["return_gate"]))
+
+    try:
+        observed_price = _dec(
+            case["current_price_observation"]["price"],
+            "current_price_observation.price",
+        )
+        entry_price = _dec(
+            case["return_gate"]["entry_price"],
+            "return_gate.entry_price",
+        )
+        if observed_price != entry_price:
+            errors.append(
+                _err(
+                    "V03-CURRENT-PRICE-BIND",
+                    "return_gate.entry_price",
+                    "must equal current_price_observation.price for current-price decision",
+                )
+            )
+    except (KeyError, ValueError):
+        pass
+
+    expectation_gap = case.get("expectation_gap")
+    if expectation_gap is not None:
+        try:
+            evaluated_gap = _canonical_expectation_gap(expectation_gap)
+            decision_horizon = str(
+                validate_horizon_selection(
+                    horizon_years=case["return_gate"]["horizon_years"],
+                    horizon_override=case["return_gate"]["horizon_override"],
+                    horizon_override_basis=case["return_gate"]["horizon_override_basis"],
+                    horizon_selection_rationale=case["return_gate"]["horizon_selection_rationale"],
+                    path="return_gate",
+                )["horizon_years"]
+            )
+            gap_horizon = str(
+                expectation_gap["independent_expectation"]["horizon_years"]
+            )
+            if gap_horizon != decision_horizon:
+                errors.append(
+                    _err(
+                        "V03-EXPECTATION-GAP-HORIZON",
+                        "expectation_gap.independent_expectation.horizon_years",
+                        "must equal the decision horizon selected by return_gate",
+                    )
+                )
+            gap_price = _dec(expectation_gap["price"], "expectation_gap.price")
+            observed_price = _dec(
+                case["current_price_observation"]["price"],
+                "current_price_observation.price",
+            )
+            if gap_price != observed_price:
+                errors.append(
+                    _err(
+                        "V03-EXPECTATION-GAP-PRICE",
+                        "expectation_gap.price",
+                        "must equal current_price_observation.price; gap must be revalidated when price changes",
+                    )
+                )
+        except ValueError as exc:
+            errors.append(
+                _err(
+                    "V03-EXPECTATION-GAP-CANONICAL",
+                    "expectation_gap",
+                    str(exc),
+                )
+            )
+
     mie = case.get("market_implied_expectation")
     if mie is not None and not isinstance(mie, dict):
         errors.append(_err("V03-MIE-TYPE", "market_implied_expectation", "optional MIE must be an object when supplied"))
@@ -256,22 +409,92 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
                 errors.append(_err("V03-DECISION-STATUS", "decision.decision_status", f"invalid status: {status}"))
     return {"status": "PASS" if not errors else "BLOCKED", "errors": errors}
 
-def _investability(metrics: dict[str, Any], trust_status: str, portfolio_status: str, risk_status: str, thesis_status: str) -> str:
-    if trust_status == "UNKNOWN" or portfolio_status == "UNKNOWN" or risk_status == "UNKNOWN" or thesis_status == "UNKNOWN":
+def _canonical_expectation_gap(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ValueError("expectation_gap must be an object when supplied")
+    independent = payload.get("independent_expectation")
+    market = payload.get("market_expectation")
+    direction = str(payload.get("comparison_direction", "")).strip()
+    if not isinstance(independent, dict):
+        raise ValueError("expectation_gap.independent_expectation is required")
+    if not isinstance(market, dict):
+        raise ValueError("expectation_gap.market_expectation is required")
+    if not direction:
+        raise ValueError("expectation_gap.comparison_direction is required")
+    try:
+        evaluated = evaluate_expectation_gap(
+            independent_expectation=independent,
+            market_expectation=market,
+            comparison_direction=ComparisonDirection(direction).value,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError(str(exc)) from exc
+
+    declared_status = str(payload.get("status", "")).upper()
+    if declared_status != evaluated["status"]:
+        raise ValueError(
+            f"expectation_gap.status does not match canonical evaluation: "
+            f"declared {declared_status!r}, evaluated {evaluated['status']!r}"
+        )
+
+    for key in ("gap_absolute", "gap_relative"):
+        declared = payload.get(key)
+        evaluated_value = evaluated.get(key)
+        if evaluated_value is None:
+            if declared is not None:
+                raise ValueError(
+                    f"expectation_gap.{key} must be null when canonical evaluation is unresolved"
+                )
+            continue
+        if declared is None:
+            raise ValueError(f"expectation_gap.{key} is required for a resolved canonical gap")
+        if _dec(declared, f"expectation_gap.{key}") != evaluated_value:
+            raise ValueError(
+                f"expectation_gap.{key} does not match canonical evaluation"
+            )
+    return evaluated
+
+
+def _expectation_gap(case: dict[str, Any]) -> tuple[str, Decimal | None]:
+    payload = case.get("expectation_gap")
+    if payload is None:
+        return "UNKNOWN", None
+    try:
+        evaluated = _canonical_expectation_gap(payload)
+    except ValueError:
+        return "UNKNOWN", None
+    status = str(evaluated["status"]).upper()
+    gap = evaluated.get("gap_relative")
+    return status, gap if isinstance(gap, Decimal) else None
+
+
+def _investability(
+    metrics: dict[str, Any],
+    trust_status: str,
+    portfolio_status: str,
+    risk_status: str,
+    thesis_status: str,
+    expectation_gap_status: str,
+    expectation_gap_positive: bool,
+) -> str:
+    if (
+        trust_status == "UNKNOWN"
+        or portfolio_status == "UNKNOWN"
+        or risk_status == "UNKNOWN"
+        or thesis_status == "UNKNOWN"
+        or expectation_gap_status in {"UNKNOWN", "BLOCKED", "INCOMPATIBLE", "AMBIGUOUS"}
+    ):
         return "UNKNOWN"
-    if trust_status != "PASS":
+    if trust_status != "PASS" or thesis_status == "BROKEN":
         return "NOT_INVESTABLE"
-    if thesis_status == "BROKEN":
+    if portfolio_status != "PASS" or risk_status != "PASS":
         return "NOT_INVESTABLE"
-    if portfolio_status != "PASS":
-        return "NOT_INVESTABLE"
-    if risk_status != "PASS":
+    if not expectation_gap_positive:
         return "NOT_INVESTABLE"
     if metrics["return_gate_pass"]:
         return "INVESTABLE"
-    if metrics["fundamental_target_pass"] and metrics["required_return_pass"] and not metrics["buy_entry_return_cushion_pass"]:
-        return "WATCH"
-    return "NOT_INVESTABLE"
+    return "WATCH"
+
 
 def decide_v03(case: dict[str, Any]) -> dict[str, Any]:
     validation = validate_case_v03(case)
@@ -280,12 +503,28 @@ def decide_v03(case: dict[str, Any]) -> dict[str, Any]:
     thesis_status = str((case.get("thesis") or {}).get("status", "UNKNOWN")).upper()
     risk_status = _risk_status(case)
     portfolio_status = _portfolio_status(case)
+    gap_status, gap_relative = _expectation_gap(case)
+    gap_positive = gap_status == "PASS" and gap_relative is not None and gap_relative > 0
+
     metrics = None
     if validation["status"] == "PASS":
         try:
-            metrics = calculate_return_metrics(case["return_gate"])
+            metrics = calculate_return_metrics(
+                case["return_gate"],
+                max_loss_pct=(case.get("risk") or {}).get("max_loss_pct"),
+            )
         except ValueError:
             metrics = None
+
+    current_price: Decimal | None = None
+    try:
+        current_price = _dec(
+            case["current_price_observation"]["price"],
+            "current_price_observation.price",
+        )
+    except (KeyError, ValueError):
+        pass
+
     gates = {
         "trust": trust_status,
         "horizon_years": metrics["horizon_years"] if metrics else None,
@@ -294,9 +533,13 @@ def decide_v03(case: dict[str, Any]) -> dict[str, Any]:
         "portfolio_constraint": portfolio_status,
         "risk": risk_status,
         "thesis": thesis_status,
-        "mie_required_for_buy_add": False,
+        "expectation_gap_status": gap_status,
+        "positive_expectation_gap_pass": gap_positive,
+        "expectation_gap_required_for_buy_add": True,
+        "current_price": str(current_price) if current_price is not None else None,
         "new_capital_allowed": False,
     }
+
     if metrics is None:
         action = "REVIEW_REQUIRED"
         status = "REVIEW_REQUIRED"
@@ -337,33 +580,54 @@ def decide_v03(case: dict[str, Any]) -> dict[str, Any]:
         status = "READY"
         reason = "RISK_GATE_FAILED"
         investability = "NOT_INVESTABLE"
-    elif metrics["expected_annualized_return"] < 0:
-        action = "REDUCE" if position > 0 else "NO-BUY"
+    elif position == 0 and gap_status in {"UNKNOWN", "BLOCKED", "INCOMPATIBLE", "AMBIGUOUS"}:
+        action = "REVIEW_REQUIRED"
+        status = "REVIEW_REQUIRED"
+        reason = "POSITIVE_EXPECTATION_GAP_UNRESOLVED"
+        investability = "UNKNOWN"
+    elif position == 0 and gap_status == "PASS" and not gap_positive:
+        action = "NO-BUY"
         status = "READY"
-        reason = "NEGATIVE_EXPECTED_ANNUALIZED_RETURN"
+        reason = "NO_POSITIVE_EXPECTATION_GAP"
         investability = "NOT_INVESTABLE"
+    elif position > 0 and gap_status in {"UNKNOWN", "BLOCKED", "INCOMPATIBLE", "AMBIGUOUS"}:
+        action = "HOLD"
+        status = "READY"
+        reason = "EXPECTATION_GAP_UNRESOLVED_FOR_ADD_ONLY"
+        investability = "WATCH"
+    elif position > 0 and gap_status == "PASS" and not gap_positive:
+        if metrics["expected_annualized_return"] < 0:
+            action = "REDUCE"
+            status = "READY"
+            reason = "NO_POSITIVE_EXPECTATION_GAP_AND_NEGATIVE_EXPECTED_RETURN"
+            investability = "NOT_INVESTABLE"
+        else:
+            action = "HOLD"
+            status = "READY"
+            reason = "NO_POSITIVE_EXPECTATION_GAP_FOR_ADD"
+            investability = "WATCH"
     elif position == 0 and metrics["return_gate_pass"]:
         action = "BUY"
         status = "READY"
-        reason = "FUNDAMENTAL_RETURN_AND_ENTRY_GATES_PASS"
+        reason = "POSITIVE_EXPECTATION_GAP_AND_RETURN_PRICE_GATES_PASS"
         investability = "INVESTABLE"
         gates["new_capital_allowed"] = True
     elif position > 0 and metrics["return_gate_pass"] and bool((case.get("portfolio") or {}).get("can_add", True)):
         action = "ADD"
         status = "READY"
-        reason = "FUNDAMENTAL_RETURN_AND_ENTRY_GATES_PASS"
+        reason = "POSITIVE_EXPECTATION_GAP_AND_RETURN_PRICE_GATES_PASS"
         investability = "INVESTABLE"
         gates["new_capital_allowed"] = True
-    elif position == 0 and metrics["fundamental_target_pass"] and metrics["required_return_pass"] and not metrics["buy_entry_return_cushion_pass"]:
+    elif position == 0 and gap_positive:
         action = "WATCH"
         status = "READY"
-        reason = "ENTRY_PRICE_OUTSIDE_SAFE_ENTRY_ZONE"
+        reason = "CURRENT_PRICE_ABOVE_TARGET_ENTRY_PRICE"
         investability = "WATCH"
     elif position > 0 and metrics["expected_annualized_return"] >= 0:
         action = "HOLD"
         status = "READY"
         reason = "CURRENT_OPPORTUNITY_DOES_NOT_JUSTIFY_NEW_CAPITAL"
-        investability = "NOT_INVESTABLE"
+        investability = "WATCH"
     else:
         action = "NO-BUY"
         status = "READY"
@@ -386,6 +650,17 @@ def decide_v03(case: dict[str, Any]) -> dict[str, Any]:
         reason = "BUY_ADD_POSITION_PACKAGE_INCOMPLETE"
         gates["new_capital_allowed"] = False
 
+    if metrics is not None:
+        gates["target_entry_price"] = str(metrics["target_entry_price"])
+        gates["target_entry_price_for_return"] = str(metrics["target_entry_price_for_return"])
+        gates["target_entry_price_for_required_return"] = str(metrics["target_entry_price_for_required_return"])
+        gates["target_entry_price_for_entry_cushion"] = str(metrics["target_entry_price_for_entry_cushion"])
+        gates["target_entry_price_for_risk"] = (
+            str(metrics["target_entry_price_for_risk"])
+            if metrics["target_entry_price_for_risk"] is not None
+            else None
+        )
+
     output = {
         "contract_version": CONTRACT_VERSION,
         "decision_status": status,
@@ -396,6 +671,18 @@ def decide_v03(case: dict[str, Any]) -> dict[str, Any]:
         "auto_execution": False,
         "gates": gates,
         "position_package_complete": package_complete,
+        "target_entry_price": (
+            _serialize_metrics(metrics)["target_entry_price"] if metrics is not None else None
+        ),
+        "target_entry_price_semantics": (
+            _serialize_metrics(metrics)["target_entry_price_semantics"] if metrics is not None else None
+        ),
+        "target_entry_price_requires_gap_revalidation": (
+            _serialize_metrics(metrics)["target_entry_price_requires_gap_revalidation"]
+            if metrics is not None
+            else None
+        ),
+        "current_price": str(current_price) if current_price is not None else None,
     }
     if metrics is not None:
         output["return_metrics"] = _serialize_metrics(metrics)

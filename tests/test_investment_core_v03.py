@@ -45,6 +45,29 @@ def case() -> dict:
             },
         },
         "thesis": {"status": "INTACT"},
+        "expectation_gap": {
+            "price": "100",
+            "status": "PASS",
+            "gap_relative": "0.3333333333333333333333333333",
+            "gap_absolute": "0.05",
+            "comparison_direction": "HIGHER_IS_BETTER",
+            "independent_expectation": {
+                "variable_id": "eps_cagr",
+                "value": "0.20",
+                "unit": "ratio",
+                "basis": "2026A_to_2028E",
+                "horizon_years": "2",
+            },
+            "market_expectation": {
+                "qualification": "DECISION_GRADE",
+                "resolution_state": "UNIQUE_MODEL",
+                "variable_id": "eps_cagr",
+                "value": "0.15",
+                "unit": "ratio",
+                "basis": "2026A_to_2028E",
+                "horizon_years": "2",
+            },
+        },
         "return_gate": {
             "entry_price": "100",
             "entry_value_reference": "115",
@@ -75,10 +98,37 @@ def test_v03_return_math_separates_the_two_15_percent_policies():
     assert abs(metrics["margin_of_safety"] - (Decimal("15")/Decimal("115"))) < Decimal("0.000001")
 
 
-def test_v03_mie_is_optional():
+def test_v03_mie_is_optional_but_gap_is_canonical():
     c = case()
     assert validate_case_v03(c)["status"] == "PASS"
     assert not any(x.startswith("V03-MIE") for x in [e["code"] for e in validate_case_v03(c)["errors"]])
+
+
+def test_v03_forged_positive_gap_is_blocked():
+    c = case()
+    c["expectation_gap"]["gap_relative"] = "0.10"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-EXPECTATION-GAP-CANONICAL" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_incompatible_canonical_gap_is_blocked():
+    c = case()
+    c["expectation_gap"]["market_expectation"]["unit"] = "CNY/share"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-EXPECTATION-GAP-CANONICAL" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_expectation_gap_horizon_must_match_decision_horizon():
+    c = case()
+    c["expectation_gap"]["independent_expectation"]["horizon_years"] = "3"
+    c["expectation_gap"]["market_expectation"]["horizon_years"] = "3"
+    c["expectation_gap"]["independent_expectation"]["basis"] = "2026A_to_2029E"
+    c["expectation_gap"]["market_expectation"]["basis"] = "2026A_to_2029E"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-EXPECTATION-GAP-HORIZON" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_buy_requires_all_three_return_conditions():
@@ -88,6 +138,138 @@ def test_v03_buy_requires_all_three_return_conditions():
     assert result["decision"]["investability_status"] == "INVESTABLE"
     assert result["decision"]["human_approval_required"] is True
     assert result["decision"]["auto_execution"] is False
+
+
+def test_v03_target_entry_price_solver_returns_binding_price_cap():
+    metrics = calculate_return_metrics(case()["return_gate"], max_loss_pct="25")
+    # For this fixture, the 15% entry cushion is the tightest constraint:
+    # 115 / 1.15 = 100.
+    assert metrics["target_entry_price_for_entry_cushion"] == Decimal("100")
+    assert metrics["target_entry_price"] == Decimal("100")
+    assert metrics["risk_pass"] is True
+
+
+def test_v03_current_price_mismatch_blocks_decision():
+    c = case()
+    c["return_gate"]["entry_price"] = "90"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-CURRENT-PRICE-BIND" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_missing_expectation_gap_blocks_new_capital_decision():
+    c = case()
+    del c["expectation_gap"]
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert result["decision"]["primary_reason"] == "POSITIVE_EXPECTATION_GAP_UNRESOLVED"
+    assert result["validation"]["status"] == "PASS"
+
+
+def test_v03_blocked_expectation_gap_requires_review_for_new_position():
+    c = case()
+    c["expectation_gap"].update({
+        "status": "BLOCKED",
+        "gap_relative": None,
+        "gap_absolute": None,
+        "market_expectation": {
+            **c["expectation_gap"]["market_expectation"],
+            "qualification": "BLOCKED",
+            "resolution_state": "INSUFFICIENT_EVIDENCE",
+        },
+    })
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+
+
+
+def test_v03_missing_expectation_gap_does_not_block_existing_hold():
+    c = case()
+    c["portfolio"]["position_pct"] = "5"
+    del c["expectation_gap"]
+    result = decide(c)
+    assert result["decision"]["action"] == "HOLD"
+
+
+def test_v03_missing_expectation_gap_does_not_block_thesis_broken_exit():
+    c = case()
+    c["portfolio"]["position_pct"] = "5"
+    c["thesis"]["status"] = "BROKEN"
+    del c["expectation_gap"]
+    result = decide(c)
+    assert result["decision"]["action"] == "EXIT"
+
+
+def test_v03_negative_expectation_gap_is_no_buy():
+    c = case()
+    c["expectation_gap"]["independent_expectation"]["value"] = "0.10"
+    c["expectation_gap"]["independent_expectation"]["basis"] = "2026A_to_2028E"
+    c["expectation_gap"]["market_expectation"]["basis"] = "2026A_to_2028E"
+    c["expectation_gap"]["gap_relative"] = "-0.3333333333333333333333333333"
+    c["expectation_gap"]["gap_absolute"] = "-0.05"
+    result = decide(c)
+    assert result["decision"]["action"] == "NO-BUY"
+    assert result["decision"]["primary_reason"] == "NO_POSITIVE_EXPECTATION_GAP"
+
+
+def test_v03_positive_gap_and_price_qualified_produces_buy():
+    c = case()
+    c["current_price_observation"]["price"] = "99"
+    c["return_gate"]["entry_price"] = "99"
+    c["expectation_gap"]["price"] = "99"
+    result = decide(c)
+    assert result["decision"]["action"] == "BUY"
+    assert Decimal(result["decision"]["target_entry_price"]) >= Decimal("99")
+
+
+def test_v03_positive_gap_but_price_above_target_is_watch_price():
+    c = case()
+    c["current_price_observation"]["price"] = "101"
+    c["return_gate"]["entry_price"] = "101"
+    c["expectation_gap"]["price"] = "101"
+    result = decide(c)
+    assert result["decision"]["action"] == "WATCH"
+    assert result["decision"]["primary_reason"] == "CURRENT_PRICE_ABOVE_TARGET_ENTRY_PRICE"
+    assert Decimal(result["decision"]["target_entry_price"]) < Decimal("101")
+
+
+
+def test_v03_expectation_gap_price_binding_requires_revalidation():
+    c = case()
+    c["current_price_observation"]["price"] = "99"
+    c["return_gate"]["entry_price"] = "99"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-EXPECTATION-GAP-PRICE" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_target_entry_price_is_conditional_and_requires_gap_revalidation():
+    result = decide(case())
+    assert result["decision"]["target_entry_price_semantics"] == (
+        "CONDITIONAL_THRESHOLD_REQUIRES_EXPECTATION_GAP_REVALIDATION"
+    )
+    assert result["decision"]["target_entry_price_requires_gap_revalidation"] is True
+    assert result["gates"]["target_entry_price"] == result["decision"]["target_entry_price"]
+
+
+def test_v03_risk_cap_enters_target_entry_price_solver():
+    c = case()
+    c["risk"]["max_loss_pct"] = "5"
+    metrics = calculate_return_metrics(c["return_gate"], max_loss_pct="5")
+    assert metrics["risk_pass"] is False
+    assert abs(
+        metrics["target_entry_price_for_risk"] - Decimal("90") / Decimal("0.95")
+    ) < Decimal("0.0000000001")
+    assert metrics["target_entry_price"] == metrics["target_entry_price_for_risk"]
+
+
+
+def test_v03_missing_risk_budget_fails_closed():
+    c = case()
+    del c["risk"]["max_loss_pct"]
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-RISK-MAX-LOSS-REQUIRED" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_exact_15_annualized_target_is_inclusive():
@@ -107,7 +289,9 @@ def test_v03_exact_15_annualized_target_is_inclusive():
 
 def test_v03_watch_when_target_passes_but_entry_cushion_fails():
     c = case()
+    c["current_price_observation"]["price"] = "110"
     c["return_gate"]["entry_price"] = "110"
+    c["expectation_gap"]["price"] = "110"
     c["return_gate"]["entry_value_reference"] = "115"
     c["return_gate"]["scenarios"] = {
         "bear": {"probability": "0.2", "terminal_value_per_share": "140", "cash_distributions_per_share": "0", "probability_rationale": "watch bear"},
@@ -119,7 +303,7 @@ def test_v03_watch_when_target_passes_but_entry_cushion_fails():
     assert result["decision"]["investability_status"] == "WATCH"
 
 
-def test_v03_no_buy_when_expected_annualized_return_below_target():
+def test_v03_watch_price_when_expected_annualized_return_below_target():
     c = case()
     c["return_gate"]["scenarios"] = {
         "bear": {"probability": "0.2", "terminal_value_per_share": "80", "cash_distributions_per_share": "0", "probability_rationale": "low"},
@@ -127,7 +311,8 @@ def test_v03_no_buy_when_expected_annualized_return_below_target():
         "bull": {"probability": "0.3", "terminal_value_per_share": "140", "cash_distributions_per_share": "0", "probability_rationale": "high"},
     }
     result = decide(c)
-    assert result["decision"]["action"] == "NO-BUY"
+    assert result["decision"]["action"] == "WATCH"
+    assert result["decision"]["target_entry_price"] is not None
 
 
 def test_v03_unknown_never_becomes_hold():
@@ -174,7 +359,9 @@ def test_v03_add_existing_position():
 def test_v03_hold_existing_when_return_is_positive_but_gate_fails():
     c = case()
     c["portfolio"]["position_pct"] = "5"
+    c["current_price_observation"]["price"] = "130"
     c["return_gate"]["entry_price"] = "130"
+    c["expectation_gap"]["price"] = "130"
     c["return_gate"]["entry_value_reference"] = "115"
     result = decide(c)
     assert result["decision"]["action"] == "HOLD"
@@ -229,6 +416,7 @@ def test_v03_jsonschema_rejects_incomplete_buy_add_package():
 
 def test_v03_default_horizon_is_one_year_and_not_an_implicit_three_year():
     c = case()
+    del c["expectation_gap"]
     c["return_gate"]["horizon_years"] = "1"
     c["return_gate"]["horizon_override"] = False
     c["return_gate"]["horizon_override_basis"] = []
@@ -241,6 +429,7 @@ def test_v03_default_horizon_is_one_year_and_not_an_implicit_three_year():
 
 def test_v03_three_year_requires_explicit_override_and_qualifying_basis():
     c = case()
+    del c["expectation_gap"]
     c["return_gate"]["horizon_years"] = "3"
     c["return_gate"]["horizon_override"] = True
     c["return_gate"]["horizon_override_basis"] = [

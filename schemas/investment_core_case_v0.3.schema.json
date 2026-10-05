@@ -155,7 +155,9 @@
           "type": [
             "string",
             "number"
-          ]
+          ],
+          "minimum": 0,
+          "exclusiveMaximum": 100
         }
       }
     },
@@ -307,7 +309,94 @@
       "type": "object"
     },
     "expectation_gap": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "price",
+        "status",
+        "gap_absolute",
+        "gap_relative",
+        "comparison_direction",
+        "independent_expectation",
+        "market_expectation"
+      ],
+      "properties": {
+        "price": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "BLOCKED",
+            "INCOMPATIBLE",
+            "AMBIGUOUS",
+            "UNKNOWN"
+          ]
+        },
+        "gap_absolute": {
+          "type": [
+            "string",
+            "number",
+            "null"
+          ]
+        },
+        "gap_relative": {
+          "type": [
+            "string",
+            "number",
+            "null"
+          ]
+        },
+        "comparison_direction": {
+          "enum": [
+            "HIGHER_IS_BETTER",
+            "LOWER_IS_BETTER"
+          ]
+        },
+        "independent_expectation": {
+          "type": "object",
+          "required": [
+            "variable_id",
+            "value",
+            "unit",
+            "basis",
+            "horizon_years"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "variable_id": { "type": "string", "minLength": 1 },
+            "value": { "type": ["string", "number"] },
+            "unit": { "type": "string", "minLength": 1 },
+            "basis": { "type": "string", "minLength": 1 },
+            "horizon_years": { "type": ["string", "number"] }
+          }
+        },
+        "market_expectation": {
+          "type": "object",
+          "required": [
+            "qualification",
+            "resolution_state",
+            "variable_id",
+            "value",
+            "unit",
+            "basis",
+            "horizon_years"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "qualification": { "type": "string", "minLength": 1 },
+            "resolution_state": { "type": "string", "minLength": 1 },
+            "variable_id": { "type": "string", "minLength": 1 },
+            "value": { "type": ["string", "number"] },
+            "unit": { "type": "string", "minLength": 1 },
+            "basis": { "type": "string", "minLength": 1 },
+            "horizon_years": { "type": ["string", "number"] }
+          }
+        }
+      }
     },
     "decision": {
       "type": "object",
@@ -358,6 +447,32 @@
         },
         "auto_execution": {
           "const": false
+        },
+        "current_price": {
+          "type": [
+            "string",
+            "number",
+            "null"
+          ]
+        },
+        "target_entry_price": {
+          "type": [
+            "string",
+            "number",
+            "null"
+          ]
+        },
+        "target_entry_price_semantics": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_entry_price_requires_gap_revalidation": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "position_package_complete": {
           "type": "boolean"
