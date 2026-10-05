@@ -130,6 +130,7 @@ def test_evidence_closes_missing_unknown_but_does_not_upgrade_known_conditional(
     t = {row["dimension"]: row["status"] for row in result["trust"]["dimensions"]}
     assert q["incremental_return_on_capital"] == "PASS"
     assert t["governance_integrity"] == "PASS"
+    assert result["trust"]["status"] == "CONDITIONAL"
 
     quality, trust = _real_core02_inputs()
     economic, capital = _bridges(
