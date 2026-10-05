@@ -231,9 +231,6 @@ def _validate_evidence_source_hash_binding(
     for observation_id, canonical in receipt_by_id.items():
         # CORE-04-C records one canonical EBITDA source for each admitted
         # observation. The consumer must carry the same byte fingerprint.
-        evidence_id = f"CORE04C-EBITDA-{observation_id.rsplit('-', 3)[-3]}-{observation_id.rsplit('-', 1)[-1]}"
-        # Use the explicit input evidence mapping instead of deriving an ID
-        # from presentation text when the case provides it.
         candidates = [
             row for row in evidence_by_id.values()
             if str(row.get("observation_date")) == str(canonical["observation_date"])
@@ -311,6 +308,46 @@ def _validate_historical_observation_binding(
             )
 
 
+def _validate_current_bridge_binding(data: dict[str, Any]) -> None:
+    evidence_by_id = {
+        str(row["evidence_id"]): row
+        for row in data.get("evidence", [])
+    }
+    rows = {
+        str(row["observation_id"]): row
+        for row in data.get("observations", [])
+    }
+    current = rows.get("CATL-EVEBITDA-CURRENT-2026-09-30")
+    if current is None:
+        raise ValueError("P2.3 missing canonical 2026-09-30 current observation")
+
+    required = {
+        "E011": ("price", "291.11"),
+        "E008": ("shares_outstanding", "4380630342"),
+        "E005": ("net_debt", "-276904623000"),
+        "CORE03-CURRENT-EBITDA-FY2025": ("economic_value", "119197217000"),
+    }
+    for evidence_id, (field, expected) in required.items():
+        evidence = evidence_by_id.get(evidence_id)
+        if evidence is None:
+            raise ValueError(
+                f"P2.3 missing admitted current-bridge evidence: {evidence_id}"
+            )
+        if _d(evidence["value"]) != _d(expected):
+            raise ValueError(
+                f"P2.3 current bridge evidence value drift: {evidence_id}"
+            )
+        if _d(current[field]) != _d(evidence["value"]):
+            raise ValueError(
+                f"P2.3 current observation is not bound to {evidence_id}"
+            )
+
+    if str(current["observation_date"]) != "2026-09-30":
+        raise ValueError("P2.3 current observation date drift")
+    if _dt(str(current["known_at"])).date() > CUTOFF:
+        raise ValueError("P2.3 current observation violates PIT cutoff")
+
+
 def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
     data = _load_json(input_path)
     if data.get("case_id") != CASE_ID:
@@ -319,6 +356,7 @@ def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
     receipt = _load_and_validate_canonical_receipt(input_receipt)
     _validate_evidence_source_hash_binding(data, receipt)
     _validate_historical_observation_binding(data, receipt)
+    _validate_current_bridge_binding(data)
 
     if data.get("status") != "EXECUTABLE_REAL_SLICE":
         raise ValueError("unexpected P3A real-slice input status")
@@ -429,6 +467,12 @@ def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
         "core04c_receipt": receipt,
         "core04c_receipt_path": str(RECEIPT_PATH),
         "core04c_input_link": input_receipt,
+        "current_bridge_binding": {
+            "E011": "price",
+            "E008": "shares_outstanding",
+            "E005": "net_debt",
+            "CORE03-CURRENT-EBITDA-FY2025": "economic_value",
+        },
         "real_current_observation": {
             "observation_id": current_id,
             "price": str(current_price),
