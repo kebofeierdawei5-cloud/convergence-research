@@ -31,9 +31,9 @@ A1-01 Economic Evidence Bridge = PASS / MERGED
         ↓
 A1-02 Capital Allocation + Trust/Governance Evidence Closure = PASS / MERGED
         ↓
-A1 Company-side Evidence Closure = IN PROGRESS
+A1-03 Quality Gate Integration = PASS / MERGED
         ↓
-A1-03 Quality Gate Integration = NEXT
+A1 Company-side Evidence Closure = PASS / MERGED
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
@@ -92,15 +92,14 @@ This is an accepted system result, not a claim that the security should be bough
 
 ### A1 — Company-side Evidence Closure
 
-Primary unresolved company-side gate:
+A1 is PASS / MERGED as an engineering and evidence-closure milestone.
 
-- incremental ROIC evidence;
-- earnings → OCF → FCF conversion;
-- CAPEX → D&A → FCF bridge;
-- working-capital normalization;
-- fuller Trust / governance revalidation.
+Completed sub-batches:
+- A1-01 Economic Evidence Bridge = PASS / MERGED;
+- A1-02 Capital Allocation + Trust/Governance Evidence Closure = PASS / MERGED;
+- A1-03 Quality Gate Integration = PASS / MERGED.
 
-Quality remains CONDITIONAL until evidence supports a stronger state.
+The company-side evidence chain is integrated into the existing Quality Gate semantics. For 300750, Quality Gate remains CONDITIONAL and new capital remains FALSE. A1 completion does not imply BUY/ADD.
 
 ### Productization
 
