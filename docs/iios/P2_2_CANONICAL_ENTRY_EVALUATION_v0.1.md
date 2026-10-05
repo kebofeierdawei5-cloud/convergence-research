@@ -31,3 +31,10 @@ The final decision exposes both the P1.4 pre-admission action and the P2.2 admis
 ## PIT and replay
 
 P2.2 creates no new market evidence. It consumes the already PIT-bound P2.1 response. Canonical entry evaluation and decision admission have deterministic exact replay functions; tampering or input drift fails replay.
+
+
+## P2.1 / legacy compatibility boundary
+
+P2.1 is the canonical source whenever the upstream model family is admitted by P2.1. Existing \`forward_pe\`/\`ps\`/\`pb\` proportional cases that are still served by the frozen P2 engine use \`P2_LEGACY_COMPAT\` explicitly; they are never relabelled as P2.1. This compatibility path is version-bound.
+
+P2.2 binds its current price to the selected price-response reference price in both paths.
