@@ -250,10 +250,10 @@ def test_outside_support_blocks_decision_grade_mie_even_when_identification_stab
 
 
 def test_unstable_identification_still_blocks_ratio_mie():
-    ps = candidate("ps-1", MarketModelFamily.PS, "candidate-ps")
+    ev_ebitda = candidate("ev-ebitda-1", MarketModelFamily.EV_EBITDA, "candidate-ev-ebitda")
     inp = build_input(
-        (ps,),
-        "revenue",
+        (ev_ebitda,),
+        "ebitda",
         ("100", "100", "100", "100", "100"),
         ("100", "100", "100", "100", "100"),
     )
