@@ -1,0 +1,28 @@
+IIOS A1-01 evidence capture E012
+case_id: RC-CN-A-300750-20261004
+source_ref: https://static.cninfo.com.cn/finalpage/2025-07-30/1224343223.PDF
+source_vintage: 2025-07-30
+known_at: 2025-07-30T00:00:00+08:00
+observation_date: 2025-06-30
+unit: CNY_thousand
+
+Consolidated balance-sheet operating-capital anchor:
+accounts_receivable: 63800375
+accounts_receivable_financing: 36388212
+prepayments: 9752799
+inventory: 72272139
+contract_assets: 346467
+notes_payable: 76968647
+accounts_payable: 133420147
+contract_liabilities: 36641662
+employee_benefits_payable: 20115797
+tax_payable: 8643847
+other_payables: 11481854
+
+Consolidated operating-asset anchor:
+fixed_assets: 118696651
+construction_in_progress: 35086190
+rou_assets: 1047592
+intangible_assets: 14684829
+
+The report also states the consolidated H1 2025 net profit and cash-flow statement values used by A1-01 in the primary financial evidence set.

@@ -1,0 +1,55 @@
+{
+  "schema_version": "IIOS-COMPANY-EVIDENCE-SUPPLEMENT-0.1",
+  "case_id": "RC-CN-A-300750-20261004",
+  "market": "CN-A",
+  "symbol": "300750",
+  "company": "宁德时代",
+  "cutoff_date": "2026-10-04T23:59:59+08:00",
+  "evidence": [
+    {
+      "evidence_id": "E012_A1",
+      "subject_id": "RC-CN-A-300750-20261004",
+      "field_id": "financial_reality.operating_capital_anchor_h1_2025",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2025-07-30T00:00:00+08:00",
+      "retrieved_at": "2026-10-05T00:00:00+08:00",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2025-07-30/1224343223.PDF",
+      "artifact_id": "catl-20261004-E012-A1-2025H1-operating-capital.txt",
+      "content_sha256": "669952717b4d0476a3b9697a2fb8ae4338baa8802f7a94484ec8372cd8b34b82",
+      "exact_bytes": true,
+      "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+      "status": "ADMITTED"
+    },
+    {
+      "evidence_id": "E013_A1",
+      "subject_id": "RC-CN-A-300750-20261004",
+      "field_id": "financial_reality.d_and_a_working_capital_bridge_h1_2026",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-07-24T00:00:00+08:00",
+      "retrieved_at": "2026-10-05T00:00:00+08:00",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
+      "artifact_id": "catl-20261004-E013-A1-2026H1-da-wc-bridge.txt",
+      "content_sha256": "e6e38e1a91f5fec9ebcb6e6f4aae0bb5f5e5088b11ad5beb102b7c1dd6e98002",
+      "exact_bytes": true,
+      "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+      "status": "ADMITTED"
+    }
+  ],
+  "raw_artifacts": [
+    {
+      "evidence_id": "E012_A1",
+      "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E012_A1_2025H1_operating_capital.txt",
+      "expected_size_bytes": 897,
+      "expected_sha256": "669952717b4d0476a3b9697a2fb8ae4338baa8802f7a94484ec8372cd8b34b82"
+    },
+    {
+      "evidence_id": "E013_A1",
+      "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E013_A1_2026H1_da_wc_bridge.txt",
+      "expected_size_bytes": 881,
+      "expected_sha256": "e6e38e1a91f5fec9ebcb6e6f4aae0bb5f5e5088b11ad5beb102b7c1dd6e98002"
+    }
+  ],
+  "audit": {
+    "manifest_sha256": "68dd4307a4658775ac5942576dfe5d0e46ca81496685b8930751ad00ffd1ab45"
+  }
+}

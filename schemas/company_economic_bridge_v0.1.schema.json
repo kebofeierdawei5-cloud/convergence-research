@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/company-economic-bridge-0.1.schema.json",
+  "title": "IIOS Company Economic Bridge v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "cutoff_date",
+    "generation_basis",
+    "incremental_roic",
+    "interpretation_status",
+    "investment_decision_effect",
+    "audit",
+    "evidence_admission",
+    "periods",
+    "deltas",
+    "incremental_roic",
+    "interpretation_status",
+    "investment_decision_effect",
+    "audit"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "IIOS-COMPANY-ECONOMIC-BRIDGE-0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cutoff_date": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generation_basis": {
+      "type": "string",
+      "minLength": 1
+    },
+    "periods": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prior",
+        "current"
+      ],
+      "properties": {
+        "prior": {
+          "$ref": "#/$defs/period_metrics"
+        },
+        "current": {
+          "$ref": "#/$defs/period_metrics"
+        }
+      }
+    },
+    "deltas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nopat_proxy",
+        "invested_capital_proxy",
+        "fcf_after_capex",
+        "core_depreciation_amortization",
+        "working_capital_cash_contribution"
+      ],
+      "properties": {
+        "nopat_proxy": {
+          "type": "number"
+        },
+        "invested_capital_proxy": {
+          "type": "number"
+        },
+        "fcf_after_capex": {
+          "type": "number"
+        },
+        "core_depreciation_amortization": {
+          "type": "number"
+        },
+        "working_capital_cash_contribution": {
+          "type": "number"
+        }
+      }
+    },
+    "incremental_roic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "status",
+        "basis",
+        "reason"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "CONDITIONAL",
+            "UNKNOWN"
+          ]
+        },
+        "basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "interpretation_status": {
+      "const": "CONDITIONAL"
+    },
+    "investment_decision_effect": {
+      "const": "NO_DIRECT_GATE_EFFECT"
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_sha256",
+        "bridge_sha256"
+      ],
+      "properties": {
+        "input_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bridge_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "evidence_admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "evidence_ids",
+        "sha256"
+      ],
+      "properties": {
+        "status": {
+          "const": "ADMITTED"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "period_metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "period_id",
+        "period_start",
+        "period_end",
+        "evidence_ids",
+        "reported_revenue",
+        "reported_operating_profit",
+        "reported_profit_before_tax",
+        "reported_income_tax",
+        "reported_net_income",
+        "reported_attributable_net_income",
+        "reported_operating_cash_flow",
+        "capex_cash_paid",
+        "core_depreciation_amortization",
+        "fcf_after_capex",
+        "ocf_to_net_income",
+        "fcf_to_net_income",
+        "ocf_to_attributable_net_income",
+        "fcf_to_attributable_net_income",
+        "effective_tax_rate",
+        "nopat_proxy",
+        "working_capital_cash_bridge",
+        "operating_working_capital_snapshot",
+        "invested_capital_proxy"
+      ],
+      "properties": {
+        "period_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "period_start": {
+          "type": "string",
+          "minLength": 1
+        },
+        "period_end": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reported_revenue": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reported_operating_profit": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reported_profit_before_tax": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reported_income_tax": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reported_net_income": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reported_attributable_net_income": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reported_operating_cash_flow": {
+          "type": "number",
+          "minimum": 0
+        },
+        "capex_cash_paid": {
+          "type": "number",
+          "minimum": 0
+        },
+        "core_depreciation_amortization": {
+          "type": "number",
+          "minimum": 0
+        },
+        "fcf_after_capex": {
+          "type": "number"
+        },
+        "ocf_to_net_income": {
+          "type": "number"
+        },
+        "fcf_to_net_income": {
+          "type": "number"
+        },
+        "ocf_to_attributable_net_income": {
+          "type": "number"
+        },
+        "fcf_to_attributable_net_income": {
+          "type": "number"
+        },
+        "effective_tax_rate": {
+          "type": "number"
+        },
+        "nopat_proxy": {
+          "type": "number"
+        },
+        "working_capital_cash_bridge": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "inventory",
+            "receivables",
+            "payables",
+            "net_cash_contribution"
+          ],
+          "properties": {
+            "inventory": {
+              "type": "number"
+            },
+            "receivables": {
+              "type": "number"
+            },
+            "payables": {
+              "type": "number"
+            },
+            "net_cash_contribution": {
+              "type": "number"
+            }
+          }
+        },
+        "operating_working_capital_snapshot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operating_current_assets",
+            "operating_current_liabilities",
+            "core_operating_nwc"
+          ],
+          "properties": {
+            "operating_current_assets": {
+              "type": "number"
+            },
+            "operating_current_liabilities": {
+              "type": "number"
+            },
+            "core_operating_nwc": {
+              "type": "number"
+            }
+          }
+        },
+        "invested_capital_proxy": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}

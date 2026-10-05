@@ -1,0 +1,26 @@
+IIOS A1-01 evidence capture E013
+case_id: RC-CN-A-300750-20261004
+source_ref: https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF
+source_vintage: 2026-07-24
+known_at: 2026-07-24T00:00:00+08:00
+observation_date: 2026-06-30
+period: 2026-01-01 through 2026-06-30
+unit: CNY_thousand
+
+Cash-flow non-cash depreciation/amortization:
+depreciation_ppe: 14282273
+depreciation_rou: 276258
+amortization_intangible: 258901
+
+Working-capital cash-flow bridge:
+inventory_change_cash_effect: -37859085
+operating_receivables_change_cash_effect: -33026925
+operating_payables_change_cash_effect: 71690439
+
+Comparable H1 2025 values from the same supplement column:
+depreciation_ppe: 11355579
+depreciation_rou: 105656
+amortization_intangible: 244874
+inventory_change_cash_effect: -13622417
+operating_receivables_change_cash_effect: 12126707
+operating_payables_change_cash_effect: 19114641
