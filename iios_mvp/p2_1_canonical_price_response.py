@@ -220,14 +220,52 @@ def _provenance_index(snapshot: Mapping[str, Any], cutoff: date) -> dict[str, Ma
     return indexed
 
 
-def _value_context(provenance: Mapping[str, Mapping[str, Any]], variable: str) -> Decimal:
+def _value_context(
+    provenance: Mapping[str, Mapping[str, Any]],
+    *,
+    variable: str,
+    model_id: str,
+) -> Decimal:
+    expected_basis = f"model_context:{model_id}:{variable}"
     matches = [
         item for item in provenance.values()
-        if item.get("variable") == variable and item.get("value") is not None
+        if item.get("variable") == variable
+        and item.get("basis") == expected_basis
+        and item.get("value") is not None
     ]
     if len(matches) != 1:
-        raise ValueError(f"P2.1 requires exactly one canonical provenance value for {variable}")
+        raise ValueError(
+            f"P2.1 requires exactly one canonical provenance value for {expected_basis}"
+        )
     return _dec(matches[0]["value"], f"provenance.{variable}.value")
+
+
+def _context_evidence_ids(
+    provenance: Mapping[str, Mapping[str, Any]],
+    *,
+    family: str,
+    model_id: str,
+) -> tuple[str, ...]:
+    variables = {"shares_outstanding"}
+    if family in {
+        MarketModelFamily.EV_EBITDA.value,
+        MarketModelFamily.DCF.value,
+        MarketModelFamily.RNPV.value,
+    }:
+        variables.add("net_debt")
+    ids = []
+    for variable in sorted(variables):
+        basis = f"model_context:{model_id}:{variable}"
+        matches = [
+            item for item in provenance.values()
+            if item.get("variable") == variable
+            and item.get("basis") == basis
+            and item.get("value") is not None
+        ]
+        if len(matches) != 1:
+            raise ValueError(f"P2.1 requires exactly one canonical provenance context for {basis}")
+        ids.append(str(matches[0]["evidence_id"]))
+    return tuple(ids)
 
 
 def _assumption_value(expectation: Mapping[str, Any], variable: str, basis: str | None = None) -> Decimal:
@@ -294,13 +332,16 @@ def _model_relation(
     family = str(expectation.get("market_model", "")).strip()
     variable = str(requirement.get("economic_variable", "")).strip()
     reference_low, reference_high = _reference_interval(requirement)
-    shares = _value_context(provenance, "shares_outstanding")
+    model_id = str(expectation.get("model_id", ""))
+    if not model_id:
+        raise ValueError("P2.1 MIE model_id is required")
+    shares = _value_context(provenance, variable="shares_outstanding", model_id=model_id)
     ev_based = {
         MarketModelFamily.EV_EBITDA.value,
         MarketModelFamily.DCF.value,
         MarketModelFamily.RNPV.value,
     }
-    net_debt = _value_context(provenance, "net_debt") if family in ev_based else Decimal("0")
+    net_debt = _value_context(provenance, variable="net_debt", model_id=model_id) if family in ev_based else Decimal("0")
 
     if family == MarketModelFamily.EV_EBITDA.value:
         if variable != "ebitda":
@@ -496,7 +537,11 @@ def build_canonical_price_response(
         for item in expectation.get("assumption_set") or []
         for evidence_id in item.get("evidence_ids") or []
     )
-    response_evidence = tuple(sorted(nested_evidence | set(independent.get("evidence_ids") or [])))
+    response_evidence = tuple(sorted(
+        nested_evidence
+        | set(independent.get("evidence_ids") or [])
+        | set(_context_evidence_ids(provenance, family=family, model_id=str(expectation["model_id"])))
+    ))
     missing = [eid for eid in response_evidence if eid not in provenance and eid not in set(independent.get("evidence_ids") or [])]
     if missing:
         raise ValueError(f"P2.1 provenance missing evidence IDs: {sorted(missing)}")
