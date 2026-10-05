@@ -1,0 +1,18 @@
+{
+  "schema_version": "IIOS-PUBLIC-SOURCE-CAPTURE-RECEIPT-0.2",
+  "capture_workflow_run": 37258457522,
+  "capture_head_sha": "fc247c9b53abcd2150e11e56f343328533e6a1c9",
+  "artifact_id": 11323138280,
+  "artifact_digest": "sha256:c61e268eaf5aa4f7efb2ff8d3220313f1897bc1fd7df3b948eb09b72b3749a45",
+  "receipt_file_sha256": "291a45c54351e1992dda05fa3770e9137b0ab4279d40c883cf3a6409507a643a",
+  "captured_at": "2026-10-05T03:12:08.452919+00:00",
+  "case_id": "RC-CN-A-300750-20261004",
+  "sources": [
+    {"source_id":"SZSE-MKT-2026-07-27","role":"MARKET_PRICE_SNAPSHOT","observation_date":"2026-07-27","http_status":200,"size_bytes":229584,"sha256":"ab420679237525a7e6846ffa49a3ef8115e4d64d6bc97f63319f5ee9c333e568","exact_bytes_captured":true,"capture_status":"SUCCESS","admission_status":"NOT_ADMITTED"},
+    {"source_id":"CNINFO-H1-2026","role":"COMPANY_FINANCIAL_REPORT","observation_date":"2026-06-30","known_at":"2026-07-25","http_status":200,"size_bytes":1374568,"sha256":"aa40daf911df40f56900dc506d7debe05a4fea43cd533474039a408e3b5aabcc","exact_bytes_captured":true,"capture_status":"SUCCESS","admission_status":"NOT_ADMITTED"},
+    {"source_id":"SZSE-MKT-2026-04-17","role":"MARKET_PRICE_SNAPSHOT","observation_date":"2026-04-17","http_status":200,"size_bytes":231968,"sha256":"bd5875b4294e3acdcca6aeddf42dd65d8284a15e5a29d6290308c65973b49a0d","exact_bytes_captured":true,"capture_status":"SUCCESS","admission_status":"NOT_ADMITTED"},
+    {"source_id":"CNINFO-Q1-2026","role":"COMPANY_FINANCIAL_REPORT","observation_date":"2026-03-31","known_at":"2026-04-16","http_status":200,"size_bytes":537170,"sha256":"32e4936e6dd68a89741a8167b4c4ae3f8b4bc7ef61d70f35b294e1cb0e46fbe8","exact_bytes_captured":true,"capture_status":"SUCCESS","admission_status":"NOT_ADMITTED"},
+    {"source_id":"SZSE-MKT-2025-10-22","role":"MARKET_PRICE_SNAPSHOT","observation_date":"2025-10-22","http_status":200,"size_bytes":230180,"sha256":"dfe49f5fade60087e5118f17446bbf55161c4cd7d765dd81155edb10ccdd6ba9","exact_bytes_captured":true,"capture_status":"SUCCESS","admission_status":"NOT_ADMITTED"},
+    {"source_id":"CNINFO-Q3-2025","role":"COMPANY_FINANCIAL_REPORT","observation_date":"2025-09-30","known_at":"2025-10-21","http_status":200,"size_bytes":351045,"sha256":"d099bc0054f4bf8624d34fffa2c82399b7d8e31cce8f84aab909955da9d84f50","exact_bytes_captured":true,"capture_status":"SUCCESS","admission_status":"NOT_ADMITTED"}
+  ]
+}
