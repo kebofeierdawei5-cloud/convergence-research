@@ -9,10 +9,14 @@
   "capture_requirements": [
     {
       "capture_id": "CATL-B2B-001",
-      "field_groups": ["security_identity","business_reality","financial_reality"],
+      "field_groups": [
+        "security_identity",
+        "business_reality",
+        "financial_reality"
+      ],
       "source_ref": "CNINFO:DISCLOSURE",
       "source_locator": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
-      "pit_basis": "SOURCE_VINTAGE",
+      "pit_basis": "EVENT_PUBLICATION",
       "required": true,
       "exact_bytes_required": true,
       "status": "PENDING_RAW",
@@ -20,7 +24,10 @@
     },
     {
       "capture_id": "CATL-B2B-002",
-      "field_groups": ["corporate_disclosures","trust_governance_events"],
+      "field_groups": [
+        "corporate_disclosures",
+        "trust_governance_events"
+      ],
       "source_ref": "CNINFO:DISCLOSURE",
       "source_locator": "https://static.cninfo.com.cn/finalpage/2026-10-01/1225592063.PDF",
       "pit_basis": "EVENT_PUBLICATION",
@@ -31,7 +38,9 @@
     },
     {
       "capture_id": "CATL-B2B-003",
-      "field_groups": ["capital_structure"],
+      "field_groups": [
+        "capital_structure"
+      ],
       "source_ref": "CNINFO:DISCLOSURE",
       "source_locator": "https://static.cninfo.com.cn/finalpage/2026-04-30/1225274804.PDF",
       "pit_basis": "EVENT_PUBLICATION",
@@ -42,7 +51,10 @@
     },
     {
       "capture_id": "CATL-B2B-004",
-      "field_groups": ["capital_structure","trust_governance_events"],
+      "field_groups": [
+        "capital_structure",
+        "trust_governance_events"
+      ],
       "source_ref": "CNINFO:DISCLOSURE",
       "source_locator": "https://static.cninfo.com.cn/finalpage/2026-08-07/1225465154.PDF",
       "pit_basis": "EVENT_PUBLICATION",
@@ -53,7 +65,9 @@
     },
     {
       "capture_id": "CATL-B2B-005",
-      "field_groups": ["market_price"],
+      "field_groups": [
+        "market_price"
+      ],
       "source_ref": "SZSE:MARKET_DATA",
       "source_locator": "SZSE official market-data lookup; code=300750; trade_date=2026-09-30",
       "pit_basis": "TRADE_DATE",
@@ -65,6 +79,6 @@
   ],
   "plan_status": "BLOCKED_PENDING_RAW",
   "audit": {
-    "plan_sha256": "56ad26fb672ad038a5656add0444b315e85bee95803db2e18c826910b7a6a721"
+    "plan_sha256": "33f1c0ecfe56362573d3994de4d9a3a1e48bd66e8f7e603f3079b1cfa2257259"
   }
 }
