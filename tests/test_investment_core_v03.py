@@ -203,6 +203,21 @@ def test_v03_return_math_separates_the_two_15_percent_policies():
     assert abs(metrics["margin_of_safety"] - (Decimal("15")/Decimal("115"))) < Decimal("0.000001")
 
 
+def test_v03_canonical_gap_requires_runtime_evidence_root_resolver():
+    c = case()
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("canonical evidence root resolver is required" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_embedded_p4f_snapshot_is_rejected():
+    c = case()
+    c["market_implied_expectation_snapshot"] = market_implied_expectation_snapshot()
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-EVIDENCE-ROOT-INLINE" in x for x in result["validation"]["blockers"])
+
+
 def test_v03_mie_is_required_for_canonical_gap():
     c = case()
     assert validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY)["status"] == "PASS"
