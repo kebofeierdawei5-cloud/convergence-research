@@ -1,0 +1,56 @@
+name: IIOS A1-01 Company Economic Evidence Bridge
+
+on:
+  pull_request:
+    paths:
+      - "calc/company_economic_bridge.py"
+      - "schemas/company_economic_bridge_v0.1.schema.json"
+      - "tests/test_company_economic_bridge.py"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/capture/E012_A1_2025H1_operating_capital.txt"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/capture/E013_A1_2026H1_da_wc_bridge.txt"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/A1_01_economic_evidence_supplement_v0.1.json"
+      - "docs/iios/A1_01_COMPANY_ECONOMIC_BRIDGE_v0.1.md"
+      - ".github/workflows/iios_a1_01.yml"
+  push:
+    branches: [main]
+    paths:
+      - "calc/company_economic_bridge.py"
+      - "schemas/company_economic_bridge_v0.1.schema.json"
+      - "tests/test_company_economic_bridge.py"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/capture/E012_A1_2025H1_operating_capital.txt"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/capture/E013_A1_2026H1_da_wc_bridge.txt"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/A1_01_economic_evidence_supplement_v0.1.json"
+      - "docs/iios/A1_01_COMPANY_ECONOMIC_BRIDGE_v0.1.md"
+      - ".github/workflows/iios_a1_01.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  a1-01:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q calc tests/test_company_economic_bridge.py
+      - run: python -m pytest -q tests/test_company_economic_bridge.py
+      - run: python -m json.tool schemas/company_economic_bridge_v0.1.schema.json >/dev/null
+      - run: |
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          import json
+
+          root = Path(".")
+          manifest = json.loads(Path("evidence/real_cases/RC-CN-A-300750-20261004/A1_01_economic_evidence_supplement_v0.1.json").read_text(encoding="utf-8"))
+          for row in manifest["raw_artifacts"]:
+              path = root / row["relative_path"]
+              payload = path.read_bytes()
+              assert len(payload) == row["expected_size_bytes"], row["evidence_id"]
+              assert hashlib.sha256(payload).hexdigest() == row["expected_sha256"], row["evidence_id"]
+          print("A1_01_EXACT_BYTES_OK")
+          PY
+      - run: git diff --check
