@@ -193,6 +193,15 @@ class ModelFit:
             diagnostic.validate()
         if self.status == ModelFitStatus.FEASIBLE and not self.evidence_ids:
             raise ValueError("FEASIBLE model fit requires evidence_ids")
+        if self.status == ModelFitStatus.FEASIBLE and self.historical_support != HistoricalSupportState.IN_RANGE:
+            raise ValueError("FEASIBLE model fit requires IN_RANGE historical support")
+        if self.status == ModelFitStatus.OUTSIDE_HISTORICAL_SUPPORT and self.historical_support not in {
+            HistoricalSupportState.BELOW_HISTORICAL_RANGE,
+            HistoricalSupportState.ABOVE_HISTORICAL_RANGE,
+        }:
+            raise ValueError("OUTSIDE_HISTORICAL_SUPPORT requires BELOW/ABOVE historical support state")
+        if self.status == ModelFitStatus.OUTSIDE_HISTORICAL_SUPPORT and self.regime_interpretation != RegimeInterpretationState.POSSIBLE_REGIME_SHIFT:
+            raise ValueError("OUTSIDE_HISTORICAL_SUPPORT requires POSSIBLE_REGIME_SHIFT interpretation")
 
 
 @dataclass(frozen=True)
