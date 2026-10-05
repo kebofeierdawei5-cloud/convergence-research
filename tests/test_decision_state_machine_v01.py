@@ -38,6 +38,16 @@ def test_precedence_table_is_unique_and_versioned():
     assert [row["rule_id"] for row in table] == ids
 
 
+
+def test_every_canonical_rule_has_executable_predicate():
+    neutral = base()
+    for rule in CANONICAL_DECISION_PRECEDENCE:
+        # _matches is intentionally private: this is a structural invariant
+        # ensuring the audit table and executable predicate map cannot drift.
+        from iios_mvp.decision_state_machine_v01 import _matches
+        result = _matches(rule, neutral)
+        assert isinstance(result, bool), rule.rule_id
+
 def test_validation_precedes_trust():
     result = evaluate_decision_state(
         base(validation_pass=False, trust_status="FAIL", thesis_status="BROKEN")
