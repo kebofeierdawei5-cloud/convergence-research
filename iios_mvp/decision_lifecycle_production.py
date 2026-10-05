@@ -134,8 +134,17 @@ def project_current_approval(*, previous: Mapping[str, Any] | None, decision_rev
     validate_decision_revision(decision_revision, case_id=decision_revision['case_id'], cutoff_date=decision_revision['cutoff_date'])
     validate_human_approval(approval, decision_revision=decision_revision)
     previous = {} if previous is None else dict(previous)
+    if previous:
+        validate_current_projection(previous)
     current_revision = int(previous.get('current_revision', 0))
     revision = decision_revision['revision']
+    if revision == current_revision and current_revision > 0:
+        if previous.get('current_decision_id') != decision_revision['decision_id']:
+            raise ValueError('same revision cannot bind a different decision_id')
+        if previous.get('snapshot_hash') != decision_revision['snapshot_hash']:
+            raise ValueError('same revision cannot bind a different snapshot')
+        if approval['approved'] and previous.get('approval_hash') != approval['approval_hash']:
+            raise ValueError('conflicting approval for current revision')
     if not approval['approved'] or revision < current_revision:
         return {
             **previous,
