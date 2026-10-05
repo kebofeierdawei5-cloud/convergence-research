@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/evidence-root-reference-0.1.schema.json",
+  "title": "IIOS Evidence Root Reference v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "root_type",
+    "root_id",
+    "content_sha256"
+  ],
+  "properties": {
+    "root_type": {
+      "const": "P4F_MIE_SNAPSHOT"
+    },
+    "root_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
