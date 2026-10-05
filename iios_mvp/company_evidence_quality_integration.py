@@ -241,7 +241,7 @@ def integrate_company_evidence_into_quality(
     quality_rows["cash_flow_conversion"] = _add_bridge_evidence(
         {
             **quality_rows["cash_flow_conversion"],
-            "status": _cap(
+            "status": _integrate_status(
                 quality_rows["cash_flow_conversion"]["status"],
                 evidence_cash_status,
             ),
@@ -252,7 +252,7 @@ def integrate_company_evidence_into_quality(
     quality_rows["reinvestment_runway"] = _add_bridge_evidence(
         {
             **quality_rows["reinvestment_runway"],
-            "status": _cap(
+            "status": _integrate_status(
                 quality_rows["reinvestment_runway"]["status"],
                 evidence_reinvestment_status,
             ),
@@ -278,7 +278,7 @@ def integrate_company_evidence_into_quality(
     trust_rows["governance_integrity"] = _add_bridge_evidence(
         {
             **trust_rows["governance_integrity"],
-            "status": _cap(
+            "status": _integrate_status(
                 trust_rows["governance_integrity"]["status"],
                 evidence_governance_status,
             ),
@@ -289,7 +289,7 @@ def integrate_company_evidence_into_quality(
     trust_rows["shareholder_treatment"] = _add_bridge_evidence(
         {
             **trust_rows["shareholder_treatment"],
-            "status": _cap(
+            "status": _integrate_status(
                 trust_rows["shareholder_treatment"]["status"],
                 evidence_shareholder_status,
             ),
