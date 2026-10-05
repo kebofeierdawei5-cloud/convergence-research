@@ -165,15 +165,29 @@ def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
     receipt = data.get("source_receipt") or {}
     expected_receipt = {
         "status": "ADMITTED",
-        "ci_run_id": 37261197564,
-        "artifact_id": 11324731141,
-        "artifact_sha256": "51e9e8c19404ef241383c99e0f9ed98bf3088fbe2b4a47778e9f5d79a26ee6c4",
+        "schema_version": "IIOS-CORE04C-CATL-EVEBITDA-RECEIPT-0.2",
+        "case_id": CASE_ID,
+        "cutoff_date": CUTOFF.isoformat(),
     }
     for key, expected in expected_receipt.items():
         if receipt.get(key) != expected:
             raise ValueError(
                 f"CORE-04-C receipt mismatch for {key}: "
                 f"expected {expected!r}, got {receipt.get(key)!r}"
+            )
+
+    expected_ci = {
+        "workflow": "real-ev-ebitda",
+        "run_id": 37261197564,
+        "artifact_id": 11324731141,
+        "artifact_sha256": "51e9e8c19404ef241383c99e0f9ed98bf3088fbe2b4a47778e9f5d79a26ee6c4",
+    }
+    ci = receipt.get("ci") or {}
+    for key, expected in expected_ci.items():
+        if ci.get(key) != expected:
+            raise ValueError(
+                f"CORE-04-C CI receipt mismatch for {key}: "
+                f"expected {expected!r}, got {ci.get(key)!r}"
             )
         raise ValueError("CORE-04-C receipt is not admitted")
     if data.get("status") != "EXECUTABLE_REAL_SLICE":
