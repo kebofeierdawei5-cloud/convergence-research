@@ -326,7 +326,7 @@
         "cutoff_date",
         "mie_snapshot_hash",
         "market_expectation_id",
-        "independent_expectation"
+        "independent_forecast_ref"
       ],
       "properties": {
         "gap_id": {
@@ -358,49 +358,21 @@
           "type": "string",
           "minLength": 1
         },
-        "independent_expectation": {
+        "independent_forecast_ref": {
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "variable_id",
-            "value",
-            "unit",
-            "basis",
-            "horizon_years",
-            "evidence_ids"
+            "forecast_id",
+            "admission_record_hash"
           ],
           "properties": {
-            "variable_id": {
+            "forecast_id": {
               "type": "string",
               "minLength": 1
             },
-            "value": {
-              "type": [
-                "string",
-                "number"
-              ]
-            },
-            "unit": {
+            "admission_record_hash": {
               "type": "string",
-              "minLength": 1
-            },
-            "basis": {
-              "type": "string",
-              "minLength": 1
-            },
-            "horizon_years": {
-              "type": [
-                "string",
-                "number"
-              ]
-            },
-            "evidence_ids": {
-              "type": "array",
-              "minItems": 1,
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
+              "pattern": "^[0-9a-f]{64}$"
             }
           }
         }
