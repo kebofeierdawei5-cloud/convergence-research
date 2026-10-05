@@ -55,6 +55,18 @@ def _d(value: Any) -> Decimal:
     return result
 
 
+def _ev_ebitda(row: dict[str, Any]) -> Decimal:
+    price = _d(row["price"])
+    shares = _d(row["shares_outstanding"])
+    net_debt = _d(row["net_debt"])
+    ebitda = _d(row["economic_value"])
+    if ebitda <= 0:
+        raise ValueError("EBITDA must be > 0 for EV/EBITDA calculation")
+    with localcontext() as ctx:
+        ctx.prec = 60
+        return (price * shares + net_debt) / ebitda
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
@@ -283,19 +295,21 @@ def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
             "feasible_model_ids": list(ident.feasible_model_ids),
             "evaluation_status": evaluation.fit.status.value,
             "historical_range": {
-                "low": str(
+                "low": format(
                     min(
-                        _d(row["ev_ebitda"])
+                        _ev_ebitda(row)
                         for row in data["observations"]
                         if row["observation_id"] != current_id
-                    )
+                    ),
+                    "f",
                 ),
-                "high": str(
+                "high": format(
                     max(
-                        _d(row["ev_ebitda"])
+                        _ev_ebitda(row)
                         for row in data["observations"]
                         if row["observation_id"] != current_id
-                    )
+                    ),
+                    "f",
                 ),
             },
         },
