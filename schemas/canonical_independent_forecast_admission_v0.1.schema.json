@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/canonical-independent-forecast-admission-0.1.schema.json",
+  "title": "IIOS Canonical Independent Forecast Admission v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "admission_schema",
+    "status",
+    "case_id",
+    "market",
+    "symbol",
+    "cutoff_date",
+    "forecast_id",
+    "forecast_version",
+    "model_version",
+    "variable_id",
+    "value",
+    "unit",
+    "basis",
+    "horizon_years",
+    "forecast_origin",
+    "known_at",
+    "prepared_without_current_price",
+    "evidence_ids",
+    "admission_record_hash"
+  ],
+  "properties": {
+    "admission_schema": {
+      "const": "IIOS-INDEPENDENT-FORECAST-ADMISSION-0.1"
+    },
+    "status": {
+      "const": "ADMITTED"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "market": {
+      "type": "string",
+      "minLength": 1
+    },
+    "symbol": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cutoff_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "forecast_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "forecast_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "variable_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "value": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$"
+    },
+    "unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "basis": {
+      "type": "string",
+      "minLength": 1
+    },
+    "horizon_years": {
+      "type": "string",
+      "pattern": "^[0-9]+(\\.[0-9]+)?$"
+    },
+    "forecast_origin": {
+      "type": "string",
+      "minLength": 1
+    },
+    "known_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prepared_without_current_price": {
+      "const": true
+    },
+    "evidence_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "admission_record_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

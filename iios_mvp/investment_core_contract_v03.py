@@ -7,6 +7,7 @@ from typing import Any
 from .canonical_expectation_gap import evaluate_canonical_expectation_gap
 from .evidence_root_admission import EvidenceRootResolver
 from .canonical_current_price import CanonicalCurrentPriceResolver, validate_current_price_binding
+from .canonical_independent_forecast import CanonicalIndependentForecastResolver
 from .horizon_semantics import validate_horizon_selection
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
@@ -256,7 +257,7 @@ def _portfolio_status(case: dict[str, Any]) -> str:
 def _risk_status(case: dict[str, Any]) -> str:
     return str((case.get("risk") or {}).get("status", "UNKNOWN")).upper()
 
-def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None) -> dict[str, Any]:
+def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None) -> dict[str, Any]:
     errors: list[dict[str, str]] = []
     if not isinstance(case, dict):
         return {"status": "BLOCKED", "errors": [_err("V03-SCHEMA-TYPE", "$", "case must be an object")]}
@@ -407,18 +408,53 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
                     path="return_gate",
                 )["horizon_years"]
             )
-            gap_horizon = str(
-                expectation_gap["independent_expectation"]["horizon_years"]
-            )
-            if gap_horizon != decision_horizon:
+            forecast_ref = expectation_gap.get("independent_forecast_ref")
+            if not isinstance(forecast_ref, dict):
                 errors.append(
                     _err(
-                        "V03-EXPECTATION-GAP-HORIZON",
-                        "expectation_gap.independent_expectation.horizon_years",
-                        "must equal the decision horizon selected by return_gate",
+                        "V03-INDEPENDENT-FORECAST-REF",
+                        "expectation_gap.independent_forecast_ref",
+                        "canonical independent forecast reference is required",
                     )
                 )
                 precondition_failed = True
+            elif independent_forecast_resolver is None:
+                errors.append(
+                    _err(
+                        "V03-INDEPENDENT-FORECAST-RESOLVER",
+                        "expectation_gap.independent_forecast_ref",
+                        "canonical independent forecast resolver is required at runtime",
+                    )
+                )
+                precondition_failed = True
+            else:
+                try:
+                    forecast_record = independent_forecast_resolver.resolve_independent_forecast(
+                        forecast_ref,
+                        case_id=case["case_id"],
+                        market=case["market"],
+                        symbol=case["symbol"],
+                        cutoff_date=cutoff,
+                    )
+                    gap_horizon = _dec(
+                        forecast_record["horizon_years"],
+                        "canonical independent forecast.horizon_years",
+                    )
+                    if gap_horizon != _dec(
+                        decision_horizon,
+                        "return_gate.horizon_years",
+                    ):
+                        errors.append(
+                            _err(
+                                "V03-EXPECTATION-GAP-HORIZON",
+                                "expectation_gap.independent_forecast_ref",
+                                "canonical forecast horizon must equal the decision horizon selected by return_gate",
+                            )
+                        )
+                        precondition_failed = True
+                except (KeyError, TypeError, ValueError):
+                    # Canonical expectation-gap evaluation below emits the authoritative blocker.
+                    pass
             gap_price = _dec(expectation_gap["price"], "expectation_gap.price")
             observed_price = _dec(
                 case["current_price_observation"]["price"],
@@ -439,7 +475,7 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
 
         if not precondition_failed:
             try:
-                _canonical_expectation_gap(expectation_gap, case, evidence_root_resolver=evidence_root_resolver)
+                _canonical_expectation_gap(expectation_gap, case, evidence_root_resolver=evidence_root_resolver, independent_forecast_resolver=independent_forecast_resolver)
             except ValueError as exc:
                 errors.append(
                     _err(
@@ -496,7 +532,7 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
                 errors.append(_err("V03-DECISION-STATUS", "decision.decision_status", f"invalid status: {status}"))
     return {"status": "PASS" if not errors else "BLOCKED", "errors": errors}
 
-def _canonical_expectation_gap(payload: Any, case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None) -> dict[str, Any]:
+def _canonical_expectation_gap(payload: Any, case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None) -> dict[str, Any]:
     mie_ref = case.get("market_implied_expectation_snapshot_ref")
     if not isinstance(mie_ref, dict):
         raise ValueError("market_implied_expectation_snapshot_ref is required for a canonical expectation gap")
@@ -515,17 +551,20 @@ def _canonical_expectation_gap(payload: Any, case: dict[str, Any], *, evidence_r
             current_price_observation=case["current_price_observation"],
             cutoff_date=case["cutoff_date"],
             case_id=case["case_id"],
+            market=case["market"],
+            symbol=case["symbol"],
+            independent_forecast_resolver=independent_forecast_resolver,
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError(str(exc)) from exc
 
 
-def _expectation_gap(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None) -> tuple[str, Decimal | None]:
+def _expectation_gap(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None) -> tuple[str, Decimal | None]:
     payload = case.get("expectation_gap")
     if payload is None:
         return "UNKNOWN", None
     try:
-        evaluated = _canonical_expectation_gap(payload, case, evidence_root_resolver=evidence_root_resolver)
+        evaluated = _canonical_expectation_gap(payload, case, evidence_root_resolver=evidence_root_resolver, independent_forecast_resolver=independent_forecast_resolver)
     except ValueError:
         return "UNKNOWN", None
     status = str(evaluated["status"]).upper()
@@ -561,14 +600,14 @@ def _investability(
     return "WATCH"
 
 
-def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None) -> dict[str, Any]:
-    validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver)
+def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None) -> dict[str, Any]:
+    validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver, independent_forecast_resolver=independent_forecast_resolver)
     position = _position(case) if isinstance(case.get("portfolio"), dict) else Decimal("0")
     trust_status = str((case.get("trust") or {}).get("status", "UNKNOWN")).upper()
     thesis_status = str((case.get("thesis") or {}).get("status", "UNKNOWN")).upper()
     risk_status = _risk_status(case)
     portfolio_status = _portfolio_status(case)
-    gap_status, gap_relative = _expectation_gap(case, evidence_root_resolver=evidence_root_resolver)
+    gap_status, gap_relative = _expectation_gap(case, evidence_root_resolver=evidence_root_resolver, independent_forecast_resolver=independent_forecast_resolver)
     gap_positive = gap_status == "PASS" and gap_relative is not None and gap_relative > 0
 
     metrics = None

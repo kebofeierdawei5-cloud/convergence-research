@@ -160,7 +160,7 @@ def test_filesystem_tampering_is_fail_closed(tmp_path):
     path = registry._path("E011")
     value = json.loads(path.read_text(encoding="utf-8"))
     value["price"] = "999.99"
-    path.write_text(json.dumps(value) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="admission record hash mismatch"):
         registry.resolve_current_price(
             ref.to_dict(), case_id="CORE-04C", market="CN-A", symbol="300750", cutoff_date=CUTOFF
