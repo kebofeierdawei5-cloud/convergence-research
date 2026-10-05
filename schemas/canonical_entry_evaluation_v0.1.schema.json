@@ -40,13 +40,15 @@
         "PASS",
         "CONDITIONAL_ONLY",
         "REVIEW_REQUIRED",
-        "NO_FEASIBLE_PRICE"
+        "NO_FEASIBLE_PRICE",
+        "COMPATIBILITY_ONLY"
       ]
     },
     "qualification": {
       "enum": [
         "DECISION_GRADE",
         "CONDITIONAL_ONLY",
+        "COMPATIBILITY_ONLY",
         "UNKNOWN"
       ]
     },
