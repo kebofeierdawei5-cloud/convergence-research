@@ -1,3 +1,7 @@
+# HISTORICAL PROPOSAL / SUPERSEDED — 2026-10-05
+
+This ADR records the pre-adjudication B1 proposal. The authoritative accepted semantics are in IIOS_INVESTMENT_CORE_CONTRACT_v0.3.md, B1 Decision Semantics v0.3, and the accepted B1 migration package. Preserve this document for audit history; do not treat its PROPOSED status as current.
+
 # IIOS B1 — Return Semantics ADR v0.3
 
 Date: 2026-10-04
