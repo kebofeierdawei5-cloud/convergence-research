@@ -361,7 +361,7 @@ def test_dcf_without_required_history_and_assumptions_is_insufficient():
     assert evaluation.fit.status.value == "INSUFFICIENT_EVIDENCE"
 
 
-def test_historical_window_perturbation_can_make_model_unstable():
+def test_historical_window_support_perturbation_does_not_fake_model_instability():
     pe = candidate("pe-1", MarketModelFamily.FORWARD_PE, "forward_eps")
     observations = (
         obs("h1", 1, "100", "10", "forward_eps"),
@@ -384,7 +384,8 @@ def test_historical_window_perturbation_can_make_model_unstable():
     )
     result = identify_market_models(base_input([pe], observations))
     assert result["identifiability"].state.value == "IDENTIFIABLE"
-    assert result["stability"].state.value == "UNSTABLE"
+    assert result["stability"].state.value == "STABLE"
+    assert result["evaluations"][0].fit.historical_support == HistoricalSupportState.IN_RANGE
 
 
 def test_candidate_unknown_provenance_is_rejected():
