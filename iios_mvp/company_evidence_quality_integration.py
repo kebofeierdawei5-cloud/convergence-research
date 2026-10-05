@@ -335,7 +335,89 @@ def integrate_company_evidence_into_quality(
     return core
 
 
+def validate_company_evidence_quality_integration(
+    record: Any,
+    *,
+    case_id: str,
+    cutoff_date: str,
+) -> None:
+    if not isinstance(record, Mapping):
+        raise ValueError("company_evidence_quality_integration must be an object")
+    required = {
+        "schema_version",
+        "case_id",
+        "cutoff_date",
+        "economic_bridge_status",
+        "capital_trust_bridge_status",
+        "quality",
+        "quality_gate",
+        "trust",
+        "decision_effect",
+        "audit",
+    }
+    if set(record) != required:
+        raise ValueError("company_evidence_quality_integration fields are invalid")
+    if record["schema_version"] != COMPANY_EVIDENCE_QUALITY_INTEGRATION_VERSION:
+        raise ValueError("company evidence integration version mismatch")
+    if record["case_id"] != case_id:
+        raise ValueError("company evidence integration case_id mismatch")
+    if record["cutoff_date"] != cutoff_date:
+        raise ValueError("company evidence integration cutoff mismatch")
+    if record["decision_effect"] != "NO_DIRECT_GATE_EFFECT":
+        raise ValueError("company evidence integration decision effect invalid")
+
+    validate_quality_gate(
+        record["quality_gate"],
+        case_id=case_id,
+        cutoff_date=cutoff_date,
+    )
+
+    if record["quality_gate"]["dimensions"] != record["quality"]["dimensions"]:
+        raise ValueError("company evidence quality/quality-gate drift")
+
+    trust = record["trust"]
+    if not isinstance(trust, Mapping) or not isinstance(trust.get("dimensions"), list):
+        raise ValueError("company evidence integration trust invalid")
+    if len(trust["dimensions"]) != len(TRUST_DIMENSIONS):
+        raise ValueError("company evidence integration trust cardinality invalid")
+
+    audit = record["audit"]
+    if not isinstance(audit, Mapping) or set(audit) != {"input_sha256", "integration_sha256"}:
+        raise ValueError("company evidence integration audit invalid")
+    for field in ("input_sha256", "integration_sha256"):
+        value = audit.get(field)
+        if (
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(c not in "0123456789abcdef" for c in value)
+        ):
+            raise ValueError(f"company evidence integration audit {field} invalid")
+
+    if record["economic_bridge_status"]["incremental_roic"] not in STATUS_SEVERITY:
+        raise ValueError("economic bridge incremental_roic status invalid")
+    if record["economic_bridge_status"]["interpretation"] not in STATUS_SEVERITY:
+        raise ValueError("economic bridge interpretation status invalid")
+
+    for field in (
+        "capital_allocation",
+        "governance_integrity",
+        "shareholder_treatment",
+        "trust_revalidation",
+    ):
+        if record["capital_trust_bridge_status"][field] not in STATUS_SEVERITY:
+            raise ValueError(f"capital trust bridge {field} status invalid")
+
+    expected_integration_hash = _sha(
+        {key: value for key, value in record.items() if key != "audit"}
+    )
+    if audit["integration_sha256"] != expected_integration_hash:
+        raise ValueError("company evidence integration hash mismatch")
+
+
+
+
 __all__ = [
     "COMPANY_EVIDENCE_QUALITY_INTEGRATION_VERSION",
     "integrate_company_evidence_into_quality",
+    "validate_company_evidence_quality_integration",
 ]
