@@ -672,6 +672,7 @@ def _fit_complex_candidate(
             diagnostics=(diagnostic,),
             evidence_ids=candidate_evidence_ids,
             constraints=("MIN_HISTORICAL_DATES",),
+            historical_support=HistoricalSupportState.INSUFFICIENT_EVIDENCE,
         )
         return CandidateEvaluation(fit, None)
 
@@ -933,6 +934,7 @@ def _fit_candidate(
             diagnostics=tuple(diagnostics),
             evidence_ids=all_ids,
             constraints=("MIN_HISTORICAL_POINTS",),
+            historical_support=HistoricalSupportState.INSUFFICIENT_EVIDENCE,
         )
         return CandidateEvaluation(fit, None)
 
@@ -1102,7 +1104,10 @@ def _identify(
             selected_model_id=None,
             competing_model_ids=(),
             evidence_ids=evidence_ids,
-            rationale="All admitted candidates are infeasible under the current evidence and constraints.",
+            rationale=(
+                "No admitted candidate remains within the empirical historical-support boundary; "
+                "outside-support candidates are not thereby proven mathematically infeasible."
+            ),
         )
     result.validate()
     return result
