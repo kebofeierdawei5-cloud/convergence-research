@@ -103,8 +103,17 @@ The company-side evidence chain is integrated into the existing Quality Gate sem
 
 ### Productization
 
-The current Investment Core still needs production lifecycle work:
+RP-01 Risk / Portfolio Production Contract is merged in canonical main:
+- PR #84;
+- merge commit d2180754ef6b3e71ecf5eaad9ad7d6224d46af00;
+- explicit risk budget and portfolio capacity inputs;
+- fail-closed package validation;
+- deterministic audit hash;
+- no Decision Precedence change.
 
+The available workflow interface did not expose a post-merge runtime CI record for independent verification in this session. Therefore RP-01 is recorded as MERGED / implementation-complete, not as independently CI-certified here.
+
+Remaining Investment Core productization:
 - Decision Revision state transitions;
 - Human Approval / Current Projection;
 - Trigger lifecycle;
@@ -188,8 +197,13 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 A1 is complete as the current company-side evidence-closure milestone.
 
+**RP-01 Risk / Portfolio Production Contract = MERGED**
+
+RP-01 is implementation-complete on canonical main; runtime CI evidence was not independently observable through the available workflow interface in this session.
+
 Acceptance:
 - `docs/iios/A1_ACCEPTANCE_2026-10-05.md`
+- `docs/iios/RP_01_RISK_PORTFOLIO_PRODUCTION_CONTRACT_v0.1.md`
 
 The next development batch must be independently scoped from the canonical main. No new P3/P4/MIE model work is implied by A1 completion.
 
