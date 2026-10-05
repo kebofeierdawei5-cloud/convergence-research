@@ -27,10 +27,20 @@ jobs:
       - run: python -m compileall -q tools
       - run: |
           python tools/core04c_materialize.py             --manifest research/core04c_source_manifest_v0.1.json             --out /tmp/core04c/raw
+        continue-on-error: true
       - run: python -m json.tool /tmp/core04c/raw/materialization_receipt.json >/dev/null
       - uses: actions/upload-artifact@v4
-        if: ${{ always() }}
         with:
           name: iios-core04c-verified-source-bytes
           path: /tmp/core04c/raw/
           retention-days: 7
+      - name: Fail on byte mismatch
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          receipt = json.loads(Path('/tmp/core04c/raw/materialization_receipt.json').read_text())
+          mismatches = [s for s in receipt['sources'] if s['status'] != 'EXACT_MATCH']
+          print(json.dumps({'mismatch_count': len(mismatches)}, ensure_ascii=False))
+          raise SystemExit(2 if mismatches else 0)
+          PY
