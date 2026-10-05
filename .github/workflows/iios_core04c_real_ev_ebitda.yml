@@ -8,6 +8,7 @@ on:
       - "tools/core04c_fetch_and_parse.py"
       - "tests/test_core04c_catl_ev_ebitda.py"
       - "docs/iios/CORE_04C_CATL_EV_EBITDA_ACCEPTANCE_2026-10-05.md"
+      - "docs/iios/CORE_04C_CATL_EV_EBITDA_EVIDENCE_2026-10-05.md"
   push:
     branches: [main]
     paths:
