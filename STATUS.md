@@ -13,7 +13,7 @@ B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. T
 
 ## Current Active Stage — 2026-10-05
 
-B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = PASS / MERGED. CATL Existing Evidence Migration = PASS / TECHNICAL. CATL Primary-Source Gap Supplementation = PASS / PRIMARY CAPTURED. CORE-03/CORE-04 = ACTIVE.
+B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = PASS / MERGED. CATL Existing Evidence Migration = PASS / TECHNICAL. CATL Primary-Source Gap Supplementation = PASS / PRIMARY CAPTURED. CORE-03 = PASS / MERGED. CORE-04-A = PASS / MERGED. CORE-04-B = PASS / MERGED / LIVE CAPTURE VERIFIED. CORE-04-C = ACTIVE / DATA ADMISSION PENDING.
 
 - B2-A merge commit: c8246ceaaad5e9b1cc02fe422723c39a441ea4f3.
 - B2 raw-artifact containment hardening merge commit: 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3.
