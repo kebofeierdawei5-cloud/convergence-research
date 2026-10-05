@@ -7,7 +7,7 @@ Status: IMPLEMENTATION TARGET
 
 B2-A is the Investment Core Evidence/PIT foundation for one user-selected company.
 
-It is independent of CSI800 historical membership, CSI Industry history, cross-company universe construction, A02 Object A/B and paid commercial data.
+It has no dependency on CSI800 historical membership, CSI Industry history, cross-company universe construction, A02 Object A/B or paid commercial data. A02 code and artifacts are outside the `research/b2/` namespace and are not executed by B2 CI.
 
 ## Vertical slice
 
@@ -51,9 +51,9 @@ B2-A blocks when material evidence is:
 - missing exact raw verification;
 - internally invalid under the Evidence Contract.
 
-## A02 boundary
+## Research Track boundary
 
-A02/CSI800 continues as a separate Research Track consumer of the same B2 Evidence/PIT primitives.
+A02/CSI800 continues as a separate Research Track consumer of the same generic Evidence/PIT primitives. Its code lives outside `research/b2/`, and B2 CI must not invoke or validate A02 execution.
 
 It is not required for the Investment Core single-company path.
 
