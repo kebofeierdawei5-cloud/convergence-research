@@ -1,0 +1,64 @@
+{
+  "schema_version": "IIOS-CORE04C-SOURCE-MATERIALIZATION-0.1",
+  "case_id": "RC-CN-A-300750-20261004",
+  "cutoff_date": "2026-10-04",
+  "sources": [
+    {
+      "source_id": "SZSE-MKT-2026-07-27",
+      "role": "MARKET_PRICE_SNAPSHOT",
+      "observation_date": "2026-07-27",
+      "url": "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-07-27&txtEndDate=2026-07-27&archiveDate=2026-07-28&random=0.20261005",
+      "filename": "SZSE-MKT-2026-07-27.xlsx",
+      "expected_size_bytes": 229584,
+      "expected_sha256": "ab420679237525a7e6846ffa49a3ef8115e4d64d6bc97f63319f5ee9c333e568"
+    },
+    {
+      "source_id": "CNINFO-H1-2026",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2026-06-30",
+      "known_at": "2026-07-25",
+      "url": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
+      "filename": "CNINFO-H1-2026.pdf",
+      "expected_size_bytes": 1374568,
+      "expected_sha256": "aa40daf911df40f56900dc506d7debe05a4fea43cd533474039a408e3b5aabcc"
+    },
+    {
+      "source_id": "SZSE-MKT-2026-04-17",
+      "role": "MARKET_PRICE_SNAPSHOT",
+      "observation_date": "2026-04-17",
+      "url": "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-04-17&txtEndDate=2026-04-17&archiveDate=2026-04-18&random=0.20261005",
+      "filename": "SZSE-MKT-2026-04-17.xlsx",
+      "expected_size_bytes": 231968,
+      "expected_sha256": "bd5875b4294e3acdcca6aeddf42dd65d8284a15e5a29d6290308c65973b49a0d"
+    },
+    {
+      "source_id": "CNINFO-Q1-2026",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2026-03-31",
+      "known_at": "2026-04-16",
+      "url": "https://static.cninfo.com.cn/finalpage/2026-04-16/1225107946.PDF",
+      "filename": "CNINFO-Q1-2026.pdf",
+      "expected_size_bytes": 537170,
+      "expected_sha256": "32e4936e6dd68a89741a8167b4c4ae3f8b4bc7ef61d70f35b294e1cb0e46fbe8"
+    },
+    {
+      "source_id": "SZSE-MKT-2025-10-22",
+      "role": "MARKET_PRICE_SNAPSHOT",
+      "observation_date": "2025-10-22",
+      "url": "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2025-10-22&txtEndDate=2025-10-22&archiveDate=2025-10-23&random=0.20261005",
+      "filename": "SZSE-MKT-2025-10-22.xlsx",
+      "expected_size_bytes": 230180,
+      "expected_sha256": "dfe49f5fade60087e5118f17446bbf55161c4cd7d765dd81155edb10ccdd6ba9"
+    },
+    {
+      "source_id": "CNINFO-Q3-2025",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2025-09-30",
+      "known_at": "2025-10-21",
+      "url": "https://static.cninfo.com.cn/finalpage/2025-10-21/1224721971.PDF",
+      "filename": "CNINFO-Q3-2025.pdf",
+      "expected_size_bytes": 351045,
+      "expected_sha256": "d099bc0054f4bf8624d34fffa2c82399b7d8e31cce8f84aab909955da9d84f50"
+    }
+  ]
+}
