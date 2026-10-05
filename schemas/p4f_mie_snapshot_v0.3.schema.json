@@ -123,6 +123,7 @@
                     "state": {
                       "enum": [
                         "NO_FEASIBLE_SOLUTION",
+                        "OUTSIDE_HISTORICAL_SUPPORT",
                         "BLOCKED"
                       ]
                     }
