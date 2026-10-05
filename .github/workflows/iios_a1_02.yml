@@ -1,0 +1,69 @@
+name: IIOS A1-02 Capital Allocation Trust Evidence
+
+on:
+  pull_request:
+    paths:
+      - "calc/company_capital_trust_bridge.py"
+      - "schemas/company_capital_trust_bridge_v0.1.schema.json"
+      - "tests/test_company_capital_trust_bridge.py"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/capture/E014_A1_2025_annual_capital_allocation.txt"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/capture/E015_A1_2026_h1_capital_allocation.txt"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/capture/E016_A1_related_party_guarantee.txt"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/capture/E017_A1_related_party_procurement.txt"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/A1_02_capital_trust_evidence_supplement_v0.1.json"
+      - "docs/iios/A1_02_CAPITAL_TRUST_EVIDENCE_v0.1.md"
+      - ".github/workflows/iios_a1_02.yml"
+  push:
+    branches: [main]
+    paths:
+      - "calc/company_capital_trust_bridge.py"
+      - "schemas/company_capital_trust_bridge_v0.1.schema.json"
+      - "tests/test_company_capital_trust_bridge.py"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/capture/E014_A1_2025_annual_capital_allocation.txt"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/capture/E015_A1_2026_h1_capital_allocation.txt"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/capture/E016_A1_related_party_guarantee.txt"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/capture/E017_A1_related_party_procurement.txt"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/A1_02_capital_trust_evidence_supplement_v0.1.json"
+      - "docs/iios/A1_02_CAPITAL_TRUST_EVIDENCE_v0.1.md"
+      - ".github/workflows/iios_a1_02.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  a1-02:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q calc tests/test_company_capital_trust_bridge.py
+      - run: python -m pytest -q tests/test_company_capital_trust_bridge.py
+      - run: python -m json.tool schemas/company_capital_trust_bridge_v0.1.schema.json >/dev/null
+      - run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path(".")
+          manifest = json.loads(
+              Path("evidence/real_cases/RC-CN-A-300750-20261004/A1_02_capital_trust_evidence_supplement_v0.1.json").read_text(encoding="utf-8")
+          )
+          manifest_copy = dict(manifest)
+          audit = manifest_copy.pop("audit")
+          canonical = json.dumps(manifest_copy, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+          assert hashlib.sha256(canonical.encode("utf-8")).hexdigest() == audit["manifest_sha256"]
+          for row in manifest["raw_artifacts"]:
+              path = root / row["relative_path"]
+              payload = path.read_bytes()
+              assert len(payload) == row["expected_size_bytes"], row["evidence_id"]
+              assert hashlib.sha256(payload).hexdigest() == row["expected_sha256"], row["evidence_id"]
+          for evidence in manifest["evidence"]:
+              assert evidence["status"] == "ADMITTED"
+              assert evidence["subject_id"] == manifest["case_id"]
+          print("A1_02_EXACT_BYTES_AND_MANIFEST_OK")
+          PY
+      - run: git diff --check
