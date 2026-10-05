@@ -401,7 +401,8 @@ def test_unstable_identification_blocks_conditional_mie():
     p3 = identify_market_models(unstable)
     assert p3["identifiability"].state.value == "UNIDENTIFIABLE"
     assert p3["stability"].state.value == "UNSTABLE"
-    assert run(unstable)[0].qualification == MIEQualification.BLOCKED
+    with pytest.raises(ValueError, match="no feasible DCF/DDM market model"):
+        run(unstable)
 
 
 def test_insufficient_evidence_assessment_blocks_mie():
