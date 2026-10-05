@@ -29,6 +29,7 @@ CANONICAL_DECISION_PRECEDENCE: tuple[DecisionRule, ...] = (
     DecisionRule("T00_TRUST_NOT_PASS", 10, "UNIVERSAL", "trust_status != PASS", "REVIEW_REQUIRED", "TRUST_NOT_PASS_REQUIRES_REVIEW", "REVIEW", "Trust Gate has precedence over all investment actions; non-PASS never auto-allocates or auto-disposes capital."),
     DecisionRule("U20_RETURN_METRICS_UNRESOLVED", 20, "UNIVERSAL", "return_metrics_ready == false", "REVIEW_REQUIRED", "RETURN_OR_CASE_VALIDATION_UNRESOLVED", "REVIEW", "Deterministic return/risk metrics are required before semantic action selection."),
     DecisionRule("EP10_THESIS_BROKEN", 20, "EXISTING_POSITION", "position > 0 and thesis_status == BROKEN", "EXIT", "THESIS_BROKEN", "DECREASE", "A broken investment thesis exits an existing position."),
+    DecisionRule("EP11_THESIS_UNKNOWN", 21, "EXISTING_POSITION", "position > 0 and thesis_status == UNKNOWN", "REVIEW_REQUIRED", "THESIS_UNKNOWN", "REVIEW", "An unresolved thesis cannot be silently converted into HOLD."),
     DecisionRule("EP15_RISK_UNKNOWN", 25, "EXISTING_POSITION", "position > 0 and risk_status == UNKNOWN", "REVIEW_REQUIRED", "RISK_UNKNOWN", "REVIEW", "Risk state is unresolved; no automatic holding/reduction decision is permitted."),
     DecisionRule("EP20_RISK_HARD_FAIL", 30, "EXISTING_POSITION", "position > 0 and hard_risk_failure", "REDUCE", "RISK_GATE_FAILED", "DECREASE", "Hard risk failure reduces an existing position."),
     DecisionRule("EP30_PORTFOLIO_UNKNOWN", 35, "EXISTING_POSITION", "position > 0 and portfolio_status == UNKNOWN", "REVIEW_REQUIRED", "PORTFOLIO_CONSTRAINT_UNKNOWN", "REVIEW", "An unresolved portfolio constraint cannot be converted into a deterministic sizing action."),
@@ -108,6 +109,7 @@ def _matches(rule: DecisionRule, inputs: DecisionStateInputs) -> bool:
         "T00_TRUST_NOT_PASS": inputs.trust_status != "PASS",
         "U20_RETURN_METRICS_UNRESOLVED": not inputs.return_metrics_ready,
         "EP10_THESIS_BROKEN": pos and inputs.thesis_status == "BROKEN",
+        "EP11_THESIS_UNKNOWN": pos and inputs.thesis_status == "UNKNOWN",
         "EP20_RISK_HARD_FAIL": pos and hard_risk_failure,
         "EP30_PORTFOLIO_BLOCKED": pos and inputs.portfolio_status == "BLOCKED",
         "EP40_EXPECTED_RETURN_NEGATIVE": pos and negative_return,
@@ -184,7 +186,7 @@ def validate_precedence_table() -> None:
     if scopes != {"UNIVERSAL", "EXISTING_POSITION", "NEW_CAPITAL"}:
         raise ValueError("decision precedence scopes are incomplete")
     existing_ids = [r.rule_id for r in CANONICAL_DECISION_PRECEDENCE if r.scope == "EXISTING_POSITION"]
-    expected_existing_prefix = ["EP10_THESIS_BROKEN", "EP15_RISK_UNKNOWN", "EP20_RISK_HARD_FAIL"]
+    expected_existing_prefix = ["EP10_THESIS_BROKEN", "EP11_THESIS_UNKNOWN", "EP15_RISK_UNKNOWN"]
     if existing_ids[:3] != expected_existing_prefix:
         raise ValueError("existing-position protection precedence is not frozen")
     new_ids = [r.rule_id for r in CANONICAL_DECISION_PRECEDENCE if r.scope == "NEW_CAPITAL"]
