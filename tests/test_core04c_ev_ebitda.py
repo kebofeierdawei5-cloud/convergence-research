@@ -12,6 +12,7 @@ from tools.core04c_ev_ebitda import (
     market_price_from_snapshot,
     normalize_text,
     ttm,
+    validate_pit_order,
 )
 
 
@@ -103,3 +104,21 @@ def test_market_snapshot_parser_requires_close_column(tmp_path: Path):
     make_xlsx(xlsx, price_header="其他")
     with pytest.raises(ValueError, match="close-price column"):
         market_price_from_snapshot(xlsx, "300750")
+
+def test_validate_pit_order_rejects_lookahead():
+    receipt = [
+        {"source_id": "BAL", "known_at": "2026-07-24T08:00:00+00:00"},
+        {"source_id": "EBITDA", "known_at": "2026-07-28T08:00:00+00:00"},
+    ]
+    periods = [("2026-07-27", "BAL", "EBITDA", "TTM_EBITDA_H1_2026", "SOURCE_VINTAGE")]
+    with pytest.raises(ValueError, match="PIT violation"):
+        validate_pit_order(receipt, periods)
+
+
+def test_validate_pit_order_accepts_same_day_or_earlier():
+    receipt = [
+        {"source_id": "BAL", "known_at": "2026-07-24T08:00:00+00:00"},
+        {"source_id": "EBITDA", "known_at": "2026-07-27T08:00:00+00:00"},
+    ]
+    periods = [("2026-07-27", "BAL", "EBITDA", "TTM_EBITDA_H1_2026", "SOURCE_VINTAGE")]
+    validate_pit_order(receipt, periods)
