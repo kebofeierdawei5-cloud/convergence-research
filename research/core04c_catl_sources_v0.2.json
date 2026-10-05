@@ -1,0 +1,14 @@
+{
+  "schema_version": "IIOS-CORE04C-CATL-SOURCES-0.2",
+  "case_id": "RC-CN-A-300750-20261004",
+  "sources": [
+    {"filename":"SZSE-MKT-2025-10-22.xlsx","url":"https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2025-10-22&txtEndDate=2025-10-22&archiveDate=2025-10-23&random=0.20261005","role":"MARKET_PRICE_SNAPSHOT","observation_date":"2025-10-22"},
+    {"filename":"CNINFO-Q3-2025.pdf","url":"https://static.cninfo.com.cn/finalpage/2025-10-21/1224721971.PDF","role":"COMPANY_FINANCIAL_REPORT","observation_date":"2025-09-30","known_at":"2025-10-21T23:59:59+08:00"},
+    {"filename":"CNINFO-FY2024-2025-03-15.pdf","url":"https://static.cninfo.com.cn/finalpage/2025-03-15/1222806982.PDF","role":"COMPANY_ANNUAL_REPORT","fiscal_year":2024,"known_at":"2025-03-15T23:59:59+08:00"},
+    {"filename":"SZSE-MKT-2026-04-17.xlsx","url":"https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-04-17&txtEndDate=2026-04-17&archiveDate=2026-04-18&random=0.20261005","role":"MARKET_PRICE_SNAPSHOT","observation_date":"2026-04-17"},
+    {"filename":"CNINFO-Q1-2026.pdf","url":"https://static.cninfo.com.cn/finalpage/2026-04-16/1225107946.PDF","role":"COMPANY_FINANCIAL_REPORT","observation_date":"2026-03-31","known_at":"2026-04-16T23:59:59+08:00"},
+    {"filename":"CNINFO-FY2025-2026-03-10.pdf","url":"https://static.cninfo.com.cn/finalpage/2026-03-10/1225002214.PDF","role":"COMPANY_ANNUAL_REPORT","fiscal_year":2025,"known_at":"2026-03-10T23:59:59+08:00"},
+    {"filename":"SZSE-MKT-2026-07-27.xlsx","url":"https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-07-27&txtEndDate=2026-07-27&archiveDate=2026-07-28&random=0.20261005","role":"MARKET_PRICE_SNAPSHOT","observation_date":"2026-07-27"},
+    {"filename":"CNINFO-H1-2026.pdf","url":"https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF","role":"COMPANY_FINANCIAL_REPORT","observation_date":"2026-06-30","known_at":"2026-07-24T23:59:59+08:00"}
+  ]
+}
