@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/canonical-entry-evaluation-v0.1.schema.json",
+  "title": "IIOS Canonical Entry Evaluation + Decision Admission v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evaluation_id","evaluation_version","status","qualification",
+    "current_price","return_target_entry_price","entry_reference_source",
+    "effective_target_entry_price","price_constraint_type",
+    "target_entry_price_inclusive","current_price_eligible",
+    "binding","binding_components","reason",
+    "p2_1_response_version","p2_1_response_id","p2_1_response_hash",
+    "snapshot_hash","model_id","expectation_id"
+  ],
+  "properties": {
+    "evaluation_id": {"type":"string","pattern":"^p22-entry-evaluation-[0-9a-f]{64}$"},
+    "evaluation_version": {"const":"IIOS-P2.2-CANONICAL-ENTRY-EVALUATION-0.1"},
+    "status": {"enum":["PASS","CONDITIONAL_ONLY","REVIEW_REQUIRED","NO_FEASIBLE_PRICE"]},
+    "qualification": {"enum":["DECISION_GRADE","CONDITIONAL_ONLY","UNKNOWN"]},
+    "current_price": {"type":"string","pattern":"^[0-9]+(\\.[0-9]+)?$"},
+    "return_target_entry_price": {"type":"string","pattern":"^[0-9]+(\\.[0-9]+)?$"},
+    "entry_reference_source": {"enum":["EXPECTATION_GAP","TARGET_ENTRY_REFERENCE","NONE"]},
+    "market_expectation_id": {"type":["string","null"]},
+    "independent_forecast_ref": {"type":["object","null"]},
+    "effective_target_entry_price": {"type":["string","null"]},
+    "price_constraint_type": {"type":["string","null"]},
+    "target_entry_price_inclusive": {"type":"boolean"},
+    "current_price_eligible": {"type":["boolean","null"]},
+    "binding": {"type":"string"},
+    "binding_components": {"type":"array","items":{"type":"string"}},
+    "reason": {"type":"string","minLength":1},
+    "p2_1_response_version": {"type":["string","null"]},
+    "p2_1_response_id": {"type":["string","null"]},
+    "p2_1_response_hash": {"type":["string","null"],"pattern":"^[0-9a-f]{64}$"},
+    "snapshot_hash": {"type":["string","null"],"pattern":"^[0-9a-f]{64}$"},
+    "model_id": {"type":["string","null"]},
+    "expectation_id": {"type":["string","null"]}
+  }
+}
