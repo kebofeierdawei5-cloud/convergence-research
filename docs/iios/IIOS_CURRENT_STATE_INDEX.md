@@ -1,3 +1,7 @@
+# SUPERSEDED CURRENT-STATE HEADER — 2026-10-05
+
+Authoritative current status is now maintained in STATUS.md plus docs/iios/PHASE_AUDIT_AND_DEVELOPMENT_PLAN_2026-10-05.md. This file is retained for historical continuity and must not override the newer canonical state.
+
 # B0 REPAIR OVERRIDE — 2026-10-04
 
 Active repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
