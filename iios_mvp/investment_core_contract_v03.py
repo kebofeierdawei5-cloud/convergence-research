@@ -4,8 +4,8 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from .canonical_expectation_gap import evaluate_canonical_expectation_gap
 from .horizon_semantics import validate_horizon_selection
-from .semantic_expectation_gap import ComparisonDirection, evaluate_expectation_gap
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
 BUY_ENTRY_RETURN_CUSHION_THRESHOLD = Decimal("0.15")
@@ -292,6 +292,14 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
             errors.append(_err("V03-PRICE-POSITIVE", "current_price_observation.price", "must be > 0"))
     except (KeyError, ValueError) as exc:
         errors.append(_err("V03-PRICE", "current_price_observation.price", str(exc)))
+    if not str(case["current_price_observation"].get("price_observation_id", "")).strip():
+        errors.append(
+            _err(
+                "V03-PRICE-OBSERVATION-ID",
+                "current_price_observation.price_observation_id",
+                "price_observation_id is required for canonical price evidence",
+            )
+        )
     try:
         position = _position(case)
         if position < 0 or position > 100:
@@ -349,8 +357,8 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
 
     expectation_gap = case.get("expectation_gap")
     if expectation_gap is not None:
+        precondition_failed = False
         try:
-            evaluated_gap = _canonical_expectation_gap(expectation_gap)
             decision_horizon = str(
                 validate_horizon_selection(
                     horizon_years=case["return_gate"]["horizon_years"],
@@ -371,6 +379,7 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
                         "must equal the decision horizon selected by return_gate",
                     )
                 )
+                precondition_failed = True
             gap_price = _dec(expectation_gap["price"], "expectation_gap.price")
             observed_price = _dec(
                 case["current_price_observation"]["price"],
@@ -384,18 +393,32 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
                         "must equal current_price_observation.price; gap must be revalidated when price changes",
                     )
                 )
-        except ValueError as exc:
-            errors.append(
-                _err(
-                    "V03-EXPECTATION-GAP-CANONICAL",
-                    "expectation_gap",
-                    str(exc),
-                )
-            )
+                precondition_failed = True
+        except (KeyError, TypeError, ValueError):
+            # Canonical boundary below produces the authoritative blocker for malformed input.
+            pass
 
-    mie = case.get("market_implied_expectation")
-    if mie is not None and not isinstance(mie, dict):
-        errors.append(_err("V03-MIE-TYPE", "market_implied_expectation", "optional MIE must be an object when supplied"))
+        if not precondition_failed:
+            try:
+                _canonical_expectation_gap(expectation_gap, case)
+            except ValueError as exc:
+                errors.append(
+                    _err(
+                        "V03-EXPECTATION-GAP-CANONICAL",
+                        "expectation_gap",
+                        str(exc),
+                    )
+                )
+
+    mie_snapshot = case.get("market_implied_expectation_snapshot")
+    if mie_snapshot is not None and not isinstance(mie_snapshot, dict):
+        errors.append(
+            _err(
+                "V03-MIE-SNAPSHOT-TYPE",
+                "market_implied_expectation_snapshot",
+                "canonical P4-F MIE snapshot must be an object when supplied",
+            )
+        )
     decision = case.get("decision")
     if decision is not None:
         if not isinstance(decision, dict):
@@ -409,50 +432,21 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
                 errors.append(_err("V03-DECISION-STATUS", "decision.decision_status", f"invalid status: {status}"))
     return {"status": "PASS" if not errors else "BLOCKED", "errors": errors}
 
-def _canonical_expectation_gap(payload: Any) -> dict[str, Any]:
-    if not isinstance(payload, dict):
-        raise ValueError("expectation_gap must be an object when supplied")
-    independent = payload.get("independent_expectation")
-    market = payload.get("market_expectation")
-    direction = str(payload.get("comparison_direction", "")).strip()
-    if not isinstance(independent, dict):
-        raise ValueError("expectation_gap.independent_expectation is required")
-    if not isinstance(market, dict):
-        raise ValueError("expectation_gap.market_expectation is required")
-    if not direction:
-        raise ValueError("expectation_gap.comparison_direction is required")
+def _canonical_expectation_gap(payload: Any, case: dict[str, Any]) -> dict[str, Any]:
+    mie = case.get("market_implied_expectation_snapshot")
+    if not isinstance(mie, dict):
+        raise ValueError("market_implied_expectation_snapshot is required for a canonical expectation gap")
     try:
-        evaluated = evaluate_expectation_gap(
-            independent_expectation=independent,
-            market_expectation=market,
-            comparison_direction=ComparisonDirection(direction).value,
+        return evaluate_canonical_expectation_gap(
+            payload,
+            market_implied_expectation_snapshot=case["market_implied_expectation_snapshot"],
+            current_price=case["current_price_observation"]["price"],
+            current_price_observation=case["current_price_observation"],
+            cutoff_date=case["cutoff_date"],
+            case_id=case["case_id"],
         )
-    except (TypeError, ValueError) as exc:
+    except (KeyError, TypeError, ValueError) as exc:
         raise ValueError(str(exc)) from exc
-
-    declared_status = str(payload.get("status", "")).upper()
-    if declared_status != evaluated["status"]:
-        raise ValueError(
-            f"expectation_gap.status does not match canonical evaluation: "
-            f"declared {declared_status!r}, evaluated {evaluated['status']!r}"
-        )
-
-    for key in ("gap_absolute", "gap_relative"):
-        declared = payload.get(key)
-        evaluated_value = evaluated.get(key)
-        if evaluated_value is None:
-            if declared is not None:
-                raise ValueError(
-                    f"expectation_gap.{key} must be null when canonical evaluation is unresolved"
-                )
-            continue
-        if declared is None:
-            raise ValueError(f"expectation_gap.{key} is required for a resolved canonical gap")
-        if _dec(declared, f"expectation_gap.{key}") != evaluated_value:
-            raise ValueError(
-                f"expectation_gap.{key} does not match canonical evaluation"
-            )
-    return evaluated
 
 
 def _expectation_gap(case: dict[str, Any]) -> tuple[str, Decimal | None]:
@@ -460,7 +454,7 @@ def _expectation_gap(case: dict[str, Any]) -> tuple[str, Decimal | None]:
     if payload is None:
         return "UNKNOWN", None
     try:
-        evaluated = _canonical_expectation_gap(payload)
+        evaluated = _canonical_expectation_gap(payload, case)
     except ValueError:
         return "UNKNOWN", None
     status = str(evaluated["status"]).upper()

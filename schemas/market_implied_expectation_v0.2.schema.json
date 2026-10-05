@@ -156,6 +156,12 @@
             "type": "string",
             "minLength": 1
           },
+          "comparison_direction": {
+            "enum": [
+              "HIGHER_IS_BETTER",
+              "LOWER_IS_BETTER"
+            ]
+          },
           "value": {
             "type": [
               "string",

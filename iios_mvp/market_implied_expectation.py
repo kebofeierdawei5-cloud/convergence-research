@@ -6,6 +6,7 @@ from decimal import Decimal
 from enum import Enum
 
 from .market_model_domain import IdentifiabilityState, MarketModelFamily, StabilityState
+from .semantic_expectation_gap import ComparisonDirection
 
 
 class MIERepresentation(str, Enum):
@@ -76,6 +77,7 @@ class MIEEconomicRequirement:
     range_low: Decimal | None = None
     range_high: Decimal | None = None
     evidence_ids: tuple[str, ...] = ()
+    comparison_direction: str = ComparisonDirection.HIGHER_IS_BETTER.value
 
     def validate(self) -> None:
         if not self.economic_variable or self.economic_variable == "market_implied_net_profit":
@@ -98,6 +100,10 @@ class MIEEconomicRequirement:
             raise ValueError("range_low must be <= range_high")
         if not self.evidence_ids:
             raise ValueError("requirement evidence_ids are required")
+        try:
+            ComparisonDirection(self.comparison_direction)
+        except ValueError as exc:
+            raise ValueError("comparison_direction is invalid") from exc
 
 
 @dataclass(frozen=True)
