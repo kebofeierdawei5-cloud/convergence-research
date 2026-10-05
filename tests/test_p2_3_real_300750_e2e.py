@@ -20,7 +20,7 @@ def test_p2_3_real_300750_replays_fail_closed_without_fabricating_mie(tmp_path: 
     assert result["core04c_receipt"]["status"] == "ADMITTED"
     assert result["real_current_observation"]["price"] == "291.11"
     assert Decimal(result["real_current_observation"]["ev_ebitda"]) == Decimal(
-        "8.375536786732361377"
+        "8.3755367867323613771955766383371182231544885817258636164299037283731213288310246"
     )
 
     assert result["p3a"]["evaluation_status"] == "INFEASIBLE"
