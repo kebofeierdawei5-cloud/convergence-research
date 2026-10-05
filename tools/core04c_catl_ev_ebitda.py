@@ -159,19 +159,24 @@ def _row_first_number(
         line = raw_line.strip()
         if not line:
             continue
-        matched = next((label for label in labels if line.startswith(label)), None)
+        compact_line = re.sub(r"\s+", "", line)
+        matched = next(
+            (label for label in labels
+             if compact_line.startswith(re.sub(r"\s+", "", label))),
+            None,
+        )
         if matched is None:
             continue
 
-        candidate = line
-        # CNINFO tables sometimes wrap the numeric cells to the next line.
+        label_compact = re.sub(r"\s+", "", matched)
+        candidate = compact_line
+        # CNINFO tables often wrap the numeric cells to the next line.
         for extra in lines[index + 1 : index + 3]:
-            candidate += " " + extra.strip()
+            candidate += re.sub(r"\s+", "", extra)
             if len(re.findall(_NUM_RE.pattern, candidate)) >= 1:
-                # keep scanning one line at most when the label itself has no value
                 break
 
-        match = re.search(_NUM_RE.pattern, candidate[len(matched):])
+        match = re.search(_NUM_RE.pattern, candidate[len(label_compact):])
         if match:
             return Decimal(match.group(0).replace(",", ""))
 
