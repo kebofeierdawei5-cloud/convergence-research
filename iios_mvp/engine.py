@@ -215,6 +215,8 @@ def decide(case: dict[str, Any]) -> dict[str, Any]:
                 "position_package_complete": proposal["position_package_complete"],
                 "human_approval_required": proposal["human_approval_required"],
                 "auto_execution": proposal["auto_execution"],
+                "current_price": proposal.get("current_price"),
+                "target_entry_price": proposal.get("target_entry_price"),
             },
             "monitoring": case.get("monitoring") or [],
         }
