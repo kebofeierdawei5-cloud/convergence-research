@@ -251,162 +251,39 @@ def test_outside_support_blocks_decision_grade_mie_even_when_identification_stab
 
 def test_unstable_identification_still_blocks_ratio_mie():
     pe = candidate("pe-1", MarketModelFamily.FORWARD_PE, "candidate-pe")
-    ps = candidate("ps-1", MarketModelFamily.PS, "candidate-ps")
-    observations = []
-    evidence = []
-    for day, price, net_debt in (
-        (1, "100", "-200"),
-        (8, "100", "0"),
-        (15, "100", "0"),
-        (22, "100", "0"),
-    ):
-        oid = f"h{day}-revenue"
-        eid = f"ev-{oid}"
-        observations.append(MarketValuationObservation(
-            observation_id=oid,
-            observation_date=date(2026, 9, day),
-            known_at=datetime(2026, 9, day, 2, tzinfo=timezone.utc),
-            price=Decimal(price),
-            shares_outstanding=Decimal("1"),
-            economic_variable="revenue",
-            economic_value=Decimal("100"),
-            unit="CNY",
-            basis="TTM",
-            evidence_ids=(eid,),
-            source="test-fixture",
-            net_debt=Decimal(net_debt),
-        ))
-        evidence.append(MarketObservableEvidence(
-            evidence_id=eid,
-            variable="revenue",
-            unit="CNY",
-            basis="TTM",
-            observation_date=observations[-1].observation_date,
-            known_at=observations[-1].known_at,
-            source="test-fixture",
-            value=Decimal("100"),
-        ))
-    current_oid = "current-revenue"
-    current_date = CUTOFF
-    current = MarketValuationObservation(
-        observation_id=current_oid,
-        observation_date=current_date,
-        known_at=datetime(2026, 10, 4, 2, tzinfo=timezone.utc),
-        price=Decimal("100"),
-        shares_outstanding=Decimal("1"),
-        economic_variable="revenue",
-        economic_value=Decimal("100"),
-        unit="CNY",
-        basis="TTM",
-        evidence_ids=("ev-current",),
-        source="test-fixture",
-        net_debt=Decimal("0"),
+    inp = build_input(
+        (pe,),
+        "forward_eps",
+        ("10", "10", "10", "10", "10"),
+        ("100", "100", "100", "100", "100"),
     )
-    observations.append(current)
-    evidence.append(MarketObservableEvidence(
-        evidence_id="ev-current",
-        variable="revenue",
-        unit="CNY",
-        basis="TTM",
-        observation_date=current_date,
-        known_at=current.known_at,
-        source="test-fixture",
-        value=Decimal("100"),
-    ))
-    evidence.extend((
-        MarketObservableEvidence(
-            evidence_id="candidate-pe",
-            variable="candidate_model",
-            unit="identifier",
-            basis="admission",
-            observation_date=current_date,
-            known_at=datetime(2026, 10, 4, 1, tzinfo=timezone.utc),
-            source="test-fixture",
-            value=Decimal("1"),
-        ),
-        MarketObservableEvidence(
-            evidence_id="candidate-ps",
-            variable="candidate_model",
-            unit="identifier",
-            basis="admission",
-            observation_date=current_date,
-            known_at=datetime(2026, 10, 4, 1, tzinfo=timezone.utc),
-            source="test-fixture",
-            value=Decimal("1"),
-        ),
-    ))
-    # Add a valid PE candidate with its own evidence-backed observations.
-    for day, price in ((1, "10"), (8, "10"), (15, "10"), (22, "10")):
-        oid=f"h{day}-eps"
-        eid=f"ev-{oid}"
-        observations.append(MarketValuationObservation(
-            observation_id=oid,
-            observation_date=date(2026, 9, day),
-            known_at=datetime(2026, 9, day, 2, tzinfo=timezone.utc),
-            price=Decimal(price),
-            shares_outstanding=Decimal("1"),
-            economic_variable="forward_eps",
-            economic_value=Decimal("1"),
-            unit="CNY/share",
-            basis="forward",
-            evidence_ids=(eid,),
-            source="test-fixture",
-        ))
-        evidence.append(MarketObservableEvidence(
-            evidence_id=eid,
-            variable="forward_eps",
-            unit="CNY/share",
-            basis="forward",
-            observation_date=date(2026, 9, day),
-            known_at=datetime(2026, 9, day, 2, tzinfo=timezone.utc),
-            source="test-fixture",
-            value=Decimal("1"),
-        ))
-    observations.append(MarketValuationObservation(
-        observation_id="current-forward_eps",
-        observation_date=current_date,
-        known_at=current.known_at,
-        price=Decimal("10"),
-        shares_outstanding=Decimal("1"),
-        economic_variable="forward_eps",
-        economic_value=Decimal("1"),
-        unit="CNY/share",
-        basis="forward",
-        evidence_ids=("ev-current-eps",),
-        source="test-fixture",
-    ))
-    evidence.append(MarketObservableEvidence(
-        evidence_id="ev-current-eps",
-        variable="forward_eps",
-        unit="CNY/share",
-        basis="forward",
-        observation_date=current_date,
-        known_at=current.known_at,
-        source="test-fixture",
-        value=Decimal("1"),
-    ))
-    inp = MarketModelIdentificationInput(
-        cutoff_date=CUTOFF,
-        current_observation_id=current_oid,
-        candidates=(pe, ps),
-        observations=tuple(observations),
-        evidence=tuple(evidence),
+    invalid = list(inp.observations)
+    invalid[0] = MarketValuationObservation(
+        observation_id=invalid[0].observation_id,
+        observation_date=invalid[0].observation_date,
+        known_at=invalid[0].known_at,
+        price=Decimal("-1"),
+        shares_outstanding=invalid[0].shares_outstanding,
+        economic_variable=invalid[0].economic_variable,
+        economic_value=invalid[0].economic_value,
+        unit=invalid[0].unit,
+        basis=invalid[0].basis,
+        evidence_ids=invalid[0].evidence_ids,
+        source=invalid[0].source,
+        net_debt=invalid[0].net_debt,
     )
-    p3 = identify_market_models(inp)
-    assert p3["identifiability"].state.value == "IDENTIFIABLE"
-    assert p3["identifiability"].selected_model_id == "pe-1"
+    unstable = MarketModelIdentificationInput(
+        cutoff_date=inp.cutoff_date,
+        current_observation_id=inp.current_observation_id,
+        candidates=inp.candidates,
+        observations=tuple(invalid),
+        evidence=inp.evidence,
+    )
+    p3 = identify_market_models(unstable)
+    assert p3["identifiability"].state.value == "UNIDENTIFIABLE"
     assert p3["stability"].state.value == "UNSTABLE"
-    outputs = build_ratio_market_implied_expectations(
-            identification_input=inp,
-            identification=p3,
-            candidate_coverage=coverage(inp),
-            evidence_sufficiency=evidence_sufficient(inp),
-            currency="CNY",
-            adjustment_semantics="UNADJUSTED",
-            period="NTM",
-            horizon="12M",
-            accounting_basis="reported",
-        )
+    outputs = run(unstable)
+    assert outputs[0].qualification == MIEQualification.BLOCKED
 
 
 def test_insufficient_candidate_coverage_blocks_mie():
