@@ -7,8 +7,11 @@ import pytest
 
 from iios_mvp.market_model_domain import (
     CandidateMarketModel,
+    HistoricalSupportState,
     MarketModelFamily,
     MarketObservableEvidence,
+    ModelFitStatus,
+    RegimeInterpretationState,
 )
 from iios_mvp.market_model_identification import (
     MarketModelIdentificationInput,
@@ -72,6 +75,89 @@ def base_input(candidates, observations, evidence=None):
             ev("e1", "forward_eps"),
         ]),
     )
+
+
+def test_outside_historical_support_is_not_model_infeasibility():
+    candidate_pe = candidate("pe-outside", MarketModelFamily.FORWARD_PE, "forward_eps")
+    observations = (
+        obs("h1", 1, "100", "5", "forward_eps"),
+        obs("h2", 15, "120", "5", "forward_eps"),
+        obs("h3", 30, "140", "5", "forward_eps"),
+        MarketValuationObservation(
+            observation_id="current",
+            observation_date=CUTOFF,
+            known_at=KNOWN,
+            price=Decimal("50"),
+            shares_outstanding=Decimal("100"),
+            economic_variable="forward_eps",
+            economic_value=Decimal("5"),
+            unit="CNY/share",
+            basis="forward",
+            evidence_ids=("e1",),
+            source="test-fixture",
+        ),
+    )
+    result = identify_market_models(base_input([candidate_pe], observations))
+    evaluation = result["evaluations"][0]
+    assert evaluation.fit.status == ModelFitStatus.OUTSIDE_HISTORICAL_SUPPORT
+    assert evaluation.feasible_solution_set is None
+    assert evaluation.fit.historical_support == HistoricalSupportState.BELOW_HISTORICAL_RANGE
+    assert evaluation.fit.regime_interpretation == RegimeInterpretationState.POSSIBLE_REGIME_SHIFT
+    assert result["identifiability"].state.value == "UNIDENTIFIABLE"
+
+
+def test_above_historical_support_is_explicit():
+    candidate_pe = candidate("pe-above", MarketModelFamily.FORWARD_PE, "forward_eps")
+    observations = (
+        obs("h1", 1, "100", "5", "forward_eps"),
+        obs("h2", 15, "120", "5", "forward_eps"),
+        obs("h3", 30, "140", "5", "forward_eps"),
+        MarketValuationObservation(
+            observation_id="current",
+            observation_date=CUTOFF,
+            known_at=KNOWN,
+            price=Decimal("800"),
+            shares_outstanding=Decimal("100"),
+            economic_variable="forward_eps",
+            economic_value=Decimal("5"),
+            unit="CNY/share",
+            basis="forward",
+            evidence_ids=("e1",),
+            source="test-fixture",
+        ),
+    )
+    result = identify_market_models(base_input([candidate_pe], observations))
+    evaluation = result["evaluations"][0]
+    assert evaluation.fit.status == ModelFitStatus.OUTSIDE_HISTORICAL_SUPPORT
+    assert evaluation.fit.historical_support == HistoricalSupportState.ABOVE_HISTORICAL_RANGE
+    assert evaluation.fit.regime_interpretation == RegimeInterpretationState.POSSIBLE_REGIME_SHIFT
+
+
+def test_in_range_feasible_fit_explicitly_has_in_range_support():
+    candidate_pe = candidate("pe-in-range", MarketModelFamily.FORWARD_PE, "forward_eps")
+    observations = (
+        obs("h1", 1, "100", "5", "forward_eps"),
+        obs("h2", 15, "120", "5", "forward_eps"),
+        obs("h3", 30, "140", "5", "forward_eps"),
+        MarketValuationObservation(
+            observation_id="current",
+            observation_date=CUTOFF,
+            known_at=KNOWN,
+            price=Decimal("125"),
+            shares_outstanding=Decimal("100"),
+            economic_variable="forward_eps",
+            economic_value=Decimal("5"),
+            unit="CNY/share",
+            basis="forward",
+            evidence_ids=("e1",),
+            source="test-fixture",
+        ),
+    )
+    result = identify_market_models(base_input([candidate_pe], observations))
+    evaluation = result["evaluations"][0]
+    assert evaluation.fit.status == ModelFitStatus.FEASIBLE
+    assert evaluation.fit.historical_support == HistoricalSupportState.IN_RANGE
+    assert evaluation.fit.regime_interpretation == RegimeInterpretationState.NOT_ASSESSED
 
 
 def test_unique_feasible_model_is_identifiable_and_solution_is_model_semantic():
