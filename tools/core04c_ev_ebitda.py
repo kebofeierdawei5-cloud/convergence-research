@@ -389,22 +389,37 @@ def derive_case(source_paths: dict[str, Path]) -> dict[str, object]:
     )
 
     h1_lines = extract_pdf_lines(source_paths["CNINFO-H1-2026"])
-    h1_start = _first_index(h1_lines, "现金流量表补充资料")
-    comparative_labels = [
-        "利润总额",
-        "利息费用",
+    h1_profit_start = _first_index(h1_lines, "合并利润表")
+    h1_cashflow_start = _first_index(h1_lines, "现金流量表补充资料")
+
+    h1_profit_values = find_row_values(
+        h1_lines, "利润总额", start_index=h1_profit_start, max_scan=80
+    )
+    h1_interest_values = find_row_values(
+        h1_lines, "利息费用", start_index=h1_profit_start, max_scan=80
+    )
+    if len(h1_profit_values) < 2 or len(h1_interest_values) < 2:
+        raise LookupError("H1 comparative profit/interest values unavailable")
+
+    h1_depreciation_values: list[list[Decimal]] = []
+    for label in (
         "固定资产折旧",
         "使用权资产折旧",
         "无形资产摊销",
         "长期待摊费用摊销",
-    ]
-    h1_comparatives: list[list[Decimal]] = []
-    for label in comparative_labels:
-        values = find_row_values(h1_lines, label, start_index=h1_start, max_scan=80)
+    ):
+        values = find_row_values(
+            h1_lines, label, start_index=h1_cashflow_start, max_scan=80
+        )
         if len(values) < 2:
-            raise LookupError(f"H1 comparative values unavailable for {label}")
-        h1_comparatives.append(values)
-    h1_2025_ebitda = sum(values[1] for values in h1_comparatives)
+            raise LookupError(f"H1 comparative depreciation values unavailable for {label}")
+        h1_depreciation_values.append(values)
+
+    h1_2025_ebitda = (
+        h1_profit_values[1]
+        + h1_interest_values[1]
+        + sum(values[1] for values in h1_depreciation_values)
+    )
 
     ebitda_for_observation_thousand_cny = {
         "2026-07-27": ttm(
