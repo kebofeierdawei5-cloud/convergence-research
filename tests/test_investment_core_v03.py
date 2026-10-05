@@ -8,6 +8,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from iios_mvp.canonical_expectation_gap import CANONICAL_EXPECTATION_GAP_VERSION
+from iios_mvp.evidence_root_admission import InMemoryEvidenceRootRegistry
 from iios_mvp.engine import decide, replay, run_case, validate_case
 from iios_mvp.market_implied_expectation import (
     CandidateCoverageAssessment,
@@ -27,6 +28,9 @@ from iios_mvp.multi_model_market_implied_expectation_set import (
 )
 from iios_mvp.p4f_mie_snapshot import P4FProvenanceRecord, build_p4f_snapshot
 from iios_mvp.investment_core_contract_v03 import calculate_return_metrics, validate_case_v03
+
+
+EVIDENCE_ROOT_REGISTRY = InMemoryEvidenceRootRegistry()
 
 
 def market_implied_expectation_snapshot() -> dict:
@@ -151,7 +155,7 @@ def case() -> dict:
             },
         },
         "thesis": {"status": "INTACT"},
-        "market_implied_expectation_snapshot": market_implied_expectation_snapshot(),
+        "market_implied_expectation_snapshot_ref": EVIDENCE_ROOT_REGISTRY.admit_p4f_snapshot(market_implied_expectation_snapshot()).to_dict(),
         "expectation_gap": {
             "gap_id": "gap-v01-001",
             "evaluator_version": CANONICAL_EXPECTATION_GAP_VERSION,
@@ -201,24 +205,24 @@ def test_v03_return_math_separates_the_two_15_percent_policies():
 
 def test_v03_mie_is_required_for_canonical_gap():
     c = case()
-    assert validate_case_v03(c)["status"] == "PASS"
+    assert validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY)["status"] == "PASS"
     assert not any(x.startswith("V03-MIE") for x in [e["code"] for e in validate_case_v03(c)["errors"]])
 
 
 def test_v03_forged_positive_gap_is_blocked():
     c = case()
     c["expectation_gap"]["gap_relative"] = "0.10"
-    result = decide(c)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-EXPECTATION-GAP-CANONICAL" in x for x in result["validation"]["blockers"])
 
 
-def test_v03_snapshot_tampering_is_blocked():
+def test_v03_evidence_root_reference_tampering_is_blocked():
     c = case()
-    c["market_implied_expectation_snapshot"]["mie_set"]["model_evaluations"][0]["expectation"]["economic_requirements"][0]["value"] = "11"
+    c["market_implied_expectation_snapshot_ref"]["content_sha256"] = "0" * 64
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
-    assert any("invalid canonical P4-F MIE snapshot" in x for x in result["validation"]["blockers"])
+    assert any("does not match admitted root" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_expectation_gap_horizon_must_match_decision_horizon():
@@ -322,10 +326,10 @@ def test_v03_positive_gap_but_price_above_target_is_watch_price():
 
 def test_v03_missing_mie_snapshot_with_gap_fails_closed():
     c = case()
-    del c["market_implied_expectation_snapshot"]
+    del c["market_implied_expectation_snapshot_ref"]
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
-    assert any("market_implied_expectation_snapshot is required" in x for x in result["validation"]["blockers"])
+    assert any("market_implied_expectation_snapshot_ref is required" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_mie_snapshot_hash_binding_fails_closed():
@@ -515,9 +519,9 @@ def test_v03_pit_leak_blocks_decision():
 
 
 def test_v03_replay_is_deterministic():
-    snap, digest = run_case(case())
+    snap, digest = run_case(case(), evidence_root_resolver=EVIDENCE_ROOT_REGISTRY)
     assert digest == snap["snapshot_hash"]
-    replay_result = replay(snap)
+    replay_result = replay(snap, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY)
     assert replay_result["replay_status"] == "PASS"
     assert replay_result["integrity_status"] == "PASS"
 
