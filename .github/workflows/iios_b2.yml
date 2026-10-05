@@ -7,6 +7,7 @@ on:
       - "schemas/evidence_record_v0.1.schema.json"
       - "schemas/source_registry_v0.1.schema.json"
       - "schemas/pit_temporal_semantics_v0.1.schema.json"
+      - "schemas/company_evidence_manifest_v0.1.schema.json"
       - "configs/source_registry_v0.1.json"
       - "docs/iios/B2_*.md"
       - ".github/workflows/iios_b2.yml"
@@ -47,7 +48,10 @@ jobs:
           python -m json.tool schemas/evidence_record_v0.1.schema.json >/dev/null
           python -m json.tool schemas/source_registry_v0.1.schema.json >/dev/null
           python -m json.tool schemas/pit_temporal_semantics_v0.1.schema.json >/dev/null
+          python -m json.tool schemas/company_evidence_manifest_v0.1.schema.json >/dev/null
           python -m jsonschema -i configs/source_registry_v0.1.json schemas/source_registry_v0.1.schema.json
+      - name: Run single-company Evidence/PIT tests
+        run: python -m pytest -q research/b2/tests/test_company_evidence.py research/b2/tests/test_evidence_contract.py
       - name: Prove A02 fails closed when exact bytes are absent
         run: |
           mkdir -p /tmp/b2-empty /tmp/b2-result

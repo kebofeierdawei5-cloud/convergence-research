@@ -132,6 +132,32 @@
       "pit_capability": "CURRENT_ONLY",
       "mandatory_for_production": false,
       "notes": "Current control only; never back-applied to historical PIT."
+    },
+    {
+      "source_ref": "HKEX:COMPANY_ANNOUNCEMENT",
+      "provider": "The Stock Exchange of Hong Kong Limited",
+      "role": [
+        "ISSUER_DISCLOSURE",
+        "PUBLICATION_EVIDENCE"
+      ],
+      "access_class": "FREE_PUBLIC",
+      "authority_level": "PRIMARY_ISSUER",
+      "pit_capability": "EVENT_PUBLICATION",
+      "mandatory_for_production": true,
+      "notes": "Applicable to HK-listed issuers; exact source capture is required for material facts."
+    },
+    {
+      "source_ref": "ISSUER:INVESTOR_RELATIONS_PUBLIC",
+      "provider": "Issuer investor-relations site",
+      "role": [
+        "ISSUER_DISCLOSURE",
+        "SOURCE_VINTAGE_CROSS_CHECK"
+      ],
+      "access_class": "FREE_PUBLIC",
+      "authority_level": "PRIMARY_ISSUER",
+      "pit_capability": "SOURCE_VINTAGE",
+      "mandatory_for_production": false,
+      "notes": "Issuer-hosted public material; exact capture and defensible publication/vintage timing are required."
     }
   ]
 }
