@@ -1,0 +1,224 @@
+{
+  "schema_version": "IIOS-COMPANY-EVIDENCE-MANIFEST-0.1",
+  "case_id": "RC-CN-A-300750-20261004",
+  "market": "CN-A",
+  "symbol": "300750",
+  "company": "宁德时代",
+  "cutoff_date": "2026-10-04T23:59:59+08:00",
+  "required_field_groups": [
+    "security_identity",
+    "market_price",
+    "corporate_disclosures",
+    "business_reality",
+    "financial_reality",
+    "capital_structure",
+    "trust_governance_events"
+  ],
+  "evidence": [
+    {
+      "evidence_id": "E001",
+      "subject_id": "RC-CN-A-300750-20261004",
+      "field_id": "security_identity.primary",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2018-06-07",
+      "retrieved_at": "2018-06-07",
+      "source_ref": "https://www.szse.cn/disclosure/notice/company/t20180607_539221.html",
+      "artifact_id": "catl-20261004-E001-security-identity.txt",
+      "content_sha256": "c5764e7e47e8074887124f307273d58e0341dafce320d4a39d626e2f9a10f9bf",
+      "exact_bytes": true,
+      "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+      "status": "ADMITTED"
+    },
+    {
+      "evidence_id": "E002",
+      "subject_id": "RC-CN-A-300750-20261004",
+      "field_id": "market_price.close.2026-09-30",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-09-30T21:28:59+08:00",
+      "retrieved_at": "2026-10-04",
+      "source_ref": "https://wap.stockstar.com/detail/RB2026093000037318",
+      "artifact_id": "catl-20261004-E002-market-price.txt",
+      "content_sha256": "839935152c4f1e852c7ad3e83282591eaeab48f176c00de31977cbf01a626346",
+      "exact_bytes": true,
+      "provenance_class": "EVENT_PUBLICATION_VERIFIED",
+      "status": "ADMITTED"
+    },
+    {
+      "evidence_id": "E003",
+      "subject_id": "RC-CN-A-300750-20261004",
+      "field_id": "corporate_disclosures.material.2026-09-30",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-09-30",
+      "retrieved_at": "2026-10-04",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-10-01/1225592063.PDF",
+      "artifact_id": "catl-20261004-E003-corporate-disclosure.txt",
+      "content_sha256": "8e873770df3ef7ddc3c299578bbd0bd5aac6c237d490410413afcfcd9c3e66b1",
+      "exact_bytes": true,
+      "provenance_class": "EVENT_PUBLICATION_VERIFIED",
+      "status": "ADMITTED"
+    },
+    {
+      "evidence_id": "E004",
+      "subject_id": "RC-CN-A-300750-20261004",
+      "field_id": "business_reality.operating_model",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-07-24",
+      "retrieved_at": "2026-10-04",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
+      "artifact_id": "catl-20261004-E004-business-reality.txt",
+      "content_sha256": "6ff413fedd9e98b36bfdbf2a3caf13ed35935101ac21c710702f67ec16ee8b9d",
+      "exact_bytes": true,
+      "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+      "status": "ADMITTED"
+    },
+    {
+      "evidence_id": "E005",
+      "subject_id": "RC-CN-A-300750-20261004",
+      "field_id": "financial_reality.h1_2026",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-07-24",
+      "retrieved_at": "2026-10-04",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
+      "artifact_id": "catl-20261004-E005-financial-reality.txt",
+      "content_sha256": "edc92ca668aa0010d37e257fd7ee8ae22a01b9dbd8d9b642b88b6195c1498777",
+      "exact_bytes": true,
+      "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+      "status": "ADMITTED"
+    },
+    {
+      "evidence_id": "E006",
+      "subject_id": "RC-CN-A-300750-20261004",
+      "field_id": "capital_structure.shareholders_h1_2026",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-07-24",
+      "retrieved_at": "2026-10-04",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
+      "artifact_id": "catl-20261004-E006-capital-structure.txt",
+      "content_sha256": "fd0fb530c211fd625b27cc052e67281215fa178c364a5f81a382714265b74739",
+      "exact_bytes": true,
+      "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+      "status": "ADMITTED"
+    },
+    {
+      "evidence_id": "E007",
+      "subject_id": "RC-CN-A-300750-20261004",
+      "field_id": "trust_governance_events.related_party_guarantee",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-09-30",
+      "retrieved_at": "2026-10-04",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-10-01/1225592063.PDF",
+      "artifact_id": "catl-20261004-E007-trust-governance.txt",
+      "content_sha256": "087113f8174f754a3cb888f75551c0862d810e75f4cc1effd7d02c88ac60a440",
+      "exact_bytes": true,
+      "provenance_class": "EVENT_PUBLICATION_VERIFIED",
+      "status": "ADMITTED"
+    },
+    {
+      "evidence_id": "E008",
+      "subject_id": "RC-CN-A-300750-20261004",
+      "field_id": "capital_structure.current_share_count",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-09-29",
+      "retrieved_at": "2026-10-04T00:00:00+08:00",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-09-29/1225589071.PDF",
+      "artifact_id": "catl-20261004-E008-current-share-count.txt",
+      "content_sha256": "744c3b810f724864f56b69d3b7c19f94963b42d02020351f72f0a45897f4083f",
+      "exact_bytes": true,
+      "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+      "status": "ADMITTED"
+    },
+    {
+      "evidence_id": "E009",
+      "subject_id": "RC-CN-A-300750-20261004",
+      "field_id": "financial_reality.2025_annual_anchor",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-03-10",
+      "retrieved_at": "2026-10-04T00:00:00+08:00",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-03-10/1225002214.PDF",
+      "artifact_id": "catl-20261004-E009-2025-annual-anchor.txt",
+      "content_sha256": "a6cde5bf99f836083cf4fcb15858c64ca4624a625ace4d3724241caedfafb71f",
+      "exact_bytes": true,
+      "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+      "status": "ADMITTED"
+    },
+    {
+      "evidence_id": "E010",
+      "subject_id": "RC-CN-A-300750-20261004",
+      "field_id": "financial_reality.working_capital_h1_2026",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-07-24",
+      "retrieved_at": "2026-10-04T00:00:00+08:00",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
+      "artifact_id": "catl-20261004-E010-working-capital-h1-2026.txt",
+      "content_sha256": "6d4ab4fd36b90e180af2cb40c09a3b6fdfb5275ab527b26e694556a52207aecb",
+      "exact_bytes": true,
+      "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+      "status": "ADMITTED"
+    }
+  ],
+  "raw_artifacts": [
+    {
+      "evidence_id": "E001",
+      "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E001_security_identity.txt",
+      "expected_size_bytes": 439,
+      "expected_sha256": "c5764e7e47e8074887124f307273d58e0341dafce320d4a39d626e2f9a10f9bf"
+    },
+    {
+      "evidence_id": "E002",
+      "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_market_price.txt",
+      "expected_size_bytes": 189,
+      "expected_sha256": "839935152c4f1e852c7ad3e83282591eaeab48f176c00de31977cbf01a626346"
+    },
+    {
+      "evidence_id": "E003",
+      "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E003_corporate_disclosures.txt",
+      "expected_size_bytes": 956,
+      "expected_sha256": "8e873770df3ef7ddc3c299578bbd0bd5aac6c237d490410413afcfcd9c3e66b1"
+    },
+    {
+      "evidence_id": "E004",
+      "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E004_business_reality.txt",
+      "expected_size_bytes": 1270,
+      "expected_sha256": "6ff413fedd9e98b36bfdbf2a3caf13ed35935101ac21c710702f67ec16ee8b9d"
+    },
+    {
+      "evidence_id": "E005",
+      "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E005_financial_reality.txt",
+      "expected_size_bytes": 586,
+      "expected_sha256": "edc92ca668aa0010d37e257fd7ee8ae22a01b9dbd8d9b642b88b6195c1498777"
+    },
+    {
+      "evidence_id": "E006",
+      "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E006_capital_structure.txt",
+      "expected_size_bytes": 567,
+      "expected_sha256": "fd0fb530c211fd625b27cc052e67281215fa178c364a5f81a382714265b74739"
+    },
+    {
+      "evidence_id": "E007",
+      "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E007_trust_governance.txt",
+      "expected_size_bytes": 925,
+      "expected_sha256": "087113f8174f754a3cb888f75551c0862d810e75f4cc1effd7d02c88ac60a440"
+    },
+    {
+      "evidence_id": "E008",
+      "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E008_current_share_count.txt",
+      "expected_size_bytes": 405,
+      "expected_sha256": "744c3b810f724864f56b69d3b7c19f94963b42d02020351f72f0a45897f4083f"
+    },
+    {
+      "evidence_id": "E009",
+      "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E009_2025_annual_anchor.txt",
+      "expected_size_bytes": 598,
+      "expected_sha256": "a6cde5bf99f836083cf4fcb15858c64ca4624a625ace4d3724241caedfafb71f"
+    },
+    {
+      "evidence_id": "E010",
+      "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E010_working_capital_h1_2026.txt",
+      "expected_size_bytes": 355,
+      "expected_sha256": "6d4ab4fd36b90e180af2cb40c09a3b6fdfb5275ab527b26e694556a52207aecb"
+    }
+  ],
+  "audit": {
+    "manifest_sha256": "3f205b9e378f4b00006cda9b1363b7cbd60cecd30314d4cf190c856a77699ebd"
+  }
+}

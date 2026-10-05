@@ -23,9 +23,9 @@ CORE-03 Real 300750 Vertical Slice = PASS / MERGED
         ↓
 B2-A Single Company Evidence / PIT Foundation = PASS / MERGED
         ↓
-B2-A Scope Repair = ACTIVE
+B2-A Scope Repair = PASS / MERGED
         ↓
-CATL Evidence Migration / Admission = NEXT
+CATL Existing Evidence Migration / Admission = ACTIVE
 ```
 
 ## Authority / continuity
@@ -74,7 +74,9 @@ BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
 
 ## Current development task
 
-B2-A Scope Repair | Re-establish Investment Core / Research Track isolation
+CATL Existing Evidence Migration / Admission
+
+Scope Repair is complete on canonical main. The next step is to validate the existing CATL E001-E010 capture artifacts against the B2 Evidence Manifest. No new acquisition platform is introduced.
 
 PR #32 Horizon Semantics is merged to main (a524390382044b9474c17f2712a2cef8adeb9612). Investment Core horizon semantics use H=1Y as the normative default; H=3 requires explicit case-level override evidence.
 
@@ -86,17 +88,10 @@ B2-A is PASS / MERGED:
 - PR #34 raw-root containment hardening merged 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3;
 - B2 CI passed after both changes.
 
-B2-B has started for the single real CATL case RC-CN-A-300750-20261004.
-The executable source-capture plan is intentionally BLOCKED_PENDING_RAW: it defines the required source inputs and PIT basis, but no Evidence Record is admitted until physical raw bytes are materialized and independently re-hashed.
+CATL Existing Evidence Migration / Admission is active for RC-CN-A-300750-20261004.
+The existing E001-E010 capture artifacts are the migration input. B2 will verify physical capture bytes, PIT semantics, case binding and manifest integrity. Source-quality gaps remain a separate disposition and do not get silently promoted to primary evidence.
 
-Current blocker:
-- CATL raw source files are not currently materialized in the repository/library/runtime;
-- historical .txt hashes in the old CORE-03 input are not accepted as proof of underlying source bytes;
-- 2026-09-30 market price requires an official historical market-data capture, not a post-cutoff dynamic secondary webpage.
-
-A02/CSI800 remains Research Track only and is not part of the B2-B Investment Core gate.
-
-Current canonical main baseline: ead980d18b72e37d24d5ac6ccf5f88e857dd235b.
+Current canonical main baseline: fa4a53bd5f88f8e25cc4c02614c9e765294afbb6.
 
 ## CORE-03 Real 300750 acceptance
 

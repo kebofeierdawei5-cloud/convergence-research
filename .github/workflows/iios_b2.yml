@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "research/b2/**"
+      - "evidence/real_cases/RC-CN-A-300750-20261004/**"
       - "schemas/evidence_record_v0.1.schema.json"
       - "schemas/source_registry_v0.1.schema.json"
       - "schemas/pit_temporal_semantics_v0.1.schema.json"
