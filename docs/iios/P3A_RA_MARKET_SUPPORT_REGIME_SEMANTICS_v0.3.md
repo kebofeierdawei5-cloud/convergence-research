@@ -1,7 +1,7 @@
 # P3-A-RA — Market Model Identification / Historical Support & Regime Shift Semantic Contract v0.3
 
 Date: 2026-10-05
-Status: EXECUTION DRAFT — merge candidate
+Status: IMPLEMENTED IN PR #69 — merge pending final red-team acceptance
 
 ## Objective
 
@@ -11,13 +11,12 @@ Separate mathematical model feasibility from empirical historical-support status
 
 ### Model fit
 
-- FEASIBLE means the model-specific inverse is computable, evidence-backed, and the current observation is inside the admitted historical support range.
-- INFEASIBLE is reserved for actual model or constraint contradiction.
-- OUTSIDE_HISTORICAL_SUPPORT means the model-specific inverse is computable from admitted evidence, but the current observation is below or above the observed historical support envelope.
+- FEASIBLE means the model-specific inverse is computable and evidence-backed; it does not require the current observation to remain inside the historical support envelope.
+- INFEASIBLE is reserved for an actual model/equation/constraint contradiction.
 - INSUFFICIENT_EVIDENCE means required PIT evidence or observations are missing/inadequate.
 - CONTRADICTED remains available for explicit evidence contradiction.
 
-OUTSIDE_HISTORICAL_SUPPORT MUST NOT be treated as INFEASIBLE.
+Historical support is an orthogonal P3 diagnostic and admission attribute. Range exclusion MUST NOT be converted into model infeasibility.
 
 ## Historical support state
 
@@ -44,9 +43,9 @@ The production P3-A path may only emit POSSIBLE_REGIME_SHIFT from an outside-ran
 
 ## Identification boundary
 
-A candidate outside historical support is not added to the P3 feasible model set. Therefore existing downstream P4-B remains fail-closed and cannot materialize a decision-grade MIE from an outside-support candidate.
+A candidate outside historical support may remain FEASIBLE and IDENTIFIABLE at P3 because model computability and model uniqueness are distinct from empirical support. Outside-support status is therefore not allowed to create a false `INFEASIBLE` or `UNIDENTIFIABLE` result.
 
-UNIDENTIFIABLE in the aggregate result now means that no candidate remains inside the admitted empirical support boundary. It does not mean that every outside-support model has been proven mathematically invalid.
+Historical support becomes a downstream Decision-Grade MIE support gate. P4-B must block decision-grade ratio MIE materialization whenever the identified model is outside the admitted support envelope.
 
 ## Stability boundary
 
@@ -61,10 +60,10 @@ For RC-CN-A-300750-20261004:
 - current EV/EBITDA = 8.3755367867x
 - historical support = 13.6686920853x to 16.3854513730x
 - support state = BELOW_HISTORICAL_RANGE
-- fit status = OUTSIDE_HISTORICAL_SUPPORT
+- fit status = FEASIBLE
 - regime interpretation = POSSIBLE_REGIME_SHIFT
-- identifiability = UNIDENTIFIABLE
-- P4-B = BLOCKED
+- identifiability = IDENTIFIABLE
+- P4-B = BLOCKED by historical-support admission gate
 - no DECISION-GRADE MIE
 - capital admitted = FALSE
 
