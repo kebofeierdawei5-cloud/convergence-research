@@ -1,39 +1,29 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 from tools.public_source_capture import capture
 
 
-def test_capture_hashes_exact_local_http_bytes(monkeypatch, tmp_path: Path):
+def test_capture_hashes_exact_local_fixture_bytes(monkeypatch, tmp_path: Path):
     body = b"iios-exact-bytes\x00\x01"
 
-    class FakeResponse:
-        status = 200
+    def fake_run(command, check, capture_output, text):
+        output_index = command.index("--output") + 1
+        Path(command[output_index]).write_bytes(body)
 
-        def __enter__(self):
-            return self
+        class Result:
+            returncode = 0
+            stdout = "200"
+            stderr = ""
 
-        def __exit__(self, *_):
-            return False
+        return Result()
 
-        def read(self, _size):
-            nonlocal body
-            chunk, body = body, b""
-            return chunk
-
-    def fake_urlopen(request, timeout):
-        assert request.full_url == "https://example.invalid/raw"
-        assert timeout == 90
-        return FakeResponse()
-
-    monkeypatch.setattr("tools.public_source_capture.urlopen", fake_urlopen)
+    monkeypatch.setattr("tools.public_source_capture.subprocess.run", fake_run)
     destination = tmp_path / "raw.bin"
     status, sha = capture("https://example.invalid/raw", destination)
 
     assert status == 200
-    assert destination.read_bytes() == b"iios-exact-bytes\x00\x01"
-    assert sha == hashlib.sha256(destination.read_bytes()).hexdigest()
+    assert destination.read_bytes() == body
+    assert sha == hashlib.sha256(body).hexdigest()
