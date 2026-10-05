@@ -42,7 +42,6 @@ class CanonicalExpectationGap:
     cutoff_date: date
     mie_snapshot_hash: str
     market_expectation_id: str
-    comparison_direction: ComparisonDirection
     independent_expectation: IndependentExpectation
 
     def validate(self) -> None:
@@ -120,7 +119,6 @@ def _parse_gap(payload: Mapping[str, Any]) -> CanonicalExpectationGap:
             "cutoff_date",
             "mie_snapshot_hash",
             "market_expectation_id",
-            "comparison_direction",
             "independent_expectation",
         },
         allowed={
@@ -131,7 +129,6 @@ def _parse_gap(payload: Mapping[str, Any]) -> CanonicalExpectationGap:
             "cutoff_date",
             "mie_snapshot_hash",
             "market_expectation_id",
-            "comparison_direction",
             "independent_expectation",
         },
         path="expectation_gap",
@@ -153,7 +150,6 @@ def _parse_gap(payload: Mapping[str, Any]) -> CanonicalExpectationGap:
         cutoff_date=_parse_date(payload["cutoff_date"], "expectation_gap.cutoff_date"),
         mie_snapshot_hash=str(payload["mie_snapshot_hash"]),
         market_expectation_id=str(payload["market_expectation_id"]),
-        comparison_direction=ComparisonDirection(str(payload["comparison_direction"])),
         independent_expectation=IndependentExpectation(
             variable_id=str(independent["variable_id"]),
             value=_dec(independent["value"], "independent_expectation.value"),
@@ -217,7 +213,7 @@ def _require_point_requirement(
     *,
     expectation: Mapping[str, Any],
     independent: IndependentExpectation,
-) -> tuple[Decimal, Decimal]:
+) -> tuple[Decimal, Decimal, ComparisonDirection]:
     requirements = expectation.get("economic_requirements") or []
     matches = []
     for item in requirements:
@@ -241,7 +237,11 @@ def _require_point_requirement(
     requirement, horizon_years = matches[0]
     if "value" not in requirement or "range_low" in requirement or "range_high" in requirement:
         raise ValueError("expectation gap requires a point-valued MIE economic requirement")
-    return _dec(requirement["value"], "market_implied_expectation.economic_requirements.value"), horizon_years
+    try:
+        direction = ComparisonDirection(str(requirement["comparison_direction"]))
+    except (KeyError, ValueError) as exc:
+        raise ValueError("canonical MIE economic requirement comparison_direction is required") from exc
+    return _dec(requirement["value"], "market_implied_expectation.economic_requirements.value"), horizon_years, direction
 
 
 def evaluate_canonical_expectation_gap(
@@ -280,7 +280,7 @@ def evaluate_canonical_expectation_gap(
         current_price_observation=current_price_observation,
     )
 
-    market_value, market_horizon_years = _require_point_requirement(
+    market_value, market_horizon_years, comparison_direction = _require_point_requirement(
         expectation=expectation,
         independent=gap.independent_expectation,
     )
@@ -303,7 +303,7 @@ def evaluate_canonical_expectation_gap(
     evaluated = evaluate_expectation_gap(
         independent_expectation=independent,
         market_expectation=market,
-        comparison_direction=gap.comparison_direction.value,
+        comparison_direction=comparison_direction.value,
     )
 
     return {
