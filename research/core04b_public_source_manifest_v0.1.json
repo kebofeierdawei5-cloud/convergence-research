@@ -1,0 +1,52 @@
+{
+  "schema_version": "IIOS-PUBLIC-SOURCE-CAPTURE-0.1",
+  "case_id": "RC-CN-A-300750-20261004",
+  "cutoff_date": "2026-10-04",
+  "sources": [
+    {
+      "source_id": "SZSE-MKT-2026-07-27",
+      "role": "MARKET_PRICE_SNAPSHOT",
+      "observation_date": "2026-07-27",
+      "url": "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-07-27&txtEndDate=2026-07-27&archiveDate=2026-07-28&random=0.20261005",
+      "expected_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "source_id": "CNINFO-H1-2026",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2026-06-30",
+      "known_at": "2026-07-25",
+      "url": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
+      "expected_content_type": "application/pdf"
+    },
+    {
+      "source_id": "SZSE-MKT-2026-04-17",
+      "role": "MARKET_PRICE_SNAPSHOT",
+      "observation_date": "2026-04-17",
+      "url": "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-04-17&txtEndDate=2026-04-17&archiveDate=2026-04-18&random=0.20261005",
+      "expected_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "source_id": "CNINFO-Q1-2026",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2026-03-31",
+      "known_at": "2026-04-16",
+      "url": "https://static.cninfo.com.cn/finalpage/2026-04-16/1225107946.PDF",
+      "expected_content_type": "application/pdf"
+    },
+    {
+      "source_id": "SZSE-MKT-2025-10-22",
+      "role": "MARKET_PRICE_SNAPSHOT",
+      "observation_date": "2025-10-22",
+      "url": "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2025-10-22&txtEndDate=2025-10-22&archiveDate=2025-10-23&random=0.20261005",
+      "expected_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "source_id": "CNINFO-Q3-2025",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2025-09-30",
+      "known_at": "2025-10-21",
+      "url": "https://static.cninfo.com.cn/finalpage/2025-10-21/1224721971.PDF",
+      "expected_content_type": "application/pdf"
+    }
+  ]
+}
