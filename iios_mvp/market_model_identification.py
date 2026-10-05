@@ -1148,7 +1148,8 @@ def _stability(
                 assessment_method="leave_one_out_historical_date",
                 observations=(),
                 evidence_ids=full_ident.evidence_ids,
-                rationale=f"requires at least {inp.stability_min_historical_points} historical dates",
+                rationale=f"requires at least {inp.stability_min_historical_points} historical dates; "
+                "no model-validity or regime-shift stability claim is made",
             )
             result.validate()
             return result
@@ -1169,7 +1170,8 @@ def _stability(
                 assessment_method="leave_one_out_historical_window",
                 observations=(),
                 evidence_ids=full_ident.evidence_ids,
-                rationale=f"requires at least {inp.stability_min_historical_points} historical observations",
+                rationale=f"requires at least {inp.stability_min_historical_points} historical observations; "
+                "no model-validity or regime-shift stability claim is made",
             )
             result.validate()
             return result
@@ -1215,7 +1217,8 @@ def _stability(
         observations=tuple(observations),
         evidence_ids=full_ident.evidence_ids,
         rationale=(
-            "Market-model identifiability is invariant across the full and admissible leave-one-out historical windows."
+            "Market-model identifiability is invariant across the full and admissible leave-one-out historical windows; "
+            "this does not establish model-validity or historical-support stability."
             if stable else
             "Market-model identifiability changes under an admissible historical-window perturbation."
         ),
