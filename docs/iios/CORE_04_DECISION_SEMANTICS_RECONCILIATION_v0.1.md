@@ -67,3 +67,13 @@ It does not authorize execution.
 An unresolved or advisory MIE state cannot be upgraded into a positive capital decision by omission of validation. A missing/ambiguous MIE can permit a BUY only when all independent company-side gates pass; it never creates a BUY by itself.
 
 Likewise, a verified MIE contradiction cannot become a veto unless an explicit versioned policy turns that contradiction into a decision rule.
+
+
+## 8. Acceptance checkpoint
+
+- PR #70: OPEN / NOT MERGED.
+- HEAD: `7d86d5595865ee90538e5260167db99d8c6a29d8`.
+- IIOS Investment Core CI #450: PASS.
+- IIOS CORE-00 Scope Reconciliation #187: PASS.
+- Independent review checkpoint recorded on PR #70: review `5414885493`.
+- Merge remains an owner-controlled action.
