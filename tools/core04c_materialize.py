@@ -56,26 +56,26 @@ def main() -> int:
         fetch(source["url"], path)
         actual_size = path.stat().st_size
         actual_sha256 = sha256(path)
-        if actual_size != source["expected_size_bytes"]:
-            raise RuntimeError(
-                f'{source["source_id"]}: size mismatch {actual_size} != {source["expected_size_bytes"]}'
-            )
-        if actual_sha256 != source["expected_sha256"]:
-            raise RuntimeError(
-                f'{source["source_id"]}: sha256 mismatch {actual_sha256} != {source["expected_sha256"]}'
-            )
+        matches_size = actual_size == source["expected_size_bytes"]
+        matches_sha256 = actual_sha256 == source["expected_sha256"]
         receipt["sources"].append({
             "source_id": source["source_id"],
             "filename": source["filename"],
             "size_bytes": actual_size,
             "sha256": actual_sha256,
-            "status": "EXACT_MATCH",
+            "expected_size_bytes": source["expected_size_bytes"],
+            "expected_sha256": source["expected_sha256"],
+            "matches_size": matches_size,
+            "matches_sha256": matches_sha256,
+            "status": "EXACT_MATCH" if matches_size and matches_sha256 else "CURRENT_BYTES_DIFFER",
         })
     (out / "materialization_receipt.json").write_text(
         json.dumps(receipt, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    return 0
+    mismatches = [item for item in receipt["sources"] if item["status"] != "EXACT_MATCH"]
+    print(json.dumps({"mismatch_count": len(mismatches)}, ensure_ascii=False))
+    return 2 if mismatches else 0
 
 
 if __name__ == "__main__":
