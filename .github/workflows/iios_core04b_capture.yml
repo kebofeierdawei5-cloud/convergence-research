@@ -35,6 +35,7 @@ jobs:
           PYTHONPATH=. python tools/public_source_capture.py             --manifest research/core04b_public_source_manifest_v0.1.json             --out /tmp/core04b/capture_receipt.json
       - run: python -m json.tool /tmp/core04b/capture_receipt.json >/dev/null
       - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
         with:
           name: iios-core04b-public-source-receipt
           path: /tmp/core04b/capture_receipt.json
