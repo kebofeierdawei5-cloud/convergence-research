@@ -100,7 +100,7 @@ def test_outside_historical_support_is_not_model_infeasibility():
     result = identify_market_models(base_input([candidate_pe], observations))
     evaluation = result["evaluations"][0]
     assert evaluation.fit.status == ModelFitStatus.FEASIBLE
-    assert evaluation.feasible_solution_set is None
+    assert evaluation.feasible_solution_set is not None
     assert evaluation.fit.historical_support == HistoricalSupportState.BELOW_HISTORICAL_RANGE
     assert evaluation.fit.regime_interpretation == RegimeInterpretationState.POSSIBLE_REGIME_SHIFT
     assert result["identifiability"].state.value == "IDENTIFIABLE"
