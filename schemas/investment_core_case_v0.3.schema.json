@@ -504,6 +504,31 @@
         "position_package_complete": {
           "type": "boolean"
         },
+        "canonical_entry_evaluation_version": {
+          "type": ["string", "null"],
+          "const": "IIOS-P2.2-CANONICAL-ENTRY-EVALUATION-0.1"
+        },
+        "canonical_entry_evaluation": {
+          "type": ["object", "null"],
+          "additionalProperties": true
+        },
+        "decision_pre_admission_action": {
+          "enum": ["BUY", "ADD", "HOLD", "REDUCE", "EXIT", "NO-BUY", "WATCH", "REVIEW_REQUIRED", null]
+        },
+        "decision_admission_version": {
+          "type": ["string", "null"],
+          "const": "IIOS-P2.2-DECISION-ADMISSION-0.1"
+        },
+        "decision_admission": {
+          "type": ["object", "null"],
+          "additionalProperties": true
+        },
+        "decision_admission_status": {
+          "type": ["string", "null"]
+        },
+        "decision_admission_rule_id": {
+          "type": ["string", "null"]
+        },
         "decision_precedence_version": {
           "const": "IIOS-DECISION-PRECEDENCE-0.1"
         },
