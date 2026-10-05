@@ -1044,10 +1044,18 @@ def _fit_candidate(
         evidence_ids=all_ids,
         constraints=(
             "MIN_HISTORICAL_POINTS",
-            "CURRENT_MULTIPLE_WITHIN_HISTORICAL_RANGE",
+            *(
+                ("CURRENT_MULTIPLE_WITHIN_HISTORICAL_RANGE",)
+                if current_consistent
+                else ()
+            ),
         ),
-        historical_support=HistoricalSupportState.IN_RANGE,
-        regime_interpretation=RegimeInterpretationState.NOT_ASSESSED,
+        historical_support=support_state,
+        regime_interpretation=(
+            RegimeInterpretationState.NOT_ASSESSED
+            if current_consistent
+            else RegimeInterpretationState.POSSIBLE_REGIME_SHIFT
+        ),
     )
     fit.validate()
     return CandidateEvaluation(fit, solution_set)
