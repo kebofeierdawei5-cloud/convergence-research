@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/verified-market-evidence-0.1.schema.json",
+  "title": "IIOS Verified Market Evidence v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidence_id",
+    "variable",
+    "unit",
+    "basis",
+    "observation_date",
+    "known_at",
+    "source",
+    "source_location",
+    "content_sha256",
+    "exact_bytes",
+    "status",
+    "temporal_provenance",
+    "value"
+  ],
+  "properties": {
+    "evidence_id": {"type": "string", "minLength": 1},
+    "variable": {"type": "string", "minLength": 1},
+    "unit": {"type": "string", "minLength": 1},
+    "basis": {"type": "string", "minLength": 1},
+    "observation_date": {"type": "string", "format": "date"},
+    "known_at": {"type": "string", "minLength": 1},
+    "source": {"type": "string", "minLength": 1},
+    "source_location": {"type": "string", "minLength": 1},
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "exact_bytes": {"const": true},
+    "status": {"const": "ADMITTED"},
+    "temporal_provenance": {
+      "enum": ["SOURCE_VINTAGE", "CONTEMPORANEOUS_PUBLICATION"]
+    },
+    "value": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(\\.[0-9]+)?$"
+    }
+  }
+}
