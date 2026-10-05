@@ -1,0 +1,35 @@
+name: IIOS DR-02 Persistence and CLI Integration
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/store.py"
+      - "iios_mvp/cli.py"
+      - "iios_mvp/decision_lifecycle_production.py"
+      - "tests/test_dr_02_persistence_cli.py"
+      - ".github/workflows/iios_dr_02.yml"
+  push:
+    branches: [main]
+    paths:
+      - "iios_mvp/store.py"
+      - "iios_mvp/cli.py"
+      - "iios_mvp/decision_lifecycle_production.py"
+      - "tests/test_dr_02_persistence_cli.py"
+      - ".github/workflows/iios_dr_02.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dr-02:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q iios_mvp tests/test_dr_02_persistence_cli.py
+      - run: python -m pytest -q tests/test_dr_02_persistence_cli.py
+      - run: python -m json.tool schemas/decision_lifecycle_v0.1.schema.json >/dev/null
+      - run: git diff --check
