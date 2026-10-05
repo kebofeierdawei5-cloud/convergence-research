@@ -71,6 +71,9 @@ def parse_szse_market_snapshot(
         shared = _shared_strings(archive)
         sheet = archive.read("xl/worksheets/sheet1.xml")
     root = ET.fromstring(sheet)
+
+    header: dict[str, int] | None = None
+    rows: list[dict[int, str]] = []
     for row in root.findall(".//main:row", _NS):
         values: dict[int, str] = {}
         for cell in row.findall("main:c", _NS):
@@ -78,14 +81,30 @@ def parse_szse_market_snapshot(
             if not ref:
                 continue
             values[_column_number(ref)] = _cell_value(cell, shared)
-        if values.get(2) == symbol and values.get(1) == expected_date:
+        rows.append(values)
+        if "证券代码" in values.values() and "今收" in values.values():
+            header = {value.strip(): col for col, value in values.items()}
+
+    if header is None:
+        raise ValueError(f"{path.name}: SZSE market header not found")
+
+    required = ("交易日期", "证券代码", "证券简称", "今收", "涨跌幅（%）")
+    missing = [name for name in required if name not in header]
+    if missing:
+        raise ValueError(f"{path.name}: missing SZSE headers: {missing}")
+
+    for values in rows:
+        row_date = values.get(header["交易日期"])
+        row_symbol = values.get(header["证券代码"])
+        if row_symbol == symbol and row_date == expected_date:
             return {
-                "observation_date": values[1],
-                "symbol": values[2],
-                "company": values.get(3, ""),
-                "close_cny": values[5],
-                "close_change_pct": values.get(9, ""),
+                "observation_date": row_date,
+                "symbol": row_symbol,
+                "company": values.get(header["证券简称"], ""),
+                "close_cny": values[header["今收"]],
+                "close_change_pct": values.get(header["涨跌幅（%）"], ""),
             }
+
     raise ValueError(f"{path.name}: {symbol} on {expected_date} not found")
 
 
@@ -118,14 +137,60 @@ def _report_text(path: Path, pages_1based: tuple[int, ...] | None = None) -> str
     return "\n".join(parts)
 
 
-def _first_number(text: str, label: str) -> Decimal:
-    match = re.search(
-        re.escape(label) + r"(?:[^0-9\\-]|-(?![0-9])){0,120}?(" + _NUM_RE.pattern + r")",
-        text,
-    )
-    if not match:
-        raise ValueError(f"label not found: {label}")
-    return Decimal(match.group(1).replace(",", ""))
+def _row_first_number(
+    text: str,
+    *,
+    labels: tuple[str, ...],
+    section_start: str | None = None,
+    section_end: str | None = None,
+) -> Decimal:
+    if section_start:
+        start = text.find(section_start)
+        if start < 0:
+            raise ValueError(f"section start not found: {section_start}")
+        text = text[start:]
+    if section_end:
+        end = text.find(section_end)
+        if end >= 0:
+            text = text[:end]
+
+    lines = text.splitlines()
+    for index, raw_line in enumerate(lines):
+        line = raw_line.strip()
+        if not line:
+            continue
+        matched = next((label for label in labels if line.startswith(label)), None)
+        if matched is None:
+            continue
+
+        candidate = line
+        # CNINFO tables sometimes wrap the numeric cells to the next line.
+        for extra in lines[index + 1 : index + 3]:
+            candidate += " " + extra.strip()
+            if len(re.findall(_NUM_RE.pattern, candidate)) >= 1:
+                # keep scanning one line at most when the label itself has no value
+                break
+
+        match = re.search(_NUM_RE.pattern, candidate[len(matched):])
+        if match:
+            return Decimal(match.group(0).replace(",", ""))
+
+    raise ValueError(f"row not found for labels: {labels}")
+
+
+def _balance_sheet_section(text: str) -> str:
+    starts = ("1、合并资产负债表", "1、合并资产负债表")
+    start = -1
+    for marker in starts:
+        start = text.find(marker)
+        if start >= 0:
+            break
+    if start < 0:
+        raise ValueError("consolidated balance-sheet section not found")
+    end = text.find("2、合并利润表", start)
+    if end < 0:
+        end = text.find("2、", start + len(starts[0]))
+    return text[start:end if end >= 0 else len(text)]
 
 
 def parse_balance_sheet(
@@ -135,18 +200,18 @@ def parse_balance_sheet(
     market_date: str,
     known_at: str,
 ) -> dict[str, object]:
-    text = _report_text(path, pages_1based)
+    text = _balance_sheet_section(_report_text(path, pages_1based))
     values_k = {
-        "cash": _first_number(text, "货币资金"),
-        "short_term_debt": _first_number(text, "短期借款"),
-        "current_portion_noncurrent": _first_number(
-            text, "一年内到期的非流动负债"
+        "cash": _row_first_number(text, labels=("货币资金",)),
+        "short_term_debt": _row_first_number(text, labels=("短期借款",)),
+        "current_portion_noncurrent": _row_first_number(
+            text, labels=("一年内到期的非流动负债",)
         ),
-        "long_term_debt": _first_number(text, "长期借款"),
-        "bonds": _first_number(text, "应付债券"),
-        "lease_liabilities": _first_number(text, "租赁负债"),
-        "long_term_payables": _first_number(text, "长期应付款"),
-        "share_capital_k": _first_number(text, "股本"),
+        "long_term_debt": _row_first_number(text, labels=("长期借款",)),
+        "bonds": _row_first_number(text, labels=("应付债券",)),
+        "lease_liabilities": _row_first_number(text, labels=("租赁负债",)),
+        "long_term_payables": _row_first_number(text, labels=("长期应付款",)),
+        "share_capital_k": _row_first_number(text, labels=("股本",)),
     }
     debt_k = (
         values_k["short_term_debt"]
@@ -198,12 +263,14 @@ def parse_annual_ebitda(
 ) -> dict[str, object]:
     income = _report_text(path, pages_income)
     cashflow = _report_text(path, pages_cashflow)
-    profit_total = _first_number(income, "利润总额")
-    interest_expense = _first_number(income, "利息费用")
-    fixed_dep = _first_number(cashflow, "固定资产折旧")
-    rou_dep = _first_number(cashflow, "使用权资产折旧")
-    intangible = _first_number(cashflow, "无形资产摊销")
-    long_deferred = _first_number(cashflow, "长期待摊费用摊销")
+    profit_total = _row_first_number(income, labels=("四、利润总额",))
+    interest_expense = _row_first_number(income, labels=("其中：利息费用",))
+    fixed_dep = _row_first_number(
+        cashflow, labels=("固定资产折旧", "固定资产折旧、油气资产折耗、生产性生物资产折旧")
+    )
+    rou_dep = _row_first_number(cashflow, labels=("使用权资产折旧",))
+    intangible = _row_first_number(cashflow, labels=("无形资产摊销",))
+    long_deferred = _row_first_number(cashflow, labels=("长期待摊费用摊销",))
     ebitda_k = profit_total + interest_expense + fixed_dep + rou_dep + intangible + long_deferred
     return {
         "fiscal_year": fiscal_year,
