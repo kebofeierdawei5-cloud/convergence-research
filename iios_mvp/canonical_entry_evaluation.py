@@ -44,6 +44,7 @@ def _canonical_json(value: Any) -> str:
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
+        default=str,
     )
 
 
