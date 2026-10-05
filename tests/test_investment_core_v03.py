@@ -210,7 +210,12 @@ def case(price="100", price_observation_id="price-1", thesis_status="INTACT") ->
         "reality": {"status": "PASS"},
         "forecast": {"status": "PASS"},
         "valuation": {"status": "PASS", "primary_model": "DCF"},
-        "risk": {"status": "PASS", "max_loss_pct": "25"},
+        "risk": {
+            "status": "PASS",
+            "max_loss_pct": "25",
+            "thesis_breaks": ["driver deterioration"],
+            "evidence_ids": ["req-pe-1"],
+        },
         "portfolio": {
             "position_pct": "0",
             "constraint_status": "PASS",
@@ -282,6 +287,31 @@ def case(price="100", price_observation_id="price-1", thesis_status="INTACT") ->
             },
         },
     }
+
+
+def test_v03_risk_portfolio_contract_is_emitted_and_explicit():
+    result = decide(
+        case(),
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        current_price_resolver=CURRENT_PRICE_REGISTRY,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+    )
+    assert result["decision"]["risk_portfolio_contract"]["contract_version"] == "IIOS-RISK-PORTFOLIO-PRODUCTION-0.1"
+    assert result["decision"]["risk_portfolio_contract"]["readiness"]["risk_ready"] is True
+    assert result["decision"]["risk_portfolio_contract"]["readiness"]["portfolio_constraint_ready"] is True
+
+
+def test_v03_missing_can_add_fails_validation_before_decision():
+    c = case()
+    del c["portfolio"]["can_add"]
+    result = decide(
+        c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        current_price_resolver=CURRENT_PRICE_REGISTRY,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+    )
+    assert result["validation"]["status"] == "BLOCKED"
+    assert any("V03-RISK-PORTFOLIO-CONTRACT" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_return_math_separates_the_two_15_percent_policies():

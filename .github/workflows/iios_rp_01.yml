@@ -1,0 +1,37 @@
+name: IIOS RP-01 Risk Portfolio Production Contract
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/risk_portfolio_production_contract.py"
+      - "schemas/risk_portfolio_production_v0.1.schema.json"
+      - "tests/test_risk_portfolio_production_contract.py"
+      - "iios_mvp/investment_core_contract_v03.py"
+      - "tests/test_investment_core_v03.py"
+      - ".github/workflows/iios_rp_01.yml"
+  push:
+    branches: [main]
+    paths:
+      - "iios_mvp/risk_portfolio_production_contract.py"
+      - "schemas/risk_portfolio_production_v0.1.schema.json"
+      - "tests/test_risk_portfolio_production_contract.py"
+      - "iios_mvp/investment_core_contract_v03.py"
+      - "tests/test_investment_core_v03.py"
+      - ".github/workflows/iios_rp_01.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  rp-01:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q iios_mvp tests/test_risk_portfolio_production_contract.py
+      - run: python -m pytest -q tests/test_risk_portfolio_production_contract.py
+      - run: python -m json.tool schemas/risk_portfolio_production_v0.1.schema.json >/dev/null
+      - run: git diff --check

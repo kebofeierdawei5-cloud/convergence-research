@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/risk-portfolio-production-0.1.schema.json",
+  "title": "IIOS Risk / Portfolio Production Contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "case_id",
+    "cutoff_date",
+    "risk",
+    "portfolio",
+    "readiness",
+    "policy_effect",
+    "audit_sha256"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "IIOS-RISK-PORTFOLIO-PRODUCTION-0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cutoff_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "risk": {
+      "$ref": "#/$defs/risk"
+    },
+    "portfolio": {
+      "$ref": "#/$defs/portfolio"
+    },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "risk_ready",
+        "portfolio_constraint_ready",
+        "package_ready"
+      ],
+      "properties": {
+        "risk_ready": {
+          "type": "boolean"
+        },
+        "portfolio_constraint_ready": {
+          "type": "boolean"
+        },
+        "package_ready": {
+          "type": "boolean"
+        }
+      }
+    },
+    "policy_effect": {
+      "const": "NO_DIRECT_DECISION_PRECEDENCE_CHANGE"
+    },
+    "audit_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "max_loss_pct",
+        "thesis_breaks",
+        "evidence_ids"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "UNKNOWN"
+          ]
+        },
+        "max_loss_pct": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "minimum": 0,
+          "exclusiveMaximum": 100
+        },
+        "thesis_breaks": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "portfolio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position_pct",
+        "constraint_status",
+        "can_add",
+        "buy_add_package",
+        "package_status"
+      ],
+      "properties": {
+        "position_pct": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "constraint_status": {
+          "enum": [
+            "PASS",
+            "BLOCKED",
+            "UNKNOWN"
+          ]
+        },
+        "can_add": {
+          "type": "boolean"
+        },
+        "package_status": {
+          "enum": [
+            "COMPLETE",
+            "ABSENT"
+          ]
+        },
+        "buy_add_package": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "entry_zone",
+                "initial_position_pct",
+                "target_position_pct",
+                "max_position_pct",
+                "thesis_break_triggers",
+                "monitoring_triggers"
+              ],
+              "properties": {
+                "entry_zone": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "initial_position_pct": {
+                  "type": [
+                    "string",
+                    "number"
+                  ],
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "target_position_pct": {
+                  "type": [
+                    "string",
+                    "number"
+                  ],
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "max_position_pct": {
+                  "type": [
+                    "string",
+                    "number"
+                  ],
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "thesis_break_triggers": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "monitoring_triggers": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
