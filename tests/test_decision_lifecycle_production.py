@@ -74,11 +74,16 @@ def test_same_revision_cannot_be_overwritten_by_conflicting_approval():
 
 
 def test_rejected_approval_does_not_replace_current():
-    rev=build_decision_revision(decision_series_id="CN-A-300750",revision=2,snapshot=snapshot("BUY"),run_id="run-2")
-    ap=build_human_approval(decision_revision=rev,approved=False,note="reject")
-    p=project_current_approval(previous={"current_revision":1,"current_decision_id":"CN-A-300750-r001"},decision_revision=rev,approval=ap)
+    rev1=build_decision_revision(decision_series_id="CN-A-300750",revision=1,snapshot=snapshot(),run_id="run-1")
+    ap1=build_human_approval(decision_revision=rev1,approved=True,note="r1")
+    current=project_current_approval(previous=None,decision_revision=rev1,approval=ap1)
+
+    rev2=build_decision_revision(decision_series_id="CN-A-300750",revision=2,snapshot=snapshot("BUY"),run_id="run-2")
+    ap2=build_human_approval(decision_revision=rev2,approved=False,note="reject")
+    p=project_current_approval(previous=current,decision_revision=rev2,approval=ap2)
     assert p["projection_status"]=="UNCHANGED"
     assert p["current_revision"]==1
+    assert p["current_decision_id"]=="CN-A-300750-r001"
 
 def test_revision_schema_accepts_record():
     rev=build_decision_revision(decision_series_id="CN-A-300750",revision=1,snapshot=snapshot(),run_id="run-1")
