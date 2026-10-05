@@ -216,6 +216,54 @@ def _load_and_validate_canonical_receipt(
     return receipt
 
 
+def _validate_evidence_source_hash_binding(
+    data: dict[str, Any],
+    receipt: dict[str, Any],
+) -> None:
+    evidence_by_id = {
+        str(row["evidence_id"]): row
+        for row in data.get("evidence", [])
+    }
+    receipt_by_id = {
+        str(row["observation_id"]): row
+        for row in receipt.get("observations", [])
+    }
+    for observation_id, canonical in receipt_by_id.items():
+        # CORE-04-C records one canonical EBITDA source for each admitted
+        # observation. The consumer must carry the same byte fingerprint.
+        evidence_id = f"CORE04C-EBITDA-{observation_id.rsplit('-', 3)[-3]}-{observation_id.rsplit('-', 1)[-1]}"
+        # Use the explicit input evidence mapping instead of deriving an ID
+        # from presentation text when the case provides it.
+        candidates = [
+            row for row in evidence_by_id.values()
+            if str(row.get("observation_date")) == str(canonical["observation_date"])
+            and str(row.get("variable")) == "ebitda"
+        ]
+        if len(candidates) != 1:
+            raise ValueError(
+                f"expected exactly one admitted EBITDA evidence row for {observation_id}"
+            )
+        evidence = candidates[0]
+        metadata = evidence.get("metadata") or {}
+        actual_sha = str(
+            metadata.get("source_sha256")
+            or metadata.get("content_sha256")
+            or ""
+        ).lower()
+        expected_sha = str(
+            (canonical.get("source_hashes") or {}).get(canonical["ebitda_source"])
+            or ""
+        ).lower()
+        if actual_sha != expected_sha or len(actual_sha) != 64:
+            raise ValueError(
+                f"CORE-04-C EBITDA source SHA drift for {observation_id}"
+            )
+        if _d(evidence["value"]) != _d(canonical["ebitda_cny"]):
+            raise ValueError(
+                f"CORE-04-C EBITDA evidence value drift for {observation_id}"
+            )
+
+
 def _validate_historical_observation_binding(
     data: dict[str, Any],
     receipt: dict[str, Any],
@@ -269,6 +317,7 @@ def run_real_case(input_path: Path, out_path: Path) -> dict[str, Any]:
         raise ValueError("real P2.3 input case_id mismatch")
     input_receipt = data.get("source_receipt") or {}
     receipt = _load_and_validate_canonical_receipt(input_receipt)
+    _validate_evidence_source_hash_binding(data, receipt)
     _validate_historical_observation_binding(data, receipt)
 
     if data.get("status") != "EXECUTABLE_REAL_SLICE":
