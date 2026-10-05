@@ -4,6 +4,8 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from .horizon_semantics import validate_horizon_selection
+
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
 BUY_ENTRY_RETURN_CUSHION_THRESHOLD = Decimal("0.15")
 FUNDAMENTAL_TARGET_ANNUALIZED_RETURN = Decimal("0.15")
@@ -58,14 +60,19 @@ def _annualize(ratio: Decimal, horizon: Decimal) -> Decimal:
 def calculate_return_metrics(return_gate: dict[str, Any]) -> dict[str, Any]:
     entry = _dec(return_gate["entry_price"], "return_gate.entry_price")
     entry_ref = _dec(return_gate["entry_value_reference"], "return_gate.entry_value_reference")
-    horizon = _dec(return_gate["horizon_years"], "return_gate.horizon_years")
+    horizon_selection = validate_horizon_selection(
+        horizon_years=return_gate["horizon_years"],
+        horizon_override=return_gate["horizon_override"],
+        horizon_override_basis=return_gate["horizon_override_basis"],
+        horizon_selection_rationale=return_gate["horizon_selection_rationale"],
+        path="return_gate",
+    )
+    horizon = _dec(horizon_selection["horizon_years"], "return_gate.horizon_years")
     threshold = _dec(return_gate["buy_entry_return_cushion_threshold"], "return_gate.buy_entry_return_cushion_threshold")
     target = _dec(return_gate["fundamental_target_annualized_return"], "return_gate.fundamental_target_annualized_return")
     rr = _dec(return_gate["required_return_annualized"], "return_gate.required_return_annualized")
     if entry <= 0 or entry_ref <= 0:
         raise ValueError("entry_price and entry_value_reference must be > 0")
-    if horizon < Decimal("1") or horizon > Decimal("3"):
-        raise ValueError("horizon_years must be within [1,3]")
     if threshold != BUY_ENTRY_RETURN_CUSHION_THRESHOLD:
         raise ValueError("buy_entry_return_cushion_threshold must equal 15%")
     if target != FUNDAMENTAL_TARGET_ANNUALIZED_RETURN:
@@ -107,6 +114,10 @@ def calculate_return_metrics(return_gate: dict[str, Any]) -> dict[str, Any]:
     return {
         "entry_return_cushion": entry_cushion,
         "margin_of_safety": mos,
+        "horizon_years": horizon_selection["horizon_years"],
+        "horizon_override": horizon_selection["horizon_override"],
+        "horizon_override_basis": horizon_selection["horizon_override_basis"],
+        "horizon_selection_rationale": horizon_selection["horizon_selection_rationale"],
         "scenario_terminal_wealth": wealth,
         "expected_terminal_wealth": expected_wealth,
         "expected_total_return": total_return,
@@ -123,6 +134,7 @@ def validate_return_gate_v03(return_gate: Any, path: str = "return_gate") -> lis
         return [_err("V03-SCHEMA-TYPE", path, "must be an object")]
     fields = (
         "entry_price", "entry_value_reference", "horizon_years",
+        "horizon_override", "horizon_override_basis", "horizon_selection_rationale",
         "buy_entry_return_cushion_threshold", "fundamental_target_annualized_return",
         "required_return_annualized", "scenarios",
     )
@@ -276,6 +288,9 @@ def decide_v03(case: dict[str, Any]) -> dict[str, Any]:
             metrics = None
     gates = {
         "trust": trust_status,
+        "horizon_years": metrics["horizon_years"] if metrics else None,
+        "horizon_override": metrics["horizon_override"] if metrics else None,
+        "horizon_override_basis": metrics["horizon_override_basis"] if metrics else [],
         "portfolio_constraint": portfolio_status,
         "risk": risk_status,
         "thesis": thesis_status,

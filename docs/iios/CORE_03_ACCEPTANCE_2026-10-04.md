@@ -23,7 +23,7 @@ CORE-02 Real 300750
 - Real case: `RC-CN-A-300750-20261004`
 - Real market observation: 2026-09-30 close 291.11 CNY
 - Current share-count anchor: 2026-09-29 issued shares excluding treasury 4,380,630,342
-- Forecast horizon: 2027-2029
+- Forecast horizon: 2027-2029 (H=3 explicit Horizon Override)
 - Scenario probabilities: 25% / 50% / 25%
 - Primary valuation: human-selected DCF
 - P4-F snapshot: valid BLOCKED / INSUFFICIENT_EVIDENCE and replay PASS

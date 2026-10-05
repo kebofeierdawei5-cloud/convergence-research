@@ -221,6 +221,9 @@
         "entry_price",
         "entry_value_reference",
         "horizon_years",
+        "horizon_override",
+        "horizon_override_basis",
+        "horizon_selection_rationale",
         "buy_entry_return_cushion_threshold",
         "fundamental_target_annualized_return",
         "required_return_annualized",
@@ -242,6 +245,23 @@
         "horizon_years": {
           "type": "string",
           "pattern": "^(1|1\\.[0-9]+|2|2\\.[0-9]+|3)$"
+        },
+        "horizon_override": {
+          "type": "boolean"
+        },
+        "horizon_override_basis": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "MAJOR_INDUSTRY_LEADER",
+              "MAJOR_INVESTMENT_CYCLE_OR_MAJOR_CAPEX"
+            ]
+          }
+        },
+        "horizon_selection_rationale": {
+          "type": "string",
+          "minLength": 1
         },
         "buy_entry_return_cushion_threshold": {
           "type": [
@@ -380,5 +400,39 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "return_gate": {
+            "properties": {
+              "horizon_years": { "const": "3" }
+            },
+            "required": ["horizon_years"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "return_gate": {
+            "properties": {
+              "horizon_override": { "const": true },
+              "horizon_override_basis": { "minItems": 1 }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "return_gate": {
+            "properties": {
+              "horizon_override": { "const": false },
+              "horizon_override_basis": { "maxItems": 0 }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

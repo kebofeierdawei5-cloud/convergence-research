@@ -320,3 +320,15 @@ The 2026-10-04 investment-core decisions above supersede any earlier project not
 - current Batch-2 expectation-gap, stability, or sizing outputs are production-grade.
 
 Repository continuity artifacts are the authoritative persistent record for these decisions. Chat discussion alone is not authoritative.
+
+
+## 15. Horizon semantics amendment — 2026-10-04
+
+- Default Decision / Expected Return reference horizon is H=1Y.
+- 3Y is an explicit exception only, requiring horizon_override=true and a qualifying basis: MAJOR_INDUSTRY_LEADER and/or MAJOR_INVESTMENT_CYCLE_OR_MAJOR_CAPEX.
+- Every case carries horizon_selection_rationale.
+- Actual holding cycle remains 1–3Y; H is not a forced sell date.
+- DCF explicit forecast length is independent of Decision H.
+- CATL 2027–2029 / ~14.20% is a CATL-specific 3Y Expected Return Reference, not the system default.
+- Shared semantic validator: iios_mvp/horizon_semantics.py.
+- This amendment is cross-module and must be reconciled across B1, CORE-03, valuation semantics and the future Decision Kernel.
