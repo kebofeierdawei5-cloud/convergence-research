@@ -9,7 +9,21 @@ B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. T
 
 ---
 
-# IIOS Project Status — 2026-10-04
+# IIOS Project Status — 2026-10-05
+
+## Current Active Stage — 2026-10-05
+
+B2-A = PASS / MERGED. B2-B = ACTIVE / BLOCKED_PENDING_RAW.
+
+- B2-A merge commit: c8246ceaaad5e9b1cc02fe422723c39a441ea4f3.
+- B2 raw-artifact containment hardening merge commit: 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3.
+- Current canonical main baseline: 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3.
+- B2-B case: RC-CN-A-300750-20261004.
+- Source capture plan: examples/real_cases/RC-CN-A-300750-20261004_b2b_capture_plan.json.
+- The plan is executable and CI-validated, but remains BLOCKED_PENDING_RAW until physical source bytes are supplied and re-hashed.
+- Old CORE-03 .txt evidence hashes are not accepted as raw-source proof.
+- A02/CSI800 remains Research Track only and is non-blocking for Investment Core.
+
 
 ## Canonical State
 
@@ -326,31 +340,12 @@ B1 semantic package and runtime migration accepted on the repair line. Evidence:
 
 ## Immediate Next Engineering Step
 
-**CORE-03 — Market Expectation + Expectation Gap.**
+B2-B — CATL Real Evidence Admission
 
-CORE-02 is complete and canonical. CORE-03 must consume the admitted economic core, independent forecast and existing P4-F MIE set without bypassing PIT/provenance/replay.
+1. Materialize the planned CATL source files as physical raw bytes.
+2. Recompute physical size + SHA-256 from the captured bytes.
+3. Populate Evidence Records only from those verified raw artifacts.
+4. Run the CATL company Evidence Manifest with known_at <= cutoff.
+5. Perform replay and fail-closed attacks before B3 Reality/Quality expansion.
 
-CORE-00 and CORE-01 are merged and accepted on canonical `main`. The next Investment Core gate is CORE-02: admitted company evidence → Reality → Trust → Quality → Value Core → valuation-model route input.
-
-P4-A through P4-F are complete. P5 must compare economically equivalent independent variables against the P4 model-semantic market requirement, fail closed on incompatible or ambiguous interpretations, validate Bear/Base/Bull probabilities, and enforce strict positive Expected Return >15% before any decision layer.
-
-P4-E must consume the accepted P4-A through P4-D typed outputs and organize multiple feasible/conditional market-model explanations without forcing a winner.
-
-The expectation set must retain:
-
-- model identity and qualification;
-- model-native economic variables;
-- conditional assumptions/context;
-- candidate coverage;
-- evidence sufficiency;
-- identifiability and stability;
-- PIT/provenance.
-
-Do not calculate Expectation Gap or Expected Return until P4-F closes PIT/replay/fail-closed integration.
-
-P2-C Company Value Core hardening remains parallel where needed for real-company acceptance.
-
-Do not resume or merge the blocked Batch 2 v0.1 PR #3.
-
-
-Current next: B2-A | Single Company Evidence / PIT Foundation
+Do not resume CSI800/A02 for the Investment Core path. Do not reuse post-cutoff dynamic pages or historical .txt hashes as canonical raw evidence.
