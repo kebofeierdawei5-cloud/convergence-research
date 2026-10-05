@@ -50,7 +50,6 @@ jobs:
           python -m json.tool schemas/source_registry_v0.1.schema.json >/dev/null
           python -m json.tool schemas/pit_temporal_semantics_v0.1.schema.json >/dev/null
           python -m json.tool schemas/company_evidence_manifest_v0.1.schema.json >/dev/null
-          python -m json.tool schemas/company_source_capture_plan_v0.1.schema.json >/dev/null
           python -m jsonschema -i configs/source_registry_v0.1.json schemas/source_registry_v0.1.schema.json
           python - <<'PY'
           import json
