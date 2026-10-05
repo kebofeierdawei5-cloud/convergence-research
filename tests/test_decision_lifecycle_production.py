@@ -59,6 +59,20 @@ def test_current_projection_is_monotonic():
     assert p_old["projection_status"]=="UNCHANGED"
     assert p_old["current_revision"]==2
 
+def test_same_revision_cannot_be_overwritten_by_conflicting_approval():
+    rev = build_decision_revision(
+        decision_series_id="CN-A-300750",
+        revision=1,
+        snapshot=snapshot(),
+        run_id="run-1",
+    )
+    first = build_human_approval(decision_revision=rev, approved=True, note="first")
+    current = project_current_approval(previous=None, decision_revision=rev, approval=first)
+    conflicting = build_human_approval(decision_revision=rev, approved=True, note="second")
+    with __import__("pytest").raises(ValueError, match="conflicting approval"):
+        project_current_approval(previous=current, decision_revision=rev, approval=conflicting)
+
+
 def test_rejected_approval_does_not_replace_current():
     rev=build_decision_revision(decision_series_id="CN-A-300750",revision=2,snapshot=snapshot("BUY"),run_id="run-2")
     ap=build_human_approval(decision_revision=rev,approved=False,note="reject")
