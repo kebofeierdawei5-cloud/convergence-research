@@ -1,0 +1,40 @@
+name: IIOS CORE-04-C Raw Bundle Diagnostic
+
+on:
+  pull_request:
+    paths:
+      - "research/core04c_source_manifest_v0.1.json"
+      - "tools/core04c_raw_bundle.py"
+      - ".github/workflows/iios_core04c_raw_bundle.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  raw-bundle:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: python -m compileall -q tools
+      - run: |
+          python tools/core04c_raw_bundle.py             --manifest research/core04c_source_manifest_v0.1.json             --out /tmp/core04c/raw
+      - run: python -m json.tool /tmp/core04c/raw/diagnostic_receipt.json >/dev/null
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iios-core04c-raw-bundle-diagnostic
+          path: /tmp/core04c/raw/
+          retention-days: 7
+      - name: Enforce historical byte identity
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          receipt = json.loads(Path('/tmp/core04c/raw/diagnostic_receipt.json').read_text())
+          bad = [s for s in receipt['sources'] if s['status'] != 'EXACT_MATCH']
+          print(json.dumps({
+              'exact_match_count': len(receipt['sources']) - len(bad),
+              'non_match_count': len(bad),
+              'non_matches': bad,
+          }, ensure_ascii=False))
+          raise SystemExit(2 if bad else 0)
+          PY
