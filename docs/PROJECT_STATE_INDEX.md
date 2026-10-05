@@ -23,7 +23,9 @@ CORE-03 Real 300750 Vertical Slice = PASS / MERGED
         ↓
 B2-A Single Company Evidence / PIT Foundation = PASS / MERGED
         ↓
-B2-B CATL Real Evidence Acquisition = ACTIVE / BLOCKED_PENDING_RAW
+B2-A Scope Repair = ACTIVE
+        ↓
+CATL Evidence Migration / Admission = NEXT
 ```
 
 ## Authority / continuity
@@ -72,7 +74,7 @@ BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
 
 ## Current development task
 
-B2-B | CATL Real Evidence Acquisition / Source Capture Plan
+B2-A Scope Repair | Re-establish Investment Core / Research Track isolation
 
 PR #32 Horizon Semantics is merged to main (a524390382044b9474c17f2712a2cef8adeb9612). Investment Core horizon semantics use H=1Y as the normative default; H=3 requires explicit case-level override evidence.
 
