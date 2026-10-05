@@ -1,0 +1,17 @@
+IIOS A1-02 evidence capture E017_A1
+case_id: RC-CN-A-300750-20261004
+source_ref: https://static.cninfo.com.cn/finalpage/2026-10-01/1225592062.PDF
+source_vintage: 2026-10-01
+known_at: 2026-10-01T00:00:00+08:00
+observation_date: 2026-09-30
+unit: USD
+
+Related-party procurement:
+related_party: Hong Kong Ansheng Mining Investment Co., Ltd.
+procurement_subject: cathode copper
+planned_period: 2027-2028
+procurement_cap: 320 million USD
+reason_disclosed: secure upstream raw-material supply and optimize procurement cost
+
+Related-party relationship disclosed:
+actual_controller_relationship: actual controller / chairman / general manager indirectly holds 29.4% of related party and serves as its non-independent director.
