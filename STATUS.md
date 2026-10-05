@@ -13,16 +13,16 @@ B1 semantic contract v0.3 is now frozen and its runtime migration is accepted. T
 
 ## Current Active Stage — 2026-10-05
 
-B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = PASS / MERGED. CATL Existing Evidence Migration = PASS / TECHNICAL. CATL Primary-Source Gap Supplementation = ACTIVE.
+B2-A Evidence/PIT = PASS / MERGED. B2-A Scope Repair = PASS / MERGED. CATL Existing Evidence Migration = PASS / TECHNICAL. CATL Primary-Source Gap Supplementation = PASS / PRIMARY CAPTURED. CORE-03/CORE-04 = ACTIVE.
 
 - B2-A merge commit: c8246ceaaad5e9b1cc02fe422723c39a441ea4f3.
 - B2 raw-artifact containment hardening merge commit: 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3.
-- Current canonical main baseline: 00fdf82a374ac46a5b99567b590e940d7220bd23.
+- Current canonical main baseline: 163509c67bd67946f0320b01ef976b5e1222bf21.
 - Existing CATL E001-E010 capture artifacts have passed technical B2 migration.
-- Source-quality gaps remain separate: E002 = P0 primary-price gap; E003/E007 = P1 direct-primary disclosure gaps when material.
+- Source-quality gaps: E002 primary-price gap is CLOSED by supplementary evidence E011; E003/E007 remain P1 direct-primary disclosure gaps when material.
 - No secondary source is silently upgraded to primary evidence.
 - A02/CSI800 is Research Track only: its code is outside research/b2 and it must not execute from B2 CI.
-- Next: targeted first-party supplementation for the material source gaps only; then return to CORE-03/CORE-04. No historical universe/data platform is required.
+- E011 is bound to SZSE:MARKET_DATA and validated against a private operator raw vault: 231,394 bytes / SHA-256 349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2; 2026-09-30 300750 close = 291.11 CNY/share. Raw trading-information bytes are not published to the public repository; public CI remains fail-closed when the private vault is absent. Legacy E002 remains append-only. Next: CORE-03 / CORE-04. No historical universe/data platform is required.
 
 
 ## Canonical State
@@ -54,7 +54,7 @@ Consolidated post-red-team development plan: `docs/iios/IIOS_CONSOLIDATED_POST_R
 - Real evidence: 7 case-bound capture artifacts
 - CORE-02 CI real-case execution: **PASS**
 - Runtime output status: **CONDITIONAL**
-- Evidence admission: **7/7 ADMITTED**
+- Evidence admission: **7/7 ADMITTED**; E011 primary-price supplement separately admitted
 - Market observation bound to latest pre-cutoff trading day: 2026-09-30 close **291.11 CNY**
 - Quality remains CONDITIONAL because incremental ROIC and full earnings/cash-flow conversion bridges are not yet fully constructed.
 - No fabricated company name, forecast, valuation or decision was introduced.
