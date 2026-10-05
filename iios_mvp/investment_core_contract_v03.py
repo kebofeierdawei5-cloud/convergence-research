@@ -446,7 +446,10 @@ def _expectation_gap(case: dict[str, Any]) -> tuple[str, Decimal | None]:
     payload = case.get("expectation_gap")
     if payload is None:
         return "UNKNOWN", None
-    evaluated = _canonical_expectation_gap(payload)
+    try:
+        evaluated = _canonical_expectation_gap(payload)
+    except ValueError:
+        return "UNKNOWN", None
     status = str(evaluated["status"]).upper()
     gap = evaluated.get("gap_relative")
     return status, gap if isinstance(gap, Decimal) else None
