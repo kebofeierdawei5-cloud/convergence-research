@@ -649,34 +649,6 @@ def main() -> int:
             },
         ])
 
-    admission_doc = {
-        "schema_version": "IIOS-CORE04C-EV-EBITDA-ADMISSION-0.1",
-        "status": "ADMITTED",
-        "case_id": "RC-CN-A-300750-20261004",
-        "cutoff_date": "2026-10-04",
-        "model_family": "ev_ebitda",
-        "observation_basis": "PIT_LATEST_AVAILABLE_OR_TTM_WHERE_DISCLOSABLE",
-        "observations": observations,
-        "evidence": evidence_rows,
-        "derivation_artifact": {
-            "path": "research/core04c_derivation.json",
-            "sha256": derivation_sha,
-        },
-        "typed_admissions": typed_admissions,
-        "fail_closed_rules": [
-            "All external source bytes must be non-empty and SHA-256 verified.",
-            "Financial source known_at must be <= market observation date.",
-            "TTM EBITDA, when used, must be constructed only from PIT-known current/prior-period report values; otherwise latest fully disclosed FY EBITDA is used and labeled explicitly.",
-            "Market price must come from the exact-date SZSE snapshot, not a current provider page.",
-            "EV must be strictly positive and EBITDA strictly positive.",
-        ],
-    }
-    admission_path = out_root / "core04c_ev_ebitda_admission.json"
-    admission_path.write_text(
-        json.dumps(admission_doc, ensure_ascii=False, indent=2, default=json_decimal) + "\n",
-        encoding="utf-8",
-    )
-
     typed_admissions: list[dict[str, object]] = []
     for obs in observations:
         typed = admit_market_valuation_observation(
@@ -736,7 +708,7 @@ def main() -> int:
                 known_at=datetime.fromisoformat(str(next(r["known_at"] for r in capture_receipt if r["source_id"] == obs["balance_source_id"]))),
                 source="IIOS-DETERMINISTIC-DERIVATION",
                 source_location="research/core04c_derivation.json",
-                content_sha256="a" * 64,
+                content_sha256=derivation_sha,
                 exact_bytes=True,
                 status=AdmissionStatus.ADMITTED,
                 temporal_provenance=TemporalProvenance.SOURCE_VINTAGE,
@@ -751,6 +723,34 @@ def main() -> int:
             "evidence_ids": list(typed.evidence_ids),
             "known_at": typed.observation.known_at.isoformat(),
         })
+
+    admission_doc = {
+        "schema_version": "IIOS-CORE04C-EV-EBITDA-ADMISSION-0.1",
+        "status": "ADMITTED",
+        "case_id": "RC-CN-A-300750-20261004",
+        "cutoff_date": "2026-10-04",
+        "model_family": "ev_ebitda",
+        "observation_basis": "PIT_LATEST_AVAILABLE_OR_TTM_WHERE_DISCLOSABLE",
+        "observations": observations,
+        "evidence": evidence_rows,
+        "derivation_artifact": {
+            "path": "research/core04c_derivation.json",
+            "sha256": derivation_sha,
+        },
+        "typed_admissions": typed_admissions,
+        "fail_closed_rules": [
+            "All external source bytes must be non-empty and SHA-256 verified.",
+            "Financial source known_at must be <= market observation date.",
+            "TTM EBITDA, when used, must be constructed only from PIT-known current/prior-period report values; otherwise latest fully disclosed FY EBITDA is used and labeled explicitly.",
+            "Market price must come from the exact-date SZSE snapshot, not a current provider page.",
+            "EV must be strictly positive and EBITDA strictly positive.",
+        ],
+    }
+    admission_path = out_root / "core04c_ev_ebitda_admission.json"
+    admission_path.write_text(
+        json.dumps(admission_doc, ensure_ascii=False, indent=2, default=json_decimal) + "\n",
+        encoding="utf-8",
+    )
 
     # Verify every exact-byte digest again immediately before success.
     for row in capture_receipt:
