@@ -31,9 +31,9 @@ A1-01 Economic Evidence Bridge = PASS / MERGED
         ↓
 A1-02 Capital Allocation + Trust/Governance Evidence Closure = PASS / MERGED
         ↓
-A1 Company-side Evidence Closure = IN PROGRESS
+A1-03 Quality Gate Integration = PASS / MERGED
         ↓
-A1-03 Quality Gate Integration = NEXT
+A1 Company-side Evidence Closure = PASS / MERGED
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
@@ -90,17 +90,30 @@ This is an accepted system result, not a claim that the security should be bough
 
 ## 4. Current blockers
 
-### A1 — Company-side Evidence Closure
+### Productization
 
-Primary unresolved company-side gate:
+The company-side evidence loop for the current 300750 case is closed at the evidence/integration layer.
 
-- incremental ROIC evidence;
-- earnings → OCF → FCF conversion;
-- CAPEX → D&A → FCF bridge;
-- working-capital normalization;
-- fuller Trust / governance revalidation.
+The remaining Investment Core product blockers are:
 
-Quality remains CONDITIONAL until evidence supports a stronger state.
+- Risk / Portfolio production contract;
+- Decision Revision state transitions;
+- Human Approval / Current Projection;
+- Trigger lifecycle;
+- Monitoring / Validation;
+- Machine Publication;
+- Human Report / Report Quality Gate;
+- second-company acceptance;
+- final independent red-team.
+
+### Research Track
+
+Separate research capabilities remain non-blocking for Investment Core:
+
+- CSI800 historical membership;
+- CSI Industry historical classification;
+- PIT Security Master / universe reconstruction;
+- FM forecast research.
 
 ### Productization
 
@@ -183,19 +196,30 @@ chat context
 
 A diagnostic or historical record can identify a problem, but cannot promote itself into capability.
 
-## 8. Current next batch
+## 8. A1 acceptance boundary
 
-**A1 Company-side Evidence Closure — IN PROGRESS**
+A1 is **PASS / MERGED** as a company-side evidence closure milestone.
 
-Completed sub-batches:
-- **A1-01 Economic Evidence Bridge = PASS / MERGED**
-- **A1-02 Capital Allocation + Trust/Governance Evidence Closure = PASS / MERGED**
+This does **not** mean the company's Quality or Trust states become PASS automatically.
 
-Acceptance records:
-- `docs/iios/A1_01_ACCEPTANCE_2026-10-05.md`
-- `docs/iios/A1_02_ACCEPTANCE_2026-10-05.md`
+For the canonical 300750 case after A1 integration:
 
-Next sub-batch:
-- **A1-03 Quality Gate Integration**
+- Incremental ROIC: CONDITIONAL;
+- cash-flow conversion: CONDITIONAL;
+- reinvestment runway: CONDITIONAL;
+- governance integrity: CONDITIONAL;
+- shareholder treatment: CONDITIONAL;
+- aggregate Quality Gate: CONDITIONAL;
+- capital admission: FALSE;
+- aggregate Trust: CONDITIONAL;
+- Decision effect from A1: NO_DIRECT_GATE_EFFECT.
 
-A1 is not complete until the remaining company-side evidence is integrated into the existing Quality semantics and tested end-to-end.
+A1 closes missing evidence and integrates that evidence into existing semantics without manufacturing a stronger investment-quality conclusion.
+
+## 9. Current next boundary
+
+A1 is complete.
+
+The next substantive Investment Core work should be separately scoped from current canonical main + this State Index.
+
+No P3/P4/MIE work is part of the A1 closure.
