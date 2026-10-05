@@ -9,6 +9,11 @@
     "case_id",
     "cutoff_date",
     "generation_basis",
+    "incremental_roic",
+    "interpretation_status",
+    "investment_decision_effect",
+    "audit",
+    "evidence_admission",
     "periods",
     "deltas",
     "incremental_roic",
@@ -127,6 +132,32 @@
           "pattern": "^[0-9a-f]{64}$"
         },
         "bridge_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "evidence_admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "evidence_ids",
+        "sha256"
+      ],
+      "properties": {
+        "status": {
+          "const": "ADMITTED"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         }
