@@ -306,9 +306,6 @@ def _parse_gap(payload: Mapping[str, Any]) -> CanonicalExpectationGap:
             "market_expectation_hash",
             "comparison_direction",
             "independent_expectation",
-            "status",
-            "gap_absolute",
-            "gap_relative",
         },
         path="expectation_gap",
     )
@@ -411,19 +408,6 @@ def evaluate_canonical_expectation_gap(
         market_expectation=market,
         comparison_direction=gap.comparison_direction.value,
     )
-
-    declared_status = str(payload.get("status", evaluated["status"])).upper()
-    if declared_status != evaluated["status"]:
-        raise ValueError("expectation_gap.status does not match canonical evaluation")
-    for key in ("gap_absolute", "gap_relative"):
-        declared = payload.get(key)
-        expected = evaluated.get(key)
-        if expected is None:
-            if declared is not None:
-                raise ValueError(f"expectation_gap.{key} must be null for unresolved canonical evaluation")
-        else:
-            if declared is None or _dec(declared, f"expectation_gap.{key}") != expected:
-                raise ValueError(f"expectation_gap.{key} does not match canonical evaluation")
 
     evidence_ids = set(gap.independent_expectation.evidence_ids)
     evidence_ids.update(mie.evidence_ids)
