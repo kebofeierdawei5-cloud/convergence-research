@@ -349,8 +349,8 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
 
     expectation_gap = case.get("expectation_gap")
     if expectation_gap is not None:
+        precondition_failed = False
         try:
-            evaluated_gap = _canonical_expectation_gap(expectation_gap, case)
             decision_horizon = str(
                 validate_horizon_selection(
                     horizon_years=case["return_gate"]["horizon_years"],
@@ -371,6 +371,7 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
                         "must equal the decision horizon selected by return_gate",
                     )
                 )
+                precondition_failed = True
             gap_price = _dec(expectation_gap["price"], "expectation_gap.price")
             observed_price = _dec(
                 case["current_price_observation"]["price"],
@@ -384,14 +385,22 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
                         "must equal current_price_observation.price; gap must be revalidated when price changes",
                     )
                 )
-        except ValueError as exc:
-            errors.append(
-                _err(
-                    "V03-EXPECTATION-GAP-CANONICAL",
-                    "expectation_gap",
-                    str(exc),
+                precondition_failed = True
+        except (KeyError, TypeError, ValueError):
+            # Canonical boundary below produces the authoritative blocker for malformed input.
+            pass
+
+        if not precondition_failed:
+            try:
+                _canonical_expectation_gap(expectation_gap, case)
+            except ValueError as exc:
+                errors.append(
+                    _err(
+                        "V03-EXPECTATION-GAP-CANONICAL",
+                        "expectation_gap",
+                        str(exc),
+                    )
                 )
-            )
 
     mie = case.get("market_implied_expectation")
     if mie is not None and not isinstance(mie, dict):
