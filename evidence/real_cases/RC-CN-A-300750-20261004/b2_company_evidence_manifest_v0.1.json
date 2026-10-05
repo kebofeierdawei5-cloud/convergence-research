@@ -122,7 +122,7 @@
       "retrieved_at": "2026-10-04T00:00:00+08:00",
       "source_ref": "https://static.cninfo.com.cn/finalpage/2026-09-29/1225589071.PDF",
       "artifact_id": "catl-20261004-E008-current-share-count.txt",
-      "content_sha256": "70ca1ac344c869754b790f8ba1ed6087ede879c71fa848f651a59f5c71fe3be1",
+      "content_sha256": "744c3b810f724864f56b69d3b7c19f94963b42d02020351f72f0a45897f4083f",
       "exact_bytes": true,
       "provenance_class": "SOURCE_VINTAGE_VERIFIED",
       "status": "ADMITTED"
@@ -150,7 +150,7 @@
       "retrieved_at": "2026-10-04T00:00:00+08:00",
       "source_ref": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
       "artifact_id": "catl-20261004-E010-working-capital-h1-2026.txt",
-      "content_sha256": "ecf6e30e7f560e706bafd422af19308e1b8023b392d76f0b7f0028bd30ec7cca",
+      "content_sha256": "6d4ab4fd36b90e180af2cb40c09a3b6fdfb5275ab527b26e694556a52207aecb",
       "exact_bytes": true,
       "provenance_class": "SOURCE_VINTAGE_VERIFIED",
       "status": "ADMITTED"
@@ -203,7 +203,7 @@
       "evidence_id": "E008",
       "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E008_current_share_count.txt",
       "expected_size_bytes": 405,
-      "expected_sha256": "70ca1ac344c869754b790f8ba1ed6087ede879c71fa848f651a59f5c71fe3be1"
+      "expected_sha256": "744c3b810f724864f56b69d3b7c19f94963b42d02020351f72f0a45897f4083f"
     },
     {
       "evidence_id": "E009",
@@ -215,10 +215,10 @@
       "evidence_id": "E010",
       "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E010_working_capital_h1_2026.txt",
       "expected_size_bytes": 355,
-      "expected_sha256": "ecf6e30e7f560e706bafd422af19308e1b8023b392d76f0b7f0028bd30ec7cca"
+      "expected_sha256": "6d4ab4fd36b90e180af2cb40c09a3b6fdfb5275ab527b26e694556a52207aecb"
     }
   ],
   "audit": {
-    "manifest_sha256": "0d5885854ed8faf3f2188c9739fab40bd079db1181d53d35b428f1f52b27b51c"
+    "manifest_sha256": "3f205b9e378f4b00006cda9b1363b7cbd60cecd30314d4cf190c856a77699ebd"
   }
 }
