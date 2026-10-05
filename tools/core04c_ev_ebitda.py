@@ -431,6 +431,23 @@ def derive_case(source_paths: dict[str, Path]) -> dict[str, object]:
         },
     }
 
+def validate_pit_order(
+    capture_receipt: list[dict[str, object]],
+    periods: list[tuple[str, str, str, str, str]],
+) -> None:
+    by_id = {str(row["source_id"]): row for row in capture_receipt}
+    for obs_date, balance_source_id, ebitda_source_id, _basis, _temporal in periods:
+        obs = date.fromisoformat(obs_date)
+        for source_id in (balance_source_id, ebitda_source_id):
+            row = by_id[source_id]
+            known = datetime.fromisoformat(str(row["known_at"]))
+            if known.date() > obs:
+                raise ValueError(
+                    f"PIT violation: {source_id} known_at={known.isoformat()} "
+                    f"after observation_date={obs.isoformat()}"
+                )
+
+
 def json_decimal(value: object) -> object:
     if isinstance(value, Decimal):
         return str(value)
@@ -485,6 +502,8 @@ def main() -> int:
         ("2025-10-22", "CNINFO-Q3-2025", "CNINFO-ANNUAL-2024", "FY2024_EBITDA_LATEST_PIT", "SOURCE_VINTAGE"),
     ]
 
+    validate_pit_order(capture_receipt, periods)
+
     for obs_date, balance_source_id, ebitda_source_id, ebitda_basis, temporal in periods:
         price = prices[obs_date]
         ebitda = derived["ebitda_for_observation_thousand_cny"][obs_date] * CNY_SCALE
@@ -524,7 +543,7 @@ def main() -> int:
         "schema_version": "IIOS-CORE04C-EV-EBITDA-DERIVATION-0.1",
         "case_id": "RC-CN-A-300750-20261004",
         "cutoff_date": "2026-10-04",
-        "formula": "EV = price * shares_outstanding + net_debt; EV/EBITDA = EV / TTM_EBITDA; TTM_EBITDA = current_period_EBITDA + prior_FY_EBITDA - prior_period_EBITDA",
+        "formula": "EV = price * shares_outstanding + net_debt; EV/EBITDA = EV / EBITDA_basis; EBITDA_basis is TTM where the PIT report set permits deterministic TTM construction, otherwise the latest fully disclosed fiscal-year EBITDA known at the observation date.",
         "net_debt_formula": "short_term_borrowings + current_portion_noncurrent_liabilities + long_term_borrowings + bonds + lease_liabilities - cash - trading_financial_assets",
         "share_count_formula": "share_capital_thousand_cny * 1000",
         "source_receipt": capture_receipt,
@@ -624,7 +643,7 @@ def main() -> int:
         "fail_closed_rules": [
             "All external source bytes must be non-empty and SHA-256 verified.",
             "Financial source known_at must be <= market observation date.",
-            "TTM EBITDA must be constructed only from PIT-known current/prior-period report values.",
+            "TTM EBITDA, when used, must be constructed only from PIT-known current/prior-period report values; otherwise latest fully disclosed FY EBITDA is used and labeled explicitly.",
             "Market price must come from the exact-date SZSE snapshot, not a current provider page.",
             "EV must be strictly positive and EBITDA strictly positive.",
         ],
