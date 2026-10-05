@@ -163,6 +163,24 @@ def test_v03_blocked_expectation_gap_requires_review_for_new_position():
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
 
 
+
+def test_v03_missing_expectation_gap_does_not_block_existing_hold():
+    c = case()
+    c["portfolio"]["position_pct"] = "5"
+    del c["expectation_gap"]
+    result = decide(c)
+    assert result["decision"]["action"] == "HOLD"
+
+
+def test_v03_missing_expectation_gap_does_not_block_thesis_broken_exit():
+    c = case()
+    c["portfolio"]["position_pct"] = "5"
+    c["thesis"]["status"] = "BROKEN"
+    del c["expectation_gap"]
+    result = decide(c)
+    assert result["decision"]["action"] == "EXIT"
+
+
 def test_v03_negative_expectation_gap_is_no_buy():
     c = case()
     c["expectation_gap"] = {
