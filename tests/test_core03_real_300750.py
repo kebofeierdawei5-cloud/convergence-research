@@ -102,6 +102,7 @@ def test_future_forecast_evidence_fails_closed():
             payload["forecast"],
             payload["valuation_assumptions"],
             payload["market_evidence"],
+            payload["price_evidence"],
             payload["forecast_evidence"],
         )
 
