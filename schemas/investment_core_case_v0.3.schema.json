@@ -21,6 +21,7 @@
     "risk",
     "portfolio",
     "thesis",
+    "decision_upstream_admission",
     "return_gate"
   ],
   "properties": {
@@ -223,6 +224,86 @@
             "BROKEN",
             "UNKNOWN"
           ]
+        }
+      }
+    },
+    "decision_upstream_admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "policy_version",
+        "case_id",
+        "cutoff_date",
+        "reality_status",
+        "quality_gate_status",
+        "value_driver_status",
+        "valuation_status",
+        "forecast_status",
+        "thesis_status",
+        "thesis_admission_status",
+        "capital_admission_ready",
+        "quality_gate",
+        "thesis_admission",
+        "evidence_ids",
+        "admission_record_hash"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "IIOS-CORE-04-UPSTREAM-ADMISSION-0.1"
+        },
+        "policy_version": {
+          "const": "IIOS-DECISION-UPSTREAM-POLICY-0.1"
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cutoff_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "reality_status": {
+          "enum": ["PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"]
+        },
+        "quality_gate_status": {
+          "enum": ["PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"]
+        },
+        "value_driver_status": {
+          "enum": ["PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"]
+        },
+        "valuation_status": {
+          "enum": ["PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"]
+        },
+        "forecast_status": {
+          "enum": ["PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"]
+        },
+        "thesis_status": {
+          "enum": ["INTACT", "WATCH", "BROKEN", "UNKNOWN"]
+        },
+        "thesis_admission_status": {
+          "enum": ["ADMITTED", "BLOCKED", "REVIEW_REQUIRED", "UNKNOWN"]
+        },
+        "capital_admission_ready": {
+          "type": "boolean"
+        },
+        "quality_gate": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "thesis_admission": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "admission_record_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         }
       }
     },
