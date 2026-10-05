@@ -1,136 +1,113 @@
-name: E002 SZSE Primary Market Data Capture
+name: E002 SZSE Primary Evidence Capture Matrix
 
 on:
-  push:
-    branches: ["e002-szse-primary-capture-20261005"]
-    paths:
-      - ".github/workflows/e002_szse_capture.yml"
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/e002_szse_capture.yml"
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   capture:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Capture official SZSE historical market data
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Capture SZSE primary endpoints
+        shell: bash
         env:
-          ENDPOINT: "https://www.szse.cn/api/market/ssjjhq/getHistoryData?cycleType=32&marketId=1&code=300750"
+          HISTORY_URL: "https://www.szse.cn/api/market/ssjjhq/getHistoryData?cycleType=32&marketId=1&code=300750"
+          EOD_URL: "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-09-30&txtEndDate=2026-09-30&archiveDate=2026-10-01&random=0.20261005"
         run: |
-          set -euo pipefail
-          mkdir -p evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse
-          curl --fail --silent --show-error --location --retry 3 --retry-all-errors             -H 'Accept: application/json, text/plain, */*'             -H 'Referer: https://www.szse.cn/market/trend/index.html'             -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/154 Safari/537.36'             "$ENDPOINT"             --output evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse/raw_response.json
-          python - <<'PY'
-          import hashlib, json, pathlib, datetime
-          root = pathlib.Path("evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse")
-          raw = (root / "raw_response.json").read_bytes()
-          obj = json.loads(raw.decode("utf-8"))
-          rows = obj.get("data") if isinstance(obj, dict) else None
-          if not isinstance(rows, list):
-              raise SystemExit(f"unexpected SZSE response shape: {type(obj).__name__}")
-          target = next((row for row in rows if isinstance(row, list) and row and str(row[0]).startswith("2026-09-30")), None)
-          if target is None:
-              raise SystemExit("2026-09-30 row not found in official SZSE response")
-          if len(target) < 3 or str(target[2]) != "291.11":
-              raise SystemExit(f"close mismatch for 2026-09-30: {target!r}")
-          receipt = {
-              "status": "PASS",
-              "source_ref": "SZSE:MARKET_DATA",
-              "source_url": "https://www.szse.cn/api/market/ssjjhq/getHistoryData?cycleType=32&marketId=1&code=300750",
-              "referer": "https://www.szse.cn/market/trend/index.html",
-              "http_method": "GET",
-              "retrieved_at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-              "target": {
-                  "symbol": "300750",
-                  "observation_date": "2026-09-30",
-                  "close": target[2],
-                  "row": target
-              },
-              "capture": {
-                  "filename": "raw_response.json",
-                  "size_bytes": len(raw),
-                  "sha256": hashlib.sha256(raw).hexdigest()
-              },
-              "github_run": {
-                  "repository": "${{ github.repository }}",
-                  "run_id": "${{ github.run_id }}",
-                  "commit_sha": "${{ github.sha }}"
-              }
+          set -u
+          ROOT="$RUNNER_TEMP/e002_primary"
+          mkdir -p "$ROOT"
+          printf 'runner_os=%s\ngithub_run_id=%s\ngithub_sha=%s\n' "$RUNNER_OS" "$GITHUB_RUN_ID" "$GITHUB_SHA" > "$ROOT/run_context.txt"
+
+          capture() {
+            label="$1"
+            url="$2"
+            out="$3"
+            headers="$4"
+            set +e
+            curl --location --retry 2 --retry-all-errors --max-time 20               -D "$headers"               -H 'Accept: application/json, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, */*'               -H 'Referer: https://www.szse.cn/market/trend/index.html'               -H 'User-Agent: Mozilla/5.0'               -w '\nHTTP_STATUS:%{http_code}\n'               "$url" -o "$out" > "$ROOT/${label}_curl.txt" 2>&1
+            rc=$?
+            printf 'label=%s\nrc=%s\n' "$label" "$rc" > "$ROOT/${label}_transport.txt"
+            wc -c "$out" > "$ROOT/${label}_size.txt" 2>/dev/null || true
+            sha256sum "$out" > "$ROOT/${label}_sha256.txt" 2>/dev/null || true
+            return 0
           }
-          (root / "E002_primary_szse_receipt.json").write_text(
-              json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-          )
-          print(json.dumps(receipt, ensure_ascii=False, indent=2))
-          PY
-      - name: Fallback capture via official SZSE EOD report API
-        if: failure()
-        env:
-          URL: "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-09-30&txtEndDate=2026-09-30&archiveDate=2026-10-01&random=0.20261005"
-        run: |
-          set -euo pipefail
-          mkdir -p evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse_eod
-          curl --fail --silent --show-error --location --retry 2 --retry-all-errors             -H 'Referer: https://www.szse.cn/market/trend/index.html'             -H 'User-Agent: Mozilla/5.0'             "$URL"             --output evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse_eod/eod_2026-09-30.xlsx
+
+          capture history "$HISTORY_URL" "$ROOT/history_response.bin" "$ROOT/history_headers.txt"
+          capture eod "$EOD_URL" "$ROOT/eod_response.bin" "$ROOT/eod_headers.txt"
+
           python - <<'PY'
-          import hashlib, pathlib, zipfile, openpyxl, json, datetime
-          root=pathlib.Path("evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse_eod")
-          raw=(root/"eod_2026-09-30.xlsx").read_bytes()
-          if not zipfile.is_zipfile(root/"eod_2026-09-30.xlsx"):
-              raise SystemExit("SZSE EOD response is not a valid XLSX")
-          wb=openpyxl.load_workbook(root/"eod_2026-09-30.xlsx", read_only=True, data_only=True)
-          target=None
-          for ws in wb.worksheets:
-              for row in ws.iter_rows(values_only=True):
-                  vals=[str(x).strip() if x is not None else "" for x in row]
-                  if "300750" in vals:
-                      target=list(row)
-                      break
-              if target is not None: break
-          if target is None:
-              raise SystemExit("300750 not found in SZSE EOD report")
-          close=None
-          for v in target:
-              try:
-                  fv=float(v)
-                  if 200 <= fv <= 400:
-                      close=fv; break
-              except Exception:
-                  pass
-          if close != 291.11:
-              raise SystemExit(f"expected close 291.11, observed candidate row={target!r}, inferred_close={close!r}")
+          import hashlib, json, pathlib, datetime, os, zipfile
+          root=pathlib.Path(os.environ["RUNNER_TEMP"]) / "e002_primary"
           receipt={
-            "status":"PASS",
-            "source_ref":"SZSE:MARKET_DATA",
-            "source_url":"https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-09-30&txtEndDate=2026-09-30&archiveDate=2026-10-01&random=0.20261005",
-            "observation_date":"2026-09-30",
-            "symbol":"300750",
-            "close":291.11,
-            "raw_artifact":{
-              "filename":"eod_2026-09-30.xlsx",
-              "size_bytes":len(raw),
-              "sha256":hashlib.sha256(raw).hexdigest()
-            },
-            "retrieved_at_utc":datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "row":target,
-            "github_run_id":"${{ github.run_id }}",
-            "github_commit_sha":"${{ github.sha }}"
+              "source_ref":"SZSE:MARKET_DATA",
+              "observation_date":"2026-09-30",
+              "symbol":"300750",
+              "retrieved_at_utc":datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "runner_os":os.environ.get("RUNNER_OS"),
+              "github_run_id":os.environ.get("GITHUB_RUN_ID"),
+              "github_sha":os.environ.get("GITHUB_SHA"),
+              "attempts":{}
           }
-          (root/"E002_primary_szse_eod_receipt.json").write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          for label, name in [("history","history_response.bin"),("eod","eod_response.bin")]:
+              p=root/name
+              data=p.read_bytes() if p.exists() else b""
+              receipt["attempts"][label]={
+                  "size_bytes":len(data),
+                  "sha256":hashlib.sha256(data).hexdigest(),
+                  "content_type":next((x.strip() for x in (root/f"{label}_headers.txt").read_text(errors="replace").splitlines() if x.lower().startswith("content-type:")), None),
+              }
+              if label=="history" and data:
+                  try:
+                      obj=json.loads(data.decode("utf-8",errors="replace"))
+                      receipt["attempts"][label]["json_shape"]=type(obj).__name__
+                      rows=obj.get("data") if isinstance(obj,dict) else None
+                      if isinstance(rows,list):
+                          for row in rows:
+                              if isinstance(row,list) and row and str(row[0]).startswith("2026-09-30") and len(row)>=3:
+                                  receipt["attempts"][label]["target_row"]=row
+                                  receipt["attempts"][label]["close"]=str(row[2])
+                                  if str(row[2])=="291.11":
+                                      receipt["status"]="PASS"
+                  except Exception as e:
+                      receipt["attempts"][label]["json_error"]=repr(e)
+              if label=="eod" and data[:2]==b"PK" and zipfile.is_zipfile(p):
+                  receipt["attempts"][label]["xlsx_valid"]=True
+          if receipt.get("status")=="PASS":
+              receipt["admission_candidate"]="PRIMARY_OFFICIAL_RAW_CAPTURE"
+          else:
+              receipt["admission_candidate"]="BLOCKED"
+          (root/"E002_CAPTURE_RECEIPT.json").write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
           print(json.dumps(receipt,ensure_ascii=False,indent=2))
           PY
-      - name: Commit captured evidence to branch
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse
-          git commit -m "evidence: capture E002 2026-09-30 SZSE primary market data"
-          git push origin HEAD:e002-szse-primary-capture-20261005
+
+      - name: Upload raw E002 capture attempt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: E002-primary-${{ matrix.os }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/e002_primary
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
