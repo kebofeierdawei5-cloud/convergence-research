@@ -187,12 +187,6 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 **A1 Company-side Evidence Closure — IN PROGRESS**
 
-Completed sub-batch:
-- **A1-01 Economic Evidence Bridge = PASS / MERGED**
-- Acceptance: `docs/iios/A1_01_ACCEPTANCE_2026-10-05.md`
-
-A1-01 established the deterministic CAPEX → D&A → FCF, Earnings → OCF → FCF, Working Capital and Incremental ROIC proxy layer without changing Decision Kernel semantics.
-
 Completed sub-batches:
 - **A1-01 Economic Evidence Bridge = PASS / MERGED**
 - **A1-02 Capital Allocation + Trust/Governance Evidence Closure = PASS / MERGED**
