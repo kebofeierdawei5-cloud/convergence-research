@@ -17,7 +17,7 @@ B2-A = PASS / MERGED. B2-B = ACTIVE / BLOCKED_PENDING_RAW.
 
 - B2-A merge commit: c8246ceaaad5e9b1cc02fe422723c39a441ea4f3.
 - B2 raw-artifact containment hardening merge commit: 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3.
-- Current canonical main baseline: 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3.
+- Current canonical main baseline: ead980d18b72e37d24d5ac6ccf5f88e857dd235b.
 - B2-B case: RC-CN-A-300750-20261004.
 - Source capture plan: examples/real_cases/RC-CN-A-300750-20261004_b2b_capture_plan.json.
 - The plan is executable and CI-validated, but remains BLOCKED_PENDING_RAW until physical source bytes are supplied and re-hashed.
