@@ -1,6 +1,6 @@
 # IIOS B2 — Acceptance Matrix v0.1
 
-Status: CANDIDATE — implementation gate
+Status: CANDIDATE — implementation gate / scope-repair
 Date: 2026-10-05
 
 ## Investment Core B2-A
@@ -16,19 +16,18 @@ Date: 2026-10-05
 | Coverage fail-closed test | Missing required company evidence group blocks | IMPLEMENTED / CI PENDING |
 | Raw verification boundary | No raw bytes => no exact-byte admission | IMPLEMENTED / CI PENDING |
 
-## A02 Research Track
+## Research Track isolation
 
-A02/CSI800 remains a separate adapter and is not a B2 Investment Core completion gate.
+A02/CSI800 is outside the B2 namespace and B2 CI execution surface. It remains an independent Research Track capability under `research/a02*` and `research/a02_raw/`.
 
-| Gate | Current status |
-|---|---|
-| 000906cons.xls exact historical bytes | BLOCKED |
-| Historical CSI800 coverage | BLOCKED |
-| PIT Security Master raw bundle | BLOCKED |
-| A02 overall admission | BLOCKED |
+| Gate | Required condition | Current status |
+|---|---|---|
+| B2 namespace isolation | No A02/CSI800 code or artifacts under `research/b2/` | IMPLEMENTED / CI PENDING |
+| B2 CI isolation | No A02/CSI800 execution step in B2 workflow | IMPLEMENTED / CI PENDING |
+| Core/Research separation | A02 remains independently addressable | PASS |
 
-## B2-A exit criterion
+## B2-A scope-repair exit criterion
 
-B2-A passes when the single-company Evidence Manifest machinery and its fail-closed boundaries pass CI.
+B2-A passes only when the single-company Evidence/PIT machinery is green AND B2 has no A02/CSI800 namespace or CI dependency.
 
-A CATL production-data admission is a subsequent B2-B task. Existing metadata hashes do not constitute physical byte verification.
+A CATL Evidence migration/admission is subsequent work. Existing capture artifacts must be audited for source fidelity before being admitted; metadata hashes alone do not prove source bytes.

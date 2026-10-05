@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from research.b2.a02_exact_admission import (
+from research.a02.a02_exact_admission import (
     EXPECTED_000906_SHA256,
     EXPECTED_000906_SIZE,
     build_attempt,
@@ -45,7 +45,7 @@ class A02AdmissionTests(unittest.TestCase):
     def test_cli_emits_blocked_result_without_raw_bytes(self):
         with tempfile.TemporaryDirectory() as input_dir, tempfile.TemporaryDirectory() as output_dir:
             completed = subprocess.run(
-                [sys.executable, "-m", "research.b2.a02_exact_admission", "--input-dir", input_dir, "--out", output_dir],
+                [sys.executable, "-m", "research.a02.a02_exact_admission", "--input-dir", input_dir, "--out", output_dir],
                 check=True, capture_output=True, text=True,
             )
             result = json.loads(Path(output_dir, "A02_EXACT_ADMISSION_RESULT.json").read_text(encoding="utf-8"))
