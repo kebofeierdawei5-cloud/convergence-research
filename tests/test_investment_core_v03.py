@@ -47,8 +47,25 @@ def case() -> dict:
         "thesis": {"status": "INTACT"},
         "expectation_gap": {
             "status": "PASS",
-            "gap_relative": "0.10",
+            "gap_relative": "0.3333333333333333333333333333",
             "gap_absolute": "0.05",
+            "comparison_direction": "HIGHER_IS_BETTER",
+            "independent_expectation": {
+                "variable_id": "eps_cagr",
+                "value": "0.20",
+                "unit": "ratio",
+                "basis": "2026A_to_2029E",
+                "horizon_years": "3",
+            },
+            "market_expectation": {
+                "qualification": "DECISION_GRADE",
+                "resolution_state": "UNIQUE_MODEL",
+                "variable_id": "eps_cagr",
+                "value": "0.15",
+                "unit": "ratio",
+                "basis": "2026A_to_2029E",
+                "horizon_years": "3",
+            },
         },
         "return_gate": {
             "entry_price": "100",
@@ -80,10 +97,26 @@ def test_v03_return_math_separates_the_two_15_percent_policies():
     assert abs(metrics["margin_of_safety"] - (Decimal("15")/Decimal("115"))) < Decimal("0.000001")
 
 
-def test_v03_mie_is_optional():
+def test_v03_mie_is_optional_but_gap_is_canonical():
     c = case()
     assert validate_case_v03(c)["status"] == "PASS"
     assert not any(x.startswith("V03-MIE") for x in [e["code"] for e in validate_case_v03(c)["errors"]])
+
+
+def test_v03_forged_positive_gap_is_blocked():
+    c = case()
+    c["expectation_gap"]["gap_relative"] = "0.10"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-EXPECTATION-GAP-CANONICAL" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_incompatible_canonical_gap_is_blocked():
+    c = case()
+    c["expectation_gap"]["market_expectation"]["unit"] = "CNY/share"
+    result = decide(c)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-EXPECTATION-GAP-CANONICAL" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_buy_requires_all_three_return_conditions():
