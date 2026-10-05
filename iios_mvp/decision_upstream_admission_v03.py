@@ -146,6 +146,12 @@ def validate_decision_upstream_admission(
         raise ValueError("decision upstream thesis_admission_status invalid")
     validate_quality_gate(record["quality_gate"], case_id=case_id, cutoff_date=cutoff.isoformat())
     validate_thesis_admission(record["thesis_admission"], case_id=case_id, cutoff_date=cutoff.isoformat())
+    if record["quality_gate_status"] != record["quality_gate"]["status"]:
+        raise ValueError("decision upstream quality_gate_status drift")
+    if record["thesis_admission_status"] != record["thesis_admission"]["admission_status"]:
+        raise ValueError("decision upstream thesis_admission_status drift")
+    if record["thesis_status"] != record["thesis_admission"]["status"]:
+        raise ValueError("decision upstream thesis_status drift")
     expected_ready = (
         record["reality_status"] == "PASS"
         and record["quality_gate_status"] == "PASS"
