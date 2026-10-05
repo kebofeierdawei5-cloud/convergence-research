@@ -280,7 +280,7 @@ def test_multiple_feasible_models_are_ambiguous():
     assert result["identifiability"].selected_model_id is None
 
 
-def test_no_feasible_model_is_unidentifiable():
+def test_outside_historical_support_is_identifiable_not_unidentifiable():
     pe = candidate("pe-1", MarketModelFamily.FORWARD_PE, "forward_eps")
     observations = (
         obs("h1", 1, "100", "5", "forward_eps"),
