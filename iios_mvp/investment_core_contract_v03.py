@@ -305,7 +305,15 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
     risk = case["risk"]
     if not isinstance(risk, dict) or _risk_status(case) not in RISK_STATES:
         errors.append(_err("V03-RISK", "risk.status", "invalid Risk state"))
-    elif "max_loss_pct" in risk:
+    elif "max_loss_pct" not in risk or risk["max_loss_pct"] is None:
+        errors.append(
+            _err(
+                "V03-RISK-MAX-LOSS-REQUIRED",
+                "risk.max_loss_pct",
+                "max_loss_pct is required for v0.3 risk fail-closed semantics",
+            )
+        )
+    else:
         try:
             max_loss = _dec(risk["max_loss_pct"], "risk.max_loss_pct")
             if max_loss < 0 or max_loss >= 100:
