@@ -960,20 +960,26 @@ def _fit_candidate(
     ))
     diagnostics.append(FitDiagnostic(
         diagnostic_id=f"{candidate.model_id}:current_consistency",
-        name="current_consistency",
-        status="PASS" if current_consistent else "INFEASIBLE",
+        name="current_historical_support",
+        status="PASS" if current_consistent else "OUTSIDE_HISTORICAL_SUPPORT",
         evidence_ids=all_ids,
-        notes=f"current_multiple={current_multiple}; within_historical_range={current_consistent}",
+        notes=(
+            f"current_multiple={current_multiple}; historical_range="
+            f"[{historical_low},{historical_high}]; support_state={support_state.value}"
+        ),
     ))
 
     if not current_consistent:
         fit = ModelFit(
             model_id=candidate.model_id,
-            status=ModelFitStatus.INFEASIBLE,
+            status=ModelFitStatus.OUTSIDE_HISTORICAL_SUPPORT,
             diagnostics=tuple(diagnostics),
             evidence_ids=all_ids,
             constraints=("CURRENT_MULTIPLE_WITHIN_HISTORICAL_RANGE",),
+            historical_support=support_state,
+            regime_interpretation=RegimeInterpretationState.POSSIBLE_REGIME_SHIFT,
         )
+        fit.validate()
         return CandidateEvaluation(fit, None)
 
     price = current.price
