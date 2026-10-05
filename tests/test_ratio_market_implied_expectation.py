@@ -495,3 +495,15 @@ def test_real_current_ev_ebitda_is_exact_and_below_historical_lower_bound():
         for item in historical
     ]
     assert current_multiple < min(historical_multiples)
+
+
+def test_outside_historical_support_cannot_materialize_ratio_mie():
+    pe = candidate("pe-outside", MarketModelFamily.FORWARD_PE, "candidate-pe")
+    inp = build_input(
+        (pe,),
+        "forward_eps",
+        ("5", "5", "5", "5", "5"),
+        ("90", "95", "100", "105", "50"),
+    )
+    with pytest.raises(ValueError, match="no feasible ratio market model"):
+        run(inp)
