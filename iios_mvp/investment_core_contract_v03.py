@@ -9,7 +9,7 @@ from .evidence_root_admission import EvidenceRootResolver
 from .canonical_current_price import CanonicalCurrentPriceResolver, validate_current_price_binding
 from .canonical_independent_forecast import CanonicalIndependentForecastResolver
 from .horizon_semantics import validate_horizon_selection
-from .decision_state_machine_v01 import DecisionStateInputs, evaluate_decision_state
+from .decision_kernel_v03 import evaluate_production_decision
 from .price_dependent_expectation_gap import (
     P2_PRICE_GAP_REVALIDATION_VERSION,
     combine_target_entry_price_v2,
@@ -212,8 +212,8 @@ def calculate_return_metrics(
         "target_entry_price_for_risk": target_entry_price_for_risk,
         "target_entry_price": target_entry_price,
         "target_entry_price_binding": "MIN_OF_RETURN_REQUIRED_RETURN_ENTRY_CUSHION_AND_RISK_CAPS",
-        "target_entry_price_semantics": "CONDITIONAL_THRESHOLD_REQUIRES_EXPECTATION_GAP_REVALIDATION",
-        "target_entry_price_requires_gap_revalidation": True,
+        "target_entry_price_semantics": "RETURN_RISK_THRESHOLD_ONLY;OPTIONAL_MIE_REFINEMENT_WHEN_AVAILABLE",
+        "target_entry_price_requires_gap_revalidation": False,
         "return_gate_pass": entry_pass and target_pass and rr_pass and risk_pass,
     }
 
@@ -686,7 +686,9 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "thesis": thesis_status,
         "expectation_gap_status": gap_status,
         "positive_expectation_gap_pass": gap_positive,
-        "expectation_gap_required_for_buy_add": True,
+        "expectation_gap_required_for_buy_add": False,
+        "mie_policy": "OPTIONAL_EXPLANATORY",
+        "mie_material_contradiction": False,
         "current_price": str(current_price) if current_price is not None else None,
         "new_capital_allowed": False,
     }
@@ -703,29 +705,29 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
     package_complete = all(field in package for field in package_fields)
     can_add = bool((case.get("portfolio") or {}).get("can_add", True))
 
-    state = evaluate_decision_state(
-        DecisionStateInputs(
-            validation_pass=validation["status"] == "PASS",
-            trust_status=trust_status,
-            thesis_status=thesis_status,
-            risk_status=risk_status,
-            portfolio_status=portfolio_status,
-            position_pct=position,
-            gap_status=gap_status,
-            gap_positive=gap_positive,
-            expected_annualized_return=(
-                metrics["expected_annualized_return"] if metrics is not None else None
-            ),
-            return_gate_pass=(
-                metrics["return_gate_pass"] if metrics is not None else False
-            ),
-            risk_gate_pass=(
-                metrics["risk_pass"] if metrics is not None else False
-            ),
-            can_add=can_add,
-            package_complete=package_complete,
-            return_metrics_ready=metrics is not None,
-        )
+    state = evaluate_production_decision(
+        validation_pass=validation["status"] == "PASS",
+        trust_status=trust_status,
+        thesis_status=thesis_status,
+        risk_status=risk_status,
+        portfolio_status=portfolio_status,
+        position_pct=position,
+        gap_status=gap_status,
+        gap_positive=gap_positive,
+        expected_annualized_return=(
+            metrics["expected_annualized_return"] if metrics is not None else None
+        ),
+        return_gate_pass=(
+            metrics["return_gate_pass"] if metrics is not None else False
+        ),
+        risk_gate_pass=(
+            metrics["risk_pass"] if metrics is not None else False
+        ),
+        can_add=can_add,
+        package_complete=package_complete,
+        return_metrics_ready=metrics is not None,
+        mie_policy="OPTIONAL_EXPLANATORY",
+        mie_material_contradiction=False,
     )
 
     action = state["action"]
@@ -838,7 +840,7 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
                 "candidate_price": str(metrics["target_entry_price"]),
             }
 
-    if metrics is not None:
+    if metrics is not None and target_ref is not None:
         try:
             canonical_price_response = (
                 p2_1_price_response
@@ -921,6 +923,7 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         pre_admission_capital_effect=state["capital_effect"],
         position_pct=position,
         entry_evaluation=canonical_entry_evaluation,
+        entry_evaluation_required=target_ref is not None,
     )
 
     action = entry_admission["action"]
@@ -1010,6 +1013,8 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "decision_admission_status": entry_admission["status"],
         "decision_admission_rule_id": entry_admission["rule_id"],
         "current_price": str(current_price) if current_price is not None else None,
+        "mie_policy": "OPTIONAL_EXPLANATORY",
+        "mie_material_contradiction": False,
         "decision_precedence_version": state["precedence_version"],
         "decision_precedence_rule_id": state["precedence_rule_id"],
         "decision_precedence_rank": state["precedence_rank"],
