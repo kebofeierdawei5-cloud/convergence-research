@@ -433,15 +433,48 @@ def combine_target_entry_price_v2(
         }
 
     if status == "NON_POSITIVE":
+        if boundary is None:
+            return {
+                "status": "REVIEW_REQUIRED",
+                "target_entry_price": None,
+                "return_target_entry_price": base_target,
+                "expectation_gap_price_boundary": None,
+                "binding": "P2_PRICE_GAP_BOUNDARY_MISSING",
+                "price_constraint_type": None,
+                "target_entry_price_inclusive": False,
+                "reason": "non-positive revalidation did not expose a deterministic price boundary",
+            }
+        if direction == ComparisonDirection.HIGHER_IS_BETTER.value and boundary < base_target:
+            return {
+                "status": "PASS",
+                "target_entry_price": boundary,
+                "return_target_entry_price": base_target,
+                "expectation_gap_price_boundary": boundary,
+                "binding": "EXPECTATION_GAP_UPPER_BOUND",
+                "price_constraint_type": "UPPER_BOUND_STRICT",
+                "target_entry_price_inclusive": False,
+                "reason": "return/risk target is above the expectation-gap ceiling; the ceiling becomes the P2 target-entry supremum",
+            }
+        if direction == ComparisonDirection.LOWER_IS_BETTER.value and base_target > boundary:
+            return {
+                "status": "PASS",
+                "target_entry_price": base_target,
+                "return_target_entry_price": base_target,
+                "expectation_gap_price_boundary": boundary,
+                "binding": "RETURN_TARGET_ENTRY_PRICE_WITH_EXPECTATION_GAP_FLOOR",
+                "price_constraint_type": "LOWER_BOUND_STRICT",
+                "target_entry_price_inclusive": True,
+                "reason": "candidate return target remains above the expectation-gap floor",
+            }
         return {
             "status": "NO_FEASIBLE_PRICE",
             "target_entry_price": None,
             "return_target_entry_price": base_target,
             "expectation_gap_price_boundary": boundary,
-            "binding": "P2_NO_POSITIVE_EXPECTATION_GAP_AT_PRICE_BOUNDARY",
+            "binding": "P2_NO_OVERLAP_BETWEEN_RETURN_AND_EXPECTATION_GAP",
             "price_constraint_type": revalidation.get("price_constraint_type"),
             "target_entry_price_inclusive": False,
-            "reason": "price-dependent expectation gap is non-positive at the supplied candidate price",
+            "reason": "no price satisfies both the return/risk threshold and the price-dependent expectation-gap constraint",
         }
 
     if status != "PASS":
