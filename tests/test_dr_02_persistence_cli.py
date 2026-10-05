@@ -116,8 +116,8 @@ def test_wrong_snapshot_cannot_be_approved(tmp_path):
 
 def test_lifecycle_replay_reconstructs_current_projection(tmp_path):
     series = create_or_load_series(tmp_path, "CN-A", "300750", "CATL", "2026-10-05T00:00:00Z")
-    for revision, action in ((1, "HOLD"), (2, "BUY")):
-        snapshot = make_snapshot(action=action)
+    for revision, action, cutoff in ((1, "HOLD", "2026-10-05"), (2, "BUY", "2026-10-06")):
+        snapshot = make_snapshot(cutoff=cutoff, action=action)
         write_snapshot(tmp_path, snapshot)
         write_decision_revision(tmp_path, series["decision_series_id"], revision, snapshot, f"run-{revision:03d}")
         approve_revision(
