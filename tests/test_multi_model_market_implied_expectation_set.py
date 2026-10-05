@@ -181,7 +181,7 @@ def test_serialization_preserves_model_identity_and_validates_schema():
     assert payload['resolution_state'] == 'AMBIGUOUS'
     assert {x['model_id'] for x in payload['model_evaluations']} == {'pe-1','ps-1'}
     assert payload['qualification'] == 'CONDITIONAL_ONLY'
-    schema_path = Path('schemas/market_implied_expectation_set_v0.2.schema.json')
+    schema_path = Path('schemas/market_implied_expectation_set_v0.3.schema.json')
     schema = json.loads(schema_path.read_text())
     from jsonschema import Draft202012Validator
     Draft202012Validator(schema).validate(payload)
