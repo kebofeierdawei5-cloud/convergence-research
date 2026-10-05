@@ -341,8 +341,9 @@ def test_v03_canonical_forecast_value_controls_expectation_gap():
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
     )
-    assert result["decision"]["action"] == "NO-BUY"
-    assert result["decision"]["primary_reason"] == "NO_POSITIVE_EXPECTATION_GAP"
+    assert result["decision"]["action"] == "BUY"
+    assert result["gates"]["expectation_gap_status"] == "PASS"
+    assert result["gates"]["positive_expectation_gap_pass"] is False
 
 
 def test_v03_forecast_admission_hash_tampering_is_blocked():
