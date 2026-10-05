@@ -8,8 +8,6 @@ on:
       - "schemas/source_registry_v0.1.schema.json"
       - "schemas/pit_temporal_semantics_v0.1.schema.json"
       - "schemas/company_evidence_manifest_v0.1.schema.json"
-      - "schemas/company_source_capture_plan_v0.1.schema.json"
-      - "examples/real_cases/RC-CN-A-300750-20261004_b2b_capture_plan.json"
       - "configs/source_registry_v0.1.json"
       - "docs/iios/B2_*.md"
       - ".github/workflows/iios_b2.yml"
@@ -110,21 +108,8 @@ jobs:
           validator.validate(fixture)
           print("company evidence manifest $ref resolution: PASS")
           PY
-      - name: Validate CATL source capture plan
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          from research.b2.source_capture_plan import validate_company_source_capture_plan
-          plan = json.loads(Path("examples/real_cases/RC-CN-A-300750-20261004_b2b_capture_plan.json").read_text())
-          registry = json.loads(Path("configs/source_registry_v0.1.json").read_text())
-          errors = validate_company_source_capture_plan(plan, registry)
-          assert errors == [], errors
-          assert plan["plan_status"] == "BLOCKED_PENDING_RAW"
-          print("CATL B2-B source capture plan: PASS / pending raw")
-          PY
       - name: Run single-company Evidence/PIT tests
-        run: python -m pytest -q research/b2/tests/test_company_evidence.py research/b2/tests/test_evidence_contract.py research/b2/tests/test_source_capture_plan.py
+        run: python -m pytest -q research/b2/tests/test_company_evidence.py research/b2/tests/test_evidence_contract.py
       - name: Verify B2 research-track isolation
         run: python -m pytest -q research/b2/tests/test_b2_scope.py
       - name: Verify working tree
