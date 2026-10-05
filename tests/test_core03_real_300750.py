@@ -21,6 +21,7 @@ def test_real_300750_core03_full_path_is_executable():
         payload["forecast"],
         payload["valuation_assumptions"],
         payload["market_evidence"],
+        payload["price_evidence"],
         payload["forecast_evidence"],
     )
     assert result["case_id"] == "RC-CN-A-300750-20261004"
@@ -43,6 +44,7 @@ def test_real_300750_valuation_outputs_are_deterministic_and_ordered():
         payload["forecast"],
         payload["valuation_assumptions"],
         payload["market_evidence"],
+        payload["price_evidence"],
         payload["forecast_evidence"],
     )
     valuation = result["company_valuation"]
@@ -64,6 +66,7 @@ def test_p4f_blocked_snapshot_replays():
         payload["forecast"],
         payload["valuation_assumptions"],
         payload["market_evidence"],
+        payload["price_evidence"],
         payload["forecast_evidence"],
     )
     replay = result["p4f_market_implied_expectation"]["replay"]
@@ -81,6 +84,7 @@ def test_forecast_does_not_use_fm01_blocked_dataset():
         payload["forecast"],
         payload["valuation_assumptions"],
         payload["market_evidence"],
+        payload["price_evidence"],
         payload["forecast_evidence"],
     )
     assert result["independent_forecast"]["method"] != "FM01_PRODUCTION_ROUTER"
@@ -109,7 +113,41 @@ def test_corrupt_core03_audit_hash_is_rejected():
         payload["forecast"],
         payload["valuation_assumptions"],
         payload["market_evidence"],
+        payload["price_evidence"],
         payload["forecast_evidence"],
     )
     result["company_valuation"]["primary_model"] = "ev_ebitda"
     assert "CORE03_HASH_MISMATCH" in validate_core03_package(result)
+
+
+def test_real_300750_price_evidence_is_primary_e011_and_legacy_e002_is_not_bound():
+    payload = _input()
+    assert payload["valuation_assumptions"]["price_evidence_id"] == "E011"
+    assert payload["price_evidence"]["evidence_id"] == "E011"
+    assert payload["price_evidence"]["source_ref"] == "SZSE:MARKET_DATA"
+    assert payload["price_evidence"]["content_sha256"] == "349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2"
+    result = build_core03_package(
+        payload["core02_input"],
+        payload["forecast"],
+        payload["valuation_assumptions"],
+        payload["market_evidence"],
+        payload["price_evidence"],
+        payload["forecast_evidence"],
+    )
+    assert result["audit"]["price_evidence"]["evidence_id"] == "E011"
+    assert result["audit"]["price_evidence"]["source_ref"] == "SZSE:MARKET_DATA"
+
+
+def test_price_evidence_mismatch_fails_closed():
+    payload = _input()
+    bad = dict(payload["price_evidence"])
+    bad["value"] = 291.10
+    with pytest.raises(ValueError, match="equal admitted price evidence value"):
+        build_core03_package(
+            payload["core02_input"],
+            payload["forecast"],
+            payload["valuation_assumptions"],
+            payload["market_evidence"],
+            bad,
+            payload["forecast_evidence"],
+        )
