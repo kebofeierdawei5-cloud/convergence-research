@@ -15,7 +15,7 @@
       "retrieved_at": "2026-10-05T00:00:00+08:00",
       "source_ref": "https://static.cninfo.com.cn/finalpage/2026-03-10/1225002214.PDF",
       "artifact_id": "catl-20261004-E014-A1-2025-annual-capital-allocation.txt",
-      "content_sha256": "35b2b59c43e4c9e24f52f007f0df0def7c79089b8bb36b6b874f7f9a5438f075",
+      "content_sha256": "e576f0388e1f9e65823154b6ef913de85b17ebfabba97ffd917ee3354c9e3c8e",
       "exact_bytes": true,
       "provenance_class": "SOURCE_VINTAGE_VERIFIED",
       "status": "ADMITTED"
@@ -67,8 +67,8 @@
     {
       "evidence_id": "E014_A1",
       "relative_path": "evidence/real_cases/RC-CN-A-300750-20261004/capture/E014_A1_2025_annual_capital_allocation.txt",
-      "expected_size_bytes": 730,
-      "expected_sha256": "35b2b59c43e4c9e24f52f007f0df0def7c79089b8bb36b6b874f7f9a5438f075"
+      "expected_size_bytes": 739,
+      "expected_sha256": "e576f0388e1f9e65823154b6ef913de85b17ebfabba97ffd917ee3354c9e3c8e"
     },
     {
       "evidence_id": "E015_A1",
@@ -90,6 +90,6 @@
     }
   ],
   "audit": {
-    "manifest_sha256": "8fe415b595a454c5c7d9e4af9da59ee81094b582dea6b8305a82b139c27f188b"
+    "manifest_sha256": "be44e156496da3f1e123ed4f7c273ade4e4b40d2d2fde30a3aa31ad7fbc15cbe"
   }
 }
