@@ -154,51 +154,32 @@ def _row_first_number(
         if end >= 0:
             text = text[:end]
 
-    lines = text.splitlines()
-    for index, raw_line in enumerate(lines):
-        line = raw_line.strip()
-        if not line:
-            continue
-        compact_line = re.sub(r"\s+", "", line)
-        matched = next(
-            (label for label in labels
-             if compact_line.startswith(re.sub(r"\s+", "", label))),
-            None,
+    for label in labels:
+        label_pattern = r"".join(
+            re.escape(ch) + r"\\s*" for ch in label
+            if not ch.isspace()
         )
-        if matched is None:
+        match = re.search(label_pattern, text)
+        if not match:
             continue
 
-        label_compact = re.sub(r"\s+", "", matched)
-        # CNINFO tables often wrap the numeric cells to the next line.
-        # Normalize only the label line; preserve numeric-column separators.
-        for offset in range(0, 3):
-            raw_candidate = lines[index + offset].strip()
-            if not raw_candidate:
-                continue
-            if offset == 0:
-                candidate_line = re.sub(r"\s+", "", raw_candidate)
-                candidate_line = candidate_line[len(label_compact):]
-            else:
-                candidate_line = raw_candidate
-            match = re.search(_NUM_RE.pattern, candidate_line)
-            if match:
-                return Decimal(match.group(0).replace(",", ""))
+        # The first numeric cell after a statement-row label is the current
+        # fiscal-period value; preserve whitespace so adjacent year columns
+        # cannot concatenate.
+        following = text[match.end():]
+        for line in following.splitlines()[:4]:
+            number = re.search(_NUM_RE.pattern, line)
+            if number:
+                return Decimal(number.group(0).replace(",", ""))
 
     raise ValueError(f"row not found for labels: {labels}")
 
 
-def _balance_sheet_section(text: str) -> str:
-    starts = ("1、合并资产负债表", "1、合并资产负债表")
-    start = -1
-    for marker in starts:
-        start = text.find(marker)
-        if start >= 0:
-            break
+def _statement_section(text: str, start_marker: str, end_marker: str) -> str:
+    start = text.find(start_marker)
     if start < 0:
-        raise ValueError("consolidated balance-sheet section not found")
-    end = text.find("2、合并利润表", start)
-    if end < 0:
-        end = text.find("2、", start + len(starts[0]))
+        raise ValueError(f"statement section start not found: {start_marker}")
+    end = text.find(end_marker, start + len(start_marker))
     return text[start:end if end >= 0 else len(text)]
 
 
@@ -270,8 +251,9 @@ def parse_annual_ebitda(
     fiscal_year: int,
     known_at: str,
 ) -> dict[str, object]:
-    income = _report_text(path, pages_income)
-    cashflow = _report_text(path, pages_cashflow)
+    full_text = _report_text(path, None)
+    income = _statement_section(full_text, "3、合并利润表", "5、合并现金流量表")
+    cashflow = _statement_section(full_text, "5、合并现金流量表", "7、合并所有者权益变动表")
     profit_total = _row_first_number(income, labels=("四、利润总额",))
     interest_expense = _row_first_number(income, labels=("其中：利息费用",))
     fixed_dep = _row_first_number(
