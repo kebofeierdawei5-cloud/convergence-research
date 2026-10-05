@@ -160,9 +160,11 @@ def test_investment_core_formally_admits_buy_through_canonical_entry_evaluation(
     assert result["decision"]["decision_pre_admission_action"] == "BUY"
     assert result["decision"]["decision_status"] == "READY"
     assert result["decision"]["capital_effect"] == "INCREASE"
-    assert result["decision"]["canonical_entry_evaluation"]["qualification"] == "DECISION_GRADE"
+    assert result["decision"]["canonical_entry_evaluation"]["qualification"] == "COMPATIBILITY_ONLY"
     assert result["decision"]["canonical_entry_evaluation"]["price_response_source"] == "P2_LEGACY_COMPAT"
-    assert result["decision"]["canonical_entry_evaluation"]["current_price_eligible"] is True
+    assert result["decision"]["canonical_entry_evaluation"]["current_price_eligible"] is None
+    assert result["decision"]["decision_admission_status"] == "COMPATIBILITY_ONLY"
+    assert result["decision"]["decision_admission_rule_id"] == "DA15_LEGACY_COMPAT_NOT_CANONICAL"
 
 
 def test_investment_core_formally_admits_add_through_canonical_entry_evaluation():
@@ -176,6 +178,8 @@ def test_investment_core_formally_admits_add_through_canonical_entry_evaluation(
     assert result["decision"]["action"] == "ADD"
     assert result["decision"]["decision_admission_rule_id"] == "DA50_CANONICAL_ENTRY_ADMITTED"
     assert result["decision"]["decision_pre_admission_action"] == "ADD"
+    assert result["decision"]["canonical_entry_evaluation"]["qualification"] == "COMPATIBILITY_ONLY"
+    assert result["decision"]["decision_admission_status"] == "COMPATIBILITY_ONLY"
 
 
 def test_entry_evaluation_rejects_current_price_mismatch_with_price_response_reference():
@@ -201,6 +205,26 @@ def test_missing_entry_evaluation_fails_closed_for_buy_add():
     assert admission["status"] == "REVIEW_REQUIRED"
     assert admission["action"] == "REVIEW_REQUIRED"
     assert admission["rule_id"] == "DA10_ENTRY_EVALUATION_MISSING"
+
+
+def test_decision_grade_non_pass_status_fails_closed():
+    admission = admit_decision(
+        pre_admission_action="BUY",
+        pre_admission_status="READY",
+        pre_admission_reason="BUY",
+        pre_admission_capital_effect="INCREASE",
+        position_pct="0",
+        entry_evaluation={
+            "evaluation_version": CANONICAL_ENTRY_EVALUATION_VERSION,
+            "evaluation_id": "fixture",
+            "status": "CONDITIONAL_ONLY",
+            "qualification": "DECISION_GRADE",
+            "current_price_eligible": True,
+        },
+    )
+    assert admission["status"] == "REVIEW_REQUIRED"
+    assert admission["action"] == "REVIEW_REQUIRED"
+    assert admission["rule_id"] == "DA30_DECISION_GRADE_ENTRY_UNRESOLVED"
 
 
 def test_conditional_only_price_boundary_cannot_become_admission_gate():
@@ -279,7 +303,7 @@ def test_canonical_entry_evaluation_supports_explicit_legacy_p2_compatibility():
         independent_forecast_ref=c["expectation_gap"]["independent_forecast_ref"],
     )
     assert evaluation["status"] == "PASS"
-    assert evaluation["qualification"] == "DECISION_GRADE"
+    assert evaluation["qualification"] == "COMPATIBILITY_ONLY"
     assert evaluation["price_response_source"] == "P2_LEGACY_COMPAT"
     assert evaluation["price_response_version"] == P2_PRICE_GAP_REVALIDATION_VERSION
 
