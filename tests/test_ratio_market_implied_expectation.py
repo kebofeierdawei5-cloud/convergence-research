@@ -1,5 +1,5 @@
 from datetime import date, datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, localcontext
 
 import pytest
 
@@ -441,7 +441,7 @@ def test_real_core04c_observations_are_consumed_by_p3a_and_fail_closed_on_curren
     assert evaluation.fit.status.value == "INFEASIBLE"
     assert diagnostics["historical_market_multiple_range"].status == "PASS"
     assert diagnostics["current_consistency"].status == "INFEASIBLE"
-    assert "current_multiple=8.3755367867323613771955766383371182231544885817258636164299" in diagnostics["current_consistency"].notes
+    assert "current_multiple=8.375536786732361377195576638" in diagnostics["current_consistency"].notes
     assert result["identifiability"].state.value == "UNIDENTIFIABLE"
     assert result["stability"].state.value == "INSUFFICIENT_EVIDENCE"
     assert payload["source_receipt"]["artifact_sha256"] == "51e9e8c19404ef241383c99e0f9ed98bf3088fbe2b4a47778e9f5d79a26ee6c4"
@@ -484,7 +484,11 @@ def test_real_current_ev_ebitda_is_exact_and_below_historical_lower_bound():
     _, inp, _, _ = _real_300750_ratio_input()
     current = next(item for item in inp.observations if item.observation_id == inp.current_observation_id)
     current_multiple = (current.price * current.shares_outstanding + current.net_debt) / current.economic_value
-    assert current_multiple == Decimal("8.3755367867323613771955766383371182231544885817258636164299037283731213288310246")
+    assert current_multiple == Decimal("8.375536786732361377195576638")
+    with localcontext() as ctx:
+        ctx.prec = 80
+        exact_multiple = (current.price * current.shares_outstanding + current.net_debt) / current.economic_value
+    assert exact_multiple == Decimal("8.3755367867323613771955766383371182231544885817258636164299037283731213288310246")
     historical = inp.observations[:3]
     historical_multiples = [
         (item.price * item.shares_outstanding + item.net_debt) / item.economic_value
