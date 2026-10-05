@@ -2,7 +2,7 @@
 
 Date: 2026-10-05
 Case: RC-CN-A-300750-20261004
-Status: FINAL CANDIDATE — awaiting CI merge gate
+Status: FINAL ACCEPTED / CI VERIFIED
 
 ## Admission result
 
@@ -107,3 +107,15 @@ Historical capture hashes from CORE-04-B remain append-only and are not overwrit
 ## Boundary
 
 This evidence establishes historical market observations for the EV/EBITDA family. It does not establish that EV/EBITDA is the unique true market model, does not promote MIE, and does not unlock Expected Return or Decision Kernel.
+
+
+## Final CI receipt
+
+- Workflow: `real-ev-ebitda`
+- Run: `37261197564`
+- Result: **SUCCESS**
+- Artifact: `11324731141`
+- Artifact ZIP SHA-256: `51e9e8c19404ef241383c99e0f9ed98bf3088fbe2b4a47778e9f5d79a26ee6c4`
+- Permanent compact receipt: `research/core04c_catl_ev_ebitda_receipt_v0.2.json`
+
+The permanent receipt records the exact captured source hashes, PIT-vintage bindings, three admitted observations, and the CI acceptance checks.
