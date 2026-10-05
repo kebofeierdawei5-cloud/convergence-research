@@ -840,10 +840,30 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
 
     if metrics is not None:
         try:
+            canonical_price_response = (
+                p2_1_price_response
+                if isinstance(p2_1_price_response, dict)
+                and p2_1_price_response.get("response_id") is not None
+                and p2_1_price_response.get("response_version") == PRICE_RESPONSE_VERSION
+                else p2_revalidation
+                if isinstance(p2_revalidation, dict)
+                and p2_revalidation.get("revalidation_id") is not None
+                and p2_revalidation.get("response_version", P2_PRICE_GAP_REVALIDATION_VERSION)
+                    == P2_PRICE_GAP_REVALIDATION_VERSION
+                else None
+            )
+            canonical_price_response_source = (
+                "P2.1_CANONICAL"
+                if canonical_price_response is p2_1_price_response
+                else "P2_LEGACY_COMPAT"
+                if canonical_price_response is p2_revalidation
+                else "P2.1_CANONICAL"
+            )
             canonical_entry_evaluation = build_canonical_entry_evaluation(
                 current_price=current_price,
                 return_target_entry_price=metrics["target_entry_price"],
-                p2_1_price_response=p2_1_price_response,
+                price_response=canonical_price_response,
+                price_response_source=canonical_price_response_source,
                 entry_reference_source=(
                     "TARGET_ENTRY_REFERENCE"
                     if isinstance(case.get("target_entry_price_reference"), dict)
