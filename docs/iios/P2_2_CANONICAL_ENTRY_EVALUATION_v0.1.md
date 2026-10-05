@@ -38,3 +38,9 @@ P2.2 creates no new market evidence. It consumes the already PIT-bound P2.1 resp
 P2.1 is the canonical source whenever the upstream model family is admitted by P2.1. Existing \`forward_pe\`/\`ps\`/\`pb\` proportional cases that are still served by the frozen P2 engine use \`P2_LEGACY_COMPAT\` explicitly; they are never relabelled as P2.1. This compatibility path is version-bound.
 
 P2.2 binds its current price to the selected price-response reference price in both paths.
+
+## Legacy compatibility is not canonical admission
+
+A frozen P2 proportional response that is not supported by P2.1 is normalized only as `P2_LEGACY_COMPAT`. Its target boundary is preserved for backward-compatible output and replay, but its qualification is `COMPATIBILITY_ONLY` and it cannot confer P2.2 canonical admission. The pre-P1.4 action is therefore preserved rather than silently upgraded or downgraded.
+
+P2.1-supported model responses are the only price-response inputs that can produce `DECISION_GRADE` canonical entry admission.
