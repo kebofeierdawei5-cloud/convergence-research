@@ -654,6 +654,7 @@ def _fit_complex_candidate(
             diagnostics=(diagnostic,),
             evidence_ids=candidate_evidence_ids,
             constraints=("CURRENT_OBSERVATION_REQUIRED",),
+            historical_support=HistoricalSupportState.INSUFFICIENT_EVIDENCE,
         )
         return CandidateEvaluation(fit, None)
 
