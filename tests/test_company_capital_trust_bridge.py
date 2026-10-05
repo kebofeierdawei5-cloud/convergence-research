@@ -107,9 +107,10 @@ def test_non_unanimous_vote_is_recorded_as_missing_control():
     assert result["trust_revalidation"]["governance_integrity"]["non_related_director_vote_control"] is False
 
 
-def test_zero_project_investment_fails_closed():
-    with pytest.raises(ValueError, match="positive"):
-        _build(indonesia_planned_investment_usd=0)
+def test_zero_project_investment_produces_unknown_ratio():
+    result = _build(indonesia_planned_investment_usd=0)
+    assert result["capital_allocation"]["capital_commitments"]["status"] == "CONDITIONAL"
+    assert result["capital_allocation"]["capital_commitments"]["guarantee_to_project_ratio"] is None
 
 
 def test_hash_tampering_is_detected():
