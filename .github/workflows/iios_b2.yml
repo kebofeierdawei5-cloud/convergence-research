@@ -19,8 +19,6 @@ on:
       - "schemas/source_registry_v0.1.schema.json"
       - "schemas/pit_temporal_semantics_v0.1.schema.json"
       - "schemas/company_evidence_manifest_v0.1.schema.json"
-      - "schemas/company_source_capture_plan_v0.1.schema.json"
-      - "examples/real_cases/RC-CN-A-300750-20261004_b2b_capture_plan.json"
       - "configs/source_registry_v0.1.json"
       - "docs/iios/B2_*.md"
       - ".github/workflows/iios_b2.yml"
