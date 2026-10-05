@@ -34,20 +34,53 @@ def _sha_json(value: Any) -> str:
     return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
 
 
+def _resolve_contained_path(root: Path, relative_path: str) -> Path | None:
+    root_resolved = root.resolve()
+    if not root_resolved.is_dir():
+        return None
+    path = (root_resolved / relative_path).resolve()
+    try:
+        path.relative_to(root_resolved)
+    except ValueError:
+        return None
+    return path
+
+
 def verify_raw_artifact(root: Path, declaration: Mapping[str, Any]) -> dict[str, Any]:
     relative_path = str(declaration.get("relative_path", "")).strip()
     expected_sha256 = str(declaration.get("expected_sha256", "")).strip()
     expected_size = declaration.get("expected_size_bytes")
     if not relative_path or not expected_sha256 or not isinstance(expected_size, int):
-        return {"status": "BLOCKED", "reason": "RAW_ARTIFACT_DECLARATION_INCOMPLETE", "relative_path": relative_path}
-    path = (root / relative_path).resolve()
+        return {
+            "status": "BLOCKED",
+            "reason": "RAW_ARTIFACT_DECLARATION_INCOMPLETE",
+            "relative_path": relative_path,
+        }
+
+    path = _resolve_contained_path(root, relative_path)
+    if path is None:
+        return {
+            "status": "BLOCKED",
+            "reason": "RAW_ARTIFACT_PATH_ESCAPE",
+            "relative_path": relative_path,
+            "size_bytes": None,
+            "sha256": None,
+        }
     if not path.is_file():
-        return {"status": "BLOCKED", "reason": "RAW_ARTIFACT_MISSING", "relative_path": relative_path, "size_bytes": None, "sha256": None}
+        return {
+            "status": "BLOCKED",
+            "reason": "RAW_ARTIFACT_MISSING",
+            "relative_path": relative_path,
+            "size_bytes": None,
+            "sha256": None,
+        }
+
     size = path.stat().st_size
     sha256 = _sha_bytes(path)
+    exact = size == expected_size and sha256 == expected_sha256
     return {
-        "status": "PASS" if size == expected_size and sha256 == expected_sha256 else "BLOCKED",
-        "reason": "EXACT_BYTES_VERIFIED" if size == expected_size and sha256 == expected_sha256 else "EXACT_BYTES_MISMATCH",
+        "status": "PASS" if exact else "BLOCKED",
+        "reason": "EXACT_BYTES_VERIFIED" if exact else "EXACT_BYTES_MISMATCH",
         "relative_path": relative_path,
         "size_bytes": size,
         "sha256": sha256,
@@ -137,8 +170,19 @@ def validate_company_evidence_manifest(
         declared_ids.add(evidence_id)
         if evidence_id and evidence_id not in evidence_ids:
             errors.append(f"RAW_ARTIFACT_WITHOUT_EVIDENCE:{evidence_id}")
-        matching = next((item for item in evidence if str(item.get("evidence_id", "")).strip() == evidence_id), None)
-        if matching is not None and str(declaration.get("expected_sha256", "")).strip() != str(matching.get("content_sha256", "")).strip():
+        matching = next(
+            (
+                item
+                for item in evidence
+                if str(item.get("evidence_id", "")).strip() == evidence_id
+            ),
+            None,
+        )
+        if (
+            matching is not None
+            and str(declaration.get("expected_sha256", "")).strip()
+            != str(matching.get("content_sha256", "")).strip()
+        ):
             errors.append(f"RAW_ARTIFACT[{evidence_id}]:EVIDENCE_HASH_MISMATCH")
         if require_raw_verification:
             if raw_root is None:
@@ -154,7 +198,11 @@ def validate_company_evidence_manifest(
             errors.append("EVIDENCE_WITHOUT_RAW_ARTIFACT:" + ",".join(missing))
 
     audit = manifest.get("audit") or {}
-    body = {key: value for key, value in manifest.items() if key not in {"audit", "status", "validation_errors"}}
+    body = {
+        key: value
+        for key, value in manifest.items()
+        if key not in {"audit", "status", "validation_errors"}
+    }
     if audit.get("manifest_sha256") != _sha_json(body):
         errors.append("MANIFEST_HASH_MISMATCH")
 
@@ -188,7 +236,7 @@ def build_company_evidence_manifest(
     errors = validate_company_evidence_manifest(
         manifest,
         raw_root=raw_root,
-        require_raw_verification=raw_root is not None,
+        require_raw_verification=True,
     )
     manifest["status"] = "PASS" if not errors else "BLOCKED"
     manifest["validation_errors"] = errors
