@@ -10,6 +10,11 @@ from .canonical_current_price import CanonicalCurrentPriceResolver, validate_cur
 from .canonical_independent_forecast import CanonicalIndependentForecastResolver
 from .horizon_semantics import validate_horizon_selection
 from .decision_state_machine_v01 import DecisionStateInputs, evaluate_decision_state
+from .price_dependent_expectation_gap import (
+    P2_PRICE_GAP_REVALIDATION_VERSION,
+    combine_target_entry_price_v2,
+    revalidate_expectation_gap_at_price,
+)
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
 BUY_ENTRY_RETURN_CUSHION_THRESHOLD = Decimal("0.15")
@@ -669,14 +674,78 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
     gates["decision_precedence_rank"] = state["precedence_rank"]
     gates["decision_scope"] = state["decision_scope"]
     gates["capital_effect"] = state["capital_effect"]
+    p2_revalidation = None
+    p2_target = None
+    if metrics is not None and isinstance(case.get("expectation_gap"), dict):
+        try:
+            if evidence_root_resolver is None:
+                raise ValueError("canonical evidence root resolver is required for P2 target-entry revalidation")
+            snapshot = evidence_root_resolver.resolve_p4f_snapshot(
+                case["market_implied_expectation_snapshot_ref"],
+                case_id=case["case_id"],
+                cutoff_date=_date(case["cutoff_date"], "cutoff_date"),
+            )
+            p2_revalidation = revalidate_expectation_gap_at_price(
+                market_implied_expectation_snapshot=snapshot,
+                current_price_observation=case["current_price_observation"],
+                candidate_price=metrics["target_entry_price"],
+                cutoff_date=case["cutoff_date"],
+                case_id=case["case_id"],
+                market=case["market"],
+                symbol=case["symbol"],
+                market_expectation_id=case["expectation_gap"]["market_expectation_id"],
+                independent_forecast_ref=case["expectation_gap"]["independent_forecast_ref"],
+                independent_forecast_resolver=independent_forecast_resolver,
+            )
+            p2_target = combine_target_entry_price_v2(
+                return_target_entry_price=metrics["target_entry_price"],
+                revalidation=p2_revalidation,
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            p2_revalidation = {
+                "status": "REVIEW_REQUIRED",
+                "reason": str(exc),
+                "reference_snapshot_hash": (
+                    case.get("expectation_gap", {}).get("mie_snapshot_hash")
+                    if isinstance(case.get("expectation_gap"), dict)
+                    else None
+                ),
+                "candidate_price": str(metrics["target_entry_price"]),
+            }
+            p2_target = {
+                "status": "REVIEW_REQUIRED",
+                "target_entry_price": None,
+                "return_target_entry_price": str(metrics["target_entry_price"]),
+                "expectation_gap_price_boundary": None,
+                "binding": "P2_PRICE_GAP_REVALIDATION_UNRESOLVED",
+                "price_constraint_type": None,
+                "target_entry_price_inclusive": False,
+                "reason": str(exc),
+            }
+
     if metrics is not None:
-        gates["target_entry_price"] = str(metrics["target_entry_price"])
         gates["target_entry_price_for_return"] = str(metrics["target_entry_price_for_return"])
         gates["target_entry_price_for_required_return"] = str(metrics["target_entry_price_for_required_return"])
         gates["target_entry_price_for_entry_cushion"] = str(metrics["target_entry_price_for_entry_cushion"])
         gates["target_entry_price_for_risk"] = (
             str(metrics["target_entry_price_for_risk"])
             if metrics["target_entry_price_for_risk"] is not None
+            else None
+        )
+        gates["target_entry_price_v2_status"] = (
+            p2_target["status"] if p2_target is not None else "SKIPPED"
+        )
+        gates["target_entry_price_v2_binding"] = (
+            p2_target["binding"] if p2_target is not None else None
+        )
+        gates["target_entry_price_for_expectation_gap"] = (
+            str(p2_target["expectation_gap_price_boundary"])
+            if p2_target is not None and p2_target.get("expectation_gap_price_boundary") is not None
+            else None
+        )
+        gates["target_entry_price"] = (
+            str(p2_target["target_entry_price"])
+            if p2_target is not None and p2_target.get("status") == "PASS"
             else None
         )
 
@@ -691,16 +760,26 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "gates": gates,
         "position_package_complete": package_complete,
         "target_entry_price": (
+            str(p2_target["target_entry_price"])
+            if p2_target is not None and p2_target.get("status") == "PASS"
+            else None
+        ),
+        "target_entry_price_return_only": (
             _serialize_metrics(metrics)["target_entry_price"] if metrics is not None else None
         ),
         "target_entry_price_semantics": (
-            _serialize_metrics(metrics)["target_entry_price_semantics"] if metrics is not None else None
+            "P2_PRICE_DEPENDENT_EXPECTATION_GAP_REVALIDATED_CONDITIONAL_THRESHOLD"
+            if p2_target is not None and p2_target.get("status") == "PASS"
+            else "P2_PRICE_DEPENDENT_EXPECTATION_GAP_REVALIDATION_UNRESOLVED"
+            if p2_target is not None
+            else (_serialize_metrics(metrics)["target_entry_price_semantics"] if metrics is not None else None)
         ),
-        "target_entry_price_requires_gap_revalidation": (
-            _serialize_metrics(metrics)["target_entry_price_requires_gap_revalidation"]
-            if metrics is not None
-            else None
+        "target_entry_price_requires_gap_revalidation": True if metrics is not None else None,
+        "target_entry_price_v2_version": (
+            P2_PRICE_GAP_REVALIDATION_VERSION if p2_target is not None else None
         ),
+        "target_entry_price_v2": p2_target,
+        "target_entry_price_gap_revalidation": p2_revalidation,
         "current_price": str(current_price) if current_price is not None else None,
         "decision_precedence_version": state["precedence_version"],
         "decision_precedence_rule_id": state["precedence_rule_id"],
