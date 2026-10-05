@@ -159,6 +159,67 @@ def _invested_capital_proxy(period: Mapping[str, Any]) -> float:
     )
 
 
+REQUIRED_METRIC_FIELDS = (
+    "period_id",
+    "period_start",
+    "period_end",
+    "evidence_ids",
+    "reported_revenue",
+    "reported_operating_profit",
+    "reported_profit_before_tax",
+    "reported_income_tax",
+    "reported_net_income",
+    "reported_attributable_net_income",
+    "reported_operating_cash_flow",
+    "capex_cash_paid",
+    "core_depreciation_amortization",
+    "fcf_after_capex",
+    "ocf_to_net_income",
+    "fcf_to_net_income",
+    "ocf_to_attributable_net_income",
+    "fcf_to_attributable_net_income",
+    "effective_tax_rate",
+    "nopat_proxy",
+    "working_capital_cash_bridge",
+    "operating_working_capital_snapshot",
+    "invested_capital_proxy",
+)
+
+
+def _validate_period_metrics(period: Any, field: str) -> None:
+    if not isinstance(period, Mapping):
+        raise ValueError(f"{field} must be an object")
+    missing = [name for name in REQUIRED_METRIC_FIELDS if name not in period]
+    if missing:
+        raise ValueError(f"{field} missing required metric fields: {missing}")
+    if set(period) != set(REQUIRED_METRIC_FIELDS):
+        extra = sorted(set(period) - set(REQUIRED_METRIC_FIELDS))
+        if extra:
+            raise ValueError(f"{field} has unsupported metric fields: {extra}")
+    if not str(period["period_id"]).strip():
+        raise ValueError(f"{field}.period_id must be non-empty")
+    start = _parse_date(period["period_start"], f"{field}.period_start")
+    end = _parse_date(period["period_end"], f"{field}.period_end")
+    if end < start:
+        raise ValueError(f"{field}.period_end cannot precede period_start")
+    _refs(period["evidence_ids"], f"{field}.evidence_ids")
+    numeric_fields = set(REQUIRED_METRIC_FIELDS) - {
+        "period_id", "period_start", "period_end", "evidence_ids",
+        "working_capital_cash_bridge", "operating_working_capital_snapshot",
+    }
+    for name in numeric_fields:
+        _number(period[name], f"{field}.{name}")
+    for container_name, expected in (
+        ("working_capital_cash_bridge", ("inventory", "receivables", "payables", "net_cash_contribution")),
+        ("operating_working_capital_snapshot", ("operating_current_assets", "operating_current_liabilities", "core_operating_nwc")),
+    ):
+        value = period[container_name]
+        if not isinstance(value, Mapping) or set(value) != set(expected):
+            raise ValueError(f"{field}.{container_name} fields invalid")
+        for name in expected:
+            _number(value[name], f"{field}.{container_name}.{name}")
+
+
 def _period_metrics(period: Mapping[str, Any]) -> dict[str, Any]:
     p = _period_core(period)
     tax_rate = p["income_tax"] / p["profit_before_tax"]
@@ -377,7 +438,7 @@ def validate_company_economic_bridge(record: Any) -> list[str]:
         for name in ("prior", "current"):
             period = periods[name]
             try:
-                _period_core(period)
+                _validate_period_metrics(period, f"{name.upper()}_PERIOD")
             except ValueError as exc:
                 errors.append(f"{name.upper()}:{exc}")
 
@@ -408,6 +469,13 @@ def validate_company_economic_bridge(record: Any) -> list[str]:
                 errors.append("AUDIT_BRIDGE_HASH_MISMATCH")
 
     if not errors and isinstance(record["periods"], Mapping):
+        for name in ("prior", "current"):
+            metric_refs = set(record["periods"][name]["evidence_ids"])
+            admitted = set(record["evidence_admission"]["evidence_ids"])
+            if not metric_refs.issubset(admitted):
+                errors.append(
+                    f"{name.upper()}:evidence IDs are not all present in evidence admission"
+                )
         expected_input = {
             "case_id": record["case_id"],
             "cutoff_date": record["cutoff_date"],
