@@ -1,9 +1,9 @@
 name: P0 Audit Carrier CI
 
 on:
-  push:
+  pull_request:
     branches:
-      - audit/p0-r1-r4-ci-20261005
+      - main
 
 jobs:
   test-mvp:
