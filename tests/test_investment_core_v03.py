@@ -167,9 +167,6 @@ def test_v03_incompatible_canonical_gap_is_blocked():
 def test_v03_expectation_gap_horizon_must_match_decision_horizon():
     c = case()
     c["expectation_gap"]["independent_expectation"]["horizon_years"] = "3"
-    c["expectation_gap"]["market_expectation"]["horizon_years"] = "3"
-    c["expectation_gap"]["independent_expectation"]["basis"] = "2026A_to_2029E"
-    c["expectation_gap"]["market_expectation"]["basis"] = "2026A_to_2029E"
     result = decide(c)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-EXPECTATION-GAP-HORIZON" in x for x in result["validation"]["blockers"])
