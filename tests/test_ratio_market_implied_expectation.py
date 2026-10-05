@@ -256,22 +256,9 @@ def test_unstable_identification_still_blocks_ratio_mie():
         "forward_eps",
         ("10", "10", "10", "10", "10"),
         ("100", "100", "100", "100", "100"),
+        net_debt="-200",
     )
     invalid = list(inp.observations)
-    invalid[0] = MarketValuationObservation(
-        observation_id=invalid[0].observation_id,
-        observation_date=invalid[0].observation_date,
-        known_at=invalid[0].known_at,
-        price=Decimal("-1"),
-        shares_outstanding=invalid[0].shares_outstanding,
-        economic_variable=invalid[0].economic_variable,
-        economic_value=invalid[0].economic_value,
-        unit=invalid[0].unit,
-        basis=invalid[0].basis,
-        evidence_ids=invalid[0].evidence_ids,
-        source=invalid[0].source,
-        net_debt=invalid[0].net_debt,
-    )
     unstable = MarketModelIdentificationInput(
         cutoff_date=inp.cutoff_date,
         current_observation_id=inp.current_observation_id,
