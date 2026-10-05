@@ -235,6 +235,7 @@ def validate_p4f_snapshot(snapshot: Mapping[str, Any]) -> None:
             observation_date=_parse_date(item.get("observation_date"), "provenance.observation_date"),
             known_at=_parse_datetime(item.get("known_at"), "provenance.known_at"), source=item.get("source", ""), source_location=item.get("source_location", ""),
             content_sha256=item.get("content_sha256", ""), captured_at=_parse_datetime(item.get("captured_at"), "provenance.captured_at"),
+            value=(None if item.get("value") is None else Decimal(str(item.get("value")))),
         )
         record.validate(cutoff)
         provenance[record.evidence_id] = record
