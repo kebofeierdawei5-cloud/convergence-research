@@ -481,6 +481,26 @@
           ],
           "additionalProperties": true
         },
+        "target_entry_price_p2_1_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_entry_price_p2_1": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        },
+        "target_entry_price_p2_1_price_response": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": true
+        },
         "position_package_complete": {
           "type": "boolean"
         },
@@ -509,6 +529,38 @@
             "DECREASE",
             "REVIEW"
           ]
+        }
+      }
+    },
+    "target_entry_price_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "market_expectation_id",
+        "independent_forecast_ref"
+      ],
+      "properties": {
+        "market_expectation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independent_forecast_ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "forecast_id",
+            "admission_record_hash"
+          ],
+          "properties": {
+            "forecast_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "admission_record_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
         }
       }
     },
@@ -581,6 +633,26 @@
       "then": {
         "required": [
           "market_implied_expectation_snapshot_ref"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "target_entry_price_reference"
+        ]
+      },
+      "then": {
+        "required": [
+          "market_implied_expectation_snapshot_ref"
+        ]
+      }
+    },
+    {
+      "not": {
+        "required": [
+          "expectation_gap",
+          "target_entry_price_reference"
         ]
       }
     },

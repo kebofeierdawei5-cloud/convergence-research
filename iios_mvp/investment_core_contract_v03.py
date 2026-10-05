@@ -15,6 +15,10 @@ from .price_dependent_expectation_gap import (
     combine_target_entry_price_v2,
     revalidate_expectation_gap_at_price,
 )
+from .p2_1_canonical_price_response import (
+    PRICE_RESPONSE_VERSION,
+    build_canonical_price_response,
+)
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
 BUY_ENTRY_RETURN_CUSHION_THRESHOLD = Decimal("0.15")
@@ -411,6 +415,56 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
     except (KeyError, ValueError):
         pass
 
+    if "target_entry_price_reference" in case and "expectation_gap" in case:
+        errors.append(_err(
+            "V03-TARGET-ENTRY-REF-CONFLICT",
+            "target_entry_price_reference",
+            "target_entry_price_reference and expectation_gap cannot coexist; "
+            "the target-entry MIE/forecast binding must use one canonical path",
+        ))
+    target_entry_reference = case.get("target_entry_price_reference")
+    if target_entry_reference is not None:
+        if not isinstance(target_entry_reference, dict):
+            errors.append(_err(
+                "V03-TARGET-ENTRY-REF-TYPE",
+                "target_entry_price_reference",
+                "must be an object",
+            ))
+        else:
+            required_ref_fields = {"market_expectation_id", "independent_forecast_ref"}
+            if set(target_entry_reference) != required_ref_fields:
+                errors.append(_err(
+                    "V03-TARGET-ENTRY-REF-FIELDS",
+                    "target_entry_price_reference",
+                    "must contain exactly market_expectation_id and independent_forecast_ref",
+                ))
+            else:
+                forecast_ref = target_entry_reference.get("independent_forecast_ref")
+                if not isinstance(forecast_ref, dict):
+                    errors.append(_err(
+                        "V03-TARGET-ENTRY-REF-FORECAST",
+                        "target_entry_price_reference.independent_forecast_ref",
+                        "canonical independent forecast reference is required",
+                    ))
+                else:
+                    if set(forecast_ref) != {"forecast_id", "admission_record_hash"}:
+                        errors.append(_err(
+                            "V03-TARGET-ENTRY-REF-FORECAST-FIELDS",
+                            "target_entry_price_reference.independent_forecast_ref",
+                            "must contain exactly forecast_id and admission_record_hash",
+                        ))
+                    if evidence_root_resolver is None:
+                        errors.append(_err(
+                            "V03-TARGET-ENTRY-REF-RESOLVER",
+                            "target_entry_price_reference",
+                            "canonical evidence root resolver is required at runtime",
+                        ))
+                    elif not isinstance(case.get("market_implied_expectation_snapshot_ref"), dict):
+                        errors.append(_err(
+                            "V03-TARGET-ENTRY-REF-SNAPSHOT",
+                            "market_implied_expectation_snapshot_ref",
+                            "canonical evidence root reference is required when target_entry_price_reference is supplied",
+                        ))
     expectation_gap = case.get("expectation_gap")
     if expectation_gap is not None:
         precondition_failed = False
@@ -686,7 +740,58 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
     gates["capital_effect"] = state["capital_effect"]
     p2_revalidation = None
     p2_target = None
-    if metrics is not None and isinstance(case.get("expectation_gap"), dict):
+    p2_1_price_response = None
+    target_ref = (
+        case.get("target_entry_price_reference")
+        if isinstance(case.get("target_entry_price_reference"), dict)
+        else None
+    )
+    if metrics is not None and target_ref is not None:
+        try:
+            if evidence_root_resolver is None:
+                raise ValueError("canonical evidence root resolver is required for P2.1 target-entry revalidation")
+            if independent_forecast_resolver is None:
+                raise ValueError("canonical independent forecast resolver is required for P2.1 target-entry revalidation")
+            snapshot = evidence_root_resolver.resolve_p4f_snapshot(
+                case["market_implied_expectation_snapshot_ref"],
+                case_id=case["case_id"],
+                cutoff_date=_date(case["cutoff_date"], "cutoff_date"),
+            )
+            p2_1_price_response = build_canonical_price_response(
+                market_implied_expectation_snapshot=snapshot,
+                current_price_observation=case["current_price_observation"],
+                candidate_price=metrics["target_entry_price"],
+                cutoff_date=case["cutoff_date"],
+                case_id=case["case_id"],
+                market=case["market"],
+                symbol=case["symbol"],
+                market_expectation_id=target_ref["market_expectation_id"],
+                independent_forecast_ref=target_ref["independent_forecast_ref"],
+                independent_forecast_resolver=independent_forecast_resolver,
+            )
+            p2_target = combine_target_entry_price_v2(
+                return_target_entry_price=metrics["target_entry_price"],
+                revalidation=p2_1_price_response,
+            )
+            p2_revalidation = p2_1_price_response
+        except (KeyError, TypeError, ValueError) as exc:
+            p2_1_price_response = {
+                "status": "REVIEW_REQUIRED",
+                "response_version": PRICE_RESPONSE_VERSION,
+                "reason": str(exc),
+                "candidate_price": str(metrics["target_entry_price"]),
+            }
+            p2_target = {
+                "status": "REVIEW_REQUIRED",
+                "target_entry_price": None,
+                "return_target_entry_price": str(metrics["target_entry_price"]),
+                "expectation_gap_price_boundary": None,
+                "binding": "P2.1_PRICE_RESPONSE_UNRESOLVED",
+                "price_constraint_type": None,
+                "target_entry_price_inclusive": False,
+                "reason": str(exc),
+            }
+    elif metrics is not None and isinstance(case.get("expectation_gap"), dict):
         try:
             if evidence_root_resolver is None:
                 raise ValueError("canonical evidence root resolver is required for P2 target-entry revalidation")
@@ -790,6 +895,9 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         ),
         "target_entry_price_v2": _serialize_nested(p2_target),
         "target_entry_price_gap_revalidation": _serialize_nested(p2_revalidation),
+        "target_entry_price_p2_1_version": PRICE_RESPONSE_VERSION if p2_1_price_response is not None else None,
+        "target_entry_price_p2_1": _serialize_nested(p2_target) if target_ref is not None else None,
+        "target_entry_price_p2_1_price_response": _serialize_nested(p2_1_price_response),
         "current_price": str(current_price) if current_price is not None else None,
         "decision_precedence_version": state["precedence_version"],
         "decision_precedence_rule_id": state["precedence_rule_id"],

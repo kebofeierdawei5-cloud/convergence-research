@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 import hashlib
 import json
@@ -52,6 +53,7 @@ class P4FProvenanceRecord:
     source_location: str
     content_sha256: str
     captured_at: datetime
+    value: Decimal | None = None
 
     def validate(self, cutoff_date: date) -> None:
         if not self.evidence_id or not self.variable or not self.unit or not self.basis:
@@ -66,15 +68,20 @@ class P4FProvenanceRecord:
             raise ValueError("P4-F PIT violation: known_at is after cutoff")
         if self.captured_at.tzinfo is None or self.known_at.tzinfo is None:
             raise ValueError("P4-F provenance timestamps must be timezone-aware")
+        if self.value is not None and not self.value.is_finite():
+            raise ValueError("P4-F provenance value must be finite")
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "evidence_id": self.evidence_id, "variable": self.variable, "unit": self.unit,
             "basis": self.basis, "observation_date": self.observation_date.isoformat(),
             "known_at": self.known_at.isoformat(), "source": self.source,
             "source_location": self.source_location, "content_sha256": self.content_sha256,
             "captured_at": self.captured_at.isoformat(),
         }
+        if self.value is not None:
+            result["value"] = str(self.value)
+        return result
 
 def _model_evaluation_from_dict(item: Mapping[str, Any]) -> tuple[str, str]:
     model_id = item.get("model_id")
@@ -228,6 +235,7 @@ def validate_p4f_snapshot(snapshot: Mapping[str, Any]) -> None:
             observation_date=_parse_date(item.get("observation_date"), "provenance.observation_date"),
             known_at=_parse_datetime(item.get("known_at"), "provenance.known_at"), source=item.get("source", ""), source_location=item.get("source_location", ""),
             content_sha256=item.get("content_sha256", ""), captured_at=_parse_datetime(item.get("captured_at"), "provenance.captured_at"),
+            value=(None if item.get("value") is None else Decimal(str(item.get("value")))),
         )
         record.validate(cutoff)
         provenance[record.evidence_id] = record
