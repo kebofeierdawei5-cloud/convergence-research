@@ -124,7 +124,7 @@ https://static.cninfo.com.cn/finalpage/2026-10-01/1225592062.PDF
 | 2025 annual payout ratio | 50.00% |
 | 2026 H1 interim payout ratio | 15.00% |
 | H1 2026 repurchase-account share ratio | ~0.612% |
-| Indonesia guarantee / project-cap ratio | ~0.218% |
+| Indonesia guarantee / project-cap ratio | ~2.178% |
 | Capital allocation status | CONDITIONAL |
 | Governance integrity | CONDITIONAL |
 | Trust revalidation | CONDITIONAL |
