@@ -85,7 +85,27 @@ def test_rejected_approval_does_not_replace_current():
     assert p["current_revision"]==1
     assert p["current_decision_id"]=="CN-A-300750-r001"
 
-def test_revision_schema_accepts_record():
-    rev=build_decision_revision(decision_series_id="CN-A-300750",revision=1,snapshot=snapshot(),run_id="run-1")
-    schema=__import__("json").load(open("schemas/decision_lifecycle_v0.1.schema.json"))
+def test_revision_approval_projection_schema_accepts_records():
+    import json
+
+    schema=json.load(open("schemas/decision_lifecycle_v0.1.schema.json",encoding="utf-8"))
+    rev=build_decision_revision(
+        decision_series_id="CN-A-300750",
+        revision=1,
+        snapshot=snapshot(),
+        run_id="run-1",
+    )
+    approval=build_human_approval(
+        decision_revision=rev,
+        approved=True,
+        note="approve",
+    )
+    projection=project_current_approval(
+        previous=None,
+        decision_revision=rev,
+        approval=approval,
+    )
     assert list(Draft202012Validator(schema,format_checker=FormatChecker()).iter_errors(rev))==[]
+    assert list(Draft202012Validator(schema["$defs"]["human_approval"],format_checker=FormatChecker()).iter_errors(approval))==[]
+    assert list(Draft202012Validator(schema["$defs"]["current_projection"],format_checker=FormatChecker()).iter_errors(projection))==[]
+
