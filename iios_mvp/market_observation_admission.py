@@ -5,7 +5,6 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from enum import Enum
 import re
-from typing import Mapping
 
 from .market_model_domain import MarketValuationObservation
 
@@ -81,6 +80,8 @@ class VerifiedMarketEvidence:
             )
         if self.observation_date > cutoff_date:
             raise ValueError(f"{self.evidence_id}.observation_date is after cutoff")
+        if self.known_at.tzinfo is None or self.known_at.utcoffset() is None:
+            raise ValueError(f"{self.evidence_id}.known_at must be timezone-aware")
         if self.known_at.date() > cutoff_date:
             raise ValueError(f"{self.evidence_id}.known_at is after cutoff")
         if not self.value.is_finite():
@@ -120,16 +121,11 @@ def admit_market_valuation_observation(
     )
     blockers: list[str] = []
 
-    try:
-        for item in evidence:
+    for item in evidence:
+        try:
             item.validate(cutoff_date)
-    except ValueError as exc:
-        return MarketObservationAdmission(
-            status=AdmissionStatus.BLOCKED,
-            observation=None,
-            evidence_ids=tuple(item.evidence_id for item in evidence),
-            blockers=(str(exc),),
-        )
+        except ValueError as exc:
+            blockers.append(str(exc))
 
     if len({item.evidence_id for item in evidence}) != len(evidence):
         blockers.append("evidence_ids must be unique")
@@ -148,15 +144,6 @@ def admit_market_valuation_observation(
     if price_evidence.observation_date != net_debt_evidence.observation_date:
         blockers.append("price/net-debt observation dates must match")
 
-    known_ats = {
-        price_evidence.known_at,
-        shares_evidence.known_at,
-        economic_evidence.known_at,
-        net_debt_evidence.known_at,
-    }
-    if min(known_ats) < datetime.min.replace(tzinfo=next(iter(known_ats)).tzinfo):
-        blockers.append("invalid known_at")
-
     if price_evidence.unit != "CNY/share":
         blockers.append("market_price unit must be CNY/share")
     if shares_evidence.unit not in {"shares", "share_count"}:
@@ -171,12 +158,14 @@ def admit_market_valuation_observation(
         )
 
     if blockers:
-        return MarketObservationAdmission(
+        result = MarketObservationAdmission(
             status=AdmissionStatus.BLOCKED,
             observation=None,
             evidence_ids=tuple(item.evidence_id for item in evidence),
             blockers=tuple(blockers),
         )
+        result.validate()
+        return result
 
     observation = MarketValuationObservation(
         observation_id=observation_id,
@@ -199,11 +188,13 @@ def admit_market_valuation_observation(
         ),
     )
     observation.validate(cutoff_date)
-    return MarketObservationAdmission(
+    result = MarketObservationAdmission(
         status=AdmissionStatus.ADMITTED,
         observation=observation,
         evidence_ids=tuple(item.evidence_id for item in evidence),
     )
+    result.validate()
+    return result
 
 
 __all__ = [
