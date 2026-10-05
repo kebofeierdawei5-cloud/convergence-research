@@ -1,0 +1,93 @@
+{
+  "schema_version": "IIOS-CORE04C-CATL-EVEBITDA-RECEIPT-0.2",
+  "case_id": "RC-CN-A-300750-20261004",
+  "status": "ADMITTED",
+  "admission_engine": "CORE-04-A",
+  "cutoff_date": "2026-10-04",
+  "ci": {
+    "workflow": "real-ev-ebitda",
+    "run_id": 37261197564,
+    "job_id": 111608607221,
+    "result": "SUCCESS",
+    "artifact_id": 11324731141,
+    "artifact_sha256": "51e9e8c19404ef241383c99e0f9ed98bf3088fbe2b4a47778e9f5d79a26ee6c4"
+  },
+  "basis": {
+    "ev": "historical_close * reported_total_share_capital + (interest_bearing_debt - cash)",
+    "ev_ebitda": "EV / latest_known_completed_fiscal_year_EBITDA",
+    "historical_denominator": "latest completed fiscal-year EBITDA known at observation date; no synthetic TTM"
+  },
+  "observations": [
+    {
+      "observation_id": "CATL-EVEBITDA-2025-10-22",
+      "observation_date": "2025-10-22",
+      "price_cny_per_share": "372.86",
+      "shares_outstanding": "4562854000",
+      "market_cap_cny": "1701305742440",
+      "net_debt_cny": "-193859897000",
+      "enterprise_value_cny": "1507445845440",
+      "ebitda_cny": "91999043000",
+      "ev_ebitda": "16.3854513730104779459499377618525879665943916394869455326834",
+      "ebitda_basis": "FY2024 completed fiscal-year EBITDA",
+      "market_source": "SZSE-MKT-2025-10-22.xlsx",
+      "financial_source": "CNINFO-Q3-2025.pdf",
+      "ebitda_source": "CNINFO-FY2024-2025-03-15.pdf",
+      "source_hashes": {
+        "SZSE-MKT-2025-10-22.xlsx": "359aa844467b5aaae9c0ef719f8191650c4fca0f0c85ce508d26ea6dc4f10d30",
+        "CNINFO-Q3-2025.pdf": "d099bc0054f4bf8624d34fffa2c82399b7d8e31cce8f84aab909955da9d84f50",
+        "CNINFO-FY2024-2025-03-15.pdf": "b4f1713d7b821eb076c102711d177fe942ccc2bc8dd171ae5d7a95799a65b0ad"
+      },
+      "admission_status": "ADMITTED"
+    },
+    {
+      "observation_id": "CATL-EVEBITDA-2026-04-17",
+      "observation_date": "2026-04-17",
+      "price_cny_per_share": "444.20",
+      "shares_outstanding": "4564063000",
+      "market_cap_cny": "2027356784600",
+      "net_debt_cny": "-223867376000",
+      "enterprise_value_cny": "1803489408600",
+      "ebitda_cny": "119197217000",
+      "ev_ebitda": "15.1302979548591306456425069051738011634952852968035319146755",
+      "ebitda_basis": "FY2025 completed fiscal-year EBITDA",
+      "market_source": "SZSE-MKT-2026-04-17.xlsx",
+      "financial_source": "CNINFO-Q1-2026.pdf",
+      "ebitda_source": "CNINFO-FY2025-2026-03-10.pdf",
+      "source_hashes": {
+        "SZSE-MKT-2026-04-17.xlsx": "f83bf14d5f10a4cc74484693c5cb3baa38bd3c747e63486ad7fd38eecbce34d9",
+        "CNINFO-Q1-2026.pdf": "32e4936e6dd68a89741a8167b4c4ae3f8b4bc7ef61d70f35b294e1cb0e46fbe8",
+        "CNINFO-FY2025-2026-03-10.pdf": "c15272977147dee7e6935a38ea0e4fd6855370aabb106f54cfe20f7cf6048ec9"
+      },
+      "admission_status": "ADMITTED"
+    },
+    {
+      "observation_id": "CATL-EVEBITDA-2026-07-27",
+      "observation_date": "2026-07-27",
+      "price_cny_per_share": "400.00",
+      "shares_outstanding": "4626654919",
+      "market_cap_cny": "1850661967600",
+      "net_debt_cny": "-221391911000",
+      "enterprise_value_cny": "1629270056600",
+      "ebitda_cny": "119197217000",
+      "ev_ebitda": "13.6686920853194080865159796474107277185842350664948830139214",
+      "ebitda_basis": "FY2025 completed fiscal-year EBITDA",
+      "market_source": "SZSE-MKT-2026-07-27.xlsx",
+      "financial_source": "CNINFO-H1-2026.pdf",
+      "ebitda_source": "CNINFO-FY2025-2026-03-10.pdf",
+      "source_hashes": {
+        "SZSE-MKT-2026-07-27.xlsx": "9ac5fe3b92b7490a048579830d15cd1979c194c22c4bf73c3716bec4ba3dc3a3",
+        "CNINFO-H1-2026.pdf": "aa40daf911df40f56900dc506d7debe05a4fea43cd533474039a408e3b5aabcc",
+        "CNINFO-FY2025-2026-03-10.pdf": "c15272977147dee7e6935a38ea0e4fd6855370aabb106f54cfe20f7cf6048ec9"
+      },
+      "admission_status": "ADMITTED"
+    }
+  ],
+  "checks": {
+    "exact_source_bytes_hashed": true,
+    "pit_known_at_enforced_in_runtime": true,
+    "all_three_observations_typed_admitted": true,
+    "zero_admission_blockers": true,
+    "arithmetic_reverified": true,
+    "retrospective_vendor_multiple_not_used": true
+  }
+}
