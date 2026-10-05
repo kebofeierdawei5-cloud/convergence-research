@@ -19,7 +19,7 @@ Close the CATL E002 material primary-price source gap without publishing SZSE tr
 - Raw filename: `E002_SZSE_primary_2026-09-30.xlsx`
 - Raw size: `231394` bytes
 - Raw SHA-256: `349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2`
-- Manifest SHA-256: `662804bd3f882b2d0b8ce17a73195f2d75a84e668442dbd00348072d624d28a0`
+- Manifest SHA-256: `bfa81216ca50a76035cc9bdca76400a287c4dfcd0793bfe9a4129a87ecd44801`
 - License status: `UNKNOWN`
 
 ## Storage boundary
