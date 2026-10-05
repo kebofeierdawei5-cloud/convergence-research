@@ -89,7 +89,7 @@ def cmd_economic_core(args: argparse.Namespace) -> int:
 
 def cmd_core03(args: argparse.Namespace) -> int:
     payload = load_json(args.input)
-    required = ("core02_input", "forecast", "valuation_assumptions", "market_evidence")
+    required = ("core02_input", "forecast", "valuation_assumptions", "market_evidence", "price_evidence")
     missing = [key for key in required if key not in payload]
     if missing:
         raise ValueError(f"core03 input missing required fields: {missing}")
@@ -98,6 +98,7 @@ def cmd_core03(args: argparse.Namespace) -> int:
         payload["forecast"],
         payload["valuation_assumptions"],
         payload["market_evidence"],
+        payload["price_evidence"],
         payload.get("forecast_evidence"),
     )
     errors = validate_core03_package(result)
