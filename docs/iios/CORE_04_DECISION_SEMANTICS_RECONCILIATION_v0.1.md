@@ -72,6 +72,7 @@ Likewise, a verified MIE contradiction cannot become a veto unless an explicit v
 ## 8. Acceptance checkpoint
 
 - PR #69: MERGED into canonical `main` as `da6964ee6dd5a50b8696a46132448c205c463726`.
-- PR #70: refreshed on top of that canonical main; post-refresh CI verification is the remaining acceptance step.
+- PR #70: refreshed on top of that canonical main via a two-parent refresh commit; post-refresh CI verification is the remaining acceptance step.
+- Refresh commit: `5381cff52116fcee1b42ac398ee9cf4b149e9726`; canonical main base: `da6964ee6dd5a50b8696a46132448c205c463726`.
 - Pre-refresh acceptance review on PR #70: review `5414885493`.
 - Merge of PR #70 remains an owner-controlled action.
