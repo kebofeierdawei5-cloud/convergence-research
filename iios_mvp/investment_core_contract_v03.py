@@ -350,7 +350,27 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
     expectation_gap = case.get("expectation_gap")
     if expectation_gap is not None:
         try:
-            _canonical_expectation_gap(expectation_gap)
+            evaluated_gap = _canonical_expectation_gap(expectation_gap)
+            decision_horizon = str(
+                validate_horizon_selection(
+                    horizon_years=case["return_gate"]["horizon_years"],
+                    horizon_override=case["return_gate"]["horizon_override"],
+                    horizon_override_basis=case["return_gate"]["horizon_override_basis"],
+                    horizon_selection_rationale=case["return_gate"]["horizon_selection_rationale"],
+                    path="return_gate",
+                )["horizon_years"]
+            )
+            gap_horizon = str(
+                expectation_gap["independent_expectation"]["horizon_years"]
+            )
+            if gap_horizon != decision_horizon:
+                errors.append(
+                    _err(
+                        "V03-EXPECTATION-GAP-HORIZON",
+                        "expectation_gap.independent_expectation.horizon_years",
+                        "must equal the decision horizon selected by return_gate",
+                    )
+                )
         except ValueError as exc:
             errors.append(
                 _err(
