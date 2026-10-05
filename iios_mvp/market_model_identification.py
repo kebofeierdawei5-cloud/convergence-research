@@ -847,8 +847,12 @@ def _fit_complex_candidate(
             "MIN_HISTORICAL_DATES",
             "CURRENT_IMPLIED_PRIMARY_WITHIN_HISTORICAL_RANGE",
         ),
-        historical_support=HistoricalSupportState.IN_RANGE,
-        regime_interpretation=RegimeInterpretationState.NOT_ASSESSED,
+        historical_support=support_state,
+        regime_interpretation=(
+            RegimeInterpretationState.NOT_ASSESSED
+            if within_historical_range
+            else RegimeInterpretationState.POSSIBLE_REGIME_SHIFT
+        ),
     )
     fit.validate()
     return CandidateEvaluation(fit, solution_set)
