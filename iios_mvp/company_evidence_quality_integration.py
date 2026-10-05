@@ -181,8 +181,10 @@ def integrate_company_evidence_into_quality(
     normalized_trust = _normalize_trust(trust)
 
     eco_refs = _refs(
-        economic_bridge["periods"]["current"]["evidence_ids"]
-        + economic_bridge["periods"]["prior"]["evidence_ids"],
+        list(dict.fromkeys(
+            economic_bridge["periods"]["current"]["evidence_ids"]
+            + economic_bridge["periods"]["prior"]["evidence_ids"]
+        )),
         "economic_bridge evidence IDs",
     )
     cap_refs = _refs(
