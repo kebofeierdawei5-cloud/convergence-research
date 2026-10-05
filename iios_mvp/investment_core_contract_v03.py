@@ -419,16 +419,17 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
     return {"status": "PASS" if not errors else "BLOCKED", "errors": errors}
 
 def _canonical_expectation_gap(payload: Any, case: dict[str, Any]) -> dict[str, Any]:
-    mie = case.get("market_implied_expectation")
+    mie = case.get("market_implied_expectation_snapshot")
     if not isinstance(mie, dict):
         raise ValueError("market_implied_expectation is required for a canonical expectation gap")
     try:
         return evaluate_canonical_expectation_gap(
             payload,
-            market_implied_expectation_payload=mie,
+            market_implied_expectation_snapshot=case["market_implied_expectation_snapshot"],
             current_price=case["current_price_observation"]["price"],
             current_price_observation=case["current_price_observation"],
             cutoff_date=case["cutoff_date"],
+            case_id=case["case_id"],
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError(str(exc)) from exc
