@@ -195,7 +195,7 @@ Trust and Investability are distinct:
 
 Portfolio Constraint is a permission/position layer. It may block or cap allocation and may require reduction of an over-limit position, but it cannot change intrinsic value, Expected Return, Quality or Thesis.
 
-MIE is non-mandatory for BUY/ADD in v0.3. Its absence or ambiguity does not itself veto a direct company-side opportunity. A material qualified contradiction may trigger REVIEW_REQUIRED only under an explicit decision-policy materiality rule.
+MIE is non-mandatory for BUY/ADD in v0.3. Its absence, UNKNOWN, BLOCKED or AMBIGUOUS state does not itself veto a direct company-side opportunity. A verified material contradiction may affect the action only through an explicit versioned decision-policy rule. CORE-04 v0.1 does not invent such a threshold.
 
 Standard fundamental BUY/ADD return conditions are conjunctive:
 - Entry Return Cushion >= 15%;
