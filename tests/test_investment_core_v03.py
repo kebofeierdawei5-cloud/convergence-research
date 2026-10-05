@@ -422,6 +422,32 @@ def test_v03_inline_market_expectation_is_rejected_by_canonical_boundary():
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("unsupported fields" in x for x in result["validation"]["blockers"])
 
+def test_v03_price_admission_hash_is_required():
+    c = case()
+    del c["current_price_observation"]["price_observation_admission_hash"]
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("V03-PRICE-ADMISSION-HASH" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_forged_current_price_is_blocked_by_canonical_admission():
+    c = case()
+    c["current_price_observation"]["price"] = "999.99"
+    c["return_gate"]["entry_price"] = "999.99"
+    c["expectation_gap"]["price"] = "999.99"
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("current_price_observation.price does not match canonical admitted price" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_current_price_source_is_bound_to_canonical_admission():
+    c = case()
+    c["current_price_observation"]["source"] = "forged-source"
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY)
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("current price source does not match canonical admission" in x for x in result["validation"]["blockers"])
+
+
 def test_v03_price_observation_id_is_required():
     c = case()
     del c["current_price_observation"]["price_observation_id"]
