@@ -8,6 +8,7 @@ import pytest
 from iios_mvp.market_model_domain import (
     CandidateMarketModel,
     FeasibleSolution,
+    HistoricalSupportState,
     FeasibleSolutionSet,
     FeasibleSolutionStatus,
     FitDiagnostic,
@@ -110,6 +111,7 @@ def test_feasible_fit_requires_evidence_and_diagnostics():
         status=ModelFitStatus.FEASIBLE,
         diagnostics=(FitDiagnostic("d1", "historical_consistency", "PASS", ("m1",)),),
         evidence_ids=("m1",),
+        historical_support=HistoricalSupportState.IN_RANGE,
     )
     fit.validate()
 
