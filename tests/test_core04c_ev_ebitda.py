@@ -16,7 +16,7 @@ from tools.core04c_ev_ebitda import (
 )
 
 
-def make_xlsx(path: Path) -> None:
+def make_xlsx(path: Path, *, price_header: str = "今收") -> None:
     ns_main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
     ns_rel = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
     ns_pkg = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -48,7 +48,7 @@ def make_xlsx(path: Path) -> None:
 
     worksheet = ET.Element(f"{{{ns_main}}}worksheet")
     data = ET.SubElement(worksheet, f"{{{ns_main}}}sheetData")
-    data.append(row_xml(1, ["证券代码", "证券简称", "今收"]))
+    data.append(row_xml(1, ["证券代码", "证券简称", price_header]))
     data.append(row_xml(2, ["300750", "宁德时代", "400.0"]))
 
     styles = b"""<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"""
@@ -101,10 +101,6 @@ def test_market_snapshot_parser_fails_closed_for_missing_symbol(tmp_path: Path):
 
 def test_market_snapshot_parser_requires_close_column(tmp_path: Path):
     xlsx = tmp_path / "snapshot.xlsx"
-    make_xlsx(xlsx)
-    # This mutation deliberately targets the fixture's header, not production behavior.
-    raw = xlsx.read_bytes()
-    raw = raw.replace("今收".encode(), "其他".encode())
-    xlsx.write_bytes(raw)
+    make_xlsx(xlsx, price_header="其他")
     with pytest.raises(ValueError, match="close-price column"):
         market_price_from_snapshot(xlsx, "300750")
