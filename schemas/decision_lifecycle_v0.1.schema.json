@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/decision-lifecycle-0.1.schema.json",
+  "title": "IIOS Decision Revision / Human Approval Lifecycle Contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "decision_id",
+    "decision_series_id",
+    "revision",
+    "run_id",
+    "trigger_event_id",
+    "case_id",
+    "as_of_date",
+    "cutoff_date",
+    "snapshot_hash",
+    "ai_action",
+    "decision_status",
+    "engine_version",
+    "human_approval_required",
+    "auto_execution",
+    "revision_hash"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "IIOS-DECISION-LIFECYCLE-0.1"
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_series_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trigger_event_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "as_of_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "cutoff_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "snapshot_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ai_action": {
+      "enum": [
+        "BUY",
+        "ADD",
+        "HOLD",
+        "REDUCE",
+        "EXIT",
+        "NO-BUY",
+        "WATCH",
+        "REVIEW_REQUIRED"
+      ]
+    },
+    "decision_status": {
+      "const": "AI_PROPOSED"
+    },
+    "engine_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "human_approval_required": {
+      "const": true
+    },
+    "auto_execution": {
+      "const": false
+    },
+    "revision_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
