@@ -125,17 +125,7 @@ jobs:
           PY
       - name: Run single-company Evidence/PIT tests
         run: python -m pytest -q research/b2/tests/test_company_evidence.py research/b2/tests/test_evidence_contract.py research/b2/tests/test_source_capture_plan.py
-      - name: Prove A02 fails closed when exact bytes are absent
-        run: |
-          mkdir -p /tmp/b2-empty /tmp/b2-result
-          python -m research.b2.a02_exact_admission --input-dir /tmp/b2-empty --out /tmp/b2-result
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          result = json.loads(Path('/tmp/b2-result/A02_EXACT_ADMISSION_RESULT.json').read_text())
-          assert result['status'] == 'BLOCKED'
-          assert result['selection_permission'] is False
-          assert result['object_A_terminal_000906']['exact_bytes'] is False
-          PY
+      - name: Verify B2 research-track isolation
+        run: python -m pytest -q research/b2/tests/test_b2_scope.py
       - name: Verify working tree
         run: git diff --check
