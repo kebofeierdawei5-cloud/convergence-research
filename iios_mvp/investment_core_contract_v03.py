@@ -840,7 +840,7 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
                 "candidate_price": str(metrics["target_entry_price"]),
             }
 
-    if metrics is not None:
+    if metrics is not None and target_ref is not None:
         try:
             canonical_price_response = (
                 p2_1_price_response
