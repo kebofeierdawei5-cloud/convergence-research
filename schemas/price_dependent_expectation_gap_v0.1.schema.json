@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/price-dependent-expectation-gap-0.1.schema.json",
+  "title": "IIOS P2 Price-Dependent Expectation Gap Revalidation v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "revalidation_id",
+    "status",
+    "reference_snapshot_hash",
+    "reference_price",
+    "candidate_price",
+    "market_model",
+    "representation",
+    "comparison_direction",
+    "reference_market_value",
+    "candidate_market_value",
+    "independent_value",
+    "gap_relative",
+    "gap_positive",
+    "price_response_semantics",
+    "price_constraint_type",
+    "expectation_gap_price_boundary",
+    "reason"
+  ],
+  "properties": {
+    "revalidation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "NON_POSITIVE",
+        "BLOCKED",
+        "AMBIGUOUS",
+        "INCOMPATIBLE",
+        "UNKNOWN"
+      ]
+    },
+    "reference_snapshot_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "reference_price": {
+      "type": "string"
+    },
+    "candidate_price": {
+      "type": "string"
+    },
+    "market_model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "representation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "comparison_direction": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "HIGHER_IS_BETTER",
+        "LOWER_IS_BETTER",
+        null
+      ]
+    },
+    "reference_market_value": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "candidate_market_value": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "independent_value": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "gap_relative": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "gap_positive": {
+      "type": "boolean"
+    },
+    "price_response_semantics": {
+      "type": "string",
+      "minLength": 1
+    },
+    "price_constraint_type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "expectation_gap_price_boundary": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
