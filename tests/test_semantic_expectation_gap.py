@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from iios_mvp.semantic_expectation_gap import (
@@ -42,8 +44,8 @@ def test_compatible_expectations_produce_gap():
         comparison_direction=ComparisonDirection.HIGHER_IS_BETTER.value,
     )
     assert result["status"] == ExpectationGapStatus.PASS.value
-    assert result["gap_absolute"] == pytest.approx(0.05)
-    assert result["gap_relative"] == pytest.approx(1 / 3)
+    assert result["gap_absolute"] == Decimal("0.05")
+    assert result["gap_relative"] == (Decimal("1") / Decimal("3"))
 
 
 @pytest.mark.parametrize("field,value", [
@@ -90,7 +92,7 @@ def test_lower_is_better_reverses_gap_direction():
         comparison_direction=ComparisonDirection.LOWER_IS_BETTER.value,
     )
     assert result["status"] == ExpectationGapStatus.PASS.value
-    assert result["gap_absolute"] == pytest.approx(0.05)
+    assert result["gap_absolute"] == Decimal("0.05")
 
 
 def test_zero_market_requirement_is_rejected_for_relative_gap():
