@@ -345,6 +345,7 @@ def evaluate_canonical_expectation_gap(
     *,
     market_implied_expectation_payload: Mapping[str, Any],
     current_price: Any,
+    current_price_observation: Mapping[str, Any],
     cutoff_date: Any,
 ) -> dict[str, Any]:
     gap = _parse_gap(payload)
@@ -356,6 +357,17 @@ def evaluate_canonical_expectation_gap(
         raise ValueError("expectation_gap.market_expectation_hash does not match canonical MIE content")
     if gap.price != _dec(current_price, "current_price_observation.price"):
         raise ValueError("expectation_gap.price must equal current_price_observation.price")
+    try:
+        observed_at = str(current_price_observation["observed_at"]).replace("Z", "+00:00")
+        observed_date = __import__("datetime").datetime.fromisoformat(observed_at).date()
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("current_price_observation.observed_at is invalid") from exc
+    if mie.observation_basis.observation_date != observed_date:
+        raise ValueError("MIE observation_basis.observation_date must equal current_price_observation.observed_at date")
+    if mie.observation_basis.currency != str(current_price_observation.get("currency", "")):
+        raise ValueError("MIE observation_basis.currency must equal current_price_observation.currency")
+    if mie.observation_basis.adjustment_semantics != str(current_price_observation.get("adjustment_semantics", "")):
+        raise ValueError("MIE observation_basis.adjustment_semantics must equal current_price_observation.adjustment_semantics")
     case_cutoff = _parse_date(cutoff_date, "cutoff_date")
     if gap.cutoff_date != case_cutoff:
         raise ValueError("expectation_gap.cutoff_date must equal case cutoff_date")
