@@ -154,7 +154,7 @@ def admit_market_valuation_observation(
         blockers.append("shares outstanding must be > 0")
     if economic_evidence.value <= 0:
         blockers.append(
-            "economic variable value must be > 0 for market-model fitting"
+            "economic variable value must be > 0"
         )
 
     if blockers:
