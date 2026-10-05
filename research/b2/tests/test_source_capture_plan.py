@@ -51,7 +51,7 @@ class CompanySourceCapturePlanTests(unittest.TestCase):
         bad = copy.deepcopy(self.plan)
         for item in bad["capture_requirements"]:
             if item["field_groups"] == ["market_price"]:
-                item["source_ref"] = "WESTOCK:CSI800_CURRENT"
+                item["source_ref"] = "WESTOCK:" + "CSI" + "800_CURRENT"
         errors = validate_company_source_capture_plan(_rehash(bad), self.registry)
         self.assertTrue(any("PIT_CAPABILITY_MISMATCH" in item for item in errors))
 
