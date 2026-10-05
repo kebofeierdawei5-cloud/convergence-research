@@ -1,0 +1,54 @@
+name: IIOS CORE-04 Real 300750 Decision E2E
+
+on:
+  push:
+    branches:
+      - "feature/core04-real-300750-decision-e2e-20261005"
+    paths:
+      - "tools/core04_real_300750_decision_e2e.py"
+      - "tests/test_core04_real_300750_decision_e2e.py"
+      - "examples/real_cases/RC-CN-A-300750-20261004_core03_input.json"
+      - "iios_mvp/**"
+      - ".github/workflows/iios_core04_real_300750_decision.yml"
+  pull_request:
+    paths:
+      - "tools/core04_real_300750_decision_e2e.py"
+      - "tests/test_core04_real_300750_decision_e2e.py"
+      - "examples/real_cases/RC-CN-A-300750-20261004_core03_input.json"
+      - "iios_mvp/**"
+      - ".github/workflows/iios_core04_real_300750_decision.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  decision-e2e:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q iios_mvp tools/core04_real_300750_decision_e2e.py tests/test_core04_real_300750_decision_e2e.py
+      - run: PYTHONPATH=. python tools/core04_real_300750_decision_e2e.py > /tmp/core04-300750-decision-e2e.json
+      - run: |
+          python -m pytest -q tests/test_core04_real_300750_decision_e2e.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("/tmp/core04-300750-decision-e2e.json")
+          x=json.loads(p.read_text(encoding="utf-8"))
+          assert x["strict_real_case"]["action"] == "REVIEW_REQUIRED"
+          assert x["strict_real_case"]["capital_admitted"] is False
+          assert x["gate_normalized_diagnostic"]["action"] == "WATCH"
+          assert x["gate_normalized_diagnostic"]["capital_admitted"] is False
+          assert x["return_metrics"]["fundamental_target_pass"] is False
+          assert x["return_metrics"]["risk_pass"] is True
+          print("CORE04_REAL_300750_DECISION_E2E_OK")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core04-real-300750-decision-e2e
+          path: /tmp/core04-300750-decision-e2e.json
+          retention-days: 14
