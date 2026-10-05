@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from decimal import Decimal
 
 from tools.core04c_catl_ev_ebitda import (
     parse_annual_ebitda,
