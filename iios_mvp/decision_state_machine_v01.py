@@ -88,6 +88,7 @@ class DecisionStateInputs:
     risk_gate_pass: bool
     can_add: bool
     package_complete: bool
+    return_metrics_ready: bool
 
 
 def _hard_risk_failure(inputs: DecisionStateInputs) -> bool:
