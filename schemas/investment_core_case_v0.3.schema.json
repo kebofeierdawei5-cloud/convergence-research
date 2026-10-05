@@ -354,9 +354,6 @@
         "cutoff_date",
         "market_expectation_id",
         "market_expectation_hash",
-        "status",
-        "gap_absolute",
-        "gap_relative",
         "comparison_direction",
         "independent_expectation"
       ],
@@ -383,21 +380,6 @@
         "market_expectation_hash": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
-        },
-        "status": {
-          "enum": [
-            "PASS",
-            "BLOCKED",
-            "INCOMPATIBLE",
-            "AMBIGUOUS",
-            "UNKNOWN"
-          ]
-        },
-        "gap_absolute": {
-          "type": ["string", "number", "null"]
-        },
-        "gap_relative": {
-          "type": ["string", "number", "null"]
         },
         "comparison_direction": {
           "enum": ["HIGHER_IS_BETTER", "LOWER_IS_BETTER"]
