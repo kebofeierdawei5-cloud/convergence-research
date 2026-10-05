@@ -1,6 +1,6 @@
 # CORE-04-C CATL EV/EBITDA Acceptance — 2026-10-05
 
-Status: IMPLEMENTATION
+Status: FINAL ACCEPTED / CI VERIFIED
 
 This task converts the six previously captured historical market/company sources plus FY2024/FY2025 annual reports into three PIT historical EV/EBITDA observations.
 
@@ -37,3 +37,18 @@ PASS requires the real source files to download, deterministic parsing to succee
 ## Out of scope
 
 Forward PE, MIE promotion, Expectation Gap, Expected Return, Decision Kernel, CSI800/A02, universe database and paid-data sources.
+
+
+## Final CI verification
+
+- CI: `real-ev-ebitda`
+- Run: `37261197564`
+- Job: `111608607221`
+- Result: **SUCCESS**
+- Unit tests: **5 passed**
+- Real parse: **PASS**
+- CORE-04-A typed admission: **ADMITTED / zero blockers**
+- Artifact: `11324731141`
+- Artifact ZIP SHA-256: `51e9e8c19404ef241383c99e0f9ed98bf3088fbe2b4a47778e9f5d79a26ee6c4`
+
+The three accepted observations are the values asserted by the live CI verification. The compact permanent receipt is stored at `research/core04c_catl_ev_ebitda_receipt_v0.2.json`.
