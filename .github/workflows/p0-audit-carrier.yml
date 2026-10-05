@@ -1,9 +1,14 @@
 name: P0 Audit Carrier CI
 
 on:
-  pull_request:
+  push:
     branches:
-      - main
+      - audit/p0-r1-r4-ci-20261005
+    paths-ignore:
+      - audit/p0-ci-result.txt
+
+permissions:
+  contents: write
 
 jobs:
   test-mvp:
@@ -13,7 +18,29 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m compileall -q iios_mvp tests/test_mvp.py tests/test_investment_core_contract.py tests/test_investment_core_v03.py tests/test_market_model_domain.py tests/test_market_model_identification.py tests/test_market_implied_expectation.py tests/test_ratio_market_implied_expectation.py tests/test_dcf_ddm_conditional_market_implied_expectation.py tests/test_sotp_rnpv_market_implied_expectation.py tests/test_multi_model_market_implied_expectation_set.py tests/test_p4f_mie_snapshot.py tests/test_semantic_expectation_gap.py tests/test_core00_scope.py tests/test_research_intake.py tests/test_company_economic_core.py
-      - run: python -m pip install --disable-pip-version-check pytest jsonschema
-      - run: python -m pytest -q tests/test_mvp.py tests/test_value_core.py tests/test_investment_core_contract.py tests/test_investment_core_v03.py tests/test_market_model_domain.py tests/test_market_model_identification.py tests/test_market_implied_expectation.py tests/test_ratio_market_implied_expectation.py tests/test_dcf_ddm_conditional_market_implied_expectation.py tests/test_sotp_rnpv_market_implied_expectation.py tests/test_multi_model_market_implied_expectation_set.py tests/test_p4f_mie_snapshot.py tests/test_semantic_expectation_gap.py tests/test_core00_scope.py tests/test_research_intake.py tests/test_company_economic_core.py
-      - run: python -m json.tool schemas/investment_core_case_v0.3.schema.json >/dev/null
+      - name: Compile
+        run: python -m compileall -q iios_mvp tests/test_mvp.py tests/test_investment_core_contract.py tests/test_investment_core_v03.py tests/test_market_model_domain.py tests/test_market_model_identification.py tests/test_market_implied_expectation.py tests/test_ratio_market_implied_expectation.py tests/test_dcf_ddm_conditional_market_implied_expectation.py tests/test_sotp_rnpv_market_implied_expectation.py tests/test_multi_model_market_implied_expectation_set.py tests/test_p4f_mie_snapshot.py tests/test_semantic_expectation_gap.py tests/test_core00_scope.py tests/test_research_intake.py tests/test_company_economic_core.py
+      - name: Install
+        run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - name: Test
+        shell: bash
+        run: |
+          set +e
+          python -m pytest -q tests/test_mvp.py tests/test_value_core.py tests/test_investment_core_contract.py tests/test_investment_core_v03.py tests/test_market_model_domain.py tests/test_market_model_identification.py tests/test_market_implied_expectation.py tests/test_ratio_market_implied_expectation.py tests/test_dcf_ddm_conditional_market_implied_expectation.py tests/test_sotp_rnpv_market_implied_expectation.py tests/test_multi_model_market_implied_expectation_set.py tests/test_p4f_mie_snapshot.py tests/test_semantic_expectation_gap.py tests/test_core00_scope.py tests/test_research_intake.py tests/test_company_economic_core.py > /tmp/pytest.txt 2>&1
+          rc=$?
+          cat /tmp/pytest.txt
+          python -m json.tool schemas/investment_core_case_v0.3.schema.json >/tmp/schema.txt 2>&1
+          schema_rc=$?
+          {
+            echo "AUDIT_COMMIT=$GITHUB_SHA"
+            echo "PYTEST_EXIT=$rc"
+            echo "SCHEMA_JSON_EXIT=$schema_rc"
+            echo
+            cat /tmp/pytest.txt
+          } > audit/p0-ci-result.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add audit/p0-ci-result.txt
+          git commit -m "AUDIT: record P0 CI result"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          exit $rc
