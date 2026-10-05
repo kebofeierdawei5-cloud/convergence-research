@@ -8,6 +8,8 @@ on:
       - "tools/__init__.py"
       - "tests/test_public_source_capture.py"
       - "docs/iios/CORE_04B_PUBLIC_SOURCE_CAPTURE_v0.1.md"
+      - "docs/iios/CORE_04B_ACCEPTANCE_2026-10-05.md"
+      - "research/core04b_public_source_receipt_20261005.json"
   push:
     branches: [main]
     paths:
@@ -34,6 +36,7 @@ jobs:
       - run: |
           PYTHONPATH=. python tools/public_source_capture.py             --manifest research/core04b_public_source_manifest_v0.1.json             --out /tmp/core04b/capture_receipt.json
       - run: python -m json.tool /tmp/core04b/capture_receipt.json >/dev/null
+      - run: python -m json.tool research/core04b_public_source_receipt_20261005.json >/dev/null
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
