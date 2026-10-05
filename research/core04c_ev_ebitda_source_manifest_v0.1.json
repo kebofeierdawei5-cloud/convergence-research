@@ -1,0 +1,71 @@
+{
+  "schema_version": "IIOS-CORE04C-SOURCE-MANIFEST-0.1",
+  "case_id": "RC-CN-A-300750-20261004",
+  "cutoff_date": "2026-10-04",
+  "sources": [
+    {
+      "source_id": "SZSE-MKT-2026-07-27",
+      "role": "MARKET_PRICE_SNAPSHOT",
+      "observation_date": "2026-07-27",
+      "known_at": "2026-07-27T07:00:00+00:00",
+      "url": "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-07-27&txtEndDate=2026-07-27&archiveDate=2026-07-28&random=0.20261005",
+      "filename": "SZSE-MKT-2026-07-27.xlsx"
+    },
+    {
+      "source_id": "CNINFO-H1-2026",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2026-06-30",
+      "known_at": "2026-07-24T08:00:00+00:00",
+      "url": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
+      "filename": "CNINFO-H1-2026.pdf"
+    },
+    {
+      "source_id": "SZSE-MKT-2026-04-17",
+      "role": "MARKET_PRICE_SNAPSHOT",
+      "observation_date": "2026-04-17",
+      "known_at": "2026-04-17T07:00:00+00:00",
+      "url": "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-04-17&txtEndDate=2026-04-17&archiveDate=2026-04-18&random=0.20261005",
+      "filename": "SZSE-MKT-2026-04-17.xlsx"
+    },
+    {
+      "source_id": "CNINFO-Q1-2026",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2026-03-31",
+      "known_at": "2026-04-16T08:00:00+00:00",
+      "url": "https://static.cninfo.com.cn/finalpage/2026-04-16/1225107946.PDF",
+      "filename": "CNINFO-Q1-2026.pdf"
+    },
+    {
+      "source_id": "SZSE-MKT-2025-10-22",
+      "role": "MARKET_PRICE_SNAPSHOT",
+      "observation_date": "2025-10-22",
+      "known_at": "2025-10-22T07:00:00+00:00",
+      "url": "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2025-10-22&txtEndDate=2025-10-22&archiveDate=2025-10-23&random=0.20261005",
+      "filename": "SZSE-MKT-2025-10-22.xlsx"
+    },
+    {
+      "source_id": "CNINFO-Q3-2025",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2025-09-30",
+      "known_at": "2025-10-21T08:00:00+00:00",
+      "url": "https://static.cninfo.com.cn/finalpage/2025-10-21/1224721971.PDF",
+      "filename": "CNINFO-Q3-2025.pdf"
+    },
+    {
+      "source_id": "CNINFO-ANNUAL-2025",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2025-12-31",
+      "known_at": "2026-03-10T08:00:00+00:00",
+      "url": "https://static.cninfo.com.cn/finalpage/2026-03-10/1225002214.PDF",
+      "filename": "CNINFO-ANNUAL-2025.pdf"
+    },
+    {
+      "source_id": "CNINFO-ANNUAL-2024",
+      "role": "COMPANY_FINANCIAL_REPORT",
+      "observation_date": "2024-12-31",
+      "known_at": "2025-03-15T08:00:00+00:00",
+      "url": "https://static.cninfo.com.cn/finalpage/2025-03-15/1222806982.PDF",
+      "filename": "CNINFO-ANNUAL-2024.pdf"
+    }
+  ]
+}
