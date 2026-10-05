@@ -22,7 +22,7 @@ CORE-04 vertical decision closure is complete.
 
 A1 is complete as the company-side evidence-closure engineering milestone. Current 300750 Quality remains CONDITIONAL and new capital remains FALSE.
 
-Current next work is **DR-02 Persistence + CLI Integration**, independently scoped from canonical main.
+Current next work is **Trigger / Monitoring / Validation Productization**, independently scoped from canonical main.
 
 No new P3/P4/MIE model work is on the critical path.
 
@@ -76,11 +76,11 @@ Acceptance:
 - `docs/iios/A1_02_ACCEPTANCE_2026-10-05.md`
 - `docs/iios/RP_01_RISK_PORTFOLIO_PRODUCTION_CONTRACT_v0.1.md`
 - `docs/iios/DR_01_DECISION_LIFECYCLE_CONTRACT_v0.1.md`
+- `docs/iios/DR_02_PERSISTENCE_CLI_INTEGRATION_v0.1.md`
 
 ## Product gaps after CORE-04
 
-- DR-02 Persistence + CLI Integration
-- Trigger / Monitoring / Validation
+- Trigger / Monitoring / Validation Productization
 - Machine Publication
 - Human Report / Report Quality Gate
 - second-company acceptance
