@@ -37,7 +37,7 @@ Schema:
 
 `schemas/company_economic_bridge_v0.1.schema.json`
 
-The bridge is intentionally upstream of the production Decision Kernel.
+The bridge is intentionally upstream of the production Decision Kernel. The builder requires a caller-supplied set of already-ADMITTED evidence IDs and fails closed when any period references an ID outside that set.
 
 ### Calculation contract
 
@@ -156,9 +156,9 @@ A computed Incremental ROIC proxy therefore cannot silently upgrade Quality, Tru
 
 The A1-01 fixture uses comparable H1 periods ending 2025-06-30 and 2026-06-30. The 2025 H1 operating-capital anchor is captured in `E012_A1`; the 2026 H1 D&A and cash-working-capital bridge are captured in `E013_A1`. Existing E005/E010 evidence supplies the corresponding reported financial and working-capital observations.
 
-The official 2025 H1 report provides the consolidated 2025-06-30 operating balance-sheet values, including AR, AR financing, prepayments, inventory, contract assets, operating liabilities, fixed assets, construction in progress, ROU assets and intangibles. The same report supplies the 2025 H1 OCF and CAPEX comparison. url2025 H1 CATL reporthttps://static.cninfo.com.cn/finalpage/2025-07-30/1224343223.PDF
+The official 2025 H1 report provides the consolidated 2025-06-30 operating balance-sheet values, including AR, AR financing, prepayments, inventory, contract assets, operating liabilities, fixed assets, construction in progress, ROU assets and intangibles. The same report supplies the 2025 H1 OCF and CAPEX comparison. https://static.cninfo.com.cn/finalpage/2025-07-30/1224343223.PDF
 
-The official 2026 H1 report supplies the 2026-06-30 balance-sheet values and the cash-flow supplement with 2026 H1 / 2025 H1 depreciation, amortization and working-capital cash-flow bridge values. url2026 H1 CATL reporthttps://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF
+The official 2026 H1 report supplies the 2026-06-30 balance-sheet values and the cash-flow supplement with 2026 H1 / 2025 H1 depreciation, amortization and working-capital cash-flow bridge values. https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF
 
 ### Expected 300750 result
 
