@@ -221,6 +221,17 @@ def decide(case: dict[str, Any], *, evidence_root_resolver: Any | None = None, c
                 "target_entry_price_requires_gap_revalidation": proposal.get(
                     "target_entry_price_requires_gap_revalidation"
                 ),
+                "decision_precedence_version": proposal.get(
+                    "decision_precedence_version"
+                ),
+                "decision_precedence_rule_id": proposal.get(
+                    "decision_precedence_rule_id"
+                ),
+                "decision_precedence_rank": proposal.get(
+                    "decision_precedence_rank"
+                ),
+                "decision_scope": proposal.get("decision_scope"),
+                "capital_effect": proposal.get("capital_effect"),
             },
             "monitoring": case.get("monitoring") or [],
         }

@@ -9,6 +9,7 @@ from .evidence_root_admission import EvidenceRootResolver
 from .canonical_current_price import CanonicalCurrentPriceResolver, validate_current_price_binding
 from .canonical_independent_forecast import CanonicalIndependentForecastResolver
 from .horizon_semantics import validate_horizon_selection
+from .decision_state_machine_v01 import DecisionStateInputs, evaluate_decision_state
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
 BUY_ENTRY_RETURN_CUSHION_THRESHOLD = Decimal("0.15")
@@ -572,34 +573,6 @@ def _expectation_gap(case: dict[str, Any], *, evidence_root_resolver: EvidenceRo
     return status, gap if isinstance(gap, Decimal) else None
 
 
-def _investability(
-    metrics: dict[str, Any],
-    trust_status: str,
-    portfolio_status: str,
-    risk_status: str,
-    thesis_status: str,
-    expectation_gap_status: str,
-    expectation_gap_positive: bool,
-) -> str:
-    if (
-        trust_status == "UNKNOWN"
-        or portfolio_status == "UNKNOWN"
-        or risk_status == "UNKNOWN"
-        or thesis_status == "UNKNOWN"
-        or expectation_gap_status in {"UNKNOWN", "BLOCKED", "INCOMPATIBLE", "AMBIGUOUS"}
-    ):
-        return "UNKNOWN"
-    if trust_status != "PASS" or thesis_status == "BROKEN":
-        return "NOT_INVESTABLE"
-    if portfolio_status != "PASS" or risk_status != "PASS":
-        return "NOT_INVESTABLE"
-    if not expectation_gap_positive:
-        return "NOT_INVESTABLE"
-    if metrics["return_gate_pass"]:
-        return "INVESTABLE"
-    return "WATCH"
-
-
 def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None) -> dict[str, Any]:
     validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver, independent_forecast_resolver=independent_forecast_resolver)
     position = _position(case) if isinstance(case.get("portfolio"), dict) else Decimal("0")
@@ -644,100 +617,6 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "new_capital_allowed": False,
     }
 
-    if metrics is None:
-        action = "REVIEW_REQUIRED"
-        status = "REVIEW_REQUIRED"
-        reason = "RETURN_OR_CASE_VALIDATION_UNRESOLVED"
-        investability = "UNKNOWN"
-    elif thesis_status == "BROKEN":
-        action = "EXIT" if position > 0 else "NO-BUY"
-        status = "READY"
-        reason = "THESIS_BROKEN"
-        investability = "NOT_INVESTABLE"
-    elif trust_status == "UNKNOWN":
-        action = "REVIEW_REQUIRED"
-        status = "REVIEW_REQUIRED"
-        reason = "TRUST_UNKNOWN"
-        investability = "UNKNOWN"
-    elif trust_status != "PASS":
-        action = "NO-BUY" if position == 0 else "REVIEW_REQUIRED"
-        status = "READY" if position == 0 else "REVIEW_REQUIRED"
-        reason = "TRUST_NOT_PASS_NEW_CAPITAL_BLOCKED"
-        investability = "NOT_INVESTABLE"
-    elif portfolio_status == "UNKNOWN":
-        action = "REVIEW_REQUIRED"
-        status = "REVIEW_REQUIRED"
-        reason = "PORTFOLIO_CONSTRAINT_UNKNOWN"
-        investability = "UNKNOWN"
-    elif portfolio_status == "BLOCKED":
-        action = "REDUCE" if position > 0 else "NO-BUY"
-        status = "READY"
-        reason = "PORTFOLIO_CONSTRAINT_BLOCKED"
-        investability = "NOT_INVESTABLE"
-    elif risk_status == "UNKNOWN":
-        action = "REVIEW_REQUIRED"
-        status = "REVIEW_REQUIRED"
-        reason = "RISK_UNKNOWN"
-        investability = "UNKNOWN"
-    elif risk_status == "FAIL":
-        action = "REDUCE" if position > 0 else "NO-BUY"
-        status = "READY"
-        reason = "RISK_GATE_FAILED"
-        investability = "NOT_INVESTABLE"
-    elif position == 0 and gap_status in {"UNKNOWN", "BLOCKED", "INCOMPATIBLE", "AMBIGUOUS"}:
-        action = "REVIEW_REQUIRED"
-        status = "REVIEW_REQUIRED"
-        reason = "POSITIVE_EXPECTATION_GAP_UNRESOLVED"
-        investability = "UNKNOWN"
-    elif position == 0 and gap_status == "PASS" and not gap_positive:
-        action = "NO-BUY"
-        status = "READY"
-        reason = "NO_POSITIVE_EXPECTATION_GAP"
-        investability = "NOT_INVESTABLE"
-    elif position > 0 and gap_status in {"UNKNOWN", "BLOCKED", "INCOMPATIBLE", "AMBIGUOUS"}:
-        action = "HOLD"
-        status = "READY"
-        reason = "EXPECTATION_GAP_UNRESOLVED_FOR_ADD_ONLY"
-        investability = "WATCH"
-    elif position > 0 and gap_status == "PASS" and not gap_positive:
-        if metrics["expected_annualized_return"] < 0:
-            action = "REDUCE"
-            status = "READY"
-            reason = "NO_POSITIVE_EXPECTATION_GAP_AND_NEGATIVE_EXPECTED_RETURN"
-            investability = "NOT_INVESTABLE"
-        else:
-            action = "HOLD"
-            status = "READY"
-            reason = "NO_POSITIVE_EXPECTATION_GAP_FOR_ADD"
-            investability = "WATCH"
-    elif position == 0 and metrics["return_gate_pass"]:
-        action = "BUY"
-        status = "READY"
-        reason = "POSITIVE_EXPECTATION_GAP_AND_RETURN_PRICE_GATES_PASS"
-        investability = "INVESTABLE"
-        gates["new_capital_allowed"] = True
-    elif position > 0 and metrics["return_gate_pass"] and bool((case.get("portfolio") or {}).get("can_add", True)):
-        action = "ADD"
-        status = "READY"
-        reason = "POSITIVE_EXPECTATION_GAP_AND_RETURN_PRICE_GATES_PASS"
-        investability = "INVESTABLE"
-        gates["new_capital_allowed"] = True
-    elif position == 0 and gap_positive:
-        action = "WATCH"
-        status = "READY"
-        reason = "CURRENT_PRICE_ABOVE_TARGET_ENTRY_PRICE"
-        investability = "WATCH"
-    elif position > 0 and metrics["expected_annualized_return"] >= 0:
-        action = "HOLD"
-        status = "READY"
-        reason = "CURRENT_OPPORTUNITY_DOES_NOT_JUSTIFY_NEW_CAPITAL"
-        investability = "WATCH"
-    else:
-        action = "NO-BUY"
-        status = "READY"
-        reason = "FUNDAMENTAL_RETURN_OR_REQUIRED_RETURN_GATE_FAILED"
-        investability = "NOT_INVESTABLE"
-
     package = (case.get("portfolio") or {}).get("buy_add_package") or {}
     package_fields = (
         "entry_zone",
@@ -748,12 +627,48 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "monitoring_triggers",
     )
     package_complete = all(field in package for field in package_fields)
-    if action in {"BUY", "ADD"} and not package_complete:
-        action = "REVIEW_REQUIRED"
-        status = "REVIEW_REQUIRED"
-        reason = "BUY_ADD_POSITION_PACKAGE_INCOMPLETE"
-        gates["new_capital_allowed"] = False
+    can_add = bool((case.get("portfolio") or {}).get("can_add", True))
 
+    state = evaluate_decision_state(
+        DecisionStateInputs(
+            validation_pass=validation["status"] == "PASS",
+            trust_status=trust_status,
+            thesis_status=thesis_status,
+            risk_status=risk_status,
+            portfolio_status=portfolio_status,
+            position_pct=position,
+            gap_status=gap_status,
+            gap_positive=gap_positive,
+            expected_annualized_return=(
+                metrics["expected_annualized_return"] if metrics is not None else None
+            ),
+            return_gate_pass=(
+                metrics["return_gate_pass"] if metrics is not None else False
+            ),
+            risk_gate_pass=(
+                metrics["risk_pass"] if metrics is not None else False
+            ),
+            can_add=can_add,
+            package_complete=package_complete,
+            return_metrics_ready=metrics is not None,
+        )
+    )
+
+    action = state["action"]
+    status = "REVIEW_REQUIRED" if action == "REVIEW_REQUIRED" else "READY"
+    reason = state["primary_reason"]
+    investability = (
+        "UNKNOWN" if action == "REVIEW_REQUIRED"
+        else "INVESTABLE" if action in {"BUY", "ADD"}
+        else "WATCH" if action in {"HOLD", "WATCH"}
+        else "NOT_INVESTABLE"
+    )
+    gates["new_capital_allowed"] = state["new_capital_allowed"]
+    gates["decision_precedence_version"] = state["precedence_version"]
+    gates["decision_precedence_rule_id"] = state["precedence_rule_id"]
+    gates["decision_precedence_rank"] = state["precedence_rank"]
+    gates["decision_scope"] = state["decision_scope"]
+    gates["capital_effect"] = state["capital_effect"]
     if metrics is not None:
         gates["target_entry_price"] = str(metrics["target_entry_price"])
         gates["target_entry_price_for_return"] = str(metrics["target_entry_price_for_return"])
@@ -787,6 +702,11 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
             else None
         ),
         "current_price": str(current_price) if current_price is not None else None,
+        "decision_precedence_version": state["precedence_version"],
+        "decision_precedence_rule_id": state["precedence_rule_id"],
+        "decision_precedence_rank": state["precedence_rank"],
+        "decision_scope": state["decision_scope"],
+        "capital_effect": state["capital_effect"],
     }
     if metrics is not None:
         output["return_metrics"] = _serialize_metrics(metrics)

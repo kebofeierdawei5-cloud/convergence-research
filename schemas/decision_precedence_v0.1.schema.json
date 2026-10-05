@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/decision-precedence-0.1.schema.json",
+  "title": "IIOS Decision State Machine / Precedence v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "precedence_version",
+    "rules"
+  ],
+  "properties": {
+    "precedence_version": {
+      "const": "IIOS-DECISION-PRECEDENCE-0.1"
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rule_id",
+          "rank",
+          "scope",
+          "trigger",
+          "action",
+          "reason",
+          "capital_effect",
+          "description"
+        ],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scope": {
+            "enum": [
+              "UNIVERSAL",
+              "EXISTING_POSITION",
+              "NEW_CAPITAL"
+            ]
+          },
+          "trigger": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action": {
+            "enum": [
+              "BUY",
+              "ADD",
+              "HOLD",
+              "REDUCE",
+              "EXIT",
+              "NO-BUY",
+              "WATCH",
+              "REVIEW_REQUIRED"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "capital_effect": {
+            "enum": [
+              "INCREASE",
+              "UNCHANGED",
+              "DECREASE",
+              "REVIEW"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

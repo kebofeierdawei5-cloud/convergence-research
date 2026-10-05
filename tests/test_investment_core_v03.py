@@ -654,14 +654,15 @@ def test_v03_add_existing_position():
     assert result["decision"]["action"] == "ADD"
 
 
-def test_v03_hold_existing_when_return_is_positive_but_gate_fails():
+def test_v03_reduce_existing_when_return_is_positive_but_risk_gate_fails():
     c = case(price="130", price_observation_id="price-130")
     c["portfolio"]["position_pct"] = "5"
     c["return_gate"]["entry_price"] = "130"
     c["expectation_gap"]["price"] = "130"
     c["return_gate"]["entry_value_reference"] = "115"
     result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
-    assert result["decision"]["action"] == "HOLD"
+    assert result["decision"]["action"] == "REDUCE"
+    assert result["decision"]["primary_reason"] == "RISK_GATE_FAILED"
 
 
 def test_v03_review_required_on_unresolved_return_input():

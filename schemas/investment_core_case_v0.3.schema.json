@@ -456,6 +456,32 @@
         },
         "position_package_complete": {
           "type": "boolean"
+        },
+        "decision_precedence_version": {
+          "const": "IIOS-DECISION-PRECEDENCE-0.1"
+        },
+        "decision_precedence_rule_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_precedence_rank": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decision_scope": {
+          "enum": [
+            "UNIVERSAL",
+            "EXISTING_POSITION",
+            "NEW_CAPITAL"
+          ]
+        },
+        "capital_effect": {
+          "enum": [
+            "INCREASE",
+            "UNCHANGED",
+            "DECREASE",
+            "REVIEW"
+          ]
         }
       }
     },
