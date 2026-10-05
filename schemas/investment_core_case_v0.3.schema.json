@@ -310,32 +310,6 @@
         }
       }
     },
-    "market_implied_expectation_snapshot": {
-      "type": "object",
-      "required": [
-        "snapshot_schema",
-        "p4f_version",
-        "case_id",
-        "cutoff_date",
-        "mie_set",
-        "provenance_manifest",
-        "mie_set_hash",
-        "provenance_hash",
-        "snapshot_hash"
-      ],
-      "properties": {
-        "snapshot_schema": { "const": "IIOS-MIE-SNAPSHOT-0.2" },
-        "p4f_version": { "const": "P4-F-0.2" },
-        "case_id": { "type": "string", "minLength": 1 },
-        "cutoff_date": { "type": "string", "format": "date" },
-        "mie_set": { "type": "object" },
-        "provenance_manifest": { "type": "array", "minItems": 1 },
-        "mie_set_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "provenance_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
-      },
-      "additionalProperties": true
-    },
     "expectation_gap": {
       "type": "object",
       "additionalProperties": false,
@@ -350,27 +324,78 @@
         "independent_expectation"
       ],
       "properties": {
-        "gap_id": { "type": "string", "minLength": 1 },
-        "evaluator_version": { "const": "IIOS-EXPECTATION-GAP-0.1" },
-        "price": { "type": ["string", "number"] },
-        "price_observation_id": { "type": "string", "minLength": 1 },
-        "cutoff_date": { "type": "string", "format": "date" },
-        "mie_snapshot_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "market_expectation_id": { "type": "string", "minLength": 1 },
+        "gap_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluator_version": {
+          "const": "IIOS-EXPECTATION-GAP-0.1"
+        },
+        "price": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "price_observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cutoff_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "mie_snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "market_expectation_id": {
+          "type": "string",
+          "minLength": 1
+        },
         "independent_expectation": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["variable_id", "value", "unit", "basis", "horizon_years", "evidence_ids"],
+          "required": [
+            "variable_id",
+            "value",
+            "unit",
+            "basis",
+            "horizon_years",
+            "evidence_ids"
+          ],
           "properties": {
-            "variable_id": { "type": "string", "minLength": 1 },
-            "value": { "type": ["string", "number"] },
-            "unit": { "type": "string", "minLength": 1 },
-            "basis": { "type": "string", "minLength": 1 },
-            "horizon_years": { "type": ["string", "number"] },
+            "variable_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": [
+                "string",
+                "number"
+              ]
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "basis": {
+              "type": "string",
+              "minLength": 1
+            },
+            "horizon_years": {
+              "type": [
+                "string",
+                "number"
+              ]
+            },
             "evidence_ids": {
               "type": "array",
               "minItems": 1,
-              "items": { "type": "string", "minLength": 1 }
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           }
         }
@@ -456,6 +481,28 @@
           "type": "boolean"
         }
       }
+    },
+    "market_implied_expectation_snapshot_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root_type",
+        "root_id",
+        "content_sha256"
+      ],
+      "properties": {
+        "root_type": {
+          "const": "P4F_MIE_SNAPSHOT"
+        },
+        "root_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
     }
   },
   "$defs": {
@@ -497,10 +544,14 @@
   "allOf": [
     {
       "if": {
-        "required": ["expectation_gap"]
+        "required": [
+          "expectation_gap"
+        ]
       },
       "then": {
-        "required": ["market_implied_expectation_snapshot"]
+        "required": [
+          "market_implied_expectation_snapshot_ref"
+        ]
       }
     },
     {
@@ -508,9 +559,13 @@
         "properties": {
           "return_gate": {
             "properties": {
-              "horizon_years": { "const": "3" }
+              "horizon_years": {
+                "const": "3"
+              }
             },
-            "required": ["horizon_years"]
+            "required": [
+              "horizon_years"
+            ]
           }
         }
       },
@@ -518,8 +573,12 @@
         "properties": {
           "return_gate": {
             "properties": {
-              "horizon_override": { "const": true },
-              "horizon_override_basis": { "minItems": 1 }
+              "horizon_override": {
+                "const": true
+              },
+              "horizon_override_basis": {
+                "minItems": 1
+              }
             }
           }
         }
@@ -528,8 +587,12 @@
         "properties": {
           "return_gate": {
             "properties": {
-              "horizon_override": { "const": false },
-              "horizon_override_basis": { "maxItems": 0 }
+              "horizon_override": {
+                "const": false
+              },
+              "horizon_override_basis": {
+                "maxItems": 0
+              }
             }
           }
         }

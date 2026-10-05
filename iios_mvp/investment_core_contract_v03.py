@@ -5,6 +5,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from .canonical_expectation_gap import evaluate_canonical_expectation_gap
+from .evidence_root_admission import EvidenceRootResolver
 from .horizon_semantics import validate_horizon_selection
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
@@ -254,7 +255,7 @@ def _portfolio_status(case: dict[str, Any]) -> str:
 def _risk_status(case: dict[str, Any]) -> str:
     return str((case.get("risk") or {}).get("status", "UNKNOWN")).upper()
 
-def validate_case_v03(case: Any) -> dict[str, Any]:
+def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None) -> dict[str, Any]:
     errors: list[dict[str, str]] = []
     if not isinstance(case, dict):
         return {"status": "BLOCKED", "errors": [_err("V03-SCHEMA-TYPE", "$", "case must be an object")]}
@@ -400,7 +401,7 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
 
         if not precondition_failed:
             try:
-                _canonical_expectation_gap(expectation_gap, case)
+                _canonical_expectation_gap(expectation_gap, case, evidence_root_resolver=evidence_root_resolver)
             except ValueError as exc:
                 errors.append(
                     _err(
@@ -410,15 +411,40 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
                     )
                 )
 
-    mie_snapshot = case.get("market_implied_expectation_snapshot")
-    if mie_snapshot is not None and not isinstance(mie_snapshot, dict):
+    if "market_implied_expectation_snapshot" in case:
         errors.append(
             _err(
-                "V03-MIE-SNAPSHOT-TYPE",
+                "V03-EVIDENCE-ROOT-INLINE",
                 "market_implied_expectation_snapshot",
-                "canonical P4-F MIE snapshot must be an object when supplied",
+                "embedded P4-F snapshot is not accepted; use market_implied_expectation_snapshot_ref",
             )
         )
+    mie_snapshot_ref = case.get("market_implied_expectation_snapshot_ref")
+    if mie_snapshot_ref is not None and not isinstance(mie_snapshot_ref, dict):
+        errors.append(
+            _err(
+                "V03-EVIDENCE-ROOT-REF-TYPE",
+                "market_implied_expectation_snapshot_ref",
+                "canonical evidence root reference must be an object when supplied",
+            )
+        )
+    if expectation_gap is not None:
+        if not isinstance(mie_snapshot_ref, dict):
+            errors.append(
+                _err(
+                    "V03-EVIDENCE-ROOT-REF-REQUIRED",
+                    "market_implied_expectation_snapshot_ref",
+                    "canonical evidence root reference is required when expectation_gap is supplied",
+                )
+            )
+        elif evidence_root_resolver is None:
+            errors.append(
+                _err(
+                    "V03-EVIDENCE-ROOT-RESOLVER",
+                    "market_implied_expectation_snapshot_ref",
+                    "canonical evidence root resolver is required at runtime",
+                )
+            )
     decision = case.get("decision")
     if decision is not None:
         if not isinstance(decision, dict):
@@ -432,14 +458,21 @@ def validate_case_v03(case: Any) -> dict[str, Any]:
                 errors.append(_err("V03-DECISION-STATUS", "decision.decision_status", f"invalid status: {status}"))
     return {"status": "PASS" if not errors else "BLOCKED", "errors": errors}
 
-def _canonical_expectation_gap(payload: Any, case: dict[str, Any]) -> dict[str, Any]:
-    mie = case.get("market_implied_expectation_snapshot")
-    if not isinstance(mie, dict):
-        raise ValueError("market_implied_expectation_snapshot is required for a canonical expectation gap")
+def _canonical_expectation_gap(payload: Any, case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None) -> dict[str, Any]:
+    mie_ref = case.get("market_implied_expectation_snapshot_ref")
+    if not isinstance(mie_ref, dict):
+        raise ValueError("market_implied_expectation_snapshot_ref is required for a canonical expectation gap")
+    if evidence_root_resolver is None:
+        raise ValueError("canonical evidence root resolver is required for a canonical expectation gap")
     try:
+        snapshot = evidence_root_resolver.resolve_p4f_snapshot(
+            mie_ref,
+            case_id=case["case_id"],
+            cutoff_date=_date(case["cutoff_date"], "cutoff_date"),
+        )
         return evaluate_canonical_expectation_gap(
             payload,
-            market_implied_expectation_snapshot=case["market_implied_expectation_snapshot"],
+            market_implied_expectation_snapshot=snapshot,
             current_price=case["current_price_observation"]["price"],
             current_price_observation=case["current_price_observation"],
             cutoff_date=case["cutoff_date"],
@@ -449,12 +482,12 @@ def _canonical_expectation_gap(payload: Any, case: dict[str, Any]) -> dict[str, 
         raise ValueError(str(exc)) from exc
 
 
-def _expectation_gap(case: dict[str, Any]) -> tuple[str, Decimal | None]:
+def _expectation_gap(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None) -> tuple[str, Decimal | None]:
     payload = case.get("expectation_gap")
     if payload is None:
         return "UNKNOWN", None
     try:
-        evaluated = _canonical_expectation_gap(payload, case)
+        evaluated = _canonical_expectation_gap(payload, case, evidence_root_resolver=evidence_root_resolver)
     except ValueError:
         return "UNKNOWN", None
     status = str(evaluated["status"]).upper()
@@ -490,14 +523,14 @@ def _investability(
     return "WATCH"
 
 
-def decide_v03(case: dict[str, Any]) -> dict[str, Any]:
-    validation = validate_case_v03(case)
+def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None) -> dict[str, Any]:
+    validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver)
     position = _position(case) if isinstance(case.get("portfolio"), dict) else Decimal("0")
     trust_status = str((case.get("trust") or {}).get("status", "UNKNOWN")).upper()
     thesis_status = str((case.get("thesis") or {}).get("status", "UNKNOWN")).upper()
     risk_status = _risk_status(case)
     portfolio_status = _portfolio_status(case)
-    gap_status, gap_relative = _expectation_gap(case)
+    gap_status, gap_relative = _expectation_gap(case, evidence_root_resolver=evidence_root_resolver)
     gap_positive = gap_status == "PASS" and gap_relative is not None and gap_relative > 0
 
     metrics = None
