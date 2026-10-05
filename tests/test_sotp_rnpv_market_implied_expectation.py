@@ -222,6 +222,24 @@ def run(inp, **kwargs):
     )
 
 
+def test_outside_historical_support_stays_conditional_not_decision_grade():
+    for inp in (
+        sotp_input(price="220"),
+        rnpv_input(price="185.4545454545454545454545454"),
+    ):
+        p3 = identify_market_models(inp)
+        assert p3["identifiability"].state.value == "IDENTIFIABLE"
+        evaluation = p3["evaluations"][0]
+        assert evaluation.fit.status.value == "FEASIBLE"
+        assert evaluation.fit.historical_support.value in {
+            "ABOVE_HISTORICAL_RANGE", "BELOW_HISTORICAL_RANGE"
+        }
+        assert evaluation.fit.regime_interpretation.value == "POSSIBLE_REGIME_SHIFT"
+        outputs = run(inp)
+        assert outputs
+        assert all(x.qualification != MIEQualification.DECISION_GRADE for x in outputs)
+        assert all(x.qualification == MIEQualification.CONDITIONAL_ONLY for x in outputs)
+
 def test_sotp_materializes_conditional_residual_and_segments():
     inp = sotp_input()
     p3 = identify_market_models(inp)
