@@ -6,7 +6,7 @@ import json
 import shutil
 import subprocess
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from pathlib import Path
 
 from core04c_catl_ev_ebitda import (
@@ -153,6 +153,12 @@ def _admit(
 
     typed = admission.observation
     typed.validate(datetime.fromisoformat("2026-10-04T23:59:59+08:00").date())
+    market_cap = typed.price * typed.shares_outstanding
+    enterprise_value = market_cap + typed.net_debt
+    with localcontext() as ctx:
+        ctx.prec = 60
+        ev_ebitda = enterprise_value / typed.economic_value
+
     observation = {
         "observation_id": typed.observation_id,
         "observation_date": typed.observation_date.isoformat(),
@@ -161,15 +167,9 @@ def _admit(
         "shares_outstanding": format(typed.shares_outstanding, "f"),
         "net_debt_cny": format(typed.net_debt, "f"),
         "ebitda_cny": format(typed.economic_value, "f"),
-        "market_cap_cny": format(typed.price * typed.shares_outstanding, "f"),
-        "enterprise_value_cny": format(
-            typed.price * typed.shares_outstanding + typed.net_debt, "f"
-        ),
-        "ev_ebitda": format(
-            (typed.price * typed.shares_outstanding + typed.net_debt)
-            / typed.economic_value,
-            "f",
-        ),
+        "market_cap_cny": format(market_cap, "f"),
+        "enterprise_value_cny": format(enterprise_value, "f"),
+        "ev_ebitda": format(ev_ebitda, "f"),
         "basis": (
             "historical_market_date / latest_known_financial_vintage / "
             "latest_known_completed_fiscal_year_EBITDA"
