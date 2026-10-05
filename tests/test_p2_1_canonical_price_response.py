@@ -2,6 +2,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 import json
 from pathlib import Path
+import pytest
 
 from jsonschema import Draft202012Validator
 
@@ -428,7 +429,15 @@ def test_pit_failure_is_fail_closed():
             _prov("ctx-net-debt", "net_debt", "model_context:model-ev_ebitda:net_debt", value="100"),
         ),
     )
-    assert snapshot is not None
+    with pytest.raises(ValueError, match="known_at is after cutoff"):
+        _make_snapshot(
+            MarketModelFamily.EV_EBITDA,
+            req,
+            context=(
+                _prov("ctx-shares", "shares_outstanding", "model_context:model-ev_ebitda:shares_outstanding", value="10", unit="shares", known_at=datetime(2026, 10, 5, tzinfo=timezone.utc)),
+                _prov("ctx-net-debt", "net_debt", "model_context:model-ev_ebitda:net_debt", value="100"),
+            ),
+        )
 
 
 def test_response_schema_and_tamper_replay():
