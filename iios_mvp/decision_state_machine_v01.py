@@ -27,6 +27,7 @@ class DecisionRule:
 CANONICAL_DECISION_PRECEDENCE: tuple[DecisionRule, ...] = (
     DecisionRule("V00_VALIDATION_UNRESOLVED", 0, "UNIVERSAL", "validation_pass == false", "REVIEW_REQUIRED", "RETURN_OR_CASE_VALIDATION_UNRESOLVED", "REVIEW", "Contract/evidence/runtime validation is a prerequisite to all semantic decisions."),
     DecisionRule("T00_TRUST_NOT_PASS", 10, "UNIVERSAL", "trust_status != PASS", "REVIEW_REQUIRED", "TRUST_NOT_PASS_REQUIRES_REVIEW", "REVIEW", "Trust Gate has precedence over all investment actions; non-PASS never auto-allocates or auto-disposes capital."),
+    DecisionRule("U20_RETURN_METRICS_UNRESOLVED", 20, "UNIVERSAL", "return_metrics_ready == false", "REVIEW_REQUIRED", "RETURN_OR_CASE_VALIDATION_UNRESOLVED", "REVIEW", "Deterministic return/risk metrics are required before semantic action selection."),
     DecisionRule("EP10_THESIS_BROKEN", 20, "EXISTING_POSITION", "position > 0 and thesis_status == BROKEN", "EXIT", "THESIS_BROKEN", "DECREASE", "A broken investment thesis exits an existing position."),
     DecisionRule("EP15_RISK_UNKNOWN", 25, "EXISTING_POSITION", "position > 0 and risk_status == UNKNOWN", "REVIEW_REQUIRED", "RISK_UNKNOWN", "REVIEW", "Risk state is unresolved; no automatic holding/reduction decision is permitted."),
     DecisionRule("EP20_RISK_HARD_FAIL", 30, "EXISTING_POSITION", "position > 0 and hard_risk_failure", "REDUCE", "RISK_GATE_FAILED", "DECREASE", "Hard risk failure reduces an existing position."),
@@ -105,6 +106,7 @@ def _matches(rule: DecisionRule, inputs: DecisionStateInputs) -> bool:
     conditions: dict[str, bool] = {
         "V00_VALIDATION_UNRESOLVED": not inputs.validation_pass,
         "T00_TRUST_NOT_PASS": inputs.trust_status != "PASS",
+        "U20_RETURN_METRICS_UNRESOLVED": not inputs.return_metrics_ready,
         "EP10_THESIS_BROKEN": pos and inputs.thesis_status == "BROKEN",
         "EP20_RISK_HARD_FAIL": pos and hard_risk_failure,
         "EP30_PORTFOLIO_BLOCKED": pos and inputs.portfolio_status == "BLOCKED",
@@ -176,7 +178,7 @@ def validate_precedence_table() -> None:
     if len(ids) != len(set(ids)):
         raise ValueError("decision precedence rule IDs must be unique")
     universal = [r for r in CANONICAL_DECISION_PRECEDENCE if r.scope == "UNIVERSAL"]
-    if [r.rule_id for r in universal] != ["V00_VALIDATION_UNRESOLVED", "T00_TRUST_NOT_PASS"]:
+    if [r.rule_id for r in universal] != ["V00_VALIDATION_UNRESOLVED", "T00_TRUST_NOT_PASS", "U20_RETURN_METRICS_UNRESOLVED"]:
         raise ValueError("universal precedence must begin with validation then Trust")
     scopes = {r.scope for r in CANONICAL_DECISION_PRECEDENCE}
     if scopes != {"UNIVERSAL", "EXISTING_POSITION", "NEW_CAPITAL"}:
