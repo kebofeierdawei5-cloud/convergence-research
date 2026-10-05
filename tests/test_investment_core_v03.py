@@ -188,7 +188,7 @@ def independent_forecast_ref(value="12", forecast_id="forecast-v03-001", horizon
     }).to_dict()
 
 
-def case(price="100", price_observation_id="price-1") -> dict:
+def case(price="100", price_observation_id="price-1", thesis_status="INTACT") -> dict:
     return {
         "contract_version": "IIOS-INVESTMENT-CORE-0.3",
         "case_id": "V03-001",
@@ -224,7 +224,7 @@ def case(price="100", price_observation_id="price-1") -> dict:
                 "monitoring_triggers": ["quarterly results"],
             },
         },
-        "thesis": {"status": "INTACT"},
+        "thesis": {"status": thesis_status},
         "decision_upstream_admission": build_decision_upstream_admission(
             case_id="V03-001",
             cutoff_date="2026-10-04",
@@ -243,7 +243,7 @@ def case(price="100", price_observation_id="price-1") -> dict:
             valuation_status="PASS",
             forecast_status="PASS",
             thesis={
-                "status": "INTACT",
+                "status": thesis_status,
                 "statement": "fixture thesis",
                 "mechanism": "fixture mechanism",
                 "key_driver_ids": ["D1"],
@@ -474,10 +474,8 @@ def test_v03_missing_expectation_gap_does_not_block_existing_add():
 
 
 def test_v03_missing_expectation_gap_does_not_block_thesis_broken_exit():
-    c = case()
+    c = case(thesis_status="BROKEN")
     c["portfolio"]["position_pct"] = "5"
-    c["thesis"]["status"] = "BROKEN"
-    c["decision_upstream_admission"]["thesis_status"] = "BROKEN"
     del c["expectation_gap"]
     result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "EXIT"
@@ -689,9 +687,8 @@ def test_v03_portfolio_block_can_reduce_existing_position():
 
 
 def test_v03_thesis_broken_exits_existing_position():
-    c = case()
+    c = case(thesis_status="BROKEN")
     c["portfolio"]["position_pct"] = "5"
-    c["thesis"]["status"] = "BROKEN"
     result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "EXIT"
 
