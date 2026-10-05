@@ -74,11 +74,10 @@ Acceptance:
 - `docs/iios/A1_ACCEPTANCE_2026-10-05.md`
 - `docs/iios/A1_01_ACCEPTANCE_2026-10-05.md`
 - `docs/iios/A1_02_ACCEPTANCE_2026-10-05.md`
+- `docs/iios/RP_01_RISK_PORTFOLIO_PRODUCTION_CONTRACT_v0.1.md`
 
 ## Product gaps after CORE-04
 
-- Company-side evidence completeness
-- Risk / Portfolio production contract
 - Decision Revision / Human Approval lifecycle
 - Trigger / Monitoring / Validation
 - Machine Publication
