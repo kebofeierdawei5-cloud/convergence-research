@@ -94,6 +94,21 @@ def test_cross_instrument_reuse_is_rejected():
         )
 
 
+def test_signed_forecast_value_is_admissible():
+    registry = InMemoryCanonicalIndependentForecastRegistry()
+    ref = registry.admit_independent_forecast(
+        forecast(value="-3", forecast_id="signed-forecast")
+    )
+    record = registry.resolve_independent_forecast(
+        ref.to_dict(),
+        case_id="P1-3-CASE",
+        market="CN-A",
+        symbol="300750",
+        cutoff_date=CUTOFF,
+    )
+    assert record["value"] == "-3"
+
+
 def test_forecast_must_be_independent_of_current_price():
     registry = InMemoryCanonicalIndependentForecastRegistry()
     with pytest.raises(ValueError, match="without current price"):
