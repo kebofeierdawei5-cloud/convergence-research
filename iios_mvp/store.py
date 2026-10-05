@@ -303,6 +303,20 @@ def replay_decision_lifecycle(
             case_id=revision["case_id"],
             cutoff_date=revision["cutoff_date"],
         )
+        historical_snapshot = read_snapshot(
+            snapshot_path(root, record["snapshot_hash"])
+        )
+        expected_historical_revision = build_decision_revision(
+            decision_series_id=record["decision_series_id"],
+            revision=record["revision"],
+            snapshot=historical_snapshot,
+            run_id=record["run_id"],
+            trigger_event_id=record["trigger_event_id"],
+        )
+        if canonical_json(expected_historical_revision) != canonical_json(record):
+            raise ValueError(
+                f"decision revision replay mismatch: {record['decision_id']}"
+            )
         records.append(record)
 
     numbers = [record["revision"] for record in records]
