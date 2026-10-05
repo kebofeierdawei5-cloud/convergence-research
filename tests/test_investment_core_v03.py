@@ -280,6 +280,68 @@ def test_v03_embedded_p4f_snapshot_is_rejected():
     assert any("V03-EVIDENCE-ROOT-INLINE" in x for x in result["validation"]["blockers"])
 
 
+def test_v03_canonical_gap_requires_independent_forecast_resolver():
+    c = case()
+    result = decide(
+        c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        current_price_resolver=CURRENT_PRICE_REGISTRY,
+    )
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any(
+        "canonical independent forecast resolver is required" in x
+        for x in result["validation"]["blockers"]
+    )
+
+
+def test_v03_inline_independent_expectation_is_rejected():
+    c = case()
+    c["expectation_gap"]["independent_expectation"] = {
+        "variable_id": "forward_eps",
+        "value": "999",
+        "unit": "CNY/share",
+        "basis": "2026A_to_2028E",
+        "horizon_years": "2",
+        "evidence_ids": ["forged"],
+    }
+    result = decide(
+        c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        current_price_resolver=CURRENT_PRICE_REGISTRY,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+    )
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("unsupported fields" in x for x in result["validation"]["blockers"])
+
+
+def test_v03_canonical_forecast_value_controls_expectation_gap():
+    c = case()
+    c["expectation_gap"]["independent_forecast_ref"] = independent_forecast_ref(
+        value="8", forecast_id="forecast-v03-controlled-8"
+    )
+    result = decide(
+        c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        current_price_resolver=CURRENT_PRICE_REGISTRY,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+    )
+    assert result["decision"]["action"] == "NO-BUY"
+    assert result["decision"]["primary_reason"] == "NO_POSITIVE_EXPECTATION_GAP"
+
+
+def test_v03_forecast_admission_hash_tampering_is_blocked():
+    c = case()
+    c["expectation_gap"]["independent_forecast_ref"]["admission_record_hash"] = "0" * 64
+    result = decide(
+        c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        current_price_resolver=CURRENT_PRICE_REGISTRY,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+    )
+    assert result["decision"]["action"] == "REVIEW_REQUIRED"
+    assert any("admission hash mismatch" in x for x in result["validation"]["blockers"])
+
+
 def test_v03_mie_is_required_for_canonical_gap():
     c = case()
     assert validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)["status"] == "PASS"
