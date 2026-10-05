@@ -37,6 +37,8 @@ CANONICAL_DECISION_PRECEDENCE: tuple[DecisionRule, ...] = (
     DecisionRule("EP30_PORTFOLIO_UNKNOWN", 35, "EXISTING_POSITION", "position > 0 and portfolio_status == UNKNOWN", "REVIEW_REQUIRED", "PORTFOLIO_CONSTRAINT_UNKNOWN", "REVIEW", "An unresolved portfolio constraint cannot be converted into a deterministic sizing action."),
     DecisionRule("EP31_PORTFOLIO_BLOCKED", 40, "EXISTING_POSITION", "position > 0 and portfolio_status == BLOCKED", "REDUCE", "PORTFOLIO_CONSTRAINT_BLOCKED", "DECREASE", "Portfolio constraint violation reduces an existing position; it cannot suppress a higher-protection thesis exit."),
     DecisionRule("EP40_EXPECTED_RETURN_NEGATIVE", 50, "EXISTING_POSITION", "position > 0 and expected_annualized_return < 0", "REDUCE", "NO_POSITIVE_LONG_TERM_RETURN", "DECREASE", "Negative expected return is a hard long-term value failure for capital already at risk."),
+    DecisionRule("EP42_QUALITY_HARD_FAIL", 55, "EXISTING_POSITION", "position > 0 and quality_gate_status == BLOCKED", "REDUCE", "QUALITY_GATE_FAILED", "DECREASE", "A blocked Quality Gate reduces an existing position after stronger thesis/risk protection."),
+    DecisionRule("EP43_UPSTREAM_GATE_UNRESOLVED", 56, "EXISTING_POSITION", "position > 0 and upstream_gate_unresolved", "REVIEW_REQUIRED", "UPSTREAM_DECISION_GATE_UNRESOLVED", "REVIEW", "Unresolved Reality/Quality/Value Driver/Valuation/Forecast/Thesis admission requires review of an existing position."),
     DecisionRule("NP10_PORTFOLIO_UNKNOWN", 10, "NEW_CAPITAL", "position == 0 and portfolio_status == UNKNOWN", "REVIEW_REQUIRED", "PORTFOLIO_CONSTRAINT_UNKNOWN", "REVIEW", "Portfolio capacity is unresolved; new capital cannot be deterministically admitted or denied."),
     DecisionRule("NP11_PORTFOLIO_BLOCKED", 15, "NEW_CAPITAL", "position == 0 and portfolio_status == BLOCKED", "NO-BUY", "PORTFOLIO_CONSTRAINT_BLOCKED", "UNCHANGED", "Portfolio Constraint blocks new capital before long-term value or expectation-gap admission."),
     DecisionRule("NP20_THESIS_BROKEN", 20, "NEW_CAPITAL", "position == 0 and thesis_status == BROKEN", "NO-BUY", "THESIS_BROKEN", "UNCHANGED", "A broken thesis cannot admit new capital."),
@@ -44,6 +46,14 @@ CANONICAL_DECISION_PRECEDENCE: tuple[DecisionRule, ...] = (
     DecisionRule("NP30_RISK_UNKNOWN", 30, "NEW_CAPITAL", "position == 0 and risk_status == UNKNOWN", "REVIEW_REQUIRED", "RISK_UNKNOWN", "REVIEW", "An unresolved risk state cannot admit new capital."),
     DecisionRule("NP31_RISK_HARD_FAIL", 35, "NEW_CAPITAL", "position == 0 and hard_risk_failure", "NO-BUY", "RISK_GATE_FAILED", "UNCHANGED", "Hard risk failure blocks new capital."),
     DecisionRule("NP40_EXPECTED_RETURN_NEGATIVE", 40, "NEW_CAPITAL", "position == 0 and expected_annualized_return < 0", "NO-BUY", "NEGATIVE_EXPECTED_RETURN", "UNCHANGED", "Negative expected return is a hard long-term value failure."),
+    DecisionRule("NP45_REALITY_NOT_PASS", 45, "NEW_CAPITAL", "position == 0 and reality_status != PASS", "REVIEW_REQUIRED", "REALITY_GATE_NOT_PASS", "REVIEW", "Company reality must be admitted before new capital can be considered."),
+    DecisionRule("NP46_QUALITY_HARD_FAIL", 46, "NEW_CAPITAL", "position == 0 and quality_gate_status == BLOCKED", "NO-BUY", "QUALITY_GATE_FAILED", "UNCHANGED", "A blocked Quality Gate cannot admit new capital."),
+    DecisionRule("NP47_QUALITY_UNRESOLVED", 47, "NEW_CAPITAL", "position == 0 and quality_gate_status in {CONDITIONAL,UNKNOWN}", "REVIEW_REQUIRED", "QUALITY_GATE_UNRESOLVED", "REVIEW", "Quality must be fully admitted before new capital."),
+    DecisionRule("NP48_VALUE_DRIVER_NOT_PASS", 48, "NEW_CAPITAL", "position == 0 and value_driver_status != PASS", "REVIEW_REQUIRED", "VALUE_DRIVER_GATE_NOT_PASS", "REVIEW", "Material value drivers must be explicitly admitted before new capital."),
+    DecisionRule("NP49_VALUATION_NOT_PASS", 49, "NEW_CAPITAL", "position == 0 and valuation_status != PASS", "REVIEW_REQUIRED", "PRIMARY_VALUATION_NOT_ADMITTED", "REVIEW", "Primary valuation must be explicitly admitted before new capital."),
+    DecisionRule("NP50_FORECAST_NOT_PASS", 50, "NEW_CAPITAL", "position == 0 and forecast_status != PASS", "REVIEW_REQUIRED", "INDEPENDENT_FORECAST_NOT_ADMITTED", "REVIEW", "Independent forecast must be explicitly admitted before new capital."),
+    DecisionRule("NP51_THESIS_ADMISSION_NOT_VALID", 51, "NEW_CAPITAL", "position == 0 and thesis_admission_status != ADMITTED", "REVIEW_REQUIRED", "THESIS_ADMISSION_NOT_VALID", "REVIEW", "A formal Thesis Admission record is required for new capital."),
+    DecisionRule("NP52_THESIS_WATCH", 52, "NEW_CAPITAL", "position == 0 and thesis_status == WATCH", "WATCH", "THESIS_ON_WATCH", "UNCHANGED", "A watched thesis cannot admit new capital at the current state."),
     DecisionRule("G00_GAP_UNRESOLVED_NEW", 50, "NEW_CAPITAL", "position == 0 and gap_status in {UNKNOWN,BLOCKED,INCOMPATIBLE,AMBIGUOUS}", "REVIEW_REQUIRED", "POSITIVE_EXPECTATION_GAP_UNRESOLVED", "REVIEW", "Canonical expectation gap is mandatory for BUY; unresolved evidence fails closed."),
     DecisionRule("G10_GAP_NONPOSITIVE_NEW", 60, "NEW_CAPITAL", "position == 0 and gap_status == PASS and not gap_positive", "NO-BUY", "NO_POSITIVE_EXPECTATION_GAP", "UNCHANGED", "No positive expectation gap means no new-capital admission."),
     DecisionRule("R00_RETURN_QUALIFIED_NEW_PACKAGE_MISSING", 70, "NEW_CAPITAL", "position == 0 and gap_positive and return_gate_pass and not package_complete", "REVIEW_REQUIRED", "BUY_ADD_POSITION_PACKAGE_INCOMPLETE", "REVIEW", "A BUY package must be complete before a BUY proposal can be READY."),
@@ -91,6 +101,12 @@ class DecisionStateInputs:
     can_add: bool
     package_complete: bool
     return_metrics_ready: bool
+    reality_status: str = "PASS"
+    quality_gate_status: str = "PASS"
+    value_driver_status: str = "PASS"
+    valuation_status: str = "PASS"
+    forecast_status: str = "PASS"
+    thesis_admission_status: str = "ADMITTED"
     mie_policy: str = MIE_POLICY_MANDATORY
     mie_material_contradiction: bool = False
 
@@ -108,6 +124,17 @@ def _matches(rule: DecisionRule, inputs: DecisionStateInputs) -> bool:
         inputs.expected_annualized_return is not None
         and inputs.expected_annualized_return < 0
     )
+
+    upstream_gate_unresolved = any(
+        status != "PASS"
+        for status in (
+            inputs.reality_status,
+            inputs.quality_gate_status,
+            inputs.value_driver_status,
+            inputs.valuation_status,
+            inputs.forecast_status,
+        )
+    ) or inputs.thesis_admission_status != "ADMITTED"
 
     conditions: dict[str, bool] = {
         "V00_VALIDATION_UNRESOLVED": not inputs.validation_pass,
@@ -127,6 +154,16 @@ def _matches(rule: DecisionRule, inputs: DecisionStateInputs) -> bool:
         "NP30_RISK_UNKNOWN": new and inputs.risk_status == "UNKNOWN",
         "NP31_RISK_HARD_FAIL": new and hard_risk_failure,
         "NP40_EXPECTED_RETURN_NEGATIVE": new and negative_return,
+        "NP45_REALITY_NOT_PASS": new and inputs.reality_status != "PASS",
+        "NP46_QUALITY_HARD_FAIL": new and inputs.quality_gate_status == "BLOCKED",
+        "NP47_QUALITY_UNRESOLVED": new and inputs.quality_gate_status in {"CONDITIONAL", "UNKNOWN"},
+        "NP48_VALUE_DRIVER_NOT_PASS": new and inputs.value_driver_status != "PASS",
+        "NP49_VALUATION_NOT_PASS": new and inputs.valuation_status != "PASS",
+        "NP50_FORECAST_NOT_PASS": new and inputs.forecast_status != "PASS",
+        "NP51_THESIS_ADMISSION_NOT_VALID": new and inputs.thesis_admission_status != "ADMITTED",
+        "NP52_THESIS_WATCH": new and inputs.thesis_status == "WATCH",
+        "EP42_QUALITY_HARD_FAIL": pos and inputs.quality_gate_status == "BLOCKED",
+        "EP43_UPSTREAM_GATE_UNRESOLVED": pos and upstream_gate_unresolved,
         "G00_GAP_UNRESOLVED_NEW": new and inputs.mie_policy == MIE_POLICY_MANDATORY and unresolved_gap,
         "G10_GAP_NONPOSITIVE_NEW": new and (inputs.mie_material_contradiction or (inputs.mie_policy == MIE_POLICY_MANDATORY and inputs.gap_status == "PASS" and not inputs.gap_positive)),
         "R00_RETURN_QUALIFIED_NEW_PACKAGE_MISSING": new and inputs.return_gate_pass and (inputs.gap_positive or inputs.mie_policy == MIE_POLICY_OPTIONAL_EXPLANATORY) and not inputs.package_complete,
@@ -164,6 +201,12 @@ def evaluate_decision_state(inputs: DecisionStateInputs) -> dict[str, Any]:
         can_add=bool(inputs.can_add),
         package_complete=bool(inputs.package_complete),
         return_metrics_ready=bool(inputs.return_metrics_ready),
+        reality_status=str(inputs.reality_status).upper(),
+        quality_gate_status=str(inputs.quality_gate_status).upper(),
+        value_driver_status=str(inputs.value_driver_status).upper(),
+        valuation_status=str(inputs.valuation_status).upper(),
+        forecast_status=str(inputs.forecast_status).upper(),
+        thesis_admission_status=str(inputs.thesis_admission_status).upper(),
         mie_policy=str(inputs.mie_policy).upper(),
         mie_material_contradiction=bool(inputs.mie_material_contradiction),
     )
@@ -196,6 +239,14 @@ def validate_precedence_table() -> None:
     if [r.rule_id for r in universal] != ["V00_VALIDATION_UNRESOLVED", "T00_TRUST_NOT_PASS", "U20_RETURN_METRICS_UNRESOLVED"]:
         raise ValueError("universal precedence must begin with validation then Trust")
     scopes = {r.scope for r in CANONICAL_DECISION_PRECEDENCE}
+    required_upstream = {
+        "NP45_REALITY_NOT_PASS", "NP46_QUALITY_HARD_FAIL", "NP47_QUALITY_UNRESOLVED",
+        "NP48_VALUE_DRIVER_NOT_PASS", "NP49_VALUATION_NOT_PASS", "NP50_FORECAST_NOT_PASS",
+        "NP51_THESIS_ADMISSION_NOT_VALID", "NP52_THESIS_WATCH",
+        "EP42_QUALITY_HARD_FAIL", "EP43_UPSTREAM_GATE_UNRESOLVED",
+    }
+    if not required_upstream.issubset(set(ids)):
+        raise ValueError("upstream decision-gate precedence is incomplete")
     if scopes != {"UNIVERSAL", "EXISTING_POSITION", "NEW_CAPITAL"}:
         raise ValueError("decision precedence scopes are incomplete")
     existing_ids = [r.rule_id for r in CANONICAL_DECISION_PRECEDENCE if r.scope == "EXISTING_POSITION"]
