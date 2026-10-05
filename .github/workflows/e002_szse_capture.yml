@@ -71,6 +71,61 @@ jobs:
           )
           print(json.dumps(receipt, ensure_ascii=False, indent=2))
           PY
+      - name: Fallback capture via official SZSE EOD report API
+        if: failure()
+        env:
+          URL: "https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-09-30&txtEndDate=2026-09-30&archiveDate=2026-10-01&random=0.20261005"
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse_eod
+          curl --fail --silent --show-error --location --retry 2 --retry-all-errors             -H 'Referer: https://www.szse.cn/market/trend/index.html'             -H 'User-Agent: Mozilla/5.0'             "$URL"             --output evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse_eod/eod_2026-09-30.xlsx
+          python - <<'PY'
+          import hashlib, pathlib, zipfile, openpyxl, json, datetime
+          root=pathlib.Path("evidence/real_cases/RC-CN-A-300750-20261004/capture/E002_primary_szse_eod")
+          raw=(root/"eod_2026-09-30.xlsx").read_bytes()
+          if not zipfile.is_zipfile(root/"eod_2026-09-30.xlsx"):
+              raise SystemExit("SZSE EOD response is not a valid XLSX")
+          wb=openpyxl.load_workbook(root/"eod_2026-09-30.xlsx", read_only=True, data_only=True)
+          target=None
+          for ws in wb.worksheets:
+              for row in ws.iter_rows(values_only=True):
+                  vals=[str(x).strip() if x is not None else "" for x in row]
+                  if "300750" in vals:
+                      target=list(row)
+                      break
+              if target is not None: break
+          if target is None:
+              raise SystemExit("300750 not found in SZSE EOD report")
+          close=None
+          for v in target:
+              try:
+                  fv=float(v)
+                  if 200 <= fv <= 400:
+                      close=fv; break
+              except Exception:
+                  pass
+          if close != 291.11:
+              raise SystemExit(f"expected close 291.11, observed candidate row={target!r}, inferred_close={close!r}")
+          receipt={
+            "status":"PASS",
+            "source_ref":"SZSE:MARKET_DATA",
+            "source_url":"https://www.szse.cn/api/report/ShowReport?SHOWTYPE=xlsx&CATALOGID=1815_stock_snapshot&TABKEY=tab1&txtBeginDate=2026-09-30&txtEndDate=2026-09-30&archiveDate=2026-10-01&random=0.20261005",
+            "observation_date":"2026-09-30",
+            "symbol":"300750",
+            "close":291.11,
+            "raw_artifact":{
+              "filename":"eod_2026-09-30.xlsx",
+              "size_bytes":len(raw),
+              "sha256":hashlib.sha256(raw).hexdigest()
+            },
+            "retrieved_at_utc":datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "row":target,
+            "github_run_id":"${{ github.run_id }}",
+            "github_commit_sha":"${{ github.sha }}"
+          }
+          (root/"E002_primary_szse_eod_receipt.json").write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          print(json.dumps(receipt,ensure_ascii=False,indent=2))
+          PY
       - name: Commit captured evidence to branch
         run: |
           set -euo pipefail
