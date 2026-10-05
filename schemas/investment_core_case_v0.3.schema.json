@@ -505,8 +505,10 @@
           "type": "boolean"
         },
         "canonical_entry_evaluation_version": {
-          "type": ["string", "null"],
-          "const": "IIOS-P2.2-CANONICAL-ENTRY-EVALUATION-0.1"
+          "anyOf": [
+            { "const": null },
+            { "const": "IIOS-P2.2-CANONICAL-ENTRY-EVALUATION-0.1" }
+          ]
         },
         "canonical_entry_evaluation": {
           "type": ["object", "null"],
@@ -516,8 +518,10 @@
           "enum": ["BUY", "ADD", "HOLD", "REDUCE", "EXIT", "NO-BUY", "WATCH", "REVIEW_REQUIRED", null]
         },
         "decision_admission_version": {
-          "type": ["string", "null"],
-          "const": "IIOS-P2.2-DECISION-ADMISSION-0.1"
+          "anyOf": [
+            { "const": null },
+            { "const": "IIOS-P2.2-DECISION-ADMISSION-0.1" }
+          ]
         },
         "decision_admission": {
           "type": ["object", "null"],
