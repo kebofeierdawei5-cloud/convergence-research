@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/company-evidence-manifest-0.1.schema.json",
+  "title": "IIOS Single Company Evidence Manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version","case_id","market","symbol","company","cutoff_date","required_field_groups","evidence","raw_artifacts","audit"],
+  "properties": {
+    "schema_version": {"const":"IIOS-COMPANY-EVIDENCE-MANIFEST-0.1"},
+    "case_id": {"type":"string","minLength":1},
+    "market": {"enum":["CN-A","HK"]},
+    "symbol": {"type":"string","minLength":1},
+    "company": {"type":"string","minLength":1},
+    "cutoff_date": {"type":"string","minLength":10},
+    "required_field_groups": {
+      "type":"array","minItems":1,"uniqueItems":true,
+      "items":{"enum":["security_identity","market_price","corporate_disclosures","business_reality","financial_reality","capital_structure","trust_governance_events"]}
+    },
+    "evidence": {
+      "type":"array",
+      "minItems":1,
+      "items":{"$ref":"https://iios.local/schemas/evidence-record-0.1.schema.json"}
+    },
+    "raw_artifacts": {
+      "type":"array","minItems":1,
+      "items":{
+        "type":"object","additionalProperties":false,
+        "required":["evidence_id","relative_path","expected_size_bytes","expected_sha256"],
+        "properties":{
+          "evidence_id":{"type":"string","minLength":1},
+          "relative_path":{"type":"string","minLength":1},
+          "expected_size_bytes":{"type":"integer","minimum":0},
+          "expected_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "status":{"enum":["PASS","BLOCKED"]},
+    "validation_errors":{"type":"array","items":{"type":"string"}},
+    "audit":{
+      "type":"object","additionalProperties":false,
+      "required":["manifest_sha256"],
+      "properties":{"manifest_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}}
+    }
+  }
+}

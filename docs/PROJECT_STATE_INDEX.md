@@ -70,7 +70,9 @@ BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
 
 ## Current development task
 
-`CORE-03 | Market Expectation + Expectation Gap`
+`B2-A | Single Company Evidence / PIT Foundation`
+
+PR #32 Horizon Semantics is merged to main (`a524390382044b9474c17f2712a2cef8adeb9612`). Investment Core horizon semantics now use H=1Y as the normative default and require explicit 3Y Horizon Override evidence.
 
 CORE-02 is merged and accepted. CORE-03 real 300750 vertical slice is also merged and accepted: independent forecast → human-selected DCF → P4-F MIE attempt → fail-closed Expectation Gap.
 

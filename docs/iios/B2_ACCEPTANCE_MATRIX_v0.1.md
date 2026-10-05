@@ -1,37 +1,34 @@
 # IIOS B2 — Acceptance Matrix v0.1
 
 Status: CANDIDATE — implementation gate
-Date: 2026-10-04
+Date: 2026-10-05
+
+## Investment Core B2-A
 
 | Gate | Required condition | Current status |
 |---|---|---|
-| Evidence contract | Machine-readable schema + executable validator | PASS |
-| Source registry | Free-first registry with paid data non-mandatory | PASS |
+| Evidence contract | Machine-readable Evidence Record schema + executable validator | PASS |
+| Source registry | Free-first registry, paid data non-mandatory | PASS |
 | PIT semantics | known_at / published_at / retrieved_at / effective intervals separated | PASS |
-| A02 Object A terminal exact bytes | 000906cons.xls size/hash independently recomputed | BLOCKED |
-| A02 Object A historical coverage | All 11 origins backed by admissible historical evidence | BLOCKED |
-| A02 Object B PIT Security Master | Exact raw bundle + source-vintage knowledge provenance | BLOCKED |
-| A02 overall admission | A + B independently pass | BLOCKED |
+| Single-company manifest | Versioned case-level Evidence Manifest schema + validator | IMPLEMENTED / CI PENDING |
+| Exact-byte verifier | Physical size + SHA-256 recomputed from local raw bytes | IMPLEMENTED / CI PENDING |
+| PIT fail-closed test | Future known_at blocks | IMPLEMENTED / CI PENDING |
+| Coverage fail-closed test | Missing required company evidence group blocks | IMPLEMENTED / CI PENDING |
+| Raw verification boundary | No raw bytes => no exact-byte admission | IMPLEMENTED / CI PENDING |
 
-## Evidence boundary
+## A02 Research Track
 
-Existing A02 v0.3 candidate material already defines the required raw acquisition and provenance envelope. This B2 layer freezes the cross-cutting evidence semantics without silently changing the A02 candidate contract.
+A02/CSI800 remains a separate adapter and is not a B2 Investment Core completion gate.
 
-## Current real-data result
+| Gate | Current status |
+|---|---|
+| 000906cons.xls exact historical bytes | BLOCKED |
+| Historical CSI800 coverage | BLOCKED |
+| PIT Security Master raw bundle | BLOCKED |
+| A02 overall admission | BLOCKED |
 
-The 2026-10-04 execution did not materialize the exact `000906cons.xls` bytes. The previously declared size/hash therefore remain validation targets only. No exact PIT security-master raw bundle was found in the accessible Library or current repository.
+## B2-A exit criterion
 
-## Exit criterion
+B2-A passes when the single-company Evidence Manifest machinery and its fail-closed boundaries pass CI.
 
-Do not mark B2/A02 PASS until:
-
-```text
-raw bytes physically present
--> SHA-256 recomputed
--> source capture receipt
--> PIT knowledge evidence
--> independent capture preflight
--> historical membership coverage
--> PIT Security Master coverage
--> A02 admission PASS
-```
+A CATL production-data admission is a subsequent B2-B task. Existing metadata hashes do not constitute physical byte verification.

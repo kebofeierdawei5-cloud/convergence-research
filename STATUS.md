@@ -351,3 +351,6 @@ Do not calculate Expectation Gap or Expected Return until P4-F closes PIT/replay
 P2-C Company Value Core hardening remains parallel where needed for real-company acceptance.
 
 Do not resume or merge the blocked Batch 2 v0.1 PR #3.
+
+
+Current next: B2-A | Single Company Evidence / PIT Foundation

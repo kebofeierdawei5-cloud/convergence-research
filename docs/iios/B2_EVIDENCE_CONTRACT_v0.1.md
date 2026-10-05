@@ -3,7 +3,7 @@
 Status: FROZEN / ENGINEERING BASELINE
 Date: 2026-10-04
 Scope: Data / Evidence / PIT Foundation
-Universe dependency: OU-M12-A02-CSI800-NONFIN-PIT-001
+Investment Core dependency: none. A02/CSI800 is a separate Research Track adapter.
 
 ## Task Contract
 
@@ -176,7 +176,11 @@ If a required material input is missing, stale beyond its allowed cutoff, confli
 
 The system MUST NOT manufacture a PASS by substituting a weaker or current source.
 
-## 9. A02 Binding
+## 9. Single-company Investment Core binding
+
+The Evidence Contract is directly consumable by a user-selected A-share or Hong Kong company case. The minimum company evidence envelope is defined by B2-A and does not require universe construction, CSI800 history or a PIT Security Master.
+
+## 10. A02 Binding
 
 A02 Object A and Object B must both pass their own exact-capture and provenance requirements before:
 ```text
