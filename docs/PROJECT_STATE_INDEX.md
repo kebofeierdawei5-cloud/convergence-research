@@ -1,6 +1,6 @@
 # IIOS Project State Index
 
-Snapshot: 2026-10-04
+Snapshot: 2026-10-05
 
 ## Current canonical engineering state
 
@@ -21,7 +21,9 @@ CORE-02 Company Economic Core = PASS / MERGED
         ↓
 CORE-03 Real 300750 Vertical Slice = PASS / MERGED
         ↓
-CORE-03 P4-F / Expectation Gap Closure = ACTIVE / BLOCKED
+B2-A Single Company Evidence / PIT Foundation = PASS / MERGED
+        ↓
+B2-B CATL Real Evidence Acquisition = ACTIVE / BLOCKED_PENDING_RAW
 ```
 
 ## Authority / continuity
@@ -70,24 +72,27 @@ BLOCKED / RESEARCH-ONLY / NON-BLOCKING TO INVESTMENT CORE
 
 ## Current development task
 
-`B2-A | Single Company Evidence / PIT Foundation`
+B2-B | CATL Real Evidence Acquisition / Source Capture Plan
 
-PR #32 Horizon Semantics is merged to main (`a524390382044b9474c17f2712a2cef8adeb9612`). Investment Core horizon semantics now use H=1Y as the normative default and require explicit 3Y Horizon Override evidence.
+PR #32 Horizon Semantics is merged to main (a524390382044b9474c17f2712a2cef8adeb9612). Investment Core horizon semantics use H=1Y as the normative default; H=3 requires explicit case-level override evidence.
 
-CORE-02 is merged and accepted. CORE-03 real 300750 vertical slice is also merged and accepted: independent forecast → human-selected DCF → P4-F MIE attempt → fail-closed Expectation Gap.
+CORE-00 through CORE-03 vertical execution are merged/accepted. P4-F remains valid infrastructure, but Expectation Gap is not forced ahead of Evidence/PIT closure.
 
-CORE-03 current blocker is strictly the per-company PIT market-model observation set required to qualify P4-F. This is a data/evidence closure task, not a reason to activate CSI800/CSI Industry/A02.
+B2-A is PASS / MERGED:
+- PR #33 merged c8246ceaaad5e9b1cc02fe422723c39a441ea4f3;
+- B2 exact raw-byte, PIT, case-binding and required-group machinery is active;
+- PR #34 raw-root containment hardening merged 6583b054ed764daa5fbbe5f1b3d4b0b004866ad3;
+- B2 CI passed after both changes.
 
-CORE-02 acceptance:
-- PR #29 merged;
-- merge commit `2a1c376e2bf3c608ebdf88a95d8be5aeaf8580b9`;
-- dedicated CI run #6 / `37209264413`: SUCCESS;
-- 30 CORE-02 regression tests passed;
-- Investment Core CI run #214 / `37209264423`: SUCCESS;
-- CORE-01 CI run #10 / `37209264528`: SUCCESS.
+B2-B has started for the single real CATL case RC-CN-A-300750-20261004.
+The executable source-capture plan is intentionally BLOCKED_PENDING_RAW: it defines the required source inputs and PIT basis, but no Evidence Record is admitted until physical raw bytes are materialized and independently re-hashed.
 
-Acceptance remains per-company and PIT-bound. CORE-03 must consume this economic core and the existing P4-F MIE infrastructure without introducing universe-level dependencies.
+Current blocker:
+- CATL raw source files are not currently materialized in the repository/library/runtime;
+- historical .txt hashes in the old CORE-03 input are not accepted as proof of underlying source bytes;
+- 2026-09-30 market price requires an official historical market-data capture, not a post-cutoff dynamic secondary webpage.
 
+A02/CSI800 remains Research Track only and is not part of the B2-B Investment Core gate.
 
 ## CORE-03 Real 300750 acceptance
 
