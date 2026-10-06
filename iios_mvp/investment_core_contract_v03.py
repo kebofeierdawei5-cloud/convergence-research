@@ -12,6 +12,7 @@ from .horizon_semantics import validate_horizon_selection
 from .decision_kernel_v03 import evaluate_production_decision
 from .decision_upstream_admission_v03 import validate_decision_upstream_admission
 from .expectation_gap_production import build_expectation_gap_evaluation
+from .positioning_sizing_production import build_positioning_sizing
 from .price_dependent_expectation_gap import (
     P2_PRICE_GAP_REVALIDATION_VERSION,
     combine_target_entry_price_v2,
@@ -784,6 +785,18 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
             expectation_gap_evaluation.get("qualification")
             if expectation_gap_evaluation is not None else None
         ),
+        "positioning_sizing_status": (
+            positioning_sizing.get("status")
+            if positioning_sizing is not None else None
+        ),
+        "positioning_timing_bias": (
+            positioning_sizing.get("timing_bias")
+            if positioning_sizing is not None else None
+        ),
+        "positioning_sizing_permission": (
+            positioning_sizing.get("sizing_permission")
+            if positioning_sizing is not None else "NO_SIZING_PERMISSION"
+        ),
         "positive_expectation_gap_pass": gap_positive,
         "expectation_gap_required_for_buy_add": False,
         "mie_policy": "OPTIONAL_EXPLANATORY",
@@ -837,6 +850,16 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
 
     action = state["action"]
     status = "REVIEW_REQUIRED" if action == "REVIEW_REQUIRED" else "READY"
+
+    positioning_sizing = None
+    try:
+        positioning_sizing = build_positioning_sizing(
+            case=case,
+            positioning=case.get("positioning"),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        positioning_sizing = None
+
     reason = state["primary_reason"]
     investability = (
         "UNKNOWN" if action == "REVIEW_REQUIRED"
@@ -1128,6 +1151,7 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "capital_effect": entry_admission["capital_effect"],
         "risk_portfolio_contract": _serialize_nested(risk_portfolio_contract),
         "expectation_gap_evaluation": _serialize_nested(expectation_gap_evaluation),
+        "positioning_sizing": _serialize_nested(positioning_sizing),
     }
     if metrics is not None:
         output["return_metrics"] = _serialize_metrics(metrics)
