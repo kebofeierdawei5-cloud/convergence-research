@@ -19,6 +19,11 @@ from .trigger_production import (
     validate_trigger_contract,
     validate_trigger_event,
 )
+from .monitoring_state import (
+    apply_trigger_event,
+    build_monitoring_state,
+    validate_monitoring_state,
+)
 
 
 def store_root(root: str | Path = "runs") -> Path:
@@ -492,3 +497,103 @@ def write_trigger_event(root: str | Path, event: dict[str, Any]) -> Path:
     if existing is not None:
         validate_trigger_event(existing, trigger_contract=contract)
     return _atomic_create(path, canonical)
+
+
+def _monitoring_state_path(root: str | Path, trigger_id: str) -> Path:
+    return store_root(root) / f"{trigger_id}.monitor.json"
+
+
+def initialize_monitoring_state(
+    root: str | Path,
+    trigger_id: str,
+    monitor_id: str,
+    lifecycle_status: str = "ACTIVE",
+    next_due_at: str | None = None,
+    evaluation_reference_at: str | None = None,
+) -> Path:
+    contract = _load_trigger_contract(root, trigger_id)
+    state = build_monitoring_state(
+        monitor_id=monitor_id,
+        trigger_contract=contract,
+        lifecycle_status=lifecycle_status,
+        next_due_at=next_due_at,
+        evaluation_reference_at=evaluation_reference_at,
+    )
+    return _atomic_create(_monitoring_state_path(root, trigger_id), state)
+
+
+def apply_monitoring_event(
+    root: str | Path,
+    trigger_event_id: str,
+    next_due_at: str | None = None,
+) -> Path:
+    event_path = _trigger_event_path(root, trigger_event_id)
+    event = _load_json(event_path)
+    if not event:
+        raise ValueError("trigger event not found")
+    trigger_id = event.get("trigger_id")
+    if not isinstance(trigger_id, str) or not trigger_id.strip():
+        raise ValueError("trigger event trigger_id is required")
+    contract = _load_trigger_contract(root, trigger_id)
+    state_path = _monitoring_state_path(root, trigger_id)
+    previous = _load_json(state_path)
+    if not previous:
+        raise ValueError("monitoring state not initialized")
+    validate_monitoring_state(previous, trigger_contract=contract)
+    validate_trigger_event(event, trigger_contract=contract)
+    updated = apply_trigger_event(
+        previous_state=previous,
+        trigger_contract=contract,
+        trigger_event=event,
+        next_due_at=next_due_at,
+    )
+    return _atomic_replace(state_path, updated)
+
+
+def replay_monitoring_state(root: str | Path, trigger_id: str) -> dict[str, Any]:
+    contract = _load_trigger_contract(root, trigger_id)
+    state_path = _monitoring_state_path(root, trigger_id)
+    persisted = _load_json(state_path)
+    if not persisted:
+        raise ValueError("monitoring state not initialized")
+    validate_monitoring_state(persisted, trigger_contract=contract)
+
+    replayed = build_monitoring_state(
+        monitor_id=persisted["monitor_id"],
+        trigger_contract=contract,
+        lifecycle_status=persisted["lifecycle_status"],
+        next_due_at=persisted["next_due_at"],
+        evaluation_reference_at=persisted["due_reference_at"],
+    )
+    event_files = []
+    for path in store_root(root).glob("*.event.json"):
+        record = _load_json(path)
+        if record.get("trigger_id") == trigger_id:
+            event_files.append(path)
+    event_files.sort(
+        key=lambda p: (
+            _load_json(p)["known_at"],
+            _load_json(p)["trigger_event_id"],
+        )
+    )
+    for path in event_files:
+        event = _load_json(path)
+        validate_trigger_event(event, trigger_contract=contract)
+        replayed = apply_trigger_event(
+            previous_state=replayed,
+            trigger_contract=contract,
+            trigger_event=event,
+        )
+    validate_monitoring_state(replayed, trigger_contract=contract)
+    if canonical_json(replayed) != canonical_json(persisted):
+        raise ValueError("monitoring state replay mismatch")
+    return {
+        "replay_status": "PASS",
+        "trigger_id": trigger_id,
+        "monitor_id": persisted["monitor_id"],
+        "last_event_id": persisted["last_event_id"],
+        "evaluation_status": persisted["evaluation_status"],
+        "last_trigger_state": persisted["last_trigger_state"],
+        "due_state": persisted["due_state"],
+        "state_hash": persisted["state_hash"],
+    }
