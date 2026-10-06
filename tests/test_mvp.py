@@ -108,7 +108,14 @@ def test_approval_cannot_bind_wrong_snapshot(tmp_path):
     write_snapshot(tmp_path, snap2)
     series = create_or_load_series(tmp_path, "CN-A", "300750", "CATL", "2026-10-04T00:00:00Z")
     did = f"{series['decision_series_id']}-r001"
-    write_decision_revision(tmp_path, series["decision_series_id"], 1, snap1, "run-1")
+    write_decision_revision(
+        tmp_path,
+        series["decision_series_id"],
+        1,
+        snap1,
+        "run-1",
+        decision_admission=build_fixture_admission_receipt(snapshot=snap1, canonical_decision=snap1["decision"]),
+    )
     try:
         approve_revision(tmp_path, did, snap2, True, "wrong snapshot", actor_identity="human:test")
     except ValueError as exc:
