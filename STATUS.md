@@ -225,3 +225,18 @@ Canonical C6 merge: 4c01e40dd7469221d9f5aee005c96e05bf4eb55f.
 C6 is record-only: execution receipt requires exact HUMAN_APPROVED binding, is immutable, and cannot mutate Decision Revision, Human Approval, Current Projection, or Decision action. auto_execution remains false.
 
 Next development boundary: C7 Full Lifecycle E2E.
+
+
+## C7 status
+
+C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL.
+
+Dedicated C7 Actions run #6 = SUCCESS on exact head 43664c9bee33b3d53f212428da019e197a9fcaf2.
+74 related tests passed; executable acceptance harness 4 / 4 PASS; compileall and git diff-check passed.
+
+Acceptance: docs/iios/C7_ACCEPTANCE_2026-10-06.md.
+Canonical C7 merge: 82d1911c985791e4b76f63d792588d175ee505f8.
+
+C7 proves append-only revisions, downstream-only Monitoring and Execution Receipt, deterministic replay, new-run/new-revision requirements, and projection-only Publication / Report. It introduces no new investment policy or execution automation.
+
+Next development boundary: C8 Final Independent Red-team / MVP Acceptance.
