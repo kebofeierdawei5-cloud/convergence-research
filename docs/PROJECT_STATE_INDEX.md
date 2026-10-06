@@ -260,3 +260,49 @@ Acceptance records:
 - `docs/iios/A1_ACCEPTANCE_2026-10-05.md`
 
 A1 is complete as the company-side evidence-closure milestone.
+
+## 9. Stage C development plan
+
+The detailed next-stage plan is canonicalized in:
+
+`docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`
+
+The planned sequence is:
+
+```
+C0 Governance Hygiene / Stage Baseline
+        ↓
+C1 Machine Publication
+        ↓
+C2 Human Report + Report Quality Gate
+        ↓
+C3 Second Company Acceptance
+        ↓
+C4 Expectation Gap Production Integration
+        ↓
+C5 Positioning / Sizing
+        ↓
+C6 Human Execution Receipt
+        ↓
+C7 Full Lifecycle E2E
+        ↓
+C8 Final Independent Red-team / MVP Acceptance
+```
+
+Parallel Research Track remains separate:
+
+```
+FM-01 exact source admission
+        ↓
+FM-02 PIT Feature Builder
+        ↓
+FM-03 Driver State Engine
+        ↓
+FM-04 Conditional Backtest
+        ↓
+research validation / prospective shadow
+```
+
+Stage C does not authorize scheduler, alerts, automatic execution, automatic order placement, new P3/P4 model-family expansion, or production Kelly/optimizer sizing.
+
+After TR-03, the next immediate engineering boundary is C0, followed by C1 Machine Publication and C2 Human Report / Report Quality Gate. C3 second-company acceptance follows those productization boundaries.
