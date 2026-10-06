@@ -149,3 +149,14 @@ def test_due_reference_is_persisted_and_replayed_deterministically():
     assert s['due_reference_at'] == '2026-10-06T00:00:00+00:00'
     assert s['due_state'] == 'NOT_DUE'
     validate_monitoring_state(s, trigger_contract=c)
+
+
+def test_scheduled_state_requires_explicit_due_reference():
+    c = contract()
+    with pytest.raises(ValueError, match='evaluation_reference_at is required'):
+        build_monitoring_state(
+            monitor_id='m1',
+            trigger_contract=c,
+            lifecycle_status='ACTIVE',
+            next_due_at='2026-10-07T00:00:00+00:00',
+        )
