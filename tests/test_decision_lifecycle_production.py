@@ -73,7 +73,16 @@ def test_revision_supports_legacy_decision_key():
     s["snapshot_hash"] = hashlib.sha256(
         json.dumps(core, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
-    assert revision(s)["ai_action"] == "HOLD"
+    assert build_decision_revision(
+        decision_series_id="CN-A-300750",
+        revision=1,
+        snapshot=s,
+        run_id="run-1",
+        decision_admission=build_fixture_admission_receipt(
+            snapshot=s,
+            canonical_decision={"action": "HOLD"},
+        ),
+    )["ai_action"] == "HOLD"
 
 
 def test_approval_binds_exact_revision_and_snapshot():
@@ -229,7 +238,7 @@ def test_wrong_admission_action_is_rejected():
 
     s = snapshot("BUY")
     bad = admission(snapshot("HOLD"))
-    with pytest.raises(ValueError, match="canonical_action"):
+    with pytest.raises(ValueError, match="snapshot binding mismatch"):
         build_decision_revision(
             decision_series_id="CN-A-300750",
             revision=1,
