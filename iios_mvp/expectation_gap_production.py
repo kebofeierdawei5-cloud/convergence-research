@@ -84,6 +84,8 @@ def _strict_gap_payload(case: Mapping[str, Any]) -> Mapping[str, Any]:
 
 
 def _resolve_snapshot(case: Mapping[str, Any], evidence_root_resolver: Any) -> dict[str, Any]:
+    if evidence_root_resolver is None:
+        raise ValueError("canonical evidence root resolver is required for C4 expectation-gap evaluation")
     reference = case.get("market_implied_expectation_snapshot_ref")
     if not isinstance(reference, Mapping):
         raise ValueError("market_implied_expectation_snapshot_ref is required")
@@ -103,6 +105,8 @@ def _resolve_forecast(
     payload: Mapping[str, Any],
     resolver: CanonicalIndependentForecastResolver,
 ) -> dict[str, Any]:
+    if resolver is None:
+        raise ValueError("canonical independent forecast resolver is required for C4 expectation-gap evaluation")
     reference = payload["independent_forecast_ref"]
     if not isinstance(reference, Mapping):
         raise ValueError("expectation_gap.independent_forecast_ref must be an object")
