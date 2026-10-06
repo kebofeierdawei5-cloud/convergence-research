@@ -156,6 +156,11 @@ def apply_trigger_event(
         new = datetime.fromisoformat(trigger_event["known_at"].replace("Z", "+00:00"))
         if new <= old:
             raise ValueError("trigger event known_at is not strictly later than monitoring state")
+    if previous_state["last_evaluation_cutoff_at"] is not None:
+        old_cutoff = datetime.fromisoformat(previous_state["last_evaluation_cutoff_at"].replace("Z", "+00:00"))
+        new_cutoff = datetime.fromisoformat(trigger_event["evaluation_cutoff_at"].replace("Z", "+00:00"))
+        if new_cutoff < old_cutoff:
+            raise ValueError("trigger event evaluation_cutoff_at cannot move backwards")
     if next_due_at is not None:
         next_due_at = _timestamp(next_due_at, "next_due_at")
     last_state = trigger_event["trigger_state"]
