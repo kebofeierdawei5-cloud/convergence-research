@@ -52,6 +52,18 @@ def test_reference_contains_identity_but_not_self_declared_domain_status():
     assert "PASS" not in ref.values()
 
 
+def test_reference_cannot_carry_self_declared_pass_status():
+    record = _record()
+    ref = {**record.reference().to_dict(), "domain_status": "PASS"}
+    registry = InMemoryCanonicalInvestmentAdmissionRegistry()
+    with pytest.raises(ValueError, match="unsupported fields"):
+        registry.resolve(
+            ref,
+            expected_domain="FORECAST",
+            **{**CASE, "cutoff_date": date(2026, 10, 4)},
+        )
+
+
 def test_unknown_hash_cannot_be_resolved_even_when_reference_identity_is_valid():
     record = _record()
     registry = InMemoryCanonicalInvestmentAdmissionRegistry()
