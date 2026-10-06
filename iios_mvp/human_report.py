@@ -234,9 +234,14 @@ def qa_human_report(*, publication: Mapping[str, Any], report: Mapping[str, Any]
     except Exception as exc:
         checks["report_integrity"] = "FAIL"
         issues.append(f"report_integrity: {exc}")
+    ref = publication.get("decision_ref") or {}
     if (
         report.get("publication_id") != publication.get("publication_id")
         or report.get("publication_hash") != publication.get("publication_hash")
+        or report.get("decision_id") != ref.get("decision_id")
+        or report.get("revision") != ref.get("revision")
+        or report.get("case_id") != ref.get("case_id")
+        or report.get("cutoff_date") != ref.get("cutoff_date")
     ):
         checks["publication_binding"] = "FAIL"
         issues.append("publication_binding: exact Machine Publication mismatch")
@@ -322,6 +327,12 @@ def report_path(root: str | Path, report_hash: str) -> Path:
     return root_path / f"{report_hash}.report.json"
 
 
+def markdown_path(root: str | Path, report_hash: str) -> Path:
+    root_path = Path(root)
+    root_path.mkdir(parents=True, exist_ok=True)
+    return root_path / f"{report_hash}.report.md"
+
+
 def qa_path(root: str | Path, qa_hash: str) -> Path:
     root_path = Path(root)
     root_path.mkdir(parents=True, exist_ok=True)
@@ -354,6 +365,14 @@ def write_human_report(
             encoding="utf-8",
             newline="\n",
         )
+    mp = markdown_path(root, report["report_hash"])
+    markdown_bytes = report["markdown"].encode("utf-8")
+    if mp.exists():
+        if mp.read_bytes() != markdown_bytes:
+            raise ValueError("human report markdown collision or attempted overwrite")
+    else:
+        mp.write_bytes(markdown_bytes)
+
     qp = qa_path(root, qa["qa_hash"])
     if qp.exists():
         existing = _load_json(qp)
