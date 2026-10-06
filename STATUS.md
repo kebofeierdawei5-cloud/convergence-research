@@ -22,7 +22,7 @@ CORE-04 vertical decision closure is complete.
 
 A1 is complete as the company-side evidence-closure engineering milestone. Current 300750 Quality remains CONDITIONAL and new capital remains FALSE.
 
-Current next work is **Machine Publication / Human Report productization**, independently scoped from canonical main.
+Current next work is **Stage C productization**, beginning with C0 Governance Hygiene / Stage Baseline, then C1 Machine Publication and C2 Human Report / Report Quality Gate.
 
 TR-03 Validation / Replay is now PASS / MERGED / CANONICAL.
 
@@ -131,3 +131,15 @@ relevant normative contract
 ```
 
 Historical documents are context only. Diagnostic branches / PRs are not capability until merged.
+
+## Stage C development plan
+
+The detailed Stage C roadmap is canonicalized in `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`.
+
+Immediate sequence: C0 Governance Hygiene / Stage Baseline → C1 Machine Publication → C2 Human Report / Report Quality Gate → C3 Second Company Acceptance.
+
+The broader Stage C sequence is C0 → C1 → C2 → C3 → C4 Expectation Gap Production Integration → C5 Positioning / Sizing → C6 Human Execution Receipt → C7 Full Lifecycle E2E → C8 Final Independent Red-team / MVP Acceptance.
+
+Parallel FM Research remains separate and does not block C1/C2/C3 productization.
+
+Scheduler, alerts, automatic execution, automatic order placement, additional P3/P4 model-family expansion, and production Kelly/optimizer sizing remain explicitly out of scope until separately authorized.
