@@ -33,7 +33,7 @@ The next_due_at field is explicit state. TR-02 does not compute a schedule, run 
 
 ## Due semantics
 
-If next_due_at is absent, due_state is UNSCHEDULED.
+If next_due_at is absent, due_state is UNSCHEDULED. If next_due_at is supplied, due_reference_at must be explicit; no implicit current-time or next-due assumption is allowed.
 If next_due_at equals the evaluation reference, due_state is DUE.
 If next_due_at is earlier than the evaluation reference, due_state is OVERDUE.
 Otherwise due_state is NOT_DUE.
