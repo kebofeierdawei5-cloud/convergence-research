@@ -10,23 +10,16 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 ## Current stage
 
-**A0 Governance / State Cleanup = PASS / MERGED**
+**Current canonical Stage C status: C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL**
 
-**A1-01 Economic Evidence Bridge = PASS / MERGED**
+C0, C1, C2, C3, C4, C5, C6 and C7 are all complete and canonical on `main`.
 
-**A1-02 Capital Allocation + Trust/Governance Evidence Closure = PASS / MERGED**
+**Immediate next Stage C boundary: C8 Final Independent Red-team / MVP Acceptance.**
 
-CORE-04 vertical decision closure is complete.
+A1 company-side evidence closure, RP-01 risk/portfolio, DR-01/DR-02 lifecycle foundations, and TR-01/TR-02/TR-03 validation foundations remain canonical prerequisites.
 
-**A1 Company-side Evidence Closure = PASS / MERGED**
+No new P3/P4/MIE model work, scheduler/alerts, automatic execution, or broader universe construction is on the Stage C critical path before C8.
 
-A1 is complete as the company-side evidence-closure engineering milestone. Current 300750 Quality remains CONDITIONAL and new capital remains FALSE.
-
-C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. C3 Second Company Acceptance = PASS / MERGED / CANONICAL. C4 Expectation Gap Production Integration = PASS / MERGED / CANONICAL. The next Stage C batch is C5 Positioning / Sizing.
-
-TR-03 Validation / Replay is now PASS / MERGED / CANONICAL.
-
-No new P3/P4/MIE model work is on the critical path.
 
 ## Canonical Investment Core
 
@@ -111,11 +104,11 @@ TR-03 Validation / Replay = PASS / MERGED / CANONICAL.
 TR-03 closes the historical `next_due_at` replay gap using immutable monitoring initialization/evaluation records and source-derived fail-closed validation.
 
 Scheduler/alerts remain out of scope.
-## Product gaps after C5
+## Stage C milestone status after C5
 
 - C6 Human Execution Receipt = PASS / MERGED / CANONICAL
-- C7 Full Lifecycle E2E
-- C8 Final Independent Red-team / MVP Acceptance
+- C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL
+- Current next boundary: C8 Final Independent Red-team / MVP Acceptance
 
 ## Governance rule
 
@@ -141,7 +134,7 @@ The canonical Stage C plan is `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.m
 
 Canonical C0 merge: `1594e43eee14aaa41ddde675ddbe61d650462cf7`.
 
-Next boundary: C4 Expectation Gap Production Integration.
+Historical next boundary at the checkpoint documented in this section: C4 Expectation Gap Production Integration.
 
 
 ## C1 status
@@ -154,7 +147,7 @@ Acceptance: `docs/iios/C1_ACCEPTANCE_2026-10-06.md`.
 
 Canonical C1 merge: `b9a8ff0fe1341a56f363fb058677dbd50a4f87b8`.
 
-Next boundary: C2 Human Report / Report Quality Gate.
+Historical next boundary at the checkpoint documented in this section: C2 Human Report / Report Quality Gate.
 
 
 ## C2 status
@@ -167,7 +160,7 @@ Acceptance: `docs/iios/C2_ACCEPTANCE_2026-10-06.md`.
 
 Canonical C2 merge: `75bb360436286ae950a05028769701380120e561`.
 
-Next boundary: C4 Expectation Gap Production Integration.
+Historical next boundary at the checkpoint documented in this section: C4 Expectation Gap Production Integration.
 
  
 ## C3 status
@@ -181,7 +174,7 @@ Dedicated C3 Actions run #11 = SUCCESS; 4 C3 tests passed; executable acceptance
 Acceptance: docs/iios/C3_ACCEPTANCE_2026-10-06.md.
 Canonical C3 merge: eb0f9fc965f9ce6aa09685776d2ec8a0522e3b47.
 
-Next development boundary: C4 Expectation Gap Production Integration. C3 introduced no Expectation Gap, positioning/sizing, scheduler, alerts, or automatic execution capability.
+Historical next boundary at the checkpoint documented in this section: C4 Expectation Gap Production Integration. C3 introduced no Expectation Gap, positioning/sizing, scheduler, alerts, or automatic execution capability.
 
 
 ## C4 status
@@ -194,7 +187,7 @@ Dedicated C4 Actions run #7 = SUCCESS on exact head aacf1c0cc715697bfac2aa0bae5e
 Acceptance: docs/iios/C4_ACCEPTANCE_2026-10-06.md.
 Canonical C4 merge: 07d45c18df8df9100d4866dd5f92fa95ccdb7186.
 
-Next development boundary: C5 Positioning / Sizing.
+Historical next boundary at the checkpoint documented in this section: C5 Positioning / Sizing.
 
 
 ## C5 status
@@ -209,7 +202,7 @@ Canonical C5 merge: cdf998cd21776363914f178e648f03ec0c1539f8.
 
 C5 is timing/sizing-only. It cannot mutate fundamental Decision action, Trust, Quality, Thesis, intrinsic value, Return, Required Return, or Risk. It does not add Kelly, portfolio optimization, scheduler, alerts, automatic execution, or Forecast Research productionization.
 
-Next development boundary: C6 Human Execution Receipt.
+Historical next boundary at the checkpoint documented in this section: C6 Human Execution Receipt.
 
 
 ## C6 status
@@ -224,7 +217,7 @@ Canonical C6 merge: 4c01e40dd7469221d9f5aee005c96e05bf4eb55f.
 
 C6 is record-only: execution receipt requires exact HUMAN_APPROVED binding, is immutable, and cannot mutate Decision Revision, Human Approval, Current Projection, or Decision action. auto_execution remains false.
 
-Next development boundary: C7 Full Lifecycle E2E.
+Historical next boundary at the checkpoint documented in this section: C7 Full Lifecycle E2E.
 
 
 ## C7 status
@@ -239,4 +232,4 @@ Canonical C7 merge: 82d1911c985791e4b76f63d792588d175ee505f8.
 
 C7 proves append-only revisions, downstream-only Monitoring and Execution Receipt, deterministic replay, new-run/new-revision requirements, and projection-only Publication / Report. It introduces no new investment policy or execution automation.
 
-Next development boundary: C8 Final Independent Red-team / MVP Acceptance.
+Current next development boundary: C8 Final Independent Red-team / MVP Acceptance.
