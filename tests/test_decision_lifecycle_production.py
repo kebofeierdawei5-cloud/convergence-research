@@ -63,37 +63,54 @@ def test_revision_is_deterministic():
     validate_decision_revision(a, case_id=CASE, cutoff_date=CUTOFF)
 
 
-def test_revision_rejects_legacy_decision_key():
-    import pytest
-
-    s = snapshot()
-    s["decision"] = {"decision": "HOLD"}
-    import hashlib
-    import json
-
-    core = {k: s[k] for k in ("snapshot_schema", "engine_version", "input", "decision")}
-    s["snapshot_hash"] = hashlib.sha256(
-        json.dumps(core, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()
-    with pytest.raises(ValueError, match="unsupported action"):
-        revision(s)
-
-def test_revision_accepts_engine_decision_wrapper():
-    s = snapshot()
-    s["decision"] = {
-        "engine_version": "0.3.0",
-        "case_id": CASE,
-        "symbol": "300750",
-        "decision": {"action": "HOLD"},
+def legacy_snapshot(decision):
+    core = {
+        "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.1.1",
+        "engine_version": "0.1.1",
+        "input": {
+            "case_id": CASE,
+            "market": "CN-A",
+            "symbol": "300750",
+            "company": "CATL",
+            "cutoff_date": CUTOFF,
+        },
+        "decision": decision,
     }
     import hashlib
     import json
 
-    core = {k: s[k] for k in ("snapshot_schema", "engine_version", "input", "decision")}
-    s["snapshot_hash"] = hashlib.sha256(
-        json.dumps(core, sort_keys=True, separators=(",", ":")).encode()
+    core["snapshot_hash"] = hashlib.sha256(
+        json.dumps(core, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
-    rev = revision(s)
+    return core
+
+
+def test_revision_rejects_legacy_decision_key():
+    import pytest
+
+    s = legacy_snapshot({"decision": "HOLD"})
+    with pytest.raises(ValueError, match="unsupported action"):
+        build_decision_revision(
+            decision_series_id="CN-A-300750",
+            revision=1,
+            snapshot=s,
+            run_id="run-legacy",
+        )
+
+
+def test_revision_accepts_engine_decision_wrapper():
+    s = legacy_snapshot({
+        "engine_version": "0.1.1",
+        "case_id": CASE,
+        "symbol": "300750",
+        "decision": {"action": "HOLD"},
+    })
+    rev = build_decision_revision(
+        decision_series_id="CN-A-300750",
+        revision=1,
+        snapshot=s,
+        run_id="run-legacy",
+    )
     assert rev["ai_action"] == "HOLD"
 
 def test_approval_binds_exact_revision_and_snapshot():
