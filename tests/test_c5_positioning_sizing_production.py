@@ -30,6 +30,11 @@ ROOT = Path(__file__).resolve().parents[1]
 def positioning(**overrides):
     value = {
         "observation_id": "pos-300750-20261004",
+        "price_zones": {
+            "entry_zone": ["95", "100"],
+            "add_zone": ["90", "95"],
+            "reduce_zone": ["110", "120"],
+        },
         "observation_as_of_date": "2026-10-04",
         "known_at": "2026-10-04T15:30:00+00:00",
         "source": "fixture-positioning-source",
@@ -55,6 +60,10 @@ def test_c5_favorable_snapshot_produces_target_sizing_band():
     assert record["sizing_band"] == "TARGET"
     assert record["sizing_permission"] == "ALLOW_UP_TO_TARGET"
     assert record["permitted_position_pct"] == "10"
+    assert record["entry_zone"] == ["95", "100"]
+    assert record["add_zone"] == ["90", "95"]
+    assert record["reduce_zone"] == ["110", "120"]
+    assert record["hard_exposure_limit"] == "10"
     assert record["policy_effect"] == C5_POLICY_EFFECT
 
 
