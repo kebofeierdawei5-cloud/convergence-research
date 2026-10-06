@@ -82,6 +82,20 @@ def _datetime(value: Any, field: str) -> datetime:
     return result
 
 
+def _price_zone(value: Any, field: str, *, required: bool = False) -> list[str] | None:
+    if value is None:
+        if required:
+            raise ValueError(f"{field} is required")
+        return None
+    if not isinstance(value, list) or len(value) != 2:
+        raise ValueError(f"{field} must contain exactly [low, high]")
+    low = _decimal(value[0], f"{field}[0]")
+    high = _decimal(value[1], f"{field}[1]")
+    if low < 0 or high < 0 or low > high:
+        raise ValueError(f"{field} must be a non-negative ordered price zone")
+    return [str(low), str(high)]
+
+
 def _hash_or_none(value: Any, field: str) -> str | None:
     if value is None:
         return None
@@ -103,7 +117,7 @@ def _factor_status(positioning: Mapping[str, Any]) -> tuple[str, str | None]:
     return "PASS", None
 
 
-def _portfolio_bounds(case: Mapping[str, Any]) -> tuple[Decimal, Decimal, Decimal, Decimal]:
+def _portfolio_bounds(case: Mapping[str, Any]) -> tuple[Decimal, Decimal, Decimal, Decimal, list[str]]:
     portfolio = case.get("portfolio") or {}
     current = _decimal(portfolio.get("position_pct", "0"), "portfolio.position_pct")
     package = portfolio.get("buy_add_package")
@@ -124,7 +138,8 @@ def _portfolio_bounds(case: Mapping[str, Any]) -> tuple[Decimal, Decimal, Decima
         raise ValueError("buy/add position bounds must satisfy initial <= target <= maximum")
     if current > maximum:
         raise ValueError("current position exceeds declared maximum position")
-    return current, initial, target, maximum
+    entry_zone = _price_zone(package.get("entry_zone"), "buy_add_package.entry_zone", required=True)
+    return current, initial, target, maximum, entry_zone
 
 
 def build_positioning_sizing(
@@ -159,6 +174,10 @@ def build_positioning_sizing(
             "target_position_pct": None,
             "max_position_pct": None,
             "permitted_position_pct": None,
+            "entry_zone": None,
+            "add_zone": None,
+            "reduce_zone": None,
+            "hard_exposure_limit": None,
             "reduce_consideration": False,
             "status": "BLOCKED",
             "reason": "positioning observation was not supplied",
@@ -268,7 +287,7 @@ def build_positioning_sizing(
         return {**common, "evaluation_id": f"c5-positioning-{digest[:16]}", "evaluation_hash": digest}
 
     try:
-        current, initial, target, maximum = _portfolio_bounds(case)
+        current, initial, target, maximum, package_entry_zone = _portfolio_bounds(case)
     except ValueError as exc:
         common["reason"] = str(exc)
         digest = _sha(common)
@@ -277,6 +296,32 @@ def build_positioning_sizing(
             "evaluation_id": f"c5-positioning-{digest[:16]}",
             "evaluation_hash": digest,
         }
+
+    price_zones = positioning.get("price_zones") or {}
+    if price_zones and not isinstance(price_zones, Mapping):
+        common["status"] = "BLOCKED"
+        common["reason"] = "positioning.price_zones must be an object"
+        digest = _sha(common)
+        return {**common, "evaluation_id": f"c5-positioning-{digest[:16]}", "evaluation_hash": digest}
+
+    try:
+        entry_zone = _price_zone(
+            price_zones.get("entry_zone") if isinstance(price_zones, Mapping) and price_zones.get("entry_zone") is not None else package_entry_zone,
+            "positioning.price_zones.entry_zone",
+            required=True,
+        )
+        add_zone = _price_zone(
+            price_zones.get("add_zone") if isinstance(price_zones, Mapping) else None,
+            "positioning.price_zones.add_zone",
+        )
+        reduce_zone = _price_zone(
+            price_zones.get("reduce_zone") if isinstance(price_zones, Mapping) else None,
+            "positioning.price_zones.reduce_zone",
+        )
+    except ValueError as exc:
+        common["reason"] = str(exc)
+        digest = _sha(common)
+        return {**common, "evaluation_id": f"c5-positioning-{digest[:16]}", "evaluation_hash": digest}
 
     factor_scores = {
         field: FACTOR_SCORE_MAP[field][common["factors"][field]]
@@ -312,6 +357,10 @@ def build_positioning_sizing(
             "target_position_pct": str(target),
             "max_position_pct": str(maximum),
             "permitted_position_pct": str(min(permitted, maximum)),
+            "entry_zone": entry_zone,
+            "add_zone": add_zone,
+            "reduce_zone": reduce_zone,
+            "hard_exposure_limit": str(maximum),
             "reduce_consideration": timing_bias == "UNFAVORABLE" and current > 0,
             "status": "PASS",
             "reason": "positioning snapshot is complete, PIT-valid and all dimensions are identifiable",
@@ -348,6 +397,10 @@ def validate_positioning_sizing(record: Any) -> None:
         "target_position_pct",
         "max_position_pct",
         "permitted_position_pct",
+        "entry_zone",
+        "add_zone",
+        "reduce_zone",
+        "hard_exposure_limit",
         "reduce_consideration",
         "status",
         "reason",
@@ -388,6 +441,8 @@ def validate_positioning_sizing(record: Any) -> None:
             "target_position_pct",
             "max_position_pct",
             "permitted_position_pct",
+            "hard_exposure_limit",
+            "entry_zone",
         )):
             raise ValueError("PASS positioning_sizing requires position bounds")
     else:
