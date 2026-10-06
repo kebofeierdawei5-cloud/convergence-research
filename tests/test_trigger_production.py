@@ -125,3 +125,79 @@ def test_event_is_versioned_and_validates():
 def test_event_requires_timezone():
     with pytest.raises(ValueError, match="include timezone"):
         event(contract(), evaluation_cutoff_at="2026-10-06T00:00:00", observed_at="2026-10-05T10:00:00", known_at="2026-10-05T10:05:00")
+
+def test_store_persists_only_canonical_trigger_objects(tmp_path):
+    from iios_mvp.store import create_or_load_series, next_revision, write_decision_revision, write_snapshot, write_trigger_contract, write_trigger_event
+    import hashlib
+    import json
+
+    core = {
+        "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.3.0",
+        "engine_version": "0.3.0",
+        "input": {"case_id": CASE, "cutoff_date": CUTOFF},
+        "decision": {"action": "HOLD"},
+    }
+    snapshot_hash = hashlib.sha256(json.dumps(core, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    snapshot = {**core, "snapshot_hash": snapshot_hash}
+    write_snapshot(tmp_path, snapshot)
+    series = create_or_load_series(tmp_path, "CN-A", "300750", "CATL", "2026-10-04T00:00:00Z")
+    write_decision_revision(tmp_path, series["decision_series_id"], 1, snapshot, "run-1")
+    revision = json.loads((tmp_path / f"{DECISION}.decision.json").read_text())
+
+    raw_contract = {
+        "trigger_id": "tr-store-1",
+        "decision_id": DECISION,
+        "decision_series_id": SERIES,
+        "revision": 1,
+        "decision_revision_hash": revision["revision_hash"],
+        "case_id": CASE,
+        "decision_cutoff_date": CUTOFF,
+        "role": "THESIS_BREAK",
+        "metric_id": "market_price",
+        "operator": "LTE",
+        "target": "300",
+        "unit": "CNY/share",
+        "evidence_ids": [],
+        "enabled": True,
+    }
+    cp = write_trigger_contract(tmp_path, DECISION, raw_contract)
+    stored_contract = __import__("json").loads(cp.read_text())
+    assert stored_contract["contract_version"] == TRIGGER_CONTRACT_VERSION
+    assert stored_contract["decision_revision_hash"] == revision["revision_hash"]
+
+    ep = write_trigger_event(tmp_path, {
+        "trigger_id": "tr-store-1",
+        "trigger_event_id": "evt-store-1",
+        "evaluation_cutoff_at": "2026-10-06T00:00:00+00:00",
+        "observed_at": "2026-10-05T10:00:00+00:00",
+        "known_at": "2026-10-05T10:05:00+00:00",
+        "source_id": "szse",
+        "evidence_id": "ev-store-1",
+        "value": "299",
+        "previous_value": None,
+    })
+    stored_event = __import__("json").loads(ep.read_text())
+    assert stored_event["trigger_state"] == "MATCHED"
+    validate_trigger_event(stored_event, trigger_contract=stored_contract)
+
+
+def test_store_rejects_orphan_or_mismatched_revision_binding(tmp_path):
+    from iios_mvp.store import write_trigger_contract
+    raw = {
+        "trigger_id": "tr-orphan",
+        "decision_id": DECISION,
+        "decision_series_id": SERIES,
+        "revision": 1,
+        "decision_revision_hash": REVISION_HASH,
+        "case_id": CASE,
+        "decision_cutoff_date": CUTOFF,
+        "role": "VALIDATION",
+        "metric_id": "market_price",
+        "operator": "LTE",
+        "target": "300",
+        "unit": None,
+        "evidence_ids": [],
+        "enabled": True,
+    }
+    with pytest.raises(ValueError, match="decision revision"):
+        write_trigger_contract(tmp_path, DECISION, raw)
