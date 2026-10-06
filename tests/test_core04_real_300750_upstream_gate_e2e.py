@@ -145,7 +145,12 @@ def _case(*, core03, core02, price_ref, trust_status):
             "primary_model": "DCF",
             "probability_weighted_value_per_share": "433.5675",
         },
-        "risk": {"status": "PASS", "max_loss_pct": "25"},
+        "risk": {
+            "status": "PASS",
+            "max_loss_pct": "25",
+            "thesis_breaks": ["incremental ROIC failure", "FCF conversion failure"],
+            "evidence_ids": ["risk-evidence-1"],
+        },
         "portfolio": {
             "position_pct": "0",
             "constraint_status": "PASS",

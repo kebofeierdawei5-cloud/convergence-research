@@ -14,8 +14,6 @@ from .decision_state_machine_v01 import (
 DECISION_KERNEL_VERSION = "IIOS-CORE-04-DECISION-KERNEL-0.2"
 DECISION_KERNEL_POLICY_VERSION = "IIOS-DECISION-POLICY-0.3"
 
-# B00-A baseline probe: no semantic behavior change.
-
 
 def _investability_for_action(action: str) -> str:
     if action == "REVIEW_REQUIRED":
