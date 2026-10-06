@@ -75,8 +75,26 @@ def test_revision_rejects_legacy_decision_key():
     s["snapshot_hash"] = hashlib.sha256(
         json.dumps(core, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
-    with pytest.raises(KeyError, match="action"):
+    with pytest.raises(ValueError, match="unsupported action"):
         revision(s)
+
+def test_revision_accepts_engine_decision_wrapper():
+    s = snapshot()
+    s["decision"] = {
+        "engine_version": "0.3.0",
+        "case_id": CASE,
+        "symbol": "300750",
+        "decision": {"action": "HOLD"},
+    }
+    import hashlib
+    import json
+
+    core = {k: s[k] for k in ("snapshot_schema", "engine_version", "input", "decision")}
+    s["snapshot_hash"] = hashlib.sha256(
+        json.dumps(core, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    rev = revision(s)
+    assert rev["ai_action"] == "HOLD"
 
 def test_approval_binds_exact_revision_and_snapshot():
     rev = revision(snapshot())
