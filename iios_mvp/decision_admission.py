@@ -139,18 +139,6 @@ def admit_canonical_decision(
     )
 
 
-def build_test_admission_receipt(
-    *,
-    snapshot: Mapping[str, Any],
-    canonical_decision: Mapping[str, Any],
-) -> dict[str, Any]:
-    """Fixture helper for lifecycle/orchestration tests with an already canonical upstream result."""
-    return _build_receipt_from_canonical(
-        snapshot=snapshot,
-        canonical_decision=canonical_decision,
-    )
-
-
 def validate_decision_admission_receipt(
     record: Any,
     *,
@@ -194,6 +182,10 @@ def validate_decision_admission_receipt(
             raise ValueError(f"decision_admission {key} does not match snapshot identity")
     if record["snapshot_hash"] != snapshot["snapshot_hash"]:
         raise ValueError("decision_admission snapshot binding mismatch")
+    if record["canonical_decision_hash"] != _sha(snapshot["decision"]):
+        raise ValueError("decision_admission canonical_decision_hash does not match snapshot decision")
+    if record["canonical_action"] != _decision_action(snapshot["decision"]):
+        raise ValueError("decision_admission canonical_action does not match snapshot decision")
     if not isinstance(record["canonical_decision_hash"], str) or len(record["canonical_decision_hash"]) != 64:
         raise ValueError("decision_admission canonical_decision_hash is invalid")
     if record["canonical_action"] not in DECISION_ACTIONS:
@@ -212,6 +204,5 @@ __all__ = [
     "DECISION_ADMISSION_METHOD",
     "DECISION_ADMISSION_STATUS",
     "admit_canonical_decision",
-    "build_test_admission_receipt",
     "validate_decision_admission_receipt",
 ]
