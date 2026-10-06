@@ -62,6 +62,8 @@ C5 Positioning / Sizing = PASS / MERGED / CANONICAL
 C6 Human Execution Receipt = PASS / MERGED / CANONICAL
         ↓
 C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL
+        ↓
+C8 Final Independent Red-team / MVP Acceptance = PASS / MERGED / CANONICAL
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
@@ -269,7 +271,18 @@ Canonical state synchronization:
 - PR #113;
 - merge commit: `a5ac4b8451041bbd38bcaa73fa39954ec6533f02`.
 
-**Immediate next development boundary: C8 Final Independent Red-team / MVP Acceptance.**
+C8 Final Independent Red-team / MVP Acceptance = PASS / MERGED / CANONICAL:
+- remediation PR #116;
+- remediation merge commit: `c99763a9eae957e59c238590ad64b00bc308e54b`;
+- canonical-main rerun: Actions Run #30;
+- tested head: `c99763a9eae957e59c238590ad64b00bc308e54b`;
+- 36 C8 lifecycle/authority tests passed;
+- compileall, C3 harness, C7 harness and diff-check passed;
+- acceptance: `docs/iios/C8_ACCEPTANCE_2026-10-06.md`.
+
+C8 closes AUTH-001/002/003 authority boundaries. It does not add investment capability, scheduler/alerts, automatic execution, universe expansion, or new forecast/valuation model families.
+
+**Post-C8 development boundary: explicit governance decision required.**
 
 C8 is an acceptance-only boundary. It must not be interpreted as permission to add new investment capability, scheduler/alerts, automatic execution, broader market screening, or new P3/P4/MIE model families.
 
@@ -277,13 +290,13 @@ Historical milestone sections remain evidence of past checkpoints and do not ove
 
 ## 9. Stage C current development boundary
 
-**C7 — Full Lifecycle E2E = PASS / MERGED / CANONICAL**
+**C8 — Final Independent Red-team / MVP Acceptance = PASS / MERGED / CANONICAL**
 
 C7 proves the complete operating loop from Decision Revision through Human Approval, Execution Receipt, Trigger/Monitoring/Validation, deterministic replay, new Revision, Machine Publication and Human Report. Historical state remains append-only and projections remain non-authoritative.
 
 Detailed roadmap: `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`.
 
-Immediate next batch: **C8 — Final Independent Red-team / MVP Acceptance**.
+Immediate next batch: **explicit post-C8 governance decision**.
 
 Parallel FM Research remains separate.
 
