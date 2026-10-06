@@ -2,7 +2,7 @@
 
 Date: 2026-10-06
 Status: CANONICAL ROADMAP
-Basis: canonical C4 implementation merge `07d45c18df8df9100d4866dd5f92fa95ccdb7186`.
+Basis: canonical C7 state-sync merge `a5ac4b8451041bbd38bcaa73fa39954ec6533f02` (C7 implementation merged at `82d1911c985791e4b76f63d792588d175ee505f8`).
 
 ## 1. Purpose
 
@@ -35,6 +35,9 @@ Completed / canonical:
 - TR-02 Monitoring State = PASS / MERGED / CANONICAL
 - TR-03 Validation / Replay = PASS / MERGED / CANONICAL
 - C4 Expectation Gap Production Integration = PASS / MERGED / CANONICAL
+- C5 Positioning / Sizing = PASS / MERGED / CANONICAL
+- C6 Human Execution Receipt = PASS / MERGED / CANONICAL
+- C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL
 
 Current 300750 result:
 - Quality = CONDITIONAL
@@ -412,16 +415,29 @@ Stage C is complete only when:
 8. final independent red-team passes;
 9. no automatic execution/scheduler/alerts capability has been introduced without separate authorization.
 
-## 9. Next immediate batch
+## 9. Current execution boundary
 
-Current execution state after C2 acceptance:
-C0 — Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL
-→ C1 — Machine Publication = PASS / MERGED / CANONICAL
-→ C2 — Human Report + Report Quality Gate = PASS / MERGED / CANONICAL
-→ C3 — Second Company Acceptance = PASS / MERGED / CANONICAL
-→ C4 — Expectation Gap Production Integration = PASS / MERGED / CANONICAL
-→ C5 — Positioning / Sizing
+**Latest canonical milestone: C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL**
 
-C5–C8 follow only after the preceding acceptance boundaries are satisfied.
+C7 implementation:
+- PR #112;
+- merge `82d1911c985791e4b76f63d792588d175ee505f8`.
 
-Parallel FM Research remains separate and does not block Stage C productization.
+C7 canonical state synchronization:
+- PR #113;
+- merge `a5ac4b8451041bbd38bcaa73fa39954ec6533f02`.
+
+C7 acceptance:
+- `docs/iios/C7_ACCEPTANCE_2026-10-06.md`;
+- dedicated Actions run #6 SUCCESS on exact head `43664c9bee33b3d53f212428da019e197a9fcaf2`;
+- 74 related tests passed;
+- acceptance harness 4 / 4 PASS;
+- compileall and git diff-check PASS.
+
+**Immediate next batch: C8 — Final Independent Red-team / MVP Acceptance.**
+
+C8 is the final Stage C acceptance boundary. It is an adversarial evaluation of the canonical product across the real CATL / 300750 and 科伦药业 cases; it is not a new capability-development batch.
+
+Parallel FM Research remains separate and does not block the Stage C C8 acceptance boundary.
+
+Historical milestone sequencing remains recorded in the batch sections above; those historical "next boundary" statements must not be read as the current development state.
