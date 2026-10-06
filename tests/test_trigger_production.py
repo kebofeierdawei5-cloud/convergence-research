@@ -1,5 +1,5 @@
 import pytest
-from json import load
+import json
 from jsonschema import Draft202012Validator, FormatChecker
 
 from iios_mvp.trigger_production import (
@@ -106,12 +106,12 @@ def test_disabled_trigger_never_matches():
     assert e["evaluation_reason"] == "trigger_disabled"
 
 def test_event_schema():
-    schema = load("schemas/trigger_event_v0.1.schema.json")
+    schema = json.load(open("schemas/trigger_event_v0.1.schema.json", encoding="utf-8"))
     e = event(contract())
     assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(e)) == []
 
 def test_contract_schema():
-    schema = load("schemas/trigger_contract_v0.1.schema.json")
+    schema = json.load(open("schemas/trigger_contract_v0.1.schema.json", encoding="utf-8"))
     c = contract()
     assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(c)) == []
 
