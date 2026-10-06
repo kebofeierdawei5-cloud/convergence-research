@@ -114,7 +114,11 @@
       "R&D spending fails to translate into economically material pipeline value",
       "material governance or minority-shareholder treatment deterioration"
     ],
-    "evidence_ids": ["E002", "E003", "E004"]
+    "evidence_ids": [
+      "E002",
+      "E003",
+      "E004"
+    ]
   },
   "thesis": {
     "status": "INTACT",
@@ -126,8 +130,22 @@
       "material pipeline failures without compensating core-business resilience",
       "material governance or shareholder-treatment deterioration"
     ],
-    "evidence_ids": ["E002", "E003", "E004"],
-    "known_at": "2026-08-27"
+    "evidence_ids": [
+      "E002",
+      "E003",
+      "E004"
+    ],
+    "known_at": "2026-08-27",
+    "key_driver_ids": [
+      "core_pharma_cash_generation",
+      "controlled_biotech_pipeline_value",
+      "r_and_d_capital_allocation"
+    ],
+    "monitoring_triggers": [
+      "core_pharma_cash_flow_conversion",
+      "biotech_pipeline_value"
+    ],
+    "prepared_without_current_price": true
   },
   "monitoring": [
     {
