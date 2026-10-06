@@ -209,29 +209,6 @@ def validate_decision_admission_receipt(
         raise ValueError("decision_admission canonical decision projection does not match snapshot")
     if record["canonical_action"] != _decision_action(projection):
         raise ValueError("decision_admission canonical_action does not match canonical projection")
-    keys = record["canonical_decision_keys"]
-    if (
-        not isinstance(keys, list)
-        or keys != sorted(set(keys))
-        or any(not isinstance(key, str) or not key for key in keys)
-        or "action" not in keys
-    ):
-        raise ValueError("decision_admission canonical_decision_keys are invalid")
-    projection = record["canonical_decision_projection"]
-    if not isinstance(projection, Mapping):
-        raise ValueError("decision_admission canonical_decision_projection is invalid")
-    if sorted(projection.keys()) != keys:
-        raise ValueError("decision_admission canonical_decision_projection keys do not match canonical_decision_keys")
-    canonical_projection = {key: projection[key] for key in keys}
-    snapshot_decision = snapshot["decision"]
-    if any(key not in snapshot_decision for key in keys):
-        raise ValueError("decision_admission canonical decision keys are not present in snapshot")
-    if any(snapshot_decision[key] != canonical_projection[key] for key in keys):
-        raise ValueError("decision_admission canonical decision projection does not match snapshot")
-    if not isinstance(record["canonical_decision_hash"], str) or len(record["canonical_decision_hash"]) != 64:
-        raise ValueError("decision_admission canonical_decision_hash is invalid")
-    if record["canonical_decision_hash"] != _sha(canonical_projection):
-        raise ValueError("decision_admission canonical_decision_hash does not match canonical snapshot fields")
     if record["canonical_action"] not in DECISION_ACTIONS:
         raise ValueError("decision_admission canonical_action is invalid")
     if not isinstance(record["canonical_decision_status"], str) or not record["canonical_decision_status"].strip():
