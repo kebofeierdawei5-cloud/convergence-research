@@ -1,7 +1,7 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-05
+Snapshot: 2026-10-06
 Authority: this file is the **only canonical Current State Index**.
 
 ## 1. Canonical state
@@ -114,9 +114,8 @@ RP-01 Risk / Portfolio Production Contract is merged in canonical main:
 The available workflow interface did not expose a post-merge runtime CI record for independent verification in this session. Therefore RP-01 is recorded as MERGED / implementation-complete, not as independently CI-certified here.
 
 Remaining Investment Core productization:
-- Trigger lifecycle;
-- Monitoring / Validation;
-- Monitoring / Validation;
+- TR-02 Monitoring State;
+- Validation / replay;
 - Machine Publication;
 - Human Report / Report Quality Gate;
 - second-company acceptance;
@@ -209,13 +208,19 @@ Canonical lifecycle semantics are frozen. Independent execution passed 8/8; GitH
 Merge commit: a4e493cc0c7f45647a02dd587f89fb7d98ee22e2.
 Canonical persistence and lifecycle replay are integrated. GitHub Actions runtime telemetry was not exposed by the available workflow interface and is recorded as UNOBSERVED.
 
+**TR-01 Trigger Contract / Event Semantics = PASS / MERGED / CANONICAL**
+
+Merge commit: 0fb7262ded47b3497f5be33dc93163e209f0098f.
+Dedicated GitHub Actions run #9 = SUCCESS; independent exact-module execution = PASS.
+
 Acceptance:
 - `docs/iios/A1_ACCEPTANCE_2026-10-05.md`
 - `docs/iios/RP_01_RISK_PORTFOLIO_PRODUCTION_CONTRACT_v0.1.md`
 - `docs/iios/DR_01_ACCEPTANCE_2026-10-05.md`
 - `docs/iios/DR_02_PERSISTENCE_CLI_INTEGRATION_v0.1.md`
+- `docs/iios/TR_01_ACCEPTANCE_2026-10-06.md`
 
-The next development batch is **Trigger / Monitoring / Validation Productization**. It must start from the resulting canonical main and this State Index. No new P3/P4/MIE model work is implied.
+The next development batch is **TR-02 Monitoring State**. It must start from the resulting canonical main and this State Index. No scheduler/alerts or new P3/P4/MIE model work is implied.
 
 Completed sub-batches:
 - **A1-01 Economic Evidence Bridge = PASS / MERGED**
