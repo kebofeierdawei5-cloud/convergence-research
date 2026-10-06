@@ -656,197 +656,232 @@
           ]
         },
         "expectation_gap_evaluation": {
-          "evaluation_version": {
-            "const": "IIOS-C4-EXPECTATION-GAP-0.1"
-          },
-          "evaluation_id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "evaluation_hash": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          },
-          "case_id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "cutoff_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "price": {
-            "type": "string"
-          },
-          "price_observation_id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "mie_snapshot_hash": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
-          },
-          "mie_set_hash": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "pattern": "^[0-9a-f]{64}$"
-          },
-          "provenance_hash": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "pattern": "^[0-9a-f]{64}$"
-          },
-          "market_expectation_id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "independent_forecast_ref": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "forecast_id",
-              "admission_record_hash"
-            ],
-            "properties": {
-              "forecast_id": {
-                "type": "string",
-                "minLength": 1
-              },
-              "admission_record_hash": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
-              }
-            }
-          },
-          "independent_forecast_id": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "independent_forecast_version": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "independent_forecast_model_version": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "status": {
-            "enum": [
-              "PASS",
-              "BLOCKED",
-              "AMBIGUOUS",
-              "INCOMPATIBLE",
-              "NO_FEASIBLE_SOLUTION"
-            ]
-          },
-          "resolution_state": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "qualification": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "comparison": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "variable_id",
-              "unit",
-              "basis",
-              "horizon_years",
-              "comparison_direction"
-            ],
-            "properties": {
-              "variable_id": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "unit": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "basis": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "horizon_years": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "comparison_direction": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "enum": [
-                  "HIGHER_IS_BETTER",
-                  "LOWER_IS_BETTER",
-                  null
-                ]
-              }
-            }
-          },
-          "independent_value": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "market_required_value": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "gap_absolute": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "gap_relative": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1
-          },
-          "policy_effect": {
-            "const": "ADVISORY_ONLY_NO_ADDITIVE_RETURN_THRESHOLD"
-          },
-          "evidence_ids": {
-            "type": "array",
-            "minItems": 1,
-            "uniqueItems": true,
-            "items": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "evaluation_version",
+            "evaluation_id",
+            "evaluation_hash",
+            "case_id",
+            "cutoff_date",
+            "price",
+            "price_observation_id",
+            "mie_snapshot_hash",
+            "mie_set_hash",
+            "provenance_hash",
+            "market_expectation_id",
+            "independent_forecast_ref",
+            "independent_forecast_id",
+            "independent_forecast_version",
+            "independent_forecast_model_version",
+            "status",
+            "resolution_state",
+            "qualification",
+            "comparison",
+            "independent_value",
+            "market_required_value",
+            "gap_absolute",
+            "gap_relative",
+            "reason",
+            "policy_effect",
+            "evidence_ids"
+          ],
+          "properties": {
+            "evaluation_version": {
+              "const": "IIOS-C4-EXPECTATION-GAP-0.1"
+            },
+            "evaluation_id": {
               "type": "string",
               "minLength": 1
+            },
+            "evaluation_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "case_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cutoff_date": {
+              "type": "string",
+              "format": "date"
+            },
+            "price": {
+              "type": "string"
+            },
+            "price_observation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mie_snapshot_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "mie_set_hash": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "provenance_hash": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "market_expectation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "independent_forecast_ref": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "forecast_id",
+                "admission_record_hash"
+              ],
+              "properties": {
+                "forecast_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "admission_record_hash": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            "independent_forecast_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "independent_forecast_version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "independent_forecast_model_version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "enum": [
+                "PASS",
+                "BLOCKED",
+                "AMBIGUOUS",
+                "INCOMPATIBLE",
+                "NO_FEASIBLE_SOLUTION"
+              ]
+            },
+            "resolution_state": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "qualification": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "comparison": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "variable_id",
+                "unit",
+                "basis",
+                "horizon_years",
+                "comparison_direction"
+              ],
+              "properties": {
+                "variable_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "unit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "basis": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "horizon_years": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "comparison_direction": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "HIGHER_IS_BETTER",
+                    "LOWER_IS_BETTER",
+                    null
+                  ]
+                }
+              }
+            },
+            "independent_value": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "market_required_value": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "gap_absolute": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "gap_relative": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "policy_effect": {
+              "const": "ADVISORY_ONLY_NO_ADDITIVE_RETURN_THRESHOLD"
+            },
+            "evidence_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           }
         }

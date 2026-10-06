@@ -93,3 +93,26 @@ The broader Investment Core CI continues to report the separately tracked CORE-0
 C5 — Positioning / Sizing.
 
 C4 is therefore closed as a canonical productization boundary.
+
+
+## Post-acceptance corrective hardening
+
+After the original C4 acceptance, a schema red-team review found that the nested v0.3 `decision.expectation_gap_evaluation` binding did not enforce the C4 field contract strictly enough, although the standalone C4 schema was strict.
+
+Corrective PR #107:
+- strict `type = object/null`;
+- `additionalProperties = false`;
+- full required-field binding;
+- full nested property validation;
+- regression test proves deletion of `evaluation_hash` is rejected.
+
+Corrective exact-head CI:
+- Workflow: IIOS C4 — Expectation Gap Production Integration
+- Run #10
+- Exact head: `28438c3a62d549573756e982aaf4d4b6462f7785`
+- 76 tests passed;
+- acceptance harness 7 / 7 PASS;
+- compileall PASS;
+- git diff --check PASS.
+
+This correction does not change C4 investment semantics or Decision precedence; it strengthens schema enforcement only.

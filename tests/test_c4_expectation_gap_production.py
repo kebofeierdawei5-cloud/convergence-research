@@ -320,3 +320,34 @@ def test_c4_schema_accepts_real_evaluation():
         )
     )
     Draft202012Validator(schema).validate(evaluation)
+
+
+def test_c4_v03_nested_schema_rejects_malformed_evaluation():
+    evaluation = build_expectation_gap_evaluation(
+        case=case(),
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+    )
+    schema = json.loads(
+        (ROOT / "schemas/investment_core_case_v0.3.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    candidate = deepcopy(case())
+    candidate["decision"] = {
+        "action": "BUY",
+        "decision_status": "READY",
+        "investability_status": "INVESTABLE",
+        "primary_reason": "C4 schema test",
+        "human_approval_required": True,
+        "auto_execution": False,
+        "expectation_gap_evaluation": evaluation,
+    }
+
+    validator = Draft202012Validator(schema)
+    assert list(validator.iter_errors(candidate)) == []
+
+    malformed = deepcopy(candidate)
+    del malformed["decision"]["expectation_gap_evaluation"]["evaluation_hash"]
+    errors = list(validator.iter_errors(malformed))
+    assert errors, "nested C4 evaluation must be schema-enforced"
