@@ -13,6 +13,12 @@ from .decision_lifecycle_production import (
     validate_human_approval,
 )
 from .engine import canonical_json, replay, sha256_obj
+from .trigger_production import (
+    build_trigger_contract,
+    build_trigger_event,
+    validate_trigger_contract,
+    validate_trigger_event,
+)
 
 
 def store_root(root: str | Path = "runs") -> Path:
@@ -369,17 +375,43 @@ def replay_decision_lifecycle(
     }
 
 
+def _trigger_contract_path(root: str | Path, trigger_id: str) -> Path:
+    return store_root(root) / f"{trigger_id}.trigger.json"
+
+
+def _trigger_event_path(root: str | Path, trigger_event_id: str) -> Path:
+    return store_root(root) / f"{trigger_event_id}.event.json"
+
+
+def _load_trigger_contract(root: str | Path, trigger_id: str) -> dict[str, Any]:
+    record = _load_json(_trigger_contract_path(root, trigger_id))
+    if not record:
+        raise ValueError("trigger contract not found")
+    validate_trigger_contract(record)
+    return record
+
+
 def write_trigger_contract(root: str | Path, decision_id: str, contract: dict[str, Any]) -> Path:
     payload = dict(contract)
     payload["decision_id"] = decision_id
-    payload.setdefault("trigger_schema_version", "IIOS-TRIGGER-1.0")
-    payload.setdefault("enabled", True)
-    payload["trigger_hash"] = sha256_obj(payload)
-    return _atomic_create(store_root(root) / f"{payload['trigger_id']}.trigger.json", payload)
+    payload.pop("trigger_hash", None)
+    canonical = build_trigger_contract(**payload)
+    path = _trigger_contract_path(root, canonical["trigger_id"])
+    return _atomic_create(path, canonical)
 
 
 def write_trigger_event(root: str | Path, event: dict[str, Any]) -> Path:
     payload = dict(event)
-    payload.setdefault("trigger_schema_version", "IIOS-TRIGGER-1.0")
-    payload["trigger_event_hash"] = sha256_obj(payload)
-    return _atomic_create(store_root(root) / f"{payload['trigger_event_id']}.event.json", payload)
+    trigger_id = payload.get("trigger_id")
+    if not isinstance(trigger_id, str) or not trigger_id.strip():
+        raise ValueError("trigger_id is required for trigger event")
+    contract = _load_trigger_contract(root, trigger_id)
+    payload.pop("trigger_contract", None)
+    payload.pop("trigger_event_hash", None)
+    payload.pop("event_version", None)
+    canonical = build_trigger_event(trigger_contract=contract, **payload)
+    path = _trigger_event_path(root, canonical["trigger_event_id"])
+    existing = _load_json(path) if path.exists() else None
+    if existing is not None:
+        validate_trigger_event(existing, trigger_contract=contract)
+    return _atomic_create(path, canonical)
