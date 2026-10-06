@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/execution-receipt-0.1.schema.json",
+  "title": "IIOS Human Execution Receipt Contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_version",
+    "execution_receipt_id",
+    "decision_id",
+    "decision_series_id",
+    "revision",
+    "run_id",
+    "case_id",
+    "cutoff_date",
+    "snapshot_hash",
+    "revision_hash",
+    "approval_hash",
+    "approval_status",
+    "approved_action",
+    "executed_at",
+    "execution_status",
+    "executed_quantity",
+    "executed_position_pct",
+    "executed_price",
+    "actor_identity",
+    "policy_effect",
+    "auto_execution",
+    "receipt_hash"
+  ],
+  "properties": {
+    "receipt_version": {
+      "const": "IIOS-C6-EXECUTION-RECEIPT-0.1"
+    },
+    "execution_receipt_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_series_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cutoff_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "snapshot_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "revision_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "approval_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "approval_status": {
+      "const": "HUMAN_APPROVED"
+    },
+    "approved_action": {
+      "enum": [
+        "BUY",
+        "ADD",
+        "HOLD",
+        "REDUCE",
+        "EXIT",
+        "NO-BUY",
+        "WATCH",
+        "REVIEW_REQUIRED"
+      ]
+    },
+    "executed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "execution_status": {
+      "enum": [
+        "EXECUTED",
+        "PARTIALLY_EXECUTED",
+        "NOT_EXECUTED",
+        "CANCELLED"
+      ]
+    },
+    "executed_quantity": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^(0|[0-9]+(?:\\.[0-9]+)?)$"
+    },
+    "executed_position_pct": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^(0|[0-9]+(?:\\.[0-9]+)?)$"
+    },
+    "executed_price": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^(0|[0-9]+(?:\\.[0-9]+)?)$"
+    },
+    "actor_identity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_effect": {
+      "const": "POST_APPROVAL_RECORD_ONLY_NO_DECISION_MUTATION"
+    },
+    "auto_execution": {
+      "const": false
+    },
+    "receipt_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "execution_status": {
+            "enum": [
+              "EXECUTED",
+              "PARTIALLY_EXECUTED"
+            ]
+          }
+        }
+      },
+      "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "executed_quantity": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "executed_position_pct": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
