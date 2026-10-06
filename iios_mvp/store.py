@@ -845,6 +845,7 @@ def replay_monitoring_validation(root: str | Path, validation_id: str) -> dict[s
         root,
         record["trigger_id"],
         record["validation_cutoff_at"],
+        validation_id=record["validation_id"],
     )
     if fresh["validation_id"] != record["validation_id"] or canonical_json(fresh) != canonical_json(record):
         raise ValueError("validation replay mismatch")
