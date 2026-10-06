@@ -168,11 +168,11 @@ def test_evaluation_cutoff_cannot_move_backwards():
     n = apply_trigger_event(
         previous_state=s,
         trigger_contract=c,
-        trigger_event=evt(c, event_id='e2', known='2026-10-05T11:05:00+00:00', cutoff='2026-10-05T11:06:00+00:00'),
+        trigger_event=evt(c, event_id='e2', known='2026-10-05T11:05:00+00:00', cutoff='2026-10-05T12:06:00+00:00'),
     )
     with pytest.raises(ValueError, match='evaluation_cutoff_at cannot move backwards'):
         apply_trigger_event(
             previous_state=n,
             trigger_contract=c,
-            trigger_event=evt(c, event_id='e3', known='2026-10-05T10:30:00+00:00', cutoff='2026-10-05T10:31:00+00:00'),
+            trigger_event=evt(c, event_id='e3', known='2026-10-05T11:30:00+00:00', cutoff='2026-10-05T11:31:00+00:00'),
         )
