@@ -1,7 +1,7 @@
 # C1 — Machine Publication v0.1
 
 Date: 2026-10-06
-Status: CANDIDATE — PENDING ACCEPTANCE
+Status: ACCEPTED / CANONICAL
 Scope: read-only machine publication of a canonical Decision Revision
 
 ## Objective
