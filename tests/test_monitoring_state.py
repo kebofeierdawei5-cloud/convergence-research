@@ -3,6 +3,7 @@ import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
 from iios_mvp.trigger_production import build_trigger_contract, build_trigger_event
+from tests.decision_admission_fixture import build_fixture_admission_receipt
 from iios_mvp.monitoring_state import build_monitoring_state, validate_monitoring_state, apply_trigger_event
 
 def contract(**overrides):
@@ -91,14 +92,21 @@ def test_replay_reconstructs_persisted_state(tmp_path):
     core = {
         'snapshot_schema': 'IIOS-MVP-SNAPSHOT-0.3.0',
         'engine_version': '0.3.0',
-        'input': {'case_id': 'RC-CN-A-300750-20261004', 'cutoff_date': '2026-10-04'},
+        'input': {'case_id': 'RC-CN-A-300750-20261004', 'market': 'CN-A', 'symbol': '300750', 'company': 'CATL', 'as_of_date': '2026-10-04', 'cutoff_date': '2026-10-04'},
         'decision': {'action': 'HOLD'},
     }
     snapshot_hash = hashlib.sha256(json.dumps(core, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     snapshot = {**core, 'snapshot_hash': snapshot_hash}
     write_snapshot(tmp_path, snapshot)
     series = create_or_load_series(tmp_path, 'CN-A', '300750', 'CATL', '2026-10-04T00:00:00Z')
-    write_decision_revision(tmp_path, series['decision_series_id'], 1, snapshot, 'run-1')
+    write_decision_revision(
+        tmp_path,
+        series['decision_series_id'],
+        1,
+        snapshot,
+        'run-1',
+        decision_admission=build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot['decision']),
+    )
     revision = json.loads((tmp_path / 'CN-A-300750-r001.decision.json').read_text())
 
     trigger = write_trigger_contract(tmp_path, 'CN-A-300750-r001', {

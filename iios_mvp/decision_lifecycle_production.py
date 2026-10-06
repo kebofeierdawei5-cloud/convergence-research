@@ -4,7 +4,9 @@ import hashlib
 import json
 from typing import Any, Mapping
 
-DECISION_LIFECYCLE_CONTRACT_VERSION = "IIOS-DECISION-LIFECYCLE-0.1"
+from .decision_admission import validate_decision_admission_receipt
+
+DECISION_LIFECYCLE_CONTRACT_VERSION = "IIOS-DECISION-LIFECYCLE-0.2"
 REVISION_STATUSES = {"AI_PROPOSED", "HUMAN_APPROVED", "HUMAN_REJECTED"}
 APPROVAL_STATUSES = {"HUMAN_APPROVED", "HUMAN_REJECTED"}
 DECISION_ACTIONS = {"BUY", "ADD", "HOLD", "REDUCE", "EXIT", "NO-BUY", "WATCH", "REVIEW_REQUIRED"}
@@ -41,7 +43,7 @@ def _snapshot_core(snapshot: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError('snapshot hash mismatch')
     return snapshot_core
 
-def build_decision_revision(*, decision_series_id: str, revision: int, snapshot: Mapping[str, Any], run_id: str, trigger_event_id: str | None = None) -> dict[str, Any]:
+def build_decision_revision(*, decision_series_id: str, revision: int, snapshot: Mapping[str, Any], run_id: str, trigger_event_id: str | None = None, decision_admission: Mapping[str, Any] | None = None) -> dict[str, Any]:
     if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
         raise ValueError('revision must be a positive integer')
     snapshot_core = _snapshot_core(snapshot)
@@ -50,6 +52,14 @@ def build_decision_revision(*, decision_series_id: str, revision: int, snapshot:
     case_id = _text(input_data.get('case_id'), 'snapshot.input.case_id')
     cutoff_date = _text(input_data.get('cutoff_date'), 'snapshot.input.cutoff_date')
     action = _action(decision)
+    if snapshot_core["snapshot_schema"] == "IIOS-MVP-SNAPSHOT-0.3.0":
+        if decision_admission is None:
+            raise ValueError("canonical v0.3 Decision Revision requires a Decision Admission receipt")
+        validate_decision_admission_receipt(decision_admission, snapshot=snapshot)
+        if decision_admission["canonical_action"] != action:
+            raise ValueError("decision admission canonical_action does not match snapshot action")
+        if decision_admission["engine_version"] != snapshot_core["engine_version"]:
+            raise ValueError("decision admission engine_version does not match snapshot")
     decision_id = f'{decision_series_id}-r{revision:03d}'
     core = {
         'contract_version': DECISION_LIFECYCLE_CONTRACT_VERSION,
@@ -67,13 +77,14 @@ def build_decision_revision(*, decision_series_id: str, revision: int, snapshot:
         'engine_version': _text(snapshot_core['engine_version'], 'snapshot.engine_version'),
         'human_approval_required': True,
         'auto_execution': False,
+        'decision_admission': None if decision_admission is None else dict(decision_admission),
     }
     return {**core, 'revision_hash': _sha(core)}
 
 def validate_decision_revision(record: Any, *, case_id: str, cutoff_date: str) -> None:
     if not isinstance(record, Mapping):
         raise ValueError('decision_revision must be an object')
-    required = {'contract_version','decision_id','decision_series_id','revision','run_id','trigger_event_id','case_id','as_of_date','cutoff_date','snapshot_hash','ai_action','decision_status','engine_version','human_approval_required','auto_execution','revision_hash'}
+    required = {'contract_version','decision_id','decision_series_id','revision','run_id','trigger_event_id','case_id','as_of_date','cutoff_date','snapshot_hash','ai_action','decision_status','engine_version','human_approval_required','auto_execution','decision_admission','revision_hash'}
     if set(record) != required:
         raise ValueError('decision_revision fields are invalid')
     if record['contract_version'] != DECISION_LIFECYCLE_CONTRACT_VERSION:
@@ -89,14 +100,38 @@ def validate_decision_revision(record: Any, *, case_id: str, cutoff_date: str) -
         raise ValueError('decision_revision approval/execution flags invalid')
     if len(str(record['snapshot_hash'])) != 64 or len(str(record['revision_hash'])) != 64:
         raise ValueError('decision_revision hashes invalid')
+    admission = record.get('decision_admission')
+    if record['engine_version'] == '0.3.0':
+        if admission is None:
+            raise ValueError('canonical v0.3 Decision Revision requires decision_admission')
+        validate_decision_admission_receipt(admission, snapshot={
+            'snapshot_schema': 'IIOS-MVP-SNAPSHOT-0.3.0',
+            'engine_version': record['engine_version'],
+            'input': {
+                'case_id': record['case_id'],
+                'market': str(admission.get('market', '')).upper(),
+                'symbol': str(admission.get('symbol', '')).upper(),
+                'company': admission.get('company', ''),
+                'cutoff_date': record['cutoff_date'],
+            },
+            'decision': dict(admission['canonical_decision_projection']),
+            'snapshot_hash': record['snapshot_hash'],
+        })
+        if admission['canonical_action'] != record['ai_action']:
+            raise ValueError('decision admission action binding mismatch')
+    elif admission is not None:
+        raise ValueError('legacy Decision Revision cannot carry decision_admission')
     core = {k: record[k] for k in required if k != 'revision_hash'}
     if record['revision_hash'] != _sha(core):
         raise ValueError('decision_revision revision hash mismatch')
 
-def build_human_approval(*, decision_revision: Mapping[str, Any], approved: bool, note: str) -> dict[str, Any]:
+def build_human_approval(*, decision_revision: Mapping[str, Any], approved: bool, note: str, actor_identity: str, authorization_method: str = "HUMAN_AUTHENTICATED") -> dict[str, Any]:
     validate_decision_revision(decision_revision, case_id=decision_revision['case_id'], cutoff_date=decision_revision['cutoff_date'])
     if not isinstance(approved, bool):
         raise ValueError('approved must be boolean')
+    actor = _text(actor_identity, 'actor_identity')
+    if authorization_method != 'HUMAN_AUTHENTICATED':
+        raise ValueError('authorization_method must equal HUMAN_AUTHENTICATED')
     core = {
         'contract_version': DECISION_LIFECYCLE_CONTRACT_VERSION,
         'decision_id': decision_revision['decision_id'],
@@ -106,6 +141,8 @@ def build_human_approval(*, decision_revision: Mapping[str, Any], approved: bool
         'approved': approved,
         'approval_status': 'HUMAN_APPROVED' if approved else 'HUMAN_REJECTED',
         'note': _text(note, 'note'),
+        'actor_identity': actor,
+        'authorization_method': authorization_method,
     }
     return {**core, 'approval_hash': _sha(core)}
 
@@ -113,7 +150,7 @@ def validate_human_approval(record: Any, *, decision_revision: Mapping[str, Any]
     validate_decision_revision(decision_revision, case_id=decision_revision['case_id'], cutoff_date=decision_revision['cutoff_date'])
     if not isinstance(record, Mapping):
         raise ValueError('human_approval must be an object')
-    required = {'contract_version','decision_id','revision','revision_hash','snapshot_hash','approved','approval_status','note','approval_hash'}
+    required = {'contract_version','decision_id','revision','revision_hash','snapshot_hash','approved','approval_status','note','actor_identity','authorization_method','approval_hash'}
     if set(record) != required:
         raise ValueError('human_approval fields are invalid')
     if record['contract_version'] != DECISION_LIFECYCLE_CONTRACT_VERSION:
@@ -126,6 +163,8 @@ def validate_human_approval(record: Any, *, decision_revision: Mapping[str, Any]
     expected_status = 'HUMAN_APPROVED' if record['approved'] else 'HUMAN_REJECTED'
     if record['approval_status'] != expected_status or not str(record['note']).strip():
         raise ValueError('human_approval status or note invalid')
+    if not str(record['actor_identity']).strip() or record['authorization_method'] != 'HUMAN_AUTHENTICATED':
+        raise ValueError('human_approval actor/authorization boundary invalid')
     core = {k: record[k] for k in required if k != 'approval_hash'}
     if record['approval_hash'] != _sha(core):
         raise ValueError('human_approval approval hash mismatch')

@@ -4,6 +4,7 @@ import json
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
+from tests.decision_admission_fixture import build_fixture_admission_receipt
 from iios_mvp.monitoring_state import build_monitoring_state
 from iios_mvp.trigger_production import build_trigger_contract, build_trigger_event
 from iios_mvp.validation_replay import (
@@ -69,7 +70,14 @@ def seed_store(tmp_path):
     core = {
         "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.3.0",
         "engine_version": "0.3.0",
-        "input": {"case_id": CASE, "cutoff_date": CUTOFF},
+        "input": {
+            "case_id": CASE,
+            "market": "CN-A",
+            "symbol": "300750",
+            "company": "CATL",
+            "as_of_date": CUTOFF,
+            "cutoff_date": CUTOFF,
+        },
         "decision": {"action": "HOLD"},
     }
     snapshot_hash = hashlib.sha256(
@@ -86,6 +94,7 @@ def seed_store(tmp_path):
         1,
         snapshot,
         "run-1",
+        decision_admission=build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"]),
     )
     revision = json.loads(
         (tmp_path / "CN-A-300750-r001.decision.json").read_text()

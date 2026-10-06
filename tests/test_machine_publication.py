@@ -76,6 +76,8 @@ def persist_revision(tmp_path, *, action="REVIEW_REQUIRED"):
     )
     snapshot = make_snapshot(action=action)
     write_snapshot(tmp_path, snapshot)
+    from tests.decision_admission_fixture import build_fixture_admission_receipt
+    admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
     decision_id = "CN-A-300750-r001"
     write_decision_revision(
         tmp_path,
@@ -83,6 +85,7 @@ def persist_revision(tmp_path, *, action="REVIEW_REQUIRED"):
         1,
         snapshot,
         "run-c1-001",
+        decision_admission=admission,
     )
     return series, snapshot, decision_id
 
@@ -128,6 +131,7 @@ def test_machine_publication_separates_human_approval_and_lifecycle_refs(tmp_pat
         snapshot,
         True,
         "human approval for C1 publication fixture",
+        actor_identity="human:owner",
     )
     assert approved["current"] is True
 
@@ -226,7 +230,7 @@ def test_machine_publication_fails_closed_on_source_revision_tampering(tmp_path)
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="revision hash mismatch"):
+    with pytest.raises(ValueError, match="decision admission action binding mismatch"):
         build_machine_publication(
             root=tmp_path,
             decision_id=decision_id,

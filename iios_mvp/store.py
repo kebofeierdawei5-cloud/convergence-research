@@ -189,14 +189,37 @@ def write_decision_revision(
     snapshot: dict[str, Any],
     run_id: str,
     trigger_event_id: str | None = None,
+    decision_admission: dict[str, Any] | None = None,
 ) -> Path:
     expected_revision = next_revision(root, series_id)
+    series = load_series(root, series_id)
+    if not series:
+        raise ValueError("decision series not found")
+    input_data = snapshot.get("input")
+    if not isinstance(input_data, dict):
+        raise ValueError("snapshot input is required for series identity binding")
+    identity_pairs = (
+        ("market", "market"),
+        ("symbol", "symbol"),
+        ("company", "company_name"),
+    )
+    for field, series_field in identity_pairs:
+        snapshot_value = str(input_data.get(field, "")).strip()
+        series_value = str(series.get(series_field, "")).strip()
+        if field != "company":
+            snapshot_value = snapshot_value.upper()
+            series_value = series_value.upper()
+        if not snapshot_value or snapshot_value != series_value:
+            raise ValueError(f"decision series identity mismatch: {field}")
+    if snapshot.get("snapshot_schema") == "IIOS-MVP-SNAPSHOT-0.3.0" and decision_admission is None:
+        raise ValueError("canonical v0.3 Decision Revision requires a Decision Admission receipt")
     payload = build_decision_revision(
         decision_series_id=series_id,
         revision=revision,
         snapshot=snapshot,
         run_id=run_id,
         trigger_event_id=trigger_event_id,
+        decision_admission=decision_admission,
     )
     path = _decision_path(root, payload["decision_id"])
 
@@ -227,16 +250,22 @@ def write_human_approval(
     approved: bool,
     note: str,
     decision_id: str | None = None,
+    actor_identity: str | None = None,
+    authorization_method: str = "HUMAN_AUTHENTICATED",
 ) -> Path:
     if not decision_id:
         raise ValueError("decision_id is required")
     revision = _load_revision(root, decision_id)
     if revision["snapshot_hash"] != snapshot.get("snapshot_hash"):
         raise ValueError("decision revision and snapshot are not bound to the same snapshot")
+    if not actor_identity:
+        raise ValueError("actor_identity is required for human approval")
     approval = build_human_approval(
         decision_revision=revision,
         approved=approved,
         note=note,
+        actor_identity=actor_identity,
+        authorization_method=authorization_method,
     )
     return _atomic_create(_approval_path(root, decision_id), approval)
 
@@ -247,11 +276,23 @@ def approve_revision(
     snapshot: dict[str, Any],
     approved: bool,
     note: str,
+    actor_identity: str | None = None,
+    authorization_method: str = "HUMAN_AUTHENTICATED",
 ) -> dict[str, Any]:
     revision = _load_revision(root, decision_id)
     if revision["snapshot_hash"] != snapshot.get("snapshot_hash"):
         raise ValueError("decision revision and snapshot are not bound to the same snapshot")
-    approval_path = write_human_approval(root, snapshot, approved, note, decision_id)
+    if not actor_identity:
+        raise ValueError("actor_identity is required for human approval")
+    approval_path = write_human_approval(
+        root,
+        snapshot,
+        approved,
+        note,
+        decision_id,
+        actor_identity=actor_identity,
+        authorization_method=authorization_method,
+    )
     approval = _load_json(approval_path)
     validate_human_approval(approval, decision_revision=revision)
 
@@ -304,6 +345,7 @@ def replay_decision_lifecycle(
         snapshot=snapshot,
         run_id=revision["run_id"],
         trigger_event_id=revision["trigger_event_id"],
+        decision_admission=revision["decision_admission"],
     )
     if canonical_json(expected_revision) != canonical_json(revision):
         raise ValueError("decision revision replay mismatch")
@@ -336,6 +378,7 @@ def replay_decision_lifecycle(
             snapshot=historical_snapshot,
             run_id=record["run_id"],
             trigger_event_id=record["trigger_event_id"],
+            decision_admission=record["decision_admission"],
         )
         if canonical_json(expected_historical_revision) != canonical_json(record):
             raise ValueError(

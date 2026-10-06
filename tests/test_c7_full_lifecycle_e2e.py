@@ -15,6 +15,7 @@ from iios_mvp.machine_publication import (
     build_machine_publication,
     validate_machine_publication,
 )
+from tests.decision_admission_fixture import build_fixture_admission_receipt
 from iios_mvp.store import (
     apply_monitoring_event,
     approve_revision,
@@ -81,12 +82,14 @@ def seed_c7(tmp_path):
         reason="initial canonical proposal",
     )
     write_snapshot(tmp_path, s1)
+    admission1 = build_fixture_admission_receipt(snapshot=s1, canonical_decision=s1["decision"])
     r1_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
         1,
         s1,
         "run-c7-001",
+        decision_admission=admission1,
     )
     revision1 = json.loads(r1_path.read_text(encoding="utf-8"))
 
@@ -96,6 +99,7 @@ def seed_c7(tmp_path):
         s1,
         True,
         "human approved initial action",
+        actor_identity="human:owner",
     )
 
     trigger_path = write_trigger_contract(
@@ -196,6 +200,7 @@ def test_c7_full_operating_loop(tmp_path):
         reason="monitoring event invalidated the prior sizing thesis",
     )
     write_snapshot(tmp_path, s2)
+    admission2 = build_fixture_admission_receipt(snapshot=s2, canonical_decision=s2["decision"])
     r2_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
@@ -203,6 +208,7 @@ def test_c7_full_operating_loop(tmp_path):
         s2,
         "run-c7-002",
         trigger_event_id="evt-c7-match",
+        decision_admission=admission2,
     )
     revision2 = json.loads(r2_path.read_text(encoding="utf-8"))
     assert revision2["revision"] == 2
@@ -216,6 +222,7 @@ def test_c7_full_operating_loop(tmp_path):
         s2,
         True,
         "human approved revised action",
+        actor_identity="human:owner",
     )
     assert approval2["status"] == "HUMAN_APPROVED"
     assert json.loads(r1_path.read_text(encoding="utf-8"))["ai_action"] == "BUY"
@@ -275,12 +282,14 @@ def test_c7_changed_decision_requires_new_run_and_revision(tmp_path):
         reason="changed proposal requires independent revision",
     )
     write_snapshot(tmp_path, s2)
+    admission2 = build_fixture_admission_receipt(snapshot=s2, canonical_decision=s2["decision"])
     r2_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
         2,
         s2,
         "run-c7-003",
+        decision_admission=admission2,
     )
     r1 = json.loads(r1_path.read_text(encoding="utf-8"))
     r2 = json.loads(r2_path.read_text(encoding="utf-8"))
