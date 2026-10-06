@@ -46,6 +46,10 @@ TR-01 Trigger Contract / Event Semantics = PASS / MERGED / CANONICAL
 TR-02 Monitoring State = PASS / MERGED / CANONICAL
         ↓
 TR-03 Validation / Replay = PASS / MERGED / CANONICAL
+        ↓
+C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL
+        ↓
+C1 Machine Publication = PASS / MERGED / CANONICAL
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
