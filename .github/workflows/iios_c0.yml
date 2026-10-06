@@ -1,0 +1,47 @@
+name: IIOS C0 Governance Hygiene
+
+on:
+  pull_request:
+    paths:
+      - "README.md"
+      - "STATUS.md"
+      - "AGENTS.md"
+      - "docs/PROJECT_STATE_INDEX.md"
+      - "docs/iios/A0_STATE_AUTHORITY_POLICY_v0.1.md"
+      - "docs/iios/IIOS_CURRENT_STATE_INDEX.md"
+      - "docs/iios/IIOS_CONSOLIDATED_POST_REDTEAM_DEVELOPMENT_PLAN_2026-10-04.md"
+      - "docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md"
+      - "tools/c0_state_authority_validator.py"
+      - "tests/test_c0_state_authority.py"
+      - ".github/workflows/iios_c0.yml"
+  push:
+    branches: [main]
+    paths:
+      - "README.md"
+      - "STATUS.md"
+      - "AGENTS.md"
+      - "docs/PROJECT_STATE_INDEX.md"
+      - "docs/iios/A0_STATE_AUTHORITY_POLICY_v0.1.md"
+      - "docs/iios/IIOS_CURRENT_STATE_INDEX.md"
+      - "docs/iios/IIOS_CONSOLIDATED_POST_REDTEAM_DEVELOPMENT_PLAN_2026-10-04.md"
+      - "docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md"
+      - "tools/c0_state_authority_validator.py"
+      - "tests/test_c0_state_authority.py"
+      - ".github/workflows/iios_c0.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  c0:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest
+      - run: python -m compileall -q tools tests
+      - run: python -m pytest -q tests/test_c0_state_authority.py
+      - run: python tools/c0_state_authority_validator.py
+      - run: git diff --check
