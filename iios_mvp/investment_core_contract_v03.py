@@ -11,6 +11,7 @@ from .canonical_independent_forecast import CanonicalIndependentForecastResolver
 from .horizon_semantics import validate_horizon_selection
 from .decision_kernel_v03 import evaluate_production_decision
 from .decision_upstream_admission_v03 import validate_decision_upstream_admission, DECISION_UPSTREAM_ADMISSION_V02
+from .upstream_authority_v03 import validate_core_upstream_authority
 from .expectation_gap_production import build_expectation_gap_evaluation
 from .positioning_sizing_production import build_positioning_sizing
 from .price_dependent_expectation_gap import (
