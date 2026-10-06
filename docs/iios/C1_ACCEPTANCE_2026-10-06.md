@@ -1,7 +1,7 @@
 # C1 Acceptance — Machine Publication
 
 Date: 2026-10-06
-Status: CANDIDATE — READY FOR CANONICAL MERGE
+Status: ACCEPTED / CANONICAL
 
 ## Acceptance decision
 
