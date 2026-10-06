@@ -563,9 +563,7 @@ def replay_monitoring_state(root: str | Path, trigger_id: str) -> dict[str, Any]
         trigger_contract=contract,
         lifecycle_status=persisted["lifecycle_status"],
         next_due_at=persisted["next_due_at"],
-        evaluation_reference_at=persisted["last_evaluation_cutoff_at"]
-        or persisted["next_due_at"]
-        or contract["decision_cutoff_date"] + "T00:00:00+00:00",
+        evaluation_reference_at=persisted["due_reference_at"],
     )
     event_files = []
     for path in store_root(root).glob("*.event.json"):
