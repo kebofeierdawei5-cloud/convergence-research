@@ -22,7 +22,7 @@ CORE-04 vertical decision closure is complete.
 
 A1 is complete as the company-side evidence-closure engineering milestone. Current 300750 Quality remains CONDITIONAL and new capital remains FALSE.
 
-C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. The next Stage C batch is C2 Human Report / Report Quality Gate.
+C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. The next Stage C batch is C3 Second Company Acceptance.
 
 TR-03 Validation / Replay is now PASS / MERGED / CANONICAL.
 
@@ -111,9 +111,8 @@ TR-03 Validation / Replay = PASS / MERGED / CANONICAL.
 TR-03 closes the historical `next_due_at` replay gap using immutable monitoring initialization/evaluation records and source-derived fail-closed validation.
 
 Scheduler/alerts remain out of scope.
-## Product gaps after C1
+## Product gaps after C2
 
-- C2 Human Report / Report Quality Gate
 - C3 Second Company Acceptance
 - C4 Expectation Gap Production Integration
 - C5 Positioning / Sizing
@@ -145,7 +144,7 @@ The canonical Stage C plan is `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.m
 
 Canonical C0 merge: `1594e43eee14aaa41ddde675ddbe61d650462cf7`.
 
-Next boundary: C2 Human Report / Report Quality Gate → C3 Second Company Acceptance.
+Next boundary: C3 Second Company Acceptance → C4 Expectation Gap Production Integration.
 
 
 ## C1 status
@@ -159,3 +158,16 @@ Acceptance: `docs/iios/C1_ACCEPTANCE_2026-10-06.md`.
 Canonical C1 merge: `b9a8ff0fe1341a56f363fb058677dbd50a4f87b8`.
 
 Next boundary: C2 Human Report / Report Quality Gate.
+
+
+## C2 status
+
+C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL.
+
+C2 provides a deterministic human-readable projection of an accepted Machine Publication, plus immutable report metadata/Markdown and a fail-closed Report Quality Gate.
+
+Acceptance: `docs/iios/C2_ACCEPTANCE_2026-10-06.md`.
+
+Canonical C2 merge: `75bb360436286ae950a05028769701380120e561`.
+
+Next boundary: C3 Second Company Acceptance.
