@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/monitoring-evaluation-0.1.schema.json",
+  "title": "IIOS Monitoring Evaluation v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evaluation_version","evaluation_id","trigger_event_id","trigger_id","trigger_hash",
+    "decision_id","decision_series_id","revision","decision_revision_hash","case_id",
+    "previous_state_hash","resulting_state_hash","previous_next_due_at","resulting_next_due_at",
+    "event_known_at","evaluation_cutoff_at","evaluation_status","evaluation_hash"
+  ],
+  "properties": {
+    "evaluation_version": {"const": "IIOS-MONITORING-EVALUATION-0.1"},
+    "evaluation_id": {"type": "string","minLength": 1},
+    "trigger_event_id": {"type": "string","minLength": 1},
+    "trigger_id": {"type": "string","minLength": 1},
+    "trigger_hash": {"type": "string","pattern": "^[0-9a-f]{64}$"},
+    "decision_id": {"type": "string","minLength": 1},
+    "decision_series_id": {"type": "string","minLength": 1},
+    "revision": {"type": "integer","minimum": 1},
+    "decision_revision_hash": {"type": "string","pattern": "^[0-9a-f]{64}$"},
+    "case_id": {"type": "string","minLength": 1},
+    "previous_state_hash": {"type": "string","pattern": "^[0-9a-f]{64}$"},
+    "resulting_state_hash": {"type": "string","pattern": "^[0-9a-f]{64}$"},
+    "previous_next_due_at": {"type": ["string","null"],"format": "date-time"},
+    "resulting_next_due_at": {"type": ["string","null"],"format": "date-time"},
+    "event_known_at": {"type": "string","format": "date-time"},
+    "evaluation_cutoff_at": {"type": "string","format": "date-time"},
+    "evaluation_status": {"enum": ["VALID","UNKNOWN"]},
+    "evaluation_hash": {"type": "string","pattern": "^[0-9a-f]{64}$"}
+  }
+}
