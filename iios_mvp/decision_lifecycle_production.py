@@ -101,25 +101,28 @@ def validate_decision_revision(record: Any, *, case_id: str, cutoff_date: str) -
     if len(str(record['snapshot_hash'])) != 64 or len(str(record['revision_hash'])) != 64:
         raise ValueError('decision_revision hashes invalid')
     admission = record.get('decision_admission')
-    if admission is None:
-        raise ValueError('canonical Decision Revision requires decision_admission')
-    validate_decision_admission_receipt(admission, snapshot={
-        'snapshot_schema': 'IIOS-MVP-SNAPSHOT-0.3.0',
-        'engine_version': record['engine_version'],
-        'input': {
-            'case_id': record['case_id'],
-            'market': record['decision_series_id'].split('-', 1)[0],
-            'symbol': record['decision_series_id'].split('-', 1)[1],
-            'company': admission['company'],
-            'cutoff_date': record['cutoff_date'],
-        },
-        'decision': {
-            'action': record['ai_action'],
-        },
-        'snapshot_hash': record['snapshot_hash'],
-    })
-    if admission['canonical_action'] != record['ai_action']:
-        raise ValueError('decision admission action binding mismatch')
+    if record['engine_version'] == '0.3.0':
+        if admission is None:
+            raise ValueError('canonical v0.3 Decision Revision requires decision_admission')
+        validate_decision_admission_receipt(admission, snapshot={
+            'snapshot_schema': 'IIOS-MVP-SNAPSHOT-0.3.0',
+            'engine_version': record['engine_version'],
+            'input': {
+                'case_id': record['case_id'],
+                'market': str(admission.get('market', '')).upper(),
+                'symbol': str(admission.get('symbol', '')).upper(),
+                'company': admission.get('company', ''),
+                'cutoff_date': record['cutoff_date'],
+            },
+            'decision': {
+                'action': record['ai_action'],
+            },
+            'snapshot_hash': record['snapshot_hash'],
+        })
+        if admission['canonical_action'] != record['ai_action']:
+            raise ValueError('decision admission action binding mismatch')
+    elif admission is not None:
+        raise ValueError('legacy Decision Revision cannot carry decision_admission')
     core = {k: record[k] for k in required if k != 'revision_hash'}
     if record['revision_hash'] != _sha(core):
         raise ValueError('decision_revision revision hash mismatch')
