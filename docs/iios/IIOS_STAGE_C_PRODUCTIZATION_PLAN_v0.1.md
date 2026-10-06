@@ -1,8 +1,8 @@
 # IIOS Stage C — Productization / Generalization / Closed-loop Validation Plan v0.1
 
 Date: 2026-10-06
-Status: CANDIDATE — PENDING CANONICAL ACCEPTANCE
-Basis: canonical `main` at `b362345f35517b37ffcc9a93fe48ff57c8ff1382`
+Status: CANONICAL ROADMAP
+Basis: canonical `main` at `1594e43eee14aaa41ddde675ddbe61d650462cf7` after C0 merge.
 
 ## 1. Purpose
 
