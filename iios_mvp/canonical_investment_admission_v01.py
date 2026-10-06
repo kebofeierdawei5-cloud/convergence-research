@@ -415,7 +415,6 @@ __all__ = [
     "ADMISSION_DOMAINS",
     "ADMITTED_STATUS",
     "CANONICAL_INVESTMENT_ADMISSION_VERSION",
-    "CanonicalInvestmentAdmissionAdmissionReference",
     "CanonicalInvestmentAdmissionReference",
     "CanonicalInvestmentAdmissionRecord",
     "CanonicalInvestmentAdmissionResolver",
