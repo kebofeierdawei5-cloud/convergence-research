@@ -1,0 +1,47 @@
+name: IIOS C5 — Positioning / Sizing Production Integration
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/positioning_sizing_production.py"
+      - "iios_mvp/investment_core_contract_v03.py"
+      - "iios_mvp/engine.py"
+      - "schemas/c5_positioning_sizing_v0.1.schema.json"
+      - "schemas/investment_core_case_v0.3.schema.json"
+      - "tests/test_c5_positioning_sizing_production.py"
+      - "tests/test_risk_portfolio_production_contract.py"
+      - "tests/test_investment_core_v03.py"
+      - "docs/iios/C5_POSITIONING_SIZING_PRODUCTION_v0.1.md"
+      - "tools/c5_positioning_sizing_e2e.py"
+      - ".github/workflows/iios_c5.yml"
+  push:
+    branches: [main]
+    paths:
+      - "iios_mvp/positioning_sizing_production.py"
+      - "iios_mvp/investment_core_contract_v03.py"
+      - "iios_mvp/engine.py"
+      - "schemas/c5_positioning_sizing_v0.1.schema.json"
+      - "schemas/investment_core_case_v0.3.schema.json"
+      - "tests/test_c5_positioning_sizing_production.py"
+      - "tests/test_risk_portfolio_production_contract.py"
+      - "tests/test_investment_core_v03.py"
+      - "docs/iios/C5_POSITIONING_SIZING_PRODUCTION_v0.1.md"
+      - "tools/c5_positioning_sizing_e2e.py"
+      - ".github/workflows/iios_c5.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  c5:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q iios_mvp tools tests
+      - run: PYTHONPATH=. pytest -q tests/test_c5_positioning_sizing_production.py tests/test_c4_expectation_gap_production.py tests/test_semantic_expectation_gap.py tests/test_risk_portfolio_production_contract.py tests/test_investment_core_v03.py
+      - run: PYTHONPATH=. python tools/c5_positioning_sizing_e2e.py
+      - run: git diff --check
