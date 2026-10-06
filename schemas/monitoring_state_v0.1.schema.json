@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/monitoring-state-0.1.schema.json",
+  "title": "IIOS Monitoring State v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "state_version",
+    "monitor_id",
+    "trigger_id",
+    "trigger_hash",
+    "decision_id",
+    "decision_series_id",
+    "revision",
+    "decision_revision_hash",
+    "case_id",
+    "lifecycle_status",
+    "evaluation_status",
+    "last_trigger_state",
+    "last_event_id",
+    "last_known_at",
+    "last_evaluation_cutoff_at",
+    "next_due_at",
+    "due_state",
+    "policy_effect",
+    "state_hash"
+  ],
+  "properties": {
+    "state_version": {
+      "const": "IIOS-MONITORING-STATE-0.1"
+    },
+    "monitor_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trigger_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trigger_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_series_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "decision_revision_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lifecycle_status": {
+      "enum": [
+        "ACTIVE",
+        "DISABLED",
+        "RETIRED"
+      ]
+    },
+    "evaluation_status": {
+      "enum": [
+        "NEVER_EVALUATED",
+        "VALID",
+        "UNKNOWN"
+      ]
+    },
+    "last_trigger_state": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "MATCHED",
+        "NOT_MATCHED",
+        "UNKNOWN",
+        null
+      ]
+    },
+    "last_event_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "last_known_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "last_evaluation_cutoff_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "next_due_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "due_state": {
+      "enum": [
+        "UNSCHEDULED",
+        "NOT_DUE",
+        "DUE",
+        "OVERDUE"
+      ]
+    },
+    "policy_effect": {
+      "const": "NO_DIRECT_DECISION_PRECEDENCE_CHANGE"
+    },
+    "state_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
