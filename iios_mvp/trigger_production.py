@@ -52,7 +52,11 @@ def _timestamp(value: Any, field: str) -> str:
     return result
 
 def _scalar(value: Any, field: str) -> Any:
-    if value is None or isinstance(value, (bool, str, int, float)):
+    if value is None or isinstance(value, (bool, str, int)):
+        return value
+    if isinstance(value, float):
+        if not __import__("math").isfinite(value):
+            raise ValueError(f"{field} must be finite")
         return value
     raise ValueError(f"{field} must be a scalar or null")
 
