@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/human-report-0.1.schema.json",
+  "title": "IIOS Human Report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report_version",
+    "generated_at",
+    "publication_id",
+    "publication_hash",
+    "decision_id",
+    "revision",
+    "case_id",
+    "cutoff_date",
+    "markdown",
+    "report_id",
+    "report_hash"
+  ],
+  "properties": {
+    "report_version": {
+      "const": "IIOS-HUMAN-REPORT-0.1"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "publication_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "publication_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cutoff_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "markdown": {
+      "type": "string",
+      "minLength": 1
+    },
+    "report_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "report_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
