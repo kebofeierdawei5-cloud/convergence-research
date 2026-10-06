@@ -1,4 +1,5 @@
 import json
+from argparse import Namespace
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from iios_mvp.machine_publication import (
     validate_machine_publication,
     write_machine_publication,
 )
+from iios_mvp import cli
 from iios_mvp.store import (
     approve_revision,
     create_or_load_series,
@@ -230,3 +232,17 @@ def test_machine_publication_fails_closed_on_source_revision_tampering(tmp_path)
         )
 
     assert publication.read_bytes() == original
+
+
+def test_cli_publish_exposes_machine_publication(tmp_path, capsys):
+    _, _, decision_id = persist_revision(tmp_path)
+    args = Namespace(
+        out=str(tmp_path),
+        decision_id=decision_id,
+        published_at="2026-10-06T06:00:00+00:00",
+    )
+    assert cli.cmd_publish(args) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["status"] == "PUBLISHED"
+    assert output["decision_id"] == decision_id
+    assert output["publication_hash"]
