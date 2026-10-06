@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from iios_mvp.engine import decide, replay, run_case, sha256_obj
+from tests.decision_admission_fixture import build_fixture_admission_receipt
 from iios_mvp.store import read_snapshot, write_snapshot
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,7 +19,7 @@ def build_persisted_snapshot(action: str, cutoff: str):
     core = {
         "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.3.0",
         "engine_version": "0.3.0",
-        "input": {"case_id": "RC-CN-A-300750-20261004", "cutoff_date": cutoff},
+        "input": {"case_id": "RC-CN-A-300750-20261004", "market": "CN-A", "symbol": "300750", "company": "CATL", "as_of_date": cutoff, "cutoff_date": cutoff},
         "decision": {"action": action},
     }
     snapshot_hash = sha256_obj(core)
@@ -78,16 +79,16 @@ def test_multiple_revisions_preserve_history_and_advance_current(tmp_path):
     write_snapshot(tmp_path, snap1)
     series = create_or_load_series(tmp_path, "CN-A", "300750", "CATL", "2026-10-04T00:00:00Z")
     r1 = next_revision(tmp_path, series["decision_series_id"])
-    write_decision_revision(tmp_path, series["decision_series_id"], r1, snap1, "run-1")
+    write_decision_revision(tmp_path, series["decision_series_id"], r1, snap1, "run-1", decision_admission=build_fixture_admission_receipt(snapshot=snap1, canonical_decision=snap1["decision"]))
     d1 = f"{series['decision_series_id']}-r001"
-    assert approve_revision(tmp_path, d1, snap1, True, "approve r1")["current"] is True
+    assert approve_revision(tmp_path, d1, snap1, True, "approve r1", actor_identity="human:test")["current"] is True
 
     snap2, h2 = build_persisted_snapshot("BUY", "2026-10-05")
     write_snapshot(tmp_path, snap2)
     r2 = next_revision(tmp_path, series["decision_series_id"])
-    write_decision_revision(tmp_path, series["decision_series_id"], r2, snap2, "run-2")
+    write_decision_revision(tmp_path, series["decision_series_id"], r2, snap2, "run-2", decision_admission=build_fixture_admission_receipt(snapshot=snap2, canonical_decision=snap2["decision"]))
     d2 = f"{series['decision_series_id']}-r002"
-    assert approve_revision(tmp_path, d2, snap2, True, "approve r2")["current"] is True
+    assert approve_revision(tmp_path, d2, snap2, True, "approve r2", actor_identity="human:test")["current"] is True
 
     current = json.loads((tmp_path / f"{series['decision_series_id']}.current.json").read_text())
     assert current["current_decision_id"] == d2
@@ -109,7 +110,7 @@ def test_approval_cannot_bind_wrong_snapshot(tmp_path):
     did = f"{series['decision_series_id']}-r001"
     write_decision_revision(tmp_path, series["decision_series_id"], 1, snap1, "run-1")
     try:
-        approve_revision(tmp_path, did, snap2, True, "wrong snapshot")
+        approve_revision(tmp_path, did, snap2, True, "wrong snapshot", actor_identity="human:test")
     except ValueError as exc:
         assert "same snapshot" in str(exc)
     else:
@@ -123,7 +124,7 @@ def test_trigger_contract_and_event_are_hashed_and_immutable(tmp_path):
     write_snapshot(tmp_path, snap)
     series = create_or_load_series(tmp_path, "CN-A", "300750", "CATL", "2026-10-04T00:00:00Z")
     decision_id = f"{series['decision_series_id']}-r001"
-    write_decision_revision(tmp_path, series["decision_series_id"], 1, snap, "run-1")
+    write_decision_revision(tmp_path, series["decision_series_id"], 1, snap, "run-1", decision_admission=build_fixture_admission_receipt(snapshot=snap, canonical_decision=snap["decision"]))
     revision = json.loads((tmp_path / f"{decision_id}.decision.json").read_text())
 
     contract = {
