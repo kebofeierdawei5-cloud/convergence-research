@@ -246,11 +246,6 @@ Acceptance:
 - fundamental decision semantics remain unchanged;
 - missing/ambiguous positioning data fails closed for the affected sizing permission.
 
-Canonical C5 acceptance:
-- PR #108 merged as `cdf998cd21776363914f178e648f03ec0c1539f8`;
-- dedicated C5 CI #7 passed on exact head `f9758beb683bba044fc9a153018050fa4ff09d9`;
-- acceptance record: `docs/iios/C5_ACCEPTANCE_2026-10-06.md`.
-
 Status: **PASS / MERGED / CANONICAL**
 
 Implementation PR: #108
