@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/decision-lifecycle-0.2.schema.json",
+  "title": "IIOS Decision Revision / Human Approval Lifecycle Contract v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "decision_id",
+    "decision_series_id",
+    "revision",
+    "run_id",
+    "trigger_event_id",
+    "case_id",
+    "as_of_date",
+    "cutoff_date",
+    "snapshot_hash",
+    "ai_action",
+    "decision_status",
+    "engine_version",
+    "human_approval_required",
+    "auto_execution",
+    "revision_hash",
+    "decision_admission"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "IIOS-DECISION-LIFECYCLE-0.2"
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_series_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trigger_event_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "as_of_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "cutoff_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "snapshot_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ai_action": {
+      "enum": [
+        "BUY",
+        "ADD",
+        "HOLD",
+        "REDUCE",
+        "EXIT",
+        "NO-BUY",
+        "WATCH",
+        "REVIEW_REQUIRED"
+      ]
+    },
+    "decision_status": {
+      "const": "AI_PROPOSED"
+    },
+    "engine_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "human_approval_required": {
+      "const": true
+    },
+    "auto_execution": {
+      "const": false
+    },
+    "revision_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_admission": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "IIOS-DECISION-ADMISSION-0.1"
+        },
+        "status": {
+          "const": "ADMITTED"
+        },
+        "admission_method": {
+          "const": "CANONICAL_DECIDE_V03_REEXECUTED"
+        },
+        "contract_version": {
+          "const": "IIOS-INVESTMENT-CORE-0.3"
+        },
+        "engine_version": {
+          "const": "0.3.0"
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "market": {
+          "type": "string",
+          "minLength": 1
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1
+        },
+        "company": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cutoff_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "canonical_decision_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "canonical_action": {
+          "enum": [
+            "BUY",
+            "ADD",
+            "HOLD",
+            "REDUCE",
+            "EXIT",
+            "NO-BUY",
+            "WATCH",
+            "REVIEW_REQUIRED"
+          ]
+        },
+        "canonical_decision_status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_new_capital_allowed": {
+          "type": "boolean"
+        },
+        "admission_record_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "schema_version",
+        "status",
+        "admission_method",
+        "contract_version",
+        "engine_version",
+        "case_id",
+        "market",
+        "symbol",
+        "company",
+        "cutoff_date",
+        "snapshot_hash",
+        "canonical_decision_hash",
+        "canonical_action",
+        "canonical_decision_status",
+        "canonical_new_capital_allowed",
+        "admission_record_hash"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "human_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "decision_id",
+        "revision",
+        "revision_hash",
+        "snapshot_hash",
+        "approved",
+        "approval_status",
+        "note",
+        "approval_hash",
+        "actor_identity",
+        "authorization_method"
+      ],
+      "properties": {
+        "contract_version": {
+          "const": "IIOS-DECISION-LIFECYCLE-0.2"
+        },
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "revision_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "approved": {
+          "type": "boolean"
+        },
+        "approval_status": {
+          "enum": [
+            "HUMAN_APPROVED",
+            "HUMAN_REJECTED"
+          ]
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approval_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "actor_identity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorization_method": {
+          "const": "HUMAN_AUTHENTICATED"
+        }
+      }
+    },
+    "current_projection": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contract_version",
+            "decision_series_id",
+            "current_decision_id",
+            "current_revision",
+            "snapshot_hash",
+            "approval_hash",
+            "projection_status",
+            "projection_hash"
+          ],
+          "properties": {
+            "contract_version": {
+              "const": "IIOS-DECISION-LIFECYCLE-0.2"
+            },
+            "decision_series_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "current_decision_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "current_revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "snapshot_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "approval_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "projection_status": {
+              "const": "CURRENT"
+            },
+            "projection_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "projection_status",
+            "candidate_decision_id",
+            "candidate_revision"
+          ],
+          "properties": {
+            "projection_status": {
+              "const": "UNCHANGED"
+            },
+            "candidate_decision_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "candidate_revision": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      ]
+    }
+  }
+}
