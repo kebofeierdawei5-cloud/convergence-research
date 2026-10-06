@@ -2,7 +2,7 @@
 
 Date: 2026-10-06
 Status: CANONICAL ROADMAP
-Basis: canonical `main` at `75bb360436286ae950a05028769701380120e561` after C2 merge.
+Basis: canonical C4 implementation merge `07d45c18df8df9100d4866dd5f92fa95ccdb7186`.
 
 ## 1. Purpose
 
@@ -34,6 +34,7 @@ Completed / canonical:
 - TR-01 Trigger Contract / Event Semantics = PASS / MERGED / CANONICAL
 - TR-02 Monitoring State = PASS / MERGED / CANONICAL
 - TR-03 Validation / Replay = PASS / MERGED / CANONICAL
+- C4 Expectation Gap Production Integration = PASS / MERGED / CANONICAL
 
 Current 300750 result:
 - Quality = CONDITIONAL
@@ -191,6 +192,20 @@ Acceptance:
 - incompatible expectations produce no scalar gap;
 - the result reconnects to the existing B1 return semantics without additive thresholds;
 - no new P3/P4 model family is required.
+
+### C4 — Expectation Gap Production Integration
+Status: **PASS / MERGED / CANONICAL**
+
+Implementation:
+- PR #105;
+- merge commit: `07d45c18df8df9100d4866dd5f92fa95ccdb7186`;
+- dedicated C4 Actions run #7 = SUCCESS on exact head `aacf1c0cc715697bfac2aa0bae5e2f0a4c899ad2`;
+- 75 tests passed;
+- executable acceptance harness = 7 / 7 PASS;
+- compileall = PASS;
+- git diff --check = PASS.
+
+Acceptance record: `docs/iios/C4_ACCEPTANCE_2026-10-06.md`.
 
 ### C5 — Positioning / Sizing
 
@@ -382,8 +397,10 @@ Current execution state after C2 acceptance:
 C0 — Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL
 → C1 — Machine Publication = PASS / MERGED / CANONICAL
 → C2 — Human Report + Report Quality Gate = PASS / MERGED / CANONICAL
-→ C3 — Second Company Acceptance
+→ C3 — Second Company Acceptance = PASS / MERGED / CANONICAL
+→ C4 — Expectation Gap Production Integration = PASS / MERGED / CANONICAL
+→ C5 — Positioning / Sizing
 
-C4–C8 follow only after the preceding acceptance boundaries are satisfied.
+C5–C8 follow only after the preceding acceptance boundaries are satisfied.
 
-Parallel FM Research remains separate and does not block C1/C2/C3 productization.
+Parallel FM Research remains separate and does not block Stage C productization.

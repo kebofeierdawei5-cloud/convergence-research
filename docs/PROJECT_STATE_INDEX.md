@@ -54,6 +54,8 @@ C1 Machine Publication = PASS / MERGED / CANONICAL
 C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL
         ↓
 C3 Second Company Acceptance — 科伦药业 = PASS / MERGED / CANONICAL
+         ↓
+C4 Expectation Gap Production Integration = PASS / MERGED / CANONICAL
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
@@ -145,14 +147,22 @@ C2 Human Report / Report Quality Gate is PASS / MERGED / CANONICAL:
 - 7 C2 tests passed;
 - report and QA JSON Schema validation plus diff check passed.
 
+C4 Expectation Gap Production Integration is PASS / MERGED / CANONICAL:
+- PR #105;
+- merge commit 07d45c18df8df9100d4866dd5f92fa95ccdb7186;
+- dedicated C4 CI #7 = SUCCESS on exact head aacf1c0cc715697bfac2aa0bae5e2f0a4c899ad2;
+- 75 tests passed;
+- executable acceptance harness 7 / 7 PASS;
+- compileall and git diff --check passed;
+- acceptance: docs/iios/C4_ACCEPTANCE_2026-10-06.md.
+
 Remaining Stage C productization:
-- C4 Expectation Gap Production Integration;
 - C5 Positioning / Sizing;
 - C6 Human Execution Receipt;
 - C7 Full Lifecycle E2E;
 - C8 Final Independent Red-team / MVP Acceptance.
 
-The full Investment Core CI still carries the separately tracked four CORE-04 assertion regressions; C1 does not modify that subsystem.
+The full Investment Core CI still carries the separately tracked four CORE-04 assertion regressions; C4 does not modify that subsystem.
 
 ## 5. State classification
 
@@ -270,7 +280,7 @@ TR-03 closes the historical `next_due_at` replay gap with immutable Monitoring E
 Acceptance:
 - `docs/iios/TR_03_ACCEPTANCE_2026-10-06.md`
 
-C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. C3 Second Company Acceptance = PASS / MERGED / CANONICAL. The next development boundary is C4 Expectation Gap Production Integration. Scheduler/alerts remain out of scope until a separate explicit batch is authorized; no new P3/P4/MIE model work is implied.
+C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. C3 Second Company Acceptance = PASS / MERGED / CANONICAL. C4 Expectation Gap Production Integration = PASS / MERGED / CANONICAL. The next development boundary is C5 Positioning / Sizing. Scheduler/alerts remain out of scope until a separate explicit batch is authorized; no new P3/P4/MIE model work is implied.
 
 Completed sub-batches:
 - **A1-01 Economic Evidence Bridge = PASS / MERGED**
@@ -286,13 +296,13 @@ A1 is complete as the company-side evidence-closure milestone.
 
 ## 9. Stage C current development boundary
 
-**C3 — Second Company Acceptance = PASS / MERGED / CANONICAL**
+**C4 — Expectation Gap Production Integration = PASS / MERGED / CANONICAL**
 
-C3 proves that the existing Decision → Machine Publication → Human Report → QA → Monitoring → Validation architecture crosses a materially different real company, 四川科伦药业股份有限公司, using SOTP and a distinct pharma/biotech economic structure. It does not modify investment semantics or create an execution path.
+C4 reconnects the existing Market Implied Expectation substrate to the canonical investment decision path as a deterministic, PIT/provenance-bound Expectation Gap evaluation. It does not alter B1 return semantics, Decision precedence, or create an execution path.
 
 Detailed roadmap: `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`.
 
-Immediate next batch: **C4 — Expectation Gap Production Integration**.
+Immediate next batch: **C5 — Positioning / Sizing**.
 
 Parallel FM Research remains separate.
 
@@ -304,3 +314,5 @@ C2 acceptance: `docs/iios/C2_ACCEPTANCE_2026-10-06.md`.
 C2 merge: `75bb360436286ae950a05028769701380120e561`.
 C3 acceptance: `docs/iios/C3_ACCEPTANCE_2026-10-06.md`.
 C3 merge: `eb0f9fc965f9ce6aa09685776d2ec8a0522e3b47`.
+C4 acceptance: `docs/iios/C4_ACCEPTANCE_2026-10-06.md`.
+C4 merge: `07d45c18df8df9100d4866dd5f92fa95ccdb7186`.

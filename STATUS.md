@@ -22,7 +22,7 @@ CORE-04 vertical decision closure is complete.
 
 A1 is complete as the company-side evidence-closure engineering milestone. Current 300750 Quality remains CONDITIONAL and new capital remains FALSE.
 
-C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. C3 Second Company Acceptance = PASS / MERGED / CANONICAL. The next Stage C batch is C4 Expectation Gap Production Integration.
+C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. C3 Second Company Acceptance = PASS / MERGED / CANONICAL. C4 Expectation Gap Production Integration = PASS / MERGED / CANONICAL. The next Stage C batch is C5 Positioning / Sizing.
 
 TR-03 Validation / Replay is now PASS / MERGED / CANONICAL.
 
@@ -184,3 +184,16 @@ Acceptance: docs/iios/C3_ACCEPTANCE_2026-10-06.md.
 Canonical C3 merge: eb0f9fc965f9ce6aa09685776d2ec8a0522e3b47.
 
 Next development boundary: C4 Expectation Gap Production Integration. C3 introduced no Expectation Gap, positioning/sizing, scheduler, alerts, or automatic execution capability.
+
+
+## C4 status
+
+C4 Expectation Gap Production Integration = PASS / MERGED / CANONICAL.
+
+Dedicated C4 Actions run #7 = SUCCESS on exact head aacf1c0cc715697bfac2aa0bae5e2f0a4c899ad2.
+75 tests passed; executable acceptance harness 7 / 7 PASS; compileall and git diff --check passed.
+
+Acceptance: docs/iios/C4_ACCEPTANCE_2026-10-06.md.
+Canonical C4 merge: 07d45c18df8df9100d4866dd5f92fa95ccdb7186.
+
+Next development boundary: C5 Positioning / Sizing.
