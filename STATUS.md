@@ -22,7 +22,7 @@ CORE-04 vertical decision closure is complete.
 
 A1 is complete as the company-side evidence-closure engineering milestone. Current 300750 Quality remains CONDITIONAL and new capital remains FALSE.
 
-C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. The next Stage C batch is C1 Machine Publication.
+C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. The next Stage C batch is C2 Human Report / Report Quality Gate.
 
 TR-03 Validation / Replay is now PASS / MERGED / CANONICAL.
 
@@ -111,12 +111,15 @@ TR-03 Validation / Replay = PASS / MERGED / CANONICAL.
 TR-03 closes the historical `next_due_at` replay gap using immutable monitoring initialization/evaluation records and source-derived fail-closed validation.
 
 Scheduler/alerts remain out of scope.
-## Product gaps after CORE-04
+## Product gaps after C1
 
-- Machine Publication
-- Human Report / Report Quality Gate
-- second-company acceptance
-- final independent red-team
+- C2 Human Report / Report Quality Gate
+- C3 Second Company Acceptance
+- C4 Expectation Gap Production Integration
+- C5 Positioning / Sizing
+- C6 Human Execution Receipt
+- C7 Full Lifecycle E2E
+- C8 Final Independent Red-team / MVP Acceptance
 
 ## Governance rule
 
@@ -142,4 +145,17 @@ The canonical Stage C plan is `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.m
 
 Canonical C0 merge: `1594e43eee14aaa41ddde675ddbe61d650462cf7`.
 
-Next boundary: C1 Machine Publication → C2 Human Report / Report Quality Gate → C3 Second Company Acceptance.
+Next boundary: C2 Human Report / Report Quality Gate → C3 Second Company Acceptance.
+
+
+## C1 status
+
+C1 Machine Publication = PASS / MERGED / CANONICAL.
+
+C1 provides a read-only, content-addressed machine-readable projection of an exact Decision Revision, with explicit AI/Human separation and bound Trigger / Monitoring / Validation references.
+
+Acceptance: `docs/iios/C1_ACCEPTANCE_2026-10-06.md`.
+
+Canonical C1 merge: `b9a8ff0fe1341a56f363fb058677dbd50a4f87b8`.
+
+Next boundary: C2 Human Report / Report Quality Gate.
