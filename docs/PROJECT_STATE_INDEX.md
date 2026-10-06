@@ -123,13 +123,23 @@ RP-01 Risk / Portfolio Production Contract is merged in canonical main:
 - deterministic audit hash;
 - no Decision Precedence change.
 
-The available workflow interface did not expose a post-merge runtime CI record for independent verification in this session. Therefore RP-01 is recorded as MERGED / implementation-complete, not as independently CI-certified here.
+C1 Machine Publication is PASS / MERGED / CANONICAL:
+- PR #97;
+- merge commit b9a8ff0fe1341a56f363fb058677dbd50a4f87b8;
+- dedicated C1 CI #7 = SUCCESS;
+- 5 C1 tests passed;
+- JSON Schema validation and diff check passed.
 
-Remaining Investment Core productization:
-- Machine Publication;
-- Human Report / Report Quality Gate;
-- second-company acceptance;
-- final independent red-team.
+Remaining Stage C productization:
+- C2 Human Report / Report Quality Gate;
+- C3 Second Company Acceptance;
+- C4 Expectation Gap Production Integration;
+- C5 Positioning / Sizing;
+- C6 Human Execution Receipt;
+- C7 Full Lifecycle E2E;
+- C8 Final Independent Red-team / MVP Acceptance.
+
+The full Investment Core CI still carries the separately tracked four CORE-04 assertion regressions; C1 does not modify that subsystem.
 
 ## 5. State classification
 
@@ -247,7 +257,7 @@ TR-03 closes the historical `next_due_at` replay gap with immutable Monitoring E
 Acceptance:
 - `docs/iios/TR_03_ACCEPTANCE_2026-10-06.md`
 
-C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. The detailed Stage C roadmap is `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`. The next development boundary is C1 Machine Publication. Scheduler/alerts remain out of scope until a separate explicit batch is authorized; no new P3/P4/MIE model work is implied.
+C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. The next development boundary is C2 Human Report / Report Quality Gate. Scheduler/alerts remain out of scope until a separate explicit batch is authorized; no new P3/P4/MIE model work is implied.
 
 Completed sub-batches:
 - **A1-01 Economic Evidence Bridge = PASS / MERGED**
@@ -269,7 +279,7 @@ C0 closed project-state authority, continuity hygiene, stale-document boundaries
 
 Detailed roadmap: `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`.
 
-Immediate next batch: C1 Machine Publication → C2 Human Report / Report Quality Gate → C3 Second Company Acceptance.
+Immediate next batch: C2 Human Report / Report Quality Gate → C3 Second Company Acceptance.
 
 Parallel FM Research remains separate.
 
