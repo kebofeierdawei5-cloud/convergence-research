@@ -690,6 +690,7 @@ def validate_monitoring_chain(
     root: str | Path,
     trigger_id: str,
     validation_cutoff_at: str,
+    validation_id: str | None = None,
 ) -> dict[str, Any]:
     contract = _load_trigger_contract(root, trigger_id)
     state_path = _monitoring_state_path(root, trigger_id)
@@ -722,8 +723,11 @@ def validate_monitoring_chain(
         checks["trigger_contract_binding"] = "FAIL"
         issues.append(f"trigger_contract_binding: {exc}")
 
-    validation_cutoff = validation_cutoff_at.replace("Z", "+00:00")
-    cutoff_dt = __import__("datetime").datetime.fromisoformat(validation_cutoff)
+    from .validation_replay import _timestamp
+    normalized_validation_cutoff = _timestamp(validation_cutoff_at, "validation_cutoff_at")
+    cutoff_dt = __import__("datetime").datetime.fromisoformat(
+        normalized_validation_cutoff.replace("Z", "+00:00")
+    )
     for event in events:
         try:
             validate_trigger_event(event, trigger_contract=contract)
@@ -789,9 +793,12 @@ def validate_monitoring_chain(
             checks["monitoring_replay"] = "FAIL"
             issues.append(f"monitoring_replay: {exc}")
 
-    from .validation_replay import _timestamp
     record = build_validation_record(
-        validation_id=f"{trigger_id}-validation-{validation_cutoff_at.replace(':', '').replace('+', 'p')}",
+        validation_id=(
+            validation_id
+            if validation_id is not None
+            else f"{trigger_id}-validation-{normalized_validation_cutoff.replace(':', '').replace('+', 'p')}"
+        ),
         trigger_contract=contract,
         monitor_id=persisted["monitor_id"],
         validation_cutoff_at=_timestamp(validation_cutoff_at, "validation_cutoff_at"),
@@ -812,21 +819,12 @@ def write_monitoring_validation(
     validation_cutoff_at: str,
     validation_id: str | None = None,
 ) -> Path:
-    record = validate_monitoring_chain(root, trigger_id, validation_cutoff_at)
-    if validation_id is not None:
-        record = build_validation_record(
-            validation_id=validation_id,
-            trigger_contract=_load_trigger_contract(root, trigger_id),
-            monitor_id=record["monitor_id"],
-            validation_cutoff_at=record["validation_cutoff_at"],
-            checks=record["checks"],
-            checked_event_ids=record["checked_event_ids"],
-            initial_state_hash=record["initial_state_hash"],
-            replayed_state_hash=record["replayed_state_hash"],
-            persisted_state_hash=record["persisted_state_hash"],
-            history_head_hash=record["history_head_hash"],
-            issues=record["issues"],
-        )
+    record = validate_monitoring_chain(
+        root,
+        trigger_id,
+        validation_cutoff_at,
+        validation_id=validation_id,
+    )
     path = _validation_path(root, record["validation_id"])
     return _atomic_create(path, record)
 
