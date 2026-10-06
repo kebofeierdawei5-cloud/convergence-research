@@ -276,6 +276,7 @@ def decide(case: dict[str, Any], *, evidence_root_resolver: Any | None = None, c
                 "capital_effect": proposal.get("capital_effect"),
                 "risk_portfolio_contract": proposal.get("risk_portfolio_contract"),
                 "expectation_gap_evaluation": proposal.get("expectation_gap_evaluation"),
+                "positioning_sizing": proposal.get("positioning_sizing"),
             },
             "monitoring": case.get("monitoring") or [],
         }

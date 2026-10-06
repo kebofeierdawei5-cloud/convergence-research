@@ -1,0 +1,383 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/c5-positioning-sizing-0.1.schema.json",
+  "title": "IIOS C5 Positioning / Sizing Production Contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evaluation_version",
+    "evaluation_id",
+    "evaluation_hash",
+    "policy_version",
+    "case_id",
+    "cutoff_date",
+    "observation_id",
+    "observation_as_of_date",
+    "known_at",
+    "source",
+    "source_bundle_sha256",
+    "evidence_ids",
+    "factors",
+    "factor_scores",
+    "composite_score",
+    "timing_bias",
+    "sizing_band",
+    "sizing_permission",
+    "current_position_pct",
+    "initial_position_pct",
+    "target_position_pct",
+    "max_position_pct",
+    "permitted_position_pct",
+    "entry_zone",
+    "add_zone",
+    "reduce_zone",
+    "hard_exposure_limit",
+    "reduce_consideration",
+    "status",
+    "reason",
+    "policy_effect"
+  ],
+  "properties": {
+    "evaluation_version": {
+      "const": "IIOS-C5-POSITIONING-SIZING-0.1"
+    },
+    "evaluation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "policy_version": {
+      "const": "IIOS-C5-POSITIONING-POLICY-0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cutoff_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "observation_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "observation_as_of_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date"
+    },
+    "known_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_bundle_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "evidence_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "factors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "market_regime",
+        "industry_sentiment",
+        "stock_structure",
+        "holder_capital_structure",
+        "crowding_supply_pressure"
+      ],
+      "properties": {
+        "market_regime": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "BULL",
+            "NEUTRAL",
+            "BEAR",
+            "UNKNOWN",
+            "AMBIGUOUS"
+          ]
+        },
+        "industry_sentiment": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "POSITIVE",
+            "NEUTRAL",
+            "NEGATIVE",
+            "UNKNOWN",
+            "AMBIGUOUS"
+          ]
+        },
+        "stock_structure": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "UP",
+            "RANGE",
+            "DOWN",
+            "UNKNOWN",
+            "AMBIGUOUS"
+          ]
+        },
+        "holder_capital_structure": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "SUPPORTIVE",
+            "NEUTRAL",
+            "OVERHANG",
+            "UNKNOWN",
+            "AMBIGUOUS"
+          ]
+        },
+        "crowding_supply_pressure": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+            "UNKNOWN",
+            "AMBIGUOUS"
+          ]
+        }
+      }
+    },
+    "factor_scores": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "market_regime": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "industry_sentiment": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "stock_structure": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "holder_capital_structure": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "crowding_supply_pressure": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1
+        }
+      }
+    },
+    "composite_score": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": -5,
+      "maximum": 5
+    },
+    "timing_bias": {
+      "enum": [
+        "FAVORABLE",
+        "NEUTRAL",
+        "UNFAVORABLE",
+        null
+      ]
+    },
+    "sizing_band": {
+      "enum": [
+        "TARGET",
+        "INITIAL",
+        "CURRENT",
+        "NONE"
+      ]
+    },
+    "sizing_permission": {
+      "enum": [
+        "ALLOW_UP_TO_TARGET",
+        "ALLOW_UP_TO_INITIAL",
+        "HOLD_CURRENT_NO_ADD",
+        "NO_SIZING_PERMISSION"
+      ]
+    },
+    "current_position_pct": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "initial_position_pct": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "target_position_pct": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "max_position_pct": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "permitted_position_pct": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reduce_consideration": {
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "BLOCKED"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_effect": {
+      "const": "TIMING_AND_SIZING_ONLY_NO_FUNDAMENTAL_DECISION_MUTATION"
+    },
+    "entry_zone": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "string"
+      }
+    },
+    "add_zone": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "string"
+      }
+    },
+    "reduce_zone": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "string"
+      }
+    },
+    "hard_exposure_limit": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "PASS"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "evidence_ids": {
+            "minItems": 1
+          },
+          "composite_score": {
+            "type": "integer"
+          },
+          "timing_bias": {
+            "not": {
+              "const": null
+            }
+          },
+          "sizing_band": {
+            "not": {
+              "const": "NONE"
+            }
+          },
+          "permitted_position_pct": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "BLOCKED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "sizing_permission": {
+            "const": "NO_SIZING_PERMISSION"
+          },
+          "sizing_band": {
+            "const": "NONE"
+          }
+        }
+      }
+    }
+  ]
+}
