@@ -160,3 +160,19 @@ def test_scheduled_state_requires_explicit_due_reference():
             lifecycle_status='ACTIVE',
             next_due_at='2026-10-07T00:00:00+00:00',
         )
+
+
+def test_evaluation_cutoff_cannot_move_backwards():
+    c = contract()
+    s = build_monitoring_state(monitor_id='m1', trigger_contract=c, lifecycle_status='ACTIVE')
+    n = apply_trigger_event(
+        previous_state=s,
+        trigger_contract=c,
+        trigger_event=evt(c, event_id='e2', known='2026-10-05T11:05:00+00:00', cutoff='2026-10-05T11:06:00+00:00'),
+    )
+    with pytest.raises(ValueError, match='evaluation_cutoff_at cannot move backwards'):
+        apply_trigger_event(
+            previous_state=n,
+            trigger_contract=c,
+            trigger_event=evt(c, event_id='e3', known='2026-10-05T12:05:00+00:00', cutoff='2026-10-05T11:05:00+00:00'),
+        )
