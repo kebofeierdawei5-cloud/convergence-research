@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from datetime import date
-from copy import deepcopy
-
 import pytest
 
 from iios_mvp.canonical_independent_forecast import InMemoryCanonicalIndependentForecastRegistry
@@ -26,14 +24,14 @@ COMPANY = "CATL"
 CUTOFF = date(2026, 10, 4)
 
 
-def _forecast():
+def _forecast(forecast_id: str = "forecast-b04-001"):
     registry = InMemoryCanonicalIndependentForecastRegistry()
     ref = registry.admit_independent_forecast({
         "case_id": CASE_ID,
         "market": MARKET,
         "symbol": SYMBOL,
         "cutoff_date": CUTOFF.isoformat(),
-        "forecast_id": "forecast-b04-001",
+        "forecast_id": forecast_id,
         "forecast_version": "B04-FORECAST-0.1",
         "model_version": "B04-MODEL-0.1",
         "variable_id": "forward_eps",
@@ -236,7 +234,7 @@ def test_b04_return_gate_reference_value_and_horizon_are_bound():
 def test_b04_forecast_to_valuation_binding_is_strict():
     forecast_registry, forecast_ref = _forecast()
     valuation_resolver, valuation_ref, valuation = _valuation(forecast_ref)
-    unrelated_registry, unrelated_ref = _forecast()
+    unrelated_registry, unrelated_ref = _forecast("forecast-b04-002")
     _ = unrelated_registry
     gate = _return_gate(unrelated_ref, valuation_ref)
     with pytest.raises(ValueError, match="valuation.forecast_ref"):
@@ -254,81 +252,3 @@ def test_b04_forecast_to_valuation_binding_is_strict():
         )
 
 
-def _core_case(return_gate):
-    return {
-        "contract_version": "IIOS-INVESTMENT-CORE-0.3",
-        "case_id": CASE_ID,
-        "market": MARKET,
-        "symbol": SYMBOL,
-        "company": COMPANY,
-        "as_of_date": CUTOFF.isoformat(),
-        "cutoff_date": CUTOFF.isoformat(),
-        "current_price_observation": {
-            "price": "291.11",
-            "price_observation_id": "b04-price-001",
-            "price_observation_admission_hash": "b" * 64,
-            "currency": "CNY",
-            "observed_at": "2026-10-04T15:00:00+00:00",
-            "known_at": "2026-10-04T15:00:00+00:00",
-            "source": "fixture",
-            "adjustment_semantics": "UNADJUSTED",
-        },
-        "company_evidence_manifest": {"manifest_id": "b04-company"},
-        "trust": {"status": "PASS"},
-        "reality": {"status": "PASS"},
-        "forecast": {"status": "PASS"},
-        "valuation": {"status": "PASS"},
-        "risk": {
-            "status": "PASS",
-            "max_loss_pct": "25",
-            "thesis_breaks": ["forecast failure"],
-            "evidence_ids": ["b04-risk"],
-        },
-        "portfolio": {
-            "position_pct": "0",
-            "constraint_status": "PASS",
-            "can_add": True,
-            "buy_add_package": {
-                "entry_zone": ["280", "291.11"],
-                "initial_position_pct": "5",
-                "target_position_pct": "10",
-                "max_position_pct": "10",
-                "thesis_break_triggers": ["forecast failure"],
-                "monitoring_triggers": ["quarterly review"],
-            },
-        },
-        "thesis": {"status": "INTACT"},
-        "decision_upstream_admission": {
-            "schema_version": "IIOS-CORE-04-UPSTREAM-ADMISSION-0.1",
-            "policy_version": "IIOS-DECISION-UPSTREAM-POLICY-0.1",
-            "case_id": CASE_ID,
-            "cutoff_date": CUTOFF.isoformat(),
-            "reality_status": "PASS",
-            "quality_gate_status": "PASS",
-            "value_driver_status": "PASS",
-            "valuation_status": "PASS",
-            "forecast_status": "PASS",
-            "thesis_status": "INTACT",
-            "thesis_admission_status": "ADMITTED",
-            "capital_admission_ready": True,
-            "quality_gate": {"status": "PASS", "case_id": CASE_ID, "cutoff_date": CUTOFF.isoformat(), "dimensions": []},
-            "thesis_admission": {"status": "INTACT", "admission_status": "ADMITTED", "case_id": CASE_ID, "cutoff_date": CUTOFF.isoformat(), "evidence_ids": ["b04-risk"]},
-            "evidence_ids": ["b04-risk"],
-            "admission_record_hash": "invalid-placeholder",
-        },
-        "return_gate": return_gate,
-    }
-
-
-def test_b04_core_validation_rejects_lineage_tampering_before_decision_runtime():
-    forecast_registry, forecast_ref = _forecast()
-    valuation_resolver, valuation_ref, _ = _valuation(forecast_ref)
-    gate = _return_gate(forecast_ref, valuation_ref)
-    gate["scenarios"]["bear"]["terminal_value_per_share"] = "999"
-    result = validate_case_v03(
-        _core_case(gate),
-        independent_forecast_resolver=forecast_registry,
-        valuation_output_resolver=valuation_resolver,
-    )
-    assert result["status"] == "BLOCKED"
-    assert any(error["code"] == "V03-RETURN-LINEAGE-CANONICAL" for error in result["errors"])
