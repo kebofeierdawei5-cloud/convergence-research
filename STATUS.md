@@ -22,7 +22,9 @@ CORE-04 vertical decision closure is complete.
 
 A1 is complete as the company-side evidence-closure engineering milestone. Current 300750 Quality remains CONDITIONAL and new capital remains FALSE.
 
-Current next work is **Validation / Replay Productization**, independently scoped from canonical main.
+Current next work is **Machine Publication / Human Report productization**, independently scoped from canonical main.
+
+TR-03 Validation / Replay is now PASS / MERGED / CANONICAL.
 
 No new P3/P4/MIE model work is on the critical path.
 
@@ -98,9 +100,19 @@ TR-02 Monitoring State = PASS / MERGED / CANONICAL.
 
 TR-02 does not include scheduler, alerts, automatic decision execution, or investment-semantic changes.
 
+## TR-03 status
+
+TR-03 Validation / Replay = PASS / MERGED / CANONICAL.
+- PR #93;
+- merge commit: 33291911c6e6b26da6deaf6c28a7a2046173c842;
+- dedicated Actions run #5 = SUCCESS;
+- red-team boundary review = PASS.
+
+TR-03 closes the historical `next_due_at` replay gap using immutable monitoring initialization/evaluation records and source-derived fail-closed validation.
+
+Scheduler/alerts remain out of scope.
 ## Product gaps after CORE-04
 
-- Validation / Replay Productization
 - Machine Publication
 - Human Report / Report Quality Gate
 - second-company acceptance
