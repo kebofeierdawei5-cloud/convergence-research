@@ -494,6 +494,24 @@
         "admission_record_hash": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "canonical_admission_refs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "REALITY",
+            "QUALITY",
+            "VALUE_DRIVER",
+            "VALUATION",
+            "FORECAST"
+          ],
+          "properties": {
+            "REALITY": {"$ref": "#/$defs/canonicalAdmissionReference"},
+            "QUALITY": {"$ref": "#/$defs/canonicalAdmissionReference"},
+            "VALUE_DRIVER": {"$ref": "#/$defs/canonicalAdmissionReference"},
+            "VALUATION": {"$ref": "#/$defs/canonicalAdmissionReference"},
+            "FORECAST": {"$ref": "#/$defs/canonicalAdmissionReference"}
+          }
         }
       }
     },
@@ -1478,6 +1496,32 @@
     }
   },
   "$defs": {
+    "canonicalAdmissionReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "admission_id",
+        "admission_record_hash",
+        "contract_version",
+        "domain",
+        "case_id",
+        "market",
+        "symbol",
+        "company",
+        "cutoff_date"
+      ],
+      "properties": {
+        "admission_id": {"type": "string", "minLength": 1},
+        "admission_record_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "contract_version": {"const": "IIOS-CANONICAL-INVESTMENT-ADMISSION-0.1"},
+        "domain": {"type": "string", "minLength": 1},
+        "case_id": {"type": "string", "minLength": 1},
+        "market": {"type": "string", "minLength": 1},
+        "symbol": {"type": "string", "minLength": 1},
+        "company": {"type": "string", "minLength": 1},
+        "cutoff_date": {"type": "string", "format": "date"}
+      }
+    },
     "scenario": {
       "type": "object",
       "additionalProperties": false,
@@ -1514,6 +1558,25 @@
     }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "decision_upstream_admission": {
+            "properties": {
+              "schema_version": {"const": "IIOS-CORE-04-UPSTREAM-ADMISSION-0.2"}
+            },
+            "required": ["schema_version"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision_upstream_admission": {
+            "required": ["canonical_admission_refs"]
+          }
+        }
+      }
+    },
     {
       "if": {
         "required": [
