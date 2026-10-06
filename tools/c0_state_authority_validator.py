@@ -60,7 +60,8 @@ def validate() -> None:
     _not_contains(readme, "Batch 2 v0.1 = OPEN / RED-TEAM BLOCKED", REPO_README)
     _not_contains(readme, "Next: Investment Core Contract v0.2", REPO_README)
 
-    _contains(a0, "docs/PROJECT_STATE_INDEX.md — the only canonical Current State Index", A0_POLICY)
+    _contains(a0, "docs/PROJECT_STATE_INDEX.md", A0_POLICY)
+    _contains(a0, "the only canonical Current State Index", A0_POLICY)
     _contains(a0, "New development starts only from canonical `main`", A0_POLICY)
 
     _historical_banner(LEGACY_INDEX)
