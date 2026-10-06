@@ -133,7 +133,9 @@ def admit_canonical_decision(
     cutoff = _date(case_identity["cutoff_date"], "case.cutoff_date")
     if cutoff != _date(snapshot_identity["cutoff_date"], "snapshot.input.cutoff_date"):
         raise ValueError("snapshot/case cutoff mismatch")
-    if _canonical(snapshot_core["decision"]) != _canonical(canonical_decision):
+    canonical_projection = {key: canonical_decision[key] for key in canonical_decision.keys()}
+    snapshot_projection = {key: snapshot_core["decision"].get(key) for key in canonical_decision.keys()}
+    if snapshot_projection != canonical_projection:
         raise ValueError("snapshot decision does not equal freshly re-executed canonical Decision Kernel result")
     return _build_receipt_from_canonical(
         snapshot=snapshot,
@@ -186,10 +188,27 @@ def validate_decision_admission_receipt(
             raise ValueError(f"decision_admission {key} does not match snapshot identity")
     if record["snapshot_hash"] != snapshot["snapshot_hash"]:
         raise ValueError("decision_admission snapshot binding mismatch")
-    if record["canonical_decision_hash"] != _sha(snapshot["decision"]):
-        raise ValueError("decision_admission canonical_decision_hash does not match snapshot decision")
-    if record["canonical_action"] != _decision_action(snapshot["decision"]):
-        raise ValueError("decision_admission canonical_action does not match snapshot decision")
+    projection = record["canonical_decision_projection"]
+    if not isinstance(projection, Mapping):
+        raise ValueError("decision_admission canonical_decision_projection is invalid")
+    keys = record["canonical_decision_keys"]
+    if (
+        not isinstance(keys, list)
+        or keys != sorted(set(keys))
+        or any(not isinstance(key, str) or not key for key in keys)
+        or "action" not in keys
+        or sorted(projection.keys()) != keys
+    ):
+        raise ValueError("decision_admission canonical decision projection is invalid")
+    if record["canonical_decision_hash"] != _sha(projection):
+        raise ValueError("decision_admission canonical_decision_hash does not match canonical projection")
+    snapshot_decision = snapshot["decision"]
+    if any(key not in snapshot_decision for key in keys):
+        raise ValueError("decision_admission canonical decision keys are not present in snapshot")
+    if any(snapshot_decision[key] != projection[key] for key in keys):
+        raise ValueError("decision_admission canonical decision projection does not match snapshot")
+    if record["canonical_action"] != _decision_action(projection):
+        raise ValueError("decision_admission canonical_action does not match canonical projection")
     keys = record["canonical_decision_keys"]
     if (
         not isinstance(keys, list)
