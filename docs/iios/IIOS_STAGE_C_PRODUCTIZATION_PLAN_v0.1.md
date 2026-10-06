@@ -272,6 +272,13 @@ Acceptance:
 - execution cannot modify historical AI/Human decision records;
 - no automatic order path exists.
 
+Status: **PASS / MERGED / CANONICAL**
+
+Implementation PR: #110
+Merge: `4c01e40dd7469221d9f5aee005c96e05bf4eb55f`
+Dedicated acceptance: C6 workflow #2 SUCCESS on exact head `f817041471a43618d30f88538b11a96e67b71fa0`; 23 tests passed; acceptance harness 8 / 8 PASS; compileall and git diff-check PASS.
+Acceptance record: `docs/iios/C6_ACCEPTANCE_2026-10-06.md`.
+
 ### C7 — Full Lifecycle E2E
 
 Objective:

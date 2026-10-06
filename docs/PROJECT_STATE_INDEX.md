@@ -290,7 +290,7 @@ TR-03 closes the historical `next_due_at` replay gap with immutable Monitoring E
 Acceptance:
 - `docs/iios/TR_03_ACCEPTANCE_2026-10-06.md`
 
-C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. C3 Second Company Acceptance = PASS / MERGED / CANONICAL. C4 Expectation Gap Production Integration = PASS / MERGED / CANONICAL. C5 Positioning / Sizing = PASS / MERGED / CANONICAL. The next development boundary is C6 Human Execution Receipt. Scheduler/alerts remain out of scope until a separate explicit batch is authorized; no new P3/P4/MIE model work is implied.
+C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. C3 Second Company Acceptance = PASS / MERGED / CANONICAL. C4 Expectation Gap Production Integration = PASS / MERGED / CANONICAL. C5 Positioning / Sizing = PASS / MERGED / CANONICAL. C6 Human Execution Receipt = PASS / MERGED / CANONICAL. The next development boundary is C7 Full Lifecycle E2E. Scheduler/alerts remain out of scope until a separate explicit batch is authorized; no new P3/P4/MIE model work is implied.
 
 Completed sub-batches:
 - **A1-01 Economic Evidence Bridge = PASS / MERGED**
@@ -306,13 +306,13 @@ A1 is complete as the company-side evidence-closure milestone.
 
 ## 9. Stage C current development boundary
 
-**C5 — Positioning / Sizing = PASS / MERGED / CANONICAL**
+**C6 — Human Execution Receipt = PASS / MERGED / CANONICAL**
 
-C5 completes the positioning / sizing layer as a deterministic, PIT-bound projection. It implements the five-layer positioning hierarchy and explicit entry/add/reduce/position-cap sizing surface, while preserving the fundamental Decision action and authority hierarchy.
+C6 records post-approval human execution against an exact Decision Revision and Human Approval, with immutable persistence and deterministic replay. It does not mutate historical Decision lifecycle artifacts and leaves auto_execution=false.
 
 Detailed roadmap: `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`.
 
-Immediate next batch: **C6 — Human Execution Receipt**.
+Immediate next batch: **C7 — Full Lifecycle E2E**.
 
 Parallel FM Research remains separate.
 
@@ -328,3 +328,5 @@ C4 acceptance: `docs/iios/C4_ACCEPTANCE_2026-10-06.md`.
 C4 merge: `07d45c18df8df9100d4866dd5f92fa95ccdb7186`.
 C5 acceptance: `docs/iios/C5_ACCEPTANCE_2026-10-06.md`.
 C5 merge: `cdf998cd21776363914f178e648f03ec0c1539f8`.
+C6 acceptance: `docs/iios/C6_ACCEPTANCE_2026-10-06.md`.
+C6 merge: `4c01e40dd7469221d9f5aee005c96e05bf4eb55f`.
