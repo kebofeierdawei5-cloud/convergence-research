@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from iios_mvp.canonical_current_price import InMemoryCanonicalCurrentPriceRegistry
+from iios_mvp.decision_admission import admit_canonical_decision
 from iios_mvp.human_report import build_human_report, qa_human_report, write_human_report
 from iios_mvp.investment_core_contract_v03 import calculate_return_metrics, decide_v03
 from iios_mvp.machine_publication import build_machine_publication, write_machine_publication
@@ -300,12 +301,18 @@ def run() -> dict[str, Any]:
             "decision": snapshot["decision"],
         })
         snapshot_path = write_snapshot(root, snapshot)
+        decision_admission = admit_canonical_decision(
+            case=case,
+            snapshot=snapshot,
+            current_price_resolver=registry,
+        )
         decision_path = write_decision_revision(
             root,
             series["decision_series_id"],
             1,
             snapshot,
             "run-c3-kolun-001",
+            decision_admission=decision_admission,
         )
         decision_record = json.loads(decision_path.read_text(encoding="utf-8"))
 
