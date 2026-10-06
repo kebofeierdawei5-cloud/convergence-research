@@ -308,8 +308,7 @@ def test_c7_publication_and_report_are_projections(tmp_path):
 
     decision_before = r1_path.read_bytes()
     projected = deepcopy(report)
-    projected["markdown"] += "
-Projection-only edit"
+    projected["markdown"] += "\nProjection-only edit"
     assert projected["markdown"] != report["markdown"]
     assert r1_path.read_bytes() == decision_before
     assert s1["decision"]["action"] == "BUY"
