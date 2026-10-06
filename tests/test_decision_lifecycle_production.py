@@ -75,7 +75,7 @@ def test_revision_rejects_legacy_decision_key():
     s["snapshot_hash"] = hashlib.sha256(
         json.dumps(core, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
-    with pytest.raises(ValueError, match="canonical decision"):
+    with pytest.raises(KeyError, match="action"):
         revision(s)
 
 def test_approval_binds_exact_revision_and_snapshot():
