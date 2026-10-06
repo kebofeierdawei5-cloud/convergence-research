@@ -1,7 +1,7 @@
 # IIOS Project Status
 
 State classification: **CANONICAL SUMMARY**
-Date: 2026-10-05
+Date: 2026-10-06
 
 Authoritative current-state record:
 `docs/PROJECT_STATE_INDEX.md`
@@ -22,7 +22,7 @@ CORE-04 vertical decision closure is complete.
 
 A1 is complete as the company-side evidence-closure engineering milestone. Current 300750 Quality remains CONDITIONAL and new capital remains FALSE.
 
-Current next work is **Trigger / Monitoring / Validation Productization**, independently scoped from canonical main.
+Current next work is **TR-02 Monitoring State**, independently scoped from canonical main.
 
 No new P3/P4/MIE model work is on the critical path.
 
@@ -78,9 +78,20 @@ Acceptance:
 - `docs/iios/DR_01_DECISION_LIFECYCLE_CONTRACT_v0.1.md`
 - `docs/iios/DR_02_PERSISTENCE_CLI_INTEGRATION_v0.1.md`
 
+## TR-01 status
+
+TR-01 Trigger Contract / Event Semantics = PASS / MERGED / CANONICAL.
+- PR #89;
+- merge commit: 0fb7262ded47b3497f5be33dc93163e209f0098f;
+- dedicated Actions run #9 = SUCCESS;
+- independent exact-module execution = PASS.
+
+The full Investment Core CI on the pre-merge TR-01 head retained four unrelated CORE-04 assertion regressions. These remain a separate cleanup item and do not change the TR-01 acceptance boundary.
+
 ## Product gaps after CORE-04
 
-- Trigger / Monitoring / Validation Productization
+- TR-02 Monitoring State
+- Validation / replay
 - Machine Publication
 - Human Report / Report Quality Gate
 - second-company acceptance
