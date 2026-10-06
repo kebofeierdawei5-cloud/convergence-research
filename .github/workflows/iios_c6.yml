@@ -1,0 +1,43 @@
+name: IIOS C6 — Human Execution Receipt
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/execution_receipt_production.py"
+      - "iios_mvp/store.py"
+      - "schemas/execution_receipt_v0.1.schema.json"
+      - "tests/test_c6_execution_receipt_production.py"
+      - "tests/test_decision_lifecycle_production.py"
+      - "tests/test_dr_02_persistence_cli.py"
+      - "docs/iios/C6_HUMAN_EXECUTION_RECEIPT_v0.1.md"
+      - "tools/c6_human_execution_receipt_e2e.py"
+      - ".github/workflows/iios_c6.yml"
+  push:
+    branches: [main]
+    paths:
+      - "iios_mvp/execution_receipt_production.py"
+      - "iios_mvp/store.py"
+      - "schemas/execution_receipt_v0.1.schema.json"
+      - "tests/test_c6_execution_receipt_production.py"
+      - "tests/test_decision_lifecycle_production.py"
+      - "tests/test_dr_02_persistence_cli.py"
+      - "docs/iios/C6_HUMAN_EXECUTION_RECEIPT_v0.1.md"
+      - "tools/c6_human_execution_receipt_e2e.py"
+      - ".github/workflows/iios_c6.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  c6:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q iios_mvp tools tests
+      - run: PYTHONPATH=. pytest -q tests/test_c6_execution_receipt_production.py tests/test_decision_lifecycle_production.py tests/test_dr_02_persistence_cli.py
+      - run: PYTHONPATH=. python tools/c6_human_execution_receipt_e2e.py
+      - run: git diff --check
