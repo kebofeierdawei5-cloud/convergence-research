@@ -146,7 +146,7 @@ def test_c8_real_company_fixture_set_contains_catl_and_kolun():
     kolun = json.loads(
         (ROOT / "examples/real_cases/RC-CN-A-002422-20261004_c3_input.json").read_text(encoding="utf-8")
     )
-    assert catl["case_id"] == CATL_CASE
+    assert catl["core02_input"]["case"]["case_id"] == CATL_CASE
     assert kolun["case_id"] == KOLUN_CASE
 
 
@@ -301,13 +301,6 @@ def test_c8_approval_cross_revision_mismatch_is_rejected(tmp_path):
 def test_c8_monitoring_history_tamper_is_detected(tmp_path):
     _, _, _, _, trigger_path = seed_c7(tmp_path)
     trigger = json.loads(trigger_path.read_text(encoding="utf-8"))
-    initialize_monitoring_state(
-        tmp_path,
-        trigger["trigger_id"],
-        "c8-monitor",
-        next_due_at="2026-10-08T00:00:00+00:00",
-        evaluation_reference_at="2026-10-04T00:00:00+00:00",
-    )
     write_trigger_event(
         tmp_path,
         {
