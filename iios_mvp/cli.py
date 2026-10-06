@@ -10,6 +10,7 @@ from .core03_market_expectation import build_core03_package, validate_core03_pac
 from .engine import replay, render_markdown, run_case
 from .research_intake import build_research_case
 from .machine_publication import write_machine_publication
+from .human_report import write_human_report
 from .store import (
     approve_revision,
     create_or_load_series,
@@ -207,6 +208,27 @@ def cmd_publish(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_report(args: argparse.Namespace) -> int:
+    report_path, qa_path = write_human_report(
+        args.out,
+        publication_path=args.publication,
+        generated_at=args.generated_at,
+    )
+    report = load_json(str(report_path))
+    qa = load_json(str(qa_path))
+    print(json.dumps({
+        "status": "REPORT_PUBLISHED",
+        "report": str(report_path),
+        "markdown": str(report_path).replace(".report.json", ".report.md"),
+        "qa": str(qa_path),
+        "report_id": report["report_id"],
+        "report_hash": report["report_hash"],
+        "qa_status": qa["qa_status"],
+        "qa_hash": qa["qa_hash"],
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_trigger_contract(args: argparse.Namespace) -> int:
     contract = load_json(args.contract)
     path = write_trigger_contract(args.out, args.decision_id, contract)
@@ -334,6 +356,12 @@ def parser() -> argparse.ArgumentParser:
     pub.add_argument("--published-at", required=True)
     pub.add_argument("--out", default="runs")
     pub.set_defaults(func=cmd_publish)
+
+    rep = sub.add_parser("report", help="render a canonical machine publication into an immutable human-readable report and run the report quality gate")
+    rep.add_argument("publication", help="canonical Machine Publication JSON")
+    rep.add_argument("--generated-at", required=True)
+    rep.add_argument("--out", default="runs")
+    rep.set_defaults(func=cmd_report)
 
 
     ap = sub.add_parser("approve", help="record separate human approval")
