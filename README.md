@@ -58,6 +58,19 @@ TR-03 Validation / Replay = PASS / CANONICAL
 Stage C Productization
 ```
 
+## Canonical return semantics
+
+B1 v0.3 keeps these as separate semantic objects:
+
+- Entry Return Cushion: non-annualized entry safety threshold, currently 15% for standard BUY/ADD;
+- Margin of Safety: separate value-relative diagnostic;
+- Expected Total Return_H;
+- Expected Annualized Return_H: standard fundamental BUY/ADD target is at least 15%;
+- Required Return: independent risk/opportunity-cost benchmark;
+- Horizon H: 1Y default, with explicit 3Y override only when justified by policy.
+
+The two 15% policies are numerically equal but are never aliases and are not added together.
+
 Current real-company accepted case:
 
 ```
