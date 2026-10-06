@@ -219,6 +219,7 @@ def test_c4_nonpositive_gap_is_a_real_calculation_but_remains_advisory():
     result = decide(
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
