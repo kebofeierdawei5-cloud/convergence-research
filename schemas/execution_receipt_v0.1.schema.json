@@ -103,19 +103,22 @@
       "type": [
         "string",
         "null"
-      ]
+      ],
+      "pattern": "^(0|[0-9]+(?:\\.[0-9]+)?)$"
     },
     "executed_position_pct": {
       "type": [
         "string",
         "null"
-      ]
+      ],
+      "pattern": "^(0|[0-9]+(?:\\.[0-9]+)?)$"
     },
     "executed_price": {
       "type": [
         "string",
         "null"
-      ]
+      ],
+      "pattern": "^(0|[0-9]+(?:\\.[0-9]+)?)$"
     },
     "actor_identity": {
       "type": "string",
@@ -147,14 +150,20 @@
       "then": {
         "anyOf": [
           {
-            "required": [
-              "executed_quantity"
-            ]
+            "properties": {
+              "executed_quantity": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           },
           {
-            "required": [
-              "executed_position_pct"
-            ]
+            "properties": {
+              "executed_position_pct": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           }
         ]
       }
