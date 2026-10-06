@@ -1,9 +1,11 @@
 import json
+from argparse import Namespace
 from pathlib import Path
 
 import pytest
 from jsonschema import Draft202012Validator
 
+from iios_mvp import cli
 from iios_mvp.human_report import (
     QA_VERSION,
     REPORT_VERSION,
@@ -211,3 +213,20 @@ def test_report_generation_does_not_mutate_publication(tmp_path):
         publication=publication, generated_at="2026-10-06T02:00:00+00:00"
     )
     assert publication_path.read_bytes() == before
+
+
+def test_cli_report_exposes_human_report(tmp_path, capsys):
+    publication, publication_path = make_publication(tmp_path)
+    args = Namespace(
+        out=str(tmp_path),
+        publication=str(publication_path),
+        generated_at="2026-10-06T02:00:00+00:00",
+    )
+    assert cli.cmd_report(args) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "REPORT_PUBLISHED"
+    assert result["report_hash"]
+    assert result["qa_status"] == "PASS"
+    assert Path(result["markdown"]).exists()
+    assert Path(result["report"]).exists()
+    assert Path(result["qa"]).exists()
