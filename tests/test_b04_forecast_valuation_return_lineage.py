@@ -24,8 +24,9 @@ COMPANY = "CATL"
 CUTOFF = date(2026, 10, 4)
 
 
-def _forecast(forecast_id: str = "forecast-b04-001"):
-    registry = InMemoryCanonicalIndependentForecastRegistry()
+def _forecast(forecast_id: str = "forecast-b04-001", registry=None):
+    if registry is None:
+        registry = InMemoryCanonicalIndependentForecastRegistry()
     ref = registry.admit_independent_forecast({
         "case_id": CASE_ID,
         "market": MARKET,
@@ -234,8 +235,8 @@ def test_b04_return_gate_reference_value_and_horizon_are_bound():
 def test_b04_forecast_to_valuation_binding_is_strict():
     forecast_registry, forecast_ref = _forecast()
     valuation_resolver, valuation_ref, valuation = _valuation(forecast_ref)
-    unrelated_registry, unrelated_ref = _forecast("forecast-b04-002")
-    _ = unrelated_registry
+    _, unrelated_ref = _forecast("forecast-b04-002", registry=forecast_registry)
+    _ = valuation
     gate = _return_gate(unrelated_ref, valuation_ref)
     with pytest.raises(ValueError, match="valuation.forecast_ref"):
         validate_forecast_valuation_return_lineage(
