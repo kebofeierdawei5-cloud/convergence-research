@@ -114,9 +114,7 @@ def validate_decision_revision(record: Any, *, case_id: str, cutoff_date: str) -
                 'company': admission.get('company', ''),
                 'cutoff_date': record['cutoff_date'],
             },
-            'decision': {
-                'action': record['ai_action'],
-            },
+            'decision': dict(admission['canonical_decision_projection']),
             'snapshot_hash': record['snapshot_hash'],
         })
         if admission['canonical_action'] != record['ai_action']:
