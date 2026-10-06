@@ -383,19 +383,92 @@ def _trigger_event_path(root: str | Path, trigger_event_id: str) -> Path:
     return store_root(root) / f"{trigger_event_id}.event.json"
 
 
+def _validate_trigger_revision_binding(
+    root: str | Path,
+    *,
+    decision_id: str,
+    decision_series_id: str,
+    revision: int,
+    decision_revision_hash: str,
+    case_id: str,
+    decision_cutoff_date: str,
+) -> None:
+    revision_record = _load_revision(root, decision_id)
+    validate_decision_revision(
+        revision_record,
+        case_id=revision_record["case_id"],
+        cutoff_date=revision_record["cutoff_date"],
+    )
+    expected = {
+        "decision_id": revision_record["decision_id"],
+        "decision_series_id": revision_record["decision_series_id"],
+        "revision": revision_record["revision"],
+        "decision_revision_hash": revision_record["revision_hash"],
+        "case_id": revision_record["case_id"],
+        "decision_cutoff_date": revision_record["cutoff_date"],
+    }
+    actual = {
+        "decision_id": decision_id,
+        "decision_series_id": decision_series_id,
+        "revision": revision,
+        "decision_revision_hash": decision_revision_hash,
+        "case_id": case_id,
+        "decision_cutoff_date": decision_cutoff_date,
+    }
+    if actual != expected:
+        raise ValueError("trigger contract is not bound to the persisted decision revision")
+
+
 def _load_trigger_contract(root: str | Path, trigger_id: str) -> dict[str, Any]:
     record = _load_json(_trigger_contract_path(root, trigger_id))
     if not record:
         raise ValueError("trigger contract not found")
     validate_trigger_contract(record)
+    _validate_trigger_revision_binding(
+        root,
+        decision_id=record["decision_id"],
+        decision_series_id=record["decision_series_id"],
+        revision=record["revision"],
+        decision_revision_hash=record["decision_revision_hash"],
+        case_id=record["case_id"],
+        decision_cutoff_date=record["decision_cutoff_date"],
+    )
     return record
 
 
 def write_trigger_contract(root: str | Path, decision_id: str, contract: dict[str, Any]) -> Path:
     payload = dict(contract)
     payload["decision_id"] = decision_id
+    payload.pop("contract_version", None)
     payload.pop("trigger_hash", None)
+    fields = {
+        "trigger_id",
+        "decision_id",
+        "decision_series_id",
+        "revision",
+        "decision_revision_hash",
+        "case_id",
+        "decision_cutoff_date",
+        "role",
+        "metric_id",
+        "operator",
+        "target",
+        "unit",
+        "evidence_ids",
+        "enabled",
+    }
+    if set(payload) != fields:
+        raise ValueError("trigger contract input fields are invalid")
     canonical = build_trigger_contract(**payload)
+    _validate_trigger_revision_binding(
+        root,
+        decision_id=canonical["decision_id"],
+        decision_series_id=canonical["decision_series_id"],
+        revision=canonical["revision"],
+        decision_revision_hash=canonical["decision_revision_hash"],
+        case_id=canonical["case_id"],
+        decision_cutoff_date=canonical["decision_cutoff_date"],
+    )
     path = _trigger_contract_path(root, canonical["trigger_id"])
     return _atomic_create(path, canonical)
 
@@ -406,9 +479,19 @@ def write_trigger_event(root: str | Path, event: dict[str, Any]) -> Path:
     if not isinstance(trigger_id, str) or not trigger_id.strip():
         raise ValueError("trigger_id is required for trigger event")
     contract = _load_trigger_contract(root, trigger_id)
-    payload.pop("trigger_contract", None)
-    payload.pop("trigger_event_hash", None)
-    payload.pop("event_version", None)
+    payload.pop("trigger_id", None)
+    fields = {
+        "trigger_event_id",
+        "evaluation_cutoff_at",
+        "observed_at",
+        "known_at",
+        "source_id",
+        "evidence_id",
+        "value",
+        "previous_value",
+    }
+    if set(payload) != fields:
+        raise ValueError("trigger event input fields are invalid")
     canonical = build_trigger_event(trigger_contract=contract, **payload)
     path = _trigger_event_path(root, canonical["trigger_event_id"])
     existing = _load_json(path) if path.exists() else None
