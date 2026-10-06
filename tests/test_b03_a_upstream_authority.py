@@ -36,7 +36,7 @@ def registry_with_states(states: dict[str, str]):
             **CASE,
             domain_status=states[domain],
             source_record_id=f"{domain}-SOURCE-001",
-            source_record_hash=(domain.lower().replace("_", "") + "a" * 64)[:64],
+            source_record_hash="a" * 64,
             output_hash=("b" * 64),
             producer_version=f"{domain}-0.1",
             evidence_ids=[f"E-{domain}"],
