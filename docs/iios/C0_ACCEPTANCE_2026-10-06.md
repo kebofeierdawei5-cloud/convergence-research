@@ -1,9 +1,13 @@
 # C0 Acceptance — Governance Hygiene / Stage Baseline
 
 Date: 2026-10-06
-Status: CANDIDATE — READY FOR CANONICAL MERGE
+Status: ACCEPTED / CANONICAL
 
 ## Acceptance decision
+
+C0 = PASS / MERGED / CANONICAL.
+
+Canonical merge commit: 1594e43eee14aaa41ddde675ddbe61d650462cf7.
 
 C0 source-level governance boundary = PASS.
 

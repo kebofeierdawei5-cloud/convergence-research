@@ -1,7 +1,7 @@
 # C0 — Governance Hygiene / Stage Baseline v0.1
 
 Date: 2026-10-06
-Status: CANDIDATE — PENDING ACCEPTANCE
+Status: ACCEPTED / CANONICAL
 Scope: project-state authority, continuity hygiene, and development-entry enforcement
 
 ## Objective
