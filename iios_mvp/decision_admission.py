@@ -12,6 +12,55 @@ CANONICAL_INVESTMENT_CORE_VERSION = "IIOS-INVESTMENT-CORE-0.3"
 CANONICAL_DECISION_ENGINE_VERSION = "0.3.0"
 DECISION_ACTIONS = {"BUY", "ADD", "HOLD", "REDUCE", "EXIT", "NO-BUY", "WATCH", "REVIEW_REQUIRED"}
 
+CANONICAL_DECISION_FIELDS = (
+    "contract_version",
+    "decision_status",
+    "investability_status",
+    "action",
+    "primary_reason",
+    "human_approval_required",
+    "auto_execution",
+    "gates",
+    "decision_upstream_admission",
+    "position_package_complete",
+    "target_entry_price",
+    "target_entry_price_return_only",
+    "target_entry_price_semantics",
+    "target_entry_price_requires_gap_revalidation",
+    "target_entry_price_v2_version",
+    "target_entry_price_v2",
+    "target_entry_price_gap_revalidation",
+    "target_entry_price_p2_1_version",
+    "target_entry_price_p2_1",
+    "target_entry_price_p2_1_price_response",
+    "canonical_entry_evaluation_version",
+    "canonical_entry_evaluation",
+    "decision_pre_admission_action",
+    "decision_admission_version",
+    "decision_admission",
+    "decision_admission_status",
+    "decision_admission_rule_id",
+    "current_price",
+    "mie_policy",
+    "mie_material_contradiction",
+    "decision_precedence_version",
+    "decision_precedence_rule_id",
+    "decision_precedence_rank",
+    "decision_scope",
+    "capital_effect",
+    "risk_portfolio_contract",
+    "expectation_gap_evaluation",
+    "positioning_sizing",
+    "return_metrics",
+)
+CANONICAL_DECISION_REQUIRED_FIELDS = (
+    "action",
+    "decision_status",
+    "gates",
+    "human_approval_required",
+    "auto_execution",
+)
+
 
 def _canonical(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -74,6 +123,18 @@ def _build_receipt_from_canonical(
     identity = _identity_from_input(snapshot_core["input"])
     if _decision_action(snapshot_core["decision"]) != _decision_action(canonical_decision):
         raise ValueError("snapshot decision action does not equal canonical Decision Kernel action")
+    missing = [key for key in CANONICAL_DECISION_REQUIRED_FIELDS if key not in canonical_decision]
+    if missing:
+        raise ValueError("canonical Decision Kernel result missing required fields: " + ", ".join(missing))
+    projection = {
+        key: canonical_decision[key]
+        for key in CANONICAL_DECISION_FIELDS
+        if key in canonical_decision
+    }
+    snapshot_decision = snapshot_core["decision"]
+    for key in projection:
+        if key not in snapshot_decision or snapshot_decision[key] != projection[key]:
+            raise ValueError("snapshot decision does not equal canonical Decision Kernel result")
     core = {
         "schema_version": DECISION_ADMISSION_SCHEMA_VERSION,
         "status": DECISION_ADMISSION_STATUS,
@@ -82,9 +143,9 @@ def _build_receipt_from_canonical(
         "engine_version": CANONICAL_DECISION_ENGINE_VERSION,
         **identity,
         "snapshot_hash": snapshot["snapshot_hash"],
-        "canonical_decision_keys": sorted(canonical_decision.keys()),
-        "canonical_decision_projection": dict(canonical_decision),
-        "canonical_decision_hash": _sha(canonical_decision),
+        "canonical_decision_keys": sorted(projection.keys()),
+        "canonical_decision_projection": projection,
+        "canonical_decision_hash": _sha(projection),
         "canonical_action": _decision_action(canonical_decision),
         "canonical_decision_status": _text(
             canonical_decision.get("decision_status", "REVIEW_REQUIRED"),
@@ -133,9 +194,16 @@ def admit_canonical_decision(
     cutoff = _date(case_identity["cutoff_date"], "case.cutoff_date")
     if cutoff != _date(snapshot_identity["cutoff_date"], "snapshot.input.cutoff_date"):
         raise ValueError("snapshot/case cutoff mismatch")
-    canonical_projection = {key: canonical_decision[key] for key in canonical_decision.keys()}
-    snapshot_projection = {key: snapshot_core["decision"].get(key) for key in canonical_decision.keys()}
-    if snapshot_projection != canonical_projection:
+    required_fields = [key for key in CANONICAL_DECISION_REQUIRED_FIELDS if key not in canonical_decision]
+    if required_fields:
+        raise ValueError("canonical Decision Kernel result missing required fields: " + ", ".join(required_fields))
+    projection = {
+        key: canonical_decision[key]
+        for key in CANONICAL_DECISION_FIELDS
+        if key in canonical_decision
+    }
+    snapshot_decision = snapshot_core["decision"]
+    if any(key not in snapshot_decision or snapshot_decision[key] != projection[key] for key in projection):
         raise ValueError("snapshot decision does not equal freshly re-executed canonical Decision Kernel result")
     return _build_receipt_from_canonical(
         snapshot=snapshot,
