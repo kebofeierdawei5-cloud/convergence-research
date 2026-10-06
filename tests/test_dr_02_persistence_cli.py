@@ -184,5 +184,5 @@ def test_persisted_revision_tampering_is_detected(tmp_path):
         json.dumps(record, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match="revision hash mismatch"):
+    with pytest.raises(ValueError, match="decision admission action binding mismatch"):
         replay_decision_lifecycle(tmp_path, "CN-A-300750-r001")
