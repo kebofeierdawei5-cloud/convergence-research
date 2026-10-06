@@ -604,6 +604,13 @@ def apply_monitoring_event(
         raise ValueError("monitoring state not initialized")
     validate_monitoring_state(previous, trigger_contract=contract)
     validate_trigger_event(event, trigger_contract=contract)
+    if event["trigger_event_id"] == previous.get("last_event_id"):
+        existing_evaluation = _load_json(
+            _monitoring_evaluation_path(root, event["trigger_event_id"])
+        )
+        if not existing_evaluation:
+            raise ValueError("idempotent monitoring event is missing its immutable evaluation record")
+        return state_path
     updated = apply_trigger_event(
         previous_state=previous,
         trigger_contract=contract,
