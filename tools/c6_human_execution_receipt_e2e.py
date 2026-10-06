@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+from inspect import signature
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from tests.test_c6_execution_receipt_production import (
     test_c6_invalid_execution_timestamp_or_negative_amount_fails_closed,
@@ -27,7 +30,11 @@ def run() -> dict[str, object]:
     )
     completed = []
     for name, check in checks:
-        check()
+        if len(signature(check).parameters) == 0:
+            check()
+        else:
+            with TemporaryDirectory() as tmp:
+                check(Path(tmp))
         completed.append(name)
     return {
         "status": "PASS",
