@@ -85,8 +85,7 @@ def test_wrong_domain_reference_is_rejected():
         registry.resolve(
             ref,
             expected_domain="VALUATION",
-            **CASE,
-            cutoff_date=date(2026, 10, 4),
+            **{**CASE, "cutoff_date": date(2026, 10, 4)},
         )
 
 
@@ -137,8 +136,7 @@ def test_reference_tampering_is_rejected_by_record_binding():
         registry.resolve(
             ref,
             expected_domain="FORECAST",
-            **CASE,
-            cutoff_date=date(2026, 10, 4),
+            **{**CASE, "cutoff_date": date(2026, 10, 4)},
         )
 
 
