@@ -12,6 +12,8 @@ A0_POLICY = REPO_ROOT / "docs" / "iios" / "A0_STATE_AUTHORITY_POLICY_v0.1.md"
 LEGACY_INDEX = REPO_ROOT / "docs" / "iios" / "IIOS_CURRENT_STATE_INDEX.md"
 LEGACY_ROADMAP = REPO_ROOT / "docs" / "iios" / "IIOS_CONSOLIDATED_POST_REDTEAM_DEVELOPMENT_PLAN_2026-10-04.md"
 STAGE_C_PLAN = REPO_ROOT / "docs" / "iios" / "IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md"
+C0_CONTRACT = REPO_ROOT / "docs" / "iios" / "C0_GOVERNANCE_HYGIENE_v0.1.md"
+C0_ACCEPTANCE = REPO_ROOT / "docs" / "iios" / "C0_ACCEPTANCE_2026-10-06.md"
 
 def _read(path: Path) -> str:
     if not path.is_file():
@@ -38,6 +40,8 @@ def validate() -> None:
     readme = _read(REPO_README)
     a0 = _read(A0_POLICY)
     stage_c = _read(STAGE_C_PLAN)
+    c0_contract = _read(C0_CONTRACT)
+    c0_acceptance = _read(C0_ACCEPTANCE)
 
     _contains(canonical, "State classification: **CANONICAL**", CANONICAL_INDEX)
     _contains(canonical, "Authority: this file is the **only canonical Current State Index**.", CANONICAL_INDEX)
@@ -70,6 +74,10 @@ def validate() -> None:
     _contains(stage_c, "# IIOS Stage C", STAGE_C_PLAN)
     _contains(stage_c, "### C0", STAGE_C_PLAN)
     _contains(stage_c, "### C8", STAGE_C_PLAN)
+    _contains(stage_c, "Status: CANONICAL ROADMAP", STAGE_C_PLAN)
+    _contains(c0_contract, "Status: ACCEPTED / CANONICAL", C0_CONTRACT)
+    _contains(c0_acceptance, "Status: ACCEPTED / CANONICAL", C0_ACCEPTANCE)
+    _contains(c0_acceptance, "C0 = PASS / MERGED / CANONICAL.", C0_ACCEPTANCE)
 
     candidates = list((REPO_ROOT / 'docs').rglob('*CURRENT_STATE_INDEX*.md'))
     for path in candidates:
