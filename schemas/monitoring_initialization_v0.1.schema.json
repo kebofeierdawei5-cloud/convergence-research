@@ -21,7 +21,7 @@
     "case_id": {"type": "string","minLength": 1},
     "monitor_id": {"type": "string","minLength": 1},
     "initial_state_hash": {"type": "string","pattern": "^[0-9a-f]{64}$"},
-    "initial_state": {"$ref": "monitoring_state_v0.1.schema.json"},
+    "initial_state": {"type": "object"},
     "initialization_hash": {"type": "string","pattern": "^[0-9a-f]{64}$"}
   }
 }
