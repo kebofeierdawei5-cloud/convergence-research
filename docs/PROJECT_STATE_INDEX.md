@@ -114,7 +114,6 @@ RP-01 Risk / Portfolio Production Contract is merged in canonical main:
 The available workflow interface did not expose a post-merge runtime CI record for independent verification in this session. Therefore RP-01 is recorded as MERGED / implementation-complete, not as independently CI-certified here.
 
 Remaining Investment Core productization:
-- TR-02 Monitoring State;
 - Validation / replay;
 - Machine Publication;
 - Human Report / Report Quality Gate;
@@ -220,7 +219,15 @@ Acceptance:
 - `docs/iios/DR_02_PERSISTENCE_CLI_INTEGRATION_v0.1.md`
 - `docs/iios/TR_01_ACCEPTANCE_2026-10-06.md`
 
-The next development batch is **TR-02 Monitoring State**. It must start from the resulting canonical main and this State Index. No scheduler/alerts or new P3/P4/MIE model work is implied.
+**TR-02 Monitoring State = PASS / MERGED / CANONICAL**
+
+Merge commit: 6b5a83ff3dcb0028945f455c517b369dbbf8220b.
+Dedicated GitHub Actions run #10 = SUCCESS; red-team review passed; no scheduler, alerts, or Decision Kernel changes were introduced.
+
+Acceptance:
+- `docs/iios/TR_02_ACCEPTANCE_2026-10-06.md`
+
+The next development batch is **Validation / Replay Productization**. It must start from the resulting canonical main and this State Index. No scheduler/alerts or new P3/P4/MIE model work is implied.
 
 Completed sub-batches:
 - **A1-01 Economic Evidence Bridge = PASS / MERGED**
