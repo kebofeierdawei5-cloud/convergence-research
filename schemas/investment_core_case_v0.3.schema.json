@@ -176,19 +176,13 @@
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
+          "items": {"type": "string", "minLength": 1}
         },
         "evidence_ids": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
+          "items": {"type": "string", "minLength": 1}
         }
       }
     },
@@ -285,60 +279,25 @@
           "format": "date"
         },
         "reality_status": {
-          "enum": [
-            "PASS",
-            "CONDITIONAL",
-            "UNKNOWN",
-            "BLOCKED"
-          ]
+          "enum": ["PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"]
         },
         "quality_gate_status": {
-          "enum": [
-            "PASS",
-            "CONDITIONAL",
-            "UNKNOWN",
-            "BLOCKED"
-          ]
+          "enum": ["PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"]
         },
         "value_driver_status": {
-          "enum": [
-            "PASS",
-            "CONDITIONAL",
-            "UNKNOWN",
-            "BLOCKED"
-          ]
+          "enum": ["PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"]
         },
         "valuation_status": {
-          "enum": [
-            "PASS",
-            "CONDITIONAL",
-            "UNKNOWN",
-            "BLOCKED"
-          ]
+          "enum": ["PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"]
         },
         "forecast_status": {
-          "enum": [
-            "PASS",
-            "CONDITIONAL",
-            "UNKNOWN",
-            "BLOCKED"
-          ]
+          "enum": ["PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"]
         },
         "thesis_status": {
-          "enum": [
-            "INTACT",
-            "WATCH",
-            "BROKEN",
-            "UNKNOWN"
-          ]
+          "enum": ["INTACT", "WATCH", "BROKEN", "UNKNOWN"]
         },
         "thesis_admission_status": {
-          "enum": [
-            "ADMITTED",
-            "BLOCKED",
-            "REVIEW_REQUIRED",
-            "UNKNOWN"
-          ]
+          "enum": ["ADMITTED", "BLOCKED", "REVIEW_REQUIRED", "UNKNOWN"]
         },
         "capital_admission_ready": {
           "type": "boolean"
@@ -353,10 +312,7 @@
         },
         "evidence_ids": {
           "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
+          "items": {"type": "string", "minLength": 1},
           "uniqueItems": true,
           "minItems": 1
         },
@@ -646,62 +602,32 @@
         },
         "canonical_entry_evaluation_version": {
           "anyOf": [
-            {
-              "const": null
-            },
-            {
-              "const": "IIOS-P2.2-CANONICAL-ENTRY-EVALUATION-0.1"
-            }
+            { "const": null },
+            { "const": "IIOS-P2.2-CANONICAL-ENTRY-EVALUATION-0.1" }
           ]
         },
         "canonical_entry_evaluation": {
-          "type": [
-            "object",
-            "null"
-          ],
+          "type": ["object", "null"],
           "additionalProperties": true
         },
         "decision_pre_admission_action": {
-          "enum": [
-            "BUY",
-            "ADD",
-            "HOLD",
-            "REDUCE",
-            "EXIT",
-            "NO-BUY",
-            "WATCH",
-            "REVIEW_REQUIRED",
-            null
-          ]
+          "enum": ["BUY", "ADD", "HOLD", "REDUCE", "EXIT", "NO-BUY", "WATCH", "REVIEW_REQUIRED", null]
         },
         "decision_admission_version": {
           "anyOf": [
-            {
-              "const": null
-            },
-            {
-              "const": "IIOS-P2.2-DECISION-ADMISSION-0.1"
-            }
+            { "const": null },
+            { "const": "IIOS-P2.2-DECISION-ADMISSION-0.1" }
           ]
         },
         "decision_admission": {
-          "type": [
-            "object",
-            "null"
-          ],
+          "type": ["object", "null"],
           "additionalProperties": true
         },
         "decision_admission_status": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "decision_admission_rule_id": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "decision_precedence_version": {
           "const": "IIOS-DECISION-PRECEDENCE-0.1"
