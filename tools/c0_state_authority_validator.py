@@ -55,7 +55,7 @@ def validate() -> None:
     _contains(readme, "Required Return", REPO_README)
     _contains(readme, "Stage C", REPO_README)
     _contains(readme, "scheduler", REPO_README)
-    _contains(readme, "auto-ordering", REPO_README)
+    _contains(readme, "automatic order placement", REPO_README)
     _not_contains(readme, "No fixed 1–3 year holding period and no annualized-return core gate.", REPO_README)
     _not_contains(readme, "Batch 2 v0.1 = OPEN / RED-TEAM BLOCKED", REPO_README)
     _not_contains(readme, "Next: Investment Core Contract v0.2", REPO_README)
