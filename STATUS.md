@@ -22,7 +22,7 @@ CORE-04 vertical decision closure is complete.
 
 A1 is complete as the company-side evidence-closure engineering milestone. Current 300750 Quality remains CONDITIONAL and new capital remains FALSE.
 
-C0 Governance Hygiene / Stage Baseline is now the active Stage C batch. C1 Machine Publication and C2 Human Report / Report Quality Gate follow only after C0 acceptance.
+C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. The next Stage C batch is C1 Machine Publication.
 
 TR-03 Validation / Replay is now PASS / MERGED / CANONICAL.
 
@@ -134,8 +134,12 @@ Historical documents are context only. Diagnostic branches / PRs are not capabil
 
 ## C0 status
 
-C0 Governance Hygiene / Stage Baseline is IN PROGRESS.
+C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL.
 
-C0 is restricted to project-state authority, continuity hygiene, stale-document boundaries, and deterministic governance CI checks. It does not modify Investment Core economics or Decision semantics.
+C0 closed project-state authority, continuity hygiene, stale-document boundaries, and deterministic governance CI checks. It did not modify Investment Core economics or Decision semantics.
 
 The canonical Stage C plan is `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`.
+
+Canonical C0 merge: `1594e43eee14aaa41ddde675ddbe61d650462cf7`.
+
+Next boundary: C1 Machine Publication → C2 Human Report / Report Quality Gate → C3 Second Company Acceptance.
