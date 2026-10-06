@@ -223,7 +223,7 @@ def test_c4_nonpositive_gap_is_a_real_calculation_but_remains_advisory():
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
-    assert result["decision"]["gates"]["expectation_gap_required_for_buy_add"] is False
+    assert result["gates"]["expectation_gap_required_for_buy_add"] is False
     assert result["decision"]["expectation_gap_evaluation"]["status"] == "PASS"
 
 
