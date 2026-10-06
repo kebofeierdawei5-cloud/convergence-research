@@ -125,6 +125,38 @@ def _validate_valuation_output(record: Mapping[str, Any]) -> None:
         raise ValueError("canonical valuation output hash mismatch")
 
 
+def build_canonical_valuation_output(payload: Mapping[str, Any]) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        raise ValueError("valuation output payload must be an object")
+    output = dict(payload)
+    output["schema_version"] = CANONICAL_VALUATION_OUTPUT_VERSION
+    output.pop("output_hash", None)
+    core_fields = {
+        "schema_version",
+        "valuation_id",
+        "valuation_version",
+        "case_id",
+        "market",
+        "symbol",
+        "company",
+        "cutoff_date",
+        "forecast_ref",
+        "horizon_years",
+        "reference_value_per_share",
+        "scenarios",
+        "evidence_ids",
+    }
+    if set(output) != core_fields:
+        raise ValueError(
+            "valuation output builder requires exactly the canonical valuation output fields"
+        )
+    output["cutoff_date"] = _date(output["cutoff_date"], "valuation.cutoff_date").isoformat()
+    _forecast_ref(output["forecast_ref"], "valuation.forecast_ref")
+    output["output_hash"] = _sha(output)
+    _validate_valuation_output(output)
+    return output
+
+
 class CanonicalValuationOutputResolver(Protocol):
     def resolve_valuation_output(
         self,
@@ -300,6 +332,7 @@ def validate_forecast_valuation_return_lineage(
 
 __all__ = [
     "CANONICAL_VALUATION_OUTPUT_VERSION",
+    "build_canonical_valuation_output",
     "FORECAST_VALUATION_RETURN_LINEAGE_VERSION",
     "CanonicalValuationOutputResolver",
     "InMemoryCanonicalValuationOutputResolver",
