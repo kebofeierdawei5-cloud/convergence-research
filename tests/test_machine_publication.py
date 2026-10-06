@@ -76,8 +76,8 @@ def persist_revision(tmp_path, *, action="REVIEW_REQUIRED"):
     )
     snapshot = make_snapshot(action=action)
     write_snapshot(tmp_path, snapshot)
-    from iios_mvp.decision_admission import build_test_admission_receipt
-    admission = build_test_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
+    from tests.decision_admission_fixture import build_fixture_admission_receipt
+    admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
     decision_id = "CN-A-300750-r001"
     write_decision_revision(
         tmp_path,
