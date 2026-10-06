@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/trigger-event-0.1.schema.json",
+  "title": "IIOS Trigger Event v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_version",
+    "trigger_event_id",
+    "trigger_id",
+    "trigger_hash",
+    "decision_id",
+    "decision_series_id",
+    "revision",
+    "decision_revision_hash",
+    "case_id",
+    "evaluation_cutoff_at",
+    "observed_at",
+    "known_at",
+    "source_id",
+    "evidence_id",
+    "value",
+    "previous_value",
+    "validation_status",
+    "trigger_state",
+    "evaluation_reason",
+    "policy_effect",
+    "trigger_event_hash"
+  ],
+  "properties": {
+    "event_version": {
+      "const": "IIOS-TRIGGER-EVENT-0.1"
+    },
+    "trigger_event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trigger_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trigger_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision_series_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "decision_revision_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_cutoff_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "known_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "value": {
+      "type": [
+        "string",
+        "number",
+        "boolean",
+        "null"
+      ]
+    },
+    "previous_value": {
+      "type": [
+        "string",
+        "number",
+        "boolean",
+        "null"
+      ]
+    },
+    "validation_status": {
+      "const": "VALID"
+    },
+    "trigger_state": {
+      "enum": [
+        "MATCHED",
+        "NOT_MATCHED",
+        "UNKNOWN"
+      ]
+    },
+    "evaluation_reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy_effect": {
+      "const": "NO_DIRECT_DECISION_PRECEDENCE_CHANGE"
+    },
+    "trigger_event_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
