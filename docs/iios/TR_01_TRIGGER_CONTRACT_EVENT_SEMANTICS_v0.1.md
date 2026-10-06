@@ -1,7 +1,7 @@
 # TR-01 — Trigger Contract / Event Semantics v0.1
 
 Date: 2026-10-06
-Status: IMPLEMENTATION TARGET
+Status: ACCEPTED / CANONICAL
 
 ## Objective
 
@@ -55,3 +55,24 @@ Contract and Event both carry policy_effect = NO_DIRECT_DECISION_PRECEDENCE_CHAN
 TR-01 cannot change Decision Precedence, upgrade Trust or Quality, authorize BUY / ADD, change valuation / forecast / MIE semantics, or execute trades.
 
 Future Monitoring / Validation layers may consume Trigger Events as evidence, but capital-affecting decisions remain subject to the canonical Decision Kernel and Human Approval lifecycle.
+
+
+## Acceptance
+
+Canonical merge:
+- PR #89;
+- merge commit: 0fb7262ded47b3497f5be33dc93163e209f0098f.
+
+Verification:
+- independent exact-module execution: PASS;
+- dedicated GitHub Actions run #9: SUCCESS;
+- compileall: PASS;
+- 20 TR-01 tests: PASS;
+- both Trigger schemas: PASS;
+- git diff --check: PASS.
+
+The full Investment Core CI retained four unrelated CORE-04 assertion regressions on the pre-merge head; they are outside the TR-01 boundary.
+
+Canonical acceptance decision: TR-01 = PASS / MERGED / CANONICAL.
+
+Next product boundary: TR-02 Monitoring State. No scheduler/alerts implementation is implied before monitoring semantics are frozen.
