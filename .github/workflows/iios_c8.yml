@@ -1,0 +1,33 @@
+name: IIOS C8 — Final Independent Red-team
+
+on:
+  pull_request:
+    paths:
+      - "tests/test_c8_final_redteam.py"
+      - "tools/c8_final_redteam.py"
+      - "docs/iios/C8_ACCEPTANCE_2026-10-06.md"
+      - ".github/workflows/iios_c8.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tests/test_c8_final_redteam.py"
+      - "tools/c8_final_redteam.py"
+      - "docs/iios/C8_ACCEPTANCE_2026-10-06.md"
+      - ".github/workflows/iios_c8.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  c8:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q iios_mvp tools tests
+      - run: PYTHONPATH=. pytest -q tests/test_c8_final_redteam.py
+      - run: PYTHONPATH=. python tools/c8_final_redteam.py
+      - run: git diff --check
