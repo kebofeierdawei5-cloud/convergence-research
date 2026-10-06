@@ -38,6 +38,7 @@ from iios_mvp.multi_model_market_implied_expectation_set import (
 from iios_mvp.p4f_mie_snapshot import P4FProvenanceRecord, build_p4f_snapshot
 from iios_mvp.engine import decide
 from tests.test_investment_core_v03 import (
+    CURRENT_PRICE_REGISTRY,
     EVIDENCE_ROOT_REGISTRY,
     INDEPENDENT_FORECAST_REGISTRY,
     case,
@@ -227,11 +228,8 @@ def test_c4_nonpositive_gap_is_a_real_calculation_but_remains_advisory():
 
 def test_c4_incompatible_semantics_never_materialize_a_scalar_gap():
     c = case()
-    c["expectation_gap"]["independent_forecast_ref"] = independent_forecast_ref(
-        value="12", forecast_id="forecast-v03-c4-incompatible", horizon_years="2"
-    )
-    # Replace the admitted record with a semantically incompatible basis.
-    INDEPENDENT_FORECAST_REGISTRY.admit_independent_forecast({
+    # Admit a fresh, immutable forecast whose basis is intentionally incompatible.
+    incompatible_ref = INDEPENDENT_FORECAST_REGISTRY.admit_independent_forecast({
         "case_id": "V03-001",
         "market": "CN-A",
         "symbol": "300750",
@@ -249,16 +247,7 @@ def test_c4_incompatible_semantics_never_materialize_a_scalar_gap():
         "prepared_without_current_price": True,
         "evidence_ids": ["ev-forecast-incompatible"],
     })
-    c["expectation_gap"]["independent_forecast_ref"] = {
-        "forecast_id": "forecast-v03-c4-incompatible",
-        "admission_record_hash": INDEPENDENT_FORECAST_REGISTRY.resolve_independent_forecast(
-            c["expectation_gap"]["independent_forecast_ref"],
-            case_id="V03-001",
-            market="CN-A",
-            symbol="300750",
-            cutoff_date=datetime(2026, 10, 4).date(),
-        )["admission_record_hash"],
-    }
+    c["expectation_gap"]["independent_forecast_ref"] = incompatible_ref.to_dict()
 
     evaluation = build_expectation_gap_evaluation(
         case=c,
@@ -303,15 +292,17 @@ def test_c4_no_feasible_solution_is_not_promoted_to_a_gap():
 
 
 def test_c4_expectation_gap_evaluation_is_bound_into_canonical_decision():
+    canonical_case = case()
     result = decide(
-        case(),
+        canonical_case,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
     )
     evaluation = result["decision"]["expectation_gap_evaluation"]
     assert evaluation["evaluation_version"] == C4_EXPECTATION_GAP_VERSION
     assert evaluation["evaluation_hash"]
-    assert evaluation["mie_snapshot_hash"] == case()["expectation_gap"]["mie_snapshot_hash"]
+    assert evaluation["mie_snapshot_hash"] == canonical_case["expectation_gap"]["mie_snapshot_hash"]
     assert evaluation["market_expectation_id"] == "mie-pe-1"
     assert evaluation["independent_forecast_id"] == "forecast-v03-001"
 
