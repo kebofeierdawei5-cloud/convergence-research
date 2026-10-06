@@ -397,7 +397,9 @@ Current execution state after C2 acceptance:
 C0 — Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL
 → C1 — Machine Publication = PASS / MERGED / CANONICAL
 → C2 — Human Report + Report Quality Gate = PASS / MERGED / CANONICAL
-→ C3 — Second Company Acceptance
+→ C3 — Second Company Acceptance = PASS / MERGED / CANONICAL
+→ C4 — Expectation Gap Production Integration = PASS / MERGED / CANONICAL
+→ C5 — Positioning / Sizing
 
 C5–C8 follow only after the preceding acceptance boundaries are satisfied.
 
