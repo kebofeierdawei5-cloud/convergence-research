@@ -201,3 +201,9 @@ def test_store_rejects_orphan_or_mismatched_revision_binding(tmp_path):
     }
     with pytest.raises(ValueError, match="decision revision"):
         write_trigger_contract(tmp_path, DECISION, raw)
+
+def test_non_finite_scalars_fail_closed():
+    with pytest.raises(ValueError, match="finite"):
+        contract(target=float("nan"))
+    with pytest.raises(ValueError, match="finite"):
+        event(contract(), value=float("inf"))
