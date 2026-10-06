@@ -197,3 +197,18 @@ Acceptance: docs/iios/C4_ACCEPTANCE_2026-10-06.md.
 Canonical C4 merge: 07d45c18df8df9100d4866dd5f92fa95ccdb7186.
 
 Next development boundary: C5 Positioning / Sizing.
+
+
+## C5 status
+
+C5 Positioning / Sizing = PASS / MERGED / CANONICAL.
+
+Dedicated C5 Actions run #7 = SUCCESS on exact head f9758beb683b3ba044fc9a153018050fa4ff09d9.
+86 tests passed; executable acceptance harness 9 / 9 PASS; compileall and git diff --check passed.
+
+Acceptance: docs/iios/C5_ACCEPTANCE_2026-10-06.md.
+Canonical C5 merge: cdf998cd21776363914f178e648f03ec0c1539f8.
+
+C5 is timing/sizing-only. It cannot mutate fundamental Decision action, Trust, Quality, Thesis, intrinsic value, Return, Required Return, or Risk. It does not add Kelly, portfolio optimization, scheduler, alerts, automatic execution, or Forecast Research productionization.
+
+Next development boundary: C6 Human Execution Receipt.
