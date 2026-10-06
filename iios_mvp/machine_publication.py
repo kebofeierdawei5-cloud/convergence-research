@@ -129,6 +129,8 @@ def _load_trigger_refs(
         if not trigger or trigger.get("decision_id") != decision_id:
             continue
         validate_trigger_contract(trigger)
+        if trigger["decision_id"] != decision_id:
+            raise ValueError("trigger contract decision binding mismatch")
 
         trigger_refs.append(
             {
@@ -146,6 +148,8 @@ def _load_trigger_refs(
         if monitoring_path.exists():
             state = _load_json(monitoring_path)
             validate_monitoring_state(state, trigger_contract=trigger)
+            if state["decision_id"] != decision_id or state["revision"] != trigger["revision"]:
+                raise ValueError("monitoring state decision binding mismatch")
             monitoring_refs.append(
                 {
                     "monitor_id": state["monitor_id"],
@@ -165,6 +169,11 @@ def _load_trigger_refs(
             if not record or record.get("trigger_id") != trigger["trigger_id"]:
                 continue
             validate_validation_record(record)
+            if (record["decision_id"] != decision_id or
+                record["revision"] != trigger["revision"] or
+                record["trigger_id"] != trigger["trigger_id"] or
+                record["trigger_hash"] != trigger["trigger_hash"]):
+                raise ValueError("validation record decision/trigger binding mismatch")
             candidate_validations.append(
                 {
                     "validation_id": record["validation_id"],
@@ -378,6 +387,8 @@ def validate_machine_publication(record: Any) -> None:
 
     lifecycle = record["lifecycle_refs"]
     for key in ("trigger_contracts", "monitoring_states", "validation_records"):
+        if key not in lifecycle:
+            raise ValueError(f"machine_publication lifecycle list missing: {key}")
         if not isinstance(lifecycle[key], list):
             raise ValueError(f"machine_publication lifecycle list invalid: {key}")
 
@@ -387,6 +398,27 @@ def validate_machine_publication(record: Any) -> None:
             raise ValueError(f"machine_publication integrity list invalid: {key}")
         if not all(isinstance(value, str) and len(value) == 64 for value in integrity[key]):
             raise ValueError(f"machine_publication integrity hashes invalid: {key}")
+
+    expected_trigger_hashes = [item.get("trigger_hash") for item in lifecycle["trigger_contracts"]]
+    expected_monitor_hashes = [item.get("state_hash") for item in lifecycle["monitoring_states"]]
+    expected_validation_hashes = [item.get("validation_hash") for item in lifecycle["validation_records"]]
+    if integrity["trigger_hashes"] != expected_trigger_hashes:
+        raise ValueError("machine_publication trigger integrity list mismatch")
+    if integrity["monitoring_state_hashes"] != expected_monitor_hashes:
+        raise ValueError("machine_publication monitoring integrity list mismatch")
+    if integrity["validation_hashes"] != expected_validation_hashes:
+        raise ValueError("machine_publication validation integrity list mismatch")
+
+    decision_ref = record["decision_ref"]
+    approval = record["human_approval"]
+    if approval["decision_id"] != decision_ref["decision_id"] or approval["revision"] != decision_ref["revision"]:
+        raise ValueError("machine_publication approval decision reference mismatch")
+    if approval["revision_hash"] != decision_ref["revision_hash"] or approval["snapshot_hash"] != decision_ref["snapshot_hash"]:
+        raise ValueError("machine_publication approval source hash mismatch")
+
+    current = record["current_projection"]
+    if current["status"] == "CURRENT" and current["current_decision_id"] != decision_ref["decision_id"]:
+        raise ValueError("machine_publication current projection mismatch")
 
     core = {k: record[k] for k in required if k not in {"publication_id", "publication_hash"}}
     expected_hash = sha256_obj(core)
