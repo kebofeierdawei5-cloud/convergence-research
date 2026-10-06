@@ -129,4 +129,4 @@ Dedicated C5 CI must prove:
 7. the fundamental Decision action is unchanged by positioning;
 8. tamper detection and replay are deterministic;
 9. standalone schema validation passes;
-10. existing Risk/Portfolio, C4 Expectation Gap, and Investment Core tests remain green for this path.
+10. C4 Expectation Gap, semantic expectation-gap, and Investment Core tests remain green for this path; the separately tracked Risk Portfolio schema-test regression remains outside C5 acceptance.
