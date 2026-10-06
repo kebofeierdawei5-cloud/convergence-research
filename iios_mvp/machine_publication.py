@@ -214,9 +214,13 @@ def build_machine_publication(
     source_decision = snapshot["decision"]
     if not isinstance(source_decision, Mapping):
         raise ValueError("snapshot decision must be an object")
-    ai_decision = source_decision.get("decision")
-    if not isinstance(ai_decision, Mapping):
-        raise ValueError("snapshot decision.decision must be an object")
+    nested_decision = source_decision.get("decision")
+    if isinstance(nested_decision, Mapping):
+        ai_decision = nested_decision
+    elif "action" in source_decision:
+        ai_decision = source_decision
+    else:
+        raise ValueError("snapshot decision must expose action or nested decision")
 
     human_approval: dict[str, Any]
     if approval is None:
