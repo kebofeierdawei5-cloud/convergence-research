@@ -128,6 +128,9 @@ def build_trigger_contract(*, trigger_id: str, decision_id: str, decision_series
     decision_revision_hash = _text(decision_revision_hash, "decision_revision_hash")
     if len(decision_revision_hash) != 64 or any(c not in "0123456789abcdef" for c in decision_revision_hash):
         raise ValueError("decision_revision_hash must be a lowercase SHA-256")
+    expected_decision_id = f"{decision_series_id}-r{revision:03d}"
+    if decision_id != expected_decision_id:
+        raise ValueError("decision_id does not match decision_series_id and revision")
     case_id = _text(case_id, "case_id")
     decision_cutoff_date = _date(decision_cutoff_date, "decision_cutoff_date")
     role = _text(role, "role").upper()
