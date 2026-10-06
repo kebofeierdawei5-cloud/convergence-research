@@ -64,7 +64,9 @@ def build_monitoring_state(
     if next_due_at is not None:
         next_due_at = _timestamp(next_due_at, "next_due_at")
     if evaluation_reference_at is None:
-        evaluation_reference_at = next_due_at or trigger_contract["decision_cutoff_date"] + "T00:00:00+00:00"
+        if next_due_at is not None:
+            raise ValueError("evaluation_reference_at is required when next_due_at is supplied")
+        evaluation_reference_at = trigger_contract["decision_cutoff_date"] + "T00:00:00+00:00"
     evaluation_reference_at = _timestamp(evaluation_reference_at, "evaluation_reference_at")
 
     core = {
