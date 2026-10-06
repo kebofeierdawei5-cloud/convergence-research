@@ -1,0 +1,333 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/machine-publication-0.1.schema.json",
+  "title": "IIOS Machine Publication v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "publication_version",
+    "published_at",
+    "decision_ref",
+    "case",
+    "ai_decision",
+    "decision_payload",
+    "human_approval",
+    "current_projection",
+    "lifecycle_refs",
+    "integrity",
+    "publication_id",
+    "publication_hash"
+  ],
+  "properties": {
+    "publication_version": {
+      "const": "IIOS-MACHINE-PUBLICATION-0.1"
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decision_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_id",
+        "decision_series_id",
+        "revision",
+        "run_id",
+        "case_id",
+        "as_of_date",
+        "cutoff_date",
+        "snapshot_hash",
+        "revision_hash",
+        "engine_version",
+        "contract_version"
+      ],
+      "properties": {
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_series_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "as_of_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "cutoff_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "revision_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "engine_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contract_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "case_id",
+        "market",
+        "symbol",
+        "company",
+        "as_of_date",
+        "cutoff_date"
+      ],
+      "properties": {
+        "case_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "market": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "symbol": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "company": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "as_of_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cutoff_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "ai_decision": {
+      "type": "object"
+    },
+    "decision_payload": {
+      "type": "object"
+    },
+    "human_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approval_status",
+        "approved",
+        "decision_id",
+        "revision",
+        "revision_hash",
+        "snapshot_hash",
+        "approval_hash"
+      ],
+      "properties": {
+        "approval_status": {
+          "enum": [
+            "PENDING",
+            "HUMAN_APPROVED",
+            "HUMAN_REJECTED"
+          ]
+        },
+        "approved": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "revision_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "approval_hash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "current_projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "current_decision_id",
+        "current_revision",
+        "projection_hash"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "CURRENT",
+            "SUPERSEDED",
+            "NOT_CURRENT",
+            "NO_CURRENT_PROJECTION"
+          ]
+        },
+        "current_decision_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "current_revision": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "projection_hash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "lifecycle_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trigger_contracts",
+        "monitoring_states",
+        "validation_records"
+      ],
+      "properties": {
+        "trigger_contracts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "monitoring_states": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "validation_records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_hash",
+        "revision_hash",
+        "approval_hash",
+        "trigger_hashes",
+        "monitoring_state_hashes",
+        "validation_hashes"
+      ],
+      "properties": {
+        "snapshot_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "revision_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "approval_hash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "trigger_hashes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "monitoring_state_hashes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "validation_hashes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "publication_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "publication_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
