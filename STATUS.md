@@ -111,11 +111,9 @@ TR-03 Validation / Replay = PASS / MERGED / CANONICAL.
 TR-03 closes the historical `next_due_at` replay gap using immutable monitoring initialization/evaluation records and source-derived fail-closed validation.
 
 Scheduler/alerts remain out of scope.
-## Product gaps after C2
+## Product gaps after C5
 
-- C4 Expectation Gap Production Integration
-- C5 Positioning / Sizing
-- C6 Human Execution Receipt
+- C6 Human Execution Receipt = PASS / MERGED / CANONICAL
 - C7 Full Lifecycle E2E
 - C8 Final Independent Red-team / MVP Acceptance
 
@@ -212,3 +210,18 @@ Canonical C5 merge: cdf998cd21776363914f178e648f03ec0c1539f8.
 C5 is timing/sizing-only. It cannot mutate fundamental Decision action, Trust, Quality, Thesis, intrinsic value, Return, Required Return, or Risk. It does not add Kelly, portfolio optimization, scheduler, alerts, automatic execution, or Forecast Research productionization.
 
 Next development boundary: C6 Human Execution Receipt.
+
+
+## C6 status
+
+C6 Human Execution Receipt = PASS / MERGED / CANONICAL.
+
+Dedicated C6 Actions run #2 = SUCCESS on exact head f817041471a43618d30f88538b11a96e67b71fa0.
+23 tests passed; executable acceptance harness 8 / 8 PASS; compileall and git diff --check passed.
+
+Acceptance: docs/iios/C6_ACCEPTANCE_2026-10-06.md.
+Canonical C6 merge: 4c01e40dd7469221d9f5aee005c96e05bf4eb55f.
+
+C6 is record-only: execution receipt requires exact HUMAN_APPROVED binding, is immutable, and cannot mutate Decision Revision, Human Approval, Current Projection, or Decision action. auto_execution remains false.
+
+Next development boundary: C7 Full Lifecycle E2E.
