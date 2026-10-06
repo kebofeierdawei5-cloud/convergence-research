@@ -277,15 +277,17 @@ A1 is complete as the company-side evidence-closure milestone.
 
 ## 9. Stage C current development boundary
 
-**C0 — Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL**
+**C1 — Machine Publication = PASS / MERGED / CANONICAL**
 
-C0 closed project-state authority, continuity hygiene, stale-document boundaries, and deterministic governance CI checks. No investment semantics or new investment capability were introduced.
+C1 provides a read-only, content-addressed machine-readable projection of an exact Decision Revision, with explicit AI/Human separation and bound Trigger / Monitoring / Validation references. It does not modify investment semantics or create an execution path.
 
 Detailed roadmap: `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`.
 
-Immediate next batch: C2 Human Report / Report Quality Gate → C3 Second Company Acceptance.
+Immediate next batch: **C2 — Human Report + Report Quality Gate**.
 
 Parallel FM Research remains separate.
 
 C0 acceptance: `docs/iios/C0_ACCEPTANCE_2026-10-06.md`.
 C0 merge: `1594e43eee14aaa41ddde675ddbe61d650462cf7`.
+C1 acceptance: `docs/iios/C1_ACCEPTANCE_2026-10-06.md`.
+C1 merge: `b9a8ff0fe1341a56f363fb058677dbd50a4f87b8`.
