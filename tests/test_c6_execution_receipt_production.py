@@ -313,5 +313,28 @@ def test_c6_schema_accepts_receipt():
     ) == []
 
 
-def test_c6_invalid_execution_timestamp_or_negative_amount_fails_closed():
-    _, snapshot, _, _, _ = setup_approved_revision(tmp_path := Path(pytest.TempPathFactory.getbasetemp.__get__(pytest.TempPathFactory, object) if False else "."))
+def test_c6_invalid_execution_timestamp_or_negative_amount_fails_closed(tmp_path):
+    _, snapshot, _, _, _ = setup_approved_revision(tmp_path)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        write_execution_receipt(
+            tmp_path,
+            "exec-c6-bad-time",
+            "CN-A-300750-r001",
+            snapshot,
+            "2026-10-06T12:00:00",
+            "EXECUTED",
+            "human:owner",
+            executed_quantity="1",
+        )
+
+    with pytest.raises(ValueError, match="finite and >= 0"):
+        write_execution_receipt(
+            tmp_path,
+            "exec-c6-negative",
+            "CN-A-300750-r001",
+            snapshot,
+            "2026-10-06T12:00:00+08:00",
+            "EXECUTED",
+            "human:owner",
+            executed_quantity="-1",
+        )
