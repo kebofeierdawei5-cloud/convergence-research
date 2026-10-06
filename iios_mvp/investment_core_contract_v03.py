@@ -29,6 +29,7 @@ from .canonical_entry_evaluation import (
     build_canonical_entry_evaluation,
 )
 from .risk_portfolio_production_contract import build_risk_portfolio_contract, validate_risk_portfolio_contract
+from .forecast_valuation_return_lineage_v01 import validate_forecast_valuation_return_lineage, FORECAST_VALUATION_RETURN_LINEAGE_VERSION
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
 BUY_ENTRY_RETURN_CUSHION_THRESHOLD = Decimal("0.15")
@@ -287,7 +288,7 @@ def _portfolio_status(case: dict[str, Any]) -> str:
 def _risk_status(case: dict[str, Any]) -> str:
     return str((case.get("risk") or {}).get("status", "UNKNOWN")).upper()
 
-def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None) -> dict[str, Any]:
+def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None, valuation_output_resolver: Any | None = None) -> dict[str, Any]:
     errors: list[dict[str, str]] = []
     if not isinstance(case, dict):
         return {"status": "BLOCKED", "errors": [_err("V03-SCHEMA-TYPE", "$", "case must be an object")]}
@@ -414,6 +415,57 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
         except (TypeError, ValueError) as exc:
             errors.append(_err("V03-RISK-PORTFOLIO-CONTRACT", "risk/portfolio", str(exc)))
     errors.extend(validate_return_gate_v03(case["return_gate"]))
+    return_gate = case["return_gate"]
+    if isinstance(return_gate, dict) and return_gate.get("lineage_version") == FORECAST_VALUATION_RETURN_LINEAGE_VERSION:
+        if not isinstance(return_gate.get("canonical_forecast_ref"), dict):
+            errors.append(_err(
+                "V03-RETURN-LINEAGE-FORECAST-REF",
+                "return_gate.canonical_forecast_ref",
+                "canonical forecast reference is required for lineage-bound return gate",
+            ))
+        if not isinstance(return_gate.get("canonical_valuation_ref"), dict):
+            errors.append(_err(
+                "V03-RETURN-LINEAGE-VALUATION-REF",
+                "return_gate.canonical_valuation_ref",
+                "canonical valuation reference is required for lineage-bound return gate",
+            ))
+        if independent_forecast_resolver is None:
+            errors.append(_err(
+                "V03-RETURN-LINEAGE-FORECAST-RESOLVER",
+                "return_gate.canonical_forecast_ref",
+                "canonical independent forecast resolver is required for lineage-bound return gate",
+            ))
+        if valuation_output_resolver is None:
+            errors.append(_err(
+                "V03-RETURN-LINEAGE-VALUATION-RESOLVER",
+                "return_gate.canonical_valuation_ref",
+                "canonical valuation output resolver is required for lineage-bound return gate",
+            ))
+        if (
+            isinstance(return_gate.get("canonical_forecast_ref"), dict)
+            and isinstance(return_gate.get("canonical_valuation_ref"), dict)
+            and independent_forecast_resolver is not None
+            and valuation_output_resolver is not None
+        ):
+            try:
+                validate_forecast_valuation_return_lineage(
+                    return_gate=return_gate,
+                    canonical_forecast_ref=return_gate["canonical_forecast_ref"],
+                    canonical_valuation_ref=return_gate["canonical_valuation_ref"],
+                    independent_forecast_resolver=independent_forecast_resolver,
+                    valuation_output_resolver=valuation_output_resolver,
+                    case_id=case["case_id"],
+                    market=case["market"],
+                    symbol=case["symbol"],
+                    company=case["company"],
+                    cutoff_date=cutoff,
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                errors.append(_err(
+                    "V03-RETURN-LINEAGE-CANONICAL",
+                    "return_gate",
+                    str(exc),
+                ))
     try:
         validate_decision_upstream_admission(
             case["decision_upstream_admission"],
@@ -716,8 +768,8 @@ def _expectation_gap(case: dict[str, Any], *, evidence_root_resolver: EvidenceRo
     return status, gap if isinstance(gap, Decimal) else None
 
 
-def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None) -> dict[str, Any]:
-    validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver, independent_forecast_resolver=independent_forecast_resolver, upstream_authority_resolver=upstream_authority_resolver)
+def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None, valuation_output_resolver: Any | None = None) -> dict[str, Any]:
+    validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver, independent_forecast_resolver=independent_forecast_resolver, upstream_authority_resolver=upstream_authority_resolver, valuation_output_resolver=valuation_output_resolver)
     position = _position(case) if isinstance(case.get("portfolio"), dict) else Decimal("0")
     trust_status = str((case.get("trust") or {}).get("status", "UNKNOWN")).upper()
     upstream = (
