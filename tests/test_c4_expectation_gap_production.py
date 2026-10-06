@@ -320,3 +320,60 @@ def test_c4_schema_accepts_real_evaluation():
         )
     )
     Draft202012Validator(schema).validate(evaluation)
+
+
+def test_c4_v03_nested_schema_rejects_malformed_evaluation():
+    evaluation = build_expectation_gap_evaluation(
+        case=case(),
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+    )
+    schema = json.loads(
+        (ROOT / "schemas/investment_core_case_v0.3.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    candidate = deepcopy(case())
+    candidate["decision"]["expectation_gap_evaluation"] = evaluation
+    # The v0.3 schema must validate the nested C4 object strictly, not merely accept an arbitrary object.
+    decision_stub = {
+        "action": "BUY",
+        "decision_status": "READY",
+        "investability_status": "INVESTABLE",
+        "primary_reason": "C4 schema test",
+        "human_approval_required": True,
+        "auto_execution": False,
+        "current_price": "100",
+        "target_entry_price": "100",
+        "target_entry_price_semantics": "RETURN_ONLY",
+        "target_entry_price_requires_gap_revalidation": False,
+        "target_entry_price_return_only": "100",
+        "target_entry_price_v2_version": None,
+        "target_entry_price_v2": None,
+        "target_entry_price_gap_revalidation": None,
+        "target_entry_price_p2_1_version": None,
+        "target_entry_price_p2_1": None,
+        "target_entry_price_p2_1_price_response": None,
+        "position_package_complete": True,
+        "canonical_entry_evaluation_version": None,
+        "canonical_entry_evaluation": None,
+        "decision_pre_admission_action": None,
+        "decision_admission_version": None,
+        "decision_admission": None,
+        "decision_admission_status": None,
+        "decision_admission_rule_id": None,
+        "decision_precedence_version": "IIOS-DECISION-PRECEDENCE-0.1",
+        "decision_precedence_rule_id": "TEST",
+        "decision_precedence_rank": 0,
+        "decision_scope": "NEW_CAPITAL",
+        "capital_effect": "INCREASE",
+        "expectation_gap_evaluation": evaluation,
+    }
+    candidate["decision"] = decision_stub
+    validator = Draft202012Validator(schema)
+    assert list(validator.iter_errors(candidate)) == []
+
+    malformed = deepcopy(candidate)
+    del malformed["decision"]["expectation_gap_evaluation"]["evaluation_hash"]
+    errors = list(validator.iter_errors(malformed))
+    assert errors, "nested C4 evaluation must be schema-enforced"
