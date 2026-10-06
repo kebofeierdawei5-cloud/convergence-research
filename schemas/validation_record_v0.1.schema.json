@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/validation-record-0.1.schema.json",
+  "title": "IIOS Validation Record v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "validation_version","validation_id","validation_scope","decision_id","decision_series_id",
+    "revision","decision_revision_hash","case_id","decision_cutoff_date","trigger_id","trigger_hash",
+    "monitor_id","validation_cutoff_at","validation_status","checks","event_count","checked_event_ids",
+    "initial_state_hash","replayed_state_hash","persisted_state_hash","history_head_hash","issues",
+    "policy_effect","validation_hash"
+  ],
+  "properties": {
+    "validation_version": {"const": "IIOS-VALIDATION-0.1"},
+    "validation_id": {"type": "string","minLength": 1},
+    "validation_scope": {"const": "MONITORING_REPLAY"},
+    "decision_id": {"type": "string","minLength": 1},
+    "decision_series_id": {"type": "string","minLength": 1},
+    "revision": {"type": "integer","minimum": 1},
+    "decision_revision_hash": {"type": "string","pattern": "^[0-9a-f]{64}$"},
+    "case_id": {"type": "string","minLength": 1},
+    "decision_cutoff_date": {"type": "string","format": "date"},
+    "trigger_id": {"type": "string","minLength": 1},
+    "trigger_hash": {"type": "string","pattern": "^[0-9a-f]{64}$"},
+    "monitor_id": {"type": "string","minLength": 1},
+    "validation_cutoff_at": {"type": "string","format": "date-time"},
+    "validation_status": {"enum": ["PASS","FAIL"]},
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_revision_replay","trigger_contract_binding","trigger_event_pit",
+        "monitoring_state_integrity","transition_history","monitoring_replay"
+      ],
+      "properties": {
+        "decision_revision_replay": {"enum": ["PASS","FAIL"]},
+        "trigger_contract_binding": {"enum": ["PASS","FAIL"]},
+        "trigger_event_pit": {"enum": ["PASS","FAIL"]},
+        "monitoring_state_integrity": {"enum": ["PASS","FAIL"]},
+        "transition_history": {"enum": ["PASS","FAIL"]},
+        "monitoring_replay": {"enum": ["PASS","FAIL"]}
+      }
+    },
+    "event_count": {"type": "integer","minimum": 0},
+    "checked_event_ids": {"type": "array","items": {"type": "string","minLength": 1}},
+    "initial_state_hash": {"type": "string","pattern": "^[0-9a-f]{64}$"},
+    "replayed_state_hash": {"type": ["string","null"],"pattern": "^[0-9a-f]{64}$"},
+    "persisted_state_hash": {"type": ["string","null"],"pattern": "^[0-9a-f]{64}$"},
+    "history_head_hash": {"type": "string","pattern": "^[0-9a-f]{64}$"},
+    "issues": {"type": "array","items": {"type": "string"}},
+    "policy_effect": {"const": "NO_DIRECT_DECISION_PRECEDENCE_CHANGE"},
+    "validation_hash": {"type": "string","pattern": "^[0-9a-f]{64}$"}
+  }
+}
