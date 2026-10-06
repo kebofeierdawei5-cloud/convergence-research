@@ -10,11 +10,11 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 ## Current stage
 
-**Current canonical Stage C status: C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL**
+**Current canonical Stage C status: C8 Final Independent Red-team / MVP Acceptance = PASS / MERGED / CANONICAL**
 
 C0, C1, C2, C3, C4, C5, C6 and C7 are all complete and canonical on `main`.
 
-**Immediate next Stage C boundary: C8 Final Independent Red-team / MVP Acceptance.**
+**Post-C8 development boundary: explicit governance decision required.**
 
 A1 company-side evidence closure, RP-01 risk/portfolio, DR-01/DR-02 lifecycle foundations, and TR-01/TR-02/TR-03 validation foundations remain canonical prerequisites.
 
@@ -104,6 +104,29 @@ TR-03 Validation / Replay = PASS / MERGED / CANONICAL.
 TR-03 closes the historical `next_due_at` replay gap using immutable monitoring initialization/evaluation records and source-derived fail-closed validation.
 
 Scheduler/alerts remain out of scope.
+## C8 status
+
+C8 Final Independent Red-team / MVP Acceptance = PASS / MERGED / CANONICAL.
+
+Remediation PR #116:
+- merge commit: c99763a9eae957e59c238590ad64b00bc308e54b.
+
+Canonical-main rerun:
+- Actions Run #30;
+- tested head: c99763a9eae957e59c238590ad64b00bc308e54b;
+- 36 tests passed;
+- compileall, C3 harness, C7 harness and git diff-check passed.
+
+AUTH-001/002/003 are enforced at Decision Admission, Decision Series persistence and Human Approval authorization boundaries.
+
+Acceptance: docs/iios/C8_ACCEPTANCE_2026-10-06.md.
+
+C8 adds no new investment capability, scheduler/alerts or automatic execution.
+
+**Post-C8 development boundary: explicit governance decision required.**
+
+Historical Stage C milestone sequencing remains context only.
+
 ## Stage C milestone status after C5
 
 Historical TR-03 checkpoint: TR-03 Validation / Replay is now PASS / MERGED / CANONICAL.
@@ -234,4 +257,4 @@ Canonical C7 merge: 82d1911c985791e4b76f63d792588d175ee505f8.
 
 C7 proves append-only revisions, downstream-only Monitoring and Execution Receipt, deterministic replay, new-run/new-revision requirements, and projection-only Publication / Report. It introduces no new investment policy or execution automation.
 
-Current next development boundary: C8 Final Independent Red-team / MVP Acceptance.
+Historical next development boundary at the C7 checkpoint: C8 Final Independent Red-team / MVP Acceptance.
