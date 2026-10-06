@@ -761,6 +761,15 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
     except (KeyError, ValueError):
         pass
 
+    positioning_sizing = None
+    try:
+        positioning_sizing = build_positioning_sizing(
+            case=case,
+            positioning=case.get("positioning"),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        positioning_sizing = None
+
     gates = {
         "trust": trust_status,
         "reality": reality_status,
@@ -850,15 +859,6 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
 
     action = state["action"]
     status = "REVIEW_REQUIRED" if action == "REVIEW_REQUIRED" else "READY"
-
-    positioning_sizing = None
-    try:
-        positioning_sizing = build_positioning_sizing(
-            case=case,
-            positioning=case.get("positioning"),
-        )
-    except (KeyError, TypeError, ValueError) as exc:
-        positioning_sizing = None
 
     reason = state["primary_reason"]
     investability = (
