@@ -111,37 +111,99 @@
           "type": [
             "string",
             "null"
+          ],
+          "enum": [
+            "BULL",
+            "NEUTRAL",
+            "BEAR",
+            "UNKNOWN",
+            "AMBIGUOUS"
           ]
         },
         "industry_sentiment": {
           "type": [
             "string",
             "null"
+          ],
+          "enum": [
+            "POSITIVE",
+            "NEUTRAL",
+            "NEGATIVE",
+            "UNKNOWN",
+            "AMBIGUOUS"
           ]
         },
         "stock_structure": {
           "type": [
             "string",
             "null"
+          ],
+          "enum": [
+            "UP",
+            "RANGE",
+            "DOWN",
+            "UNKNOWN",
+            "AMBIGUOUS"
           ]
         },
         "holder_capital_structure": {
           "type": [
             "string",
             "null"
+          ],
+          "enum": [
+            "SUPPORTIVE",
+            "NEUTRAL",
+            "OVERHANG",
+            "UNKNOWN",
+            "AMBIGUOUS"
           ]
         },
         "crowding_supply_pressure": {
           "type": [
             "string",
             "null"
+          ],
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+            "UNKNOWN",
+            "AMBIGUOUS"
           ]
         }
       }
     },
     "factor_scores": {
       "type": "object",
-      "additionalProperties": false
+      "additionalProperties": false,
+      "properties": {
+        "market_regime": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "industry_sentiment": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "stock_structure": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "holder_capital_structure": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "crowding_supply_pressure": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1
+        }
+      }
     },
     "composite_score": {
       "type": [
@@ -221,5 +283,58 @@
     "policy_effect": {
       "const": "TIMING_AND_SIZING_ONLY_NO_FUNDAMENTAL_DECISION_MUTATION"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "PASS"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "evidence_ids": {
+            "minItems": 1
+          },
+          "composite_score": {
+            "type": "integer"
+          },
+          "timing_bias": {
+            "not": {
+              "const": null
+            }
+          },
+          "sizing_band": {
+            "not": {
+              "const": "NONE"
+            }
+          },
+          "permitted_position_pct": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "BLOCKED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "sizing_permission": {
+            "const": "NO_SIZING_PERMISSION"
+          },
+          "sizing_band": {
+            "const": "NONE"
+          }
+        }
+      }
+    }
+  ]
 }
