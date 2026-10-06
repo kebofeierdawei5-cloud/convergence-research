@@ -151,7 +151,10 @@ def test_machine_publication_separates_human_approval_and_lifecycle_refs(tmp_pat
         enabled=True,
     )
     validate_trigger_contract(trigger)
-    write_trigger_contract(tmp_path, decision_id, trigger)
+    trigger_input = dict(trigger)
+    trigger_input.pop("contract_version")
+    trigger_input.pop("trigger_hash")
+    write_trigger_contract(tmp_path, decision_id, trigger_input)
 
     initialize_monitoring_state(
         tmp_path,
