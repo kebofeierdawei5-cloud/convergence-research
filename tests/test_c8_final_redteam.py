@@ -23,7 +23,7 @@ from iios_mvp.market_observation_admission import (
     TemporalProvenance,
     VerifiedMarketEvidence,
 )
-from iios_mvp.machine_publication import build_machine_publication
+from iios_mvp.machine_publication import build_machine_publication, validate_machine_publication
 from iios_mvp.semantic_expectation_gap import evaluate_expectation_gap
 from iios_mvp.store import (
     apply_monitoring_event,
@@ -410,6 +410,13 @@ def test_c8_crafted_revision_can_bypass_kernel():
         assert record["ai_action"] == "BUY"
         assert forged["decision"]["gates"]["trust"] == "FAIL"
         assert forged["decision"]["return_metrics"]["fundamental_target_pass"] is False
+        publication = build_machine_publication(
+            root=root,
+            decision_id=record["decision_id"],
+            published_at="2026-10-06T11:00:00+00:00",
+        )
+        validate_machine_publication(publication)
+        assert publication["ai_decision"]["action"] == "BUY"
 
 
 def test_c8_cross_company_revision_coupling_can_bypass_identity():
@@ -440,6 +447,15 @@ def test_c8_cross_company_revision_coupling_can_bypass_identity():
         assert record["decision_id"] == "CN-A-002422-r001"
         assert catl_snapshot["input"]["symbol"] == "300750"
         assert catl_snapshot["input"]["company"] == "宁德时代"
+        publication = build_machine_publication(
+            root=root,
+            decision_id=record["decision_id"],
+            published_at="2026-10-06T11:00:00+00:00",
+        )
+        validate_machine_publication(publication)
+        assert publication["decision_ref"]["decision_series_id"] == "CN-A-002422"
+        assert publication["case"]["symbol"] == "300750"
+        assert publication["case"]["company"] == "宁德时代"
 
 
 def test_c8_human_approval_has_no_actor_identity_boundary(tmp_path):
