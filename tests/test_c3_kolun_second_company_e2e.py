@@ -1,7 +1,12 @@
 import hashlib
 import json
+import sys
 from pathlib import Path
+
 from jsonschema import Draft202012Validator
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 from tools.c3_kolun_second_company_e2e import run, CASE_PATH, PRICE_CAPTURE_PATH
 
@@ -53,13 +58,17 @@ def test_c3_fixture_evidence_hashes_and_case_schema_are_bound():
 
     assert hashlib.sha256(PRICE_CAPTURE_PATH.read_bytes()).hexdigest() == fixture["evidence"][-1]["capture_sha256"]
     schema = json.loads(Path("schemas/investment_core_case_v0.3.schema.json").read_text(encoding="utf-8"))
-    errors = sorted(Draft202012Validator(schema).iter_errors({
-        **__import__("tools.c3_kolun_second_company_e2e", fromlist=["build_case"]).build_case(
-            fixture,
-            {
-                "price_observation_id": "placeholder",
-                "admission_record_hash": "0" * 64,
-            },
-        )
-    }), key=lambda error: list(error.path))
+    from tools.c3_kolun_second_company_e2e import build_case
+
+    built_case = build_case(
+        fixture,
+        {
+            "price_observation_id": "placeholder",
+            "admission_record_hash": "0" * 64,
+        },
+    )
+    errors = sorted(
+        Draft202012Validator(schema).iter_errors(built_case),
+        key=lambda error: list(error.path),
+    )
     assert not errors, [error.message for error in errors]
