@@ -61,8 +61,7 @@ def test_unknown_hash_cannot_be_resolved_even_when_reference_identity_is_valid()
         registry.resolve(
             forged,
             expected_domain="FORECAST",
-            **CASE,
-            cutoff_date=date(2026, 10, 4),
+            **{**CASE, "cutoff_date": date(2026, 10, 4)},
         )
 
 
