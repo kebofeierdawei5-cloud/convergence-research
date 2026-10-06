@@ -27,7 +27,7 @@ Trigger state is observation output. It is not a Decision State and cannot autho
 
 A Trigger Event must bind to the exact Trigger Contract. The Monitoring State is advanced only by a valid immutable event.
 
-Events must be strictly newer by known_at than the persisted prior event, except for an idempotent re-application of the same event_id.
+Events must be strictly newer by known_at than the persisted prior event, and evaluation_cutoff_at cannot move backwards. The same event_id may be re-applied idempotently only without changing next_due_at.
 
 The next_due_at field is explicit state. TR-02 does not compute a schedule, run a scheduler, send alerts, or automatically mutate next_due_at.
 
