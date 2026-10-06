@@ -63,7 +63,9 @@ def test_revision_is_deterministic():
     validate_decision_revision(a, case_id=CASE, cutoff_date=CUTOFF)
 
 
-def test_revision_supports_legacy_decision_key():
+def test_revision_rejects_legacy_decision_key():
+    import pytest
+
     s = snapshot()
     s["decision"] = {"decision": "HOLD"}
     import hashlib
@@ -73,17 +75,8 @@ def test_revision_supports_legacy_decision_key():
     s["snapshot_hash"] = hashlib.sha256(
         json.dumps(core, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
-    assert build_decision_revision(
-        decision_series_id="CN-A-300750",
-        revision=1,
-        snapshot=s,
-        run_id="run-1",
-        decision_admission=build_fixture_admission_receipt(
-            snapshot=s,
-            canonical_decision={"action": "HOLD"},
-        ),
-    )["ai_action"] == "HOLD"
-
+    with pytest.raises(ValueError, match="canonical decision"):
+        revision(s)
 
 def test_approval_binds_exact_revision_and_snapshot():
     rev = revision(snapshot())
