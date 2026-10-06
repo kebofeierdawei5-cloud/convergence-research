@@ -21,6 +21,9 @@ from .store import (
     write_snapshot,
     write_trigger_contract,
     write_trigger_event,
+    initialize_monitoring_state,
+    apply_monitoring_event,
+    replay_monitoring_state,
 )
 
 
@@ -198,6 +201,43 @@ def cmd_trigger_event(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_monitor_init(args: argparse.Namespace) -> int:
+    path = initialize_monitoring_state(
+        args.out,
+        args.trigger_id,
+        args.monitor_id,
+        lifecycle_status=args.lifecycle_status,
+        next_due_at=args.next_due_at,
+        evaluation_reference_at=args.evaluation_reference_at,
+    )
+    persisted = load_json(str(path))
+    print(json.dumps({
+        "monitoring_state": str(path),
+        "state_hash": persisted["state_hash"],
+        "due_state": persisted["due_state"],
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_monitor_apply(args: argparse.Namespace) -> int:
+    path = apply_monitoring_event(args.out, args.trigger_event_id, next_due_at=args.next_due_at)
+    persisted = load_json(str(path))
+    print(json.dumps({
+        "monitoring_state": str(path),
+        "state_hash": persisted["state_hash"],
+        "last_event_id": persisted["last_event_id"],
+        "last_trigger_state": persisted["last_trigger_state"],
+        "evaluation_status": persisted["evaluation_status"],
+        "due_state": persisted["due_state"],
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_monitor_replay(args: argparse.Namespace) -> int:
+    print(json.dumps(replay_monitoring_state(args.out, args.trigger_id), ensure_ascii=False, indent=2))
+    return 0
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="iios-mvp", description="IIOS v0.1.1 investment-decision kernel")
     sub = p.add_subparsers(dest="command", required=True)
@@ -258,6 +298,26 @@ def parser() -> argparse.ArgumentParser:
     te.add_argument("event")
     te.add_argument("--out", default="runs")
     te.set_defaults(func=cmd_trigger_event)
+
+    mi = sub.add_parser("monitor-init", help="initialize canonical monitoring state for a trigger")
+    mi.add_argument("trigger_id")
+    mi.add_argument("--monitor-id", required=True)
+    mi.add_argument("--lifecycle-status", choices=("ACTIVE", "DISABLED", "RETIRED"), default="ACTIVE")
+    mi.add_argument("--next-due-at")
+    mi.add_argument("--evaluation-reference-at")
+    mi.add_argument("--out", default="runs")
+    mi.set_defaults(func=cmd_monitor_init)
+
+    ma = sub.add_parser("monitor-apply", help="apply one canonical trigger event to monitoring state")
+    ma.add_argument("trigger_event_id")
+    ma.add_argument("--next-due-at")
+    ma.add_argument("--out", default="runs")
+    ma.set_defaults(func=cmd_monitor_apply)
+
+    mr = sub.add_parser("monitor-replay", help="replay monitoring state from canonical trigger events")
+    mr.add_argument("trigger_id")
+    mr.add_argument("--out", default="runs")
+    mr.set_defaults(func=cmd_monitor_replay)
     return p
 
 
