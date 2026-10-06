@@ -174,5 +174,5 @@ def test_evaluation_cutoff_cannot_move_backwards():
         apply_trigger_event(
             previous_state=n,
             trigger_contract=c,
-            trigger_event=evt(c, event_id='e3', known='2026-10-05T12:05:00+00:00', cutoff='2026-10-05T11:05:00+00:00'),
+            trigger_event=evt(c, event_id='e3', known='2026-10-05T10:30:00+00:00', cutoff='2026-10-05T10:31:00+00:00'),
         )
