@@ -8,6 +8,7 @@ from pathlib import Path
 from .company_economic_core import build_company_economic_core, validate_company_economic_core
 from .core03_market_expectation import build_core03_package, validate_core03_package
 from .engine import replay, render_markdown, run_case
+from .decision_admission import admit_canonical_decision
 from .research_intake import build_research_case
 from .machine_publication import write_machine_publication
 from .human_report import write_human_report
@@ -138,6 +139,12 @@ def cmd_run(args: argparse.Namespace) -> int:
         args.out, args.market, case["symbol"], case["company"], now_iso()
     )
     revision = next_revision(args.out, series["decision_series_id"])
+    decision_admission = None
+    if snapshot.get("snapshot_schema") == "IIOS-MVP-SNAPSHOT-0.3.0":
+        decision_admission = admit_canonical_decision(
+            case=case,
+            snapshot=snapshot,
+        )
     decision_path = write_decision_revision(
         args.out,
         series["decision_series_id"],
@@ -145,6 +152,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         snapshot,
         run_id=snapshot_hash[:16],
         trigger_event_id=args.trigger_event_id,
+        decision_admission=decision_admission,
     )
     if args.format == "markdown":
         print(render_markdown(snapshot))
@@ -177,6 +185,8 @@ def cmd_approve(args: argparse.Namespace) -> int:
         snapshot,
         args.approved,
         args.note,
+        actor_identity=args.actor_identity,
+        authorization_method=args.authorization_method,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
@@ -371,6 +381,8 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--series-id")
     ap.add_argument("--approved", action=argparse.BooleanOptionalAction, default=True)
     ap.add_argument("--note", required=True)
+    ap.add_argument("--actor-identity", required=True)
+    ap.add_argument("--authorization-method", default="HUMAN_AUTHENTICATED", choices=("HUMAN_AUTHENTICATED",))
     ap.set_defaults(func=cmd_approve)
 
     tc = sub.add_parser("trigger-contract", help="persist a reusable trigger contract")
