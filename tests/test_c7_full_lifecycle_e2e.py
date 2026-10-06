@@ -15,7 +15,7 @@ from iios_mvp.machine_publication import (
     build_machine_publication,
     validate_machine_publication,
 )
-from iios_mvp.decision_admission import build_test_admission_receipt
+from tests.decision_admission_fixture import build_fixture_admission_receipt
 from iios_mvp.store import (
     apply_monitoring_event,
     approve_revision,
@@ -82,7 +82,7 @@ def seed_c7(tmp_path):
         reason="initial canonical proposal",
     )
     write_snapshot(tmp_path, s1)
-    admission1 = build_test_admission_receipt(snapshot=s1, canonical_decision=s1["decision"])
+    admission1 = build_fixture_admission_receipt(snapshot=s1, canonical_decision=s1["decision"])
     r1_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
@@ -200,7 +200,7 @@ def test_c7_full_operating_loop(tmp_path):
         reason="monitoring event invalidated the prior sizing thesis",
     )
     write_snapshot(tmp_path, s2)
-    admission2 = build_test_admission_receipt(snapshot=s2, canonical_decision=s2["decision"])
+    admission2 = build_fixture_admission_receipt(snapshot=s2, canonical_decision=s2["decision"])
     r2_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
@@ -282,7 +282,7 @@ def test_c7_changed_decision_requires_new_run_and_revision(tmp_path):
         reason="changed proposal requires independent revision",
     )
     write_snapshot(tmp_path, s2)
-    admission2 = build_test_admission_receipt(snapshot=s2, canonical_decision=s2["decision"])
+    admission2 = build_fixture_admission_receipt(snapshot=s2, canonical_decision=s2["decision"])
     r2_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
