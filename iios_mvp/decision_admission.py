@@ -82,6 +82,7 @@ def _build_receipt_from_canonical(
         "engine_version": CANONICAL_DECISION_ENGINE_VERSION,
         **identity,
         "snapshot_hash": snapshot["snapshot_hash"],
+        "canonical_decision_keys": sorted(canonical_decision.keys()),
         "canonical_decision_hash": _sha(canonical_decision),
         "canonical_action": _decision_action(canonical_decision),
         "canonical_decision_status": _text(
@@ -158,6 +159,7 @@ def validate_decision_admission_receipt(
         "company",
         "cutoff_date",
         "snapshot_hash",
+        "canonical_decision_keys",
         "canonical_decision_hash",
         "canonical_action",
         "canonical_decision_status",
@@ -186,8 +188,22 @@ def validate_decision_admission_receipt(
         raise ValueError("decision_admission canonical_decision_hash does not match snapshot decision")
     if record["canonical_action"] != _decision_action(snapshot["decision"]):
         raise ValueError("decision_admission canonical_action does not match snapshot decision")
+    keys = record["canonical_decision_keys"]
+    if (
+        not isinstance(keys, list)
+        or keys != sorted(set(keys))
+        or any(not isinstance(key, str) or not key for key in keys)
+        or "action" not in keys
+    ):
+        raise ValueError("decision_admission canonical_decision_keys are invalid")
+    snapshot_decision = snapshot["decision"]
+    if any(key not in snapshot_decision for key in keys):
+        raise ValueError("decision_admission canonical decision keys are not present in snapshot")
+    canonical_projection = {key: snapshot_decision[key] for key in keys}
     if not isinstance(record["canonical_decision_hash"], str) or len(record["canonical_decision_hash"]) != 64:
         raise ValueError("decision_admission canonical_decision_hash is invalid")
+    if record["canonical_decision_hash"] != _sha(canonical_projection):
+        raise ValueError("decision_admission canonical_decision_hash does not match canonical snapshot fields")
     if record["canonical_action"] not in DECISION_ACTIONS:
         raise ValueError("decision_admission canonical_action is invalid")
     if not isinstance(record["canonical_decision_status"], str) or not record["canonical_decision_status"].strip():
