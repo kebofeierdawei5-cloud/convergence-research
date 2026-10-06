@@ -1,7 +1,7 @@
 # TR-03 — Validation / Replay Productization v0.1
 
 Date: 2026-10-06
-Status: PROPOSED / BRANCH-ONLY
+Status: ACCEPTED / CANONICAL
 
 ## Objective
 
