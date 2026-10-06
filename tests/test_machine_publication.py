@@ -230,7 +230,7 @@ def test_machine_publication_fails_closed_on_source_revision_tampering(tmp_path)
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="revision hash mismatch"):
+    with pytest.raises(ValueError, match="decision admission action binding mismatch"):
         build_machine_publication(
             root=tmp_path,
             decision_id=decision_id,
