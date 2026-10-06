@@ -4,6 +4,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .execution_receipt_production import (
+    build_execution_receipt,
+    execution_receipt_path,
+    replay_execution_receipt,
+    validate_execution_receipt,
+)
 from .decision_lifecycle_production import (
     build_decision_revision,
     build_human_approval,
@@ -857,3 +863,63 @@ def replay_monitoring_validation(root: str | Path, validation_id: str) -> dict[s
         "validation_hash": record["validation_hash"],
     }
 
+
+
+def write_execution_receipt(
+    root: str | Path,
+    execution_receipt_id: str,
+    decision_id: str,
+    snapshot: dict[str, Any],
+    executed_at: str,
+    execution_status: str,
+    actor_identity: str,
+    executed_quantity: Any = None,
+    executed_position_pct: Any = None,
+    executed_price: Any = None,
+) -> Path:
+    revision = _load_revision(root, decision_id)
+    if revision["snapshot_hash"] != snapshot.get("snapshot_hash"):
+        raise ValueError("execution receipt and snapshot are not bound to the same snapshot")
+    approval_path = _approval_path(root, decision_id)
+    if not approval_path.exists():
+        raise ValueError("human approval is required before execution receipt")
+    approval = _load_json(approval_path)
+    receipt = build_execution_receipt(
+        execution_receipt_id=execution_receipt_id,
+        decision_revision=revision,
+        human_approval=approval,
+        executed_at=executed_at,
+        execution_status=execution_status,
+        executed_quantity=executed_quantity,
+        executed_position_pct=executed_position_pct,
+        executed_price=executed_price,
+        actor_identity=actor_identity,
+    )
+    return _atomic_create(
+        execution_receipt_path(root, execution_receipt_id),
+        receipt,
+    )
+
+
+def read_execution_receipt(path: str | Path) -> dict[str, Any]:
+    record = _load_json(Path(path))
+    validate_execution_receipt(record)
+    return record
+
+
+def replay_persisted_execution_receipt(
+    root: str | Path,
+    execution_receipt_id: str,
+) -> dict[str, Any]:
+    record = read_execution_receipt(execution_receipt_path(root, execution_receipt_id))
+    revision = _load_revision(root, record["decision_id"])
+    snapshot = read_snapshot(snapshot_path(root, revision["snapshot_hash"]))
+    if record["snapshot_hash"] != snapshot["snapshot_hash"]:
+        raise ValueError("execution receipt snapshot binding mismatch")
+    approval = _load_json(_approval_path(root, record["decision_id"]))
+    validate_human_approval(approval, decision_revision=revision)
+    return replay_execution_receipt(
+        record,
+        decision_revision=revision,
+        human_approval=approval,
+    )
