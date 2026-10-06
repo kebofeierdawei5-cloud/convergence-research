@@ -218,13 +218,21 @@ def build_positioning_sizing(
     else:
         positioning_reason = None
 
-    source_bundle_sha256 = _hash_or_none(
-        positioning.get("source_bundle_sha256"),
-        "positioning.source_bundle_sha256",
-    )
+    try:
+        source_bundle_sha256 = _hash_or_none(
+            positioning.get("source_bundle_sha256"),
+            "positioning.source_bundle_sha256",
+        )
+    except ValueError as exc:
+        source_bundle_sha256 = None
+        positioning_reason = positioning_reason or str(exc)
+
     raw_evidence_ids = positioning.get("evidence_ids")
     if isinstance(raw_evidence_ids, list):
-        evidence_ids = [str(x) for x in raw_evidence_ids]
+        evidence_ids = [str(x).strip() for x in raw_evidence_ids]
+    if not evidence_ids or any(not x for x in evidence_ids) or len(evidence_ids) != len(set(evidence_ids)):
+        positioning_reason = positioning_reason or "positioning.evidence_ids must be a unique non-empty list"
+
     factor_state, factor_reason = _factor_status(positioning)
     block_reason = positioning_reason or factor_reason
 
@@ -259,7 +267,17 @@ def build_positioning_sizing(
         digest = _sha(common)
         return {**common, "evaluation_id": f"c5-positioning-{digest[:16]}", "evaluation_hash": digest}
 
-    current, initial, target, maximum = _portfolio_bounds(case)
+    try:
+        current, initial, target, maximum = _portfolio_bounds(case)
+    except ValueError as exc:
+        common["reason"] = str(exc)
+        digest = _sha(common)
+        return {
+            **common,
+            "evaluation_id": f"c5-positioning-{digest[:16]}",
+            "evaluation_hash": digest,
+        }
+
     factor_scores = {
         field: FACTOR_SCORE_MAP[field][common["factors"][field]]
         for field in FACTOR_FIELDS
