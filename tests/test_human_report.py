@@ -170,7 +170,7 @@ def test_report_qa_fails_closed_on_publication_binding_mismatch(tmp_path):
     report = build_human_report(
         publication=publication, generated_at="2026-10-06T02:00:00+00:00"
     )
-    second, _ = make_publication(tmp_path / "second")
+    second, _ = make_publication(tmp_path / "second", action="HOLD")
     qa = qa_human_report(publication=second, report=report)
     assert qa["qa_status"] == "FAIL"
     assert qa["checks"]["publication_binding"] == "FAIL"
