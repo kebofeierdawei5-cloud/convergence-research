@@ -417,26 +417,29 @@ Stage C is complete only when:
 
 ## 9. Current execution boundary
 
-**Latest canonical milestone: C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL**
+**Latest canonical milestone: C8 Final Independent Red-team / MVP Acceptance = PASS / MERGED / CANONICAL**
 
-C7 implementation:
-- PR #112;
-- merge `82d1911c985791e4b76f63d792588d175ee505f8`.
+C8 remediation:
+- PR #116;
+- merge `c99763a9eae957e59c238590ad64b00bc308e54b`.
 
-C7 canonical state synchronization:
-- PR #113;
-- merge `a5ac4b8451041bbd38bcaa73fa39954ec6533f02`.
+C8 canonical-main acceptance:
+- `docs/iios/C8_ACCEPTANCE_2026-10-06.md`;
+- Actions Run #30 SUCCESS on exact head `c99763a9eae957e59c238590ad64b00bc308e54b`;
+- 36 C8 authority/lifecycle tests passed;
+- compileall, C3 harness, C7 harness and git diff-check passed.
 
-C7 acceptance:
-- `docs/iios/C7_ACCEPTANCE_2026-10-06.md`;
-- dedicated Actions run #6 SUCCESS on exact head `43664c9bee33b3d53f212428da019e197a9fcaf2`;
-- 74 related tests passed;
-- acceptance harness 4 / 4 PASS;
-- compileall and git diff-check PASS.
+C8 closes AUTH-001/002/003:
+- Decision Revision requires canonical Decision Admission;
+- Decision Series is bound to market + symbol + company + case identity;
+- Human Approval requires explicit actor identity and `HUMAN_AUTHENTICATED` authorization boundary.
 
-**Immediate next batch: C8 — Final Independent Red-team / MVP Acceptance.**
+C7 remains the preceding lifecycle milestone.
 
-C8 is the final Stage C acceptance boundary. It is an adversarial evaluation of the canonical product across the real CATL / 300750 and 科伦药业 cases; it is not a new capability-development batch.
+**Post-C8 development boundary: explicit governance decision required.**
+
+C8 was an acceptance-only boundary. No new investment capability, scheduler/alerts, automatic execution, universe expansion or new forecast/valuation model family was introduced.
+
 
 Parallel FM Research remains separate and does not block the Stage C C8 acceptance boundary.
 
