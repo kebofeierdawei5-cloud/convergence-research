@@ -117,7 +117,7 @@ def test_c6_receipt_binds_exact_approved_revision_and_action():
             "canonical_action": "BUY",
             "canonical_decision_status": "READY",
             "canonical_new_capital_allowed": false,
-            "admission_record_hash": "a".repeat(64),
+            "admission_record_hash": "8766d70fe40167ba81688c5ace4b8e7eac3596d79f36af4a7bb5e612d8f34dd6",
         },
     }
     rev["revision_hash"] = hashlib.sha256(
@@ -275,7 +275,7 @@ def test_c6_receipt_tampering_is_detected():
             "canonical_action": "REDUCE",
             "canonical_decision_status": "READY",
             "canonical_new_capital_allowed": false,
-            "admission_record_hash": "b".repeat(64),
+            "admission_record_hash": "6518d5599053e55328e3eb0dcb53340ad780a44d179985d8af07688484a40eb4",
         },
     }
     rev["revision_hash"] = hashlib.sha256(
@@ -368,7 +368,7 @@ def test_c6_schema_accepts_receipt():
             "canonical_action": "ADD",
             "canonical_decision_status": "READY",
             "canonical_new_capital_allowed": false,
-            "admission_record_hash": "c".repeat(64),
+            "admission_record_hash": "83eb69bd63ea8c43d4a9643125fb3c7de16aaa5971bafe7adf0c4a8b5028325f",
         },
     }
     rev["revision_hash"] = hashlib.sha256(
