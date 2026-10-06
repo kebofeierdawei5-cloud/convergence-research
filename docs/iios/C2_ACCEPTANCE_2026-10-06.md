@@ -1,7 +1,7 @@
 # C2 Acceptance — Human Report + Report Quality Gate
 
 Date: 2026-10-06
-Status: CANDIDATE — PENDING ACCEPTANCE
+Status: ACCEPTED / CANONICAL
 
 ## Acceptance target
 
