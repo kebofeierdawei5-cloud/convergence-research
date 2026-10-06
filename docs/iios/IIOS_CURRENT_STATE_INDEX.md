@@ -1,15 +1,14 @@
-# SUPERSEDED CURRENT-STATE HEADER — 2026-10-05
+# HISTORICAL / SUPERSEDED CURRENT-STATE DOCUMENT — 2026-10-06
 
-Authoritative current status is now maintained in STATUS.md plus docs/iios/PHASE_AUDIT_AND_DEVELOPMENT_PLAN_2026-10-05.md. This file is retained for historical continuity and must not override the newer canonical state.
+This file is retained only as immutable historical continuity evidence. It MUST NOT be used as the current state authority.
 
-# B0 REPAIR OVERRIDE — 2026-10-04
+The sole canonical Current State Index is:
 
-Active repair baseline: `d209b33b7f922866f2fdc1190785c27edb8a28e4`
-Active stage: **B0 PASS → B1 PASS → B2 Data/Evidence/PIT Foundation**
+`docs/PROJECT_STATE_INDEX.md`
 
-This index retains the incumbent v0.2 and P4 acceptance records below for historical continuity. They do not override the B0 authority freeze. The incumbent return statement and P5 next-step text are superseded as the active repair target until B1 is approved.
+Current implementation truth is the canonical Git `main` ref. Current roadmap and accepted state must be read from `docs/PROJECT_STATE_INDEX.md` and its referenced normative/acceptance records.
 
-B1 v0.3 is now the active frozen Investment Core semantic contract. It separately defines BUY-entry threshold/safety cushion, 1–3Y annualized target, Expected Return, Required Return, Horizon, action semantics, Unknown/Trust/Investability/Portfolio boundaries and non-mandatory MIE.
+This historical document predates the post-TR-03 Stage C productization state. Its old status, roadmap, next-step wording, and capability descriptions are not current.
 
 ---
 
