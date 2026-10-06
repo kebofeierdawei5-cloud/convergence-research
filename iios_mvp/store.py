@@ -39,11 +39,9 @@ def write_snapshot(root: str | Path, snapshot: dict[str, Any]) -> Path:
             raise ValueError("snapshot hash collision or attempted overwrite")
         return path
     path.write_text(
-        json.dumps(snapshot, ensure_ascii=False, indent=2) + "
-",
+        json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
-        newline="
-",
+        newline="\n",
     )
     return path
 
@@ -80,11 +78,9 @@ def _atomic_create(path: Path, payload: dict[str, Any]) -> Path:
         return path
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "
-",
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
-        newline="
-",
+        newline="\n",
     )
     tmp.replace(path)
     return path
@@ -93,11 +89,9 @@ def _atomic_create(path: Path, payload: dict[str, Any]) -> Path:
 def _atomic_replace(path: Path, payload: dict[str, Any]) -> Path:
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "
-",
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
-        newline="
-",
+        newline="\n",
     )
     tmp.replace(path)
     return path
