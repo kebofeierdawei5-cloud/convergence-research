@@ -156,7 +156,7 @@ def test_c5_deterministic_replay_and_tamper_detection():
     assert replay["deterministic_replay"] is True
 
     tampered = deepcopy(record)
-    tampered["composite_score"] = 4
+    tampered["reason"] = "tampered"
     with pytest.raises(ValueError, match="hash mismatch"):
         validate_positioning_sizing(tampered)
 
