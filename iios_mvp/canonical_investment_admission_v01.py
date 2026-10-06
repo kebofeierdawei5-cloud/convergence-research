@@ -246,11 +246,12 @@ def build_canonical_investment_admission(
     _datetime(values["admitted_at"], "admitted_at")
     core = {**values}
     record_hash = _sha(core)
-    record = CanonicalInvestmentAdmissionRecord(
+    record_values = {
         **core,
-        evidence_ids=tuple(core["evidence_ids"]),
-        admission_record_hash=record_hash,
-    )
+        "evidence_ids": tuple(core["evidence_ids"]),
+        "admission_record_hash": record_hash,
+    }
+    record = CanonicalInvestmentAdmissionRecord(**record_values)
     validate_canonical_investment_admission_record(record)
     return record
 
