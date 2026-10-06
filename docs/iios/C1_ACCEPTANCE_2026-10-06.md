@@ -1,9 +1,13 @@
 # C1 Acceptance — Machine Publication
 
 Date: 2026-10-06
-Status: CANDIDATE — READY FOR CANONICAL MERGE
+Status: ACCEPTED / CANONICAL
 
 ## Acceptance decision
+
+C1 = PASS / MERGED / CANONICAL.
+
+Canonical merge commit: b9a8ff0fe1341a56f363fb058677dbd50a4f87b8.
 
 C1 source-level Machine Publication boundary = PASS.
 

@@ -378,11 +378,10 @@ Stage C is complete only when:
 
 ## 9. Next immediate batch
 
-After this plan is canonically accepted:
-C0 — Governance Hygiene / Stage Baseline
-→ C1 — Machine Publication
+Current execution state after C1 acceptance:
+C0 — Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL
+→ C1 — Machine Publication = PASS / MERGED / CANONICAL
 → C2 — Human Report + Report Quality Gate
-→ C3 — Second Company Acceptance
 
 C4–C8 follow only after the preceding acceptance boundaries are satisfied.
 
