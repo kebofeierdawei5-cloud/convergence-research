@@ -22,7 +22,7 @@ CORE-04 vertical decision closure is complete.
 
 A1 is complete as the company-side evidence-closure engineering milestone. Current 300750 Quality remains CONDITIONAL and new capital remains FALSE.
 
-C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. The next Stage C batch is C3 Second Company Acceptance.
+C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. C3 Second Company Acceptance = PASS / MERGED / CANONICAL. The next Stage C batch is C4 Expectation Gap Production Integration.
 
 TR-03 Validation / Replay is now PASS / MERGED / CANONICAL.
 
@@ -113,7 +113,6 @@ TR-03 closes the historical `next_due_at` replay gap using immutable monitoring 
 Scheduler/alerts remain out of scope.
 ## Product gaps after C2
 
-- C3 Second Company Acceptance
 - C4 Expectation Gap Production Integration
 - C5 Positioning / Sizing
 - C6 Human Execution Receipt
@@ -144,7 +143,7 @@ The canonical Stage C plan is `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.m
 
 Canonical C0 merge: `1594e43eee14aaa41ddde675ddbe61d650462cf7`.
 
-Next boundary: C3 Second Company Acceptance → C4 Expectation Gap Production Integration.
+Next boundary: C4 Expectation Gap Production Integration.
 
 
 ## C1 status
@@ -170,4 +169,18 @@ Acceptance: `docs/iios/C2_ACCEPTANCE_2026-10-06.md`.
 
 Canonical C2 merge: `75bb360436286ae950a05028769701380120e561`.
 
-Next boundary: C3 Second Company Acceptance.
+Next boundary: C4 Expectation Gap Production Integration.
+
+ 
+## C3 status
+
+C3 Second Company Acceptance = PASS / MERGED / CANONICAL.
+
+Real second company: 四川科伦药业股份有限公司 / CN-A / 002422.
+
+Dedicated C3 Actions run #11 = SUCCESS; 4 C3 tests passed; executable acceptance harness passed; compileall and git diff --check passed.
+
+Acceptance: docs/iios/C3_ACCEPTANCE_2026-10-06.md.
+Canonical C3 merge: eb0f9fc965f9ce6aa09685776d2ec8a0522e3b47.
+
+Next development boundary: C4 Expectation Gap Production Integration. C3 introduced no Expectation Gap, positioning/sizing, scheduler, alerts, or automatic execution capability.

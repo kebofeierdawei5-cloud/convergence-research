@@ -1,7 +1,7 @@
 # C3 — Second Company Acceptance v0.1
 
 Date: 2026-10-06
-Status: IMPLEMENTATION / PENDING ACCEPTANCE
+Status: ACCEPTED / CANONICAL
 
 ## Objective
 
