@@ -88,8 +88,8 @@ def test_c8_auth_002_store_rejects_cross_company_series_binding(tmp_path):
     series = create_or_load_series(
         tmp_path,
         "CN-A",
-        "002422",
-        "四川科伦药业股份有限公司",
+        "300750",
+        "CATL",
         "2026-10-06T00:00:00+00:00",
     )
     write_snapshot(tmp_path, snapshot)
