@@ -83,6 +83,7 @@ def _build_receipt_from_canonical(
         **identity,
         "snapshot_hash": snapshot["snapshot_hash"],
         "canonical_decision_keys": sorted(canonical_decision.keys()),
+        "canonical_decision_projection": dict(canonical_decision),
         "canonical_decision_hash": _sha(canonical_decision),
         "canonical_action": _decision_action(canonical_decision),
         "canonical_decision_status": _text(
@@ -160,6 +161,7 @@ def validate_decision_admission_receipt(
         "cutoff_date",
         "snapshot_hash",
         "canonical_decision_keys",
+        "canonical_decision_projection",
         "canonical_decision_hash",
         "canonical_action",
         "canonical_decision_status",
@@ -196,10 +198,17 @@ def validate_decision_admission_receipt(
         or "action" not in keys
     ):
         raise ValueError("decision_admission canonical_decision_keys are invalid")
+    projection = record["canonical_decision_projection"]
+    if not isinstance(projection, Mapping):
+        raise ValueError("decision_admission canonical_decision_projection is invalid")
+    if sorted(projection.keys()) != keys:
+        raise ValueError("decision_admission canonical_decision_projection keys do not match canonical_decision_keys")
+    canonical_projection = {key: projection[key] for key in keys}
     snapshot_decision = snapshot["decision"]
     if any(key not in snapshot_decision for key in keys):
         raise ValueError("decision_admission canonical decision keys are not present in snapshot")
-    canonical_projection = {key: snapshot_decision[key] for key in keys}
+    if any(snapshot_decision[key] != canonical_projection[key] for key in keys):
+        raise ValueError("decision_admission canonical decision projection does not match snapshot")
     if not isinstance(record["canonical_decision_hash"], str) or len(record["canonical_decision_hash"]) != 64:
         raise ValueError("decision_admission canonical_decision_hash is invalid")
     if record["canonical_decision_hash"] != _sha(canonical_projection):
