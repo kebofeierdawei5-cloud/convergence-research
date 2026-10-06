@@ -1,0 +1,160 @@
+{
+  "case_id": "RC-CN-A-002422-20261004",
+  "market": "CN-A",
+  "symbol": "002422",
+  "company": "四川科伦药业股份有限公司",
+  "as_of_date": "2026-10-04",
+  "cutoff_date": "2026-10-04",
+  "economic_structure": {
+    "type": "PHARMA_MANUFACTURING_AND_CONTROLLED_BIOTECH",
+    "material_difference_from_catl": [
+      "mature pharmaceutical manufacturing and infusion products",
+      "controlled biotechnology R&D / pipeline optionality",
+      "higher R&D intensity and clinical-development uncertainty",
+      "SOTP rather than CATL's DCF primary valuation path"
+    ]
+  },
+  "evidence": [
+    {
+      "evidence_id": "E001",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-08-27",
+      "source": "CNINFO 2026 H1 annual report",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-08-27/1225512872.PDF",
+      "capture_sha256": "9dead01b21d7450bb806e29931db26ef296e6d56dff02852da4bb8f4c40b832f",
+      "capture": "Official CNINFO/SZSE disclosure identity: 四川科伦药业股份有限公司; stock code 002422; Shenzhen Stock Exchange; 2026 H1 report dated 2026-08-27."
+    },
+    {
+      "evidence_id": "E002",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-08-27",
+      "source": "CNINFO 2026 H1 annual report",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-08-27/1225512872.PDF",
+      "capture_sha256": "e6fc571f9d96011c5364c8a0c623d3aa64240587fd05e3f7e7371d9cc21c741f",
+      "capture": "CNINFO 2026 H1 report: operating revenue CNY 8,838,531,817; net profit attributable to parent CNY 1,127,804,000 (reported); adjusted net profit attributable CNY 699,400,000 (reported); operating cash flow CNY 2,341,200,000; R&D expense CNY 1,212,595,045; 2026-06-30."
+    },
+    {
+      "evidence_id": "E003",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-08-27",
+      "source": "CNINFO 2026 H1 annual report",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-08-27/1225512872.PDF",
+      "capture_sha256": "57e57d4a81617a54c1a6c55f1f47204ea402ec5cfa929918efea26dd82d802bd",
+      "capture": "CNINFO 2026 H1 business disclosure: infusion product sales revenue about CNY 3.559bn, down 5.08%; triple-chamber bag sales 6.54m bags, up 20.21%; pharmaceutical manufacturing remains the core operating base."
+    },
+    {
+      "evidence_id": "E004",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-08-27",
+      "source": "CNINFO 2026 H1 annual report",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-08-27/1225512872.PDF",
+      "capture_sha256": "dd87824b4fef176ad1873e23a2711b5c875e021a81d1468c249bfb055e27d66b",
+      "capture": "CNINFO 2026 H1 subsidiary disclosure: 科伦博泰生物 is a key biotechnology subsidiary focused on drug R&D, production and sales; its 2026 H1 operating and investment profile is materially different from the mature pharmaceutical manufacturing business."
+    },
+    {
+      "evidence_id": "E005",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-09-30T23:59:00+08:00",
+      "source": "CFi historical quote capture",
+      "source_ref": "https://quote.cfi.cn/quote_002422.html",
+      "artifact_id": "c3_price_capture.txt",
+      "capture_sha256": "b59d6844530261896569dcd071f2fecb670fc26ad162a6ecbf31ccca1f464d7f",
+      "value": 40.85,
+      "unit": "CNY/share",
+      "observation_date": "2026-09-30"
+    }
+  ],
+  "forecast_assumptions": {
+    "version": "C3-KOLUN-FORECAST-ASSUMPTIONS-0.1",
+    "classification": "EXPLICIT_MODEL_ASSUMPTION_NOT_EVIDENCE",
+    "basis": "2026 H1 operating anchors plus scenario-specific assumptions",
+    "r_and_d_intensity_h1": "0.1372",
+    "scenarios": {
+      "bear": {
+        "core_pharma_value_per_share": "27",
+        "controlled_biotech_option_value_per_share": "8",
+        "cash_and_other_per_share": "2",
+        "core_revenue_growth_assumption": "-0.05",
+        "biotech_value_assumption": "LOW"
+      },
+      "base": {
+        "core_pharma_value_per_share": "32",
+        "controlled_biotech_option_value_per_share": "21",
+        "cash_and_other_per_share": "5",
+        "core_revenue_growth_assumption": "0.03",
+        "biotech_value_assumption": "MEDIUM"
+      },
+      "bull": {
+        "core_pharma_value_per_share": "42",
+        "controlled_biotech_option_value_per_share": "41",
+        "cash_and_other_per_share": "5",
+        "core_revenue_growth_assumption": "0.08",
+        "biotech_value_assumption": "HIGH"
+      }
+    }
+  },
+  "valuation": {
+    "status": "PASS",
+    "primary_model": "SOTP",
+    "model_role": "PRIMARY_VALUATION",
+    "scenario_values_per_share": {
+      "bear": "37",
+      "base": "58",
+      "bull": "88"
+    },
+    "formula": "core_pharma + controlled_biotech_option + cash_and_other",
+    "model_note": "All component values are explicit model assumptions; they are not market-implied expectations and are not imported from a CATL valuation fixture."
+  },
+  "risk": {
+    "status": "PASS",
+    "max_loss_pct": "25",
+    "thesis_breaks": [
+      "core pharmaceutical manufacturing economics structurally deteriorate",
+      "cash-flow conversion persistently diverges from accounting earnings",
+      "R&D spending fails to translate into economically material pipeline value",
+      "material governance or minority-shareholder treatment deterioration"
+    ],
+    "evidence_ids": [
+      "E002",
+      "E003",
+      "E004"
+    ]
+  },
+  "thesis": {
+    "status": "INTACT",
+    "statement": "科伦药业 can combine a durable pharmaceutical manufacturing base with value creation from its controlled biotechnology platform.",
+    "mechanism": "The mature portfolio supplies cash generation while R&D and the controlled biotech platform provide longer-duration product optionality; value creation requires both cash conversion and successful capital deployment.",
+    "falsifiers": [
+      "persistent deterioration of core pharmaceutical cash economics",
+      "incremental R&D / capital allocation returns remain below required return",
+      "material pipeline failures without compensating core-business resilience",
+      "material governance or shareholder-treatment deterioration"
+    ],
+    "evidence_ids": [
+      "E002",
+      "E003",
+      "E004"
+    ],
+    "known_at": "2026-08-27T23:59:00+08:00",
+    "key_driver_ids": [
+      "core_pharma_cash_generation",
+      "controlled_biotech_pipeline_value",
+      "r_and_d_capital_allocation"
+    ],
+    "monitoring_triggers": [
+      "core_pharma_cash_flow_conversion",
+      "biotech_pipeline_value"
+    ],
+    "prepared_without_current_price": true
+  },
+  "monitoring": [
+    {
+      "metric": "core_pharma_cash_flow_conversion",
+      "condition": "quarterly recheck of operating cash flow versus earnings and working-capital normalization"
+    },
+    {
+      "metric": "biotech_pipeline_value",
+      "condition": "reassess pipeline progress, approvals and incremental R&D economics"
+    }
+  ]
+}

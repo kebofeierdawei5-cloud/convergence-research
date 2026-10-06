@@ -1,0 +1,12 @@
+IIOS C3 PRICE EVIDENCE CAPTURE
+source_class: SECONDARY_REPRODUCIBLE_PUBLIC_DATA
+source: CFi historical quote
+source_location: https://quote.cfi.cn/quote_002422.html
+observation_date: 2026-09-30
+known_at: 2026-09-30T23:59:00+08:00
+market: CN-A
+symbol: 002422
+company: 四川科伦药业股份有限公司
+close: 40.85 CNY/share
+adjustment_semantics: UNADJUSTED
+capture_note: Public historical quote page records the 2026-09-30 close. This capture is an evidence packet, not a claim of retained SZSE raw-response bytes.
