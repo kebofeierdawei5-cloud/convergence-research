@@ -31,6 +31,7 @@ def build_fixture_admission_receipt(
         "company": str(snapshot["input"]["company"]),
         "cutoff_date": str(snapshot["input"]["cutoff_date"]),
         "snapshot_hash": str(snapshot["snapshot_hash"]),
+        "canonical_decision_keys": sorted(decision.keys()),
         "canonical_decision_hash": _sha(decision),
         "canonical_action": str(decision["action"]).upper(),
         "canonical_decision_status": str(decision.get("decision_status", "READY")),
