@@ -24,7 +24,15 @@ def _text(value: Any, field: str) -> str:
     return result
 
 def _action(decision: Mapping[str, Any]) -> str:
-    value = decision.get('action', decision.get('decision'))
+    direct_action = decision.get('action')
+    if direct_action is not None:
+        value = direct_action
+    else:
+        nested = decision.get('decision')
+        if isinstance(nested, Mapping):
+            value = nested.get('action')
+        else:
+            value = None
     result = str(value or '').strip().upper()
     if result not in DECISION_ACTIONS:
         raise ValueError(f'decision.action has unsupported action: {result}')
