@@ -76,6 +76,8 @@ def persist_revision(tmp_path, *, action="REVIEW_REQUIRED"):
     )
     snapshot = make_snapshot(action=action)
     write_snapshot(tmp_path, snapshot)
+    from iios_mvp.decision_admission import build_test_admission_receipt
+    admission = build_test_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
     decision_id = "CN-A-300750-r001"
     write_decision_revision(
         tmp_path,
@@ -83,6 +85,7 @@ def persist_revision(tmp_path, *, action="REVIEW_REQUIRED"):
         1,
         snapshot,
         "run-c1-001",
+        decision_admission=admission,
     )
     return series, snapshot, decision_id
 
@@ -128,6 +131,7 @@ def test_machine_publication_separates_human_approval_and_lifecycle_refs(tmp_pat
         snapshot,
         True,
         "human approval for C1 publication fixture",
+        actor_identity="human:owner",
     )
     assert approved["current"] is True
 
