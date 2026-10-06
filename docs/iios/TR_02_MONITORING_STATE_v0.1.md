@@ -1,7 +1,7 @@
 # TR-02 — Monitoring State v0.1
 
 Date: 2026-10-06
-Status: IMPLEMENTATION TARGET
+Status: ACCEPTED / CANONICAL
 
 ## Objective
 
@@ -43,3 +43,24 @@ Otherwise due_state is NOT_DUE.
 Monitoring State cannot change Decision Precedence, Trust, Quality, valuation, forecast, MIE, portfolio constraints, or Human Approval.
 
 TR-03 may consume monitoring history to build explicit Validation / replay evidence, but any investment decision remains under the canonical Decision Kernel and Human Approval lifecycle.
+
+
+## Acceptance
+
+TR-02 = PASS / MERGED / CANONICAL.
+
+Canonical merge:
+- PR #91;
+- merge commit: 6b5a83ff3dcb0028945f455c517b369dbbf8220b.
+
+Verification:
+- dedicated GitHub Actions run #10 = SUCCESS;
+- compileall = PASS;
+- TR-02 test suite = PASS;
+- monitoring state schema = PASS;
+- git diff check = PASS;
+- red-team scope and state/replay review = PASS.
+
+Known non-blocking observation: replay reconstructs the final Monitoring State projection, but historical next_due_at mutations are not themselves represented as a separate immutable event stream. A future validation/audit-history layer may address that without changing TR-02 canonical semantics.
+
+Next product boundary: Validation / Replay Productization. No scheduler or alerts implementation is implied.

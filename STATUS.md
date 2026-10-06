@@ -22,7 +22,7 @@ CORE-04 vertical decision closure is complete.
 
 A1 is complete as the company-side evidence-closure engineering milestone. Current 300750 Quality remains CONDITIONAL and new capital remains FALSE.
 
-Current next work is **TR-02 Monitoring State**, independently scoped from canonical main.
+Current next work is **Validation / Replay Productization**, independently scoped from canonical main.
 
 No new P3/P4/MIE model work is on the critical path.
 
@@ -88,10 +88,19 @@ TR-01 Trigger Contract / Event Semantics = PASS / MERGED / CANONICAL.
 
 The full Investment Core CI on the pre-merge TR-01 head retained four unrelated CORE-04 assertion regressions. These remain a separate cleanup item and do not change the TR-01 acceptance boundary.
 
+## TR-02 status
+
+TR-02 Monitoring State = PASS / MERGED / CANONICAL.
+- PR #91;
+- merge commit: 6b5a83ff3dcb0028945f455c517b369dbbf8220b;
+- dedicated Actions run #10 = SUCCESS;
+- red-team boundary review = PASS.
+
+TR-02 does not include scheduler, alerts, automatic decision execution, or investment-semantic changes.
+
 ## Product gaps after CORE-04
 
-- TR-02 Monitoring State
-- Validation / replay
+- Validation / Replay Productization
 - Machine Publication
 - Human Report / Report Quality Gate
 - second-company acceptance
