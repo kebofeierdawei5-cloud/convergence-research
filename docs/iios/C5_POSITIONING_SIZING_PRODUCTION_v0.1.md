@@ -18,6 +18,13 @@ Market Regime
 
 The C5 surface is a projection only. It cannot rewrite Quality, Thesis, Intrinsic Value, Return, Required Return, Trust, Risk, or the canonical Decision action.
 
+Initial sizing surface emitted by C5:
+- entry zone;
+- add zone when explicitly supplied by the admitted positioning snapshot;
+- reduce zone when explicitly supplied by the admitted positioning snapshot;
+- initial / target / maximum position;
+- hard exposure limit = declared maximum position cap.
+
 ## 2. Production input contract
 
 A positioning observation must bind:
@@ -57,7 +64,7 @@ Sizing surface:
 
 The policy never auto-reduces an existing position. An unfavorable positioning state may set `reduce_consideration = true`, leaving the actual Decision action unchanged.
 
-The sizing output is capped by the existing portfolio package and never exceeds declared maximum position.
+The sizing output is capped by the existing portfolio package and never exceeds declared maximum position. Missing optional add/reduce zone inputs remain explicit nulls; C5 never fabricates price zones.
 
 ## 4. Fail-closed behavior
 
