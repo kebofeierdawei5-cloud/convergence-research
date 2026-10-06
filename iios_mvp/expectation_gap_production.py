@@ -5,6 +5,7 @@ from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 import re
+from pathlib import Path
 from typing import Any, Mapping
 
 from .canonical_expectation_gap import evaluate_canonical_expectation_gap
@@ -24,7 +25,7 @@ _STATUS_VALUES = {
     "NO_FEASIBLE_SOLUTION",
 }
 _HASH_RE = re.compile(r"^[0-9a-f]{64}$")
-_HORIZON_RE = re.compile(r"^([0-9]+(?:\\.[0-9]+)?)(Y|M)$")
+_HORIZON_RE = re.compile(r"^([0-9]+(?:\.[0-9]+)?)(Y|M)$")
 
 
 def _canonical_json(value: Any) -> str:
@@ -318,6 +319,9 @@ def build_expectation_gap_evaluation(
         )
 
     comparison, requirement = _comparison_context(expectation, independent_record)
+    independent_value = _decimal(
+        independent_record["value"], "independent forecast value"
+    )
     if requirement is None or not comparison["comparison_direction"]:
         return _record(
             case=case,
@@ -328,7 +332,22 @@ def build_expectation_gap_evaluation(
             qualification=qualification,
             reason="market and independent expectation semantics do not match exactly",
             comparison=comparison,
-            independent_value=_decimal(independent_record["value"], "independent forecast value"),
+            independent_value=independent_value,
+            independent_record=independent_record,
+        )
+    if "value" not in requirement or any(
+        key in requirement for key in ("range_low", "range_high")
+    ):
+        return _record(
+            case=case,
+            payload=payload,
+            snapshot=snapshot,
+            status="INCOMPATIBLE",
+            resolution_state=resolution_state,
+            qualification=qualification,
+            reason="market-implied requirement is not a point value and cannot generate a scalar expectation gap",
+            comparison=comparison,
+            independent_value=independent_value,
             independent_record=independent_record,
         )
 
@@ -453,7 +472,11 @@ def validate_expectation_gap_evaluation(record: Any) -> None:
 
 def replay_expectation_gap_evaluation(record: Mapping[str, Any]) -> dict[str, Any]:
     validate_expectation_gap_evaluation(record)
-    core = {k: record[k] for k in record if k != "evaluation_hash"}
+    core = {
+        k: record[k]
+        for k in record
+        if k not in {"evaluation_id", "evaluation_hash"}
+    }
     return {
         "evaluation_hash": record["evaluation_hash"],
         "replay_hash": _sha256_obj(core),
@@ -462,8 +485,8 @@ def replay_expectation_gap_evaluation(record: Mapping[str, Any]) -> dict[str, An
     }
 
 
-def evaluation_path(root: str, evaluation_hash: str) -> str:
-    return str(__import__("pathlib").Path(root) / f"{evaluation_hash}.expectation-gap.json")
+def evaluation_path(root: str | Path, evaluation_hash: str) -> Path:
+    return Path(root) / f"{evaluation_hash}.expectation-gap.json"
 
 
 __all__ = [
