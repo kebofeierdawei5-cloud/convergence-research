@@ -143,7 +143,7 @@ The canonical Stage C plan is `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.m
 
 Canonical C0 merge: `1594e43eee14aaa41ddde675ddbe61d650462cf7`.
 
-Next boundary: C5 Positioning / Sizing.
+Next boundary: C4 Expectation Gap Production Integration.
 
 
 ## C1 status
@@ -184,3 +184,16 @@ Acceptance: docs/iios/C3_ACCEPTANCE_2026-10-06.md.
 Canonical C3 merge: eb0f9fc965f9ce6aa09685776d2ec8a0522e3b47.
 
 Next development boundary: C4 Expectation Gap Production Integration. C3 introduced no Expectation Gap, positioning/sizing, scheduler, alerts, or automatic execution capability.
+
+
+## C4 status
+
+C4 Expectation Gap Production Integration = PASS / MERGED / CANONICAL.
+
+Dedicated C4 Actions run #7 = SUCCESS on exact head aacf1c0cc715697bfac2aa0bae5e2f0a4c899ad2.
+75 tests passed; executable acceptance harness 7 / 7 PASS; compileall and git diff --check passed.
+
+Acceptance: docs/iios/C4_ACCEPTANCE_2026-10-06.md.
+Canonical C4 merge: 07d45c18df8df9100d4866dd5f92fa95ccdb7186.
+
+Next development boundary: C5 Positioning / Sizing.
