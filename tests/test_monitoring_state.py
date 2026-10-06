@@ -63,3 +63,75 @@ def test_schema_accepts():
     c=contract(); s=build_monitoring_state(monitor_id='m1',trigger_contract=c,lifecycle_status='ACTIVE')
     schema=json.load(open('schemas/monitoring_state_v0.1.schema.json',encoding='utf-8'))
     assert list(Draft202012Validator(schema,format_checker=FormatChecker()).iter_errors(s))==[]
+
+
+def test_unknown_event_propagates_to_unknown_evaluation_status():
+    c = contract()
+    s = build_monitoring_state(monitor_id='m1', trigger_contract=c, lifecycle_status='ACTIVE')
+    e = evt(c, value='not-a-number')
+    n = apply_trigger_event(previous_state=s, trigger_contract=c, trigger_event=e)
+    assert n['last_trigger_state'] == 'UNKNOWN'
+    assert n['evaluation_status'] == 'UNKNOWN'
+
+
+def test_replay_reconstructs_persisted_state(tmp_path):
+    from iios_mvp.store import (
+        apply_monitoring_event,
+        create_or_load_series,
+        initialize_monitoring_state,
+        replay_monitoring_state,
+        write_decision_revision,
+        write_snapshot,
+        write_trigger_contract,
+        write_trigger_event,
+    )
+    import hashlib
+    import json
+
+    core = {
+        'snapshot_schema': 'IIOS-MVP-SNAPSHOT-0.3.0',
+        'engine_version': '0.3.0',
+        'input': {'case_id': 'RC-CN-A-300750-20261004', 'cutoff_date': '2026-10-04'},
+        'decision': {'action': 'HOLD'},
+    }
+    snapshot_hash = hashlib.sha256(json.dumps(core, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    snapshot = {**core, 'snapshot_hash': snapshot_hash}
+    write_snapshot(tmp_path, snapshot)
+    series = create_or_load_series(tmp_path, 'CN-A', '300750', 'CATL', '2026-10-04T00:00:00Z')
+    write_decision_revision(tmp_path, series['decision_series_id'], 1, snapshot, 'run-1')
+    revision = json.loads((tmp_path / 'CN-A-300750-r001.decision.json').read_text())
+
+    trigger = write_trigger_contract(tmp_path, 'CN-A-300750-r001', {
+        'trigger_id': 'tr-replay',
+        'decision_id': 'CN-A-300750-r001',
+        'decision_series_id': 'CN-A-300750',
+        'revision': 1,
+        'decision_revision_hash': revision['revision_hash'],
+        'case_id': 'RC-CN-A-300750-20261004',
+        'decision_cutoff_date': '2026-10-04',
+        'role': 'MONITORING',
+        'metric_id': 'market_price',
+        'operator': 'LTE',
+        'target': '350',
+        'unit': 'CNY/share',
+        'evidence_ids': [],
+        'enabled': True,
+    })
+    initialize_monitoring_state(tmp_path, 'tr-replay', 'monitor-1')
+    event_path = write_trigger_event(tmp_path, {
+        'trigger_id': 'tr-replay',
+        'trigger_event_id': 'evt-replay',
+        'evaluation_cutoff_at': '2026-10-05T10:06:00+00:00',
+        'observed_at': '2026-10-05T10:00:00+00:00',
+        'known_at': '2026-10-05T10:05:00+00:00',
+        'source_id': 'szse',
+        'evidence_id': 'ev-replay',
+        'value': '349.5',
+        'previous_value': None,
+    })
+    apply_monitoring_event(tmp_path, 'evt-replay')
+    result = replay_monitoring_state(tmp_path, 'tr-replay')
+    assert result['replay_status'] == 'PASS'
+    assert result['last_event_id'] == 'evt-replay'
+    assert event_path.exists()
+    assert trigger.exists()
