@@ -252,67 +252,66 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 ## 8. Current next batch
 
-**C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL**
+**B00 — Post-C8 Baseline Recovery + Authority Threat Reproduction = PASS / MERGED / CANONICAL**
 
-C7 is the latest completed Stage C capability and is already synchronized into canonical `main`.
+Acceptance record: `docs/iios/B00_ACCEPTANCE_2026-10-06.md`.
 
-Implementation:
-- PR #112;
-- merge commit: `82d1911c985791e4b76f63d792588d175ee505f8`.
+### B00-A — Restore Global Investment Core CI GREEN
 
-Acceptance:
-- `docs/iios/C7_ACCEPTANCE_2026-10-06.md`;
-- dedicated C7 Actions run #6 = SUCCESS on exact head `43664c9bee33b3d53f212428da019e197a9fcaf2`;
-- 74 related tests passed;
-- acceptance harness 4 / 4 PASS;
-- compileall and git diff-check PASS.
+Status: **PASS / MERGED / CANONICAL**
 
-Canonical state synchronization:
-- PR #113;
-- merge commit: `a5ac4b8451041bbd38bcaa73fa39954ec6533f02`.
+B00-A restored the canonical baseline without changing Investment Decision semantics.
 
-C8 Final Independent Red-team / MVP Acceptance = PASS / MERGED / CANONICAL:
-- remediation PR #116;
-- remediation merge commit: `c99763a9eae957e59c238590ad64b00bc308e54b`;
-- canonical-main rerun: Actions Run #30;
-- tested head: `c99763a9eae957e59c238590ad64b00bc308e54b`;
-- 36 C8 lifecycle/authority tests passed;
-- compileall, C3 harness, C7 harness and diff-check passed;
-- acceptance: `docs/iios/C8_ACCEPTANCE_2026-10-06.md`.
+Evidence:
+- PR #118 — real 300750 Risk fixture aligned with the current Risk/Portfolio Contract;
+- PR #119 — legacy CLI demo explicitly bound to `CN-A`;
+- PR #120 — lifecycle parser fixed to resolve direct `action` or nested engine-wrapper `decision.action`;
+- PR #121 — lifecycle regression tests corrected to exercise the actual legacy snapshot schema;
+- Global Investment Core CI run `37487233225` = SUCCESS on head `cffc71aa9944489c23c7aaffa84d73973a247a46`;
+- the full 407-test Investment Core pytest suite passed;
+- DR-02 `37487233216`, C6 `37487379909`, DR-01 `37487379916`, and C8 `37487379923` all = SUCCESS after lifecycle correction;
+- C8 also re-ran the lifecycle regression suite and C7 full-lifecycle harness successfully.
 
-C8 closes AUTH-001/002/003 authority boundaries. It does not add investment capability, scheduler/alerts, automatic execution, universe expansion, or new forecast/valuation model families.
+PR #117 was a temporary no-semantic baseline probe and is historical evidence only.
 
-**Post-C8 development boundary: explicit governance decision required.**
+### B00-B — Reproduce Second-Red-Team Attacks
 
-C8 is an acceptance-only boundary. It must not be interpreted as permission to add new investment capability, scheduler/alerts, automatic execution, broader market screening, or new P3/P4/MIE model families.
+Status: **PASS / MERGED / CANONICAL — DIAGNOSTIC FINDINGS**
 
-Historical milestone sections remain evidence of past checkpoints and do not override the current C7 → C8 boundary.
+Diagnostic-only PR #122 and dedicated workflow run `37487757790` = SUCCESS.
+
+Confirmed:
+- **P0-01:** caller-declared Reality / Value Driver / Valuation / Forecast PASS states can reach `BUY` with `new_capital_allowed=true` without domain-owned canonical admission references;
+- **P0-02:** separately supplied Return Gate can diverge economically from Forecast and Valuation while still reaching `BUY` with `new_capital_allowed=true`;
+- **P0-03:** execution receipt can record an action/position mismatch, but C6 remains `POST_APPROVAL_RECORD_ONLY_NO_DECISION_MUTATION` with `auto_execution=false`; this is therefore classified **P1 evidence-integrity hardening**, not an internal execution-authority bypass.
+
+B00 intentionally does **not** remediate P0-01 or P0-02.
 
 ## 9. Stage C current development boundary
 
-**C8 — Final Independent Red-team / MVP Acceptance = PASS / MERGED / CANONICAL**
+**B00 = PASS / MERGED / CANONICAL**
 
-C7 proves the complete operating loop from Decision Revision through Human Approval, Execution Receipt, Trigger/Monitoring/Validation, deterministic replay, new Revision, Machine Publication and Human Report. Historical state remains append-only and projections remain non-authoritative.
+The post-C8 Stage C boundary is now investment-authority hardening, not additional productization.
 
-Detailed roadmap: `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`.
+### Immediate next batches
 
-Immediate next batch: **explicit post-C8 governance decision**.
+**B02 — Canonical Investment Input / Admission Contract**
 
-Parallel FM Research remains separate.
+Freeze domain-owned, provenance-bound admission references for every decision-critical upstream state. The contract should use domain-specific admission/resolver components rather than a monolithic generic object, and must preserve fail-closed semantics.
 
-C0 acceptance: `docs/iios/C0_ACCEPTANCE_2026-10-06.md`.
-C0 merge: `1594e43eee14aaa41ddde675ddbe61d650462cf7`.
-C1 acceptance: `docs/iios/C1_ACCEPTANCE_2026-10-06.md`.
-C1 merge: `b9a8ff0fe1341a56f363fb058677dbd50a4f87b8`.
-C2 acceptance: `docs/iios/C2_ACCEPTANCE_2026-10-06.md`.
-C2 merge: `75bb360436286ae950a05028769701380120e561`.
-C3 acceptance: `docs/iios/C3_ACCEPTANCE_2026-10-06.md`.
-C3 merge: `eb0f9fc965f9ce6aa09685776d2ec8a0522e3b47`.
-C4 acceptance: `docs/iios/C4_ACCEPTANCE_2026-10-06.md`.
-C4 merge: `07d45c18df8df9100d4866dd5f92fa95ccdb7186`.
-C5 acceptance: `docs/iios/C5_ACCEPTANCE_2026-10-06.md`.
-C5 merge: `cdf998cd21776363914f178e648f03ec0c1539f8`.
-C6 acceptance: `docs/iios/C6_ACCEPTANCE_2026-10-06.md`.
-C6 merge: `4c01e40dd7469221d9f5aee005c96e05bf4eb55f`.
-C7 acceptance: `docs/iios/C7_ACCEPTANCE_2026-10-06.md`.
-C7 merge: `82d1911c985791e4b76f63d792588d175ee505f8`.
+**B03 — Upstream Authority Integration**
+
+Replace caller-declared decision-critical status authority with canonical resolver-backed admission. Add negative tests proving forged PASS states cannot cross the Decision boundary.
+
+**B04 — Forecast / Valuation / Return Lineage Contract**
+
+Proceed only after B02/B03 are accepted. Define the hard lineage from canonical Forecast → Valuation → Return Gate / expected-return metrics and prove that inconsistent substituted values cannot reach BUY/ADD.
+
+P1 execution-evidence hardening remains separate from the internal Decision authority boundary until execution is intentionally brought inside IIOS.
+
+### Explicitly out of scope
+
+No scheduler, alerts, automatic execution, full-market screening, optimizer/Kelly logic, or new valuation/forecast model family is authorized by B00.
+
+Historical Stage C acceptance records remain valid evidence of prior checkpoints but no longer define the current next batch.
+
