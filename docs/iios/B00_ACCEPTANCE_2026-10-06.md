@@ -6,7 +6,7 @@ Date: 2026-10-06
 
 **B00 = PASS / MERGED / CANONICAL**
 
-Canonical main after B00: `e97d6292678175448b905eded6f221631b81`
+Canonical main after B00: `e97d629267817544cb75dc64c9ad523c6f4149bd`
 
 B00 was executed as two independent PR tracks:
 
