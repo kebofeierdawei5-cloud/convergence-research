@@ -117,7 +117,7 @@ def test_c6_receipt_binds_exact_approved_revision_and_action():
             "canonical_decision_hash": "95ac255afa82bcec8609c7492bd56f8ed201e3cf4624ddbbabfd28f8ff77c5cc",
             "canonical_action": "BUY",
             "canonical_decision_status": "READY",
-            "canonical_new_capital_allowed": false,
+            "canonical_new_capital_allowed": False,
             "admission_record_hash": "8766d70fe40167ba81688c5ace4b8e7eac3596d79f36af4a7bb5e612d8f34dd6",
         },
     }
@@ -276,7 +276,7 @@ def test_c6_receipt_tampering_is_detected():
             "canonical_decision_hash": "e714c245ceee121baa0bd5ad719ce0f0e12a22b0f1662d8f361beb0582d664ba",
             "canonical_action": "REDUCE",
             "canonical_decision_status": "READY",
-            "canonical_new_capital_allowed": false,
+            "canonical_new_capital_allowed": False,
             "admission_record_hash": "6518d5599053e55328e3eb0dcb53340ad780a44d179985d8af07688484a40eb4",
         },
     }
@@ -370,7 +370,7 @@ def test_c6_schema_accepts_receipt():
             "canonical_decision_hash": "f68b6fac1c0f9c5957a60408673cf603242d9588fcc4bd2a08271ff1233dc59d",
             "canonical_action": "ADD",
             "canonical_decision_status": "READY",
-            "canonical_new_capital_allowed": false,
+            "canonical_new_capital_allowed": False,
             "admission_record_hash": "83eb69bd63ea8c43d4a9643125fb3c7de16aaa5971bafe7adf0c4a8b5028325f",
         },
     }
