@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/canonical_investment_admission_reference_v0.1.schema.json",
+  "title": "IIOS Canonical Investment Admission Reference v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "admission_id",
+    "admission_record_hash",
+    "contract_version",
+    "domain",
+    "case_id",
+    "market",
+    "symbol",
+    "company",
+    "cutoff_date"
+  ],
+  "properties": {
+    "admission_id": {"type": "string", "minLength": 1},
+    "admission_record_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "contract_version": {"const": "IIOS-CANONICAL-INVESTMENT-ADMISSION-0.1"},
+    "domain": {
+      "enum": [
+        "REALITY",
+        "QUALITY",
+        "VALUE_DRIVER",
+        "VALUATION",
+        "FORECAST",
+        "THESIS",
+        "RETURN",
+        "RISK",
+        "PORTFOLIO"
+      ]
+    },
+    "case_id": {"type": "string", "minLength": 1},
+    "market": {"type": "string", "minLength": 1},
+    "symbol": {"type": "string", "minLength": 1},
+    "company": {"type": "string", "minLength": 1},
+    "cutoff_date": {"type": "string", "format": "date"}
+  }
+}
