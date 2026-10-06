@@ -180,7 +180,7 @@ def test_rejected_approval_does_not_replace_current():
 def test_revision_approval_projection_schema_accepts_records():
     import json
 
-    schema = json.load(open("schemas/decision_lifecycle_v0.1.schema.json", encoding="utf-8"))
+    schema = json.load(open("schemas/decision_lifecycle_v0.2.schema.json", encoding="utf-8"))
     rev = revision(snapshot())
     approval = build_human_approval(
         decision_revision=rev,
