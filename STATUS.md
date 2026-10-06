@@ -106,6 +106,8 @@ TR-03 closes the historical `next_due_at` replay gap using immutable monitoring 
 Scheduler/alerts remain out of scope.
 ## Stage C milestone status after C5
 
+Historical TR-03 checkpoint: TR-03 Validation / Replay is now PASS / MERGED / CANONICAL.
+
 - C6 Human Execution Receipt = PASS / MERGED / CANONICAL
 - C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL
 - Current next boundary: C8 Final Independent Red-team / MVP Acceptance
