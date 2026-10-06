@@ -1,4 +1,5 @@
 name: IIOS C7 — Full Lifecycle E2E
+# exact-head acceptance refresh
 
 on:
   pull_request:
