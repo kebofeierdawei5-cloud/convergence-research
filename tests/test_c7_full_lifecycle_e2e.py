@@ -167,7 +167,7 @@ def test_c7_full_operating_loop(tmp_path):
     assert validation["validation_status"] == "PASS"
 
     assert replay_monitoring_state(tmp_path, "tr-c7-price")["replay_status"] == "PASS"
-    assert replay_monitoring_validation(tmp_path, "validation-c7-001")["replay_status"] == "PASS"
+    assert replay_monitoring_validation(tmp_path, "validation-c7-001")["validation_replay_status"] == "PASS"
     assert replay_decision_lifecycle(tmp_path, "CN-A-300750-r001")["replay_status"] == "PASS"
 
     receipt_path = write_execution_receipt(
