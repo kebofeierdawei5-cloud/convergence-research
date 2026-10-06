@@ -32,7 +32,7 @@ def test_c3_decision_and_lifecycle_are_canonical_paths():
     assert result["return_metrics"]["required_return_pass"] is True
     assert result["return_metrics"]["risk_pass"] is True
     assert result["lifecycle"]["trigger_state"] == "MATCHED"
-    assert result["lifecycle"]["monitoring_evaluation_status"] == "MATCHED"
+    assert result["lifecycle"]["monitoring_evaluation_status"] == "VALID"
     assert result["lifecycle"]["validation_status"] == "PASS"
     assert result["lifecycle"]["decision_replay_status"] == "PASS"
 
