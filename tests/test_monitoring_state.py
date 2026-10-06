@@ -135,3 +135,17 @@ def test_replay_reconstructs_persisted_state(tmp_path):
     assert result['last_event_id'] == 'evt-replay'
     assert event_path.exists()
     assert trigger.exists()
+
+
+def test_due_reference_is_persisted_and_replayed_deterministically():
+    c = contract()
+    s = build_monitoring_state(
+        monitor_id='m1',
+        trigger_contract=c,
+        lifecycle_status='ACTIVE',
+        next_due_at='2026-10-07T00:00:00+00:00',
+        evaluation_reference_at='2026-10-06T00:00:00+00:00',
+    )
+    assert s['due_reference_at'] == '2026-10-06T00:00:00+00:00'
+    assert s['due_state'] == 'NOT_DUE'
+    validate_monitoring_state(s, trigger_contract=c)
