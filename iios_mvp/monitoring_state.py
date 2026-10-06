@@ -84,6 +84,7 @@ def build_monitoring_state(
         "last_known_at": None,
         "last_evaluation_cutoff_at": None,
         "next_due_at": next_due_at,
+        "due_reference_at": evaluation_reference_at,
         "due_state": _due_state(next_due_at, evaluation_reference_at),
         "policy_effect": "NO_DIRECT_DECISION_PRECEDENCE_CHANGE",
     }
@@ -116,7 +117,7 @@ def validate_monitoring_state(record: Any, *, trigger_contract: Mapping[str, Any
         raise ValueError("monitoring_state evaluation_status invalid")
     if record["last_trigger_state"] not in TRIGGER_STATES | {None}:
         raise ValueError("monitoring_state last_trigger_state invalid")
-    for field in ("last_known_at", "last_evaluation_cutoff_at", "next_due_at"):
+    for field in ("last_known_at", "last_evaluation_cutoff_at", "next_due_at", "due_reference_at"):
         if record[field] is not None:
             _timestamp(record[field], field)
     if record["last_event_id"] is None:
@@ -175,6 +176,7 @@ def apply_trigger_event(
         "last_known_at": trigger_event["known_at"],
         "last_evaluation_cutoff_at": trigger_event["evaluation_cutoff_at"],
         "next_due_at": previous_state["next_due_at"] if next_due_at is None else next_due_at,
+        "due_reference_at": reference_at,
         "due_state": _due_state(previous_state["next_due_at"] if next_due_at is None else next_due_at, reference_at),
         "policy_effect": "NO_DIRECT_DECISION_PRECEDENCE_CHANGE",
     }
