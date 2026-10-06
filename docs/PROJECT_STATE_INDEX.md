@@ -247,7 +247,7 @@ TR-03 closes the historical `next_due_at` replay gap with immutable Monitoring E
 Acceptance:
 - `docs/iios/TR_03_ACCEPTANCE_2026-10-06.md`
 
-The next development boundary is **Machine Publication / Human Report productization**. Scheduler/alerts remain out of scope until a separate explicit batch is authorized; no new P3/P4/MIE model work is implied.
+C0 Governance Hygiene / Stage Baseline is the current development batch. The detailed Stage C roadmap is `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`. Scheduler/alerts remain out of scope until a separate explicit batch is authorized; no new P3/P4/MIE model work is implied.
 
 Completed sub-batches:
 - **A1-01 Economic Evidence Bridge = PASS / MERGED**
@@ -260,3 +260,16 @@ Acceptance records:
 - `docs/iios/A1_ACCEPTANCE_2026-10-05.md`
 
 A1 is complete as the company-side evidence-closure milestone.
+
+## 9. Stage C current development boundary
+
+**C0 — Governance Hygiene / Stage Baseline = IN PROGRESS**
+
+C0 is a governance-only batch. It may update state-authority/continuity surfaces and CI governance checks, but it must not change investment semantics or introduce new investment capability.
+
+Detailed roadmap: `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`.
+
+Immediate sequence after C0:
+C1 Machine Publication → C2 Human Report / Report Quality Gate → C3 Second Company Acceptance.
+
+Parallel FM Research remains separate.
