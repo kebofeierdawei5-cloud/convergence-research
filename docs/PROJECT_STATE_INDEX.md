@@ -306,13 +306,13 @@ A1 is complete as the company-side evidence-closure milestone.
 
 ## 9. Stage C current development boundary
 
-**C6 — Human Execution Receipt = PASS / MERGED / CANONICAL**
+**C7 — Full Lifecycle E2E = PASS / MERGED / CANONICAL**
 
-C6 records post-approval human execution against an exact Decision Revision and Human Approval, with immutable persistence and deterministic replay. It does not mutate historical Decision lifecycle artifacts and leaves auto_execution=false.
+C7 proves the complete operating loop from Decision Revision through Human Approval, Execution Receipt, Trigger/Monitoring/Validation, deterministic replay, new Revision, Machine Publication and Human Report. Historical state remains append-only and projections remain non-authoritative.
 
 Detailed roadmap: `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`.
 
-Immediate next batch: **C7 — Full Lifecycle E2E**.
+Immediate next batch: **C8 — Final Independent Red-team / MVP Acceptance**.
 
 Parallel FM Research remains separate.
 
@@ -330,3 +330,5 @@ C5 acceptance: `docs/iios/C5_ACCEPTANCE_2026-10-06.md`.
 C5 merge: `cdf998cd21776363914f178e648f03ec0c1539f8`.
 C6 acceptance: `docs/iios/C6_ACCEPTANCE_2026-10-06.md`.
 C6 merge: `4c01e40dd7469221d9f5aee005c96e05bf4eb55f`.
+C7 acceptance: `docs/iios/C7_ACCEPTANCE_2026-10-06.md`.
+C7 merge: `82d1911c985791e4b76f63d792588d175ee505f8`.

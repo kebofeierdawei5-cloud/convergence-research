@@ -281,6 +281,13 @@ Acceptance record: `docs/iios/C6_ACCEPTANCE_2026-10-06.md`.
 
 ### C7 — Full Lifecycle E2E
 
+Status: **PASS / MERGED / CANONICAL**
+
+Implementation PR: #112
+Merge: `82d1911c985791e4b76f63d792588d175ee505f8`
+Dedicated acceptance: C7 workflow #6 SUCCESS on exact head `43664c9bee33b3d53f212428da019e197a9fcaf2`; 74 related tests passed; acceptance harness 4 / 4 PASS; compileall and git diff-check PASS.
+Acceptance record: `docs/iios/C7_ACCEPTANCE_2026-10-06.md`.
+
 Objective:
 - prove the complete operating loop.
 
