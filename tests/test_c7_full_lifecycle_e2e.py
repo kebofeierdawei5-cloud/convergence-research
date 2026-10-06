@@ -282,12 +282,14 @@ def test_c7_changed_decision_requires_new_run_and_revision(tmp_path):
         reason="changed proposal requires independent revision",
     )
     write_snapshot(tmp_path, s2)
+    admission2 = build_test_admission_receipt(snapshot=s2, canonical_decision=s2["decision"])
     r2_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
         2,
         s2,
         "run-c7-003",
+        decision_admission=admission2,
     )
     r1 = json.loads(r1_path.read_text(encoding="utf-8"))
     r2 = json.loads(r2_path.read_text(encoding="utf-8"))
