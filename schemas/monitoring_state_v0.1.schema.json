@@ -21,6 +21,7 @@
     "last_known_at",
     "last_evaluation_cutoff_at",
     "next_due_at",
+    "due_reference_at",
     "due_state",
     "policy_effect",
     "state_hash"
@@ -112,6 +113,10 @@
         "string",
         "null"
       ],
+      "format": "date-time"
+    },
+    "due_reference_at": {
+      "type": "string",
       "format": "date-time"
     },
     "due_state": {
