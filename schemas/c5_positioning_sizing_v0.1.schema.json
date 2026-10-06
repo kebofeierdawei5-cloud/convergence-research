@@ -28,6 +28,10 @@
     "target_position_pct",
     "max_position_pct",
     "permitted_position_pct",
+    "entry_zone",
+    "add_zone",
+    "reduce_zone",
+    "hard_exposure_limit",
     "reduce_consideration",
     "status",
     "reason",
@@ -282,6 +286,45 @@
     },
     "policy_effect": {
       "const": "TIMING_AND_SIZING_ONLY_NO_FUNDAMENTAL_DECISION_MUTATION"
+    },
+    "entry_zone": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "string"
+      }
+    },
+    "add_zone": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "string"
+      }
+    },
+    "reduce_zone": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "string"
+      }
+    },
+    "hard_exposure_limit": {
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "allOf": [
