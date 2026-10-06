@@ -1,0 +1,40 @@
+name: IIOS C2 Human Report
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/human_report.py"
+      - "iios_mvp/cli.py"
+      - "schemas/human_report_v0.1.schema.json"
+      - "schemas/report_qa_v0.1.schema.json"
+      - "tests/test_human_report.py"
+      - "docs/iios/C2_HUMAN_REPORT_v0.1.md"
+      - ".github/workflows/iios_c2.yml"
+  push:
+    branches: [main]
+    paths:
+      - "iios_mvp/human_report.py"
+      - "iios_mvp/cli.py"
+      - "schemas/human_report_v0.1.schema.json"
+      - "schemas/report_qa_v0.1.schema.json"
+      - "tests/test_human_report.py"
+      - "docs/iios/C2_HUMAN_REPORT_v0.1.md"
+      - ".github/workflows/iios_c2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  c2:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q iios_mvp tests
+      - run: python -m pytest -q tests/test_human_report.py
+      - run: python -m json.tool schemas/human_report_v0.1.schema.json >/dev/null
+      - run: python -m json.tool schemas/report_qa_v0.1.schema.json >/dev/null
+      - run: git diff --check
