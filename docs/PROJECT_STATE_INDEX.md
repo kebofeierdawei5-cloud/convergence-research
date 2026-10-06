@@ -50,6 +50,8 @@ TR-03 Validation / Replay = PASS / MERGED / CANONICAL
 C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL
         ↓
 C1 Machine Publication = PASS / MERGED / CANONICAL
+        ↓
+C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
@@ -134,8 +136,14 @@ C1 Machine Publication is PASS / MERGED / CANONICAL:
 - 5 C1 tests passed;
 - JSON Schema validation and diff check passed.
 
+C2 Human Report / Report Quality Gate is PASS / MERGED / CANONICAL:
+- PR #101;
+- merge commit 75bb360436286ae950a05028769701380120e561;
+- dedicated C2 CI #2 = SUCCESS;
+- 7 C2 tests passed;
+- report and QA JSON Schema validation plus diff check passed.
+
 Remaining Stage C productization:
-- C2 Human Report / Report Quality Gate;
 - C3 Second Company Acceptance;
 - C4 Expectation Gap Production Integration;
 - C5 Positioning / Sizing;
@@ -261,7 +269,7 @@ TR-03 closes the historical `next_due_at` replay gap with immutable Monitoring E
 Acceptance:
 - `docs/iios/TR_03_ACCEPTANCE_2026-10-06.md`
 
-C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. The next development boundary is C2 Human Report / Report Quality Gate. Scheduler/alerts remain out of scope until a separate explicit batch is authorized; no new P3/P4/MIE model work is implied.
+C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. The next development boundary is C3 Second Company Acceptance. Scheduler/alerts remain out of scope until a separate explicit batch is authorized; no new P3/P4/MIE model work is implied.
 
 Completed sub-batches:
 - **A1-01 Economic Evidence Bridge = PASS / MERGED**
@@ -277,13 +285,13 @@ A1 is complete as the company-side evidence-closure milestone.
 
 ## 9. Stage C current development boundary
 
-**C1 — Machine Publication = PASS / MERGED / CANONICAL**
+**C2 — Human Report + Report Quality Gate = PASS / MERGED / CANONICAL**
 
-C1 provides a read-only, content-addressed machine-readable projection of an exact Decision Revision, with explicit AI/Human separation and bound Trigger / Monitoring / Validation references. It does not modify investment semantics or create an execution path.
+C2 provides a deterministic human-readable projection of the accepted Machine Publication, with immutable report metadata/Markdown and a fail-closed Report Quality Gate. It does not modify investment semantics or create an execution path.
 
 Detailed roadmap: `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.md`.
 
-Immediate next batch: **C2 — Human Report + Report Quality Gate**.
+Immediate next batch: **C3 — Second Company Acceptance**.
 
 Parallel FM Research remains separate.
 
@@ -291,3 +299,5 @@ C0 acceptance: `docs/iios/C0_ACCEPTANCE_2026-10-06.md`.
 C0 merge: `1594e43eee14aaa41ddde675ddbe61d650462cf7`.
 C1 acceptance: `docs/iios/C1_ACCEPTANCE_2026-10-06.md`.
 C1 merge: `b9a8ff0fe1341a56f363fb058677dbd50a4f87b8`.
+C2 acceptance: `docs/iios/C2_ACCEPTANCE_2026-10-06.md`.
+C2 merge: `75bb360436286ae950a05028769701380120e561`.

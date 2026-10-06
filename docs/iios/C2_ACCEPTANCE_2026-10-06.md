@@ -1,7 +1,7 @@
 # C2 Acceptance — Human Report + Report Quality Gate
 
 Date: 2026-10-06
-Status: CANDIDATE — PENDING ACCEPTANCE
+Status: ACCEPTED / CANONICAL
 
 ## Acceptance target
 
@@ -47,6 +47,31 @@ C2 does not:
 - create scheduler/alerts/automatic execution;
 - enter C3/C4/C5.
 
-## Pending evidence
+## Acceptance evidence
 
-Dedicated C2 CI must pass before canonical acceptance.
+Dedicated C2 GitHub Actions run #2 = SUCCESS:
+- compileall = PASS;
+- tests/test_human_report.py = 7 passed;
+- human report JSON Schema syntax = PASS;
+- Report QA JSON Schema syntax = PASS;
+- git diff --check = PASS.
+
+Relevant existing module checks on the same C2 head passed:
+- C1 = SUCCESS;
+- CORE-01 = SUCCESS;
+- CORE-02 = SUCCESS;
+- CORE-03 real 300750 = SUCCESS;
+- DR-02 = SUCCESS;
+- TR-01 = SUCCESS;
+- TR-02 = SUCCESS;
+- TR-03 = SUCCESS.
+
+Investment Core CI retains the separately tracked four CORE-04 assertion regressions; C2 did not modify that subsystem.
+
+## Canonical decision
+
+C2 = PASS / MERGED / CANONICAL.
+
+Canonical merge commit: 75bb360436286ae950a05028769701380120e561.
+
+Next boundary: C3 — Second Company Acceptance.

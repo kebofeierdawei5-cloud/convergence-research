@@ -2,7 +2,7 @@
 
 Date: 2026-10-06
 Status: CANONICAL ROADMAP
-Basis: canonical `main` at `1594e43eee14aaa41ddde675ddbe61d650462cf7` after C0 merge.
+Basis: canonical `main` at `75bb360436286ae950a05028769701380120e561` after C2 merge.
 
 ## 1. Purpose
 
@@ -378,10 +378,11 @@ Stage C is complete only when:
 
 ## 9. Next immediate batch
 
-Current execution state after C1 acceptance:
+Current execution state after C2 acceptance:
 C0 — Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL
 → C1 — Machine Publication = PASS / MERGED / CANONICAL
-→ C2 — Human Report + Report Quality Gate
+→ C2 — Human Report + Report Quality Gate = PASS / MERGED / CANONICAL
+→ C3 — Second Company Acceptance
 
 C4–C8 follow only after the preceding acceptance boundaries are satisfied.
 
