@@ -156,7 +156,7 @@ def apply_trigger_event(
     if next_due_at is not None:
         next_due_at = _timestamp(next_due_at, "next_due_at")
     last_state = trigger_event["trigger_state"]
-    evaluation_status = "VALID"
+    evaluation_status = "UNKNOWN" if last_state == "UNKNOWN" else "VALID"
     reference_at = trigger_event["evaluation_cutoff_at"]
     core = {
         "state_version": MONITORING_STATE_VERSION,
