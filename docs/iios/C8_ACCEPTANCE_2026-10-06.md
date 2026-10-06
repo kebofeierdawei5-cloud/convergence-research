@@ -24,6 +24,18 @@ Any unresolved CRITICAL authority or identity bypass blocks final MVP acceptance
 
 PIT leakage; evidence substitution/hash binding; Trust/Quality bypass; forecast contamination; valuation/MIE semantic mismatch; MIE false-identifiability; 15% return gate; Required Return; revision overwrite; approval mismatch; stale/revision-bound triggers; monitoring tampering; replay mismatch; Publication/Report drift; LLM authority escalation; cross-company coupling; hidden automatic execution.
 
+## Dedicated CI evidence
+
+- C8 workflow run #3
+- run ID: `37470375959`
+- pull-request head: `127f6247c01cfcad3699536c936a9c2643b17f0a`
+- Actions job: `112291993869`
+- conclusion: SUCCESS
+- compileall: PASS
+- C8 tests: 14 passed
+- executable red-team harness: PASS (reports C8 BLOCKED by reproduced findings)
+- git diff --check: PASS
+
 ## Result
 
 ### Safe controls
