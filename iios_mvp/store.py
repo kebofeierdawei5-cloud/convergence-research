@@ -25,6 +25,15 @@ from .monitoring_state import (
     validate_monitoring_state,
 )
 
+from .validation_replay import (
+    build_monitoring_evaluation_record,
+    build_monitoring_initialization_record,
+    build_validation_record,
+    validate_monitoring_evaluation_record,
+    validate_monitoring_initialization_record,
+    validate_validation_record,
+)
+
 
 def store_root(root: str | Path = "runs") -> Path:
     path = Path(root)
@@ -503,6 +512,18 @@ def _monitoring_state_path(root: str | Path, trigger_id: str) -> Path:
     return store_root(root) / f"{trigger_id}.monitor.json"
 
 
+def _monitoring_initialization_path(root: str | Path, trigger_id: str) -> Path:
+    return store_root(root) / f"{trigger_id}.monitor.initial.json"
+
+
+def _monitoring_evaluation_path(root: str | Path, trigger_event_id: str) -> Path:
+    return store_root(root) / f"{trigger_event_id}.evaluation.json"
+
+
+def _validation_path(root: str | Path, validation_id: str) -> Path:
+    return store_root(root) / f"{validation_id}.validation.json"
+
+
 def initialize_monitoring_state(
     root: str | Path,
     trigger_id: str,
@@ -519,7 +540,49 @@ def initialize_monitoring_state(
         next_due_at=next_due_at,
         evaluation_reference_at=evaluation_reference_at,
     )
+    initialization = build_monitoring_initialization_record(
+        trigger_contract=contract,
+        initial_state=state,
+    )
+    _atomic_create(_monitoring_initialization_path(root, trigger_id), initialization)
     return _atomic_create(_monitoring_state_path(root, trigger_id), state)
+
+
+def _load_monitoring_initialization(
+    root: str | Path,
+    trigger_id: str,
+    contract: dict[str, Any],
+) -> dict[str, Any]:
+    record = _load_json(_monitoring_initialization_path(root, trigger_id))
+    if not record:
+        raise ValueError("monitoring initialization record not found")
+    validate_monitoring_initialization_record(record, trigger_contract=contract)
+    return record
+
+
+def _load_monitoring_events(
+    root: str | Path,
+    trigger_id: str,
+) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for path in store_root(root).glob("*.event.json"):
+        record = _load_json(path)
+        if record.get("trigger_id") == trigger_id:
+            events.append(record)
+    events.sort(key=lambda record: (record["known_at"], record["trigger_event_id"]))
+    return events
+
+
+def _load_monitoring_evaluation(
+    root: str | Path,
+    trigger_event_id: str,
+) -> dict[str, Any]:
+    record = _load_json(_monitoring_evaluation_path(root, trigger_event_id))
+    if not record:
+        raise ValueError(
+            f"monitoring evaluation record not found for event: {trigger_event_id}"
+        )
+    return record
 
 
 def apply_monitoring_event(
@@ -547,6 +610,13 @@ def apply_monitoring_event(
         trigger_event=event,
         next_due_at=next_due_at,
     )
+    evaluation = build_monitoring_evaluation_record(
+        trigger_contract=contract,
+        trigger_event=event,
+        previous_state=previous,
+        resulting_state=updated,
+    )
+    _atomic_create(_monitoring_evaluation_path(root, trigger_event_id), evaluation)
     return _atomic_replace(state_path, updated)
 
 
@@ -557,33 +627,43 @@ def replay_monitoring_state(root: str | Path, trigger_id: str) -> dict[str, Any]
     if not persisted:
         raise ValueError("monitoring state not initialized")
     validate_monitoring_state(persisted, trigger_contract=contract)
-
-    replayed = build_monitoring_state(
-        monitor_id=persisted["monitor_id"],
-        trigger_contract=contract,
-        lifecycle_status=persisted["lifecycle_status"],
-        next_due_at=persisted["next_due_at"],
-        evaluation_reference_at=persisted["due_reference_at"],
-    )
-    event_files = []
-    for path in store_root(root).glob("*.event.json"):
-        record = _load_json(path)
-        if record.get("trigger_id") == trigger_id:
-            event_files.append(path)
-    event_files.sort(
-        key=lambda p: (
-            _load_json(p)["known_at"],
-            _load_json(p)["trigger_event_id"],
-        )
-    )
-    for path in event_files:
-        event = _load_json(path)
+    initialization = _load_monitoring_initialization(root, trigger_id, contract)
+    replayed = dict(initialization["initial_state"])
+    events = _load_monitoring_events(root, trigger_id)
+    seen: set[str] = set()
+    for event in events:
+        event_id = event["trigger_event_id"]
+        if event_id in seen:
+            raise ValueError(f"duplicate trigger_event_id in monitoring history: {event_id}")
+        seen.add(event_id)
         validate_trigger_event(event, trigger_contract=contract)
+        evaluation = _load_monitoring_evaluation(root, event_id)
+        validate_monitoring_evaluation_record(
+            evaluation,
+            trigger_contract=contract,
+            trigger_event=event,
+            previous_state=replayed,
+            resulting_state=apply_trigger_event(
+                previous_state=replayed,
+                trigger_contract=contract,
+                trigger_event=event,
+                next_due_at=evaluation.get("resulting_next_due_at"),
+            ),
+        )
+        if evaluation["previous_state_hash"] != replayed["state_hash"]:
+            raise ValueError(
+                f"monitoring evaluation history previous_state_hash mismatch: {event_id}"
+            )
         replayed = apply_trigger_event(
             previous_state=replayed,
             trigger_contract=contract,
             trigger_event=event,
+            next_due_at=evaluation["resulting_next_due_at"],
         )
+        if evaluation["resulting_state_hash"] != replayed["state_hash"]:
+            raise ValueError(
+                f"monitoring evaluation history resulting_state_hash mismatch: {event_id}"
+            )
     validate_monitoring_state(replayed, trigger_contract=contract)
     if canonical_json(replayed) != canonical_json(persisted):
         raise ValueError("monitoring state replay mismatch")
@@ -596,4 +676,178 @@ def replay_monitoring_state(root: str | Path, trigger_id: str) -> dict[str, Any]
         "last_trigger_state": persisted["last_trigger_state"],
         "due_state": persisted["due_state"],
         "state_hash": persisted["state_hash"],
+        "event_count": len(events),
+        "initial_state_hash": initialization["initial_state_hash"],
+        "history_head_hash": (
+            _load_monitoring_evaluation(root, events[-1]["trigger_event_id"])["evaluation_hash"]
+            if events
+            else initialization["initialization_hash"]
+        ),
     }
+
+
+def validate_monitoring_chain(
+    root: str | Path,
+    trigger_id: str,
+    validation_cutoff_at: str,
+) -> dict[str, Any]:
+    contract = _load_trigger_contract(root, trigger_id)
+    state_path = _monitoring_state_path(root, trigger_id)
+    persisted = _load_json(state_path)
+    if not persisted:
+        raise ValueError("monitoring state not initialized")
+    validate_monitoring_state(persisted, trigger_contract=contract)
+    initialization = _load_monitoring_initialization(root, trigger_id, contract)
+    events = _load_monitoring_events(root, trigger_id)
+
+    checks = {
+        "decision_revision_replay": "PASS",
+        "trigger_contract_binding": "PASS",
+        "trigger_event_pit": "PASS",
+        "monitoring_state_integrity": "PASS",
+        "transition_history": "PASS",
+        "monitoring_replay": "PASS",
+    }
+    issues: list[str] = []
+
+    try:
+        replay_decision_lifecycle(root, contract["decision_id"])
+    except Exception as exc:
+        checks["decision_revision_replay"] = "FAIL"
+        issues.append(f"decision_revision_replay: {exc}")
+
+    try:
+        _load_trigger_contract(root, trigger_id)
+    except Exception as exc:
+        checks["trigger_contract_binding"] = "FAIL"
+        issues.append(f"trigger_contract_binding: {exc}")
+
+    validation_cutoff = validation_cutoff_at.replace("Z", "+00:00")
+    cutoff_dt = __import__("datetime").datetime.fromisoformat(validation_cutoff)
+    for event in events:
+        try:
+            validate_trigger_event(event, trigger_contract=contract)
+            known_dt = __import__("datetime").datetime.fromisoformat(event["known_at"].replace("Z", "+00:00"))
+            eval_dt = __import__("datetime").datetime.fromisoformat(event["evaluation_cutoff_at"].replace("Z", "+00:00"))
+            if known_dt > cutoff_dt or eval_dt > cutoff_dt:
+                raise ValueError("event is newer than validation_cutoff_at")
+        except Exception as exc:
+            checks["trigger_event_pit"] = "FAIL"
+            issues.append(f"trigger_event_pit[{event.get('trigger_event_id')}]: {exc}")
+
+    try:
+        validate_monitoring_initialization_record(
+            initialization,
+            trigger_contract=contract,
+        )
+        validate_monitoring_state(persisted, trigger_contract=contract)
+    except Exception as exc:
+        checks["monitoring_state_integrity"] = "FAIL"
+        issues.append(f"monitoring_state_integrity: {exc}")
+
+    replayed = dict(initialization["initial_state"])
+    history_head_hash = initialization["initialization_hash"]
+    try:
+        seen: set[str] = set()
+        for event in events:
+            event_id = event["trigger_event_id"]
+            if event_id in seen:
+                raise ValueError(f"duplicate trigger_event_id: {event_id}")
+            seen.add(event_id)
+            validate_trigger_event(event, trigger_contract=contract)
+            evaluation = _load_monitoring_evaluation(root, event_id)
+            candidate = apply_trigger_event(
+                previous_state=replayed,
+                trigger_contract=contract,
+                trigger_event=event,
+                next_due_at=evaluation.get("resulting_next_due_at"),
+            )
+            validate_monitoring_evaluation_record(
+                evaluation,
+                trigger_contract=contract,
+                trigger_event=event,
+                previous_state=replayed,
+                resulting_state=candidate,
+            )
+            if evaluation["previous_state_hash"] != replayed["state_hash"]:
+                raise ValueError(f"previous_state_hash mismatch for {event_id}")
+            replayed = candidate
+            if evaluation["resulting_state_hash"] != replayed["state_hash"]:
+                raise ValueError(f"resulting_state_hash mismatch for {event_id}")
+            history_head_hash = evaluation["evaluation_hash"]
+    except Exception as exc:
+        checks["transition_history"] = "FAIL"
+        checks["monitoring_replay"] = "FAIL"
+        issues.append(f"transition_history: {exc}")
+
+    if checks["monitoring_replay"] == "PASS":
+        try:
+            validate_monitoring_state(replayed, trigger_contract=contract)
+            if canonical_json(replayed) != canonical_json(persisted):
+                raise ValueError("replayed state does not equal persisted state")
+        except Exception as exc:
+            checks["monitoring_replay"] = "FAIL"
+            issues.append(f"monitoring_replay: {exc}")
+
+    from .validation_replay import _timestamp
+    record = build_validation_record(
+        validation_id=f"{trigger_id}-validation-{validation_cutoff_at.replace(':', '').replace('+', 'p')}",
+        trigger_contract=contract,
+        monitor_id=persisted["monitor_id"],
+        validation_cutoff_at=_timestamp(validation_cutoff_at, "validation_cutoff_at"),
+        checks=checks,
+        checked_event_ids=[event["trigger_event_id"] for event in events],
+        initial_state_hash=initialization["initial_state_hash"],
+        replayed_state_hash=replayed["state_hash"] if checks["monitoring_replay"] == "PASS" else None,
+        persisted_state_hash=persisted["state_hash"],
+        history_head_hash=history_head_hash,
+        issues=issues,
+    )
+    return record
+
+
+def write_monitoring_validation(
+    root: str | Path,
+    trigger_id: str,
+    validation_cutoff_at: str,
+    validation_id: str | None = None,
+) -> Path:
+    record = validate_monitoring_chain(root, trigger_id, validation_cutoff_at)
+    if validation_id is not None:
+        record = build_validation_record(
+            validation_id=validation_id,
+            trigger_contract=_load_trigger_contract(root, trigger_id),
+            monitor_id=record["monitor_id"],
+            validation_cutoff_at=record["validation_cutoff_at"],
+            checks=record["checks"],
+            checked_event_ids=record["checked_event_ids"],
+            initial_state_hash=record["initial_state_hash"],
+            replayed_state_hash=record["replayed_state_hash"],
+            persisted_state_hash=record["persisted_state_hash"],
+            history_head_hash=record["history_head_hash"],
+            issues=record["issues"],
+        )
+    path = _validation_path(root, record["validation_id"])
+    return _atomic_create(path, record)
+
+
+def replay_monitoring_validation(root: str | Path, validation_id: str) -> dict[str, Any]:
+    record = _load_json(_validation_path(root, validation_id))
+    if not record:
+        raise ValueError("validation record not found")
+    validate_validation_record(record)
+    fresh = validate_monitoring_chain(
+        root,
+        record["trigger_id"],
+        record["validation_cutoff_at"],
+    )
+    if fresh["validation_id"] != record["validation_id"] or canonical_json(fresh) != canonical_json(record):
+        raise ValueError("validation replay mismatch")
+    return {
+        "validation_replay_status": "PASS",
+        "validation_id": validation_id,
+        "validation_status": record["validation_status"],
+        "event_count": record["event_count"],
+        "validation_hash": record["validation_hash"],
+    }
+
