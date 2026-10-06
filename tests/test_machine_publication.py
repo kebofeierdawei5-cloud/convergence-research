@@ -154,6 +154,7 @@ def test_machine_publication_separates_human_approval_and_lifecycle_refs(tmp_pat
     trigger_input = dict(trigger)
     trigger_input.pop("contract_version")
     trigger_input.pop("trigger_hash")
+    trigger_input.pop("policy_effect")
     write_trigger_contract(tmp_path, decision_id, trigger_input)
 
     initialize_monitoring_state(
