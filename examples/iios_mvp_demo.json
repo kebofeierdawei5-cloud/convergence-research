@@ -1,5 +1,6 @@
 {
   "case_id": "MVP-DEMO-001",
+  "market": "CN-A",
   "symbol": "DEMO.SZ",
   "company": "IIOS MVP Demo Company",
   "cutoff_date": "2026-09-30",
