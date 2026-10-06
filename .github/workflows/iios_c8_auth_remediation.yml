@@ -1,0 +1,48 @@
+name: IIOS C8 Auth Remediation
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/decision_admission.py"
+      - "iios_mvp/decision_lifecycle_production.py"
+      - "iios_mvp/store.py"
+      - "schemas/decision_lifecycle_v0.2.schema.json"
+      - "tests/decision_admission_fixture.py"
+      - "tests/test_c8_auth_remediation.py"
+      - "tests/test_decision_lifecycle_production.py"
+      - "tests/test_c7_full_lifecycle_e2e.py"
+      - "tests/test_c6_execution_receipt_production.py"
+      - "tests/test_machine_publication.py"
+      - "tools/c3_kolun_second_company_e2e.py"
+  push:
+    branches: [main]
+    paths:
+      - "iios_mvp/decision_admission.py"
+      - "iios_mvp/decision_lifecycle_production.py"
+      - "iios_mvp/store.py"
+      - "schemas/decision_lifecycle_v0.2.schema.json"
+      - "tests/decision_admission_fixture.py"
+      - "tests/test_c8_auth_remediation.py"
+      - "tests/test_decision_lifecycle_production.py"
+      - "tests/test_c7_full_lifecycle_e2e.py"
+      - "tests/test_c6_execution_receipt_production.py"
+      - "tests/test_machine_publication.py"
+      - "tools/c3_kolun_second_company_e2e.py"
+
+permissions:
+  contents: read
+
+jobs:
+  auth-remediation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q iios_mvp tools tests
+      - run: PYTHONPATH=. pytest -q tests/test_c8_auth_remediation.py tests/test_decision_lifecycle_production.py tests/test_c6_execution_receipt_production.py tests/test_machine_publication.py tests/test_c7_full_lifecycle_e2e.py tests/test_c3_kolun_second_company_e2e.py
+      - run: PYTHONPATH=. python tools/c3_kolun_second_company_e2e.py
+      - run: PYTHONPATH=. python tools/c7_full_lifecycle_e2e.py
+      - run: git diff --check
