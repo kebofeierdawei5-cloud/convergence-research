@@ -1,6 +1,6 @@
 from jsonschema import Draft202012Validator, FormatChecker
 
-from iios_mvp.decision_admission import build_test_admission_receipt
+from tests.decision_admission_fixture import build_fixture_admission_receipt
 from iios_mvp.decision_lifecycle_production import (
     build_decision_revision,
     build_human_approval,
@@ -39,7 +39,7 @@ def snapshot(action="REVIEW_REQUIRED"):
 
 
 def admission(s):
-    return build_test_admission_receipt(snapshot=s, canonical_decision=s["decision"])
+    return build_fixture_admission_receipt(snapshot=s, canonical_decision=s["decision"])
 
 
 def revision(s, revision_number=1, run_id="run-1"):
