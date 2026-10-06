@@ -11,6 +11,7 @@ from .canonical_independent_forecast import CanonicalIndependentForecastResolver
 from .horizon_semantics import validate_horizon_selection
 from .decision_kernel_v03 import evaluate_production_decision
 from .decision_upstream_admission_v03 import validate_decision_upstream_admission
+from .expectation_gap_production import build_expectation_gap_evaluation
 from .price_dependent_expectation_gap import (
     P2_PRICE_GAP_REVALIDATION_VERSION,
     combine_target_entry_price_v2,
@@ -708,7 +709,26 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
     thesis_admission_status = str(upstream.get("thesis_admission_status", "UNKNOWN")).upper()
     risk_status = _risk_status(case)
     portfolio_status = _portfolio_status(case)
-    gap_status, gap_relative = _expectation_gap(case, evidence_root_resolver=evidence_root_resolver, independent_forecast_resolver=independent_forecast_resolver)
+
+    expectation_gap_evaluation = None
+    gap_status = "UNKNOWN"
+    gap_relative = None
+    if isinstance(case.get("expectation_gap"), dict):
+        try:
+            expectation_gap_evaluation = build_expectation_gap_evaluation(
+                case=case,
+                evidence_root_resolver=evidence_root_resolver,
+                independent_forecast_resolver=independent_forecast_resolver,
+            )
+            gap_status = str(expectation_gap_evaluation["status"]).upper()
+            if gap_status == "NO_FEASIBLE_SOLUTION":
+                gap_status = "BLOCKED"
+            gap_relative_raw = expectation_gap_evaluation.get("gap_relative")
+            if gap_relative_raw is not None:
+                gap_relative = _dec(gap_relative_raw, "expectation_gap_evaluation.gap_relative")
+        except (KeyError, TypeError, ValueError):
+            gap_status = "UNKNOWN"
+
     gap_positive = gap_status == "PASS" and gap_relative is not None and gap_relative > 0
 
     metrics = None
@@ -756,6 +776,14 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "risk": risk_status,
         "thesis": thesis_status,
         "expectation_gap_status": gap_status,
+        "expectation_gap_resolution_state": (
+            expectation_gap_evaluation.get("resolution_state")
+            if expectation_gap_evaluation is not None else None
+        ),
+        "expectation_gap_qualification": (
+            expectation_gap_evaluation.get("qualification")
+            if expectation_gap_evaluation is not None else None
+        ),
         "positive_expectation_gap_pass": gap_positive,
         "expectation_gap_required_for_buy_add": False,
         "mie_policy": "OPTIONAL_EXPLANATORY",
@@ -1099,6 +1127,7 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "decision_scope": state["decision_scope"],
         "capital_effect": entry_admission["capital_effect"],
         "risk_portfolio_contract": _serialize_nested(risk_portfolio_contract),
+        "expectation_gap_evaluation": _serialize_nested(expectation_gap_evaluation),
     }
     if metrics is not None:
         output["return_metrics"] = _serialize_metrics(metrics)
