@@ -22,7 +22,7 @@ CORE-04 vertical decision closure is complete.
 
 A1 is complete as the company-side evidence-closure engineering milestone. Current 300750 Quality remains CONDITIONAL and new capital remains FALSE.
 
-C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. C3 Second Company Acceptance = PASS / MERGED / CANONICAL. The next Stage C batch is C4 Expectation Gap Production Integration.
+C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. C3 Second Company Acceptance = PASS / MERGED / CANONICAL. C4 Expectation Gap Production Integration = PASS / MERGED / CANONICAL. The next Stage C batch is C5 Positioning / Sizing.
 
 TR-03 Validation / Replay is now PASS / MERGED / CANONICAL.
 
@@ -143,7 +143,7 @@ The canonical Stage C plan is `docs/iios/IIOS_STAGE_C_PRODUCTIZATION_PLAN_v0.1.m
 
 Canonical C0 merge: `1594e43eee14aaa41ddde675ddbe61d650462cf7`.
 
-Next boundary: C4 Expectation Gap Production Integration.
+Next boundary: C5 Positioning / Sizing.
 
 
 ## C1 status
