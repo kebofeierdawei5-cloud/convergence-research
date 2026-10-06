@@ -63,8 +63,8 @@ def setup_approved_revision(tmp_path, action="BUY"):
     )
     snapshot = make_snapshot(action=action)
     write_snapshot_path = write_snapshot(tmp_path, snapshot)
-    from iios_mvp.decision_admission import build_test_admission_receipt
-    admission = build_test_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
+    from tests.decision_admission_fixture import build_fixture_admission_receipt
+    admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
     revision_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
@@ -157,8 +157,8 @@ def test_c6_rejected_approval_cannot_create_execution_receipt(tmp_path):
     series = create_or_load_series(tmp_path, "CN-A", "300750", "CATL", "2026-10-06T00:00:00Z")
     snapshot = make_snapshot()
     write_snapshot(tmp_path, snapshot)
-    from iios_mvp.decision_admission import build_test_admission_receipt
-    admission = build_test_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
+    from tests.decision_admission_fixture import build_fixture_admission_receipt
+    admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
     write_decision_revision(
         tmp_path,
         series["decision_series_id"],
