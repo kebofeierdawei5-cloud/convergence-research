@@ -33,7 +33,13 @@ def make_snapshot(case_id="V03-C6", cutoff="2026-10-06", action="BUY"):
     core = {
         "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.3.0",
         "engine_version": "0.3.0",
-        "input": {"case_id": case_id, "cutoff_date": cutoff},
+        "input": {
+            "case_id": case_id,
+            "market": "CN-A",
+            "symbol": "300750",
+            "company": "CATL",
+            "cutoff_date": cutoff,
+        },
         "decision": {"action": action},
     }
     core["snapshot_hash"] = hashlib.sha256(
@@ -57,12 +63,15 @@ def setup_approved_revision(tmp_path, action="BUY"):
     )
     snapshot = make_snapshot(action=action)
     write_snapshot_path = write_snapshot(tmp_path, snapshot)
+    from iios_mvp.decision_admission import build_test_admission_receipt
+    admission = build_test_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
     revision_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
         1,
         snapshot,
         "run-c6-001",
+        decision_admission=admission,
     )
     approval = approve_revision(
         tmp_path,
@@ -70,13 +79,14 @@ def setup_approved_revision(tmp_path, action="BUY"):
         snapshot,
         True,
         "human approval for C6 test",
+        actor_identity="human:owner",
     )
     return series, snapshot, revision_path, write_snapshot_path, approval
 
 
 def test_c6_receipt_binds_exact_approved_revision_and_action():
     rev = {
-        "contract_version": "IIOS-DECISION-LIFECYCLE-0.1",
+        "contract_version": "IIOS-DECISION-LIFECYCLE-0.2",
         "decision_id": "CN-A-300750-r001",
         "decision_series_id": "CN-A-300750",
         "revision": 1,
@@ -91,12 +101,30 @@ def test_c6_receipt_binds_exact_approved_revision_and_action():
         "engine_version": "0.3.0",
         "human_approval_required": True,
         "auto_execution": False,
+        "decision_admission": {
+            "schema_version": "IIOS-DECISION-ADMISSION-0.1",
+            "status": "ADMITTED",
+            "admission_method": "CANONICAL_DECIDE_V03_REEXECUTED",
+            "contract_version": "IIOS-INVESTMENT-CORE-0.3",
+            "engine_version": "0.3.0",
+            "case_id": "V03-C6",
+            "market": "CN-A",
+            "symbol": "300750",
+            "company": "CATL",
+            "cutoff_date": "2026-10-06",
+            "snapshot_hash": "a".repeat(64),
+            "canonical_decision_hash": "a".repeat(64),
+            "canonical_action": "BUY",
+            "canonical_decision_status": "READY",
+            "canonical_new_capital_allowed": false,
+            "admission_record_hash": "a".repeat(64),
+        },
     }
     rev["revision_hash"] = hashlib.sha256(
         canonical_json({k: rev[k] for k in rev if k != "revision_hash"}).encode()
     ).hexdigest()
     from iios_mvp.decision_lifecycle_production import build_human_approval
-    approval = build_human_approval(decision_revision=rev, approved=True, note="approved")
+    approval = build_human_approval(decision_revision=rev, approved=True, note="approved", actor_identity="human:test")
     receipt = build_execution_receipt(
         execution_receipt_id="exec-c6-001",
         decision_revision=rev,
@@ -129,8 +157,24 @@ def test_c6_rejected_approval_cannot_create_execution_receipt(tmp_path):
     series = create_or_load_series(tmp_path, "CN-A", "300750", "CATL", "2026-10-06T00:00:00Z")
     snapshot = make_snapshot()
     write_snapshot(tmp_path, snapshot)
-    write_decision_revision(tmp_path, series["decision_series_id"], 1, snapshot, "run-c6-reject")
-    approve_revision(tmp_path, "CN-A-300750-r001", snapshot, False, "rejected")
+    from iios_mvp.decision_admission import build_test_admission_receipt
+    admission = build_test_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
+    write_decision_revision(
+        tmp_path,
+        series["decision_series_id"],
+        1,
+        snapshot,
+        "run-c6-reject",
+        decision_admission=admission,
+    )
+    approve_revision(
+        tmp_path,
+        "CN-A-300750-r001",
+        snapshot,
+        False,
+        "rejected",
+        actor_identity="human:owner",
+    )
     with pytest.raises(ValueError, match="HUMAN_APPROVED"):
         write_execution_receipt(
             tmp_path,
@@ -200,7 +244,7 @@ def test_c6_persisted_receipt_is_immutable_and_does_not_mutate_lifecycle(tmp_pat
 
 def test_c6_receipt_tampering_is_detected():
     rev = {
-        "contract_version": "IIOS-DECISION-LIFECYCLE-0.1",
+        "contract_version": "IIOS-DECISION-LIFECYCLE-0.2",
         "decision_id": "CN-A-300750-r001",
         "decision_series_id": "CN-A-300750",
         "revision": 1,
@@ -215,12 +259,30 @@ def test_c6_receipt_tampering_is_detected():
         "engine_version": "0.3.0",
         "human_approval_required": True,
         "auto_execution": False,
+        "decision_admission": {
+            "schema_version": "IIOS-DECISION-ADMISSION-0.1",
+            "status": "ADMITTED",
+            "admission_method": "CANONICAL_DECIDE_V03_REEXECUTED",
+            "contract_version": "IIOS-INVESTMENT-CORE-0.3",
+            "engine_version": "0.3.0",
+            "case_id": "V03-C6",
+            "market": "CN-A",
+            "symbol": "300750",
+            "company": "CATL",
+            "cutoff_date": "2026-10-06",
+            "snapshot_hash": "b".repeat(64),
+            "canonical_decision_hash": "b".repeat(64),
+            "canonical_action": "REDUCE",
+            "canonical_decision_status": "READY",
+            "canonical_new_capital_allowed": false,
+            "admission_record_hash": "b".repeat(64),
+        },
     }
     rev["revision_hash"] = hashlib.sha256(
         canonical_json({k: rev[k] for k in rev if k != "revision_hash"}).encode()
     ).hexdigest()
     from iios_mvp.decision_lifecycle_production import build_human_approval
-    approval = build_human_approval(decision_revision=rev, approved=True, note="approved")
+    approval = build_human_approval(decision_revision=rev, approved=True, note="approved", actor_identity="human:test")
     receipt = build_execution_receipt(
         execution_receipt_id="exec-c6-tamper",
         decision_revision=rev,
@@ -275,7 +337,7 @@ def test_c6_persisted_replay_reconstructs_receipt(tmp_path):
 
 def test_c6_schema_accepts_receipt():
     rev = {
-        "contract_version": "IIOS-DECISION-LIFECYCLE-0.1",
+        "contract_version": "IIOS-DECISION-LIFECYCLE-0.2",
         "decision_id": "CN-A-300750-r001",
         "decision_series_id": "CN-A-300750",
         "revision": 1,
@@ -290,12 +352,30 @@ def test_c6_schema_accepts_receipt():
         "engine_version": "0.3.0",
         "human_approval_required": True,
         "auto_execution": False,
+        "decision_admission": {
+            "schema_version": "IIOS-DECISION-ADMISSION-0.1",
+            "status": "ADMITTED",
+            "admission_method": "CANONICAL_DECIDE_V03_REEXECUTED",
+            "contract_version": "IIOS-INVESTMENT-CORE-0.3",
+            "engine_version": "0.3.0",
+            "case_id": "V03-C6",
+            "market": "CN-A",
+            "symbol": "300750",
+            "company": "CATL",
+            "cutoff_date": "2026-10-06",
+            "snapshot_hash": "c".repeat(64),
+            "canonical_decision_hash": "c".repeat(64),
+            "canonical_action": "ADD",
+            "canonical_decision_status": "READY",
+            "canonical_new_capital_allowed": false,
+            "admission_record_hash": "c".repeat(64),
+        },
     }
     rev["revision_hash"] = hashlib.sha256(
         canonical_json({k: rev[k] for k in rev if k != "revision_hash"}).encode()
     ).hexdigest()
     from iios_mvp.decision_lifecycle_production import build_human_approval
-    approval = build_human_approval(decision_revision=rev, approved=True, note="approved")
+    approval = build_human_approval(decision_revision=rev, approved=True, note="approved", actor_identity="human:test")
     receipt = build_execution_receipt(
         execution_receipt_id="exec-c6-schema",
         decision_revision=rev,
