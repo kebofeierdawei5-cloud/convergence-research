@@ -11,6 +11,10 @@ from iios_mvp.upstream_authority_v03 import (
     CORE_STATUS_DOMAINS,
     validate_core_upstream_authority,
 )
+from iios_mvp.decision_upstream_admission_v03 import (
+    build_decision_upstream_admission,
+    build_canonical_upstream_admission_v02,
+)
 
 
 CASE = {
@@ -145,3 +149,49 @@ def test_tampered_reference_hash_fails_closed():
             resolver=registry,
             **CASE,
         )
+
+
+def test_v02_upstream_bundle_is_resolver_bound():
+    base = build_decision_upstream_admission(
+        case_id=CASE["case_id"],
+        cutoff_date=CASE["cutoff_date"].isoformat(),
+        reality_status="PASS",
+        quality={"dimensions": [
+            {"dimension": d, "status": "PASS", "rationale": "fixture", "evidence_ids": ["E1"]}
+            for d in (
+                "competitive_advantage",
+                "incremental_return_on_capital",
+                "earnings_quality",
+                "cash_flow_conversion",
+                "balance_sheet_resilience",
+                "reinvestment_runway",
+            )
+        ]},
+        value_driver_status="PASS",
+        valuation_status="PASS",
+        forecast_status="PASS",
+        thesis={
+            "status": "INTACT",
+            "statement": "fixture",
+            "mechanism": "fixture",
+            "key_driver_ids": ["D1"],
+            "falsifiers": ["F1"],
+            "monitoring_triggers": ["T1"],
+            "evidence_ids": ["E1"],
+            "known_at": "2026-10-04T12:00:00+00:00",
+            "prepared_without_current_price": True,
+        },
+    )
+    registry, refs = registry_with_states(
+        {domain: "PASS" for domain in CORE_STATUS_DOMAINS}
+    )
+    record = build_canonical_upstream_admission_v02(
+        base_record=base,
+        canonical_admission_refs=refs,
+        resolver=registry,
+        market=CASE["market"],
+        symbol=CASE["symbol"],
+        company=CASE["company"],
+    )
+    assert record["schema_version"] == "IIOS-CORE-04-UPSTREAM-ADMISSION-0.2"
+    assert record["capital_admission_ready"] is True
