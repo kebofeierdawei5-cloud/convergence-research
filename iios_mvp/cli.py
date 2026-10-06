@@ -185,14 +185,16 @@ def cmd_lifecycle_replay(args: argparse.Namespace) -> int:
 def cmd_trigger_contract(args: argparse.Namespace) -> int:
     contract = load_json(args.contract)
     path = write_trigger_contract(args.out, args.decision_id, contract)
-    print(json.dumps({"trigger_contract": str(path), "trigger_hash": contract.get("trigger_hash")}, ensure_ascii=False, indent=2))
+    persisted = load_json(str(path))
+    print(json.dumps({"trigger_contract": str(path), "trigger_hash": persisted["trigger_hash"]}, ensure_ascii=False, indent=2))
     return 0
 
 
 def cmd_trigger_event(args: argparse.Namespace) -> int:
     event = load_json(args.event)
     path = write_trigger_event(args.out, event)
-    print(json.dumps({"trigger_event": str(path), "trigger_event_hash": event.get("trigger_event_hash")}, ensure_ascii=False, indent=2))
+    persisted = load_json(str(path))
+    print(json.dumps({"trigger_event": str(path), "trigger_event_hash": persisted["trigger_event_hash"], "trigger_state": persisted["trigger_state"]}, ensure_ascii=False, indent=2))
     return 0
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from iios_mvp.engine import decide, replay, run_case
+from iios_mvp.engine import decide, replay, run_case, sha256_obj
 from iios_mvp.store import read_snapshot, write_snapshot
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +12,17 @@ DEMO = ROOT / "examples" / "iios_mvp_demo.json"
 
 def load_demo():
     return json.loads(DEMO.read_text(encoding="utf-8"))
+
+
+def build_persisted_snapshot(action: str, cutoff: str):
+    core = {
+        "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.3.0",
+        "engine_version": "0.3.0",
+        "input": {"case_id": "RC-CN-A-300750-20261004", "cutoff_date": cutoff},
+        "decision": {"action": action},
+    }
+    snapshot_hash = sha256_obj(core)
+    return {**core, "snapshot_hash": snapshot_hash}, snapshot_hash
 
 
 def test_demo_decision_is_buy_without_human_approval():
@@ -63,30 +74,24 @@ def test_multiple_revisions_preserve_history_and_advance_current(tmp_path):
         write_decision_revision, write_snapshot,
     )
 
-    case1 = load_demo()
-    case1["cutoff_date"] = "2026-10-04"
-    snap1, h1 = run_case(case1)
+    snap1, h1 = build_persisted_snapshot("HOLD", "2026-10-04")
     write_snapshot(tmp_path, snap1)
-    series = create_or_load_series(tmp_path, "CN-A", case1["symbol"], case1["company"], "2026-10-04T00:00:00Z")
+    series = create_or_load_series(tmp_path, "CN-A", "300750", "CATL", "2026-10-04T00:00:00Z")
     r1 = next_revision(tmp_path, series["decision_series_id"])
-    write_decision_revision(tmp_path, series["decision_series_id"], r1, snap1, h1[:16])
-    (tmp_path / f"{series['decision_series_id']}.index.json").write_text(json.dumps({"next_revision": 2}), encoding="utf-8")
+    write_decision_revision(tmp_path, series["decision_series_id"], r1, snap1, "run-1")
     d1 = f"{series['decision_series_id']}-r001"
     assert approve_revision(tmp_path, d1, snap1, True, "approve r1")["current"] is True
 
-    case2 = load_demo()
-    case2["cutoff_date"] = "2026-10-05"
-    case2["valuation"]["current_price"] = 380
-    snap2, h2 = run_case(case2)
+    snap2, h2 = build_persisted_snapshot("BUY", "2026-10-05")
     write_snapshot(tmp_path, snap2)
     r2 = next_revision(tmp_path, series["decision_series_id"])
-    write_decision_revision(tmp_path, series["decision_series_id"], r2, snap2, h2[:16])
-    (tmp_path / f"{series['decision_series_id']}.index.json").write_text(json.dumps({"next_revision": 3}), encoding="utf-8")
+    write_decision_revision(tmp_path, series["decision_series_id"], r2, snap2, "run-2")
     d2 = f"{series['decision_series_id']}-r002"
     assert approve_revision(tmp_path, d2, snap2, True, "approve r2")["current"] is True
 
     current = json.loads((tmp_path / f"{series['decision_series_id']}.current.json").read_text())
-    assert current["current_approved_decision_id"] == d2
+    assert current["current_decision_id"] == d2
+    assert current["current_revision"] == 2
     assert (tmp_path / f"{d1}.decision.json").exists()
     assert (tmp_path / f"{d2}.decision.json").exists()
     assert read_snapshot(tmp_path / f"{h1}.json")["snapshot_hash"] == h1
@@ -96,13 +101,13 @@ def test_multiple_revisions_preserve_history_and_advance_current(tmp_path):
 def test_approval_cannot_bind_wrong_snapshot(tmp_path):
     from iios_mvp.store import approve_revision, create_or_load_series, write_decision_revision, write_snapshot
 
-    snap1, h1 = run_case(load_demo())
-    snap2, h2 = run_case({**load_demo(), "cutoff_date": "2026-10-06"})
+    snap1, h1 = build_persisted_snapshot("HOLD", "2026-10-04")
+    snap2, h2 = build_persisted_snapshot("BUY", "2026-10-06")
     write_snapshot(tmp_path, snap1)
     write_snapshot(tmp_path, snap2)
     series = create_or_load_series(tmp_path, "CN-A", "300750", "CATL", "2026-10-04T00:00:00Z")
     did = f"{series['decision_series_id']}-r001"
-    write_decision_revision(tmp_path, series["decision_series_id"], 1, snap1, h1[:16])
+    write_decision_revision(tmp_path, series["decision_series_id"], 1, snap1, "run-1")
     try:
         approve_revision(tmp_path, did, snap2, True, "wrong snapshot")
     except ValueError as exc:
@@ -112,21 +117,49 @@ def test_approval_cannot_bind_wrong_snapshot(tmp_path):
 
 
 def test_trigger_contract_and_event_are_hashed_and_immutable(tmp_path):
-    from iios_mvp.store import write_trigger_contract, write_trigger_event
+    from iios_mvp.store import create_or_load_series, write_decision_revision, write_trigger_contract, write_trigger_event
 
-    contract = {"trigger_id": "t1", "trigger_type": "PRICE", "metric": "market_price", "operator": "<=", "threshold": 350}
-    event = {"trigger_event_id": "e1", "event_type": "PRICE", "metric": "market_price", "value": 349.5}
-    cp = write_trigger_contract(tmp_path, "CN-A-300750-r001", contract)
-    ep = write_trigger_event(tmp_path, event)
-    assert cp.exists() and ep.exists()
-    c = json.loads(cp.read_text())
-    e = json.loads(ep.read_text())
-    assert len(c["trigger_hash"]) == 64
-    assert len(e["trigger_event_hash"]) == 64
-    write_trigger_contract(tmp_path, "CN-A-300750-r001", contract)
-    write_trigger_event(tmp_path, event)
+    snap, _ = build_persisted_snapshot("HOLD", "2026-10-04")
+    write_snapshot(tmp_path, snap)
+    series = create_or_load_series(tmp_path, "CN-A", "300750", "CATL", "2026-10-04T00:00:00Z")
+    decision_id = f"{series['decision_series_id']}-r001"
+    write_decision_revision(tmp_path, series["decision_series_id"], 1, snap, "run-1")
+    revision = json.loads((tmp_path / f"{decision_id}.decision.json").read_text())
 
+    contract = {
+        "trigger_id": "t1",
+        "decision_id": decision_id,
+        "decision_series_id": series["decision_series_id"],
+        "revision": 1,
+        "decision_revision_hash": revision["revision_hash"],
+        "case_id": snap["input"]["case_id"],
+        "decision_cutoff_date": snap["input"]["cutoff_date"],
+        "role": "MONITORING",
+        "metric_id": "market_price",
+        "operator": "LTE",
+        "target": "350",
+        "unit": "CNY/share",
+        "evidence_ids": [],
+        "enabled": True,
+    }
+    cp = write_trigger_contract(tmp_path, decision_id, contract)
+    stored_contract = json.loads(cp.read_text())
+    assert len(stored_contract["trigger_hash"]) == 64
 
+    ep = write_trigger_event(tmp_path, {
+        "trigger_id": "t1",
+        "trigger_event_id": "e1",
+        "evaluation_cutoff_at": "2026-10-06T00:00:00+00:00",
+        "observed_at": "2026-10-05T10:00:00+00:00",
+        "known_at": "2026-10-05T10:05:00+00:00",
+        "source_id": "szse",
+        "evidence_id": "ev-1",
+        "value": "349.5",
+        "previous_value": None,
+    })
+    stored_event = json.loads(ep.read_text())
+    assert len(stored_event["trigger_event_hash"]) == 64
+    assert stored_event["trigger_state"] == "MATCHED"
 def test_valuation_model_selection_is_not_pe_only():
     from iios_mvp.valuation import select_model
     selection = select_model({
