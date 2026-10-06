@@ -24,6 +24,8 @@ from .store import (
     initialize_monitoring_state,
     apply_monitoring_event,
     replay_monitoring_state,
+    write_monitoring_validation,
+    replay_monitoring_validation,
 )
 
 
@@ -238,6 +240,34 @@ def cmd_monitor_replay(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_monitor_validate(args: argparse.Namespace) -> int:
+    path = write_monitoring_validation(
+        args.out,
+        args.trigger_id,
+        args.validation_cutoff_at,
+        validation_id=args.validation_id,
+    )
+    persisted = load_json(str(path))
+    print(json.dumps({
+        "validation_record": str(path),
+        "validation_id": persisted["validation_id"],
+        "validation_status": persisted["validation_status"],
+        "event_count": persisted["event_count"],
+        "validation_hash": persisted["validation_hash"],
+        "issues": persisted["issues"],
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_monitor_validation_replay(args: argparse.Namespace) -> int:
+    print(json.dumps(
+        replay_monitoring_validation(args.out, args.validation_id),
+        ensure_ascii=False,
+        indent=2,
+    ))
+    return 0
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="iios-mvp", description="IIOS v0.1.1 investment-decision kernel")
     sub = p.add_subparsers(dest="command", required=True)
@@ -318,6 +348,24 @@ def parser() -> argparse.ArgumentParser:
     mr.add_argument("trigger_id")
     mr.add_argument("--out", default="runs")
     mr.set_defaults(func=cmd_monitor_replay)
+
+    mv = sub.add_parser(
+        "monitor-validate",
+        help="validate and persist the monitoring transition/replay evidence chain",
+    )
+    mv.add_argument("trigger_id")
+    mv.add_argument("--validation-cutoff-at", required=True)
+    mv.add_argument("--validation-id")
+    mv.add_argument("--out", default="runs")
+    mv.set_defaults(func=cmd_monitor_validate)
+
+    mvr = sub.add_parser(
+        "monitor-validation-replay",
+        help="replay a persisted monitoring validation record from source state",
+    )
+    mvr.add_argument("validation_id")
+    mvr.add_argument("--out", default="runs")
+    mvr.set_defaults(func=cmd_monitor_validation_replay)
     return p
 
 
