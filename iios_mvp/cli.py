@@ -9,6 +9,7 @@ from .company_economic_core import build_company_economic_core, validate_company
 from .core03_market_expectation import build_core03_package, validate_core03_package
 from .engine import replay, render_markdown, run_case
 from .research_intake import build_research_case
+from .machine_publication import write_machine_publication
 from .store import (
     approve_revision,
     create_or_load_series,
@@ -187,6 +188,25 @@ def cmd_lifecycle_replay(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_publish(args: argparse.Namespace) -> int:
+    path = write_machine_publication(
+        args.out,
+        decision_id=args.decision_id,
+        published_at=args.published_at,
+    )
+    record = load_json(str(path))
+    print(json.dumps({
+        "status": "PUBLISHED",
+        "publication": str(path),
+        "publication_id": record["publication_id"],
+        "publication_hash": record["publication_hash"],
+        "decision_id": record["decision_ref"]["decision_id"],
+        "revision": record["decision_ref"]["revision"],
+        "currentness": record["current_projection"]["status"],
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_trigger_contract(args: argparse.Namespace) -> int:
     contract = load_json(args.contract)
     path = write_trigger_contract(args.out, args.decision_id, contract)
@@ -308,6 +328,13 @@ def parser() -> argparse.ArgumentParser:
     lr.add_argument("decision_id")
     lr.add_argument("--out", default="runs")
     lr.set_defaults(func=cmd_lifecycle_replay)
+
+    pub = sub.add_parser("publish", help="publish one canonical decision revision as immutable machine-readable projection")
+    pub.add_argument("decision_id")
+    pub.add_argument("--published-at", required=True)
+    pub.add_argument("--out", default="runs")
+    pub.set_defaults(func=cmd_publish)
+
 
     ap = sub.add_parser("approve", help="record separate human approval")
     ap.add_argument("snapshot")
