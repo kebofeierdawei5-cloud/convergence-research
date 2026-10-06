@@ -34,6 +34,18 @@ A1-02 Capital Allocation + Trust/Governance Evidence Closure = PASS / MERGED
 A1-03 Quality Gate Integration = PASS / MERGED
         ↓
 A1 Company-side Evidence Closure = PASS / MERGED
+        ↓
+RP-01 Risk / Portfolio Production Contract = MERGED
+        ↓
+DR-01 Decision Revision / Human Approval = PASS / MERGED
+        ↓
+DR-02 Persistence / CLI = MERGED
+        ↓
+TR-01 Trigger Contract / Event Semantics = PASS / MERGED / CANONICAL
+        ↓
+TR-02 Monitoring State = PASS / MERGED / CANONICAL
+        ↓
+TR-03 Validation / Replay = PASS / MERGED / CANONICAL
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
@@ -114,7 +126,6 @@ RP-01 Risk / Portfolio Production Contract is merged in canonical main:
 The available workflow interface did not expose a post-merge runtime CI record for independent verification in this session. Therefore RP-01 is recorded as MERGED / implementation-complete, not as independently CI-certified here.
 
 Remaining Investment Core productization:
-- Validation / replay;
 - Machine Publication;
 - Human Report / Report Quality Gate;
 - second-company acceptance;
@@ -227,7 +238,16 @@ Dedicated GitHub Actions run #10 = SUCCESS; red-team review passed; no scheduler
 Acceptance:
 - `docs/iios/TR_02_ACCEPTANCE_2026-10-06.md`
 
-The next development batch is **Validation / Replay Productization**. It must start from the resulting canonical main and this State Index. No scheduler/alerts or new P3/P4/MIE model work is implied.
+**TR-03 Validation / Replay = PASS / MERGED / CANONICAL**
+
+Merge commit: 33291911c6e6b26da6deaf6c28a7a2046173c842.
+Dedicated GitHub Actions run #5 = SUCCESS; red-team review passed.
+TR-03 closes the historical `next_due_at` replay gap with immutable Monitoring Evaluation Records.
+
+Acceptance:
+- `docs/iios/TR_03_ACCEPTANCE_2026-10-06.md`
+
+The next development boundary is **Machine Publication / Human Report productization**. Scheduler/alerts remain out of scope until a separate explicit batch is authorized; no new P3/P4/MIE model work is implied.
 
 Completed sub-batches:
 - **A1-01 Economic Evidence Bridge = PASS / MERGED**
