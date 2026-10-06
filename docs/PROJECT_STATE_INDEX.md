@@ -58,6 +58,10 @@ C3 Second Company Acceptance — 科伦药业 = PASS / MERGED / CANONICAL
 C4 Expectation Gap Production Integration = PASS / MERGED / CANONICAL
          ↓
 C5 Positioning / Sizing = PASS / MERGED / CANONICAL
+        ↓
+C6 Human Execution Receipt = PASS / MERGED / CANONICAL
+        ↓
+C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
@@ -167,10 +171,12 @@ C5 Positioning / Sizing is PASS / MERGED / CANONICAL:
 - compileall and git diff --check passed;
 - acceptance: docs/iios/C5_ACCEPTANCE_2026-10-06.md.
 
-Remaining Stage C productization:
-- C6 Human Execution Receipt;
-- C7 Full Lifecycle E2E;
-- C8 Final Independent Red-team / MVP Acceptance.
+Canonical Stage C milestone state:
+- C6 Human Execution Receipt = PASS / MERGED / CANONICAL;
+- C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL.
+- Current next Stage C boundary = C8 Final Independent Red-team / MVP Acceptance.
+
+The separately tracked full Investment Core / Risk Portfolio CI regressions remain non-blocking for C4/C5/C6/C7 acceptance and are not current Stage C capability gaps.
 
 The full Investment Core / Risk Portfolio CI still carries separately tracked pre-existing regressions; C4/C5 acceptance is independently bounded and these failures are not treated as C4/C5 capability evidence.
 
@@ -244,65 +250,30 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 ## 8. Current next batch
 
-**A1 Company-side Evidence Closure = PASS / MERGED**
+**C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL**
 
-A1 is complete as the current company-side evidence-closure milestone.
+C7 is the latest completed Stage C capability and is already synchronized into canonical `main`.
 
-**RP-01 Risk / Portfolio Production Contract = MERGED**
-
-RP-01 is implementation-complete on canonical main; runtime CI evidence was not independently observable through the available workflow interface in this session.
-
-**DR-01 Decision Revision / Human Approval Contract = PASS / MERGED**
-
-Canonical lifecycle semantics are frozen. Independent execution passed 8/8; GitHub Actions runtime telemetry was not exposed by the available workflow interface and is recorded as UNOBSERVED.
-
-**DR-02 Persistence + CLI Integration = MERGED / IMPLEMENTATION COMPLETE**
-
-Merge commit: a4e493cc0c7f45647a02dd587f89fb7d98ee22e2.
-Canonical persistence and lifecycle replay are integrated. GitHub Actions runtime telemetry was not exposed by the available workflow interface and is recorded as UNOBSERVED.
-
-**TR-01 Trigger Contract / Event Semantics = PASS / MERGED / CANONICAL**
-
-Merge commit: 0fb7262ded47b3497f5be33dc93163e209f0098f.
-Dedicated GitHub Actions run #9 = SUCCESS; independent exact-module execution = PASS.
+Implementation:
+- PR #112;
+- merge commit: `82d1911c985791e4b76f63d792588d175ee505f8`.
 
 Acceptance:
-- `docs/iios/A1_ACCEPTANCE_2026-10-05.md`
-- `docs/iios/RP_01_RISK_PORTFOLIO_PRODUCTION_CONTRACT_v0.1.md`
-- `docs/iios/DR_01_ACCEPTANCE_2026-10-05.md`
-- `docs/iios/DR_02_PERSISTENCE_CLI_INTEGRATION_v0.1.md`
-- `docs/iios/TR_01_ACCEPTANCE_2026-10-06.md`
+- `docs/iios/C7_ACCEPTANCE_2026-10-06.md`;
+- dedicated C7 Actions run #6 = SUCCESS on exact head `43664c9bee33b3d53f212428da019e197a9fcaf2`;
+- 74 related tests passed;
+- acceptance harness 4 / 4 PASS;
+- compileall and git diff-check PASS.
 
-**TR-02 Monitoring State = PASS / MERGED / CANONICAL**
+Canonical state synchronization:
+- PR #113;
+- merge commit: `a5ac4b8451041bbd38bcaa73fa39954ec6533f02`.
 
-Merge commit: 6b5a83ff3dcb0028945f455c517b369dbbf8220b.
-Dedicated GitHub Actions run #10 = SUCCESS; red-team review passed; no scheduler, alerts, or Decision Kernel changes were introduced.
+**Immediate next development boundary: C8 Final Independent Red-team / MVP Acceptance.**
 
-Acceptance:
-- `docs/iios/TR_02_ACCEPTANCE_2026-10-06.md`
+C8 is an acceptance-only boundary. It must not be interpreted as permission to add new investment capability, scheduler/alerts, automatic execution, broader market screening, or new P3/P4/MIE model families.
 
-**TR-03 Validation / Replay = PASS / MERGED / CANONICAL**
-
-Merge commit: 33291911c6e6b26da6deaf6c28a7a2046173c842.
-Dedicated GitHub Actions run #5 = SUCCESS; red-team review passed.
-TR-03 closes the historical `next_due_at` replay gap with immutable Monitoring Evaluation Records.
-
-Acceptance:
-- `docs/iios/TR_03_ACCEPTANCE_2026-10-06.md`
-
-C0 Governance Hygiene / Stage Baseline = PASS / MERGED / CANONICAL. C1 Machine Publication = PASS / MERGED / CANONICAL. C2 Human Report / Report Quality Gate = PASS / MERGED / CANONICAL. C3 Second Company Acceptance = PASS / MERGED / CANONICAL. C4 Expectation Gap Production Integration = PASS / MERGED / CANONICAL. C5 Positioning / Sizing = PASS / MERGED / CANONICAL. C6 Human Execution Receipt = PASS / MERGED / CANONICAL. The next development boundary is C7 Full Lifecycle E2E. Scheduler/alerts remain out of scope until a separate explicit batch is authorized; no new P3/P4/MIE model work is implied.
-
-Completed sub-batches:
-- **A1-01 Economic Evidence Bridge = PASS / MERGED**
-- **A1-02 Capital Allocation + Trust/Governance Evidence Closure = PASS / MERGED**
-- **A1-03 Quality Gate Integration = PASS / MERGED**
-
-Acceptance records:
-- `docs/iios/A1_01_ACCEPTANCE_2026-10-05.md`
-- `docs/iios/A1_02_ACCEPTANCE_2026-10-05.md`
-- `docs/iios/A1_ACCEPTANCE_2026-10-05.md`
-
-A1 is complete as the company-side evidence-closure milestone.
+Historical milestone sections remain evidence of past checkpoints and do not override the current C7 → C8 boundary.
 
 ## 9. Stage C current development boundary
 
