@@ -103,7 +103,7 @@ def validate_monitoring_state(record: Any, *, trigger_contract: Mapping[str, Any
         "state_version", "monitor_id", "trigger_id", "trigger_hash", "decision_id",
         "decision_series_id", "revision", "decision_revision_hash", "case_id",
         "lifecycle_status", "evaluation_status", "last_trigger_state", "last_event_id",
-        "last_known_at", "last_evaluation_cutoff_at", "next_due_at", "due_state",
+        "last_known_at", "last_evaluation_cutoff_at", "next_due_at", "due_reference_at", "due_state",
         "policy_effect", "state_hash",
     }
     if set(record) != required:
