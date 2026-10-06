@@ -165,6 +165,15 @@
         "admission_record_hash": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "canonical_decision_keys": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       },
       "required": [
@@ -179,6 +188,7 @@
         "company",
         "cutoff_date",
         "snapshot_hash",
+        "canonical_decision_keys",
         "canonical_decision_hash",
         "canonical_action",
         "canonical_decision_status",
