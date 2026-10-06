@@ -130,6 +130,8 @@ def seed_c7(tmp_path):
 
 def test_c7_full_operating_loop(tmp_path):
     series, s1, r1_path, approval1, trigger_path = seed_c7(tmp_path)
+    case_id = "RC-CN-A-300750-20261004"
+    cutoff = "2026-10-04"
     revision1_bytes = r1_path.read_bytes()
     approval1_path = tmp_path / "CN-A-300750-r001.approval.json"
     approval1_bytes = approval1_path.read_bytes()
