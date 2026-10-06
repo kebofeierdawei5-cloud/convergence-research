@@ -341,3 +341,35 @@ def test_validation_id_cannot_overwrite_different_content(tmp_path):
         write_monitoring_validation(
             root, "tr-validation", "2026-10-05T00:00:00+00:00", validation_id="same-id"
         )
+
+
+def test_store_preserves_idempotent_event_application(tmp_path):
+    root, _, _ = seed_store(tmp_path)
+    write_trigger_event(
+        root,
+        {
+            "trigger_id": "tr-validation",
+            "trigger_event_id": "evt-idempotent",
+            "evaluation_cutoff_at": "2026-10-05T10:06:00+00:00",
+            "observed_at": "2026-10-05T10:00:00+00:00",
+            "known_at": "2026-10-05T10:05:00+00:00",
+            "source_id": "szse",
+            "evidence_id": "ev-idempotent",
+            "value": "349",
+            "previous_value": None,
+        },
+    )
+    first = apply_monitoring_event(
+        root,
+        "evt-idempotent",
+        next_due_at="2026-10-07T00:00:00+00:00",
+    )
+    state_before = json.loads(first.read_text())
+    second = apply_monitoring_event(
+        root,
+        "evt-idempotent",
+        next_due_at="2026-10-07T00:00:00+00:00",
+    )
+    state_after = json.loads(second.read_text())
+    assert state_after == state_before
+    assert json.loads((root / "evt-idempotent.evaluation.json").read_text())["previous_state_hash"] != state_after["state_hash"]
