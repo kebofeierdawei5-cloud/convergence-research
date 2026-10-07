@@ -50,8 +50,8 @@
       "evidence_id": "E005",
       "claim_type": "OBSERVED_FACT",
       "known_at": "2026-09-30",
-      "source": "NetEase Finance historical market data",
-      "source_ref": "https://quotes.money.163.com/service/chddata.html?code=1002001&start=20260930&end=20260930&fields=TCLOSE;HIGH;LOW;TOPEN;LCLOSE;CHG;PCHG;TURNOVER;VOTURNOVER;VATURNOVER;TCAP;MCAP",
+      "source": "Tencent Finance historical market data",
+      "source_ref": "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sz002001,day,2026-09-30,2026-09-30,5,",
       "purpose": "latest tradable close before 2026-10-07"
     },
     {
