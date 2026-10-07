@@ -291,10 +291,10 @@ def signed_state(feature_id: str, feature: dict[str, Any]) -> dict[str, Any]:
 
 
 def comparison_state(feature_id: str, current: dict[str, Any], prior: dict[str, Any] | None, lower_label: str, equal_label: str, higher_label: str) -> tuple[dict[str, Any], list[str]]:
-    if current["status"] != "AVAILABLE" or (prior is not None and prior["status"] != "AVAILABLE"):
-        reason = "NO_PRIOR_FROZEN_ORIGIN" if prior is None else "SOURCE_FEATURE_UNKNOWN"
-        feature_ids = [feature_id]
-        return _state_unknown(reason), feature_ids
+    if prior is None:
+        return _state_unknown("NO_PRIOR_FROZEN_ORIGIN"), [feature_id]
+    if current["status"] != "AVAILABLE" or prior["status"] != "AVAILABLE":
+        return _state_unknown("SOURCE_FEATURE_UNKNOWN"), [feature_id]
     value = current["value"]
     previous = prior["value"]
     if value < previous:
