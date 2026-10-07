@@ -92,7 +92,7 @@
       "additionalProperties": false,
       "required": ["value_encoding", "never_impute", "feature_status", "fatal_input_errors"],
       "properties": {
-        "value_encoding": {"const": "null"},
+        "value_encoding": {"const": null},
         "never_impute": {"const": true},
         "feature_status": {"const": ["AVAILABLE", "UNKNOWN"]},
         "fatal_input_errors": {
