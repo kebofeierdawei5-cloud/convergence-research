@@ -6,6 +6,10 @@ on:
       - "research/fm01/**"
       - "research/fm02/**"
       - "research/fm00/OU-M12-FM00-CATL-001.json"
+      - "STATUS.md"
+      - "CHANGELOG.md"
+      - "docs/PROJECT_STATE_INDEX.md"
+      - "docs/iios/**"
       - ".github/workflows/iios_m12_fm01_source_admission.yml"
   workflow_dispatch:
 
