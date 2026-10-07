@@ -304,7 +304,6 @@ def case(price="100", price_observation_id="price-1", thesis_status="INTACT") ->
     payload, _, _ = bind_return_lineage(
         payload,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         valuation_admission_registry=VALUATION_ADMISSION_REGISTRY,
         valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
