@@ -1,6 +1,15 @@
 name: A02 Data-01 Evidence Supply Preflight
 
 on:
+  push:
+    branches:
+      - "m1.2-data-01-a02-evidence-supply-20261007"
+    paths:
+      - "research/a02_raw/a02_evidence_delivery.py"
+      - "research/a02_raw/A02_DATA01_DELIVERY_MANIFEST_TEMPLATE.json"
+      - "research/a02_raw/tests/test_a02_data01_preflight.py"
+      - "research/a02_raw/A02_DATA01_EVIDENCE_SUPPLY_CONTRACT_v0.1.md"
+      - ".github/workflows/a02_data01_evidence_supply_preflight.yml"
   pull_request:
     paths:
       - "research/a02_raw/a02_evidence_delivery.py"
