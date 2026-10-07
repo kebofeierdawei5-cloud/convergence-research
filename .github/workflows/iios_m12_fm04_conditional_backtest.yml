@@ -44,6 +44,7 @@ jobs:
           python - <<'PY'
           import hashlib, json
           from pathlib import Path
+          import hashlib
           from jsonschema import Draft202012Validator
 
           def csha(value):
@@ -159,7 +160,11 @@ jobs:
           errors=sorted(Draft202012Validator(schema).iter_errors(manifest), key=lambda e:list(e.path))
           assert not errors, "\\n".join(str(e) for e in errors)
           assert manifest["result_schema_version"]=="IIOS-FM04-CONDITIONAL-BACKTEST-RESULT-0.2"
-          print("FM04 result manifest: PASS")
+          digest=hashlib.sha256(Path("/tmp/FM04_BACKTEST_RESULT.json").read_bytes()).hexdigest()
+          assert manifest["result_sha256"]==digest
+          assert manifest["code_commit_sha"]=="${{ github.sha }}"
+          assert manifest["workflow_run_id"]=="${{ github.run_id }}"
+          print("FM04 result manifest + exact result SHA: PASS")
           PY
 
       - name: Archive exact FM04 result and manifest
