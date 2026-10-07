@@ -432,3 +432,16 @@ A run-2 provenance inconsistency in the emitted admission matrix was identified 
 Run #3 confirms the repaired artifact-transport path. It does not convert current snapshots into historical PIT evidence and does not change A02 admission state.
 
 Next technical boundary: obtain reproducible historical PIT carrier evidence with source-vintage / known_at; do not activate the proposed successor forecast epoch before A02 admission is complete.
+
+### DATA-01-A Batch 2
+
+- historical G0-T02 handoff pointer located: `CSINDEX_000906_20260703T100909Z`;
+- declared historical package: 373560 bytes;
+- declared package SHA-256: `fab0950153e3a683e9590dc895533276e0092146d7774b4822442d00d45b369b`;
+- declared terminal member: `000906cons.xls`, 169984 bytes, SHA-256 `f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984`;
+- current runtime/package access: **BLOCKED**;
+- independent A raw preflight: **BLOCKED**;
+- negative-control tests: **3/3 PASS**;
+- no checksum/package declaration has been promoted to raw-byte evidence.
+
+Batch-2 state remains `HISTORICAL_CARRIER_BYTES = BLOCKED`. The approved next transition is actual package/raw-byte supply followed by independent SHA-256 and A preflight.
