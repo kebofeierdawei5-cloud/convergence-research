@@ -57,6 +57,7 @@ def test_b03_b_legacy_v01_upstream_authority_is_blocked_at_decision_runtime():
 
     decision = decide(
         c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
@@ -90,6 +91,7 @@ def test_b03_b_engine_propagates_upstream_authority_resolver():
     c = _runtime_case()
     errors = validate_case(
         c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
