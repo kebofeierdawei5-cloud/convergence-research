@@ -22,6 +22,7 @@ from tests.test_investment_core_v03 import (
     EVIDENCE_ROOT_REGISTRY,
     INDEPENDENT_FORECAST_REGISTRY,
     UPSTREAM_AUTHORITY_REGISTRY,
+    VALUATION_OUTPUT_RESOLVER,
     case,
 )
 
@@ -108,6 +109,7 @@ def test_c5_unfavorable_snapshot_stops_adds_but_does_not_rewrite_decision():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
@@ -191,6 +193,7 @@ def test_c5_projection_is_optional_and_action_stays_fundamental():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert "positioning_sizing" in result_without["decision"]
 
@@ -200,6 +203,7 @@ def test_c5_projection_is_optional_and_action_stays_fundamental():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result_with["decision"]["action"] == result_without["decision"]["action"]
     assert result_with["gates"]["positioning_sizing_status"] == "PASS"
