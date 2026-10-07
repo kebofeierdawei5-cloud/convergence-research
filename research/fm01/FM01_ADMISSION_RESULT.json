@@ -1,17 +1,36 @@
 {
-  "schema_version": "IIOS-FM01-ADMISSION-RESULT-0.1",
-  "status": "BLOCKED_DATA_INGRESS",
+  "schema_version": "IIOS-FM01-ADMISSION-RESULT-0.2",
+  "status": "DATA_READY",
   "manifest_id": "DHM-M12-FM01-CATL-001",
   "dataset_path": "research/fm01/CATL_DRIVER_HISTORY.ndjson",
-  "record_count": 0,
+  "record_count": 44,
   "validation_findings": [],
   "data_gate": {
-    "exact_source_snapshot_present": false,
+    "exact_source_snapshot_present": true,
+    "source_package_sha256": "34c16dca266a2f35bc2895739b3e847a6c20ea0d66e0acbbc57274a96e22804b",
+    "source_bundle_sha256": "0f3dd5d5058722ce8f63a6a24d8c7aafa8b28c20ae0374c3bb0a94e9fa2609e1",
     "coverage_target": {
       "start": "2021Q1",
       "end": "2026Q2",
       "expected_quarters": 22
     },
-    "block_reason": "Exact M1.1 historical source snapshot is not present; no numeric CATL values may be fabricated or inferred as a substitute."
+    "block_reason": null
+  },
+  "admission": {
+    "admission_id": "ADM-M12-FM01-CATL-M11-001",
+    "source_manifest_id": "ESM-M12-FM01-CATL-M11-001",
+    "status": "PASS",
+    "verified_records": 44,
+    "verified_quarters": 22
+  },
+  "replay": {
+    "status": "PASS",
+    "script": "research/fm01/fm01_source_admission_replay.py",
+    "origin_counts": {
+      "3M": 11,
+      "6M": 10,
+      "12M": 8
+    },
+    "target_actual_excluded_from_training": true
   }
 }
