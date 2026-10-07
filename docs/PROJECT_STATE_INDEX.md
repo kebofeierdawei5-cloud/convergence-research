@@ -76,8 +76,6 @@ M1.2-FM02 PIT Feature Builder / Forecastability Feature Contract = PASS / MERGED
 M1.2-FM03 State Engine / Forecastability State Construction = PASS / MERGED / CANONICAL
         ↓
 M1.2-FM04 Conditional Backtest = PASS / MERGED / CANONICAL
-        ↓
-M1.2-FM03 State Engine / Forecastability State Construction = PASS / MERGED / CANONICAL
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
@@ -266,7 +264,7 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 ## 8. Current canonical M1.2 baseline state
 
-The M1.2 research baseline is complete through deterministic PIT State Construction:
+The M1.2 research baseline is complete through the FM04 Conditional Backtest, under the exploratory / contaminated / development-only boundary:
 
 ```
 Post-B04 Authority Re-audit = PASS
@@ -278,6 +276,10 @@ FM01 Exact M1.1 Source Snapshot Admission = PASS / MERGED / CANONICAL
 FM01 DATA_READY = PASS
         ↓
 M1.2-FM02 PIT Feature Builder / Forecastability Feature Contract = PASS / MERGED / CANONICAL
+        ↓
+M1.2-FM03 State Engine / Forecastability State Construction = PASS / MERGED / CANONICAL
+        ↓
+M1.2-FM04 Conditional Backtest = PASS / MERGED / CANONICAL
 ```
 
 ### M1.2-FM00 Git Baseline
