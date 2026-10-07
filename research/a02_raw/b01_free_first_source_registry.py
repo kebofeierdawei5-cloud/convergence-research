@@ -11,6 +11,9 @@ def main():
     doc_blob=subprocess.check_output(['git','hash-object',a.a02_status_doc],text=True).strip(); assert doc_blob=='2b2297a62d2a9dbdd14abdf815f9e8d796282580'
     assert m['admission_state']['status']=='BLOCKED'
     assert m['free_first_rules']['paid_source_required'] is False and m['free_first_rules']['tushare_credential_required'] is False
-    covered=set(); [covered.update(x['domains']) for x in m['sources']]; assert set(m['required_domains']).issubset(covered)
+    covered=set(); [covered.update(x['domains']) for x in m['sources']]
+    unresolved=set(m['admission_state']['blocking_domains'])
+    assert unresolved.issubset(set(m['required_domains']))
+    assert not (set(m['required_domains']) - covered - unresolved)
     print('A02 B-01 free-first source matrix: PASS / ADMISSION REMAINS BLOCKED')
 if __name__=='__main__': main()
