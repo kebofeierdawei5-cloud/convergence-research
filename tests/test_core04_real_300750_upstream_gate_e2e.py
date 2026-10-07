@@ -230,7 +230,7 @@ def test_real_300750_strict_trust_still_precedes_quality_gate():
     registry, price_ref = _price_ref()
     case = _case(core03=core03, core02=core02, price_ref=price_ref, trust_status="REVALIDATION")
 
-    result = decide_v03(case, current_price_resolver=registry)
+    result = decide_v03(case, current_price_resolver=registry, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY)
 
     assert result["action"] == "REVIEW_REQUIRED"
     assert result["primary_reason"] == "TRUST_NOT_PASS_REQUIRES_REVIEW"
