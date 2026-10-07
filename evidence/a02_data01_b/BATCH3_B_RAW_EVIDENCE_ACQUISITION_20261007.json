@@ -1,9 +1,10 @@
 {
-  "schema_version": "IIOS-A02-DATA01-B-B3-01-ACQUISITION-ADJUDICATION-0.1",
-  "recorded_at": "2026-10-07T17:43:00+08:00",
+  "schema_version": "IIOS-A02-DATA01-B-B3-01-ACQUISITION-ADJUDICATION-0.2",
+  "recorded_at": "2026-10-07T18:10:00+08:00",
   "batch": "DATA-01-B / B3-01",
   "status": "BLOCKED_NO_COMPLETE_B_RAW_BUNDLE",
-  "canonical_main": "08adaf484fee64f5448fafcfa8346403abac98a5",
+  "canonical_main": "7aa4e333146ad29d3312a61e4c867b472e7a873f",
+  "runtime_head_sha": "08adaf484fee64f5448fafcfa8346403abac98a5",
   "universe_id": "OU-M12-A02-CSI800-NONFIN-PIT-001",
   "required_origins": [
     "2023Q3",
@@ -27,9 +28,9 @@
     "source_vintages"
   ],
   "runtime_probe": {
-    "run_id": 37595133874,
-    "artifact_id": 11469743020,
-    "artifact_sha256": "cffd3bcd18609d85b290875fe7c6b492994aae994c7d43efd9996075c68f3d49",
+    "run_id": 37596399460,
+    "artifact_id": 11471840025,
+    "artifact_sha256": "5cad0c1dc67af0638ad4723ffb3a359f49f37b6f83c02a6860e4aea1ac58d0b1",
     "preflight": "BLOCKED",
     "exit_code": 4,
     "complete_b_raw_bundle_present": false
@@ -37,13 +38,11 @@
   "acquisition_paths": {
     "free_first_materializer": {
       "available": true,
-      "historical_b_complete": false,
-      "reason": "current official snapshots plus optional secondary material; historical known_at/provenance remains open"
+      "historical_b_complete": false
     },
     "tushare_raw_runner": {
       "available": true,
-      "historical_b_complete": false,
-      "reason": "current implementation records conditional raw only / blocked provenance"
+      "historical_b_complete": false
     },
     "operator_or_data_owner_bundle": {
       "required_for_next_material_transition": true
@@ -57,7 +56,7 @@
     "pointer_without_bytes": "FORBIDDEN"
   },
   "downstream": {
-    "data_01_c": "NOT_STARTED",
+    "data_01_c": "LOCKED",
     "data_02": "LOCKED",
     "a02_admission": "BLOCKED",
     "cross_security_epoch": "LOCKED",
