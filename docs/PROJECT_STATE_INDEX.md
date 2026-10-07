@@ -551,3 +551,39 @@ Status: **PASS / MERGED / CANONICAL — ADMISSION REMAINS BLOCKED**
 - current unresolved admission domains: `st_history`, `industry_history`, `source_vintages`.
 
 The recommended successor M1.2 epoch remains inactive until a complete PIT universe is admitted and independently replayed.
+
+
+### M1.2-DATA-01 A02 Evidence Supply & Free-First Materialization
+Status: **PIPELINE READY / EVIDENCE GATE BLOCKED**
+
+- PR #172;
+- merge commit: `ba9eadb852de65bbdca3dded0ed7ac6e6378f06e`;
+- isolated-branch CI head: `e3bb284386c340b8cb6cd40cea4ccc26d1a7ace7`;
+- PR preflight run: `37590845175`;
+- preflight job: `112691698097`;
+- CI result: tests PASS; deterministic no-input preflight PASS as an engineering check; DATA-01 raw evidence state remains BLOCKED;
+- preflight artifact: `11468790803`;
+- artifact digest: `sha256:1b53e6662274f45d4cb1f539df5f8902cf6d0a3657f7d9e5f6f2252e281c1e1e`;
+- persistent Library copy: `/iios/A02/A02-data01-preflight-37590845175.zip`.
+
+The batch now has a non-self-certifying intake boundary for an operator-supplied `A02_DELIVERY` ZIP, independent raw-byte SHA-256 verification, manifest identity checks, required-origin/domain checks, and safe ZIP extraction limits.
+
+The latest execution supplied **no external A/B raw evidence bundle**. The independent preflight therefore records:
+- terminal `000906cons.xls`: absent from the supplied workspace;
+- historical membership states: 7/7 missing;
+- B required domains: 6/6 missing;
+- A02 admission: `BLOCKED`;
+- current-to-historical substitution, retrieved_at-to-known_at substitution, checksum-without-bytes, and self-authored receipt admission all remain forbidden.
+
+This batch does **not** change A02 research semantics and does not unlock FM-02/FM-03 generalization, A02 FM-04/FM-05/FM-06, or model selection.
+
+The actual next evidence objective remains:
+```
+DATA-01-A  exact historical A bytes
+   +
+DATA-01-B  complete B free-first PIT evidence bundle
+   ↓
+DATA-01-C independent raw verification
+```
+
+Only after those raw inputs exist will PIT reconstruction and independent replay begin.
