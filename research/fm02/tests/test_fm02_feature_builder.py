@@ -154,6 +154,21 @@ class FM02FeatureBuilderTests(unittest.TestCase):
         self.assertEqual(summary1, summary2)
 
 
+    def test_contract_cannot_authorize_downstream_capability(self):
+        contract = copy.deepcopy(self.contract)
+        contract["capability_boundary"]["model_selection"] = True
+        with self.assertRaisesRegex(
+            FM02FeatureError, "FM02 capability boundary was widened"
+        ):
+            build_feature_snapshot(
+                self.records,
+                self.manifest,
+                self.admission,
+                contract,
+                self.outer_lock,
+            )
+
+
 def _qkey(period):
     return (int(period[:4]), int(period[-1]))
 
@@ -162,13 +177,6 @@ def _qadd(period, offset):
     year, quarter = _qkey(period)
     serial = year * 4 + quarter - 1 + offset
     return f"{serial // 4}Q{serial % 4 + 1}"
-
-
-    def test_contract_cannot_authorize_downstream_capability(self):
-        contract = copy.deepcopy(self.contract)
-        contract["capability_boundary"]["model_selection"] = True
-        with self.assertRaisesRegex(FM02FeatureError, "FM02 capability boundary was widened"):
-            self.build()
 
 
 if __name__ == "__main__":
