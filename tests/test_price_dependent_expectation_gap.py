@@ -11,6 +11,7 @@ from tests.test_investment_core_v03 import (
     INDEPENDENT_FORECAST_REGISTRY,
     CURRENT_PRICE_REGISTRY,
     UPSTREAM_AUTHORITY_REGISTRY,
+    VALUATION_OUTPUT_RESOLVER,
     case,
 )
 
@@ -96,6 +97,7 @@ def test_p2_target_entry_price_2_is_integrated_into_decision_output():
         "bull": {"probability": "0.3", "terminal_value_per_share": "260", "cash_distributions_per_share": "0", "probability_rationale": "P2 bull"},
     }
     result = decide(
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
