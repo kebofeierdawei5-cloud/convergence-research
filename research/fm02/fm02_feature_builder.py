@@ -110,9 +110,9 @@ def validate_inputs(
         raise FM02FeatureError("FM01 exact source snapshot is not admitted")
     if admission.get("status") != "PASS":
         raise FM02FeatureError("FM01_ADMISSION_NOT_PASS")
-    if admission.get("manifest_id") != manifest.get("manifest_id"):
-        raise FM02FeatureError("FM01_ADMISSION_MANIFEST_MISMATCH")
     accepted = admission.get("accepted_dataset", {})
+    if accepted.get("path") != contract["input_contract"]["dataset_path"]:
+        raise FM02FeatureError("FM01_ADMISSION_DATASET_PATH_MISMATCH")
     if accepted.get("records") != 44 or accepted.get("unique_quarters") != 22:
         raise FM02FeatureError("FM01_EXACT_DATASET_CARDINALITY_MISMATCH")
     if manifest.get("data_status", {}).get("records_ingested") != 44:
