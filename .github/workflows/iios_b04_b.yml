@@ -22,6 +22,7 @@ on:
       - ".github/workflows/iios_b04_b.yml"
   workflow_dispatch:
 
+# B04-B verification is canonical-head scoped.
 jobs:
   b04-b:
     runs-on: ubuntu-latest
