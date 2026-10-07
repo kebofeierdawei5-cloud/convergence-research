@@ -154,6 +154,7 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
+          import hashlib
           from jsonschema import Draft202012Validator
           schema=json.loads(Path("research/fm04/fm04_result_manifest.schema.json").read_text())
           manifest=json.loads(Path("/tmp/FM04_RESULT_MANIFEST.json").read_text())
