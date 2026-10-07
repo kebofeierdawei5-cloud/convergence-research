@@ -1,0 +1,67 @@
+{
+  "schema_version": "IIOS-A02-DATA01-B-B3-01-ACQUISITION-ADJUDICATION-0.1",
+  "recorded_at": "2026-10-07T17:43:00+08:00",
+  "batch": "DATA-01-B / B3-01",
+  "status": "BLOCKED_NO_COMPLETE_B_RAW_BUNDLE",
+  "canonical_main": "08adaf484fee64f5448fafcfa8346403abac98a5",
+  "universe_id": "OU-M12-A02-CSI800-NONFIN-PIT-001",
+  "required_origins": [
+    "2023Q3",
+    "2023Q4",
+    "2024Q1",
+    "2024Q2",
+    "2024Q3",
+    "2024Q4",
+    "2025Q1",
+    "2025Q2",
+    "2025Q3",
+    "2025Q4",
+    "2026Q1"
+  ],
+  "required_domains": [
+    "identity",
+    "listing_delisting",
+    "common_equity",
+    "st_history",
+    "industry_history",
+    "source_vintages"
+  ],
+  "runtime_probe": {
+    "run_id": 37595133874,
+    "artifact_id": 11469743020,
+    "artifact_sha256": "cffd3bcd18609d85b290875fe7c6b492994aae994c7d43efd9996075c68f3d49",
+    "preflight": "BLOCKED",
+    "exit_code": 4,
+    "complete_b_raw_bundle_present": false
+  },
+  "acquisition_paths": {
+    "free_first_materializer": {
+      "available": true,
+      "historical_b_complete": false,
+      "reason": "current official snapshots plus optional secondary material; historical known_at/provenance remains open"
+    },
+    "tushare_raw_runner": {
+      "available": true,
+      "historical_b_complete": false,
+      "reason": "current implementation records conditional raw only / blocked provenance"
+    },
+    "operator_or_data_owner_bundle": {
+      "required_for_next_material_transition": true
+    }
+  },
+  "promotion_controls": {
+    "checksum_without_bytes": "FORBIDDEN",
+    "current_snapshot_as_historical": "FORBIDDEN",
+    "retrieved_at_as_known_at": "FORBIDDEN",
+    "secondary_reconstruction_as_normative": "FORBIDDEN",
+    "pointer_without_bytes": "FORBIDDEN"
+  },
+  "downstream": {
+    "data_01_c": "NOT_STARTED",
+    "data_02": "LOCKED",
+    "a02_admission": "BLOCKED",
+    "cross_security_epoch": "LOCKED",
+    "model_selection": "LOCKED"
+  },
+  "next_transition": "SUPPLY_ACTUAL_B_RAW_BUNDLE"
+}
