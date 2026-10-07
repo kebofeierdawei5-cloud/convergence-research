@@ -252,6 +252,8 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 ## 8. Current canonical M1.2 baseline state
 
+Current canonical main after FM01 source admission and final governance synchronization: `e32c08bb57b4a5027725d2d5828695d068c694a3`.
+
 The M1.2 baseline is now complete through exact CATL M1.1 source admission and independent PIT replay:
 
 ```

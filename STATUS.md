@@ -31,7 +31,7 @@ FM01 DATA_READY
 ```
 
 Canonical main after FM01 admission and final governance sync:
-`840f653f52dbfb13bf3d1dba3074283dc383334f`
+`e32c08bb57b4a5027725d2d5828695d068c694a3`
 
 Baseline:
 - PR #136 = MERGED;
