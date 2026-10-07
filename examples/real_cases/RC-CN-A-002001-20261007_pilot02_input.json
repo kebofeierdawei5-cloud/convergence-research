@@ -50,8 +50,8 @@
       "evidence_id": "E005",
       "claim_type": "OBSERVED_FACT",
       "known_at": "2026-09-30",
-      "source": "Yahoo Finance historical market data",
-      "source_ref": "https://query1.finance.yahoo.com/v8/finance/chart/002001.SZ?period1=1790726400&period2=1790812800&interval=1d&events=history&includeAdjustedClose=true",
+      "source": "NetEase Finance historical market data",
+      "source_ref": "https://quotes.money.163.com/service/chddata.html?code=1002001&start=20260930&end=20260930&fields=TCLOSE;HIGH;LOW;TOPEN;LCLOSE;CHG;PCHG;TURNOVER;VOTURNOVER;VATURNOVER;TCAP;MCAP",
       "purpose": "latest tradable close before 2026-10-07"
     },
     {
