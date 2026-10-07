@@ -520,3 +520,16 @@ Status: **PROPOSED / CANONICAL DESIGN ONLY**
 - current epoch `RE-M12-EXP-CATL-20260930` remains closed and unchanged;
 - successor epoch is not activated;
 - A02 PIT universe admission is a hard entry gate.
+
+
+### A02 B-01 Free-First Source Registry
+Status: **PASS / MERGED / CANONICAL — ADMISSION REMAINS BLOCKED**
+
+- PR #163;
+- merge commit: `3230c7d09f212ab92622ffefc66e684d18262dd0`;
+- source registry distinguishes current/control sources from historical PIT-admissible evidence;
+- paid sources and Tushare remain optional;
+- field-level known_at, raw bytes, metadata, and fail-closed unresolved domains remain mandatory;
+- current unresolved admission domains: `st_history`, `industry_history`, `source_vintages`.
+
+The recommended successor M1.2 epoch remains inactive until a complete PIT universe is admitted and independently replayed.
