@@ -978,3 +978,19 @@ Next canonical boundary:
 
 A02 / CSI800 remains non-blocking to company-level Investment Core testing.
 Human usability evidence remains separate from technical replay acceptance.
+
+## 17. MVP Pilot Acceptance — human gate preparation — 2026-10-07
+
+Status: **TECHNICAL GATE READY / HUMAN ACCEPTANCE REQUIRED**
+
+The company-level Investment Core remains on the MVP critical path after PILOT-04 independent clean replay. The final MVP Pilot Acceptance boundary is now split between machine-verifiable technical evidence and explicit operator usability acceptance.
+
+This batch hardens the Human Report presentation layer without changing Investment Core decision semantics:
+- Risk / Portfolio contract data is rendered as investor-facing bullets instead of raw internal JSON;
+- Report QA now detects JSON-like machine field dumps in the main report and fails closed;
+- regression coverage prevents reintroduction of the defect;
+- PILOT-04 clean-replay CI is isolated from ordinary PRs because its canonical-base assertion is intentionally tied to the dedicated historical replay baseline.
+
+Technical acceptance remains supported by PILOT-01 / PILOT-02 / PILOT-03 / PILOT-04 evidence. The remaining MVP acceptance blocker is the real operator's human usability attestation. CI success must not be used as a substitute for that attestation.
+
+A02 / CSI800 remains non-blocking to company-level Investment Core MVP acceptance.

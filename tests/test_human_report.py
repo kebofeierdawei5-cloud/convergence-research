@@ -56,6 +56,25 @@ def make_snapshot(action="REVIEW_REQUIRED"):
             "required_return": "0.10",
         },
         "risk": {"max_loss_pct": "0.25"},
+        "risk_portfolio_contract": {
+            "contract_version": "IIOS-RISK-PORTFOLIO-PRODUCTION-0.1",
+            "readiness": {"risk_ready": True, "portfolio_constraint_ready": True, "package_ready": True},
+            "portfolio": {
+                "position_pct": "0",
+                "can_add": True,
+                "constraint_status": "PASS",
+                "package_status": "COMPLETE",
+                "buy_add_package": {
+                    "entry_zone": ["24.00", "25.95"],
+                    "initial_position_pct": "5",
+                    "target_position_pct": "10",
+                    "max_position_pct": "10",
+                    "monitoring_triggers": ["cash flow conversion"],
+                    "thesis_break_triggers": ["structural margin deterioration"],
+                },
+            },
+            "risk": {"max_loss_pct": "25"},
+        },
         "thesis": {"falsifiers": ["TEST_FALSIFIER"]},
         "monitoring": [{"metric": "quality", "condition": "recheck quarterly"}],
     }
@@ -173,6 +192,28 @@ def test_report_qa_fails_closed_on_decision_drift(tmp_path):
     assert "report_integrity" in " ".join(tampered_qa["issues"])
 
 
+def test_report_qa_fails_closed_on_machine_json_field_dump(tmp_path):
+    publication, _ = make_publication(tmp_path)
+    report = build_human_report(
+        publication=publication, generated_at="2026-10-06T02:00:00+00:00"
+    )
+    tampered = dict(report)
+    tampered["markdown"] = tampered["markdown"].replace(
+        "- Risk / portfolio contract: available",
+        '- Risk / portfolio contract: {"audit_sha256":"deadbeef"}',
+    )
+    tampered["report_hash"] = sha256_obj(
+        {k: tampered[k] for k in tampered if k not in {"report_id", "report_hash"}}
+    )
+    tampered["report_id"] = (
+        f'{tampered["publication_id"]}-report-{tampered["report_hash"][:16]}'
+    )
+    qa = qa_human_report(publication=publication, report=tampered)
+    assert qa["qa_status"] == "FAIL"
+    assert qa["checks"]["human_readability"] == "FAIL"
+    assert any("machine-readable JSON-like field dump" in issue for issue in qa["issues"])
+
+
 def test_report_qa_fails_closed_on_publication_binding_mismatch(tmp_path):
     publication, _ = make_publication(tmp_path)
     report = build_human_report(
@@ -238,3 +279,20 @@ def test_cli_report_exposes_human_report(tmp_path, capsys):
     assert Path(result["markdown"]).exists()
     assert Path(result["report"]).exists()
     assert Path(result["qa"]).exists()
+
+def test_report_renders_risk_portfolio_contract_without_machine_json_dump(tmp_path):
+    publication, _ = make_publication(tmp_path)
+    report = build_human_report(
+        publication=publication,
+        generated_at="2026-10-06T02:00:00+00:00",
+    )
+    markdown = report["markdown"]
+    assert "Risk / portfolio contract: available" in markdown
+    assert "Entry zone: 24.00–25.95" in markdown
+    assert "Initial position: 5%" in markdown
+    assert "Target position: 10%" in markdown
+    assert "Maximum position: 10%" in markdown
+    assert "cash flow conversion" in markdown
+    assert "structural margin deterioration" in markdown
+    assert "audit_sha256" not in markdown
+    assert '{"contract_version"' not in markdown
