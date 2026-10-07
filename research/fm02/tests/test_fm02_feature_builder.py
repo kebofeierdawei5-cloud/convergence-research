@@ -164,5 +164,12 @@ def _qadd(period, offset):
     return f"{serial // 4}Q{serial % 4 + 1}"
 
 
+    def test_contract_cannot_authorize_downstream_capability(self):
+        contract = copy.deepcopy(self.contract)
+        contract["capability_boundary"]["model_selection"] = True
+        with self.assertRaisesRegex(FM02FeatureError, "FM02 capability boundary was widened"):
+            self.build()
+
+
 if __name__ == "__main__":
     unittest.main()
