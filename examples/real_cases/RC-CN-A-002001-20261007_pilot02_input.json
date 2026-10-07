@@ -153,7 +153,7 @@
     "primary_model": "FORWARD_PE",
     "model_role": "PRIMARY_VALUATION",
     "scenario_values_per_share": {
-      "bear": "19.00",
+      "bear": "19.95",
       "base": "32.20",
       "bull": "45.50"
     },
