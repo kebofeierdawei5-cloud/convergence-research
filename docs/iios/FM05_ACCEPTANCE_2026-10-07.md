@@ -1,6 +1,6 @@
 # M1.2-FM05 Acceptance — 2026-10-07
 
-Status: **IMPLEMENTED / PENDING CI ACCEPTANCE**
+Status: **PASS / MERGED / CANONICAL**
 
 ## Scope
 
@@ -64,4 +64,15 @@ PIT, UNKNOWN, provenance, frozen origin schedule, nested inner/outer separation,
 
 ## CI acceptance evidence
 
-To be filled only after the dedicated FM05 gate passes on the exact PR head.
+- PR: #156
+- accepted exact head: `b6ba3fa72b692b641b6e755df111b863db63bbad`
+- dedicated workflow: `IIOS M1.2 FM05 Scope / Estimand / Sufficiency Freeze`
+- accepted run: #1
+- accepted run id: `37578843014`
+- accepted job: `verify-fm05-scope-freeze`
+- accepted job id: `112653697085`
+- conclusion: **SUCCESS**
+- archived receipt: `iios-m12-fm05-scope-freeze-37578843014`
+- artifact SHA-256: `94d31e169d3fed1af20f21f788f0aa23815fe19625523652c50e9eb53a20e6e`
+
+The dedicated gate independently replays FM02/FM03/FM04 inputs needed for the sufficiency adjudication, verifies the pinned FM03 snapshot and frozen upstream byte anchors, validates the FM05 contract, and emits the machine-readable FM05 scope-freeze receipt.
