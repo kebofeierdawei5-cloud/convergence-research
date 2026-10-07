@@ -1,0 +1,61 @@
+name: IIOS MVP Pilot — Investment Core
+
+on:
+  pull_request:
+    paths:
+      - "evidence/mvp_pilot/**"
+      - "docs/iios/IIOS_MVP_FAST_LAUNCH_PLAN_v0.1.md"
+      - ".github/workflows/iios_mvp_pilot.yml"
+      - "iios_mvp/**"
+      - "tests/test_core03_real_300750.py"
+      - "tests/test_core04_final_300750_decision_e2e.py"
+      - "tests/test_c3_kolun_second_company_e2e.py"
+      - "tests/test_c7_full_lifecycle_e2e.py"
+      - "tests/test_c8_auth_remediation.py"
+      - "tests/test_machine_publication.py"
+      - "tests/test_human_report.py"
+      - "tests/test_c6_execution_receipt_production.py"
+      - "tests/test_monitoring_state.py"
+      - "tests/test_validation_replay.py"
+      - "tools/core04_final_300750_decision_e2e.py"
+      - "tools/c3_kolun_second_company_e2e.py"
+      - "tools/c7_full_lifecycle_e2e.py"
+  push:
+    branches: [main]
+    paths:
+      - "evidence/mvp_pilot/**"
+      - "docs/iios/IIOS_MVP_FAST_LAUNCH_PLAN_v0.1.md"
+      - ".github/workflows/iios_mvp_pilot.yml"
+      - "iios_mvp/**"
+      - "tests/test_core03_real_300750.py"
+      - "tests/test_core04_final_300750_decision_e2e.py"
+      - "tests/test_c3_kolun_second_company_e2e.py"
+      - "tests/test_c7_full_lifecycle_e2e.py"
+      - "tests/test_c8_auth_remediation.py"
+      - "tests/test_machine_publication.py"
+      - "tests/test_human_report.py"
+      - "tests/test_execution_receipt_production.py"
+      - "tests/test_monitoring_state.py"
+      - "tests/test_validation_replay.py"
+      - "tools/core04_final_300750_decision_e2e.py"
+      - "tools/c3_kolun_second_company_e2e.py"
+      - "tools/c7_full_lifecycle_e2e.py"
+
+permissions:
+  contents: read
+
+jobs:
+  pilot:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q iios_mvp tools tests
+      - run: PYTHONPATH=. pytest -q tests/test_core03_real_300750.py tests/test_core04_final_300750_decision_e2e.py tests/test_c3_kolun_second_company_e2e.py tests/test_c7_full_lifecycle_e2e.py tests/test_c8_auth_remediation.py tests/test_machine_publication.py tests/test_human_report.py tests/test_monitoring_state.py tests/test_validation_replay.py
+      - run: PYTHONPATH=. python tools/core04_final_300750_decision_e2e.py
+      - run: PYTHONPATH=. python tools/c3_kolun_second_company_e2e.py
+      - run: PYTHONPATH=. python tools/c7_full_lifecycle_e2e.py
+      - run: git diff --check
