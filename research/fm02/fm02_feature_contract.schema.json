@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/fm02-feature-contract-0.1.json",
+  "title": "IIOS M1.2 FM02 Forecastability Feature Contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "version",
+    "status",
+    "research_epoch_id",
+    "confirmatory_eligible",
+    "input_contract",
+    "origin_contract",
+    "feature_asof_contract",
+    "features",
+    "unknown_policy",
+    "provenance_contract",
+    "capability_boundary"
+  ],
+  "properties": {
+    "schema_version": {"const": "IIOS-FM02-FEATURE-CONTRACT-0.1"},
+    "contract_id": {"type": "string", "pattern": "^FC-M12-FM02-[A-Z0-9_-]+$"},
+    "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+    "status": {"enum": ["DRAFT", "FROZEN", "SUPERSEDED", "INVALID"]},
+    "research_epoch_id": {"type": "string", "minLength": 1},
+    "confirmatory_eligible": {"const": false},
+    "input_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataset_manifest", "admission_record", "dataset_path", "required_security_ids", "required_drivers"],
+      "properties": {
+        "dataset_manifest": {"type": "string"},
+        "admission_record": {"type": "string"},
+        "dataset_path": {"type": "string"},
+        "required_security_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true},
+        "required_drivers": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "origin_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outer_universe_lock", "cutoff_rule", "origin_selection_rule", "horizon_targets"],
+      "properties": {
+        "outer_universe_lock": {"type": "string"},
+        "cutoff_rule": {"const": "ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF"},
+        "origin_selection_rule": {"const": "FROZEN_PRE_SCHEDULED_ORIGINS_ONLY"},
+        "horizon_targets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["3M", "6M", "12M"],
+          "properties": {
+            "3M": {"type": "integer", "const": 1},
+            "6M": {"type": "integer", "const": 2},
+            "12M": {"type": "integer", "const": 4}
+          }
+        }
+      }
+    },
+    "feature_asof_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule", "latest_period_must_be_before_target", "known_at_rule", "revision_rule"],
+      "properties": {
+        "rule": {"const": "LATEST_VISIBLE_PERIOD_AT_OR_BEFORE_CUTOFF"},
+        "latest_period_must_be_before_target": {"const": true},
+        "known_at_rule": {"const": "ALL_INPUT_RECORDS_KNOWN_AT_OR_BEFORE_ORIGIN_CUTOFF"},
+        "revision_rule": {"const": "ONE_UNAMBIGUOUS_VISIBLE_REVISION_PER_DRIVER_PERIOD"}
+      }
+    },
+    "features": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["feature_id", "formula", "lookback", "transform_class", "min_history", "unknown_codes"],
+        "properties": {
+          "feature_id": {"enum": ["YOY_GROWTH", "GROWTH_ACCELERATION", "ROLLING_GROWTH_VOL", "SEASONAL_DEVIATION", "MEAN_REVERSION_GAP", "SLOPE_STABILITY"]},
+          "formula": {"type": "string", "minLength": 10},
+          "lookback": {"type": "string", "minLength": 1},
+          "transform_class": {"enum": ["NONE", "ROLLING_DETERMINISTIC", "LEARNED_PIT_FIT"]},
+          "min_history": {"type": "integer", "minimum": 1},
+          "unknown_codes": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true}
+        }
+      }
+    },
+    "unknown_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value_encoding", "never_impute", "feature_status", "fatal_input_errors"],
+      "properties": {
+        "value_encoding": {"const": "null"},
+        "never_impute": {"const": true},
+        "feature_status": {"const": ["AVAILABLE", "UNKNOWN"]},
+        "fatal_input_errors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string"},
+          "uniqueItems": true
+        }
+      }
+    },
+    "provenance_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row_fields", "per_feature_fields", "input_record_identity"],
+      "properties": {
+        "row_fields": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true},
+        "per_feature_fields": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true},
+        "input_record_identity": {"const": "RECORD_ID"}
+      }
+    },
+    "capability_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["feature_builder_only", "state_engine", "conditional_backtest", "model_selection", "production_router", "automatic_execution"],
+      "properties": {
+        "feature_builder_only": {"const": true},
+        "state_engine": {"const": false},
+        "conditional_backtest": {"const": false},
+        "model_selection": {"const": false},
+        "production_router": {"const": false},
+        "automatic_execution": {"const": false}
+      }
+    }
+  }
+}
