@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import hashlib
-import io
 import json
 import tempfile
 from datetime import date, datetime, timezone
@@ -85,26 +83,20 @@ def admit_price(price_path: Path, receipt: dict[str, Any]) -> tuple[InMemoryCano
         raise ValueError("price raw-byte SHA mismatch")
     if not receipt["price_exact_bytes"]:
         raise ValueError("price bytes not marked exact")
-    text = raw.decode("utf-8-sig", errors="ignore")
-    if "TCLOSE" not in text and "收盘价" not in text:
-        raise ValueError("unexpected NetEase historical-price payload")
-    rows = list(csv.reader(io.StringIO(text)))
-    if not rows:
-        raise ValueError("empty historical-price payload")
-    header = rows[0]
-    date_idx = 0
-    close_idx = 3 if len(header) > 3 else None
-    if close_idx is None:
-        raise ValueError("historical-price payload missing close column")
-    close = None
-    for row in rows[1:]:
-        if not row:
-            continue
-        if row[date_idx].strip() == PRICE_DATE.isoformat():
-            close = Decimal(row[close_idx].strip())
-            break
-    if close is None:
+    payload = _load_json(price_path)
+    try:
+        node = payload["data"]["sz002001"]
+        bars = node.get("day") or node.get("qfqday") or node.get("hfqday")
+    except (KeyError, TypeError) as exc:
+        raise ValueError("unexpected Tencent historical-price payload") from exc
+    if not isinstance(bars, list):
+        raise ValueError("Tencent historical-price bars missing")
+    price_row = next((row for row in bars if row and str(row[0]).strip() == PRICE_DATE.isoformat()), None)
+    if price_row is None:
         raise ValueError("no 2026-09-30 close in supplied market evidence")
+    if len(price_row) < 3:
+        raise ValueError("Tencent historical-price row missing close field")
+    close = Decimal(str(price_row[2]))
     if close != PRICE:
         raise ValueError(f"unexpected 2026-09-30 close: {close}")
 
@@ -114,10 +106,10 @@ def admit_price(price_path: Path, receipt: dict[str, Any]) -> tuple[InMemoryCano
         evidence_id="E005",
         variable="market_price",
         unit="CNY/share",
-        basis="NetEase Finance historical close for 2026-09-30",
+        basis="Tencent Finance historical daily close for 2026-09-30, unadjusted K-line",
         observation_date=PRICE_DATE,
         known_at=known_at,
-        source="NETEASE_FINANCE:HISTORICAL",
+        source="TENCENT_FINANCE:HISTORICAL_KLINE",
         source_location=receipt["price_source_ref"],
         content_sha256=receipt["price_sha256"],
         exact_bytes=True,
