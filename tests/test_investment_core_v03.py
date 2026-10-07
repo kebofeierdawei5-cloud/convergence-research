@@ -11,6 +11,7 @@ from iios_mvp.canonical_expectation_gap import CANONICAL_EXPECTATION_GAP_VERSION
 from iios_mvp.evidence_root_admission import InMemoryEvidenceRootRegistry
 from iios_mvp.canonical_independent_forecast import InMemoryCanonicalIndependentForecastRegistry
 from iios_mvp.canonical_current_price import InMemoryCanonicalCurrentPriceRegistry
+from iios_mvp.canonical_investment_admission_v01 import InMemoryCanonicalInvestmentAdmissionRegistry
 from iios_mvp.market_observation_admission import AdmissionStatus, TemporalProvenance, VerifiedMarketEvidence, admit_market_valuation_observation
 from iios_mvp.engine import decide, replay, run_case, validate_case
 from iios_mvp.market_implied_expectation import (
@@ -32,11 +33,13 @@ from iios_mvp.multi_model_market_implied_expectation_set import (
 from iios_mvp.p4f_mie_snapshot import P4FProvenanceRecord, build_p4f_snapshot
 from iios_mvp.investment_core_contract_v03 import calculate_return_metrics, validate_case_v03
 from iios_mvp.decision_upstream_admission_v03 import build_decision_upstream_admission
+from tests.b03b_upstream_authority_fixture import build_runtime_upstream_authority
 
 
 EVIDENCE_ROOT_REGISTRY = InMemoryEvidenceRootRegistry()
 CURRENT_PRICE_REGISTRY = InMemoryCanonicalCurrentPriceRegistry()
 INDEPENDENT_FORECAST_REGISTRY = InMemoryCanonicalIndependentForecastRegistry()
+UPSTREAM_AUTHORITY_REGISTRY = InMemoryCanonicalInvestmentAdmissionRegistry()
 
 
 def market_implied_expectation_snapshot(price_observation_id="price-1") -> dict:
@@ -189,6 +192,41 @@ def independent_forecast_ref(value="12", forecast_id="forecast-v03-001", horizon
 
 
 def case(price="100", price_observation_id="price-1", thesis_status="INTACT") -> dict:
+    quality = {
+        "dimensions": [
+            {"dimension": "competitive_advantage", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
+            {"dimension": "incremental_return_on_capital", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
+            {"dimension": "earnings_quality", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
+            {"dimension": "cash_flow_conversion", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
+            {"dimension": "balance_sheet_resilience", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
+            {"dimension": "reinvestment_runway", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
+        ]
+    }
+    thesis = {
+        "status": thesis_status,
+        "statement": "fixture thesis",
+        "mechanism": "fixture mechanism",
+        "key_driver_ids": ["D1"],
+        "falsifiers": ["fixture falsifier"],
+        "monitoring_triggers": ["fixture trigger"],
+        "evidence_ids": ["req-pe-1"],
+        "known_at": "2026-10-04T12:00:00+00:00",
+        "prepared_without_current_price": True,
+    }
+    _, upstream = build_runtime_upstream_authority(
+        case_id="V03-001",
+        market="CN-A",
+        symbol="300750",
+        company="CATL",
+        cutoff_date=date(2026, 10, 4),
+        reality={"status": "PASS", "evidence_ids": ["req-pe-1"]},
+        quality=quality,
+        value_driver={"status": "PASS", "evidence_ids": ["req-pe-1"]},
+        valuation={"status": "PASS", "evidence_ids": ["req-pe-1"]},
+        forecast={"status": "PASS", "evidence_ids": ["ev-forecast"]},
+        thesis=thesis,
+        registry=UPSTREAM_AUTHORITY_REGISTRY,
+    )
     return {
         "contract_version": "IIOS-INVESTMENT-CORE-0.3",
         "case_id": "V03-001",
@@ -230,35 +268,7 @@ def case(price="100", price_observation_id="price-1", thesis_status="INTACT") ->
             },
         },
         "thesis": {"status": thesis_status},
-        "decision_upstream_admission": build_decision_upstream_admission(
-            case_id="V03-001",
-            cutoff_date="2026-10-04",
-            reality_status="PASS",
-            quality={
-                "dimensions": [
-                    {"dimension": "competitive_advantage", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
-                    {"dimension": "incremental_return_on_capital", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
-                    {"dimension": "earnings_quality", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
-                    {"dimension": "cash_flow_conversion", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
-                    {"dimension": "balance_sheet_resilience", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
-                    {"dimension": "reinvestment_runway", "status": "PASS", "rationale": "fixture", "evidence_ids": ["req-pe-1"]},
-                ]
-            },
-            value_driver_status="PASS",
-            valuation_status="PASS",
-            forecast_status="PASS",
-            thesis={
-                "status": thesis_status,
-                "statement": "fixture thesis",
-                "mechanism": "fixture mechanism",
-                "key_driver_ids": ["D1"],
-                "falsifiers": ["fixture falsifier"],
-                "monitoring_triggers": ["fixture trigger"],
-                "evidence_ids": ["req-pe-1"],
-                "known_at": "2026-10-04T12:00:00+00:00",
-                "prepared_without_current_price": True,
-            },
-        ),
+        "decision_upstream_admission": upstream,
         "market_implied_expectation_snapshot_ref": EVIDENCE_ROOT_REGISTRY.admit_p4f_snapshot(market_implied_expectation_snapshot(price_observation_id)).to_dict(),
         "expectation_gap": {
             "gap_id": "gap-v01-001",
@@ -294,7 +304,7 @@ def test_v03_risk_portfolio_contract_is_emitted_and_explicit():
         case(),
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
-        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
     )
     assert result["decision"]["risk_portfolio_contract"]["contract_version"] == "IIOS-RISK-PORTFOLIO-PRODUCTION-0.1"
     assert result["decision"]["risk_portfolio_contract"]["readiness"]["risk_ready"] is True
@@ -308,7 +318,7 @@ def test_v03_missing_can_add_fails_validation_before_decision():
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
-        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
     )
     assert result["validation"]["status"] == "BLOCKED"
     assert any("V03-RISK-PORTFOLIO-CONTRACT" in x for x in result["validation"]["blockers"])
@@ -335,7 +345,7 @@ def test_v03_target_entry_reference_cannot_coexist_with_expectation_gap():
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
-        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
     )
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-TARGET-ENTRY-REF-CONFLICT" in x for x in result["validation"]["blockers"])
@@ -351,7 +361,7 @@ def test_v03_canonical_gap_requires_runtime_evidence_root_resolver():
 def test_v03_embedded_p4f_snapshot_is_rejected():
     c = case()
     c["market_implied_expectation_snapshot"] = market_implied_expectation_snapshot()
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-EVIDENCE-ROOT-INLINE" in x for x in result["validation"]["blockers"])
 
@@ -384,7 +394,7 @@ def test_v03_inline_independent_expectation_is_rejected():
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
-        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
     )
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("unsupported fields" in x for x in result["validation"]["blockers"])
@@ -399,7 +409,7 @@ def test_v03_canonical_forecast_value_controls_expectation_gap():
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
-        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
     assert result["gates"]["expectation_gap_status"] == "PASS"
@@ -413,7 +423,7 @@ def test_v03_forecast_admission_hash_tampering_is_blocked():
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
-        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
     )
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("admission hash mismatch" in x for x in result["validation"]["blockers"])
@@ -421,14 +431,14 @@ def test_v03_forecast_admission_hash_tampering_is_blocked():
 
 def test_v03_mie_is_required_for_canonical_gap():
     c = case()
-    assert validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)["status"] == "PASS"
-    assert not any(x.startswith("V03-MIE") for x in [e["code"] for e in validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)["errors"]])
+    assert validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)["status"] == "PASS"
+    assert not any(x.startswith("V03-MIE") for x in [e["code"] for e in validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)["errors"]])
 
 
 def test_v03_forged_positive_gap_is_blocked():
     c = case()
     c["expectation_gap"]["gap_relative"] = "0.10"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-EXPECTATION-GAP-CANONICAL" in x for x in result["validation"]["blockers"])
 
@@ -436,7 +446,7 @@ def test_v03_forged_positive_gap_is_blocked():
 def test_v03_evidence_root_reference_tampering_is_blocked():
     c = case()
     c["market_implied_expectation_snapshot_ref"]["content_sha256"] = "0" * 64
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("does not match admitted root" in x for x in result["validation"]["blockers"])
 
@@ -444,13 +454,13 @@ def test_v03_evidence_root_reference_tampering_is_blocked():
 def test_v03_expectation_gap_horizon_must_match_decision_horizon():
     c = case()
     c["expectation_gap"]["independent_forecast_ref"] = independent_forecast_ref(horizon_years="3", forecast_id="forecast-v03-h3")
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-EXPECTATION-GAP-HORIZON" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_buy_requires_all_three_return_conditions():
-    result = decide(case(), evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(case(), evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "BUY"
     assert result["decision"]["decision_status"] == "READY"
     assert result["decision"]["investability_status"] == "INVESTABLE"
@@ -470,7 +480,7 @@ def test_v03_target_entry_price_solver_returns_binding_price_cap():
 def test_v03_current_price_mismatch_blocks_decision():
     c = case()
     c["return_gate"]["entry_price"] = "90"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-CURRENT-PRICE-BIND" in x for x in result["validation"]["blockers"])
 
@@ -478,7 +488,7 @@ def test_v03_current_price_mismatch_blocks_decision():
 def test_v03_missing_expectation_gap_does_not_block_company_side_buy():
     c = case()
     del c["expectation_gap"]
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "BUY"
     assert result["validation"]["status"] == "PASS"
     assert result["gates"]["expectation_gap_required_for_buy_add"] is False
@@ -489,7 +499,7 @@ def test_v03_missing_expectation_gap_does_not_block_company_side_buy():
 def test_v03_unresolved_mie_snapshot_requires_review_for_new_position():
     c = case()
     c["expectation_gap"]["market_expectation_id"] = "mie-not-materialized"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("must identify exactly one materialized MIE" in x for x in result["validation"]["blockers"])
 
@@ -499,7 +509,7 @@ def test_v03_missing_expectation_gap_does_not_block_existing_add():
     c = case()
     c["portfolio"]["position_pct"] = "5"
     del c["expectation_gap"]
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "ADD"
 
 
@@ -507,14 +517,14 @@ def test_v03_missing_expectation_gap_does_not_block_thesis_broken_exit():
     c = case(thesis_status="BROKEN")
     c["portfolio"]["position_pct"] = "5"
     del c["expectation_gap"]
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "EXIT"
 
 
 def test_v03_negative_expectation_gap_is_advisory_without_explicit_material_contradiction():
     c = case()
     c["expectation_gap"]["independent_forecast_ref"] = independent_forecast_ref(value="8", forecast_id="forecast-v03-8")
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "BUY"
     assert result["gates"]["expectation_gap_status"] == "PASS"
     assert result["gates"]["positive_expectation_gap_pass"] is False
@@ -524,7 +534,7 @@ def test_v03_positive_gap_and_price_qualified_produces_buy():
     c = case(price="99", price_observation_id="price-99")
     c["return_gate"]["entry_price"] = "99"
     c["expectation_gap"]["price"] = "99"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "BUY"
     assert Decimal(result["decision"]["target_entry_price"]) >= Decimal("99")
 
@@ -533,7 +543,7 @@ def test_v03_positive_gap_but_price_above_target_is_watch_price():
     c = case(price="101", price_observation_id="price-101")
     c["return_gate"]["entry_price"] = "101"
     c["expectation_gap"]["price"] = "101"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "WATCH"
     assert result["decision"]["primary_reason"] == "CURRENT_PRICE_ABOVE_TARGET_ENTRY_PRICE"
     assert Decimal(result["decision"]["target_entry_price"]) < Decimal("101")
@@ -543,7 +553,7 @@ def test_v03_positive_gap_but_price_above_target_is_watch_price():
 def test_v03_missing_mie_snapshot_with_gap_fails_closed():
     c = case()
     del c["market_implied_expectation_snapshot_ref"]
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("market_implied_expectation_snapshot_ref is required" in x for x in result["validation"]["blockers"])
 
@@ -551,7 +561,7 @@ def test_v03_missing_mie_snapshot_with_gap_fails_closed():
 def test_v03_mie_snapshot_hash_binding_fails_closed():
     c = case()
     c["expectation_gap"]["mie_snapshot_hash"] = "0" * 64
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("mie_snapshot_hash" in x for x in result["validation"]["blockers"])
 
@@ -559,7 +569,7 @@ def test_v03_mie_snapshot_hash_binding_fails_closed():
 def test_v03_mie_id_tampering_fails_closed():
     c = case()
     c["expectation_gap"]["market_expectation_id"] = "mie-forged"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("market_expectation_id" in x for x in result["validation"]["blockers"])
 
@@ -567,7 +577,7 @@ def test_v03_mie_id_tampering_fails_closed():
 def test_v03_gap_cannot_override_canonical_mie_comparison_direction():
     c = case()
     c["expectation_gap"]["comparison_direction"] = "LOWER_IS_BETTER"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("unsupported fields" in x for x in result["validation"]["blockers"])
 
@@ -575,14 +585,14 @@ def test_v03_gap_cannot_override_canonical_mie_comparison_direction():
 def test_v03_inline_market_expectation_is_rejected_by_canonical_boundary():
     c = case()
     c["expectation_gap"]["market_expectation"] = {"value": "999"}
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("unsupported fields" in x for x in result["validation"]["blockers"])
 
 def test_v03_price_admission_hash_is_required():
     c = case()
     del c["current_price_observation"]["price_observation_admission_hash"]
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-PRICE-ADMISSION-HASH" in x for x in result["validation"]["blockers"])
 
@@ -592,7 +602,7 @@ def test_v03_forged_current_price_is_blocked_by_canonical_admission():
     c["current_price_observation"]["price"] = "999.99"
     c["return_gate"]["entry_price"] = "999.99"
     c["expectation_gap"]["price"] = "999.99"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("current_price_observation.price does not match canonical admitted price" in x for x in result["validation"]["blockers"])
 
@@ -600,7 +610,7 @@ def test_v03_forged_current_price_is_blocked_by_canonical_admission():
 def test_v03_current_price_source_is_bound_to_canonical_admission():
     c = case()
     c["current_price_observation"]["source"] = "forged-source"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("current price source does not match canonical admission" in x for x in result["validation"]["blockers"])
 
@@ -608,7 +618,7 @@ def test_v03_current_price_source_is_bound_to_canonical_admission():
 def test_v03_price_observation_id_is_required():
     c = case()
     del c["current_price_observation"]["price_observation_id"]
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-PRICE-OBSERVATION-ID" in x for x in result["validation"]["blockers"])
 
@@ -616,13 +626,13 @@ def test_v03_expectation_gap_price_binding_requires_revalidation():
     c = case()
     c["current_price_observation"]["price"] = "99"
     c["return_gate"]["entry_price"] = "99"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-EXPECTATION-GAP-PRICE" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_target_entry_price_is_return_risk_first_and_mie_optional():
-    result = decide(case(), evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(case(), evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["target_entry_price_requires_gap_revalidation"] is False
     assert result["decision"]["target_entry_price_semantics"].startswith("RETURN_RISK_THRESHOLD_ONLY")
     assert result["gates"]["target_entry_price"] == result["decision"]["target_entry_price"]
@@ -643,7 +653,7 @@ def test_v03_risk_cap_enters_target_entry_price_solver():
 def test_v03_missing_risk_budget_fails_closed():
     c = case()
     del c["risk"]["max_loss_pct"]
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-RISK-MAX-LOSS-REQUIRED" in x for x in result["validation"]["blockers"])
 
@@ -673,7 +683,7 @@ def test_v03_watch_when_target_passes_but_entry_cushion_fails():
         "base": {"probability": "0.5", "terminal_value_per_share": "160", "cash_distributions_per_share": "0", "probability_rationale": "watch base"},
         "bull": {"probability": "0.3", "terminal_value_per_share": "180", "cash_distributions_per_share": "0", "probability_rationale": "watch bull"},
     }
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "WATCH"
     assert result["decision"]["investability_status"] == "WATCH"
 
@@ -685,7 +695,7 @@ def test_v03_watch_price_when_expected_annualized_return_below_target():
         "base": {"probability": "0.5", "terminal_value_per_share": "125", "cash_distributions_per_share": "0", "probability_rationale": "base"},
         "bull": {"probability": "0.3", "terminal_value_per_share": "140", "cash_distributions_per_share": "0", "probability_rationale": "high"},
     }
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "WATCH"
     assert result["decision"]["target_entry_price"] is not None
 
@@ -693,10 +703,10 @@ def test_v03_watch_price_when_expected_annualized_return_below_target():
 def test_v03_unknown_never_becomes_hold():
     c = case()
     c["trust"]["status"] = "UNKNOWN"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     c["portfolio"]["position_pct"] = "5"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
 
 
@@ -704,7 +714,7 @@ def test_v03_trust_fail_does_not_auto_exit():
     c = case()
     c["portfolio"]["position_pct"] = "5"
     c["trust"]["status"] = "FAIL"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
 
 
@@ -712,21 +722,21 @@ def test_v03_portfolio_block_can_reduce_existing_position():
     c = case()
     c["portfolio"]["position_pct"] = "15"
     c["portfolio"]["constraint_status"] = "BLOCKED"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REDUCE"
 
 
 def test_v03_thesis_broken_exits_existing_position():
     c = case(thesis_status="BROKEN")
     c["portfolio"]["position_pct"] = "5"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "EXIT"
 
 
 def test_v03_add_existing_position():
     c = case()
     c["portfolio"]["position_pct"] = "5"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "ADD"
 
 
@@ -736,7 +746,7 @@ def test_v03_reduce_existing_when_return_is_positive_but_risk_gate_fails():
     c["return_gate"]["entry_price"] = "130"
     c["expectation_gap"]["price"] = "130"
     c["return_gate"]["entry_value_reference"] = "115"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REDUCE"
     assert result["decision"]["primary_reason"] == "RISK_GATE_FAILED"
 
@@ -744,22 +754,22 @@ def test_v03_reduce_existing_when_return_is_positive_but_risk_gate_fails():
 def test_v03_review_required_on_unresolved_return_input():
     c = case()
     del c["return_gate"]["required_return_annualized"]
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
 
 
 def test_v03_pit_leak_blocks_decision():
     c = case()
     c["current_price_observation"]["known_at"] = "2026-10-05T09:00:00+08:00"
-    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-PIT-PRICE-KNOWN-AT" in x for x in result["validation"]["blockers"])
 
 
 def test_v03_replay_is_deterministic():
-    snap, digest = run_case(case(), evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    snap, digest = run_case(case(), evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert digest == snap["snapshot_hash"]
-    replay_result = replay(snap, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    replay_result = replay(snap, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert replay_result["replay_status"] == "PASS"
     assert replay_result["integrity_status"] == "PASS"
 
@@ -795,7 +805,7 @@ def test_v03_default_horizon_is_one_year_and_not_an_implicit_three_year():
     c["return_gate"]["horizon_override"] = False
     c["return_gate"]["horizon_override_basis"] = []
     c["return_gate"]["horizon_selection_rationale"] = "Use the IIOS default one-year decision horizon."
-    assert validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)["status"] == "PASS"
+    assert validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)["status"] == "PASS"
     metrics = calculate_return_metrics(c["return_gate"])
     assert metrics["horizon_years"] == "1"
     assert metrics["horizon_override"] is False
@@ -811,7 +821,7 @@ def test_v03_three_year_requires_explicit_override_and_qualifying_basis():
         "MAJOR_INVESTMENT_CYCLE_OR_MAJOR_CAPEX",
     ]
     c["return_gate"]["horizon_selection_rationale"] = "Three-year horizon is justified by major industry leadership and a major investment cycle."
-    assert validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)["status"] == "PASS"
+    assert validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)["status"] == "PASS"
 
 
 def test_v03_three_year_without_override_fails_closed():
@@ -820,7 +830,7 @@ def test_v03_three_year_without_override_fails_closed():
     c["return_gate"]["horizon_override"] = False
     c["return_gate"]["horizon_override_basis"] = []
     c["return_gate"]["horizon_selection_rationale"] = "Attempted three-year horizon without exception."
-    result = validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["status"] == "BLOCKED"
     assert any("horizon_override" in e["message"] for e in result["errors"])
 
@@ -831,7 +841,7 @@ def test_v03_three_year_with_unqualified_basis_fails_closed():
     c["return_gate"]["horizon_override"] = True
     c["return_gate"]["horizon_override_basis"] = ["OTHER"]
     c["return_gate"]["horizon_selection_rationale"] = "Attempted three-year horizon with unsupported reason."
-    result = validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["status"] == "BLOCKED"
 
 
@@ -841,7 +851,7 @@ def test_v03_two_year_override_is_not_treated_as_a_three_year_exception():
     c["return_gate"]["horizon_override"] = True
     c["return_gate"]["horizon_override_basis"] = ["MAJOR_INDUSTRY_LEADER"]
     c["return_gate"]["horizon_selection_rationale"] = "Attempted two-year override."
-    result = validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
+    result = validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY)
     assert result["status"] == "BLOCKED"
 
 
@@ -857,7 +867,7 @@ def test_v03_nonpositive_mie_gap_is_advisory_not_an_automatic_buy_veto():
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
-        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
     assert result["gates"]["expectation_gap_status"] == "PASS"
