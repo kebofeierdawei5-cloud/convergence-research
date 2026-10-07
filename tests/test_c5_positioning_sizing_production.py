@@ -105,11 +105,11 @@ def test_c5_unfavorable_snapshot_stops_adds_but_does_not_rewrite_decision():
     c = case()
     c["positioning"] = p
     result = decide(
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
@@ -189,21 +189,21 @@ def test_c5_schema_accepts_record():
 def test_c5_projection_is_optional_and_action_stays_fundamental():
     c = case()
     result_without = decide(
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert "positioning_sizing" in result_without["decision"]
 
     c["positioning"] = positioning(industry_sentiment="NEGATIVE")
     result_with = decide(
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result_with["decision"]["action"] == result_without["decision"]["action"]
     assert result_with["gates"]["positioning_sizing_status"] == "PASS"
