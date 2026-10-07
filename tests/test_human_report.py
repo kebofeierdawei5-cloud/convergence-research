@@ -56,6 +56,25 @@ def make_snapshot(action="REVIEW_REQUIRED"):
             "required_return": "0.10",
         },
         "risk": {"max_loss_pct": "0.25"},
+        "risk_portfolio_contract": {
+            "contract_version": "IIOS-RISK-PORTFOLIO-PRODUCTION-0.1",
+            "readiness": {"risk_ready": True, "portfolio_constraint_ready": True, "package_ready": True},
+            "portfolio": {
+                "position_pct": "0",
+                "can_add": True,
+                "constraint_status": "PASS",
+                "package_status": "COMPLETE",
+                "buy_add_package": {
+                    "entry_zone": ["24.00", "25.95"],
+                    "initial_position_pct": "5",
+                    "target_position_pct": "10",
+                    "max_position_pct": "10",
+                    "monitoring_triggers": ["cash flow conversion"],
+                    "thesis_break_triggers": ["structural margin deterioration"],
+                },
+            },
+            "risk": {"max_loss_pct": "25"},
+        },
         "thesis": {"falsifiers": ["TEST_FALSIFIER"]},
         "monitoring": [{"metric": "quality", "condition": "recheck quarterly"}],
     }
@@ -241,25 +260,6 @@ def test_cli_report_exposes_human_report(tmp_path, capsys):
 
 def test_report_renders_risk_portfolio_contract_without_machine_json_dump(tmp_path):
     publication, _ = make_publication(tmp_path)
-    publication["ai_decision"]["risk_portfolio_contract"] = {
-        "contract_version": "IIOS-RISK-PORTFOLIO-PRODUCTION-0.1",
-        "readiness": {"risk_ready": True, "portfolio_constraint_ready": True, "package_ready": True},
-        "portfolio": {
-            "position_pct": "0",
-            "can_add": True,
-            "constraint_status": "PASS",
-            "package_status": "COMPLETE",
-            "buy_add_package": {
-                "entry_zone": ["24.00", "25.95"],
-                "initial_position_pct": "5",
-                "target_position_pct": "10",
-                "max_position_pct": "10",
-                "monitoring_triggers": ["cash flow conversion"],
-                "thesis_break_triggers": ["structural margin deterioration"],
-            },
-        },
-        "risk": {"max_loss_pct": "25"},
-    }
     report = build_human_report(
         publication=publication,
         generated_at="2026-10-06T02:00:00+00:00",
@@ -274,4 +274,3 @@ def test_report_renders_risk_portfolio_contract_without_machine_json_dump(tmp_pa
     assert "structural margin deterioration" in markdown
     assert "audit_sha256" not in markdown
     assert '{"contract_version"' not in markdown
-\n
