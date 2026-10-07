@@ -739,3 +739,37 @@ Human intervention is required only for the fresh real-company pilot inputs: act
 
 Hard stop conditions remain unchanged: any P0 authority/PIT/provenance/semantic bypass, human-approval bypass, current-to-historical substitution, publication/report mutation of canonical state, or non-reproducible lifecycle replay blocks pilot continuation.
 
+
+## 13. PILOT-01 controlled real-company pilot — 2026-10-07
+
+Status: **TECHNICAL PASS / HUMAN OBSERVATION PENDING**
+
+Exact execution baseline:
+- main: `a14e561b266fb288a696bb9c70d853a2e6e218f2`
+- pilot workflow run: `37605725511`
+- pilot job: `112740590739`
+- dedicated pilot CI conclusion: **SUCCESS**
+- pytest: **57 passed**
+- compileall: **PASS**
+- git diff --check: **PASS**
+- CATL E2E: **PASS**
+- 科伦 E2E: **PASS**
+- full lifecycle E2E: **PASS**
+
+Controlled case outcomes:
+- CATL / 300750: `REVIEW_REQUIRED`, new capital `FALSE`, Quality `CONDITIONAL`, Trust `REVALIDATION`.
+- 科伦 / 002422: `REVIEW_REQUIRED`, new capital `FALSE`, Quality `CONDITIONAL`, primary valuation `SOTP`; lifecycle replay `PASS`, monitoring `VALID`, validation `PASS`, publication/report QA `PASS`, automatic execution `FALSE`.
+
+PILOT-01 proves the current technical Investment Core path works on two materially different real-company cases. It does **not** by itself prove operator usability or investment performance.
+
+Human observation is now the explicit next gate:
+- review the generated outputs;
+- identify confusing, missing, or operationally burdensome elements;
+- record what information had to be manually reconstructed;
+- record whether the final report/decision is practically usable.
+
+Human observations become PILOT-03 candidate findings only; they cannot silently change normative semantics.
+
+PILOT-02 fresh-candidate testing remains gated on completion of this human observation step.
+
+A02 / CSI800 remains non-blocking to Investment Core testing.
