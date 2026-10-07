@@ -44,6 +44,7 @@ from tests.test_investment_core_v03 import (
     case,
     independent_forecast_ref,
     market_implied_expectation_snapshot,
+    UPSTREAM_AUTHORITY_REGISTRY,
 )
 
 
@@ -221,6 +222,7 @@ def test_c4_nonpositive_gap_is_a_real_calculation_but_remains_advisory():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
     assert result["gates"]["expectation_gap_required_for_buy_add"] is False
