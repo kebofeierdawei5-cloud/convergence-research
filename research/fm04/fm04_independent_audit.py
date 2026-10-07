@@ -22,6 +22,10 @@ class AuditError(AssertionError):
     pass
 
 
+class ForecastUnavailable(AuditError):
+    pass
+
+
 def qkey(p: str) -> tuple[int, int]:
     return int(p[:4]), int(p[5])
 
@@ -81,7 +85,7 @@ def visible(by_period, origin):
 
 def req(vis, period):
     if period not in vis:
-        raise AuditError("PIT_INPUT_UNAVAILABLE")
+        raise ForecastUnavailable("PIT_INPUT_UNAVAILABLE")
     return vis[period]
 
 
@@ -105,7 +109,7 @@ def forecast(model, vis, origin, horizon):
             r = req(vis, qadd(origin, -7 + i))
             value = float(r["value"])
             if value <= 0:
-                raise AuditError("NON_POSITIVE_TREND_INPUT")
+                raise ForecastUnavailable("NON_POSITIVE_TREND_INPUT")
             values.append(math.log(value))
             ids.append(r["record_id"])
         xbar = 3.5
@@ -123,7 +127,7 @@ def forecast(model, vis, origin, horizon):
             cur = req(vis, qadd(origin, offset))
             prev = req(vis, qadd(origin, offset - 4))
             if float(prev["value"]) == 0:
-                raise AuditError("ZERO_YOY_DENOMINATOR")
+                raise ForecastUnavailable("ZERO_YOY_DENOMINATOR")
             growths.append(float(cur["value"]) / float(prev["value"]) - 1.0)
             ids.extend([cur["record_id"], prev["record_id"]])
         return float(base["value"]) * (1.0 + mean(growths)), sorted(set(ids))
@@ -207,8 +211,15 @@ def recompute_empirical_group(group, origins, state_by_key, by_driver):
         actual = actual_rows[0]
         vis = visible(by_driver[driver_id], origin)
         forecasts = {}
+        failed = False
         for model in MODELS:
-            forecasts[model] = forecast(model, vis, origin, horizon)
+            try:
+                forecasts[model] = forecast(model, vis, origin, horizon)
+            except ForecastUnavailable:
+                failed = True
+                break
+        if failed:
+            continue
         model_metrics = {
             model: metrics(forecasts[model][0], float(actual["value"]))
             for model in MODELS
