@@ -74,14 +74,22 @@ class FM04Tests(unittest.TestCase):
     def test_unknown_state_forces_no_selection(self):
         if self.states is None:
             self.skipTest("FM03 snapshot is not committed; CI builds it before FM04")
+        from fm04_conditional_backtest import selection_record
         states = copy.deepcopy(self.states)
         target = next(r for r in states if r["origin_id"]=="2025Q4" and r["driver_id"]=="REVENUE")
         target["states"]["DIRECTION"] = {
             "state":"UNKNOWN","status":"UNKNOWN","unknown_reason":"TEST_UNKNOWN",
-            "input_feature_ids":["YOY_GROWTH"],"input_feature_row_ids":[target["feature_row_id"]],"input_record_ids":[]
+            "input_feature_ids":["YOY_GROWTH"], "input_feature_row_ids":[target["feature_row_id"]],
+            "input_record_ids":[]
         }
-        result = build_result(self.contract, states, self.lock, self.records)
-        unit = next(x for x in result["outer_selection_evaluations"] if x["outer_origin_id"]=="2025Q4" and x["driver_id"]=="REVENUE" and x["horizon"]=="3M" and x["state_dimension"]=="DIRECTION")
+        state_by_key = {(r["origin_id"], r["driver_id"]): r for r in states}
+        by_driver = {"REVENUE":{}, "NET_PROFIT":{}}
+        for record in self.records:
+            by_driver[record["driver_id"]][record["period"]] = record
+        unit = selection_record(
+            "2025Q4", "REVENUE", "3M", "DIRECTION", target,
+            self.lock["origins"], state_by_key, by_driver,
+        )
         self.assertEqual(unit["status"], "NO_SELECTION")
         self.assertEqual(unit["no_selection_reason"], "UNKNOWN_STATE")
 
