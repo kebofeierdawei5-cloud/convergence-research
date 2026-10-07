@@ -14,7 +14,7 @@ on:
       - "tests/test_c8_auth_remediation.py"
       - "tests/test_machine_publication.py"
       - "tests/test_human_report.py"
-      - "tests/test_execution_receipt_production.py"
+      - "tests/test_c6_execution_receipt_production.py"
       - "tests/test_monitoring_state.py"
       - "tests/test_validation_replay.py"
       - "tools/core04_final_300750_decision_e2e.py"
