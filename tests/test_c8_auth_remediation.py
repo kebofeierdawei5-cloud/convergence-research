@@ -53,8 +53,7 @@ def test_c8_auth_001_admission_reexecutes_kernel_and_rejects_forged_decision():
         case=case,
         snapshot=valid_snapshot,
         current_price_resolver=registry,
-            upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY,
-        upstream_authority_resolver=AUTHORITY_REGISTRY,
+        upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY,
     )
     assert receipt["status"] == "ADMITTED"
     assert receipt["admission_method"] == "CANONICAL_DECIDE_V03_REEXECUTED"
@@ -77,14 +76,19 @@ def test_c8_auth_001_admission_reexecutes_kernel_and_rejects_forged_decision():
             case=case,
             snapshot=forged,
             current_price_resolver=registry,
+            upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY,
         )
 
 
 def test_c8_auth_002_store_rejects_cross_company_series_binding(tmp_path):
-    fixture = load_case_fixture()
-    registry, price_ref = admit_price()
-    case = build_case(fixture, price_ref)
-    decision = decide_v03(case, current_price_resolver=registry)
+    fixture = c3_e2e.load_case_fixture()
+    registry, price_ref = c3_e2e.admit_price()
+    case = c3_e2e.build_case(fixture, price_ref)
+    decision = decide_v03(
+        case,
+        current_price_resolver=registry,
+        upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY,
+    )
     snapshot = _snapshot(case, decision)
 
     series = create_or_load_series(
