@@ -252,9 +252,9 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 ## 8. Current canonical M1.2 baseline state
 
-Current canonical main after FM01 source admission and final governance synchronization: `491ba1dba34acf0942f8fc5df06de35627a65329`.
+FM02 feature merge commit: `ade3541302eb6f3fa43ec8aac76540820000a727`.
 
-The M1.2 baseline is now complete through exact CATL M1.1 source admission and independent PIT replay:
+The M1.2 baseline is now complete through deterministic FM02 PIT feature construction:
 
 ```
 Post-B04 Authority Re-audit = PASS
@@ -264,6 +264,8 @@ M1.2-FM00 Git Baseline = PASS / MERGED / CANONICAL
 FM01 Exact M1.1 Source Snapshot Admission = PASS / MERGED / CANONICAL
         ↓
 FM01 DATA_READY = PASS
+        ↓
+M1.2-FM02 PIT Feature Builder / Forecastability Feature Contract = PASS / MERGED / CANONICAL
 ```
 
 ### M1.2-FM00 Git Baseline
@@ -373,21 +375,50 @@ RP-01 remains a separate legacy fixture regression (`str.read`) and is not FM01 
 
 ## 9. Next canonical development boundary
 
-FM01 data admission is complete. The next boundary is:
+FM01 data admission and FM02 feature construction are complete. The next boundary is:
 
-**M1.2-FM-02 Feature Builder / Forecastability Feature Contract**
+**M1.2-FM-03 State Engine / Forecastability State Construction**
 
-FM02 remains gated by:
+### M1.2-FM02 canonical acceptance
 
-- research-epoch contamination/purity rules;
-- PIT-only feature construction;
-- learned-transform fit boundaries;
-- explicit State / UNKNOWN semantics;
+Status: **PASS / MERGED / CANONICAL**
+
+- PR #144;
+- merge commit `ade3541302eb6f3fa43ec8aac76540820000a727`;
+- final pre-merge head `617c9b8a3f091e76d5ea44a39e963ff255ffd99b`;
+- final remote CI run #15 = SUCCESS;
+- FM01 source-admission job = SUCCESS;
+- FM02 unit tests = 13 / 13 PASS;
+- real CATL feature build = PASS;
+- output snapshot schema = PASS;
+- independent PIT provenance audit = PASS;
+- compileall = PASS;
+- git diff --check = PASS;
+- generated feature-row canonical content hash = `3803be1404255652b831627fcd32acaf203f8984da33f70d3784e28dc449b9da`;
+- generated feature snapshot shape = 11 frozen origins × 2 drivers = 22 rows.
+
+The canonical contract is `research/fm02/FM02_FEATURE_CONTRACT.json`. FM02 is explicitly non-confirmatory:
+
+`confirmatory_eligible = false`
+
+and does not authorize State Engine, Conditional Backtest, Model Selection, Production Router, current-price inputs, scheduler, alerts, or automatic execution.
+
+FM02 features are horizon-neutral feature-construction outputs. Unknown outcomes remain explicit and are never imputed.
+
+### M1.2 forward gates
+
+FM03 must preserve:
+
+- research-epoch contamination/purity separation;
+- PIT-only visibility;
+- explicit AVAILABLE / UNKNOWN semantics;
+- record-level provenance;
+- frozen origin schedule;
 - inner-selection / outer-evaluation separation;
 - capability-access isolation;
-- sealed research manifest;
+- sealed research manifest requirements;
 - independent blind scoring controls.
 
-Do not use the admitted FM01 data to retroactively claim clean-confirmatory model-selection evidence. FM00 remains an exploratory contaminated epoch.
+FM00 remains an exploratory contaminated epoch. FM02 output cannot be relabeled as clean-confirmatory model-selection evidence.
 
 No scheduler, automatic execution, full-market screening, portfolio optimizer/Kelly logic, or unrestricted model family is authorized by this state.
