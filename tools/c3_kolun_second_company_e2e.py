@@ -22,6 +22,7 @@ CASE_ID = "RC-CN-A-002422-20261004"
 CUTOFF = date(2026, 10, 4)
 PRICE = Decimal("40.85")
 PRICE_EVIDENCE_SHA = "b59d6844530261896569dcd071f2fecb670fc26ad162a6ecbf31ccca1f464d7f"
+AUTHORITY_REGISTRY: InMemoryCanonicalInvestmentAdmissionRegistry | None = None
 
 
 def load_case_fixture() -> dict[str, Any]:
