@@ -415,4 +415,20 @@ A02 B-01 Free-First Source Registry = **PASS / MERGED / CANONICAL — ADMISSION 
 
 A run-2 provenance inconsistency in the emitted admission matrix was identified and corrected in the canonical materializer. No admission boundary was relaxed.
 
+### DATA-01-B Run #3
+
+- workflow run: `37593671212`;
+- head SHA: `6f47e5f6f481df8f4a300765f237c5f7f70dae0d`;
+- artifact: `11469780985`;
+- GitHub artifact digest = independent ZIP SHA-256: `85e836b2e797730be459a334172993118eb7101e44014c2539344c7ef679eb62`;
+- independent manifest verification: **8/8 PASS**;
+- materializer exit code: `4` (expected bounded fail-closed result);
+- current official raw evidence: materialized and independently hashed;
+- historical security-master PIT evidence: **NOT ESTABLISHED**;
+- Baostock: **BLOCKED / NOT ADMITTED**;
+- overall B sufficiency: **BLOCKED**;
+- permitted Run #3 result class: **BLOCKED**.
+
+Run #3 confirms the repaired artifact-transport path. It does not convert current snapshots into historical PIT evidence and does not change A02 admission state.
+
 Next technical boundary: obtain reproducible historical PIT carrier evidence with source-vintage / known_at; do not activate the proposed successor forecast epoch before A02 admission is complete.
