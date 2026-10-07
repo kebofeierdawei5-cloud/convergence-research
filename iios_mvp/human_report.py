@@ -51,6 +51,47 @@ def _fmt(value: Any) -> str:
     return str(value)
 
 
+
+def _render_risk_portfolio_contract(value: Any) -> list[str]:
+    """Render risk/portfolio data as investor-facing bullets, never as a machine JSON dump."""
+    if not isinstance(value, Mapping):
+        return [f"- Risk / portfolio contract: {_fmt(value)}"]
+
+    lines = ["- Risk / portfolio contract: available"]
+    if "contract_version" in value:
+        lines.append(f"  - Contract version: {_fmt(value.get('contract_version'))}")
+    readiness = value.get("readiness")
+    if isinstance(readiness, Mapping):
+        lines.append(f"  - Risk ready: {_fmt(readiness.get('risk_ready'))}")
+        lines.append(f"  - Portfolio constraint ready: {_fmt(readiness.get('portfolio_constraint_ready'))}")
+        lines.append(f"  - Package ready: {_fmt(readiness.get('package_ready'))}")
+    portfolio = value.get("portfolio")
+    if isinstance(portfolio, Mapping):
+        lines.append(f"  - Current position: {_fmt(portfolio.get('position_pct'))}%")
+        lines.append(f"  - Add permission in package: {_fmt(portfolio.get('can_add'))}")
+        lines.append(f"  - Portfolio constraint: {_fmt(portfolio.get('constraint_status'))}")
+        lines.append(f"  - Position package: {_fmt(portfolio.get('package_status'))}")
+        package = portfolio.get("buy_add_package")
+        if isinstance(package, Mapping):
+            zone = package.get("entry_zone")
+            if isinstance(zone, list) and len(zone) == 2:
+                lines.append(f"  - Entry zone: {_fmt(zone[0])}–{_fmt(zone[1])}")
+            lines.append(f"  - Initial position: {_fmt(package.get('initial_position_pct'))}%")
+            lines.append(f"  - Target position: {_fmt(package.get('target_position_pct'))}%")
+            lines.append(f"  - Maximum position: {_fmt(package.get('max_position_pct'))}%")
+            triggers = package.get("monitoring_triggers")
+            if isinstance(triggers, list) and triggers:
+                lines.append("  - Package monitoring triggers:")
+                lines.extend(f"    - {item}" for item in triggers)
+            breaks = package.get("thesis_break_triggers")
+            if isinstance(breaks, list) and breaks:
+                lines.append("  - Package thesis-break triggers:")
+                lines.extend(f"    - {item}" for item in breaks)
+    risk = value.get("risk")
+    if isinstance(risk, Mapping) and "max_loss_pct" in risk:
+        lines.append(f"  - Maximum loss boundary: {_fmt(risk.get('max_loss_pct'))}%")
+    return lines
+
 def render_human_report(publication: Mapping[str, Any]) -> str:
     validate_machine_publication(publication)
     case = publication["case"]
@@ -120,7 +161,7 @@ def render_human_report(publication: Mapping[str, Any]) -> str:
         "",
         "## Risk & Monitoring",
         "",
-        f"- Risk / portfolio contract: {_fmt(decision.get('risk_portfolio_contract'))}",
+        *_render_risk_portfolio_contract(decision.get("risk_portfolio_contract")),
         f"- Maximum loss / risk surface: {_fmt(risk.get('max_loss_pct'))}",
         "- Thesis break and risk boundaries are carried by the canonical Decision and are not amended here.",
     ]
