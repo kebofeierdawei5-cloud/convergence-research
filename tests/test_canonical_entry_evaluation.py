@@ -24,8 +24,11 @@ from tests.test_investment_core_v03 import (
     CURRENT_PRICE_REGISTRY,
     INDEPENDENT_FORECAST_REGISTRY,
     UPSTREAM_AUTHORITY_REGISTRY,
+    VALUATION_OUTPUT_RESOLVER,
+    VALUATION_ADMISSION_REGISTRY,
     case,
 )
+from tests.b04b_return_lineage_fixture import bind_return_lineage
 
 
 def _decision_case(*, price: str = "100", position_pct: str = "0") -> dict:
@@ -54,6 +57,12 @@ def _decision_case(*, price: str = "100", position_pct: str = "0") -> dict:
             "probability_rationale": "P2.2 bull",
         },
     }
+    c, _, _ = bind_return_lineage(
+        c,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_admission_registry=VALUATION_ADMISSION_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
+    )
     return c
 
 
@@ -154,6 +163,7 @@ def test_investment_core_formally_admits_buy_through_canonical_entry_evaluation(
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
@@ -176,6 +186,7 @@ def test_investment_core_formally_admits_add_through_canonical_entry_evaluation(
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "ADD"

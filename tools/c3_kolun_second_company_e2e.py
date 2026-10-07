@@ -11,6 +11,8 @@ from typing import Any
 from iios_mvp.canonical_current_price import InMemoryCanonicalCurrentPriceRegistry
 from iios_mvp.canonical_investment_admission_v01 import InMemoryCanonicalInvestmentAdmissionRegistry
 from tests.b03b_upstream_authority_fixture import build_runtime_upstream_authority
+from iios_mvp.forecast_valuation_return_lineage_v01 import InMemoryCanonicalValuationOutputResolver
+from tests.b04b_return_lineage_fixture import bind_return_lineage
 from iios_mvp.decision_admission import admit_canonical_decision
 from iios_mvp.human_report import build_human_report, qa_human_report, write_human_report
 from iios_mvp.investment_core_contract_v03 import calculate_return_metrics, decide_v03
@@ -47,6 +49,9 @@ CUTOFF = date(2026, 10, 4)
 PRICE = Decimal("40.85")
 PRICE_EVIDENCE_SHA = "b59d6844530261896569dcd071f2fecb670fc26ad162a6ecbf31ccca1f464d7f"
 AUTHORITY_REGISTRY: InMemoryCanonicalInvestmentAdmissionRegistry | None = None
+FORECAST_REGISTRY = None
+VALUATION_ADMISSION_REGISTRY = InMemoryCanonicalInvestmentAdmissionRegistry()
+VALUATION_OUTPUT_RESOLVER: InMemoryCanonicalValuationOutputResolver | None = None
 
 
 def load_case_fixture() -> dict[str, Any]:
@@ -112,7 +117,7 @@ def admit_price() -> tuple[InMemoryCanonicalCurrentPriceRegistry, dict[str, Any]
 
 
 def build_case(fixture: dict[str, Any], price_ref: dict[str, Any]) -> dict[str, Any]:
-    global AUTHORITY_REGISTRY
+    global AUTHORITY_REGISTRY, FORECAST_REGISTRY, VALUATION_OUTPUT_RESOLVER
     quality = {
         "dimensions": [
             {
@@ -175,7 +180,7 @@ def build_case(fixture: dict[str, Any], price_ref: dict[str, Any]) -> dict[str, 
         },
     )
     AUTHORITY_REGISTRY = authority_registry
-    return {
+    payload = {
         "contract_version": "IIOS-INVESTMENT-CORE-0.3",
         "case_id": CASE_ID,
         "market": "CN-A",
@@ -259,6 +264,13 @@ def build_case(fixture: dict[str, Any], price_ref: dict[str, Any]) -> dict[str, 
             },
         },
     }
+    payload, FORECAST_REGISTRY, VALUATION_OUTPUT_RESOLVER = bind_return_lineage(
+        payload,
+        valuation_admission_registry=VALUATION_ADMISSION_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
+    )
+    return payload
+
 
 
 def run() -> dict[str, Any]:
@@ -266,7 +278,7 @@ def run() -> dict[str, Any]:
     registry, price_ref = admit_price()
     case = build_case(fixture, price_ref)
 
-    decision = decide_v03(case, current_price_resolver=registry, upstream_authority_resolver=AUTHORITY_REGISTRY)
+    decision = decide_v03(case, current_price_resolver=registry, independent_forecast_resolver=FORECAST_REGISTRY, upstream_authority_resolver=AUTHORITY_REGISTRY, valuation_output_resolver=VALUATION_OUTPUT_RESOLVER)
     if decision["action"] != "REVIEW_REQUIRED":
         raise AssertionError("C3 expected a review-required result from conditional quality")
     if decision["gates"]["new_capital_allowed"] is not False:
@@ -318,7 +330,9 @@ def run() -> dict[str, Any]:
             case=case,
             snapshot=snapshot,
             current_price_resolver=registry,
+            independent_forecast_resolver=FORECAST_REGISTRY,
             upstream_authority_resolver=AUTHORITY_REGISTRY,
+            valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         )
         decision_path = write_decision_revision(
             root,

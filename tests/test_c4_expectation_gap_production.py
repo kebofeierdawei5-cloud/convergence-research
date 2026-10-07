@@ -45,6 +45,7 @@ from tests.test_investment_core_v03 import (
     independent_forecast_ref,
     market_implied_expectation_snapshot,
     UPSTREAM_AUTHORITY_REGISTRY,
+    VALUATION_OUTPUT_RESOLVER,
 )
 
 
@@ -222,6 +223,7 @@ def test_c4_nonpositive_gap_is_a_real_calculation_but_remains_advisory():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
@@ -301,6 +303,7 @@ def test_c4_expectation_gap_evaluation_is_bound_into_canonical_decision():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     evaluation = result["decision"]["expectation_gap_evaluation"]
     assert evaluation["evaluation_version"] == C4_EXPECTATION_GAP_VERSION

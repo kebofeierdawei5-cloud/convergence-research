@@ -14,6 +14,7 @@ from iios_mvp.execution_receipt_production import (
 from iios_mvp.investment_core_contract_v03 import decide_v03, validate_case_v03
 
 from tests.decision_admission_fixture import build_fixture_admission_receipt
+from tests.b04b_return_lineage_fixture import bind_return_lineage
 from tests.test_core04_real_300750_upstream_gate_e2e import (
     _case,
     _inputs,
@@ -87,35 +88,38 @@ def test_p0_01_caller_declared_upstream_status_is_blocked_without_canonical_doma
     assert decision["gates"]["new_capital_allowed"] is False
 
 
-def test_p0_02_return_gate_can_diverge_from_forecast_and_valuation_and_still_reach_buy():
+def test_p0_02_return_gate_divergence_is_blocked_by_canonical_lineage():
     case, registry = _buyable_case()
+    case, forecast_registry, valuation_resolver = bind_return_lineage(case)
 
-    # Deliberately make the supplied Valuation and Forecast economically
-    # incompatible with the separately supplied Return Gate while keeping all
-    # individually checked structural contracts valid.
-    case["valuation"]["probability_weighted_value_per_share"] = "50"
-    case["forecast"]["scenarios"]["base"]["fcf_proxy_bn_cny"] = ["1", "1", "1"]
-    case["forecast"]["scenarios"]["bull"]["fcf_proxy_bn_cny"] = ["2", "2", "2"]
-    case["forecast"]["scenarios"]["bear"]["fcf_proxy_bn_cny"] = ["0.5", "0.5", "0.5"]
+    # B04-B attack: after canonical valuation is admitted, independently
+    # substitute an optimistic Return Gate terminal value.
+    # The canonical Valuation output remains unchanged and must win.
+    case["return_gate"]["scenarios"]["base"]["terminal_value_per_share"] = "999"
 
     validation = validate_case_v03(
         case,
         current_price_resolver=registry,
+        independent_forecast_resolver=forecast_registry,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+        valuation_output_resolver=valuation_resolver,
     )
-    assert validation["status"] == "PASS", validation["errors"]
+    assert validation["status"] == "BLOCKED", validation["errors"]
+    assert any(
+        error["code"] == "V03-RETURN-LINEAGE-CANONICAL"
+        for error in validation["errors"]
+    )
 
     decision = decide_v03(
         case,
         current_price_resolver=registry,
+        independent_forecast_resolver=forecast_registry,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+        valuation_output_resolver=valuation_resolver,
     )
 
-    assert decision["action"] == "BUY"
-    assert decision["gates"]["new_capital_allowed"] is True
-    assert decision["gates"]["valuation"] == "PASS"
-    assert decision["gates"]["forecast"] == "PASS"
-    assert Decimal(decision["return_metrics"]["expected_annualized_return"]) > Decimal("0.15")
+    assert decision["action"] != "BUY"
+    assert decision["gates"]["new_capital_allowed"] is False
 
 
 def test_p1_03_execution_receipt_accepts_action_scope_mismatch_as_record_only_evidence():

@@ -9,6 +9,7 @@ from tests.test_investment_core_v03 import (
     EVIDENCE_ROOT_REGISTRY,
     INDEPENDENT_FORECAST_REGISTRY,
     UPSTREAM_AUTHORITY_REGISTRY,
+    VALUATION_OUTPUT_RESOLVER,
     case,
 )
 
@@ -25,6 +26,7 @@ def test_b03_b_canonical_v02_upstream_is_required_and_passes_with_trusted_resolv
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result["status"] == "PASS"
     assert c["decision_upstream_admission"]["schema_version"] == REQUIRED_RUNTIME_UPSTREAM_ADMISSION_VERSION
@@ -48,6 +50,7 @@ def test_b03_b_legacy_v01_upstream_authority_is_blocked_at_decision_runtime():
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result["status"] == "BLOCKED"
     assert any(
@@ -95,13 +98,16 @@ def test_b03_b_engine_propagates_upstream_authority_resolver():
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert errors == []
 
     decision = decide(
         c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert decision["decision"]["auto_execution"] is False
