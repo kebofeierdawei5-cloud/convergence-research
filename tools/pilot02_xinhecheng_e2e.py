@@ -239,7 +239,7 @@ def build_case(fixture: dict[str, Any], price_ref: dict[str, Any]):
             "currency": "CNY",
             "observed_at": "2026-09-30T15:00:00+00:00",
             "known_at": "2026-09-30T23:59:00+00:00",
-            "source": "YAHOO_FINANCE:HISTORICAL",
+            "source": "TENCENT_FINANCE:HISTORICAL_KLINE",
             "adjustment_semantics": "UNADJUSTED",
             "price_observation_admission_hash": price_ref["admission_record_hash"],
             "as_of_note": "2026-10-07 is a non-trading day; 2026-09-30 is the latest tradable close.",
