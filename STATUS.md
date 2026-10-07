@@ -10,31 +10,46 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 ## Current stage
 
-**Current canonical authority-hardening status: Post-B04 Independent Authority Re-audit = PASS / GOVERNANCE-ADJUDICATED**
+**Current canonical M1.2 status: FM00 Git Baseline = PASS / MERGED / CANONICAL**
 
 C8 and all prior Stage C productization milestones remain canonical.
 
-Authority hardening is now complete through:
+Authority hardening is complete through:
 
 ```
 B02 → B03-B → B04-B → independent post-B04 re-audit
 ```
 
-Canonical main at this governance checkpoint:
-`c64309268695ddd40c16ed0c7bfbf23979a339de`
+M1.2 baseline is now complete through:
 
-Independent audit:
-- target main before audit: `268852d754ab2385d9a96a10309a782978eb25af`;
-- audit workflow #5 = SUCCESS;
-- 7/7 fresh authority attack tests passed;
-- no production Decision semantics were changed by the audit;
-- governance verdict: PASS.
+```
+FM00 exact historical source anchor
+        +
+G2 frozen-reference identity separation
+        +
+remote baseline CI
+        ↓
+M1.2-FM00 Git Baseline = PASS
+```
 
-**Next boundary: M1.2-FM00 Git Baseline / Frozen Reference Establishment, then FM-01.**
+Canonical main at this checkpoint:
+`ea1453f6ac1a04343b3b7fb9a704d3df03e7d6ba`
 
-FM-02 remains explicitly gated by M1.2 governance, data partitioning and sealed-manifest controls.
+Baseline:
+- PR #136 = MERGED;
+- exact FM00 source anchor = `536e883bc873dbe7dd7383690a7a95a0f65591a7`;
+- immutable tag `m1.2-fm00-v0.1.0`;
+- baseline workflow #6 = SUCCESS on exact PR head `ff6bfe0ff7677d0a965af513ac2ee644413565d1`.
 
-RP-01 remains a separate legacy fixture regression and is not authority-hardening acceptance evidence.
+G2 historical frozen identity remains separate from the accepted R0 successor evidence; no frozen-byte rewrite was performed.
+
+**Next boundary: exact M1.1 CATL source snapshot admission for FM01 data ingress.**
+
+FM01 code remains `IMPLEMENTATION_PASS / DATA_INGRESS_BLOCKED`; no numeric CATL values may be fabricated or inferred.
+
+FM02 remains separately gated by M1.2 research governance, feature/state contracts, conditional backtest, partitioning and sealed-manifest controls.
+
+RP-01 remains a separate legacy fixture regression and is not M1.2 baseline acceptance evidence.
 
 
 ## Canonical Investment Core

@@ -250,112 +250,110 @@ chat context
 
 A diagnostic or historical record can identify a problem, but cannot promote itself into capability.
 
-## 8. Current canonical authority-hardening state
+## 8. Current canonical M1.2 baseline state
 
-The post-C8 authority-hardening sequence is complete through the independent re-audit.
-
-Current canonical main after governance state synchronization: `c64309268695ddd40c16ed0c7bfbf23979a339de`
+The post-C8 authority-hardening sequence is complete through independent re-audit, and the M1.2-FM00 Git baseline is now established on the canonical repository:
 
 ```
 B00 = PASS / MERGED / CANONICAL
    ↓
-B02 Canonical Investment Admission = PASS / MERGED / CANONICAL
+B02 = PASS / MERGED / CANONICAL
    ↓
-B03-B Canonical Upstream Authority Mandatory = PASS / MERGED / CANONICAL
+B03-B = PASS / MERGED / CANONICAL
    ↓
-B04-B Forecast → Valuation → Return Lineage Mandatory = PASS / MERGED / CANONICAL
+B04-B = PASS / MERGED / CANONICAL
    ↓
 Post-B04 Independent Authority Re-audit = PASS / GOVERNANCE-ADJUDICATED
+   ↓
+M1.2-FM00 Git Baseline = PASS / MERGED / CANONICAL
 ```
-
-### B02 — Canonical Investment Admission
-
-- PR #125;
-- merge commit: `67e4ba3e6e4c047a2e59d684335bf1fd745e20f5`.
-
-### B03-B — Mandatory Upstream Authority
-
-- PR #128;
-- merge commit: `18b848d569796ac3a712f8c5d217669496d3887f`;
-- runtime requires canonical upstream authority schema `IIOS-CORE-04-UPSTREAM-ADMISSION-0.2`;
-- legacy v0.1 caller-declared authority is blocked at Decision runtime.
-
-### B04-B — Mandatory Forecast / Valuation / Return Lineage
-
-Status: **PASS / MERGED / CANONICAL**
-
-- PR #129;
-- merge commit: `d9712c3f48fd71dfec348aca18fdf6b0fd1559a6`;
-- dedicated B04-B workflow #29 = SUCCESS;
-- Investment Core #746, B00-B #74, B03-B #54, B04 #60, C3 #89, C4 #87, C5 #75 and C8 #89 = SUCCESS on the exact B04-B branch head.
-
-B04-B enforces:
-- exact Return lineage version `IIOS-FORECAST-VALUATION-RETURN-LINEAGE-0.1`;
-- canonical Forecast reference;
-- canonical Valuation reference resolved through the trusted resolver;
-- Return Gate scenario equality against canonical Valuation output;
-- Return Gate current entry-price equality against the canonical current-price observation;
-- fail-closed handling of missing, legacy, substituted or divergent lineage.
-
-The B00-B P0-02 attack is closed on the enforced Decision path.
-
-### PR #131 — Post-B04-B authority regression hardening
-
-Status: **PASS / MERGED / CANONICAL TEST HARDENING**
-
-- merge commit: `268852d754ab2385d9a96a10309a782978eb25af`;
-- test-only changes;
-- adds resolver-propagation spying at the engine boundary;
-- hardens the P0-02 regression by explicitly forging the canonical Valuation admission hash.
-
-No production Decision semantics changed.
 
 ### Post-B04 Independent Authority Re-audit
 
 Status: **PASS / GOVERNANCE-ADJUDICATED**
 
 - diagnostic PR #133;
-- audit target: canonical `main` `268852d754ab2385d9a96a10309a782978eb25af`;
-- exact audit head: `a080caebe3e6fa08d3716511128db674a6e8d7f1`;
-- audit acceptance run #5 = SUCCESS;
-- 7 / 7 fresh audit tests passed;
-- compileall = PASS;
-- git diff --check = PASS;
-- governance verdict: no authority bypass reproduced in the tested post-B04 chain.
+- audit target: `268852d754ab2385d9a96a10309a782978eb25af`;
+- acceptance workflow #5 = SUCCESS;
+- 7 / 7 fresh authority attack tests passed;
+- acceptance record: `docs/iios/POST_B04_INDEPENDENT_REAUDIT_2026-10-07.md`.
 
-Fresh attack classes tested:
-- valid alternate Forecast substitution;
-- valid alternate Valuation substitution;
-- valid cross-domain upstream reference;
-- missing mandatory Valuation resolver at direct Decision runtime;
-- missing mandatory Valuation resolver during v0.3 replay;
-- immutable canonical Forecast same-ID conflicting bytes.
+### M1.2-FM00 Git Baseline
 
-The persisted snapshot / re-execution distinction was also verified: replay returns `FAIL` when the mandatory resolver is absent, while the original snapshot remains integrity-valid.
+Status: **PASS / MERGED / CANONICAL**
 
-Acceptance record:
-`docs/iios/POST_B04_INDEPENDENT_REAUDIT_2026-10-07.md`.
+- baseline PR #136;
+- baseline base main: `60d5f9927cb5543415307454aea231376f86c72e`;
+- exact FM00 source anchor: commit `536e883bc873dbe7dd7383690a7a95a0f65591a7`;
+- immutable FM00 tag: `m1.2-fm00-v0.1.0`;
+- tag object: `aac0cccf596ee2703caedffc08f434be9e2dffed`;
+- exact-head baseline CI: workflow run #6 = SUCCESS on head `ff6bfe0ff7677d0a965af513ac2ee644413565d1`;
+- baseline merge commit: `ea1453f6ac1a04343b3b7fb9a704d3df03e7d6ba`.
+
+The baseline does not rewrite the historical FM00 root commit or frozen G2 bytes.
+
+### G2 reference resolution
+
+The historical frozen G2 identity remains immutable and separate from the R0 successor evidence used for current closure:
+
+- historical frozen carrier SHA-256: `899f0b1b9f3619458e17be76ac43dd6e00b5397d0c12adb7b68e2479c7f51524`;
+- R0 successor evidence carrier SHA-256: `bd5cbaf23c9029b46fafd19992029932431059de7424a08de48624aca5d431c8`;
+- successor role: `ACCEPTED_SUCCESSOR_FOR_CURRENT_CLOSURE_ROLE_ONLY`;
+- no historical frozen identity rewrite.
+
+Reference resolution record:
+`governance/m1-2-fm00-baseline/G2_REFERENCE_RESOLUTION_v0.1.json`.
+
+### FM00 boundary
+
+FM00 remains:
+
+- `EXPLORATORY`;
+- `EXPOSED_PRIOR_RESULTS`;
+- `confirmatory_eligible = false`;
+- `production_router_allowed = false`.
+
+The exact historical source baseline is anchored by the immutable Git commit/tag above.
+
+### FM01 boundary
+
+FM01 implementation exists on the repository, but the CATL population gate remains:
+
+```
+BLOCKED_DATA_INGRESS
+```
+
+The target remains 22 quarters (2021Q1–2026Q2), and no numeric value may be fabricated or inferred while the exact M1.1 source snapshot is absent.
+
+Acceptance / baseline records:
+- `governance/m1-2-fm00-baseline/M1_2_FM00_BASELINE_MANIFEST_v0.2.json`
+- `governance/m1-2-fm00-baseline/M1_2_FM00_GIT_BASELINE_ACCEPTANCE_2026-10-07.md`
 
 ### Independent regression track
 
-RP-01 remains a separate legacy fixture failure (`str.read`) and is not authority-hardening acceptance evidence.
+RP-01 remains a separate legacy fixture regression (`str.read`) and is not M1.2 baseline acceptance evidence.
 
 ## 9. Next canonical development boundary
 
-The post-B04 authority chain is now governance-adjudicated PASS.
-
 The next engineering boundary is:
 
-**M1.2-FM00 — Git Baseline / Frozen Reference Establishment**
+**M1.2-FM-01 / exact CATL M1.1 source snapshot admission**
 
-Then proceed to:
+However, implementation already exists and is explicitly blocked at data ingress. Therefore the next permitted task is:
 
-**FM-01 — exact CATL M1.1 source snapshot**
+**Acquire / admit the exact M1.1 CATL source snapshot under PIT and provenance controls.**
 
-FM-02 Forecast Model Selection / research-model productionization remains blocked by its own M1.2 governance, partitioning, capability-access and sealed-manifest requirements.
+Only after exact source admission should FM01 data population proceed.
 
-This boundary is a development-governance transition, not permission to bypass M1.2 controls.
+FM02 Forecast Model Selection remains gated by the M1.2 research epoch, feature/state contracts, conditional backtest, research partition, capability-access and sealed-manifest requirements.
 
-The Investment Core remains single-company and PIT-bound. No scheduler, alerts, automatic execution, full-market screening, optimizer/Kelly logic, or new forecast/valuation model family is authorized by this state.
+This boundary does not authorize:
+- model selection;
+- result-driven tuning in the contaminated FM00 epoch;
+- a production router;
+- scheduler / alerts;
+- automatic execution;
+- full-market screening;
+- portfolio optimizer / Kelly logic.
 
 Historical Stage C acceptance records remain valid evidence of prior checkpoints but do not define the current development boundary.
