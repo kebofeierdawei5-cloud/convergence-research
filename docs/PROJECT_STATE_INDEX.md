@@ -391,9 +391,9 @@ RP-01 remains a separate legacy fixture regression (`str.read`) and is not FM01 
 
 ## 9. Next canonical development boundary
 
-FM01 data admission, FM02 feature construction, FM03 state construction, FM04 conditional backtest, and FM05 scope / estimand / sufficiency freeze are complete. The next boundary is an explicit owner adjudication of whether to open a new M1.2 research epoch:
+FM01 data admission, FM02 feature construction, FM03 state construction, FM04 conditional backtest, FM05 scope / estimand / sufficiency freeze, and FM07 research-epoch amendment gate are complete. The next boundary is **design of a new M1.2 research epoch**, subject to explicit scope / estimand / sufficiency freeze before execution:
 
-**No new M1.2 research capability is authorized by the current frozen epoch.**
+**The current epoch is closed to same-epoch amendment. No new epoch is opened automatically.**
 
 ### M1.2-FM02 canonical acceptance
 
@@ -495,3 +495,16 @@ Status: **PASS / MERGED / CANONICAL**
 - frozen replay: 406 outer selection units, 0 selected, 0 outer evaluated, 406 NO_SELECTION, 79 structural conditional groups, 0 empirical conditional groups.
 
 FM05 is a governance freeze. Result-driven redesign requires a new research epoch and a fresh scope / estimand freeze.
+
+
+### M1.2-FM07 canonical acceptance
+Status: **PASS / MERGED / CANONICAL**
+
+- PR #159;
+- merge commit: `549f16ce37058a9b889c159b6392d175bc3397b4`;
+- accepted exact head: `d8870e08aded67eac5f6cdda1b811b4d4632eda7`;
+- dedicated workflow run: SUCCESS;
+- gate decision: **DO_NOT_AMEND_CURRENT_EPOCH**;
+- current research epoch: `RE-M12-EXP-CATL-20260930`;
+- any scope / estimand / threshold / state / model / metric / origin / universe change requires a new research epoch;
+- FM07 does not open a new epoch automatically and adds no model-selection or production capability.
