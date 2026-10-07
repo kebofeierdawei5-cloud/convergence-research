@@ -53,7 +53,31 @@ jobs:
 
           curl --fail --location --proto '=https' --tlsv1.2 --max-time 180             --max-filesize 500000000             -o "$RUNNER_TEMP/a02_delivery/input.zip" "$BUNDLE_URL"
 
-          unzip -q "$RUNNER_TEMP/a02_delivery/input.zip" -d "$RUNNER_TEMP/a02_delivery/extracted"
+          python - "$RUNNER_TEMP/a02_delivery/input.zip" "$RUNNER_TEMP/a02_delivery/extracted" <<'PY'
+          import sys, zipfile
+          from pathlib import Path
+
+          src = Path(sys.argv[1]).resolve()
+          dst = Path(sys.argv[2]).resolve()
+          dst.mkdir(parents=True, exist_ok=True)
+          max_members = 20000
+          max_uncompressed = 800_000_000
+          with zipfile.ZipFile(src) as z:
+              infos = z.infolist()
+              if len(infos) > max_members:
+                  raise SystemExit("bundle contains too many ZIP members")
+              total = sum(i.file_size for i in infos)
+              if total > max_uncompressed:
+                  raise SystemExit("bundle uncompressed size exceeds limit")
+              for i in infos:
+                  if i.is_dir():
+                      continue
+                  target = (dst / i.filename).resolve()
+                  if target != dst and dst not in target.parents:
+                      raise SystemExit(f"unsafe ZIP member path: {i.filename}")
+              z.extractall(dst)
+          PY
+
           if [ -d "$RUNNER_TEMP/a02_delivery/extracted/A02_DELIVERY" ]; then
             cp -a "$RUNNER_TEMP/a02_delivery/extracted/A02_DELIVERY/." "$RUNNER_TEMP/a02_delivery/"
           else
