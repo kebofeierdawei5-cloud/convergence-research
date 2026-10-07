@@ -498,7 +498,14 @@ def replay(snapshot: dict[str, Any], *, evidence_root_resolver: Any | None = Non
                 "integrity_status": "FAIL",
                 "reason": "V03_SNAPSHOT_SCHEMA_NOT_SUPPORTED",
             }
-        fresh = decide(input_case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver, independent_forecast_resolver=independent_forecast_resolver)
+        fresh = decide(
+            input_case,
+            evidence_root_resolver=evidence_root_resolver,
+            current_price_resolver=current_price_resolver,
+            independent_forecast_resolver=independent_forecast_resolver,
+            upstream_authority_resolver=upstream_authority_resolver,
+            valuation_output_resolver=valuation_output_resolver,
+        )
         same = canonical_json(fresh) == canonical_json(snapshot["decision"])
         expected_hash = sha256_obj({
             "snapshot_schema": snapshot["snapshot_schema"],
