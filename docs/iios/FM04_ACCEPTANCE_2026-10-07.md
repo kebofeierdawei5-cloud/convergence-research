@@ -1,6 +1,6 @@
 # M1.2-FM04 Acceptance — 2026-10-07
 
-Status: **PASS / ACCEPTED / READY FOR MERGE**
+Status: **PASS / MERGED / CANONICAL**
 
 ## Scope
 
@@ -11,11 +11,12 @@ It evaluates whether forecast-model performance can be compared conditional on t
 ## Canonical implementation
 
 - PR: #150
-- accepted implementation head: `59bcc26e9e9b2c15d004dbe773b20ce542f24b86`
-- merge commit: to be recorded after merge
+- accepted pre-merge head: `fab5814c98e2cc26219d6aaf827b40f49460fb36`
+- merge commit: `a311136f662adc7a8d5e58cf6c0a122d4262af7d`
 - base canonical main: `ddf7034e7422d91f1f7f0135470fef6907b94272`
 - dedicated workflow: `IIOS M1.2 FM04 Conditional Backtest`
-- accepted CI run: #2
+- accepted implementation CI run: #2
+- canonical-main merge: `a311136f662adc7a8d5e58cf6c0a122d4262af7d`
 - accepted run id: `37564860982`
 - accepted job: `verify-fm04-conditional-backtest`
 - accepted job id: `112610137700`
