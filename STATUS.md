@@ -445,3 +445,16 @@ Next technical boundary: obtain reproducible historical PIT carrier evidence wit
 - no checksum/package declaration has been promoted to raw-byte evidence.
 
 Batch-2 state remains `HISTORICAL_CARRIER_BYTES = BLOCKED`. The approved next transition is actual package/raw-byte supply followed by independent SHA-256 and A preflight.
+
+## DATA-01-B Batch 3
+
+- Batch 3: `DATA-01-B` B-side Free-First Raw Intake.
+- Independent B raw preflight: `research/a02_raw/b_raw_preflight.py`.
+- Required B domains: identity, listing_delisting, common_equity, st_history, industry_history, source_vintages.
+- Required PIT origins: 11 origins from 2023Q3 through 2026Q1.
+- Latest runtime probe: Run `37595133874`, Artifact `11469743020`, artifact SHA-256 `cffd3bcd18609d85b290875fe7c6b492994aae994c7d43efd9996075c68f3d49`.
+- B raw preflight result: **BLOCKED / exit 4**; latest artifact contains no `DELIVERY_MANIFEST.json` and no B raw-domain files.
+- Independent negative-control suite: **4/4 PASS**.
+- No B raw-intake declaration, current snapshot, checksum-only metadata, or `retrieved_at` value has been promoted to PIT evidence.
+- Downstream remains locked: A02 admission BLOCKED; Model Selection LOCKED; cross-security successor epoch LOCKED.
+- Next transition: actual B raw bundle supply → independent DATA-01-C verification.

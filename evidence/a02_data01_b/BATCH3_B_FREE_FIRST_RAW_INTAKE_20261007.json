@@ -1,0 +1,49 @@
+{
+  "schema_version": "IIOS-A02-DATA01-B-BATCH3-INTAKE-ADJUDICATION-0.1",
+  "recorded_at": "2026-10-07T08:55:00Z",
+  "batch": "DATA-01-B",
+  "purpose": "Independent B-side raw-intake gate for the six PIT security-eligibility domains.",
+  "required_origins": [
+    "2023Q3",
+    "2023Q4",
+    "2024Q1",
+    "2024Q2",
+    "2024Q3",
+    "2024Q4",
+    "2025Q1",
+    "2025Q2",
+    "2025Q3",
+    "2025Q4",
+    "2026Q1"
+  ],
+  "required_domains": [
+    "identity",
+    "listing_delisting",
+    "common_equity",
+    "st_history",
+    "industry_history",
+    "source_vintages"
+  ],
+  "runtime_probe": {
+    "source_run_id": 37595133874,
+    "artifact_id": 11469743020,
+    "artifact_name": "A02-exact-raw-37595133874",
+    "artifact_sha256": "cffd3bcd18609d85b290875fe7c6b492994aae994c7d43efd9996075c68f3d49",
+    "b_raw_preflight_status": "BLOCKED",
+    "exit_code": 4,
+    "finding": "latest runtime artifact contains no DELIVERY_MANIFEST.json and no B raw domain files"
+  },
+  "controls": {
+    "independent_from_collector": true,
+    "checksum_without_bytes_forbidden": true,
+    "retrieved_at_as_known_at_forbidden": true,
+    "current_snapshot_as_historical_forbidden": true,
+    "secondary_source_as_normative_without_role_basis_forbidden": true
+  },
+  "result": "BLOCKED",
+  "downstream": {
+    "a02_admission": "BLOCKED",
+    "model_selection": "LOCKED",
+    "cross_security_successor_epoch": "LOCKED"
+  }
+}
