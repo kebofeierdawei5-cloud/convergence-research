@@ -28,9 +28,10 @@ jobs:
         run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
       - name: Verify canonical post-FM04-R baseline
         run: |
-          test "$(git rev-parse HEAD~1)" = "$(git rev-parse HEAD~1)"
-          test "$(git show -s --format=%B HEAD | grep -c 'FM04-R: validate semantic adjudication in CI')" = "0" || true
-          git log -1 --oneline
+          git fetch origin main --no-tags
+          test "$(git rev-parse origin/main)" = "7f08d55356dda8fbcbc448446b11925da6c42195"
+          test "$(git merge-base HEAD origin/main)" = "$(git rev-parse origin/main)"
+          git show -s --format='%H %s' origin/main
       - name: Build exact FM02 snapshot
         run: |
           python research/fm02/fm02_feature_builder.py --output /tmp/FM02_FEATURE_SNAPSHOT.ndjson --receipt /tmp/FM02_FEATURE_BUILD_RECEIPT.json
