@@ -79,7 +79,9 @@ def test_c8_auth_001_admission_reexecutes_kernel_and_rejects_forged_decision():
             case=case,
             snapshot=forged,
             current_price_resolver=registry,
+            independent_forecast_resolver=c3_e2e.FORECAST_REGISTRY,
             upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY,
+            valuation_output_resolver=c3_e2e.VALUATION_OUTPUT_RESOLVER,
         )
 
 
@@ -90,7 +92,9 @@ def test_c8_auth_002_store_rejects_cross_company_series_binding(tmp_path):
     decision = decide_v03(
         case,
         current_price_resolver=registry,
+        independent_forecast_resolver=c3_e2e.FORECAST_REGISTRY,
         upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY,
+        valuation_output_resolver=c3_e2e.VALUATION_OUTPUT_RESOLVER,
     )
     snapshot = _snapshot(case, decision)
 
