@@ -143,7 +143,7 @@ def fetch_wayback_target() -> dict:
             collections.append(c)
         # Search newest 2026 collections first; historical target is around 2026-09-30,
         # and restricting to an older calendar window can silently exclude the needed capture.
-        collections = sorted(collections, key=lambda c: str(c.get("id")), reverse=True)[:12]
+        collections = sorted(collections, key=lambda c: str(c.get("id")), reverse=True)[:4]
         _record_attempt(attempts, "COMMONCRAWL_INDEX", status="OK", collection_count=len(collections), collections=[str(c.get("id")) for c in collections])
     except Exception as exc:
         _record_attempt(attempts, "COMMONCRAWL_INDEX", status="ERROR", error=str(exc))
