@@ -87,6 +87,30 @@ jobs:
           python research/fm02/fm02_feature_builder.py \\
             --output /tmp/FM02_FEATURE_SNAPSHOT.ndjson \\
             --receipt /tmp/FM02_FEATURE_BUILD_RECEIPT.json
+      - name: Validate generated FM02 snapshot schema
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("research/fm02/fm02_feature_snapshot.schema.json").read_text())
+          validator = Draft202012Validator(schema)
+          rows = [
+              json.loads(line)
+              for line in Path("/tmp/FM02_FEATURE_SNAPSHOT.ndjson").read_text().splitlines()
+              if line.strip()
+          ]
+          errors = []
+          for index, row in enumerate(rows):
+              for issue in validator.iter_errors(row):
+                  path = ".".join(str(x) for x in issue.path) or "$"
+                  errors.append(f"row[{index}] {path}: {issue.message}")
+          assert not errors, "\\n".join(errors)
+          assert len(rows) == 22
+          print("FM02 generated snapshot schema: PASS")
+          PY
+
       - name: Verify FM02 build receipt
         run: |
           python - <<'PY'
