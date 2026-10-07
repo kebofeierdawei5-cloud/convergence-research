@@ -22,7 +22,8 @@
       "SEASONAL_DEVIATION",
       "MEAN_REVERSION_GAP",
       "SLOPE_STABILITY"
-    ]
+    ],
+    "feature_contract_sha256": "4298c1cd1fdc0e0b82f46ffa714430361165fe191f0b4b61567f3b1e7b81f56e"
   },
   "origin_contract": {
     "outer_universe_lock": "research/fm00/OU-M12-FM00-CATL-001.json",
@@ -34,7 +35,8 @@
       "3M": 1,
       "6M": 2,
       "12M": 4
-    }
+    },
+    "outer_universe_lock_sha256": "63a828d081474193af3870dcf0996f2201466210fba2c5011de23312044f591e"
   },
   "state_dimensions": [
     {
