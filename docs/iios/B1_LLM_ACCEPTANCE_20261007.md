@@ -1,6 +1,6 @@
 # IIOS B1-LCE Acceptance — 2026-10-07
 
-Status: **IMPLEMENTATION CANDIDATE — READY FOR INDEPENDENT CI / CANONICAL MERGE**
+Status: **PASS / MERGED / CANONICAL**
 
 ## Scope
 
@@ -30,9 +30,25 @@ This batch does not implement:
 
 Those remain B2/B4 work.
 
-## Local acceptance
+## Acceptance evidence
 
-Exact local checks on the candidate tree:
+Canonical branch lineage:
+
+```text
+B1 parent main:
+de1fba8ccee403ce219455a35b12ea6fd712a0cb
+
+B1 implementation head:
+8bf658b65ce7430d814046f1301af9915f3dea2c
+
+PR:
+#198
+
+merge commit:
+f34c3325e6cfab75303f944124330289c1cb9444
+```
+
+Local verification:
 
 ```text
 pytest:       8 passed
@@ -40,7 +56,20 @@ compileall:   PASS
 JSON syntax:  PASS
 ```
 
-The initial test collection failure was environmental only (`PYTHONPATH` omitted) and was reproduced cleanly after setting the package root; no test logic was weakened to obtain PASS.
+Dedicated remote B1 workflow:
+
+```text
+workflow:
+IIOS B1 Canonical Research Orchestrator
+
+run:
+37644825682
+
+status:
+completed / success
+```
+
+The remote run executed the B1 tests, schema tests, compileall, JSON syntax checks and git diff --check.
 
 ## Canonical integrity properties
 
@@ -51,28 +80,14 @@ The initial test collection failure was environmental only (`PYTHONPATH` omitted
 5. A COMPLETE run cannot issue an incomplete run receipt.
 6. A direct lower-level execution can be explicitly classified as `NON_CANONICAL`.
 7. Stage hashes are lowercase SHA-256 values.
-8. Both new JSON schemas are syntactically valid and the run-receipt schema accepts a canonical complete receipt while rejecting an external semantic producer.
+8. The run-receipt schema requires a complete canonical dependency chain.
 9. No Investment Core v0.3 economic formula or decision precedence rule is modified.
 
-## Remote acceptance
+## Result
 
-Dedicated workflow:
+**B1-LCE = PASS / MERGED / CANONICAL**
 
-```text
-.github/workflows/iios_b1_llm_orchestrator.yml
-```
-
-It runs:
-
-- B1 orchestrator tests;
-- B1 schema tests;
-- compileall;
-- JSON schema syntax validation;
-- git diff --check.
-
-## Next gate
-
-After independent CI and canonical merge:
+Next canonical gate:
 
 ```text
 B2 — LLM Semantic Workbench + Semantic Producer Admission

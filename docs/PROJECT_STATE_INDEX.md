@@ -1096,10 +1096,13 @@ promotion method         = Git Data tree → commit → ref
 This section is the canonical Current State Index amendment for the P0 LLM governance freeze.
 ## B1-LCE — Canonical Research Orchestrator — 2026-10-07
 
-Status: **IMPLEMENTED / READY FOR CANONICAL MERGE**
+Status: **PASS / MERGED / CANONICAL**
 
 Parent canonical main: `de1fba8ccee403ce219455a35b12ea6fd712a0cb`
-Branch: `repair/b1-llm-canonical-orchestrator-20261007`
+Implementation head: `8bf658b65ce7430d814046f1301af9915f3dea2c`
+PR #198
+Merge commit: `f34c3325e6cfab75303f944124330289c1cb9444`
+Canonical main after merge: `f34c3325e6cfab75303f944124330289c1cb9444`
 
 B1-LCE establishes the first production control-plane boundary required by P0-LLM-001 through P0-LLM-004.
 
@@ -1117,7 +1120,7 @@ This is a control-plane implementation only. It does not generate economic judgm
 
 Local acceptance: **8 tests PASS / compileall PASS / JSON syntax PASS**.
 
-Dedicated remote workflow: `.github/workflows/iios_b1_llm_orchestrator.yml`.
+Dedicated remote workflow: `.github/workflows/iios_b1_llm_orchestrator.yml` — Run #1 `37644825682` = SUCCESS.
 
 The existing lower-level Investment Core modules remain directly unit-testable, but product-declared canonical investment execution must be bound to the orchestrator. B2 will implement the actual LLM Semantic Workbench and semantic producer admission against admitted evidence.
 

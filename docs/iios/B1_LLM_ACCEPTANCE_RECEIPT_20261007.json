@@ -2,15 +2,18 @@
   "batch": "B1-LCE",
   "date": "2026-10-07",
   "baseline_main_sha": "de1fba8ccee403ce219455a35b12ea6fd712a0cb",
+  "implementation_head_sha": "8bf658b65ce7430d814046f1301af9915f3dea2c",
+  "pr_number": 198,
+  "merge_commit": "f34c3325e6cfab75303f944124330289c1cb9444",
   "branch": "repair/b1-llm-canonical-orchestrator-20261007",
-  "scope": "Canonical Research Orchestrator control plane",
+  "workflow_run": 37644825682,
+  "workflow_conclusion": "success",
   "local_acceptance": {
     "pytest": "8 passed",
     "compileall": "PASS",
     "json_syntax": "PASS"
   },
-  "remote_workflow": ".github/workflows/iios_b1_llm_orchestrator.yml",
   "economic_semantics_changed": false,
   "next_gate": "B2 — LLM Semantic Workbench + Semantic Producer Admission",
-  "status": "IMPLEMENTATION_CANDIDATE"
+  "status": "PASS_MERGED_CANONICAL"
 }
