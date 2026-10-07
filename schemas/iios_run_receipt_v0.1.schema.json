@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/iios-run-receipt-0.1.schema.json",
+  "title": "IIOS Canonical Research Run Receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version","run_id","case_id","market","symbol","cutoff_date","as_of_date",
+    "orchestrator_version","research_case_hash","evidence_manifest_hash","semantic_artifact_hashes",
+    "forecast_admission_hash","valuation_admission_hash","return_hash","risk_portfolio_hash",
+    "decision_admission_hash","decision_revision","publication_hash","report_hash","run_status","receipt_hash"
+  ],
+  "properties": {
+    "schema_version":{"const":"IIOS-RUN-RECEIPT-0.1"},
+    "run_id":{"type":"string","minLength":1},
+    "case_id":{"type":"string","minLength":1},
+    "market":{"enum":["CN-A","HK"]},
+    "symbol":{"type":"string","minLength":1},
+    "cutoff_date":{"type":"string","format":"date"},
+    "as_of_date":{"type":"string","format":"date"},
+    "orchestrator_version":{"type":"string","minLength":1},
+    "research_case_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "evidence_manifest_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "semantic_artifact_hashes":{"type":"array","items":{"type":"string","pattern":"^[0-9a-f]{64}$"},"uniqueItems":true},
+    "forecast_admission_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "valuation_admission_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "return_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "risk_portfolio_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "decision_admission_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "decision_revision":{"type":"integer","minimum":1},
+    "publication_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "report_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "run_status":{"const":"COMPLETE"},
+    "receipt_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"}
+  }
+}
