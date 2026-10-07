@@ -1,0 +1,32 @@
+{
+  "schema_version": "IIOS-A02-DATA-01-DELIVERY-MANIFEST-0.1",
+  "status": "CANDIDATE_INPUT",
+  "universe_id": "OU-M12-A02-CSI800-NONFIN-PIT-001",
+  "required_origins": [
+    "2023Q3", "2023Q4", "2024Q1", "2024Q2", "2024Q3", "2024Q4",
+    "2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1"
+  ],
+  "required_membership_states": [
+    "2023-06", "2023-12", "2024-06", "2024-12",
+    "2025-06", "2025-12", "2026-06"
+  ],
+  "required_b_domains": [
+    "identity", "listing_delisting", "common_equity",
+    "st_history", "industry_history", "source_vintages"
+  ],
+  "terminal_a_target": {
+    "file_name": "000906cons.xls",
+    "size_bytes": 169984,
+    "sha256": "f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984",
+    "role": "VALIDATION_TARGET_ONLY_UNTIL_BYTES_PRESENT"
+  },
+  "a_membership_states": [],
+  "b_domain_records": [],
+  "free_first": {
+    "paid_source_required": false,
+    "tushare_required": false,
+    "current_snapshot_substitution_forbidden": true,
+    "retrieved_at_as_known_at_forbidden": true
+  },
+  "statement": "This manifest is an input contract and does not itself prove that any evidence exists."
+}
