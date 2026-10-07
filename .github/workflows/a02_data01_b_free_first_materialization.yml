@@ -1,0 +1,75 @@
+name: A02 DATA-01-B Free-First PIT Materialization
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "research/a02_b1b/**"
+      - ".github/workflows/a02_data01_b_free_first_materialization.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  materialize-free-first-b:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout canonical source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install free-first dependencies
+        run: |
+          python -m pip install --disable-pip-version-check \
+            requests==2.32.5 \
+            pandas==2.2.3 \
+            baostock==0.8.9
+
+      - name: Materialize B free-first raw evidence
+        id: materialize
+        shell: bash
+        run: |
+          set +e
+          python research/a02_b1b/materialize_free_pit.py \
+            --out "$RUNNER_TEMP/a02_b1b"
+          rc=$?
+          echo "exit_code=$rc" >> "$GITHUB_OUTPUT"
+          # Exit code 4 is the expected fail-closed admission result for the pilot.
+          if [ "$rc" != "0" ] && [ "$rc" != "4" ]; then
+            exit "$rc"
+          fi
+
+      - name: Build independent raw-byte manifest
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          root = Path("$RUNNER_TEMP/a02_b1b")
+          out = []
+          for p in sorted(x for x in root.rglob("*") if x.is_file()):
+              out.append(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.relative_to(root)}")
+          (root / "SHA256_MANIFEST.txt").write_text("\n".join(out) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload B raw evidence and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: A02-data01-b-free-first-${{ github.run_id }}
+          path: ${{ runner.temp }}/a02_b1b
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Emit bounded execution verdict
+        run: |
+          echo "B materialization execution completed."
+          echo "pilot_exit_code=${{ steps.materialize.outputs.exit_code }}"
+          echo "Admission remains evidence-driven and may remain BLOCKED."
