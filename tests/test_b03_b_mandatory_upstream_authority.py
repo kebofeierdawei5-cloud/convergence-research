@@ -6,6 +6,7 @@ from iios_mvp.engine import decide, validate_case
 from iios_mvp.investment_core_contract_v03 import REQUIRED_RUNTIME_UPSTREAM_ADMISSION_VERSION, validate_case_v03
 from tests.test_investment_core_v03 import (
     CURRENT_PRICE_REGISTRY,
+    EVIDENCE_ROOT_REGISTRY,
     INDEPENDENT_FORECAST_REGISTRY,
     UPSTREAM_AUTHORITY_REGISTRY,
     case,
@@ -20,6 +21,7 @@ def test_b03_b_canonical_v02_upstream_is_required_and_passes_with_trusted_resolv
     c = _runtime_case()
     result = validate_case_v03(
         c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
