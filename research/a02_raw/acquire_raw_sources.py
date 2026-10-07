@@ -135,19 +135,16 @@ def fetch_wayback_target() -> dict:
     try:
         info = requests.get("https://index.commoncrawl.org/collinfo.json", timeout=60, headers={"User-Agent": "Mozilla/5.0"})
         info.raise_for_status()
-        target_start = "20260601"
-        target_end = "20260731"
         collections = []
         for c in info.json():
             cid = str(c.get("id", ""))
             if not cid.startswith("CC-MAIN-2026-"):
                 continue
-            c_from = str(c.get("from", "")).replace("-", "")
-            c_to = str(c.get("to", "")).replace("-", "")
-            if (not c_from or c_from <= target_end) and (not c_to or c_to >= target_start):
-                collections.append(c)
-        collections = sorted(collections, key=lambda c: str(c.get("id")), reverse=True)
-        _record_attempt(attempts, "COMMONCRAWL_INDEX", status="OK", collection_count=len(collections))
+            collections.append(c)
+        # Search newest 2026 collections first; historical target is around 2026-09-30,
+        # and restricting to an older calendar window can silently exclude the needed capture.
+        collections = sorted(collections, key=lambda c: str(c.get("id")), reverse=True)[:12]
+        _record_attempt(attempts, "COMMONCRAWL_INDEX", status="OK", collection_count=len(collections), collections=[str(c.get("id")) for c in collections])
     except Exception as exc:
         _record_attempt(attempts, "COMMONCRAWL_INDEX", status="ERROR", error=str(exc))
         collections = []
