@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/fm04-contract-0.1.json",
+  "title": "IIOS M1.2 FM04 Conditional Backtest Contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version","contract_id","version","status","research_epoch_id",
+    "confirmatory_eligible","input_contract","origin_contract","targets",
+    "models","evaluation","selection_policy","unknown_policy",
+    "provenance_contract","capability_boundary","capability_contract","research_boundary"
+  ],
+  "properties": {
+    "schema_version": {"const": "IIOS-FM04-CONDITIONAL-BACKTEST-0.1"},
+    "contract_id": {"type": "string"},
+    "version": {"const": "0.1.0"},
+    "status": {"const": "FROZEN"},
+    "research_epoch_id": {"const": "RE-M12-EXP-CATL-20260930"},
+    "confirmatory_eligible": {"const": false},
+    "input_contract": {"type":"object","required":["state_snapshot","state_contract","driver_history","required_security_ids","required_drivers","state_snapshot_sha256","upstream_git_blob_sha"]},
+    "origin_contract": {"type":"object","required":["outer_universe_lock","cutoff_rule","origin_selection_rule","exact_origin_count","horizon_offsets"]},
+    "targets": {"type":"array","minItems":2},
+    "models": {"type":"array","minItems":4,"maxItems":4},
+    "evaluation": {"type":"object"},
+    "selection_policy": {"type":"object"},
+    "unknown_policy": {"type":"object"},
+    "provenance_contract": {"type":"object"},
+    "capability_boundary": {"type":"object"},
+    "capability_contract": {"type":"object"},
+    "research_boundary": {"type":"object"}
+  }
+}
