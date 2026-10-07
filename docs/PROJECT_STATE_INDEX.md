@@ -897,19 +897,84 @@ Targeted regression outcome:
 
 PILOT-03 does not modify the accepted PILOT-02 investment result. It only closes observed pilot-friction defects.
 
-Next canonical development boundary:
+PILOT-03 does not modify the accepted PILOT-02 investment result. It only closes observed pilot-friction defects.
 
-**PILOT-04 — Independent Clean Replay**
-
-PILOT-04 must start from the clean canonical main and independently reproduce the accepted PILOT-02 result without relying on the diagnostic branch or its working tree, including:
-- exact candidate identity and cutoff;
-- admitted price/evidence provenance;
-- Decision;
-- Decision Revision;
-- Monitoring;
-- Validation;
-- lifecycle replay;
-- Machine Publication;
-- Human Report QA.
+PILOT-04 is now **PASS / MERGED / CANONICAL** and closes the planned clean-replay boundary.
 
 Human usability observations from PILOT-01 / PILOT-02 remain separate operator evidence and cannot be inferred from automated regression.
+
+
+## 16. PILOT-04 independent clean replay — 2026-10-07
+
+Status: **PASS / MERGED / CANONICAL**
+
+Scope:
+- PR #194
+- merge commit: `f3405f66e74a091e4f60aac0ddb5c6d1e1ad4700`
+- canonical starting main SHA: `79c5576bc4c63d3989a252401683c6691e66d998`
+- no Investment Core production semantic code changed
+- replay harness / pilot acceptance evidence only
+
+Accepted independent replay:
+- workflow: `IIOS PILOT-04 — Xinhecheng Independent Clean Replay`
+- accepted run #3
+- run id: `37632285110`
+- job id: `112829358751`
+- overall: **SUCCESS**
+- all 11 acceptance steps completed successfully
+
+Canonical clean-base proof:
+- PR base SHA = `79c5576bc4c63d3989a252401683c6691e66d998`
+- remote `origin/main` at replay = `79c5576bc4c63d3989a252401683c6691e66d998`
+- replay was not based on a diagnostic branch
+
+Fresh evidence:
+- CNINFO H1 report raw SHA-256 reproduced exactly:
+  `ab0ff443cc4b15b20ca8f4ed5fb8d4a5dea9b7fadf4b83ab8cd0532e54dd803e`
+- ChinaClear holiday-page raw SHA-256 reproduced exactly:
+  `756241e1e86515b5a9bbfafdede05055344c9ac9cf7dcba38a75141ed2096fa7`
+- fresh Tencent raw SHA-256:
+  `3716fea96259842264ee47a8c04a69c1515b127c3d4617ab803026398cb0caa5`
+- normalized 2026-09-30 historical day-row SHA-256 matched accepted PILOT-02:
+  `cdbe0bfc375a5d84ed99d59a3ca925e4488607d8ad3d4df57f7b5d88962473be`
+- observed close remained CNY 25.95
+- fresh Tencent raw-vintage differs because the endpoint carries dynamic transport metadata; this does not alter the normalized economic observation
+
+Replay result:
+- stable Decision/lifecycle semantic fingerprint:
+  `acd3943850ed38ca001e4a636ba8fea6e5cf69e23b0cfb820a8ad2e398408af2`
+- Trust = REVALIDATION
+- Quality = CONDITIONAL
+- Decision = REVIEW_REQUIRED
+- Primary reason = TRUST_NOT_PASS_REQUIRES_REVIEW
+- New capital = FALSE
+- Human approval = TRUE
+- Automatic execution = FALSE
+- Expected annualized return = 20.1734104046%...
+- Fundamental target / required return / risk gates = PASS
+- Target entry price = CNY 26.60
+- Decision ID = `CN-A-002001-r001`
+- Revision = 1
+- Monitoring = VALID
+- Validation = PASS
+- Lifecycle replay = PASS
+- Machine Publication QA = PASS
+- Human Report QA = PASS
+- deterministic report replay = TRUE
+
+Fresh lineage hashes are intentionally different from PILOT-02 because the admitted Tencent raw source-vintage is new. Internal binding and deterministic report QA both passed.
+
+Run #2 diagnostic:
+- The first PILOT-04 attempt failed only because the new replay receipt omitted `price_source_ref`, required by the existing canonical current-price admission path.
+- This was classified as a pilot-harness defect, not an Investment Core semantic regression.
+- The corrected receipt now binds source location, raw SHA and normalized historical-observation projection.
+
+PILOT-04 conclusion:
+**Independent clean replay PASS.**
+
+Next canonical boundary:
+
+**MVP Pilot Acceptance**
+
+A02 / CSI800 remains non-blocking to company-level Investment Core testing.
+Human usability evidence remains separate from technical replay acceptance.
