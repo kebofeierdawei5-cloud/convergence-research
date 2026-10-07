@@ -32,6 +32,7 @@ from .risk_portfolio_production_contract import build_risk_portfolio_contract, v
 from .forecast_valuation_return_lineage_v01 import validate_forecast_valuation_return_lineage, FORECAST_VALUATION_RETURN_LINEAGE_VERSION
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
+REQUIRED_RUNTIME_UPSTREAM_ADMISSION_VERSION = DECISION_UPSTREAM_ADMISSION_V02
 BUY_ENTRY_RETURN_CUSHION_THRESHOLD = Decimal("0.15")
 FUNDAMENTAL_TARGET_ANNUALIZED_RETURN = Decimal("0.15")
 
@@ -475,7 +476,16 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
         if (
             isinstance(case["decision_upstream_admission"], dict)
             and case["decision_upstream_admission"].get("schema_version")
-            == "IIOS-CORE-04-UPSTREAM-ADMISSION-0.2"
+            != REQUIRED_RUNTIME_UPSTREAM_ADMISSION_VERSION
+        ):
+            raise ValueError(
+                "Decision runtime requires canonical upstream admission v0.2; "
+                "legacy v0.1 authority path is disabled"
+            )
+        if (
+            isinstance(case["decision_upstream_admission"], dict)
+            and case["decision_upstream_admission"].get("schema_version")
+            == REQUIRED_RUNTIME_UPSTREAM_ADMISSION_VERSION
         ):
             if upstream_authority_resolver is None:
                 raise ValueError(
