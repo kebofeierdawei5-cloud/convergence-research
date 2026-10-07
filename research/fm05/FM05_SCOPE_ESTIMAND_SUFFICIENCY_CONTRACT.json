@@ -1,0 +1,105 @@
+{
+  "schema_version": "IIOS-FM05-SCOPE-ESTIMAND-SUFFICIENCY-0.1",
+  "contract_id": "FC-M12-FM05-CATL-001",
+  "version": "0.1.0",
+  "status": "FROZEN",
+  "research_epoch_id": "RE-M12-EXP-CATL-20260930",
+  "confirmatory_eligible": false,
+  "purpose": {
+    "scope_freeze": true,
+    "estimand_freeze": true,
+    "sufficiency_adjudication": true,
+    "statement": "Freeze the FM04 research scope and estimand after the observed zero-selection sufficiency boundary; no result-driven relaxation or redesign is authorized within the current research epoch."
+  },
+  "scope": {
+    "securities": ["300750.SZ"],
+    "drivers": ["REVENUE", "NET_PROFIT"],
+    "targets": ["CATL_REVENUE", "CATL_NET_PROFIT"],
+    "horizons": ["3M", "6M", "12M"],
+    "state_dimensions": ["DIRECTION", "MOMENTUM", "VOLATILITY", "SEASONALITY", "MEAN_REVERSION_PRESSURE", "STRUCTURAL_STABILITY", "DATA_QUALITY"],
+    "model_families": ["SEASONAL_NAIVE", "PERSISTENCE_YOY", "TREND_LOG_LINEAR", "MEAN_REVERSION_YOY"],
+    "model_instances": ["SEASONAL_NAIVE", "PERSISTENCE_YOY", "TREND_LOG_LINEAR_8Q", "MEAN_REVERSION_YOY_8"],
+    "origin_schedule": {
+      "origin_count": 11,
+      "horizons_by_origin": {"3M": 11, "6M": 10, "12M": 8},
+      "selection_rule": "FROZEN_PRE_SCHEDULED_ORIGINS_ONLY"
+    },
+    "current_price_allowed": false
+  },
+  "estimand": {
+    "selection_unit": "security × driver × horizon × state_dimension × state_value × outer_origin",
+    "structural_group_unit": "security × driver × horizon × state_dimension × state_value",
+    "primary_selection_estimand": "difference in mean inner MAE among the four frozen model instances on the common inner-origin universe conditional on the outer-origin state",
+    "outer_performance_estimand": "descriptive out-of-sample forecast error conditional on the frozen outer-origin state, only where inner selection is eligible",
+    "primary_metric": "MAE",
+    "secondary_metrics": ["RMSE", "sMAPE"],
+    "comparison_rule": "SAME_ORIGIN_UNIVERSE_SAME_TARGET_SAME_HORIZON_SAME_ACTUAL",
+    "rolling_origin_independence_assumption": false,
+    "inferential_claims_allowed": false,
+    "descriptive_only": true,
+    "current_price_in_estimand": false,
+    "investment_decision_in_estimand": false
+  },
+  "sufficiency_policy": {
+    "selection_min_common_inner_observations": 3,
+    "common_model_universe_required": true,
+    "inner_origins_strictly_earlier": true,
+    "inner_actual_known_by_outer_cutoff": true,
+    "unknown_state_forces_no_selection": true,
+    "no_imputation": true,
+    "structural_group_definition_requires_state_available": true,
+    "empirical_group_definition_requires_at_least_one_evaluated_outer_selection_unit": true,
+    "current_adjudication": {
+      "status": "INSUFFICIENT_FOR_STATE_CONDITIONED_SELECTION",
+      "source": "FM04 canonical result replay",
+      "outer_selection_unit_count": 406,
+      "selected_count": 0,
+      "outer_evaluated_count": 0,
+      "no_selection_count": 406,
+      "structural_conditional_group_count": 79,
+      "empirical_conditional_group_count": 0
+    }
+  },
+  "amendment_policy": {
+    "same_epoch_forbidden_changes": [
+      "LOWER_SELECTION_MIN_COMMON_INNER_OBSERVATIONS",
+      "MERGE_STATE_VALUES",
+      "DELETE_OR_SKIP_ORIGINS",
+      "EXPAND_MODEL_FAMILY_UNIVERSE",
+      "ADD_RESULT_DERIVED_THRESHOLDS",
+      "CHANGE_PRIMARY_METRIC",
+      "REDEFINE_ESTIMAND_FROM_FM04_OUTCOME",
+      "RELABEL_DATA_QUALITY_AS_AN_ECONOMIC_STATE"
+    ],
+    "result_driven_change_requires_new_epoch": true,
+    "new_epoch_requires_new_scope_and_estimand_freeze": true,
+    "outer_results_cannot_flow_back_into_same_epoch_tuning": true
+  },
+  "provenance_policy": {
+    "fm04_contract_id": "FC-M12-FM04-CATL-001",
+    "required_fm04_result_schema_version": "IIOS-FM04-CONDITIONAL-BACKTEST-RESULT-0.2",
+    "state_snapshot_sha256": "7e020df6eeb5b6aa4cf47e625d902c3c5ca7645457427c8af085a55d25811fd4",
+    "upstream_git_blob_sha": {
+      "state_contract": "1ede6cfd87476e466010a229599c52f984b24de6",
+      "driver_history": "8fbdafaa941587d843ab2509bb732620f5f66b4d",
+      "outer_universe_lock": "abe9c575ea4a194249a419bbb145b5ddf7dd05de",
+      "research_plan": "a440223d2b61b786434c9d63b00ca1d525fb4a79",
+      "candidate_space": "70778aa3bbeccccc87c856c7d4645ea366de3ac0",
+      "purity_boundary": "b7e7810bd383e893a328e2ed738d825423e98eda"
+    }
+  },
+  "capability_boundary": {
+    "scope_freeze_only": true,
+    "model_selection": false,
+    "production_router": false,
+    "production_forecast": false,
+    "automatic_execution": false,
+    "investment_decision": false
+  },
+  "research_boundary": {
+    "usage": "DEVELOPMENT_ONLY",
+    "purity": "CONTAMINATED",
+    "confirmatory_evidence_authorized": false,
+    "current_epoch_remains_unchanged": true
+  }
+}
