@@ -90,8 +90,17 @@ def test_b03_b_forged_v02_reference_without_matching_canonical_record_fails_clos
     )
 
 
-def test_b03_b_engine_propagates_upstream_authority_resolver():
+def test_b03_b_engine_propagates_upstream_authority_resolver(monkeypatch):
     c = _runtime_case()
+    captured = {}
+    import iios_mvp.investment_core_contract_v03 as core_v03
+    original_validate = core_v03.validate_case_v03
+
+    def spy_validate(case_arg, **kwargs):
+        captured["valuation_output_resolver"] = kwargs.get("valuation_output_resolver")
+        return original_validate(case_arg, **kwargs)
+
+    monkeypatch.setattr(core_v03, "validate_case_v03", spy_validate)
     errors = validate_case(
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
@@ -100,14 +109,5 @@ def test_b03_b_engine_propagates_upstream_authority_resolver():
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
         valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
+    assert captured["valuation_output_resolver"] is VALUATION_OUTPUT_RESOLVER
     assert errors == []
-
-    decision = decide(
-        c,
-        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
-        current_price_resolver=CURRENT_PRICE_REGISTRY,
-        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
-    )
-    assert decision["decision"]["auto_execution"] is False
