@@ -58,6 +58,7 @@ def build_runtime_upstream_authority(
     forecast: Mapping[str, Any],
     thesis: Mapping[str, Any],
     declared_statuses: Mapping[str, str] | None = None,
+    registry: InMemoryCanonicalInvestmentAdmissionRegistry | None = None,
 ) -> tuple[InMemoryCanonicalInvestmentAdmissionRegistry, dict[str, Any]]:
     statuses = {
         "REALITY": "PASS",
@@ -76,7 +77,7 @@ def build_runtime_upstream_authority(
         "VALUATION": valuation,
         "FORECAST": forecast,
     }
-    registry = InMemoryCanonicalInvestmentAdmissionRegistry()
+    registry = registry or InMemoryCanonicalInvestmentAdmissionRegistry()
     refs: dict[str, dict[str, Any]] = {}
 
     for domain in CORE_DOMAINS:
