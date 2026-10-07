@@ -8,6 +8,8 @@ on:
       - "research/a02_raw/**"
   workflow_dispatch: {}
 
+# A02 execution trigger: run exact raw materialization from canonical main.
+
 permissions:
   contents: read
 
