@@ -21,7 +21,7 @@ B02 → B03-B → B04-B → independent post-B04 re-audit
 ```
 
 Canonical main at this governance checkpoint:
-`77b0aa24922cab5d0424de6a62fdff1b58cf918c`
+`c64309268695ddd40c16ed0c7bfbf23979a339de`
 
 Independent audit:
 - target main before audit: `268852d754ab2385d9a96a10309a782978eb25af`;
