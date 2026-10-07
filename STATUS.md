@@ -30,8 +30,8 @@ FM01 exact M1.1 source admission = PASS
 FM01 DATA_READY
 ```
 
-Canonical main after FM01 admission:
-`b48db1b688c1d66270db63c9d008354fd4a625b9`
+Canonical main after FM01 admission and final governance sync:
+`840f653f52dbfb13bf3d1dba3074283dc383334f`
 
 Baseline:
 - PR #136 = MERGED;
