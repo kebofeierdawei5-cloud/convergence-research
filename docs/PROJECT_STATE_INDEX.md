@@ -74,6 +74,8 @@ FM01 DATA_READY = PASS
 M1.2-FM02 PIT Feature Builder / Forecastability Feature Contract = PASS / MERGED / CANONICAL
         ↓
 M1.2-FM03 State Engine / Forecastability State Construction = PASS / MERGED / CANONICAL
+        ↓
+M1.2-FM03 State Engine / Forecastability State Construction = PASS / MERGED / CANONICAL
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
