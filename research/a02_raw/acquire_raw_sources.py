@@ -117,6 +117,15 @@ def fetch_wayback_target() -> dict:
                     return {"status": "PASS", "timestamp": timestamp, "archive_url": archive_url, "size_bytes": len(data), "sha256": got, "bytes": data, "attempts": attempts}
             except Exception as exc:
                 _record_attempt(attempts, "WAYBACK", source_url=source_url, timestamp=timestamp, archive_url=archive_url, error=str(exc))
+    # Independent archive discovery: Internet Archive Availability API, Memento aggregator, then Arquivo.pt.
+    availability = fetch_availability_api(urls, attempts)
+    if availability.get("status") == "PASS":
+        availability["attempts"] = attempts
+        return availability
+    memento = fetch_memento_target(urls, attempts)
+    if memento.get("status") == "PASS":
+        memento["attempts"] = attempts
+        return memento
     # Arquivo.pt.
     arquivo = fetch_archive_pt_target(urls, attempts)
     if arquivo.get("status") == "PASS":
@@ -194,6 +203,63 @@ def fetch_wayback_target() -> dict:
                     _record_attempt(attempts, "COMMONCRAWL_RECORD", collection=index_id, original=original, timestamp=timestamp, archive_url=warc_url, error=str(exc))
     return {"status": "BLOCKED", "attempts": attempts}
 
+def _try_archived_bytes(archive_url: str, source_label: str, source_url: str, attempts: list[dict]) -> dict:
+    try:
+        resp = requests.get(archive_url, timeout=120, headers={"User-Agent": "Mozilla/5.0"}, allow_redirects=True)
+        data = resp.content
+        got = sha256_bytes(data)
+        _record_attempt(attempts, source_label, source_url=source_url, archive_url=archive_url, http_status=resp.status_code, size_bytes=len(data), sha256=got, expected_match=(len(data) == EXPECTED_000906_SIZE and got == EXPECTED_000906_SHA256))
+        if len(data) == EXPECTED_000906_SIZE and got == EXPECTED_000906_SHA256:
+            return {"status":"PASS","archive_url":archive_url,"size_bytes":len(data),"sha256":got,"bytes":data}
+    except Exception as exc:
+        _record_attempt(attempts, source_label, source_url=source_url, archive_url=archive_url, error=str(exc))
+    return {"status":"BLOCKED"}
+
+def fetch_memento_target(source_urls: list[str], attempts: list[dict]) -> dict:
+    import urllib.parse
+    timestamps = ["20260930","20261001","20261002","20261003","20261004","20261005"]
+    for source_url in source_urls:
+        for target_dt in timestamps:
+            api_url = "https://timetravel.mementoweb.org/api/json/" + target_dt + "/" + source_url
+            try:
+                resp = requests.get(api_url, timeout=60, headers={"User-Agent":"Mozilla/5.0"}, allow_redirects=True)
+                if resp.status_code != 200:
+                    _record_attempt(attempts, "MEMENTO_API", source_url=source_url, target_datetime=target_dt, http_status=resp.status_code)
+                    continue
+                payload = resp.json()
+                memento = payload.get("memento") or {}
+                uri = memento.get("uri") or payload.get("uri") or payload.get("url")
+                _record_attempt(attempts, "MEMENTO_API", source_url=source_url, target_datetime=target_dt, http_status=resp.status_code, memento_uri=uri, memento_datetime=memento.get("datetime") or payload.get("datetime"))
+                if not uri:
+                    continue
+                result = _try_archived_bytes(uri, "MEMENTO_MEMENTO", source_url, attempts)
+                if result.get("status") == "PASS":
+                    return result
+            except Exception as exc:
+                _record_attempt(attempts, "MEMENTO_API", source_url=source_url, target_datetime=target_dt, error=str(exc))
+    return {"status":"BLOCKED"}
+
+def fetch_availability_api(source_urls: list[str], attempts: list[dict]) -> dict:
+    import urllib.parse
+    timestamps = ["20260930000000","20261001000000","20261002000000","20261003000000","20261004000000"]
+    for source_url in source_urls:
+        for target_dt in timestamps:
+            api_url = "https://archive.org/wayback/available?" + urllib.parse.urlencode({"url":source_url,"timestamp":target_dt})
+            try:
+                resp = requests.get(api_url, timeout=60, headers={"User-Agent":"Mozilla/5.0"})
+                resp.raise_for_status()
+                payload = resp.json()
+                closest = payload.get("archived_snapshots", {}).get("closest")
+                _record_attempt(attempts, "WAYBACK_AVAILABILITY", source_url=source_url, target_datetime=target_dt, http_status=resp.status_code, available=bool(closest), snapshot=closest)
+                if not closest or not closest.get("url"):
+                    continue
+                result = _try_archived_bytes(closest["url"], "WAYBACK_AVAILABILITY_REPLAY", source_url, attempts)
+                if result.get("status") == "PASS":
+                    result["timestamp"] = closest.get("timestamp")
+                    return result
+            except Exception as exc:
+                _record_attempt(attempts, "WAYBACK_AVAILABILITY", source_url=source_url, target_datetime=target_dt, error=str(exc))
+    return {"status":"BLOCKED"}
 def post_tushare(token: str, api_name: str, params: dict, fields: str, out: Path, timeout: int = 60) -> dict:
     payload = {"api_name": api_name, "token": token, "params": params, "fields": fields}
     started = datetime.now(timezone.utc).isoformat()
