@@ -334,7 +334,7 @@ Remote exact-head CI:
 Acceptance records:
 
 - `research/fm01/M1_1_EXACT_SOURCE_SNAPSHOT_MANIFEST.json`
-- `research/fm01/M1_1_SOURCE_BYTES_VERIFICATION.json`
+- `research/fm01/M1_1_EXACT_SOURCE_BYTES_VERIFICATION.json`
 - `research/fm01/M1_1_SOURCE_ADMISSION.json`
 - `research/fm01/FM01_ADMISSION_RESULT.json`
 - `research/fm01/FM01_CI_ADMISSION_RECEIPT.json`
