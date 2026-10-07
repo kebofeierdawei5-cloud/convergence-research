@@ -183,6 +183,30 @@ class FM02FeatureBuilderTests(unittest.TestCase):
         self.assertIsNone(early["features"]["ROLLING_GROWTH_VOL"]["value"])
         self.assertIsNone(early["features"]["MEAN_REVERSION_GAP"]["value"])
 
+
+    def test_exact_fm01_cardinality_cannot_be_widened(self):
+        manifest = copy.deepcopy(self.manifest)
+        manifest["data_status"]["records_ingested"] = 45
+        with self.assertRaisesRegex(
+            FM02FeatureError, "FM01_RECORD_COUNT_MISMATCH"
+        ):
+            self.build()
+
+    def test_outer_origin_lock_must_remain_frozen_and_exact(self):
+        outer = copy.deepcopy(self.outer_lock)
+        outer["status"] = "DRAFT"
+        with self.assertRaisesRegex(
+            FM02FeatureError, "FM02_OUTER_LOCK_NOT_FROZEN"
+        ):
+            build_feature_snapshot(
+                self.records,
+                self.manifest,
+                self.admission,
+                self.contract,
+                outer,
+            )
+
+
     def test_fm01_gate_cannot_be_bypassed(self):
         manifest = copy.deepcopy(self.manifest)
         manifest["status"] = "BLOCKED_DATA_INGRESS"
