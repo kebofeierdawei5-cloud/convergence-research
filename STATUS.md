@@ -10,7 +10,7 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 ## Current stage
 
-**Current canonical M1.2 status: FM02 PIT Feature Builder / Forecastability Feature Contract = PASS / MERGED / CANONICAL**
+**Current canonical M1.2 status: FM03 State Engine / Forecastability State Construction = PASS / MERGED / CANONICAL**
 
 C8 and all prior Stage C productization milestones remain canonical.
 
@@ -30,6 +30,8 @@ FM01 exact M1.1 source admission = PASS
 FM01 DATA_READY
         ↓
 FM02 PIT feature builder / feature contract = PASS
+        ↓
+FM03 State Engine / Forecastability State Construction = PASS
 ```
 
 FM02 feature merge commit:
@@ -43,7 +45,7 @@ Baseline:
 
 G2 historical frozen identity remains separate from the accepted R0 successor evidence; no frozen-byte rewrite was performed.
 
-**Next boundary: M1.2-FM-03 State Engine / Forecastability State Construction.**
+**Next boundary: M1.2-FM-04 Conditional Backtest.**
 
 FM01 data gate is now `DATA_READY` after exact-source admission, provenance binding, 22-quarter coverage validation, and independent PIT replay.
 
@@ -67,6 +69,21 @@ FM02 acceptance:
 Acceptance: `docs/iios/FM02_ACCEPTANCE_2026-10-07.md`.
 
 FM02 does not authorize State Engine, Conditional Backtest, confirmatory model selection, production router, current-price inputs, scheduler, alerts, or automatic execution.
+FM03 acceptance:
+- PR #147;
+- merge commit `007ac477f7e45664c6eb7d4681de5d92c3a16b11`;
+- accepted pre-merge head `276d37111c0866ef7a0e69b7ab38aa1e4e1d2788`;
+- dedicated Actions run #2 = SUCCESS;
+- 14 / 14 FM03 tests passed;
+- generated state snapshot = 22 rows (11 frozen origins × 2 drivers);
+- canonical state-row content hash `7e020df6eeb5b6aa4cf47e625d902c3c5ca7645457427c8af085a55d25811fd4`;
+- independent PIT/provenance audit, output schema validation, compileall, and diff-check = PASS;
+- `confirmatory_eligible=false`, principal `iios_research`, grant `m1.2.fm03.state_engine`.
+
+FM03 preserves PIT visibility, explicit UNKNOWN propagation without imputation, provenance closure to FM02 / DriverSeries, the hash-bound frozen origin schedule, and fail-closed capability isolation. It uses deterministic non-tuned state mappings only and does not authorize Conditional Backtest, Model Selection, Production Router, or Automatic Execution.
+
+Acceptance: `docs/iios/FM03_ACCEPTANCE_2026-10-07.md`.
+
 
 RP-01 remains a separate legacy fixture regression and is not M1.2 baseline acceptance evidence.
 
