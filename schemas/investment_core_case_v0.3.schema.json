@@ -529,6 +529,9 @@
         "buy_entry_return_cushion_threshold",
         "fundamental_target_annualized_return",
         "required_return_annualized",
+        "lineage_version",
+        "canonical_forecast_ref",
+        "canonical_valuation_ref",
         "scenarios"
       ],
       "properties": {
