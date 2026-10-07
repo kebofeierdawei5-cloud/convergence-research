@@ -26,8 +26,15 @@ def _sha(value: Any) -> str:
     return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
 
 
-def _evidence_ids(output: Mapping[str, Any]) -> list[str]:
+def _evidence_ids(output: Any) -> list[str]:
     ids: set[str] = set()
+    if isinstance(output, list):
+        for row in output:
+            if isinstance(row, Mapping):
+                ids.update(str(x) for x in row.get("evidence_ids", []) if str(x).strip())
+        return sorted(ids) or ["B03B-FIXTURE-EVIDENCE"]
+    if not isinstance(output, Mapping):
+        return ["B03B-FIXTURE-EVIDENCE"]
     direct = output.get("evidence_ids")
     if isinstance(direct, list):
         ids.update(str(x) for x in direct if str(x).strip())
