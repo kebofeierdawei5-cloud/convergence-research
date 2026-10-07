@@ -110,6 +110,15 @@ def validate_inputs(
         raise FM02FeatureError("FM01 exact source snapshot is not admitted")
     if admission.get("status") != "PASS":
         raise FM02FeatureError("FM01_ADMISSION_NOT_PASS")
+    if admission.get("manifest_id") != manifest.get("manifest_id"):
+        raise FM02FeatureError("FM01_ADMISSION_MANIFEST_MISMATCH")
+    accepted = admission.get("accepted_dataset", {})
+    if accepted.get("records") != 44 or accepted.get("unique_quarters") != 22:
+        raise FM02FeatureError("FM01_EXACT_DATASET_CARDINALITY_MISMATCH")
+    if manifest.get("data_status", {}).get("records_ingested") != 44:
+        raise FM02FeatureError("FM01_RECORD_COUNT_MISMATCH")
+    if manifest.get("data_status", {}).get("quarterly_coverage_verified") != 22:
+        raise FM02FeatureError("FM01_QUARTER_COVERAGE_MISMATCH")
 
     expected_security = set(contract["input_contract"]["required_security_ids"])
     expected_drivers = set(contract["input_contract"]["required_drivers"])
@@ -338,6 +347,17 @@ def build_feature_snapshot(
     outer_lock: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     validate_inputs(records, manifest, admission, contract)
+    if outer_lock.get("status") != "FROZEN":
+        raise FM02FeatureError("FM02_OUTER_LOCK_NOT_FROZEN")
+    if outer_lock.get("lock_id") != Path(contract["origin_contract"]["outer_universe_lock"]).stem:
+        raise FM02FeatureError("FM02_OUTER_LOCK_ID_MISMATCH")
+    horizons = {"3M": 0, "6M": 0, "12M": 0}
+    for origin in outer_lock.get("origins", []):
+        for horizon in horizons:
+            if horizon in origin.get("scheduled_horizons", []):
+                horizons[horizon] += 1
+    if horizons != {"3M": 11, "6M": 10, "12M": 8}:
+        raise FM02FeatureError("FM02_OUTER_LOCK_HORIZON_COUNTS_MISMATCH")
 
     rows: list[dict[str, Any]] = []
     for origin in outer_lock["origins"]:
