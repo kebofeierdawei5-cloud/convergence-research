@@ -4,12 +4,8 @@ on:
   pull_request:
     paths:
       - "tools/pilot04_clean_replay_verify.py"
-      - ".github/workflows/iios_pilot04.yml"
       - "examples/real_cases/RC-CN-A-002001-20261007_pilot02_input.json"
-      - "tools/pilot02_xinhecheng_e2e.py"
-      - "iios_mvp/**"
-      - "tests/b03b_upstream_authority_fixture.py"
-      - "tests/b04b_return_lineage_fixture.py"
+      - "docs/iios/PILOT-04_CLEAN_REPLAY_20261007.md"
   workflow_dispatch:
 
 permissions:
@@ -21,6 +17,7 @@ concurrency:
 
 jobs:
   pilot-04:
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'pilot-04-clean-replay-') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
