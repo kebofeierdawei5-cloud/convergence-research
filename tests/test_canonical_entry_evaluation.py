@@ -151,11 +151,11 @@ def test_decision_admission_downgrades_add_when_canonical_entry_rejects_price():
 def test_investment_core_formally_admits_buy_through_canonical_entry_evaluation():
     c = _decision_case(price="125")
     result = decide(
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
@@ -178,6 +178,7 @@ def test_investment_core_formally_admits_add_through_canonical_entry_evaluation(
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "ADD"
