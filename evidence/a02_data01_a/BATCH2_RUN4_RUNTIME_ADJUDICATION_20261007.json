@@ -1,0 +1,44 @@
+{
+  "schema_version": "IIOS-A02-DATA01-A-BATCH2-RUN-ADJUDICATION-0.1",
+  "recorded_at": "2026-10-07T08:47:00Z",
+  "workflow": {
+    "run_id": 37595133874,
+    "head_sha": "ee260b4d19d034c82433483acbc24e0eb2caaf16",
+    "artifact_id": 11469743020,
+    "artifact_name": "A02-exact-raw-37595133874",
+    "artifact_size_bytes": 197437,
+    "github_artifact_digest": "sha256:cffd3bcd18609d85b290875fe7c6b492994aae994c7d43efd9996075c68f3d49",
+    "independent_zip_sha256": "cffd3bcd18609d85b290875fe7c6b492994aae994c7d43efd9996075c68f3d49",
+    "artifact_integrity": "PASS"
+  },
+  "terminal_control": {
+    "required_file": "000906cons.xls",
+    "expected_size_bytes": 169984,
+    "expected_sha256": "f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984",
+    "observed_path": "A_CSI800_RAW/official_000906_current_20261004_000906cons.xls",
+    "observed_size_bytes": 169984,
+    "observed_sha256": "b3338f5f6fdfd04a72fb42f5444539507b50ee4805c83dabb04ec26e54c3b5fb",
+    "size_match": true,
+    "sha256_match": false,
+    "role": "CURRENT_SNAPSHOT_NOT_HISTORICAL_TARGET"
+  },
+  "historical_coverage": {
+    "required_states": ["2023-06", "2023-12", "2024-06", "2024-12", "2025-06", "2025-12", "2026-06"],
+    "raw_state_files_present": false,
+    "status": "BLOCKED"
+  },
+  "admission": {
+    "historical_carrier_bytes": "BLOCKED",
+    "a_raw_preflight": "BLOCKED",
+    "a02_admission": "BLOCKED",
+    "model_selection": "LOCKED",
+    "cross_security_successor_epoch": "LOCKED"
+  },
+  "controls": {
+    "checksum_without_bytes_accepted": false,
+    "current_to_historical_substitution_accepted": false,
+    "retrieved_at_as_known_at_accepted": false,
+    "archive_url_only_accepted": false
+  },
+  "verdict": "BLOCKED"
+}
