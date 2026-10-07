@@ -32,6 +32,8 @@ FM01 DATA_READY
 FM02 PIT feature builder / feature contract = PASS
         ↓
 FM03 State Engine / Forecastability State Construction = PASS
+        ↓
+FM04 Conditional Backtest = PASS
 ```
 
 FM02 feature merge commit:
@@ -45,7 +47,7 @@ Baseline:
 
 G2 historical frozen identity remains separate from the accepted R0 successor evidence; no frozen-byte rewrite was performed.
 
-**Next boundary: M1.2-FM-04 Conditional Backtest.**
+**Next boundary: M1.2-FM-05 Scope Freeze / Data Sufficiency Adjudication.**
 
 FM01 data gate is now `DATA_READY` after exact-source admission, provenance binding, 22-quarter coverage validation, and independent PIT replay.
 
