@@ -310,6 +310,16 @@ def case(price="100", price_observation_id="price-1", thesis_status="INTACT") ->
     return payload
 
 
+def _rebind_return_lineage(c: dict) -> dict:
+    rebound, _, _ = bind_return_lineage(
+        c,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_admission_registry=VALUATION_ADMISSION_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
+    )
+    return rebound
+
+
 def test_v03_risk_portfolio_contract_is_emitted_and_explicit():
 
     result = decide(
@@ -714,6 +724,7 @@ def test_v03_watch_when_target_passes_but_entry_cushion_fails():
         "base": {"probability": "0.5", "terminal_value_per_share": "160", "cash_distributions_per_share": "0", "probability_rationale": "watch base"},
         "bull": {"probability": "0.3", "terminal_value_per_share": "180", "cash_distributions_per_share": "0", "probability_rationale": "watch bull"},
     }
+    c = _rebind_return_lineage(c)
     result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY, valuation_output_resolver=VALUATION_OUTPUT_RESOLVER)
     assert result["decision"]["action"] == "WATCH"
     assert result["decision"]["investability_status"] == "WATCH"
@@ -726,6 +737,7 @@ def test_v03_watch_price_when_expected_annualized_return_below_target():
         "base": {"probability": "0.5", "terminal_value_per_share": "125", "cash_distributions_per_share": "0", "probability_rationale": "base"},
         "bull": {"probability": "0.3", "terminal_value_per_share": "140", "cash_distributions_per_share": "0", "probability_rationale": "high"},
     }
+    c = _rebind_return_lineage(c)
     result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY, valuation_output_resolver=VALUATION_OUTPUT_RESOLVER)
     assert result["decision"]["action"] == "WATCH"
     assert result["decision"]["target_entry_price"] is not None
@@ -777,6 +789,7 @@ def test_v03_reduce_existing_when_return_is_positive_but_risk_gate_fails():
     c["return_gate"]["entry_price"] = "130"
     c["expectation_gap"]["price"] = "130"
     c["return_gate"]["entry_value_reference"] = "115"
+    c = _rebind_return_lineage(c)
     result = decide(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY, valuation_output_resolver=VALUATION_OUTPUT_RESOLVER)
     assert result["decision"]["action"] == "REDUCE"
     assert result["decision"]["primary_reason"] == "RISK_GATE_FAILED"
@@ -836,6 +849,7 @@ def test_v03_default_horizon_is_one_year_and_not_an_implicit_three_year():
     c["return_gate"]["horizon_override"] = False
     c["return_gate"]["horizon_override_basis"] = []
     c["return_gate"]["horizon_selection_rationale"] = "Use the IIOS default one-year decision horizon."
+    c = _rebind_return_lineage(c)
     assert validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY, valuation_output_resolver=VALUATION_OUTPUT_RESOLVER)["status"] == "PASS"
     metrics = calculate_return_metrics(c["return_gate"])
     assert metrics["horizon_years"] == "1"
@@ -852,6 +866,7 @@ def test_v03_three_year_requires_explicit_override_and_qualifying_basis():
         "MAJOR_INVESTMENT_CYCLE_OR_MAJOR_CAPEX",
     ]
     c["return_gate"]["horizon_selection_rationale"] = "Three-year horizon is justified by major industry leadership and a major investment cycle."
+    c = _rebind_return_lineage(c)
     assert validate_case_v03(c, evidence_root_resolver=EVIDENCE_ROOT_REGISTRY, current_price_resolver=CURRENT_PRICE_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY, valuation_output_resolver=VALUATION_OUTPUT_RESOLVER)["status"] == "PASS"
 
 
