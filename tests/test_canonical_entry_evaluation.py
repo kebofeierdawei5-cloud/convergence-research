@@ -25,8 +25,10 @@ from tests.test_investment_core_v03 import (
     INDEPENDENT_FORECAST_REGISTRY,
     UPSTREAM_AUTHORITY_REGISTRY,
     VALUATION_OUTPUT_RESOLVER,
+    VALUATION_ADMISSION_REGISTRY,
     case,
 )
+from tests.b04b_return_lineage_fixture import bind_return_lineage
 
 
 def _decision_case(*, price: str = "100", position_pct: str = "0") -> dict:
@@ -55,6 +57,12 @@ def _decision_case(*, price: str = "100", position_pct: str = "0") -> dict:
             "probability_rationale": "P2.2 bull",
         },
     }
+    c, _, _ = bind_return_lineage(
+        c,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_admission_registry=VALUATION_ADMISSION_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
+    )
     return c
 
 
