@@ -1,0 +1,41 @@
+name: IIOS M1.2 New Research Epoch Design Proposal
+
+on:
+  pull_request:
+    paths:
+      - "research/fm05/**"
+      - "research/fm07/**"
+      - "research/m12_epoch_design/**"
+      - "docs/iios/M12_NEW_RESEARCH_EPOCH_DESIGN_2026-10-07.md"
+      - ".github/workflows/iios_m12_new_epoch_design.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-new-epoch-design:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validation dependency
+        run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Verify exact FM05 contract and A02 evidence anchors
+        run: |
+          test "$(git hash-object research/fm05/FM05_SCOPE_ESTIMAND_SUFFICIENCY_CONTRACT.json)" = "23cfaa05c82f8556ae1badc177602e96af4bb0a8"
+          test "$(git hash-object docs/iios/A02_BATCH1_EXECUTION_2026-10-04.md)" = "2b2297a62d2a9dbdd14abdf815f9e8d796282580"
+          echo "Exact FM05/A02 anchors: PASS"
+      - name: Run proposal tests
+        run: python -m unittest discover -s research/m12_epoch_design/tests -p 'test_*.py' -v
+      - name: Validate proposal against exact current epoch state
+        run: |
+          python research/m12_epoch_design/m12_epoch_design_validator.py             --fm05-contract research/fm05/FM05_SCOPE_ESTIMAND_SUFFICIENCY_CONTRACT.json             --a02-evidence docs/iios/A02_BATCH1_EXECUTION_2026-10-04.md
+      - name: Compile
+        run: python -m compileall -q research/m12_epoch_design
+      - name: Diff check
+        run: git diff --check
