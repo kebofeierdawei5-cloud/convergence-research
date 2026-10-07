@@ -997,7 +997,7 @@ A02 / CSI800 remains non-blocking to company-level Investment Core MVP acceptanc
 
 ## 18. B0 — LLM Canonical Execution Governance Boundary Freeze — 2026-10-07
 
-Status: **GOVERNANCE CONTENT FROZEN / LOCAL CANONICAL RECORD PERSISTED / REMOTE MAIN PROMOTION PENDING**
+Status: **GOVERNANCE CONTENT FROZEN / CANONICAL ON MAIN AFTER MERGE**
 
 Purpose:
 
@@ -1084,12 +1084,13 @@ References:
 - P0 findings SHA-256: `b70d83e9920e4ef9b2b879e727fa427d057b2ffa96cf6c53ddd73329a1705ea1`;
 - governance record SHA-256: `eacef7ec2ec40cfc716a44ba8374bcdc800aeebba0a2d1553e852e8a476f7191`.
 
-Current Git promotion state:
+Canonical Git promotion record:
 
 ```text
 canonical main baseline = 0839dfe972f2e1451a9cc8a8ce3f909020b8b784
+B0 governance commit     = de6e67904a644266133fd3436dbc7f2567e92e1b
 repair branch            = audit/p0-llm-canonical-execution-20261007
-remote file/commit write = BLOCKED BY GITHUB CONNECTOR INTERNAL ERROR
+promotion method         = Git Data tree → commit → ref
 ```
 
-Therefore this section is the exact intended canonical Current State Index amendment, persisted locally and ready for application to `main` once GitHub mutation is operational.
+This section is the canonical Current State Index amendment for the P0 LLM governance freeze.
