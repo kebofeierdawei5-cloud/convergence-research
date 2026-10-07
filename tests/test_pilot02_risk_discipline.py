@@ -33,7 +33,7 @@ def test_pilot02_bear_case_is_not_backsolved_into_risk_pass() -> None:
 
     gate = {
         "entry_price": str(entry),
-        "entry_value_reference": str(case["return_gate"]["entry_value_reference"]),
+        "entry_value_reference": str(case["valuation"]["scenario_values_per_share"]["base"]),
         "horizon_years": "1",
         "horizon_override": False,
         "horizon_override_basis": [],
