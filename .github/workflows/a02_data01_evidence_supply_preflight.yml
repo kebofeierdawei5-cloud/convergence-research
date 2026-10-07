@@ -1,0 +1,90 @@
+name: A02 Data-01 Evidence Supply Preflight
+
+on:
+  pull_request:
+    paths:
+      - "research/a02_raw/a02_evidence_delivery.py"
+      - "research/a02_raw/A02_DATA01_DELIVERY_MANIFEST_TEMPLATE.json"
+      - "research/a02_raw/tests/test_a02_data01_preflight.py"
+      - "research/a02_raw/A02_DATA01_EVIDENCE_SUPPLY_CONTRACT_v0.1.md"
+      - ".github/workflows/a02_data01_evidence_supply_preflight.yml"
+  workflow_dispatch:
+    inputs:
+      bundle_url:
+        description: "HTTPS URL of an operator-supplied A02_DELIVERY ZIP"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run deterministic unit tests
+        run: python -m unittest discover -s research/a02_raw/tests -p 'test_a02_data01_preflight.py' -v
+
+      - name: Prepare operator bundle workspace
+        env:
+          BUNDLE_URL: ${{ inputs.bundle_url }}
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/a02_delivery"
+          mkdir -p "$RUNNER_TEMP/a02_delivery"
+
+          if [ -z "$BUNDLE_URL" ]; then
+            printf '%s\n' '{"mode":"NO_EXTERNAL_BUNDLE","status":"BLOCKED"}' > "$RUNNER_TEMP/a02_delivery/INPUT_STATUS.json"
+            exit 0
+          fi
+
+          case "$BUNDLE_URL" in
+            https://*) ;;
+            *) echo "bundle_url must use https://"; exit 2 ;;
+          esac
+
+          curl --fail --location --proto '=https' --tlsv1.2 --max-time 180             --max-filesize 500000000             -o "$RUNNER_TEMP/a02_delivery/input.zip" "$BUNDLE_URL"
+
+          unzip -q "$RUNNER_TEMP/a02_delivery/input.zip" -d "$RUNNER_TEMP/a02_delivery/extracted"
+          if [ -d "$RUNNER_TEMP/a02_delivery/extracted/A02_DELIVERY" ]; then
+            cp -a "$RUNNER_TEMP/a02_delivery/extracted/A02_DELIVERY/." "$RUNNER_TEMP/a02_delivery/"
+          else
+            cp -a "$RUNNER_TEMP/a02_delivery/extracted/." "$RUNNER_TEMP/a02_delivery/"
+          fi
+
+          sha256sum "$RUNNER_TEMP/a02_delivery/input.zip" > "$RUNNER_TEMP/a02_delivery/INPUT_ZIP_SHA256.txt"
+
+      - name: Independent raw-byte preflight
+        id: verify
+        continue-on-error: true
+        run: |
+          python research/a02_raw/a02_evidence_delivery.py             --root "$RUNNER_TEMP/a02_delivery"             --strict > "$RUNNER_TEMP/a02_delivery/PREFLIGHT_STDOUT.json"
+
+      - name: Upload preflight evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: A02-data01-preflight-${{ github.run_id }}
+          path: ${{ runner.temp }}/a02_delivery
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Fail closed for DATA-01 execution
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          code="${{ steps.verify.outcome }}"
+          if [ "$code" != "success" ]; then
+            echo "A02 DATA-01 raw evidence preflight is BLOCKED."
+            exit 4
+          fi
+          echo "A02 DATA-01 raw evidence preflight: PASS_RAW_COMPLETE (A02 admission remains locked)."
