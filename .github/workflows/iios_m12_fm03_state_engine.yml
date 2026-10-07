@@ -127,7 +127,8 @@ jobs:
                   if prior_origin is None:
                       assert state["status"]=="UNKNOWN" and state["unknown_reason"]=="NO_PRIOR_FROZEN_ORIGIN"
                   else:
-                      prior_id=f"FM02-{source['row_id'].split('-',2)[1]}-{prior_origin}-{row['driver_id']}"
+                      prior_prefix=source["row_id"].rsplit("-",2)[0]
+                      prior_id=f"{prior_prefix}-{prior_origin}-{row['driver_id']}"
                       assert prior_id in state["input_feature_row_ids"]
           print("FM03 independent PIT/provenance audit: PASS")
           PY
