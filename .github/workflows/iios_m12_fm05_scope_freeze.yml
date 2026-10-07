@@ -1,0 +1,70 @@
+name: IIOS M1.2 FM05 Scope / Estimand / Sufficiency Freeze
+
+on:
+  pull_request:
+    paths:
+      - "research/fm00/**"
+      - "research/fm01/**"
+      - "research/fm02/**"
+      - "research/fm03/**"
+      - "research/fm04/**"
+      - "research/fm05/**"
+      - ".github/workflows/iios_m12_fm05_scope_freeze.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-fm05-scope-freeze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validation dependency
+        run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Verify exact upstream byte anchors
+        run: |
+          test "$(git hash-object research/fm03/FM03_STATE_CONTRACT.json)" = "1ede6cfd87476e466010a229599c52f984b24de6"
+          test "$(git hash-object research/fm01/CATL_DRIVER_HISTORY.ndjson)" = "8fbdafaa941587d843ab2509bb732620f5f66b4d"
+          test "$(git hash-object research/fm00/OU-M12-FM00-CATL-001.json)" = "abe9c575ea4a194249a419bbb145b5ddf7dd05de"
+          test "$(git hash-object research/fm00/RP-M12-FM00-EXP-001.json)" = "a440223d2b61b786434c9d63b00ca1d525fb4a79"
+          test "$(git hash-object research/fm00/CS-M12-FM00-CATL-001.json)" = "70778aa3bbeccccc87c856c7d4645ea366de3ac0"
+          test "$(git hash-object research/fm00/EPB-M12-FM00-EXP-001.json)" = "b7e7810bd383e893a328e2ed738d825423e98eda"
+          echo "Exact upstream anchors: PASS"
+      - name: Run FM05 contract tests
+        run: python -m unittest discover -s research/fm05/tests -p 'test_*.py' -v
+      - name: Build exact FM02 snapshot
+        run: python research/fm02/fm02_feature_builder.py --output /tmp/FM02_FEATURE_SNAPSHOT.ndjson --receipt /tmp/FM02_FEATURE_BUILD_RECEIPT.json
+      - name: Build exact FM03 state snapshot
+        run: python research/fm03/fm03_state_engine.py --feature-snapshot /tmp/FM02_FEATURE_SNAPSHOT.ndjson --output /tmp/FM03_STATE_SNAPSHOT.ndjson --receipt /tmp/FM03_STATE_BUILD_RECEIPT.json
+      - name: Verify pinned FM03 snapshot
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          rows=[json.loads(line) for line in Path("/tmp/FM03_STATE_SNAPSHOT.ndjson").read_text().splitlines() if line.strip()]
+          sha=hashlib.sha256(json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",",":")).encode()).hexdigest()
+          assert len(rows)==22
+          assert sha=="7e020df6eeb5b6aa4cf47e625d902c3c5ca7645457427c8af085a55d25811fd4"
+          print("Pinned FM03 state snapshot: PASS", sha)
+          PY
+      - name: Build exact FM04 result
+        run: python research/fm04/fm04_conditional_backtest.py --state-snapshot /tmp/FM03_STATE_SNAPSHOT.ndjson --driver-history research/fm01/CATL_DRIVER_HISTORY.ndjson --output /tmp/FM04_BACKTEST_RESULT.json
+      - name: Validate FM05 against exact FM04 result
+        run: python research/fm05/fm05_scope_freeze.py --fm04-result /tmp/FM04_BACKTEST_RESULT.json --output /tmp/FM05_SCOPE_FREEZE_RECEIPT.json
+      - name: Archive FM05 receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: iios-m12-fm05-scope-freeze-${{ github.run_id }}
+          path: /tmp/FM05_SCOPE_FREEZE_RECEIPT.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Compile FM05
+        run: python -m compileall -q research/fm05
+      - name: Diff check
+        run: git diff --check
