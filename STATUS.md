@@ -32,7 +32,7 @@ FM01 DATA_READY
 FM02 PIT feature builder / feature contract = PASS
 ```
 
-Canonical main after FM02 merge:
+FM02 feature merge commit:
 `ade3541302eb6f3fa43ec8aac76540820000a727`
 
 Baseline:
