@@ -80,7 +80,7 @@ def main() -> int:
         result,
         state_path,
         Path("/tmp/fm04-redteam-tr02.json"),
-        lambda x: x["conditional_performance"].append(copy.deepcopy(x["conditional_performance"][populated_group_index(x)])),
+        lambda x: x["conditional_performance"].append(copy.deepcopy(x["conditional_performance"][0])),
     ))
     attacks.append(require_rejection(
         "TR-03 mutate driver history canonical binding",
