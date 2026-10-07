@@ -7,6 +7,8 @@ from pathlib import Path
 
 from iios_mvp.canonical_current_price import InMemoryCanonicalCurrentPriceRegistry
 from iios_mvp.investment_core_contract_v03 import decide_v03
+from iios_mvp.canonical_investment_admission_v01 import InMemoryCanonicalInvestmentAdmissionRegistry
+from tests.b03b_upstream_authority_fixture import build_runtime_upstream_authority
 from iios_mvp.decision_upstream_admission_v03 import build_decision_upstream_admission
 from iios_mvp.market_model_identification import MarketValuationObservation
 from iios_mvp.market_observation_admission import (
@@ -23,6 +25,7 @@ CUTOFF = date(2026, 10, 4)
 PRICE_DATE = date(2026, 9, 30)
 PRICE = Decimal("291.11")
 PRICE_EVIDENCE_SHA = "349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2"
+UPSTREAM_AUTHORITY_REGISTRY = InMemoryCanonicalInvestmentAdmissionRegistry()
 
 
 def _inputs():
@@ -105,15 +108,30 @@ def _thesis():
 
 
 def _case(*, core03, core02, price_ref, trust_status):
-    upstream = build_decision_upstream_admission(
+    _, upstream = build_runtime_upstream_authority(
         case_id=CASE_ID,
-        cutoff_date="2026-10-04",
-        reality_status="PASS",
+        market="CN-A",
+        symbol="300750",
+        company="宁德时代",
+        cutoff_date=CUTOFF,
+        reality=core02["reality"],
         quality=core02["quality"],
-        value_driver_status="PASS",
-        valuation_status="PASS",
-        forecast_status="PASS",
+        value_driver=core02["value_driver_ranking"],
+        valuation={
+            "status": "PASS",
+            "primary_model": "DCF",
+            "probability_weighted_value_per_share": "433.5675",
+        },
+        forecast=core03["forecast"],
         thesis=_thesis(),
+        declared_statuses={
+            "REALITY": "PASS",
+            "QUALITY": "CONDITIONAL",
+            "VALUE_DRIVER": "PASS",
+            "VALUATION": "PASS",
+            "FORECAST": "PASS",
+        },
+        registry=UPSTREAM_AUTHORITY_REGISTRY,
     )
     return {
         "contract_version": "IIOS-INVESTMENT-CORE-0.3",
@@ -192,7 +210,7 @@ def test_real_300750_quality_gate_is_explicitly_propagated_to_kernel():
     registry, price_ref = _price_ref()
     case = _case(core03=core03, core02=core02, price_ref=price_ref, trust_status="PASS")
 
-    result = decide_v03(case, current_price_resolver=registry)
+    result = decide_v03(case, current_price_resolver=registry, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY)
 
     assert result["decision_status"] == "REVIEW_REQUIRED"
     assert result["gates"]["reality"] == "PASS"
