@@ -21,6 +21,7 @@ from tests.test_investment_core_v03 import (
     CURRENT_PRICE_REGISTRY,
     EVIDENCE_ROOT_REGISTRY,
     INDEPENDENT_FORECAST_REGISTRY,
+    UPSTREAM_AUTHORITY_REGISTRY,
     case,
 )
 
@@ -107,6 +108,7 @@ def test_c5_unfavorable_snapshot_stops_adds_but_does_not_rewrite_decision():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
     assert result["decision"]["positioning_sizing"]["timing_bias"] == "UNFAVORABLE"
