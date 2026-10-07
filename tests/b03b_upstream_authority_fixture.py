@@ -9,6 +9,7 @@ from iios_mvp.canonical_investment_admission_v01 import (
     InMemoryCanonicalInvestmentAdmissionRegistry,
     build_canonical_investment_admission,
 )
+from iios_mvp.quality_gate_v03 import build_quality_gate
 from iios_mvp.decision_upstream_admission_v03 import (
     build_canonical_upstream_admission_v02,
     build_decision_upstream_admission,
@@ -77,9 +78,15 @@ def build_runtime_upstream_authority(
     if declared_statuses:
         statuses.update({str(k).upper(): str(v).upper() for k, v in declared_statuses.items()})
 
+    quality_gate = build_quality_gate(
+        quality,
+        case_id=case_id,
+        cutoff_date=cutoff_date.isoformat(),
+    )
+    statuses["QUALITY"] = quality_gate["status"]
     outputs = {
         "REALITY": reality,
-        "QUALITY": quality,
+        "QUALITY": quality_gate,
         "VALUE_DRIVER": value_driver,
         "VALUATION": valuation,
         "FORECAST": forecast,
@@ -118,14 +125,6 @@ def build_runtime_upstream_authority(
         forecast_status=statuses["FORECAST"],
         thesis=thesis,
     )
-    # Quality authority is owned by the canonical Quality Gate output; do not
-    # permit the fixture helper to override the derived quality status.
-    if base["quality_gate_status"] != statuses["QUALITY"]:
-        raise ValueError(
-            f"fixture QUALITY status mismatch: declared={statuses['QUALITY']} "
-            f"derived={base['quality_gate_status']}"
-        )
-
     v02 = build_canonical_upstream_admission_v02(
         base_record=base,
         canonical_admission_refs=refs,
