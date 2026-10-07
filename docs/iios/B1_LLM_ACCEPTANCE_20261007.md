@@ -15,7 +15,8 @@ Included:
 - exact-stage authorization for downstream engine invocation;
 - complete-run `IIOS_RUN_RECEIPT-0.1` builder;
 - typed semantic-artifact common schema;
-- regression tests for canonical/non-canonical execution boundaries.
+- regression tests for canonical/non-canonical execution boundaries;
+- dedicated GitHub Actions verification workflow.
 
 ## Explicit non-goals
 
@@ -34,12 +35,12 @@ Those remain B2/B4 work.
 Exact local checks on the candidate tree:
 
 ```text
-pytest:       6 passed
+pytest:       8 passed
 compileall:   PASS
 JSON syntax:  PASS
 ```
 
-The initial test collection failure was environmental only (`PYTHONPATH` omitted) and was reproduced cleanly after setting the package root; no test logic was changed to obtain PASS.
+The initial test collection failure was environmental only (`PYTHONPATH` omitted) and was reproduced cleanly after setting the package root; no test logic was weakened to obtain PASS.
 
 ## Canonical integrity properties
 
@@ -50,7 +51,24 @@ The initial test collection failure was environmental only (`PYTHONPATH` omitted
 5. A COMPLETE run cannot issue an incomplete run receipt.
 6. A direct lower-level execution can be explicitly classified as `NON_CANONICAL`.
 7. Stage hashes are lowercase SHA-256 values.
-8. No Investment Core v0.3 economic formula or decision precedence rule is modified.
+8. Both new JSON schemas are syntactically valid and the run-receipt schema accepts a canonical complete receipt while rejecting an external semantic producer.
+9. No Investment Core v0.3 economic formula or decision precedence rule is modified.
+
+## Remote acceptance
+
+Dedicated workflow:
+
+```text
+.github/workflows/iios_b1_llm_orchestrator.yml
+```
+
+It runs:
+
+- B1 orchestrator tests;
+- B1 schema tests;
+- compileall;
+- JSON schema syntax validation;
+- git diff --check.
 
 ## Next gate
 

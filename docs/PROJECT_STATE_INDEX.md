@@ -1115,7 +1115,9 @@ Implemented:
 
 This is a control-plane implementation only. It does not generate economic judgments and does not modify Investment Core v0.3 formulas, Trust/Quality/Decision semantics or automatic-execution boundaries.
 
-Local acceptance: **6 tests PASS / compileall PASS / JSON syntax PASS**.
+Local acceptance: **8 tests PASS / compileall PASS / JSON syntax PASS**.
+
+Dedicated remote workflow: `.github/workflows/iios_b1_llm_orchestrator.yml`.
 
 The existing lower-level Investment Core modules remain directly unit-testable, but product-declared canonical investment execution must be bound to the orchestrator. B2 will implement the actual LLM Semantic Workbench and semantic producer admission against admitted evidence.
 
