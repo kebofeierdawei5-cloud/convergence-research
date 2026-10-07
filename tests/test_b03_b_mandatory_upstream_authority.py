@@ -98,13 +98,16 @@ def test_b03_b_engine_propagates_upstream_authority_resolver():
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert errors == []
 
     decision = decide(
         c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert decision["decision"]["auto_execution"] is False
