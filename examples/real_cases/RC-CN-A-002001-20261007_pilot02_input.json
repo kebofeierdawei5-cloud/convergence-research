@@ -1,0 +1,209 @@
+{
+  "pilot": "PILOT-02",
+  "research_weighting": {
+    "cyclical": "0.70",
+    "growth": "0.30",
+    "financial_sector_inclusion": false,
+    "classification": "USER_REQUESTED_RESEARCH_WEIGHTING_NOT_EVIDENCE"
+  },
+  "case_id": "RC-CN-A-002001-20261007",
+  "market": "CN-A",
+  "symbol": "002001",
+  "company": "浙江新和成股份有限公司",
+  "as_of_date": "2026-10-07",
+  "cutoff_date": "2026-10-07",
+  "security_classification": "NON_FINANCIAL",
+  "evidence": [
+    {
+      "evidence_id": "E001",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-08-20",
+      "source": "CNINFO 2026 H1 annual report",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-08-20/1225482495.PDF",
+      "purpose": "issuer identity, listing, business classification"
+    },
+    {
+      "evidence_id": "E002",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-08-20",
+      "source": "CNINFO 2026 H1 annual report",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-08-20/1225482495.PDF",
+      "purpose": "financial reality, growth and cash-flow anchors"
+    },
+    {
+      "evidence_id": "E003",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-08-20",
+      "source": "CNINFO 2026 H1 annual report",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-08-20/1225482495.PDF",
+      "purpose": "product mix, margin and operating-cycle anchors"
+    },
+    {
+      "evidence_id": "E004",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-08-20",
+      "source": "CNINFO 2026 H1 annual report",
+      "source_ref": "https://static.cninfo.com.cn/finalpage/2026-08-20/1225482495.PDF",
+      "purpose": "capital structure and balance-sheet anchors"
+    },
+    {
+      "evidence_id": "E005",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-09-30",
+      "source": "Yahoo Finance historical market data",
+      "source_ref": "https://query1.finance.yahoo.com/v8/finance/chart/002001.SZ?period1=1790726400&period2=1790812800&interval=1d&events=history&includeAdjustedClose=true",
+      "purpose": "latest tradable close before 2026-10-07"
+    },
+    {
+      "evidence_id": "E006",
+      "claim_type": "OBSERVED_FACT",
+      "known_at": "2026-09-17",
+      "source": "Shenzhen Stock Exchange 2026 holiday schedule",
+      "source_ref": "https://www.szse.cn/disclosure/notice/general/t20260917_617929.html",
+      "purpose": "2026-10-07 is a non-trading day; latest tradable session is 2026-09-30"
+    }
+  ],
+  "economic_structure": {
+    "type": "PHARMA_MANUFACTURING_AND_NUTRITION_CHEMICALS",
+    "sector_classification": "NON_FINANCIAL",
+    "h1_2026_revenue_bn_cny": "13.12930026089",
+    "h1_2026_net_profit_bn_cny": "4.01073345455",
+    "h1_2026_adjusted_net_profit_bn_cny": "3.91893656372",
+    "h1_2026_operating_cash_flow_bn_cny": "3.64014428294",
+    "h1_2026_rd_bn_cny": "0.60572807764",
+    "revenue_mix": {
+      "nutrition_products_pct": "67.07",
+      "flavors_fragrances_pct": "15.40",
+      "new_materials_pct": "8.88",
+      "overseas_sales_pct": "58.43",
+      "pharma_chemicals_pct": "90.64"
+    },
+    "cycle_anchor": "H1 report states methionine demand and price rose materially and volume/price both increased.",
+    "growth_anchors": [
+      "new materials expansion",
+      "overseas revenue exposure",
+      "R&D investment growth",
+      "product and capacity expansion"
+    ],
+    "style_mix": {
+      "cyclical": "0.70",
+      "growth": "0.30"
+    }
+  },
+  "thesis": {
+    "status": "INTACT",
+    "statement": "本次测试将新和成视为‘周期70% + 成长30%’的组合型研究对象：主要盈利弹性来自维生素/营养品等产品价格与供需周期，成长部分来自产品扩张、海外渗透、新材料与研发投入。",
+    "mechanism": "周期部分决定短中期利润弹性与估值中枢；成长部分决定盈利中枢能否在周期回归后继续抬升。核心验证不是单看利润增速，而是价格/供需、毛利率、现金流与新增资本回报能否共同成立。",
+    "key_driver_ids": [
+      "nutrition_product_price_cycle",
+      "product_mix_and_volume",
+      "growth_project_capital_returns"
+    ],
+    "falsifiers": [
+      "主要营养品价格与供需快速均值回归导致盈利显著低于正常化假设",
+      "核心产品毛利率持续恶化且无法由量增抵消",
+      "经营现金流长期弱于利润且营运资本无法解释",
+      "新增材料/产能项目回报持续低于必要回报",
+      "重大治理或中小股东利益风险恶化"
+    ],
+    "monitoring_triggers": [
+      "核心营养品价格与价差",
+      "核心产品毛利率",
+      "经营现金流/利润转换",
+      "新材料与新增产能投产后回报",
+      "海外销售增长与利润率"
+    ],
+    "evidence_ids": ["E002", "E003", "E004"],
+    "known_at": "2026-08-20T23:59:00+08:00",
+    "prepared_without_current_price": true
+  },
+  "forecast_assumptions": {
+    "version": "PILOT-02-XHC-FORECAST-0.1",
+    "classification": "EXPLICIT_MODEL_ASSUMPTION_NOT_EVIDENCE",
+    "method": "NORMALIZED_EARNINGS_DRIVER_SCENARIO",
+    "horizon_years": "1",
+    "prepared_without_current_price": true,
+    "style_weighting": {
+      "cyclical": "0.70",
+      "growth": "0.30"
+    },
+    "scenarios": {
+      "bear": {
+        "normalized_eps_cny": "2.00",
+        "valuation_multiple": "9.5",
+        "value_per_share": "19.00",
+        "rationale": "周期回归较快，核心产品价差和毛利率下行；成长项目只能部分抵消。"
+      },
+      "base": {
+        "normalized_eps_cny": "2.80",
+        "valuation_multiple": "11.5",
+        "value_per_share": "32.20",
+        "rationale": "周期从高位正常化但仍高于低景气水平，量增/产品结构和成长项目托住盈利中枢。"
+      },
+      "bull": {
+        "normalized_eps_cny": "3.50",
+        "valuation_multiple": "13.0",
+        "value_per_share": "45.50",
+        "rationale": "主要营养品周期维持强势更久，海外/新材料扩张提高盈利质量并抬升正常化盈利。"
+      }
+    }
+  },
+  "valuation": {
+    "status": "PASS",
+    "primary_model": "FORWARD_PE",
+    "model_role": "PRIMARY_VALUATION",
+    "scenario_values_per_share": {
+      "bear": "19.00",
+      "base": "32.20",
+      "bull": "45.50"
+    },
+    "formula": "normalized_eps × valuation_multiple",
+    "model_note": "为周期股使用正常化盈利/估值倍数的测试模型；EPS、倍数和情景概率均为显式模型假设，不是市场一致预期。"
+  },
+  "risk": {
+    "status": "PASS",
+    "max_loss_pct": "25",
+    "thesis_breaks": [
+      "核心营养品盈利中枢结构性下移",
+      "现金流持续背离利润且缺乏营运资本解释",
+      "新增资本开支长期无法产生足够回报",
+      "重大治理或股东利益风险恶化"
+    ],
+    "evidence_ids": ["E002", "E003", "E004"]
+  },
+  "portfolio": {
+    "position_pct": "0",
+    "constraint_status": "PASS",
+    "can_add": true,
+    "buy_add_package": {
+      "entry_zone": ["24.00", "25.95"],
+      "initial_position_pct": "5",
+      "target_position_pct": "10",
+      "max_position_pct": "10",
+      "thesis_break_triggers": [
+        "核心营养品盈利中枢结构性下移",
+        "现金流持续背离利润且缺乏营运资本解释"
+      ],
+      "monitoring_triggers": [
+        "核心营养品价格与价差",
+        "核心产品毛利率",
+        "经营现金流/利润转换"
+      ]
+    },
+    "classification": "PILOT_TEST_HARNESS_NOT_USER_PORTFOLIO_STATE"
+  },
+  "monitoring": [
+    {
+      "metric": "nutrition_product_cycle",
+      "condition": "quarterly recheck of major product prices, volume and gross margin"
+    },
+    {
+      "metric": "cash_conversion",
+      "condition": "quarterly operating cash flow versus earnings and working-capital movements"
+    },
+    {
+      "metric": "growth_project_returns",
+      "condition": "reassess new-materials/capacity economics after production ramp"
+    }
+  ]
+}
