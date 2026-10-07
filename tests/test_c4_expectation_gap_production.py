@@ -45,6 +45,7 @@ from tests.test_investment_core_v03 import (
     independent_forecast_ref,
     market_implied_expectation_snapshot,
     UPSTREAM_AUTHORITY_REGISTRY,
+    VALUATION_OUTPUT_RESOLVER,
 )
 
 
@@ -218,6 +219,7 @@ def test_c4_nonpositive_gap_is_a_real_calculation_but_remains_advisory():
     assert Decimal(evaluation["gap_relative"]) < 0
 
     result = decide(
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
