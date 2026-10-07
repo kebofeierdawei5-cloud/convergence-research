@@ -1,0 +1,157 @@
+name: IIOS PILOT-04 — Xinhecheng Independent Clean Replay
+
+on:
+  pull_request:
+    paths:
+      - "tools/pilot04_clean_replay_verify.py"
+      - ".github/workflows/iios_pilot04.yml"
+      - "examples/real_cases/RC-CN-A-002001-20261007_pilot02_input.json"
+      - "tools/pilot02_xinhecheng_e2e.py"
+      - "iios_mvp/**"
+      - "tests/b03b_upstream_authority_fixture.py"
+      - "tests/b04b_return_lineage_fixture.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iios-pilot-04-xinhecheng-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pilot-04:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      EXPECTED_CANONICAL_BASE_SHA: 79c5576bc4c63d3989a252401683c6691e66d998
+      ACTUAL_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assert clean canonical base
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            test "${ACTUAL_PR_BASE_SHA}" = "${EXPECTED_CANONICAL_BASE_SHA}"
+          fi
+          git fetch origin main --depth=1
+          remote_main="$(git rev-parse origin/main)"
+          test "${remote_main}" = "${EXPECTED_CANONICAL_BASE_SHA}"
+          echo "PILOT-04_CANONICAL_BASE_SHA=${remote_main}"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pilot dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema pypdf
+
+      - name: Compile clean-replay code
+        run: python -m compileall -q iios_mvp tools tests/b03b_upstream_authority_fixture.py tests/b04b_return_lineage_fixture.py
+
+      - name: Acquire fresh exact primary evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/pilot04-xhc
+          mkdir -p /tmp/pilot04-xhc/raw /tmp/pilot04-xhc/out
+
+          curl --connect-timeout 15 --max-time 75 -L --fail --retry 3 --retry-delay 2             "https://static.cninfo.com.cn/finalpage/2026-08-20/1225482495.PDF"             -o /tmp/pilot04-xhc/raw/xinhecheng_2026_h1.pdf
+
+          curl --connect-timeout 15 --max-time 45 -L --fail --retry 3 --retry-delay 2             -A "Mozilla/5.0"             -H "Referer: https://gu.qq.com/"             "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sz002001,day,2026-09-30,2026-09-30,5,"             -o /tmp/pilot04-xhc/raw/002001_20260930_tencent.json
+
+          curl --connect-timeout 15 --max-time 45 -L --fail --retry 3 --retry-delay 2             "https://m.chinaclear.cn/zdjs/gszb/202609/0404d81f1ee8409c95b5dc4af693409f.shtml"             -o /tmp/pilot04-xhc/raw/chinaclear_2026_holiday_schedule.html
+
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          from pypdf import PdfReader
+
+          root = Path("/tmp/pilot04-xhc/raw")
+
+          def sha(path):
+              digest = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          pdf = root / "xinhecheng_2026_h1.pdf"
+          text = "\n".join(page.extract_text() or "" for page in PdfReader(str(pdf)).pages)
+          required = [
+              "浙江新和成股份有限公司",
+              "13,129,300,260.89",
+              "4,010,733,454.55",
+              "3,640,144,282.94",
+              "605,728,077.64",
+              "67.07%",
+              "58.43%",
+          ]
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit("CNINFO H1 report anchor extraction failed: " + repr(missing))
+
+          price = json.loads((root / "002001_20260930_tencent.json").read_text())
+          node = price["data"]["sz002001"]
+          bars = node.get("day") or node.get("qfqday") or node.get("hfqday")
+          if not isinstance(bars, list):
+              raise SystemExit("Tencent historical K-line bars missing")
+          row = next((item for item in bars if item and str(item[0]) == "2026-09-30"), None)
+          if row is None or len(row) < 3:
+              raise SystemExit("2026-09-30 row missing from Tencent historical K-line response")
+          if float(row[2]) != 25.95:
+              raise SystemExit(f"unexpected 2026-09-30 close: {row[2]!r}")
+
+          price_projection = json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+          price_projection_sha256 = hashlib.sha256(price_projection).hexdigest()
+
+          calendar = (root / "chinaclear_2026_holiday_schedule.html").read_text(
+              encoding="utf-8", errors="ignore"
+          )
+          if not (("2026/10/01" in calendar and "2026/10/07" in calendar) or
+                  ("10月1日" in calendar and "10月7日" in calendar)):
+              raise SystemExit("ChinaClear holiday-page closure anchors missing")
+
+          receipt = {
+              "case_id": "RC-CN-A-002001-20261007",
+              "cutoff_date": "2026-10-07",
+              "report_sha256": sha(pdf),
+              "report_exact_bytes": True,
+              "price_source_ref": "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sz002001,day,2026-09-30,2026-09-30,5,",
+              "price_sha256": sha(root / "002001_20260930_tencent.json"),
+              "price_exact_bytes": True,
+              "price_projection_sha256": price_projection_sha256,
+              "calendar_sha256": sha(root / "chinaclear_2026_holiday_schedule.html"),
+              "calendar_exact_bytes": True,
+              "latest_tradable_date": "2026-09-30",
+              "price": "25.95",
+          }
+          Path("/tmp/pilot04-xhc/PILOT-04_RAW_EVIDENCE_RECEIPT.json").write_text(
+              json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True),
+              encoding="utf-8",
+          )
+          print(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True))
+          PY
+
+      - name: Independently replay the full Investment Core chain
+        run: |
+          PYTHONPATH=. python tools/pilot02_xinhecheng_e2e.py             --report /tmp/pilot04-xhc/raw/xinhecheng_2026_h1.pdf             --price /tmp/pilot04-xhc/raw/002001_20260930_tencent.json             --receipt /tmp/pilot04-xhc/PILOT-04_RAW_EVIDENCE_RECEIPT.json             --out /tmp/pilot04-xhc/out
+
+      - name: Exact replay equivalence check
+        run: |
+          PYTHONPATH=. python tools/pilot04_clean_replay_verify.py             /tmp/pilot04-xhc/out /tmp/pilot04-xhc/PILOT-04_RAW_EVIDENCE_RECEIPT.json
+
+      - name: Persist replay artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: iios-pilot04-xinhecheng-clean-replay-20261007
+          path: /tmp/pilot04-xhc/
+          retention-days: 14
+
+      - name: Git diff-check
+        run: git diff --check
