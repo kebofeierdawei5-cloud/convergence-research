@@ -1,0 +1,137 @@
+name: IIOS M1.2 FM03 State Engine
+
+on:
+  pull_request:
+    paths:
+      - "research/fm00/OU-M12-FM00-CATL-001.json"
+      - "research/fm01/**"
+      - "research/fm02/**"
+      - "research/fm03/**"
+      - ".github/workflows/iios_m12_fm03_state_engine.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-fm03-state-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validation dependency
+        run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Verify frozen FM03 contracts
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          def canonical_sha(value):
+              return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+          root = Path("research/fm03")
+          contract = json.loads((root / "FM03_STATE_CONTRACT.json").read_text())
+          schema = json.loads((root / "fm03_state_contract.schema.json").read_text())
+          errors = sorted(Draft202012Validator(schema).iter_errors(contract), key=lambda e: list(e.path))
+          assert not errors, "\n".join(str(e) for e in errors)
+          upstream = json.loads(Path("research/fm02/FM02_FEATURE_CONTRACT.json").read_text())
+          lock = json.loads(Path("research/fm00/OU-M12-FM00-CATL-001.json").read_text())
+          assert canonical_sha(upstream) == contract["input_contract"]["feature_contract_sha256"]
+          assert canonical_sha(lock) == contract["origin_contract"]["outer_universe_lock_sha256"]
+          assert contract["status"] == "FROZEN"
+          assert contract["confirmatory_eligible"] is False
+          assert contract["capability_boundary"] == {"state_engine_only":True,"conditional_backtest":False,"model_selection":False,"production_router":False,"automatic_execution":False}
+          print("FM03 frozen contract + upstream hashes: PASS")
+          PY
+      - name: Build exact FM02 snapshot
+        run: python research/fm02/fm02_feature_builder.py --output /tmp/FM02_FEATURE_SNAPSHOT.ndjson --receipt /tmp/FM02_FEATURE_BUILD_RECEIPT.json
+      - name: Run FM03 unit tests
+        run: FM02_FEATURE_SNAPSHOT=/tmp/FM02_FEATURE_SNAPSHOT.ndjson python -m unittest discover -s research/fm03/tests -p 'test_*.py' -v
+      - name: Build FM03 state snapshot
+        run: python research/fm03/fm03_state_engine.py --feature-snapshot /tmp/FM02_FEATURE_SNAPSHOT.ndjson --output /tmp/FM03_STATE_SNAPSHOT.ndjson --receipt /tmp/FM03_STATE_BUILD_RECEIPT.json
+      - name: Validate FM03 output schema and receipt
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("research/fm03")
+          schema = json.loads((root / "fm03_state_snapshot.schema.json").read_text())
+          validator = Draft202012Validator(schema)
+          rows = [json.loads(line) for line in Path("/tmp/FM03_STATE_SNAPSHOT.ndjson").read_text().splitlines() if line.strip()]
+          errors=[]
+          for i,row in enumerate(rows):
+              for e in validator.iter_errors(row):
+                  errors.append(f"row[{i}] {e.message}")
+          assert not errors, "\n".join(errors)
+          receipt=json.loads(Path("/tmp/FM03_STATE_BUILD_RECEIPT.json").read_text())
+          assert len(rows)==22
+          assert receipt["status"]=="PASS"
+          assert receipt["origin_count"]==11
+          assert receipt["row_count"]==22
+          assert receipt["state_dimensions"]==["DIRECTION","MOMENTUM","VOLATILITY","SEASONALITY","MEAN_REVERSION_PRESSURE","STRUCTURAL_STABILITY","DATA_QUALITY"]
+          assert receipt["confirmatory_eligible"] is False
+          print("FM03 output schema + receipt: PASS")
+          PY
+      - name: Independent FM03 PIT / provenance audit
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+
+          TZ8=timezone(timedelta(hours=8))
+          def qkey(p): return int(p[:4]), int(p[-1])
+          def qadd(p,o):
+              y,q=qkey(p); s=y*4+q-1+o; return f"{s//4}Q{s%4+1}"
+          def qcutoff(p):
+              y,q=qkey(p); m={1:3,2:6,3:9,4:12}[q]; d={3:31,6:30,9:30,12:31}[m]; return datetime(y,m,d,23,59,59,tzinfo=TZ8)
+
+          lock=json.loads(Path("research/fm00/OU-M12-FM00-CATL-001.json").read_text())
+          fm02=[json.loads(l) for l in Path("/tmp/FM02_FEATURE_SNAPSHOT.ndjson").read_text().splitlines() if l.strip()]
+          fm03=[json.loads(l) for l in Path("/tmp/FM03_STATE_SNAPSHOT.ndjson").read_text().splitlines() if l.strip()]
+          fm02_by_id={r["row_id"]:r for r in fm02}
+          origins=lock["origins"]
+          assert len(fm02)==22 and len(fm03)==22
+          expected={(o["origin_id"],d) for o in origins for d in ("REVENUE","NET_PROFIT")}
+          assert {(r["origin_id"],r["driver_id"]) for r in fm03}==expected
+          prior_by_key={}
+          for i,o in enumerate(origins):
+              prior_by_key[o["origin_id"]]=origins[i-1]["origin_id"] if i else None
+          for row in fm03:
+              source=fm02_by_id[row["feature_row_id"]]
+              assert row["origin_id"]==source["origin_id"] and row["driver_id"]==source["driver_id"]
+              cutoff=qcutoff(row["origin_id"])
+              assert datetime.fromisoformat(row["origin_cutoff"])==cutoff
+              assert datetime.fromisoformat(row["feature_asof_known_at"])<=cutoff
+              assert qkey(row["max_feature_input_period"])<=qkey(row["feature_asof_period"])<=qkey(row["origin_id"])
+              for off in (1,2,4):
+                  target=qkey(qadd(row["origin_id"],off))
+                  assert qkey(row["feature_asof_period"])<target
+                  assert qkey(row["max_feature_input_period"])<target
+              assert row["feature_row_id"] in row["input_feature_row_ids"]
+              referenced=set(row["input_feature_row_ids"])
+              assert referenced.issubset(set(fm02_by_id))
+              upstream_ids=set().union(*(set(fm02_by_id[rid]["input_record_ids"]) for rid in referenced))
+              assert set(row["input_record_ids"]).issubset(upstream_ids)
+              prior_origin=prior_by_key[row["origin_id"]]
+              for dimension in ("VOLATILITY","STRUCTURAL_STABILITY"):
+                  state=row["states"][dimension]
+                  if prior_origin is None:
+                      assert state["status"]=="UNKNOWN" and state["unknown_reason"]=="NO_PRIOR_FROZEN_ORIGIN"
+                  else:
+                      prior_id=f"FM02-{source['row_id'].split('-',2)[1]}-{prior_origin}-{row['driver_id']}"
+                      assert prior_id in state["input_feature_row_ids"]
+          print("FM03 independent PIT/provenance audit: PASS")
+          PY
+      - name: Compile FM03
+        run: python -m compileall -q research/fm03
+      - name: Diff check
+        run: git diff --check
