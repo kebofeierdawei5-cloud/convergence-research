@@ -75,6 +75,8 @@ M1.2-FM02 PIT Feature Builder / Forecastability Feature Contract = PASS / MERGED
         ↓
 M1.2-FM03 State Engine / Forecastability State Construction = PASS / MERGED / CANONICAL
         ↓
+M1.2-FM04 Conditional Backtest = PASS / MERGED / CANONICAL
+        ↓
 M1.2-FM03 State Engine / Forecastability State Construction = PASS / MERGED / CANONICAL
 ```
 
@@ -385,9 +387,9 @@ RP-01 remains a separate legacy fixture regression (`str.read`) and is not FM01 
 
 ## 9. Next canonical development boundary
 
-FM01 data admission, FM02 feature construction, and FM03 state construction are complete. The next boundary is:
+FM01 data admission, FM02 feature construction, FM03 state construction, and FM04 conditional backtest are complete. The next boundary is:
 
-**M1.2-FM-04 Conditional Backtest**
+**M1.2-FM-05 Scope Freeze / Data Sufficiency Adjudication**
 
 ### M1.2-FM02 canonical acceptance
 
@@ -416,6 +418,9 @@ and does not authorize State Engine, Conditional Backtest, Model Selection, Prod
 FM02 features are horizon-neutral feature-construction outputs. Unknown outcomes remain explicit and are never imputed.
 
 ### M1.2 forward gates
+
+FM04 is complete under its exploratory boundary. The next controlled development boundary is:
+**M1.2-FM05 Scope Freeze / Data Sufficiency Adjudication.**
 
 FM03 must preserve:
 
@@ -455,3 +460,20 @@ FM03 preserves the frozen FM00 origin schedule and binds the FM02 feature contra
 UNKNOWN remains first-class and is never imputed. Comparison-only states require the immediately prior frozen origin. Feature/state provenance remains bound to FM02 feature rows and upstream DriverSeries record IDs. Downstream Conditional Backtest, Model Selection, Production Router, and Automatic Execution capabilities remain explicitly disabled.
 
 FM03 is DEVELOPMENT_ONLY under the contaminated FM00 research lineage and does not constitute predictive evidence, confirmatory evidence, or production forecasting authorization.
+
+### M1.2-FM04 canonical acceptance
+Status: **PASS / MERGED / CANONICAL**
+
+- PR #150;
+- accepted CI run #2 = SUCCESS;
+- accepted run id `37564860982`;
+- 12 FM04 tests passed;
+- exact FM02 and FM03 reconstruction passed;
+- FM03 state snapshot canonical hash `7e020df6eeb5b6aa4cf47e625d902c3c5ca7645457427c8af085a55d25811fd4`;
+- real CATL Conditional Backtest: 406 outer selection units, 0 selected, 406 `NO_SELECTION`, 79 conditional descriptive groups;
+- independent PIT/nested-selection/scoring audit = PASS;
+- result schema/invariants, compileall, and git diff-check = PASS.
+
+The 0 selected result is a valid sufficiency boundary under the frozen research policy. It is not evidence that a state dimension predicts future outcomes, nor evidence for production model routing. FM04 remains exploratory/contaminated/development-only with `confirmatory_eligible=false`.
+
+Acceptance: `docs/iios/FM04_ACCEPTANCE_2026-10-07.md`.
