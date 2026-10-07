@@ -389,6 +389,24 @@ Historical G2 frozen identity remains immutable and separate from R0 successor e
 
 RP-01 remains a separate legacy fixture regression (`str.read`) and is not FM01 admission evidence.
 
+## 10. A02 Runtime Evidence — 2026-10-07
+
+The canonical A02 acquisition workflow produced a real immutable runtime artifact, independently verified, but the admission gate remains BLOCKED.
+
+- workflow run: 37588901115
+- job: 112684403959
+- artifact: 11468022181 / A02-exact-raw-37588901115
+- artifact digest: b385d27e24b5765aca9c62e50bd01617c6553a1985f44f6be040e20ec47ab180
+- current 000906 SHA-256: b3338f5f6fdfd04a72fb42f5444539507b50ee4805c83dabb04ec26e54c3b5fb
+- frozen historical target SHA-256: f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984
+- B PIT raw bundle: NOT MATERIALIZED
+- A02 verdict: BLOCKED
+
+The independent verification record is docs/iios/A02_RUNTIME_INDEPENDENT_VERIFICATION_v0.2.json. The full acquisition ZIP is retained in the persistent Library and is not itself canonical source evidence.
+
+Development rule: prioritize actual historical raw evidence supply and B free-first materialization over additional archive-probe expansion. Until A/B raw evidence, field-level known_at, PIT reconstruction, and independent replay pass, the cross-sectional research path and model selection remain locked.
+
+
 ## 9. Next canonical development boundary
 
 FM01 data admission, FM02 feature construction, FM03 state construction, FM04 conditional backtest, FM05 scope / estimand / sufficiency freeze, and FM07 research-epoch amendment gate are complete. The next boundary is **design of a new M1.2 research epoch**, subject to explicit scope / estimand / sufficiency freeze before execution:
