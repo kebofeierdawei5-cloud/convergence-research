@@ -1,0 +1,37 @@
+{
+  "schema_version": "IIOS-MVP-PILOT-00-BASELINE-0.1",
+  "status": "FROZEN_FOR_PILOT",
+  "baseline_main": "f9ab3590425c0df87881ce2b7a2ce1aee11749d5",
+  "recorded_at": "2026-10-07",
+  "purpose": "Freeze exact company-level Investment Core baseline for real-user pilot testing.",
+  "pilot_scope": {
+    "controlled_cases": [
+      "RC-CN-A-300750-20261004",
+      "RC-CN-A-002422-20261004"
+    ],
+    "fresh_candidate_required_after_controlled_cases": true
+  },
+  "critical_path": "Investment Core",
+  "non_blocking_track": "A02 / CSI800 / cross-sectional forecast research",
+  "prohibited": {
+    "automatic_execution": false,
+    "scheduler": false,
+    "alerts": false,
+    "current_to_historical_substitution": true,
+    "llm_direct_authoritative_state_write": true
+  },
+  "acceptance_questions": [
+    "Can a real company case run end-to-end without bypassing gates?",
+    "Are AI proposal and human approval distinct?",
+    "Are evidence/provenance failures visible and fail-closed?",
+    "Are publication/report outputs projections only?",
+    "Can lifecycle replay reproduce the persisted state?"
+  ],
+  "test_commands": [
+    "PYTHONPATH=. pytest -q tests/test_core03_real_300750.py tests/test_core04_final_300750_decision_e2e.py",
+    "PYTHONPATH=. pytest -q tests/test_c3_kolun_second_company_e2e.py",
+    "PYTHONPATH=. python tools/core04_final_300750_decision_e2e.py",
+    "PYTHONPATH=. python tools/c3_kolun_second_company_e2e.py",
+    "PYTHONPATH=. python tools/c7_full_lifecycle_e2e.py"
+  ]
+}
