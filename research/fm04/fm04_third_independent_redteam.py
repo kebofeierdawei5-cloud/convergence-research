@@ -96,6 +96,14 @@ def independent_full_check(result,states,records,lock,contract):
     state={(r["origin_id"],r["driver_id"]):r for r in states}
     by={"REVENUE":{},"NET_PROFIT":{}}
     for r in records: by[r["driver_id"]].setdefault(r["period"],[]).append(r)
+    evaluations=result["outer_selection_evaluations"]
+    assert result["summary"]["outer_selection_unit_count"]==len(evaluations)
+    assert result["summary"]["selected_count"]==sum(r["status"]!="NO_SELECTION" for r in evaluations)
+    assert result["summary"]["no_selection_count"]==sum(r["status"]=="NO_SELECTION" for r in evaluations)
+    assert result["summary"]["outer_evaluated_count"]==sum(r["status"]=="SELECTED_AND_EVALUATED" for r in evaluations)
+    assert sum(result["summary"]["selected_model_counts"].values())==result["summary"]["selected_count"]
+    assert all(result["summary"]["selected_model_counts"].get(m,0)>=0 for m in MODELS)
+
     for r in result["outer_selection_evaluations"]:
         sr=state[(r["outer_origin_id"],r["driver_id"])]
         st=sr["states"][r["state_dimension"]]
