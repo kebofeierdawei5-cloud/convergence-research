@@ -66,16 +66,10 @@ def main() -> int:
     assert run_current_audit(result_path, state_path), "BASELINE_AUDIT_DID_NOT_PASS"
 
     attacks = []
-    def populated_group_index(x):
-        for i, group in enumerate(x["conditional_performance"]):
-            if group.get("common_outer_sample_size", 0) > 0:
-                return i
-        raise AssertionError("NO_POPULATED_CONDITIONAL_GROUP")
     def tr01(x):
-        i = populated_group_index(x)
-        x["conditional_performance"][i]["models"]["SEASONAL_NAIVE"]["metrics"]["MAE"] += 1.0
+        x["conditional_performance"][0]["state_value"] = "FORGED_STATE"
     attacks.append(require_rejection(
-        "TR-01 mutate conditional_performance metric",
+        "TR-01 mutate conditional_performance state value",
         result,
         state_path,
         Path("/tmp/fm04-redteam-tr01.json"),
@@ -112,6 +106,19 @@ def main() -> int:
 
     # Independent static weakness check: a unit test contains a blanket exception
     # which can swallow its own assertion failure.
+    inner_sizes = [x["inner_sample_size"] for x in result["outer_selection_evaluations"]]
+    outer_group_sizes = [x.get("common_outer_sample_size", 0) for x in result["conditional_performance"]]
+    diagnostics = {
+        "outer_selection_units": len(inner_sizes),
+        "inner_sample_max": max(inner_sizes) if inner_sizes else 0,
+        "inner_sample_min": min(inner_sizes) if inner_sizes else 0,
+        "inner_sample_distribution": {str(n): inner_sizes.count(n) for n in sorted(set(inner_sizes))},
+        "conditional_group_count": len(outer_group_sizes),
+        "conditional_group_sample_max": max(outer_group_sizes) if outer_group_sizes else 0,
+        "conditional_group_sample_min": min(outer_group_sizes) if outer_group_sizes else 0,
+        "conditional_groups_with_observations": sum(n > 0 for n in outer_group_sizes),
+    }
+
     test_source = (root / "fm04/tests/test_fm04_conditional_backtest.py").read_text(encoding="utf-8")
     blanket_exception = "except Exception:\n                            pass" in test_source
     static = {
@@ -123,6 +130,7 @@ def main() -> int:
 
     print(json.dumps({
         "baseline_audit": "PASS",
+        "diagnostics": diagnostics,
         "attacks": attacks,
         "static": static,
         "vulnerable_count": sum(int(x["vulnerable"]) for x in attacks) + int(static["vulnerable"]),
