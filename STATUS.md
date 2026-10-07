@@ -10,7 +10,7 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 ## Current stage
 
-**Current canonical M1.2 status: FM03 State Engine / Forecastability State Construction = PASS / MERGED / CANONICAL**
+**Current canonical M1.2 status: FM04 Conditional Backtest = PASS / MERGED / CANONICAL**
 
 C8 and all prior Stage C productization milestones remain canonical.
 
@@ -325,3 +325,22 @@ Canonical C7 merge: 82d1911c985791e4b76f63d792588d175ee505f8.
 C7 proves append-only revisions, downstream-only Monitoring and Execution Receipt, deterministic replay, new-run/new-revision requirements, and projection-only Publication / Report. It introduces no new investment policy or execution automation.
 
 Historical next development boundary at the C7 checkpoint: C8 Final Independent Red-team / MVP Acceptance.
+
+## FM04 status
+
+M1.2-FM04 Conditional Backtest = PASS / MERGED / CANONICAL.
+
+- PR #150;
+- accepted CI run #2 = SUCCESS (run id `37564860982`);
+- 12 FM04 tests passed;
+- exact FM02 and FM03 reconstruction passed;
+- pinned FM03 snapshot hash: `7e020df6eeb5b6aa4cf47e625d902c3c5ca7645457427c8af085a55d25811fd4`;
+- real CATL result: 406 selection units, 0 selected, 406 `NO_SELECTION`, 79 conditional descriptive groups;
+- independent PIT/nested-selection/scoring audit = PASS;
+- output schema/invariants, compileall, and git diff-check = PASS.
+
+The backtest machinery is valid, but the frozen 11-origin / seven-state-dimension sample produces no state-conditioned inner selection with N≥3. This is a data-sufficiency result, not predictive-validity evidence. FM04 does not authorize production routing, confirmatory inference, or investment decisions.
+
+Acceptance: `docs/iios/FM04_ACCEPTANCE_2026-10-07.md`.
+
+**Next boundary: M1.2-FM05 Scope Freeze / Data Sufficiency Adjudication.**
