@@ -398,11 +398,12 @@
         "quality_gate",
         "thesis_admission",
         "evidence_ids",
-        "admission_record_hash"
+        "admission_record_hash",
+        "canonical_admission_refs"
       ],
       "properties": {
         "schema_version": {
-          "const": "IIOS-CORE-04-UPSTREAM-ADMISSION-0.1"
+          "const": "IIOS-CORE-04-UPSTREAM-ADMISSION-0.2"
         },
         "policy_version": {
           "const": "IIOS-DECISION-UPSTREAM-POLICY-0.1"
