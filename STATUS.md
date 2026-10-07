@@ -10,7 +10,7 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 ## Current stage
 
-**Current canonical M1.2 status: FM07 Research Epoch Amendment Gate = PASS / MERGED / CANONICAL**
+**Current canonical M1.2 status: New Research Epoch Design Proposal = CANONICAL DESIGN / NOT ACTIVATED**
 
 C8 and all prior Stage C productization milestones remain canonical.
 
@@ -51,7 +51,7 @@ Baseline:
 
 G2 historical frozen identity remains separate from the accepted R0 successor evidence; no frozen-byte rewrite was performed.
 
-**Next boundary: design of a new M1.2 research epoch; the current epoch is closed to same-epoch amendment and no new epoch is opened automatically.**
+**Next boundary: A02 B-01 Free-First Raw Evidence Materialization, required before activating the recommended cross-sectional successor epoch.**
 
 FM01 data gate is now `DATA_READY` after exact-source admission, provenance binding, 22-quarter coverage validation, and independent PIT replay.
 
@@ -378,3 +378,14 @@ M1.2-FM07 Research Epoch Amendment Gate = PASS / MERGED / CANONICAL.
 - current epoch `RE-M12-EXP-CATL-20260930` is closed to same-epoch amendment.
 
 Any result-driven scope, estimand, threshold, state, model-family, metric, origin-schedule, or universe change requires a new research epoch with pre-execution freeze and renewed PIT/provenance/purity controls. FM07 does not open that epoch automatically.
+
+
+## New research epoch design
+
+M1.2 New Research Epoch Design Proposal = **CANONICAL DESIGN / NOT ACTIVATED**.
+
+- PR #161;
+- merge commit `8dfcb150583c05f963fa2bd1c50ca9a55aed9935`;
+- recommendation: cross-sectional universe expansion with threshold preservation;
+- N>=3, MAE primary metric, existing model instances and state dimensions remain provisional defaults, not an active epoch;
+- A02 PIT universe admission, renewed provenance, purity freeze, and owner approval remain required before execution.
