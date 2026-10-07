@@ -1,6 +1,6 @@
 # M1.2-FM00 Git Baseline Acceptance — 2026-10-07
 
-Status: **CANDIDATE / PENDING CI**
+Status: **PASS / EXACT-HEAD-VERIFIED / PENDING MERGE**
 
 ## Task contract
 
@@ -75,6 +75,14 @@ because the exact M1.1 historical source snapshot is absent. No numeric replacem
 
 ## Acceptance rule
 
-This document remains **PENDING CI** until the additive remote baseline commit has passed the dedicated baseline workflow on its exact PR head. It must then be independently checked after merge.
+Exact-head acceptance has passed:
+
+- PR #136
+- accepted PR head: `7894c6892b5b8d2fa6f7c73d10c73b1841098742`
+- baseline workflow run #3: `37559419787` = SUCCESS
+- all baseline assertions passed
+
+This document remains tied to the exact PR-head evidence. After merge, the canonical main SHA must be re-read independently and recorded by a separate governance state synchronization step.
+
 
 No production capability is changed by this governance baseline.
