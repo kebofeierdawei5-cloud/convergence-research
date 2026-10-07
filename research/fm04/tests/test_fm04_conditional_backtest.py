@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -25,7 +26,8 @@ class FM04Tests(unittest.TestCase):
     def setUpClass(cls):
         cls.contract = load_json(ROOT / "FM04_CONDITIONAL_BACKTEST_CONTRACT.json")
         cls.lock = load_json(REPO / "research/fm00/OU-M12-FM00-CATL-001.json")
-        cls.states = load_ndjson(REPO / "research/fm03/FM03_STATE_SNAPSHOT.ndjson") if (REPO / "research/fm03/FM03_STATE_SNAPSHOT.ndjson").exists() else None
+        path = Path(os.environ.get("FM03_STATE_SNAPSHOT", REPO / "research/fm03/FM03_STATE_SNAPSHOT.ndjson"))
+        cls.states = load_ndjson(path) if path.exists() else None
         cls.records = load_ndjson(REPO / "research/fm01/CATL_DRIVER_HISTORY.ndjson")
 
     def capability(self):
