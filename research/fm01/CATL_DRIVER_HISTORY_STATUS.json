@@ -1,17 +1,32 @@
 {
-  "schema_version": "IIOS-FM01-DATASET-STATUS-0.1",
+  "schema_version": "IIOS-FM01-DATASET-STATUS-0.2",
   "dataset_id": "CATL-DRIVER-HISTORY-FM01-001",
-  "version": "0.1.0",
-  "status": "BLOCKED_DATA_INGRESS",
+  "version": "0.2.0",
+  "status": "DATA_READY",
   "security_id": "300750.SZ",
-  "drivers": ["REVENUE", "NET_PROFIT"],
-  "coverage_target": {"start": "2021Q1", "end": "2026Q2", "expected_quarters": 22},
-  "records_ingested": 0,
-  "records_verified": 0,
+  "drivers": [
+    "REVENUE",
+    "NET_PROFIT"
+  ],
+  "coverage_target": {
+    "start": "2021Q1",
+    "end": "2026Q2",
+    "expected_quarters": 22
+  },
+  "records_ingested": 44,
+  "records_verified": 44,
   "source_snapshot": {
     "required": true,
-    "present": false,
-    "reason": "The exact M1.1 historical source snapshot is not available in the FM-00 Git baseline."
+    "present": true,
+    "library_path": "/iios/PROJECT/IIOS_M1_1_QUARTERLY_REALITY_ROLLING_BACKTEST_v1.1.0.zip",
+    "sha256": "34c16dca266a2f35bc2895739b3e847a6c20ea0d66e0acbbc57274a96e22804b",
+    "bundle_sha256": "0f3dd5d5058722ce8f63a6a24d8c7aafa8b28c20ae0374c3bb0a94e9fa2609e1",
+    "exact_bytes_verified": true
   },
-  "prohibition": "No numeric observation may be filled from memory, third-party inference, or LLM estimation solely to satisfy coverage."
+  "provenance": {
+    "source_vintage_count": 22,
+    "direct_quarter_count": 12,
+    "derived_quarter_count": 10
+  },
+  "pit_replay": "PASS"
 }
