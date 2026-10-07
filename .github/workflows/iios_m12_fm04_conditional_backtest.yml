@@ -184,6 +184,11 @@ jobs:
           FM04_BACKTEST_RESULT: /tmp/FM04_BACKTEST_RESULT.json
         run: python research/fm04/fm04_independent_audit.py
 
+      - name: FM04-R result integrity mutation suite
+        env:
+          FM03_STATE_SNAPSHOT: /tmp/FM03_STATE_SNAPSHOT.ndjson
+        run: python research/fm04/fm04_r_mutation_tests.py
+
       - name: Compile FM04
         run: python -m compileall -q research/fm04
 
