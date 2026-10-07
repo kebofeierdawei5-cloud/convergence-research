@@ -1,0 +1,365 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/fm03-state-contract-0.1.json",
+  "title": "IIOS M1.2 FM03 State Contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "version",
+    "status",
+    "research_epoch_id",
+    "confirmatory_eligible",
+    "input_contract",
+    "origin_contract",
+    "state_dimensions",
+    "unknown_policy",
+    "provenance_contract",
+    "capability_boundary",
+    "capability_contract",
+    "research_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "IIOS-FM03-STATE-CONTRACT-0.1"
+    },
+    "contract_id": {
+      "type": "string",
+      "pattern": "^FC-M12-FM03-[A-Z0-9_-]+$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "status": {
+      "const": "FROZEN"
+    },
+    "research_epoch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "confirmatory_eligible": {
+      "const": false
+    },
+    "input_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature_snapshot",
+        "feature_contract",
+        "required_security_ids",
+        "required_drivers",
+        "required_feature_ids"
+      ],
+      "properties": {
+        "feature_snapshot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "feature_contract": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_security_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "required_drivers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "required_feature_ids": {
+          "type": "array",
+          "minItems": 6,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "origin_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outer_universe_lock",
+        "cutoff_rule",
+        "origin_selection_rule",
+        "exact_origin_count",
+        "exact_row_count",
+        "horizon_targets"
+      ],
+      "properties": {
+        "outer_universe_lock": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cutoff_rule": {
+          "const": "ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF"
+        },
+        "origin_selection_rule": {
+          "const": "FROZEN_PRE_SCHEDULED_ORIGINS_ONLY"
+        },
+        "exact_origin_count": {
+          "const": 11
+        },
+        "exact_row_count": {
+          "const": 22
+        },
+        "horizon_targets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "3M",
+            "6M",
+            "12M"
+          ],
+          "properties": {
+            "3M": {
+              "const": 1
+            },
+            "6M": {
+              "const": 2
+            },
+            "12M": {
+              "const": 4
+            }
+          }
+        }
+      }
+    },
+    "state_dimensions": {
+      "type": "array",
+      "const": [
+        {
+          "state_dimension": "DIRECTION",
+          "feature_id": "YOY_GROWTH",
+          "mapping": {
+            "negative": "DOWN",
+            "zero": "FLAT",
+            "positive": "UP"
+          }
+        },
+        {
+          "state_dimension": "MOMENTUM",
+          "feature_id": "GROWTH_ACCELERATION",
+          "mapping": {
+            "negative": "DECELERATING",
+            "zero": "FLAT",
+            "positive": "ACCELERATING"
+          }
+        },
+        {
+          "state_dimension": "VOLATILITY",
+          "feature_id": "ROLLING_GROWTH_VOL",
+          "comparison_basis": "CURRENT_VS_PRIOR_FROZEN_ORIGIN",
+          "mapping": {
+            "lower": "FALLING",
+            "equal": "FLAT",
+            "higher": "RISING"
+          }
+        },
+        {
+          "state_dimension": "SEASONALITY",
+          "feature_id": "SEASONAL_DEVIATION",
+          "mapping": {
+            "negative": "NEGATIVE",
+            "zero": "NEUTRAL",
+            "positive": "POSITIVE"
+          }
+        },
+        {
+          "state_dimension": "MEAN_REVERSION_PRESSURE",
+          "feature_id": "MEAN_REVERSION_GAP",
+          "mapping": {
+            "negative": "UPWARD",
+            "zero": "NEUTRAL",
+            "positive": "DOWNWARD"
+          }
+        },
+        {
+          "state_dimension": "STRUCTURAL_STABILITY",
+          "feature_id": "SLOPE_STABILITY",
+          "comparison_basis": "CURRENT_VS_PRIOR_FROZEN_ORIGIN",
+          "mapping": {
+            "lower": "IMPROVING",
+            "equal": "STABLE",
+            "higher": "DETERIORATING"
+          }
+        },
+        {
+          "state_dimension": "DATA_QUALITY",
+          "feature_id": "__AGGREGATE__",
+          "mapping": {
+            "all_available": "COMPLETE",
+            "mixed": "PARTIAL",
+            "all_unknown": "UNKNOWN"
+          }
+        }
+      ]
+    },
+    "unknown_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature_status",
+        "state_status",
+        "never_impute",
+        "comparison_prerequisite",
+        "reasons"
+      ],
+      "properties": {
+        "feature_status": {
+          "const": [
+            "AVAILABLE",
+            "UNKNOWN"
+          ]
+        },
+        "state_status": {
+          "const": [
+            "AVAILABLE",
+            "UNKNOWN"
+          ]
+        },
+        "never_impute": {
+          "const": true
+        },
+        "comparison_prerequisite": {
+          "const": "CURRENT_AND_PRIOR_FEATURES_MUST_BE_AVAILABLE"
+        },
+        "reasons": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "provenance_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "row_fields",
+        "state_fields",
+        "input_feature_identity",
+        "upstream_identity"
+      ],
+      "properties": {
+        "row_fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "state_fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "input_feature_identity": {
+          "const": "FEATURE_ID"
+        },
+        "upstream_identity": {
+          "const": "FM02_ROW_ID_AND_DRIVER_SERIES_RECORD_ID"
+        }
+      }
+    },
+    "capability_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_engine_only",
+        "conditional_backtest",
+        "model_selection",
+        "production_router",
+        "automatic_execution"
+      ],
+      "properties": {
+        "state_engine_only": {
+          "const": true
+        },
+        "conditional_backtest": {
+          "const": false
+        },
+        "model_selection": {
+          "const": false
+        },
+        "production_router": {
+          "const": false
+        },
+        "automatic_execution": {
+          "const": false
+        }
+      }
+    },
+    "capability_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "required_principal",
+        "required_grant",
+        "forbidden_grants"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "IIOS-CAPABILITY-CONTEXT-0.1"
+        },
+        "required_principal": {
+          "const": "iios_research"
+        },
+        "required_grant": {
+          "const": "m1.2.fm03.state_engine"
+        },
+        "forbidden_grants": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "research_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "usage",
+        "purity",
+        "outer_results_cannot_flow_back_into_same_epoch_tuning",
+        "result_driven_change_requires_new_epoch"
+      ],
+      "properties": {
+        "usage": {
+          "const": "DEVELOPMENT_ONLY"
+        },
+        "purity": {
+          "const": "CONTAMINATED"
+        },
+        "outer_results_cannot_flow_back_into_same_epoch_tuning": {
+          "const": true
+        },
+        "result_driven_change_requires_new_epoch": {
+          "const": true
+        }
+      }
+    }
+  }
+}
