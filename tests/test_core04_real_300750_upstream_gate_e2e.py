@@ -9,6 +9,7 @@ from iios_mvp.canonical_current_price import InMemoryCanonicalCurrentPriceRegist
 from iios_mvp.investment_core_contract_v03 import decide_v03
 from iios_mvp.canonical_investment_admission_v01 import InMemoryCanonicalInvestmentAdmissionRegistry
 from tests.b03b_upstream_authority_fixture import build_runtime_upstream_authority
+from tests.b04b_return_lineage_fixture import bind_return_lineage
 from iios_mvp.decision_upstream_admission_v03 import build_decision_upstream_admission
 from iios_mvp.market_model_identification import MarketValuationObservation
 from iios_mvp.market_observation_admission import (
@@ -26,6 +27,8 @@ PRICE_DATE = date(2026, 9, 30)
 PRICE = Decimal("291.11")
 PRICE_EVIDENCE_SHA = "349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2"
 UPSTREAM_AUTHORITY_REGISTRY = InMemoryCanonicalInvestmentAdmissionRegistry()
+FORECAST_REGISTRY = None
+VALUATION_OUTPUT_RESOLVER = None
 
 
 def _inputs():
@@ -84,7 +87,7 @@ def _price_ref():
 
 
 def _thesis():
-    return {
+    payload = {
         "status": "INTACT",
         "statement": "CATL can convert global battery-system scale, unit economics and disciplined reinvestment into durable economic profit.",
         "mechanism": "Volume and product mix drive revenue and margins; reinvestment must convert into adequate incremental ROIC and sustained FCF.",
@@ -108,6 +111,7 @@ def _thesis():
 
 
 def _case(*, core03, core02, price_ref, trust_status):
+    global FORECAST_REGISTRY, VALUATION_OUTPUT_RESOLVER
     _, upstream = build_runtime_upstream_authority(
         case_id=CASE_ID,
         market="CN-A",
@@ -203,6 +207,8 @@ def _case(*, core03, core02, price_ref, trust_status):
             },
         },
     }
+    payload, FORECAST_REGISTRY, VALUATION_OUTPUT_RESOLVER = bind_return_lineage(payload)
+    return payload
 
 
 def test_real_300750_quality_gate_is_explicitly_propagated_to_kernel():
@@ -210,7 +216,7 @@ def test_real_300750_quality_gate_is_explicitly_propagated_to_kernel():
     registry, price_ref = _price_ref()
     case = _case(core03=core03, core02=core02, price_ref=price_ref, trust_status="PASS")
 
-    result = decide_v03(case, current_price_resolver=registry, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY)
+    result = decide_v03(case, current_price_resolver=registry, independent_forecast_resolver=FORECAST_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, valuation_output_resolver=VALUATION_OUTPUT_RESOLVER)
 
     assert result["decision_status"] == "REVIEW_REQUIRED"
     assert result["gates"]["reality"] == "PASS"
