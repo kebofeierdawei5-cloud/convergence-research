@@ -66,12 +66,14 @@ def main() -> int:
     assert run_current_audit(result_path, state_path), "BASELINE_AUDIT_DID_NOT_PASS"
 
     attacks = []
+    def tr01(x):
+        x["conditional_performance"][0]["models"]["SEASONAL_NAIVE"]["metrics"]["MAE"] += 1.0
     attacks.append(require_rejection(
         "TR-01 mutate conditional_performance metric",
         result,
         state_path,
         Path("/tmp/fm04-redteam-tr01.json"),
-        lambda x: x["conditional_performance"][0]["models"]["SEASONAL_NAIVE"]["metrics"]["MAE"] += 1.0,
+        tr01,
     ))
     attacks.append(require_rejection(
         "TR-02 mutate conditional_performance length",
