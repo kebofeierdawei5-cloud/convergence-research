@@ -176,6 +176,7 @@ def test_investment_core_formally_admits_add_through_canonical_entry_evaluation(
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "ADD"
     assert result["decision"]["decision_admission_rule_id"] == "DA15_LEGACY_COMPAT_NOT_CANONICAL"
