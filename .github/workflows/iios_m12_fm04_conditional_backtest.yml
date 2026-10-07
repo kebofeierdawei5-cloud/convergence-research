@@ -1,0 +1,134 @@
+name: IIOS M1.2 FM04 Conditional Backtest
+
+on:
+  pull_request:
+    paths:
+      - "research/fm00/**"
+      - "research/fm01/**"
+      - "research/fm02/**"
+      - "research/fm03/**"
+      - "research/fm04/**"
+      - ".github/workflows/iios_m12_fm04_conditional_backtest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-fm04-conditional-backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install validation dependency
+        run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
+
+      - name: Verify exact upstream byte anchors
+        run: |
+          test "$(git hash-object research/fm03/FM03_STATE_CONTRACT.json)" = "1ede6cfd87476e466010a229599c52f984b24de6"
+          test "$(git hash-object research/fm01/CATL_DRIVER_HISTORY.ndjson)" = "8fbdafaa941587d843ab2509bb732620f5f66b4d"
+          test "$(git hash-object research/fm00/OU-M12-FM00-CATL-001.json)" = "abe9c575ea4a194249a419bbb145b5ddf7dd05de"
+          test "$(git hash-object research/fm00/RP-M12-FM00-EXP-001.json)" = "a440223d2b61b786434c9d63b00ca1d525fb4a79"
+          test "$(git hash-object research/fm00/CS-M12-FM00-CATL-001.json)" = "70778aa3bbeccccc87c856c7d4645ea366de3ac0"
+          test "$(git hash-object research/fm00/EPB-M12-FM00-EXP-001.json)" = "b7e7810bd383e893a328e2ed738d825423e98eda"
+          echo "Exact upstream Git blob anchors: PASS"
+
+      - name: Verify frozen FM04 contract
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          def csha(value):
+              return hashlib.sha256(
+                  json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+              ).hexdigest()
+
+          root=Path("research/fm04")
+          contract=json.loads((root/"FM04_CONDITIONAL_BACKTEST_CONTRACT.json").read_text())
+          schema=json.loads((root/"fm04_conditional_backtest.schema.json").read_text())
+          errors=sorted(Draft202012Validator(schema).iter_errors(contract), key=lambda e:list(e.path))
+          assert not errors, "\n".join(str(e) for e in errors)
+          assert contract["status"]=="FROZEN"
+          assert contract["confirmatory_eligible"] is False
+          assert contract["research_epoch_id"]=="RE-M12-EXP-CATL-20260930"
+          assert contract["evaluation"]["primary_metric"]=="MAE"
+          assert contract["selection_policy"]["min_common_inner_observations"]==3
+          assert contract["selection_policy"]["inner_common_universe_rule"]=="ALL_FOUR_MODELS_FORECASTABLE_ON_THE_SAME_INNER_ORIGIN_SET"
+          assert contract["evaluation"]["pairwise_comparison_rule"]=="SAME_ORIGIN_UNIVERSE_SAME_TARGET_SAME_HORIZON_SAME_ACTUAL"
+          assert contract["capability_boundary"]["production_model_selection"] is False
+          assert contract["research_boundary"]["confirmatory_evidence_authorized"] is False
+          print("FM04 frozen contract/schema: PASS")
+          PY
+
+      - name: Build exact FM02 feature snapshot
+        run: |
+          python research/fm02/fm02_feature_builder.py             --output /tmp/FM02_FEATURE_SNAPSHOT.ndjson             --receipt /tmp/FM02_FEATURE_BUILD_RECEIPT.json
+
+      - name: Build exact FM03 state snapshot
+        run: |
+          python research/fm03/fm03_state_engine.py             --feature-snapshot /tmp/FM02_FEATURE_SNAPSHOT.ndjson             --output /tmp/FM03_STATE_SNAPSHOT.ndjson             --receipt /tmp/FM03_STATE_BUILD_RECEIPT.json
+
+      - name: Verify pinned FM03 snapshot
+        run: |
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          rows=[json.loads(line) for line in Path("/tmp/FM03_STATE_SNAPSHOT.ndjson").read_text().splitlines() if line.strip()]
+          sha=hashlib.sha256(json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+          assert len(rows)==22
+          assert sha=="7e020df6eeb5b6aa4cf47e625d902c3c5ca7645457427c8af085a55d25811fd4"
+          print("Pinned FM03 state snapshot: PASS", sha)
+          PY
+
+      - name: Run FM04 unit tests
+        env:
+          FM03_STATE_SNAPSHOT: /tmp/FM03_STATE_SNAPSHOT.ndjson
+        run: python -m unittest discover -s research/fm04/tests -p 'test_*.py' -v
+
+      - name: Build FM04 conditional backtest result
+        env:
+          FM03_STATE_SNAPSHOT: /tmp/FM03_STATE_SNAPSHOT.ndjson
+        run: |
+          python research/fm04/fm04_conditional_backtest.py             --state-snapshot /tmp/FM03_STATE_SNAPSHOT.ndjson             --driver-history research/fm01/CATL_DRIVER_HISTORY.ndjson             --output /tmp/FM04_BACKTEST_RESULT.json
+
+      - name: Validate FM04 result schema and structural invariants
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema=json.loads(Path("research/fm04/fm04_backtest_result.schema.json").read_text())
+          result=json.loads(Path("/tmp/FM04_BACKTEST_RESULT.json").read_text())
+          errors=sorted(Draft202012Validator(schema).iter_errors(result), key=lambda e:list(e.path))
+          assert not errors, "\n".join(str(e) for e in errors)
+          assert result["status"]=="PASS"
+          assert result["confirmatory_eligible"] is False
+          assert result["summary"]["outer_selection_unit_count"]==406
+          assert result["summary"]["selected_count"] + result["summary"]["no_selection_count"] == 406
+          assert result["summary"]["significance_claim_allowed"] is False
+          assert result["summary"]["current_price_used"] is False
+          assert result["summary"]["automatic_execution"] is False
+          assert len(result["conditional_performance"]) == result["summary"]["conditional_group_count"]
+          print("FM04 result schema + structural invariants: PASS")
+          PY
+
+      - name: Independent FM04 PIT / nested-selection / blind-scoring audit
+        env:
+          FM03_STATE_SNAPSHOT: /tmp/FM03_STATE_SNAPSHOT.ndjson
+          FM04_BACKTEST_RESULT: /tmp/FM04_BACKTEST_RESULT.json
+        run: python research/fm04/fm04_independent_audit.py
+
+      - name: Compile FM04
+        run: python -m compileall -q research/fm04
+
+      - name: Diff check
+        run: git diff --check
