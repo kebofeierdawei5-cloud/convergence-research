@@ -64,6 +64,16 @@ C6 Human Execution Receipt = PASS / MERGED / CANONICAL
 C7 Full Lifecycle E2E = PASS / MERGED / CANONICAL
         ↓
 C8 Final Independent Red-team / MVP Acceptance = PASS / MERGED / CANONICAL
+        ↓
+M1.2-FM00 Git Baseline = PASS / MERGED / CANONICAL
+        ↓
+FM01 Exact M1.1 Source Snapshot Admission = PASS / MERGED / CANONICAL
+        ↓
+FM01 DATA_READY = PASS
+        ↓
+M1.2-FM02 PIT Feature Builder / Forecastability Feature Contract = PASS / MERGED / CANONICAL
+        ↓
+M1.2-FM03 State Engine / Forecastability State Construction = PASS / MERGED / CANONICAL
 ```
 
 Current canonical main is the sole source of current implementation truth. The Git ref, not a duplicated document hash, defines the current main SHA.
@@ -252,9 +262,7 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 ## 8. Current canonical M1.2 baseline state
 
-FM02 feature merge commit: `ade3541302eb6f3fa43ec8aac76540820000a727`.
-
-The M1.2 baseline is now complete through deterministic FM02 PIT feature construction:
+The M1.2 research baseline is complete through deterministic PIT State Construction:
 
 ```
 Post-B04 Authority Re-audit = PASS
@@ -375,9 +383,9 @@ RP-01 remains a separate legacy fixture regression (`str.read`) and is not FM01 
 
 ## 9. Next canonical development boundary
 
-FM01 data admission and FM02 feature construction are complete. The next boundary is:
+FM01 data admission, FM02 feature construction, and FM03 state construction are complete. The next boundary is:
 
-**M1.2-FM-03 State Engine / Forecastability State Construction**
+**M1.2-FM-04 Conditional Backtest**
 
 ### M1.2-FM02 canonical acceptance
 
@@ -422,3 +430,26 @@ FM03 must preserve:
 FM00 remains an exploratory contaminated epoch. FM02 output cannot be relabeled as clean-confirmatory model-selection evidence.
 
 No scheduler, automatic execution, full-market screening, portfolio optimizer/Kelly logic, or unrestricted model family is authorized by this state.
+
+### M1.2-FM03 canonical acceptance
+
+Status: **PASS / MERGED / CANONICAL**
+
+- PR #147; merge commit `007ac477f7e45664c6eb7d4681de5d92c3a16b11`;
+- accepted pre-merge head `276d37111c0866ef7a0e69b7ab38aa1e4e1d2788`;
+- canonical base main `bc5ca3f2166d946d69b47da27f2213f6e1758a7a`;
+- dedicated workflow `IIOS M1.2 FM03 State Engine`, run #2 = SUCCESS;
+- 14 / 14 FM03 tests passed;
+- real CATL build = 22 rows (11 frozen origins × 2 drivers);
+- generated state snapshot canonical content hash `7e020df6eeb5b6aa4cf47e625d902c3c5ca7645457427c8af085a55d25811fd4`;
+- independent PIT/provenance audit = PASS;
+- output schema, compileall, and diff-check = PASS;
+- confirmatory_eligible = false;
+- capability principal = `iios_research`;
+- capability grant = `m1.2.fm03.state_engine`.
+
+FM03 preserves the frozen FM00 origin schedule and binds the FM02 feature contract and outer-universe lock by canonical content hash. It constructs the orthogonal state dimensions DIRECTION, MOMENTUM, VOLATILITY, SEASONALITY, MEAN_REVERSION_PRESSURE, STRUCTURAL_STABILITY, and DATA_QUALITY using deterministic, non-tuned mappings only.
+
+UNKNOWN remains first-class and is never imputed. Comparison-only states require the immediately prior frozen origin. Feature/state provenance remains bound to FM02 feature rows and upstream DriverSeries record IDs. Downstream Conditional Backtest, Model Selection, Production Router, and Automatic Execution capabilities remain explicitly disabled.
+
+FM03 is DEVELOPMENT_ONLY under the contaminated FM00 research lineage and does not constitute predictive evidence, confirmatory evidence, or production forecasting authorization.
