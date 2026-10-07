@@ -12,8 +12,10 @@ from tests.test_investment_core_v03 import (
     CURRENT_PRICE_REGISTRY,
     UPSTREAM_AUTHORITY_REGISTRY,
     VALUATION_OUTPUT_RESOLVER,
+    VALUATION_ADMISSION_REGISTRY,
     case,
 )
+from tests.b04b_return_lineage_fixture import bind_return_lineage
 
 
 def test_p2_revalidation_changes_market_expectation_with_candidate_price():
@@ -96,6 +98,12 @@ def test_p2_target_entry_price_2_is_integrated_into_decision_output():
         "base": {"probability": "0.5", "terminal_value_per_share": "220", "cash_distributions_per_share": "0", "probability_rationale": "P2 base"},
         "bull": {"probability": "0.3", "terminal_value_per_share": "260", "cash_distributions_per_share": "0", "probability_rationale": "P2 bull"},
     }
+    c, _, _ = bind_return_lineage(
+        c,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_admission_registry=VALUATION_ADMISSION_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
+    )
     result = decide(
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
