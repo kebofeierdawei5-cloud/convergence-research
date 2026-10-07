@@ -129,9 +129,9 @@
     },
     "scenarios": {
       "bear": {
-        "normalized_eps_cny": "2.00",
+        "normalized_eps_cny": "2.10",
         "valuation_multiple": "9.5",
-        "value_per_share": "19.00",
+        "value_per_share": "19.95",
         "rationale": "周期回归较快，核心产品价差和毛利率下行；成长项目只能部分抵消。"
       },
       "base": {
