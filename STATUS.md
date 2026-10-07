@@ -10,7 +10,7 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 ## Current stage
 
-**Current canonical M1.2 status: FM04 Conditional Backtest = PASS / MERGED / CANONICAL**
+**Current canonical M1.2 status: FM05 Scope / Estimand / Sufficiency Freeze = PASS / MERGED / CANONICAL**
 
 C8 and all prior Stage C productization milestones remain canonical.
 
@@ -32,6 +32,10 @@ FM01 DATA_READY
 FM02 PIT feature builder / feature contract = PASS
         ↓
 FM03 State Engine / Forecastability State Construction = PASS
+        ↓
+FM04 Conditional Backtest = PASS
+        ↓
+FM05 Scope / Estimand / Sufficiency Freeze = PASS
         ↓
 FM04 Conditional Backtest = PASS
 ```
@@ -346,3 +350,18 @@ The backtest machinery is valid, but the frozen 11-origin / seven-state-dimensio
 Acceptance: `docs/iios/FM04_ACCEPTANCE_2026-10-07.md`.
 
 **Next boundary: M1.2-FM05 Scope Freeze / Data Sufficiency Adjudication.**
+
+
+## FM05 status
+
+M1.2-FM05 Scope / Estimand / Sufficiency Freeze = PASS / MERGED / CANONICAL.
+
+- PR #156;
+- merge commit `215afcc60e649dde331e7f076be809dda716770a`;
+- accepted exact head `e6b5a77290409d3e95164007245d57f58246ccd4`;
+- dedicated FM05 workflow run #1 = SUCCESS;
+- run id `37578843014`;
+- adjudication: **INSUFFICIENT_FOR_STATE_CONDITIONED_SELECTION**;
+- frozen replay: 406 outer selection units, 0 selected, 0 outer evaluated, 406 NO_SELECTION, 79 structural conditional groups, 0 empirical conditional groups.
+
+FM05 is governance-only. It does not authorize model selection, production routing, automatic execution, or investment decisions. Result-driven redesign requires a new research epoch.
