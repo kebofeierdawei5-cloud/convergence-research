@@ -78,7 +78,7 @@ def test_p0_01_caller_declared_upstream_status_is_blocked_without_canonical_doma
     validation = validate_case_v03(case, current_price_resolver=registry)
     assert validation["status"] == "BLOCKED"
     assert any(
-        "Decision runtime requires canonical upstream admission v0.2" in error["message"]
+        "canonical upstream authority resolver is required for v0.2 upstream admission" in error["message"]
         for error in validation["errors"]
     )
 
