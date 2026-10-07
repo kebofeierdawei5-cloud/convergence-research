@@ -192,6 +192,28 @@ def test_report_qa_fails_closed_on_decision_drift(tmp_path):
     assert "report_integrity" in " ".join(tampered_qa["issues"])
 
 
+def test_report_qa_fails_closed_on_machine_json_field_dump(tmp_path):
+    publication, _ = make_publication(tmp_path)
+    report = build_human_report(
+        publication=publication, generated_at="2026-10-06T02:00:00+00:00"
+    )
+    tampered = dict(report)
+    tampered["markdown"] = tampered["markdown"].replace(
+        "- Risk / portfolio contract: available",
+        '- Risk / portfolio contract: {"audit_sha256":"deadbeef"}',
+    )
+    tampered["report_hash"] = sha256_obj(
+        {k: tampered[k] for k in tampered if k not in {"report_id", "report_hash"}}
+    )
+    tampered["report_id"] = (
+        f'{tampered["publication_id"]}-report-{tampered["report_hash"][:16]}'
+    )
+    qa = qa_human_report(publication=publication, report=tampered)
+    assert qa["qa_status"] == "FAIL"
+    assert qa["checks"]["human_readability"] == "FAIL"
+    assert any("machine-readable JSON-like field dump" in issue for issue in qa["issues"])
+
+
 def test_report_qa_fails_closed_on_publication_binding_mismatch(tmp_path):
     publication, _ = make_publication(tmp_path)
     report = build_human_report(
