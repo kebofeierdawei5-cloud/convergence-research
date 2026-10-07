@@ -238,3 +238,40 @@ def test_cli_report_exposes_human_report(tmp_path, capsys):
     assert Path(result["markdown"]).exists()
     assert Path(result["report"]).exists()
     assert Path(result["qa"]).exists()
+
+def test_report_renders_risk_portfolio_contract_without_machine_json_dump(tmp_path):
+    publication, _ = make_publication(tmp_path)
+    publication["ai_decision"]["risk_portfolio_contract"] = {
+        "contract_version": "IIOS-RISK-PORTFOLIO-PRODUCTION-0.1",
+        "readiness": {"risk_ready": True, "portfolio_constraint_ready": True, "package_ready": True},
+        "portfolio": {
+            "position_pct": "0",
+            "can_add": True,
+            "constraint_status": "PASS",
+            "package_status": "COMPLETE",
+            "buy_add_package": {
+                "entry_zone": ["24.00", "25.95"],
+                "initial_position_pct": "5",
+                "target_position_pct": "10",
+                "max_position_pct": "10",
+                "monitoring_triggers": ["cash flow conversion"],
+                "thesis_break_triggers": ["structural margin deterioration"],
+            },
+        },
+        "risk": {"max_loss_pct": "25"},
+    }
+    report = build_human_report(
+        publication=publication,
+        generated_at="2026-10-06T02:00:00+00:00",
+    )
+    markdown = report["markdown"]
+    assert "Risk / portfolio contract: available" in markdown
+    assert "Entry zone: 24.00–25.95" in markdown
+    assert "Initial position: 5%" in markdown
+    assert "Target position: 10%" in markdown
+    assert "Maximum position: 10%" in markdown
+    assert "cash flow conversion" in markdown
+    assert "structural margin deterioration" in markdown
+    assert "audit_sha256" not in markdown
+    assert '{"contract_version"' not in markdown
+\n
