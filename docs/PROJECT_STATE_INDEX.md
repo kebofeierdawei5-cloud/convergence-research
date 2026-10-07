@@ -994,3 +994,102 @@ This batch hardens the Human Report presentation layer without changing Investme
 Technical acceptance remains supported by PILOT-01 / PILOT-02 / PILOT-03 / PILOT-04 evidence. The remaining MVP acceptance blocker is the real operator's human usability attestation. CI success must not be used as a substitute for that attestation.
 
 A02 / CSI800 remains non-blocking to company-level Investment Core MVP acceptance.
+
+## 18. B0 — LLM Canonical Execution Governance Boundary Freeze — 2026-10-07
+
+Status: **GOVERNANCE CONTENT FROZEN / LOCAL CANONICAL RECORD PERSISTED / REMOTE MAIN PROMOTION PENDING**
+
+Purpose:
+
+The 2026-10-07 P0 LLM red-team findings are now converted into a formal governance boundary without changing Investment Core economic formulas or normative decision semantics.
+
+Canonical execution constitution:
+
+```text
+explicit / deterministic rules
+        → Code / Script
+
+ambiguous / semantic / deep reasoning
+        → LLM / expert reasoning
+
+LLM semantic output
+        → Typed Semantic Artifact + provenance
+        → Deterministic Admission
+        → Canonical State
+```
+
+Authority separation:
+
+```text
+LLM    = Reasoning Authority
+Code   = Rule / Permission Authority
+Human  = Capital / Approval Authority
+```
+
+Frozen mandatory boundary:
+
+```text
+User Natural-Language Request
+→ Canonical Research Orchestrator
+→ Research Case / Run Envelope
+→ Evidence Acquisition + Evidence Admission
+→ LLM Semantic Workbench
+→ Typed Semantic Artifacts + semantic provenance
+→ Deterministic Admission / consistency
+→ Canonical State
+→ Decision Kernel
+→ Decision Admission
+→ Human Approval
+→ Machine Publication
+→ Human Report
+→ Monitoring / Validation / Replay
+```
+
+Confirmed P0 requirements:
+- P0-LLM-001: natural-language investment requests must not bypass the Canonical Research Orchestrator;
+- P0-LLM-002: Reality, Trust, Quality, Thesis, Value Drivers, Forecast reasoning, Valuation Proposal, MIE interpretation, Risk interpretation and Positioning interpretation require an explicit semantic producer boundary;
+- P0-LLM-003: evidence provenance does not substitute for semantic provenance; producer identity/version/stage/input-output lineage are required for canonical semantic admission;
+- P0-LLM-004: PILOT-01~04 do not prove real natural-language LLM conformance because their semantic inputs were preconstructed.
+
+Canonicality rule:
+
+```text
+valid Evidence Provenance ≠ valid Semantic Provenance
+
+missing / invalid IIOS_RUN_RECEIPT
+→ NON-CANONICAL ANALYSIS / BLOCKED
+```
+
+Required `IIOS_RUN_RECEIPT` fields include run/case identity, market/symbol, cutoff/as-of, engine version, research/evidence hashes, semantic artifact hashes, forecast/valuation/return-risk-portfolio/decision admission hashes, decision revision, publication hash and report hash.
+
+B0 prohibitions:
+- no economic formula or return/risk semantic changes;
+- no new universal MIE BUY gate;
+- no automatic trading;
+- no self-declared external JSON as canonical semantic state;
+- no claim that existing pilots prove natural-language-to-canonical conformance;
+- no B1/B2/B3 implementation changes under B0.
+
+B1 unlock target:
+
+```text
+B1 — Canonical Research Orchestrator + Semantic Contract Design
+```
+
+B1 requires a successor versioned design covering the orchestrator/stage machine, typed semantic artifact contract, producer authenticity, run receipt, authority boundaries and Haomai conformance tests.
+
+References:
+- governance record: `docs/iios/B0_LLM_CANONICAL_EXECUTION_GOVERNANCE_FREEZE_20261007.md`;
+- P0 findings: `docs/iios/P0_LLM_CANONICAL_EXECUTION_AUDIT_20261007.md`;
+- P0 findings SHA-256: `b70d83e9920e4ef9b2b879e727fa427d057b2ffa96cf6c53ddd73329a1705ea1`;
+- governance record SHA-256: `eacef7ec2ec40cfc716a44ba8374bcdc800aeebba0a2d1553e852e8a476f7191`.
+
+Current Git promotion state:
+
+```text
+canonical main baseline = 0839dfe972f2e1451a9cc8a8ce3f909020b8b784
+repair branch            = audit/p0-llm-canonical-execution-20261007
+remote file/commit write = BLOCKED BY GITHUB CONNECTOR INTERNAL ERROR
+```
+
+Therefore this section is the exact intended canonical Current State Index amendment, persisted locally and ready for application to `main` once GitHub mutation is operational.
