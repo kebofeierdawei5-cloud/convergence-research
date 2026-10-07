@@ -3,7 +3,8 @@ from __future__ import annotations
 import copy
 import json
 import os
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 from fm04_conditional_backtest import build_result, load_json, load_ndjson
@@ -28,7 +29,8 @@ def env(**values):
 def run_current_audit(result_path: Path, state_path: Path) -> bool:
     with env(FM04_BACKTEST_RESULT=result_path, FM03_STATE_SNAPSHOT=state_path):
         try:
-            rc = audit.main()
+            with redirect_stdout(StringIO()):
+                rc = audit.main()
         except AssertionError:
             return False
         return rc == 0
