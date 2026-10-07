@@ -65,6 +65,38 @@ def verify_terminal_a(root: Path, findings: list[str]) -> dict[str, Any]:
     return {"status": "PASS", "present": True, "match": passed[0], "candidates": matches}
 
 
+def verify_manifest_identity(manifest: dict[str, Any], findings: list[str]) -> bool:
+    ok = True
+    if manifest.get("schema_version") != "IIOS-A02-DATA-01-DELIVERY-MANIFEST-0.1":
+        findings.append("delivery manifest schema_version is invalid or missing")
+        ok = False
+    if manifest.get("universe_id") != "OU-M12-A02-CSI800-NONFIN-PIT-001":
+        findings.append("delivery manifest universe_id is invalid or missing")
+        ok = False
+    expected_origins = [
+        "2023Q3", "2023Q4", "2024Q1", "2024Q2", "2024Q3", "2024Q4",
+        "2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1",
+    ]
+    if manifest.get("required_origins") != expected_origins:
+        findings.append("delivery manifest required_origins do not match the frozen A02 origins")
+        ok = False
+    if manifest.get("required_b_domains") != REQUIRED_B_DOMAINS:
+        findings.append("delivery manifest required_b_domains do not match the frozen B domains")
+        ok = False
+    return ok
+
+
+def verify_digest(path: Path, declared: str | None, findings: list[str], label: str) -> bool:
+    if not declared:
+        findings.append(f"{label}: missing declared sha256")
+        return False
+    actual = sha256_file(path)
+    if actual != str(declared).lower():
+        findings.append(f"{label}: declared sha256 does not match recomputed sha256")
+        return False
+    return True
+
+
 def verify_states(root: Path, manifest: dict[str, Any], findings: list[str]) -> dict[str, Any]:
     rows = manifest.get("a_membership_states", [])
     by_state = {str(x.get("state_id")): x for x in rows if isinstance(x, dict)}
@@ -78,9 +110,17 @@ def verify_states(root: Path, manifest: dict[str, Any], findings: list[str]) -> 
         raw_path = row.get("raw_path")
         if not raw_path or not (root / raw_path).is_file():
             invalid.append({"state": state, "reason": "raw_path_missing"})
-        for k in ("source_ref", "publication_basis", "effective_date"):
+        for k in ("source_ref", "publication_basis", "effective_date", "known_at_basis"):
             if not row.get(k):
                 invalid.append({"state": state, "reason": f"missing_{k}"})
+        if raw_path and (root / raw_path).is_file():
+            if not verify_digest(
+                root / raw_path,
+                row.get("raw_sha256"),
+                findings,
+                f"A state {state}",
+            ):
+                invalid.append({"state": state, "reason": "raw_sha256_mismatch"})
     if missing:
         findings.append("A historical membership states missing: " + ",".join(missing))
     if invalid:
@@ -109,6 +149,19 @@ def verify_b(root: Path, manifest: dict[str, Any], findings: list[str]) -> dict[
         for k in ("source_ref", "known_at_basis", "license_redistribution_status"):
             if not row.get(k):
                 invalid.append({"domain": domain, "reason": f"missing_{k}"})
+        declared_hashes = row.get("raw_sha256_by_path")
+        if not isinstance(declared_hashes, dict):
+            invalid.append({"domain": domain, "reason": "raw_sha256_by_path_missing"})
+        else:
+            for raw_path in raw_paths:
+                if isinstance(raw_path, str) and (root / raw_path).is_file():
+                    if not verify_digest(
+                        root / raw_path,
+                        declared_hashes.get(raw_path),
+                        findings,
+                        f"B {domain} {raw_path}",
+                    ):
+                        invalid.append({"domain": domain, "reason": "raw_sha256_mismatch", "path": raw_path})
     if missing:
         findings.append("B domains missing: " + ",".join(missing))
     if invalid:
@@ -125,11 +178,17 @@ def run(root: Path, strict: bool) -> int:
         findings.append(str(exc))
         manifest = {}
 
+    manifest_ok = verify_manifest_identity(manifest, findings) if manifest else False
     a = verify_terminal_a(root, findings)
     states = verify_states(root, manifest, findings)
     b = verify_b(root, manifest, findings)
 
-    raw_complete = a["status"] == "PASS" and states["status"] == "PASS" and b["status"] == "PASS"
+    raw_complete = (
+        manifest_ok
+        and a["status"] == "PASS"
+        and states["status"] == "PASS"
+        and b["status"] == "PASS"
+    )
     result = {
         "schema_version": "IIOS-A02-DATA-01-INDEPENDENT-RAW-PREFLIGHT-0.1",
         "status": "PASS_RAW_COMPLETE" if raw_complete else "BLOCKED",
