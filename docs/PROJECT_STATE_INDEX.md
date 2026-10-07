@@ -252,7 +252,9 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 ## 8. Current canonical authority-hardening state
 
-The post-C8 authority-hardening sequence is complete through the independent re-audit:
+The post-C8 authority-hardening sequence is complete through the independent re-audit.
+
+Current canonical main after governance state synchronization: `c64309268695ddd40c16ed0c7bfbf23979a339de`
 
 ```
 B00 = PASS / MERGED / CANONICAL
