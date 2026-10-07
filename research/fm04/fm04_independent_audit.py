@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from statistics import mean
@@ -123,8 +124,8 @@ def metrics(pred, actual):
 def main() -> int:
     root = Path("research")
     contract = json.loads((root / "fm04/FM04_CONDITIONAL_BACKTEST_CONTRACT.json").read_text())
-    result = json.loads((root / "fm04/FM04_BACKTEST_RESULT.json").read_text())
-    states = load_ndjson(root / "fm03/FM03_STATE_SNAPSHOT.ndjson")
+    result = json.loads(Path(os.environ.get("FM04_BACKTEST_RESULT", root / "fm04/FM04_BACKTEST_RESULT.json")).read_text())
+    states = load_ndjson(Path(os.environ.get("FM03_STATE_SNAPSHOT", root / "fm03/FM03_STATE_SNAPSHOT.ndjson")))
     records = load_ndjson(root / "fm01/CATL_DRIVER_HISTORY.ndjson")
     lock = json.loads((root / "fm00/OU-M12-FM00-CATL-001.json").read_text())
 
