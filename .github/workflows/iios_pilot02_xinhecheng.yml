@@ -10,9 +10,6 @@ on:
       - "tests/b03b_upstream_authority_fixture.py"
       - "tests/b04b_return_lineage_fixture.py"
   workflow_dispatch:
-  push:
-    branches:
-      - "pilot-02-xinhecheng-20261007"
 
 permissions:
   contents: read
