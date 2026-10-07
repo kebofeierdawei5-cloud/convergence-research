@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/a02-b01-free-first-source-matrix-0.1.json",
+  "title": "IIOS A02 B-01 Free-First Source Matrix v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "matrix_id",
+    "version",
+    "status",
+    "pit_origins",
+    "required_domains",
+    "sources",
+    "free_first_rules",
+    "admission_state"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "IIOS-A02-B01-FREE-FIRST-SOURCE-MATRIX-0.1"
+    },
+    "matrix_id": {
+      "const": "SM-A02-B01-20261007"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "FROZEN_FOR_ADMISSION_PREPARATION"
+    },
+    "pit_origins": {
+      "const": [
+        "2023Q3",
+        "2023Q4",
+        "2024Q1",
+        "2024Q2",
+        "2024Q3",
+        "2024Q4",
+        "2025Q1",
+        "2025Q2",
+        "2025Q3",
+        "2025Q4",
+        "2026Q1"
+      ]
+    },
+    "required_domains": {
+      "const": [
+        "identity",
+        "listing_delisting",
+        "common_equity",
+        "st_history",
+        "industry_history",
+        "source_vintages"
+      ]
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "provider",
+          "class",
+          "url",
+          "domains",
+          "temporal_capability",
+          "pit_known_at_capability",
+          "admission_status"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "class": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "domains": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "temporal_capability": {
+            "type": "string"
+          },
+          "pit_known_at_capability": {
+            "type": [
+              "boolean",
+              "string"
+            ]
+          },
+          "admission_status": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "free_first_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paid_source_required",
+        "tushare_credential_required",
+        "current_snapshot_may_replace_historical_target",
+        "current_classification_may_replace_historical_pit_state",
+        "field_level_known_at_required",
+        "raw_bytes_and_metadata_required",
+        "secondary_public_sources_may_reconcile_but_not_silently_become_normative",
+        "unresolved_required_domain_fails_closed"
+      ],
+      "properties": {
+        "paid_source_required": {
+          "const": false
+        },
+        "tushare_credential_required": {
+          "const": false
+        },
+        "current_snapshot_may_replace_historical_target": {
+          "const": false
+        },
+        "current_classification_may_replace_historical_pit_state": {
+          "const": false
+        },
+        "field_level_known_at_required": {
+          "const": true
+        },
+        "raw_bytes_and_metadata_required": {
+          "const": true
+        },
+        "secondary_public_sources_may_reconcile_but_not_silently_become_normative": {
+          "const": true
+        },
+        "unresolved_required_domain_fails_closed": {
+          "const": true
+        }
+      }
+    },
+    "admission_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "blocking_domains",
+        "statement"
+      ],
+      "properties": {
+        "status": {
+          "const": "BLOCKED"
+        },
+        "blocking_domains": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "statement": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
