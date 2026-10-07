@@ -100,8 +100,8 @@ def main():
       "free_first":True,"paid_mandatory":False,"current_to_historical_substitution":False,
       "fields":{
         "identity":{"status":"BLOCKED","reason":"Official stock-list snapshots materialized; historical source-vintage/known_at not closed."},
-        "listing_delisting":{"status":"CONDITIONAL","reason":"Free secondary effective dates materialized; source publication/known_at not closed."},
-        "common_equity":{"status":"CONDITIONAL","reason":"Instrument metadata materialized; historical source-authority not closed."},
+        "listing_delisting":{"status":"CONDITIONAL","reason":"Current exchange listing metadata materialized; historical source publication/vintage and known_at are not closed."},
+        "common_equity":{"status":"CONDITIONAL","reason":"Current instrument metadata materialized; historical source authority and known_at are not closed."},
         "ST_status":{"status":"BLOCKED","reason":"Official risk-warning source is current snapshot; historical PIT known_at not closed."},
         "CSI_industry_taxonomy":{"status":"PASS_FOR_STANDARD_DEFINITION","reason":"Official CSI taxonomy document captured exactly; security-level assignments remain separate."},
         "CSI_industry_security_history":{"status":"BLOCKED","reason":"Historical security-level CSI assignments with reproducible known_at are not yet materialized."}
