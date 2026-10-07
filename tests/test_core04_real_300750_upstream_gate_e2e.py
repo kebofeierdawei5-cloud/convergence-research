@@ -9,7 +9,6 @@ from iios_mvp.canonical_current_price import InMemoryCanonicalCurrentPriceRegist
 from iios_mvp.investment_core_contract_v03 import decide_v03
 from iios_mvp.canonical_investment_admission_v01 import InMemoryCanonicalInvestmentAdmissionRegistry
 from tests.b03b_upstream_authority_fixture import build_runtime_upstream_authority
-from tests.b04b_return_lineage_fixture import bind_return_lineage
 from iios_mvp.decision_upstream_admission_v03 import build_decision_upstream_admission
 from iios_mvp.market_model_identification import MarketValuationObservation
 from iios_mvp.market_observation_admission import (
@@ -27,8 +26,6 @@ PRICE_DATE = date(2026, 9, 30)
 PRICE = Decimal("291.11")
 PRICE_EVIDENCE_SHA = "349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2"
 UPSTREAM_AUTHORITY_REGISTRY = InMemoryCanonicalInvestmentAdmissionRegistry()
-FORECAST_REGISTRY = None
-VALUATION_OUTPUT_RESOLVER = None
 
 
 def _inputs():
@@ -110,11 +107,102 @@ def _thesis():
     }
 
 
-def _    payload, FORECAST_REGISTRY, VALUATION_OUTPUT_RESOLVER = bind_return_lineage(
-        payload,
+def _case(*, core03, core02, price_ref, trust_status):
+    _, upstream = build_runtime_upstream_authority(
+        case_id=CASE_ID,
+        market="CN-A",
+        symbol="300750",
+        company="宁德时代",
+        cutoff_date=CUTOFF,
+        reality=core02["reality"],
+        quality=core02["quality"],
+        value_driver=core02["value_driver_ranking"],
+        valuation={
+            "status": "PASS",
+            "primary_model": "DCF",
+            "probability_weighted_value_per_share": "433.5675",
+        },
+        forecast=core03["forecast"],
+        thesis=_thesis(),
+        declared_statuses={
+            "REALITY": "PASS",
+            "QUALITY": "CONDITIONAL",
+            "VALUE_DRIVER": "PASS",
+            "VALUATION": "PASS",
+            "FORECAST": "PASS",
+        },
+        registry=UPSTREAM_AUTHORITY_REGISTRY,
     )
-    return payload
-
+    return {
+        "contract_version": "IIOS-INVESTMENT-CORE-0.3",
+        "case_id": CASE_ID,
+        "market": "CN-A",
+        "symbol": "300750",
+        "company": "宁德时代",
+        "as_of_date": "2026-10-04",
+        "cutoff_date": "2026-10-04",
+        "current_price_observation": {
+            "price": "291.11",
+            "price_observation_id": price_ref["price_observation_id"],
+            "currency": "CNY",
+            "observed_at": "2026-09-30T15:00:00+00:00",
+            "known_at": "2026-09-30T23:59:00+00:00",
+            "source": "SZSE:MARKET_DATA",
+            "adjustment_semantics": "UNADJUSTED",
+            "price_observation_admission_hash": price_ref["admission_record_hash"],
+        },
+        "company_evidence_manifest": {
+            "manifest_id": "b2_company_evidence_manifest_v0.1"
+        },
+        "trust": {"status": trust_status},
+        "reality": core02["reality"],
+        "quality": core02["quality"],
+        "forecast": core03["forecast"],
+        "valuation": {
+            "status": "PASS",
+            "primary_model": "DCF",
+            "probability_weighted_value_per_share": "433.5675",
+        },
+        "risk": {
+            "status": "PASS",
+            "max_loss_pct": "25",
+            "thesis_breaks": ["incremental ROIC failure", "FCF conversion failure"],
+            "evidence_ids": ["risk-evidence-1"],
+        },
+        "portfolio": {
+            "position_pct": "0",
+            "constraint_status": "PASS",
+            "can_add": True,
+            "buy_add_package": {
+                "entry_zone": ["285", "291.11"],
+                "initial_position_pct": "5",
+                "target_position_pct": "10",
+                "max_position_pct": "10",
+                "thesis_break_triggers": ["incremental ROIC failure", "FCF conversion failure"],
+                "monitoring_triggers": ["quarterly operating review"],
+            },
+        },
+        "thesis": {
+            **_thesis(),
+        },
+        "decision_upstream_admission": upstream,
+        "return_gate": {
+            "entry_price": "291.11",
+            "entry_value_reference": "433.5675",
+            "horizon_years": "3",
+            "horizon_override": True,
+            "horizon_override_basis": ["MAJOR_INDUSTRY_LEADER", "MAJOR_INVESTMENT_CYCLE_OR_MAJOR_CAPEX"],
+            "horizon_selection_rationale": "Explicit 3Y override for major industry leadership and capital-cycle characteristics; default remains 1Y.",
+            "buy_entry_return_cushion_threshold": "0.15",
+            "fundamental_target_annualized_return": "0.15",
+            "required_return_annualized": "0.10",
+            "scenarios": {
+                "bear": {"probability": "0.25", "terminal_value_per_share": "258.32", "cash_distributions_per_share": "0", "probability_rationale": "CORE-03 admitted Bear scenario."},
+                "base": {"probability": "0.50", "terminal_value_per_share": "418.49", "cash_distributions_per_share": "0", "probability_rationale": "CORE-03 admitted Base scenario."},
+                "bull": {"probability": "0.25", "terminal_value_per_share": "638.97", "cash_distributions_per_share": "0", "probability_rationale": "CORE-03 admitted Bull scenario."},
+            },
+        },
+    }
 
 
 def test_real_300750_quality_gate_is_explicitly_propagated_to_kernel():
@@ -122,7 +210,7 @@ def test_real_300750_quality_gate_is_explicitly_propagated_to_kernel():
     registry, price_ref = _price_ref()
     case = _case(core03=core03, core02=core02, price_ref=price_ref, trust_status="PASS")
 
-    result = decide_v03(case, current_price_resolver=registry, independent_forecast_resolver=FORECAST_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, valuation_output_resolver=VALUATION_OUTPUT_RESOLVER)
+    result = decide_v03(case, current_price_resolver=registry, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY)
 
     assert result["decision_status"] == "REVIEW_REQUIRED"
     assert result["gates"]["reality"] == "PASS"
