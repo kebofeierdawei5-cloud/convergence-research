@@ -1,0 +1,57 @@
+{
+  "schema_version": "IIOS-A02-DATA01-A-BATCH2-ACQUISITION-RECEIPT-0.1",
+  "batch": "Batch 2 — DATA-01-A Historical Carrier Acquisition",
+  "attempt_date": "2026-10-07",
+  "universe_id": "OU-M12-A02-CSI800-NONFIN-PIT-001",
+  "acquisition_status": "BLOCKED_EXACT_CARRIER_BYTES_NOT_AVAILABLE",
+  "historical_pointer": {
+    "repository": "benzemaer/convergence-research",
+    "commit": "fec2a640d478e18e10c0a56164caedee7666ed16",
+    "task_id": "G0-T02",
+    "source_snapshot_id": "CSINDEX_000906_20260703T100909Z",
+    "delivery_mode": "local_read_only_artifact",
+    "created_at": "2026-07-03T11:05:57.4372994Z",
+    "package_size_bytes": 373560,
+    "package_sha256": "fab0950153e3a683e9590dc895533276e0092146d7774b4822442d00d45b369b",
+    "contents_manifest_sha256": "823d6d3ffe75730fb5789170d6539f65477b458c5cf70f9389af716f18c3412d"
+  },
+  "terminal_target": {
+    "file_name": "000906cons.xls",
+    "size_bytes": 169984,
+    "sha256": "f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984",
+    "historical_handoff_declares_exact_member": true,
+    "actual_bytes_available_in_current_runtime": false,
+    "independent_hash_verified_in_current_runtime": false
+  },
+  "declared_package_members": [
+    "000906_Index_Methodology_cn.pdf",
+    "000906_Index_Methodology_cn.pdf.headers.json",
+    "000906cons.xls",
+    "000906cons.xls.headers.json",
+    "2026-05-29_部分指数样本调整名单.pdf",
+    "2026-05-29_部分指数样本调整名单.pdf.headers.json",
+    "announcement_3006137.json",
+    "announcement_3006137.json.headers.json",
+    "executor_validation.json",
+    "index-details-data_000906.json",
+    "index-details-data_000906.json.headers.json",
+    "source_snapshot_manifest.json"
+  ],
+  "independent_preflight": {
+    "verifier": "research/a02_raw/a_raw_preflight.py",
+    "status": "BLOCKED",
+    "terminal_status": "BLOCKED",
+    "historical_states_status": "BLOCKED",
+    "checksum_without_bytes_rejected": true,
+    "current_to_historical_substitution_forbidden": true,
+    "retrieved_at_to_known_at_substitution_forbidden": true,
+    "tests": "3/3 PASS"
+  },
+  "gate_effect": {
+    "a_raw_complete": false,
+    "A02_admission": "BLOCKED",
+    "cross_security_successor_epoch": "LOCKED",
+    "model_selection": "LOCKED"
+  },
+  "next_transition": "SUPPLY_HISTORICAL_HANDOFF_PACKAGE_BYTES_OR_EQUIVALENT_OFFICIAL_REBALANCE_RAW_BUNDLE"
+}
