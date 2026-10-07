@@ -31,4 +31,4 @@ Create the reusable historical driver layer required by FM-02 Feature Builder wi
 
 ## Data ingress status
 
-The implementation is ready, but the CATL production-history population gate is intentionally `BLOCKED_DATA_INGRESS` because the exact M1.1 historical source snapshot is not present in the FM-00 Git baseline. This is a data-lineage blocker, not permission to invent replacement values.
+The implementation is ready and the CATL production-history population gate is now `DATA_READY`. The exact M1.1 historical source snapshot was admitted after external byte-level SHA-256 verification, source-vintage binding, 22-quarter coverage validation, and an independent PIT replay. Underlying filing URLs are preserved as snapshot provenance; they were not re-fetched during this admission.
