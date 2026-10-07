@@ -97,7 +97,7 @@ class FM03StateEngineTests(unittest.TestCase):
         result = next(r for r in out if r["origin_id"] == "2025Q4" and r["driver_id"] == "REVENUE")
         self.assertEqual(result["states"]["DIRECTION"]["state"], "UNKNOWN")
         self.assertEqual(result["states"]["DIRECTION"]["status"], "UNKNOWN")
-        self.assertIsNone(result["states"]["DIRECTION"]["input_record_ids"] if False else None)
+        self.assertEqual(result["states"]["DIRECTION"]["input_record_ids"], [])
         self.assertEqual(result["states"]["DATA_QUALITY"]["state"], "PARTIAL")
 
     def test_future_feature_asof_fails_closed(self):
