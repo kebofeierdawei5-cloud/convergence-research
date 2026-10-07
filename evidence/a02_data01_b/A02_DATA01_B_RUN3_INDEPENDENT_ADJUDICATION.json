@@ -1,0 +1,49 @@
+{
+  "schema_version": "IIOS-A02-DATA01-B-RUN3-INDEPENDENT-ADJUDICATION-0.1",
+  "workflow_run_id": 37593671212,
+  "run_number": 3,
+  "head_sha": "6f47e5f6f481df8f4a300765f237c5f7f70dae0d",
+  "job_id": 112700956010,
+  "artifact_id": 11469780985,
+  "artifact_name": "A02-data01-b-free-first-37593671212",
+  "github_artifact_digest": "sha256:85e836b2e797730be459a334172993118eb7101e44014c2539344c7ef679eb62",
+  "independent_artifact_sha256": "85e836b2e797730be459a334172993118eb7101e44014c2539344c7ef679eb62",
+  "artifact_size_bytes": 861959,
+  "artifact_members": 9,
+  "manifest_entries": 8,
+  "manifest_verified": 8,
+  "manifest_errors": [],
+  "artifact_integrity": "PASS",
+  "manifest_integrity": "PASS",
+  "materializer_exit_code": 4,
+  "current_only_fields": [
+    "sse_stock_list",
+    "szse_stock_list",
+    "sse_risk_plate",
+    "szse_company_notice"
+  ],
+  "standard_only_fields": [
+    "csi_industry_taxonomy"
+  ],
+  "historical_pit_fields": {
+    "identity": "BLOCKED",
+    "listing_delisting": "BLOCKED_FOR_PIT",
+    "common_equity": "BLOCKED_FOR_PIT",
+    "ST_status": "BLOCKED",
+    "CSI_industry_security_history": "BLOCKED"
+  },
+  "known_at_audit": {
+    "retrieved_at_used_as_known_at": false,
+    "csi_industry_standard_known_at": null,
+    "historical_known_at_coverage": "NOT_ESTABLISHED"
+  },
+  "secondary_source": {
+    "provider": "BAOSTOCK",
+    "status": "BLOCKED",
+    "admitted": false,
+    "error": "baostock login failed: 10002007 网络接收错误。"
+  },
+  "overall": "BLOCKED",
+  "allowed_result_class": "BLOCKED",
+  "admission": "NOT_ADMITTED"
+}

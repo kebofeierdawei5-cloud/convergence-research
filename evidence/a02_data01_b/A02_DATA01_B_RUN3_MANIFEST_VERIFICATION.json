@@ -1,0 +1,63 @@
+{
+  "schema_version": "IIOS-A02-DATA01-B-RUN3-MANIFEST-INDEPENDENT-VERIFICATION-0.1",
+  "artifact_id": 11469780985,
+  "entries": [
+    {
+      "path": "B1B_FIELD_ADMISSION_MATRIX.json",
+      "size_bytes": 1382,
+      "declared_sha256": "0f6510eb45b486f875600aa4b33ad033899f59a9a8a6caf1648ed4d542e8337d",
+      "recomputed_sha256": "0f6510eb45b486f875600aa4b33ad033899f59a9a8a6caf1648ed4d542e8337d",
+      "match": true
+    },
+    {
+      "path": "official/csi_industry_classification_standard.pdf",
+      "size_bytes": 192674,
+      "declared_sha256": "86ff0b57bfa1b5c419fcdd3a1ee0d32fd9b168c51da11ce092854ca3d8650aa3",
+      "recomputed_sha256": "86ff0b57bfa1b5c419fcdd3a1ee0d32fd9b168c51da11ce092854ca3d8650aa3",
+      "match": true
+    },
+    {
+      "path": "official/receipt.json",
+      "size_bytes": 3786,
+      "declared_sha256": "d726c9014ebaa2f800707e796eb0553549ae51c3449aa5c26a01df12239075e0",
+      "recomputed_sha256": "d726c9014ebaa2f800707e796eb0553549ae51c3449aa5c26a01df12239075e0",
+      "match": true
+    },
+    {
+      "path": "official/sse_risk_plate.html",
+      "size_bytes": 29212,
+      "declared_sha256": "81132b24e328e70a451f9bc0594ce19aea965caf24ca2eadf72fb7b03bae4642",
+      "recomputed_sha256": "81132b24e328e70a451f9bc0594ce19aea965caf24ca2eadf72fb7b03bae4642",
+      "match": true
+    },
+    {
+      "path": "official/sse_stock_list.json",
+      "size_bytes": 1208363,
+      "declared_sha256": "c0cd0fd645a812ae00a74e7220927752a13879644c9045f1c2e563f865e3a520",
+      "recomputed_sha256": "c0cd0fd645a812ae00a74e7220927752a13879644c9045f1c2e563f865e3a520",
+      "match": true
+    },
+    {
+      "path": "official/szse_company_notice.html",
+      "size_bytes": 93029,
+      "declared_sha256": "7f4e72e22edcb285b2f464c61ef220a9e303331826444ea0cb02e8af60c5e93a",
+      "recomputed_sha256": "7f4e72e22edcb285b2f464c61ef220a9e303331826444ea0cb02e8af60c5e93a",
+      "match": true
+    },
+    {
+      "path": "official/szse_stock_list.xlsx",
+      "size_bytes": 545040,
+      "declared_sha256": "e32b6a0424fd0e6ff300e37e198abfebef4c0966da309415324a3ddaae17e23b",
+      "recomputed_sha256": "e32b6a0424fd0e6ff300e37e198abfebef4c0966da309415324a3ddaae17e23b",
+      "match": true
+    },
+    {
+      "path": "secondary_baostock/receipt.json",
+      "size_bytes": 160,
+      "declared_sha256": "58522adef24a007b32b7effd439e71f23c861156c589b3894b18e970446bba65",
+      "recomputed_sha256": "58522adef24a007b32b7effd439e71f23c861156c589b3894b18e970446bba65",
+      "match": true
+    }
+  ],
+  "overall": "PASS"
+}
