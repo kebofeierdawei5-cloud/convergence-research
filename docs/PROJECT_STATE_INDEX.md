@@ -252,7 +252,7 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 ## 8. Current canonical M1.2 baseline state
 
-Current canonical main after FM02 merge: `ade3541302eb6f3fa43ec8aac76540820000a727`.
+FM02 feature merge commit: `ade3541302eb6f3fa43ec8aac76540820000a727`.
 
 The M1.2 baseline is now complete through deterministic FM02 PIT feature construction:
 
