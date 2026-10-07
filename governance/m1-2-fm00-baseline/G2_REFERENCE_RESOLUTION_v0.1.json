@@ -1,0 +1,21 @@
+{
+  "schema_version": "IIOS-M1.2-G2-REFERENCE-RESOLUTION-0.1",
+  "status": "RESOLVED_WITH_EXPLICIT_SEPARATION",
+  "historical_frozen_identity": {
+    "registry_id": "G2-NORMATIVE-0.9-RM7R-TR02B-F03FIX-CANDIDATE",
+    "revision": "F03FIX-4",
+    "frozen_carrier_sha256": "899f0b1b9f3619458e17be76ac43dd6e00b5397d0c12adb7b68e2479c7f51524",
+    "external_package_sha256": "462adf71419def6cb6fe4d196a018cc45b9a0b66149f00279c0ca6fa3f38f0f0",
+    "status": "FROZEN_REFERENCE_IDENTITY",
+    "exact_bytes_reverified_here": false
+  },
+  "successor_evidence": {
+    "carrier_sha256": "bd5cbaf23c9029b46fafd19992029932431059de7424a08de48624aca5d431c8",
+    "status": "ACCEPTED_FOR_CURRENT_CLOSURE_ROLE_ONLY",
+    "policy_sha256": "bfdf516e6b83c4e8393b31500098ed96fccde6ced5bd6f2469509769e5a1d6e5",
+    "semantic_sha256": "9d096d5f4c9c01d429eaa53e5be753686136cd41ebcdd4eb35aca081c071c898",
+    "replacement_of_historical_frozen_identity": false,
+    "replacement_of_frozen_normative_bytes": false
+  },
+  "rule": "Do not relabel the successor carrier as the historical frozen carrier. Current closure evidence and historical frozen identity remain separate authorities."
+}
