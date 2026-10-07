@@ -318,6 +318,7 @@ def run() -> dict[str, Any]:
             case=case,
             snapshot=snapshot,
             current_price_resolver=registry,
+            upstream_authority_resolver=AUTHORITY_REGISTRY,
         )
         decision_path = write_decision_revision(
             root,
