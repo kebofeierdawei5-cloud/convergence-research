@@ -106,6 +106,9 @@ jobs:
           if float(row[2]) != 25.95:
               raise SystemExit(f"unexpected 2026-09-30 close: {row[2]!r}")
 
+          price_projection = json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+          price_projection_sha256 = hashlib.sha256(price_projection).hexdigest()
+
           calendar = (root / "chinaclear_2026_holiday_schedule.html").read_text(
               encoding="utf-8", errors="ignore"
           )
@@ -118,8 +121,10 @@ jobs:
               "cutoff_date": "2026-10-07",
               "report_sha256": sha(pdf),
               "report_exact_bytes": True,
+              "price_source_ref": "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sz002001,day,2026-09-30,2026-09-30,5,",
               "price_sha256": sha(root / "002001_20260930_tencent.json"),
               "price_exact_bytes": True,
+              "price_projection_sha256": price_projection_sha256,
               "calendar_sha256": sha(root / "chinaclear_2026_holiday_schedule.html"),
               "calendar_exact_bytes": True,
               "latest_tradable_date": "2026-09-30",
@@ -141,6 +146,7 @@ jobs:
           PYTHONPATH=. python tools/pilot04_clean_replay_verify.py             /tmp/pilot04-xhc/out /tmp/pilot04-xhc/PILOT-04_RAW_EVIDENCE_RECEIPT.json
 
       - name: Persist replay artifacts
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: iios-pilot04-xinhecheng-clean-replay-20261007
