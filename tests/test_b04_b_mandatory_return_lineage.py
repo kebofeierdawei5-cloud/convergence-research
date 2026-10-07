@@ -68,4 +68,4 @@ def test_b04_b_canonical_lineage_matches_runtime_version():
     c = case()
     assert c["return_gate"]["lineage_version"] == REQUIRED_RUNTIME_RETURN_LINEAGE_VERSION
     result = _validate(c)
-    assert result["status"] == "PASS"
+    assert result["status"] == "PASS", result
