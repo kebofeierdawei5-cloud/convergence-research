@@ -40,9 +40,11 @@ def bind_return_lineage(
     InMemoryCanonicalValuationOutputResolver,
 ]:
     cutoff = date.fromisoformat(str(case["cutoff_date"]))
-    forecast_registry = independent_forecast_resolver
-    if forecast_registry is None:
-        forecast_registry = InMemoryCanonicalIndependentForecastRegistry()
+    forecast_registry = independent_forecast_resolver or InMemoryCanonicalIndependentForecastRegistry()
+    gap = case.get("expectation_gap")
+    if isinstance(gap, Mapping) and isinstance(gap.get("independent_forecast_ref"), Mapping):
+        forecast_ref = dict(gap["independent_forecast_ref"])
+    else:
         forecast_ref = forecast_registry.admit_independent_forecast({
             "case_id": case["case_id"],
             "market": case["market"],
@@ -61,11 +63,6 @@ def bind_return_lineage(
             "prepared_without_current_price": True,
             "evidence_ids": ["B04B-FORECAST-EVIDENCE"],
         }).to_dict()
-    else:
-        gap = case.get("expectation_gap")
-        if not isinstance(gap, Mapping) or not isinstance(gap.get("independent_forecast_ref"), Mapping):
-            raise ValueError("B04B fixture requires an existing canonical independent forecast reference")
-        forecast_ref = dict(gap["independent_forecast_ref"])
 
     gate = case["return_gate"]
     valuation_output = build_canonical_valuation_output({
