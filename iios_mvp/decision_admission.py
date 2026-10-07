@@ -189,6 +189,8 @@ def admit_canonical_decision(
         evidence_root_resolver=evidence_root_resolver,
         current_price_resolver=current_price_resolver,
         independent_forecast_resolver=independent_forecast_resolver,
+        upstream_authority_resolver=upstream_authority_resolver,
+        valuation_output_resolver=valuation_output_resolver,
     )
     snapshot_core = _snapshot_core(snapshot)
     snapshot_identity = _identity_from_input(snapshot_core["input"])
