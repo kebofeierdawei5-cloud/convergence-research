@@ -15,9 +15,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: iios-pilot-04-xinhecheng-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   pilot-04:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     env:
       EXPECTED_CANONICAL_BASE_SHA: 79c5576bc4c63d3989a252401683c6691e66d998
       ACTUAL_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -55,11 +60,11 @@ jobs:
           rm -rf /tmp/pilot04-xhc
           mkdir -p /tmp/pilot04-xhc/raw /tmp/pilot04-xhc/out
 
-          curl -L --fail --retry 3 --retry-delay 2             "https://static.cninfo.com.cn/finalpage/2026-08-20/1225482495.PDF"             -o /tmp/pilot04-xhc/raw/xinhecheng_2026_h1.pdf
+          curl --connect-timeout 15 --max-time 75 -L --fail --retry 3 --retry-delay 2             "https://static.cninfo.com.cn/finalpage/2026-08-20/1225482495.PDF"             -o /tmp/pilot04-xhc/raw/xinhecheng_2026_h1.pdf
 
-          curl -L --fail --retry 3 --retry-delay 2             -A "Mozilla/5.0"             -H "Referer: https://gu.qq.com/"             "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sz002001,day,2026-09-30,2026-09-30,5,"             -o /tmp/pilot04-xhc/raw/002001_20260930_tencent.json
+          curl --connect-timeout 15 --max-time 45 -L --fail --retry 3 --retry-delay 2             -A "Mozilla/5.0"             -H "Referer: https://gu.qq.com/"             "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sz002001,day,2026-09-30,2026-09-30,5,"             -o /tmp/pilot04-xhc/raw/002001_20260930_tencent.json
 
-          curl -L --fail --retry 3 --retry-delay 2             "https://m.chinaclear.cn/zdjs/gszb/202609/0404d81f1ee8409c95b5dc4af693409f.shtml"             -o /tmp/pilot04-xhc/raw/chinaclear_2026_holiday_schedule.html
+          curl --connect-timeout 15 --max-time 45 -L --fail --retry 3 --retry-delay 2             "https://m.chinaclear.cn/zdjs/gszb/202609/0404d81f1ee8409c95b5dc4af693409f.shtml"             -o /tmp/pilot04-xhc/raw/chinaclear_2026_holiday_schedule.html
 
           python - <<'PY'
           import hashlib, json
@@ -71,7 +76,7 @@ jobs:
           def sha(path):
               digest = hashlib.sha256()
               with path.open("rb") as handle:
-                  for chunk in iter(lambda: handle.read(1024*1024), b""):
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
                       digest.update(chunk)
               return digest.hexdigest()
 
@@ -93,6 +98,8 @@ jobs:
           price = json.loads((root / "002001_20260930_tencent.json").read_text())
           node = price["data"]["sz002001"]
           bars = node.get("day") or node.get("qfqday") or node.get("hfqday")
+          if not isinstance(bars, list):
+              raise SystemExit("Tencent historical K-line bars missing")
           row = next((item for item in bars if item and str(item[0]) == "2026-09-30"), None)
           if row is None or len(row) < 3:
               raise SystemExit("2026-09-30 row missing from Tencent historical K-line response")
@@ -127,16 +134,11 @@ jobs:
 
       - name: Independently replay the full Investment Core chain
         run: |
-          PYTHONPATH=. python tools/pilot02_xinhecheng_e2e.py \
-            --report /tmp/pilot04-xhc/raw/xinhecheng_2026_h1.pdf \
-            --price /tmp/pilot04-xhc/raw/002001_20260930_tencent.json \
-            --receipt /tmp/pilot04-xhc/PILOT-04_RAW_EVIDENCE_RECEIPT.json \
-            --out /tmp/pilot04-xhc/out
+          PYTHONPATH=. python tools/pilot02_xinhecheng_e2e.py             --report /tmp/pilot04-xhc/raw/xinhecheng_2026_h1.pdf             --price /tmp/pilot04-xhc/raw/002001_20260930_tencent.json             --receipt /tmp/pilot04-xhc/PILOT-04_RAW_EVIDENCE_RECEIPT.json             --out /tmp/pilot04-xhc/out
 
       - name: Exact replay equivalence check
         run: |
-          PYTHONPATH=. python tools/pilot04_clean_replay_verify.py \
-            /tmp/pilot04-xhc/out /tmp/pilot04-xhc/PILOT-04_RAW_EVIDENCE_RECEIPT.json
+          PYTHONPATH=. python tools/pilot04_clean_replay_verify.py             /tmp/pilot04-xhc/out /tmp/pilot04-xhc/PILOT-04_RAW_EVIDENCE_RECEIPT.json
 
       - name: Persist replay artifacts
         uses: actions/upload-artifact@v4
