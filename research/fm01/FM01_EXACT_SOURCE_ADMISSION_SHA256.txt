@@ -1,0 +1,13 @@
+# FM-01 Exact Source Admission Hash Manifest v0.1
+
+M1.1 package SHA256  34c16dca266a2f35bc2895739b3e847a6c20ea0d66e0acbbc57274a96e22804b
+M1.1 bundle SHA256   0f3dd5d5058722ce8f63a6a24d8c7aafa8b28c20ae0374c3bb0a94e9fa2609e1
+M1.1 commit          9b612cc79cd8c16ed8aea1529a6ea93e9eb8b993
+M1.1 tag object      a9516728aa1429cd033b474414ed5398c939eabb
+
+Exact M1.1 projection identities:
+quarterly_case       c19185ac7594e162bb767e518076355e56b3abf2f9d6dcd5f517f9d262ee2a9f
+driver_series        134c37688d7d39d1bb1f87b6247331eaaab113df5f1b8879c32672eea9ca9517
+acceptance            c70fa48980dbdfadf46ca47e2b91f6fb41e626a44f3132e787fb50102ac7b4ca
+
+Admitted dataset and governance documents are hashed by Git at commit time and independently replayed by CI.

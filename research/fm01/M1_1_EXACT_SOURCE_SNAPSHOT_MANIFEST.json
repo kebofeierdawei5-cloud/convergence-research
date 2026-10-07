@@ -1,0 +1,196 @@
+{
+  "schema_version": "IIOS-FM01-EXACT-SOURCE-SNAPSHOT-MANIFEST-0.1",
+  "manifest_id": "ESM-M12-FM01-CATL-M11-001",
+  "status": "ADMITTED",
+  "security_id": "300750.SZ",
+  "source_package": {
+    "filename": "IIOS_M1_1_QUARTERLY_REALITY_ROLLING_BACKTEST_v1.1.0.zip",
+    "library_path": "/iios/PROJECT/IIOS_M1_1_QUARTERLY_REALITY_ROLLING_BACKTEST_v1.1.0.zip",
+    "size_bytes": 250799,
+    "sha256": "34c16dca266a2f35bc2895739b3e847a6c20ea0d66e0acbbc57274a96e22804b"
+  },
+  "git_bundle": {
+    "filename": "IIOS_M1_1_QUARTERLY_REALITY_ROLLING_BACKTEST_v1.1.0.bundle",
+    "library_path": "/iios/PROJECT/IIOS_M1_1_QUARTERLY_REALITY_ROLLING_BACKTEST_v1.1.0.bundle",
+    "size_bytes": 226719,
+    "sha256": "0f3dd5d5058722ce8f63a6a24d8c7aafa8b28c20ae0374c3bb0a94e9fa2609e1"
+  },
+  "m11_identity": {
+    "version": "v1.1.0",
+    "commit": "9b612cc79cd8c16ed8aea1529a6ea93e9eb8b993",
+    "annotated_tag": "v1.1.0",
+    "tag_object_sha": "a9516728aa1429cd033b474414ed5398c939eabb",
+    "git_tree_sha": "20bb96c600c398eda0d655a9f5c11763a742a541",
+    "bundle_tracked_file_count": 113,
+    "release_zip_entry_count": 133,
+    "exact_m11_quarterly_case_sha256": "c19185ac7594e162bb767e518076355e56b3abf2f9d6dcd5f517f9d262ee2a9f",
+    "exact_m11_driver_series_sha256": "134c37688d7d39d1bb1f87b6247331eaaab113df5f1b8879c32672eea9ca9517",
+    "exact_m11_acceptance_sha256": "c70fa48980dbdfadf46ca47e2b91f6fb41e626a44f3132e787fb50102ac7b4ca"
+  },
+  "source_records": [
+    {
+      "source_evidence_ref": "CATL-2021Q1-2021-04-30",
+      "published_at": "2021-04-30T00:00:00+08:00",
+      "source_url": "https://static.cninfo.com.cn/finalpage/2021-04-30/1209867063.PDF",
+      "source_class": "CNINFO",
+      "authority_class": "OFFICIAL"
+    },
+    {
+      "source_evidence_ref": "CATL-2021H1-2021-08-26",
+      "published_at": "2021-08-26T00:00:00+08:00",
+      "source_url": "http://static.cninfo.com.cn/finalpage/2021-08-26/1210861690.PDF",
+      "source_class": "CNINFO",
+      "authority_class": "OFFICIAL"
+    },
+    {
+      "source_evidence_ref": "CATL-2021Q3-2021-10-28",
+      "published_at": "2021-10-28T00:00:00+08:00",
+      "source_url": "https://vip.stock.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=7619264",
+      "source_class": "SINA_CORP_BULLETIN",
+      "authority_class": "SECONDARY_ARCHIVE"
+    },
+    {
+      "source_evidence_ref": "CATL-2021A-2022-04-22",
+      "published_at": "2022-04-22T00:00:00+08:00",
+      "source_url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=8039190",
+      "source_class": "SINA_CORP_BULLETIN",
+      "authority_class": "SECONDARY_ARCHIVE"
+    },
+    {
+      "source_evidence_ref": "CATL-2022Q1-2022-04-30",
+      "published_at": "2022-04-30T00:00:00+08:00",
+      "source_url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=8160475",
+      "source_class": "SINA_CORP_BULLETIN",
+      "authority_class": "SECONDARY_ARCHIVE"
+    },
+    {
+      "source_evidence_ref": "CATL-2022H1-2022-08-24",
+      "published_at": "2022-08-24T00:00:00+08:00",
+      "source_url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=8452999",
+      "source_class": "SINA_CORP_BULLETIN",
+      "authority_class": "SECONDARY_ARCHIVE"
+    },
+    {
+      "source_evidence_ref": "CATL-2022Q3-2022-10-22",
+      "published_at": "2022-10-22T00:00:00+08:00",
+      "source_url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=8607136",
+      "source_class": "SINA_CORP_BULLETIN",
+      "authority_class": "SECONDARY_ARCHIVE"
+    },
+    {
+      "source_evidence_ref": "CATL-2022A-2023-03-10",
+      "published_at": "2023-03-10T00:00:00+08:00",
+      "source_url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=8874946",
+      "source_class": "SINA_CORP_BULLETIN",
+      "authority_class": "SECONDARY_ARCHIVE"
+    },
+    {
+      "source_evidence_ref": "CATL-2023Q1-2023-04-21",
+      "published_at": "2023-04-21T00:00:00+08:00",
+      "source_url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=9026058",
+      "source_class": "SINA_CORP_BULLETIN",
+      "authority_class": "SECONDARY_ARCHIVE"
+    },
+    {
+      "source_evidence_ref": "CATL-2023H1-2023-07-26",
+      "published_at": "2023-07-26T00:00:00+08:00",
+      "source_url": "https://vip.stock.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=9370373",
+      "source_class": "SINA_CORP_BULLETIN",
+      "authority_class": "SECONDARY_ARCHIVE"
+    },
+    {
+      "source_evidence_ref": "CATL-2023Q3-2023-10-20",
+      "published_at": "2023-10-20T00:00:00+08:00",
+      "source_url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=9577510",
+      "source_class": "SINA_CORP_BULLETIN",
+      "authority_class": "SECONDARY_ARCHIVE"
+    },
+    {
+      "source_evidence_ref": "CATL-2023A-2024-03-16",
+      "published_at": "2024-03-16T00:00:00+08:00",
+      "source_url": "https://vip.stock.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=9876422",
+      "source_class": "SINA_CORP_BULLETIN",
+      "authority_class": "SECONDARY_ARCHIVE"
+    },
+    {
+      "source_evidence_ref": "CATL-2024Q1-2024-04-16",
+      "published_at": "2024-04-16T00:00:00+08:00",
+      "source_url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=9973750",
+      "source_class": "SINA_CORP_BULLETIN",
+      "authority_class": "SECONDARY_ARCHIVE"
+    },
+    {
+      "source_evidence_ref": "CATL-2024H1-2024-07-27",
+      "published_at": "2024-07-27T00:00:00+08:00",
+      "source_url": "https://static.cninfo.com.cn/finalpage/2024-07-27/1220740372.PDF",
+      "source_class": "CNINFO",
+      "authority_class": "OFFICIAL"
+    },
+    {
+      "source_evidence_ref": "CATL-2024Q3-2024-10-19",
+      "published_at": "2024-10-19T00:00:00+08:00",
+      "source_url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=10532675",
+      "source_class": "SINA_CORP_BULLETIN",
+      "authority_class": "SECONDARY_ARCHIVE"
+    },
+    {
+      "source_evidence_ref": "CATL-2024A-2025-03-17",
+      "published_at": "2025-03-17T00:00:00+08:00",
+      "source_url": "https://www.catl.com/uploads/1/file/public/202503/20250317212347_bwwxumcfi0.pdf",
+      "source_class": "CATL_OFFICIAL",
+      "authority_class": "OFFICIAL"
+    },
+    {
+      "source_evidence_ref": "CATL-2025Q1-2025-04-15",
+      "published_at": "2025-04-15T00:00:00+08:00",
+      "source_url": "https://vip.stock.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=10873117",
+      "source_class": "SINA_CORP_BULLETIN",
+      "authority_class": "SECONDARY_ARCHIVE"
+    },
+    {
+      "source_evidence_ref": "CATL-2025H1-2025-07-31",
+      "published_at": "2025-07-31T00:00:00+08:00",
+      "source_url": "https://static.cninfo.com.cn/finalpage/2025-07-31/1224342874.PDF",
+      "source_class": "CNINFO",
+      "authority_class": "OFFICIAL"
+    },
+    {
+      "source_evidence_ref": "CATL-2025Q3-2025-10-21",
+      "published_at": "2025-10-21T00:00:00+08:00",
+      "source_url": "https://static.cninfo.com.cn/finalpage/2025-10-21/1224721971.PDF",
+      "source_class": "CNINFO",
+      "authority_class": "OFFICIAL"
+    },
+    {
+      "source_evidence_ref": "CATL-2025A-2026-03-10",
+      "published_at": "2026-03-10T00:00:00+08:00",
+      "source_url": "https://static.cninfo.com.cn/finalpage/2026-03-10/1225002214.PDF",
+      "source_class": "CNINFO",
+      "authority_class": "OFFICIAL"
+    },
+    {
+      "source_evidence_ref": "CATL-2026Q1-2026-04-16",
+      "published_at": "2026-04-16T00:00:00+08:00",
+      "source_url": "https://static.cninfo.com.cn/finalpage/2026-04-16/1225107946.PDF",
+      "source_class": "CNINFO",
+      "authority_class": "OFFICIAL"
+    },
+    {
+      "source_evidence_ref": "CATL-2026H1-2026-07-24",
+      "published_at": "2026-07-24T00:00:00+08:00",
+      "source_url": "https://static.cninfo.com.cn/finalpage/2026-07-24/1225442062.PDF",
+      "source_class": "CNINFO",
+      "authority_class": "OFFICIAL"
+    }
+  ],
+  "provenance_rule": "known_at is bound to the earliest public filing timestamp carried by the exact M1.1 snapshot; Q2 derived values use H1-minus-Q1; Q4 derived values use annual-minus-Q1-Q2-Q3.",
+  "exact_bytes_verification": {
+    "method": "SHA-256 recomputation over both materialized Library raw bytes; ZIP extracted M1.1 quarterly case and driver-series files byte-equal to corresponding bundle content.",
+    "runtime_bundle_sha256": "0f3dd5d5058722ce8f63a6a24d8c7aafa8b28c20ae0374c3bb0a94e9fa2609e1",
+    "runtime_zip_sha256": "34c16dca266a2f35bc2895739b3e847a6c20ea0d66e0acbbc57274a96e22804b",
+    "quarterly_observation_count": 22,
+    "exact_range": "2021Q1–2026Q2",
+    "verified_at": "2026-10-07"
+  },
+  "note": "The source ZIP/bundle bytes are retained in the user's persistent Library and referenced by stable library_path. They are not duplicated into Git history. The Git-tracked admission layer contains the exact hash identity, provenance/snapshot mapping, and admitted PIT data projection."
+}

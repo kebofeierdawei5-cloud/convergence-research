@@ -1,0 +1,61 @@
+{
+  "schema_version": "IIOS-FM01-SOURCE-ADMISSION-0.2",
+  "admission_id": "ADM-M12-FM01-CATL-M11-001",
+  "status": "PASS",
+  "security_id": "300750.SZ",
+  "source_manifest_id": "ESM-M12-FM01-CATL-M11-001",
+  "source_package_sha256": "34c16dca266a2f35bc2895739b3e847a6c20ea0d66e0acbbc57274a96e22804b",
+  "source_bundle_sha256": "0f3dd5d5058722ce8f63a6a24d8c7aafa8b28c20ae0374c3bb0a94e9fa2609e1",
+  "exact_source_bytes_verified": true,
+  "m11_commit": "9b612cc79cd8c16ed8aea1529a6ea93e9eb8b993",
+  "m11_tag": "v1.1.0",
+  "driver_series_source_hash": "134c37688d7d39d1bb1f87b6247331eaaab113df5f1b8879c32672eea9ca9517",
+  "quarterly_case_source_hash": "c19185ac7594e162bb767e518076355e56b3abf2f9d6dcd5f517f9d262ee2a9f",
+  "accepted_dataset": {
+    "path": "research/fm01/CATL_DRIVER_HISTORY.ndjson",
+    "records": 44,
+    "unique_quarters": 22,
+    "drivers": [
+      "REVENUE",
+      "NET_PROFIT"
+    ],
+    "period_start": "2021Q1",
+    "period_end": "2026Q2"
+  },
+  "provenance": {
+    "source_vintage_records": 22,
+    "direct_quarters": 12,
+    "derived_quarters": 10,
+    "known_at_equals_published_at_date": true,
+    "derived_q2_rule": "H1_value - Q1_value",
+    "derived_q4_rule": "Annual_value - Q1_value - Q2_value - Q3_value",
+    "all_derived_records_carry_parent_source_refs": true
+  },
+  "pit_admission": {
+    "rule": "known_at <= origin quarter-end cutoff",
+    "origins_start": "2023Q3",
+    "horizons": {
+      "3M": {
+        "origin_count": 11,
+        "target_offset_quarters": 1
+      },
+      "6M": {
+        "origin_count": 10,
+        "target_offset_quarters": 2
+      },
+      "12M": {
+        "origin_count": 8,
+        "target_offset_quarters": 4
+      }
+    },
+    "target_actual_excluded_from_training": true,
+    "current_state_substitution": false,
+    "future_known_data_excluded": true
+  },
+  "independent_replay": {
+    "status": "PASS",
+    "workflow_scope": "independent source admission replay",
+    "replay_script": "research/fm01/fm01_source_admission_replay.py"
+  },
+  "data_gate_transition": "BLOCKED_DATA_INGRESS -> DATA_READY"
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": "IIOS-FM01-EXACT-SOURCE-BYTES-VERIFICATION-0.1",
+  "status": "PASS",
+  "verified_at": "2026-10-07",
+  "source_zip": {
+    "library_path": "/iios/PROJECT/IIOS_M1_1_QUARTERLY_REALITY_ROLLING_BACKTEST_v1.1.0.zip",
+    "materialized_path": "/mnt/data/iios/m11/IIOS_M1_1_QUARTERLY_REALITY_ROLLING_BACKTEST_v1.1.0.zip",
+    "size_bytes": 250799,
+    "sha256": "34c16dca266a2f35bc2895739b3e847a6c20ea0d66e0acbbc57274a96e22804b"
+  },
+  "source_bundle": {
+    "library_path": "/iios/PROJECT/IIOS_M1_1_QUARTERLY_REALITY_ROLLING_BACKTEST_v1.1.0.bundle",
+    "materialized_path": "/mnt/data/iios/m11/IIOS_M1_1_QUARTERLY_REALITY_ROLLING_BACKTEST_v1.1.0.bundle",
+    "size_bytes": 226719,
+    "sha256": "0f3dd5d5058722ce8f63a6a24d8c7aafa8b28c20ae0374c3bb0a94e9fa2609e1"
+  },
+  "m11_git_identity": {
+    "commit": "9b612cc79dc8c16ed8aea1529a6ea93e9eb8b993",
+    "tag": "v1.1.0",
+    "tag_object_sha": "a9516728aa1429cd033b474414ed5398c939eabb",
+    "tree_sha": "20bb96c600c398eda0d655a9f5c11763a742a541"
+  },
+  "exact_projection_checks": {
+    "quarterly_case": {
+      "path": "iios/cases/300750.SZ/backtest/m11_quarterly_reality_case.json",
+      "sha256": "c19185ac7594e162bb767e518076355e56b3abf2f9d6dcd5f517f9d262ee2a9f",
+      "quarter_count": 22
+    },
+    "driver_series": {
+      "path": "iios/cases/300750.SZ/backtest/m11_historical_quarterly_driver_series_v1_frozen.json",
+      "sha256": "134c37688d7d39d1bb1f87b6247331eaaab113df5f1b8879c32672eea9ca9517",
+      "quarter_count": 22
+    },
+    "acceptance": {
+      "path": "iios/cases/300750.SZ/backtest/m11_acceptance.json",
+      "sha256": "c70fa48980dbdfadf46ca47e2b91f6fb41e626a44f3132e787fb50102ac7b4ca"
+    },
+    "zip_to_bundle_byte_equality": {
+      "quarterly_case": true,
+      "driver_series": true
+    }
+  },
+  "verification_method": [
+    "materialize exact user-Library ZIP and Git bundle as raw bytes",
+    "recompute SHA-256 outside the application runtime",
+    "verify bundle contains exact v1.1.0 commit/tag",
+    "extract ZIP and compare critical M1.1 files byte-for-byte with bundle checkout"
+  ],
+  "limitation": "Underlying historical filing URLs were not re-fetched in the 2026-10-07 admission. The admission verifies the exact M1.1 snapshot bytes and preserves the snapshot's recorded source-vintage metadata."
+}
