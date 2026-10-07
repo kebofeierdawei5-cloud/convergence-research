@@ -10,7 +10,7 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 ## Current stage
 
-**Current canonical M1.2 status: FM05 Scope / Estimand / Sufficiency Freeze = PASS / MERGED / CANONICAL**
+**Current canonical M1.2 status: FM07 Research Epoch Amendment Gate = PASS / MERGED / CANONICAL**
 
 C8 and all prior Stage C productization milestones remain canonical.
 
@@ -51,7 +51,7 @@ Baseline:
 
 G2 historical frozen identity remains separate from the accepted R0 successor evidence; no frozen-byte rewrite was performed.
 
-**Next boundary: explicit owner adjudication of whether to open a new M1.2 research epoch; no new production or confirmatory capability is implied.**
+**Next boundary: design of a new M1.2 research epoch; the current epoch is closed to same-epoch amendment and no new epoch is opened automatically.**
 
 FM01 data gate is now `DATA_READY` after exact-source admission, provenance binding, 22-quarter coverage validation, and independent PIT replay.
 
@@ -365,3 +365,16 @@ M1.2-FM05 Scope / Estimand / Sufficiency Freeze = PASS / MERGED / CANONICAL.
 - frozen replay: 406 outer selection units, 0 selected, 0 outer evaluated, 406 NO_SELECTION, 79 structural conditional groups, 0 empirical conditional groups.
 
 FM05 is governance-only. It does not authorize model selection, production routing, automatic execution, or investment decisions. Result-driven redesign requires a new research epoch.
+
+
+## FM07 status
+
+M1.2-FM07 Research Epoch Amendment Gate = PASS / MERGED / CANONICAL.
+
+- PR #159;
+- merge commit: `549f16ce37058a9b889c159b6392d175bc3397b4`;
+- accepted exact head: `d8870e08aded67eac5f6cdda1b811b4d4632eda7`;
+- gate decision: **DO_NOT_AMEND_CURRENT_EPOCH**;
+- current epoch `RE-M12-EXP-CATL-20260930` is closed to same-epoch amendment.
+
+Any result-driven scope, estimand, threshold, state, model-family, metric, origin-schedule, or universe change requires a new research epoch with pre-execution freeze and renewed PIT/provenance/purity controls. FM07 does not open that epoch automatically.
