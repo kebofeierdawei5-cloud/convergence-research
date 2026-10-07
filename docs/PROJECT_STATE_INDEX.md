@@ -508,3 +508,15 @@ Status: **PASS / MERGED / CANONICAL**
 - current research epoch: `RE-M12-EXP-CATL-20260930`;
 - any scope / estimand / threshold / state / model / metric / origin / universe change requires a new research epoch;
 - FM07 does not open a new epoch automatically and adds no model-selection or production capability.
+
+
+### M1.2 New Research Epoch Design Proposal
+Status: **PROPOSED / CANONICAL DESIGN ONLY**
+
+- PR #161;
+- merge commit: `8dfcb150583c05f963fa2bd1c50ca9a55aed9935`;
+- accepted proposal head: `84666525a71f937e6a759113c86aba7083d18aeb`;
+- recommended strategy: cross-sectional universe expansion with threshold preservation;
+- current epoch `RE-M12-EXP-CATL-20260930` remains closed and unchanged;
+- successor epoch is not activated;
+- A02 PIT universe admission is a hard entry gate.
