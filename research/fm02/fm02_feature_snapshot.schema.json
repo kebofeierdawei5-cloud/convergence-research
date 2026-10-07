@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/fm02-feature-snapshot-0.1.json",
+  "title": "IIOS M1.2 FM02 Feature Snapshot Row v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "row_id",
+    "security_id",
+    "driver_id",
+    "origin_id",
+    "origin_cutoff",
+    "feature_asof_period",
+    "feature_asof_known_at",
+    "max_feature_input_period",
+    "visible_record_count",
+    "input_record_ids",
+    "features"
+  ],
+  "properties": {
+    "row_id": {
+      "type": "string",
+      "pattern": "^FM02-[A-Z0-9_-]+-\\d{4}Q[1-4]-[A-Z0-9_]+$"
+    },
+    "security_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "driver_id": {
+      "enum": [
+        "REVENUE",
+        "NET_PROFIT"
+      ]
+    },
+    "origin_id": {
+      "type": "string",
+      "pattern": "^\\d{4}Q[1-4]$"
+    },
+    "origin_cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "feature_asof_period": {
+      "type": "string",
+      "pattern": "^\\d{4}Q[1-4]$"
+    },
+    "feature_asof_known_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "max_feature_input_period": {
+      "type": "string",
+      "pattern": "^\\d{4}Q[1-4]$"
+    },
+    "visible_record_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "input_record_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "YOY_GROWTH",
+        "GROWTH_ACCELERATION",
+        "ROLLING_GROWTH_VOL",
+        "SEASONAL_DEVIATION",
+        "MEAN_REVERSION_GAP",
+        "SLOPE_STABILITY"
+      ],
+      "properties": {
+        "YOY_GROWTH": {
+          "$ref": "#/$defs/feature"
+        },
+        "GROWTH_ACCELERATION": {
+          "$ref": "#/$defs/feature"
+        },
+        "ROLLING_GROWTH_VOL": {
+          "$ref": "#/$defs/feature"
+        },
+        "SEASONAL_DEVIATION": {
+          "$ref": "#/$defs/feature"
+        },
+        "MEAN_REVERSION_GAP": {
+          "$ref": "#/$defs/feature"
+        },
+        "SLOPE_STABILITY": {
+          "$ref": "#/$defs/feature"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "feature": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "status",
+            "unknown_reason",
+            "input_record_ids"
+          ],
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "status": {
+              "const": "AVAILABLE"
+            },
+            "unknown_reason": {
+              "const": null
+            },
+            "input_record_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "status",
+            "unknown_reason",
+            "input_record_ids"
+          ],
+          "properties": {
+            "value": {
+              "const": null
+            },
+            "status": {
+              "const": "UNKNOWN"
+            },
+            "unknown_reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "input_record_ids": {
+              "const": []
+            }
+          }
+        }
+      ]
+    }
+  }
+}

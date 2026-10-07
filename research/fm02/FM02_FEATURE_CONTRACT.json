@@ -1,0 +1,105 @@
+{
+  "schema_version": "IIOS-FM02-FEATURE-CONTRACT-0.1",
+  "contract_id": "FC-M12-FM02-CATL-001",
+  "version": "0.1.0",
+  "status": "FROZEN",
+  "research_epoch_id": "RE-M12-EXP-CATL-20260930",
+  "confirmatory_eligible": false,
+  "input_contract": {
+    "dataset_manifest": "research/fm01/dataset_manifest.json",
+    "admission_record": "research/fm01/M1_1_SOURCE_ADMISSION.json",
+    "dataset_path": "research/fm01/CATL_DRIVER_HISTORY.ndjson",
+    "required_security_ids": ["300750.SZ"],
+    "required_drivers": ["REVENUE", "NET_PROFIT"]
+  },
+  "origin_contract": {
+    "outer_universe_lock": "research/fm00/OU-M12-FM00-CATL-001.json",
+    "cutoff_rule": "ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF",
+    "origin_selection_rule": "FROZEN_PRE_SCHEDULED_ORIGINS_ONLY",
+    "horizon_targets": {"3M": 1, "6M": 2, "12M": 4}
+  },
+  "feature_asof_contract": {
+    "rule": "LATEST_VISIBLE_PERIOD_AT_OR_BEFORE_CUTOFF",
+    "latest_period_must_be_before_target": true,
+    "known_at_rule": "ALL_INPUT_RECORDS_KNOWN_AT_OR_BEFORE_ORIGIN_CUTOFF",
+    "revision_rule": "ONE_UNAMBIGUOUS_VISIBLE_REVISION_PER_DRIVER_PERIOD"
+  },
+  "features": [
+    {
+      "feature_id": "YOY_GROWTH",
+      "formula": "(x_t / x_{t-4}) - 1",
+      "lookback": "4 quarters",
+      "transform_class": "NONE",
+      "min_history": 5,
+      "unknown_codes": ["INSUFFICIENT_LOOKBACK", "ZERO_DENOMINATOR"]
+    },
+    {
+      "feature_id": "GROWTH_ACCELERATION",
+      "formula": "YOY_GROWTH_t - YOY_GROWTH_{t-1}",
+      "lookback": "5 quarters",
+      "transform_class": "NONE",
+      "min_history": 6,
+      "unknown_codes": ["INSUFFICIENT_LOOKBACK", "ZERO_DENOMINATOR"]
+    },
+    {
+      "feature_id": "ROLLING_GROWTH_VOL",
+      "formula": "population_std(last_8_available_YOY_growth_values_including_current)",
+      "lookback": "8 YoY growth observations",
+      "transform_class": "ROLLING_DETERMINISTIC",
+      "min_history": 11,
+      "unknown_codes": ["INSUFFICIENT_LOOKBACK", "ZERO_DENOMINATOR"]
+    },
+    {
+      "feature_id": "SEASONAL_DEVIATION",
+      "formula": "current_YOY_growth - mean(all_prior_visible_YOY_growth_values_with_same_quarter)",
+      "lookback": "all prior same-quarter observations visible at origin",
+      "transform_class": "LEARNED_PIT_FIT",
+      "min_history": 2,
+      "unknown_codes": ["INSUFFICIENT_SAME_QUARTER_HISTORY", "ZERO_DENOMINATOR"]
+    },
+    {
+      "feature_id": "MEAN_REVERSION_GAP",
+      "formula": "current_YOY_growth - mean(prior_8_visible_YOY_growth_values)",
+      "lookback": "8 prior YoY growth observations",
+      "transform_class": "LEARNED_PIT_FIT",
+      "min_history": 9,
+      "unknown_codes": ["INSUFFICIENT_FIT_HISTORY", "ZERO_DENOMINATOR"]
+    },
+    {
+      "feature_id": "SLOPE_STABILITY",
+      "formula": "population_std(OLS_slopes_of_log(x)_over_each_rolling_8_quarter_window_ending_at_or_before_current_period)",
+      "lookback": "8 quarters per slope; at least 2 rolling slopes",
+      "transform_class": "ROLLING_DETERMINISTIC",
+      "min_history": 9,
+      "unknown_codes": ["INSUFFICIENT_HISTORY", "NON_POSITIVE_VALUE"]
+    }
+  ],
+  "unknown_policy": {
+    "value_encoding": null,
+    "never_impute": true,
+    "feature_status": ["AVAILABLE", "UNKNOWN"],
+    "fatal_input_errors": [
+      "FM01_NOT_DATA_READY",
+      "FM01_ADMISSION_NOT_PASS",
+      "OUTSIDE_SECURITY_SCOPE",
+      "OUTSIDE_DRIVER_SCOPE",
+      "MISSING_PIT_FIELD",
+      "INVALID_TIMESTAMP",
+      "AMBIGUOUS_VISIBLE_REVISION",
+      "TARGET_PERIOD_VISIBLE_AS_FEATURE_ASOF"
+    ]
+  },
+  "provenance_contract": {
+    "row_fields": ["security_id", "driver_id", "origin_id", "origin_cutoff", "feature_asof_period", "feature_asof_known_at", "visible_record_count"],
+    "per_feature_fields": ["value", "status", "unknown_reason", "input_record_ids"],
+    "input_record_identity": "RECORD_ID"
+  },
+  "capability_boundary": {
+    "feature_builder_only": true,
+    "state_engine": false,
+    "conditional_backtest": false,
+    "model_selection": false,
+    "production_router": false,
+    "automatic_execution": false
+  }
+}
