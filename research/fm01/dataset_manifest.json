@@ -1,28 +1,48 @@
 {
   "schema_version": "IIOS-DRIVER-HISTORY-MANIFEST-0.1",
   "manifest_id": "DHM-M12-FM01-CATL-001",
-  "version": "0.1.0",
-  "status": "BLOCKED_DATA_INGRESS",
+  "version": "0.2.0",
+  "status": "DATA_READY",
   "security_id": "300750.SZ",
-  "drivers": ["REVENUE", "NET_PROFIT"],
+  "drivers": [
+    "REVENUE",
+    "NET_PROFIT"
+  ],
   "frequency": "QUARTERLY",
-  "coverage_target": {"start": "2021Q1", "end": "2026Q2", "expected_quarters": 22},
-  "required_pit_fields": ["value", "known_at", "published_at", "provenance", "source_ref", "revision"],
+  "coverage_target": {
+    "start": "2021Q1",
+    "end": "2026Q2",
+    "expected_quarters": 22
+  },
+  "required_pit_fields": [
+    "value",
+    "known_at",
+    "published_at",
+    "provenance",
+    "source_ref",
+    "revision"
+  ],
   "allowed_provenance": [
     "DIRECT_PERIODIC_FILING",
     "DERIVED_H1_MINUS_Q1",
     "DERIVED_ANNUAL_MINUS_Q1_Q2_Q3",
     "OTHER_DERIVED"
   ],
+  "source_snapshot_manifest": "research/fm01/M1_1_EXACT_SOURCE_SNAPSHOT_MANIFEST.json",
+  "admission_record": "research/fm01/M1_1_SOURCE_ADMISSION.json",
   "data_status": {
-    "exact_source_snapshot_present": false,
-    "records_ingested": 0,
-    "records_verified": 0,
-    "reason": "The prior M1.1 dataset bytes are not present in the FM-00 Git baseline or current runtime. No CATL values are fabricated or reconstructed without the exact source snapshot."
+    "exact_source_snapshot_present": true,
+    "source_package_sha256": "34c16dca266a2f35bc2895739b3e847a6c20ea0d66e0acbbc57274a96e22804b",
+    "records_ingested": 44,
+    "records_verified": 44,
+    "quarterly_coverage_verified": 22,
+    "reason": "Exact M1.1 v1.1.0 bytes were hash-verified from the user's persistent Library; 22-quarter CATL PIT driver data were admitted with source-vintage and lineage."
   },
   "fail_closed_behavior": {
     "missing_source": "BLOCK_DATA_READY_GATE",
     "downstream_feature_use": "PROHIBIT_UNVERIFIED_DATA",
-    "fallback_to_llm_estimate": false
+    "fallback_to_llm_estimate": false,
+    "source_hash_mismatch": "BLOCK",
+    "pit_conflict": "BLOCK"
   }
 }
