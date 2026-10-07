@@ -33,7 +33,7 @@ jobs:
           cat /tmp/pilot03_changed.txt
           while IFS= read -r path; do
             case "$path" in
-              .github/workflows/iios_pilot02_xinhecheng.yml|tests/test_pilot02_risk_discipline.py|docs/iios/PILOT-03_OBSERVED_FRICTION_20261007.md) ;;
+              .github/workflows/iios_pilot02_xinhecheng.yml|.github/workflows/iios_pilot03.yml|tests/test_pilot02_risk_discipline.py|docs/iios/PILOT-03_OBSERVED_FRICTION_20261007.md) ;;
               *) echo "Unexpected PILOT-03 file change: $path"; exit 1 ;;
             esac
           done < /tmp/pilot03_changed.txt
