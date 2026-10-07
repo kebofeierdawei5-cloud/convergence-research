@@ -69,6 +69,21 @@ jobs:
           print("FM04 frozen contract/schema: PASS")
           PY
 
+      - name: Validate FM04-R semantic adjudication
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          root=Path("research/fm04")
+          schema=json.loads((root/"FM04_R_SEMANTIC_ADJUDICATION.schema.json").read_text())
+          policy=json.loads((root/"FM04_R_SEMANTIC_ADJUDICATION.json").read_text())
+          errors=sorted(Draft202012Validator(schema).iter_errors(policy), key=lambda e:list(e.path))
+          assert not errors, "\n".join(str(e) for e in errors)
+          assert policy["applies_to_contract_id"]==json.loads((root/"FM04_CONDITIONAL_BACKTEST_CONTRACT.json").read_text())["contract_id"]
+          print("FM04-R semantic adjudication: PASS")
+          PY
+
       - name: Build exact FM02 feature snapshot
         run: |
           python research/fm02/fm02_feature_builder.py             --output /tmp/FM02_FEATURE_SNAPSHOT.ndjson             --receipt /tmp/FM02_FEATURE_BUILD_RECEIPT.json
