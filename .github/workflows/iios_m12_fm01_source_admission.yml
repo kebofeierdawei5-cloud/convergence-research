@@ -1,0 +1,47 @@
+name: IIOS M1.2 FM01 Exact CATL Source Admission
+
+on:
+  pull_request:
+    paths:
+      - "research/fm01/**"
+      - ".github/workflows/iios_m12_fm01_source_admission.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-fm01-source-admission:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install FM01 dependency
+        run: python -m pip install --disable-pip-version-check "jsonschema==4.26.0"
+      - name: Validate DriverSeries
+        run: python research/fm01/fm01_validator.py research/fm01/CATL_DRIVER_HISTORY.ndjson
+      - name: Run independent PIT replay
+        run: python research/fm01/fm01_source_admission_replay.py
+      - name: Verify admission invariants
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          sm = json.loads(Path("research/fm01/M1_1_EXACT_SOURCE_SNAPSHOT_MANIFEST.json").read_text())
+          adm = json.loads(Path("research/fm01/M1_1_SOURCE_ADMISSION.json").read_text())
+          ds = Path("research/fm01/CATL_DRIVER_HISTORY.ndjson").read_text().splitlines()
+          assert sm["status"] == "ADMITTED"
+          assert adm["status"] == "PASS"
+          assert sm["exact_bytes_verification"]["quarterly_observation_count"] == 22
+          assert len(ds) == 44
+          assert adm["accepted_dataset"]["unique_quarters"] == 22
+          print("FM01 exact source admission invariants: PASS")
+          PY
+      - name: Compile FM01
+        run: python -m compileall -q research/fm01
+      - name: Diff check
+        run: git diff --check
