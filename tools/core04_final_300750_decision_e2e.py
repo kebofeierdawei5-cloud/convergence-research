@@ -11,6 +11,7 @@ from iios_mvp.horizon_semantics import DEFAULT_HORIZON_YEARS, validate_horizon_s
 from iios_mvp.investment_core_contract_v03 import calculate_return_metrics, decide_v03
 from iios_mvp.canonical_investment_admission_v01 import InMemoryCanonicalInvestmentAdmissionRegistry
 from tests.b03b_upstream_authority_fixture import build_runtime_upstream_authority
+from tests.b04b_return_lineage_fixture import bind_return_lineage
 from iios_mvp.market_model_identification import MarketValuationObservation
 from iios_mvp.market_observation_admission import (
     AdmissionStatus,
@@ -26,6 +27,8 @@ PRICE_DATE = date(2026, 9, 30)
 PRICE = Decimal("291.11")
 PRICE_EVIDENCE_SHA = "349b422f6f9c95d5ea8787aa664e8cd913f9aac3b056914e68f3826567cd6ea2"
 UPSTREAM_AUTHORITY_REGISTRY = InMemoryCanonicalInvestmentAdmissionRegistry()
+FORECAST_REGISTRY = None
+VALUATION_OUTPUT_RESOLVER = None
 
 
 def load_inputs() -> tuple[dict, dict]:
@@ -91,6 +94,7 @@ def admit_price() -> tuple[InMemoryCanonicalCurrentPriceRegistry, dict]:
 
 
 def thesis_record() -> dict:
+    global FORECAST_REGISTRY, VALUATION_OUTPUT_RESOLVER
     return {
         "status": "INTACT",
         "statement": (
@@ -240,6 +244,9 @@ def build_case(
             },
         },
     }
+    payload, FORECAST_REGISTRY, VALUATION_OUTPUT_RESOLVER = bind_return_lineage(payload)
+    return payload
+
 
 
 def run() -> dict:
@@ -272,11 +279,11 @@ def run() -> dict:
     )
 
     metrics = calculate_return_metrics(case["return_gate"], max_loss_pct="25")
-    decision = decide_v03(case, current_price_resolver=registry, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY)
+    decision = decide_v03(case, current_price_resolver=registry, independent_forecast_resolver=FORECAST_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, valuation_output_resolver=VALUATION_OUTPUT_RESOLVER)
 
     diagnostic = dict(case)
     diagnostic["trust"] = {"status": "PASS"}
-    diagnostic_decision = decide_v03(diagnostic, current_price_resolver=registry, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY)
+    diagnostic_decision = decide_v03(diagnostic, current_price_resolver=registry, independent_forecast_resolver=FORECAST_REGISTRY, upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, valuation_output_resolver=VALUATION_OUTPUT_RESOLVER)
 
     assert default_horizon["horizon_years"] == "1"
     assert default_horizon["horizon_override"] is False
