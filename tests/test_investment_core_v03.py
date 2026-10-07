@@ -12,6 +12,7 @@ from iios_mvp.evidence_root_admission import InMemoryEvidenceRootRegistry
 from iios_mvp.canonical_independent_forecast import InMemoryCanonicalIndependentForecastRegistry
 from iios_mvp.canonical_current_price import InMemoryCanonicalCurrentPriceRegistry
 from iios_mvp.canonical_investment_admission_v01 import InMemoryCanonicalInvestmentAdmissionRegistry
+from iios_mvp.forecast_valuation_return_lineage_v01 import InMemoryCanonicalValuationOutputResolver
 from iios_mvp.market_observation_admission import AdmissionStatus, TemporalProvenance, VerifiedMarketEvidence, admit_market_valuation_observation
 from iios_mvp.engine import decide, replay, run_case, validate_case
 from iios_mvp.market_implied_expectation import (
@@ -34,12 +35,15 @@ from iios_mvp.p4f_mie_snapshot import P4FProvenanceRecord, build_p4f_snapshot
 from iios_mvp.investment_core_contract_v03 import calculate_return_metrics, validate_case_v03
 from iios_mvp.decision_upstream_admission_v03 import build_decision_upstream_admission
 from tests.b03b_upstream_authority_fixture import build_runtime_upstream_authority
+from tests.b04b_return_lineage_fixture import bind_return_lineage
 
 
 EVIDENCE_ROOT_REGISTRY = InMemoryEvidenceRootRegistry()
 CURRENT_PRICE_REGISTRY = InMemoryCanonicalCurrentPriceRegistry()
 INDEPENDENT_FORECAST_REGISTRY = InMemoryCanonicalIndependentForecastRegistry()
 UPSTREAM_AUTHORITY_REGISTRY = InMemoryCanonicalInvestmentAdmissionRegistry()
+VALUATION_ADMISSION_REGISTRY = InMemoryCanonicalInvestmentAdmissionRegistry()
+VALUATION_OUTPUT_RESOLVER = InMemoryCanonicalValuationOutputResolver(VALUATION_ADMISSION_REGISTRY)
 
 
 def market_implied_expectation_snapshot(price_observation_id="price-1") -> dict:
@@ -227,7 +231,7 @@ def case(price="100", price_observation_id="price-1", thesis_status="INTACT") ->
         thesis=thesis,
         registry=UPSTREAM_AUTHORITY_REGISTRY,
     )
-    return {
+    payload = {
         "contract_version": "IIOS-INVESTMENT-CORE-0.3",
         "case_id": "V03-001",
         "market": "CN-A",
@@ -297,10 +301,20 @@ def case(price="100", price_observation_id="price-1", thesis_status="INTACT") ->
             },
         },
     }
+    payload, _, _ = bind_return_lineage(
+        payload,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_admission_registry=VALUATION_ADMISSION_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
+    )
+    return payload
 
 
 def test_v03_risk_portfolio_contract_is_emitted_and_explicit():
+
     result = decide(
+
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         case(),
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
@@ -314,7 +328,10 @@ def test_v03_risk_portfolio_contract_is_emitted_and_explicit():
 def test_v03_missing_can_add_fails_validation_before_decision():
     c = case()
     del c["portfolio"]["can_add"]
+
     result = decide(
+
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
@@ -341,7 +358,10 @@ def test_v03_target_entry_reference_cannot_coexist_with_expectation_gap():
         "market_expectation_id": c["expectation_gap"]["market_expectation_id"],
         "independent_forecast_ref": c["expectation_gap"]["independent_forecast_ref"],
     }
+
     result = decide(
+
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
@@ -368,7 +388,10 @@ def test_v03_embedded_p4f_snapshot_is_rejected():
 
 def test_v03_canonical_gap_requires_independent_forecast_resolver():
     c = case()
+
     result = decide(
+
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
@@ -390,7 +413,10 @@ def test_v03_inline_independent_expectation_is_rejected():
         "horizon_years": "2",
         "evidence_ids": ["forged"],
     }
+
     result = decide(
+
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
@@ -405,7 +431,10 @@ def test_v03_canonical_forecast_value_controls_expectation_gap():
     c["expectation_gap"]["independent_forecast_ref"] = independent_forecast_ref(
         value="8", forecast_id="forecast-v03-controlled-8"
     )
+
     result = decide(
+
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
@@ -419,7 +448,10 @@ def test_v03_canonical_forecast_value_controls_expectation_gap():
 def test_v03_forecast_admission_hash_tampering_is_blocked():
     c = case()
     c["expectation_gap"]["independent_forecast_ref"]["admission_record_hash"] = "0" * 64
+
     result = decide(
+
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
@@ -863,7 +895,10 @@ def test_v03_nonpositive_mie_gap_is_advisory_not_an_automatic_buy_veto():
     c["expectation_gap"]["independent_forecast_ref"] = independent_forecast_ref(
         value="8", forecast_id="forecast-v03-advisory-negative-gap"
     )
+
     result = decide(
+
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
