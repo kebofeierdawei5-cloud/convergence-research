@@ -52,11 +52,11 @@ class FM02FeatureBuilderTests(unittest.TestCase):
         features = build_features(values, "2023Q4")
 
         self.assertAlmostEqual(
-            features["YOY_GROWTH"]["value"], 163.0 / 123.0 - 1.0, places=12
+            features["YOY_GROWTH"]["value"], 163.0 / 143.0 - 1.0, places=12
         )
         self.assertAlmostEqual(
             features["GROWTH_ACCELERATION"]["value"],
-            (163.0 / 123.0 - 1.0) - (162.0 / 122.0 - 1.0),
+            (163.0 / 143.0 - 1.0) - (162.0 / 142.0 - 1.0),
             places=12,
         )
         self.assertAlmostEqual(
