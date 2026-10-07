@@ -10,7 +10,8 @@ from .canonical_current_price import CanonicalCurrentPriceResolver, validate_cur
 from .canonical_independent_forecast import CanonicalIndependentForecastResolver
 from .horizon_semantics import validate_horizon_selection
 from .decision_kernel_v03 import evaluate_production_decision
-from .decision_upstream_admission_v03 import validate_decision_upstream_admission
+from .decision_upstream_admission_v03 import validate_decision_upstream_admission, DECISION_UPSTREAM_ADMISSION_V02
+from .upstream_authority_v03 import validate_core_upstream_authority
 from .expectation_gap_production import build_expectation_gap_evaluation
 from .positioning_sizing_production import build_positioning_sizing
 from .price_dependent_expectation_gap import (
@@ -286,7 +287,7 @@ def _portfolio_status(case: dict[str, Any]) -> str:
 def _risk_status(case: dict[str, Any]) -> str:
     return str((case.get("risk") or {}).get("status", "UNKNOWN")).upper()
 
-def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None) -> dict[str, Any]:
+def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None) -> dict[str, Any]:
     errors: list[dict[str, str]] = []
     if not isinstance(case, dict):
         return {"status": "BLOCKED", "errors": [_err("V03-SCHEMA-TYPE", "$", "case must be an object")]}
@@ -419,6 +420,31 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
             case_id=case["case_id"],
             cutoff_date=case["cutoff_date"],
         )
+        if (
+            isinstance(case["decision_upstream_admission"], dict)
+            and case["decision_upstream_admission"].get("schema_version")
+            == "IIOS-CORE-04-UPSTREAM-ADMISSION-0.2"
+        ):
+            if upstream_authority_resolver is None:
+                raise ValueError(
+                    "canonical upstream authority resolver is required for v0.2 upstream admission"
+                )
+            validate_core_upstream_authority(
+                admission_refs=case["decision_upstream_admission"].get("canonical_admission_refs"),
+                declared_states={
+                    "reality_status": case["decision_upstream_admission"].get("reality_status"),
+                    "quality_gate_status": case["decision_upstream_admission"].get("quality_gate_status"),
+                    "value_driver_status": case["decision_upstream_admission"].get("value_driver_status"),
+                    "valuation_status": case["decision_upstream_admission"].get("valuation_status"),
+                    "forecast_status": case["decision_upstream_admission"].get("forecast_status"),
+                },
+                resolver=upstream_authority_resolver,
+                case_id=case["case_id"],
+                market=case["market"],
+                symbol=case["symbol"],
+                company=case["company"],
+                cutoff_date=cutoff,
+            )
     except (TypeError, ValueError) as exc:
         errors.append(
             _err(
@@ -690,8 +716,8 @@ def _expectation_gap(case: dict[str, Any], *, evidence_root_resolver: EvidenceRo
     return status, gap if isinstance(gap, Decimal) else None
 
 
-def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None) -> dict[str, Any]:
-    validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver, independent_forecast_resolver=independent_forecast_resolver)
+def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None) -> dict[str, Any]:
+    validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver, independent_forecast_resolver=independent_forecast_resolver, upstream_authority_resolver=upstream_authority_resolver)
     position = _position(case) if isinstance(case.get("portfolio"), dict) else Decimal("0")
     trust_status = str((case.get("trust") or {}).get("status", "UNKNOWN")).upper()
     upstream = (

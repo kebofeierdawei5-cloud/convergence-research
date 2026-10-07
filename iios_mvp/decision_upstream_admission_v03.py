@@ -15,8 +15,11 @@ from .thesis_admission_v03 import (
     admit_thesis,
     validate_thesis_admission,
 )
+from .canonical_investment_admission_v01 import CanonicalInvestmentAdmissionResolver
+from .upstream_authority_v03 import CORE_STATUS_DOMAINS, STATUS_FIELDS, validate_core_upstream_authority
 
 DECISION_UPSTREAM_ADMISSION_VERSION = "IIOS-CORE-04-UPSTREAM-ADMISSION-0.1"
+DECISION_UPSTREAM_ADMISSION_V02 = "IIOS-CORE-04-UPSTREAM-ADMISSION-0.2"
 DECISION_UPSTREAM_POLICY_VERSION = "IIOS-DECISION-UPSTREAM-POLICY-0.1"
 GATE_STATES = {"PASS", "CONDITIONAL", "UNKNOWN", "BLOCKED"}
 THESIS_ADMISSION_STATES = {"ADMITTED", "BLOCKED", "REVIEW_REQUIRED", "UNKNOWN"}
@@ -101,6 +104,55 @@ def build_decision_upstream_admission(
     }
 
 
+
+def build_canonical_upstream_admission_v02(
+    *,
+    base_record: Mapping[str, Any],
+    canonical_admission_refs: Mapping[str, Mapping[str, Any]],
+    resolver: CanonicalInvestmentAdmissionResolver,
+    market: str,
+    symbol: str,
+    company: str,
+) -> dict[str, Any]:
+    if not isinstance(base_record, Mapping):
+        raise ValueError("base_record must be an object")
+    case_id = str(base_record.get("case_id", "")).strip()
+    cutoff_date = str(base_record.get("cutoff_date", "")).strip()
+    if not case_id or not cutoff_date:
+        raise ValueError("base_record case_id and cutoff_date are required")
+    result = validate_core_upstream_authority(
+        admission_refs=canonical_admission_refs,
+        declared_states={
+            STATUS_FIELDS[domain]: base_record.get(STATUS_FIELDS[domain])
+            for domain in CORE_STATUS_DOMAINS
+        },
+        resolver=resolver,
+        case_id=case_id,
+        market=market,
+        symbol=symbol,
+        company=company,
+        cutoff_date=date.fromisoformat(cutoff_date),
+    )
+    core = dict(base_record)
+    core["schema_version"] = DECISION_UPSTREAM_ADMISSION_V02
+    core["canonical_admission_refs"] = {
+        domain: dict(canonical_admission_refs[domain])
+        for domain in sorted(canonical_admission_refs)
+    }
+    for field, state in result["resolved_states"].items():
+        core[field] = state
+    core["capital_admission_ready"] = (
+        core["reality_status"] == "PASS"
+        and core["quality_gate_status"] == "PASS"
+        and core["value_driver_status"] == "PASS"
+        and core["valuation_status"] == "PASS"
+        and core["forecast_status"] == "PASS"
+        and core["thesis_admission_status"] == "ADMITTED"
+        and core["thesis_status"] == "INTACT"
+    )
+    core.pop("admission_record_hash", None)
+    return {**core, "admission_record_hash": _sha(core)}
+
 def validate_decision_upstream_admission(
     record: Any,
     *,
@@ -127,9 +179,15 @@ def validate_decision_upstream_admission(
         "evidence_ids",
         "admission_record_hash",
     }
+    is_v02 = record.get("schema_version") == DECISION_UPSTREAM_ADMISSION_V02
+    if is_v02:
+        required = required | {"canonical_admission_refs"}
     if set(record) != required:
         raise ValueError("decision_upstream_admission fields are invalid")
-    if record["schema_version"] != DECISION_UPSTREAM_ADMISSION_VERSION:
+    if record["schema_version"] not in {
+        DECISION_UPSTREAM_ADMISSION_VERSION,
+        DECISION_UPSTREAM_ADMISSION_V02,
+    }:
         raise ValueError("decision upstream admission version mismatch")
     if record["policy_version"] != DECISION_UPSTREAM_POLICY_VERSION:
         raise ValueError("decision upstream policy version mismatch")
@@ -163,6 +221,16 @@ def validate_decision_upstream_admission(
     )
     if record["capital_admission_ready"] is not expected_ready:
         raise ValueError("decision upstream capital_admission_ready mismatch")
+    if is_v02:
+        canonical_refs = record["canonical_admission_refs"]
+        if not isinstance(canonical_refs, Mapping):
+            raise ValueError("canonical_admission_refs must be an object")
+        if set(canonical_refs) != set(CORE_STATUS_DOMAINS):
+            raise ValueError("canonical_admission_refs are incomplete")
+        for domain, reference in canonical_refs.items():
+            if not isinstance(reference, Mapping):
+                raise ValueError(f"canonical admission reference for {domain} must be an object")
+
     refs = record["evidence_ids"]
     if not isinstance(refs, list) or len(refs) != len(set(refs)) or any(not str(x).strip() for x in refs):
         raise ValueError("decision upstream evidence_ids invalid")
@@ -182,6 +250,8 @@ def validate_decision_upstream_admission(
 __all__ = [
     "DECISION_UPSTREAM_ADMISSION_VERSION",
     "DECISION_UPSTREAM_POLICY_VERSION",
+    "DECISION_UPSTREAM_ADMISSION_V02",
     "build_decision_upstream_admission",
+    "build_canonical_upstream_admission_v02",
     "validate_decision_upstream_admission",
 ]
