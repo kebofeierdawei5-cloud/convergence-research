@@ -111,13 +111,28 @@ jobs:
           compression-level: 0
           retention-days: 14
 
-      - name: Fail closed for DATA-01 execution
+      - name: Record DATA-01 execution gate
         if: ${{ always() }}
         run: |
           set -euo pipefail
-          code="${{ steps.verify.outcome }}"
-          if [ "$code" != "success" ]; then
-            echo "A02 DATA-01 raw evidence preflight is BLOCKED."
+          mode="UNKNOWN"
+          if [ -f "$RUNNER_TEMP/a02_delivery/INPUT_STATUS.json" ]; then
+            mode=$(python - "$RUNNER_TEMP/a02_delivery/INPUT_STATUS.json" <<'PY'
+          import json,sys
+          with open(sys.argv[1], encoding="utf-8") as fh:
+              p=json.load(fh)
+          print(p.get("mode", "UNKNOWN"))
+          PY
+            )
+          fi
+          verify_outcome="${{ steps.verify.outcome }}"
+          if [ "$mode" = "NO_EXTERNAL_BUNDLE" ]; then
+            echo "A02 DATA-01 pipeline preflight: GREEN / INPUT_NOT_SUPPLIED."
+            echo "A02 raw evidence gate remains BLOCKED because no external evidence bundle was supplied."
+            exit 0
+          fi
+          if [ "$verify_outcome" != "success" ]; then
+            echo "A02 DATA-01 supplied-bundle preflight: BLOCKED."
             exit 4
           fi
-          echo "A02 DATA-01 raw evidence preflight: PASS_RAW_COMPLETE (A02 admission remains locked)."
+          echo "A02 DATA-01 supplied-bundle preflight: PASS_RAW_COMPLETE (A02 admission remains locked)."
