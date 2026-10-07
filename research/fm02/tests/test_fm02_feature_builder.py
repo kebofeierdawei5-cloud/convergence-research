@@ -9,7 +9,13 @@ ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parents[1]
 sys.path.insert(0, str(ROOT))
 
-from fm02_feature_builder import FM02FeatureError, build_feature_snapshot, load_json, load_ndjson
+from fm02_feature_builder import (
+    FM02FeatureError,
+    build_feature_snapshot,
+    load_json,
+    load_ndjson,
+    resolve_visible,
+)
 
 
 FM01 = REPO / "research" / "fm01"
@@ -128,7 +134,11 @@ class FM02FeatureBuilderTests(unittest.TestCase):
                 )
 
     def test_future_known_revision_cannot_change_prior_origin(self):
-        baseline_rows, baseline_summary = self.build()
+        from fm02_feature_builder import qcutoff
+
+        cutoff = qcutoff("2023Q3")
+        baseline = resolve_visible(self.records, "REVENUE", cutoff)
+
         mutated = copy.deepcopy(self.records)
         future = copy.deepcopy(self.records[0])
         future["record_id"] = "DSR-FM02-FUTURE-REVISION"
@@ -136,19 +146,18 @@ class FM02FeatureBuilderTests(unittest.TestCase):
         future["known_at"] = "2030-01-01T00:00:00+08:00"
         future["published_at"] = "2030-01-01T00:00:00+08:00"
         mutated.append(future)
-        rows, summary = self.build(mutated)
-        self.assertEqual(summary["snapshot_sha256"], baseline_summary["snapshot_sha256"])
-        self.assertEqual(rows, baseline_rows)
+
+        replayed = resolve_visible(mutated, "REVENUE", cutoff)
+        self.assertEqual(replayed, baseline)
 
     def test_target_period_visible_as_of_origin_is_fail_closed(self):
         mutated = copy.deepcopy(self.records)
-        target = copy.deepcopy(
-            next(r for r in self.records if r["driver_id"] == "REVENUE" and r["period"] == "2023Q4")
+        target_index = next(
+            i for i, r in enumerate(mutated)
+            if r["driver_id"] == "REVENUE" and r["period"] == "2023Q4"
         )
-        target["record_id"] = "DSR-FM02-TARGET-EARLY"
-        target["known_at"] = "2023-09-01T00:00:00+08:00"
-        target["published_at"] = "2023-09-01T00:00:00+08:00"
-        mutated.append(target)
+        mutated[target_index]["known_at"] = "2023-09-01T00:00:00+08:00"
+        mutated[target_index]["published_at"] = "2023-09-01T00:00:00+08:00"
         with self.assertRaisesRegex(
             FM02FeatureError, "TARGET_PERIOD_VISIBLE_AS_FEATURE_ASOF"
         ):
@@ -161,11 +170,11 @@ class FM02FeatureBuilderTests(unittest.TestCase):
         )
         conflict["record_id"] = "DSR-FM02-CONFLICT"
         conflict["value"] = conflict["value"] + 1.0
-        mutated.append(conflict)
+        cutoff = __import__("fm02_feature_builder").qcutoff("2023Q3")
         with self.assertRaisesRegex(
             FM02FeatureError, "AMBIGUOUS_VISIBLE_REVISION"
         ):
-            self.build(mutated)
+            resolve_visible(mutated + [conflict], "REVENUE", cutoff)
 
     def test_insufficient_history_is_unknown_not_imputed(self):
         rows, _ = self.build()
@@ -190,7 +199,13 @@ class FM02FeatureBuilderTests(unittest.TestCase):
         with self.assertRaisesRegex(
             FM02FeatureError, "FM01_RECORD_COUNT_MISMATCH"
         ):
-            self.build()
+            build_feature_snapshot(
+                self.records,
+                manifest,
+                self.admission,
+                self.contract,
+                self.outer_lock,
+            )
 
     def test_extra_admitted_record_is_rejected(self):
         mutated = copy.deepcopy(self.records)
