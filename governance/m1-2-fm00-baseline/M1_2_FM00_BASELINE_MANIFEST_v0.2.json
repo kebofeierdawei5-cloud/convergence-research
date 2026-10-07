@@ -1,9 +1,12 @@
 {
   "schema_version": "IIOS-M1.2-FM00-GIT-BASELINE-0.2",
   "baseline_id": "M12-FM00-GIT-BASELINE-20261007",
-  "status": "CANDIDATE",
+  "status": "ACCEPTED",
   "repository": "kebofeierdawei5-cloud/convergence-research",
   "base_main_sha": "60d5f9927cb5543415307454aea231376f86c72e",
+  "accepted_pr": 136,
+  "accepted_head_sha": "7894c6892b5b8d2fa6f7c73d10c73b1841098742",
+  "acceptance_workflow_run": 37559419787,
   "scope": {
     "objective": "Establish the durable remote Git baseline for M1.2-FM00 after the post-B04 authority re-audit, without mutating the frozen G2 normative bytes.",
     "included": [
@@ -67,6 +70,7 @@
     "frozen_g2_bytes_may_not_be_modified": true,
     "fm00_v0_1_anchor_may_not_be_rewritten": true,
     "chat_is_not_authoritative": true,
-    "next_after_baseline": "FM01_DATA_INGRESS_ONLY_AFTER_EXACT_M1.1_SOURCE_SNAPSHOT"
+    "next_after_baseline": "FM01_DATA_INGRESS_ONLY_AFTER_EXACT_M1.1_SOURCE_SNAPSHOT",
+    "baseline_acceptance": "PASS"
   }
 }
