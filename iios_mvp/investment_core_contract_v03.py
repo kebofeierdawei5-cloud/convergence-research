@@ -33,6 +33,7 @@ from .forecast_valuation_return_lineage_v01 import validate_forecast_valuation_r
 
 CONTRACT_VERSION = "IIOS-INVESTMENT-CORE-0.3"
 REQUIRED_RUNTIME_UPSTREAM_ADMISSION_VERSION = DECISION_UPSTREAM_ADMISSION_V02
+REQUIRED_RUNTIME_RETURN_LINEAGE_VERSION = FORECAST_VALUATION_RETURN_LINEAGE_VERSION
 BUY_ENTRY_RETURN_CUSHION_THRESHOLD = Decimal("0.15")
 FUNDAMENTAL_TARGET_ANNUALIZED_RETURN = Decimal("0.15")
 
@@ -232,7 +233,8 @@ def validate_return_gate_v03(return_gate: Any, path: str = "return_gate") -> lis
         "entry_price", "entry_value_reference", "horizon_years",
         "horizon_override", "horizon_override_basis", "horizon_selection_rationale",
         "buy_entry_return_cushion_threshold", "fundamental_target_annualized_return",
-        "required_return_annualized", "scenarios",
+        "required_return_annualized", "lineage_version",
+        "canonical_forecast_ref", "canonical_valuation_ref", "scenarios",
     )
     _required(return_gate, fields, path, errors)
     if errors:
@@ -417,7 +419,17 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
             errors.append(_err("V03-RISK-PORTFOLIO-CONTRACT", "risk/portfolio", str(exc)))
     errors.extend(validate_return_gate_v03(case["return_gate"]))
     return_gate = case["return_gate"]
-    if isinstance(return_gate, dict) and return_gate.get("lineage_version") == FORECAST_VALUATION_RETURN_LINEAGE_VERSION:
+    if (
+        not isinstance(return_gate, dict)
+        or return_gate.get("lineage_version") != REQUIRED_RUNTIME_RETURN_LINEAGE_VERSION
+    ):
+        errors.append(_err(
+            "V03-RETURN-LINEAGE-REQUIRED",
+            "return_gate.lineage_version",
+            "Decision runtime requires canonical Forecast-Valuation-Return lineage "
+            f"{REQUIRED_RUNTIME_RETURN_LINEAGE_VERSION}",
+        ))
+    elif isinstance(return_gate, dict) and return_gate.get("lineage_version") == REQUIRED_RUNTIME_RETURN_LINEAGE_VERSION:
         if not isinstance(return_gate.get("canonical_forecast_ref"), dict):
             errors.append(_err(
                 "V03-RETURN-LINEAGE-FORECAST-REF",
