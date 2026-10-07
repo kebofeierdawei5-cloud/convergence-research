@@ -10,7 +10,7 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 ## Current stage
 
-**Current canonical M1.2 status: FM01 Exact CATL M1.1 Source Snapshot Admission = PASS / MERGED / CANONICAL**
+**Current canonical M1.2 status: FM02 PIT Feature Builder / Forecastability Feature Contract = PASS / MERGED / CANONICAL**
 
 C8 and all prior Stage C productization milestones remain canonical.
 
@@ -28,10 +28,12 @@ FM00 Git Baseline = PASS
 FM01 exact M1.1 source admission = PASS
         ↓
 FM01 DATA_READY
+        ↓
+FM02 PIT feature builder / feature contract = PASS
 ```
 
-Canonical main after FM01 admission and final governance sync:
-`491ba1dba34acf0942f8fc5df06de35627a65329`
+Canonical main after FM02 merge:
+`ade3541302eb6f3fa43ec8aac76540820000a727`
 
 Baseline:
 - PR #136 = MERGED;
@@ -41,7 +43,7 @@ Baseline:
 
 G2 historical frozen identity remains separate from the accepted R0 successor evidence; no frozen-byte rewrite was performed.
 
-**Next boundary: M1.2-FM-02 Feature Builder / Forecastability Feature Contract.**
+**Next boundary: M1.2-FM-03 State Engine / Forecastability State Construction.**
 
 FM01 data gate is now `DATA_READY` after exact-source admission, provenance binding, 22-quarter coverage validation, and independent PIT replay.
 
@@ -49,7 +51,22 @@ Admitted CATL scope: 300750.SZ, 2021Q1–2026Q2, 22 quarters, 44 DriverSeries re
 
 No FM01 numeric data were fabricated, inferred, or reconstructed from memory.
 
-FM02 remains separately gated by M1.2 research governance, feature/state contracts, conditional backtest, partitioning and sealed-manifest controls.
+FM02 is now PASS / MERGED / CANONICAL as a feature-construction research capability. It remains separately gated from confirmatory model selection by M1.2 research governance, State / UNKNOWN semantics, conditional backtest, partitioning, sealed-manifest and blind-scoring controls.
+
+FM02 acceptance:
+- PR #144;
+- merge commit `ade3541302eb6f3fa43ec8aac76540820000a727`;
+- final pre-merge head `617c9b8a3f091e76d5ea44a39e963ff255ffd99b`;
+- remote CI run #15 = SUCCESS;
+- 13 / 13 FM02 unit tests passed;
+- generated feature snapshot = 22 rows (11 origins × 2 drivers);
+- canonical feature-row content hash `3803be1404255652b831627fcd32acaf203f8984da33f70d3784e28dc449b9da`;
+- generated snapshot schema validation = PASS;
+- independent PIT provenance audit = PASS.
+
+Acceptance: `docs/iios/FM02_ACCEPTANCE_2026-10-07.md`.
+
+FM02 does not authorize State Engine, Conditional Backtest, confirmatory model selection, production router, current-price inputs, scheduler, alerts, or automatic execution.
 
 RP-01 remains a separate legacy fixture regression and is not M1.2 baseline acceptance evidence.
 
