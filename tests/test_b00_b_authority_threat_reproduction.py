@@ -92,13 +92,10 @@ def test_p0_02_return_gate_divergence_is_blocked_by_canonical_lineage():
     case, registry = _buyable_case()
     case, forecast_registry, valuation_resolver = bind_return_lineage(case)
 
-    # Deliberately make the supplied Valuation and Forecast economically
-    # incompatible with the separately supplied Return Gate while keeping all
-    # individually checked structural contracts valid.
-    case["valuation"]["probability_weighted_value_per_share"] = "50"
-    case["forecast"]["scenarios"]["base"]["fcf_proxy_bn_cny"] = ["1", "1", "1"]
-    case["forecast"]["scenarios"]["bull"]["fcf_proxy_bn_cny"] = ["2", "2", "2"]
-    case["forecast"]["scenarios"]["bear"]["fcf_proxy_bn_cny"] = ["0.5", "0.5", "0.5"]
+    # B04-B attack: after canonical valuation is admitted, independently
+    # substitute an optimistic Return Gate terminal value.
+    # The canonical Valuation output remains unchanged and must win.
+    case["return_gate"]["scenarios"]["base"]["terminal_value_per_share"] = "999"
 
     validation = validate_case_v03(
         case,
