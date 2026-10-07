@@ -41,11 +41,10 @@ from tests.test_investment_core_v03 import (
     CURRENT_PRICE_REGISTRY,
     EVIDENCE_ROOT_REGISTRY,
     INDEPENDENT_FORECAST_REGISTRY,
-    UPSTREAM_AUTHORITY_REGISTRY,
-    VALUATION_OUTPUT_RESOLVER,
     case,
     independent_forecast_ref,
     market_implied_expectation_snapshot,
+    UPSTREAM_AUTHORITY_REGISTRY,
 )
 
 
@@ -189,7 +188,6 @@ def test_c4_positive_compatible_gap_is_materialized_and_replayable():
         case=c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert evaluation["evaluation_version"] == C4_EXPECTATION_GAP_VERSION
     assert evaluation["status"] == "PASS"
@@ -215,7 +213,6 @@ def test_c4_nonpositive_gap_is_a_real_calculation_but_remains_advisory():
         case=c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert evaluation["status"] == "PASS"
     assert Decimal(evaluation["gap_relative"]) < 0
@@ -225,7 +222,6 @@ def test_c4_nonpositive_gap_is_a_real_calculation_but_remains_advisory():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
@@ -260,7 +256,6 @@ def test_c4_incompatible_semantics_never_materialize_a_scalar_gap():
         case=c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert evaluation["status"] == "INCOMPATIBLE"
     assert evaluation["market_required_value"] is None
@@ -276,7 +271,6 @@ def test_c4_ambiguous_market_interpretation_has_no_scalar_gap():
         case=c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert evaluation["status"] == "AMBIGUOUS"
     assert evaluation["resolution_state"] == "AMBIGUOUS"
@@ -292,7 +286,6 @@ def test_c4_no_feasible_solution_is_not_promoted_to_a_gap():
         case=c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert evaluation["status"] == "NO_FEASIBLE_SOLUTION"
     assert evaluation["resolution_state"] == "NO_FEASIBLE_MODEL"
@@ -308,7 +301,6 @@ def test_c4_expectation_gap_evaluation_is_bound_into_canonical_decision():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     evaluation = result["decision"]["expectation_gap_evaluation"]
     assert evaluation["evaluation_version"] == C4_EXPECTATION_GAP_VERSION
@@ -323,7 +315,6 @@ def test_c4_schema_accepts_real_evaluation():
         case=case(),
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     schema = json.loads(
         (ROOT / "schemas/c4_expectation_gap_evaluation_v0.1.schema.json").read_text(
@@ -338,7 +329,6 @@ def test_c4_v03_nested_schema_rejects_malformed_evaluation():
         case=case(),
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     schema = json.loads(
         (ROOT / "schemas/investment_core_case_v0.3.schema.json").read_text(
