@@ -48,7 +48,7 @@ jobs:
           from pathlib import Path
           p = Path("governance/m1-2-fm00-baseline/M1_2_FM00_BASELINE_MANIFEST_v0.2.json")
           d = json.loads(p.read_text(encoding="utf-8"))
-          assert d["status"] == "CANDIDATE"
+          assert d["status"] == "ACCEPTED"
           assert d["fm00_exact_anchor"]["commit"] == "536e883bc873dbe7dd7383690a7a95a0f65591a7"
           assert d["fm00_exact_anchor"]["tag_object_sha"] == "aac0cccf596ee2703caedffc08f434be9e2dffed"
           assert d["g2_reference"]["historical_frozen_carrier_sha256"] == "899f0b1b9f3619458e17be76ac43dd6e00b5397d0c12adb7b68e2479c7f51524"
