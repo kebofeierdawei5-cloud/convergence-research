@@ -645,7 +645,7 @@ def build_result(
                         )
                     )
 
-    conditional = conditional_performance(origins, state_by_key, by_driver)
+    group_definitions, empirical_performance = conditional_performance(origins, state_by_key, by_driver)
     selected_count = sum(
         result["status"] in ("SELECTED", "SELECTED_AND_EVALUATED", "SELECTED_BUT_OUTER_UNAVAILABLE")
         for result in selection_results
@@ -662,7 +662,7 @@ def build_result(
             model_counts[result["selected_model"]] += 1
 
     result = {
-        "schema_version": "IIOS-FM04-CONDITIONAL-BACKTEST-RESULT-0.1",
+        "schema_version": "IIOS-FM04-CONDITIONAL-BACKTEST-RESULT-0.2",
         "status": "PASS",
         "contract_id": contract["contract_id"],
         "research_epoch_id": contract["research_epoch_id"],
@@ -684,7 +684,8 @@ def build_result(
             "selected_count": selected_count,
             "outer_evaluated_count": evaluated_count,
             "no_selection_count": no_selection_count,
-            "conditional_group_count": len(conditional),
+            "conditional_group_count": len(group_definitions),
+            "empirical_conditional_group_count": len(empirical_performance),
             "model_order": list(MODEL_ORDER),
             "min_common_inner_observations": 3,
             "no_selection_reason_counts": reason_counts,
@@ -695,8 +696,22 @@ def build_result(
             "current_price_used": False,
             "automatic_execution": False,
         },
+        "selection_eligibility": [
+            {
+                "selection_id": item["selection_id"],
+                "driver_id": item["driver_id"],
+                "horizon": item["horizon"],
+                "state_dimension": item["state_dimension"],
+                "outer_origin_id": item["outer_origin_id"],
+                "state_value": item["state_value"],
+                "eligible": item["status"] in ("SELECTED", "SELECTED_AND_EVALUATED", "SELECTED_BUT_OUTER_UNAVAILABLE"),
+                "reason": item["no_selection_reason"],
+            }
+            for item in selection_results
+        ],
         "outer_selection_evaluations": selection_results,
-        "conditional_performance": conditional,
+        "conditional_group_definitions": group_definitions,
+        "conditional_empirical_performance": empirical_performance,
     }
     return result
 
