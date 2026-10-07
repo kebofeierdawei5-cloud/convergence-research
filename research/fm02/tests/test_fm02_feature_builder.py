@@ -33,6 +33,54 @@ class FM02FeatureBuilderTests(unittest.TestCase):
             self.outer_lock,
         )
 
+    def test_feature_formula_reference_fixture(self):
+        values = {}
+        fixture_values = [
+            ("2020Q1", 100.0), ("2020Q2", 110.0), ("2020Q3", 120.0), ("2020Q4", 130.0),
+            ("2021Q1", 120.0), ("2021Q2", 121.0), ("2021Q3", 122.0), ("2021Q4", 123.0),
+            ("2022Q1", 140.0), ("2022Q2", 141.0), ("2022Q3", 142.0), ("2022Q4", 143.0),
+            ("2023Q1", 160.0), ("2023Q2", 161.0), ("2023Q3", 162.0), ("2023Q4", 163.0),
+        ]
+        for period, value in fixture_values:
+            values[period] = {
+                "record_id": f"FIX-{period}",
+                "security_id": "TEST",
+                "value": value,
+            }
+
+        from fm02_feature_builder import build_features
+        features = build_features(values, "2023Q4")
+
+        self.assertAlmostEqual(
+            features["YOY_GROWTH"]["value"], 163.0 / 123.0 - 1.0, places=12
+        )
+        self.assertAlmostEqual(
+            features["GROWTH_ACCELERATION"]["value"],
+            (163.0 / 123.0 - 1.0) - (162.0 / 122.0 - 1.0),
+            places=12,
+        )
+        self.assertAlmostEqual(
+            features["ROLLING_GROWTH_VOL"]["value"],
+            0.011711575254106422,
+            places=12,
+        )
+        self.assertAlmostEqual(
+            features["SEASONAL_DEVIATION"]["value"],
+            0.08548240377508665,
+            places=12,
+        )
+        self.assertAlmostEqual(
+            features["MEAN_REVERSION_GAP"]["value"],
+            0.011086139088200803,
+            places=12,
+        )
+        self.assertAlmostEqual(
+            features["SLOPE_STABILITY"]["value"],
+            0.007625207178128894,
+            places=12,
+        )
+
+
     def test_real_catl_snapshot_has_expected_shape_and_frozen_boundary(self):
         rows, summary = self.build()
         self.assertEqual(summary["status"], "PASS")
