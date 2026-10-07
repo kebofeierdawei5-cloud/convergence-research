@@ -582,6 +582,30 @@
             "number"
           ]
         },
+        "lineage_version": {
+          "const": "IIOS-FORECAST-VALUATION-RETURN-LINEAGE-0.1"
+        },
+        "canonical_forecast_ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "forecast_id",
+            "admission_record_hash"
+          ],
+          "properties": {
+            "forecast_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "admission_record_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "canonical_valuation_ref": {
+          "$ref": "#/$defs/canonicalAdmissionReference"
+        },
         "scenarios": {
           "type": "object",
           "additionalProperties": false,
@@ -1558,6 +1582,32 @@
     }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "return_gate": {
+            "properties": {
+              "lineage_version": {
+                "const": "IIOS-FORECAST-VALUATION-RETURN-LINEAGE-0.1"
+              }
+            },
+            "required": [
+              "lineage_version"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "return_gate": {
+            "required": [
+              "canonical_forecast_ref",
+              "canonical_valuation_ref"
+            ]
+          }
+        }
+      }
+    },
     {
       "if": {
         "properties": {
