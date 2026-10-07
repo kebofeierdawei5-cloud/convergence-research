@@ -103,7 +103,11 @@ def test_p0_02_return_gate_can_diverge_from_forecast_and_valuation_and_still_rea
         current_price_resolver=registry,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
-    assert validation["status"] == "PASS", validation["errors"]
+    assert validation["status"] == "BLOCKED", validation["errors"]
+    assert any(
+        error["code"] == "V03-RETURN-LINEAGE-CANONICAL"
+        for error in validation["errors"]
+    )
 
     decision = decide_v03(
         case,
@@ -111,11 +115,8 @@ def test_p0_02_return_gate_can_diverge_from_forecast_and_valuation_and_still_rea
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
 
-    assert decision["action"] == "BUY"
-    assert decision["gates"]["new_capital_allowed"] is True
-    assert decision["gates"]["valuation"] == "PASS"
-    assert decision["gates"]["forecast"] == "PASS"
-    assert Decimal(decision["return_metrics"]["expected_annualized_return"]) > Decimal("0.15")
+    assert decision["action"] != "BUY"
+    assert decision["gates"]["new_capital_allowed"] is False
 
 
 def test_p1_03_execution_receipt_accepts_action_scope_mismatch_as_record_only_evidence():
