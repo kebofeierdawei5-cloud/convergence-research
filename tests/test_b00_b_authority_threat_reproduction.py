@@ -95,6 +95,7 @@ def test_p0_02_return_gate_divergence_is_blocked_by_canonical_lineage():
     # B04-B attack: after canonical valuation is admitted, independently
     # substitute an optimistic Return Gate terminal value.
     # The canonical Valuation output remains unchanged and must win.
+    case["return_gate"]["canonical_valuation_ref"]["admission_record_hash"] = "0" * 64
     case["return_gate"]["scenarios"]["base"]["terminal_value_per_share"] = "999"
 
     validation = validate_case_v03(
