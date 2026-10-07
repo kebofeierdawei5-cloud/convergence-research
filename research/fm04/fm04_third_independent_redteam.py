@@ -142,7 +142,9 @@ def independent_full_check(result,states,records,lock,contract):
                 assert all(math.isclose(o["model_metrics"][m][k],mm[k],rel_tol=0,abs_tol=1e-12) for k in mm)
 
 def mutate_and_expect_reject(base_result,state_path,mutate,label):
-    from research.fm04 import fm04_independent_audit as module
+    import sys
+    sys.path.insert(0, "research/fm04")
+    import fm04_independent_audit as module
     value=copy.deepcopy(base_result); mutate(value)
     with tempfile.TemporaryDirectory() as td:
         p=Path(td)/(label+".json"); p.write_text(json.dumps(value,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
@@ -175,9 +177,30 @@ def main():
         base=Path(td)/"baseline.json"; base.write_text(json.dumps(result,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
         os.environ["FM04_BACKTEST_RESULT"]=str(base); os.environ["FM03_STATE_SNAPSHOT"]=os.environ["FM03_STATE_SNAPSHOT"]
         with redirect_stdout(StringIO()): audit.main()
+        def add_attack(label, mutation):
+            mutated=copy.deepcopy(result)
+            mutation(mutated)
+            p=Path(td)/(label+".json")
+            p.write_text(json.dumps(mutated,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+            os.environ["FM04_BACKTEST_RESULT"]=str(p)
+            accepted=True
+            try:
+                with redirect_stdout(StringIO()): audit.main()
+            except Exception:
+                accepted=False
+            assert not accepted, label
+
+        def mut_empirical_metric(x):
+            if x["conditional_empirical_performance"]:
+                x["conditional_empirical_performance"][0]["models"][MODELS[0]]["metrics"]["MAE"] += 1.0
+
+        def mut_empirical_actual(x):
+            if x["conditional_empirical_performance"]:
+                x["conditional_empirical_performance"][0]["observations"][0]["actual_record_id"] = "FORGED"
+
         attacks=[
-            ("mutate_empirical_metric",lambda x: x["conditional_empirical_performance"][0]["models"][MODELS[0]]["metrics"]["MAE"]+=1),
-            ("mutate_empirical_observation_actual",lambda x: x["conditional_empirical_performance"][0]["observations"][0]["actual_record_id"]="FORGED"),
+            ("mutate_empirical_metric",mut_empirical_metric),
+            ("mutate_empirical_observation_actual",mut_empirical_actual),
             ("mutate_group_definition",lambda x: x["conditional_group_definitions"][0].__setitem__("state_value","FORGED")),
             ("mutate_selection_eligibility",lambda x: x["selection_eligibility"][0].__setitem__("eligible",True)),
             ("mutate_all_driver_binding",lambda x: x["input_bindings"].__setitem__("driver_history_git_blob_sha","0"*40)),
@@ -185,7 +208,7 @@ def main():
             ("mutate_summary_count",lambda x: x["summary"].__setitem__("no_selection_count",0)),
         ]
         for label,mutation in attacks:
-            mutated=copy.deepcopy(result); mutation(mutated); p=Path(td)/(label+".json"); p.write_text(json.dumps(mutated,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+            add_attack(label, mutation)
             os.environ["FM04_BACKTEST_RESULT"]=str(p)
             accepted=True
             try:
