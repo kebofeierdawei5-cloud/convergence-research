@@ -222,7 +222,7 @@ def fetch_memento_target(source_urls: list[str], attempts: list[dict]) -> dict:
         for target_dt in timestamps:
             api_url = "https://timetravel.mementoweb.org/api/json/" + target_dt + "/" + source_url
             try:
-                resp = requests.get(api_url, timeout=60, headers={"User-Agent":"Mozilla/5.0"}, allow_redirects=True)
+                resp = requests.get(api_url, timeout=20, headers={"User-Agent":"Mozilla/5.0"}, allow_redirects=True)
                 if resp.status_code != 200:
                     _record_attempt(attempts, "MEMENTO_API", source_url=source_url, target_datetime=target_dt, http_status=resp.status_code)
                     continue
@@ -241,12 +241,12 @@ def fetch_memento_target(source_urls: list[str], attempts: list[dict]) -> dict:
 
 def fetch_availability_api(source_urls: list[str], attempts: list[dict]) -> dict:
     import urllib.parse
-    timestamps = ["20260930000000","20261001000000","20261002000000","20261003000000","20261004000000"]
+    timestamps = ["20261001000000"]
     for source_url in source_urls:
         for target_dt in timestamps:
             api_url = "https://archive.org/wayback/available?" + urllib.parse.urlencode({"url":source_url,"timestamp":target_dt})
             try:
-                resp = requests.get(api_url, timeout=60, headers={"User-Agent":"Mozilla/5.0"})
+                resp = requests.get(api_url, timeout=20, headers={"User-Agent":"Mozilla/5.0"})
                 resp.raise_for_status()
                 payload = resp.json()
                 closest = payload.get("archived_snapshots", {}).get("closest")
