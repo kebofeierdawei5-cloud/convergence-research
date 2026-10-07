@@ -1,0 +1,93 @@
+{
+  "schema_version": "IIOS-FM07-RESEARCH-EPOCH-AMENDMENT-GATE-0.1",
+  "gate_id": "AG-M12-FM07-CATL-001",
+  "version": "0.1.0",
+  "status": "FROZEN",
+  "current_research_epoch_id": "RE-M12-EXP-CATL-20260930",
+  "current_epoch_status": "CLOSED_TO_SAME_EPOCH_AMENDMENT",
+  "decision": "DO_NOT_AMEND_CURRENT_EPOCH",
+  "new_epoch_required_for_scope_change": true,
+  "evidence_basis": {
+    "fm05_contract_id": "FC-M12-FM05-CATL-001",
+    "fm05_contract_git_blob_sha": "23cfaa05c82f8556ae1badc177602e96af4bb0a8",
+    "sufficiency_status": "INSUFFICIENT_FOR_STATE_CONDITIONED_SELECTION",
+    "outer_selection_unit_count": 406,
+    "selected_count": 0,
+    "outer_evaluated_count": 0,
+    "no_selection_count": 406,
+    "structural_conditional_group_count": 79,
+    "empirical_conditional_group_count": 0
+  },
+  "amendment_classes": [
+    {
+      "id": "THRESHOLD_RELAXATION",
+      "same_epoch_allowed": false,
+      "requires_new_epoch": true
+    },
+    {
+      "id": "STATE_REGROUPING",
+      "same_epoch_allowed": false,
+      "requires_new_epoch": true
+    },
+    {
+      "id": "ORIGIN_SCHEDULE_CHANGE",
+      "same_epoch_allowed": false,
+      "requires_new_epoch": true
+    },
+    {
+      "id": "MODEL_FAMILY_EXPANSION",
+      "same_epoch_allowed": false,
+      "requires_new_epoch": true
+    },
+    {
+      "id": "METRIC_CHANGE",
+      "same_epoch_allowed": false,
+      "requires_new_epoch": true
+    },
+    {
+      "id": "ESTIMAND_CHANGE",
+      "same_epoch_allowed": false,
+      "requires_new_epoch": true
+    },
+    {
+      "id": "UNIVERSE_EXPANSION",
+      "same_epoch_allowed": false,
+      "requires_new_epoch": true
+    },
+    {
+      "id": "DATA_QUALITY_SEMANTIC_CHANGE",
+      "same_epoch_allowed": false,
+      "requires_new_epoch": true
+    }
+  ],
+  "new_epoch_entry_requirements": {
+    "owner_approval_recorded": true,
+    "new_epoch_id_unique": true,
+    "scope_explicitly_frozen_before_execution": true,
+    "estimand_explicitly_frozen_before_execution": true,
+    "sufficiency_policy_explicitly_frozen_before_execution": true,
+    "pit_data_admission_revalidated": true,
+    "provenance_bindings_recomputed": true,
+    "evaluation_purity_boundary_frozen": true,
+    "no_forward_use_of_current_epoch_results_for_tuning": true
+  },
+  "capability_boundary": {
+    "amendment_gate_only": true,
+    "opens_new_epoch_automatically": false,
+    "changes_current_scope": false,
+    "changes_current_estimand": false,
+    "changes_current_threshold": false,
+    "model_selection": false,
+    "production_router": false,
+    "production_forecast": false,
+    "automatic_execution": false,
+    "investment_decision": false
+  },
+  "research_boundary": {
+    "current_epoch_remains_contaminated": true,
+    "current_epoch_remains_development_only": true,
+    "confirmatory_eligible": false,
+    "current_epoch_results_are_diagnostic_only": true,
+    "current_epoch_results_may_not_be_used_as_same_epoch_tuning_targets": true
+  }
+}

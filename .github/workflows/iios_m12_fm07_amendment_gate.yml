@@ -1,0 +1,45 @@
+name: IIOS M1.2 FM07 Research Epoch Amendment Gate
+
+on:
+  pull_request:
+    paths:
+      - "research/fm05/**"
+      - "research/fm07/**"
+      - ".github/workflows/iios_m12_fm07_amendment_gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-fm07-amendment-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validation dependency
+        run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Verify exact FM05 blob anchor
+        run: |
+          test "$(git hash-object research/fm05/FM05_SCOPE_ESTIMAND_SUFFICIENCY_CONTRACT.json)" = "23cfaa05c82f8556ae1badc177602e96af4bb0a8"
+          echo "Exact FM05 blob anchor: PASS"
+      - name: Run FM07 contract tests
+        run: python -m unittest discover -s research/fm07/tests -p 'test_*.py' -v
+      - name: Validate FM07 amendment gate
+        run: |
+          python research/fm07/fm07_amendment_gate.py             --fm05-contract research/fm05/FM05_SCOPE_ESTIMAND_SUFFICIENCY_CONTRACT.json             --output /tmp/FM07_AMENDMENT_GATE_RECEIPT.json
+      - name: Archive FM07 receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: iios-m12-fm07-amendment-gate-${{ github.run_id }}
+          path: /tmp/FM07_AMENDMENT_GATE_RECEIPT.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Compile FM07
+        run: python -m compileall -q research/fm07
+      - name: Diff check
+        run: git diff --check
