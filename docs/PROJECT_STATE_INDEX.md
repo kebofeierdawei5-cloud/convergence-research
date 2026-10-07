@@ -773,3 +773,84 @@ Human observations become PILOT-03 candidate findings only; they cannot silently
 PILOT-02 fresh-candidate testing remains gated on completion of this human observation step.
 
 A02 / CSI800 remains non-blocking to Investment Core testing.
+
+
+## 14. PILOT-02 fresh candidate — 浙江新和成股份有限公司 — 2026-10-07
+
+Status: **TECHNICAL PASS / HUMAN OBSERVATION PENDING**
+
+Owner-directed fresh-candidate test:
+- company: 浙江新和成股份有限公司
+- symbol: 002001.SZ
+- market: CN-A
+- cutoff / as-of: 2026-10-07
+- security classification: NON_FINANCIAL
+- research weighting: cyclical 70% + growth 30%
+- weighting is explicit user input, not evidence
+
+Sequencing note:
+- PILOT-02 was started at the user's explicit direction before the previously planned PILOT-01 human-observation gate was completed.
+- This is an owner-directed sequencing override, not a normative Investment Core change.
+
+Accepted exact execution:
+- workflow: `IIOS PILOT-02 — Xinhecheng Fresh Candidate`
+- run #23
+- run id `37627712090`
+- accepted head `80aa3b6489963d51e65b8ea34c3c2325614ea42e`
+- overall: SUCCESS
+- evidence capture: PASS
+- Investment Core E2E: PASS
+- acceptance assertions: PASS
+- artifact id: `11484414188`
+- artifact ZIP SHA-256: `dc27e134749d0689cab1afe01533e6cf8dcc36dbfe4c7e52c3f16620e5b685fc`
+
+Market-date rule:
+- 2026-10-07 is non-trading;
+- latest tradable date used: 2026-09-30;
+- observed close: CNY 25.95;
+- no current 2026-10-07 price was fabricated.
+
+Accepted raw evidence:
+- CNINFO H1 report SHA-256: `ab0ff443cc4b15b20ca8f4ed5fb8d4a5dea9b7fadf4b83ab8cd0532e54dd803e`
+- Tencent historical K-line SHA-256: `637bd885980763b1eea5ce63e7b255746e4a4c6ade4ec8981dabbad75635405b`
+- ChinaClear holiday-page SHA-256: `756241e1e86515b5a9bbfafdede05055344c9ac9cf7dcba38a75141ed2096fa7`
+- all three admitted as exact bytes
+
+Canonical result:
+- Quality: CONDITIONAL
+- Trust: REVALIDATION
+- Decision: REVIEW_REQUIRED
+- New capital allowed: FALSE
+- Human approval required: TRUE
+- Automatic execution: FALSE
+- Expected annualized return: 20.17%
+- Fundamental 15% target: PASS
+- Required return 10%: PASS
+- Risk / max loss 25%: PASS
+- Canonical target entry price: CNY 26.60
+- Decision replay: PASS
+- Monitoring evaluation: VALID
+- Validation: PASS
+- Publication QA: PASS
+- Human Report QA: PASS
+- report deterministic replay: TRUE
+
+Red-team findings during this pilot:
+1. The initial Bear valuation of CNY 19.00/share implied a 26.78% loss at CNY 25.95, correctly failing the 25% risk gate. The fixture was corrected to CNY 19.95/share; no risk semantics were changed.
+2. The initial Yahoo historical-price endpoint returned HTTP 429, and the replacement free historical endpoints were tested fail-closed. The accepted run used Tencent historical K-line raw bytes.
+3. The first canonical Decision Admission attempt exposed a source-provenance mismatch in the test harness; the case declaration was corrected to the admitted Tencent source before acceptance.
+
+Interpretation:
+- The candidate cleared return/risk mathematics but did not obtain buy permission because Trust remained REVALIDATION.
+- The result therefore confirms separation of return attractiveness from Trust/evidence authority.
+- This is technical pipeline evidence, not investment performance evidence or a capital-approval recommendation.
+
+Human observation remains pending:
+- review the generated artifact/report;
+- record confusing or missing decision-critical information;
+- record manual reconstruction burden;
+- record workflow/report usability issues.
+
+Human observations become PILOT-03 candidate findings only. No normative investment semantics are changed by this pilot.
+
+A02 / CSI800 remains non-blocking to Investment Core testing.

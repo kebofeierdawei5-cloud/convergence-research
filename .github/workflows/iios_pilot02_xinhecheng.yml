@@ -1,0 +1,185 @@
+name: IIOS PILOT-02 — Xinhecheng Fresh Candidate
+
+on:
+  pull_request:
+    paths:
+      - "examples/real_cases/RC-CN-A-002001-20261007_pilot02_input.json"
+      - "tools/pilot02_xinhecheng_e2e.py"
+      - ".github/workflows/iios_pilot02_xinhecheng.yml"
+      - "iios_mvp/**"
+      - "tests/b03b_upstream_authority_fixture.py"
+      - "tests/b04b_return_lineage_fixture.py"
+  workflow_dispatch:
+  push:
+    branches:
+      - "pilot-02-xinhecheng-20261007"
+
+permissions:
+  contents: read
+
+jobs:
+  pilot-02:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema pypdf
+
+      - name: Compile pilot code
+        run: python -m compileall -q iios_mvp tools tests/b03b_upstream_authority_fixture.py tests/b04b_return_lineage_fixture.py
+
+      - name: Capture exact primary evidence and latest tradable price
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/pilot02-xhc
+          mkdir -p /tmp/pilot02-xhc/raw /tmp/pilot02-xhc/out
+
+          curl -L --fail --retry 3 --retry-delay 2 \
+            "https://static.cninfo.com.cn/finalpage/2026-08-20/1225482495.PDF" \
+            -o /tmp/pilot02-xhc/raw/xinhecheng_2026_h1.pdf
+
+          curl -L --fail --retry 3 --retry-delay 2 \
+            -A "Mozilla/5.0" \
+            -H "Referer: https://gu.qq.com/" \
+            "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sz002001,day,2026-09-30,2026-09-30,5," \
+            -o /tmp/pilot02-xhc/raw/002001_20260930_tencent.json
+
+          curl -L --fail --retry 3 --retry-delay 2 \
+            "https://m.chinaclear.cn/zdjs/gszb/202609/0404d81f1ee8409c95b5dc4af693409f.shtml" \
+            -o /tmp/pilot02-xhc/raw/chinaclear_2026_holiday_schedule.html
+
+          python - <<'PY'
+          import hashlib, json, re
+          from pathlib import Path
+          from pypdf import PdfReader
+
+          root = Path("/tmp/pilot02-xhc/raw")
+
+          def sha(p):
+              h=hashlib.sha256()
+              with p.open("rb") as f:
+                  for chunk in iter(lambda:f.read(1024*1024), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          pdf = root / "xinhecheng_2026_h1.pdf"
+          text = "\n".join(page.extract_text() or "" for page in PdfReader(str(pdf)).pages)
+          required = [
+              "浙江新和成股份有限公司",
+              "13,129,300,260.89",
+              "4,010,733,454.55",
+              "3,640,144,282.94",
+              "605,728,077.64",
+              "67.07%",
+              "58.43%",
+          ]
+          missing = [x for x in required if x not in text]
+          if missing:
+              raise SystemExit("CNINFO H1 report anchor extraction failed: " + repr(missing))
+          (root / "cninfo_h1_anchor_extract.txt").write_text(
+              "\n".join(x for x in required), encoding="utf-8"
+          )
+
+          price = json.loads((root / "002001_20260930_tencent.json").read_text())
+          node = price["data"]["sz002001"]
+          bars = node.get("day") or node.get("qfqday") or node.get("hfqday")
+          if not bars:
+              raise SystemExit("empty Tencent historical K-line response")
+          price_row = next((row for row in bars if row and str(row[0]) == "2026-09-30"), None)
+          if price_row is None or len(price_row) < 3:
+              raise SystemExit("2026-09-30 row missing from Tencent historical K-line response")
+          close = float(price_row[2])
+          if close != 25.95:
+              raise SystemExit(f"2026-09-30 002001 close mismatch: {close!r}")
+
+          calendar = (root / "chinaclear_2026_holiday_schedule.html").read_text(
+              encoding="utf-8", errors="ignore"
+          )
+          calendar_ok = ("2026/10/01" in calendar and "2026/10/07" in calendar) or (
+              "10月1日" in calendar and "10月7日" in calendar
+          )
+          if not calendar_ok:
+              raise SystemExit("ChinaClear holiday page did not expose the expected Oct 1-Oct 7 closure anchors")
+
+          receipt = {
+              "pilot": "PILOT-02",
+              "case_id": "RC-CN-A-002001-20261007",
+              "cutoff_date": "2026-10-07",
+              "company": "浙江新和成股份有限公司",
+              "symbol": "002001",
+              "security_classification": "NON_FINANCIAL",
+              "research_weighting": {
+                  "cyclical": "0.70",
+                  "growth": "0.30",
+                  "financial_sector_inclusion": False,
+                  "classification": "USER_REQUESTED_RESEARCH_WEIGHTING_NOT_EVIDENCE"
+              },
+              "report_source_ref": "https://static.cninfo.com.cn/finalpage/2026-08-20/1225482495.PDF",
+              "report_sha256": sha(pdf),
+              "report_exact_bytes": True,
+              "price_source_ref": "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sz002001,day,2026-09-30,2026-09-30,5,",
+              "price_sha256": sha(root / "002001_20260930_tencent.json"),
+              "price_exact_bytes": True,
+              "price": "25.95",
+              "latest_tradable_date": "2026-09-30",
+              "calendar_source_ref": "https://m.chinaclear.cn/zdjs/gszb/202609/0404d81f1ee8409c95b5dc4af693409f.shtml",
+              "calendar_sha256": sha(root / "chinaclear_2026_holiday_schedule.html"),
+              "calendar_exact_bytes": True,
+              "admission_rule": "known_at <= cutoff_date; current-to-historical substitution forbidden"
+          }
+          (Path("/tmp/pilot02-xhc/PILOT-02_RAW_EVIDENCE_RECEIPT.json")).write_text(
+              json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True),
+              encoding="utf-8",
+          )
+          print(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True))
+          PY
+
+      - name: Execute fresh-candidate IIOS E2E
+        run: |
+          PYTHONPATH=. python tools/pilot02_xinhecheng_e2e.py \
+            --report /tmp/pilot02-xhc/raw/xinhecheng_2026_h1.pdf \
+            --price /tmp/pilot02-xhc/raw/002001_20260930_tencent.json \
+            --receipt /tmp/pilot02-xhc/PILOT-02_RAW_EVIDENCE_RECEIPT.json \
+            --out /tmp/pilot02-xhc/out
+
+      - name: Assert pilot result
+        run: |
+          python - <<'PY'
+          import json
+          from decimal import Decimal
+          p="/tmp/pilot02-xhc/out/PILOT-02_XINHECHENG_RESULT.json"
+          x=json.load(open(p,encoding="utf-8"))
+          assert x["company"]=="浙江新和成股份有限公司"
+          assert x["symbol"]=="002001"
+          assert x["cutoff_date"]=="2026-10-07"
+          assert x["latest_tradable_date"]=="2026-09-30"
+          assert x["current_price"]=="25.95"
+          assert x["security_classification"]=="NON_FINANCIAL"
+          assert x["research_weighting"]["cyclical"]=="0.70"
+          assert x["research_weighting"]["growth"]=="0.30"
+          assert x["decision"]["action"]=="REVIEW_REQUIRED"
+          assert x["decision"]["new_capital_allowed"] is False
+          assert x["decision"]["human_approval_required"] is True
+          assert x["decision"]["auto_execution"] is False
+          assert x["publication"]["qa_status"]=="PASS"
+          assert x["publication"]["report_deterministic_replay"] is True
+          assert x["lifecycle"]["decision_replay_status"]=="PASS"
+          assert Decimal(x["return_metrics"]["expected_annualized_return"]) > Decimal("0.15")
+          assert x["return_metrics"]["fundamental_target_pass"] is True
+          assert x["return_metrics"]["required_return_pass"] is True
+          assert x["return_metrics"]["risk_pass"] is True
+          print("PILOT-02_XINHECHENG_ACCEPTANCE_ASSERTIONS_OK")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iios-pilot02-xinhecheng-20261007
+          path: /tmp/pilot02-xhc/
+          retention-days: 14
+
+      - run: git diff --check
