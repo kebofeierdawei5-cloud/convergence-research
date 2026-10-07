@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### 2026-10-07 — M1.2-FM04 Conditional Backtest
+
+- Added frozen Conditional Backtest contract and result schema over the canonical FM03 state path.
+- Added PIT-safe evaluation for the four preregistered model candidates with strict inner/outer separation.
+- Added explicit UNKNOWN → `NO_SELECTION`, common-inner-universe, deterministic MAE selection/tie-break, and provenance controls.
+- Added independent PIT/nested-selection/scoring audit and dedicated CI.
+- Accepted CATL run #2 with 12 tests passing, 406 outer selection units, 0 selected, 406 `NO_SELECTION`, and 79 conditional descriptive groups.
+- FM04 remains exploratory/contaminated/development-only and does not authorize production model routing, confirmatory inference, automatic execution, or investment decisions.
+
 ### 2026-10-07 — M1.2-FM03 Deterministic PIT State Engine
 
 - Added frozen FM03 State Contract and output schema for the seven orthogonal Forecastability State dimensions.

@@ -1,0 +1,143 @@
+{
+  "schema_version": "IIOS-FM04-CONDITIONAL-BACKTEST-0.1",
+  "contract_id": "FC-M12-FM04-CATL-001",
+  "version": "0.1.0",
+  "status": "FROZEN",
+  "research_epoch_id": "RE-M12-EXP-CATL-20260930",
+  "confirmatory_eligible": false,
+  "input_contract": {
+    "state_snapshot": "research/fm03/FM03_STATE_SNAPSHOT.ndjson",
+    "state_contract": "research/fm03/FM03_STATE_CONTRACT.json",
+    "driver_history": "research/fm01/CATL_DRIVER_HISTORY.ndjson",
+    "required_security_ids": ["300750.SZ"],
+    "required_drivers": ["REVENUE", "NET_PROFIT"],
+    "state_snapshot_sha256": "7e020df6eeb5b6aa4cf47e625d902c3c5ca7645457427c8af085a55d25811fd4",
+    "upstream_git_blob_sha": {
+      "state_contract": "1ede6cfd87476e466010a229599c52f984b24de6",
+      "driver_history": "8fbdafaa941587d843ab2509bb732620f5f66b4d",
+      "outer_universe_lock": "abe9c575ea4a194249a419bbb145b5ddf7dd05de",
+      "research_plan": "a440223d2b61b786434c9d63b00ca1d525fb4a79",
+      "candidate_space": "70778aa3bbeccccc87c856c7d4645ea366de3ac0",
+      "purity_boundary": "b7e7810bd383e893a328e2ed738d825423e98eda"
+    }
+  },
+  "origin_contract": {
+    "outer_universe_lock": "research/fm00/OU-M12-FM00-CATL-001.json",
+    "cutoff_rule": "ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF",
+    "origin_selection_rule": "FROZEN_PRE_SCHEDULED_ORIGINS_ONLY",
+    "exact_origin_count": 11,
+    "horizon_offsets": {"3M": 1, "6M": 2, "12M": 4}
+  },
+  "targets": [
+    {"target_id": "CATL_REVENUE", "driver_id": "REVENUE"},
+    {"target_id": "CATL_NET_PROFIT", "driver_id": "NET_PROFIT"}
+  ],
+  "models": [
+    {
+      "model_id": "SEASONAL_NAIVE",
+      "order": 1,
+      "formula": "forecast(t+h) = x(t+h-4)",
+      "required_visible_periods": "target_period_minus_4",
+      "uses_current_origin_value": false
+    },
+    {
+      "model_id": "PERSISTENCE_YOY",
+      "order": 2,
+      "formula": "forecast(t+h) = x(t+h-4) * (1 + yoy_growth(t))",
+      "required_visible_periods": "target_period_minus_4_and_t_and_t_minus_4",
+      "uses_current_origin_value": true
+    },
+    {
+      "model_id": "TREND_LOG_LINEAR_8Q",
+      "order": 3,
+      "formula": "fit OLS log(x) on the latest 8 visible quarters ending at t; forecast at t+h",
+      "required_visible_periods": "t_minus_7_through_t",
+      "uses_current_origin_value": true
+    },
+    {
+      "model_id": "MEAN_REVERSION_YOY_8",
+      "order": 4,
+      "formula": "forecast(t+h) = x(t+h-4) * (1 + mean(last_8_visible_yoy_growth_values_ending_at_t))",
+      "required_visible_periods": "t_minus_11_through_t",
+      "uses_current_origin_value": true
+    }
+  ],
+  "evaluation": {
+    "primary_metric": "MAE",
+    "secondary_metrics": ["RMSE", "sMAPE"],
+    "pairwise_comparison_rule": "SAME_ORIGIN_UNIVERSE_SAME_TARGET_SAME_HORIZON_SAME_ACTUAL",
+    "rolling_origins_assumed_iid": false,
+    "significance_claim_allowed": false,
+    "descriptive_only": true
+  },
+  "selection_policy": {
+    "state_dimensions": [
+      "DIRECTION",
+      "MOMENTUM",
+      "VOLATILITY",
+      "SEASONALITY",
+      "MEAN_REVERSION_PRESSURE",
+      "STRUCTURAL_STABILITY",
+      "DATA_QUALITY"
+    ],
+    "min_common_inner_observations": 3,
+    "inner_origin_rule": "STRICTLY_EARLIER_SCHEDULED_ORIGIN",
+    "inner_actual_knowledge_rule": "ACTUAL_KNOWN_AT_OR_BEFORE_OUTER_CUTOFF",
+    "inner_common_universe_rule": "ALL_FOUR_MODELS_FORECASTABLE_ON_THE_SAME_INNER_ORIGIN_SET",
+    "selection_metric": "MAE",
+    "tie_break_order": [
+      "SEASONAL_NAIVE",
+      "PERSISTENCE_YOY",
+      "TREND_LOG_LINEAR_8Q",
+      "MEAN_REVERSION_YOY_8"
+    ],
+    "unknown_state_outcome": "NO_SELECTION",
+    "insufficiency_outcome": "NO_SELECTION",
+    "no_post_hoc_tuning_same_epoch": true
+  },
+  "unknown_policy": {
+    "state_statuses": ["AVAILABLE", "UNKNOWN"],
+    "unknown_state_outcome": "NO_SELECTION",
+    "never_impute": true
+  },
+  "provenance_contract": {
+    "outer_required": [
+      "state_row_id",
+      "state_input_feature_row_ids",
+      "state_input_record_ids",
+      "actual_record_id",
+      "selected_model_input_record_ids"
+    ],
+    "inner_required": [
+      "inner_origin_id",
+      "inner_state_row_id",
+      "inner_actual_record_id",
+      "inner_model_input_record_ids"
+    ]
+  },
+  "capability_boundary": {
+    "conditional_backtest_only": true,
+    "production_router": false,
+    "production_model_selection": false,
+    "automatic_execution": false,
+    "investment_decision": false
+  },
+  "capability_contract": {
+    "schema_version": "IIOS-CAPABILITY-CONTEXT-0.1",
+    "required_principal": "iios_research",
+    "required_grant": "m1.2.fm04.conditional_backtest",
+    "forbidden_grants": [
+      "m1.2.model_selection",
+      "production.forecast_router",
+      "production.automatic_execution",
+      "investment.decision"
+    ]
+  },
+  "research_boundary": {
+    "usage": "DEVELOPMENT_ONLY",
+    "purity": "CONTAMINATED",
+    "outer_results_cannot_flow_back_into_same_epoch_tuning": true,
+    "result_driven_change_requires_new_epoch": true,
+    "confirmatory_evidence_authorized": false
+  }
+}
