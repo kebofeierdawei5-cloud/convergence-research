@@ -14,6 +14,7 @@ from iios_mvp.execution_receipt_production import (
 from iios_mvp.investment_core_contract_v03 import decide_v03, validate_case_v03
 
 from tests.decision_admission_fixture import build_fixture_admission_receipt
+from tests.b04b_return_lineage_fixture import bind_return_lineage
 from tests.test_core04_real_300750_upstream_gate_e2e import (
     _case,
     _inputs,
@@ -87,8 +88,9 @@ def test_p0_01_caller_declared_upstream_status_is_blocked_without_canonical_doma
     assert decision["gates"]["new_capital_allowed"] is False
 
 
-def test_p0_02_return_gate_can_diverge_from_forecast_and_valuation_and_still_reach_buy():
+def test_p0_02_return_gate_divergence_is_blocked_by_canonical_lineage():
     case, registry = _buyable_case()
+    case, forecast_registry, valuation_resolver = bind_return_lineage(case)
 
     # Deliberately make the supplied Valuation and Forecast economically
     # incompatible with the separately supplied Return Gate while keeping all
@@ -101,7 +103,9 @@ def test_p0_02_return_gate_can_diverge_from_forecast_and_valuation_and_still_rea
     validation = validate_case_v03(
         case,
         current_price_resolver=registry,
+        independent_forecast_resolver=forecast_registry,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+        valuation_output_resolver=valuation_resolver,
     )
     assert validation["status"] == "BLOCKED", validation["errors"]
     assert any(
@@ -112,7 +116,9 @@ def test_p0_02_return_gate_can_diverge_from_forecast_and_valuation_and_still_rea
     decision = decide_v03(
         case,
         current_price_resolver=registry,
+        independent_forecast_resolver=forecast_registry,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+        valuation_output_resolver=valuation_resolver,
     )
 
     assert decision["action"] != "BUY"
