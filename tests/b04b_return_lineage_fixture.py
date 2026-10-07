@@ -45,12 +45,13 @@ def bind_return_lineage(
     if isinstance(gap, Mapping) and isinstance(gap.get("independent_forecast_ref"), Mapping):
         forecast_ref = dict(gap["independent_forecast_ref"])
     else:
+        horizon_token = str(case["return_gate"]["horizon_years"]).replace(".", "_")
         forecast_ref = forecast_registry.admit_independent_forecast({
             "case_id": case["case_id"],
             "market": case["market"],
             "symbol": case["symbol"],
             "cutoff_date": cutoff.isoformat(),
-            "forecast_id": f"B04B-{case['symbol']}-FORECAST",
+            "forecast_id": f"B04B-{case['symbol']}-FORECAST-H{horizon_token}",
             "forecast_version": "B04B-FIXTURE-FORECAST-0.1",
             "model_version": "B04B-FIXTURE-MODEL-0.1",
             "variable_id": "forward_eps",
