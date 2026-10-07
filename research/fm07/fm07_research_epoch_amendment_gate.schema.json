@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/fm07-research-epoch-amendment-gate-0.1.json",
+  "title": "IIOS M1.2 FM07 Research Epoch Amendment Gate v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "gate_id",
+    "version",
+    "status",
+    "current_research_epoch_id",
+    "current_epoch_status",
+    "decision",
+    "new_epoch_required_for_scope_change",
+    "evidence_basis",
+    "amendment_classes",
+    "new_epoch_entry_requirements",
+    "capability_boundary",
+    "research_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "IIOS-FM07-RESEARCH-EPOCH-AMENDMENT-GATE-0.1"
+    },
+    "gate_id": {
+      "const": "AG-M12-FM07-CATL-001"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "FROZEN"
+    },
+    "current_research_epoch_id": {
+      "const": "RE-M12-EXP-CATL-20260930"
+    },
+    "current_epoch_status": {
+      "const": "CLOSED_TO_SAME_EPOCH_AMENDMENT"
+    },
+    "decision": {
+      "const": "DO_NOT_AMEND_CURRENT_EPOCH"
+    },
+    "new_epoch_required_for_scope_change": {
+      "const": true
+    },
+    "evidence_basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fm05_contract_id",
+        "fm05_contract_git_blob_sha",
+        "sufficiency_status",
+        "outer_selection_unit_count",
+        "selected_count",
+        "outer_evaluated_count",
+        "no_selection_count",
+        "structural_conditional_group_count",
+        "empirical_conditional_group_count"
+      ],
+      "properties": {
+        "fm05_contract_id": {
+          "const": "FC-M12-FM05-CATL-001"
+        },
+        "fm05_contract_git_blob_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "sufficiency_status": {
+          "const": "INSUFFICIENT_FOR_STATE_CONDITIONED_SELECTION"
+        },
+        "outer_selection_unit_count": {
+          "const": 406
+        },
+        "selected_count": {
+          "const": 0
+        },
+        "outer_evaluated_count": {
+          "const": 0
+        },
+        "no_selection_count": {
+          "const": 406
+        },
+        "structural_conditional_group_count": {
+          "const": 79
+        },
+        "empirical_conditional_group_count": {
+          "const": 0
+        }
+      }
+    },
+    "amendment_classes": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "same_epoch_allowed",
+          "requires_new_epoch"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "same_epoch_allowed": {
+            "const": false
+          },
+          "requires_new_epoch": {
+            "const": true
+          }
+        }
+      }
+    },
+    "new_epoch_entry_requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_approval_recorded",
+        "new_epoch_id_unique",
+        "scope_explicitly_frozen_before_execution",
+        "estimand_explicitly_frozen_before_execution",
+        "sufficiency_policy_explicitly_frozen_before_execution",
+        "pit_data_admission_revalidated",
+        "provenance_bindings_recomputed",
+        "evaluation_purity_boundary_frozen",
+        "no_forward_use_of_current_epoch_results_for_tuning"
+      ],
+      "properties": {
+        "owner_approval_recorded": {
+          "const": true
+        },
+        "new_epoch_id_unique": {
+          "const": true
+        },
+        "scope_explicitly_frozen_before_execution": {
+          "const": true
+        },
+        "estimand_explicitly_frozen_before_execution": {
+          "const": true
+        },
+        "sufficiency_policy_explicitly_frozen_before_execution": {
+          "const": true
+        },
+        "pit_data_admission_revalidated": {
+          "const": true
+        },
+        "provenance_bindings_recomputed": {
+          "const": true
+        },
+        "evaluation_purity_boundary_frozen": {
+          "const": true
+        },
+        "no_forward_use_of_current_epoch_results_for_tuning": {
+          "const": true
+        }
+      }
+    },
+    "capability_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amendment_gate_only",
+        "opens_new_epoch_automatically",
+        "changes_current_scope",
+        "changes_current_estimand",
+        "changes_current_threshold",
+        "model_selection",
+        "production_router",
+        "production_forecast",
+        "automatic_execution",
+        "investment_decision"
+      ],
+      "properties": {
+        "amendment_gate_only": {
+          "const": true
+        },
+        "opens_new_epoch_automatically": {
+          "const": false
+        },
+        "changes_current_scope": {
+          "const": false
+        },
+        "changes_current_estimand": {
+          "const": false
+        },
+        "changes_current_threshold": {
+          "const": false
+        },
+        "model_selection": {
+          "const": false
+        },
+        "production_router": {
+          "const": false
+        },
+        "production_forecast": {
+          "const": false
+        },
+        "automatic_execution": {
+          "const": false
+        },
+        "investment_decision": {
+          "const": false
+        }
+      }
+    },
+    "research_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "current_epoch_remains_contaminated",
+        "current_epoch_remains_development_only",
+        "confirmatory_eligible",
+        "current_epoch_results_are_diagnostic_only",
+        "current_epoch_results_may_not_be_used_as_same_epoch_tuning_targets"
+      ],
+      "properties": {
+        "current_epoch_remains_contaminated": {
+          "const": true
+        },
+        "current_epoch_remains_development_only": {
+          "const": true
+        },
+        "confirmatory_eligible": {
+          "const": false
+        },
+        "current_epoch_results_are_diagnostic_only": {
+          "const": true
+        },
+        "current_epoch_results_may_not_be_used_as_same_epoch_tuning_targets": {
+          "const": true
+        }
+      }
+    }
+  }
+}
