@@ -10,7 +10,7 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 ## Current stage
 
-**Current canonical M1.2 status: FM00 Git Baseline = PASS / MERGED / CANONICAL**
+**Current canonical M1.2 status: FM01 Exact CATL M1.1 Source Snapshot Admission = PASS / MERGED / CANONICAL**
 
 C8 and all prior Stage C productization milestones remain canonical.
 
@@ -20,20 +20,18 @@ Authority hardening is complete through:
 B02 → B03-B → B04-B → independent post-B04 re-audit
 ```
 
-M1.2 baseline is now complete through:
+M1.2 baseline progression:
 
 ```
-FM00 exact historical source anchor
-        +
-G2 frozen-reference identity separation
-        +
-remote baseline CI
+FM00 Git Baseline = PASS
         ↓
-M1.2-FM00 Git Baseline = PASS
+FM01 exact M1.1 source admission = PASS
+        ↓
+FM01 DATA_READY
 ```
 
-Canonical main at this checkpoint:
-`ea1453f6ac1a04343b3b7fb9a704d3df03e7d6ba`
+Canonical main after FM01 admission:
+`b48db1b688c1d66270db63c9d008354fd4a625b9`
 
 Baseline:
 - PR #136 = MERGED;
@@ -43,9 +41,13 @@ Baseline:
 
 G2 historical frozen identity remains separate from the accepted R0 successor evidence; no frozen-byte rewrite was performed.
 
-**Next boundary: exact M1.1 CATL source snapshot admission for FM01 data ingress.**
+**Next boundary: M1.2-FM-02 Feature Builder / Forecastability Feature Contract.**
 
-FM01 code remains `IMPLEMENTATION_PASS / DATA_INGRESS_BLOCKED`; no numeric CATL values may be fabricated or inferred.
+FM01 data gate is now `DATA_READY` after exact-source admission, provenance binding, 22-quarter coverage validation, and independent PIT replay.
+
+Admitted CATL scope: 300750.SZ, 2021Q1–2026Q2, 22 quarters, 44 DriverSeries records for REVENUE / NET_PROFIT.
+
+No FM01 numeric data were fabricated, inferred, or reconstructed from memory.
 
 FM02 remains separately gated by M1.2 research governance, feature/state contracts, conditional backtest, partitioning and sealed-manifest controls.
 
