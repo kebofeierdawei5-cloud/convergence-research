@@ -1,7 +1,7 @@
 # IIOS Project Status
 
 State classification: **CANONICAL SUMMARY**
-Date: 2026-10-06
+Date: 2026-10-07
 
 Authoritative current-state record:
 `docs/PROJECT_STATE_INDEX.md`
@@ -10,15 +10,28 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 ## Current stage
 
-**Current canonical Stage C status: C8 Final Independent Red-team / MVP Acceptance = PASS / MERGED / CANONICAL**
+**Current canonical authority-hardening status: B04-B Mandatory Forecast → Valuation → Return Lineage = PASS / MERGED / CANONICAL**
 
-C0, C1, C2, C3, C4, C5, C6 and C7 are all complete and canonical on `main`.
+C8 and all prior Stage C productization milestones remain canonical. Post-C8 authority hardening is now complete through:
 
-**Post-C8 development boundary: explicit governance decision required.**
+```
+B02 → B03-B → B04-B
+```
 
-A1 company-side evidence closure, RP-01 risk/portfolio, DR-01/DR-02 lifecycle foundations, and TR-01/TR-02/TR-03 validation foundations remain canonical prerequisites.
+Current canonical `main`:
+`d9712c3f48fd71dfec348aca18fdf6b0fd1559a6`
 
-No new P3/P4/MIE model work, scheduler/alerts, automatic execution, or broader universe construction is on the Stage C critical path before C8.
+B04-B exact-head acceptance:
+- PR #129;
+- exact accepted head `581ad3d4c833e02d362a4f2eda36c161de027869`;
+- dedicated B04-B workflow #29 = SUCCESS;
+- B00-B #74, B03-B #54, Investment Core #746, B04 #60, C3 #89, C4 #87, C5 #75 and C8 #89 = SUCCESS on the same branch head.
+
+**Next boundary: explicit post-B04 independent red-team / governance re-audit.**
+
+RP-01 remains a separate legacy fixture regression and is not B04-B acceptance evidence.
+
+No FM-02 implementation, new model family, scheduler/alerts, automatic execution, full-market screening, or portfolio optimizer is authorized by this state.
 
 
 ## Canonical Investment Core

@@ -1,7 +1,7 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-06
+Snapshot: 2026-10-07
 Authority: this file is the **only canonical Current State Index**.
 
 ## 1. Canonical state
@@ -250,68 +250,78 @@ chat context
 
 A diagnostic or historical record can identify a problem, but cannot promote itself into capability.
 
-## 8. Current next batch
+## 8. Current canonical authority-hardening state
 
-**B00 — Post-C8 Baseline Recovery + Authority Threat Reproduction = PASS / MERGED / CANONICAL**
+The post-C8 authority-hardening sequence is now complete through B04-B:
 
-Acceptance record: `docs/iios/B00_ACCEPTANCE_2026-10-06.md`.
+```
+B00 = PASS / MERGED / CANONICAL
+   ↓
+B02 Canonical Investment Admission = PASS / MERGED / CANONICAL
+   ↓
+B03-B Canonical Upstream Authority Mandatory = PASS / MERGED / CANONICAL
+   ↓
+B04-B Forecast → Valuation → Return Lineage Mandatory = PASS / MERGED / CANONICAL
+```
 
-### B00-A — Restore Global Investment Core CI GREEN
+### B02 — Canonical Investment Admission
+
+- PR #125;
+- merge commit: `67e4ba3e6e4c047a2e59d684335bf1fd745e20f5`.
+
+### B03-B — Mandatory Upstream Authority
+
+- PR #128;
+- merge commit: `18b848d569796ac3a712f8c5d217669496d3887f`;
+- runtime requires canonical upstream authority schema `IIOS-CORE-04-UPSTREAM-ADMISSION-0.2`;
+- legacy v0.1 caller-declared authority is blocked at Decision runtime.
+
+### B04-B — Mandatory Forecast / Valuation / Return Lineage
 
 Status: **PASS / MERGED / CANONICAL**
 
-B00-A restored the canonical baseline without changing Investment Decision semantics.
+- PR #129;
+- exact PR head accepted by dedicated CI: `581ad3d4c833e02d362a4f2eda36c161de027869`;
+- merge commit / current canonical main: `d9712c3f48fd71dfec348aca18fdf6b0fd1559a6`;
+- dedicated B04-B workflow run #29 = SUCCESS;
+- Investment Core CI run #746 = SUCCESS;
+- B00-B threat reproduction run #74 = SUCCESS;
+- B03-B authority run #54 = SUCCESS;
+- B04 lineage run #60 = SUCCESS;
+- C3 run #89 = SUCCESS;
+- C4 run #87 = SUCCESS;
+- C5 run #75 = SUCCESS;
+- C8 run #89 = SUCCESS.
 
-Evidence:
-- PR #118 — real 300750 Risk fixture aligned with the current Risk/Portfolio Contract;
-- PR #119 — legacy CLI demo explicitly bound to `CN-A`;
-- PR #120 — lifecycle parser fixed to resolve direct `action` or nested engine-wrapper `decision.action`;
-- PR #121 — lifecycle regression tests corrected to exercise the actual legacy snapshot schema;
-- Global Investment Core CI run `37487233225` = SUCCESS on head `cffc71aa9944489c23c7aaffa84d73973a247a46`;
-- the full 407-test Investment Core pytest suite passed;
-- DR-02 `37487233216`, C6 `37487379909`, DR-01 `37487379916`, and C8 `37487379923` all = SUCCESS after lifecycle correction;
-- C8 also re-ran the lifecycle regression suite and C7 full-lifecycle harness successfully.
+B04-B enforces:
 
-PR #117 was a temporary no-semantic baseline probe and is historical evidence only.
+- exact Return lineage version `IIOS-FORECAST-VALUATION-RETURN-LINEAGE-0.1`;
+- canonical Forecast reference;
+- canonical Valuation reference resolved through the trusted resolver;
+- Return Gate scenario probabilities / terminal values / cash distributions bound to the canonical Valuation output;
+- Return Gate current entry price bound to the canonical current-price observation;
+- missing, legacy, substituted, or divergent lineage is fail-closed.
 
-### B00-B — Reproduce Second-Red-Team Attacks
+The historical P0-02 attack is therefore closed on the enforced Decision path.
 
-Status: **PASS / MERGED / CANONICAL — DIAGNOSTIC FINDINGS**
+### Independent regression track
 
-Diagnostic-only PR #122 and dedicated workflow run `37487757790` = SUCCESS.
+RP-01 Risk / Portfolio workflow run #86 remains a separate legacy fixture failure (`str.read`) and was not modified by B04-B. It is not B04-B acceptance evidence and does not change the authority-hardening result above.
 
-Confirmed:
-- **P0-01:** caller-declared Reality / Value Driver / Valuation / Forecast PASS states can reach `BUY` with `new_capital_allowed=true` without domain-owned canonical admission references;
-- **P0-02:** separately supplied Return Gate can diverge economically from Forecast and Valuation while still reaching `BUY` with `new_capital_allowed=true`;
-- **P0-03:** execution receipt can record an action/position mismatch, but C6 remains `POST_APPROVAL_RECORD_ONLY_NO_DECISION_MUTATION` with `auto_execution=false`; this is therefore classified **P1 evidence-integrity hardening**, not an internal execution-authority bypass.
+Post-merge verification confirms that `main` is exactly `d9712c3f48fd71dfec348aca18fdf6b0fd1559a6`. No additional canonical-main workflow run was emitted by the repository's current PR-oriented workflows after the merge; acceptance therefore rests on the exact PR-head CI plus the verified merge SHA.
 
-B00 intentionally does **not** remediate P0-01 or P0-02.
+## 9. Next canonical development boundary
 
-## 9. Stage C current development boundary
+B02, B03-B and B04-B are now canonical. No new capability should be inferred automatically from their completion.
 
-**B00 = PASS / MERGED / CANONICAL**
+The next boundary is:
 
-The post-C8 Stage C boundary is now investment-authority hardening, not additional productization.
+**Post-B04 independent red-team / governance re-audit of the canonical `main` authority chain.**
 
-### Immediate next batches
+This is a verification/adjudication gate, not a new investment capability.
 
-**B02 — Canonical Investment Input / Admission Contract**
+**FM-02 remains explicitly out of scope until that governance boundary is separately accepted.**
 
-Freeze domain-owned, provenance-bound admission references for every decision-critical upstream state. The contract should use domain-specific admission/resolver components rather than a monolithic generic object, and must preserve fail-closed semantics.
+The Investment Core remains single-company and PIT-bound. No scheduler, alerts, automatic execution, full-market screening, optimizer/Kelly logic, or new forecast/valuation model family is authorized by this state.
 
-**B03 — Upstream Authority Integration**
-
-Replace caller-declared decision-critical status authority with canonical resolver-backed admission. Add negative tests proving forged PASS states cannot cross the Decision boundary.
-
-**B04 — Forecast / Valuation / Return Lineage Contract**
-
-Proceed only after B02/B03 are accepted. Define the hard lineage from canonical Forecast → Valuation → Return Gate / expected-return metrics and prove that inconsistent substituted values cannot reach BUY/ADD.
-
-P1 execution-evidence hardening remains separate from the internal Decision authority boundary until execution is intentionally brought inside IIOS.
-
-### Explicitly out of scope
-
-No scheduler, alerts, automatic execution, full-market screening, optimizer/Kelly logic, or new valuation/forecast model family is authorized by B00.
-
-Historical Stage C acceptance records remain valid evidence of prior checkpoints but no longer define the current next batch.
-
+Historical Stage C acceptance records remain valid evidence of prior checkpoints but do not define the current development boundary.
