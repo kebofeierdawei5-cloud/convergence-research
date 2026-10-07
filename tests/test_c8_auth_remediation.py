@@ -12,7 +12,7 @@ from iios_mvp.decision_lifecycle_production import build_human_approval, validat
 from iios_mvp.investment_core_contract_v03 import decide_v03
 from iios_mvp.store import create_or_load_series, write_decision_revision, write_snapshot
 from tests.decision_admission_fixture import build_fixture_admission_receipt
-from tools.c3_kolun_second_company_e2e import admit_price, build_case, load_case_fixture
+import tools.c3_kolun_second_company_e2e as c3_e2e
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,20 +39,21 @@ def _snapshot(case: dict, decision: dict) -> dict:
 
 
 def _canonical_kolun_case():
-    fixture = load_case_fixture()
-    registry, price_ref = admit_price()
-    return build_case(fixture, price_ref), registry
+    fixture = c3_e2e.load_case_fixture()
+    registry, price_ref = c3_e2e.admit_price()
+    return c3_e2e.build_case(fixture, price_ref), registry
 
 
 def test_c8_auth_001_admission_reexecutes_kernel_and_rejects_forged_decision():
     case, registry = _canonical_kolun_case()
-    canonical_decision = decide_v03(case, current_price_resolver=registry)
+    canonical_decision = decide_v03(case, current_price_resolver=registry, upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY)
     valid_snapshot = _snapshot(case, canonical_decision)
 
     receipt = admit_canonical_decision(
         case=case,
         snapshot=valid_snapshot,
         current_price_resolver=registry,
+        upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY,
     )
     assert receipt["status"] == "ADMITTED"
     assert receipt["admission_method"] == "CANONICAL_DECIDE_V03_REEXECUTED"
@@ -75,14 +76,19 @@ def test_c8_auth_001_admission_reexecutes_kernel_and_rejects_forged_decision():
             case=case,
             snapshot=forged,
             current_price_resolver=registry,
+            upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY,
         )
 
 
 def test_c8_auth_002_store_rejects_cross_company_series_binding(tmp_path):
-    fixture = load_case_fixture()
-    registry, price_ref = admit_price()
-    case = build_case(fixture, price_ref)
-    decision = decide_v03(case, current_price_resolver=registry)
+    fixture = c3_e2e.load_case_fixture()
+    registry, price_ref = c3_e2e.admit_price()
+    case = c3_e2e.build_case(fixture, price_ref)
+    decision = decide_v03(
+        case,
+        current_price_resolver=registry,
+        upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY,
+    )
     snapshot = _snapshot(case, decision)
 
     series = create_or_load_series(

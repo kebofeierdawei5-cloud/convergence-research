@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from iios_mvp.canonical_current_price import InMemoryCanonicalCurrentPriceRegistry
+from iios_mvp.canonical_investment_admission_v01 import InMemoryCanonicalInvestmentAdmissionRegistry
+from tests.b03b_upstream_authority_fixture import build_runtime_upstream_authority
 from iios_mvp.decision_admission import admit_canonical_decision
 from iios_mvp.human_report import build_human_report, qa_human_report, write_human_report
 from iios_mvp.investment_core_contract_v03 import calculate_return_metrics, decide_v03
@@ -44,6 +46,7 @@ CASE_ID = "RC-CN-A-002422-20261004"
 CUTOFF = date(2026, 10, 4)
 PRICE = Decimal("40.85")
 PRICE_EVIDENCE_SHA = "b59d6844530261896569dcd071f2fecb670fc26ad162a6ecbf31ccca1f464d7f"
+AUTHORITY_REGISTRY: InMemoryCanonicalInvestmentAdmissionRegistry | None = None
 
 
 def load_case_fixture() -> dict[str, Any]:
@@ -109,6 +112,7 @@ def admit_price() -> tuple[InMemoryCanonicalCurrentPriceRegistry, dict[str, Any]
 
 
 def build_case(fixture: dict[str, Any], price_ref: dict[str, Any]) -> dict[str, Any]:
+    global AUTHORITY_REGISTRY
     quality = {
         "dimensions": [
             {
@@ -150,18 +154,27 @@ def build_case(fixture: dict[str, Any], price_ref: dict[str, Any]) -> dict[str, 
         ]
     }
     thesis = dict(fixture["thesis"])
-    from iios_mvp.decision_upstream_admission_v03 import build_decision_upstream_admission
-
-    upstream = build_decision_upstream_admission(
+    authority_registry, upstream = build_runtime_upstream_authority(
         case_id=CASE_ID,
-        cutoff_date="2026-10-04",
-        reality_status="PASS",
+        market="CN-A",
+        symbol="002422",
+        company="四川科伦药业股份有限公司",
+        cutoff_date=CUTOFF,
+        reality={"status": "PASS", "economic_structure": fixture["economic_structure"], "evidence_ids": ["E001", "E002", "E003", "E004"]},
         quality=quality,
-        value_driver_status="PASS",
-        valuation_status="PASS",
-        forecast_status="PASS",
+        value_driver={"status": "PASS", "drivers": thesis["key_driver_ids"], "evidence_ids": thesis["evidence_ids"]},
+        valuation=fixture["valuation"],
+        forecast={"status": "PASS", "forecast_assumptions": fixture["forecast_assumptions"], "evidence_ids": ["E002", "E003", "E004"]},
         thesis=thesis,
+        declared_statuses={
+            "REALITY": "PASS",
+            "QUALITY": "CONDITIONAL",
+            "VALUE_DRIVER": "PASS",
+            "VALUATION": "PASS",
+            "FORECAST": "PASS",
+        },
     )
+    AUTHORITY_REGISTRY = authority_registry
     return {
         "contract_version": "IIOS-INVESTMENT-CORE-0.3",
         "case_id": CASE_ID,
@@ -253,7 +266,7 @@ def run() -> dict[str, Any]:
     registry, price_ref = admit_price()
     case = build_case(fixture, price_ref)
 
-    decision = decide_v03(case, current_price_resolver=registry)
+    decision = decide_v03(case, current_price_resolver=registry, upstream_authority_resolver=AUTHORITY_REGISTRY)
     if decision["action"] != "REVIEW_REQUIRED":
         raise AssertionError("C3 expected a review-required result from conditional quality")
     if decision["gates"]["new_capital_allowed"] is not False:
@@ -305,6 +318,7 @@ def run() -> dict[str, Any]:
             case=case,
             snapshot=snapshot,
             current_price_resolver=registry,
+            upstream_authority_resolver=AUTHORITY_REGISTRY,
         )
         decision_path = write_decision_revision(
             root,

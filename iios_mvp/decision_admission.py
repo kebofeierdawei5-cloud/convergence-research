@@ -165,6 +165,8 @@ def admit_canonical_decision(
     evidence_root_resolver: Any | None = None,
     current_price_resolver: Any | None = None,
     independent_forecast_resolver: Any | None = None,
+    upstream_authority_resolver: Any | None = None,
+    valuation_output_resolver: Any | None = None,
 ) -> dict[str, Any]:
     """Re-run the canonical v0.3 Decision Kernel and issue a binding admission receipt."""
     from .investment_core_contract_v03 import decide_v03, validate_case_v03
@@ -174,6 +176,8 @@ def admit_canonical_decision(
         evidence_root_resolver=evidence_root_resolver,
         current_price_resolver=current_price_resolver,
         independent_forecast_resolver=independent_forecast_resolver,
+        upstream_authority_resolver=upstream_authority_resolver,
+        valuation_output_resolver=valuation_output_resolver,
     )
     if validation["status"] != "PASS":
         raise ValueError(
@@ -185,6 +189,8 @@ def admit_canonical_decision(
         evidence_root_resolver=evidence_root_resolver,
         current_price_resolver=current_price_resolver,
         independent_forecast_resolver=independent_forecast_resolver,
+        upstream_authority_resolver=upstream_authority_resolver,
+        valuation_output_resolver=valuation_output_resolver,
     )
     snapshot_core = _snapshot_core(snapshot)
     snapshot_identity = _identity_from_input(snapshot_core["input"])
@@ -203,8 +209,16 @@ def admit_canonical_decision(
         if key in canonical_decision
     }
     snapshot_decision = snapshot_core["decision"]
-    if any(key not in snapshot_decision or snapshot_decision[key] != projection[key] for key in projection):
-        raise ValueError("snapshot decision does not equal freshly re-executed canonical Decision Kernel result")
+    mismatched_keys = [
+        key
+        for key in projection
+        if key not in snapshot_decision or snapshot_decision[key] != projection[key]
+    ]
+    if mismatched_keys:
+        raise ValueError(
+            "snapshot decision does not equal freshly re-executed canonical Decision Kernel result"
+            f"; mismatched keys={mismatched_keys}"
+        )
     return _build_receipt_from_canonical(
         snapshot=snapshot,
         canonical_decision=canonical_decision,

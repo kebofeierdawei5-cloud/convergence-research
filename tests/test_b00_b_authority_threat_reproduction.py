@@ -18,6 +18,7 @@ from tests.test_core04_real_300750_upstream_gate_e2e import (
     _case,
     _inputs,
     _price_ref,
+    UPSTREAM_AUTHORITY_REGISTRY,
 )
 from tests.test_decision_lifecycle_production import snapshot
 
@@ -71,29 +72,19 @@ def _buyable_case() -> tuple[dict, object]:
     return case, registry
 
 
-def test_p0_01_caller_declared_upstream_status_can_reach_buy_without_canonical_domain_admissions():
+def test_p0_01_caller_declared_upstream_status_is_blocked_without_canonical_domain_admissions():
     case, registry = _buyable_case()
 
     validation = validate_case_v03(case, current_price_resolver=registry)
-    assert validation["status"] == "PASS", validation["errors"]
-
-    upstream = case["decision_upstream_admission"]
-    assert upstream["reality_status"] == "PASS"
-    assert upstream["value_driver_status"] == "PASS"
-    assert upstream["valuation_status"] == "PASS"
-    assert upstream["forecast_status"] == "PASS"
-
-    # No domain-owned canonical admission references are required by the
-    # current v0.3 upstream admission contract for these caller-declared states.
-    assert "reality_admission_ref" not in upstream
-    assert "value_driver_admission_ref" not in upstream
-    assert "valuation_admission_ref" not in upstream
-    assert "independent_forecast_ref" not in upstream
+    assert validation["status"] == "BLOCKED"
+    assert any(
+        "canonical upstream authority resolver is required for v0.2 upstream admission" in error["message"]
+        for error in validation["errors"]
+    )
 
     decision = decide_v03(case, current_price_resolver=registry)
-
-    assert decision["action"] == "BUY"
-    assert decision["gates"]["new_capital_allowed"] is True
+    assert decision["action"] != "BUY"
+    assert decision["gates"]["new_capital_allowed"] is False
 
 
 def test_p0_02_return_gate_can_diverge_from_forecast_and_valuation_and_still_reach_buy():
@@ -107,10 +98,18 @@ def test_p0_02_return_gate_can_diverge_from_forecast_and_valuation_and_still_rea
     case["forecast"]["scenarios"]["bull"]["fcf_proxy_bn_cny"] = ["2", "2", "2"]
     case["forecast"]["scenarios"]["bear"]["fcf_proxy_bn_cny"] = ["0.5", "0.5", "0.5"]
 
-    validation = validate_case_v03(case, current_price_resolver=registry)
+    validation = validate_case_v03(
+        case,
+        current_price_resolver=registry,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+    )
     assert validation["status"] == "PASS", validation["errors"]
 
-    decision = decide_v03(case, current_price_resolver=registry)
+    decision = decide_v03(
+        case,
+        current_price_resolver=registry,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+    )
 
     assert decision["action"] == "BUY"
     assert decision["gates"]["new_capital_allowed"] is True

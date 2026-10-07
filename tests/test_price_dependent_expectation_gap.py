@@ -10,6 +10,7 @@ from tests.test_investment_core_v03 import (
     EVIDENCE_ROOT_REGISTRY,
     INDEPENDENT_FORECAST_REGISTRY,
     CURRENT_PRICE_REGISTRY,
+    UPSTREAM_AUTHORITY_REGISTRY,
     case,
 )
 
@@ -99,6 +100,7 @@ def test_p2_target_entry_price_2_is_integrated_into_decision_output():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
     assert result["decision"]["target_entry_price_return_only"] is not None

@@ -16,6 +16,7 @@ from iios_mvp.forecast_valuation_return_lineage_v01 import (
     build_canonical_valuation_output,
 )
 from iios_mvp.investment_core_contract_v03 import validate_case_v03
+from tests.b03b_upstream_authority_fixture import build_runtime_upstream_authority
 from iios_mvp.market_model_identification import MarketValuationObservation
 from iios_mvp.market_observation_admission import (
     AdmissionStatus,
@@ -26,6 +27,7 @@ from iios_mvp.market_observation_admission import (
 
 
 CASE_ID = "B04-CORE-001"
+UPSTREAM_AUTHORITY_REGISTRY = InMemoryCanonicalInvestmentAdmissionRegistry()
 MARKET = "CN-A"
 SYMBOL = "300750"
 COMPANY = "CATL"
@@ -157,35 +159,49 @@ def _price():
 
 
 def _upstream():
-    return build_decision_upstream_admission(
+    quality = {
+        "dimensions": [
+            {"dimension": "competitive_advantage", "status": "PASS", "rationale": "B04", "evidence_ids": ["b04-core-risk"]},
+            {"dimension": "incremental_return_on_capital", "status": "PASS", "rationale": "B04", "evidence_ids": ["b04-core-risk"]},
+            {"dimension": "earnings_quality", "status": "PASS", "rationale": "B04", "evidence_ids": ["b04-core-risk"]},
+            {"dimension": "cash_flow_conversion", "status": "PASS", "rationale": "B04", "evidence_ids": ["b04-core-risk"]},
+            {"dimension": "balance_sheet_resilience", "status": "PASS", "rationale": "B04", "evidence_ids": ["b04-core-risk"]},
+            {"dimension": "reinvestment_runway", "status": "PASS", "rationale": "B04", "evidence_ids": ["b04-core-risk"]},
+        ]
+    }
+    thesis = {
+        "status": "INTACT",
+        "statement": "B04 fixture thesis",
+        "mechanism": "B04 fixture mechanism",
+        "key_driver_ids": ["D1"],
+        "falsifiers": ["forecast failure"],
+        "monitoring_triggers": ["quarterly review"],
+        "evidence_ids": ["b04-core-risk"],
+        "known_at": "2026-10-04T12:00:00+00:00",
+        "prepared_without_current_price": True,
+    }
+    _, upstream = build_runtime_upstream_authority(
         case_id=CASE_ID,
-        cutoff_date=CUTOFF.isoformat(),
-        reality_status="PASS",
-        quality={
-            "dimensions": [
-                {"dimension": "competitive_advantage", "status": "PASS", "rationale": "B04", "evidence_ids": ["b04-core-risk"]},
-                {"dimension": "incremental_return_on_capital", "status": "PASS", "rationale": "B04", "evidence_ids": ["b04-core-risk"]},
-                {"dimension": "earnings_quality", "status": "PASS", "rationale": "B04", "evidence_ids": ["b04-core-risk"]},
-                {"dimension": "cash_flow_conversion", "status": "PASS", "rationale": "B04", "evidence_ids": ["b04-core-risk"]},
-                {"dimension": "balance_sheet_resilience", "status": "PASS", "rationale": "B04", "evidence_ids": ["b04-core-risk"]},
-                {"dimension": "reinvestment_runway", "status": "PASS", "rationale": "B04", "evidence_ids": ["b04-core-risk"]},
-            ]
+        market=MARKET,
+        symbol=SYMBOL,
+        company=COMPANY,
+        cutoff_date=CUTOFF,
+        reality={"status": "PASS", "evidence_ids": ["b04-core-risk"]},
+        quality=quality,
+        value_driver={"status": "PASS", "evidence_ids": ["b04-core-risk"]},
+        valuation={"status": "PASS", "evidence_ids": ["b04-core-valuation-evidence"]},
+        forecast={"status": "PASS", "evidence_ids": ["b04-core-forecast-evidence"]},
+        thesis=thesis,
+        declared_statuses={
+            "REALITY": "PASS",
+            "QUALITY": "PASS",
+            "VALUE_DRIVER": "PASS",
+            "VALUATION": "PASS",
+            "FORECAST": "PASS",
         },
-        value_driver_status="PASS",
-        valuation_status="PASS",
-        forecast_status="PASS",
-        thesis={
-            "status": "INTACT",
-            "statement": "B04 fixture thesis",
-            "mechanism": "B04 fixture mechanism",
-            "key_driver_ids": ["D1"],
-            "falsifiers": ["forecast failure"],
-            "monitoring_triggers": ["quarterly review"],
-            "evidence_ids": ["b04-core-risk"],
-            "known_at": "2026-10-04T12:00:00+00:00",
-            "prepared_without_current_price": True,
-        },
+        registry=UPSTREAM_AUTHORITY_REGISTRY,
     )
+    return upstream
 
 
 def _case(return_gate, price_ref):
@@ -267,6 +283,7 @@ def test_b04_core_accepts_canonical_lineage():
         _case(_return_gate(forecast_ref, valuation_ref), price_ref),
         current_price_resolver=price_registry,
         independent_forecast_resolver=forecast_registry,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
         valuation_output_resolver=valuation_resolver,
     )
     assert result["status"] == "PASS"
