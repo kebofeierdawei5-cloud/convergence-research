@@ -389,6 +389,24 @@ Historical G2 frozen identity remains immutable and separate from R0 successor e
 
 RP-01 remains a separate legacy fixture regression (`str.read`) and is not FM01 admission evidence.
 
+### DATA-01-A exact-byte intake — run 37590889419
+
+A second network-enabled A02 runtime attempt has been independently downloaded and verified.
+
+- workflow run: `37590889419`
+- job: `112691834326`
+- artifact: `11468960920 / A02-exact-raw-37590889419`
+- artifact SHA-256: `bdfff9342c848f3231127c4ee581829e275b29a7dcbbeab1e0b3501bb04e70de`
+- exact historical A target SHA-256: `f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984`
+- captured current 000906 SHA-256: `b3338f5f6fdfd04a72fb42f5444539507b50ee4805c83dabb04ec26e54c3b5fb`
+- historical exact match: `FALSE`
+- B free-first raw bundle in this run: `NOT MATERIALIZED`
+- A02 admission: `BLOCKED`
+
+Independent verification record: `docs/iios/A02_DATA01_RUN14_INDEPENDENT_VERIFICATION_20261007.md`.
+
+The run therefore proves actual current-byte capture and fail-closed historical mismatch, but does not supply the missing historical A bytes or B evidence.
+
 ## 10. A02 Runtime Evidence — 2026-10-07
 
 The canonical A02 acquisition workflow produced a real immutable runtime artifact, independently verified, but the admission gate remains BLOCKED.
