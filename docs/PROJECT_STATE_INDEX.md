@@ -391,9 +391,9 @@ RP-01 remains a separate legacy fixture regression (`str.read`) and is not FM01 
 
 ## 9. Next canonical development boundary
 
-FM01 data admission, FM02 feature construction, FM03 state construction, and FM04 conditional backtest are complete. The next boundary is:
+FM01 data admission, FM02 feature construction, FM03 state construction, FM04 conditional backtest, and FM05 scope / estimand / sufficiency freeze are complete. The next boundary is an explicit owner adjudication of whether to open a new M1.2 research epoch:
 
-**M1.2-FM-05 Scope Freeze / Data Sufficiency Adjudication**
+**No new M1.2 research capability is authorized by the current frozen epoch.**
 
 ### M1.2-FM02 canonical acceptance
 

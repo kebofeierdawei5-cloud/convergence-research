@@ -51,7 +51,7 @@ Baseline:
 
 G2 historical frozen identity remains separate from the accepted R0 successor evidence; no frozen-byte rewrite was performed.
 
-**Next boundary: M1.2-FM-05 Scope Freeze / Data Sufficiency Adjudication.**
+**Next boundary: explicit owner adjudication of whether to open a new M1.2 research epoch; no new production or confirmatory capability is implied.**
 
 FM01 data gate is now `DATA_READY` after exact-source admission, provenance binding, 22-quarter coverage validation, and independent PIT replay.
 
