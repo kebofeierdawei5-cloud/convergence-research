@@ -209,8 +209,16 @@ def admit_canonical_decision(
         if key in canonical_decision
     }
     snapshot_decision = snapshot_core["decision"]
-    if any(key not in snapshot_decision or snapshot_decision[key] != projection[key] for key in projection):
-        raise ValueError("snapshot decision does not equal freshly re-executed canonical Decision Kernel result")
+    mismatched_keys = [
+        key
+        for key in projection
+        if key not in snapshot_decision or snapshot_decision[key] != projection[key]
+    ]
+    if mismatched_keys:
+        raise ValueError(
+            "snapshot decision does not equal freshly re-executed canonical Decision Kernel result"
+            f"; mismatched keys={mismatched_keys}"
+        )
     return _build_receipt_from_canonical(
         snapshot=snapshot,
         canonical_decision=canonical_decision,
