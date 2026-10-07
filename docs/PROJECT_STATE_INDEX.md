@@ -264,7 +264,7 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 ## 8. Current canonical M1.2 baseline state
 
-The M1.2 research baseline is complete through the FM04 Conditional Backtest, under the exploratory / contaminated / development-only boundary:
+The M1.2 research baseline is complete through the FM05 Scope / Estimand / Sufficiency Freeze, under the exploratory / contaminated / development-only boundary:
 
 ```
 Post-B04 Authority Re-audit = PASS
@@ -280,6 +280,8 @@ M1.2-FM02 PIT Feature Builder / Forecastability Feature Contract = PASS / MERGED
 M1.2-FM03 State Engine / Forecastability State Construction = PASS / MERGED / CANONICAL
         ↓
 M1.2-FM04 Conditional Backtest = PASS / MERGED / CANONICAL
+        ↓
+M1.2-FM05 Scope / Estimand / Sufficiency Freeze = PASS / MERGED / CANONICAL
 ```
 
 ### M1.2-FM00 Git Baseline
@@ -479,3 +481,17 @@ Status: **PASS / MERGED / CANONICAL**
 The 0 selected result is a valid sufficiency boundary under the frozen research policy. It is not evidence that a state dimension predicts future outcomes, nor evidence for production model routing. FM04 remains exploratory/contaminated/development-only with `confirmatory_eligible=false`.
 
 Acceptance: `docs/iios/FM04_ACCEPTANCE_2026-10-07.md`.
+
+
+### M1.2-FM05 canonical acceptance
+Status: **PASS / MERGED / CANONICAL**
+
+- PR #156;
+- merge commit `215afcc60e649dde331e7f076be809dda716770a`;
+- accepted exact head `e6b5a77290409d3e95164007245d57f58246ccd4`;
+- dedicated workflow run #1 = SUCCESS;
+- run id `37578843014`;
+- adjudication: INSUFFICIENT_FOR_STATE_CONDITIONED_SELECTION;
+- frozen replay: 406 outer selection units, 0 selected, 0 outer evaluated, 406 NO_SELECTION, 79 structural conditional groups, 0 empirical conditional groups.
+
+FM05 is a governance freeze. Result-driven redesign requires a new research epoch and a fresh scope / estimand freeze.
