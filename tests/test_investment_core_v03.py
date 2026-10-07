@@ -231,7 +231,7 @@ def case(price="100", price_observation_id="price-1", thesis_status="INTACT") ->
         thesis=thesis,
         registry=UPSTREAM_AUTHORITY_REGISTRY,
     )
-    return {
+    payload = {
         "contract_version": "IIOS-INVESTMENT-CORE-0.3",
         "case_id": "V03-001",
         "market": "CN-A",
@@ -300,7 +300,7 @@ def case(price="100", price_observation_id="price-1", thesis_status="INTACT") ->
                 "bull": {"probability": "0.3", "terminal_value_per_share": "180", "cash_distributions_per_share": "0", "probability_rationale": "test bull"},
             },
         },
-    }    payload = 
+    }
     payload, _, _ = bind_return_lineage(
         payload,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
