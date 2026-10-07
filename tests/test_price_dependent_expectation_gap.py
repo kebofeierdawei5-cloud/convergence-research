@@ -11,7 +11,6 @@ from tests.test_investment_core_v03 import (
     INDEPENDENT_FORECAST_REGISTRY,
     CURRENT_PRICE_REGISTRY,
     UPSTREAM_AUTHORITY_REGISTRY,
-    VALUATION_OUTPUT_RESOLVER,
     case,
 )
 
@@ -34,7 +33,6 @@ def test_p2_revalidation_changes_market_expectation_with_candidate_price():
         market_expectation_id=c["expectation_gap"]["market_expectation_id"],
         independent_forecast_ref=c["expectation_gap"]["independent_forecast_ref"],
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result["status"] == "PASS"
     assert result["reference_price"] == "100"
@@ -65,7 +63,6 @@ def test_p2_revalidation_detects_gap_failure_at_higher_candidate_price():
         market_expectation_id=c["expectation_gap"]["market_expectation_id"],
         independent_forecast_ref=c["expectation_gap"]["independent_forecast_ref"],
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result["status"] == "NON_POSITIVE"
     assert result["gap_positive"] is False
@@ -103,7 +100,6 @@ def test_p2_target_entry_price_2_is_integrated_into_decision_output():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
@@ -151,6 +147,5 @@ def test_p2_revalidation_does_not_mutate_canonical_current_price():
         market_expectation_id=c["expectation_gap"]["market_expectation_id"],
         independent_forecast_ref=c["expectation_gap"]["independent_forecast_ref"],
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
-        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert c["current_price_observation"]["price"] == original
