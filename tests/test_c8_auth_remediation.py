@@ -53,6 +53,7 @@ def test_c8_auth_001_admission_reexecutes_kernel_and_rejects_forged_decision():
         case=case,
         snapshot=valid_snapshot,
         current_price_resolver=registry,
+            upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY,
         upstream_authority_resolver=AUTHORITY_REGISTRY,
     )
     assert receipt["status"] == "ADMITTED"
