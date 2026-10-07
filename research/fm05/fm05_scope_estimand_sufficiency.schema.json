@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/fm05-scope-estimand-sufficiency-0.1.json",
+  "title": "IIOS M1.2 FM05 Scope / Estimand / Sufficiency Contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version","contract_id","version","status","research_epoch_id","confirmatory_eligible","purpose","scope","estimand","sufficiency_policy","amendment_policy","provenance_policy","capability_boundary","research_boundary"],
+  "properties": {
+    "schema_version": {"const":"IIOS-FM05-SCOPE-ESTIMAND-SUFFICIENCY-0.1"},
+    "contract_id": {"const":"FC-M12-FM05-CATL-001"},
+    "version": {"const":"0.1.0"},
+    "status": {"const":"FROZEN"},
+    "research_epoch_id": {"const":"RE-M12-EXP-CATL-20260930"},
+    "confirmatory_eligible": {"const":false},
+    "purpose": {
+      "type":"object","additionalProperties":false,
+      "required":["scope_freeze","estimand_freeze","sufficiency_adjudication","statement"],
+      "properties":{"scope_freeze":{"const":true},"estimand_freeze":{"const":true},"sufficiency_adjudication":{"const":true},"statement":{"type":"string"}}
+    },
+    "scope": {
+      "type":"object","additionalProperties":false,
+      "required":["securities","drivers","targets","horizons","state_dimensions","model_families","model_instances","origin_schedule","current_price_allowed"],
+      "properties":{
+        "securities":{"const":["300750.SZ"]},
+        "drivers":{"const":["REVENUE","NET_PROFIT"]},
+        "targets":{"const":["CATL_REVENUE","CATL_NET_PROFIT"]},
+        "horizons":{"const":["3M","6M","12M"]},
+        "state_dimensions":{"const":["DIRECTION","MOMENTUM","VOLATILITY","SEASONALITY","MEAN_REVERSION_PRESSURE","STRUCTURAL_STABILITY","DATA_QUALITY"]},
+        "model_families":{"const":["SEASONAL_NAIVE","PERSISTENCE_YOY","TREND_LOG_LINEAR","MEAN_REVERSION_YOY"]},
+        "model_instances":{"const":["SEASONAL_NAIVE","PERSISTENCE_YOY","TREND_LOG_LINEAR_8Q","MEAN_REVERSION_YOY_8"]},
+        "origin_schedule":{
+          "type":"object","additionalProperties":false,"required":["origin_count","horizons_by_origin","selection_rule"],
+          "properties":{"origin_count":{"const":11},"horizons_by_origin":{"const":{"3M":11,"6M":10,"12M":8}},"selection_rule":{"const":"FROZEN_PRE_SCHEDULED_ORIGINS_ONLY"}}
+        },
+        "current_price_allowed":{"const":false}
+      }
+    },
+    "estimand":{
+      "type":"object","additionalProperties":false,
+      "required":["selection_unit","structural_group_unit","primary_selection_estimand","outer_performance_estimand","primary_metric","secondary_metrics","comparison_rule","rolling_origin_independence_assumption","inferential_claims_allowed","descriptive_only","current_price_in_estimand","investment_decision_in_estimand"],
+      "properties":{
+        "selection_unit":{"const":"security × driver × horizon × state_dimension × state_value × outer_origin"},
+        "structural_group_unit":{"const":"security × driver × horizon × state_dimension × state_value"},
+        "primary_selection_estimand":{"type":"string"},
+        "outer_performance_estimand":{"type":"string"},
+        "primary_metric":{"const":"MAE"},
+        "secondary_metrics":{"const":["RMSE","sMAPE"]},
+        "comparison_rule":{"const":"SAME_ORIGIN_UNIVERSE_SAME_TARGET_SAME_HORIZON_SAME_ACTUAL"},
+        "rolling_origin_independence_assumption":{"const":false},
+        "inferential_claims_allowed":{"const":false},
+        "descriptive_only":{"const":true},
+        "current_price_in_estimand":{"const":false},
+        "investment_decision_in_estimand":{"const":false}
+      }
+    },
+    "sufficiency_policy":{
+      "type":"object","additionalProperties":false,
+      "required":["selection_min_common_inner_observations","common_model_universe_required","inner_origins_strictly_earlier","inner_actual_known_by_outer_cutoff","unknown_state_forces_no_selection","no_imputation","structural_group_definition_requires_state_available","empirical_group_definition_requires_at_least_one_evaluated_outer_selection_unit","current_adjudication"],
+      "properties":{
+        "selection_min_common_inner_observations":{"const":3},
+        "common_model_universe_required":{"const":true},
+        "inner_origins_strictly_earlier":{"const":true},
+        "inner_actual_known_by_outer_cutoff":{"const":true},
+        "unknown_state_forces_no_selection":{"const":true},
+        "no_imputation":{"const":true},
+        "structural_group_definition_requires_state_available":{"const":true},
+        "empirical_group_definition_requires_at_least_one_evaluated_outer_selection_unit":{"const":true},
+        "current_adjudication":{
+          "type":"object","additionalProperties":false,
+          "required":["status","source","outer_selection_unit_count","selected_count","outer_evaluated_count","no_selection_count","structural_conditional_group_count","empirical_conditional_group_count"],
+          "properties":{
+            "status":{"const":"INSUFFICIENT_FOR_STATE_CONDITIONED_SELECTION"},
+            "source":{"const":"FM04 canonical result replay"},
+            "outer_selection_unit_count":{"const":406},
+            "selected_count":{"const":0},
+            "outer_evaluated_count":{"const":0},
+            "no_selection_count":{"const":406},
+            "structural_conditional_group_count":{"const":79},
+            "empirical_conditional_group_count":{"const":0}
+          }
+        }
+      }
+    },
+    "amendment_policy":{
+      "type":"object","additionalProperties":false,
+      "required":["same_epoch_forbidden_changes","result_driven_change_requires_new_epoch","new_epoch_requires_new_scope_and_estimand_freeze","outer_results_cannot_flow_back_into_same_epoch_tuning"],
+      "properties":{
+        "same_epoch_forbidden_changes":{"type":"array","minItems":8,"items":{"type":"string"}},
+        "result_driven_change_requires_new_epoch":{"const":true},
+        "new_epoch_requires_new_scope_and_estimand_freeze":{"const":true},
+        "outer_results_cannot_flow_back_into_same_epoch_tuning":{"const":true}
+      }
+    },
+    "provenance_policy":{
+      "type":"object","additionalProperties":false,
+      "required":["fm04_contract_id","required_fm04_result_schema_version","state_snapshot_sha256","upstream_git_blob_sha"],
+      "properties":{
+        "fm04_contract_id":{"const":"FC-M12-FM04-CATL-001"},
+        "required_fm04_result_schema_version":{"const":"IIOS-FM04-CONDITIONAL-BACKTEST-RESULT-0.2"},
+        "state_snapshot_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+        "upstream_git_blob_sha":{
+          "type":"object","additionalProperties":false,
+          "required":["state_contract","driver_history","outer_universe_lock","research_plan","candidate_space","purity_boundary"],
+          "properties":{
+            "state_contract":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+            "driver_history":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+            "outer_universe_lock":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+            "research_plan":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+            "candidate_space":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+            "purity_boundary":{"type":"string","pattern":"^[0-9a-f]{40}$"}
+          }
+        }
+      }
+    },
+    "capability_boundary":{
+      "type":"object","additionalProperties":false,
+      "required":["scope_freeze_only","model_selection","production_router","production_forecast","automatic_execution","investment_decision"],
+      "properties":{"scope_freeze_only":{"const":true},"model_selection":{"const":false},"production_router":{"const":false},"production_forecast":{"const":false},"automatic_execution":{"const":false},"investment_decision":{"const":false}}
+    },
+    "research_boundary":{
+      "type":"object","additionalProperties":false,
+      "required":["usage","purity","confirmatory_evidence_authorized","current_epoch_remains_unchanged"],
+      "properties":{"usage":{"const":"DEVELOPMENT_ONLY"},"purity":{"const":"CONTAMINATED"},"confirmatory_evidence_authorized":{"const":false},"current_epoch_remains_unchanged":{"const":true}}
+    }
+  }
+}
