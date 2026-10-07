@@ -44,8 +44,9 @@ jobs:
             -o /tmp/pilot02-xhc/raw/xinhecheng_2026_h1.pdf
 
           curl -L --fail --retry 3 --retry-delay 2 \
-            "https://query1.finance.yahoo.com/v8/finance/chart/002001.SZ?period1=1790726400&period2=1790812800&interval=1d&events=history&includeAdjustedClose=true" \
-            -o /tmp/pilot02-xhc/raw/002001_20260930_yahoo.json
+            -A "Mozilla/5.0" \
+            "https://quotes.money.163.com/service/chddata.html?code=1002001&start=20260930&end=20260930&fields=TCLOSE;HIGH;LOW;TOPEN;LCLOSE;CHG;PCHG;TURNOVER;VOTURNOVER;VATURNOVER;TCAP;MCAP" \
+            -o /tmp/pilot02-xhc/raw/002001_20260930_netease.csv
 
           curl -L --fail --retry 3 --retry-delay 2 \
             "https://www.szse.cn/disclosure/notice/general/t20260917_617929.html" \
@@ -83,16 +84,23 @@ jobs:
               "\n".join(x for x in required), encoding="utf-8"
           )
 
-          price = json.loads((root / "002001_20260930_yahoo.json").read_text())
-          result = price["chart"]["result"][0]
-          timestamps = result["timestamp"]
-          closes = result["indicators"]["quote"][0]["close"]
-          rows = {}
-          from datetime import datetime, timezone
-          for ts, close in zip(timestamps, closes):
-              rows[datetime.fromtimestamp(ts, tz=timezone.utc).date().isoformat()] = close
-          if rows.get("2026-09-30") != 25.95:
-              raise SystemExit(f"2026-09-30 002001 close mismatch: {rows.get('2026-09-30')!r}")
+          import csv, io
+          raw_price = (root / "002001_20260930_netease.csv").read_bytes()
+          text = raw_price.decode("gb18030", errors="ignore")
+          rows = list(csv.reader(io.StringIO(text)))
+          if not rows:
+              raise SystemExit("empty NetEase historical-price response")
+          header = rows[0]
+          close_idx = next(
+              (i for i, value in enumerate(header) if "收盘" in value or value == "TCLOSE"),
+              3,
+          )
+          price_row = next((row for row in rows[1:] if row and row[0].strip() == "2026-09-30"), None)
+          if price_row is None:
+              raise SystemExit("2026-09-30 row missing from NetEase historical-price response")
+          close = float(price_row[close_idx].strip())
+          if close != 25.95:
+              raise SystemExit(f"2026-09-30 002001 close mismatch: {close!r}")
 
           calendar = (root / "szse_2026_holiday_schedule.html").read_text(
               encoding="utf-8", errors="ignore"
@@ -119,8 +127,8 @@ jobs:
               "report_source_ref": "https://static.cninfo.com.cn/finalpage/2026-08-20/1225482495.PDF",
               "report_sha256": sha(pdf),
               "report_exact_bytes": True,
-              "price_source_ref": "https://query1.finance.yahoo.com/v8/finance/chart/002001.SZ?period1=1790726400&period2=1790812800&interval=1d&events=history&includeAdjustedClose=true",
-              "price_sha256": sha(root / "002001_20260930_yahoo.json"),
+              "price_source_ref": "https://quotes.money.163.com/service/chddata.html?code=1002001&start=20260930&end=20260930&fields=TCLOSE;HIGH;LOW;TOPEN;LCLOSE;CHG;PCHG;TURNOVER;VOTURNOVER;VATURNOVER;TCAP;MCAP",
+              "price_sha256": sha(root / "002001_20260930_netease.csv"),
               "price_exact_bytes": True,
               "price": "25.95",
               "latest_tradable_date": "2026-09-30",
@@ -140,7 +148,7 @@ jobs:
         run: |
           PYTHONPATH=. python tools/pilot02_xinhecheng_e2e.py \
             --report /tmp/pilot02-xhc/raw/xinhecheng_2026_h1.pdf \
-            --price /tmp/pilot02-xhc/raw/002001_20260930_yahoo.json \
+            --price /tmp/pilot02-xhc/raw/002001_20260930_netease.csv \
             --receipt /tmp/pilot02-xhc/PILOT-02_RAW_EVIDENCE_RECEIPT.json \
             --out /tmp/pilot02-xhc/out
 
