@@ -18,6 +18,7 @@ from tests.test_core04_real_300750_upstream_gate_e2e import (
     _case,
     _inputs,
     _price_ref,
+    UPSTREAM_AUTHORITY_REGISTRY,
 )
 from tests.test_decision_lifecycle_production import snapshot
 
@@ -97,10 +98,18 @@ def test_p0_02_return_gate_can_diverge_from_forecast_and_valuation_and_still_rea
     case["forecast"]["scenarios"]["bull"]["fcf_proxy_bn_cny"] = ["2", "2", "2"]
     case["forecast"]["scenarios"]["bear"]["fcf_proxy_bn_cny"] = ["0.5", "0.5", "0.5"]
 
-    validation = validate_case_v03(case, current_price_resolver=registry)
+    validation = validate_case_v03(
+        case,
+        current_price_resolver=registry,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+    )
     assert validation["status"] == "PASS", validation["errors"]
 
-    decision = decide_v03(case, current_price_resolver=registry)
+    decision = decide_v03(
+        case,
+        current_price_resolver=registry,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+    )
 
     assert decision["action"] == "BUY"
     assert decision["gates"]["new_capital_allowed"] is True
