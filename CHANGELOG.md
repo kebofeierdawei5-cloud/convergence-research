@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### 2026-10-07 — M1.2-FM03 Deterministic PIT State Engine
+
+- Added frozen FM03 State Contract and output schema for the seven orthogonal Forecastability State dimensions.
+- Added deterministic PIT state construction from the admitted FM02 CATL feature snapshot with explicit AVAILABLE / UNKNOWN semantics and no imputation.
+- Added provenance closure to FM02 feature rows and upstream DriverSeries record IDs, frozen FM00 origin-lock hash binding, and fail-closed capability isolation for `iios_research` / `m1.2.fm03.state_engine`.
+- Added dedicated CI with 14 / 14 tests, real CATL 22-row state build, output schema validation, independent PIT/provenance audit, compileall, and diff-check.
+- FM03 remains DEVELOPMENT_ONLY / contaminated and non-confirmatory; Conditional Backtest, Model Selection, Production Router, current-price inputs, scheduler, and automatic execution remain out of scope.
+
 ### 2026-10-07 — M1.2-FM02 PIT Feature Builder / Forecastability Feature Contract
 
 - Added the frozen FM02 forecastability feature contract and output schema.
