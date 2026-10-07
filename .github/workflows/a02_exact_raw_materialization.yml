@@ -11,7 +11,7 @@ on:
 # A02 execution trigger: run exact raw materialization from canonical main.
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   acquire:
@@ -45,6 +45,30 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
+      - name: Persist runtime artifact pointer (diagnostic only)
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api -H "Accept: application/vnd.github+json" "/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" > "$RUNNER_TEMP/a02_artifacts.json"
+          python - <<'PY'
+          import json, os, pathlib
+          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'a02_artifacts.json'
+          payload=json.loads(p.read_text())
+          rows=[]
+          for a in payload.get('artifacts',[]):
+              rows.append({k:a.get(k) for k in ('id','name','size_in_bytes','archive_download_url','expired','created_at','expires_at')})
+          out=pathlib.Path('docs/iios/A02_LAST_RUNTIME_ARTIFACT_POINTER.json')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          out.write_text(json.dumps({'schema_version':'IIOS-A02-RUNTIME-ARTIFACT-POINTER-0.1','role':'DIAGNOSTIC_RUNTIME_POINTER_ONLY','run_id':int(os.environ['GITHUB_RUN_ID']),'head_sha':os.environ['GITHUB_SHA'],'workflow':'A02 Exact Raw Materialization','artifacts':rows}, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/iios/A02_LAST_RUNTIME_ARTIFACT_POINTER.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs(a02): persist runtime artifact pointer"
+          git push origin HEAD:main
       - name: Fail closed unless both A and B admit
         if: ${{ always() }}
         run: |
