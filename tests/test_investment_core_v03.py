@@ -304,6 +304,7 @@ def case(price="100", price_observation_id="price-1", thesis_status="INTACT") ->
     payload, _, _ = bind_return_lineage(
         payload,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         valuation_admission_registry=VALUATION_ADMISSION_REGISTRY,
         valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
@@ -317,6 +318,7 @@ def test_v03_risk_portfolio_contract_is_emitted_and_explicit():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result["decision"]["risk_portfolio_contract"]["contract_version"] == "IIOS-RISK-PORTFOLIO-PRODUCTION-0.1"
     assert result["decision"]["risk_portfolio_contract"]["readiness"]["risk_ready"] is True
@@ -331,6 +333,7 @@ def test_v03_missing_can_add_fails_validation_before_decision():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result["validation"]["status"] == "BLOCKED"
     assert any("V03-RISK-PORTFOLIO-CONTRACT" in x for x in result["validation"]["blockers"])
@@ -358,6 +361,7 @@ def test_v03_target_entry_reference_cannot_coexist_with_expectation_gap():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("V03-TARGET-ENTRY-REF-CONFLICT" in x for x in result["validation"]["blockers"])
@@ -407,6 +411,7 @@ def test_v03_inline_independent_expectation_is_rejected():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("unsupported fields" in x for x in result["validation"]["blockers"])
@@ -422,6 +427,7 @@ def test_v03_canonical_forecast_value_controls_expectation_gap():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result["decision"]["action"] == "BUY"
     assert result["gates"]["expectation_gap_status"] == "PASS"
@@ -436,6 +442,7 @@ def test_v03_forecast_admission_hash_tampering_is_blocked():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert any("admission hash mismatch" in x for x in result["validation"]["blockers"])
@@ -880,6 +887,7 @@ def test_v03_nonpositive_mie_gap_is_advisory_not_an_automatic_buy_veto():
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY, independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result["decision"]["action"] == "BUY"
     assert result["gates"]["expectation_gap_status"] == "PASS"
