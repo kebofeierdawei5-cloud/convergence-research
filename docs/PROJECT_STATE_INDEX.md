@@ -607,3 +607,102 @@ DATA-01-C independent raw verification
 Only after those raw inputs exist will PIT reconstruction and independent replay begin.
 
 Additional DATA-01 discovery on 2026-10-07: the predecessor `benzemaer/convergence-research` public repository exposes a tracked G0-T02 handoff manifest naming a previously materialized historical `000906cons.xls` with the frozen target SHA-256 `f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984` and package SHA-256 `fab0950153e3a683e9590dc895533276e0092146d7774b4822442d00d45b369b`. The actual ZIP/XLS bytes are documented as non-Git local review material and are not present in the public Git object; therefore this remains a recovery/provenance lead, not admitted evidence. The same predecessor repository exposes security-master/Tushare/tnskhdata candidate contracts and code, but no directly materializable PIT raw bundle satisfying the six B domains. See `docs/iios/A02_HISTORICAL_A_EVIDENCE_SUPPLY_DISCOVERY_20261007.md`.
+
+## 11. DATA-01-B / B3-01 latest evidence state — 2026-10-07
+
+Status: **EVIDENCE GATE BLOCKED / CANONICAL GOVERNANCE RECORDED**
+
+The B3-01 acquisition adjudication and independent preflight evidence were persisted and merged in **PR #185**, merge commit `3ee439fa5a0d51b4f43b8acad53db2f864298996`.
+
+### Latest independently inspected runtime
+
+- workflow: `A02 Exact Raw Materialization`
+- run: `37596399460` (#16)
+- runtime head: `08adaf484fee64f5448fafcfa8346403abac98a5`
+- artifact: `11471840025 / A02-exact-raw-37596399460`
+- artifact ZIP SHA-256: `5cad0c1dc67af0638ad4723ffb3a359f49f37b6f83c02a6860e4aea1ac58d0b1`
+- workflow conclusion: **failure / fail-closed**
+- complete B raw bundle: **NOT PRESENT**
+- independent B preflight: **BLOCKED**
+- strict exit code: `4`
+
+The runtime artifact contains the current `000906cons.xls` snapshot and acquisition receipt, but no `DELIVERY_MANIFEST.json` and no `B_PIT_SECURITY_MASTER_RAW/` tree.
+
+Independent verification recorded current `000906cons.xls` SHA-256 as:
+
+```text
+b3338f5f6fdfd04a72fb42f5444539507b50ee4805c83dabb04ec26e54c3b5fb
+```
+
+The frozen historical A target remains:
+
+```text
+f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984
+```
+
+Therefore the captured A file is not admitted as the historical target.
+
+### B3-01 independent preflight
+
+```text
+independent_from_collector = true
+raw_bundle_received         = PASS_RECEIVED
+artifact_inventory          = PASS
+independent_sha256          = PASS
+manifest_comparison         = PARTIAL_ONLY
+contract/schema             = FAIL
+coverage                    = FAIL
+provenance                  = FAIL
+final                       = BLOCKED
+```
+
+Missing B domains:
+
+```text
+identity
+listing_delisting
+common_equity
+st_history
+industry_history
+source_vintages
+```
+
+Canonical receipt:
+
+```text
+evidence/a02_data01_b/BATCH3_B_INDEPENDENT_PREFLIGHT_RECEIPT_20261007.json
+```
+
+### Human intervention boundary
+
+**No human intervention is required for the current engineering steps.**
+
+The next material dependency that requires the user or another data owner is:
+
+```text
+ACTUAL_B_RAW_EVIDENCE_BUNDLE
+```
+
+Accepted handoff:
+
+```text
+A02_DELIVERY ZIP
+  + DELIVERY_MANIFEST.json
+  + six required B domain raw trees
+  + 11 required PIT origins
+  + actual raw bytes
+  + source-vintage / known_at evidence
+  + license / redistribution status
+```
+
+A data-owner/vendor PIT export is also acceptable when it preserves the same evidence chain.
+
+Until that bundle exists, `DATA-01-C`, `DATA-02`, A02 admission, cross-security epoch activation, and model selection remain locked.
+
+The canonical rule is unchanged:
+
+```text
+no bytes → no hash admission
+no known_at evidence → no PIT admission
+no complete B bundle → no DATA-01-C
+```
