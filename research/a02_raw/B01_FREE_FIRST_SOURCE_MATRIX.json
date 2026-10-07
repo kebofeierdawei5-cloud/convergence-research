@@ -1,0 +1,125 @@
+{
+  "schema_version": "IIOS-A02-B01-FREE-FIRST-SOURCE-MATRIX-0.1",
+  "matrix_id": "SM-A02-B01-20261007",
+  "version": "0.1.0",
+  "status": "FROZEN_FOR_ADMISSION_PREPARATION",
+  "pit_origins": [
+    "2023Q3",
+    "2023Q4",
+    "2024Q1",
+    "2024Q2",
+    "2024Q3",
+    "2024Q4",
+    "2025Q1",
+    "2025Q2",
+    "2025Q3",
+    "2025Q4",
+    "2026Q1"
+  ],
+  "required_domains": [
+    "identity",
+    "listing_delisting",
+    "common_equity",
+    "st_history",
+    "industry_history",
+    "source_vintages"
+  ],
+  "sources": [
+    {
+      "source_id": "SSE_STOCK_LIST",
+      "provider": "SSE",
+      "class": "OFFICIAL_PUBLIC",
+      "url": "https://www.sse.com.cn/assortment/stock/home/",
+      "domains": [
+        "identity",
+        "listing_delisting"
+      ],
+      "temporal_capability": "CURRENT_SNAPSHOT",
+      "pit_known_at_capability": false,
+      "admission_status": "CONTROL_ONLY"
+    },
+    {
+      "source_id": "SSE_DELISTING_LIST",
+      "provider": "SSE",
+      "class": "OFFICIAL_PUBLIC",
+      "url": "https://big5.sse.com.cn/site/cht/www.sse.com.cn/assortment/stock/list/delisting/",
+      "domains": [
+        "listing_delisting"
+      ],
+      "temporal_capability": "CURRENT_DELISTING_VIEW",
+      "pit_known_at_capability": false,
+      "admission_status": "CONTROL_ONLY"
+    },
+    {
+      "source_id": "SSE_INDUSTRY_CLASSIFICATION",
+      "provider": "SSE",
+      "class": "OFFICIAL_PUBLIC",
+      "url": "https://www.sse.com.cn/assortment/stock/areatrade/trade/",
+      "domains": [
+        "industry_history"
+      ],
+      "temporal_capability": "CURRENT_CLASSIFICATION",
+      "pit_known_at_capability": false,
+      "admission_status": "CONTROL_ONLY"
+    },
+    {
+      "source_id": "SZSE_DATA_SERVICES",
+      "provider": "SZSE",
+      "class": "OFFICIAL_PUBLIC",
+      "url": "https://www.szse.cn/English/services/dataServices/index.html",
+      "domains": [
+        "identity",
+        "listing_delisting",
+        "st_history",
+        "common_equity"
+      ],
+      "temporal_capability": "PUBLIC_DATA_CATALOG",
+      "pit_known_at_capability": "FIELD_DEPENDENT",
+      "admission_status": "ROUTE_CANDIDATE"
+    },
+    {
+      "source_id": "SZSE_RISK_WARNING_RULES",
+      "provider": "SZSE",
+      "class": "OFFICIAL_PUBLIC_RULES",
+      "url": "https://www.szse.cn/English/rules/siteRule/P020240911598827821065.pdf",
+      "domains": [
+        "st_history"
+      ],
+      "temporal_capability": "SEMANTIC_RULES_ONLY",
+      "pit_known_at_capability": false,
+      "admission_status": "NORMATIVE_SEMANTICS_ONLY"
+    },
+    {
+      "source_id": "CSI_PUBLIC_MATERIALS",
+      "provider": "CSI",
+      "class": "OFFICIAL_PUBLIC",
+      "url": "https://www.csindex.com.cn/",
+      "domains": [
+        "industry_history",
+        "listing_delisting"
+      ],
+      "temporal_capability": "CURRENT_SNAPSHOT",
+      "pit_known_at_capability": false,
+      "admission_status": "CONTROL_ONLY"
+    }
+  ],
+  "free_first_rules": {
+    "paid_source_required": false,
+    "tushare_credential_required": false,
+    "current_snapshot_may_replace_historical_target": false,
+    "current_classification_may_replace_historical_pit_state": false,
+    "field_level_known_at_required": true,
+    "raw_bytes_and_metadata_required": true,
+    "secondary_public_sources_may_reconcile_but_not_silently_become_normative": true,
+    "unresolved_required_domain_fails_closed": true
+  },
+  "admission_state": {
+    "status": "BLOCKED",
+    "blocking_domains": [
+      "st_history",
+      "industry_history",
+      "source_vintages"
+    ],
+    "statement": "No free-first source route is yet admitted for the complete historical PIT field chain across all 11 origins. This matrix is preparation/control only and does not constitute A02 admission."
+  }
+}
