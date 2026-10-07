@@ -1,0 +1,48 @@
+name: IIOS PILOT-03 — Observed Friction Remediation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/iios_pilot02_xinhecheng.yml"
+      - "tests/test_pilot02_risk_discipline.py"
+      - "docs/iios/PILOT-03_OBSERVED_FRICTION_20261007.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pilot-03:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema pypdf
+
+      - name: Scope check
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only "origin/main...HEAD" > /tmp/pilot03_changed.txt
+          cat /tmp/pilot03_changed.txt
+          while IFS= read -r path; do
+            case "$path" in
+              .github/workflows/iios_pilot02_xinhecheng.yml|tests/test_pilot02_risk_discipline.py|docs/iios/PILOT-03_OBSERVED_FRICTION_20261007.md) ;;
+              *) echo "Unexpected PILOT-03 file change: $path"; exit 1 ;;
+            esac
+          done < /tmp/pilot03_changed.txt
+
+      - name: Compile touched test surface
+        run: python -m compileall -q tests iios_mvp
+
+      - name: Run PILOT-03 regression tests
+        run: PYTHONPATH=. pytest -q tests/test_pilot02_risk_discipline.py tests/test_canonical_current_price.py tests/test_decision_kernel_v03.py
+
+      - name: Diff check
+        run: git diff --check
