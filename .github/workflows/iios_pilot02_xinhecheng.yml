@@ -1,0 +1,179 @@
+name: IIOS PILOT-02 — Xinhecheng Fresh Candidate
+
+on:
+  pull_request:
+    paths:
+      - "examples/real_cases/RC-CN-A-002001-20261007_pilot02_input.json"
+      - "tools/pilot02_xinhecheng_e2e.py"
+      - ".github/workflows/iios_pilot02_xinhecheng.yml"
+      - "iios_mvp/**"
+      - "tests/b03b_upstream_authority_fixture.py"
+      - "tests/b04b_return_lineage_fixture.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pilot-02:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema pypdf
+
+      - name: Compile pilot code
+        run: python -m compileall -q iios_mvp tools tests/b03b_upstream_authority_fixture.py tests/b04b_return_lineage_fixture.py
+
+      - name: Capture exact primary evidence and latest tradable price
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/pilot02-xhc
+          mkdir -p /tmp/pilot02-xhc/raw /tmp/pilot02-xhc/out
+
+          curl -L --fail --retry 3 --retry-delay 2 \
+            "https://static.cninfo.com.cn/finalpage/2026-08-20/1225482495.PDF" \
+            -o /tmp/pilot02-xhc/raw/xinhecheng_2026_h1.pdf
+
+          curl -L --fail --retry 3 --retry-delay 2 \
+            "https://query1.finance.yahoo.com/v8/finance/chart/002001.SZ?period1=1790726400&period2=1790812800&interval=1d&events=history&includeAdjustedClose=true" \
+            -o /tmp/pilot02-xhc/raw/002001_20260930_yahoo.json
+
+          curl -L --fail --retry 3 --retry-delay 2 \
+            "https://www.szse.cn/disclosure/notice/general/t20260917_617929.html" \
+            -o /tmp/pilot02-xhc/raw/szse_2026_holiday_schedule.html
+
+          python - <<'PY'
+          import hashlib, json, re
+          from pathlib import Path
+          from pypdf import PdfReader
+
+          root = Path("/tmp/pilot02-xhc/raw")
+
+          def sha(p):
+              h=hashlib.sha256()
+              with p.open("rb") as f:
+                  for chunk in iter(lambda:f.read(1024*1024), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          pdf = root / "xinhecheng_2026_h1.pdf"
+          text = "\n".join(page.extract_text() or "" for page in PdfReader(str(pdf)).pages)
+          required = [
+              "浙江新和成股份有限公司",
+              "13,129,300,260.89",
+              "4,010,733,454.55",
+              "3,640,144,282.94",
+              "605,728,077.64",
+              "67.07%",
+              "58.43%",
+          ]
+          missing = [x for x in required if x not in text]
+          if missing:
+              raise SystemExit("CNINFO H1 report anchor extraction failed: " + repr(missing))
+          (root / "cninfo_h1_anchor_extract.txt").write_text(
+              "\n".join(x for x in required), encoding="utf-8"
+          )
+
+          price = json.loads((root / "002001_20260930_yahoo.json").read_text())
+          result = price["chart"]["result"][0]
+          timestamps = result["timestamp"]
+          closes = result["indicators"]["quote"][0]["close"]
+          rows = {}
+          from datetime import datetime, timezone
+          for ts, close in zip(timestamps, closes):
+              rows[datetime.fromtimestamp(ts, tz=timezone.utc).date().isoformat()] = close
+          if rows.get("2026-09-30") != 25.95:
+              raise SystemExit(f"2026-09-30 002001 close mismatch: {rows.get('2026-09-30')!r}")
+
+          calendar = (root / "szse_2026_holiday_schedule.html").read_text(
+              encoding="utf-8", errors="ignore"
+          )
+          calendar_ok = ("10月1日" in calendar and "10月7日" in calendar) or (
+              "2026-10-01" in calendar and "2026-10-07" in calendar
+          )
+          if not calendar_ok:
+              raise SystemExit("SZSE holiday page did not expose the expected Oct 1-Oct 7 closure anchors")
+
+          receipt = {
+              "pilot": "PILOT-02",
+              "case_id": "RC-CN-A-002001-20261007",
+              "cutoff_date": "2026-10-07",
+              "company": "浙江新和成股份有限公司",
+              "symbol": "002001",
+              "security_classification": "NON_FINANCIAL",
+              "research_weighting": {
+                  "cyclical": "0.70",
+                  "growth": "0.30",
+                  "financial_sector_inclusion": False,
+                  "classification": "USER_REQUESTED_RESEARCH_WEIGHTING_NOT_EVIDENCE"
+              },
+              "report_source_ref": "https://static.cninfo.com.cn/finalpage/2026-08-20/1225482495.PDF",
+              "report_sha256": sha(pdf),
+              "report_exact_bytes": True,
+              "price_source_ref": "https://query1.finance.yahoo.com/v8/finance/chart/002001.SZ?period1=1790726400&period2=1790812800&interval=1d&events=history&includeAdjustedClose=true",
+              "price_sha256": sha(root / "002001_20260930_yahoo.json"),
+              "price_exact_bytes": True,
+              "price": "25.95",
+              "latest_tradable_date": "2026-09-30",
+              "calendar_source_ref": "https://www.szse.cn/disclosure/notice/general/t20260917_617929.html",
+              "calendar_sha256": sha(root / "szse_2026_holiday_schedule.html"),
+              "calendar_exact_bytes": True,
+              "admission_rule": "known_at <= cutoff_date; current-to-historical substitution forbidden"
+          }
+          (Path("/tmp/pilot02-xhc/PILOT-02_RAW_EVIDENCE_RECEIPT.json")).write_text(
+              json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True),
+              encoding="utf-8",
+          )
+          print(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True))
+          PY
+
+      - name: Execute fresh-candidate IIOS E2E
+        run: |
+          PYTHONPATH=. python tools/pilot02_xinhecheng_e2e.py \
+            --report /tmp/pilot02-xhc/raw/xinhecheng_2026_h1.pdf \
+            --price /tmp/pilot02-xhc/raw/002001_20260930_yahoo.json \
+            --receipt /tmp/pilot02-xhc/PILOT-02_RAW_EVIDENCE_RECEIPT.json \
+            --out /tmp/pilot02-xhc/out
+
+      - name: Assert pilot result
+        run: |
+          python - <<'PY'
+          import json
+          from decimal import Decimal
+          p="/tmp/pilot02-xhc/out/PILOT-02_XINHECHENG_RESULT.json"
+          x=json.load(open(p,encoding="utf-8"))
+          assert x["company"]=="浙江新和成股份有限公司"
+          assert x["symbol"]=="002001"
+          assert x["cutoff_date"]=="2026-10-07"
+          assert x["latest_tradable_date"]=="2026-09-30"
+          assert x["current_price"]=="25.95"
+          assert x["security_classification"]=="NON_FINANCIAL"
+          assert x["research_weighting"]["cyclical"]=="0.70"
+          assert x["research_weighting"]["growth"]=="0.30"
+          assert x["decision"]["action"]=="REVIEW_REQUIRED"
+          assert x["decision"]["new_capital_allowed"] is False
+          assert x["decision"]["human_approval_required"] is True
+          assert x["decision"]["auto_execution"] is False
+          assert x["publication"]["qa_status"]=="PASS"
+          assert x["publication"]["report_deterministic_replay"] is True
+          assert x["lifecycle"]["decision_replay_status"]=="PASS"
+          assert Decimal(x["return_metrics"]["expected_annualized_return"]) > Decimal("0.15")
+          assert x["return_metrics"]["fundamental_target_pass"] is True
+          assert x["return_metrics"]["required_return_pass"] is True
+          assert x["return_metrics"]["risk_pass"] is True
+          print("PILOT-02_XINHECHENG_ACCEPTANCE_ASSERTIONS_OK")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iios-pilot02-xinhecheng-20261007
+          path: /tmp/pilot02-xhc/
+          retention-days: 14
+
+      - run: git diff --check
