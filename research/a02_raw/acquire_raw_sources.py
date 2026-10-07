@@ -117,6 +117,15 @@ def fetch_wayback_target() -> dict:
                     return {"status": "PASS", "timestamp": timestamp, "archive_url": archive_url, "size_bytes": len(data), "sha256": got, "bytes": data, "attempts": attempts}
             except Exception as exc:
                 _record_attempt(attempts, "WAYBACK", source_url=source_url, timestamp=timestamp, archive_url=archive_url, error=str(exc))
+    # Independent archive discovery: Internet Archive Availability API, Memento aggregator, then Arquivo.pt.
+    availability = fetch_availability_api(urls, attempts)
+    if availability.get("status") == "PASS":
+        availability["attempts"] = attempts
+        return availability
+    memento = fetch_memento_target(urls, attempts)
+    if memento.get("status") == "PASS":
+        memento["attempts"] = attempts
+        return memento
     # Arquivo.pt.
     arquivo = fetch_archive_pt_target(urls, attempts)
     if arquivo.get("status") == "PASS":
