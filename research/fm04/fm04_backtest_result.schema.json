@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/fm04-backtest-result-0.1.json",
+  "title": "IIOS M1.2 FM04 Conditional Backtest Result v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version","status","contract_id","research_epoch_id","confirmatory_eligible",
+    "input_bindings","summary","outer_selection_evaluations","conditional_performance"
+  ],
+  "properties": {
+    "schema_version": {"const":"IIOS-FM04-CONDITIONAL-BACKTEST-RESULT-0.1"},
+    "status": {"const":"PASS"},
+    "contract_id": {"type":"string"},
+    "research_epoch_id": {"type":"string"},
+    "confirmatory_eligible": {"const":false},
+    "input_bindings": {"type":"object","required":["state_snapshot_sha256","driver_history_git_blob_sha","outer_universe_lock_git_blob_sha"]},
+    "summary": {"type":"object","required":["outer_origins","outer_selection_unit_count","selected_count","no_selection_count","conditional_group_count","model_order"]},
+    "outer_selection_evaluations": {"type":"array","items":{"type":"object","required":["selection_id","driver_id","horizon","state_dimension","outer_origin_id","state_status","status"]}},
+    "conditional_performance": {"type":"array","items":{"type":"object","required":["driver_id","horizon","state_dimension","state_value","common_outer_sample_size","models"]}}
+  }
+}
