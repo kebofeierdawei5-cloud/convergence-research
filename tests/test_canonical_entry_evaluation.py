@@ -24,6 +24,7 @@ from tests.test_investment_core_v03 import (
     CURRENT_PRICE_REGISTRY,
     INDEPENDENT_FORECAST_REGISTRY,
     UPSTREAM_AUTHORITY_REGISTRY,
+    VALUATION_OUTPUT_RESOLVER,
     case,
 )
 
@@ -150,6 +151,7 @@ def test_decision_admission_downgrades_add_when_canonical_entry_rejects_price():
 def test_investment_core_formally_admits_buy_through_canonical_entry_evaluation():
     c = _decision_case(price="125")
     result = decide(
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
