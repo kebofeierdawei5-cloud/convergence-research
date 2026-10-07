@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### 2026-10-07 — M1.2-FM02 PIT Feature Builder / Forecastability Feature Contract
+
+- Added the frozen FM02 forecastability feature contract and output schema.
+- Added deterministic PIT feature construction for six forecastability features over the admitted CATL 22-quarter FM01 history.
+- Added explicit AVAILABLE / UNKNOWN semantics, record-level provenance, exact FM01 admission cardinality gates, frozen outer-origin lock checks, and fail-closed adversarial tests.
+- Final remote CI run #15 passed with 13 / 13 FM02 tests, generated snapshot schema validation, independent PIT provenance audit, compileall, and diff-check.
+- FM02 remains research-only and non-confirmatory; State Engine, Conditional Backtest, Model Selection, Production Router, current-price inputs, scheduler, and automatic execution remain out of scope.
+
 ### 2026-10-04 — B2 Data / Evidence / PIT Foundation
 
 - Added frozen Evidence Contract v0.1 and machine-readable Evidence Record schema.
