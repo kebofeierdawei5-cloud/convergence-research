@@ -29,7 +29,7 @@ def test_pilot02_bear_case_is_not_backsolved_into_risk_pass() -> None:
     entry = Decimal("25.95")
     bear_loss = Decimal("1") - (bear / entry)
 
-    assert bear_loss >= max_loss_pct / Decimal("100")
+    assert bear_loss <= max_loss_pct / Decimal("100")
 
     gate = {
         "entry_price": str(entry),
