@@ -854,3 +854,62 @@ Human observation remains pending:
 Human observations become PILOT-03 candidate findings only. No normative investment semantics are changed by this pilot.
 
 A02 / CSI800 remains non-blocking to Investment Core testing.
+
+
+## 15. PILOT-03 observed-friction remediation — 2026-10-07
+
+Status: **PASS / MERGED / CANONICAL**
+
+Scope:
+- PR #192
+- merge commit: `7bf304158116577a7676366a65e02c7caa87d499`
+- no Investment Core production semantic code changed
+- remediation limited to pilot CI hygiene and regression discipline
+
+Accepted findings:
+1. PILOT-02 duplicate execution was caused by the branch-specific `push` trigger in the pilot workflow. PILOT-03 removed that trigger; `pull_request` remains the canonical review path and `workflow_dispatch` remains available for explicit reruns.
+2. The initial Bear scenario exceeded the declared 25% maximum-loss boundary. PILOT-02 correctly failed the Risk gate; PILOT-03 added regression coverage for Bear/Risk input discipline without changing Risk semantics.
+3. The first canonical Decision Admission source mismatch was a test-harness provenance declaration defect. Existing canonical price binding correctly rejected it; no canonical binding rule was weakened.
+
+External endpoint instability remains non-canonical operational behavior:
+- Yahoo HTTP 429, alternative endpoint 502/connection reset were observed during acquisition;
+- the runtime remained fail-closed;
+- accepted PILOT-02 evidence was later captured and admitted from an exact Tencent historical K-line response.
+
+PILOT-03 independent acceptance:
+- Scope Check: PASS
+- compileall: PASS
+- targeted regression suite: PASS
+- git diff --check: PASS
+- canonical Trust precedence: preserved
+- canonical current-price provenance binding: preserved
+- Risk semantics: preserved
+- Human Approval boundary: preserved
+- automatic execution: remains disabled
+- scheduler / alerts: remain disabled
+- A02 / CSI800 remains non-blocking
+
+Targeted regression outcome:
+- 20 tests passed across:
+  - PILOT-02 Bear/Risk discipline
+  - canonical current-price binding
+  - Decision Kernel Trust / Quality precedence
+
+PILOT-03 does not modify the accepted PILOT-02 investment result. It only closes observed pilot-friction defects.
+
+Next canonical development boundary:
+
+**PILOT-04 — Independent Clean Replay**
+
+PILOT-04 must start from the clean canonical main and independently reproduce the accepted PILOT-02 result without relying on the diagnostic branch or its working tree, including:
+- exact candidate identity and cutoff;
+- admitted price/evidence provenance;
+- Decision;
+- Decision Revision;
+- Monitoring;
+- Validation;
+- lifecycle replay;
+- Machine Publication;
+- Human Report QA.
+
+Human usability observations from PILOT-01 / PILOT-02 remain separate operator evidence and cannot be inferred from automated regression.
