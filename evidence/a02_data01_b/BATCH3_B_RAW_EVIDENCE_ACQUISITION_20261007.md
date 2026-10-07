@@ -22,11 +22,19 @@ This record does not grant DATA-01-C, DATA-02, A02 admission, cross-security epo
 
 ## 2. Canonical baseline verified
 
-Canonical main at B3-01 start:
+Canonical `main` used for this adjudication:
+
+```text
+7aa4e333146ad29d3312a61e4c867b472e7a873f
+```
+
+The acquisition probe itself executed on a later canonical runtime head:
 
 ```text
 08adaf484fee64f5448fafcfa8346403abac98a5
 ```
+
+The distinction is intentional: the runtime head is evidence about an execution; it is **not** a replacement for the current-state authority of `main`.
 
 The canonical source tree already contains the independent B preflight, delivery manifest template, evidence-supply contract, source matrix, free-first materializer, and corresponding GitHub Actions workflow.
 
@@ -36,37 +44,96 @@ It additionally requires actual raw files, independently recomputed SHA-256, sou
 
 ## 3. Latest runtime evidence
 
-Latest canonical Batch-3 runtime probe recorded in the project state:
+Latest A02 Exact Raw Materialization runtime independently inspected for this B3-01 follow-up:
 
-- workflow run: 37595133874
-- artifact: 11469743020
-- artifact SHA-256: cffd3bcd18609d85b290875fe7c6b492994aae994c7d43efd9996075c68f3d49
+- workflow run: 37596399460
+- run number: 16
+- runtime head: 08adaf484fee64f5448fafcfa8346403abac98a5
+- artifact: 11471840025 / A02-exact-raw-37596399460
+- artifact ZIP SHA-256: 5cad0c1dc67af0638ad4723ffb3a359f49f37b6f83c02a6860e4aea1ac58d0b1
+- workflow conclusion: **failure / fail-closed**
 - B raw preflight: **BLOCKED**
-- exit code: 4
+- strict independent preflight exit code: 4
 
-The artifact did not contain DELIVERY_MANIFEST.json or a complete B_PIT_SECURITY_MASTER_RAW tree. This is consistent with the independent B preflight semantics and does not create admission evidence.
+The downloaded artifact contains:
 
-## 4. Acquisition-path inspection
+```text
+A02_RAW_MATERIALIZATION_RECEIPT.json
+A_CSI800_RAW/official_000906_current_20261004_000906cons.xls
+A_CSI800_RAW/official_000906_current_20261004_000906cons.xls.meta.json
+GITHUB_RUN_CONTEXT.txt
+SHA256_MANIFEST.txt
+```
+
+It contains **no** `DELIVERY_MANIFEST.json` and **no** `B_PIT_SECURITY_MASTER_RAW/` tree.
+
+Independent verification of the transport artifact showed that the substantive listed file hashes match their actual bytes. The manifest's self-hash entry is inherently non-self-consistent after final write and is treated only as a transport-manifest limitation, not as B evidence.
+
+The current `000906cons.xls` bytes are 169,984 bytes but have SHA-256:
+
+```text
+b3338f5f6fdfd04a72fb42f5444539507b50ee4805c83dabb04ec26e54c3b5fb
+```
+
+rather than the frozen historical target:
+
+```text
+f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984
+```
+
+Accordingly the A file is a **current snapshot**, not the historical A target.
+
+## 4. Independent B preflight result
+
+The canonical independent verifier was run against the downloaded runtime artifact using its own SHA-256 computation over the actual unpacked files.
+
+Result:
+
+```text
+RC=4
+status=BLOCKED
+admission_status=NOT_ADMISSION
+independent_from_collector=true
+missing_domains=
+  identity
+  listing_delisting
+  common_equity
+  st_history
+  industry_history
+  source_vintages
+finding:
+  missing DELIVERY_MANIFEST.json
+```
+
+This is a genuine raw-byte-to-verifier result, not a producer-declared PASS.
+
+## 5. Acquisition-path inspection
 
 ### Free-first materializer
 
-research/a02_b1b/materialize_free_pit.py was inspected. It can capture current SSE/SZSE stock lists, current risk-warning pages, the official CSI industry taxonomy definition, and optional Baostock secondary material. Its own admission matrix leaves the historical B fields blocked or conditional. It is therefore not a mechanism for manufacturing a PIT Security Master from current snapshots.
+`research/a02_b1b/materialize_free_pit.py` can capture current SSE/SZSE stock lists, current risk-warning pages, the official CSI industry taxonomy definition, and optional Baostock secondary material. Its own admission matrix leaves the historical B fields blocked or conditional.
+
+It is therefore not a mechanism for manufacturing a PIT Security Master from current snapshots.
 
 ### Older raw acquisition runner
 
-research/a02_raw/acquire_raw_sources.py was inspected. Its Tushare path can archive raw API responses, but the current implementation explicitly records B as conditional raw only / blocked provenance because static listing metadata and industry/member material do not by themselves close the historical known_at chain.
+`research/a02_raw/acquire_raw_sources.py` can archive raw API responses through the Tushare path, but the current implementation explicitly records B as conditional raw only / blocked provenance because static listing metadata and industry/member material do not by themselves close the historical known_at chain.
 
-Therefore a Tushare token alone does not automatically satisfy B3-01.
+Therefore a Tushare token alone does not satisfy B3-01.
 
 ### Persistent recovery policy
 
 The persistent A02 recovery playbook defines two valid operational routes: a network-enabled environment that preserves exact raw responses and provenance, or a data-owner/vendor export containing raw bytes plus source-vintage / known_at evidence.
 
-## 5. Current evidence inventory
+## 6. Current evidence inventory
 
-The canonical repository contains B-side diagnostic/adjudication records, source registries, and preflight machinery, but no complete B raw bundle. Persistent Library search likewise surfaced prior receipts, adjudications, and recovery documents, not a complete B raw delivery.
+The canonical repository contains B-side diagnostic/adjudication records, source registries, and preflight machinery, but no complete B raw bundle.
 
-## 6. Required B3-01 handoff object
+The latest A02 runtime artifact independently inspected also contains no B raw bundle.
+
+No checksum, pointer, prior receipt, or secondary reconstruction is promoted to substitute for the missing bytes.
+
+## 7. Required B3-01 handoff object
 
 The next material input must conform to the existing contract:
 
@@ -85,20 +152,20 @@ Every raw file must be bound to source_ref, source vintage / publication basis, 
 
 Where a vendor-PIT source is used, the delivery must preserve the query/export evidence needed to establish availability by the claimed cutoff. retrieved_at alone is insufficient.
 
-## 7. Negative decisions
+## 8. Negative decisions
 
-The following were deliberately not promoted to B raw evidence:
+The following remain explicitly non-admissible:
 
 - current stock lists;
 - current exchange classification pages;
 - current CSI taxonomy;
-- old Run #2 / Run #3 artifacts;
+- old runtime artifacts;
 - checksum or manifest declarations without corresponding bytes;
 - secondary reconstructions;
 - retrieved_at used as known_at;
 - source pointers without underlying bytes.
 
-## 8. Exit condition
+## 9. Exit condition
 
 B3-01 changes from BLOCKED only when an actual B raw bundle is physically supplied and can enter the canonical intake path.
 
@@ -128,8 +195,10 @@ Cross-security epoch  = LOCKED
 Model Selection       = LOCKED
 ```
 
-## 9. B3-01 conclusion
+## 10. B3-01 conclusion
 
 **B3-01 is correctly BLOCKED at the evidence-supply boundary.**
 
-The engineering side of the gate is ready. The remaining work is not another verifier or another declaration; it is the arrival of the actual historical B raw evidence package.
+The engineering side of the gate is ready. The remaining material dependency is the arrival of the actual historical B raw evidence package.
+
+The next engineering action can be performed autonomously: on receipt of the bundle, immediately run the existing independent preflight against the actual bytes. No additional verifier design is needed merely to advance the gate.
