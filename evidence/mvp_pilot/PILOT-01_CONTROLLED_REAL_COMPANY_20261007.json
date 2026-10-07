@@ -1,0 +1,81 @@
+{
+  "schema_version": "IIOS-MVP-PILOT-01-CONTROLLED-0.1",
+  "status": "TECHNICAL_PASS_HUMAN_OBSERVATION_PENDING",
+  "pilot": "PILOT-01",
+  "baseline_main": "a14e561b266fb288a696bb9c70d853a2e6e218f2",
+  "execution": {
+    "workflow": "IIOS MVP Pilot — Investment Core",
+    "run_id": 37605725511,
+    "run_number": 2,
+    "conclusion": "success",
+    "job_id": 112740590739,
+    "test_summary": {
+      "pytest": "57 passed",
+      "compileall": "PASS",
+      "diff_check": "PASS",
+      "catl_e2e": "PASS",
+      "kolun_e2e": "PASS",
+      "lifecycle_e2e": "PASS"
+    }
+  },
+  "cases": [
+    {
+      "case_id": "RC-CN-A-300750-20261004",
+      "company": "宁德时代",
+      "symbol": "300750",
+      "price": "291.11",
+      "decision": "REVIEW_REQUIRED",
+      "new_capital_allowed": false,
+      "quality_gate": "CONDITIONAL",
+      "trust": "REVALIDATION",
+      "expected_annualized_return": "0.142001125678525203923836280",
+      "required_return_pass": true,
+      "risk_pass": true,
+      "fundamental_target_pass": false,
+      "lifecycle_scope": "decision semantics + authority isolation + core E2E"
+    },
+    {
+      "case_id": "RC-CN-A-002422-20261004",
+      "company": "四川科伦药业股份有限公司",
+      "symbol": "002422",
+      "price": "40.85",
+      "decision": "REVIEW_REQUIRED",
+      "new_capital_allowed": false,
+      "quality_gate": "CONDITIONAL",
+      "primary_valuation_model": "SOTP",
+      "expected_annualized_return": "0.412484700122399020807833537",
+      "required_return_pass": true,
+      "risk_pass": true,
+      "lifecycle": {
+        "decision_revision": 1,
+        "trigger_state": "MATCHED",
+        "monitoring_evaluation_status": "VALID",
+        "validation_status": "PASS",
+        "decision_replay_status": "PASS"
+      },
+      "publication_report": {
+        "qa_status": "PASS",
+        "report_deterministic_replay": true,
+        "publication_hash": "9a02343e9cd69800193a01dffece436b8b294165f27ce5e0b3288cad76d269ad",
+        "qa_hash": "be0212534ee84c33d86f82c1e7a2877a85b3b2ae58534879b2aea6c6525e6931",
+        "report_hash": "a41e27fcc1d1a56bf6539be095e4f16f1cd8fbe942046a32d40243aeb71bbe04"
+      },
+      "authority_boundary": {
+        "human_approval_required": true,
+        "auto_execution": false,
+        "report_policy_effect": "REPORT_ONLY_PROJECTION",
+        "validation_policy_effect": "NO_DIRECT_DECISION_PRECEDENCE_CHANGE"
+      }
+    }
+  ],
+  "acceptance": {
+    "technical_chain": "PASS",
+    "gate_bypass": "NOT_OBSERVED",
+    "current_to_historical_substitution": "NOT_OBSERVED",
+    "llm_authority_escalation": "NOT_OBSERVED",
+    "automatic_execution": "ABSENT",
+    "human_observation": "PENDING",
+    "user_friction_capture": "PENDING"
+  },
+  "next_transition": "PILOT-01-HUMAN-OBSERVATION"
+}
