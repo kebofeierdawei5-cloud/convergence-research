@@ -1094,3 +1094,35 @@ promotion method         = Git Data tree → commit → ref
 ```
 
 This section is the canonical Current State Index amendment for the P0 LLM governance freeze.
+## B1-LCE — Canonical Research Orchestrator — 2026-10-07
+
+Status: **IMPLEMENTED / READY FOR CANONICAL MERGE**
+
+Parent canonical main: `de1fba8ccee403ce219455a35b12ea6fd712a0cb`
+Branch: `repair/b1-llm-canonical-orchestrator-20261007`
+
+B1-LCE establishes the first production control-plane boundary required by P0-LLM-001 through P0-LLM-004.
+
+Implemented:
+- `CanonicalResearchOrchestrator` run-envelope authority;
+- monotonic stage machine with fail-closed bypass rejection;
+- append-only stage receipts carrying input/output refs, hashes, producer type/version, cutoff and timestamps;
+- semantic-stage producer-type boundary;
+- exact-stage authorization for downstream engine invocation;
+- complete-run `IIOS-RUN-RECEIPT-0.1` construction;
+- `IIOS-LLM-SEMANTIC-ARTIFACT-0.1` common envelope schema;
+- regression coverage for stage bypass, semantic producer bypass, canonical completion and direct/non-canonical execution.
+
+This is a control-plane implementation only. It does not generate economic judgments and does not modify Investment Core v0.3 formulas, Trust/Quality/Decision semantics or automatic-execution boundaries.
+
+Local acceptance: **8 tests PASS / compileall PASS / JSON syntax PASS**.
+
+Dedicated remote workflow: `.github/workflows/iios_b1_llm_orchestrator.yml`.
+
+The existing lower-level Investment Core modules remain directly unit-testable, but product-declared canonical investment execution must be bound to the orchestrator. B2 will implement the actual LLM Semantic Workbench and semantic producer admission against admitted evidence.
+
+Next canonical gate:
+
+```text
+B2 — LLM Semantic Workbench + Semantic Producer Admission
+```
