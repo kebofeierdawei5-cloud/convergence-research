@@ -66,8 +66,14 @@ def main() -> int:
     assert run_current_audit(result_path, state_path), "BASELINE_AUDIT_DID_NOT_PASS"
 
     attacks = []
+    def populated_group_index(x):
+        for i, group in enumerate(x["conditional_performance"]):
+            if group.get("common_outer_sample_size", 0) > 0:
+                return i
+        raise AssertionError("NO_POPULATED_CONDITIONAL_GROUP")
     def tr01(x):
-        x["conditional_performance"][0]["models"]["SEASONAL_NAIVE"]["metrics"]["MAE"] += 1.0
+        i = populated_group_index(x)
+        x["conditional_performance"][i]["models"]["SEASONAL_NAIVE"]["metrics"]["MAE"] += 1.0
     attacks.append(require_rejection(
         "TR-01 mutate conditional_performance metric",
         result,
@@ -80,7 +86,7 @@ def main() -> int:
         result,
         state_path,
         Path("/tmp/fm04-redteam-tr02.json"),
-        lambda x: x["conditional_performance"].append(copy.deepcopy(x["conditional_performance"][0])),
+        lambda x: x["conditional_performance"].append(copy.deepcopy(x["conditional_performance"][populated_group_index(x)])),
     ))
     attacks.append(require_rejection(
         "TR-03 mutate driver history canonical binding",
@@ -101,7 +107,7 @@ def main() -> int:
         result,
         state_path,
         Path("/tmp/fm04-redteam-tr05.json"),
-        lambda x: x["conditional_performance"][0].__setitem__("state_value", "FORGED_STATE"),
+        lambda x: x["conditional_performance"][populated_group_index(x)].__setitem__("state_value", "FORGED_STATE"),
     ))
 
     # Independent static weakness check: a unit test contains a blanket exception
