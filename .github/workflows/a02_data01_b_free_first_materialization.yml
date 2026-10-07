@@ -49,15 +49,22 @@ jobs:
 
       - name: Build independent raw-byte manifest
         shell: bash
+        env:
+          A02_B_ROOT: ${{ runner.temp }}/a02_b1b
         run: |
           python - <<'PY'
           from pathlib import Path
           import hashlib
-          root = Path("$RUNNER_TEMP/a02_b1b")
+          import os
+
+          root = Path(os.environ["A02_B_ROOT"]).resolve()
+          root.mkdir(parents=True, exist_ok=True)
           out = []
-          for p in sorted(x for x in root.rglob("*") if x.is_file()):
+          for p in sorted(x for x in root.rglob("*") if x.is_file() and x.name != "SHA256_MANIFEST.txt"):
               out.append(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.relative_to(root)}")
           (root / "SHA256_MANIFEST.txt").write_text("\n".join(out) + "\n", encoding="utf-8")
+          print(f"manifest_root={root}")
+          print(f"manifest_entries={len(out)}")
           PY
 
       - name: Upload B raw evidence and receipt
