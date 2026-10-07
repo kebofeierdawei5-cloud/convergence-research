@@ -427,9 +427,15 @@ Development rule: prioritize actual historical raw evidence supply and B free-fi
 
 ## 9. Next canonical development boundary
 
-FM01 data admission, FM02 feature construction, FM03 state construction, FM04 conditional backtest, FM05 scope / estimand / sufficiency freeze, and FM07 research-epoch amendment gate are complete. The next boundary is **design of a new M1.2 research epoch**, subject to explicit scope / estimand / sufficiency freeze before execution:
+The original Investment Core is already implemented through the C8 independent red-team acceptance. The immediate development objective is now **MVP real-user pilot testing**, not additional research infrastructure.
 
-**The current epoch is closed to same-epoch amendment. No new epoch is opened automatically.**
+The next boundary is:
+
+**PILOT-00 → PILOT-01 → PILOT-02 → PILOT-03 → PILOT-04 → MVP Pilot Acceptance**
+
+The M1.2 cross-sectional research epoch remains a separate proposed Research Track capability. A02 / CSI800 historical-universe evidence is **not an Investment Core dependency** and must not block company-level MVP testing.
+
+The current FM research epoch remains closed to same-epoch amendment. The proposed cross-sectional successor epoch is not activated until its own scope, estimand, sufficiency, PIT/provenance, purity and owner-approval gates are satisfied.
 
 ### M1.2-FM02 canonical acceptance
 
@@ -706,3 +712,30 @@ no bytes → no hash admission
 no known_at evidence → no PIT admission
 no complete B bundle → no DATA-01-C
 ```
+
+## 12. MVP Fast Launch status — 2026-10-07
+
+Canonical launch plan:
+
+docs/iios/IIOS_MVP_FAST_LAUNCH_PLAN_v0.1.md
+
+Decision:
+
+Investment Core = LIVE TESTING
+Research Track A02 / CSI800 = NON-BLOCKING
+
+Immediate sequence:
+
+PILOT-00 Baseline / Test Protocol
+→ PILOT-01 CATL + 科伦 controlled pilot
+→ PILOT-02 fresh user-selected candidate
+→ PILOT-03 observed-friction remediation
+→ PILOT-04 independent replay
+→ MVP Pilot Acceptance
+
+The pilot starts from the already accepted company-level Investment Core and does not require CSI800 membership or A02 evidence.
+
+Human intervention is required only for the fresh real-company pilot inputs: actual candidate-specific evidence, research cutoff/as-of, price/valuation evidence, and relevant portfolio constraints.
+
+Hard stop conditions remain unchanged: any P0 authority/PIT/provenance/semantic bypass, human-approval bypass, current-to-historical substitution, publication/report mutation of canonical state, or non-reproducible lifecycle replay blocks pilot continuation.
+
