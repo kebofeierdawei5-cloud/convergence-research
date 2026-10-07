@@ -1,0 +1,74 @@
+{
+  "schema_version": "IIOS-A02-DATA01-B-RUN2-INDEPENDENT-ADJUDICATION-0.1",
+  "workflow_run_id": 37593042893,
+  "run_number": 2,
+  "head_sha": "6e8fc8ef9639c486daae33aa74bb64b86366c4dc",
+  "job_id": 112698887788,
+  "artifact_id": 11469004605,
+  "artifact_name": "A02-data01-b-free-first-37593042893",
+  "github_artifact_digest": "sha256:dabc25996524f03e8c533e33bd7921ed5c03e85a4b72edbf1b3a15589c4b17ec",
+  "independent_artifact_sha256": "dabc25996524f03e8c533e33bd7921ed5c03e85a4b72edbf1b3a15589c4b17ec",
+  "artifact_integrity": "PASS",
+  "artifact_members": 9,
+  "manifest_entries": 8,
+  "manifest_verified": 8,
+  "manifest_errors": [],
+  "sources": {
+    "sse_stock_list": {
+      "http_status": 200,
+      "size_bytes": 1208363,
+      "sha256": "c0cd0fd645a812ae00a74e7220927752a13879644c9045f1c2e563f865e3a520",
+      "role": "CURRENT_SNAPSHOT_ONLY",
+      "observed_records": 1604
+    },
+    "szse_stock_list": {
+      "http_status": 200,
+      "size_bytes": 545039,
+      "sha256": "b1a32b524c78be0aa021a1938cd9f6b683ce7076ce88ccfc1b86b17e2f162a53",
+      "role": "CURRENT_SNAPSHOT_ONLY",
+      "observed_rows": 2904
+    },
+    "sse_risk_plate": {
+      "http_status": 200,
+      "size_bytes": 29212,
+      "sha256": "81132b24e328e70a451f9bc0594ce19aea965caf24ca2eadf72fb7b03bae4642",
+      "role": "CURRENT_SNAPSHOT_ONLY"
+    },
+    "szse_company_notice": {
+      "http_status": 200,
+      "size_bytes": 93029,
+      "sha256": "7f4e72e22edcb285b2f464c61ef220a9e303331826444ea0cb02e8af60c5e93a",
+      "role": "CURRENT_PUBLIC_PAGE_ONLY"
+    },
+    "csi_industry_standard": {
+      "http_status": 200,
+      "size_bytes": 192674,
+      "sha256": "86ff0b57bfa1b5c419fcdd3a1ee0d32fd9b168c51da11ce092854ca3d8650aa3",
+      "role": "STANDARD_DEFINITION_ONLY",
+      "known_at": null
+    },
+    "baostock": {
+      "status": "BLOCKED",
+      "error": "baostock login failed: 10002007 网络接收错误。",
+      "admitted": false
+    }
+  },
+  "pit_adjudication": {
+    "identity": "BLOCKED",
+    "listing_delisting": "BLOCKED_FOR_PIT",
+    "common_equity": "BLOCKED_FOR_PIT",
+    "ST_status": "BLOCKED",
+    "CSI_industry_definition": "PASS_FOR_STANDARD_DEFINITION",
+    "CSI_industry_security_history": "BLOCKED"
+  },
+  "overall": "BLOCKED",
+  "provenance_finding": {
+    "severity": "P1_GOVERNANCE_INCONSISTENCY",
+    "detail": "The emitted B1B_FIELD_ADMISSION_MATRIX claims free secondary effective dates were materialized for listing/delisting, but the artifact contains only a blocked Baostock receipt and no secondary data files.",
+    "action": "Corrected admission-matrix reasons in the canonical materializer; overall admission remains BLOCKED."
+  },
+  "locked_boundaries": {
+    "confirmatory_model_selection": "LOCKED",
+    "cross_security_successor_epoch": "LOCKED"
+  }
+}

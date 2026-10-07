@@ -400,4 +400,19 @@ A02 B-01 Free-First Source Registry = **PASS / MERGED / CANONICAL — ADMISSION 
 - current unresolved domains: `st_history`, `industry_history`, `source_vintages`;
 - no historical PIT admission is claimed from current official pages alone.
 
-Next technical boundary: materialize and independently verify the missing historical PIT evidence; do not activate the proposed successor forecast epoch before A02 admission is complete.
+### DATA-01-B Run #2
+
+- workflow run: `37593042893`;
+- head SHA: `6e8fc8ef9639c486daae33aa74bb64b86366c4dc`;
+- artifact: `11469004605`;
+- GitHub artifact digest = independent ZIP SHA-256: `dabc25996524f03e8c533e33bd7921ed5c03e85a4b72edbf1b3a15589c4b17ec`;
+- independent manifest verification: **8/8 PASS**;
+- exact current official bytes: SSE / SZSE stock lists, SSE risk plate, SZSE company notice, CSI taxonomy definition;
+- Baostock secondary materialization: **BLOCKED** at login;
+- PIT sufficiency: **BLOCKED**;
+- identity / listing-delisting / common-equity / ST historical known_at: **not admitted**;
+- CSI security-level historical industry assignments: **not materialized**.
+
+A run-2 provenance inconsistency in the emitted admission matrix was identified and corrected in the canonical materializer. No admission boundary was relaxed.
+
+Next technical boundary: obtain reproducible historical PIT carrier evidence with source-vintage / known_at; do not activate the proposed successor forecast epoch before A02 admission is complete.
