@@ -24,6 +24,7 @@ from tests.test_investment_core_v03 import (
     CURRENT_PRICE_REGISTRY,
     INDEPENDENT_FORECAST_REGISTRY,
     UPSTREAM_AUTHORITY_REGISTRY,
+    VALUATION_OUTPUT_RESOLVER,
     case,
 )
 
@@ -154,6 +155,7 @@ def test_investment_core_formally_admits_buy_through_canonical_entry_evaluation(
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "BUY"
@@ -176,6 +178,7 @@ def test_investment_core_formally_admits_add_through_canonical_entry_evaluation(
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
     )
     assert result["decision"]["action"] == "ADD"
@@ -295,6 +298,7 @@ def test_canonical_entry_evaluation_supports_explicit_legacy_p2_compatibility():
         market_expectation_id=c["expectation_gap"]["market_expectation_id"],
         independent_forecast_ref=c["expectation_gap"]["independent_forecast_ref"],
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     evaluation = build_canonical_entry_evaluation(
         current_price="100",
