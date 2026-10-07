@@ -294,8 +294,6 @@ def comparison_state(feature_id: str, current: dict[str, Any], prior: dict[str, 
     if current["status"] != "AVAILABLE" or (prior is not None and prior["status"] != "AVAILABLE"):
         reason = "NO_PRIOR_FROZEN_ORIGIN" if prior is None else "SOURCE_FEATURE_UNKNOWN"
         feature_ids = [feature_id]
-        if prior is not None:
-            feature_ids.append(feature_id)
         return _state_unknown(reason), feature_ids
     value = current["value"]
     previous = prior["value"]
