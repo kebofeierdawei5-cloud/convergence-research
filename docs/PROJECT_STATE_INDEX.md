@@ -252,7 +252,7 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 ## 8. Current canonical authority-hardening state
 
-The post-C8 authority-hardening sequence is now complete through B04-B:
+The post-C8 authority-hardening sequence is complete through the independent re-audit:
 
 ```
 B00 = PASS / MERGED / CANONICAL
@@ -262,6 +262,8 @@ B02 Canonical Investment Admission = PASS / MERGED / CANONICAL
 B03-B Canonical Upstream Authority Mandatory = PASS / MERGED / CANONICAL
    ↓
 B04-B Forecast → Valuation → Return Lineage Mandatory = PASS / MERGED / CANONICAL
+   ↓
+Post-B04 Independent Authority Re-audit = PASS / GOVERNANCE-ADJUDICATED
 ```
 
 ### B02 — Canonical Investment Admission
@@ -281,46 +283,76 @@ B04-B Forecast → Valuation → Return Lineage Mandatory = PASS / MERGED / CANO
 Status: **PASS / MERGED / CANONICAL**
 
 - PR #129;
-- exact PR head accepted by dedicated CI: `581ad3d4c833e02d362a4f2eda36c161de027869`;
-- merge commit / current canonical main: `d9712c3f48fd71dfec348aca18fdf6b0fd1559a6`;
-- dedicated B04-B workflow run #29 = SUCCESS;
-- Investment Core CI run #746 = SUCCESS;
-- B00-B threat reproduction run #74 = SUCCESS;
-- B03-B authority run #54 = SUCCESS;
-- B04 lineage run #60 = SUCCESS;
-- C3 run #89 = SUCCESS;
-- C4 run #87 = SUCCESS;
-- C5 run #75 = SUCCESS;
-- C8 run #89 = SUCCESS.
+- merge commit: `d9712c3f48fd71dfec348aca18fdf6b0fd1559a6`;
+- dedicated B04-B workflow #29 = SUCCESS;
+- Investment Core #746, B00-B #74, B03-B #54, B04 #60, C3 #89, C4 #87, C5 #75 and C8 #89 = SUCCESS on the exact B04-B branch head.
 
 B04-B enforces:
-
 - exact Return lineage version `IIOS-FORECAST-VALUATION-RETURN-LINEAGE-0.1`;
 - canonical Forecast reference;
 - canonical Valuation reference resolved through the trusted resolver;
-- Return Gate scenario probabilities / terminal values / cash distributions bound to the canonical Valuation output;
-- Return Gate current entry price bound to the canonical current-price observation;
-- missing, legacy, substituted, or divergent lineage is fail-closed.
+- Return Gate scenario equality against canonical Valuation output;
+- Return Gate current entry-price equality against the canonical current-price observation;
+- fail-closed handling of missing, legacy, substituted or divergent lineage.
 
-The historical P0-02 attack is therefore closed on the enforced Decision path.
+The B00-B P0-02 attack is closed on the enforced Decision path.
+
+### PR #131 — Post-B04-B authority regression hardening
+
+Status: **PASS / MERGED / CANONICAL TEST HARDENING**
+
+- merge commit: `268852d754ab2385d9a96a10309a782978eb25af`;
+- test-only changes;
+- adds resolver-propagation spying at the engine boundary;
+- hardens the P0-02 regression by explicitly forging the canonical Valuation admission hash.
+
+No production Decision semantics changed.
+
+### Post-B04 Independent Authority Re-audit
+
+Status: **PASS / GOVERNANCE-ADJUDICATED**
+
+- diagnostic PR #133;
+- audit target: canonical `main` `268852d754ab2385d9a96a10309a782978eb25af`;
+- exact audit head: `a080caebe3e6fa08d3716511128db674a6e8d7f1`;
+- audit acceptance run #5 = SUCCESS;
+- 7 / 7 fresh audit tests passed;
+- compileall = PASS;
+- git diff --check = PASS;
+- governance verdict: no authority bypass reproduced in the tested post-B04 chain.
+
+Fresh attack classes tested:
+- valid alternate Forecast substitution;
+- valid alternate Valuation substitution;
+- valid cross-domain upstream reference;
+- missing mandatory Valuation resolver at direct Decision runtime;
+- missing mandatory Valuation resolver during v0.3 replay;
+- immutable canonical Forecast same-ID conflicting bytes.
+
+The persisted snapshot / re-execution distinction was also verified: replay returns `FAIL` when the mandatory resolver is absent, while the original snapshot remains integrity-valid.
+
+Acceptance record:
+`docs/iios/POST_B04_INDEPENDENT_REAUDIT_2026-10-07.md`.
 
 ### Independent regression track
 
-RP-01 Risk / Portfolio workflow run #86 remains a separate legacy fixture failure (`str.read`) and was not modified by B04-B. It is not B04-B acceptance evidence and does not change the authority-hardening result above.
-
-Post-merge verification confirms that `main` is exactly `d9712c3f48fd71dfec348aca18fdf6b0fd1559a6`. No additional canonical-main workflow run was emitted by the repository's current PR-oriented workflows after the merge; acceptance therefore rests on the exact PR-head CI plus the verified merge SHA.
+RP-01 remains a separate legacy fixture failure (`str.read`) and is not authority-hardening acceptance evidence.
 
 ## 9. Next canonical development boundary
 
-B02, B03-B and B04-B are now canonical. No new capability should be inferred automatically from their completion.
+The post-B04 authority chain is now governance-adjudicated PASS.
 
-The next boundary is:
+The next engineering boundary is:
 
-**Post-B04 independent red-team / governance re-audit of the canonical `main` authority chain.**
+**M1.2-FM00 — Git Baseline / Frozen Reference Establishment**
 
-This is a verification/adjudication gate, not a new investment capability.
+Then proceed to:
 
-**FM-02 remains explicitly out of scope until that governance boundary is separately accepted.**
+**FM-01 — exact CATL M1.1 source snapshot**
+
+FM-02 Forecast Model Selection / research-model productionization remains blocked by its own M1.2 governance, partitioning, capability-access and sealed-manifest requirements.
+
+This boundary is a development-governance transition, not permission to bypass M1.2 controls.
 
 The Investment Core remains single-company and PIT-bound. No scheduler, alerts, automatic execution, full-market screening, optimizer/Kelly logic, or new forecast/valuation model family is authorized by this state.
 

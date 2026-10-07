@@ -10,28 +10,31 @@ This file is a concise human-readable summary. When it conflicts with the Curren
 
 ## Current stage
 
-**Current canonical authority-hardening status: B04-B Mandatory Forecast → Valuation → Return Lineage = PASS / MERGED / CANONICAL**
+**Current canonical authority-hardening status: Post-B04 Independent Authority Re-audit = PASS / GOVERNANCE-ADJUDICATED**
 
-C8 and all prior Stage C productization milestones remain canonical. Post-C8 authority hardening is now complete through:
+C8 and all prior Stage C productization milestones remain canonical.
+
+Authority hardening is now complete through:
 
 ```
-B02 → B03-B → B04-B
+B02 → B03-B → B04-B → independent post-B04 re-audit
 ```
 
-Current canonical `main`:
-`d9712c3f48fd71dfec348aca18fdf6b0fd1559a6`
+Canonical main at this governance checkpoint:
+`77b0aa24922cab5d0424de6a62fdff1b58cf918c`
 
-B04-B exact-head acceptance:
-- PR #129;
-- exact accepted head `581ad3d4c833e02d362a4f2eda36c161de027869`;
-- dedicated B04-B workflow #29 = SUCCESS;
-- B00-B #74, B03-B #54, Investment Core #746, B04 #60, C3 #89, C4 #87, C5 #75 and C8 #89 = SUCCESS on the same branch head.
+Independent audit:
+- target main before audit: `268852d754ab2385d9a96a10309a782978eb25af`;
+- audit workflow #5 = SUCCESS;
+- 7/7 fresh authority attack tests passed;
+- no production Decision semantics were changed by the audit;
+- governance verdict: PASS.
 
-**Next boundary: explicit post-B04 independent red-team / governance re-audit.**
+**Next boundary: M1.2-FM00 Git Baseline / Frozen Reference Establishment, then FM-01.**
 
-RP-01 remains a separate legacy fixture regression and is not B04-B acceptance evidence.
+FM-02 remains explicitly gated by M1.2 governance, data partitioning and sealed-manifest controls.
 
-No FM-02 implementation, new model family, scheduler/alerts, automatic execution, full-market screening, or portfolio optimizer is authorized by this state.
+RP-01 remains a separate legacy fixture regression and is not authority-hardening acceptance evidence.
 
 
 ## Canonical Investment Core
