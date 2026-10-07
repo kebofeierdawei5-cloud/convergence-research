@@ -119,6 +119,8 @@ def validate_inputs(
         raise FM02FeatureError("FM01_RECORD_COUNT_MISMATCH")
     if manifest.get("data_status", {}).get("quarterly_coverage_verified") != 22:
         raise FM02FeatureError("FM01_QUARTER_COVERAGE_MISMATCH")
+    if len(records) != accepted.get("records"):
+        raise FM02FeatureError("FM01_DATASET_RECORD_COUNT_MISMATCH")
 
     expected_security = set(contract["input_contract"]["required_security_ids"])
     expected_drivers = set(contract["input_contract"]["required_drivers"])
