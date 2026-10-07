@@ -192,6 +192,17 @@ class FM02FeatureBuilderTests(unittest.TestCase):
         ):
             self.build()
 
+    def test_extra_admitted_record_is_rejected(self):
+        mutated = copy.deepcopy(self.records)
+        extra = copy.deepcopy(self.records[0])
+        extra["record_id"] = "DSR-FM02-EXTRA-RECORD"
+        extra["period"] = "2026Q2"
+        mutated.append(extra)
+        with self.assertRaisesRegex(
+            FM02FeatureError, "FM01_DATASET_RECORD_COUNT_MISMATCH"
+        ):
+            self.build(mutated)
+
     def test_outer_origin_lock_must_remain_frozen_and_exact(self):
         outer = copy.deepcopy(self.outer_lock)
         outer["status"] = "DRAFT"
