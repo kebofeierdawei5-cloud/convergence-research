@@ -1,0 +1,126 @@
+{
+  "schema_version": "IIOS-M1.2-NEW-EPOCH-DESIGN-PROPOSAL-0.1",
+  "proposal_id": "EPD-M12-20261007-001",
+  "version": "0.1.0",
+  "status": "PROPOSED",
+  "current_epoch_id": "RE-M12-EXP-CATL-20260930",
+  "current_epoch_action": "CLOSE_AND_PRESERVE",
+  "proposed_epoch_id": "RE-M12-EXP2-CROSSSECTIONAL-20261007",
+  "activation_authorized": false,
+  "design_question": "How should the next research epoch improve sample sufficiency without weakening the preregistered selection threshold or using FM04 outcomes for same-epoch tuning?",
+  "observed_boundary": {
+    "source_contract_id": "FC-M12-FM05-CATL-001",
+    "outer_selection_units": 406,
+    "selected": 0,
+    "outer_evaluated": 0,
+    "no_selection": 406,
+    "structural_groups": 79,
+    "empirical_groups": 0,
+    "diagnosis": "INSUFFICIENT_FOR_STATE_CONDITIONED_SELECTION"
+  },
+  "candidate_amendments": [
+    {
+      "id": "CROSS_SECTIONAL_UNIVERSE_EXPANSION",
+      "status": "RECOMMENDED",
+      "preserves_selection_threshold": true,
+      "requires_a02_pit_admission": true,
+      "reason": "Adds independent security-level outer observations while preserving the core state-conditioned estimand and N>=3 threshold.",
+      "requires_semantic_redefinition": false,
+      "requires_new_exact_pit_source": false,
+      "requires_stronger_justification": false
+    },
+    {
+      "id": "LONGER_HISTORY_EXPANSION",
+      "status": "SECONDARY",
+      "preserves_selection_threshold": true,
+      "requires_new_exact_pit_source": true,
+      "reason": "Can increase temporal origin count, but usefulness depends on exact historical driver availability and revision-quality evidence.",
+      "requires_a02_pit_admission": false,
+      "requires_semantic_redefinition": false,
+      "requires_stronger_justification": false
+    },
+    {
+      "id": "STATE_REGROUPING",
+      "status": "DEFERRED",
+      "preserves_selection_threshold": false,
+      "requires_semantic_redefinition": true,
+      "reason": "Changes the conditioning structure and should not be the first response to sparsity.",
+      "requires_a02_pit_admission": false,
+      "requires_new_exact_pit_source": false,
+      "requires_stronger_justification": false
+    },
+    {
+      "id": "THRESHOLD_RELAXATION",
+      "status": "REJECTED_FOR_NEXT_EPOCH_DEFAULT",
+      "preserves_selection_threshold": false,
+      "requires_stronger_justification": true,
+      "reason": "Directly trades statistical sufficiency for weaker minimum evidence and risks overfitting the observed sparsity boundary.",
+      "requires_a02_pit_admission": false,
+      "requires_semantic_redefinition": false,
+      "requires_new_exact_pit_source": false
+    }
+  ],
+  "recommended_design": {
+    "strategy": "CROSS_SECTIONAL_UNIVERSE_EXPANSION_WITH_THRESHOLD_PRESERVATION",
+    "security_universe_source": "A02 PIT-admitted universe only",
+    "drivers": [
+      "REVENUE",
+      "NET_PROFIT"
+    ],
+    "horizons": [
+      "3M",
+      "6M",
+      "12M"
+    ],
+    "state_dimensions": [
+      "DIRECTION",
+      "MOMENTUM",
+      "VOLATILITY",
+      "SEASONALITY",
+      "MEAN_REVERSION_PRESSURE",
+      "STRUCTURAL_STABILITY",
+      "DATA_QUALITY"
+    ],
+    "model_instances": [
+      "SEASONAL_NAIVE",
+      "PERSISTENCE_YOY",
+      "TREND_LOG_LINEAR_8Q",
+      "MEAN_REVERSION_YOY_8"
+    ],
+    "min_common_inner_observations": 3,
+    "primary_metric": "MAE",
+    "secondary_metrics": [
+      "RMSE",
+      "sMAPE"
+    ],
+    "same_epoch_result_reuse_for_tuning": false
+  },
+  "hard_entry_gates": [
+    "A02 PASS with exact historical/raw admission and independent replay",
+    "new research epoch scope frozen before execution",
+    "new research epoch estimand frozen before execution",
+    "sufficiency policy frozen before execution",
+    "PIT and provenance bindings recomputed for expanded universe",
+    "evaluation purity boundary frozen and independent of prior FM04 results",
+    "owner approval explicitly recorded"
+  ],
+  "current_blocker": {
+    "id": "A02_DATA_ADMISSION",
+    "status": "BLOCKED",
+    "evidence_doc": "docs/iios/A02_BATCH1_EXECUTION_2026-10-04.md",
+    "evidence_doc_git_blob_sha": "2b2297a62d2a9dbdd14abdf815f9e8d796282580",
+    "exact_historical_csi800_sha256": "f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984",
+    "statement": "The exact historical CSI800 membership bytes and complete PIT Security Eligibility evidence chain are not yet admitted; current snapshots cannot substitute for the frozen historical target."
+  },
+  "capability_boundary": {
+    "proposal_only": true,
+    "activates_new_epoch": false,
+    "changes_current_epoch": false,
+    "changes_current_estimand": false,
+    "changes_current_threshold": false,
+    "model_selection": false,
+    "production_router": false,
+    "automatic_execution": false,
+    "investment_decision": false
+  }
+}

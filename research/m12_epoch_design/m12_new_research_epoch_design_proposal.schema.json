@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/m12-new-epoch-design-proposal-0.1.json",
+  "title": "IIOS M1.2 New Research Epoch Design Proposal v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "proposal_id",
+    "version",
+    "status",
+    "current_epoch_id",
+    "current_epoch_action",
+    "proposed_epoch_id",
+    "activation_authorized",
+    "design_question",
+    "observed_boundary",
+    "candidate_amendments",
+    "recommended_design",
+    "hard_entry_gates",
+    "current_blocker",
+    "capability_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "IIOS-M1.2-NEW-EPOCH-DESIGN-PROPOSAL-0.1"
+    },
+    "proposal_id": {
+      "const": "EPD-M12-20261007-001"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "PROPOSED"
+    },
+    "current_epoch_id": {
+      "const": "RE-M12-EXP-CATL-20260930"
+    },
+    "current_epoch_action": {
+      "const": "CLOSE_AND_PRESERVE"
+    },
+    "proposed_epoch_id": {
+      "type": "string",
+      "pattern": "^RE-M12-EXP2-"
+    },
+    "activation_authorized": {
+      "const": false
+    },
+    "design_question": {
+      "type": "string"
+    },
+    "observed_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_contract_id",
+        "outer_selection_units",
+        "selected",
+        "outer_evaluated",
+        "no_selection",
+        "structural_groups",
+        "empirical_groups",
+        "diagnosis"
+      ],
+      "properties": {
+        "source_contract_id": {
+          "const": "FC-M12-FM05-CATL-001"
+        },
+        "outer_selection_units": {
+          "const": 406
+        },
+        "selected": {
+          "const": 0
+        },
+        "outer_evaluated": {
+          "const": 0
+        },
+        "no_selection": {
+          "const": 406
+        },
+        "structural_groups": {
+          "const": 79
+        },
+        "empirical_groups": {
+          "const": 0
+        },
+        "diagnosis": {
+          "const": "INSUFFICIENT_FOR_STATE_CONDITIONED_SELECTION"
+        }
+      }
+    },
+    "candidate_amendments": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "status",
+          "preserves_selection_threshold",
+          "requires_a02_pit_admission",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "preserves_selection_threshold": {
+            "type": "boolean"
+          },
+          "requires_a02_pit_admission": {
+            "type": "boolean"
+          },
+          "requires_semantic_redefinition": {
+            "type": "boolean"
+          },
+          "requires_new_exact_pit_source": {
+            "type": "boolean"
+          },
+          "requires_stronger_justification": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "recommended_design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "security_universe_source",
+        "drivers",
+        "horizons",
+        "state_dimensions",
+        "model_instances",
+        "min_common_inner_observations",
+        "primary_metric",
+        "secondary_metrics",
+        "same_epoch_result_reuse_for_tuning"
+      ],
+      "properties": {
+        "strategy": {
+          "const": "CROSS_SECTIONAL_UNIVERSE_EXPANSION_WITH_THRESHOLD_PRESERVATION"
+        },
+        "security_universe_source": {
+          "const": "A02 PIT-admitted universe only"
+        },
+        "drivers": {
+          "const": [
+            "REVENUE",
+            "NET_PROFIT"
+          ]
+        },
+        "horizons": {
+          "const": [
+            "3M",
+            "6M",
+            "12M"
+          ]
+        },
+        "state_dimensions": {
+          "const": [
+            "DIRECTION",
+            "MOMENTUM",
+            "VOLATILITY",
+            "SEASONALITY",
+            "MEAN_REVERSION_PRESSURE",
+            "STRUCTURAL_STABILITY",
+            "DATA_QUALITY"
+          ]
+        },
+        "model_instances": {
+          "const": [
+            "SEASONAL_NAIVE",
+            "PERSISTENCE_YOY",
+            "TREND_LOG_LINEAR_8Q",
+            "MEAN_REVERSION_YOY_8"
+          ]
+        },
+        "min_common_inner_observations": {
+          "const": 3
+        },
+        "primary_metric": {
+          "const": "MAE"
+        },
+        "secondary_metrics": {
+          "const": [
+            "RMSE",
+            "sMAPE"
+          ]
+        },
+        "same_epoch_result_reuse_for_tuning": {
+          "const": false
+        }
+      }
+    },
+    "hard_entry_gates": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "type": "string"
+      }
+    },
+    "current_blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "evidence_doc",
+        "evidence_doc_git_blob_sha",
+        "exact_historical_csi800_sha256",
+        "statement"
+      ],
+      "properties": {
+        "id": {
+          "const": "A02_DATA_ADMISSION"
+        },
+        "status": {
+          "const": "BLOCKED"
+        },
+        "evidence_doc": {
+          "const": "docs/iios/A02_BATCH1_EXECUTION_2026-10-04.md"
+        },
+        "evidence_doc_git_blob_sha": {
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "exact_historical_csi800_sha256": {
+          "const": "f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984"
+        },
+        "statement": {
+          "type": "string"
+        }
+      }
+    },
+    "capability_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal_only",
+        "activates_new_epoch",
+        "changes_current_epoch",
+        "changes_current_estimand",
+        "changes_current_threshold",
+        "model_selection",
+        "production_router",
+        "automatic_execution",
+        "investment_decision"
+      ],
+      "properties": {
+        "proposal_only": {
+          "const": true
+        },
+        "activates_new_epoch": {
+          "const": false
+        },
+        "changes_current_epoch": {
+          "const": false
+        },
+        "changes_current_estimand": {
+          "const": false
+        },
+        "changes_current_threshold": {
+          "const": false
+        },
+        "model_selection": {
+          "const": false
+        },
+        "production_router": {
+          "const": false
+        },
+        "automatic_execution": {
+          "const": false
+        },
+        "investment_decision": {
+          "const": false
+        }
+      }
+    }
+  }
+}
