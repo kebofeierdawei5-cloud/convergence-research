@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/fm04-result-manifest-0.1.json",
+  "title": "IIOS M1.2 FM04 Result Manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version","result_schema_version","result_sha256","code_commit_sha",
+    "workflow_run_id","workflow_name","repository","ref","python_version","input_bindings"
+  ],
+  "properties": {
+    "schema_version": {"const":"IIOS-FM04-RESULT-MANIFEST-0.1"},
+    "result_schema_version": {"const":"IIOS-FM04-CONDITIONAL-BACKTEST-RESULT-0.2"},
+    "result_sha256": {"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "code_commit_sha": {"type":"string","pattern":"^[0-9a-f]{40}$"},
+    "workflow_run_id": {"type":["string","null"]},
+    "workflow_name": {"type":["string","null"]},
+    "repository": {"type":["string","null"]},
+    "ref": {"type":["string","null"]},
+    "python_version": {"type":"string"},
+    "input_bindings": {"type":"object"}
+  }
+}

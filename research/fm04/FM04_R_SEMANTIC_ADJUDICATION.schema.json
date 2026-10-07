@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/fm04-r-semantic-adjudication-0.1.json",
+  "title": "IIOS FM04-R Semantic Adjudication v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "version",
+    "status",
+    "applies_to_contract_id",
+    "state_interpretation",
+    "model_identity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "IIOS-FM04-R-SEMANTIC-ADJUDICATION-0.1"
+    },
+    "policy_id": {
+      "type": "string"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "FROZEN"
+    },
+    "applies_to_contract_id": {
+      "const": "FC-M12-FM04-CATL-001"
+    },
+    "state_interpretation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "economic_dimensions",
+        "research_control_dimensions",
+        "data_quality_usage",
+        "result_driven_role_change_requires_new_epoch"
+      ],
+      "properties": {
+        "economic_dimensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "research_control_dimensions": {
+          "const": [
+            "DATA_QUALITY"
+          ]
+        },
+        "data_quality_usage": {
+          "const": "DIAGNOSTIC_CONTROL_ONLY"
+        },
+        "result_driven_role_change_requires_new_epoch": {
+          "const": true
+        }
+      }
+    },
+    "model_identity": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model_family",
+          "parameterization",
+          "model_instance_id"
+        ],
+        "properties": {
+          "model_family": {
+            "type": "string"
+          },
+          "parameterization": {
+            "type": "object"
+          },
+          "model_instance_id": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

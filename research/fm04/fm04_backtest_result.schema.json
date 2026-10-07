@@ -1,22 +1,205 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://iios.local/schema/fm04-backtest-result-0.1.json",
-  "title": "IIOS M1.2 FM04 Conditional Backtest Result v0.1",
+  "$id": "https://iios.local/schema/fm04-backtest-result-0.2.json",
+  "title": "IIOS M1.2 FM04 Conditional Backtest Result v0.2",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version","status","contract_id","research_epoch_id","confirmatory_eligible",
-    "input_bindings","summary","outer_selection_evaluations","conditional_performance"
+    "schema_version",
+    "status",
+    "contract_id",
+    "research_epoch_id",
+    "confirmatory_eligible",
+    "input_bindings",
+    "summary",
+    "selection_eligibility",
+    "outer_selection_evaluations",
+    "conditional_group_definitions",
+    "conditional_empirical_performance"
   ],
   "properties": {
-    "schema_version": {"const":"IIOS-FM04-CONDITIONAL-BACKTEST-RESULT-0.1"},
-    "status": {"const":"PASS"},
-    "contract_id": {"type":"string"},
-    "research_epoch_id": {"type":"string"},
-    "confirmatory_eligible": {"const":false},
-    "input_bindings": {"type":"object","required":["state_snapshot_sha256","driver_history_git_blob_sha","outer_universe_lock_git_blob_sha"]},
-    "summary": {"type":"object","required":["outer_origins","outer_selection_unit_count","selected_count","no_selection_count","conditional_group_count","model_order"]},
-    "outer_selection_evaluations": {"type":"array","items":{"type":"object","required":["selection_id","driver_id","horizon","state_dimension","outer_origin_id","state_status","status"]}},
-    "conditional_performance": {"type":"array","items":{"type":"object","required":["driver_id","horizon","state_dimension","state_value","common_outer_sample_size","models"]}}
+    "schema_version": {"const": "IIOS-FM04-CONDITIONAL-BACKTEST-RESULT-0.2"},
+    "status": {"const": "PASS"},
+    "contract_id": {"type": "string"},
+    "research_epoch_id": {"type": "string"},
+    "confirmatory_eligible": {"const": false},
+    "input_bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state_snapshot_sha256",
+        "driver_history_canonical_sha256",
+        "driver_history_git_blob_sha",
+        "state_contract_git_blob_sha",
+        "outer_universe_lock_git_blob_sha",
+        "research_plan_git_blob_sha",
+        "candidate_space_git_blob_sha",
+        "purity_boundary_git_blob_sha",
+        "outer_universe_lock_canonical_sha256"
+      ],
+      "properties": {
+        "state_snapshot_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "driver_history_canonical_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "driver_history_git_blob_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "state_contract_git_blob_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "outer_universe_lock_git_blob_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "research_plan_git_blob_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "candidate_space_git_blob_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "purity_boundary_git_blob_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "outer_universe_lock_canonical_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outer_origins",
+        "outer_selection_unit_count",
+        "selected_count",
+        "outer_evaluated_count",
+        "no_selection_count",
+        "conditional_group_count",
+        "empirical_conditional_group_count",
+        "model_order",
+        "min_common_inner_observations",
+        "no_selection_reason_counts",
+        "selected_model_counts",
+        "rolling_origins_assumed_iid",
+        "significance_claim_allowed",
+        "descriptive_only",
+        "current_price_used",
+        "automatic_execution"
+      ],
+      "properties": {
+        "outer_origins": {"type": "array", "items": {"type": "string"}},
+        "outer_selection_unit_count": {"type": "integer", "minimum": 0},
+        "selected_count": {"type": "integer", "minimum": 0},
+        "outer_evaluated_count": {"type": "integer", "minimum": 0},
+        "no_selection_count": {"type": "integer", "minimum": 0},
+        "conditional_group_count": {"type": "integer", "minimum": 0},
+        "empirical_conditional_group_count": {"type": "integer", "minimum": 0},
+        "model_order": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "string"}},
+        "min_common_inner_observations": {"const": 3},
+        "no_selection_reason_counts": {"type": "object"},
+        "selected_model_counts": {"type": "object"},
+        "rolling_origins_assumed_iid": {"const": false},
+        "significance_claim_allowed": {"const": false},
+        "descriptive_only": {"const": true},
+        "current_price_used": {"const": false},
+        "automatic_execution": {"const": false}
+      }
+    },
+    "selection_eligibility": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "selection_id","driver_id","horizon","state_dimension",
+          "outer_origin_id","state_value","eligible","reason"
+        ],
+        "properties": {
+          "selection_id": {"type": "string"},
+          "driver_id": {"type": "string"},
+          "horizon": {"type": "string"},
+          "state_dimension": {"type": "string"},
+          "outer_origin_id": {"type": "string"},
+          "state_value": {"type": ["string","null"]},
+          "eligible": {"type": "boolean"},
+          "reason": {"type": ["string","null"]}
+        }
+      }
+    },
+    "outer_selection_evaluations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "selection_id","driver_id","horizon","state_dimension","outer_origin_id",
+          "state_row_id","state_status","state_value","status","no_selection_reason",
+          "inner_sample_size","inner_candidate_origins","inner_model_mae",
+          "selected_model","outer_actual_record_id","outer_actual_known_at",
+          "outer_forecast","outer_metrics","provenance"
+        ],
+        "properties": {
+          "selection_id": {"type": "string"},
+          "driver_id": {"type": "string"},
+          "horizon": {"type": "string"},
+          "state_dimension": {"type": "string"},
+          "outer_origin_id": {"type": "string"},
+          "state_row_id": {"type": "string"},
+          "state_status": {"enum": ["AVAILABLE","UNKNOWN"]},
+          "state_value": {"type": ["string","null"]},
+          "status": {"type": "string"},
+          "no_selection_reason": {"type": ["string","null"]},
+          "inner_sample_size": {"type": "integer", "minimum": 0},
+          "inner_candidate_origins": {"type": "array", "items": {"type": "string"}},
+          "inner_model_mae": {"type": "object"},
+          "selected_model": {"type": ["string","null"]},
+          "outer_actual_record_id": {"type": ["string","null"]},
+          "outer_actual_known_at": {"type": ["string","null"]},
+          "outer_forecast": {"type": ["number","null"]},
+          "outer_metrics": {"type": ["object","null"]},
+          "provenance": {"type": "object"}
+        }
+      }
+    },
+    "conditional_group_definitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["group_id","driver_id","horizon","state_dimension","state_value"],
+        "properties": {
+          "group_id": {"type": "string"},
+          "driver_id": {"type": "string"},
+          "horizon": {"type": "string"},
+          "state_dimension": {"type": "string"},
+          "state_value": {"type": "string"}
+        }
+      }
+    },
+    "conditional_empirical_performance": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "performance_id","group_id","driver_id","horizon","state_dimension","state_value",
+          "common_outer_sample_size","common_outer_origins","observations","models",
+          "selection_eligible","descriptive_only"
+        ],
+        "properties": {
+          "performance_id": {"type": "string"},
+          "group_id": {"type": "string"},
+          "driver_id": {"type": "string"},
+          "horizon": {"type": "string"},
+          "state_dimension": {"type": "string"},
+          "state_value": {"type": "string"},
+          "common_outer_sample_size": {"type": "integer","minimum": 1},
+          "common_outer_origins": {"type":"array","items":{"type":"string"}},
+          "observations": {
+            "type":"array",
+            "minItems":1,
+            "items":{
+              "type":"object",
+              "additionalProperties":false,
+              "required":["outer_origin_id","state_row_id","actual_record_id","model_input_record_ids","model_forecasts","model_metrics"],
+              "properties":{
+                "outer_origin_id":{"type":"string"},
+                "state_row_id":{"type":"string"},
+                "actual_record_id":{"type":"string"},
+                "model_input_record_ids":{"type":"object"},
+                "model_forecasts":{"type":"object"},
+                "model_metrics":{"type":"object"}
+              }
+            }
+          },
+          "models": {"type":"object"},
+          "selection_eligible":{"const":false},
+          "descriptive_only":{"const":true}
+        }
+      }
+    }
   }
 }

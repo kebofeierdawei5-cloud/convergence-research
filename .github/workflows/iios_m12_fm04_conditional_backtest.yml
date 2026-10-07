@@ -44,6 +44,7 @@ jobs:
           python - <<'PY'
           import hashlib, json
           from pathlib import Path
+          import hashlib
           from jsonschema import Draft202012Validator
 
           def csha(value):
@@ -66,6 +67,21 @@ jobs:
           assert contract["capability_boundary"]["production_model_selection"] is False
           assert contract["research_boundary"]["confirmatory_evidence_authorized"] is False
           print("FM04 frozen contract/schema: PASS")
+          PY
+
+      - name: Validate FM04-R semantic adjudication
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          root=Path("research/fm04")
+          schema=json.loads((root/"FM04_R_SEMANTIC_ADJUDICATION.schema.json").read_text())
+          policy=json.loads((root/"FM04_R_SEMANTIC_ADJUDICATION.json").read_text())
+          errors=sorted(Draft202012Validator(schema).iter_errors(policy), key=lambda e:list(e.path))
+          assert not errors, "\n".join(str(e) for e in errors)
+          assert policy["applies_to_contract_id"]==json.loads((root/"FM04_CONDITIONAL_BACKTEST_CONTRACT.json").read_text())["contract_id"]
+          print("FM04-R semantic adjudication: PASS")
           PY
 
       - name: Build exact FM02 feature snapshot
@@ -117,15 +133,76 @@ jobs:
           assert result["summary"]["significance_claim_allowed"] is False
           assert result["summary"]["current_price_used"] is False
           assert result["summary"]["automatic_execution"] is False
-          assert len(result["conditional_performance"]) == result["summary"]["conditional_group_count"]
+          assert len(result["conditional_group_definitions"]) == result["summary"]["conditional_group_count"]
+          assert len(result["conditional_empirical_performance"]) == result["summary"]["empirical_conditional_group_count"]
+          assert len(result["selection_eligibility"]) == result["summary"]["outer_selection_unit_count"]
           print("FM04 result schema + structural invariants: PASS")
           PY
 
-      - name: Independent FM04 PIT / nested-selection / blind-scoring audit
+      - name: Verify exact FM04 result input bindings from repository bytes
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          result=json.loads(Path("/tmp/FM04_BACKTEST_RESULT.json").read_text())
+          paths={
+            "state_contract":"research/fm03/FM03_STATE_CONTRACT.json",
+            "driver_history":"research/fm01/CATL_DRIVER_HISTORY.ndjson",
+            "outer_universe_lock":"research/fm00/OU-M12-FM00-CATL-001.json",
+            "research_plan":"research/fm00/RP-M12-FM00-EXP-001.json",
+            "candidate_space":"research/fm00/CS-M12-FM00-CATL-001.json",
+            "purity_boundary":"research/fm00/EPB-M12-FM00-EXP-001.json",
+          }
+          for name,path in paths.items():
+              got=subprocess.check_output(["git","hash-object",path],text=True).strip()
+              assert got==result["input_bindings"][name+"_git_blob_sha"]
+          print("Exact FM04 result input bindings: PASS")
+          PY
+
+      - name: Build exact FM04 result manifest
+        run: |
+          python research/fm04/fm04_result_manifest.py             --result /tmp/FM04_BACKTEST_RESULT.json             --output /tmp/FM04_RESULT_MANIFEST.json
+
+      - name: Validate exact FM04 result manifest
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import hashlib
+          from jsonschema import Draft202012Validator
+          schema=json.loads(Path("research/fm04/fm04_result_manifest.schema.json").read_text())
+          manifest=json.loads(Path("/tmp/FM04_RESULT_MANIFEST.json").read_text())
+          errors=sorted(Draft202012Validator(schema).iter_errors(manifest), key=lambda e:list(e.path))
+          assert not errors, "\\n".join(str(e) for e in errors)
+          assert manifest["result_schema_version"]=="IIOS-FM04-CONDITIONAL-BACKTEST-RESULT-0.2"
+          digest=hashlib.sha256(Path("/tmp/FM04_BACKTEST_RESULT.json").read_bytes()).hexdigest()
+          assert manifest["result_sha256"]==digest
+          assert manifest["code_commit_sha"]=="${{ github.sha }}"
+          assert manifest["workflow_run_id"]=="${{ github.run_id }}"
+          print("FM04 result manifest + exact result SHA: PASS")
+          PY
+
+      - name: Archive exact FM04 result and manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: iios-m12-fm04-result-${{ github.run_id }}
+          path: |
+            /tmp/FM04_BACKTEST_RESULT.json
+            /tmp/FM04_RESULT_MANIFEST.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Independent FM04 PIT / nested-selection / result-integrity audit
         env:
           FM03_STATE_SNAPSHOT: /tmp/FM03_STATE_SNAPSHOT.ndjson
           FM04_BACKTEST_RESULT: /tmp/FM04_BACKTEST_RESULT.json
         run: python research/fm04/fm04_independent_audit.py
+
+      - name: FM04-R result integrity mutation suite
+        env:
+          FM03_STATE_SNAPSHOT: /tmp/FM03_STATE_SNAPSHOT.ndjson
+        run: python research/fm04/fm04_r_mutation_tests.py
 
       - name: Compile FM04
         run: python -m compileall -q research/fm04

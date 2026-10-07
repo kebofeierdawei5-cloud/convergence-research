@@ -1,0 +1,53 @@
+{
+  "schema_version": "IIOS-FM04-R-SEMANTIC-ADJUDICATION-0.1",
+  "policy_id": "FM04-R-SEMANTIC-20261007",
+  "version": "0.1.0",
+  "status": "FROZEN",
+  "applies_to_contract_id": "FC-M12-FM04-CATL-001",
+  "state_interpretation": {
+    "economic_dimensions": [
+      "DIRECTION",
+      "MOMENTUM",
+      "VOLATILITY",
+      "SEASONALITY",
+      "MEAN_REVERSION_PRESSURE",
+      "STRUCTURAL_STABILITY"
+    ],
+    "research_control_dimensions": [
+      "DATA_QUALITY"
+    ],
+    "data_quality_usage": "DIAGNOSTIC_CONTROL_ONLY",
+    "result_driven_role_change_requires_new_epoch": true
+  },
+  "model_identity": [
+    {
+      "model_family": "SEASONAL_NAIVE",
+      "parameterization": {
+        "seasonal_period_quarters": 4
+      },
+      "model_instance_id": "SEASONAL_NAIVE"
+    },
+    {
+      "model_family": "PERSISTENCE_YOY",
+      "parameterization": {
+        "growth_lag_quarters": 4
+      },
+      "model_instance_id": "PERSISTENCE_YOY"
+    },
+    {
+      "model_family": "TREND_LOG_LINEAR",
+      "parameterization": {
+        "window_quarters": 8
+      },
+      "model_instance_id": "TREND_LOG_LINEAR_8Q"
+    },
+    {
+      "model_family": "MEAN_REVERSION_YOY",
+      "parameterization": {
+        "window_quarters": 8,
+        "central_tendency": "PIT_ROLLING_MEAN"
+      },
+      "model_instance_id": "MEAN_REVERSION_YOY_8"
+    }
+  ]
+}
