@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
@@ -55,7 +56,7 @@ def _fmt(value: Any) -> str:
 def _render_risk_portfolio_contract(value: Any) -> list[str]:
     """Render risk/portfolio data as investor-facing bullets, never as a machine JSON dump."""
     if not isinstance(value, Mapping):
-        return [f"- Risk / portfolio contract: {_fmt(value)}"]
+        return ["- Risk / portfolio contract: unavailable (structured contract not provided)"]
 
     lines = ["- Risk / portfolio contract: available"]
     if "contract_version" in value:
@@ -263,6 +264,7 @@ def qa_human_report(*, publication: Mapping[str, Any], report: Mapping[str, Any]
         "decision_fidelity": "PASS",
         "human_boundary": "PASS",
         "non_authority": "PASS",
+        "human_readability": "PASS",
     }
     issues: list[str] = []
     try:
@@ -312,6 +314,10 @@ def qa_human_report(*, publication: Mapping[str, Any], report: Mapping[str, Any]
     if "does not approve" not in lower or "cannot place orders" not in lower:
         checks["non_authority"] = "FAIL"
         issues.append("non_authority: explicit boundary language missing")
+    machine_json_dump = re.compile(r"(?m)^-\\s+[^:\\n]+:\\s*(?:\\{|\\[)[\\\"']")
+    if machine_json_dump.search(markdown):
+        checks["human_readability"] = "FAIL"
+        issues.append("human_readability: machine-readable JSON-like field dump detected in main report")
     status = "PASS" if all(v == "PASS" for v in checks.values()) else "FAIL"
     core = {
         "qa_version": QA_VERSION,
