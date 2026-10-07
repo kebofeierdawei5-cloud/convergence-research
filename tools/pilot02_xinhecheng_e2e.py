@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
+import io
 import json
 import tempfile
 from datetime import date, datetime, timezone
@@ -83,15 +85,27 @@ def admit_price(price_path: Path, receipt: dict[str, Any]) -> tuple[InMemoryCano
         raise ValueError("price raw-byte SHA mismatch")
     if not receipt["price_exact_bytes"]:
         raise ValueError("price bytes not marked exact")
-    series = _load_json(price_path)
-    result = series["chart"]["result"][0]
-    timestamps = result["timestamp"]
-    quote = result["indicators"]["quote"][0]["close"]
-    rows = {datetime.fromtimestamp(ts, tz=timezone.utc).date(): close for ts, close in zip(timestamps, quote)}
-    close = rows.get(PRICE_DATE)
+    text = raw.decode("utf-8-sig", errors="ignore")
+    if "TCLOSE" not in text and "收盘价" not in text:
+        raise ValueError("unexpected NetEase historical-price payload")
+    rows = list(csv.reader(io.StringIO(text)))
+    if not rows:
+        raise ValueError("empty historical-price payload")
+    header = rows[0]
+    date_idx = 0
+    close_idx = 3 if len(header) > 3 else None
+    if close_idx is None:
+        raise ValueError("historical-price payload missing close column")
+    close = None
+    for row in rows[1:]:
+        if not row:
+            continue
+        if row[date_idx].strip() == PRICE_DATE.isoformat():
+            close = Decimal(row[close_idx].strip())
+            break
     if close is None:
         raise ValueError("no 2026-09-30 close in supplied market evidence")
-    if Decimal(str(close)) != PRICE:
+    if close != PRICE:
         raise ValueError(f"unexpected 2026-09-30 close: {close}")
 
     registry = InMemoryCanonicalCurrentPriceRegistry()
@@ -100,10 +114,10 @@ def admit_price(price_path: Path, receipt: dict[str, Any]) -> tuple[InMemoryCano
         evidence_id="E005",
         variable="market_price",
         unit="CNY/share",
-        basis="Yahoo Finance historical close for 2026-09-30",
+        basis="NetEase Finance historical close for 2026-09-30",
         observation_date=PRICE_DATE,
         known_at=known_at,
-        source="YAHOO_FINANCE:HISTORICAL",
+        source="NETEASE_FINANCE:HISTORICAL",
         source_location=receipt["price_source_ref"],
         content_sha256=receipt["price_sha256"],
         exact_bytes=True,
@@ -227,8 +241,6 @@ def build_case(fixture: dict[str, Any], price_ref: dict[str, Any]):
         "company": "浙江新和成股份有限公司",
         "as_of_date": "2026-10-07",
         "cutoff_date": "2026-10-07",
-        "security_classification": "NON_FINANCIAL",
-        "research_weighting": fixture["research_weighting"],
         "current_price_observation": {
             "price": "25.95",
             "price_observation_id": price_ref["price_observation_id"],
@@ -283,15 +295,6 @@ def build_case(fixture: dict[str, Any], price_ref: dict[str, Any]):
             },
         },
     }
-    payload, forecast_registry, valuation_resolver = bind_return_lineage(
-        payload,
-        valuation_admission_registry=InMemoryCanonicalInvestmentAdmissionRegistry(),
-        valuation_output_resolver=InMemoryCanonicalValuationOutputResolver(
-            InMemoryCanonicalInvestmentAdmissionRegistry()
-        ),
-    )
-    # Rebind using the registry that owns the valuation admission above. The resolver
-    # constructor alone is not sufficient for a production-style lineage lookup.
     payload, forecast_registry, valuation_resolver = bind_return_lineage(payload)
     return payload, authority_registry, forecast_registry, valuation_resolver
 
