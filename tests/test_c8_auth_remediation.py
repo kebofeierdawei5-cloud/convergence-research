@@ -13,6 +13,7 @@ from iios_mvp.investment_core_contract_v03 import decide_v03
 from iios_mvp.store import create_or_load_series, write_decision_revision, write_snapshot
 from tests.decision_admission_fixture import build_fixture_admission_receipt
 import tools.c3_kolun_second_company_e2e as c3_e2e
+from tests.b04b_return_lineage_fixture import bind_return_lineage
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,14 +47,16 @@ def _canonical_kolun_case():
 
 def test_c8_auth_001_admission_reexecutes_kernel_and_rejects_forged_decision():
     case, registry = _canonical_kolun_case()
-    canonical_decision = decide_v03(case, current_price_resolver=registry, upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY)
+    canonical_decision = decide_v03(case, current_price_resolver=registry, independent_forecast_resolver=c3_e2e.FORECAST_REGISTRY, upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY, valuation_output_resolver=c3_e2e.VALUATION_OUTPUT_RESOLVER)
     valid_snapshot = _snapshot(case, canonical_decision)
 
     receipt = admit_canonical_decision(
         case=case,
         snapshot=valid_snapshot,
         current_price_resolver=registry,
+        independent_forecast_resolver=c3_e2e.FORECAST_REGISTRY,
         upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY,
+        valuation_output_resolver=c3_e2e.VALUATION_OUTPUT_RESOLVER,
     )
     assert receipt["status"] == "ADMITTED"
     assert receipt["admission_method"] == "CANONICAL_DECIDE_V03_REEXECUTED"
