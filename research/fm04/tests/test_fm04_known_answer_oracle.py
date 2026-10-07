@@ -53,6 +53,24 @@ class FM04KnownAnswerOracleTests(unittest.TestCase):
             self.assertTrue(math.isclose(actual, expected, rel_tol=0.0, abs_tol=1e-9),
                             f"{model_id}: expected {expected}, got {actual}")
 
+    def test_semantic_adjudication_matches_frozen_candidate_space(self):
+        import json
+        policy=json.loads((ROOT / "FM04_R_SEMANTIC_ADJUDICATION.json").read_text(encoding="utf-8"))
+        candidate=json.loads((ROOT.parent / "fm00/CS-M12-FM00-CATL-001.json").read_text(encoding="utf-8"))
+        contract=json.loads((ROOT / "FM04_CONDITIONAL_BACKTEST_CONTRACT.json").read_text(encoding="utf-8"))
+        self.assertEqual(policy["applies_to_contract_id"], contract["contract_id"])
+        state_dimensions=set(contract["selection_policy"]["state_dimensions"])
+        self.assertEqual(
+            state_dimensions,
+            set(policy["state_interpretation"]["economic_dimensions"]) | set(policy["state_interpretation"]["research_control_dimensions"]),
+        )
+        self.assertEqual(policy["state_interpretation"]["research_control_dimensions"], ["DATA_QUALITY"])
+        admitted_families=set(candidate["models"])
+        for mapping in policy["model_identity"]:
+            self.assertIn(mapping["model_family"], admitted_families)
+        instances={x["model_instance_id"] for x in policy["model_identity"]}
+        self.assertEqual(instances, set(m["model_id"] for m in contract["models"]))
+
     def test_known_answer_metric_bundle(self):
         expected = {"MAE": 10.0, "RMSE": 10.0, "sMAPE": 66.66666666666667}
         actual = metric_bundle(10.0, 20.0)
