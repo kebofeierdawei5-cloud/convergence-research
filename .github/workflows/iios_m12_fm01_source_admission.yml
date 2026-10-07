@@ -83,10 +83,7 @@ jobs:
       - name: Run FM02 unit tests
         run: python -m unittest discover -s research/fm02/tests -p 'test_*.py' -v
       - name: Build FM02 PIT feature snapshot
-        run: |
-          python research/fm02/fm02_feature_builder.py \\
-            --output /tmp/FM02_FEATURE_SNAPSHOT.ndjson \\
-            --receipt /tmp/FM02_FEATURE_BUILD_RECEIPT.json
+        run: python research/fm02/fm02_feature_builder.py --output /tmp/FM02_FEATURE_SNAPSHOT.ndjson --receipt /tmp/FM02_FEATURE_BUILD_RECEIPT.json
       - name: Validate generated FM02 snapshot schema
         run: |
           python - <<'PY'
