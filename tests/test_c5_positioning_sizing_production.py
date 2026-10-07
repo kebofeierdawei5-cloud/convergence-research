@@ -22,6 +22,7 @@ from tests.test_investment_core_v03 import (
     EVIDENCE_ROOT_REGISTRY,
     INDEPENDENT_FORECAST_REGISTRY,
     UPSTREAM_AUTHORITY_REGISTRY,
+    VALUATION_OUTPUT_RESOLVER,
     case,
 )
 
@@ -104,6 +105,7 @@ def test_c5_unfavorable_snapshot_stops_adds_but_does_not_rewrite_decision():
     c = case()
     c["positioning"] = p
     result = decide(
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
@@ -187,6 +189,7 @@ def test_c5_schema_accepts_record():
 def test_c5_projection_is_optional_and_action_stays_fundamental():
     c = case()
     result_without = decide(
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
@@ -196,6 +199,7 @@ def test_c5_projection_is_optional_and_action_stays_fundamental():
 
     c["positioning"] = positioning(industry_sentiment="NEGATIVE")
     result_with = decide(
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         c,
         evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
         current_price_resolver=CURRENT_PRICE_REGISTRY,
