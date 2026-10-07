@@ -1,0 +1,40 @@
+name: A02 B-01 Free-First Source Registry
+
+on:
+  pull_request:
+    paths:
+      - "research/a02_raw/B01_FREE_FIRST_SOURCE_MATRIX.json"
+      - "research/a02_raw/b01_free_first_source_matrix.schema.json"
+      - "research/a02_raw/b01_free_first_source_registry.py"
+      - "research/a02_raw/tests/test_b01_free_first_source_registry.py"
+      - "docs/iios/A02_B01_FREE_FIRST_SOURCE_REGISTRY_2026-10-07.md"
+      - ".github/workflows/a02_b01_free_first_source_registry.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-a02-b01-source-registry:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validation dependency
+        run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Verify exact A02 status evidence anchor
+        run: |
+          test "$(git hash-object docs/iios/A02_BATCH1_EXECUTION_2026-10-04.md)" = "2b2297a62d2a9dbdd14abdf815f9e8d796282580"
+      - name: Run B-01 registry tests
+        run: python -m unittest discover -s research/a02_raw/tests -p 'test_b01_*.py' -v
+      - name: Validate B-01 registry
+        run: |
+          python research/a02_raw/b01_free_first_source_registry.py             --a02-status-doc docs/iios/A02_BATCH1_EXECUTION_2026-10-04.md
+      - name: Compile
+        run: python -m compileall -q research/a02_raw
+      - name: Diff check
+        run: git diff --check
