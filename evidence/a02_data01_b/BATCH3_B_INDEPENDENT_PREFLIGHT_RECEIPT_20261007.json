@@ -1,0 +1,125 @@
+{
+  "schema_version": "IIOS-A02-DATA01-B-B3-01-INDEPENDENT-PREFLIGHT-RECEIPT-0.2",
+  "recorded_at": "2026-10-07T18:10:00+08:00",
+  "batch": "DATA-01-B / B3-01",
+  "role": "DIAGNOSTIC_EVIDENCE_RECORD_ONLY",
+  "canonical_main": "7aa4e333146ad29d3312a61e4c867b472e7a873f",
+  "runtime_head_sha": "08adaf484fee64f5448fafcfa8346403abac98a5",
+  "universe_id": "OU-M12-A02-CSI800-NONFIN-PIT-001",
+  "required_origins": [
+    "2023Q3",
+    "2023Q4",
+    "2024Q1",
+    "2024Q2",
+    "2024Q3",
+    "2024Q4",
+    "2025Q1",
+    "2025Q2",
+    "2025Q3",
+    "2025Q4",
+    "2026Q1"
+  ],
+  "required_domains": [
+    "identity",
+    "listing_delisting",
+    "common_equity",
+    "st_history",
+    "industry_history",
+    "source_vintages"
+  ],
+  "runtime_artifact": {
+    "workflow": "A02 Exact Raw Materialization",
+    "run_id": 37596399460,
+    "run_number": 16,
+    "artifact_id": 11471840025,
+    "artifact_name": "A02-exact-raw-37596399460",
+    "artifact_zip_sha256": "5cad0c1dc67af0638ad4723ffb3a359f49f37b6f83c02a6860e4aea1ac58d0b1",
+    "workflow_conclusion": "failure"
+  },
+  "inventory": {
+    "files": [
+      [
+        "A02_RAW_MATERIALIZATION_RECEIPT.json",
+        26869
+      ],
+      [
+        "A_CSI800_RAW/official_000906_current_20261004_000906cons.xls",
+        169984
+      ],
+      [
+        "A_CSI800_RAW/official_000906_current_20261004_000906cons.xls.meta.json",
+        665
+      ],
+      [
+        "GITHUB_RUN_CONTEXT.txt",
+        118
+      ],
+      [
+        "SHA256_MANIFEST.txt",
+        461
+      ]
+    ],
+    "delivery_manifest_present": false,
+    "b_raw_tree_present": false
+  },
+  "independent_sha256": {
+    "status": "PASS",
+    "method": "verifier recomputed SHA-256 over actual extracted file bytes",
+    "current_000906_sha256": "b3338f5f6fdfd04a72fb42f5444539507b50ee4805c83dabb04ec26e54c3b5fb",
+    "current_000906_size_bytes": 169984,
+    "frozen_historical_000906_target_sha256": "f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984",
+    "historical_a_exact_match": false
+  },
+  "checks": {
+    "raw_bundle_received": "PASS_RECEIVED",
+    "artifact_inventory": "PASS",
+    "independent_sha256": "PASS",
+    "manifest_comparison": "PARTIAL_ONLY",
+    "contract_schema_check": "FAIL",
+    "coverage_check": "FAIL",
+    "provenance_check": "FAIL"
+  },
+  "independent_b_preflight": {
+    "status": "BLOCKED",
+    "admission_status": "NOT_ADMISSION",
+    "independent_from_collector": true,
+    "strict_exit_code": 4,
+    "missing_domains": [
+      "identity",
+      "listing_delisting",
+      "common_equity",
+      "st_history",
+      "industry_history",
+      "source_vintages"
+    ],
+    "findings": [
+      "missing DELIVERY_MANIFEST.json"
+    ]
+  },
+  "decision": "BLOCKED",
+  "b_raw_materialization_receipt": "NOT_EMITTABLE_AS_PASS",
+  "downstream": {
+    "data_01_c": "LOCKED",
+    "data_02": "LOCKED",
+    "a02_admission": "BLOCKED",
+    "cross_security_epoch": "LOCKED",
+    "model_selection": "LOCKED"
+  },
+  "human_intervention": {
+    "required_now": false,
+    "next_required_input": "ACTUAL_B_RAW_EVIDENCE_BUNDLE",
+    "accepted_forms": [
+      "A02_DELIVERY ZIP containing DELIVERY_MANIFEST.json plus the six required B domain raw trees",
+      "data-owner/vendor PIT export preserving raw bytes and knowledge/availability evidence"
+    ],
+    "hard_requirements": [
+      "actual raw bytes",
+      "independent SHA-256 verifiable by IIOS",
+      "all 11 required origins",
+      "all 6 required B domains",
+      "field-level known_at basis",
+      "source provenance and source-vintage evidence",
+      "license/redistribution status"
+    ]
+  }
+}
