@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schema/fm03-state-snapshot-0.1.json",
+  "title": "IIOS M1.2 FM03 State Snapshot Row v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "state_row_id",
+    "security_id",
+    "driver_id",
+    "origin_id",
+    "origin_cutoff",
+    "feature_asof_period",
+    "feature_asof_known_at",
+    "max_feature_input_period",
+    "feature_row_id",
+    "input_feature_row_ids",
+    "input_record_ids",
+    "states"
+  ],
+  "properties": {
+    "state_row_id": {
+      "type": "string",
+      "pattern": "^FM03-[A-Z0-9_-]+-\\d{4}Q[1-4]-[A-Z0-9_]+$"
+    },
+    "security_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "driver_id": {
+      "enum": [
+        "REVENUE",
+        "NET_PROFIT"
+      ]
+    },
+    "origin_id": {
+      "type": "string",
+      "pattern": "^\\d{4}Q[1-4]$"
+    },
+    "origin_cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "feature_asof_period": {
+      "type": "string",
+      "pattern": "^\\d{4}Q[1-4]$"
+    },
+    "feature_asof_known_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "max_feature_input_period": {
+      "type": "string",
+      "pattern": "^\\d{4}Q[1-4]$"
+    },
+    "feature_row_id": {
+      "type": "string",
+      "pattern": "^FM02-[A-Z0-9_-]+-\\d{4}Q[1-4]-[A-Z0-9_]+$"
+    },
+    "input_feature_row_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "input_record_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "states": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "DIRECTION",
+        "MOMENTUM",
+        "VOLATILITY",
+        "SEASONALITY",
+        "MEAN_REVERSION_PRESSURE",
+        "STRUCTURAL_STABILITY",
+        "DATA_QUALITY"
+      ],
+      "properties": {
+        "DIRECTION": {
+          "$ref": "#/$defs/state"
+        },
+        "MOMENTUM": {
+          "$ref": "#/$defs/state"
+        },
+        "VOLATILITY": {
+          "$ref": "#/$defs/state"
+        },
+        "SEASONALITY": {
+          "$ref": "#/$defs/state"
+        },
+        "MEAN_REVERSION_PRESSURE": {
+          "$ref": "#/$defs/state"
+        },
+        "STRUCTURAL_STABILITY": {
+          "$ref": "#/$defs/state"
+        },
+        "DATA_QUALITY": {
+          "$ref": "#/$defs/state"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "state": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "status",
+            "unknown_reason",
+            "input_feature_ids",
+            "input_feature_row_ids",
+            "input_record_ids"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "UP",
+                "FLAT",
+                "DOWN",
+                "ACCELERATING",
+                "DECELERATING",
+                "RISING",
+                "FALLING",
+                "POSITIVE",
+                "NEUTRAL",
+                "NEGATIVE",
+                "DOWNWARD",
+                "UPWARD",
+                "IMPROVING",
+                "STABLE",
+                "DETERIORATING",
+                "COMPLETE",
+                "PARTIAL"
+              ]
+            },
+            "status": {
+              "const": "AVAILABLE"
+            },
+            "unknown_reason": {
+              "const": null
+            },
+            "input_feature_ids": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "input_feature_row_ids": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "input_record_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "status",
+            "unknown_reason",
+            "input_feature_ids",
+            "input_feature_row_ids",
+            "input_record_ids"
+          ],
+          "properties": {
+            "state": {
+              "const": "UNKNOWN"
+            },
+            "status": {
+              "const": "UNKNOWN"
+            },
+            "unknown_reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "input_feature_ids": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "input_feature_row_ids": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "input_record_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      ]
+    }
+  }
+}

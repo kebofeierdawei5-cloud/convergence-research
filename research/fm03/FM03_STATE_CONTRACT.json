@@ -1,0 +1,172 @@
+{
+  "schema_version": "IIOS-FM03-STATE-CONTRACT-0.1",
+  "contract_id": "FC-M12-FM03-CATL-001",
+  "version": "0.1.0",
+  "status": "FROZEN",
+  "research_epoch_id": "RE-M12-EXP-CATL-20260930",
+  "confirmatory_eligible": false,
+  "input_contract": {
+    "feature_snapshot": "research/fm02/FM02_FEATURE_SNAPSHOT.ndjson",
+    "feature_contract": "research/fm02/FM02_FEATURE_CONTRACT.json",
+    "required_security_ids": [
+      "300750.SZ"
+    ],
+    "required_drivers": [
+      "REVENUE",
+      "NET_PROFIT"
+    ],
+    "required_feature_ids": [
+      "YOY_GROWTH",
+      "GROWTH_ACCELERATION",
+      "ROLLING_GROWTH_VOL",
+      "SEASONAL_DEVIATION",
+      "MEAN_REVERSION_GAP",
+      "SLOPE_STABILITY"
+    ],
+    "feature_contract_sha256": "4298c1cd1fdc0e0b82f46ffa714430361165fe191f0b4b61567f3b1e7b81f56e"
+  },
+  "origin_contract": {
+    "outer_universe_lock": "research/fm00/OU-M12-FM00-CATL-001.json",
+    "cutoff_rule": "ORIGIN_QUARTER_END_KNOWN_AT_CUTOFF",
+    "origin_selection_rule": "FROZEN_PRE_SCHEDULED_ORIGINS_ONLY",
+    "exact_origin_count": 11,
+    "exact_row_count": 22,
+    "horizon_targets": {
+      "3M": 1,
+      "6M": 2,
+      "12M": 4
+    },
+    "outer_universe_lock_sha256": "63a828d081474193af3870dcf0996f2201466210fba2c5011de23312044f591e"
+  },
+  "state_dimensions": [
+    {
+      "state_dimension": "DIRECTION",
+      "feature_id": "YOY_GROWTH",
+      "mapping": {
+        "negative": "DOWN",
+        "zero": "FLAT",
+        "positive": "UP"
+      }
+    },
+    {
+      "state_dimension": "MOMENTUM",
+      "feature_id": "GROWTH_ACCELERATION",
+      "mapping": {
+        "negative": "DECELERATING",
+        "zero": "FLAT",
+        "positive": "ACCELERATING"
+      }
+    },
+    {
+      "state_dimension": "VOLATILITY",
+      "feature_id": "ROLLING_GROWTH_VOL",
+      "comparison_basis": "CURRENT_VS_PRIOR_FROZEN_ORIGIN",
+      "mapping": {
+        "lower": "FALLING",
+        "equal": "FLAT",
+        "higher": "RISING"
+      }
+    },
+    {
+      "state_dimension": "SEASONALITY",
+      "feature_id": "SEASONAL_DEVIATION",
+      "mapping": {
+        "negative": "NEGATIVE",
+        "zero": "NEUTRAL",
+        "positive": "POSITIVE"
+      }
+    },
+    {
+      "state_dimension": "MEAN_REVERSION_PRESSURE",
+      "feature_id": "MEAN_REVERSION_GAP",
+      "mapping": {
+        "negative": "UPWARD",
+        "zero": "NEUTRAL",
+        "positive": "DOWNWARD"
+      }
+    },
+    {
+      "state_dimension": "STRUCTURAL_STABILITY",
+      "feature_id": "SLOPE_STABILITY",
+      "comparison_basis": "CURRENT_VS_PRIOR_FROZEN_ORIGIN",
+      "mapping": {
+        "lower": "IMPROVING",
+        "equal": "STABLE",
+        "higher": "DETERIORATING"
+      }
+    },
+    {
+      "state_dimension": "DATA_QUALITY",
+      "feature_id": "__AGGREGATE__",
+      "mapping": {
+        "all_available": "COMPLETE",
+        "mixed": "PARTIAL",
+        "all_unknown": "UNKNOWN"
+      }
+    }
+  ],
+  "unknown_policy": {
+    "feature_status": [
+      "AVAILABLE",
+      "UNKNOWN"
+    ],
+    "state_status": [
+      "AVAILABLE",
+      "UNKNOWN"
+    ],
+    "never_impute": true,
+    "comparison_prerequisite": "CURRENT_AND_PRIOR_FEATURES_MUST_BE_AVAILABLE",
+    "reasons": [
+      "SOURCE_FEATURE_UNKNOWN",
+      "NO_PRIOR_FROZEN_ORIGIN",
+      "INVALID_INPUT_STATE",
+      "PIT_BOUNDARY_FAILURE"
+    ]
+  },
+  "provenance_contract": {
+    "row_fields": [
+      "security_id",
+      "driver_id",
+      "origin_id",
+      "origin_cutoff",
+      "feature_asof_period",
+      "feature_asof_known_at",
+      "max_feature_input_period",
+      "feature_row_id"
+    ],
+    "state_fields": [
+      "state",
+      "status",
+      "unknown_reason",
+      "input_feature_ids",
+      "input_feature_row_ids",
+      "input_record_ids"
+    ],
+    "input_feature_identity": "FEATURE_ID",
+    "upstream_identity": "FM02_ROW_ID_AND_DRIVER_SERIES_RECORD_ID"
+  },
+  "capability_boundary": {
+    "state_engine_only": true,
+    "conditional_backtest": false,
+    "model_selection": false,
+    "production_router": false,
+    "automatic_execution": false
+  },
+  "capability_contract": {
+    "schema_version": "IIOS-CAPABILITY-CONTEXT-0.1",
+    "required_principal": "iios_research",
+    "required_grant": "m1.2.fm03.state_engine",
+    "forbidden_grants": [
+      "m1.2.fm04.conditional_backtest",
+      "m1.2.model_selection",
+      "production.forecast_router",
+      "production.automatic_execution"
+    ]
+  },
+  "research_boundary": {
+    "usage": "DEVELOPMENT_ONLY",
+    "purity": "CONTAMINATED",
+    "outer_results_cannot_flow_back_into_same_epoch_tuning": true,
+    "result_driven_change_requires_new_epoch": true
+  }
+}
