@@ -101,7 +101,7 @@ def main() -> int:
         result,
         state_path,
         Path("/tmp/fm04-redteam-tr05.json"),
-        lambda x: x["conditional_performance"][populated_group_index(x)].__setitem__("state_value", "FORGED_STATE"),
+        lambda x: x["conditional_performance"][0].__setitem__("state_value", "FORGED_STATE"),
     ))
 
     # Independent static weakness check: a unit test contains a blanket exception
