@@ -104,7 +104,7 @@ jobs:
               "10月1日" in calendar and "10月7日" in calendar
           )
           if not calendar_ok:
-              raise SystemExit("SZSE holiday page did not expose the expected Oct 1-Oct 7 closure anchors")
+              raise SystemExit("ChinaClear holiday page did not expose the expected Oct 1-Oct 7 closure anchors")
 
           receipt = {
               "pilot": "PILOT-02",
