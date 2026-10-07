@@ -33,6 +33,7 @@ def bind_return_lineage(
     *,
     independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None,
     valuation_admission_registry: InMemoryCanonicalInvestmentAdmissionRegistry | None = None,
+    valuation_output_resolver: InMemoryCanonicalValuationOutputResolver | None = None,
 ) -> tuple[
     dict[str, Any],
     InMemoryCanonicalIndependentForecastRegistry | CanonicalIndependentForecastResolver,
@@ -107,7 +108,7 @@ def bind_return_lineage(
         admitted_at=f"{cutoff.isoformat()}T16:00:00+00:00",
     )
     valuation_ref = admissions.admit(admission).to_dict()
-    valuation_resolver = InMemoryCanonicalValuationOutputResolver(admissions)
+    valuation_resolver = valuation_output_resolver or InMemoryCanonicalValuationOutputResolver(admissions)
     valuation_resolver.register_output(
         valuation_reference=valuation_ref,
         valuation_output=valuation_output,
