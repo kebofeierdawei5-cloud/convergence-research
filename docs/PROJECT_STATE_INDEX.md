@@ -252,108 +252,140 @@ A diagnostic or historical record can identify a problem, but cannot promote its
 
 ## 8. Current canonical M1.2 baseline state
 
-The post-C8 authority-hardening sequence is complete through independent re-audit, and the M1.2-FM00 Git baseline is now established on the canonical repository:
+The M1.2 baseline is now complete through exact CATL M1.1 source admission and independent PIT replay:
 
 ```
-B00 = PASS / MERGED / CANONICAL
-   ↓
-B02 = PASS / MERGED / CANONICAL
-   ↓
-B03-B = PASS / MERGED / CANONICAL
-   ↓
-B04-B = PASS / MERGED / CANONICAL
-   ↓
-Post-B04 Independent Authority Re-audit = PASS / GOVERNANCE-ADJUDICATED
-   ↓
+Post-B04 Authority Re-audit = PASS
+        ↓
 M1.2-FM00 Git Baseline = PASS / MERGED / CANONICAL
+        ↓
+FM01 Exact M1.1 Source Snapshot Admission = PASS / MERGED / CANONICAL
+        ↓
+FM01 DATA_READY = PASS
 ```
-
-### Post-B04 Independent Authority Re-audit
-
-Status: **PASS / GOVERNANCE-ADJUDICATED**
-
-- diagnostic PR #133;
-- audit target: `268852d754ab2385d9a96a10309a782978eb25af`;
-- acceptance workflow #5 = SUCCESS;
-- 7 / 7 fresh authority attack tests passed;
-- acceptance record: `docs/iios/POST_B04_INDEPENDENT_REAUDIT_2026-10-07.md`.
 
 ### M1.2-FM00 Git Baseline
 
 Status: **PASS / MERGED / CANONICAL**
 
-- baseline PR #136;
-- baseline base main: `60d5f9927cb5543415307454aea231376f86c72e`;
-- exact FM00 source anchor: commit `536e883bc873dbe7dd7383690a7a95a0f65591a7`;
-- immutable FM00 tag: `m1.2-fm00-v0.1.0`;
-- tag object: `aac0cccf596ee2703caedffc08f434be9e2dffed`;
-- exact-head baseline CI: workflow run #6 = SUCCESS on head `ff6bfe0ff7677d0a965af513ac2ee644413565d1`;
-- baseline merge commit: `ea1453f6ac1a04343b3b7fb9a704d3df03e7d6ba`.
+- PR #136; merge `ea1453f6ac1a04343b3b7fb9a704d3df03e7d6ba`;
+- exact FM00 source anchor `536e883bc873dbe7dd7383690a7a95a0f65591a7`;
+- immutable tag `m1.2-fm00-v0.1.0`;
+- dedicated baseline CI passed on exact PR head.
 
-The baseline does not rewrite the historical FM00 root commit or frozen G2 bytes.
+### FM01 Exact CATL M1.1 Source Snapshot Admission
 
-### G2 reference resolution
+Status: **PASS / MERGED / CANONICAL**
 
-The historical frozen G2 identity remains immutable and separate from the R0 successor evidence used for current closure:
+- PR #138;
+- baseline main before admission `13adfd6ad4475adf4a57b50ef009075a2a15ccef`;
+- exact M1.1 package SHA-256 `34c16dca266a2f35bc2895739b3e847a6c20ea0d66e0acbbc57274a96e22804b`;
+- exact M1.1 Git bundle SHA-256 `0f3dd5d5058722ce8f63a6a24d8c7aafa8b28c20ae0374c3bb0a94e9fa2609e1`;
+- M1.1 commit `9b612cc79dc8c16ed8aea1529a6ea93e9eb8b993`;
+- M1.1 tag `v1.1.0`;
+- tag object `a9516728aa1429cd033b474414ed5398c939eabb`;
+- exact source bytes were independently SHA-256 verified from the persistent Library and ZIP/bundle critical projections were byte-compared.
 
-- historical frozen carrier SHA-256: `899f0b1b9f3619458e17be76ac43dd6e00b5397d0c12adb7b68e2479c7f51524`;
-- R0 successor evidence carrier SHA-256: `bd5cbaf23c9029b46fafd19992029932431059de7424a08de48624aca5d431c8`;
-- successor role: `ACCEPTED_SUCCESSOR_FOR_CURRENT_CLOSURE_ROLE_ONLY`;
-- no historical frozen identity rewrite.
+Admitted dataset:
 
-Reference resolution record:
-`governance/m1-2-fm00-baseline/G2_REFERENCE_RESOLUTION_v0.1.json`.
+- `300750.SZ`;
+- 2021Q1–2026Q2;
+- 22 quarters;
+- 44 records;
+- drivers: `REVENUE`, `NET_PROFIT`;
+- 12 direct quarterly observations;
+- 10 explicitly derived quarterly observations.
 
-### FM00 boundary
+Derived provenance remains:
 
-FM00 remains:
+```
+Q2 = H1 cumulative - Q1
+Q4 = Annual cumulative - Q1 - Q2 - Q3
+```
 
-- `EXPLORATORY`;
-- `EXPOSED_PRIOR_RESULTS`;
-- `confirmatory_eligible = false`;
-- `production_router_allowed = false`.
+Each admitted record carries source evidence reference, publication/knowledge timestamp, source-vintage metadata, provenance and revision fields.
 
-The exact historical source baseline is anchored by the immutable Git commit/tag above.
+### PIT admission / independent replay
 
-### FM01 boundary
+Status: **PASS**
 
-FM01 implementation exists on the repository, but the CATL population gate remains:
+Independent replay implementation:
+
+`research/fm01/fm01_source_admission_replay.py`
+
+Verified:
+
+- all historical records satisfy the origin-cutoff rule;
+- target actual is excluded from the training-visible set;
+- future-known observations remain excluded;
+- missing/conflicting source state remains fail-closed;
+- M1.1 rolling origin counts reproduce as:
+  - 3M = 11;
+  - 6M = 10;
+  - 12M = 8.
+
+Remote exact-head CI:
+
+- workflow `IIOS M1.2 FM01 Exact CATL Source Admission`;
+- run #2 = SUCCESS;
+- job `verify-fm01-source-admission` = SUCCESS;
+- validation, PIT replay, admission invariants, compileall and diff-check all PASS.
+
+Acceptance records:
+
+- `research/fm01/M1_1_EXACT_SOURCE_SNAPSHOT_MANIFEST.json`
+- `research/fm01/M1_1_SOURCE_BYTES_VERIFICATION.json`
+- `research/fm01/M1_1_SOURCE_ADMISSION.json`
+- `research/fm01/FM01_ADMISSION_RESULT.json`
+- `research/fm01/FM01_CI_ADMISSION_RECEIPT.json`
+
+### FM01 data gate
+
+The former gate:
 
 ```
 BLOCKED_DATA_INGRESS
 ```
 
-The target remains 22 quarters (2021Q1–2026Q2), and no numeric value may be fabricated or inferred while the exact M1.1 source snapshot is absent.
+is now:
 
-Acceptance / baseline records:
-- `governance/m1-2-fm00-baseline/M1_2_FM00_BASELINE_MANIFEST_v0.2.json`
-- `governance/m1-2-fm00-baseline/M1_2_FM00_GIT_BASELINE_ACCEPTANCE_2026-10-07.md`
+```
+DATA_READY
+```
+
+Current `research/fm01/CATL_DRIVER_HISTORY.ndjson` contains 44 admitted records and the dataset manifest records 22-quarter coverage.
+
+FM01 remains a historical driver-data foundation only. It does not authorize FM02 model selection or a production router.
+
+### G2 reference boundary
+
+Historical G2 frozen identity remains immutable and separate from R0 successor evidence:
+
+- historical frozen carrier SHA-256: `899f0b1b9f3619458e17be76ac43dd6e00b5397d0c12adb7b68e2479c7f51524`;
+- R0 successor evidence carrier SHA-256: `bd5cbaf23c9029b46fafd19992029932431059de7424a08de48624aca5d431c8`;
+- successor role: `ACCEPTED_SUCCESSOR_FOR_CURRENT_CLOSURE_ROLE_ONLY`.
 
 ### Independent regression track
 
-RP-01 remains a separate legacy fixture regression (`str.read`) and is not M1.2 baseline acceptance evidence.
+RP-01 remains a separate legacy fixture regression (`str.read`) and is not FM01 admission evidence.
 
 ## 9. Next canonical development boundary
 
-The next engineering boundary is:
+FM01 data admission is complete. The next boundary is:
 
-**M1.2-FM-01 / exact CATL M1.1 source snapshot admission**
+**M1.2-FM-02 Feature Builder / Forecastability Feature Contract**
 
-However, implementation already exists and is explicitly blocked at data ingress. Therefore the next permitted task is:
+FM02 remains gated by:
 
-**Acquire / admit the exact M1.1 CATL source snapshot under PIT and provenance controls.**
+- research-epoch contamination/purity rules;
+- PIT-only feature construction;
+- learned-transform fit boundaries;
+- explicit State / UNKNOWN semantics;
+- inner-selection / outer-evaluation separation;
+- capability-access isolation;
+- sealed research manifest;
+- independent blind scoring controls.
 
-Only after exact source admission should FM01 data population proceed.
+Do not use the admitted FM01 data to retroactively claim clean-confirmatory model-selection evidence. FM00 remains an exploratory contaminated epoch.
 
-FM02 Forecast Model Selection remains gated by the M1.2 research epoch, feature/state contracts, conditional backtest, research partition, capability-access and sealed-manifest requirements.
-
-This boundary does not authorize:
-- model selection;
-- result-driven tuning in the contaminated FM00 epoch;
-- a production router;
-- scheduler / alerts;
-- automatic execution;
-- full-market screening;
-- portfolio optimizer / Kelly logic.
-
-Historical Stage C acceptance records remain valid evidence of prior checkpoints but do not define the current development boundary.
+No scheduler, automatic execution, full-market screening, portfolio optimizer/Kelly logic, or unrestricted model family is authorized by this state.

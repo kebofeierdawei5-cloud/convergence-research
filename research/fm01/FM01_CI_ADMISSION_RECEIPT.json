@@ -1,0 +1,23 @@
+{
+  "schema_version": "IIOS-FM01-CI-ADMISSION-RECEIPT-0.1",
+  "status": "PASS",
+  "pull_request": 138,
+  "exact_head": "45783b7ee1a355668656ced650879328cd8bb84c",
+  "workflow": {
+    "name": "IIOS M1.2 FM01 Exact CATL Source Admission",
+    "run_id": 37560330256,
+    "run_number": 2,
+    "conclusion": "success",
+    "job": "verify-fm01-source-admission",
+    "job_id": 112595889194
+  },
+  "checks": {
+    "driver_series_validation": "PASS",
+    "independent_pit_replay": "PASS",
+    "admission_invariants": "PASS",
+    "compileall": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "merge_commit": "b48db1b688c1d66270db63c9d008354fd4a625b9",
+  "note": "CI verifies the Git-tracked admission projection and independent PIT replay. Exact raw M1.1 ZIP/bundle byte hashes were independently recomputed before admission and are referenced by the source-byte verification receipt."
+}
