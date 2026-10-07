@@ -10,6 +10,8 @@ from typing import Any
 
 from iios_mvp.canonical_current_price import InMemoryCanonicalCurrentPriceRegistry
 from iios_mvp.canonical_investment_admission_v01 import InMemoryCanonicalInvestmentAdmissionRegistry
+from iios_mvp.forecast_valuation_return_lineage_v01 import InMemoryCanonicalValuationOutputResolver
+from tests.b04b_return_lineage_fixture import bind_return_lineage
 from tests.b03b_upstream_authority_fixture import build_runtime_upstream_authority
 from iios_mvp.decision_admission import admit_canonical_decision
 from iios_mvp.human_report import build_human_report, qa_human_report, write_human_report
@@ -47,6 +49,9 @@ CUTOFF = date(2026, 10, 4)
 PRICE = Decimal("40.85")
 PRICE_EVIDENCE_SHA = "b59d6844530261896569dcd071f2fecb670fc26ad162a6ecbf31ccca1f464d7f"
 AUTHORITY_REGISTRY: InMemoryCanonicalInvestmentAdmissionRegistry | None = None
+FORECAST_REGISTRY = None
+VALUATION_ADMISSION_REGISTRY = InMemoryCanonicalInvestmentAdmissionRegistry()
+VALUATION_OUTPUT_RESOLVER: InMemoryCanonicalValuationOutputResolver | None = None
 
 
 def load_case_fixture() -> dict[str, Any]:
@@ -112,7 +117,7 @@ def admit_price() -> tuple[InMemoryCanonicalCurrentPriceRegistry, dict[str, Any]
 
 
 def build_case(fixture: dict[str, Any], price_ref: dict[str, Any]) -> dict[str, Any]:
-    global AUTHORITY_REGISTRY
+    global AUTHORITY_REGISTRY, FORECAST_REGISTRY, VALUATION_OUTPUT_RESOLVER
     quality = {
         "dimensions": [
             {
@@ -153,112 +158,14 @@ def build_case(fixture: dict[str, Any], price_ref: dict[str, Any]) -> dict[str, 
             },
         ]
     }
-    thesis = dict(fixture["thesis"])
-    authority_registry, upstream = build_runtime_upstream_authority(
-        case_id=CASE_ID,
-        market="CN-A",
-        symbol="002422",
-        company="四川科伦药业股份有限公司",
-        cutoff_date=CUTOFF,
-        reality={"status": "PASS", "economic_structure": fixture["economic_structure"], "evidence_ids": ["E001", "E002", "E003", "E004"]},
-        quality=quality,
-        value_driver={"status": "PASS", "drivers": thesis["key_driver_ids"], "evidence_ids": thesis["evidence_ids"]},
-        valuation=fixture["valuation"],
-        forecast={"status": "PASS", "forecast_assumptions": fixture["forecast_assumptions"], "evidence_ids": ["E002", "E003", "E004"]},
-        thesis=thesis,
-        declared_statuses={
-            "REALITY": "PASS",
-            "QUALITY": "CONDITIONAL",
-            "VALUE_DRIVER": "PASS",
-            "VALUATION": "PASS",
-            "FORECAST": "PASS",
-        },
+    payload, FORECAST_REGISTRY, VALUATION_OUTPUT_RESOLVER = bind_return_lineage(
+        payload,
+        independent_forecast_resolver=None,
+        valuation_admission_registry=VALUATION_ADMISSION_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
-    AUTHORITY_REGISTRY = authority_registry
-    return {
-        "contract_version": "IIOS-INVESTMENT-CORE-0.3",
-        "case_id": CASE_ID,
-        "market": "CN-A",
-        "symbol": "002422",
-        "company": "四川科伦药业股份有限公司",
-        "as_of_date": "2026-10-04",
-        "cutoff_date": "2026-10-04",
-        "current_price_observation": {
-            "price": "40.85",
-            "price_observation_id": price_ref["price_observation_id"],
-            "currency": "CNY",
-            "observed_at": "2026-09-30T15:00:00+00:00",
-            "known_at": "2026-09-30T23:59:00+00:00",
-            "source": "CFi:HISTORICAL_QUOTE",
-            "adjustment_semantics": "UNADJUSTED",
-            "price_observation_admission_hash": price_ref["admission_record_hash"],
-        },
-        "company_evidence_manifest": {
-            "manifest_id": "c3-kolun-evidence-v0.1",
-            "evidence_source_hierarchy": "CNINFO primary company evidence + separately captured public market price",
-            "evidence_ids": [item["evidence_id"] for item in fixture["evidence"]],
-        },
-        "trust": {"status": "PASS"},
-        "reality": {
-            "status": "PASS",
-            "economic_structure": fixture["economic_structure"],
-            "evidence_ids": ["E001", "E002", "E003", "E004"],
-        },
-        "forecast": {
-            "status": "PASS",
-            "forecast_type": "C3_SCENARIO_FORECAST",
-            "assumption_classification": "EXPLICIT_MODEL_ASSUMPTION_NOT_EVIDENCE",
-            "assumptions": fixture["forecast_assumptions"],
-        },
-        "valuation": fixture["valuation"],
-        "risk": fixture["risk"],
-        "portfolio": {
-            "position_pct": "0",
-            "constraint_status": "PASS",
-            "can_add": True,
-            "buy_add_package": {
-                "entry_zone": ["38", "42"],
-                "initial_position_pct": "5",
-                "target_position_pct": "10",
-                "max_position_pct": "10",
-                "thesis_break_triggers": fixture["thesis"]["falsifiers"],
-                "monitoring_triggers": [item["metric"] for item in fixture["monitoring"]],
-            },
-        },
-        "thesis": thesis,
-        "decision_upstream_admission": upstream,
-        "return_gate": {
-            "entry_price": "40.85",
-            "entry_value_reference": "58",
-            "horizon_years": "1",
-            "horizon_override": False,
-            "horizon_override_basis": [],
-            "horizon_selection_rationale": "C3 uses the default 1Y decision horizon; the case does not invoke a 3Y exception.",
-            "buy_entry_return_cushion_threshold": "0.15",
-            "fundamental_target_annualized_return": "0.15",
-            "required_return_annualized": "0.10",
-            "scenarios": {
-                "bear": {
-                    "probability": "0.30",
-                    "terminal_value_per_share": "37",
-                    "cash_distributions_per_share": "0",
-                    "probability_rationale": "Core pharmaceutical risk and lower biotechnology option realization.",
-                },
-                "base": {
-                    "probability": "0.50",
-                    "terminal_value_per_share": "58",
-                    "cash_distributions_per_share": "0",
-                    "probability_rationale": "Core pharmaceutical stabilization plus medium realization of controlled-biotech option value.",
-                },
-                "bull": {
-                    "probability": "0.20",
-                    "terminal_value_per_share": "88",
-                    "cash_distributions_per_share": "0",
-                    "probability_rationale": "Core business growth plus high realization of biotechnology platform value.",
-                },
-            },
-        },
-    }
+    return payload
+
 
 
 def run() -> dict[str, Any]:
@@ -266,7 +173,7 @@ def run() -> dict[str, Any]:
     registry, price_ref = admit_price()
     case = build_case(fixture, price_ref)
 
-    decision = decide_v03(case, current_price_resolver=registry, upstream_authority_resolver=AUTHORITY_REGISTRY)
+    decision = decide_v03(case, current_price_resolver=registry, independent_forecast_resolver=FORECAST_REGISTRY, upstream_authority_resolver=AUTHORITY_REGISTRY, valuation_output_resolver=VALUATION_OUTPUT_RESOLVER)
     if decision["action"] != "REVIEW_REQUIRED":
         raise AssertionError("C3 expected a review-required result from conditional quality")
     if decision["gates"]["new_capital_allowed"] is not False:
@@ -318,7 +225,9 @@ def run() -> dict[str, Any]:
             case=case,
             snapshot=snapshot,
             current_price_resolver=registry,
+            independent_forecast_resolver=FORECAST_REGISTRY,
             upstream_authority_resolver=AUTHORITY_REGISTRY,
+            valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         )
         decision_path = write_decision_revision(
             root,
