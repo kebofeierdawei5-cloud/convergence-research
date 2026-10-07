@@ -58,7 +58,8 @@
         "required_sections",
         "decision_fidelity",
         "human_boundary",
-        "non_authority"
+        "non_authority",
+        "human_readability"
       ],
       "properties": {
         "publication_integrity": {
@@ -104,6 +105,12 @@
           ]
         },
         "non_authority": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "human_readability": {
           "enum": [
             "PASS",
             "FAIL"
