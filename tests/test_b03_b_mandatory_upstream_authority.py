@@ -50,6 +50,7 @@ def test_b03_b_legacy_v01_upstream_authority_is_blocked_at_decision_runtime():
         current_price_resolver=CURRENT_PRICE_REGISTRY,
         independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     assert result["status"] == "BLOCKED"
     assert any(
