@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
@@ -314,8 +313,16 @@ def qa_human_report(*, publication: Mapping[str, Any], report: Mapping[str, Any]
     if "does not approve" not in lower or "cannot place orders" not in lower:
         checks["non_authority"] = "FAIL"
         issues.append("non_authority: explicit boundary language missing")
-    machine_json_dump = re.compile(r"(?m)^-\\s+[^:\\n]+:\\s*(?:\\{|\\[)[\\\"']")
-    if machine_json_dump.search(markdown):
+    machine_json_dump = False
+    for line in markdown.splitlines():
+        stripped = line.lstrip()
+        if not stripped.startswith("- ") or ":" not in stripped:
+            continue
+        value = stripped.split(":", 1)[1].strip()
+        if value.startswith("{") or value.startswith("["):
+            machine_json_dump = True
+            break
+    if machine_json_dump:
         checks["human_readability"] = "FAIL"
         issues.append("human_readability: machine-readable JSON-like field dump detected in main report")
     status = "PASS" if all(v == "PASS" for v in checks.values()) else "FAIL"
@@ -352,7 +359,7 @@ def validate_report_qa(record: Any) -> None:
     expected_checks = {
         "publication_integrity", "publication_binding", "report_integrity",
         "deterministic_render_replay", "required_sections", "decision_fidelity",
-        "human_boundary", "non_authority",
+        "human_boundary", "non_authority", "human_readability",
     }
     if not isinstance(checks, Mapping) or set(checks) != expected_checks:
         raise ValueError("report_qa checks invalid")
