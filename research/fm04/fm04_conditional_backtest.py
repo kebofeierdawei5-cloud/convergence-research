@@ -511,8 +511,8 @@ def conditional_performance(
     origins: list[dict[str, Any]],
     state_by_key: dict[tuple[str, str], dict[str, Any]],
     by_driver: dict[str, dict[str, dict[str, Any]]],
-) -> list[dict[str, Any]]:
-    groups: dict[tuple[str, str, str, str], set[str]] = {}
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    groups: set[tuple[str, str, str, str]] = set()
     for origin_item in origins:
         origin = origin_item["origin_id"]
         for horizon in origin_item.get("scheduled_horizons", []):
@@ -521,11 +521,22 @@ def conditional_performance(
                 for dimension in STATE_DIMENSIONS:
                     state = state_row["states"][dimension]
                     if state["status"] == "AVAILABLE":
-                        groups.setdefault((driver_id, horizon, dimension, state["state"]), set()).add(origin)
+                        groups.add((driver_id, horizon, dimension, state["state"]))
 
-    results = []
-    for (driver_id, horizon, dimension, state_value), _ in sorted(groups.items()):
-        common_units = []
+    group_definitions: list[dict[str, Any]] = []
+    empirical_results: list[dict[str, Any]] = []
+
+    for (driver_id, horizon, dimension, state_value) in sorted(groups):
+        group_id = f"FM04-GRP-{driver_id}-{horizon}-{dimension}-{state_value}"
+        group_definitions.append({
+            "group_id": group_id,
+            "driver_id": driver_id,
+            "horizon": horizon,
+            "state_dimension": dimension,
+            "state_value": state_value,
+        })
+
+        observations: list[dict[str, Any]] = []
         per_model_metrics: dict[str, list[dict[str, float]]] = {m: [] for m in MODEL_ORDER}
         for origin_item in origins:
             origin = origin_item["origin_id"]
@@ -540,7 +551,7 @@ def conditional_performance(
             if actual is None:
                 continue
             visible = visible_records(by_driver[driver_id], qcutoff(origin))
-            forecasts = {}
+            forecasts: dict[str, tuple[float, list[str]]] = {}
             failed = False
             for model_id in MODEL_ORDER:
                 try:
@@ -552,22 +563,39 @@ def conditional_performance(
                     break
             if failed:
                 continue
-            common_units.append({
+
+            model_metrics = {
+                model_id: metric_bundle(forecasts[model_id][0], float(actual["value"]))
+                for model_id in MODEL_ORDER
+            }
+            observations.append({
                 "outer_origin_id": origin,
-                "actual_record_id": actual["record_id"],
                 "state_row_id": state_row["state_row_id"],
+                "actual_record_id": actual["record_id"],
+                "model_input_record_ids": {
+                    model_id: forecasts[model_id][1] for model_id in MODEL_ORDER
+                },
+                "model_forecasts": {
+                    model_id: forecasts[model_id][0] for model_id in MODEL_ORDER
+                },
+                "model_metrics": model_metrics,
             })
             for model_id in MODEL_ORDER:
-                per_model_metrics[model_id].append(
-                    metric_bundle(forecasts[model_id][0], float(actual["value"]))
-                )
-        results.append({
+                per_model_metrics[model_id].append(model_metrics[model_id])
+
+        if not observations:
+            continue
+
+        empirical_results.append({
+            "performance_id": f"FM04-EMP-{driver_id}-{horizon}-{dimension}-{state_value}",
+            "group_id": group_id,
             "driver_id": driver_id,
             "horizon": horizon,
             "state_dimension": dimension,
             "state_value": state_value,
-            "common_outer_sample_size": len(common_units),
-            "common_outer_origins": [u["outer_origin_id"] for u in common_units],
+            "common_outer_sample_size": len(observations),
+            "common_outer_origins": [x["outer_origin_id"] for x in observations],
+            "observations": observations,
             "models": {
                 model_id: {
                     "metrics": aggregate_metrics(per_model_metrics[model_id]),
@@ -575,11 +603,10 @@ def conditional_performance(
                 }
                 for model_id in MODEL_ORDER
             },
-            "insufficient_for_selection": len(common_units) < 3,
+            "selection_eligible": False,
             "descriptive_only": True,
         })
-    return results
-
+    return group_definitions, empirical_results
 
 def build_result(
     contract: dict[str, Any],
