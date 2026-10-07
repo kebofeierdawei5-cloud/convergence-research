@@ -389,3 +389,15 @@ M1.2 New Research Epoch Design Proposal = **CANONICAL DESIGN / NOT ACTIVATED**.
 - recommendation: cross-sectional universe expansion with threshold preservation;
 - N>=3, MAE primary metric, existing model instances and state dimensions remain provisional defaults, not an active epoch;
 - A02 PIT universe admission, renewed provenance, purity freeze, and owner approval remain required before execution.
+
+
+## A02 B-01 status
+
+A02 B-01 Free-First Source Registry = **PASS / MERGED / CANONICAL — ADMISSION REMAINS BLOCKED**.
+
+- PR #163;
+- merge commit: `3230c7d09f212ab92622ffefc66e684d18262dd0`;
+- current unresolved domains: `st_history`, `industry_history`, `source_vintages`;
+- no historical PIT admission is claimed from current official pages alone.
+
+Next technical boundary: materialize and independently verify the missing historical PIT evidence; do not activate the proposed successor forecast epoch before A02 admission is complete.
