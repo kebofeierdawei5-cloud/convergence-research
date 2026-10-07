@@ -69,7 +69,13 @@ class FM04Tests(unittest.TestCase):
         result = build_result(copy.deepcopy(self.contract), copy.deepcopy(self.states), copy.deepcopy(self.lock), copy.deepcopy(self.records))
         self.assertEqual(result["summary"]["outer_selection_unit_count"], 406)
         self.assertEqual(result["summary"]["selected_count"] + result["summary"]["no_selection_count"], 406)
-        self.assertEqual(result["summary"]["conditional_group_count"], len(result["conditional_performance"]))
+        self.assertEqual(result["summary"]["conditional_group_count"], len(result["conditional_group_definitions"]))
+        self.assertEqual(result["summary"]["empirical_conditional_group_count"], len(result["conditional_empirical_performance"]))
+        self.assertEqual(len(result["selection_eligibility"]), 406)
+        self.assertEqual(len(result["conditional_group_definitions"]), len({
+            (x["driver_id"], x["horizon"], x["state_dimension"], x["state_value"])
+            for x in result["conditional_group_definitions"]
+        }))
 
     def test_unknown_state_forces_no_selection(self):
         if self.states is None:
@@ -132,8 +138,9 @@ class FM04Tests(unittest.TestCase):
                         try:
                             _, ids = forecast_model(model, by_driver[driver], vis, origin, horizon)
                             self.assertTrue(all(by_driver[driver][next(p for p,r in by_driver[driver].items() if r["record_id"]==rid)]["period"] <= origin for rid in ids))
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            if exc.__class__.__name__ != "ForecastUnavailable":
+                                raise
 
     def test_deterministic_replay(self):
         if self.states is None:
