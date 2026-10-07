@@ -58,7 +58,7 @@
       "evidence_id": "E006",
       "claim_type": "OBSERVED_FACT",
       "known_at": "2026-09-17",
-      "source": "Shenzhen Stock Exchange 2026 holiday schedule",
+      "source": "ChinaClear 2026 holiday schedule",
       "source_ref": "https://m.chinaclear.cn/zdjs/gszb/202609/0404d81f1ee8409c95b5dc4af693409f.shtml",
       "purpose": "2026-10-07 is a non-trading day; latest tradable session is 2026-09-30"
     }
