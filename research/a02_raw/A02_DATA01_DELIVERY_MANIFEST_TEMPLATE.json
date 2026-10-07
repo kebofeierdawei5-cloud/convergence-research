@@ -3,16 +3,34 @@
   "status": "CANDIDATE_INPUT",
   "universe_id": "OU-M12-A02-CSI800-NONFIN-PIT-001",
   "required_origins": [
-    "2023Q3", "2023Q4", "2024Q1", "2024Q2", "2024Q3", "2024Q4",
-    "2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1"
+    "2023Q3",
+    "2023Q4",
+    "2024Q1",
+    "2024Q2",
+    "2024Q3",
+    "2024Q4",
+    "2025Q1",
+    "2025Q2",
+    "2025Q3",
+    "2025Q4",
+    "2026Q1"
   ],
   "required_membership_states": [
-    "2023-06", "2023-12", "2024-06", "2024-12",
-    "2025-06", "2025-12", "2026-06"
+    "2023-06",
+    "2023-12",
+    "2024-06",
+    "2024-12",
+    "2025-06",
+    "2025-12",
+    "2026-06"
   ],
   "required_b_domains": [
-    "identity", "listing_delisting", "common_equity",
-    "st_history", "industry_history", "source_vintages"
+    "identity",
+    "listing_delisting",
+    "common_equity",
+    "st_history",
+    "industry_history",
+    "source_vintages"
   ],
   "terminal_a_target": {
     "file_name": "000906cons.xls",
@@ -20,13 +38,36 @@
     "sha256": "f8e4aa8d28bec4871fe6f582d4e5fc490c79312524a568de8f23b73e22b2b984",
     "role": "VALIDATION_TARGET_ONLY_UNTIL_BYTES_PRESENT"
   },
-  "a_membership_states": [],
-  "b_domain_records": [],
+  "a_membership_states": [
+    {
+      "state_id": "2023-06",
+      "raw_path": "A_CSI800_RAW/rebalance/REPLACE_WITH_EXACT_RAW_FILE",
+      "raw_sha256": "REPLACE_WITH_RECOMPUTED_SHA256",
+      "source_ref": "REPLACE_WITH_SOURCE_REFERENCE",
+      "publication_basis": "REPLACE_WITH_PUBLICATION_OR_SOURCE_VINTAGE",
+      "effective_date": "2023-06-REPLACE",
+      "known_at_basis": "REPLACE_WITH_KNOWN_AT_EVIDENCE"
+    }
+  ],
+  "b_domain_records": [
+    {
+      "domain": "identity",
+      "raw_paths": [
+        "B_PIT_SECURITY_MASTER_RAW/identity/REPLACE_WITH_RAW_FILE"
+      ],
+      "raw_sha256_by_path": {
+        "B_PIT_SECURITY_MASTER_RAW/identity/REPLACE_WITH_RAW_FILE": "REPLACE_WITH_RECOMPUTED_SHA256"
+      },
+      "source_ref": "REPLACE_WITH_SOURCE_REFERENCE",
+      "known_at_basis": "REPLACE_WITH_SOURCE_VINTAGE_OR_EVENT_PUBLICATION",
+      "license_redistribution_status": "REPLACE_WITH_STATUS"
+    }
+  ],
   "free_first": {
     "paid_source_required": false,
     "tushare_required": false,
     "current_snapshot_substitution_forbidden": true,
     "retrieved_at_as_known_at_forbidden": true
   },
-  "statement": "This manifest is an input contract and does not itself prove that any evidence exists."
+  "statement": "Template only. Replace all placeholders with real raw evidence metadata before preflight; the template itself proves nothing."
 }
