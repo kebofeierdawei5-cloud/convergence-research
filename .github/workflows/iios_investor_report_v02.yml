@@ -57,6 +57,31 @@ jobs:
           path: /tmp/iios-xhc/artifact
 
 
+      - name: Diagnose exact XHC writer invocation
+        if: ${{ always() }}
+        continue-on-error: true
+        run: |
+          set +e
+          rm -rf /tmp/iios-xhc/diagnostic/writer
+          mkdir -p /tmp/iios-xhc/diagnostic/writer
+          ls -la /tmp/iios-xhc/diagnostic/writer
+          python - <<'PY' > /tmp/iios-xhc/writer-diag.txt 2>&1
+          import traceback
+          from pathlib import Path
+          from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
+          pub=Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
+          out=Path("/tmp/iios-xhc/diagnostic/writer")
+          try:
+              out.mkdir(parents=True,exist_ok=True)
+              result=write_investor_review_report_v02(str(out), publication_path=str(pub), generated_at="2026-10-08T05:00:00+00:00")
+              print("WRITE_PASS", [str(p) for p in result], flush=True)
+          except BaseException:
+              traceback.print_exc()
+              raise
+          PY
+          cat /tmp/iios-xhc/writer-diag.txt
+          ls -la /tmp/iios-xhc/diagnostic/writer
+
       - name: Render canonical Xinhecheng Publication through Investor Review v0.2
         run: |
           set -euo pipefail
