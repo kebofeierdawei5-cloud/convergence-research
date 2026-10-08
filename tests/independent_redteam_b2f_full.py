@@ -135,27 +135,18 @@ def test_rt_b2f_007_finding_nested_decision_field_can_evade_semantic_guard():
 
 
 def test_rt_b2f_008_finding_decision_series_identity_is_caller_supplied():
-    fn = _function_tree(DECISION_LIFECYCLE, "build_decision_revision")
-    args = {
-        node.arg
-        for node in ast.walk(fn)
-        if isinstance(node, ast.arg)
-    }
-    for field in ("case_id", "market", "symbol", "company"):
-        assert field in args or field == "case_id"
     source = _source(DECISION_LIFECYCLE)
-    assert "decision_series_id: str" in source
+    fn = _function_tree(DECISION_LIFECYCLE, "build_decision_revision")
+    arg_names = {node.arg for node in ast.walk(fn) if isinstance(node, ast.arg)}
+    assert "decision_series_id" in arg_names
     assert "'decision_series_id': _text(decision_series_id" in source
-    assert "'market'" not in {
-        key
-        for key in [
-            "decision_series_id_market",
-            "decision_series_market",
-        ]
-    }
+    core = source[source.index("core = {"):source.index("return {**core, 'revision_hash'")]
+    assert "'market'" not in core
+    assert "'symbol'" not in core
+    assert "'company'" not in core
     raise AssertionError(
         "F-004 P1 reproduced: Decision Revision accepts an externally supplied decision_series_id "
-        "and does not structurally carry market/symbol/company into the series identity record; "
+        "and does not structurally carry market/symbol/company into the lifecycle series record; "
         "series binding therefore depends on caller discipline rather than the lifecycle contract."
     )
 
