@@ -57,60 +57,21 @@ jobs:
           path: /tmp/iios-xhc/artifact
 
 
-      - name: Diagnose real Xinhecheng v0.2 QA before writer
-        if: ${{ always() }}
-        continue-on-error: true
-        run: |
-          set +e
-          pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
-          python -c 'import json; from iios_mvp.investor_review_report_v02 import build_investor_review_report_v02, qa_investor_review_v02; p=json.load(open("'$pub'",encoding="utf-8")); r=build_investor_review_report_v02(publication=p,generated_at="2026-10-08T05:00:00+00:00"); q=qa_investor_review_v02(publication=p,report=r); print("QA_STATUS",q["qa_status"]); print("QA_ISSUES",q["issues"]); print("REPORT_HASH",r["report_hash"]); print("QA_HASH",q["qa_hash"])' > /tmp/iios-xhc/qa-diagnostic.txt 2>&1
-          rc=$?
-          cat /tmp/iios-xhc/qa-diagnostic.txt
-          echo QA_DIAGNOSTIC_RC=$rc
-          exit 0
-
-      - name: Diagnose real Xinhecheng v0.2 writer I/O failure
-        if: ${{ always() }}
-        run: |
-          set +e
-          pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
-          rm -rf /tmp/iios-xhc/writer-diag
-          mkdir -p /tmp/iios-xhc/writer-diag
-          python - <<'PY' > /tmp/iios-xhc/writer-diag/traceback.txt 2>&1
-          import traceback
-          from pathlib import Path
-          from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
-          pub=Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
-          out=Path("/tmp/iios-xhc/writer-diag/out")
-          try:
-              result=write_investor_review_report_v02(str(out),publication_path=str(pub),generated_at="2026-10-08T05:00:00+00:00")
-              print("WRITE_PASS")
-              print([str(p) for p in result])
-          except BaseException:
-              traceback.print_exc()
-              raise
-          PY
-          rc=$?
-          echo writer_rc=$rc
-          cat /tmp/iios-xhc/writer-diag/traceback.txt
-          exit 0
-
       - name: Render canonical Xinhecheng Publication through Investor Review v0.2
         run: |
           set -euo pipefail
           pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
           test -f "$pub"
           test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
-          rm -rf .iios-xhc-render
+          rm -rf /tmp/iios-xhc/final
+          mkdir -p /tmp/iios-xhc/final
           python - <<'PY'
           from pathlib import Path
           from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
           pub=Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
-          out=Path.cwd() / ".iios-xhc-render"
-          out.mkdir(parents=True,exist_ok=True)
+          out=Path("/tmp/iios-xhc/final")
           print([str(p) for p in write_investor_review_report_v02(str(out), publication_path=str(pub), generated_at="2026-10-08T05:00:00+00:00")])
           PY
-
 
       - name: Assert canonical Xinhecheng v0.2 Human Auditability
         run: |
@@ -118,7 +79,7 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          root=Path(".iios-xhc-render")
+          root=Path("/tmp/iios-xhc/final")
           report=json.loads(next(root.glob("*.investor-review-v02.json")).read_text(encoding="utf-8"))
           qa=json.loads(next(root.glob("*.investor-review-v02-qa.json")).read_text(encoding="utf-8"))
           audit=report["machine_report"]["semantic_surface"]["human_auditability"]
@@ -143,15 +104,15 @@ jobs:
         run: |
           set -euo pipefail
           python tests/independent_redteam_investor_review_v02.py \
-            --report "$(find .iios-xhc-render -name '*.investor-review-v02.json' -print -quit)" \
-            --qa "$(find .iios-xhc-render -name '*.investor-review-v02-qa.json' -print -quit)" \
-            --markdown "$(find .iios-xhc-render -name '*.investor-review-v02.md' -print -quit)"
+            --report "$(find /tmp/iios-xhc/final -name '*.investor-review-v02.json' -print -quit)" \
+            --qa "$(find /tmp/iios-xhc/final -name '*.investor-review-v02-qa.json' -print -quit)" \
+            --markdown "$(find /tmp/iios-xhc/final -name '*.investor-review-v02.md' -print -quit)"
 
       - name: Upload real Xinhecheng v0.2 report evidence
         uses: actions/upload-artifact@v4
         with:
           name: iios-investor-review-v02-xinhecheng
-          path: .iios-xhc-render/
+          path: /tmp/iios-xhc/final/
           if-no-files-found: error
 
       - run: python -m json.tool schemas/investor_review_report_v0.2.schema.json >/dev/null
