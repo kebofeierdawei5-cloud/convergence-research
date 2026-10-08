@@ -77,6 +77,10 @@ def _status(node: Any, gates: Mapping[str, Any], *keys: str) -> str:
         if value not in (None, ""):
             return str(value)
     if isinstance(node, Mapping):
+        for key in keys:
+            value = node.get(key)
+            if value not in (None, ""):
+                return str(value)
         value = node.get("status")
         if value not in (None, ""):
             return str(value)
@@ -199,7 +203,7 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
     }
     semantic_matrix = {name: modules[name] for name, _ in MODULE_ORDER}
     core_missing = [
-        name for name in ("quality", "reality", "thesis", "value_drivers", "forecast", "valuation", "mie", "expectation_gap", "risk", "positioning")
+        name for name in ("trust", "quality", "reality", "thesis", "value_drivers", "forecast", "valuation", "mie", "expectation_gap", "risk", "positioning")
         if (
             semantic_matrix[name]["status"] == "NOT_PROVIDED"
             or not semantic_matrix[name]["present"]
