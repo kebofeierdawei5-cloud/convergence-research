@@ -754,6 +754,8 @@ def qa_investor_review_v02(*, publication: Mapping[str, Any], report: Mapping[st
         if audit.get("overall_status") not in {"COMPLETE", "INCOMPLETE"}:
             checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: invalid overall status")
         mg = audit.get("mie_expectation_gap", {})
+        if mg.get("audit_status") not in {"COMPLETE", "INCOMPLETE"}:
+            checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: invalid MIE/Expectation Gap audit status")
         if "inference_rule" not in mg or mg.get("inference_rule") != "absence_never_implies_not_identifiable":
             checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: MIE inference rule missing")
         rr = audit.get("required_return", {})
