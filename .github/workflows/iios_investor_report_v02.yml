@@ -57,6 +57,18 @@ jobs:
           path: /tmp/iios-xhc/artifact
 
 
+      - name: Diagnose real Xinhecheng v0.2 QA before writer
+        if: ${{ always() }}
+        continue-on-error: true
+        run: |
+          set +e
+          pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
+          python -c 'import json; from iios_mvp.investor_review_report_v02 import build_investor_review_report_v02, qa_investor_review_v02; p=json.load(open("'$pub'",encoding="utf-8")); r=build_investor_review_report_v02(publication=p,generated_at="2026-10-08T05:00:00+00:00"); q=qa_investor_review_v02(publication=p,report=r); print("QA_STATUS",q["qa_status"]); print("QA_ISSUES",q["issues"]); print("REPORT_HASH",r["report_hash"]); print("QA_HASH",q["qa_hash"])' > /tmp/iios-xhc/qa-diagnostic.txt 2>&1
+          rc=$?
+          cat /tmp/iios-xhc/qa-diagnostic.txt
+          echo QA_DIAGNOSTIC_RC=$rc
+          exit 0
+
       - name: Render canonical Xinhecheng Publication through Investor Review v0.2
         run: |
           set -euo pipefail
