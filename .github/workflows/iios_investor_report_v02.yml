@@ -9,6 +9,8 @@ on:
       - "schemas/investor_review_qa_v0.2.schema.json"
       - "tests/test_investor_review_report_v02.py"
       - "docs/iios/INVESTOR_REVIEW_REPORT_v0.2.md"
+      - "docs/iios/INVESTOR_REVIEW_HUMAN_AUDITABILITY_CONTRACT_v0.2.md"
+      - "schemas/human_auditability_v0.2.schema.json"
       - ".github/workflows/iios_investor_report_v02.yml"
   push:
     branches: [main]
@@ -37,4 +39,5 @@ jobs:
       - run: python -m pytest -q tests/test_investor_review_report_v02.py
       - run: python -m json.tool schemas/investor_review_report_v0.2.schema.json >/dev/null
       - run: python -m json.tool schemas/investor_review_qa_v0.2.schema.json >/dev/null
+      - run: python -m json.tool schemas/human_auditability_v0.2.schema.json >/dev/null
       - run: git diff --check
