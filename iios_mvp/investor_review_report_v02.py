@@ -407,7 +407,7 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
             gate_status=gates.get("mie") or gates.get("mie_status"),
         ),
         "expectation_gap": _module(
-            "expectation_gap", "Expectation Gap / 预期差", _status(gap, gates, "expectation_gap"),
+            "expectation_gap", "Expectation Gap / 预期差", _status(gap, gates, "expectation_gap", "expectation_gap_status"),
             "decision_payload.expectation_gap / expectation_gap_evaluation / gates.expectation_gap_status",
             gap,
             content_status="PARTIAL" if gap and not payload.get("expectation_gap") and not payload.get("expectation_gap_evaluation") else None,
@@ -431,23 +431,6 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
         name for name in ("trust", "quality", "reality", "thesis", "value_drivers", "forecast", "valuation", "mie", "expectation_gap", "risk", "positioning")
         if semantic_matrix[name]["content_status"] not in {"STRUCTURED"}
     ]
-    completeness_flags = {
-        "required_return_value_missing_but_pass_flag_present": bool(
-            returns.get("required_return") in (None, "")
-            and returns.get("required_return_pass") is True
-        ),
-        "scenario_probabilities_missing": bool(
-            forecast
-            and isinstance(forecast.get("scenarios"), Mapping)
-            and any(
-                isinstance(forecast.get("scenarios", {}).get(name), Mapping)
-                and (forecast["scenarios"][name].get("probability") in (None, "") and forecast["scenarios"][name].get("prob") in (None, ""))
-                for name in ("bear", "base", "bull")
-            )
-        ),
-        "actionable_target_entry_unavailable": decision.get("target_entry_price") in (None, ""),
-        "positioning_blocked": _status(positioning, gates, "positioning", "positioning_sizing") == "BLOCKED",
-    }
     auditability = _human_auditability(
         payload=payload,
         decision=decision,
@@ -704,6 +687,7 @@ def qa_investor_review_v02(*, publication: Mapping[str, Any], report: Mapping[st
         "machine_surface_integrity": "PASS", "human_surface_integrity": "PASS",
         "deterministic_render_replay": "PASS", "required_sections": "PASS",
         "semantic_matrix_complete": "PASS", "explicit_absence_handling": "PASS",
+        "human_auditability_contract": "PASS",
         "decision_fidelity": "PASS", "human_boundary": "PASS", "non_authority": "PASS",
     }
     issues: list[str] = []
@@ -752,6 +736,29 @@ def qa_investor_review_v02(*, publication: Mapping[str, Any], report: Mapping[st
         checks["semantic_matrix_complete"] = "FAIL"; issues.append("semantic_matrix_complete: invalid status")
     if surface.get("missing_core_modules") and "NOT_PROVIDED" not in str(report.get("markdown", "")):
         checks["explicit_absence_handling"] = "FAIL"; issues.append("explicit_absence_handling: missing modules are silent")
+    audit = surface.get("human_auditability") if isinstance(surface, Mapping) else None
+    if not isinstance(audit, Mapping):
+        checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: missing contract object")
+    else:
+        required_audit_keys = {"required_return", "expected_return", "scenario_probability", "entry_price", "portfolio_permission", "mie_expectation_gap", "overall_status", "contract_version"}
+        if set(audit) != required_audit_keys or audit.get("contract_version") != HUMAN_AUDITABILITY_CONTRACT_VERSION:
+            checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: contract shape/version mismatch")
+        rr = audit.get("required_return", {})
+        er = audit.get("expected_return", {})
+        prob = audit.get("scenario_probability", {})
+        entry = audit.get("entry_price", {})
+        pp = audit.get("portfolio_permission", {})
+        mg = audit.get("mie_expectation_gap", {})
+        if rr.get("pass_flag") is True and rr.get("numeric_value") in (None, "") and rr.get("status") != "INCOMPLETE":
+            checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: Required Return pass without numeric value")
+        if er.get("expected_annualized_return") not in (None, "") and er.get("scenario_probability_status") != "COMPLETE" and er.get("status") != "INCOMPLETE":
+            checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: Expected Return lacks auditable scenario probabilities")
+        if entry.get("threshold_price") not in (None, "") and entry.get("actionable_target_entry_price") in (None, "") and entry.get("status") != "THRESHOLD_ONLY":
+            checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: threshold-only entry not explicit")
+        if pp.get("package_can_add") is True and pp.get("decision_new_capital_allowed") is False and pp.get("status") != "OVERRIDDEN_BY_DECISION":
+            checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: portfolio override not explicit")
+        if mg.get("mie", {}).get("source_presence") == "MISSING" and mg.get("mie", {}).get("status") == "NOT_IDENTIFIABLE":
+            checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: MIE absence incorrectly inferred as NOT_IDENTIFIABLE")
     decision = publication.get("ai_decision") or {}
     markdown = str(report.get("markdown", ""))
     if str(decision.get("action", "")) not in markdown or str(decision.get("primary_reason", "")) not in markdown:
@@ -777,7 +784,7 @@ def validate_investor_review_qa_v02(record: Any) -> None:
         raise ValueError("investor_review_qa_v02 fields are invalid")
     if record["qa_version"] != INVESTOR_QA_VERSION or record["qa_status"] not in {"PASS", "FAIL"}:
         raise ValueError("investor_review_qa_v02 version/status invalid")
-    expected_checks = {"publication_integrity", "publication_binding", "machine_surface_integrity", "human_surface_integrity", "deterministic_render_replay", "required_sections", "semantic_matrix_complete", "explicit_absence_handling", "decision_fidelity", "human_boundary", "non_authority"}
+    expected_checks = {"publication_integrity", "publication_binding", "machine_surface_integrity", "human_surface_integrity", "deterministic_render_replay", "required_sections", "semantic_matrix_complete", "explicit_absence_handling", "human_auditability_contract", "decision_fidelity", "human_boundary", "non_authority"}
     if not isinstance(record["checks"], Mapping) or set(record["checks"]) != expected_checks:
         raise ValueError("investor_review_qa_v02 checks invalid")
     if any(v not in {"PASS", "FAIL"} for v in record["checks"].values()):
