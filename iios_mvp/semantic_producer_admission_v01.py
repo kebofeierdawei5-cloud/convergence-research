@@ -11,6 +11,19 @@ from iios_mvp.canonical_research_orchestrator import SEMANTIC_PRODUCER_TYPES, ca
 SEMANTIC_ADMISSION_VERSION = "IIOS-SEMANTIC-PRODUCER-ADMISSION-0.1"
 SEMANTIC_PRODUCER_RECEIPT_SCHEMA_VERSION = "IIOS-SEMANTIC-PRODUCER-RECEIPT-0.1"
 
+SEMANTIC_ARTIFACT_TYPES = {
+    "REALITY_INTERPRETATION",
+    "TRUST_ASSESSMENT",
+    "QUALITY_ASSESSMENT",
+    "THESIS_ASSESSMENT",
+    "VALUE_DRIVER_ASSESSMENT",
+    "INDEPENDENT_FORECAST_REASONING",
+    "VALUATION_PROPOSAL",
+    "MIE_INTERPRETATION",
+    "RISK_ASSESSMENT",
+    "POSITIONING_ASSESSMENT",
+}
+
 
 class SemanticAdmissionError(ValueError):
     """Raised when semantic output is not canonically admissible."""
@@ -115,6 +128,8 @@ def build_semantic_artifact(
 ) -> dict[str, Any]:
     if not artifact_id.strip():
         raise ValueError("artifact_id is required")
+    if artifact_type not in SEMANTIC_ARTIFACT_TYPES:
+        raise ValueError("unsupported semantic artifact type")
     if artifact_type != context.artifact_type:
         raise ValueError("artifact_type does not match admission context")
     if context.producer_type not in SEMANTIC_PRODUCER_TYPES:
