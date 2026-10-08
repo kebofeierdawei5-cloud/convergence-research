@@ -16,6 +16,7 @@ from iios_mvp.decision_admission import admit_canonical_decision
 from iios_mvp.decision_lifecycle_production import build_decision_revision, validate_decision_revision
 from iios_mvp.decision_upstream_admission_v03 import DECISION_UPSTREAM_ADMISSION_V02
 from iios_mvp.investment_core_contract_v03 import decide_v03
+from iios_mvp.semantic_to_core_projection_v01 import project_thesis_semantic_to_core
 from iios_mvp.llm_semantic_workbench_v01 import (
     LLMSemanticWorkbench,
     SemanticProducer,
@@ -259,7 +260,7 @@ def run_b2e_conformance(
     )
     snapshot = _build_snapshot(case=case, decision=canonical_decision)
     decision_admission = admit_canonical_decision(
-        case=case,
+        case=projected_case,
         snapshot=snapshot,
         current_price_resolver=current_price_resolver,
         independent_forecast_resolver=independent_forecast_resolver,
@@ -302,7 +303,9 @@ def run_b2e_conformance(
         "raw_request_sha256": admitted.request_receipt["raw_request_sha256"],
         "request_receipt_hash": admitted.request_receipt["receipt_hash"],
         "research_case_hash": admitted.case_hash,
-        "case_hash": sha256(case),
+        "case_hash": sha256(projected_case),
+        "semantic_core_projection_hash": projection["projection_hash"],
+        "semantic_core_projection_hash": projection["projection_hash"],
         "semantic_artifact_hash": semantic.artifact["artifact_hash"],
         "semantic_admission_hash": semantic.admission.admission_hash,
         "decision_admission_hash": decision_admission["admission_record_hash"],
