@@ -41,6 +41,7 @@ def _snapshot():
             "forecast": "PASS", "valuation": "PASS",
             "new_capital_allowed": False, "positioning_sizing_permission": "NO_SIZING_PERMISSION",
         },
+        "trust": {"status": "REVALIDATION", "revalidation_required": True, "evidence_ids": ["E001"]},
         "evidence_chain": [
             {"evidence_id": "E001", "claim_type": "OBSERVED_FACT", "source": "annual_report", "period": "2025", "known_at": cutoff, "purpose": "financial history"},
             {"evidence_id": "E002", "claim_type": "OBSERVED_FACT", "source": "exchange", "period": "2026Q2", "known_at": cutoff, "purpose": "quarterly reality"},
