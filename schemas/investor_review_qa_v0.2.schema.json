@@ -16,7 +16,7 @@
     "checks": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["publication_integrity","publication_binding","machine_surface_integrity","human_surface_integrity","deterministic_render_replay","required_sections","semantic_matrix_complete","explicit_absence_handling","decision_fidelity","human_boundary","non_authority"],
+      "required": ["publication_integrity","publication_binding","machine_surface_integrity","human_surface_integrity","deterministic_render_replay","required_sections","semantic_matrix_complete","explicit_absence_handling","human_auditability_contract","decision_fidelity","human_boundary","non_authority"],
       "properties": {
         "publication_integrity": {"enum": ["PASS","FAIL"]},
         "publication_binding": {"enum": ["PASS","FAIL"]},
@@ -26,6 +26,7 @@
         "required_sections": {"enum": ["PASS","FAIL"]},
         "semantic_matrix_complete": {"enum": ["PASS","FAIL"]},
         "explicit_absence_handling": {"enum": ["PASS","FAIL"]},
+        "human_auditability_contract": {"enum": ["PASS","FAIL"]},
         "decision_fidelity": {"enum": ["PASS","FAIL"]},
         "human_boundary": {"enum": ["PASS","FAIL"]},
         "non_authority": {"enum": ["PASS","FAIL"]}
