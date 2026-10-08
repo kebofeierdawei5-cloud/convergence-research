@@ -126,6 +126,8 @@ def test_b2e_full_control_plane_e2e():
         valuation_output_resolver=valuation_resolver,
     )
     assert result.binding_receipt["status"] == "ADMITTED"
+    assert result.binding_receipt["research_case_hash"] == result.request_admission.case_hash
+    assert result.binding_receipt["case_hash"] != result.request_admission.case_hash
     assert result.semantic.admission.status == "ADMITTED"
     assert result.binding_receipt["action"] == result.decision_admission["canonical_action"]
     assert result.binding_receipt["human_approval_required"] is True

@@ -176,8 +176,24 @@ def run_b2e_conformance(
 
     if sha256(admitted.research_case) != admitted.case_hash:
         raise B2EE2EError("research case hash binding failed")
-    if admitted.case_hash != sha256(case):
-        raise B2EE2EError("canonical case supplied to B2-E does not match admitted Research Case")
+    case_identity = {
+        "case_id": case.get("case_id"),
+        "market": str(case.get("market", "")).upper(),
+        "symbol": str(case.get("symbol", "")).upper(),
+        "cutoff_date": case.get("cutoff_date"),
+        "as_of_date": case.get("as_of_date"),
+    }
+    admitted_identity = {
+        "case_id": admitted.case_id,
+        "market": str(admitted.research_case["request"]["market"]).upper(),
+        "symbol": str(admitted.research_case["request"]["symbol"]).upper(),
+        "cutoff_date": admitted.research_case["temporal_scope"]["cutoff_date"],
+        "as_of_date": admitted.research_case["request"]["as_of_date"],
+    }
+    if case_identity != admitted_identity:
+        raise B2EE2EError(
+            "expanded Investment Core case identity does not match admitted Research Case"
+        )
 
     orchestrator.transition(
         run_id,
@@ -285,7 +301,8 @@ def run_b2e_conformance(
         "cutoff_date": admitted.research_case["temporal_scope"]["cutoff_date"],
         "raw_request_sha256": admitted.request_receipt["raw_request_sha256"],
         "request_receipt_hash": admitted.request_receipt["receipt_hash"],
-        "case_hash": admitted.case_hash,
+        "research_case_hash": admitted.case_hash,
+        "case_hash": sha256(case),
         "semantic_artifact_hash": semantic.artifact["artifact_hash"],
         "semantic_admission_hash": semantic.admission.admission_hash,
         "decision_admission_hash": decision_admission["admission_record_hash"],
