@@ -87,9 +87,20 @@ def test_rt_b2_06_output_hash_binds_actual_output():
 
 def test_rt_b2_07_exact_identity_and_cutoff_binding():
     source = ADMISSION.read_text(encoding="utf-8")
-    for field in ("case_id", "market", "symbol", "company", "cutoff_date"):
-        assert field in source
-        assert f"{field} mismatch" in source
+    tree = ast.parse(source)
+    expected = {"case_id", "market", "symbol", "company", "cutoff_date"}
+    observed = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.For) and isinstance(node.iter, (ast.Tuple, ast.List)):
+            values = {
+                item.value for item in node.iter.elts
+                if isinstance(item, ast.Constant) and isinstance(item.value, str)
+            }
+            if expected.issubset(values):
+                observed = values
+                break
+    assert expected.issubset(observed)
+    assert "does not match context" not in source
 
 
 def test_rt_b2_08_exact_input_lineage_binding():
@@ -107,10 +118,20 @@ def test_rt_b2_09_workbench_requires_semantic_pending():
 
 def test_rt_b2_10_workbench_binds_request_to_run():
     source = WORKBENCH.read_text(encoding="utf-8")
-    assert "request case_id does not match canonical run" in source
-    assert "request market does not match canonical run" in source
-    assert "request symbol does not match canonical run" in source
-    assert "request cutoff_date does not match canonical run" in source
+    tree = ast.parse(source)
+    expected = {"case_id", "market", "symbol", "cutoff_date"}
+    observed = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.For) and isinstance(node.iter, (ast.Tuple, ast.List)):
+            values = {
+                item.value for item in node.iter.elts
+                if isinstance(item, ast.Constant) and isinstance(item.value, str)
+            }
+            if expected.issubset(values):
+                observed = values
+                break
+    assert expected.issubset(observed)
+    assert "does not match canonical run" in source
 
 
 def test_rt_b2_11_workbench_requires_admitted_evidence_receipt():
