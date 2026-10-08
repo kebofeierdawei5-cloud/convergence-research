@@ -42,10 +42,11 @@ def make_snapshot(action="REVIEW_REQUIRED"):
         "auto_execution": False,
         "gates": {
             "trust": "PASS",
-            "evidence_pit": True,
-            "forecast_ready": True,
-            "valuation_ready": True,
-            "new_buy_add_allowed": False,
+            "reality": "PASS",
+            "forecast": "PASS",
+            "valuation": "PASS",
+            "new_capital_allowed": False,
+            "positioning_sizing_permission": "NO_SIZING_PERMISSION",
         },
         "evidence_chain": [
             {"evidence_id": "E001", "claim_type": "OBSERVED_FACT", "known_at": cutoff, "purpose": "test evidence"},
