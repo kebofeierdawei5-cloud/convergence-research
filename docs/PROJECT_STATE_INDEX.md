@@ -1348,3 +1348,53 @@ B2-C — Live Semantic Producer Binding + Natural-Language-to-Semantic-to-Decisi
 ```
 
 B2-C must introduce an authorized real semantic producer boundary or an explicitly signed external-provider receipt path. It must demonstrate end-to-end lineage from natural-language request through semantic admission and into Decision Admission without allowing the LLM to grant permission authority.
+
+## 24. B2-C — Signed External Semantic Provider Binding — 2026-10-08
+
+Status: **PASS / MERGED / CANONICAL**
+
+Scope:
+- PR #210;
+- exact accepted implementation head: `1eaaae6f0859bf3283a65ff0c700c5da6392b4d0`;
+- merge commit: `883ca6ee9be0c5982d7f9b2ef1e0d70c564a39f8`.
+
+Technical evidence:
+- B2-C Signed External Semantic Provider workflow Run #3: **SUCCESS**;
+- signed-provider conformance tests: **7 / 7 PASS**;
+- independent clean-room red-team: **15 / 15 PASS**;
+- compileall: PASS;
+- external signed-provider receipt schema validation: PASS;
+- git diff --check: PASS.
+
+Closed boundary:
+- trusted Ed25519 external-provider public-key registry;
+- exact producer_id / producer_type / producer_version / policy_version binding;
+- raw natural-language request SHA-256 binding;
+- exact request_id / run_id / case_id / cutoff binding;
+- exact semantic input references and hashes binding;
+- semantic artifact hash binding;
+- attestation integrity hash and Ed25519 signature verification;
+- reuse of B2-A deterministic semantic admission;
+- successful path advances only `SEMANTIC_PENDING → SEMANTIC_ADMITTED`.
+
+Governance:
+- owner/operator approved B2-C for merge after dedicated CI and independent clean-room red-team;
+- B2-C is canonical semantic-provider authentication infrastructure;
+- no Decision, capital permission, Human Approval, publication or execution authority is introduced.
+
+Explicit non-claim:
+- B2-C uses a deterministic fixture signing key in repository conformance tests;
+- B2-C does **not** prove a live production LLM/provider connection;
+- B2-C does **not** prove provider model quality or economic decision validity.
+
+Next canonical development boundary:
+
+```text
+B2-D — Real Provider Adapter / Live Model Invocation + Independent Provider Replay
+```
+
+B2-D is now the only remaining B2 blocker on the LLM side. It must either:
+1. connect an actually authorized live provider through a real runtime connector, or
+2. admit a production-origin provider artifact/receipt whose provenance can be independently replayed.
+
+No fixture-only result may be promoted as live-provider evidence.
