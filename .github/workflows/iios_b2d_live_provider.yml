@@ -12,6 +12,7 @@ on:
   push:
     branches:
       - "feature/b2d-live-provider-canonical-refresh-20261008"
+      - "feature/b2d2-provider-neutral-runtime-20261008"
   workflow_dispatch:
 
 permissions:
