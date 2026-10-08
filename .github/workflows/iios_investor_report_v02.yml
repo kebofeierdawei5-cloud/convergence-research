@@ -1,0 +1,135 @@
+name: IIOS Investor Review Report v0.2
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/investor_review_report_v02.py"
+      - "iios_mvp/cli.py"
+      - "schemas/investor_review_report_v0.2.schema.json"
+      - "schemas/investor_review_qa_v0.2.schema.json"
+      - "tests/test_investor_review_report_v02.py"
+      - "tests/independent_redteam_investor_review_v02.py"
+      - "docs/iios/INVESTOR_REVIEW_V02_REDTEAM_XHC_2_20261008.md"
+      - "docs/iios/INVESTOR_REVIEW_REPORT_v0.2.md"
+      - "docs/iios/INVESTOR_REVIEW_HUMAN_AUDITABILITY_CONTRACT_v0.2.md"
+      - "schemas/human_auditability_v0.2.schema.json"
+      - ".github/workflows/iios_investor_report_v02.yml"
+  push:
+    branches: [main]
+    paths:
+      - "iios_mvp/investor_review_report_v02.py"
+      - "iios_mvp/cli.py"
+      - "schemas/investor_review_report_v0.2.schema.json"
+      - "schemas/investor_review_qa_v0.2.schema.json"
+      - "tests/test_investor_review_report_v02.py"
+      - "docs/iios/INVESTOR_REVIEW_REPORT_v0.2.md"
+      - ".github/workflows/iios_investor_report_v02.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  investor-report-v02:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact PR head checkout
+        if: github.event_name == 'pull_request'
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q iios_mvp tests
+      - run: python -m pytest -q tests/test_investor_review_report_v02.py
+
+      - name: Download canonical Xinhecheng Publication evidence
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 11529920007
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 37730232684
+          path: /tmp/iios-xhc/artifact
+
+
+      - name: Render canonical Xinhecheng Publication through Investor Review v0.2
+        run: |
+          set +e
+          pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
+          test -f "$pub"
+          test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
+          rm -rf /tmp/iios-xhc/formal-writer
+          mkdir -p /tmp/iios-xhc/formal-writer
+          python - <<'PY' > /tmp/iios-xhc/formal-writer/result.txt 2>&1
+          import traceback
+          from pathlib import Path
+          from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
+          pub=Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
+          out=Path("/tmp/iios-xhc/formal-writer/out")
+          try:
+              out.mkdir(parents=True,exist_ok=True)
+              result=write_investor_review_report_v02(str(out),publication_path=str(pub),generated_at="2026-10-08T05:00:00+00:00")
+              print("WRITE_PASS")
+              print([str(p) for p in result])
+          except BaseException:
+              traceback.print_exc()
+              raise
+          PY
+          rc=$?
+          cat /tmp/iios-xhc/formal-writer/result.txt
+          echo FORMAL_WRITER_RC=$rc
+          set -e
+          test "$rc" = "0"
+
+
+      - name: Assert canonical Xinhecheng v0.2 Human Auditability
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("/tmp/iios-xhc/formal-writer/out")
+          report=json.loads(next(root.glob("*.investor-review-v02.json")).read_text(encoding="utf-8"))
+          qa=json.loads(next(root.glob("*.investor-review-v02-qa.json")).read_text(encoding="utf-8"))
+          audit=report["machine_report"]["semantic_surface"]["human_auditability"]
+          expected={
+              "report_hash": report["report_hash"] == "b5ab777d1389d20f2b6f1d03e8d15324bb03fbe58fe299c0f5ee5f7b68672bce",
+              "qa_hash": qa["qa_hash"] == "fefcdd47f83fe8c6a8b81eec7ae39cddc9cab8d6e364142fa0d6e2b118145b4d",
+              "required_return": audit["required_return"]["status"] == "INCOMPLETE" and audit["required_return"]["numeric_value"] is None,
+              "scenario_probability": audit["scenario_probability"]["status"] == "MISSING",
+              "expected_return": audit["expected_return"]["status"] == "INCOMPLETE",
+              "entry_price": audit["entry_price"]["status"] == "THRESHOLD_ONLY" and audit["entry_price"]["actionable_target_entry_price"] is None and audit["entry_price"]["threshold_price"] == "26.6",
+              "portfolio_permission": audit["portfolio_permission"]["status"] == "OVERRIDDEN_BY_DECISION",
+              "mie": audit["mie_expectation_gap"]["mie"]["status"] == "NOT_PROVIDED" and audit["mie_expectation_gap"]["mie"]["source_presence"] == "MISSING",
+              "gap": audit["mie_expectation_gap"]["expectation_gap"]["status"] == "UNKNOWN",
+              "inference_rule": audit["mie_expectation_gap"]["inference_rule"] == "absence_never_implies_not_identifiable",
+              "qa": qa["qa_status"] == "PASS" and not qa["issues"],
+          }
+          print(json.dumps(expected,ensure_ascii=False,sort_keys=True))
+          if not all(expected.values()): raise SystemExit("XHC_HUMAN_AUDITABILITY_ASSERT_FAIL")
+          PY
+
+      - name: Second-round independent clean-room redteam
+        run: |
+          set -euo pipefail
+          python tests/independent_redteam_investor_review_v02.py \
+            --report "$(find /tmp/iios-xhc/formal-writer/out -name '*.investor-review-v02.json' -print -quit)" \
+            --qa "$(find /tmp/iios-xhc/formal-writer/out -name '*.investor-review-v02-qa.json' -print -quit)" \
+            --markdown "$(find /tmp/iios-xhc/formal-writer/out -name '*.investor-review-v02.md' -print -quit)"
+
+      - name: Upload real Xinhecheng v0.2 report evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: iios-investor-review-v02-xinhecheng
+          path: /tmp/iios-xhc/formal-writer/out/
+          if-no-files-found: error
+
+      - run: python -m json.tool schemas/investor_review_report_v0.2.schema.json >/dev/null
+      - run: python -m json.tool schemas/investor_review_qa_v0.2.schema.json >/dev/null
+      - run: python -m json.tool schemas/human_auditability_v0.2.schema.json >/dev/null
+      - run: git diff --check
