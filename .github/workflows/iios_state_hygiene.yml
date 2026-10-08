@@ -1,0 +1,30 @@
+name: IIOS State Hygiene
+
+on:
+  pull_request:
+    paths:
+      - "docs/PROJECT_STATE_INDEX.md"
+      - "tests/test_state_authority_index.py"
+      - ".github/workflows/iios_state_hygiene.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Verify canonical state authority
+        run: python -m pytest -q tests/test_state_authority_index.py
+      - name: Diff check
+        run: git diff --check
