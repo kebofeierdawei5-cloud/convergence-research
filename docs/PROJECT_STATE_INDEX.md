@@ -73,6 +73,60 @@ A02 / CSI800 historical-universe evidence and the M1.2 Research Track remain **o
 
 The M1.2 current epoch remains closed by FM07/FM05 governance; no same-epoch model/threshold redesign is authorized.
 
+## B2-D3 — Real Provider Runtime + Live Evidence Gate — 2026-10-08
+
+Status: **IMPLEMENTATION PASS / LIVE EVIDENCE BLOCKED**
+
+Canonical promotion:
+- PR #221;
+- canonical implementation merge: `52f3afb6925ec34dd2982c52908416e2e2fa302d`;
+- source canonical base: `2906fb71715d51971e7dab0146bdbef8da9e45c9`.
+
+Implementation boundary closed:
+- strict, manual-only real-provider workflow;
+- production runtime configuration is injected only through GitHub Secrets / Variables;
+- existing B2-D2 provider-neutral runtime policy remains authoritative;
+- real HTTP invocation path is implemented;
+- raw response bytes are retained in the live evidence artifact;
+- request/response SHA-256, replay hash and IIOS Ed25519 attestation are captured;
+- B2-D1 independent verifier is invoked as a separate verification process;
+- non-secret run manifest records the evidence file hash and verification hashes;
+- live execution is not connected to Semantic, Forecast, Valuation, Decision, Human Approval or execution authority.
+
+Verification:
+- B2-D workflow run #21 = SUCCESS;
+- B2-D tests and existing clean-room red-team = PASS;
+- B2-D1 independent verifier tests = PASS;
+- B2-D2 runtime tests / independent red-team = PASS;
+- B2-D3 workflow contract tests = PASS;
+- compile, schema validation and diff-check = PASS.
+
+Live gate:
+- B2-D3 production workflow was deliberately made `workflow_dispatch` only;
+- no provider credentials were admitted in the repository runtime at this stage;
+- therefore no authoritative `LIVE_RESPONSE_CAPTURED` evidence was produced;
+- the existing B2-D live job correctly remained `BLOCKED_OR_FAILED` under fail-closed configuration absence and must not be counted as live PASS.
+
+Next gate:
+
+```
+Configure production provider runtime
+        ↓
+Manually dispatch B2-D3 real-provider workflow
+        ↓
+LIVE_RESPONSE_CAPTURED
+        ↓
+B2-D1 INDEPENDENT_VERIFIED
+        ↓
+B2-E Natural-Language → Semantic → Decision E2E
+```
+
+Explicit non-claims:
+- B2-D3 implementation PASS does not prove a real provider response;
+- B2-D3 does not promote fixture output to live evidence;
+- B2-D3 does not make any commercial LLM provider an architectural dependency;
+- B2-E remains locked until a real live evidence artifact passes independent verification.
+
 ## 1. Canonical state
 
 ```
