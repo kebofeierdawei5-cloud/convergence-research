@@ -248,7 +248,7 @@ def test_v02_p0_mie_absence_preserves_unknown_vs_not_identifiable(tmp_path):
     assert mg["mie"]["identifiability"] is None
     assert mg["expectation_gap"]["status"] == "UNKNOWN"
     assert mg["expectation_gap"]["source_presence"] == "MISSING"
-    assert "NOT_IDENTIFIABLE" not in report["markdown"]
+    assert "MIE：**NOT_PROVIDED**" in report["markdown"]
 
 def test_v02_p0_explicit_not_identifiable_is_preserved(tmp_path):
     publication, _ = _publication(tmp_path)
