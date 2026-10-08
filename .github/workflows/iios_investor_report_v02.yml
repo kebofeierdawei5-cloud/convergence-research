@@ -54,11 +54,49 @@ jobs:
           from iios_mvp.machine_publication import build_machine_publication
           from iios_mvp.store import create_or_load_series, write_decision_revision, write_snapshot
 
-          with TemporaryDirectory() as td:
-              root = Path(td)
+          def make_publication(run_id):
+              td = TemporaryDirectory()
+              root = Path(td.name)
               snapshot = _snapshot()
               write_snapshot(root, snapshot)
               series = create_or_load_series(root, "CN-A", "300750", "CATL", "2026-10-08T00:00:00+00:00")
+              write_decision_revision(
+                  root,
+                  series["decision_series_id"],
+                  1,
+                  snapshot,
+                  run_id,
+                  decision_admission=build_fixture_admission_receipt(
+                      snapshot=snapshot,
+                      canonical_decision=snapshot["decision"],
+                  ),
+              )
+              record = build_machine_publication(
+                  root=root,
+                  decision_id="CN-A-300750-r001",
+                  published_at="2026-10-08T01:00:00+00:00",
+              )
+              required = {
+                  "publication_version","published_at","decision_ref","case",
+                  "ai_decision","decision_payload","human_approval",
+                  "current_projection","lifecycle_refs","integrity",
+                  "publication_id","publication_hash",
+              }
+              core = {k: record[k] for k in required if k not in {"publication_id","publication_hash"}}
+              expected = sha256_obj(core)
+              print(run_id, "publication_hash=", record["publication_hash"])
+              print(run_id, "recomputed_hash=", expected)
+              print(run_id, "hash_equal=", record["publication_hash"] == expected)
+              return td, root, record
+
+          first_td, first_root, first_publication = make_publication("run-v02-diagnostic-1")
+          from iios_mvp.investor_review_report_v02 import build_investor_review_report_v02, validate_investor_review_report_v02, qa_investor_review_v02, validate_investor_review_qa_v02
+          first_report = build_investor_review_report_v02(publication=first_publication, generated_at="2026-10-08T02:00:00+00:00")
+          validate_investor_review_report_v02(first_report)
+          first_qa = qa_investor_review_v02(publication=first_publication, report=first_report)
+          validate_investor_review_qa_v02(first_qa)
+          print("first_report_qa_status=", first_qa["qa_status"])
+          second_td, second_root, second_publication = make_publication("run-v02-diagnostic-2")
               write_decision_revision(
                   root,
                   series["decision_series_id"],
@@ -89,6 +127,7 @@ jobs:
           PY
       - run: python -m pytest -q tests/test_investor_review_report_v02.py
       - name: Re-render canonical Xinhecheng Publication through Investor Review v0.2
+        if: ${{ always() }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
