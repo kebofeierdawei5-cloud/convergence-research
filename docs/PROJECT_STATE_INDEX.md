@@ -19,6 +19,7 @@ B2-A Semantic Producer Admission                       PASS / CANONICAL
 B2-B Natural-Language Conformance                       PASS / CANONICAL
 B2-C Signed External Provider Binding                   PASS / CANONICAL
 B2-D Canonical Refresh + Live Provider Boundary        PASS / CANONICAL
+B2-D1 Live Evidence Verification Hardening             PASS / CANONICAL
 B2-D Live Provider Invocation / Evidence                BLOCKED
 ```
 
@@ -28,21 +29,24 @@ B2-D Live Provider Invocation / Evidence                BLOCKED
 
 B2-D canonical refresh is now merged in PR #215 (merge `b32c9203b5a7baf729cdff2090bb4e54237a177c`) from the post-State-Hygiene canonical main. The old pre-hygiene PR #212 is closed and is not an admissible development base.
 
-Dedicated B2-D static validation passed:
+B2-D1 independent live-evidence verification hardening is now merged in PR #217 (merge `0b0b9cb9db86b86dc3ffefef42dc624bffa11ca9`). The hardening gate was verified on the B2-D workflow run #7:
 - B2-D tests: 11 / 11 PASS;
 - independent clean-room red-team: 15 / 15 PASS;
+- B2-D1 independent verifier tests: 7 / 7 PASS;
 - compileall, schema validation and diff-check: PASS.
 
-A real live-provider smoke was attempted in Actions run #6. The runtime exposed no values for the required production configuration, so the invocation did not occur and no `LIVE_RESPONSE_CAPTURED` evidence was admitted.
+The B2-D live smoke remains blocked because the Actions runtime exposes no production provider credentials/configuration. No `LIVE_RESPONSE_CAPTURED` evidence was admitted.
 
 Therefore:
 - fixture output MUST NOT be labeled as live-provider evidence;
 - B2-D live MUST NOT be marked complete merely because static/preflight CI is green;
-- the next executable evidence gate is production runtime configuration followed by a real provider invocation and independent replay.
+- B2-D1 is complete; the next development gate is provider-neutral runtime abstraction, then real provider configuration and invocation followed by the independently verified evidence gate.
 
 ### Current next development batch
 
 ```text
+B2-D2 Provider-Neutral Runtime Boundary
+  ↓
 PRODUCTION PROVIDER RUNTIME CONFIGURATION
   ↓
 REAL LIVE INVOCATION + RAW RESPONSE CAPTURE
