@@ -37,7 +37,8 @@ REQUIRED_SECTIONS = tuple(label for _, label in MODULE_ORDER) + (
 
 ALLOWED_STATUS = {
     "PASS", "FAIL", "CONDITIONAL", "UNKNOWN", "NOT_PROVIDED",
-    "NOT_RUN", "NOT_IDENTIFIABLE", "BLOCKED", "N/A", "REVIEW_REQUIRED"
+    "NOT_RUN", "NOT_IDENTIFIABLE", "BLOCKED", "N/A", "REVIEW_REQUIRED",
+    "REVALIDATION", "ADMITTED"
 }
 
 def _timestamp(value: Any, field: str) -> str:
