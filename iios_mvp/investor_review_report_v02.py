@@ -634,7 +634,19 @@ def build_investor_review_report_v02(*, publication: Mapping[str, Any], generate
     }
     machine_hash = sha256_obj(machine_core)
     machine_report = {**machine_core, "machine_report_id": f'{publication["publication_id"]}-machine-{machine_hash[:16]}', "machine_report_hash": machine_hash}
-    human_core = {**machine_core, "machine_report_hash": machine_hash, "markdown": markdown}
+    human_core = {
+        "report_version": INVESTOR_REPORT_VERSION,
+        "generated_at": generated_at,
+        "publication_id": publication["publication_id"],
+        "publication_hash": publication["publication_hash"],
+        "decision_id": publication["decision_ref"]["decision_id"],
+        "revision": publication["decision_ref"]["revision"],
+        "case_id": publication["decision_ref"]["case_id"],
+        "cutoff_date": publication["decision_ref"]["cutoff_date"],
+        "language": LANGUAGE,
+        "machine_report_hash": machine_hash,
+        "markdown": markdown,
+    }
     human_hash = sha256_obj(human_core)
     return {
         "report_version": INVESTOR_REPORT_VERSION,
