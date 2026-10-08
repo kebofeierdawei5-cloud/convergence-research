@@ -52,6 +52,12 @@ def _fmt(value: Any) -> str:
 
 
 
+def _fmt_entry_zone(value: Any) -> str:
+    if isinstance(value, list) and len(value) == 2:
+        return f"{_fmt(value[0])}–{_fmt(value[1])}"
+    return _fmt(value)
+
+
 def _render_risk_portfolio_contract(value: Any) -> list[str]:
     """Render risk/portfolio data as investor-facing bullets, never as a machine JSON dump."""
     if not isinstance(value, Mapping):
@@ -157,7 +163,7 @@ def render_human_report(publication: Mapping[str, Any]) -> str:
         f"- Current canonical decision price: {_fmt(decision.get('current_price'))}",
         f"- Actionable target entry price: {_fmt(decision.get('target_entry_price'))}",
         f"- Return/risk threshold price: {_fmt(returns.get('target_entry_price'))}",
-        f"- Entry-zone package (not an authorization): {_fmt((decision.get('risk_portfolio_contract') or {}).get('portfolio', {}).get('buy_add_package', {}).get('entry_zone'))}",
+        f"- Entry-zone package (not an authorization): {_fmt_entry_zone((decision.get('risk_portfolio_contract') or {}).get('portfolio', {}).get('buy_add_package', {}).get('entry_zone'))}",
         f"- Target entry semantics: {_fmt(decision.get('target_entry_price_semantics'))}",
         f"- Canonical entry evaluation: {_fmt(decision.get('canonical_entry_evaluation'))}",
         "",
