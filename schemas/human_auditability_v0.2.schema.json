@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/human-auditability-0.2.schema.json",
+  "title": "IIOS Human Auditability Contract v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version","required_return","expected_return","scenario_probability","entry_price","portfolio_permission","mie_expectation_gap","overall_status"],
+  "properties": {
+    "contract_version": {"const": "IIOS-HUMAN-AUDITABILITY-0.2"},
+    "overall_status": {"enum": ["COMPLETE","INCOMPLETE"]},
+    "required_return": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status","numeric_value","pass_flag","rule"],
+      "properties": {
+        "status": {"enum": ["AUDITABLE","INCOMPLETE","NOT_PROVIDED"]},
+        "numeric_value": {},
+        "pass_flag": {"type": ["boolean","null"]},
+        "rule": {"type": "string"}
+      }
+    },
+    "expected_return": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status","expected_annualized_return","scenario_probability_status","rule"],
+      "properties": {
+        "status": {"enum": ["AUDITABLE","INCOMPLETE","NOT_PROVIDED"]},
+        "expected_annualized_return": {},
+        "scenario_probability_status": {"enum": ["COMPLETE","MISSING","NOT_PROVIDED"]},
+        "rule": {"type": "string"}
+      }
+    },
+    "scenario_probability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status","bear","base","bull","all_present"],
+      "properties": {
+        "status": {"enum": ["COMPLETE","MISSING","NOT_PROVIDED"]},
+        "bear": {},
+        "base": {},
+        "bull": {},
+        "all_present": {"type": "boolean"}
+      }
+    },
+    "entry_price": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status","actionable_target_entry_price","threshold_price","canonical_entry_evaluation","semantics"],
+      "properties": {
+        "status": {"enum": ["ACTIONABLE","THRESHOLD_ONLY","UNAVAILABLE"]},
+        "actionable_target_entry_price": {},
+        "threshold_price": {},
+        "canonical_entry_evaluation": {},
+        "semantics": {}
+      }
+    },
+    "portfolio_permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status","package_can_add","decision_new_capital_allowed","positioning_sizing_permission","override","rule"],
+      "properties": {
+        "status": {"enum": ["ALLOWED","BLOCKED","OVERRIDDEN_BY_DECISION","NOT_PROVIDED"]},
+        "package_can_add": {"type": ["boolean","null"]},
+        "decision_new_capital_allowed": {"type": ["boolean","null"]},
+        "positioning_sizing_permission": {},
+        "override": {"type": "boolean"},
+        "rule": {"type": "string"}
+      }
+    },
+    "mie_expectation_gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mie","expectation_gap","inference_rule"],
+      "properties": {
+        "mie": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status","identifiability","stability","decision_grade","source_presence"],
+          "properties": {
+            "status": {"enum": ["PASS","FAIL","CONDITIONAL","UNKNOWN","NOT_PROVIDED","NOT_IDENTIFIABLE","BLOCKED","REVIEW_REQUIRED"]},
+            "identifiability": {},
+            "stability": {},
+            "decision_grade": {},
+            "source_presence": {"enum": ["STRUCTURED","MISSING"]}
+          }
+        },
+        "expectation_gap": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status","identifiability","source_presence"],
+          "properties": {
+            "status": {"enum": ["PASS","FAIL","CONDITIONAL","UNKNOWN","NOT_PROVIDED","NOT_IDENTIFIABLE","BLOCKED","REVIEW_REQUIRED"]},
+            "identifiability": {},
+            "source_presence": {"enum": ["STRUCTURED","MISSING"]}
+          }
+        },
+        "inference_rule": {"const": "absence_never_implies_not_identifiable"}
+      }
+    }
+  }
+}
