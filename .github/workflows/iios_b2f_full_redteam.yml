@@ -28,11 +28,19 @@ jobs:
         run: |
           python -m pytest -q             tests/independent_redteam_b2f_full.py             --maxfail=0
       - name: Emit finding summary
+        if: always()
         run: |
-          python - <<'PY'
-from pathlib import Path
-print(Path("docs/iios/B2_F_FULL_INDEPENDENT_REDTEAM_20261008.md").read_text(encoding="utf-8"))
-PY
+          mkdir -p artifacts
+          cp docs/iios/B2_F_FULL_INDEPENDENT_REDTEAM_20261008.md artifacts/
+          cp research/b2f/B2_F_FINDINGS_20261008.json artifacts/
+      - name: Upload findings artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iios-b2f-redteam-findings-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
       - name: Compile and diff check
         run: |
           python -m compileall -q iios_mvp/b2e_nl_semantic_decision_e2e_v01.py iios_mvp/decision_lifecycle_production.py

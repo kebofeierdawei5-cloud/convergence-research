@@ -1,0 +1,14 @@
+{
+  "schema_version": "IIOS-B2-F-FINDINGS-0.1",
+  "status": "BLOCKED",
+  "target": "B2-E Natural-Language -> Semantic -> Decision E2E",
+  "redteam_mode": "INDEPENDENT_CLEAN_ROOM",
+  "findings": [
+    {"id":"F-001","severity":"P0","status":"REPRODUCED","title":"Semantic output has no causal edge into the canonical economic Decision input","blocking":true},
+    {"id":"F-002","severity":"P1","status":"REPRODUCED","title":"Forecast / Valuation stage admission is not independently validator-backed","blocking":true},
+    {"id":"F-003","severity":"P1","status":"REPRODUCED","title":"Nested semantic decision-authority fields can evade the B2-E guard","blocking":true},
+    {"id":"F-004","severity":"P1","status":"REPRODUCED","title":"Decision Series identity depends on a caller-supplied series id","blocking":true}
+  ],
+  "disposition": "B2-F BLOCKED; repair required before MVP final acceptance",
+  "production_live_gate": "B2-D3 LIVE_RESPONSE_CAPTURED + B2-D1 INDEPENDENT_VERIFIED remains separately required"
+}
