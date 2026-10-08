@@ -64,11 +64,13 @@ jobs:
           test -f "$pub"
           test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
           rm -rf /tmp/iios-xhc/writer-diag
+          mkdir -p /tmp/iios-xhc/writer-diag
           python - <<'PY'
           from pathlib import Path
           from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
           pub=Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
           out=Path("/tmp/iios-xhc/writer-diag/out")
+          out.mkdir(parents=True,exist_ok=True)
           print([str(p) for p in write_investor_review_report_v02(str(out), publication_path=str(pub), generated_at="2026-10-08T05:00:00+00:00")])
           PY
 
