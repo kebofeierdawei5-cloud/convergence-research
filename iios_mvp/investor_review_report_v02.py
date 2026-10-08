@@ -157,13 +157,19 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
     returns = payload.get("return_metrics") if isinstance(payload.get("return_metrics"), Mapping) else {}
     trust = _first_mapping(payload, "trust", "evidence_trust")
     quality = _first_mapping(payload, "quality", "quality_gate")
-    reality = _first_mapping(payload, "reality", "economic_reality")
+    reality = _first_mapping(payload, "reality", "economic_reality", "economic_structure")
     thesis = _first_mapping(payload, "thesis", "investment_thesis")
     drivers = _first_mapping(payload, "value_driver_ranking", "value_drivers", "value_core")
     forecast = _first_mapping(payload, "forecast", "independent_forecast")
     valuation = _first_mapping(payload, "valuation", "primary_valuation")
     mie = _first_mapping(payload, "p4f_market_implied_expectation", "market_implied_expectation", "mie")
-    gap = _first_mapping(payload, "expectation_gap")
+    gap = _first_mapping(payload, "expectation_gap", "expectation_gap_evaluation")
+    if not gap and gates.get("expectation_gap_status") not in (None, ""):
+        gap = {
+            "status": gates.get("expectation_gap_status"),
+            "resolution_state": gates.get("expectation_gap_resolution_state"),
+            "qualification": gates.get("expectation_gap_qualification"),
+        }
     risk = _first_mapping(payload, "risk")
     positioning = _first_mapping(payload, "positioning", "positioning_sizing", "market_positioning")
     rpc = decision.get("risk_portfolio_contract")
@@ -194,7 +200,10 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
     semantic_matrix = {name: modules[name] for name, _ in MODULE_ORDER}
     core_missing = [
         name for name in ("quality", "reality", "thesis", "value_drivers", "forecast", "valuation", "mie", "expectation_gap", "risk", "positioning")
-        if semantic_matrix[name]["status"] == "NOT_PROVIDED"
+        if (
+            semantic_matrix[name]["status"] == "NOT_PROVIDED"
+            or not semantic_matrix[name]["present"]
+        )
     ]
     return {
         "surface_version": "IIOS-INVESTOR-SEMANTIC-SURFACE-0.2",
