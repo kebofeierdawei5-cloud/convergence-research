@@ -390,7 +390,7 @@ def parser() -> argparse.ArgumentParser:
     pub.add_argument("--out", default="runs")
     pub.set_defaults(func=cmd_publish)
 
-    rep = sub.add_parser("report", help="render a canonical machine publication into an immutable human-readable report and run the report quality gate")
+    rep = sub.add_parser("report", help="render the canonical Machine Publication into the compact machine/archive report and run its report quality gate")
     rep.add_argument("publication", help="canonical Machine Publication JSON")
     rep.add_argument("--generated-at", required=True)
     rep.add_argument("--out", default="runs")
