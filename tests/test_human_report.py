@@ -47,6 +47,25 @@ def make_snapshot(action="REVIEW_REQUIRED"):
             "valuation_ready": True,
             "new_buy_add_allowed": False,
         },
+        "evidence_chain": [
+            {"evidence_id": "E001", "claim_type": "OBSERVED_FACT", "known_at": cutoff, "purpose": "test evidence"},
+            {"evidence_id": "E002", "claim_type": "OBSERVED_FACT", "known_at": cutoff, "purpose": "test financial"},
+        ],
+        "forecast": {
+            "method": "NORMALIZED_EARNINGS_DRIVER_SCENARIO",
+            "horizon_years": "1",
+            "style_weighting": {"cyclical": "0.70", "growth": "0.30"},
+            "scenarios": {
+                "base": {"normalized_eps_cny": "2.80", "valuation_multiple": "11.5"},
+                "bear": {"normalized_eps_cny": "2.10", "valuation_multiple": "9.5"},
+                "bull": {"normalized_eps_cny": "3.50", "valuation_multiple": "13.0"},
+            },
+        },
+        "valuation": {
+            "primary_model": "FORWARD_PE",
+            "status": "PASS",
+            "scenario_values_per_share": {"base": "32.20", "bear": "19.95", "bull": "45.50"},
+        },
         "return_metrics": {
             "entry_return_cushion": "0.15",
             "expected_total_return": "0.20",
@@ -54,6 +73,8 @@ def make_snapshot(action="REVIEW_REQUIRED"):
             "fundamental_target_pass": True,
             "required_return_pass": True,
             "required_return": "0.10",
+            "target_entry_price": "26.60",
+            "margin_of_safety": "0.1941",
         },
         "risk": {"max_loss_pct": "0.25"},
         "risk_portfolio_contract": {
@@ -238,7 +259,8 @@ def test_report_distinguishes_actionable_target_from_return_risk_threshold(tmp_p
     )
     markdown = report["markdown"]
     assert "- Actionable target entry price: UNAVAILABLE" in markdown
-    assert "- Return/risk threshold price: UNAVAILABLE" in markdown
+    assert "- Return/risk threshold price: 26.60" in markdown
+    assert "No actionable target entry price is bound" in markdown
 
 
 def test_report_qa_fails_closed_on_publication_binding_mismatch(tmp_path):
