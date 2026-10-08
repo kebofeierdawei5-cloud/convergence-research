@@ -38,12 +38,14 @@ def test_live_provider_config_is_loaded():
     assert cfg.base_url.endswith("/v1/responses")
     assert cfg.provider_id == "openai"
     assert cfg.protocol == "OPENAI_RESPONSES"
+    assert cfg.auth_mode == "BEARER"
+    assert cfg.deployment_mode == "EXTERNAL"
 
 
 def test_live_provider_config_fails_closed_without_key():
     values = env()
     values.pop("IIOS_LLM_PROVIDER_API_KEY")
-    with pytest.raises(LiveProviderPreflightError, match="configuration missing"):
+    with pytest.raises(LiveProviderPreflightError, match="requires an API key"):
         load_live_provider_config(values)
 
 
