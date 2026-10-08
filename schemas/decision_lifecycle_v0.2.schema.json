@@ -8,6 +8,8 @@
     "contract_version",
     "decision_id",
     "decision_series_id",
+    "decision_series_identity",
+    "decision_series_identity_hash",
     "revision",
     "run_id",
     "trigger_event_id",
@@ -34,6 +36,21 @@
     "decision_series_id": {
       "type": "string",
       "minLength": 1
+    },
+    "decision_series_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_id", "market", "symbol", "company"],
+      "properties": {
+        "case_id": {"type": "string", "minLength": 1},
+        "market": {"type": "string", "minLength": 1},
+        "symbol": {"type": "string", "minLength": 1},
+        "company": {"type": "string", "minLength": 1}
+      }
+    },
+    "decision_series_identity_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     },
     "revision": {
       "type": "integer",

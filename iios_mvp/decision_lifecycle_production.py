@@ -38,6 +38,19 @@ def _action(decision: Mapping[str, Any]) -> str:
         raise ValueError(f'decision.action has unsupported action: {result}')
     return result
 
+def _derive_series_identity(snapshot_core: Mapping[str, Any]) -> tuple[str, dict[str, str], str]:
+    input_data = snapshot_core.get('input')
+    if not isinstance(input_data, Mapping):
+        raise ValueError('snapshot.input must be an object')
+    identity = {
+        'case_id': _text(input_data.get('case_id'), 'snapshot.input.case_id'),
+        'market': _text(input_data.get('market'), 'snapshot.input.market').upper(),
+        'symbol': _text(input_data.get('symbol'), 'snapshot.input.symbol').upper(),
+        'company': _text(input_data.get('company'), 'snapshot.input.company'),
+    }
+    series_id = f"{identity['market']}-{identity['symbol']}"
+    return series_id, identity, _sha(identity)
+
 def _snapshot_core(snapshot: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(snapshot, Mapping):
         raise ValueError('snapshot must be an object')
@@ -51,7 +64,7 @@ def _snapshot_core(snapshot: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError('snapshot hash mismatch')
     return snapshot_core
 
-def build_decision_revision(*, decision_series_id: str, revision: int, snapshot: Mapping[str, Any], run_id: str, trigger_event_id: str | None = None, decision_admission: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def build_decision_revision(*, decision_series_id: str | None = None, revision: int, snapshot: Mapping[str, Any], run_id: str, trigger_event_id: str | None = None, decision_admission: Mapping[str, Any] | None = None) -> dict[str, Any]:
     if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
         raise ValueError('revision must be a positive integer')
     snapshot_core = _snapshot_core(snapshot)
@@ -59,6 +72,15 @@ def build_decision_revision(*, decision_series_id: str, revision: int, snapshot:
     decision = snapshot_core['decision']
     case_id = _text(input_data.get('case_id'), 'snapshot.input.case_id')
     cutoff_date = _text(input_data.get('cutoff_date'), 'snapshot.input.cutoff_date')
+    canonical_series_id, series_identity, series_identity_hash = _derive_series_identity(snapshot_core)
+    if decision_series_id is None:
+        bound_series_id = canonical_series_id
+    else:
+        bound_series_id = _text(decision_series_id, 'decision_series_id')
+        if bound_series_id != canonical_series_id:
+            raise ValueError(
+                f'decision_series_id is not canonical for snapshot identity: expected {canonical_series_id}'
+            )
     action = _action(decision)
     if snapshot_core["snapshot_schema"] == "IIOS-MVP-SNAPSHOT-0.3.0":
         if decision_admission is None:
@@ -68,11 +90,13 @@ def build_decision_revision(*, decision_series_id: str, revision: int, snapshot:
             raise ValueError("decision admission canonical_action does not match snapshot action")
         if decision_admission["engine_version"] != snapshot_core["engine_version"]:
             raise ValueError("decision admission engine_version does not match snapshot")
-    decision_id = f'{decision_series_id}-r{revision:03d}'
+    decision_id = f'{bound_series_id}-r{revision:03d}'
     core = {
         'contract_version': DECISION_LIFECYCLE_CONTRACT_VERSION,
         'decision_id': decision_id,
-        'decision_series_id': _text(decision_series_id, 'decision_series_id'),
+        'decision_series_id': bound_series_id,
+        'decision_series_identity': series_identity,
+        'decision_series_identity_hash': series_identity_hash,
         'revision': revision,
         'run_id': _text(run_id, 'run_id'),
         'trigger_event_id': None if trigger_event_id is None else _text(trigger_event_id, 'trigger_event_id'),
@@ -92,7 +116,7 @@ def build_decision_revision(*, decision_series_id: str, revision: int, snapshot:
 def validate_decision_revision(record: Any, *, case_id: str, cutoff_date: str) -> None:
     if not isinstance(record, Mapping):
         raise ValueError('decision_revision must be an object')
-    required = {'contract_version','decision_id','decision_series_id','revision','run_id','trigger_event_id','case_id','as_of_date','cutoff_date','snapshot_hash','ai_action','decision_status','engine_version','human_approval_required','auto_execution','decision_admission','revision_hash'}
+    required = {'contract_version','decision_id','decision_series_id','decision_series_identity','decision_series_identity_hash','revision','run_id','trigger_event_id','case_id','as_of_date','cutoff_date','snapshot_hash','ai_action','decision_status','engine_version','human_approval_required','auto_execution','decision_admission','revision_hash'}
     if set(record) != required:
         raise ValueError('decision_revision fields are invalid')
     if record['contract_version'] != DECISION_LIFECYCLE_CONTRACT_VERSION:
@@ -101,6 +125,20 @@ def validate_decision_revision(record: Any, *, case_id: str, cutoff_date: str) -
         raise ValueError('decision_revision case/cutoff mismatch')
     if not isinstance(record['revision'], int) or isinstance(record['revision'], bool) or record['revision'] < 1:
         raise ValueError('decision_revision revision invalid')
+    identity = record['decision_series_identity']
+    if not isinstance(identity, Mapping) or set(identity) != {'case_id', 'market', 'symbol', 'company'}:
+        raise ValueError('decision series identity fields are invalid')
+    if identity['case_id'] != record['case_id']:
+        raise ValueError('decision series identity mismatch: case_id')
+    market = _text(identity['market'], 'decision_series_identity.market').upper()
+    symbol = _text(identity['symbol'], 'decision_series_identity.symbol').upper()
+    company = _text(identity['company'], 'decision_series_identity.company')
+    if record['decision_series_id'] != f'{market}-{symbol}':
+        raise ValueError('decision series identity mismatch: series_id')
+    if record['decision_id'] != f"{record['decision_series_id']}-r{record['revision']:03d}":
+        raise ValueError('decision series identity mismatch: decision_id')
+    if _sha({'case_id': identity['case_id'], 'market': market, 'symbol': symbol, 'company': company}) != record['decision_series_identity_hash']:
+        raise ValueError('decision series identity hash mismatch')
     if record['decision_status'] != 'AI_PROPOSED':
         raise ValueError('decision_revision status invalid')
     _action({'action': record['ai_action']})
@@ -127,6 +165,13 @@ def validate_decision_revision(record: Any, *, case_id: str, cutoff_date: str) -
         })
         if admission['canonical_action'] != record['ai_action']:
             raise ValueError('decision admission action binding mismatch')
+        if (
+            admission['case_id'] != identity['case_id']
+            or str(admission['market']).upper() != market
+            or str(admission['symbol']).upper() != symbol
+            or str(admission['company']) != company
+        ):
+            raise ValueError('decision series identity does not match canonical Decision Admission')
     elif admission is not None:
         raise ValueError('legacy Decision Revision cannot carry decision_admission')
     core = {k: record[k] for k in required if k != 'revision_hash'}

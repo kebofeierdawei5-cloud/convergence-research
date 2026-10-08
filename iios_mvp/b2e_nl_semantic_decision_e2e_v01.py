@@ -335,7 +335,6 @@ def run_b2e_conformance(
     )
 
     revision = build_decision_revision(
-        decision_series_id=f"{admitted.case_id}:{admitted.research_case['request']['market']}:{admitted.research_case['request']['symbol']}",
         revision=1,
         snapshot=snapshot,
         run_id=run_id,
