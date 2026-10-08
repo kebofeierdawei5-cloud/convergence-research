@@ -99,6 +99,7 @@ def test_v02_dual_surface_and_schema(tmp_path):
     assert report["machine_report"]["semantic_surface"]["human_review_readiness"] == "READY"
     assert qa["qa_version"] == INVESTOR_QA_VERSION
     assert qa["qa_status"] == "PASS"
+    assert qa["checks"]["human_auditability_contract"] == "PASS"
     assert "## Quality / 经济质量" in report["markdown"]
     assert "## Market Implied Expectation / 市场隐含预期" in report["markdown"]
     assert "NOT_IDENTIFIABLE" in report["markdown"]
