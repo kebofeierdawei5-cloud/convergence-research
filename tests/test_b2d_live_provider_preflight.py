@@ -52,7 +52,7 @@ def test_live_provider_config_fails_closed_without_key():
 def test_live_provider_config_requires_https():
     values = env()
     values["IIOS_LLM_PROVIDER_BASE_URL"] = "http://provider.example/v1/responses"
-    with pytest.raises(LiveProviderPreflightError, match="https URL"):
+    with pytest.raises(LiveProviderPreflightError, match="must use HTTPS"):
         load_live_provider_config(values)
 
 
