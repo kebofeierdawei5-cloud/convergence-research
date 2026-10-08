@@ -6,7 +6,7 @@ Authority: this file is the **only canonical Current State Index**.
 
 ## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-08
 
-**Current canonical main:** `5f84417ae0cd8b352ffd938396d38c21e3f30dcc`
+**Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
 The records below are cumulative milestone history. A milestone's historical “next boundary” is **time-local** and MUST NOT be interpreted as the current development instruction.
 
