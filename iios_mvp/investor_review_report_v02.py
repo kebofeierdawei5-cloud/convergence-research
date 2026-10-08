@@ -561,15 +561,22 @@ def render_investor_review_v02(publication: Mapping[str, Any], surface: Mapping[
     lines.append("这是受控阅读投影。NOT_PROVIDED / NOT_RUN / NOT_IDENTIFIABLE / BLOCKED 均明确保留，不被隐式填充。")
     lines.append("")
 
-    def add_module(title: str, name: str, notes: list[str] | None = None) -> None:
+    def add_module(
+        title: str,
+        name: str,
+        notes: list[str] | None = None,
+        *,
+        data_override: Mapping[str, Any] | None = None,
+    ) -> None:
         mod = modules[name]
+        rendered_data = data_override if data_override is not None else mod["data"]
         lines.extend([
             f"## {title}", "",
             f"状态：**{mod['status']}**｜语义内容：**{mod.get('content_status', 'UNKNOWN')}**｜Gate：**{mod.get('gate_status', mod['status'])}**",
             f"来源路径：{mod['source_path']}"
         ])
-        if mod["present"] and isinstance(mod["data"], Mapping):
-            lines.extend(_render_mapping(mod["data"]))
+        if rendered_data and isinstance(rendered_data, Mapping):
+            lines.extend(_render_mapping(rendered_data))
         elif mod["present"] and isinstance(mod["data"], list):
             for item in mod["data"]:
                 lines.append(f"- {_fmt(item)}")
@@ -600,7 +607,15 @@ def render_investor_review_v02(publication: Mapping[str, Any], surface: Mapping[
     add_module("Expectation Gap / 预期差", "expectation_gap", ["- 需要明确市场隐含假设、Independent Forecast 与差异来源；缺失即保留缺失。"])
     add_module("Risk / 风险", "risk", [f"- Expected annualized return={_fmt(returns.get('expected_annualized_return'))}；Required return={_fmt(returns.get('required_return'))}；Margin of safety={_fmt(returns.get('margin_of_safety'))}。"])
     add_module("Market / Positioning / 市场与筹码", "positioning", ["- 筹码只影响 timing、sizing 和风险预算，不得改写基本面 Decision。"])
-    add_module("Decision / 决策", "decision", [f"- Primary reason：**{_fmt(decision.get('primary_reason'))}**。"])
+    add_module(
+        "Decision / 决策",
+        "decision",
+        [
+            f"- Primary reason：**{_fmt(decision.get('primary_reason'))}**。",
+            "- Human reading guard: canonical Required Return / return-gate flags and threshold price fields are not rendered as executable authorization here; Human Auditability Contract is authoritative for interpretation."
+        ],
+        data_override=surface["decision"],
+    )
     add_module("Position / 仓位", "position", ["- 仓位包不能覆盖 Trust、Decision Status 或 Human Approval。"])
     add_module("Monitoring / 监控", "monitoring", ["- 触发关键经营偏离、Trust/Evidence 失效或 Thesis Break 时，应重新进入 Decision Revision。"])
     add_module("Validation / 验证", "validation", ["- Validation 应复核 Forecast、Valuation、Decision 与 Thesis 的兑现情况，而不是只看股价。"])
