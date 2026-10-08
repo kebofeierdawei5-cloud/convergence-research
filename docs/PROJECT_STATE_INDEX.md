@@ -1,7 +1,7 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-07
+Snapshot: 2026-10-08
 Authority: this file is the **only canonical Current State Index**.
 
 ## 1. Canonical state
@@ -1171,7 +1171,7 @@ Therefore:
 
 ```text
 PILOT technical gate = PASS
-Human report review gate = PENDING operator attestation
+Human report review gate = APPROVED by owner/operator attestation on 2026-10-08
 Final MVP v0.1.1 DoD = BLOCKED by P0-LLM-004
 ```
 
@@ -1188,7 +1188,7 @@ A02 / CSI800 remains non-blocking and must not be reintroduced into the MVP crit
 
 ## 20. Dual Report Surface — Human Review + Machine Archive — 2026-10-08
 
-Status: IMPLEMENTED ON VALIDATION BRANCH / HUMAN REVIEW SURFACE PENDING CANONICAL PROMOTION
+Status: PASS / MERGED / CANONICAL
 
 Decision:
 - split the report layer into two separate outputs derived from the exact same canonical Machine Publication;
@@ -1211,3 +1211,51 @@ Acceptance rule:
 - the Human Usability Gate must be performed against the Chinese Investor Review Report, not the compact machine/archive summary;
 - accepting report usability does not equal approving a trade;
 - final MVP remains blocked by B0 P0-LLM-004 / B2 natural-language-to-canonical conformance requirements.
+
+
+## 21. Investor Review Report v0.2 — Human Acceptance + Canonical Promotion — 2026-10-08
+
+Status: **PASS / MERGED / CANONICAL**
+
+Scope:
+- PR #204;
+- merge commit: `aa0e298f5e7da4f793996a5a2bcf17d60a90ee34`;
+- exact implementation head before merge: `41a3d114c8234250b0a8e8bfddaa32e7cad507ff`.
+
+Technical gate:
+- exact-head CI Run #80 / run id `37739468730` = SUCCESS;
+- v0.2 targeted tests = 26 / 26 PASS;
+- second-round independent clean-room red-team = 23 / 23 PASS;
+- schemas, render, Human Auditability P0 assertions and diff-check = PASS;
+- accepted real Xinhecheng Publication SHA-256:
+  `7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0`;
+- v0.2 human report hash:
+  `b5ab777d1389d20f2b6f1d03e8d15324bb03fbe58fe299c0f5ee5f7b68672bce`;
+- v0.2 machine report hash:
+  `9764641a2274769a168155c99a93c6e4e1923f5c78d8da0589126fa762ee4c72`;
+- v0.2 QA hash:
+  `fefcdd47f83fe8c6a8b81eec7ae39cddc9cab8d6e364142fa0d6e2b118145b4d`;
+- CI artifact id `11533186204`, digest:
+  `sha256:5eeb573228f20cb5a68ecb3df67d7dba1cb58bcc8040d1c4842a26e36769147c`.
+
+Human governance gate:
+- owner/operator independently reviewed the real Xinhecheng Chinese Investor Review Report;
+- Human Acceptance = **APPROVED** on 2026-10-08;
+- acceptance is for the report projection only, not for investment capital or trade execution;
+- known non-blocking usability observations are retained: some monitoring/validation fields are structurally dense, and expected annualized return uses high-precision decimal formatting;
+- the underlying Xinhecheng case remains explicitly incomplete in Required Return, scenario probabilities, actionable entry admission and MIE/Expectation Gap, and these gaps remain fail-closed.
+
+Authority:
+- v0.2 is a projection-only report surface and cannot become a second Decision Source;
+- canonical Decision, Risk/Portfolio precedence and Human Approval remain unchanged;
+- B0 P0-LLM-004 remains unresolved by this report milestone: the pilot/report chain does not prove Natural Language → LLM Semantic Reasoning → Semantic Admission → Canonical Decision.
+
+Next canonical development boundary:
+
+```text
+B2 — LLM Semantic Workbench + Semantic Producer Admission
+```
+
+B2 must establish the real typed semantic producer boundary, producer authenticity/provenance, deterministic semantic admission, and a natural-language-to-canonical conformance test before the final MVP DoD can close.
+
+A02 / CSI800 remains non-blocking to company-level Investment Core MVP and must not be reintroduced into the critical path.
