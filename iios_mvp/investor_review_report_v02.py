@@ -202,7 +202,7 @@ def _scenario_probability_audit(forecast: Mapping[str, Any]) -> dict[str, Any]:
             all_present = False
         if numeric is None or numeric < 0 or numeric > 1:
             all_numeric = False
-    total = sum(numeric_values.values(), Decimal("0"))
+    total = sum((value for value in numeric_values.values() if value is not None), Decimal("0"))
     complete = all_present and all_numeric and total == Decimal("1")
     return {
         "status": "COMPLETE" if complete else "MISSING",
@@ -256,10 +256,11 @@ def _human_auditability(
 
     probability = _scenario_probability_audit(forecast)
     expected_value = returns.get("expected_annualized_return")
+    expected_numeric = _numeric(expected_value)
     expected_return = {
         "status": (
             "AUDITABLE"
-            if expected_value not in (None, "") and probability["status"] == "COMPLETE"
+            if expected_numeric is not None and probability["status"] == "COMPLETE"
             else "INCOMPLETE"
             if expected_value not in (None, "")
             else "NOT_PROVIDED"
@@ -275,7 +276,8 @@ def _human_auditability(
     entry_evaluation = payload.get("canonical_entry_evaluation")
     entry_status = payload.get("gates", {}).get("canonical_entry_evaluation_status") if isinstance(payload.get("gates"), Mapping) else None
     evaluation_admitted = bool(
-        entry_evaluation not in (None, {})
+        isinstance(entry_evaluation, Mapping)
+        and bool(entry_evaluation)
         and entry_status not in (None, "", "SKIPPED", "NOT_RUN", "BLOCKED")
     )
     if _numeric(actionable) is not None and evaluation_admitted:
