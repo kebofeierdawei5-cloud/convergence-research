@@ -33,7 +33,7 @@ The receipt binds artifact identity/type, research-stage identity, case identity
 Evidence provenance remains separate from semantic provenance.
 
 ### 4. Workbench boundary
-LLMSemanticWorkbench only runs when the canonical orchestrator is already at SEMANTIC_PENDING. Producer output is untrusted until deterministic admission succeeds. Success advances only SEMANTIC_PENDING → SEMANTIC_ADMITTED; no decision or execution transition is performed by B2-A.
+LLMSemanticWorkbench only runs when the canonical orchestrator is already at SEMANTIC_PENDING. The request must exactly match the active run's case, market, symbol and cutoff, and every semantic input pair must already be present in that run's admitted Evidence receipt. Producer output is untrusted until deterministic admission succeeds. Success advances only SEMANTIC_PENDING → SEMANTIC_ADMITTED; no decision or execution transition is performed by B2-A.
 
 ## Fail-closed cases
 
