@@ -65,13 +65,7 @@ jobs:
           test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
           rm -rf /tmp/iios-xhc/diagnostic/writer
           mkdir -p /tmp/iios-xhc/diagnostic/writer
-          python - <<'PY'
-          from pathlib import Path
-          from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
-          pub=Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
-          out=Path("/tmp/iios-xhc/diagnostic/writer")
-          print([str(p) for p in write_investor_review_report_v02(str(out), publication_path=str(pub), generated_at="2026-10-08T05:00:00+00:00")])
-          PY
+          python -c 'from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02; print([str(p) for p in write_investor_review_report_v02("/tmp/iios-xhc/diagnostic/writer", publication_path="/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json", generated_at="2026-10-08T05:00:00+00:00")])'
 
       - name: Assert canonical Xinhecheng v0.2 Human Auditability
         run: |
@@ -106,7 +100,7 @@ jobs:
           python tests/independent_redteam_investor_review_v02.py \
             --report "$(find /tmp/iios-xhc/diagnostic/writer -name '*.investor-review-v02.json' -print -quit)" \
             --qa "$(find /tmp/iios-xhc/diagnostic/writer -name '*.investor-review-v02-qa.json' -print -quit)" \
-            --markdown "$(find /tmp/iios-xhc/diagnostic/writer -name '*.investor-review-v02.md' -print -quit)
+            --markdown "$(find /tmp/iios-xhc/diagnostic/writer -name '*.investor-review-v02.md' -print -quit)"
 
       - name: Upload real Xinhecheng v0.2 report evidence
         uses: actions/upload-artifact@v4
