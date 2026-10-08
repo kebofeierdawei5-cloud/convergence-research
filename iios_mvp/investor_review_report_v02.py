@@ -430,6 +430,16 @@ def qa_investor_review_v02(*, publication: Mapping[str, Any], report: Mapping[st
     except Exception as exc:
         checks["publication_integrity"] = "FAIL"; issues.append(f"publication_integrity: {exc}")
     try:
+        machine = report.get("machine_report")
+        if not isinstance(machine, Mapping):
+            raise ValueError("machine_report missing")
+        machine_core = {k: machine[k] for k in machine if k not in {"machine_report_id", "machine_report_hash"}}
+        expected = sha256_obj(machine_core)
+        if machine.get("machine_report_hash") != expected or report.get("machine_report_hash") != expected:
+            raise ValueError("machine surface hash mismatch")
+    except Exception as exc:
+        checks["machine_surface_integrity"] = "FAIL"; issues.append(f"machine_surface_integrity: {exc}")
+    try:
         validate_investor_review_report_v02(report)
     except Exception as exc:
         checks["human_surface_integrity"] = "FAIL"; issues.append(f"human_surface_integrity: {exc}")
@@ -447,6 +457,10 @@ def qa_investor_review_v02(*, publication: Mapping[str, Any], report: Mapping[st
             checks["deterministic_render_replay"] = "FAIL"; issues.append("deterministic_render_replay: regenerated report differs")
     except Exception as exc:
         checks["deterministic_render_replay"] = "FAIL"; issues.append(f"deterministic_render_replay: {exc}")
+    markdown = str(report.get("markdown", ""))
+    missing_sections = [section for section in REQUIRED_SECTIONS if f"## {section}" not in markdown]
+    if missing_sections:
+        checks["required_sections"] = "FAIL"; issues.append("required_sections: " + ", ".join(missing_sections))
     surface = report.get("machine_report", {}).get("semantic_surface", {})
     matrix = surface.get("semantic_matrix", {}) if isinstance(surface, Mapping) else {}
     expected_names = [name for name, _ in MODULE_ORDER]
