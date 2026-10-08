@@ -135,6 +135,9 @@ jobs:
           cli_rc=${PIPESTATUS[0]}
           set -e
           echo "cli_rc=${cli_rc}" | tee -a /tmp/iios-xhc/cli.txt
+          mkdir -p ci-evidence
+          cp /tmp/iios-xhc/cli.txt ci-evidence/real-xinhecheng-cli.txt
+          printf '%s  %s\\n' "$pub" "$(sha256sum "$pub" | awk '{print $1}')" > ci-evidence/publication-sha256.txt
           test "${cli_rc}" = "0"
           python - <<'PY'
           import json
@@ -161,7 +164,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: iios-investor-review-v02-xinhecheng
-          path: /tmp/iios-xhc/
+          path: ci-evidence/
           if-no-files-found: warn
 
       - run: python -m json.tool schemas/investor_review_report_v0.2.schema.json >/dev/null
