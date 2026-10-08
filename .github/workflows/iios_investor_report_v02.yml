@@ -169,7 +169,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: iios-investor-review-v02-xinhecheng
-          path: /tmp/iios-xhc/rendered/
+          path: /tmp/iios-xhc/
           if-no-files-found: warn
       - run: python -m json.tool schemas/investor_review_report_v0.2.schema.json >/dev/null
       - run: python -m json.tool schemas/investor_review_qa_v0.2.schema.json >/dev/null
