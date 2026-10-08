@@ -12,6 +12,7 @@ from .decision_admission import admit_canonical_decision
 from .research_intake import build_research_case
 from .machine_publication import write_machine_publication
 from .human_report import write_human_report
+from .investor_review_report import write_investor_review_report
 from .store import (
     approve_revision,
     create_or_load_series,
@@ -239,6 +240,28 @@ def cmd_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_investor_report(args: argparse.Namespace) -> int:
+    report_path, qa_path = write_investor_review_report(
+        args.out,
+        publication_path=args.publication,
+        generated_at=args.generated_at,
+    )
+    report = load_json(str(report_path))
+    qa = load_json(str(qa_path))
+    print(json.dumps({
+        "status": "INVESTOR_REVIEW_REPORT_PUBLISHED",
+        "report": str(report_path),
+        "markdown": str(report_path).replace(".investor-review.json", ".investor-review.md"),
+        "qa": str(qa_path),
+        "report_id": report["report_id"],
+        "report_hash": report["report_hash"],
+        "qa_status": qa["qa_status"],
+        "qa_hash": qa["qa_hash"],
+        "machine_publication_hash": report["publication_hash"],
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_trigger_contract(args: argparse.Namespace) -> int:
     contract = load_json(args.contract)
     path = write_trigger_contract(args.out, args.decision_id, contract)
@@ -367,12 +390,21 @@ def parser() -> argparse.ArgumentParser:
     pub.add_argument("--out", default="runs")
     pub.set_defaults(func=cmd_publish)
 
-    rep = sub.add_parser("report", help="render a canonical machine publication into an immutable human-readable report and run the report quality gate")
+    rep = sub.add_parser("report", help="render the canonical Machine Publication into the compact machine/archive report and run its report quality gate")
     rep.add_argument("publication", help="canonical Machine Publication JSON")
     rep.add_argument("--generated-at", required=True)
     rep.add_argument("--out", default="runs")
     rep.set_defaults(func=cmd_report)
 
+
+    inv = sub.add_parser(
+        "investor-report",
+        help="render the canonical Machine Publication into the Chinese investor-facing review report",
+    )
+    inv.add_argument("publication", help="canonical Machine Publication JSON")
+    inv.add_argument("--generated-at", required=True)
+    inv.add_argument("--out", default="runs")
+    inv.set_defaults(func=cmd_investor_report)
 
     ap = sub.add_parser("approve", help="record separate human approval")
     ap.add_argument("snapshot")

@@ -1184,3 +1184,30 @@ B2 — LLM Semantic Workbench + Semantic Producer Admission
 B2 must close the real semantic producer boundary and then add a natural-language-to-canonical conformance test before the final MVP gate can be closed.
 
 A02 / CSI800 remains non-blocking and must not be reintroduced into the MVP critical path.
+
+
+## 20. Dual Report Surface — Human Review + Machine Archive — 2026-10-08
+
+Status: IMPLEMENTED ON VALIDATION BRANCH / HUMAN REVIEW SURFACE PENDING CANONICAL PROMOTION
+
+Decision:
+- split the report layer into two separate outputs derived from the exact same canonical Machine Publication;
+- human-facing surface = IIOS-INVESTOR-REVIEW-0.1, Chinese, detailed, intended for actual investor/operator usability review;
+- machine/archive surface = existing IIOS-HUMAN-REPORT-0.1 output, retained as compact structured/English summary for CI, deterministic replay and archival lookup.
+
+Authority boundary:
+- both surfaces are one-way projections only;
+- neither surface may create evidence, recalculate economics, mutate the Decision, or authorize execution;
+- the new investor review report has exact publication/decision binding, deterministic rendering, immutable hash and its own QA record.
+
+New implementation:
+- iios_mvp/investor_review_report.py;
+- schemas/investor_review_report_v0.1.schema.json;
+- tests/test_investor_review_report.py;
+- CLI command: iios-mvp investor-report <publication> --generated-at <timestamp>;
+- design record: docs/iios/IIOS_DUAL_REPORT_SURFACE_20261008.md.
+
+Acceptance rule:
+- the Human Usability Gate must be performed against the Chinese Investor Review Report, not the compact machine/archive summary;
+- accepting report usability does not equal approving a trade;
+- final MVP remains blocked by B0 P0-LLM-004 / B2 natural-language-to-canonical conformance requirements.
