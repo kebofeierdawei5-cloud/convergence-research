@@ -4,6 +4,59 @@ State classification: **CANONICAL**
 Snapshot: 2026-10-08
 Authority: this file is the **only canonical Current State Index**.
 
+## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-08
+
+**Current canonical main:** `9066305a97eeec854c7f395904f2b109546b0644`
+
+The records below are cumulative milestone history. A milestone's historical “next boundary” is **time-local** and MUST NOT be interpreted as the current development instruction.
+
+### Current implementation state
+
+```text
+Investment Core / Stage C / C8 / PILOT-04              PASS / CANONICAL
+Investor Review Report v0.2 + Human Acceptance          PASS / CANONICAL
+B2-A Semantic Producer Admission                       PASS / CANONICAL
+B2-B Natural-Language Conformance                       PASS / CANONICAL
+B2-C Signed External Provider Binding                   PASS / CANONICAL
+B2-D Live Provider Preflight                            PASS
+B2-D Live Provider Invocation / Evidence                BLOCKED
+```
+
+### Current blocker
+
+**B2-D LIVE = BLOCKED**
+
+PR #212 is the active development branch. Its dedicated preflight CI passed, including live-provider configuration validation, replay validation and independent clean-room review. No production provider credential/runtime or production-origin provider receipt has been admitted.
+
+Therefore:
+- fixture output MUST NOT be labeled as live-provider evidence;
+- B2-D MUST NOT be marked complete merely because preflight CI is green;
+- the next executable evidence gate is a real provider invocation or a production-origin signed receipt with independent replay.
+
+### Current next development batch
+
+```text
+B2-D
+  ↓
+REAL PROVIDER RUNTIME / PRODUCTION-ORIGIN RECEIPT
+  ↓
+LIVE INVOCATION + RAW RESPONSE CAPTURE
+  ↓
+INDEPENDENT PROVIDER REPLAY
+  ↓
+B2-E Natural-Language → Semantic → Decision E2E
+  ↓
+B2-F Full Independent Red-team
+  ↓
+MVP Final Human Acceptance
+```
+
+### Explicit non-blockers
+
+A02 / CSI800 historical-universe evidence and the M1.2 Research Track remain **outside the company-level MVP critical path**.
+
+The M1.2 current epoch remains closed by FM07/FM05 governance; no same-epoch model/threshold redesign is authorized.
+
 ## 1. Canonical state
 
 ```
@@ -131,6 +184,18 @@ Case: `RC-CN-A-300750-20261004`
 This is an accepted system result, not a claim that the security should be bought.
 
 ## 4. Current blockers
+
+### B2-D — Live Provider Evidence
+
+Status: **PRE-FLIGHT PASS / LIVE GATE BLOCKED**
+
+- active PR: #212;
+- live-provider preflight CI: SUCCESS;
+- live invocation evidence: NOT ADMITTED;
+- production provider credential/runtime: NOT SUPPLIED;
+- production-origin provider receipt with independent replay: NOT SUPPLIED.
+
+This is the current LLM/MVP blocker.
 
 ### A1 — Company-side Evidence Closure
 
@@ -425,17 +490,17 @@ The independent verification record is docs/iios/A02_RUNTIME_INDEPENDENT_VERIFIC
 Development rule: prioritize actual historical raw evidence supply and B free-first materialization over additional archive-probe expansion. Until A/B raw evidence, field-level known_at, PIT reconstruction, and independent replay pass, the cross-sectional research path and model selection remain locked.
 
 
-## 9. Next canonical development boundary
+## 9. Historical MVP / Research boundary record
 
-The original Investment Core is already implemented through the C8 independent red-team acceptance. The immediate development objective is now **MVP real-user pilot testing**, not additional research infrastructure.
+The original company-level Investment Core and the planned PILOT-00 → PILOT-04 technical lifecycle are completed historical foundations. Their milestone sequence is retained for audit history only.
 
-The next boundary is:
+The **current** development boundary is defined by the CURRENT ACTIVE DEVELOPMENT AUTHORITY section at the top of this file:
 
-**PILOT-00 → PILOT-01 → PILOT-02 → PILOT-03 → PILOT-04 → MVP Pilot Acceptance**
+```text
+B2-D → real provider evidence → B2-E → B2-F → final MVP acceptance
+```
 
-The M1.2 cross-sectional research epoch remains a separate proposed Research Track capability. A02 / CSI800 historical-universe evidence is **not an Investment Core dependency** and must not block company-level MVP testing.
-
-The current FM research epoch remains closed to same-epoch amendment. The proposed cross-sectional successor epoch is not activated until its own scope, estimand, sufficiency, PIT/provenance, purity and owner-approval gates are satisfied.
+The M1.2 Research Track remains separate. A02 / CSI800 evidence is not an Investment Core dependency and must not be reintroduced into the MVP critical path.
 
 ### M1.2-FM02 canonical acceptance
 
@@ -712,6 +777,8 @@ no bytes → no hash admission
 no known_at evidence → no PIT admission
 no complete B bundle → no DATA-01-C
 ```
+
+> **Historical-record notice:** Sections 12–24 preserve immutable milestone records. Any “Immediate sequence”, “Next canonical development boundary”, or similar forward-looking statement inside these historical sections is time-local and is superseded by the **CURRENT ACTIVE DEVELOPMENT AUTHORITY** section above.
 
 ## 12. MVP Fast Launch status — 2026-10-07
 
