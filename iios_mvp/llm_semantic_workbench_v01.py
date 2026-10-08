@@ -60,6 +60,20 @@ class LLMSemanticWorkbench:
         for field in ('producer_type', 'producer_version', 'policy_version'):
             if getattr(registration, field) != getattr(producer, field):
                 raise ValueError(f'{field} is not registry-authorized')
+        run = self._orchestrator.get(request.run_id)
+        evidence_receipts = [receipt for receipt in run.stage_receipts if receipt.stage_id == Stage.EVIDENCE_ADMITTED.value]
+        if not evidence_receipts:
+            raise ValueError("semantic inputs require an admitted evidence receipt")
+        admitted_pairs = {
+            pair for pair in zip(
+                evidence_receipts[-1].output_refs,
+                evidence_receipts[-1].output_hashes,
+                strict=True,
+            )
+        }
+        requested_pairs = set(zip(request.input_refs, request.input_hashes, strict=True))
+        if not requested_pairs or not requested_pairs.issubset(admitted_pairs):
+            raise ValueError("semantic input lineage is not fully admitted")
         context = SemanticAdmissionContext(
             case_id=request.case_id,
             market=request.market,
