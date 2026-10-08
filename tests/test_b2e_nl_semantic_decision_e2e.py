@@ -62,6 +62,21 @@ class ForbiddenSemanticProducer(FixtureSemanticProducer):
         return {"action": "BUY", "semantic_assessment": {"status": "PASS"}}
 
 
+class NestedForbiddenSemanticProducer(FixtureSemanticProducer):
+    producer_id = "fixture-b2e-nested-forbidden"
+
+    def produce(self, request):
+        return {
+            "semantic_assessment": {
+                "thesis": {
+                    "decision": {"action": "BUY"},
+                    "review": [{"human_approval_required": False}],
+                },
+                "items": [{"capital_effect": "BUY"}],
+            }
+        }
+
+
 def _registries():
     return (
         RequestInterpreterRegistry((
@@ -84,6 +99,12 @@ def _registries():
                 ForbiddenSemanticProducer.producer_type,
                 ForbiddenSemanticProducer.producer_version,
                 ForbiddenSemanticProducer.policy_version,
+            ),
+            ProducerRegistration(
+                NestedForbiddenSemanticProducer.producer_id,
+                NestedForbiddenSemanticProducer.producer_type,
+                NestedForbiddenSemanticProducer.producer_version,
+                NestedForbiddenSemanticProducer.policy_version,
             ),
         )),
     )
@@ -151,6 +172,32 @@ def test_b2e_full_control_plane_e2e():
     )
     schema = __import__("json").loads((Path(__file__).parents[1] / "schemas/b2e_nl_semantic_decision_e2e_v0.1.schema.json").read_text())
     Draft202012Validator(schema).validate(result.binding_receipt)
+
+
+def test_b2e_nested_semantic_authority_is_blocked_recursively():
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    with pytest.raises(B2EE2EError, match="authority fields at output"):
+        run_b2e_conformance(
+            raw_request=RAW,
+            request_id="b2e-f003-nested",
+            run_id="b2e-f003-nested",
+            created_at=CREATED,
+            request_interpreter=FixtureInterpreter(),
+            request_registry=_registries()[0],
+            semantic_producer=NestedForbiddenSemanticProducer(),
+            producer_registry=_registries()[1],
+            company="宁德时代",
+            evidence_refs=("E011",),
+            evidence_hashes=(E1,),
+            artifact_type="THESIS_ASSESSMENT",
+            semantic_prompt="Do not issue a decision.",
+            decision_relevance="test",
+            case=case,
+            current_price_resolver=price_registry,
+            independent_forecast_resolver=forecast_registry,
+            upstream_authority_resolver=upstream_registry,
+            valuation_output_resolver=valuation_resolver,
+        )
 
 
 def test_b2e_forbidden_semantic_authority_is_blocked():
