@@ -70,8 +70,9 @@
     "mie_expectation_gap": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["mie","expectation_gap","inference_rule"],
+      "required": ["audit_status","mie","expectation_gap","inference_rule"],
       "properties": {
+        "audit_status": {"enum": ["COMPLETE","INCOMPLETE"]},
         "mie": {
           "type": "object",
           "additionalProperties": false,
