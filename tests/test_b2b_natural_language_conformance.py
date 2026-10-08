@@ -138,6 +138,7 @@ def test_full_conformance_fixture_reaches_semantic_admitted():
         request_id="nl-6", run_id="run-nl-6",
         raw_request="请判断002001当前价格是否值得买入", created_at="2026-10-08T00:00:00+00:00",
     )
+    o.transition("run-nl-6", Stage.EVIDENCE_PENDING, created_at="2026-10-08T00:00:00+00:00")
     o.transition(
         "run-nl-6",
         Stage.EVIDENCE_ADMITTED,
