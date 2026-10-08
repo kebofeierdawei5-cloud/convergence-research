@@ -164,6 +164,174 @@ def _module(
         "data": data if isinstance(data, (Mapping, list)) else {},
     }
 
+
+HUMAN_AUDITABILITY_CONTRACT_VERSION = "IIOS-HUMAN-AUDITABILITY-0.2"
+
+def _scenario_probability_audit(forecast: Mapping[str, Any]) -> dict[str, Any]:
+    scenarios = forecast.get("scenarios")
+    if not isinstance(scenarios, Mapping):
+        return {
+            "status": "NOT_PROVIDED",
+            "bear": None, "base": None, "bull": None,
+            "all_present": False,
+        }
+    values = {}
+    all_present = True
+    for name in ("bear", "base", "bull"):
+        item = scenarios.get(name)
+        value = item.get("probability") if isinstance(item, Mapping) else None
+        if value in (None, "") and isinstance(item, Mapping):
+            value = item.get("prob")
+        values[name] = value
+        if value in (None, ""):
+            all_present = False
+    return {
+        "status": "COMPLETE" if all_present else "MISSING",
+        **values,
+        "all_present": all_present,
+    }
+
+def _human_auditability(
+    *,
+    payload: Mapping[str, Any],
+    decision: Mapping[str, Any],
+    returns: Mapping[str, Any],
+    forecast: Mapping[str, Any],
+    mie: Mapping[str, Any],
+    gap: Mapping[str, Any],
+    gates: Mapping[str, Any],
+    portfolio: Mapping[str, Any],
+    positioning: Mapping[str, Any],
+) -> dict[str, Any]:
+    required_value = returns.get("required_return")
+    required_pass = returns.get("required_return_pass")
+    if required_value not in (None, ""):
+        required_return = {
+            "status": "AUDITABLE",
+            "numeric_value": required_value,
+            "pass_flag": required_pass,
+            "rule": "numeric_required_return_present",
+        }
+    elif required_pass is True:
+        required_return = {
+            "status": "INCOMPLETE",
+            "numeric_value": None,
+            "pass_flag": True,
+            "rule": "pass_flag_without_numeric_required_return_is_not_auditable",
+        }
+    else:
+        required_return = {
+            "status": "NOT_PROVIDED",
+            "numeric_value": None,
+            "pass_flag": required_pass,
+            "rule": "no_numeric_required_return_admitted",
+        }
+
+    probability = _scenario_probability_audit(forecast)
+    expected_value = returns.get("expected_annualized_return")
+    expected_return = {
+        "status": (
+            "AUDITABLE"
+            if expected_value not in (None, "") and probability["status"] == "COMPLETE"
+            else "INCOMPLETE"
+            if expected_value not in (None, "")
+            else "NOT_PROVIDED"
+        ),
+        "expected_annualized_return": expected_value,
+        "scenario_probability_status": probability["status"],
+        "rule": "expected_return_reconstruction_requires_published_scenario_probabilities",
+    }
+
+    actionable = decision.get("target_entry_price")
+    threshold = returns.get("target_entry_price")
+    semantics = payload.get("target_entry_price_semantics") or returns.get("target_entry_price_semantics")
+    entry_evaluation = payload.get("canonical_entry_evaluation")
+    entry_status = payload.get("gates", {}).get("canonical_entry_evaluation_status") if isinstance(payload.get("gates"), Mapping) else None
+    if actionable not in (None, "") and (entry_evaluation not in (None, {}) or entry_status not in (None, "", "SKIPPED")):
+        entry = {
+            "status": "ACTIONABLE",
+            "actionable_target_entry_price": actionable,
+            "threshold_price": threshold,
+            "canonical_entry_evaluation": entry_evaluation,
+            "semantics": semantics,
+        }
+    elif threshold not in (None, ""):
+        entry = {
+            "status": "THRESHOLD_ONLY",
+            "actionable_target_entry_price": None,
+            "threshold_price": threshold,
+            "canonical_entry_evaluation": entry_evaluation,
+            "semantics": semantics,
+            "reason": "canonical Decision did not form an executable target entry price",
+        }
+    else:
+        entry = {
+            "status": "UNAVAILABLE",
+            "actionable_target_entry_price": None,
+            "threshold_price": None,
+            "canonical_entry_evaluation": entry_evaluation,
+            "semantics": semantics,
+        }
+
+    package_can_add = portfolio.get("can_add")
+    decision_new_capital = gates.get("new_capital_allowed")
+    sizing_permission = gates.get("positioning_sizing_permission")
+    if package_can_add is True and decision_new_capital is False:
+        effective = "OVERRIDDEN_BY_DECISION"
+    elif decision_new_capital is True and sizing_permission not in (None, "", "NO_SIZING_PERMISSION"):
+        effective = "ALLOWED"
+    elif decision_new_capital is False:
+        effective = "BLOCKED"
+    else:
+        effective = "NOT_PROVIDED"
+    portfolio_resolution = {
+        "status": effective,
+        "package_can_add": package_can_add,
+        "decision_new_capital_allowed": decision_new_capital,
+        "positioning_sizing_permission": sizing_permission,
+        "override": package_can_add is True and decision_new_capital is False,
+        "rule": "Decision capital authorization overrides package can_add",
+    }
+
+    mie_status = _status(mie, {}, "status") if mie else "NOT_PROVIDED"
+    mie_identifiability = mie.get("identifiability") if mie else None
+    mie_stability = mie.get("stability") if mie else None
+    mie_decision_grade = mie.get("decision_grade") if mie else None
+    gap_status = _status(gap, {}, "status") if gap else str(gates.get("expectation_gap_status") or "UNKNOWN")
+    gap_identifiability = gap.get("identifiability") if gap else None
+    mie_gap = {
+        "mie": {
+            "status": mie_status,
+            "identifiability": mie_identifiability,
+            "stability": mie_stability,
+            "decision_grade": mie_decision_grade,
+            "source_presence": "STRUCTURED" if mie else "MISSING",
+        },
+        "expectation_gap": {
+            "status": gap_status,
+            "identifiability": gap_identifiability,
+            "source_presence": "STRUCTURED" if gap else "MISSING",
+        },
+        "inference_rule": "absence_never_implies_not_identifiable",
+    }
+
+    incomplete = any([
+        required_return["status"] == "INCOMPLETE",
+        expected_return["status"] == "INCOMPLETE",
+        entry["status"] == "THRESHOLD_ONLY",
+        portfolio_resolution["status"] == "OVERRIDDEN_BY_DECISION",
+    ])
+    return {
+        "contract_version": HUMAN_AUDITABILITY_CONTRACT_VERSION,
+        "required_return": required_return,
+        "expected_return": expected_return,
+        "scenario_probability": probability,
+        "entry_price": entry,
+        "portfolio_permission": portfolio_resolution,
+        "mie_expectation_gap": mie_gap,
+        "overall_status": "INCOMPLETE" if incomplete else "COMPLETE",
+    }
+
 def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
     validate_machine_publication(publication)
     case = publication["case"]
@@ -193,12 +361,6 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
     valuation = _first_mapping(payload, "valuation", "primary_valuation")
     mie = _first_mapping(payload, "p4f_market_implied_expectation", "market_implied_expectation", "mie")
     gap = _first_mapping(payload, "expectation_gap", "expectation_gap_evaluation")
-    if not gap and gates.get("expectation_gap_status") not in (None, ""):
-        gap = {
-            "status": gates.get("expectation_gap_status"),
-            "resolution_state": gates.get("expectation_gap_resolution_state"),
-            "qualification": gates.get("expectation_gap_qualification"),
-        }
     risk = _first_mapping(payload, "risk")
     positioning = _first_mapping(payload, "positioning", "positioning_sizing", "market_positioning")
     rpc = decision.get("risk_portfolio_contract")
@@ -284,8 +446,19 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
             )
         ),
         "actionable_target_entry_unavailable": decision.get("target_entry_price") in (None, ""),
-        "positioning_blocked": status(positioning, gates, "positioning", "positioning_sizing") == "BLOCKED",
+        "positioning_blocked": _status(positioning, gates, "positioning", "positioning_sizing") == "BLOCKED",
     }
+    auditability = _human_auditability(
+        payload=payload,
+        decision=decision,
+        returns=returns,
+        forecast=forecast,
+        mie=mie,
+        gap=gap,
+        gates=gates,
+        portfolio=portfolio,
+        positioning=positioning,
+    )
     return {
         "surface_version": "IIOS-INVESTOR-SEMANTIC-SURFACE-0.2",
         "language": LANGUAGE,
@@ -309,6 +482,7 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
         "missing_core_modules": core_missing,
         "human_review_readiness": "READY" if not core_missing else "HUMAN_REVIEW_NOT_READY",
         "completeness_flags": completeness_flags,
+        "human_auditability": auditability,
         "current_projection": publication["current_projection"],
         "human_approval": publication["human_approval"],
         "lifecycle_refs": publication["lifecycle_refs"],
@@ -346,7 +520,10 @@ def render_investor_review_v02(publication: Mapping[str, Any], surface: Mapping[
         f"- Current price：**{_fmt(decision.get('current_price'))}**；Actionable target entry：**{_fmt(decision.get('target_entry_price'))}**。",
         f"- Expected annualized return：**{_fmt(returns.get('expected_annualized_return'))}**；Required return：**{_fmt(returns.get('required_return'))}**。",
         f"- New capital allowed：**{_fmt((publication['decision_payload'].get('gates') or {}).get('new_capital_allowed'))}**；Human Approval：**{_fmt(approval.get('approval_status'))}**。",
-        f"- Human-review readiness：**{surface['human_review_readiness']}**。",
+        f"- Human-review readiness：**{surface['human_review_readiness']}**；Human Auditability：**{surface['human_auditability']['overall_status']}**。",
+        f"- Required Return audit：**{surface['human_auditability']['required_return']['status']}**；Expected Return audit：**{surface['human_auditability']['expected_return']['status']}**。",
+        f"- Entry-price semantics：**{surface['human_auditability']['entry_price']['status']}**；Portfolio permission resolution：**{surface['human_auditability']['portfolio_permission']['status']}**。",
+        f"- MIE：**{surface['human_auditability']['mie_expectation_gap']['mie']['status']}**；Expectation Gap：**{surface['human_auditability']['mie_expectation_gap']['expectation_gap']['status']}**。",
         "",
         "核心原则：模块缺失不会被默认成 PASS；价格阈值、仓位包和报告本身都不能替代 canonical Decision 与 Human Approval。",
         "",
@@ -406,6 +583,16 @@ def render_investor_review_v02(publication: Mapping[str, Any], surface: Mapping[
     add_module("Validation / 验证", "validation", ["- Validation 应复核 Forecast、Valuation、Decision 与 Thesis 的兑现情况，而不是只看股价。"])
 
     lines += [
+        "## Human Auditability Contract / 人工可审计性契约", "",
+        f"- Contract：**{surface['human_auditability']['contract_version']}**。",
+        f"- Overall：**{surface['human_auditability']['overall_status']}**。",
+        f"- Required Return：**{surface['human_auditability']['required_return']['status']}**。只有存在数值 Required Return 时，PASS 标记才可被独立复核。",
+        f"- Expected Return：**{surface['human_auditability']['expected_return']['status']}**。情景概率状态：**{surface['human_auditability']['scenario_probability']['status']}**。",
+        f"- Entry Price：**{surface['human_auditability']['entry_price']['status']}**。Threshold={_fmt(surface['human_auditability']['entry_price']['threshold_price'])}；Actionable={_fmt(surface['human_auditability']['entry_price']['actionable_target_entry_price'])}。",
+        f"- Portfolio Permission：**{surface['human_auditability']['portfolio_permission']['status']}**。Package can_add={_fmt(surface['human_auditability']['portfolio_permission']['package_can_add'])}；Decision new_capital_allowed={_fmt(surface['human_auditability']['portfolio_permission']['decision_new_capital_allowed'])}。",
+        f"- MIE / Expectation Gap：MIE **{surface['human_auditability']['mie_expectation_gap']['mie']['status']}**；Expectation Gap **{surface['human_auditability']['mie_expectation_gap']['expectation_gap']['status']}**。",
+        "- 规则：缺少 MIE 不自动推导 NOT_IDENTIFIABLE；缺少数字也不自动补写。",
+        "",
         "## 人工判断边界", "",
         f"- Human Approval：**{_fmt(approval.get('approval_status'))}**；Approved：**{_fmt(approval.get('approved'))}**。",
         "- Report PASS / CI PASS / Publication PASS 都不等于 Human Approval。",
