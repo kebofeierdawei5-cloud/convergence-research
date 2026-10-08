@@ -1259,3 +1259,47 @@ B2 — LLM Semantic Workbench + Semantic Producer Admission
 B2 must establish the real typed semantic producer boundary, producer authenticity/provenance, deterministic semantic admission, and a natural-language-to-canonical conformance test before the final MVP DoD can close.
 
 A02 / CSI800 remains non-blocking to company-level Investment Core MVP and must not be reintroduced into the critical path.
+
+## 22. B2-A — LLM Semantic Workbench + Semantic Producer Admission — 2026-10-08
+
+Status: **PASS / MERGED / CANONICAL**
+
+Scope:
+- PR #206;
+- exact accepted implementation head: `7be863f19800810528784361b38b61c820e9c81d`;
+- merge commit: `ae5b6dd6d7cd606f8aadd0100eb2beedb0bef5df`.
+
+Technical evidence:
+- B2 Semantic Producer Admission workflow Run #8: **SUCCESS**;
+- B2 admission tests: **12 / 12 PASS**;
+- independent clean-room B2 red-team: **15 / 15 PASS**;
+- compileall: PASS;
+- semantic producer receipt schema validation: PASS;
+- git diff --check: PASS;
+- additional repository regression workflows triggered on the exact head remained green where completed.
+
+Closed boundary:
+- typed semantic artifact allow-list;
+- active producer registry binding producer_id / producer_type / producer_version / policy_version;
+- producer receipt with semantic provenance;
+- deterministic artifact / receipt / output hash binding;
+- exact case / market / symbol / company / cutoff identity binding;
+- semantic input references and hashes must originate from the current run's admitted Evidence receipt;
+- Workbench requires canonical `SEMANTIC_PENDING`;
+- Workbench request must exactly match the canonical run identity;
+- successful admission advances only `SEMANTIC_PENDING → SEMANTIC_ADMITTED`.
+
+Non-claims:
+- B2-A does **not** prove a live external LLM connection;
+- B2-A does **not** prove Natural Language → real LLM → semantic admission → canonical Decision;
+- B2-A does not alter economic formulas, Decision precedence, Risk/Portfolio semantics, Human Approval, or automatic execution.
+
+Governance:
+- owner/operator approved B2-A for merge after the dedicated CI and independent red-team gate;
+- B2-A is now canonical infrastructure, not an economic judgment engine.
+
+Next canonical development boundary:
+
+```text
+B2-B — Natural-Language Semantic Conformance + Independent Red Team
+```
