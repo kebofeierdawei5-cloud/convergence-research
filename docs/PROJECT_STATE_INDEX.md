@@ -1188,7 +1188,7 @@ A02 / CSI800 remains non-blocking and must not be reintroduced into the MVP crit
 
 ## 20. Dual Report Surface — Human Review + Machine Archive — 2026-10-08
 
-Status: IMPLEMENTED ON VALIDATION BRANCH / HUMAN REVIEW SURFACE PENDING CANONICAL PROMOTION
+Status: CANONICAL / HUMAN REVIEW SURFACE READY
 
 Decision:
 - split the report layer into two separate outputs derived from the exact same canonical Machine Publication;
