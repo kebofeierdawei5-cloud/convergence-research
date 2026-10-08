@@ -33,20 +33,25 @@ def sha256_json(value: dict) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def test_rt_b2_01_producer_allowlist_is_closed():
+def test_rt_b2_01_artifact_type_allowlist_is_closed():
     source = ADMISSION.read_text(encoding="utf-8")
     tree = ast.parse(source)
-    names = {
-        node.targets[0].id
+    assignments = [
+        node.value
         for node in ast.walk(tree)
         if isinstance(node, ast.Assign)
         and node.targets
         and isinstance(node.targets[0], ast.Name)
         and node.targets[0].id == "SEMANTIC_ARTIFACT_TYPES"
+    ]
+    assert len(assignments) == 1
+    assert isinstance(assignments[0], ast.Set)
+    observed = {
+        item.value for item in assignments[0].elts
+        if isinstance(item, ast.Constant) and isinstance(item.value, str)
     }
-    assert names == {"SEMANTIC_ARTIFACT_TYPES"}
-    for token in ("LLM_SEMANTIC_PRODUCER", "HUMAN_EXPERT_ADJUDICATION"):
-        assert token in source
+    assert observed == ARTIFACT_TYPES
+    assert "SEMANTIC_PRODUCER_TYPES" in source
 
 
 def test_rt_b2_02_external_json_not_authorized():
