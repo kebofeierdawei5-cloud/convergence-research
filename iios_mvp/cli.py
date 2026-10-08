@@ -13,6 +13,7 @@ from .research_intake import build_research_case
 from .machine_publication import write_machine_publication
 from .human_report import write_human_report
 from .investor_review_report import write_investor_review_report
+from .investor_review_report_v02 import write_investor_review_report_v02
 from .store import (
     approve_revision,
     create_or_load_series,
@@ -262,6 +263,30 @@ def cmd_investor_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_investor_report_v02(args: argparse.Namespace) -> int:
+    report_path, machine_path, markdown_path, qa_path = write_investor_review_report_v02(
+        args.out,
+        publication_path=args.publication,
+        generated_at=args.generated_at,
+    )
+    report = load_json(str(report_path))
+    qa = load_json(str(qa_path))
+    print(json.dumps({
+        "status": "INVESTOR_REVIEW_REPORT_V02_PUBLISHED",
+        "report": str(report_path),
+        "machine": str(machine_path),
+        "markdown": str(markdown_path),
+        "qa": str(qa_path),
+        "report_id": report["report_id"],
+        "report_hash": report["report_hash"],
+        "machine_report_hash": report["machine_report_hash"],
+        "human_report_hash": report["human_report_hash"],
+        "qa_status": qa["qa_status"],
+        "qa_hash": qa["qa_hash"],
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_trigger_contract(args: argparse.Namespace) -> int:
     contract = load_json(args.contract)
     path = write_trigger_contract(args.out, args.decision_id, contract)
@@ -405,6 +430,15 @@ def parser() -> argparse.ArgumentParser:
     inv.add_argument("--generated-at", required=True)
     inv.add_argument("--out", default="runs")
     inv.set_defaults(func=cmd_investor_report)
+
+    inv2 = sub.add_parser(
+        "investor-report-v02",
+        help="render the fail-closed dual-surface Investor Review Report v0.2",
+    )
+    inv2.add_argument("publication", help="canonical Machine Publication JSON")
+    inv2.add_argument("--generated-at", required=True)
+    inv2.add_argument("--out", default="runs")
+    inv2.set_defaults(func=cmd_investor_report_v02)
 
     ap = sub.add_parser("approve", help="record separate human approval")
     ap.add_argument("snapshot")
