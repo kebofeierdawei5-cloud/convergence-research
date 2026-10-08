@@ -262,7 +262,6 @@ def _human_auditability(
             "threshold_price": threshold,
             "canonical_entry_evaluation": entry_evaluation,
             "semantics": semantics,
-            "reason": "canonical Decision did not form an executable target entry price",
         }
     else:
         entry = {
