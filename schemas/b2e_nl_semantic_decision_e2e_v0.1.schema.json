@@ -18,6 +18,7 @@
     "request_receipt_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
     "research_case_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
     "case_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "semantic_core_projection_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
     "semantic_artifact_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
     "semantic_admission_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
     "decision_admission_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
