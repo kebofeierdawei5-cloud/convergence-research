@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/nl-request-admission-0.1.schema.json",
+  "title": "IIOS Natural-Language Request Admission Receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version","request_id","run_id","raw_request_sha256","normalized_request_sha256",
+    "normalized_request","case_id","case_hash","market","symbol","as_of_date","cutoff_date",
+    "request_type","interpreter_type","interpreter_id","interpreter_version","policy_version",
+    "orchestrator_version","status","created_at","receipt_hash"
+  ],
+  "properties": {
+    "schema_version":{"const":"IIOS-NL-REQUEST-ADMISSION-0.1"},
+    "request_id":{"type":"string","minLength":1},
+    "run_id":{"type":"string","minLength":1},
+    "raw_request_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "normalized_request_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "normalized_request":{
+      "type":"object","additionalProperties":false,
+      "required":["market","symbol","as_of_date","current_position_pct","request_type"],
+      "properties":{
+        "market":{"enum":["CN-A","HK"]},
+        "symbol":{"type":"string","minLength":1},
+        "as_of_date":{"type":"string","format":"date"},
+        "current_position_pct":{"type":["string","number"]},
+        "request_type":{"const":"INVESTMENT_DECISION"}
+      }
+    },
+    "case_id":{"type":"string","minLength":1},
+    "case_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "market":{"enum":["CN-A","HK"]},
+    "symbol":{"type":"string","minLength":1},
+    "as_of_date":{"type":"string","format":"date"},
+    "cutoff_date":{"type":"string","format":"date"},
+    "request_type":{"const":"INVESTMENT_DECISION"},
+    "interpreter_type":{"enum":["LLM_REQUEST_INTERPRETER","HUMAN_EXPERT_ADJUDICATION"]},
+    "interpreter_id":{"type":"string","minLength":1},
+    "interpreter_version":{"type":"string","minLength":1},
+    "policy_version":{"type":"string","minLength":1},
+    "orchestrator_version":{"type":"string","minLength":1},
+    "status":{"const":"ADMITTED"},
+    "created_at":{"type":"string","format":"date-time"},
+    "receipt_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"}
+  }
+}
