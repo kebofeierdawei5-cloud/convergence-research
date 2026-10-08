@@ -97,7 +97,8 @@ def _case_and_resolvers():
         horizon_override_basis=["MAJOR_INDUSTRY_LEADER", "MAJOR_INVESTMENT_CYCLE_OR_MAJOR_CAPEX"],
         horizon_rationale="B2-E fixture uses the existing canonical 300750 3Y override.",
     )
-    return case, price_registry, None, __import__("tools.core04_final_300750_decision_e2e", fromlist=["UPSTREAM_AUTHORITY_REGISTRY"]).UPSTREAM_AUTHORITY_REGISTRY, None
+    mod = __import__("tools.core04_final_300750_decision_e2e", fromlist=["UPSTREAM_AUTHORITY_REGISTRY", "FORECAST_REGISTRY", "VALUATION_OUTPUT_RESOLVER"])
+    return case, price_registry, mod.FORECAST_REGISTRY, mod.UPSTREAM_AUTHORITY_REGISTRY, mod.VALUATION_OUTPUT_RESOLVER
 
 
 def test_b2e_full_control_plane_e2e():
