@@ -124,14 +124,14 @@ jobs:
         if: ${{ always() }}
         run: |
           set -euo pipefail
-          pub=/tmp/iios-xhc/artifact/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
+          pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
           test -f "$pub"
           test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
           python - <<'PY'
           import json
           import traceback
           from iios_mvp.machine_publication import validate_machine_publication
-          pub_path="/tmp/iios-xhc/artifact/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json"
+          pub_path="/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json"
           publication=json.loads(open(pub_path, encoding="utf-8").read())
           set +e
           python -c 'import json,sys; from iios_mvp.machine_publication import validate_machine_publication; d=json.load(open(sys.argv[1],encoding="utf-8")); validate_machine_publication(d); print("PASS", flush=True)' "$pub" 2>&1 | tee /tmp/iios-xhc/validation.txt
