@@ -370,6 +370,20 @@ def test_v02_p0_invalid_sizing_permission_cannot_become_allowed(tmp_path):
     assert audit["portfolio_permission"]["status"] == "NOT_PROVIDED"
 
 
+def test_v02_admits_canonical_thesis_intact_status(tmp_path):
+    publication, _ = _publication(tmp_path)
+    publication["decision_payload"]["thesis"]["status"] = "INTACT"
+    _reseal_publication(publication)
+    report = build_investor_review_report_v02(
+        publication=publication, generated_at="2026-10-08T02:00:00+00:00"
+    )
+    validate_investor_review_report_v02(report)
+    qa = qa_investor_review_v02(publication=publication, report=report)
+    validate_investor_review_qa_v02(qa)
+    assert report["machine_report"]["semantic_surface"]["semantic_matrix"]["thesis"]["status"] == "INTACT"
+    assert qa["checks"]["semantic_matrix_complete"] == "PASS"
+
+
 def test_v02_missing_modules_are_explicit_and_not_ready(tmp_path):
     publication, _ = _publication(tmp_path)
     for key in ("quality", "reality", "p4f_market_implied_expectation", "expectation_gap", "positioning"):
