@@ -52,6 +52,12 @@ def _fmt(value: Any) -> str:
 
 
 
+def _fmt_entry_zone(value: Any) -> str:
+    if isinstance(value, list) and len(value) == 2:
+        return f"{_fmt(value[0])}–{_fmt(value[1])}"
+    return _fmt(value)
+
+
 def _render_risk_portfolio_contract(value: Any) -> list[str]:
     """Render risk/portfolio data as investor-facing bullets, never as a machine JSON dump."""
     if not isinstance(value, Mapping):
@@ -126,10 +132,11 @@ def render_human_report(publication: Mapping[str, Any]) -> str:
         "## Investment Case",
         "",
         f"- Trust gate: {_fmt(gates.get('trust'))}",
-        f"- Evidence/PIT gate: {_fmt(gates.get('evidence_pit'))}",
-        f"- Forecast readiness: {_fmt(gates.get('forecast_ready'))}",
-        f"- Valuation readiness: {_fmt(gates.get('valuation_ready'))}",
-        f"- BUY/ADD permission at decision time: {_fmt(gates.get('new_buy_add_allowed'))}",
+        f"- Evidence chain: {len(payload.get('evidence_chain') or [])} canonical observations",
+        f"- Forecast readiness: {_fmt(gates.get('forecast_ready', gates.get('forecast')))}",
+        f"- Valuation readiness: {_fmt(gates.get('valuation_ready', gates.get('valuation')))}",
+        f"- New capital permission at decision time: {_fmt(gates.get('new_buy_add_allowed', gates.get('new_capital_allowed')))}",
+        f"- Positioning/sizing permission: {_fmt(gates.get('positioning_sizing_permission'))}",
         f"- Decision scope: {_fmt(payload.get('decision_scope'))}",
         "",
         "### Return & Valuation",
@@ -140,6 +147,7 @@ def render_human_report(publication: Mapping[str, Any]) -> str:
         f"- Fundamental Target Pass: {_fmt(returns.get('fundamental_target_pass'))}",
         f"- Required Return Pass: {_fmt(returns.get('required_return_pass'))}",
         f"- Required Return: {_fmt(returns.get('required_return'))}",
+        f"- Margin of Safety: {_fmt(returns.get('margin_of_safety'))}",
         "",
         "## Trust & Evidence Boundary",
         "",
@@ -153,16 +161,36 @@ def render_human_report(publication: Mapping[str, Any]) -> str:
         "## Reality / Forecast / Valuation",
         "",
         f"- Current canonical decision price: {_fmt(decision.get('current_price'))}",
-        f"- Target entry price: {_fmt(decision.get('target_entry_price'))}",
+        f"- Actionable target entry price: {_fmt(decision.get('target_entry_price'))}",
+        f"- Return/risk threshold price: {_fmt(returns.get('target_entry_price'))}",
+        f"- Entry-zone package (not an authorization): {_fmt_entry_zone((decision.get('risk_portfolio_contract') or {}).get('portfolio', {}).get('buy_add_package', {}).get('entry_zone'))}",
         f"- Target entry semantics: {_fmt(decision.get('target_entry_price_semantics'))}",
         f"- Canonical entry evaluation: {_fmt(decision.get('canonical_entry_evaluation'))}",
+        "",
+        "No actionable target entry price is bound when the canonical decision is REVIEW_REQUIRED and the entry evaluation is skipped. The return/risk threshold remains an informational valuation threshold, not a capital authorization.",
+        "",
+        "### Forecast",
+        "",
+        f"- Method: {_fmt((payload.get('forecast') or {}).get('method'))}",
+        f"- Horizon: {_fmt((payload.get('forecast') or {}).get('horizon_years'))} year(s)",
+        f"- Base normalized EPS: {_fmt(((payload.get('forecast') or {}).get('scenarios') or {}).get('base', {}).get('normalized_eps_cny'))} CNY",
+        f"- Base valuation multiple: {_fmt(((payload.get('forecast') or {}).get('scenarios') or {}).get('base', {}).get('valuation_multiple'))}x",
+        f"- Style weighting: cyclical {_fmt(((payload.get('forecast') or {}).get('style_weighting') or {}).get('cyclical'))}; growth {_fmt(((payload.get('forecast') or {}).get('style_weighting') or {}).get('growth'))}",
+        "",
+        "### Valuation",
+        "",
+        f"- Primary model: {_fmt((payload.get('valuation') or {}).get('primary_model'))}",
+        f"- Base value per share: {_fmt(((payload.get('valuation') or {}).get('scenario_values_per_share') or {}).get('base'))} CNY",
+        f"- Bear value per share: {_fmt(((payload.get('valuation') or {}).get('scenario_values_per_share') or {}).get('bear'))} CNY",
+        f"- Bull value per share: {_fmt(((payload.get('valuation') or {}).get('scenario_values_per_share') or {}).get('bull'))} CNY",
+        "- Forecast and valuation figures are explicit model assumptions, not market consensus.",
         "",
         "The report does not independently recalculate company economics. Those values remain owned by the canonical Decision payload.",
         "",
         "## Risk & Monitoring",
         "",
         *_render_risk_portfolio_contract(decision.get("risk_portfolio_contract")),
-        f"- Maximum loss / risk surface: {_fmt(risk.get('max_loss_pct'))}",
+        f"- Maximum loss / risk surface: {_fmt(risk.get('max_loss_pct'))}%",
         "- Thesis break and risk boundaries are carried by the canonical Decision and are not amended here.",
     ]
     for item in (payload.get("thesis") or {}).get("falsifiers", []) or []:

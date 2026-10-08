@@ -42,10 +42,30 @@ def make_snapshot(action="REVIEW_REQUIRED"):
         "auto_execution": False,
         "gates": {
             "trust": "PASS",
-            "evidence_pit": True,
-            "forecast_ready": True,
-            "valuation_ready": True,
-            "new_buy_add_allowed": False,
+            "reality": "PASS",
+            "forecast": "PASS",
+            "valuation": "PASS",
+            "new_capital_allowed": False,
+            "positioning_sizing_permission": "NO_SIZING_PERMISSION",
+        },
+        "evidence_chain": [
+            {"evidence_id": "E001", "claim_type": "OBSERVED_FACT", "known_at": cutoff, "purpose": "test evidence"},
+            {"evidence_id": "E002", "claim_type": "OBSERVED_FACT", "known_at": cutoff, "purpose": "test financial"},
+        ],
+        "forecast": {
+            "method": "NORMALIZED_EARNINGS_DRIVER_SCENARIO",
+            "horizon_years": "1",
+            "style_weighting": {"cyclical": "0.70", "growth": "0.30"},
+            "scenarios": {
+                "base": {"normalized_eps_cny": "2.80", "valuation_multiple": "11.5"},
+                "bear": {"normalized_eps_cny": "2.10", "valuation_multiple": "9.5"},
+                "bull": {"normalized_eps_cny": "3.50", "valuation_multiple": "13.0"},
+            },
+        },
+        "valuation": {
+            "primary_model": "FORWARD_PE",
+            "status": "PASS",
+            "scenario_values_per_share": {"base": "32.20", "bear": "19.95", "bull": "45.50"},
         },
         "return_metrics": {
             "entry_return_cushion": "0.15",
@@ -54,6 +74,8 @@ def make_snapshot(action="REVIEW_REQUIRED"):
             "fundamental_target_pass": True,
             "required_return_pass": True,
             "required_return": "0.10",
+            "target_entry_price": "26.60",
+            "margin_of_safety": "0.1941",
         },
         "risk": {"max_loss_pct": "0.25"},
         "risk_portfolio_contract": {
@@ -212,6 +234,34 @@ def test_report_qa_fails_closed_on_machine_json_field_dump(tmp_path):
     assert qa["qa_status"] == "FAIL"
     assert qa["checks"]["human_readability"] == "FAIL"
     assert any("machine-readable JSON-like field dump" in issue for issue in qa["issues"])
+
+
+def test_report_projects_canonical_gate_forecast_valuation_and_thresholds(tmp_path):
+    publication, _ = make_publication(tmp_path)
+    report = build_human_report(
+        publication=publication, generated_at="2026-10-06T02:00:00+00:00"
+    )
+    markdown = report["markdown"]
+    assert "- Forecast readiness: PASS" in markdown
+    assert "- Valuation readiness: PASS" in markdown
+    assert "- New capital permission at decision time: NO" in markdown
+    assert "- Positioning/sizing permission: NO_SIZING_PERMISSION" in markdown
+    assert "- Evidence chain: 0 canonical observations" not in markdown
+    assert "- Primary model: FORWARD_PE" in markdown
+    assert "- Base value per share: 32.20 CNY" in markdown
+    assert "- Bear value per share: 19.95 CNY" in markdown
+    assert "- Bull value per share: 45.50 CNY" in markdown
+
+
+def test_report_distinguishes_actionable_target_from_return_risk_threshold(tmp_path):
+    publication, _ = make_publication(tmp_path)
+    report = build_human_report(
+        publication=publication, generated_at="2026-10-06T02:00:00+00:00"
+    )
+    markdown = report["markdown"]
+    assert "- Actionable target entry price: UNAVAILABLE" in markdown
+    assert "- Return/risk threshold price: 26.60" in markdown
+    assert "No actionable target entry price is bound" in markdown
 
 
 def test_report_qa_fails_closed_on_publication_binding_mismatch(tmp_path):
