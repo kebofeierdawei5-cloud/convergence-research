@@ -1303,3 +1303,48 @@ Next canonical development boundary:
 ```text
 B2-B — Natural-Language Semantic Conformance + Independent Red Team
 ```
+
+## 23. B2-B — Natural-Language Semantic Conformance — 2026-10-08
+
+Status: **PASS / MERGED / CANONICAL**
+
+Scope:
+- PR #208;
+- exact accepted implementation head: `941926c7fe8762933cb90d6c21d6d1b446487c1f`;
+- merge commit: `6eeccea9069d3262ca8a7484e4fa1461f9f2797e`.
+
+Technical evidence:
+- B2-B Natural Language Conformance workflow Run #2: **SUCCESS**;
+- conformance tests: **7 / 7 PASS**;
+- independent clean-room red-team: **15 / 15 PASS**;
+- compileall: PASS;
+- request-admission schema validation: PASS;
+- git diff --check: PASS.
+
+Closed boundary:
+- raw natural-language request is hashed before interpretation;
+- normalized request intent receives an independent canonical hash;
+- request interpreter identity / type / version / policy is registry-bound;
+- only INVESTMENT_DECISION requests enter this canonical path;
+- existing Research Case v0.1 construction and validation remain the deterministic case boundary;
+- request admission receipt binds request_id / run_id / case_id / case_hash / interpreter provenance;
+- REQUEST_ADMITTED must precede CASE_CREATED;
+- conformance can progress through Evidence → SEMANTIC_PENDING → B2-A Semantic Admission.
+
+Non-claims:
+- B2-B does **not** prove live external LLM/provider conformance;
+- fixture interpreter and fixture semantic producer are test doubles;
+- B2-B does **not** prove economic decision quality;
+- no Decision, capital permission, Human Approval, or execution authority is granted.
+
+Governance:
+- owner/operator approved B2-B for merge after dedicated CI and independent red-team;
+- B2-B is canonical entry infrastructure.
+
+Next canonical development boundary:
+
+```text
+B2-C — Live Semantic Producer Binding + Natural-Language-to-Semantic-to-Decision Conformance
+```
+
+B2-C must introduce an authorized real semantic producer boundary or an explicitly signed external-provider receipt path. It must demonstrate end-to-end lineage from natural-language request through semantic admission and into Decision Admission without allowing the LLM to grant permission authority.
