@@ -1,0 +1,28 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://iios.local/schemas/live-provider-replay-0.2.schema.json",
+  "title":"IIOS Live Provider Replay Record v0.2",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema_version","provider_id","provider_version","protocol","model","endpoint","run_id","case_id","request_id","cutoff_date","request_sha256","response_sha256","request_payload","response_bytes_b64","http_status","content_type","created_at","replay_hash"],
+  "properties":{
+    "schema_version":{"const":"IIOS-LIVE-PROVIDER-REPLAY-0.2"},
+    "provider_id":{"type":"string","minLength":1},
+    "provider_version":{"type":"string","minLength":1},
+    "protocol":{"const":"OPENAI_RESPONSES"},
+    "model":{"type":"string","minLength":1},
+    "endpoint":{"type":"string","format":"uri","pattern":"^https://"},
+    "run_id":{"type":"string","minLength":1},
+    "case_id":{"type":"string","minLength":1},
+    "request_id":{"type":"string","minLength":1},
+    "cutoff_date":{"type":"string","format":"date"},
+    "request_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "response_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "request_payload":{"type":"object"},
+    "response_bytes_b64":{"type":"string","minLength":1},
+    "http_status":{"type":"integer","minimum":100,"maximum":599},
+    "content_type":{"type":"string"},
+    "created_at":{"type":"string","format":"date-time"},
+    "replay_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"}
+  }
+}

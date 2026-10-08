@@ -1,0 +1,99 @@
+name: IIOS B2-D Live Provider
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/live_provider_*.py"
+      - "schemas/live_provider_*.schema.json"
+      - "tests/test_b2d_live_provider_preflight.py"
+      - "tests/independent_redteam_b2d_live_provider.py"
+      - "docs/iios/B2_D_LIVE_PROVIDER_PREFLIGHT_20261008.md"
+      - ".github/workflows/iios_b2d_live_provider.yml"
+  push:
+    branches:
+      - "feature/b2d-live-provider-canonical-refresh-20261008"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema cryptography
+      - name: Run B2-D tests
+        run: python -m pytest -q tests/test_b2d_live_provider_preflight.py
+      - name: Run independent B2-D red-team
+        run: python -m pytest -q tests/independent_redteam_b2d_live_provider.py
+      - name: Compile
+        run: python -m compileall -q iios_mvp/live_provider_preflight_v01.py iios_mvp/live_provider_invocation_v01.py iios_mvp/live_provider_replay_v01.py iios_mvp/live_provider_evidence_v01.py
+      - name: Validate schemas
+        run: |
+          python -m json.tool schemas/live_provider_replay_v0.2.schema.json >/dev/null
+          python -m json.tool schemas/live_provider_evidence_v0.1.schema.json >/dev/null
+      - name: Diff check
+        run: git diff --check
+
+  live:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    continue-on-error: true
+    env:
+      IIOS_LLM_PROVIDER_BASE_URL: ${{ secrets.IIOS_LLM_PROVIDER_BASE_URL }}
+      IIOS_LLM_PROVIDER_API_KEY: ${{ secrets.IIOS_LLM_PROVIDER_API_KEY }}
+      IIOS_LLM_PROVIDER_MODEL: ${{ secrets.IIOS_LLM_PROVIDER_MODEL }}
+      IIOS_LLM_PROVIDER_RUNTIME_PRIVATE_KEY_B64: ${{ secrets.IIOS_LLM_PROVIDER_RUNTIME_PRIVATE_KEY_B64 }}
+      IIOS_LLM_PROVIDER_ID: ${{ secrets.IIOS_LLM_PROVIDER_ID }}
+      IIOS_LLM_PROVIDER_VERSION: ${{ secrets.IIOS_LLM_PROVIDER_VERSION }}
+      IIOS_LLM_PROVIDER_PROTOCOL: ${{ secrets.IIOS_LLM_PROVIDER_PROTOCOL }}
+      IIOS_LLM_PROVIDER_TIMEOUT_SECONDS: ${{ secrets.IIOS_LLM_PROVIDER_TIMEOUT_SECONDS }}
+      IIOS_B2D_LIVE_RUN_ID: b2d-live-smoke-20261008
+      IIOS_B2D_LIVE_CASE_ID: B2D-LIVE-SMOKE-20261008
+      IIOS_B2D_LIVE_REQUEST_ID: b2d-live-request-20261008
+      IIOS_B2D_LIVE_CUTOFF_DATE: "2026-10-08"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check cryptography
+      - name: Fail-closed live provider smoke
+        id: invoke
+        shell: bash
+        run: |
+          set +e
+          python -m iios_mvp.live_provider_evidence_v01 > live_provider_evidence.json
+          rc=$?
+          if [ "$rc" -ne 0 ]; then
+            echo '{"status":"BLOCKED_OR_FAILED","note":"live provider credentials/runtime unavailable or invocation failed"}' > live_provider_status.json
+            cat live_provider_status.json
+            exit 0
+          fi
+          python - <<'PY'
+          import json
+          with open("live_provider_evidence.json", encoding="utf-8") as f:
+              record=json.load(f)
+          assert record["status"] == "LIVE_RESPONSE_CAPTURED"
+          print("LIVE_PROVIDER_EVIDENCE_ADMITTED")
+          print("provider_id=", record["provider_id"])
+          print("model=", record["model"])
+          print("response_sha256=", record["response_sha256"])
+          print("replay_hash=", record["replay_hash"])
+          print("attestation_hash=", record["attestation_hash"])
+          PY
+      - name: Upload live evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: iios-b2d-live-provider-evidence
+          path: |
+            live_provider_evidence.json
+            live_provider_status.json
+          if-no-files-found: ignore

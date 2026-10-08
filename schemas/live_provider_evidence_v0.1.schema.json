@@ -1,0 +1,33 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://iios.local/schemas/live-provider-evidence-0.1.schema.json",
+  "title":"IIOS Live Provider Evidence v0.1",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema_version","status","run_id","case_id","request_id","cutoff_date","provider_id","provider_version","protocol","model","endpoint","request_sha256","response_sha256","request_payload","response_bytes_b64","http_status","content_type","replay_hash","runtime_public_key_b64","created_at","attestation_hash","signature_algorithm","signature_b64"],
+  "properties":{
+    "schema_version":{"const":"IIOS-LIVE-PROVIDER-EVIDENCE-0.1"},
+    "status":{"const":"LIVE_RESPONSE_CAPTURED"},
+    "run_id":{"type":"string","minLength":1},
+    "case_id":{"type":"string","minLength":1},
+    "request_id":{"type":"string","minLength":1},
+    "cutoff_date":{"type":"string","format":"date"},
+    "provider_id":{"type":"string","minLength":1},
+    "provider_version":{"type":"string","minLength":1},
+    "protocol":{"const":"OPENAI_RESPONSES"},
+    "model":{"type":"string","minLength":1},
+    "endpoint":{"type":"string","format":"uri","pattern":"^https://"},
+    "request_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "response_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "request_payload":{"type":"object"},
+    "response_bytes_b64":{"type":"string","minLength":1},
+    "http_status":{"type":"integer","minimum":200,"maximum":299},
+    "content_type":{"type":"string"},
+    "replay_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "runtime_public_key_b64":{"type":"string","minLength":1},
+    "created_at":{"type":"string","format":"date-time"},
+    "attestation_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "signature_algorithm":{"const":"Ed25519"},
+    "signature_b64":{"type":"string","minLength":1}
+  }
+}
