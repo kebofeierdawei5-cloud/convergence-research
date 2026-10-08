@@ -1,0 +1,40 @@
+name: IIOS Investor Review Report v0.2
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/investor_review_report_v02.py"
+      - "iios_mvp/cli.py"
+      - "schemas/investor_review_report_v0.2.schema.json"
+      - "schemas/investor_review_qa_v0.2.schema.json"
+      - "tests/test_investor_review_report_v02.py"
+      - "docs/iios/INVESTOR_REVIEW_REPORT_v0.2.md"
+      - ".github/workflows/iios_investor_report_v02.yml"
+  push:
+    branches: [main]
+    paths:
+      - "iios_mvp/investor_review_report_v02.py"
+      - "iios_mvp/cli.py"
+      - "schemas/investor_review_report_v0.2.schema.json"
+      - "schemas/investor_review_qa_v0.2.schema.json"
+      - "tests/test_investor_review_report_v02.py"
+      - "docs/iios/INVESTOR_REVIEW_REPORT_v0.2.md"
+      - ".github/workflows/iios_investor_report_v02.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  investor-report-v02:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - run: python -m compileall -q iios_mvp tests
+      - run: python -m pytest -q tests/test_investor_review_report_v02.py
+      - run: python -m json.tool schemas/investor_review_report_v0.2.schema.json >/dev/null
+      - run: python -m json.tool schemas/investor_review_qa_v0.2.schema.json >/dev/null
+      - run: git diff --check
