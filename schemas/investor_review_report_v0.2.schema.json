@@ -17,7 +17,18 @@
     "language": {"const": "zh-CN"},
     "machine_report_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "human_report_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "machine_report": {"type": "object", "additionalProperties": true, "required": ["machine_report_hash","semantic_surface"]},
+    "machine_report": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["machine_report_hash","semantic_surface"],
+      "properties": {
+        "semantic_surface": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["human_auditability"]
+        }
+      }
+    },
     "markdown": {"type": "string", "minLength": 1},
     "report_id": {"type": "string", "minLength": 1},
     "report_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
