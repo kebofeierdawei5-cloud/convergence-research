@@ -35,12 +35,17 @@ jobs:
         run: python -m pytest -q tests/independent_redteam_b2d_live_provider.py
       - name: Run B2-D1 independent verifier tests
         run: python -m pytest -q tests/test_b2d1_independent_live_evidence.py
+      - name: Run B2-D2 provider runtime tests
+        run: python -m pytest -q tests/test_b2d2_provider_runtime.py
+      - name: Run B2-D2 independent red-team
+        run: python -m pytest -q tests/independent_redteam_b2d2_provider_runtime.py
       - name: Compile
         run: python -m compileall -q iios_mvp/live_provider_preflight_v01.py iios_mvp/live_provider_invocation_v01.py iios_mvp/live_provider_replay_v01.py iios_mvp/live_provider_evidence_v01.py iios_mvp/live_provider_independent_verify_v01.py
       - name: Validate schemas
         run: |
           python -m json.tool schemas/live_provider_replay_v0.2.schema.json >/dev/null
           python -m json.tool schemas/live_provider_evidence_v0.1.schema.json >/dev/null
+          python -m json.tool schemas/provider_runtime_v0.1.schema.json >/dev/null
       - name: Diff check
         run: git diff --check
 
