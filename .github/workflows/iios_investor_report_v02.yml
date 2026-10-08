@@ -54,6 +54,30 @@ jobs:
           run-id: 37730232684
           path: /tmp/iios-xhc/artifact
 
+      - name: Diagnose canonical Xinhecheng v0.2 writer
+        if: ${{ always() }}
+        run: |
+          set +e
+          mkdir -p /tmp/iios-xhc/diagnostic
+          python - <<'PY' > /tmp/iios-xhc/diagnostic/write-report.txt 2>&1
+          import traceback
+          from pathlib import Path
+          from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
+          pub=Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
+          out=Path("/tmp/iios-xhc/diagnostic/writer")
+          out.mkdir(parents=True,exist_ok=True)
+          try:
+              result=write_investor_review_report_v02(str(out), publication_path=str(pub), generated_at="2026-10-08T05:00:00+00:00")
+              print("WRITE_PASS", [str(p) for p in result], flush=True)
+          except BaseException:
+              traceback.print_exc()
+              raise
+          PY
+          rc=$?
+          echo "writer_rc=$rc" >> /tmp/iios-xhc/diagnostic/write-report.txt
+          cat /tmp/iios-xhc/diagnostic/write-report.txt
+          exit 0
+
       - name: Re-render canonical Xinhecheng Publication through Investor Review v0.2
         run: |
           set -euo pipefail
@@ -91,6 +115,14 @@ jobs:
           if not all(expected.values()):
               raise SystemExit("XHC_HUMAN_AUDITABILITY_ASSERT_FAIL")
           PY
+
+      - name: Upload writer diagnostic
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: iios-investor-review-v02-writer-diagnostic
+          path: /tmp/iios-xhc/diagnostic/
+          if-no-files-found: error
 
       - name: Upload real Xinhecheng v0.2 report evidence
         uses: actions/upload-artifact@v4
