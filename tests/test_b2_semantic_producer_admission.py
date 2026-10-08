@@ -140,13 +140,55 @@ def test_orchestrator_stage_cannot_be_bypassed():
         )
 
 
+def test_workbench_rejects_unadmitted_semantic_input():
+    orchestrator = CanonicalResearchOrchestrator()
+    orchestrator.start(
+        run_id="b2-lineage",
+        case_id="RC-CN-A-002001-20261008",
+        market="CN-A",
+        symbol="002001.SZ",
+        cutoff_date="2026-10-08",
+        as_of_date="2026-10-08",
+        created_at="2026-10-08T00:00:00+00:00",
+    )
+    orchestrator.transition("b2-lineage", Stage.REQUEST_ADMITTED)
+    orchestrator.transition("b2-lineage", Stage.CASE_CREATED)
+    orchestrator.transition("b2-lineage", Stage.EVIDENCE_PENDING)
+    orchestrator.transition(
+        "b2-lineage",
+        Stage.EVIDENCE_ADMITTED,
+        output_refs=("E001",),
+        output_hashes=(SHA_A,),
+    )
+    orchestrator.transition("b2-lineage", Stage.SEMANTIC_PENDING)
+    with pytest.raises(ValueError, match="semantic input lineage is not fully admitted"):
+        LLMSemanticWorkbench(orchestrator=orchestrator, registry=registry()).run(
+            producer=FixtureLLM(),
+            request=SemanticRequest(
+                request_id="req-lineage",
+                run_id="b2-lineage",
+                case_id="RC-CN-A-002001-20261008",
+                market="CN-A",
+                symbol="002001.SZ",
+                company="浙江新和成股份有限公司",
+                cutoff_date="2026-10-08",
+                artifact_type="QUALITY_ASSESSMENT",
+                input_refs=("E001", "E002"),
+                input_hashes=(SHA_A, SHA_B),
+                prompt="Assess Quality from admitted evidence only.",
+                created_at="2026-10-08T00:00:00+00:00",
+            ),
+            decision_relevance="Quality controls capital admission.",
+        )
+
+
 def test_workbench_admits_authorized_fixture_and_advances_orchestrator():
     orchestrator = CanonicalResearchOrchestrator()
     orchestrator.start(run_id="b2-run", case_id="RC-CN-A-002001-20261008", market="CN-A", symbol="002001.SZ", cutoff_date="2026-10-08", as_of_date="2026-10-08", created_at="2026-10-08T00:00:00+00:00")
     orchestrator.transition("b2-run", Stage.REQUEST_ADMITTED)
     orchestrator.transition("b2-run", Stage.CASE_CREATED)
     orchestrator.transition("b2-run", Stage.EVIDENCE_PENDING)
-    orchestrator.transition("b2-run", Stage.EVIDENCE_ADMITTED, artifact_ref="evidence", output_hashes=(SHA_A,))
+    orchestrator.transition("b2-run", Stage.EVIDENCE_ADMITTED, output_refs=("E001", "E002"), output_hashes=(SHA_A, SHA_B))
     orchestrator.transition("b2-run", Stage.SEMANTIC_PENDING)
     result = LLMSemanticWorkbench(orchestrator=orchestrator, registry=registry()).run(
         producer=FixtureLLM(),
