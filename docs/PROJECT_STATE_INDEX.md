@@ -32,7 +32,7 @@ B2-F Full Independent Red-team                          BLOCKED / FINDINGS
 
 The B2-F independent clean-room audit reproduced one P0 and four P1 findings against the B2-E control-plane implementation. The P0 is the missing semantic-to-economic causal edge: B2-E admits/hashes semantic output but the canonical Decision Kernel consumes an independently supplied expanded Investment Core case. Therefore B2-E is not yet a production-backed Natural-Language → LLM Reasoning → Canonical Economic Decision path.
 
-The four findings are recorded in docs/iios/B2_F_FULL_INDEPENDENT_REDTEAM_20261008.md and research/b2f/B2_F_FINDINGS_20261008.json on the red-team audit branch. The canonical repair sequence must address F-001 through F-004 and then rerun the independent red-team.
+The four findings are recorded in docs/iios/B2_F_FULL_INDEPENDENT_REDTEAM_20261008.md and research/b2f/B2_F_FINDINGS_20261008.json on the red-team audit branch. The canonical repair sequence must address F-001 through F-005 and then rerun the independent red-team.
 
 **B2-D LIVE = BLOCKED**
 
