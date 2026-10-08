@@ -21,7 +21,7 @@ def test_rt_b2c_01_signature_is_cryptographically_verified():
 
 def test_rt_b2c_02_trust_registry_binds_provider_identity():
     s = source()
-    assert "trusted = registry.get(attestation["public_key_id"])" in s
+    assert 'trusted = registry.get(attestation["public_key_id"])' in s
     assert "trusted provider " in s
 
 
