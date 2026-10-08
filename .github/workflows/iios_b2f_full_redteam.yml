@@ -1,0 +1,39 @@
+name: IIOS B2-F Full Independent Red-team
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/b2e_nl_semantic_decision_e2e_v01.py"
+      - "iios_mvp/decision_lifecycle_production.py"
+      - "schemas/b2e_nl_semantic_decision_e2e_v0.1.schema.json"
+      - "tests/independent_redteam_b2f_full.py"
+      - "docs/iios/B2_F_FULL_INDEPENDENT_REDTEAM_20261008.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  redteam:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install verification dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - name: Run independent B2-F probes
+        run: |
+          python -m pytest -q             tests/independent_redteam_b2f_full.py             --maxfail=0
+      - name: Emit finding summary
+        run: |
+          python - <<'PY'
+from pathlib import Path
+print(Path("docs/iios/B2_F_FULL_INDEPENDENT_REDTEAM_20261008.md").read_text(encoding="utf-8"))
+PY
+      - name: Compile and diff check
+        run: |
+          python -m compileall -q iios_mvp/b2e_nl_semantic_decision_e2e_v01.py iios_mvp/decision_lifecycle_production.py
+          git diff --check
