@@ -17,6 +17,10 @@ The implementation is deliberately split:
 
 No stage here authorizes semantic admission, forecast, valuation, Decision, Human Approval, publication, or execution.
 
+The canonical stage boundary remains:
+`EVIDENCE_ADMITTED → SEMANTIC_PENDING → SEMANTIC_ADMITTED → FORECAST_PENDING`.
+B2-D stops before `SEMANTIC_ADMITTED`; it only supplies live external-provider evidence for B2-E.
+
 ## Real provider protocol
 
 The first concrete provider protocol is `OPENAI_RESPONSES`. OpenAI's current API documentation uses the Responses API for new integrations; the request is model + input and this batch keeps `store=false` so the smoke call does not persist provider-side conversation state.
