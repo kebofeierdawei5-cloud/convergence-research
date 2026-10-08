@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import base64
 import os
-from urllib.parse import urlparse
+
+from iios_mvp.provider_runtime_v01 import validate_provider_runtime_policy
 
 
 class LiveProviderPreflightError(ValueError):
@@ -20,12 +21,13 @@ class LiveProviderConfig:
     provider_version: str
     protocol: str
     timeout_seconds: int = 30
+    auth_mode: str = "BEARER"
+    deployment_mode: str = "EXTERNAL"
 
 
 REQUIRED_ENV = (
     "IIOS_LLM_PROVIDER_BASE_URL",
-    "IIOS_LLM_PROVIDER_API_KEY",
-    "IIOS_LLM_PROVIDER_MODEL",
+undefined    "IIOS_LLM_PROVIDER_MODEL",
     "IIOS_LLM_PROVIDER_RUNTIME_PRIVATE_KEY_B64",
     "IIOS_LLM_PROVIDER_ID",
     "IIOS_LLM_PROVIDER_VERSION",
@@ -45,10 +47,23 @@ def load_live_provider_config(env: dict[str, str] | None = None) -> LiveProvider
     if parsed.scheme != "https" or not parsed.netloc:
         raise LiveProviderPreflightError("IIOS_LLM_PROVIDER_BASE_URL must be an https URL")
     protocol = str(values["IIOS_LLM_PROVIDER_PROTOCOL"]).strip().upper()
-    if protocol not in {"OPENAI_RESPONSES"}:
-        raise LiveProviderPreflightError("unsupported live provider protocol")
+    auth_mode = str(values.get("IIOS_LLM_PROVIDER_AUTH_MODE", "BEARER")).strip().upper()
+    deployment_mode = str(values.get("IIOS_LLM_PROVIDER_DEPLOYMENT_MODE", "EXTERNAL")).strip().upper()
+    try:
+        validate_provider_runtime_policy(
+            base_url=base_url,
+            protocol=protocol,
+            auth_mode=auth_mode,
+            deployment_mode=deployment_mode,
+        )
+    except ValueError as exc:
+        raise LiveProviderPreflightError(str(exc)) from exc
     model = str(values["IIOS_LLM_PROVIDER_MODEL"]).strip()
-    api_key = str(values["IIOS_LLM_PROVIDER_API_KEY"]).strip()
+    api_key = str(values.get("IIOS_LLM_PROVIDER_API_KEY", "")).strip()
+    if auth_mode == "BEARER" and not api_key:
+        raise LiveProviderPreflightError("auth_mode BEARER requires an API key")
+    if auth_mode == "NONE" and api_key:
+        raise LiveProviderPreflightError("auth_mode NONE must not receive an API key")
     provider_id = str(values["IIOS_LLM_PROVIDER_ID"]).strip()
     provider_version = str(values["IIOS_LLM_PROVIDER_VERSION"]).strip()
     private_key = str(values["IIOS_LLM_PROVIDER_RUNTIME_PRIVATE_KEY_B64"]).strip()
@@ -81,6 +96,8 @@ def load_live_provider_config(env: dict[str, str] | None = None) -> LiveProvider
         provider_version=provider_version,
         protocol=protocol,
         timeout_seconds=timeout_seconds,
+        auth_mode=auth_mode,
+        deployment_mode=deployment_mode,
     )
 
 
