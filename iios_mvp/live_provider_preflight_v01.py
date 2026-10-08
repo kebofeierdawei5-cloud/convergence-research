@@ -27,7 +27,7 @@ class LiveProviderConfig:
 
 REQUIRED_ENV = (
     "IIOS_LLM_PROVIDER_BASE_URL",
-undefined    "IIOS_LLM_PROVIDER_MODEL",
+    "IIOS_LLM_PROVIDER_MODEL",
     "IIOS_LLM_PROVIDER_RUNTIME_PRIVATE_KEY_B64",
     "IIOS_LLM_PROVIDER_ID",
     "IIOS_LLM_PROVIDER_VERSION",
@@ -43,9 +43,6 @@ def load_live_provider_config(env: dict[str, str] | None = None) -> LiveProvider
             "live provider configuration missing: " + ", ".join(missing)
         )
     base_url = str(values["IIOS_LLM_PROVIDER_BASE_URL"]).strip()
-    parsed = urlparse(base_url)
-    if parsed.scheme != "https" or not parsed.netloc:
-        raise LiveProviderPreflightError("IIOS_LLM_PROVIDER_BASE_URL must be an https URL")
     protocol = str(values["IIOS_LLM_PROVIDER_PROTOCOL"]).strip().upper()
     auth_mode = str(values.get("IIOS_LLM_PROVIDER_AUTH_MODE", "BEARER")).strip().upper()
     deployment_mode = str(values.get("IIOS_LLM_PROVIDER_DEPLOYMENT_MODE", "EXTERNAL")).strip().upper()
