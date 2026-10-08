@@ -244,21 +244,28 @@ def run_b2e_conformance(
     )
     _assert_no_authority_fields(semantic.artifact)
 
+    projected_case = project_thesis_semantic_to_core(
+        artifact=semantic.artifact,
+        admission=semantic.admission,
+        case=case,
+    )
+    projection = projected_case["semantic_core_projection"]
+
     _transition_pre_decision(
         orchestrator,
         run_id=run_id,
-        case=case,
+        case=projected_case,
         created_at=created_at,
     )
 
     canonical_decision = decide_v03(
-        dict(case),
+        dict(projected_case),
         current_price_resolver=current_price_resolver,
         independent_forecast_resolver=independent_forecast_resolver,
         upstream_authority_resolver=upstream_authority_resolver,
         valuation_output_resolver=valuation_output_resolver,
     )
-    snapshot = _build_snapshot(case=case, decision=canonical_decision)
+    snapshot = _build_snapshot(case=projected_case, decision=canonical_decision)
     decision_admission = admit_canonical_decision(
         case=projected_case,
         snapshot=snapshot,
