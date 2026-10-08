@@ -133,13 +133,13 @@ jobs:
           from iios_mvp.machine_publication import validate_machine_publication
           pub_path="/tmp/iios-xhc/artifact/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json"
           publication=json.loads(open(pub_path, encoding="utf-8").read())
-          try:
-              validate_machine_publication(publication)
-          except Exception as exc:
-              print("real_publication_machine_validation=FAIL")
-              print("validation_error=" + repr(exc))
-              raise
-          print("real_publication_machine_validation=PASS")
+          set +e
+          validation_output=$(python -c 'import json,sys; from iios_mvp.machine_publication import validate_machine_publication; d=json.load(open(sys.argv[1],encoding="utf-8")); validate_machine_publication(d); print("PASS")' "$pub" 2>&1)
+          validation_rc=$?
+          set -e
+          printf '%s\\n' "$validation_output" > /tmp/iios-xhc/validation.txt
+          cat /tmp/iios-xhc/validation.txt
+          test "$validation_rc" = "0"
           PY
           python -m iios_mvp.cli investor-report-v02 "$pub" \
             --generated-at "2026-10-08T05:00:00+00:00" \
