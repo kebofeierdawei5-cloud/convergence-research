@@ -608,7 +608,7 @@ def render_investor_review_v02(publication: Mapping[str, Any], surface: Mapping[
         "## 明确非授权", "",
         "本报告是 Machine Publication 的投资者阅读投影，不是第二个 Decision Source。",
         "",
-        "不存在“到价即可自动买入”的隐含授权。BUY/ADD/REDUCE/EXIT 必须受 canonical Decision、Risk/Portfolio 与 Human Approval 约束。",
+        "本报告不能下单，也不授权下单。不存在“到价即可自动买入”的隐含授权。BUY/ADD/REDUCE/EXIT 必须受 canonical Decision、Risk/Portfolio 与 Human Approval 约束。",
         "",
         "本报告不会把缺失的 Quality、Reality、MIE、Expectation Gap、Positioning 或其他模块补写成结论。",
         "",
