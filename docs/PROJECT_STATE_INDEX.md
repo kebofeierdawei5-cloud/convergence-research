@@ -23,14 +23,14 @@ B2-D1 Live Evidence Verification Hardening             PASS / CANONICAL
 B2-D2 Provider-Neutral Runtime Boundary               PASS / CANONICAL
 B2-D Live Provider Invocation / Evidence                BLOCKED
 B2-E Natural-Language → Semantic → Decision E2E          PASS / CANONICAL
-B2-F Full Independent Red-team                          BLOCKED / F-003 F-004 F-005
+B2-F Full Independent Red-team                          BLOCKED / F-005
 ```
 
 ### Current blocker
 
-**B2-F = BLOCKED by independent red-team findings**
+**B2-F = BLOCKED only by F-005**
 
-F-001 and F-002 have been repaired and promoted to canonical by B2-FR1 and B2-FR2. The remaining B2-F blockers are F-003 (nested semantic authority-field escape), F-004 (caller-supplied Decision Series identity), and F-005 (B2-D3 live workflow trigger discrepancy). These remain independently reproduced and must be repaired before B2-F can PASS.
+F-001 and F-002 were repaired and promoted to canonical by B2-FR1 and B2-FR2. F-003 was repaired by B2-FR3 and F-004 was repaired by B2-FR4; both are now canonical and are no longer active blockers. F-005 (B2-D3 live workflow trigger discrepancy) remains the only open B2-F finding and must be repaired before the fresh B2-F independent red-team can PASS.
 
 **B2-D LIVE = BLOCKED**
 
@@ -59,13 +59,9 @@ Therefore:
 
 ### Current next development batch
 
-B2-F remains blocked only by F-003 / F-004 / F-005. B2-D3 live evidence remains a separate prerequisite and must not be configured in production until F-005 is resolved.
+B2-F remains blocked only by F-005. B2-D3 live evidence remains a separate prerequisite and must not be configured in production until F-005 is resolved.
 
 ```text
-B2-FR3  Repair F-003 recursive semantic authority-field guard
-  ↓
-B2-FR4  Repair F-004 Decision Series identity hardening
-  ↓
 B2-FR5  Repair F-005 B2-D3 trigger boundary
   ↓
 Fresh B2-F independent red-team
@@ -276,6 +272,64 @@ Verification:
 - B00-B / Post-B04 red-teams: PASS.
 
 F-002 is no longer an active blocker.
+
+## B2-FR3 — Recursive Semantic Authority-Field Guard — 2026-10-08
+
+Status: **PASS / MERGED / CANONICAL**
+
+- PR #231;
+- merge commit: `fcb4253c71d415f5d56c539611763d228ea5241e`;
+- F-003 closed.
+
+Closed boundary:
+- semantic Decision-authority fields are now checked recursively throughout the entire semantic artifact `output`, including nested mappings and list/tuple elements;
+- the guard reports the offending nested path and rejects the artifact before semantic output can influence downstream canonical Decision processing;
+- the existing top-level guard behavior remains covered.
+
+Verification on FR3 head `77e892c16c98f364d684171b4bafcafb90fd4bb8`:
+- B2-E E2E: PASS;
+- B2 Semantic Producer Admission: PASS;
+- Investment Core CI: PASS;
+- MVP Pilot: PASS;
+- B00-B Authority Threat Reproduction: PASS;
+- Post-B04 Independent Red-team: PASS.
+
+F-003 is no longer an active blocker.
+
+## B2-FR4 — Decision Series Identity Hardening — 2026-10-08
+
+Status: **PASS / MERGED / CANONICAL**
+
+- PR #232;
+- merge commit: `7efe3fc227941429d3aac015d03d197af7b4254c`;
+- F-004 closed.
+
+Closed boundary:
+- canonical `decision_series_id` is deterministically derived from snapshot `market + symbol`;
+- a caller-supplied series ID is accepted only when it exactly matches that canonical identity;
+- every Decision Revision now carries structured `case_id / market / symbol / company` series identity plus an integrity hash;
+- canonical v0.3 Decision Revisions bind that identity to the canonical Decision Admission;
+- B2-E no longer supplies a caller-defined series ID;
+- Decision ID is structurally bound to the canonical series ID and revision number.
+
+Regression repair:
+- three legacy C6 lifecycle fixtures were updated to the new v0.2 revision contract;
+- the resulting C6/C7/C8 lifecycle regressions were rerun and passed.
+
+Verification on FR4 final head `dfbd533f3b9e14deeb7e6ad6fc5ede0a9a39d90c`:
+- B2-E E2E: PASS;
+- B2 Semantic Producer Admission: PASS;
+- Investment Core CI: PASS;
+- MVP Pilot: PASS;
+- C6 Human Execution Receipt: PASS;
+- C7 Full Lifecycle E2E: PASS;
+- C8 Auth Remediation: PASS;
+- DR-01 Decision Lifecycle Contract: PASS;
+- DR-02 Persistence / CLI: PASS;
+- B00-B Authority Threat Reproduction: parallel validation remained clean where completed; no FR4-specific failure remained;
+- Post-B04 Independent Red-team: PASS.
+
+F-004 is no longer an active blocker.
 
 ## 1. Canonical state
 
