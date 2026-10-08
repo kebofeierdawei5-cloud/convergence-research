@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -167,6 +168,16 @@ def _module(
 
 HUMAN_AUDITABILITY_CONTRACT_VERSION = "IIOS-HUMAN-AUDITABILITY-0.2"
 
+def _numeric(value: Any) -> Decimal | None:
+    if value in (None, "") or isinstance(value, bool):
+        return None
+    try:
+        result = Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+    return result if result.is_finite() else None
+
+
 def _scenario_probability_audit(forecast: Mapping[str, Any]) -> dict[str, Any]:
     scenarios = forecast.get("scenarios")
     if not isinstance(scenarios, Mapping):
@@ -176,19 +187,27 @@ def _scenario_probability_audit(forecast: Mapping[str, Any]) -> dict[str, Any]:
             "all_present": False,
         }
     values = {}
+    numeric_values = {}
     all_present = True
+    all_numeric = True
     for name in ("bear", "base", "bull"):
         item = scenarios.get(name)
         value = item.get("probability") if isinstance(item, Mapping) else None
         if value in (None, "") and isinstance(item, Mapping):
             value = item.get("prob")
         values[name] = value
+        numeric = _numeric(value)
+        numeric_values[name] = numeric
         if value in (None, ""):
             all_present = False
+        if numeric is None or numeric < 0 or numeric > 1:
+            all_numeric = False
+    total = sum(numeric_values.values(), Decimal("0"))
+    complete = all_present and all_numeric and total == Decimal("1")
     return {
-        "status": "COMPLETE" if all_present else "MISSING",
+        "status": "COMPLETE" if complete else "MISSING",
         **values,
-        "all_present": all_present,
+        "all_present": complete,
     }
 
 def _human_auditability(
@@ -205,12 +224,20 @@ def _human_auditability(
 ) -> dict[str, Any]:
     required_value = returns.get("required_return")
     required_pass = returns.get("required_return_pass")
-    if required_value not in (None, ""):
+    required_numeric = _numeric(required_value)
+    if required_numeric is not None:
         required_return = {
             "status": "AUDITABLE",
             "numeric_value": required_value,
             "pass_flag": required_pass,
             "rule": "numeric_required_return_present",
+        }
+    elif required_value not in (None, ""):
+        required_return = {
+            "status": "INCOMPLETE",
+            "numeric_value": required_value,
+            "pass_flag": required_pass,
+            "rule": "required_return_present_but_not_numeric",
         }
     elif required_pass is True:
         required_return = {
@@ -247,7 +274,11 @@ def _human_auditability(
     semantics = payload.get("target_entry_price_semantics") or returns.get("target_entry_price_semantics")
     entry_evaluation = payload.get("canonical_entry_evaluation")
     entry_status = payload.get("gates", {}).get("canonical_entry_evaluation_status") if isinstance(payload.get("gates"), Mapping) else None
-    if actionable not in (None, "") and (entry_evaluation not in (None, {}) or entry_status not in (None, "", "SKIPPED")):
+    evaluation_admitted = bool(
+        entry_evaluation not in (None, {})
+        and entry_status not in (None, "", "SKIPPED", "NOT_RUN", "BLOCKED")
+    )
+    if _numeric(actionable) is not None and evaluation_admitted:
         entry = {
             "status": "ACTIONABLE",
             "actionable_target_entry_price": actionable,
@@ -275,9 +306,10 @@ def _human_auditability(
     package_can_add = portfolio.get("can_add")
     decision_new_capital = gates.get("new_capital_allowed")
     sizing_permission = gates.get("positioning_sizing_permission")
+    allowed_sizing = {"ALLOW_UP_TO_TARGET", "ALLOW_UP_TO_INITIAL"}
     if package_can_add is True and decision_new_capital is False:
         effective = "OVERRIDDEN_BY_DECISION"
-    elif decision_new_capital is True and sizing_permission not in (None, "", "NO_SIZING_PERMISSION"):
+    elif decision_new_capital is True and sizing_permission in allowed_sizing:
         effective = "ALLOWED"
     elif decision_new_capital is False:
         effective = "BLOCKED"
