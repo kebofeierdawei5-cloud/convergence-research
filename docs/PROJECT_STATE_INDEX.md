@@ -20,6 +20,7 @@ B2-B Natural-Language Conformance                       PASS / CANONICAL
 B2-C Signed External Provider Binding                   PASS / CANONICAL
 B2-D Canonical Refresh + Live Provider Boundary        PASS / CANONICAL
 B2-D1 Live Evidence Verification Hardening             PASS / CANONICAL
+B2-D2 Provider-Neutral Runtime Boundary               PASS / CANONICAL
 B2-D Live Provider Invocation / Evidence                BLOCKED
 ```
 
@@ -35,18 +36,24 @@ B2-D1 independent live-evidence verification hardening is now merged in PR #217 
 - B2-D1 independent verifier tests: 7 / 7 PASS;
 - compileall, schema validation and diff-check: PASS.
 
-The B2-D live smoke remains blocked because the Actions runtime exposes no production provider credentials/configuration. No `LIVE_RESPONSE_CAPTURED` evidence was admitted.
+B2-D2 provider-neutral runtime boundary is now merged in PR #219 (merge `7997a107ab18687d7c81f731ec7e0b3fae09ed9a`). Exact-head B2-D workflow run #17 = SUCCESS:
+- existing B2-D tests: 11 / 11 PASS;
+- existing B2-D clean-room red-team: 15 / 15 PASS;
+- B2-D1 independent verifier tests: PASS;
+- B2-D2 provider runtime tests: PASS;
+- B2-D2 independent clean-room red-team: PASS;
+- compileall, schema validation and git diff-check: PASS.
+The live job remained a non-authoritative success record with no production credentials; no `LIVE_RESPONSE_CAPTURED` evidence was admitted.
 
 Therefore:
 - fixture output MUST NOT be labeled as live-provider evidence;
 - B2-D live MUST NOT be marked complete merely because static/preflight CI is green;
-- B2-D1 is complete; the next development gate is provider-neutral runtime abstraction, then real provider configuration and invocation followed by the independently verified evidence gate.
+- B2-D1 and B2-D2 are complete;
+- the next development gate is real production provider configuration followed by a real invocation and independent evidence verification.
 
 ### Current next development batch
 
 ```text
-B2-D2 Provider-Neutral Runtime Boundary
-  ↓
 PRODUCTION PROVIDER RUNTIME CONFIGURATION
   ↓
 REAL LIVE INVOCATION + RAW RESPONSE CAPTURE
@@ -1512,3 +1519,42 @@ Live-provider gate result:
 The live job is intentionally non-authoritative and must not be counted as a live PASS. The next gate is real production runtime configuration, followed by live invocation, independent replay/attestation verification, and only then B2-E consumption.
 
 No fixture-only result may satisfy this gate.
+
+## B2-D2 — Provider-Neutral Runtime Boundary — 2026-10-08
+
+Status: **PASS / MERGED / CANONICAL**
+
+Canonical promotion:
+- PR #219;
+- canonical base: `9b0a147ba86e7f7d2645b800cc95281e8082b55f`;
+- accepted implementation head: `d5bffeff8afcde0b4b0be9114cfd9d9cab1bdfbf`;
+- merge commit: `7997a107ab18687d7c81f731ec7e0b3fae09ed9a`.
+
+Closed runtime boundary:
+- `OPENAI_RESPONSES` remains the protocol contract, not a commercial-provider identity;
+- provider identity/version remain separate from deployment mode and authentication mode;
+- `auth_mode=BEARER` requires an API key;
+- `auth_mode=NONE` emits no Authorization header and requires no API credential;
+- `deployment_mode=SELF_HOSTED` is supported;
+- non-HTTPS is permitted only for explicitly self-hosted loopback endpoints;
+- non-loopback endpoints remain HTTPS-only;
+- live invocation authentication is delegated to the provider-neutral runtime policy;
+- no new semantic, Forecast, Valuation, Decision, Human Approval or execution authority is introduced.
+
+Dedicated verification:
+- B2-D workflow run #17 = SUCCESS;
+- existing B2-D tests: 11 / 11 PASS;
+- existing B2-D clean-room red-team: 15 / 15 PASS;
+- B2-D1 independent verifier tests: PASS;
+- B2-D2 provider runtime tests: PASS;
+- B2-D2 independent clean-room red-team: PASS;
+- compileall, provider-runtime schema validation and git diff-check: PASS.
+
+Live status remains:
+`BLOCKED` because the production provider runtime credentials/configuration are absent. This does not invalidate B2-D2; it confirms that runtime neutrality is implemented before credential admission.
+
+Explicit non-claims:
+- B2-D2 does not prove a real provider response;
+- no commercial provider is a mandatory architectural dependency;
+- no self-hosted provider has been connected or trusted yet;
+- B2-E remains locked until a real `LIVE_RESPONSE_CAPTURED` evidence artifact passes independent verification.
