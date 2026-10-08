@@ -472,7 +472,6 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
         "semantic_matrix": semantic_matrix,
         "missing_core_modules": core_missing,
         "human_review_readiness": "READY" if not core_missing else "HUMAN_REVIEW_NOT_READY",
-        "completeness_flags": completeness_flags,
         "human_auditability": auditability,
         "current_projection": publication["current_projection"],
         "human_approval": publication["human_approval"],
