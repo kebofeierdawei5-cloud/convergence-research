@@ -8,6 +8,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from iios_mvp.live_provider_preflight_v01 import LiveProviderConfig
+from iios_mvp.provider_runtime_v01 import build_provider_auth_headers
 
 
 @dataclass(frozen=True)
@@ -51,14 +52,20 @@ def invoke_live_provider(
 ) -> LiveProviderResponse:
     request_body = _canonical_json(payload)
     request_hash = hashlib.sha256(request_body).hexdigest()
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    headers.update(
+        build_provider_auth_headers(
+            auth_mode=config.auth_mode,
+            api_key=config.api_key,
+        )
+    )
     req = Request(
         config.base_url,
         data=request_body,
-        headers={
-            "Authorization": f"Bearer {config.api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        },
+        headers=headers,
         method="POST",
     )
     try:
