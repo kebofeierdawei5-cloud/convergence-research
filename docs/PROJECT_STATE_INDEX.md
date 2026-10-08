@@ -6,7 +6,7 @@ Authority: this file is the **only canonical Current State Index**.
 
 ## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-08
 
-**Current canonical main:** `9066305a97eeec854c7f395904f2b109546b0644`
+**Current canonical main:** `5f84417ae0cd8b352ffd938396d38c21e3f30dcc`
 
 The records below are cumulative milestone history. A milestone's historical “next boundary” is **time-local** and MUST NOT be interpreted as the current development instruction.
 
@@ -26,7 +26,7 @@ B2-D Live Provider Invocation / Evidence                BLOCKED
 
 **B2-D LIVE = BLOCKED**
 
-PR #212 is the active development branch. Its dedicated preflight CI passed, including live-provider configuration validation, replay validation and independent clean-room review. No production provider credential/runtime or production-origin provider receipt has been admitted.
+PR #212 is the existing B2-D work item. Its dedicated preflight CI passed, including live-provider configuration validation, replay validation and independent clean-room review. Its base predates this State Hygiene merge, so it MUST be refreshed from the current canonical `main` before any B2-D merge. No production provider credential/runtime or production-origin provider receipt has been admitted.
 
 Therefore:
 - fixture output MUST NOT be labeled as live-provider evidence;
