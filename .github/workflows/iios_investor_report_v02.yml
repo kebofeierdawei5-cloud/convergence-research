@@ -8,6 +8,8 @@ on:
       - "schemas/investor_review_report_v0.2.schema.json"
       - "schemas/investor_review_qa_v0.2.schema.json"
       - "tests/test_investor_review_report_v02.py"
+      - "tests/independent_redteam_investor_review_v02.py"
+      - "docs/iios/INVESTOR_REVIEW_V02_REDTEAM_XHC_2_20261008.md"
       - "docs/iios/INVESTOR_REVIEW_REPORT_v0.2.md"
       - "docs/iios/INVESTOR_REVIEW_HUMAN_AUDITABILITY_CONTRACT_v0.2.md"
       - "schemas/human_auditability_v0.2.schema.json"
@@ -54,56 +56,16 @@ jobs:
           run-id: 37730232684
           path: /tmp/iios-xhc/artifact
 
-      - name: Diagnose canonical Xinhecheng v0.2 writer
-        if: ${{ always() }}
-        run: |
-          set +e
-          mkdir -p /tmp/iios-xhc/diagnostic
-          python - <<'PY' > /tmp/iios-xhc/diagnostic/write-report.txt 2>&1
-          import traceback
-          from pathlib import Path
-          from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
-          pub=Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
-          out=Path("/tmp/iios-xhc/diagnostic/writer")
-          out.mkdir(parents=True,exist_ok=True)
-          try:
-              result=write_investor_review_report_v02(str(out), publication_path=str(pub), generated_at="2026-10-08T05:00:00+00:00")
-              print("WRITE_PASS", [str(p) for p in result], flush=True)
-          except BaseException:
-              traceback.print_exc()
-              raise
-          PY
-          rc=$?
-          echo "writer_rc=$rc" >> /tmp/iios-xhc/diagnostic/write-report.txt
-          cat /tmp/iios-xhc/diagnostic/write-report.txt
-          exit 0
+      - name: Download canonical Xinhecheng Publication evidence
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 11529920007
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 37730232684
+          path: /tmp/iios-xhc/artifact
 
-      - name: Diagnose CLI import and dispatch
-        if: ${{ always() }}
-        run: |
-          set -euo pipefail
-          python -c 'import iios_mvp.cli; print("CLI_IMPORT_PASS")'
-          python -c 'from iios_mvp.cli import parser; p=parser(); print("CLI_PARSER_PASS", any(a=='investor-report-v02' for a in [getattr(x,"dest","") for x in []]))'
-
-      - name: Diagnose CLI actual argument dispatch
-        if: ${{ always() }}
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import argparse
-          from pathlib import Path
-          from iios_mvp.cli import parser, cmd_investor_report_v02
-          pub="/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json"
-          out="/tmp/iios-xhc/dispatch"
-          ns=parser().parse_args(["investor-report-v02", pub, "--generated-at", "2026-10-08T05:00:00+00:00", "--out", out])
-          print("DISPATCH_FUNC", ns.func.__name__)
-          print("DISPATCH_OUT", ns.out)
-          rc=ns.func(ns)
-          print("DISPATCH_RC", rc)
-          assert rc == 0
-          PY
-
-      - name: Re-render canonical Xinhecheng Publication through Investor Review v0.2
+      - name: Render canonical Xinhecheng Publication through Investor Review v0.2
         run: |
           set -euo pipefail
           pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
@@ -111,9 +73,13 @@ jobs:
           test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
           rm -rf /tmp/iios-xhc/rendered
           mkdir -p /tmp/iios-xhc/rendered
-          python -m iios_mvp.cli investor-report-v02 "$pub" \
-            --generated-at "2026-10-08T05:00:00+00:00" \
-            --out /tmp/iios-xhc/rendered
+          python - <<'PY'
+          from pathlib import Path
+          from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
+          pub=Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
+          out=Path("/tmp/iios-xhc/rendered")
+          print([str(p) for p in write_investor_review_report_v02(str(out), publication_path=str(pub), generated_at="2026-10-08T05:00:00+00:00")])
+          PY
 
       - name: Assert canonical Xinhecheng v0.2 Human Auditability
         run: |
@@ -123,9 +89,11 @@ jobs:
           from pathlib import Path
           root=Path("/tmp/iios-xhc/rendered")
           report=json.loads(next(root.glob("*.investor-review-v02.json")).read_text(encoding="utf-8"))
-          qa=json.loads(next(root.glob("*.report-qa.json")).read_text(encoding="utf-8"))
+          qa=json.loads(next(root.glob("*.investor-review-v02-qa.json")).read_text(encoding="utf-8"))
           audit=report["machine_report"]["semantic_surface"]["human_auditability"]
           expected={
+              "report_hash": report["report_hash"] == "b5ab777d1389d20f2b6f1d03e8d15324bb03fbe58fe299c0f5ee5f7b68672bce",
+              "qa_hash": qa["qa_hash"] == "fefcdd47f83fe8c6a8b81eec7ae39cddc9cab8d6e364142fa0d6e2b118145b4d",
               "required_return": audit["required_return"]["status"] == "INCOMPLETE" and audit["required_return"]["numeric_value"] is None,
               "scenario_probability": audit["scenario_probability"]["status"] == "MISSING",
               "expected_return": audit["expected_return"]["status"] == "INCOMPLETE",
@@ -137,17 +105,16 @@ jobs:
               "qa": qa["qa_status"] == "PASS" and not qa["issues"],
           }
           print(json.dumps(expected,ensure_ascii=False,sort_keys=True))
-          if not all(expected.values()):
-              raise SystemExit("XHC_HUMAN_AUDITABILITY_ASSERT_FAIL")
+          if not all(expected.values()): raise SystemExit("XHC_HUMAN_AUDITABILITY_ASSERT_FAIL")
           PY
 
-      - name: Upload writer diagnostic
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: iios-investor-review-v02-writer-diagnostic
-          path: /tmp/iios-xhc/diagnostic/
-          if-no-files-found: error
+      - name: Second-round independent clean-room redteam
+        run: |
+          set -euo pipefail
+          python tests/independent_redteam_investor_review_v02.py \
+            --report "$(find /tmp/iios-xhc/rendered -name '*.investor-review-v02.json' -print -quit)" \
+            --qa "$(find /tmp/iios-xhc/rendered -name '*.investor-review-v02-qa.json' -print -quit)" \
+            --markdown "$(find /tmp/iios-xhc/rendered -name '*.investor-review-v02.md' -print -quit)
 
       - name: Upload real Xinhecheng v0.2 report evidence
         uses: actions/upload-artifact@v4
