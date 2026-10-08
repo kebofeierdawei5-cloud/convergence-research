@@ -25,6 +25,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   investor-report-v02:
@@ -42,7 +43,88 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install --disable-pip-version-check pytest jsonschema
       - run: python -m compileall -q iios_mvp tests
+      - name: Diagnose fixture publication hash before pytest
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+          from tests.test_investor_review_report_v02 import _snapshot
+          from tests.decision_admission_fixture import build_fixture_admission_receipt
+          from iios_mvp.engine import sha256_obj
+          from iios_mvp.machine_publication import build_machine_publication
+          from iios_mvp.store import create_or_load_series, write_decision_revision, write_snapshot
+
+          with TemporaryDirectory() as td:
+              root = Path(td)
+              snapshot = _snapshot()
+              write_snapshot(root, snapshot)
+              series = create_or_load_series(root, "CN-A", "300750", "CATL", "2026-10-08T00:00:00+00:00")
+              write_decision_revision(
+                  root,
+                  series["decision_series_id"],
+                  1,
+                  snapshot,
+                  "run-v02-diagnostic",
+                  decision_admission=build_fixture_admission_receipt(
+                      snapshot=snapshot,
+                      canonical_decision=snapshot["decision"],
+                  ),
+              )
+              record = build_machine_publication(
+                  root=root,
+                  decision_id="CN-A-300750-r001",
+                  published_at="2026-10-08T01:00:00+00:00",
+              )
+              required = {
+                  "publication_version","published_at","decision_ref","case",
+                  "ai_decision","decision_payload","human_approval",
+                  "current_projection","lifecycle_refs","integrity",
+                  "publication_id","publication_hash",
+              }
+              core = {k: record[k] for k in required if k not in {"publication_id","publication_hash"}}
+              expected = sha256_obj(core)
+              print("publication_hash=", record["publication_hash"])
+              print("recomputed_hash=", expected)
+              print("hash_equal=", record["publication_hash"] == expected)
+          PY
       - run: python -m pytest -q tests/test_investor_review_report_v02.py
+      - name: Re-render canonical Xinhecheng Publication through Investor Review v0.2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/iios-xhc
+          curl -fsSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/11529920007/zip" \
+            -o /tmp/iios-xhc/pilot04.zip
+          unzip -q /tmp/iios-xhc/pilot04.zip -d /tmp/iios-xhc/artifact
+          pub=/tmp/iios-xhc/artifact/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
+          test -f "$pub"
+          test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
+          python -m iios_mvp.cli investor-report-v02 "$pub" \
+            --generated-at "2026-10-08T05:00:00+00:00" \
+            --out /tmp/iios-xhc/rendered
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("/tmp/iios-xhc/rendered")
+          report=json.loads(next(root.glob("*.investor-review-v02.json")).read_text())
+          audit=report["machine_report"]["semantic_surface"]["human_auditability"]
+          print(json.dumps({
+              "report_id": report["report_id"],
+              "report_hash": report["report_hash"],
+              "publication_hash": report["publication_hash"],
+              "overall_status": audit["overall_status"],
+              "required_return": audit["required_return"],
+              "expected_return": audit["expected_return"],
+              "scenario_probability": audit["scenario_probability"],
+              "entry_price": audit["entry_price"],
+              "portfolio_permission": audit["portfolio_permission"],
+              "mie_expectation_gap": audit["mie_expectation_gap"],
+          }, ensure_ascii=False, indent=2))
+          PY
       - run: python -m json.tool schemas/investor_review_report_v0.2.schema.json >/dev/null
       - run: python -m json.tool schemas/investor_review_qa_v0.2.schema.json >/dev/null
       - run: python -m json.tool schemas/human_auditability_v0.2.schema.json >/dev/null
