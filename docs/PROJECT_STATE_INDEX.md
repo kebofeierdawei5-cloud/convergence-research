@@ -23,9 +23,16 @@ B2-D1 Live Evidence Verification Hardening             PASS / CANONICAL
 B2-D2 Provider-Neutral Runtime Boundary               PASS / CANONICAL
 B2-D Live Provider Invocation / Evidence                BLOCKED
 B2-E Natural-Language → Semantic → Decision E2E          PASS / CANONICAL
+B2-F Full Independent Red-team                          BLOCKED / FINDINGS
 ```
 
 ### Current blocker
+
+**B2-F = BLOCKED by independent red-team findings**
+
+The B2-F independent clean-room audit reproduced one P0 and three P1 findings against the B2-E control-plane implementation. The P0 is the missing semantic-to-economic causal edge: B2-E admits/hashes semantic output but the canonical Decision Kernel consumes an independently supplied expanded Investment Core case. Therefore B2-E is not yet a production-backed Natural-Language → LLM Reasoning → Canonical Economic Decision path.
+
+The four findings are recorded in docs/iios/B2_F_FULL_INDEPENDENT_REDTEAM_20261008.md and research/b2f/B2_F_FINDINGS_20261008.json on the red-team audit branch. The canonical repair sequence must address F-001 through F-004 and then rerun the independent red-team.
 
 **B2-D LIVE = BLOCKED**
 
@@ -54,7 +61,7 @@ Therefore:
 
 ### Current next development batch
 
-B2-E control-plane implementation is now canonical, but production-backed E2E remains gated by B2-D3 live evidence.
+B2-E control-plane implementation is canonical, but B2-F has blocked production-backed E2E pending repair of independent red-team findings. B2-D3 live evidence remains a separate prerequisite.
 
 ```text
 B2-D3 PRODUCTION PROVIDER CONFIGURATION
@@ -185,6 +192,38 @@ Explicit non-claims:
 - no Human Approval was issued by B2-E;
 - no automatic execution capability was added;
 - B2-D3 LIVE remains BLOCKED until real production runtime evidence is captured and independently verified.
+
+## B2-F — Full Independent Red-team — 2026-10-08
+
+Status: **BLOCKED / FINDINGS REPRODUCED**
+
+Audit branch: redteam/b2f-full-independent-20261008
+
+Audit mode:
+- independent clean-room source/AST and contract inspection;
+- targeted authority / lineage attacks;
+- no product-code remediation performed on the red-team branch.
+
+Findings:
+- **F-001 P0:** semantic artifact has no causal edge into canonical economic Decision input;
+- **F-002 P1:** Forecast / Valuation stage admission is not independently validator-backed;
+- **F-003 P1:** nested semantic Decision-authority fields can evade the top-level guard;
+- **F-004 P1:** Decision Series identity depends on a caller-supplied series ID and does not structurally carry market / symbol / company.
+
+Disposition:
+B2-F BLOCKED
+→ repair F-001
+→ repair F-002
+→ repair F-003
+→ repair F-004
+→ rerun independent B2-F
+→ B2-F PASS / FAIL
+
+Important distinction:
+- B2-E remains PASS / CANONICAL as a control-plane conformance implementation;
+- B2-F demonstrates that B2-E does not yet prove a causal production Semantic → Economic Decision chain;
+- B2-D3 live-provider capture remains independently blocked and is not changed by the red-team result;
+- MVP Final Human Acceptance remains locked.
 
 ## 1. Canonical state
 
