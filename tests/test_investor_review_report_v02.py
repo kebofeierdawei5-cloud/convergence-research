@@ -190,6 +190,45 @@ def test_v02_human_auditability_contract_is_emitted(tmp_path):
         "mie_expectation_gap", "overall_status",
     }
 
+
+def test_v02_real_xinhecheng_p0_shape_regression(tmp_path):
+    publication, _ = _publication(tmp_path)
+    payload = publication["decision_payload"]
+    decision = publication["ai_decision"]
+
+    # Real XHC PILOT-04 published values:
+    payload["gates"]["new_capital_allowed"] = False
+    payload["gates"]["positioning_sizing_permission"] = "NO_SIZING_PERMISSION"
+    payload["gates"]["expectation_gap_status"] = "UNKNOWN"
+    payload["return_metrics"]["required_return"] = None
+    payload["return_metrics"]["required_return_pass"] = True
+    payload["return_metrics"]["expected_annualized_return"] = "0.201734104046242774566473988"
+    payload["return_metrics"]["target_entry_price"] = "26.60"
+    payload["target_entry_price_semantics"] = "RETURN_RISK_THRESHOLD_ONLY;OPTIONAL_MIE_REFINEMENT_WHEN_AVAILABLE"
+    decision["target_entry_price"] = None
+    decision["risk_portfolio_contract"]["portfolio"]["can_add"] = True
+    for scenario in payload["forecast"]["scenarios"].values():
+        scenario.pop("probability", None)
+        scenario.pop("prob", None)
+    payload.pop("p4f_market_implied_expectation", None)
+    payload.pop("expectation_gap", None)
+    payload.pop("expectation_gap_evaluation", None)
+
+    report = build_investor_review_report_v02(
+        publication=publication, generated_at="2026-10-08T02:00:00+00:00"
+    )
+    audit = report["machine_report"]["semantic_surface"]["human_auditability"]
+    assert audit["required_return"]["status"] == "INCOMPLETE"
+    assert audit["expected_return"]["status"] == "INCOMPLETE"
+    assert audit["scenario_probability"]["status"] == "MISSING"
+    assert audit["entry_price"]["status"] == "THRESHOLD_ONLY"
+    assert audit["entry_price"]["threshold_price"] == "26.60"
+    assert audit["portfolio_permission"]["status"] == "OVERRIDDEN_BY_DECISION"
+    assert audit["mie_expectation_gap"]["mie"]["status"] == "NOT_PROVIDED"
+    assert audit["mie_expectation_gap"]["expectation_gap"]["status"] == "UNKNOWN"
+    assert audit["mie_expectation_gap"]["inference_rule"] == "absence_never_implies_not_identifiable"
+    assert audit["overall_status"] == "INCOMPLETE"
+
 def test_v02_p0_required_return_pass_without_value_is_not_auditable(tmp_path):
     publication, _ = _publication(tmp_path)
     returns = publication["decision_payload"]["return_metrics"]
