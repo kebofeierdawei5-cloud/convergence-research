@@ -114,7 +114,7 @@ def make_end_to_end():
         "status": "SIGNED",
         "created_at": "2026-10-08T00:00:00+00:00",
     }
-    signature = PRIVATE.sign(canonical_bytes(core))
+    signature = PRIVATE.sign(canonical_bytes({k:v for k,v in core.items() if k!="signature_b64"}))
     attestation = {
         **core,
         "signature_b64": base64.b64encode(signature).decode(),
