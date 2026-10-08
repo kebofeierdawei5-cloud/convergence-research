@@ -69,6 +69,32 @@ jobs:
           echo QA_DIAGNOSTIC_RC=$rc
           exit 0
 
+      - name: Diagnose real Xinhecheng v0.2 writer I/O failure
+        if: ${{ always() }}
+        run: |
+          set +e
+          pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
+          rm -rf /tmp/iios-xhc/writer-diag
+          mkdir -p /tmp/iios-xhc/writer-diag
+          python - <<'PY' > /tmp/iios-xhc/writer-diag/traceback.txt 2>&1
+          import traceback
+          from pathlib import Path
+          from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
+          pub=Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
+          out=Path("/tmp/iios-xhc/writer-diag/out")
+          try:
+              result=write_investor_review_report_v02(str(out),publication_path=str(pub),generated_at="2026-10-08T05:00:00+00:00")
+              print("WRITE_PASS")
+              print([str(p) for p in result])
+          except BaseException:
+              traceback.print_exc()
+              raise
+          PY
+          rc=$?
+          echo writer_rc=$rc
+          cat /tmp/iios-xhc/writer-diag/traceback.txt
+          exit 0
+
       - name: Render canonical Xinhecheng Publication through Investor Review v0.2
         run: |
           set -euo pipefail
