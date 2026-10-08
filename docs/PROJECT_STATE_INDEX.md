@@ -18,7 +18,7 @@ Investor Review Report v0.2 + Human Acceptance          PASS / CANONICAL
 B2-A Semantic Producer Admission                       PASS / CANONICAL
 B2-B Natural-Language Conformance                       PASS / CANONICAL
 B2-C Signed External Provider Binding                   PASS / CANONICAL
-B2-D Live Provider Preflight                            PASS
+B2-D Canonical Refresh + Live Provider Boundary        PASS / CANONICAL
 B2-D Live Provider Invocation / Evidence                BLOCKED
 ```
 
@@ -26,23 +26,28 @@ B2-D Live Provider Invocation / Evidence                BLOCKED
 
 **B2-D LIVE = BLOCKED**
 
-PR #212 is the existing B2-D work item. Its dedicated preflight CI passed, including live-provider configuration validation, replay validation and independent clean-room review. Its base predates this State Hygiene merge, so it MUST be refreshed from the current canonical `main` before any B2-D merge. No production provider credential/runtime or production-origin provider receipt has been admitted.
+B2-D canonical refresh is now merged in PR #215 (merge `b32c9203b5a7baf729cdff2090bb4e54237a177c`) from the post-State-Hygiene canonical main. The old pre-hygiene PR #212 is closed and is not an admissible development base.
+
+Dedicated B2-D static validation passed:
+- B2-D tests: 11 / 11 PASS;
+- independent clean-room red-team: 15 / 15 PASS;
+- compileall, schema validation and diff-check: PASS.
+
+A real live-provider smoke was attempted in Actions run #6. The runtime exposed no values for the required production configuration, so the invocation did not occur and no `LIVE_RESPONSE_CAPTURED` evidence was admitted.
 
 Therefore:
 - fixture output MUST NOT be labeled as live-provider evidence;
-- B2-D MUST NOT be marked complete merely because preflight CI is green;
-- the next executable evidence gate is a real provider invocation or a production-origin signed receipt with independent replay.
+- B2-D live MUST NOT be marked complete merely because static/preflight CI is green;
+- the next executable evidence gate is production runtime configuration followed by a real provider invocation and independent replay.
 
 ### Current next development batch
 
 ```text
-B2-D
+PRODUCTION PROVIDER RUNTIME CONFIGURATION
   ↓
-REAL PROVIDER RUNTIME / PRODUCTION-ORIGIN RECEIPT
+REAL LIVE INVOCATION + RAW RESPONSE CAPTURE
   ↓
-LIVE INVOCATION + RAW RESPONSE CAPTURE
-  ↓
-INDEPENDENT PROVIDER REPLAY
+INDEPENDENT PROVIDER REPLAY / ATTESTATION VERIFICATION
   ↓
 B2-E Natural-Language → Semantic → Decision E2E
   ↓
@@ -187,13 +192,15 @@ This is an accepted system result, not a claim that the security should be bough
 
 ### B2-D — Live Provider Evidence
 
-Status: **PRE-FLIGHT PASS / LIVE GATE BLOCKED**
+Status: **CANONICAL REFRESH PASS / LIVE GATE BLOCKED**
 
-- active PR: #212;
-- live-provider preflight CI: SUCCESS;
-- live invocation evidence: NOT ADMITTED;
+- canonical refresh PR: #215; merge commit `b32c9203b5a7baf729cdff2090bb4e54237a177c`;
+- stale pre-hygiene PR #212: CLOSED / SUPERSEDED;
+- B2-D static + independent red-team: PASS;
+- real live-provider invocation evidence: NOT ADMITTED;
 - production provider credential/runtime: NOT SUPPLIED;
-- production-origin provider receipt with independent replay: NOT SUPPLIED.
+- production-origin provider receipt with independent replay: NOT SUPPLIED;
+- current live smoke artifact: Actions run #6, status `BLOCKED_OR_FAILED` because required runtime configuration was absent.
 
 This is the current LLM/MVP blocker.
 
@@ -397,7 +404,6 @@ Status: **PASS**
 Independent replay implementation:
 
 `research/fm01/fm01_source_admission_replay.py`
-
 Verified:
 
 - all historical records satisfy the origin-cutoff rule;
@@ -1197,7 +1203,6 @@ Next canonical gate:
 B2 — LLM Semantic Workbench + Semantic Producer Admission
 ```
 ## 19. MVP Pilot Acceptance — technical gate complete / final MVP P0 remains — 2026-10-08
-
 Status: **TECHNICAL PILOT ACCEPTANCE PASS / FINAL MVP DO NOT CLOSE**
 
 Canonical implementation head after MVP human-report projection correction:
@@ -1397,7 +1402,6 @@ Closed boundary:
 - request admission receipt binds request_id / run_id / case_id / case_hash / interpreter provenance;
 - REQUEST_ADMITTED must precede CASE_CREATED;
 - conformance can progress through Evidence → SEMANTIC_PENDING → B2-A Semantic Admission.
-
 Non-claims:
 - B2-B does **not** prove live external LLM/provider conformance;
 - fixture interpreter and fixture semantic producer are test doubles;
@@ -1465,3 +1469,42 @@ B2-D is now the only remaining B2 blocker on the LLM side. It must either:
 2. admit a production-origin provider artifact/receipt whose provenance can be independently replayed.
 
 No fixture-only result may be promoted as live-provider evidence.
+
+## 25. B2-D — Canonical Refresh + Real Provider Boundary — 2026-10-08
+
+Status: **CANONICAL INFRASTRUCTURE PASS / LIVE EVIDENCE BLOCKED**
+
+Canonical promotion:
+- PR #215;
+- source canonical main: `e1ad65a08be1beed626b21d4955107f29ad96098`;
+- canonical refresh implementation head: `72d8bc3cf68e22c5dbffb4bc101af5277639f697`;
+- merge commit: `b32c9203b5a7baf729cdff2090bb4e54237a177c`;
+- stale PR #212: closed / superseded.
+
+Closed engineering boundary:
+- fail-closed live-provider runtime configuration;
+- concrete `OPENAI_RESPONSES` request mapping;
+- HTTPS-only transport;
+- raw request/response bytes and SHA-256 capture;
+- replay record bound to provider, model, run, case, request and cutoff;
+- IIOS-side Ed25519 runtime attestation with independent verification;
+- no semantic admission / Forecast / Valuation / Decision / Human Approval / publication / execution authority.
+
+Dedicated B2-D validation:
+- workflow `IIOS B2-D Live Provider`, run #6;
+- static tests: 11 / 11 PASS;
+- independent clean-room red-team: 15 / 15 PASS;
+- compileall: PASS;
+- schema validation: PASS;
+- git diff --check: PASS.
+
+Live-provider gate result:
+- the Actions runtime exposed blank values for all seven required provider configuration variables;
+- therefore no real provider HTTP invocation occurred;
+- uploaded artifact id: 11537940345;
+- artifact status: `BLOCKED_OR_FAILED`;
+- `LIVE_RESPONSE_CAPTURED` evidence: NOT ADMITTED.
+
+The live job is intentionally non-authoritative and must not be counted as a live PASS. The next gate is real production runtime configuration, followed by live invocation, independent replay/attestation verification, and only then B2-E consumption.
+
+No fixture-only result may satisfy this gate.
