@@ -82,9 +82,21 @@ def test_schema_and_receipt_are_valid():
 
 
 def test_unregistered_producer_is_blocked():
-    artifact = make_artifact()
-    receipt = build_producer_receipt(receipt_id="r2", artifact=artifact, stage_id="QUALITY_ASSESSMENT", created_at="2026-10-08T00:00:00+00:00")
     bad_context = SemanticAdmissionContext(**{**context().__dict__, "producer_id": "unregistered"})
+    artifact = build_semantic_artifact(
+        artifact_id="unregistered-a1",
+        artifact_type="QUALITY_ASSESSMENT",
+        context=bad_context,
+        output={"status": "CONDITIONAL"},
+        decision_relevance="test",
+        created_at="2026-10-08T00:00:00+00:00",
+    )
+    receipt = build_producer_receipt(
+        receipt_id="r2",
+        artifact=artifact,
+        stage_id="QUALITY_ASSESSMENT",
+        created_at="2026-10-08T00:00:00+00:00",
+    )
     with pytest.raises(SemanticAdmissionError, match="producer is not registered"):
         admit_semantic_artifact(artifact, receipt, context=bad_context, registry=registry())
 
@@ -136,6 +148,48 @@ def test_orchestrator_stage_cannot_be_bypassed():
                 company="浙江新和成股份有限公司", cutoff_date="2026-10-08", artifact_type="QUALITY_ASSESSMENT",
                 input_refs=("E001",), input_hashes=(SHA_A,), prompt="Assess quality",
                 created_at="2026-10-08T00:00:00+00:00"),
+            decision_relevance="test",
+        )
+
+
+def test_workbench_rejects_request_identity_mismatch():
+    orchestrator = CanonicalResearchOrchestrator()
+    orchestrator.start(
+        run_id="b2-identity",
+        case_id="RC-CN-A-002001-20261008",
+        market="CN-A",
+        symbol="002001.SZ",
+        cutoff_date="2026-10-08",
+        as_of_date="2026-10-08",
+        created_at="2026-10-08T00:00:00+00:00",
+    )
+    orchestrator.transition("b2-identity", Stage.REQUEST_ADMITTED)
+    orchestrator.transition("b2-identity", Stage.CASE_CREATED)
+    orchestrator.transition("b2-identity", Stage.EVIDENCE_PENDING)
+    orchestrator.transition(
+        "b2-identity",
+        Stage.EVIDENCE_ADMITTED,
+        output_refs=("E001",),
+        output_hashes=(SHA_A,),
+    )
+    orchestrator.transition("b2-identity", Stage.SEMANTIC_PENDING)
+    with pytest.raises(ValueError, match="request symbol does not match canonical run"):
+        LLMSemanticWorkbench(orchestrator=orchestrator, registry=registry()).run(
+            producer=FixtureLLM(),
+            request=SemanticRequest(
+                request_id="req-identity",
+                run_id="b2-identity",
+                case_id="RC-CN-A-002001-20261008",
+                market="CN-A",
+                symbol="300750.SZ",
+                company="浙江新和成股份有限公司",
+                cutoff_date="2026-10-08",
+                artifact_type="QUALITY_ASSESSMENT",
+                input_refs=("E001",),
+                input_hashes=(SHA_A,),
+                prompt="Assess Quality from admitted evidence only.",
+                created_at="2026-10-08T00:00:00+00:00",
+            ),
             decision_relevance="test",
         )
 
