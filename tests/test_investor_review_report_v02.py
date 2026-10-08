@@ -118,6 +118,20 @@ def test_v02_preserves_explicit_mie_identifiability_status(tmp_path):
     assert surface["semantic_matrix"]["expectation_gap"]["status"] == "NOT_IDENTIFIABLE"
 
 
+def test_v02_machine_surface_tampering_fails_closed(tmp_path):
+    publication, _ = _publication(tmp_path)
+    report = build_investor_review_report_v02(publication=publication, generated_at="2026-10-08T02:00:00+00:00")
+    tampered = dict(report)
+    tampered_machine = dict(tampered["machine_report"])
+    tampered_surface = dict(tampered_machine["semantic_surface"])
+    tampered_surface["human_review_readiness"] = "READY_FOR_ANYTHING"
+    tampered_machine["semantic_surface"] = tampered_surface
+    tampered["machine_report"] = tampered_machine
+    qa = qa_investor_review_v02(publication=publication, report=tampered)
+    assert qa["qa_status"] == "FAIL"
+    assert qa["checks"]["machine_surface_integrity"] == "FAIL"
+
+
 def test_v02_tampering_and_replay(tmp_path):
     publication, _ = _publication(tmp_path)
     report = build_investor_review_report_v02(publication=publication, generated_at="2026-10-08T02:00:00+00:00")
