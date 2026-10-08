@@ -43,75 +43,9 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install --disable-pip-version-check pytest jsonschema
       - run: python -m compileall -q iios_mvp tests
-      - name: Diagnose fixture publication hash before pytest
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          from tempfile import TemporaryDirectory
-
-          from tests.test_investor_review_report_v02 import _snapshot
-          from tests.decision_admission_fixture import build_fixture_admission_receipt
-          from iios_mvp.engine import sha256_obj
-          from iios_mvp.machine_publication import build_machine_publication
-          from iios_mvp.store import create_or_load_series, write_decision_revision, write_snapshot
-          from iios_mvp.investor_review_report_v02 import (
-              build_investor_review_report_v02,
-              validate_investor_review_report_v02,
-              qa_investor_review_v02,
-              validate_investor_review_qa_v02,
-          )
-
-          def make_publication(run_id):
-              td = TemporaryDirectory()
-              root = Path(td.name)
-              snapshot = _snapshot()
-              write_snapshot(root, snapshot)
-              series = create_or_load_series(
-                  root, "CN-A", "300750", "CATL", "2026-10-08T00:00:00+00:00"
-              )
-              write_decision_revision(
-                  root,
-                  series["decision_series_id"],
-                  1,
-                  snapshot,
-                  run_id,
-                  decision_admission=build_fixture_admission_receipt(
-                      snapshot=snapshot, canonical_decision=snapshot["decision"]
-                  ),
-              )
-              return td, build_machine_publication(
-                  root=root,
-                  decision_id="CN-A-300750-r001",
-                  published_at="2026-10-08T01:00:00+00:00",
-              )
-
-          first_td, first_publication = make_publication("run-v02-diagnostic-1")
-          expected_first = sha256_obj({
-              k: first_publication[k]
-              for k in first_publication
-              if k not in {"publication_id", "publication_hash"}
-          })
-          print("first_hash_equal=", first_publication["publication_hash"] == expected_first)
-          first_report = build_investor_review_report_v02(
-              publication=first_publication, generated_at="2026-10-08T02:00:00+00:00"
-          )
-          validate_investor_review_report_v02(first_report)
-          first_qa = qa_investor_review_v02(publication=first_publication, report=first_report)
-          validate_investor_review_qa_v02(first_qa)
-          print("first_report_qa_status=", first_qa["qa_status"])
-
-          second_td, second_publication = make_publication("run-v02-diagnostic-2")
-          expected_second = sha256_obj({
-              k: second_publication[k]
-              for k in second_publication
-              if k not in {"publication_id", "publication_hash"}
-          })
-          print("second_hash_equal=", second_publication["publication_hash"] == expected_second)
-          print("cross_test_publication_build_equal=", first_publication["publication_hash"] != second_publication["publication_hash"])
-          PY
       - run: python -m pytest -q tests/test_investor_review_report_v02.py
-      - name: Re-render canonical Xinhecheng Publication through Investor Review v0.2
-        if: ${{ always() }}
+
+      - name: Download canonical Xinhecheng Publication evidence
         uses: actions/download-artifact@v4
         with:
           artifact-ids: 11529920007
@@ -120,107 +54,45 @@ jobs:
           run-id: 37730232684
           path: /tmp/iios-xhc/artifact
 
-      - name: XHC stage 1 — machine Publication validation
-        id: xhc_publication_validation
-        continue-on-error: true
+      - name: Re-render canonical Xinhecheng Publication through Investor Review v0.2
         run: |
           set -euo pipefail
           pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
           test -f "$pub"
           test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
-          python -c 'import json,sys; from iios_mvp.machine_publication import validate_machine_publication; d=json.load(open(sys.argv[1],encoding="utf-8")); validate_machine_publication(d); print("XHC_MACHINE_PUBLICATION_PASS")' "$pub"
-
-      - name: XHC stage 2 — investor report build
-        id: xhc_report_build
-        continue-on-error: true
-        run: |
-          set -euo pipefail
+          rm -rf /tmp/iios-xhc/rendered
           mkdir -p /tmp/iios-xhc/rendered
-          pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
+          python -m iios_mvp.cli investor-report-v02 "$pub" \
+            --generated-at "2026-10-08T05:00:00+00:00" \
+            --out /tmp/iios-xhc/rendered
+
+      - name: Assert canonical Xinhecheng v0.2 Human Auditability
+        run: |
+          set -euo pipefail
           python - <<'PY'
           import json
           from pathlib import Path
-          from iios_mvp.investor_review_report_v02 import build_investor_review_report_v02
-          pub_path=Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
-          publication=json.loads(pub_path.read_text(encoding="utf-8"))
-          report=build_investor_review_report_v02(publication=publication, generated_at="2026-10-08T05:00:00+00:00")
           root=Path("/tmp/iios-xhc/rendered")
-          (root / "xhc-v02-report.json").write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-          (root / "xhc-v02-report.md").write_text(report["markdown"],encoding="utf-8")
-          print("XHC_REPORT_BUILD_PASS", report["report_hash"])
-          PY
-
-      - name: XHC stage 3 — investor report validation
-        id: xhc_report_validation
-        continue-on-error: true
-        if: ${{ always() }}
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          from iios_mvp.investor_review_report_v02 import validate_investor_review_report_v02
-          report=json.loads(Path("/tmp/iios-xhc/rendered/xhc-v02-report.json").read_text(encoding="utf-8"))
-          validate_investor_review_report_v02(report)
-          print("XHC_REPORT_VALIDATION_PASS")
-          PY
-
-      - name: XHC stage 4 — QA build and validation
-        id: xhc_qa_validation
-        continue-on-error: true
-        if: ${{ always() }}
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          from iios_mvp.investor_review_report_v02 import qa_investor_review_v02, validate_investor_review_qa_v02
-          pub=json.loads(Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json").read_text(encoding="utf-8"))
-          report=json.loads(Path("/tmp/iios-xhc/rendered/xhc-v02-report.json").read_text(encoding="utf-8"))
-          qa=qa_investor_review_v02(publication=pub, report=report)
-          Path("/tmp/iios-xhc/rendered/xhc-v02-qa.json").write_text(json.dumps(qa,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-          print("XHC_QA_STATUS", qa["qa_status"])
-          if qa["qa_status"] != "PASS":
-              raise SystemExit("QA_FAIL: "+"; ".join(qa["issues"]))
-          validate_investor_review_qa_v02(qa)
-          print("XHC_QA_VALIDATION_PASS")
-          PY
-
-      - name: XHC stage 5 — Human Auditability P0 resolution check
-        id: xhc_p0_resolution
-        continue-on-error: true
-        if: ${{ always() }}
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          report=json.loads(Path("/tmp/iios-xhc/rendered/xhc-v02-report.json").read_text(encoding="utf-8"))
+          report=json.loads(next(root.glob("*.investor-review-v02.json")).read_text(encoding="utf-8"))
+          qa=json.loads(next(root.glob("*.report-qa.json")).read_text(encoding="utf-8"))
           audit=report["machine_report"]["semantic_surface"]["human_auditability"]
-          checks={
-              "required_return": audit["required_return"]["status"] == "INCOMPLETE",
+          expected={
+              "required_return": audit["required_return"]["status"] == "INCOMPLETE" and audit["required_return"]["numeric_value"] is None,
               "scenario_probability": audit["scenario_probability"]["status"] == "MISSING",
-              "entry_price": audit["entry_price"]["status"] == "THRESHOLD_ONLY" and audit["entry_price"]["actionable_target_entry_price"] is None,
+              "expected_return": audit["expected_return"]["status"] == "INCOMPLETE",
+              "entry_price": audit["entry_price"]["status"] == "THRESHOLD_ONLY" and audit["entry_price"]["actionable_target_entry_price"] is None and audit["entry_price"]["threshold_price"] == "26.6",
               "portfolio_permission": audit["portfolio_permission"]["status"] == "OVERRIDDEN_BY_DECISION",
-              "mie_absence_boundary": audit["mie_expectation_gap"]["mie"]["status"] == "NOT_PROVIDED" and audit["mie_expectation_gap"]["mie"]["source_presence"] == "MISSING" and audit["mie_expectation_gap"]["inference_rule"] == "absence_never_implies_not_identifiable",
-              "gap_unknown": audit["mie_expectation_gap"]["expectation_gap"]["status"] == "UNKNOWN",
+              "mie": audit["mie_expectation_gap"]["mie"]["status"] == "NOT_PROVIDED" and audit["mie_expectation_gap"]["mie"]["source_presence"] == "MISSING",
+              "gap": audit["mie_expectation_gap"]["expectation_gap"]["status"] == "UNKNOWN",
+              "inference_rule": audit["mie_expectation_gap"]["inference_rule"] == "absence_never_implies_not_identifiable",
+              "qa": qa["qa_status"] == "PASS" and not qa["issues"],
           }
-          print(json.dumps(checks,ensure_ascii=False,sort_keys=True))
-          if not all(checks.values()): raise SystemExit("P0_RESOLUTION_FAIL")
+          print(json.dumps(expected,ensure_ascii=False,sort_keys=True))
+          if not all(expected.values()):
+              raise SystemExit("XHC_HUMAN_AUDITABILITY_ASSERT_FAIL")
           PY
 
-      - name: Assert real Xinhecheng v0.2 stages
-        if: ${{ always() }}
-        run: |
-          set -euo pipefail
-          test "${{ steps.xhc_publication_validation.outcome }}" = "success"
-          test "${{ steps.xhc_report_build.outcome }}" = "success"
-          test "${{ steps.xhc_report_validation.outcome }}" = "success"
-          test "${{ steps.xhc_qa_validation.outcome }}" = "success"
-          test "${{ steps.xhc_p0_resolution.outcome }}" = "success"
-
-      - name: Upload real Xinhecheng v0.2 rerender artifacts
-        if: ${{ always() }}
+      - name: Upload real Xinhecheng v0.2 report evidence
         uses: actions/upload-artifact@v4
         with:
           name: iios-investor-review-v02-xinhecheng
