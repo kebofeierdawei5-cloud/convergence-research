@@ -1,0 +1,38 @@
+name: IIOS B2-C Signed External Semantic Provider
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/external_semantic_provider_admission_v01.py"
+      - "schemas/external_semantic_provider_receipt_v0.1.schema.json"
+      - "tests/test_b2c_signed_external_provider.py"
+      - "tests/independent_redteam_b2c_signed_external_provider.py"
+      - "docs/iios/B2_C_SIGNED_EXTERNAL_PROVIDER_BINDING_20261008.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install verification dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema cryptography
+      - name: Run B2-C conformance tests
+        run: python -m pytest -q tests/test_b2c_signed_external_provider.py
+      - name: Run independent B2-C clean-room red-team
+        run: python -m pytest -q tests/independent_redteam_b2c_signed_external_provider.py
+      - name: Compile B2-C implementation
+        run: python -m compileall -q iios_mvp/external_semantic_provider_admission_v01.py
+      - name: Validate B2-C schema
+        run: python -m json.tool schemas/external_semantic_provider_receipt_v0.1.schema.json >/dev/null
+      - name: Diff check
+        run: git diff --check
