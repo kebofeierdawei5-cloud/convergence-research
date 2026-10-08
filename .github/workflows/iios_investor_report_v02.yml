@@ -112,17 +112,18 @@ jobs:
       - run: python -m pytest -q tests/test_investor_review_report_v02.py
       - name: Re-render canonical Xinhecheng Publication through Investor Review v0.2
         if: ${{ always() }}
-        env:
-          GH_TOKEN: ${{ github.token }}
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 11529920007
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 37730232684
+          path: /tmp/iios-xhc/artifact
+
+      - name: Validate and render canonical Xinhecheng Publication through Investor Review v0.2
+        if: ${{ always() }}
         run: |
           set -euo pipefail
-          mkdir -p /tmp/iios-xhc
-          curl -fsSL \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/11529920007/zip" \
-            -o /tmp/iios-xhc/pilot04.zip
-          unzip -q /tmp/iios-xhc/pilot04.zip -d /tmp/iios-xhc/artifact
           pub=/tmp/iios-xhc/artifact/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
           test -f "$pub"
           test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
@@ -148,6 +149,14 @@ jobs:
               "mie_expectation_gap": audit["mie_expectation_gap"],
           }, ensure_ascii=False, indent=2))
           PY
+
+      - name: Upload real Xinhecheng v0.2 rerender artifacts
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: iios-investor-review-v02-xinhecheng
+          path: /tmp/iios-xhc/rendered/
+          if-no-files-found: warn
       - run: python -m json.tool schemas/investor_review_report_v0.2.schema.json >/dev/null
       - run: python -m json.tool schemas/investor_review_qa_v0.2.schema.json >/dev/null
       - run: python -m json.tool schemas/human_auditability_v0.2.schema.json >/dev/null
