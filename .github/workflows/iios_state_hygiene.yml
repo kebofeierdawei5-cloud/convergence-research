@@ -6,6 +6,13 @@ on:
       - "docs/PROJECT_STATE_INDEX.md"
       - "tests/test_state_authority_index.py"
       - ".github/workflows/iios_state_hygiene.yml"
+  push:
+    branches:
+      - "sync/state-hygiene-20261008"
+    paths:
+      - "docs/PROJECT_STATE_INDEX.md"
+      - "tests/test_state_authority_index.py"
+      - ".github/workflows/iios_state_hygiene.yml"
   workflow_dispatch:
 
 permissions:
