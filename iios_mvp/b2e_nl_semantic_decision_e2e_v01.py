@@ -73,11 +73,25 @@ def _assert_no_authority_fields(value: Mapping[str, Any]) -> None:
     output = value.get("output")
     if not isinstance(output, Mapping):
         raise B2EE2EError("semantic artifact output must be an object")
-    present = sorted(FORBIDDEN_SEMANTIC_AUTHORITY_FIELDS.intersection(output.keys()))
-    if present:
-        raise B2EE2EError(
-            "semantic producer attempted decision authority fields: " + ", ".join(present)
-        )
+
+    def walk(node: Any, path: str) -> None:
+        if isinstance(node, Mapping):
+            present = sorted(
+                FORBIDDEN_SEMANTIC_AUTHORITY_FIELDS.intersection(node.keys())
+            )
+            if present:
+                raise B2EE2EError(
+                    "semantic producer attempted decision authority fields at "
+                    f"{path}: " + ", ".join(present)
+                )
+            for key, child in node.items():
+                walk(child, f"{path}.{key}")
+            return
+        if isinstance(node, (list, tuple)):
+            for index, child in enumerate(node):
+                walk(child, f"{path}[{index}]")
+
+    walk(output, "output")
 
 
 def _build_snapshot(
