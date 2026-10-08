@@ -13,7 +13,7 @@ def test_current_authority_points_to_b2d_live_gate():
     start = text.index("## CURRENT ACTIVE DEVELOPMENT AUTHORITY")
     end = text.index("## 2. Investment Core capability boundary")
     current = text[start:end]
-    assert "B2-D Live Provider Preflight" in current
+    assert "B2-D Canonical Refresh + Live Provider Boundary" in current
     assert "B2-D Live Provider Invocation / Evidence                BLOCKED" in current
     assert "B2-D" in current and "B2-E" in current and "B2-F" in current
 
