@@ -300,6 +300,9 @@ def _human_auditability(
     gap_status = _status(gap, {}, "status") if gap else str(gates.get("expectation_gap_status") or "UNKNOWN")
     gap_identifiability = gap.get("identifiability") if gap else None
     mie_gap = {
+        "audit_status": "INCOMPLETE" if (
+            (not mie) or (not gap)
+        ) else "COMPLETE",
         "mie": {
             "status": mie_status,
             "identifiability": mie_identifiability,
@@ -315,11 +318,16 @@ def _human_auditability(
         "inference_rule": "absence_never_implies_not_identifiable",
     }
 
+    mie_gap_incomplete = (
+        mie_gap["mie"]["source_presence"] == "MISSING"
+        or mie_gap["expectation_gap"]["source_presence"] == "MISSING"
+    )
     incomplete = any([
         required_return["status"] == "INCOMPLETE",
         expected_return["status"] == "INCOMPLETE",
         entry["status"] == "THRESHOLD_ONLY",
         portfolio_resolution["status"] == "OVERRIDDEN_BY_DECISION",
+        mie_gap_incomplete,
     ])
     return {
         "contract_version": HUMAN_AUDITABILITY_CONTRACT_VERSION,
@@ -743,6 +751,11 @@ def qa_investor_review_v02(*, publication: Mapping[str, Any], report: Mapping[st
         required_audit_keys = {"required_return", "expected_return", "scenario_probability", "entry_price", "portfolio_permission", "mie_expectation_gap", "overall_status", "contract_version"}
         if set(audit) != required_audit_keys or audit.get("contract_version") != HUMAN_AUDITABILITY_CONTRACT_VERSION:
             checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: contract shape/version mismatch")
+        if audit.get("overall_status") not in {"COMPLETE", "INCOMPLETE"}:
+            checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: invalid overall status")
+        mg = audit.get("mie_expectation_gap", {})
+        if "inference_rule" not in mg or mg.get("inference_rule") != "absence_never_implies_not_identifiable":
+            checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: MIE inference rule missing")
         rr = audit.get("required_return", {})
         er = audit.get("expected_return", {})
         prob = audit.get("scenario_probability", {})
@@ -759,6 +772,12 @@ def qa_investor_review_v02(*, publication: Mapping[str, Any], report: Mapping[st
             checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: portfolio override not explicit")
         if mg.get("mie", {}).get("source_presence") == "MISSING" and mg.get("mie", {}).get("status") == "NOT_IDENTIFIABLE":
             checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: MIE absence incorrectly inferred as NOT_IDENTIFIABLE")
+        if mg.get("mie", {}).get("source_presence") == "MISSING" and mg.get("mie", {}).get("status") != "NOT_PROVIDED":
+            checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: absent MIE must be NOT_PROVIDED")
+        if mg.get("mie", {}).get("source_presence") == "STRUCTURED" and mg.get("mie", {}).get("status") == "NOT_IDENTIFIABLE" and mg.get("mie", {}).get("identifiability") != "FAIL":
+            checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: explicit MIE NOT_IDENTIFIABLE lost identifiability evidence")
+        if mg.get("expectation_gap", {}).get("source_presence") == "MISSING" and mg.get("expectation_gap", {}).get("status") == "NOT_IDENTIFIABLE":
+            checks["human_auditability_contract"] = "FAIL"; issues.append("human_auditability_contract: absent Expectation Gap must not become NOT_IDENTIFIABLE")
     decision = publication.get("ai_decision") or {}
     markdown = str(report.get("markdown", ""))
     if str(decision.get("action", "")) not in markdown or str(decision.get("primary_reason", "")) not in markdown:
