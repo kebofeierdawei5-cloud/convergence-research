@@ -179,7 +179,10 @@ def project_thesis_semantic_to_core(
         "falsifiers": falsifiers,
         "monitoring_triggers": monitoring_triggers,
         "evidence_ids": evidence_ids,
-        "known_at": created_at.isoformat(),
+        # Semantic reasoning may be generated after the historical cutoff.
+        # Its effective economic knowledge date is bounded by the admitted case cutoff;
+        # the actual reasoning creation time remains preserved in the projection receipt.
+        "known_at": f"{cutoff.isoformat()}T23:59:59+00:00",
         "prepared_without_current_price": True,
     }
     thesis_admission = admit_thesis(
@@ -242,6 +245,7 @@ def project_thesis_semantic_to_core(
         "market": str(case["market"]).upper(),
         "symbol": str(case["symbol"]).upper(),
         "cutoff_date": cutoff.isoformat(),
+        "semantic_reasoning_created_at": created_at.isoformat(),
         "input_evidence_ids": evidence_ids,
         "thesis_admission_hash": thesis_admission["admission_record_hash"],
     }
