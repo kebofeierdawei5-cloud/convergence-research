@@ -85,6 +85,24 @@ jobs:
           python -c 'import iios_mvp.cli; print("CLI_IMPORT_PASS")'
           python -c 'from iios_mvp.cli import parser; p=parser(); print("CLI_PARSER_PASS", any(a=='investor-report-v02' for a in [getattr(x,"dest","") for x in []]))'
 
+      - name: Diagnose CLI actual argument dispatch
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import argparse
+          from pathlib import Path
+          from iios_mvp.cli import parser, cmd_investor_report_v02
+          pub="/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json"
+          out="/tmp/iios-xhc/dispatch"
+          ns=parser().parse_args(["investor-report-v02", pub, "--generated-at", "2026-10-08T05:00:00+00:00", "--out", out])
+          print("DISPATCH_FUNC", ns.func.__name__)
+          print("DISPATCH_OUT", ns.out)
+          rc=ns.func(ns)
+          print("DISPATCH_RC", rc)
+          assert rc == 0
+          PY
+
       - name: Re-render canonical Xinhecheng Publication through Investor Review v0.2
         run: |
           set -euo pipefail
