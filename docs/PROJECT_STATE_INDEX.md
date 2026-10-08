@@ -23,16 +23,14 @@ B2-D1 Live Evidence Verification Hardening             PASS / CANONICAL
 B2-D2 Provider-Neutral Runtime Boundary               PASS / CANONICAL
 B2-D Live Provider Invocation / Evidence                BLOCKED
 B2-E Natural-Language → Semantic → Decision E2E          PASS / CANONICAL
-B2-F Full Independent Red-team                          BLOCKED / FINDINGS
+B2-F Full Independent Red-team                          BLOCKED / F-003 F-004 F-005
 ```
 
 ### Current blocker
 
 **B2-F = BLOCKED by independent red-team findings**
 
-The B2-F independent clean-room audit reproduced one P0 and four P1 findings against the B2-E control-plane implementation. The P0 is the missing semantic-to-economic causal edge: B2-E admits/hashes semantic output but the canonical Decision Kernel consumes an independently supplied expanded Investment Core case. Therefore B2-E is not yet a production-backed Natural-Language → LLM Reasoning → Canonical Economic Decision path.
-
-The four findings are recorded in docs/iios/B2_F_FULL_INDEPENDENT_REDTEAM_20261008.md and research/b2f/B2_F_FINDINGS_20261008.json on the red-team audit branch. The canonical repair sequence must address F-001 through F-005 and then rerun the independent red-team.
+F-001 and F-002 have been repaired and promoted to canonical by B2-FR1 and B2-FR2. The remaining B2-F blockers are F-003 (nested semantic authority-field escape), F-004 (caller-supplied Decision Series identity), and F-005 (B2-D3 live workflow trigger discrepancy). These remain independently reproduced and must be repaired before B2-F can PASS.
 
 **B2-D LIVE = BLOCKED**
 
@@ -224,6 +222,56 @@ Important distinction:
 - B2-F demonstrates that B2-E does not yet prove a causal production Semantic → Economic Decision chain;
 - B2-D3 live-provider capture remains independently blocked and is not changed by the red-team result;
 - MVP Final Human Acceptance remains locked.
+
+## B2-FR1 — Semantic → Economic Canonical Transformation — 2026-10-08
+
+Status: **PASS / MERGED / CANONICAL**
+
+- PR #227;
+- merge commit: `88f21977f58057943af287ce2df3f356535c689a`;
+- F-001 closed.
+
+Closed boundary:
+- admitted THESIS_ASSESSMENT requires an exact typed `core_projection`;
+- semantic input evidence lineage is the source of projected thesis evidence_ids;
+- projected Thesis is admitted by the existing Thesis Admission contract;
+- canonical upstream admission is rebuilt with the projected Thesis state;
+- B2-E Decision Kernel consumes the projected Core case;
+- binding receipt records semantic core projection hash;
+- semantic reasoning creation time is separated from PIT-bounded Thesis knowledge date.
+
+Verification:
+- B2-E E2E workflow: PASS;
+- Investment Core CI: PASS;
+- MVP Pilot: PASS;
+- B2 semantic admission + clean-room: PASS;
+- B00-B / Post-B04 red-teams: PASS.
+
+F-001 is no longer an active blocker.
+
+## B2-FR2 — Forecast / Valuation Admission Binding — 2026-10-08
+
+Status: **PASS / MERGED / CANONICAL**
+
+- PR #228;
+- merge commit: `b7f48b742f4ab4ddb60942365cdc24df160ab3c2`;
+- F-002 closed.
+
+Closed boundary:
+- B2-E validates canonical Forecast / Valuation lineage before stage admission;
+- existing `validate_forecast_valuation_return_lineage` is reused as the canonical validator;
+- Forecast / Valuation stage receipts carry canonical admission hashes;
+- Decision Pending carries the same canonical Forecast / Valuation lineage;
+- tampered Return Gate scenario values are rejected before Decision.
+
+Verification:
+- B2-E E2E workflow: PASS;
+- Investment Core CI: PASS;
+- MVP Pilot: PASS;
+- B2 semantic admission + clean-room: PASS;
+- B00-B / Post-B04 red-teams: PASS.
+
+F-002 is no longer an active blocker.
 
 ## 1. Canonical state
 
