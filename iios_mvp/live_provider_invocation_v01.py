@@ -5,7 +5,7 @@ from typing import Any, Mapping
 import hashlib
 import json
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from iios_mvp.live_provider_preflight_v01 import LiveProviderConfig
 from iios_mvp.provider_runtime_v01 import build_provider_auth_headers
@@ -22,6 +22,13 @@ class LiveProviderResponse:
 
 class LiveProviderInvocationError(RuntimeError):
     """Raised when a configured live provider invocation fails."""
+
+
+class _RejectRedirectHandler(HTTPRedirectHandler):
+    """Reject every redirect so the configured HTTPS endpoint stays exact."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise LiveProviderInvocationError("live provider redirects are not permitted")
 
 
 def _canonical_json(value: Mapping[str, Any]) -> bytes:
@@ -69,7 +76,8 @@ def invoke_live_provider(
         method="POST",
     )
     try:
-        with urlopen(req, timeout=config.timeout_seconds) as response:
+        opener = build_opener(_RejectRedirectHandler)
+        with opener.open(req, timeout=config.timeout_seconds) as response:
             body = response.read()
             return LiveProviderResponse(
                 request_sha256=request_hash,
