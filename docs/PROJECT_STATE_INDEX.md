@@ -1129,3 +1129,58 @@ Next canonical gate:
 ```text
 B2 — LLM Semantic Workbench + Semantic Producer Admission
 ```
+## 19. MVP Pilot Acceptance — technical gate complete / final MVP P0 remains — 2026-10-08
+
+Status: **TECHNICAL PILOT ACCEPTANCE PASS / FINAL MVP DO NOT CLOSE**
+
+Canonical implementation head after MVP human-report projection correction:
+- PR #200 merge commit: `71ff164a19098c58b0d64745ce5f446e568eef7a`;
+- canonical `main`: `71ff164a19098c58b0d64745ce5f446e568eef7a` at this state-sync start.
+
+Post-fix technical verification:
+- PILOT-02 fresh Xinhecheng run #46: SUCCESS;
+- Investment Core CI #848 (pre-merge validation): SUCCESS;
+- MVP Pilot CI #17 (pre-merge validation): SUCCESS;
+- C2 Human Report #25: SUCCESS;
+- C7 lifecycle #50: SUCCESS;
+- B00-B authority red-team #90: SUCCESS;
+- Post-B04 independent red-team #16: SUCCESS before canonical merge.
+
+Corrected real Xinhecheng report evidence:
+- report hash: `5a6a3e8136cd589d64a5008d0c70cfb88a1047051234a33a8013f34ae5b8a9c5`;
+- publication hash: `7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0`;
+- report QA hash: `a168cf332802cef5de0e9ff5c845dc9e6bb007ffce9f47a34cea5dd8468494ec`;
+- report QA: `PASS`, including human_readability / decision_fidelity / binding / deterministic replay.
+
+Observed report-projection defect was fixed:
+- canonical Forecast / Valuation states now render correctly;
+- new-capital permission now renders as `NO`;
+- positioning/sizing permission now renders as `NO_SIZING_PERMISSION`;
+- return/risk threshold `26.60` is exposed separately from actionable entry authorization;
+- entry-zone arrays are rendered as human text rather than JSON.
+
+Human usability remains a real operator gate. A review worksheet has been generated from the corrected report and must be completed by the operator; CI cannot substitute for this attestation.
+
+### P0 governance override on final MVP closure
+
+B0 LLM canonical-execution governance freeze and B1-LCE now supersede the earlier pilot-only interpretation of MVP closure.
+
+P0-LLM-004 explicitly states that PILOT-01~04 primarily validate deterministic lifecycle behavior from preconstructed semantic inputs and **do not prove natural-language request → LLM reasoning → semantic admission → canonical decision**.
+
+Therefore:
+
+```text
+PILOT technical gate = PASS
+Human report review gate = PENDING operator attestation
+Final MVP v0.1.1 DoD = BLOCKED by P0-LLM-004
+```
+
+The next canonical development gate is therefore:
+
+```text
+B2 — LLM Semantic Workbench + Semantic Producer Admission
+```
+
+B2 must close the real semantic producer boundary and then add a natural-language-to-canonical conformance test before the final MVP gate can be closed.
+
+A02 / CSI800 remains non-blocking and must not be reintroduced into the MVP critical path.
