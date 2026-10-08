@@ -40,12 +40,17 @@ class FixtureSemanticProducer:
     producer_version = "b2e-fixture-producer-0.1"
     policy_version = "IIOS-LLM-POLICY-0.1"
 
+    thesis_status = "INTACT"
+
     def produce(self, request):
         return {
-            "semantic_assessment": {
-                "status": "PASS",
-                "scope": "investment-analysis",
-                "note": "Fixture semantic assessment; not a decision.",
+            "core_projection": {
+                "status": self.thesis_status,
+                "statement": "Semantic-proposed thesis statement.",
+                "mechanism": "Semantic-proposed economic mechanism.",
+                "key_driver_ids": ["D1", "D2", "D3"],
+                "falsifiers": ["driver failure"],
+                "monitoring_triggers": ["quarterly review"],
             }
         }
 
@@ -173,6 +178,47 @@ def test_b2e_forbidden_semantic_authority_is_blocked():
             valuation_output_resolver=valuation_resolver,
         )
 
+
+def test_b2e_semantic_projection_changes_canonical_decision():
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    case = dict(case)
+    case["trust"] = {"status": "PASS"}
+
+    intact = FixtureSemanticProducer()
+    intact.thesis_status = "INTACT"
+    broken = FixtureSemanticProducer()
+    broken.thesis_status = "BROKEN"
+
+    def run(producer, run_id):
+        return run_b2e_conformance(
+            raw_request=RAW,
+            request_id=run_id,
+            run_id=run_id,
+            created_at=CREATED,
+            request_interpreter=FixtureInterpreter(),
+            request_registry=_registries()[0],
+            semantic_producer=producer,
+            producer_registry=_registries()[1],
+            company="宁德时代",
+            evidence_refs=("E011", "E008"),
+            evidence_hashes=(E1, E2),
+            artifact_type="THESIS_ASSESSMENT",
+            semantic_prompt="Assess thesis.",
+            decision_relevance="Semantic thesis proposal only.",
+            case=case,
+            current_price_resolver=price_registry,
+            independent_forecast_resolver=forecast_registry,
+            upstream_authority_resolver=upstream_registry,
+            valuation_output_resolver=valuation_resolver,
+        )
+
+    intact_result = run(intact, "b2e-causal-intact")
+    broken_result = run(broken, "b2e-causal-broken")
+    assert intact_result.binding_receipt["semantic_core_projection_hash"]
+    assert broken_result.binding_receipt["semantic_core_projection_hash"]
+    assert intact_result.binding_receipt["action"] == "REVIEW_REQUIRED"
+    assert broken_result.binding_receipt["action"] == "NO-BUY"
+    assert intact_result.binding_receipt["action"] != broken_result.binding_receipt["action"]
 
 def test_b2e_semantic_lineage_is_required():
     case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
