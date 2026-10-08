@@ -17,6 +17,7 @@ from iios_mvp.decision_lifecycle_production import build_decision_revision, vali
 from iios_mvp.decision_upstream_admission_v03 import DECISION_UPSTREAM_ADMISSION_V02
 from iios_mvp.investment_core_contract_v03 import decide_v03
 from iios_mvp.semantic_to_core_projection_v01 import project_thesis_semantic_to_core
+from iios_mvp.forecast_valuation_return_lineage_v01 import validate_forecast_valuation_return_lineage, FORECAST_VALUATION_RETURN_LINEAGE_VERSION
 from iios_mvp.llm_semantic_workbench_v01 import (
     LLMSemanticWorkbench,
     SemanticProducer,
@@ -98,24 +99,47 @@ def _transition_pre_decision(
     *,
     run_id: str,
     case: Mapping[str, Any],
+    independent_forecast_resolver: Any,
+    valuation_output_resolver: Any,
     created_at: str,
 ) -> None:
-    forecast = case.get("forecast")
-    valuation = case.get("valuation")
-    if not isinstance(forecast, Mapping) or not isinstance(valuation, Mapping):
-        raise B2EE2EError("canonical case forecast and valuation are required for B2-E")
+    return_gate = case.get("return_gate")
+    if not isinstance(return_gate, Mapping):
+        raise B2EE2EError("canonical return_gate is required for Forecast/Valuation admission")
+
+    try:
+        lineage = validate_forecast_valuation_return_lineage(
+            return_gate=return_gate,
+            canonical_forecast_ref=return_gate.get("canonical_forecast_ref"),
+            canonical_valuation_ref=return_gate.get("canonical_valuation_ref"),
+            independent_forecast_resolver=independent_forecast_resolver,
+            valuation_output_resolver=valuation_output_resolver,
+            case_id=str(case["case_id"]),
+            market=str(case["market"]).upper(),
+            symbol=str(case["symbol"]).upper(),
+            company=str(case["company"]),
+            cutoff_date=__import__("datetime").date.fromisoformat(str(case["cutoff_date"])),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise B2EE2EError(
+            f"canonical Forecast/Valuation lineage admission failed: {exc}"
+        ) from exc
+
+    forecast_ref = lineage["canonical_forecast_ref"]
+    valuation_ref = lineage["canonical_valuation_ref"]
 
     orchestrator.transition(
         run_id,
         Stage.FORECAST_PENDING,
         created_at=created_at,
     )
-    forecast_hash = sha256(forecast)
     orchestrator.transition(
         run_id,
         Stage.FORECAST_ADMITTED,
-        output_refs=("forecast",),
-        output_hashes=(forecast_hash,),
+        output_refs=(forecast_ref["forecast_id"],),
+        output_hashes=(forecast_ref["admission_record_hash"],),
+        producer_type="CODE",
+        producer_version=FORECAST_VALUATION_RETURN_LINEAGE_VERSION,
         created_at=created_at,
     )
     orchestrator.transition(
@@ -123,17 +147,26 @@ def _transition_pre_decision(
         Stage.VALUATION_PENDING,
         created_at=created_at,
     )
-    valuation_hash = sha256(valuation)
     orchestrator.transition(
         run_id,
         Stage.VALUATION_ADMITTED,
-        output_refs=("valuation",),
-        output_hashes=(valuation_hash,),
+        output_refs=(valuation_ref["admission_id"],),
+        output_hashes=(valuation_ref["admission_record_hash"],),
+        producer_type="CODE",
+        producer_version=FORECAST_VALUATION_RETURN_LINEAGE_VERSION,
         created_at=created_at,
     )
     orchestrator.transition(
         run_id,
         Stage.DECISION_PENDING,
+        input_refs=(
+            forecast_ref["forecast_id"],
+            valuation_ref["admission_id"],
+        ),
+        input_hashes=(
+            forecast_ref["admission_record_hash"],
+            valuation_ref["admission_record_hash"],
+        ),
         created_at=created_at,
     )
 
@@ -255,6 +288,8 @@ def run_b2e_conformance(
         orchestrator,
         run_id=run_id,
         case=projected_case,
+        independent_forecast_resolver=independent_forecast_resolver,
+        valuation_output_resolver=valuation_output_resolver,
         created_at=created_at,
     )
 
