@@ -63,12 +63,13 @@ jobs:
           pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
           test -f "$pub"
           test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
-          rm -rf /tmp/iios-xhc-${GITHUB_RUN_ID}
+          rm -rf /tmp/iios-xhc/diagnostic/writer
+          mkdir -p /tmp/iios-xhc/diagnostic/writer
           python - <<'PY'
           from pathlib import Path
           from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
           pub=Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
-          out=Path("/tmp/iios-xhc-${GITHUB_RUN_ID}")
+          out=Path("/tmp/iios-xhc/diagnostic/writer")
           print([str(p) for p in write_investor_review_report_v02(str(out), publication_path=str(pub), generated_at="2026-10-08T05:00:00+00:00")])
           PY
 
@@ -78,7 +79,7 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          root=Path("/tmp/iios-xhc-${GITHUB_RUN_ID}")
+          root=Path("/tmp/iios-xhc/diagnostic/writer")
           report=json.loads(next(root.glob("*.investor-review-v02.json")).read_text(encoding="utf-8"))
           qa=json.loads(next(root.glob("*.investor-review-v02-qa.json")).read_text(encoding="utf-8"))
           audit=report["machine_report"]["semantic_surface"]["human_auditability"]
@@ -103,15 +104,15 @@ jobs:
         run: |
           set -euo pipefail
           python tests/independent_redteam_investor_review_v02.py \
-            --report "$(find /tmp/iios-xhc-${GITHUB_RUN_ID} -name '*.investor-review-v02.json' -print -quit)" \
-            --qa "$(find /tmp/iios-xhc-${GITHUB_RUN_ID} -name '*.investor-review-v02-qa.json' -print -quit)" \
-            --markdown "$(find /tmp/iios-xhc-${GITHUB_RUN_ID} -name '*.investor-review-v02.md' -print -quit)
+            --report "$(find /tmp/iios-xhc/diagnostic/writer -name '*.investor-review-v02.json' -print -quit)" \
+            --qa "$(find /tmp/iios-xhc/diagnostic/writer -name '*.investor-review-v02-qa.json' -print -quit)" \
+            --markdown "$(find /tmp/iios-xhc/diagnostic/writer -name '*.investor-review-v02.md' -print -quit)
 
       - name: Upload real Xinhecheng v0.2 report evidence
         uses: actions/upload-artifact@v4
         with:
           name: iios-investor-review-v02-xinhecheng
-          path: /tmp/iios-xhc-${GITHUB_RUN_ID}/
+          path: /tmp/iios-xhc/diagnostic/writer/
           if-no-files-found: error
 
       - run: python -m json.tool schemas/investor_review_report_v0.2.schema.json >/dev/null
