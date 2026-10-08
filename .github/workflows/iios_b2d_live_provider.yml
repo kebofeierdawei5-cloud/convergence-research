@@ -32,8 +32,10 @@ jobs:
         run: python -m pytest -q tests/test_b2d_live_provider_preflight.py
       - name: Run independent B2-D red-team
         run: python -m pytest -q tests/independent_redteam_b2d_live_provider.py
+      - name: Run B2-D1 independent verifier tests
+        run: python -m pytest -q tests/test_b2d1_independent_live_evidence.py
       - name: Compile
-        run: python -m compileall -q iios_mvp/live_provider_preflight_v01.py iios_mvp/live_provider_invocation_v01.py iios_mvp/live_provider_replay_v01.py iios_mvp/live_provider_evidence_v01.py
+        run: python -m compileall -q iios_mvp/live_provider_preflight_v01.py iios_mvp/live_provider_invocation_v01.py iios_mvp/live_provider_replay_v01.py iios_mvp/live_provider_evidence_v01.py iios_mvp/live_provider_independent_verify_v01.py
       - name: Validate schemas
         run: |
           python -m json.tool schemas/live_provider_replay_v0.2.schema.json >/dev/null
@@ -77,12 +79,24 @@ jobs:
             cat live_provider_status.json
             exit 0
           fi
+          python -m iios_mvp.live_provider_independent_verify_v01 --evidence live_provider_evidence.json > live_provider_independent_verification.json
+          verify_rc=$?
+          if [ "$verify_rc" -ne 0 ]; then
+            echo '{"status":"INDEPENDENT_VERIFICATION_FAILED","note":"producer output exists but independent verifier rejected it"}' > live_provider_status.json
+            cat live_provider_independent_verification.json
+            cat live_provider_status.json
+            exit 0
+          fi
           python - <<'PY'
           import json
           with open("live_provider_evidence.json", encoding="utf-8") as f:
               record=json.load(f)
+          with open("live_provider_independent_verification.json", encoding="utf-8") as f:
+              verification=json.load(f)
           assert record["status"] == "LIVE_RESPONSE_CAPTURED"
+          assert verification["status"] == "INDEPENDENT_VERIFIED"
           print("LIVE_PROVIDER_EVIDENCE_ADMITTED")
+          print("independent_verifier=", verification["verifier_version"])
           print("provider_id=", record["provider_id"])
           print("model=", record["model"])
           print("response_sha256=", record["response_sha256"])
@@ -95,5 +109,6 @@ jobs:
           name: iios-b2d-live-provider-evidence
           path: |
             live_provider_evidence.json
+            live_provider_independent_verification.json
             live_provider_status.json
           if-no-files-found: ignore
