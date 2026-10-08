@@ -13,6 +13,7 @@ from iios_mvp.investor_review_report_v02 import (
     validate_investor_review_qa_v02,
     validate_investor_review_report_v02,
     write_investor_review_report_v02,
+    HUMAN_AUDITABILITY_CONTRACT_VERSION,
 )
 from iios_mvp.machine_publication import write_machine_publication
 from iios_mvp.store import create_or_load_series, write_decision_revision, write_snapshot
@@ -99,6 +100,79 @@ def test_v02_dual_surface_and_schema(tmp_path):
     assert "## Market Implied Expectation / 市场隐含预期" in report["markdown"]
     assert "NOT_IDENTIFIABLE" in report["markdown"]
 
+
+
+def test_v02_p0_required_return_pass_without_value_is_incomplete(tmp_path):
+    publication, _ = _publication(tmp_path)
+    payload = publication["decision_payload"]
+    payload["return_metrics"]["required_return"] = None
+    payload["return_metrics"]["required_return_pass"] = True
+    report = build_investor_review_report_v02(publication=publication, generated_at="2026-10-08T02:00:00+00:00")
+    audit = report["machine_report"]["semantic_surface"]["human_auditability"]
+    assert audit["required_return"]["status"] == "INCOMPLETE"
+    assert audit["required_return"]["numeric_value"] is None
+    assert "Required Return" in report["markdown"]
+
+def test_v02_p0_expected_return_requires_scenario_probabilities(tmp_path):
+    publication, _ = _publication(tmp_path)
+    scenarios = publication["decision_payload"]["forecast"]["scenarios"]
+    for item in scenarios.values():
+        item.pop("probability", None)
+        item.pop("prob", None)
+    report = build_investor_review_report_v02(publication=publication, generated_at="2026-10-08T02:00:00+00:00")
+    audit = report["machine_report"]["semantic_surface"]["human_auditability"]
+    assert audit["scenario_probability"]["status"] == "MISSING"
+    assert audit["expected_return"]["status"] == "INCOMPLETE"
+
+def test_v02_p0_threshold_is_not_actionable_entry(tmp_path):
+    publication, _ = _publication(tmp_path)
+    decision = publication["ai_decision"]
+    decision["target_entry_price"] = None
+    publication["decision_payload"]["return_metrics"]["target_entry_price"] = "26.60"
+    publication["decision_payload"]["target_entry_price_semantics"] = "RETURN_RISK_THRESHOLD_ONLY"
+    report = build_investor_review_report_v02(publication=publication, generated_at="2026-10-08T02:00:00+00:00")
+    audit = report["machine_report"]["semantic_surface"]["human_auditability"]
+    assert audit["entry_price"]["status"] == "THRESHOLD_ONLY"
+    assert audit["entry_price"]["actionable_target_entry_price"] is None
+    assert audit["entry_price"]["threshold_price"] == "26.60"
+    assert "THRESHOLD_ONLY" in report["markdown"]
+
+def test_v02_p0_portfolio_can_add_is_overridden_by_decision(tmp_path):
+    publication, _ = _publication(tmp_path)
+    payload = publication["decision_payload"]
+    payload["gates"]["new_capital_allowed"] = False
+    payload["gates"]["positioning_sizing_permission"] = "NO_SIZING_PERMISSION"
+    package = publication["ai_decision"]["risk_portfolio_contract"]["portfolio"]
+    package["can_add"] = True
+    report = build_investor_review_report_v02(publication=publication, generated_at="2026-10-08T02:00:00+00:00")
+    audit = report["machine_report"]["semantic_surface"]["human_auditability"]
+    assert audit["portfolio_permission"]["status"] == "OVERRIDDEN_BY_DECISION"
+    assert audit["portfolio_permission"]["override"] is True
+    assert "OVERRIDDEN_BY_DECISION" in report["markdown"]
+
+def test_v02_p0_mie_absence_never_implies_not_identifiable(tmp_path):
+    publication, _ = _publication(tmp_path)
+    payload = publication["decision_payload"]
+    payload.pop("p4f_market_implied_expectation", None)
+    payload.pop("expectation_gap", None)
+    payload.pop("expectation_gap_evaluation", None)
+    payload["gates"]["expectation_gap_status"] = "UNKNOWN"
+    report = build_investor_review_report_v02(publication=publication, generated_at="2026-10-08T02:00:00+00:00")
+    audit = report["machine_report"]["semantic_surface"]["human_auditability"]
+    assert audit["contract_version"] == HUMAN_AUDITABILITY_CONTRACT_VERSION
+    assert audit["mie_expectation_gap"]["mie"]["status"] == "NOT_PROVIDED"
+    assert audit["mie_expectation_gap"]["mie"]["identifiability"] is None
+    assert audit["mie_expectation_gap"]["expectation_gap"]["status"] == "UNKNOWN"
+    assert audit["mie_expectation_gap"]["inference_rule"] == "absence_never_implies_not_identifiable"
+    assert "NOT_IDENTIFIABLE" not in report["markdown"]
+
+def test_v02_p0_explicit_mie_not_identifiable_is_preserved(tmp_path):
+    publication, _ = _publication(tmp_path)
+    report = build_investor_review_report_v02(publication=publication, generated_at="2026-10-08T02:00:00+00:00")
+    audit = report["machine_report"]["semantic_surface"]["human_auditability"]
+    assert audit["mie_expectation_gap"]["mie"]["status"] == "NOT_IDENTIFIABLE"
+    assert audit["mie_expectation_gap"]["mie"]["identifiability"] == "FAIL"
+    assert audit["mie_expectation_gap"]["expectation_gap"]["status"] == "NOT_IDENTIFIABLE"
 
 def test_v02_missing_modules_are_explicit_and_not_ready(tmp_path):
     publication, _ = _publication(tmp_path)
