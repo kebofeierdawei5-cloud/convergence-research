@@ -119,6 +119,16 @@ The current contract relies on caller discipline to prevent cross-company series
 - no order/live-provider imports in B2-E;
 - closed B2-E schema.
 
+## Finding F-005 — P1 — Live Workflow Trigger Discrepancy
+
+The repository workflow source declares B2-D3 as workflow_dispatch-only, but GitHub Actions recorded repeated B2-D3 runs with event=push on commits that touched unrelated B2-F documentation/test branches.
+
+Observed examples include B2-D3 run #35 on head 6a5e3decaf096bd614bbf8d3f8eac0cde35efbf4 and earlier runs #31 and #30 on B2-F audit commits.
+
+No live request was admitted because production credentials were absent and the workflow failed closed. Nevertheless, the observed trigger behavior contradicts the intended “manual-only” spending boundary.
+
+This must be resolved before any production provider credentials are admitted. A push-triggered live workflow could otherwise spend provider quota or produce live evidence without explicit operator dispatch.
+
 ## Overall disposition
 
 **B2-F = BLOCKED.**
