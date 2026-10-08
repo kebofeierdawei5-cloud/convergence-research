@@ -78,6 +78,13 @@ jobs:
           cat /tmp/iios-xhc/diagnostic/write-report.txt
           exit 0
 
+      - name: Diagnose CLI import and dispatch
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          python -c 'import iios_mvp.cli; print("CLI_IMPORT_PASS")'
+          python -c 'from iios_mvp.cli import parser; p=parser(); print("CLI_PARSER_PASS", any(a=='investor-report-v02' for a in [getattr(x,"dest","") for x in []]))'
+
       - name: Re-render canonical Xinhecheng Publication through Investor Review v0.2
         run: |
           set -euo pipefail
