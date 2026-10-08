@@ -160,10 +160,23 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
     gates = payload.get("gates") if isinstance(payload.get("gates"), Mapping) else {}
     returns = payload.get("return_metrics") if isinstance(payload.get("return_metrics"), Mapping) else {}
     trust = _first_mapping(payload, "trust", "evidence_trust")
-    quality = _first_mapping(payload, "quality", "quality_gate")
+    upstream = payload.get("decision_upstream_admission") if isinstance(payload.get("decision_upstream_admission"), Mapping) else {}
+    upstream_quality = upstream.get("quality_gate") if isinstance(upstream.get("quality_gate"), Mapping) else {}
+    quality = _first_mapping(payload, "quality", "quality_gate") or upstream_quality
     reality = _first_mapping(payload, "reality", "economic_reality", "economic_structure")
     thesis = _first_mapping(payload, "thesis", "investment_thesis")
     drivers = _first_mapping(payload, "value_driver_ranking", "value_drivers", "value_core")
+    if not drivers:
+        thesis_admission = upstream.get("thesis_admission") if isinstance(upstream.get("thesis_admission"), Mapping) else {}
+        value_ref = (upstream.get("canonical_admission_refs") or {}).get("VALUE_DRIVER") if isinstance(upstream.get("canonical_admission_refs"), Mapping) else None
+        driver_ids = thesis_admission.get("key_driver_ids") if isinstance(thesis_admission.get("key_driver_ids"), list) else []
+        if driver_ids or value_ref:
+            drivers = {
+                "status": upstream.get("value_driver_status") or gates.get("value_driver"),
+                "semantic_completeness": "PARTIAL",
+                "key_driver_ids": driver_ids,
+                "canonical_admission_ref": value_ref,
+            }
     forecast = _first_mapping(payload, "forecast", "independent_forecast")
     valuation = _first_mapping(payload, "valuation", "primary_valuation")
     mie = _first_mapping(payload, "p4f_market_implied_expectation", "market_implied_expectation", "mie")
@@ -204,11 +217,25 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
     semantic_matrix = {name: modules[name] for name, _ in MODULE_ORDER}
     core_missing = [
         name for name in ("trust", "quality", "reality", "thesis", "value_drivers", "forecast", "valuation", "mie", "expectation_gap", "risk", "positioning")
-        if (
-            semantic_matrix[name]["status"] == "NOT_PROVIDED"
-            or not semantic_matrix[name]["present"]
-        )
+        if semantic_matrix[name]["content_status"] not in {"STRUCTURED"}
     ]
+    completeness_flags = {
+        "required_return_value_missing_but_pass_flag_present": bool(
+            returns.get("required_return") in (None, "")
+            and returns.get("required_return_pass") is True
+        ),
+        "scenario_probabilities_missing": bool(
+            forecast
+            and isinstance(forecast.get("scenarios"), Mapping)
+            and any(
+                isinstance(forecast.get("scenarios", {}).get(name), Mapping)
+                and (forecast["scenarios"][name].get("probability") in (None, "") and forecast["scenarios"][name].get("prob") in (None, ""))
+                for name in ("bear", "base", "bull")
+            )
+        ),
+        "actionable_target_entry_unavailable": decision.get("target_entry_price") in (None, ""),
+        "positioning_blocked": status(positioning, gates, "positioning", "positioning_sizing") == "BLOCKED",
+    }
     return {
         "surface_version": "IIOS-INVESTOR-SEMANTIC-SURFACE-0.2",
         "language": LANGUAGE,
@@ -231,6 +258,7 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
         "semantic_matrix": semantic_matrix,
         "missing_core_modules": core_missing,
         "human_review_readiness": "READY" if not core_missing else "HUMAN_REVIEW_NOT_READY",
+        "completeness_flags": completeness_flags,
         "current_projection": publication["current_projection"],
         "human_approval": publication["human_approval"],
         "lifecycle_refs": publication["lifecycle_refs"],
@@ -285,7 +313,11 @@ def render_investor_review_v02(publication: Mapping[str, Any], surface: Mapping[
 
     def add_module(title: str, name: str, notes: list[str] | None = None) -> None:
         mod = modules[name]
-        lines.extend([f"## {title}", "", f"状态：**{mod['status']}**", f"来源路径：{mod['source_path']}"])
+        lines.extend([
+            f"## {title}", "",
+            f"状态：**{mod['status']}**｜语义内容：**{mod.get('content_status', 'UNKNOWN')}**｜Gate：**{mod.get('gate_status', mod['status'])}**",
+            f"来源路径：{mod['source_path']}"
+        ])
         if mod["present"] and isinstance(mod["data"], Mapping):
             lines.extend(_render_mapping(mod["data"]))
         elif mod["present"] and isinstance(mod["data"], list):
