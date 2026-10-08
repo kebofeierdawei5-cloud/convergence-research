@@ -1,0 +1,159 @@
+name: IIOS B2-D3 Real Provider Live Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      cutoff_date:
+        description: "Explicit evidence cutoff date (YYYY-MM-DD)"
+        required: true
+        default: "2026-10-08"
+      case_id:
+        description: "Smoke case identity"
+        required: true
+        default: "B2D3-LIVE-SMOKE-20261008"
+      request_id:
+        description: "Smoke request identity"
+        required: true
+        default: "b2d3-live-request-20261008"
+      prompt:
+        description: "Non-semantic live-provider smoke prompt"
+        required: true
+        default: 'Return exactly this JSON object and nothing else: {"status":"LIVE_PROVIDER_OK","marker":"IIOS-B2-D3"}'
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      IIOS_LLM_PROVIDER_BASE_URL: ${{ secrets.IIOS_LLM_PROVIDER_BASE_URL }}
+      IIOS_LLM_PROVIDER_API_KEY: ${{ secrets.IIOS_LLM_PROVIDER_API_KEY }}
+      IIOS_LLM_PROVIDER_MODEL: ${{ secrets.IIOS_LLM_PROVIDER_MODEL }}
+      IIOS_LLM_PROVIDER_RUNTIME_PRIVATE_KEY_B64: ${{ secrets.IIOS_LLM_PROVIDER_RUNTIME_PRIVATE_KEY_B64 }}
+      IIOS_LLM_PROVIDER_ID: ${{ secrets.IIOS_LLM_PROVIDER_ID }}
+      IIOS_LLM_PROVIDER_VERSION: ${{ secrets.IIOS_LLM_PROVIDER_VERSION }}
+      IIOS_LLM_PROVIDER_PROTOCOL: ${{ secrets.IIOS_LLM_PROVIDER_PROTOCOL }}
+      IIOS_LLM_PROVIDER_AUTH_MODE: ${{ vars.IIOS_LLM_PROVIDER_AUTH_MODE || 'BEARER' }}
+      IIOS_LLM_PROVIDER_DEPLOYMENT_MODE: ${{ vars.IIOS_LLM_PROVIDER_DEPLOYMENT_MODE || 'EXTERNAL' }}
+      IIOS_LLM_PROVIDER_TIMEOUT_SECONDS: ${{ secrets.IIOS_LLM_PROVIDER_TIMEOUT_SECONDS || '30' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check cryptography jsonschema
+      - name: Fail-closed production configuration preflight
+        run: python - <<'PY'
+from iios_mvp.live_provider_preflight_v01 import load_live_provider_config
+cfg = load_live_provider_config()
+print({
+    "base_url": cfg.base_url,
+    "model": cfg.model,
+    "provider_id": cfg.provider_id,
+    "provider_version": cfg.provider_version,
+    "protocol": cfg.protocol,
+    "auth_mode": cfg.auth_mode,
+    "deployment_mode": cfg.deployment_mode,
+    "timeout_seconds": cfg.timeout_seconds,
+    "api_key_present": bool(cfg.api_key),
+    "runtime_private_key_present": bool(cfg.runtime_private_key_b64),
+})
+PY
+
+  live_and_verify:
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      IIOS_LLM_PROVIDER_BASE_URL: ${{ secrets.IIOS_LLM_PROVIDER_BASE_URL }}
+      IIOS_LLM_PROVIDER_API_KEY: ${{ secrets.IIOS_LLM_PROVIDER_API_KEY }}
+      IIOS_LLM_PROVIDER_MODEL: ${{ secrets.IIOS_LLM_PROVIDER_MODEL }}
+      IIOS_LLM_PROVIDER_RUNTIME_PRIVATE_KEY_B64: ${{ secrets.IIOS_LLM_PROVIDER_RUNTIME_PRIVATE_KEY_B64 }}
+      IIOS_LLM_PROVIDER_ID: ${{ secrets.IIOS_LLM_PROVIDER_ID }}
+      IIOS_LLM_PROVIDER_VERSION: ${{ secrets.IIOS_LLM_PROVIDER_VERSION }}
+      IIOS_LLM_PROVIDER_PROTOCOL: ${{ secrets.IIOS_LLM_PROVIDER_PROTOCOL }}
+      IIOS_LLM_PROVIDER_AUTH_MODE: ${{ vars.IIOS_LLM_PROVIDER_AUTH_MODE || 'BEARER' }}
+      IIOS_LLM_PROVIDER_DEPLOYMENT_MODE: ${{ vars.IIOS_LLM_PROVIDER_DEPLOYMENT_MODE || 'EXTERNAL' }}
+      IIOS_LLM_PROVIDER_TIMEOUT_SECONDS: ${{ secrets.IIOS_LLM_PROVIDER_TIMEOUT_SECONDS || '30' }}
+      IIOS_B2D_LIVE_RUN_ID: b2d3-live-${{ github.run_id }}
+      IIOS_B2D_LIVE_CASE_ID: ${{ inputs.case_id }}
+      IIOS_B2D_LIVE_REQUEST_ID: ${{ inputs.request_id }}
+      IIOS_B2D_LIVE_CUTOFF_DATE: ${{ inputs.cutoff_date }}
+      IIOS_B2D_LIVE_SMOKE_PROMPT: ${{ inputs.prompt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install runtime dependencies
+        run: python -m pip install --disable-pip-version-check cryptography jsonschema
+      - name: Capture raw live provider evidence
+        run: |
+          mkdir -p artifacts
+          python -m iios_mvp.live_provider_evidence_v01 > artifacts/b2d3_live_provider_evidence.json
+      - name: Assert LIVE_RESPONSE_CAPTURED and 2xx
+        run: |
+          python - <<'PY'
+import json
+from pathlib import Path
+record = json.loads(Path("artifacts/b2d3_live_provider_evidence.json").read_text(encoding="utf-8"))
+assert record["status"] == "LIVE_RESPONSE_CAPTURED"
+assert 200 <= int(record["http_status"]) <= 299
+assert record["response_sha256"]
+assert record["request_sha256"]
+assert record["replay_hash"]
+assert record["attestation_hash"]
+print({
+    "status": record["status"],
+    "http_status": record["http_status"],
+    "provider_id": record["provider_id"],
+    "provider_version": record["provider_version"],
+    "model": record["model"],
+    "response_sha256": record["response_sha256"],
+    "replay_hash": record["replay_hash"],
+    "attestation_hash": record["attestation_hash"],
+})
+PY
+      - name: B2-D1 independent verification
+        run: |
+          python -m iios_mvp.live_provider_independent_verify_v01             --evidence artifacts/b2d3_live_provider_evidence.json
+      - name: Build non-secret run manifest
+        run: |
+          python - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+p = Path("artifacts/b2d3_live_provider_evidence.json")
+raw = p.read_bytes()
+record = json.loads(raw.decode("utf-8"))
+manifest = {
+    "schema_version": "IIOS-B2-D3-RUN-MANIFEST-0.1",
+    "status": "LIVE_RESPONSE_CAPTURED_AND_INDEPENDENTLY_VERIFIED",
+    "workflow": "${{ github.workflow }}",
+    "run_id": "${{ github.run_id }}",
+    "run_number": "${{ github.run_number }}",
+    "commit_sha": "${{ github.sha }}",
+    "ref": "${{ github.ref }}",
+    "evidence_file_sha256": hashlib.sha256(raw).hexdigest(),
+    "response_sha256": record["response_sha256"],
+    "request_sha256": record["request_sha256"],
+    "replay_hash": record["replay_hash"],
+    "attestation_hash": record["attestation_hash"],
+    "verifier": "IIOS-LIVE-PROVIDER-INDEPENDENT-VERIFIER-0.1",
+}
+Path("artifacts/b2d3_run_manifest.json").write_text(
+    json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+    encoding="utf-8",
+)
+print(json.dumps(manifest, ensure_ascii=False, sort_keys=True))
+PY
+      - name: Upload B2-D3 live evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iios-b2d3-live-evidence-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14
