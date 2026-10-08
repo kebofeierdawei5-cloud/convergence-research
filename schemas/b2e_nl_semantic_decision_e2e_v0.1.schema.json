@@ -1,0 +1,41 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://iios.local/schemas/b2e_nl_semantic_decision_e2e_v0.1.schema.json",
+  "title":"IIOS B2-E NL Semantic Decision E2E v0.1",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["schema_version","status","run_id","request_id","case_id","market","symbol","cutoff_date","raw_request_sha256","request_receipt_hash","research_case_hash","case_hash","semantic_artifact_hash","semantic_admission_hash","decision_admission_hash","decision_revision_hash","action","human_approval_required","auto_execution","authority_boundary","created_at","binding_receipt_hash"],
+  "properties":{
+    "schema_version":{"const":"IIOS-B2-E-NL-SEMANTIC-DECISION-E2E-0.1"},
+    "status":{"const":"ADMITTED"},
+    "run_id":{"type":"string","minLength":1},
+    "request_id":{"type":"string","minLength":1},
+    "case_id":{"type":"string","minLength":1},
+    "market":{"enum":["CN-A","HK"]},
+    "symbol":{"type":"string","minLength":1},
+    "cutoff_date":{"type":"string","format":"date"},
+    "raw_request_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "request_receipt_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "research_case_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "case_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "semantic_artifact_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "semantic_admission_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "decision_admission_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "decision_revision_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "action":{"enum":["BUY","ADD","HOLD","REDUCE","EXIT","NO-BUY","WATCH","REVIEW_REQUIRED"]},
+    "human_approval_required":{"const":true},
+    "auto_execution":{"const":false},
+    "authority_boundary":{
+      "type":"object","additionalProperties":false,
+      "required":["semantic_producer_can_decide","canonical_decision_kernel_is_authoritative","human_approval_is_required","automatic_execution_is_forbidden"],
+      "properties":{
+        "semantic_producer_can_decide":{"const":false},
+        "canonical_decision_kernel_is_authoritative":{"const":true},
+        "human_approval_is_required":{"const":true},
+        "automatic_execution_is_forbidden":{"const":true}
+      }
+    },
+    "created_at":{"type":"string","format":"date-time"},
+    "binding_receipt_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"}
+  }
+}

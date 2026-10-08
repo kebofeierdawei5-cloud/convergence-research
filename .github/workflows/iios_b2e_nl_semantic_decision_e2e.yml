@@ -1,0 +1,36 @@
+name: IIOS B2-E Natural Language Semantic Decision E2E
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/b2e_nl_semantic_decision_e2e_v01.py"
+      - "schemas/b2e_nl_semantic_decision_e2e_v0.1.schema.json"
+      - "tests/test_b2e_nl_semantic_decision_e2e.py"
+      - "tests/independent_redteam_b2e_nl_semantic_decision.py"
+      - "docs/iios/B2_E_NL_SEMANTIC_DECISION_E2E_20261008.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install verification dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema cryptography
+      - name: Run B2-E E2E tests
+        run: python -m pytest -q tests/test_b2e_nl_semantic_decision_e2e.py
+      - name: Run independent B2-E red-team
+        run: python -m pytest -q tests/independent_redteam_b2e_nl_semantic_decision.py
+      - name: Compile B2-E implementation
+        run: python -m compileall -q iios_mvp/b2e_nl_semantic_decision_e2e_v01.py
+      - name: Validate B2-E schema
+        run: python -m json.tool schemas/b2e_nl_semantic_decision_e2e_v0.1.schema.json >/dev/null
+      - name: Diff check
+        run: git diff --check
