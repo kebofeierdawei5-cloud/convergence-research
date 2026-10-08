@@ -22,6 +22,7 @@ B2-D Canonical Refresh + Live Provider Boundary        PASS / CANONICAL
 B2-D1 Live Evidence Verification Hardening             PASS / CANONICAL
 B2-D2 Provider-Neutral Runtime Boundary               PASS / CANONICAL
 B2-D Live Provider Invocation / Evidence                BLOCKED
+B2-E Natural-Language → Semantic → Decision E2E          PASS / CANONICAL
 ```
 
 ### Current blocker
@@ -53,19 +54,23 @@ Therefore:
 
 ### Current next development batch
 
+B2-E control-plane implementation is now canonical, but production-backed E2E remains gated by B2-D3 live evidence.
+
 ```text
-PRODUCTION PROVIDER RUNTIME CONFIGURATION
+B2-D3 PRODUCTION PROVIDER CONFIGURATION
   ↓
 REAL LIVE INVOCATION + RAW RESPONSE CAPTURE
   ↓
-INDEPENDENT PROVIDER REPLAY / ATTESTATION VERIFICATION
+B2-D1 INDEPENDENT VERIFICATION
   ↓
-B2-E Natural-Language → Semantic → Decision E2E
+B2-E PRODUCTION-BACKED NL → SEMANTIC → DECISION
   ↓
-B2-F Full Independent Red-team
+B2-F FULL INDEPENDENT RED-TEAM
   ↓
-MVP Final Human Acceptance
+MVP FINAL HUMAN ACCEPTANCE
 ```
+
+B2-E fixture-backed conformance is not admitted as live-provider evidence.
 
 ### Explicit non-blockers
 
@@ -126,6 +131,60 @@ Explicit non-claims:
 - B2-D3 does not promote fixture output to live evidence;
 - B2-D3 does not make any commercial LLM provider an architectural dependency;
 - B2-E remains locked until a real live evidence artifact passes independent verification.
+
+## B2-E — Natural-Language → Semantic → Decision E2E — 2026-10-08
+
+Status: **PASS / MERGED / CANONICAL**
+
+Canonical promotion:
+- PR #223;
+- merge commit: `bb297c212f3deb153549cab013000904ebd982dd`;
+- canonical base before batch: `999bf17080f0ac73736d8a44d98a7202c1dad147`.
+
+Closed control-plane boundary:
+- B2-B natural-language request admission is the canonical entry;
+- admitted Research Case identity is bound to the expanded Investment Core case by case_id / market / symbol / cutoff / as_of identity;
+- admitted Evidence is required before semantic production;
+- B2-A semantic admission precedes downstream Forecast / Valuation / Decision stages;
+- semantic producer output is explicitly forbidden from writing Decision-authoritative fields;
+- canonical v0.3 Decision Kernel is re-executed at Decision Admission;
+- Decision Admission is bound to the resulting canonical Decision snapshot;
+- lifecycle output is `AI_PROPOSED`;
+- `human_approval_required=true`;
+- `auto_execution=false`;
+- E2E binding receipt ties raw request, Research Case, expanded Investment Core case, semantic artifact/admission, Decision Admission and Decision Revision.
+
+Verification:
+- dedicated B2-E workflow run #3 = SUCCESS;
+- B2-E E2E tests: 3 / 3 PASS;
+- independent B2-E red-team: 4 / 4 PASS;
+- B2 Semantic Producer workflow #27 = SUCCESS, including B2-E E2E + red-team;
+- Investment Core CI #999 = SUCCESS;
+- MVP Pilot #137 = SUCCESS;
+- Post-B04 independent red-team #126 = SUCCESS;
+- B2 Data Evidence PIT #94 = SUCCESS.
+
+Evidence classification:
+- this batch uses fixture request interpreter / semantic producer and the existing canonical 300750 case/resolvers;
+- therefore B2-E is a **control-plane and authority-conformance PASS**, not production LLM economic-reasoning validation.
+
+Production gate remains:
+```text
+B2-D3 LIVE_RESPONSE_CAPTURED
+        ↓
+B2-D1 INDEPENDENT_VERIFIED
+        ↓
+production request interpreter / semantic producer
+        ↓
+B2-E production-backed execution
+```
+
+Explicit non-claims:
+- B2-E does not claim model quality or economic forecast validity;
+- semantic producer cannot directly authorize a Decision;
+- no Human Approval was issued by B2-E;
+- no automatic execution capability was added;
+- B2-D3 LIVE remains BLOCKED until real production runtime evidence is captured and independently verified.
 
 ## 1. Canonical state
 
