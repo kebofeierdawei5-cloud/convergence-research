@@ -61,6 +61,9 @@ class LLMSemanticWorkbench:
             if getattr(registration, field) != getattr(producer, field):
                 raise ValueError(f'{field} is not registry-authorized')
         run = self._orchestrator.get(request.run_id)
+        for field in ('case_id', 'market', 'symbol', 'cutoff_date'):
+            if getattr(run, field) != getattr(request, field):
+                raise ValueError(f'request {field} does not match canonical run')
         evidence_receipts = [receipt for receipt in run.stage_receipts if receipt.stage_id == Stage.EVIDENCE_ADMITTED.value]
         if not evidence_receipts:
             raise ValueError("semantic inputs require an admitted evidence receipt")
