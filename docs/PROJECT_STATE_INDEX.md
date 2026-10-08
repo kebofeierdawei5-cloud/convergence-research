@@ -59,18 +59,22 @@ Therefore:
 
 ### Current next development batch
 
-B2-E control-plane implementation is canonical, but B2-F has blocked production-backed E2E pending repair of independent red-team findings. B2-D3 live evidence remains a separate prerequisite.
+B2-F remains blocked only by F-003 / F-004 / F-005. B2-D3 live evidence remains a separate prerequisite and must not be configured in production until F-005 is resolved.
 
 ```text
-B2-D3 PRODUCTION PROVIDER CONFIGURATION
+B2-FR3  Repair F-003 recursive semantic authority-field guard
   ↓
-REAL LIVE INVOCATION + RAW RESPONSE CAPTURE
+B2-FR4  Repair F-004 Decision Series identity hardening
+  ↓
+B2-FR5  Repair F-005 B2-D3 trigger boundary
+  ↓
+Fresh B2-F independent red-team
+  ↓
+B2-D3 REAL LIVE EVIDENCE
   ↓
 B2-D1 INDEPENDENT VERIFICATION
   ↓
 B2-E PRODUCTION-BACKED NL → SEMANTIC → DECISION
-  ↓
-B2-F FULL INDEPENDENT RED-TEAM
   ↓
 MVP FINAL HUMAN ACCEPTANCE
 ```
