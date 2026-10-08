@@ -384,6 +384,32 @@ def test_v02_admits_canonical_thesis_intact_status(tmp_path):
     assert qa["checks"]["semantic_matrix_complete"] == "PASS"
 
 
+def test_v02_human_render_does_not_expose_raw_positive_return_or_threshold_bypass(tmp_path):
+    publication, _ = _publication(tmp_path)
+    publication["ai_decision"]["return_metrics"] = {
+        "required_return": None,
+        "required_return_pass": True,
+        "expected_annualized_return": "0.20",
+        "return_gate_pass": True,
+        "target_entry_price": "26.6",
+    }
+    publication["ai_decision"]["target_entry_price"] = None
+    publication["decision_payload"]["return_metrics"]["required_return"] = None
+    publication["decision_payload"]["return_metrics"]["required_return_pass"] = True
+    publication["decision_payload"]["return_metrics"]["expected_annualized_return"] = "0.20"
+    publication["decision_payload"]["return_metrics"]["target_entry_price"] = "26.6"
+    publication["decision_payload"]["gates"]["canonical_entry_evaluation_status"] = "SKIPPED"
+    _reseal_publication(publication)
+    report = build_investor_review_report_v02(
+        publication=publication, generated_at="2026-10-08T02:00:00+00:00"
+    )
+    assert "required return pass: 是" not in report["markdown"]
+    assert "return gate pass: 是" not in report["markdown"]
+    assert "target entry price: 26.6" not in report["markdown"]
+    assert "Entry Price：**THRESHOLD_ONLY**" in report["markdown"]
+    assert "Required Return：**INCOMPLETE**" in report["markdown"]
+
+
 def test_v02_missing_modules_are_explicit_and_not_ready(tmp_path):
     publication, _ = _publication(tmp_path)
     for key in ("quality", "reality", "p4f_market_implied_expectation", "expectation_gap", "positioning"):
