@@ -60,6 +60,14 @@ def test_revision_is_deterministic():
     assert a["decision_status"] == "AI_PROPOSED"
     assert a["human_approval_required"] is True
     assert a["auto_execution"] is False
+    assert a["decision_series_id"] == "CN-A-300750"
+    assert a["decision_series_identity"] == {
+        "case_id": CASE,
+        "market": "CN-A",
+        "symbol": "300750",
+        "company": "CATL",
+    }
+    assert len(a["decision_series_identity_hash"]) == 64
     validate_decision_revision(a, case_id=CASE, cutoff_date=CUTOFF)
 
 
@@ -83,6 +91,32 @@ def legacy_snapshot(decision):
         json.dumps(core, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
     return core
+
+
+def test_revision_can_derive_series_identity_without_caller_id():
+    s = snapshot()
+    rev = build_decision_revision(
+        revision=1,
+        snapshot=s,
+        run_id="run-derived",
+        decision_admission=admission(s),
+    )
+    assert rev["decision_series_id"] == "CN-A-300750"
+    assert rev["decision_id"] == "CN-A-300750-r001"
+    validate_decision_revision(rev, case_id=CASE, cutoff_date=CUTOFF)
+
+
+def test_revision_rejects_noncanonical_series_id():
+    import pytest
+
+    with pytest.raises(ValueError, match="decision_series_id is not canonical"):
+        build_decision_revision(
+            decision_series_id="CN-A-999999",
+            revision=1,
+            snapshot=snapshot(),
+            run_id="run-spoof-series",
+            decision_admission=admission(snapshot()),
+        )
 
 
 def test_revision_rejects_legacy_decision_key():
@@ -112,6 +146,28 @@ def test_revision_accepts_engine_decision_wrapper():
         run_id="run-legacy",
     )
     assert rev["ai_action"] == "HOLD"
+
+def test_revision_rejects_tampered_series_identity_even_with_rehashed_revision():
+    import hashlib
+    import json
+    import pytest
+
+    rev = revision(snapshot())
+    tampered = dict(rev)
+    tampered["decision_series_identity"] = dict(rev["decision_series_identity"])
+    tampered["decision_series_identity"]["company"] = "Forged Company"
+    identity = tampered["decision_series_identity"]
+    tampered["decision_series_identity_hash"] = hashlib.sha256(
+        json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    core = {k: tampered[k] for k in tampered if k != "revision_hash"}
+    tampered["revision_hash"] = hashlib.sha256(
+        json.dumps(core, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+    with pytest.raises(ValueError, match="decision series identity does not match canonical"):
+        validate_decision_revision(tampered, case_id=CASE, cutoff_date=CUTOFF)
+
 
 def test_approval_binds_exact_revision_and_snapshot():
     rev = revision(snapshot())
