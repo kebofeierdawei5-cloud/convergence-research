@@ -1,0 +1,41 @@
+name: IIOS B2 Semantic Producer Admission
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/semantic_producer_admission_v01.py"
+      - "iios_mvp/llm_semantic_workbench_v01.py"
+      - "schemas/semantic_producer_receipt_v0.1.schema.json"
+      - "tests/test_b2_semantic_producer_admission.py"
+      - "tests/independent_redteam_b2_semantic_producer.py"
+      - "docs/iios/B2_A_INDEPENDENT_REDTEAM_20261008.md"
+      - "docs/iios/B2_SEMANTIC_WORKBENCH_AND_PRODUCER_ADMISSION_v0.1.md"
+      - "docs/PROJECT_STATE_INDEX.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install verification dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - name: Run B2 admission tests
+        run: python -m pytest -q tests/test_b2_semantic_producer_admission.py
+      - name: Run independent B2 clean-room red-team
+        run: python -m pytest -q tests/independent_redteam_b2_semantic_producer.py
+      - name: Compile B2 implementation
+        run: python -m compileall -q iios_mvp/semantic_producer_admission_v01.py iios_mvp/llm_semantic_workbench_v01.py
+      - name: Validate B2 schema
+        run: python -m json.tool schemas/semantic_producer_receipt_v0.1.schema.json >/dev/null
+      - name: Diff check
+        run: git diff --check

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/semantic-producer-receipt-0.1.schema.json",
+  "title": "IIOS Semantic Producer Receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version","receipt_id","artifact_id","artifact_type","stage_id","case_id","market","symbol","company","cutoff_date","producer_type","producer_id","producer_version","policy_version","input_refs","input_hashes","artifact_hash","output_hash","status","created_at","receipt_hash"],
+  "properties": {
+    "schema_version":{"const":"IIOS-SEMANTIC-PRODUCER-RECEIPT-0.1"},
+    "receipt_id":{"type":"string","minLength":1},
+    "artifact_id":{"type":"string","minLength":1},
+    "artifact_type":{"enum":["REALITY_INTERPRETATION","TRUST_ASSESSMENT","QUALITY_ASSESSMENT","THESIS_ASSESSMENT","VALUE_DRIVER_ASSESSMENT","INDEPENDENT_FORECAST_REASONING","VALUATION_PROPOSAL","MIE_INTERPRETATION","RISK_ASSESSMENT","POSITIONING_ASSESSMENT"]},
+    "stage_id":{"type":"string","minLength":1},
+    "case_id":{"type":"string","minLength":1},
+    "market":{"enum":["CN-A","HK"]},
+    "symbol":{"type":"string","minLength":1},
+    "company":{"type":"string","minLength":1},
+    "cutoff_date":{"type":"string","format":"date"},
+    "producer_type":{"enum":["LLM_SEMANTIC_PRODUCER","HUMAN_EXPERT_ADJUDICATION"]},
+    "producer_id":{"type":"string","minLength":1},
+    "producer_version":{"type":"string","minLength":1},
+    "policy_version":{"type":"string","minLength":1},
+    "input_refs":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","minLength":1}},
+    "input_hashes":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","pattern":"^[0-9a-f]{64}$"}},
+    "artifact_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "output_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "status":{"const":"PRODUCED"},
+    "created_at":{"type":"string","format":"date-time"},
+    "receipt_hash":{"type":"string","pattern":"^[0-9a-f]{64}$"}
+  }
+}
