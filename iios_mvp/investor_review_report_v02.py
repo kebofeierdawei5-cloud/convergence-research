@@ -142,13 +142,25 @@ def _scenario_summary(scenarios: Any) -> dict[str, Any]:
             }
     return result
 
-def _module(name: str, label: str, status: str, source_path: str, data: Any) -> dict[str, Any]:
+def _module(
+    name: str,
+    label: str,
+    status_value: str,
+    source_path: str,
+    data: Any,
+    *,
+    content_status: str | None = None,
+    gate_status: str | None = None,
+) -> dict[str, Any]:
+    present = bool(data)
     return {
         "module": name,
         "label": label,
-        "status": status if status in ALLOWED_STATUS else str(status),
+        "status": status_value if status_value in ALLOWED_STATUS else str(status_value),
+        "gate_status": gate_status if gate_status not in (None, "") else status_value,
+        "content_status": content_status or ("STRUCTURED" if present else "MISSING"),
         "source_path": source_path,
-        "present": bool(data),
+        "present": present,
         "data": data if isinstance(data, (Mapping, list)) else {},
     }
 
@@ -198,17 +210,55 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
 
     modules = {
         "candidate": _module("candidate", "Candidate / 标的", "PASS", "case", case),
-        "trust": _module("trust", "Trust / 可信度", _status(trust, gates, "trust"), "decision_payload.trust / gates.trust", trust),
-        "quality": _module("quality", "Quality / 经济质量", _status(quality, gates, "quality"), "decision_payload.quality / gates.quality", quality),
-        "reality": _module("reality", "Reality / 经营现实", _status(reality, gates, "reality"), "decision_payload.reality / gates.reality", reality),
+        "trust": _module(
+            "trust", "Trust / 可信度", _status(trust, gates, "trust"),
+            "decision_payload.trust / gates.trust", trust,
+            gate_status=gates.get("trust"),
+        ),
+        "quality": _module(
+            "quality", "Quality / 经济质量", _status(quality, gates, "quality"),
+            "decision_payload.quality / decision_upstream_admission.quality_gate / gates.quality",
+            quality,
+            gate_status=gates.get("quality_gate") or upstream.get("quality_gate_status"),
+        ),
+        "reality": _module(
+            "reality", "Reality / 经营现实", _status(reality, gates, "reality"),
+            "decision_payload.reality / economic_structure / gates.reality", reality,
+            gate_status=gates.get("reality"),
+        ),
         "thesis": _module("thesis", "Thesis / 投资论点", _status(thesis, gates, "thesis"), "decision_payload.thesis / gates.thesis", thesis),
-        "value_drivers": _module("value_drivers", "Value Drivers / 价值驱动", _status(drivers, gates, "value_driver", "value_drivers"), "decision_payload.value_driver_ranking / value_drivers / value_core", drivers),
+        "value_drivers": _module(
+            "value_drivers", "Value Drivers / 价值驱动",
+            _status(drivers, gates, "value_driver", "value_drivers"),
+            "decision_payload.value_driver_ranking / value_drivers / value_core / decision_upstream_admission.thesis_admission",
+            drivers,
+            content_status="PARTIAL" if drivers and drivers.get("semantic_completeness") == "PARTIAL" else None,
+            gate_status=gates.get("value_driver") or upstream.get("value_driver_status"),
+        ),
         "forecast": _module("forecast", "Independent Forecast / 独立预测", _status(forecast, gates, "forecast_ready", "forecast"), "decision_payload.forecast / gates.forecast", forecast),
         "valuation": _module("valuation", "Valuation / 估值", _status(valuation, gates, "valuation_ready", "valuation"), "decision_payload.valuation / gates.valuation", valuation),
-        "mie": _module("mie", "Market Implied Expectation / 市场隐含预期", _status(mie, gates, "mie", "mie_status"), "decision_payload.p4f_market_implied_expectation / market_implied_expectation / mie", mie),
-        "expectation_gap": _module("expectation_gap", "Expectation Gap / 预期差", _status(gap, gates, "expectation_gap"), "decision_payload.expectation_gap / gates.expectation_gap", gap),
+        "mie": _module(
+            "mie", "Market Implied Expectation / 市场隐含预期",
+            _status(mie, gates, "mie", "mie_status"),
+            "decision_payload.p4f_market_implied_expectation / market_implied_expectation / mie",
+            mie,
+            gate_status=gates.get("mie") or gates.get("mie_status"),
+        ),
+        "expectation_gap": _module(
+            "expectation_gap", "Expectation Gap / 预期差", _status(gap, gates, "expectation_gap"),
+            "decision_payload.expectation_gap / expectation_gap_evaluation / gates.expectation_gap_status",
+            gap,
+            content_status="PARTIAL" if gap and not payload.get("expectation_gap") and not payload.get("expectation_gap_evaluation") else None,
+            gate_status=gates.get("expectation_gap_status"),
+        ),
         "risk": _module("risk", "Risk / 风险", _status(risk, gates, "risk"), "decision_payload.risk / gates.risk", risk),
-        "positioning": _module("positioning", "Market / Positioning / 市场与筹码", _status(positioning, gates, "positioning", "positioning_sizing"), "decision_payload.positioning / positioning_sizing", positioning),
+        "positioning": _module(
+            "positioning", "Market / Positioning / 市场与筹码",
+            _status(positioning, gates, "positioning", "positioning_sizing"),
+            "decision_payload.positioning / positioning_sizing",
+            positioning,
+            gate_status=gates.get("positioning_sizing_status") or gates.get("positioning_sizing"),
+        ),
         "decision": _module("decision", "Decision / 决策", _status(decision, gates, "decision_status"), "ai_decision", decision),
         "position": _module("position", "Position / 仓位", "PASS" if portfolio else "NOT_PROVIDED", "ai_decision.risk_portfolio_contract.portfolio", portfolio),
         "monitoring": _module("monitoring", "Monitoring / 监控", "PASS" if monitoring or lifecycle.get("monitoring_states") else "NOT_PROVIDED", "decision_payload.monitoring / lifecycle_refs.monitoring_states", monitoring),
