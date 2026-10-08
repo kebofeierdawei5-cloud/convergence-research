@@ -56,14 +56,6 @@ jobs:
           run-id: 37730232684
           path: /tmp/iios-xhc/artifact
 
-      - name: Download canonical Xinhecheng Publication evidence
-        uses: actions/download-artifact@v4
-        with:
-          artifact-ids: 11529920007
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: 37730232684
-          path: /tmp/iios-xhc/artifact
 
       - name: Render canonical Xinhecheng Publication through Investor Review v0.2
         run: |
