@@ -9,6 +9,9 @@ on:
       - "tests/independent_redteam_b2d_live_provider.py"
       - "docs/iios/B2_D_LIVE_PROVIDER_PREFLIGHT_20261008.md"
       - ".github/workflows/iios_b2d_live_provider.yml"
+      - ".github/workflows/iios_b2d3_real_provider.yml"
+      - "tests/test_b2d3_live_provider_workflow_contract.py"
+      - "docs/iios/B2_D3_REAL_PROVIDER_LIVE_20261008.md"
   push:
     branches:
       - "feature/b2d-live-provider-canonical-refresh-20261008"
