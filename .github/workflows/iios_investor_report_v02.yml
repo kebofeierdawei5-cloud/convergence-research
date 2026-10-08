@@ -213,11 +213,11 @@ jobs:
         if: ${{ always() }}
         run: |
           set -euo pipefail
-          test "${{ steps.xhc_publication_validation.outcome }}" = "success"
-          test "${{ steps.xhc_report_build.outcome }}" = "success"
-          test "${{ steps.xhc_report_validation.outcome }}" = "success"
-          test "${{ steps.xhc_qa_validation.outcome }}" = "success"
-          test "${{ steps.xhc_p0_resolution.outcome }}" = "success"
+          test "${{ steps.xhc_publication_validation.conclusion }}" = "success"
+          test "${{ steps.xhc_report_build.conclusion }}" = "success"
+          test "${{ steps.xhc_report_validation.conclusion }}" = "success"
+          test "${{ steps.xhc_qa_validation.conclusion }}" = "success"
+          test "${{ steps.xhc_p0_resolution.conclusion }}" = "success"
 
       - name: Upload real Xinhecheng v0.2 rerender artifacts
         if: ${{ always() }}
