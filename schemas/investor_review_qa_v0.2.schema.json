@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/investor-review-qa-0.2.schema.json",
+  "title": "IIOS Investor Review Report QA v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["qa_version","qa_id","report_id","report_hash","publication_id","publication_hash","qa_status","checks","issues","policy_effect","qa_hash"],
+  "properties": {
+    "qa_version": {"const": "IIOS-INVESTOR-REVIEW-QA-0.2"},
+    "qa_id": {"type": "string", "minLength": 1},
+    "report_id": {"type": "string", "minLength": 1},
+    "report_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "publication_id": {"type": "string", "minLength": 1},
+    "publication_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "qa_status": {"enum": ["PASS","FAIL"]},
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["publication_integrity","publication_binding","machine_surface_integrity","human_surface_integrity","deterministic_render_replay","required_sections","semantic_matrix_complete","explicit_absence_handling","decision_fidelity","human_boundary","non_authority"],
+      "properties": {
+        "publication_integrity": {"enum": ["PASS","FAIL"]},
+        "publication_binding": {"enum": ["PASS","FAIL"]},
+        "machine_surface_integrity": {"enum": ["PASS","FAIL"]},
+        "human_surface_integrity": {"enum": ["PASS","FAIL"]},
+        "deterministic_render_replay": {"enum": ["PASS","FAIL"]},
+        "required_sections": {"enum": ["PASS","FAIL"]},
+        "semantic_matrix_complete": {"enum": ["PASS","FAIL"]},
+        "explicit_absence_handling": {"enum": ["PASS","FAIL"]},
+        "decision_fidelity": {"enum": ["PASS","FAIL"]},
+        "human_boundary": {"enum": ["PASS","FAIL"]},
+        "non_authority": {"enum": ["PASS","FAIL"]}
+      }
+    },
+    "issues": {"type": "array", "items": {"type": "string"}},
+    "policy_effect": {"const": "REPORT_ONLY_PROJECTION"},
+    "qa_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
