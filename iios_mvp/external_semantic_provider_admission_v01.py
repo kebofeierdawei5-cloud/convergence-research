@@ -215,32 +215,15 @@ def admit_external_signed_semantic_artifact(
         producer_type=str(attestation["producer_type"]),
         policy_version=str(attestation["policy_version"]),
     )
-    admission_receipt = {
-        "artifact_id": f"{run_id}:{request_id}:external",
-        "artifact_type": context.artifact_type,
-        "case_id": context.case_id,
-        "market": context.market,
-        "symbol": context.symbol,
-        "company": context.company,
-        "cutoff_date": context.cutoff_date,
-        "producer_type": context.producer_type,
-        "producer_id": context.producer_id,
-        "producer_version": context.producer_version,
-        "policy_version": context.policy_version,
-        "input_refs": list(input_refs),
-        "input_hashes": list(input_hashes),
-        "output": dict(artifact.get("output", {})),
-        "artifact_hash": artifact["artifact_hash"],
-    }
     from iios_mvp.semantic_producer_admission_v01 import build_producer_receipt
     local_receipt = build_producer_receipt(
         receipt_id=f"{run_id}:{request_id}:local-receipt",
-        artifact={**dict(artifact), "artifact_id": admission_receipt["artifact_id"]},
+        artifact=artifact,
         stage_id=context.artifact_type,
         created_at=created_at,
     )
     semantic_admission = admit_semantic_artifact(
-        {**dict(artifact), "artifact_id": admission_receipt["artifact_id"]},
+        artifact,
         local_receipt,
         context=context,
         registry=producer_registry,
