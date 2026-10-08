@@ -1,0 +1,13 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://iios.local/schemas/provider-runtime-0.1.schema.json",
+  "title":"IIOS Provider-Neutral Runtime Policy v0.1",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["protocol","auth_mode","deployment_mode"],
+  "properties":{
+    "protocol":{"const":"OPENAI_RESPONSES"},
+    "auth_mode":{"enum":["BEARER","NONE"]},
+    "deployment_mode":{"enum":["EXTERNAL","SELF_HOSTED"]}
+  }
+}

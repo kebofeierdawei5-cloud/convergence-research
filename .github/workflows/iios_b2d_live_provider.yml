@@ -12,6 +12,7 @@ on:
   push:
     branches:
       - "feature/b2d-live-provider-canonical-refresh-20261008"
+      - "feature/b2d2-provider-neutral-runtime-20261008"
   workflow_dispatch:
 
 permissions:
@@ -34,12 +35,17 @@ jobs:
         run: python -m pytest -q tests/independent_redteam_b2d_live_provider.py
       - name: Run B2-D1 independent verifier tests
         run: python -m pytest -q tests/test_b2d1_independent_live_evidence.py
+      - name: Run B2-D2 provider runtime tests
+        run: python -m pytest -q tests/test_b2d2_provider_runtime.py
+      - name: Run B2-D2 independent red-team
+        run: python -m pytest -q tests/independent_redteam_b2d2_provider_runtime.py
       - name: Compile
         run: python -m compileall -q iios_mvp/live_provider_preflight_v01.py iios_mvp/live_provider_invocation_v01.py iios_mvp/live_provider_replay_v01.py iios_mvp/live_provider_evidence_v01.py iios_mvp/live_provider_independent_verify_v01.py
       - name: Validate schemas
         run: |
           python -m json.tool schemas/live_provider_replay_v0.2.schema.json >/dev/null
           python -m json.tool schemas/live_provider_evidence_v0.1.schema.json >/dev/null
+          python -m json.tool schemas/provider_runtime_v0.1.schema.json >/dev/null
       - name: Diff check
         run: git diff --check
 
@@ -55,6 +61,8 @@ jobs:
       IIOS_LLM_PROVIDER_ID: ${{ secrets.IIOS_LLM_PROVIDER_ID }}
       IIOS_LLM_PROVIDER_VERSION: ${{ secrets.IIOS_LLM_PROVIDER_VERSION }}
       IIOS_LLM_PROVIDER_PROTOCOL: ${{ secrets.IIOS_LLM_PROVIDER_PROTOCOL }}
+      IIOS_LLM_PROVIDER_AUTH_MODE: ${{ vars.IIOS_LLM_PROVIDER_AUTH_MODE || 'BEARER' }}
+      IIOS_LLM_PROVIDER_DEPLOYMENT_MODE: ${{ vars.IIOS_LLM_PROVIDER_DEPLOYMENT_MODE || 'EXTERNAL' }}
       IIOS_LLM_PROVIDER_TIMEOUT_SECONDS: ${{ secrets.IIOS_LLM_PROVIDER_TIMEOUT_SECONDS }}
       IIOS_B2D_LIVE_RUN_ID: b2d-live-smoke-20261008
       IIOS_B2D_LIVE_CASE_ID: B2D-LIVE-SMOKE-20261008
