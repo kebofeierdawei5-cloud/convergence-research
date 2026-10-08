@@ -7,6 +7,7 @@ PREFLIGHT = ROOT / "iios_mvp/live_provider_preflight_v01.py"
 ADAPTER = ROOT / "iios_mvp/live_provider_invocation_v01.py"
 REPLAY = ROOT / "iios_mvp/live_provider_replay_v01.py"
 EVIDENCE = ROOT / "iios_mvp/live_provider_evidence_v01.py"
+RUNTIME = ROOT / "iios_mvp/provider_runtime_v01.py"
 REPLAY_SCHEMA = ROOT / "schemas/live_provider_replay_v0.2.schema.json"
 EVIDENCE_SCHEMA = ROOT / "schemas/live_provider_evidence_v0.1.schema.json"
 
@@ -21,8 +22,11 @@ def test_rt_b2d_01_secrets_are_explicit_and_fail_closed():
     assert "configuration missing" in s
 
 
-def test_rt_b2d_02_https_only():
-    assert 'parsed.scheme != "https"' in source(PREFLIGHT)
+def test_rt_b2d_02_endpoint_security_is_delegated_to_runtime_boundary():
+    s = source(PREFLIGHT)
+    runtime = source(RUNTIME)
+    assert "validate_provider_runtime_policy" in s
+    assert "must use HTTPS unless SELF_HOSTED on loopback" in runtime
 
 
 def test_rt_b2d_03_timeout_is_bounded():
@@ -35,9 +39,12 @@ def test_rt_b2d_04_real_protocol_is_explicit():
     assert '"store": False' in s
 
 
-def test_rt_b2d_05_authorization_is_bearer_only():
+def test_rt_b2d_05_authorization_is_runtime_policy_controlled():
     s = source(ADAPTER)
-    assert 'Authorization": f"Bearer {config.api_key}"' in s
+    runtime = source(RUNTIME)
+    assert "build_provider_auth_headers" in s
+    assert 'Authorization": f"Bearer {key}"' in runtime
+    assert 'if mode == "NONE"' in runtime
 
 
 def test_rt_b2d_06_request_response_hashes_are_retained():
