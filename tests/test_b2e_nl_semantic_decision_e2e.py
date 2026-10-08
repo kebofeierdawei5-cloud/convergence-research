@@ -220,6 +220,39 @@ def test_b2e_semantic_projection_changes_canonical_decision():
     assert broken_result.binding_receipt["action"] == "NO-BUY"
     assert intact_result.binding_receipt["action"] != broken_result.binding_receipt["action"]
 
+
+def test_b2e_forecast_valuation_admission_is_canonical_and_tamper_evident():
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    tampered = dict(case)
+    tampered["return_gate"] = dict(case["return_gate"])
+    tampered["return_gate"]["scenarios"] = dict(case["return_gate"]["scenarios"])
+    tampered["return_gate"]["scenarios"]["base"] = dict(case["return_gate"]["scenarios"]["base"])
+    tampered["return_gate"]["scenarios"]["base"]["terminal_value_per_share"] = "999.99"
+
+    with pytest.raises(B2EE2EError, match="canonical Forecast/Valuation lineage admission failed"):
+        run_b2e_conformance(
+            raw_request=RAW,
+            request_id="b2e-f002-tamper",
+            run_id="b2e-f002-tamper",
+            created_at=CREATED,
+            request_interpreter=FixtureInterpreter(),
+            request_registry=_registries()[0],
+            semantic_producer=FixtureSemanticProducer(),
+            producer_registry=_registries()[1],
+            company="宁德时代",
+            evidence_refs=("E011", "E008"),
+            evidence_hashes=(E1, E2),
+            artifact_type="THESIS_ASSESSMENT",
+            semantic_prompt="Assess thesis.",
+            decision_relevance="Semantic thesis proposal only.",
+            case=tampered,
+            current_price_resolver=price_registry,
+            independent_forecast_resolver=forecast_registry,
+            upstream_authority_resolver=upstream_registry,
+            valuation_output_resolver=valuation_resolver,
+        )
+
+
 def test_b2e_semantic_lineage_is_required():
     case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
     with pytest.raises(ValueError, match="semantic input lineage"):
