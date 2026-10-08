@@ -128,9 +128,14 @@ jobs:
           pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
           test -f "$pub"
           test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
+          set +e
           python -m iios_mvp.cli investor-report-v02 "$pub" \
             --generated-at "2026-10-08T05:00:00+00:00" \
-            --out /tmp/iios-xhc/rendered
+            --out /tmp/iios-xhc/rendered 2>&1 | tee /tmp/iios-xhc/cli.txt
+          cli_rc=${PIPESTATUS[0]}
+          set -e
+          echo "cli_rc=${cli_rc}" | tee -a /tmp/iios-xhc/cli.txt
+          test "${cli_rc}" = "0"
           python - <<'PY'
           import json
           from pathlib import Path
@@ -156,7 +161,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: iios-investor-review-v02-xinhecheng
-          path: /tmp/iios-xhc/rendered/
+          path: /tmp/iios-xhc/
           if-no-files-found: warn
 
       - run: python -m json.tool schemas/investor_review_report_v0.2.schema.json >/dev/null
