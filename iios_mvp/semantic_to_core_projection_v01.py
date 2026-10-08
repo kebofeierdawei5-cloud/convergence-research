@@ -155,10 +155,6 @@ def project_thesis_semantic_to_core(
     if created_at.tzinfo is None or created_at.utcoffset() is None:
         raise SemanticCoreProjectionError("semantic artifact created_at must be timezone-aware")
     cutoff = date.fromisoformat(str(case["cutoff_date"]))
-    if created_at.date() > cutoff:
-        raise SemanticCoreProjectionError(
-            "semantic artifact created_at is after case cutoff_date"
-        )
 
     input_refs = artifact.get("input_refs")
     if not isinstance(input_refs, list) or not input_refs:
