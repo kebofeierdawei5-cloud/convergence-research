@@ -19,7 +19,7 @@ No stage here authorizes semantic admission, forecast, valuation, Decision, Huma
 
 ## Real provider protocol
 
-The first concrete provider protocol is `OPENAI_RESPONSES`. OpenAI's current API documentation uses the Responses API for new integrations; the request is model + input and this batch keeps `store=false` so the smoke call is not a persistent conversation-side state transition. citeturn626962search0
+The first concrete provider protocol is `OPENAI_RESPONSES`. OpenAI's current API documentation uses the Responses API for new integrations; the request is model + input and this batch keeps `store=false` so the smoke call does not persist provider-side conversation state.
 
 IIOS still treats the provider response as **untrusted external output**. The runtime attestation is an IIOS-side Ed25519 signature over the captured evidence. It is not a claim that the provider itself cryptographically signed the response.
 
