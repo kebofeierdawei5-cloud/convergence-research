@@ -128,6 +128,46 @@ jobs:
           pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
           test -f "$pub"
           test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
+          python - <<'PY'
+          import json
+          from iios_mvp.machine_publication import validate_machine_publication
+          from iios_mvp.investor_review_report_v02 import (
+              build_investor_review_report_v02,
+              validate_investor_review_report_v02,
+              qa_investor_review_v02,
+              validate_investor_review_qa_v02,
+          )
+          pub=json.load(open("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json",encoding="utf-8"))
+          try:
+              validate_machine_publication(pub)
+              print("STAGE machine_publication=PASS")
+          except Exception as exc:
+              print("STAGE machine_publication=FAIL", repr(exc))
+          try:
+              report=build_investor_review_report_v02(pub, generated_at="2026-10-08T05:00:00+00:00")
+              print("STAGE report_build=PASS")
+          except Exception as exc:
+              print("STAGE report_build=FAIL", repr(exc))
+              report=None
+          if report is not None:
+              try:
+                  validate_investor_review_report_v02(report)
+                  print("STAGE report_schema=PASS")
+              except Exception as exc:
+                  print("STAGE report_schema=FAIL", repr(exc))
+              try:
+                  qa=qa_investor_review_v02(publication=pub, report=report)
+                  print("STAGE qa_build=PASS", qa.get("qa_status"))
+              except Exception as exc:
+                  print("STAGE qa_build=FAIL", repr(exc))
+                  qa=None
+              if qa is not None:
+                  try:
+                      validate_investor_review_qa_v02(qa)
+                      print("STAGE qa_schema=PASS")
+                  except Exception as exc:
+                      print("STAGE qa_schema=FAIL", repr(exc))
+          PY
           set +e
           python -m iios_mvp.cli investor-report-v02 "$pub" \
             --generated-at "2026-10-08T05:00:00+00:00" \
