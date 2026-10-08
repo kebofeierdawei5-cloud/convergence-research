@@ -63,3 +63,11 @@ The missing LLM semantic-orchestration capability remains a separate B2 boundary
 Passing tests does not make v0.2 canonical. Promotion requires dedicated CI, independent red-team review, exact-head evidence, explicit governance acceptance and a Project State Index update.
 
 Until promotion, the existing canonical v0.1 report remains authoritative.
+
+## Human Auditability Contract
+
+The normative contract is docs/iios/INVESTOR_REVIEW_HUMAN_AUDITABILITY_CONTRACT_v0.2.md and its machine schema is schemas/human_auditability_v0.2.schema.json.
+
+The v0.2 surface MUST explicitly resolve five auditability boundaries: Required Return numeric auditability, Scenario Probability / Expected Return reconstruction, Actionable Entry vs Return/Risk Threshold, Portfolio can_add vs Decision capital authorization, and MIE / Expectation Gap absence versus identifiability.
+
+These are report-layer auditability states only. They must not mutate canonical Decision semantics.
