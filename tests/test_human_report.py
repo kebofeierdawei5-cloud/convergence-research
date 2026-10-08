@@ -214,6 +214,33 @@ def test_report_qa_fails_closed_on_machine_json_field_dump(tmp_path):
     assert any("machine-readable JSON-like field dump" in issue for issue in qa["issues"])
 
 
+def test_report_projects_canonical_gate_forecast_valuation_and_thresholds(tmp_path):
+    publication, _ = make_publication(tmp_path)
+    report = build_human_report(
+        publication=publication, generated_at="2026-10-06T02:00:00+00:00"
+    )
+    markdown = report["markdown"]
+    assert "- Forecast readiness: PASS" in markdown
+    assert "- Valuation readiness: PASS" in markdown
+    assert "- New capital permission at decision time: NO" in markdown
+    assert "- Positioning/sizing permission: NO_SIZING_PERMISSION" in markdown
+    assert "- Evidence chain: 0 canonical observations" not in markdown
+    assert "- Primary model: FORWARD_PE" in markdown
+    assert "- Base value per share: 32.20 CNY" in markdown
+    assert "- Bear value per share: 19.95 CNY" in markdown
+    assert "- Bull value per share: 45.50 CNY" in markdown
+
+
+def test_report_distinguishes_actionable_target_from_return_risk_threshold(tmp_path):
+    publication, _ = make_publication(tmp_path)
+    report = build_human_report(
+        publication=publication, generated_at="2026-10-06T02:00:00+00:00"
+    )
+    markdown = report["markdown"]
+    assert "- Actionable target entry price: UNAVAILABLE" in markdown
+    assert "- Return/risk threshold price: UNAVAILABLE" in markdown
+
+
 def test_report_qa_fails_closed_on_publication_binding_mismatch(tmp_path):
     publication, _ = make_publication(tmp_path)
     report = build_human_report(
