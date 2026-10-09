@@ -99,13 +99,15 @@ def test_replay_reconstructs_persisted_state(tmp_path):
     snapshot = {**core, 'snapshot_hash': snapshot_hash}
     write_snapshot(tmp_path, snapshot)
     series = create_or_load_series(tmp_path, 'CN-A', '300750', 'CATL', '2026-10-04T00:00:00Z')
+    admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot['decision'])
+    prepare_authorized_test_run(root=str(tmp_path), run_id='run-1', snapshot=snapshot, decision_admission=admission)
     write_decision_revision(
         tmp_path,
         series['decision_series_id'],
         1,
         snapshot,
         'run-1',
-        decision_admission=build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot['decision']),
+        decision_admission=admission,
     )
     revision = json.loads((tmp_path / 'CN-A-300750-r001.decision.json').read_text())
 
