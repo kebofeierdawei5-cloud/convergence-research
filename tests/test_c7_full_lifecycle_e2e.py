@@ -16,6 +16,7 @@ from iios_mvp.machine_publication import (
     validate_machine_publication,
 )
 from tests.decision_admission_fixture import build_fixture_admission_receipt
+from tests.canonical_run_authorization_fixture import authorize_test_run
 from iios_mvp.store import (
     apply_monitoring_event,
     approve_revision,
@@ -83,6 +84,7 @@ def seed_c7(tmp_path):
     )
     write_snapshot(tmp_path, s1)
     admission1 = build_fixture_admission_receipt(snapshot=s1, canonical_decision=s1["decision"])
+    authorize_test_run(tmp_path, snapshot=s1, decision_admission=admission1, run_id="run-c7-001")
     r1_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
@@ -201,6 +203,7 @@ def test_c7_full_operating_loop(tmp_path):
     )
     write_snapshot(tmp_path, s2)
     admission2 = build_fixture_admission_receipt(snapshot=s2, canonical_decision=s2["decision"])
+    authorize_test_run(tmp_path, snapshot=s2, decision_admission=admission2, run_id="run-c7-002")
     r2_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
@@ -283,6 +286,7 @@ def test_c7_changed_decision_requires_new_run_and_revision(tmp_path):
     )
     write_snapshot(tmp_path, s2)
     admission2 = build_fixture_admission_receipt(snapshot=s2, canonical_decision=s2["decision"])
+    authorize_test_run(tmp_path, snapshot=s2, decision_admission=admission2, run_id="run-c7-003")
     r2_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
