@@ -60,9 +60,10 @@ jobs:
       - name: Verify legacy Xinhecheng Publication is blocked without a current canonical run receipt
         run: |
           set -euo pipefail
-          pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
-          test -f "$pub"
-          test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
+          pub="$(find /tmp/iios-xhc/artifact -type f -name '7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json' -print -quit)"
+          test -n "$pub" || { find /tmp/iios-xhc/artifact -maxdepth 5 -type f -print; exit 1; }
+          actual_sha="$(sha256sum "$pub" | awk '{print $1}')"
+          test "$actual_sha" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
           rm -rf /tmp/iios-xhc/formal-writer
           mkdir -p /tmp/iios-xhc/formal-writer/out
           python - <<'PY'
