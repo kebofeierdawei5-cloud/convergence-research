@@ -1,7 +1,20 @@
 from pathlib import Path
+import yaml
 
 ROOT = Path(__file__).parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "iios_b2d3_real_provider.yml"
+
+
+def test_b2d3_workflow_is_valid_yaml_and_manual_only():
+    text = WORKFLOW.read_text(encoding="utf-8")
+    workflow = yaml.load(text, Loader=yaml.BaseLoader)
+    assert workflow["name"] == "IIOS B2-D3 Real Provider Live Evidence"
+    assert list(workflow["on"].keys()) == ["workflow_dispatch"]
+    assert set(workflow["jobs"]) == {"preflight", "live_and_verify"}
+    for job_id, job in workflow["jobs"].items():
+        secret_values = [str(v) for v in job.get("env", {}).values() if "secrets." in str(v)]
+        if secret_values:
+            assert job.get("if") == "github.event_name == 'workflow_dispatch'", job_id
 
 
 def test_b2d3_is_manual_only_and_strict():

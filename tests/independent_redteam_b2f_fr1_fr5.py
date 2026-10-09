@@ -4,6 +4,7 @@ import ast
 import json
 import re
 from pathlib import Path
+import yaml
 
 ROOT = Path(__file__).parents[1]
 B2E_PATH = ROOT / "iios_mvp" / "b2e_nl_semantic_decision_e2e_v01.py"
@@ -123,6 +124,10 @@ def test_rt_fr4_decision_series_identity_is_derived_and_admission_bound():
 
 def test_rt_fr5_only_dispatch_is_authorized_to_touch_provider_runtime():
     source = _source(B2D3_WORKFLOW_PATH)
+    workflow = yaml.load(source, Loader=yaml.BaseLoader)
+    assert workflow["name"] == "IIOS B2-D3 Real Provider Live Evidence"
+    assert list(workflow["on"].keys()) == ["workflow_dispatch"]
+    assert set(workflow["jobs"]) == {"preflight", "live_and_verify"}
     trigger_block = source.split("permissions:", 1)[0]
     events = re.findall(r"(?m)^  ([A-Za-z_][A-Za-z0-9_-]*):\s*$", trigger_block)
     assert events == ["workflow_dispatch"], f"unexpected workflow triggers: {events}"
