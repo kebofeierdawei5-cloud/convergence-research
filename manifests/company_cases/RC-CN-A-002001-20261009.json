@@ -88,18 +88,6 @@
       "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
     },
     {
-      "source_id": "PRICE-SOHU-HISTORY-API",
-      "field_group": "market_price",
-      "source_ref": "SOHU:PUBLIC_HISTORICAL_PRICE_API",
-      "source_class": "PUBLIC_SECONDARY",
-      "url": "https://q.stock.sohu.com/app2/history.up?method=history&code=cn_002001&sd=2026-10-09&ed=2026-10-09&t=d&res=js",
-      "known_at": "",
-      "known_at_basis": "",
-      "published_at": "",
-      "observation_date": "2026-10-09",
-      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
-    },
-    {
       "source_id": "PRICE-EASTMONEY-QUOTE",
       "field_group": "market_price",
       "source_ref": "EASTMONEY:PUBLIC_MARKET_QUOTE",
