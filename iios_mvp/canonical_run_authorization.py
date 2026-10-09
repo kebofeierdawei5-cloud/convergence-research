@@ -77,6 +77,12 @@ def _stage_record(receipt: Any) -> dict[str, Any]:
         if not isinstance(result[name], (list, tuple)):
             raise ValueError(f"stage receipt {name} must be a list")
         result[name] = list(result[name])
+    if len(result["input_refs"]) != len(result["input_hashes"]):
+        raise ValueError("stage receipt input refs/hashes do not align")
+    if len(result["output_refs"]) != len(result["output_hashes"]):
+        raise ValueError("stage receipt output refs/hashes do not align")
+    if any(not str(ref).strip() for ref in result["input_refs"] + result["output_refs"]):
+        raise ValueError("stage receipt refs must be non-empty strings")
     for h in result["input_hashes"] + result["output_hashes"]:
         if not is_sha256(h):
             raise ValueError("stage receipt contains an invalid SHA-256")
@@ -229,6 +235,25 @@ def _verify_record(record: Mapping[str, Any]) -> None:
         raise ValueError("canonical run authorization stage records mismatch")
     if canonical_hash(stage_records) != record["stage_chain_hash"]:
         raise ValueError("canonical run authorization stage-chain hash mismatch")
+    if any(x["cutoff_date"] != record["cutoff_date"] for x in stage_records):
+        raise ValueError("canonical run authorization stage cutoff mismatch")
+    for previous, current in zip(stage_records, stage_records[1:]):
+        if not set(previous["output_hashes"]).intersection(current["input_hashes"]):
+            raise ValueError(
+                f"canonical run authorization stage lineage broken between {previous['stage_id']} and {current['stage_id']}"
+            )
+    by_stage = {x["stage_id"]: x for x in stage_records}
+    expected_stage_hashes = {
+        "evidence_manifest_hashes": by_stage["EVIDENCE_ADMITTED"]["output_hashes"],
+        "semantic_artifact_hashes": by_stage["SEMANTIC_ADMITTED"]["output_hashes"],
+        "forecast_admission_hashes": by_stage["FORECAST_ADMITTED"]["output_hashes"],
+        "valuation_admission_hashes": by_stage["VALUATION_ADMITTED"]["output_hashes"],
+    }
+    for field, expected_values in expected_stage_hashes.items():
+        if record[field] != expected_values:
+            raise ValueError(f"canonical run authorization {field} do not match stage outputs")
+    if record["decision_admission_hash"] not in by_stage["DECISION_ADMITTED"]["output_hashes"]:
+        raise ValueError("canonical run authorization Decision Admission hash is not bound to final stage")
     core = {key: record[key] for key in required if key != "authorization_hash"}
     if canonical_hash(core) != record["authorization_hash"]:
         raise ValueError("canonical run authorization hash mismatch")
