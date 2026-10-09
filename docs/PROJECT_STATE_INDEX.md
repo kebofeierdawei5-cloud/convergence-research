@@ -104,27 +104,34 @@ The primary Investment Core MVP path is **Route A — free-first single-company 
 
 **Latest real capture: Run #8 succeeded as `PARTIAL_CAPTURE_VERIFIED_NOT_ADMITTED`.** Eight of nine declared source objects were retained and independently hash-verified; the public Eastmoney K-line endpoint failed on this run. The artifact and failure row were retained instead of discarding the other eight files. The existing B2 preflight executed successfully and correctly returned `BLOCKED_NOT_ADMITTED`.
 
-Next, inspect the captured source bytes and use the existing B2 Evidence/PIT contract to create and review **fact-level** Evidence Records. Route A currently proves file acquisition and byte integrity, not fact extraction: all eight source-artifact records remain `UNKNOWN`, so `admitted_field_groups=[]` and all seven groups remain uncovered for permission-bearing company analysis. No research conclusion may be drawn from file-level coverage alone.
+**Latest Route A advance — PR #259, page-located fact extraction review.** A reproducible extractor now re-verifies raw source SHA-256/size, checks selected text terms against exact PDF page locators, and emitted 11 fact-level candidates from the H1 summary, H1 full report and 2026-09 buyback progress PDF. The review record is `docs/iios/ROUTE_A_FACT_EXTRACTION_REVIEW_20261009.md`; local machine-readable output is `ROUTE_A_FACT_EXTRACTION_REVIEW_20261009.json`.
+
+This advances beyond file-only capture, but does **not** change admission status: every candidate remains `known_at=null`, `provenance_class=UNKNOWN`, `status=UNKNOWN`, `admission_status=NOT_ADMITTED`; `admitted_field_groups=[]`. The report is useful for review and reproducible locator checking only. The extractor's test CI validates contracts, not official source-origin or economic truth.
+
+Next action is **source-level adjudication and B2 Evidence/PIT admission**, not more LLM configuration:
+1. Independently verify each cited document's issuer/exchange identity and actual first-public timestamp; only then decide whether the proposed `known_at` can be admitted.
+2. Resolve the declared `PUBLIC_ACCESS_REUSE_UNKNOWN` license/reuse state.
+3. Convert individually reviewed facts to B2 Evidence Records and run the unchanged B2 validator; UNKNOWN must continue to fail closed.
+4. Capture a date-specific official/free market-price observation with defensible PIT/source vintage. Run #8's Eastmoney K-line row failed and has no bytes/hash; Sohu/Eastmoney quote/history page bytes are not admitted closing-price facts.
+5. Add any still-missing business-reality/capital-structure/trust facts. Only adequate admitted group coverage permits company-level valuation and decision.
 
 ```text
-Public web search (no key; candidate URLs only)
+Public web discovery (no key; candidate URLs only)
   ↓
-Route A capture: Run #8 (8 raw objects / 1 fetch failed)
+Route A raw capture + independent byte verification
   ↓
-independent raw-byte + manifest hash verification
+page-located fact extraction (11 candidates; text match PASS)
   ↓
-source-origin / document identity / actual publication time / reuse review
+source-origin / first-public-time / license adjudication (OPEN)
   ↓
-fact-level extraction with page/table/row locator + direct source hash
+B2 Evidence/PIT admission (currently BLOCKED_NOT_ADMITTED)
   ↓
-existing B2 Evidence/PIT validation; UNKNOWN fails closed
+market-price and remaining field-group gaps
   ↓
-supplement missing business-reality evidence and resolve capital/price candidates
-  ↓
-only after adequate admitted fact coverage: company analysis / valuation / expectation gap / decision
+only after adequate admitted facts: company analysis / valuation / expectation gap / decision
 ```
 
-Run #8 details are recorded in `docs/iios/ROUTE_A_CAPTURE_RC_CN_A_002001_20261009_RUN8.md`. Raw receipt status is `PARTIAL_CAPTURE_NOT_ADMITTED`; independent verifier status is `INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION`; B2 preflight remains `BLOCKED_NOT_ADMITTED`. Current IR and quote/history pages remain `UNKNOWN_NO_KNOWN_AT`; the exchange PDFs' declared dates are candidates requiring source-level validation. No source is promoted from a declared date or successful download alone.
+Run #8 details remain in `docs/iios/ROUTE_A_CAPTURE_RC_CN_A_002001_20261009_RUN8.md`. The original Run #8 receipt, capture artifact and failed-source row remain unchanged. No source is promoted from a declared date, public-search snippet, PDF text match or successful download alone.
 
 B2-D3 real LLM provider invocation → B2-D1 independent verification → production-backed B2-E remains a separately tracked optional integration path. It does not block Route A acquisition, manual original intake, fact-level review, or free-first MVP development.
 
@@ -269,7 +276,7 @@ The active manifest no longer includes the previously flaky duplicate Sohu `app2
 
 The preflight generated artifact-level source records from the eight successfully captured files. Those records are explicitly `provenance_class=UNKNOWN` and `status=UNKNOWN`; therefore the existing B2 validator rejects them for PIT/field-group coverage. This is expected and correct: a file containing a report or a market page has not yet been mapped into admitted facts.
 
-Next action: review report publication identity and source vintage, extract individually scoped facts with page/table/row locators, bind each fact to an admitted evidence record and exact raw object, and run the existing B2 validator. Add a separate official/free source for operating-model/business-reality where needed. Do not use report data merely because the captured PDF hash matches.
+Next action after PR #259 fact extraction: independently adjudicate the three cited PDFs’ source identity, first-public timestamp and license/reuse; then construct B2 Evidence Records only for facts whose source/PIT basis passes. The 11 candidates are locator-verified but remain UNKNOWN/NOT_ADMITTED. Resolve the market-price gap separately; the failed K-line source remains failed and no close is inferred from captured quote pages.
 
 ## B2-D3 — Real Provider Runtime + Live Evidence Gate — 2026-10-08
 
