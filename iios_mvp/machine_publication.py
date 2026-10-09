@@ -14,6 +14,14 @@ from .decision_lifecycle_production import (
 from .engine import canonical_json, sha256_obj
 from .monitoring_state import validate_monitoring_state
 from .store import read_snapshot, snapshot_path
+from .canonical_run_authority_v01 import (
+    CanonicalRunAuthorizationError,
+    authorize_publication_write,
+    advance_persisted_run,
+    run_state_path,
+    validate_run_state_record,
+)
+from .canonical_research_orchestrator import Stage
 from .trigger_production import validate_trigger_contract
 from .validation_replay import validate_validation_record
 
@@ -203,6 +211,7 @@ def build_machine_publication(
 ) -> dict[str, Any]:
     published_at = _timestamp(published_at, "published_at")
     revision = _load_revision(root, decision_id)
+    canonical_run_ref = authorize_publication_write(root, revision=revision)
     snapshot = _load_bound_snapshot(root, revision)
     approval = _load_approval(root, revision)
     current_projection = _load_current_projection(root, revision)
@@ -257,6 +266,7 @@ def build_machine_publication(
     core = {
         "publication_version": PUBLICATION_VERSION,
         "published_at": published_at,
+        "canonical_run_ref": canonical_run_ref,
         "decision_ref": {
             "decision_id": revision["decision_id"],
             "decision_series_id": revision["decision_series_id"],
@@ -328,6 +338,7 @@ def validate_machine_publication(record: Any) -> None:
         "publication_version",
         "published_at",
         "decision_ref",
+        "canonical_run_ref",
         "case",
         "ai_decision",
         "decision_payload",
@@ -344,6 +355,21 @@ def validate_machine_publication(record: Any) -> None:
         raise ValueError("machine_publication version mismatch")
     _timestamp(record["published_at"], "published_at")
 
+    run_ref = record["canonical_run_ref"]
+    if not isinstance(run_ref, Mapping):
+        raise ValueError("machine_publication canonical_run_ref invalid")
+    run_ref_required = {
+        "schema_version", "run_id", "case_id", "market", "symbol", "cutoff_date",
+        "stage", "stage_receipt_hash", "state_hash_at_stage", "authorized_refs",
+        "authorized_hashes", "authorization_hash",
+    }
+    if set(run_ref) != run_ref_required:
+        raise ValueError("machine_publication canonical_run_ref fields are invalid")
+    if run_ref.get("schema_version") != "IIOS-RUN-STAGE-AUTH-0.1" or run_ref.get("stage") != "HUMAN_APPROVAL_PENDING":
+        raise ValueError("machine_publication canonical_run_ref version/stage invalid")
+    auth_core = {k: run_ref[k] for k in run_ref_required if k != "authorization_hash"}
+    if run_ref.get("authorization_hash") != sha256_obj(auth_core):
+        raise ValueError("machine_publication canonical_run_ref hash mismatch")
     decision_ref = record["decision_ref"]
     if not isinstance(decision_ref, Mapping):
         raise ValueError("machine_publication decision_ref invalid")
@@ -457,12 +483,32 @@ def write_machine_publication(
         validate_machine_publication(existing)
         if canonical_json(existing) != canonical_json(record):
             raise ValueError("machine publication hash collision or attempted overwrite")
-        return path
-    path.write_text(
-        json.dumps(record, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-        newline="\n",
-    )
+    else:
+        path.write_text(
+            json.dumps(record, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+
+    # Commit the PUBLISHED stage only after the immutable Publication bytes exist.
+    run_path = run_state_path(root, record["decision_ref"]["run_id"])
+    run_state = validate_run_state_record(_load_json(run_path))
+    current_stage = run_state["envelope"]["stage_state"]
+    if current_stage == Stage.HUMAN_APPROVAL_PENDING.value:
+        advance_persisted_run(
+            root, record["decision_ref"]["run_id"], Stage.PUBLISHED,
+            input_refs=(record["decision_ref"]["decision_id"],),
+            input_hashes=(record["decision_ref"]["revision_hash"],),
+            output_refs=(record["publication_id"],),
+            output_hashes=(record["publication_hash"],),
+            producer_type="CODE",
+            producer_version=PUBLICATION_VERSION,
+        )
+    else:
+        receipts = run_state["envelope"]["stage_receipts"]
+        published = [x for x in receipts if x["stage_id"] == Stage.PUBLISHED.value]
+        if not published or record["publication_hash"] not in published[-1]["output_hashes"]:
+            raise CanonicalRunAuthorizationError("Publication is not bound to the run's PUBLISHED receipt")
     return path
 
 
