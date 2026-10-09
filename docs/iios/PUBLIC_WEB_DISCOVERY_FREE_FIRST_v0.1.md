@@ -6,7 +6,7 @@ Status: **IMPLEMENTATION CANDIDATE until exact-head CI passes; discovery records
 
 The company-level Investment Core MVP must not require a commercial LLM endpoint/API key or a paid web-search API in order to find public sources. B2-D external LLM live invocation is a separate optional integration track. Source discovery and source evidence are different capabilities.
 
-This adapter uses the open-source `ddgs` metasearch library to query publicly accessible web-search engines without a configured LLM provider endpoint or provider API key. It is best-effort only: public search engines can rate-limit/block automated traffic or change their behavior, and results are not guaranteed or authoritative. If it fails, the user can use ChatGPT/web-browser search or provide official URLs; the source capture/B2 path does not wait for an LLM provider.
+This adapter first uses the open-source `ddgs` metasearch library and, when it errors or returns no results, falls back to the public Bing HTML search page. Neither path needs a configured LLM provider endpoint, provider API key, or paid search API. Both are best-effort: public search engines can rate-limit/block automated traffic or change their behavior. If both paths are unavailable, the receipt keeps the combined backend failure code. ChatGPT/browser public search or an operator-supplied official URL can still feed Route A; source capture/B2 does not wait for an LLM provider.
 
 ## Run locally
 

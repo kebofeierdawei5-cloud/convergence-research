@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 import hashlib
 import ipaddress
 import json
 import re
 from pathlib import Path
 from typing import Any, Callable, Mapping
-from urllib.parse import urlsplit, urlunsplit
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode, urlsplit, urlunsplit
+from urllib.request import Request, urlopen
 
 SCHEMA_VERSION = "IIOS-PUBLIC-WEB-DISCOVERY-RECORD-0.1"
 TOOL_VERSION = "IIOS-PUBLIC-WEB-DISCOVERY-0.1"
@@ -69,6 +72,105 @@ def _ddgs_search(query: str, *, region: str, max_results: int, backend: str) -> 
     ))
 
 
+
+class _BingResultsParser(HTMLParser):
+    """Best-effort parser for public Bing HTML result cards."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.results = []
+        self.current = None
+        self.in_title = False
+        self.in_anchor = False
+        self.in_snippet = False
+
+    def handle_starttag(self, tag, attrs):
+        attr = dict(attrs)
+        classes = set((attr.get("class") or "").split())
+        if tag == "li" and "b_algo" in classes:
+            self.current = {"title": [], "snippet": [], "href": ""}
+            self.in_title = self.in_anchor = self.in_snippet = False
+            return
+        if self.current is None:
+            return
+        if tag == "h2":
+            self.in_title = True
+        elif tag == "a" and self.in_title and not self.current["href"]:
+            self.current["href"] = attr.get("href") or ""
+            self.in_anchor = True
+        elif tag == "p":
+            self.in_snippet = True
+
+    def handle_data(self, data):
+        if self.current is None:
+            return
+        if self.in_anchor:
+            self.current["title"].append(data)
+        if self.in_snippet:
+            self.current["snippet"].append(data)
+
+    def handle_endtag(self, tag):
+        if self.current is None:
+            return
+        if tag == "a":
+            self.in_anchor = False
+        elif tag == "h2":
+            self.in_title = self.in_anchor = False
+        elif tag == "p":
+            self.in_snippet = False
+        elif tag == "li":
+            title = " ".join("".join(self.current["title"]).split())
+            snippet = " ".join("".join(self.current["snippet"]).split())
+            href = str(self.current.get("href") or "")
+            if title and href:
+                self.results.append({"title": title, "href": href, "body": snippet})
+            self.current = None
+            self.in_title = self.in_anchor = self.in_snippet = False
+
+
+def _safe_error_detail(value):
+    text = " ".join(str(value or "").replace(chr(0), " ").split())
+    text = re.sub(r"(?i)(api[_-]?key|token|password|secret|authorization)=([^&\\s]+)", r"\\1=[REDACTED]", text)
+    return text[:240]
+
+
+def _bing_html_search(query: str, *, region: str, max_results: int, backend: str = "bing-html") -> list[dict[str, Any]]:
+    """No-key fallback via Bing's public HTML page; upstream may rate-limit or change markup."""
+    params = urlencode({
+        "q": query,
+        "count": min(max_results, 25),
+        "setlang": "zh-hans" if region.endswith("-zh") else "en",
+        "cc": "CN" if region.startswith("cn-") else "US",
+    })
+    request = Request(
+        "https://www.bing.com/search?" + params,
+        headers={
+            "User-Agent": "Mozilla/5.0 (compatible; IIOS-Public-Research/0.2)",
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.7",
+        },
+    )
+    try:
+        with urlopen(request, timeout=8) as response:
+            status = int(getattr(response, "status", getattr(response, "code", 0)))
+            if status < 200 or status >= 300:
+                raise PublicWebDiscoveryError(f"BING_HTTP_STATUS_{status}")
+            html = response.read(2 * 1024 * 1024 + 1)
+    except PublicWebDiscoveryError:
+        raise
+    except HTTPError as exc:
+        raise PublicWebDiscoveryError(f"BING_HTTP_STATUS_{exc.code}") from exc
+    except (URLError, TimeoutError, OSError) as exc:
+        raise PublicWebDiscoveryError("BING_PUBLIC_HTML_FETCH_FAILED:" + _safe_error_detail(exc)) from exc
+    if len(html) > 2 * 1024 * 1024:
+        raise PublicWebDiscoveryError("BING_HTML_RESPONSE_TOO_LARGE")
+    parser = _BingResultsParser()
+    parser.feed(html.decode("utf-8", errors="replace"))
+    if not parser.results:
+        raise PublicWebDiscoveryError("BING_HTML_NO_USABLE_RESULTS")
+    return parser.results[:max_results]
+
+
 def _validate_inputs(query: str, region: str, max_results: int, backend: str) -> None:
     if not isinstance(query, str) or not query.strip() or len(query.strip()) > MAX_QUERY_CHARS:
         raise PublicWebDiscoveryError("QUERY_MUST_BE_1_TO_500_CHARACTERS")
@@ -92,19 +194,43 @@ def discover_public_web(
     """Discover public candidate URLs. Search results are leads, never admitted evidence."""
     _validate_inputs(query, region, max_results, backend)
     query = query.strip()
-    search_fn = search_fn or _ddgs_search
+    injected_search = search_fn is not None
+    primary_search = search_fn or _ddgs_search
+    fallback_search = bing_fn or _bing_html_search
     captured_at = captured_at or datetime.now(timezone.utc).isoformat()
     candidates: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
     rejected = 0
     failure_code = None
+    raw_results = []
+    primary_error = None
     try:
-        raw_results = search_fn(query=query, region=region, max_results=max_results, backend=backend)
+        raw_results = primary_search(query=query, region=region, max_results=max_results, backend=backend)
         if not isinstance(raw_results, list):
             raise PublicWebDiscoveryError("SEARCH_RESULT_SET_MUST_BE_A_LIST")
     except Exception as exc:
         raw_results = []
-        failure_code = exc.code if isinstance(exc, PublicWebDiscoveryError) else type(exc).__name__
+        primary_code = exc.code if isinstance(exc, PublicWebDiscoveryError) else type(exc).__name__
+        primary_error = f"{primary_code}:{_safe_error_detail(exc)}"
+
+    backend_used = "injected_search" if injected_search else "ddgs"
+    if not injected_search and not raw_results:
+        try:
+            raw_results = fallback_search(query=query, region=region, max_results=max_results, backend="bing-html")
+            if not isinstance(raw_results, list):
+                raise PublicWebDiscoveryError("SEARCH_RESULT_SET_MUST_BE_A_LIST")
+            if not raw_results:
+                raise PublicWebDiscoveryError("BING_HTML_NO_USABLE_RESULTS")
+            backend_used = "bing_html_fallback"
+        except Exception as exc:
+            fallback_code = exc.code if isinstance(exc, PublicWebDiscoveryError) else type(exc).__name__
+            fallback_error = f"{fallback_code}:{_safe_error_detail(exc)}"
+            raw_results = []
+            failure_code = "PUBLIC_SEARCH_BACKENDS_UNAVAILABLE"
+            failure_code += f";DDGS={primary_error or 'NO_RESULTS'};BING={fallback_error}"
+            backend_used = "none"
+    elif primary_error:
+        failure_code = primary_code if "primary_code" in locals() else "PUBLIC_SEARCH_UNAVAILABLE"
 
     for item in raw_results:
         if not isinstance(item, Mapping):
@@ -128,7 +254,11 @@ def discover_public_web(
         if len(candidates) >= max_results:
             break
 
-    status = "SEARCH_UNAVAILABLE" if failure_code else ("RESULTS_FOUND" if candidates else "NO_RESULTS")
+    if candidates:
+        status = "RESULTS_FOUND"
+        failure_code = None
+    else:
+        status = "SEARCH_UNAVAILABLE" if failure_code else "NO_RESULTS"
     body = {
         "schema_version": SCHEMA_VERSION,
         "tool_version": TOOL_VERSION,
@@ -136,6 +266,7 @@ def discover_public_web(
         "query": query,
         "region": region,
         "backend": backend,
+        "backend_used": backend_used,
         "captured_at": captured_at,
         "results": candidates,
         "discarded_candidate_count": rejected,
@@ -161,6 +292,8 @@ def verify_discovery_record(record: Any) -> None:
         raise PublicWebDiscoveryError("DISCOVERY_SCHEMA_VERSION_MISMATCH")
     if record.get("status") not in {"RESULTS_FOUND", "NO_RESULTS", "SEARCH_UNAVAILABLE"}:
         raise PublicWebDiscoveryError("DISCOVERY_STATUS_INVALID")
+    if record.get("backend_used") not in {"ddgs", "bing_html_fallback", "injected_search", "none"}:
+        raise PublicWebDiscoveryError("DISCOVERY_BACKEND_USED_INVALID")
     contract = record.get("contract")
     if not isinstance(contract, dict) or contract != {
         "public_search_no_llm_endpoint": True,
@@ -231,6 +364,8 @@ def main() -> int:
         "status": record["status"],
         "results": len(record["results"]),
         "candidate_receipt": str(destination),
+        "backend_used": record["backend_used"],
+        "failure_code": record["failure_code"],
         "evidence_admission": False,
         "pit_admission": False,
     }, ensure_ascii=False, sort_keys=True))

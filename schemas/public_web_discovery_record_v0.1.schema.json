@@ -11,6 +11,7 @@
     "query",
     "region",
     "backend",
+    "backend_used",
     "captured_at",
     "results",
     "discarded_candidate_count",
@@ -150,6 +151,14 @@
           "pattern": "^[0-9a-f]{64}$"
         }
       }
+    },
+    "backend_used": {
+      "enum": [
+        "ddgs",
+        "bing_html_fallback",
+        "injected_search",
+        "none"
+      ]
     }
   }
 }

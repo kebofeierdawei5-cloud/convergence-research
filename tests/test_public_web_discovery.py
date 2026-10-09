@@ -61,6 +61,48 @@ def test_public_search_error_is_auditable_but_never_promoted_to_evidence():
     assert record["contract"]["evidence_admission"] is False
 
 
+
+
+def test_default_search_falls_back_to_no_key_public_bing(monkeypatch):
+    def ddgs_down(**kwargs):
+        raise RuntimeError("public search engines unavailable")
+
+    def bing_ok(**kwargs):
+        assert kwargs["backend"] == "bing-html"
+        return [{"title": "Official SZSE", "href": "https://disc.static.szse.cn/002001.pdf", "body": "exchange PDF"}]
+
+    monkeypatch.setattr("tools.public_web_discovery._ddgs_search", ddgs_down)
+    record = discover_public_web(
+        "site:disc.static.szse.cn 002001",
+        bing_fn=bing_ok,
+        captured_at="2026-10-09T11:30:00+00:00",
+    )
+    verify_discovery_record(record)
+    assert record["status"] == "RESULTS_FOUND"
+    assert record["backend_used"] == "bing_html_fallback"
+    assert record["failure_code"] is None
+    assert record["results"][0]["url"] == "https://disc.static.szse.cn/002001.pdf"
+    assert record["contract"]["provider_api_key_required"] is False
+    assert record["contract"]["evidence_admission"] is False
+
+
+def test_both_public_search_backends_fail_with_auditable_diagnostic(monkeypatch):
+    def ddgs_down(**kwargs):
+        raise RuntimeError("ddgs fixture outage")
+
+    def bing_down(**kwargs):
+        raise PublicWebDiscoveryError("BING_HTTP_STATUS_403")
+
+    monkeypatch.setattr("tools.public_web_discovery._ddgs_search", ddgs_down)
+    record = discover_public_web("newhecheng official report", bing_fn=bing_down)
+    verify_discovery_record(record)
+    assert record["status"] == "SEARCH_UNAVAILABLE"
+    assert record["backend_used"] == "none"
+    assert record["failure_code"].startswith("PUBLIC_SEARCH_BACKENDS_UNAVAILABLE")
+    assert "DDGS=RuntimeError" in record["failure_code"]
+    assert "BING_HTTP_STATUS_403" in record["failure_code"]
+    assert record["contract"]["evidence_admission"] is False
+
 def test_empty_results_is_not_a_successful_search_result():
     record = discover_public_web("nonexistent fixture query", search_fn=lambda **kwargs: [])
     verify_discovery_record(record)
