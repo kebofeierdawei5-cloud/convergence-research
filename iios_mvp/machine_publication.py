@@ -388,6 +388,17 @@ def validate_machine_publication(record: Any) -> None:
     }
     if set(decision_ref) != ref_required:
         raise ValueError("machine_publication decision_ref fields are invalid")
+    for field, ref_field in (
+        ("run_id", "run_id"), ("case_id", "case_id"),
+        ("market", "market"), ("symbol", "symbol"), ("cutoff_date", "cutoff_date"),
+    ):
+        if str(run_ref.get(ref_field, "")).upper() != str(decision_ref.get(field, "")).upper():
+            raise ValueError("machine_publication canonical run identity mismatch")
+    if decision_ref["revision_hash"] not in run_ref["authorized_hashes"]:
+        # Publication authority is a separate HUMAN_APPROVAL_PENDING-stage
+        # reference; the Decision Revision reference remains DECISION_ADMITTED.
+        # The run ref must authorize the revision hash, not merely identify run.
+        raise ValueError("machine_publication run authority does not bind Decision Revision")
     for field in ("snapshot_hash", "revision_hash"):
         value = decision_ref[field]
         if not isinstance(value, str) or len(value) != 64:
