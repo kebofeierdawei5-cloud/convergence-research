@@ -1,0 +1,7 @@
+{
+  "schema_version": "IIOS-PUBLIC-WEB-DISCOVERY-REQUEST-0.1",
+  "query": "新和成 002001 2026年10月9日 收盘价 历史行情",
+  "region": "cn-zh",
+  "max_results": 10,
+  "backend": "auto"
+}
