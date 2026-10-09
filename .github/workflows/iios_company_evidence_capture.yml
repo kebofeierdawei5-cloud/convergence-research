@@ -41,18 +41,17 @@ jobs:
 
           root = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
           manifest_path = os.environ.get("INPUT_MANIFEST_PATH", "").strip()
+          expected_case_id = ""
           if not manifest_path:
-              event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
-              requests = sorted({
-                  name
-                  for commit in event.get("commits", [])
-                  for name in (commit.get("added", []) + commit.get("modified", []))
-                  if name.startswith("manifests/capture_requests/") and name.endswith(".json")
-              })
-              if len(requests) != 1:
+              request_root = root / "manifests" / "capture_requests"
+              request_files = sorted(request_root.glob("*.json")) if request_root.is_dir() else []
+              if len(request_files) != 1:
                   raise SystemExit("CAPTURE_REQUEST_MUST_NAME_EXACTLY_ONE_REQUEST_FILE")
-              request = json.loads((root / requests[0]).read_text(encoding="utf-8"))
+              request = json.loads(request_files[0].read_text(encoding="utf-8"))
+              if request.get("schema_version") != "IIOS-COMPANY-EVIDENCE-CAPTURE-REQUEST-0.1":
+                  raise SystemExit("CAPTURE_REQUEST_SCHEMA_UNSUPPORTED")
               manifest_path = str(request.get("manifest_path", "")).strip()
+              expected_case_id = str(request.get("case_id", "")).strip()
 
           candidate = Path(manifest_path)
           normalized = candidate.as_posix()
@@ -67,6 +66,10 @@ jobs:
           resolved = (root / candidate).resolve()
           if root not in resolved.parents or not resolved.is_file():
               raise SystemExit("MANIFEST_PATH_MISSING_OR_ESCAPES_REPOSITORY")
+          if expected_case_id:
+              manifest = json.loads(resolved.read_text(encoding="utf-8"))
+              if manifest.get("case_id") != expected_case_id:
+                  raise SystemExit("CAPTURE_REQUEST_CASE_ID_MISMATCH")
           with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
               output.write(f"path={normalized}\n")
           print("manifest_path_validated=" + normalized)
