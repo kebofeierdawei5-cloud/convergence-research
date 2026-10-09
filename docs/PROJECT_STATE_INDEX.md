@@ -61,19 +61,25 @@ Therefore:
 
 ### Current next development batch
 
-B2-F independent red-team = PASS / CANONICAL. The remaining company-level MVP path is now the separate production-provider evidence gate; credentials/configuration must be supplied through the authorized production secret/variable boundary and are not stored in source.
+**Primary Investment Core MVP path: Route A — free-first single-company evidence intake.** This path must work without commercial LLM credentials or paid financial-data subscriptions. B2-D LIVE remains a separately tracked model-integration gate and must not block official-source capture, operator-supplied originals, raw-byte verification, or PIT/UNKNOWN evaluation.
 
 ```text
-B2-F PASS / CANONICAL
+User-selected company + cutoff
   ↓
-B2-D3 REAL LIVE EVIDENCE — pending authorized provider runtime configuration
+Route A: official/free HTTPS sources OR operator-supplied raw originals
   ↓
-B2-D1 INDEPENDENT VERIFICATION
+retain exact raw bytes + SHA-256 + source/retrieval metadata
   ↓
-B2-E PRODUCTION-BACKED NL → SEMANTIC → DECISION
+independent raw-byte and manifest verification
   ↓
-MVP FINAL HUMAN ACCEPTANCE
+known_at <= cutoff candidate check; otherwise UNKNOWN/BLOCKED
+  ↓
+existing B2 evidence/PIT admission — separate permission gate
+  ↓
+company analysis / valuation / decision / human report acceptance
 ```
+
+B2-D3 real LLM provider invocation → B2-D1 independent verification → production-backed B2-E remains a separate optional integration acceptance path. It is not a prerequisite for collecting/validating basic company research evidence. Every Route-A capture receipt must remain `NOT_ADMITTED` merely because bytes were downloaded or manually supplied; existing B2 evidence admission remains a separate gate.
 
 B2-E fixture-backed conformance is not admitted as live-provider evidence.
 
@@ -82,6 +88,26 @@ B2-E fixture-backed conformance is not admitted as live-provider evidence.
 A02 / CSI800 historical-universe evidence and the M1.2 Research Track remain **outside the company-level MVP critical path**.
 
 The M1.2 current epoch remains closed by FM07/FM05 governance; no same-epoch model/threshold redesign is authorized.
+
+## Route A — Free-First Company Evidence Intake — 2026-10-09
+
+Status: **IMPLEMENTATION CANDIDATE / VALIDATION PENDING**
+
+Scope:
+- user-selected single-company A-share / Hong Kong case only;
+- official/free HTTPS source download or operator-supplied original bytes;
+- per-run immutable raw files, original manifest copy, SHA-256, size, capture timestamps, source registry match, and explicit license/reuse status;
+- PIT candidate checks that never turn missing `known_at` into PASS;
+- independent raw-byte and manifest verifier;
+- no API key, paid data provider or live LLM dependency.
+
+Acceptance boundary:
+- capture and hash verification are raw-intake results only;
+- declared source class, publication date and known-at basis remain unverified claims until evidence-level review;
+- all receipt/source records remain `NOT_ADMITTED`;
+- M1.2 A02 / CSI800 / CSI Industry work remains a separate Research Track and is not invoked.
+
+The implementation candidate is under review and remains non-canonical until the dedicated exact-head CI and independent red-team pass and the PR is merged.
 
 ## B2-D3 — Real Provider Runtime + Live Evidence Gate — 2026-10-08
 
