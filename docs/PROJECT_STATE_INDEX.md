@@ -38,6 +38,21 @@ Current MVP acceptance gaps:
 
 The current independent B2-F audit remains PASS / CANONICAL.
 
+### P0 Canonical Entry Incident — Batch 0
+
+Status: **INCIDENT REPRODUCTION PASS / CANONICAL RECORD — PRODUCTION P0s OPEN**
+
+- Original regression request: `使用新版本iios分析百龙创园 605016，产能增长型B端成长股，截止2026-10-09`.
+- Cutoff: `2026-10-09`.
+- Batch 0 exact-head workflow #4 / Run ID `37940734602`: SUCCESS.
+- Characterization tests: 6 / 6 PASS; compileall and diff-check PASS.
+- The tests reproduce canonical-entry, unadmitted-evidence, missing-semantic-artifact and run-receipt/write-binding bypasses.
+- This result proves the defect can be reproduced; it does not close P0-LLM-001 or P0-LLM-004, admit any company evidence, or establish investment-decision conformance.
+- Next batch: enforce the canonical research entry and run authorization at the final write boundary; replace characterization tests with fail-closed assertions and add a positive, fully authorized replay.
+
+Canonical incident contract: `docs/iios/P0_CANONICAL_ENTRY_INCIDENT_REPRODUCTION_20261009.md`.
+
+
 F-001 through F-005 have been remediated and independently re-audited. The fresh B2-F audit passed against the FR5-fix head on 2026-10-09 and is preserved as a canonical, rerunnable source/contract audit. This closes the B2-F red-team finding set; it does **not** prove production provider invocation or model/economic validity.
 
 **B2-D LIVE provider integration = OPTIONAL / BLOCKED (NOT AN MVP GATE).** No provider runtime configuration or `LIVE_RESPONSE_CAPTURED + INDEPENDENT_VERIFIED` evidence has been supplied; that matters only if the optional external-LLM integration itself is being accepted.
