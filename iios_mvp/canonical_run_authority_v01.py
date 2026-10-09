@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 from typing import Any, Mapping
 
+from .canonical_evidence_admission_v01 import validate_company_evidence_manifest
 from .canonical_research_orchestrator import (
     ORCHESTRATOR_VERSION,
     CanonicalResearchOrchestrator,
@@ -472,6 +473,54 @@ def authorize_decision_revision_write(
         raise CanonicalRunAuthorizationError("snapshot/Decision Admission identity mismatch")
     record = _load_record(root, run_id)
     envelope = record["envelope"]
+
+    # The persisted DECISION_ADMITTED stage is not sufficient by itself.
+    # Re-open the immutable admitted B2 manifest and hash-check every raw byte
+    # before permitting a formal Decision Revision write. This blocks a forged
+    # run-state file that merely lists arbitrary evidence IDs and digest strings.
+    evidence_stage = _receipt_for_stage(record, Stage.EVIDENCE_ADMITTED)[1]
+    if not evidence_stage["output_hashes"] or not evidence_stage["output_refs"]:
+        raise CanonicalRunAuthorizationError("BLOCKED: Evidence/PIT stage has no manifest-bound receipt")
+    manifest_hash = str(evidence_stage["output_hashes"][0])
+    expected_manifest_ref = f"evidence-manifest:{manifest_hash}"
+    if evidence_stage["output_refs"][0] != expected_manifest_ref:
+        raise CanonicalRunAuthorizationError("BLOCKED: Evidence stage is not bound to a canonical manifest")
+    manifest_dir = Path(root) / "canonical-artifacts"
+    evidence_root = Path(root) / "canonical-evidence"
+    candidates = []
+    for path in manifest_dir.glob("*.evidence-manifest.json"):
+        try:
+            candidate = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        audit = candidate.get("audit") if isinstance(candidate, Mapping) else None
+        if isinstance(audit, Mapping) and audit.get("manifest_sha256") == manifest_hash:
+            candidates.append(candidate)
+    if len(candidates) != 1:
+        raise CanonicalRunAuthorizationError("BLOCKED: exact admitted B2 Evidence Manifest artifact is absent or ambiguous")
+    manifest = candidates[0]
+    evidence_errors = validate_company_evidence_manifest(
+        manifest, raw_root=evidence_root, require_raw_verification=True
+    )
+    if evidence_errors:
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: persisted B2 Evidence/PIT admission no longer validates: "
+            + "; ".join(sorted(set(evidence_errors)))
+        )
+    manifest_identity = {
+        "case_id": str(manifest.get("case_id", "")),
+        "market": str(manifest.get("market", "")).upper(),
+        "symbol": str(manifest.get("symbol", "")).upper(),
+        "company": str(manifest.get("company", "")),
+        "cutoff_date": str(manifest.get("cutoff_date", ""))[:10],
+    }
+    if manifest_identity != snapshot_identity:
+        raise CanonicalRunAuthorizationError("BLOCKED: Evidence Manifest identity/cutoff mismatch")
+    manifest_evidence = manifest.get("evidence") or []
+    expected_refs = [expected_manifest_ref, *[str(x.get("evidence_id", "")) for x in manifest_evidence]]
+    expected_hashes = [manifest_hash, *[str(x.get("content_sha256", "")) for x in manifest_evidence]]
+    if evidence_stage["output_refs"] != expected_refs or evidence_stage["output_hashes"] != expected_hashes:
+        raise CanonicalRunAuthorizationError("BLOCKED: Evidence stage receipts differ from the admitted Manifest")
     if any((
         str(envelope["case_id"]) != str(snapshot_identity["case_id"]),
         str(envelope["market"]).upper() != str(snapshot_identity["market"]),
