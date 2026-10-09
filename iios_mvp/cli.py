@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .company_economic_core import build_company_economic_core, validate_company_economic_core
+from .canonical_run_authorization import verify_snapshot_write_authorization
 from .core03_market_expectation import build_core03_package, validate_core03_package
 from .engine import replay, render_markdown, run_case
 from .decision_admission import admit_canonical_decision
@@ -136,23 +137,39 @@ def cmd_core03(args: argparse.Namespace) -> int:
 def cmd_run(args: argparse.Namespace) -> int:
     case = load_json(args.case)
     snapshot, snapshot_hash = run_case(case)
+    decision_admission = None
+    run_id = snapshot_hash[:16]
+
+    if snapshot.get("snapshot_schema") == "IIOS-MVP-SNAPSHOT-0.3.0":
+        if not args.run_id:
+            raise ValueError(
+                "CANONICAL_RUN_AUTHORIZATION_BLOCKED: v0.3 run requires --run-id from the canonical orchestrator"
+            )
+        decision_admission = admit_canonical_decision(
+            case=case,
+            snapshot=snapshot,
+        )
+        # Validate before writing even a snapshot or decision revision. A direct
+        # CLI invocation is not a canonical run merely because the kernel runs.
+        verify_snapshot_write_authorization(
+            args.out,
+            snapshot=snapshot,
+            run_id=args.run_id,
+            decision_admission=decision_admission,
+        )
+        run_id = args.run_id
+
     out = write_snapshot(args.out, snapshot)
     series = create_or_load_series(
         args.out, args.market, case["symbol"], case["company"], now_iso()
     )
     revision = next_revision(args.out, series["decision_series_id"])
-    decision_admission = None
-    if snapshot.get("snapshot_schema") == "IIOS-MVP-SNAPSHOT-0.3.0":
-        decision_admission = admit_canonical_decision(
-            case=case,
-            snapshot=snapshot,
-        )
     decision_path = write_decision_revision(
         args.out,
         series["decision_series_id"],
         revision,
         snapshot,
-        run_id=snapshot_hash[:16],
+        run_id=run_id,
         trigger_event_id=args.trigger_event_id,
         decision_admission=decision_admission,
     )
@@ -160,16 +177,17 @@ def cmd_run(args: argparse.Namespace) -> int:
         print(render_markdown(snapshot))
     else:
         print(json.dumps({
+            "status": "CANONICAL_RUN_AUTHORIZED" if snapshot.get("snapshot_schema") == "IIOS-MVP-SNAPSHOT-0.3.0" else "LEGACY_NON_CANONICAL_COMPATIBILITY",
             "snapshot": str(out),
             "snapshot_hash": snapshot_hash,
             "decision_id": f"{series['decision_series_id']}-r{revision:03d}",
-            "decision": snapshot["decision"]["decision"]["action"],
+            "decision": snapshot["decision"].get("decision", {}).get("action") if isinstance(snapshot["decision"].get("decision"), dict) else snapshot["decision"].get("action"),
             "decision_revision": str(decision_path),
             "next_revision": next_revision(args.out, series["decision_series_id"]),
             "engine_version": snapshot["engine_version"],
+            "run_id": run_id,
         }, ensure_ascii=False, indent=2))
     return 0
-
 
 def cmd_replay(args: argparse.Namespace) -> int:
     snapshot = read_snapshot(args.snapshot)
@@ -397,6 +415,7 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--out", default="runs")
     run.add_argument("--market", default="CN-A")
     run.add_argument("--trigger-event-id")
+    run.add_argument("--run-id", help="canonical orchestrator run_id; mandatory for v0.3 decisions")
     run.add_argument("--format", choices=("json", "markdown"), default="json")
     run.set_defaults(func=cmd_run)
 
