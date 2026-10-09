@@ -134,3 +134,4 @@ jobs:
             --verify-outcome "$VERIFY_OUTCOME" \
             --b2-preflight-outcome "$B2_PREFLIGHT_OUTCOME" \
             --upload-outcome "$UPLOAD_OUTCOME"
+          echo "B2_PREFLIGHT_BLOCKED_NOT_ADMITTED; EVIDENCE_ADMISSION=FALSE"
