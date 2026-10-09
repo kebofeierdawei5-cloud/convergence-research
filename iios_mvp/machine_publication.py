@@ -388,11 +388,8 @@ def validate_machine_publication(record: Any) -> None:
     }
     if set(decision_ref) != ref_required:
         raise ValueError("machine_publication decision_ref fields are invalid")
-    for field, ref_field in (
-        ("run_id", "run_id"), ("case_id", "case_id"),
-        ("market", "market"), ("symbol", "symbol"), ("cutoff_date", "cutoff_date"),
-    ):
-        if str(run_ref.get(ref_field, "")).upper() != str(decision_ref.get(field, "")).upper():
+    for field in ("run_id", "case_id", "cutoff_date"):
+        if str(run_ref.get(field, "")).upper() != str(decision_ref.get(field, "")).upper():
             raise ValueError("machine_publication canonical run identity mismatch")
     if decision_ref["revision_hash"] not in run_ref["authorized_hashes"]:
         # Publication authority is a separate HUMAN_APPROVAL_PENDING-stage
@@ -409,6 +406,13 @@ def validate_machine_publication(record: Any) -> None:
     for field in ("case", "ai_decision", "decision_payload", "human_approval", "current_projection", "lifecycle_refs", "integrity"):
         if not isinstance(record[field], Mapping):
             raise ValueError(f"machine_publication {field} must be an object")
+    if (
+        str(run_ref.get("market", "")).upper() != str(record["case"].get("market", "")).upper()
+        or str(run_ref.get("symbol", "")).upper() != str(record["case"].get("symbol", "")).upper()
+        or str(run_ref.get("case_id", "")) != str(record["case"].get("case_id", ""))
+        or str(run_ref.get("cutoff_date", "")) != str(record["case"].get("cutoff_date", ""))
+    ):
+        raise ValueError("machine_publication canonical run identity does not match case")
 
     approval = record["human_approval"]
     if approval["approval_status"] not in {"PENDING", "HUMAN_APPROVED", "HUMAN_REJECTED"}:
