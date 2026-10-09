@@ -1,0 +1,7 @@
+{
+  "schema_version": "IIOS-COMPANY-EVIDENCE-CAPTURE-REQUEST-0.1",
+  "case_id": "RC-CN-A-002001-20261009",
+  "manifest_path": "manifests/company_cases/RC-CN-A-002001-20261009.json",
+  "requested_at": "2026-10-09T21:00:00+08:00",
+  "purpose": "Exercise the canonical Route A capture→independent raw integrity→existing B2 Evidence/PIT preflight. Capture only declared public sources, preserve raw bytes and generate BLOCKED_NOT_ADMITTED for capture-only/unknown source artifacts."
+}
