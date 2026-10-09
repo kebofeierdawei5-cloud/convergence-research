@@ -25,7 +25,7 @@ def test_current_next_batch_prioritizes_free_first_company_evidence():
     end = text.index("### Explicit non-blockers", start)
     current = text[start:end]
     assert "Route A — free-first single-company evidence intake" in current
-    assert "operator-supplied raw originals" in current
+    assert "manually supplied evidence" in current
     assert "No LLM provider endpoint or API key is required" in current
     assert "public web discovery" in current
     assert "NOT_ADMITTED" in current
