@@ -15,6 +15,7 @@ from iios_mvp.canonical_natural_language_entry_v01 import (
 from iios_mvp.canonical_research_orchestrator import CanonicalResearchOrchestrator, Stage
 from iios_mvp.canonical_run_authority_v01 import (
     PersistedCanonicalResearchOrchestrator,
+    block_persisted_run,
     run_state_path,
 )
 from iios_mvp.decision_admission import admit_canonical_decision
@@ -193,7 +194,7 @@ def _transition_pre_decision(
     )
 
 
-def run_b2e_conformance(
+def _run_b2e_conformance_impl(
     *,
     raw_request: str,
     request_id: str,
@@ -540,6 +541,27 @@ def run_b2e_conformance(
             str(run_state_path(run_root, run_id)) if run_root is not None else None
         ),
     )
+
+
+def run_b2e_conformance(*args: Any, **kwargs: Any) -> B2EConformanceResult:
+    """Canonical B2-E API; all failures persist BLOCKED when a run was started."""
+    run_root = kwargs.get("run_root")
+    run_id = kwargs.get("run_id")
+    try:
+        return _run_b2e_conformance_impl(*args, **kwargs)
+    except Exception as exc:
+        if run_root and run_id:
+            try:
+                block_persisted_run(
+                    str(run_root), str(run_id),
+                    f"{type(exc).__name__}: {str(exc)[:1800]}",
+                )
+            except Exception:
+                # Preserve the original exception. If state itself cannot be
+                # persisted, callers still receive BLOCKED and no writer is
+                # authorized without a valid state file.
+                pass
+        raise
 
 
 __all__ = [
