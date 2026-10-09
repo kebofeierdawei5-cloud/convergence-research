@@ -1,0 +1,7 @@
+{
+  "schema_version": "IIOS-COMPANY-EVIDENCE-CAPTURE-REQUEST-0.1",
+  "case_id": "RC-CN-A-002001-20261009",
+  "manifest_path": "manifests/company_cases/RC-CN-A-002001-20261009.json",
+  "requested_at": "2026-10-09T18:30:00+08:00",
+  "purpose": "First Route A live capture of declared public issuer/SZSE sources; capture and byte-integrity verification only, no evidence admission."
+}
