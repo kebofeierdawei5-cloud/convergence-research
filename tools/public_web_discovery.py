@@ -189,6 +189,7 @@ def discover_public_web(
     max_results: int = 10,
     backend: str = "auto",
     search_fn: Callable[..., list[dict[str, Any]]] | None = None,
+    bing_fn: Callable[..., list[dict[str, Any]]] | None = None,
     captured_at: str | None = None,
 ) -> dict[str, Any]:
     """Discover public candidate URLs. Search results are leads, never admitted evidence."""
