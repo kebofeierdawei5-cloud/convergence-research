@@ -351,7 +351,7 @@ def verify_snapshot_write_authorization(
         raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: snapshot input missing")
     from .decision_admission import validate_decision_admission_receipt
     validate_decision_admission_receipt(dict(decision_admission), snapshot=dict(snapshot))
-    return verify_run_authorization(
+    record = verify_run_authorization(
         root,
         run_id=run_id,
         snapshot_hash=snapshot_hash,
@@ -362,6 +362,11 @@ def verify_snapshot_write_authorization(
         company=str(input_data.get("company", "")),
         cutoff_date=str(input_data.get("cutoff_date", "")),
     )
+    if record["research_case_hash"] != canonical_hash(dict(input_data)):
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: Research Case hash does not match snapshot input")
+    if record["orchestrator_version"] != "IIOS-CANONICAL-RESEARCH-ORCHESTRATOR-0.1":
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: unsupported orchestrator version")
+    return record
 
 
 def verify_revision_write_authorization(
