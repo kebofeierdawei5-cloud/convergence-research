@@ -21,6 +21,7 @@ def test_push_search_request_resolution_is_bounded_and_not_based_on_event_file_l
     assert 'request.get("schema_version") != "IIOS-PUBLIC-WEB-DISCOVERY-REQUEST-0.1"' in text
     assert "GITHUB_EVENT_PATH" not in text
     assert "SEARCH_QUERY_MUST_BE_SINGLE_LINE" in text
+    assert 'output.write(f"query={query.strip()}\\n")' in text
     assert "SEARCH_MAX_RESULTS_OUT_OF_RANGE" in text
 
 

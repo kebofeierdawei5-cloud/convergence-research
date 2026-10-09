@@ -78,7 +78,7 @@ jobs:
 
           if not isinstance(query, str) or not query.strip() or len(query.strip()) > 500:
               raise SystemExit("SEARCH_QUERY_MUST_BE_1_TO_500_CHARACTERS")
-          if any(ord(ch) < 32 for ch in query) or "\\n" in query or "\\r" in query:
+          if any(ord(ch) < 32 for ch in query) or "\n" in query or "\r" in query:
               raise SystemExit("SEARCH_QUERY_MUST_BE_SINGLE_LINE")
           if not isinstance(region, str) or not re.fullmatch(r"[a-z]{2}-[a-z]{2}", region):
               raise SystemExit("SEARCH_REGION_INVALID")
@@ -93,10 +93,10 @@ jobs:
 
           output_path = Path(os.environ["GITHUB_OUTPUT"])
           with output_path.open("a", encoding="utf-8") as output:
-              output.write(f"query={query.strip()}\\n")
-              output.write(f"region={region}\\n")
-              output.write(f"max_results={max_results_number}\\n")
-              output.write(f"backend={backend}\\n")
+              output.write(f"query={query.strip()}\n")
+              output.write(f"region={region}\n")
+              output.write(f"max_results={max_results_number}\n")
+              output.write(f"backend={backend}\n")
           print(json.dumps({"query": query.strip(), "region": region, "max_results": max_results_number, "backend": backend}, ensure_ascii=False, sort_keys=True))
           PY
       - name: Install keyless public search library
