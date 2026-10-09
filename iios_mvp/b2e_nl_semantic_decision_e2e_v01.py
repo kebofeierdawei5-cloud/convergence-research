@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Mapping
 import hashlib
 import json
@@ -29,6 +30,7 @@ from iios_mvp.llm_semantic_workbench_v01 import (
     WorkbenchResult,
 )
 from iios_mvp.semantic_producer_admission_v01 import ProducerRegistry
+from research.b2.company_evidence import validate_company_evidence_manifest
 
 B2E_CONTRACT_VERSION = "IIOS-B2-E-NL-SEMANTIC-DECISION-E2E-0.1"
 B2E_STATUS_ADMITTED = "ADMITTED"
@@ -217,6 +219,8 @@ def run_b2e_conformance(
     upstream_authority_resolver: Any,
     valuation_output_resolver: Any,
     run_root: str | None = None,
+    evidence_manifest: Mapping[str, Any] | None = None,
+    evidence_root: str | None = None,
 ) -> B2EConformanceResult:
     orchestrator = (
         PersistedCanonicalResearchOrchestrator(run_root)
@@ -234,7 +238,60 @@ def run_b2e_conformance(
     )
 
     if sha256(admitted.research_case) != admitted.case_hash:
+        if run_root is not None:
+            orchestrator.block(run_id, "RESEARCH_CASE_HASH_BINDING_FAILED")
         raise B2EE2EError("research case hash binding failed")
+    # Production-backed runs must prove source-by-source B2/PIT admission from
+    # the exact raw-byte root. Caller-provided IDs/hashes alone are never admission.
+    admitted_manifest: dict[str, Any] | None = None
+    admitted_manifest_hash: str | None = None
+    if run_root is not None:
+        if not isinstance(evidence_manifest, Mapping) or not evidence_root:
+            orchestrator.block(run_id, "B2_EVIDENCE_PIT_ADMISSION_REQUIRED")
+            raise B2EE2EError(
+                "BLOCKED: persisted canonical runs require a B2 Evidence/PIT manifest and raw_root"
+            )
+        admitted_manifest = dict(evidence_manifest)
+        evidence_errors = validate_company_evidence_manifest(
+            admitted_manifest,
+            raw_root=Path(evidence_root),
+            require_raw_verification=True,
+        )
+        if admitted_manifest.get("status") != "PASS" or admitted_manifest.get("validation_errors") not in (None, []):
+            evidence_errors = list(evidence_errors) + [
+                "MANIFEST_STATUS_NOT_PASS",
+                *list(admitted_manifest.get("validation_errors") or []),
+            ]
+        manifest_identity = (
+            str(admitted_manifest.get("case_id", "")),
+            str(admitted_manifest.get("market", "")).upper(),
+            str(admitted_manifest.get("symbol", "")).upper(),
+            str(admitted_manifest.get("company", "")),
+            str(admitted_manifest.get("cutoff_date", ""))[:10],
+        )
+        expected_identity = (
+            admitted.case_id,
+            str(admitted.research_case["request"]["market"]).upper(),
+            str(admitted.research_case["request"]["symbol"]).upper(),
+            str(company),
+            str(admitted.research_case["temporal_scope"]["cutoff_date"]),
+        )
+        if manifest_identity != expected_identity:
+            evidence_errors.append("EVIDENCE_MANIFEST_CASE_IDENTITY_OR_CUTOFF_MISMATCH")
+        manifest_evidence = admitted_manifest.get("evidence") or []
+        manifest_refs = tuple(str(x.get("evidence_id", "")) for x in manifest_evidence)
+        manifest_hashes = tuple(str(x.get("content_sha256", "")) for x in manifest_evidence)
+        if manifest_refs != tuple(evidence_refs) or manifest_hashes != tuple(evidence_hashes):
+            evidence_errors.append("CALLER_EVIDENCE_REFS_HASHES_DO_NOT_MATCH_ADMITTED_MANIFEST")
+        if evidence_errors:
+            orchestrator.block(run_id, "B2_EVIDENCE_PIT_ADMISSION_FAILED")
+            raise B2EE2EError(
+                "BLOCKED: B2 Evidence/PIT admission failed: " + "; ".join(sorted(set(evidence_errors)))
+            )
+        admitted_manifest_hash = str((admitted_manifest.get("audit") or {}).get("manifest_sha256", ""))
+        if len(admitted_manifest_hash) != 64 or any(c not in "0123456789abcdef" for c in admitted_manifest_hash):
+            orchestrator.block(run_id, "B2_EVIDENCE_MANIFEST_HASH_INVALID")
+            raise B2EE2EError("BLOCKED: admitted Evidence Manifest hash is invalid")
     case_identity = {
         "case_id": case.get("case_id"),
         "market": str(case.get("market", "")).upper(),
@@ -250,6 +307,8 @@ def run_b2e_conformance(
         "as_of_date": admitted.research_case["request"]["as_of_date"],
     }
     if case_identity != admitted_identity:
+        if run_root is not None:
+            orchestrator.block(run_id, "INVESTMENT_CASE_IDENTITY_MISMATCH")
         raise B2EE2EError(
             "expanded Investment Core case identity does not match admitted Research Case"
         )
@@ -260,12 +319,18 @@ def run_b2e_conformance(
         created_at=created_at,
     )
     if len(evidence_refs) == 0 or len(evidence_refs) != len(evidence_hashes):
+        if run_root is not None:
+            orchestrator.block(run_id, "EVIDENCE_LINEAGE_INVALID")
         raise B2EE2EError("evidence lineage must contain matching non-empty references and hashes")
+    manifest_refs = (
+        (f"evidence-manifest:{admitted_manifest_hash}",) if admitted_manifest_hash else ()
+    )
+    manifest_hashes = (admitted_manifest_hash,) if admitted_manifest_hash else ()
     orchestrator.transition(
         run_id,
         Stage.EVIDENCE_ADMITTED,
-        output_refs=evidence_refs,
-        output_hashes=evidence_hashes,
+        output_refs=manifest_refs + evidence_refs,
+        output_hashes=manifest_hashes + evidence_hashes,
         created_at=created_at,
     )
     orchestrator.transition(
@@ -381,6 +446,7 @@ def run_b2e_conformance(
         artifacts = {
             "research-case": admitted.research_case,
             "investment-case": projected_case,
+            "evidence-manifest": admitted_manifest,
             "semantic-artifact": dict(semantic.artifact),
             "semantic-admission": dict(semantic.admission.__dict__),
             "decision-admission": dict(decision_admission),
