@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/public-web-discovery-record-v0.2.schema.json",
+  "title": "IIOS Public Web Discovery Record v0.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tool_version",
+    "status",
+    "query",
+    "region",
+    "backend",
+    "backend_used",
+    "captured_at",
+    "results",
+    "discarded_candidate_count",
+    "failure_code",
+    "contract",
+    "audit"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "IIOS-PUBLIC-WEB-DISCOVERY-RECORD-0.2"
+    },
+    "tool_version": {
+      "const": "IIOS-PUBLIC-WEB-DISCOVERY-0.2"
+    },
+    "status": {
+      "enum": [
+        "RESULTS_FOUND",
+        "NO_RESULTS",
+        "SEARCH_UNAVAILABLE"
+      ]
+    },
+    "query": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "region": {
+      "type": "string",
+      "pattern": "^[a-z]{2}-[a-z]{2}$"
+    },
+    "backend": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "captured_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "results": {
+      "type": "array",
+      "maxItems": 25,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rank",
+          "title",
+          "url",
+          "snippet",
+          "https_candidate",
+          "discovery_only"
+        ],
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 25
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https?://"
+          },
+          "snippet": {
+            "type": "string",
+            "maxLength": 3000
+          },
+          "https_candidate": {
+            "type": "boolean"
+          },
+          "discovery_only": {
+            "const": true
+          }
+        }
+      }
+    },
+    "discarded_candidate_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "failure_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "public_search_no_llm_endpoint",
+        "provider_api_key_required",
+        "search_results_are_source_leads_only",
+        "source_bytes_captured",
+        "evidence_admission",
+        "pit_admission",
+        "automatic_manifest_mutation"
+      ],
+      "properties": {
+        "public_search_no_llm_endpoint": {
+          "const": true
+        },
+        "provider_api_key_required": {
+          "const": false
+        },
+        "search_results_are_source_leads_only": {
+          "const": true
+        },
+        "source_bytes_captured": {
+          "const": false
+        },
+        "evidence_admission": {
+          "const": false
+        },
+        "pit_admission": {
+          "const": false
+        },
+        "automatic_manifest_mutation": {
+          "const": false
+        }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_sha256"
+      ],
+      "properties": {
+        "record_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "backend_used": {
+      "enum": [
+        "ddgs",
+        "bing_html_fallback",
+        "injected_search",
+        "none"
+      ]
+    }
+  }
+}
