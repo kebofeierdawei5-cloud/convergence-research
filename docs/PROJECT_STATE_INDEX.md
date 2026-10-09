@@ -69,7 +69,7 @@ Therefore:
 
 ### Current next development batch
 
-The primary Investment Core MVP path is **Route A — free-first single-company evidence intake + public web discovery**. Public-web discovery, public-source capture, B2 preflight and artifact retention all run without an external LLM endpoint, paid search API or API key. B2-D remains an optional external-LLM integration adapter and is not an MVP gate.
+The primary Investment Core MVP path is **Route A — free-first single-company evidence intake + public web discovery**. Public-web discovery, public-source capture, B2 preflight and artifact retention all run without an external LLM endpoint, paid search API or API key. Operator-supplied raw originals and manually supplied evidence remain supported when public URLs are unavailable or source bytes need to be supplied directly. B2-D remains an optional external-LLM integration adapter and is not an MVP gate.
 
 **Latest real capture: Run #8 succeeded as `PARTIAL_CAPTURE_VERIFIED_NOT_ADMITTED`.** Eight of nine declared source objects were retained and independently hash-verified; the public Eastmoney K-line endpoint failed on this run. The artifact and failure row were retained instead of discarding the other eight files. The existing B2 preflight executed successfully and correctly returned `BLOCKED_NOT_ADMITTED`.
 
