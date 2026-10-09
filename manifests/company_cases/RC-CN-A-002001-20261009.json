@@ -17,6 +17,18 @@
       "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
     },
     {
+      "source_id": "SZSE-2025-ANNUAL-FULL",
+      "field_group": "business_reality",
+      "source_ref": "SZSE:COMPANY_ANNOUNCEMENT",
+      "source_class": "OFFICIAL_EXCHANGE",
+      "url": "https://disc.static.szse.cn/download/disc/disk03/finalpage/2026-04-16/496f3ed8-d4eb-425b-80c3-c2096a1f3806.PDF",
+      "known_at": "",
+      "known_at_basis": "",
+      "published_at": "",
+      "observation_date": "2025-12-31",
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+    },
+    {
       "source_id": "SZSE-2026-H1-FULL",
       "field_group": "financial_reality",
       "source_ref": "SZSE:COMPANY_ANNOUNCEMENT",

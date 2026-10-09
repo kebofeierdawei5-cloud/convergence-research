@@ -78,7 +78,7 @@ def test_newhecheng_case_manifest_uses_free_primary_exchange_sources_and_preserv
     assert value["market"] == "CN-A"
     assert value["symbol"] == "002001"
     assert value["cutoff_date"] == "2026-10-09"
-    assert len(value["sources"]) == 9
+    assert len(value["sources"]) == 10
     for source in value["sources"]:
         assert source["url"].startswith("https://")
         assert source["license_status"] == "PUBLIC_ACCESS_REUSE_UNKNOWN"
@@ -88,6 +88,13 @@ def test_newhecheng_case_manifest_uses_free_primary_exchange_sources_and_preserv
     assert "financial_reality" in [source["field_group"] for source in value["sources"]]
     assert "corporate_disclosures" in [source["field_group"] for source in value["sources"]]
     assert "trust_governance_events" in [source["field_group"] for source in value["sources"]]
+    annual = next(source for source in value["sources"] if source["source_id"] == "SZSE-2025-ANNUAL-FULL")
+    assert annual["url"] == "https://disc.static.szse.cn/download/disc/disk03/finalpage/2026-04-16/496f3ed8-d4eb-425b-80c3-c2096a1f3806.PDF"
+    assert annual["field_group"] == "business_reality"
+    assert annual["source_class"] == "OFFICIAL_EXCHANGE"
+    assert annual["observation_date"] == "2025-12-31"
+    assert annual["known_at"] == "" and annual["known_at_basis"] == ""
+
     market_sources = [source for source in value["sources"] if source["field_group"] == "market_price"]
     assert len(market_sources) == 3
     assert all(source["source_class"] == "PUBLIC_SECONDARY" for source in market_sources)
