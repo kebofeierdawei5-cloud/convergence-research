@@ -510,7 +510,7 @@ def test_p0_real_catl_manifest_runs_through_revision_publication_report_and_rece
     hashes = tuple(str(x["content_sha256"]) for x in rows)
     run_root = tmp_path / "runs-real-catl"
     result = run_b2e_conformance(
-        raw_request="请对宁德时代进行投资决策分析，截止2026-10-04；以现有获准入证据为依据。",
+        raw_request=RAW,
         request_id="p0-real-catl-request",
         run_id="p0-real-catl-run",
         created_at=CREATED,
