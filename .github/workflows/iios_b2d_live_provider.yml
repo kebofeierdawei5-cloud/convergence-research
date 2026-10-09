@@ -31,7 +31,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install test dependencies
-        run: python -m pip install --disable-pip-version-check pytest jsonschema cryptography
+        run: python -m pip install --disable-pip-version-check pytest jsonschema cryptography pyyaml
       - name: Run B2-D tests
         run: python -m pytest -q tests/test_b2d_live_provider_preflight.py
       - name: Run independent B2-D red-team
