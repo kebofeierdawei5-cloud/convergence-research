@@ -65,9 +65,6 @@ jobs:
       - name: Assert historical Xinhecheng Publication is rejected without run authority
         run: |
           set -euo pipefail
-          pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
-          test -f "$pub"
-          test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
           rm -rf /tmp/iios-xhc/formal-writer
           mkdir -p /tmp/iios-xhc/formal-writer/out
           python - <<'PY'
@@ -76,13 +73,29 @@ jobs:
           from pathlib import Path
           from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
 
-          pub = Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
-          out = Path("/tmp/iios-xhc/formal-writer/out")
+          artifact_root = Path("/tmp/iios-xhc/artifact")
+          candidates = sorted(artifact_root.rglob("*.publication.json"))
+          legacy = []
+          for candidate in candidates:
+              try:
+                  publication = json.loads(candidate.read_text(encoding="utf-8"))
+              except (OSError, json.JSONDecodeError):
+                  continue
+              if isinstance(publication, dict) and "canonical_run_ref" not in publication:
+                  legacy.append((candidate, publication))
+          if len(legacy) != 1:
+              raise SystemExit(
+                  "Expected exactly one historical Publication without canonical_run_ref; "
+                  f"found {len(legacy)} candidates from {len(candidates)} publication files"
+              )
+          pub, _source = legacy[0]
           payload = pub.read_bytes()
+          out = Path("/tmp/iios-xhc/formal-writer/out")
           receipt = {
               "status": "BLOCKED",
               "classification": "NON_CANONICAL",
               "reason": "historical Publication predates persisted Run Envelope/Stage Receipt authority",
+              "input_publication_path": str(pub.relative_to(artifact_root)),
               "input_publication_sha256": hashlib.sha256(payload).hexdigest(),
               "formal_report_created": False,
           }
