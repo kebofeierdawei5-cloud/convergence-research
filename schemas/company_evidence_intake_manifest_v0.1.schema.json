@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/company-evidence-intake-manifest-v0.1.schema.json",
+  "title": "IIOS Company Evidence Intake Manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "market",
+    "symbol",
+    "cutoff_date",
+    "sources"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "IIOS-COMPANY-EVIDENCE-INTAKE-MANIFEST-0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "market": {
+      "enum": [
+        "CN-A",
+        "HK"
+      ]
+    },
+    "symbol": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 9
+    },
+    "cutoff_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "field_group",
+          "source_ref",
+          "source_class",
+          "license_status"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$"
+          },
+          "field_group": {
+            "enum": [
+              "security_identity",
+              "market_price",
+              "corporate_disclosures",
+              "business_reality",
+              "financial_reality",
+              "capital_structure",
+              "trust_governance_events"
+            ]
+          },
+          "source_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_class": {
+            "enum": [
+              "OFFICIAL_EXCHANGE",
+              "ISSUER_PRIMARY",
+              "REGULATOR_PRIMARY",
+              "OFFICIAL_DATABASE",
+              "PUBLIC_SECONDARY",
+              "OPERATOR_SUPPLIED"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "local_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "known_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "known_at_basis": {
+            "type": "string"
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "observation_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "effective_to": {
+            "type": "string",
+            "format": "date"
+          },
+          "license_status": {
+            "enum": [
+              "REDISTRIBUTION_ALLOWED",
+              "PUBLIC_ACCESS_REUSE_UNKNOWN",
+              "OPERATOR_SUPPLIED_RIGHTS_CONFIRMED",
+              "RESTRICTED_NO_REDISTRIBUTION",
+              "UNKNOWN"
+            ]
+          }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "url"
+            ],
+            "not": {
+              "required": [
+                "local_path"
+              ]
+            }
+          },
+          {
+            "required": [
+              "local_path"
+            ],
+            "not": {
+              "required": [
+                "url"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

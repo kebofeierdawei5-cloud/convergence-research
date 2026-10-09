@@ -1,0 +1,20 @@
+{
+  "schema_version": "IIOS-COMPANY-EVIDENCE-INTAKE-MANIFEST-0.1",
+  "case_id": "RC-CN-A-300750-20261009",
+  "market": "CN-A",
+  "symbol": "300750",
+  "cutoff_date": "2026-10-09",
+  "sources": [
+    {
+      "source_id": "SZSE-ANNOUNCEMENT-001",
+      "field_group": "corporate_disclosures",
+      "source_ref": "SZSE:COMPANY_ANNOUNCEMENT",
+      "source_class": "OFFICIAL_EXCHANGE",
+      "local_path": "raw_input/replace-with-original-document.pdf",
+      "known_at": "",
+      "known_at_basis": "",
+      "published_at": "",
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+    }
+  ]
+}

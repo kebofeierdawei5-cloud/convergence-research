@@ -18,6 +18,16 @@ def test_current_authority_points_to_b2d_live_gate():
     assert "B2-D Live Provider Invocation / Evidence                BLOCKED" in current
     assert "B2-D" in current and "B2-E" in current and "B2-F" in current
 
+def test_current_next_batch_prioritizes_free_first_company_evidence():
+    text = STATE.read_text(encoding="utf-8")
+    start = text.index("### Current next development batch")
+    end = text.index("### Explicit non-blockers", start)
+    current = text[start:end]
+    assert "Route A — free-first single-company evidence intake" in current
+    assert "operator-supplied raw originals" in current
+    assert "B2-D LIVE remains a separately tracked model-integration gate" in current
+    assert "NOT_ADMITTED" in current
+
 
 def test_stale_pilot_next_sequence_is_marked_historical():
     text = STATE.read_text(encoding="utf-8")
