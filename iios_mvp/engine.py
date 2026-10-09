@@ -471,10 +471,9 @@ def _mark_direct_engine_result_non_canonical(snapshot: dict[str, Any]) -> dict[s
         **classification_core,
         "classification_hash": sha256_obj(classification_core),
     }
-    # Keep the diagnostic artifact internally hash-consistent while making its
-    # non-canonical provenance explicit; integrity must not be confused with admission.
-    payload = {k: v for k, v in snapshot.items() if k != "snapshot_hash"}
-    snapshot["snapshot_hash"] = sha256_obj(payload)
+    # execution_classification is a separately self-hashed metadata envelope.
+    # Keep snapshot_hash bound to the established immutable decision snapshot
+    # core so deterministic replay and integrity semantics remain unchanged.
     return snapshot
 
 
