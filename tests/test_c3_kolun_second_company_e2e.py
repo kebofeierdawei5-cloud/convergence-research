@@ -22,7 +22,7 @@ def test_c3_kolun_is_a_real_second_company_case():
     assert result["current_price"] == "40.85"
 
 
-def test_c3_decision_and_lifecycle_are_canonical_paths():
+def test_c3_economic_calculation_is_inspectable_but_lifecycle_is_fail_closed():
     result = run()
     assert result["decision"]["action"] == "REVIEW_REQUIRED"
     assert result["decision"]["decision_status"] == "REVIEW_REQUIRED"
@@ -31,19 +31,23 @@ def test_c3_decision_and_lifecycle_are_canonical_paths():
     assert result["return_metrics"]["fundamental_target_pass"] is True
     assert result["return_metrics"]["required_return_pass"] is True
     assert result["return_metrics"]["risk_pass"] is True
-    assert result["lifecycle"]["trigger_state"] == "MATCHED"
-    assert result["lifecycle"]["monitoring_evaluation_status"] == "VALID"
-    assert result["lifecycle"]["validation_status"] == "PASS"
-    assert result["lifecycle"]["decision_replay_status"] == "PASS"
+    assert result["lifecycle"]["status"] == "BLOCKED_NOT_ADMITTED"
+    assert result["lifecycle"]["blocking_gate"] == "B2_EVIDENCE_PIT_ADMISSION_REQUIRED"
+    assert result["lifecycle"]["formal_decision_revision_created"] is False
+    assert result["lifecycle"]["trigger_state"] == "NOT_RUN"
+    assert result["lifecycle"]["monitoring_evaluation_status"] == "NOT_RUN"
+    assert result["lifecycle"]["validation_status"] == "NOT_RUN"
+    assert result["lifecycle"]["decision_replay_status"] == "NOT_RUN"
 
 
-def test_c3_publication_and_report_are_deterministic_projections():
+def test_c3_publication_and_report_are_blocked_without_admitted_b2_manifest():
     result = run()
-    assert result["publication"]["qa_status"] == "PASS"
-    assert result["publication"]["report_deterministic_replay"] is True
-    assert len(result["publication"]["publication_hash"]) == 64
-    assert len(result["publication"]["report_hash"]) == 64
-    assert len(result["publication"]["qa_hash"]) == 64
+    assert result["publication"]["status"] == "BLOCKED_NOT_ADMITTED"
+    assert result["publication"]["qa_status"] == "BLOCKED_NOT_ADMITTED"
+    assert result["publication"]["report_deterministic_replay"] is False
+    assert result["publication"]["publication_hash"] is None
+    assert result["publication"]["report_hash"] is None
+    assert result["publication"]["qa_hash"] is None
     assert result["authority_boundary"]["human_approval_required"] is True
     assert result["authority_boundary"]["auto_execution"] is False
     assert result["authority_boundary"]["report_policy_effect"] == "REPORT_ONLY_PROJECTION"
