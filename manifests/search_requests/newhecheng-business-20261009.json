@@ -1,0 +1,7 @@
+{
+  "schema_version": "IIOS-PUBLIC-WEB-DISCOVERY-REQUEST-0.1",
+  "query": "site:disc.static.szse.cn 002001 新和成 2026 半年度报告 营养品 尼龙 PPS 项目 产能",
+  "region": "cn-zh",
+  "max_results": 10,
+  "backend": "auto"
+}
