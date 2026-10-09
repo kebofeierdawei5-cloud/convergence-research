@@ -349,7 +349,12 @@ def validate_machine_publication(record: Any) -> None:
         "publication_id",
         "publication_hash",
     }
-    if set(record) != required:
+    supplied = set(record)
+    if "canonical_run_ref" not in supplied:
+        raise CanonicalRunAuthorizationError(
+            "NON_CANONICAL: Machine Publication has no persisted Run Envelope/Stage Receipt authority"
+        )
+    if supplied != required:
         raise ValueError("machine_publication fields are invalid")
     if record["publication_version"] != PUBLICATION_VERSION:
         raise ValueError("machine_publication version mismatch")
