@@ -125,6 +125,19 @@ def test_p0_ce_01_direct_cli_entry_returns_noncanonical_and_writes_nothing(tmp_p
     assert not output_root.exists() or not list(output_root.glob("*.decision.json"))
 
 
+def test_p0_ce_01b_official_canonical_entry_never_falls_back_when_runtime_missing(tmp_path, capsys):
+    bundle = tmp_path / "request.json"
+    bundle.write_text(json.dumps({"raw_request": "使用新版本IIOS分析百龙创园605016，截止2026-10-09"}), encoding="utf-8")
+    args = parser().parse_args(["canonical-run", str(bundle), "--out", str(tmp_path / "runs")])
+    code = args.func(args)
+    output = json.loads(capsys.readouterr().out)
+    assert code == 2
+    assert output["status"] == "BLOCKED"
+    assert output["canonical_decision_created"] is False
+    assert output["reason"] == "CANONICAL_RUNTIME_NOT_REGISTERED"
+    assert not (tmp_path / "runs").exists()
+
+
 def test_p0_ce_02_unadmitted_evidence_cannot_become_canonical_decision():
     snapshot, _digest = run_case(_legacy_unadmitted_case())
     assert snapshot["execution_classification"]["status"] == "NON_CANONICAL"
