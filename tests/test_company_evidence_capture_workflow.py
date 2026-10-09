@@ -1,0 +1,60 @@
+from pathlib import Path
+import json
+import yaml
+
+ROOT = Path(__file__).parents[1]
+WORKFLOW_PATH = ROOT / ".github" / "workflows" / "iios_company_evidence_capture.yml"
+MANIFEST_PATH = ROOT / "manifests" / "company_cases" / "RC-CN-A-002001-20261009.json"
+
+
+def test_capture_workflow_is_manual_or_dedicated_capture_branch_only():
+    workflow = yaml.load(WORKFLOW_PATH.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    triggers = workflow["on"]
+    assert "workflow_dispatch" in triggers
+    assert "pull_request" not in triggers
+    assert triggers["push"]["branches"] == ["route-a-capture/**"]
+    assert triggers["push"]["paths"] == ["manifests/capture_requests/**"]
+    assert workflow["permissions"]["contents"] == "read"
+
+
+def test_capture_workflow_uses_path_allowlist_no_secrets_and_no_admission_claim():
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert 'normalized.startswith("manifests/company_cases/")' in text
+    assert 'candidate.is_absolute()' in text
+    assert '".." in candidate.parts' in text
+    assert "secrets." not in text
+    assert "RAW_CAPTURE_AND_INTEGRITY_VERIFICATION_SUCCEEDED_NOT_EVIDENCE_ADMISSION" in text
+    assert "retention-days: 14" in text
+
+
+def test_capture_workflow_orders_capture_verification_artifact_and_final_gate():
+    workflow = yaml.load(WORKFLOW_PATH.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    steps = workflow["jobs"]["capture-and-verify"]["steps"]
+    names = [step.get("name", step.get("uses", "")) for step in steps]
+    capture = next(i for i, name in enumerate(names) if name == "Capture exact public-source bytes")
+    verify = next(i for i, name in enumerate(names) if name == "Independently verify captured bytes and receipt")
+    upload = next(i for i, name in enumerate(names) if name == "Upload raw evidence, receipt and verifier result")
+    gate = next(i for i, name in enumerate(names) if name == "Require complete capture and independent integrity verification")
+    assert capture < verify < upload < gate
+    assert steps[capture]["continue-on-error"] == "true"
+    assert steps[verify]["if"] == "always()"
+    assert steps[upload]["if"] == "always()"
+    assert steps[gate]["if"] == "always()"
+
+
+def test_newhecheng_case_manifest_uses_free_primary_exchange_sources_and_preserves_unknowns():
+    value = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    assert value["case_id"] == "RC-CN-A-002001-20261009"
+    assert value["market"] == "CN-A"
+    assert value["symbol"] == "002001"
+    assert value["cutoff_date"] == "2026-10-09"
+    assert len(value["sources"]) == 5
+    for source in value["sources"]:
+        assert source["url"].startswith("https://")
+        assert source["license_status"] == "PUBLIC_ACCESS_REUSE_UNKNOWN"
+    issuer = next(source for source in value["sources"] if source["source_id"] == "ISSUER-IR-PAGE-CURRENT")
+    assert issuer["known_at"] == ""
+    assert issuer["known_at_basis"] == ""
+    assert "financial_reality" in [source["field_group"] for source in value["sources"]]
+    assert "corporate_disclosures" in [source["field_group"] for source in value["sources"]]
+    assert "trust_governance_events" in [source["field_group"] for source in value["sources"]]

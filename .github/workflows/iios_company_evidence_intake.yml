@@ -11,6 +11,9 @@ on:
       - "tests/independent_redteam_company_evidence_intake.py"
       - "docs/iios/COMPANY_EVIDENCE_INTAKE_FREE_FIRST_v0.1.md"
       - ".github/workflows/iios_company_evidence_intake.yml"
+      - ".github/workflows/iios_company_evidence_capture.yml"
+      - "manifests/company_cases/RC-CN-A-002001-20261009.json"
+      - "tests/test_company_evidence_capture_workflow.py"
   push:
     branches: [main]
     paths:
@@ -37,7 +40,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install test dependencies
-        run: python -m pip install --disable-pip-version-check pytest jsonschema
+        run: python -m pip install --disable-pip-version-check pytest jsonschema pyyaml
       - name: Compile intake and verifier
         run: python -m compileall -q tools/company_evidence_intake.py tools/verify_company_evidence_intake.py
       - name: Validate schema and manifest
@@ -50,13 +53,22 @@ jobs:
           from jsonschema import Draft202012Validator
           root = Path(".")
           schema = json.loads((root / "schemas/company_evidence_intake_manifest_v0.1.schema.json").read_text(encoding="utf-8"))
-          manifest = json.loads((root / "manifests/company_evidence_intake_template_v0.1.json").read_text(encoding="utf-8"))
           Draft202012Validator.check_schema(schema)
-          Draft202012Validator(schema).validate(manifest)
+          manifests = [
+              root / "manifests/company_evidence_intake_template_v0.1.json",
+              *sorted((root / "manifests/company_cases").glob("*.json")),
+          ]
+          for manifest_path in manifests:
+              manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+              Draft202012Validator(schema).validate(manifest)
+              print("validated", manifest_path)
           PY
           python tools/company_evidence_intake.py --manifest manifests/company_evidence_intake_template_v0.1.json --out /tmp/unused --validate-only
+          python tools/company_evidence_intake.py --manifest manifests/company_cases/RC-CN-A-002001-20261009.json --out /tmp/unused --validate-only
       - name: Run company evidence intake tests
         run: python -m pytest -q tests/test_company_evidence_intake.py
+      - name: Run capture workflow contract tests
+        run: python -m pytest -q tests/test_company_evidence_capture_workflow.py
       - name: Run independent red-team tests
         run: python -m pytest -q tests/independent_redteam_company_evidence_intake.py
       - name: Diff check

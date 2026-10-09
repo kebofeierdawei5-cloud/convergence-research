@@ -1,0 +1,67 @@
+{
+  "schema_version": "IIOS-COMPANY-EVIDENCE-INTAKE-MANIFEST-0.1",
+  "case_id": "RC-CN-A-002001-20261009",
+  "market": "CN-A",
+  "symbol": "002001",
+  "cutoff_date": "2026-10-09",
+  "sources": [
+    {
+      "source_id": "ISSUER-IR-PAGE-CURRENT",
+      "field_group": "security_identity",
+      "source_ref": "ISSUER:INVESTOR_RELATIONS_PUBLIC",
+      "source_class": "ISSUER_PRIMARY",
+      "url": "https://www.cnhu.com/investor/zh-cn",
+      "known_at": "",
+      "known_at_basis": "",
+      "published_at": "",
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+    },
+    {
+      "source_id": "SZSE-2026-H1-FULL",
+      "field_group": "financial_reality",
+      "source_ref": "SZSE:COMPANY_ANNOUNCEMENT",
+      "source_class": "OFFICIAL_EXCHANGE",
+      "url": "https://disc.static.szse.cn/disc/disk03/finalpage/2026-08-20/83165436-1015-4d77-919c-97c8cce0c67d.PDF",
+      "known_at": "2026-08-20",
+      "known_at_basis": "SZSE-hosted source path and exchange-indexed document identify publication date 2026-08-20; exact first-public timestamp and date basis remain subject to existing B2 Evidence/PIT admission review.",
+      "published_at": "2026-08-20",
+      "observation_date": "2026-06-30",
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+    },
+    {
+      "source_id": "SZSE-2026-H1-SUMMARY",
+      "field_group": "corporate_disclosures",
+      "source_ref": "SZSE:COMPANY_ANNOUNCEMENT",
+      "source_class": "OFFICIAL_EXCHANGE",
+      "url": "https://disc.static.szse.cn/disc/disk03/finalpage/2026-08-20/6d1ad0be-5e22-482b-a163-2ebb0b6d1d95.PDF",
+      "known_at": "2026-08-20",
+      "known_at_basis": "SZSE-hosted source path and exchange-indexed summary identify publication date 2026-08-20; exact first-public timestamp and date basis remain subject to existing B2 Evidence/PIT admission review.",
+      "published_at": "2026-08-20",
+      "observation_date": "2026-06-30",
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+    },
+    {
+      "source_id": "SZSE-2026-Q1-FULL",
+      "field_group": "financial_reality",
+      "source_ref": "SZSE:COMPANY_ANNOUNCEMENT",
+      "source_class": "OFFICIAL_EXCHANGE",
+      "url": "https://disc.static.szse.cn/download/disc/disk03/finalpage/2026-04-29/094c9e5d-f2de-4411-b604-b2aece32f35b.PDF",
+      "known_at": "2026-04-29",
+      "known_at_basis": "SZSE-hosted source path and exchange-indexed report identify publication date 2026-04-29; exact first-public timestamp and date basis remain subject to existing B2 Evidence/PIT admission review.",
+      "published_at": "2026-04-29",
+      "observation_date": "2026-03-31",
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+    },
+    {
+      "source_id": "SZSE-2026-BUYBACK-PLAN",
+      "field_group": "trust_governance_events",
+      "source_ref": "SZSE:COMPANY_ANNOUNCEMENT",
+      "source_class": "OFFICIAL_EXCHANGE",
+      "url": "https://disc.static.szse.cn/download/disc/disk03/finalpage/2026-06-24/53248225-c2cf-45cf-a0fd-a6c9fee4f267.PDF",
+      "known_at": "2026-06-24",
+      "known_at_basis": "SZSE-hosted source path and exchange announcement number identify publication date as 2026-06-24; exact first-public timestamp remains subject to independent B2 Evidence/PIT admission review.",
+      "published_at": "2026-06-24",
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+    }
+  ]
+}
