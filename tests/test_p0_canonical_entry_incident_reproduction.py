@@ -205,7 +205,7 @@ def test_p0_ce_01d_invalid_runtime_factory_blocks_without_artifacts(tmp_path, ca
     assert output["status"] == "BLOCKED"
     assert output["canonical_decision_created"] is False
     assert output["reason"] == "CANONICAL_RUNTIME_FACTORY_INVALID"
-    assert output["formal_artifacts_created"] is False
+    assert output["error_type"] == "ValueError"
     assert not output_root.exists()
 
 
