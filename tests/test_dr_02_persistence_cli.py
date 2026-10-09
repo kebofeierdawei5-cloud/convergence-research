@@ -15,7 +15,7 @@ from iios_mvp.store import (
     write_decision_revision,
     write_snapshot,
 )
-from tests.decision_admission_fixture import build_fixture_admission_receipt
+from tests.decision_admission_fixture import build_fixture_admission_receipt, prepare_authorized_test_run
 
 
 def make_snapshot(case_id="V03-DR02", cutoff="2026-10-05", action="REVIEW_REQUIRED"):
@@ -52,13 +52,15 @@ def admission(snapshot):
 
 def persist(root, series, revision, snapshot, run_id):
     write_snapshot(root, snapshot)
+    admitted = admission(snapshot)
+    prepare_authorized_test_run(root=str(root), run_id=run_id, snapshot=snapshot, decision_admission=admitted)
     return write_decision_revision(
         root,
         series["decision_series_id"],
         revision,
         snapshot,
         run_id,
-        decision_admission=admission(snapshot),
+        decision_admission=admitted,
     )
 
 

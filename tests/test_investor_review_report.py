@@ -15,7 +15,7 @@ from iios_mvp.investor_review_report import (
 )
 from iios_mvp.engine import sha256_obj
 from iios_mvp.store import create_or_load_series, write_decision_revision, write_snapshot
-from tests.decision_admission_fixture import build_fixture_admission_receipt
+from tests.decision_admission_fixture import build_fixture_admission_receipt, prepare_authorized_test_run
 
 
 def make_snapshot():
@@ -111,15 +111,15 @@ def make_publication(tmp_path):
         tmp_path, "CN-A", "300750", "CATL", "2026-10-06T00:00:00+00:00"
     )
     decision_id = "CN-A-300750-r001"
+    admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
+    prepare_authorized_test_run(root=str(tmp_path), run_id="run-c2-001", snapshot=snapshot, decision_admission=admission)
     write_decision_revision(
         tmp_path,
         series["decision_series_id"],
         1,
         snapshot,
         "run-c2-001",
-        decision_admission=build_fixture_admission_receipt(
-            snapshot=snapshot, canonical_decision=snapshot["decision"]
-        ),
+        decision_admission=admission,
     )
     from iios_mvp.machine_publication import write_machine_publication
     publication_path = write_machine_publication(

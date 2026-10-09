@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from dataclasses import dataclass
 from typing import Any, Mapping
 import hashlib
@@ -12,6 +14,11 @@ from iios_mvp.canonical_natural_language_entry_v01 import (
     admit_natural_language_request,
 )
 from iios_mvp.canonical_research_orchestrator import CanonicalResearchOrchestrator, Stage
+from iios_mvp.canonical_run_authority_v01 import (
+    PersistedCanonicalResearchOrchestrator,
+    block_persisted_run,
+    run_state_path,
+)
 from iios_mvp.decision_admission import admit_canonical_decision
 from iios_mvp.decision_lifecycle_production import build_decision_revision, validate_decision_revision
 from iios_mvp.decision_upstream_admission_v03 import DECISION_UPSTREAM_ADMISSION_V02
@@ -25,6 +32,7 @@ from iios_mvp.llm_semantic_workbench_v01 import (
     WorkbenchResult,
 )
 from iios_mvp.semantic_producer_admission_v01 import ProducerRegistry
+from iios_mvp.canonical_evidence_admission_v01 import validate_company_evidence_manifest
 
 B2E_CONTRACT_VERSION = "IIOS-B2-E-NL-SEMANTIC-DECISION-E2E-0.1"
 B2E_STATUS_ADMITTED = "ADMITTED"
@@ -54,6 +62,8 @@ class B2EConformanceResult:
     decision_admission: Mapping[str, Any]
     decision_revision: Mapping[str, Any]
     binding_receipt: Mapping[str, Any]
+    canonicality_status: str = "NON_CANONICAL_CONFORMANCE_ONLY"
+    run_state_path: str | None = None
 
 
 def _canonical(value: Any) -> bytes:
@@ -185,6 +195,31 @@ def _transition_pre_decision(
     )
 
 
+def _persist_blocked_on_error(function):
+    from functools import wraps
+
+    @wraps(function)
+    def guarded(*args: Any, **kwargs: Any) -> B2EConformanceResult:
+        run_root = kwargs.get("run_root")
+        run_id = kwargs.get("run_id")
+        try:
+            return function(*args, **kwargs)
+        except Exception as exc:
+            if run_root and run_id:
+                try:
+                    block_persisted_run(
+                        str(run_root), str(run_id),
+                        f"{type(exc).__name__}: {str(exc)[:1800]}",
+                    )
+                except Exception:
+                    # Preserve the primary exception. Without a verifiable
+                    # state file, no formal writer can obtain authorization.
+                    pass
+            raise
+    return guarded
+
+
+@_persist_blocked_on_error
 def run_b2e_conformance(
     *,
     raw_request: str,
@@ -210,8 +245,15 @@ def run_b2e_conformance(
     independent_forecast_resolver: Any,
     upstream_authority_resolver: Any,
     valuation_output_resolver: Any,
+    run_root: str | None = None,
+    evidence_manifest: Mapping[str, Any] | None = None,
+    evidence_root: str | None = None,
 ) -> B2EConformanceResult:
-    orchestrator = CanonicalResearchOrchestrator()
+    orchestrator = (
+        PersistedCanonicalResearchOrchestrator(run_root)
+        if run_root is not None
+        else CanonicalResearchOrchestrator()
+    )
     admitted = admit_natural_language_request(
         orchestrator=orchestrator,
         registry=request_registry,
@@ -223,7 +265,60 @@ def run_b2e_conformance(
     )
 
     if sha256(admitted.research_case) != admitted.case_hash:
+        if run_root is not None:
+            orchestrator.block(run_id, "RESEARCH_CASE_HASH_BINDING_FAILED")
         raise B2EE2EError("research case hash binding failed")
+    # Production-backed runs must prove source-by-source B2/PIT admission from
+    # the exact raw-byte root. Caller-provided IDs/hashes alone are never admission.
+    admitted_manifest: dict[str, Any] | None = None
+    admitted_manifest_hash: str | None = None
+    if run_root is not None:
+        if not isinstance(evidence_manifest, Mapping) or not evidence_root:
+            orchestrator.block(run_id, "B2_EVIDENCE_PIT_ADMISSION_REQUIRED")
+            raise B2EE2EError(
+                "BLOCKED: persisted canonical runs require a B2 Evidence/PIT manifest and raw_root"
+            )
+        admitted_manifest = dict(evidence_manifest)
+        evidence_errors = validate_company_evidence_manifest(
+            admitted_manifest,
+            raw_root=Path(evidence_root),
+            require_raw_verification=True,
+        )
+        if admitted_manifest.get("status") != "PASS" or admitted_manifest.get("validation_errors") not in (None, []):
+            evidence_errors = list(evidence_errors) + [
+                "MANIFEST_STATUS_NOT_PASS",
+                *list(admitted_manifest.get("validation_errors") or []),
+            ]
+        manifest_identity = (
+            str(admitted_manifest.get("case_id", "")),
+            str(admitted_manifest.get("market", "")).upper(),
+            str(admitted_manifest.get("symbol", "")).upper(),
+            str(admitted_manifest.get("company", "")),
+            str(admitted_manifest.get("cutoff_date", ""))[:10],
+        )
+        expected_identity = (
+            admitted.case_id,
+            str(admitted.research_case["request"]["market"]).upper(),
+            str(admitted.research_case["request"]["symbol"]).upper(),
+            str(company),
+            str(admitted.research_case["temporal_scope"]["cutoff_date"]),
+        )
+        if manifest_identity != expected_identity:
+            evidence_errors.append("EVIDENCE_MANIFEST_CASE_IDENTITY_OR_CUTOFF_MISMATCH")
+        manifest_evidence = admitted_manifest.get("evidence") or []
+        manifest_refs = tuple(str(x.get("evidence_id", "")) for x in manifest_evidence)
+        manifest_hashes = tuple(str(x.get("content_sha256", "")) for x in manifest_evidence)
+        if manifest_refs != tuple(evidence_refs) or manifest_hashes != tuple(evidence_hashes):
+            evidence_errors.append("CALLER_EVIDENCE_REFS_HASHES_DO_NOT_MATCH_ADMITTED_MANIFEST")
+        if evidence_errors:
+            orchestrator.block(run_id, "B2_EVIDENCE_PIT_ADMISSION_FAILED")
+            raise B2EE2EError(
+                "BLOCKED: B2 Evidence/PIT admission failed: " + "; ".join(sorted(set(evidence_errors)))
+            )
+        admitted_manifest_hash = str((admitted_manifest.get("audit") or {}).get("manifest_sha256", ""))
+        if len(admitted_manifest_hash) != 64 or any(c not in "0123456789abcdef" for c in admitted_manifest_hash):
+            orchestrator.block(run_id, "B2_EVIDENCE_MANIFEST_HASH_INVALID")
+            raise B2EE2EError("BLOCKED: admitted Evidence Manifest hash is invalid")
     case_identity = {
         "case_id": case.get("case_id"),
         "market": str(case.get("market", "")).upper(),
@@ -239,6 +334,8 @@ def run_b2e_conformance(
         "as_of_date": admitted.research_case["request"]["as_of_date"],
     }
     if case_identity != admitted_identity:
+        if run_root is not None:
+            orchestrator.block(run_id, "INVESTMENT_CASE_IDENTITY_MISMATCH")
         raise B2EE2EError(
             "expanded Investment Core case identity does not match admitted Research Case"
         )
@@ -249,12 +346,18 @@ def run_b2e_conformance(
         created_at=created_at,
     )
     if len(evidence_refs) == 0 or len(evidence_refs) != len(evidence_hashes):
+        if run_root is not None:
+            orchestrator.block(run_id, "EVIDENCE_LINEAGE_INVALID")
         raise B2EE2EError("evidence lineage must contain matching non-empty references and hashes")
+    manifest_refs = (
+        (f"evidence-manifest:{admitted_manifest_hash}",) if admitted_manifest_hash else ()
+    )
+    manifest_hashes = (admitted_manifest_hash,) if admitted_manifest_hash else ()
     orchestrator.transition(
         run_id,
         Stage.EVIDENCE_ADMITTED,
-        output_refs=evidence_refs,
-        output_hashes=evidence_hashes,
+        output_refs=manifest_refs + evidence_refs,
+        output_hashes=manifest_hashes + evidence_hashes,
         created_at=created_at,
     )
     orchestrator.transition(
@@ -324,22 +427,129 @@ def run_b2e_conformance(
         valuation_output_resolver=valuation_output_resolver,
     )
 
+    return_metrics_hash = sha256(canonical_decision.get("return_metrics") or {})
+    risk_portfolio_payload = (
+        canonical_decision.get("risk_portfolio_contract")
+        or canonical_decision.get("positioning_sizing")
+        or {}
+    )
+    risk_portfolio_hash = sha256(risk_portfolio_payload)
+    decision_snapshot_hash = snapshot["snapshot_hash"]
+    decision_admission_hash = decision_admission["admission_record_hash"]
+    decision_stage_refs = (
+        "decision_snapshot",
+        "decision_admission",
+        "return_metrics",
+        "risk_portfolio",
+    )
+    decision_stage_hashes = (
+        decision_snapshot_hash,
+        decision_admission_hash,
+        return_metrics_hash,
+        risk_portfolio_hash,
+    )
     orchestrator.transition(
         run_id,
         Stage.DECISION_ADMITTED,
-        output_refs=(decision_admission["admission_record_hash"],),
-        output_hashes=(decision_admission["admission_record_hash"],),
+        output_refs=decision_stage_refs,
+        output_hashes=decision_stage_hashes,
         input_refs=(semantic.artifact["artifact_id"],),
         input_hashes=(semantic.artifact["artifact_hash"],),
         created_at=created_at,
     )
 
-    revision = build_decision_revision(
-        revision=1,
-        snapshot=snapshot,
-        run_id=run_id,
-        decision_admission=decision_admission,
-    )
+    revision: Mapping[str, Any]
+    if run_root is not None:
+        from iios_mvp.store import (
+            create_or_load_series, next_revision, write_decision_revision,
+            write_snapshot,
+        )
+        root_path = Path(run_root)
+        root_path.mkdir(parents=True, exist_ok=True)
+        # Persist inspectable canonical inputs before the Decision Revision. These
+        # are immutable audit artifacts; the registered validators remain the
+        # authority for their semantic admission.
+        artifacts = {
+            "research-case": admitted.research_case,
+            "investment-case": projected_case,
+            "evidence-manifest": admitted_manifest,
+            "semantic-artifact": dict(semantic.artifact),
+            "semantic-admission": dict(semantic.admission.__dict__),
+            "decision-admission": dict(decision_admission),
+        }
+        # Copy the already verified source bytes into the run's immutable evidence
+        # root. The Decision Revision write boundary independently reopens these
+        # bytes and the admitted manifest; a manifest without its raw byte bundle
+        # cannot authorize a formal write.
+        if not isinstance(admitted_manifest, Mapping) or not evidence_root:
+            raise B2EE2EError("BLOCKED: canonical evidence manifest/raw root is absent")
+        source_root = Path(evidence_root).resolve()
+        canonical_evidence_root = (root_path / "canonical-evidence").resolve()
+        canonical_evidence_root.mkdir(parents=True, exist_ok=True)
+        for declaration in admitted_manifest.get("raw_artifacts", []):
+            relative_path = declaration.get("relative_path")
+            if not isinstance(relative_path, str) or not relative_path.strip():
+                raise B2EE2EError("BLOCKED: raw evidence relative_path is invalid")
+            source_path = (source_root / relative_path).resolve()
+            destination_path = (canonical_evidence_root / relative_path).resolve()
+            try:
+                source_path.relative_to(source_root)
+                destination_path.relative_to(canonical_evidence_root)
+            except ValueError as exc:
+                raise B2EE2EError("BLOCKED: raw evidence path escapes its root") from exc
+            if not source_path.is_file():
+                raise B2EE2EError("BLOCKED: raw evidence bytes are missing: " + relative_path)
+            raw_bytes = source_path.read_bytes()
+            actual_hash = hashlib.sha256(raw_bytes).hexdigest()
+            if (
+                len(raw_bytes) != declaration.get("expected_size_bytes")
+                or actual_hash != declaration.get("expected_sha256")
+            ):
+                raise B2EE2EError("BLOCKED: raw evidence bytes no longer match admitted manifest: " + relative_path)
+            destination_path.parent.mkdir(parents=True, exist_ok=True)
+            if destination_path.exists():
+                if destination_path.read_bytes() != raw_bytes:
+                    raise B2EE2EError("immutable canonical raw evidence collision: " + relative_path)
+            else:
+                destination_path.write_bytes(raw_bytes)
+
+        for artifact_name, artifact_payload in artifacts.items():
+            artifact_bytes = json.dumps(
+                artifact_payload, ensure_ascii=False, sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            artifact_digest = hashlib.sha256(artifact_bytes).hexdigest()
+            artifact_path = root_path / "canonical-artifacts" / f"{artifact_digest}.{artifact_name}.json"
+            artifact_path.parent.mkdir(parents=True, exist_ok=True)
+            if artifact_path.exists():
+                if artifact_path.read_bytes() != artifact_bytes:
+                    raise B2EE2EError("immutable canonical artifact collision")
+            else:
+                artifact_path.write_bytes(artifact_bytes)
+        write_snapshot(root_path, snapshot)
+        series = create_or_load_series(
+            root_path, str(projected_case["market"]), str(projected_case["symbol"]),
+            str(projected_case["company"]), created_at,
+        )
+        revision_number = next_revision(root_path, series["decision_series_id"])
+        revision_path = write_decision_revision(
+            root_path,
+            series["decision_series_id"],
+            revision_number,
+            snapshot,
+            run_id=run_id,
+            decision_admission=dict(decision_admission),
+        )
+        revision = json.loads(revision_path.read_text(encoding="utf-8"))
+    else:
+        # Useful for conformance tests and diagnostics, but no persistent run
+        # authority means this result is not publishable as a canonical decision.
+        revision = build_decision_revision(
+            revision=1,
+            snapshot=snapshot,
+            run_id=run_id,
+            decision_admission=decision_admission,
+        )
     validate_decision_revision(
         revision,
         case_id=admitted.case_id,
@@ -384,6 +594,13 @@ def run_b2e_conformance(
         decision_admission=decision_admission,
         decision_revision=revision,
         binding_receipt=receipt,
+        canonicality_status=(
+            "CANONICAL_RUN_IN_PROGRESS" if run_root is not None
+            else "NON_CANONICAL_CONFORMANCE_ONLY"
+        ),
+        run_state_path=(
+            str(run_state_path(run_root, run_id)) if run_root is not None else None
+        ),
     )
 
 

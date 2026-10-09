@@ -191,6 +191,27 @@ def write_decision_revision(
     trigger_event_id: str | None = None,
     decision_admission: dict[str, Any] | None = None,
 ) -> Path:
+    from .canonical_run_authority_v01 import (
+        CanonicalRunAuthorizationError,
+        authorize_decision_revision_write,
+        advance_persisted_run,
+        run_state_path,
+        validate_run_state_record,
+        validate_stage_authority_ref,
+    )
+    from .canonical_research_orchestrator import Stage
+
+    if snapshot.get("snapshot_schema") != "IIOS-MVP-SNAPSHOT-0.3.0":
+        raise CanonicalRunAuthorizationError(
+            "NON_CANONICAL: only v0.3 snapshots may be persisted as formal Decision Revisions"
+        )
+    if decision_admission is None:
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: canonical v0.3 Decision Revision requires a Decision Admission receipt"
+        )
+    if run_id != decision_admission.get("run_id", run_id):
+        raise CanonicalRunAuthorizationError("Decision Admission run binding mismatch")
+
     expected_revision = next_revision(root, series_id)
     series = load_series(root, series_id)
     if not series:
@@ -211,8 +232,58 @@ def write_decision_revision(
             series_value = series_value.upper()
         if not snapshot_value or snapshot_value != series_value:
             raise ValueError(f"decision series identity mismatch: {field}")
-    if snapshot.get("snapshot_schema") == "IIOS-MVP-SNAPSHOT-0.3.0" and decision_admission is None:
-        raise ValueError("canonical v0.3 Decision Revision requires a Decision Admission receipt")
+
+    canonical_decision_id = f"{series_id}-r{revision:03d}"
+    path = _decision_path(root, canonical_decision_id)
+    if path.exists():
+        existing = _load_revision(root, canonical_decision_id)
+        validate_decision_revision(
+            existing,
+            case_id=str(input_data.get("case_id")),
+            cutoff_date=str(input_data.get("cutoff_date")),
+        )
+        if (
+            existing.get("snapshot_hash") != snapshot.get("snapshot_hash")
+            or existing.get("run_id") != run_id
+            or existing.get("decision_admission") != decision_admission
+        ):
+            raise CanonicalRunAuthorizationError(
+                "immutable Decision Revision does not match this request/run/admission"
+            )
+        validate_stage_authority_ref(
+            root,
+            existing.get("run_authority_ref"),
+            required_stage=Stage.DECISION_ADMITTED,
+            required_hashes=(
+                str(snapshot.get("snapshot_hash")),
+                str(decision_admission.get("admission_record_hash")),
+            ),
+        )
+        state_path = run_state_path(root, run_id)
+        state = validate_run_state_record(json.loads(state_path.read_text(encoding="utf-8")))
+        if state["envelope"]["stage_state"] == Stage.DECISION_ADMITTED.value:
+            advance_persisted_run(
+                root, run_id, Stage.HUMAN_APPROVAL_PENDING,
+                input_refs=("snapshot", "decision_admission"),
+                input_hashes=(
+                    str(snapshot["snapshot_hash"]),
+                    str(decision_admission["admission_record_hash"]),
+                ),
+                output_refs=(existing["decision_id"], f"revision:{revision}"),
+                output_hashes=(existing["revision_hash"],),
+            )
+        return path
+
+    if revision != expected_revision:
+        raise ValueError(
+            f"revision {revision} is not the next canonical revision; expected {expected_revision}"
+        )
+    run_authority_ref = authorize_decision_revision_write(
+        root,
+        run_id=run_id,
+        snapshot=snapshot,
+        decision_admission=decision_admission,
+    )
     payload = build_decision_revision(
         decision_series_id=series_id,
         revision=revision,
@@ -220,29 +291,24 @@ def write_decision_revision(
         run_id=run_id,
         trigger_event_id=trigger_event_id,
         decision_admission=decision_admission,
+        run_authority_ref=run_authority_ref,
     )
-    path = _decision_path(root, payload["decision_id"])
+    _atomic_create(path, payload)
+    _atomic_replace(_index_path(root, series_id), {"next_revision": revision + 1})
 
-    if path.exists():
-        existing = _load_revision(root, payload["decision_id"])
-        validate_decision_revision(
-            existing,
-            case_id=payload["case_id"],
-            cutoff_date=payload["cutoff_date"],
-        )
-        if canonical_json(existing) != canonical_json(payload):
-            raise ValueError("immutable decision revision already exists with different content")
-    else:
-        if revision != expected_revision:
-            raise ValueError(
-                f"revision {revision} is not the next canonical revision; expected {expected_revision}"
-            )
-        _atomic_create(path, payload)
-
-    next_value = max(expected_revision, revision + 1)
-    _atomic_replace(_index_path(root, series_id), {"next_revision": next_value})
+    # Writing a revision advances the persisted run into the only stage that
+    # permits publication. A caller-provided string run_id alone is insufficient.
+    advance_persisted_run(
+        root, run_id, Stage.HUMAN_APPROVAL_PENDING,
+        input_refs=("snapshot", "decision_admission"),
+        input_hashes=(
+            str(snapshot["snapshot_hash"]),
+            str(decision_admission["admission_record_hash"]),
+        ),
+        output_refs=(payload["decision_id"], f"revision:{revision}"),
+        output_hashes=(payload["revision_hash"],),
+    )
     return path
-
 
 def write_human_approval(
     root: str | Path,
@@ -346,6 +412,7 @@ def replay_decision_lifecycle(
         run_id=revision["run_id"],
         trigger_event_id=revision["trigger_event_id"],
         decision_admission=revision["decision_admission"],
+        run_authority_ref=revision.get("run_authority_ref"),
     )
     if canonical_json(expected_revision) != canonical_json(revision):
         raise ValueError("decision revision replay mismatch")
@@ -379,6 +446,7 @@ def replay_decision_lifecycle(
             run_id=record["run_id"],
             trigger_event_id=record["trigger_event_id"],
             decision_admission=record["decision_admission"],
+            run_authority_ref=record.get("run_authority_ref"),
         )
         if canonical_json(expected_historical_revision) != canonical_json(record):
             raise ValueError(

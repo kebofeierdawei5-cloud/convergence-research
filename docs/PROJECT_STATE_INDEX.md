@@ -55,6 +55,33 @@ Canonical incident contract: `docs/iios/P0_CANONICAL_ENTRY_INCIDENT_REPRODUCTION
 - Canonical promotion status: Batch 0 freezes a reproducible defect and acceptance contract only. Production execution enforcement remains an OPEN P0 and must be remediated and independently tested in successor batches.
 
 
+### P0 Canonical Entry and Write Authorization — Batch 1 Successor
+
+Status: **CODE + REGRESSION ACCEPTANCE PASS / PRODUCTION CONFORMANCE OPEN**
+
+- Fresh baseline: current canonical main after PR #259, `ad1c71ad97f7c19746cae68b863aac81524f142e`.
+- The fuller Batch 1 implementation from the earlier PR #257 was transplanted onto a new single-parent successor from that exact current main because the earlier PR had a stale state-index base after Route A promotion.
+- Implemented: explicit `canonical-run` entry via a registered runtime; legacy `run` no longer writes a formal decision; persisted Run Envelope and stage receipts; request/Case/admission binding; exact-byte B2 Evidence/PIT manifest checks; stage-scoped Decision Revision, Machine Publication and report authorization; complete versioned `IIOS_RUN_RECEIPT` binding and replay validation; fail-closed bypass probes and synthetic positive control-plane E2E.
+- Exact-head successor `1057c6665ce6636b895d022768c89cc5b66d20a3`: **34/34 triggered workflows SUCCESS**, including Investment Core CI, State Hygiene, CORE-00 scope isolation, P0 canonical-entry regression, B00-B authority threat reproduction, B2-E, B2-F independent red-team and report/lifecycle/monitoring regressions. These establish the tested code/control-plane boundary, not the deployed product host or live LLM economic reasoning.
+- Strict non-claims: the actual product host is not yet proven to be wired to the registered runtime; the real 605016 case remains blocked until official-source Evidence/PIT admission and authorized semantic/Forecast/Valuation inputs pass; no capital or order execution is authorized.
+
+```text
+public / operator evidence intake (no Provider API key)
+  ↓
+explicit canonical-run entry / registered runtime
+  ↓
+persisted Run Envelope + monotonic stage receipts
+  ↓
+actual B2 exact-byte/PIT admission + authorized semantic/forecast/valuation artifacts
+  ↓
+Decision Admission + revision + immutable publication + report
+  ↓
+replay-validated IIOS_RUN_RECEIPT
+```
+
+Next acceptance gate is **runtime integration and real-case evidence**, not adding Provider endpoint/key requirements to Route A: (1) wire the actual user-facing host to call `canonical-run`; (2) register an approved request interpreter, semantic producer, and canonical resolvers in that host; (3) admit the source-vintage/license/PIT-verified 605016 evidence and authorized Forecast/Valuation chain; and (4) run production-backed natural-language-to-canonical conformance. The runtime registry is intentionally empty by default, so `canonical-run` returns `BLOCKED / CANONICAL_RUNTIME_NOT_REGISTERED` until an approved composition is supplied. P0-LLM-001/P0-LLM-004 remain OPEN until this is proven; no default fallback is allowed.
+
+
 F-001 through F-005 have been remediated and independently re-audited. The fresh B2-F audit passed against the FR5-fix head on 2026-10-09 and is preserved as a canonical, rerunnable source/contract audit. This closes the B2-F red-team finding set; it does **not** prove production provider invocation or model/economic validity.
 
 **B2-D LIVE provider integration = OPTIONAL / BLOCKED (NOT AN MVP GATE).** No provider runtime configuration or `LIVE_RESPONSE_CAPTURED + INDEPENDENT_VERIFIED` evidence has been supplied; that matters only if the optional external-LLM integration itself is being accepted.

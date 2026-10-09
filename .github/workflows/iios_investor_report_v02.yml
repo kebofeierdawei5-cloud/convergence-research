@@ -5,6 +5,8 @@ on:
     paths:
       - "iios_mvp/investor_review_report_v02.py"
       - "iios_mvp/cli.py"
+      - "iios_mvp/machine_publication.py"
+      - "iios_mvp/canonical_run_authority_v01.py"
       - "schemas/investor_review_report_v0.2.schema.json"
       - "schemas/investor_review_qa_v0.2.schema.json"
       - "tests/test_investor_review_report_v02.py"
@@ -19,6 +21,8 @@ on:
     paths:
       - "iios_mvp/investor_review_report_v02.py"
       - "iios_mvp/cli.py"
+      - "iios_mvp/machine_publication.py"
+      - "iios_mvp/canonical_run_authority_v01.py"
       - "schemas/investor_review_report_v0.2.schema.json"
       - "schemas/investor_review_qa_v0.2.schema.json"
       - "tests/test_investor_review_report_v02.py"
@@ -38,8 +42,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Assert exact PR head checkout
         if: github.event_name == 'pull_request'
-        run: |
-          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -47,7 +50,10 @@ jobs:
       - run: python -m compileall -q iios_mvp tests
       - run: python -m pytest -q tests/test_investor_review_report_v02.py
 
-      - name: Download canonical Xinhecheng Publication evidence
+      # This is an older publication artifact captured before P0 run receipts
+      # became mandatory. It must now be rejected, not re-rendered as if it
+      # carried a current canonical Run Envelope.
+      - name: Download historical Xinhecheng Publication evidence
         uses: actions/download-artifact@v4
         with:
           artifact-ids: 11529920007
@@ -56,77 +62,67 @@ jobs:
           run-id: 37730232684
           path: /tmp/iios-xhc/artifact
 
-
-      - name: Render canonical Xinhecheng Publication through Investor Review v0.2
-        run: |
-          set +e
-          pub=/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json
-          test -f "$pub"
-          test "$(sha256sum "$pub" | awk '{print $1}')" = "7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0"
-          rm -rf /tmp/iios-xhc/formal-writer
-          mkdir -p /tmp/iios-xhc/formal-writer
-          python - <<'PY' > /tmp/iios-xhc/formal-writer/result.txt 2>&1
-          import traceback
-          from pathlib import Path
-          from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
-          pub=Path("/tmp/iios-xhc/artifact/iios-pilot02-xinhecheng-20261007/out/7e9bc390c03e12ac3309754cdb65938aa928d9dea97a4145998e3ab9911a0ea0.publication.json")
-          out=Path("/tmp/iios-xhc/formal-writer/out")
-          try:
-              out.mkdir(parents=True,exist_ok=True)
-              result=write_investor_review_report_v02(str(out),publication_path=str(pub),generated_at="2026-10-08T05:00:00+00:00")
-              print("WRITE_PASS")
-              print([str(p) for p in result])
-          except BaseException:
-              traceback.print_exc()
-              raise
-          PY
-          rc=$?
-          cat /tmp/iios-xhc/formal-writer/result.txt
-          echo FORMAL_WRITER_RC=$rc
-          set -e
-          test "$rc" = "0"
-
-
-      - name: Assert canonical Xinhecheng v0.2 Human Auditability
+      - name: Assert historical Xinhecheng Publication is rejected without run authority
         run: |
           set -euo pipefail
+          rm -rf /tmp/iios-xhc/formal-writer
+          mkdir -p /tmp/iios-xhc/formal-writer/out
           python - <<'PY'
+          import hashlib
           import json
           from pathlib import Path
-          root=Path("/tmp/iios-xhc/formal-writer/out")
-          report=json.loads(next(root.glob("*.investor-review-v02.json")).read_text(encoding="utf-8"))
-          qa=json.loads(next(root.glob("*.investor-review-v02-qa.json")).read_text(encoding="utf-8"))
-          audit=report["machine_report"]["semantic_surface"]["human_auditability"]
-          expected={
-              "report_hash": report["report_hash"] == "b5ab777d1389d20f2b6f1d03e8d15324bb03fbe58fe299c0f5ee5f7b68672bce",
-              "qa_hash": qa["qa_hash"] == "fefcdd47f83fe8c6a8b81eec7ae39cddc9cab8d6e364142fa0d6e2b118145b4d",
-              "required_return": audit["required_return"]["status"] == "INCOMPLETE" and audit["required_return"]["numeric_value"] is None,
-              "scenario_probability": audit["scenario_probability"]["status"] == "MISSING",
-              "expected_return": audit["expected_return"]["status"] == "INCOMPLETE",
-              "entry_price": audit["entry_price"]["status"] == "THRESHOLD_ONLY" and audit["entry_price"]["actionable_target_entry_price"] is None and audit["entry_price"]["threshold_price"] == "26.6",
-              "portfolio_permission": audit["portfolio_permission"]["status"] == "OVERRIDDEN_BY_DECISION",
-              "mie": audit["mie_expectation_gap"]["mie"]["status"] == "NOT_PROVIDED" and audit["mie_expectation_gap"]["mie"]["source_presence"] == "MISSING",
-              "gap": audit["mie_expectation_gap"]["expectation_gap"]["status"] == "UNKNOWN",
-              "inference_rule": audit["mie_expectation_gap"]["inference_rule"] == "absence_never_implies_not_identifiable",
-              "qa": qa["qa_status"] == "PASS" and not qa["issues"],
+          from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
+
+          artifact_root = Path("/tmp/iios-xhc/artifact")
+          candidates = sorted(artifact_root.rglob("*.publication.json"))
+          legacy = []
+          for candidate in candidates:
+              try:
+                  publication = json.loads(candidate.read_text(encoding="utf-8"))
+              except (OSError, json.JSONDecodeError):
+                  continue
+              if isinstance(publication, dict) and "canonical_run_ref" not in publication:
+                  legacy.append((candidate, publication))
+          if len(legacy) != 1:
+              raise SystemExit(
+                  "Expected exactly one historical Publication without canonical_run_ref; "
+                  f"found {len(legacy)} candidates from {len(candidates)} publication files"
+              )
+          pub, _source = legacy[0]
+          payload = pub.read_bytes()
+          out = Path("/tmp/iios-xhc/formal-writer/out")
+          receipt = {
+              "status": "BLOCKED",
+              "classification": "NON_CANONICAL",
+              "reason": "historical Publication predates persisted Run Envelope/Stage Receipt authority",
+              "input_publication_path": str(pub.relative_to(artifact_root)),
+              "input_publication_sha256": hashlib.sha256(payload).hexdigest(),
+              "formal_report_created": False,
           }
-          print(json.dumps(expected,ensure_ascii=False,sort_keys=True))
-          if not all(expected.values()): raise SystemExit("XHC_HUMAN_AUDITABILITY_ASSERT_FAIL")
+          try:
+              write_investor_review_report_v02(
+                  str(out), publication_path=str(pub),
+                  generated_at="2026-10-08T05:00:00+00:00",
+              )
+          except (ValueError, OSError) as exc:
+              receipt["reason"] = str(exc)
+              if "Run Envelope/Stage Receipt authority" not in receipt["reason"]:
+                  raise SystemExit("Unexpected failure; fail-closed classification missing: " + receipt["reason"])
+          else:
+              raise SystemExit("P0 REGRESSION: a Publication without canonical run authority produced a formal report")
+          if list(out.glob("*.investor-review-v02.json")) or list(out.glob("*.investor-review-v02.machine.json")) or list(out.glob("*.investor-review-v02.md")) or list(out.glob("*.investor-review-v02-qa.json")):
+              raise SystemExit("P0 REGRESSION: blocked write left formal report side effects")
+          (Path("/tmp/iios-xhc/formal-writer") / "blocked-receipt.json").write_text(
+              json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(receipt, ensure_ascii=False, sort_keys=True))
           PY
 
-      - name: Second-round independent clean-room redteam
-        run: |
-          set -euo pipefail
-          python tests/independent_redteam_investor_review_v02.py \
-            --report "$(find /tmp/iios-xhc/formal-writer/out -name '*.investor-review-v02.json' -print -quit)" \
-            --qa "$(find /tmp/iios-xhc/formal-writer/out -name '*.investor-review-v02-qa.json' -print -quit)" \
-            --markdown "$(find /tmp/iios-xhc/formal-writer/out -name '*.investor-review-v02.md' -print -quit)"
-
-      - name: Upload real Xinhecheng v0.2 report evidence
+      - name: Upload rejection evidence for historical Publication
         uses: actions/upload-artifact@v4
         with:
-          name: iios-investor-review-v02-xinhecheng
-          path: /tmp/iios-xhc/formal-writer/out/
+          name: iios-investor-review-v02-rejected-historical-xinhecheng
+          path: /tmp/iios-xhc/formal-writer/blocked-receipt.json
           if-no-files-found: error
 
       - run: python -m json.tool schemas/investor_review_report_v0.2.schema.json >/dev/null

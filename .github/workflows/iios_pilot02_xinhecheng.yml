@@ -144,13 +144,17 @@ jobs:
             --receipt /tmp/pilot02-xhc/PILOT-02_RAW_EVIDENCE_RECEIPT.json \
             --out /tmp/pilot02-xhc/out
 
-      - name: Assert pilot result
+      - name: Assert capture is preserved but canonical lifecycle is fail-closed
         run: |
           python - <<'PY'
           import json
           from decimal import Decimal
           p="/tmp/pilot02-xhc/out/PILOT-02_XINHECHENG_RESULT.json"
           x=json.load(open(p,encoding="utf-8"))
+          assert x["pilot"]=="PILOT-02"
+          assert x["status"]=="BLOCKED_NOT_ADMITTED"
+          assert x["canonicality_status"]=="NON_CANONICAL_PREVIEW_ONLY"
+          assert x["blocking_gate"]=="B2_EVIDENCE_PIT_MANIFEST_AND_RUN_ENVELOPE_REQUIRED"
           assert x["company"]=="浙江新和成股份有限公司"
           assert x["symbol"]=="002001"
           assert x["cutoff_date"]=="2026-10-07"
@@ -159,18 +163,31 @@ jobs:
           assert x["security_classification"]=="NON_FINANCIAL"
           assert x["research_weighting"]["cyclical"]=="0.70"
           assert x["research_weighting"]["growth"]=="0.30"
-          assert x["decision"]["action"]=="REVIEW_REQUIRED"
-          assert x["decision"]["new_capital_allowed"] is False
-          assert x["decision"]["human_approval_required"] is True
-          assert x["decision"]["auto_execution"] is False
-          assert x["publication"]["qa_status"]=="PASS"
-          assert x["publication"]["report_deterministic_replay"] is True
-          assert x["lifecycle"]["decision_replay_status"]=="PASS"
-          assert Decimal(x["return_metrics"]["expected_annualized_return"]) > Decimal("0.15")
-          assert x["return_metrics"]["fundamental_target_pass"] is True
-          assert x["return_metrics"]["required_return_pass"] is True
-          assert x["return_metrics"]["risk_pass"] is True
-          print("PILOT-02_XINHECHENG_ACCEPTANCE_ASSERTIONS_OK")
+          assert x["raw_ingress"]["report_exact_bytes"] is True
+          assert x["raw_ingress"]["price_exact_bytes"] is True
+          assert x["raw_ingress"]["calendar_exact_bytes"] is True
+          assert x["raw_ingress"]["captured_sources_are_not_fact_admissions"] is True
+          assert x["evidence_admission"]["manifest_present"] is False
+          assert x["evidence_admission"]["admitted_field_groups"] == []
+          assert set(x["evidence_admission"]["missing_required_field_groups"]) == set(x["evidence_admission"]["required_field_groups"])
+          assert x["economic_preview"]["action_preview"]=="REVIEW_REQUIRED"
+          assert x["economic_preview"]["new_capital_allowed_preview"] is False
+          assert x["economic_preview"]["human_approval_required"] is True
+          assert x["economic_preview"]["auto_execution"] is False
+          assert x["lifecycle"]["formal_decision_revision_created"] is False
+          assert x["lifecycle"]["trigger_state"]=="NOT_RUN"
+          assert x["lifecycle"]["monitoring_evaluation_status"]=="NOT_RUN"
+          assert x["lifecycle"]["validation_status"]=="NOT_RUN"
+          assert x["lifecycle"]["decision_replay_status"]=="NOT_RUN"
+          assert x["publication"]["status"]=="BLOCKED_NOT_ADMITTED"
+          assert x["publication"]["report_status"]=="BLOCKED_NOT_ADMITTED"
+          assert x["publication"]["publication_hash"] is None
+          assert x["publication"]["report_hash"] is None
+          assert Decimal(x["economic_preview"]["return_metrics_preview"]["expected_annualized_return"]) > Decimal("0.15")
+          assert x["economic_preview"]["return_metrics_preview"]["fundamental_target_pass"] is True
+          assert x["economic_preview"]["return_metrics_preview"]["required_return_pass"] is True
+          assert x["economic_preview"]["return_metrics_preview"]["risk_pass"] is True
+          print("PILOT-02_RAW_CAPTURE_PRESERVED_FORMAL_WRITES_BLOCKED_OK")
           PY
 
       - uses: actions/upload-artifact@v4

@@ -76,9 +76,10 @@ def persist_revision(tmp_path, *, action="REVIEW_REQUIRED"):
     )
     snapshot = make_snapshot(action=action)
     write_snapshot(tmp_path, snapshot)
-    from tests.decision_admission_fixture import build_fixture_admission_receipt
+    from tests.decision_admission_fixture import build_fixture_admission_receipt, prepare_authorized_test_run
     admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
     decision_id = "CN-A-300750-r001"
+    prepare_authorized_test_run(root=str(tmp_path), run_id="run-c1-001", snapshot=snapshot, decision_admission=admission)
     write_decision_revision(
         tmp_path,
         series["decision_series_id"],
@@ -193,7 +194,7 @@ def test_machine_publication_separates_human_approval_and_lifecycle_refs(tmp_pat
     assert record["integrity"]["validation_hashes"]
 
 
-def test_machine_publication_old_bytes_remain_valid_after_new_publication(tmp_path):
+def test_machine_publication_is_immutable_per_canonical_run(tmp_path):
     _, _, decision_id = persist_revision(tmp_path)
     first = write_machine_publication(
         tmp_path,
@@ -201,16 +202,18 @@ def test_machine_publication_old_bytes_remain_valid_after_new_publication(tmp_pa
         published_at="2026-10-06T01:00:00+00:00",
     )
     first_bytes = first.read_bytes()
-
-    second = write_machine_publication(
-        tmp_path,
-        decision_id=decision_id,
-        published_at="2026-10-06T04:00:00+00:00",
-    )
-    assert second != first
+    state_path = tmp_path / "canonical-runs" / "run-c1-001.run.json"
+    state_before = state_path.read_bytes()
+    with pytest.raises(ValueError, match="different PUBLISHED artifact"):
+        write_machine_publication(
+            tmp_path,
+            decision_id=decision_id,
+            published_at="2026-10-06T04:00:00+00:00",
+        )
     assert first.read_bytes() == first_bytes
+    assert state_path.read_bytes() == state_before
+    assert len(list(tmp_path.glob("*.publication.json"))) == 1
     validate_machine_publication(json.loads(first.read_text(encoding="utf-8")))
-    validate_machine_publication(json.loads(second.read_text(encoding="utf-8")))
 
 
 def test_machine_publication_fails_closed_on_source_revision_tampering(tmp_path):

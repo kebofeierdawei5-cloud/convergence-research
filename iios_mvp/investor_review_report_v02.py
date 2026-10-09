@@ -8,6 +8,14 @@ from typing import Any, Mapping
 
 from .engine import canonical_json, sha256_obj
 from .machine_publication import validate_machine_publication
+from .canonical_run_authority_v01 import (
+    authorize_report_write,
+    advance_persisted_run,
+    run_state_path,
+    validate_run_state_record,
+    write_complete_run_receipt,
+)
+from .canonical_research_orchestrator import Stage
 
 INVESTOR_REPORT_VERSION = "IIOS-INVESTOR-REVIEW-0.2"
 INVESTOR_QA_VERSION = "IIOS-INVESTOR-REVIEW-QA-0.2"
@@ -887,6 +895,7 @@ def _write_immutable(path: Path, content: bytes) -> None:
 def write_investor_review_report_v02(root: str | Path, *, publication_path: str | Path, generated_at: str) -> tuple[Path, Path, Path, Path]:
     publication = _load_json(publication_path)
     validate_machine_publication(publication)
+    run_authority_ref = authorize_report_write(root, publication=publication)
     report = build_investor_review_report_v02(publication=publication, generated_at=generated_at)
     validate_investor_review_report_v02(report)
     qa = qa_investor_review_v02(publication=publication, report=report)
@@ -898,8 +907,65 @@ def write_investor_review_report_v02(root: str | Path, *, publication_path: str 
     mp = root_path / f'{report["machine_report_hash"]}.investor-review-v02.machine.json'
     hp = root_path / f'{report["human_report_hash"]}.investor-review-v02.md'
     qp = root_path / f'{qa["qa_hash"]}.investor-review-v02-qa.json'
+
+    # Compute the immutable bundle identity and check run state before writing.
+    # A completed run cannot be silently revised by changing generated_at,
+    # report content or QA output; a new report requires a new decision/run.
+    run_id = str(run_authority_ref["run_id"])
+    report_bundle_hash = sha256_obj({
+        "report_hash": report["report_hash"],
+        "machine_report_hash": report["machine_report_hash"],
+        "human_report_hash": report["human_report_hash"],
+        "qa_hash": qa["qa_hash"],
+    })
+    state_path = run_state_path(root, run_id)
+    state = validate_run_state_record(_load_json(str(state_path)))
+    current_stage = state["envelope"]["stage_state"]
+    if current_stage not in {Stage.PUBLISHED.value, Stage.REPORTED.value, Stage.COMPLETE.value}:
+        raise ValueError("report cannot finalize a run outside PUBLISHED/REPORTED/COMPLETE")
+    if current_stage in {Stage.REPORTED.value, Stage.COMPLETE.value}:
+        reported = [
+            x for x in state["envelope"]["stage_receipts"]
+            if x["stage_id"] == Stage.REPORTED.value
+        ]
+        if not reported or report_bundle_hash not in reported[-1]["output_hashes"]:
+            raise ValueError("run already binds a different final report bundle")
+    if current_stage == Stage.COMPLETE.value:
+        receipt_path = Path(root) / f"{run_id}.run-receipt.json"
+        if not receipt_path.is_file():
+            raise ValueError("COMPLETE run is missing its immutable Run Receipt")
+        persisted_receipt = _load_json(receipt_path)
+        if persisted_receipt.get("report_hash") != report_bundle_hash:
+            raise ValueError("Run Receipt already binds a different final report bundle")
+
     _write_immutable(rp, json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8") + b"\n")
     _write_immutable(mp, json.dumps(report["machine_report"], ensure_ascii=False, indent=2).encode("utf-8") + b"\n")
     _write_immutable(hp, report["markdown"].encode("utf-8"))
     _write_immutable(qp, json.dumps(qa, ensure_ascii=False, indent=2).encode("utf-8") + b"\n")
+
+    # Publish the report-stage receipt only after all immutable outputs exist.
+    if current_stage == Stage.PUBLISHED.value:
+        advance_persisted_run(
+            root, run_id, Stage.REPORTED,
+            input_refs=(publication["publication_id"],),
+            input_hashes=(publication["publication_hash"],),
+            output_refs=(
+                "report_bundle", report["report_id"], report["machine_report_hash"],
+                report["human_report_hash"], qa["qa_hash"],
+            ),
+            output_hashes=(
+                report_bundle_hash, report["report_hash"],
+                report["machine_report_hash"], report["human_report_hash"], qa["qa_hash"],
+            ),
+            producer_type="CODE",
+            producer_version=INVESTOR_REPORT_VERSION,
+        )
+        advance_persisted_run(
+            root, run_id, Stage.COMPLETE,
+            input_refs=(report["report_id"],),
+            input_hashes=(report_bundle_hash,),
+            producer_type="CODE",
+            producer_version=INVESTOR_REPORT_VERSION,
+        )
+    write_complete_run_receipt(root, run_id, report_hash=report_bundle_hash)
     return rp, mp, hp, qp
