@@ -461,8 +461,9 @@ def decide(case: dict[str, Any], *, evidence_root_resolver: Any | None = None, c
 
 
 def _mark_direct_engine_result_non_canonical(snapshot: dict[str, Any]) -> dict[str, Any]:
+    source_hash = str(snapshot.get("snapshot_hash", ""))
     classification_core = {
-        "snapshot_hash": snapshot.get("snapshot_hash"),
+        "source_snapshot_hash": source_hash,
         "status": "NON_CANONICAL",
         "reason": "direct lower-level run_case invocation has no persisted Run Envelope/Stage Admission authority",
     }
@@ -470,6 +471,10 @@ def _mark_direct_engine_result_non_canonical(snapshot: dict[str, Any]) -> dict[s
         **classification_core,
         "classification_hash": sha256_obj(classification_core),
     }
+    # Keep the diagnostic artifact internally hash-consistent while making its
+    # non-canonical provenance explicit; integrity must not be confused with admission.
+    payload = {k: v for k, v in snapshot.items() if k != "snapshot_hash"}
+    snapshot["snapshot_hash"] = sha256_obj(payload)
     return snapshot
 
 
