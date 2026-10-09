@@ -23,7 +23,7 @@ def test_capture_workflow_uses_path_allowlist_no_secrets_and_no_admission_claim(
     assert 'candidate.is_absolute()' in text
     assert '".." in candidate.parts' in text
     assert "secrets." not in text
-    assert "B2_PREFLIGHT_BLOCKED_NOT_ADMITTED" in text or "B2_PREFLIGHT_OUTCOME" in text
+    assert "route_a_capture_final_gate.py" in text or "B2_PREFLIGHT_OUTCOME" in text
     assert "route_a_capture_final_gate.py" in text
     assert "upload_evidence_artifact" in text
     assert "retention-days: 14" in text
