@@ -61,6 +61,8 @@ Therefore:
 
 ### Current next development batch
 
+The primary Investment Core MVP path remains **Route A — free-first single-company evidence intake**. B2-D LIVE remains a separately tracked model-integration gate and does not block capture from official/free sources or operator-supplied raw originals. Every Route-A capture receipt stays `NOT_ADMITTED` until existing B2 Evidence/PIT admission accepts the source facts.
+
 **Route A first real capture = captured + independently integrity-verified; B2 Evidence/PIT admission is still pending.** The next batch is to take the actual five-source run artifact through the existing B2 Evidence/PIT gate (not invent a second admission system), and record per-source admission/UNKNOWN decisions. The first bundle is not complete for company-level analysis: the market-price, business-reality and capital-structure field groups have no captured bytes yet.
 
 ```text
