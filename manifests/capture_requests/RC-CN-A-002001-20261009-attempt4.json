@@ -1,0 +1,7 @@
+{
+  "schema_version": "IIOS-COMPANY-EVIDENCE-CAPTURE-REQUEST-0.1",
+  "case_id": "RC-CN-A-002001-20261009",
+  "manifest_path": "manifests/company_cases/RC-CN-A-002001-20261009.json",
+  "requested_at": "2026-10-09T20:40:00+08:00",
+  "purpose": "Capture added public market-price candidate source pages from the 10-source Newhecheng Route A case manifest, preserve exact bytes, and independently verify hashes only; no source/evidence/PIT admission."
+}
