@@ -610,6 +610,98 @@ def block_persisted_run(root: str | Path, run_id: str, reason: str) -> dict[str,
     )
 
 
+def validate_complete_run_receipt(
+    root: str | Path,
+    run_id: str,
+) -> dict[str, Any]:
+    """Replay the complete receipt against the exact persisted Run Envelope."""
+    path = run_receipt_path(root, run_id)
+    if not path.is_file():
+        raise CanonicalRunAuthorizationError("complete Run Receipt is absent")
+    try:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CanonicalRunAuthorizationError("complete Run Receipt cannot be read") from exc
+    fields = {
+        "schema_version", "run_id", "case_id", "market", "symbol", "cutoff_date",
+        "as_of_date", "orchestrator_version", "research_case_hash", "raw_request_sha256",
+        "request_receipt_hash", "normalized_request_sha256", "stage_receipt_hashes",
+        "stage_chain_hash", "evidence_manifest_hash", "semantic_artifact_hashes",
+        "forecast_admission_hash", "valuation_admission_hash", "return_hash",
+        "risk_portfolio_hash", "decision_admission_hash", "decision_revision",
+        "publication_hash", "report_hash", "run_status", "receipt_hash",
+    }
+    if not isinstance(receipt, Mapping) or set(receipt) != fields:
+        raise CanonicalRunAuthorizationError("complete Run Receipt fields are invalid")
+    if receipt["schema_version"] != RUN_RECEIPT_V02_SCHEMA_VERSION or receipt["run_id"] != run_id:
+        raise CanonicalRunAuthorizationError("complete Run Receipt version/run_id mismatch")
+    core = {k: receipt[k] for k in fields if k != "receipt_hash"}
+    if not is_sha256(receipt["receipt_hash"]) or canonical_hash(core) != receipt["receipt_hash"]:
+        raise CanonicalRunAuthorizationError("complete Run Receipt hash mismatch")
+    record = _load_record(root, run_id)
+    env = record["envelope"]
+    if env["run_status"] != RunStatus.COMPLETE.value or env["stage_state"] != Stage.COMPLETE.value:
+        raise CanonicalRunAuthorizationError("Run Envelope is not COMPLETE")
+    metadata = record["request_metadata"]
+    bindings = {
+        "run_id": env["run_id"], "case_id": env["case_id"], "market": env["market"],
+        "symbol": env["symbol"], "cutoff_date": env["cutoff_date"], "as_of_date": env["as_of_date"],
+        "orchestrator_version": env["orchestrator_version"],
+        "research_case_hash": env["research_case_hash"],
+        "raw_request_sha256": metadata["raw_request_sha256"],
+        "request_receipt_hash": metadata["request_receipt_hash"],
+        "normalized_request_sha256": metadata["normalized_request_sha256"],
+        "stage_receipt_hashes": record["stage_receipt_hashes"],
+        "stage_chain_hash": record["stage_chain_hash"],
+        "run_status": RunStatus.COMPLETE.value,
+    }
+    for key, expected in bindings.items():
+        if receipt[key] != expected:
+            raise CanonicalRunAuthorizationError(f"Run Receipt {key} does not match Run Envelope")
+    stages = {x["stage_id"]: x for x in env["stage_receipts"]}
+    for stage in (
+        Stage.EVIDENCE_ADMITTED, Stage.SEMANTIC_ADMITTED, Stage.FORECAST_ADMITTED,
+        Stage.VALUATION_ADMITTED, Stage.DECISION_ADMITTED,
+        Stage.HUMAN_APPROVAL_PENDING, Stage.PUBLISHED, Stage.REPORTED, Stage.COMPLETE,
+    ):
+        if stage.value not in stages:
+            raise CanonicalRunAuthorizationError("complete Run Receipt omits required stage " + stage.value)
+    evidence = stages[Stage.EVIDENCE_ADMITTED.value]
+    semantic = stages[Stage.SEMANTIC_ADMITTED.value]
+    forecast = stages[Stage.FORECAST_ADMITTED.value]
+    valuation = stages[Stage.VALUATION_ADMITTED.value]
+    decision = stages[Stage.DECISION_ADMITTED.value]
+    published = stages[Stage.PUBLISHED.value]
+    reported = stages[Stage.REPORTED.value]
+    if receipt["evidence_manifest_hash"] != evidence["output_hashes"][0]:
+        raise CanonicalRunAuthorizationError("Run Receipt Evidence Manifest binding mismatch")
+    if receipt["semantic_artifact_hashes"] != semantic["output_hashes"]:
+        raise CanonicalRunAuthorizationError("Run Receipt semantic artifact binding mismatch")
+    if receipt["forecast_admission_hash"] != forecast["output_hashes"][0]:
+        raise CanonicalRunAuthorizationError("Run Receipt Forecast admission binding mismatch")
+    if receipt["valuation_admission_hash"] != valuation["output_hashes"][0]:
+        raise CanonicalRunAuthorizationError("Run Receipt Valuation admission binding mismatch")
+    decision_hashes = dict(zip(decision["output_refs"], decision["output_hashes"]))
+    for key, ref in (("return_hash", "return_metrics"), ("risk_portfolio_hash", "risk_portfolio"), ("decision_admission_hash", "decision_admission")):
+        if receipt[key] != decision_hashes.get(ref):
+            raise CanonicalRunAuthorizationError(f"Run Receipt {key} binding mismatch")
+    revision_refs = [
+        x for x in stages[Stage.HUMAN_APPROVAL_PENDING.value]["output_refs"]
+        if re.search(r"-r([0-9]+)$", x)
+    ]
+    if len(revision_refs) != 1:
+        raise CanonicalRunAuthorizationError("Run Receipt cannot identify one Decision Revision")
+    revision_match = re.search(r"-r([0-9]+)$", revision_refs[0])
+    assert revision_match is not None
+    if receipt["decision_revision"] != int(revision_match.group(1)):
+        raise CanonicalRunAuthorizationError("Run Receipt Decision Revision number mismatch")
+    if receipt["publication_hash"] != published["output_hashes"][0]:
+        raise CanonicalRunAuthorizationError("Run Receipt Publication binding mismatch")
+    if not reported["output_hashes"] or receipt["report_hash"] != reported["output_hashes"][0]:
+        raise CanonicalRunAuthorizationError("Run Receipt final report binding mismatch")
+    return dict(receipt)
+
+
 def write_complete_run_receipt(
     root: str | Path,
     run_id: str,
@@ -688,7 +780,7 @@ def write_complete_run_receipt(
             raise CanonicalRunAuthorizationError("complete Run Receipt is immutable")
     else:
         _atomic_write_json(path, receipt)
-    return receipt
+    return validate_complete_run_receipt(root, run_id)
 
 
 __all__ = [
@@ -697,5 +789,5 @@ __all__ = [
     "PersistedCanonicalResearchOrchestrator", "run_state_path", "run_receipt_path",
     "validate_run_state_record", "make_stage_authority_ref", "validate_stage_authority_ref",
     "authorize_decision_revision_write", "authorize_publication_write",
-    "authorize_report_write", "advance_persisted_run", "block_persisted_run", "write_complete_run_receipt",
+    "authorize_report_write", "advance_persisted_run", "block_persisted_run", "write_complete_run_receipt", "validate_complete_run_receipt",
 ]
