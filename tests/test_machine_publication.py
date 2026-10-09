@@ -23,6 +23,8 @@ from iios_mvp.store import (
 )
 from iios_mvp.trigger_production import build_trigger_contract, validate_trigger_contract
 from iios_mvp.store import write_trigger_contract
+from tests.decision_admission_fixture import build_fixture_admission_receipt
+from tests.canonical_run_authorization_fixture import authorize_test_run
 
 
 SCHEMA = Path("schemas/machine_publication_v0.1.schema.json")
@@ -76,10 +78,8 @@ def persist_revision(tmp_path, *, action="REVIEW_REQUIRED"):
     )
     snapshot = make_snapshot(action=action)
     write_snapshot(tmp_path, snapshot)
-    from tests.decision_admission_fixture import build_fixture_admission_receipt
-from tests.canonical_run_authorization_fixture import authorize_test_run
-from tests.canonical_run_authorization_fixture import authorize_test_run
     admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
+    authorize_test_run(tmp_path, snapshot=snapshot, decision_admission=admission, run_id="run-c1-001")
     decision_id = "CN-A-300750-r001"
     write_decision_revision(
         tmp_path,
