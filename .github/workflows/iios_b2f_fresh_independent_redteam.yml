@@ -1,0 +1,41 @@
+name: IIOS B2-F Fresh Independent Red-team (FR1–FR5)
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/b2e_nl_semantic_decision_e2e_v01.py"
+      - "iios_mvp/decision_lifecycle_production.py"
+      - "schemas/decision_lifecycle_v0.2.schema.json"
+      - ".github/workflows/iios_b2d3_real_provider.yml"
+      - "tests/independent_redteam_b2f_fr1_fr5.py"
+      - ".github/workflows/iios_b2f_fresh_independent_redteam.yml"
+      - "docs/PROJECT_STATE_INDEX.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-redteam:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install verification dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - name: Run fresh B2-F independent source/contract audit
+        run: |
+          PYTHONPATH=. pytest -q tests/independent_redteam_b2f_fr1_fr5.py --maxfail=0
+      - name: Run relevant runtime regression tests
+        run: |
+          PYTHONPATH=. pytest -q \
+            tests/test_b2e_nl_semantic_decision_e2e.py \
+            tests/test_decision_lifecycle_production.py \
+            tests/test_b2d3_live_provider_workflow_contract.py
+      - name: Compile and diff check
+        run: |
+          python -m compileall -q iios_mvp tests
+          git diff --check
