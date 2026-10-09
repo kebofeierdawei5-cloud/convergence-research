@@ -1,6 +1,6 @@
 # Route A — Free-First Company Evidence Intake v0.1
 
-Status: **IMPLEMENTATION CANDIDATE until the exact-head CI and independent tests pass**
+Status: **PASS / CANONICAL for raw-intake infrastructure; evidence admission remains separate**
 
 ## Task contract
 
@@ -27,6 +27,8 @@ python tools/verify_company_evidence_intake.py \
 
 For a public official source, replace `local_path` with a publicly accessible `https://` `url`. URLs with embedded credentials/signed-token query parameters are rejected. HTTPS redirects are allowed only if they remain HTTPS. Each object is capped at 50 MiB; use a new, empty output directory for every run. The intake refuses to overwrite prior artifacts.
 
+For checked-in case manifests under `manifests/company_cases/`, `.github/workflows/iios_company_evidence_capture.yml` can download public HTTPS sources and upload raw files, receipt and independent verification as a 14-day artifact. It requires no secrets and never fetches sources on pull-request events. Manual capture of operator-supplied local files remains a local CLI operation using `--input-root`.
+
 The `raw/` directory retains exact bytes. The receipt retains the exact intake manifest copy and SHA-256 for each byte object. Never put API keys, private URLs, raw company documents, or generated evidence runs into Git. Run data locally or in a controlled evidence store.
 
 ## Trust and PIT contract
@@ -42,4 +44,4 @@ The `raw/` directory retains exact bytes. The receipt retains the exact intake m
 
 ## CI boundary
 
-The dedicated GitHub workflow validates schemas, runs deterministic tests/red-team attacks, and checks code formatting. It deliberately does not download external sources on pull requests, need secrets, or declare a real company case admitted. An actual capture must be an operator-triggered/local run with a specific case and real source manifest.
+The dedicated contract workflow validates schemas and runs deterministic tests/red-team attacks without network fetches. The separate capture workflow is manual-only or triggered by an explicit push to a dedicated `route-a-capture/**` branch with a capture-request file; it captures only public HTTPS sources, needs no secrets, and uploads a short-retention artifact. Capture plus independent byte integrity verification still does not admit evidence or certify source authenticity, PIT eligibility or completeness.
