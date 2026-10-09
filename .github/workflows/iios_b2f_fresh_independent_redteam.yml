@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install verification dependencies
-        run: python -m pip install --disable-pip-version-check pytest jsonschema
+        run: python -m pip install --disable-pip-version-check pytest jsonschema pyyaml
       - name: Run fresh B2-F independent source/contract audit
         run: |
           PYTHONPATH=. pytest -q tests/independent_redteam_b2f_fr1_fr5.py --maxfail=0
