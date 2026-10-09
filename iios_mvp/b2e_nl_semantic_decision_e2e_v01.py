@@ -12,6 +12,10 @@ from iios_mvp.canonical_natural_language_entry_v01 import (
     admit_natural_language_request,
 )
 from iios_mvp.canonical_research_orchestrator import CanonicalResearchOrchestrator, Stage
+from iios_mvp.canonical_run_authority_v01 import (
+    PersistedCanonicalResearchOrchestrator,
+    run_state_path,
+)
 from iios_mvp.decision_admission import admit_canonical_decision
 from iios_mvp.decision_lifecycle_production import build_decision_revision, validate_decision_revision
 from iios_mvp.decision_upstream_admission_v03 import DECISION_UPSTREAM_ADMISSION_V02
@@ -54,6 +58,8 @@ class B2EConformanceResult:
     decision_admission: Mapping[str, Any]
     decision_revision: Mapping[str, Any]
     binding_receipt: Mapping[str, Any]
+    canonicality_status: str = "NON_CANONICAL_CONFORMANCE_ONLY"
+    run_state_path: str | None = None
 
 
 def _canonical(value: Any) -> bytes:
@@ -210,8 +216,13 @@ def run_b2e_conformance(
     independent_forecast_resolver: Any,
     upstream_authority_resolver: Any,
     valuation_output_resolver: Any,
+    run_root: str | None = None,
 ) -> B2EConformanceResult:
-    orchestrator = CanonicalResearchOrchestrator()
+    orchestrator = (
+        PersistedCanonicalResearchOrchestrator(run_root)
+        if run_root is not None
+        else CanonicalResearchOrchestrator()
+    )
     admitted = admit_natural_language_request(
         orchestrator=orchestrator,
         registry=request_registry,
@@ -324,22 +335,93 @@ def run_b2e_conformance(
         valuation_output_resolver=valuation_output_resolver,
     )
 
+    return_metrics_hash = sha256(canonical_decision.get("return_metrics") or {})
+    risk_portfolio_payload = (
+        canonical_decision.get("risk_portfolio_contract")
+        or canonical_decision.get("positioning_sizing")
+        or {}
+    )
+    risk_portfolio_hash = sha256(risk_portfolio_payload)
+    decision_snapshot_hash = snapshot["snapshot_hash"]
+    decision_admission_hash = decision_admission["admission_record_hash"]
+    decision_stage_refs = (
+        "decision_snapshot",
+        "decision_admission",
+        "return_metrics",
+        "risk_portfolio",
+    )
+    decision_stage_hashes = (
+        decision_snapshot_hash,
+        decision_admission_hash,
+        return_metrics_hash,
+        risk_portfolio_hash,
+    )
     orchestrator.transition(
         run_id,
         Stage.DECISION_ADMITTED,
-        output_refs=(decision_admission["admission_record_hash"],),
-        output_hashes=(decision_admission["admission_record_hash"],),
+        output_refs=decision_stage_refs,
+        output_hashes=decision_stage_hashes,
         input_refs=(semantic.artifact["artifact_id"],),
         input_hashes=(semantic.artifact["artifact_hash"],),
         created_at=created_at,
     )
 
-    revision = build_decision_revision(
-        revision=1,
-        snapshot=snapshot,
-        run_id=run_id,
-        decision_admission=decision_admission,
-    )
+    revision: Mapping[str, Any]
+    if run_root is not None:
+        from pathlib import Path
+        from iios_mvp.store import (
+            create_or_load_series, next_revision, write_decision_revision,
+            write_snapshot,
+        )
+        root_path = Path(run_root)
+        root_path.mkdir(parents=True, exist_ok=True)
+        # Persist inspectable canonical inputs before the Decision Revision. These
+        # are immutable audit artifacts; the registered validators remain the
+        # authority for their semantic admission.
+        artifacts = {
+            "research-case": admitted.research_case,
+            "investment-case": projected_case,
+            "semantic-artifact": dict(semantic.artifact),
+            "semantic-admission": dict(semantic.admission.__dict__),
+            "decision-admission": dict(decision_admission),
+        }
+        for artifact_name, artifact_payload in artifacts.items():
+            artifact_bytes = json.dumps(
+                artifact_payload, ensure_ascii=False, sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            artifact_digest = hashlib.sha256(artifact_bytes).hexdigest()
+            artifact_path = root_path / "canonical-artifacts" / f"{artifact_digest}.{artifact_name}.json"
+            artifact_path.parent.mkdir(parents=True, exist_ok=True)
+            if artifact_path.exists():
+                if artifact_path.read_bytes() != artifact_bytes:
+                    raise B2EE2EError("immutable canonical artifact collision")
+            else:
+                artifact_path.write_bytes(artifact_bytes)
+        write_snapshot(root_path, snapshot)
+        series = create_or_load_series(
+            root_path, str(projected_case["market"]), str(projected_case["symbol"]),
+            str(projected_case["company"]), created_at,
+        )
+        revision_number = next_revision(root_path, series["decision_series_id"])
+        revision_path = write_decision_revision(
+            root_path,
+            series["decision_series_id"],
+            revision_number,
+            snapshot,
+            run_id=run_id,
+            decision_admission=dict(decision_admission),
+        )
+        revision = json.loads(revision_path.read_text(encoding="utf-8"))
+    else:
+        # Useful for conformance tests and diagnostics, but no persistent run
+        # authority means this result is not publishable as a canonical decision.
+        revision = build_decision_revision(
+            revision=1,
+            snapshot=snapshot,
+            run_id=run_id,
+            decision_admission=decision_admission,
+        )
     validate_decision_revision(
         revision,
         case_id=admitted.case_id,
@@ -384,6 +466,13 @@ def run_b2e_conformance(
         decision_admission=decision_admission,
         decision_revision=revision,
         binding_receipt=receipt,
+        canonicality_status=(
+            "CANONICAL_RUN_IN_PROGRESS" if run_root is not None
+            else "NON_CANONICAL_CONFORMANCE_ONLY"
+        ),
+        run_state_path=(
+            str(run_state_path(run_root, run_id)) if run_root is not None else None
+        ),
     )
 
 
