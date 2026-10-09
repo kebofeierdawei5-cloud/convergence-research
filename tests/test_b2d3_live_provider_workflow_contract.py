@@ -6,10 +6,21 @@ WORKFLOW = ROOT / ".github" / "workflows" / "iios_b2d3_real_provider.yml"
 
 def test_b2d3_is_manual_only_and_strict():
     text = WORKFLOW.read_text(encoding="utf-8")
-    assert "workflow_dispatch:" in text
-    assert "pull_request:" not in text
+    trigger_block = text.split("permissions:", 1)[0]
+    assert "workflow_dispatch:" in trigger_block
+    assert "push:" not in trigger_block
+    assert "pull_request:" not in trigger_block
     assert "continue-on-error" not in text
     assert "if-no-files-found: error" in text
+
+
+def test_b2d3_all_provider_jobs_fail_closed_on_non_dispatch_events():
+    text = WORKFLOW.read_text(encoding="utf-8")
+    guard = "if: github.event_name == 'workflow_dispatch'"
+    secret_ref = "$" + "{{ secrets."
+    assert text.count(guard) == 2
+    assert text.index("preflight:") < text.index(guard) < text.index("IIOS_LLM_PROVIDER_API_KEY: " + secret_ref)
+    assert text.index("live_and_verify:") < text.rindex(guard) < text.rindex("IIOS_LLM_PROVIDER_API_KEY: " + secret_ref)
 
 
 def test_b2d3_injects_canonical_runtime_contract():

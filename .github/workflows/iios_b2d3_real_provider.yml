@@ -24,7 +24,10 @@ permissions:
   contents: read
 
 jobs:
+  # Defense in depth: an unexpected push-triggered run must be inert even if
+  # GitHub's workflow/event metadata contradicts the workflow_dispatch contract.
   preflight:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -64,6 +67,7 @@ print({
 PY
 
   live_and_verify:
+    if: github.event_name == 'workflow_dispatch'
     needs: preflight
     runs-on: ubuntu-24.04
     timeout-minutes: 10
