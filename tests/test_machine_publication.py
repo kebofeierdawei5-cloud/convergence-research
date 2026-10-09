@@ -76,9 +76,10 @@ def persist_revision(tmp_path, *, action="REVIEW_REQUIRED"):
     )
     snapshot = make_snapshot(action=action)
     write_snapshot(tmp_path, snapshot)
-    from tests.decision_admission_fixture import build_fixture_admission_receipt
+    from tests.decision_admission_fixture import build_fixture_admission_receipt, prepare_authorized_test_run
     admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
     decision_id = "CN-A-300750-r001"
+    prepare_authorized_test_run(root=str(tmp_path), run_id="run-c1-001", snapshot=snapshot, decision_admission=admission)
     write_decision_revision(
         tmp_path,
         series["decision_series_id"],
