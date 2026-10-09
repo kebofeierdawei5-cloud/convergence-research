@@ -212,8 +212,6 @@ def validate_run_state_record(record: Any) -> dict[str, Any]:
         raise CanonicalRunAuthorizationError("run stage/status does not match replay")
     if env["run_status"] == RunStatus.COMPLETE.value and env["stage_state"] != Stage.COMPLETE.value:
         raise CanonicalRunAuthorizationError("complete run must end at COMPLETE")
-    if env["stage_state"] == Stage.REQUEST_RECEIVED.value:
-        raise CanonicalRunAuthorizationError("request has not been admitted")
     # Any formal write requires the request, case, evidence, semantics, forecast,
     # valuation and decision receipts; a bare state file is never sufficient.
     if env["run_status"] == RunStatus.IN_PROGRESS.value:
@@ -357,8 +355,8 @@ def make_stage_authority_ref(
     record = _load_record(root, run_id)
     env = record["envelope"]
     current = Stage(env["stage_state"])
-    if env["run_status"] != RunStatus.IN_PROGRESS.value:
-        raise CanonicalRunAuthorizationError("terminal/non-canonical runs cannot authorize writes")
+    if env["run_status"] != RunStatus.IN_PROGRESS.value and not (allow_later_stage and env["stage_state"] == Stage.COMPLETE.value):
+        raise CanonicalRunAuthorizationError("terminal/non-canonical runs cannot authorize new writes")
     if allow_later_stage:
         stage_order = [s.value for s in Stage]
         if stage_order.index(current.value) < stage_order.index(required_stage.value):
@@ -607,6 +605,11 @@ def write_complete_run_receipt(
     admission_hash = ref_hashes.get("decision_admission")
     if not all(is_sha256(x) for x in (return_hash, risk_portfolio_hash, admission_hash)):
         raise CanonicalRunAuthorizationError("Decision stage lacks return/risk/admission hashes")
+    revision_refs = [x for x in by_stage[Stage.HUMAN_APPROVAL_PENDING.value]["output_refs"] if re.search(r"-r([0-9]+)$", x)]
+    if len(revision_refs) != 1:
+        raise CanonicalRunAuthorizationError("HUMAN_APPROVAL_PENDING must identify one Decision Revision")
+    revision_match = re.search(r"-r([0-9]+)$", revision_refs[0])
+    assert revision_match is not None
     receipt_core = {
         "schema_version": RUN_RECEIPT_V02_SCHEMA_VERSION,
         "run_id": run_id,
@@ -631,7 +634,7 @@ def write_complete_run_receipt(
         "return_hash": return_hash,
         "risk_portfolio_hash": risk_portfolio_hash,
         "decision_admission_hash": admission_hash,
-        "decision_revision": 1,
+        "decision_revision": int(revision_match.group(1)),
         "publication_hash": published["output_hashes"][0],
         "report_hash": report_hash,
         "run_status": RunStatus.COMPLETE.value,
