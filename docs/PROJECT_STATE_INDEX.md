@@ -69,7 +69,7 @@ Therefore:
 
 ### Current next development batch
 
-The primary Investment Core MVP path is **Route A — free-first single-company evidence intake + public web discovery**. Public web search is used only to locate candidate URLs; the selected public-source bytes must still pass capture, SHA-256 verification and the existing B2 Evidence/PIT admission. No LLM provider endpoint or API key is required on this path. B2-D remains an optional external-LLM integration adapter.
+The primary Investment Core MVP path is **Route A — free-first single-company evidence intake + public web discovery**. Public web search is used only to locate candidate URLs; the selected public-source bytes must still pass capture, SHA-256 verification and the existing B2 Evidence/PIT admission. Operator-supplied raw originals remain supported when a public URL cannot be retrieved. No LLM provider endpoint or API key is required on this path. B2-D remains an optional external-LLM integration adapter.
 
 **Route A first real capture = captured + independently integrity-verified; B2 Evidence/PIT admission is pending.** Next, use public search discovery for official/free sources that cover `market_price`, `business_reality` and `capital_structure`, then run those sources through the existing source-by-source Evidence/PIT gate. The initial five-source bundle remains incomplete for company-level analysis.
 
