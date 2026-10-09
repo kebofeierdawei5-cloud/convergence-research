@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### 2026-10-09 — Route A First Real Source Capture (Raw Intake Only)
+
+- Captured five public source objects for the manually selected `002001.SZ` case through the no-secret GitHub Actions Route A workflow.
+- Run #2 / `37918304170` = SUCCESS; all five HTTP fetches succeeded; independent verifier returned `INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION` with `raw_bytes_verified=5` and `unknown_pit_sources=1`.
+- Artifact ID `11610237261`; ZIP SHA-256 `71600859888d65d7bcdd67591f1029791910be744fe7e17dadedfcff804006d3`; 14-day GitHub retention. The evidence bundle is not embedded in Git.
+- Preserved explicit non-claim: receipt remains `CAPTURED_NOT_ADMITTED`; the IR page is UNKNOWN, four exchange PDFs remain PIT candidates, and source authenticity/license/evidence admission have not passed.
+- The next gate is the existing B2 Evidence/PIT admission for these actual bytes, followed by coverage of missing price, business-reality and capital-structure source groups.
+
 ### 2026-10-09 — Route A Free-First Company Evidence Intake
 
 - Added company-level raw intake for public HTTPS source URLs and operator-supplied original files, without paid financial-data or LLM provider credentials.
