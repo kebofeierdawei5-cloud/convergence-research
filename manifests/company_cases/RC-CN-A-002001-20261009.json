@@ -88,11 +88,11 @@
       "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
     },
     {
-      "source_id": "PRICE-INVESTING-HISTORY",
+      "source_id": "PRICE-SOHU-HISTORY-API",
       "field_group": "market_price",
-      "source_ref": "INVESTING:PUBLIC_MARKET_HISTORY",
+      "source_ref": "SOHU:PUBLIC_HISTORICAL_PRICE_API",
       "source_class": "PUBLIC_SECONDARY",
-      "url": "https://cn.investing.com/equities/zhejiang-nhu-a-historical-data",
+      "url": "https://q.stock.sohu.com/app2/history.up?method=history&code=cn_002001&sd=2026-10-09&ed=2026-10-09&t=d&res=js",
       "known_at": "",
       "known_at_basis": "",
       "published_at": "",
@@ -112,11 +112,11 @@
       "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
     },
     {
-      "source_id": "PRICE-YAHOO-HISTORY",
+      "source_id": "PRICE-EASTMONEY-KLINE-API",
       "field_group": "market_price",
-      "source_ref": "YAHOO_FINANCE:PUBLIC_MARKET_HISTORY",
+      "source_ref": "EASTMONEY:PUBLIC_HISTORICAL_KLINE_API",
       "source_class": "PUBLIC_SECONDARY",
-      "url": "https://hk.finance.yahoo.com/quote/002001.SZ/history/",
+      "url": "https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=0.002001&fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61&klt=101&fqt=0&beg=20261009&end=20261010",
       "known_at": "",
       "known_at_basis": "",
       "published_at": "",
