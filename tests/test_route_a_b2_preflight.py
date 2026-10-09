@@ -53,6 +53,26 @@ def _capture(tmp_path, *, sources=None, raw_file=True):
     return output, receipt
 
 
+def test_cli_imports_b2_contract_when_started_outside_repo_root(tmp_path):
+    import os
+    import subprocess
+    import sys
+
+    script = ROOT / "tools" / "route_a_b2_preflight.py"
+    env = dict(os.environ)
+    env.pop("PYTHONPATH", None)
+    completed = subprocess.run(
+        [sys.executable, str(script), "--help"],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "existing B2 Evidence/PIT contract" in completed.stdout
+
+
 def test_date_only_cutoff_is_expanded_to_eod_plus_0800():
     assert _b2_cutoff_end_of_day("2026-10-09") == "2026-10-09T23:59:59+08:00"
 

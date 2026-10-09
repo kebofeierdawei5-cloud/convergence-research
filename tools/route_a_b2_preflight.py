@@ -6,7 +6,14 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import sys
 from typing import Any, Mapping
+
+# Direct script execution sets sys.path[0] to tools/. Add the repository root
+# explicitly so the canonical research.b2 package is found on GitHub runners.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from research.b2.company_evidence import (
     REQUIRED_COMPANY_FIELD_GROUPS,
