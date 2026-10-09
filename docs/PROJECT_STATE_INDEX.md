@@ -55,6 +55,34 @@ Canonical incident contract: `docs/iios/P0_CANONICAL_ENTRY_INCIDENT_REPRODUCTION
 - Canonical promotion status: Batch 0 freezes a reproducible defect and acceptance contract only. Production execution enforcement remains an OPEN P0 and must be remediated and independently tested in successor batches.
 
 
+### P0 Canonical Entry and Write Authorization — Batch 1 Successor
+
+Status: **IMPLEMENTATION CANDIDATE / EXACT-HEAD ACCEPTANCE PENDING / P0s STILL OPEN**
+
+- Fresh baseline: current canonical main after PR #259, `ad1c71ad97f7c19746cae68b863aac81524f142e`.
+- The fuller Batch 1 implementation from the earlier PR #257 was transplanted onto a new single-parent successor from that exact current main because the earlier PR had a stale state-index base after Route A promotion.
+- Implemented candidate capabilities: explicit `canonical-run` entry via a registered runtime; legacy `run` no longer writes a formal decision; persisted Run Envelope and stage receipts; case/request/admission binding; exact-byte B2 Evidence/PIT manifest checking; stage-scoped Decision Revision, Machine Publication and report-write authorization; complete versioned `IIOS_RUN_RECEIPT` binding and replay validation; fail-closed bypass probes and synthetic positive control-plane E2E.
+- Rebased successor branch: `repair/p0-canonical-run-enforcement-refresh-20261009`; its PR head and exact-head CI must be resolved from Git before any acceptance claim.
+- Prior candidate head `0d7ac275e322f4e719f9b59450033d3f9a787ce1` ran the cross-repository regression suite successfully, including Investment Core, C0/C1/C2/C3/C5/C6/C7/C8, TR-01/02/03, B2-E, B2-F and P0 characterization-remediation workflows. Those results are diagnostic for that old head only; the rebased successor must rerun.
+- Strict non-claims: this is not yet proof that the actual product host is wired to the registered canonical runtime; the real 605016 case remains blocked until the official-source Evidence/PIT manifest and authorized semantic/Forecast/Valuation inputs exist; synthetic E2E does not prove live LLM economic reasoning; no capital or order execution is authorized.
+
+```text
+fresh canonical main
+  ↓
+explicit canonical-run entry / registry
+  ↓
+persisted Run Envelope + monotonic stage receipts
+  ↓
+actual B2 exact-byte/PIT admission + authorized producer/forecast/valuation artifacts
+  ↓
+Decision Admission + revision + immutable publication + report
+  ↓
+replay-validated IIOS_RUN_RECEIPT
+```
+
+Next acceptance gate: exact-head checks on the rebased successor, an independent bypass audit, and verification that the deployed/user-facing host calls `canonical-run` rather than bypassing it. P0-LLM-001/P0-LLM-004 remain OPEN until production-backed natural-language-to-canonical conformance and the real company evidence chain are proven.
+
+
 F-001 through F-005 have been remediated and independently re-audited. The fresh B2-F audit passed against the FR5-fix head on 2026-10-09 and is preserved as a canonical, rerunnable source/contract audit. This closes the B2-F red-team finding set; it does **not** prove production provider invocation or model/economic validity.
 
 **B2-D LIVE provider integration = OPTIONAL / BLOCKED (NOT AN MVP GATE).** No provider runtime configuration or `LIVE_RESPONSE_CAPTURED + INDEPENDENT_VERIFIED` evidence has been supplied; that matters only if the optional external-LLM integration itself is being accepted.
