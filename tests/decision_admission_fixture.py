@@ -95,7 +95,7 @@ def prepare_authorized_test_run(
     for index, group in enumerate(REQUIRED_COMPANY_FIELD_GROUPS):
         raw_bytes = f"SYNTHETIC_TEST_ONLY:{run_id}:{case['case_id']}:{group}:{index}".encode("utf-8")
         digest = hashlib.sha256(raw_bytes).hexdigest()
-        relative_path = f"raw/{group}.bin"
+        relative_path = f"raw/{run_id}/{group}.bin"
         raw_path = evidence_root / relative_path
         raw_path.parent.mkdir(parents=True, exist_ok=True)
         if raw_path.exists():
