@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 from typing import Any, Mapping
 
 
@@ -80,6 +81,84 @@ def prepare_authorized_test_run(
         return
 
     case = snapshot["input"]
+    # Synthetic exact-byte B2 manifest for lifecycle writer tests. These bytes
+    # are explicitly not company facts and MUST NOT be used outside tests.
+    from research.b2.company_evidence import (
+        REQUIRED_COMPANY_FIELD_GROUPS,
+        build_company_evidence_manifest,
+    )
+    root_path = Path(root).resolve()
+    evidence_root = root_path / "canonical-evidence"
+    evidence_root.mkdir(parents=True, exist_ok=True)
+    synthetic_evidence = []
+    synthetic_raw_artifacts = []
+    for index, group in enumerate(REQUIRED_COMPANY_FIELD_GROUPS):
+        raw_bytes = f"SYNTHETIC_TEST_ONLY:{run_id}:{case['case_id']}:{group}:{index}".encode("utf-8")
+        digest = hashlib.sha256(raw_bytes).hexdigest()
+        relative_path = f"raw/{group}.bin"
+        raw_path = evidence_root / relative_path
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        if raw_path.exists():
+            if raw_path.read_bytes() != raw_bytes:
+                raise AssertionError("synthetic raw evidence fixture collision")
+        else:
+            raw_path.write_bytes(raw_bytes)
+        synthetic_evidence.append({
+            "evidence_id": f"TEST-{run_id}-{group}",
+            "subject_id": str(case["case_id"]),
+            "field_id": f"{group}.test_anchor",
+            "claim_type": "OBSERVED_FACT",
+            "value": "SYNTHETIC_TEST_ONLY_NOT_REAL_FACT",
+            "observation_date": "2026-09-30",
+            "period": "TEST_PERIOD",
+            "published_at": "2026-09-30T15:00:00+08:00",
+            "known_at": "2026-09-30T16:00:00+08:00",
+            "retrieved_at": "2026-10-09T00:00:00+00:00",
+            "effective_from": "2026-09-01",
+            "effective_to": None,
+            "source_ref": f"SYNTHETIC_TEST_ONLY:{group}",
+            "source_version": "test-fixture-v1",
+            "source_locator": "Synthetic test fixture bytes",
+            "artifact_id": f"synthetic-test:{group}:{digest[:16]}",
+            "content_sha256": digest,
+            "capture_sha256": digest,
+            "exact_bytes": True,
+            "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+            "status": "ADMITTED",
+            "transformation": {"type": "DIRECT", "code_ref": None, "code_sha256": None, "formula_id": None},
+            "parents": [],
+            "quality_notes": ["SYNTHETIC_TEST_ONLY_NOT_COMPANY_EVIDENCE"],
+            "license_status": "TEST_ONLY",
+        })
+        synthetic_raw_artifacts.append({
+            "evidence_id": f"TEST-{run_id}-{group}",
+            "relative_path": relative_path,
+            "expected_size_bytes": len(raw_bytes),
+            "expected_sha256": digest,
+        })
+    manifest = build_company_evidence_manifest(
+        case_id=str(case["case_id"]),
+        market=str(case["market"]).upper(),
+        symbol=str(case["symbol"]),
+        company=str(case["company"]),
+        cutoff_date=str(case["cutoff_date"]),
+        evidence=synthetic_evidence,
+        raw_artifacts=synthetic_raw_artifacts,
+        required_field_groups=list(REQUIRED_COMPANY_FIELD_GROUPS),
+        raw_root=evidence_root,
+    )
+    if manifest.get("status") != "PASS":
+        raise AssertionError("synthetic B2 manifest fixture failed: " + "; ".join(manifest.get("validation_errors") or []))
+    manifest_hash = str(manifest["audit"]["manifest_sha256"])
+    manifest_path = root_path / "canonical-artifacts" / f"{_sha(manifest)}.evidence-manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_bytes = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8") + b"\\n"
+    if manifest_path.exists():
+        if manifest_path.read_bytes() != manifest_bytes:
+            raise AssertionError("synthetic Evidence Manifest fixture collision")
+    else:
+        manifest_path.write_bytes(manifest_bytes)
+
     market = str(case["market"]).upper()
     symbol = str(case["symbol"]).upper()
     case_id = str(case["case_id"])
@@ -148,10 +227,12 @@ def prepare_authorized_test_run(
         created_at="2026-10-09T00:00:02+00:00",
     )
     orchestrator.transition(run_id, Stage.EVIDENCE_PENDING, created_at="2026-10-09T00:00:03+00:00")
-    evidence_hash = _sha({"test-evidence": case_id})
+    evidence_ids = [str(x["evidence_id"]) for x in manifest["evidence"]]
+    evidence_hashes = [str(x["content_sha256"]) for x in manifest["evidence"]]
     orchestrator.transition(
         run_id, Stage.EVIDENCE_ADMITTED,
-        output_refs=("test-evidence-manifest",), output_hashes=(evidence_hash,),
+        output_refs=(f"evidence-manifest:{manifest_hash}", *evidence_ids),
+        output_hashes=(manifest_hash, *evidence_hashes),
         producer_type="CODE", producer_version="test-evidence",
         created_at="2026-10-09T00:00:04+00:00",
     )
