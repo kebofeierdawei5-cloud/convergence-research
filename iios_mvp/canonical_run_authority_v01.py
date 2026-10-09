@@ -448,6 +448,36 @@ def authorize_decision_revision_write(
 ) -> dict[str, Any]:
     if snapshot.get("snapshot_schema") != "IIOS-MVP-SNAPSHOT-0.3.0":
         raise CanonicalRunAuthorizationError("canonical run authorization requires Investment Core v0.3 snapshot")
+    snapshot_input = snapshot.get("input")
+    if not isinstance(snapshot_input, Mapping):
+        raise CanonicalRunAuthorizationError("snapshot input identity is required")
+    admission_identity = {
+        "case_id": decision_admission.get("case_id"),
+        "market": str(decision_admission.get("market", "")).upper(),
+        "symbol": str(decision_admission.get("symbol", "")).upper(),
+        "company": decision_admission.get("company"),
+        "cutoff_date": decision_admission.get("cutoff_date"),
+    }
+    snapshot_identity = {
+        "case_id": snapshot_input.get("case_id"),
+        "market": str(snapshot_input.get("market", "")).upper(),
+        "symbol": str(snapshot_input.get("symbol", "")).upper(),
+        "company": snapshot_input.get("company"),
+        "cutoff_date": snapshot_input.get("cutoff_date"),
+    }
+    if snapshot_identity != admission_identity:
+        raise CanonicalRunAuthorizationError("snapshot/Decision Admission identity mismatch")
+    record = _load_record(root, run_id)
+    envelope = record["envelope"]
+    if any((
+        str(envelope["case_id"]) != str(snapshot_identity["case_id"]),
+        str(envelope["market"]).upper() != str(snapshot_identity["market"]),
+        str(envelope["symbol"]).upper() != str(snapshot_identity["symbol"]),
+        str(envelope["cutoff_date"]) != str(snapshot_identity["cutoff_date"]),
+        str(envelope["as_of_date"]) != str(snapshot_input.get("as_of_date") or snapshot_identity["cutoff_date"]),
+        str(decision_admission.get("snapshot_hash")) != str(snapshot.get("snapshot_hash")),
+    )):
+        raise CanonicalRunAuthorizationError("snapshot/Decision Admission does not match canonical Run Envelope")
     hashes = (
         str(snapshot.get("snapshot_hash", "")),
         str(decision_admission.get("admission_record_hash", "")),
