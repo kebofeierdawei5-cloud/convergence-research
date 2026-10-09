@@ -185,6 +185,30 @@ def test_p0_ce_01c_explicit_runtime_factory_is_trusted_host_input(monkeypatch, t
         )
 
 
+def test_p0_ce_01d_invalid_runtime_factory_blocks_without_artifacts(tmp_path, capsys, monkeypatch):
+    import iios_mvp.cli as cli
+
+    monkeypatch.setattr(cli, "get_canonical_runtime", lambda: None)
+    bundle = tmp_path / "request.json"
+    output_root = tmp_path / "runs"
+    bundle.write_text(
+        json.dumps({"raw_request": "使用新版本IIOS分析百龙创园605016，截止2026-10-09"}),
+        encoding="utf-8",
+    )
+    args = parser().parse_args([
+        "canonical-run", str(bundle), "--out", str(output_root),
+        "--runtime-factory", "arbitrary code supplied by request bundle",
+    ])
+    code = args.func(args)
+    output = json.loads(capsys.readouterr().out)
+    assert code == 2
+    assert output["status"] == "BLOCKED"
+    assert output["canonical_decision_created"] is False
+    assert output["reason"] == "CANONICAL_RUNTIME_FACTORY_INVALID"
+    assert output["formal_artifacts_created"] is False
+    assert not output_root.exists()
+
+
 def test_p0_ce_02_unadmitted_evidence_cannot_become_canonical_decision():
     snapshot, _digest = run_case(_legacy_unadmitted_case())
     assert snapshot["execution_classification"]["status"] == "NON_CANONICAL"
