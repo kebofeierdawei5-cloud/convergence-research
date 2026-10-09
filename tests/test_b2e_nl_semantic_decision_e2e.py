@@ -476,3 +476,91 @@ def test_p0_persisted_b2e_requires_exact_admitted_manifest_and_completes_run(tmp
     Draft202012Validator(receipt_schema).validate(receipt)
     run_receipt_schema = json.loads((Path(__file__).parents[1] / "schemas/iios_run_receipt_v0.2.schema.json").read_text(encoding="utf-8"))
     Draft202012Validator(run_receipt_schema).validate(receipt)
+
+
+def test_p0_real_catl_manifest_runs_through_revision_publication_report_and_receipt(tmp_path):
+    """Positive P0 regression using the repository's real admitted CATL capture bundle.
+
+    The LLM-semantic producer remains a deterministic test double; the case
+    identity, B2 manifest, captured bytes, PIT timestamps, market/forecast/
+    valuation resolvers and Decision Kernel inputs are the existing real case.
+    This verifies persistence/auth plumbing, not semantic model quality.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    manifest_path = (
+        repo_root / "evidence" / "real_cases" / "RC-CN-A-300750-20261004"
+        / "b2_company_evidence_manifest_v0.1.json"
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    # This legacy canonical manifest predates the explicit status envelope.
+    # Materialize a fresh admission result from the current independent validator
+    # instead of editing the tracked evidence artifact or trusting caller status.
+    manifest = dict(manifest)
+    manifest["status"] = "PASS"
+    manifest["validation_errors"] = []
+    from iios_mvp.canonical_evidence_admission_v01 import validate_company_evidence_manifest
+    manifest_errors = validate_company_evidence_manifest(
+        manifest, raw_root=repo_root, require_raw_verification=True
+    )
+    assert manifest_errors == [], "; ".join(manifest_errors)
+
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    rows = manifest["evidence"]
+    refs = tuple(str(x["evidence_id"]) for x in rows)
+    hashes = tuple(str(x["content_sha256"]) for x in rows)
+    run_root = tmp_path / "runs-real-catl"
+    result = run_b2e_conformance(
+        raw_request="请对宁德时代进行投资决策分析，截止2026-10-04；以现有获准入证据为依据。",
+        request_id="p0-real-catl-request",
+        run_id="p0-real-catl-run",
+        created_at=CREATED,
+        request_interpreter=FixtureInterpreter(),
+        request_registry=_registries()[0],
+        semantic_producer=FixtureSemanticProducer(),
+        producer_registry=_registries()[1],
+        company="宁德时代",
+        evidence_refs=refs,
+        evidence_hashes=hashes,
+        artifact_type="THESIS_ASSESSMENT",
+        semantic_prompt="Assess the admitted CATL evidence. Do not issue an action.",
+        semantic_facts=tuple({
+            "evidence_id": row["evidence_id"],
+            "statement": f"Admitted source-record anchor for {row['field_id']}.",
+        } for row in rows),
+        decision_relevance="Existing real-case evidence manifest and current PIT admission only.",
+        case=case,
+        current_price_resolver=price_registry,
+        independent_forecast_resolver=forecast_registry,
+        upstream_authority_resolver=upstream_registry,
+        valuation_output_resolver=valuation_resolver,
+        run_root=str(run_root),
+        evidence_manifest=manifest,
+        evidence_root=str(repo_root),
+    )
+    assert result.canonicality_status == "CANONICAL_RUN_IN_PROGRESS"
+    assert result.request_admission.case_id == manifest["case_id"]
+    assert result.decision_revision["run_authority_ref"]["run_id"] == "p0-real-catl-run"
+    for declaration in manifest["raw_artifacts"]:
+        persisted_raw = run_root / "canonical-evidence" / declaration["relative_path"]
+        assert persisted_raw.is_file()
+        assert hashlib.sha256(persisted_raw.read_bytes()).hexdigest() == declaration["expected_sha256"]
+
+    publication_path = write_machine_publication(
+        run_root,
+        decision_id=result.decision_revision["decision_id"],
+        published_at="2026-10-08T03:00:00+00:00",
+    )
+    publication = json.loads(publication_path.read_text(encoding="utf-8"))
+    assert publication["canonical_run_ref"]["run_id"] == "p0-real-catl-run"
+    report_paths = write_investor_review_report_v02(
+        run_root,
+        publication_path=publication_path,
+        generated_at="2026-10-08T04:00:00+00:00",
+    )
+    assert all(path.is_file() for path in report_paths)
+    from iios_mvp.canonical_run_authority_v01 import validate_complete_run_receipt
+    receipt = validate_complete_run_receipt(run_root, "p0-real-catl-run")
+    assert receipt["run_status"] == "COMPLETE"
+    assert receipt["case_id"] == manifest["case_id"]
+    assert receipt["evidence_manifest_hash"] == manifest["audit"]["manifest_sha256"]
+    assert receipt["publication_hash"] == publication["publication_hash"]
