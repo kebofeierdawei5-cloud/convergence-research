@@ -334,14 +334,52 @@ def run() -> dict[str, Any]:
             upstream_authority_resolver=AUTHORITY_REGISTRY,
             valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
         )
-        decision_path = write_decision_revision(
-            root,
-            series["decision_series_id"],
-            1,
-            snapshot,
-            "run-c3-kolun-001",
-            decision_admission=decision_admission,
-        )
+        try:
+            decision_path = write_decision_revision(
+                root,
+                series["decision_series_id"],
+                1,
+                snapshot,
+                "run-c3-kolun-001",
+                decision_admission=decision_admission,
+            )
+        except ValueError as exc:
+            if "CANONICAL_RUN_AUTHORIZATION_BLOCKED" not in str(exc):
+                raise
+            # This runner uses fixture-bound upstream producers. Until a real
+            # canonical orchestrator receipt is supplied, it may report the
+            # kernel proposal for diagnostics but must not create a formal
+            # Decision Revision, Publication, or Investor Report.
+            return {
+                "status": "BLOCKED_NON_CANONICAL",
+                "block_reason": "CANONICAL_RUN_AUTHORIZATION_BLOCKED",
+                "case_id": CASE_ID,
+                "company": case["company"],
+                "symbol": case["symbol"],
+                "economic_structure": fixture["economic_structure"]["type"],
+                "valuation_primary_model": fixture["valuation"]["primary_model"],
+                "forecast_assumption_version": fixture["forecast_assumptions"]["version"],
+                "current_price": str(PRICE),
+                "decision": {
+                    "action": decision["action"],
+                    "primary_reason": decision["primary_reason"],
+                    "decision_status": decision["decision_status"],
+                    "new_capital_allowed": decision["gates"]["new_capital_allowed"],
+                },
+                "return_metrics": {
+                    "expected_annualized_return": str(metrics["expected_annualized_return"]),
+                    "fundamental_target_pass": metrics["fundamental_target_pass"],
+                    "required_return_pass": metrics["required_return_pass"],
+                    "risk_pass": metrics["risk_pass"],
+                },
+                "formal_artifacts_written": False,
+                "authority_boundary": {
+                    "human_approval_required": True,
+                    "auto_execution": False,
+                    "report_policy_effect": "NOT_RUN_NON_CANONICAL",
+                    "validation_policy_effect": "NO_DIRECT_DECISION_PRECEDENCE_CHANGE",
+                },
+            }
         decision_record = json.loads(decision_path.read_text(encoding="utf-8"))
 
         trigger = {
