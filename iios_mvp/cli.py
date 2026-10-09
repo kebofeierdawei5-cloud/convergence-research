@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
+import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -9,7 +12,7 @@ from .company_economic_core import build_company_economic_core, validate_company
 from .core03_market_expectation import build_core03_package, validate_core03_package
 from .engine import replay, render_markdown, run_case
 from .b2e_nl_semantic_decision_e2e_v01 import run_b2e_conformance
-from .canonical_runtime_registry_v01 import get_canonical_runtime
+from .canonical_runtime_registry_v01 import CanonicalRuntimeBindings, get_canonical_runtime
 from .decision_admission import admit_canonical_decision
 from .research_intake import build_research_case
 from .machine_publication import write_machine_publication
@@ -135,17 +138,68 @@ def cmd_core03(args: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_canonical_runtime(*, factory_spec: str | None, bundle: dict, output_root: str):
+    """Resolve the explicit host binding; never import code named by request data.
+
+    A deployment may pre-register CanonicalRuntimeBindings in its host process,
+    or pass a trusted module:factory value via --runtime-factory /
+    IIOS_CANONICAL_RUNTIME_FACTORY. The factory receives the already-loaded
+    request bundle and output path and must return validated runtime bindings.
+    No in-repository test fixture is installed as a production default.
+    """
+    registered = get_canonical_runtime()
+    if registered is not None:
+        return registered
+    if not factory_spec:
+        return None
+    spec = str(factory_spec).strip()
+    if not re.fullmatch(r"[A-Za-z_]\\w*(?:\\.[A-Za-z_]\\w*)*:[A-Za-z_]\\w*", spec):
+        raise ValueError("runtime factory must use trusted module:callable syntax")
+    module_name, factory_name = spec.split(":", 1)
+    module = importlib.import_module(module_name)
+    factory = getattr(module, factory_name, None)
+    if not callable(factory):
+        raise ValueError("runtime factory callable is missing or not callable")
+    runtime = factory(bundle=bundle, output_root=output_root)
+    if not isinstance(runtime, CanonicalRuntimeBindings):
+        raise ValueError("runtime factory must return CanonicalRuntimeBindings")
+    required = (
+        "request_interpreter", "request_registry", "semantic_producer",
+        "producer_registry", "current_price_resolver",
+        "independent_forecast_resolver", "upstream_authority_resolver",
+        "valuation_output_resolver",
+    )
+    missing = [name for name in required if getattr(runtime, name, None) is None]
+    if missing:
+        raise ValueError("runtime factory has missing bindings: " + ", ".join(missing))
+    return runtime
+
+
 def cmd_canonical_run(args: argparse.Namespace) -> int:
     """Official natural-language investment entry. No fallback to free-form run_case."""
     try:
         bundle = load_json(args.request_bundle)
-        runtime = get_canonical_runtime()
+        try:
+            runtime = _resolve_canonical_runtime(
+                factory_spec=getattr(args, "runtime_factory", None),
+                bundle=bundle,
+                output_root=str(args.out),
+            )
+        except Exception as exc:
+            print(json.dumps({
+                "status": "BLOCKED",
+                "canonical_decision_created": False,
+                "reason": "CANONICAL_RUNTIME_FACTORY_INVALID",
+                "detail": f"{type(exc).__name__}: {str(exc)[:1200]}",
+                "formal_artifacts_created": False,
+            }, ensure_ascii=False, indent=2))
+            return 2
         if runtime is None:
             print(json.dumps({
                 "status": "BLOCKED",
                 "canonical_decision_created": False,
                 "reason": "CANONICAL_RUNTIME_NOT_REGISTERED",
-                "required": "deployment must register an approved request interpreter, semantic producer, and canonical evidence/price/forecast/valuation resolvers",
+                "required": "pre-register CanonicalRuntimeBindings in the trusted host or specify --runtime-factory module:callable / IIOS_CANONICAL_RUNTIME_FACTORY",
             }, ensure_ascii=False, indent=2))
             return 2
 
@@ -502,6 +556,11 @@ def parser() -> argparse.ArgumentParser:
         help="JSON object containing raw request, admitted-company case, evidence manifest path/root, and semantic request metadata",
     )
     canonical_run.add_argument("--out", default="runs")
+    canonical_run.add_argument(
+        "--runtime-factory",
+        default=os.environ.get("IIOS_CANONICAL_RUNTIME_FACTORY"),
+        help="trusted deployment factory as module:callable; callable(bundle=..., output_root=...) must return CanonicalRuntimeBindings",
+    )
     canonical_run.set_defaults(func=cmd_canonical_run)
 
     rp = sub.add_parser("replay", help="replay a frozen snapshot")
