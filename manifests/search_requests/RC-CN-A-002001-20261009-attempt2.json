@@ -1,0 +1,9 @@
+{
+  "schema_version": "IIOS-PUBLIC-WEB-DISCOVERY-REQUEST-0.1",
+  "case_id": "RC-CN-A-002001-20261009",
+  "query": "site:disc.static.szse.cn 002001 新和成 2026-10-09 回购进展公告",
+  "region": "cn-zh",
+  "max_results": 10,
+  "backend": "auto",
+  "purpose": "Discover official/free URLs for the already selected company case, prioritizing trust/capital and recent disclosure coverage. Candidate discovery only; no source capture or evidence admission."
+}
