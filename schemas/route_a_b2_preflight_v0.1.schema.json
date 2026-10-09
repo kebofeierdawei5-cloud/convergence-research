@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/route-a-b2-preflight-v0.1.schema.json",
+  "title": "IIOS Route A to B2 Evidence/PIT Preflight v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "case_id",
+    "market",
+    "symbol",
+    "cutoff_date",
+    "intake_receipt_status",
+    "raw_integrity_status",
+    "receipt_manifest_sha256",
+    "raw_bytes_verified",
+    "declared_source_count",
+    "captured_source_count",
+    "uncaptured_source_count",
+    "groups_with_raw_bytes",
+    "admitted_field_groups",
+    "missing_required_field_groups",
+    "b2_manifest_status",
+    "b2_manifest_sha256",
+    "source_origin_verified",
+    "evidence_admission",
+    "pit_admission",
+    "llm_provider_required",
+    "b2_validation_errors",
+    "sources",
+    "contract"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "IIOS-ROUTE-A-B2-PREFLIGHT-0.1"
+    },
+    "status": {
+      "enum": [
+        "BLOCKED_NOT_ADMITTED",
+        "BLOCKED_NO_RAW_BYTES"
+      ]
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "market": {
+      "enum": [
+        "CN-A",
+        "HK"
+      ]
+    },
+    "symbol": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cutoff_date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T23:59:59\\+08:00$"
+    },
+    "intake_receipt_status": {
+      "enum": [
+        "CAPTURED_NOT_ADMITTED",
+        "PARTIAL_CAPTURE_NOT_ADMITTED"
+      ]
+    },
+    "raw_integrity_status": {
+      "const": "INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION"
+    },
+    "receipt_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "raw_bytes_verified": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "declared_source_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "captured_source_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "uncaptured_source_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "groups_with_raw_bytes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "security_identity",
+          "market_price",
+          "corporate_disclosures",
+          "business_reality",
+          "financial_reality",
+          "capital_structure",
+          "trust_governance_events"
+        ]
+      }
+    },
+    "admitted_field_groups": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "missing_required_field_groups": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "security_identity",
+          "market_price",
+          "corporate_disclosures",
+          "business_reality",
+          "financial_reality",
+          "capital_structure",
+          "trust_governance_events"
+        ]
+      }
+    },
+    "b2_manifest_status": {
+      "enum": [
+        "BLOCKED",
+        "NOT_BUILT_NO_RAW_BYTES"
+      ]
+    },
+    "b2_manifest_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_origin_verified": {
+      "const": false
+    },
+    "evidence_admission": {
+      "const": false
+    },
+    "pit_admission": {
+      "const": false
+    },
+    "llm_provider_required": {
+      "const": false
+    },
+    "b2_validation_errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "field_group",
+          "capture_status",
+          "raw_artifact_path",
+          "size_bytes",
+          "sha256",
+          "error_code",
+          "b2_evidence_status",
+          "declared_known_at",
+          "declared_known_at_basis",
+          "source_origin_verified"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "field_group": {
+            "enum": [
+              "security_identity",
+              "market_price",
+              "corporate_disclosures",
+              "business_reality",
+              "financial_reality",
+              "capital_structure",
+              "trust_governance_events"
+            ]
+          },
+          "capture_status": {
+            "enum": [
+              "SUCCESS",
+              "FAILED"
+            ]
+          },
+          "raw_artifact_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "size_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "b2_evidence_status": {
+            "enum": [
+              "UNKNOWN",
+              "NO_RECORD_NO_RAW_BYTES"
+            ]
+          },
+          "declared_known_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "declared_known_at_basis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_origin_verified": {
+            "const": false
+          }
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_capture_does_not_equal_fact_admission",
+        "declared_known_at_is_never_promoted_by_this_preflight",
+        "only_admitted_pit_qualified_records_cover_required_groups",
+        "not_an_investment_decision"
+      ],
+      "properties": {
+        "raw_capture_does_not_equal_fact_admission": {
+          "const": true
+        },
+        "declared_known_at_is_never_promoted_by_this_preflight": {
+          "const": true
+        },
+        "only_admitted_pit_qualified_records_cover_required_groups": {
+          "const": true
+        },
+        "not_an_investment_decision": {
+          "const": true
+        }
+      }
+    }
+  }
+}

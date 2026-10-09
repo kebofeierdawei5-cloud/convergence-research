@@ -93,6 +93,22 @@ jobs:
           test -f "$OUT_DIR/COMPANY_EVIDENCE_INTAKE_RECEIPT.json"
           python tools/verify_company_evidence_intake.py --root "$OUT_DIR"
 
+      - name: Run existing B2 Evidence/PIT preflight (not an admission)
+        id: b2_preflight
+        if: always()
+        env:
+          OUT_DIR: ${{ runner.temp }}/iios-company-evidence-${{ github.run_id }}
+        run: |
+          if [ ! -f "$OUT_DIR/COMPANY_EVIDENCE_INTAKE_RECEIPT.json" ]; then
+            echo "ROUTE_A_RECEIPT_MISSING; B2 preflight cannot run."
+            exit 1
+          fi
+          python tools/route_a_b2_preflight.py --root "$OUT_DIR"
+          python -m json.tool "$OUT_DIR/ROUTE_A_B2_PREFLIGHT.json" >/dev/null
+          if [ -f "$OUT_DIR/B2_COMPANY_EVIDENCE_MANIFEST.json" ]; then
+            python -m json.tool "$OUT_DIR/B2_COMPANY_EVIDENCE_MANIFEST.json" >/dev/null
+          fi
+
       - name: Upload raw evidence, receipt and verifier result
         if: always()
         uses: actions/upload-artifact@v4
@@ -107,9 +123,14 @@ jobs:
         env:
           CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
           VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+          B2_PREFLIGHT_OUTCOME: ${{ steps.b2_preflight.outcome }}
         run: |
+          if [ "$B2_PREFLIGHT_OUTCOME" != "success" ]; then
+            echo "B2_PREFLIGHT_EXECUTION_FAILED_CLOSED; inspect the uploaded artifact if available."
+            exit 1
+          fi
           if [ "$CAPTURE_OUTCOME" != "success" ] || [ "$VERIFY_OUTCOME" != "success" ]; then
             echo "CAPTURE_OR_INDEPENDENT_VERIFICATION_FAILED; inspect the uploaded artifact if available."
             exit 1
           fi
-          echo "RAW_CAPTURE_AND_INTEGRITY_VERIFICATION_SUCCEEDED_NOT_EVIDENCE_ADMISSION"
+          echo "RAW_CAPTURE_AND_INTEGRITY_VERIFICATION_SUCCEEDED; B2_PREFLIGHT_BLOCKED_NOT_ADMITTED; EVIDENCE_ADMISSION=FALSE"
