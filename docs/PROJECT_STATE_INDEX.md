@@ -21,18 +21,26 @@ B2-C Signed External Provider Binding                   PASS / CANONICAL
 B2-D Canonical Refresh + Live Provider Boundary        PASS / CANONICAL
 B2-D1 Live Evidence Verification Hardening             PASS / CANONICAL
 B2-D2 Provider-Neutral Runtime Boundary               PASS / CANONICAL
-B2-D Live Provider Invocation / Evidence                BLOCKED
+B2-D Live Provider Invocation / Evidence                OPTIONAL / BLOCKED — NOT MVP GATE
 B2-E Natural-Language → Semantic → Decision E2E          PASS / CANONICAL
 B2-F Full Independent Red-team                          PASS / CANONICAL
 ```
 
 ### Current blocker
 
-**B2-F = PASS / CANONICAL after FR1–FR5 and the fresh independent red-team.**
+**The company-level Investment Core MVP does NOT require an external LLM provider endpoint, paid search API, or API key.** The provider-specific live-evidence gate is an optional integration track, not a blocker to research execution.
+
+Current MVP acceptance gaps:
+- source-by-source B2 Evidence/PIT admission of the five actual 新和成 (002001.SZ) source objects;
+- public-web discovery for missing official/free sources, followed by raw-byte capture and independent hash verification;
+- coverage gaps for `market_price`, `business_reality`, and `capital_structure`;
+- sufficient admitted evidence before company-level analysis, valuation or decision.
+
+The current independent B2-F audit remains PASS / CANONICAL.
 
 F-001 through F-005 have been remediated and independently re-audited. The fresh B2-F audit passed against the FR5-fix head on 2026-10-09 and is preserved as a canonical, rerunnable source/contract audit. This closes the B2-F red-team finding set; it does **not** prove production provider invocation or model/economic validity.
 
-**B2-D LIVE = BLOCKED** remains a separate operational gate: no authorized provider runtime configuration or `LIVE_RESPONSE_CAPTURED + INDEPENDENT_VERIFIED` evidence has been supplied.
+**B2-D LIVE provider integration = OPTIONAL / BLOCKED (NOT AN MVP GATE).** No provider runtime configuration or `LIVE_RESPONSE_CAPTURED + INDEPENDENT_VERIFIED` evidence has been supplied; that matters only if the optional external-LLM integration itself is being accepted.
 
 **B2-D LIVE = BLOCKED**
 
@@ -57,29 +65,28 @@ Therefore:
 - fixture output MUST NOT be labeled as live-provider evidence;
 - B2-D live MUST NOT be marked complete merely because static/preflight CI is green;
 - B2-D1 and B2-D2 are complete;
-- the next development gate is real production provider configuration followed by a real invocation and independent evidence verification.
+- production provider configuration and live LLM invocation are only required to validate the optional B2-D external-provider adapter; they are not required for the free-first company research MVP.
 
 ### Current next development batch
 
-The primary Investment Core MVP path remains **Route A — free-first single-company evidence intake**. B2-D LIVE remains a separately tracked model-integration gate and does not block capture from official/free sources or operator-supplied raw originals. Every Route-A capture receipt stays `NOT_ADMITTED` until existing B2 Evidence/PIT admission accepts the source facts.
+The primary Investment Core MVP path is **Route A — free-first single-company evidence intake + public web discovery**. Public web search is used only to locate candidate URLs; the selected public-source bytes must still pass capture, SHA-256 verification and the existing B2 Evidence/PIT admission. No LLM provider endpoint or API key is required on this path. B2-D remains an optional external-LLM integration adapter.
 
-**Route A first real capture = captured + independently integrity-verified; B2 Evidence/PIT admission is still pending.** The next batch is to take the actual five-source run artifact through the existing B2 Evidence/PIT gate (not invent a second admission system), and record per-source admission/UNKNOWN decisions. The first bundle is not complete for company-level analysis: the market-price, business-reality and capital-structure field groups have no captured bytes yet.
+**Route A first real capture = captured + independently integrity-verified; B2 Evidence/PIT admission is pending.** Next, use public search discovery for official/free sources that cover `market_price`, `business_reality` and `capital_structure`, then run those sources through the existing source-by-source Evidence/PIT gate. The initial five-source bundle remains incomplete for company-level analysis.
 
 ```text
-Actual Run #2: 新和成 002001.SZ, cutoff 2026-10-09
+User/company query
   ↓
-5 public-source byte objects captured, all HTTP 200
+public web discovery (no LLM endpoint/API key) → candidate URLs + discovery receipt
   ↓
-manifest + per-file SHA-256 independently integrity-verified
+select authoritative public source; do not auto-admit search snippets
   ↓
-source-by-source review:
-authority / actual first-public date / known_at basis / effective interval / reuse
+Route A raw-byte capture + SHA-256
   ↓
-existing B2 Evidence/PIT admission: admit or reject each item, fail closed
+existing B2 Evidence/PIT admission; UNKNOWN fails closed
   ↓
-acquire missing official/free source groups (market price, business reality, capital structure)
+cover security / price / disclosures / business / financial / capital / trust groups
   ↓
-only after adequate admitted coverage: company analysis / valuation / expectation gap / decision / human report
+only after sufficient admitted evidence: company analysis / valuation / expectation gap / decision / human report
 ```
 
 The run receipt remains `CAPTURED_NOT_ADMITTED`; independent integrity verification is not source-authenticity verification or Evidence/PIT admission. The issuer IR page remains `UNKNOWN_NO_KNOWN_AT`; the four exchange PDFs remain `PIT_CANDIDATE_REQUIRES_INDEPENDENT_REVIEW`. No source is promoted from a declared date alone.

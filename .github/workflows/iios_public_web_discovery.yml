@@ -1,0 +1,94 @@
+name: IIOS Public Web Discovery (Free-First, No Key)
+
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: "Search query, preferably company symbol + official-source terms"
+        required: true
+        type: string
+      region:
+        description: "Public search region, e.g. cn-zh or us-en"
+        required: true
+        default: "cn-zh"
+        type: string
+      max_results:
+        description: "Maximum candidate URLs"
+        required: true
+        default: "10"
+        type: string
+      backend:
+        description: "Public search backend; auto fans out over the installed open search library"
+        required: true
+        default: "auto"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install keyless public search library
+        run: python -m pip install --disable-pip-version-check ddgs
+      - name: Run public web discovery (candidate URLs only)
+        id: search
+        continue-on-error: true
+        env:
+          SEARCH_QUERY: ${{ inputs.query }}
+          SEARCH_REGION: ${{ inputs.region }}
+          SEARCH_MAX_RESULTS: ${{ inputs.max_results }}
+          SEARCH_BACKEND: ${{ inputs.backend }}
+          OUT_FILE: ${{ runner.temp }}/iios-public-web-discovery-${{ github.run_id }}.json
+        run: |
+          python tools/public_web_discovery.py \
+            --query "$SEARCH_QUERY" \
+            --region "$SEARCH_REGION" \
+            --max-results "$SEARCH_MAX_RESULTS" \
+            --backend "$SEARCH_BACKEND" \
+            --out "$OUT_FILE"
+      - name: Verify discovery record contract
+        if: always()
+        env:
+          OUT_FILE: ${{ runner.temp }}/iios-public-web-discovery-${{ github.run_id }}.json
+        run: |
+          test -f "$OUT_FILE"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from tools.public_web_discovery import verify_discovery_record
+          record = json.loads(Path(os.environ["OUT_FILE"]).read_text(encoding="utf-8"))
+          verify_discovery_record(record)
+          print(json.dumps({
+              "status": record["status"],
+              "result_count": len(record["results"]),
+              "evidence_admission": record["contract"]["evidence_admission"],
+              "pit_admission": record["contract"]["pit_admission"],
+          }, sort_keys=True))
+          PY
+      - name: Upload the search-result candidate receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iios-public-web-discovery-${{ github.run_id }}
+          path: ${{ runner.temp }}/iios-public-web-discovery-${{ github.run_id }}.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Require at least one public search candidate
+        if: always()
+        env:
+          SEARCH_OUTCOME: ${{ steps.search.outcome }}
+        run: |
+          if [ "$SEARCH_OUTCOME" != "success" ]; then
+            echo "Public search returned no usable candidates or was unavailable. Receipt is uploaded when available; no evidence is admitted."
+            exit 1
+          fi
