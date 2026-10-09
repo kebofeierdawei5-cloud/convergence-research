@@ -460,7 +460,23 @@ def decide(case: dict[str, Any], *, evidence_root_resolver: Any | None = None, c
     }
 
 
+def _mark_direct_engine_result_non_canonical(snapshot: dict[str, Any]) -> dict[str, Any]:
+    classification_core = {
+        "snapshot_hash": snapshot.get("snapshot_hash"),
+        "status": "NON_CANONICAL",
+        "reason": "direct lower-level run_case invocation has no persisted Run Envelope/Stage Admission authority",
+    }
+    snapshot["execution_classification"] = {
+        **classification_core,
+        "classification_hash": sha256_obj(classification_core),
+    }
+    return snapshot
+
+
 def run_case(case: dict[str, Any], *, evidence_root_resolver: Any | None = None, current_price_resolver: Any | None = None, independent_forecast_resolver: Any | None = None, upstream_authority_resolver: Any | None = None, valuation_output_resolver: Any | None = None) -> tuple[dict[str, Any], str]:
+    # The lower-level engine is a calculation component, not an authorized
+    # product entry. Direct results are explicitly diagnostic; only the
+    # persisted B2-E/orchestrated path may create Decision Revisions.
     if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.3":
         decision = decide(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver, independent_forecast_resolver=independent_forecast_resolver, upstream_authority_resolver=upstream_authority_resolver, valuation_output_resolver=valuation_output_resolver)
         snapshot = {
@@ -470,6 +486,7 @@ def run_case(case: dict[str, Any], *, evidence_root_resolver: Any | None = None,
             "decision": decision,
         }
         snapshot["snapshot_hash"] = sha256_obj(snapshot)
+        _mark_direct_engine_result_non_canonical(snapshot)
         return snapshot, snapshot["snapshot_hash"]
     if case.get("contract_version") == "IIOS-INVESTMENT-CORE-0.2":
         # v0.2 has no production snapshot schema yet. Never persist an
@@ -483,6 +500,7 @@ def run_case(case: dict[str, Any], *, evidence_root_resolver: Any | None = None,
         "decision": decision,
     }
     snapshot["snapshot_hash"] = sha256_obj(snapshot)
+    _mark_direct_engine_result_non_canonical(snapshot)
     return snapshot, snapshot["snapshot_hash"]
 
 
