@@ -1,10 +1,10 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-08
+Snapshot: 2026-10-09
 Authority: this file is the **only canonical Current State Index**.
 
-## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-08
+## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-09
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
@@ -23,14 +23,16 @@ B2-D1 Live Evidence Verification Hardening             PASS / CANONICAL
 B2-D2 Provider-Neutral Runtime Boundary               PASS / CANONICAL
 B2-D Live Provider Invocation / Evidence                BLOCKED
 B2-E Natural-Language → Semantic → Decision E2E          PASS / CANONICAL
-B2-F Full Independent Red-team                          BLOCKED / F-005
+B2-F Full Independent Red-team                          PASS / CANONICAL
 ```
 
 ### Current blocker
 
-**B2-F = BLOCKED only by F-005**
+**B2-F = PASS / CANONICAL after FR1–FR5 and the fresh independent red-team.**
 
-F-001 and F-002 were repaired and promoted to canonical by B2-FR1 and B2-FR2. F-003 was repaired by B2-FR3 and F-004 was repaired by B2-FR4; both are now canonical and are no longer active blockers. F-005 (B2-D3 live workflow trigger discrepancy) remains the only open B2-F finding and must be repaired before the fresh B2-F independent red-team can PASS.
+F-001 through F-005 have been remediated and independently re-audited. The fresh B2-F audit passed against the FR5-fix head on 2026-10-09 and is preserved as a canonical, rerunnable source/contract audit. This closes the B2-F red-team finding set; it does **not** prove production provider invocation or model/economic validity.
+
+**B2-D LIVE = BLOCKED** remains a separate operational gate: no authorized provider runtime configuration or `LIVE_RESPONSE_CAPTURED + INDEPENDENT_VERIFIED` evidence has been supplied.
 
 **B2-D LIVE = BLOCKED**
 
@@ -59,14 +61,12 @@ Therefore:
 
 ### Current next development batch
 
-B2-F remains blocked only by F-005. B2-D3 live evidence remains a separate prerequisite and must not be configured in production until F-005 is resolved.
+B2-F independent red-team = PASS / CANONICAL. The remaining company-level MVP path is now the separate production-provider evidence gate; credentials/configuration must be supplied through the authorized production secret/variable boundary and are not stored in source.
 
 ```text
-B2-FR5  Repair F-005 B2-D3 trigger boundary
+B2-F PASS / CANONICAL
   ↓
-Fresh B2-F independent red-team
-  ↓
-B2-D3 REAL LIVE EVIDENCE
+B2-D3 REAL LIVE EVIDENCE — pending authorized provider runtime configuration
   ↓
 B2-D1 INDEPENDENT VERIFICATION
   ↓
@@ -330,6 +330,52 @@ Verification on FR4 final head `dfbd533f3b9e14deeb7e6ad6fc5ede0a9a39d90c`:
 - Post-B04 Independent Red-team: PASS.
 
 F-004 is no longer an active blocker.
+
+## B2-FR5 — D3 Workflow YAML / Trigger-Boundary Remediation — 2026-10-09
+
+Status: **PASS / MERGED / CANONICAL**
+
+Canonical promotions:
+- PR #234 initially added an event guard on every provider-secret-bearing D3 job; merge commit `026a74461f81db2d653815a9912667163f8d54ee`.
+- Root-cause follow-up PR #236 corrected the invalid D3 workflow YAML and added parser-based contract coverage; merge commit `8c112f1e343cf4c70e2ac159e98b42d95e56fbb2`.
+- F-005 closed.
+
+Root cause:
+- The preflight step used an inline `run: python - <<'PY'` while its Python body was unindented outside the YAML scalar.
+- Two later heredoc bodies also escaped their `run: |` scalar by being flush-left.
+- GitHub did not parse the declared workflow name/trigger/jobs and instead recorded phantom failed `event=push` runs whose workflow name was the file path and whose job list was empty.
+
+Closed boundary:
+- all Python heredocs now reside inside valid YAML block scalars;
+- the D3 contract tests parse the workflow with PyYAML BaseLoader and assert the custom workflow name, the exact single trigger `workflow_dispatch`, and the required job structure;
+- every provider-secret-bearing job has an explicit `if: github.event_name == 'workflow_dispatch'` guard as defense in depth;
+- PyYAML parsing is part of both the dedicated D3 contract CI and the fresh B2-F independent audit;
+- no credentials were added, and this repair did not create live-provider evidence.
+
+Exact-head verification:
+- B2-D Live Provider workflow Run #23 / run id `37870351002` = SUCCESS; D3 workflow contract tests, existing B2-D tests, B2-D1 verifier tests, B2-D2 runtime/red-team, schemas, compile and diff-check all passed.
+- Fresh B2-F Independent Red-team workflow Run #2 / run id `37870351055` = SUCCESS on head `a32b8b1b8461a7aa760190b4a53967da13bb80da`; the FR1–FR5 independent source/contract audit, targeted runtime regression tests, compileall and diff-check passed.
+- On the previously malformed head `857f379128561cb894fba8ae3b48003d13635fd3`, GitHub recorded D3 path-named push failures with zero jobs. No D3 workflow run was observed for the corrected YAML head at the final run-history check.
+
+Evidence boundary:
+- F-005 is closed as a workflow syntax/trigger-boundary finding.
+- B2-D LIVE remains **BLOCKED** because no authorized provider runtime configuration or independently verified real response has been admitted.
+- A successful static or fail-closed smoke workflow is not live-provider evidence.
+
+## B2-F Fresh Independent Red-team — FR1–FR5 — 2026-10-09
+
+Status: **PASS / CANONICAL**
+
+- Audit PR #235; merge commit `857f379128561cb894fba8ae3b48003d13635fd3`.
+- Follow-up fresh audit on the D3 YAML correction: workflow Run #2, run id `37870351055`, SUCCESS.
+- Independent probes cover:
+  - F-001: typed semantic thesis projection is the actual canonical Decision input;
+  - F-002: Forecast / Valuation transitions require canonical return-lineage validation;
+  - F-003: semantic authority guard recursively checks mappings and sequences;
+  - F-004: Decision Series identity is derived and bound to the Decision Admission;
+  - F-005: D3 is valid YAML, workflow_dispatch-only, and all provider-secret-bearing jobs carry the explicit event guard.
+- Relevant B2-E, Decision Lifecycle, and D3 workflow contract tests passed; compileall and diff-check passed.
+- This is a code/contract authority pass only. It does not authorize capital, issue Human Approval, execute orders, or satisfy the live-provider evidence gate.
 
 ## 1. Canonical state
 
