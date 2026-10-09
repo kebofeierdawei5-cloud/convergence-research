@@ -4,6 +4,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 from iios_mvp.trigger_production import build_trigger_contract, build_trigger_event
 from tests.decision_admission_fixture import build_fixture_admission_receipt
+from tests.canonical_run_authorization_fixture import authorize_test_run
 from iios_mvp.monitoring_state import build_monitoring_state, validate_monitoring_state, apply_trigger_event
 
 def contract(**overrides):
@@ -99,13 +100,15 @@ def test_replay_reconstructs_persisted_state(tmp_path):
     snapshot = {**core, 'snapshot_hash': snapshot_hash}
     write_snapshot(tmp_path, snapshot)
     series = create_or_load_series(tmp_path, 'CN-A', '300750', 'CATL', '2026-10-04T00:00:00Z')
+    admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot['decision'])
+    authorize_test_run(tmp_path, snapshot=snapshot, decision_admission=admission, run_id='run-1')
     write_decision_revision(
         tmp_path,
         series['decision_series_id'],
         1,
         snapshot,
         'run-1',
-        decision_admission=build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot['decision']),
+        decision_admission=admission,
     )
     revision = json.loads((tmp_path / 'CN-A-300750-r001.decision.json').read_text())
 
