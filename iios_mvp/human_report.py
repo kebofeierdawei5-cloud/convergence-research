@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from .engine import canonical_json, sha256_obj
 from .machine_publication import validate_machine_publication
+from .canonical_run_authority_v01 import authorize_report_write
 
 REPORT_VERSION = "IIOS-HUMAN-REPORT-0.1"
 QA_VERSION = "IIOS-REPORT-QA-0.1"
@@ -429,6 +430,7 @@ def write_human_report(
 ) -> tuple[Path, Path]:
     publication = _load_json(publication_path)
     validate_machine_publication(publication)
+    authorize_report_write(root, publication=publication)
     report = build_human_report(publication=publication, generated_at=generated_at)
     validate_human_report(report)
     qa = qa_human_report(publication=publication, report=report)
