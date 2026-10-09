@@ -144,13 +144,15 @@ jobs:
             --receipt /tmp/pilot02-xhc/PILOT-02_RAW_EVIDENCE_RECEIPT.json \
             --out /tmp/pilot02-xhc/out
 
-      - name: Assert pilot result
+      - name: Assert pilot result is diagnostic-only until canonical run admission
         run: |
           python - <<'PY'
           import json
           from decimal import Decimal
           p="/tmp/pilot02-xhc/out/PILOT-02_XINHECHENG_RESULT.json"
           x=json.load(open(p,encoding="utf-8"))
+          assert x["status"]=="BLOCKED_NON_CANONICAL"
+          assert x["block_reason"]=="CANONICAL_RUN_AUTHORIZATION_BLOCKED"
           assert x["company"]=="浙江新和成股份有限公司"
           assert x["symbol"]=="002001"
           assert x["cutoff_date"]=="2026-10-07"
@@ -163,16 +165,17 @@ jobs:
           assert x["decision"]["new_capital_allowed"] is False
           assert x["decision"]["human_approval_required"] is True
           assert x["decision"]["auto_execution"] is False
-          assert x["publication"]["qa_status"]=="PASS"
-          assert x["publication"]["report_deterministic_replay"] is True
-          assert x["lifecycle"]["decision_replay_status"]=="PASS"
+          assert x["canonical_execution"]["status"]=="BLOCKED"
+          assert x["canonical_execution"]["formal_artifacts_written"] is False
+          assert x["canonical_execution"]["provider_endpoint_required"] is False
+          assert x["canonical_execution"]["provider_api_key_required"] is False
           assert Decimal(x["return_metrics"]["expected_annualized_return"]) > Decimal("0.15")
           assert x["return_metrics"]["fundamental_target_pass"] is True
           assert x["return_metrics"]["required_return_pass"] is True
           assert x["return_metrics"]["risk_pass"] is True
-          print("PILOT-02_XINHECHENG_ACCEPTANCE_ASSERTIONS_OK")
+          assert "publication" not in x and "lifecycle" not in x
+          print("PILOT-02_CAPTURE_AND_KERNEL_DIAGNOSTIC_OK; CANONICAL_PUBLICATION_CORRECTLY_BLOCKED")
           PY
-
       - uses: actions/upload-artifact@v4
         with:
           name: iios-pilot02-xinhecheng-20261007
