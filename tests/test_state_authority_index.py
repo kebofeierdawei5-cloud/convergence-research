@@ -4,7 +4,8 @@ STATE = Path("docs/PROJECT_STATE_INDEX.md")
 
 def test_state_index_declares_single_current_authority():
     text = STATE.read_text(encoding="utf-8")
-    assert text.count("## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-08") == 1
+    assert "Snapshot: 2026-10-09" in text
+    assert text.count("## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-09") == 1
     assert "**Current canonical main:**" in text
 
 
