@@ -497,7 +497,27 @@ def authorize_decision_revision_write(
         if isinstance(audit, Mapping) and audit.get("manifest_sha256") == manifest_hash:
             candidates.append(candidate)
     if len(candidates) != 1:
-        raise CanonicalRunAuthorizationError("BLOCKED: exact admitted B2 Evidence Manifest artifact is absent or ambiguous")
+        observed = []
+        if manifest_dir.is_dir():
+            for path in sorted(manifest_dir.glob("*.evidence-manifest.json")):
+                try:
+                    payload = json.loads(path.read_text(encoding="utf-8"))
+                    audit = payload.get("audit") if isinstance(payload, Mapping) else None
+                    observed.append({
+                        "path": path.name,
+                        "manifest_sha256": audit.get("manifest_sha256") if isinstance(audit, Mapping) else None,
+                    })
+                except (OSError, json.JSONDecodeError):
+                    observed.append({"path": path.name, "manifest_sha256": "UNREADABLE"})
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: exact admitted B2 Evidence Manifest artifact is absent or ambiguous; "
+            + json.dumps({
+                "expected_manifest_sha256": manifest_hash,
+                "canonical_artifacts_dir": str(manifest_dir),
+                "candidate_count": len(candidates),
+                "observed_manifest_artifacts": observed[:20],
+            }, ensure_ascii=False, sort_keys=True)
+        )
     manifest = candidates[0]
     evidence_errors = validate_company_evidence_manifest(
         manifest, raw_root=evidence_root, require_raw_verification=True
