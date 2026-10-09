@@ -292,203 +292,55 @@ def run() -> dict[str, Any]:
     if metrics["risk_pass"] is not True:
         raise AssertionError("C3 scenario should clear risk cap")
 
-    with tempfile.TemporaryDirectory(prefix="iios-c3-002422-") as tmp:
-        root = Path(tmp)
-        series = create_or_load_series(
-            root, "CN-A", "002422", "四川科伦药业股份有限公司", "2026-10-06T10:00:00+08:00"
-        )
-        snapshot = {
-            "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.3.0",
-            "engine_version": "0.3.0",
-            "input": {
-                "case_id": CASE_ID,
-                "market": "CN-A",
-                "symbol": "002422",
-                "company": "四川科伦药业股份有限公司",
-                "as_of_date": "2026-10-04",
-                "cutoff_date": "2026-10-04",
-            },
-            "decision": {
-                **decision,
-                "economic_structure": fixture["economic_structure"],
-                "forecast": fixture["forecast_assumptions"],
-                "valuation": fixture["valuation"],
-                "risk": fixture["risk"],
-                "thesis": fixture["thesis"],
-                "monitoring": fixture["monitoring"],
-                "evidence_chain": fixture["evidence"],
-            },
-        }
-        snapshot["snapshot_hash"] = sha256_obj({
-            "snapshot_schema": snapshot["snapshot_schema"],
-            "engine_version": snapshot["engine_version"],
-            "input": snapshot["input"],
-            "decision": snapshot["decision"],
-        })
-        snapshot_path = write_snapshot(root, snapshot)
-        decision_admission = admit_canonical_decision(
-            case=case,
-            snapshot=snapshot,
-            current_price_resolver=registry,
-            independent_forecast_resolver=FORECAST_REGISTRY,
-            upstream_authority_resolver=AUTHORITY_REGISTRY,
-            valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
-        )
-        decision_path = write_decision_revision(
-            root,
-            series["decision_series_id"],
-            1,
-            snapshot,
-            "run-c3-kolun-001",
-            decision_admission=decision_admission,
-        )
-        decision_record = json.loads(decision_path.read_text(encoding="utf-8"))
-
-        trigger = {
-            "trigger_id": "tr-c3-002422-01",
-            "decision_id": decision_record["decision_id"],
-            "decision_series_id": decision_record["decision_series_id"],
-            "revision": decision_record["revision"],
-            "decision_revision_hash": decision_record["revision_hash"],
-            "case_id": CASE_ID,
-            "decision_cutoff_date": "2026-10-04",
-            "role": "MONITORING",
-            "metric_id": "core_pharma_cash_flow_conversion",
-            "operator": "EQ",
-            "target": "PASS",
-            "unit": "status",
-            "evidence_ids": ["E002"],
-            "enabled": True,
-        }
-        trigger_path = write_trigger_contract(root, decision_record["decision_id"], trigger)
-        trigger_record = json.loads(trigger_path.read_text(encoding="utf-8"))
-
-        event_path = write_trigger_event(
-            root,
-            {
-                "trigger_id": trigger_record["trigger_id"],
-                "trigger_event_id": "evt-c3-002422-01",
-                "evaluation_cutoff_at": "2026-10-06T10:00:00+08:00",
-                "observed_at": "2026-06-30T00:00:00+00:00",
-                "known_at": "2026-08-27T00:00:00+00:00",
-                "source_id": "CNINFO:2026_H1_REPORT",
-                "evidence_id": "E002",
-                "value": "PASS",
-                "previous_value": "PASS",
-            },
-        )
-        event_record = json.loads(event_path.read_text(encoding="utf-8"))
-        if event_record["trigger_state"] != "MATCHED":
-            raise AssertionError("C3 monitoring event did not match")
-
-        monitor_path = initialize_monitoring_state(
-            root,
-            trigger_record["trigger_id"],
-            "monitor-c3-002422-01",
-            lifecycle_status="ACTIVE",
-            next_due_at="2026-11-04T00:00:00+00:00",
-            evaluation_reference_at="2026-10-06T10:00:00+08:00",
-        )
-        apply_monitoring_event(
-            root,
-            event_record["trigger_event_id"],
-            next_due_at="2026-11-04T00:00:00+08:00",
-        )
-        monitor = json.loads(monitor_path.read_text(encoding="utf-8"))
-        validation_path = write_monitoring_validation(
-            root,
-            trigger_record["trigger_id"],
-            "2026-10-06T10:30:00+08:00",
-            validation_id="validation-c3-002422-01",
-        )
-        validation = json.loads(validation_path.read_text(encoding="utf-8"))
-        if validation["validation_status"] != "PASS":
-            raise AssertionError(f"C3 TR-03 validation did not pass: {validation}")
-
-        replay = replay_decision_lifecycle(root, decision_record["decision_id"])
-        if replay["replay_status"] != "PASS":
-            raise AssertionError("C3 decision lifecycle replay failed")
-
-        publication_path = write_machine_publication(
-            root,
-            decision_id=decision_record["decision_id"],
-            published_at="2026-10-06T10:00:00+08:00",
-        )
-        publication = json.loads(publication_path.read_text(encoding="utf-8"))
-        if publication["case"]["symbol"] != "002422":
-            raise AssertionError("C3 publication case binding failed")
-        if publication["decision_ref"]["revision_hash"] != decision_record["revision_hash"]:
-            raise AssertionError("C3 publication revision binding failed")
-        if len(publication["lifecycle_refs"]["trigger_contracts"]) != 1:
-            raise AssertionError("C3 publication trigger reference missing")
-        if len(publication["lifecycle_refs"]["monitoring_states"]) != 1:
-            raise AssertionError("C3 publication monitoring reference missing")
-        if len(publication["lifecycle_refs"]["validation_records"]) != 1:
-            raise AssertionError("C3 publication validation reference missing")
-
-        report = build_human_report(
-            publication=publication,
-            generated_at="2026-10-06T10:05:00+08:00",
-        )
-        qa = qa_human_report(publication=publication, report=report)
-        if qa["qa_status"] != "PASS":
-            raise AssertionError(f"C3 report QA failed: {qa}")
-        replay_report = build_human_report(
-            publication=publication,
-            generated_at="2026-10-06T10:05:00+08:00",
-        )
-        if replay_report != report:
-            raise AssertionError("C3 human report deterministic replay failed")
-
-        report_path, qa_path = write_human_report(
-            root,
-            publication_path=publication_path,
-            generated_at="2026-10-06T10:05:00+08:00",
-        )
-        if report_path.exists() is not True or qa_path.exists() is not True:
-            raise AssertionError("C3 immutable report artifacts were not persisted")
-
-        return {
-            "case_id": CASE_ID,
-            "company": case["company"],
-            "symbol": case["symbol"],
-            "economic_structure": fixture["economic_structure"]["type"],
-            "valuation_primary_model": fixture["valuation"]["primary_model"],
-            "forecast_assumption_version": fixture["forecast_assumptions"]["version"],
-            "current_price": str(PRICE),
-            "decision": {
-                "action": decision["action"],
-                "primary_reason": decision["primary_reason"],
-                "decision_status": decision["decision_status"],
-                "new_capital_allowed": decision["gates"]["new_capital_allowed"],
-            },
-            "return_metrics": {
-                "expected_annualized_return": str(metrics["expected_annualized_return"]),
-                "fundamental_target_pass": metrics["fundamental_target_pass"],
-                "required_return_pass": metrics["required_return_pass"],
-                "risk_pass": metrics["risk_pass"],
-            },
-            "lifecycle": {
-                "decision_revision": decision_record["revision"],
-                "trigger_state": event_record["trigger_state"],
-                "monitoring_evaluation_status": monitor["evaluation_status"],
-                "validation_status": validation["validation_status"],
-                "decision_replay_status": replay["replay_status"],
-            },
-            "publication": {
-                "publication_hash": publication["publication_hash"],
-                "report_hash": report["report_hash"],
-                "qa_status": qa["qa_status"],
-                "qa_hash": qa["qa_hash"],
-                "report_deterministic_replay": True,
-            },
-            "authority_boundary": {
-                "human_approval_required": decision["human_approval_required"],
-                "auto_execution": decision["auto_execution"],
-                "report_policy_effect": qa["policy_effect"],
-                "validation_policy_effect": validation["policy_effect"],
-            },
-        }
+    # The fixture currently has source-capture anchors and a separately
+    # admitted price observation, but no complete B2 company Evidence Manifest
+    # with independently verified raw bytes/PIT for all required field groups.
+    # Keep the economic calculation inspectable, but block all formal persistence
+    # rather than promoting this legacy fixture as a canonical Run Envelope.
+    return {
+        "case_id": CASE_ID,
+        "company": case["company"],
+        "symbol": case["symbol"],
+        "economic_structure": fixture["economic_structure"]["type"],
+        "valuation_primary_model": fixture["valuation"]["primary_model"],
+        "forecast_assumption_version": fixture["forecast_assumptions"]["version"],
+        "current_price": str(PRICE),
+        "decision": {
+            "action": decision["action"],
+            "primary_reason": decision["primary_reason"],
+            "decision_status": decision["decision_status"],
+            "new_capital_allowed": decision["gates"]["new_capital_allowed"],
+        },
+        "return_metrics": {
+            "expected_annualized_return": str(metrics["expected_annualized_return"]),
+            "fundamental_target_pass": metrics["fundamental_target_pass"],
+            "required_return_pass": metrics["required_return_pass"],
+            "risk_pass": metrics["risk_pass"],
+        },
+        "lifecycle": {
+            "status": "BLOCKED_NOT_ADMITTED",
+            "blocking_gate": "B2_EVIDENCE_PIT_ADMISSION_REQUIRED",
+            "formal_decision_revision_created": False,
+            "trigger_state": "NOT_RUN",
+            "monitoring_evaluation_status": "NOT_RUN",
+            "validation_status": "NOT_RUN",
+            "decision_replay_status": "NOT_RUN",
+        },
+        "publication": {
+            "status": "BLOCKED_NOT_ADMITTED",
+            "qa_status": "BLOCKED_NOT_ADMITTED",
+            "report_deterministic_replay": False,
+            "publication_hash": None,
+            "report_hash": None,
+            "qa_hash": None,
+        },
+        "authority_boundary": {
+            "human_approval_required": True,
+            "auto_execution": False,
+            "report_policy_effect": "REPORT_ONLY_PROJECTION",
+            "validation_policy_effect": "NO_DIRECT_DECISION_PRECEDENCE_CHANGE",
+        },
+    }
 
 
 if __name__ == "__main__":
