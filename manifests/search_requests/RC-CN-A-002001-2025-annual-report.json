@@ -1,0 +1,9 @@
+{
+  "schema_version": "IIOS-PUBLIC-WEB-DISCOVERY-REQUEST-0.1",
+  "query": "site:disc.static.szse.cn/download/disc/disk03/finalpage/2026-04-16 002001 新和成 2025年年度报告全文 主营业务 核心竞争力",
+  "region": "cn-zh",
+  "max_results": 10,
+  "backend": "auto",
+  "case_id": "RC-CN-A-002001-20261009",
+  "intended_use": "Locate primary public 2025 annual-report bytes for business-reality research; discovery leads only, no evidence/PIT admission."
+}
