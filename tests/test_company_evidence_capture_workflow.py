@@ -42,6 +42,16 @@ def test_capture_workflow_orders_capture_verification_artifact_and_final_gate():
     assert steps[gate]["if"] == "always()"
 
 
+def test_push_capture_request_uses_checkout_glob_not_optional_event_commit_list():
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert 'request_root = root / "manifests" / "capture_requests"' in text
+    assert 'request_root.glob("*.json")' in text
+    assert "GITHUB_EVENT_PATH" not in text
+    assert 'request.get("schema_version") != "IIOS-COMPANY-EVIDENCE-CAPTURE-REQUEST-0.1"' in text
+    assert 'manifest.get("case_id") != expected_case_id' in text
+    assert "CAPTURE_REQUEST_CASE_ID_MISMATCH" in text
+
+
 def test_newhecheng_case_manifest_uses_free_primary_exchange_sources_and_preserves_unknowns():
     value = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     assert value["case_id"] == "RC-CN-A-002001-20261009"
