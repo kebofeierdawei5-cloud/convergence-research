@@ -1,0 +1,7 @@
+{
+  "schema_version": "IIOS-COMPANY-EVIDENCE-CAPTURE-REQUEST-0.1",
+  "case_id": "RC-CN-A-002001-20261009",
+  "manifest_path": "manifests/company_cases/RC-CN-A-002001-20261009.json",
+  "requested_at": "2026-10-09T21:42:00+08:00",
+  "purpose": "Capture the nine active public/free source candidates after removing an unstable duplicate Sohu endpoint; independently verify exact bytes and run the existing B2 preflight. Capture-only artifacts remain NOT_ADMITTED."
+}
