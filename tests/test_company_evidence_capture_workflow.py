@@ -24,7 +24,8 @@ def test_capture_workflow_uses_path_allowlist_no_secrets_and_no_admission_claim(
     assert '".." in candidate.parts' in text
     assert "secrets." not in text
     assert "B2_PREFLIGHT_BLOCKED_NOT_ADMITTED" in text or "B2_PREFLIGHT_OUTCOME" in text
-    assert "EVIDENCE_ADMISSION=FALSE" in text
+    assert "route_a_capture_final_gate.py" in text
+    assert "upload_evidence_artifact" in text
     assert "retention-days: 14" in text
 
 
@@ -63,7 +64,7 @@ def test_capture_workflow_runs_b2_preflight_before_upload_and_never_requires_pro
     verify = next(i for i, name in enumerate(names) if name == "Independently verify captured bytes and receipt")
     preflight = next(i for i, name in enumerate(names) if name == "Run existing B2 Evidence/PIT preflight (not an admission)")
     upload = next(i for i, name in enumerate(names) if name == "Upload raw evidence, receipt and verifier result")
-    gate = next(i for i, name in enumerate(names) if name == "Require complete capture and independent integrity verification")
+    gate = next(i for i, name in enumerate(names) if name == "Validate artifact integrity and preserve partial-source status (not admission)")
     assert verify < preflight < upload < gate
     assert steps[preflight]["if"] == "always()"
     text = WORKFLOW_PATH.read_text(encoding="utf-8")
