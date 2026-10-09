@@ -13,7 +13,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
-SCHEMA_VERSION = "IIOS-PUBLIC-WEB-DISCOVERY-RECORD-0.1"
+SCHEMA_VERSION = "IIOS-PUBLIC-WEB-DISCOVERY-RECORD-0.2"
 TOOL_VERSION = "IIOS-PUBLIC-WEB-DISCOVERY-0.1"
 MAX_QUERY_CHARS = 500
 MAX_RESULTS = 25
@@ -291,6 +291,8 @@ def verify_discovery_record(record: Any) -> None:
         raise PublicWebDiscoveryError("DISCOVERY_RECORD_MUST_BE_OBJECT")
     if record.get("schema_version") != SCHEMA_VERSION:
         raise PublicWebDiscoveryError("DISCOVERY_SCHEMA_VERSION_MISMATCH")
+    if record.get("tool_version") != TOOL_VERSION:
+        raise PublicWebDiscoveryError("DISCOVERY_TOOL_VERSION_MISMATCH")
     if record.get("status") not in {"RESULTS_FOUND", "NO_RESULTS", "SEARCH_UNAVAILABLE"}:
         raise PublicWebDiscoveryError("DISCOVERY_STATUS_INVALID")
     if record.get("backend_used") not in {"ddgs", "bing_html_fallback", "injected_search", "none"}:

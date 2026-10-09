@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://iios.local/schemas/public-web-discovery-record-v0.1.schema.json",
-  "title": "IIOS Public Web Discovery Record v0.1",
+  "$id": "https://iios.local/schemas/public-web-discovery-record-v0.2.schema.json",
+  "title": "IIOS Public Web Discovery Record v0.2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,6 +11,7 @@
     "query",
     "region",
     "backend",
+    "backend_used",
     "captured_at",
     "results",
     "discarded_candidate_count",
@@ -20,10 +21,10 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "IIOS-PUBLIC-WEB-DISCOVERY-RECORD-0.1"
+      "const": "IIOS-PUBLIC-WEB-DISCOVERY-RECORD-0.2"
     },
     "tool_version": {
-      "const": "IIOS-PUBLIC-WEB-DISCOVERY-0.1"
+      "const": "IIOS-PUBLIC-WEB-DISCOVERY-0.2"
     },
     "status": {
       "enum": [
@@ -150,6 +151,14 @@
           "pattern": "^[0-9a-f]{64}$"
         }
       }
+    },
+    "backend_used": {
+      "enum": [
+        "ddgs",
+        "bing_html_fallback",
+        "injected_search",
+        "none"
+      ]
     }
   }
 }

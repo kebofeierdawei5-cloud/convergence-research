@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from tools.public_web_discovery import (
     PublicWebDiscoveryError,
@@ -143,6 +144,21 @@ def test_invalid_queries_and_limits_fail_closed():
         discover_public_web("query", max_results=50)
     with pytest.raises(PublicWebDiscoveryError, match="REGION_MUST"):
         discover_public_web("query", region="China")
+
+
+
+
+def test_generated_discovery_record_matches_v02_schema():
+    schema = json.loads(
+        (Path(__file__).parents[1] / "schemas/public_web_discovery_record_v0.2.schema.json").read_text(encoding="utf-8")
+    )
+    record = discover_public_web(
+        "site:disc.static.szse.cn 002001",
+        search_fn=lambda **kwargs: [{"title": "Official", "href": "https://disc.static.szse.cn/report.pdf"}],
+        captured_at="2026-10-09T11:30:00+00:00",
+    )
+    Draft202012Validator.check_schema(schema)
+    Draft202012Validator(schema).validate(record)
 
 
 def test_public_web_discovery_does_not_reference_llm_provider_configuration():
