@@ -62,6 +62,18 @@
       "known_at_basis": "SZSE-hosted source path and exchange announcement number identify publication date as 2026-06-24; exact first-public timestamp remains subject to independent B2 Evidence/PIT admission review.",
       "published_at": "2026-06-24",
       "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+    },
+    {
+      "source_id": "SZSE-2026-BUYBACK-PROGRESS-SEP",
+      "field_group": "capital_structure",
+      "source_ref": "SZSE:COMPANY_ANNOUNCEMENT",
+      "source_class": "OFFICIAL_EXCHANGE",
+      "url": "https://disc.static.szse.cn/download/disc/disk03/finalpage/2026-10-09/abbcbfb7-92cb-4e05-a838-aff78aaa8077.PDF",
+      "known_at": "2026-10-09",
+      "known_at_basis": "Public web discovery returned this direct HTTPS PDF under the official SZSE static domain; document title/content and exact publication time must still be checked from the captured bytes and by B2 Evidence/PIT admission.",
+      "published_at": "2026-10-09",
+      "observation_date": "2026-09-30",
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
     }
   ]
 }
