@@ -93,7 +93,7 @@ jobs:
                   "note": "This legacy publication does not carry the new persisted canonical-run authorization receipt. No fresh formal report was generated."
               }
               (output / "LEGACY_PUBLICATION_REAUTHORIZATION_BLOCKED.json").write_text(
-                  json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\\n",
+                  json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
                   encoding="utf-8",
               )
               print(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True))
