@@ -469,5 +469,10 @@ def test_p0_persisted_b2e_requires_exact_admitted_manifest_and_completes_run(tmp
     assert receipt["run_status"] == "COMPLETE"
     assert receipt["evidence_manifest_hash"] == manifest["audit"]["manifest_sha256"]
     assert len(receipt["receipt_hash"]) == 64
+    from iios_mvp.canonical_run_authority_v01 import validate_complete_run_receipt
+    replayed = validate_complete_run_receipt(run_root, "p0-full-run")
+    assert replayed == receipt
+    receipt_schema = json.loads((Path(__file__).parents[1] / "schemas/iios_run_receipt_v0.2.schema.json").read_text())
+    Draft202012Validator(receipt_schema).validate(receipt)
     run_receipt_schema = json.loads((Path(__file__).parents[1] / "schemas/iios_run_receipt_v0.2.schema.json").read_text(encoding="utf-8"))
     Draft202012Validator(run_receipt_schema).validate(receipt)
