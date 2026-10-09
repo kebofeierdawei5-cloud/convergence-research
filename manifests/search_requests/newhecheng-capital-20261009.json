@@ -1,0 +1,7 @@
+{
+  "schema_version": "IIOS-PUBLIC-WEB-DISCOVERY-REQUEST-0.1",
+  "query": "site:disc.static.szse.cn 002001 新和成 2026 半年度报告 股东户数 股本 2026-08-20",
+  "region": "cn-zh",
+  "max_results": 10,
+  "backend": "auto"
+}
