@@ -10,6 +10,7 @@ from .execution_receipt_production import (
     replay_execution_receipt,
     validate_execution_receipt,
 )
+from .canonical_run_authorization import verify_snapshot_write_authorization
 from .decision_lifecycle_production import (
     build_decision_revision,
     build_human_approval,
@@ -213,6 +214,15 @@ def write_decision_revision(
             raise ValueError(f"decision series identity mismatch: {field}")
     if snapshot.get("snapshot_schema") == "IIOS-MVP-SNAPSHOT-0.3.0" and decision_admission is None:
         raise ValueError("canonical v0.3 Decision Revision requires a Decision Admission receipt")
+    if snapshot.get("snapshot_schema") == "IIOS-MVP-SNAPSHOT-0.3.0":
+        if decision_admission is None:
+            raise ValueError("canonical v0.3 Decision Revision requires a Decision Admission receipt")
+        verify_snapshot_write_authorization(
+            root,
+            snapshot=snapshot,
+            run_id=run_id,
+            decision_admission=decision_admission,
+        )
     payload = build_decision_revision(
         decision_series_id=series_id,
         revision=revision,
