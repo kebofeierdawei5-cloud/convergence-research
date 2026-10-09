@@ -74,6 +74,54 @@
       "published_at": "2026-10-09",
       "observation_date": "2026-09-30",
       "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+    },
+    {
+      "source_id": "PRICE-SOHU-HISTORY",
+      "field_group": "market_price",
+      "source_ref": "SOHU:PUBLIC_MARKET_HISTORY",
+      "source_class": "PUBLIC_SECONDARY",
+      "url": "https://q.stock.sohu.com/cn/002001/lshq.shtml",
+      "known_at": "",
+      "known_at_basis": "",
+      "published_at": "",
+      "observation_date": "2026-10-09",
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+    },
+    {
+      "source_id": "PRICE-INVESTING-HISTORY",
+      "field_group": "market_price",
+      "source_ref": "INVESTING:PUBLIC_MARKET_HISTORY",
+      "source_class": "PUBLIC_SECONDARY",
+      "url": "https://cn.investing.com/equities/zhejiang-nhu-a-historical-data",
+      "known_at": "",
+      "known_at_basis": "",
+      "published_at": "",
+      "observation_date": "2026-10-09",
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+    },
+    {
+      "source_id": "PRICE-EASTMONEY-QUOTE",
+      "field_group": "market_price",
+      "source_ref": "EASTMONEY:PUBLIC_MARKET_QUOTE",
+      "source_class": "PUBLIC_SECONDARY",
+      "url": "https://quote.eastmoney.com/sz002001.html",
+      "known_at": "",
+      "known_at_basis": "",
+      "published_at": "",
+      "observation_date": "2026-10-09",
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+    },
+    {
+      "source_id": "PRICE-YAHOO-HISTORY",
+      "field_group": "market_price",
+      "source_ref": "YAHOO_FINANCE:PUBLIC_MARKET_HISTORY",
+      "source_class": "PUBLIC_SECONDARY",
+      "url": "https://hk.finance.yahoo.com/quote/002001.SZ/history/",
+      "known_at": "",
+      "known_at_basis": "",
+      "published_at": "",
+      "observation_date": "2026-10-09",
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
     }
   ]
 }

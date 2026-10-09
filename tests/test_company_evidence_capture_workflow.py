@@ -58,7 +58,7 @@ def test_newhecheng_case_manifest_uses_free_primary_exchange_sources_and_preserv
     assert value["market"] == "CN-A"
     assert value["symbol"] == "002001"
     assert value["cutoff_date"] == "2026-10-09"
-    assert len(value["sources"]) == 6
+    assert len(value["sources"]) == 10
     for source in value["sources"]:
         assert source["url"].startswith("https://")
         assert source["license_status"] == "PUBLIC_ACCESS_REUSE_UNKNOWN"
@@ -68,6 +68,10 @@ def test_newhecheng_case_manifest_uses_free_primary_exchange_sources_and_preserv
     assert "financial_reality" in [source["field_group"] for source in value["sources"]]
     assert "corporate_disclosures" in [source["field_group"] for source in value["sources"]]
     assert "trust_governance_events" in [source["field_group"] for source in value["sources"]]
+    market_sources = [source for source in value["sources"] if source["field_group"] == "market_price"]
+    assert len(market_sources) == 4
+    assert all(source["source_class"] == "PUBLIC_SECONDARY" for source in market_sources)
+    assert all(source["known_at"] == "" and source["known_at_basis"] == "" for source in market_sources)
     buyback_progress = next(source for source in value["sources"] if source["source_id"] == "SZSE-2026-BUYBACK-PROGRESS-SEP")
     assert buyback_progress["url"] == "https://disc.static.szse.cn/download/disc/disk03/finalpage/2026-10-09/abbcbfb7-92cb-4e05-a838-aff78aaa8077.PDF"
     assert buyback_progress["field_group"] == "capital_structure"
