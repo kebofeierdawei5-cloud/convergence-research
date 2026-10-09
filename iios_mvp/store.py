@@ -412,6 +412,7 @@ def replay_decision_lifecycle(
         run_id=revision["run_id"],
         trigger_event_id=revision["trigger_event_id"],
         decision_admission=revision["decision_admission"],
+        run_authority_ref=revision.get("run_authority_ref"),
     )
     if canonical_json(expected_revision) != canonical_json(revision):
         raise ValueError("decision revision replay mismatch")
@@ -445,6 +446,7 @@ def replay_decision_lifecycle(
             run_id=record["run_id"],
             trigger_event_id=record["trigger_event_id"],
             decision_admission=record["decision_admission"],
+            run_authority_ref=record.get("run_authority_ref"),
         )
         if canonical_json(expected_historical_revision) != canonical_json(record):
             raise ValueError(
