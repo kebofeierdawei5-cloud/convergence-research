@@ -134,42 +134,30 @@ def cmd_core03(args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    case = load_json(args.case)
-    snapshot, snapshot_hash = run_case(case)
-    out = write_snapshot(args.out, snapshot)
-    series = create_or_load_series(
-        args.out, args.market, case["symbol"], case["company"], now_iso()
-    )
-    revision = next_revision(args.out, series["decision_series_id"])
-    decision_admission = None
-    if snapshot.get("snapshot_schema") == "IIOS-MVP-SNAPSHOT-0.3.0":
-        decision_admission = admit_canonical_decision(
-            case=case,
-            snapshot=snapshot,
-        )
-    decision_path = write_decision_revision(
-        args.out,
-        series["decision_series_id"],
-        revision,
-        snapshot,
-        run_id=snapshot_hash[:16],
-        trigger_event_id=args.trigger_event_id,
-        decision_admission=decision_admission,
-    )
-    if args.format == "markdown":
-        print(render_markdown(snapshot))
-    else:
-        print(json.dumps({
-            "snapshot": str(out),
-            "snapshot_hash": snapshot_hash,
-            "decision_id": f"{series['decision_series_id']}-r{revision:03d}",
-            "decision": snapshot["decision"]["decision"]["action"],
-            "decision_revision": str(decision_path),
-            "next_revision": next_revision(args.out, series["decision_series_id"]),
-            "engine_version": snapshot["engine_version"],
-        }, ensure_ascii=False, indent=2))
-    return 0
-
+    # The legacy case-file CLI is intentionally diagnostic-only. It cannot
+    # establish a raw-request Run Envelope, B2 Evidence/PIT Admission, or the
+    # authorized semantic producer lineage; therefore it must not call run_case
+    # or write a Decision Revision.
+    try:
+        case = load_json(args.case)
+        identity = {
+            "case_id": case.get("case_id"),
+            "market": case.get("market"),
+            "symbol": case.get("symbol"),
+            "cutoff_date": case.get("cutoff_date"),
+        }
+    except Exception:
+        identity = {}
+    print(json.dumps({
+        "status": "NON_CANONICAL",
+        "canonical_decision_created": False,
+        "decision_revision_created": False,
+        "publication_created": False,
+        "reason": "direct CLI run bypasses the canonical natural-language entry and persisted Run Envelope",
+        "required_entry": "run_b2e_conformance(..., run_root=...) with registered request/semantic producers and admitted Evidence/PIT + Forecast/Valuation lineage",
+        "case_identity": identity,
+    }, ensure_ascii=False, indent=2))
+    return 2
 
 def cmd_replay(args: argparse.Namespace) -> int:
     snapshot = read_snapshot(args.snapshot)
@@ -202,90 +190,110 @@ def cmd_lifecycle_replay(args: argparse.Namespace) -> int:
 
 
 def cmd_publish(args: argparse.Namespace) -> int:
-    path = write_machine_publication(
-        args.out,
-        decision_id=args.decision_id,
-        published_at=args.published_at,
-    )
-    record = load_json(str(path))
-    print(json.dumps({
-        "status": "PUBLISHED",
-        "publication": str(path),
-        "publication_id": record["publication_id"],
-        "publication_hash": record["publication_hash"],
-        "decision_id": record["decision_ref"]["decision_id"],
-        "revision": record["decision_ref"]["revision"],
-        "currentness": record["current_projection"]["status"],
-    }, ensure_ascii=False, indent=2))
-    return 0
-
+    try:
+        path = write_machine_publication(
+            args.out,
+            decision_id=args.decision_id,
+            published_at=args.published_at,
+        )
+        record = load_json(str(path))
+        print(json.dumps({
+            "status": "PUBLISHED",
+            "publication": str(path),
+            "publication_id": record["publication_id"],
+            "publication_hash": record["publication_hash"],
+            "decision_id": record["decision_ref"]["decision_id"],
+            "revision": record["decision_ref"]["revision"],
+            "currentness": record["current_projection"]["status"],
+            "run_id": record["canonical_run_ref"]["run_id"],
+        }, ensure_ascii=False, indent=2))
+        return 0
+    except (ValueError, OSError) as exc:
+        print(json.dumps({
+            "status": "BLOCKED",
+            "artifact_created": False,
+            "reason": str(exc),
+        }, ensure_ascii=False, indent=2))
+        return 2
 
 def cmd_report(args: argparse.Namespace) -> int:
-    report_path, qa_path = write_human_report(
-        args.out,
-        publication_path=args.publication,
-        generated_at=args.generated_at,
-    )
-    report = load_json(str(report_path))
-    qa = load_json(str(qa_path))
-    print(json.dumps({
-        "status": "REPORT_PUBLISHED",
-        "report": str(report_path),
-        "markdown": str(report_path).replace(".report.json", ".report.md"),
-        "qa": str(qa_path),
-        "report_id": report["report_id"],
-        "report_hash": report["report_hash"],
-        "qa_status": qa["qa_status"],
-        "qa_hash": qa["qa_hash"],
-    }, ensure_ascii=False, indent=2))
-    return 0
-
+    try:
+        report_path, qa_path = write_human_report(
+            args.out,
+            publication_path=args.publication,
+            generated_at=args.generated_at,
+        )
+        report = load_json(str(report_path))
+        qa = load_json(str(qa_path))
+        print(json.dumps({
+            "status": "REPORT_PUBLISHED",
+            "report": str(report_path),
+            "markdown": str(report_path).replace(".report.json", ".report.md"),
+            "qa": str(qa_path),
+            "report_id": report["report_id"],
+            "report_hash": report["report_hash"],
+            "qa_status": qa["qa_status"],
+            "qa_hash": qa["qa_hash"],
+        }, ensure_ascii=False, indent=2))
+        return 0
+    except (ValueError, OSError) as exc:
+        print(json.dumps({"status": "BLOCKED", "artifact_created": False, "reason": str(exc)}, ensure_ascii=False, indent=2))
+        return 2
 
 def cmd_investor_report(args: argparse.Namespace) -> int:
-    report_path, qa_path = write_investor_review_report(
-        args.out,
-        publication_path=args.publication,
-        generated_at=args.generated_at,
-    )
-    report = load_json(str(report_path))
-    qa = load_json(str(qa_path))
-    print(json.dumps({
-        "status": "INVESTOR_REVIEW_REPORT_PUBLISHED",
-        "report": str(report_path),
-        "markdown": str(report_path).replace(".investor-review.json", ".investor-review.md"),
-        "qa": str(qa_path),
-        "report_id": report["report_id"],
-        "report_hash": report["report_hash"],
-        "qa_status": qa["qa_status"],
-        "qa_hash": qa["qa_hash"],
-        "machine_publication_hash": report["publication_hash"],
-    }, ensure_ascii=False, indent=2))
-    return 0
-
+    try:
+        report_path, qa_path = write_investor_review_report(
+            args.out,
+            publication_path=args.publication,
+            generated_at=args.generated_at,
+        )
+        report = load_json(str(report_path))
+        qa = load_json(str(qa_path))
+        print(json.dumps({
+            "status": "INVESTOR_REVIEW_REPORT_PUBLISHED",
+            "report": str(report_path),
+            "markdown": str(report_path).replace(".investor-review.json", ".investor-review.md"),
+            "qa": str(qa_path),
+            "report_id": report["report_id"],
+            "report_hash": report["report_hash"],
+            "qa_status": qa["qa_status"],
+            "qa_hash": qa["qa_hash"],
+            "machine_publication_hash": report["publication_hash"],
+        }, ensure_ascii=False, indent=2))
+        return 0
+    except (ValueError, OSError) as exc:
+        print(json.dumps({"status": "BLOCKED", "artifact_created": False, "reason": str(exc)}, ensure_ascii=False, indent=2))
+        return 2
 
 def cmd_investor_report_v02(args: argparse.Namespace) -> int:
-    report_path, machine_path, markdown_path, qa_path = write_investor_review_report_v02(
-        args.out,
-        publication_path=args.publication,
-        generated_at=args.generated_at,
-    )
-    report = load_json(str(report_path))
-    qa = load_json(str(qa_path))
-    print(json.dumps({
-        "status": "INVESTOR_REVIEW_REPORT_V02_PUBLISHED",
-        "report": str(report_path),
-        "machine": str(machine_path),
-        "markdown": str(markdown_path),
-        "qa": str(qa_path),
-        "report_id": report["report_id"],
-        "report_hash": report["report_hash"],
-        "machine_report_hash": report["machine_report_hash"],
-        "human_report_hash": report["human_report_hash"],
-        "qa_status": qa["qa_status"],
-        "qa_hash": qa["qa_hash"],
-    }, ensure_ascii=False, indent=2))
-    return 0
-
+    try:
+        report_path, machine_path, markdown_path, qa_path = write_investor_review_report_v02(
+            args.out,
+            publication_path=args.publication,
+            generated_at=args.generated_at,
+        )
+        report = load_json(str(report_path))
+        qa = load_json(str(qa_path))
+        run_id = str(report["machine_report"].get("run_id") or "")
+        print(json.dumps({
+            "status": "INVESTOR_REVIEW_REPORT_V02_PUBLISHED",
+            "report": str(report_path),
+            "machine": str(machine_path),
+            "markdown": str(markdown_path),
+            "qa": str(qa_path),
+            "report_id": report["report_id"],
+            "report_hash": report["report_hash"],
+            "machine_report_hash": report["machine_report_hash"],
+            "human_report_hash": report["human_report_hash"],
+            "qa_status": qa["qa_status"],
+            "qa_hash": qa["qa_hash"],
+            "run_id": run_id or None,
+            "canonical_run_receipt": "issued_by_report_writer",
+        }, ensure_ascii=False, indent=2))
+        return 0
+    except (ValueError, OSError) as exc:
+        print(json.dumps({"status": "BLOCKED", "artifact_created": False, "reason": str(exc)}, ensure_ascii=False, indent=2))
+        return 2
 
 def cmd_trigger_contract(args: argparse.Namespace) -> int:
     contract = load_json(args.contract)
