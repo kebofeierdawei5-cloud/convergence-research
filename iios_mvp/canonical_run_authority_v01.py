@@ -597,6 +597,19 @@ def _persist_replayed(
     return record
 
 
+def block_persisted_run(root: str | Path, run_id: str, reason: str) -> dict[str, Any]:
+    """Record a terminal BLOCKED result for any failed canonical run stage."""
+    record = _load_record(root, run_id)
+    env = record["envelope"]
+    if env["run_status"] != RunStatus.IN_PROGRESS.value:
+        return dict(record)
+    orchestrator = _replay_record(record)
+    blocked = orchestrator.block(run_id, reason or "CANONICAL_STAGE_FAILED")
+    return _persist_replayed(
+        root, blocked, record["request_metadata"], previous=record
+    )
+
+
 def write_complete_run_receipt(
     root: str | Path,
     run_id: str,
@@ -686,5 +699,5 @@ __all__ = [
     "PersistedCanonicalResearchOrchestrator", "run_state_path", "run_receipt_path",
     "validate_run_state_record", "make_stage_authority_ref", "validate_stage_authority_ref",
     "authorize_decision_revision_write", "authorize_publication_write",
-    "authorize_report_write", "advance_persisted_run", "write_complete_run_receipt",
+    "authorize_report_write", "advance_persisted_run", "block_persisted_run", "write_complete_run_receipt",
 ]
