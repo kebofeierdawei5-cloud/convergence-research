@@ -101,59 +101,59 @@ PY
       - name: Assert LIVE_RESPONSE_CAPTURED and 2xx
         run: |
           python - <<'PY'
-import json
-from pathlib import Path
-record = json.loads(Path("artifacts/b2d3_live_provider_evidence.json").read_text(encoding="utf-8"))
-assert record["status"] == "LIVE_RESPONSE_CAPTURED"
-assert 200 <= int(record["http_status"]) <= 299
-assert record["response_sha256"]
-assert record["request_sha256"]
-assert record["replay_hash"]
-assert record["attestation_hash"]
-print({
-    "status": record["status"],
-    "http_status": record["http_status"],
-    "provider_id": record["provider_id"],
-    "provider_version": record["provider_version"],
-    "model": record["model"],
-    "response_sha256": record["response_sha256"],
-    "replay_hash": record["replay_hash"],
-    "attestation_hash": record["attestation_hash"],
-})
-PY
+          import json
+          from pathlib import Path
+          record = json.loads(Path("artifacts/b2d3_live_provider_evidence.json").read_text(encoding="utf-8"))
+          assert record["status"] == "LIVE_RESPONSE_CAPTURED"
+          assert 200 <= int(record["http_status"]) <= 299
+          assert record["response_sha256"]
+          assert record["request_sha256"]
+          assert record["replay_hash"]
+          assert record["attestation_hash"]
+          print({
+              "status": record["status"],
+              "http_status": record["http_status"],
+              "provider_id": record["provider_id"],
+              "provider_version": record["provider_version"],
+              "model": record["model"],
+              "response_sha256": record["response_sha256"],
+              "replay_hash": record["replay_hash"],
+              "attestation_hash": record["attestation_hash"],
+          })
+          PY
       - name: B2-D1 independent verification
         run: |
           python -m iios_mvp.live_provider_independent_verify_v01             --evidence artifacts/b2d3_live_provider_evidence.json
       - name: Build non-secret run manifest
         run: |
           python - <<'PY'
-import hashlib
-import json
-from pathlib import Path
-p = Path("artifacts/b2d3_live_provider_evidence.json")
-raw = p.read_bytes()
-record = json.loads(raw.decode("utf-8"))
-manifest = {
-    "schema_version": "IIOS-B2-D3-RUN-MANIFEST-0.1",
-    "status": "LIVE_RESPONSE_CAPTURED_AND_INDEPENDENTLY_VERIFIED",
-    "workflow": "${{ github.workflow }}",
-    "run_id": "${{ github.run_id }}",
-    "run_number": "${{ github.run_number }}",
-    "commit_sha": "${{ github.sha }}",
-    "ref": "${{ github.ref }}",
-    "evidence_file_sha256": hashlib.sha256(raw).hexdigest(),
-    "response_sha256": record["response_sha256"],
-    "request_sha256": record["request_sha256"],
-    "replay_hash": record["replay_hash"],
-    "attestation_hash": record["attestation_hash"],
-    "verifier": "IIOS-LIVE-PROVIDER-INDEPENDENT-VERIFIER-0.1",
-}
-Path("artifacts/b2d3_run_manifest.json").write_text(
-    json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-    encoding="utf-8",
-)
-print(json.dumps(manifest, ensure_ascii=False, sort_keys=True))
-PY
+          import hashlib
+          import json
+          from pathlib import Path
+          p = Path("artifacts/b2d3_live_provider_evidence.json")
+          raw = p.read_bytes()
+          record = json.loads(raw.decode("utf-8"))
+          manifest = {
+              "schema_version": "IIOS-B2-D3-RUN-MANIFEST-0.1",
+              "status": "LIVE_RESPONSE_CAPTURED_AND_INDEPENDENTLY_VERIFIED",
+              "workflow": "${{ github.workflow }}",
+              "run_id": "${{ github.run_id }}",
+              "run_number": "${{ github.run_number }}",
+              "commit_sha": "${{ github.sha }}",
+              "ref": "${{ github.ref }}",
+              "evidence_file_sha256": hashlib.sha256(raw).hexdigest(),
+              "response_sha256": record["response_sha256"],
+              "request_sha256": record["request_sha256"],
+              "replay_hash": record["replay_hash"],
+              "attestation_hash": record["attestation_hash"],
+              "verifier": "IIOS-LIVE-PROVIDER-INDEPENDENT-VERIFIER-0.1",
+          }
+          Path("artifacts/b2d3_run_manifest.json").write_text(
+              json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(manifest, ensure_ascii=False, sort_keys=True))
+          PY
       - name: Upload B2-D3 live evidence artifact
         uses: actions/upload-artifact@v4
         with:
