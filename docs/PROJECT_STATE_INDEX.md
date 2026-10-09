@@ -61,25 +61,29 @@ Therefore:
 
 ### Current next development batch
 
-**Primary Investment Core MVP path: Route A — free-first single-company evidence intake.** This path must work without commercial LLM credentials or paid financial-data subscriptions. B2-D LIVE remains a separately tracked model-integration gate and must not block official-source capture, operator-supplied originals, raw-byte verification, or PIT/UNKNOWN evaluation.
+**Primary Investment Core MVP path: Route A — free-first single-company evidence intake.** Its raw-intake infrastructure is PASS / CANONICAL. The next batch is to execute the first real single-company intake with a case-specific manifest, using official/free sources and operator-supplied raw originals only where necessary. B2-D LIVE remains a separately tracked model-integration gate and must not block this raw-intake path.
 
 ```text
-User-selected company + cutoff
+User-selected company + explicit cutoff
   ↓
-Route A: official/free HTTPS sources OR operator-supplied raw originals
+case-specific source manifest (seven existing evidence groups)
   ↓
-retain exact raw bytes + SHA-256 + source/retrieval metadata
+download official/free HTTPS bytes OR copy operator-supplied originals
   ↓
-independent raw-byte and manifest verification
+retain raw bytes + manifest + SHA-256 + provenance/time fields
   ↓
-known_at <= cutoff candidate check; otherwise UNKNOWN/BLOCKED
+independent manifest/byte integrity verification
   ↓
-existing B2 evidence/PIT admission — separate permission gate
+field-level authority, publication/known_at, effective interval and license review
   ↓
-company analysis / valuation / decision / human report acceptance
+existing B2 Evidence/PIT admission (separate gate; unknowns fail closed)
+  ↓
+company analysis / valuation / expectation gap / decision / human report acceptance
 ```
 
-B2-D3 real LLM provider invocation → B2-D1 independent verification → production-backed B2-E remains a separate optional integration acceptance path. It is not a prerequisite for collecting/validating basic company research evidence. Every Route-A capture receipt must remain `NOT_ADMITTED` merely because bytes were downloaded or manually supplied; existing B2 evidence admission remains a separate gate.
+The intake tool is infrastructure, not a claim that any live company case has already been captured or admitted. All route-A receipts remain `NOT_ADMITTED`; successful downloads, matching hashes, or operator-supplied files do not prove source authenticity or PIT eligibility.
+
+B2-D3 real LLM provider invocation → B2-D1 independent verification → production-backed B2-E remains a separately tracked model-integration gate. It does not block free-first raw-source capture or manually supplied evidence.
 
 B2-E fixture-backed conformance is not admitted as live-provider evidence.
 
@@ -91,23 +95,37 @@ The M1.2 current epoch remains closed by FM07/FM05 governance; no same-epoch mod
 
 ## Route A — Free-First Company Evidence Intake — 2026-10-09
 
-Status: **IMPLEMENTATION CANDIDATE / VALIDATION PENDING**
+Status: **PASS / MERGED / CANONICAL — RAW-INTAKE INFRASTRUCTURE ONLY**
 
-Scope:
-- user-selected single-company A-share / Hong Kong case only;
-- official/free HTTPS source download or operator-supplied original bytes;
-- per-run immutable raw files, original manifest copy, SHA-256, size, capture timestamps, source registry match, and explicit license/reuse status;
-- PIT candidate checks that never turn missing `known_at` into PASS;
-- independent raw-byte and manifest verifier;
-- no API key, paid data provider or live LLM dependency.
+Canonical promotion:
+- PR #238;
+- merge commit: `33ee2263683d346f7c6aec34a049b0bcd25e7dba`;
+- validated source PR head: `9c19dba98b40073ccc53f677cd464c2f2797ecd6`.
 
-Acceptance boundary:
-- capture and hash verification are raw-intake results only;
-- declared source class, publication date and known-at basis remain unverified claims until evidence-level review;
-- all receipt/source records remain `NOT_ADMITTED`;
-- M1.2 A02 / CSI800 / CSI Industry work remains a separate Research Track and is not invoked.
+Implementation:
+- `tools/company_evidence_intake.py` supports public/free HTTPS URLs and operator-supplied original files;
+- raw bytes are retained per run beside a byte-for-byte manifest copy;
+- receipt records size, SHA-256, retrieval time, source identity/class claims, license/reuse declaration, publication/known-at basis, observation date and effective interval;
+- `tools/verify_company_evidence_intake.py` independently recomputes manifest and raw-byte hashes, checks source metadata is bound to the manifest, rejects path traversal/unreferenced bytes and refuses forged admission;
+- absent/unverifiable known_at remains UNKNOWN; future known_at is PIT-blocked; pre-cutoff known_at remains only a candidate for evidence-level review;
+- no paid data subscription, provider API key or LLM runtime is needed for raw intake.
 
-The implementation candidate is under review and remains non-canonical until the dedicated exact-head CI and independent red-team pass and the PR is merged.
+Exact PR validation on head `9c19dba98b40073ccc53f677cd464c2f2797ecd6`:
+- Route A dedicated CI run #2 / `37916871337`: PASS;
+- State Hygiene #25 / `37916871262`: PASS;
+- B2-F independent red-team #6 / `37916871355`: PASS;
+- Investment Core CI #1029 / `37916871376`: PASS;
+- B1 Canonical Research Orchestrator #34 / `37916871290`: PASS;
+- B2 Semantic Producer Admission #45 / `37916871235`: PASS;
+- CORE-00 Scope Reconciliation #428 / `37916871397`: PASS;
+- FM01 Exact CATL Source Admission #217 / `37916871388`: PASS;
+- C0 Governance Hygiene #166 / `37916871346`: PASS.
+
+Authority boundary:
+- capture/byte integrity PASS does not mean source authenticity PASS, PIT admission PASS, completeness PASS or a real-company case admission;
+- all capture outputs remain `NOT_ADMITTED` until the existing independent B2 Evidence/PIT gate accepts the source facts;
+- no real company raw bundle was produced by the fixture-based PR CI;
+- A02 / CSI800 / CSI Industry remains a separate Research Track, out of this path.
 
 ## B2-D3 — Real Provider Runtime + Live Evidence Gate — 2026-10-08
 

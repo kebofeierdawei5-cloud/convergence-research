@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### 2026-10-09 — Route A Free-First Company Evidence Intake
+
+- Added company-level raw intake for public HTTPS source URLs and operator-supplied original files, without paid financial-data or LLM provider credentials.
+- Retained exact raw bytes and manifest copies; recorded per-source SHA-256, byte size, retrieval time, source locator, time-basis claims and license/reuse declarations.
+- Added a separate independent verifier for manifest binding, raw-byte hashes, source locator metadata, safe paths, unreferenced files and fail-closed PIT/UNKNOWN semantics.
+- Kept capture outputs explicitly NOT_ADMITTED: hash verification does not establish source authenticity, PIT eligibility, completeness, or company-case admission.
+- Merged PR #238 at `33ee2263683d346f7c6aec34a049b0bcd25e7dba`; dedicated Route A CI, State Hygiene, B2-F independent red-team, Investment Core, B1, B2, CORE-00, FM01 and C0 regression workflows passed on the validated PR head.
+
 ### 2026-10-07 — M1.2-FM04 Conditional Backtest
 
 - Added frozen Conditional Backtest contract and result schema over the canonical FM03 state path.
