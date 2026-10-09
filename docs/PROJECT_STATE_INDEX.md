@@ -61,7 +61,7 @@ Therefore:
 
 ### Current next development batch
 
-**Route A raw-intake infrastructure = PASS / CANONICAL.** The next batch is to execute the first real single-company intake with a case-specific manifest, using official/free sources and operator-supplied originals only where necessary.
+**Primary Investment Core MVP path: Route A — free-first single-company evidence intake.** Its raw-intake infrastructure is PASS / CANONICAL. The next batch is to execute the first real single-company intake with a case-specific manifest, using official/free sources and operator-supplied raw originals only where necessary. B2-D LIVE remains a separately tracked model-integration gate and must not block this raw-intake path.
 
 ```text
 User-selected company + explicit cutoff
