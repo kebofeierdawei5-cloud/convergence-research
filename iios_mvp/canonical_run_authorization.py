@@ -307,6 +307,103 @@ def verify_run_authorization(
     return record
 
 
+
+def verify_snapshot_write_authorization(
+    root: str | Path,
+    *,
+    snapshot: Mapping[str, Any],
+    run_id: str,
+    decision_admission: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Check the durable run authorization against the exact v0.3 snapshot."""
+    snapshot_hash = _snapshot_hash(snapshot)
+    input_data = snapshot.get("input")
+    if not isinstance(input_data, Mapping):
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: snapshot input missing")
+    from .decision_admission import validate_decision_admission_receipt
+    validate_decision_admission_receipt(dict(decision_admission), snapshot=dict(snapshot))
+    return verify_run_authorization(
+        root,
+        run_id=run_id,
+        snapshot_hash=snapshot_hash,
+        decision_admission=decision_admission,
+        case_id=str(input_data.get("case_id", "")),
+        market=str(input_data.get("market", "")),
+        symbol=str(input_data.get("symbol", "")),
+        company=str(input_data.get("company", "")),
+        cutoff_date=str(input_data.get("cutoff_date", "")),
+    )
+
+
+def verify_revision_write_authorization(
+    root: str | Path,
+    revision: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """Require an exact persisted authorization for every v0.3 revision write."""
+    if revision.get("engine_version") != "0.3.0":
+        return None
+    root_path = Path(root)
+    snapshot_path = root_path / f'{revision.get("snapshot_hash", "")}.json'
+    if not snapshot_path.is_file():
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: bound snapshot is not persisted")
+    try:
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: bound snapshot is unreadable") from exc
+    if not isinstance(snapshot, dict) or snapshot.get("snapshot_hash") != revision.get("snapshot_hash"):
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: snapshot binding mismatch")
+    admission = revision.get("decision_admission")
+    if not isinstance(admission, Mapping):
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: Decision Admission missing")
+    if (
+        str(revision.get("run_id", "")) == ""
+        or revision.get("case_id") != snapshot.get("input", {}).get("case_id")
+    ):
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: revision identity mismatch")
+    return verify_snapshot_write_authorization(
+        root_path,
+        snapshot=snapshot,
+        run_id=str(revision["run_id"]),
+        decision_admission=admission,
+    )
+
+
+def verify_publication_write_authorization(
+    root: str | Path,
+    publication: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """Reject free-standing v0.3 publication/report inputs not stored from an authorized revision."""
+    decision_ref = publication.get("decision_ref")
+    if not isinstance(decision_ref, Mapping) or decision_ref.get("engine_version") != "0.3.0":
+        return None
+    root_path = Path(root)
+    publication_hash = str(publication.get("publication_hash", ""))
+    canonical_publication = root_path / f"{publication_hash}.publication.json"
+    if not canonical_publication.is_file():
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: canonical Machine Publication is not persisted")
+    try:
+        persisted_publication = json.loads(canonical_publication.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: canonical Machine Publication is unreadable") from exc
+    if canonical_hash(persisted_publication) != canonical_hash(dict(publication)):
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: report publication is not the persisted canonical object")
+    decision_id = str(decision_ref.get("decision_id", ""))
+    revision_path = root_path / f"{decision_id}.decision.json"
+    if not revision_path.is_file():
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: Decision Revision is not persisted")
+    try:
+        revision = json.loads(revision_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: Decision Revision is unreadable") from exc
+    if (
+        revision.get("revision_hash") != decision_ref.get("revision_hash")
+        or revision.get("snapshot_hash") != decision_ref.get("snapshot_hash")
+        or revision.get("run_id") != decision_ref.get("run_id")
+    ):
+        raise ValueError("CANONICAL_RUN_AUTHORIZATION_BLOCKED: publication does not bind the persisted revision")
+    return verify_revision_write_authorization(root_path, revision)
+
+
 def persist_run_envelope(root: str | Path, envelope: Any) -> Path:
     """Persist stage receipts append-only and update a non-authoritative envelope projection."""
     run_id = _field(getattr(envelope, "run_id", None), "run_id")
@@ -353,5 +450,8 @@ __all__ = [
     "build_run_authorization",
     "write_run_authorization",
     "verify_run_authorization",
+    "verify_snapshot_write_authorization",
+    "verify_revision_write_authorization",
+    "verify_publication_write_authorization",
     "persist_run_envelope",
 ]
