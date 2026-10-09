@@ -103,6 +103,15 @@ def test_redteam_unknown_pit_cannot_be_promoted_by_receipt_edit(tmp_path):
         verify_intake(root)
 
 
+def test_redteam_receipt_cannot_rebind_source_locator(tmp_path):
+    root = build_run(tmp_path)
+    path, receipt = read_receipt(root)
+    receipt["sources"][0]["source_url"] = "https://attacker.invalid/replaced.pdf"
+    path.write_text(json.dumps(receipt), encoding="utf-8")
+    with pytest.raises(IndependentVerificationError, match="SOURCE_METADATA_BINDING_MISMATCH"):
+        verify_intake(root)
+
+
 def test_independent_verifier_does_not_import_collector():
     source = (Path(__file__).parents[1] / "tools" / "verify_company_evidence_intake.py").read_text(encoding="utf-8")
     assert "company_evidence_intake import" not in source

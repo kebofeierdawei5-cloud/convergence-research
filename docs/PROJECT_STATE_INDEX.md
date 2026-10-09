@@ -79,7 +79,9 @@ existing B2 evidence/PIT admission — separate permission gate
 company analysis / valuation / decision / human report acceptance
 ```
 
-B2-D3 real LLM provider invocation → B2-D1 independent verification → production-backed B2-E remains a separate optional integration acceptance path. It is not a prerequisite for collecting/validating basic company research evidence. No route-A capture receipt may be labelled ADMITTED merely because bytes were downloaded or manually supplied.
+B2-D3 real LLM provider invocation → B2-D1 independent verification → production-backed B2-E remains a separate optional integration acceptance path. It is not a prerequisite for collecting/validating basic company research evidence. Every Route-A capture receipt must remain `NOT_ADMITTED` merely because bytes were downloaded or manually supplied; existing B2 evidence admission remains a separate gate.
+
+B2-E fixture-backed conformance is not admitted as live-provider evidence.
 
 ### Explicit non-blockers
 

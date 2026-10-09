@@ -130,9 +130,14 @@ def verify_intake(root: str | Path) -> dict[str, Any]:
             ("field_group", "field_group"),
             ("source_ref", "source_ref"),
             ("source_class_claim", "source_class"),
+            ("source_url", "url"),
+            ("operator_local_path", "local_path"),
             ("known_at", "known_at"),
             ("known_at_basis", "known_at_basis"),
             ("published_at", "published_at"),
+            ("observation_date", "observation_date"),
+            ("effective_from", "effective_from"),
+            ("effective_to", "effective_to"),
             ("license_status", "license_status"),
         ):
             if row.get(field) != source.get(manifest_field):
