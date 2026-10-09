@@ -31,6 +31,16 @@ For checked-in case manifests under `manifests/company_cases/`, `.github/workflo
 
 The `raw/` directory retains exact bytes. The receipt retains the exact intake manifest copy and SHA-256 for each byte object. Never put API keys, private URLs, raw company documents, or generated evidence runs into Git. Run data locally or in a controlled evidence store. The controlled GitHub capture workflow also runs `tools/route_a_b2_preflight.py` against the repository's existing `research/b2` Evidence/PIT validator and includes `B2_COMPANY_EVIDENCE_MANIFEST.json` plus `ROUTE_A_B2_PREFLIGHT.json` in the temporary artifact.
 
+## Current Newhecheng single-company source set
+
+The case manifest `manifests/company_cases/RC-CN-A-002001-20261009.json` now includes the official SZSE-hosted 2025 annual report in addition to the H1/Q1 financial reports, buyback notices, issuer IR and public quote/history candidates. The annual report is a primary source for prior-year business model, product/capacity context and audited financial history. Its direct public URL was found via public web discovery; no search or LLM API key was used.
+
+```text
+https://disc.static.szse.cn/download/disc/disk03/finalpage/2026-04-16/496f3ed8-d4eb-425b-80c3-c2096a1f3806.PDF
+```
+
+Its case manifest deliberately leaves `known_at`, `known_at_basis` and `published_at` blank until the official first-public time is supported by a defensible source. Successful capture/hash verification will not automatically admit its facts.
+
 ## Trust and PIT contract
 
 - A raw SHA-256 proves byte identity against the captured artifact, **not** source authenticity or content truth.
