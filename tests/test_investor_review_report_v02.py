@@ -18,6 +18,7 @@ from iios_mvp.investor_review_report_v02 import (
 from iios_mvp.machine_publication import write_machine_publication
 from iios_mvp.store import create_or_load_series, write_decision_revision, write_snapshot
 from tests.decision_admission_fixture import build_fixture_admission_receipt
+from tests.canonical_run_authorization_fixture import authorize_test_run
 
 
 def _snapshot():
@@ -79,8 +80,10 @@ def _publication(tmp_path):
     write_snapshot(tmp_path, snapshot)
     series = create_or_load_series(tmp_path, "CN-A", "300750", "CATL", "2026-10-08T00:00:00+00:00")
     decision_id = "CN-A-300750-r001"
+    admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
+    authorize_test_run(tmp_path, snapshot=snapshot, decision_admission=admission, run_id="run-v02-001")
     write_decision_revision(tmp_path, series["decision_series_id"], 1, snapshot, "run-v02-001",
-                            decision_admission=build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"]))
+                            decision_admission=admission)
     path = write_machine_publication(tmp_path, decision_id=decision_id, published_at="2026-10-08T01:00:00+00:00")
     return json.loads(path.read_text(encoding="utf-8")), path
 
