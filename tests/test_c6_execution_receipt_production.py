@@ -15,6 +15,8 @@ from iios_mvp.execution_receipt_production import (
     replay_execution_receipt,
     validate_execution_receipt,
 )
+from tests.canonical_run_authorization_fixture import authorize_test_run
+
 from iios_mvp.store import (
     approve_revision,
     create_or_load_series,
@@ -65,6 +67,7 @@ def setup_approved_revision(tmp_path, action="BUY"):
     write_snapshot_path = write_snapshot(tmp_path, snapshot)
     from tests.decision_admission_fixture import build_fixture_admission_receipt
     admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
+    authorize_test_run(tmp_path, snapshot=snapshot, decision_admission=admission, run_id="run-c6-001")
     revision_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
@@ -168,6 +171,7 @@ def test_c6_rejected_approval_cannot_create_execution_receipt(tmp_path):
     write_snapshot(tmp_path, snapshot)
     from tests.decision_admission_fixture import build_fixture_admission_receipt
     admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
+    authorize_test_run(tmp_path, snapshot=snapshot, decision_admission=admission, run_id="run-c6-reject")
     write_decision_revision(
         tmp_path,
         series["decision_series_id"],
