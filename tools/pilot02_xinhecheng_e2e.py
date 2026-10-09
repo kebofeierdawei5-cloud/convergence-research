@@ -378,14 +378,75 @@ def run(*, report_path: Path, price_path: Path, receipt_path: Path, out_dir: Pat
             upstream_authority_resolver=authority_registry,
             valuation_output_resolver=valuation_resolver,
         )
-        decision_path = write_decision_revision(
-            root,
-            series["decision_series_id"],
-            1,
-            snapshot,
-            "run-pilot02-xhc-001",
-            decision_admission=decision_admission,
-        )
+        try:
+            decision_path = write_decision_revision(
+                root,
+                series["decision_series_id"],
+                1,
+                snapshot,
+                "run-pilot02-xhc-001",
+                decision_admission=decision_admission,
+            )
+        except ValueError as exc:
+            if "CANONICAL_RUN_AUTHORIZATION_BLOCKED" not in str(exc):
+                raise
+            # The pilot inputs are captured and the kernel may be evaluated for
+            # diagnostics, but this script currently does not construct the
+            # complete canonical stage/admission chain. Never publish its
+            # decision as a canonical IIOS run until that chain is supplied.
+            blocked = {
+                "pilot": "PILOT-02",
+                "status": "BLOCKED_NON_CANONICAL",
+                "block_reason": "CANONICAL_RUN_AUTHORIZATION_BLOCKED",
+                "case_id": CASE_ID,
+                "company": "浙江新和成股份有限公司",
+                "symbol": "002001",
+                "cutoff_date": str(CUTOFF),
+                "latest_tradable_date": "2026-09-30",
+                "current_price": str(PRICE),
+                "security_classification": "NON_FINANCIAL",
+                "research_weighting": fixture["research_weighting"],
+                "quality_gate_status": decision["gates"]["quality_gate"],
+                "trust_status": case["trust"]["status"],
+                "return_metrics": {
+                    "entry_return_cushion": str(metrics["entry_return_cushion"]),
+                    "margin_of_safety": str(metrics["margin_of_safety"]),
+                    "expected_total_return": str(metrics["expected_total_return"]),
+                    "expected_annualized_return": str(metrics["expected_annualized_return"]),
+                    "fundamental_target_pass": metrics["fundamental_target_pass"],
+                    "required_return_pass": metrics["required_return_pass"],
+                    "risk_pass": metrics["risk_pass"],
+                    "target_entry_price": str(metrics["target_entry_price"]),
+                },
+                "decision": {
+                    "action": decision["action"],
+                    "decision_status": decision["decision_status"],
+                    "primary_reason": decision["primary_reason"],
+                    "new_capital_allowed": decision["gates"]["new_capital_allowed"],
+                    "human_approval_required": decision["human_approval_required"],
+                    "auto_execution": decision["auto_execution"],
+                },
+                "canonical_execution": {
+                    "status": "BLOCKED",
+                    "reason": "Missing verified canonical Run Authorization / complete admitted stage chain",
+                    "formal_artifacts_written": False,
+                    "provider_endpoint_required": False,
+                    "provider_api_key_required": False,
+                },
+                "evidence": {
+                    "report_sha256": receipt["report_sha256"],
+                    "price_sha256": receipt["price_sha256"],
+                    "report_exact_bytes": receipt["report_exact_bytes"],
+                    "price_exact_bytes": receipt["price_exact_bytes"],
+                },
+            }
+            result_path = out_dir / "PILOT-02_XINHECHENG_RESULT.json"
+            result_path.write_text(
+                json.dumps(blocked, ensure_ascii=False, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+            print(json.dumps(blocked, ensure_ascii=False, indent=2, sort_keys=True))
+            return blocked
         decision_record = json.loads(decision_path.read_text(encoding="utf-8"))
 
         trigger = {
