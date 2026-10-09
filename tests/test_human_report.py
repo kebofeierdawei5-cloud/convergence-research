@@ -17,6 +17,7 @@ from iios_mvp.human_report import (
 )
 from iios_mvp.machine_publication import build_machine_publication
 from tests.decision_admission_fixture import build_fixture_admission_receipt
+from tests.canonical_run_authorization_fixture import authorize_test_run
 from iios_mvp.store import (
     create_or_load_series,
     write_decision_revision,
@@ -129,13 +130,15 @@ def persist_revision(tmp_path, action="REVIEW_REQUIRED"):
     snapshot = make_snapshot(action)
     write_snapshot(tmp_path, snapshot)
     decision_id = "CN-A-300750-r001"
+    admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
+    authorize_test_run(tmp_path, snapshot=snapshot, decision_admission=admission, run_id="run-c2-001")
     write_decision_revision(
         tmp_path,
         series["decision_series_id"],
         1,
         snapshot,
         "run-c2-001",
-        decision_admission=build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"]),
+        decision_admission=admission,
     )
     decision_path = tmp_path / f"{decision_id}.decision.json"
     return snapshot, decision_id, decision_path
