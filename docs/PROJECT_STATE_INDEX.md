@@ -87,10 +87,9 @@ Next acceptance gate is **runtime integration and real-case evidence**, not addi
 Status: **FOLLOW-UP IMPLEMENTED / EXACT-HEAD CI PASS / PRODUCTION RUNTIME ACCEPTANCE OPEN**
 
 - PR #262: `P0 follow-up: trusted runtime factory and bounded Route A CI capture`.
-- Exact verified head: `f9bdc73ed3b7da8a15bd135dc08e74a64a2fe754`.
-- Triggered workflows at that exact head: **17 / 17 SUCCESS**, zero failures and zero still-running checks.
-- P0 canonical-entry regression: **10 / 10 PASS** on the exact head.
-- The previously slow PILOT-02 source-capture step completed successfully after adding `--connect-timeout 8 --max-time 25 --retry 1` to each of its three network calls and a four-minute step timeout. Its output still correctly reports `BLOCKED_NOT_ADMITTED`; raw source captures are preserved, and no formal Decision Revision or report is written.
+- Code-and-test head before the state sync: `f9bdc73ed3b7da8a15bd135dc08e74a64a2fe754`; after recording this sync, exact-head run for the state-sync commit `e97d626e1762cfd9eaeaee14faa6e62aad85e59f` completed **24 / 24 SUCCESS**, with zero failures and zero still-running checks.
+- P0 canonical-entry regression: **10 / 10 PASS** on both exact heads.
+- The previously slow PILOT-02 source-capture step completed in about 41 seconds after adding `--connect-timeout 8 --max-time 25 --retry 1` to each of its three network calls and a four-minute step timeout. One HTTPS attempt timed out on the first try; the bounded retry succeeded. The E2E still correctly reports `BLOCKED_NOT_ADMITTED`; raw captures are preserved, and no formal Decision Revision or report is written.
 - `canonical-run` now accepts an explicitly trusted `--runtime-factory module:callable` or `IIOS_CANONICAL_RUNTIME_FACTORY`, or a host-pre-registered `CanonicalRuntimeBindings`. The factory selector is taken only from CLI/environment configuration, not request JSON. Invalid configuration returns `BLOCKED`; raw factory exception text is not echoed. The default remains fail-closed when no runtime is registered.
 
 Non-claims:
