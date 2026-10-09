@@ -56,6 +56,19 @@ jobs:
       - run: python -m compileall -q iios_mvp tools tests
       - run: PYTHONPATH=. pytest -q tests/test_core03_real_300750.py tests/test_core04_final_300750_decision_e2e.py tests/test_c3_kolun_second_company_e2e.py tests/test_c7_full_lifecycle_e2e.py tests/test_c8_auth_remediation.py tests/test_machine_publication.py tests/test_human_report.py tests/test_monitoring_state.py tests/test_validation_replay.py
       - run: PYTHONPATH=. python tools/core04_final_300750_decision_e2e.py
-      - run: PYTHONPATH=. python tools/c3_kolun_second_company_e2e.py
+      - name: Run C3 kernel diagnostic and assert formal publication is blocked without canonical run auth
+        run: |
+          PYTHONPATH=. python tools/c3_kolun_second_company_e2e.py > /tmp/c3-diagnostic.json
+          python - <<'PY'
+          import json
+          x=json.load(open("/tmp/c3-diagnostic.json",encoding="utf-8"))
+          assert x["status"]=="BLOCKED_NON_CANONICAL"
+          assert x["block_reason"]=="CANONICAL_RUN_AUTHORIZATION_BLOCKED"
+          assert x["decision"]["action"]=="REVIEW_REQUIRED"
+          assert x["decision"]["new_capital_allowed"] is False
+          assert x["formal_artifacts_written"] is False
+          assert x["authority_boundary"]["auto_execution"] is False
+          print("C3_DIAGNOSTIC_OK; FORMAL_WRITE_CORRECTLY_BLOCKED")
+          PY
       - run: PYTHONPATH=. python tools/c7_full_lifecycle_e2e.py
       - run: git diff --check
