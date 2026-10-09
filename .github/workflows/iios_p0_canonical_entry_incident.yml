@@ -1,0 +1,37 @@
+name: IIOS P0 Canonical Entry Incident Reproduction
+
+on:
+  pull_request:
+    paths:
+      - "docs/iios/P0_CANONICAL_ENTRY_INCIDENT_REPRODUCTION_20261009.md"
+      - "tests/test_p0_canonical_entry_incident_reproduction.py"
+      - ".github/workflows/iios_p0_canonical_entry_incident.yml"
+      - "iios_mvp/canonical_research_orchestrator.py"
+      - "iios_mvp/cli.py"
+      - "iios_mvp/engine.py"
+      - "iios_mvp/machine_publication.py"
+      - "iios_mvp/investor_review_report_v02.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  incident-reproduction:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema
+      - name: Compile IIOS modules
+        run: python -m compileall -q iios_mvp
+      - name: Run Batch 0 characterization probes
+        run: PYTHONPATH=. pytest -q tests/test_p0_canonical_entry_incident_reproduction.py
+      - name: Check diff formatting
+        run: git diff --check
