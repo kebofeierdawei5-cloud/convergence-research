@@ -258,3 +258,117 @@ def test_probe_p0_ce_05b_legacy_cli_publish_is_blocked_for_a_different_guard(tmp
     ])
     with pytest.raises(ValueError, match="canonical v0.3 Decision Revision requires decision_admission"):
         publish_args.func(publish_args)
+
+
+def test_p0_positive_canonical_run_authorization_allows_exact_revision(tmp_path):
+    """The new gate must admit a fully bound orchestrator receipt, not block everything."""
+    from iios_mvp.canonical_research_orchestrator import CanonicalResearchOrchestrator, Stage
+    from iios_mvp.canonical_run_authorization import canonical_hash, write_run_authorization
+    from iios_mvp.engine import sha256_obj
+    from iios_mvp.store import create_or_load_series, write_decision_revision, write_snapshot
+    from tests.decision_admission_fixture import build_fixture_admission_receipt
+
+    case_id = "P0-POSITIVE-CN-A-605016-20261009"
+    company = "百龙创园（synthetic authorization test only）"
+    input_data = {
+        "case_id": case_id,
+        "market": "CN-A",
+        "symbol": "605016.SH",
+        "company": company,
+        "as_of_date": "2026-10-09",
+        "cutoff_date": "2026-10-09",
+    }
+    decision = {
+        "engine_version": "0.3.0",
+        "case_id": case_id,
+        "symbol": "605016.SH",
+        "company": company,
+        "cutoff_date": "2026-10-09",
+        "action": "REVIEW_REQUIRED",
+        "decision_status": "REVIEW_REQUIRED",
+        "investability_status": "REVIEW_REQUIRED",
+        "primary_reason": "SYNTHETIC_AUTHORIZATION_TEST_ONLY",
+        "human_approval_required": True,
+        "auto_execution": False,
+        "gates": {"trust": "UNKNOWN", "new_capital_allowed": False},
+        "return_metrics": {"expected_annualized_return": None},
+        "monitoring": [],
+    }
+    core = {
+        "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.3.0",
+        "engine_version": "0.3.0",
+        "input": input_data,
+        "decision": decision,
+    }
+    snapshot = {**core, "snapshot_hash": sha256_obj(core)}
+    admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=decision)
+
+    run_id = "P0-POSITIVE-AUTH-TEST-RUN"
+    orchestrator = CanonicalResearchOrchestrator()
+    orchestrator.start(
+        run_id=run_id,
+        case_id=case_id,
+        market="CN-A",
+        symbol="605016.SH",
+        cutoff_date="2026-10-09",
+        as_of_date="2026-10-09",
+        research_case_hash=canonical_hash(input_data),
+        created_at="2026-10-09T15:00:00+00:00",
+    )
+    stages = [
+        (Stage.REQUEST_ADMITTED, "CODE"),
+        (Stage.CASE_CREATED, "CODE"),
+        (Stage.EVIDENCE_PENDING, "CODE"),
+        (Stage.EVIDENCE_ADMITTED, "B2_EVIDENCE_PIT_VALIDATOR"),
+        (Stage.SEMANTIC_PENDING, "CODE"),
+        (Stage.SEMANTIC_ADMITTED, "LLM_SEMANTIC_PRODUCER"),
+        (Stage.FORECAST_PENDING, "CODE"),
+        (Stage.FORECAST_ADMITTED, "INDEPENDENT_FORECAST_ADMISSION"),
+        (Stage.VALUATION_PENDING, "CODE"),
+        (Stage.VALUATION_ADMITTED, "VALUATION_ADMISSION"),
+        (Stage.DECISION_PENDING, "CODE"),
+        (Stage.DECISION_ADMITTED, "DECISION_ADMISSION_VALIDATOR"),
+    ]
+    previous_hash = None
+    for index, (stage, producer) in enumerate(stages, start=1):
+        if stage == Stage.CASE_CREATED:
+            output_hash = canonical_hash(input_data)
+        elif stage == Stage.DECISION_ADMITTED:
+            output_hash = canonical_hash(admission)
+        else:
+            output_hash = canonical_hash({"test_stage": stage.value, "ordinal": index})
+        input_hashes = () if previous_hash is None else (previous_hash,)
+        orchestrator.transition(
+            run_id,
+            stage,
+            input_refs=() if previous_hash is None else (f"stage-output:{index-1}",),
+            input_hashes=input_hashes,
+            output_refs=(f"stage-output:{index}",),
+            output_hashes=(output_hash,),
+            producer_type=producer,
+            producer_version=f"test-producer-{index}",
+            status="PASS",
+            created_at="2026-10-09T15:00:00+00:00",
+        )
+        previous_hash = output_hash
+
+    write_run_authorization(
+        tmp_path,
+        envelope=orchestrator.get(run_id),
+        snapshot=snapshot,
+        decision_admission=admission,
+        issued_at="2026-10-09T15:01:00+00:00",
+    )
+    write_snapshot(tmp_path, snapshot)
+    series = create_or_load_series(
+        tmp_path, "CN-A", "605016.SH", company, "2026-10-09T15:02:00+00:00"
+    )
+    decision_path = write_decision_revision(
+        tmp_path,
+        series["decision_series_id"],
+        1,
+        snapshot,
+        run_id=run_id,
+        decision_admission=admission,
+    )
+    assert decision_path.is_file()
