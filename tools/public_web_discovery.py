@@ -211,7 +211,7 @@ def discover_public_web(
             raise PublicWebDiscoveryError("SEARCH_RESULT_SET_MUST_BE_A_LIST")
     except Exception as exc:
         raw_results = []
-        primary_code = exc.code if isinstance(exc, PublicWebDiscoveryError) else type(exc).__name__
+        primary_code = getattr(exc, "code", str(exc) or type(exc).__name__) if isinstance(exc, PublicWebDiscoveryError) else type(exc).__name__
         primary_error = f"{primary_code}:{_safe_error_detail(exc)}"
 
     backend_used = "injected_search" if injected_search else "ddgs"
@@ -224,7 +224,7 @@ def discover_public_web(
                 raise PublicWebDiscoveryError("BING_HTML_NO_USABLE_RESULTS")
             backend_used = "bing_html_fallback"
         except Exception as exc:
-            fallback_code = exc.code if isinstance(exc, PublicWebDiscoveryError) else type(exc).__name__
+            fallback_code = getattr(exc, "code", str(exc) or type(exc).__name__) if isinstance(exc, PublicWebDiscoveryError) else type(exc).__name__
             fallback_error = f"{fallback_code}:{_safe_error_detail(exc)}"
             raw_results = []
             failure_code = "PUBLIC_SEARCH_BACKENDS_UNAVAILABLE"
