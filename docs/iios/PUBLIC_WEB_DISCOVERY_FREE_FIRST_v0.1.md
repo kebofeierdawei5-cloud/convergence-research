@@ -24,7 +24,7 @@ The tool emits a hash-bound discovery receipt containing the query, search regio
 
 ## GitHub Actions
 
-The manual-only workflow `.github/workflows/iios_public_web_discovery.yml` accepts a query, region and result limit. It needs no repository secrets, has read-only contents permissions, and uploads the candidate receipt for 14 days. It doesn't fetch source URLs. Search failures produce a diagnostic receipt when possible and keep the workflow failed instead of pretending discovery succeeded.
+The workflow `.github/workflows/iios_public_web_discovery.yml` accepts a query through manual dispatch, or can be triggered by pushing exactly one request JSON under `manifests/search_requests/` to a dedicated `route-a-search/**` branch. The request must use schema version `IIOS-PUBLIC-WEB-DISCOVERY-REQUEST-0.1`. The workflow needs no repository secrets, has read-only contents permissions, and uploads the candidate receipt for 14 days. It doesn't fetch source URLs. Search failures produce a diagnostic receipt when possible and keep the workflow failed instead of pretending discovery succeeded.
 
 ## Trust and evidence boundary
 

@@ -22,6 +22,11 @@ on:
         required: true
         default: "auto"
         type: string
+  push:
+    branches:
+      - "route-a-search/**"
+    paths:
+      - "manifests/search_requests/**"
 
 permissions:
   contents: read
@@ -37,16 +42,73 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: Resolve and constrain public search request
+        id: resolve_request
+        env:
+          INPUT_QUERY: ${{ inputs.query }}
+          INPUT_REGION: ${{ inputs.region }}
+          INPUT_MAX_RESULTS: ${{ inputs.max_results }}
+          INPUT_BACKEND: ${{ inputs.backend }}
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          root = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+          query = os.environ.get("INPUT_QUERY", "").strip()
+          region = os.environ.get("INPUT_REGION", "").strip() or "cn-zh"
+          max_results = os.environ.get("INPUT_MAX_RESULTS", "").strip() or "10"
+          backend = os.environ.get("INPUT_BACKEND", "").strip() or "auto"
+
+          if not query:
+              request_root = root / "manifests" / "search_requests"
+              requests = sorted(request_root.glob("*.json")) if request_root.is_dir() else []
+              if len(requests) != 1:
+                  raise SystemExit("SEARCH_REQUEST_MUST_NAME_EXACTLY_ONE_JSON_FILE")
+              request = json.loads(requests[0].read_text(encoding="utf-8"))
+              if request.get("schema_version") != "IIOS-PUBLIC-WEB-DISCOVERY-REQUEST-0.1":
+                  raise SystemExit("SEARCH_REQUEST_SCHEMA_UNSUPPORTED")
+              query = request.get("query", "")
+              region = request.get("region", "cn-zh")
+              max_results = str(request.get("max_results", 10))
+              backend = request.get("backend", "auto")
+
+          if not isinstance(query, str) or not query.strip() or len(query.strip()) > 500:
+              raise SystemExit("SEARCH_QUERY_MUST_BE_1_TO_500_CHARACTERS")
+          if any(ord(ch) < 32 for ch in query) or "\n" in query or "\r" in query:
+              raise SystemExit("SEARCH_QUERY_MUST_BE_SINGLE_LINE")
+          if not isinstance(region, str) or not re.fullmatch(r"[a-z]{2}-[a-z]{2}", region):
+              raise SystemExit("SEARCH_REGION_INVALID")
+          try:
+              max_results_number = int(max_results)
+          except (TypeError, ValueError):
+              raise SystemExit("SEARCH_MAX_RESULTS_INVALID")
+          if not 1 <= max_results_number <= 25:
+              raise SystemExit("SEARCH_MAX_RESULTS_OUT_OF_RANGE")
+          if not isinstance(backend, str) or not backend.strip() or len(backend) > 80 or any(ord(ch) < 32 for ch in backend):
+              raise SystemExit("SEARCH_BACKEND_INVALID")
+
+          output_path = Path(os.environ["GITHUB_OUTPUT"])
+          with output_path.open("a", encoding="utf-8") as output:
+              output.write(f"query={query.strip()}\n")
+              output.write(f"region={region}\n")
+              output.write(f"max_results={max_results_number}\n")
+              output.write(f"backend={backend}\n")
+          print(json.dumps({"query": query.strip(), "region": region, "max_results": max_results_number, "backend": backend}, ensure_ascii=False, sort_keys=True))
+          PY
       - name: Install keyless public search library
         run: python -m pip install --disable-pip-version-check ddgs
       - name: Run public web discovery (candidate URLs only)
         id: search
         continue-on-error: true
         env:
-          SEARCH_QUERY: ${{ inputs.query }}
-          SEARCH_REGION: ${{ inputs.region }}
-          SEARCH_MAX_RESULTS: ${{ inputs.max_results }}
-          SEARCH_BACKEND: ${{ inputs.backend }}
+          SEARCH_QUERY: ${{ steps.resolve_request.outputs.query }}
+          SEARCH_REGION: ${{ steps.resolve_request.outputs.region }}
+          SEARCH_MAX_RESULTS: ${{ steps.resolve_request.outputs.max_results }}
+          SEARCH_BACKEND: ${{ steps.resolve_request.outputs.backend }}
           OUT_FILE: ${{ runner.temp }}/iios-public-web-discovery-${{ github.run_id }}.json
         run: |
           python tools/public_web_discovery.py \
