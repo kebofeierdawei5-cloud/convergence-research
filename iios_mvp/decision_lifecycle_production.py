@@ -64,7 +64,7 @@ def _snapshot_core(snapshot: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError('snapshot hash mismatch')
     return snapshot_core
 
-def build_decision_revision(*, decision_series_id: str | None = None, revision: int, snapshot: Mapping[str, Any], run_id: str, trigger_event_id: str | None = None, decision_admission: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def build_decision_revision(*, decision_series_id: str | None = None, revision: int, snapshot: Mapping[str, Any], run_id: str, trigger_event_id: str | None = None, decision_admission: Mapping[str, Any] | None = None, run_authority_ref: Mapping[str, Any] | None = None) -> dict[str, Any]:
     if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
         raise ValueError('revision must be a positive integer')
     snapshot_core = _snapshot_core(snapshot)
@@ -111,13 +111,16 @@ def build_decision_revision(*, decision_series_id: str | None = None, revision: 
         'auto_execution': False,
         'decision_admission': None if decision_admission is None else dict(decision_admission),
     }
+    if run_authority_ref is not None:
+        core["run_authority_ref"] = dict(run_authority_ref)
     return {**core, 'revision_hash': _sha(core)}
 
 def validate_decision_revision(record: Any, *, case_id: str, cutoff_date: str) -> None:
     if not isinstance(record, Mapping):
         raise ValueError('decision_revision must be an object')
     required = {'contract_version','decision_id','decision_series_id','decision_series_identity','decision_series_identity_hash','revision','run_id','trigger_event_id','case_id','as_of_date','cutoff_date','snapshot_hash','ai_action','decision_status','engine_version','human_approval_required','auto_execution','decision_admission','revision_hash'}
-    if set(record) != required:
+    supplied_fields = set(record)
+    if not required.issubset(supplied_fields) or supplied_fields - required - {'run_authority_ref'}:
         raise ValueError('decision_revision fields are invalid')
     if record['contract_version'] != DECISION_LIFECYCLE_CONTRACT_VERSION:
         raise ValueError('decision_revision version mismatch')
@@ -174,7 +177,39 @@ def validate_decision_revision(record: Any, *, case_id: str, cutoff_date: str) -
             raise ValueError('decision series identity does not match canonical Decision Admission')
     elif admission is not None:
         raise ValueError('legacy Decision Revision cannot carry decision_admission')
+    run_authority_ref = record.get('run_authority_ref')
+    if run_authority_ref is not None:
+        auth_required = {
+            'schema_version', 'run_id', 'case_id', 'market', 'symbol', 'cutoff_date',
+            'stage', 'stage_receipt_hash', 'state_hash_at_stage', 'authorized_refs',
+            'authorized_hashes', 'authorization_hash',
+        }
+        if not isinstance(run_authority_ref, Mapping) or set(run_authority_ref) != auth_required:
+            raise ValueError('decision_revision run_authority_ref fields are invalid')
+        if run_authority_ref['schema_version'] != 'IIOS-RUN-STAGE-AUTH-0.1':
+            raise ValueError('decision_revision run_authority_ref version mismatch')
+        if run_authority_ref['run_id'] != record['run_id'] or run_authority_ref['stage'] != 'DECISION_ADMITTED':
+            raise ValueError('decision_revision run_authority_ref run/stage mismatch')
+        if (
+            run_authority_ref['case_id'] != identity['case_id']
+            or str(run_authority_ref['market']).upper() != market
+            or str(run_authority_ref['symbol']).upper() != symbol
+            or run_authority_ref['cutoff_date'] != record['cutoff_date']
+        ):
+            raise ValueError('decision_revision run_authority_ref identity mismatch')
+        auth_core = {k: run_authority_ref[k] for k in auth_required if k != 'authorization_hash'}
+        if run_authority_ref['authorization_hash'] != _sha(auth_core):
+            raise ValueError('decision_revision run_authority_ref hash mismatch')
+        if not all(isinstance(run_authority_ref.get(k), str) and len(run_authority_ref[k]) == 64
+                   for k in ('stage_receipt_hash', 'state_hash_at_stage')):
+            raise ValueError('decision_revision run_authority_ref digest invalid')
+        if record['snapshot_hash'] not in run_authority_ref['authorized_hashes']:
+            raise ValueError('decision_revision snapshot is not bound to run stage receipt')
+        if admission is not None and admission['admission_record_hash'] not in run_authority_ref['authorized_hashes']:
+            raise ValueError('Decision Admission is not bound to run stage receipt')
     core = {k: record[k] for k in required if k != 'revision_hash'}
+    if run_authority_ref is not None:
+        core['run_authority_ref'] = dict(run_authority_ref)
     if record['revision_hash'] != _sha(core):
         raise ValueError('decision_revision revision hash mismatch')
 
