@@ -83,7 +83,7 @@ def test_b2_preflight_reuses_exact_bytes_but_keeps_declared_known_at_unknown(tmp
     assert evidence["provenance_class"] == "UNKNOWN"
     assert evidence["status"] == "UNKNOWN"
     assert any(note == "DECLARED_KNOWN_AT_NOT_ADMITTED=2026-10-01" for note in evidence["quality_notes"])
-    assert "EVIDENCE[ROUTEA-SOURCE-SOURCE-001]:PIT:PIT_UNKNOWN" in b2_manifest["validation_errors"]
+    assert any(item.startswith("EVIDENCE[ROUTEA-SOURCE-SOURCE-001]:PIT:PIT_UNKNOWN:") for item in b2_manifest["validation_errors"])
     assert (root / REPORT_FILENAME).is_file()
 
 
