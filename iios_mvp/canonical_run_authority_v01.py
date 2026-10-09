@@ -668,9 +668,7 @@ def write_complete_run_receipt(
         "normalized_request_sha256": meta["normalized_request_sha256"],
         "stage_receipt_hashes": list(record["stage_receipt_hashes"]),
         "stage_chain_hash": record["stage_chain_hash"],
-        "evidence_manifest_hash": canonical_hash({
-            "refs": evidence["output_refs"], "hashes": evidence["output_hashes"]
-        }),
+        "evidence_manifest_hash": evidence["output_hashes"][0],
         "semantic_artifact_hashes": list(semantic["output_hashes"]),
         "forecast_admission_hash": forecast["output_hashes"][0],
         "valuation_admission_hash": valuation["output_hashes"][0],
