@@ -6,8 +6,10 @@ on:
       - "tools/company_evidence_intake.py"
       - "tools/verify_company_evidence_intake.py"
       - "tools/route_a_b2_preflight.py"
+      - "tools/route_a_fact_review.py"
       - "tools/route_a_capture_final_gate.py"
       - "tests/test_route_a_capture_final_gate.py"
+      - "tests/test_route_a_fact_review.py"
       - "schemas/route_a_b2_preflight_v0.1.schema.json"
       - "tests/test_route_a_b2_preflight.py"
       - "tests/independent_redteam_route_a_b2_preflight.py"
@@ -16,6 +18,7 @@ on:
       - "tests/test_company_evidence_intake.py"
       - "tests/independent_redteam_company_evidence_intake.py"
       - "docs/iios/COMPANY_EVIDENCE_INTAKE_FREE_FIRST_v0.1.md"
+      - "docs/iios/ROUTE_A_FACT_EXTRACTION_REVIEW_20261009.md"
       - ".github/workflows/iios_company_evidence_intake.yml"
       - ".github/workflows/iios_company_evidence_capture.yml"
       - "manifests/company_cases/RC-CN-A-002001-20261009.json"
@@ -56,9 +59,13 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install test dependencies
-        run: python -m pip install --disable-pip-version-check pytest jsonschema pyyaml
+        run: python -m pip install --disable-pip-version-check pytest jsonschema pyyaml pypdf
       - name: Compile intake and verifier
         run: python -m compileall -q tools/company_evidence_intake.py tools/verify_company_evidence_intake.py tools/route_a_b2_preflight.py tools/route_a_capture_final_gate.py research/b2
+      - name: Compile and test page-located Route A fact extraction (not admission)
+        run: |
+          python -m compileall -q tools/route_a_fact_review.py tests/test_route_a_fact_review.py
+          PYTHONPATH=. pytest -q tests/test_route_a_fact_review.py
       - name: Validate schema and manifest
         run: |
           python -m json.tool schemas/company_evidence_intake_manifest_v0.1.schema.json >/dev/null
