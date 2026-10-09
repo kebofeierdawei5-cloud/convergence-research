@@ -50,6 +50,45 @@ class EvidenceContractTests(unittest.TestCase):
         errors = validate_evidence_record(evidence(known_at=""))
         self.assertTrue(any(item.startswith("TEMPORAL:") for item in errors))
 
+    def test_unknown_record_can_represent_missing_known_at_but_cannot_pass_pit(self):
+        item = evidence(
+            known_at=None,
+            provenance_class="UNKNOWN",
+            status="UNKNOWN",
+        )
+        self.assertEqual(validate_evidence_record(item), [])
+        with self.assertRaisesRegex(ValueError, "PIT_UNKNOWN"):
+            assert_pit(item, "2025-12-31T23:59:59+08:00")
+
+    def test_unknown_provenance_cannot_pass_even_with_a_plausible_date(self):
+        item = evidence(
+            known_at="2025-01-01T10:00:00+08:00",
+            provenance_class="UNKNOWN",
+            status="UNKNOWN",
+        )
+        with self.assertRaisesRegex(ValueError, "PIT_UNKNOWN"):
+            assert_pit(item, "2025-12-31T23:59:59+08:00")
+
+    def test_blocked_status_cannot_pass_pit(self):
+        item = evidence(status="BLOCKED")
+        with self.assertRaisesRegex(ValueError, "PIT_BLOCKED"):
+            assert_pit(item, "2025-12-31T23:59:59+08:00")
+
+    def test_schema_only_allows_null_known_at_for_explicit_unknown_pair(self):
+        import json
+        from pathlib import Path
+        from jsonschema import Draft202012Validator
+
+        schema = json.loads(
+            (Path(__file__).resolve().parents[3] / "schemas" / "evidence_record_v0.1.schema.json")
+            .read_text(encoding="utf-8")
+        )
+        record = evidence(known_at=None, provenance_class="UNKNOWN", status="UNKNOWN")
+        Draft202012Validator(schema).validate(record)
+        invalid = evidence(known_at=None, provenance_class="SOURCE_VINTAGE_VERIFIED", status="ADMITTED")
+        with self.assertRaises(Exception):
+            Draft202012Validator(schema).validate(invalid)
+
     def test_derived_known_at_is_latest_parent(self):
         result = derived_known_at([
             "2025-01-01T00:00:00+08:00",

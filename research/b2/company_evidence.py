@@ -142,13 +142,25 @@ def validate_company_evidence_manifest(
             errors.append(f"DUPLICATE_EVIDENCE_ID:{evidence_id}")
         evidence_ids.add(evidence_id)
         field_id = str(item.get("field_id", ""))
-        if "." in field_id:
-            covered_groups.add(field_id.split(".", 1)[0])
+        pit_passed = False
         if evidence_id:
             try:
                 assert_pit(item, manifest["cutoff_date"])
+                pit_passed = True
             except ValueError as exc:
                 errors.append(f"EVIDENCE[{evidence_id}]:PIT:{exc}")
+        # Group coverage is a permission-bearing conclusion. UNKNOWN, BLOCKED,
+        # structurally invalid, or non-ADMITTED records cannot satisfy it.
+        if (
+            "." in field_id
+            and not item_errors
+            and evidence_id
+            and str(item.get("subject_id", "")).strip() == str(manifest["case_id"]).strip()
+            and item.get("status") == "ADMITTED"
+            and item.get("provenance_class") != "UNKNOWN"
+            and pit_passed
+        ):
+            covered_groups.add(field_id.split(".", 1)[0])
 
     missing_groups = sorted(set(groups) - covered_groups)
     if missing_groups:

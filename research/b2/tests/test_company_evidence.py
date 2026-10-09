@@ -56,6 +56,71 @@ class CompanyEvidenceTests(unittest.TestCase):
         self.assertEqual(manifest["status"], "PASS")
         self.assertEqual(manifest["validation_errors"], [])
 
+    def test_unknown_record_does_not_satisfy_required_group_or_manifest_admission(self):
+        payload = b"unknown source with exact bytes"
+        digest = hashlib.sha256(payload).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "unknown.bin").write_bytes(payload)
+            unknown = _evidence(
+                "EV-UNKNOWN",
+                "security_identity.primary",
+                digest,
+                "2026-10-04T08:00:00+08:00",
+            )
+            unknown.update({
+                "known_at": None,
+                "provenance_class": "UNKNOWN",
+                "status": "UNKNOWN",
+            })
+            manifest = build_company_evidence_manifest(
+                case_id="CASE-001",
+                market="CN-A",
+                symbol="000001",
+                company="TESTCO",
+                cutoff_date="2026-10-05T09:30:00+08:00",
+                evidence=[unknown],
+                raw_artifacts=[{
+                    "evidence_id": "EV-UNKNOWN",
+                    "relative_path": "unknown.bin",
+                    "expected_size_bytes": len(payload),
+                    "expected_sha256": digest,
+                }],
+                required_field_groups=["security_identity"],
+                raw_root=root,
+            )
+        self.assertEqual(manifest["status"], "BLOCKED")
+        self.assertTrue(any("PIT_UNKNOWN" in item for item in manifest["validation_errors"]))
+        self.assertTrue(any("REQUIRED_FIELD_GROUPS_UNCOVERED:security_identity" in item for item in manifest["validation_errors"]))
+
+    def test_conditional_or_blocked_record_does_not_satisfy_required_group(self):
+        for status in ("CONDITIONAL", "BLOCKED"):
+            payload = ("source-" + status).encode()
+            digest = hashlib.sha256(payload).hexdigest()
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "source.bin").write_bytes(payload)
+                item = _evidence("EV-" + status, "security_identity.primary", digest, "2026-10-04T08:00:00+08:00")
+                item["status"] = status
+                manifest = build_company_evidence_manifest(
+                    case_id="CASE-001",
+                    market="CN-A",
+                    symbol="000001",
+                    company="TESTCO",
+                    cutoff_date="2026-10-05T09:30:00+08:00",
+                    evidence=[item],
+                    raw_artifacts=[{
+                        "evidence_id": "EV-" + status,
+                        "relative_path": "source.bin",
+                        "expected_size_bytes": len(payload),
+                        "expected_sha256": digest,
+                    }],
+                    required_field_groups=["security_identity"],
+                    raw_root=root,
+                )
+            self.assertEqual(manifest["status"], "BLOCKED")
+            self.assertTrue(any("REQUIRED_FIELD_GROUPS_UNCOVERED:security_identity" in item for item in manifest["validation_errors"]))
+
     def test_future_known_at_blocks_manifest(self):
         payload = b"future"
         digest = hashlib.sha256(payload).hexdigest()
