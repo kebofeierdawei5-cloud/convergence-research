@@ -8,6 +8,8 @@ from pathlib import Path
 from .company_economic_core import build_company_economic_core, validate_company_economic_core
 from .core03_market_expectation import build_core03_package, validate_core03_package
 from .engine import replay, render_markdown, run_case
+from .b2e_nl_semantic_decision_e2e_v01 import run_b2e_conformance
+from .canonical_runtime_registry_v01 import get_canonical_runtime
 from .decision_admission import admit_canonical_decision
 from .research_intake import build_research_case
 from .machine_publication import write_machine_publication
@@ -131,6 +133,89 @@ def cmd_core03(args: argparse.Namespace) -> int:
     else:
         print(output)
     return 0
+
+
+def cmd_canonical_run(args: argparse.Namespace) -> int:
+    """Official natural-language investment entry. No fallback to free-form run_case."""
+    try:
+        bundle = load_json(args.request_bundle)
+        runtime = get_canonical_runtime()
+        if runtime is None:
+            print(json.dumps({
+                "status": "BLOCKED",
+                "canonical_decision_created": False,
+                "reason": "CANONICAL_RUNTIME_NOT_REGISTERED",
+                "required": "deployment must register an approved request interpreter, semantic producer, and canonical evidence/price/forecast/valuation resolvers",
+            }, ensure_ascii=False, indent=2))
+            return 2
+
+        required = (
+            "raw_request", "request_id", "run_id", "company",
+            "investment_case", "evidence_manifest_path", "evidence_root",
+            "artifact_type", "semantic_prompt", "decision_relevance",
+        )
+        missing = [key for key in required if key not in bundle or bundle[key] in (None, "")]
+        if missing:
+            raise ValueError("BLOCKED: canonical request bundle missing " + ", ".join(missing))
+
+        manifest = load_json(str(bundle["evidence_manifest_path"]))
+        manifest_evidence = manifest.get("evidence")
+        if not isinstance(manifest_evidence, list) or not manifest_evidence:
+            raise ValueError("BLOCKED: evidence manifest has no source-level evidence rows")
+        evidence_refs = tuple(str(item.get("evidence_id", "")) for item in manifest_evidence)
+        evidence_hashes = tuple(str(item.get("content_sha256", "")) for item in manifest_evidence)
+        if any(not ref for ref in evidence_refs) or any(not digest for digest in evidence_hashes):
+            raise ValueError("BLOCKED: evidence manifest rows lack evidence_id/content_sha256")
+
+        result = run_b2e_conformance(
+            raw_request=str(bundle["raw_request"]),
+            request_id=str(bundle["request_id"]),
+            run_id=str(bundle["run_id"]),
+            created_at=str(bundle.get("created_at") or now_iso()),
+            request_interpreter=runtime.request_interpreter,
+            request_registry=runtime.request_registry,
+            semantic_producer=runtime.semantic_producer,
+            producer_registry=runtime.producer_registry,
+            company=str(bundle["company"]),
+            evidence_refs=evidence_refs,
+            evidence_hashes=evidence_hashes,
+            artifact_type=str(bundle["artifact_type"]),
+            semantic_prompt=str(bundle["semantic_prompt"]),
+            semantic_facts=tuple(bundle.get("semantic_facts") or ()),
+            semantic_inferences=tuple(bundle.get("semantic_inferences") or ()),
+            semantic_assumptions=tuple(bundle.get("semantic_assumptions") or ()),
+            semantic_uncertainties=tuple(bundle.get("semantic_uncertainties") or ()),
+            decision_relevance=str(bundle["decision_relevance"]),
+            case=bundle["investment_case"],
+            current_price_resolver=runtime.current_price_resolver,
+            independent_forecast_resolver=runtime.independent_forecast_resolver,
+            upstream_authority_resolver=runtime.upstream_authority_resolver,
+            valuation_output_resolver=runtime.valuation_output_resolver,
+            run_root=args.out,
+            evidence_manifest=manifest,
+            evidence_root=str(bundle["evidence_root"]),
+        )
+        print(json.dumps({
+            "status": result.canonicality_status,
+            "run_id": result.request_admission.run_id,
+            "case_id": result.request_admission.case_id,
+            "decision_id": result.decision_revision.get("decision_id"),
+            "action": result.decision_admission.get("canonical_action"),
+            "human_approval_required": True,
+            "auto_execution": False,
+            "run_state": result.run_state_path,
+            "publication_required": True,
+            "human_report_required": True,
+            "message": "AI proposal only; this command does not publish a report or authorize capital execution.",
+        }, ensure_ascii=False, indent=2))
+        return 0
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        print(json.dumps({
+            "status": "BLOCKED",
+            "canonical_decision_created": False,
+            "reason": str(exc),
+        }, ensure_ascii=False, indent=2))
+        return 2
 
 
 def cmd_run(args: argparse.Namespace) -> int:
@@ -407,6 +492,17 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--trigger-event-id")
     run.add_argument("--format", choices=("json", "markdown"), default="json")
     run.set_defaults(func=cmd_run)
+
+    canonical_run = sub.add_parser(
+        "canonical-run",
+        help="official NL -> admitted evidence/semantics -> canonical Decision Kernel entry",
+    )
+    canonical_run.add_argument(
+        "request_bundle",
+        help="JSON object containing raw request, admitted-company case, evidence manifest path/root, and semantic request metadata",
+    )
+    canonical_run.add_argument("--out", default="runs")
+    canonical_run.set_defaults(func=cmd_canonical_run)
 
     rp = sub.add_parser("replay", help="replay a frozen snapshot")
     rp.add_argument("snapshot")
