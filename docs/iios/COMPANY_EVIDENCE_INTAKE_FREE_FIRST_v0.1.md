@@ -29,7 +29,7 @@ For a public official source, replace `local_path` with a publicly accessible `h
 
 For checked-in case manifests under `manifests/company_cases/`, `.github/workflows/iios_company_evidence_capture.yml` can download public HTTPS sources and upload raw files, receipt and independent verification as a 14-day artifact. It requires no secrets and never fetches sources on pull-request events. Manual capture of operator-supplied local files remains a local CLI operation using `--input-root`.
 
-The `raw/` directory retains exact bytes. The receipt retains the exact intake manifest copy and SHA-256 for each byte object. Never put API keys, private URLs, raw company documents, or generated evidence runs into Git. Run data locally or in a controlled evidence store.
+The `raw/` directory retains exact bytes. The receipt retains the exact intake manifest copy and SHA-256 for each byte object. Never put API keys, private URLs, raw company documents, or generated evidence runs into Git. Run data locally or in a controlled evidence store. The controlled GitHub capture workflow also runs `tools/route_a_b2_preflight.py` against the repository's existing `research/b2` Evidence/PIT validator and includes `B2_COMPANY_EVIDENCE_MANIFEST.json` plus `ROUTE_A_B2_PREFLIGHT.json` in the temporary artifact.
 
 ## Trust and PIT contract
 
@@ -39,9 +39,9 @@ The `raw/` directory retains exact bytes. The receipt retains the exact intake m
 - If `known_at` or `known_at_basis` is absent, the source PIT status remains `UNKNOWN`.
 - If `known_at` is after the requested cutoff, the source is `BLOCKED_KNOWN_AFTER_CUTOFF`.
 - Even when the declared basis puts `known_at` before the cutoff, the result is only `PIT_CANDIDATE_REQUIRES_INDEPENDENT_REVIEW`.
-- Every source record and the whole run retain `admission_status = NOT_ADMITTED`. The separate verifier outputs `INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION`; it does not certify publication dates, licenses, issuer authenticity or evidence admission.
+- Every source record and the whole run retain `admission_status = NOT_ADMITTED`. The separate verifier outputs `INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION`; it does not certify publication dates, licenses, issuer authenticity or evidence admission. The B2 preflight turns captured objects into artifact-level `UNKNOWN` records, preserves declared dates only as unverified notes, and intentionally returns `BLOCKED_NOT_ADMITTED`; it is an integration check, not a separate admission mechanism.
 - Seven field groups are reported as capture coverage only. A non-empty group does not mean its evidence is sufficient for a company decision.
 
 ## CI boundary
 
-The dedicated contract workflow validates schemas and runs deterministic tests/red-team attacks without network fetches. The separate capture workflow is manual-only or triggered by an explicit push to a dedicated `route-a-capture/**` branch with a capture-request file; it captures only public HTTPS sources, needs no secrets, and uploads a short-retention artifact. Capture plus independent byte integrity verification still does not admit evidence or certify source authenticity, PIT eligibility or completeness.
+The dedicated contract workflow validates schemas and runs deterministic tests/red-team attacks without network fetches. The separate capture workflow is manual-only or triggered by an explicit push to a dedicated `route-a-capture/**` branch with a capture-request file; it captures only public HTTPS sources, needs no secrets, independently verifies the raw bytes, runs the existing B2 Evidence/PIT preflight, and uploads a short-retention artifact. The expected B2 result for capture-only source artifacts is `BLOCKED_NOT_ADMITTED`; raw integrity verification does not certify source authenticity, PIT eligibility, fact extraction or completeness.

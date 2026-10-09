@@ -23,7 +23,8 @@ def test_capture_workflow_uses_path_allowlist_no_secrets_and_no_admission_claim(
     assert 'candidate.is_absolute()' in text
     assert '".." in candidate.parts' in text
     assert "secrets." not in text
-    assert "RAW_CAPTURE_AND_INTEGRITY_VERIFICATION_SUCCEEDED_NOT_EVIDENCE_ADMISSION" in text
+    assert "B2_PREFLIGHT_BLOCKED_NOT_ADMITTED" in text
+    assert "EVIDENCE_ADMISSION=FALSE" in text
     assert "retention-days: 14" in text
 
 
@@ -51,6 +52,22 @@ def test_push_capture_request_uses_checkout_glob_not_optional_event_commit_list(
     assert 'manifest.get("case_id") != expected_case_id' in text
     assert "CAPTURE_REQUEST_CASE_ID_MISMATCH" in text
 
+
+
+def test_capture_workflow_runs_b2_preflight_before_upload_and_never_requires_provider():
+    workflow = yaml.load(WORKFLOW_PATH.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    steps = workflow["jobs"]["capture-and-verify"]["steps"]
+    names = [step.get("name", step.get("uses", "")) for step in steps]
+    verify = next(i for i, name in enumerate(names) if name == "Independently verify captured bytes and receipt")
+    preflight = next(i for i, name in enumerate(names) if name == "Run existing B2 Evidence/PIT preflight (not an admission)")
+    upload = next(i for i, name in enumerate(names) if name == "Upload raw evidence, receipt and verifier result")
+    gate = next(i for i, name in enumerate(names) if name == "Require complete capture and independent integrity verification")
+    assert verify < preflight < upload < gate
+    assert steps[preflight]["if"] == "always()"
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "IIOS_LLM_PROVIDER_API_KEY" not in text
+    assert "B2_PREFLIGHT_OUTCOME" in text
+    assert "B2_PREFLIGHT_BLOCKED_NOT_ADMITTED" in text
 
 def test_newhecheng_case_manifest_uses_free_primary_exchange_sources_and_preserves_unknowns():
     value = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
