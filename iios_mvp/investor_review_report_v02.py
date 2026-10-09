@@ -8,6 +8,14 @@ from typing import Any, Mapping
 
 from .engine import canonical_json, sha256_obj
 from .machine_publication import validate_machine_publication
+from .canonical_run_authority_v01 import (
+    authorize_report_write,
+    advance_persisted_run,
+    run_state_path,
+    validate_run_state_record,
+    write_complete_run_receipt,
+)
+from .canonical_research_orchestrator import Stage
 
 INVESTOR_REPORT_VERSION = "IIOS-INVESTOR-REVIEW-0.2"
 INVESTOR_QA_VERSION = "IIOS-INVESTOR-REVIEW-QA-0.2"
@@ -887,6 +895,7 @@ def _write_immutable(path: Path, content: bytes) -> None:
 def write_investor_review_report_v02(root: str | Path, *, publication_path: str | Path, generated_at: str) -> tuple[Path, Path, Path, Path]:
     publication = _load_json(publication_path)
     validate_machine_publication(publication)
+    run_authority_ref = authorize_report_write(root, publication=publication)
     report = build_investor_review_report_v02(publication=publication, generated_at=generated_at)
     validate_investor_review_report_v02(report)
     qa = qa_investor_review_v02(publication=publication, report=report)
@@ -902,4 +911,43 @@ def write_investor_review_report_v02(root: str | Path, *, publication_path: str 
     _write_immutable(mp, json.dumps(report["machine_report"], ensure_ascii=False, indent=2).encode("utf-8") + b"\n")
     _write_immutable(hp, report["markdown"].encode("utf-8"))
     _write_immutable(qp, json.dumps(qa, ensure_ascii=False, indent=2).encode("utf-8") + b"\n")
+
+    # The Chinese investor surface is the final human-review artifact. Once all
+    # four immutable outputs exist, bind them into REPORTED -> COMPLETE and emit
+    # the complete Run Receipt as a separate sidecar to avoid hash recursion.
+    run_id = str(run_authority_ref["run_id"])
+    report_bundle_hash = sha256_obj({
+        "report_hash": report["report_hash"],
+        "machine_report_hash": report["machine_report_hash"],
+        "human_report_hash": report["human_report_hash"],
+        "qa_hash": qa["qa_hash"],
+    })
+    state_path = run_state_path(root, run_id)
+    state = validate_run_state_record(_load_json(str(state_path)))
+    if state["envelope"]["stage_state"] == Stage.PUBLISHED.value:
+        advance_persisted_run(
+            root, run_id, Stage.REPORTED,
+            input_refs=(publication["publication_id"],),
+            input_hashes=(publication["publication_hash"],),
+            output_refs=(
+                "report_bundle", report["report_id"], report["machine_report_hash"],
+                report["human_report_hash"], qa["qa_hash"],
+            ),
+            output_hashes=(
+                report_bundle_hash, report["report_hash"],
+                report["machine_report_hash"], report["human_report_hash"], qa["qa_hash"],
+            ),
+            producer_type="CODE",
+            producer_version=INVESTOR_REPORT_VERSION,
+        )
+        advance_persisted_run(
+            root, run_id, Stage.COMPLETE,
+            input_refs=(report["report_id"],),
+            input_hashes=(report_bundle_hash,),
+            producer_type="CODE",
+            producer_version=INVESTOR_REPORT_VERSION,
+        )
+    elif state["envelope"]["stage_state"] != Stage.COMPLETE.value:
+        raise ValueError("report cannot finalize a run outside PUBLISHED/COMPLETE")
+    run_receipt = write_complete_run_receipt(root, run_id, report_hash=report_bundle_hash)
     return rp, mp, hp, qp
