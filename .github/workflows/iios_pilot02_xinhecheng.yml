@@ -29,24 +29,28 @@ jobs:
       - name: Compile pilot code
         run: python -m compileall -q iios_mvp tools tests/b03b_upstream_authority_fixture.py tests/b04b_return_lineage_fixture.py
 
+      - name: Assert external source capture is time-bounded
+        run: python -m pytest -q tests/test_pilot02_capture_timeout_contract.py
+
       - name: Capture exact primary evidence and latest tradable price
         shell: bash
+        timeout-minutes: 4
         run: |
           set -euo pipefail
           rm -rf /tmp/pilot02-xhc
           mkdir -p /tmp/pilot02-xhc/raw /tmp/pilot02-xhc/out
 
-          curl -L --fail --retry 3 --retry-delay 2 \
+          curl -L --fail --connect-timeout 8 --max-time 25 --retry 1 --retry-delay 2 \
             "https://static.cninfo.com.cn/finalpage/2026-08-20/1225482495.PDF" \
             -o /tmp/pilot02-xhc/raw/xinhecheng_2026_h1.pdf
 
-          curl -L --fail --retry 3 --retry-delay 2 \
+          curl -L --fail --connect-timeout 8 --max-time 25 --retry 1 --retry-delay 2 \
             -A "Mozilla/5.0" \
             -H "Referer: https://gu.qq.com/" \
             "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sz002001,day,2026-09-30,2026-09-30,5," \
             -o /tmp/pilot02-xhc/raw/002001_20260930_tencent.json
 
-          curl -L --fail --retry 3 --retry-delay 2 \
+          curl -L --fail --connect-timeout 8 --max-time 25 --retry 1 --retry-delay 2 \
             "https://m.chinaclear.cn/zdjs/gszb/202609/0404d81f1ee8409c95b5dc4af693409f.shtml" \
             -o /tmp/pilot02-xhc/raw/chinaclear_2026_holiday_schedule.html
 

@@ -138,6 +138,77 @@ def test_p0_ce_01b_official_canonical_entry_never_falls_back_when_runtime_missin
     assert not (tmp_path / "runs").exists()
 
 
+def test_p0_ce_01c_explicit_runtime_factory_is_trusted_host_input(monkeypatch, tmp_path):
+    import sys
+    import types
+
+    import iios_mvp.cli as cli
+    from iios_mvp.canonical_runtime_registry_v01 import CanonicalRuntimeBindings
+
+    module_name = "iios_mvp_test_runtime_factory"
+    module = types.ModuleType(module_name)
+    calls = {}
+    expected = CanonicalRuntimeBindings(
+        request_interpreter=object(),
+        request_registry=object(),
+        semantic_producer=object(),
+        producer_registry=object(),
+        current_price_resolver=object(),
+        independent_forecast_resolver=object(),
+        upstream_authority_resolver=object(),
+        valuation_output_resolver=object(),
+    )
+
+    def build_runtime(*, bundle, output_root):
+        calls["bundle"] = bundle
+        calls["output_root"] = output_root
+        return expected
+
+    module.build_runtime = build_runtime
+    monkeypatch.setitem(sys.modules, module_name, module)
+    monkeypatch.setattr(cli, "get_canonical_runtime", lambda: None)
+
+    bundle = {"raw_request": "test request", "runtime_factory": "THIS_MUST_NOT_BE_READ_FROM_REQUEST"}
+    runtime = cli._resolve_canonical_runtime(
+        factory_spec=f"{module_name}:build_runtime",
+        bundle=bundle,
+        output_root=str(tmp_path / "runs"),
+    )
+    assert runtime is expected
+    assert calls == {"bundle": bundle, "output_root": str(tmp_path / "runs")}
+
+    with pytest.raises(ValueError, match="trusted module:callable"):
+        cli._resolve_canonical_runtime(
+            factory_spec="arbitrary code supplied by request bundle",
+            bundle=bundle,
+            output_root=str(tmp_path / "runs"),
+        )
+
+
+def test_p0_ce_01d_invalid_runtime_factory_blocks_without_artifacts(tmp_path, capsys, monkeypatch):
+    import iios_mvp.cli as cli
+
+    monkeypatch.setattr(cli, "get_canonical_runtime", lambda: None)
+    bundle = tmp_path / "request.json"
+    output_root = tmp_path / "runs"
+    bundle.write_text(
+        json.dumps({"raw_request": "使用新版本IIOS分析百龙创园605016，截止2026-10-09"}),
+        encoding="utf-8",
+    )
+    args = parser().parse_args([
+        "canonical-run", str(bundle), "--out", str(output_root),
+        "--runtime-factory", "arbitrary code supplied by request bundle",
+    ])
+    code = args.func(args)
+    output = json.loads(capsys.readouterr().out)
+    assert code == 2
+    assert output["status"] == "BLOCKED"
+    assert output["canonical_decision_created"] is False
+    assert output["reason"] == "CANONICAL_RUNTIME_FACTORY_INVALID"
+    assert output["error_type"] == "ValueError"
+    assert not output_root.exists()
+
+
 def test_p0_ce_02_unadmitted_evidence_cannot_become_canonical_decision():
     snapshot, _digest = run_case(_legacy_unadmitted_case())
     assert snapshot["execution_classification"]["status"] == "NON_CANONICAL"

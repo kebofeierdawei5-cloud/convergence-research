@@ -82,6 +82,23 @@ replay-validated IIOS_RUN_RECEIPT
 Next acceptance gate is **runtime integration and real-case evidence**, not adding Provider endpoint/key requirements to Route A: (1) wire the actual user-facing host to call `canonical-run`; (2) register an approved request interpreter, semantic producer, and canonical resolvers in that host; (3) admit the source-vintage/license/PIT-verified 605016 evidence and authorized Forecast/Valuation chain; and (4) run production-backed natural-language-to-canonical conformance. The runtime registry is intentionally empty by default, so `canonical-run` returns `BLOCKED / CANONICAL_RUNTIME_NOT_REGISTERED` until an approved composition is supplied. P0-LLM-001/P0-LLM-004 remain OPEN until this is proven; no default fallback is allowed.
 
 
+### P0 Follow-up — Runtime Composition Hook + Bounded Source Capture — 2026-10-09
+
+Status: **FOLLOW-UP IMPLEMENTED / EXACT-HEAD CI PASS / PRODUCTION RUNTIME ACCEPTANCE OPEN**
+
+- PR #262: `P0 follow-up: trusted runtime factory and bounded Route A CI capture`.
+- Code-and-test head before the state sync: `f9bdc73ed3b7da8a15bd135dc08e74a64a2fe754`; after recording this sync, exact-head run for the state-sync commit `e97d626e1762cfd9eaeaee14faa6e62aad85e59f` completed **24 / 24 SUCCESS**, with zero failures and zero still-running checks.
+- P0 canonical-entry regression: **10 / 10 PASS** on both exact heads.
+- The previously slow PILOT-02 source-capture step completed in about 41 seconds after adding `--connect-timeout 8 --max-time 25 --retry 1` to each of its three network calls and a four-minute step timeout. One HTTPS attempt timed out on the first try; the bounded retry succeeded. The E2E still correctly reports `BLOCKED_NOT_ADMITTED`; raw captures are preserved, and no formal Decision Revision or report is written.
+- `canonical-run` now accepts an explicitly trusted `--runtime-factory module:callable` or `IIOS_CANONICAL_RUNTIME_FACTORY`, or a host-pre-registered `CanonicalRuntimeBindings`. The factory selector is taken only from CLI/environment configuration, not request JSON. Invalid configuration returns `BLOCKED`; raw factory exception text is not echoed. The default remains fail-closed when no runtime is registered.
+
+Non-claims:
+- The follow-up does not ship or register a production runtime factory; it provides the deployment handoff only.
+- A valid factory must still bind a real request interpreter, semantic producer, exact-byte B2 Evidence/PIT intake, current price, independent forecast, upstream authority and valuation resolvers.
+- The successful PILOT-02 workflow verifies bounded acquisition and preserved diagnostic output, **not company evidence admission or an investment decision**.
+- P0-LLM-001 / P0-LLM-004 remain **OPEN** until the actual user-facing host is wired, a genuine company run completes Evidence/PIT → Decision Revision → Publication → report → Run Receipt replay, and the production runtime is independently accepted.
+
+
 F-001 through F-005 have been remediated and independently re-audited. The fresh B2-F audit passed against the FR5-fix head on 2026-10-09 and is preserved as a canonical, rerunnable source/contract audit. This closes the B2-F red-team finding set; it does **not** prove production provider invocation or model/economic validity.
 
 **B2-D LIVE provider integration = OPTIONAL / BLOCKED (NOT AN MVP GATE).** No provider runtime configuration or `LIVE_RESPONSE_CAPTURED + INDEPENDENT_VERIFIED` evidence has been supplied; that matters only if the optional external-LLM integration itself is being accepted.

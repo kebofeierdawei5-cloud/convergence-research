@@ -47,6 +47,8 @@ jobs:
               ".github/workflows/iios_pilot03.yml",
               "tools/pilot02_xinhecheng_e2e.py",
               "tests/test_pilot02_risk_discipline.py",
+              # Contract-only regression for the bounded source capture invoked by PILOT-02.
+              "tests/test_pilot02_capture_timeout_contract.py",
               "docs/iios/PILOT-03_OBSERVED_FRICTION_20261007.md",
           }
           related = {
