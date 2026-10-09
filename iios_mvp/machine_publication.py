@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
+from .canonical_run_authorization import verify_revision_write_authorization
 from .decision_lifecycle_production import (
     validate_current_projection,
     validate_decision_revision,
@@ -203,6 +204,7 @@ def build_machine_publication(
 ) -> dict[str, Any]:
     published_at = _timestamp(published_at, "published_at")
     revision = _load_revision(root, decision_id)
+    verify_revision_write_authorization(root, revision)
     snapshot = _load_bound_snapshot(root, revision)
     approval = _load_approval(root, revision)
     current_projection = _load_current_projection(root, revision)
