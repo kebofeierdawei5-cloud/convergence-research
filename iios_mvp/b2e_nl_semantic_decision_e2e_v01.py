@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
+
+from dataclasses import dataclass
 from typing import Any, Mapping
 import hashlib
 import json
@@ -31,7 +32,7 @@ from iios_mvp.llm_semantic_workbench_v01 import (
     WorkbenchResult,
 )
 from iios_mvp.semantic_producer_admission_v01 import ProducerRegistry
-from research.b2.company_evidence import validate_company_evidence_manifest
+from iios_mvp.canonical_evidence_admission_v01 import validate_company_evidence_manifest
 
 B2E_CONTRACT_VERSION = "IIOS-B2-E-NL-SEMANTIC-DECISION-E2E-0.1"
 B2E_STATUS_ADMITTED = "ADMITTED"
@@ -194,7 +195,32 @@ def _transition_pre_decision(
     )
 
 
-def _run_b2e_conformance_impl(
+def _persist_blocked_on_error(function):
+    from functools import wraps
+
+    @wraps(function)
+    def guarded(*args: Any, **kwargs: Any) -> B2EConformanceResult:
+        run_root = kwargs.get("run_root")
+        run_id = kwargs.get("run_id")
+        try:
+            return function(*args, **kwargs)
+        except Exception as exc:
+            if run_root and run_id:
+                try:
+                    block_persisted_run(
+                        str(run_root), str(run_id),
+                        f"{type(exc).__name__}: {str(exc)[:1800]}",
+                    )
+                except Exception:
+                    # Preserve the primary exception. Without a verifiable
+                    # state file, no formal writer can obtain authorization.
+                    pass
+            raise
+    return guarded
+
+
+@_persist_blocked_on_error
+def run_b2e_conformance(
     *,
     raw_request: str,
     request_id: str,
@@ -434,7 +460,6 @@ def _run_b2e_conformance_impl(
 
     revision: Mapping[str, Any]
     if run_root is not None:
-        from pathlib import Path
         from iios_mvp.store import (
             create_or_load_series, next_revision, write_decision_revision,
             write_snapshot,
@@ -541,27 +566,6 @@ def _run_b2e_conformance_impl(
             str(run_state_path(run_root, run_id)) if run_root is not None else None
         ),
     )
-
-
-def run_b2e_conformance(*args: Any, **kwargs: Any) -> B2EConformanceResult:
-    """Canonical B2-E API; all failures persist BLOCKED when a run was started."""
-    run_root = kwargs.get("run_root")
-    run_id = kwargs.get("run_id")
-    try:
-        return _run_b2e_conformance_impl(*args, **kwargs)
-    except Exception as exc:
-        if run_root and run_id:
-            try:
-                block_persisted_run(
-                    str(run_root), str(run_id),
-                    f"{type(exc).__name__}: {str(exc)[:1800]}",
-                )
-            except Exception:
-                # Preserve the original exception. If state itself cannot be
-                # persisted, callers still receive BLOCKED and no writer is
-                # authorized without a valid state file.
-                pass
-        raise
 
 
 __all__ = [
