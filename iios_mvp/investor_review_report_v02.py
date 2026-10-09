@@ -938,10 +938,10 @@ def write_investor_review_report_v02(root: str | Path, *, publication_path: str 
         if persisted_receipt.get("report_hash") != report_bundle_hash:
             raise ValueError("Run Receipt already binds a different final report bundle")
 
-    _write_immutable(rp, json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8") + b"\\n")
-    _write_immutable(mp, json.dumps(report["machine_report"], ensure_ascii=False, indent=2).encode("utf-8") + b"\\n")
+    _write_immutable(rp, json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8") + b"\n")
+    _write_immutable(mp, json.dumps(report["machine_report"], ensure_ascii=False, indent=2).encode("utf-8") + b"\n")
     _write_immutable(hp, report["markdown"].encode("utf-8"))
-    _write_immutable(qp, json.dumps(qa, ensure_ascii=False, indent=2).encode("utf-8") + b"\\n")
+    _write_immutable(qp, json.dumps(qa, ensure_ascii=False, indent=2).encode("utf-8") + b"\n")
 
     # Publish the report-stage receipt only after all immutable outputs exist.
     if current_stage == Stage.PUBLISHED.value:
