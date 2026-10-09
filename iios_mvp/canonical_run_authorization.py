@@ -156,6 +156,10 @@ def build_run_authorization(
     }
     for field, expected in expected_identity.items():
         actual = input_data.get(field)
+        # Older v0.3 snapshot fixtures omit as_of_date; in that case the
+        # explicit cutoff_date is the only supported as-of basis.
+        if field == "as_of_date" and actual is None:
+            actual = input_data.get("cutoff_date")
         if field in {"market", "symbol"}:
             actual = str(actual or "").upper()
         if str(actual or "") != expected:
