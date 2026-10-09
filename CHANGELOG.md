@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### 2026-10-09 — Route A Run #8 Partial Capture Retained + B2 Preflight (No Provider Credentials)
+
+- Run #8 / `37938129274` completed SUCCESS using the canonical partial-capture final gate.
+- Nine public/free sources were declared; eight objects were captured and their exact raw bytes independently verified; the Eastmoney K-line API failed with no bytes and remains explicitly failed in the receipt.
+- Receipt status = `PARTIAL_CAPTURE_NOT_ADMITTED`; B2 preflight = `BLOCKED_NOT_ADMITTED`; independent integrity = `INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION`.
+- Artifact ID `11620425220`, SHA-256 `0c7ddb34a4b77f7298309ae89ac8de96877a059656a811beefe7eabfe99a0ba1`, 14-day retention. Run record: `docs/iios/ROUTE_A_CAPTURE_RC_CN_A_002001_20261009_RUN8.md`.
+- No LLM/provider endpoint or API key was used. This green run means a partial artifact was preserved and verified; it does not mean complete URL coverage or any source's PIT/evidence admission.
+- Next gate: create source-located fact-level Evidence Records from the raw reports/pages, review actual publication-vintage/licence evidence, and use the existing B2 validator. Until then, all seven required field groups remain uncovered by admitted facts.
+
+
 ### 2026-10-09 — Route A First Real Source Capture (Raw Intake Only)
 
 - Captured five public source objects for the manually selected `002001.SZ` case through the no-secret GitHub Actions Route A workflow.
