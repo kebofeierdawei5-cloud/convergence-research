@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .engine import canonical_json, sha256_obj
+from .canonical_run_authorization import verify_publication_write_authorization
 from .machine_publication import validate_machine_publication
 
 INVESTOR_REPORT_VERSION = "IIOS-INVESTOR-REVIEW-0.2"
@@ -887,6 +888,7 @@ def _write_immutable(path: Path, content: bytes) -> None:
 def write_investor_review_report_v02(root: str | Path, *, publication_path: str | Path, generated_at: str) -> tuple[Path, Path, Path, Path]:
     publication = _load_json(publication_path)
     validate_machine_publication(publication)
+    verify_publication_write_authorization(root, publication)
     report = build_investor_review_report_v02(publication=publication, generated_at=generated_at)
     validate_investor_review_report_v02(report)
     qa = qa_investor_review_v02(publication=publication, report=report)
