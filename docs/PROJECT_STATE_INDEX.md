@@ -48,11 +48,25 @@ Status: **INCIDENT REPRODUCTION PASS / CANONICAL RECORD — PRODUCTION P0s OPEN*
 - Characterization tests: 6 / 6 PASS; compileall and diff-check PASS.
 - The tests reproduce canonical-entry, unadmitted-evidence, missing-semantic-artifact and run-receipt/write-binding bypasses.
 - This result proves the defect can be reproduced; it does not close P0-LLM-001 or P0-LLM-004, admit any company evidence, or establish investment-decision conformance.
-- Next batch: enforce the canonical research entry and run authorization at the final write boundary; replace characterization tests with fail-closed assertions and add a positive, fully authorized replay.
+- Time-local next batch at Batch 0 completion: enforce the canonical research entry and run authorization at the final write boundary; replace characterization tests with fail-closed assertions and add a positive, fully authorized replay.
 
 Canonical incident contract: `docs/iios/P0_CANONICAL_ENTRY_INCIDENT_REPRODUCTION_20261009.md`.
 
-- Canonical promotion status: Batch 0 freezes a reproducible defect and acceptance contract only. Production execution enforcement remains an OPEN P0 and must be remediated and independently tested in successor batches.
+- Canonical promotion status: Batch 0 freezes a reproducible defect and acceptance contract only. Production execution enforcement remains an OPEN P0 until Batch 1 acceptance; this record is not closure evidence.
+
+### P0 Canonical Entry and Write Authorization — Batch 1
+
+Status: **IMPLEMENTED ON PR #257 / ACCEPTANCE OPEN / P0s NOT CLOSED**
+
+- Working branch: `repair/p0-canonical-run-enforcement-20261009`; always resolve the exact PR head and its CI status rather than reusing a historical commit.
+- Implemented: persisted Run Envelope and append-only stage receipts; raw-request/admission binding; exact-byte B2 Evidence/PIT manifest verification; same-case/cutoff Decision Revision authorization; immutable Publication authorization; report-stage completion and replay-validated Run Receipt v0.2.
+- Legacy `iios-mvp run` now returns `NON_CANONICAL`; `canonical-run` fails closed with `BLOCKED` when no explicitly registered runtime is available. It has no silent fallback to the lower-level engine.
+- Lower-level `run_case` remains available for calculations but tags its result `NON_CANONICAL`; the formal Decision Revision writer rejects that tag.
+- The real 新和成 capture pilot preserves original source hashes and economic calculation as a diagnostic preview, but is `BLOCKED_NOT_ADMITTED` until a complete, independently validated B2 manifest and canonical run exist. It must not mint a Decision Revision or report from the three captured objects alone.
+- A full synthetic authorization regression and a real CATL-manifest end-to-end regression are included for exact-head verification. The synthetic regression proves control-plane mechanics only; the deterministic semantic producer is a test double and does not establish semantic-model quality.
+- Acceptance gate: all exact-head critical CI and fresh independent red-team checks must pass; negative bypass probes must assert `BLOCKED`/`NON_CANONICAL`; the real-manifest E2E must persist and replay a complete Run Receipt; no formal artifact may be written by an unadmitted real-company run.
+
+**Do not mark P0-LLM-001 / P0-LLM-004 PASS or merge this batch merely because code is present or selected workflows are green.** The P0s stay open until the complete acceptance gate is independently verified and the official runtime/application entry is demonstrably wired for the intended deployment.
 
 
 F-001 through F-005 have been remediated and independently re-audited. The fresh B2-F audit passed against the FR5-fix head on 2026-10-09 and is preserved as a canonical, rerunnable source/contract audit. This closes the B2-F red-team finding set; it does **not** prove production provider invocation or model/economic validity.
