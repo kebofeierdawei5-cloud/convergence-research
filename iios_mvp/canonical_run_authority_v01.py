@@ -448,6 +448,9 @@ def authorize_decision_revision_write(
 ) -> dict[str, Any]:
     if snapshot.get("snapshot_schema") != "IIOS-MVP-SNAPSHOT-0.3.0":
         raise CanonicalRunAuthorizationError("canonical run authorization requires Investment Core v0.3 snapshot")
+    execution_classification = snapshot.get("execution_classification")
+    if isinstance(execution_classification, Mapping) and execution_classification.get("status") == "NON_CANONICAL":
+        raise CanonicalRunAuthorizationError("NON_CANONICAL: lower-level engine snapshot cannot be promoted to Decision Revision")
     snapshot_input = snapshot.get("input")
     if not isinstance(snapshot_input, Mapping):
         raise CanonicalRunAuthorizationError("snapshot input identity is required")
