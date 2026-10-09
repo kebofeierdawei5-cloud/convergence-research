@@ -70,7 +70,7 @@ def test_cli_imports_b2_contract_when_started_outside_repo_root(tmp_path):
         check=False,
     )
     assert completed.returncode == 0, completed.stderr
-    assert "existing B2 Evidence/PIT contract" in completed.stdout
+    assert "usage: route_a_b2_preflight.py" in completed.stdout
 
 
 def test_date_only_cutoff_is_expanded_to_eod_plus_0800():
