@@ -6,7 +6,16 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import sys
 from typing import Any, Mapping
+
+# When executed as "python tools/route_a_b2_preflight.py", sys.path[0] is
+# the tools directory, not the repository root. Add the canonical source root
+# explicitly so the existing research.b2 contract is imported without relying
+# on runner-specific PYTHONPATH state.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from research.b2.company_evidence import (
     REQUIRED_COMPANY_FIELD_GROUPS,
