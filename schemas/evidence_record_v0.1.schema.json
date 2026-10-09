@@ -64,7 +64,10 @@
       "minLength": 1
     },
     "known_at": {
-      "type": "string",
+      "type": [
+        "string",
+        "null"
+      ],
       "minLength": 1
     },
     "retrieved_at": {
@@ -192,5 +195,48 @@
         "UNKNOWN"
       ]
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "provenance_class": {
+            "const": "UNKNOWN"
+          },
+          "status": {
+            "const": "UNKNOWN"
+          }
+        },
+        "required": [
+          "provenance_class",
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "known_at"
+        ],
+        "properties": {
+          "known_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "known_at"
+        ],
+        "properties": {
+          "known_at": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
 }

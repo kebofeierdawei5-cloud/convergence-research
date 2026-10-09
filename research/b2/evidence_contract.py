@@ -84,15 +84,27 @@ def validate_evidence_record(evidence: Any) -> list[str]:
     status = evidence.get("status")
     if status not in {"ADMITTED", "CONDITIONAL", "UNKNOWN", "BLOCKED"}:
         errors.append("STATUS:invalid")
+    known_raw = evidence.get("known_at")
+    known_missing = known_raw is None or (
+        isinstance(known_raw, str) and not known_raw.strip()
+    )
+    explicitly_unknown = (
+        evidence.get("provenance_class") == "UNKNOWN" and status == "UNKNOWN"
+    )
     try:
-        known = parse_temporal(evidence["known_at"], "known_at")
+        # Represent an unknown time without inventing a date. This is valid as
+        # an UNKNOWN record only; assert_pit() below the capture boundary will
+        # still reject it for admission.
+        known = None if explicitly_unknown and known_missing else parse_temporal(
+            known_raw, "known_at"
+        )
         retrieved = parse_temporal(evidence["retrieved_at"], "retrieved_at")
-        if retrieved < known:
+        if known is not None and retrieved < known:
             errors.append("TEMPORAL_ORDER:retrieved_at cannot precede known_at")
         published_raw = evidence.get("published_at")
         if published_raw:
             published = parse_temporal(published_raw, "published_at")
-            if published > known:
+            if known is not None and published > known:
                 errors.append("TEMPORAL_ORDER:published_at cannot be after known_at")
         start_raw = evidence.get("effective_from")
         end_raw = evidence.get("effective_to")
@@ -114,6 +126,10 @@ def assert_pit(evidence: dict[str, Any], cutoff: Any) -> None:
     errors = validate_evidence_record(evidence)
     if errors:
         raise ValueError("; ".join(errors))
+    if evidence.get("provenance_class") == "UNKNOWN" or evidence.get("status") == "UNKNOWN":
+        raise ValueError("PIT_UNKNOWN: source availability/provenance is not established")
+    if evidence.get("status") == "BLOCKED":
+        raise ValueError("PIT_BLOCKED: evidence record is blocked")
     if not pit_qualified(evidence, cutoff):
         raise ValueError("PIT_FAIL: known_at exceeds cutoff")
 
