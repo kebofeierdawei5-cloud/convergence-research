@@ -2,7 +2,7 @@ import pytest
 import json
 from jsonschema import Draft202012Validator, FormatChecker
 
-from tests.decision_admission_fixture import build_fixture_admission_receipt
+from tests.decision_admission_fixture import build_fixture_admission_receipt, prepare_authorized_test_run
 from iios_mvp.trigger_production import (
     TRIGGER_CONTRACT_VERSION, TRIGGER_EVENT_VERSION,
     build_trigger_contract, build_trigger_event,
@@ -142,13 +142,15 @@ def test_store_persists_only_canonical_trigger_objects(tmp_path):
     snapshot = {**core, "snapshot_hash": snapshot_hash}
     write_snapshot(tmp_path, snapshot)
     series = create_or_load_series(tmp_path, "CN-A", "300750", "CATL", "2026-10-04T00:00:00Z")
+    admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
+    prepare_authorized_test_run(root=str(tmp_path), run_id="run-1", snapshot=snapshot, decision_admission=admission)
     write_decision_revision(
         tmp_path,
         series["decision_series_id"],
         1,
         snapshot,
         "run-1",
-        decision_admission=build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"]),
+        decision_admission=admission,
     )
     revision = json.loads((tmp_path / f"{DECISION}.decision.json").read_text())
 
