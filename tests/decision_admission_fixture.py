@@ -152,7 +152,7 @@ def prepare_authorized_test_run(
     manifest_hash = str(manifest["audit"]["manifest_sha256"])
     manifest_path = root_path / "canonical-artifacts" / f"{_sha(manifest)}.evidence-manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_bytes = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8") + b"\\n"
+    manifest_bytes = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8") + b"\n"
     if manifest_path.exists():
         if manifest_path.read_bytes() != manifest_bytes:
             raise AssertionError("synthetic Evidence Manifest fixture collision")
