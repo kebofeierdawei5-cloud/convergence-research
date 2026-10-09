@@ -1,0 +1,9 @@
+{
+  "schema_version": "IIOS-PUBLIC-WEB-DISCOVERY-REQUEST-0.1",
+  "case_id": "RC-CN-A-002001-20261009",
+  "query": "site:disc.static.szse.cn 002001 新和成 2026-10-09 回购进展公告 2026 三季报 股东 股份变动",
+  "region": "cn-zh",
+  "max_results": 10,
+  "backend": "auto",
+  "purpose": "Discover public official source URLs for missing market-price, business-reality and capital-structure evidence groups. Candidate discovery only; no capture or evidence admission."
+}
