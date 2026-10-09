@@ -492,6 +492,19 @@ def write_machine_publication(
         published_at=published_at,
     )
     validate_machine_publication(record)
+    # Check the append-only publication stage before writing bytes. A second
+    # publication with a different timestamp/hash for the same run is not
+    # authorized and must not leave an orphaned file behind.
+    run_path = run_state_path(root, record["decision_ref"]["run_id"])
+    run_state = validate_run_state_record(_load_json(run_path))
+    current_stage = run_state["envelope"]["stage_state"]
+    if current_stage != Stage.HUMAN_APPROVAL_PENDING.value:
+        receipts = run_state["envelope"]["stage_receipts"]
+        published = [x for x in receipts if x["stage_id"] == Stage.PUBLISHED.value]
+        if not published or record["publication_hash"] not in published[-1]["output_hashes"]:
+            raise CanonicalRunAuthorizationError(
+                "run already has a different PUBLISHED artifact; publication is immutable per canonical run"
+            )
     path = publication_path(root, record["publication_hash"])
     if path.exists():
         existing = _load_json(path)
@@ -506,9 +519,6 @@ def write_machine_publication(
         )
 
     # Commit the PUBLISHED stage only after the immutable Publication bytes exist.
-    run_path = run_state_path(root, record["decision_ref"]["run_id"])
-    run_state = validate_run_state_record(_load_json(run_path))
-    current_stage = run_state["envelope"]["stage_state"]
     if current_stage == Stage.HUMAN_APPROVAL_PENDING.value:
         advance_persisted_run(
             root, record["decision_ref"]["run_id"], Stage.PUBLISHED,
