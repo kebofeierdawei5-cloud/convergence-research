@@ -14,7 +14,7 @@ from urllib.parse import urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 SCHEMA_VERSION = "IIOS-PUBLIC-WEB-DISCOVERY-RECORD-0.2"
-TOOL_VERSION = "IIOS-PUBLIC-WEB-DISCOVERY-0.1"
+TOOL_VERSION = "IIOS-PUBLIC-WEB-DISCOVERY-0.2"
 MAX_QUERY_CHARS = 500
 MAX_RESULTS = 25
 REGION_RE = re.compile(r"^[a-z]{2}-[a-z]{2}$")
