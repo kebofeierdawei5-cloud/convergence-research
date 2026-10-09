@@ -57,7 +57,27 @@ def prepare_authorized_test_run(
     after the input gates are represented as already admitted fixtures.
     """
     from iios_mvp.canonical_research_orchestrator import Stage
-    from iios_mvp.canonical_run_authority_v01 import PersistedCanonicalResearchOrchestrator
+    from iios_mvp.canonical_run_authority_v01 import (
+        PersistedCanonicalResearchOrchestrator, run_state_path,
+        validate_run_state_record,
+    )
+
+    existing_path = run_state_path(root, run_id)
+    if existing_path.exists():
+        existing = validate_run_state_record(json.loads(existing_path.read_text(encoding="utf-8")))
+        env = existing["envelope"]
+        expected = snapshot["input"]
+        if (
+            env["case_id"] != expected["case_id"]
+            or env["market"] != str(expected["market"]).upper()
+            or env["symbol"] != str(expected["symbol"]).upper()
+            or env["cutoff_date"] != expected["cutoff_date"]
+        ):
+            raise AssertionError("existing synthetic run fixture identity mismatch")
+        decision_stages = [x for x in env["stage_receipts"] if x["stage_id"] == Stage.DECISION_ADMITTED.value]
+        if not decision_stages or snapshot["snapshot_hash"] not in decision_stages[-1]["output_hashes"] or decision_admission["admission_record_hash"] not in decision_stages[-1]["output_hashes"]:
+            raise AssertionError("existing synthetic run fixture is not bound to this snapshot/admission")
+        return
 
     case = snapshot["input"]
     market = str(case["market"]).upper()
