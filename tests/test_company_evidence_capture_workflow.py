@@ -23,8 +23,9 @@ def test_capture_workflow_uses_path_allowlist_no_secrets_and_no_admission_claim(
     assert 'candidate.is_absolute()' in text
     assert '".." in candidate.parts' in text
     assert "secrets." not in text
-    assert "B2_PREFLIGHT_BLOCKED_NOT_ADMITTED" in text
-    assert "EVIDENCE_ADMISSION=FALSE" in text
+    assert "route_a_capture_final_gate.py" in text or "B2_PREFLIGHT_OUTCOME" in text
+    assert "route_a_capture_final_gate.py" in text
+    assert "upload_evidence_artifact" in text
     assert "retention-days: 14" in text
 
 
@@ -35,12 +36,14 @@ def test_capture_workflow_orders_capture_verification_artifact_and_final_gate():
     capture = next(i for i, name in enumerate(names) if name == "Capture exact public-source bytes")
     verify = next(i for i, name in enumerate(names) if name == "Independently verify captured bytes and receipt")
     upload = next(i for i, name in enumerate(names) if name == "Upload raw evidence, receipt and verifier result")
-    gate = next(i for i, name in enumerate(names) if name == "Require complete capture and independent integrity verification")
+    gate = next(i for i, name in enumerate(names) if name == "Validate artifact integrity and preserve partial-source status (not admission)")
     assert capture < verify < upload < gate
     assert steps[capture]["continue-on-error"] == "true"
     assert steps[verify]["if"] == "always()"
     assert steps[upload]["if"] == "always()"
+    assert steps[upload]["id"] == "upload_evidence_artifact"
     assert steps[gate]["if"] == "always()"
+    assert "tools/route_a_capture_final_gate.py" in steps[gate]["run"]
 
 
 def test_push_capture_request_uses_checkout_glob_not_optional_event_commit_list():
@@ -61,7 +64,7 @@ def test_capture_workflow_runs_b2_preflight_before_upload_and_never_requires_pro
     verify = next(i for i, name in enumerate(names) if name == "Independently verify captured bytes and receipt")
     preflight = next(i for i, name in enumerate(names) if name == "Run existing B2 Evidence/PIT preflight (not an admission)")
     upload = next(i for i, name in enumerate(names) if name == "Upload raw evidence, receipt and verifier result")
-    gate = next(i for i, name in enumerate(names) if name == "Require complete capture and independent integrity verification")
+    gate = next(i for i, name in enumerate(names) if name == "Validate artifact integrity and preserve partial-source status (not admission)")
     assert verify < preflight < upload < gate
     assert steps[preflight]["if"] == "always()"
     text = WORKFLOW_PATH.read_text(encoding="utf-8")
@@ -75,7 +78,7 @@ def test_newhecheng_case_manifest_uses_free_primary_exchange_sources_and_preserv
     assert value["market"] == "CN-A"
     assert value["symbol"] == "002001"
     assert value["cutoff_date"] == "2026-10-09"
-    assert len(value["sources"]) == 10
+    assert len(value["sources"]) == 9
     for source in value["sources"]:
         assert source["url"].startswith("https://")
         assert source["license_status"] == "PUBLIC_ACCESS_REUSE_UNKNOWN"
@@ -86,10 +89,10 @@ def test_newhecheng_case_manifest_uses_free_primary_exchange_sources_and_preserv
     assert "corporate_disclosures" in [source["field_group"] for source in value["sources"]]
     assert "trust_governance_events" in [source["field_group"] for source in value["sources"]]
     market_sources = [source for source in value["sources"] if source["field_group"] == "market_price"]
-    assert len(market_sources) == 4
+    assert len(market_sources) == 3
     assert all(source["source_class"] == "PUBLIC_SECONDARY" for source in market_sources)
     assert all(source["known_at"] == "" and source["known_at_basis"] == "" for source in market_sources)
-    assert any(source["source_id"] == "PRICE-SOHU-HISTORY-API" and "/app2/history.up?" in source["url"] for source in market_sources)
+    assert all(source["source_id"] != "PRICE-SOHU-HISTORY-API" for source in market_sources)
     assert any(source["source_id"] == "PRICE-EASTMONEY-KLINE-API" and "push2his.eastmoney.com/api/qt/stock/kline/get?" in source["url"] for source in market_sources)
     assert all("api_key=" not in source["url"].lower() and "token=" not in source["url"].lower() for source in market_sources)
     buyback_progress = next(source for source in value["sources"] if source["source_id"] == "SZSE-2026-BUYBACK-PROGRESS-SEP")

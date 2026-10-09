@@ -110,6 +110,7 @@ jobs:
           fi
 
       - name: Upload raw evidence, receipt and verifier result
+        id: upload_evidence_artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -118,19 +119,19 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Require complete capture and independent integrity verification
+      - name: Validate artifact integrity and preserve partial-source status (not admission)
         if: always()
         env:
+          OUT_DIR: ${{ runner.temp }}/iios-company-evidence-${{ github.run_id }}
           CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
           VERIFY_OUTCOME: ${{ steps.verify.outcome }}
           B2_PREFLIGHT_OUTCOME: ${{ steps.b2_preflight.outcome }}
+          UPLOAD_OUTCOME: ${{ steps.upload_evidence_artifact.outcome }}
         run: |
-          if [ "$B2_PREFLIGHT_OUTCOME" != "success" ]; then
-            echo "B2_PREFLIGHT_EXECUTION_FAILED_CLOSED; inspect the uploaded artifact if available."
-            exit 1
-          fi
-          if [ "$CAPTURE_OUTCOME" != "success" ] || [ "$VERIFY_OUTCOME" != "success" ]; then
-            echo "CAPTURE_OR_INDEPENDENT_VERIFICATION_FAILED; inspect the uploaded artifact if available."
-            exit 1
-          fi
-          echo "RAW_CAPTURE_AND_INTEGRITY_VERIFICATION_SUCCEEDED; B2_PREFLIGHT_BLOCKED_NOT_ADMITTED; EVIDENCE_ADMISSION=FALSE"
+          python tools/route_a_capture_final_gate.py \
+            --root "$OUT_DIR" \
+            --capture-outcome "$CAPTURE_OUTCOME" \
+            --verify-outcome "$VERIFY_OUTCOME" \
+            --b2-preflight-outcome "$B2_PREFLIGHT_OUTCOME" \
+            --upload-outcome "$UPLOAD_OUTCOME"
+          echo "B2_PREFLIGHT_BLOCKED_NOT_ADMITTED; EVIDENCE_ADMISSION=FALSE"
