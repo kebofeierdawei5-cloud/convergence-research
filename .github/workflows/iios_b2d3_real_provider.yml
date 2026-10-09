@@ -49,22 +49,23 @@ jobs:
       - name: Install runtime dependencies
         run: python -m pip install --disable-pip-version-check cryptography jsonschema
       - name: Fail-closed production configuration preflight
-        run: python - <<'PY'
-from iios_mvp.live_provider_preflight_v01 import load_live_provider_config
-cfg = load_live_provider_config()
-print({
-    "base_url": cfg.base_url,
-    "model": cfg.model,
-    "provider_id": cfg.provider_id,
-    "provider_version": cfg.provider_version,
-    "protocol": cfg.protocol,
-    "auth_mode": cfg.auth_mode,
-    "deployment_mode": cfg.deployment_mode,
-    "timeout_seconds": cfg.timeout_seconds,
-    "api_key_present": bool(cfg.api_key),
-    "runtime_private_key_present": bool(cfg.runtime_private_key_b64),
-})
-PY
+        run: |
+          python - <<'PY'
+          from iios_mvp.live_provider_preflight_v01 import load_live_provider_config
+          cfg = load_live_provider_config()
+          print({
+              "base_url": cfg.base_url,
+              "model": cfg.model,
+              "provider_id": cfg.provider_id,
+              "provider_version": cfg.provider_version,
+              "protocol": cfg.protocol,
+              "auth_mode": cfg.auth_mode,
+              "deployment_mode": cfg.deployment_mode,
+              "timeout_seconds": cfg.timeout_seconds,
+              "api_key_present": bool(cfg.api_key),
+              "runtime_private_key_present": bool(cfg.runtime_private_key_b64),
+          })
+          PY
 
   live_and_verify:
     if: github.event_name == 'workflow_dispatch'
