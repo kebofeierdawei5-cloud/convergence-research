@@ -169,6 +169,10 @@ def admit_natural_language_request(
     }
     receipt = {**receipt_core, "receipt_hash": canonical_hash(receipt_core)}
 
+    bind_request = getattr(orchestrator, "bind_request", None)
+    if callable(bind_request):
+        bind_request(run_id=run_id, raw_request=raw_request, request_receipt=receipt)
+
     envelope = orchestrator.start(
         run_id=run_id,
         case_id=case["case_id"],
