@@ -477,6 +477,42 @@ def run_b2e_conformance(
             "semantic-admission": dict(semantic.admission.__dict__),
             "decision-admission": dict(decision_admission),
         }
+        # Copy the already verified source bytes into the run's immutable evidence
+        # root. The Decision Revision write boundary independently reopens these
+        # bytes and the admitted manifest; a manifest without its raw byte bundle
+        # cannot authorize a formal write.
+        if not isinstance(admitted_manifest, Mapping) or not evidence_root:
+            raise B2EE2EError("BLOCKED: canonical evidence manifest/raw root is absent")
+        source_root = Path(evidence_root).resolve()
+        canonical_evidence_root = (root_path / "canonical-evidence").resolve()
+        canonical_evidence_root.mkdir(parents=True, exist_ok=True)
+        for declaration in admitted_manifest.get("raw_artifacts", []):
+            relative_path = declaration.get("relative_path")
+            if not isinstance(relative_path, str) or not relative_path.strip():
+                raise B2EE2EError("BLOCKED: raw evidence relative_path is invalid")
+            source_path = (source_root / relative_path).resolve()
+            destination_path = (canonical_evidence_root / relative_path).resolve()
+            try:
+                source_path.relative_to(source_root)
+                destination_path.relative_to(canonical_evidence_root)
+            except ValueError as exc:
+                raise B2EE2EError("BLOCKED: raw evidence path escapes its root") from exc
+            if not source_path.is_file():
+                raise B2EE2EError("BLOCKED: raw evidence bytes are missing: " + relative_path)
+            raw_bytes = source_path.read_bytes()
+            actual_hash = hashlib.sha256(raw_bytes).hexdigest()
+            if (
+                len(raw_bytes) != declaration.get("expected_size_bytes")
+                or actual_hash != declaration.get("expected_sha256")
+            ):
+                raise B2EE2EError("BLOCKED: raw evidence bytes no longer match admitted manifest: " + relative_path)
+            destination_path.parent.mkdir(parents=True, exist_ok=True)
+            if destination_path.exists():
+                if destination_path.read_bytes() != raw_bytes:
+                    raise B2EE2EError("immutable canonical raw evidence collision: " + relative_path)
+            else:
+                destination_path.write_bytes(raw_bytes)
+
         for artifact_name, artifact_payload in artifacts.items():
             artifact_bytes = json.dumps(
                 artifact_payload, ensure_ascii=False, sort_keys=True,
