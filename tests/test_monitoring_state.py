@@ -3,7 +3,7 @@ import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
 from iios_mvp.trigger_production import build_trigger_contract, build_trigger_event
-from tests.decision_admission_fixture import build_fixture_admission_receipt
+from tests.decision_admission_fixture import build_fixture_admission_receipt, prepare_authorized_test_run
 from iios_mvp.monitoring_state import build_monitoring_state, validate_monitoring_state, apply_trigger_event
 
 def contract(**overrides):
