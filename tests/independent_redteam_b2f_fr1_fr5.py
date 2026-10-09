@@ -154,5 +154,6 @@ def test_rt_fr5_only_dispatch_is_authorized_to_touch_provider_runtime():
 
 def test_rt_fr5_no_provider_credentials_or_live_capture_were_admitted_by_repair():
     state = _source(ROOT / "docs" / "PROJECT_STATE_INDEX.md")
-    assert "B2-D Live Provider Invocation / Evidence                BLOCKED" in state
+    assert "B2-D Live Provider Invocation / Evidence                OPTIONAL / BLOCKED — NOT MVP GATE" in state
+    assert "does NOT require an external LLM provider endpoint" in state
     assert "B2-E fixture-backed conformance is not admitted as live-provider evidence." in state

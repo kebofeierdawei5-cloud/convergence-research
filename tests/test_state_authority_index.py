@@ -9,13 +9,14 @@ def test_state_index_declares_single_current_authority():
     assert "**Current canonical main:**" in text
 
 
-def test_current_authority_points_to_b2d_live_gate():
+def test_current_authority_marks_external_llm_provider_optional_not_mvp_gate():
     text = STATE.read_text(encoding="utf-8")
     start = text.index("## CURRENT ACTIVE DEVELOPMENT AUTHORITY")
     end = text.index("## 2. Investment Core capability boundary")
     current = text[start:end]
     assert "B2-D Canonical Refresh + Live Provider Boundary" in current
-    assert "B2-D Live Provider Invocation / Evidence                BLOCKED" in current
+    assert "B2-D Live Provider Invocation / Evidence                OPTIONAL / BLOCKED — NOT MVP GATE" in current
+    assert "does NOT require an external LLM provider endpoint" in current
     assert "B2-D" in current and "B2-E" in current and "B2-F" in current
 
 def test_current_next_batch_prioritizes_free_first_company_evidence():
@@ -24,8 +25,9 @@ def test_current_next_batch_prioritizes_free_first_company_evidence():
     end = text.index("### Explicit non-blockers", start)
     current = text[start:end]
     assert "Route A — free-first single-company evidence intake" in current
-    assert "operator-supplied raw originals" in current
-    assert "B2-D LIVE remains a separately tracked model-integration gate" in current
+    assert "manually supplied evidence" in current
+    assert "No LLM provider endpoint or API key is required" in current
+    assert "public web discovery" in current
     assert "NOT_ADMITTED" in current
 
 
