@@ -153,7 +153,7 @@ def _resolve_canonical_runtime(*, factory_spec: str | None, bundle: dict, output
     if not factory_spec:
         return None
     spec = str(factory_spec).strip()
-    if not re.fullmatch(r"[A-Za-z_]\\w*(?:\\.[A-Za-z_]\\w*)*:[A-Za-z_]\\w*", spec):
+    if not re.fullmatch(r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*", spec):
         raise ValueError("runtime factory must use trusted module:callable syntax")
     module_name, factory_name = spec.split(":", 1)
     module = importlib.import_module(module_name)
