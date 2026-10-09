@@ -72,6 +72,9 @@ def test_newhecheng_case_manifest_uses_free_primary_exchange_sources_and_preserv
     assert len(market_sources) == 4
     assert all(source["source_class"] == "PUBLIC_SECONDARY" for source in market_sources)
     assert all(source["known_at"] == "" and source["known_at_basis"] == "" for source in market_sources)
+    assert any(source["source_id"] == "PRICE-SOHU-HISTORY-API" and "/app2/history.up?" in source["url"] for source in market_sources)
+    assert any(source["source_id"] == "PRICE-EASTMONEY-KLINE-API" and "push2his.eastmoney.com/api/qt/stock/kline/get?" in source["url"] for source in market_sources)
+    assert all("api_key=" not in source["url"].lower() and "token=" not in source["url"].lower() for source in market_sources)
     buyback_progress = next(source for source in value["sources"] if source["source_id"] == "SZSE-2026-BUYBACK-PROGRESS-SEP")
     assert buyback_progress["url"] == "https://disc.static.szse.cn/download/disc/disk03/finalpage/2026-10-09/abbcbfb7-92cb-4e05-a838-aff78aaa8077.PDF"
     assert buyback_progress["field_group"] == "capital_structure"
