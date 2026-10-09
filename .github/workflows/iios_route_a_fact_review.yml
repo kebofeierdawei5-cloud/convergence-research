@@ -1,0 +1,27 @@
+name: IIOS Route A Fact Extraction Review Contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/route_a_fact_review.py"
+      - "tests/test_route_a_fact_review.py"
+      - "docs/iios/ROUTE_A_FACT_EXTRACTION_REVIEW_20261009.md"
+      - ".github/workflows/iios_route_a_fact_review.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fact-review-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --disable-pip-version-check pytest pypdf
+      - run: python -m compileall -q tools/route_a_fact_review.py tests/test_route_a_fact_review.py
+      - run: PYTHONPATH=. pytest -q tests/test_route_a_fact_review.py
+      - run: git diff --check
