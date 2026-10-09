@@ -190,8 +190,9 @@ def cmd_canonical_run(args: argparse.Namespace) -> int:
                 "status": "BLOCKED",
                 "canonical_decision_created": False,
                 "reason": "CANONICAL_RUNTIME_FACTORY_INVALID",
-                "detail": f"{type(exc).__name__}: {str(exc)[:1200]}",
-                "formal_artifacts_created": False,
+                # Do not echo arbitrary deployment-factory exception text:
+                # connection/configuration errors can accidentally contain secrets.
+                "error_type": type(exc).__name__,
             }, ensure_ascii=False, indent=2))
             return 2
         if runtime is None:
