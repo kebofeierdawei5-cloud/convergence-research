@@ -84,20 +84,18 @@ Next acceptance gate is **runtime integration and real-case evidence**, not addi
 
 ### P0 Follow-up — Runtime Composition Hook + Bounded Source Capture — 2026-10-09
 
-Status: **FOLLOW-UP IMPLEMENTED / EXACT-HEAD CI PASS / PRODUCTION RUNTIME ACCEPTANCE OPEN**
+Status: **MERGED / EXACT-HEAD CI PASS / PRODUCTION RUNTIME ACCEPTANCE OPEN**
 
-- PR #262: `P0 follow-up: trusted runtime factory and bounded Route A CI capture`.
-- Code-and-test head before the state sync: `f9bdc73ed3b7da8a15bd135dc08e74a64a2fe754`; after recording this sync, exact-head run for the state-sync commit `e97d626e1762cfd9eaeaee14faa6e62aad85e59f` completed **24 / 24 SUCCESS**, with zero failures and zero still-running checks.
-- P0 canonical-entry regression: **10 / 10 PASS** on both exact heads.
-- The previously slow PILOT-02 source-capture step completed in about 41 seconds after adding `--connect-timeout 8 --max-time 25 --retry 1` to each of its three network calls and a four-minute step timeout. One HTTPS attempt timed out on the first try; the bounded retry succeeded. The E2E still correctly reports `BLOCKED_NOT_ADMITTED`; raw captures are preserved, and no formal Decision Revision or report is written.
-- `canonical-run` now accepts an explicitly trusted `--runtime-factory module:callable` or `IIOS_CANONICAL_RUNTIME_FACTORY`, or a host-pre-registered `CanonicalRuntimeBindings`. The factory selector is taken only from CLI/environment configuration, not request JSON. Invalid configuration returns `BLOCKED`; raw factory exception text is not echoed. The default remains fail-closed when no runtime is registered.
+- Canonical promotion: PR #262 merged; merge commit `9b017919f95b2a4e6f30c20656c58bd354f7c133`.
+- Exact validated PR head: `aa42e56eab7c7968c65bc6f84df0dcb6c13cc645`; all **24 / 24** triggered workflows passed with zero failures.
+- P0 canonical-entry regression and trusted-factory tests passed. The factory selector comes only from trusted CLI/environment configuration or host pre-registration, never request JSON; absent/invalid factory fails closed and raw factory exception text is not echoed.
+- PILOT-02 source capture is bounded with `--connect-timeout 8 --max-time 25 --retry 1` for each of its three public-source calls and a four-minute step timeout. The final-head PILOT-03 scope guard explicitly allows the new timeout contract test and passed. A failed fetch stays a failed fetch; capture diagnostics are preserved.
+- The E2E still correctly reports `BLOCKED_NOT_ADMITTED` when the seven-group B2 Evidence/PIT manifest is absent; no formal Decision Revision or report is written by the capture-only pilot.
 
 Non-claims:
-- The follow-up does not ship or register a production runtime factory; it provides the deployment handoff only.
-- A valid factory must still bind a real request interpreter, semantic producer, exact-byte B2 Evidence/PIT intake, current price, independent forecast, upstream authority and valuation resolvers.
-- The successful PILOT-02 workflow verifies bounded acquisition and preserved diagnostic output, **not company evidence admission or an investment decision**.
-- P0-LLM-001 / P0-LLM-004 remain **OPEN** until the actual user-facing host is wired, a genuine company run completes Evidence/PIT → Decision Revision → Publication → report → Run Receipt replay, and the production runtime is independently accepted.
-
+- This PR provides a trusted runtime-factory handoff, but does not ship or register a production runtime factory.
+- The real host must still bind a request interpreter, genuine semantic producer, exact-byte B2 Evidence/PIT intake, date-correct current-price resolver, independent forecast, upstream-authority and valuation resolvers.
+- P0-LLM-001 / P0-LLM-004 remain **OPEN** until the actual user-facing host is wired, a genuine company run completes Evidence/PIT → Decision Revision → Publication → report → Run Receipt replay, and production-backed semantic conformance is independently accepted.
 
 F-001 through F-005 have been remediated and independently re-audited. The fresh B2-F audit passed against the FR5-fix head on 2026-10-09 and is preserved as a canonical, rerunnable source/contract audit. This closes the B2-F red-team finding set; it does **not** prove production provider invocation or model/economic validity.
 
@@ -129,6 +127,8 @@ Therefore:
 - production provider configuration and live LLM invocation are only required to validate the optional B2-D external-provider adapter; they are not required for the free-first company research MVP.
 
 ### Current next development batch
+
+**Refreshed execution plan:** `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261009.md`, refreshed against `main@9b017919f95b2a4e6f30c20656c58bd354f7c133`. Batch A is complete (PR #262, 24/24 workflows PASS). The active batch is **Batch B — actual host composition and runtime-registration proof**. The primary critical path remains the real 605016 P0 case, with Route A / 新和成 (002001.SZ) fact-source adjudication in parallel. The plan keeps unadmitted facts UNKNOWN and does not make Route A depend on an API key.
 
 The primary Investment Core MVP path is **Route A — free-first single-company evidence intake + public web discovery**. No LLM provider endpoint or API key is required for this Route A path. Public-web discovery, public-source capture, B2 preflight and artifact retention all run without an external LLM endpoint, paid search API or API key. Operator-supplied raw originals and manually supplied evidence remain supported when public URLs are unavailable or source bytes need to be supplied directly. B2-D remains an optional external-LLM integration adapter and is not an MVP gate.
 
