@@ -138,6 +138,57 @@ def test_p0_ce_01b_official_canonical_entry_never_falls_back_when_runtime_missin
     assert not (tmp_path / "runs").exists()
 
 
+def test_p0_ce_01c_explicit_runtime_factory_is_trusted_host_input(monkeypatch, tmp_path):
+    import sys
+    import types
+
+    import iios_mvp.cli as cli
+    from iios_mvp.canonical_runtime_registry_v01 import CanonicalRuntimeBindings
+
+    module_name = "iios_mvp_test_runtime_factory"
+    module = types.ModuleType(module_name)
+    calls = {}
+    expected = CanonicalRuntimeBindings(
+        request_interpreter=object(),
+        request_registry=object(),
+        semantic_producer=object(),
+        producer_registry=object(),
+        current_price_resolver=object(),
+        independent_forecast_resolver=object(),
+        upstream_authority_resolver=object(),
+        valuation_output_resolver=object(),
+    )
+
+    def build_runtime(*, bundle, output_root):
+        calls["bundle"] = bundle
+        calls["output_root"] = output_root
+        return expected
+
+    module.build_runtime = build_runtime
+    monkeypatch.setitem(sys.modules, module_name, module)
+    monkeypatch.setattr(cli, "get_canonical_runtime", lambda: None)
+
+    # Request-controlled data must not override the trusted host factory.
+    bundle = {
+        "raw_request": "synthetic test request",
+        "runtime_factory": "THIS_MUST_NOT_BE_READ_FROM_REQUEST",
+    }
+    runtime = cli._resolve_canonical_runtime(
+        factory_spec=f"{module_name}:build_runtime",
+        bundle=bundle,
+        output_root=str(tmp_path / "runs"),
+    )
+    assert runtime is expected
+    assert calls == {"bundle": bundle, "output_root": str(tmp_path / "runs")}
+
+    with pytest.raises(ValueError, match="trusted module:callable"):
+        cli._resolve_canonical_runtime(
+            factory_spec="arbitrary code supplied by bundle",
+            bundle=bundle,
+            output_root=str(tmp_path / "runs"),
+        )
+
+
 def test_p0_ce_02_unadmitted_evidence_cannot_become_canonical_decision():
     snapshot, _digest = run_case(_legacy_unadmitted_case())
     assert snapshot["execution_classification"]["status"] == "NON_CANONICAL"
