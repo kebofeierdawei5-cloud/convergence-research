@@ -138,10 +138,28 @@ jobs:
           name: iios-p2-3-real-300750-e2e
           path: /tmp/p2-3-real-300750/
           retention-days: 14
-      - run: PYTHONPATH=. python -m iios_mvp.cli run examples/iios_mvp_demo.json --out /tmp/iios-mvp
-      - run: |
-          snapshot=$(find /tmp/iios-mvp -maxdepth 1 -name '*.json' ! -name '*.series.json' ! -name '*.index.json' ! -name '*.decision.json' | head -n 1)
-          test -n "$snapshot"
-          PYTHONPATH=. python -m iios_mvp.cli replay "$snapshot"
+      - name: Assert legacy CLI run is NON_CANONICAL and creates no formal output
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/iios-mvp
+          set +e
+          output=$(PYTHONPATH=. python -m iios_mvp.cli run examples/iios_mvp_demo.json --out /tmp/iios-mvp 2>&1)
+          rc=$?
+          set -e
+          test "$rc" = "2"
+          printf '%s\n' "$output" | grep -q '"status": "NON_CANONICAL"'
+          printf '%s\n' "$output" | grep -q '"decision_revision_created": false'
+          test ! -d /tmp/iios-mvp || ! find /tmp/iios-mvp -type f -name '*.decision.json' | grep -q .
+      - name: Assert canonical entry without registered runtime returns BLOCKED
+        run: |
+          set -euo pipefail
+          set +e
+          output=$(PYTHONPATH=. python -m iios_mvp.cli canonical-run examples/iios_mvp_demo.json --out /tmp/iios-canonical-blocked 2>&1)
+          rc=$?
+          set -e
+          test "$rc" = "2"
+          printf '%s\n' "$output" | grep -q '"status": "BLOCKED"'
+          printf '%s\n' "$output" | grep -q '"canonical_decision_created": false'
+          test ! -d /tmp/iios-canonical-blocked || ! find /tmp/iios-canonical-blocked -type f -name '*.decision.json' | grep -q .
 
 # P2-A integration audit CI trigger

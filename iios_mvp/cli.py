@@ -8,6 +8,8 @@ from pathlib import Path
 from .company_economic_core import build_company_economic_core, validate_company_economic_core
 from .core03_market_expectation import build_core03_package, validate_core03_package
 from .engine import replay, render_markdown, run_case
+from .b2e_nl_semantic_decision_e2e_v01 import run_b2e_conformance
+from .canonical_runtime_registry_v01 import get_canonical_runtime
 from .decision_admission import admit_canonical_decision
 from .research_intake import build_research_case
 from .machine_publication import write_machine_publication
@@ -133,43 +135,114 @@ def cmd_core03(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_run(args: argparse.Namespace) -> int:
-    case = load_json(args.case)
-    snapshot, snapshot_hash = run_case(case)
-    out = write_snapshot(args.out, snapshot)
-    series = create_or_load_series(
-        args.out, args.market, case["symbol"], case["company"], now_iso()
-    )
-    revision = next_revision(args.out, series["decision_series_id"])
-    decision_admission = None
-    if snapshot.get("snapshot_schema") == "IIOS-MVP-SNAPSHOT-0.3.0":
-        decision_admission = admit_canonical_decision(
-            case=case,
-            snapshot=snapshot,
-        )
-    decision_path = write_decision_revision(
-        args.out,
-        series["decision_series_id"],
-        revision,
-        snapshot,
-        run_id=snapshot_hash[:16],
-        trigger_event_id=args.trigger_event_id,
-        decision_admission=decision_admission,
-    )
-    if args.format == "markdown":
-        print(render_markdown(snapshot))
-    else:
-        print(json.dumps({
-            "snapshot": str(out),
-            "snapshot_hash": snapshot_hash,
-            "decision_id": f"{series['decision_series_id']}-r{revision:03d}",
-            "decision": snapshot["decision"]["decision"]["action"],
-            "decision_revision": str(decision_path),
-            "next_revision": next_revision(args.out, series["decision_series_id"]),
-            "engine_version": snapshot["engine_version"],
-        }, ensure_ascii=False, indent=2))
-    return 0
+def cmd_canonical_run(args: argparse.Namespace) -> int:
+    """Official natural-language investment entry. No fallback to free-form run_case."""
+    try:
+        bundle = load_json(args.request_bundle)
+        runtime = get_canonical_runtime()
+        if runtime is None:
+            print(json.dumps({
+                "status": "BLOCKED",
+                "canonical_decision_created": False,
+                "reason": "CANONICAL_RUNTIME_NOT_REGISTERED",
+                "required": "deployment must register an approved request interpreter, semantic producer, and canonical evidence/price/forecast/valuation resolvers",
+            }, ensure_ascii=False, indent=2))
+            return 2
 
+        required = (
+            "raw_request", "request_id", "run_id", "company",
+            "investment_case", "evidence_manifest_path", "evidence_root",
+            "artifact_type", "semantic_prompt", "decision_relevance",
+        )
+        missing = [key for key in required if key not in bundle or bundle[key] in (None, "")]
+        if missing:
+            raise ValueError("BLOCKED: canonical request bundle missing " + ", ".join(missing))
+
+        manifest = load_json(str(bundle["evidence_manifest_path"]))
+        manifest_evidence = manifest.get("evidence")
+        if not isinstance(manifest_evidence, list) or not manifest_evidence:
+            raise ValueError("BLOCKED: evidence manifest has no source-level evidence rows")
+        evidence_refs = tuple(str(item.get("evidence_id", "")) for item in manifest_evidence)
+        evidence_hashes = tuple(str(item.get("content_sha256", "")) for item in manifest_evidence)
+        if any(not ref for ref in evidence_refs) or any(not digest for digest in evidence_hashes):
+            raise ValueError("BLOCKED: evidence manifest rows lack evidence_id/content_sha256")
+
+        result = run_b2e_conformance(
+            raw_request=str(bundle["raw_request"]),
+            request_id=str(bundle["request_id"]),
+            run_id=str(bundle["run_id"]),
+            created_at=str(bundle.get("created_at") or now_iso()),
+            request_interpreter=runtime.request_interpreter,
+            request_registry=runtime.request_registry,
+            semantic_producer=runtime.semantic_producer,
+            producer_registry=runtime.producer_registry,
+            company=str(bundle["company"]),
+            evidence_refs=evidence_refs,
+            evidence_hashes=evidence_hashes,
+            artifact_type=str(bundle["artifact_type"]),
+            semantic_prompt=str(bundle["semantic_prompt"]),
+            semantic_facts=tuple(bundle.get("semantic_facts") or ()),
+            semantic_inferences=tuple(bundle.get("semantic_inferences") or ()),
+            semantic_assumptions=tuple(bundle.get("semantic_assumptions") or ()),
+            semantic_uncertainties=tuple(bundle.get("semantic_uncertainties") or ()),
+            decision_relevance=str(bundle["decision_relevance"]),
+            case=bundle["investment_case"],
+            current_price_resolver=runtime.current_price_resolver,
+            independent_forecast_resolver=runtime.independent_forecast_resolver,
+            upstream_authority_resolver=runtime.upstream_authority_resolver,
+            valuation_output_resolver=runtime.valuation_output_resolver,
+            run_root=args.out,
+            evidence_manifest=manifest,
+            evidence_root=str(bundle["evidence_root"]),
+        )
+        print(json.dumps({
+            "status": result.canonicality_status,
+            "run_id": result.request_admission.run_id,
+            "case_id": result.request_admission.case_id,
+            "decision_id": result.decision_revision.get("decision_id"),
+            "action": result.decision_admission.get("canonical_action"),
+            "human_approval_required": True,
+            "auto_execution": False,
+            "run_state": result.run_state_path,
+            "publication_required": True,
+            "human_report_required": True,
+            "message": "AI proposal only; this command does not publish a report or authorize capital execution.",
+        }, ensure_ascii=False, indent=2))
+        return 0
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        print(json.dumps({
+            "status": "BLOCKED",
+            "canonical_decision_created": False,
+            "reason": str(exc),
+        }, ensure_ascii=False, indent=2))
+        return 2
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    # The legacy case-file CLI is intentionally diagnostic-only. It cannot
+    # establish a raw-request Run Envelope, B2 Evidence/PIT Admission, or the
+    # authorized semantic producer lineage; therefore it must not call run_case
+    # or write a Decision Revision.
+    try:
+        case = load_json(args.case)
+        identity = {
+            "case_id": case.get("case_id"),
+            "market": case.get("market"),
+            "symbol": case.get("symbol"),
+            "cutoff_date": case.get("cutoff_date"),
+        }
+    except Exception:
+        identity = {}
+    print(json.dumps({
+        "status": "NON_CANONICAL",
+        "canonical_decision_created": False,
+        "decision_revision_created": False,
+        "publication_created": False,
+        "reason": "direct CLI run bypasses the canonical natural-language entry and persisted Run Envelope",
+        "required_entry": "run_b2e_conformance(..., run_root=...) with registered request/semantic producers and admitted Evidence/PIT + Forecast/Valuation lineage",
+        "case_identity": identity,
+    }, ensure_ascii=False, indent=2))
+    return 2
 
 def cmd_replay(args: argparse.Namespace) -> int:
     snapshot = read_snapshot(args.snapshot)
@@ -202,90 +275,110 @@ def cmd_lifecycle_replay(args: argparse.Namespace) -> int:
 
 
 def cmd_publish(args: argparse.Namespace) -> int:
-    path = write_machine_publication(
-        args.out,
-        decision_id=args.decision_id,
-        published_at=args.published_at,
-    )
-    record = load_json(str(path))
-    print(json.dumps({
-        "status": "PUBLISHED",
-        "publication": str(path),
-        "publication_id": record["publication_id"],
-        "publication_hash": record["publication_hash"],
-        "decision_id": record["decision_ref"]["decision_id"],
-        "revision": record["decision_ref"]["revision"],
-        "currentness": record["current_projection"]["status"],
-    }, ensure_ascii=False, indent=2))
-    return 0
-
+    try:
+        path = write_machine_publication(
+            args.out,
+            decision_id=args.decision_id,
+            published_at=args.published_at,
+        )
+        record = load_json(str(path))
+        print(json.dumps({
+            "status": "PUBLISHED",
+            "publication": str(path),
+            "publication_id": record["publication_id"],
+            "publication_hash": record["publication_hash"],
+            "decision_id": record["decision_ref"]["decision_id"],
+            "revision": record["decision_ref"]["revision"],
+            "currentness": record["current_projection"]["status"],
+            "run_id": record["canonical_run_ref"]["run_id"],
+        }, ensure_ascii=False, indent=2))
+        return 0
+    except (ValueError, OSError) as exc:
+        print(json.dumps({
+            "status": "BLOCKED",
+            "artifact_created": False,
+            "reason": str(exc),
+        }, ensure_ascii=False, indent=2))
+        return 2
 
 def cmd_report(args: argparse.Namespace) -> int:
-    report_path, qa_path = write_human_report(
-        args.out,
-        publication_path=args.publication,
-        generated_at=args.generated_at,
-    )
-    report = load_json(str(report_path))
-    qa = load_json(str(qa_path))
-    print(json.dumps({
-        "status": "REPORT_PUBLISHED",
-        "report": str(report_path),
-        "markdown": str(report_path).replace(".report.json", ".report.md"),
-        "qa": str(qa_path),
-        "report_id": report["report_id"],
-        "report_hash": report["report_hash"],
-        "qa_status": qa["qa_status"],
-        "qa_hash": qa["qa_hash"],
-    }, ensure_ascii=False, indent=2))
-    return 0
-
+    try:
+        report_path, qa_path = write_human_report(
+            args.out,
+            publication_path=args.publication,
+            generated_at=args.generated_at,
+        )
+        report = load_json(str(report_path))
+        qa = load_json(str(qa_path))
+        print(json.dumps({
+            "status": "REPORT_PUBLISHED",
+            "report": str(report_path),
+            "markdown": str(report_path).replace(".report.json", ".report.md"),
+            "qa": str(qa_path),
+            "report_id": report["report_id"],
+            "report_hash": report["report_hash"],
+            "qa_status": qa["qa_status"],
+            "qa_hash": qa["qa_hash"],
+        }, ensure_ascii=False, indent=2))
+        return 0
+    except (ValueError, OSError) as exc:
+        print(json.dumps({"status": "BLOCKED", "artifact_created": False, "reason": str(exc)}, ensure_ascii=False, indent=2))
+        return 2
 
 def cmd_investor_report(args: argparse.Namespace) -> int:
-    report_path, qa_path = write_investor_review_report(
-        args.out,
-        publication_path=args.publication,
-        generated_at=args.generated_at,
-    )
-    report = load_json(str(report_path))
-    qa = load_json(str(qa_path))
-    print(json.dumps({
-        "status": "INVESTOR_REVIEW_REPORT_PUBLISHED",
-        "report": str(report_path),
-        "markdown": str(report_path).replace(".investor-review.json", ".investor-review.md"),
-        "qa": str(qa_path),
-        "report_id": report["report_id"],
-        "report_hash": report["report_hash"],
-        "qa_status": qa["qa_status"],
-        "qa_hash": qa["qa_hash"],
-        "machine_publication_hash": report["publication_hash"],
-    }, ensure_ascii=False, indent=2))
-    return 0
-
+    try:
+        report_path, qa_path = write_investor_review_report(
+            args.out,
+            publication_path=args.publication,
+            generated_at=args.generated_at,
+        )
+        report = load_json(str(report_path))
+        qa = load_json(str(qa_path))
+        print(json.dumps({
+            "status": "INVESTOR_REVIEW_REPORT_PUBLISHED",
+            "report": str(report_path),
+            "markdown": str(report_path).replace(".investor-review.json", ".investor-review.md"),
+            "qa": str(qa_path),
+            "report_id": report["report_id"],
+            "report_hash": report["report_hash"],
+            "qa_status": qa["qa_status"],
+            "qa_hash": qa["qa_hash"],
+            "machine_publication_hash": report["publication_hash"],
+        }, ensure_ascii=False, indent=2))
+        return 0
+    except (ValueError, OSError) as exc:
+        print(json.dumps({"status": "BLOCKED", "artifact_created": False, "reason": str(exc)}, ensure_ascii=False, indent=2))
+        return 2
 
 def cmd_investor_report_v02(args: argparse.Namespace) -> int:
-    report_path, machine_path, markdown_path, qa_path = write_investor_review_report_v02(
-        args.out,
-        publication_path=args.publication,
-        generated_at=args.generated_at,
-    )
-    report = load_json(str(report_path))
-    qa = load_json(str(qa_path))
-    print(json.dumps({
-        "status": "INVESTOR_REVIEW_REPORT_V02_PUBLISHED",
-        "report": str(report_path),
-        "machine": str(machine_path),
-        "markdown": str(markdown_path),
-        "qa": str(qa_path),
-        "report_id": report["report_id"],
-        "report_hash": report["report_hash"],
-        "machine_report_hash": report["machine_report_hash"],
-        "human_report_hash": report["human_report_hash"],
-        "qa_status": qa["qa_status"],
-        "qa_hash": qa["qa_hash"],
-    }, ensure_ascii=False, indent=2))
-    return 0
-
+    try:
+        report_path, machine_path, markdown_path, qa_path = write_investor_review_report_v02(
+            args.out,
+            publication_path=args.publication,
+            generated_at=args.generated_at,
+        )
+        report = load_json(str(report_path))
+        qa = load_json(str(qa_path))
+        run_id = str(report["machine_report"].get("run_id") or "")
+        print(json.dumps({
+            "status": "INVESTOR_REVIEW_REPORT_V02_PUBLISHED",
+            "report": str(report_path),
+            "machine": str(machine_path),
+            "markdown": str(markdown_path),
+            "qa": str(qa_path),
+            "report_id": report["report_id"],
+            "report_hash": report["report_hash"],
+            "machine_report_hash": report["machine_report_hash"],
+            "human_report_hash": report["human_report_hash"],
+            "qa_status": qa["qa_status"],
+            "qa_hash": qa["qa_hash"],
+            "run_id": run_id or None,
+            "canonical_run_receipt": "issued_by_report_writer",
+        }, ensure_ascii=False, indent=2))
+        return 0
+    except (ValueError, OSError) as exc:
+        print(json.dumps({"status": "BLOCKED", "artifact_created": False, "reason": str(exc)}, ensure_ascii=False, indent=2))
+        return 2
 
 def cmd_trigger_contract(args: argparse.Namespace) -> int:
     contract = load_json(args.contract)
@@ -399,6 +492,17 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--trigger-event-id")
     run.add_argument("--format", choices=("json", "markdown"), default="json")
     run.set_defaults(func=cmd_run)
+
+    canonical_run = sub.add_parser(
+        "canonical-run",
+        help="official NL -> admitted evidence/semantics -> canonical Decision Kernel entry",
+    )
+    canonical_run.add_argument(
+        "request_bundle",
+        help="JSON object containing raw request, admitted-company case, evidence manifest path/root, and semantic request metadata",
+    )
+    canonical_run.add_argument("--out", default="runs")
+    canonical_run.set_defaults(func=cmd_canonical_run)
 
     rp = sub.add_parser("replay", help="replay a frozen snapshot")
     rp.add_argument("snapshot")

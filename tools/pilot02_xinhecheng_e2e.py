@@ -331,174 +331,68 @@ def run(*, report_path: Path, price_path: Path, receipt_path: Path, out_dir: Pat
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory(prefix="iios-pilot02-xhc-") as tmp:
-        root = Path(tmp)
-        series = create_or_load_series(
-            root,
-            "CN-A",
-            "002001",
-            "浙江新和成股份有限公司",
-            "2026-10-07T10:00:00+08:00",
-        )
-        snapshot = {
-            "snapshot_schema": "IIOS-MVP-SNAPSHOT-0.3.0",
-            "engine_version": "0.3.0",
-            "input": {
-                "case_id": CASE_ID,
-                "market": "CN-A",
-                "symbol": "002001",
-                "company": "浙江新和成股份有限公司",
-                "as_of_date": "2026-10-07",
-                "cutoff_date": "2026-10-07",
-                "research_weighting": fixture["research_weighting"],
-            },
-            "decision": {
-                **decision,
-                "economic_structure": fixture["economic_structure"],
-                "forecast": fixture["forecast_assumptions"],
-                "valuation": fixture["valuation"],
-                "risk": fixture["risk"],
-                "thesis": fixture["thesis"],
-                "monitoring": fixture["monitoring"],
-                "evidence_chain": fixture["evidence"],
-            },
-        }
-        snapshot["snapshot_hash"] = sha256_obj({
-            "snapshot_schema": snapshot["snapshot_schema"],
-            "engine_version": snapshot["engine_version"],
-            "input": snapshot["input"],
-            "decision": snapshot["decision"],
-        })
-        snapshot_path = write_snapshot(root, snapshot)
-        decision_admission = admit_canonical_decision(
-            case=case,
-            snapshot=snapshot,
-            current_price_resolver=registry,
-            independent_forecast_resolver=forecast_registry,
-            upstream_authority_resolver=authority_registry,
-            valuation_output_resolver=valuation_resolver,
-        )
-        decision_path = write_decision_revision(
-            root,
-            series["decision_series_id"],
-            1,
-            snapshot,
-            "run-pilot02-xhc-001",
-            decision_admission=decision_admission,
-        )
-        decision_record = json.loads(decision_path.read_text(encoding="utf-8"))
-
-        trigger = {
-            "trigger_id": "tr-pilot02-002001-01",
-            "decision_id": decision_record["decision_id"],
-            "decision_series_id": decision_record["decision_series_id"],
-            "revision": decision_record["revision"],
-            "decision_revision_hash": decision_record["revision_hash"],
-            "case_id": CASE_ID,
-            "decision_cutoff_date": "2026-10-07",
-            "role": "MONITORING",
-            "metric_id": "nutrition_product_cycle",
-            "operator": "EQ",
-            "target": "PASS",
-            "unit": "status",
-            "evidence_ids": ["E002", "E003"],
-            "enabled": True,
-        }
-        trigger_record = json.loads(write_trigger_contract(root, decision_record["decision_id"], trigger).read_text(encoding="utf-8"))
-        event_record = json.loads(
-            write_trigger_event(
-                root,
-                {
-                    "trigger_id": trigger_record["trigger_id"],
-                    "trigger_event_id": "evt-pilot02-002001-01",
-                    "evaluation_cutoff_at": "2026-10-07T10:00:00+08:00",
-                    "observed_at": "2026-06-30T00:00:00+00:00",
-                    "known_at": "2026-08-20T00:00:00+08:00",
-                    "source_id": "CNINFO:2026_H1_REPORT",
-                    "evidence_id": "E002",
-                    "value": "PASS",
-                    "previous_value": "PASS",
-                },
-            ).read_text(encoding="utf-8")
-        )
-        if event_record["trigger_state"] != "MATCHED":
-            raise AssertionError("PILOT-02 monitoring event did not match")
-
-        monitor_path = initialize_monitoring_state(
-            root,
-            trigger_record["trigger_id"],
-            "monitor-pilot02-002001-01",
-            lifecycle_status="ACTIVE",
-            next_due_at="2026-11-07T00:00:00+08:00",
-            evaluation_reference_at="2026-10-07T10:00:00+08:00",
-        )
-        apply_monitoring_event(root, event_record["trigger_event_id"], next_due_at="2026-11-07T00:00:00+08:00")
-        monitor = json.loads(monitor_path.read_text(encoding="utf-8"))
-
-        validation = json.loads(
-            write_monitoring_validation(
-                root,
-                trigger_record["trigger_id"],
-                "2026-10-07T10:30:00+08:00",
-                validation_id="validation-pilot02-002001-01",
-            ).read_text(encoding="utf-8")
-        )
-        if validation["validation_status"] != "PASS":
-            raise AssertionError(f"PILOT-02 validation failed: {validation}")
-
-        replay = replay_decision_lifecycle(root, decision_record["decision_id"])
-        if replay["replay_status"] != "PASS":
-            raise AssertionError("PILOT-02 lifecycle replay failed")
-
-        publication_path = write_machine_publication(
-            root,
-            decision_id=decision_record["decision_id"],
-            published_at="2026-10-07T10:00:00+08:00",
-        )
-        publication = json.loads(publication_path.read_text(encoding="utf-8"))
-        if publication["case"]["symbol"] != "002001":
-            raise AssertionError("PILOT-02 publication symbol binding failed")
-        if publication["decision_ref"]["revision_hash"] != decision_record["revision_hash"]:
-            raise AssertionError("PILOT-02 publication decision binding failed")
-
-        report = build_human_report(
-            publication=publication,
-            generated_at="2026-10-07T10:05:00+08:00",
-        )
-        qa = qa_human_report(publication=publication, report=report)
-        if qa["qa_status"] != "PASS":
-            raise AssertionError(f"PILOT-02 report QA failed: {qa}")
-        if build_human_report(publication=publication, generated_at="2026-10-07T10:05:00+08:00") != report:
-            raise AssertionError("PILOT-02 human report replay mismatch")
-
-        report_path_out, qa_path = write_human_report(
-            root,
-            publication_path=publication_path,
-            generated_at="2026-10-07T10:05:00+08:00",
-        )
-        # Persist only derived test artifacts, never raw authority state.
-        for source in (
-            publication_path,
-            report_path_out,
-            qa_path,
-            decision_path,
-        ):
-            target = out_dir / source.name
-            target.write_bytes(source.read_bytes())
-
-        result = {
-            "pilot": "PILOT-02",
-            "case_id": CASE_ID,
-            "company": "浙江新和成股份有限公司",
-            "symbol": "002001",
-            "cutoff_date": str(CUTOFF),
-            "latest_tradable_date": "2026-09-30",
-            "current_price": str(PRICE),
-            "security_classification": "NON_FINANCIAL",
-            "research_weighting": fixture["research_weighting"],
-            "quality_gate_status": decision["gates"]["quality_gate"],
-            "trust_status": case["trust"]["status"],
-            "return_metrics": {
+    # Preserve the live source-capture and economic-calculation result, but do
+    # not create a Decision Revision from three captured files. The current
+    # pilot has no complete B2 company Evidence/PIT Manifest spanning all seven
+    # required field groups, and it has no persisted canonical Run Envelope.
+    # Therefore this computation is diagnostic preview only and all formal
+    # lifecycle/publication/report outputs remain blocked.
+    required_field_groups = [
+        "security_identity",
+        "market_price",
+        "corporate_disclosures",
+        "business_reality",
+        "financial_reality",
+        "capital_structure",
+        "trust_governance_events",
+    ]
+    result = {
+        "pilot": "PILOT-02",
+        "status": "BLOCKED_NOT_ADMITTED",
+        "canonicality_status": "NON_CANONICAL_PREVIEW_ONLY",
+        "blocking_gate": "B2_EVIDENCE_PIT_MANIFEST_AND_RUN_ENVELOPE_REQUIRED",
+        "case_id": CASE_ID,
+        "company": "浙江新和成股份有限公司",
+        "symbol": "002001",
+        "cutoff_date": str(CUTOFF),
+        "latest_tradable_date": "2026-09-30",
+        "current_price": str(PRICE),
+        "security_classification": "NON_FINANCIAL",
+        "research_weighting": fixture["research_weighting"],
+        "raw_ingress": {
+            "report_source_ref": receipt["report_source_ref"],
+            "report_sha256": receipt["report_sha256"],
+            "report_exact_bytes": receipt["report_exact_bytes"],
+            "price_source_ref": receipt["price_source_ref"],
+            "price_sha256": receipt["price_sha256"],
+            "price_exact_bytes": receipt["price_exact_bytes"],
+            "calendar_source_ref": receipt["calendar_source_ref"],
+            "calendar_sha256": receipt["calendar_sha256"],
+            "calendar_exact_bytes": receipt["calendar_exact_bytes"],
+            "captured_source_types": [
+                "OFFICIAL_H1_REPORT",
+                "HISTORICAL_PRICE_RESPONSE",
+                "OFFICIAL_TRADING_HOLIDAY_CALENDAR",
+            ],
+            "captured_sources_are_not_fact_admissions": True,
+        },
+        "evidence_admission": {
+            "status": "BLOCKED_NOT_ADMITTED",
+            "manifest_present": False,
+            "admitted_field_groups": [],
+            "required_field_groups": required_field_groups,
+            "missing_required_field_groups": required_field_groups,
+            "source_origin_and_pit_admission": False,
+        },
+        "economic_preview": {
+            "status": "NON_CANONICAL_PREVIEW_ONLY",
+            "action_preview": decision["action"],
+            "decision_status_preview": decision["decision_status"],
+            "primary_reason_preview": decision["primary_reason"],
+            "new_capital_allowed_preview": decision["gates"]["new_capital_allowed"],
+            "human_approval_required": True,
+            "auto_execution": False,
+            "return_metrics_preview": {
                 "entry_return_cushion": str(metrics["entry_return_cushion"]),
                 "margin_of_safety": str(metrics["margin_of_safety"]),
                 "expected_total_return": str(metrics["expected_total_return"]),
@@ -508,44 +402,38 @@ def run(*, report_path: Path, price_path: Path, receipt_path: Path, out_dir: Pat
                 "risk_pass": metrics["risk_pass"],
                 "target_entry_price": str(metrics["target_entry_price"]),
             },
-            "decision": {
-                "action": decision["action"],
-                "decision_status": decision["decision_status"],
-                "primary_reason": decision["primary_reason"],
-                "new_capital_allowed": decision["gates"]["new_capital_allowed"],
-                "human_approval_required": decision["human_approval_required"],
-                "auto_execution": decision["auto_execution"],
-            },
-            "lifecycle": {
-                "decision_revision": decision_record["revision"],
-                "monitoring_evaluation_status": monitor["evaluation_status"],
-                "validation_status": validation["validation_status"],
-                "decision_replay_status": replay["replay_status"],
-            },
-            "publication": {
-                "publication_hash": publication["publication_hash"],
-                "report_hash": report["report_hash"],
-                "qa_status": qa["qa_status"],
-                "qa_hash": qa["qa_hash"],
-                "report_deterministic_replay": True,
-            },
-            "evidence": {
-                "report_sha256": receipt["report_sha256"],
-                "price_sha256": receipt["price_sha256"],
-                "report_exact_bytes": receipt["report_exact_bytes"],
-                "price_exact_bytes": receipt["price_exact_bytes"],
-            },
-        }
-        (out_dir / "PILOT-02_XINHECHENG_RESULT.json").write_text(
-            json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True),
-            encoding="utf-8",
-        )
-        # Print the actual human report for operator review in CI logs.
-        print("\n===== PILOT-02 HUMAN REPORT =====")
-        print((out_dir / report_path_out.name).read_text(encoding="utf-8"))
-        print("===== PILOT-02 RESULT =====")
-        print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
-        return result
+        },
+        "lifecycle": {
+            "formal_decision_revision_created": False,
+            "trigger_state": "NOT_RUN",
+            "monitoring_evaluation_status": "NOT_RUN",
+            "validation_status": "NOT_RUN",
+            "decision_replay_status": "NOT_RUN",
+        },
+        "publication": {
+            "status": "BLOCKED_NOT_ADMITTED",
+            "report_status": "BLOCKED_NOT_ADMITTED",
+            "qa_status": "NOT_RUN",
+            "publication_hash": None,
+            "report_hash": None,
+            "qa_hash": None,
+            "report_deterministic_replay": False,
+        },
+        "authority_boundary": {
+            "human_approval_required": True,
+            "auto_execution": False,
+            "no_formal_authority_from_calculation_preview": True,
+            "report_policy_effect": "REPORT_ONLY_PROJECTION",
+        },
+    }
+    result_path = out_dir / "PILOT-02_XINHECHENG_RESULT.json"
+    result_path.write_text(
+        json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    print("PILOT-02 BLOCKED_NOT_ADMITTED — raw capture is preserved; no formal decision or report was written.")
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return result
 
 
 def main() -> None:

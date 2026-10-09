@@ -63,8 +63,9 @@ def setup_approved_revision(tmp_path, action="BUY"):
     )
     snapshot = make_snapshot(action=action)
     write_snapshot_path = write_snapshot(tmp_path, snapshot)
-    from tests.decision_admission_fixture import build_fixture_admission_receipt
+    from tests.decision_admission_fixture import build_fixture_admission_receipt, prepare_authorized_test_run
     admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
+    prepare_authorized_test_run(root=str(tmp_path), run_id="run-c6-001", snapshot=snapshot, decision_admission=admission)
     revision_path = write_decision_revision(
         tmp_path,
         series["decision_series_id"],
@@ -168,6 +169,8 @@ def test_c6_rejected_approval_cannot_create_execution_receipt(tmp_path):
     write_snapshot(tmp_path, snapshot)
     from tests.decision_admission_fixture import build_fixture_admission_receipt
     admission = build_fixture_admission_receipt(snapshot=snapshot, canonical_decision=snapshot["decision"])
+    from tests.decision_admission_fixture import prepare_authorized_test_run
+    prepare_authorized_test_run(root=str(tmp_path), run_id="run-c6-reject", snapshot=snapshot, decision_admission=admission)
     write_decision_revision(
         tmp_path,
         series["decision_series_id"],
