@@ -55,14 +55,14 @@ Canonical incident contract: `docs/iios/P0_CANONICAL_ENTRY_INCIDENT_REPRODUCTION
 - Canonical promotion status: Batch 0 freezes a reproducible defect and acceptance contract only. Production execution enforcement remains an OPEN P0 and must be remediated and independently tested in successor batches.
 
 
-### P0 Canonical Entry and Write Authorization — Batch 1 Successor
+### P0 Canonical Entry and Write Authorization — Batch 1
 
-Status: **CODE + REGRESSION ACCEPTANCE PASS / PRODUCTION CONFORMANCE OPEN**
+Status: **MERGED / CODE + REGRESSION ACCEPTANCE PASS / PRODUCTION CONFORMANCE OPEN**
 
-- Fresh baseline: current canonical main after PR #259, `ad1c71ad97f7c19746cae68b863aac81524f142e`.
-- The fuller Batch 1 implementation from the earlier PR #257 was transplanted onto a new single-parent successor from that exact current main because the earlier PR had a stale state-index base after Route A promotion.
+- Canonical promotion: PR #260 merged; merge commit `c14ef1b66da6f564da5f48178c5efd2728d69698`.
+- Source branch was refreshed from the post-Route-A canonical main at `ad1c71ad97f7c19746cae68b863aac81524f142e`, not the stale pre-promotion base from earlier PR #257.
 - Implemented: explicit `canonical-run` entry via a registered runtime; legacy `run` no longer writes a formal decision; persisted Run Envelope and stage receipts; request/Case/admission binding; exact-byte B2 Evidence/PIT manifest checks; stage-scoped Decision Revision, Machine Publication and report authorization; complete versioned `IIOS_RUN_RECEIPT` binding and replay validation; fail-closed bypass probes and synthetic positive control-plane E2E.
-- Exact-head successor `1057c6665ce6636b895d022768c89cc5b66d20a3`: **34/34 triggered workflows SUCCESS**, including Investment Core CI, State Hygiene, CORE-00 scope isolation, P0 canonical-entry regression, B00-B authority threat reproduction, B2-E, B2-F independent red-team and report/lifecycle/monitoring regressions. These establish the tested code/control-plane boundary, not the deployed product host or live LLM economic reasoning.
+- Final PR-head `cf7be75651d7bbb830385e0c8aabab89fd27e417`: **34/34 triggered workflows SUCCESS**, including Investment Core CI, State Hygiene, CORE-00 scope isolation, P0 canonical-entry regression, B00-B authority threat reproduction, B2-E, B2-F independent red-team and report/lifecycle/monitoring regressions. This establishes the tested code/control-plane boundary; it does not prove the deployed host or live LLM economic reasoning. Post-merge run set also had 20+ workflow checks already successful, with remaining reruns tracked separately from the pre-merge exact-head acceptance.
 - Strict non-claims: the actual product host is not yet proven to be wired to the registered runtime; the real 605016 case remains blocked until official-source Evidence/PIT admission and authorized semantic/Forecast/Valuation inputs pass; no capital or order execution is authorized.
 
 ```text
