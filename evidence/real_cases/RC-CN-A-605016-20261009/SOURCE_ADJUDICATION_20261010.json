@@ -43,7 +43,9 @@
         "financial_reality",
         "capital_structure"
       ],
-      "notes": "Financial observations are as of 2026-06-30; the share count is historical as-of-date data, not a claim that the 2026-10-09 share count is unchanged."
+      "notes": "Financial observations are as of 2026-06-30; the share count is historical as-of-date data, not a claim that the 2026-10-09 share count is unchanged.",
+      "size_bytes": 1130844,
+      "sha256": "a5df7754ac08d50f47c6f91d9a8af4e99cbc98894cfa3d6a94dfbeb7bdc3f35c"
     },
     {
       "source_id": "SINA-2025-ANNUAL-REPORT-PAGE",
@@ -56,7 +58,9 @@
       "first_public_time": "NOT_REVIEWED",
       "reuse_status": "UNKNOWN",
       "disposition": "EXCLUDED_FROM_ADMITTED_FACTS",
-      "notes": "Secondary annual-report mirror is not needed because primary SSE Q1 and H1 reports cover the selected historical financial facts."
+      "notes": "Secondary annual-report mirror is not needed because primary SSE Q1 and H1 reports cover the selected historical financial facts.",
+      "size_bytes": 661417,
+      "sha256": "3fddcf95747f8d44f1a14d848d875c922535f74996f8abc78ca5bddabaab2e65"
     },
     {
       "source_id": "SSE-Q1-2026-FULL",
@@ -72,7 +76,9 @@
       "disposition": "ADMITTED_FOR_SPECIFIC_INTERNAL_FACTS",
       "fact_scope": [
         "financial_reality"
-      ]
+      ],
+      "size_bytes": 158143,
+      "sha256": "1f630ef7d8c62acef307eeb5362c9dbbacec326bad5925e1431317adc70e0d2d"
     },
     {
       "source_id": "SSE-H1-OPERATING-DATA-2026",
@@ -90,7 +96,9 @@
         "business_reality",
         "financial_reality"
       ],
-      "notes": "Operating numbers explicitly disclosed as unaudited; use as management-reported half-year data, not audited results."
+      "notes": "Operating numbers explicitly disclosed as unaudited; use as management-reported half-year data, not audited results.",
+      "size_bytes": 322292,
+      "sha256": "d30d62a097f68d3137788d5980dabb7577e1e23d320061554686ff19e43a2196"
     },
     {
       "source_id": "SSE-2026-09-SUBSIDIARY-INVESTMENT",
@@ -106,7 +114,9 @@
       "disposition": "ADMITTED_FOR_SPECIFIC_INTERNAL_FACTS",
       "fact_scope": [
         "business_reality"
-      ]
+      ],
+      "size_bytes": 138693,
+      "sha256": "d6baad120437e6969eedef87f298c1583eaeaa4ac79ddc25eccaee7583a97caa"
     },
     {
       "source_id": "SSE-2026-10-09-SHAREHOLDERS-MEETING",
@@ -125,7 +135,9 @@
         "corporate_disclosures",
         "capital_structure"
       ],
-      "notes": "Timestamp is a latest-known bound from a public secondary article, not a claim about exact first publication time on SSE."
+      "notes": "Timestamp is a latest-known bound from a public secondary article, not a claim about exact first publication time on SSE.",
+      "size_bytes": 77573,
+      "sha256": "89136a9f3e6410c2f4c420cb516fb88c8368fa3e8767efdb12a3727fa0025936"
     },
     {
       "source_id": "SSE-2026-09-CONVERTIBLE-BOND-UPDATE",
@@ -142,7 +154,9 @@
       "fact_scope": [
         "capital_structure"
       ],
-      "notes": "The captured notice states that CSRC registration was still pending and outcome/timing remained uncertain. It does not establish final bond terms or that issuance has completed."
+      "notes": "The captured notice states that CSRC registration was still pending and outcome/timing remained uncertain. It does not establish final bond terms or that issuance has completed.",
+      "size_bytes": 79239,
+      "sha256": "5c18d08896a99d65a844644e7314d3c48915cd0a2ab8f58a477784c5e164dddb"
     },
     {
       "source_id": "SSE-2026-CONVERTIBLE-BOND-PROSPECTUS",
@@ -156,7 +170,9 @@
       "first_public_time": "UNKNOWN_INTRADAY; archive/source date is confirmed",
       "reuse_status": "RESTRICTED_NO_REDISTRIBUTION",
       "disposition": "EXCLUDED_AS_SUPERSEDED_FOR_CURRENT_TERMS",
-      "notes": "The 2026-09-11 update says the registration-draft application documents were updated after the H1 report; this April application draft must not be presented as current final terms."
+      "notes": "The 2026-09-11 update says the registration-draft application documents were updated after the H1 report; this April application draft must not be presented as current final terms.",
+      "size_bytes": 8200458,
+      "sha256": "23b5a43f9107df57110a57911f931e93288fe91226673c7f332a0c184803d767"
     },
     {
       "source_id": "SSE-2026-H1-DIVIDEND-PLAN",
@@ -171,7 +187,9 @@
       "reuse_status": "RESTRICTED_NO_REDISTRIBUTION",
       "disposition": "EXCLUDED_FOR_CURRENT_DISTRIBUTION_STATE_PENDING_IMPLEMENTATION_NOTICE",
       "superseding_official_listing": "SSE's 2026-09-22 notice list names 百龙创园 2026年半年度权益分派实施公告; exact PDF bytes not included in Attempt 10.",
-      "notes": "The proposal is not a substitute for the implementation notice. Capture that official implementation PDF before admitting actual record/ex-dividend/payment dates or final cash distribution."
+      "notes": "The proposal is not a substitute for the implementation notice. Capture that official implementation PDF before admitting actual record/ex-dividend/payment dates or final cash distribution.",
+      "size_bytes": 100586,
+      "sha256": "2d3044e4bedc4039a22dd98cc17eab2fc73e00951c700c07bd64a77255a98a3b"
     },
     {
       "source_id": "SSE-2026-07-PLEDGE-RELEASE",
@@ -187,7 +205,9 @@
       "disposition": "ADMITTED_FOR_SPECIFIC_INTERNAL_FACTS",
       "fact_scope": [
         "trust_governance_events"
-      ]
+      ],
+      "size_bytes": 84898,
+      "sha256": "f4daed15f824900bc553e4d31fbdf2994e70682cc43cd9e8a33a4fcba5d025bf"
     },
     {
       "source_id": "PRICE-STOCKSTAR-2026-10-09",
@@ -201,7 +221,9 @@
       "first_public_time": "2026-10-09T18:09:28+08:00",
       "reuse_status": "UNKNOWN",
       "disposition": "NOT_ADMITTED_PRICE_CANDIDATE",
-      "notes": "A separate historical page also shows 20.28 for 2026-10-09; 20.73 corresponds to 2026-09-29 in that table, not 2026-10-09. Price is not admitted because no official/source-authoritative 2026-10-09 close has been captured and secondary rights/reuse remain unresolved."
+      "notes": "A separate historical page also shows 20.28 for 2026-10-09; 20.73 corresponds to 2026-09-29 in that table, not 2026-10-09. Price is not admitted because no official/source-authoritative 2026-10-09 close has been captured and secondary rights/reuse remain unresolved.",
+      "size_bytes": 22772,
+      "sha256": "0d78fe37969224552a3309e85d078a352f864b77d9c4f785db50329dd9562f98"
     },
     {
       "source_id": "PRICE-SOHU-HISTORY-2026-10-09",
@@ -214,7 +236,9 @@
       "first_public_time": "UNKNOWN",
       "reuse_status": "UNKNOWN",
       "disposition": "EXCLUDED_NO_PRICE_ROWS",
-      "notes": "Captured HTML contains navigation/page-shell content but no usable dated historical-price rows."
+      "notes": "Captured HTML contains navigation/page-shell content but no usable dated historical-price rows.",
+      "size_bytes": 21843,
+      "sha256": "1e18871c74111367957660d6b6510b463b1955424c49330c9b43a097bf07a8be"
     }
   ],
   "evidence_candidates": [
