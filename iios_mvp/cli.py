@@ -12,7 +12,11 @@ from .company_economic_core import build_company_economic_core, validate_company
 from .core03_market_expectation import build_core03_package, validate_core03_package
 from .engine import replay, render_markdown, run_case
 from .b2e_nl_semantic_decision_e2e_v01 import run_b2e_conformance
-from .canonical_runtime_registry_v01 import CanonicalRuntimeBindings, get_canonical_runtime
+from .canonical_runtime_registry_v01 import (
+    CanonicalRuntimeBindings,
+    get_canonical_runtime,
+    validate_canonical_runtime_bindings,
+)
 from .decision_admission import admit_canonical_decision
 from .research_intake import build_research_case
 from .machine_publication import write_machine_publication
@@ -149,7 +153,7 @@ def _resolve_canonical_runtime(*, factory_spec: str | None, bundle: dict, output
     """
     registered = get_canonical_runtime()
     if registered is not None:
-        return registered
+        return validate_canonical_runtime_bindings(registered)
     if not factory_spec:
         return None
     spec = str(factory_spec).strip()
@@ -161,18 +165,7 @@ def _resolve_canonical_runtime(*, factory_spec: str | None, bundle: dict, output
     if not callable(factory):
         raise ValueError("runtime factory callable is missing or not callable")
     runtime = factory(bundle=bundle, output_root=output_root)
-    if not isinstance(runtime, CanonicalRuntimeBindings):
-        raise ValueError("runtime factory must return CanonicalRuntimeBindings")
-    required = (
-        "request_interpreter", "request_registry", "semantic_producer",
-        "producer_registry", "current_price_resolver",
-        "independent_forecast_resolver", "upstream_authority_resolver",
-        "valuation_output_resolver",
-    )
-    missing = [name for name in required if getattr(runtime, name, None) is None]
-    if missing:
-        raise ValueError("runtime factory has missing bindings: " + ", ".join(missing))
-    return runtime
+    return validate_canonical_runtime_bindings(runtime)
 
 
 def cmd_canonical_run(args: argparse.Namespace) -> int:
