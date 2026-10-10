@@ -15,10 +15,11 @@
       "known_at_basis": "Candidate date from SSE archive path/public event index; not independently established as exact first-public timestamp.",
       "published_at": "2026-08-31",
       "observation_date": "2026-06-30",
-      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN",
+      "expected_payload_type": "PDF"
     },
     {
-      "source_id": "SINA-2025-ANNUAL-REPORT",
+      "source_id": "SINA-2025-ANNUAL-REPORT-PAGE",
       "field_group": "financial_reality",
       "source_ref": "SINA:PUBLIC_DISCLOSURE_MIRROR",
       "source_class": "PUBLIC_SECONDARY",
@@ -27,7 +28,8 @@
       "known_at_basis": "Secondary public bulletin listing dates this annual report 2026-04-08; bytes are not issuer-origin originals.",
       "published_at": "2026-04-08",
       "observation_date": "2025-12-31",
-      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN",
+      "expected_payload_type": "HTML"
     },
     {
       "source_id": "SSE-Q1-2026-FULL",
@@ -39,7 +41,8 @@
       "known_at_basis": "Candidate date from SSE archive path/public index; first-public timestamp is not independently verified.",
       "published_at": "2026-04-30",
       "observation_date": "2026-03-31",
-      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN",
+      "expected_payload_type": "PDF"
     },
     {
       "source_id": "SSE-H1-OPERATING-DATA-2026",
@@ -51,7 +54,8 @@
       "known_at_basis": "Candidate date from SSE archive path/public index; claims must be checked against captured original bytes.",
       "published_at": "2026-08-31",
       "observation_date": "2026-06-30",
-      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN",
+      "expected_payload_type": "PDF"
     },
     {
       "source_id": "SSE-2026-09-SUBSIDIARY-INVESTMENT",
@@ -62,7 +66,8 @@
       "known_at": "2026-09-10",
       "known_at_basis": "Candidate date from SSE archive path/public index; announcement text and timestamp require captured-byte verification.",
       "published_at": "2026-09-10",
-      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN",
+      "expected_payload_type": "PDF"
     },
     {
       "source_id": "SSE-2026-10-09-SHAREHOLDERS-MEETING",
@@ -74,7 +79,8 @@
       "known_at_basis": "Candidate archive/public index date. Keep first-public timestamp and vote claims pending raw-byte/origin verification.",
       "published_at": "2026-10-09",
       "observation_date": "2026-10-08",
-      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN",
+      "expected_payload_type": "PDF"
     },
     {
       "source_id": "SSE-2026-09-CONVERTIBLE-BOND-UPDATE",
@@ -85,7 +91,8 @@
       "known_at": "2026-09-11",
       "known_at_basis": "Candidate archive/public index date; bond terms and status require inspection of exact captured bytes.",
       "published_at": "2026-09-11",
-      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN",
+      "expected_payload_type": "PDF"
     },
     {
       "source_id": "SSE-2026-CONVERTIBLE-BOND-PROSPECTUS",
@@ -96,7 +103,8 @@
       "known_at": "2026-04-30",
       "known_at_basis": "SSE-hosted document surfaced from exchange-domain search; confirm document identity/status from captured bytes.",
       "published_at": "2026-04-30",
-      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN",
+      "expected_payload_type": "PDF"
     },
     {
       "source_id": "SSE-2026-H1-DIVIDEND-PLAN",
@@ -107,7 +115,8 @@
       "known_at": "2026-08-31",
       "known_at_basis": "Candidate archive/public index date; verify amount/share base/timing from the captured original.",
       "published_at": "2026-08-31",
-      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN",
+      "expected_payload_type": "PDF"
     },
     {
       "source_id": "SSE-2026-07-PLEDGE-RELEASE",
@@ -118,7 +127,8 @@
       "known_at": "2026-07-24",
       "known_at_basis": "Candidate archive/public index date; pledged-share scope must be extracted from captured original.",
       "published_at": "2026-07-24",
-      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN",
+      "expected_payload_type": "PDF"
     },
     {
       "source_id": "PRICE-STOCKSTAR-2026-10-09",
@@ -130,7 +140,8 @@
       "known_at_basis": "Search result shows publication time 2026-10-09 18:09:28; secondary price claim still requires exact-byte replay and source-origin adjudication.",
       "published_at": "2026-10-09T18:09:28+08:00",
       "observation_date": "2026-10-09",
-      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN",
+      "expected_payload_type": "HTML"
     },
     {
       "source_id": "PRICE-SOHU-HISTORY-2026-10-09",
@@ -142,7 +153,8 @@
       "known_at_basis": "",
       "published_at": "",
       "observation_date": "2026-10-09",
-      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
+      "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN",
+      "expected_payload_type": "HTML"
     }
   ]
 }
