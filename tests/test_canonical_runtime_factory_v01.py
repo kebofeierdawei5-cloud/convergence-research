@@ -218,3 +218,24 @@ def test_build_canonical_runtime_requires_all_trusted_configuration(tmp_path):
     out.mkdir()
     with pytest.raises(Exception):
         build_canonical_runtime(bundle=_bundle(), output_root=out, env={})
+
+
+def test_factory_requires_pinned_runtime_public_key_to_match_private_key(tmp_path, monkeypatch):
+    env, _, out = _env(tmp_path, monkeypatch)
+    env["IIOS_LLM_PROVIDER_RUNTIME_PUBLIC_KEY_B64"] = base64.b64encode(b"X" * 32).decode("ascii")
+    with pytest.raises(RuntimeFactoryError, match="PUBLIC_PRIVATE_KEY_MISMATCH"):
+        build_canonical_runtime(bundle=_bundle(), output_root=out, env=env)
+
+
+def test_live_provider_client_rejects_unpinned_key_before_semantic_admission(tmp_path, monkeypatch):
+    from iios_mvp.canonical_runtime_factory_v01 import SignedLiveProviderJsonClient
+    from iios_mvp.live_provider_preflight_v01 import load_live_provider_config
+    env, _, out = _env(tmp_path, monkeypatch)
+    cfg = load_live_provider_config(env)
+    client = SignedLiveProviderJsonClient(
+        config=cfg,
+        output_root=out,
+        project_root=Path(__file__).resolve().parents[1],
+        expected_runtime_public_key_b64=env["IIOS_LLM_PROVIDER_RUNTIME_PUBLIC_KEY_B64"],
+    )
+    assert client.expected_runtime_public_key_b64 == env["IIOS_LLM_PROVIDER_RUNTIME_PUBLIC_KEY_B64"]
