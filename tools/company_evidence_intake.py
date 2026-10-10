@@ -159,7 +159,7 @@ def _payload_contract_status(
     decoded = _payload_bytes_for_validation(content)
     prefix = decoded[:8192].lstrip(b"\xef\xbb\xbf\x00\t\r\n ")
     lowered = prefix[:4096].lower()
-    if b"%pdf-" in prefix[:1024]:
+    if b"%pdf-" in prefix[:1024].lower():
         actual = "PDF"
     elif (
         lowered.startswith(b"<!doctype html")
