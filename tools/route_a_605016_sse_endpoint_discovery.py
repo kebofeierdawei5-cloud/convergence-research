@@ -101,6 +101,80 @@ def endpoint_candidates(payload: str, source_url: str) -> list[dict[str, str]]:
     return found
 
 
+def probe_official_daily_bar() -> dict[str, Any]:
+    """Probe the SSE TLS endpoint for a date row; retain no quote values or raw response."""
+    urls = [
+        "https://yunhq.sse.com.cn:32042/v1/sh1/dayk/605016?begin=20261008&end=20261008&select=date,open,high,low,close,volume,amount",
+        "https://yunhq.sse.com.cn:32041/v1/sh1/dayk/605016?begin=20261008&end=20261008&select=date,open,high,low,close,volume,amount",
+    ]
+    attempts: list[dict[str, Any]] = []
+    for url in urls:
+        response = fetch_https(url, referer="https://www.sse.com.cn/market/stockdata/overview/day/")
+        meta = {k: v for k, v in response.items() if k != "body"}
+        meta["url"] = url
+        if response.get("status") != "CAPTURED":
+            attempts.append(meta)
+            continue
+        raw = response["body"]
+        try:
+            payload = json.loads(raw.decode("utf-8-sig"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            attempts.append({**meta, "payload_json": False, "row_match_count": 0})
+            continue
+
+        matches: list[dict[str, Any]] = []
+        target = "20261008"
+
+        def visit(node: Any, pointer: str = "$") -> None:
+            if isinstance(node, dict):
+                lowered = {str(k).lower(): v for k, v in node.items()}
+                date_value = next((lowered[k] for k in ("date", "trade_date", "tradedate", "tradingdate", "dt") if k in lowered), None)
+                if date_value is not None and str(date_value).replace("-", "")[:8] == target:
+                    matches.append({"path": pointer, "shape": "OBJECT_WITH_DATE_FIELD", "field_names": sorted(str(k) for k in node.keys())})
+                for key, value in node.items():
+                    visit(value, f"{pointer}.{key}")
+            elif isinstance(node, list):
+                for index, value in enumerate(node):
+                    if isinstance(value, list) and value and str(value[0]).replace("-", "")[:8] == target:
+                        matches.append({
+                            "path": f"{pointer}[{index}]",
+                            "shape": "ROW_ARRAY_DATE_FIRST",
+                            "field_count": len(value),
+                        })
+                    visit(value, f"{pointer}[{index}]")
+        visit(payload)
+        attempts.append({
+            "url": url,
+            "status": "HTTPS_RESPONSE_PARSED",
+            "http_status": response.get("http_status"),
+            "content_type": response.get("content_type"),
+            "size_bytes": len(raw),
+            "sha256": sha256(raw),
+            "payload_json": True,
+            "requested_trade_date_row_match_count": len(matches),
+            "row_shapes": matches,
+            "numeric_quote_values_persisted": False,
+            "raw_payload_persisted": False,
+        })
+        if matches:
+            return {
+                "status": "OFFICIAL_HTTPS_ROW_FOUND_NEEDS_B2_PIT_ADJUDICATION",
+                "attempts": attempts,
+                "date_row_found": True,
+                "payload_sha256": sha256(raw),
+                "payload_size_bytes": len(raw),
+                "numeric_quote_values_persisted": False,
+                "raw_payload_persisted": False,
+            }
+    return {
+        "status": "OFFICIAL_HTTPS_ROW_NOT_FOUND",
+        "attempts": attempts,
+        "date_row_found": False,
+        "numeric_quote_values_persisted": False,
+        "raw_payload_persisted": False,
+    }
+
+
 def main() -> int:
     out_dir = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/605016-endpoint-discovery")
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -169,7 +243,11 @@ def main() -> int:
             break
     report["candidate_endpoints"] = deduped
     report["candidate_endpoint_count"] = len(deduped)
-    report["status"] = "ENDPOINT_CANDIDATES_FOUND_NEED_VALIDATION" if deduped else "NO_OFFICIAL_ENDPOINT_FOUND"
+    report["official_daily_bar_probe"] = probe_official_daily_bar()
+    if report["official_daily_bar_probe"].get("date_row_found"):
+        report["status"] = "OFFICIAL_HTTPS_DATE_ROW_FOUND_NEEDS_B2_PIT_ADJUDICATION"
+    else:
+        report["status"] = "ENDPOINT_CANDIDATES_FOUND_NEED_VALIDATION" if deduped else "NO_OFFICIAL_ENDPOINT_FOUND"
     report_path = out_dir / "SSE_HTTPS_ENDPOINT_DISCOVERY_REPORT.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({
