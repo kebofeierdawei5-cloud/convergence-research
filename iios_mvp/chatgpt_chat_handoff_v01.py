@@ -185,6 +185,12 @@ def _load_task(root: Path, task_id: str) -> tuple[dict[str, Any], dict[str, Path
         raise ChatGPTChatHandoffError("HANDOFF_REQUEST_NOT_FOUND") from exc
     if task.get("task_id") != task_id:
         raise ChatGPTChatHandoffError("HANDOFF_TASK_ID_MISMATCH")
+    if task.get("schema_version") != SCHEMA_VERSION or task.get("execution_channel") != "CHATGPT_WEB_FREE_MANUAL":
+        raise ChatGPTChatHandoffError("HANDOFF_REQUEST_SCHEMA_OR_CHANNEL_INVALID")
+    if task.get("provider_origin_verified") is not False:
+        raise ChatGPTChatHandoffError("HANDOFF_REQUEST_ORIGIN_CLAIM_INVALID")
+    if task.get("stage") not in ALLOWED_STAGES:
+        raise ChatGPTChatHandoffError("HANDOFF_REQUEST_STAGE_INVALID")
     if hashlib.sha256(prompt_raw).hexdigest() != task.get("prompt_sha256"):
         raise ChatGPTChatHandoffError("HANDOFF_PROMPT_HASH_MISMATCH")
     task_core = {k: v for k, v in task.items() if k != "task_id"}
@@ -206,8 +212,14 @@ def _load_response_record(root: Path, task_id: str) -> tuple[dict[str, Any], dic
     for field in ("task_id", "stage", "run_id", "request_id", "case_id", "cutoff_date", "prompt_sha256"):
         if record.get(field) != task.get(field):
             raise ChatGPTChatHandoffError("CHATGPT_RESPONSE_TASK_BINDING_MISMATCH")
+    if record.get("schema_version") != SCHEMA_VERSION:
+        raise ChatGPTChatHandoffError("CHATGPT_RESPONSE_SCHEMA_VERSION_INVALID")
     if record.get("execution_channel") != "CHATGPT_WEB_FREE_MANUAL" or record.get("provider_origin_verified") is not False:
         raise ChatGPTChatHandoffError("CHATGPT_RESPONSE_ORIGIN_CLAIM_INVALID")
+    if record.get("operator_reported_origin") != "CHATGPT_FREE_WEB_UI":
+        raise ChatGPTChatHandoffError("CHATGPT_RESPONSE_REPORTED_ORIGIN_INVALID")
+    if record.get("integrity_semantics") != "HASH_INTEGRITY_ONLY_NOT_PROVIDER_AUTHENTICATION":
+        raise ChatGPTChatHandoffError("CHATGPT_RESPONSE_INTEGRITY_SEMANTICS_INVALID")
     response_text = record.get("response_text")
     if not isinstance(response_text, str) or not response_text.strip():
         raise ChatGPTChatHandoffError("CHATGPT_RESPONSE_TEXT_MISSING")
@@ -225,8 +237,14 @@ def _load_response_record(root: Path, task_id: str) -> tuple[dict[str, Any], dic
     for field in ("task_id", "stage", "run_id", "request_id", "case_id", "cutoff_date", "prompt_sha256", "response_sha256", "execution_channel", "provider_origin_verified"):
         if receipt.get(field) != record.get(field):
             raise ChatGPTChatHandoffError("CHATGPT_OPERATOR_RECEIPT_BINDING_MISMATCH")
+    if receipt.get("schema_version") != SCHEMA_VERSION:
+        raise ChatGPTChatHandoffError("CHATGPT_OPERATOR_RECEIPT_SCHEMA_VERSION_INVALID")
     if receipt.get("provider_origin_verified") is not False:
         raise ChatGPTChatHandoffError("CHATGPT_OPERATOR_RECEIPT_ORIGIN_CLAIM_INVALID")
+    if receipt.get("operator_reported_origin") != "CHATGPT_FREE_WEB_UI":
+        raise ChatGPTChatHandoffError("CHATGPT_OPERATOR_RECEIPT_REPORTED_ORIGIN_INVALID")
+    if receipt.get("integrity_semantics") != "HASH_INTEGRITY_ONLY_NOT_PROVIDER_AUTHENTICATION":
+        raise ChatGPTChatHandoffError("CHATGPT_OPERATOR_RECEIPT_INTEGRITY_SEMANTICS_INVALID")
     parsed = _parse_json_object(response_raw, reason="CHATGPT_RESPONSE_NOT_STRICT_JSON_OBJECT")
     return task, {"record": record, "parsed": parsed}, paths
 
