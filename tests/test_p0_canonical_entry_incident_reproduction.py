@@ -143,16 +143,58 @@ def test_p0_ce_01c_explicit_runtime_factory_is_trusted_host_input(monkeypatch, t
     import types
 
     import iios_mvp.cli as cli
+    from iios_mvp.canonical_natural_language_entry_v01 import (
+        RequestIntent,
+        RequestInterpreterRegistration,
+        RequestInterpreterRegistry,
+    )
     from iios_mvp.canonical_runtime_registry_v01 import CanonicalRuntimeBindings
+    from iios_mvp.semantic_producer_admission_v01 import (
+        ProducerRegistration,
+        ProducerRegistry,
+    )
+
+    class TestInterpreter:
+        interpreter_id = "test-interpreter"
+        interpreter_type = "LLM_REQUEST_INTERPRETER"
+        interpreter_version = "test-v1"
+        policy_version = "test-policy-v1"
+
+        def interpret(self, raw_request):
+            return RequestIntent("CN-A", "605016.SH", "2026-10-09", 0)
+
+    class TestSemanticProducer:
+        producer_id = "test-semantic-producer"
+        producer_type = "LLM_SEMANTIC_PRODUCER"
+        producer_version = "test-v1"
+        policy_version = "test-policy-v1"
+
+        def produce(self, request):
+            return {"status": "TEST_ONLY"}
+
+    interpreter = TestInterpreter()
+    producer = TestSemanticProducer()
+    request_registry = RequestInterpreterRegistry((
+        RequestInterpreterRegistration(
+            interpreter.interpreter_id, interpreter.interpreter_type,
+            interpreter.interpreter_version, interpreter.policy_version,
+        ),
+    ))
+    producer_registry = ProducerRegistry((
+        ProducerRegistration(
+            producer.producer_id, producer.producer_type,
+            producer.producer_version, producer.policy_version,
+        ),
+    ))
 
     module_name = "iios_mvp_test_runtime_factory"
     module = types.ModuleType(module_name)
     calls = {}
     expected = CanonicalRuntimeBindings(
-        request_interpreter=object(),
-        request_registry=object(),
-        semantic_producer=object(),
-        producer_registry=object(),
+        request_interpreter=interpreter,
+        request_registry=request_registry,
+        semantic_producer=producer,
+        producer_registry=producer_registry,
         current_price_resolver=object(),
         independent_forecast_resolver=object(),
         upstream_authority_resolver=object(),
@@ -184,7 +226,6 @@ def test_p0_ce_01c_explicit_runtime_factory_is_trusted_host_input(monkeypatch, t
             output_root=str(tmp_path / "runs"),
         )
 
-
 def test_p0_ce_01d_invalid_runtime_factory_blocks_without_artifacts(tmp_path, capsys, monkeypatch):
     import iios_mvp.cli as cli
 
@@ -207,6 +248,63 @@ def test_p0_ce_01d_invalid_runtime_factory_blocks_without_artifacts(tmp_path, ca
     assert output["reason"] == "CANONICAL_RUNTIME_FACTORY_INVALID"
     assert output["error_type"] == "ValueError"
     assert not output_root.exists()
+
+
+def test_p0_ce_01e_incomplete_pre_registered_runtime_is_blocked_before_artifacts(
+    tmp_path, capsys, monkeypatch
+):
+    import iios_mvp.cli as cli
+    from iios_mvp.canonical_runtime_registry_v01 import CanonicalRuntimeBindings
+
+    incomplete = CanonicalRuntimeBindings(
+        request_interpreter=object(),
+        request_registry=object(),
+        semantic_producer=object(),
+        producer_registry=object(),
+        current_price_resolver=object(),
+        independent_forecast_resolver=object(),
+        upstream_authority_resolver=object(),
+        valuation_output_resolver=None,
+    )
+    monkeypatch.setattr(cli, "get_canonical_runtime", lambda: incomplete)
+
+    bundle = tmp_path / "request.json"
+    output_root = tmp_path / "runs"
+    bundle.write_text(
+        json.dumps({"raw_request": "使用新版本IIOS分析百龙创园605016，截止2026-10-09"}),
+        encoding="utf-8",
+    )
+    args = parser().parse_args([
+        "canonical-run", str(bundle), "--out", str(output_root),
+    ])
+    code = args.func(args)
+    output = json.loads(capsys.readouterr().out)
+
+    assert code == 2
+    assert output["status"] == "BLOCKED"
+    assert output["canonical_decision_created"] is False
+    assert output["reason"] == "CANONICAL_RUNTIME_FACTORY_INVALID"
+    assert not output_root.exists()
+
+
+def test_p0_ce_01f_runtime_registry_rejects_incomplete_bindings(monkeypatch):
+    import iios_mvp.canonical_runtime_registry_v01 as registry
+
+    monkeypatch.setattr(registry, "_RUNTIME", None)
+    incomplete = registry.CanonicalRuntimeBindings(
+        request_interpreter=object(),
+        request_registry=object(),
+        semantic_producer=object(),
+        producer_registry=object(),
+        current_price_resolver=object(),
+        independent_forecast_resolver=object(),
+        upstream_authority_resolver=object(),
+        valuation_output_resolver=None,
+    )
+
+    with pytest.raises(ValueError, match="runtime has missing bindings"):
+        registry.register_canonical_runtime(incomplete)
+    assert registry.get_canonical_runtime() is None
 
 
 def test_p0_ce_02_unadmitted_evidence_cannot_become_canonical_decision():
