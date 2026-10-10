@@ -93,7 +93,7 @@ def _payload_contract_status(expected_payload_type: Any, content: bytes) -> tupl
             pass
     prefix = decoded[:8192].lstrip(b"\xef\xbb\xbf\x00\t\r\n ")
     lowered = prefix[:4096].lower()
-    if b"%pdf-" in prefix[:1024]:
+    if b"%pdf-" in prefix[:1024].lower():
         actual = "PDF"
     elif lowered.startswith(b"<!doctype html") or lowered.startswith(b"<html") or b"<html" in lowered or b"<script" in lowered:
         actual = "HTML"
