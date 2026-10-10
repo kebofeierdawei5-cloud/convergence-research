@@ -1,0 +1,60 @@
+{
+  "schema_version": "IIOS-605016-FOLLOWUP-B2-RUN-0.1",
+  "case_id": "RC-CN-A-605016-20261009",
+  "cutoff_date": "2026-10-09",
+  "combined_b2_workflow": {
+    "run_id": 38039463649,
+    "conclusion": "SUCCESS",
+    "exact_code_head": "ea855f38f38426c68921daefa9397ed793f5d8bc",
+    "artifact_id": 11665325858,
+    "artifact_sha256": "44a306a01ad175e624016fc8e6c05ee294b0b9e1a96efa13918583120d6ceeef"
+  },
+  "input_artifacts": {
+    "attempt10": {
+      "run_id": 38026139364,
+      "artifact_id": 11660285551,
+      "manifest_sha256": "563bc41ab2e6ce4925451fc02986f87409e06b879e3b92066d443ef6d796f244"
+    },
+    "dividend_capture": {
+      "run_id": 38039073275,
+      "artifact_id": 11664882557,
+      "pdf_sha256": "1a153c20f908abbd48fdd63a651ecb0edde269f3e7dd0ea27a0b8ce420e5ea8c"
+    },
+    "official_price_attempt": {
+      "run_id": 38039463667,
+      "artifact_id": 11665610580,
+      "row_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480"
+    }
+  },
+  "b2": {
+    "core_validator": "research.b2.company_evidence.build_company_evidence_manifest (unchanged)",
+    "candidate_manifest_sha256": "7b91b2531ab82f8f53a7a06887564eb5f8b3938d2f5d4d8e6f867a4057fc6f74",
+    "evidence_record_count": 11,
+    "admitted_record_count": 10,
+    "admitted_field_groups": [
+      "business_reality",
+      "capital_structure",
+      "corporate_disclosures",
+      "financial_reality",
+      "security_identity",
+      "trust_governance_events"
+    ],
+    "missing_required_field_groups": [
+      "market_price"
+    ],
+    "validation_errors": [
+      "EVIDENCE[605016-PRICE-CANDIDATE-20261009]:PIT:PIT_UNKNOWN: source availability/provenance is not established",
+      "REQUIRED_FIELD_GROUPS_UNCOVERED:market_price"
+    ],
+    "evidence_admission": false,
+    "pit_admission": false,
+    "formal_valuation_decision_publication_report_run_receipt_authorized": false
+  },
+  "overall": "BLOCKED_AS_REQUIRED",
+  "next_steps": [
+    "Do not promote the 2026-10-08 SSE day-K row acquired over HTTP; retain it as a diagnostic-only source candidate.",
+    "Retry an HTTPS official SSE market-data endpoint or resolve reuse/source-vintage through a different authorized HTTPS source.",
+    "Until a price Evidence Record passes the unchanged core PIT validator, do not generate a formal valuation, Decision Revision, publication, investor report or complete Run Receipt.",
+    "After B2 passes, separately configure the deployed Host and complete a genuine 605016 host-origin semantic/Forecast/Valuation/decision/report/receipt replay and independent red-team."
+  ]
+}
