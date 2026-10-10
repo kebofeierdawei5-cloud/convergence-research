@@ -226,6 +226,7 @@ def test_p0_ce_01c_explicit_runtime_factory_is_trusted_host_input(monkeypatch, t
             output_root=str(tmp_path / "runs"),
         )
 
+
 def test_p0_ce_01d_invalid_runtime_factory_blocks_without_artifacts(tmp_path, capsys, monkeypatch):
     import iios_mvp.cli as cli
 
