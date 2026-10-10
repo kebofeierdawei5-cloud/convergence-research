@@ -5,6 +5,10 @@ on:
       - "tools/route_a_605016_followup_capture.py"
       - ".github/workflows/route_a_605016_followup_capture.yml"
   workflow_dispatch:
+concurrency:
+  group: route-a-605016-followup-capture-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 jobs:
