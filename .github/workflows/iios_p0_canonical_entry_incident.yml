@@ -5,6 +5,7 @@ on:
     paths:
       - "docs/iios/P0_CANONICAL_ENTRY_INCIDENT_REPRODUCTION_20261009.md"
       - "tests/test_p0_canonical_entry_incident_reproduction.py"
+      - "tests/test_canonical_cli_host_integration.py"
       - ".github/workflows/iios_p0_canonical_entry_incident.yml"
       - "iios_mvp/canonical_research_orchestrator.py"
       - "iios_mvp/cli.py"
@@ -28,10 +29,10 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install --disable-pip-version-check pytest jsonschema
+        run: python -m pip install --disable-pip-version-check pytest jsonschema cryptography
       - name: Compile IIOS modules
         run: python -m compileall -q iios_mvp
       - name: Run Batch 0 characterization probes
-        run: PYTHONPATH=. pytest -q tests/test_p0_canonical_entry_incident_reproduction.py
+        run: PYTHONPATH=. pytest -q tests/test_p0_canonical_entry_incident_reproduction.py tests/test_canonical_cli_host_integration.py
       - name: Check diff formatting
         run: git diff --check
