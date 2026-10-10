@@ -8,9 +8,11 @@ Authoritative current-state record:
 
 ## Latest P0 status — 2026-10-10
 
-P0 Batch B3 is merged in PR [#276](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/276), merge commit `d3582621918b285f29b4573c2618c1072247885c`. Exact-head regression checks passed for formal write authorization, P0 entry reproduction, B2-E end-to-end, Investment Core, runtime factory, reports, lineage and independent red-team suites. The Decision Revision, Publication and Report write boundaries now revalidate persisted upstream admission artifacts and fail closed when those bytes are missing.
+P0 Batch B3 is merged in PR [#276](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/276), merge commit `d3582621918b285f29b4573c2618c1072247885c`. Formal Decision Revision, Publication and Report writers now revalidate persisted upstream admissions and fail closed when those bytes are missing.
 
-**Production P0-LLM-001 / P0-LLM-004 remain OPEN.** Control-plane CI uses TEST_ONLY lifecycle evidence and does not prove deployed-host integration, 605016 source-origin/PIT admission, a genuine production semantic-to-decision run, or completed Run Receipt replay from the live host. Follow `docs/PROJECT_STATE_INDEX.md` for the active next boundary.
+P0 C1 source adjudication PR [#278](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/278) is also merged (`1e574438a255c350905c1575a13a691078fe27b8`). The real Attempt 10 artifact was independently re-hashed (12/12) and passed to the unchanged B2/PIT validator. Six of seven evidence groups are now covered; `market_price` remains UNKNOWN because the 2026-10-09 CNY 20.28 secondary close candidate still lacks admitted underlying-source authority/reuse. The date-only cutoff has not been reinterpreted; the 2026-10-09 evening meeting disclosure remains excluded, with a pre-cutoff official disclosure covering corporate_disclosures.
+
+**Production P0-LLM-001 / P0-LLM-004 remain OPEN.** There is still no deployed production-host run proving a genuine company semantic/Forecast/Valuation chain, Decision Revision, publication/report and complete Run Receipt replay with independent red-team. Follow `docs/PROJECT_STATE_INDEX.md` for the active next boundary.
 
 
 This file is a concise human-readable summary. When it conflicts with the Current State Index, the Current State Index wins.
