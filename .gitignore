@@ -6,3 +6,7 @@ venv/
 .DS_Store
 *.log
 *.tmp
+
+# Local IIOS runtime configuration, private keys, tokens and company data
+.iios-local/
+.iios-secrets/
