@@ -335,7 +335,11 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
         combined_root = base_out / "combined-evidence-root"
         combined_manifest_path = base_out / "COMBINED_B2_CANDIDATE_MANIFEST.json"
         combined_manifest = _read_obj(combined_manifest_path)
-    else:
+    elif (
+        dividend.get("status") == "BLOCKED"
+        and isinstance(dividend.get("listing_request"), dict)
+        and dividend["listing_request"].get("status") == "BLOCKED"
+    ):
         # The SSE listing API can be unreachable from some personal networks.
         # Reuse the repository's previously adjudicated listing/fact record while
         # re-fetching and exact-hash-verifying the official PDF directly over HTTPS.
@@ -344,6 +348,8 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
             attempt10_root, base_out, followup_root, dividend, prior_ledger
         )
         combined_manifest_path = base_out / "COMBINED_B2_CANDIDATE_MANIFEST.json"
+    else:
+        raise ValueError("OFFICIAL_DIVIDEND_SOURCE_CAPTURE_FAILED:" + str(dividend.get("status")))
 
     # Only query the official SSE HTTPS endpoint. Raw bytes and numeric fields are
     # confined to the ephemeral runner workspace and are never uploaded as artifacts.
@@ -470,6 +476,11 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
             "pdf_size_bytes": (dividend.get("pdf_capture") or {}).get("size_bytes"),
             "published_at_precision": "DATE_ONLY_2026-09-22",
             "reuse_disposition": "RESTRICTED_NO_REDISTRIBUTION; internal fact-level use only",
+            "capture_mode": dividend.get("capture_mode", "CURRENT_RUN_OFFICIAL_LISTING_AND_PDF_CAPTURE"),
+            "listing_bytes_reverified_in_current_run": bool(
+                (dividend.get("prior_adjudication") or {}).get("listing_bytes_reverified_in_current_run", True)
+            ),
+            "prior_dividend_ledger_sha256": (dividend.get("prior_adjudication") or {}).get("ledger_sha256"),
         },
         "official_price_source": {
             "source_id": "PRICE-SSE-OFFICIAL-DAYK-2026-10-08",
