@@ -17,7 +17,7 @@ from iios_mvp.engine import run_case, sha256_obj
 from iios_mvp.machine_publication import write_machine_publication
 from iios_mvp.store import create_or_load_series, write_decision_revision, write_snapshot
 from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
-from iios_mvp.canonical_run_authority_v01 import CanonicalRunAuthorizationError
+from iios_mvp.canonical_run_authority_v01 import CanonicalRunAuthorizationError, run_state_path
 from iios_mvp.canonical_research_orchestrator import Stage
 from tests.decision_admission_fixture import (
     build_fixture_admission_receipt,
@@ -416,3 +416,95 @@ def test_p0_ce_06_positive_synthetic_run_binds_revision_publication_report_and_r
     assert run_receipt["run_id"] == run_id
     assert run_receipt["run_status"] == "COMPLETE"
     assert len(run_receipt["receipt_hash"]) == 64
+
+
+
+def test_p0_ce_07_formal_writers_block_when_upstream_admission_bytes_are_missing(tmp_path):
+    """Existing, hash-shaped stage receipts cannot substitute for missing upstream bytes."""
+
+    def seed(root: Path, run_id: str):
+        snapshot = _v03_snapshot()
+        write_snapshot(root, snapshot)
+        series = create_or_load_series(
+            root, "CN-A", "605016.SH", snapshot["input"]["company"],
+            "2026-10-09T23:59:00+08:00",
+        )
+        admission = build_fixture_admission_receipt(
+            snapshot=snapshot, canonical_decision=snapshot["decision"]
+        )
+        prepare_authorized_test_run(
+            root=str(root), run_id=run_id,
+            snapshot=snapshot, decision_admission=admission,
+        )
+        return snapshot, series, admission
+
+    # Decision Revision: deleting the exact admitted semantic bytes blocks
+    # before a formal decision file/index or the next stage can be written.
+    decision_root = tmp_path / "decision-gate"
+    decision_root.mkdir()
+    snapshot, series, admission = seed(decision_root, "synthetic-missing-semantic-run")
+    semantic_files = list((decision_root / "canonical-artifacts").glob("*.semantic-artifact.json"))
+    assert len(semantic_files) == 1
+    semantic_files[0].unlink()
+    state_before = run_state_path(decision_root, "synthetic-missing-semantic-run").read_bytes()
+    with pytest.raises(CanonicalRunAuthorizationError, match="BLOCKED: admitted semantic-artifact artifact is absent"):
+        write_decision_revision(
+            decision_root, series["decision_series_id"], 1, snapshot,
+            "synthetic-missing-semantic-run", decision_admission=admission,
+        )
+    assert not list(decision_root.glob("*.decision.json"))
+    assert run_state_path(decision_root, "synthetic-missing-semantic-run").read_bytes() == state_before
+    assert not list(decision_root.glob("*.publication.json"))
+    assert not list(decision_root.glob("*.investor-review-v02.json"))
+
+    # Publication: a valid revision does not keep publication authority after an
+    # upstream valuation payload disappears.
+    publication_root = tmp_path / "publication-gate"
+    publication_root.mkdir()
+    snapshot, series, admission = seed(publication_root, "synthetic-missing-valuation-run")
+    revision_path = write_decision_revision(
+        publication_root, series["decision_series_id"], 1, snapshot,
+        "synthetic-missing-valuation-run", decision_admission=admission,
+    )
+    revision = json.loads(revision_path.read_text(encoding="utf-8"))
+    valuation_files = list((publication_root / "canonical-artifacts").glob("*.valuation-output.json"))
+    assert len(valuation_files) == 1
+    valuation_files[0].unlink()
+    from iios_mvp.canonical_run_authority_v01 import run_state_path as _run_state_path
+    state_before = _run_state_path(publication_root, "synthetic-missing-valuation-run").read_bytes()
+    with pytest.raises(CanonicalRunAuthorizationError, match="BLOCKED: admitted valuation-output artifact is absent"):
+        write_machine_publication(
+            publication_root, decision_id=revision["decision_id"],
+            published_at="2026-10-09T23:59:10+08:00",
+        )
+    assert not list(publication_root.glob("*.publication.json"))
+    assert _run_state_path(publication_root, "synthetic-missing-valuation-run").read_bytes() == state_before
+
+    # Report: a prior publication cannot authorize a report if forecast admission
+    # bytes have disappeared; no report/QA/markdown artifact or completion receipt
+    # may be emitted on that blocked path.
+    report_root = tmp_path / "report-gate"
+    report_root.mkdir()
+    snapshot, series, admission = seed(report_root, "synthetic-missing-forecast-run")
+    revision_path = write_decision_revision(
+        report_root, series["decision_series_id"], 1, snapshot,
+        "synthetic-missing-forecast-run", decision_admission=admission,
+    )
+    revision = json.loads(revision_path.read_text(encoding="utf-8"))
+    publication_path = write_machine_publication(
+        report_root, decision_id=revision["decision_id"],
+        published_at="2026-10-09T23:59:10+08:00",
+    )
+    forecast_files = list((report_root / "canonical-artifacts").glob("*.forecast-admission.json"))
+    assert len(forecast_files) == 1
+    forecast_files[0].unlink()
+    state_before = _run_state_path(report_root, "synthetic-missing-forecast-run").read_bytes()
+    with pytest.raises(CanonicalRunAuthorizationError, match="BLOCKED: admitted forecast-admission artifact is absent"):
+        write_investor_review_report_v02(
+            report_root, publication_path=publication_path,
+            generated_at="2026-10-09T23:59:30+08:00",
+        )
+    assert not list(report_root.glob("*.investor-review-v02.json"))
+    assert not list(report_root.glob("*.investor-review-v02.md"))
+    assert not (report_root / "synthetic-missing-forecast-run.run-receipt.json").exists()
+    assert _run_state_path(report_root, "synthetic-missing-forecast-run").read_bytes() == state_before
