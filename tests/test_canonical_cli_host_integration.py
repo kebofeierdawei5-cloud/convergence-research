@@ -58,7 +58,7 @@ def test_cli_host_routes_natural_language_request_through_canonical_run(
         # CLI configuration. The factory still receives the request for normal
         # case composition but returns only this explicitly test-only runtime.
         assert bundle["run_id"] == run_id
-        assert Path(output_root) == output_root_arg
+        assert str(output_root) == output_root_arg
         return runtime
 
     output_root_arg = str(output_root)
