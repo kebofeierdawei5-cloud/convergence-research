@@ -1,7 +1,7 @@
 # IIOS Batch Execution Plan — Refreshed 2026-10-10
 
 **Plan class:** execution plan / canonical-main recovery  
-**Authority baseline:** `main@2978cdbc3f76f1ab1596896e3425c75661144a57`  
+**Authority baseline:** `main@a62e2304983cbdf28f0365f7fd55f53378c4adab`  
 **State authority:** `docs/PROJECT_STATE_INDEX.md`  
 **Purpose:** move IIOS from validated control-plane code to a real, fail-closed, single-company research run without making external LLM API credentials a Route A prerequisite.
 
@@ -72,7 +72,7 @@ E. Independent red-team + full Run Receipt replay
 F. MVP acceptance decision (not trade execution)
 ```
 
-**Critical path:** PR #270 first-party HTTP host implementation → trusted real-runtime factory/configuration and deployment acceptance → PR #272 current-main 605016 capture refresh → issuer-origin/license/PIT fact admission → one real canonical run → report/Run Receipt replay → independent red-team.
+**Critical path:** PR #270 first-party HTTP host + PR #274 trusted factory code (MERGED) → real endpoint/keypair/durable admitted-store provisioning and host deployment acceptance → PR #272 current-main 605016 capture refresh → issuer-origin/license/PIT fact admission → one real canonical run → report/Run Receipt replay → independent red-team.
 
 The 新和成 case is a parallel Route A proving ground because its real raw-source bundle and fact-extraction candidates already exist. It must not block the original 605016 P0 acceptance, and it must not be relabeled admitted merely because source capture and PDF text matching succeeded.
 
@@ -122,9 +122,17 @@ This closes the repository-CLI route/persistence integration test gap only.
 - HTTP accepts only an operator-staged `bundle_id`; trusted roots/runtime factory remain process configuration. The default bind is loopback, run submission is bearer-authenticated and responses cannot authorize trading.
 - Deployment instructions and the complete trust-boundary/non-claim contract are in `docs/iios/P0_BATCH_B2_FIRST_PARTY_HOST_20261010.md`.
 
+#### Batch B3 — trusted runtime factory implementation (MERGED) / runtime provisioning (OPEN)
+
+- PR #274 merged at `a62e2304983cbdf28f0365f7fd55f53378c4adab`; exact head `14105076b1b69f626907e4eb8bdddf0893d84c23`; **8/8 exact-head checks SUCCESS**, including factory contract and red-team.
+- Factory: `iios_mvp.canonical_runtime_factory_v01:build_canonical_runtime`; set only in the trusted host environment as `IIOS_CANONICAL_RUNTIME_FACTORY`.
+- Uses a real provider Responses-compatible HTTPS endpoint through the existing provider-neutral caller. Strict schema validates the model's natural-language request intent and thesis-only semantic proposal. Signed raw-response receipts are written immutably and checked against a configured Ed25519 public-key pin before semantic admission.
+- All eight runtime bindings are composed, but upstream stores remain read-only: the factory cannot write fake ADMITTED current prices, forecasts, authority, or valuation outputs.
+- Factory contract and operator setup are specified in `docs/iios/P0_BATCH_B2_TRUSTED_RUNTIME_FACTORY_20261010.md`.
+
 **Remaining actions**
-1. Provision trusted bundle/data/output roots and secret token outside Git; start the host in the actual operator/deployment environment.
-2. Implement and register a genuine runtime factory containing all eight validated bindings. A self-hosted compatible model may use the existing `auth_mode=NONE` + `deployment_mode=SELF_HOSTED` policy on loopback; no paid API key is an evidence-ingestion requirement.
+1. Provision trusted bundle/data/output roots and the host auth token outside Git; deploy the host and record the deployed commit/config provenance.
+2. Configure `IIOS_CANONICAL_RUNTIME_FACTORY=iios_mvp.canonical_runtime_factory_v01:build_canonical_runtime`, a real HTTPS provider endpoint (self-hosted with `AUTH_MODE=NONE` is permitted if genuinely available), pinned Ed25519 keypair, and a durable canonical admission root. No API credential is required for source capture; a live semantic callback requires a real endpoint.
 3. Ensure the bundle is prepared from the real case and admitted source bytes; never accept request-supplied paths or semantic assertions. The factory must resolve genuine current-price, independent forecast, upstream-authority and valuation records, all case/cutoff bound and independently replayable.
 4. Obtain one fresh host-origin run. Missing model output, missing evidence, absent references or wrong case identity must return `BLOCKED`, not fallback.
 5. Only after successful Evidence/PIT + semantic/Forecast/Valuation admission run publication/report/complete `IIOS_RUN_RECEIPT` replay and independent red-team.
@@ -240,8 +248,8 @@ The red-team must test both negative bypasses and one end-to-end positive real c
 
 ## 5. Immediate execution order
 
-1. Batch A and the canonical host code are merged. PR #262 passed 24/24, PR #264 passed 16/16, PR #267 passed 13/13 dedicated P0 tests, and PR #270 passed 21/21 dedicated host contract tests plus 8/8 exact-head checks.
-2. Batch B is now implemented at the in-repo host boundary; production deployment/runtime/semantic acceptance remains blocked until the operator environment provisions the trusted factory and real data/runtime records. Do not infer production acceptance from host CI.
+1. Batch A, the first-party host and trusted runtime factory code are merged. PR #262 passed 24/24, PR #264 passed 16/16, PR #267 passed 13/13 dedicated P0 tests, PR #270 passed 21/21 host tests, and PR #274 passed 8/8 exact-head checks including factory-contract and red-team.
+2. Batch B source code is implemented (host PR #270 + factory PR #274); production deployment/runtime/semantic acceptance remains OPEN until the operator environment provisions a real endpoint/keypair/store and a real host-origin run passes receipt replay. Do not infer production acceptance from host/factory CI.
 3. Continue C1 (605016) source-origin/license/PIT fact adjudication using Attempt 10 artifact #11660285551 and preserve all UNKNOWN states; run C2 (002001) source adjudication in parallel.
 4. Only after the seven evidence groups and PIT admission pass, execute D1/D2 real canonical runs and complete receipt replay.
 5. Finish with independent red-team and explicit MVP acceptance; keep P0-LLM-001/P0-LLM-004 OPEN until a production-backed real-company conformance run passes.
