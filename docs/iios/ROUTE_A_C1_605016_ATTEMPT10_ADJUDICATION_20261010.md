@@ -37,7 +37,7 @@ For each object in Artifact 11660285551:
 ## 4. Price and report boundary
 
 - The cutoff requires a defensible **2026-10-09 closing-price observation**, not the older 2026-09-30 close.
-- Stockstar currently reports a 2026-10-09 close of **CNY 20.28** and an article timestamp of 18:09:28 +08:00: https://wap.stockstar.com/detail/RB2026100900029140. Treat it only as a secondary cross-check until exact bytes, field and provenance are captured and reviewed; it does not by itself become an admitted price fact.
+- Stockstar published a secondary market-close article on 2026-10-09 at 18:09:28 +08:00: https://wap.stockstar.com/detail/RB2026100900029140. Its numeric quote values are withheld from this public repository because source authority/reuse were not admitted and the event is later than the original date-only cutoff. It was not admitted as a price fact.
 - The SSE-hosted H1 2026 report locator is an official-source candidate. Publicly rendered content identifies code 605016 / 百龙创园 and the half-year reporting period, but rendered page text does not prove the exact captured response digest or first-public time.
 
 ## 5. Decision boundary
