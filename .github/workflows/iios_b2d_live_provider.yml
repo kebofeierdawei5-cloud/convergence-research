@@ -21,6 +21,9 @@ on:
       - "tests/test_prepare_iios_local_ollama_runtime.py"
       - "tests/test_canonical_runtime_factory_v01.py"
       - "docs/iios/P0_BATCH_B2_LOCAL_OLLAMA_RUNTIME_20261010.md"
+      - "docs/PROJECT_STATE_INDEX.md"
+      - "docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md"
+      - "STATUS.md"
   push:
     branches:
       - "feature/b2d-live-provider-canonical-refresh-20261008"
