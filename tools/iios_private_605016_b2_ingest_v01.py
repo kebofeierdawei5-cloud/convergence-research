@@ -73,7 +73,7 @@ def _is_under(path: Path, parent: Path) -> bool:
 
 def _preflight_private_root(root: str | Path, *, repository_root: str | Path) -> Path:
     supplied = Path(root).expanduser()
-    if supplied.exists() and supplied.is_symlink():
+    if supplied.is_symlink():
         raise PrivateIngestError("PRIVATE_ROOT_MUST_NOT_BE_SYMLINK")
     repository = Path(repository_root).resolve(strict=True)
     resolved = supplied.resolve(strict=False)
@@ -86,7 +86,7 @@ def _preflight_private_root(root: str | Path, *, repository_root: str | Path) ->
     if supplied.exists() and hasattr(os, "getuid"):
         if supplied.stat().st_uid != os.getuid():
             raise PrivateIngestError("PRIVATE_ROOT_MUST_BE_OWNED_BY_CURRENT_USER")
-    return supplied
+    return resolved
 
 
 def _make_private_directory(path: Path) -> None:
@@ -394,6 +394,8 @@ def ingest_private_b2_candidate(
         _make_private_directory(case_root)
         destination = case_root / fingerprint
 
+        if destination.is_symlink():
+            raise PrivateIngestError("EXISTING_PRIVATE_CANDIDATE_MUST_NOT_BE_SYMLINK")
         if destination.exists():
             existing = _validate_existing_candidate(destination, validator=core_validator)
             if _candidate_fingerprint(existing["manifest"]) != fingerprint:
