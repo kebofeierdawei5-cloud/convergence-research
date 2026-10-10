@@ -215,88 +215,105 @@ def official_dividend_capture(root: Path) -> dict[str, Any]:
 
 
 def official_exchange_price_capture(root: Path) -> dict[str, Any]:
-    # The SSE-hosted YunHQ daily-bar API is an official-market-data candidate.
-    # Treat it as diagnostic until response schema, date and field are independently checked.
-    url = (
-        "http://yunhq.sse.com.cn:32041/v1/sh1/dayk/605016"
+    """Capture a pre-cutoff close from the official SSE service; never admit plain-HTTP bytes."""
+    params = (
         "?begin=20261008&end=20261008"
         "&select=date,open,high,low,close,volume,amount"
     )
-    result = fetch(url, referer="https://www.sse.com.cn/market/stockdata/overview/day/")
-    primary_capture = {k: v for k, v in result.items() if k != "bytes"}
-    if result.get("status") != "CAPTURED":
-        fallback_url = (
-            "https://query.sse.com.cn/marketdata/tradedata/data/stockDailyTransData.do?"
-            "isPagination=false&productId=605016&startDate=2026-10-08&endDate=2026-10-08"
-        )
-        fallback = fetch(fallback_url, referer="https://www.sse.com.cn/market/stockdata/overview/day/")
-        if fallback.get("status") == "CAPTURED":
-            result = fallback
-        else:
-            result["fallback_attempt"] = {k: v for k, v in fallback.items() if k != "bytes"}
-        result["primary_attempt"] = primary_capture
+    secure_urls = [
+        "https://yunhq.sse.com.cn/v1/sh1/dayk/605016" + params,
+        "https://yunhq.sse.com.cn:32041/v1/sh1/dayk/605016" + params,
+        "https://query.sse.com.cn/marketdata/tradedata/data/stockDailyTransData.do?"
+        "isPagination=false&productId=605016&startDate=2026-10-08&endDate=2026-10-08",
+    ]
+    attempts: list[dict[str, Any]] = []
+    result: dict[str, Any] | None = None
+    secure = False
+    for url in secure_urls:
+        candidate = fetch(url, referer="https://www.sse.com.cn/market/stockdata/overview/day/")
+        attempts.append({k: v for k, v in candidate.items() if k != "bytes"})
+        if candidate.get("status") == "CAPTURED":
+            result = candidate
+            secure = True
+            break
+
+    if result is None:
+        # Diagnostic-only fallback: keep the response hash for troubleshooting,
+        # but never pass an unencrypted transport payload into the B2 manifest.
+        url = "http://yunhq.sse.com.cn:32041/v1/sh1/dayk/605016" + params
+        candidate = fetch(url, referer="https://www.sse.com.cn/market/stockdata/overview/day/")
+        attempts.append({k: v for k, v in candidate.items() if k != "bytes"})
+        if candidate.get("status") == "CAPTURED":
+            result = candidate
+            secure = False
+
     record: dict[str, Any] = {
         "source_id": "PRICE-SSE-OFFICIAL-DAYK-2026-10-08",
         "source_class": "OFFICIAL_EXCHANGE_MARKET_DATA_CANDIDATE",
         "expected_observation_date": "2026-10-08",
-        "url": url,
         "status": "BLOCKED",
-        "capture": {k: v for k, v in result.items() if k != "bytes"},
+        "secure_transport_verified": bool(secure),
+        "capture_attempts": attempts,
     }
-    if result.get("status") != "CAPTURED":
+    if result is None:
+        record["capture"] = "NO_ENDPOINT_RETURNED_BYTES"
         return record
+
     raw = result["bytes"]
-    save_bytes(root, "raw/PRICE-SSE-DAYK-605016-2026-10-08.bin", raw)
-    record["saved_path"] = "raw/PRICE-SSE-DAYK-605016-2026-10-09.bin"
+    record["url"] = result["url"]
+    record["capture"] = {k: v for k, v in result.items() if k != "bytes"}
+    record["saved_path"] = "raw/PRICE-SSE-DAYK-605016-2026-10-08.bin"
+    save_bytes(root, record["saved_path"], raw)
     record["payload_sha256"] = sha256(raw)
     record["size_bytes"] = len(raw)
     try:
         payload = parse_json_or_jsonp(raw)
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
-        record["status"] = "CAPTURED_UNPARSED_OFFICIAL_RESPONSE"
+        record["status"] = "CAPTURED_UNPARSED_OFFICIAL_RESPONSE" if secure else "BLOCKED_HTTP_TRANSPORT_NOT_ADMISSIBLE"
         record["parse_error"] = str(exc)
         record["payload_prefix"] = raw[:1000].decode("utf-8", errors="replace")
         return record
-    record["payload_preview"] = payload
-    matches = []
+
+    matches: list[dict[str, Any]] = []
     target_digits = "20261008"
-    target_iso = "2026-10-09"
+
     def visit(node: Any, pointer: str = "$") -> None:
         if isinstance(node, dict):
             norm = {str(k).lower(): v for k, v in node.items()}
-            date_value = next((norm[k] for k in ("date","trade_date","tradedate","tradingdate","dt") if k in norm), None)
-            date_text = str(date_value).replace("-", "")
-            if date_text == target_digits:
+            date_value = next((norm[k] for k in ("date", "trade_date", "tradedate", "tradingdate", "dt") if k in norm), None)
+            if str(date_value).replace("-", "") == target_digits:
                 matches.append({"path": pointer, "row": node})
             for key, value in node.items():
                 visit(value, f"{pointer}.{key}")
         elif isinstance(node, list):
             for i, value in enumerate(node):
-                if isinstance(value, list) and value:
-                    first = str(value[0]).replace("-", "")
-                    if first == target_digits:
-                        matches.append({
-                            "path": f"{pointer}[{i}]",
-                            "row": {
-                                "date": value[0],
-                                "open": value[1] if len(value) > 1 else None,
-                                "high": value[2] if len(value) > 2 else None,
-                                "low": value[3] if len(value) > 3 else None,
-                                "close": value[4] if len(value) > 4 else None,
-                                "volume": value[5] if len(value) > 5 else None,
-                                "amount": value[6] if len(value) > 6 else None,
-                                "field_order_assumption": "date,open,high,low,close,volume,amount",
-                            },
-                        })
+                if isinstance(value, list) and value and str(value[0]).replace("-", "") == target_digits:
+                    matches.append({
+                        "path": f"{pointer}[{i}]",
+                        "row": {
+                            "date": value[0],
+                            "open": value[1] if len(value) > 1 else None,
+                            "high": value[2] if len(value) > 2 else None,
+                            "low": value[3] if len(value) > 3 else None,
+                            "close": value[4] if len(value) > 4 else None,
+                            "volume": value[5] if len(value) > 5 else None,
+                            "amount": value[6] if len(value) > 6 else None,
+                            "field_order_assumption": "date,open,high,low,close,volume,amount",
+                        },
+                    })
                 visit(value, f"{pointer}[{i}]")
+
     visit(payload)
+    record["payload_preview"] = payload
     record["matches"] = matches
-    if not matches:
-        record["status"] = "CAPTURED_OFFICIAL_API_NO_MATCHING_DATE_ROW"
-        return record
-    # Do not automatically admit even a matching official API row: retain the exact
-    # provider schema/payload and require a reviewer to confirm units, quote time and PIT.
-    record["status"] = "OFFICIAL_DATE_ROW_CANDIDATE_NOT_ADMITTED"
+    if len(matches) != 1:
+        record["status"] = "CAPTURED_NO_SINGLE_MATCHING_DATE_ROW" if secure else "BLOCKED_HTTP_TRANSPORT_NOT_ADMISSIBLE"
+    elif secure:
+        record["status"] = "OFFICIAL_DATE_ROW_CANDIDATE_NOT_ADMITTED"
+        record["admission_note"] = "Secure official endpoint and exact date row captured; source first-public availability time and source-specific reuse conditions still require review before B2 admission."
+    else:
+        record["status"] = "BLOCKED_HTTP_TRANSPORT_NOT_ADMISSIBLE"
+        record["admission_note"] = "The endpoint returned a matching historical row over unencrypted HTTP. The repository source-intake contract requires HTTPS, so this result is not an admissible B2 source even though the host is the official SSE domain."
     return record
 
 
