@@ -209,6 +209,18 @@
       "pit_capability": "UNKNOWN",
       "mandatory_for_production": false,
       "notes": "Free-access historical page for cross-check only; source-vintage/known_at semantics are unknown until independently established. Not primary market authority."
+    },
+    {
+      "source_ref": "SOHU:MARKET_HISTORY_PAGE",
+      "provider": "Sohu Finance",
+      "role": [
+        "HISTORICAL_MARKET_PRICE_CROSS_CHECK"
+      ],
+      "access_class": "FREE_PUBLIC",
+      "authority_level": "SECONDARY_VALIDATION",
+      "pit_capability": "UNKNOWN",
+      "mandatory_for_production": false,
+      "notes": "Free secondary history page for cross-check only. History-page byte capture does not establish exact source vintage/known_at or grant primary market authority."
     }
   ]
 }

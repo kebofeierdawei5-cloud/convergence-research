@@ -133,11 +133,11 @@
       "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN"
     },
     {
-      "source_id": "PRICE-INVESTING-HISTORY-2026-10-09",
+      "source_id": "PRICE-SOHU-HISTORY-2026-10-09",
       "field_group": "market_price",
-      "source_ref": "INVESTING:MARKET_HISTORY_PAGE",
+      "source_ref": "SOHU:MARKET_HISTORY_PAGE",
       "source_class": "PUBLIC_SECONDARY",
-      "url": "https://hk.investing.com/equities/shandong-bailong-chuangyuan-bio-historical-data",
+      "url": "https://q.stock.sohu.com/cn/605016/lshq.shtml",
       "known_at": "",
       "known_at_basis": "",
       "published_at": "",
