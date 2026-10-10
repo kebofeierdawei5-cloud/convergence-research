@@ -61,6 +61,6 @@ def test_report_explicitly_disclaims_run_execution() -> None:
         "blockers": [{"id": "BUNDLE_MISSING", "finding": "missing", "next": "stage it"}],
     }
     text = MODULE.render_markdown(report)
-    assert "has NOT been executed" in text
+    assert "does not run the formal canonical investment decision workflow" in text
     assert "does not" in text
     assert "market_price" in text
