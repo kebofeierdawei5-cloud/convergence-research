@@ -218,7 +218,7 @@ def official_exchange_price_capture(root: Path) -> dict[str, Any]:
     # The SSE-hosted YunHQ daily-bar API is an official-market-data candidate.
     # Treat it as diagnostic until response schema, date and field are independently checked.
     url = (
-        "https://yunhq.sse.com.cn:32041/v1/sh1/dayk/605016"
+        "http://yunhq.sse.com.cn:32041/v1/sh1/dayk/605016"
         "?begin=20261009&end=20261009"
         "&select=date,open,high,low,close,volume,amount"
     )
