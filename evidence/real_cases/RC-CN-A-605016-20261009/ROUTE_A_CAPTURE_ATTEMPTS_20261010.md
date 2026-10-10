@@ -112,6 +112,17 @@ The previous exact-head capture proved that eight PDF-declared static-host URLs 
 - **B2 preflight: `BLOCKED_NOT_ADMITTED`**; all seven required groups remained missing, evidence admission false, PIT admission false. The final gate means capture + byte/type verification only.
 - The successful format gate resolves the former HTML-challenge payload problem on this route for the captured responses. It does not establish first-public timestamp, licensing/reuse rights, fact truth or decision-grade sufficiency.
 
+
+
+### Attempt 9 — exact outcome from the stale pre-refresh branch
+
+- Capture workflow run: [38016542987](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38016542987); artifact [11655947894](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38016542987/artifacts/11655947894) (8,526,897 bytes, retained under the workflow's 14-day policy).
+- Raw capture: 12/12 sources returned bytes; 0 transport failures, 0 unregistered sources.
+- Independent byte integrity: 12/12 exact size/SHA checks passed; declared payload format: 12/12 pass, 0 mismatches. Intake receipt manifest hash: `563bc41ab2e6ce4925451fc02986f87409e06b879e3b92066d443ef6d796f244`.
+- PIT warning: 1 source has unknown timing; source origin is explicitly `false`.
+- **B2 preflight: `BLOCKED_NOT_ADMITTED`**; all seven required groups remained missing, evidence admission false, PIT admission false. The final gate means capture + byte/type verification only.
+- The successful format gate resolves the former HTML-challenge payload problem on this route for the captured responses. It does not establish first-public timestamp, licensing/reuse rights, fact truth or decision-grade sufficiency.
+
 The fresh current-main run is Attempt 10. It must produce a new artifact/receipt bound to the newer code and is the only result to use for current-main verification.
 
 ## Explicit gate boundary
