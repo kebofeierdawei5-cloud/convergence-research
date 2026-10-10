@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Any, Mapping
 import base64
+import ipaddress
 import hashlib
 import json
 import os
+from urllib.parse import urlparse
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
@@ -15,6 +17,34 @@ from iios_mvp.live_provider_preflight_v01 import load_live_provider_config
 from iios_mvp.live_provider_replay_v01 import build_replay_record, verify_replay_record
 
 LIVE_PROVIDER_EVIDENCE_SCHEMA_VERSION = "IIOS-LIVE-PROVIDER-EVIDENCE-0.1"
+
+
+def _is_loopback_host(hostname: str | None) -> bool:
+    if not hostname:
+        return False
+    normalized = hostname.strip().lower().rstrip(".")
+    if normalized == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
+
+
+def _validate_record_endpoint_policy(record: Mapping[str, Any]) -> None:
+    endpoint = urlparse(str(record.get("endpoint", "")))
+    if endpoint.scheme.lower() == "https" and endpoint.hostname:
+        return
+    # Keep no-key local inference support narrow and explicit in the signed receipt.
+    if (
+        endpoint.scheme.lower() == "http"
+        and record.get("deployment_mode") == "SELF_HOSTED"
+        and record.get("auth_mode") == "NONE"
+        and _is_loopback_host(endpoint.hostname)
+    ):
+        return
+    raise ValueError("live provider endpoint policy invalid")
+
 
 
 def _canonical_bytes(value: Mapping[str, Any]) -> bytes:
@@ -84,6 +114,8 @@ def build_signed_live_evidence(
         "protocol": config.protocol,
         "model": config.model,
         "endpoint": config.base_url,
+        "auth_mode": config.auth_mode,
+        "deployment_mode": config.deployment_mode,
         "request_sha256": response.request_sha256,
         "response_sha256": response.response_sha256,
         "request_payload": payload,
@@ -116,6 +148,7 @@ def verify_signed_live_evidence(record: Mapping[str, Any]) -> None:
         raise ValueError("live provider evidence status is not admitted")
     if record["signature_algorithm"] != "Ed25519":
         raise ValueError("unsupported live provider evidence signature algorithm")
+    _validate_record_endpoint_policy(record)
     core = {k: v for k, v in record.items() if k not in {"attestation_hash","signature_algorithm","signature_b64"}}
     expected_hash = hashlib.sha256(_canonical_bytes(core)).hexdigest()
     if record["attestation_hash"] != expected_hash:
