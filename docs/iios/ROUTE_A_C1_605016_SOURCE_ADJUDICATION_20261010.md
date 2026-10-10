@@ -2,7 +2,7 @@
 
 **Case:** `RC-CN-A-605016-20261009`  
 **Security:** 百龙创园 / 605016.SH  
-**PIT cutoff:** 2026-10-09 23:59:59 +08:00  
+**PIT cutoff:** `2026-10-09` (original date-only cutoff; no end-of-day reinterpretation)  
 **Input:** actual Attempt 10 GitHub Actions artifact [#11660285551](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38026139364/artifacts/11660285551) from run [#38026139364](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38026139364).
 
 ## Decision
