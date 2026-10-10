@@ -34,7 +34,7 @@ This is not an attempt to relabel the original `CAPTURED_NOT_ADMITTED` receipt. 
 | `SSE-2026-CONVERTIBLE-BOND-PROSPECTUS` — SHA-256 `23b5a43f9107df57110a57911f931e93288fe91226673c7f332a0c184803d767` | Official SSE-hosted April application draft; body identifies the company/code and calls itself “申报稿”. | Date-level source vintage 2026-04-30. A 2026-09-11 notice says application documents were subsequently updated after the H1 report. | Restricted/no redistribution; exclude from current-final-terms claims as superseded/historical. |
 | `SSE-2026-H1-DIVIDEND-PLAN` — SHA-256 `2d3044e4bedc4039a22dd98cc17eab2fc73e00951c700c07bd64a77255a98a3b` | Official SSE host; body is the H1 dividend **proposal**, announcement no. 2026-036. | Proposal published 2026-08-31. SSE announcement list shows a later 2026-09-22 “2026年半年度权益分派实施公告” for 605016. | Restricted/no redistribution; exclude for the actual implemented dividend state. The later implementation PDF still needs raw capture and inspection. |
 | `SSE-2026-07-PLEDGE-RELEASE` — SHA-256 `f4daed15f824900bc553e4d31fbdf2994e70682cc43cd9e8a33a4fcba5d025bf` | Official SSE host; title/body/code and announcement no. 2026-033 match. | Archive date 2026-07-24; exact intraday time unavailable, before cutoff. | Restricted/no redistribution. Admit the located pledge-release/extension facts, clearly bounded to this announcement. |
-| `PRICE-STOCKSTAR-2026-10-09` — SHA-256 `0d78fe37969224552a3309e85d078a352f864b77d9c4f785db50329dd9562f98` | Exact secondary article/page and publication timestamp verified; underlying quote-data authority not independently established. | Article posted 2026-10-09 18:09:28 +08; says 20.28 close, 20.14 open, 20.35 high and 19.88 low. Investing.com historical table corroborates 20.28 for 10-09. **20.73 is the 09-29 row, not the 10-09 close.** | Licence/reuse unresolved. Retain as `UNKNOWN`; do not admit market price yet. |
+| `PRICE-STOCKSTAR-2026-10-09` — SHA-256 `0d78fe37969224552a3309e85d078a352f864b77d9c4f785db50329dd9562f98` | Exact secondary article/page and publication timestamp verified; underlying quote-data authority not independently established. | Article posted 2026-10-09 18:09:28 +08; numeric quote withheld from the public ledger because source authority/reuse are not admitted and it postdates the original date-only cutoff. | Licence/reuse unresolved. Explicitly `UNKNOWN`; no numeric value is admitted or published in this repository. |
 | `PRICE-SOHU-HISTORY-2026-10-09` — SHA-256 `1e18871c74111367957660d6b6510b463b1955424c49330c9b43a097bf07a8be` | Exact HTML bytes verified, but captured content is a page/navigation shell and contains no usable dated close-price rows. | No defensible known-at basis. | Rights unknown; exclude. It does not support the required market-price field. |
 
 ## Fact-level results and their limits
@@ -48,7 +48,7 @@ The adjudication ledger contains eleven fact candidates: ten source-backed fact 
 - **Capital structure:** 420,012,320 shares **as of 2026-06-30** (not asserted to be the 2026-10-09 share count), and convertible-bond registration status as of the 2026-09-11 update.
 - **Trust/governance:** the exact July pledge release/extension facts.
 
-The market-price group remains unadmitted. It is unsafe to infer a price from the Sohu shell, nor to silently promote a secondary article to an authoritative close merely because its captured bytes hash correctly.
+The market-price group remains unadmitted. The Sohu shell has no usable rows; an SSE daily-bar response is available only over plaintext HTTP and fails the HTTPS intake contract; Eastmoney and Yahoo automated quote collection/reuse are excluded under their captured terms absent prior permissions. Numeric quote values are withheld from the public repository.
 
 ## Actual B2/PIT execution — SUCCESSFUL fail-closed BLOCKED result
 
@@ -74,7 +74,7 @@ The run summary is preserved at `evidence/real_cases/RC-CN-A-605016-20261009/SOU
 The dedicated workflow downloads the actual Attempt 10 artifact, independently re-hashes all 12 raw sources, builds the fact-level candidate manifest from the source-adjudication ledger and calls the core-owned, unchanged `research.b2.company_evidence.build_company_evidence_manifest` validator.
 
 - Six of seven required groups are covered by source-adjudicated, PIT-eligible official Evidence Records.
-- `market_price` remains UNKNOWN because the 20.28 CNY close is currently corroborated only by secondary sources whose underlying data authority and reuse status have not been admitted.
+- `market_price` remains UNKNOWN. No numeric price value is published in this public ledger because the only captured official SSE row used plaintext HTTP, while secondary automated quote sources lack accepted reuse authority.
 - Final manifest remains `BLOCKED`; `evidence_admission=false`, `pit_admission=false`.
 - No valuation, Decision Revision, Machine Publication, Investor Review Report or complete `IIOS_RUN_RECEIPT` is authorized.
 
