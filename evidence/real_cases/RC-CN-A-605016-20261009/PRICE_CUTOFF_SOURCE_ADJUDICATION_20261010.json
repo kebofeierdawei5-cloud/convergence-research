@@ -54,10 +54,33 @@
       "reason": "Underlying quote authority and reuse status unresolved; also after the date-only cutoff instant."
     },
     "eastmoney": {
-      "observation_date": "2026-10-09",
-      "close_cny": 20.28,
-      "status": "CAPTURED_IN_PRIOR_ARTIFACT_BUT_NOT_ADMITTED",
-      "reason": "Secondary aggregator; reuse and source-authority adjudication unresolved."
+      "observation_date": "2026-10-08",
+      "close_cny": 20.22,
+      "capture_url": "https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.605016&klt=101&fqt=0&lmt=120&end=20261009&beg=20260901&fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61",
+      "capture_sha256": "796d42ab8661392ab56029c400ed0b99930757bf7265311b7de6bcf31847adda",
+      "capture_size_bytes": 1944,
+      "terms_source": "https://about.eastmoney.com/home/legal",
+      "terms_page_sha256": "2f669b80d2ca640e0d4f2995c3cdbb77c4abc4c150e761492f2aab44b06d78ca",
+      "terms_page_size_bytes": 12905,
+      "terms_capture_run_id": 38039773596,
+      "terms_capture_artifact_id": 11664868816,
+      "terms_clause_summary": "Legal statement section VIII says any copying/modifying/reprinting/distribution of site content requires prior written permission. Section X states market quotes may not be copied/disseminated/displayed without prior written consent from SSE/SZSE.",
+      "license_reuse_status": "RESTRICTED_WRITTEN_PERMISSION_REQUIRED",
+      "disposition": "EXCLUDED_FROM_ADMITTED_EVIDENCE",
+      "status": "NOT_ADMITTED",
+      "reason": "No written permission for this evidence-system copy was obtained. The row is retained only as an audit cross-check reference; it must not be promoted into the B2 Evidence/PIT manifest.",
+      "rows_crosschecked": [
+        {
+          "date": "2026-10-08",
+          "close_cny": 20.22
+        },
+        {
+          "date": "2026-10-09",
+          "close_cny": 20.28
+        }
+      ],
+      "terms_capture_status": "TERMS_CAPTURED_NEEDS_HUMAN_REVIEW",
+      "raw_price_bytes_committed_to_git": false
     },
     "date_error_reconciliation": "The 20.73 CNY entry belongs to 2026-09-29, not 2026-10-09."
   },
