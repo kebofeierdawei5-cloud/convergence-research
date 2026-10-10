@@ -1,0 +1,48 @@
+name: IIOS — One-click case readiness (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorize_read_only_preflight:
+        description: "I approve a read-only check of canonical main only. No local files, data writes, ChatGPT call, investment decision, or order execution."
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    if: ${{ inputs.authorize_read_only_preflight }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout canonical main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate readiness report
+        run: |
+          set -euo pipefail
+          python tools/iios_one_click_readiness_v01.py --repo-root . --report-dir artifacts/operator-readiness
+          {
+            echo "## IIOS one-click readiness"
+            echo
+            echo "This workflow has NOT executed canonical-run. A green Actions check means only that report generation worked. Read the internal readiness result below."
+            echo
+            cat artifacts/operator-readiness/RC-CN-A-605016-20261009-readiness.md
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload human and machine reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iios-readiness-${{ github.run_id }}
+          path: artifacts/operator-readiness/
+          if-no-files-found: error
+          retention-days: 14
