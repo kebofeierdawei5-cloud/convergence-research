@@ -1,0 +1,27 @@
+name: Route A 605016 HTTPS Price Provider Candidate
+on:
+  pull_request:
+    paths:
+      - "tools/route_a_605016_https_price_provider.py"
+      - ".github/workflows/route_a_605016_https_price_provider.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture-https-price-candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Capture HTTPS candidate and terms without automatic admission
+        run: python tools/route_a_605016_https_price_provider.py /tmp/605016-https-price
+      - name: Upload exact bytes and machine-readable report for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-a-605016-https-price-provider
+          path: /tmp/605016-https-price/
+          if-no-files-found: error
+          retention-days: 14
