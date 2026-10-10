@@ -936,6 +936,11 @@ def authorize_decision_revision_write(
     expected_hashes = [manifest_hash, *[str(x.get("content_sha256", "")) for x in manifest_evidence]]
     if evidence_stage["output_refs"] != expected_refs or evidence_stage["output_hashes"] != expected_hashes:
         raise CanonicalRunAuthorizationError("BLOCKED: Evidence stage receipts differ from the admitted Manifest")
+    _validate_canonical_upstream_admissions(
+        root,
+        record,
+        manifest_evidence_ids={str(item.get("evidence_id", "")) for item in manifest_evidence},
+    )
     if any((
         str(envelope["case_id"]) != str(snapshot_identity["case_id"]),
         str(envelope["market"]).upper() != str(snapshot_identity["market"]),
@@ -969,6 +974,7 @@ def authorize_publication_write(
     )
     run_id = str(revision["run_id"])
     record = _load_record(root, run_id)
+    _validate_canonical_upstream_admissions(root, record)
     env = record["envelope"]
     if env["stage_state"] == Stage.HUMAN_APPROVAL_PENDING.value:
         return make_stage_authority_ref(
@@ -1003,6 +1009,7 @@ def authorize_report_write(
     )
     run_id = str(run_ref["run_id"])
     record = _load_record(root, run_id)
+    _validate_canonical_upstream_admissions(root, record)
     env = record["envelope"]
     if env["stage_state"] not in {
         Stage.PUBLISHED.value, Stage.REPORTED.value, Stage.COMPLETE.value
