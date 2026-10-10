@@ -499,6 +499,7 @@ def run_b2e_conformance(
         "canonical_forecast_ref": dict(upstream_lineage["canonical_forecast_ref"]),
         "forecast_record": dict(upstream_lineage["forecast_record"]),
         "canonical_valuation_ref": dict(upstream_lineage["canonical_valuation_ref"]),
+        "valuation_admission_record": dict(upstream_lineage["valuation_admission_record"]),
         "valuation_output": dict(upstream_lineage["valuation_output"]),
         "validated_lineage": {
             key: value for key, value in upstream_lineage.items()
@@ -534,6 +535,9 @@ def run_b2e_conformance(
             "semantic-artifact": dict(semantic.artifact),
             "semantic-producer-receipt": dict(semantic.producer_receipt),
             "semantic-admission": dict(semantic.admission.__dict__),
+            "forecast-admission": dict(upstream_lineage["forecast_record"]),
+            "valuation-admission": dict(upstream_lineage["valuation_admission_record"]),
+            "valuation-output": dict(upstream_lineage["valuation_output"]),
             "decision-admission": dict(decision_admission),
             "canonical-upstream-admissions": canonical_upstream_bundle,
         }
