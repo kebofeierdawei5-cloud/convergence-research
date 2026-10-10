@@ -101,6 +101,70 @@ def test_reuses_prior_listing_decision_but_refetches_and_rehashes_exact_pdf(tmp_
     assert capture_report["prior_listing_bytes_reverified_in_current_run"] is False
 
 
+
+def test_official_static_https_candidate_is_used_only_after_primary_transport_block(
+    tmp_path: Path, monkeypatch
+) -> None:
+    pdf_raw = _pdf_bytes()
+    _setup(tmp_path, monkeypatch, pdf_raw)
+    calls: list[str] = []
+    fallback_url = MODULE.DIVIDEND_PDF_HTTPS_URLS[1]
+
+    def fake_fetch(url: str, **_kwargs):
+        calls.append(url)
+        if url == MODULE.DIVIDEND_PDF_HTTPS_URLS[0]:
+            return {"status": "BLOCKED", "url": url, "error": "NETWORK_UNREACHABLE"}
+        if url == fallback_url:
+            return {
+                "status": "CAPTURED",
+                "url": url,
+                "final_url": url,
+                "http_status": 200,
+                "content_type": "application/pdf",
+                "body": pdf_raw,
+            }
+        raise AssertionError("later candidates must not be tried after a successful response")
+
+    monkeypatch.setattr(MODULE, "fetch_https", fake_fetch)
+    output = tmp_path / "followup"
+    dividend, _ledger_obj = MODULE._recover_dividend_from_prior_canonical_adjudication(output)
+
+    assert calls == list(MODULE.DIVIDEND_PDF_HTTPS_URLS[:2])
+    assert dividend["pdf_capture"]["requested_url"] == fallback_url
+    assert dividend["pdf_capture"]["final_url"] == fallback_url
+    persisted_pdf = output / "raw" / "SSE-2026-09-22-DIVIDEND-IMPLEMENTATION.pdf"
+    assert persisted_pdf.read_bytes() == pdf_raw
+    assert hashlib.sha256(persisted_pdf.read_bytes()).hexdigest() == MODULE.EXPECTED_DIVIDEND_PDF_SHA256
+
+
+def test_successful_but_wrong_pdf_bytes_block_without_trying_another_host(
+    tmp_path: Path, monkeypatch
+) -> None:
+    expected_pdf = _pdf_bytes()
+    wrong_pdf = b"%PDF-1.7\\nnot-the-adjudicated-document"
+    _setup(tmp_path, monkeypatch, expected_pdf)
+    calls: list[str] = []
+
+    def fake_fetch(url: str, **_kwargs):
+        calls.append(url)
+        return {
+            "status": "CAPTURED",
+            "url": url,
+            "final_url": url,
+            "http_status": 200,
+            "content_type": "application/pdf",
+            "body": wrong_pdf,
+        }
+
+    monkeypatch.setattr(MODULE, "fetch_https", fake_fetch)
+    output = tmp_path / "followup"
+    with pytest.raises(ValueError, match="OFFICIAL_DIVIDEND_PDF_EXACT_BYTES_MISMATCH"):
+        MODULE._recover_dividend_from_prior_canonical_adjudication(output)
+
+    assert calls == [MODULE.DIVIDEND_PDF_HTTPS_URLS[0]]
+    assert not (output / "raw" / "SSE-2026-09-22-DIVIDEND-IMPLEMENTATION.pdf").exists()
+
+
 def test_direct_pdf_fetch_failure_blocks_without_creating_passing_capture(tmp_path: Path, monkeypatch) -> None:
     pdf_raw = _pdf_bytes()
     _setup(tmp_path, monkeypatch, pdf_raw)
