@@ -1,0 +1,102 @@
+{
+  "schema_version": "IIOS-605016-OFFICIAL-HTTPS-B2-ADJUDICATION-0.1",
+  "record_class": "EPHEMERAL_REAL_SOURCE_B2_PIT_ACCEPTANCE",
+  "case_id": "RC-CN-A-605016-20261009",
+  "cutoff_date": "2026-10-09",
+  "workflow": {
+    "run_id": 38050190177,
+    "run_url": "https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38050190177",
+    "run_head": "d77180f0be81c9d9265ca248592f0851cd169efa",
+    "result": "SUCCESS",
+    "output_artifact_id": 11669076729,
+    "output_artifact_sha256": "1078efa5d90a5aa161c5bb49da155658644cc52d8b8b907eb2f4990744f68ae6",
+    "output_artifact_size_bytes": 2104,
+    "output_scope": "SANITIZED_STATUS_HASH_SHAPE_ONLY",
+    "retention_days": 7
+  },
+  "source_inputs": {
+    "attempt10_run_id": 38026139364,
+    "attempt10_artifact_id": 11660285551,
+    "dividend_notice": {
+      "source_id": "SSE-2026-09-22-DIVIDEND-IMPLEMENTATION",
+      "evidence_id": "605016-H1-DIVIDEND-IMPLEMENTED-202609",
+      "capture_status": "CURRENT_RUN_OFFICIAL_LISTING_AND_PDF_CAPTURE",
+      "listing_bytes_reverified_in_current_run": true,
+      "pdf_sha256": "1a153c20f908abbd48fdd63a651ecb0edde269f3e7dd0ea27a0b8ce420e5ea8c",
+      "pdf_size_bytes": 146499,
+      "known_at": "2026-09-22",
+      "known_at_precision": "DATE_ONLY",
+      "fact_level_admission": "ADMITTED_FOR_SPECIFIC_INTERNAL_FACTS",
+      "reuse_status": "RESTRICTED_NO_REDISTRIBUTION"
+    }
+  },
+  "official_market_price_source": {
+    "source_id": "PRICE-SSE-OFFICIAL-DAYK-2026-10-08",
+    "url": "https://yunhq.sse.com.cn:32042/v1/sh1/dayk/605016?begin=20261008&end=20261008&select=date,open,high,low,close,volume,amount",
+    "transport": "HTTPS_TLS_VERIFIED",
+    "http_status": 200,
+    "content_type": "application/json;charset=UTF-8",
+    "observation_date": "2026-10-08",
+    "known_at": "2026-10-08T15:00:00+08:00",
+    "known_at_basis": "Market-session close event time; not an exact endpoint first-public timestamp.",
+    "raw_size_bytes": 124,
+    "raw_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480",
+    "row_match_count": 1,
+    "row_shape": {
+      "date_value_present": true,
+      "row_field_count": 7,
+      "required_quote_fields_present": true,
+      "numeric_fields_valid": true,
+      "numeric_values_serialized": false
+    },
+    "reuse_disposition": "RESTRICTED_NO_REDISTRIBUTION; internal non-commercial research gate only",
+    "numeric_quote_value_in_report": false,
+    "raw_source_bytes_in_report_artifact": false,
+    "raw_source_bytes_committed_to_git": false
+  },
+  "b2_pit": {
+    "validator": "research.b2.company_evidence.build_company_evidence_manifest (unchanged)",
+    "scope": "EPHEMERAL_CANDIDATE_MANIFEST_ONLY",
+    "candidate_manifest_status": "PASS",
+    "candidate_manifest_sha256": "7eb1106c2b6e746fc6b257b041b408c365d62733f33f82b036ad3717a54eb41b",
+    "evidence_record_count": 11,
+    "admitted_record_count": 11,
+    "admitted_field_groups": [
+      "business_reality",
+      "capital_structure",
+      "corporate_disclosures",
+      "financial_reality",
+      "market_price",
+      "security_identity",
+      "trust_governance_events"
+    ],
+    "missing_required_field_groups": [],
+    "validation_errors": [],
+    "evidence_admission_ephemeral": true,
+    "pit_admission_ephemeral": true,
+    "canonical_durable_admission": false
+  },
+  "scope_boundary": {
+    "private_host_data_root_persisted": false,
+    "private_persistence_status": "PENDING_OPERATOR_LOCAL_RERUN",
+    "exact_first_public_timestamp_verified": false,
+    "source_vintage_review_required": true,
+    "formal_signed_admission_created": false,
+    "production_host_accepted": false,
+    "bundle_created": false,
+    "decision_created": false,
+    "publication_created": false,
+    "complete_run_receipt_replay": false,
+    "independent_red_team_acceptance": false,
+    "human_approval_required": true,
+    "auto_execution": false,
+    "reason": "The passing manifest and numeric price value are not published. A private local persistence tool exists; its latest operator-reported local attempt stopped before writes when the listing API was blocked. Canonical code now has a fail-closed recovery path. A successful current-run B2/PIT artifact alone is not private durable persistence or production acceptance."
+  },
+  "next_steps": [
+    "Rerun the canonical-main local command tools/Launch_IIOS_Private_605016_B2_Ingest.command on the operator's Mac; it clones current main and performs the private write only after candidate and persisted-copy Core-validator replay pass.",
+    "Expected local result: PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED or its idempotent ALREADY_PERSISTED_CORE_VALIDATED_NOT_PRODUCTION_ACCEPTED counterpart. Any BLOCKED result must be preserved verbatim and must leave private_store_written=false.",
+    "Independently review the market-session-close known_at basis because the historical endpoint provides no exact first-public timestamp.",
+    "Only after private persistence, run real configured Host semantic/Forecast/Valuation admission, Decision, Publication/report, complete Run Receipt replay and independent red-team. P0-LLM-001/P0-LLM-004 remain OPEN."
+  ],
+  "public_repository_policy": "This repository is public. Non-admitted/restricted market quote values and raw price bytes are intentionally withheld; this record contains only dates, source hashes, response shape, validator status and explicit remaining gates."
+}
