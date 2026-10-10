@@ -139,7 +139,7 @@ def _validate_source_url(url: str) -> None:
 
 def _payload_bytes_for_validation(content: bytes) -> bytes:
     """Decode transport-level gzip only for sniffing; retained raw bytes never change."""
-    if content.startswith(b"\\x1f\\x8b"):
+    if content.startswith(b"\x1f\x8b"):
         try:
             return gzip.decompress(content)
         except OSError:
@@ -157,7 +157,7 @@ def _payload_contract_status(
     if not expected or expected == "ANY":
         return "NOT_CHECKED", None
     decoded = _payload_bytes_for_validation(content)
-    prefix = decoded[:8192].lstrip(b"\\xef\\xbb\\xbf\\x00\\t\\r\\n ")
+    prefix = decoded[:8192].lstrip(b"\xef\xbb\xbf\x00\t\r\n ")
     lowered = prefix[:4096].lower()
     if b"%pdf-" in prefix[:1024]:
         actual = "PDF"
