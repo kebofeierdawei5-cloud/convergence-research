@@ -1,5 +1,7 @@
 {
   "schema_version": "IIOS-COMPANY-EVIDENCE-CAPTURE-REQUEST-0.1",
   "case_id": "RC-CN-A-605016-20261009",
-  "manifest_path": "manifests/company_cases/RC-CN-A-605016-20261009.json"
+  "manifest_path": "manifests/company_cases/RC-CN-A-605016-20261009.json",
+  "acquisition_attempt": 2,
+  "note": "Retry after source-ref registry binding and failed-source diagnostic enhancement; capture output remains NOT_ADMITTED."
 }
