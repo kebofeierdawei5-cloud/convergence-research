@@ -2,6 +2,6 @@
   "schema_version": "IIOS-COMPANY-EVIDENCE-CAPTURE-REQUEST-0.1",
   "case_id": "RC-CN-A-605016-20261009",
   "manifest_path": "manifests/company_cases/RC-CN-A-605016-20261009.json",
-  "acquisition_attempt": 6,
-  "note": "Attempt 6: run after adding an 18-second per-source deadline, 8-second read timeout and 6-minute workflow-step timeout; confirm uppercase %PDF- is accepted, gzip HTML challenge responses excluded from B2 candidates, and raw bytes/failed rows remain audited."
+  "acquisition_attempt": 7,
+  "note": "Attempt 7: rerun after fixing the datetime.time import collision. Use per-source 18s deadline, 8s socket timeout, 64 KiB read1 chunks, and the 6-minute capture-step limit. Reverify actual PDF magic and HTML challenge mismatches; no evidence/PIT admission presumed."
 }

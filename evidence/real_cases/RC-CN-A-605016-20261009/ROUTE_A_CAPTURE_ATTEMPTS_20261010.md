@@ -52,17 +52,31 @@ The request was incremented to attempt 4 after the payload-type gate landed. App
 ## Attempt 4 — expected-payload-type gate against real sources
 
 - Workflow run: [38015723986](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38015723986)
-- Intake: `CAPTURED_NOT_ADMITTED`; 12/12 raw response bodies captured; 0 transport failures and 0 unregistered source refs.
-- Independent raw integrity: 12/12 byte arrays hash/size verified; payload checks: 12 checked, 3 passes, 9 mismatches.
-- Of the nine `PDF`-declared SSE sources, 8 were correctly identified as gzip-transported HTML challenge pages. The ninth was a real PDF (`%PDF-1.5`) but was falsely classified `UNKNOWN` because the detector compared uppercase PDF magic against a lowercase literal case-sensitively.
-- B2 preflight: `BLOCKED_NOT_ADMITTED`; `b2_candidate_source_count=3` (only the three HTML-page candidates), `payload_contract_failure_count=9`; all seven required groups still missing; `evidence_admission=false`, `pit_admission=false`.
+- Intake: 12/12 raw response bodies captured; 0 transport failures and 0 unregistered refs.
+- Independent raw integrity: 12/12 raw byte arrays hash/size verified; payload checks: 12 checked, 3 passes, 9 mismatches.
+- Of the nine PDF-declared SSE source URLs, 8 were correctly identified as gzip-transported HTML challenge pages. The ninth was a real PDF (`%PDF-1.5`) but was falsely classified `UNKNOWN` because the detector compared uppercase PDF magic against a lowercase literal case-sensitively.
+- B2 preflight: `BLOCKED_NOT_ADMITTED`; `b2_candidate_source_count=3` (three HTML-page candidates); `payload_contract_failure_count=9`; all seven required groups remained missing; `evidence_admission=false`, `pit_admission=false`.
 - Artifact: [11656955181](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38015723986/artifacts/11656955181).
 
-The attempt did not admit any source. It exposed a second detector defect; capture and verifier now perform case-insensitive PDF magic recognition independently and a positive regression requires a genuine `%PDF-1.7` body to pass. Do not rewrite this run's result: its 9 mismatch count reflects the buggy detector version used for Attempt 4.
+## Attempt 5 — uppercase PDF fix, but slow source still failed
 
-## Attempt 5 — PDF signature correction
+- Workflow run: [38015841564](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38015841564)
+- Runtime: approximately 4m35s, exposing why the prior sequential acquisition path felt stuck.
+- Intake: 11/12 response bodies captured; source `SSE-H1-2026-FULL` failed with `SOURCE_FETCH_FAILED`; remaining 11 raw bodies independently hash/size verified.
+- Payload checks: 11 checked, 4 passes, 7 mismatches. This run confirmed real `%PDF-1.5` bytes now passed and the three HTML pages passed; seven other SSE PDF URLs produced HTML access-challenge payloads.
+- B2 preflight: `BLOCKED_NOT_ADMITTED`; candidate sources=4; all seven groups missing; no Evidence/PIT admission.
+- Artifact: [11656331805](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38015841564/artifacts/11656331805).
 
-The capture request is incremented to attempt 5. Acceptance target: 8 HTML challenge mismatches, 1 genuine PDF pass, and 3 expected HTML page passes, with raw integrity verified for all 12 and B2 still blocked. These are expectations to verify against the next run, not assumed results.
+## Attempt 6 — bounded-read implementation exposed an import-name collision
+
+- Workflow run: [38015985509](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38015985509), conclusion `failure`; artifact [11656276832](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38015985509/artifacts/11656276832).
+- Root cause from exact traceback: adding `import time` shadowed the existing `datetime.time`, so `_pit_candidate_status()` failed at `time.min` with `AttributeError: module 'time' has no attribute 'min'`. No B2 admission or formal artifact was created; verifier/preflight could not run because capture did not write its receipt.
+- Fix: import the monotonic clock as `_clock` and preserve `datetime.time`; regression test now patches `_clock.monotonic`.
+- The per-source 18-second deadline / 8-second read timeout is retained, and response reads now prefer `read1()` with 64 KiB blocks so a slow trickle cannot hide beyond the total deadline within a 1 MiB buffered read.
+
+## Attempt 7 — rerun after clock-collision fix
+
+The capture request was incremented to attempt 7 after the clock import fix. The run must verify real PDF magic, detect HTML challenges, finish within the bounded capture step, preserve failed-source rows, and keep all evidence/PIT admission blocked. Results will be added only after the workflow finishes.
 
 ## Explicit gate boundary
 
