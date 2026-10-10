@@ -1,0 +1,36 @@
+name: IIOS Private 605016 B2 Persistence Contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/iios_private_605016_b2_ingest_v01.py"
+      - "tools/Launch_IIOS_Private_605016_B2_Ingest.command"
+      - "tests/test_iios_private_605016_b2_ingest_v01.py"
+      - "docs/iios/PRIVATE_605016_B2_PERSISTENCE_20261010.md"
+      - ".github/workflows/iios_private_605016_b2_ingest.yml"
+      - "iios_mvp/canonical_evidence_admission_v01.py"
+      - "tools/route_a_605016_official_https_b2_adjudicate.py"
+      - "research/b2/company_evidence.py"
+      - "research/b2/evidence_contract.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  private-persistence-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the existing official PDF parser and test runner
+        run: python -m pip install --disable-pip-version-check pytest pypdf
+      - name: Compile the local ingester and contract tests
+        run: python -m py_compile tools/iios_private_605016_b2_ingest_v01.py tests/test_iios_private_605016_b2_ingest_v01.py
+      - name: Run private persistence and adversarial path tests
+        run: PYTHONPATH=. python -m pytest -q tests/test_iios_private_605016_b2_ingest_v01.py
+      - name: Check patch formatting
+        run: git diff --check
