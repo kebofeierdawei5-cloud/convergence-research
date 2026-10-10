@@ -50,6 +50,26 @@ The adjudication ledger contains ten fact candidates, of which nine are backed b
 
 The market-price group remains unadmitted. It is unsafe to infer a price from the Sohu shell, nor to silently promote a secondary article to an authoritative close merely because its captured bytes hash correctly.
 
+## Actual B2/PIT execution — PASS as a fail-closed BLOCKED result
+
+The source adjudication was executed against the **real GitHub Actions Attempt 10 artifact**, not a synthetic fixture:
+
+- Workflow run [#38030568727](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38030568727), exact code/ledger head `aa3ef559c55335cd84bd38db43a0ae3975cc6ef6`, job `adjudicate-real-attempt-10`: **SUCCESS**.
+- Input capture artifact [#11660285551](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38026139364/artifacts/11660285551), manifest SHA-256 `563bc41ab2e6ce4925451fc02986f87409e06b879e3b92066d443ef6d796f244`.
+- Output JSON artifact [#11662067708](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38030568727/artifacts/11662067708), ZIP SHA-256 `b9fb562c0b72229f588540dfe2eab99486c37eea2472a28c88f7f2713207895e`.
+- Independently reverified source size/hash: **12/12 PASS**; payload contract: **12/12 PASS**.
+- Fact-level candidate count: 10; records with source-adjudication status ADMITTED: 9; explicit UNKNOWN price candidate: 1.
+- **B2 manifest status: BLOCKED**, with only five field groups passing the unchanged core PIT criteria: `security_identity`, `business_reality`, `financial_reality`, `capital_structure`, and `trust_governance_events`.
+- Remaining groups: `corporate_disclosures` and `market_price`.
+- Exact core-validator errors:
+  1. `EVIDENCE[605016-MEETING-CB-RESOLUTIONS-20261008]:PIT:PIT_FAIL: known_at exceeds cutoff`
+  2. `EVIDENCE[605016-PRICE-CANDIDATE-20261009]:PIT:PIT_UNKNOWN: source availability/provenance is not established`
+  3. `REQUIRED_FIELD_GROUPS_UNCOVERED:corporate_disclosures,market_price`
+
+The date-only `2026-10-09` cutoff was preserved from the original intake/case. The meeting-resolution source is factually corroborated, but its conservative known-at bound of 18:09:28 on the cutoff date is later than the core's date-only cutoff point, so that fact does not cover `corporate_disclosures` in this case. No end-of-day adjustment, required-group relaxation, or validator change was made.
+
+Acceptance run receipt summary is preserved at `evidence/real_cases/RC-CN-A-605016-20261009/SOURCE_ADJUDICATION_RUN_20261010.json`. Only machine-readable JSON outputs were uploaded; raw source documents were not re-uploaded as the result artifact.
+
 ## Unchanged B2/PIT admission result
 
 The dedicated workflow downloads the actual Attempt 10 artifact, independently re-hashes all 12 raw sources, builds the fact-level candidate manifest from this ledger and calls the core-owned, unchanged `research.b2.company_evidence.build_company_evidence_manifest` validator.
