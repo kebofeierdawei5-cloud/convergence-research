@@ -189,7 +189,7 @@ def test_curl_helper_keeps_tls_verification_and_https_redirect_only(
         assert kwargs["timeout"] == 10
         return type("Completed", (), {
             "returncode": 0,
-            "stdout": f"200\\n{url}\\napplication/pdf\\n".encode("utf-8"),
+            "stdout": f"200\n{url}\napplication/pdf\n".encode("utf-8"),
         })()
 
     monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
