@@ -49,6 +49,21 @@ Source registration resolves provenance classification only. It does not establi
 
 The request was incremented to attempt 4 after the payload-type gate landed. Append the exact run result below when completed. No admission is assumed in advance.
 
+## Attempt 4 — expected-payload-type gate against real sources
+
+- Workflow run: [38015723986](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38015723986)
+- Intake: `CAPTURED_NOT_ADMITTED`; 12/12 raw response bodies captured; 0 transport failures and 0 unregistered source refs.
+- Independent raw integrity: 12/12 byte arrays hash/size verified; payload checks: 12 checked, 3 passes, 9 mismatches.
+- Of the nine `PDF`-declared SSE sources, 8 were correctly identified as gzip-transported HTML challenge pages. The ninth was a real PDF (`%PDF-1.5`) but was falsely classified `UNKNOWN` because the detector compared uppercase PDF magic against a lowercase literal case-sensitively.
+- B2 preflight: `BLOCKED_NOT_ADMITTED`; `b2_candidate_source_count=3` (only the three HTML-page candidates), `payload_contract_failure_count=9`; all seven required groups still missing; `evidence_admission=false`, `pit_admission=false`.
+- Artifact: [11656955181](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38015723986/artifacts/11656955181).
+
+The attempt did not admit any source. It exposed a second detector defect; capture and verifier now perform case-insensitive PDF magic recognition independently and a positive regression requires a genuine `%PDF-1.7` body to pass. Do not rewrite this run's result: its 9 mismatch count reflects the buggy detector version used for Attempt 4.
+
+## Attempt 5 — PDF signature correction
+
+The capture request is incremented to attempt 5. Acceptance target: 8 HTML challenge mismatches, 1 genuine PDF pass, and 3 expected HTML page passes, with raw integrity verified for all 12 and B2 still blocked. These are expectations to verify against the next run, not assumed results.
+
 ## Explicit gate boundary
 
 All captured facts remain `NOT_ADMITTED` until issuer/exchange origin, known-at basis, license/reuse status, field-level locator, source-vintage and B2/PIT validation are independently reviewed. All seven required groups remain uncovered for decision purposes; no valuation, formal Decision Revision, publication or report is authorized by this capture record.
