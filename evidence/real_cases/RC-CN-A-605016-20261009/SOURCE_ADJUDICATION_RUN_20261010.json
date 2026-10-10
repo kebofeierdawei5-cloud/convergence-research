@@ -1,0 +1,82 @@
+{
+  "schema_version": "IIOS-ROUTE-A-SOURCE-ADJUDICATION-ACCEPTANCE-0.1",
+  "record_class": "REAL_ATTEMPT10_B2_GATE_RUN",
+  "case_id": "RC-CN-A-605016-20261009",
+  "market": "CN-A",
+  "symbol": "605016",
+  "cutoff_date": "2026-10-09",
+  "workflow": {
+    "name": "Route A 605016 Real Source Adjudication",
+    "run_id": 38030568727,
+    "result": "SUCCESS",
+    "head_sha": "aa3ef559c55335cd84bd38db43a0ae3975cc6ef6",
+    "job_name": "adjudicate-real-attempt-10",
+    "job_conclusion": "success",
+    "run_url": "https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38030568727"
+  },
+  "source_capture": {
+    "workflow_run_id": 38026139364,
+    "workflow_run_url": "https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38026139364",
+    "artifact_id": 11660285551,
+    "artifact_name": "iios-company-evidence-38026139364",
+    "artifact_size_bytes": 8526921,
+    "artifact_digest_sha256": "19916fee166b45a04430e4d2bb3131be2f0beab3140df4820793099d7d413f5c",
+    "intake_manifest_sha256": "563bc41ab2e6ce4925451fc02986f87409e06b879e3b92066d443ef6d796f244",
+    "raw_source_count": 12,
+    "raw_source_sha256_and_size_passed": 12,
+    "expected_payload_contract_passed": 12,
+    "source_origin_verified_by_capture": false
+  },
+  "adjudication_ledger": {
+    "repo_path": "evidence/real_cases/RC-CN-A-605016-20261009/SOURCE_ADJUDICATION_20261010.json",
+    "source_count": 12,
+    "fact_candidate_count": 10,
+    "source_adjudication_ledger_sha256": "UNBOUND_TO_CURRENT_BRANCH_COMMIT_UNTIL_MERGE"
+  },
+  "b2_gate": {
+    "core_validator": "research.b2.company_evidence.build_company_evidence_manifest (unchanged)",
+    "candidate_manifest_status": "BLOCKED",
+    "fact_record_count": 10,
+    "record_status_admitted_count": 9,
+    "explicit_unknown_record_count": 1,
+    "admitted_field_groups": [
+      "business_reality",
+      "capital_structure",
+      "financial_reality",
+      "security_identity",
+      "trust_governance_events"
+    ],
+    "missing_required_field_groups": [
+      "corporate_disclosures",
+      "market_price"
+    ],
+    "evidence_admission": false,
+    "pit_admission": false,
+    "validation_errors": [
+      "EVIDENCE[605016-MEETING-CB-RESOLUTIONS-20261008]:PIT:PIT_FAIL: known_at exceeds cutoff",
+      "EVIDENCE[605016-PRICE-CANDIDATE-20261009]:PIT:PIT_UNKNOWN: source availability/provenance is not established",
+      "REQUIRED_FIELD_GROUPS_UNCOVERED:corporate_disclosures,market_price"
+    ],
+    "cutoff_semantics": "Case and intake remain date-only 2026-10-09. The unchanged core treats date-only cutoff as the start of the local date; no end-of-day reinterpretation was applied.",
+    "formal_valuation_or_decision_authorized": false
+  },
+  "output_artifact": {
+    "artifact_id": 11662067708,
+    "artifact_name": "route-a-605016-source-adjudication",
+    "artifact_size_bytes": 8323,
+    "artifact_sha256": "b9fb562c0b72229f588540dfe2eab99486c37eea2472a28c88f7f2713207895e",
+    "expires_at": "2026-10-24T06:20:17Z",
+    "report_filename": "SOURCE_ADJUDICATION_RUN_REPORT.json",
+    "report_sha256": "bb6df79c3f536efe1631ca3459eec5ab5eea337d5909c02585aef56ac905bd6f",
+    "b2_manifest_filename": "SOURCE_ADJUDICATED_B2_CANDIDATE_MANIFEST.json",
+    "b2_manifest_sha256": "697a713704f85cb1f824a2cf68e3d27664bdd3e6388fe5b92c98d7586a20fb07"
+  },
+  "decision": "BLOCKED_AS_REQUIRED",
+  "next_steps": [
+    "Capture exact raw bytes of the official 2026-09-22 H1 dividend implementation notice and inspect its body.",
+    "Find and preserve an authoritative/free 2026-10-09 close-price row, then independently verify source, field/date, source vintage, PIT and reuse status.",
+    "Rerun the same unchanged B2/PIT validator; do not modify date-only cutoff semantics or required groups.",
+    "Do not run formal valuation, Decision Revision, Publication, report or Run Receipt until all seven required groups are admitted.",
+    "Production Host deployment and genuine host-origin semantic/Forecast/Valuation E2E remain separate OPEN gates."
+  ]
+}
