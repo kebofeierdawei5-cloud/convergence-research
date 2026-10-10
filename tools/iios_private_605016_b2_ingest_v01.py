@@ -584,6 +584,39 @@ def main() -> int:
             "auto_execution": False,
         }, ensure_ascii=False, indent=2))
         return 2
+    except ValueError as exc:
+        # Validation/source errors are expected blocked outcomes, not tracebacks.
+        # Emit only a stable uppercase error code; never expose source bytes or paths.
+        raw_reason = str(exc)
+        import re
+        reason = raw_reason if re.fullmatch(r"[A-Z0-9_:-]{1,160}", raw_reason) else "SOURCE_OR_VALIDATION_FAILED"
+        print(json.dumps({
+            "status": "BLOCKED",
+            "reason": reason,
+            "private_store_written": False,
+            "formal_signed_admission_created": False,
+            "production_host_accepted": False,
+            "bundle_created": False,
+            "decision_created": False,
+            "human_approval_required": True,
+            "auto_execution": False,
+        }, ensure_ascii=False, indent=2))
+        return 2
+    except Exception as exc:
+        # Fail closed without exposing a traceback, input values, or local paths.
+        print(json.dumps({
+            "status": "BLOCKED",
+            "reason": "UNEXPECTED_PRIVATE_INGEST_FAILURE",
+            "error_type": type(exc).__name__,
+            "private_store_written": False,
+            "formal_signed_admission_created": False,
+            "production_host_accepted": False,
+            "bundle_created": False,
+            "decision_created": False,
+            "human_approval_required": True,
+            "auto_execution": False,
+        }, ensure_ascii=False, indent=2))
+        return 2
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
