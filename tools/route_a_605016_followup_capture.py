@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import sys
+import time as _clock
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,8 @@ CASE_ID = "RC-CN-A-605016-20261009"
 CUTOFF_DATE = "2026-10-09"
 USER_AGENT = "IIOS-free-first-source-acquisition/0.1 (public-source provenance capture)"
 TIMEOUT_SECONDS = 8
+MAX_FETCH_SECONDS = 12
+READ_CHUNK_BYTES = 64 * 1024
 MAX_BYTES = 50 * 1024 * 1024
 
 
@@ -28,17 +31,39 @@ def fetch(url: str, *, referer: str, max_bytes: int = MAX_BYTES) -> dict[str, An
         "Accept": "*/*",
         "Referer": referer,
         "Accept-Encoding": "identity",
+        "Connection": "close",
     })
+    deadline = _clock.monotonic() + MAX_FETCH_SECONDS
     try:
         with urlopen(req, timeout=TIMEOUT_SECONDS) as response:
             status = int(getattr(response, "status", 0))
             content_type = str(response.headers.get("Content-Type", ""))
-            body = response.read(max_bytes + 1)
-            if len(body) > max_bytes:
-                return {
-                    "url": url, "http_status": status, "content_type": content_type,
-                    "status": "BLOCKED", "error": "SOURCE_EXCEEDS_MAX_BYTES",
-                }
+            chunks: list[bytes] = []
+            total = 0
+            read_once = getattr(response, "read1", None)
+            while True:
+                if _clock.monotonic() >= deadline:
+                    return {
+                        "url": url, "http_status": status, "content_type": content_type,
+                        "status": "BLOCKED", "error": "SOURCE_FETCH_DEADLINE_EXCEEDED",
+                    }
+                amount = min(READ_CHUNK_BYTES, max_bytes + 1 - total)
+                block = read_once(amount) if callable(read_once) else response.read(amount)
+                if _clock.monotonic() >= deadline:
+                    return {
+                        "url": url, "http_status": status, "content_type": content_type,
+                        "status": "BLOCKED", "error": "SOURCE_FETCH_DEADLINE_EXCEEDED",
+                    }
+                if not block:
+                    break
+                total += len(block)
+                if total > max_bytes:
+                    return {
+                        "url": url, "http_status": status, "content_type": content_type,
+                        "status": "BLOCKED", "error": "SOURCE_EXCEEDS_MAX_BYTES",
+                    }
+                chunks.append(block)
+            body = b"".join(chunks)
             return {
                 "url": url, "http_status": status, "content_type": content_type,
                 "status": "CAPTURED" if 200 <= status < 300 else "BLOCKED",
