@@ -10,7 +10,7 @@ On macOS, download the file **tools/Launch_IIOS_Private_605016_B2_Ingest.command
 1. checks for git, Python 3.12+, GitHub CLI (gh) and an authenticated GitHub CLI session;
 2. obtains canonical main source into a temporary working directory;
 3. downloads the genuine Attempt 10 artifact (run 38026139364, artifact iios-company-evidence-38026139364) into a temporary directory;
-4. re-runs the established official HTTPS dividend/price adjudicator and then the Investment Core-owned Evidence/PIT validator;
+4. re-runs the established official HTTPS dividend/price adjudicator and then the Investment Core-owned Evidence/PIT validator. If the SSE bulletin-listing API is blocked by the local network, it reuses the already adjudicated canonical listing/fact record, directly re-fetches the fixed official Big5 PDF URL over HTTPS, and requires the exact previously recorded PDF size/SHA-256 before continuing; the receipt explicitly says the original listing bytes were not re-fetched in that run;
 5. if both validators pass, atomically persists the manifest and only the raw files referenced by that manifest under:
    ~/Library/Application Support/IIOS/private-data/cases/RC-CN-A-605016-20261009/<candidate-fingerprint>/
 6. removes the temporary clone, raw download and full temporary adjudication workspace.
@@ -50,3 +50,8 @@ The tool therefore reports PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUC
 ## Verification
 
 tests/test_iios_private_605016_b2_ingest_v01.py covers exact referenced-byte persistence, private permissions, idempotence, core-validator fail-closed behavior, repository-root rejection, path traversal and official price-hash mismatch. The dedicated workflow is contract-only; it does not access the user's private machine or run the real intake.
+
+
+## Network-failure recovery added after operator report
+
+A network `BLOCKED` result from the SSE query API no longer creates an uncaught traceback or immediately abandons the run. The adjudicator may use the canonical `DIVIDEND_IMPLEMENTATION_ADJUDICATION_20261010.json` for the previously reviewed listing identity, but it must directly retrieve the official PDF again over HTTPS and match the pinned 146,499-byte SHA-256 before proceeding. It does not represent the historical listing body as re-downloaded: `listing_bytes_reverified_in_current_run=false` is included in the report. If direct PDF retrieval, TLS origin, hash or PDF structure validation fails, the run remains `BLOCKED` and no private persistent candidate is written. The local command now emits a sanitized `BLOCKED` JSON reason instead of exposing a traceback.
