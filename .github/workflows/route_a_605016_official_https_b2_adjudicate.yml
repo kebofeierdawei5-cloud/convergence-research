@@ -1,0 +1,43 @@
+name: Route A 605016 Official HTTPS Price B2 Admission
+on:
+  pull_request:
+    paths:
+      - "tools/route_a_605016_official_https_b2_adjudicate.py"
+      - ".github/workflows/route_a_605016_official_https_b2_adjudicate.yml"
+      - "research/b2/company_evidence.py"
+      - "research/b2/evidence_contract.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-official-https-price-in-ephemeral-b2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install only the PDF parser needed for official dividend verification
+        run: python -m pip install --disable-pip-version-check pypdf
+      - name: Download the captured Attempt 10 base sources
+        uses: actions/download-artifact@v4
+        with:
+          name: iios-company-evidence-38026139364
+          run-id: 38026139364
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          path: /tmp/605016-attempt10
+      - name: Verify official SSE dividend and obtain the official daily-bar over HTTPS
+        run: |
+          PYTHONPATH=. python tools/route_a_605016_official_https_b2_adjudicate.py \
+            --attempt10-root /tmp/605016-attempt10 \
+            --out-dir /tmp/605016-official-https-b2
+      - name: Upload only sanitized B2 status/hash report (not raw bytes or manifest)
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-a-605016-official-https-b2-report
+          path: /tmp/605016-official-https-b2/OFFICIAL_HTTPS_B2_ADJUDICATION_REPORT.json
+          if-no-files-found: error
+          retention-days: 7
