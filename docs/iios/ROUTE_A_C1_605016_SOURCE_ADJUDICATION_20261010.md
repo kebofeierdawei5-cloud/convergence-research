@@ -16,7 +16,7 @@ This is not an attempt to relabel the original `CAPTURED_NOT_ADMITTED` receipt. 
 ## Publication time and reuse rules
 
 - For older official SSE filings, the published **date** is supported by the official SSE-hosted archive path and the document's matching issuer name, code, title and announcement number. Exact intraday first-public times were not exposed in the accessible archive. The ledger preserves this loss of precision rather than manufacturing a timestamp. Those source dates precede the 2026-10-09 cutoff.
-- For the 2026-10-09 shareholders' meeting resolution, the official SSE-hosted PDF is dated 2026-10-09. The captured secondary article [Stockstar, timestamp 18:09:28 +08](https://wap.stockstar.com/detail/RB2026100900029140) references that same resolution. The run records 18:09:28 as a **conservative latest-known bound**, not as a claim that the SSE PDF was first published at that exact second. Under the unchanged core PIT contract, the date-only cutoff `2026-10-09` is interpreted at the start of that local date, so this event is **not eligible** for this case's cutoff; it remains a source-adjudicated fact candidate but does not cover the corporate-disclosures group.
+- For the 2026-10-09 shareholders' meeting resolution, the official SSE-hosted PDF is dated 2026-10-09. The captured secondary article [Stockstar, timestamp 18:09:28 +08](https://wap.stockstar.com/detail/RB2026100900029140) references that same resolution. The run records 18:09:28 as a **conservative latest-known bound**, not as a claim that the SSE PDF was first published at that exact second. Under the unchanged core PIT contract, the date-only cutoff `2026-10-09` is interpreted at the start of that local date, so this event is **not eligible** for this case's cutoff. It remains in the source-adjudication ledger but is excluded from the B2 candidate manifest. A separate pre-cutoff official SSE disclosure no. 2026-042 dated 2026-09-11 covers the corporate-disclosures group with the narrower fact that convertible-bond registration was still pending at that date.
 - The official SSE [legal statement](https://www.sse.com.cn/home/legal/) permits browsing/downloading for non-commercial purposes but restricts reuse/distribution without authorization. Official SSE captures are classified operationally as `RESTRICTED_NO_REDISTRIBUTION` for this internal research use; do not upload source PDFs/HTML to Git or redistribute them. Only fact-level records, locators and hashes are included in this review package.
 - Secondary-source licence/reuse has not been adjudicated. The captured price article is therefore explicitly retained as an UNKNOWN candidate, not admitted market-price evidence.
 
@@ -39,7 +39,7 @@ This is not an attempt to relabel the original `CAPTURED_NOT_ADMITTED` receipt. 
 
 ## Fact-level results and their limits
 
-The adjudication ledger contains ten fact candidates, of which nine are backed by exact official SSE filing bytes and one is a deliberately UNKNOWN price candidate. The source review yields facts for six conceptual groups, but only five pass the unchanged date-only B2/PIT cutoff in this run:
+The adjudication ledger contains eleven fact candidates: ten source-backed fact candidates from official SSE filings plus one deliberately UNKNOWN secondary price candidate. One same-day meeting fact (known at 18:09:28+08 on the cutoff date) is excluded from the B2 candidate manifest by the unchanged date-only PIT rule. Six groups pass the unchanged B2/PIT gate; market_price remains uncovered.
 
 - **Security identity:** issuer name, short name and code from the H1 report cover.
 - **Financial reality:** Q1 reported revenue/net profit/operating cash flow; H1 reported revenue/net profit/operating cash flow, with audit status preserved.
@@ -66,7 +66,7 @@ The source adjudication was executed against the **real GitHub Actions Attempt 1
   2. `EVIDENCE[605016-PRICE-CANDIDATE-20261009]:PIT:PIT_UNKNOWN: source availability/provenance is not established`
   3. `REQUIRED_FIELD_GROUPS_UNCOVERED:corporate_disclosures,market_price`
 
-The date-only `2026-10-09` cutoff was preserved from the original intake/case. The meeting-resolution source is factually corroborated, but its conservative known-at bound of 18:09:28 on the cutoff date is later than the core's date-only cutoff point, so that fact does not cover `corporate_disclosures` in this case. No end-of-day adjustment, required-group relaxation, or validator change was made.
+The date-only `2026-10-09` cutoff was preserved from the original intake/case. The meeting-resolution source is factually corroborated but excluded from the B2 manifest because its conservative known-at bound of 18:09:28 is after the cutoff instant. A pre-cutoff official 2026-09-11 disclosure now covers `corporate_disclosures`. No end-of-day adjustment, required-group relaxation, or validator change was made.
 
 Acceptance run receipt summary is preserved at `evidence/real_cases/RC-CN-A-605016-20261009/SOURCE_ADJUDICATION_RUN_20261010.json`. Only machine-readable JSON outputs were uploaded; raw source documents were not re-uploaded as the result artifact.
 
@@ -76,9 +76,9 @@ The dedicated workflow downloads the actual Attempt 10 artifact, independently r
 
 Expected fail-closed outcome:
 
-- **Five of seven groups** covered by schema-valid, source-adjudicated official Evidence Records.
-- `corporate_disclosures` and `market_price` remain uncovered.
-- Explicit validation errors: same-day shareholder resolution `PIT_FAIL`, UNKNOWN/PIT for the Stockstar price candidate, and `REQUIRED_FIELD_GROUPS_UNCOVERED:corporate_disclosures,market_price`.
+- **Six of seven groups** covered by schema-valid, source-adjudicated official Evidence Records.
+- `market_price` remains uncovered.
+- The post-cutoff meeting resolution is retained in the source ledger but excluded from the B2 candidate manifest. The only remaining core B2/PIT errors are UNKNOWN/PIT for the Stockstar price candidate and `REQUIRED_FIELD_GROUPS_UNCOVERED:market_price`.
 - Final manifest remains `BLOCKED`; `evidence_admission=false`, `pit_admission=false`.
 - No valuation, Decision Revision, Machine Publication, Investor Review Report or complete `IIOS_RUN_RECEIPT` may be produced.
 
