@@ -204,6 +204,28 @@ def test_curl_helper_keeps_tls_verification_and_https_redirect_only(
     assert response["body"] == pdf_raw
 
 
+def test_recovery_condition_requires_exact_live_notice_identity_when_listing_was_captured() -> None:
+    matching = {
+        "status": "BLOCKED_NO_VERIFIED_PDF_BYTES",
+        "listing_request": {"status": "CAPTURED"},
+        "listing_row": dict(MODULE.EXPECTED_DIVIDEND_LISTING_ROW),
+    }
+    assert MODULE._can_recover_dividend_from_prior(matching)
+
+    wrong_title = dict(matching)
+    wrong_title["listing_row"] = {**MODULE.EXPECTED_DIVIDEND_LISTING_ROW, "TITLE": "其他公告"}
+    assert not MODULE._can_recover_dividend_from_prior(wrong_title)
+
+    missing_row = dict(matching)
+    missing_row.pop("listing_row")
+    assert not MODULE._can_recover_dividend_from_prior(missing_row)
+
+    # Preserve the original listing-transport-blocked recovery route.
+    assert MODULE._can_recover_dividend_from_prior({
+        "status": "BLOCKED", "listing_request": {"status": "BLOCKED"}
+    })
+
+
 def test_all_blocked_pdf_fetch_diagnostics_are_safe_and_specific() -> None:
     blocked = MODULE.OfficialDividendPdfFetchBlocked([
         {"endpoint": "BIG5", "transport": "PYTHON_HTTPS", "outcome": "DNS_FAILURE"},
