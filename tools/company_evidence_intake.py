@@ -314,13 +314,13 @@ def _fetch_url(url: str) -> tuple[bytes, int, str]:
             total = 0
             read_once = getattr(response, "read1", None)
             while True:
-                if time.monotonic() >= deadline:
+                if _clock.monotonic() >= deadline:
                     raise SourceCaptureError("SOURCE_FETCH_DEADLINE_EXCEEDED")
                 amount = min(SOURCE_READ_CHUNK_BYTES, MAX_SOURCE_BYTES + 1 - total)
                 # read1 performs at most one underlying read, so a slow trickle
                 # cannot hide beyond the total deadline inside a 1 MiB read.
                 block = read_once(amount) if callable(read_once) else response.read(amount)
-                if time.monotonic() >= deadline:
+                if _clock.monotonic() >= deadline:
                     raise SourceCaptureError("SOURCE_FETCH_DEADLINE_EXCEEDED")
                 if not block:
                     break
