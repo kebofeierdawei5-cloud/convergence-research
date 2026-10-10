@@ -18,8 +18,14 @@ from tools.prepare_iios_local_ollama_runtime import (
 class _Handler(BaseHTTPRequestHandler):
     model_names = ["qwen3:8b"]
     version = "0.13.3"
+    redirect_version = False
 
     def do_GET(self):
+        if self.path == "/api/version" and self.redirect_version:
+            self.send_response(302)
+            self.send_header("Location", "/api/tags")
+            self.end_headers()
+            return
         if self.path == "/api/version":
             body = {"version": self.version}
             status = 200
@@ -125,3 +131,13 @@ def test_setup_refuses_missing_model(tmp_path, ollama_server):
             prepare_local_runtime(workspace=tmp_path / "x", ollama_url=ollama_server)
     finally:
         _Handler.model_names = ["qwen3:8b"]
+
+
+
+def test_setup_refuses_redirect_from_local_preflight(tmp_path, ollama_server):
+    _Handler.redirect_version = True
+    try:
+        with pytest.raises(LocalRuntimeSetupError, match="REDIRECTS_NOT_PERMITTED"):
+            prepare_local_runtime(workspace=tmp_path / "redirect", ollama_url=ollama_server)
+    finally:
+        _Handler.redirect_version = False
