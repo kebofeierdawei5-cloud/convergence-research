@@ -2,6 +2,6 @@
   "schema_version": "IIOS-COMPANY-EVIDENCE-CAPTURE-REQUEST-0.1",
   "case_id": "RC-CN-A-605016-20261009",
   "manifest_path": "manifests/company_cases/RC-CN-A-605016-20261009.json",
-  "acquisition_attempt": 7,
-  "note": "Attempt 7: rerun after fixing the datetime.time import collision. Use per-source 18s deadline, 8s socket timeout, 64 KiB read1 chunks, and the 6-minute capture-step limit. Reverify actual PDF magic and HTML challenge mismatches; no evidence/PIT admission presumed."
+  "acquisition_attempt": 8,
+  "note": "Attempt 8: both stale time.monotonic references are now _clock.monotonic; datetime.time remains intact. Use 64 KiB read1 chunks, 18s per-source deadline, 8s socket timeout and 6-minute step limit. Confirm PDF payload pass / HTML challenge mismatch and preserve fail-closed B2 status."
 }

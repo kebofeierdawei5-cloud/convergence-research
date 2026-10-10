@@ -74,9 +74,15 @@ The request was incremented to attempt 4 after the payload-type gate landed. App
 - Fix: import the monotonic clock as `_clock` and preserve `datetime.time`; regression test now patches `_clock.monotonic`.
 - The per-source 18-second deadline / 8-second read timeout is retained, and response reads now prefer `read1()` with 64 KiB blocks so a slow trickle cannot hide beyond the total deadline within a 1 MiB buffered read.
 
-## Attempt 7 — rerun after clock-collision fix
+## Attempt 7 — remaining stale clock reference found
 
-The capture request was incremented to attempt 7 after the clock import fix. The run must verify real PDF magic, detect HTML challenges, finish within the bounded capture step, preserve failed-source rows, and keep all evidence/PIT admission blocked. Results will be added only after the workflow finishes.
+- Workflow run: [38016238303](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38016238303), conclusion `failure`; artifact [11656651029](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38016238303/artifacts/11656651029).
+- The run failed before completing capture because two lines in the read loop still referenced `time.monotonic()` after the module had been renamed to `_clock`. Exact failure: `AttributeError: type object 'datetime.time' has no attribute 'monotonic'`. The receipt was not written, so verifier and B2 preflight correctly failed closed.
+- Corrective commit replaced both remaining calls with `_clock.monotonic()`. No raw-byte or admission claims are made from this failed attempt.
+
+## Attempt 8 — rerun with all clock references corrected
+
+The capture request is now attempt 8. The code path contains `_clock.monotonic()` for the start deadline and both read-loop checks, `datetime.time` remains unshadowed for PIT cutoff handling, reads prefer 64 KiB `read1()`, each source has an 18-second total deadline and 8-second socket timeout, and the workflow capture step has a six-minute hard limit. Actual capture, verifier and B2 results must be read from the next exact run; no admission is presumed.
 
 ## Explicit gate boundary
 
