@@ -395,11 +395,11 @@ def eastmoney_terms_capture(root: Path) -> dict[str, Any]:
     home_raw = home["bytes"]
     save_bytes(root, "raw/EASTMONEY-HOMEPAGE.html", home_raw)
     html = home_raw.decode("utf-8", errors="replace")
-    anchors = re.findall(r"<a\\b[^>]*href=[\\\"']([^\\\"']+)[\\\"'][^>]*>(.*?)</a>", html, flags=re.I | re.S)
+    anchors = re.findall(r"<a\b[^>]*href=['\"]([^'\"]+)['\"][^>]*>(.*?)</a>", html, flags=re.I | re.S)
     terms_candidates: list[tuple[str, str]] = []
     for href, label in anchors:
         title = re.sub(r"<[^>]+>", " ", label)
-        title = re.sub(r"\\s+", " ", title).strip()
+        title = re.sub(r"\s+", " ", title).strip()
         if re.search(r"免责声明|法律|版权|使用协议|服务协议|用户协议|隐私|数据授权|网站声明", title):
             url = urljoin(home_url, href.strip())
             if url.startswith("https://") and all(url != old[0] for old in terms_candidates):
