@@ -407,6 +407,117 @@ def public_secondary_price_capture(root: Path) -> dict[str, Any]:
     return record
 
 
+def yahoo_price_candidate_capture(root: Path) -> dict[str, Any]:
+    """Capture a keyless HTTPS daily bar as a secondary candidate only."""
+    from datetime import timedelta
+    # Include the surrounding UTC dates because chart timestamps may be UTC midnight
+    # or exchange-local midnight. Select by Shanghai-local trade date, not array position.
+    url = (
+        "https://query1.finance.yahoo.com/v8/finance/chart/605016.SS?"
+        "period1=1791331200&period2=1791590400&interval=1d&events=history"
+    )
+    result = fetch(url, referer="https://finance.yahoo.com/quote/605016.SS/history/")
+    record: dict[str, Any] = {
+        "source_id": "PRICE-YAHOO-CHART-605016",
+        "source_class": "PUBLIC_SECONDARY",
+        "url": url,
+        "expected_observation_date": "2026-10-08",
+        "secure_transport_verified": True,
+        "reuse_status": "TERMS_PENDING_REVIEW",
+        "status": "BLOCKED",
+        "capture": {k: v for k, v in result.items() if k != "bytes"},
+        "admission_note": "This HTTPS market-data response is a secondary candidate; do not admit until the exact row, cutoff and source-specific reuse terms are reviewed.",
+    }
+    if result.get("status") != "CAPTURED":
+        return record
+    raw = result["bytes"]
+    save_bytes(root, "raw/PRICE-YAHOO-CHART-605016.json", raw)
+    record["saved_path"] = "raw/PRICE-YAHOO-CHART-605016.json"
+    record["size_bytes"] = len(raw)
+    record["sha256"] = sha256(raw)
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        record["status"] = "BLOCKED_PRICE_RESPONSE_NOT_JSON"
+        record["parse_error"] = str(exc)
+        return record
+    chart = payload.get("chart") or {}
+    results = chart.get("result") or []
+    if not results:
+        record["status"] = "BLOCKED_YAHOO_CHART_HAS_NO_RESULT"
+        record["chart_error"] = chart.get("error")
+        return record
+    root_obj = results[0]
+    meta = root_obj.get("meta") or {}
+    timestamps = root_obj.get("timestamp") or []
+    indicators = root_obj.get("indicators") or {}
+    quote_sets = indicators.get("quote") or []
+    quote = quote_sets[0] if quote_sets else {}
+    rows = []
+    tz_shanghai = timezone(timedelta(hours=8))
+    for i, ts in enumerate(timestamps):
+        local_date = datetime.fromtimestamp(int(ts), tz_shanghai).date().isoformat()
+        if local_date != "2026-10-08":
+            continue
+        def at(key: str) -> Any:
+            values = quote.get(key) or []
+            return values[i] if i < len(values) else None
+        rows.append({
+            "timestamp": int(ts),
+            "trade_date_shanghai": local_date,
+            "open": at("open"),
+            "high": at("high"),
+            "low": at("low"),
+            "close": at("close"),
+            "volume": at("volume"),
+        })
+    record["meta"] = {
+        "currency": meta.get("currency"),
+        "exchange_name": meta.get("exchangeName"),
+        "full_exchange_name": meta.get("fullExchangeName"),
+        "instrument_type": meta.get("instrumentType"),
+        "exchange_timezone": meta.get("exchangeTimezoneName"),
+        "symbol": meta.get("symbol"),
+    }
+    record["matched_rows"] = rows
+    if len(rows) != 1 or meta.get("currency") not in (None, "CNY") or meta.get("symbol") != "605016.SS":
+        record["status"] = "BLOCKED_YAHOO_ROW_OR_INSTRUMENT_BINDING_MISMATCH"
+    else:
+        record["status"] = "HTTPS_SECONDARY_PRICE_CANDIDATE_NOT_ADMITTED"
+    return record
+
+
+def yahoo_terms_capture(root: Path) -> dict[str, Any]:
+    url = "https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html"
+    result = fetch(url, referer="https://finance.yahoo.com/")
+    record: dict[str, Any] = {
+        "source_id": "YAHOO-PUBLIC-TERMS-REVIEW",
+        "source_class": "PUBLIC_SECONDARY_PROVIDER_TERMS",
+        "url": url,
+        "status": "TERMS_NOT_ADJUDICATED",
+        "capture": {k: v for k, v in result.items() if k != "bytes"},
+    }
+    if result.get("status") != "CAPTURED":
+        return record
+    raw = result["bytes"]
+    save_bytes(root, "raw/YAHOO-TERMS.html", raw)
+    text = re.sub(r"<[^>]+>", " ", raw.decode("utf-8", errors="replace"))
+    text = re.sub(r"\\s+", " ", text)
+    record["saved_path"] = "raw/YAHOO-TERMS.html"
+    record["size_bytes"] = len(raw)
+    record["sha256"] = sha256(raw)
+    excerpts = []
+    for match in re.finditer(r"personal|non-commercial|reproduce|redistribute|content|data|third party|permission|commercial", text, flags=re.I):
+        excerpt = text[max(0, match.start()-100):min(len(text), match.end()+180)]
+        if excerpt not in excerpts:
+            excerpts.append(excerpt)
+        if len(excerpts) >= 10:
+            break
+    record["terms_text_excerpts"] = excerpts
+    record["status"] = "TERMS_CAPTURED_NEEDS_REVIEW"
+    return record
+
+
 def eastmoney_terms_capture(root: Path) -> dict[str, Any]:
     """Capture public Eastmoney legal/terms pages for a reuse review; this does not admit price data."""
     home_url = "https://www.eastmoney.com/"
@@ -501,8 +612,12 @@ def main() -> int:
     report["sources"].append(official_price)
     price = public_secondary_price_capture(out)
     report["sources"].append(price)
+    yahoo_price = yahoo_price_candidate_capture(out)
+    report["sources"].append(yahoo_price)
     terms = eastmoney_terms_capture(out)
     report["sources"].append(terms)
+    yahoo_terms = yahoo_terms_capture(out)
+    report["sources"].append(yahoo_terms)
     report["raw_files"] = []
     for p in sorted((out / "raw").glob("*")) if (out / "raw").exists() else []:
         data = p.read_bytes()
@@ -520,6 +635,9 @@ def main() -> int:
         "dividend_final_pdf_url": dividend.get("final_pdf_url"),
         "official_price_status": official_price.get("status"),
         "official_price_matches": official_price.get("matches"),
+        "yahoo_price_status": yahoo_price.get("status"),
+        "yahoo_price_rows": yahoo_price.get("matched_rows"),
+        "yahoo_terms_status": yahoo_terms.get("status"),
         "price_status": price.get("status"),
         "price_rows": price.get("matched_rows"),
         "raw_files": report["raw_files"],
