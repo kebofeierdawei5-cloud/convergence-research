@@ -179,6 +179,15 @@ def test_expected_pdf_http_200_gzip_html_challenge_is_retained_but_payload_block
         "error_code": "EXPECTED_PDF_RECEIVED_HTML_OR_ACCESS_CHALLENGE",
     }]
 
+    # A caller cannot relabel the persisted challenge bytes as a valid PDF.
+    receipt_path = out / "COMPANY_EVIDENCE_INTAKE_RECEIPT.json"
+    tampered = json.loads(receipt_path.read_text(encoding="utf-8"))
+    tampered["sources"][0]["payload_contract_status"] = "PASS"
+    tampered["sources"][0]["payload_contract_error"] = None
+    receipt_path.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(IndependentVerificationError, match="PAYLOAD_CONTRACT_STATUS_MISMATCH"):
+        verify_intake(out)
+
 
 def test_missing_known_at_remains_unknown_and_cannot_admit(tmp_path):
     _, out, receipt = run_capture(tmp_path, source_overrides={"known_at": None, "known_at_basis": ""})
