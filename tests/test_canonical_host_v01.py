@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+from email.message import Message
 from pathlib import Path
 import subprocess
 from types import SimpleNamespace
@@ -67,11 +68,12 @@ def _request(handler, *, method, path, body=b"", token=None, content_type="appli
     instance = object.__new__(handler)
     instance.command = method
     instance.path = path
-    instance.headers = {
-        "Content-Type": content_type,
-        "Content-Length": str(len(body)),
-        **({"Authorization": f"Bearer {token}"} if token else {}),
-    }
+    headers = Message()
+    headers["Content-Type"] = content_type
+    headers["Content-Length"] = str(len(body))
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    instance.headers = headers
     instance.rfile = io.BytesIO(body)
     instance.wfile = io.BytesIO()
     instance.request_version = "HTTP/1.1"
