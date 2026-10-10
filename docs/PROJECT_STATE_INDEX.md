@@ -31,7 +31,7 @@ B2-F Full Independent Red-team                          PASS / CANONICAL
 **The company-level Investment Core MVP does NOT require an external LLM provider endpoint, paid search API, or API key.** Free-first Route A remains independent of optional provider integration. The remaining critical gates are production-runtime registration/deployment and actual source-by-source Evidence/PIT admission.
 
 - Batch B: the first-party loopback-first HTTP host is now implemented in canonical main (PR #270) with 21/21 dedicated host contract tests. It is **not yet a deployed/production-accepted host**: a trusted runtime factory and genuine semantic callback must be provisioned, and a real host-origin run must be replay-verified.
-- Primary C1 case: `RC-CN-A-605016-20261009` remains blocked. Raw capture succeeded on attempt 8, but 8/12 payloads were format mismatches and none are promoted to admitted facts; all seven required field groups remain uncovered.
+- Primary C1 case: `RC-CN-A-605016-20261009` remains blocked on source-origin/PIT admission, not transport. Current-main refresh PR #272 merged at `2978cdbc3f76f1ab1596896e3425c75661144a57`; Attempt 10 run #38026139364 / artifact #11660285551 captured 12/12 sources, independent byte/hash verification 12/12, payload contract 12/12, zero transport failures. Source origin remains unverified, one source has unknown PIT timing, all seven required groups remain uncovered, and Evidence/PIT admission remains false.
 - Parallel C2 case: 新和成 (002001.SZ) still requires source-by-source B2/PIT adjudication, missing-field capture and authoritative 2026-10-09 market-price evidence.
 - A successful CI, byte hash, URL/title match, or payload format check is not source-origin proof or PIT admission.
 
@@ -49,6 +49,18 @@ Status: **HOST CODE MERGED / DEDICATED CONTRACT PASS / PRODUCTION RUNTIME + DEPL
 - Security defaults: loopback binding, bearer token of at least 32 characters, no shell for subprocess execution, no stderr disclosure; remote bind requires explicit opt-in and declared TLS termination.
 - `/readyz` is deliberately `CONFIGURED_NOT_PRODUCTION_ACCEPTED`. Host CI proves implementation/control-flow boundaries only, not a deployed service, real runtime factory, live semantic response or company decision quality.
 - P0-LLM-001 / P0-LLM-004 remain **OPEN** until a configured/deployed host executes a real company run with admitted evidence, authentic semantic/forecast/valuation lineage, report/publication, Run Receipt replay and independent red-team.
+
+### Route A C1 — 605016 canonical-main capture refresh — 2026-10-10
+
+Status: **RAW CAPTURE + INDEPENDENT INTEGRITY PASS / SOURCE-ORIGIN + EVIDENCE/PIT ADMISSION BLOCKED**.
+
+- PR #272 merged at `2978cdbc3f76f1ab1596896e3425c75661144a57`; exact accepted PR head `e8209d5de74a034db11b06574577bc8653759cdd`.
+- Canonical-main capture run #38026139364: [workflow](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38026139364), artifact #11660285551 (8,526,921 bytes; temporary Actions retention).
+- Exact result: 12/12 source bodies captured; 0 transport failures; 0 unregistered source refs; 12/12 independently recomputed size/SHA checks PASS; 12/12 declared payload types PASS.
+- Correct states: `CAPTURED_NOT_ADMITTED`, `INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION`, and `CAPTURE_COMPLETE_NOT_ADMITTED`.
+- Independent verifier states `source_origin_verified=false`; one source has unknown PIT timing. Unchanged B2 preflight is `BLOCKED_NOT_ADMITTED`; all seven required field groups remain uncovered, `evidence_admission=false`, `pit_admission=false`.
+- Audit: `docs/iios/ROUTE_A_C1_605016_ATTEMPT10_ADJUDICATION_20261010.md`; full attempt ledger: `evidence/real_cases/RC-CN-A-605016-20261009/ROUTE_A_CAPTURE_ATTEMPTS_20261010.md`.
+- Non-claim: 12 verified byte objects do not equal 12 true facts; the result does not permit valuation, Decision Revision, publication/report or `IIOS_RUN_RECEIPT`.
 
 ### P0 Canonical Entry Incident — Batch 0
 
@@ -178,7 +190,7 @@ Therefore:
 
 ### Current next development batch
 
-**Current execution plan:** `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md`, refreshed against `main@b26e3e071eec7e145c46d4bef8a6f206439be1c2`. Batch A and runtime-binding validation are complete (PR #262: 24/24; PR #264: 16/16 exact-head workflows PASS). **Batch B1 — repository CLI host integration — is merged** (PR #267, 13/13 dedicated P0 tests and workflow checks PASS). Batch B2 remains blocked on identifying a real deployable user-facing host and registering a genuine production runtime; a repository-level CLI test is not proof of an external app deployment or live LLM. Continue C1's real 605016 evidence chain as the primary data critical path and source-adjudication for 新和成 (002001.SZ) in parallel. Unadmitted facts remain UNKNOWN; Route A does not depend on API credentials.
+**Current execution plan:** `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md`, refreshed against `main@2978cdbc3f76f1ab1596896e3425c75661144a57`. Batch B first-party HTTP host implementation is merged (PR #270; dedicated host tests 21/21 PASS) but production runtime/deployment acceptance remains OPEN. Route A C1 current-main capture refresh is merged (PR #272) and Attempt 10 passed 12/12 raw-byte/hash and 12/12 payload checks, while B2/PIT remains correctly `BLOCKED_NOT_ADMITTED`. Continue source-by-source issuer-origin, PIT and reuse adjudication for 605016; continue 002001 source adjudication in parallel. Unadmitted facts remain UNKNOWN; Route A does not depend on API credentials.
 
 The primary Investment Core MVP path is **Route A — free-first single-company evidence intake + public web discovery**. No LLM provider endpoint or API key is required for this Route A path. Public-web discovery, public-source capture, B2 preflight and artifact retention all run without an external LLM endpoint, paid search API or API key. Operator-supplied raw originals and manually supplied evidence remain supported when public URLs are unavailable or source bytes need to be supplied directly. B2-D remains an optional external-LLM integration adapter and is not an MVP gate.
 

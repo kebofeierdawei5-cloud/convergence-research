@@ -1,7 +1,7 @@
 # IIOS Batch Execution Plan — Refreshed 2026-10-10
 
 **Plan class:** execution plan / canonical-main recovery  
-**Authority baseline:** `main@d8c5b41e13185c365314adacae1449255b8e0eaf`  
+**Authority baseline:** `main@2978cdbc3f76f1ab1596896e3425c75661144a57`  
 **State authority:** `docs/PROJECT_STATE_INDEX.md`  
 **Purpose:** move IIOS from validated control-plane code to a real, fail-closed, single-company research run without making external LLM API credentials a Route A prerequisite.
 
@@ -72,7 +72,7 @@ E. Independent red-team + full Run Receipt replay
 F. MVP acceptance decision (not trade execution)
 ```
 
-**Critical path:** PR #262 + PR #264 + PR #267 (CLI-only integration) → B2 production host discovery/runtime registration → 605016 source evidence and PIT admission → one real canonical run → independent red-team/replay.
+**Critical path:** PR #270 first-party HTTP host implementation → trusted real-runtime factory/configuration and deployment acceptance → PR #272 current-main 605016 capture refresh → issuer-origin/license/PIT fact admission → one real canonical run → report/Run Receipt replay → independent red-team.
 
 The 新和成 case is a parallel Route A proving ground because its real raw-source bundle and fact-extraction candidates already exist. It must not block the original 605016 P0 acceptance, and it must not be relabeled admitted merely because source capture and PDF text matching succeeded.
 
@@ -139,24 +139,29 @@ This closes the repository-CLI route/persistence integration test gap only.
 
 ### Batch C1 — actual 605016 (百龙创园) source bundle and B2/PIT admission
 
-**Status:** BLOCKED on new evidence artifacts; the P0 synthetic E2E is not a real company case.
+**Status:** **CURRENT-MAIN RAW CAPTURE/INTEGRITY PASS / SOURCE-ORIGIN + EVIDENCE/PIT NOT ADMITTED**.
 
-**Actions**
-1. Create a case-specific source manifest for `RC-CN-A-605016-20261009` (or the exact canonical Case ID required by the current schema) using only official/free sources and operator-supplied originals if necessary.
-2. Cover all seven mandatory groups: `security_identity`, `market_price`, `corporate_disclosures`, `business_reality`, `financial_reality`, `capital_structure`, `trust_governance_events`.
-3. For every source: retain exact bytes; record content length and SHA-256; identify source class and locator; capture published/known/effective times and their basis; preserve the source's reuse/license status; extract facts with page/table/row-level locators.
-4. Verify raw bytes independently, create fact-level Evidence Records, run the unchanged B2 Evidence/PIT validator and fresh independent red-team. `UNKNOWN` must not cover a required group.
-5. Where an official public source cannot provide the necessary time/version facts, capture an operator-supplied original and preserve its operator-supplied provenance. Do not backfill dates from current web-page retrieval time.
+**Canonical implementation and actual capture**
+- PR #272 merged at `2978cdbc3f76f1ab1596896e3425c75661144a57`; exact accepted PR head `e8209d5de74a034db11b06574577bc8653759cdd`.
+- Case: `RC-CN-A-605016-20261009`; cutoff `2026-10-09`; source manifest: `manifests/company_cases/RC-CN-A-605016-20261009.json`.
+- Attempt 10 workflow #38026139364 succeeded against current-main-refresh code; artifact #11660285551 (8,526,921 bytes; retained temporarily under Actions retention).
+- 12/12 response bodies captured; 0 failed sources; 0 unregistered refs; 12/12 independent byte-size/SHA checks passed; 12/12 expected-payload contracts passed; 0 mismatches.
+- Independent status: `INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION`; `source_origin_verified=false`; one source has unknown PIT timing.
+- B2 preflight: `BLOCKED_NOT_ADMITTED`; all seven field groups uncovered; `evidence_admission=false`, `pit_admission=false`.
 
-**Price-date correction.** The official 2026 exchange calendar says the A-share market closed October 1–7 and resumed October 8. Therefore for a cutoff of **2026-10-09**, the intended latest-trading-date observation is the **2026-10-09 close**, subject to exact source verification—not the September 30 close used in the earlier 2026-10-07 PILOT-02 test. Keep the two cutoffs and their receipts separate. Official calendar sources:
-- SZSE 2026 trading calendar: https://investor.szse.cn/English/services/trading/calendar/index.html
-- SSE holiday notice dated 2026-09-17: https://www.sse.org.cn/disclosure/notice/general/t20260917_622911.html
+**Next actions — fact-level adjudication, not more capture-only changes**
+1. Preserve Artifact #11660285551 beyond the temporary Actions window, keeping intake receipt, manifest hash, exact source hashes and ledger together; do not claim permanent retention until a durable copy is confirmed.
+2. For every object, re-open exact bytes and recompute hash/size; confirm issuer/exchange identity, title, stock code, report/announcement number, period and date from document body; retain page/table/row locators.
+3. Verify first-public/known-at from an official source-backed index/event record, not retrieval time or URL date alone. Keep the unknown source as UNKNOWN.
+4. Review reuse/licensing separately from public accessibility; unresolved `PUBLIC_ACCESS_REUSE_UNKNOWN` remains explicit.
+5. Resolve the cutoff-correct 2026-10-09 closing price. Stockstar's reported CNY 20.28 close is a secondary cross-check only pending exact-byte capture and adjudication; do not use the 2026-09-30 close by default.
+6. Create fact-level B2 Evidence Records only for individually adjudicated facts; run unchanged B2/PIT validator and fresh independent red-team. A source group is covered only by admitted facts, never by captured source count.
 
-**Pass criteria**
-- all seven required groups have at least one individually valid, source-bound, case-bound and PIT-qualified `ADMITTED` evidence record;
-- the manifest's raw artifacts re-verify from bytes, not caller-supplied hash declarations alone;
-- case ID, symbol, company, cutoff and source identity are consistent;
-- no report valuation/decision proceeds while a required group remains uncovered or UNKNOWN.
+Audit record: `docs/iios/ROUTE_A_C1_605016_ATTEMPT10_ADJUDICATION_20261010.md`; full attempt history: `evidence/real_cases/RC-CN-A-605016-20261009/ROUTE_A_CAPTURE_ATTEMPTS_20261010.md`.
+
+**Decision gate:** Until all seven groups are covered by valid, case-bound and PIT-qualified `ADMITTED` Evidence Records, D1 may not produce formal valuation, expectation-gap decision, report/publication or complete `IIOS_RUN_RECEIPT`. Do not convert capture/integrity PASS into an economic-analysis PASS.
+
+**Price-date correction:** the exchange was closed Oct 1–7 and resumed Oct 8; cutoff Oct 9 requires the Oct 9 close when exact source verification is available. Keep the Oct 7 PILOT cutoff and Sep 30 price receipt separate.
 
 ### Batch C2 — finish Route A evidence adjudication for 新和成 (002001.SZ)
 
@@ -237,6 +242,6 @@ The red-team must test both negative bypasses and one end-to-end positive real c
 
 1. Batch A and the canonical host code are merged. PR #262 passed 24/24, PR #264 passed 16/16, PR #267 passed 13/13 dedicated P0 tests, and PR #270 passed 21/21 dedicated host contract tests plus 8/8 exact-head checks.
 2. Batch B is now implemented at the in-repo host boundary; production deployment/runtime/semantic acceptance remains blocked until the operator environment provisions the trusted factory and real data/runtime records. Do not infer production acceptance from host CI.
-3. Continue C1 (605016) source-origin/PIT adjudication and repair the stale capture PR into a current-main exact-head evidence-acquisition PR; run C2 (002001) source adjudication in parallel.
+3. Continue C1 (605016) source-origin/license/PIT fact adjudication using Attempt 10 artifact #11660285551 and preserve all UNKNOWN states; run C2 (002001) source adjudication in parallel.
 4. Only after the seven evidence groups and PIT admission pass, execute D1/D2 real canonical runs and complete receipt replay.
 5. Finish with independent red-team and explicit MVP acceptance; keep P0-LLM-001/P0-LLM-004 OPEN until a production-backed real-company conformance run passes.
