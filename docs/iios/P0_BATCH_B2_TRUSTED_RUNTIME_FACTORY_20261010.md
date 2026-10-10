@@ -15,9 +15,10 @@ Required existing provider-neutral variables:
 - `IIOS_LLM_PROVIDER_BASE_URL`: HTTPS URL for an OpenAI Responses-compatible endpoint.
 - `IIOS_LLM_PROVIDER_MODEL`, `IIOS_LLM_PROVIDER_ID`, `IIOS_LLM_PROVIDER_VERSION`, `IIOS_LLM_PROVIDER_PROTOCOL=OPENAI_RESPONSES`.
 - `IIOS_LLM_PROVIDER_RUNTIME_PRIVATE_KEY_B64`: 32-byte Ed25519 runtime attestation key, stored only in deployment secret storage.
+- `IIOS_LLM_PROVIDER_RUNTIME_PUBLIC_KEY_B64`: separately pinned 32-byte public key. Startup derives the public key from the configured private key and rejects mismatched keypairs; every captured receipt must match this pin before downstream semantic admission.
 - `IIOS_LLM_PROVIDER_AUTH_MODE=NONE` and no `IIOS_LLM_PROVIDER_API_KEY` may be used for a self-hosted, HTTPS-protected model endpoint. If bearer auth is selected, a key is required by that provider's own deployment. The production factory currently requires HTTPS because the independent provider verifier requires HTTPS; use a verified TLS endpoint/reverse proxy for local model services rather than disabling TLS verification.
 
-The runtime calls the actual provider at execution time. It writes a signed raw provider receipt to the immutable `<output_root>/live-provider-evidence/` store for each request-intent and semantic call, independently verifies the receipt, then parses strict JSON. Extra fields, schema drift, instrument/cutoff mismatch, non-finite numbers, non-JSON output, refusal and incomplete provider responses block the run. Provider output still passes the existing deterministic semantic admission and cannot set action/authority fields.
+The runtime calls the actual provider at execution time. It writes a signed raw provider receipt to the immutable `<output_root>/live-provider-evidence/` store for each request-intent and semantic call, independently verifies the receipt and checks the attested public key against the configured pin before parsing strict JSON. Extra fields, schema drift, instrument/cutoff mismatch, non-finite numbers, non-JSON output, refusal and incomplete provider responses block the run. Provider output still passes the existing deterministic semantic admission and cannot set action/authority fields.
 
 ## Admission-store layout
 
