@@ -1,0 +1,53 @@
+name: Cleanup Restricted 605016 Source Capture Artifacts
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cleanup_605016_restricted_source_artifacts.yml"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  delete-source-capture-artifacts:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Delete superseded raw 605016 follow-up source artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          artifact_ids=(
+            11663699848
+            11665092106
+            11665242309
+            11664882557
+            11665325853
+            11665610580
+            11664868356
+            11664868816
+            11665756093
+            11664729821
+          )
+          for artifact_id in "${artifact_ids[@]}"; do
+            response_file="$(mktemp)"
+            status="$(curl --silent --show-error \
+              --output "$response_file" \
+              --write-out "%{http_code}" \
+              --request DELETE \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$GH_REPOSITORY/actions/artifacts/$artifact_id")"
+            if [ "$status" = "204" ] || [ "$status" = "404" ]; then
+              echo "Artifact $artifact_id deleted or already absent (HTTP $status)."
+            else
+              cat "$response_file"
+              echo "Artifact deletion failed for $artifact_id (HTTP $status)." >&2
+              exit 1
+            fi
+          done
