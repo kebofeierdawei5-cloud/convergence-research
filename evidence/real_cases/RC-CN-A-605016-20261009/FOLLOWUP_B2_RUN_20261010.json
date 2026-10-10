@@ -77,6 +77,13 @@
       "Section VIII: prior written permission is required to copy, modify, reprint, disseminate or otherwise distribute site content.",
       "Section X: market quotes may not be copied, disseminated, rebroadcast, demonstrated or otherwise distributed without prior written consent from the Shanghai/Shenzhen Stock Exchanges."
     ],
-    "decision": "Do not use the Eastmoney price payload as an admitted B2 evidence row without written permission; retain the citation/hash only as a non-admitted diagnostic cross-check."
+    "decision": "Do not use the Eastmoney price payload as an admitted B2 evidence row without written permission; retain the citation/hash only as a non-admitted diagnostic cross-check.",
+    "status": "TERMS_REVIEWED_SOURCE_REUSE_BLOCKED",
+    "reviewed_at": "2026-10-10",
+    "terms_url": "https://about.eastmoney.com/home/legal",
+    "terms_sha256": "2f669b80d2ca640e0d4f2995c3cdbb77c4abc4c150e761492f2aab44b06d78ca",
+    "terms_size_bytes": 12905,
+    "disposition": "EXCLUDED_FROM_B2_ADMISSION_WITHOUT_WRITTEN_PERMISSION",
+    "non_legal_advice_note": "Project source-admission decision based on captured terms; not legal advice."
   }
 }
