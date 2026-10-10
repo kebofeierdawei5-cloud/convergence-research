@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import date, datetime, time, timedelta, timezone
+import gzip
 import hashlib
 import json
 import re
@@ -136,6 +137,50 @@ def _validate_source_url(url: str) -> None:
             raise IntakeError("POSSIBLE_CREDENTIAL_IN_SOURCE_URL")
 
 
+def _payload_bytes_for_validation(content: bytes) -> bytes:
+    """Decode transport-level gzip only for sniffing; retained raw bytes never change."""
+    if content.startswith(b"\\x1f\\x8b"):
+        try:
+            return gzip.decompress(content)
+        except OSError:
+            return content
+    return content
+
+
+def _payload_contract_status(
+    expected_payload_type: Any,
+    content: bytes,
+    content_type: str | None = None,
+) -> tuple[str, str | None]:
+    """Check file-type contract without promoting payload to factual evidence."""
+    expected = _text(expected_payload_type).upper()
+    if not expected or expected == "ANY":
+        return "NOT_CHECKED", None
+    decoded = _payload_bytes_for_validation(content)
+    prefix = decoded[:8192].lstrip(b"\\xef\\xbb\\xbf\\x00\\t\\r\\n ")
+    lowered = prefix[:4096].lower()
+    if b"%pdf-" in prefix[:1024]:
+        actual = "PDF"
+    elif (
+        lowered.startswith(b"<!doctype html")
+        or lowered.startswith(b"<html")
+        or b"<html" in lowered
+        or b"<script" in lowered
+    ):
+        actual = "HTML"
+    else:
+        try:
+            json.loads(decoded.decode("utf-8-sig"))
+            actual = "JSON"
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            actual = "UNKNOWN"
+    if actual == expected:
+        return "PASS", None
+    if expected == "PDF" and actual == "HTML":
+        return "MISMATCH", "EXPECTED_PDF_RECEIVED_HTML_OR_ACCESS_CHALLENGE"
+    return "MISMATCH", f"EXPECTED_{expected}_RECEIVED_{actual}"
+
+
 def validate_manifest(manifest: Any) -> dict[str, Any]:
     if not isinstance(manifest, dict):
         raise IntakeError("MANIFEST_MUST_BE_OBJECT")
@@ -174,6 +219,9 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
             raise IntakeError("SOURCE_REF_REQUIRED")
         if source.get("source_class") not in SOURCE_CLASSES:
             raise IntakeError("INVALID_SOURCE_CLASS")
+        expected_payload_type = _text(source.get("expected_payload_type")).upper()
+        if expected_payload_type and expected_payload_type not in {"PDF", "HTML", "JSON", "ANY"}:
+            raise IntakeError("INVALID_EXPECTED_PAYLOAD_TYPE")
         if source.get("license_status") not in LICENSE_STATUSES:
             raise IntakeError("INVALID_OR_MISSING_LICENSE_STATUS")
         remote = _text(source.get("url"))
@@ -326,6 +374,9 @@ def capture_sources(
             "effective_from": source.get("effective_from"),
             "effective_to": source.get("effective_to"),
             "license_status": source["license_status"],
+            "expected_payload_type": _text(source.get("expected_payload_type")).upper() or "ANY",
+            "payload_contract_status": "NOT_CHECKED",
+            "payload_contract_error": None,
             "attempted_at": attempted_at,
             "capture_status": "FAILED",
             "raw_artifact_path": None,
@@ -355,6 +406,12 @@ def capture_sources(
                 "sha256": sha256_bytes(content),
                 "http_status": http_status,
                 "content_type": content_type,
+                "payload_contract_status": _payload_contract_status(
+                    source.get("expected_payload_type"), content, content_type
+                )[0],
+                "payload_contract_error": _payload_contract_status(
+                    source.get("expected_payload_type"), content, content_type
+                )[1],
                 "retrieved_at": datetime.now(timezone.utc).isoformat(),
                 "pit_status": _pit_candidate_status(source, cutoff),
             })
@@ -426,6 +483,11 @@ def main() -> int:
         {"source_id": row["source_id"], "source_ref": row.get("source_ref")}
         for row in rows if row.get("source_registry_status") == "UNREGISTERED"
     ]
+    payload_mismatches = [
+        {"source_id": row["source_id"], "expected_payload_type": row.get("expected_payload_type"),
+         "error_code": row.get("payload_contract_error")}
+        for row in rows if row.get("payload_contract_status") == "MISMATCH"
+    ]
     print(json.dumps({
         "status": receipt["status"],
         "admission_status": receipt["admission_status"],
@@ -434,6 +496,7 @@ def main() -> int:
         "failed": len(failed_sources),
         "failed_sources": failed_sources,
         "unregistered_sources": unregistered_sources,
+        "payload_mismatches": payload_mismatches,
         "receipt": str(Path(args.out) / "COMPANY_EVIDENCE_INTAKE_RECEIPT.json"),
     }, ensure_ascii=False, sort_keys=True))
     return 0 if receipt["status"] == "CAPTURED_NOT_ADMITTED" else 4
