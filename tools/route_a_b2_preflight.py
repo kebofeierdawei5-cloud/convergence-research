@@ -188,7 +188,9 @@ def run_route_a_b2_preflight(
     raw_artifacts = []
     source_rows = []
     raw_groups = set()
+    payload_contract_pass_groups = set()
     uncaptured_count = 0
+    payload_contract_failure_count = 0
 
     for row in rows:
         if not isinstance(row, dict):
@@ -198,21 +200,30 @@ def run_route_a_b2_preflight(
         if spec is None:
             raise RouteAB2PreflightError("ROUTE_A_SOURCE_SPEC_NOT_FOUND")
         capture_status = row.get("capture_status")
+        payload_status = row.get("payload_contract_status", "NOT_CHECKED")
+        payload_error = row.get("payload_contract_error")
+        expected_payload_type = row.get("expected_payload_type", "ANY")
         if capture_status == "SUCCESS":
-            evidence = _source_evidence_record(
-                case_id=case_id,
-                source_spec=spec,
-                receipt_row=row,
-            )
-            evidence_records.append(evidence)
-            raw_artifacts.append({
-                "evidence_id": evidence["evidence_id"],
-                "relative_path": row["raw_artifact_path"],
-                "expected_size_bytes": row["size_bytes"],
-                "expected_sha256": row["sha256"],
-            })
             raw_groups.add(str(row["field_group"]))
-            b2_evidence_status = "UNKNOWN"
+            if payload_status == "MISMATCH":
+                payload_contract_failure_count += 1
+                b2_evidence_status = "PAYLOAD_CONTRACT_MISMATCH_NO_FACT_RECORD"
+            else:
+                evidence = _source_evidence_record(
+                    case_id=case_id,
+                    source_spec=spec,
+                    receipt_row=row,
+                )
+                evidence_records.append(evidence)
+                raw_artifacts.append({
+                    "evidence_id": evidence["evidence_id"],
+                    "relative_path": row["raw_artifact_path"],
+                    "expected_size_bytes": row["size_bytes"],
+                    "expected_sha256": row["sha256"],
+                })
+                if payload_status == "PASS":
+                    payload_contract_pass_groups.add(str(row["field_group"]))
+                b2_evidence_status = "UNKNOWN"
         elif capture_status == "FAILED":
             uncaptured_count += 1
             b2_evidence_status = "NO_RECORD_NO_RAW_BYTES"
@@ -226,6 +237,9 @@ def run_route_a_b2_preflight(
             "size_bytes": row.get("size_bytes"),
             "sha256": row.get("sha256"),
             "error_code": row.get("error_code"),
+            "expected_payload_type": expected_payload_type,
+            "payload_contract_status": payload_status,
+            "payload_contract_error": payload_error,
             "b2_evidence_status": b2_evidence_status,
             "declared_known_at": spec.get("known_at") or None,
             "declared_known_at_basis": spec.get("known_at_basis") or None,
@@ -259,11 +273,19 @@ def run_route_a_b2_preflight(
         b2_manifest_sha256 = b2_manifest["audit"]["manifest_sha256"]
         preflight_status = "BLOCKED_NOT_ADMITTED"
     else:
-        # No raw bytes means no Evidence Records can safely be constructed.
-        b2_manifest_status = "NOT_BUILT_NO_RAW_BYTES"
-        b2_manifest_sha256 = None
-        b2_validation_errors = ["NO_CAPTURED_RAW_BYTES"]
-        preflight_status = "BLOCKED_NO_RAW_BYTES"
+        raw_success_count = sum(1 for row in rows if isinstance(row, dict) and row.get("capture_status") == "SUCCESS")
+        if raw_success_count > 0 and payload_contract_failure_count > 0:
+            # Raw response bytes exist, but all candidate content failed its declared type contract.
+            b2_manifest_status = "NOT_BUILT_NO_VALID_PAYLOADS"
+            b2_manifest_sha256 = None
+            b2_validation_errors = ["NO_PAYLOAD_CONTRACT_PASS_SOURCES"]
+            preflight_status = "BLOCKED_NOT_ADMITTED"
+        else:
+            # No raw bytes means no Evidence Records can safely be constructed.
+            b2_manifest_status = "NOT_BUILT_NO_RAW_BYTES"
+            b2_manifest_sha256 = None
+            b2_validation_errors = ["NO_CAPTURED_RAW_BYTES"]
+            preflight_status = "BLOCKED_NO_RAW_BYTES"
 
     missing_groups = sorted(REQUIRED_COMPANY_FIELD_GROUPS)
     for item in b2_validation_errors:
@@ -285,7 +307,10 @@ def run_route_a_b2_preflight(
         "declared_source_count": len(rows),
         "captured_source_count": len(evidence_records),
         "uncaptured_source_count": uncaptured_count,
+        "payload_contract_failure_count": payload_contract_failure_count,
+        "b2_candidate_source_count": len(evidence_records),
         "groups_with_raw_bytes": sorted(raw_groups),
+        "groups_with_payload_contract_pass": sorted(payload_contract_pass_groups),
         "admitted_field_groups": [],
         "missing_required_field_groups": missing_groups,
         "b2_manifest_status": b2_manifest_status,
@@ -298,6 +323,7 @@ def run_route_a_b2_preflight(
         "sources": source_rows,
         "contract": {
             "raw_capture_does_not_equal_fact_admission": True,
+            "payload_contract_mismatch_is_not_b2_evidence": True,
             "declared_known_at_is_never_promoted_by_this_preflight": True,
             "only_admitted_pit_qualified_records_cover_required_groups": True,
             "not_an_investment_decision": True,
