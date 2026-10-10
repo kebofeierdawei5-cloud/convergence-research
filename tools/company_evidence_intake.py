@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import json
 import re
+import time
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
@@ -16,6 +17,8 @@ TOOL_VERSION = "IIOS-COMPANY-EVIDENCE-INTAKE-0.1"
 MANIFEST_SCHEMA = "IIOS-COMPANY-EVIDENCE-INTAKE-MANIFEST-0.1"
 RECEIPT_SCHEMA = "IIOS-COMPANY-EVIDENCE-INTAKE-RECEIPT-0.1"
 MAX_SOURCE_BYTES = 50 * 1024 * 1024
+MAX_SOURCE_CAPTURE_SECONDS = 18
+SOURCE_READ_TIMEOUT_SECONDS = 8
 MAX_SOURCES = 100
 UTC_PLUS_8 = timezone(timedelta(hours=8))
 SOURCE_CLASSES = {
@@ -299,16 +302,21 @@ def _fetch_url(url: str) -> tuple[bytes, int, str]:
         headers={"User-Agent": "IIOS-company-evidence-intake/0.1", "Accept": "*/*"},
         method="GET",
     )
+    deadline = time.monotonic() + MAX_SOURCE_CAPTURE_SECONDS
     try:
         opener = build_opener(_HTTPSOnlyRedirectHandler())
-        with opener.open(request, timeout=30) as response:
+        with opener.open(request, timeout=SOURCE_READ_TIMEOUT_SECONDS) as response:
             status = int(getattr(response, "status", getattr(response, "code", 0)))
             if status < 200 or status >= 300:
                 raise SourceCaptureError("UNEXPECTED_HTTP_STATUS")
             chunks = []
             total = 0
             while True:
+                if time.monotonic() >= deadline:
+                    raise SourceCaptureError("SOURCE_FETCH_DEADLINE_EXCEEDED")
                 block = response.read(min(1024 * 1024, MAX_SOURCE_BYTES + 1 - total))
+                if time.monotonic() >= deadline:
+                    raise SourceCaptureError("SOURCE_FETCH_DEADLINE_EXCEEDED")
                 if not block:
                     break
                 total += len(block)
@@ -321,6 +329,8 @@ def _fetch_url(url: str) -> tuple[bytes, int, str]:
     except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
         if isinstance(exc, HTTPError):
             raise SourceCaptureError("HTTP_REQUEST_FAILED") from exc
+        if isinstance(exc, TimeoutError):
+            raise SourceCaptureError("SOURCE_READ_TIMEOUT") from exc
         raise SourceCaptureError("SOURCE_FETCH_FAILED") from exc
 
 
