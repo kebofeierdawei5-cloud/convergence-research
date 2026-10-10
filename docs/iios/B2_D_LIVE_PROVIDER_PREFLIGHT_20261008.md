@@ -40,7 +40,7 @@ The live workflow reads these GitHub Actions secrets:
 - `IIOS_LLM_PROVIDER_PROTOCOL`
 - optional `IIOS_LLM_PROVIDER_TIMEOUT_SECONDS`
 
-The runtime fails closed on missing credentials, non-HTTPS endpoints, unsupported protocol, malformed signing key, or invalid timeout.
+The runtime fails closed on missing credentials, endpoints outside the HTTPS or narrow self-hosted-loopback exception, unsupported protocol, malformed signing key, or invalid timeout. Plain HTTP is allowed only for a loopback endpoint with `deployment_mode=SELF_HOSTED` and `auth_mode=NONE`; see `docs/iios/P0_BATCH_B2_LOCAL_OLLAMA_RUNTIME_20261010.md`.
 
 ## Live gate
 
