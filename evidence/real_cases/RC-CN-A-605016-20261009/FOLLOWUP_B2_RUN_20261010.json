@@ -48,7 +48,8 @@
     ],
     "evidence_admission": false,
     "pit_admission": false,
-    "formal_valuation_decision_publication_report_run_receipt_authorized": false
+    "formal_valuation_decision_publication_report_run_receipt_authorized": false,
+    "current_blocker_reason": "The official SSE 2026-10-08 row is obtainable only over plain HTTP on the configured endpoint and cannot pass the HTTPS-only intake. The alternate HTTPS Eastmoney row matches 20.22 but its legal statement requires written permission for copying market data; no written permission was obtained. The 2026-10-09 secondary close is after the date-only cutoff instant and likewise cannot cover market_price."
   },
   "overall": "BLOCKED_AS_REQUIRED",
   "next_steps": [
@@ -65,5 +66,17 @@
     "official_dividend_pdf_sha256": "1a153c20f908abbd48fdd63a651ecb0edde269f3e7dd0ea27a0b8ce420e5ea8c",
     "official_price_candidate_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480",
     "official_price_candidate_status": "BLOCKED_HTTP_TRANSPORT_NOT_ADMISSIBLE"
+  },
+  "secondary_price_terms_review": {
+    "source": "https://about.eastmoney.com/home/legal",
+    "source_page_sha256": "2f669b80d2ca640e0d4f2995c3cdbb77c4abc4c150e761492f2aab44b06d78ca",
+    "capture_run_id": 38039773596,
+    "capture_artifact_id": 11664868816,
+    "result": "RESTRICTED_WRITTEN_PERMISSION_REQUIRED",
+    "key_clauses": [
+      "Section VIII: prior written permission is required to copy, modify, reprint, disseminate or otherwise distribute site content.",
+      "Section X: market quotes may not be copied, disseminated, rebroadcast, demonstrated or otherwise distributed without prior written consent from the Shanghai/Shenzhen Stock Exchanges."
+    ],
+    "decision": "Do not use the Eastmoney price payload as an admitted B2 evidence row without written permission; retain the citation/hash only as a non-admitted diagnostic cross-check."
   }
 }
