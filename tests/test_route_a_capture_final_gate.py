@@ -8,11 +8,17 @@ import pytest
 from tools.route_a_capture_final_gate import CaptureFinalGateError, validate_capture_final_gate
 
 
-def _write_run(root: Path, *, status="CAPTURED_NOT_ADMITTED", succeeded=2, failed=0):
+def _write_run(root: Path, *, status="CAPTURED_NOT_ADMITTED", succeeded=2, failed=0, payload_mismatches=0):
     root.mkdir(parents=True, exist_ok=True)
     rows = []
     for index in range(succeeded):
-        rows.append({"source_id": f"OK-{index}", "capture_status": "SUCCESS"})
+        mismatch = index < payload_mismatches
+        rows.append({
+            "source_id": f"OK-{index}", "capture_status": "SUCCESS",
+            "expected_payload_type": "PDF" if mismatch else "ANY",
+            "payload_contract_status": "MISMATCH" if mismatch else "NOT_CHECKED",
+            "payload_contract_error": "EXPECTED_PDF_RECEIVED_HTML_OR_ACCESS_CHALLENGE" if mismatch else None,
+        })
     for index in range(failed):
         rows.append({"source_id": f"FAIL-{index}", "capture_status": "FAILED"})
     receipt = {
@@ -25,6 +31,9 @@ def _write_run(root: Path, *, status="CAPTURED_NOT_ADMITTED", succeeded=2, faile
     verification = {
         "status": "INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION",
         "raw_bytes_verified": succeeded,
+        "payload_contract_checked": payload_mismatches,
+        "payload_contract_passes": 0,
+        "payload_contract_mismatches": payload_mismatches,
     }
     preflight = {
         "schema_version": "IIOS-ROUTE-A-B2-PREFLIGHT-0.1",
@@ -33,6 +42,7 @@ def _write_run(root: Path, *, status="CAPTURED_NOT_ADMITTED", succeeded=2, faile
         "intake_receipt_status": status,
         "raw_integrity_status": verification["status"],
         "raw_bytes_verified": succeeded,
+        "payload_contract_failure_count": payload_mismatches,
         "source_origin_verified": False,
         "evidence_admission": False,
         "pit_admission": False,
@@ -75,6 +85,18 @@ def test_partial_capture_with_verified_bytes_is_preserved_not_misreported_comple
     assert result["sources_captured"] == 2
     assert result["sources_failed"] == 1
     assert "failed source rows remain explicit" in result["meaning"]
+
+
+def test_complete_raw_capture_with_html_challenge_bytes_is_not_reported_as_complete_documents(tmp_path):
+    root = tmp_path / "payload-mismatch"
+    _write_run(root, succeeded=2, failed=0, payload_mismatches=1)
+    result = _validate(root)
+    assert result["status"] == "RAW_CAPTURE_COMPLETE_WITH_PAYLOAD_MISMATCHES_NOT_ADMITTED"
+    assert result["sources_captured"] == 2
+    assert result["payload_contract_mismatches"] == 1
+    assert "not emitted as B2 Evidence Records" in result["meaning"]
+    assert result["evidence_admission"] is False
+    assert result["pit_admission"] is False
 
 
 def test_partial_capture_with_zero_verified_bytes_is_rejected(tmp_path):
