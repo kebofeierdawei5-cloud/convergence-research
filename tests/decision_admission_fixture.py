@@ -237,42 +237,257 @@ def prepare_authorized_test_run(
         created_at="2026-10-09T00:00:04+00:00",
     )
     orchestrator.transition(run_id, Stage.SEMANTIC_PENDING, created_at="2026-10-09T00:00:05+00:00")
-    semantic_hash = _sha({"test-semantic": case_id})
+    from iios_mvp.semantic_producer_admission_v01 import (
+        ProducerRegistration, ProducerRegistry, SemanticAdmissionContext,
+        build_semantic_artifact, build_producer_receipt, admit_semantic_artifact,
+    )
+    from iios_mvp.canonical_investment_admission_v01 import (
+        build_canonical_investment_admission,
+    )
+    from iios_mvp.forecast_valuation_return_lineage_v01 import (
+        CANONICAL_VALUATION_OUTPUT_VERSION,
+    )
+
+    # These objects are valid, fully bound TEST-ONLY records. They are persisted
+    # so downstream writer tests exercise byte reopening, schema checks and hash
+    # binding instead of relying on stage-ID/hash strings alone.
+    producer_id = "TEST_FIXTURE_ONLY"
+    producer_version = "0.0-test"
+    policy_version = "TEST_ONLY"
+    artifact_type = "THESIS_ASSESSMENT"
+    semantic_context = SemanticAdmissionContext(
+        case_id=case_id,
+        market=market,
+        symbol=symbol,
+        company=company,
+        cutoff_date=cutoff,
+        artifact_type=artifact_type,
+        input_refs=tuple(evidence_ids),
+        input_hashes=tuple(evidence_hashes),
+        producer_id=producer_id,
+        producer_version=producer_version,
+        producer_type="LLM_SEMANTIC_PRODUCER",
+        policy_version=policy_version,
+    )
+    semantic_artifact = build_semantic_artifact(
+        artifact_id=f"TEST-SEMANTIC-{run_id}",
+        artifact_type=artifact_type,
+        context=semantic_context,
+        output={"summary": "SYNTHETIC_TEST_ONLY_NOT_A_COMPANY_FACT"},
+        decision_relevance="TEST_ONLY_AUTHORIZATION_MECHANICS",
+        created_at=f"{cutoff}T00:00:05+00:00",
+    )
+    semantic_producer_receipt = build_producer_receipt(
+        receipt_id=f"TEST-SEMANTIC-RECEIPT-{run_id}",
+        artifact=semantic_artifact,
+        stage_id=artifact_type,
+        created_at=f"{cutoff}T00:00:05+00:00",
+    )
+    semantic_registry = ProducerRegistry((
+        ProducerRegistration(
+            producer_id=producer_id,
+            producer_type="LLM_SEMANTIC_PRODUCER",
+            producer_version=producer_version,
+            policy_version=policy_version,
+        ),
+    ))
+    semantic_admission_obj = admit_semantic_artifact(
+        semantic_artifact,
+        semantic_producer_receipt,
+        context=semantic_context,
+        registry=semantic_registry,
+    )
+    semantic_admission = dict(semantic_admission_obj.__dict__)
     orchestrator.transition(
         run_id, Stage.SEMANTIC_ADMITTED,
-        output_refs=("test-semantic-artifact",), output_hashes=(semantic_hash,),
-        producer_type="LLM_SEMANTIC_PRODUCER", producer_version="0.0-test",
-        created_at="2026-10-09T00:00:06+00:00",
+        output_refs=(semantic_artifact["artifact_id"],),
+        output_hashes=(semantic_artifact["artifact_hash"],),
+        input_refs=tuple(evidence_ids),
+        input_hashes=tuple(evidence_hashes),
+        producer_type="LLM_SEMANTIC_PRODUCER",
+        producer_version=producer_version,
+        created_at=f"{cutoff}T00:00:06+00:00",
     )
-    orchestrator.transition(run_id, Stage.FORECAST_PENDING, created_at="2026-10-09T00:00:07+00:00")
-    forecast_hash = _sha({"test-forecast": case_id})
+
+    from iios_mvp.canonical_independent_forecast import (
+        CANONICAL_INDEPENDENT_FORECAST_ADMISSION_SCHEMA,
+    )
+    forecast_core = {
+        "admission_schema": CANONICAL_INDEPENDENT_FORECAST_ADMISSION_SCHEMA,
+        "status": "ADMITTED",
+        "case_id": case_id,
+        "market": market,
+        "symbol": symbol,
+        "cutoff_date": cutoff,
+        "forecast_id": f"TEST-FORECAST-{run_id}",
+        "forecast_version": "test-fixture-v1",
+        "model_version": "test-fixture-model-v1",
+        "variable_id": "intrinsic_value_growth_proxy",
+        "value": "0.1",
+        "unit": "fraction",
+        "basis": "SYNTHETIC_TEST_ONLY",
+        "horizon_years": "1",
+        "forecast_origin": f"{cutoff}T00:00:00+00:00",
+        "known_at": f"{cutoff}T00:00:00+00:00",
+        "prepared_without_current_price": True,
+        "evidence_ids": list(evidence_ids),
+    }
+    forecast_record = {
+        **forecast_core,
+        "admission_record_hash": _sha(forecast_core),
+    }
+    forecast_ref = {
+        "forecast_id": forecast_record["forecast_id"],
+        "admission_record_hash": forecast_record["admission_record_hash"],
+    }
+    orchestrator.transition(run_id, Stage.FORECAST_PENDING, created_at=f"{cutoff}T00:00:07+00:00")
     orchestrator.transition(
         run_id, Stage.FORECAST_ADMITTED,
-        output_refs=("test-forecast-admission",), output_hashes=(forecast_hash,),
-        producer_type="CODE", producer_version="test-forecast",
-        created_at="2026-10-09T00:00:08+00:00",
+        output_refs=(forecast_ref["forecast_id"],),
+        output_hashes=(forecast_ref["admission_record_hash"],),
+        producer_type="CODE",
+        producer_version="IIOS-FORECAST-VALUATION-RETURN-LINEAGE-0.1",
+        created_at=f"{cutoff}T00:00:08+00:00",
     )
-    orchestrator.transition(run_id, Stage.VALUATION_PENDING, created_at="2026-10-09T00:00:09+00:00")
-    valuation_hash = _sha({"test-valuation": case_id})
+
+    valuation_output_core = {
+        "schema_version": CANONICAL_VALUATION_OUTPUT_VERSION,
+        "valuation_id": f"TEST-VALUATION-OUTPUT-{run_id}",
+        "valuation_version": "test-fixture-v1",
+        "case_id": case_id,
+        "market": market,
+        "symbol": symbol,
+        "company": company,
+        "cutoff_date": cutoff,
+        "forecast_ref": forecast_ref,
+        "horizon_years": "1",
+        "reference_value_per_share": "10",
+        "scenarios": {
+            "bear": {"probability": "0.25", "value_per_share": "8", "cash_distributions_per_share": "0"},
+            "base": {"probability": "0.50", "value_per_share": "10", "cash_distributions_per_share": "0"},
+            "bull": {"probability": "0.25", "value_per_share": "14", "cash_distributions_per_share": "0"},
+        },
+        "evidence_ids": list(evidence_ids),
+    }
+    valuation_output = {
+        **valuation_output_core,
+        "output_hash": _sha(valuation_output_core),
+    }
+    valuation_admission_obj = build_canonical_investment_admission(
+        admission_id=f"TEST-VALUATION-ADMISSION-{run_id}",
+        domain="VALUATION",
+        case_id=case_id,
+        market=market,
+        symbol=symbol,
+        company=company,
+        cutoff_date=cutoff,
+        domain_status="PASS",
+        source_record_id=valuation_output["valuation_id"],
+        source_record_hash=valuation_output["output_hash"],
+        output_hash=valuation_output["output_hash"],
+        producer_version="test-fixture-v1",
+        evidence_ids=evidence_ids,
+        admitted_at=f"{cutoff}T00:00:09+00:00",
+    )
+    valuation_admission = valuation_admission_obj.to_dict()
+    valuation_ref = valuation_admission_obj.reference().to_dict()
+    orchestrator.transition(run_id, Stage.VALUATION_PENDING, created_at=f"{cutoff}T00:00:09+00:00")
     orchestrator.transition(
         run_id, Stage.VALUATION_ADMITTED,
-        output_refs=("test-valuation-admission",), output_hashes=(valuation_hash,),
-        producer_type="CODE", producer_version="test-valuation",
-        created_at="2026-10-09T00:00:10+00:00",
+        output_refs=(valuation_ref["admission_id"],),
+        output_hashes=(valuation_ref["admission_record_hash"],),
+        producer_type="CODE",
+        producer_version="IIOS-FORECAST-VALUATION-RETURN-LINEAGE-0.1",
+        created_at=f"{cutoff}T00:00:10+00:00",
     )
-    orchestrator.transition(run_id, Stage.DECISION_PENDING, created_at="2026-10-09T00:00:11+00:00")
-    decision = snapshot["decision"]
-    return_hash = _sha(decision.get("return_metrics") or {})
-    risk_hash = _sha(decision.get("risk_portfolio_contract") or decision.get("positioning_sizing") or {})
+    orchestrator.transition(
+        run_id, Stage.DECISION_PENDING,
+        input_refs=(forecast_ref["forecast_id"], valuation_ref["admission_id"]),
+        input_hashes=(forecast_ref["admission_record_hash"], valuation_ref["admission_record_hash"]),
+        created_at=f"{cutoff}T00:00:11+00:00",
+    )
+
+    def persist_artifact(suffix, payload):
+        raw = _canonical(payload).encode("utf-8")
+        digest = hashlib.sha256(raw).hexdigest()
+        path = root_path / "canonical-artifacts" / f"{digest}.{suffix}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.read_bytes() != raw:
+            raise AssertionError(f"synthetic {suffix} artifact collision")
+        if not path.exists():
+            path.write_bytes(raw)
+        return digest
+
+    for suffix, payload in (
+        ("semantic-artifact", semantic_artifact),
+        ("semantic-producer-receipt", semantic_producer_receipt),
+        ("semantic-admission", semantic_admission),
+        ("forecast-admission", forecast_record),
+        ("valuation-admission", valuation_admission),
+        ("valuation-output", valuation_output),
+    ):
+        persist_artifact(suffix, payload)
+
+    return_metrics = decision.get("return_metrics") or {}
+    risk_portfolio = decision.get("risk_portfolio_contract") or decision.get("positioning_sizing") or {}
+    validated_lineage = {
+        "status": "PASS",
+        "lineage_version": "IIOS-FORECAST-VALUATION-RETURN-LINEAGE-0.1",
+        "canonical_forecast_ref": forecast_ref,
+        "canonical_valuation_ref": valuation_ref,
+        "forecast_id": forecast_record["forecast_id"],
+        "forecast_version": forecast_record["forecast_version"],
+        "valuation_id": valuation_output["valuation_id"],
+        "valuation_version": valuation_output["valuation_version"],
+        "valuation_primary_model": "TEST_FIXTURE_ONLY",
+        "horizon_years": "1",
+        "reference_value_per_share": "10",
+        "binding": "FORECAST_REF_EQUALITY_AND_CANONICAL_VALUATION_SCENARIO_EQUALITY",
+        "valuation_admission_record": valuation_admission,
+    }
+    upstream_core = {
+        "schema_version": "IIOS-CANONICAL-UPSTREAM-ADMISSIONS-0.1",
+        "run_id": run_id,
+        "case_id": case_id,
+        "market": market,
+        "symbol": symbol,
+        "company": company,
+        "cutoff_date": cutoff,
+        "semantic_artifact": semantic_artifact,
+        "semantic_producer_receipt": semantic_producer_receipt,
+        "semantic_admission": semantic_admission,
+        "canonical_forecast_ref": forecast_ref,
+        "forecast_record": forecast_record,
+        "canonical_valuation_ref": valuation_ref,
+        "valuation_admission_record": valuation_admission,
+        "valuation_output": valuation_output,
+        "validated_lineage": validated_lineage,
+    }
+    upstream_bundle = {**upstream_core, "bundle_hash": _sha(upstream_core)}
+    bundle_bytes = _canonical(upstream_bundle).encode("utf-8")
+    bundle_digest = hashlib.sha256(bundle_bytes).hexdigest()
+    bundle_path = root_path / "canonical-artifacts" / f"{bundle_digest}.canonical-upstream-admissions.json"
+    if bundle_path.exists() and bundle_path.read_bytes() != bundle_bytes:
+        raise AssertionError("synthetic upstream admission bundle collision")
+    if not bundle_path.exists():
+        bundle_path.write_bytes(bundle_bytes)
+
     orchestrator.transition(
         run_id, Stage.DECISION_ADMITTED,
-        output_refs=("decision_snapshot", "decision_admission", "return_metrics", "risk_portfolio"),
+        output_refs=(
+            "decision_snapshot", "decision_admission", "return_metrics", "risk_portfolio",
+            f"canonical-upstream-admissions:{bundle_digest}",
+        ),
         output_hashes=(
             str(snapshot["snapshot_hash"]),
             str(decision_admission["admission_record_hash"]),
-            return_hash,
-            risk_hash,
+            _sha(return_metrics),
+            _sha(risk_portfolio),
+            bundle_digest,
         ),
-        producer_type="CODE", producer_version="test-decision",
-        created_at="2026-10-09T00:00:12+00:00",
+        input_refs=(semantic_artifact["artifact_id"],),
+        input_hashes=(semantic_artifact["artifact_hash"],),
+        producer_type="CODE",
+        producer_version="test-decision",
+        created_at=f"{cutoff}T00:00:12+00:00",
     )
