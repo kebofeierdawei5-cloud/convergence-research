@@ -52,7 +52,7 @@ Status: **INCIDENT REPRODUCTION PASS / CANONICAL RECORD — PRODUCTION P0s OPEN*
 
 Canonical incident contract: `docs/iios/P0_CANONICAL_ENTRY_INCIDENT_REPRODUCTION_20261009.md`.
 
-- Canonical promotion status: Batch 0 freezes a reproducible defect and acceptance contract only. Production execution enforcement remains an OPEN P0 and must be remediated and independently tested in successor batches.
+- Canonical promotion status: Batch 0 freezes the reproducible defect and acceptance contract only. Successor code batches #260 and #264 have closed the tested CLI-entry/write-authorization and runtime-binding enforcement gaps; the remaining P0 is production acceptance (actual host wiring, real-company Evidence/PIT + semantic/Forecast/Valuation lineage, full receipt replay and independent red-team). Do not mark P0-LLM-001/P0-LLM-004 closed from synthetic/control-plane CI alone.
 
 
 ### P0 Canonical Entry and Write Authorization — Batch 1
