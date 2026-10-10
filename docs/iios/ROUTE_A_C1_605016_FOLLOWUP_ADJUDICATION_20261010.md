@@ -36,8 +36,10 @@ Case：`RC-CN-A-605016-20261009`
 - 上交所官方日 K 服务的 HTTPS 入口无法取得响应：标准 HTTPS 主机报网络不可达；同一服务的 HTTPS:32041 返回 SSL 协议不匹配；另一个尝试的 HTTPS 查询路由返回 404。
 - 该官方主机的 HTTP:32041 路由返回了精确的 2026-10-08 日 K 行：开盘 21.00、最高 21.24、最低 20.01、收盘 **20.22 元**、成交量 4,636,300 股、成交额 95,082,618 元。原始响应只有 124 bytes，SHA-256 `45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480`。
 - **不准入原因明确：**当前原始证据 intake contract 要求 HTTPS。虽然 HTTP 响应来自 SSE 官方域名、日期和数值结构匹配，未加密传输不能满足该合同，故状态是 `BLOCKED_HTTP_TRANSPORT_NOT_ADMISSIBLE`。没有把它写进 B2 manifest。
-- 二级来源显示 2026-10-09 收盘 20.28 元，但来源权限/底层行情源尚未准入，而且这个收盘晚于本案日期型 cutoff 的时点；不可用其覆盖市场价格组。历史表中 20.73 元对应 2026-09-29，不是 2026-10-09。
-- 所以当前唯一缺口仍为 `market_price`。不允许把 HTTP 原始行、二级来源或检索时间伪造成已知 PIT 事实，也不放宽 HTTPS intake 或 cutoff。
+- 二级来源显示 2026-10-09 收盘 20.28 元、2026-10-08 收盘 20.22 元，但 Eastmoney 官网法律声明已被实际抓取和检查。其第八节要求未获书面许可不得复制/转载网站内容，第十节特别要求未经上交所/深交所事先书面同意不得复制、传播、转播或展示行情信息。当前没有拿到书面授权，所以不能把 Eastmoney 数据复制进 B2 Evidence/PIT manifest；仅作为“未准入的交叉核对”记录其 URL/hash。历史表中 20.73 元对应 2026-09-29，不是 2026-10-09。
+- 所以当前唯一缺口仍为 `market_price`。官方数据通道的问题是 HTTPS 不可达且 HTTP 不符合 intake 合同；二级数据通道的问题是网站法律声明要求书面授权复制行情数据，而授权尚未取得。两条都不能变为 ADMITTED。不允许把 HTTP 原始行、未经授权的二级来源或检索时间伪造成已知 PIT 事实，也不放宽 HTTPS intake 或 cutoff。
+
+- Eastmoney 法律声明原始页已在 [Follow-up capture run #38039773596](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38039773596) 中捕获；法律页面 URL `https://about.eastmoney.com/home/legal`，原始 HTML SHA-256 `2f669b80d2ca640e0d4f2995c3cdbb77c4abc4c150e761492f2aab44b06d78ca`。本结论只记录该声明的文本，不构成法律意见；但按 IIOS “授权复用必须单独通过”的原则，没有书面授权就不准入该行情源。
 
 机器记录：`evidence/real_cases/RC-CN-A-605016-20261009/PRICE_CUTOFF_SOURCE_ADJUDICATION_20261010.json` 与 `FOLLOWUP_B2_RUN_20261010.json`。
 
