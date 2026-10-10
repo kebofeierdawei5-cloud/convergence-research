@@ -29,10 +29,6 @@ def test_self_hosted_no_auth_loopback_http_is_valid():
     assert policy.deployment_mode == "SELF_HOSTED"
 
 
-@pytest.mark.parametrize("url", [
-    "http://provider.example/v1/responses",
-    "http://192.168.1.10:8000/v1/responses",
-])
 def test_self_hosted_loopback_http_with_bearer_auth_is_rejected():
     with pytest.raises(ProviderRuntimeBoundaryError, match="must use HTTPS"):
         validate_provider_runtime_policy(
@@ -43,6 +39,10 @@ def test_self_hosted_loopback_http_with_bearer_auth_is_rejected():
         )
 
 
+@pytest.mark.parametrize("url", [
+    "http://provider.example/v1/responses",
+    "http://192.168.1.10:8000/v1/responses",
+])
 def test_non_loopback_http_is_rejected(url):
     with pytest.raises(
         ProviderRuntimeBoundaryError,
