@@ -1,7 +1,7 @@
 # IIOS Batch Execution Plan — Refreshed 2026-10-10
 
 **Plan class:** execution plan / canonical-main recovery  
-**Authority baseline:** `main@b26e3e071eec7e145c46d4bef8a6f206439be1c2`  
+**Authority baseline:** `main@92ad57f837fed50ab474ebf89f4f308869e31545`  
 **State authority:** `docs/PROJECT_STATE_INDEX.md`  
 **Purpose:** move IIOS from validated control-plane code to a real, fail-closed, single-company research run without making external LLM API credentials a Route A prerequisite.
 
@@ -115,6 +115,8 @@ This closes the repository-CLI route/persistence integration test gap only.
 #### Batch B2 — production host discovery and runtime registration
 
 **Status:** BLOCKED — ACTUAL DEPLOYABLE HOST / PRODUCTION CALLBACK NOT IDENTIFIED IN REPOSITORY.
+
+**Discovery update (2026-10-10):** the linked GitHub inventory currently exposes only the canonical repository, and its exact-main tree contains no separately identifiable deployed web/server/front-end host. See `docs/iios/P0_BATCH_B2_HOST_DISCOVERY_20261010.md`. This narrows the blocker to an inaccessible/undisclosed host source and a missing production runtime callback; it does not prove no external deployment exists. It is not a credential gate for Route A.
 
 **Remaining actions**
 1. Identify the actual app/service that receives the user request outside this repository; inspect its launch/deployment entry and determine whether this repo's CLI can be invoked within that host. Do not assume the CLI is the deployed ChatGPT/product host.
