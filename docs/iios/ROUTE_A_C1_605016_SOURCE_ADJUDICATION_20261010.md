@@ -74,7 +74,7 @@ The run summary is preserved at `evidence/real_cases/RC-CN-A-605016-20261009/SOU
 The dedicated workflow downloads the actual Attempt 10 artifact, independently re-hashes all 12 raw sources, builds the fact-level candidate manifest from the source-adjudication ledger and calls the core-owned, unchanged `research.b2.company_evidence.build_company_evidence_manifest` validator.
 
 - Six of seven required groups are covered by source-adjudicated, PIT-eligible official Evidence Records.
-- `market_price` remains UNKNOWN because the 20.28 CNY close is currently corroborated only by secondary sources whose underlying data authority and reuse status have not been admitted.
+- In this Attempt-10-only run, `market_price` remained UNKNOWN because the secondary candidate's source authority/reuse was not admitted. The later official HTTPS ephemeral B2 result is documented below and supersedes this earlier run status.
 - Final manifest remains `BLOCKED`; `evidence_admission=false`, `pit_admission=false`.
 - No valuation, Decision Revision, Machine Publication, Investor Review Report or complete `IIOS_RUN_RECEIPT` is authorized.
 
