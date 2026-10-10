@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -118,6 +119,65 @@ def test_https_download_retains_exact_response_bytes(monkeypatch, tmp_path):
     assert (out / "raw" / "SZSE-ANNOUNCEMENT-001.pdf").read_bytes() == BODY
     assert receipt["sources"][0]["sha256"] == hashlib.sha256(BODY).hexdigest()
     assert verify_intake(out)["raw_bytes_verified"] == 1
+
+
+def test_expected_pdf_http_200_gzip_html_challenge_is_retained_but_payload_blocked(monkeypatch, tmp_path):
+    import gzip
+
+    challenge = b"<html><script>challenge();</script><body>Access verification</body></html>"
+    wire_bytes = gzip.compress(challenge)
+    value = manifest(source_overrides={
+        "url": "https://static.sse.cn/disclosure/announcement.pdf",
+        "expected_payload_type": "PDF",
+    })
+    value["sources"][0].pop("local_path")
+    input_root = tmp_path / "unused"
+    input_root.mkdir()
+    path = write_manifest(tmp_path, value)
+
+    class Response:
+        status = 200
+        headers = {"Content-Type": "text/html; charset=utf-8"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def __init__(self):
+            self.payload = wire_bytes
+
+        def read(self, amount=-1):
+            if amount < 0:
+                data, self.payload = self.payload, b""
+                return data
+            data, self.payload = self.payload[:amount], self.payload[amount:]
+            return data
+
+    class Opener:
+        def open(self, request, timeout):
+            assert request.full_url.endswith(".pdf")
+            return Response()
+
+    monkeypatch.setattr(intake, "build_opener", lambda handler: Opener())
+    out = tmp_path / "challenge-output"
+    receipt = intake.capture_sources(path, out_dir=out, input_root=input_root)
+    row = receipt["sources"][0]
+    raw = out / row["raw_artifact_path"]
+    assert row["capture_status"] == "SUCCESS"
+    assert row["payload_contract_status"] == "MISMATCH"
+    assert row["payload_contract_error"] == "EXPECTED_PDF_RECEIVED_HTML_OR_ACCESS_CHALLENGE"
+    assert raw.read_bytes() == wire_bytes
+    assert row["sha256"] == hashlib.sha256(wire_bytes).hexdigest()
+    verification = verify_intake(out)
+    assert verification["raw_bytes_verified"] == 1
+    assert verification["payload_contract_mismatches"] == 1
+    assert verification["payload_contract_mismatch_sources"] == [{
+        "source_id": "SZSE-ANNOUNCEMENT-001",
+        "expected_payload_type": "PDF",
+        "error_code": "EXPECTED_PDF_RECEIVED_HTML_OR_ACCESS_CHALLENGE",
+    }]
 
 
 def test_missing_known_at_remains_unknown_and_cannot_admit(tmp_path):
