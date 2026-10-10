@@ -12,6 +12,10 @@ on:
       - ".github/workflows/iios_b2d3_real_provider.yml"
       - "tests/test_b2d3_live_provider_workflow_contract.py"
       - "docs/iios/B2_D3_REAL_PROVIDER_LIVE_20261008.md"
+      - "tools/prepare_iios_local_ollama_runtime.py"
+      - "tests/test_prepare_iios_local_ollama_runtime.py"
+      - "tests/test_canonical_runtime_factory_v01.py"
+      - "docs/iios/P0_BATCH_B2_LOCAL_OLLAMA_RUNTIME_20261010.md"
   push:
     branches:
       - "feature/b2d-live-provider-canonical-refresh-20261008"
@@ -42,6 +46,10 @@ jobs:
         run: python -m pytest -q tests/test_b2d2_provider_runtime.py
       - name: Run B2-D2 independent red-team
         run: python -m pytest -q tests/independent_redteam_b2d2_provider_runtime.py
+      - name: Run local Ollama setup contract
+        run: python -m pytest -q tests/test_prepare_iios_local_ollama_runtime.py
+      - name: Run canonical factory endpoint-policy tests
+        run: python -m pytest -q tests/test_canonical_runtime_factory_v01.py
       - name: Run B2-D3 workflow contract tests
         run: python -m pytest -q tests/test_b2d3_live_provider_workflow_contract.py
       - name: Compile
