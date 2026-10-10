@@ -484,7 +484,6 @@ def _require_content_addressed_artifact(
 def _validate_canonical_upstream_admissions(
     root: str | Path,
     record: Mapping[str, Any],
-    *,
 ) -> dict[str, Any]:
     """Re-open and validate persisted semantic, forecast and valuation admission bytes."""
     env = record["envelope"]
