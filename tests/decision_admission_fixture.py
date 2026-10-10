@@ -81,6 +81,7 @@ def prepare_authorized_test_run(
         return
 
     case = snapshot["input"]
+    decision = snapshot["decision"]
     # Synthetic exact-byte B2 manifest for lifecycle writer tests. These bytes
     # are explicitly not company facts and MUST NOT be used outside tests.
     from research.b2.company_evidence import (
