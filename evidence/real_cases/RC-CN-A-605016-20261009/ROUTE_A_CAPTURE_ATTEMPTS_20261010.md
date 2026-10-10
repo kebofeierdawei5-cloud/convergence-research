@@ -16,13 +16,20 @@ Status: **RAW CAPTURE DIAGNOSTICS ONLY — NOT ADMITTED**
 
 The failed Investing row is preserved here as acquisition history. It is not silently recoded as success or dropped from the incident record.
 
-## Source-ref correction
+## Attempt 2 — registry correction, original failed locator retained
 
-The captured run showed no unregistered source references after the source registry correction: the eleven official SSE items use `SSE:COMPANY_ANNOUNCEMENT`; secondary carriers have their own explicit `SECONDARY_VALIDATION` registry entries. Registration does not establish evidence origin, factual accuracy, licensing or PIT admission.
+- Workflow run: [38014724607](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38014724607)
+- Intake: `PARTIAL_CAPTURE_NOT_ADMITTED`; 11/12 sources captured.
+- Independent verification: 11 raw files hash/size verified.
+- Failed source: `PRICE-INVESTING-HISTORY-2026-10-09`; `HTTP_REQUEST_FAILED`.
+- Unregistered sources: **0**; all official SSE sources use `SSE:COMPANY_ANNOUNCEMENT`, and secondary sources are explicitly registered as `SECONDARY_VALIDATION`.
+- Artifact: [11655484327](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38014724607/artifacts/11655484327).
 
-## Attempt 2 — current retry
+Source registration resolves provenance classification only. It does not establish source origin, factual accuracy, licensing or PIT admission.
 
-The inaccessible Investing historical page has been replaced with Sohu's free history page as a new acquisition candidate. The original failed source and its error remain in Attempt 1 above. A successful recapture, if obtained, will mean only raw-byte capture/integrity; it will not admit the 2026-10-09 closing price.
+## Attempt 3 — Sohu replacement for inaccessible Investing page
+
+The manifest now uses `https://q.stock.sohu.com/cn/605016/lshq.shtml` as the free historical-price acquisition candidate under `SOHU:MARKET_HISTORY_PAGE`. The original Investing failure remains preserved above. This retry can at most establish raw-byte capture/integrity; it cannot admit the 2026-10-09 closing price.
 
 ## Explicit gate boundary
 
