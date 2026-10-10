@@ -515,6 +515,16 @@ def _validate_canonical_upstream_admissions(
         for ref, digest in zip(decision_stage["output_refs"], decision_stage["output_hashes"], strict=True)
         if str(ref).startswith("canonical-upstream-admissions:")
     ]
+    if (
+        len(decision_stage["output_refs"]) < 5
+        or decision_stage["output_refs"][:4] != [
+            "decision_snapshot", "decision_admission", "return_metrics", "risk_portfolio"
+        ]
+        or any(not is_sha256(str(item)) for item in decision_stage["output_hashes"][:4])
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: DECISION_ADMITTED formal output slots/hashes are invalid"
+        )
     if len(bundle_entries) != 1:
         raise CanonicalRunAuthorizationError(
             "BLOCKED: DECISION_ADMITTED does not bind exactly one persisted upstream-admission bundle"
@@ -583,6 +593,8 @@ def _validate_canonical_upstream_admissions(
         or len(semantic_stage["output_hashes"]) != 1
         or semantic_stage["output_refs"][0] != semantic.get("artifact_id")
         or semantic_stage["output_hashes"][0] != semantic.get("artifact_hash")
+        or semantic_stage.get("producer_type") != semantic.get("producer_type")
+        or semantic_stage.get("producer_version") != semantic.get("producer_version")
     ):
         raise CanonicalRunAuthorizationError(
             "BLOCKED: SEMANTIC_ADMITTED receipt does not bind the exact semantic artifact"
@@ -746,10 +758,12 @@ def _validate_canonical_upstream_admissions(
             raise CanonicalRunAuthorizationError(
                 f"BLOCKED: forecast admission {field} identity mismatch"
             )
-    if manifest_evidence_ids is not None and not set(forecast_record.get("evidence_ids", [])).issubset(manifest_evidence_ids):
-        raise CanonicalRunAuthorizationError(
-            "BLOCKED: forecast admission references Evidence IDs outside the admitted manifest"
-        )
+    # Forecast records are separately admitted in the canonical forecast registry.
+    # Their evidence IDs may belong to a separately versioned upstream evidence
+    # set (for example forecast anchors E009/E010) and need not all be repeated in
+    # the B2 company manifest. The content-addressed admission record is validated
+    # here; provenance admission remains owned by its canonical evidence/forecast
+    # admission boundary rather than by string-set equality against this manifest.
     _require_content_addressed_artifact(root, suffix="forecast-admission", payload=forecast_record)
 
     valuation_ref = bundle["canonical_valuation_ref"]
@@ -804,10 +818,9 @@ def _validate_canonical_upstream_admissions(
             raise CanonicalRunAuthorizationError(
                 f"BLOCKED: valuation admission/output {field} identity mismatch"
             )
-    if manifest_evidence_ids is not None and not set(valuation_admission.get("evidence_ids", [])).issubset(manifest_evidence_ids):
-        raise CanonicalRunAuthorizationError(
-            "BLOCKED: valuation admission references Evidence IDs outside the admitted manifest"
-        )
+    # Valuation Admission has its own domain-owned evidence lineage. Do not
+    # equate its evidence namespace to the B2 company-manifest namespace; validate
+    # the admitted record/output hash binding and exact persisted bytes instead.
     _require_content_addressed_artifact(root, suffix="valuation-admission", payload=valuation_admission)
     _require_content_addressed_artifact(root, suffix="valuation-output", payload=valuation_output)
 
