@@ -26,29 +26,29 @@ B2-E Natural-Language → Semantic → Decision E2E          PASS / CANONICAL
 B2-F Full Independent Red-team                          PASS / CANONICAL
 ```
 
-### Current blocker
+### Current blockers
 
-**The company-level Investment Core MVP does NOT require an external LLM provider endpoint, paid search API, or API key.** The provider-specific live-evidence gate is an optional integration track, not a blocker to research execution.
+**Free-first Route A does NOT require an external LLM endpoint, paid search API, or API key.** The remaining critical gates are production-runtime registration/deployment and actual source-by-source Evidence/PIT admission.
 
-Current MVP acceptance gaps:
-- source-by-source B2 Evidence/PIT admission of the five actual 新和成 (002001.SZ) source objects;
-- public-web discovery for missing official/free sources, followed by raw-byte capture and independent hash verification;
-- coverage gaps for `market_price`, `business_reality`, and `capital_structure`;
-- sufficient admitted evidence before company-level analysis, valuation or decision.
+- Batch B: the first-party loopback-first HTTP host is now implemented in canonical main (PR #270) with 21/21 dedicated host contract tests. It is **not yet a deployed/production-accepted host**: a trusted runtime factory and genuine semantic callback must be provisioned, and a real host-origin run must be replay-verified.
+- Primary C1 case: `RC-CN-A-605016-20261009` remains blocked. Raw capture succeeded on attempt 8, but 8/12 payloads were format mismatches and none are promoted to admitted facts; all seven required field groups remain uncovered.
+- Parallel C2 case: 新和成 (002001.SZ) still requires source-by-source B2/PIT adjudication, missing-field capture and authoritative 2026-10-09 market-price evidence.
+- A successful CI, byte hash, URL/title match, or payload format check is not source-origin proof or PIT admission.
 
-The current independent B2-F audit remains PASS / CANONICAL.
+The independent B2-F audit remains PASS / CANONICAL. Production host acceptance and real-company admission remain OPEN.
 
-### P0 Batch B2 — Production Host Discovery — 2026-10-10
+### P0 Batch B2 — First-Party Host Implementation — 2026-10-10
 
-Status: **DISCOVERY EXECUTED / PRODUCTION HOST ACCEPTANCE BLOCKED**.
+Status: **HOST CODE MERGED / DEDICATED CONTRACT PASS / PRODUCTION RUNTIME + DEPLOYMENT ACCEPTANCE OPEN**.
 
 - Discovery record: `docs/iios/P0_BATCH_B2_HOST_DISCOVERY_20261010.md`.
-- Baseline: `main@92ad57f837fed50ab474ebf89f4f308869e31545`.
-- The currently accessible GitHub repository inventory exposes only the canonical `convergence-research` repository. Its recursive tree contains the Python CLI/runtime modules but no separately identifiable production web/server/front-end composition root or deployment entrypoint.
-- `iios_mvp.cli.main()` supports a trusted pre-registered runtime or trusted `--runtime-factory` / `IIOS_CANONICAL_RUNTIME_FACTORY`; `canonical_runtime_registry_v01.py` deliberately defaults to an empty registry and the CLI returns `BLOCKED / CANONICAL_RUNTIME_NOT_REGISTERED` when none is supplied.
-- PR #267's host integration remains a `TEST_ONLY` control-plane proof. No genuine production host, registered runtime, or semantic/model callback was found in the accessible source scope.
-- This blocker is **not** a demand for a paid API key: Route A evidence intake is free-first. It is a missing production-host source/runtime evidence boundary. The linked audit defines the minimum artifacts required to resume.
-- P0-LLM-001 / P0-LLM-004 remain **OPEN**; do not call Batch B complete.
+- First-party host record: `docs/iios/P0_BATCH_B2_FIRST_PARTY_HOST_20261010.md`.
+- Implementation PR #270 merged at `d8c5b41e13185c365314adacae1449255b8e0eaf`, exact accepted PR head `79a5024ee52a37ff1450c6d56fbd24589cbcefcd`.
+- Dedicated host workflow passed **21/21 tests**; the PR exact-head suite had **8/8 checks SUCCESS**, including Investment Core CI, PILOT, authority threat reproduction, post-B04 red-team, FM01/FМ02 and the dedicated host contract. The post-merge Investment Core CI also passed.
+- New entrypoint: `python -m iios_mvp.canonical_host_v01`; authenticated `POST /v1/canonical-runs` accepts only a trusted operator-staged `bundle_id`, confines evidence paths to a configured data root, generates server-side run/request IDs, ignores caller-provided semantic claims, and delegates to the canonical CLI with runtime factory configuration sourced only from trusted process environment.
+- Security defaults: loopback binding, bearer token of at least 32 characters, no shell for subprocess execution, no stderr disclosure; remote bind requires explicit opt-in and declared TLS termination.
+- `/readyz` is deliberately `CONFIGURED_NOT_PRODUCTION_ACCEPTED`. Host CI proves implementation/control-flow boundaries only, not a deployed service, real runtime factory, live semantic response or company decision quality.
+- P0-LLM-001 / P0-LLM-004 remain **OPEN** until a configured/deployed host executes a real company run with admitted evidence, authentic semantic/forecast/valuation lineage, report/publication, Run Receipt replay and independent red-team.
 
 ### P0 Canonical Entry Incident — Batch 0
 
