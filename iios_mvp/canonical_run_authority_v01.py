@@ -15,6 +15,19 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .canonical_evidence_admission_v01 import validate_company_evidence_manifest
+from .canonical_independent_forecast import (
+    CanonicalIndependentForecastReference,
+    validate_canonical_independent_forecast_admission,
+)
+from .canonical_investment_admission_v01 import (
+    CanonicalInvestmentAdmissionReference,
+    validate_canonical_investment_admission_record,
+)
+from .forecast_valuation_return_lineage_v01 import (
+    FORECAST_VALUATION_RETURN_LINEAGE_VERSION,
+    validate_canonical_valuation_output,
+)
+from .semantic_producer_admission_v01 import SEMANTIC_ADMISSION_VERSION
 from .canonical_research_orchestrator import (
     ORCHESTRATOR_VERSION,
     CanonicalResearchOrchestrator,
@@ -440,6 +453,399 @@ def validate_stage_authority_ref(
     return dict(record)
 
 
+
+def _require_content_addressed_artifact(
+    root: str | Path,
+    *,
+    suffix: str,
+    payload: Mapping[str, Any],
+) -> Path:
+    """Require the exact immutable payload the canonical run claims to have admitted."""
+    raw = _canonical_bytes(payload)
+    digest = _sha_bytes(raw)
+    path = Path(root) / "canonical-artifacts" / f"{digest}.{suffix}.json"
+    if not path.is_file():
+        raise CanonicalRunAuthorizationError(
+            f"BLOCKED: admitted {suffix} artifact is absent"
+        )
+    try:
+        persisted = path.read_bytes()
+    except OSError as exc:
+        raise CanonicalRunAuthorizationError(
+            f"BLOCKED: admitted {suffix} artifact cannot be read"
+        ) from exc
+    if persisted != raw or _sha_bytes(persisted) != digest:
+        raise CanonicalRunAuthorizationError(
+            f"BLOCKED: admitted {suffix} artifact bytes/hash mismatch"
+        )
+    return path
+
+
+def _validate_canonical_upstream_admissions(
+    root: str | Path,
+    record: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Re-open and validate persisted semantic, forecast and valuation admission bytes."""
+    env = record["envelope"]
+    identity = {
+        "run_id": str(env["run_id"]),
+        "case_id": str(env["case_id"]),
+        "market": str(env["market"]).upper(),
+        "symbol": str(env["symbol"]).upper(),
+        "cutoff_date": str(env["cutoff_date"]),
+    }
+    semantic_stage = _receipt_for_stage(record, Stage.SEMANTIC_ADMITTED)[1]
+    forecast_stage = _receipt_for_stage(record, Stage.FORECAST_ADMITTED)[1]
+    valuation_stage = _receipt_for_stage(record, Stage.VALUATION_ADMITTED)[1]
+    decision_stage = _receipt_for_stage(record, Stage.DECISION_ADMITTED)[1]
+    decision_pending = _receipt_for_stage(record, Stage.DECISION_PENDING)[1]
+
+    if any(
+        len(stage["output_refs"]) != len(stage["output_hashes"])
+        for stage in (semantic_stage, forecast_stage, valuation_stage, decision_stage, decision_pending)
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: upstream stage refs/hashes are not positionally bound"
+        )
+
+    bundle_entries = [
+        (ref, digest)
+        for ref, digest in zip(decision_stage["output_refs"], decision_stage["output_hashes"], strict=True)
+        if str(ref).startswith("canonical-upstream-admissions:")
+    ]
+    if (
+        len(decision_stage["output_refs"]) < 5
+        or decision_stage["output_refs"][:4] != [
+            "decision_snapshot", "decision_admission", "return_metrics", "risk_portfolio"
+        ]
+        or any(not is_sha256(str(item)) for item in decision_stage["output_hashes"][:4])
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: DECISION_ADMITTED formal output slots/hashes are invalid"
+        )
+    if len(bundle_entries) != 1:
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: DECISION_ADMITTED does not bind exactly one persisted upstream-admission bundle"
+        )
+    bundle_ref, bundle_digest = bundle_entries[0]
+    expected_ref = f"canonical-upstream-admissions:{bundle_digest}"
+    if bundle_ref != expected_ref or not is_sha256(str(bundle_digest)):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: upstream-admission bundle ref/hash is malformed"
+        )
+
+    bundle_path = Path(root) / "canonical-artifacts" / f"{bundle_digest}.canonical-upstream-admissions.json"
+    if not bundle_path.is_file():
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: persisted canonical upstream-admission bundle is absent"
+        )
+    try:
+        bundle_bytes = bundle_path.read_bytes()
+        bundle = json.loads(bundle_bytes.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: persisted canonical upstream-admission bundle is unreadable"
+        ) from exc
+    if _sha_bytes(bundle_bytes) != bundle_digest or _canonical_bytes(bundle) != bundle_bytes:
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: upstream-admission bundle bytes are not canonical or content-addressed"
+        )
+    required_bundle_fields = {
+        "schema_version", "run_id", "case_id", "market", "symbol", "company",
+        "cutoff_date", "semantic_artifact", "semantic_producer_receipt",
+        "semantic_admission", "canonical_forecast_ref", "forecast_record",
+        "canonical_valuation_ref", "valuation_admission_record", "valuation_output",
+        "validated_lineage", "bundle_hash",
+    }
+    if not isinstance(bundle, Mapping) or set(bundle) != required_bundle_fields:
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: canonical upstream-admission bundle fields are invalid"
+        )
+    bundle_core = {key: value for key, value in bundle.items() if key != "bundle_hash"}
+    if (
+        bundle["schema_version"] != "IIOS-CANONICAL-UPSTREAM-ADMISSIONS-0.1"
+        or bundle["bundle_hash"] != canonical_hash(bundle_core)
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: canonical upstream-admission bundle schema/hash mismatch"
+        )
+    for field, expected in identity.items():
+        if bundle.get(field) != expected:
+            raise CanonicalRunAuthorizationError(
+                f"BLOCKED: upstream-admission bundle {field} identity mismatch"
+            )
+    if not isinstance(bundle.get("company"), str) or not bundle["company"].strip():
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: upstream-admission bundle company identity is missing"
+        )
+
+    semantic = bundle["semantic_artifact"]
+    producer = bundle["semantic_producer_receipt"]
+    semantic_admission = bundle["semantic_admission"]
+    if not isinstance(semantic, Mapping) or not isinstance(producer, Mapping) or not isinstance(semantic_admission, Mapping):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: semantic artifact/producer/admission payloads must be objects"
+        )
+    if (
+        len(semantic_stage["output_refs"]) != 1
+        or len(semantic_stage["output_hashes"]) != 1
+        or semantic_stage["output_refs"][0] != semantic.get("artifact_id")
+        or semantic_stage["output_hashes"][0] != semantic.get("artifact_hash")
+        or semantic_stage.get("producer_type") != semantic.get("producer_type")
+        or semantic_stage.get("producer_version") != semantic.get("producer_version")
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: SEMANTIC_ADMITTED receipt does not bind the exact semantic artifact"
+        )
+    semantic_core = {key: value for key, value in semantic.items() if key != "artifact_hash"}
+    if (
+        semantic.get("schema_version") != "IIOS-LLM-SEMANTIC-ARTIFACT-0.1"
+        or not is_sha256(str(semantic.get("artifact_hash", "")))
+        or semantic.get("artifact_hash") != canonical_hash(semantic_core)
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: semantic artifact schema/integrity check failed"
+        )
+    semantic_identity = {
+        "case_id": identity["case_id"],
+        "market": identity["market"],
+        "symbol": identity["symbol"],
+        "cutoff_date": identity["cutoff_date"],
+    }
+    for field, expected in semantic_identity.items():
+        if semantic.get(field) != expected:
+            raise CanonicalRunAuthorizationError(
+                f"BLOCKED: semantic artifact {field} identity mismatch"
+            )
+    if semantic.get("company") != bundle["company"]:
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: semantic artifact company identity mismatch"
+        )
+    if (
+        semantic.get("producer_type") not in {"LLM_SEMANTIC_PRODUCER", "HUMAN_EXPERT_ADJUDICATION"}
+        or not str(semantic.get("producer_id", "")).strip()
+        or not str(semantic.get("producer_version", "")).strip()
+        or not str(semantic.get("policy_version", "")).strip()
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: semantic producer identity/version/policy is not admitted"
+        )
+    evidence_stage = _receipt_for_stage(record, Stage.EVIDENCE_ADMITTED)[1]
+    admitted_input_pairs = list(zip(
+        evidence_stage["output_refs"][1:],
+        evidence_stage["output_hashes"][1:],
+        strict=True,
+    ))
+    semantic_input_pairs = list(zip(
+        semantic.get("input_refs", []),
+        semantic.get("input_hashes", []),
+        strict=True,
+    ))
+    if not semantic_input_pairs or semantic_input_pairs != admitted_input_pairs:
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: semantic input lineage differs from admitted Evidence/PIT receipt"
+        )
+    forbidden = {
+        "action", "decision_status", "new_capital_allowed", "human_approval_required",
+        "auto_execution", "capital_effect", "decision_admission",
+        "decision_precedence_rule_id", "decision_pre_admission_action",
+    }
+    def reject_authority_fields(node: Any) -> bool:
+        if isinstance(node, Mapping):
+            if forbidden.intersection(node):
+                return True
+            return any(reject_authority_fields(value) for value in node.values())
+        if isinstance(node, (list, tuple)):
+            return any(reject_authority_fields(value) for value in node)
+        return False
+    if reject_authority_fields(semantic.get("output")):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: semantic producer artifact contains Decision-authoritative fields"
+        )
+
+    required_producer_fields = {
+        "schema_version", "receipt_id", "artifact_id", "artifact_type", "stage_id",
+        "case_id", "market", "symbol", "company", "cutoff_date", "producer_type",
+        "producer_id", "producer_version", "policy_version", "input_refs", "input_hashes",
+        "artifact_hash", "output_hash", "status", "created_at", "receipt_hash",
+    }
+    if set(producer) != required_producer_fields:
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: semantic producer receipt fields are invalid"
+        )
+    producer_core = {key: value for key, value in producer.items() if key != "receipt_hash"}
+    if (
+        producer.get("schema_version") != "IIOS-SEMANTIC-PRODUCER-RECEIPT-0.1"
+        or producer.get("receipt_hash") != canonical_hash(producer_core)
+        or producer.get("status") != "PRODUCED"
+        or producer.get("artifact_hash") != semantic.get("artifact_hash")
+        or producer.get("artifact_id") != semantic.get("artifact_id")
+        or producer.get("stage_id") != semantic.get("artifact_type")
+        or producer.get("output_hash") != canonical_hash(semantic.get("output"))
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: semantic producer receipt does not validate against semantic artifact"
+        )
+    for field in (
+        "artifact_id", "artifact_type", "case_id", "market", "symbol", "company",
+        "cutoff_date", "producer_type", "producer_id", "producer_version",
+        "policy_version", "input_refs", "input_hashes", "artifact_hash",
+    ):
+        if producer.get(field) != semantic.get(field):
+            raise CanonicalRunAuthorizationError(
+                f"BLOCKED: semantic producer receipt binding mismatch: {field}"
+            )
+    if set(semantic_admission) != {"status", "artifact_hash", "producer_receipt_hash", "admission_hash"}:
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: semantic admission receipt fields are invalid"
+        )
+    admission_core = {
+        "admission_version": SEMANTIC_ADMISSION_VERSION,
+        "status": semantic_admission["status"],
+        "artifact_hash": semantic_admission["artifact_hash"],
+        "producer_receipt_hash": semantic_admission["producer_receipt_hash"],
+        "producer_id": semantic.get("producer_id"),
+        "producer_version": semantic.get("producer_version"),
+        "policy_version": semantic.get("policy_version"),
+        "case_id": semantic.get("case_id"),
+        "artifact_type": semantic.get("artifact_type"),
+    }
+    if (
+        semantic_admission["status"] != "ADMITTED"
+        or semantic_admission["artifact_hash"] != semantic.get("artifact_hash")
+        or semantic_admission["producer_receipt_hash"] != producer.get("receipt_hash")
+        or semantic_admission["admission_hash"] != canonical_hash(admission_core)
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: semantic producer admission does not bind the exact artifact and receipt"
+        )
+    _require_content_addressed_artifact(root, suffix="semantic-artifact", payload=semantic)
+    _require_content_addressed_artifact(root, suffix="semantic-producer-receipt", payload=producer)
+    _require_content_addressed_artifact(root, suffix="semantic-admission", payload=semantic_admission)
+
+    forecast_ref = bundle["canonical_forecast_ref"]
+    forecast_record = bundle["forecast_record"]
+    if not isinstance(forecast_ref, Mapping) or not isinstance(forecast_record, Mapping):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: canonical Forecast reference/record must be objects"
+        )
+    try:
+        parsed_forecast_ref = CanonicalIndependentForecastReference.from_mapping(forecast_ref)
+        validate_canonical_independent_forecast_admission(forecast_record)
+    except (TypeError, ValueError) as exc:
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: canonical Forecast admission validation failed"
+        ) from exc
+    if (
+        len(forecast_stage["output_refs"]) != 1
+        or len(forecast_stage["output_hashes"]) != 1
+        or forecast_stage["output_refs"][0] != parsed_forecast_ref.forecast_id
+        or forecast_stage["output_hashes"][0] != parsed_forecast_ref.admission_record_hash
+        or forecast_record.get("forecast_id") != parsed_forecast_ref.forecast_id
+        or forecast_record.get("admission_record_hash") != parsed_forecast_ref.admission_record_hash
+        or forecast_record.get("status") != "ADMITTED"
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: FORECAST_ADMITTED receipt does not bind the exact forecast admission record"
+        )
+    for field, expected in {
+        "case_id": identity["case_id"], "market": identity["market"],
+        "symbol": identity["symbol"], "cutoff_date": identity["cutoff_date"],
+    }.items():
+        if forecast_record.get(field) != expected:
+            raise CanonicalRunAuthorizationError(
+                f"BLOCKED: forecast admission {field} identity mismatch"
+            )
+    # Forecast records are separately admitted in the canonical forecast registry.
+    # Their evidence IDs may belong to a separately versioned upstream evidence
+    # set (for example forecast anchors E009/E010) and need not all be repeated in
+    # the B2 company manifest. The content-addressed admission record is validated
+    # here; provenance admission remains owned by its canonical evidence/forecast
+    # admission boundary rather than by string-set equality against this manifest.
+    _require_content_addressed_artifact(root, suffix="forecast-admission", payload=forecast_record)
+
+    valuation_ref = bundle["canonical_valuation_ref"]
+    valuation_admission = bundle["valuation_admission_record"]
+    valuation_output = bundle["valuation_output"]
+    if not isinstance(valuation_ref, Mapping) or not isinstance(valuation_admission, Mapping) or not isinstance(valuation_output, Mapping):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: canonical Valuation reference/admission/output must be objects"
+        )
+    try:
+        parsed_valuation_ref = CanonicalInvestmentAdmissionReference.from_mapping(valuation_ref)
+        validate_canonical_investment_admission_record(valuation_admission)
+        validate_canonical_valuation_output(valuation_output)
+    except (TypeError, ValueError) as exc:
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: canonical Valuation admission/output validation failed"
+        ) from exc
+    expected_valuation_ref = {
+        "admission_id": parsed_valuation_ref.admission_id,
+        "admission_record_hash": parsed_valuation_ref.admission_record_hash,
+        "contract_version": parsed_valuation_ref.contract_version,
+        "domain": parsed_valuation_ref.domain,
+        "case_id": parsed_valuation_ref.case_id,
+        "market": parsed_valuation_ref.market,
+        "symbol": parsed_valuation_ref.symbol,
+        "company": parsed_valuation_ref.company,
+        "cutoff_date": parsed_valuation_ref.cutoff_date,
+    }
+    if (
+        expected_valuation_ref != dict(valuation_ref)
+        or parsed_valuation_ref.domain != "VALUATION"
+        or valuation_admission.get("status") != "ADMITTED"
+        or valuation_admission.get("domain") != "VALUATION"
+        or valuation_admission.get("admission_id") != parsed_valuation_ref.admission_id
+        or valuation_admission.get("admission_record_hash") != parsed_valuation_ref.admission_record_hash
+        or valuation_admission.get("output_hash") != valuation_output.get("output_hash")
+        or valuation_output.get("forecast_ref") != dict(forecast_ref)
+        or len(valuation_stage["output_refs"]) != 1
+        or len(valuation_stage["output_hashes"]) != 1
+        or valuation_stage["output_refs"][0] != parsed_valuation_ref.admission_id
+        or valuation_stage["output_hashes"][0] != parsed_valuation_ref.admission_record_hash
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: VALUATION_ADMITTED receipt does not bind the exact admitted valuation output"
+        )
+    for field, expected in {
+        "case_id": identity["case_id"], "market": identity["market"],
+        "symbol": identity["symbol"], "company": bundle["company"],
+        "cutoff_date": identity["cutoff_date"],
+    }.items():
+        if valuation_admission.get(field) != expected or valuation_output.get(field) != expected:
+            raise CanonicalRunAuthorizationError(
+                f"BLOCKED: valuation admission/output {field} identity mismatch"
+            )
+    # Valuation Admission has its own domain-owned evidence lineage. Do not
+    # equate its evidence namespace to the B2 company-manifest namespace; validate
+    # the admitted record/output hash binding and exact persisted bytes instead.
+    _require_content_addressed_artifact(root, suffix="valuation-admission", payload=valuation_admission)
+    _require_content_addressed_artifact(root, suffix="valuation-output", payload=valuation_output)
+
+    if (
+        decision_pending.get("input_refs") != [parsed_forecast_ref.forecast_id, parsed_valuation_ref.admission_id]
+        or decision_pending.get("input_hashes") != [parsed_forecast_ref.admission_record_hash, parsed_valuation_ref.admission_record_hash]
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: DECISION_PENDING does not bind admitted Forecast and Valuation records"
+        )
+    validated_lineage = bundle["validated_lineage"]
+    if (
+        not isinstance(validated_lineage, Mapping)
+        or validated_lineage.get("status") != "PASS"
+        or validated_lineage.get("lineage_version") != FORECAST_VALUATION_RETURN_LINEAGE_VERSION
+        or validated_lineage.get("canonical_forecast_ref") != dict(forecast_ref)
+        or validated_lineage.get("canonical_valuation_ref") != dict(valuation_ref)
+        or validated_lineage.get("forecast_id") != forecast_record.get("forecast_id")
+        or validated_lineage.get("valuation_id") != valuation_output.get("valuation_id")
+        or validated_lineage.get("binding") != "FORECAST_REF_EQUALITY_AND_CANONICAL_VALUATION_SCENARIO_EQUALITY"
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: persisted Forecast/Valuation return-lineage admission is inconsistent"
+        )
+    return dict(bundle)
+
+
 def authorize_decision_revision_write(
     root: str | Path,
     *,
@@ -541,6 +947,7 @@ def authorize_decision_revision_write(
     expected_hashes = [manifest_hash, *[str(x.get("content_sha256", "")) for x in manifest_evidence]]
     if evidence_stage["output_refs"] != expected_refs or evidence_stage["output_hashes"] != expected_hashes:
         raise CanonicalRunAuthorizationError("BLOCKED: Evidence stage receipts differ from the admitted Manifest")
+    _validate_canonical_upstream_admissions(root, record)
     if any((
         str(envelope["case_id"]) != str(snapshot_identity["case_id"]),
         str(envelope["market"]).upper() != str(snapshot_identity["market"]),
@@ -574,6 +981,7 @@ def authorize_publication_write(
     )
     run_id = str(revision["run_id"])
     record = _load_record(root, run_id)
+    _validate_canonical_upstream_admissions(root, record)
     env = record["envelope"]
     if env["stage_state"] == Stage.HUMAN_APPROVAL_PENDING.value:
         return make_stage_authority_ref(
@@ -608,6 +1016,7 @@ def authorize_report_write(
     )
     run_id = str(run_ref["run_id"])
     record = _load_record(root, run_id)
+    _validate_canonical_upstream_admissions(root, record)
     env = record["envelope"]
     if env["stage_state"] not in {
         Stage.PUBLISHED.value, Stage.REPORTED.value, Stage.COMPLETE.value

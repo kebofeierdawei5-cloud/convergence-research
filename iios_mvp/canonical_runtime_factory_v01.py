@@ -203,6 +203,29 @@ class FileSystemCanonicalValuationOutputResolver:
         self.records_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         self._admission_resolver = admission_resolver
 
+    def resolve_valuation_admission(
+        self,
+        reference: Mapping[str, Any],
+        *,
+        case_id: str,
+        market: str,
+        symbol: str,
+        company: str,
+        cutoff_date: date,
+    ) -> dict[str, Any]:
+        """Return the exact immutable admission record used to authorize output resolution."""
+        ref = _strict_ref(reference, "valuation_reference")
+        admission = self._admission_resolver.resolve(
+            ref,
+            expected_domain="VALUATION",
+            case_id=case_id,
+            market=market,
+            symbol=symbol,
+            company=company,
+            cutoff_date=cutoff_date,
+        )
+        return admission.to_dict()
+
     def resolve_valuation_output(
         self,
         reference: Mapping[str, Any],

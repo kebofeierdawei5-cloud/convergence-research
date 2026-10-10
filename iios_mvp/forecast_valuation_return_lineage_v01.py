@@ -125,6 +125,13 @@ def _validate_valuation_output(record: Mapping[str, Any]) -> None:
         raise ValueError("canonical valuation output hash mismatch")
 
 
+def validate_canonical_valuation_output(record: Mapping[str, Any]) -> None:
+    """Public, deterministic validator for a persisted canonical valuation output."""
+    if not isinstance(record, Mapping):
+        raise ValueError("canonical valuation output must be an object")
+    _validate_valuation_output(record)
+
+
 def build_canonical_valuation_output(payload: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(payload, Mapping):
         raise ValueError("valuation output payload must be an object")
@@ -158,6 +165,18 @@ def build_canonical_valuation_output(payload: Mapping[str, Any]) -> dict[str, An
 
 
 class CanonicalValuationOutputResolver(Protocol):
+    def resolve_valuation_admission(
+        self,
+        reference: Mapping[str, Any],
+        *,
+        case_id: str,
+        market: str,
+        symbol: str,
+        company: str,
+        cutoff_date: date,
+    ) -> dict[str, Any]:
+        ...
+
     def resolve_valuation_output(
         self,
         reference: Mapping[str, Any],
@@ -210,6 +229,27 @@ class InMemoryCanonicalValuationOutputResolver:
         if admission.output_hash != output["output_hash"]:
             raise ValueError("admitted VALUATION output_hash does not match materialized valuation output")
         self._outputs[ref["admission_record_hash"]] = output
+
+    def resolve_valuation_admission(
+        self,
+        reference: Mapping[str, Any],
+        *,
+        case_id: str,
+        market: str,
+        symbol: str,
+        company: str,
+        cutoff_date: date,
+    ) -> dict[str, Any]:
+        ref = _strict_ref(reference, "valuation_reference")
+        return self._admission_resolver.resolve(
+            ref,
+            expected_domain="VALUATION",
+            case_id=case_id,
+            market=market,
+            symbol=symbol,
+            company=company,
+            cutoff_date=cutoff_date,
+        ).to_dict()
 
     def resolve_valuation_output(
         self,
@@ -327,6 +367,10 @@ def validate_forecast_valuation_return_lineage(
         "horizon_years": str(valuation_horizon),
         "reference_value_per_share": str(canonical_reference),
         "binding": "FORECAST_REF_EQUALITY_AND_CANONICAL_VALUATION_SCENARIO_EQUALITY",
+        # Retain exact resolver-returned payloads so formal write authorization
+        # can revalidate them after the process that performed admission exits.
+        "forecast_record": dict(forecast),
+        "valuation_output": dict(valuation),
     }
 
 

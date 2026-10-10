@@ -379,6 +379,13 @@ class InMemoryCanonicalIndependentForecastRegistry:
         return dict(record)
 
 
+def validate_canonical_independent_forecast_admission(record: Mapping[str, Any]) -> None:
+    """Public, deterministic validator for a persisted admitted forecast record."""
+    if not isinstance(record, Mapping):
+        raise ValueError("canonical independent forecast admission must be an object")
+    _validate_record(record)
+
+
 def canonical_independent_expectation_from_record(
     record: Mapping[str, Any],
 ) -> dict[str, Any]:
