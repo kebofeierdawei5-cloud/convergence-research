@@ -2,6 +2,6 @@
   "schema_version": "IIOS-COMPANY-EVIDENCE-CAPTURE-REQUEST-0.1",
   "case_id": "RC-CN-A-605016-20261009",
   "manifest_path": "manifests/company_cases/RC-CN-A-605016-20261009.json",
-  "acquisition_attempt": 3,
-  "note": "Attempt 3: use registered source refs and Sohu price-history candidate; previous Investing HTTP_REQUEST_FAILED remains preserved in ROUTE_A_CAPTURE_ATTEMPTS_20261010.md."
+  "acquisition_attempt": 4,
+  "note": "Attempt 4: enforce expected_payload_type and independent payload-contract replay. Retain raw mismatched bytes, but exclude HTML challenge payloads from B2 Evidence candidates. Prior run 3's 8/9 SSE PDF URL challenge responses are documented in ROUTE_A_CAPTURE_ATTEMPTS_20261010.md."
 }
