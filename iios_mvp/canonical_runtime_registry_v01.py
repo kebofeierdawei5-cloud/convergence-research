@@ -86,6 +86,8 @@ def validate_canonical_runtime_bindings(runtime: Any) -> CanonicalRuntimeBinding
     producer_fields = ("producer_id", "producer_type", "producer_version", "policy_version")
     if not callable(getattr(producer, "produce", None)):
         raise ValueError("semantic producer must implement callable produce(request)")
+    if getattr(producer, "producer_type", None) != "LLM_SEMANTIC_PRODUCER":
+        raise ValueError("canonical natural-language entry requires an LLM semantic producer")
     if any(not isinstance(getattr(producer, field, None), str)
            or not getattr(producer, field).strip()
            for field in producer_fields):
