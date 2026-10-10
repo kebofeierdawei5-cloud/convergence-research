@@ -159,7 +159,7 @@ def test_source_fetch_enforces_deadline_between_small_reads(monkeypatch):
     # at t=119, beyond the t=118 deadline, and must be rejected immediately.
     ticks = iter([100.0, 101.0, 119.0])
     monkeypatch.setattr(intake, "build_opener", lambda handler: FakeOpener())
-    monkeypatch.setattr(intake.time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(intake._clock, "monotonic", lambda: next(ticks))
     with pytest.raises(intake.SourceCaptureError, match="SOURCE_FETCH_DEADLINE_EXCEEDED"):
         intake._fetch_url("https://example.com/report.pdf")
     assert called["timeout"] == intake.SOURCE_READ_TIMEOUT_SECONDS == 8
