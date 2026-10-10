@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import os
+import sys
 import pytest
 
 from tools import iios_private_605016_b2_ingest_v01 as MODULE
@@ -349,3 +350,23 @@ def test_real_investment_core_validator_replays_exact_manifest_bytes(tmp_path: P
     errors = MODULE._validate_core(manifest, raw_root, validator=None)
 
     assert any("EXACT_BYTES_MISMATCH" in error for error in errors)
+
+
+
+def test_main_renders_validation_error_as_blocked_json_not_traceback(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(sys, "argv", ["iios_private_605016_b2_ingest_v01.py"])
+    monkeypatch.setattr(
+        MODULE,
+        "ingest_private_b2_candidate",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            ValueError("OFFICIAL_DIVIDEND_PDF_DIRECT_HTTPS_FETCH_BLOCKED")
+        ),
+    )
+
+    code = MODULE.main()
+    output = capsys.readouterr().out
+
+    assert code == 2
+    assert '"status": "BLOCKED"' in output
+    assert '"reason": "OFFICIAL_DIVIDEND_PDF_DIRECT_HTTPS_FETCH_BLOCKED"' in output
+    assert "Traceback" not in output
