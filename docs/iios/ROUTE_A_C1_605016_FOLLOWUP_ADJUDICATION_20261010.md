@@ -34,16 +34,23 @@ Case：`RC-CN-A-605016-20261009`
 严格日期型 cutoff `2026-10-09` 的含义是只使用当日开始前已知的价格。因此本案应核验最后一个完整交易日 **2026-10-08** 的收盘，不应把 2026-10-09 的收盘倒灌进当日开始时点。
 
 - 上交所官方日 K 服务的 HTTPS 入口无法取得响应：标准 HTTPS 主机报网络不可达；同一服务的 HTTPS:32041 返回 SSL 协议不匹配；另一个尝试的 HTTPS 查询路由返回 404。
-- 该官方主机的 HTTP:32041 路由返回了精确的 2026-10-08 日 K 行：开盘 21.00、最高 21.24、最低 20.01、收盘 **20.22 元**、成交量 4,636,300 股、成交额 95,082,618 元。原始响应只有 124 bytes，SHA-256 `45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480`。
+- 较早的 HTTP:32041 路由返回过 2026-10-08 日 K 候选，但未加密传输不满足 intake 合同。该响应为 124 bytes，SHA-256 `45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480`；具体行情值不在公共仓库重复发布。
 - **不准入原因明确：**当前原始证据 intake contract 要求 HTTPS。虽然 HTTP 响应来自 SSE 官方域名、日期和数值结构匹配，未加密传输不能满足该合同，故状态是 `BLOCKED_HTTP_TRANSPORT_NOT_ADMISSIBLE`。没有把它写进 B2 manifest。
-- 二级来源显示 2026-10-09 收盘 20.28 元、2026-10-08 收盘 20.22 元，但 Eastmoney 官网法律声明已被实际抓取和检查。其第八节要求未获书面许可不得复制/转载网站内容，第十节特别要求未经上交所/深交所事先书面同意不得复制、传播、转播或展示行情信息。当前没有拿到书面授权，所以不能把 Eastmoney 数据复制进 B2 Evidence/PIT manifest；仅作为“未准入的交叉核对”记录其 URL/hash。历史表中 20.73 元对应 2026-09-29，不是 2026-10-09。
+- 二级来源只用于诊断日期/字段冲突，具体行情值不在公共仓库重发。Eastmoney 法律声明要求行情信息的复制/传播须取得交易所事先书面同意；目前没有该授权，因此 Eastmoney 被排除。Yahoo 条款要求自动化采集须事先许可，亦被排除。
 - 所以当前唯一缺口仍为 `market_price`。官方数据通道的问题是 HTTPS 不可达且 HTTP 不符合 intake 合同；二级数据通道的问题是网站法律声明要求书面授权复制行情数据，而授权尚未取得。两条都不能变为 ADMITTED。不允许把 HTTP 原始行、未经授权的二级来源或检索时间伪造成已知 PIT 事实，也不放宽 HTTPS intake 或 cutoff。
 
 - Eastmoney 法律声明原始页已在 [Follow-up capture run #38039773596](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38039773596) 中捕获；法律页面 URL `https://about.eastmoney.com/home/legal`，原始 HTML SHA-256 `2f669b80d2ca640e0d4f2995c3cdbb77c4abc4c150e761492f2aab44b06d78ca`。本结论只记录该声明的文本，不构成法律意见；但按 IIOS “授权复用必须单独通过”的原则，没有书面授权就不准入该行情源。
 
 机器记录：`evidence/real_cases/RC-CN-A-605016-20261009/PRICE_CUTOFF_SOURCE_ADJUDICATION_20261010.json` 与 `FOLLOWUP_B2_RUN_20261010.json`。
 
-## 四、下一道门
+## 四、最新官方 HTTPS B2/PIT 重跑 — 2026-10-10
+
+最新工作流 [#38050190177](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38050190177) 使用上交所官方 HTTPS/TLS 日 K 接口，并将真实 Attempt 10、正式分红实施公告和价格候选送入未修改的 B2/PIT 核心。候选清单通过：11 条记录、七组必需字段全覆盖、0 个校验错误。公开 artifact [#11669076729](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38050190177/artifacts/11669076729) 只保存日期、URL、字段形状、哈希和状态，不含行情数值、原始价格字节或完整候选清单。
+
+此结果为 **PASS_EPHEMERAL_B2**，不是私有持久化准入。下一步仍是本机重跑 `tools/Launch_IIOS_Private_605016_B2_Ingest.command`，再检查持久化副本是否通过 Investment Core-owned validator。`known_at` 采用前一交易日市场收盘事件时点，不是 API 的精确首次公开时刻，须独立审查。生产 Host、决策、报告、完整 Run Receipt 回放和独立 red-team 仍未验收。
+
+## 五、下一道门
+
 
 1. 继续寻找满足 HTTPS intake 契约的官方/授权免费 2026-10-08 收盘价来源，并单独核验来源版本、字段含义、已知时间和复用条款；如找不到，价格继续 UNKNOWN。
 2. 新价格通过后，运行原封不动的 B2/PIT validator。只有七组全部被有效记录覆盖，才允许进入正式估值和决策链。
