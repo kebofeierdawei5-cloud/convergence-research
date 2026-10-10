@@ -99,6 +99,42 @@ def test_trusted_factory_builds_all_eight_validated_bindings_without_paid_api_ke
     assert not list((out / "live-provider-evidence").glob("*.json"))
 
 
+
+def test_trusted_factory_accepts_self_hosted_loopback_endpoint_without_api_key(tmp_path, monkeypatch):
+    values, _, out = _env(tmp_path, monkeypatch)
+    values.pop("IIOS_LLM_PROVIDER_API_KEY", None)
+    values["IIOS_LLM_PROVIDER_BASE_URL"] = "http://127.0.0.1:11434/v1/responses"
+    values["IIOS_LLM_PROVIDER_AUTH_MODE"] = "NONE"
+    values["IIOS_LLM_PROVIDER_DEPLOYMENT_MODE"] = "SELF_HOSTED"
+    runtime = build_canonical_runtime(bundle=_bundle(), output_root=out, env=values)
+    assert validate_canonical_runtime_bindings(runtime) is runtime
+    assert runtime.request_interpreter.interpreter_id == "iios-live-json-request-interpreter"
+    assert runtime.semantic_producer.producer_type == "LLM_SEMANTIC_PRODUCER"
+    assert not list((out / "live-provider-evidence").glob("*.json"))
+
+
+@pytest.mark.parametrize(
+    "endpoint,auth_mode,deployment_mode",
+    [
+        ("http://provider.example/v1/responses", "NONE", "SELF_HOSTED"),
+        ("http://192.168.1.20:11434/v1/responses", "NONE", "SELF_HOSTED"),
+        ("http://127.0.0.1:11434/v1/responses", "BEARER", "SELF_HOSTED"),
+        ("http://127.0.0.1:11434/v1/responses", "NONE", "EXTERNAL"),
+    ],
+)
+def test_trusted_factory_rejects_http_outside_local_no_auth_policy(
+    tmp_path, monkeypatch, endpoint, auth_mode, deployment_mode
+):
+    values, _, out = _env(tmp_path, monkeypatch)
+    values["IIOS_LLM_PROVIDER_BASE_URL"] = endpoint
+    values["IIOS_LLM_PROVIDER_AUTH_MODE"] = auth_mode
+    values["IIOS_LLM_PROVIDER_DEPLOYMENT_MODE"] = deployment_mode
+    if auth_mode == "NONE":
+        values.pop("IIOS_LLM_PROVIDER_API_KEY", None)
+    with pytest.raises(ValueError):
+        build_canonical_runtime(bundle=_bundle(), output_root=out, env=values)
+
+
 def test_trusted_factory_blocks_unbound_case_identity(tmp_path, monkeypatch):
     env, _, out = _env(tmp_path, monkeypatch)
     bundle = _bundle()
