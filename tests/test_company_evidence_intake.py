@@ -121,6 +121,22 @@ def test_https_download_retains_exact_response_bytes(monkeypatch, tmp_path):
     assert verify_intake(out)["raw_bytes_verified"] == 1
 
 
+def test_declared_pdf_with_real_pdf_magic_passes_payload_contract(tmp_path):
+    _, out, receipt = run_capture(
+        tmp_path,
+        source_overrides={"expected_payload_type": "PDF"},
+    )
+    row = receipt["sources"][0]
+    assert row["capture_status"] == "SUCCESS"
+    assert row["payload_contract_status"] == "PASS"
+    assert row["payload_contract_error"] is None
+    assert (out / row["raw_artifact_path"]).read_bytes().startswith(b"%PDF-1.7")
+    verification = verify_intake(out)
+    assert verification["payload_contract_checked"] == 1
+    assert verification["payload_contract_passes"] == 1
+    assert verification["payload_contract_mismatches"] == 0
+
+
 def test_expected_pdf_http_200_gzip_html_challenge_is_retained_but_payload_blocked(monkeypatch, tmp_path):
     import gzip
 
