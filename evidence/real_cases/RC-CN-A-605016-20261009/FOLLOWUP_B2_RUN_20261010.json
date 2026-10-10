@@ -56,5 +56,14 @@
     "Retry an HTTPS official SSE market-data endpoint or resolve reuse/source-vintage through a different authorized HTTPS source.",
     "Until a price Evidence Record passes the unchanged core PIT validator, do not generate a formal valuation, Decision Revision, publication, investor report or complete Run Receipt.",
     "After B2 passes, separately configure the deployed Host and complete a genuine 605016 host-origin semantic/Forecast/Valuation/decision/report/receipt replay and independent red-team."
-  ]
+  ],
+  "latest_followup_capture": {
+    "run_id": 38039572043,
+    "result": "SUCCESS",
+    "artifact_id": 11664868356,
+    "artifact_sha256": "5567217818f06a2d7e6df5e419d08fa6792bb8cf1a2faf3ac876286bfb340f2c",
+    "official_dividend_pdf_sha256": "1a153c20f908abbd48fdd63a651ecb0edde269f3e7dd0ea27a0b8ce420e5ea8c",
+    "official_price_candidate_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480",
+    "official_price_candidate_status": "BLOCKED_HTTP_TRANSPORT_NOT_ADMISSIBLE"
+  }
 }
