@@ -16,13 +16,12 @@
     "http_status": 200,
     "content_type": "application/json;charset=UTF-8",
     "exact_row": {
-      "date": "2026-10-08",
-      "open_cny": 21,
-      "high_cny": 21.24,
-      "low_cny": 20.01,
-      "close_cny": 20.22,
-      "volume_shares": 4636300,
-      "turnover_cny": 95082618
+      "observation_date": "2026-10-08",
+      "field_count": 7,
+      "numeric_market_quote_values": "WITHHELD_FROM_PUBLIC_REPOSITORY",
+      "raw_payload_size_bytes": 124,
+      "raw_payload_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480",
+      "transport_status": "BLOCKED_HTTP_TRANSPORT_NOT_ADMISSIBLE"
     },
     "secure_transport_attempts": [
       {
@@ -52,30 +51,30 @@
   "secondary_cross_checks": {
     "stockstar": {
       "observation_date": "2026-10-09",
-      "close_cny": 20.28,
       "publication_time": "2026-10-09T18:09:28+08:00",
       "content_sha256": "0d78fe37969224552a3309e85d078a352f864b77d9c4f785db50329dd9562f98",
+      "numeric_market_quote_values": "WITHHELD_FROM_PUBLIC_REPOSITORY",
       "status": "UNKNOWN_NOT_ADMITTED",
-      "reason": "Underlying quote authority and reuse status unresolved; also after the date-only cutoff instant."
+      "reason": "Secondary article is after the original date-only cutoff instant; underlying quote authority/reuse was not admitted."
     },
     "eastmoney": {
-      "observation_date": "2026-10-09",
-      "close_cny": 20.28,
+      "observation_date": "2026-10-08/2026-10-09",
       "status": "EXCLUDED_FOR_CANONICAL_EVIDENCE_REUSE_UNLESS_EXCHANGE_WRITTEN_PERMISSION_EXISTS",
       "terms": {
         "url": "https://about.eastmoney.com/home/legal",
         "response_sha256": "2f669b80d2ca640e0d4f2995c3cdbb77c4abc4c150e761492f2aab44b06d78ca",
         "captured_in_artifact_id": 11664868816,
         "homepage_sha256": "78c9972b6d2e14ba38a0e71a7cd7d082b4d998473b3e5a95e0fba469d5a1aa34",
-        "legal_clause": "Section X: without prior written consent of the Shanghai/Shenzhen Stock Exchanges, no institution or individual may copy, disseminate, rebroadcast, demonstrate or otherwise distribute market quotation information from Eastmoney's website.",
-        "adjudication": "FAIL_CLOSED; no reuse of Eastmoney quote as canonical price evidence without prior written exchange permission."
+        "legal_clause_summary": "Eastmoney's public legal statement requires prior written Shanghai/Shenzhen Stock Exchange consent before market-quote information is copied, distributed, rebroadcast, demonstrated or otherwise disseminated.",
+        "adjudication": "FAIL_CLOSED_FOR_CANONICAL_RAW_EVIDENCE_REUSE"
       },
-      "reason": "Secondary aggregator; legal terms explicitly restrict reuse of market-quote information absent prior written exchange permission. Do not promote its value into the B2 manifest."
+      "numeric_market_quote_values": "WITHHELD_FROM_PUBLIC_REPOSITORY",
+      "reason": "No prior written permission exists; Eastmoney quote information is excluded from canonical Evidence/PIT."
     },
-    "date_error_reconciliation": "The 20.73 CNY entry belongs to 2026-09-29, not 2026-10-09."
+    "date_error_reconciliation": "An earlier secondary historical table row was dated to a different session than the target close. Numerical quote values are withheld from this public repository."
   },
-  "b2_decision": "MARKET_PRICE_REMAINS_UNKNOWN_AND_BLOCKED",
-  "next_admissible_path": "Obtain the official row through an HTTPS source that satisfies the current intake contract, or independently adjudicate a permitted source with source vintage/reuse terms and PIT basis. Do not admit the plain-HTTP response or shift the date-only cutoff.",
+  "b2_decision": "EPHEMERAL_B2_PASS_ON_OFFICIAL_HTTPS_SOURCE; CANONICAL_DURABLE_ADMISSION_AND_PRODUCTION_HOST_ACCEPTANCE_PENDING",
+  "next_admissible_path": "Persist exact official HTTPS source bytes and signed admission privately in the operator-controlled Host data root, repeat the unchanged B2/PIT gate there, and obtain independent review of the market-session-close known_at basis. Do not upload or commit numeric quote values/raw market data into this public repository.",
   "latest_capture_attempt": {
     "run_id": 38039572043,
     "run_head": "8fd654ad26ef3671a7d2ba94b3ee0785587e0d40",
@@ -100,5 +99,43 @@
     "http_payload_size_bytes": 124,
     "http_payload_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480",
     "data_row_matches_previous_capture": true
-  }
+  },
+  "yahoo_candidate": {
+    "status": "EXCLUDED_FOR_AUTOMATED_COLLECTION_WITHOUT_EXPRESS_PRIOR_PERMISSION",
+    "terms_url": "https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html",
+    "terms_sha256": "4bcdd5402dcb56638165e1566de0c6a980b31a42eb3ab7ff092e1f9dacb2a257",
+    "disposition": "Exploratory PR #288 was closed without merge; its quote-capture artifact was deleted and verified absent. Yahoo remains excluded unless express prior permission is obtained."
+  },
+  "latest_official_https_b2_run": {
+    "run_id": 38041208974,
+    "run_url": "https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38041208974",
+    "code_merge_commit": "05069aa9d4e45f3eb39bc8bf3b55f0f2203f95ae",
+    "output_artifact_id": 11665881455,
+    "output_artifact_sha256": "4203898caf2d98277713a09b0dd8d5c5dc855d059a4c6186eeec6dd0a2cf6dc8",
+    "result": "PASS_EPHEMERAL_B2",
+    "official_https_response_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480",
+    "response_size_bytes": 124,
+    "observation_date": "2026-10-08",
+    "row_match_count": 1,
+    "row_field_count": 7,
+    "numeric_market_quote_values": "NOT_IN_REPORT_ARTIFACT_OR_GIT",
+    "raw_source_bytes": "NOT_UPLOADED",
+    "candidate_manifest_sha256": "523da9b9b67a5dda7ba33fa45c3365e8892f616cb67fa14b7e77fdffcf9375ec",
+    "evidence_records": 11,
+    "admitted_field_groups": [
+      "business_reality",
+      "capital_structure",
+      "corporate_disclosures",
+      "financial_reality",
+      "market_price",
+      "security_identity",
+      "trust_governance_events"
+    ],
+    "missing_field_groups": [],
+    "validation_errors": [],
+    "canonical_durable_admission": false,
+    "production_host_acceptance": false,
+    "known_at_basis": "2026-10-08T15:00:00+08:00, market-session close event time; official endpoint does not expose an exact first-public timestamp."
+  },
+  "public_repository_policy": "This repository is public. Non-admitted or restricted market quote values and raw price bytes are intentionally not reproduced here."
 }
