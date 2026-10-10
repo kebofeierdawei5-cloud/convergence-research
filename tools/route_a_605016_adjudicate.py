@@ -11,14 +11,15 @@ from research.b2.company_evidence import (
     build_company_evidence_manifest,
     verify_raw_artifact,
 )
+from research.b2.evidence_contract import assert_pit, validate_evidence_record
 
 EXPECTED_BLOCKERS = (
+    "EVIDENCE[605016-MEETING-CB-RESOLUTIONS-20261008]:PIT:PIT_FAIL: known_at exceeds cutoff",
     "EVIDENCE[605016-PRICE-CANDIDATE-20261009]:PIT:PIT_UNKNOWN: source availability/provenance is not established",
-    "REQUIRED_FIELD_GROUPS_UNCOVERED:market_price",
+    "REQUIRED_FIELD_GROUPS_UNCOVERED:corporate_disclosures,market_price",
 )
 EXPECTED_ADMITTED_GROUPS = {
     "security_identity",
-    "corporate_disclosures",
     "business_reality",
     "financial_reality",
     "capital_structure",
@@ -117,6 +118,23 @@ def adjudicate(input_dir: Path, out_dir: Path) -> dict[str, Any]:
     if ledger.get("case_id") != intake.get("case_id"):
         raise ValueError("SOURCE_ADJUDICATION_CASE_BINDING_MISMATCH")
 
+    ledger_sources = ledger.get("sources")
+    if not isinstance(ledger_sources, list) or len(ledger_sources) != 12:
+        raise ValueError("SOURCE_ADJUDICATION_LEDGER_SOURCE_COUNT_MISMATCH")
+    ledger_by_id = {
+        str(row.get("source_id")): row for row in ledger_sources if isinstance(row, Mapping)
+    }
+    if set(ledger_by_id) != set(by_receipt):
+        raise ValueError("SOURCE_ADJUDICATION_LEDGER_SOURCE_SET_MISMATCH")
+    for source_id, ledger_row in ledger_by_id.items():
+        receipt_row = by_receipt[source_id]
+        if (
+            str(ledger_row.get("raw_file")) != str(receipt_row.get("raw_artifact_path"))
+            or str(ledger_row.get("sha256")) != str(receipt_row.get("sha256"))
+            or str(ledger_row.get("source_url")) != str(by_spec[source_id].get("url") or "")
+        ):
+            raise ValueError(f"SOURCE_ADJUDICATION_LEDGER_RAW_BINDING_MISMATCH:{source_id}")
+
     candidates = ledger.get("evidence_candidates")
     if not isinstance(candidates, list) or not candidates:
         raise ValueError("EVIDENCE_CANDIDATES_REQUIRED")
@@ -196,21 +214,33 @@ def adjudicate(input_dir: Path, out_dir: Path) -> dict[str, Any]:
         raw_root=input_dir,
     )
     errors = list(manifest.get("validation_errors") or [])
-    actual_admitted_groups = {
-        str(item["field_id"]).split(".", 1)[0]
-        for item in evidence
-        if item.get("status") == "ADMITTED"
-        and item.get("provenance_class") != "UNKNOWN"
-    }
+    actual_admitted_groups: set[str] = set()
+    for item in evidence:
+        if item.get("status") != "ADMITTED" or item.get("provenance_class") == "UNKNOWN":
+            continue
+        if validate_evidence_record(item):
+            continue
+        try:
+            # The unchanged core contract treats a date-only cutoff as the
+            # beginning of that local date. A 10/09 18:09:28 disclosure is
+            # therefore outside a date-only 10/09 cutoff unless the governing
+            # case contract explicitly supplies an end-of-day timestamp.
+            assert_pit(item, str(ledger["cutoff_date"]))
+        except ValueError:
+            continue
+        actual_admitted_groups.add(str(item["field_id"]).split(".", 1)[0])
     missing_groups = sorted(set(REQUIRED_COMPANY_FIELD_GROUPS) - actual_admitted_groups)
 
     # Expected outcome is a real fail-closed result, not overall PASS:
-    # six source-adjudicated groups are covered; price is deliberately withheld
-    # until the official close/rights/source authority is established.
+    # five groups are covered by source-adjudicated facts. The same-day meeting
+    # resolution fails the current date-only cutoff, and market price remains
+    # UNKNOWN. No cutoff semantics or core B2/PIT rule is modified here.
     if manifest.get("status") != "BLOCKED":
-        raise AssertionError(f"B2_MUST_REMAIN_BLOCKED_UNTIL_PRICE_ADMISSION:{manifest.get('status')}")
-    if missing_groups != ["market_price"]:
+        raise AssertionError(f"B2_MUST_REMAIN_BLOCKED_BY_CURRENT_PIT_GATES:{manifest.get('status')}")
+    if missing_groups != ["corporate_disclosures", "market_price"]:
         raise AssertionError(f"UNEXPECTED_MISSING_GROUPS:{missing_groups}")
+    if actual_admitted_groups != EXPECTED_ADMITTED_GROUPS:
+        raise AssertionError(f"UNEXPECTED_ADMITTED_GROUPS:{sorted(actual_admitted_groups)}")
     if errors != list(EXPECTED_BLOCKERS):
         raise AssertionError(f"UNEXPECTED_B2_VALIDATION_ERRORS:{errors}")
     if unknown_count != 1:
@@ -238,7 +268,8 @@ def adjudicate(input_dir: Path, out_dir: Path) -> dict[str, Any]:
         "evidence_admission": False,
         "pit_admission": False,
         "validation_errors": errors,
-        "decision": "BLOCKED_AS_REQUIRED: market_price remains unadmitted; no valuation, Decision Revision, Publication, report or complete Run Receipt may be produced.",
+        "decision": "BLOCKED_AS_REQUIRED: corporate_disclosures fails the unchanged date-only cutoff semantics and market_price remains UNKNOWN; no valuation, Decision Revision, Publication, report or complete Run Receipt may be produced.",
+        "cutoff_semantics_note": "The unchanged core parses date-only cutoff 2026-10-09 as the start of that day. The 2026-10-09 18:09:28+08 meeting-disclosure known_at therefore fails PIT; no end-of-day reinterpretation was applied.",
         "raw_sources": raw_verification,
         "evidence_manifest_path": str(manifest_path.name),
         "non_claims": [
