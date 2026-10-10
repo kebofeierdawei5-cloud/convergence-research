@@ -6,6 +6,7 @@ on:
       - "iios_mvp/self_hosted_semantic_runtime_v01.py"
       - "iios_mvp/self_hosted_runtime_factory_v01.py"
       - "tests/test_self_hosted_semantic_runtime_v01.py"
+      - "tests/independent_redteam_self_hosted_runtime.py"
       - "docs/iios/P0_BATCH_B3_SELF_HOSTED_RUNTIME_20261010.md"
       - ".github/workflows/iios_p0_self_hosted_runtime.yml"
 
