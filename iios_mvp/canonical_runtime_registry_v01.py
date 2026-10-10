@@ -102,6 +102,19 @@ def validate_canonical_runtime_bindings(runtime: Any) -> CanonicalRuntimeBinding
         if getattr(producer_registration, field) != getattr(producer, field):
             raise ValueError("semantic producer identity/version/policy does not match its registry")
 
+    resolver_methods = {
+        "current_price_resolver": "resolve_current_price",
+        "independent_forecast_resolver": "resolve_independent_forecast",
+        "upstream_authority_resolver": "resolve",
+        "valuation_output_resolver": "resolve_valuation_output",
+    }
+    for binding_name, method_name in resolver_methods.items():
+        resolver = getattr(runtime, binding_name)
+        if not callable(getattr(resolver, method_name, None)):
+            raise ValueError(
+                f"{binding_name} must implement callable {method_name}(...)"
+            )
+
     return runtime
 
 
