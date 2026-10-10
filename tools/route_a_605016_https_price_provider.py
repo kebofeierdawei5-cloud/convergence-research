@@ -19,10 +19,20 @@ USER_AGENT = "IIOS-free-first-source-adjudication/0.1"
 SOCKET_TIMEOUT_SECONDS = 6
 TOTAL_FETCH_DEADLINE_SECONDS = 10
 MAX_BYTES = 10 * 1024 * 1024
-TARGET_KLINE_URL = (
-    "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?"
-    "param=sh605016,day,,,100"
-)
+KLINE_ENDPOINTS = [
+    {
+        "url": "https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=sh605016,day,,,100",
+        "adjustment": "UNADJUSTED_KLINE_ENDPOINT_CANDIDATE",
+    },
+    {
+        "url": "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sh605016,day,,,100,qfq",
+        "adjustment": "QFQ_ADJUSTED_CANDIDATE_NOT_EQUAL_TO_RAW_CLOSE",
+    },
+    {
+        "url": "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sh605016,day,,,100,hfq",
+        "adjustment": "HFQ_ADJUSTED_CANDIDATE_NOT_EQUAL_TO_RAW_CLOSE",
+    },
+]
 TARGET_STOCK_PAGE = "https://gu.qq.com/sh605016/gp"
 KNOWN_TERMS_PAGES = [
     "https://www.tencent.com/zh-cn/service-agreement.html",
@@ -189,32 +199,39 @@ def main() -> int:
             "Raw payloads are captured in temporary Actions artifacts only; do not commit raw quote bytes to Git."
         ]
     }
-    kline=fetch(TARGET_KLINE_URL,TARGET_STOCK_PAGE)
-    price_record={
+    price_record: dict[str, Any] = {
         "source_id":"PRICE-TENCENT-KLINE-605016-2026-10-08",
         "source_class":"PUBLIC_SECONDARY_MARKET_DATA_CANDIDATE",
-        "url":TARGET_KLINE_URL,
         "expected_date":REQUIRED_PRICE_DATE,
         "terms_reuse_status":"UNKNOWN_UNTIL_TERMS_REVIEW",
         "admission_status":"NOT_ADMITTED",
-        "capture":{k:v for k,v in kline.items() if k!="bytes"}
+        "endpoint_attempts":[],
+        "matching_rows":[],
     }
-    if kline.get("status")=="CAPTURED":
-        raw=kline["bytes"]
-        save(out,"raw/TENCENT-KLINE-605016.bin",raw)
-        price_record["raw_path"]="raw/TENCENT-KLINE-605016.bin"
-        try:
-            payload=parse_json_or_jsonp(raw)
-            matches=find_date_rows(payload)
-            price_record["payload_sha256"]=sha256(raw)
-            price_record["matched_2026_10_08_rows"]=matches
-            price_record["candidate_status"]="CROSS_CHECK_NOT_ADMITTED" if len(matches)==1 else "BLOCKED_EXPECTED_SINGLE_ROW_NOT_FOUND"
-        except (ValueError,UnicodeDecodeError,json.JSONDecodeError) as exc:
-            price_record["candidate_status"]="BLOCKED_RESPONSE_PARSE"
-            price_record["parse_error"]=str(exc)
-            price_record["payload_prefix"]=raw[:1000].decode("utf-8",errors="replace")
-    else:
-        price_record["candidate_status"]="BLOCKED_NO_HTTPS_PRICE_BYTES"
+    for index, endpoint in enumerate(KLINE_ENDPOINTS):
+        kline=fetch(endpoint["url"],TARGET_STOCK_PAGE)
+        attempt={"url":endpoint["url"],"adjustment":endpoint["adjustment"],"capture":{k:v for k,v in kline.items() if k!="bytes"}}
+        if kline.get("status")=="CAPTURED":
+            raw=kline["bytes"]
+            rel=f"raw/TENCENT-KLINE-CANDIDATE-{index+1}.bin"
+            save(out,rel,raw)
+            attempt.update({"raw_path":rel,"sha256":sha256(raw),"size_bytes":len(raw)})
+            try:
+                payload=parse_json_or_jsonp(raw)
+                matches=find_date_rows(payload)
+                attempt["matched_2026_10_08_rows"]=matches
+                attempt["payload_sha256"]=sha256(raw)
+                price_record["matching_rows"].extend(
+                    [{"endpoint_index":index+1,"adjustment":endpoint["adjustment"],**row} for row in matches]
+                )
+            except (ValueError,UnicodeDecodeError,json.JSONDecodeError) as exc:
+                attempt["parse_error"]=str(exc)
+                attempt["payload_prefix"]=raw[:1000].decode("utf-8",errors="replace")
+        price_record["endpoint_attempts"].append(attempt)
+    unadjusted_matches=[item for item in price_record["matching_rows"] if item.get("adjustment")=="UNADJUSTED_KLINE_ENDPOINT_CANDIDATE"]
+    price_record["candidate_status"] = "UNADJUSTED_ROW_CAPTURED_NOT_ADMITTED" if len(unadjusted_matches)==1 else "BLOCKED_UNADJUSTED_ROW_NOT_FOUND"
+    price_record["source_reuse_status"]="UNKNOWN_UNTIL_TERMS_REVIEW"
+    price_record["field_order_note"]="Tencent response schema has not yet been independently accepted; do not interpret adjusted qfq/hfq values as raw closing price."
     report["sources"].append(price_record)
     page=fetch(TARGET_STOCK_PAGE,"https://gu.qq.com/")
     page_record={"source_id":"TENCENT-STOCK-PAGE-605016","capture":{k:v for k,v in page.items() if k!="bytes"}}
@@ -235,7 +252,7 @@ def main() -> int:
     print(json.dumps({
         "overall_status":report["overall_status"],
         "price_candidate_status":price_record.get("candidate_status"),
-        "price_rows":price_record.get("matched_2026_10_08_rows"),
+        "price_rows":price_record.get("matching_rows"),
         "terms_status":report["sources"][-1].get("status"),
         "raw_file_count":len(report["raw_files"])
     },ensure_ascii=False,indent=2))
