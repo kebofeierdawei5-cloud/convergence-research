@@ -1,5 +1,6 @@
 import base64
 import json
+from pathlib import Path
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -53,6 +54,40 @@ def test_live_provider_config_requires_https():
     values = env()
     values["IIOS_LLM_PROVIDER_BASE_URL"] = "http://provider.example/v1/responses"
     with pytest.raises(LiveProviderPreflightError, match="must use HTTPS"):
+        load_live_provider_config(values)
+
+
+def test_live_provider_config_allows_self_hosted_loopback_http_without_api_key():
+    values = env()
+    values["IIOS_LLM_PROVIDER_BASE_URL"] = "http://127.0.0.1:11434/v1/responses"
+    values["IIOS_LLM_PROVIDER_AUTH_MODE"] = "NONE"
+    values["IIOS_LLM_PROVIDER_DEPLOYMENT_MODE"] = "SELF_HOSTED"
+    values.pop("IIOS_LLM_PROVIDER_API_KEY")
+    cfg = load_live_provider_config(values)
+    assert cfg.auth_mode == "NONE"
+    assert cfg.deployment_mode == "SELF_HOSTED"
+    assert cfg.base_url == "http://127.0.0.1:11434/v1/responses"
+
+
+@pytest.mark.parametrize(
+    "endpoint,auth_mode,deployment_mode",
+    [
+        ("http://127.0.0.1:11434/v1/responses", "BEARER", "SELF_HOSTED"),
+        ("http://127.0.0.1:11434/v1/responses", "NONE", "EXTERNAL"),
+        ("http://192.168.1.20:11434/v1/responses", "NONE", "SELF_HOSTED"),
+        ("http://provider.example/v1/responses", "NONE", "SELF_HOSTED"),
+    ],
+)
+def test_live_provider_config_rejects_http_outside_loopback_no_auth(
+    endpoint, auth_mode, deployment_mode
+):
+    values = env()
+    values["IIOS_LLM_PROVIDER_BASE_URL"] = endpoint
+    values["IIOS_LLM_PROVIDER_AUTH_MODE"] = auth_mode
+    values["IIOS_LLM_PROVIDER_DEPLOYMENT_MODE"] = deployment_mode
+    if auth_mode == "NONE":
+        values.pop("IIOS_LLM_PROVIDER_API_KEY")
+    with pytest.raises(LiveProviderPreflightError):
         load_live_provider_config(values)
 
 
@@ -175,6 +210,53 @@ def test_live_evidence_signature_and_replay_binding():
             prompt="hello",
         )
     verify_signed_live_evidence(record)
+
+
+def test_self_hosted_loopback_signed_receipt_passes_independent_verifier():
+    from unittest.mock import patch
+    import hashlib
+    from iios_mvp.live_provider_independent_verify_v01 import verify_live_evidence
+    cfg = LiveProviderConfig(
+        base_url="http://127.0.0.1:11434/v1/responses",
+        api_key="",
+        model="test-model",
+        runtime_private_key_b64=base64.b64encode(b"z" * 32).decode(),
+        provider_id="ollama-self-hosted",
+        provider_version="ollama-test;model/test-model",
+        protocol="OPENAI_RESPONSES",
+        timeout_seconds=30,
+        auth_mode="NONE",
+        deployment_mode="SELF_HOSTED",
+    )
+    payload = build_provider_payload(config=cfg, prompt="hello")
+    request_bytes = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    response_body = b'{"status":"completed","output_text":"{}"}'
+    mocked = LiveProviderResponse(
+        request_sha256=hashlib.sha256(request_bytes).hexdigest(),
+        response_sha256=hashlib.sha256(response_body).hexdigest(),
+        response_bytes=response_body,
+        http_status=200,
+        content_type="application/json",
+    )
+    with patch("iios_mvp.live_provider_evidence_v01.invoke_live_provider", return_value=mocked):
+        record = build_signed_live_evidence(
+            config=cfg,
+            run_id="local-run",
+            case_id="local-case",
+            request_id="local-request",
+            cutoff_date="2026-10-10",
+            prompt="hello",
+        )
+    verify_signed_live_evidence(record)
+    verified = verify_live_evidence(
+        record,
+        schema_path=Path(__file__).parents[1] / "schemas/live_provider_evidence_v0.1.schema.json",
+    )
+    assert record["auth_mode"] == "NONE"
+    assert record["deployment_mode"] == "SELF_HOSTED"
+    assert verified["status"] == "INDEPENDENT_VERIFIED"
 
 
 def test_live_evidence_tampering_is_blocked():
