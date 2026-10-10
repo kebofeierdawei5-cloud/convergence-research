@@ -11,7 +11,7 @@ cleanup() {
   rm -rf "$WORKDIR"
   if [ -t 0 ]; then
     if [ "$rc" -eq 0 ]; then
-      printf '%s\\n' "运行结束。按回车关闭窗口..."
+      printf '%s\n' "运行结束。按回车关闭窗口..."
     else
       printf '%s\\n' "运行被阻止或失败。请阅读上方错误。按回车关闭窗口..."
     fi
