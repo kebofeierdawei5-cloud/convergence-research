@@ -32,6 +32,13 @@ def test_cli_host_routes_natural_language_request_through_canonical_run(
     """A fresh request through the supported host persists run and stage receipts."""
     case, current_price, forecast, upstream, valuation = _case_and_resolvers()
     evidence_root, manifest, manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    # Materialize standards-compliant JSON for the real CLI file loader. The
+    # helper's returned mapping is fixture evidence; the CLI receives only the
+    # serialized manifest path, exactly as a host deployment would.
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     request_id = "host-b1-request-20261010"
     run_id = "host-b1-run-20261010"
     output_root = tmp_path / "canonical-runs"
