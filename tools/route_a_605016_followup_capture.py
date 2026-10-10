@@ -219,7 +219,7 @@ def official_exchange_price_capture(root: Path) -> dict[str, Any]:
     # Treat it as diagnostic until response schema, date and field are independently checked.
     url = (
         "http://yunhq.sse.com.cn:32041/v1/sh1/dayk/605016"
-        "?begin=20261009&end=20261009"
+        "?begin=20261008&end=20261008"
         "&select=date,open,high,low,close,volume,amount"
     )
     result = fetch(url, referer="https://www.sse.com.cn/market/stockdata/overview/day/")
@@ -227,7 +227,7 @@ def official_exchange_price_capture(root: Path) -> dict[str, Any]:
     if result.get("status") != "CAPTURED":
         fallback_url = (
             "https://query.sse.com.cn/marketdata/tradedata/data/stockDailyTransData.do?"
-            "isPagination=false&productId=605016&startDate=2026-10-09&endDate=2026-10-09"
+            "isPagination=false&productId=605016&startDate=2026-10-08&endDate=2026-10-08"
         )
         fallback = fetch(fallback_url, referer="https://www.sse.com.cn/market/stockdata/overview/day/")
         if fallback.get("status") == "CAPTURED":
@@ -236,9 +236,9 @@ def official_exchange_price_capture(root: Path) -> dict[str, Any]:
             result["fallback_attempt"] = {k: v for k, v in fallback.items() if k != "bytes"}
         result["primary_attempt"] = primary_capture
     record: dict[str, Any] = {
-        "source_id": "PRICE-SSE-OFFICIAL-DAYK-2026-10-09",
+        "source_id": "PRICE-SSE-OFFICIAL-DAYK-2026-10-08",
         "source_class": "OFFICIAL_EXCHANGE_MARKET_DATA_CANDIDATE",
-        "expected_observation_date": "2026-10-09",
+        "expected_observation_date": "2026-10-08",
         "url": url,
         "status": "BLOCKED",
         "capture": {k: v for k, v in result.items() if k != "bytes"},
@@ -246,7 +246,7 @@ def official_exchange_price_capture(root: Path) -> dict[str, Any]:
     if result.get("status") != "CAPTURED":
         return record
     raw = result["bytes"]
-    save_bytes(root, "raw/PRICE-SSE-DAYK-605016-2026-10-09.bin", raw)
+    save_bytes(root, "raw/PRICE-SSE-DAYK-605016-2026-10-08.bin", raw)
     record["saved_path"] = "raw/PRICE-SSE-DAYK-605016-2026-10-09.bin"
     record["payload_sha256"] = sha256(raw)
     record["size_bytes"] = len(raw)
@@ -259,7 +259,7 @@ def official_exchange_price_capture(root: Path) -> dict[str, Any]:
         return record
     record["payload_preview"] = payload
     matches = []
-    target_digits = "20261009"
+    target_digits = "20261008"
     target_iso = "2026-10-09"
     def visit(node: Any, pointer: str = "$") -> None:
         if isinstance(node, dict):
