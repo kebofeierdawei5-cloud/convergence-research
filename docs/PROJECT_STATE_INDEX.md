@@ -1,10 +1,10 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-09
+Snapshot: 2026-10-10
 Authority: this file is the **only canonical Current State Index**.
 
-## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-09
+## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-10
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
@@ -48,7 +48,7 @@ Status: **INCIDENT REPRODUCTION PASS / CANONICAL RECORD — PRODUCTION P0s OPEN*
 - Characterization tests: 6 / 6 PASS; compileall and diff-check PASS.
 - The tests reproduce canonical-entry, unadmitted-evidence, missing-semantic-artifact and run-receipt/write-binding bypasses.
 - This result proves the defect can be reproduced; it does not close P0-LLM-001 or P0-LLM-004, admit any company evidence, or establish investment-decision conformance.
-- Next batch: enforce the canonical research entry and run authorization at the final write boundary; replace characterization tests with fail-closed assertions and add a positive, fully authorized replay.
+- Historical successor completed: Batch 1 (PR #260) introduced canonical-run and stage-scoped write authorization and replaced characterization-only assertions with fail-closed regressions. The later PR #264 follow-up hardens host-registered and factory-loaded runtime bindings. Production-host integration and real-company evidence/semantic acceptance remain open.
 
 Canonical incident contract: `docs/iios/P0_CANONICAL_ENTRY_INCIDENT_REPRODUCTION_20261009.md`.
 
@@ -101,6 +101,25 @@ F-001 through F-005 have been remediated and independently re-audited. The fresh
 
 **B2-D LIVE provider integration = OPTIONAL / BLOCKED (NOT AN MVP GATE).** No provider runtime configuration or `LIVE_RESPONSE_CAPTURED + INDEPENDENT_VERIFIED` evidence has been supplied; that matters only if the optional external-LLM integration itself is being accepted.
 
+
+### P0 Follow-up — Runtime Binding Validation — 2026-10-10
+
+Status: **MERGED / EXACT-HEAD CI PASS / PRODUCTION RUNTIME ACCEPTANCE OPEN**
+
+- Canonical promotion: PR #264 merged; merge commit `e50018ffa5d8eec5909b98340ed74fe56c178344`.
+- Exact validated PR head: `32de0b1a47188e45ea38339bfdc6013b631e0672`; all **16 / 16 triggered workflows passed** with zero failures.
+- Dedicated P0 entry regression: **12 / 12 tests passed**; `compileall` and `git diff --check` passed.
+- Runtime validation is now shared by `register_canonical_runtime`, `get_canonical_runtime`, the trusted host pre-registration path and the trusted `--runtime-factory` path.
+- The validator requires all eight bindings, callable request-interpreter / semantic-producer methods, correctly typed allow-list registries, active registrations and exact type/version/policy binding. It also checks the four canonical resolver interfaces before the run can enter the canonical pipeline.
+- Incomplete pre-registered runtime and placeholder resolver tests fail closed before formal artifacts can be written.
+
+Non-claims:
+- This closes a configuration-validation inconsistency; it does **not** register a production host runtime or prove a genuine LLM callback.
+- Test doubles are only control-plane tests. They do not admit company Evidence/PIT, forecast or valuation artifacts and do not prove economic decision quality.
+- P0-LLM-001 / P0-LLM-004 remain **OPEN** until the actual user-facing host is identified and wired, the seven-group 605016 evidence chain is admitted, and a production-backed canonical run passes report/receipt replay and independent red-team.
+
+Next development batch remains **Batch B — actual host composition and runtime-registration proof**. The registry deliberately remains empty by default; no new default runtime or fallback was introduced.
+
 ### Retained B2-D integration history (optional, non-blocking)
 
 B2-D canonical refresh is now merged in PR #215 (merge `b32c9203b5a7baf729cdff2090bb4e54237a177c`) from the post-State-Hygiene canonical main. The old pre-hygiene PR #212 is closed and is not an admissible development base.
@@ -128,7 +147,7 @@ Therefore:
 
 ### Current next development batch
 
-**Refreshed execution plan:** `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261009.md`, refreshed against `main@9b017919f95b2a4e6f30c20656c58bd354f7c133`. Batch A is complete (PR #262, 24/24 workflows PASS). The active batch is **Batch B — actual host composition and runtime-registration proof**. The primary critical path remains the real 605016 P0 case, with Route A / 新和成 (002001.SZ) fact-source adjudication in parallel. The plan keeps unadmitted facts UNKNOWN and does not make Route A depend on an API key.
+**Current execution plan:** `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md`, refreshed against `main@e50018ffa5d8eec5909b98340ed74fe56c178344`. Batch A and PR #264 runtime-binding hardening are complete (PR #262: 24/24; PR #264: 16/16 exact-head workflows PASS). The active batch is **Batch B — actual host composition and runtime-registration proof**. The primary critical path remains the real 605016 P0 case, with Route A / 新和成 (002001.SZ) fact-source adjudication in parallel. The plan keeps unadmitted facts UNKNOWN and does not make Route A depend on an API key.
 
 The primary Investment Core MVP path is **Route A — free-first single-company evidence intake + public web discovery**. No LLM provider endpoint or API key is required for this Route A path. Public-web discovery, public-source capture, B2 preflight and artifact retention all run without an external LLM endpoint, paid search API or API key. Operator-supplied raw originals and manually supplied evidence remain supported when public URLs are unavailable or source bytes need to be supplied directly. B2-D remains an optional external-LLM integration adapter and is not an MVP gate.
 
