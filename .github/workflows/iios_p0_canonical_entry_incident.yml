@@ -12,10 +12,15 @@ on:
       - "iios_mvp/engine.py"
       - "iios_mvp/machine_publication.py"
       - "iios_mvp/investor_review_report_v02.py"
+      - "tools/route_a_605016_adjudicate.py"
+      - "evidence/real_cases/RC-CN-A-605016-20261009/SOURCE_ADJUDICATION_20261010.json"
+      - "docs/iios/ROUTE_A_C1_605016_SOURCE_ADJUDICATION_20261010.md"
+      - ".github/workflows/route_a_605016_source_adjudication.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   incident-reproduction:
@@ -36,3 +41,37 @@ jobs:
         run: PYTHONPATH=. pytest -q tests/test_p0_canonical_entry_incident_reproduction.py tests/test_canonical_cli_host_integration.py
       - name: Check diff formatting
         run: git diff --check
+
+  source-adjudication-real-attempt-10:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.title, '605016: adjudicate real sources')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download the actual Attempt 10 capture artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: iios-company-evidence-38026139364
+          run-id: 38026139364
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          path: /tmp/605016-attempt10
+      - name: Independently re-hash actual files and run unchanged B2/PIT admission
+        run: |
+          python tools/route_a_605016_adjudicate.py \
+            --input-run-dir /tmp/605016-attempt10 \
+            --out-dir /tmp/605016-adjudication-output
+      - name: Preserve JSON result only (never source-document bytes)
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-a-605016-source-adjudication
+          path: |
+            /tmp/605016-adjudication-output/SOURCE_ADJUDICATED_B2_CANDIDATE_MANIFEST.json
+            /tmp/605016-adjudication-output/SOURCE_ADJUDICATION_RUN_REPORT.json
+          if-no-files-found: error
+          retention-days: 14
