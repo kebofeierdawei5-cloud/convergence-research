@@ -1,0 +1,46 @@
+name: Route A 605016 Real Source Adjudication
+on:
+  pull_request:
+    paths:
+      - "tools/route_a_605016_adjudicate.py"
+      - "evidence/real_cases/RC-CN-A-605016-20261009/SOURCE_ADJUDICATION_20261010.json"
+      - "research/b2/company_evidence.py"
+      - "research/b2/evidence_contract.py"
+      - ".github/workflows/route_a_605016_source_adjudication.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  adjudicate-real-attempt-10:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout canonical source code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download the actual Attempt 10 capture artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: iios-company-evidence-38026139364
+          run-id: 38026139364
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          path: /tmp/605016-attempt10
+      - name: Re-verify actual source bytes and run unchanged B2/PIT validator
+        run: |
+          python tools/route_a_605016_adjudicate.py \
+            --input-run-dir /tmp/605016-attempt10 \
+            --out-dir /tmp/605016-adjudication-output
+      - name: Preserve only the machine-readable adjudication result (never source-document bytes)
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-a-605016-source-adjudication
+          path: |
+            /tmp/605016-adjudication-output/SOURCE_ADJUDICATED_B2_CANDIDATE_MANIFEST.json
+            /tmp/605016-adjudication-output/SOURCE_ADJUDICATION_RUN_REPORT.json
+          if-no-files-found: error
+          retention-days: 14
