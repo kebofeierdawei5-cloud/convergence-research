@@ -41,11 +41,11 @@ def _manifest(*, sources=None):
     }
 
 
-def _capture(tmp_path, *, sources=None, raw_file=True):
+def _capture(tmp_path, *, sources=None, raw_file=True, raw_content=RAW):
     incoming = tmp_path / "incoming"
     incoming.mkdir()
     if raw_file:
-        (incoming / "source.pdf").write_bytes(RAW)
+        (incoming / "source.pdf").write_bytes(raw_content)
     manifest_path = tmp_path / "input-manifest.json"
     manifest_path.write_text(json.dumps(_manifest(sources=sources), ensure_ascii=False), encoding="utf-8")
     output = tmp_path / "run"
@@ -105,6 +105,35 @@ def test_b2_preflight_reuses_exact_bytes_but_keeps_declared_known_at_unknown(tmp
     assert any(note == "DECLARED_KNOWN_AT_NOT_ADMITTED=2026-10-01" for note in evidence["quality_notes"])
     assert any(item.startswith("EVIDENCE[ROUTEA-SOURCE-SOURCE-001]:PIT:PIT_UNKNOWN:") for item in b2_manifest["validation_errors"])
     assert (root / REPORT_FILENAME).is_file()
+
+
+def test_payload_mismatched_pdf_response_is_not_emitted_as_b2_evidence(tmp_path):
+    import gzip
+
+    source = dict(_manifest()["sources"][0])
+    source["expected_payload_type"] = "PDF"
+    challenge_bytes = gzip.compress(b"<html><script>anti_bot();</script><body>verify</body></html>")
+    root, receipt = _capture(tmp_path, sources=[source], raw_content=challenge_bytes)
+    assert receipt["sources"][0]["capture_status"] == "SUCCESS"
+    assert receipt["sources"][0]["payload_contract_status"] == "MISMATCH"
+
+    report = run_route_a_b2_preflight(root, company="TESTCO")
+    assert report["status"] == "BLOCKED_NOT_ADMITTED"
+    assert report["raw_bytes_verified"] == 1
+    assert report["captured_source_count"] == 1
+    assert report["b2_candidate_source_count"] == 0
+    assert report["payload_contract_failure_count"] == 1
+    assert report["groups_with_raw_bytes"] == ["financial_reality"]
+    assert report["groups_with_payload_contract_pass"] == []
+    assert report["missing_required_field_groups"] == [
+        "business_reality", "capital_structure", "corporate_disclosures",
+        "financial_reality", "market_price", "security_identity", "trust_governance_events"
+    ]
+    source_row = report["sources"][0]
+    assert source_row["payload_contract_status"] == "MISMATCH"
+    assert source_row["b2_evidence_status"] == "PAYLOAD_CONTRACT_MISMATCH_NO_FACT_RECORD"
+    assert report["b2_manifest_status"] == "NOT_BUILT_NO_VALID_PAYLOADS"
+    assert not (root / "B2_COMPANY_EVIDENCE_MANIFEST.json").exists()
 
 
 def test_b2_preflight_reports_partial_capture_without_forging_failed_sources(tmp_path):
