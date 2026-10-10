@@ -86,12 +86,12 @@ def _payload_contract_status(expected_payload_type: Any, content: bytes) -> tupl
     if expected in {"", "ANY"}:
         return "NOT_CHECKED", None
     decoded = content
-    if decoded.startswith(b"\\x1f\\x8b"):
+    if decoded.startswith(b"\x1f\x8b"):
         try:
             decoded = gzip.decompress(decoded)
         except OSError:
             pass
-    prefix = decoded[:8192].lstrip(b"\\xef\\xbb\\xbf\\x00\\t\\r\\n ")
+    prefix = decoded[:8192].lstrip(b"\xef\xbb\xbf\x00\t\r\n ")
     lowered = prefix[:4096].lower()
     if b"%pdf-" in prefix[:1024]:
         actual = "PDF"
