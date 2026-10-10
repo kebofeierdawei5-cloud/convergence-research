@@ -605,7 +605,8 @@ def main() -> int:
         # raw OS errors, response headers, source bytes or local paths.
         safe_diagnostics = getattr(exc, "safe_diagnostics", None)
         if isinstance(safe_diagnostics, list) and safe_diagnostics:
-            blocked_result["source_fetch_diagnostics"] = safe_diagnostics
+            diagnostic_field = getattr(exc, "diagnostic_field", "source_fetch_diagnostics")
+            blocked_result[diagnostic_field] = safe_diagnostics
         print(json.dumps(blocked_result, ensure_ascii=False, indent=2))
         return 2
     except Exception as exc:
