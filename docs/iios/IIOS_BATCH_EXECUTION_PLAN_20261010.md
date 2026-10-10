@@ -115,31 +115,28 @@ The repository contains the CLI and a deliberately empty-by-default canonical ru
 
 ### Batch C1 — actual 605016 (百龙创园) source bundle and B2/PIT admission
 
-**Status:** **PARTIAL CAPTURE VERIFIED / EVIDENCE AND PIT NOT ADMITTED**. Raw bundle and case manifest exist; this advances acquisition but not the original P0 analysis acceptance.
+**Status:** **RAW RESPONSE CAPTURE COMPLETE / PAYLOAD CONTRACT MISMATCHES VERIFIED / EVIDENCE AND PIT NOT ADMITTED**.
 
-**Observed capture**
-- Case manifest: `manifests/company_cases/RC-CN-A-605016-20261009.json`; capture request: `manifests/capture_requests/RC-CN-A-605016-20261009.json`.
-- Attempt 1, run `38014567975`: 11/12 sources captured; Investing historical-price URL failed with `HTTP_REQUEST_FAILED`; artifact `11655558984`.
-- Attempt 2, run `38014724607`: source refs registered as official SSE or explicitly secondary-validation types; 11/12 captured; the same Investing URL failed; artifact `11655484327`.
-- Attempt 3, run `38014829961`: the Sohu historical-price page replaced the inaccessible Investing candidate; 12/12 captured, 0 failed sources, 0 unregistered refs, independent byte/hash verification 12/12, artifact `11655654643`. All outputs remain NOT_ADMITTED.
-- Attempt ledger: `evidence/real_cases/RC-CN-A-605016-20261009/ROUTE_A_CAPTURE_ATTEMPTS_20261010.md`.
+**Exact capture history**
+- Case manifest: `manifests/company_cases/RC-CN-A-605016-20261009.json`; request: `manifests/capture_requests/RC-CN-A-605016-20261009.json`.
+- Attempts 1–2 (`38014567975`, `38014724607`): the Investing history URL failed; each captured 11/12 raw responses. Source refs were then corrected and registered.
+- Attempt 3 (`38014829961`): 12/12 response bodies captured and byte-verified; retrospective inspection found 8 of 9 PDF-declared SSE URLs returned gzip HTML/JavaScript challenges.
+- Attempt 4 (`38015723986`): expected-payload gate correctly flagged HTML challenges but the case-sensitive PDF signature check also misclassified a real PDF.
+- Attempt 5 (`38015841564`): corrected PDF recognition; 11/12 captured due a slow-source failure; 7 mismatches / 4 passes; this run took about 4m35s.
+- Attempts 6–7 (`38015985509`, `38016238303`) failed from clock import-name collisions in PIT handling/read deadline checks; exact stack traces are in the attempt ledger.
+- **Attempt 8 (`38016339121`): SUCCESS in about 36 seconds** using an 8-second read timeout, an 18-second per-source deadline, 64 KiB `read1()` chunks and a 6-minute capture-step cap. 12/12 raw bodies captured, 0 transport failures, 0 unregistered refs, and 12/12 byte/hash checks passed. Payload contract: **8 mismatches / 4 passes**. Artifact `11656422240`.
 
-**Remaining actions**
-1. Independently adjudicate each captured document's identity, source origin, title, page/table/row locator, exact publication timestamp/known-at basis and reuse/license status. A registered source_ref and exact bytes alone do not admit a fact.
-2. Resolve the authoritative 2026-10-09 close; Stockstar/Sohu are secondary acquisition candidates, not primary market-data authority. Preserve the declared `unknown_pit_sources=1` until resolved.
-3. Convert only fact-level claims that pass independent adjudication to B2 Evidence Records, preserving exact bytes and their hashes; run the unchanged B2 Evidence/PIT validator and independent red-team. `UNKNOWN` must not cover a required group.
-4. Where an official public source cannot provide the necessary time/version facts, capture an operator-supplied original and preserve provenance. Do not backfill dates from current retrieval time.
-5. Keep the three-run acquisition history, including the failed Investing URL attempts; do not rewrite failed rows as successful merely because a replacement source was later captured.
+**Admission result**
+- Final capture-gate status: `RAW_CAPTURE_COMPLETE_WITH_PAYLOAD_MISMATCHES_NOT_ADMITTED`.
+- B2 preflight: `BLOCKED_NOT_ADMITTED`; `b2_candidate_source_count=4`; `payload_contract_failure_count=8`; all seven required groups remain uncovered; `evidence_admission=false`, `pit_admission=false`.
+- Eight PDF-declared SSE links are serving HTML challenge content rather than PDF bytes. Three other expected HTML pages and one actual PDF pass payload-type validation, but they are still only raw candidates, not admitted claims. The 2026-10-09 close is not admitted from secondary Stockstar/Sohu data.
 
-**Price-date correction.** The official 2026 exchange calendar says the A-share market closed October 1–7 and resumed October 8. Therefore for a cutoff of **2026-10-09**, the intended latest-trading-date observation is the **2026-10-09 close**, subject to exact source verification—not the September 30 close used in the earlier 2026-10-07 PILOT-02 test. Keep the two cutoffs and their receipts separate. Official calendar sources:
-- SZSE 2026 trading calendar: https://investor.szse.cn/English/services/trading/calendar/index.html
-- SSE holiday notice dated 2026-09-17: https://www.sse.org.cn/disclosure/notice/general/t20260917_622911.html
-
-**Pass criteria**
-- all seven required groups have at least one individually valid, source-bound, case-bound and PIT-qualified `ADMITTED` evidence record;
-- the manifest's raw artifacts re-verify from bytes, not caller-supplied hash declarations alone;
-- case ID, symbol, company, cutoff and source identity are consistent;
-- no report valuation/decision proceeds while a required group remains uncovered or UNKNOWN.
+**Next actions**
+1. Replace challenged direct SSE PDF URLs with an accessible official document locator/transport, or capture operator-supplied issuer-origin originals with provenance. Do not change `expected_payload_type=PDF` to HTML merely to make CI green.
+2. For every retrieved actual document, verify issuer/exchange identity, report title, exact page/table/row locator, first-public/known-at basis, source-vintage and reuse/license state.
+3. Resolve the authoritative 2026-10-09 closing price; secondary Stockstar/Sohu pages remain cross-check candidates only.
+4. Convert only individually adjudicated facts to B2 Evidence Records and run the unchanged B2/PIT validator and independent red-team. Keep UNKNOWN non-admissible.
+5. Preserve all attempt failures in `evidence/real_cases/RC-CN-A-605016-20261009/ROUTE_A_CAPTURE_ATTEMPTS_20261010.md`.
 
 ### Batch C2 — finish Route A evidence adjudication for 新和成 (002001.SZ)
 

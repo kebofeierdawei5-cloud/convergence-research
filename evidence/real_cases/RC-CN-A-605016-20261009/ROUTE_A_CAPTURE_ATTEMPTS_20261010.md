@@ -80,9 +80,18 @@ The request was incremented to attempt 4 after the payload-type gate landed. App
 - The run failed before completing capture because two lines in the read loop still referenced `time.monotonic()` after the module had been renamed to `_clock`. Exact failure: `AttributeError: type object 'datetime.time' has no attribute 'monotonic'`. The receipt was not written, so verifier and B2 preflight correctly failed closed.
 - Corrective commit replaced both remaining calls with `_clock.monotonic()`. No raw-byte or admission claims are made from this failed attempt.
 
-## Attempt 8 — rerun with all clock references corrected
+## Attempt 8 — successful bounded raw capture, payload contracts enforced
 
-The capture request is now attempt 8. The code path contains `_clock.monotonic()` for the start deadline and both read-loop checks, `datetime.time` remains unshadowed for PIT cutoff handling, reads prefer 64 KiB `read1()`, each source has an 18-second total deadline and 8-second socket timeout, and the workflow capture step has a six-minute hard limit. Actual capture, verifier and B2 results must be read from the next exact run; no admission is presumed.
+- Workflow run: [38016339121](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38016339121), **SUCCESS**.
+- Runtime from workflow timestamps: about 36 seconds, demonstrating the capture no longer hangs on one slow source.
+- Intake: `CAPTURED_NOT_ADMITTED`; 12/12 raw responses captured, 0 failed sources, 0 unregistered source refs.
+- Independent byte verification: 12/12 raw response payloads matched captured size/SHA-256; payload type checked on all 12.
+- Payload contract: **8 mismatches** (`EXPECTED_PDF_RECEIVED_HTML_OR_ACCESS_CHALLENGE`) for SSE URLs declared as PDFs; **4 passes** (1 actual PDF plus 3 HTML pages).
+- B2 preflight: `BLOCKED_NOT_ADMITTED`; 4 format-compatible B2 candidate records, 8 payload-contract failures, all seven required groups still missing, `evidence_admission=false`, `pit_admission=false`.
+- Final gate: `RAW_CAPTURE_COMPLETE_WITH_PAYLOAD_MISMATCHES_NOT_ADMITTED`; `raw_integrity=PASS` is only byte integrity, not source origin or evidence admission.
+- Artifact: [11656422240](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38016339121/artifacts/11656422240), retained by GitHub Actions policy.
+
+This is the first run that simultaneously has bounded source retrieval and correctly recognizes the uppercase `%PDF-` signature. It proves the network hang is remediated and that the previous count “12/12 documents” was too strong: it was 12/12 response bodies. Eight of the nine PDF-declared SSE candidates are still HTML challenge payloads. The one real PDF and three HTML pages remain only raw candidates; none is yet an admitted fact.
 
 ## Explicit gate boundary
 
