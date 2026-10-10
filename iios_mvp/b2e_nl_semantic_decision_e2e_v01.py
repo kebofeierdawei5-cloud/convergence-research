@@ -485,37 +485,40 @@ def run_b2e_conformance(
     )
     # The formal writer must be able to re-open every authority-bearing upstream
     # payload after restart; stage hashes alone only prove self-consistency.
-    upstream_bundle_core = {
-        "schema_version": "IIOS-CANONICAL-UPSTREAM-ADMISSIONS-0.1",
-        "run_id": run_id,
-        "case_id": str(projected_case["case_id"]),
-        "market": str(projected_case["market"]).upper(),
-        "symbol": str(projected_case["symbol"]).upper(),
-        "company": str(projected_case["company"]),
-        "cutoff_date": str(projected_case["cutoff_date"]),
-        "semantic_artifact": dict(semantic.artifact),
-        "semantic_producer_receipt": dict(semantic.producer_receipt),
-        "semantic_admission": dict(semantic.admission.__dict__),
-        "canonical_forecast_ref": dict(upstream_lineage["canonical_forecast_ref"]),
-        "forecast_record": dict(upstream_lineage["forecast_record"]),
-        "canonical_valuation_ref": dict(upstream_lineage["canonical_valuation_ref"]),
-        "valuation_admission_record": dict(upstream_lineage["valuation_admission_record"]),
-        "valuation_output": dict(upstream_lineage["valuation_output"]),
-        "validated_lineage": {
-            key: value for key, value in upstream_lineage.items()
-            if key not in {"forecast_record", "valuation_output"}
-        },
-    }
-    canonical_upstream_bundle = {
-        **upstream_bundle_core,
-        "bundle_hash": sha256(upstream_bundle_core),
-    }
-    canonical_upstream_bytes = _canonical(canonical_upstream_bundle)
-    canonical_upstream_file_hash = hashlib.sha256(canonical_upstream_bytes).hexdigest()
-    decision_stage_refs = decision_stage_refs + (
-        f"canonical-upstream-admissions:{canonical_upstream_file_hash}",
-    )
-    decision_stage_hashes = decision_stage_hashes + (canonical_upstream_file_hash,)
+    canonical_upstream_bundle: dict[str, Any] | None = None
+    if run_root is not None:
+        upstream_bundle_core = {
+            "schema_version": "IIOS-CANONICAL-UPSTREAM-ADMISSIONS-0.1",
+            "run_id": run_id,
+            "case_id": str(projected_case["case_id"]),
+            "market": str(projected_case["market"]).upper(),
+            "symbol": str(projected_case["symbol"]).upper(),
+            "company": str(projected_case["company"]),
+            "cutoff_date": str(projected_case["cutoff_date"]),
+            "semantic_artifact": dict(semantic.artifact),
+            "semantic_producer_receipt": dict(semantic.producer_receipt),
+            "semantic_admission": dict(semantic.admission.__dict__),
+            "canonical_forecast_ref": dict(upstream_lineage["canonical_forecast_ref"]),
+            "forecast_record": dict(upstream_lineage["forecast_record"]),
+            "canonical_valuation_ref": dict(upstream_lineage["canonical_valuation_ref"]),
+            "valuation_admission_record": dict(upstream_lineage["valuation_admission_record"]),
+            "valuation_output": dict(upstream_lineage["valuation_output"]),
+            "validated_lineage": {
+                key: value for key, value in upstream_lineage.items()
+                if key not in {"forecast_record", "valuation_output"}
+            },
+        }
+        canonical_upstream_bundle = {
+            **upstream_bundle_core,
+            "bundle_hash": sha256(upstream_bundle_core),
+        }
+        canonical_upstream_bytes = _canonical(canonical_upstream_bundle)
+        canonical_upstream_file_hash = hashlib.sha256(canonical_upstream_bytes).hexdigest()
+        decision_stage_refs = decision_stage_refs + (
+            f"canonical-upstream-admissions:{canonical_upstream_file_hash}",
+        )
+        decision_stage_hashes = decision_stage_hashes + (canonical_upstream_file_hash,)
+
 
     revision: Mapping[str, Any]
     if run_root is not None:
