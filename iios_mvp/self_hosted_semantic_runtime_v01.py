@@ -14,7 +14,6 @@ from iios_mvp.canonical_runtime_registry_v01 import CanonicalRuntimeBindings
 from iios_mvp.live_provider_invocation_v01 import (
     build_provider_payload,
     invoke_live_provider,
-    parse_json_response,
 )
 from iios_mvp.live_provider_preflight_v01 import LiveProviderConfig
 from iios_mvp.llm_semantic_workbench_v01 import SemanticRequest
@@ -165,9 +164,22 @@ class SelfHostedResponsesClient:
         )
         payload = build_provider_payload(config=provider_config, prompt=prompt)
         response = invoke_live_provider(config=provider_config, payload=payload)
+        if not 200 <= int(response.http_status) < 300:
+            raise SelfHostedRuntimeError("SELF_HOSTED_HTTP_STATUS_NOT_SUCCESS")
+        if "application/json" not in str(response.content_type).lower():
+            raise SelfHostedRuntimeError("SELF_HOSTED_RESPONSE_CONTENT_TYPE_NOT_JSON")
         if len(response.response_bytes) > _MAX_RESPONSE_BYTES:
             raise SelfHostedRuntimeError("SELF_HOSTED_RESPONSE_TOO_LARGE")
-        decoded_response = parse_json_response(response)
+        try:
+            decoded_response = json.loads(
+                response.response_bytes.decode("utf-8"),
+                object_pairs_hook=_reject_duplicate_json_pairs,
+                parse_constant=_reject_json_constant,
+            )
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise SelfHostedRuntimeError("SELF_HOSTED_RESPONSE_ENVELOPE_INVALID_JSON") from exc
+        if not isinstance(decoded_response, Mapping):
+            raise SelfHostedRuntimeError("SELF_HOSTED_RESPONSE_ENVELOPE_NOT_OBJECT")
         text_value = _extract_output_text(decoded_response)
         try:
             value = json.loads(

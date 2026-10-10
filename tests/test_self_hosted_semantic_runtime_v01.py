@@ -88,7 +88,7 @@ def test_local_runtime_rejects_non_loopback_or_wrong_endpoint(endpoint):
 
 def test_responses_client_uses_no_auth_and_extracts_json(monkeypatch):
     body = json.dumps({"output_text": json.dumps({"ok": True})}).encode("utf-8")
-    response = SimpleNamespace(response_bytes=body)
+    response = SimpleNamespace(response_bytes=body, http_status=200, content_type="application/json")
     captured = {}
 
     def fake_invoke(*, config, payload):
@@ -115,7 +115,7 @@ def test_responses_client_extracts_nested_output_text(monkeypatch):
     }).encode("utf-8")
     monkeypatch.setattr(
         semantic_runtime, "invoke_live_provider",
-        lambda **_: SimpleNamespace(response_bytes=body),
+        lambda **_: SimpleNamespace(response_bytes=body, http_status=200, content_type="application/json"),
     )
     client = semantic_runtime.SelfHostedResponsesClient(
         semantic_runtime.load_self_hosted_responses_config(env_config())
@@ -127,7 +127,7 @@ def test_responses_client_rejects_duplicate_json_keys(monkeypatch):
     body = json.dumps({"output_text": '{"status":"ok","status":"fake"}'}).encode("utf-8")
     monkeypatch.setattr(
         semantic_runtime, "invoke_live_provider",
-        lambda **_: SimpleNamespace(response_bytes=body),
+        lambda **_: SimpleNamespace(response_bytes=body, http_status=200, content_type="application/json"),
     )
     client = semantic_runtime.SelfHostedResponsesClient(
         semantic_runtime.load_self_hosted_responses_config(env_config())

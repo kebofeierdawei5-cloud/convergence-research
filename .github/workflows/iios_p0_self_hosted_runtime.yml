@@ -27,5 +27,7 @@ jobs:
         run: python -m compileall -q iios_mvp
       - name: Run free-first runtime contract tests
         run: PYTHONPATH=. pytest -q tests/test_self_hosted_semantic_runtime_v01.py tests/test_canonical_host_v01.py tests/test_canonical_cli_host_integration.py
+      - name: Run self-hosted runtime adversarial red-team
+        run: PYTHONPATH=. pytest -q tests/independent_redteam_self_hosted_runtime.py
       - name: Check diff formatting
         run: git diff --check
