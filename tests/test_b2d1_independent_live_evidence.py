@@ -19,7 +19,7 @@ def canonical_bytes(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
-def build_record():
+def build_record(*, endpoint="https://provider.example/v1/responses", auth_mode=None, deployment_mode=None):
     private_key = Ed25519PrivateKey.generate()
     public_key_b64 = base64.b64encode(
         private_key.public_key().public_bytes(
@@ -39,7 +39,7 @@ def build_record():
         "provider_version": "fixture-1",
         "protocol": "OPENAI_RESPONSES",
         "model": "test-model",
-        "endpoint": "https://provider.example/v1/responses",
+        "endpoint": endpoint,
         "run_id": "run-1",
         "case_id": "case-1",
         "request_id": "request-1",
@@ -63,7 +63,7 @@ def build_record():
         "provider_version": "fixture-1",
         "protocol": "OPENAI_RESPONSES",
         "model": "test-model",
-        "endpoint": "https://provider.example/v1/responses",
+        "endpoint": endpoint,
         "request_sha256": replay_core["request_sha256"],
         "response_sha256": replay_core["response_sha256"],
         "request_payload": request_payload,
@@ -74,6 +74,10 @@ def build_record():
         "runtime_public_key_b64": public_key_b64,
         "created_at": replay_core["created_at"],
     }
+    if auth_mode is not None:
+        core["auth_mode"] = auth_mode
+    if deployment_mode is not None:
+        core["deployment_mode"] = deployment_mode
     signature = private_key.sign(canonical_bytes(core))
     return {
         **core,
@@ -126,3 +130,41 @@ def test_independent_verifier_has_no_runtime_provider_dependency():
     assert "live_provider_evidence_v01" not in source
     assert "live_provider_invocation_v01" not in source
     assert "live_provider_replay_v01" not in source
+
+
+def test_independent_verifier_accepts_self_hosted_loopback_http_without_auth():
+    record = build_record(
+        endpoint="http://127.0.0.1:11434/v1/responses",
+        auth_mode="NONE",
+        deployment_mode="SELF_HOSTED",
+    )
+    result = verify_live_evidence(
+        record,
+        schema_path=ROOT / "schemas/live_provider_evidence_v0.1.schema.json",
+    )
+    assert result["status"] == "INDEPENDENT_VERIFIED"
+
+
+@pytest.mark.parametrize(
+    "endpoint,auth_mode,deployment_mode",
+    [
+        ("http://provider.example/v1/responses", "NONE", "SELF_HOSTED"),
+        ("http://192.168.1.20:11434/v1/responses", "NONE", "SELF_HOSTED"),
+        ("http://127.0.0.1:11434/v1/responses", "BEARER", "SELF_HOSTED"),
+        ("http://127.0.0.1:11434/v1/responses", "NONE", "EXTERNAL"),
+        ("http://127.0.0.1:11434/v1/responses", None, None),
+    ],
+)
+def test_independent_verifier_rejects_http_outside_narrow_local_policy(
+    endpoint, auth_mode, deployment_mode
+):
+    record = build_record(
+        endpoint=endpoint,
+        auth_mode=auth_mode,
+        deployment_mode=deployment_mode,
+    )
+    with pytest.raises(IndependentVerificationError):
+        verify_live_evidence(
+            record,
+            schema_path=ROOT / "schemas/live_provider_evidence_v0.1.schema.json",
+        )

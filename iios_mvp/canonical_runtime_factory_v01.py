@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
 import hashlib
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -50,6 +51,18 @@ from .semantic_producer_admission_v01 import ProducerRegistration, ProducerRegis
 from .llm_semantic_workbench_v01 import SemanticRequest, SemanticProducer
 
 FACTORY_VERSION = "IIOS-TRUSTED-RUNTIME-FACTORY-0.1"
+
+def _is_loopback_host(hostname: str | None) -> bool:
+    if not hostname:
+        return False
+    normalized = hostname.strip().lower().rstrip(".")
+    if normalized == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
+
 REQUEST_INTERPRETER_ID = "iios-live-json-request-interpreter"
 REQUEST_INTERPRETER_VERSION = "0.1.0"
 REQUEST_INTERPRETER_POLICY = "IIOS-NL-POLICY-0.1"
@@ -331,10 +344,15 @@ class SignedLiveProviderJsonClient:
         if len(expected_key) != 32:
             raise RuntimeFactoryError("RUNTIME_PUBLIC_KEY_PIN_INVALID")
         endpoint = urlparse(str(config.base_url))
-        # The independent verifier requires HTTPS. A local model may still be
-        # used without a commercial key, provided it is behind verified HTTPS.
-        if endpoint.scheme.lower() != "https" or not endpoint.hostname:
-            raise RuntimeFactoryError("PRODUCTION_LIVE_PROVIDER_REQUIRES_HTTPS_ENDPOINT")
+        https_endpoint = endpoint.scheme.lower() == "https" and bool(endpoint.hostname)
+        local_no_auth_endpoint = (
+            endpoint.scheme.lower() == "http"
+            and config.deployment_mode == "SELF_HOSTED"
+            and config.auth_mode == "NONE"
+            and _is_loopback_host(endpoint.hostname)
+        )
+        if not (https_endpoint or local_no_auth_endpoint):
+            raise RuntimeFactoryError("LIVE_PROVIDER_ENDPOINT_POLICY_INVALID")
         self.output_root = Path(output_root).resolve(strict=True)
         if not self.output_root.is_dir():
             raise RuntimeFactoryError("RUNTIME_OUTPUT_ROOT_MUST_BE_DIRECTORY")

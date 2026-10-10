@@ -4,14 +4,26 @@ on:
   pull_request:
     paths:
       - "iios_mvp/live_provider_*.py"
+      - "iios_mvp/provider_runtime_v01.py"
+      - "iios_mvp/canonical_runtime_factory_v01.py"
       - "schemas/live_provider_*.schema.json"
       - "tests/test_b2d_live_provider_preflight.py"
+      - "tests/test_b2d1_independent_live_evidence.py"
+      - "tests/test_b2d2_provider_runtime.py"
+      - "tests/independent_redteam_b2d2_provider_runtime.py"
       - "tests/independent_redteam_b2d_live_provider.py"
       - "docs/iios/B2_D_LIVE_PROVIDER_PREFLIGHT_20261008.md"
       - ".github/workflows/iios_b2d_live_provider.yml"
       - ".github/workflows/iios_b2d3_real_provider.yml"
       - "tests/test_b2d3_live_provider_workflow_contract.py"
       - "docs/iios/B2_D3_REAL_PROVIDER_LIVE_20261008.md"
+      - "tools/prepare_iios_local_ollama_runtime.py"
+      - "tests/test_prepare_iios_local_ollama_runtime.py"
+      - "tests/test_canonical_runtime_factory_v01.py"
+      - "docs/iios/P0_BATCH_B2_LOCAL_OLLAMA_RUNTIME_20261010.md"
+      - "docs/PROJECT_STATE_INDEX.md"
+      - "docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md"
+      - "STATUS.md"
   push:
     branches:
       - "feature/b2d-live-provider-canonical-refresh-20261008"
@@ -42,6 +54,10 @@ jobs:
         run: python -m pytest -q tests/test_b2d2_provider_runtime.py
       - name: Run B2-D2 independent red-team
         run: python -m pytest -q tests/independent_redteam_b2d2_provider_runtime.py
+      - name: Run local Ollama setup contract
+        run: python -m pytest -q tests/test_prepare_iios_local_ollama_runtime.py
+      - name: Run canonical factory endpoint-policy tests
+        run: python -m pytest -q tests/test_canonical_runtime_factory_v01.py
       - name: Run B2-D3 workflow contract tests
         run: python -m pytest -q tests/test_b2d3_live_provider_workflow_contract.py
       - name: Compile

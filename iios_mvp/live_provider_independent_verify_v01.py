@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import base64
 import hashlib
+import ipaddress
 import json
 from pathlib import Path
 from typing import Any, Mapping
@@ -41,6 +42,34 @@ SIGNATURE_FIELDS = {"attestation_hash", "signature_algorithm", "signature_b64"}
 
 class IndependentVerificationError(ValueError):
     """Raised when a live-provider evidence artifact fails independent verification."""
+
+
+def _is_loopback_host(hostname: str | None) -> bool:
+    if not hostname:
+        return False
+    normalized = hostname.strip().lower().rstrip(".")
+    if normalized == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
+
+
+def _validate_endpoint_policy(record: Mapping[str, Any]) -> None:
+    endpoint = urlparse(str(record.get("endpoint", "")))
+    if endpoint.scheme.lower() == "https" and endpoint.hostname:
+        return
+    # Plain HTTP is admitted only for explicitly self-hosted no-auth loopback.
+    # The signed attestation covers auth_mode and deployment_mode.
+    if (
+        endpoint.scheme.lower() == "http"
+        and record.get("deployment_mode") == "SELF_HOSTED"
+        and record.get("auth_mode") == "NONE"
+        and _is_loopback_host(endpoint.hostname)
+    ):
+        return
+    raise IndependentVerificationError("evidence endpoint violates transport policy")
 
 def _canonical_bytes(value: Mapping[str, Any]) -> bytes:
     return json.dumps(
@@ -122,8 +151,7 @@ def verify_live_evidence(
         raise IndependentVerificationError("evidence is not marked LIVE_RESPONSE_CAPTURED")
     if record["protocol"] != "OPENAI_RESPONSES":
         raise IndependentVerificationError("unsupported provider protocol")
-    if urlparse(str(record["endpoint"])).scheme != "https":
-        raise IndependentVerificationError("evidence endpoint is not HTTPS")
+    _validate_endpoint_policy(record)
     if record["signature_algorithm"] != "Ed25519":
         raise IndependentVerificationError("unsupported signature algorithm")
 
