@@ -717,7 +717,7 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
         "next_gate": "If PASS_EPHEMERAL_B2, ingest this exact HTTPS source privately into the deployed Host data root; repeat unchanged B2/PIT admission there, then run genuine semantic/Forecast/Valuation/Decision/report/Run Receipt replay and independent red-team. Do not promote this public run as canonical durable admission.",
     }
     (out_dir / "OFFICIAL_HTTPS_B2_ADJUDICATION_REPORT.json").write_text(
-        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     # The full manifest with numeric market data is intentionally left in the
     # ephemeral workspace and must not be uploaded to Actions artifacts.
