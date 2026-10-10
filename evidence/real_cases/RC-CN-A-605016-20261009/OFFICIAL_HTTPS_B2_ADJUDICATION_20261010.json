@@ -1,0 +1,89 @@
+{
+  "schema_version": "IIOS-605016-OFFICIAL-HTTPS-B2-ADJUDICATION-0.1",
+  "record_class": "EPHEMERAL_REAL_SOURCE_B2_PIT_ACCEPTANCE",
+  "case_id": "RC-CN-A-605016-20261009",
+  "cutoff_date": "2026-10-09",
+  "workflow": {
+    "run_id": 38041208974,
+    "run_url": "https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38041208974",
+    "code_head": "85f0d06421458b9f5aeb10dec3e12e4c740210e4",
+    "code_merge_commit": "05069aa9d4e45f3eb39bc8bf3b55f0f2203f95ae",
+    "job_conclusion": "success",
+    "output_artifact_id": 11665881455,
+    "output_artifact_sha256": "4203898caf2d98277713a09b0dd8d5c5dc855d059a4c6186eeec6dd0a2cf6dc8",
+    "output_artifact_scope": "SANITIZED_STATUS_HASH_REPORT_ONLY"
+  },
+  "source_inputs": {
+    "attempt10_run_id": 38026139364,
+    "attempt10_artifact_id": 11660285551,
+    "attempt10_manifest_sha256": "563bc41ab2e6ce4925451fc02986f87409e06b879e3b92066d443ef6d796f244",
+    "dividend_notice": {
+      "source_id": "SSE-2026-09-22-DIVIDEND-IMPLEMENTATION",
+      "evidence_id": "605016-H1-DIVIDEND-IMPLEMENTED-202609",
+      "capture_status": "RAW_PDF_CAPTURED_NOT_ADMITTED",
+      "fact_level_admission": "ADMITTED_FOR_SPECIFIC_INTERNAL_FACTS",
+      "pdf_sha256": "1a153c20f908abbd48fdd63a651ecb0edde269f3e7dd0ea27a0b8ce420e5ea8c",
+      "pdf_size_bytes": 146499,
+      "known_at": "2026-09-22",
+      "known_at_precision": "DATE_ONLY",
+      "reuse_status": "RESTRICTED_NO_REDISTRIBUTION"
+    }
+  },
+  "official_market_price_source": {
+    "source_id": "PRICE-SSE-OFFICIAL-DAYK-2026-10-08",
+    "transport": "HTTPS_TLS_VERIFIED",
+    "url": "https://yunhq.sse.com.cn:32042/v1/sh1/dayk/605016?begin=20261008&end=20261008&select=date,open,high,low,close,volume,amount",
+    "http_status": 200,
+    "content_type": "application/json;charset=UTF-8",
+    "observation_date": "2026-10-08",
+    "source_response_size_bytes": 124,
+    "source_response_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480",
+    "matching_date_row_count": 1,
+    "row_field_count": 7,
+    "numeric_fields_shape_and_constraints": "PASS",
+    "numerical_market_quote_values": "WITHHELD_FROM_PUBLIC_REPOSITORY_AND_ARTIFACT",
+    "known_at": "2026-10-08T15:00:00+08:00",
+    "known_at_basis": "Market-session close event time for the completed prior trading session; the endpoint does not expose an exact first-public timestamp. This is not an assertion that the historical JSON row was first uploaded at that exact instant.",
+    "reuse_status": "RESTRICTED_NO_REDISTRIBUTION; internal non-commercial research use only",
+    "raw_response_committed_to_git": false,
+    "raw_response_uploaded_to_artifact": false
+  },
+  "b2_pit": {
+    "validator": "research.b2.company_evidence.build_company_evidence_manifest (unchanged)",
+    "validation_status": "PASS",
+    "scope": "EPHEMERAL_CANDIDATE_MANIFEST_ONLY",
+    "candidate_manifest_sha256": "523da9b9b67a5dda7ba33fa45c3365e8892f616cb67fa14b7e77fdffcf9375ec",
+    "evidence_record_count": 11,
+    "admitted_record_count": 11,
+    "admitted_field_groups": [
+      "business_reality",
+      "capital_structure",
+      "corporate_disclosures",
+      "financial_reality",
+      "market_price",
+      "security_identity",
+      "trust_governance_events"
+    ],
+    "missing_required_field_groups": [],
+    "validation_errors": [],
+    "ephemeral_evidence_admission": true,
+    "ephemeral_pit_admission": true,
+    "canonical_durable_admission": false
+  },
+  "scope_boundary": {
+    "production_host_acceptance": false,
+    "private_host_data_persistence": false,
+    "formal_valuation_or_decision_authorized": false,
+    "complete_run_receipt_replay": false,
+    "independent_red_team_acceptance": false,
+    "human_approval_required": true,
+    "auto_execution": false,
+    "why_not_canonical": "The exact response bytes and manifest containing the numerical close were kept only in the ephemeral runner workspace and were not uploaded or committed because the source reuse disposition is restricted. The operator-controlled private Host/data root must persist and revalidate the exact bytes plus admission record before production use."
+  },
+  "next_steps": [
+    "Ingest the official HTTPS response directly into the operator-controlled private Host data root, preserving the exact bytes and their hash under the source's no-redistribution restriction.",
+    "Repeat the unchanged B2/PIT gate there and have an independent reviewer approve the observation-time basis (market-session close versus endpoint first-public time).",
+    "Only then execute a genuine 605016 host-origin run through real semantic/Forecast/Valuation admission, Decision Revision, publication/report, complete Run Receipt replay, and independent red-team.",
+    "P0-LLM-001 and P0-LLM-004 remain OPEN until that full production acceptance passes."
+  ]
+}
