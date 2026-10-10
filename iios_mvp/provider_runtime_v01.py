@@ -64,6 +64,7 @@ def validate_provider_runtime_policy(
     if (
         parsed.scheme == "http"
         and deployment_mode == "SELF_HOSTED"
+        and auth_mode == "NONE"
         and _is_loopback_host(parsed.hostname)
     ):
         return ProviderRuntimePolicy(
