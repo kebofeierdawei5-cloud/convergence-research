@@ -3,7 +3,10 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import shutil
+import subprocess
+import tempfile
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -46,6 +49,154 @@ DIVIDEND_PDF_ALLOWED_FINAL_URLS = frozenset(DIVIDEND_PDF_HTTPS_URLS)
 DIVIDEND_LEDGER_RELATIVE = Path(
     "evidence/real_cases/RC-CN-A-605016-20261009/DIVIDEND_IMPLEMENTATION_ADJUDICATION_20261010.json"
 )
+MAX_DIVIDEND_CURL_BYTES = 8 * 1024 * 1024
+DIVIDEND_REFERER = "https://www.sse.com.cn/disclosure/listedinfo/announcement/index.shtml"
+
+
+class OfficialDividendPdfFetchBlocked(ValueError):
+    """All pinned official HTTPS candidates failed; diagnostics contain no URLs or raw errors."""
+
+    def __init__(self, diagnostics: list[dict[str, str]]) -> None:
+        self.safe_diagnostics = diagnostics
+        super().__init__("OFFICIAL_DIVIDEND_PDF_DIRECT_HTTPS_FETCH_BLOCKED")
+
+
+def _safe_transport_outcome(response: dict[str, Any]) -> str:
+    status = response.get("http_status")
+    if isinstance(status, int) and not 200 <= status < 300:
+        return f"HTTP_{status}"
+    error = str(response.get("error", "")).upper()
+    http_match = re.search(r"HTTP ERROR (\\d{3})", error)
+    if http_match:
+        return "HTTP_" + http_match.group(1)
+    curl_match = re.search(r"CURL_EXIT_(\\d+)", error)
+    if curl_match:
+        return {
+            "6": "DNS_FAILURE",
+            "7": "CONNECTION_FAILURE",
+            "22": "HTTP_FAILURE",
+            "28": "TIMEOUT",
+            "35": "TLS_HANDSHAKE_FAILURE",
+            "60": "TLS_CERTIFICATE_FAILURE",
+            "63": "RESPONSE_TOO_LARGE",
+        }.get(curl_match.group(1), "CURL_FAILURE")
+    low = error.lower()
+    if "temporary failure in name resolution" in low or "name or service not known" in low or "nodename nor servname" in low or "getaddrinfo failed" in low:
+        return "DNS_FAILURE"
+    if "timed out" in low or "timeout" in low:
+        return "TIMEOUT"
+    if "certificate_verify_failed" in low or "certificate" in low or "ssl:" in low or "tls" in low:
+        return "TLS_FAILURE"
+    if "connection refused" in low:
+        return "CONNECTION_REFUSED"
+    if "connection reset" in low:
+        return "CONNECTION_RESET"
+    if "network is unreachable" in low:
+        return "NETWORK_UNREACHABLE"
+    if "http error" in low:
+        return "HTTP_FAILURE"
+    if "curl unavailable" in low:
+        return "CURL_UNAVAILABLE"
+    return "FETCH_BLOCKED"
+
+
+def _safe_fetch_diagnostic(url: str, transport: str, response: dict[str, Any]) -> dict[str, str]:
+    host = urlparse(url).hostname or ""
+    endpoint = {
+        "big5.sse.com.cn": "BIG5",
+        "static.sse.com.cn": "STATIC",
+        "www.sse.com.cn": "WWW",
+    }.get(host, "UNRECOGNIZED_HOST")
+    return {
+        "endpoint": endpoint,
+        "transport": transport,
+        "outcome": _safe_transport_outcome(response),
+    }
+
+
+def _fetch_official_pdf_via_curl(url: str, *, referer: str) -> dict[str, Any]:
+    """Second HTTPS transport only; URL/redirect allowlists and exact bytes remain mandatory."""
+    if url not in DIVIDEND_PDF_HTTPS_URLS or urlparse(url).scheme.lower() != "https":
+        return {"url": url, "status": "BLOCKED", "error": "CURL_URL_NOT_ALLOWLISTED"}
+    curl = shutil.which("curl")
+    if not curl:
+        return {"url": url, "status": "BLOCKED", "error": "CURL_UNAVAILABLE"}
+    with tempfile.TemporaryDirectory(prefix="iios-605016-official-pdf-") as temp_dir:
+        body_path = Path(temp_dir) / "response.pdf"
+        command = [
+            curl,
+            "--location",
+            "--max-redirs", "5",
+            "--connect-timeout", "4",
+            "--max-time", "9",
+            "--proto", "=https",
+            "--proto-redir", "=https",
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+            "--referer", referer,
+            "--header", "Accept: application/pdf,*/*",
+            "--header", "Accept-Encoding: identity",
+            "--max-filesize", str(MAX_DIVIDEND_CURL_BYTES),
+            "--output", str(body_path),
+            "--write-out", "%{http_code}\\n%{url_effective}\\n%{content_type}\\n",
+            url,
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            return {"url": url, "status": "BLOCKED", "error": "CURL_TIMEOUT"}
+        except OSError:
+            return {"url": url, "status": "BLOCKED", "error": "CURL_EXEC_FAILED"}
+
+        metadata = (completed.stdout or b"").decode("utf-8", errors="replace").splitlines()
+        try:
+            http_status = int(metadata[0]) if metadata and metadata[0].isdigit() else 0
+        except (TypeError, ValueError):
+            http_status = 0
+        final_url = metadata[1] if len(metadata) > 1 else url
+        content_type = metadata[2] if len(metadata) > 2 else ""
+        if completed.returncode != 0:
+            error = "CURL_EXIT_" + str(completed.returncode)
+            if http_status:
+                return {
+                    "url": url, "final_url": final_url, "status": "BLOCKED",
+                    "error": error, "http_status": http_status,
+                }
+            return {"url": url, "final_url": final_url, "status": "BLOCKED", "error": error}
+        if not 200 <= http_status < 300:
+            return {
+                "url": url, "final_url": final_url, "status": "BLOCKED",
+                "error": "CURL_HTTP_RESPONSE_NOT_SUCCESS", "http_status": http_status,
+            }
+        if not body_path.is_file():
+            return {
+                "url": url, "final_url": final_url, "status": "BLOCKED",
+                "error": "CURL_BODY_MISSING", "http_status": http_status,
+            }
+        size = body_path.stat().st_size
+        if size > MAX_DIVIDEND_CURL_BYTES:
+            return {
+                "url": url, "final_url": final_url, "status": "BLOCKED",
+                "error": "CURL_RESPONSE_TOO_LARGE", "http_status": http_status,
+            }
+        body = body_path.read_bytes()
+        return {
+            "url": url,
+            "final_url": final_url,
+            "status": "CAPTURED",
+            "http_status": http_status,
+            "content_type": content_type,
+            "size_bytes": len(body),
+            "body": body,
+        }
 
 
 def _sha256(raw: bytes) -> str:
@@ -166,21 +317,32 @@ def _recover_dividend_from_prior_canonical_adjudication(
 
     response = None
     requested_url = None
+    fetch_diagnostics: list[dict[str, str]] = []
     for candidate_url in DIVIDEND_PDF_HTTPS_URLS:
-        candidate = fetch_https(
-            candidate_url,
-            referer="https://www.sse.com.cn/disclosure/listedinfo/announcement/index.shtml",
-        )
-        # A transport failure may try the next fixed official SSE HTTPS URL.
-        # Once a server returns bytes, those bytes must pass the pinned contract;
-        # do not hide a wrong-origin or changed-document response via fallback.
-        if candidate.get("status") != "CAPTURED":
-            continue
-        response = candidate
-        requested_url = candidate_url
-        break
+        candidate = fetch_https(candidate_url, referer=DIVIDEND_REFERER)
+        # A captured response is validated immediately below. We never hide a
+        # wrong-origin/hash/PDF response by falling through to another endpoint.
+        if candidate.get("status") == "CAPTURED":
+            response = candidate
+            requested_url = candidate_url
+            break
+        fetch_diagnostics.append(_safe_fetch_diagnostic(candidate_url, "PYTHON_HTTPS", candidate))
+
+    # A second, standard macOS HTTPS client handles cases where urllib's proxy,
+    # TLS, or HTTP negotiation is blocked. It uses only the same fixed HTTPS
+    # candidates and refuses HTTPS-to-HTTP redirects. The bytes still have to
+    # pass the canonical URL/origin, exact size/SHA-256 and PDF structure gates.
+    if response is None:
+        for candidate_url in DIVIDEND_PDF_HTTPS_URLS:
+            candidate = _fetch_official_pdf_via_curl(candidate_url, referer=DIVIDEND_REFERER)
+            if candidate.get("status") == "CAPTURED":
+                response = candidate
+                requested_url = candidate_url
+                break
+            fetch_diagnostics.append(_safe_fetch_diagnostic(candidate_url, "CURL_HTTPS", candidate))
+
     if response is None or requested_url is None:
-        raise ValueError("OFFICIAL_DIVIDEND_PDF_DIRECT_HTTPS_FETCH_BLOCKED")
+        raise OfficialDividendPdfFetchBlocked(fetch_diagnostics)
 
     final_url = str(response.get("final_url") or response.get("url") or requested_url)
     final = urlparse(final_url)
