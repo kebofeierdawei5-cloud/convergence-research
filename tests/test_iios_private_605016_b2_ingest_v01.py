@@ -270,3 +270,82 @@ def test_rejects_wrong_official_price_hash_before_persistence(tmp_path: Path) ->
             core_validator=_fake_core_validator,
         )
     assert not private_root.exists()
+
+
+
+def _make_real_core_validator_fixture(tmp_path: Path) -> tuple[dict, Path]:
+    from research.b2.company_evidence import (
+        REQUIRED_COMPANY_FIELD_GROUPS,
+        build_company_evidence_manifest,
+    )
+
+    raw_root = tmp_path / "real-core-raw"
+    evidence = []
+    raw_artifacts = []
+    for index, field_group in enumerate(REQUIRED_COMPANY_FIELD_GROUPS):
+        relative_path = f"raw/{field_group}.json"
+        raw = json.dumps(
+            {"field_group": field_group, "fact_number": index},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        raw_path = raw_root / relative_path
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        raw_path.write_bytes(raw)
+        digest = hashlib.sha256(raw).hexdigest()
+        evidence_id = f"CORE-CONTRACT-{field_group.upper()}"
+        evidence.append({
+            "evidence_id": evidence_id,
+            "subject_id": MODULE.CASE_ID,
+            "field_id": field_group + ".contract_fact",
+            "claim_type": "OBSERVED_FACT",
+            "value": {"fixture_fact": field_group},
+            "unit": "test_unit",
+            "basis": "isolated validator contract fixture",
+            "observation_date": "2026-10-08",
+            "known_at": "2026-10-08T15:00:00+08:00",
+            "retrieved_at": "2026-10-10T12:00:00+00:00",
+            "source_ref": f"https://official.example.test/{field_group}",
+            "artifact_id": "core-contract:" + digest[:16],
+            "content_sha256": digest,
+            "exact_bytes": True,
+            "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+            "status": "ADMITTED",
+            "license_status": "TEST_FIXTURE_ONLY",
+            "source_locator": "isolated contract test; not real-world evidence",
+            "parents": [],
+            "transformation": {"type": "DIRECT", "code_ref": None, "code_sha256": None, "formula_id": None},
+        })
+        raw_artifacts.append({
+            "evidence_id": evidence_id,
+            "relative_path": relative_path,
+            "expected_size_bytes": len(raw),
+            "expected_sha256": digest,
+        })
+
+    manifest = build_company_evidence_manifest(
+        case_id=MODULE.CASE_ID,
+        market="CN-A",
+        symbol="605016",
+        company="山东百龙创园生物科技股份有限公司",
+        cutoff_date=MODULE.CUTOFF_DATE,
+        evidence=evidence,
+        raw_artifacts=raw_artifacts,
+        required_field_groups=list(REQUIRED_COMPANY_FIELD_GROUPS),
+        raw_root=raw_root,
+    )
+    assert manifest["status"] == "PASS", manifest["validation_errors"]
+    return manifest, raw_root
+
+
+def test_real_investment_core_validator_replays_exact_manifest_bytes(tmp_path: Path) -> None:
+    manifest, raw_root = _make_real_core_validator_fixture(tmp_path)
+
+    assert MODULE._validate_core(manifest, raw_root, validator=None) == []
+
+    declaration = manifest["raw_artifacts"][0]
+    tampered = raw_root / declaration["relative_path"]
+    tampered.write_bytes(tampered.read_bytes() + b"tampered")
+    errors = MODULE._validate_core(manifest, raw_root, validator=None)
+
+    assert any("EXACT_BYTES_MISMATCH" in error for error in errors)
