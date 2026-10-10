@@ -5,6 +5,7 @@ on:
     paths:
       - "iios_mvp/canonical_runtime_preflight_v01.py"
       - "tests/test_canonical_runtime_preflight_v01.py"
+      - "tests/independent_redteam_runtime_preflight.py"
       - "docs/iios/P0_CANONICAL_RUNTIME_PREFLIGHT_20261010.md"
       - ".github/workflows/iios_p0_runtime_preflight.yml"
   workflow_dispatch:
@@ -27,5 +28,7 @@ jobs:
         run: python -m compileall -q iios_mvp
       - name: Run preflight and canonical factory regressions
         run: PYTHONPATH=. pytest -q tests/test_canonical_runtime_preflight_v01.py tests/test_canonical_runtime_factory_v01.py tests/test_canonical_host_v01.py
+      - name: Run independent preflight adversarial review
+        run: PYTHONPATH=. pytest -q tests/independent_redteam_runtime_preflight.py
       - name: Check diff formatting
         run: git diff --check

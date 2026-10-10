@@ -20,6 +20,9 @@ from iios_mvp.canonical_natural_language_entry_v01 import RequestIntent
 from iios_mvp.canonical_runtime_registry_v01 import validate_canonical_runtime_bindings
 from iios_mvp.cli import _resolve_canonical_runtime
 from iios_mvp.llm_semantic_workbench_v01 import SemanticRequest
+from iios_mvp.thesis_admission_v03 import THESIS_STATUSES
+
+_PROJECTION_FIELDS = {"status", "statement", "mechanism", "key_driver_ids", "falsifiers", "monitoring_triggers"}
 
 VERSION = "IIOS-CANONICAL-RUNTIME-PREFLIGHT-0.1"
 _SHA = re.compile(r"^[0-9a-f]{64}$")
@@ -180,8 +183,22 @@ def perform_callback_preflight(
         result = bindings.semantic_producer.produce(request)
         if not isinstance(result, Mapping) or set(result) != {"core_projection"} or not isinstance(result.get("core_projection"), Mapping):
             raise HostRequestError("SEMANTIC_PRODUCER_OUTPUT_SCHEMA_INVALID")
+        projection = result["core_projection"]
+        if set(projection) != _PROJECTION_FIELDS:
+            raise HostRequestError("PREFLIGHT_SEMANTIC_PROJECTION_SCHEMA_INVALID")
+        if projection.get("status") not in THESIS_STATUSES:
+            raise HostRequestError("PREFLIGHT_SEMANTIC_STATUS_INVALID")
+        for field in ("statement", "mechanism"):
+            if not isinstance(projection.get(field), str) or not projection[field].strip():
+                raise HostRequestError("PREFLIGHT_SEMANTIC_TEXT_INVALID")
+        for field in ("key_driver_ids", "falsifiers", "monitoring_triggers"):
+            values = projection.get(field)
+            if not isinstance(values, list) or not values or any(
+                not isinstance(value, str) or not value.strip() for value in values
+            ):
+                raise HostRequestError("PREFLIGHT_SEMANTIC_LIST_INVALID")
         report["semantic_callback_status"] = "PASS"
-        report["semantic_projection_keys"] = sorted(str(k) for k in result["core_projection"].keys())
+        report["semantic_projection_keys"] = sorted(str(k) for k in projection.keys())
         report["status"] = "PREFLIGHT_ONLY_COMPLETE"
     except Exception as exc:
         report["status"] = "PREFLIGHT_ONLY_BLOCKED"
