@@ -1,0 +1,32 @@
+name: IIOS ChatGPT Free Web Operator Runtime
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/chatgpt_chat_handoff_v01.py"
+      - "iios_mvp/chatgpt_chat_runtime_v01.py"
+      - "tests/test_chatgpt_chat_operator_runtime.py"
+      - "docs/iios/P0_CHATGPT_FREE_WEB_RUNTIME_20261010.md"
+      - ".github/workflows/iios_chatgpt_free_web_runtime.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chatgpt-web-handoff-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install contract dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema cryptography
+      - name: Run operator handoff contract tests
+        run: PYTHONPATH=. python -m pytest -q tests/test_chatgpt_chat_operator_runtime.py
+      - name: Compile runtime modules
+        run: python -m compileall -q iios_mvp/chatgpt_chat_handoff_v01.py iios_mvp/chatgpt_chat_runtime_v01.py tests/test_chatgpt_chat_operator_runtime.py
+      - name: Check diff formatting
+        run: git diff --check
