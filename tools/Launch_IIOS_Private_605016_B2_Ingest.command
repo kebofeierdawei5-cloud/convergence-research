@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO="https://github.com/kebofeierdawei5-cloud/convergence-research.git"
 PRIVATE_ROOT="$HOME/Library/Application Support/IIOS/private-data"
-WORKDIR="$(mktemp -d "\${TMPDIR:-/tmp}/iios-private-605016.XXXXXX")"
+WORKDIR="$(mktemp -d /tmp/iios-private-605016.XXXXXX)"
 
 cleanup() {
   rc=$?
