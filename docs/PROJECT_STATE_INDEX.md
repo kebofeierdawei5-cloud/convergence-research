@@ -53,7 +53,7 @@ Status: **MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL TESTS PASS / LIVE OPERATOR 
 - Operator instructions: `docs/iios/P0_CANONICAL_RUNTIME_PREFLIGHT_20261010.md`.
 - **Non-claim:** no real operator environment was available to run this command against an actual local/self-hosted or external provider. The CI fake bindings prove only diagnostic control flow. A successful preflight will prove callback connectivity and receipt persistence, not deployed Host-origin acceptance, source admission, semantic admission, forecast/valuation quality or a completed canonical company run.
 - The canonical provider contract is preserved. A self-hosted model must still use the existing factory and a verified HTTPS endpoint with `AUTH_MODE=NONE`; the pinned runtime keypair and admitted-store contract remain required. No paid commercial API key is mandatory for a properly deployed self-hosted provider.
-- C1 case `RC-CN-A-605016-20261009` remains blocked on unadmitted `market_price`; P0-LLM-001/P0-LLM-004 remain OPEN.
+- At the time of this runtime-preflight milestone (before PR #294), C1 still lacked an admitted market-price record. The later official HTTPS ephemeral B2 result is recorded in the current-state summary; private durable admission and production-host acceptance remain OPEN.
 
 ### P0 C1 — Source-by-source adjudication and unchanged B2/PIT — 2026-10-10
 
@@ -71,9 +71,9 @@ Status: **REAL RAW-BYTE REPLAY PASS / PARTIAL FACT ADMISSION / B2 BLOCKED ON MAR
 - Exact validated PR head `f31f029b8027b19f4a8ff74fede7fdae8977f516`: P0 entry/write regression, B2-E E2E, Investment Core CI, trusted runtime factory, investor report, B04/B04-B, and independent authority/red-team workflows passed. This is control-plane regression evidence only.
 - P0-LLM-001 / P0-LLM-004 remain OPEN: no production host-origin run has yet proved source-admitted 605016 Evidence/PIT, authentic semantic/Forecast/Valuation lineage, report/publication, complete Run Receipt replay and independent review in the deployed runtime.
 
-### P0 C1 Follow-up — Official dividend implementation and market-price source gate — 2026-10-10
+### P0 C1 Follow-up — Official dividend implementation and initial market-price gate — 2026-10-10 (historical state before PR #294)
 
-Status: **OFFICIAL DIVIDEND FACT ADMITTED / SIX-OF-SEVEN B2 GROUPS PASS / MARKET PRICE BLOCKED**.
+Status at run #38039463649: **OFFICIAL DIVIDEND FACT ADMITTED / SIX-OF-SEVEN B2 GROUPS PASS / MARKET PRICE BLOCKED**. This specific run is historical and is superseded by the later official HTTPS ephemeral B2 pass described in the current blockers and next-development-batch sections.
 
 - PR #282 merged at `8420d287271c565e61e8501e6168239d6f13bf73`. Adjudication record: `docs/iios/ROUTE_A_C1_605016_FOLLOWUP_ADJUDICATION_20261010.md`.
 - Official SSE implementation notice `2026年半年度权益分派实施公告`, announcement no. 2026-043, was captured from the official SSE big5 host. Exact PDF: 146,499 bytes, SHA-256 `1a153c20f908abbd48fdd63a651ecb0edde269f3e7dd0ea27a0b8ce420e5ea8c`. Fact-level record confirms gross cash dividend RMB 0.075/share, record date 2026-09-28, ex-dividend/payment date 2026-09-29, share basis 420,012,320 and total RMB 31,500,924. Reuse class is `RESTRICTED_NO_REDISTRIBUTION`; PDF bytes are not committed to Git.
@@ -83,7 +83,7 @@ Status: **OFFICIAL DIVIDEND FACT ADMITTED / SIX-OF-SEVEN B2 GROUPS PASS / MARKET
 - Eastmoney terms require prior written exchange permission for market-quote reuse; Yahoo terms require express prior permission for automated quote collection. No permission is available, so both are excluded from canonical B2. Neither path may be promoted by relaxing source contracts or PIT.
 - Canonical evidence/run records: `evidence/real_cases/RC-CN-A-605016-20261009/DIVIDEND_IMPLEMENTATION_ADJUDICATION_20261010.json`, `PRICE_CUTOFF_SOURCE_ADJUDICATION_20261010.json`, and `FOLLOWUP_B2_RUN_20261010.json`.
 - Remaining evidence gate: persist the exact official HTTPS market-price source and signed admission record inside the private Host/data root, rerun unchanged B2/PIT there, and independently review the event-time `known_at` basis. Until that durable/private admission passes, no formal valuation, Decision Revision, Publication, investor report or complete Run Receipt is permitted.
-- Price-provider reuse review is preserved at `evidence/real_cases/RC-CN-A-605016-20261009/PRICE_PROVIDER_TERMS_ADJUDICATION_20261010.json`. The tested alternative sources are not admitted: one lacks a sufficiently explicit reuse grant for IIOS evidence use, and one provider's terms require prior permission for automated retrieval. The official price route remains blocked by the HTTPS intake rule. No quote value is promoted, and `market_price` remains UNKNOWN.
+- Historical price-provider reuse review is preserved at `evidence/real_cases/RC-CN-A-605016-20261009/PRICE_PROVIDER_TERMS_ADJUDICATION_20261010.json`. The tested alternatives remain excluded: one requires prior written exchange permission for quote reuse, and another requires express prior permission for automated retrieval. At the time of this earlier run the official TLS endpoint had not yet been identified; PR #294 subsequently validated the official HTTPS candidate ephemerally. No quote value is included in the public record, and canonical durable admission remains OPEN.
 - Production Host/deployment, genuine semantic/Forecast/Valuation and full host-origin Run Receipt replay remain separate OPEN gates. P0-LLM-001 / P0-LLM-004 remain **OPEN**.
 
 ### P0 Batch B2 — First-Party Host Implementation — 2026-10-10
