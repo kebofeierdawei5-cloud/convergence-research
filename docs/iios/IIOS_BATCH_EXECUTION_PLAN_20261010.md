@@ -132,8 +132,7 @@ This closes the repository-CLI route/persistence integration test gap only.
 
 **Remaining actions**
 1. Provision trusted bundle/data/output roots and the host auth token outside Git; deploy the host and record the deployed commit/config provenance.
-2. Configure `IIOS_CANONICAL_RUNTIME_FACTORY=iios_mvp.canonical_runtime_factory_v01:build_canonical_runtime`, a real HTTPS provider endpoint (self-hosted with `AUTH_MODE=NONE` is permitted if genuinely available), pinned Ed25519 keypair, and a durable canonical admission root. No API credential is required for source capture; a live semantic callback requires a real endpoint.
-3. Ensure the bundle is prepared from the real case and admitted source bytes; never accept request-supplied paths or semantic assertions. The factory must resolve genuine current-price, independent forecast, upstream-authority and valuation records, all case/cutoff bound and independently replayable.
+2. Configure `IIOS_CANONICAL_RUNTIME_FACTORY=iios_mvp.canonical_runtime_factory_v01:build_canonical_runtime`, a pinned Ed25519 keypair and a durable canonical admission root. An external provider must use HTTPS. The free-first local path from PR #285 may use HTTP only when the Ollama endpoint is loopback and both `DEPLOYMENT_MODE=SELF_HOSTED` and `AUTH_MODE=NONE`; run `python tools/prepare_iios_local_ollama_runtime.py` on the same machine/network namespace as the Host and an installed Ollama model (v0.13.3+). A remote Host cannot use the operator machine’s loopback address. No API credential is required for source capture; a live semantic callback still requires a real model endpoint.3. Ensure the bundle is prepared from the real case and admitted source bytes; never accept request-supplied paths or semantic assertions. The factory must resolve genuine current-price, independent forecast, upstream-authority and valuation records, all case/cutoff bound and independently replayable.
 4. Obtain one fresh host-origin run. Missing model output, missing evidence, absent references or wrong case identity must return `BLOCKED`, not fallback.
 5. Only after successful Evidence/PIT + semantic/Forecast/Valuation admission run publication/report/complete `IIOS_RUN_RECEIPT` replay and independent red-team.
 
@@ -143,7 +142,7 @@ This closes the repository-CLI route/persistence integration test gap only.
 - At least one real company run passes the exact-byte seven-group Evidence/PIT gate and all downstream admission/report/receipt gates.
 - Human approval remains required and automatic execution remains disabled.
 
-**Credential boundary:** the host adapter itself and Route A evidence intake need no paid API key. A genuine semantic stage requires a real configured model callback or signed production-origin semantic receipt; the host deliberately blocks rather than fabricating one.
+**Credential boundary:** the host adapter itself and Route A evidence intake need no paid API key. A genuine semantic stage can use a real local Ollama Responses endpoint without a paid API key if the Host and model share a machine; a remote/external endpoint must be HTTPS and may impose its own credential requirements. The host deliberately blocks rather than fabricating a response.
 
 ### Batch C1 — actual 605016 (百龙创园) source bundle and B2/PIT admission
 
