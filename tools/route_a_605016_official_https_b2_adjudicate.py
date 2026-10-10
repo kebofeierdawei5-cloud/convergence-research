@@ -34,6 +34,15 @@ EXPECTED_DIVIDEND_PDF_SIZE = 146499
 EXPECTED_DIVIDEND_LISTING_SHA256 = "8c7f84e0161d4db6162c1af4ec32cd29092a3e515435c46887419f6dd2909aa0"
 EXPECTED_DIVIDEND_LISTING_SIZE = 3079
 EXPECTED_DIVIDEND_PDF_URL = "https://big5.sse.com.cn/site/cht/www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-09-22/605016_20260922_1YLT.pdf"
+# Fixed official SSE HTTPS candidates for the exact same announcement path. The
+# fallback is transport-only: every successful response must still match the
+# canonical PDF's previously admitted exact size/SHA-256 and three-page shape.
+DIVIDEND_PDF_HTTPS_URLS = (
+    EXPECTED_DIVIDEND_PDF_URL,
+    "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-09-22/605016_20260922_1YLT.pdf",
+    "https://www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-09-22/605016_20260922_1YLT.pdf",
+)
+DIVIDEND_PDF_ALLOWED_FINAL_URLS = frozenset(DIVIDEND_PDF_HTTPS_URLS)
 DIVIDEND_LEDGER_RELATIVE = Path(
     "evidence/real_cases/RC-CN-A-605016-20261009/DIVIDEND_IMPLEMENTATION_ADJUDICATION_20261010.json"
 )
@@ -155,18 +164,30 @@ def _recover_dividend_from_prior_canonical_adjudication(
     ):
         raise ValueError("CANONICAL_DIVIDEND_FACT_RECORD_BINDING_MISMATCH")
 
-    response = fetch_https(
-        EXPECTED_DIVIDEND_PDF_URL,
-        referer="https://www.sse.com.cn/disclosure/listedinfo/announcement/index.shtml",
-    )
-    if response.get("status") != "CAPTURED":
+    response = None
+    requested_url = None
+    for candidate_url in DIVIDEND_PDF_HTTPS_URLS:
+        candidate = fetch_https(
+            candidate_url,
+            referer="https://www.sse.com.cn/disclosure/listedinfo/announcement/index.shtml",
+        )
+        # A transport failure may try the next fixed official SSE HTTPS URL.
+        # Once a server returns bytes, those bytes must pass the pinned contract;
+        # do not hide a wrong-origin or changed-document response via fallback.
+        if candidate.get("status") != "CAPTURED":
+            continue
+        response = candidate
+        requested_url = candidate_url
+        break
+    if response is None or requested_url is None:
         raise ValueError("OFFICIAL_DIVIDEND_PDF_DIRECT_HTTPS_FETCH_BLOCKED")
-    final_url = str(response.get("final_url") or response.get("url") or "")
+
+    final_url = str(response.get("final_url") or response.get("url") or requested_url)
     final = urlparse(final_url)
     if (
         final.scheme.lower() != "https"
-        or final.hostname != "big5.sse.com.cn"
-        or final_url.split("#", 1)[0] != EXPECTED_DIVIDEND_PDF_URL
+        or final_url.split("#", 1)[0] not in DIVIDEND_PDF_ALLOWED_FINAL_URLS
+        or final.hostname not in {"big5.sse.com.cn", "static.sse.com.cn", "www.sse.com.cn"}
     ):
         raise ValueError("OFFICIAL_DIVIDEND_PDF_TLS_ORIGIN_MISMATCH")
     raw_pdf = response.get("body")
@@ -196,10 +217,12 @@ def _recover_dividend_from_prior_canonical_adjudication(
         "expected_listing_date": "2026-09-22",
         "status": "RAW_PDF_CAPTURED_NOT_ADMITTED",
         "listing_row": row,
-        "final_pdf_url": EXPECTED_DIVIDEND_PDF_URL,
+        "final_pdf_url": final_url,
         "pdf_capture": {
             "url": final_url,
             "final_url": final_url,
+            "requested_url": requested_url,
+            "canonical_url": EXPECTED_DIVIDEND_PDF_URL,
             "status": "CAPTURED",
             "http_status": response.get("http_status"),
             "content_type": response.get("content_type"),
@@ -214,7 +237,7 @@ def _recover_dividend_from_prior_canonical_adjudication(
             "listing_bytes_reverified_in_current_run": False,
             "fact_level_status": "ADMITTED_IN_CANONICAL_SOURCE_LEDGER",
         },
-        "capture_mode": "PRIOR_CANONICAL_LISTING_ADJUDICATION_PLUS_CURRENT_DIRECT_PDF_REHASH",
+        "capture_mode": "PRIOR_CANONICAL_LISTING_ADJUDICATION_PLUS_CURRENT_OFFICIAL_HTTPS_CANDIDATE_PDF_REHASH",
     }
     capture_report = {
         "schema_version": "IIOS-605016-FOLLOWUP-SOURCE-CAPTURE-0.1",
@@ -259,19 +282,19 @@ def _build_base_manifest_from_prior_dividend(
     source = ledger["source"]
     dividend_evidence = dict(ledger["evidence_record"])
     dividend_evidence.update({
-        "basis": "Official SSE implementation notice: the exact PDF bytes were re-fetched from the pinned official Big5 URL and matched the SHA-256 already recorded in the canonical source adjudication. Source-listing row identity and date are reused from that prior canonical adjudication; its original raw listing bytes were not re-fetched in this run.",
+        "basis": "Official SSE implementation notice: the exact PDF bytes were re-fetched from an allowlisted official SSE HTTPS URL and matched the SHA-256 already recorded in the canonical source adjudication. Source-listing row identity and date are reused from that prior canonical adjudication; its original raw listing bytes were not re-fetched in this run.",
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
-        "source_ref": EXPECTED_DIVIDEND_PDF_URL,
+        "source_ref": final_url,
         "artifact_id": "ROUTE-A-FOLLOWUP:SSE-2026-09-22-DIVIDEND-IMPLEMENTATION:" + pdf_sha[:16],
         "capture_sha256": pdf_sha,
         "exact_bytes": True,
         "effective_from": "2026-09-29",
         "source_id": str(source["source_id"]),
-        "source_origin_adjudication": "PASS_PRIOR_CANONICAL_SSE_LISTING_AND_CURRENT_EXACT_OFFICIAL_PDF_REHASH",
+        "source_origin_adjudication": "PASS_PRIOR_CANONICAL_SSE_LISTING_AND_CURRENT_ALLOWLISTED_OFFICIAL_HTTPS_EXACT_PDF_REHASH",
         "parents": [],
         "transformation": {"type": "DIRECT", "code_ref": None, "code_sha256": None, "formula_id": None},
         "quality_notes": [
-            "Exact raw PDF size/SHA-256 were reverified during this local run.",
+            "Exact raw PDF size/SHA-256 were reverified during this local run from the captured official SSE HTTPS endpoint.",
             "The original official listing row and its raw-byte hash come from the canonical prior adjudication; listing raw bytes were not reacquired because the query API was blocked.",
             "Official SSE source reuse remains restricted to non-redistributive internal fact-level use.",
             "The exact intraday first-public timestamp is not asserted; known_at remains date-only 2026-09-22.",
