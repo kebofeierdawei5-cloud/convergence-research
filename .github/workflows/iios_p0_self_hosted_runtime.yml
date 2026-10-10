@@ -1,0 +1,30 @@
+name: IIOS P0 Self-Hosted Semantic Runtime
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/self_hosted_semantic_runtime_v01.py"
+      - "iios_mvp/self_hosted_runtime_factory_v01.py"
+      - "tests/test_self_hosted_semantic_runtime_v01.py"
+      - ".github/workflows/iios_p0_self_hosted_runtime.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  self-hosted-runtime-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema cryptography
+      - name: Compile canonical modules
+        run: python -m compileall -q iios_mvp
+      - name: Run free-first runtime contract tests
+        run: PYTHONPATH=. pytest -q tests/test_self_hosted_semantic_runtime_v01.py tests/test_canonical_host_v01.py tests/test_canonical_cli_host_integration.py
+      - name: Check diff formatting
+        run: git diff --check
