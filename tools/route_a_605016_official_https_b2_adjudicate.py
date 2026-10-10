@@ -66,10 +66,10 @@ def _safe_transport_outcome(response: dict[str, Any]) -> str:
     if isinstance(status, int) and not 200 <= status < 300:
         return f"HTTP_{status}"
     error = str(response.get("error", "")).upper()
-    http_match = re.search(r"HTTP ERROR (\\d{3})", error)
+    http_match = re.search(r"HTTP ERROR (\d{3})", error)
     if http_match:
         return "HTTP_" + http_match.group(1)
-    curl_match = re.search(r"CURL_EXIT_(\\d+)", error)
+    curl_match = re.search(r"CURL_EXIT_(\d+)", error)
     if curl_match:
         return {
             "6": "DNS_FAILURE",
@@ -140,7 +140,7 @@ def _fetch_official_pdf_via_curl(url: str, *, referer: str) -> dict[str, Any]:
             "--header", "Accept-Encoding: identity",
             "--max-filesize", str(MAX_DIVIDEND_CURL_BYTES),
             "--output", str(body_path),
-            "--write-out", "%{http_code}\\n%{url_effective}\\n%{content_type}\\n",
+            "--write-out", "%{http_code}\n%{url_effective}\n%{content_type}\n",
             url,
         ]
         try:
