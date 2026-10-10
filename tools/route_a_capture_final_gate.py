@@ -62,6 +62,11 @@ def validate_capture_final_gate(
     if not isinstance(rows, list) or not rows:
         raise CaptureFinalGateError("CAPTURE_RECEIPT_SOURCE_ROWS_INVALID")
     succeeded = sum(1 for row in rows if isinstance(row, dict) and row.get("capture_status") == "SUCCESS")
+    receipt_payload_mismatches = sum(
+        1 for row in rows if isinstance(row, dict) and row.get("payload_contract_status") == "MISMATCH"
+    )
+    if receipt_payload_mismatches != payload_mismatches:
+        raise CaptureFinalGateError("RECEIPT_PAYLOAD_CONTRACT_COUNT_MISMATCH")
     failed = sum(1 for row in rows if isinstance(row, dict) and row.get("capture_status") == "FAILED")
     if succeeded + failed != len(rows):
         raise CaptureFinalGateError("CAPTURE_RECEIPT_SOURCE_STATUS_INVALID")
