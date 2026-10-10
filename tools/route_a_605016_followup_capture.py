@@ -223,6 +223,18 @@ def official_exchange_price_capture(root: Path) -> dict[str, Any]:
         "&select=date,open,high,low,close,volume,amount"
     )
     result = fetch(url, referer="https://www.sse.com.cn/market/stockdata/overview/day/")
+    primary_capture = {k: v for k, v in result.items() if k != "bytes"}
+    if result.get("status") != "CAPTURED":
+        fallback_url = (
+            "https://query.sse.com.cn/marketdata/tradedata/data/stockDailyTransData.do?"
+            "isPagination=false&productId=605016&startDate=2026-10-09&endDate=2026-10-09"
+        )
+        fallback = fetch(fallback_url, referer="https://www.sse.com.cn/market/stockdata/overview/day/")
+        if fallback.get("status") == "CAPTURED":
+            result = fallback
+        else:
+            result["fallback_attempt"] = {k: v for k, v in fallback.items() if k != "bytes"}
+        result["primary_attempt"] = primary_capture
     record: dict[str, Any] = {
         "source_id": "PRICE-SSE-OFFICIAL-DAYK-2026-10-09",
         "source_class": "OFFICIAL_EXCHANGE_MARKET_DATA_CANDIDATE",
@@ -298,6 +310,10 @@ def public_secondary_price_capture(root: Path) -> dict[str, Any]:
         "&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61"
     )
     result = fetch(url, referer="https://quote.eastmoney.com/sh605016.html")
+    if result.get("status") != "CAPTURED":
+        first_attempt = {k: v for k, v in result.items() if k != "bytes"}
+        result = fetch(url, referer="https://quote.eastmoney.com/sh605016.html")
+        result["first_attempt"] = first_attempt
     record: dict[str, Any] = {
         "source_id": "PRICE-EASTMONEY-KLINE-605016",
         "source_class": "PUBLIC_SECONDARY",
