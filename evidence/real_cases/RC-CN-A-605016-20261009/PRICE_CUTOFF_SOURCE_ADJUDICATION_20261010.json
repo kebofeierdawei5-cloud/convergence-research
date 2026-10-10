@@ -79,8 +79,11 @@
           "close_cny": 20.28
         }
       ],
-      "terms_capture_status": "TERMS_CAPTURED_NEEDS_HUMAN_REVIEW",
-      "raw_price_bytes_committed_to_git": false
+      "terms_capture_status": "TERMS_REVIEWED_SOURCE_REUSE_BLOCKED",
+      "raw_price_bytes_committed_to_git": false,
+      "terms_review_conclusion": "The captured Eastmoney legal statement explicitly requires prior written permission to copy/reproduce website content and separately states market quotes require prior written consent from SSE/SZSE for copying/dissemination/display. No written permission is recorded for this use; exclude from B2 admission.",
+      "terms_reviewed_at": "2026-10-10",
+      "terms_review_record_class": "RESEARCH_POLICY_ADJUDICATION_NOT_LEGAL_ADVICE"
     },
     "date_error_reconciliation": "The 20.73 CNY entry belongs to 2026-09-29, not 2026-10-09."
   },
