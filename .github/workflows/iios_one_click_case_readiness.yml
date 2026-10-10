@@ -1,6 +1,12 @@
 name: IIOS — One-click case readiness (read-only)
 
 on:
+  pull_request:
+    paths:
+      - "tools/iios_one_click_readiness_v01.py"
+      - "tests/test_iios_one_click_readiness_v01.py"
+      - "docs/iios/IIOS_ONE_CLICK_READINESS_20261010.md"
+      - ".github/workflows/iios_one_click_case_readiness.yml"
   workflow_dispatch:
     inputs:
       authorize_read_only_preflight:
@@ -13,8 +19,26 @@ permissions:
   contents: read
 
 jobs:
+  contract-tests:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Compile diagnostic
+        run: python -m py_compile tools/iios_one_click_readiness_v01.py
+      - name: Run fail-closed contract tests
+        run: python -m pytest -q tests/test_iios_one_click_readiness_v01.py
+      - name: Check patch formatting
+        run: git diff --check
+
   readiness:
-    if: ${{ inputs.authorize_read_only_preflight }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.authorize_read_only_preflight }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
