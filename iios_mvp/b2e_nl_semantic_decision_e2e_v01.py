@@ -126,7 +126,7 @@ def _transition_pre_decision(
     independent_forecast_resolver: Any,
     valuation_output_resolver: Any,
     created_at: str,
-) -> None:
+) -> dict[str, Any]:
     return_gate = case.get("return_gate")
     if not isinstance(return_gate, Mapping):
         raise B2EE2EError("canonical return_gate is required for Forecast/Valuation admission")
@@ -193,6 +193,7 @@ def _transition_pre_decision(
         ),
         created_at=created_at,
     )
+    return lineage
 
 
 def _persist_blocked_on_error(function):
@@ -401,7 +402,7 @@ def run_b2e_conformance(
     )
     projection = projected_case["semantic_core_projection"]
 
-    _transition_pre_decision(
+    upstream_lineage = _transition_pre_decision(
         orchestrator,
         run_id=run_id,
         case=projected_case,
@@ -448,15 +449,38 @@ def run_b2e_conformance(
         return_metrics_hash,
         risk_portfolio_hash,
     )
-    orchestrator.transition(
-        run_id,
-        Stage.DECISION_ADMITTED,
-        output_refs=decision_stage_refs,
-        output_hashes=decision_stage_hashes,
-        input_refs=(semantic.artifact["artifact_id"],),
-        input_hashes=(semantic.artifact["artifact_hash"],),
-        created_at=created_at,
+    # The formal writer must be able to re-open every authority-bearing upstream
+    # payload after restart; stage hashes alone only prove self-consistency.
+    upstream_bundle_core = {
+        "schema_version": "IIOS-CANONICAL-UPSTREAM-ADMISSIONS-0.1",
+        "run_id": run_id,
+        "case_id": str(projected_case["case_id"]),
+        "market": str(projected_case["market"]).upper(),
+        "symbol": str(projected_case["symbol"]).upper(),
+        "company": str(projected_case["company"]),
+        "cutoff_date": str(projected_case["cutoff_date"]),
+        "semantic_artifact": dict(semantic.artifact),
+        "semantic_producer_receipt": dict(semantic.producer_receipt),
+        "semantic_admission": dict(semantic.admission.__dict__),
+        "canonical_forecast_ref": dict(upstream_lineage["canonical_forecast_ref"]),
+        "forecast_record": dict(upstream_lineage["forecast_record"]),
+        "canonical_valuation_ref": dict(upstream_lineage["canonical_valuation_ref"]),
+        "valuation_output": dict(upstream_lineage["valuation_output"]),
+        "validated_lineage": {
+            key: value for key, value in upstream_lineage.items()
+            if key not in {"forecast_record", "valuation_output"}
+        },
+    }
+    canonical_upstream_bundle = {
+        **upstream_bundle_core,
+        "bundle_hash": sha256(upstream_bundle_core),
+    }
+    canonical_upstream_bytes = _canonical(canonical_upstream_bundle)
+    canonical_upstream_file_hash = hashlib.sha256(canonical_upstream_bytes).hexdigest()
+    decision_stage_refs = decision_stage_refs + (
+        f"canonical-upstream-admissions:{canonical_upstream_file_hash}",
     )
+    decision_stage_hashes = decision_stage_hashes + (canonical_upstream_file_hash,)
 
     revision: Mapping[str, Any]
     if run_root is not None:
@@ -474,8 +498,10 @@ def run_b2e_conformance(
             "investment-case": projected_case,
             "evidence-manifest": admitted_manifest,
             "semantic-artifact": dict(semantic.artifact),
+            "semantic-producer-receipt": dict(semantic.producer_receipt),
             "semantic-admission": dict(semantic.admission.__dict__),
             "decision-admission": dict(decision_admission),
+            "canonical-upstream-admissions": canonical_upstream_bundle,
         }
         # Copy the already verified source bytes into the run's immutable evidence
         # root. The Decision Revision write boundary independently reopens these
@@ -527,6 +553,15 @@ def run_b2e_conformance(
             else:
                 artifact_path.write_bytes(artifact_bytes)
         write_snapshot(root_path, snapshot)
+        orchestrator.transition(
+            run_id,
+            Stage.DECISION_ADMITTED,
+            output_refs=decision_stage_refs,
+            output_hashes=decision_stage_hashes,
+            input_refs=(semantic.artifact["artifact_id"],),
+            input_hashes=(semantic.artifact["artifact_hash"],),
+            created_at=created_at,
+        )
         series = create_or_load_series(
             root_path, str(projected_case["market"]), str(projected_case["symbol"]),
             str(projected_case["company"]), created_at,
