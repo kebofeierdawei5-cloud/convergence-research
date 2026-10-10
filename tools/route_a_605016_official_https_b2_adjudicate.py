@@ -739,7 +739,42 @@ def main() -> int:
     parser.add_argument("--attempt10-root", required=True, type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
     args = parser.parse_args()
-    report = adjudicate(args.attempt10_root, args.out_dir)
+    try:
+        report = adjudicate(args.attempt10_root, args.out_dir)
+    except OfficialDividendPdfFetchBlocked as exc:
+        # Source unavailability is a completed fail-closed outcome, not a PASS
+        # and not an unhandled workflow crash. Publish only sanitized transport
+        # categories so operators can distinguish DNS/TLS/HTTP failures.
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        report = {
+            "schema_version": "IIOS-605016-OFFICIAL-HTTPS-B2-ADJUDICATION-0.1",
+            "case_id": CASE_ID,
+            "cutoff_date": CUTOFF_DATE,
+            "overall_status": "BLOCKED_SOURCE_FETCH",
+            "reason": str(exc),
+            "candidate_manifest_status": "NOT_CREATED",
+            "source_fetch_diagnostics": exc.safe_diagnostics,
+            "raw_source_bytes_uploaded": False,
+            "numeric_quote_values_printed": False,
+            "formal_signed_admission_created": False,
+            "production_host_accepted": False,
+            "decision_created": False,
+            "human_approval_required": True,
+            "auto_execution": False,
+        }
+        (args.out_dir / "OFFICIAL_HTTPS_B2_ADJUDICATION_REPORT.json").write_text(
+            json.dumps(report, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8"
+        )
+        print(json.dumps({
+            "status": "BLOCKED",
+            "reason": str(exc),
+            "source_fetch_diagnostics": exc.safe_diagnostics,
+            "candidate_manifest_status": "NOT_CREATED",
+            "raw_source_bytes_uploaded": False,
+        }, ensure_ascii=False, indent=2))
+        # The report itself is a blocked result. Workflow success means only
+        # that the fail-closed adjudication outcome was recorded and sanitized.
+        return 0
     # B2 fail-closed is a completed validation outcome; don't disguise a blocked
     # manifest as workflow success by setting PASS, nor fail to publish the report.
     return 0
