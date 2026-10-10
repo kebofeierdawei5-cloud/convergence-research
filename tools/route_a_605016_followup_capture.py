@@ -449,7 +449,7 @@ def eastmoney_terms_capture(root: Path) -> dict[str, Any]:
             item["size_bytes"] = len(raw)
             item["sha256"] = sha256(raw)
             page_text = re.sub(r"<[^>]+>", " ", raw.decode("utf-8", errors="replace"))
-            page_text = re.sub(r"\\s+", " ", page_text)
+            page_text = re.sub(r"\s+", " ", page_text)
             snippets = []
             for match in re.finditer(r"免责声明|版权|未经授权|商业使用|转载|数据服务|本网站|数据使用|许可|用户协议|服务协议", page_text, flags=re.I):
                 begin, end = max(0, match.start() - 100), min(len(page_text), match.end() + 180)
