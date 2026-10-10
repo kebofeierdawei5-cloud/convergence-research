@@ -115,14 +115,21 @@ The repository contains the CLI and a deliberately empty-by-default canonical ru
 
 ### Batch C1 — actual 605016 (百龙创园) source bundle and B2/PIT admission
 
-**Status:** BLOCKED on new evidence artifacts; the P0 synthetic E2E is not a real company case.
+**Status:** **PARTIAL CAPTURE VERIFIED / EVIDENCE AND PIT NOT ADMITTED**. Raw bundle and case manifest exist; this advances acquisition but not the original P0 analysis acceptance.
 
-**Actions**
-1. Create a case-specific source manifest for `RC-CN-A-605016-20261009` (or the exact canonical Case ID required by the current schema) using only official/free sources and operator-supplied originals if necessary.
-2. Cover all seven mandatory groups: `security_identity`, `market_price`, `corporate_disclosures`, `business_reality`, `financial_reality`, `capital_structure`, `trust_governance_events`.
-3. For every source: retain exact bytes; record content length and SHA-256; identify source class and locator; capture published/known/effective times and their basis; preserve the source's reuse/license status; extract facts with page/table/row-level locators.
-4. Verify raw bytes independently, create fact-level Evidence Records, run the unchanged B2 Evidence/PIT validator and fresh independent red-team. `UNKNOWN` must not cover a required group.
-5. Where an official public source cannot provide the necessary time/version facts, capture an operator-supplied original and preserve its operator-supplied provenance. Do not backfill dates from current web-page retrieval time.
+**Observed capture**
+- Case manifest: `manifests/company_cases/RC-CN-A-605016-20261009.json`; capture request: `manifests/capture_requests/RC-CN-A-605016-20261009.json`.
+- Attempt 1, run `38014567975`: 11/12 sources captured; Investing historical-price URL failed with `HTTP_REQUEST_FAILED`; artifact `11655558984`.
+- Attempt 2, run `38014724607`: source refs registered as official SSE or explicitly secondary-validation types; 11/12 captured; the same Investing URL failed; artifact `11655484327`.
+- Attempt 3, run `38014829961`: the Sohu historical-price page replaced the inaccessible Investing candidate; 12/12 captured, 0 failed sources, 0 unregistered refs, independent byte/hash verification 12/12, artifact `11655654643`. All outputs remain NOT_ADMITTED.
+- Attempt ledger: `evidence/real_cases/RC-CN-A-605016-20261009/ROUTE_A_CAPTURE_ATTEMPTS_20261010.md`.
+
+**Remaining actions**
+1. Independently adjudicate each captured document's identity, source origin, title, page/table/row locator, exact publication timestamp/known-at basis and reuse/license status. A registered source_ref and exact bytes alone do not admit a fact.
+2. Resolve the authoritative 2026-10-09 close; Stockstar/Sohu are secondary acquisition candidates, not primary market-data authority. Preserve the declared `unknown_pit_sources=1` until resolved.
+3. Convert only fact-level claims that pass independent adjudication to B2 Evidence Records, preserving exact bytes and their hashes; run the unchanged B2 Evidence/PIT validator and independent red-team. `UNKNOWN` must not cover a required group.
+4. Where an official public source cannot provide the necessary time/version facts, capture an operator-supplied original and preserve provenance. Do not backfill dates from current retrieval time.
+5. Keep the three-run acquisition history, including the failed Investing URL attempts; do not rewrite failed rows as successful merely because a replacement source was later captured.
 
 **Price-date correction.** The official 2026 exchange calendar says the A-share market closed October 1–7 and resumed October 8. Therefore for a cutoff of **2026-10-09**, the intended latest-trading-date observation is the **2026-10-09 close**, subject to exact source verification—not the September 30 close used in the earlier 2026-10-07 PILOT-02 test. Keep the two cutoffs and their receipts separate. Official calendar sources:
 - SZSE 2026 trading calendar: https://investor.szse.cn/English/services/trading/calendar/index.html
@@ -213,6 +220,6 @@ The red-team must test both negative bypasses and one end-to-end positive real c
 
 1. Batch A and P0 runtime-binding validation are complete: PR #262 passed 24/24 exact-head workflows; PR #264 passed 16/16, including 12/12 dedicated P0 regression tests. Do not treat either result as production-runtime acceptance.
 2. Begin Batch B: wire the trusted factory into the actual user-facing host and prove the host calls `canonical-run`; a loader and valid binding interface alone are not a registered production runtime.
-3. Start C1's 605016 official/free evidence bundle as the primary critical path; run C2's Xinhecheng source adjudication in parallel.
+3. Continue C1 from the verified 12/12 raw capture into source-origin/license/PIT adjudication, especially the authoritative 2026-10-09 price; run C2's Xinhecheng fact adjudication in parallel.
 4. Only after source groups and PIT admission pass, execute D1/D2 canonical real runs and receipt replay.
 5. Finish with independent red-team and explicit MVP acceptance; keep P0-LLM-001/P0-LLM-004 OPEN until production-backed semantic conformance is proved.
