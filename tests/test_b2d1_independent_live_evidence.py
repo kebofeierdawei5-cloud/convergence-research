@@ -63,7 +63,7 @@ def build_record(*, endpoint="https://provider.example/v1/responses", auth_mode=
         "provider_version": "fixture-1",
         "protocol": "OPENAI_RESPONSES",
         "model": "test-model",
-        "endpoint": "https://provider.example/v1/responses",
+        "endpoint": endpoint,
         "request_sha256": replay_core["request_sha256"],
         "response_sha256": replay_core["response_sha256"],
         "request_payload": request_payload,
