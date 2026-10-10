@@ -33,6 +33,16 @@ def test_self_hosted_no_auth_loopback_http_is_valid():
     "http://provider.example/v1/responses",
     "http://192.168.1.10:8000/v1/responses",
 ])
+def test_self_hosted_loopback_http_with_bearer_auth_is_rejected():
+    with pytest.raises(ProviderRuntimeBoundaryError, match="must use HTTPS"):
+        validate_provider_runtime_policy(
+            base_url="http://127.0.0.1:11434/v1/responses",
+            protocol="OPENAI_RESPONSES",
+            auth_mode="BEARER",
+            deployment_mode="SELF_HOSTED",
+        )
+
+
 def test_non_loopback_http_is_rejected(url):
     with pytest.raises(
         ProviderRuntimeBoundaryError,
