@@ -31,7 +31,8 @@
     "repo_path": "evidence/real_cases/RC-CN-A-605016-20261009/SOURCE_ADJUDICATION_20261010.json",
     "source_count": 12,
     "fact_candidate_count": 10,
-    "source_adjudication_ledger_sha256": "UNBOUND_TO_CURRENT_BRANCH_COMMIT_UNTIL_MERGE"
+    "source_adjudication_ledger_sha256": "1bdf00e29e4845c07b2862a0a2a890826f708c60fe1cf18c09fb175b15bee02e",
+    "ledger_content_sha256_is_for": "workflow source tree at exact head aa3ef559c55335cd84bd38db43a0ae3975cc6ef6"
   },
   "b2_gate": {
     "core_validator": "research.b2.company_evidence.build_company_evidence_manifest (unchanged)",
