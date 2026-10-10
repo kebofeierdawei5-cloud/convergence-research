@@ -29,7 +29,15 @@ Source registration resolves provenance classification only. It does not establi
 
 ## Attempt 3 — Sohu replacement for inaccessible Investing page
 
-The manifest now uses `https://q.stock.sohu.com/cn/605016/lshq.shtml` as the free historical-price acquisition candidate under `SOHU:MARKET_HISTORY_PAGE`. The original Investing failure remains preserved above. This retry can at most establish raw-byte capture/integrity; it cannot admit the 2026-10-09 closing price.
+- Workflow run: [38014829961](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38014829961)
+- Intake: `CAPTURED_NOT_ADMITTED`; **12/12 sources captured**, no failed rows, no unregistered source refs.
+- Independent verification: `INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION`; **12 raw files hash/size verified**.
+- `unknown_pit_sources=1`; source origin, exact historical market-price vintage, reuse/licensing, and fact-level content remain independently unadjudicated.
+- B2 preflight: `BLOCKED_NOT_ADMITTED`; B2 manifest status `BLOCKED`; all seven required groups remain uncovered for admission; `evidence_admission=false`, `pit_admission=false`.
+- Final route-A gate: `CAPTURE_COMPLETE_NOT_ADMITTED`.
+- Artifact: [11655654643](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38014829961/artifacts/11655654643), 14-day Actions retention.
+
+The manifest uses `https://q.stock.sohu.com/cn/605016/lshq.shtml` as the free historical-price acquisition candidate under `SOHU:MARKET_HISTORY_PAGE`. The original Investing failures remain preserved in Attempts 1–2. This successful recapture proves only that the current URLs returned byte payloads that matched the capture receipt; it does **not** prove that the market-price row is the authoritative 2026-10-09 close, nor that any business fact is admitted.
 
 ## Explicit gate boundary
 
