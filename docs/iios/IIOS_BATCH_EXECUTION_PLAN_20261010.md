@@ -1,7 +1,7 @@
 # IIOS Batch Execution Plan — Refreshed 2026-10-10
 
 **Plan class:** execution plan / canonical-main recovery  
-**Authority baseline:** `main@92ad57f837fed50ab474ebf89f4f308869e31545`  
+**Authority baseline:** `main@d8c5b41e13185c365314adacae1449255b8e0eaf`  
 **State authority:** `docs/PROJECT_STATE_INDEX.md`  
 **Purpose:** move IIOS from validated control-plane code to a real, fail-closed, single-company research run without making external LLM API credentials a Route A prerequisite.
 
@@ -94,11 +94,11 @@ The 新和成 case is a parallel Route A proving ground because its real raw-sou
 - It does not instantiate/register a production runtime, prove the actual host calls `canonical-run`, admit company Evidence/PIT, validate live model output or create a trade-authorized decision.
 - The next batch is Batch B. Do not relabel P0-LLM-001/P0-LLM-004 as PASS merely because Batch A CI is green.
 
-### Batch B — actual host composition and runtime-registration proof
+### Batch B — first-party host composition, runtime registration and production acceptance
 
-**Status:** PARTIAL CONTROL-PLANE PASS / PRODUCTION HOST ACCEPTANCE OPEN.
+**Status:** FIRST-PARTY HOST IMPLEMENTATION MERGED / PRODUCTION RUNTIME + DEPLOYMENT ACCEPTANCE OPEN.
 
-The repository-resident CLI command dispatcher has now been exercised end-to-end through its trusted `canonical-run` route. However, repository inspection did not identify a separate deployable web/server/front-end host. Therefore the repository CLI test is a verified slice of the host boundary, not proof that the actual product deployment calls it.
+PR #270 added a first-party loopback-first HTTP host entrypoint inside the canonical repository. This resolves the absence of a repository-owned deployable host adapter. It does not claim that any deployment is already running, or that an actual production runtime has been registered.
 
 #### Batch B1 — repository CLI host integration
 
@@ -112,25 +112,30 @@ The repository-resident CLI command dispatcher has now been exercised end-to-end
 
 This closes the repository-CLI route/persistence integration test gap only.
 
-#### Batch B2 — production host discovery and runtime registration
+#### Batch B2 — first-party host adapter (MERGED) and production composition (OPEN)
 
-**Status:** BLOCKED — ACTUAL DEPLOYABLE HOST / PRODUCTION CALLBACK NOT IDENTIFIED IN REPOSITORY.
+**Implementation status:** MERGED; **production status:** NOT DEPLOYED / NOT ACCEPTED.
 
-**Discovery update (2026-10-10):** the linked GitHub inventory currently exposes only the canonical repository, and its exact-main tree contains no separately identifiable deployed web/server/front-end host. See `docs/iios/P0_BATCH_B2_HOST_DISCOVERY_20261010.md`. This narrows the blocker to an inaccessible/undisclosed host source and a missing production runtime callback; it does not prove no external deployment exists. It is not a credential gate for Route A.
+- PR #270 / merge `d8c5b41e13185c365314adacae1449255b8e0eaf`; exact PR head `79a5024ee52a37ff1450c6d56fbd24589cbcefcd`.
+- Dedicated host workflow: **21/21 tests PASS**; eight exact-head checks all SUCCESS.
+- Operator entrypoint: `python -m iios_mvp.canonical_host_v01`.
+- HTTP accepts only an operator-staged `bundle_id`; trusted roots/runtime factory remain process configuration. The default bind is loopback, run submission is bearer-authenticated and responses cannot authorize trading.
+- Deployment instructions and the complete trust-boundary/non-claim contract are in `docs/iios/P0_BATCH_B2_FIRST_PARTY_HOST_20261010.md`.
 
 **Remaining actions**
-1. Identify the actual app/service that receives the user request outside this repository; inspect its launch/deployment entry and determine whether this repo's CLI can be invoked within that host. Do not assume the CLI is the deployed ChatGPT/product host.
-2. Wire the real host to `canonical-run`, not legacy `run` or direct `run_case`; source the factory selector from trusted deployment configuration, never request JSON.
-3. Register genuine request interpreter, semantic producer and the four canonical resolvers. Require exact producer ID/type/version/policy and input/output lineage. If the host has no genuine semantic/model callback, record the semantic stage `BLOCKED/NOT_RUN`.
-4. Prove a host-level fresh run through persisted envelope/stage receipts, then perform a real-company run after evidence and forecast/valuation admission. Fixture runs cannot satisfy this production gate.
+1. Provision trusted bundle/data/output roots and secret token outside Git; start the host in the actual operator/deployment environment.
+2. Implement and register a genuine runtime factory containing all eight validated bindings. A self-hosted compatible model may use the existing `auth_mode=NONE` + `deployment_mode=SELF_HOSTED` policy on loopback; no paid API key is an evidence-ingestion requirement.
+3. Ensure the bundle is prepared from the real case and admitted source bytes; never accept request-supplied paths or semantic assertions. The factory must resolve genuine current-price, independent forecast, upstream-authority and valuation records, all case/cutoff bound and independently replayable.
+4. Obtain one fresh host-origin run. Missing model output, missing evidence, absent references or wrong case identity must return `BLOCKED`, not fallback.
+5. Only after successful Evidence/PIT + semantic/Forecast/Valuation admission run publication/report/complete `IIOS_RUN_RECEIPT` replay and independent red-team.
 
 **Pass criteria remaining**
-- The actual deployed host reaches `canonical-run` and uses an approved process runtime.
-- Genuine runtime bindings and producer identity/version/input-output lineage are persistent and replay-verifiable.
-- The host path is shown not to bypass exact-byte B2 Evidence/PIT, Forecast/Valuation or Decision Admission.
-- No fixture or manually supplied artifact is represented as live semantic conformance.
+- The service is actually deployed in the operator environment and its build SHA/config provenance are recorded.
+- The factory returns a fully validated `CanonicalRuntimeBindings` from trusted config; real callback/producer identity and output lineage replay cleanly.
+- At least one real company run passes the exact-byte seven-group Evidence/PIT gate and all downstream admission/report/receipt gates.
+- Human approval remains required and automatic execution remains disabled.
 
-**Credential boundary:** public-source discovery, raw evidence capture and B2/PIT validation do not need a paid search or LLM API key. A live semantic stage requires a genuine model callback or another explicitly admitted production-origin semantic receipt. Do not reintroduce external API credentials as a prerequisite for Route A data intake.
+**Credential boundary:** the host adapter itself and Route A evidence intake need no paid API key. A genuine semantic stage requires a real configured model callback or signed production-origin semantic receipt; the host deliberately blocks rather than fabricating one.
 
 ### Batch C1 — actual 605016 (百龙创园) source bundle and B2/PIT admission
 
@@ -230,8 +235,8 @@ The red-team must test both negative bypasses and one end-to-end positive real c
 
 ## 5. Immediate execution order
 
-1. Batch A, P0 runtime-binding validation and Batch B1 CLI integration are merged: PR #262 passed 24/24, PR #264 passed 16/16, and PR #267 passed 13/13 dedicated P0 tests. These do not prove production runtime acceptance.
-2. Batch B2 remains blocked on identifying the actual deployable host and genuine production callback; do not label the repository CLI test as deployed-host conformance.
-3. Continue C1's 605016 official/free evidence bundle as the primary data critical path; run C2's Xinhecheng source adjudication in parallel.
-4. Only after source groups and PIT admission pass, execute D1/D2 canonical real runs and receipt replay.
-5. Finish with independent red-team and explicit MVP acceptance; keep P0-LLM-001/P0-LLM-004 OPEN until production-backed semantic conformance is proved.
+1. Batch A and the canonical host code are merged. PR #262 passed 24/24, PR #264 passed 16/16, PR #267 passed 13/13 dedicated P0 tests, and PR #270 passed 21/21 dedicated host contract tests plus 8/8 exact-head checks.
+2. Batch B is now implemented at the in-repo host boundary; production deployment/runtime/semantic acceptance remains blocked until the operator environment provisions the trusted factory and real data/runtime records. Do not infer production acceptance from host CI.
+3. Continue C1 (605016) source-origin/PIT adjudication and repair the stale capture PR into a current-main exact-head evidence-acquisition PR; run C2 (002001) source adjudication in parallel.
+4. Only after the seven evidence groups and PIT admission pass, execute D1/D2 real canonical runs and complete receipt replay.
+5. Finish with independent red-team and explicit MVP acceptance; keep P0-LLM-001/P0-LLM-004 OPEN until a production-backed real-company conformance run passes.
