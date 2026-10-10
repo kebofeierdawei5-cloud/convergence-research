@@ -248,6 +248,10 @@ def official_exchange_price_capture(root: Path) -> dict[str, Any]:
     secure_urls = [
         "https://yunhq.sse.com.cn/v1/sh1/dayk/605016" + params,
         "https://yunhq.sse.com.cn:32041/v1/sh1/dayk/605016" + params,
+        "https://query.sse.com.cn/marketdata/tradedata/queryTradingByStockCodeData.do?"
+        "jsonCallBack=iiosStockDaily&isPagination=true&stockCode=605016"
+        "&beginDate=2026-10-08&endDate=2026-10-08"
+        "&pageHelp.pageSize=100&pageHelp.pageNo=1&pageHelp.beginPage=1&pageHelp.cacheSize=1&pageHelp.endPage=1",
         "https://query.sse.com.cn/marketdata/tradedata/data/stockDailyTransData.do?"
         "isPagination=false&productId=605016&startDate=2026-10-08&endDate=2026-10-08",
     ]
@@ -457,6 +461,17 @@ def eastmoney_terms_capture(root: Path) -> dict[str, Any]:
             item["terms_text_excerpts"] = snippets
         record["terms_pages"].append(item)
     record["status"] = "TERMS_CAPTURED_NEEDS_HUMAN_REVIEW" if record["terms_pages"] else "TERMS_URL_NOT_FOUND_OR_CAPTURE_FAILED"
+    # Conservative internal adjudication after reviewing Eastmoney's public legal statement:
+    # section X requires prior written SSE/SZSE consent before market-quote information is
+    # copied, distributed, rebroadcast, demonstrated or otherwise disseminated.
+    if any(item.get("url") == "https://about.eastmoney.com/home/legal" for item in record["terms_pages"]):
+        record["market_quote_reuse_disposition"] = "EXCLUDED_UNLESS_PRIOR_EXCHANGE_WRITTEN_PERMISSION_EXISTS"
+        record["market_quote_reuse_basis"] = {
+            "terms_url": "https://about.eastmoney.com/home/legal",
+            "terms_sha256": next((item.get("sha256") for item in record["terms_pages"] if item.get("url") == "https://about.eastmoney.com/home/legal"), None),
+            "reviewed_text": "第十条 特别声明：未经深圳证券交易所和上海证券交易所等交易所的事先书面同意，任何机构或个人不得以任何理由和方式将本网站的行情信息进行复制、传播、转播、演示或任何其他形式的散发。",
+            "decision": "FAIL_CLOSED_FOR_CANONICAL_RAW_EVIDENCE_REUSE",
+        }
     return record
 
 
