@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import sys
 
 from pypdf import PdfWriter
 import pytest
@@ -213,6 +214,37 @@ def test_all_blocked_pdf_fetch_diagnostics_are_safe_and_specific() -> None:
         {"endpoint": "BIG5", "transport": "PYTHON_HTTPS", "outcome": "DNS_FAILURE"},
         {"endpoint": "BIG5", "transport": "CURL_HTTPS", "outcome": "TIMEOUT"},
     ]
+
+
+def test_cli_writes_sanitized_blocked_report_without_traceback(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    diagnostics = [
+        {"endpoint": "BIG5", "transport": "PYTHON_HTTPS", "outcome": "DNS_FAILURE"},
+        {"endpoint": "STATIC", "transport": "CURL_HTTPS", "outcome": "TLS_CERTIFICATE_FAILURE"},
+    ]
+    attempt_root = tmp_path / "attempt10"
+    attempt_root.mkdir()
+    output_root = tmp_path / "out"
+    monkeypatch.setattr(sys, "argv", [
+        "route_a_605016_official_https_b2_adjudicate.py",
+        "--attempt10-root", str(attempt_root),
+        "--out-dir", str(output_root),
+    ])
+    monkeypatch.setattr(
+        MODULE, "adjudicate",
+        lambda *_args: (_ for _ in ()).throw(MODULE.OfficialDividendPdfFetchBlocked(diagnostics)),
+    )
+
+    assert MODULE.main() == 0
+    report = json.loads((output_root / "OFFICIAL_HTTPS_B2_ADJUDICATION_REPORT.json").read_text(encoding="utf-8"))
+    console = json.loads(capsys.readouterr().out)
+    assert report["overall_status"] == "BLOCKED_SOURCE_FETCH"
+    assert report["candidate_manifest_status"] == "NOT_CREATED"
+    assert report["source_fetch_diagnostics"] == diagnostics
+    assert report["raw_source_bytes_uploaded"] is False
+    assert console["status"] == "BLOCKED"
+    assert "sse.com.cn" not in json.dumps(report).lower()
 
 
 def test_successful_but_wrong_pdf_bytes_block_without_trying_another_host(
