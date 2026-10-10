@@ -2,6 +2,6 @@
   "schema_version": "IIOS-COMPANY-EVIDENCE-CAPTURE-REQUEST-0.1",
   "case_id": "RC-CN-A-605016-20261009",
   "manifest_path": "manifests/company_cases/RC-CN-A-605016-20261009.json",
-  "acquisition_attempt": 5,
-  "note": "Attempt 5: capture/verifier now recognize uppercase %PDF- magic case-insensitively; positive regression requires real PDF PASS. Expected status is raw capture with eight HTML challenge mismatches and no B2 fact admission; verify actual run before recording."
+  "acquisition_attempt": 6,
+  "note": "Attempt 6: run after adding an 18-second per-source deadline, 8-second read timeout and 6-minute workflow-step timeout; confirm uppercase %PDF- is accepted, gzip HTML challenge responses excluded from B2 candidates, and raw bytes/failed rows remain audited."
 }
