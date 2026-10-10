@@ -63,7 +63,7 @@ jobs:
           path: /tmp/605016-attempt10
       - name: Independently re-hash actual files and run unchanged B2/PIT admission
         run: |
-          python tools/route_a_605016_adjudicate.py \
+          PYTHONPATH=. python tools/route_a_605016_adjudicate.py \
             --input-run-dir /tmp/605016-attempt10 \
             --out-dir /tmp/605016-adjudication-output
       - name: Preserve JSON result only (never source-document bytes)
