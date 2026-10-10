@@ -15,8 +15,8 @@ from urllib.error import HTTPError, URLError
 CASE_ID = "RC-CN-A-605016-20261009"
 CUTOFF_DATE = "2026-10-09"
 USER_AGENT = "IIOS-free-first-source-acquisition/0.1 (public-source provenance capture)"
-TIMEOUT_SECONDS = 8
-MAX_FETCH_SECONDS = 12
+TIMEOUT_SECONDS = 4
+MAX_FETCH_SECONDS = 5
 READ_CHUNK_BYTES = 64 * 1024
 MAX_BYTES = 50 * 1024 * 1024
 
