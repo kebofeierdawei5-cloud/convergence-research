@@ -417,14 +417,25 @@ def main() -> int:
         code = str(exc) if isinstance(exc, IntakeError) else "INPUT_FILE_UNAVAILABLE"
         print(json.dumps({"status": "INTAKE_BLOCKED", "error_code": code}, sort_keys=True))
         return 2
+    rows = receipt["sources"]
+    failed_sources = [
+        {"source_id": row["source_id"], "error_code": row.get("error_code")}
+        for row in rows if row.get("capture_status") == "FAILED"
+    ]
+    unregistered_sources = [
+        {"source_id": row["source_id"], "source_ref": row.get("source_ref")}
+        for row in rows if row.get("source_registry_status") == "UNREGISTERED"
+    ]
     print(json.dumps({
         "status": receipt["status"],
         "admission_status": receipt["admission_status"],
         "case_id": receipt["case_id"],
-        "sources": len(receipt["sources"]),
-        "failed": sum(row["capture_status"] != "SUCCESS" for row in receipt["sources"]),
+        "sources": len(rows),
+        "failed": len(failed_sources),
+        "failed_sources": failed_sources,
+        "unregistered_sources": unregistered_sources,
         "receipt": str(Path(args.out) / "COMPANY_EVIDENCE_INTAKE_RECEIPT.json"),
-    }, sort_keys=True))
+    }, ensure_ascii=False, sort_keys=True))
     return 0 if receipt["status"] == "CAPTURED_NOT_ADMITTED" else 4
 
 
