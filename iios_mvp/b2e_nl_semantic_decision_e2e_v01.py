@@ -152,6 +152,40 @@ def _transition_pre_decision(
     forecast_ref = lineage["canonical_forecast_ref"]
     valuation_ref = lineage["canonical_valuation_ref"]
 
+    if isinstance(orchestrator, PersistedCanonicalResearchOrchestrator):
+        resolve_valuation_admission = getattr(
+            valuation_output_resolver, "resolve_valuation_admission", None
+        )
+        if not callable(resolve_valuation_admission):
+            raise B2EE2EError(
+                "BLOCKED: persisted canonical runs require resolver-backed valuation admission records"
+            )
+        valuation_admission = resolve_valuation_admission(
+            valuation_ref,
+            case_id=str(case["case_id"]),
+            market=str(case["market"]).upper(),
+            symbol=str(case["symbol"]).upper(),
+            company=str(case["company"]),
+            cutoff_date=__import__("datetime").date.fromisoformat(str(case["cutoff_date"])),
+        )
+        from iios_mvp.canonical_investment_admission_v01 import (
+            validate_canonical_investment_admission_record,
+        )
+        validate_canonical_investment_admission_record(valuation_admission)
+        if hasattr(valuation_admission, "to_dict"):
+            valuation_admission = valuation_admission.to_dict()
+        if (
+            valuation_admission.get("status") != "ADMITTED"
+            or valuation_admission.get("domain") != "VALUATION"
+            or valuation_admission.get("admission_id") != valuation_ref.get("admission_id")
+            or valuation_admission.get("admission_record_hash") != valuation_ref.get("admission_record_hash")
+            or valuation_admission.get("output_hash") != lineage["valuation_output"].get("output_hash")
+        ):
+            raise B2EE2EError(
+                "BLOCKED: persisted valuation output is not bound to its admitted VALUATION record"
+            )
+        lineage["valuation_admission_record"] = dict(valuation_admission)
+
     orchestrator.transition(
         run_id,
         Stage.FORECAST_PENDING,
