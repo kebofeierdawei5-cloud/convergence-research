@@ -502,7 +502,7 @@ def yahoo_terms_capture(root: Path) -> dict[str, Any]:
     raw = result["bytes"]
     save_bytes(root, "raw/YAHOO-TERMS.html", raw)
     text = re.sub(r"<[^>]+>", " ", raw.decode("utf-8", errors="replace"))
-    text = re.sub(r"\\s+", " ", text)
+    text = re.sub(r"\s+", " ", text)
     record["saved_path"] = "raw/YAHOO-TERMS.html"
     record["size_bytes"] = len(raw)
     record["sha256"] = sha256(raw)
