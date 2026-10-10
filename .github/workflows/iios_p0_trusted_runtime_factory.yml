@@ -1,0 +1,34 @@
+name: IIOS P0 Trusted Runtime Factory
+
+on:
+  pull_request:
+    paths:
+      - "iios_mvp/canonical_runtime_factory_v01.py"
+      - "tests/test_canonical_runtime_factory_v01.py"
+      - "docs/iios/P0_BATCH_B2_TRUSTED_RUNTIME_FACTORY_20261010.md"
+      - ".github/workflows/iios_p0_trusted_runtime_factory.yml"
+      - "iios_mvp/canonical_runtime_registry_v01.py"
+      - "iios_mvp/live_provider_evidence_v01.py"
+      - "iios_mvp/live_provider_independent_verify_v01.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  factory-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema cryptography
+      - name: Compile canonical runtime factory
+        run: python -m compileall -q iios_mvp
+      - name: Run factory and resolver fail-closed contracts
+        run: PYTHONPATH=. pytest -q tests/test_canonical_runtime_factory_v01.py tests/test_canonical_host_v01.py tests/test_canonical_cli_host_integration.py tests/test_p0_canonical_entry_incident_reproduction.py
+      - name: Check diff formatting
+        run: git diff --check
