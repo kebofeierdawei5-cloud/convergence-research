@@ -185,6 +185,7 @@ Next boundary at that checkpoint: **Batch B2 — production host identification 
 
 Status: **MERGED / EXACT-HEAD CONTROL-PLANE REGRESSION PASS / PRODUCTION P0 OPEN**.
 
+- Acceptance record: `docs/iios/P0_BATCH_B3_PERSISTED_UPSTREAM_WRITE_AUTHORIZATION_20261010.md`.
 - PR #276: [P0 persisted upstream write authorization](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/276).
 - Merge commit: `d3582621918b285f29b4573c2618c1072247885c`; validated pre-merge exact head: `f31f029b8027b19f4a8ff74fede7fdae8977f516`.
 - The canonical run now retains exact content-addressed Semantic Artifact, Producer Receipt/Admission, Forecast Admission, Valuation Admission/Output and a bound upstream-admission bundle before `DECISION_ADMITTED` is persisted.
