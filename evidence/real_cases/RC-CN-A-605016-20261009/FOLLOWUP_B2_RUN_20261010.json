@@ -85,5 +85,38 @@
     "terms_size_bytes": 12905,
     "disposition": "EXCLUDED_FROM_B2_ADMISSION_WITHOUT_WRITTEN_PERMISSION",
     "non_legal_advice_note": "Project source-admission decision based on captured terms; not legal advice."
-  }
+  },
+  "current_blocker_reason": "Historical result from the pre-HTTPS attempt: official price bytes were available only via plain HTTP and were correctly blocked. This result is superseded by the later ephemeral official HTTPS B2 run #38041208974; no numeric market quote values are stored in this public record.",
+  "latest_official_https_b2_run": {
+    "run_id": 38041208974,
+    "run_url": "https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38041208974",
+    "result": "PASS_EPHEMERAL_B2",
+    "output_artifact_id": 11665881455,
+    "output_artifact_sha256": "4203898caf2d98277713a09b0dd8d5c5dc855d059a4c6186eeec6dd0a2cf6dc8",
+    "official_price_source_id": "PRICE-SSE-OFFICIAL-DAYK-2026-10-08",
+    "official_https_response_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480",
+    "official_https_response_size_bytes": 124,
+    "candidate_manifest_sha256": "523da9b9b67a5dda7ba33fa45c3365e8892f616cb67fa14b7e77fdffcf9375ec",
+    "evidence_record_count": 11,
+    "admitted_record_count": 11,
+    "admitted_field_groups": [
+      "business_reality",
+      "capital_structure",
+      "corporate_disclosures",
+      "financial_reality",
+      "market_price",
+      "security_identity",
+      "trust_governance_events"
+    ],
+    "missing_required_field_groups": [],
+    "validation_errors": [],
+    "raw_quote_values": "WITHHELD_FROM_PUBLIC_REPOSITORY",
+    "raw_source_bytes_uploaded": false,
+    "candidate_manifest_uploaded": false,
+    "canonical_durable_admission": false,
+    "production_host_acceptance": false,
+    "known_at": "2026-10-08T15:00:00+08:00",
+    "known_at_basis": "Market-session close event time for the completed prior session; not an asserted first-public timestamp for the historical API row; independent temporal review required."
+  },
+  "decision": "The unchanged core B2/PIT validator passed in the ephemeral official HTTPS run. Durable canonical admission is still pending private Host/data-root persistence and independent review of the observation-time basis."
 }
