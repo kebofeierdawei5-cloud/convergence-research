@@ -63,9 +63,45 @@ DIVIDEND_REFERER = "https://www.sse.com.cn/disclosure/listedinfo/announcement/in
 class OfficialDividendPdfFetchBlocked(ValueError):
     """All pinned official HTTPS candidates failed; diagnostics contain no URLs or raw errors."""
 
+    diagnostic_field = "source_fetch_diagnostics"
+
     def __init__(self, diagnostics: list[dict[str, str]]) -> None:
         self.safe_diagnostics = diagnostics
         super().__init__("OFFICIAL_DIVIDEND_PDF_DIRECT_HTTPS_FETCH_BLOCKED")
+
+
+class OfficialDividendPdfBytesMismatch(ValueError):
+    """A captured response failed the pinned exact-byte contract; never retry around changed bytes."""
+
+    diagnostic_field = "source_byte_diagnostics"
+
+    def __init__(self, url: str, transport: str, raw_pdf: bytes) -> None:
+        host = urlparse(url).hostname or ""
+        endpoint = {
+            "big5.sse.com.cn": "BIG5",
+            "static.sse.com.cn": "STATIC",
+            "www.sse.com.cn": "WWW",
+        }.get(host, "UNRECOGNIZED_HOST")
+        actual_hash = _sha256(raw_pdf)
+        failures: list[str] = []
+        if len(raw_pdf) != EXPECTED_DIVIDEND_PDF_SIZE:
+            failures.append("SIZE_MISMATCH")
+        if actual_hash != EXPECTED_DIVIDEND_PDF_SHA256:
+            failures.append("SHA256_MISMATCH")
+        if not raw_pdf.startswith(b"%PDF-"):
+            failures.append("PDF_MAGIC_MISSING")
+        self.safe_diagnostics = [{
+            "endpoint": endpoint,
+            "transport": transport,
+            "outcome": "EXACT_BYTES_CONTRACT_MISMATCH",
+            "failed_checks": failures,
+            "actual_size_bytes": len(raw_pdf),
+            "expected_size_bytes": EXPECTED_DIVIDEND_PDF_SIZE,
+            "actual_sha256": actual_hash,
+            "expected_sha256": EXPECTED_DIVIDEND_PDF_SHA256,
+            "pdf_magic_present": raw_pdf.startswith(b"%PDF-"),
+        }]
+        super().__init__("OFFICIAL_DIVIDEND_PDF_EXACT_BYTES_MISMATCH")
 
 
 def _safe_transport_outcome(response: dict[str, Any]) -> str:
@@ -344,6 +380,7 @@ def _recover_dividend_from_prior_canonical_adjudication(
 
     response = None
     requested_url = None
+    requested_transport = None
     fetch_diagnostics: list[dict[str, str]] = []
     for candidate_url in DIVIDEND_PDF_HTTPS_URLS:
         candidate = fetch_https(candidate_url, referer=DIVIDEND_REFERER)
@@ -352,6 +389,7 @@ def _recover_dividend_from_prior_canonical_adjudication(
         if candidate.get("status") == "CAPTURED":
             response = candidate
             requested_url = candidate_url
+            requested_transport = "PYTHON_HTTPS"
             break
         fetch_diagnostics.append(_safe_fetch_diagnostic(candidate_url, "PYTHON_HTTPS", candidate))
 
@@ -365,6 +403,7 @@ def _recover_dividend_from_prior_canonical_adjudication(
             if candidate.get("status") == "CAPTURED":
                 response = candidate
                 requested_url = candidate_url
+                requested_transport = "CURL_HTTPS"
                 break
             fetch_diagnostics.append(_safe_fetch_diagnostic(candidate_url, "CURL_HTTPS", candidate))
 
@@ -387,7 +426,9 @@ def _recover_dividend_from_prior_canonical_adjudication(
         or _sha256(raw_pdf) != EXPECTED_DIVIDEND_PDF_SHA256
         or not raw_pdf.startswith(b"%PDF-")
     ):
-        raise ValueError("OFFICIAL_DIVIDEND_PDF_EXACT_BYTES_MISMATCH")
+        raise OfficialDividendPdfBytesMismatch(
+            requested_url, str(requested_transport or "UNKNOWN_HTTPS"), raw_pdf
+        )
 
     followup_root.mkdir(parents=True, exist_ok=True)
     raw_dir = followup_root / "raw"
@@ -765,19 +806,24 @@ def main() -> int:
     args = parser.parse_args()
     try:
         report = adjudicate(args.attempt10_root, args.out_dir)
-    except OfficialDividendPdfFetchBlocked as exc:
-        # Source unavailability is a completed fail-closed outcome, not a PASS
-        # and not an unhandled workflow crash. Publish only sanitized transport
-        # categories so operators can distinguish DNS/TLS/HTTP failures.
+    except (OfficialDividendPdfFetchBlocked, OfficialDividendPdfBytesMismatch) as exc:
+        # Source unavailability or changed bytes are completed fail-closed
+        # outcomes, not PASS and not unhandled workflow crashes. Emit metadata only.
         args.out_dir.mkdir(parents=True, exist_ok=True)
+        diagnostic_field = exc.diagnostic_field
+        overall_status = (
+            "BLOCKED_SOURCE_FETCH"
+            if isinstance(exc, OfficialDividendPdfFetchBlocked)
+            else "BLOCKED_SOURCE_BYTES_MISMATCH"
+        )
         report = {
             "schema_version": "IIOS-605016-OFFICIAL-HTTPS-B2-ADJUDICATION-0.1",
             "case_id": CASE_ID,
             "cutoff_date": CUTOFF_DATE,
-            "overall_status": "BLOCKED_SOURCE_FETCH",
+            "overall_status": overall_status,
             "reason": str(exc),
             "candidate_manifest_status": "NOT_CREATED",
-            "source_fetch_diagnostics": exc.safe_diagnostics,
+            diagnostic_field: exc.safe_diagnostics,
             "raw_source_bytes_uploaded": False,
             "numeric_quote_values_printed": False,
             "formal_signed_admission_created": False,
@@ -789,15 +835,16 @@ def main() -> int:
         (args.out_dir / "OFFICIAL_HTTPS_B2_ADJUDICATION_REPORT.json").write_text(
             json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        print(json.dumps({
+        console_report = {
             "status": "BLOCKED",
             "reason": str(exc),
-            "source_fetch_diagnostics": exc.safe_diagnostics,
             "candidate_manifest_status": "NOT_CREATED",
             "raw_source_bytes_uploaded": False,
-        }, ensure_ascii=False, indent=2))
-        # The report itself is a blocked result. Workflow success means only
-        # that the fail-closed adjudication outcome was recorded and sanitized.
+        }
+        console_report[diagnostic_field] = exc.safe_diagnostics
+        print(json.dumps(console_report, ensure_ascii=False, indent=2))
+        # A blocked result is not an accepted candidate. Exit zero only so the
+        # workflow can upload this sanitized report; production remains blocked.
         return 0
     # B2 fail-closed is a completed validation outcome; don't disguise a blocked
     # manifest as workflow success by setting PASS, nor fail to publish the report.
