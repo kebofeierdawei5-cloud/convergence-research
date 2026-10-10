@@ -28,7 +28,7 @@ B2-F Full Independent Red-team                          PASS / CANONICAL
 
 ### Current blockers
 
-**Free-first Route A does NOT require an external LLM endpoint, paid search API, or API key.** The remaining critical gates are production-runtime registration/deployment and actual source-by-source Evidence/PIT admission.
+**The company-level Investment Core MVP does NOT require an external LLM provider endpoint, paid search API, or API key.** Free-first Route A remains independent of optional provider integration. The remaining critical gates are production-runtime registration/deployment and actual source-by-source Evidence/PIT admission.
 
 - Batch B: the first-party loopback-first HTTP host is now implemented in canonical main (PR #270) with 21/21 dedicated host contract tests. It is **not yet a deployed/production-accepted host**: a trusted runtime factory and genuine semantic callback must be provisioned, and a real host-origin run must be replay-verified.
 - Primary C1 case: `RC-CN-A-605016-20261009` remains blocked. Raw capture succeeded on attempt 8, but 8/12 payloads were format mismatches and none are promoted to admitted facts; all seven required field groups remain uncovered.
