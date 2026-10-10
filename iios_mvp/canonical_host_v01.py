@@ -190,6 +190,8 @@ def load_host_config(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     import socket
     try:
         bind_ip = ipaddress.ip_address(host)
+        if bind_ip.version != 4:
+            raise HostConfigurationError("HOST_BIND_REQUIRES_IPV4_OR_LOCALHOST")
         loopback = bind_ip.is_loopback
     except ValueError:
         loopback = host.lower() == "localhost"
@@ -238,6 +240,11 @@ def _safe_cli_result(stdout: str, returncode: int) -> dict[str, Any]:
         "canonical_decision_created", "reason",
     )
     result = {key: raw[key] for key in allowed if key in raw}
+    if result.get("reason") is not None:
+        reason = str(result["reason"])
+        result["reason"] = reason if re.fullmatch(r"[A-Z0-9_:-]{1,120}", reason) else "CANONICAL_RUN_BLOCKED"
+    if result.get("status") not in {"CANONICAL_RUN_IN_PROGRESS", "BLOCKED", "NON_CANONICAL"}:
+        result["status"] = "BLOCKED"
     if returncode != 0 or result.get("status") == "BLOCKED":
         result["status"] = "BLOCKED"
         result.setdefault("canonical_decision_created", False)
