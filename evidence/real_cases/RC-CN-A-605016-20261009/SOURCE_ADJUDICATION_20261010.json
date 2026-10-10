@@ -216,12 +216,12 @@
       "source_class": "PUBLIC_SECONDARY",
       "raw_integrity": "PASS",
       "source_origin": "ARTICLE_AND_PUBLICATION_TIMESTAMP_VERIFIED; UNDERLYING_PRICE_DATASET_AUTHORITY_NOT_ESTABLISHED",
-      "body_match": "PASS: title names 百龙创园 (605016); article page time 2026-10-09 18:09:28; article states close 20.28, open 20.14, high 20.35, low 19.88",
+      "body_match": "PASS: article identifies 百龙创园 (605016) and publication timestamp 2026-10-09 18:09:28; numeric market-quote values withheld from the public repository.",
       "publication_date": "2026-10-09",
       "first_public_time": "2026-10-09T18:09:28+08:00",
       "reuse_status": "UNKNOWN",
-      "disposition": "NOT_ADMITTED_PRICE_CANDIDATE",
-      "notes": "A separate historical page also shows 20.28 for 2026-10-09; 20.73 corresponds to 2026-09-29 in that table, not 2026-10-09. Price is not admitted because no official/source-authoritative 2026-10-09 close has been captured and secondary rights/reuse remain unresolved.",
+      "disposition": "EXCLUDED_FROM_CANONICAL_PRICE_EVIDENCE_PENDING_REUSE_AND_PIT",
+      "notes": "Secondary source; exact bytes and publication timestamp were captured, but numeric quote values are withheld from this public repository. The item is not PIT-eligible for the original date-only cutoff.",
       "size_bytes": 22772,
       "sha256": "0d78fe37969224552a3309e85d078a352f864b77d9c4f785db50329dd9562f98"
     },
@@ -500,14 +500,11 @@
       "claim_type": "OBSERVED_FACT",
       "value": {
         "observation_date": "2026-10-09",
-        "close_cny_per_share": 20.28,
-        "open_cny_per_share": 20.14,
-        "high_cny_per_share": 20.35,
-        "low_cny_per_share": 19.88,
-        "candidate_only": true
+        "candidate_only": true,
+        "numeric_quote_status": "WITHHELD_NOT_ADMITTED"
       },
       "unit": "CNY_per_share",
-      "basis": "Secondary Stockstar article captured as exact bytes and published at 2026-10-09 18:09:28 +08. The 20.28 closing claim is corroborated by an Investing.com historical table; 20.73 in that table corresponds to 2026-09-29, not 2026-10-09.",
+      "basis": "Secondary article captured as exact bytes with a date/time-bound publication record; numeric quote values withheld from the public repository because source authority/reuse was not admitted and the event postdates the original date-only cutoff.",
       "observation_date": "2026-10-09",
       "known_at": "2026-10-09T18:09:28+08:00",
       "published_at": "2026-10-09T18:09:28+08:00",
@@ -518,9 +515,23 @@
       "source_locator": "Captured HTML, article header/first paragraph containing the date, timestamp, open/high/low/close.",
       "quality_notes": [
         "secondary market-price candidate only",
-        "underlying official price source not independently reproduced",
-        "license/reuse not reviewed"
+        "source authority/reuse not admitted",
+        "numeric quote intentionally withheld from public record"
       ]
     }
-  ]
+  ],
+  "followup_official_https_b2": {
+    "run_id": 38041208974,
+    "result": "PASS_EPHEMERAL_B2",
+    "official_price_source_id": "PRICE-SSE-OFFICIAL-DAYK-2026-10-08",
+    "source_response_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480",
+    "raw_size_bytes": 124,
+    "candidate_manifest_sha256": "523da9b9b67a5dda7ba33fa45c3365e8892f616cb67fa14b7e77fdffcf9375ec",
+    "all_seven_required_groups_pass": true,
+    "numeric_market_quote_values": "WITHHELD_FROM_PUBLIC_REPOSITORY",
+    "canonical_durable_admission": false,
+    "production_host_acceptance": false,
+    "known_at_basis": "Market-session close event time; exact endpoint first-published timestamp remains unexposed and requires independent review."
+  },
+  "public_repo_reuse_policy": "This is a public repository. Numeric market quote values from sources that are restricted or not admitted for reuse are intentionally withheld."
 }
