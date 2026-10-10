@@ -125,6 +125,13 @@ def _validate_valuation_output(record: Mapping[str, Any]) -> None:
         raise ValueError("canonical valuation output hash mismatch")
 
 
+def validate_canonical_valuation_output(record: Mapping[str, Any]) -> None:
+    """Public, deterministic validator for a persisted canonical valuation output."""
+    if not isinstance(record, Mapping):
+        raise ValueError("canonical valuation output must be an object")
+    _validate_valuation_output(record)
+
+
 def build_canonical_valuation_output(payload: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(payload, Mapping):
         raise ValueError("valuation output payload must be an object")
@@ -327,6 +334,10 @@ def validate_forecast_valuation_return_lineage(
         "horizon_years": str(valuation_horizon),
         "reference_value_per_share": str(canonical_reference),
         "binding": "FORECAST_REF_EQUALITY_AND_CANONICAL_VALUATION_SCENARIO_EQUALITY",
+        # Retain exact resolver-returned payloads so formal write authorization
+        # can revalidate them after the process that performed admission exits.
+        "forecast_record": dict(forecast),
+        "valuation_output": dict(valuation),
     }
 
 
