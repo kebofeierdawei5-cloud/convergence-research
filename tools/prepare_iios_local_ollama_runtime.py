@@ -20,7 +20,7 @@ import stat
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -32,6 +32,13 @@ DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
 
 class LocalRuntimeSetupError(RuntimeError):
     """Raised when a trusted local runtime cannot be safely provisioned."""
+
+
+class _RejectRedirectHandler(HTTPRedirectHandler):
+    """Prevent a local preflight endpoint from redirecting the probe elsewhere."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise LocalRuntimeSetupError("OLLAMA_REDIRECTS_NOT_PERMITTED")
 
 
 def _loopback_base_url(value: str) -> str:
@@ -61,7 +68,7 @@ def _loopback_base_url(value: str) -> str:
 def _get_json(url: str, timeout_seconds: int) -> dict[str, Any]:
     request = Request(url, headers={"Accept": "application/json"}, method="GET")
     try:
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with build_opener(_RejectRedirectHandler).open(request, timeout=timeout_seconds) as response:
             if not 200 <= int(response.status) < 300:
                 raise LocalRuntimeSetupError("OLLAMA_PREFLIGHT_HTTP_STATUS")
             raw = response.read(1024 * 1024 + 1)
