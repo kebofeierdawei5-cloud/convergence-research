@@ -6,7 +6,7 @@
 
 ## Why manual handoff is used
 
-ChatGPT Free web UI and the OpenAI API are separate products/interfaces. The web UI does not expose a supported generic Responses API endpoint that this repository can call. This implementation does not reverse engineer web sessions or automate browser interaction.
+ChatGPT Free web UI and the OpenAI API are separate products/interfaces; OpenAI's billing documentation explicitly says their billing systems are separate: https://help.openai.com/en/articles/9039756-managing-billing-settings-on-the-chatgpt-web-and-api-platform. The web UI does not expose a supported generic Responses API endpoint that this repository can call. This implementation does not reverse engineer web sessions or automate browser interaction.
 
 Instead, IIOS emits the exact prompt to a private local handoff directory and fails closed with `CHATGPT_CHAT_RESPONSE_REQUIRED:<task_id>`. The operator pastes that prompt into ChatGPT Chat, copies the raw JSON response to a local file, imports it, and reruns the exact same canonical command. The next missing model stage emits its own distinct handoff.
 
