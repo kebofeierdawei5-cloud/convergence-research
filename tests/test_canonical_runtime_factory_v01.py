@@ -143,10 +143,17 @@ def test_trusted_factory_blocks_unbound_case_identity(tmp_path, monkeypatch):
         build_canonical_runtime(bundle=bundle, output_root=out, env=env)
 
 
-def test_trusted_factory_rejects_unverified_http_endpoint_even_if_self_hosted(tmp_path, monkeypatch):
-    env, _, out = _env(tmp_path, monkeypatch, IIOS_LLM_PROVIDER_BASE_URL="http://127.0.0.1:11434/v1/responses")
-    with pytest.raises(RuntimeFactoryError, match="REQUIRES_HTTPS"):
-        build_canonical_runtime(bundle=_bundle(), output_root=out, env=env)
+def test_trusted_factory_accepts_loopback_http_only_for_self_hosted_no_auth(tmp_path, monkeypatch):
+    env, _, out = _env(
+        tmp_path,
+        monkeypatch,
+        IIOS_LLM_PROVIDER_BASE_URL="http://127.0.0.1:11434/v1/responses",
+        IIOS_LLM_PROVIDER_AUTH_MODE="NONE",
+        IIOS_LLM_PROVIDER_DEPLOYMENT_MODE="SELF_HOSTED",
+    )
+    env.pop("IIOS_LLM_PROVIDER_API_KEY", None)
+    runtime = build_canonical_runtime(bundle=_bundle(), output_root=out, env=env)
+    assert validate_canonical_runtime_bindings(runtime) is runtime
 
 
 def test_filesystem_admission_resolver_blocks_missing_or_wrong_case_record(tmp_path):
