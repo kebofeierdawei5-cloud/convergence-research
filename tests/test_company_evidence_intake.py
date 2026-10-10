@@ -109,7 +109,7 @@ def test_https_download_retains_exact_response_bytes(monkeypatch, tmp_path):
     class Opener:
         def open(self, request, timeout):
             assert request.full_url.startswith("https://")
-            assert timeout == 30
+            assert timeout == intake.SOURCE_READ_TIMEOUT_SECONDS == 8
             return Response()
 
     monkeypatch.setattr(intake, "build_opener", lambda handler: Opener())
