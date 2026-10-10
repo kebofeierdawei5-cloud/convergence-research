@@ -195,10 +195,10 @@ def test_p0_ce_01c_explicit_runtime_factory_is_trusted_host_input(monkeypatch, t
         request_registry=request_registry,
         semantic_producer=producer,
         producer_registry=producer_registry,
-        current_price_resolver=object(),
-        independent_forecast_resolver=object(),
-        upstream_authority_resolver=object(),
-        valuation_output_resolver=object(),
+        current_price_resolver=types.SimpleNamespace(resolve_current_price=lambda *args, **kwargs: {}),
+        independent_forecast_resolver=types.SimpleNamespace(resolve_independent_forecast=lambda *args, **kwargs: {}),
+        upstream_authority_resolver=types.SimpleNamespace(resolve=lambda *args, **kwargs: {}),
+        valuation_output_resolver=types.SimpleNamespace(resolve_valuation_output=lambda *args, **kwargs: {}),
     )
 
     def build_runtime(*, bundle, output_root):
@@ -222,6 +222,18 @@ def test_p0_ce_01c_explicit_runtime_factory_is_trusted_host_input(monkeypatch, t
     with pytest.raises(ValueError, match="trusted module:callable"):
         cli._resolve_canonical_runtime(
             factory_spec="arbitrary code supplied by request bundle",
+            bundle=bundle,
+            output_root=str(tmp_path / "runs"),
+        )
+
+    from dataclasses import replace
+
+    module.build_invalid_runtime = lambda **kwargs: replace(
+        expected, current_price_resolver=object()
+    )
+    with pytest.raises(ValueError, match="current_price_resolver must implement callable resolve_current_price"):
+        cli._resolve_canonical_runtime(
+            factory_spec=f"{module_name}:build_invalid_runtime",
             bundle=bundle,
             output_root=str(tmp_path / "runs"),
         )
