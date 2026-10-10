@@ -1,0 +1,60 @@
+{
+  "schema_version": "IIOS-605016-PRICE-PROVIDER-EXCLUSION-0.1",
+  "record_class": "NON_ADMITTED_SOURCE_TERMS_ADJUDICATION",
+  "case_id": "RC-CN-A-605016-20261009",
+  "original_cutoff_date_only": "2026-10-09",
+  "remaining_required_field_group": "market_price",
+  "source_candidates": [
+    {
+      "source_id": "PRICE-TENCENT-KLINE-605016-2026-10-08",
+      "source_url": "https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=sh605016,day,,,100",
+      "source_class": "PUBLIC_SECONDARY_MARKET_DATA_CANDIDATE",
+      "capture_workflow_run_id": 38040556977,
+      "capture_artifact_id": 11665945197,
+      "capture_artifact_sha256": "acd8338603a5c6e6027c9910d8ac96446e8d2be58270445c0bc89e69c4c9c16d",
+      "terms_url": "https://www.tencent.com/zh-cn/legal-statement/",
+      "terms_sha256": "4d00b247455b703f754c9628189dbd95349fafc24c3d3e7fb66fe8f47842a526",
+      "terms_status": "REUSE_UNRESOLVED",
+      "reason": "Tencent's public legal statement says it holds copyright in works it creates or co-creates and reserves legal remedies for use beyond reasonable/fair use without written permission. The captured statement is general and does not specifically grant permission to copy this market-data API into IIOS evidence. Source terms do not establish an explicit market-quote reuse grant for this use.",
+      "disposition": "DO_NOT_ADMIT_OR_REPEAT_AUTOMATED_CAPTURE_UNTIL_REUSE_AUTHORITY_IS_ESTABLISHED",
+      "quote_value_committed_to_git": false,
+      "raw_response_committed_to_git": false,
+      "note": "A public HTTPS response and a valid historical-date row do not establish reuse rights or the source's exact first-known time."
+    },
+    {
+      "source_id": "PRICE-YAHOO-CHART-605016-2026-10-08",
+      "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/605016.SS?period1=1791388800&period2=1791648000&interval=1d&events=div%2Csplits&includeAdjustedClose=true",
+      "source_class": "PUBLIC_SECONDARY_MARKET_DATA_CANDIDATE",
+      "capture_workflow_run_id": 38040556977,
+      "capture_artifact_id": 11665945197,
+      "capture_artifact_sha256": "acd8338603a5c6e6027c9910d8ac96446e8d2be58270445c0bc89e69c4c9c16d",
+      "terms_url": "https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html",
+      "terms_sha256": "4bcdd5402dcb56638165e1566de0c6a980b31a42eb3ab7ff092e1f9dacb2a257",
+      "terms_status": "AUTOMATED_DATA_COLLECTION_REQUIRES_EXPRESS_PRIOR_PERMISSION",
+      "reason": "Captured Yahoo Terms of Service prohibit accessing or collecting data through automated means, including scrapers and data-gathering/extraction tools, without express prior permission. No such permission is available.",
+      "disposition": "EXCLUDE; DO_NOT_REPEAT_AUTOMATED_ACCESS; DO_NOT_ADMIT",
+      "quote_value_committed_to_git": false,
+      "raw_response_committed_to_git": false,
+      "note": "The public page can be read interactively subject to applicable terms, but automated data collection for IIOS is not authorized by the terms reviewed here."
+    }
+  ],
+  "current_b2_outcome": {
+    "validator": "research.b2.company_evidence.build_company_evidence_manifest (unchanged)",
+    "manifest_status": "BLOCKED",
+    "admitted_required_field_groups": [
+      "security_identity",
+      "corporate_disclosures",
+      "business_reality",
+      "financial_reality",
+      "capital_structure",
+      "trust_governance_events"
+    ],
+    "missing_required_field_groups": [
+      "market_price"
+    ],
+    "evidence_admission": false,
+    "pit_admission": false,
+    "formal_valuation_or_decision_authorized": false
+  },
+  "next_permitted_action": "Seek an explicitly licensed/openly reusable source or obtain written permission for a source whose terms require it. Do not continue automated Yahoo retrieval, do not promote Tencent based only on public accessibility, and do not relax the original date-only cutoff or HTTPS intake requirement."
+}
