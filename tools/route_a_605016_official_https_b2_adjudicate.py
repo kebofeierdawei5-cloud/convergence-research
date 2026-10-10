@@ -763,7 +763,7 @@ def main() -> int:
             "auto_execution": False,
         }
         (args.out_dir / "OFFICIAL_HTTPS_B2_ADJUDICATION_REPORT.json").write_text(
-            json.dumps(report, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8"
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         print(json.dumps({
             "status": "BLOCKED",
