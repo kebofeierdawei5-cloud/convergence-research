@@ -29,7 +29,7 @@ This is not an attempt to relabel the original `CAPTURED_NOT_ADMITTED` receipt. 
 | `SSE-Q1-2026-FULL` — SHA-256 `1f630ef7d8c62acef307eeb5362c9dbbacec326bad5925e1431317adc70e0d2d` | Official SSE host; PDF p.1 identifies the 2026 Q1 report and code 605016. | Archive date 2026-04-30; exact intraday time unavailable, before cutoff. | Restricted/no redistribution. Admit the specifically located Q1 financial table. |
 | `SSE-H1-OPERATING-DATA-2026` — SHA-256 `d30d62a097f68d3137788d5980dabb7577e1e23d320061554686ff19e43a2196` | Official SSE host; body matches title and announcement no. 2026-038. | Archive date 2026-08-31; body says H1 figures are unaudited. | Restricted/no redistribution. Admit the located H1 product-mix table as unaudited reported data. |
 | `SSE-2026-09-SUBSIDIARY-INVESTMENT` — SHA-256 `d6baad120437e6969eedef87f298c1583eaeaa4ac79ddc25eccaee7583a97caa` | Official SSE host; title/body/code and announcement no. 2026-041 match. | Archive date 2026-09-10; exact intraday time unavailable, before cutoff. | Restricted/no redistribution. Admit only the announced RMB 10m, 100%-owned Kunming subsidiary investment. |
-| `SSE-2026-10-09-SHAREHOLDERS-MEETING` — SHA-256 `89136a9f3e6410c2f4c420cb516fb88c8368fa3e8767efdb12a3727fa0025936` | Official SSE host; title/body/code and announcement no. 2026-048 match. | Announcement dated 2026-10-09; exact SSE first-public minute unavailable; known publicly by 18:09:28 +08 from corroborating secondary coverage. | Restricted/no redistribution. Admit the exact resolutions and vote facts using that conservative known-at bound. |
+| `SSE-2026-10-09-SHAREHOLDERS-MEETING` — SHA-256 `89136a9f3e6410c2f4c420cb516fb88c8368fa3e8767efdb12a3727fa0025936` | Official SSE host; title/body/code and announcement no. 2026-048 match. | Announcement dated 2026-10-09; exact SSE first-public minute unavailable; known publicly by 18:09:28 +08 from corroborating secondary coverage. | Restricted/no redistribution. Keep as a source-ledger fact only; exclude from this date-only-cutoff B2 manifest because known_at is after the cutoff instant. |
 | `SSE-2026-09-CONVERTIBLE-BOND-UPDATE` — SHA-256 `5c18d08896a99d65a844644e7314d3c48915cd0a2ab8f58a477784c5e164dddb` | Official SSE host; title/body/code and announcement no. 2026-042 match. | Archive date 2026-09-11; exact intraday time unavailable, before cutoff. | Restricted/no redistribution. Admit procedural status only: CSRC registration was still pending; no final issuance/terms are inferred. |
 | `SSE-2026-CONVERTIBLE-BOND-PROSPECTUS` — SHA-256 `23b5a43f9107df57110a57911f931e93288fe91226673c7f332a0c184803d767` | Official SSE-hosted April application draft; body identifies the company/code and calls itself “申报稿”. | Date-level source vintage 2026-04-30. A 2026-09-11 notice says application documents were subsequently updated after the H1 report. | Restricted/no redistribution; exclude from current-final-terms claims as superseded/historical. |
 | `SSE-2026-H1-DIVIDEND-PLAN` — SHA-256 `2d3044e4bedc4039a22dd98cc17eab2fc73e00951c700c07bd64a77255a98a3b` | Official SSE host; body is the H1 dividend **proposal**, announcement no. 2026-036. | Proposal published 2026-08-31. SSE announcement list shows a later 2026-09-22 “2026年半年度权益分派实施公告” for 605016. | Restricted/no redistribution; exclude for the actual implemented dividend state. The later implementation PDF still needs raw capture and inspection. |
@@ -44,43 +44,39 @@ The adjudication ledger contains eleven fact candidates: ten source-backed fact 
 - **Security identity:** issuer name, short name and code from the H1 report cover.
 - **Financial reality:** Q1 reported revenue/net profit/operating cash flow; H1 reported revenue/net profit/operating cash flow, with audit status preserved.
 - **Business reality:** H1 product revenue mix and the announced RMB 10m Kunming subsidiary investment.
-- **Corporate disclosures:** the 2026-10-08 meeting resolutions disclosed on 2026-10-09, with exact vote percentages and conservative known-at bound. This fact is source-adjudicated but fails the current date-only cutoff because the conservative known-at bound is later that day.
+- **Corporate disclosures:** the 2026-09-11 official convertible-bond update (announcement no. 2026-042), narrowly recording that CSRC registration remained pending at that date. The 2026-10-09 meeting resolution is separately retained in the source ledger but excluded from B2 because its known_at is after the date-only cutoff.
 - **Capital structure:** 420,012,320 shares **as of 2026-06-30** (not asserted to be the 2026-10-09 share count), and convertible-bond registration status as of the 2026-09-11 update.
 - **Trust/governance:** the exact July pledge release/extension facts.
 
 The market-price group remains unadmitted. It is unsafe to infer a price from the Sohu shell, nor to silently promote a secondary article to an authoritative close merely because its captured bytes hash correctly.
 
-## Actual B2/PIT execution — PASS as a fail-closed BLOCKED result
+## Actual B2/PIT execution — SUCCESSFUL fail-closed BLOCKED result
 
-The source adjudication was executed against the **real GitHub Actions Attempt 10 artifact**, not a synthetic fixture:
+The adjudication was executed against the **real Attempt 10 GitHub Actions artifact**, not a synthetic fixture:
 
-- Workflow run [#38030568727](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38030568727), exact code/ledger head `aa3ef559c55335cd84bd38db43a0ae3975cc6ef6`, job `adjudicate-real-attempt-10`: **SUCCESS**.
-- Input capture artifact [#11660285551](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38026139364/artifacts/11660285551), manifest SHA-256 `563bc41ab2e6ce4925451fc02986f87409e06b879e3b92066d443ef6d796f244`.
-- Output JSON artifact [#11662067708](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38030568727/artifacts/11662067708), ZIP SHA-256 `b9fb562c0b72229f588540dfe2eab99486c37eea2472a28c88f7f2713207895e`.
-- Independently reverified source size/hash: **12/12 PASS**; payload contract: **12/12 PASS**.
-- Fact-level candidate count: 10; records with source-adjudication status ADMITTED: 9; explicit UNKNOWN price candidate: 1.
-- **B2 manifest status: BLOCKED**, with only five field groups passing the unchanged core PIT criteria: `security_identity`, `business_reality`, `financial_reality`, `capital_structure`, and `trust_governance_events`.
-- Remaining groups: `corporate_disclosures` and `market_price`.
+- Source-adjudication workflow run [#38038481645](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38038481645), code head `a4752719595869f37863900fb3f2b28767d4dc45`, job `adjudicate-real-attempt-10`: **SUCCESS**.
+- Input capture artifact [#11660285551](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38026139364/artifacts/11660285551), intake manifest SHA-256 `563bc41ab2e6ce4925451fc02986f87409e06b879e3b92066d443ef6d796f244`.
+- Output JSON artifact [#11663494596](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38038481645/artifacts/11663494596), ZIP SHA-256 `10918db5f6393a2ffd81ab4fae8a07d15ebd64fc0fd0b88eb371910ef9926294`.
+- Independently reverified raw source size/hash: **12/12 PASS**; expected payload contract: **12/12 PASS**.
+- Adjudication ledger: 11 candidates (ten official-filing facts, including one same-day fact excluded by PIT, plus one UNKNOWN market-price candidate). B2 manifest: ten records (nine status-ADMITTED records and one UNKNOWN price record); one post-cutoff meeting fact was excluded before manifest validation.
+- **B2 manifest status: BLOCKED**. Six groups pass unchanged core PIT validation: `security_identity`, `corporate_disclosures`, `business_reality`, `financial_reality`, `capital_structure`, and `trust_governance_events`.
+- The only remaining required group is `market_price`.
 - Exact core-validator errors:
-  1. `EVIDENCE[605016-MEETING-CB-RESOLUTIONS-20261008]:PIT:PIT_FAIL: known_at exceeds cutoff`
-  2. `EVIDENCE[605016-PRICE-CANDIDATE-20261009]:PIT:PIT_UNKNOWN: source availability/provenance is not established`
-  3. `REQUIRED_FIELD_GROUPS_UNCOVERED:corporate_disclosures,market_price`
+  1. `EVIDENCE[605016-PRICE-CANDIDATE-20261009]:PIT:PIT_UNKNOWN: source availability/provenance is not established`
+  2. `REQUIRED_FIELD_GROUPS_UNCOVERED:market_price`
 
-The date-only `2026-10-09` cutoff was preserved from the original intake/case. The meeting-resolution source is factually corroborated but excluded from the B2 manifest because its conservative known-at bound of 18:09:28 is after the cutoff instant. A pre-cutoff official 2026-09-11 disclosure now covers `corporate_disclosures`. No end-of-day adjustment, required-group relaxation, or validator change was made.
+The original date-only cutoff `2026-10-09` was preserved. The 2026-10-09 18:09:28 +08 shareholders' meeting resolution remains in the source ledger but is excluded from the B2 admission manifest; a separate pre-cutoff official announcement no. 2026-042 dated 2026-09-11 now covers the corporate-disclosures group. The validator, required groups and cutoff semantics were not relaxed or changed.
 
-Acceptance run receipt summary is preserved at `evidence/real_cases/RC-CN-A-605016-20261009/SOURCE_ADJUDICATION_RUN_20261010.json`. Only machine-readable JSON outputs were uploaded; raw source documents were not re-uploaded as the result artifact.
+The run summary is preserved at `evidence/real_cases/RC-CN-A-605016-20261009/SOURCE_ADJUDICATION_RUN_20261010.json`. Only machine-readable JSON results were uploaded; captured source PDFs/HTML were not re-uploaded as result artifacts.
 
 ## Unchanged B2/PIT admission result
 
-The dedicated workflow downloads the actual Attempt 10 artifact, independently re-hashes all 12 raw sources, builds the fact-level candidate manifest from this ledger and calls the core-owned, unchanged `research.b2.company_evidence.build_company_evidence_manifest` validator.
+The dedicated workflow downloads the actual Attempt 10 artifact, independently re-hashes all 12 raw sources, builds the fact-level candidate manifest from the source-adjudication ledger and calls the core-owned, unchanged `research.b2.company_evidence.build_company_evidence_manifest` validator.
 
-Expected fail-closed outcome:
-
-- **Six of seven groups** covered by schema-valid, source-adjudicated official Evidence Records.
-- `market_price` remains uncovered.
-- The post-cutoff meeting resolution is retained in the source ledger but excluded from the B2 candidate manifest. The only remaining core B2/PIT errors are UNKNOWN/PIT for the Stockstar price candidate and `REQUIRED_FIELD_GROUPS_UNCOVERED:market_price`.
+- Six of seven required groups are covered by source-adjudicated, PIT-eligible official Evidence Records.
+- `market_price` remains UNKNOWN because the 20.28 CNY close is currently corroborated only by secondary sources whose underlying data authority and reuse status have not been admitted.
 - Final manifest remains `BLOCKED`; `evidence_admission=false`, `pit_admission=false`.
-- No valuation, Decision Revision, Machine Publication, Investor Review Report or complete `IIOS_RUN_RECEIPT` may be produced.
+- No valuation, Decision Revision, Machine Publication, Investor Review Report or complete `IIOS_RUN_RECEIPT` is authorized.
 
 ## Next real-data gates
 
