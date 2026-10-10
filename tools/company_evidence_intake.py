@@ -6,7 +6,7 @@ import gzip
 import hashlib
 import json
 import re
-import time
+import time as _clock
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
@@ -303,7 +303,7 @@ def _fetch_url(url: str) -> tuple[bytes, int, str]:
         headers={"User-Agent": "IIOS-company-evidence-intake/0.1", "Accept": "*/*"},
         method="GET",
     )
-    deadline = time.monotonic() + MAX_SOURCE_CAPTURE_SECONDS
+    deadline = _clock.monotonic() + MAX_SOURCE_CAPTURE_SECONDS
     try:
         opener = build_opener(_HTTPSOnlyRedirectHandler())
         with opener.open(request, timeout=SOURCE_READ_TIMEOUT_SECONDS) as response:
