@@ -120,6 +120,19 @@ def test_reimport_is_idempotent_for_same_exact_response_only(tmp_path):
         import_chatgpt_response(root=root, task_id=task_id, response_file=other)
 
 
+def test_tampered_operator_receipt_blocks_response_replay(tmp_path):
+    root = tmp_path / "handoff"
+    client = ChatGPTChatJsonClient(root=root)
+    values = _task_context()
+    with pytest.raises(ChatGPTChatHandoffRequired) as caught:
+        client.generate_json(**values)
+    response_file = _save_response(tmp_path / "response.json", '{"ok":true,"count":2}')
+    imported = import_chatgpt_response(root=root, task_id=caught.value.task_id, response_file=response_file)
+    Path(imported["receipt_file"]).write_text('{"receipt_sha256":"tampered"}', encoding="utf-8")
+    with pytest.raises(ChatGPTChatHandoffError, match="RECEIPT_HASH_MISMATCH"):
+        client.generate_json(**values)
+
+
 def _bundle():
     return {
         "raw_request": "Assess CATL as of 2026-10-10.",
