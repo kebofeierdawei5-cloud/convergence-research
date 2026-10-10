@@ -159,7 +159,10 @@ def adjudicate(input_dir: Path, out_dir: Path) -> dict[str, Any]:
         known_at_value = candidate.get("known_at")
         if known_at_value:
             try:
-                if parse_temporal(known_at_value, "known_at") > cutoff_instant:
+                if (
+                    str(candidate.get("status")) == "ADMITTED"
+                    and parse_temporal(known_at_value, "known_at") > cutoff_instant
+                ):
                     excluded_after_cutoff.append({
                         "evidence_id": evidence_id,
                         "source_id": source_id,
