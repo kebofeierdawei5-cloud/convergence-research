@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import json
 from pathlib import Path
 
@@ -12,10 +13,10 @@ from tools.verify_company_evidence_intake import IndependentVerificationError
 RAW = b"%PDF-1.7\x00adversarial-source-bytes"
 
 
-def make_run(tmp_path, declared_known_at="2026-10-01"):
+def make_run(tmp_path, declared_known_at="2026-10-01", *, expected_payload_type=None, raw_content=RAW):
     incoming = tmp_path / "incoming"
     incoming.mkdir()
-    (incoming / "source.pdf").write_bytes(RAW)
+    (incoming / "source.pdf").write_bytes(raw_content)
     manifest = {
         "schema_version": intake.MANIFEST_SCHEMA,
         "case_id": "RC-CN-A-000001-20261009",
@@ -34,6 +35,8 @@ def make_run(tmp_path, declared_known_at="2026-10-01"):
             "license_status": "PUBLIC_ACCESS_REUSE_UNKNOWN",
         }],
     }
+    if expected_payload_type:
+        manifest["sources"][0]["expected_payload_type"] = expected_payload_type
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     root = tmp_path / "run"
@@ -60,6 +63,28 @@ def test_redteam_missing_known_at_does_not_inherit_retrieved_at(tmp_path):
     assert evidence["known_at"] is None
     assert evidence["known_at"] != evidence["retrieved_at"]
     assert report["status"] == "BLOCKED_NOT_ADMITTED"
+
+
+def test_redteam_html_challenge_for_declared_pdf_is_never_a_b2_evidence_record(tmp_path):
+    challenge = gzip.compress(b"<html><script>proof_of_access_check();</script></html>")
+    root = make_run(
+        tmp_path,
+        expected_payload_type="PDF",
+        raw_content=challenge,
+    )
+    report = run_route_a_b2_preflight(root)
+    assert report["raw_integrity_status"] == "INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION"
+    assert report["raw_bytes_verified"] == 1
+    assert report["captured_source_count"] == 1
+    assert report["payload_contract_failure_count"] == 1
+    assert report["b2_candidate_source_count"] == 0
+    assert report["b2_manifest_status"] == "NOT_BUILT_NO_VALID_PAYLOADS"
+    assert report["sources"][0]["payload_contract_status"] == "MISMATCH"
+    assert report["sources"][0]["b2_evidence_status"] == "PAYLOAD_CONTRACT_MISMATCH_NO_FACT_RECORD"
+    assert report["admitted_field_groups"] == []
+    assert len(report["missing_required_field_groups"]) == 7
+    assert report["evidence_admission"] is False
+    assert report["pit_admission"] is False
 
 
 def test_redteam_tampered_raw_bytes_are_rejected_before_b2(tmp_path):
