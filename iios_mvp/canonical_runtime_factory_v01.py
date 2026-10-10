@@ -22,12 +22,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from .canonical_current_price import FileSystemCanonicalCurrentPriceRegistry
-from .canonical_independent_forecast import (
-    CanonicalIndependentForecastReference,
-    CanonicalIndependentForecastRecord,
-    FileSystemCanonicalIndependentForecastRegistry,
-    _validate_record as _validate_forecast_record,
-)
+from .canonical_independent_forecast import FileSystemCanonicalIndependentForecastRegistry
 from .canonical_investment_admission_v01 import (
     ADMITTED_STATUS,
     CanonicalInvestmentAdmissionRecord,
@@ -302,8 +297,16 @@ class SignedLiveProviderJsonClient:
         config: Any,
         output_root: str | Path,
         project_root: str | Path,
+        expected_runtime_public_key_b64: str,
     ) -> None:
         self.config = config
+        self.expected_runtime_public_key_b64 = str(expected_runtime_public_key_b64).strip()
+        try:
+            expected_key = base64.b64decode(self.expected_runtime_public_key_b64, validate=True)
+        except Exception as exc:
+            raise RuntimeFactoryError("RUNTIME_PUBLIC_KEY_PIN_INVALID") from exc
+        if len(expected_key) != 32:
+            raise RuntimeFactoryError("RUNTIME_PUBLIC_KEY_PIN_INVALID")
         endpoint = urlparse(str(config.base_url))
         # The independent verifier requires HTTPS. A local model may still be
         # used without a commercial key, provided it is behind verified HTTPS.
@@ -394,6 +397,8 @@ class SignedLiveProviderJsonClient:
             cutoff_date=cutoff_date,
             prompt=prompt,
         )
+        if signed.get("runtime_public_key_b64") != self.expected_runtime_public_key_b64:
+            raise RuntimeFactoryError("LIVE_PROVIDER_RUNTIME_PUBLIC_KEY_PIN_MISMATCH")
         verify_signed_live_evidence(signed)
         try:
             verify_live_evidence(signed, schema_path=self.schema_path)
@@ -568,11 +573,29 @@ def build_canonical_runtime(
     if not admission_root.is_dir():
         raise RuntimeFactoryError("CANONICAL_ADMISSION_ROOT_MUST_BE_DIRECTORY")
     output_path = Path(output_root).expanduser().resolve(strict=True)
+    configured_public_key = str(values.get("IIOS_LLM_PROVIDER_RUNTIME_PUBLIC_KEY_B64", "")).strip()
+    if not configured_public_key:
+        raise RuntimeFactoryError("IIOS_LLM_PROVIDER_RUNTIME_PUBLIC_KEY_B64_REQUIRED")
+    try:
+        public_key_bytes = base64.b64decode(configured_public_key, validate=True)
+        private_key_bytes = base64.b64decode(provider_config.runtime_private_key_b64, validate=True)
+        private_key = Ed25519PrivateKey.from_private_bytes(private_key_bytes)
+        derived_public_key = base64.b64encode(
+            private_key.public_key().public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw,
+            )
+        ).decode("ascii")
+    except Exception as exc:
+        raise RuntimeFactoryError("RUNTIME_ATTESTATION_KEYPAIR_INVALID") from exc
+    if len(public_key_bytes) != 32 or derived_public_key != configured_public_key:
+        raise RuntimeFactoryError("RUNTIME_ATTESTATION_PUBLIC_PRIVATE_KEY_MISMATCH")
     project_root = Path(__file__).resolve().parents[1]
     client = SignedLiveProviderJsonClient(
         config=provider_config,
         output_root=output_path,
         project_root=project_root,
+        expected_runtime_public_key_b64=configured_public_key,
     )
     request_interpreter = LiveJsonRequestInterpreter(client=client, context=context)
     request_registry = RequestInterpreterRegistry((
