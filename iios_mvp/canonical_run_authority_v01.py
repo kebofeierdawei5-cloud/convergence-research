@@ -485,7 +485,6 @@ def _validate_canonical_upstream_admissions(
     root: str | Path,
     record: Mapping[str, Any],
     *,
-    manifest_evidence_ids: set[str] | None = None,
 ) -> dict[str, Any]:
     """Re-open and validate persisted semantic, forecast and valuation admission bytes."""
     env = record["envelope"]
@@ -949,11 +948,7 @@ def authorize_decision_revision_write(
     expected_hashes = [manifest_hash, *[str(x.get("content_sha256", "")) for x in manifest_evidence]]
     if evidence_stage["output_refs"] != expected_refs or evidence_stage["output_hashes"] != expected_hashes:
         raise CanonicalRunAuthorizationError("BLOCKED: Evidence stage receipts differ from the admitted Manifest")
-    _validate_canonical_upstream_admissions(
-        root,
-        record,
-        manifest_evidence_ids={str(item.get("evidence_id", "")) for item in manifest_evidence},
-    )
+    _validate_canonical_upstream_admissions(root, record)
     if any((
         str(envelope["case_id"]) != str(snapshot_identity["case_id"]),
         str(envelope["market"]).upper() != str(snapshot_identity["market"]),
