@@ -10,6 +10,9 @@ on:
       - "iios_mvp/canonical_runtime_registry_v01.py"
       - "iios_mvp/live_provider_evidence_v01.py"
       - "iios_mvp/live_provider_independent_verify_v01.py"
+      - "docs/PROJECT_STATE_INDEX.md"
+      - "docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md"
+      - "STATUS.md"
   workflow_dispatch:
 
 permissions:
