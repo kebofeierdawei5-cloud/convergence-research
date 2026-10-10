@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import argparse
 from datetime import date, datetime, time, timedelta, timezone
+import gzip
 import hashlib
 import json
 import re
+import time as _clock
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
@@ -15,6 +17,9 @@ TOOL_VERSION = "IIOS-COMPANY-EVIDENCE-INTAKE-0.1"
 MANIFEST_SCHEMA = "IIOS-COMPANY-EVIDENCE-INTAKE-MANIFEST-0.1"
 RECEIPT_SCHEMA = "IIOS-COMPANY-EVIDENCE-INTAKE-RECEIPT-0.1"
 MAX_SOURCE_BYTES = 50 * 1024 * 1024
+MAX_SOURCE_CAPTURE_SECONDS = 18
+SOURCE_READ_TIMEOUT_SECONDS = 8
+SOURCE_READ_CHUNK_BYTES = 64 * 1024
 MAX_SOURCES = 100
 UTC_PLUS_8 = timezone(timedelta(hours=8))
 SOURCE_CLASSES = {
@@ -136,6 +141,50 @@ def _validate_source_url(url: str) -> None:
             raise IntakeError("POSSIBLE_CREDENTIAL_IN_SOURCE_URL")
 
 
+def _payload_bytes_for_validation(content: bytes) -> bytes:
+    """Decode transport-level gzip only for sniffing; retained raw bytes never change."""
+    if content.startswith(b"\x1f\x8b"):
+        try:
+            return gzip.decompress(content)
+        except OSError:
+            return content
+    return content
+
+
+def _payload_contract_status(
+    expected_payload_type: Any,
+    content: bytes,
+    content_type: str | None = None,
+) -> tuple[str, str | None]:
+    """Check file-type contract without promoting payload to factual evidence."""
+    expected = _text(expected_payload_type).upper()
+    if not expected or expected == "ANY":
+        return "NOT_CHECKED", None
+    decoded = _payload_bytes_for_validation(content)
+    prefix = decoded[:8192].lstrip(b"\xef\xbb\xbf\x00\t\r\n ")
+    lowered = prefix[:4096].lower()
+    if b"%pdf-" in prefix[:1024].lower():
+        actual = "PDF"
+    elif (
+        lowered.startswith(b"<!doctype html")
+        or lowered.startswith(b"<html")
+        or b"<html" in lowered
+        or b"<script" in lowered
+    ):
+        actual = "HTML"
+    else:
+        try:
+            json.loads(decoded.decode("utf-8-sig"))
+            actual = "JSON"
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            actual = "UNKNOWN"
+    if actual == expected:
+        return "PASS", None
+    if expected == "PDF" and actual == "HTML":
+        return "MISMATCH", "EXPECTED_PDF_RECEIVED_HTML_OR_ACCESS_CHALLENGE"
+    return "MISMATCH", f"EXPECTED_{expected}_RECEIVED_{actual}"
+
+
 def validate_manifest(manifest: Any) -> dict[str, Any]:
     if not isinstance(manifest, dict):
         raise IntakeError("MANIFEST_MUST_BE_OBJECT")
@@ -174,6 +223,9 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
             raise IntakeError("SOURCE_REF_REQUIRED")
         if source.get("source_class") not in SOURCE_CLASSES:
             raise IntakeError("INVALID_SOURCE_CLASS")
+        expected_payload_type = _text(source.get("expected_payload_type")).upper()
+        if expected_payload_type and expected_payload_type not in {"PDF", "HTML", "JSON", "ANY"}:
+            raise IntakeError("INVALID_EXPECTED_PAYLOAD_TYPE")
         if source.get("license_status") not in LICENSE_STATUSES:
             raise IntakeError("INVALID_OR_MISSING_LICENSE_STATUS")
         remote = _text(source.get("url"))
@@ -251,16 +303,25 @@ def _fetch_url(url: str) -> tuple[bytes, int, str]:
         headers={"User-Agent": "IIOS-company-evidence-intake/0.1", "Accept": "*/*"},
         method="GET",
     )
+    deadline = _clock.monotonic() + MAX_SOURCE_CAPTURE_SECONDS
     try:
         opener = build_opener(_HTTPSOnlyRedirectHandler())
-        with opener.open(request, timeout=30) as response:
+        with opener.open(request, timeout=SOURCE_READ_TIMEOUT_SECONDS) as response:
             status = int(getattr(response, "status", getattr(response, "code", 0)))
             if status < 200 or status >= 300:
                 raise SourceCaptureError("UNEXPECTED_HTTP_STATUS")
             chunks = []
             total = 0
+            read_once = getattr(response, "read1", None)
             while True:
-                block = response.read(min(1024 * 1024, MAX_SOURCE_BYTES + 1 - total))
+                if _clock.monotonic() >= deadline:
+                    raise SourceCaptureError("SOURCE_FETCH_DEADLINE_EXCEEDED")
+                amount = min(SOURCE_READ_CHUNK_BYTES, MAX_SOURCE_BYTES + 1 - total)
+                # read1 performs at most one underlying read, so a slow trickle
+                # cannot hide beyond the total deadline inside a 1 MiB read.
+                block = read_once(amount) if callable(read_once) else response.read(amount)
+                if _clock.monotonic() >= deadline:
+                    raise SourceCaptureError("SOURCE_FETCH_DEADLINE_EXCEEDED")
                 if not block:
                     break
                 total += len(block)
@@ -273,6 +334,8 @@ def _fetch_url(url: str) -> tuple[bytes, int, str]:
     except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
         if isinstance(exc, HTTPError):
             raise SourceCaptureError("HTTP_REQUEST_FAILED") from exc
+        if isinstance(exc, TimeoutError):
+            raise SourceCaptureError("SOURCE_READ_TIMEOUT") from exc
         raise SourceCaptureError("SOURCE_FETCH_FAILED") from exc
 
 
@@ -326,6 +389,9 @@ def capture_sources(
             "effective_from": source.get("effective_from"),
             "effective_to": source.get("effective_to"),
             "license_status": source["license_status"],
+            "expected_payload_type": _text(source.get("expected_payload_type")).upper() or "ANY",
+            "payload_contract_status": "NOT_CHECKED",
+            "payload_contract_error": None,
             "attempted_at": attempted_at,
             "capture_status": "FAILED",
             "raw_artifact_path": None,
@@ -355,6 +421,12 @@ def capture_sources(
                 "sha256": sha256_bytes(content),
                 "http_status": http_status,
                 "content_type": content_type,
+                "payload_contract_status": _payload_contract_status(
+                    source.get("expected_payload_type"), content, content_type
+                )[0],
+                "payload_contract_error": _payload_contract_status(
+                    source.get("expected_payload_type"), content, content_type
+                )[1],
                 "retrieved_at": datetime.now(timezone.utc).isoformat(),
                 "pit_status": _pit_candidate_status(source, cutoff),
             })
@@ -417,14 +489,31 @@ def main() -> int:
         code = str(exc) if isinstance(exc, IntakeError) else "INPUT_FILE_UNAVAILABLE"
         print(json.dumps({"status": "INTAKE_BLOCKED", "error_code": code}, sort_keys=True))
         return 2
+    rows = receipt["sources"]
+    failed_sources = [
+        {"source_id": row["source_id"], "error_code": row.get("error_code")}
+        for row in rows if row.get("capture_status") == "FAILED"
+    ]
+    unregistered_sources = [
+        {"source_id": row["source_id"], "source_ref": row.get("source_ref")}
+        for row in rows if row.get("source_registry_status") == "UNREGISTERED"
+    ]
+    payload_mismatches = [
+        {"source_id": row["source_id"], "expected_payload_type": row.get("expected_payload_type"),
+         "error_code": row.get("payload_contract_error")}
+        for row in rows if row.get("payload_contract_status") == "MISMATCH"
+    ]
     print(json.dumps({
         "status": receipt["status"],
         "admission_status": receipt["admission_status"],
         "case_id": receipt["case_id"],
-        "sources": len(receipt["sources"]),
-        "failed": sum(row["capture_status"] != "SUCCESS" for row in receipt["sources"]),
+        "sources": len(rows),
+        "failed": len(failed_sources),
+        "failed_sources": failed_sources,
+        "unregistered_sources": unregistered_sources,
+        "payload_mismatches": payload_mismatches,
         "receipt": str(Path(args.out) / "COMPANY_EVIDENCE_INTAKE_RECEIPT.json"),
-    }, sort_keys=True))
+    }, ensure_ascii=False, sort_keys=True))
     return 0 if receipt["status"] == "CAPTURED_NOT_ADMITTED" else 4
 
 

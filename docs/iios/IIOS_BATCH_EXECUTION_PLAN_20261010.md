@@ -115,24 +115,28 @@ The repository contains the CLI and a deliberately empty-by-default canonical ru
 
 ### Batch C1 — actual 605016 (百龙创园) source bundle and B2/PIT admission
 
-**Status:** BLOCKED on new evidence artifacts; the P0 synthetic E2E is not a real company case.
+**Status:** **RAW RESPONSE CAPTURE COMPLETE / PAYLOAD CONTRACT MISMATCHES VERIFIED / EVIDENCE AND PIT NOT ADMITTED**.
 
-**Actions**
-1. Create a case-specific source manifest for `RC-CN-A-605016-20261009` (or the exact canonical Case ID required by the current schema) using only official/free sources and operator-supplied originals if necessary.
-2. Cover all seven mandatory groups: `security_identity`, `market_price`, `corporate_disclosures`, `business_reality`, `financial_reality`, `capital_structure`, `trust_governance_events`.
-3. For every source: retain exact bytes; record content length and SHA-256; identify source class and locator; capture published/known/effective times and their basis; preserve the source's reuse/license status; extract facts with page/table/row-level locators.
-4. Verify raw bytes independently, create fact-level Evidence Records, run the unchanged B2 Evidence/PIT validator and fresh independent red-team. `UNKNOWN` must not cover a required group.
-5. Where an official public source cannot provide the necessary time/version facts, capture an operator-supplied original and preserve its operator-supplied provenance. Do not backfill dates from current web-page retrieval time.
+**Exact capture history**
+- Case manifest: `manifests/company_cases/RC-CN-A-605016-20261009.json`; request: `manifests/capture_requests/RC-CN-A-605016-20261009.json`.
+- Attempts 1–2 (`38014567975`, `38014724607`): the Investing history URL failed; each captured 11/12 raw responses. Source refs were then corrected and registered.
+- Attempt 3 (`38014829961`): 12/12 response bodies captured and byte-verified; retrospective inspection found 8 of 9 PDF-declared SSE URLs returned gzip HTML/JavaScript challenges.
+- Attempt 4 (`38015723986`): expected-payload gate correctly flagged HTML challenges but the case-sensitive PDF signature check also misclassified a real PDF.
+- Attempt 5 (`38015841564`): corrected PDF recognition; 11/12 captured due a slow-source failure; 7 mismatches / 4 passes; this run took about 4m35s.
+- Attempts 6–7 (`38015985509`, `38016238303`) failed from clock import-name collisions in PIT handling/read deadline checks; exact stack traces are in the attempt ledger.
+- **Attempt 8 (`38016339121`): SUCCESS in about 36 seconds** using an 8-second read timeout, an 18-second per-source deadline, 64 KiB `read1()` chunks and a 6-minute capture-step cap. 12/12 raw bodies captured, 0 transport failures, 0 unregistered refs, and 12/12 byte/hash checks passed. Payload contract: **8 mismatches / 4 passes**. Artifact `11656422240`.
 
-**Price-date correction.** The official 2026 exchange calendar says the A-share market closed October 1–7 and resumed October 8. Therefore for a cutoff of **2026-10-09**, the intended latest-trading-date observation is the **2026-10-09 close**, subject to exact source verification—not the September 30 close used in the earlier 2026-10-07 PILOT-02 test. Keep the two cutoffs and their receipts separate. Official calendar sources:
-- SZSE 2026 trading calendar: https://investor.szse.cn/English/services/trading/calendar/index.html
-- SSE holiday notice dated 2026-09-17: https://www.sse.org.cn/disclosure/notice/general/t20260917_622911.html
+**Admission result**
+- Final capture-gate status: `RAW_CAPTURE_COMPLETE_WITH_PAYLOAD_MISMATCHES_NOT_ADMITTED`.
+- B2 preflight: `BLOCKED_NOT_ADMITTED`; `b2_candidate_source_count=4`; `payload_contract_failure_count=8`; all seven required groups remain uncovered; `evidence_admission=false`, `pit_admission=false`.
+- Eight PDF-declared SSE links are serving HTML challenge content rather than PDF bytes. Three other expected HTML pages and one actual PDF pass payload-type validation, but they are still only raw candidates, not admitted claims. The 2026-10-09 close is not admitted from secondary Stockstar/Sohu data.
 
-**Pass criteria**
-- all seven required groups have at least one individually valid, source-bound, case-bound and PIT-qualified `ADMITTED` evidence record;
-- the manifest's raw artifacts re-verify from bytes, not caller-supplied hash declarations alone;
-- case ID, symbol, company, cutoff and source identity are consistent;
-- no report valuation/decision proceeds while a required group remains uncovered or UNKNOWN.
+**Next actions**
+1. Replace challenged direct SSE PDF URLs with an accessible official document locator/transport, or capture operator-supplied issuer-origin originals with provenance. Do not change `expected_payload_type=PDF` to HTML merely to make CI green.
+2. For every retrieved actual document, verify issuer/exchange identity, report title, exact page/table/row locator, first-public/known-at basis, source-vintage and reuse/license state.
+3. Resolve the authoritative 2026-10-09 closing price; secondary Stockstar/Sohu pages remain cross-check candidates only.
+4. Convert only individually adjudicated facts to B2 Evidence Records and run the unchanged B2/PIT validator and independent red-team. Keep UNKNOWN non-admissible.
+5. Preserve all attempt failures in `evidence/real_cases/RC-CN-A-605016-20261009/ROUTE_A_CAPTURE_ATTEMPTS_20261010.md`.
 
 ### Batch C2 — finish Route A evidence adjudication for 新和成 (002001.SZ)
 
@@ -213,6 +217,6 @@ The red-team must test both negative bypasses and one end-to-end positive real c
 
 1. Batch A and P0 runtime-binding validation are complete: PR #262 passed 24/24 exact-head workflows; PR #264 passed 16/16, including 12/12 dedicated P0 regression tests. Do not treat either result as production-runtime acceptance.
 2. Begin Batch B: wire the trusted factory into the actual user-facing host and prove the host calls `canonical-run`; a loader and valid binding interface alone are not a registered production runtime.
-3. Start C1's 605016 official/free evidence bundle as the primary critical path; run C2's Xinhecheng source adjudication in parallel.
+3. Continue C1 from the verified 12/12 raw capture into source-origin/license/PIT adjudication, especially the authoritative 2026-10-09 price; run C2's Xinhecheng fact adjudication in parallel.
 4. Only after source groups and PIT admission pass, execute D1/D2 canonical real runs and receipt replay.
 5. Finish with independent red-team and explicit MVP acceptance; keep P0-LLM-001/P0-LLM-004 OPEN until production-backed semantic conformance is proved.

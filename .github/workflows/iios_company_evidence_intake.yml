@@ -14,6 +14,8 @@ on:
       - "tests/test_route_a_b2_preflight.py"
       - "tests/independent_redteam_route_a_b2_preflight.py"
       - "schemas/company_evidence_intake_manifest_v0.1.schema.json"
+      - "configs/source_registry_v0.1.json"
+      - "schemas/source_registry_v0.1.schema.json"
       - "manifests/company_evidence_intake_template_v0.1.json"
       - "tests/test_company_evidence_intake.py"
       - "tests/independent_redteam_company_evidence_intake.py"
@@ -22,6 +24,7 @@ on:
       - ".github/workflows/iios_company_evidence_intake.yml"
       - ".github/workflows/iios_company_evidence_capture.yml"
       - "manifests/company_cases/RC-CN-A-002001-20261009.json"
+      - "manifests/company_cases/RC-CN-A-605016-20261009.json"
       - "tests/test_company_evidence_capture_workflow.py"
       - "tools/route_a_b2_preflight.py"
       - "schemas/route_a_b2_preflight_v0.1.schema.json"
@@ -39,6 +42,8 @@ on:
       - "tools/company_evidence_intake.py"
       - "tools/verify_company_evidence_intake.py"
       - "schemas/company_evidence_intake_manifest_v0.1.schema.json"
+      - "configs/source_registry_v0.1.json"
+      - "schemas/source_registry_v0.1.schema.json"
       - "manifests/company_evidence_intake_template_v0.1.json"
       - "tests/test_company_evidence_intake.py"
       - "tests/independent_redteam_company_evidence_intake.py"
@@ -69,6 +74,8 @@ jobs:
       - name: Validate schema and manifest
         run: |
           python -m json.tool schemas/company_evidence_intake_manifest_v0.1.schema.json >/dev/null
+          python -m json.tool schemas/source_registry_v0.1.schema.json >/dev/null
+          python -m json.tool configs/source_registry_v0.1.json >/dev/null
           python -m json.tool schemas/route_a_b2_preflight_v0.1.schema.json >/dev/null
           python -m json.tool manifests/company_evidence_intake_template_v0.1.json >/dev/null
           python - <<'PY'
@@ -86,9 +93,14 @@ jobs:
               manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
               Draft202012Validator(schema).validate(manifest)
               print("validated", manifest_path)
+          source_registry_schema = json.loads((root / "schemas/source_registry_v0.1.schema.json").read_text(encoding="utf-8"))
+          source_registry = json.loads((root / "configs/source_registry_v0.1.json").read_text(encoding="utf-8"))
+          Draft202012Validator(source_registry_schema).validate(source_registry)
+          print("validated", root / "configs/source_registry_v0.1.json")
           PY
           python tools/company_evidence_intake.py --manifest manifests/company_evidence_intake_template_v0.1.json --out /tmp/unused --validate-only
           python tools/company_evidence_intake.py --manifest manifests/company_cases/RC-CN-A-002001-20261009.json --out /tmp/unused --validate-only
+          python tools/company_evidence_intake.py --manifest manifests/company_cases/RC-CN-A-605016-20261009.json --out /tmp/unused --validate-only
       - name: Run company evidence intake tests
         run: python -m pytest -q tests/test_company_evidence_intake.py
       - name: Run Route A to B2 preflight tests

@@ -18,6 +18,9 @@
     "declared_source_count",
     "captured_source_count",
     "uncaptured_source_count",
+    "groups_with_payload_contract_pass",
+    "b2_candidate_source_count",
+    "payload_contract_failure_count",
     "groups_with_raw_bytes",
     "admitted_field_groups",
     "missing_required_field_groups",
@@ -125,7 +128,8 @@
     "b2_manifest_status": {
       "enum": [
         "BLOCKED",
-        "NOT_BUILT_NO_RAW_BYTES"
+        "NOT_BUILT_NO_RAW_BYTES",
+        "NOT_BUILT_NO_VALID_PAYLOADS"
       ]
     },
     "b2_manifest_sha256": {
@@ -167,6 +171,9 @@
           "size_bytes",
           "sha256",
           "error_code",
+          "payload_contract_error",
+          "payload_contract_status",
+          "expected_payload_type",
           "b2_evidence_status",
           "declared_known_at",
           "declared_known_at_basis",
@@ -223,7 +230,8 @@
           "b2_evidence_status": {
             "enum": [
               "UNKNOWN",
-              "NO_RECORD_NO_RAW_BYTES"
+              "NO_RECORD_NO_RAW_BYTES",
+              "PAYLOAD_CONTRACT_MISMATCH_NO_FACT_RECORD"
             ]
           },
           "declared_known_at": {
@@ -240,6 +248,27 @@
           },
           "source_origin_verified": {
             "const": false
+          },
+          "expected_payload_type": {
+            "enum": [
+              "PDF",
+              "HTML",
+              "JSON",
+              "ANY"
+            ]
+          },
+          "payload_contract_status": {
+            "enum": [
+              "PASS",
+              "MISMATCH",
+              "NOT_CHECKED"
+            ]
+          },
+          "payload_contract_error": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       }
@@ -249,6 +278,7 @@
       "additionalProperties": false,
       "required": [
         "raw_capture_does_not_equal_fact_admission",
+        "payload_contract_mismatch_is_not_b2_evidence",
         "declared_known_at_is_never_promoted_by_this_preflight",
         "only_admitted_pit_qualified_records_cover_required_groups",
         "not_an_investment_decision"
@@ -265,7 +295,33 @@
         },
         "not_an_investment_decision": {
           "const": true
+        },
+        "payload_contract_mismatch_is_not_b2_evidence": {
+          "const": true
         }
+      }
+    },
+    "payload_contract_failure_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "b2_candidate_source_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "groups_with_payload_contract_pass": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "security_identity",
+          "market_price",
+          "corporate_disclosures",
+          "business_reality",
+          "financial_reality",
+          "capital_structure",
+          "trust_governance_events"
+        ]
       }
     }
   }

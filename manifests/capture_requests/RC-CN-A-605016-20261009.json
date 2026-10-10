@@ -1,0 +1,7 @@
+{
+  "schema_version": "IIOS-COMPANY-EVIDENCE-CAPTURE-REQUEST-0.1",
+  "case_id": "RC-CN-A-605016-20261009",
+  "manifest_path": "manifests/company_cases/RC-CN-A-605016-20261009.json",
+  "acquisition_attempt": 9,
+  "note": "Attempt 9: for eight PDF-declared SSE locators that returned HTML challenge pages, retry through SSE's indexed official big5 delivery route. Keep expected_payload_type=PDF; do not accept HTTP-200 HTML. Existing source-vintage, license, evidence and PIT states remain unadmitted."
+}

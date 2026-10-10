@@ -147,9 +147,23 @@ Therefore:
 
 ### Current next development batch
 
-**Current execution plan:** `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md`, refreshed against `main@e50018ffa5d8eec5909b98340ed74fe56c178344`. Batch A and PR #264 runtime-binding hardening are complete (PR #262: 24/24; PR #264: 16/16 exact-head workflows PASS). The active batch is **Batch B — actual host composition and runtime-registration proof**. The primary critical path remains the real 605016 P0 case, with Route A / 新和成 (002001.SZ) fact-source adjudication in parallel. The plan keeps unadmitted facts UNKNOWN and does not make Route A depend on an API key.
+**Current execution plan:** `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md`; current main baseline before this Route A evidence-intake branch was `7ba1adcf99532b2de10bc7f405b66b4affd4647d`. Batch A and PR #264 runtime-binding hardening are complete (PR #262: 24/24; PR #264: 16/16 exact-head workflows PASS). The active work combines **Batch B — actual host composition/runtime-registration proof** with **Batch C1 — 605016 source-vintage and B2/PIT admission**. The actual host integration remains unproven. Route A / 新和成 (002001.SZ) fact-source adjudication proceeds in parallel. No paid provider key is required for free-first acquisition.
 
 The primary Investment Core MVP path is **Route A — free-first single-company evidence intake + public web discovery**. No LLM provider endpoint or API key is required for this Route A path. Public-web discovery, public-source capture, B2 preflight and artifact retention all run without an external LLM endpoint, paid search API or API key. Operator-supplied raw originals and manually supplied evidence remain supported when public URLs are unavailable or source bytes need to be supplied directly. B2-D remains an optional external-LLM integration adapter and is not an MVP gate.
+
+### P0 C1 — 605016 / 百龙创园 Free-First Raw Capture — 2026-10-10
+
+Status: **RAW CAPTURE COMPLETE / PAYLOAD CONTRACT MISMATCHES EXPLICIT / EVIDENCE-PIT BLOCKED / NOT ADMITTED**
+
+- Case: `RC-CN-A-605016-20261009`, cutoff `2026-10-09`; manifest `manifests/company_cases/RC-CN-A-605016-20261009.json` (12 free-first candidates across seven required groups).
+- The full eight-attempt history, including failed Investing URLs and code-level failures, is preserved in `evidence/real_cases/RC-CN-A-605016-20261009/ROUTE_A_CAPTURE_ATTEMPTS_20261010.md`.
+- Attempts 1–3 exposed Investing access failure and unregistered source refs; attempt 3 captured 12 HTTP response bodies but retrospective inspection showed 8 of 9 PDF-declared SSE URLs were HTML challenge pages.
+- Payload-type validation, independent replay, B2 candidate exclusion and bounded HTTP reads have now been implemented. Attempts 4–7 exposed and fixed the lowercase PDF magic bug, slow sequential capture risk, and two clock-module naming collisions; every failure is retained in the attempt ledger.
+- **Attempt 8 / run `38016339121`: SUCCESS in ~36 seconds.** 12/12 raw response bodies captured, 0 failed rows, 0 unregistered refs, 12/12 SHA/size verification; expected-payload contract = **8 mismatches / 4 passes**. Artifact `11656422240`.
+- B2 preflight remains `BLOCKED_NOT_ADMITTED`; `b2_candidate_source_count=4`; eight PDF-declared responses were excluded as HTML challenges; all seven required field groups remain uncovered for decision-grade admission; `evidence_admission=false`, `pit_admission=false`.
+- The correct status is `RAW_CAPTURE_COMPLETE_WITH_PAYLOAD_MISMATCHES_NOT_ADMITTED`, not “12 valid documents.” Raw response integrity is not issuer-origin verification, known-at/PIT admission, licensing, or fact truth.
+
+Next: replace the challenged direct PDF transport paths with an accessible official-source locator (or preserve operator-supplied issuer-origin originals); then verify document identity and timestamps, independently adjudicate the declared reuse state and extract page/table-located facts. The 2026-10-09 closing price still requires a defensible authoritative market-data observation. No valuation, formal Decision Revision, publication or report is authorized.
 
 **Latest real capture: Run #8 succeeded as `PARTIAL_CAPTURE_VERIFIED_NOT_ADMITTED`.** Eight of nine declared source objects were retained and independently hash-verified; the public Eastmoney K-line endpoint failed on this run. The artifact and failure row were retained instead of discarding the other eight files. The existing B2 preflight executed successfully and correctly returned `BLOCKED_NOT_ADMITTED`.
 

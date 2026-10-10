@@ -78,6 +78,7 @@ jobs:
       - name: Capture exact public-source bytes
         id: capture
         continue-on-error: true
+        timeout-minutes: 6
         env:
           MANIFEST_PATH: ${{ steps.resolve_manifest.outputs.path }}
           OUT_DIR: ${{ runner.temp }}/iios-company-evidence-${{ github.run_id }}
