@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import date, datetime, time, timedelta, timezone
+import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -79,6 +80,36 @@ def _contained_file(root: Path, relative: Any) -> Path:
     return candidate
 
 
+def _payload_contract_status(expected_payload_type: Any, content: bytes) -> tuple[str, str | None]:
+    """Independent payload-type replay; does not import the acquisition module."""
+    expected = str(expected_payload_type or "ANY").strip().upper()
+    if expected in {"", "ANY"}:
+        return "NOT_CHECKED", None
+    decoded = content
+    if decoded.startswith(b"\x1f\x8b"):
+        try:
+            decoded = gzip.decompress(decoded)
+        except OSError:
+            pass
+    prefix = decoded[:8192].lstrip(b"\xef\xbb\xbf\x00\t\r\n ")
+    lowered = prefix[:4096].lower()
+    if b"%pdf-" in prefix[:1024].lower():
+        actual = "PDF"
+    elif lowered.startswith(b"<!doctype html") or lowered.startswith(b"<html") or b"<html" in lowered or b"<script" in lowered:
+        actual = "HTML"
+    else:
+        try:
+            json.loads(decoded.decode("utf-8-sig"))
+            actual = "JSON"
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            actual = "UNKNOWN"
+    if actual == expected:
+        return "PASS", None
+    if expected == "PDF" and actual == "HTML":
+        return "MISMATCH", "EXPECTED_PDF_RECEIVED_HTML_OR_ACCESS_CHALLENGE"
+    return "MISMATCH", f"EXPECTED_{expected}_RECEIVED_{actual}"
+
+
 def verify_intake(root: str | Path) -> dict[str, Any]:
     root_path = Path(root).resolve()
     receipt_path = root_path / "COMPANY_EVIDENCE_INTAKE_RECEIPT.json"
@@ -116,6 +147,10 @@ def verify_intake(root: str | Path) -> dict[str, Any]:
     verified_count = 0
     unknown_count = 0
     future_count = 0
+    payload_contract_checked = 0
+    payload_contract_passes = 0
+    payload_contract_mismatches = 0
+    payload_contract_mismatch_sources = []
     for row in rows:
         if not isinstance(row, dict):
             raise IndependentVerificationError("RECEIPT_SOURCE_RECORD_INVALID")
@@ -142,6 +177,9 @@ def verify_intake(root: str | Path) -> dict[str, Any]:
         ):
             if row.get(field) != source.get(manifest_field):
                 raise IndependentVerificationError("SOURCE_METADATA_BINDING_MISMATCH")
+        expected_payload_type = str(source.get("expected_payload_type") or "ANY").strip().upper()
+        if row.get("expected_payload_type") != expected_payload_type:
+            raise IndependentVerificationError("EXPECTED_PAYLOAD_TYPE_BINDING_MISMATCH")
         if row.get("admission_status") != "NOT_ADMITTED":
             raise IndependentVerificationError("SOURCE_RECORD_MUST_NOT_CLAIM_ADMISSION")
         if row.get("source_authenticity_status") != "UNVERIFIED":
@@ -160,6 +198,21 @@ def verify_intake(root: str | Path) -> dict[str, Any]:
                 raise IndependentVerificationError("RAW_SHA256_MISMATCH")
             if len(actual) != row.get("size_bytes"):
                 raise IndependentVerificationError("RAW_SIZE_MISMATCH")
+            expected_type = expected_payload_type
+            replay_status, replay_error = _payload_contract_status(expected_type, actual)
+            if row.get("payload_contract_status") != replay_status or row.get("payload_contract_error") != replay_error:
+                raise IndependentVerificationError("PAYLOAD_CONTRACT_STATUS_MISMATCH")
+            if expected_type != "ANY":
+                payload_contract_checked += 1
+            if replay_status == "PASS":
+                payload_contract_passes += 1
+            elif replay_status == "MISMATCH":
+                payload_contract_mismatches += 1
+                payload_contract_mismatch_sources.append({
+                    "source_id": source_id,
+                    "expected_payload_type": expected_type,
+                    "error_code": replay_error,
+                })
             verified_paths.add(path.relative_to(root_path / "raw").as_posix())
             verified_count += 1
         elif row.get("capture_status") == "FAILED":
@@ -185,6 +238,10 @@ def verify_intake(root: str | Path) -> dict[str, Any]:
         "raw_bytes_verified": verified_count,
         "unknown_pit_sources": unknown_count,
         "future_known_sources": future_count,
+        "payload_contract_checked": payload_contract_checked,
+        "payload_contract_passes": payload_contract_passes,
+        "payload_contract_mismatches": payload_contract_mismatches,
+        "payload_contract_mismatch_sources": payload_contract_mismatch_sources,
         "source_origin_verified": False,
         "evidence_admission": False,
         "live_llm_required": False,

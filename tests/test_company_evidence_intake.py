@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -108,7 +109,7 @@ def test_https_download_retains_exact_response_bytes(monkeypatch, tmp_path):
     class Opener:
         def open(self, request, timeout):
             assert request.full_url.startswith("https://")
-            assert timeout == 30
+            assert timeout == intake.SOURCE_READ_TIMEOUT_SECONDS == 8
             return Response()
 
     monkeypatch.setattr(intake, "build_opener", lambda handler: Opener())
@@ -118,6 +119,121 @@ def test_https_download_retains_exact_response_bytes(monkeypatch, tmp_path):
     assert (out / "raw" / "SZSE-ANNOUNCEMENT-001.pdf").read_bytes() == BODY
     assert receipt["sources"][0]["sha256"] == hashlib.sha256(BODY).hexdigest()
     assert verify_intake(out)["raw_bytes_verified"] == 1
+
+
+def test_declared_pdf_with_real_pdf_magic_passes_payload_contract(tmp_path):
+    _, out, receipt = run_capture(
+        tmp_path,
+        source_overrides={"expected_payload_type": "PDF"},
+    )
+    row = receipt["sources"][0]
+    assert row["capture_status"] == "SUCCESS"
+    assert row["payload_contract_status"] == "PASS"
+    assert row["payload_contract_error"] is None
+    assert (out / row["raw_artifact_path"]).read_bytes().startswith(b"%PDF-1.7")
+    verification = verify_intake(out)
+    assert verification["payload_contract_checked"] == 1
+    assert verification["payload_contract_passes"] == 1
+    assert verification["payload_contract_mismatches"] == 0
+
+
+def test_source_fetch_enforces_deadline_between_small_reads(monkeypatch):
+    called = {"read_sizes": []}
+
+    class FakeResponse:
+        status = 200
+        headers = {"Content-Type": "application/pdf"}
+
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def read1(self, n=-1):
+            called["read_sizes"].append(n)
+            return b"partial-slow-response"
+
+    class FakeOpener:
+        def open(self, request, timeout):
+            called["timeout"] = timeout
+            return FakeResponse()
+
+    # start deadline at t=100; pre-read check t=101; a slow block returns
+    # at t=119, beyond the t=118 deadline, and must be rejected immediately.
+    ticks = iter([100.0, 101.0, 119.0])
+    monkeypatch.setattr(intake, "build_opener", lambda handler: FakeOpener())
+    monkeypatch.setattr(intake._clock, "monotonic", lambda: next(ticks))
+    with pytest.raises(intake.SourceCaptureError, match="SOURCE_FETCH_DEADLINE_EXCEEDED"):
+        intake._fetch_url("https://example.com/report.pdf")
+    assert called["timeout"] == intake.SOURCE_READ_TIMEOUT_SECONDS == 8
+    assert called["read_sizes"] == [intake.SOURCE_READ_CHUNK_BYTES]
+    assert intake.SOURCE_READ_CHUNK_BYTES == 64 * 1024
+    assert intake.MAX_SOURCE_CAPTURE_SECONDS == 18
+
+
+def test_expected_pdf_http_200_gzip_html_challenge_is_retained_but_payload_blocked(monkeypatch, tmp_path):
+    import gzip
+
+    challenge = b"<html><script>challenge();</script><body>Access verification</body></html>"
+    wire_bytes = gzip.compress(challenge)
+    value = manifest(source_overrides={
+        "url": "https://static.sse.cn/disclosure/announcement.pdf",
+        "expected_payload_type": "PDF",
+    })
+    value["sources"][0].pop("local_path")
+    input_root = tmp_path / "unused"
+    input_root.mkdir()
+    path = write_manifest(tmp_path, value)
+
+    class Response:
+        status = 200
+        headers = {"Content-Type": "text/html; charset=utf-8"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def __init__(self):
+            self.payload = wire_bytes
+
+        def read(self, amount=-1):
+            if amount < 0:
+                data, self.payload = self.payload, b""
+                return data
+            data, self.payload = self.payload[:amount], self.payload[amount:]
+            return data
+
+    class Opener:
+        def open(self, request, timeout):
+            assert request.full_url.endswith(".pdf")
+            return Response()
+
+    monkeypatch.setattr(intake, "build_opener", lambda handler: Opener())
+    out = tmp_path / "challenge-output"
+    receipt = intake.capture_sources(path, out_dir=out, input_root=input_root)
+    row = receipt["sources"][0]
+    raw = out / row["raw_artifact_path"]
+    assert row["capture_status"] == "SUCCESS"
+    assert row["payload_contract_status"] == "MISMATCH"
+    assert row["payload_contract_error"] == "EXPECTED_PDF_RECEIVED_HTML_OR_ACCESS_CHALLENGE"
+    assert raw.read_bytes() == wire_bytes
+    assert row["sha256"] == hashlib.sha256(wire_bytes).hexdigest()
+    verification = verify_intake(out)
+    assert verification["raw_bytes_verified"] == 1
+    assert verification["payload_contract_mismatches"] == 1
+    assert verification["payload_contract_mismatch_sources"] == [{
+        "source_id": "SZSE-ANNOUNCEMENT-001",
+        "expected_payload_type": "PDF",
+        "error_code": "EXPECTED_PDF_RECEIVED_HTML_OR_ACCESS_CHALLENGE",
+    }]
+
+    # A caller cannot relabel the persisted challenge bytes as a valid PDF.
+    receipt_path = out / "COMPANY_EVIDENCE_INTAKE_RECEIPT.json"
+    tampered = json.loads(receipt_path.read_text(encoding="utf-8"))
+    tampered["sources"][0]["payload_contract_status"] = "PASS"
+    tampered["sources"][0]["payload_contract_error"] = None
+    receipt_path.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(IndependentVerificationError, match="PAYLOAD_CONTRACT_STATUS_MISMATCH"):
+        verify_intake(out)
 
 
 def test_missing_known_at_remains_unknown_and_cannot_admit(tmp_path):
@@ -194,3 +310,29 @@ def test_verifier_does_not_depend_on_collector_module():
     source = (ROOT / "tools" / "verify_company_evidence_intake.py").read_text(encoding="utf-8")
     assert "company_evidence_intake import" not in source
     assert "from tools.company_evidence_intake" not in source
+
+
+def test_capture_cli_reports_failed_source_ids_and_unregistered_refs(monkeypatch, tmp_path, capsys):
+    import sys
+
+    value = manifest(source_overrides={"local_path": "raw_input/missing.pdf"})
+    path = write_manifest(tmp_path, value)
+    input_root = tmp_path / "incoming"
+    input_root.mkdir()
+    out = tmp_path / "cli-output"
+    monkeypatch.setattr(sys, "argv", [
+        "company_evidence_intake.py",
+        "--manifest", str(path),
+        "--input-root", str(input_root),
+        "--out", str(out),
+    ])
+    code = intake.main()
+    output = json.loads(capsys.readouterr().out)
+    assert code == 4
+    assert output["status"] == "PARTIAL_CAPTURE_NOT_ADMITTED"
+    assert output["failed_sources"] == [{
+        "source_id": "SZSE-ANNOUNCEMENT-001",
+        "error_code": "LOCAL_SOURCE_FILE_NOT_FOUND",
+    }]
+    assert output["unregistered_sources"] == []
+
