@@ -25,6 +25,7 @@ B2-D Live Provider Invocation / Evidence                OPTIONAL / BLOCKED — N
 B2-E Natural-Language → Semantic → Decision E2E          PASS / CANONICAL
 B2-F Full Independent Red-team                          PASS / CANONICAL
 P0 B3 persisted upstream write authorization             MERGED / EXACT-HEAD CI PASS
+P0 Canonical Runtime Callback Preflight                  MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL PASS
 Production P0-LLM-001 / P0-LLM-004                      OPEN / REAL-HOST ACCEPTANCE REQUIRED
 ```
 
@@ -33,11 +34,26 @@ Production P0-LLM-001 / P0-LLM-004                      OPEN / REAL-HOST ACCEPTA
 **The company-level Investment Core MVP does NOT require an external LLM provider endpoint, paid search API, or API key.** Free-first Route A remains independent of optional provider integration. The remaining critical gates are production-runtime registration/deployment and actual source-by-source Evidence/PIT admission.
 
 - Batch B: the first-party loopback-first HTTP host is implemented in canonical main (PR #270; dedicated host contract 21/21). Trusted runtime factory implementation is now also merged in PR #274 (`a62e2304983cbdf28f0365f7fd55f53378c4adab`), exact head `14105076b1b69f626907e4eb8bdddf0893d84c23`, with 8/8 exact-head checks passing. It wires genuine provider-backed request/semantic producers plus read-only canonical admission resolvers, pins the Ed25519 runtime public key, and deliberately refuses synthetic upstream admissions. It is still **not a deployed/production-accepted host**: no real provider endpoint, secret/keypair, durable canonical admission store, or real host-origin run has been provisioned/replay-verified.
+- Runtime callback preflight: PR #283 merged at `d18251fe7541267dad49d04bad67ada54ab58e31`; exact validated PR head `a86457fcadeb951bbc89e0e0a0b8d747ef55b0b3`. All 8/8 triggered checks passed, including 23/23 preflight/factory/Host contract tests and a separately executed 5/5 adversarial suite. New command: `python -m iios_mvp.canonical_runtime_preflight_v01 --bundle-id <staged_bundle_id>`. It invokes the existing trusted factory's request interpreter and semantic producer and reuses signed Ed25519 provider-receipt verification. CI exercised control-flow with explicit fake bindings only; the actual operator-environment callback has NOT yet been run. The report explicitly says Evidence/PIT admission and semantic admission are unchecked and Decision/publication/Run Receipt are not created. P0-LLM-001/P0-LLM-004 remain OPEN.
 - Primary C1 case: `RC-CN-A-605016-20261009` remains blocked only on `market_price` after source adjudication; transport is no longer the blocker. Attempt 10 run #38026139364 / artifact #11660285551 captured 12/12 sources, with 12/12 independent byte/hash checks and 12/12 payload checks. Source adjudication PR #278 merged at `1e574438a255c350905c1575a13a691078fe27b8`; real adjudication run #38038481645 / artifact #11663494596 reverified 12/12 raw objects and passed six of seven field groups through the unchanged core B2/PIT validator. The 2026-10-09 same-day meeting resolution remains excluded under the date-only cutoff; the pre-cutoff 2026-09-11 convertible-bond update covers `corporate_disclosures`. The 2026-10-09 close candidate (CNY 20.28) remains UNKNOWN because the underlying quote-source authority and reuse status have not been admitted; `market_price` remains uncovered and Evidence/PIT admission remains false.
 - Parallel C2 case: 新和成 (002001.SZ) still requires source-by-source B2/PIT adjudication, missing-field capture and authoritative 2026-10-09 market-price evidence.
 - A successful CI, byte hash, URL/title match, or payload format check is not source-origin proof or PIT admission.
 
 The independent B2-F audit remains PASS / CANONICAL. Production host acceptance and real-company admission remain OPEN.
+
+### P0 — Canonical Runtime Callback Preflight — 2026-10-10
+
+Status: **MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL TESTS PASS / LIVE OPERATOR CALLBACK NOT YET PROVEN**.
+
+- PR #283 merged at `d18251fe7541267dad49d04bad67ada54ab58e31`; exact validated PR head `a86457fcadeb951bbc89e0e0a0b8d747ef55b0b3`.
+- Eight triggered exact-head checks passed: Investment Core CI, MVP Pilot, PILOT-02, B00-B authority threat reproduction, Post-B04 independent red-team, FM01 source admission, FM02 feature builder, and the dedicated runtime-preflight workflow.
+- Dedicated workflow: 23/23 callback-preflight + trusted-factory + Host contract tests passed; a separate adversarial test file passed 5/5. Compileall and diff checks passed.
+- New entrypoint: `python -m iios_mvp.canonical_runtime_preflight_v01 --bundle-id <staged_bundle_id>`. It loads only a trusted staged bundle, resolves the existing `iios_mvp.canonical_runtime_factory_v01:build_canonical_runtime`, then calls the request interpreter and thesis-semantic producer through that factory. Signed provider raw-response receipts remain pinned to the configured Ed25519 public key and independently verified.
+- The preflight report records signed receipt hashes and minimal provider metadata only; it does not copy model prompts/raw outputs. It explicitly writes `evidence_pit_admission_checked=false`, `semantic_admission_checked=false`, `decision_created=false`, `publication_created=false`, `run_receipt_created=false`, `human_approval_required=true`, and `auto_execution=false`.
+- Operator instructions: `docs/iios/P0_CANONICAL_RUNTIME_PREFLIGHT_20261010.md`.
+- **Non-claim:** no real operator environment was available to run this command against an actual local/self-hosted or external provider. The CI fake bindings prove only diagnostic control flow. A successful preflight will prove callback connectivity and receipt persistence, not deployed Host-origin acceptance, source admission, semantic admission, forecast/valuation quality or a completed canonical company run.
+- The canonical provider contract is preserved. A self-hosted model must still use the existing factory and a verified HTTPS endpoint with `AUTH_MODE=NONE`; the pinned runtime keypair and admitted-store contract remain required. No paid commercial API key is mandatory for a properly deployed self-hosted provider.
+- C1 case `RC-CN-A-605016-20261009` remains blocked on unadmitted `market_price`; P0-LLM-001/P0-LLM-004 remain OPEN.
 
 ### P0 C1 — Source-by-source adjudication and unchanged B2/PIT — 2026-10-10
 
