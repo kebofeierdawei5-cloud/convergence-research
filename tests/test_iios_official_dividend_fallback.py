@@ -137,6 +137,84 @@ def test_official_static_https_candidate_is_used_only_after_primary_transport_bl
     assert hashlib.sha256(persisted_pdf.read_bytes()).hexdigest() == MODULE.EXPECTED_DIVIDEND_PDF_SHA256
 
 
+def test_curl_transport_fallback_uses_same_official_pdf_exact_byte_gate(
+    tmp_path: Path, monkeypatch
+) -> None:
+    pdf_raw = _pdf_bytes()
+    _setup(tmp_path, monkeypatch, pdf_raw)
+    python_calls: list[str] = []
+    curl_calls: list[str] = []
+
+    def blocked_python(url: str, **_kwargs):
+        python_calls.append(url)
+        return {"status": "BLOCKED", "url": url, "error": "NETWORK_UNREACHABLE"}
+
+    def captured_curl(url: str, **_kwargs):
+        curl_calls.append(url)
+        return {
+            "status": "CAPTURED",
+            "url": url,
+            "final_url": url,
+            "http_status": 200,
+            "content_type": "application/pdf",
+            "body": pdf_raw,
+        }
+
+    monkeypatch.setattr(MODULE, "fetch_https", blocked_python)
+    monkeypatch.setattr(MODULE, "_fetch_official_pdf_via_curl", captured_curl)
+    output = tmp_path / "curl-followup"
+    dividend, _ledger_obj = MODULE._recover_dividend_from_prior_canonical_adjudication(output)
+
+    assert python_calls == list(MODULE.DIVIDEND_PDF_HTTPS_URLS)
+    assert curl_calls == [MODULE.DIVIDEND_PDF_HTTPS_URLS[0]]
+    assert dividend["pdf_capture"]["requested_url"] == MODULE.EXPECTED_DIVIDEND_PDF_URL
+    persisted_pdf = output / "raw" / "SSE-2026-09-22-DIVIDEND-IMPLEMENTATION.pdf"
+    assert persisted_pdf.read_bytes() == pdf_raw
+    assert hashlib.sha256(persisted_pdf.read_bytes()).hexdigest() == MODULE.EXPECTED_DIVIDEND_PDF_SHA256
+
+
+def test_curl_helper_keeps_tls_verification_and_https_redirect_only(
+    tmp_path: Path, monkeypatch
+) -> None:
+    pdf_raw = _pdf_bytes()
+    _setup(tmp_path, monkeypatch, pdf_raw)
+    monkeypatch.setattr(MODULE.shutil, "which", lambda name: "/usr/bin/curl" if name == "curl" else None)
+
+    def fake_run(command, **kwargs):
+        output_path = Path(command[command.index("--output") + 1])
+        output_path.write_bytes(pdf_raw)
+        url = command[-1]
+        assert command[command.index("--proto") + 1] == "=https"
+        assert command[command.index("--proto-redir") + 1] == "=https"
+        assert kwargs["timeout"] == 10
+        return type("Completed", (), {
+            "returncode": 0,
+            "stdout": f"200\\n{url}\\napplication/pdf\\n".encode("utf-8"),
+        })()
+
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    response = MODULE._fetch_official_pdf_via_curl(
+        MODULE.EXPECTED_DIVIDEND_PDF_URL,
+        referer="https://www.sse.com.cn/disclosure/listedinfo/announcement/index.shtml",
+    )
+
+    assert response["status"] == "CAPTURED"
+    assert response["final_url"] == MODULE.EXPECTED_DIVIDEND_PDF_URL
+    assert response["body"] == pdf_raw
+
+
+def test_all_blocked_pdf_fetch_diagnostics_are_safe_and_specific() -> None:
+    blocked = MODULE.OfficialDividendPdfFetchBlocked([
+        {"endpoint": "BIG5", "transport": "PYTHON_HTTPS", "outcome": "DNS_FAILURE"},
+        {"endpoint": "BIG5", "transport": "CURL_HTTPS", "outcome": "TIMEOUT"},
+    ])
+    assert str(blocked) == "OFFICIAL_DIVIDEND_PDF_DIRECT_HTTPS_FETCH_BLOCKED"
+    assert blocked.safe_diagnostics == [
+        {"endpoint": "BIG5", "transport": "PYTHON_HTTPS", "outcome": "DNS_FAILURE"},
+        {"endpoint": "BIG5", "transport": "CURL_HTTPS", "outcome": "TIMEOUT"},
+    ]
+
+
 def test_successful_but_wrong_pdf_bytes_block_without_trying_another_host(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -168,10 +246,13 @@ def test_successful_but_wrong_pdf_bytes_block_without_trying_another_host(
 def test_direct_pdf_fetch_failure_blocks_without_creating_passing_capture(tmp_path: Path, monkeypatch) -> None:
     pdf_raw = _pdf_bytes()
     _setup(tmp_path, monkeypatch, pdf_raw)
-    monkeypatch.setattr(MODULE, "fetch_https", lambda *_args, **_kwargs: {
+    monkeypatch.setattr(MODULE, "fetch_https", lambda url, **_kwargs: {
         "status": "BLOCKED",
-        "url": MODULE.EXPECTED_DIVIDEND_PDF_URL,
+        "url": url,
         "error": "NETWORK_UNREACHABLE",
+    })
+    monkeypatch.setattr(MODULE, "_fetch_official_pdf_via_curl", lambda url, **_kwargs: {
+        "status": "BLOCKED", "url": url, "error": "CURL_EXIT_6",
     })
 
     output = tmp_path / "followup"
