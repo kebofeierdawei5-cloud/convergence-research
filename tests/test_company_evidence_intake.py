@@ -137,11 +137,8 @@ def test_declared_pdf_with_real_pdf_magic_passes_payload_contract(tmp_path):
     assert verification["payload_contract_mismatches"] == 0
 
 
-def test_source_fetch_has_per_source_deadline_and_short_read_timeout(monkeypatch):
-    import io
-    from types import SimpleNamespace
-
-    called = {}
+def test_source_fetch_enforces_deadline_between_small_reads(monkeypatch):
+    called = {"read_sizes": []}
 
     class FakeResponse:
         status = 200
@@ -149,20 +146,25 @@ def test_source_fetch_has_per_source_deadline_and_short_read_timeout(monkeypatch
 
         def __enter__(self): return self
         def __exit__(self, *args): return False
-        def read(self, n=-1):
-            raise AssertionError("deadline should be enforced before an unbounded read")
+        def read1(self, n=-1):
+            called["read_sizes"].append(n)
+            return b"partial-slow-response"
 
     class FakeOpener:
         def open(self, request, timeout):
             called["timeout"] = timeout
             return FakeResponse()
 
-    ticks = iter([100.0, 119.0])
+    # start deadline at t=100; pre-read check t=101; a slow block returns
+    # at t=119, beyond the t=118 deadline, and must be rejected immediately.
+    ticks = iter([100.0, 101.0, 119.0])
     monkeypatch.setattr(intake, "build_opener", lambda handler: FakeOpener())
     monkeypatch.setattr(intake.time, "monotonic", lambda: next(ticks))
     with pytest.raises(intake.SourceCaptureError, match="SOURCE_FETCH_DEADLINE_EXCEEDED"):
         intake._fetch_url("https://example.com/report.pdf")
-    assert called["timeout"] == 8
+    assert called["timeout"] == intake.SOURCE_READ_TIMEOUT_SECONDS == 8
+    assert called["read_sizes"] == [intake.SOURCE_READ_CHUNK_BYTES]
+    assert intake.SOURCE_READ_CHUNK_BYTES == 64 * 1024
     assert intake.MAX_SOURCE_CAPTURE_SECONDS == 18
 
 
