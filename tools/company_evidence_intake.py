@@ -19,6 +19,7 @@ RECEIPT_SCHEMA = "IIOS-COMPANY-EVIDENCE-INTAKE-RECEIPT-0.1"
 MAX_SOURCE_BYTES = 50 * 1024 * 1024
 MAX_SOURCE_CAPTURE_SECONDS = 18
 SOURCE_READ_TIMEOUT_SECONDS = 8
+SOURCE_READ_CHUNK_BYTES = 64 * 1024
 MAX_SOURCES = 100
 UTC_PLUS_8 = timezone(timedelta(hours=8))
 SOURCE_CLASSES = {
@@ -311,10 +312,14 @@ def _fetch_url(url: str) -> tuple[bytes, int, str]:
                 raise SourceCaptureError("UNEXPECTED_HTTP_STATUS")
             chunks = []
             total = 0
+            read_once = getattr(response, "read1", None)
             while True:
                 if time.monotonic() >= deadline:
                     raise SourceCaptureError("SOURCE_FETCH_DEADLINE_EXCEEDED")
-                block = response.read(min(1024 * 1024, MAX_SOURCE_BYTES + 1 - total))
+                amount = min(SOURCE_READ_CHUNK_BYTES, MAX_SOURCE_BYTES + 1 - total)
+                # read1 performs at most one underlying read, so a slow trickle
+                # cannot hide beyond the total deadline inside a 1 MiB read.
+                block = read_once(amount) if callable(read_once) else response.read(amount)
                 if time.monotonic() >= deadline:
                     raise SourceCaptureError("SOURCE_FETCH_DEADLINE_EXCEEDED")
                 if not block:
