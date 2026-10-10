@@ -5,7 +5,7 @@ import json
 import re
 import sys
 import time as _clock
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
@@ -129,6 +129,93 @@ def find_date_rows(node: Any, path: str = "$") -> list[dict[str, Any]]:
     return found
 
 
+def yahoo_price_capture(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Capture an HTTPS historical-price candidate and the public Yahoo terms; never auto-admit."""
+    url = (
+        "https://query1.finance.yahoo.com/v8/finance/chart/605016.SS?"
+        "period1=1791388800&period2=1791648000&interval=1d&events=div%2Csplits&includeAdjustedClose=true"
+    )
+    response = fetch(url, "https://finance.yahoo.com/")
+    record: dict[str, Any] = {
+        "source_id": "PRICE-YAHOO-CHART-605016-2026-10-08",
+        "source_class": "PUBLIC_SECONDARY_MARKET_DATA_CANDIDATE",
+        "url": url,
+        "expected_observation_date": REQUIRED_PRICE_DATE,
+        "terms_reuse_status": "UNKNOWN_UNTIL_TERMS_REVIEW",
+        "status": "NOT_ADMITTED",
+        "capture": {k:v for k,v in response.items() if k!="bytes"},
+    }
+    if response.get("status") == "CAPTURED":
+        raw = response["bytes"]
+        save(root, "raw/YAHOO-CHART-605016.json", raw)
+        record["raw_path"] = "raw/YAHOO-CHART-605016.json"
+        record["raw_size_bytes"] = len(raw)
+        record["raw_sha256"] = sha256(raw)
+        try:
+            payload = json.loads(raw.decode("utf-8-sig"))
+            chart = (payload.get("chart") or {})
+            rows = chart.get("result") or []
+            if not rows:
+                record["candidate_status"] = "BLOCKED_NO_CHART_RESULT"
+                record["error"] = chart.get("error")
+            else:
+                row = rows[0]
+                meta = row.get("meta") or {}
+                timestamps = row.get("timestamp") or []
+                quote_list = (((row.get("indicators") or {}).get("quote") or [{}])[0])
+                adj_list = (((row.get("indicators") or {}).get("adjclose") or [{}])[0]).get("adjclose") or []
+                found = []
+                for i, stamp in enumerate(timestamps):
+                    local_date = datetime.fromtimestamp(int(stamp), timezone.utc).astimezone(timezone(timedelta(hours=8))).date().isoformat()
+                    if local_date == REQUIRED_PRICE_DATE:
+                        found.append({
+                            "observation_date": local_date,
+                            "timestamp_utc": datetime.fromtimestamp(int(stamp), timezone.utc).isoformat(),
+                            "open": (quote_list.get("open") or [None] * len(timestamps))[i],
+                            "high": (quote_list.get("high") or [None] * len(timestamps))[i],
+                            "low": (quote_list.get("low") or [None] * len(timestamps))[i],
+                            "close": (quote_list.get("close") or [None] * len(timestamps))[i],
+                            "volume": (quote_list.get("volume") or [None] * len(timestamps))[i],
+                            "adjusted_close": adj_list[i] if i < len(adj_list) else None,
+                        })
+                record["meta"] = {k:meta.get(k) for k in ("symbol","exchangeName","instrumentType","currency","timezone","gmtoffset","exchangeTimezoneName","firstTradeDate","regularMarketTime","dataGranularity","range") if k in meta}
+                record["matching_rows"] = found
+                record["candidate_status"] = "CROSS_CHECK_NOT_ADMITTED" if len(found) == 1 else "BLOCKED_EXPECTED_SINGLE_ROW_NOT_FOUND"
+                if len(found) == 1:
+                    record["source_field_note"] = "Yahoo chart schema maps close separately from adjclose; both are preserved. A candidate row is not an Evidence/PIT admission."
+        except (ValueError, UnicodeDecodeError, json.JSONDecodeError, TypeError, IndexError) as exc:
+            record["candidate_status"] = "BLOCKED_RESPONSE_PARSE"
+            record["parse_error"] = str(exc)
+            record["payload_prefix"] = raw[:1200].decode("utf-8", errors="replace")
+    else:
+        record["candidate_status"] = "BLOCKED_NO_HTTPS_PRICE_BYTES"
+
+    terms_url = "https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html"
+    terms_response = fetch(terms_url, "https://finance.yahoo.com/")
+    terms_record: dict[str, Any] = {
+        "source_id": "YAHOO-PUBLIC-TERMS-REVIEW",
+        "url": terms_url,
+        "status": "TERMS_NOT_ADJUDICATED",
+        "capture": {k:v for k,v in terms_response.items() if k!="bytes"},
+        "important_limit": "Public terms capture is not itself a licence grant for copying financial quotes into an evidence manifest.",
+    }
+    if terms_response.get("status") == "CAPTURED":
+        terms_raw = terms_response["bytes"]
+        save(root, "raw/YAHOO-TERMS.html", terms_raw)
+        terms_record["raw_path"] = "raw/YAHOO-TERMS.html"
+        terms_record["size_bytes"] = len(terms_raw)
+        terms_record["sha256"] = sha256(terms_raw)
+        plain = re.sub(r"<[^>]+>", " ", terms_raw.decode("utf-8", errors="replace"))
+        plain = re.sub(r"\\s+", " ", plain)
+        excerpts = []
+        for match in re.finditer(r"personal|non-commercial|redistribut|reproduce|copy|scrap|data|quote|market|permission|licen[cs]e", plain, flags=re.I):
+            excerpt = plain[max(0,match.start()-100):min(len(plain),match.end()+180)]
+            if excerpt not in excerpts: excerpts.append(excerpt)
+            if len(excerpts) >= 12: break
+        terms_record["terms_text_excerpts"] = excerpts
+        terms_record["status"] = "TERMS_CAPTURED_NEEDS_REVIEW"
+    return record, terms_record
+
 def capture_terms(root: Path) -> dict[str, Any]:
     homepage = fetch("https://www.tencent.com/zh-cn/", "https://www.tencent.com/")
     record: dict[str, Any] = {
@@ -233,6 +320,9 @@ def main() -> int:
     price_record["source_reuse_status"]="UNKNOWN_UNTIL_TERMS_REVIEW"
     price_record["field_order_note"]="Tencent response schema has not yet been independently accepted; do not interpret adjusted qfq/hfq values as raw closing price."
     report["sources"].append(price_record)
+    yahoo_price, yahoo_terms = yahoo_price_capture(out)
+    report["sources"].append(yahoo_price)
+    report["sources"].append(yahoo_terms)
     page=fetch(TARGET_STOCK_PAGE,"https://gu.qq.com/")
     page_record={"source_id":"TENCENT-STOCK-PAGE-605016","capture":{k:v for k,v in page.items() if k!="bytes"}}
     if page.get("status")=="CAPTURED":
@@ -253,6 +343,9 @@ def main() -> int:
         "overall_status":report["overall_status"],
         "price_candidate_status":price_record.get("candidate_status"),
         "price_rows":price_record.get("matching_rows"),
+        "yahoo_price_status":yahoo_price.get("candidate_status"),
+        "yahoo_price_rows":yahoo_price.get("matching_rows"),
+        "yahoo_terms_status":yahoo_terms.get("status"),
         "terms_status":report["sources"][-1].get("status"),
         "raw_file_count":len(report["raw_files"])
     },ensure_ascii=False,indent=2))
