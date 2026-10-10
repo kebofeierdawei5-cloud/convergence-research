@@ -1,0 +1,54 @@
+name: Route A 605016 Follow-up Dividend Adjudication and Combined B2
+on:
+  pull_request:
+    paths:
+      - "tools/route_a_605016_followup_adjudicate.py"
+      - ".github/workflows/route_a_605016_followup_adjudicate.yml"
+      - "tools/route_a_605016_followup_capture.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  adjudicate-official-dividend-and-combined-b2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PDF text validation dependency
+        run: python -m pip install --disable-pip-version-check pytest jsonschema cryptography pypdf
+      - name: Download exact Attempt 10 raw-source artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: iios-company-evidence-38026139364
+          run-id: 38026139364
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          path: /tmp/605016-attempt10
+      - name: Download exact official-dividend capture artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: route-a-605016-followup-capture
+          run-id: 38039073275
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          path: /tmp/605016-followup
+      - name: Verify actual PDF body/hash, add fact and rerun unchanged B2/PIT
+        run: |
+          PYTHONPATH=. python tools/route_a_605016_followup_adjudicate.py \
+            --attempt10-root /tmp/605016-attempt10 \
+            --followup-root /tmp/605016-followup \
+            --out-dir /tmp/605016-followup-adjudication
+      - name: Upload only machine-readable results (no source bytes)
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-a-605016-followup-adjudication
+          path: |
+            /tmp/605016-followup-adjudication/DIVIDEND_IMPLEMENTATION_ADJUDICATION.json
+            /tmp/605016-followup-adjudication/COMBINED_B2_CANDIDATE_MANIFEST.json
+            /tmp/605016-followup-adjudication/COMBINED_B2_RUN_REPORT.json
+          if-no-files-found: error
+          retention-days: 14

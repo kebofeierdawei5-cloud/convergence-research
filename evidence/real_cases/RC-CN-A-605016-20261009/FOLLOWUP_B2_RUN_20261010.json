@@ -1,0 +1,89 @@
+{
+  "schema_version": "IIOS-605016-FOLLOWUP-B2-RUN-0.1",
+  "case_id": "RC-CN-A-605016-20261009",
+  "cutoff_date": "2026-10-09",
+  "combined_b2_workflow": {
+    "run_id": 38039463649,
+    "conclusion": "SUCCESS",
+    "exact_code_head": "ea855f38f38426c68921daefa9397ed793f5d8bc",
+    "artifact_id": 11665325858,
+    "artifact_sha256": "44a306a01ad175e624016fc8e6c05ee294b0b9e1a96efa13918583120d6ceeef"
+  },
+  "input_artifacts": {
+    "attempt10": {
+      "run_id": 38026139364,
+      "artifact_id": 11660285551,
+      "manifest_sha256": "563bc41ab2e6ce4925451fc02986f87409e06b879e3b92066d443ef6d796f244"
+    },
+    "dividend_capture": {
+      "run_id": 38039073275,
+      "artifact_id": 11664882557,
+      "pdf_sha256": "1a153c20f908abbd48fdd63a651ecb0edde269f3e7dd0ea27a0b8ce420e5ea8c"
+    },
+    "official_price_attempt": {
+      "run_id": 38039463667,
+      "artifact_id": 11665610580,
+      "row_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480"
+    }
+  },
+  "b2": {
+    "core_validator": "research.b2.company_evidence.build_company_evidence_manifest (unchanged)",
+    "candidate_manifest_sha256": "7b91b2531ab82f8f53a7a06887564eb5f8b3938d2f5d4d8e6f867a4057fc6f74",
+    "evidence_record_count": 11,
+    "admitted_record_count": 10,
+    "admitted_field_groups": [
+      "business_reality",
+      "capital_structure",
+      "corporate_disclosures",
+      "financial_reality",
+      "security_identity",
+      "trust_governance_events"
+    ],
+    "missing_required_field_groups": [
+      "market_price"
+    ],
+    "validation_errors": [
+      "EVIDENCE[605016-PRICE-CANDIDATE-20261009]:PIT:PIT_UNKNOWN: source availability/provenance is not established",
+      "REQUIRED_FIELD_GROUPS_UNCOVERED:market_price"
+    ],
+    "evidence_admission": false,
+    "pit_admission": false,
+    "formal_valuation_decision_publication_report_run_receipt_authorized": false,
+    "current_blocker_reason": "The official SSE 2026-10-08 row is obtainable only over plain HTTP on the configured endpoint and cannot pass the HTTPS-only intake. The alternate HTTPS Eastmoney row matches 20.22 but its legal statement requires written permission for copying market data; no written permission was obtained. The 2026-10-09 secondary close is after the date-only cutoff instant and likewise cannot cover market_price."
+  },
+  "overall": "BLOCKED_AS_REQUIRED",
+  "next_steps": [
+    "Do not promote the 2026-10-08 SSE day-K row acquired over HTTP; retain it as a diagnostic-only source candidate.",
+    "Retry an HTTPS official SSE market-data endpoint or resolve reuse/source-vintage through a different authorized HTTPS source.",
+    "Until a price Evidence Record passes the unchanged core PIT validator, do not generate a formal valuation, Decision Revision, publication, investor report or complete Run Receipt.",
+    "After B2 passes, separately configure the deployed Host and complete a genuine 605016 host-origin semantic/Forecast/Valuation/decision/report/receipt replay and independent red-team."
+  ],
+  "latest_followup_capture": {
+    "run_id": 38039572043,
+    "result": "SUCCESS",
+    "artifact_id": 11664868356,
+    "artifact_sha256": "5567217818f06a2d7e6df5e419d08fa6792bb8cf1a2faf3ac876286bfb340f2c",
+    "official_dividend_pdf_sha256": "1a153c20f908abbd48fdd63a651ecb0edde269f3e7dd0ea27a0b8ce420e5ea8c",
+    "official_price_candidate_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480",
+    "official_price_candidate_status": "BLOCKED_HTTP_TRANSPORT_NOT_ADMISSIBLE"
+  },
+  "secondary_price_terms_review": {
+    "source": "https://about.eastmoney.com/home/legal",
+    "source_page_sha256": "2f669b80d2ca640e0d4f2995c3cdbb77c4abc4c150e761492f2aab44b06d78ca",
+    "capture_run_id": 38039773596,
+    "capture_artifact_id": 11664868816,
+    "result": "RESTRICTED_WRITTEN_PERMISSION_REQUIRED",
+    "key_clauses": [
+      "Section VIII: prior written permission is required to copy, modify, reprint, disseminate or otherwise distribute site content.",
+      "Section X: market quotes may not be copied, disseminated, rebroadcast, demonstrated or otherwise distributed without prior written consent from the Shanghai/Shenzhen Stock Exchanges."
+    ],
+    "decision": "Do not use the Eastmoney price payload as an admitted B2 evidence row without written permission; retain the citation/hash only as a non-admitted diagnostic cross-check.",
+    "status": "TERMS_REVIEWED_SOURCE_REUSE_BLOCKED",
+    "reviewed_at": "2026-10-10",
+    "terms_url": "https://about.eastmoney.com/home/legal",
+    "terms_sha256": "2f669b80d2ca640e0d4f2995c3cdbb77c4abc4c150e761492f2aab44b06d78ca",
+    "terms_size_bytes": 12905,
+    "disposition": "EXCLUDED_FROM_B2_ADMISSION_WITHOUT_WRITTEN_PERMISSION",
+    "non_legal_advice_note": "Project source-admission decision based on captured terms; not legal advice."
+  }
+}

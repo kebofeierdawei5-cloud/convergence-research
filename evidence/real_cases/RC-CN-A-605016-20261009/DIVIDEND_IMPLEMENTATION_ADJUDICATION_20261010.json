@@ -1,0 +1,76 @@
+{
+  "schema_version": "IIOS-605016-DIVIDEND-IMPLEMENTATION-ADJUDICATION-0.1",
+  "record_class": "OFFICIAL_SOURCE_FACT_ADJUDICATION",
+  "case_id": "RC-CN-A-605016-20261009",
+  "cutoff_date": "2026-10-09",
+  "source": {
+    "source_id": "SSE-2026-09-22-DIVIDEND-IMPLEMENTATION",
+    "source_class": "OFFICIAL_EXCHANGE",
+    "listing_api_url": "https://query.sse.com.cn/security/stock/queryCompanyBulletin.do?jsonCallBack=iiosSourceCapture&isPagination=true&productId=605016&securityType=0101%2C120200&reportType=ALL&beginDate=2026-09-22&endDate=2026-09-22&pageHelp.pageSize=100&pageHelp.pageNo=1&pageHelp.beginPage=1&pageHelp.cacheSize=1&pageHelp.endPage=1",
+    "listing_sha256": "8c7f84e0161d4db6162c1af4ec32cd29092a3e515435c46887419f6dd2909aa0",
+    "listing_size_bytes": 3079,
+    "listing_row": {
+      "ADDDATE": "2026-09-21 16:44:10",
+      "SSEDATE": "2026-09-22",
+      "SECURITY_CODE": "605016",
+      "SECURITY_NAME": "百龙创园",
+      "TITLE": "2026年半年度权益分派实施公告",
+      "URL": "/disclosure/listedinfo/announcement/c/new/2026-09-22/605016_20260922_1YLT.pdf"
+    },
+    "pdf_url": "https://big5.sse.com.cn/site/cht/www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-09-22/605016_20260922_1YLT.pdf",
+    "pdf_size_bytes": 146499,
+    "pdf_sha256": "1a153c20f908abbd48fdd63a651ecb0edde269f3e7dd0ea27a0b8ce420e5ea8c",
+    "pdf_magic": "%PDF-1.7",
+    "pdf_page_count": 3,
+    "pdf_metadata_creation_date": "2026-09-21T16:42:58+08:00",
+    "body_footer_date": "2026-09-22",
+    "capture_workflow_run_id": 38039073275,
+    "capture_artifact_id": 11664882557,
+    "source_adjudication_workflow_run_id": 38039463649,
+    "source_adjudication_artifact_id": 11665325858
+  },
+  "publication_time_adjudication": {
+    "known_at": "2026-09-22",
+    "published_at": "2026-09-22",
+    "precision": "DATE_ONLY",
+    "basis": "Official SSE listing identifies SSEDATE=2026-09-22; PDF body footer is dated 2026-09-22. Listing ADDDATE=2026-09-21 16:44:10 and PDF metadata creation date 2026-09-21 16:42:58+08 are preserved as corroborating timestamp candidates; ADDDATE semantics are not formally documented, so these are not asserted as exact first-public time.",
+    "pit_result_for_cutoff": "PASS_BEFORE_2026-10-09_DATE_ONLY_CUTOFF"
+  },
+  "reuse": {
+    "status": "RESTRICTED_NO_REDISTRIBUTION",
+    "disposition": "May be used as a narrow fact-level citation for internal personal research; do not commit or redistribute the PDF bytes.",
+    "raw_pdf_committed_to_git": false
+  },
+  "evidence_record": {
+    "evidence_id": "605016-H1-DIVIDEND-IMPLEMENTED-202609",
+    "subject_id": "RC-CN-A-605016-20261009",
+    "field_id": "capital_structure.dividend_implementation_2026H1",
+    "claim_type": "OBSERVED_FACT",
+    "value": {
+      "announcement_no": "2026-043",
+      "period": "2026H1",
+      "cash_dividend_cny_per_share_gross": "0.075",
+      "shareholder_record_date": "2026-09-28",
+      "ex_dividend_date": "2026-09-29",
+      "cash_payment_date": "2026-09-29",
+      "total_shares_basis": 420012320,
+      "aggregate_cash_dividend_cny_gross": 31500924,
+      "implementation_status": "IMPLEMENTATION_ANNOUNCEMENT"
+    },
+    "unit": "CNY_per_share_and_total_CNY",
+    "observation_date": "2026-09-29",
+    "known_at": "2026-09-22",
+    "published_at": "2026-09-22",
+    "known_at_basis": "Official listing date plus matching official PDF body and footer; exact first-public intraday timestamp is not asserted.",
+    "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+    "status": "ADMITTED",
+    "license_status": "RESTRICTED_NO_REDISTRIBUTION",
+    "content_sha256": "1a153c20f908abbd48fdd63a651ecb0edde269f3e7dd0ea27a0b8ce420e5ea8c",
+    "source_locator": "PDF p.1: key information and distribution base; pp.1-2: shareholder record date and ex-dividend/payment dates; p.3: board footer and date."
+  },
+  "non_claims": [
+    "This is the 2026 H1 dividend implementation notice, not the earlier proposal.",
+    "The record does not establish an admitted 2026-10-09 closing-price observation.",
+    "The source document's raw PDF is retained only in a time-limited Actions artifact; this JSON records fact-level metadata and SHA-256 only."
+  ]
+}

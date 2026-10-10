@@ -1,0 +1,104 @@
+{
+  "schema_version": "IIOS-605016-MARKET-PRICE-SOURCE-ADJUDICATION-0.1",
+  "case_id": "RC-CN-A-605016-20261009",
+  "cutoff_date": "2026-10-09",
+  "cutoff_interpretation": "Original date-only case cutoff is interpreted by the core PIT contract as the start of 2026-10-09. Therefore use the latest fully completed session before that point, i.e. 2026-10-08, rather than the 2026-10-09 closing print.",
+  "official_endpoint_attempt": {
+    "source_id": "PRICE-SSE-OFFICIAL-DAYK-2026-10-08",
+    "run_id": 38039463667,
+    "artifact_id": 11665610580,
+    "artifact_sha256": "e5e68b3ab860bab22ca4018cae540d969ac0393a3e9573fc480bf02c3e521029",
+    "raw_data_path_in_artifact": "raw/PRICE-SSE-DAYK-605016-2026-10-08.bin",
+    "raw_size_bytes": 124,
+    "raw_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480",
+    "data_url": "http://yunhq.sse.com.cn:32041/v1/sh1/dayk/605016?begin=20261008&end=20261008&select=date,open,high,low,close,volume,amount",
+    "host": "yunhq.sse.com.cn",
+    "http_status": 200,
+    "content_type": "application/json;charset=UTF-8",
+    "exact_row": {
+      "date": "2026-10-08",
+      "open_cny": 21,
+      "high_cny": 21.24,
+      "low_cny": 20.01,
+      "close_cny": 20.22,
+      "volume_shares": 4636300,
+      "turnover_cny": 95082618
+    },
+    "secure_transport_attempts": [
+      {
+        "url": "https://yunhq.sse.com.cn/v1/sh1/dayk/605016?begin=20261008&end=20261008&select=date,open,high,low,close,volume,amount",
+        "status": "BLOCKED",
+        "error": "NETWORK_UNREACHABLE"
+      },
+      {
+        "url": "https://yunhq.sse.com.cn:32041/v1/sh1/dayk/605016?begin=20261008&end=20261008&select=date,open,high,low,close,volume,amount",
+        "status": "BLOCKED",
+        "error": "SSL_WRONG_VERSION_NUMBER"
+      },
+      {
+        "url": "https://query.sse.com.cn/marketdata/tradedata/data/stockDailyTransData.do?isPagination=false&productId=605016&startDate=2026-10-08&endDate=2026-10-08",
+        "status": "BLOCKED",
+        "error": "HTTP_404"
+      },
+      {
+        "url": "https://query.sse.com.cn/marketdata/tradedata/queryTradingByStockCodeData.do?jsonCallBack=iiosStockDaily&isPagination=true&stockCode=605016&beginDate=2026-10-08&endDate=2026-10-08",
+        "status": "PENDING_CAPTURE_RUN_38039997977",
+        "note": "New candidate official HTTPS endpoint added in the current PR; update this row with exact response after run completes."
+      }
+    ],
+    "disposition": "BLOCKED_HTTP_TRANSPORT_NOT_ADMISSIBLE",
+    "reason": "The only returned exact daily row came over plain HTTP. The IIOS company-evidence intake contract requires HTTPS; the row is therefore excluded from the B2 Evidence/PIT manifest despite matching the official SSE host name."
+  },
+  "secondary_cross_checks": {
+    "stockstar": {
+      "observation_date": "2026-10-09",
+      "close_cny": 20.28,
+      "publication_time": "2026-10-09T18:09:28+08:00",
+      "content_sha256": "0d78fe37969224552a3309e85d078a352f864b77d9c4f785db50329dd9562f98",
+      "status": "UNKNOWN_NOT_ADMITTED",
+      "reason": "Underlying quote authority and reuse status unresolved; also after the date-only cutoff instant."
+    },
+    "eastmoney": {
+      "observation_date": "2026-10-09",
+      "close_cny": 20.28,
+      "status": "EXCLUDED_FOR_CANONICAL_EVIDENCE_REUSE_UNLESS_EXCHANGE_WRITTEN_PERMISSION_EXISTS",
+      "terms": {
+        "url": "https://about.eastmoney.com/home/legal",
+        "response_sha256": "2f669b80d2ca640e0d4f2995c3cdbb77c4abc4c150e761492f2aab44b06d78ca",
+        "captured_in_artifact_id": 11664868816,
+        "homepage_sha256": "78c9972b6d2e14ba38a0e71a7cd7d082b4d998473b3e5a95e0fba469d5a1aa34",
+        "legal_clause": "Section X: without prior written consent of the Shanghai/Shenzhen Stock Exchanges, no institution or individual may copy, disseminate, rebroadcast, demonstrate or otherwise distribute market quotation information from Eastmoney's website.",
+        "adjudication": "FAIL_CLOSED; no reuse of Eastmoney quote as canonical price evidence without prior written exchange permission."
+      },
+      "reason": "Secondary aggregator; legal terms explicitly restrict reuse of market-quote information absent prior written exchange permission. Do not promote its value into the B2 manifest."
+    },
+    "date_error_reconciliation": "The 20.73 CNY entry belongs to 2026-09-29, not 2026-10-09."
+  },
+  "b2_decision": "MARKET_PRICE_REMAINS_UNKNOWN_AND_BLOCKED",
+  "next_admissible_path": "Obtain the official row through an HTTPS source that satisfies the current intake contract, or independently adjudicate a permitted source with source vintage/reuse terms and PIT basis. Do not admit the plain-HTTP response or shift the date-only cutoff.",
+  "latest_capture_attempt": {
+    "run_id": 38039572043,
+    "run_head": "8fd654ad26ef3671a7d2ba94b3ee0785587e0d40",
+    "artifact_id": 11664868356,
+    "artifact_zip_sha256": "5567217818f06a2d7e6df5e419d08fa6792bb8cf1a2faf3ac876286bfb340f2c",
+    "result": "SUCCESSFUL_CAPTURE_JOB_WITH_PRICE_REMAINING_BLOCKED",
+    "secure_transport_verified": false,
+    "https_attempts": [
+      {
+        "url": "https://yunhq.sse.com.cn/v1/sh1/dayk/605016?begin=20261008&end=20261008&select=date,open,high,low,close,volume,amount",
+        "result": "NETWORK_UNREACHABLE"
+      },
+      {
+        "url": "https://yunhq.sse.com.cn:32041/v1/sh1/dayk/605016?begin=20261008&end=20261008&select=date,open,high,low,close,volume,amount",
+        "result": "SSL_WRONG_VERSION_NUMBER"
+      },
+      {
+        "url": "https://query.sse.com.cn/marketdata/tradedata/data/stockDailyTransData.do?isPagination=false&productId=605016&startDate=2026-10-08&endDate=2026-10-08",
+        "result": "HTTP_404"
+      }
+    ],
+    "http_payload_size_bytes": 124,
+    "http_payload_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480",
+    "data_row_matches_previous_capture": true
+  }
+}
