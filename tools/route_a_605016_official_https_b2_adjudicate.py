@@ -7,12 +7,14 @@ import shutil
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from pypdf import PdfReader
 from typing import Any
 from urllib.parse import urlparse
 
 from research.b2.company_evidence import build_company_evidence_manifest, REQUIRED_COMPANY_FIELD_GROUPS
 from tools.route_a_605016_followup_capture import official_dividend_capture
 from tools.route_a_605016_followup_adjudicate import adjudicate as adjudicate_attempt10_and_dividend
+from tools.route_a_605016_adjudicate import adjudicate as adjudicate_attempt10
 from tools.route_a_605016_sse_endpoint_discovery import fetch_https
 
 CASE_ID = "RC-CN-A-605016-20261009"
@@ -27,6 +29,14 @@ PRICE_EVIDENCE_ID = "605016-SSE-HTTPS-DAILY-CLOSE-20261008"
 OLD_UNKNOWN_PRICE_EVIDENCE_ID = "605016-PRICE-CANDIDATE-20261009"
 EXPECTED_PRICE_RAW_SHA256 = "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480"
 EXPECTED_PRICE_RAW_SIZE = 124
+EXPECTED_DIVIDEND_PDF_SHA256 = "1a153c20f908abbd48fdd63a651ecb0edde269f3e7dd0ea27a0b8ce420e5ea8c"
+EXPECTED_DIVIDEND_PDF_SIZE = 146499
+EXPECTED_DIVIDEND_LISTING_SHA256 = "8c7f84e0161d4db6162c1af4ec32cd29092a3e515435c46887419f6dd2909aa0"
+EXPECTED_DIVIDEND_LISTING_SIZE = 3079
+EXPECTED_DIVIDEND_PDF_URL = "https://big5.sse.com.cn/site/cht/www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-09-22/605016_20260922_1YLT.pdf"
+DIVIDEND_LEDGER_RELATIVE = Path(
+    "evidence/real_cases/RC-CN-A-605016-20261009/DIVIDEND_IMPLEMENTATION_ADJUDICATION_20261010.json"
+)
 
 
 def _sha256(raw: bytes) -> str:
@@ -91,30 +101,249 @@ def _parse_daybar(raw: bytes) -> tuple[dict[str, Any], list[Any]]:
     return shape, row
 
 
+
+
+def _recover_dividend_from_prior_canonical_adjudication(
+    followup_root: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Recover the known official PDF without repeating the flaky SSE listing API call.
+
+    The source listing row and fact-level decision already exist in the canonical
+    case ledger. This path revalidates that ledger's pinned identity, fetches the
+    exact official PDF URL over HTTPS, and re-hashes/rechecks the PDF bytes. It
+    explicitly does not claim that the original listing response bytes were
+    reacquired in this run.
+    """
+    ledger_path = Path(__file__).resolve().parents[1] / DIVIDEND_LEDGER_RELATIVE
+    ledger_raw = ledger_path.read_bytes()
+    ledger = _read_obj(ledger_path)
+    source = ledger.get("source")
+    fact = ledger.get("evidence_record")
+    expected_row = {
+        "SECURITY_CODE": "605016",
+        "SECURITY_NAME": "百龙创园",
+        "SSEDATE": "2026-09-22",
+        "TITLE": "2026年半年度权益分派实施公告",
+        "URL": "/disclosure/listedinfo/announcement/c/new/2026-09-22/605016_20260922_1YLT.pdf",
+    }
+    if ledger.get("schema_version") != "IIOS-605016-DIVIDEND-IMPLEMENTATION-ADJUDICATION-0.1":
+        raise ValueError("CANONICAL_DIVIDEND_LEDGER_SCHEMA_MISMATCH")
+    if ledger.get("case_id") != CASE_ID or ledger.get("cutoff_date") != CUTOFF_DATE:
+        raise ValueError("CANONICAL_DIVIDEND_LEDGER_CASE_OR_CUTOFF_MISMATCH")
+    if not isinstance(source, dict) or not isinstance(fact, dict):
+        raise ValueError("CANONICAL_DIVIDEND_LEDGER_SOURCE_OR_FACT_MISSING")
+    row = source.get("listing_row")
+    if any(not isinstance(row, dict) or row.get(key) != value for key, value in expected_row.items()):
+        raise ValueError("CANONICAL_DIVIDEND_LISTING_IDENTITY_MISMATCH")
+    if (
+        source.get("listing_sha256") != EXPECTED_DIVIDEND_LISTING_SHA256
+        or source.get("listing_size_bytes") != EXPECTED_DIVIDEND_LISTING_SIZE
+        or source.get("pdf_url") != EXPECTED_DIVIDEND_PDF_URL
+        or source.get("pdf_sha256") != EXPECTED_DIVIDEND_PDF_SHA256
+        or source.get("pdf_size_bytes") != EXPECTED_DIVIDEND_PDF_SIZE
+        or source.get("pdf_page_count") != 3
+        or ledger.get("reuse", {}).get("status") != "RESTRICTED_NO_REDISTRIBUTION"
+    ):
+        raise ValueError("CANONICAL_DIVIDEND_SOURCE_PIN_MISMATCH")
+    if (
+        fact.get("evidence_id") != "605016-H1-DIVIDEND-IMPLEMENTED-202609"
+        or fact.get("content_sha256") != EXPECTED_DIVIDEND_PDF_SHA256
+        or fact.get("status") != "ADMITTED"
+        or fact.get("provenance_class") != "SOURCE_VINTAGE_VERIFIED"
+        or fact.get("known_at") != "2026-09-22"
+        or fact.get("field_id") != "capital_structure.dividend_implementation_2026H1"
+    ):
+        raise ValueError("CANONICAL_DIVIDEND_FACT_RECORD_BINDING_MISMATCH")
+
+    response = fetch_https(
+        EXPECTED_DIVIDEND_PDF_URL,
+        referer="https://www.sse.com.cn/disclosure/listedinfo/announcement/index.shtml",
+    )
+    if response.get("status") != "CAPTURED":
+        raise ValueError("OFFICIAL_DIVIDEND_PDF_DIRECT_HTTPS_FETCH_BLOCKED")
+    final_url = str(response.get("final_url") or response.get("url") or "")
+    final = urlparse(final_url)
+    if (
+        final.scheme.lower() != "https"
+        or final.hostname != "big5.sse.com.cn"
+        or final_url.split("#", 1)[0] != EXPECTED_DIVIDEND_PDF_URL
+    ):
+        raise ValueError("OFFICIAL_DIVIDEND_PDF_TLS_ORIGIN_MISMATCH")
+    raw_pdf = response.get("body")
+    if not isinstance(raw_pdf, bytes):
+        raise ValueError("OFFICIAL_DIVIDEND_PDF_BYTES_MISSING")
+    if (
+        len(raw_pdf) != EXPECTED_DIVIDEND_PDF_SIZE
+        or _sha256(raw_pdf) != EXPECTED_DIVIDEND_PDF_SHA256
+        or not raw_pdf.startswith(b"%PDF-")
+    ):
+        raise ValueError("OFFICIAL_DIVIDEND_PDF_EXACT_BYTES_MISMATCH")
+
+    followup_root.mkdir(parents=True, exist_ok=True)
+    raw_dir = followup_root / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    pdf_path = raw_dir / "SSE-2026-09-22-DIVIDEND-IMPLEMENTATION.pdf"
+    pdf_path.write_bytes(raw_pdf)
+    reader = PdfReader(str(pdf_path), strict=True)
+    if len(reader.pages) != 3:
+        raise ValueError("OFFICIAL_DIVIDEND_PDF_PAGE_COUNT_MISMATCH")
+
+    dividend = {
+        "source_id": source["source_id"],
+        "source_class": "OFFICIAL_EXCHANGE",
+        "expected_title": expected_row["TITLE"],
+        "expected_security_code": "605016",
+        "expected_listing_date": "2026-09-22",
+        "status": "RAW_PDF_CAPTURED_NOT_ADMITTED",
+        "listing_row": row,
+        "final_pdf_url": EXPECTED_DIVIDEND_PDF_URL,
+        "pdf_capture": {
+            "url": final_url,
+            "final_url": final_url,
+            "status": "CAPTURED",
+            "http_status": response.get("http_status"),
+            "content_type": response.get("content_type"),
+            "size_bytes": len(raw_pdf),
+            "sha256": _sha256(raw_pdf),
+        },
+        "prior_adjudication": {
+            "ledger_path": DIVIDEND_LEDGER_RELATIVE.as_posix(),
+            "ledger_sha256": _sha256(ledger_raw),
+            "listing_sha256": EXPECTED_DIVIDEND_LISTING_SHA256,
+            "listing_size_bytes": EXPECTED_DIVIDEND_LISTING_SIZE,
+            "listing_bytes_reverified_in_current_run": False,
+            "fact_level_status": "ADMITTED_IN_CANONICAL_SOURCE_LEDGER",
+        },
+        "capture_mode": "PRIOR_CANONICAL_LISTING_ADJUDICATION_PLUS_CURRENT_DIRECT_PDF_REHASH",
+    }
+    capture_report = {
+        "schema_version": "IIOS-605016-FOLLOWUP-SOURCE-CAPTURE-0.1",
+        "case_id": CASE_ID,
+        "case_cutoff_date": CUTOFF_DATE,
+        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "capture_mode": dividend["capture_mode"],
+        "prior_listing_bytes_reverified_in_current_run": False,
+        "sources": [dividend],
+    }
+    (followup_root / "FOLLOWUP_SOURCE_CAPTURE_REPORT.json").write_text(
+        json.dumps(capture_report, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return dividend, ledger
+
+
+def _build_base_manifest_from_prior_dividend(
+    attempt10_root: Path,
+    base_out: Path,
+    followup_root: Path,
+    dividend: dict[str, Any],
+    ledger: dict[str, Any],
+) -> tuple[dict[str, Any], Path, dict[str, Any]]:
+    """Repeat the unchanged B2 builder using the already-adjudicated dividend fact."""
+    base_out.mkdir(parents=True, exist_ok=True)
+    base_report = adjudicate_attempt10(attempt10_root, base_out)
+    base_manifest = _read_obj(base_out / "SOURCE_ADJUDICATED_B2_CANDIDATE_MANIFEST.json")
+    combined_root = base_out / "combined-evidence-root"
+    shutil.copytree(attempt10_root, combined_root)
+    pdf_raw = (followup_root / "raw" / "SSE-2026-09-22-DIVIDEND-IMPLEMENTATION.pdf").read_bytes()
+    pdf_sha = _sha256(pdf_raw)
+    if len(pdf_raw) != EXPECTED_DIVIDEND_PDF_SIZE or pdf_sha != EXPECTED_DIVIDEND_PDF_SHA256:
+        raise ValueError("OFFICIAL_DIVIDEND_PDF_CHANGED_BEFORE_B2")
+    supplemental_relative = "raw/SSE-2026-09-22-DIVIDEND-IMPLEMENTATION.pdf"
+    supplemental_target = combined_root / supplemental_relative
+    if supplemental_target.exists():
+        raise ValueError("SUPPLEMENTAL_RAW_PATH_COLLISION")
+    supplemental_target.parent.mkdir(parents=True, exist_ok=True)
+    supplemental_target.write_bytes(pdf_raw)
+
+    source = ledger["source"]
+    dividend_evidence = dict(ledger["evidence_record"])
+    dividend_evidence.update({
+        "basis": "Official SSE implementation notice: the exact PDF bytes were re-fetched from the pinned official Big5 URL and matched the SHA-256 already recorded in the canonical source adjudication. Source-listing row identity and date are reused from that prior canonical adjudication; its original raw listing bytes were not re-fetched in this run.",
+        "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "source_ref": EXPECTED_DIVIDEND_PDF_URL,
+        "artifact_id": "ROUTE-A-FOLLOWUP:SSE-2026-09-22-DIVIDEND-IMPLEMENTATION:" + pdf_sha[:16],
+        "capture_sha256": pdf_sha,
+        "exact_bytes": True,
+        "effective_from": "2026-09-29",
+        "source_id": str(source["source_id"]),
+        "source_origin_adjudication": "PASS_PRIOR_CANONICAL_SSE_LISTING_AND_CURRENT_EXACT_OFFICIAL_PDF_REHASH",
+        "parents": [],
+        "transformation": {"type": "DIRECT", "code_ref": None, "code_sha256": None, "formula_id": None},
+        "quality_notes": [
+            "Exact raw PDF size/SHA-256 were reverified during this local run.",
+            "The original official listing row and its raw-byte hash come from the canonical prior adjudication; listing raw bytes were not reacquired because the query API was blocked.",
+            "Official SSE source reuse remains restricted to non-redistributive internal fact-level use.",
+            "The exact intraday first-public timestamp is not asserted; known_at remains date-only 2026-09-22.",
+        ],
+    })
+    evidence = list(base_manifest.get("evidence") or [])
+    if any(item.get("evidence_id") == dividend_evidence["evidence_id"] for item in evidence if isinstance(item, dict)):
+        raise ValueError("CANONICAL_DIVIDEND_EVIDENCE_ID_COLLISION")
+    evidence.append(dividend_evidence)
+    raw_artifacts = list(base_manifest.get("raw_artifacts") or [])
+    raw_artifacts.append({
+        "evidence_id": dividend_evidence["evidence_id"],
+        "relative_path": supplemental_relative,
+        "expected_size_bytes": len(pdf_raw),
+        "expected_sha256": pdf_sha,
+    })
+    combined_manifest = build_company_evidence_manifest(
+        case_id=CASE_ID,
+        market="CN-A",
+        symbol=SYMBOL,
+        company="山东百龙创园生物科技股份有限公司",
+        cutoff_date=CUTOFF_DATE,
+        evidence=evidence,
+        raw_artifacts=raw_artifacts,
+        required_field_groups=list(REQUIRED_COMPANY_FIELD_GROUPS),
+        raw_root=combined_root,
+    )
+    combined_manifest_path = base_out / "COMBINED_B2_CANDIDATE_MANIFEST.json"
+    combined_manifest_path.write_text(
+        json.dumps(combined_manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    summary = {
+        "combined_b2_manifest_status": combined_manifest.get("status"),
+        "validation_errors": list(combined_manifest.get("validation_errors") or []),
+        "source_mode": "PRIOR_CANONICAL_DIVIDEND_ADJUDICATION_PLUS_CURRENT_DIRECT_PDF_REHASH",
+        "prior_listing_bytes_reverified_in_current_run": False,
+    }
+    return summary, combined_root, combined_manifest
+
+
 def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
     attempt10_root = attempt10_root.resolve(strict=True)
     out_dir.mkdir(parents=True, exist_ok=True)
     followup_root = out_dir / "official-dividend-capture"
     followup_root.mkdir()
     dividend = official_dividend_capture(followup_root)
-    if dividend.get("status") != "RAW_PDF_CAPTURED_NOT_ADMITTED":
-        raise ValueError("OFFICIAL_DIVIDEND_SOURCE_CAPTURE_FAILED:" + str(dividend.get("status")))
-    capture_report = {
-        "case_id": CASE_ID,
-        "case_cutoff_date": CUTOFF_DATE,
-        "captured_at": datetime.now(timezone.utc).isoformat(),
-        "sources": [dividend],
-    }
-    (followup_root / "FOLLOWUP_SOURCE_CAPTURE_REPORT.json").write_text(
-        json.dumps(capture_report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
-
     base_out = out_dir / "base-b2"
-    base_out.mkdir()
-    base_summary = adjudicate_attempt10_and_dividend(attempt10_root, followup_root, base_out)
-    combined_root = base_out / "combined-evidence-root"
-    combined_manifest_path = base_out / "COMBINED_B2_CANDIDATE_MANIFEST.json"
-    combined_manifest = _read_obj(combined_manifest_path)
+    if dividend.get("status") == "RAW_PDF_CAPTURED_NOT_ADMITTED":
+        capture_report = {
+            "case_id": CASE_ID,
+            "case_cutoff_date": CUTOFF_DATE,
+            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "sources": [dividend],
+        }
+        (followup_root / "FOLLOWUP_SOURCE_CAPTURE_REPORT.json").write_text(
+            json.dumps(capture_report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        base_out.mkdir()
+        base_summary = adjudicate_attempt10_and_dividend(attempt10_root, followup_root, base_out)
+        combined_root = base_out / "combined-evidence-root"
+        combined_manifest_path = base_out / "COMBINED_B2_CANDIDATE_MANIFEST.json"
+        combined_manifest = _read_obj(combined_manifest_path)
+    else:
+        # The SSE listing API can be unreachable from some personal networks.
+        # Reuse the repository's previously adjudicated listing/fact record while
+        # re-fetching and exact-hash-verifying the official PDF directly over HTTPS.
+        dividend, prior_ledger = _recover_dividend_from_prior_canonical_adjudication(followup_root)
+        base_summary, combined_root, combined_manifest = _build_base_manifest_from_prior_dividend(
+            attempt10_root, base_out, followup_root, dividend, prior_ledger
+        )
+        combined_manifest_path = base_out / "COMBINED_B2_CANDIDATE_MANIFEST.json"
 
     # Only query the official SSE HTTPS endpoint. Raw bytes and numeric fields are
     # confined to the ephemeral runner workspace and are never uploaded as artifacts.
