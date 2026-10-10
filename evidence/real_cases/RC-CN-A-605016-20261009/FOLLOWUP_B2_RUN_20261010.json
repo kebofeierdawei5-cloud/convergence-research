@@ -86,7 +86,7 @@
     "disposition": "EXCLUDED_FROM_B2_ADMISSION_WITHOUT_WRITTEN_PERMISSION",
     "non_legal_advice_note": "Project source-admission decision based on captured terms; not legal advice."
   },
-  "current_blocker_reason": "Historical result from the pre-HTTPS attempt: official price bytes were available only via plain HTTP and were correctly blocked. This result is superseded by the later ephemeral official HTTPS B2 run #38041208974; no numeric market quote values are stored in this public record.",
+  "current_blocker_reason": "Historical result from the pre-HTTPS attempt: official market-data bytes were available only via plain HTTP and were correctly blocked under the HTTPS-only intake contract. This historical blocker is superseded by the later official HTTPS ephemeral B2 run #38041208974. Numeric quote values are withheld from this public repository.",
   "latest_official_https_b2_run": {
     "run_id": 38041208974,
     "run_url": "https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38041208974",
