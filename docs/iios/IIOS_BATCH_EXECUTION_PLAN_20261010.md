@@ -1,7 +1,7 @@
 # IIOS Batch Execution Plan — Refreshed 2026-10-10
 
 **Plan class:** execution plan / canonical-main recovery  
-**Authority baseline:** `main@a62e2304983cbdf28f0365f7fd55f53378c4adab`  
+**Authority baseline:** `main@d18251fe7541267dad49d04bad67ada54ab58e31`  
 **State authority:** `docs/PROJECT_STATE_INDEX.md`  
 **Purpose:** move IIOS from validated control-plane code to a real, fail-closed, single-company research run without making external LLM API credentials a Route A prerequisite.
 
@@ -20,6 +20,21 @@
 | P0 Batch 1 CLI host integration | PR #267 / merge `b26e3e071eec7e145c46d4bef8a6f206439be1c2` | Exact validated head `cd44c503ed2535bede25ad4a5e2f483cfb606ef4`: 13/13 dedicated P0 tests passed; CLI persists ordered stage lineage | Proves repository CLI path only; no deployed host or live LLM conformance |
 
 P0 Batch 1 exact validated head `cf7be75651d7bbb830385e0c8aabab89fd27e417` passed 34/34 triggered workflows before merge. This is code/control-plane evidence, not proof that a production host has registered a runtime. Older PRs #257 and #258 are superseded and closed.
+
+### PR #283 — canonical runtime callback preflight — merged 2026-10-10
+
+Status: **MERGED / 8-OF-8 EXACT-HEAD CHECKS PASS / REAL OPERATOR CALLBACK STILL OPEN**.
+
+- Merge commit: `d18251fe7541267dad49d04bad67ada54ab58e31`.
+- Exact validated head: `a86457fcadeb951bbc89e0e0a0b8d747ef55b0b3`; all eight triggered checks passed.
+- The dedicated workflow passed 23/23 preflight/factory/Host contract tests plus a separately executed 5/5 adversarial suite; compileall and diff checks passed.
+- Entry: `python -m iios_mvp.canonical_runtime_preflight_v01 --bundle-id <staged_bundle_id>`. It uses the existing trusted factory, not an alternate factory, and calls both provider-backed request-intent and thesis-semantic callbacks. Signed raw provider receipts continue to be pinned to the trusted Ed25519 public key and independently verified.
+- The report records only receipt hashes and minimal provider metadata, not prompt or raw output. It is an immutable diagnostic, not a canonical run receipt. Evidence/PIT admission and semantic admission remain explicitly unchecked; no forecast, valuation, decision, publication, report or complete Run Receipt is produced.
+- The adversarial suite covers bundle path traversal, duplicate JSON keys, wrong instrument, semantic authority smuggling, prompt/output leakage and provider failure without fallback.
+- Non-claim: no real operator environment/model endpoint was available for a genuine callback run; test doubles in CI do not prove production connectivity or Host-origin acceptance. The preflight command must be run inside the actual intended operator environment.
+- C1/605016 remains blocked on `market_price`; P0-LLM-001/P0-LLM-004 remain OPEN.
+
+
 
 ### PR #262 follow-up — now merged
 
@@ -248,8 +263,8 @@ The red-team must test both negative bypasses and one end-to-end positive real c
 
 ## 5. Immediate execution order
 
-1. Batch A, the first-party host and trusted runtime factory code are merged. PR #262 passed 24/24, PR #264 passed 16/16, PR #267 passed 13/13 dedicated P0 tests, PR #270 passed 21/21 host tests, and PR #274 passed 8/8 exact-head checks including factory-contract and red-team.
-2. Batch B source code is implemented (host PR #270 + factory PR #274); production deployment/runtime/semantic acceptance remains OPEN until the operator environment provisions a real endpoint/keypair/store and a real host-origin run passes receipt replay. Do not infer production acceptance from host/factory CI.
-3. Continue C1 (605016) source-origin/license/PIT fact adjudication using Attempt 10 artifact #11660285551 and preserve all UNKNOWN states; run C2 (002001) source adjudication in parallel.
-4. Only after the seven evidence groups and PIT admission pass, execute D1/D2 real canonical runs and complete receipt replay.
-5. Finish with independent red-team and explicit MVP acceptance; keep P0-LLM-001/P0-LLM-004 OPEN until a production-backed real-company conformance run passes.
+1. Canonical Host + trusted runtime factory + callback preflight are merged: PR #270 passed 21/21 host tests; PR #274 passed 8/8 exact-head checks; PR #283 passed 8/8 exact-head checks, 23/23 contract tests and 5/5 adversarial tests.
+2. Next for Batch B: in the actual intended operator environment, provision the existing factory's trusted Host roots, real Responses-compatible HTTPS endpoint (self-hosted `AUTH_MODE=NONE` is allowed), matching Ed25519 private/public keypair and durable canonical store. Then run `python -m iios_mvp.canonical_runtime_preflight_v01 --bundle-id <staged_bundle_id>`. This preflight is not host-origin production acceptance and must not be relabeled as a decision or Run Receipt.
+3. Continue C1: resolve market-price source origin and reuse/license status, then run the unchanged B2/PIT validator. The current 605016 case is still blocked; a provider callback cannot repair missing market evidence.
+4. Run C2 (002001) source adjudication in parallel; after seven-group Evidence/PIT admission and case-bound Forecast/Valuation records are actually admitted, perform one real Host-origin canonical run.
+5. Complete publication/report, full `IIOS_RUN_RECEIPT` replay and fresh independent red-team. Keep P0-LLM-001/P0-LLM-004 OPEN until the real production path is accepted.
