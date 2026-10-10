@@ -228,7 +228,15 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
         "cutoff_date": CUTOFF_DATE,
         "cutoff_semantics": "Date-only 2026-10-09 is interpreted by the unchanged core as the start of that date.",
         "official_dividend_source": {
-            "status": dividend.get("status"),
+            "capture_status": dividend.get("status"),
+            "fact_level_admission": (
+                "ADMITTED_FOR_SPECIFIC_INTERNAL_FACTS"
+                if any(item.get("evidence_id") == "605016-H1-DIVIDEND-IMPLEMENTED-202609"
+                       and item.get("status") == "ADMITTED"
+                       for item in manifest.get("evidence", []))
+                else "NOT_ADMITTED"
+            ),
+            "evidence_id": "605016-H1-DIVIDEND-IMPLEMENTED-202609",
             "pdf_sha256": (dividend.get("pdf_capture") or {}).get("sha256"),
             "pdf_size_bytes": (dividend.get("pdf_capture") or {}).get("size_bytes"),
             "published_at_precision": "DATE_ONLY_2026-09-22",
@@ -252,6 +260,7 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
             "raw_source_bytes_in_report_artifact": False,
         },
         "core_b2": {
+            "scope": "EPHEMERAL_CANDIDATE_MANIFEST_ONLY",
             "validator": "research.b2.company_evidence.build_company_evidence_manifest (unchanged)",
             "candidate_manifest_status": manifest.get("status"),
             "candidate_manifest_sha256": (manifest.get("audit") or {}).get("manifest_sha256"),
@@ -260,8 +269,9 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
             "admitted_field_groups": admitted_groups,
             "missing_required_field_groups": sorted(set(REQUIRED_COMPANY_FIELD_GROUPS) - set(admitted_groups)),
             "validation_errors": list(manifest.get("validation_errors") or []),
-            "evidence_admission": manifest.get("status") == "PASS",
-            "pit_admission": manifest.get("status") == "PASS",
+            "evidence_admission_ephemeral": manifest.get("status") == "PASS",
+            "pit_admission_ephemeral": manifest.get("status") == "PASS",
+            "canonical_durable_admission": False,
             "numeric_quote_value_in_report": False,
             "raw_source_bytes_uploaded": False,
             "full_candidate_manifest_uploaded": False,
