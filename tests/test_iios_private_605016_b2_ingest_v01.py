@@ -249,7 +249,7 @@ def test_rejects_path_traversal_in_manifest_and_cleans_new_root(tmp_path: Path) 
         MODULE.ingest_private_b2_candidate(
             private_root=private_root, repository_root=tmp_path / "repo",
             attempt10_root=input_root, adjudicator=traversal_adjudicator,
-            core_validator=_fake_core_validator,
+            core_validator=lambda *_args, **_kwargs: [],
         )
     assert not private_root.exists()
 
