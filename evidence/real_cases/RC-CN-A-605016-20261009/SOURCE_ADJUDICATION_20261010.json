@@ -393,6 +393,30 @@
       "caution": "This admits procedural status only; it does not assert issuance was subsequently approved, completed, or that final terms were unchanged."
     },
     {
+      "evidence_id": "605016-CB-DISCLOSURE-STATUS-202609",
+      "source_id": "SSE-2026-09-CONVERTIBLE-BOND-UPDATE",
+      "field_id": "corporate_disclosures.convertible_bond_registration_update",
+      "claim_type": "OBSERVED_FACT",
+      "value": {
+        "announcement_no": "2026-042",
+        "sse_listing_review_passed_on": "2026-08-27",
+        "registration_status_as_of_2026-09-11": "CSRC_REGISTRATION_PENDING",
+        "approval_outcome_and_timing": "UNCERTAIN"
+      },
+      "unit": "status_record",
+      "basis": "Official issuer/exchange disclosure no. 2026-042, published 2026-09-11; the announcement is a corporate disclosure and supports procedural status only.",
+      "observation_date": "2026-09-11",
+      "known_at": "2026-09-11",
+      "published_at": "2026-09-11",
+      "known_at_basis": "Official SSE archive date and matching announcement no. 2026-042/title in body; exact intraday first-public time not exposed.",
+      "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+      "status": "ADMITTED",
+      "license_status": "RESTRICTED_NO_REDISTRIBUTION",
+      "source_locator": "PDF p.1, opening paragraphs following announcement title; explicitly says registration by CSRC remained required and approval/outcome timing was uncertain.",
+      "caution": "This admits procedural status only; it does not assert issuance was subsequently approved, completed, or that final terms were unchanged.",
+      "decision_basis": "Valid pre-cutoff corporate-disclosure evidence; the later 2026-10-09 meeting resolution remains excluded under the original date-only cutoff."
+    },
+    {
       "evidence_id": "605016-SHARE-BASE-H1-20260630",
       "source_id": "SSE-H1-2026-FULL",
       "field_id": "capital_structure.reported_shares_as_of_20260630",
