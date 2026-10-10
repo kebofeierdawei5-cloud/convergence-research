@@ -269,6 +269,49 @@ def test_cli_writes_sanitized_blocked_report_without_traceback(
     assert "sse.com.cn" not in json.dumps(report).lower()
 
 
+def test_cli_writes_sanitized_byte_mismatch_report_without_traceback(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    wrong_pdf = b"%PDF-1.7\\nchanged-document"
+    diagnostics = [{
+        "endpoint": "BIG5",
+        "transport": "CURL_HTTPS",
+        "outcome": "EXACT_BYTES_CONTRACT_MISMATCH",
+        "failed_checks": ["SIZE_MISMATCH", "SHA256_MISMATCH"],
+        "actual_size_bytes": len(wrong_pdf),
+        "expected_size_bytes": MODULE.EXPECTED_DIVIDEND_PDF_SIZE,
+        "actual_sha256": hashlib.sha256(wrong_pdf).hexdigest(),
+        "expected_sha256": MODULE.EXPECTED_DIVIDEND_PDF_SHA256,
+        "pdf_magic_present": True,
+    }]
+    attempt_root = tmp_path / "attempt10"
+    attempt_root.mkdir()
+    output_root = tmp_path / "out"
+    monkeypatch.setattr(sys, "argv", [
+        "route_a_605016_official_https_b2_adjudicate.py",
+        "--attempt10-root", str(attempt_root),
+        "--out-dir", str(output_root),
+    ])
+    monkeypatch.setattr(
+        MODULE, "adjudicate",
+        lambda *_args: (_ for _ in ()).throw(MODULE.OfficialDividendPdfBytesMismatch(
+            MODULE.EXPECTED_DIVIDEND_PDF_URL, "CURL_HTTPS", wrong_pdf
+        )),
+    )
+
+    assert MODULE.main() == 0
+    report = json.loads((output_root / "OFFICIAL_HTTPS_B2_ADJUDICATION_REPORT.json").read_text(encoding="utf-8"))
+    console = json.loads(capsys.readouterr().out)
+    assert report["overall_status"] == "BLOCKED_SOURCE_BYTES_MISMATCH"
+    assert report["candidate_manifest_status"] == "NOT_CREATED"
+    assert report["source_byte_diagnostics"] == diagnostics
+    assert report["raw_source_bytes_uploaded"] is False
+    assert "changed-document" not in json.dumps(report)
+    assert "sse.com.cn" not in json.dumps(report).lower()
+    assert console["status"] == "BLOCKED"
+    assert console["source_byte_diagnostics"] == diagnostics
+
+
 def test_successful_but_wrong_pdf_bytes_block_without_trying_another_host(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -290,9 +333,21 @@ def test_successful_but_wrong_pdf_bytes_block_without_trying_another_host(
 
     monkeypatch.setattr(MODULE, "fetch_https", fake_fetch)
     output = tmp_path / "followup"
-    with pytest.raises(ValueError, match="OFFICIAL_DIVIDEND_PDF_EXACT_BYTES_MISMATCH"):
+    with pytest.raises(MODULE.OfficialDividendPdfBytesMismatch) as captured:
         MODULE._recover_dividend_from_prior_canonical_adjudication(output)
 
+    assert str(captured.value) == "OFFICIAL_DIVIDEND_PDF_EXACT_BYTES_MISMATCH"
+    assert captured.value.safe_diagnostics == [{
+        "endpoint": "BIG5",
+        "transport": "PYTHON_HTTPS",
+        "outcome": "EXACT_BYTES_CONTRACT_MISMATCH",
+        "failed_checks": ["SIZE_MISMATCH", "SHA256_MISMATCH"],
+        "actual_size_bytes": len(wrong_pdf),
+        "expected_size_bytes": MODULE.EXPECTED_DIVIDEND_PDF_SIZE,
+        "actual_sha256": hashlib.sha256(wrong_pdf).hexdigest(),
+        "expected_sha256": MODULE.EXPECTED_DIVIDEND_PDF_SHA256,
+        "pdf_magic_present": True,
+    }]
     assert calls == [MODULE.DIVIDEND_PDF_HTTPS_URLS[0]]
     assert not (output / "raw" / "SSE-2026-09-22-DIVIDEND-IMPLEMENTATION.pdf").exists()
 
