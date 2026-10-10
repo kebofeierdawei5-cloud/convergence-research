@@ -194,3 +194,29 @@ def test_verifier_does_not_depend_on_collector_module():
     source = (ROOT / "tools" / "verify_company_evidence_intake.py").read_text(encoding="utf-8")
     assert "company_evidence_intake import" not in source
     assert "from tools.company_evidence_intake" not in source
+
+
+def test_capture_cli_reports_failed_source_ids_and_unregistered_refs(monkeypatch, tmp_path, capsys):
+    import sys
+
+    value = manifest(source_overrides={"local_path": "raw_input/missing.pdf"})
+    path = write_manifest(tmp_path, value)
+    input_root = tmp_path / "incoming"
+    input_root.mkdir()
+    out = tmp_path / "cli-output"
+    monkeypatch.setattr(sys, "argv", [
+        "company_evidence_intake.py",
+        "--manifest", str(path),
+        "--input-root", str(input_root),
+        "--out", str(out),
+    ])
+    code = intake.main()
+    output = json.loads(capsys.readouterr().out)
+    assert code == 4
+    assert output["status"] == "PARTIAL_CAPTURE_NOT_ADMITTED"
+    assert output["failed_sources"] == [{
+        "source_id": "SZSE-ANNOUNCEMENT-001",
+        "error_code": "LOCAL_SOURCE_FILE_NOT_FOUND",
+    }]
+    assert output["unregistered_sources"] == []
+
