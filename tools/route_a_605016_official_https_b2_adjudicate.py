@@ -46,6 +46,13 @@ DIVIDEND_PDF_HTTPS_URLS = (
     "https://www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-09-22/605016_20260922_1YLT.pdf",
 )
 DIVIDEND_PDF_ALLOWED_FINAL_URLS = frozenset(DIVIDEND_PDF_HTTPS_URLS)
+EXPECTED_DIVIDEND_LISTING_ROW = {
+    "SECURITY_CODE": "605016",
+    "SECURITY_NAME": "百龙创园",
+    "SSEDATE": "2026-09-22",
+    "TITLE": "2026年半年度权益分派实施公告",
+    "URL": "/disclosure/listedinfo/announcement/c/new/2026-09-22/605016_20260922_1YLT.pdf",
+}
 DIVIDEND_LEDGER_RELATIVE = Path(
     "evidence/real_cases/RC-CN-A-605016-20261009/DIVIDEND_IMPLEMENTATION_ADJUDICATION_20261010.json"
 )
@@ -112,6 +119,32 @@ def _safe_fetch_diagnostic(url: str, transport: str, response: dict[str, Any]) -
         "transport": transport,
         "outcome": _safe_transport_outcome(response),
     }
+
+
+def _current_listing_row_matches_canonical(dividend: dict[str, Any]) -> bool:
+    row = dividend.get("listing_row")
+    return isinstance(row, dict) and all(
+        row.get(key) == value for key, value in EXPECTED_DIVIDEND_LISTING_ROW.items()
+    )
+
+
+def _can_recover_dividend_from_prior(dividend: dict[str, Any]) -> bool:
+    listing_request = dividend.get("listing_request")
+    if not isinstance(listing_request, dict):
+        return False
+    if dividend.get("status") == "BLOCKED" and listing_request.get("status") == "BLOCKED":
+        # Existing behavior: the listing endpoint itself was transport-blocked.
+        return True
+    if (
+        dividend.get("status") == "BLOCKED_NO_VERIFIED_PDF_BYTES"
+        and listing_request.get("status") == "CAPTURED"
+        and _current_listing_row_matches_canonical(dividend)
+    ):
+        # A live listing was read, the exact expected row was matched, but none
+        # of the PDF candidates produced verified PDF bytes. Reuse only the
+        # already-pinned adjudication and re-fetch/re-hash that exact PDF.
+        return True
+    return False
 
 
 def _fetch_official_pdf_via_curl(url: str, *, referer: str) -> dict[str, Any]:
@@ -279,13 +312,7 @@ def _recover_dividend_from_prior_canonical_adjudication(
     ledger = _read_obj(ledger_path)
     source = ledger.get("source")
     fact = ledger.get("evidence_record")
-    expected_row = {
-        "SECURITY_CODE": "605016",
-        "SECURITY_NAME": "百龙创园",
-        "SSEDATE": "2026-09-22",
-        "TITLE": "2026年半年度权益分派实施公告",
-        "URL": "/disclosure/listedinfo/announcement/c/new/2026-09-22/605016_20260922_1YLT.pdf",
-    }
+    expected_row = EXPECTED_DIVIDEND_LISTING_ROW
     if ledger.get("schema_version") != "IIOS-605016-DIVIDEND-IMPLEMENTATION-ADJUDICATION-0.1":
         raise ValueError("CANONICAL_DIVIDEND_LEDGER_SCHEMA_MISMATCH")
     if ledger.get("case_id") != CASE_ID or ledger.get("cutoff_date") != CUTOFF_DATE:
@@ -520,14 +547,11 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
         combined_root = base_out / "combined-evidence-root"
         combined_manifest_path = base_out / "COMBINED_B2_CANDIDATE_MANIFEST.json"
         combined_manifest = _read_obj(combined_manifest_path)
-    elif (
-        dividend.get("status") == "BLOCKED"
-        and isinstance(dividend.get("listing_request"), dict)
-        and dividend["listing_request"].get("status") == "BLOCKED"
-    ):
-        # The SSE listing API can be unreachable from some personal networks.
-        # Reuse the repository's previously adjudicated listing/fact record while
-        # re-fetching and exact-hash-verifying the official PDF directly over HTTPS.
+    elif _can_recover_dividend_from_prior(dividend):
+        # The SSE listing API can be unreachable, or a current exact-match notice
+        # row may be available while every direct PDF response is blocked/non-PDF.
+        # Reuse the pinned listing/fact adjudication and re-fetch/re-hash the exact
+        # PDF; mismatched current notice identity does not enter this recovery path.
         dividend, prior_ledger = _recover_dividend_from_prior_canonical_adjudication(followup_root)
         base_summary, combined_root, combined_manifest = _build_base_manifest_from_prior_dividend(
             attempt10_root, base_out, followup_root, dividend, prior_ledger
