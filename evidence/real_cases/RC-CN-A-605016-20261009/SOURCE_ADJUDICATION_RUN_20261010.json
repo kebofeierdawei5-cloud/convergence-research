@@ -7,12 +7,12 @@
   "cutoff_date": "2026-10-09",
   "workflow": {
     "name": "Route A 605016 Real Source Adjudication",
-    "run_id": 38030568727,
+    "run_id": 38038481645,
     "result": "SUCCESS",
-    "head_sha": "aa3ef559c55335cd84bd38db43a0ae3975cc6ef6",
+    "head_sha": "a4752719595869f37863900fb3f2b28767d4dc45",
     "job_name": "adjudicate-real-attempt-10",
     "job_conclusion": "success",
-    "run_url": "https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38030568727"
+    "run_url": "https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38038481645"
   },
   "source_capture": {
     "workflow_run_id": 38026139364,
@@ -30,9 +30,8 @@
   "adjudication_ledger": {
     "repo_path": "evidence/real_cases/RC-CN-A-605016-20261009/SOURCE_ADJUDICATION_20261010.json",
     "source_count": 12,
-    "fact_candidate_count": 10,
-    "source_adjudication_ledger_sha256": "1bdf00e29e4845c07b2862a0a2a890826f708c60fe1cf18c09fb175b15bee02e",
-    "ledger_content_sha256_is_for": "workflow source tree at exact head aa3ef559c55335cd84bd38db43a0ae3975cc6ef6"
+    "fact_candidate_count": 11,
+    "source_adjudication_ledger_sha256": "bbf0252c4f7dcb22cb75613d9675b3fb9713d96e02872a673cadbb7f82fece0c"
   },
   "b2_gate": {
     "core_validator": "research.b2.company_evidence.build_company_evidence_manifest (unchanged)",
@@ -43,41 +42,42 @@
     "admitted_field_groups": [
       "business_reality",
       "capital_structure",
+      "corporate_disclosures",
       "financial_reality",
       "security_identity",
       "trust_governance_events"
     ],
     "missing_required_field_groups": [
-      "corporate_disclosures",
       "market_price"
     ],
     "evidence_admission": false,
     "pit_admission": false,
     "validation_errors": [
-      "EVIDENCE[605016-MEETING-CB-RESOLUTIONS-20261008]:PIT:PIT_FAIL: known_at exceeds cutoff",
       "EVIDENCE[605016-PRICE-CANDIDATE-20261009]:PIT:PIT_UNKNOWN: source availability/provenance is not established",
-      "REQUIRED_FIELD_GROUPS_UNCOVERED:corporate_disclosures,market_price"
+      "REQUIRED_FIELD_GROUPS_UNCOVERED:market_price"
     ],
-    "cutoff_semantics": "Case and intake remain date-only 2026-10-09. The unchanged core treats date-only cutoff as the start of the local date; no end-of-day reinterpretation was applied.",
-    "formal_valuation_or_decision_authorized": false
+    "cutoff_semantics": "Case and intake remain date-only 2026-10-09. The unchanged validator uses the start of the date. The same-day 2026-10-09 18:09:28+08 meeting resolution is preserved in the source ledger but excluded from the admission manifest; a 2026-09-11 pre-cutoff official disclosure covers corporate_disclosures.",
+    "formal_valuation_or_decision_authorized": false,
+    "admitted_fact_record_count": 9,
+    "excluded_after_cutoff_record_count": 1
   },
   "output_artifact": {
-    "artifact_id": 11662067708,
+    "artifact_id": 11663494596,
     "artifact_name": "route-a-605016-source-adjudication",
-    "artifact_size_bytes": 8323,
-    "artifact_sha256": "b9fb562c0b72229f588540dfe2eab99486c37eea2472a28c88f7f2713207895e",
-    "expires_at": "2026-10-24T06:20:17Z",
+    "artifact_size_bytes": 7952,
+    "artifact_sha256": "10918db5f6393a2ffd81ab4fae8a07d15ebd64fc0fd0b88eb371910ef9926294",
+    "expires_at": "2026-10-24T08:36:54Z",
     "report_filename": "SOURCE_ADJUDICATION_RUN_REPORT.json",
-    "report_sha256": "bb6df79c3f536efe1631ca3459eec5ab5eea337d5909c02585aef56ac905bd6f",
+    "report_sha256": "7370a0613f97bb6148ea8582caff94dfd6f50481449092658d44332d61943af80",
     "b2_manifest_filename": "SOURCE_ADJUDICATED_B2_CANDIDATE_MANIFEST.json",
-    "b2_manifest_sha256": "697a713704f85cb1f824a2cf68e3d27664bdd3e6388fe5b92c98d7586a20fb07"
+    "b2_manifest_sha256": "cb7f38c9d86d33145efdcb52cf5c27784d53f63927389aacd687e8deca54b480"
   },
   "decision": "BLOCKED_AS_REQUIRED",
   "next_steps": [
-    "Capture exact raw bytes of the official 2026-09-22 H1 dividend implementation notice and inspect its body.",
-    "Find and preserve an authoritative/free 2026-10-09 close-price row, then independently verify source, field/date, source vintage, PIT and reuse status.",
-    "Rerun the same unchanged B2/PIT validator; do not modify date-only cutoff semantics or required groups.",
-    "Do not run formal valuation, Decision Revision, Publication, report or Run Receipt until all seven required groups are admitted.",
-    "Production Host deployment and genuine host-origin semantic/Forecast/Valuation E2E remain separate OPEN gates."
+    "Acquire exact raw bytes for the official 2026-09-22 H1 dividend implementation notice and inspect its body; the 2026-08-31 dividend proposal is not evidence that distribution was implemented.",
+    "Identify a defensible free official or authorized 2026-10-09 close-price record, preserve exact source bytes and source terms/reuse disposition, and rerun core B2/PIT without status overrides.",
+    "The existing date-only cutoff is start-of-day; if the intended case is as-of the 2026-10-09 close, resolve this case-time contract explicitly rather than silently changing date-only semantics.",
+    "Do not run formal valuation, Decision Revision, Publication, investor report or complete Run Receipt until all seven groups are admitted.",
+    "Deploy/configure the actual Host and complete a genuine 605016 host-origin run with real semantic/Forecast/Valuation records and complete receipt replay; independent red-team acceptance remains required."
   ]
 }
