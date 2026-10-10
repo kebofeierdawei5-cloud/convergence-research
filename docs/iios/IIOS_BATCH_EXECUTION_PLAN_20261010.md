@@ -1,7 +1,7 @@
 # IIOS Batch Execution Plan — Refreshed 2026-10-10
 
 **Plan class:** execution plan / canonical-main recovery  
-**Authority baseline:** `main@e50018ffa5d8eec5909b98340ed74fe56c178344`  
+**Authority baseline:** `main@b26e3e071eec7e145c46d4bef8a6f206439be1c2`  
 **State authority:** `docs/PROJECT_STATE_INDEX.md`  
 **Purpose:** move IIOS from validated control-plane code to a real, fail-closed, single-company research run without making external LLM API credentials a Route A prerequisite.
 
@@ -17,6 +17,7 @@
 | State index sync | PR #261 / merge `0ca9ce1927da8f24e955927fd40847f70653eaf0` | State Hygiene, Investment Core CI, CORE-00 and other exact-head contract checks passed | Real case evidence admission |
 | Trusted runtime-factory hook + bounded capture | PR #262 / merge `9b017919f95b2a4e6f30c20656c58bd354f7c133` | Exact validated head `aa42e56eab7c7968c65bc6f84df0dcb6c13cc645`: 24/24 triggered workflows passed; trusted factory selector and bounded free-source capture are tested | Does not register a production runtime or admit evidence |
 | P0 runtime-binding validation | PR #264 / merge `e50018ffa5d8eec5909b98340ed74fe56c178344` | Exact validated head `32de0b1a47188e45ea38339bfdc6013b631e0672`: 16/16 triggered workflows passed; dedicated P0 test file 12/12 passed | Does not wire a production host or admit evidence |
+| P0 Batch 1 CLI host integration | PR #267 / merge `b26e3e071eec7e145c46d4bef8a6f206439be1c2` | Exact validated head `cd44c503ed2535bede25ad4a5e2f483cfb606ef4`: 13/13 dedicated P0 tests passed; CLI persists ordered stage lineage | Proves repository CLI path only; no deployed host or live LLM conformance |
 
 P0 Batch 1 exact validated head `cf7be75651d7bbb830385e0c8aabab89fd27e417` passed 34/34 triggered workflows before merge. This is code/control-plane evidence, not proof that a production host has registered a runtime. Older PRs #257 and #258 are superseded and closed.
 
@@ -49,6 +50,7 @@ Status: **MERGED / 16-OF-16 EXACT-HEAD WORKFLOWS PASS / PRODUCTION RUNTIME ACCEP
 ```text
 A. PR #262 trusted factory handoff + bounded capture (MERGED)
 A2. PR #264 runtime-binding validation across host/factory entry paths (MERGED)
+B1. PR #267 repository CLI host-route persistence integration (MERGED; control-plane only)
         |
         v
 B. Wire a trusted runtime factory into the actual user-facing host
@@ -70,7 +72,7 @@ E. Independent red-team + full Run Receipt replay
 F. MVP acceptance decision (not trade execution)
 ```
 
-**Critical path:** PR #262 + PR #264 → trusted host/runtime integration → 605016 source evidence and PIT admission → one real canonical run → independent red-team/replay.
+**Critical path:** PR #262 + PR #264 + PR #267 (CLI-only integration) → B2 production host discovery/runtime registration → 605016 source evidence and PIT admission → one real canonical run → independent red-team/replay.
 
 The 新和成 case is a parallel Route A proving ground because its real raw-source bundle and fact-extraction candidates already exist. It must not block the original 605016 P0 acceptance, and it must not be relabeled admitted merely because source capture and PDF text matching succeeded.
 
@@ -94,24 +96,39 @@ The 新和成 case is a parallel Route A proving ground because its real raw-sou
 
 ### Batch B — actual host composition and runtime-registration proof
 
-**Status:** NOT STARTED; depends on Batch A.
+**Status:** PARTIAL CONTROL-PLANE PASS / PRODUCTION HOST ACCEPTANCE OPEN.
 
-The repository contains the CLI and a deliberately empty-by-default canonical runtime registry. A trusted factory loader is only a hook; it is not itself a deployed runtime. No separate web/server/front-end deployment entry was identified in the repository tree during this refresh, so the actual supported user-facing host must be identified and verified rather than assumed.
+The repository-resident CLI command dispatcher has now been exercised end-to-end through its trusted `canonical-run` route. However, repository inspection did not identify a separate deployable web/server/front-end host. Therefore the repository CLI test is a verified slice of the host boundary, not proof that the actual product deployment calls it.
 
-**Actions**
-1. Identify the real user-facing host/entry path and document the exact handoff from natural-language request to `canonical-run`.
-2. Implement the smallest trusted composition root for that host. It must provide all required bindings: request interpreter and registry, semantic producer and producer registry, current-price resolver, independent-forecast resolver, upstream-authority resolver and valuation-output resolver.
-3. Ensure host-controlled deployment configuration selects the factory. Do not load a Python module/callable name from the user request bundle or case JSON.
-4. Add a host-level integration test that uses a new test run ID and verifies the persisted Run Envelope and stage receipts. Keep test-only producers clearly typed and inadmissible as production evidence.
-5. If the host cannot invoke a genuine model callback, explicitly report the semantic stage as BLOCKED/NOT_RUN. A manually supplied expert artifact or fixture is not live LLM conformance.
+#### Batch B1 — repository CLI host integration
 
-**Pass criteria**
-- A user request through the actual host reaches `canonical-run`, not legacy `run` or `run_case` directly;
-- a trusted runtime is registered for the process and all mandatory bindings are present;
-- runtime binding and producer identity/version/input-output lineage are persisted and replay-verifiable;
-- no host integration test relies on fixture outputs to claim production semantic conformance.
+**Status:** MERGED / EXACT-HEAD P0 WORKFLOW PASS.
 
-**Credential boundary:** no LLM API key is required for public-source discovery, raw evidence capture or B2/PIT validation. A real model-runtime callback is necessary to claim that a live natural-language-to-semantic reasoning stage passed. If the deployed host has no usable model callback, report that as a separately blocked integration, not a reason to reintroduce paid credentials into Route A.
+- PR #267 merged at `b26e3e071eec7e145c46d4bef8a6f206439be1c2`.
+- Exact accepted head: `cd44c503ed2535bede25ad4a5e2f483cfb606ef4`.
+- Dedicated P0 workflow passed **13/13 tests**, including `tests/test_canonical_cli_host_integration.py`; module compile and `git diff --check` passed. The additional triggered FM01 exact-source workflow also passed.
+- The new test invokes `iios_mvp.cli.main()`, calls `canonical-run`, uses a fresh run ID, resolves the trusted factory from the CLI argument, and validates the persisted Run Envelope and ordered receipts through `HUMAN_APPROVAL_PENDING`.
+- Test-only semantic/evidence inputs are explicitly marked `TEST_ONLY`; no report or complete Run Receipt is emitted by the CLI step itself.
+
+This closes the repository-CLI route/persistence integration test gap only.
+
+#### Batch B2 — production host discovery and runtime registration
+
+**Status:** BLOCKED — ACTUAL DEPLOYABLE HOST / PRODUCTION CALLBACK NOT IDENTIFIED IN REPOSITORY.
+
+**Remaining actions**
+1. Identify the actual app/service that receives the user request outside this repository; inspect its launch/deployment entry and determine whether this repo's CLI can be invoked within that host. Do not assume the CLI is the deployed ChatGPT/product host.
+2. Wire the real host to `canonical-run`, not legacy `run` or direct `run_case`; source the factory selector from trusted deployment configuration, never request JSON.
+3. Register genuine request interpreter, semantic producer and the four canonical resolvers. Require exact producer ID/type/version/policy and input/output lineage. If the host has no genuine semantic/model callback, record the semantic stage `BLOCKED/NOT_RUN`.
+4. Prove a host-level fresh run through persisted envelope/stage receipts, then perform a real-company run after evidence and forecast/valuation admission. Fixture runs cannot satisfy this production gate.
+
+**Pass criteria remaining**
+- The actual deployed host reaches `canonical-run` and uses an approved process runtime.
+- Genuine runtime bindings and producer identity/version/input-output lineage are persistent and replay-verifiable.
+- The host path is shown not to bypass exact-byte B2 Evidence/PIT, Forecast/Valuation or Decision Admission.
+- No fixture or manually supplied artifact is represented as live semantic conformance.
+
+**Credential boundary:** public-source discovery, raw evidence capture and B2/PIT validation do not need a paid search or LLM API key. A live semantic stage requires a genuine model callback or another explicitly admitted production-origin semantic receipt. Do not reintroduce external API credentials as a prerequisite for Route A data intake.
 
 ### Batch C1 — actual 605016 (百龙创园) source bundle and B2/PIT admission
 
@@ -211,8 +228,8 @@ The red-team must test both negative bypasses and one end-to-end positive real c
 
 ## 5. Immediate execution order
 
-1. Batch A and P0 runtime-binding validation are complete: PR #262 passed 24/24 exact-head workflows; PR #264 passed 16/16, including 12/12 dedicated P0 regression tests. Do not treat either result as production-runtime acceptance.
-2. Begin Batch B: wire the trusted factory into the actual user-facing host and prove the host calls `canonical-run`; a loader and valid binding interface alone are not a registered production runtime.
-3. Start C1's 605016 official/free evidence bundle as the primary critical path; run C2's Xinhecheng source adjudication in parallel.
+1. Batch A, P0 runtime-binding validation and Batch B1 CLI integration are merged: PR #262 passed 24/24, PR #264 passed 16/16, and PR #267 passed 13/13 dedicated P0 tests. These do not prove production runtime acceptance.
+2. Batch B2 remains blocked on identifying the actual deployable host and genuine production callback; do not label the repository CLI test as deployed-host conformance.
+3. Continue C1's 605016 official/free evidence bundle as the primary data critical path; run C2's Xinhecheng source adjudication in parallel.
 4. Only after source groups and PIT admission pass, execute D1/D2 canonical real runs and receipt replay.
 5. Finish with independent red-team and explicit MVP acceptance; keep P0-LLM-001/P0-LLM-004 OPEN until production-backed semantic conformance is proved.
