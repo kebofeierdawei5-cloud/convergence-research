@@ -58,7 +58,7 @@
     "validator": "research.b2.company_evidence.build_company_evidence_manifest (unchanged)",
     "scope": "EPHEMERAL_CANDIDATE_MANIFEST_ONLY",
     "candidate_manifest_status": "PASS",
-    "candidate_manifest_sha256": "7eb1106c2b6e746fc6b257b041b408c365d62733f82b036ad3717a54eb41b",
+    "candidate_manifest_sha256": "7eb1106c2b6e746fc6b257b041b408c365d62733f33f82b036ad3717a54eb41b",
     "evidence_record_count": 11,
     "admitted_record_count": 11,
     "admitted_field_groups": [
