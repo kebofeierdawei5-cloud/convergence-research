@@ -11,15 +11,15 @@ from research.b2.company_evidence import (
     build_company_evidence_manifest,
     verify_raw_artifact,
 )
-from research.b2.evidence_contract import assert_pit, validate_evidence_record
+from research.b2.evidence_contract import assert_pit, parse_temporal, validate_evidence_record
 
 EXPECTED_BLOCKERS = (
-    "EVIDENCE[605016-MEETING-CB-RESOLUTIONS-20261008]:PIT:PIT_FAIL: known_at exceeds cutoff",
     "EVIDENCE[605016-PRICE-CANDIDATE-20261009]:PIT:PIT_UNKNOWN: source availability/provenance is not established",
-    "REQUIRED_FIELD_GROUPS_UNCOVERED:corporate_disclosures,market_price",
+    "REQUIRED_FIELD_GROUPS_UNCOVERED:market_price",
 )
 EXPECTED_ADMITTED_GROUPS = {
     "security_identity",
+    "corporate_disclosures",
     "business_reality",
     "financial_reality",
     "capital_structure",
@@ -142,6 +142,8 @@ def adjudicate(input_dir: Path, out_dir: Path) -> dict[str, Any]:
     evidence: list[dict[str, Any]] = []
     raw_artifacts: list[dict[str, Any]] = []
     unknown_count = 0
+    excluded_after_cutoff: list[dict[str, Any]] = []
+    cutoff_instant = parse_temporal(str(ledger["cutoff_date"]), "cutoff_date")
     for candidate in candidates:
         if not isinstance(candidate, Mapping):
             raise ValueError("EVIDENCE_CANDIDATE_MUST_BE_OBJECT")
@@ -154,6 +156,19 @@ def adjudicate(input_dir: Path, out_dir: Path) -> dict[str, Any]:
             raise ValueError(f"EVIDENCE_CANDIDATE_SOURCE_NOT_CAPTURED:{source_id}")
 
         evidence_id = str(candidate["evidence_id"])
+        known_at_value = candidate.get("known_at")
+        if known_at_value:
+            try:
+                if parse_temporal(known_at_value, "known_at") > cutoff_instant:
+                    excluded_after_cutoff.append({
+                        "evidence_id": evidence_id,
+                        "source_id": source_id,
+                        "known_at": known_at_value,
+                        "reason": "KNOWN_AT_AFTER_ORIGINAL_DATE_ONLY_CUTOFF",
+                    })
+                    continue
+            except ValueError as exc:
+                raise ValueError(f"INVALID_CANDIDATE_KNOWN_AT:{evidence_id}") from exc
         raw_path = str(source_receipt["raw_artifact_path"])
         raw_sha = str(source_receipt["sha256"])
         source_status = str(candidate["status"])
@@ -232,13 +247,15 @@ def adjudicate(input_dir: Path, out_dir: Path) -> dict[str, Any]:
     missing_groups = sorted(set(REQUIRED_COMPANY_FIELD_GROUPS) - actual_admitted_groups)
 
     # Expected outcome is a real fail-closed result, not overall PASS:
-    # five groups are covered by source-adjudicated facts. The same-day meeting
-    # resolution fails the current date-only cutoff, and market price remains
-    # UNKNOWN. No cutoff semantics or core B2/PIT rule is modified here.
+    # six groups have eligible source-adjudicated facts, while price remains
+    # UNKNOWN. Same-day facts with known_at after the original date-only cutoff
+    # are kept in the source ledger but excluded from the B2 candidate manifest.
     if manifest.get("status") != "BLOCKED":
-        raise AssertionError(f"B2_MUST_REMAIN_BLOCKED_BY_CURRENT_PIT_GATES:{manifest.get('status')}")
-    if missing_groups != ["corporate_disclosures", "market_price"]:
+        raise AssertionError(f"B2_MUST_REMAIN_BLOCKED_UNTIL_PRICE_ADMISSION:{manifest.get('status')}")
+    if missing_groups != ["market_price"]:
         raise AssertionError(f"UNEXPECTED_MISSING_GROUPS:{missing_groups}")
+    if len(excluded_after_cutoff) != 1 or excluded_after_cutoff[0]["evidence_id"] != "605016-MEETING-CB-RESOLUTIONS-20261008":
+        raise AssertionError(f"UNEXPECTED_AFTER_CUTOFF_EXCLUSIONS:{excluded_after_cutoff}")
     if actual_admitted_groups != EXPECTED_ADMITTED_GROUPS:
         raise AssertionError(f"UNEXPECTED_ADMITTED_GROUPS:{sorted(actual_admitted_groups)}")
     if errors != list(EXPECTED_BLOCKERS):
@@ -261,6 +278,8 @@ def adjudicate(input_dir: Path, out_dir: Path) -> dict[str, Any]:
         "fact_record_count": len(evidence),
         "admitted_fact_record_count": len([item for item in evidence if item.get("status") == "ADMITTED"]),
         "explicit_unknown_fact_record_count": unknown_count,
+        "excluded_after_cutoff_fact_record_count": len(excluded_after_cutoff),
+        "excluded_after_cutoff_fact_records": excluded_after_cutoff,
         "admitted_field_groups": sorted(actual_admitted_groups),
         "missing_required_field_groups": missing_groups,
         "core_b2_validator": "research.b2.company_evidence.build_company_evidence_manifest (unchanged)",
@@ -268,8 +287,8 @@ def adjudicate(input_dir: Path, out_dir: Path) -> dict[str, Any]:
         "evidence_admission": False,
         "pit_admission": False,
         "validation_errors": errors,
-        "decision": "BLOCKED_AS_REQUIRED: corporate_disclosures fails the unchanged date-only cutoff semantics and market_price remains UNKNOWN; no valuation, Decision Revision, Publication, report or complete Run Receipt may be produced.",
-        "cutoff_semantics_note": "The unchanged core parses date-only cutoff 2026-10-09 as the start of that day. The 2026-10-09 18:09:28+08 meeting-disclosure known_at therefore fails PIT; no end-of-day reinterpretation was applied.",
+        "decision": "BLOCKED_AS_REQUIRED: market_price remains UNKNOWN; no valuation, Decision Revision, Publication, report or complete Run Receipt may be produced.",
+        "cutoff_semantics_note": "The unchanged core parses date-only cutoff 2026-10-09 as the start of that day. The same-day 18:09:28+08 meeting resolution is retained in the source ledger but excluded from the admission manifest; a pre-cutoff 2026-09-11 official disclosure covers corporate_disclosures. No end-of-day reinterpretation was applied.",
         "raw_sources": raw_verification,
         "evidence_manifest_path": str(manifest_path.name),
         "non_claims": [
