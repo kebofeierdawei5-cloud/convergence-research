@@ -30,7 +30,7 @@ B2-F Full Independent Red-team                          PASS / CANONICAL
 
 **The company-level Investment Core MVP does NOT require an external LLM provider endpoint, paid search API, or API key.** Free-first Route A remains independent of optional provider integration. The remaining critical gates are production-runtime registration/deployment and actual source-by-source Evidence/PIT admission.
 
-- Batch B: the first-party loopback-first HTTP host is now implemented in canonical main (PR #270) with 21/21 dedicated host contract tests. It is **not yet a deployed/production-accepted host**: a trusted runtime factory and genuine semantic callback must be provisioned, and a real host-origin run must be replay-verified.
+- Batch B: the first-party loopback-first HTTP host is implemented in canonical main (PR #270; dedicated host contract 21/21). Trusted runtime factory implementation is now also merged in PR #274 (`a62e2304983cbdf28f0365f7fd55f53378c4adab`), exact head `14105076b1b69f626907e4eb8bdddf0893d84c23`, with 8/8 exact-head checks passing. It wires genuine provider-backed request/semantic producers plus read-only canonical admission resolvers, pins the Ed25519 runtime public key, and deliberately refuses synthetic upstream admissions. It is still **not a deployed/production-accepted host**: no real provider endpoint, secret/keypair, durable canonical admission store, or real host-origin run has been provisioned/replay-verified.
 - Primary C1 case: `RC-CN-A-605016-20261009` remains blocked on source-origin/PIT admission, not transport. Current-main refresh PR #272 merged at `2978cdbc3f76f1ab1596896e3425c75661144a57`; Attempt 10 run #38026139364 / artifact #11660285551 captured 12/12 sources, independent byte/hash verification 12/12, payload contract 12/12, zero transport failures. Source origin remains unverified, one source has unknown PIT timing, all seven required groups remain uncovered, and Evidence/PIT admission remains false.
 - Parallel C2 case: 新和成 (002001.SZ) still requires source-by-source B2/PIT adjudication, missing-field capture and authoritative 2026-10-09 market-price evidence.
 - A successful CI, byte hash, URL/title match, or payload format check is not source-origin proof or PIT admission.
@@ -49,6 +49,18 @@ Status: **HOST CODE MERGED / DEDICATED CONTRACT PASS / PRODUCTION RUNTIME + DEPL
 - Security defaults: loopback binding, bearer token of at least 32 characters, no shell for subprocess execution, no stderr disclosure; remote bind requires explicit opt-in and declared TLS termination.
 - `/readyz` is deliberately `CONFIGURED_NOT_PRODUCTION_ACCEPTED`. Host CI proves implementation/control-flow boundaries only, not a deployed service, real runtime factory, live semantic response or company decision quality.
 - P0-LLM-001 / P0-LLM-004 remain **OPEN** until a configured/deployed host executes a real company run with admitted evidence, authentic semantic/forecast/valuation lineage, report/publication, Run Receipt replay and independent red-team.
+
+### P0 Batch B2 — Trusted runtime factory implementation — 2026-10-10
+
+Status: **FACTORY CODE MERGED / EXACT-HEAD CONTRACT + RED-TEAM PASS / DEPLOYMENT AND REAL-RUNTIME ACCEPTANCE OPEN**.
+
+- PR #274 merged at `a62e2304983cbdf28f0365f7fd55f53378c4adab`; exact validated PR head `14105076b1b69f626907e4eb8bdddf0893d84c23`.
+- Exact-head checks: 8/8 success, including the dedicated `factory-contract` workflow, Investment Core CI, PILOT, authority threat reproduction and independent red-team.
+- Factory entrypoint: `iios_mvp.canonical_runtime_factory_v01:build_canonical_runtime`; configure only through trusted process/deployment configuration, never request JSON.
+- The factory composes the eight validated bindings using the existing live Responses-compatible provider client, strict JSON request/semantic outputs, raw signed provider-response receipt persistence/verification, pinned Ed25519 public-key configuration, and read-only case/cutoff/domain-bound current-price, forecast, upstream-admission and valuation resolvers.
+- No factory path writes or fabricates upstream ADMITTED price/forecast/quality/valuation records. Missing/corrupt/mismatched admission records fail closed. No paid API key is required only when a compatible self-hosted provider is genuinely deployed behind HTTPS with `AUTH_MODE=NONE`; no provider is called by CI.
+- The provider runtime factory contract does not admit the 605016 source capture, deploy the host or create economic evidence. Production acceptance still requires the operator to configure a real provider, provision the signed keypair and durable admission store, deploy the host, then pass an actual real-company Evidence/PIT → semantic/forecast/valuation → report/Run Receipt replay → independent red-team run.
+- P0-LLM-001/P0-LLM-004 remain **OPEN**; host/factory CI is not live semantic conformance.
 
 ### Route A C1 — 605016 canonical-main capture refresh — 2026-10-10
 
