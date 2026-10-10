@@ -32,7 +32,7 @@ jobs:
           path: /tmp/605016-attempt10
       - name: Re-verify actual source bytes and run unchanged B2/PIT validator
         run: |
-          python tools/route_a_605016_adjudicate.py \
+          PYTHONPATH=. python tools/route_a_605016_adjudicate.py \
             --input-run-dir /tmp/605016-attempt10 \
             --out-dir /tmp/605016-adjudication-output
       - name: Preserve only the machine-readable adjudication result (never source-document bytes)
