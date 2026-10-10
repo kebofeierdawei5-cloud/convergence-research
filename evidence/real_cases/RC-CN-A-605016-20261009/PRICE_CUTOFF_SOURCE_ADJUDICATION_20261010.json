@@ -62,5 +62,30 @@
     "date_error_reconciliation": "The 20.73 CNY entry belongs to 2026-09-29, not 2026-10-09."
   },
   "b2_decision": "MARKET_PRICE_REMAINS_UNKNOWN_AND_BLOCKED",
-  "next_admissible_path": "Obtain the official row through an HTTPS source that satisfies the current intake contract, or independently adjudicate a permitted source with source vintage/reuse terms and PIT basis. Do not admit the plain-HTTP response or shift the date-only cutoff."
+  "next_admissible_path": "Obtain the official row through an HTTPS source that satisfies the current intake contract, or independently adjudicate a permitted source with source vintage/reuse terms and PIT basis. Do not admit the plain-HTTP response or shift the date-only cutoff.",
+  "latest_capture_attempt": {
+    "run_id": 38039572043,
+    "run_head": "8fd654ad26ef3671a7d2ba94b3ee0785587e0d40",
+    "artifact_id": 11664868356,
+    "artifact_zip_sha256": "5567217818f06a2d7e6df5e419d08fa6792bb8cf1a2faf3ac876286bfb340f2c",
+    "result": "SUCCESSFUL_CAPTURE_JOB_WITH_PRICE_REMAINING_BLOCKED",
+    "secure_transport_verified": false,
+    "https_attempts": [
+      {
+        "url": "https://yunhq.sse.com.cn/v1/sh1/dayk/605016?begin=20261008&end=20261008&select=date,open,high,low,close,volume,amount",
+        "result": "NETWORK_UNREACHABLE"
+      },
+      {
+        "url": "https://yunhq.sse.com.cn:32041/v1/sh1/dayk/605016?begin=20261008&end=20261008&select=date,open,high,low,close,volume,amount",
+        "result": "SSL_WRONG_VERSION_NUMBER"
+      },
+      {
+        "url": "https://query.sse.com.cn/marketdata/tradedata/data/stockDailyTransData.do?isPagination=false&productId=605016&startDate=2026-10-08&endDate=2026-10-08",
+        "result": "HTTP_404"
+      }
+    ],
+    "http_payload_size_bytes": 124,
+    "http_payload_sha256": "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480",
+    "data_row_matches_previous_capture": true
+  }
 }
