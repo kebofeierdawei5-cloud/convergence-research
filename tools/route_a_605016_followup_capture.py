@@ -401,7 +401,7 @@ def eastmoney_terms_capture(root: Path) -> dict[str, Any]:
         title = re.sub(r"<[^>]+>", " ", label)
         title = re.sub(r"\\s+", " ", title).strip()
         if re.search(r"免责声明|法律|版权|使用协议|服务协议|用户协议|隐私|数据授权|网站声明", title):
-            url = urljoin(home_url, html_unescape(title) if False else href.strip())
+            url = urljoin(home_url, href.strip())
             if url.startswith("https://") and all(url != old[0] for old in terms_candidates):
                 terms_candidates.append((url, title))
     record["candidate_links"] = [{"url": u, "label": title} for u, title in terms_candidates[:12]]
