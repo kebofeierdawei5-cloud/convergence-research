@@ -137,6 +137,35 @@ def test_declared_pdf_with_real_pdf_magic_passes_payload_contract(tmp_path):
     assert verification["payload_contract_mismatches"] == 0
 
 
+def test_source_fetch_has_per_source_deadline_and_short_read_timeout(monkeypatch):
+    import io
+    from types import SimpleNamespace
+
+    called = {}
+
+    class FakeResponse:
+        status = 200
+        headers = {"Content-Type": "application/pdf"}
+
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def read(self, n=-1):
+            raise AssertionError("deadline should be enforced before an unbounded read")
+
+    class FakeOpener:
+        def open(self, request, timeout):
+            called["timeout"] = timeout
+            return FakeResponse()
+
+    ticks = iter([100.0, 119.0])
+    monkeypatch.setattr(intake, "build_opener", lambda handler: FakeOpener())
+    monkeypatch.setattr(intake.time, "monotonic", lambda: next(ticks))
+    with pytest.raises(intake.SourceCaptureError, match="SOURCE_FETCH_DEADLINE_EXCEEDED"):
+        intake._fetch_url("https://example.com/report.pdf")
+    assert called["timeout"] == 8
+    assert intake.MAX_SOURCE_CAPTURE_SECONDS == 18
+
+
 def test_expected_pdf_http_200_gzip_html_challenge_is_retained_but_payload_blocked(monkeypatch, tmp_path):
     import gzip
 
