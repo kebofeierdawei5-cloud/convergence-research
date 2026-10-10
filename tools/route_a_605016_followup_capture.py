@@ -157,24 +157,38 @@ def official_dividend_capture(root: Path) -> dict[str, Any]:
     if not link:
         report["status"] = "BLOCKED_PDF_URL_NOT_FOUND_IN_OFFICIAL_LISTING"
         return report
-    pdf = fetch(link, referer="https://www.sse.com.cn/disclosure/listedinfo/announcement/index.shtml")
-    first_response = {k: v for k, v in pdf.items() if k != "bytes"}
-    report["pdf_fetch_attempts"] = [first_response]
-    if pdf.get("status") == "CAPTURED" and not pdf["bytes"].startswith(b"%PDF-"):
-        # Some SSE announcement routes return a compressed HTML challenge despite HTTP 200.
-        # Preserve those bytes with the actual response type, then try the static SSE PDF CDN
-        # derived from the official listing's exact document basename.
-        save_bytes(root, "raw/SSE-2026-09-22-announcement-route-response.bin", pdf["bytes"])
-        match = re.search(r"(605016_20260922_[A-Za-z0-9]+\\.pdf)$", link)
-        if match:
-            static_url = "https://static.sse.com.cn/stock/disclosure/announcement/c/202609/" + match.group(1)
-            retry = fetch(static_url, referer="https://www.sse.com.cn/disclosure/listedinfo/announcement/index.shtml")
-            report["static_cdn_url"] = static_url
-            report["pdf_fetch_attempts"].append({k: v for k, v in retry.items() if k != "bytes"})
-            pdf = retry
-    if pdf.get("status") != "CAPTURED":
-        report["status"] = "BLOCKED_PDF_FETCH_FAILED"
+    basename = str(link).rsplit("/", 1)[-1]
+    static_url = "https://static.sse.com.cn/stock/disclosure/announcement/c/202609/" + basename
+    big5_url = "https://big5.sse.com.cn/site/cht/www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-09-22/" + basename
+    report["pdf_fetch_attempts"] = []
+    chosen = None
+    for index, candidate_url_value in enumerate([link, static_url, big5_url]):
+        response = fetch(candidate_url_value, referer="https://www.sse.com.cn/disclosure/listedinfo/announcement/index.shtml")
+        report["pdf_fetch_attempts"].append({k: v for k, v in response.items() if k != "bytes"})
+        if response.get("status") != "CAPTURED":
+            continue
+        body = response["bytes"]
+        if body.startswith(b"%PDF-"):
+            chosen = response
+            break
+        save_bytes(root, f"raw/SSE-2026-09-22-response-{index}.bin", body)
+        report.setdefault("non_pdf_responses", []).append({
+            "url": candidate_url_value,
+            "raw_size_bytes": len(body),
+            "raw_sha256": sha256(body),
+            "classification": "EXPECTED_PDF_BUT_RECEIVED_NON_PDF_BYTES",
+        })
+    if chosen is None:
+        report["status"] = "BLOCKED_NO_VERIFIED_PDF_BYTES"
         return report
+    body = chosen["bytes"]
+    save_bytes(root, "raw/SSE-2026-09-22-DIVIDEND-IMPLEMENTATION.pdf", body)
+    report["final_pdf_url"] = chosen["url"]
+    report["pdf_capture"] = {k: v for k, v in chosen.items() if k != "bytes"}
+    report["pdf_magic"] = body[:8].decode("ascii", errors="replace")
+    report["status"] = "RAW_PDF_CAPTURED_NOT_ADMITTED"
+    report["important_limit"] = "Captured raw bytes still require independent body/date/fact-locator and reuse adjudication."
+    return report
     body = pdf["bytes"]
     if not body.startswith(b"%PDF-"):
         save_bytes(root, "raw/SSE-2026-09-22-dividend-response-not-pdf.bin", body)
