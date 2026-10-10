@@ -93,6 +93,15 @@ The request was incremented to attempt 4 after the payload-type gate landed. App
 
 This is the first run that simultaneously has bounded source retrieval and correctly recognizes the uppercase `%PDF-` signature. It proves the network hang is remediated and that the previous count “12/12 documents” was too strong: it was 12/12 response bodies. Eight of the nine PDF-declared SSE candidates are still HTML challenge payloads. The one real PDF and three HTML pages remain only raw candidates; none is yet an admitted fact.
 
+## Attempt 9 — alternative official SSE delivery host
+
+The previous exact-head capture proved that eight PDF-declared static-host URLs returned HTML challenges while the separately named convertible-bond prospectus URL returned valid PDF bytes. To avoid simply repeating those failed network locators, the eight mismatching official-exchange candidates are now routed through SSE's indexed international-host file path:
+
+`https://big5.sse.com.cn/site/cht/www.sse.com.cn/...`
+
+- This is a transport/locator substitution under the same official-exchange provenance class; it does **not** alter expected payload type (`PDF`), known-at candidates, license status, or admission rules.
+- The old `static.sse.com.cn` attempts and their raw hashes remain preserved above; the manifest now contains the new current candidate URLs.
+- Workflow request is incremented to attempt 9. The only success criterion for this retry is actual PDF magic and independent raw verification; HTTP 200 / HTML must remain `MISMATCH`. B2/PIT stays fail-closed.
 ## Explicit gate boundary
 
 All captured facts remain `NOT_ADMITTED` until issuer/exchange origin, known-at basis, license/reuse status, field-level locator, source-vintage and B2/PIT validation are independently reviewed. All seven required groups remain uncovered for decision purposes; no valuation, formal Decision Revision, publication or report is authorized by this capture record.
