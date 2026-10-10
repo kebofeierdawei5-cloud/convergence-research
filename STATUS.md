@@ -6,6 +6,14 @@ Date: 2026-10-10
 Authoritative current-state record:
 `docs/PROJECT_STATE_INDEX.md`
 
+## Latest 605016 local persistence status — 2026-10-10
+
+The official SSE HTTPS price source now passes the unchanged B2/PIT gate in an ephemeral workflow run (#38050190177): 7/7 required groups, zero missing groups. This is **not** durable canonical admission. PR #300/#301 delivered the local private persistence tool and real Core-validator contract; PR #302 fixes the operator-reported SSE listing API `BLOCKED` error by reusing the previously canonical-adjudicated dividend listing/fact record and re-fetching the exact PDF over HTTPS with size/hash verification. The fallback explicitly records that the listing raw bytes were not re-fetched in the current run. Contract tests passed 11/11 on exact head, and PR #302 is merged.
+
+**Next action:** rerun the same local `Launch_IIOS_Private_605016_B2_Ingest.command`; it clones current canonical main. A local private persistence pass still does not mean signed admission, production Host acceptance, formal Decision/Report/Run Receipt or trade authorization. Exact first-public timestamp review remains open.
+
+Authoritative next-step detail is in `docs/PROJECT_STATE_INDEX.md`.
+
 ## Latest P0 status — 2026-10-10
 
 P0 Batch B3 is merged in PR [#276](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/276), merge commit `d3582621918b285f29b4573c2618c1072247885c`. Formal Decision Revision, Publication and Report writers now revalidate persisted upstream admissions and fail closed when those bytes are missing.
