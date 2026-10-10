@@ -18,7 +18,13 @@ def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+@pytest.fixture(autouse=True)
+def _patch_expected_price_hash(monkeypatch):
+    monkeypatch.setattr(MODULE, "EXPECTED_PRICE_RAW_SHA256", RAW_SHA)
+
+
 def _input_root(tmp_path: Path) -> Path:
+    (tmp_path / "repo").mkdir(exist_ok=True)
     root = tmp_path / "attempt10"
     root.mkdir()
     _write_json(root / "intake_manifest.json", {
@@ -121,7 +127,11 @@ def _fake_core_validator(manifest, *, raw_root, require_raw_verification):
         errors.append("MANIFEST_STATUS_NOT_PASS")
     if manifest.get("validation_errors") != []:
         errors.append("MANIFEST_ERRORS_PRESENT")
+    evidence_by_id = {item["evidence_id"]: item for item in manifest.get("evidence", [])}
     for declaration in manifest.get("raw_artifacts", []):
+        evidence = evidence_by_id.get(declaration["evidence_id"])
+        if evidence is None or evidence.get("content_sha256") != declaration["expected_sha256"]:
+            errors.append("EVIDENCE_HASH_BINDING_MISMATCH")
         path = raw_root / declaration["relative_path"]
         if not path.is_file():
             errors.append("RAW_ARTIFACT_MISSING")
@@ -202,9 +212,8 @@ def test_core_validator_blocked_creates_no_private_store(tmp_path: Path) -> None
 
 
 def test_rejects_private_root_inside_public_repository_before_ingest(tmp_path: Path) -> None:
-    repo = tmp_path / "repo"
-    repo.mkdir()
     input_root = _input_root(tmp_path)
+    repo = tmp_path / "repo"
     called = False
 
     def should_not_run(*_args, **_kwargs):
