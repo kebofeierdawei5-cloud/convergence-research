@@ -120,6 +120,25 @@ Non-claims:
 
 Next development batch remains **Batch B — actual host composition and runtime-registration proof**. The registry deliberately remains empty by default; no new default runtime or fallback was introduced.
 
+
+### P0 Batch 1 — Repository CLI Host Integration — 2026-10-10
+
+Status: **MERGED / CONTROL-PLANE INTEGRATION PASS / PRODUCTION HOST ACCEPTANCE OPEN**
+
+- Canonical promotion: PR #267 merged; merge commit `b26e3e071eec7e145c46d4bef8a6f206439be1c2`.
+- Exact validated PR head: `cd44c503ed2535bede25ad4a5e2f483cfb606ef4`.
+- Dedicated P0 workflow: **13 / 13 tests passed**, including the new host-level CLI integration; module compile and diff check passed. The additional triggered FM01 exact-source workflow also passed.
+- The integration test invokes the real `iios_mvp.cli.main()` dispatcher with `canonical-run`, a fresh run ID and a trusted test-only factory. It verifies a persisted Run Envelope and ordered stage receipts through `HUMAN_APPROVAL_PENDING`, with `human_approval_required=true` and `auto_execution=false`.
+- It expressly asserts that the CLI run does not itself publish a report or create a complete Run Receipt. The semantic producer and evidence rows are deterministic `TEST_ONLY` fixtures.
+
+Non-claims:
+- This proves repository-resident CLI control-plane routing/persistence only.
+- Repository inspection did not find a separate deployable web/server/front-end entry point; no external product-host integration was demonstrated.
+- No production factory or live semantic/model callback was installed. Real 605016 Evidence/PIT admission remains a separate critical path.
+- P0-LLM-001 / P0-LLM-004 remain **OPEN** until the real host is identified and wired, genuine runtime identity is independently verified, and a real-company run passes evidence/semantic/forecast/valuation admission, publication/report/receipt replay and independent red-team.
+
+Next boundary: **Batch B2 — production host identification and trusted runtime registration**. Do not call Batch B fully complete because Batch B1 is merged.
+
 ### Retained B2-D integration history (optional, non-blocking)
 
 B2-D canonical refresh is now merged in PR #215 (merge `b32c9203b5a7baf729cdff2090bb4e54237a177c`) from the post-State-Hygiene canonical main. The old pre-hygiene PR #212 is closed and is not an admissible development base.
@@ -147,7 +166,7 @@ Therefore:
 
 ### Current next development batch
 
-**Current execution plan:** `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md`, refreshed against `main@e50018ffa5d8eec5909b98340ed74fe56c178344`. Batch A and PR #264 runtime-binding hardening are complete (PR #262: 24/24; PR #264: 16/16 exact-head workflows PASS). The active batch is **Batch B — actual host composition and runtime-registration proof**. The primary critical path remains the real 605016 P0 case, with Route A / 新和成 (002001.SZ) fact-source adjudication in parallel. The plan keeps unadmitted facts UNKNOWN and does not make Route A depend on an API key.
+**Current execution plan:** `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md`, refreshed against `main@b26e3e071eec7e145c46d4bef8a6f206439be1c2`. Batch A and runtime-binding validation are complete (PR #262: 24/24; PR #264: 16/16 exact-head workflows PASS). **Batch B1 — repository CLI host integration — is merged** (PR #267, 13/13 dedicated P0 tests and workflow checks PASS). Batch B2 remains blocked on identifying a real deployable user-facing host and registering a genuine production runtime; a repository-level CLI test is not proof of an external app deployment or live LLM. Continue C1's real 605016 evidence chain as the primary data critical path and source-adjudication for 新和成 (002001.SZ) in parallel. Unadmitted facts remain UNKNOWN; Route A does not depend on API credentials.
 
 The primary Investment Core MVP path is **Route A — free-first single-company evidence intake + public web discovery**. No LLM provider endpoint or API key is required for this Route A path. Public-web discovery, public-source capture, B2 preflight and artifact retention all run without an external LLM endpoint, paid search API or API key. Operator-supplied raw originals and manually supplied evidence remain supported when public URLs are unavailable or source bytes need to be supplied directly. B2-D remains an optional external-LLM integration adapter and is not an MVP gate.
 
