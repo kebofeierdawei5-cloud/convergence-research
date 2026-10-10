@@ -125,6 +125,16 @@ The previous exact-head capture proved that eight PDF-declared static-host URLs 
 
 The fresh current-main run is Attempt 10. It must produce a new artifact/receipt bound to the newer code and is the only result to use for current-main verification.
 
+## Attempt 10 — exact capture result against canonical-main code
+
+- Workflow run: [38026139364](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38026139364); branch head `6afeb1fd02cf944d14179c7408c817b11e153658`.
+- Workflow result: SUCCESS; raw capture step, independent verifier, B2 preflight, artifact upload and final capture gate all completed successfully.
+- Artifact: [11660285551](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38026139364/artifacts/11660285551), `iios-company-evidence-38026139364`, 8,526,921 bytes; artifact retained temporarily under the 14-day policy.
+- Exact-byte result: 12/12 source bodies captured; 0 failed sources; 0 unregistered source refs; 12/12 independent size/SHA-256 checks passed.
+- Payload contract: 12 checked, 12 passes, 0 mismatches. Intake status `CAPTURED_NOT_ADMITTED`; independent verifier status `INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION`; source origin verified = false; one source has unknown PIT timing.
+- B2 preflight: `BLOCKED_NOT_ADMITTED`; 12 candidates; all seven required field groups remain missing; evidence admission false; PIT admission false.
+- Final gate: `CAPTURE_COMPLETE_NOT_ADMITTED`. This means the network/capture integrity issue is remediated on current-main code. It does **not** mean 12 admissible source facts. No formal Decision Revision, valuation, publication, report or Run Receipt is authorized.
+
 ## Explicit gate boundary
 
 All captured facts remain `NOT_ADMITTED` until issuer/exchange origin, known-at basis, license/reuse status, field-level locator, source-vintage and B2/PIT validation are independently reviewed. All seven required groups remain uncovered for decision purposes; no valuation, formal Decision Revision, publication or report is authorized by this capture record.
