@@ -13,6 +13,7 @@ from tools.prepare_iios_local_ollama_runtime import (
     LocalRuntimeSetupError,
     prepare_local_runtime,
 )
+from iios_mvp.canonical_runtime_factory_v01 import build_canonical_runtime
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -132,6 +133,38 @@ def test_setup_refuses_missing_model(tmp_path, ollama_server):
     finally:
         _Handler.model_names = ["qwen3:8b"]
 
+
+
+def test_generated_environment_is_accepted_by_trusted_factory(tmp_path, ollama_server):
+    workspace = tmp_path / ".iios-local"
+    result = prepare_local_runtime(
+        workspace=workspace,
+        ollama_url=ollama_server,
+        model="qwen3:8b",
+    )
+    values = _env(Path(result["env_file"]))
+    bundle = {
+        "raw_request": "Assess this staged company case as of the cutoff date.",
+        "run_id": "bootstrap-contract-run",
+        "request_id": "bootstrap-contract-request",
+        "company": "百龙创园",
+        "investment_case": {
+            "case_id": "RC-CN-A-605016-20261009",
+            "market": "CN-A",
+            "symbol": "605016",
+            "company": "百龙创园",
+            "as_of_date": "2026-10-09",
+            "cutoff_date": "2026-10-09",
+        },
+    }
+    runtime = build_canonical_runtime(
+        bundle=bundle,
+        output_root=workspace / "outputs",
+        env=values,
+    )
+    assert runtime.request_interpreter.interpreter_id == "iios-live-json-request-interpreter"
+    assert runtime.semantic_producer.producer_id == "iios-live-json-semantic-producer"
+    assert not list((workspace / "outputs" / "live-provider-evidence").glob("*.json"))
 
 
 def test_setup_refuses_redirect_from_local_preflight(tmp_path, ollama_server):
