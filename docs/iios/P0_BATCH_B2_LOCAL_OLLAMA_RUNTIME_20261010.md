@@ -1,6 +1,6 @@
 # P0 Batch B2 production-host follow-up — Free-First Local Ollama Runtime Path — 2026-10-10
 
-Status: implementation candidate; exact-head CI and independent review required.  
+Status: **MERGED** in PR #285 at `cf3fb42ebf3f0faedb7a50244ea0edd00fc142ac`; exact PR-head checks **17/17 PASS** and post-merge required checks **6/6 PASS**. **Production Host acceptance remains OPEN.**  
 Goal: make the existing trusted runtime factory usable with a local, no-paid-key model without weakening the external-provider boundary.
 
 ## Defect corrected
@@ -39,8 +39,9 @@ Official Ollama API reference: https://github.com/ollama/ollama/blob/main/docs/a
     set +a
     python -m iios_mvp.canonical_host_v01
 
-3. From another local terminal, check GET http://127.0.0.1:8765/healthz and GET http://127.0.0.1:8765/readyz. Keep the authentication token private.
-4. Do not submit a company bundle until the real source bundle, seven-group B2 Evidence/PIT admission, price observation, independently admitted Forecast, authority records and Valuation output exist. An empty admission directory is intentionally not enough; missing records must remain BLOCKED.
+3. From another local terminal, check `GET http://127.0.0.1:8765/healthz` and `GET http://127.0.0.1:8765/readyz`. Keep the authentication token private. `/readyz` only confirms safe configuration; it deliberately does not invoke the factory or the model.
+4. For a real callback-only preflight, first stage a real operator-owned case bundle under `.iios-local/bundles/` with its manifest and original files under `.iios-local/data/`. Load the protected environment in the same shell and run `python -m iios_mvp.canonical_runtime_preflight_v01 --bundle-id <staged_bundle_id>`. This exercises the configured model's request interpreter and semantic producer and saves a signed preflight report; it explicitly does **not** run Evidence/PIT admission, Forecast, Valuation, Decision, publication or full Run Receipt. Use a real case and real captured bytes, never a fixture to claim production acceptance.
+5. A full `POST /v1/canonical-runs` company request is authorized only after the real source bundle, all seven B2 Evidence/PIT groups, market-price evidence, independently admitted Forecast, authority records and Valuation output exist. An empty admission directory is intentionally not enough; missing records must remain `BLOCKED`.
 
 ## What this does not prove
 
@@ -51,6 +52,6 @@ Official Ollama API reference: https://github.com/ollama/ollama/blob/main/docs/a
 - A local model response is not a provider-quality certification or an investment Decision. Canonical admission, independent Forecast/Valuation, full Run Receipt replay, independent red-team and human approval remain mandatory.
 - Automatic trade execution remains disabled.
 
-## Acceptance after merge
+## Remaining production acceptance
 
 A real local operator must start the actual service and local model, record the exact main SHA and Ollama/model version, submit an operator-staged real bundle, preserve signed raw response receipts, and prove that negative cases remain blocked. Production P0 closure still requires a complete real-company run plus replay and independent red-team.
