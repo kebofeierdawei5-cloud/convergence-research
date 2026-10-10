@@ -16,7 +16,7 @@ This is not an attempt to relabel the original `CAPTURED_NOT_ADMITTED` receipt. 
 ## Publication time and reuse rules
 
 - For older official SSE filings, the published **date** is supported by the official SSE-hosted archive path and the document's matching issuer name, code, title and announcement number. Exact intraday first-public times were not exposed in the accessible archive. The ledger preserves this loss of precision rather than manufacturing a timestamp. Those source dates precede the 2026-10-09 cutoff.
-- For the 2026-10-09 shareholders' meeting resolution, the official SSE-hosted PDF is dated 2026-10-09. The captured secondary article [Stockstar, timestamp 18:09:28 +08](https://wap.stockstar.com/detail/RB2026100900029140) references that same resolution. The run uses 18:09:28 as a **conservative latest-known bound**, not as a claim that the SSE PDF was first published at that exact second.
+- For the 2026-10-09 shareholders' meeting resolution, the official SSE-hosted PDF is dated 2026-10-09. The captured secondary article [Stockstar, timestamp 18:09:28 +08](https://wap.stockstar.com/detail/RB2026100900029140) references that same resolution. The run records 18:09:28 as a **conservative latest-known bound**, not as a claim that the SSE PDF was first published at that exact second. Under the unchanged core PIT contract, the date-only cutoff `2026-10-09` is interpreted at the start of that local date, so this event is **not eligible** for this case's cutoff; it remains a source-adjudicated fact candidate but does not cover the corporate-disclosures group.
 - The official SSE [legal statement](https://www.sse.com.cn/home/legal/) permits browsing/downloading for non-commercial purposes but restricts reuse/distribution without authorization. Official SSE captures are classified operationally as `RESTRICTED_NO_REDISTRIBUTION` for this internal research use; do not upload source PDFs/HTML to Git or redistribute them. Only fact-level records, locators and hashes are included in this review package.
 - Secondary-source licence/reuse has not been adjudicated. The captured price article is therefore explicitly retained as an UNKNOWN candidate, not admitted market-price evidence.
 
@@ -39,12 +39,12 @@ This is not an attempt to relabel the original `CAPTURED_NOT_ADMITTED` receipt. 
 
 ## Fact-level results and their limits
 
-The adjudication ledger contains ten fact candidates, of which nine are backed by exact official SSE filing bytes and one is a deliberately UNKNOWN price candidate. The fact candidates cover six required groups:
+The adjudication ledger contains ten fact candidates, of which nine are backed by exact official SSE filing bytes and one is a deliberately UNKNOWN price candidate. The source review yields facts for six conceptual groups, but only five pass the unchanged date-only B2/PIT cutoff in this run:
 
 - **Security identity:** issuer name, short name and code from the H1 report cover.
 - **Financial reality:** Q1 reported revenue/net profit/operating cash flow; H1 reported revenue/net profit/operating cash flow, with audit status preserved.
 - **Business reality:** H1 product revenue mix and the announced RMB 10m Kunming subsidiary investment.
-- **Corporate disclosures:** the 2026-10-08 meeting resolutions disclosed on 2026-10-09, with exact vote percentages and conservative known-at bound.
+- **Corporate disclosures:** the 2026-10-08 meeting resolutions disclosed on 2026-10-09, with exact vote percentages and conservative known-at bound. This fact is source-adjudicated but fails the current date-only cutoff because the conservative known-at bound is later that day.
 - **Capital structure:** 420,012,320 shares **as of 2026-06-30** (not asserted to be the 2026-10-09 share count), and convertible-bond registration status as of the 2026-09-11 update.
 - **Trust/governance:** the exact July pledge release/extension facts.
 
@@ -56,9 +56,9 @@ The dedicated workflow downloads the actual Attempt 10 artifact, independently r
 
 Expected fail-closed outcome:
 
-- **Six of seven groups** covered by schema-valid, source-adjudicated official Evidence Records.
-- `market_price` remains uncovered.
-- Explicit validation errors: UNKNOWN/PIT for the Stockstar price candidate and `REQUIRED_FIELD_GROUPS_UNCOVERED:market_price`.
+- **Five of seven groups** covered by schema-valid, source-adjudicated official Evidence Records.
+- `corporate_disclosures` and `market_price` remain uncovered.
+- Explicit validation errors: same-day shareholder resolution `PIT_FAIL`, UNKNOWN/PIT for the Stockstar price candidate, and `REQUIRED_FIELD_GROUPS_UNCOVERED:corporate_disclosures,market_price`.
 - Final manifest remains `BLOCKED`; `evidence_admission=false`, `pit_admission=false`.
 - No valuation, Decision Revision, Machine Publication, Investor Review Report or complete `IIOS_RUN_RECEIPT` may be produced.
 
