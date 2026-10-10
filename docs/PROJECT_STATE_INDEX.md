@@ -38,6 +38,18 @@ Current MVP acceptance gaps:
 
 The current independent B2-F audit remains PASS / CANONICAL.
 
+### P0 Batch B2 — Production Host Discovery — 2026-10-10
+
+Status: **DISCOVERY EXECUTED / PRODUCTION HOST ACCEPTANCE BLOCKED**.
+
+- Discovery record: `docs/iios/P0_BATCH_B2_HOST_DISCOVERY_20261010.md`.
+- Baseline: `main@92ad57f837fed50ab474ebf89f4f308869e31545`.
+- The currently accessible GitHub repository inventory exposes only the canonical `convergence-research` repository. Its recursive tree contains the Python CLI/runtime modules but no separately identifiable production web/server/front-end composition root or deployment entrypoint.
+- `iios_mvp.cli.main()` supports a trusted pre-registered runtime or trusted `--runtime-factory` / `IIOS_CANONICAL_RUNTIME_FACTORY`; `canonical_runtime_registry_v01.py` deliberately defaults to an empty registry and the CLI returns `BLOCKED / CANONICAL_RUNTIME_NOT_REGISTERED` when none is supplied.
+- PR #267's host integration remains a `TEST_ONLY` control-plane proof. No genuine production host, registered runtime, or semantic/model callback was found in the accessible source scope.
+- This blocker is **not** a demand for a paid API key: Route A evidence intake is free-first. It is a missing production-host source/runtime evidence boundary. The linked audit defines the minimum artifacts required to resume.
+- P0-LLM-001 / P0-LLM-004 remain **OPEN**; do not call Batch B complete.
+
 ### P0 Canonical Entry Incident — Batch 0
 
 Status: **INCIDENT REPRODUCTION PASS / CANONICAL RECORD — PRODUCTION P0s OPEN**
