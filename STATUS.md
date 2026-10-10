@@ -1,10 +1,17 @@
 # IIOS Project Status
 
 State classification: **CANONICAL SUMMARY**
-Date: 2026-10-07
+Date: 2026-10-10
 
 Authoritative current-state record:
 `docs/PROJECT_STATE_INDEX.md`
+
+## Latest P0 status — 2026-10-10
+
+P0 Batch B3 is merged in PR [#276](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/276), merge commit `d3582621918b285f29b4573c2618c1072247885c`. Exact-head regression checks passed for formal write authorization, P0 entry reproduction, B2-E end-to-end, Investment Core, runtime factory, reports, lineage and independent red-team suites. The Decision Revision, Publication and Report write boundaries now revalidate persisted upstream admission artifacts and fail closed when those bytes are missing.
+
+**Production P0-LLM-001 / P0-LLM-004 remain OPEN.** Control-plane CI uses TEST_ONLY lifecycle evidence and does not prove deployed-host integration, 605016 source-origin/PIT admission, a genuine production semantic-to-decision run, or completed Run Receipt replay from the live host. Follow `docs/PROJECT_STATE_INDEX.md` for the active next boundary.
+
 
 This file is a concise human-readable summary. When it conflicts with the Current State Index, the Current State Index wins.
 
