@@ -214,6 +214,19 @@ def _load_response_record(root: Path, task_id: str) -> tuple[dict[str, Any], dic
     response_raw = response_text.encode("utf-8")
     if hashlib.sha256(response_raw).hexdigest() != record.get("response_sha256"):
         raise ChatGPTChatHandoffError("CHATGPT_RESPONSE_HASH_MISMATCH")
+    try:
+        receipt = _parse_json_object(paths["receipt"].read_bytes(), reason="CHATGPT_OPERATOR_RECEIPT_INVALID_JSON")
+    except OSError as exc:
+        raise ChatGPTChatHandoffError("CHATGPT_OPERATOR_RECEIPT_MISSING") from exc
+    receipt_hash = receipt.get("receipt_sha256")
+    receipt_core = {k: v for k, v in receipt.items() if k != "receipt_sha256"}
+    if not isinstance(receipt_hash, str) or hashlib.sha256(_canonical_bytes(receipt_core)).hexdigest() != receipt_hash:
+        raise ChatGPTChatHandoffError("CHATGPT_OPERATOR_RECEIPT_HASH_MISMATCH")
+    for field in ("task_id", "stage", "run_id", "request_id", "case_id", "cutoff_date", "prompt_sha256", "response_sha256", "execution_channel", "provider_origin_verified"):
+        if receipt.get(field) != record.get(field):
+            raise ChatGPTChatHandoffError("CHATGPT_OPERATOR_RECEIPT_BINDING_MISMATCH")
+    if receipt.get("provider_origin_verified") is not False:
+        raise ChatGPTChatHandoffError("CHATGPT_OPERATOR_RECEIPT_ORIGIN_CLAIM_INVALID")
     parsed = _parse_json_object(response_raw, reason="CHATGPT_RESPONSE_NOT_STRICT_JSON_OBJECT")
     return task, {"record": record, "parsed": parsed}, paths
 
