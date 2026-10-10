@@ -1,0 +1,27 @@
+name: Route A 605016 SSE HTTPS Endpoint Discovery
+on:
+  pull_request:
+    paths:
+      - "tools/route_a_605016_sse_endpoint_discovery.py"
+      - ".github/workflows/route_a_605016_sse_endpoint_discovery.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  discover-official-https-endpoints:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Discover official HTTPS API candidates without collecting prices or persisting page source
+        run: python tools/route_a_605016_sse_endpoint_discovery.py /tmp/605016-sse-endpoint-discovery
+      - name: Upload route/hash-only discovery report
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-a-605016-sse-https-endpoint-discovery
+          path: /tmp/605016-sse-endpoint-discovery/SSE_HTTPS_ENDPOINT_DISCOVERY_REPORT.json
+          if-no-files-found: error
+          retention-days: 7
