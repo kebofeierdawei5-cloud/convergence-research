@@ -378,6 +378,63 @@ def public_secondary_price_capture(root: Path) -> dict[str, Any]:
     return record
 
 
+def eastmoney_terms_capture(root: Path) -> dict[str, Any]:
+    """Capture public Eastmoney legal/terms pages for a reuse review; this does not admit price data."""
+    home_url = "https://www.eastmoney.com/"
+    home = fetch(home_url, referer="https://www.eastmoney.com/")
+    record: dict[str, Any] = {
+        "source_id": "EASTMONEY-PUBLIC-TERMS-REVIEW",
+        "source_class": "PUBLIC_SECONDARY_PROVIDER_TERMS",
+        "status": "TERMS_NOT_ADJUDICATED",
+        "homepage_capture": {k: v for k, v in home.items() if k != "bytes"},
+        "terms_pages": [],
+        "important_limit": "Capturing a terms page is not a legal determination; reuse stays UNKNOWN until the wording is reviewed.",
+    }
+    if home.get("status") != "CAPTURED":
+        return record
+    home_raw = home["bytes"]
+    save_bytes(root, "raw/EASTMONEY-HOMEPAGE.html", home_raw)
+    html = home_raw.decode("utf-8", errors="replace")
+    anchors = re.findall(r"<a\\b[^>]*href=[\\\"']([^\\\"']+)[\\\"'][^>]*>(.*?)</a>", html, flags=re.I | re.S)
+    terms_candidates: list[tuple[str, str]] = []
+    for href, label in anchors:
+        title = re.sub(r"<[^>]+>", " ", label)
+        title = re.sub(r"\\s+", " ", title).strip()
+        if re.search(r"免责声明|法律|版权|使用协议|服务协议|用户协议|隐私|数据授权|网站声明", title):
+            url = urljoin(home_url, html_unescape(title) if False else href.strip())
+            if url.startswith("https://") and all(url != old[0] for old in terms_candidates):
+                terms_candidates.append((url, title))
+    record["candidate_links"] = [{"url": u, "label": title} for u, title in terms_candidates[:12]]
+    for index, (url, title) in enumerate(terms_candidates[:4]):
+        response = fetch(url, referer=home_url)
+        item = {
+            "url": url,
+            "label": title,
+            "response": {k: v for k, v in response.items() if k != "bytes"},
+        }
+        if response.get("status") == "CAPTURED":
+            raw = response["bytes"]
+            relative = f"raw/EASTMONEY-TERMS-{index + 1}.bin"
+            save_bytes(root, relative, raw)
+            item["saved_path"] = relative
+            item["size_bytes"] = len(raw)
+            item["sha256"] = sha256(raw)
+            page_text = re.sub(r"<[^>]+>", " ", raw.decode("utf-8", errors="replace"))
+            page_text = re.sub(r"\\s+", " ", page_text)
+            snippets = []
+            for match in re.finditer(r"免责声明|版权|未经授权|商业使用|转载|数据服务|本网站|数据使用|许可|用户协议|服务协议", page_text, flags=re.I):
+                begin, end = max(0, match.start() - 100), min(len(page_text), match.end() + 180)
+                excerpt = page_text[begin:end]
+                if excerpt not in snippets:
+                    snippets.append(excerpt)
+                if len(snippets) >= 8:
+                    break
+            item["terms_text_excerpts"] = snippets
+        record["terms_pages"].append(item)
+    record["status"] = "TERMS_CAPTURED_NEEDS_HUMAN_REVIEW" if record["terms_pages"] else "TERMS_URL_NOT_FOUND_OR_CAPTURE_FAILED"
+    return record
+
+
 def main() -> int:
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/605016-followup-capture")
     out.mkdir(parents=True, exist_ok=True)
@@ -404,6 +461,8 @@ def main() -> int:
     report["sources"].append(official_price)
     price = public_secondary_price_capture(out)
     report["sources"].append(price)
+    terms = eastmoney_terms_capture(out)
+    report["sources"].append(terms)
     report["raw_files"] = []
     for p in sorted((out / "raw").glob("*")) if (out / "raw").exists() else []:
         data = p.read_bytes()
