@@ -590,7 +590,7 @@ def main() -> int:
         raw_reason = str(exc)
         import re
         reason = raw_reason if re.fullmatch(r"[A-Z0-9_:-]{1,160}", raw_reason) else "SOURCE_OR_VALIDATION_FAILED"
-        print(json.dumps({
+        blocked_result = {
             "status": "BLOCKED",
             "reason": reason,
             "private_store_written": False,
@@ -600,7 +600,14 @@ def main() -> int:
             "decision_created": False,
             "human_approval_required": True,
             "auto_execution": False,
-        }, ensure_ascii=False, indent=2))
+        }
+        # Only aliases and sanitized categories are emitted; never print URLs,
+        # raw OS errors, response headers, source bytes or local paths.
+        safe_diagnostics = getattr(exc, "safe_diagnostics", None)
+        if isinstance(safe_diagnostics, list) and safe_diagnostics:
+            diagnostic_field = getattr(exc, "diagnostic_field", "source_fetch_diagnostics")
+            blocked_result[diagnostic_field] = safe_diagnostics
+        print(json.dumps(blocked_result, ensure_ascii=False, indent=2))
         return 2
     except Exception as exc:
         # Fail closed without exposing a traceback, input values, or local paths.

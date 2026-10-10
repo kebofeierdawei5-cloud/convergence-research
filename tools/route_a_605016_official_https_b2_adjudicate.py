@@ -3,7 +3,10 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import shutil
+import subprocess
+import tempfile
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -43,9 +46,226 @@ DIVIDEND_PDF_HTTPS_URLS = (
     "https://www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-09-22/605016_20260922_1YLT.pdf",
 )
 DIVIDEND_PDF_ALLOWED_FINAL_URLS = frozenset(DIVIDEND_PDF_HTTPS_URLS)
+EXPECTED_DIVIDEND_LISTING_ROW = {
+    "SECURITY_CODE": "605016",
+    "SECURITY_NAME": "百龙创园",
+    "SSEDATE": "2026-09-22",
+    "TITLE": "2026年半年度权益分派实施公告",
+    "URL": "/disclosure/listedinfo/announcement/c/new/2026-09-22/605016_20260922_1YLT.pdf",
+}
 DIVIDEND_LEDGER_RELATIVE = Path(
     "evidence/real_cases/RC-CN-A-605016-20261009/DIVIDEND_IMPLEMENTATION_ADJUDICATION_20261010.json"
 )
+MAX_DIVIDEND_CURL_BYTES = 8 * 1024 * 1024
+DIVIDEND_REFERER = "https://www.sse.com.cn/disclosure/listedinfo/announcement/index.shtml"
+
+
+class OfficialDividendPdfFetchBlocked(ValueError):
+    """All pinned official HTTPS candidates failed; diagnostics contain no URLs or raw errors."""
+
+    diagnostic_field = "source_fetch_diagnostics"
+
+    def __init__(self, diagnostics: list[dict[str, str]]) -> None:
+        self.safe_diagnostics = diagnostics
+        super().__init__("OFFICIAL_DIVIDEND_PDF_DIRECT_HTTPS_FETCH_BLOCKED")
+
+
+class OfficialDividendPdfBytesMismatch(ValueError):
+    """A captured response failed the pinned exact-byte contract; never retry around changed bytes."""
+
+    diagnostic_field = "source_byte_diagnostics"
+
+    def __init__(self, url: str, transport: str, raw_pdf: bytes) -> None:
+        host = urlparse(url).hostname or ""
+        endpoint = {
+            "big5.sse.com.cn": "BIG5",
+            "static.sse.com.cn": "STATIC",
+            "www.sse.com.cn": "WWW",
+        }.get(host, "UNRECOGNIZED_HOST")
+        actual_hash = _sha256(raw_pdf)
+        failures: list[str] = []
+        if len(raw_pdf) != EXPECTED_DIVIDEND_PDF_SIZE:
+            failures.append("SIZE_MISMATCH")
+        if actual_hash != EXPECTED_DIVIDEND_PDF_SHA256:
+            failures.append("SHA256_MISMATCH")
+        if not raw_pdf.startswith(b"%PDF-"):
+            failures.append("PDF_MAGIC_MISSING")
+        self.safe_diagnostics = [{
+            "endpoint": endpoint,
+            "transport": transport,
+            "outcome": "EXACT_BYTES_CONTRACT_MISMATCH",
+            "failed_checks": failures,
+            "actual_size_bytes": len(raw_pdf),
+            "expected_size_bytes": EXPECTED_DIVIDEND_PDF_SIZE,
+            "actual_sha256": actual_hash,
+            "expected_sha256": EXPECTED_DIVIDEND_PDF_SHA256,
+            "pdf_magic_present": raw_pdf.startswith(b"%PDF-"),
+        }]
+        super().__init__("OFFICIAL_DIVIDEND_PDF_EXACT_BYTES_MISMATCH")
+
+
+def _safe_transport_outcome(response: dict[str, Any]) -> str:
+    status = response.get("http_status")
+    if isinstance(status, int) and not 200 <= status < 300:
+        return f"HTTP_{status}"
+    error = str(response.get("error", "")).upper()
+    http_match = re.search(r"HTTP ERROR (\d{3})", error)
+    if http_match:
+        return "HTTP_" + http_match.group(1)
+    curl_match = re.search(r"CURL_EXIT_(\d+)", error)
+    if curl_match:
+        return {
+            "6": "DNS_FAILURE",
+            "7": "CONNECTION_FAILURE",
+            "22": "HTTP_FAILURE",
+            "28": "TIMEOUT",
+            "35": "TLS_HANDSHAKE_FAILURE",
+            "60": "TLS_CERTIFICATE_FAILURE",
+            "63": "RESPONSE_TOO_LARGE",
+        }.get(curl_match.group(1), "CURL_FAILURE")
+    low = error.lower()
+    if "temporary failure in name resolution" in low or "name or service not known" in low or "nodename nor servname" in low or "getaddrinfo failed" in low:
+        return "DNS_FAILURE"
+    if "timed out" in low or "timeout" in low:
+        return "TIMEOUT"
+    if "certificate_verify_failed" in low or "certificate" in low or "ssl:" in low or "tls" in low:
+        return "TLS_FAILURE"
+    if "connection refused" in low:
+        return "CONNECTION_REFUSED"
+    if "connection reset" in low:
+        return "CONNECTION_RESET"
+    if "network is unreachable" in low:
+        return "NETWORK_UNREACHABLE"
+    if "http error" in low:
+        return "HTTP_FAILURE"
+    if "curl unavailable" in low:
+        return "CURL_UNAVAILABLE"
+    return "FETCH_BLOCKED"
+
+
+def _safe_fetch_diagnostic(url: str, transport: str, response: dict[str, Any]) -> dict[str, str]:
+    host = urlparse(url).hostname or ""
+    endpoint = {
+        "big5.sse.com.cn": "BIG5",
+        "static.sse.com.cn": "STATIC",
+        "www.sse.com.cn": "WWW",
+    }.get(host, "UNRECOGNIZED_HOST")
+    return {
+        "endpoint": endpoint,
+        "transport": transport,
+        "outcome": _safe_transport_outcome(response),
+    }
+
+
+def _current_listing_row_matches_canonical(dividend: dict[str, Any]) -> bool:
+    row = dividend.get("listing_row")
+    return isinstance(row, dict) and all(
+        row.get(key) == value for key, value in EXPECTED_DIVIDEND_LISTING_ROW.items()
+    )
+
+
+def _can_recover_dividend_from_prior(dividend: dict[str, Any]) -> bool:
+    listing_request = dividend.get("listing_request")
+    if not isinstance(listing_request, dict):
+        return False
+    if dividend.get("status") == "BLOCKED" and listing_request.get("status") == "BLOCKED":
+        # Existing behavior: the listing endpoint itself was transport-blocked.
+        return True
+    if (
+        dividend.get("status") == "BLOCKED_NO_VERIFIED_PDF_BYTES"
+        and listing_request.get("status") == "CAPTURED"
+        and _current_listing_row_matches_canonical(dividend)
+    ):
+        # A live listing was read, the exact expected row was matched, but none
+        # of the PDF candidates produced verified PDF bytes. Reuse only the
+        # already-pinned adjudication and re-fetch/re-hash that exact PDF.
+        return True
+    return False
+
+
+def _fetch_official_pdf_via_curl(url: str, *, referer: str) -> dict[str, Any]:
+    """Second HTTPS transport only; URL/redirect allowlists and exact bytes remain mandatory."""
+    if url not in DIVIDEND_PDF_HTTPS_URLS or urlparse(url).scheme.lower() != "https":
+        return {"url": url, "status": "BLOCKED", "error": "CURL_URL_NOT_ALLOWLISTED"}
+    curl = shutil.which("curl")
+    if not curl:
+        return {"url": url, "status": "BLOCKED", "error": "CURL_UNAVAILABLE"}
+    with tempfile.TemporaryDirectory(prefix="iios-605016-official-pdf-") as temp_dir:
+        body_path = Path(temp_dir) / "response.pdf"
+        command = [
+            curl,
+            "--location",
+            "--max-redirs", "5",
+            "--connect-timeout", "4",
+            "--max-time", "9",
+            "--proto", "=https",
+            "--proto-redir", "=https",
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15",
+            "--referer", referer,
+            "--header", "Accept: application/pdf,*/*",
+            "--header", "Accept-Encoding: identity",
+            "--max-filesize", str(MAX_DIVIDEND_CURL_BYTES),
+            "--output", str(body_path),
+            "--write-out", "%{http_code}\n%{url_effective}\n%{content_type}\n",
+            url,
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=10,
+            )
+        except subprocess.TimeoutExpired:
+            return {"url": url, "status": "BLOCKED", "error": "CURL_TIMEOUT"}
+        except OSError:
+            return {"url": url, "status": "BLOCKED", "error": "CURL_EXEC_FAILED"}
+
+        metadata = (completed.stdout or b"").decode("utf-8", errors="replace").splitlines()
+        try:
+            http_status = int(metadata[0]) if metadata and metadata[0].isdigit() else 0
+        except (TypeError, ValueError):
+            http_status = 0
+        final_url = metadata[1] if len(metadata) > 1 else url
+        content_type = metadata[2] if len(metadata) > 2 else ""
+        if completed.returncode != 0:
+            error = "CURL_EXIT_" + str(completed.returncode)
+            if http_status:
+                return {
+                    "url": url, "final_url": final_url, "status": "BLOCKED",
+                    "error": error, "http_status": http_status,
+                }
+            return {"url": url, "final_url": final_url, "status": "BLOCKED", "error": error}
+        if not 200 <= http_status < 300:
+            return {
+                "url": url, "final_url": final_url, "status": "BLOCKED",
+                "error": "CURL_HTTP_RESPONSE_NOT_SUCCESS", "http_status": http_status,
+            }
+        if not body_path.is_file():
+            return {
+                "url": url, "final_url": final_url, "status": "BLOCKED",
+                "error": "CURL_BODY_MISSING", "http_status": http_status,
+            }
+        size = body_path.stat().st_size
+        if size > MAX_DIVIDEND_CURL_BYTES:
+            return {
+                "url": url, "final_url": final_url, "status": "BLOCKED",
+                "error": "CURL_RESPONSE_TOO_LARGE", "http_status": http_status,
+            }
+        body = body_path.read_bytes()
+        return {
+            "url": url,
+            "final_url": final_url,
+            "status": "CAPTURED",
+            "http_status": http_status,
+            "content_type": content_type,
+            "size_bytes": len(body),
+            "body": body,
+        }
 
 
 def _sha256(raw: bytes) -> str:
@@ -128,13 +348,7 @@ def _recover_dividend_from_prior_canonical_adjudication(
     ledger = _read_obj(ledger_path)
     source = ledger.get("source")
     fact = ledger.get("evidence_record")
-    expected_row = {
-        "SECURITY_CODE": "605016",
-        "SECURITY_NAME": "百龙创园",
-        "SSEDATE": "2026-09-22",
-        "TITLE": "2026年半年度权益分派实施公告",
-        "URL": "/disclosure/listedinfo/announcement/c/new/2026-09-22/605016_20260922_1YLT.pdf",
-    }
+    expected_row = EXPECTED_DIVIDEND_LISTING_ROW
     if ledger.get("schema_version") != "IIOS-605016-DIVIDEND-IMPLEMENTATION-ADJUDICATION-0.1":
         raise ValueError("CANONICAL_DIVIDEND_LEDGER_SCHEMA_MISMATCH")
     if ledger.get("case_id") != CASE_ID or ledger.get("cutoff_date") != CUTOFF_DATE:
@@ -166,21 +380,35 @@ def _recover_dividend_from_prior_canonical_adjudication(
 
     response = None
     requested_url = None
+    requested_transport = None
+    fetch_diagnostics: list[dict[str, str]] = []
     for candidate_url in DIVIDEND_PDF_HTTPS_URLS:
-        candidate = fetch_https(
-            candidate_url,
-            referer="https://www.sse.com.cn/disclosure/listedinfo/announcement/index.shtml",
-        )
-        # A transport failure may try the next fixed official SSE HTTPS URL.
-        # Once a server returns bytes, those bytes must pass the pinned contract;
-        # do not hide a wrong-origin or changed-document response via fallback.
-        if candidate.get("status") != "CAPTURED":
-            continue
-        response = candidate
-        requested_url = candidate_url
-        break
+        candidate = fetch_https(candidate_url, referer=DIVIDEND_REFERER)
+        # A captured response is validated immediately below. We never hide a
+        # wrong-origin/hash/PDF response by falling through to another endpoint.
+        if candidate.get("status") == "CAPTURED":
+            response = candidate
+            requested_url = candidate_url
+            requested_transport = "PYTHON_HTTPS"
+            break
+        fetch_diagnostics.append(_safe_fetch_diagnostic(candidate_url, "PYTHON_HTTPS", candidate))
+
+    # A second, standard macOS HTTPS client handles cases where urllib's proxy,
+    # TLS, or HTTP negotiation is blocked. It uses only the same fixed HTTPS
+    # candidates and refuses HTTPS-to-HTTP redirects. The bytes still have to
+    # pass the canonical URL/origin, exact size/SHA-256 and PDF structure gates.
+    if response is None:
+        for candidate_url in DIVIDEND_PDF_HTTPS_URLS:
+            candidate = _fetch_official_pdf_via_curl(candidate_url, referer=DIVIDEND_REFERER)
+            if candidate.get("status") == "CAPTURED":
+                response = candidate
+                requested_url = candidate_url
+                requested_transport = "CURL_HTTPS"
+                break
+            fetch_diagnostics.append(_safe_fetch_diagnostic(candidate_url, "CURL_HTTPS", candidate))
+
     if response is None or requested_url is None:
-        raise ValueError("OFFICIAL_DIVIDEND_PDF_DIRECT_HTTPS_FETCH_BLOCKED")
+        raise OfficialDividendPdfFetchBlocked(fetch_diagnostics)
 
     final_url = str(response.get("final_url") or response.get("url") or requested_url)
     final = urlparse(final_url)
@@ -198,7 +426,9 @@ def _recover_dividend_from_prior_canonical_adjudication(
         or _sha256(raw_pdf) != EXPECTED_DIVIDEND_PDF_SHA256
         or not raw_pdf.startswith(b"%PDF-")
     ):
-        raise ValueError("OFFICIAL_DIVIDEND_PDF_EXACT_BYTES_MISMATCH")
+        raise OfficialDividendPdfBytesMismatch(
+            requested_url, str(requested_transport or "UNKNOWN_HTTPS"), raw_pdf
+        )
 
     followup_root.mkdir(parents=True, exist_ok=True)
     raw_dir = followup_root / "raw"
@@ -358,14 +588,11 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
         combined_root = base_out / "combined-evidence-root"
         combined_manifest_path = base_out / "COMBINED_B2_CANDIDATE_MANIFEST.json"
         combined_manifest = _read_obj(combined_manifest_path)
-    elif (
-        dividend.get("status") == "BLOCKED"
-        and isinstance(dividend.get("listing_request"), dict)
-        and dividend["listing_request"].get("status") == "BLOCKED"
-    ):
-        # The SSE listing API can be unreachable from some personal networks.
-        # Reuse the repository's previously adjudicated listing/fact record while
-        # re-fetching and exact-hash-verifying the official PDF directly over HTTPS.
+    elif _can_recover_dividend_from_prior(dividend):
+        # The SSE listing API can be unreachable, or a current exact-match notice
+        # row may be available while every direct PDF response is blocked/non-PDF.
+        # Reuse the pinned listing/fact adjudication and re-fetch/re-hash the exact
+        # PDF; mismatched current notice identity does not enter this recovery path.
         dividend, prior_ledger = _recover_dividend_from_prior_canonical_adjudication(followup_root)
         base_summary, combined_root, combined_manifest = _build_base_manifest_from_prior_dividend(
             attempt10_root, base_out, followup_root, dividend, prior_ledger
@@ -555,7 +782,7 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
         "next_gate": "If PASS_EPHEMERAL_B2, ingest this exact HTTPS source privately into the deployed Host data root; repeat unchanged B2/PIT admission there, then run genuine semantic/Forecast/Valuation/Decision/report/Run Receipt replay and independent red-team. Do not promote this public run as canonical durable admission.",
     }
     (out_dir / "OFFICIAL_HTTPS_B2_ADJUDICATION_REPORT.json").write_text(
-        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     # The full manifest with numeric market data is intentionally left in the
     # ephemeral workspace and must not be uploaded to Actions artifacts.
@@ -577,7 +804,48 @@ def main() -> int:
     parser.add_argument("--attempt10-root", required=True, type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
     args = parser.parse_args()
-    report = adjudicate(args.attempt10_root, args.out_dir)
+    try:
+        report = adjudicate(args.attempt10_root, args.out_dir)
+    except (OfficialDividendPdfFetchBlocked, OfficialDividendPdfBytesMismatch) as exc:
+        # Source unavailability or changed bytes are completed fail-closed
+        # outcomes, not PASS and not unhandled workflow crashes. Emit metadata only.
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        diagnostic_field = exc.diagnostic_field
+        overall_status = (
+            "BLOCKED_SOURCE_FETCH"
+            if isinstance(exc, OfficialDividendPdfFetchBlocked)
+            else "BLOCKED_SOURCE_BYTES_MISMATCH"
+        )
+        report = {
+            "schema_version": "IIOS-605016-OFFICIAL-HTTPS-B2-ADJUDICATION-0.1",
+            "case_id": CASE_ID,
+            "cutoff_date": CUTOFF_DATE,
+            "overall_status": overall_status,
+            "reason": str(exc),
+            "candidate_manifest_status": "NOT_CREATED",
+            diagnostic_field: exc.safe_diagnostics,
+            "raw_source_bytes_uploaded": False,
+            "numeric_quote_values_printed": False,
+            "formal_signed_admission_created": False,
+            "production_host_accepted": False,
+            "decision_created": False,
+            "human_approval_required": True,
+            "auto_execution": False,
+        }
+        (args.out_dir / "OFFICIAL_HTTPS_B2_ADJUDICATION_REPORT.json").write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        console_report = {
+            "status": "BLOCKED",
+            "reason": str(exc),
+            "candidate_manifest_status": "NOT_CREATED",
+            "raw_source_bytes_uploaded": False,
+        }
+        console_report[diagnostic_field] = exc.safe_diagnostics
+        print(json.dumps(console_report, ensure_ascii=False, indent=2))
+        # A blocked result is not an accepted candidate. Exit zero only so the
+        # workflow can upload this sanitized report; production remains blocked.
+        return 0
     # B2 fail-closed is a completed validation outcome; don't disguise a blocked
     # manifest as workflow success by setting PASS, nor fail to publish the report.
     return 0
