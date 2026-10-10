@@ -158,10 +158,36 @@ def official_dividend_capture(root: Path) -> dict[str, Any]:
         report["status"] = "BLOCKED_PDF_URL_NOT_FOUND_IN_OFFICIAL_LISTING"
         return report
     pdf = fetch(link, referer="https://www.sse.com.cn/disclosure/listedinfo/announcement/index.shtml")
-    report["pdf_capture"] = {k: v for k, v in pdf.items() if k != "bytes"}
+    first_response = {k: v for k, v in pdf.items() if k != "bytes"}
+    report["pdf_fetch_attempts"] = [first_response]
+    if pdf.get("status") == "CAPTURED" and not pdf["bytes"].startswith(b"%PDF-"):
+        # Some SSE announcement routes return a compressed HTML challenge despite HTTP 200.
+        # Preserve those bytes with the actual response type, then try the static SSE PDF CDN
+        # derived from the official listing's exact document basename.
+        save_bytes(root, "raw/SSE-2026-09-22-announcement-route-response.bin", pdf["bytes"])
+        match = re.search(r"(605016_20260922_[A-Za-z0-9]+\\.pdf)$", link)
+        if match:
+            static_url = "https://static.sse.com.cn/stock/disclosure/announcement/c/202609/" + match.group(1)
+            retry = fetch(static_url, referer="https://www.sse.com.cn/disclosure/listedinfo/announcement/index.shtml")
+            report["static_cdn_url"] = static_url
+            report["pdf_fetch_attempts"].append({k: v for k, v in retry.items() if k != "bytes"})
+            pdf = retry
     if pdf.get("status") != "CAPTURED":
         report["status"] = "BLOCKED_PDF_FETCH_FAILED"
         return report
+    body = pdf["bytes"]
+    if not body.startswith(b"%PDF-"):
+        save_bytes(root, "raw/SSE-2026-09-22-dividend-response-not-pdf.bin", body)
+        report["status"] = "BLOCKED_EXPECTED_PDF_BYTES"
+        report["actual_prefix_hex"] = body[:24].hex()
+        return report
+    save_bytes(root, "raw/SSE-2026-09-22-DIVIDEND-IMPLEMENTATION.pdf", body)
+    report["final_pdf_url"] = pdf["url"]
+    report["pdf_capture"] = {k: v for k, v in pdf.items() if k != "bytes"}
+    report["pdf_magic"] = body[:8].decode("ascii", errors="replace")
+    report["status"] = "RAW_PDF_CAPTURED_NOT_ADMITTED"
+    report["important_limit"] = "Byte capture and official listing match do not alone admit implementation facts; the PDF body/date/issuer/fact locators and reuse disposition still require independent review."
+    return report
     body = pdf["bytes"]
     save_bytes(root, "raw/SSE-2026-09-22-DIVIDEND-IMPLEMENTATION.pdf", body)
     if not body.startswith(b"%PDF-"):
@@ -172,6 +198,80 @@ def official_dividend_capture(root: Path) -> dict[str, Any]:
     report["status"] = "RAW_PDF_CAPTURED_NOT_ADMITTED"
     report["important_limit"] = "Byte capture and official listing match do not alone admit implementation facts; the PDF body/date/issuer/fact locators and reuse disposition still require independent review."
     return report
+
+
+def official_exchange_price_capture(root: Path) -> dict[str, Any]:
+    # The SSE-hosted YunHQ daily-bar API is an official-market-data candidate.
+    # Treat it as diagnostic until response schema, date and field are independently checked.
+    url = (
+        "https://yunhq.sse.com.cn:32041/v1/sh1/dayk/605016"
+        "?begin=20261009&end=20261009"
+        "&select=date,open,high,low,close,volume,amount"
+    )
+    result = fetch(url, referer="https://www.sse.com.cn/market/stockdata/overview/day/")
+    record: dict[str, Any] = {
+        "source_id": "PRICE-SSE-OFFICIAL-DAYK-2026-10-09",
+        "source_class": "OFFICIAL_EXCHANGE_MARKET_DATA_CANDIDATE",
+        "expected_observation_date": "2026-10-09",
+        "url": url,
+        "status": "BLOCKED",
+        "capture": {k: v for k, v in result.items() if k != "bytes"},
+    }
+    if result.get("status") != "CAPTURED":
+        return record
+    raw = result["bytes"]
+    save_bytes(root, "raw/PRICE-SSE-DAYK-605016-2026-10-09.bin", raw)
+    record["saved_path"] = "raw/PRICE-SSE-DAYK-605016-2026-10-09.bin"
+    record["payload_sha256"] = sha256(raw)
+    record["size_bytes"] = len(raw)
+    try:
+        payload = parse_json_or_jsonp(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        record["status"] = "CAPTURED_UNPARSED_OFFICIAL_RESPONSE"
+        record["parse_error"] = str(exc)
+        record["payload_prefix"] = raw[:1000].decode("utf-8", errors="replace")
+        return record
+    record["payload_preview"] = payload
+    matches = []
+    target_digits = "20261009"
+    target_iso = "2026-10-09"
+    def visit(node: Any, pointer: str = "$") -> None:
+        if isinstance(node, dict):
+            norm = {str(k).lower(): v for k, v in node.items()}
+            date_value = next((norm[k] for k in ("date","trade_date","tradedate","tradingdate","dt") if k in norm), None)
+            date_text = str(date_value).replace("-", "")
+            if date_text == target_digits:
+                matches.append({"path": pointer, "row": node})
+            for key, value in node.items():
+                visit(value, f"{pointer}.{key}")
+        elif isinstance(node, list):
+            for i, value in enumerate(node):
+                if isinstance(value, list) and value:
+                    first = str(value[0]).replace("-", "")
+                    if first == target_digits:
+                        matches.append({
+                            "path": f"{pointer}[{i}]",
+                            "row": {
+                                "date": value[0],
+                                "open": value[1] if len(value) > 1 else None,
+                                "high": value[2] if len(value) > 2 else None,
+                                "low": value[3] if len(value) > 3 else None,
+                                "close": value[4] if len(value) > 4 else None,
+                                "volume": value[5] if len(value) > 5 else None,
+                                "amount": value[6] if len(value) > 6 else None,
+                                "field_order_assumption": "date,open,high,low,close,volume,amount",
+                            },
+                        })
+                visit(value, f"{pointer}[{i}]")
+    visit(payload)
+    record["matches"] = matches
+    if not matches:
+        record["status"] = "CAPTURED_OFFICIAL_API_NO_MATCHING_DATE_ROW"
+        return record
+    # Do not automatically admit even a matching official API row: retain the exact
+    # provider schema/payload and require a reviewer to confirm units, quote time and PIT.
+    record["status"] = "OFFICIAL_DATE_ROW_CANDIDATE_NOT_ADMITTED"
+    return record
 
 
 def public_secondary_price_capture(root: Path) -> dict[str, Any]:
@@ -253,6 +353,8 @@ def main() -> int:
     }
     dividend = official_dividend_capture(out)
     report["sources"].append(dividend)
+    official_price = official_exchange_price_capture(out)
+    report["sources"].append(official_price)
     price = public_secondary_price_capture(out)
     report["sources"].append(price)
     report["raw_files"] = []
@@ -269,6 +371,9 @@ def main() -> int:
         "final_status": report["final_status"],
         "dividend_status": dividend.get("status"),
         "dividend_url": dividend.get("resolved_pdf_url"),
+        "dividend_final_pdf_url": dividend.get("final_pdf_url"),
+        "official_price_status": official_price.get("status"),
+        "official_price_matches": official_price.get("matches"),
         "price_status": price.get("status"),
         "price_rows": price.get("matched_rows"),
         "raw_files": report["raw_files"],
