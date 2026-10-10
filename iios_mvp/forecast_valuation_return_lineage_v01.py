@@ -165,6 +165,18 @@ def build_canonical_valuation_output(payload: Mapping[str, Any]) -> dict[str, An
 
 
 class CanonicalValuationOutputResolver(Protocol):
+    def resolve_valuation_admission(
+        self,
+        reference: Mapping[str, Any],
+        *,
+        case_id: str,
+        market: str,
+        symbol: str,
+        company: str,
+        cutoff_date: date,
+    ) -> dict[str, Any]:
+        ...
+
     def resolve_valuation_output(
         self,
         reference: Mapping[str, Any],
@@ -217,6 +229,27 @@ class InMemoryCanonicalValuationOutputResolver:
         if admission.output_hash != output["output_hash"]:
             raise ValueError("admitted VALUATION output_hash does not match materialized valuation output")
         self._outputs[ref["admission_record_hash"]] = output
+
+    def resolve_valuation_admission(
+        self,
+        reference: Mapping[str, Any],
+        *,
+        case_id: str,
+        market: str,
+        symbol: str,
+        company: str,
+        cutoff_date: date,
+    ) -> dict[str, Any]:
+        ref = _strict_ref(reference, "valuation_reference")
+        return self._admission_resolver.resolve(
+            ref,
+            expected_domain="VALUATION",
+            case_id=case_id,
+            market=market,
+            symbol=symbol,
+            company=company,
+            cutoff_date=cutoff_date,
+        ).to_dict()
 
     def resolve_valuation_output(
         self,
