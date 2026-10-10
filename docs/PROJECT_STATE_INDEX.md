@@ -24,6 +24,8 @@ B2-D2 Provider-Neutral Runtime Boundary               PASS / CANONICAL
 B2-D Live Provider Invocation / Evidence                OPTIONAL / BLOCKED — NOT MVP GATE
 B2-E Natural-Language → Semantic → Decision E2E          PASS / CANONICAL
 B2-F Full Independent Red-team                          PASS / CANONICAL
+P0 B3 persisted upstream write authorization             MERGED / EXACT-HEAD CI PASS
+Production P0-LLM-001 / P0-LLM-004                      OPEN / REAL-HOST ACCEPTANCE REQUIRED
 ```
 
 ### Current blockers
@@ -36,6 +38,10 @@ B2-F Full Independent Red-team                          PASS / CANONICAL
 - A successful CI, byte hash, URL/title match, or payload format check is not source-origin proof or PIT admission.
 
 The independent B2-F audit remains PASS / CANONICAL. Production host acceptance and real-company admission remain OPEN.
+
+- P0 Batch B3 / PR #276 is merged: the formal Decision Revision, Machine Publication and Investor Review Report write gates now re-open and validate content-addressed semantic, Forecast and Valuation admission payloads and their stage bindings. Missing upstream bytes are required to fail closed as `BLOCKED` before formal output files or Run Envelope mutation.
+- Exact validated PR head `f31f029b8027b19f4a8ff74fede7fdae8977f516`: P0 entry/write regression, B2-E E2E, Investment Core CI, trusted runtime factory, investor report, B04/B04-B, and independent authority/red-team workflows passed. This is control-plane regression evidence only.
+- P0-LLM-001 / P0-LLM-004 remain OPEN: no production host-origin run has yet proved source-admitted 605016 Evidence/PIT, authentic semantic/Forecast/Valuation lineage, report/publication, complete Run Receipt replay and independent review in the deployed runtime.
 
 ### P0 Batch B2 — First-Party Host Implementation — 2026-10-10
 
@@ -173,7 +179,19 @@ Non-claims:
 - No production factory or live semantic/model callback was installed. Real 605016 Evidence/PIT admission remains a separate critical path.
 - P0-LLM-001 / P0-LLM-004 remain **OPEN** until the real host is identified and wired, genuine runtime identity is independently verified, and a real-company run passes evidence/semantic/forecast/valuation admission, publication/report/receipt replay and independent red-team.
 
-Next boundary: **Batch B2 — production host identification and trusted runtime registration**. Do not call Batch B fully complete because Batch B1 is merged.
+Next boundary at that checkpoint: **Batch B2 — production host identification and trusted runtime registration**. Do not call Batch B fully complete because Batch B1 is merged.
+
+### P0 Batch B3 — Persisted Upstream Admission + Formal Write Authorization — 2026-10-10
+
+Status: **MERGED / EXACT-HEAD CONTROL-PLANE REGRESSION PASS / PRODUCTION P0 OPEN**.
+
+- PR #276: [P0 persisted upstream write authorization](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/276).
+- Merge commit: `d3582621918b285f29b4573c2618c1072247885c`; validated pre-merge exact head: `f31f029b8027b19f4a8ff74fede7fdae8977f516`.
+- The canonical run now retains exact content-addressed Semantic Artifact, Producer Receipt/Admission, Forecast Admission, Valuation Admission/Output and a bound upstream-admission bundle before `DECISION_ADMITTED` is persisted.
+- Formal Decision Revision, Publication and Report authorization re-open and validate upstream artifact bytes, hashes, schema/identity, lineage and stage receipt bindings. A resolver that cannot return the exact admitted Valuation record cannot downgrade to reference-ID-only authorization.
+- Negative compliance regression `test_p0_ce_07_formal_writers_block_when_upstream_admission_bytes_are_missing` deletes semantic, valuation-output or forecast-admission bytes at the corresponding writer boundary and checks that the request is blocked and the Run Envelope remains byte-identical; no formal output, report or complete Run Receipt is emitted on blocked paths.
+- Exact-head checks passed for P0 canonical-entry incident reproduction, B2-E natural-language E2E, Investment Core CI, trusted runtime factory, investor report, B04 and B04-B lineage, B00-B authority reproduction, B2-F fresh independent red-team and post-B04 independent red-team.
+- Scope limitation: the regressions use synthetic TEST_ONLY lifecycle records to test authorization mechanics. They do not admit 605016 company evidence, prove source-origin/PIT, deploy the HTTP host, prove live semantic reasoning or establish investment-decision quality. P0-LLM-001 / P0-LLM-004 remain OPEN.
 
 ### Retained B2-D integration history (optional, non-blocking)
 
@@ -202,7 +220,7 @@ Therefore:
 
 ### Current next development batch
 
-**Current execution plan:** `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md`, refreshed against `main@2978cdbc3f76f1ab1596896e3425c75661144a57`. Batch B first-party HTTP host implementation is merged (PR #270; dedicated host tests 21/21 PASS) but production runtime/deployment acceptance remains OPEN. Route A C1 current-main capture refresh is merged (PR #272) and Attempt 10 passed 12/12 raw-byte/hash and 12/12 payload checks, while B2/PIT remains correctly `BLOCKED_NOT_ADMITTED`. Continue source-by-source issuer-origin, PIT and reuse adjudication for 605016; continue 002001 source adjudication in parallel. Unadmitted facts remain UNKNOWN; Route A does not depend on API credentials.
+**Current execution plan:** `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md` is the active plan, but the indexed status here supersedes any stale milestone sequencing inside it. PR #276 has now closed the tested stage-receipt-only formal-write gap. The next evidence gate is source-by-source issuer-origin, first-public-time/PIT and reuse adjudication for 605016, then unchanged B2 Evidence/PIT admission; continue 002001 source adjudication in parallel. The production gate remains deployment/configuration of the real first-party host and a genuine host-origin run through semantic/Forecast/Valuation admission, publication/report and full Run Receipt replay. Raw capture/hash/payload checks remain `CAPTURED_NOT_ADMITTED`; unadmitted facts remain UNKNOWN. Route A does not depend on a paid API key or external search credentials.
 
 The primary Investment Core MVP path is **Route A — free-first single-company evidence intake + public web discovery**. No LLM provider endpoint or API key is required for this Route A path. Public-web discovery, public-source capture, B2 preflight and artifact retention all run without an external LLM endpoint, paid search API or API key. Operator-supplied raw originals and manually supplied evidence remain supported when public URLs are unavailable or source bytes need to be supplied directly. B2-D remains an optional external-LLM integration adapter and is not an MVP gate.
 
