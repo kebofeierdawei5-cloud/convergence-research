@@ -52,6 +52,12 @@ def validate_capture_final_gate(
     if preflight.get("source_origin_verified") is not False:
         raise CaptureFinalGateError("B2_PREFLIGHT_MUST_NOT_CLAIM_SOURCE_ORIGIN_VERIFIED")
 
+    payload_mismatches = verification.get("payload_contract_mismatches", 0)
+    if isinstance(payload_mismatches, bool) or not isinstance(payload_mismatches, int) or payload_mismatches < 0:
+        raise CaptureFinalGateError("PAYLOAD_CONTRACT_MISMATCH_COUNT_INVALID")
+    if preflight.get("payload_contract_failure_count", 0) != payload_mismatches:
+        raise CaptureFinalGateError("B2_PREFLIGHT_PAYLOAD_CONTRACT_BINDING_MISMATCH")
+
     rows = receipt.get("sources")
     if not isinstance(rows, list) or not rows:
         raise CaptureFinalGateError("CAPTURE_RECEIPT_SOURCE_ROWS_INVALID")
@@ -73,12 +79,20 @@ def validate_capture_final_gate(
         if failed != 0 or succeeded != len(rows) or capture_outcome != "success":
             raise CaptureFinalGateError("COMPLETE_CAPTURE_STATUS_MISMATCH")
         expected_b2 = "BLOCKED_NOT_ADMITTED"
-        gate_status = "CAPTURE_COMPLETE_NOT_ADMITTED"
+        gate_status = (
+            "RAW_CAPTURE_COMPLETE_WITH_PAYLOAD_MISMATCHES_NOT_ADMITTED"
+            if payload_mismatches
+            else "CAPTURE_COMPLETE_NOT_ADMITTED"
+        )
     elif status == "PARTIAL_CAPTURE_NOT_ADMITTED":
         if succeeded <= 0 or failed <= 0 or capture_outcome != "failure":
             raise CaptureFinalGateError("PARTIAL_CAPTURE_STATUS_MISMATCH")
         expected_b2 = "BLOCKED_NOT_ADMITTED"
-        gate_status = "PARTIAL_CAPTURE_VERIFIED_NOT_ADMITTED"
+        gate_status = (
+            "PARTIAL_CAPTURE_WITH_PAYLOAD_MISMATCHES_NOT_ADMITTED"
+            if payload_mismatches
+            else "PARTIAL_CAPTURE_VERIFIED_NOT_ADMITTED"
+        )
     else:
         raise CaptureFinalGateError("CAPTURE_RECEIPT_STATUS_INVALID")
     if preflight.get("status") != expected_b2:
@@ -98,15 +112,21 @@ def validate_capture_final_gate(
         "sources_captured": succeeded,
         "sources_failed": failed,
         "raw_bytes_verified": raw_verified,
+        "payload_contract_mismatches": payload_mismatches,
+        "payload_contract_passes": verification.get("payload_contract_passes", 0),
         "raw_integrity": "PASS",
         "b2_preflight": expected_b2,
         "evidence_admission": False,
         "pit_admission": False,
         "llm_provider_required": False,
         "meaning": (
-            "Partial capture retained; failed source rows remain explicit in the receipt."
-            if failed
-            else "All declared sources captured and byte-verified."
+            f"Raw bytes retained; {payload_mismatches} source payload(s) failed the declared file-type contract and were not emitted as B2 Evidence Records."
+            if payload_mismatches
+            else (
+                "Partial capture retained; failed source rows remain explicit in the receipt."
+                if failed
+                else "All declared sources captured and byte-verified; payload type was not checked unless declared in the source manifest."
+            )
         ),
     }
 
