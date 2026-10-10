@@ -8,7 +8,7 @@
     {
       "source_id": "SSE-H1-2026-FULL",
       "field_group": "security_identity",
-      "source_ref": "SSE:2026_H1_FULL_REPORT",
+      "source_ref": "SSE:COMPANY_ANNOUNCEMENT",
       "source_class": "OFFICIAL_EXCHANGE",
       "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-08-31/605016_20260831_CM3F.pdf",
       "known_at": "2026-08-31",
@@ -20,7 +20,7 @@
     {
       "source_id": "SINA-2025-ANNUAL-REPORT",
       "field_group": "financial_reality",
-      "source_ref": "SINA:2025_ANNUAL_REPORT_REPRODUCTION",
+      "source_ref": "SINA:PUBLIC_DISCLOSURE_MIRROR",
       "source_class": "PUBLIC_SECONDARY",
       "url": "https://money.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=12066477&stockid=605016",
       "known_at": "2026-04-08",
@@ -32,7 +32,7 @@
     {
       "source_id": "SSE-Q1-2026-FULL",
       "field_group": "financial_reality",
-      "source_ref": "SSE:2026_Q1_FULL_REPORT",
+      "source_ref": "SSE:COMPANY_ANNOUNCEMENT",
       "source_class": "OFFICIAL_EXCHANGE",
       "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-04-30/605016_20260430_JRPF.pdf",
       "known_at": "2026-04-30",
@@ -44,7 +44,7 @@
     {
       "source_id": "SSE-H1-OPERATING-DATA-2026",
       "field_group": "business_reality",
-      "source_ref": "SSE:2026_H1_MAIN_OPERATING_DATA",
+      "source_ref": "SSE:COMPANY_ANNOUNCEMENT",
       "source_class": "OFFICIAL_EXCHANGE",
       "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-08-31/605016_20260831_1LZA.pdf",
       "known_at": "2026-08-31",
@@ -56,7 +56,7 @@
     {
       "source_id": "SSE-2026-09-SUBSIDIARY-INVESTMENT",
       "field_group": "business_reality",
-      "source_ref": "SSE:2026_KUNMING_SUBSIDIARY_ANNOUNCEMENT",
+      "source_ref": "SSE:COMPANY_ANNOUNCEMENT",
       "source_class": "OFFICIAL_EXCHANGE",
       "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-09-10/605016_20260910_G7QR.pdf",
       "known_at": "2026-09-10",
@@ -67,7 +67,7 @@
     {
       "source_id": "SSE-2026-10-09-SHAREHOLDERS-MEETING",
       "field_group": "corporate_disclosures",
-      "source_ref": "SSE:2026_SECOND_EXTRAORDINARY_SHAREHOLDERS_MEETING_RESOLUTION",
+      "source_ref": "SSE:COMPANY_ANNOUNCEMENT",
       "source_class": "OFFICIAL_EXCHANGE",
       "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-10-09/605016_20261009_68UA.pdf",
       "known_at": "2026-10-09",
@@ -79,7 +79,7 @@
     {
       "source_id": "SSE-2026-09-CONVERTIBLE-BOND-UPDATE",
       "field_group": "capital_structure",
-      "source_ref": "SSE:CONVERTIBLE_BOND_APPLICATION_UPDATE_NOTICE",
+      "source_ref": "SSE:COMPANY_ANNOUNCEMENT",
       "source_class": "OFFICIAL_EXCHANGE",
       "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-09-11/605016_20260911_B759.pdf",
       "known_at": "2026-09-11",
@@ -90,7 +90,7 @@
     {
       "source_id": "SSE-2026-CONVERTIBLE-BOND-PROSPECTUS",
       "field_group": "capital_structure",
-      "source_ref": "SSE:CONVERTIBLE_BOND_PROSPECTUS_DRAFT",
+      "source_ref": "SSE:COMPANY_ANNOUNCEMENT",
       "source_class": "OFFICIAL_EXCHANGE",
       "url": "https://static.sse.com.cn/stock/disclosure/announcement/c/202604/605016_20260430_ZKLC.pdf",
       "known_at": "2026-04-30",
@@ -101,7 +101,7 @@
     {
       "source_id": "SSE-2026-H1-DIVIDEND-PLAN",
       "field_group": "capital_structure",
-      "source_ref": "SSE:2026_H1_PROFIT_DISTRIBUTION_PLAN",
+      "source_ref": "SSE:COMPANY_ANNOUNCEMENT",
       "source_class": "OFFICIAL_EXCHANGE",
       "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-08-31/605016_20260831_T6IL.pdf",
       "known_at": "2026-08-31",
@@ -112,7 +112,7 @@
     {
       "source_id": "SSE-2026-07-PLEDGE-RELEASE",
       "field_group": "trust_governance_events",
-      "source_ref": "SSE:CONTROLLING_SHAREHOLDER_PLEDGE_RELEASE_AND_EXTENSION",
+      "source_ref": "SSE:COMPANY_ANNOUNCEMENT",
       "source_class": "OFFICIAL_EXCHANGE",
       "url": "https://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-07-24/605016_20260724_7ZUA.pdf",
       "known_at": "2026-07-24",
@@ -123,7 +123,7 @@
     {
       "source_id": "PRICE-STOCKSTAR-2026-10-09",
       "field_group": "market_price",
-      "source_ref": "STOCKSTAR:2026-10-09_PRICE_NEWS_REPORT",
+      "source_ref": "STOCKSTAR:MARKET_PRICE_ARTICLE",
       "source_class": "PUBLIC_SECONDARY",
       "url": "https://wap.stockstar.com/detail/RB2026100900029140",
       "known_at": "2026-10-09T18:09:28+08:00",
@@ -135,7 +135,7 @@
     {
       "source_id": "PRICE-INVESTING-HISTORY-2026-10-09",
       "field_group": "market_price",
-      "source_ref": "INVESTING:605016_HISTORICAL_PRICE_PAGE",
+      "source_ref": "INVESTING:MARKET_HISTORY_PAGE",
       "source_class": "PUBLIC_SECONDARY",
       "url": "https://hk.investing.com/equities/shandong-bailong-chuangyuan-bio-historical-data",
       "known_at": "",
