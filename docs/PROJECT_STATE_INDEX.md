@@ -1,10 +1,10 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-10
+Snapshot: 2026-10-11
 Authority: this file is the **only canonical Current State Index**.
 
-## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-10
+## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-11
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
@@ -27,7 +27,7 @@ B2-F Full Independent Red-team                          PASS / CANONICAL
 P0 B3 persisted upstream write authorization             MERGED / EXACT-HEAD CI PASS
 P0 Canonical Runtime Callback Preflight                  MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL PASS
 Production P0-LLM-001 / P0-LLM-004                      OPEN / REAL-HOST ACCEPTANCE REQUIRED
-605016 official HTTPS B2 candidate                       PASS / EPHEMERAL; LOCAL PRIVATE PERSISTENCE PENDING
+605016 private candidate + read-only replay               PASS / CANONICAL LOCAL ARTIFACT; PRODUCTION GATES OPEN
 ```
 
 ### Current blockers
@@ -2299,3 +2299,17 @@ Explicit non-claims:
 - **Resolved:** the local read-only-verification `ModuleNotFoundError` incident and persisted-copy replay gate.
 - **Still blocked / not admitted:** `exact_first_public_timestamp_verified=false`, `source_vintage_review_required=true`; no formal signed admission, production Host acceptance, request bundle, or decision. Human approval remains required; automatic execution remains false.
 - **Next canonical boundary:** resolve the price-evidence source-vintage policy using official/reproducible evidence. Do not rerun ingest or storage verification just to revisit this closed gate. Do not promote a candidate into a decision until the source-vintage gate is explicitly adjudicated under the governing PIT contract.
+
+
+## C1 — 605016 Bounded Source-Vintage / PIT Adjudication — 2026-10-11
+
+Status: **IMPLEMENTATION CI PASS / LOCAL SUCCESSOR MIGRATION NOT YET RUN**
+
+- Local candidate storage is no longer a blocker. Operator-confirmed replay returned `VERIFIED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED`; the established candidate still has 11 evidence records / 11 raw declarations / 8 unique physical raw files. Its old manifest bytes, receipt schema and fingerprint remain unchanged.
+- Official SSE 2026 trading rules (issued 2026-04-24, effective 2026-07-06; §§3.7.2, 3.7.9 and 5.1.1) support a conservative public-availability upper bound of `2026-10-08T15:30:00+08:00` for the official 2026-10-08 closing price, because the closing price is included in real-time quote during the 15:05–15:30 post-market fixed-price session. This is a rule-derived upper bound, **not** an assertion of the historical JSON endpoint's exact upload/first-public timestamp.
+- PR [#329](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/329) adds a deterministic policy receipt bound to case/cutoff, price evidence ID, existing private raw-byte SHA-256, official rule URL/version/clauses and a strict bound-before-cutoff comparison. It re-runs the unchanged Core/PIT validator.
+- Exact first-public timestamp stays explicitly unverified: `exact_first_public_timestamp_verified=false`. The rule webpage/document bytes were not materialized as raw source bytes in this run; `raw_rule_bytes_sha256=null` records that limit honestly.
+- The successor is written to a new content-addressed directory only after full byte, receipt, privacy and Core/PIT replay. The prior candidate is preserved unchanged. New receipt schema is `IIOS-LOCAL-PRIVATE-B2-PERSISTENCE-0.2`; old `0.1` candidates remain supported. Launcher mode `--adjudicate-source-vintage` uses only already-stored local bytes and does not download Attempt 10 or request official price/dividend endpoints.
+- Exact-head checks after the latest code-only fix: private persistence contract 53/53 PASS; B2 data Evidence/PIT tests 31/31 PASS; company Evidence/PIT tests 23/23 PASS; B2 scope 3/3 PASS; compile/schema/diff checks PASS. Documentation is being synchronized on this PR branch; rerun all relevant checks after the final documentation commit before merge.
+- **Not granted:** formal signed admission, Production Host acceptance, request bundle, Decision, publication, Human Approval or execution permission. Resolving the bounded PIT availability question does not claim exact endpoint timestamp telemetry and does not by itself authorize investment decisions.
+- **Operator action only after PR #329 is merged and exact final-head CI passes:** run the launcher's `--adjudicate-source-vintage` mode once; then preserve its sanitized result and confirm two candidates exist (legacy unchanged + bounded successor) and the successor reports Core/PIT PASS. Do not rerun ingest or fetch market sources for this migration.
