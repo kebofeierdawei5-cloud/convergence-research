@@ -689,9 +689,9 @@ def test_default_core_validator_import_bootstraps_repository_root(
     package_root.mkdir(parents=True)
     (package_root / "__init__.py").write_text("", encoding="utf-8")
     (package_root / "canonical_evidence_admission_v01.py").write_text(
-        "def validate_company_evidence_manifest(manifest, *, raw_root, require_raw_verification):\\n"
-        "    assert require_raw_verification is True\\n"
-        "    return ['FIXTURE_CORE_IMPORT_FROM_REPOSITORY_ROOT']\\n",
+        "def validate_company_evidence_manifest(manifest, *, raw_root, require_raw_verification):\n"
+        "    assert require_raw_verification is True\n"
+        "    return ['FIXTURE_CORE_IMPORT_FROM_REPOSITORY_ROOT']\n",
         encoding="utf-8",
     )
 
