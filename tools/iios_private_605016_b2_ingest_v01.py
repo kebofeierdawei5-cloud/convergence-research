@@ -766,21 +766,41 @@ def _copy_exact_artifacts(
 
 
 def _validate_core(
-    manifest: Mapping[str, Any], raw_root: Path, validator: Callable[..., list[str]] | None
+    manifest: Mapping[str, Any],
+    raw_root: Path,
+    validator: Callable[..., list[str]] | None,
+    repository_root: str | Path = REPOSITORY_ROOT,
 ) -> list[str]:
     if validator is None:
+        # Every entry point (including read-only --verify-existing) must establish
+        # the same repository import environment. Ingest used to do this only as
+        # an incidental side effect of importing the adjudicator; offline replay
+        # skips that branch and could fail with ModuleNotFoundError before it
+        # inspected the persisted candidate.
+        try:
+            import_root = Path(repository_root).expanduser().resolve(strict=True)
+        except OSError:
+            raise PrivateIngestError("CORE_VALIDATOR_REPOSITORY_ROOT_MISSING") from None
+        if not import_root.is_dir():
+            raise PrivateIngestError("CORE_VALIDATOR_REPOSITORY_ROOT_MISSING")
+        import_root_text = str(import_root)
+        if import_root_text not in sys.path:
+            sys.path.insert(0, import_root_text)
         from iios_mvp.canonical_evidence_admission_v01 import validate_company_evidence_manifest
         validator = validate_company_evidence_manifest
     return list(validator(manifest, raw_root=raw_root, require_raw_verification=True))
 
 
 def _validate_existing_candidate(
-    candidate_dir: Path, *, validator: Callable[..., list[str]] | None
+    candidate_dir: Path,
+    *,
+    validator: Callable[..., list[str]] | None,
+    repository_root: str | Path = REPOSITORY_ROOT,
 ) -> dict[str, Any]:
     manifest_path = candidate_dir / "company_evidence_manifest.json"
     raw_root = candidate_dir / "evidence_root"
     manifest = _read_object(manifest_path, "EXISTING_PRIVATE_MANIFEST")
-    errors = _validate_core(manifest, raw_root, validator)
+    errors = _validate_core(manifest, raw_root, validator, repository_root=repository_root)
     if errors:
         raise PrivateIngestError("EXISTING_PRIVATE_CANDIDATE_FAILED_CORE_REPLAY")
     receipt = _read_object(candidate_dir / "PRIVATE_B2_PERSISTENCE_RECEIPT.json", "EXISTING_PRIVATE_RECEIPT")
@@ -826,10 +846,17 @@ def _verify_private_tree_permissions(root: Path, *, label: str) -> None:
             _require_private_entry(current_path / name, label=label)
 
 
-def _verify_private_candidate_contents(candidate_dir: Path, *, validator: Callable[..., list[str]] | None) -> dict[str, Any]:
+def _verify_private_candidate_contents(
+    candidate_dir: Path,
+    *,
+    validator: Callable[..., list[str]] | None,
+    repository_root: str | Path = REPOSITORY_ROOT,
+) -> dict[str, Any]:
     """Check persisted metadata, privacy, exact file set and original Core/PIT validator."""
     _verify_private_tree_permissions(candidate_dir, label="PRIVATE_CANDIDATE")
-    existing = _validate_existing_candidate(candidate_dir, validator=validator)
+    existing = _validate_existing_candidate(
+        candidate_dir, validator=validator, repository_root=repository_root
+    )
     manifest = existing["manifest"]
     receipt = existing["receipt"]
 
@@ -958,7 +985,9 @@ def verify_existing_private_b2_candidate(
         raise PrivateIngestError("PRIVATE_B2_CANDIDATE_NOT_FOUND")
 
     verified = [
-        _verify_private_candidate_contents(candidate, validator=core_validator)
+        _verify_private_candidate_contents(
+            candidate, validator=core_validator, repository_root=repository_root
+        )
         for candidate in sorted(candidate_dirs, key=lambda item: item.name)
     ]
     return {
@@ -1025,7 +1054,9 @@ def ingest_private_b2_candidate(
         if not isinstance(manifest.get("audit"), Mapping):
             raise PrivateIngestError("EPHEMERAL_B2_AUDIT_MISSING")
         price = _price_record_preflight(manifest, ephemeral_report)
-        core_errors = _validate_core(manifest, raw_root, core_validator)
+        core_errors = _validate_core(
+            manifest, raw_root, core_validator, repository_root=repository_root
+        )
         if core_errors:
             raise PrivateIngestError("CORE_OWNED_B2_PIT_VALIDATOR_BLOCKED:" + ",".join(core_errors[:8]))
 
@@ -1047,7 +1078,9 @@ def ingest_private_b2_candidate(
         if destination.is_symlink():
             raise PrivateIngestError("EXISTING_PRIVATE_CANDIDATE_MUST_NOT_BE_SYMLINK")
         if destination.exists():
-            existing = _validate_existing_candidate(destination, validator=core_validator)
+            existing = _validate_existing_candidate(
+                destination, validator=core_validator, repository_root=repository_root
+            )
             if _candidate_fingerprint(existing["manifest"]) != fingerprint:
                 raise PrivateIngestError("IMMUTABLE_PRIVATE_CANDIDATE_CONFLICT")
             return {
@@ -1095,7 +1128,10 @@ def ingest_private_b2_candidate(
                 os.fsync(handle.fileno())
             os.chmod(manifest_out, 0o600)
             copied_manifest = _read_object(manifest_out, "PERSISTED_B2_MANIFEST")
-            persisted_errors = _validate_core(copied_manifest, evidence_destination, core_validator)
+            persisted_errors = _validate_core(
+                copied_manifest, evidence_destination, core_validator,
+                repository_root=repository_root,
+            )
             if persisted_errors:
                 raise PrivateIngestError("PERSISTED_CORE_VALIDATOR_BLOCKED:" + ",".join(persisted_errors[:8]))
             if copied_count != len(raw_declarations):
@@ -1142,7 +1178,9 @@ def ingest_private_b2_candidate(
             os.chmod(receipt_out, 0o600)
 
             # Re-read and validate the self-contained payload before atomic promotion.
-            _validate_existing_candidate(payload_root, validator=core_validator)
+            _validate_existing_candidate(
+                payload_root, validator=core_validator, repository_root=repository_root
+            )
             os.replace(payload_root, destination)
             shutil.rmtree(stage_root, ignore_errors=True)
         except Exception:
