@@ -69,7 +69,7 @@ def _cutoff_datetime(cutoff_date: str) -> datetime:
 
 
 def _safe_relative_path(value: Any) -> PurePosixPath:
-    if not isinstance(value, str) or not value.strip() or "\\\\" in value:
+    if not isinstance(value, str) or not value.strip() or chr(92) in value:
         raise SourceVintageAdjudicationError("SOURCE_VINTAGE_RAW_PATH_INVALID")
     path = PurePosixPath(value)
     if (
@@ -203,8 +203,8 @@ def validate_source_vintage_adjudication(
             raise SourceVintageAdjudicationError("SOURCE_VINTAGE_ADJUDICATION_CONTRACT_MISMATCH:" + field)
     if not isinstance(adjudication.get("previous_known_at"), str):
         raise SourceVintageAdjudicationError("SOURCE_VINTAGE_PREVIOUS_KNOWN_AT_MISSING")
-    if not isinstance(adjudication.get("adjudicated_at"), str) or not adjudication.get("adjudicated_at"):
-        raise SourceVintageAdjudicationError("SOURCE_VINTAGE_ADJUDICATED_AT_MISSING")
+    if adjudication.get("policy_evaluation_mode") != "DETERMINISTIC_RULE_BOUND; NO_WALL_CLOCK_INPUT":
+        raise SourceVintageAdjudicationError("SOURCE_VINTAGE_POLICY_EVALUATION_MODE_INVALID")
     price, raw_ref = _price_binding(manifest, expected_price_sha256)
     _materialized_raw_bytes(raw_root, raw_ref, expected_price_sha256)
     if (
@@ -233,7 +233,6 @@ def adjudicate_605016_source_vintage(
     *,
     raw_root: Path,
     expected_price_sha256: str,
-    adjudicated_at: str,
 ) -> dict[str, Any]:
     """Return a new, Core-validated manifest using a conservative publication bound."""
     if manifest.get("source_vintage_adjudication") is not None:
@@ -245,15 +244,6 @@ def adjudicate_605016_source_vintage(
     result = deepcopy(dict(manifest))
     price, raw_ref = _price_binding(result, expected_price_sha256)
     _materialized_raw_bytes(raw_root, raw_ref, expected_price_sha256)
-    if not adjudicated_at or not isinstance(adjudicated_at, str):
-        raise SourceVintageAdjudicationError("SOURCE_VINTAGE_ADJUDICATED_AT_INVALID")
-    try:
-        parsed_adjudicated_at = datetime.fromisoformat(adjudicated_at.replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise SourceVintageAdjudicationError("SOURCE_VINTAGE_ADJUDICATED_AT_INVALID") from exc
-    if parsed_adjudicated_at.tzinfo is None:
-        raise SourceVintageAdjudicationError("SOURCE_VINTAGE_ADJUDICATED_AT_MUST_BE_TIMEZONE_AWARE")
-
     bound = datetime.fromisoformat(PUBLIC_AVAILABILITY_UPPER_BOUND)
     cutoff = _cutoff_datetime(str(result.get("cutoff_date")))
     if bound >= cutoff:
@@ -298,12 +288,12 @@ def adjudicate_605016_source_vintage(
                 "not materialized into the private evidence store in this run, so no rule-byte SHA-256 is claimed."
             ),
         },
+        "policy_evaluation_mode": "DETERMINISTIC_RULE_BOUND; NO_WALL_CLOCK_INPUT",
         "reasoning": (
             "The official SSE rule places the closing price in real-time quote during the 15:05-15:30 "
             "post-market fixed-price session. Use 15:30 as the conservative public-availability upper bound. "
             "This bounds PIT knowledge without asserting the historical daily-bar endpoint's exact upload time."
         ),
-        "adjudicated_at": adjudicated_at,
         "non_claims": [
             "exact_first_public_timestamp_not_verified",
             "historical_endpoint_upload_time_not_verified",
