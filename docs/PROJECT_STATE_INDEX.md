@@ -29,7 +29,7 @@ P0 Canonical Runtime Callback Preflight                  MERGED / EXACT-HEAD CON
 Batch 0 narrow state reconciliation                     PASS ON MERGE; NO ECONOMIC SEMANTICS CHANGED
 Batch 1 private Path A scenario runner                  PASS / MERGED; 40 TESTS; ANALYSIS-ONLY
 Batch 1 macOS one-click launcher permission fix             PASS / MERGED PR #358; 12 CHECKS + 3 STATIC TESTS PASS; OPERATOR REPORTS SUCCESS / BUNDLE NOT INDEPENDENTLY REVIEWED
-Batch 2 Path A scenario integrity audit                    IN PROGRESS / independent arithmetic, report consistency, exact-byte hashes
+Batch 2 Path A scenario integrity audit                    IN PROGRESS / PR #360 MERGED; 43 TESTS + 13 EXACT-HEAD CHECKS PASS; LOCAL BUNDLE REVIEW OPEN
 C0 Local-first architecture / product-entry decision     DECISION RECORDED; IMPLEMENTATION GATES OPEN
 P0 incident workflow zero-job anomaly                    OPEN / RUN 38143887553 ALSO ZERO JOBS; NO TEST ASSERTIONS EXECUTED
 C1 formal Evidence/PIT admission                         OPEN / TRUST REGISTRY EMPTY; SSE PRICE RIGHTS UNGRANTED
