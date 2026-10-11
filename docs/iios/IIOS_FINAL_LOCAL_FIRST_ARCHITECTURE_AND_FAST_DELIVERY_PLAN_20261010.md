@@ -314,22 +314,17 @@ assurance = OPERATOR_ASSERTED_NOT_CRYPTOGRAPHICALLY_VERIFIED
 
 建议按下列依赖推进，不把每个箭头理解成一个新的永久批次命名空间：
 
-\`\`\`text
-Action A: code/gap map + producer policy decision
-             ↓
-Action B: local input + durable official evidence
-             ↓
-Action C: authorized / explicitly bounded AI handoff
-             ↓
-Action D: one real canonical company run + complete receipt/replay
-             ↓
-Action E: adversarial regression + existing pilot acceptance
-             ↓
-Action F: only measured UX / installer improvements
-\`\`\`
+~~~text
+                    ┌─ Action B: verify local intake + evidence persistence ─┐
+Action A ───────────┤                                                        ├─→ Action D
+                    └─ Action C: approved AI producer contract / handoff ────┘
+                                                                                 ↓
+                                                           Action E: red-team + existing PILOT gates
+                                                                                 ↓
+                                                           Action F: measured UX / installer (optional)
+~~~
 
-B 与 C 在代码上可并行做窄范围准备，但正式端到端验收依赖二者都达到各自门槛。若 Action A 判定人工 ChatGPT Free 输出不允许进入正式语义准入，Action C 只能完成 non-canonical auxiliary workflow；必须另选一个符合现行治理的推理来源来继续正式路径，不能将正式决策门禁降级。
-
+Action A 必须先完成；其后的 B 与 C 可在不互相重复实现的前提下并行推进，以减少总工期。Action B 的操作者本机持久化验证如果暂时无法执行，不应阻止无依赖的 C 类契约/导入器开发，但在真实公司正式运行前必须补齐。D 依赖 B 与 C 的相关门槛均通过。若 Action A 判定人工 ChatGPT Free 输出不允许进入正式语义准入，Action C 只能完成 non-canonical auxiliary workflow；必须另选一个符合现行治理的推理来源来继续正式路径，不能将正式决策门禁降级。
 ## 7. 成本控制原则
 
 - **先复用，再新增：**每个新模块都必须指出现有实现为什么不能满足需求。
@@ -370,3 +365,46 @@ LOCAL_SINGLE_USER 只有同时满足以下条件才可标记为 MVP usable：
 保留 LOCAL_SINGLE_USER 与现有核心复用方向；不采纳另起一套 B0–B5 / S0–S6 生命周期的做法。把工作映射回现有权威状态与 PILOT 接受框架，先做一次有证据的能力/缺口盘点，再优先验证本地真实输入和证据持久化、AI 生产者准入和一家公司完整链路。
 
 **最快的可信交付不是先搭建更多界面，而是尽快证明现有内核能通过唯一用户入口完成一次真实、合规、可重放的投资决策；然后只修复这条路径上已证实的阻塞。**
+
+
+## 11. 独立中立审查与本次优化记录（2026-10-11）
+
+本节记录对方案本身的审查，不表示其已在生产环境实现或通过。
+
+### 11.1 审查结论
+
+**架构方向：建议保留。开发路线：经过本次调整后有条件接受；仍需 Action A 的代码和治理证据才能冻结为执行指令。**
+
+| 维度 | 评估 | 依据与限制 |
+|---|---|---|
+| 原始投资需求匹配 | 强 | 单公司、价格决策、证据/PIT、独立预测、回报/风险、人工审批和回放被保留 |
+| 工程治理匹配 | 强但有条件 | Orchestrator 和权限边界保留；人工 Web producer 的正式资格尚未裁定 |
+| 开发经济性 | 中上 | 避免重写和重复服务；可复用 API 的实际范围尚需代码盘点 |
+| 部署简化潜力 | 中上 | LOCAL_SINGLE_USER 能缩减远程基础设施，但真实 Mac 安装、升级和恢复尚未验证 |
+| 单次使用成本 | 未证实 | 两轮交接是待测假设；免费网页额度和输出格式可影响失败率及重试量 |
+| 计划依赖清晰度 | 本次改善 | B 与 C 可并行准备；正式端到端运行仍须同时满足证据与生产者门槛 |
+
+### 11.2 仍然存在的风险
+
+1. **免费网页的治理决策具有架构影响。** 不应先实现正式导入，再补写准入规则；必须先作有版本记录的 Go/No-Go。
+2. **现有能力的名称不等同于生产验收。** 每个“可复用”组件必须引用代码入口和对应测试范围；fixture-only 或 preconstructed artifacts 不能用于证明端到端通过。
+3. **本地运行依然依赖网络获取部分官方来源。** Local-first 不等于完全离线；网络失败时需要稳定、可诊断的 BLOCKED 状态和受控官方文件导入路径。
+4. **两轮交接不是硬性产品约束。** 它应以试点的人工交接次数、重试率、输出缺项率和人工改写量评估；若拆成更少或更多轮有可测收益，应以数据决定。
+5. **一家公司通过不等于策略有效或整个 MVP 已接受。** 单公司闭环是技术主路径证据；现有 Fast Launch Plan 对控制案例、fresh candidate 和独立重放的更高接受标准仍须执行。
+6. **低部署成本还包含升级与数据迁移。** 不仅要证明首次启动，也要验证版本升级、旧记录可读、失败恢复与私有数据不会泄漏。
+
+### 11.3 本次已做的优化
+
+- 取消另起一套 B0–B5 / S0–S6 生命周期的含义，明确本文件是现有 canonical 状态和 PILOT 路线之下的实施建议，而非新的状态权威。
+- 将 Action A 定为唯一先决步骤，优先确认现有能力、真实缺口与 ChatGPT Web 来源保证契约。
+- 调整依赖关系：Action B（本地证据和持久化实证）与 Action C（AI 交接契约/实现准备）可在 Action A 之后并行，避免操作环境的暂时阻塞拖延独立工作；Action D 仍必须等待两者相关门槛通过。
+- 将现有 605016 Mac 私有持久化待验证问题视为真实验收工作，但不把单一案例/操作者机器阻塞绝对化为所有开发的前置条件；若另一个候选拥有更完整且可合法使用的证据，可用于端到端试点，同时保留 605016 的真实状态。
+- 明确两轮 ChatGPT 交接是成本假设而非永久硬规则，必须用实际使用数据评估。
+- 明确不能把旧 PILOT PASS、局部 CI、哈希匹配或可读报告扩张解释为真实 LLM 产品验收。
+- 不新增技术组件、不更改经济语义、不修改权威 State Index，也不宣称 P0 已关闭。
+
+### 11.4 评审后的执行决定
+
+下一步只进入 Action A：基于最新 canonical main 完成逐文件能力映射、调用路径和测试证据盘点，并作出人工 Web producer 的正式治理 Go/No-Go。Action A 结束后更新唯一权威状态索引和当前任务指令，再依据真实差距启动 B/C 窄 PR。
+
+在 Action A 以前，不应先开发新的浏览器扩展、本地网页、数据库替换、多 Provider 路由或重新实现报告/编排系统。
