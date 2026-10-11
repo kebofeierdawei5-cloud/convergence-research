@@ -62,3 +62,37 @@ The SZSE describes SSIC as exclusively authorized to manage/distribute SZSE secu
 5. Cover all seven mandatory field groups with case-bound fact records, then run the unchanged company Evidence/PIT validator and a fresh independent review. Any uncovered group keeps the case BLOCKED.
 
 **Non-claims:** This audit does not admit facts, pass B2, certify reuse rights, create a formal signed admission, accept a production Host, create a Decision, or authorize a trade.
+
+
+## 5. Official-source page cross-check — 2026-10-11
+
+The exact URLs for the four pre-cutoff official PDF sources were opened independently on the public SZSE static-document host. The visible PDF content confirms the issuer/security identity and document titles. Supporting official same-day board resolutions also state that the respective report/announcement was published to designated disclosure media on that date:
+
+| Raw source in Run #8 | Official document identity | Publication-date cross-check | Conservative PIT upper bound | Current disposition |
+|---|---|---|---|---|
+| `SZSE-2026-H1-FULL` | 2026 H1 full report; cover identifies 浙江新和成股份有限公司 | Official archive path `2026-08-20`; board resolution announcement `2026-034` says the H1 report was disclosed in the designated media on the same day | `2026-08-20T23:59:59+08:00` | Source/date candidate verified; byte hash independently verified from Run #8; exact intraday first-public time not known |
+| `SZSE-2026-H1-SUMMARY` | H1 report summary; PDF identifies code 002001 / 新和成 / announcement `2026-035` | Archive path `2026-08-20`; same-day board resolution `2026-034` names the report and summary and states same-day disclosure | `2026-08-20T23:59:59+08:00` | Source/date candidate verified; byte hash independently verified from Run #8; exact intraday first-public time not known |
+| `SZSE-2026-Q1-FULL` | Q1 report; PDF identifies code 002001 / 新和成 / announcement `2026-021` | Archive path `2026-04-29`; board resolution announcement `2026-020` dated 2026-04-29 states that the Q1 report was disclosed in designated media the same day | `2026-04-29T23:59:59+08:00` | Source/date candidate verified; byte hash independently verified from Run #8; exact intraday first-public time not known |
+| `SZSE-2026-BUYBACK-PLAN` | Buyback-plan announcement; PDF identifies code 002001 / 新和成 / announcement `2026-027` | Archive path `2026-06-24`; board resolution announcement `2026-026` dated 2026-06-24 states the buyback plan was disclosed in designated media/CNINFO the same day | `2026-06-24T23:59:59+08:00` | Source/date candidate verified; byte hash independently verified from Run #8; exact intraday first-public time not known |
+
+Publicly accessible supporting document locators (the support PDFs were reviewed through the public web but their bytes were **not** added to the Run #8 archive or locally re-hashed in this task):
+
+- H1 board resolution `2026-034`: https://disc.static.szse.cn/disc/disk03/finalpage/2026-08-20/a0f47443-c60c-4e88-b444-bf3e0da5372e.PDF
+- Q1 board resolution `2026-020`: https://disc.static.szse.cn/download/disc/disk03/finalpage/2026-04-29/03e7b79f-9516-4062-854f-34f5c29dc093.PDF
+- Buyback-plan board resolution `2026-026`: https://disc.static.szse.cn/disc/disk03/finalpage/2026-06-24/0f51c1d5-2f3d-4f07-9f7c-c02bfd2c63a4.PDF
+
+The conservative date-end bounds above are all strictly before the canonical date-only cutoff instant `2026-10-09T00:00:00+08:00`. They are upper bounds, not a claim that the first-public time occurred at 23:59:59. The archived PDF bytes remain the fact source and retain their existing local SHA-256s. A final B2 successor must bind each fact to its exact archive object and page/table/row locator, record a cautious non-redistribution/internal-research disposition, and pass the unchanged Core/PIT validator.
+
+### 5.1 Source-use distinction
+
+SZSE's own Data Services page describes SSIC as authorized to manage/distribute SZSE securities information and describes closing-price data as end-of-day market data service: https://investor.szse.cn/English/services/dataServices/index.html. This supports keeping market-price data behind a separate source-reuse gate. It does **not** mean the four corporate-filing PDFs and market-quote pages share the same reuse status, and it does not establish an unrestricted license for bulk redistribution of filing PDFs.
+
+For the filing documents, use the narrowest internal-research handling: original files stay in the private evidence store, public Git contains only source references/hashes/locators and adjudication status, no PDF bytes or full numeric tables are redistributed, and extracted facts are still candidates until the manifest rebuild is Core/PIT validated. This handling is a conservative workflow disposition, not a legal opinion or an assertion of a broad redistribution license.
+
+### 5.2 Current fact-candidate coverage
+
+From the existing 11 page-located extraction candidates, the 2026-10-09 buyback-progress fact is excluded by the date-only cutoff. The other 10 candidates bind to the earlier H1 documents; the buyback-plan PDF adds a possible earlier trust/governance fact, and the dated official H1 filing record can supply a corporate-disclosure candidate. These are **source-qualified candidates**, not yet newly emitted ADMITTED Core Evidence Records.
+
+- Candidate-capable groups: `security_identity`, `corporate_disclosures`, `business_reality`, `financial_reality`, `capital_structure`, `trust_governance_events`.
+- Still not covered by an admitted record: `market_price`. The two captured Sohu/Eastmoney pages remain `UNKNOWN_NO_KNOWN_AT`; the Eastmoney K-line source still has no bytes/hash.
+- Overall case status remains `BLOCKED_NOT_ADMITTED`. The historic manifest's end-of-day cutoff is not repaired in place; a successor must be built with canonical date-only cutoff semantics.
