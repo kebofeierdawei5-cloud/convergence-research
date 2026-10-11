@@ -569,3 +569,80 @@ def test_main_renders_validation_error_as_blocked_json_not_traceback(monkeypatch
     assert '"status": "BLOCKED"' in output
     assert '"reason": "OFFICIAL_DIVIDEND_PDF_DIRECT_HTTPS_FETCH_BLOCKED"' in output
     assert "Traceback" not in output
+
+
+
+def test_artifact_api_transport_falls_back_to_curl_without_token_in_process_args(monkeypatch) -> None:
+    token = "test-token-not-for-process-arguments"
+
+    class FailingOpener:
+        def open(self, *_args, **_kwargs):
+            raise MODULE.URLError(MODULE.ssl.SSLCertVerificationError("certificate verify failed"))
+
+    monkeypatch.setattr(MODULE, "build_opener", lambda *_args, **_kwargs: FailingOpener())
+    monkeypatch.setattr(MODULE.shutil, "which", lambda name: "/usr/bin/curl" if name == "curl" else None)
+    captured = {}
+
+    def fake_run(args, **kwargs):
+        captured["args"] = args
+        captured["input"] = kwargs["input"]
+        return MODULE.subprocess.CompletedProcess(
+            args=args, returncode=0,
+            stdout="HTTP/2 302\\r\\nlocation: https://artifact-storage.example/signed-object\\r\\n\\r\\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    location = MODULE._request_attempt10_archive_url(token)
+
+    assert location == "https://artifact-storage.example/signed-object"
+    assert token not in " ".join(captured["args"])
+    assert "Authorization: Bearer " + token in captured["input"]
+    assert "--config" in captured["args"]
+    assert "-L" not in captured["args"]
+
+
+def test_artifact_api_double_transport_failure_reports_bounded_diagnostics(monkeypatch) -> None:
+    class FailingOpener:
+        def open(self, *_args, **_kwargs):
+            raise MODULE.URLError(MODULE.socket.gaierror("temporary failure in name resolution"))
+
+    monkeypatch.setattr(MODULE, "build_opener", lambda *_args, **_kwargs: FailingOpener())
+    monkeypatch.setattr(MODULE.shutil, "which", lambda name: "/usr/bin/curl" if name == "curl" else None)
+
+    def fake_run(args, **kwargs):
+        return MODULE.subprocess.CompletedProcess(
+            args=args, returncode=6, stdout="", stderr="Could not resolve host: api.github.com"
+        )
+
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    with pytest.raises(
+        MODULE.PrivateIngestError,
+        match="ATTEMPT10_ARTIFACT_API_TRANSPORT_FAILED_PYTHON_DNS_LOOKUP_FAILED_CURL_DNS_LOOKUP_FAILED",
+    ):
+        MODULE._request_attempt10_archive_url("dummy-token")
+
+
+def test_artifact_api_response_maps_access_and_retention_failures() -> None:
+    with pytest.raises(
+        MODULE.PrivateIngestError,
+        match="GITHUB_ACTIONS_ARTIFACT_ACCESS_DENIED_CHECK_TOKEN_ACTIONS_READ",
+    ):
+        MODULE._parse_artifact_api_response(403)
+    with pytest.raises(
+        MODULE.PrivateIngestError,
+        match="ATTEMPT10_ARTIFACT_MISSING_OR_EXPIRED_CHECK_CANONICAL_ARTIFACT",
+    ):
+        MODULE._parse_artifact_api_response(410)
+
+
+def test_curl_header_parser_uses_final_response_block() -> None:
+    headers = (
+        "HTTP/1.1 200 Connection established\\r\\n\\r\\n"
+        "HTTP/2 302\\r\\n"
+        "location: https://artifact-storage.example/signed-object\\r\\n"
+        "content-length: 0\\r\\n\\r\\n"
+    )
+    status, location = MODULE._parse_curl_dumped_headers(headers)
+    assert status == 302
+    assert location == "https://artifact-storage.example/signed-object"
