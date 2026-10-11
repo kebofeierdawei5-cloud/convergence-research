@@ -27,7 +27,7 @@ B2-F Full Independent Red-team                          PASS / CANONICAL
 P0 B3 persisted upstream write authorization             MERGED / EXACT-HEAD CI PASS
 P0 Canonical Runtime Callback Preflight                  MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL PASS
 Production P0-LLM-001 / P0-LLM-004                      OPEN / REAL-HOST ACCEPTANCE REQUIRED
-605016 private candidate + read-only replay               PASS / CANONICAL LOCAL ARTIFACT; PRODUCTION GATES OPEN
+605016 source-vintage successor                           PASS / LOCAL CORE-VALIDATED CANDIDATE; FORMAL/HOST GATES OPEN
 ```
 
 ### Current blockers
