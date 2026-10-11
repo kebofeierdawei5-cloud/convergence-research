@@ -1,7 +1,7 @@
 # 605016 — Local Private B2/PIT Persistence — 2026-10-10
 
 **Scope:** persist the real official-HTTPS B2 candidate and exact raw bytes in a user-controlled local private data root.  
-**Status:** operator-reported local private persistence PASS on 2026-10-11; a read-only offline replay after atomic promotion is the remaining storage-integrity confirmation. GitHub-hosted CI cannot inspect the user's private filesystem.
+**Status:** operator-confirmed local private persistence and read-only replay PASS on 2026-10-11. Current private candidate fingerprint/manifest hash are recorded in `docs/PROJECT_STATE_INDEX.md`. Storage integrity is closed; production Host and formal decision gates remain open.
 
 ## One-launcher operation
 
@@ -77,3 +77,31 @@ The follow-up downloader uses the official GitHub Actions artifact ZIP endpoint 
 ## Network-failure recovery added after operator report
 
 A network `BLOCKED` result from the SSE query API no longer creates an uncaught traceback or immediately abandons the run. The adjudicator may use the canonical `DIVIDEND_IMPLEMENTATION_ADJUDICATION_20261010.json` for the previously reviewed listing identity, but it must directly retrieve the official PDF again over HTTPS and match the pinned 146,499-byte SHA-256 before proceeding. It does not represent the historical listing body as re-downloaded: `listing_bytes_reverified_in_current_run=false` is included in the report. If direct PDF retrieval, TLS origin, hash or PDF structure validation fails, the run remains `BLOCKED` and no private persistent candidate is written. The local command now emits a sanitized `BLOCKED` JSON reason instead of exposing a traceback.
+
+
+## C1 — Bounded source-vintage PIT adjudication (2026-10-11)
+
+### What is adjudicated
+
+The existing official SSE daily-bar response binds the 2026-10-08 close to exact stored raw bytes. The endpoint does not reveal when that historical row was first uploaded, so the exact first-public timestamp remains unverified. The official SSE 2026 trading rules (document `上证发〔2026〕41号`; published 2026-04-24, effective 2026-07-06; §§3.7.2, 3.7.9 and 5.1.1) support using **2026-10-08 15:30 +08:00** as a conservative public-availability upper bound: the closing price is included in real-time quote during the 15:05–15:30 post-market fixed-price session. This is a conservative upper bound rather than endpoint upload telemetry.
+
+PR [#329](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/329) implements a deterministic record bound to the case/cutoff, raw price SHA-256, evidence ID, rule identity, strict time comparison and unchanged Core/PIT validation. It keeps `exact_first_public_timestamp_verified=false` explicit. The official rule page bytes were not materialized and hashed in this run; the policy records `raw_rule_bytes_materialized=false` and `raw_rule_bytes_sha256=null`.
+
+### One-time local successor migration (only after PR #329 is merged)
+
+Refresh the launcher from public canonical `main`, then run the special offline migration mode:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kebofeierdawei5-cloud/convergence-research/main/tools/Launch_IIOS_Private_605016_B2_Ingest.command -o "$HOME/Downloads/Launch_IIOS_Private_605016_B2_Ingest.command"
+bash "$HOME/Downloads/Launch_IIOS_Private_605016_B2_Ingest.command" --adjudicate-source-vintage
+```
+
+This mode obtains code from public GitHub, does **not** require GitHub CLI login, does **not** download Attempt 10, and does **not** re-request the official dividend/price endpoints. It reads and verifies the currently persisted private candidate, re-hashes the original bytes, builds the bounded successor manifest, runs the unchanged Core/PIT validator and promotes a new content-addressed candidate only after all validations pass. The original candidate remains untouched; migration replay is idempotent.
+
+Expected success status: `SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED` or its `ALREADY_SOURCE_VINTAGE_ADJUDICATED_...` replay form. The output must report `official_source_refetched=false`, `attempt10_downloaded=false`, `previous_candidate_retained=true`, Core validator PASS and `exact_first_public_timestamp_verified=false`.
+
+Do not run ordinary ingest or this migration until the PR is merged and the final docs-updated HEAD has passing exact-head CI. Local successor migration has not been performed as of this document update.
+
+### Unchanged non-claims
+
+No formal signed admission, Production Host acceptance, request bundle, Decision, publication, Human Approval or trade authorization is created by this source-vintage policy. It resolves the bounded cutoff-ordering review under the cited official rule; it does not assert the historical endpoint's exact publication time.
