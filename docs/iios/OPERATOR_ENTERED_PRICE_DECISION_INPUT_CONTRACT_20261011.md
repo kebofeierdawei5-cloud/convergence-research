@@ -1,8 +1,8 @@
 # Operator-Entered Price — Decision Input Contract (2026-10-11)
 
 - Record class: governance/implementation contract proposal
-- Baseline: canonical `main@70d146f3e5589829d334e18d0198692eed4fcd81`
-- Status: **MP-1 PASS / MERGED at `c0eeb8c7543aec8939de7b29d84ac35b62044fdf`; MP-2/MP-3 OPEN**
+- Baseline: canonical `main@4a0994fa4c84d12eef77d81a17c25dabf9145d66`
+- Status: **MP-1 PASS / MERGED PR #366; MP-2 CORE PASS / MERGED PR #368; REPORT ASSURANCE SURFACE + LOCAL RECEIPT REVIEW + MP-3 OPEN**
 - Scope: initial A/H-share current-price entry is supplied manually by the operator; IIOS does not automatically fetch market quotes for this path.
 
 ## 1. Decision
@@ -67,14 +67,18 @@ The operator can manually enter a value without naming a source. If a source is 
 - Added `tests/test_operator_entered_price_decision_input_v01.py` with 23 guardrail cases, including provenance escalation, timestamp, unsupported A-share prefixes, private-path redaction, tilde-expanded symlink, and storage boundaries and wired it into `.github/workflows/iios_private_scenario_analysis.yml`.
 - This is only typed input and replay integrity. It deliberately leaves `decision_chain_bound=false`, `formal_evidence_pit_admission=false`, and `formal_decision_authority=false`. Exact-head CI/review must pass before MP-1 is accepted.
 
-### Batch MP-2 — decision-chain integration
-- Integrate the typed price into the current-price resolver as an explicitly lower-assurance input class.
-- Bind the input receipt/hash to the Run Envelope, stage receipts, valuation/return/risk outputs and full Run Receipt.
-- Ensure report and machine publication expose the operator-attested class and limitations; do not claim formal exchange-price admission.
-- Keep Human Approval required and automatic execution disabled.
+### Batch MP-2 — decision-chain integration (CORE PASS / MERGED PR #368)
+- Added a separate trusted local resolver for the operator price bundle; canonical admitted-market-price resolver behavior is unchanged.
+- Validated private price-input and receipt bytes/hashes, case/instrument/currency identity and date-level cutoff; manual values remain `OPERATOR_ATTESTED_MARKET_DATA`, with source-origin/vintage/rights and formal Evidence/PIT flags false.
+- Kept the P4-F MIE baseline price source-qualified and separate from the operator current price used for entry/return evaluation.
+- Bound the input and receipt as two distinct hashes/references in `DECISION_PENDING`; Run Authority validates pair format, hash format, equality with the snapshot reference, price synchronization and non-escalated provenance flags.
+- Decision Admission preserves the input class and assurance; Human Approval remains required and automatic execution disabled.
+- Exact-head PR #368 passed 30/30 triggered workflow checks, including B2-E persisted integration, legacy Run Envelope replay and B2-F/Post-B04 independent red-team.
+- **Not yet complete:** human/machine investor report must render this price class and assurance clearly; one actual private local bundle/Run Receipt/replay must be independently reviewed. No private price value/source label/bundle is stored in Git.
 
-### Batch MP-3 — adversarial and end-to-end acceptance
-- Test missing/false operator confirmation, wrong symbol/exchange/currency, invalid or adjusted price, duplicated records, stale/ambiguous timestamps, date-only cutoff violation, post-cutoff backfill, changed bytes, path traversal/symlinks, unsafe permissions, replay/tamper, and attempts to flip provenance flags.
+### Batch MP-3 — adversarial and end-to-end acceptance (OPEN)
+- Re-run negative tests at the entire B2-E/Decision Admission/Run Authority boundary for missing resolver, forged/mismatched top-level input ref, stale or changed record/receipt hashes, wrong case/instrument/currency, unsupported price class, price/gap/return-gate desynchronization, incomplete or mismatched stage reference pairs, legacy snapshots with injected operator-price extensions, source/canonical-admission flag escalation, and bypass attempts.
+- Existing MP-1 unit tests already cover missing/false operator confirmation, wrong symbol/exchange/currency, unsupported A-share prefixes, unsafe private storage, symlinks, changed bytes and replay tampering; new MP-3 cases must cover cross-layer integration and must not duplicate only unit-level checks.
 - Prove ordinary company Evidence/PIT admission still rejects an absent or invalid company-evidence group; operator price cannot fill it by type confusion.
 - Run exact-head CI with real jobs, then independent red-team review and one locally executed sanitized receipt/replay.
 - Until all applicable gates pass, existing output stays explicitly analysis-only and no formal Decision is claimed.
