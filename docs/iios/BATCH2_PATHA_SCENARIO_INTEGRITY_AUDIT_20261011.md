@@ -2,7 +2,7 @@
 
 ## Status
 
-**IN PROGRESS — test suite added; exact-head CI and full independent review pending.**
+**IN PROGRESS — initial audit slice merged; operator bundle/receipt review pending.**
 
 The operator reports that the fixed macOS one-click launcher completed normally. The actual private bundle, report and receipt have not been attached to this repository or independently inspected in this session. State classification is therefore **operator-reported successful execution; bundle-level acceptance not independently evidenced here**. Private prices and source labels must not be uploaded to public GitHub.
 
@@ -31,9 +31,9 @@ These are deterministic re-calculations of declared scenario assumptions, not pr
 
 ## Acceptance gates
 
-- [ ] Exact-head CI including the Batch 2 tests passes.
-- [ ] Independent arithmetic/report/hash tests pass.
-- [ ] State, plan and test changes merge to canonical main.
+- [x] Exact-head CI including the Batch 2 tests passes: 13/13 checks; dedicated workflow 43 passed.
+- [x] Independent arithmetic/report/hash tests pass.
+- [x] Batch 2 test/document changes merged to canonical main at `0d257fe243d0a2e921023504c2a3b2128fdd285a`.
 - [ ] A sanitized local receipt summary (status, analysis ID, replay status and hash-check outcomes only) is reviewed before claiming operator-bundle validation. Do not request or upload private price values, original source labels or input.json.
 - [ ] No status is elevated to formal Evidence/PIT, Forecast, Valuation, Decision, Publication or execution authority.
 
