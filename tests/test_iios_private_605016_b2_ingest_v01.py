@@ -646,3 +646,111 @@ def test_curl_header_parser_uses_final_response_block() -> None:
     status, location = MODULE._parse_curl_dumped_headers(headers)
     assert status == 302
     assert location == "https://artifact-storage.example/signed-object"
+
+
+
+def test_download_attempt10_uses_curl_when_python_cannot_open_signed_url(tmp_path: Path, monkeypatch) -> None:
+    token = "gh-test-token"
+    archive_bytes = b"verified-archive-placeholder"
+    captured = {}
+
+    monkeypatch.setattr(
+        MODULE.shutil, "which",
+        lambda name: "/fake/gh" if name == "gh" else ("/fake/curl" if name == "curl" else None),
+    )
+    monkeypatch.setattr(
+        MODULE.subprocess, "run",
+        lambda args, **kwargs: MODULE.subprocess.CompletedProcess(
+            args=args, returncode=0, stdout=token, stderr=""
+        ),
+    )
+
+    class FailingOpener:
+        def open(self, *_args, **_kwargs):
+            raise MODULE.URLError(MODULE.socket.gaierror("temporary failure in name resolution"))
+
+    monkeypatch.setattr(MODULE, "build_opener", lambda *_args, **_kwargs: FailingOpener())
+    monkeypatch.setattr(
+        MODULE, "_request_attempt10_archive_url",
+        lambda actual_token: (
+            "https://signed-storage.example/archive?signature=temporary"
+            if actual_token == token else (_ for _ in ()).throw(AssertionError("wrong token"))
+        ),
+    )
+
+    def fake_curl_download(location, archive_path, *, python_reason):
+        captured["location"] = location
+        captured["python_reason"] = python_reason
+        archive_path.write_bytes(archive_bytes)
+
+    monkeypatch.setattr(MODULE, "_download_attempt10_archive_with_curl", fake_curl_download)
+    monkeypatch.setattr(MODULE, "ATTEMPT10_ARTIFACT_SIZE_BYTES", len(archive_bytes))
+    monkeypatch.setattr(MODULE, "ATTEMPT10_ARTIFACT_SHA256", hashlib.sha256(archive_bytes).hexdigest())
+    candidate = tmp_path / "candidate"
+    monkeypatch.setattr(MODULE, "_extract_verified_attempt10_archive", lambda _archive, _dest: candidate)
+
+    result = MODULE._download_attempt10(tmp_path / "unpacked")
+
+    assert result == candidate
+    assert captured["location"] == "https://signed-storage.example/archive?signature=temporary"
+    assert captured["python_reason"] == "DNS_LOOKUP_FAILED"
+    assert not (tmp_path / "attempt10-artifact.zip").exists()
+
+
+def test_signed_url_curl_fallback_is_https_only_bounded_and_has_no_api_auth(
+    tmp_path: Path, monkeypatch
+) -> None:
+    location = "https://signed-storage.example/archive?signature=temporary"
+    archive_path = tmp_path / "attempt10-artifact.zip"
+    captured = {}
+
+    monkeypatch.setattr(MODULE.shutil, "which", lambda name: "/fake/curl" if name == "curl" else None)
+
+    def fake_run(args, **kwargs):
+        captured["args"] = args
+        captured["config"] = kwargs["input"]
+        archive_path.write_bytes(b"placeholder-zip")
+        return MODULE.subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    MODULE._download_attempt10_archive_with_curl(
+        location, archive_path, python_reason="DNS_LOOKUP_FAILED"
+    )
+
+    config = captured["config"]
+    assert captured["args"] == ["/fake/curl", "--config", "-"]
+    assert location in config
+    assert "Authorization" not in config
+    assert "Bearer " not in config
+    assert 'proto = "=https"' in config
+    assert 'proto-redir = "=https"' in config
+    assert "max-redirs = 5" in config
+    assert f"max-filesize = {MODULE.ATTEMPT10_ARTIFACT_SIZE_BYTES}" in config
+    assert str(archive_path) in config
+    assert archive_path.stat().st_mode & 0o077 == 0
+
+
+def test_signed_url_curl_fallback_reports_sanitized_transport_category_and_cleans_partial_file(
+    tmp_path: Path, monkeypatch
+) -> None:
+    archive_path = tmp_path / "attempt10-artifact.zip"
+    monkeypatch.setattr(MODULE.shutil, "which", lambda name: "/fake/curl" if name == "curl" else None)
+
+    def failed_run(args, **kwargs):
+        archive_path.write_bytes(b"partial")
+        return MODULE.subprocess.CompletedProcess(
+            args=args, returncode=6, stdout="", stderr="Could not resolve host: signed-storage.example"
+        )
+
+    monkeypatch.setattr(MODULE.subprocess, "run", failed_run)
+    with pytest.raises(
+        MODULE.PrivateIngestError,
+        match="ATTEMPT10_ARTIFACT_DOWNLOAD_TRANSPORT_FAILED_PYTHON_TLS_CERTIFICATE_VERIFY_FAILED_CURL_DNS_LOOKUP_FAILED",
+    ):
+        MODULE._download_attempt10_archive_with_curl(
+            "https://signed-storage.example/archive?signature=secret",
+            archive_path,
+            python_reason="TLS_CERTIFICATE_VERIFY_FAILED",
+        )
+
+    assert not archive_path.exists()

@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath
 import shutil
 import socket
@@ -419,6 +420,83 @@ def _request_attempt10_archive_url(token: str) -> str:
         return _request_attempt10_archive_url_with_curl(token, python_reason)
 
 
+def _download_attempt10_archive_with_curl(
+    location: str, archive_path: Path, *, python_reason: str
+) -> None:
+    """Download a validated signed HTTPS URL without GitHub API credentials or redirect downgrade."""
+    parsed = urlparse(location)
+    if parsed.scheme.lower() != "https" or not parsed.netloc:
+        raise PrivateIngestError("ATTEMPT10_ARTIFACT_DOWNLOAD_REDIRECT_INVALID")
+    curl = shutil.which("curl")
+    if not curl:
+        raise PrivateIngestError(
+            f"ATTEMPT10_ARTIFACT_DOWNLOAD_TRANSPORT_FAILED_PYTHON_{python_reason}_CURL_UNAVAILABLE"
+        ) from None
+
+    try:
+        # Pre-create exclusively under the private temporary workspace. Curl truncates
+        # this mode-0600 file rather than creating a world-readable archive.
+        with archive_path.open("xb"):
+            pass
+        os.chmod(archive_path, 0o600)
+    except OSError:
+        raise PrivateIngestError("ATTEMPT10_ARTIFACT_PRIVATE_TEMP_FILE_CREATE_FAILED") from None
+
+    config = "\n".join((
+        f"url = {_curl_config_quote(location)}",
+        "silent",
+        "show-error",
+        "fail",
+        "location",
+        "max-redirs = 5",
+        "connect-timeout = 10",
+        "max-time = 120",
+        'proto = "=https"',
+        'proto-redir = "=https"',
+        f"max-filesize = {ATTEMPT10_ARTIFACT_SIZE_BYTES}",
+        f"output = {_curl_config_quote(str(archive_path))}",
+        f'user-agent = {_curl_config_quote("IIOS-private-B2-ingest")}',
+        "",
+    ))
+    # The signed URL remains in curl stdin config, not argv or logs. No Authorization
+    # header/token is used for blob storage; redirects are allowed only over HTTPS.
+    try:
+        result = subprocess.run(
+            [curl, "--config", "-"],
+            input=config,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=125,
+            check=False,
+        )
+    except (OSError, TimeoutError, subprocess.TimeoutExpired) as exc:
+        try:
+            archive_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        reason = _classify_python_transport_failure(exc)
+        raise PrivateIngestError(
+            f"ATTEMPT10_ARTIFACT_DOWNLOAD_TRANSPORT_FAILED_PYTHON_{python_reason}_CURL_{reason}"
+        ) from None
+
+    if result.returncode != 0:
+        stderr = result.stderr or ""
+        match = re.search(r"returned error:\s*(\d{3})", stderr.lower())
+        try:
+            archive_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        if match:
+            raise PrivateIngestError(
+                f"ATTEMPT10_ARTIFACT_DOWNLOAD_HTTP_{match.group(1)}"
+            ) from None
+        curl_reason = _classify_curl_transport_failure(stderr)
+        raise PrivateIngestError(
+            f"ATTEMPT10_ARTIFACT_DOWNLOAD_TRANSPORT_FAILED_PYTHON_{python_reason}_CURL_{curl_reason}"
+        ) from None
+
+
 def _download_attempt10(destination: Path) -> Path:
     gh = shutil.which("gh")
     if not gh:
@@ -440,27 +518,56 @@ def _download_attempt10(destination: Path) -> Path:
         location = _request_attempt10_archive_url(token)
         request = Request(location, headers={"User-Agent": "IIOS-private-B2-ingest"})
         opener = build_opener(_HTTPSOnlyRedirect())
-        with opener.open(request, timeout=120) as response:
-            if urlparse(response.geturl()).scheme.lower() != "https":
-                raise PrivateIngestError("ATTEMPT10_ARTIFACT_DOWNLOAD_HTTPS_REQUIRED")
-            with archive_path.open("xb") as archive_file:
-                os.chmod(archive_path, 0o600)
-                digest = hashlib.sha256()
-                total = 0
-                while True:
-                    chunk = response.read(1024 * 1024)
-                    if not chunk:
-                        break
-                    total += len(chunk)
-                    if total > ATTEMPT10_ARTIFACT_SIZE_BYTES:
-                        raise PrivateIngestError("ATTEMPT10_ARTIFACT_ARCHIVE_SIZE_MISMATCH")
-                    digest.update(chunk)
-                    archive_file.write(chunk)
-                archive_file.flush()
-                os.fsync(archive_file.fileno())
-        if total != ATTEMPT10_ARTIFACT_SIZE_BYTES:
+        response = None
+        python_transport_reason = None
+        try:
+            response = opener.open(request, timeout=120)
+        except (URLError, TimeoutError, OSError) as exc:
+            python_transport_reason = _classify_python_transport_failure(exc)
+
+        if python_transport_reason is not None:
+            _download_attempt10_archive_with_curl(
+                location, archive_path, python_reason=python_transport_reason
+            )
+        else:
+            if response is None:
+                raise PrivateIngestError("ATTEMPT10_ARTIFACT_DOWNLOAD_RESPONSE_MISSING")
+            with response:
+                if urlparse(response.geturl()).scheme.lower() != "https":
+                    raise PrivateIngestError("ATTEMPT10_ARTIFACT_DOWNLOAD_HTTPS_REQUIRED")
+                with archive_path.open("xb") as archive_file:
+                    os.chmod(archive_path, 0o600)
+                    digest = hashlib.sha256()
+                    total = 0
+                    while True:
+                        try:
+                            chunk = response.read(1024 * 1024)
+                        except (URLError, TimeoutError, OSError) as exc:
+                            python_transport_reason = _classify_python_transport_failure(exc)
+                            break
+                        if not chunk:
+                            break
+                        total += len(chunk)
+                        if total > ATTEMPT10_ARTIFACT_SIZE_BYTES:
+                            raise PrivateIngestError("ATTEMPT10_ARTIFACT_ARCHIVE_SIZE_MISMATCH")
+                        digest.update(chunk)
+                        archive_file.write(chunk)
+                    if python_transport_reason is None:
+                        archive_file.flush()
+                        os.fsync(archive_file.fileno())
+            if python_transport_reason is not None:
+                try:
+                    archive_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                _download_attempt10_archive_with_curl(
+                    location, archive_path, python_reason=python_transport_reason
+                )
+
+        actual_size = archive_path.stat().st_size
+        if actual_size != ATTEMPT10_ARTIFACT_SIZE_BYTES:
             raise PrivateIngestError("ATTEMPT10_ARTIFACT_ARCHIVE_SIZE_MISMATCH")
-        if digest.hexdigest() != ATTEMPT10_ARTIFACT_SHA256:
+        if _sha256(archive_path.read_bytes()) != ATTEMPT10_ARTIFACT_SHA256:
             raise PrivateIngestError("ATTEMPT10_ARTIFACT_ARCHIVE_SHA256_MISMATCH")
         return _extract_verified_attempt10_archive(archive_path, destination)
     except HTTPError as exc:
@@ -474,7 +581,10 @@ def _download_attempt10(destination: Path) -> Path:
             ) from None
         raise PrivateIngestError(f"ATTEMPT10_ARTIFACT_DOWNLOAD_HTTP_{exc.code}") from None
     except (URLError, TimeoutError, OSError) as exc:
-        raise PrivateIngestError("ATTEMPT10_ARTIFACT_DOWNLOAD_TRANSPORT_FAILED") from None
+        reason = _classify_python_transport_failure(exc)
+        raise PrivateIngestError(
+            f"ATTEMPT10_ARTIFACT_DOWNLOAD_TRANSPORT_FAILED_PYTHON_{reason}"
+        ) from None
     finally:
         try:
             archive_path.unlink(missing_ok=True)
