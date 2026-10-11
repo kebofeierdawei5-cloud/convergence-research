@@ -27,7 +27,7 @@ def payload(**overrides):
         "price": "26.58",
         "adjustment_semantics": "UNADJUSTED_CLOSE",
         "quote_timestamp": "2026-10-09T15:00:00+08:00",
-        "valid_until": "2026-10-12T18:00:00+08:00",
+        "valid_until": "2026-10-13T18:00:00+08:00",
         "operator_confirmed": True,
         "source_claim": None,
     }
@@ -228,16 +228,33 @@ def test_operator_price_resolver_binds_exact_private_bundle_and_cutoff(tmp_path)
     assert bound["source_origin_verified"] is False
     assert bound["source_use_rights_verified"] is False
     assert observation["price_observation_id"] == reference["bundle_id"]
+    assert observation["adjustment_semantics"] == "UNADJUSTED"
+    assert observation["operator_input_adjustment_semantics"] == "UNADJUSTED_CLOSE"
     assert "price_observation_admission_hash" not in observation
 
 
-def test_operator_price_resolver_fails_if_entry_is_not_before_cutoff_start(tmp_path):
+def test_operator_price_resolver_allows_intraday_entry_on_cutoff_date(tmp_path):
+    root = private_root(tmp_path / "private")
+    reference = operator_reference(root)
+    resolver = price_input.FileSystemOperatorPriceInputResolver(root)
+    result = resolver.resolve_operator_price_input(
+        reference,
+        case_id="RC-CN-A-002001-20261012",
+        market="CN-A",
+        symbol="002001",
+        currency="CNY",
+        cutoff_date=__import__("datetime").date(2026, 10, 12),
+    )
+    assert result["status"] == "OPERATOR_PRICE_INPUT_BOUND"
+
+
+def test_operator_price_resolver_blocks_input_entered_after_case_cutoff_date(tmp_path):
     root = private_root(tmp_path / "private")
     reference = operator_reference(root)
     resolver = price_input.FileSystemOperatorPriceInputResolver(root)
     with pytest.raises(
         price_input.OperatorEnteredPriceError,
-        match="OPERATOR_PRICE_ENTERED_AT_OR_AFTER_CUTOFF_START",
+        match="OPERATOR_PRICE_ENTERED_AFTER_CUTOFF_DATE",
     ):
         resolver.resolve_operator_price_input(
             reference,
@@ -245,7 +262,7 @@ def test_operator_price_resolver_fails_if_entry_is_not_before_cutoff_start(tmp_p
             market="CN-A",
             symbol="002001",
             currency="CNY",
-            cutoff_date=__import__("datetime").date(2026, 10, 11),
+            cutoff_date=__import__("datetime").date(2026, 10, 10),
         )
 
 
