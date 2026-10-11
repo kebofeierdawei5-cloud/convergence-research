@@ -43,7 +43,7 @@ Canonical traceability is recorded in State Index:
 
 ## 3. Deep-audit result and added defensive hardening
 
-The follow-up implementation in this audit branch strengthens the local copy boundary beyond the failures already fixed:
+Merged hardening PR #325 (merge commit `819a4080992a09e02e01a169a1c5be2951667976`; 13/13 exact-head checks passed) strengthens the local copy boundary beyond the failures already fixed:
 
 1. Validate all declarations and shared-path size/hash contracts before writing.
 2. Reject symlinked path components in the ephemeral raw-source tree rather than calling `is_symlink()` only after `resolve()` (which would have lost evidence that the original path was a symlink).
@@ -74,7 +74,7 @@ This hardening does not change the contents, fingerprint, manifest SHA-256, or r
 
 ## 5. Next step and remaining gates
 
-**Do not rerun ingest again merely to check storage.** After this hardening PR is merged, perform one read-only verification using the already existing candidate:
+**Do not rerun ingest again merely to check storage.** The hardening PR is already merged into canonical `main`. Perform one read-only verification using the already existing candidate:
 
 ```bash
 bash "$HOME/Downloads/Launch_IIOS_Private_605016_B2_Ingest.command" --verify-existing
