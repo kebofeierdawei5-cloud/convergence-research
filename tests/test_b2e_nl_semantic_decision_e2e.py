@@ -21,7 +21,7 @@ from iios_mvp.semantic_producer_admission_v01 import ProducerRegistration, Produ
 from iios_mvp.decision_admission import validate_decision_admission_receipt
 from tools.core04_final_300750_decision_e2e import build_case, load_inputs, admit_price
 from research.b2.company_evidence import REQUIRED_COMPANY_FIELD_GROUPS, build_company_evidence_manifest
-from iios_mvp.canonical_run_authority_v01 import run_state_path, run_receipt_path, validate_complete_run_receipt, CanonicalRunAuthorizationError, _validate_decision_pending_input_refs, authorize_decision_revision_write
+from iios_mvp.canonical_run_authority_v01 import run_state_path, run_receipt_path, validate_complete_run_receipt, canonical_hash, CanonicalRunAuthorizationError, _validate_decision_pending_input_refs, authorize_decision_revision_write
 from iios_mvp.machine_publication import write_machine_publication
 from iios_mvp.store import read_snapshot, snapshot_path
 from iios_mvp.machine_publication import write_machine_publication
@@ -271,6 +271,51 @@ def test_persisted_b2e_binds_private_operator_price_reference_and_replays_hashes
         reference["record_sha256"],
         reference["receipt_sha256"],
     ]
+
+    # Complete the normal publication/report lifecycle so the full Run Receipt
+    # must transitively bind the DECISION_PENDING stage containing both hashes.
+    publication_path = write_machine_publication(
+        run_root,
+        decision_id=result.decision_revision["decision_id"],
+        published_at="2026-10-08T01:00:00+00:00",
+    )
+    report_paths = write_investor_review_report_v02(
+        run_root,
+        publication_path=publication_path,
+        generated_at="2026-10-08T02:00:00+00:00",
+    )
+    assert all(path.is_file() for path in report_paths)
+
+    receipt = validate_complete_run_receipt(run_root, "b2e-operator-price-run")
+    assert receipt["run_status"] == "COMPLETE"
+    completed_state = json.loads(run_state_path(run_root, "b2e-operator-price-run").read_text(encoding="utf-8"))
+    assert completed_state["envelope"]["stage_state"] == "COMPLETE"
+    assert receipt["stage_receipt_hashes"] == completed_state["stage_receipt_hashes"]
+    assert receipt["stage_chain_hash"] == completed_state["stage_chain_hash"]
+    decision_pending_index = next(
+        index for index, row in enumerate(completed_state["envelope"]["stage_receipts"])
+        if row["stage_id"] == "DECISION_PENDING"
+    )
+    assert receipt["stage_receipt_hashes"][decision_pending_index] == completed_state["stage_receipt_hashes"][decision_pending_index]
+    # Run Receipt v0.2 binds stage hashes/chain rather than leaking private
+    # operator-price values or bundle identifiers into the public receipt.
+    assert reference["record_sha256"] not in json.dumps(receipt)
+    assert reference["receipt_sha256"] not in json.dumps(receipt)
+    assert reference["bundle_id"] not in json.dumps(receipt)
+
+    # Re-hashing a tampered Run Receipt cannot substitute a fabricated stage
+    # receipt hash: validator replays the receipt against the persisted envelope.
+    receipt_file = run_receipt_path(run_root, "b2e-operator-price-run")
+    forged_receipt = json.loads(json.dumps(receipt))
+    forged_receipt["stage_receipt_hashes"][decision_pending_index] = "0" * 64
+    forged_core = {key: value for key, value in forged_receipt.items() if key != "receipt_hash"}
+    forged_receipt["receipt_hash"] = canonical_hash(forged_core)
+    receipt_file.write_text(json.dumps(forged_receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    with pytest.raises(
+        CanonicalRunAuthorizationError,
+        match="Run Receipt stage_receipt_hashes does not match Run Envelope",
+    ):
+        validate_complete_run_receipt(run_root, "b2e-operator-price-run")
 
 
 def test_b2e_rejects_operator_price_reference_without_trusted_resolver():
