@@ -29,5 +29,18 @@
   "run_receipt_created": false,
   "execution_authorized": false,
   "overall_status": "FACT_AND_PIT_SECOND_PASS_PASS; FORMAL_ADMISSION_BLOCKED_ON_UNKNOWN_USE_RIGHTS_AND_EXTERNAL_REVIEW",
-  "next_gate": "A separate reviewer must sign off the 13 claims and fact-level private-use boundary. Unknown source reuse/retention rights stay blocking; do not repeat market-price web search."
+  "next_gate": "A separate reviewer must sign off the 13 claims and fact-level private-use boundary. The official SZSE service agreement contains a sale/resale/commercial-use restriction, but its applicability to static disclosure PDFs and any personal private retention permission remain unresolved. Do not repeat market-price web search.",
+  "source_use_terms_review": {
+    "reviewed_at": "2026-10-11",
+    "official_url": "https://www.szse.cn/application/register/protocol/",
+    "source_class": "OFFICIAL_SZSE_USER_SERVICE_AGREEMENT",
+    "ownership_and_ip_statement_found": true,
+    "sale_resale_or_commercial_use_restriction_found": true,
+    "text_scope": "Network-service information obtained through the SZSE service platform",
+    "applicability_to_static_disclosure_pdf_urls": "NOT_CONCLUSIVELY_ESTABLISHED",
+    "explicit_private_retention_permission_found": false,
+    "explicit_noncommercial_personal_fact_level_permission_found": false,
+    "legal_opinion": false,
+    "effect_on_current_status": "NO_CHANGE; USE_RIGHTS_REMAIN_BLOCKED_UNKNOWN"
+  }
 }
