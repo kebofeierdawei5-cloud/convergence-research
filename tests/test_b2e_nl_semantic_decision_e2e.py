@@ -804,12 +804,26 @@ def test_operator_price_snapshot_sync_tampering_blocks_decision_revision_write(t
     persisted_snapshot = read_snapshot(
         snapshot_path(run_root, result.decision_revision["snapshot_hash"])
     )
+    def ensure_gap(value):
+        observation = value["input"]["current_price_observation"]
+        return value["input"].setdefault(
+            "expectation_gap",
+            {
+                "price": observation["price"],
+                "price_observation_id": observation["price_observation_id"],
+            },
+        )
+
+    def ensure_return_gate(value):
+        observation = value["input"]["current_price_observation"]
+        return value["input"].setdefault("return_gate", {"entry_price": observation["price"]})
+
     mutations = (
-        ("expectation_gap_price", lambda value: value["input"]["expectation_gap"].__setitem__("price", "999.00"),
+        ("expectation_gap_price", lambda value: ensure_gap(value).__setitem__("price", "999.00"),
          "expectation-gap input is not synchronized to operator current price"),
-        ("expectation_gap_price_id", lambda value: value["input"]["expectation_gap"].__setitem__("price_observation_id", "forged-price-id"),
+        ("expectation_gap_price_id", lambda value: ensure_gap(value).__setitem__("price_observation_id", "forged-price-id"),
          "expectation-gap input is not synchronized to operator current price"),
-        ("return_gate_entry_price", lambda value: value["input"]["return_gate"].__setitem__("entry_price", "999.00"),
+        ("return_gate_entry_price", lambda value: ensure_return_gate(value).__setitem__("entry_price", "999.00"),
          "return gate entry_price is not synchronized to operator current price"),
         ("current_price", lambda value: value["input"]["current_price_observation"].__setitem__("price", "999.00"),
          "expectation-gap input is not synchronized to operator current price"),
@@ -829,8 +843,21 @@ def test_operator_price_snapshot_sync_tampering_blocks_decision_revision_write(t
     # the edited JSON cannot rebind it to the already-issued Decision Admission.
     from iios_mvp.engine import sha256_obj
     forged_consistent = json.loads(json.dumps(persisted_snapshot))
-    forged_consistent["input"]["current_price_observation"]["price"] = "999.00"
+    current_observation = forged_consistent["input"]["current_price_observation"]
+    forged_consistent["input"].setdefault(
+        "expectation_gap",
+        {
+            "price": current_observation["price"],
+            "price_observation_id": current_observation["price_observation_id"],
+        },
+    )
+    forged_consistent["input"].setdefault(
+        "return_gate",
+        {"entry_price": current_observation["price"]},
+    )
+    current_observation["price"] = "999.00"
     forged_consistent["input"]["expectation_gap"]["price"] = "999.00"
+    forged_consistent["input"]["expectation_gap"]["price_observation_id"] = current_observation["price_observation_id"]
     forged_consistent["input"]["return_gate"]["entry_price"] = "999.00"
     forged_consistent["snapshot_hash"] = sha256_obj({
         "snapshot_schema": forged_consistent["snapshot_schema"],
