@@ -24,7 +24,7 @@ The immediately useful product gap is now narrower than rebuilding the system: t
 
 The workflow run `38137977103` at `main@f632169f4da60a19f194b0abba109600c67e51f3` reports conclusion `failure`, event `push`, and the Jobs API returns zero jobs. The workflow file at this baseline declares `pull_request` and `workflow_dispatch`, not an explicit `push` trigger.
 
-This is classified as **UNCLASSIFIED ZERO-JOB WORKFLOW FAILURE**, not as evidence that a test step failed and not as a PASS. Batch 0 makes the trigger explicit for pushes to `main` and retains the pull-request path filter. The next exact relevant run must contain an actual job and step result. If it still returns zero jobs, investigate repository/workflow execution configuration; do not infer application-code failure or success.
+This is classified as **UNCLASSIFIED ZERO-JOB WORKFLOW FAILURE**, not as evidence that a test step failed and not as a PASS. Batch 0 added an explicit push trigger, but follow-up run `38143107853` at `main@e06669fc6093669e2bfd657a8679c6d061d414e3` again returned failure with zero jobs. The trigger-only change therefore did not fix the underlying anomaly. Keep this item OPEN for a separate narrow investigation of workflow execution/check-suite configuration; do not infer application-code failure or success. Batch 1 uses an independent dedicated test workflow with actual pytest steps.
 
 ## 4. Active execution order after Batch 0
 
