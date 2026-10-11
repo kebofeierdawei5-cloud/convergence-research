@@ -94,7 +94,7 @@ def test_replay_blocks_tampered_private_price_bytes(tmp_path):
     edited = json.loads(price_path.read_text())
     edited["price"] = "99.99"
     price_path.write_text(json.dumps(edited))
-    with pytest.raises(price_input.OperatorEnteredPriceError, match="RECEIPT_CONTENT_MISMATCH"):
+    with pytest.raises(price_input.OperatorEnteredPriceError, match="RECORD_BYTES_NONCANONICAL"):
         price_input.replay_bundle(result["bundle_path"])
 
 
@@ -107,7 +107,7 @@ def test_replay_blocks_authority_flag_escalation(tmp_path):
     edited = json.loads(price_path.read_text())
     edited["formal_evidence_pit_admission"] = True
     price_path.write_text(json.dumps(edited))
-    with pytest.raises(price_input.OperatorEnteredPriceError, match="RECEIPT_CONTENT_MISMATCH"):
+    with pytest.raises(price_input.OperatorEnteredPriceError, match="RECORD_BYTES_NONCANONICAL"):
         price_input.replay_bundle(result["bundle_path"])
 
 
