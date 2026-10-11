@@ -1,0 +1,29 @@
+{
+  "schema_version": "IIOS-D1A-HOST-ACCEPTANCE-STATUS-0.1",
+  "record_class": "SANITIZED_DEPLOYMENT_STATUS_NOT_ACCEPTANCE",
+  "case_id": "RC-CN-A-605016-20261009",
+  "recorded_at": "2026-10-11",
+  "status": "OPEN_REAL_HOST_ORIGIN_EVIDENCE_NOT_YET_ACCEPTED",
+  "canonical_host_implementation": "MERGED_CONTRACT_CODE",
+  "trusted_runtime_factory_implementation": "MERGED_CONTRACT_CODE",
+  "configuration_check_proves_production_acceptance": false,
+  "host_process_started_in_operator_environment": false,
+  "production_endpoint_probed": false,
+  "actual_provider_invocation_verified": false,
+  "signed_live_provider_receipt_verified": false,
+  "durable_admission_store_replayed": false,
+  "canonical_run_completed": false,
+  "complete_run_receipt_created": false,
+  "independent_replay_passed": false,
+  "formal_decision_created": false,
+  "publication_created": false,
+  "execution_authorized": false,
+  "blocking_evidence": [
+    "actual host-process and endpoint evidence from the operator-controlled deployment",
+    "actual authorized provider invocation bound to the 605016 case and cutoff",
+    "independent Ed25519 receipt verification against the pinned public key",
+    "durable persistence and clean replay of admitted source/provider/run records",
+    "separate reviewer sign-off"
+  ],
+  "next_gate": "Run the real Host configuration check and host-origin provider smoke on the operator-controlled environment. Keep all secrets/raw responses private; attach only sanitized hashes/status and request independent review."
+}
