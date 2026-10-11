@@ -21,7 +21,7 @@ from iios_mvp.semantic_producer_admission_v01 import ProducerRegistration, Produ
 from iios_mvp.decision_admission import validate_decision_admission_receipt
 from tools.core04_final_300750_decision_e2e import build_case, load_inputs, admit_price
 from research.b2.company_evidence import REQUIRED_COMPANY_FIELD_GROUPS, build_company_evidence_manifest
-from iios_mvp.canonical_run_authority_v01 import run_state_path
+from iios_mvp.canonical_run_authority_v01 import run_state_path, CanonicalRunAuthorizationError, _validate_decision_pending_input_refs
 from iios_mvp.machine_publication import write_machine_publication
 from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
 
@@ -271,6 +271,152 @@ def test_persisted_b2e_binds_private_operator_price_reference_and_replays_hashes
     ]
 
 
+def test_b2e_rejects_operator_price_reference_without_trusted_resolver():
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    fake_ref = {
+        "bundle_id": "operator-price-" + "a" * 24,
+        "record_sha256": "a" * 64,
+        "receipt_sha256": "b" * 64,
+    }
+    with pytest.raises(B2EE2EError, match="operator price input reference supplied without trusted resolver"):
+        run_b2e_conformance(
+            raw_request=RAW,
+            request_id="b2e-no-operator-resolver",
+            run_id="b2e-no-operator-resolver",
+            created_at=CREATED,
+            request_interpreter=FixtureInterpreter(),
+            request_registry=_registries()[0],
+            semantic_producer=FixtureSemanticProducer(),
+            producer_registry=_registries()[1],
+            company="宁德时代",
+            evidence_refs=("E011", "E008"),
+            evidence_hashes=(E1, E2),
+            artifact_type="THESIS_ASSESSMENT",
+            semantic_prompt="test",
+            decision_relevance="Synthetic negative test.",
+            case=case,
+            current_price_resolver=price_registry,
+            independent_forecast_resolver=forecast_registry,
+            upstream_authority_resolver=upstream_registry,
+            valuation_output_resolver=valuation_resolver,
+            operator_price_input_ref=fake_ref,
+        )
+
+
+def test_b2e_rejects_conflicting_case_and_request_operator_price_refs(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case)
+    case["current_price_observation"] = resolver.build_current_price_observation(
+        reference,
+        case_id=case["case_id"],
+        market=case["market"],
+        symbol=case["symbol"],
+        currency="CNY",
+        cutoff_date=__import__("datetime").date.fromisoformat(case["cutoff_date"]),
+        mie_reference_price_observation_id=case["current_price_observation"]["price_observation_id"],
+    )
+    conflict = dict(reference)
+    conflict["receipt_sha256"] = "c" * 64
+
+    with pytest.raises(B2EE2EError, match="top-level operator price reference conflicts with case input"):
+        run_b2e_conformance(
+            raw_request=RAW,
+            request_id="b2e-conflicting-operator-ref",
+            run_id="b2e-conflicting-operator-ref",
+            created_at=CREATED,
+            request_interpreter=FixtureInterpreter(),
+            request_registry=_registries()[0],
+            semantic_producer=FixtureSemanticProducer(),
+            producer_registry=_registries()[1],
+            company="宁德时代",
+            evidence_refs=("E011", "E008"),
+            evidence_hashes=(E1, E2),
+            artifact_type="THESIS_ASSESSMENT",
+            semantic_prompt="test",
+            decision_relevance="Synthetic negative test.",
+            case=case,
+            current_price_resolver=price_registry,
+            independent_forecast_resolver=forecast_registry,
+            upstream_authority_resolver=upstream_registry,
+            valuation_output_resolver=valuation_resolver,
+            operator_price_input_resolver=resolver,
+            operator_price_input_ref=conflict,
+        )
+
+
+def test_persisted_b2e_blocks_forged_operator_receipt_hash_before_decision(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    evidence_root, manifest, _manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case)
+    forged = dict(reference)
+    forged["receipt_sha256"] = "0" * 64
+    run_root = tmp_path / "forged-operator-price-run"
+    evidences = manifest["evidence"]
+
+    with pytest.raises(B2EE2EError, match="cannot materialize private operator price input: OPERATOR_PRICE_RECEIPT_SHA256_MISMATCH"):
+        run_b2e_conformance(
+            raw_request=RAW,
+            request_id="b2e-forged-operator-receipt",
+            run_id="b2e-forged-operator-receipt",
+            created_at=CREATED,
+            request_interpreter=FixtureInterpreter(),
+            request_registry=_registries()[0],
+            semantic_producer=FixtureSemanticProducer(),
+            producer_registry=_registries()[1],
+            company="宁德时代",
+            evidence_refs=tuple(row["evidence_id"] for row in evidences),
+            evidence_hashes=tuple(row["content_sha256"] for row in evidences),
+            artifact_type="THESIS_ASSESSMENT",
+            semantic_prompt="test",
+            semantic_facts=tuple({"evidence_id": row["evidence_id"], "statement": "SYNTHETIC_TEST_ONLY"} for row in evidences),
+            decision_relevance="Synthetic negative test.",
+            case=case,
+            current_price_resolver=price_registry,
+            independent_forecast_resolver=forecast_registry,
+            upstream_authority_resolver=upstream_registry,
+            valuation_output_resolver=valuation_resolver,
+            operator_price_input_resolver=resolver,
+            operator_price_input_ref=forged,
+            run_root=str(run_root),
+            evidence_manifest=manifest,
+            evidence_root=str(evidence_root),
+        )
+
+    state = json.loads(run_state_path(run_root, "b2e-forged-operator-receipt").read_text(encoding="utf-8"))
+    assert state["envelope"]["run_status"] == "BLOCKED"
+    stage_ids = [row["stage_id"] for row in state["envelope"]["stage_receipts"]]
+    assert "DECISION_PENDING" not in stage_ids
+    assert "DECISION_ADMITTED" not in stage_ids
+    assert not list((run_root / "canonical-artifacts").glob("*.canonical-upstream-admissions.json")) if (run_root / "canonical-artifacts").exists() else True
+
+
+def test_run_authority_rejects_malformed_operator_price_stage_pairs():
+    base_refs = ["forecast-id", "valuation-id"]
+    base_hashes = ["a" * 64, "b" * 64]
+    assert _validate_decision_pending_input_refs({
+        "input_refs": base_refs, "input_hashes": base_hashes
+    }) == (base_refs, base_hashes)
+
+    bundle_id = "operator-price-" + "c" * 24
+    valid_refs = base_refs + [
+        f"operator-price-input-record:{bundle_id}",
+        f"operator-price-input-receipt:{bundle_id}",
+    ]
+    valid_hashes = base_hashes + ["c" * 64, "d" * 64]
+    assert _validate_decision_pending_input_refs({
+        "input_refs": valid_refs, "input_hashes": valid_hashes
+    }) == (valid_refs, valid_hashes)
+
+    bad_pairs = [
+        (base_refs + [f"operator-price-input-record:{bundle_id}"], base_hashes + ["c" * 64]),
+        (base_refs + [f"operator-price-input-record:{bundle_id}", "operator-price-input-receipt:" + "d" * 24], valid_hashes),
+        (valid_refs, base_hashes + ["not-a-sha256", "d" * 64]),
+    ]
+    for refs, hashes in bad_pairs:
+        with pytest.raises(CanonicalRunAuthorizationError):
+            _validate_decision_pending_input_refs({"input_refs": refs, "input_hashes": hashes})
+
+
 def test_b2e_nested_semantic_authority_is_blocked_recursively():
     case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
     with pytest.raises(B2EE2EError, match="authority fields at output"):
@@ -478,6 +624,39 @@ def _admitted_synthetic_manifest(tmp_path, case):
     path = tmp_path / "B2_COMPANY_EVIDENCE_MANIFEST.json"
     path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
     return root, manifest, path
+
+
+def _private_operator_price_bundle(tmp_path, case):
+    root = tmp_path / "operator-price-private"
+    root.mkdir(mode=0o700)
+    root.chmod(0o700)
+    bundle = operator_price_input.create_bundle(
+        {
+            "schema_version": operator_price_input.SCHEMA,
+            "base_case_id": case["case_id"],
+            "market": "CN-A",
+            "symbol": "300750",
+            "exchange": "SZSE",
+            "currency": "CNY",
+            "observation_date": "2026-09-30",
+            "price": "270.00",
+            "adjustment_semantics": "UNADJUSTED_CLOSE",
+            "quote_timestamp": "2026-09-30T15:00:00+08:00",
+            "valid_until": "2026-10-05T18:00:00+08:00",
+            "operator_confirmed": True,
+            "source_claim": "SYNTHETIC_TEST_ONLY_NOT_SOURCE_VERIFIED",
+        },
+        root,
+        entered_at=datetime.fromisoformat("2026-10-04T10:00:00+08:00"),
+        decision_cutoff_at=datetime.fromisoformat("2026-10-04T10:01:00+08:00"),
+    )
+    reference = {
+        "bundle_id": bundle["bundle_id"],
+        "record_sha256": bundle["record_sha256"],
+        "receipt_sha256": bundle["receipt_sha256"],
+    }
+    resolver = operator_price_input.FileSystemOperatorPriceInputResolver(root)
+    return root, reference, resolver
 
 
 def test_p0_persisted_b2e_blocks_without_b2_evidence_pit_admission(tmp_path):
