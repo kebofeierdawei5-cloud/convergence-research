@@ -1,8 +1,8 @@
 # Operator-Entered Price — Decision Input Contract (2026-10-11)
 
 - Record class: governance/implementation contract proposal
-- Baseline: canonical `main@a60e62cd6c39492b404fee1cbfc0511717726ee3`
-- Status: **MP-1 + MP-2 + REPORT ASSURANCE PASS / PRs #366/#368/#370; MP-3 CROSS-LAYER / EVIDENCE-PIT / SNAPSHOT / PROVENANCE / NO-PUBLICATION SLICES PASS / PRs #372/#375/#377/#378/#379; LOCAL RECEIPT REVIEW + REMAINING MP-3 OPEN**
+- Baseline: canonical `main@c22c75d3bfce4e044cbadb155f5645f6384f014c`
+- Status: **MP-1 + MP-2 + REPORT ASSURANCE PASS / PRs #366/#368/#370; MP-3 CROSS-LAYER / EVIDENCE-PIT / SNAPSHOT / PROVENANCE / NO-PUBLICATION / COMPLETE-RECEIPT-REPLAY SLICES PASS / PRs #372/#375/#377/#378/#379/#383; LOCAL MAC RUN REVIEW OPEN; RESIDUAL MP-3 FROZEN BY EXECUTION-FIRST PLAN**
 - Scope: initial A/H-share current-price entry is supplied manually by the operator; IIOS does not automatically fetch market quotes for this path.
 
 ## 1. Decision
@@ -75,7 +75,7 @@ The operator can manually enter a value without naming a source. If a source is 
 - Decision Admission preserves the input class and assurance; Human Approval remains required and automatic execution disabled.
 - Exact-head PR #368 passed 30/30 triggered workflow checks, including B2-E persisted integration, legacy Run Envelope replay and B2-F/Post-B04 independent red-team.
 - **Report assurance completed in PR #370** (`d6fe4855276a7e5425950fa89efbc6d20242646b`): 6/6 exact-head checks passed, including dedicated investor-review QA and Post-B04 independent red-team. The machine surface records the price input class, assurance label and limitation codes; the Chinese report discloses non-verification/source-rights limits, and private bundle IDs/hashes are deliberately omitted. No private price value/source label/bundle is stored in Git.
-- **Still open:** independently review one actual local private bundle/receipt/Run Receipt replay using sanitized status and hash outcomes, then finish MP-3 cross-layer adversarial acceptance.
+- **Local operator run review still open:** independently review one actual local private bundle/receipt/complete Run Receipt replay using only sanitized status and hash outcomes. The MP-3 cross-layer software slices and complete Run Receipt replay fixture are now green, but they do not constitute acceptance of the operator's actual Mac run.
 
 ### Batch MP-3 — adversarial and end-to-end acceptance (MULTIPLE SLICES PASS / REMAINDER OPEN)
 - **PR #372 cross-layer slice PASS:** both exact-head workflows passed (B2-E 14/14, B2-E red-team 7/7, B2 semantic admission 14/14, semantic red-team 15/15). It rejects a missing trusted resolver, conflicting top-level-vs-Case references, forged receipt SHA blocking a persisted run before Decision stage, and malformed Run Authority record/receipt pairs.
