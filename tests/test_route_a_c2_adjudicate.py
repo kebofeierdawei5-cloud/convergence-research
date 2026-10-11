@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from tools.route_a_c2_adjudicate import (
     CASE_ID,
     CUTOFF_INSTANT,
