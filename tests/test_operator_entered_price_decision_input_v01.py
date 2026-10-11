@@ -281,6 +281,19 @@ def test_filesystem_error_diagnostic_does_not_leak_private_path():
     assert "/Users/private-user" not in diagnostic
 
 
+def test_tilde_expansion_does_not_bypass_output_symlink_guard(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    private_parent = home / ".iios-private"
+    private_parent.mkdir(parents=True, mode=0o700)
+    target = private_root(tmp_path / "real-target")
+    link = private_parent / "link"
+    link.symlink_to(target, target_is_directory=True)
+    monkeypatch.setenv("HOME", str(home))
+
+    with pytest.raises(price_input.OperatorEnteredPriceError, match="OUTPUT_ROOT_MUST_NOT_BE_SYMLINK"):
+        price_input._private_root(Path("~/.iios-private/link"))
+
+
 def test_private_root_blocks_public_repository_and_open_permissions(tmp_path):
     with pytest.raises(price_input.OperatorEnteredPriceError, match="OUTSIDE_PUBLIC_REPOSITORY"):
         price_input._private_root(price_input.REPOSITORY_ROOT)
