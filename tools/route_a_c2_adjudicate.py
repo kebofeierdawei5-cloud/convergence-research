@@ -5,10 +5,16 @@ import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
-import shutil
+import sys
 import tempfile
 import zipfile
 from typing import Any
+
+# Direct script execution sets sys.path[0] to tools/. Add the repository root
+# explicitly so the canonical Core/B2 validator imports work from any cwd.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from jsonschema import Draft202012Validator
 from pypdf import PdfReader
