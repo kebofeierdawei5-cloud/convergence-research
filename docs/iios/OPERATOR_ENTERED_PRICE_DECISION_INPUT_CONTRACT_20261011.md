@@ -1,8 +1,8 @@
 # Operator-Entered Price — Decision Input Contract (2026-10-11)
 
 - Record class: governance/implementation contract proposal
-- Baseline: canonical `main@d6fe4855276a7e5425950fa89efbc6d20242646b`
-- Status: **MP-1 + MP-2 CORE + REPORT ASSURANCE PASS / MERGED PRs #366/#368/#370; LOCAL RECEIPT REVIEW + MP-3 OPEN**
+- Baseline: canonical `main@48a6b64465f107cbbdae0b27c845c217ae8cbd2b`
+- Status: **MP-1 + MP-2 CORE + REPORT ASSURANCE PASS / MERGED PRs #366/#368/#370; MP-3 CROSS-LAYER SLICE PASS / MERGED PR #372; LOCAL RECEIPT REVIEW + REMAINING MP-3 OPEN**
 - Scope: initial A/H-share current-price entry is supplied manually by the operator; IIOS does not automatically fetch market quotes for this path.
 
 ## 1. Decision
@@ -77,12 +77,12 @@ The operator can manually enter a value without naming a source. If a source is 
 - **Report assurance completed in PR #370** (`d6fe4855276a7e5425950fa89efbc6d20242646b`): 6/6 exact-head checks passed, including dedicated investor-review QA and Post-B04 independent red-team. The machine surface records the price input class, assurance label and limitation codes; the Chinese report discloses non-verification/source-rights limits, and private bundle IDs/hashes are deliberately omitted. No private price value/source label/bundle is stored in Git.
 - **Still open:** independently review one actual local private bundle/receipt/Run Receipt replay using sanitized status and hash outcomes, then finish MP-3 cross-layer adversarial acceptance.
 
-### Batch MP-3 — adversarial and end-to-end acceptance (OPEN)
-- Re-run negative tests at the entire B2-E/Decision Admission/Run Authority boundary for missing resolver, forged/mismatched top-level input ref, stale or changed record/receipt hashes, wrong case/instrument/currency, unsupported price class, price/gap/return-gate desynchronization, incomplete or mismatched stage reference pairs, legacy snapshots with injected operator-price extensions, source/canonical-admission flag escalation, and bypass attempts.
-- Existing MP-1 unit tests already cover missing/false operator confirmation, wrong symbol/exchange/currency, unsupported A-share prefixes, unsafe private storage, symlinks, changed bytes and replay tampering; new MP-3 cases must cover cross-layer integration and must not duplicate only unit-level checks.
-- Prove ordinary company Evidence/PIT admission still rejects an absent or invalid company-evidence group; operator price cannot fill it by type confusion.
-- Run exact-head CI with real jobs, then independent red-team review and one locally executed sanitized receipt/replay.
-- Until all applicable gates pass, existing output stays explicitly analysis-only and no formal Decision is claimed.
+### Batch MP-3 — adversarial and end-to-end acceptance (PARTIAL SLICE PASS / REMAINDER OPEN)
+- **Merged cross-layer slice: PR #372** at `48a6b64465f107cbbdae0b27c845c217ae8cbd2b`. Both exact-head workflows passed: B2-E tests 14/14, B2-E independent red-team 7/7, B2 semantic producer admission 14/14 and its independent red-team 15/15. Added cases reject a missing trusted resolver, conflicting request-vs-Case price references, a forged receipt SHA (persisted run is BLOCKED before DECISION_PENDING/Decision admission), and malformed Run Authority record/receipt stage-reference pairs.
+- **Remaining cross-layer negatives:** changed/stale record hash; wrong case/instrument/currency/exchange through full B2-E; unsupported class; price/gap/return-gate desynchronization and post-construction snapshot tampering; legacy snapshots with injected operator-price extensions; source/canonical-admission flag escalation; and stage bypass/replay tampering. Keep every failure fail-closed and verify no Decision Admission/Publication/Run Receipt can be created from a blocked run.
+- **Evidence/PIT isolation:** prove normal company Evidence/PIT admission still rejects an absent or invalid company-evidence group and that operator price cannot fill it by type confusion.
+- **Local acceptance still OPEN:** independently review one actual local private price bundle/receipt and complete Run Receipt/replay with only sanitized status/analysis ID/hash outcomes. Do not upload price values, source labels, raw files, or private manifests.
+- Until all remaining gates pass, existing Path A output stays explicitly analysis-only; no formal investment acceptance is inferred merely from passing software tests.
 
 ## 7. Non-goals
 
