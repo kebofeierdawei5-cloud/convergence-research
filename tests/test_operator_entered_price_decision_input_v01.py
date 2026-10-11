@@ -404,9 +404,16 @@ def test_operator_price_resolver_never_marks_unverified_mie_reference_as_price_e
         cutoff_date=__import__("datetime").date(2026, 10, 12),
         current_price_observation=observation,
     )
+    assert bound["source_claim_verified"] is False
     assert bound["source_origin_verified"] is False
     assert bound["source_vintage_verified"] is False
+    assert bound["source_use_rights_verified"] is False
+    assert bound["raw_source_bytes_captured"] is False
+    assert bound["canonical_exchange_price_admission"] is False
     assert bound["formal_evidence_pit_admission"] is False
+    assert observation["source_claim_verified"] is False
+    assert observation["raw_source_bytes_captured"] is False
+    assert observation["canonical_exchange_price_admission"] is False
     assert bound["decision_chain_bound"] is False
 
 
