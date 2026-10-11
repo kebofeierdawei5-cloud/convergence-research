@@ -262,6 +262,25 @@ def test_cutoff_must_strictly_follow_local_entry_time():
         )
 
 
+def test_cli_redacts_private_output_path_and_price(tmp_path, monkeypatch, capsys):
+    root = private_root(tmp_path / "private")
+    monkeypatch.setattr(price_input, "_prompt_payload", lambda: payload())
+    assert price_input.main(["--output-root", str(root)]) == 0
+    output = capsys.readouterr().out
+    receipt = json.loads(output)
+    assert receipt["bundle_path_redacted"] is True
+    assert "bundle_path" not in receipt
+    assert str(root) not in output
+    assert "26.58" not in output
+
+
+def test_filesystem_error_diagnostic_does_not_leak_private_path():
+    error = PermissionError(13, "permission denied", "/Users/private-user/.iios-private")
+    diagnostic = price_input._safe_os_error_reason(error)
+    assert diagnostic == "LOCAL_IO_PERMISSION_DENIED"
+    assert "/Users/private-user" not in diagnostic
+
+
 def test_private_root_blocks_public_repository_and_open_permissions(tmp_path):
     with pytest.raises(price_input.OperatorEnteredPriceError, match="OUTSIDE_PUBLIC_REPOSITORY"):
         price_input._private_root(price_input.REPOSITORY_ROOT)
