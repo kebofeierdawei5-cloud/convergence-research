@@ -275,3 +275,54 @@ def test_context_identity_mismatch_blocks_admission():
     bad_context = SemanticAdmissionContext(**{**context().__dict__, "symbol": "300750.SZ"})
     with pytest.raises(SemanticAdmissionError, match="symbol mismatch"):
         admit_semantic_artifact(artifact, receipt, context=bad_context, registry=registry())
+
+
+@pytest.mark.parametrize(
+    ("producer_id", "policy_version"),
+    [
+        (
+            "iios-chatgpt-web-semantic-producer",
+            "IIOS-CHATGPT-WEB-OPERATOR-POLICY-0.1",
+        ),
+        (
+            "renamed-producer-id",
+            "IIOS-CHATGPT-WEB-OPERATOR-POLICY-0.2",
+        ),
+    ],
+)
+def test_manual_web_origin_unverified_is_never_canonically_admitted(producer_id, policy_version):
+    manual_context = SemanticAdmissionContext(**{
+        **context().__dict__,
+        "producer_id": producer_id,
+        "policy_version": policy_version,
+    })
+    artifact = build_semantic_artifact(
+        artifact_id="manual-web-a1",
+        artifact_type="QUALITY_ASSESSMENT",
+        context=manual_context,
+        output={"status": "CONDITIONAL"},
+        decision_relevance="exploratory proposal only",
+        created_at="2026-10-08T00:00:00+00:00",
+    )
+    receipt = build_producer_receipt(
+        receipt_id="manual-web-r1",
+        artifact=artifact,
+        stage_id="QUALITY_ASSESSMENT",
+        created_at="2026-10-08T00:00:00+00:00",
+    )
+    manual_registry = ProducerRegistry((ProducerRegistration(
+        producer_id=producer_id,
+        producer_type=FixtureLLM.producer_type,
+        producer_version=FixtureLLM.producer_version,
+        policy_version=policy_version,
+    ),))
+    with pytest.raises(
+        SemanticAdmissionError,
+        match="manual ChatGPT Web semantic output is NON_CANONICAL",
+    ):
+        admit_semantic_artifact(
+            artifact,
+            receipt,
+            context=manual_context,
+            registry=manual_registry,
+        )
