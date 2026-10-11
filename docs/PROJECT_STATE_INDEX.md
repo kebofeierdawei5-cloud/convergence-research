@@ -27,6 +27,7 @@ B2-F Full Independent Red-team                          PASS / CANONICAL
 P0 B3 persisted upstream write authorization             MERGED / EXACT-HEAD CI PASS
 P0 Canonical Runtime Callback Preflight                  MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL PASS
 Production P0-LLM-001 / P0-LLM-004                      OPEN / REAL-HOST ACCEPTANCE REQUIRED
+D1-A 605016 production Host acceptance                         RUNBOOK CANONICAL; REAL HOST ORIGIN EVIDENCE OPEN
 605016 source-vintage successor                           PASS / LOCAL CORE-VALIDATED CANDIDATE; FORMAL/HOST GATES OPEN
 Route A C2 / 新和成 002001                            PRIVATE CORE/PIT PASS (7/7; OPERATOR-ATTESTED); FORMAL/INDEPENDENT/HOST GATES OPEN
 ```
@@ -310,7 +311,7 @@ The primary Investment Core MVP path is **Route A — free-first single-company 
 
 **C2 next action (operator policy):** PR [#338](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/338) and synthetic full-path PR [#340](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/340) are PASS / MERGED / CANONICAL. The actual private C2 run has now passed the unchanged Core/PIT validator ephemerally for all seven required groups, using `OPERATOR_ATTESTED_MARKET_DATA`; Run #8's eight captured raw objects and 13 PDF locators were reverified. No further web search/audit was done. This is not source-vintage verification, a formal signed admission, production Host acceptance, or a canonical Decision. The numeric value, private manifest and result bundle remain local-only. See audit sections 10–11 and machine record `evidence/real_cases/RC-CN-A-002001-20261009/C2_MARKET_PRICE_SOURCE_REVIEW_20261011.json`.
 
-The formal C2 case remains `NOT_ADMITTED` pending a genuinely separate review of the 13 filing facts/source-date bounds/internal fact-level use boundary, signed Evidence/PIT admission, and production Host acceptance. Continue the 605016 production Host critical path in parallel. The C2 plan does not weaken cutoff or PIT requirements.
+C2-P3 PR [#345](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/345) is PASS / MERGED / CANONICAL for the separate-method review. Its exact-head workflow [#38126026797](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38126026797) independently re-extracted 13/13 page-located claim term sets from the verified Run #8 source members, checked official HTTPS SZSE bindings and conservative cutoff-safe `known_at` upper bounds, and excluded the 2026-10-09 same-day buyback-progress notice. This is not external third-party sign-off or a legal opinion. Every reviewed source still declares `PUBLIC_ACCESS_REUSE_UNKNOWN`, so formal C2 remains `NOT_ADMITTED` until a separate reviewer resolves the 13 claims and permitted private fact-level retention/use boundary, and signed Evidence/PIT admission plus production Host acceptance pass. Continue the 605016 production Host critical path in parallel. The C2 plan does not weaken cutoff or PIT requirements.
 
 B2-D3 real LLM provider invocation → B2-D1 independent verification → production-backed B2-E remains a separately tracked optional integration path. It does not block Route A acquisition, manual original intake, fact-level review, or free-first MVP development.
 
