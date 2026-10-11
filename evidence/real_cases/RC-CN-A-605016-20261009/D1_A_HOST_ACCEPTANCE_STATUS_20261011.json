@@ -31,5 +31,26 @@
   "host_config_and_liveness_can_be_progressed_in_parallel": true,
   "host_origin_605016_provider_invocation_blocked_until_c1_formal_admission": true,
   "fixture_or_other_case_can_substitute_for_d1_acceptance": false,
-  "runbook_detail_updated": "LOCAL OLLAMA SETUP, PRIVATE ENV, CONFIG/HEALTH/READY PROBES AND PROTECTED POST HOST REQUEST EXAMPLE"
+  "runbook_detail_updated": "LOCAL OLLAMA SETUP, PRIVATE ENV, CONFIG/HEALTH/READY PROBES AND PROTECTED POST HOST REQUEST EXAMPLE",
+  "provider_smoke_diagnostic": {
+    "workflow_run_id": 38127035406,
+    "workflow_run_url": "https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38127035406",
+    "source_head_sha": "c77c47e8e7e7ce0c104278bce6c19237ab9ad3d9",
+    "static_job": "SUCCESS",
+    "live_job": "COMPLETED_SUCCESS_BUT_FAIL_CLOSED_NO_CREDENTIALS",
+    "required_provider_configuration_present": false,
+    "missing_configuration_fields": [
+      "IIOS_LLM_PROVIDER_BASE_URL",
+      "IIOS_LLM_PROVIDER_MODEL",
+      "IIOS_LLM_PROVIDER_RUNTIME_PRIVATE_KEY_B64",
+      "IIOS_LLM_PROVIDER_ID",
+      "IIOS_LLM_PROVIDER_VERSION",
+      "IIOS_LLM_PROVIDER_PROTOCOL"
+    ],
+    "emitted_status": "BLOCKED_OR_FAILED",
+    "actual_provider_invocation": false,
+    "independent_live_receipt_verification": false,
+    "workflow_green_interpretation": "NOT_PROVIDER_SUCCESS: workflow uses continue-on-error/fail-closed exit handling",
+    "acceptance_credit": "NONE"
+  }
 }
