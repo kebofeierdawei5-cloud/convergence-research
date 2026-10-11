@@ -21,7 +21,8 @@ from iios_mvp.semantic_producer_admission_v01 import ProducerRegistration, Produ
 from iios_mvp.decision_admission import validate_decision_admission_receipt
 from tools.core04_final_300750_decision_e2e import build_case, load_inputs, admit_price
 from research.b2.company_evidence import REQUIRED_COMPANY_FIELD_GROUPS, build_company_evidence_manifest
-from iios_mvp.canonical_run_authority_v01 import run_state_path, CanonicalRunAuthorizationError, _validate_decision_pending_input_refs
+from iios_mvp.canonical_run_authority_v01 import run_state_path, CanonicalRunAuthorizationError, _validate_decision_pending_input_refs, authorize_decision_revision_write
+from iios_mvp.store import read_snapshot, snapshot_path
 from iios_mvp.machine_publication import write_machine_publication
 from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
 
@@ -657,6 +658,220 @@ def _private_operator_price_bundle(tmp_path, case):
     }
     resolver = operator_price_input.FileSystemOperatorPriceInputResolver(root)
     return root, reference, resolver
+
+
+def test_operator_price_cannot_substitute_for_missing_company_evidence_manifest(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case)
+    run_root = tmp_path / "operator-price-without-evidence-run"
+
+    with pytest.raises(B2EE2EError, match="B2 Evidence/PIT manifest and raw_root"):
+        run_b2e_conformance(
+            raw_request=RAW,
+            request_id="b2e-operator-without-company-evidence",
+            run_id="b2e-operator-without-company-evidence",
+            created_at=CREATED,
+            request_interpreter=FixtureInterpreter(),
+            request_registry=_registries()[0],
+            semantic_producer=FixtureSemanticProducer(),
+            producer_registry=_registries()[1],
+            company="宁德时代",
+            evidence_refs=("E011",),
+            evidence_hashes=(E1,),
+            artifact_type="THESIS_ASSESSMENT",
+            semantic_prompt="test",
+            decision_relevance="Synthetic test of Evidence/PIT separation.",
+            case=case,
+            current_price_resolver=price_registry,
+            independent_forecast_resolver=forecast_registry,
+            upstream_authority_resolver=upstream_registry,
+            valuation_output_resolver=valuation_resolver,
+            operator_price_input_resolver=resolver,
+            operator_price_input_ref=reference,
+            run_root=str(run_root),
+            # Intentionally omit both evidence_manifest and evidence_root.
+        )
+
+    state = json.loads(
+        run_state_path(run_root, "b2e-operator-without-company-evidence").read_text(encoding="utf-8")
+    )
+    assert state["envelope"]["run_status"] == "BLOCKED"
+    stage_ids = [row["stage_id"] for row in state["envelope"]["stage_receipts"]]
+    assert "EVIDENCE_ADMITTED" not in stage_ids
+    assert "DECISION_PENDING" not in stage_ids
+    assert "DECISION_ADMITTED" not in stage_ids
+
+
+def test_operator_price_cannot_replace_a_required_company_evidence_group(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    evidence_root, valid_manifest, _manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    incomplete_manifest = build_company_evidence_manifest(
+        case_id=valid_manifest["case_id"],
+        market=valid_manifest["market"],
+        symbol=valid_manifest["symbol"],
+        company=valid_manifest["company"],
+        cutoff_date=valid_manifest["cutoff_date"],
+        evidence=valid_manifest["evidence"][:-1],
+        raw_artifacts=valid_manifest["raw_artifacts"][:-1],
+        required_field_groups=list(REQUIRED_COMPANY_FIELD_GROUPS),
+        raw_root=evidence_root,
+    )
+    assert incomplete_manifest["status"] == "BLOCKED"
+    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case)
+    evidences = incomplete_manifest["evidence"]
+    run_root = tmp_path / "operator-price-with-incomplete-evidence-run"
+
+    with pytest.raises(B2EE2EError, match="B2 Evidence/PIT admission failed"):
+        run_b2e_conformance(
+            raw_request=RAW,
+            request_id="b2e-operator-with-incomplete-company-evidence",
+            run_id="b2e-operator-with-incomplete-company-evidence",
+            created_at=CREATED,
+            request_interpreter=FixtureInterpreter(),
+            request_registry=_registries()[0],
+            semantic_producer=FixtureSemanticProducer(),
+            producer_registry=_registries()[1],
+            company="宁德时代",
+            evidence_refs=tuple(row["evidence_id"] for row in evidences),
+            evidence_hashes=tuple(row["content_sha256"] for row in evidences),
+            artifact_type="THESIS_ASSESSMENT",
+            semantic_prompt="test",
+            semantic_facts=tuple({
+                "evidence_id": row["evidence_id"],
+                "statement": "SYNTHETIC_TEST_ONLY",
+            } for row in evidences),
+            decision_relevance="Synthetic test of required company Evidence/PIT groups.",
+            case=case,
+            current_price_resolver=price_registry,
+            independent_forecast_resolver=forecast_registry,
+            upstream_authority_resolver=upstream_registry,
+            valuation_output_resolver=valuation_resolver,
+            operator_price_input_resolver=resolver,
+            operator_price_input_ref=reference,
+            run_root=str(run_root),
+            evidence_manifest=incomplete_manifest,
+            evidence_root=str(evidence_root),
+        )
+
+    state = json.loads(
+        run_state_path(run_root, "b2e-operator-with-incomplete-company-evidence").read_text(encoding="utf-8")
+    )
+    assert state["envelope"]["run_status"] == "BLOCKED"
+    stage_ids = [row["stage_id"] for row in state["envelope"]["stage_receipts"]]
+    assert "EVIDENCE_ADMITTED" not in stage_ids
+    assert "DECISION_PENDING" not in stage_ids
+    assert "DECISION_ADMITTED" not in stage_ids
+
+
+def test_operator_price_snapshot_sync_tampering_blocks_decision_revision_write(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    evidence_root, manifest, _manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case)
+    run_root = tmp_path / "operator-price-snapshot-tamper-run"
+    evidences = manifest["evidence"]
+
+    result = run_b2e_conformance(
+        raw_request=RAW,
+        request_id="b2e-operator-snapshot-sync",
+        run_id="b2e-operator-snapshot-sync",
+        created_at=CREATED,
+        request_interpreter=FixtureInterpreter(),
+        request_registry=_registries()[0],
+        semantic_producer=FixtureSemanticProducer(),
+        producer_registry=_registries()[1],
+        company="宁德时代",
+        evidence_refs=tuple(row["evidence_id"] for row in evidences),
+        evidence_hashes=tuple(row["content_sha256"] for row in evidences),
+        artifact_type="THESIS_ASSESSMENT",
+        semantic_prompt="Assess the thesis from admitted evidence. Do not issue a decision.",
+        semantic_facts=tuple({
+            "evidence_id": row["evidence_id"],
+            "statement": "SYNTHETIC_TEST_ONLY",
+        } for row in evidences),
+        decision_relevance="Synthetic negative test of price snapshot synchronization.",
+        case=case,
+        current_price_resolver=price_registry,
+        independent_forecast_resolver=forecast_registry,
+        upstream_authority_resolver=upstream_registry,
+        valuation_output_resolver=valuation_resolver,
+        operator_price_input_resolver=resolver,
+        operator_price_input_ref=reference,
+        run_root=str(run_root),
+        evidence_manifest=manifest,
+        evidence_root=str(evidence_root),
+    )
+
+    persisted_snapshot = read_snapshot(
+        snapshot_path(run_root, result.decision_revision["snapshot_hash"])
+    )
+    def ensure_gap(value):
+        observation = value["input"]["current_price_observation"]
+        return value["input"].setdefault(
+            "expectation_gap",
+            {
+                "price": observation["price"],
+                "price_observation_id": observation["price_observation_id"],
+            },
+        )
+
+    def ensure_return_gate(value):
+        observation = value["input"]["current_price_observation"]
+        return value["input"].setdefault("return_gate", {"entry_price": observation["price"]})
+
+    mutations = (
+        ("expectation_gap_price", lambda value: ensure_gap(value).__setitem__("price", "999.00"),
+         "expectation-gap input is not synchronized to operator current price"),
+        ("expectation_gap_price_id", lambda value: ensure_gap(value).__setitem__("price_observation_id", "forged-price-id"),
+         "expectation-gap input is not synchronized to operator current price"),
+        ("return_gate_entry_price", lambda value: ensure_return_gate(value).__setitem__("entry_price", "999.00"),
+         "return gate entry_price is not synchronized to operator current price"),
+        ("current_price", lambda value: value["input"]["current_price_observation"].__setitem__("price", "999.00"),
+         "return gate entry_price is not synchronized to operator current price"),
+    )
+    for name, mutate, expected_error in mutations:
+        tampered = json.loads(json.dumps(persisted_snapshot))
+        mutate(tampered)
+        with pytest.raises(CanonicalRunAuthorizationError, match=expected_error):
+            authorize_decision_revision_write(
+                run_root,
+                run_id="b2e-operator-snapshot-sync",
+                snapshot=tampered,
+                decision_admission=result.decision_admission,
+            )
+
+    # Even when all linked current-price fields are changed together, re-hashing
+    # the edited JSON cannot rebind it to the already-issued Decision Admission.
+    from iios_mvp.engine import sha256_obj
+    forged_consistent = json.loads(json.dumps(persisted_snapshot))
+    current_observation = forged_consistent["input"]["current_price_observation"]
+    forged_consistent["input"].setdefault(
+        "expectation_gap",
+        {
+            "price": current_observation["price"],
+            "price_observation_id": current_observation["price_observation_id"],
+        },
+    )
+    forged_consistent["input"].setdefault(
+        "return_gate",
+        {"entry_price": current_observation["price"]},
+    )
+    current_observation["price"] = "999.00"
+    forged_consistent["input"]["expectation_gap"]["price"] = "999.00"
+    forged_consistent["input"]["expectation_gap"]["price_observation_id"] = current_observation["price_observation_id"]
+    forged_consistent["input"]["return_gate"]["entry_price"] = "999.00"
+    forged_consistent["snapshot_hash"] = sha256_obj({
+        "snapshot_schema": forged_consistent["snapshot_schema"],
+        "engine_version": forged_consistent["engine_version"],
+        "input": forged_consistent["input"],
+        "decision": forged_consistent["decision"],
+    })
+    with pytest.raises(CanonicalRunAuthorizationError, match="snapshot/Decision Admission does not match canonical Run Envelope"):
+        authorize_decision_revision_write(
+            run_root,
+            run_id="b2e-operator-snapshot-sync",
+            snapshot=forged_consistent,
+            decision_admission=result.decision_admission,
+        )
 
 
 def test_p0_persisted_b2e_blocks_without_b2_evidence_pit_admission(tmp_path):
