@@ -16,7 +16,7 @@
     "checks": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["publication_integrity","publication_binding","machine_surface_integrity","human_surface_integrity","deterministic_render_replay","required_sections","semantic_matrix_complete","explicit_absence_handling","human_auditability_contract","decision_fidelity","human_boundary","non_authority"],
+      "required": ["publication_integrity","publication_binding","machine_surface_integrity","human_surface_integrity","deterministic_render_replay","required_sections","semantic_matrix_complete","explicit_absence_handling","human_auditability_contract","decision_fidelity","human_boundary","non_authority","price_assurance_transparency"],
       "properties": {
         "publication_integrity": {"enum": ["PASS","FAIL"]},
         "publication_binding": {"enum": ["PASS","FAIL"]},
@@ -29,7 +29,8 @@
         "human_auditability_contract": {"enum": ["PASS","FAIL"]},
         "decision_fidelity": {"enum": ["PASS","FAIL"]},
         "human_boundary": {"enum": ["PASS","FAIL"]},
-        "non_authority": {"enum": ["PASS","FAIL"]}
+        "non_authority": {"enum": ["PASS","FAIL"]},
+        "price_assurance_transparency": {"enum": ["PASS","FAIL"]}
       }
     },
     "issues": {"type": "array", "items": {"type": "string"}},
