@@ -509,6 +509,19 @@ def _build_base_manifest_from_prior_dividend(
     supplemental_target.parent.mkdir(parents=True, exist_ok=True)
     supplemental_target.write_bytes(pdf_raw)
 
+    final_url = str(
+        dividend.get("final_pdf_url")
+        or (dividend.get("pdf_capture") or {}).get("final_url")
+        or ""
+    )
+    parsed_final_url = urlparse(final_url)
+    if (
+        parsed_final_url.scheme.lower() != "https"
+        or final_url.split("#", 1)[0] not in DIVIDEND_PDF_ALLOWED_FINAL_URLS
+        or parsed_final_url.hostname not in {"big5.sse.com.cn", "static.sse.com.cn", "www.sse.com.cn"}
+    ):
+        raise ValueError("RECOVERED_DIVIDEND_PDF_FINAL_URL_INVALID")
+
     source = ledger["source"]
     dividend_evidence = dict(ledger["evidence_record"])
     dividend_evidence.update({
