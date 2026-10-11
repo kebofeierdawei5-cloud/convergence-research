@@ -7,6 +7,7 @@ source verification, formal Evidence/PIT admission, or Decision-chain binding.
 """
 
 import argparse
+import errno
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 import hashlib
@@ -15,7 +16,6 @@ import os
 from pathlib import Path
 import re
 import stat
-import sys
 from typing import Any, Mapping
 
 SCHEMA = "IIOS-OPERATOR-ENTERED-PRICE-INPUT-0.1"
@@ -23,7 +23,6 @@ RECEIPT_SCHEMA = "IIOS-OPERATOR-ENTERED-PRICE-RECEIPT-0.1"
 STATUS = "ACCEPTED_OPERATOR_INPUT_NOT_EVIDENCE_ADMISSION"
 SHANGHAI = timezone(timedelta(hours=8))
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _FIELDS = {
     "schema_version", "base_case_id", "market", "symbol", "exchange", "currency",
     "observation_date", "price", "adjustment_semantics", "quote_timestamp",
@@ -439,6 +438,19 @@ def _prompt_payload() -> dict[str, Any]:
     }
 
 
+def _safe_os_error_reason(exc: OSError) -> str:
+    """Map filesystem failures to non-path-bearing diagnostics."""
+    if exc.errno in {errno.EACCES, errno.EPERM}:
+        return "LOCAL_IO_PERMISSION_DENIED"
+    if exc.errno == errno.ENOSPC:
+        return "LOCAL_IO_NO_SPACE"
+    if exc.errno == errno.EEXIST:
+        return "LOCAL_IO_PATH_EXISTS"
+    if exc.errno == errno.ENOENT:
+        return "LOCAL_IO_PATH_NOT_FOUND"
+    return "LOCAL_IO_ERROR"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Private operator-entered A/H price intake (not formal source admission)")
     parser.add_argument("--output-root", default="~/.iios-private/operator-entered-prices")
@@ -450,10 +462,17 @@ def main(argv: list[str] | None = None) -> int:
         else:
             payload = _prompt_payload()
             result = create_bundle(payload, args.output_root)
+        if "bundle_path" in result:
+            result = dict(result)
+            result.pop("bundle_path", None)
+            result["bundle_path_redacted"] = True
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
         return 0
-    except (OperatorEnteredPriceError, OSError) as exc:
+    except OperatorEnteredPriceError as exc:
         print(json.dumps({"status": "BLOCKED", "reason": str(exc)}, ensure_ascii=False, sort_keys=True))
+        return 4
+    except OSError as exc:
+        print(json.dumps({"status": "BLOCKED", "reason": _safe_os_error_reason(exc)}, ensure_ascii=False, sort_keys=True))
         return 4
 
 
