@@ -315,6 +315,76 @@ def test_operator_price_resolver_rejects_forged_canonical_price_flags(tmp_path):
         )
 
 
+def test_operator_price_resolver_rejects_every_assurance_flag_escalation(tmp_path):
+    root = private_root(tmp_path / "private")
+    reference = operator_reference(root)
+    resolver = price_input.FileSystemOperatorPriceInputResolver(root)
+    observation = resolver.build_current_price_observation(
+        reference,
+        case_id="RC-CN-A-002001-20261012",
+        market="CN-A",
+        symbol="002001",
+        currency="CNY",
+        cutoff_date=__import__("datetime").date(2026, 10, 12),
+        mie_reference_price_observation_id="official-price-ref-20261009",
+    )
+    flags = (
+        "source_claim_verified",
+        "source_origin_verified",
+        "source_vintage_verified",
+        "source_use_rights_verified",
+        "raw_source_bytes_captured",
+        "canonical_exchange_price_admission",
+        "canonical_price_admission",
+        "formal_evidence_pit_admission",
+    )
+    for flag in flags:
+        forged = dict(observation)
+        forged[flag] = True
+        with pytest.raises(
+            price_input.OperatorEnteredPriceError,
+            match="OPERATOR_PRICE_PROVENANCE_FLAG_ESCALATED",
+        ):
+            resolver.resolve_operator_price_input(
+                reference,
+                case_id="RC-CN-A-002001-20261012",
+                market="CN-A",
+                symbol="002001",
+                currency="CNY",
+                cutoff_date=__import__("datetime").date(2026, 10, 12),
+                current_price_observation=forged,
+            )
+
+
+def test_operator_price_resolver_rejects_exchange_metadata_tampering(tmp_path):
+    root = private_root(tmp_path / "private")
+    reference = operator_reference(root)
+    resolver = price_input.FileSystemOperatorPriceInputResolver(root)
+    observation = resolver.build_current_price_observation(
+        reference,
+        case_id="RC-CN-A-002001-20261012",
+        market="CN-A",
+        symbol="002001",
+        currency="CNY",
+        cutoff_date=__import__("datetime").date(2026, 10, 12),
+        mie_reference_price_observation_id="official-price-ref-20261009",
+    )
+    observation["exchange"] = "SSE"
+    with pytest.raises(
+        price_input.OperatorEnteredPriceError,
+        match="OPERATOR_PRICE_EXCHANGE_MISMATCH",
+    ):
+        resolver.resolve_operator_price_input(
+            reference,
+            case_id="RC-CN-A-002001-20261012",
+            market="CN-A",
+            symbol="002001",
+            currency="CNY",
+            cutoff_date=__import__("datetime").date(2026, 10, 12),
+            current_price_observation=observation,
+        )
+
+
 def test_operator_price_resolver_never_marks_unverified_mie_reference_as_price_evidence(tmp_path):
     root = private_root(tmp_path / "private")
     reference = operator_reference(root)
