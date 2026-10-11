@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 import stat
 
@@ -253,3 +255,171 @@ def test_unknown_top_level_scope_flag_or_wrong_schema_blocks(tmp_path):
     input_path = _write_input(tmp_path, normalized=normalized)
     with pytest.raises(PrivateScenarioAnalysisError, match="FORBIDDEN_SCOPE_FLAG_NOT_FALSE"):
         run_private_scenario_analysis(input_path=input_path, output_root=tmp_path / "out")
+
+
+
+def _batch2_q8(value: Decimal) -> str:
+    return format(value.quantize(Decimal("0.00000001"), rounding=ROUND_HALF_UP), "f")
+
+
+def _batch2_pct4(value: Decimal) -> str:
+    return format((value * Decimal("100")).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP), "f")
+
+
+def test_batch2_independent_fixed_profile_math_matches_machine_json(tmp_path):
+    # Independent constants intentionally do not read _SCENARIO_PROFILES:
+    # the test must be able to catch a changed or internally self-consistent
+    # but unintended profile as well as arithmetic defects.
+    fixed_profiles = {
+        "002001": {
+            "price": Decimal("26.58"),
+            "scenarios": {
+                "bear": (Decimal("2.10"), Decimal("9.5"), Decimal("0.30")),
+                "base": (Decimal("2.80"), Decimal("11.5"), Decimal("0.50")),
+                "bull": (Decimal("3.50"), Decimal("13.0"), Decimal("0.20")),
+            },
+        },
+        "605016": {
+            "price": Decimal("20.28"),
+            "scenarios": {
+                "bear": (Decimal("0.80"), Decimal("17"), Decimal("0.25")),
+                "base": (Decimal("1.10"), Decimal("22"), Decimal("0.50")),
+                "bull": (Decimal("1.30"), Decimal("25"), Decimal("0.25")),
+            },
+        },
+    }
+    target = Decimal("0.15")
+    max_bear_loss = Decimal("0.25")
+    input_path = _write_input(tmp_path)
+    result = run_private_scenario_analysis(
+        input_path=input_path,
+        output_root=tmp_path / "batch2-math-audit",
+    )
+    machine = json.loads((Path(result["run_dir"]) / "analysis.json").read_text(encoding="utf-8"))
+    companies = {row["case"]["symbol"]: row for row in machine["company_analyses"]}
+    assert set(companies) == set(fixed_profiles)
+
+    for symbol, fixed in fixed_profiles.items():
+        company = companies[symbol]
+        profile = company["scenario_profile"]
+        returns = company["return_and_entry_evaluation"]
+        assert Decimal(company["case"]["current_price_cny"]) == fixed["price"]
+        assert profile["probabilities_calibrated"] is False
+        assert int(profile["horizon_years"]) == 1
+        assert Decimal(profile["target_annualized_return_pct"]) == Decimal("15.0000")
+        assert Decimal(profile["maximum_bear_loss_pct"]) == Decimal("25.0000")
+
+        expected_wealth = Decimal("0")
+        bear_wealth = Decimal("0")
+        assert set(profile["scenarios"]) == {"bear", "base", "bull"}
+        for name, (eps, multiple, probability) in fixed["scenarios"].items():
+            actual = profile["scenarios"][name]
+            assert Decimal(actual["eps_cny"]) == eps
+            assert Decimal(actual["multiple"]) == multiple
+            assert Decimal(actual["probability"]) == probability
+            assert Decimal(actual["cash_distributions_per_share_cny"]) == 0
+            scenario_value = eps * multiple
+            assert Decimal(actual["value_per_share_cny"]) == scenario_value
+            terminal_wealth = scenario_value
+            expected_wealth += probability * terminal_wealth
+            if name == "bear":
+                bear_wealth = terminal_wealth
+
+        assert sum((row[2] for row in fixed["scenarios"].values()), Decimal("0")) == Decimal("1")
+        expected_total_return = expected_wealth / fixed["price"] - Decimal("1")
+        # This profile set is H=1Y, so the annualized return must equal total return.
+        expected_annualized_return = expected_total_return
+        hurdle_ceiling = expected_wealth / ((Decimal("1") + target) ** 1)
+        bear_ceiling = bear_wealth / (Decimal("1") - max_bear_loss)
+        binding_ceiling = min(hurdle_ceiling, bear_ceiling)
+        headroom = binding_ceiling - fixed["price"]
+        bear_return = bear_wealth / fixed["price"] - Decimal("1")
+
+        assert returns["expected_terminal_wealth_per_share_cny"] == _batch2_q8(expected_wealth)
+        assert returns["expected_total_return_pct"] == _batch2_pct4(expected_total_return)
+        assert returns["expected_annualized_return_pct"] == _batch2_pct4(expected_annualized_return)
+        assert returns["return_hurdle_entry_price_ceiling_cny"] == _batch2_q8(hurdle_ceiling)
+        assert returns["bear_terminal_wealth_per_share_cny"] == _batch2_q8(bear_wealth)
+        assert returns["bear_return_at_current_price_pct"] == _batch2_pct4(bear_return)
+        assert returns["entry_price_ceiling_from_max_bear_loss_cny"] == _batch2_q8(bear_ceiling)
+        assert returns["binding_conditional_entry_price_ceiling_cny"] == _batch2_q8(binding_ceiling)
+        assert returns["headroom_to_binding_ceiling_cny"] == _batch2_q8(headroom)
+        assert returns["conditional_price_screen"] == (
+            "PRICE_AT_OR_BELOW_CONDITIONAL_ENTRY_CEILING"
+            if fixed["price"] <= binding_ceiling
+            else "PRICE_ABOVE_CONDITIONAL_ENTRY_CEILING"
+        )
+
+
+def test_batch2_rendered_report_matches_machine_json_and_retains_caveats(tmp_path):
+    input_path = _write_input(tmp_path)
+    result = run_private_scenario_analysis(
+        input_path=input_path,
+        output_root=tmp_path / "batch2-report-audit",
+    )
+    bundle = Path(result["run_dir"])
+    machine = json.loads((bundle / "analysis.json").read_text(encoding="utf-8"))
+    report = (bundle / "report.md").read_text(encoding="utf-8")
+
+    for company in machine["company_analyses"]:
+        case = company["case"]
+        profile = company["scenario_profile"]
+        returns = company["return_and_entry_evaluation"]
+        assert f"## {case['company']}（{case['symbol']}.{case['exchange']}）" in report
+        assert f"人工输入价格：**¥{case['current_price_cny']}** / 股" in report
+        assert f"假设版本：`{profile['profile_id']}`" in report
+        assert f"假设性质：{profile['assumption_class']}" in report
+        assert "概率是否校准：否" in report
+        assert f"| 概率加权终值（含本模型现金分配假设） | ¥{returns['expected_terminal_wealth_per_share_cny']} |" in report
+        assert f"| 预期总回报 | {returns['expected_total_return_pct']}% |" in report
+        assert f"| 预期年化回报（H={profile['horizon_years']}Y） | {returns['expected_annualized_return_pct']}% |" in report
+        assert f"| 满足 15% 年化门槛的入场价上限 | ¥{returns['return_hurdle_entry_price_ceiling_cny']} |" in report
+        assert f"| Bear 损失上限约束下的价格上限 | ¥{returns['entry_price_ceiling_from_max_bear_loss_cny']} |" in report
+        assert f"**两项约束共同决定的条件性入场价上限** | **¥{returns['binding_conditional_entry_price_ceiling_cny']}**" in report
+        assert f"`{returns['conditional_price_screen']}`" in report
+
+    for caveat in (
+        "不是市场一致预期",
+        "不是 IIOS BUY/ADD/NO-BUY/Decision",
+        "不创建正式投资 Decision",
+        "不是新 Case PIT",
+    ):
+        assert caveat in report
+    assert machine["governance"]["formal_decision_created"] is False
+    assert machine["governance"]["execution_authorized"] is False
+
+
+def test_batch2_independently_recomputes_receipt_file_hashes(tmp_path):
+    input_path = _write_input(tmp_path)
+    result = run_private_scenario_analysis(
+        input_path=input_path,
+        output_root=tmp_path / "batch2-hash-audit",
+    )
+    bundle = Path(result["run_dir"])
+    receipt = json.loads((bundle / "receipt.json").read_text(encoding="utf-8"))
+    input_bytes = (bundle / "input.json").read_bytes()
+    analysis_bytes = (bundle / "analysis.json").read_bytes()
+    report_bytes = (bundle / "report.md").read_bytes()
+    machine = json.loads(analysis_bytes.decode("utf-8"))
+
+    assert receipt["input_sha256"] == hashlib.sha256(input_bytes).hexdigest()
+    assert receipt["analysis_file_sha256"] == hashlib.sha256(analysis_bytes).hexdigest()
+    assert receipt["report_file_sha256"] == hashlib.sha256(report_bytes).hexdigest()
+    assert machine["input_sha256"] == hashlib.sha256(input_bytes).hexdigest()
+
+    # Independently reconstitute the exact canonical analysis body whose digest
+    # is embedded inside analysis.json, omitting only that digest field.
+    body = {key: value for key, value in machine.items() if key != "analysis_content_sha256"}
+    canonical_body = json.dumps(
+        body,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    assert machine["analysis_content_sha256"] == hashlib.sha256(canonical_body).hexdigest()
+    assert receipt["integrity_scope"] == "EXACT_PRIVATE_FILE_BYTES_ONLY_NOT_EXTERNAL_SOURCE_AUTHENTICATION"
+    assert receipt["source_origin_verified"] is False
+    assert receipt["source_use_rights_verified"] is False
+    assert receipt["formal_decision_created"] is False
+    assert receipt["execution_authorized"] is False
