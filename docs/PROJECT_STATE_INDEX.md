@@ -41,7 +41,23 @@ D1-A 605016 production Host acceptance                         RUNBOOK + LOOPBAC
 605016 source-vintage successor                           PASS / LOCAL CORE-VALIDATED CANDIDATE; FORMAL/HOST GATES OPEN
 Route A C2 / 新和成 002001                            PRIVATE CORE/PIT PASS (7/7; PRIOR INPUT); FORMAL/INDEPENDENT/HOST GATES OPEN
 Path A operator-attested price overlay               ANALYSIS-ONLY INTAKE IMPLEMENTATION; NO CANONICAL PRICE ADMISSION
+Local single-user complete pilot                     ACTIVE P0 PRIORITY; NON-CANONICAL PILOT BEFORE FURTHER HARDENING
+Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
+P0 zero-job workflow anomaly                         OPEN / DIAGNOSTIC BACKLOG; NON-BLOCKING FOR LOCAL PILOT
 ```
+
+### Execution-first local MVP priority (2026-10-11; supersedes earlier task ordering)
+
+The owner has explicitly redirected the project to **finish core functionality and conduct a complete actual local run before further optimization**. The governing details and acceptance criteria are in [Execution-first Local Single-User MVP Pivot](iios/LOCAL_SINGLE_USER_EXECUTION_FIRST_PIVOT_20261011.md).
+
+Immediate order:
+1. Pause new residual MP-3 anti-tamper permutations / broader red-team expansion unless a demonstrated issue directly blocks the run or could silently mislead an investment conclusion.
+2. Build and run a complete local, single-user, candidate-driven research workflow using the existing investment modules; do not limit the main product to the fixed-profile Path A scenario calculator.
+3. Allow a clearly segregated `PILOT_NON_CANONICAL` route for practical end-to-end testing with manually supplied price and explicitly identified free/manual AI assistance. Do not bypass or weaken formal admission, and never report this pilot as a canonical Decision or canonical Run Receipt.
+4. Treat C1/C2 formal signer/source-rights work as requirements for their formal evidence and canonical-decision claims, not as prerequisites to exercising the provisional pilot.
+5. Leave the zero-job P0 workflow investigation open as diagnostic backlog; it does not block running the local tool.
+
+Minimum requirements still apply: visible source/known-at and price assurance, UNKNOWN/missing/conflict behavior, deterministic investment math, private local persistence, a useful Chinese report, human approval separation, and no auto-trading. The pilot is to reveal real user/product defects first; additional hardening follows the observed run.
 
 ### Current blockers
 
