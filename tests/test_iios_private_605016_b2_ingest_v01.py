@@ -279,7 +279,10 @@ def test_private_persistence_allows_multiple_evidence_records_to_share_exact_raw
     )
 
     assert result["status"] == "PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED"
-    assert result["raw_artifact_count"] == 2
+    assert result["raw_artifact_count"] == 2  # legacy alias: manifest declarations
+    assert result["raw_artifact_declaration_count"] == 2
+    assert result["unique_raw_file_count"] == 1
+    assert result["raw_artifact_count_semantics"] == "MANIFEST_DECLARATIONS_NOT_UNIQUE_FILES"
     persisted_raw = Path(result["evidence_root"]) / "raw" / "sse-market.json"
     assert persisted_raw.read_bytes() == RAW
     assert len([path for path in (Path(result["evidence_root"]) / "raw").iterdir() if path.is_file()]) == 1
@@ -293,6 +296,9 @@ def test_private_persistence_allows_multiple_evidence_records_to_share_exact_raw
     )
     assert verified["status"] == "VERIFIED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED"
     assert verified["candidates"][0]["raw_artifact_count"] == 2
+    assert verified["candidates"][0]["raw_artifact_declaration_count"] == 2
+    assert verified["candidates"][0]["unique_raw_file_count"] == 1
+    assert verified["candidates"][0]["raw_artifact_count_semantics"] == "MANIFEST_DECLARATIONS_NOT_UNIQUE_FILES"
 
 
 def test_shared_raw_path_with_conflicting_byte_contract_fails_before_any_write(tmp_path: Path) -> None:
