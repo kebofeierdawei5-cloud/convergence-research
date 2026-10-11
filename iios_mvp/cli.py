@@ -239,6 +239,7 @@ def cmd_canonical_run(args: argparse.Namespace) -> int:
             independent_forecast_resolver=runtime.independent_forecast_resolver,
             upstream_authority_resolver=runtime.upstream_authority_resolver,
             valuation_output_resolver=runtime.valuation_output_resolver,
+            operator_price_input_resolver=getattr(runtime, "operator_price_input_resolver", None),
             run_root=args.out,
             evidence_manifest=manifest,
             evidence_root=str(bundle["evidence_root"]),
