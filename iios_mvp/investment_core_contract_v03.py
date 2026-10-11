@@ -291,7 +291,7 @@ def _portfolio_status(case: dict[str, Any]) -> str:
 def _risk_status(case: dict[str, Any]) -> str:
     return str((case.get("risk") or {}).get("status", "UNKNOWN")).upper()
 
-def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None, valuation_output_resolver: Any | None = None) -> dict[str, Any]:
+def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None, valuation_output_resolver: Any | None = None, operator_price_input_resolver: Any | None = None) -> dict[str, Any]:
     errors: list[dict[str, str]] = []
     if not isinstance(case, dict):
         return {"status": "BLOCKED", "errors": [_err("V03-SCHEMA-TYPE", "$", "case must be an object")]}
@@ -337,43 +337,78 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
                 "price_observation_id is required for canonical price evidence",
             )
         )
-    if not str(case["current_price_observation"].get("price_observation_admission_hash", "")).strip():
-        errors.append(
-            _err(
+    price_observation = case["current_price_observation"]
+    price_input_class = price_observation.get("price_input_class", "CANONICAL_ADMITTED_MARKET_DATA")
+    if price_input_class == "OPERATOR_ATTESTED_MARKET_DATA":
+        if price_observation.get("price_observation_admission_hash") not in (None, ""):
+            errors.append(_err(
+                "V03-OPERATOR-PRICE-CANONICAL-HASH",
+                "current_price_observation.price_observation_admission_hash",
+                "operator-attested input must not claim a canonical price admission hash",
+            ))
+        if operator_price_input_resolver is None:
+            errors.append(_err(
+                "V03-OPERATOR-PRICE-RESOLVER",
+                "current_price_observation.operator_price_input_ref",
+                "trusted operator price input resolver is required for OPERATOR_ATTESTED_MARKET_DATA",
+            ))
+        else:
+            try:
+                operator_price_input_resolver.resolve_operator_price_input(
+                    price_observation.get("operator_price_input_ref"),
+                    case_id=case["case_id"],
+                    market=case["market"],
+                    symbol=case["symbol"],
+                    currency=price_observation.get("currency"),
+                    cutoff_date=cutoff,
+                    current_price_observation=price_observation,
+                )
+                if not str(price_observation.get("mie_reference_price_observation_id", "")).strip():
+                    raise ValueError("source-qualified MIE calibration price reference is required")
+            except (KeyError, TypeError, ValueError, OSError) as exc:
+                errors.append(_err(
+                    "V03-OPERATOR-PRICE-INPUT",
+                    "current_price_observation",
+                    str(exc),
+                ))
+    elif price_input_class == "CANONICAL_ADMITTED_MARKET_DATA":
+        if not str(price_observation.get("price_observation_admission_hash", "")).strip():
+            errors.append(_err(
                 "V03-PRICE-ADMISSION-HASH",
                 "current_price_observation.price_observation_admission_hash",
                 "price_observation_admission_hash is required for canonical price evidence",
-            )
-        )
-    if current_price_resolver is None:
-        errors.append(
-            _err(
+            ))
+        if current_price_resolver is None:
+            errors.append(_err(
                 "V03-PRICE-RESOLVER",
                 "current_price_observation",
                 "canonical current price resolver is required at runtime",
-            )
-        )
-    else:
-        try:
-            canonical_price = current_price_resolver.resolve_current_price(
-                {
-                    "price_observation_id": case["current_price_observation"].get("price_observation_id", ""),
-                    "admission_record_hash": case["current_price_observation"].get("price_observation_admission_hash", ""),
-                },
-                case_id=case["case_id"],
-                market=case["market"],
-                symbol=case["symbol"],
-                cutoff_date=cutoff,
-            )
-            validate_current_price_binding(case["current_price_observation"], canonical_price)
-        except (KeyError, TypeError, ValueError) as exc:
-            errors.append(
-                _err(
+            ))
+        else:
+            try:
+                canonical_price = current_price_resolver.resolve_current_price(
+                    {
+                        "price_observation_id": price_observation.get("price_observation_id", ""),
+                        "admission_record_hash": price_observation.get("price_observation_admission_hash", ""),
+                    },
+                    case_id=case["case_id"],
+                    market=case["market"],
+                    symbol=case["symbol"],
+                    cutoff_date=cutoff,
+                )
+                validate_current_price_binding(price_observation, canonical_price)
+            except (KeyError, TypeError, ValueError) as exc:
+                errors.append(_err(
                     "V03-PRICE-CANONICAL",
                     "current_price_observation",
                     str(exc),
-                )
-            )
+                ))
+    else:
+        errors.append(_err(
+            "V03-PRICE-INPUT-CLASS",
+            "current_price_observation.price_input_class",
+            "unsupported current price input class; fail closed",
+        ))
     try:
         position = _position(case)
         if position < 0 or position > 100:
@@ -790,8 +825,8 @@ def _expectation_gap(case: dict[str, Any], *, evidence_root_resolver: EvidenceRo
     return status, gap if isinstance(gap, Decimal) else None
 
 
-def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None, valuation_output_resolver: Any | None = None) -> dict[str, Any]:
-    validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver, independent_forecast_resolver=independent_forecast_resolver, upstream_authority_resolver=upstream_authority_resolver, valuation_output_resolver=valuation_output_resolver)
+def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None, valuation_output_resolver: Any | None = None, operator_price_input_resolver: Any | None = None) -> dict[str, Any]:
+    validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver, independent_forecast_resolver=independent_forecast_resolver, upstream_authority_resolver=upstream_authority_resolver, valuation_output_resolver=valuation_output_resolver, operator_price_input_resolver=operator_price_input_resolver)
     position = _position(case) if isinstance(case.get("portfolio"), dict) else Decimal("0")
     trust_status = str((case.get("trust") or {}).get("status", "UNKNOWN")).upper()
     upstream = (
@@ -1242,6 +1277,26 @@ def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootReso
         "decision_admission_status": entry_admission["status"],
         "decision_admission_rule_id": entry_admission["rule_id"],
         "current_price": str(current_price) if current_price is not None else None,
+        "current_price_input_class": (
+            "OPERATOR_ATTESTED_MARKET_DATA"
+            if case.get("current_price_observation", {}).get("price_input_class") == "OPERATOR_ATTESTED_MARKET_DATA"
+            else "CANONICAL_ADMITTED_MARKET_DATA"
+        ),
+        "current_price_assurance": (
+            "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
+            if case.get("current_price_observation", {}).get("price_input_class") == "OPERATOR_ATTESTED_MARKET_DATA"
+            else "CANONICAL_PRICE_ADMISSION_VERIFIED"
+        ),
+        "operator_price_input_ref": (
+            _serialize_nested(case.get("current_price_observation", {}).get("operator_price_input_ref"))
+            if case.get("current_price_observation", {}).get("price_input_class") == "OPERATOR_ATTESTED_MARKET_DATA"
+            else None
+        ),
+        "mie_reference_price_observation_id": (
+            case.get("current_price_observation", {}).get("mie_reference_price_observation_id")
+            if case.get("current_price_observation", {}).get("price_input_class") == "OPERATOR_ATTESTED_MARKET_DATA"
+            else None
+        ),
         "mie_policy": "OPTIONAL_EXPLANATORY",
         "mie_material_contradiction": False,
         "decision_precedence_version": state["precedence_version"],
