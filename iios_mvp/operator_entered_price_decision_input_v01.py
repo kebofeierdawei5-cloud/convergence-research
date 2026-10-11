@@ -351,7 +351,7 @@ def replay_bundle(bundle_path: str | Path) -> dict[str, Any]:
     _assert_private_file(directory / "receipt.json", "RECEIPT_FILE")
     record, record_raw = _read_json(directory / "price-input.json")
     receipt, receipt_raw = _read_json(directory / "receipt.json")
-    if _canonical(record) + b"\\n" != record_raw:
+    if _canonical(record) + b"\n" != record_raw:
         raise OperatorEnteredPriceError("RECORD_BYTES_NONCANONICAL")
     expected = build_receipt(record, record_bytes=record_raw)
     if receipt != expected:
