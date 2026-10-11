@@ -87,21 +87,20 @@ The existing official SSE daily-bar response binds the 2026-10-08 close to exact
 
 PR [#329](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/329) implements a deterministic record bound to the case/cutoff, raw price SHA-256, evidence ID, rule identity, strict time comparison and unchanged Core/PIT validation. It keeps `exact_first_public_timestamp_verified=false` explicit. The official rule page bytes were not materialized and hashed in this run; the policy records `raw_rule_bytes_materialized=false` and `raw_rule_bytes_sha256=null`.
 
-### One-time local successor migration (only after PR #329 is merged)
+### C1 migration result — PASS (operator confirmed 2026-10-11)
 
-Refresh the launcher from public canonical `main`, then run the special offline migration mode:
+The merged offline migration has now been run successfully. Reported status:
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/kebofeierdawei5-cloud/convergence-research/main/tools/Launch_IIOS_Private_605016_B2_Ingest.command -o "$HOME/Downloads/Launch_IIOS_Private_605016_B2_Ingest.command"
-bash "$HOME/Downloads/Launch_IIOS_Private_605016_B2_Ingest.command" --adjudicate-source-vintage
-```
+`SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED`
 
-This mode obtains code from public GitHub, does **not** require GitHub CLI login, does **not** download Attempt 10, and does **not** re-request the official dividend/price endpoints. It reads and verifies the currently persisted private candidate, re-hashes the original bytes, builds the bounded successor manifest, runs the unchanged Core/PIT validator and promotes a new content-addressed candidate only after all validations pass. The original candidate remains untouched; migration replay is idempotent.
+- New candidate fingerprint: `9a4a1f2e22c982e12f09fc7858eba2ee06768cac59659734ab35ea450579bd3c`.
+- Manifest SHA-256: `90b1b4b77b28a0e8df36fb7737c7ade5a7ede85948246bcde0439cfc7bd1f72a`.
+- Source-vintage adjudication SHA-256: `e06240acec667926aaa453a7558f76d9f1763488fe5630f5916b180157c75535`.
+- 11 evidence records / 11 raw declarations / 8 unique raw files; Core validator PASS.
+- `source_vintage_review_required=false`; bound `2026-10-08T15:30:00+08:00`; exact endpoint first-public timestamp remains unverified.
+- `official_source_refetched=false`; `attempt10_downloaded=false`; prior candidate retained unchanged.
 
-Expected success status: `SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED` or its `ALREADY_SOURCE_VINTAGE_ADJUDICATED_...` replay form. The output must report `official_source_refetched=false`, `attempt10_downloaded=false`, `previous_candidate_retained=true`, Core validator PASS and `exact_first_public_timestamp_verified=false`.
-
-Do not run ordinary ingest or this migration until the PR is merged and the final docs-updated HEAD has passing exact-head CI. Local successor migration has not been performed as of this document update.
-
+No further C1 ingest or source-vintage migration is required. The next data task is C2 / 新和成 (002001.SZ), governed by `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md`. The old C2 Run #8 preflight uses an end-of-day cutoff timestamp that conflicts with the canonical date-only cutoff rule; it remains diagnostic, and its same-day filings/close must not be back-applied.
 ### Unchanged non-claims
 
 No formal signed admission, Production Host acceptance, request bundle, Decision, publication, Human Approval or trade authorization is created by this source-vintage policy. It resolves the bounded cutoff-ordering review under the cited official rule; it does not assert the historical endpoint's exact publication time.
