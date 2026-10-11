@@ -1,23 +1,19 @@
 from __future__ import annotations
 
-"""Candidate-driven, local-only IIOS pilot.
+"""Minimal candidate-driven, non-canonical local IIOS pilot.
 
-This path is deliberately non-canonical. It reuses IIOS's deterministic return
-and entry-price calculation, but it never creates canonical Evidence/PIT
-admission, Decision Admission, Machine Publication, or IIOS_RUN_RECEIPT.
+This is a practical trial path, not a second canonical engine. It uses the
+existing research-intake validator and the existing IIOS return/entry-price
+solver. Formal admission and canonical Decision code remain unchanged.
 """
 
 import argparse
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
-import hashlib
 import json
 import os
 from pathlib import Path
 import re
-import shutil
-import stat
-import tempfile
 from typing import Any, Mapping
 
 from .investment_core_contract_v03 import (
@@ -30,88 +26,18 @@ from .research_intake import build_research_case
 
 PILOT_SCHEMA = "IIOS-LOCAL-INVESTMENT-PILOT-0.1"
 PILOT_ANALYSIS_SCHEMA = "IIOS-LOCAL-INVESTMENT-PILOT-ANALYSIS-0.1"
-PILOT_RECEIPT_SCHEMA = "IIOS-LOCAL-INVESTMENT-PILOT-RECEIPT-0.1"
-PILOT_RUNNER_VERSION = "IIOS-LOCAL-INVESTMENT-PILOT-RUNNER-0.1"
 PILOT_STATUS = "PILOT_NON_CANONICAL"
+PILOT_RECEIPT_SCHEMA = "IIOS-LOCAL-PILOT-RUN-RECORD-0.1"
 SHANGHAI = timezone(timedelta(hours=8))
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-SOURCE_CLASSES = {
-    "OFFICIAL_EXCHANGE",
-    "ISSUER_PRIMARY",
-    "REGULATOR_PRIMARY",
-    "OFFICIAL_DATABASE",
-    "PUBLIC_SECONDARY",
-    "OPERATOR_SUPPLIED",
-    "UNKNOWN",
-}
-TRUST_STATES = {"PASS", "REVALIDATION", "FAIL", "UNKNOWN"}
-ASSESSMENT_STATES = {"PASS", "CONDITIONAL", "BLOCKED", "UNKNOWN"}
-THESIS_STATES = {"INTACT", "WATCH", "BROKEN", "UNKNOWN"}
-MIE_STATES = {
-    "PASS", "NOT_IDENTIFIABLE", "OUTSIDE_HISTORICAL_SUPPORT", "UNKNOWN",
-    "BLOCKED", "AMBIGUOUS", "INCOMPATIBLE",
-}
-GAP_STATES = {"PASS", "UNKNOWN", "BLOCKED", "AMBIGUOUS", "INCOMPATIBLE"}
-GAP_DIRECTIONS = {"POSITIVE", "NEUTRAL", "NEGATIVE", "UNKNOWN"}
 PRICE_ASSURANCE = "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
 
 
 class LocalInvestmentPilotError(ValueError):
-    """An invalid pilot input or private bundle."""
+    """Bad local pilot input or unavailable pilot output."""
 
 
-def _json_safe(value: Any) -> Any:
-    if isinstance(value, Decimal):
-        return format(value, "f")
-    if isinstance(value, Mapping):
-        return {str(k): _json_safe(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_json_safe(v) for v in value]
-    if isinstance(value, (date, datetime)):
-        return value.isoformat()
-    return value
-
-
-def _canonical(value: Any) -> bytes:
-    return json.dumps(
-        _json_safe(value),
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-        allow_nan=False,
-    ).encode("utf-8")
-
-
-def _sha256(raw: bytes) -> str:
-    return hashlib.sha256(raw).hexdigest()
-
-
-def _parse_json_object(raw: bytes, *, reason: str) -> dict[str, Any]:
-    def unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-        result: dict[str, Any] = {}
-        for key, value in pairs:
-            if key in result:
-                raise LocalInvestmentPilotError("DUPLICATE_JSON_KEY")
-            result[key] = value
-        return result
-
-    try:
-        value = json.loads(
-            raw.decode("utf-8"),
-            object_pairs_hook=unique_pairs,
-            parse_constant=lambda _: (_ for _ in ()).throw(
-                LocalInvestmentPilotError("NON_FINITE_JSON_NUMBER")
-            ),
-        )
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise LocalInvestmentPilotError(reason) from exc
-    if not isinstance(value, dict):
-        raise LocalInvestmentPilotError("JSON_OBJECT_REQUIRED")
-    return value
-
-
-def _decimal(value: Any, field: str) -> Decimal:
+def _number(value: Any, field: str) -> Decimal:
     try:
         result = Decimal(str(value))
     except (InvalidOperation, ValueError, TypeError) as exc:
@@ -122,22 +48,37 @@ def _decimal(value: Any, field: str) -> Decimal:
 
 
 def _positive(value: Any, field: str) -> Decimal:
-    result = _decimal(value, field)
+    result = _number(value, field)
     if result <= 0:
         raise LocalInvestmentPilotError(f"{field}_MUST_BE_POSITIVE")
     return result
 
 
-def _local_datetime(value: Any, field: str, *, allow_date_only: bool = True) -> datetime:
+def _safe(value: Any) -> Any:
+    if isinstance(value, Decimal):
+        return format(value, "f")
+    if isinstance(value, Mapping):
+        return {str(k): _safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_safe(v) for v in value]
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    return value
+
+
+def _date(value: Any, field: str) -> date:
+    try:
+        return date.fromisoformat(str(value))
+    except (ValueError, TypeError) as exc:
+        raise LocalInvestmentPilotError(f"{field}_MUST_BE_YYYY_MM_DD") from exc
+
+
+def _datetime(value: Any, field: str, *, allow_date_only: bool = True) -> datetime:
     raw = str(value or "").strip()
     if not raw:
         raise LocalInvestmentPilotError(f"{field}_REQUIRED")
     if allow_date_only and len(raw) == 10:
-        try:
-            day = date.fromisoformat(raw)
-        except ValueError as exc:
-            raise LocalInvestmentPilotError(f"{field}_MUST_BE_ISO_DATE_OR_DATETIME") from exc
-        return datetime.combine(day, time.min, tzinfo=SHANGHAI)
+        return datetime.combine(_date(raw, field), time.min, tzinfo=SHANGHAI)
     try:
         parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError as exc:
@@ -147,19 +88,10 @@ def _local_datetime(value: Any, field: str, *, allow_date_only: bool = True) -> 
     return parsed.astimezone(SHANGHAI)
 
 
-def _date(value: Any, field: str) -> date:
-    try:
-        return date.fromisoformat(str(value))
-    except (TypeError, ValueError) as exc:
-        raise LocalInvestmentPilotError(f"{field}_MUST_BE_YYYY_MM_DD") from exc
-
-
-def _outside_repository(path: str | Path, field: str, *, must_exist: bool = False) -> Path:
+def _outside_repo(path: str | Path, field: str, *, must_exist: bool = False) -> Path:
     raw = Path(path).expanduser()
-    if raw.is_symlink():
-        raise LocalInvestmentPilotError(f"{field}_MUST_NOT_BE_SYMLINK")
-    if must_exist and not raw.exists():
-        raise LocalInvestmentPilotError(f"{field}_MUST_EXIST")
+    if must_exist and not raw.is_file():
+        raise LocalInvestmentPilotError(f"{field}_MUST_BE_A_FILE")
     resolved = raw.resolve(strict=must_exist)
     try:
         resolved.relative_to(REPOSITORY_ROOT)
@@ -168,375 +100,255 @@ def _outside_repository(path: str | Path, field: str, *, must_exist: bool = Fals
     raise LocalInvestmentPilotError(f"{field}_MUST_BE_OUTSIDE_REPOSITORY")
 
 
-def _prepare_private_directory(path: str | Path, field: str) -> Path:
-    raw = Path(path).expanduser()
-    if raw.is_symlink():
-        raise LocalInvestmentPilotError(f"{field}_MUST_NOT_BE_SYMLINK")
-    resolved = _outside_repository(raw, field)
-    was_present = resolved.exists()
-    resolved.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if resolved.is_symlink() or not resolved.is_dir():
-        raise LocalInvestmentPilotError(f"{field}_MUST_BE_DIRECTORY")
+def _private_dir(path: str | Path, field: str) -> Path:
+    root = _outside_repo(path, field)
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return root
+
+
+def _write_local(path: Path, content: str) -> None:
+    path.write_text(content, encoding="utf-8")
     if os.name != "nt":
-        mode = stat.S_IMODE(resolved.stat().st_mode)
-        if was_present and mode & 0o077:
-            raise LocalInvestmentPilotError(f"{field}_PERMISSIONS_TOO_OPEN")
-        if mode & 0o077:
-            raise LocalInvestmentPilotError(f"{field}_PERMISSIONS_TOO_OPEN")
-    return resolved
+        path.chmod(0o600)
 
 
-def _write_private_file(path: Path, raw: bytes) -> None:
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    fd = os.open(path, flags, 0o600)
-    try:
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(raw)
-            handle.flush()
-            os.fsync(handle.fileno())
-    except Exception:
-        path.unlink(missing_ok=True)
-        raise
-    if os.name != "nt" and stat.S_IMODE(path.stat().st_mode) & 0o077:
-        path.unlink(missing_ok=True)
-        raise LocalInvestmentPilotError("PRIVATE_FILE_PERMISSIONS_TOO_OPEN")
+def _status(value: Any, allowed: set[str]) -> str:
+    item = str(value or "UNKNOWN").strip().upper()
+    return item if item in allowed else "UNKNOWN"
 
 
-def _text(value: Any) -> str:
-    return str(value or "").strip()
-
-
-def _list_of_text(value: Any, field: str) -> list[str]:
-    if value is None:
+def _items(value: Any) -> list[str]:
+    if not isinstance(value, list):
         return []
-    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
-        raise LocalInvestmentPilotError(f"{field}_MUST_BE_ARRAY_OF_STRINGS")
-    return [item.strip() for item in value if item.strip()]
+    return [str(item).strip() for item in value if str(item).strip()]
 
 
-def _status(value: Any, allowed: set[str], field: str, default: str = "UNKNOWN") -> str:
-    normalized = str(value or default).strip().upper()
-    if normalized not in allowed:
-        raise LocalInvestmentPilotError(f"{field}_INVALID:{normalized}")
-    return normalized
-
-
-def _source_register(source_rows: Any, cutoff: date) -> tuple[list[dict[str, Any]], list[str], list[str]]:
-    if source_rows is None:
-        source_rows = []
-    if not isinstance(source_rows, list):
-        raise LocalInvestmentPilotError("EVIDENCE_REGISTER_MUST_BE_ARRAY")
-    seen: set[str] = set()
-    clean_rows: list[dict[str, Any]] = []
-    after_cutoff: list[str] = []
-    unknown_time: list[str] = []
-    cutoff_start = datetime.combine(cutoff, time.min, tzinfo=SHANGHAI)
-    for index, item in enumerate(source_rows):
-        if not isinstance(item, Mapping):
-            raise LocalInvestmentPilotError(f"EVIDENCE_REGISTER_ROW_{index}_MUST_BE_OBJECT")
-        source_id = _text(item.get("source_id"))
-        if not source_id:
-            raise LocalInvestmentPilotError(f"EVIDENCE_REGISTER_ROW_{index}_SOURCE_ID_REQUIRED")
-        if source_id in seen:
-            raise LocalInvestmentPilotError("EVIDENCE_SOURCE_ID_DUPLICATE")
-        seen.add(source_id)
-        source_class = str(item.get("source_class") or "UNKNOWN").strip().upper()
-        if source_class not in SOURCE_CLASSES:
-            raise LocalInvestmentPilotError(f"EVIDENCE_SOURCE_CLASS_INVALID:{source_id}")
-        known_at = _text(item.get("known_at"))
-        time_status = "UNKNOWN"
-        if known_at:
-            try:
-                parsed = _local_datetime(known_at, f"{source_id}.known_at")
-                if parsed <= cutoff_start:
-                    time_status = "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
-                else:
-                    time_status = "AFTER_CUTOFF_EXCLUDED_FROM_PIT"
-                    after_cutoff.append(source_id)
-            except LocalInvestmentPilotError:
-                time_status = "KNOWN_AT_INVALID"
-                unknown_time.append(source_id)
-        else:
-            unknown_time.append(source_id)
-        hash_claim = _text(item.get("raw_sha256_claimed")) or None
-        if hash_claim is not None and not _SHA256_RE.fullmatch(hash_claim):
-            raise LocalInvestmentPilotError(f"EVIDENCE_SHA256_FORMAT_INVALID:{source_id}")
-        clean_rows.append({
-            "source_id": source_id,
-            "title": _text(item.get("title")) or "未提供标题",
-            "source_class": source_class,
-            "source_ref": _text(item.get("source_ref")) or "UNKNOWN",
-            "published_at": _text(item.get("published_at")) or None,
-            "known_at": known_at or None,
-            "time_status": time_status,
-            "summary": _text(item.get("summary")) or "未提供事实摘要",
-            "raw_sha256_claimed": hash_claim,
-            "raw_bytes_verified": False,
-            "formal_evidence_pit_admission": False,
-        })
-    return clean_rows, after_cutoff, unknown_time
-
-
-def _collect_references(value: Any) -> set[str]:
-    found: set[str] = set()
+def _collect_refs(value: Any) -> set[str]:
+    result: set[str] = set()
     if isinstance(value, Mapping):
         for key, item in value.items():
             if key in {"evidence_refs", "source_refs", "evidence_ids", "source_ids"} and isinstance(item, list):
-                found.update(str(row).strip() for row in item if str(row).strip())
+                result.update(str(row).strip() for row in item if str(row).strip())
             else:
-                found.update(_collect_references(item))
+                result.update(_collect_refs(item))
     elif isinstance(value, list):
         for item in value:
-            found.update(_collect_references(item))
-    return found
+            result.update(_collect_refs(item))
+    return result
 
 
-def _normalise_assessment(raw: Any) -> dict[str, Any]:
-    if raw is None:
-        raw = {}
-    if not isinstance(raw, Mapping):
-        raise LocalInvestmentPilotError("ASSESSMENT_MUST_BE_OBJECT")
-    trust = dict(raw.get("trust") or {})
-    reality = dict(raw.get("reality") or {})
-    quality = dict(raw.get("quality") or {})
-    thesis = dict(raw.get("thesis") or {})
-    mie = dict(raw.get("market_implied_expectation") or {})
-    gap = dict(raw.get("expectation_gap") or {})
-    risk = dict(raw.get("risk") or {})
-    drivers = raw.get("value_drivers") or []
-    if not isinstance(drivers, list):
-        raise LocalInvestmentPilotError("VALUE_DRIVERS_MUST_BE_ARRAY")
-    for i, driver in enumerate(drivers):
-        if not isinstance(driver, Mapping):
-            raise LocalInvestmentPilotError(f"VALUE_DRIVER_{i}_MUST_BE_OBJECT")
-    trust["status"] = _status(trust.get("status"), TRUST_STATES, "TRUST_STATUS")
-    reality["status"] = _status(reality.get("status"), ASSESSMENT_STATES, "REALITY_STATUS")
-    quality["status"] = _status(quality.get("status"), ASSESSMENT_STATES, "QUALITY_STATUS")
-    thesis["status"] = _status(thesis.get("status"), THESIS_STATES, "THESIS_STATUS")
-    mie["status"] = _status(mie.get("status"), MIE_STATES, "MIE_STATUS")
-    gap["status"] = _status(gap.get("status"), GAP_STATES, "EXPECTATION_GAP_STATUS")
-    gap["direction"] = _status(gap.get("direction"), GAP_DIRECTIONS, "EXPECTATION_GAP_DIRECTION")
-    risk["status"] = _status(risk.get("status"), {"PASS", "FAIL", "UNKNOWN"}, "RISK_STATUS")
-    risk["max_loss_pct"] = _text(risk.get("max_loss_pct")) or "UNKNOWN"
-    risk["items"] = _list_of_text(risk.get("items"), "RISK_ITEMS")
-    thesis["drivers"] = thesis.get("drivers") if isinstance(thesis.get("drivers"), list) else []
-    thesis["break_conditions"] = _list_of_text(thesis.get("break_conditions"), "THESIS_BREAK_CONDITIONS")
-    thesis["reassessment_triggers"] = _list_of_text(thesis.get("reassessment_triggers"), "REASSESSMENT_TRIGGERS")
-    for item in (thesis["drivers"]):
-        if not isinstance(item, Mapping):
-            raise LocalInvestmentPilotError("THESIS_DRIVERS_MUST_BE_OBJECTS")
-    clean_drivers: list[dict[str, Any]] = []
-    for i, item in enumerate(drivers, start=1):
-        clean = dict(item)
-        clean["rank"] = int(clean.get("rank", i))
-        clean["driver"] = _text(clean.get("driver")) or "未命名价值驱动因素"
-        clean["impact"] = _status(
-            clean.get("impact"), {"POSITIVE", "NEGATIVE", "MIXED", "UNKNOWN"},
-            f"VALUE_DRIVER_{i}_IMPACT",
-        )
-        clean["rationale"] = _text(clean.get("rationale"))
-        clean["evidence_refs"] = _list_of_text(clean.get("evidence_refs"), f"VALUE_DRIVER_{i}_EVIDENCE_REFS")
-        clean_drivers.append(clean)
-    return {
-        "trust": trust,
-        "reality": reality,
-        "quality": quality,
-        "thesis": thesis,
-        "value_drivers": clean_drivers,
-        "market_implied_expectation": mie,
-        "expectation_gap": gap,
-        "risk": risk,
-    }
-
-
-def _validate_pilot_input(payload: Mapping[str, Any]) -> dict[str, Any]:
+def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     if payload.get("schema_version") != PILOT_SCHEMA:
         raise LocalInvestmentPilotError("PILOT_INPUT_SCHEMA_MISMATCH")
-    allowed_top = {
-        "schema_version", "case", "price_input", "evidence_register", "assessment",
-        "forecast_valuation", "decision_parameters", "notes",
-    }
-    extra = sorted(set(payload) - allowed_top)
-    if extra:
-        raise LocalInvestmentPilotError(f"UNSUPPORTED_TOP_LEVEL_FIELDS:{extra}")
-    case_input = payload.get("case")
-    price_input = payload.get("price_input")
-    if not isinstance(case_input, Mapping) or not isinstance(price_input, Mapping):
-        raise LocalInvestmentPilotError("CASE_AND_PRICE_INPUT_OBJECTS_REQUIRED")
-    company = _text(case_input.get("company"))
+    case_raw = payload.get("case")
+    price_raw = payload.get("price_input")
+    if not isinstance(case_raw, Mapping) or not isinstance(price_raw, Mapping):
+        raise LocalInvestmentPilotError("CASE_AND_PRICE_INPUT_REQUIRED")
+    company = str(case_raw.get("company") or "").strip()
     if not company:
-        raise LocalInvestmentPilotError("COMPANY_NAME_REQUIRED")
-    market = _text(case_input.get("market") or "CN-A")
-    symbol = _text(case_input.get("symbol"))
-    as_of = _date(case_input.get("as_of_date"), "AS_OF_DATE")
-    position = _text(case_input.get("current_position_pct") if "current_position_pct" in case_input else "0")
-    # Reuse the canonical research-intake contract for A/H symbol, market, cutoff,
-    # and position normalization. The returned evidence plan remains pending.
-    case_seed = build_research_case(symbol, as_of.isoformat(), position, market=market)
-    position_pct = _decimal(case_seed["request"]["current_position_pct"], "CURRENT_POSITION_PCT")
-    currency = _text(case_input.get("currency") or ("CNY" if case_seed["request"]["market"] == "CN-A" else "HKD")).upper()
-    expected_currency = "CNY" if case_seed["request"]["market"] == "CN-A" else "HKD"
-    if currency != expected_currency:
+        raise LocalInvestmentPilotError("COMPANY_REQUIRED")
+    market = str(case_raw.get("market") or "CN-A")
+    symbol = str(case_raw.get("symbol") or "").strip()
+    cutoff = _date(case_raw.get("as_of_date"), "AS_OF_DATE")
+    position_raw = str(case_raw.get("current_position_pct", "0"))
+    case = build_research_case(symbol, cutoff.isoformat(), position_raw, market=market)
+    position = str(case["request"]["current_position_pct"])
+    normalized_market = case["request"]["market"]
+    currency = str(case_raw.get("currency") or ("CNY" if normalized_market == "CN-A" else "HKD")).upper()
+    if currency != ("CNY" if normalized_market == "CN-A" else "HKD"):
         raise LocalInvestmentPilotError("CURRENCY_DOES_NOT_MATCH_MARKET")
-    price = _positive(price_input.get("price"), "CURRENT_PRICE")
-    observation_date = _date(price_input.get("observation_date"), "PRICE_OBSERVATION_DATE")
-    known_at = _local_datetime(price_input.get("known_at"), "PRICE_KNOWN_AT", allow_date_only=False)
-    cutoff_start = datetime.combine(as_of, time.min, tzinfo=SHANGHAI)
-    price_time_status = "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY"
+
+    price = _positive(price_raw.get("price"), "CURRENT_PRICE")
+    observation = _date(price_raw.get("observation_date"), "PRICE_OBSERVATION_DATE")
+    known_at = _datetime(price_raw.get("known_at"), "PRICE_KNOWN_AT", allow_date_only=False)
+    cutoff_start = datetime.combine(cutoff, time.min, tzinfo=SHANGHAI)
     price_issues: list[str] = []
-    if known_at.date() != observation_date:
+    if known_at.date() != observation:
         price_issues.append("PRICE_KNOWN_AT_DATE_MISMATCH")
-    if observation_date > as_of:
+    if observation > cutoff:
         price_issues.append("PRICE_OBSERVATION_AFTER_CUTOFF")
     if known_at > cutoff_start:
         price_issues.append("PRICE_KNOWN_AFTER_DATE_ONLY_CUTOFF")
-    if price_issues:
-        price_time_status = "PRICE_NOT_PIT_QUALIFIED"
-    assurance = _text(price_input.get("assurance_label"))
-    if assurance != PRICE_ASSURANCE:
-        raise LocalInvestmentPilotError("PRICE_ASSURANCE_MUST_REMAIN_OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED")
-    source_claims = _list_of_text(price_input.get("sources_claimed"), "PRICE_SOURCE_CLAIMS")
-    if not source_claims:
-        raise LocalInvestmentPilotError("PRICE_SOURCE_CLAIMS_REQUIRED")
-    sources, after_cutoff_sources, unknown_time_sources = _source_register(payload.get("evidence_register"), as_of)
-    assessment = _normalise_assessment(payload.get("assessment"))
-    referenced = _collect_references(assessment)
-    source_ids = {row["source_id"] for row in sources}
-    unresolved_references = sorted(referenced - source_ids)
-    price_model = payload.get("forecast_valuation")
-    if price_model is None:
-        price_model = {}
-    if not isinstance(price_model, Mapping):
-        raise LocalInvestmentPilotError("FORECAST_VALUATION_MUST_BE_OBJECT")
-    forecast_valuation = dict(price_model)
-    forecast_valuation["model"] = _text(forecast_valuation.get("model")) or "UNKNOWN"
-    forecast_valuation["model_rationale"] = _text(forecast_valuation.get("model_rationale"))
-    forecast_valuation["entry_value_reference_per_share"] = _text(
-        forecast_valuation.get("entry_value_reference_per_share")
-    ) or None
-    forecast_valuation["probabilities_calibrated"] = forecast_valuation.get("probabilities_calibrated") is True
-    forecast_valuation["probability_calibration_basis"] = _text(
-        forecast_valuation.get("probability_calibration_basis")
+    if str(price_raw.get("assurance_label") or "") != PRICE_ASSURANCE:
+        raise LocalInvestmentPilotError("PRICE_MUST_REMAIN_OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED")
+    claims = _items(price_raw.get("sources_claimed"))
+    if not claims:
+        raise LocalInvestmentPilotError("PRICE_SOURCE_CLAIM_REQUIRED")
+
+    sources: list[dict[str, Any]] = []
+    source_ids: set[str] = set()
+    for row in payload.get("evidence_register") or []:
+        if not isinstance(row, Mapping):
+            continue
+        source_id = str(row.get("source_id") or "").strip()
+        if not source_id or source_id in source_ids:
+            continue
+        source_ids.add(source_id)
+        known_text = str(row.get("known_at") or "")
+        source_time_status = "UNKNOWN"
+        if known_text:
+            try:
+                source_time = _datetime(known_text, f"{source_id}_KNOWN_AT")
+                source_time_status = (
+                    "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+                    if source_time <= cutoff_start else "AFTER_CUTOFF"
+                )
+            except LocalInvestmentPilotError:
+                source_time_status = "KNOWN_AT_INVALID"
+        sources.append({
+            "source_id": source_id,
+            "title": str(row.get("title") or "未提供标题"),
+            "source_class": str(row.get("source_class") or "UNKNOWN"),
+            "source_ref": str(row.get("source_ref") or "UNKNOWN"),
+            "known_at": known_text or None,
+            "time_status": source_time_status,
+            "summary": str(row.get("summary") or "未提供事实摘要"),
+            "raw_sha256_claimed": row.get("raw_sha256_claimed"),
+            "formal_evidence_pit_admission": False,
+        })
+
+    raw_assessment = payload.get("assessment") if isinstance(payload.get("assessment"), Mapping) else {}
+    allowed_assessment = {
+        "trust": {"PASS", "REVALIDATION", "FAIL", "UNKNOWN"},
+        "reality": {"PASS", "CONDITIONAL", "BLOCKED", "UNKNOWN"},
+        "quality": {"PASS", "CONDITIONAL", "BLOCKED", "UNKNOWN"},
+        "thesis": {"INTACT", "WATCH", "BROKEN", "UNKNOWN"},
+        "market_implied_expectation": {"PASS", "NOT_IDENTIFIABLE", "OUTSIDE_HISTORICAL_SUPPORT", "UNKNOWN", "BLOCKED", "AMBIGUOUS", "INCOMPATIBLE"},
+        "expectation_gap": {"PASS", "UNKNOWN", "BLOCKED", "AMBIGUOUS", "INCOMPATIBLE"},
+        "risk": {"PASS", "FAIL", "UNKNOWN"},
+    }
+    assessment: dict[str, Any] = {}
+    for name, states in allowed_assessment.items():
+        raw = raw_assessment.get(name) if isinstance(raw_assessment.get(name), Mapping) else {}
+        assessment[name] = dict(raw)
+        assessment[name]["status"] = _status(raw.get("status"), states)
+        assessment[name]["summary"] = str(raw.get("summary") or "")
+    assessment["expectation_gap"]["direction"] = _status(
+        assessment["expectation_gap"].get("direction"),
+        {"POSITIVE", "NEUTRAL", "NEGATIVE", "UNKNOWN"},
     )
-    forecast_valuation["assumptions"] = _list_of_text(
-        forecast_valuation.get("assumptions"), "FORECAST_ASSUMPTIONS"
-    )
-    forecast_valuation["scenarios"] = forecast_valuation.get("scenarios") or {}
-    if not isinstance(forecast_valuation["scenarios"], Mapping):
-        raise LocalInvestmentPilotError("FORECAST_SCENARIOS_MUST_BE_OBJECT")
-    parameters = dict(payload.get("decision_parameters") or {})
-    horizon_years = parameters.get("horizon_years", 1)
+    assessment["thesis"]["break_conditions"] = _items(assessment["thesis"].get("break_conditions"))
+    assessment["thesis"]["reassessment_triggers"] = _items(assessment["thesis"].get("reassessment_triggers"))
+    assessment["risk"]["items"] = _items(assessment["risk"].get("items"))
+    value_drivers = raw_assessment.get("value_drivers") or []
+    assessment["value_drivers"] = [
+        {
+            "rank": int(item.get("rank", index)),
+            "driver": str(item.get("driver") or "未命名价值驱动因素"),
+            "impact": _status(item.get("impact"), {"POSITIVE", "NEGATIVE", "MIXED", "UNKNOWN"}),
+            "rationale": str(item.get("rationale") or ""),
+            "evidence_refs": _items(item.get("evidence_refs")),
+        }
+        for index, item in enumerate(value_drivers, start=1) if isinstance(item, Mapping)
+    ]
+    assessment["thesis"]["core_statement"] = str(assessment["thesis"].get("core_statement") or "")
+    assessment["thesis"]["drivers"] = assessment["thesis"].get("drivers") if isinstance(assessment["thesis"].get("drivers"), list) else []
+
+    forecast_raw = payload.get("forecast_valuation") if isinstance(payload.get("forecast_valuation"), Mapping) else {}
+    forecast = {
+        "model": str(forecast_raw.get("model") or "UNKNOWN"),
+        "model_rationale": str(forecast_raw.get("model_rationale") or ""),
+        "entry_value_reference_per_share": forecast_raw.get("entry_value_reference_per_share"),
+        "probabilities_calibrated": forecast_raw.get("probabilities_calibrated") is True,
+        "assumptions": _items(forecast_raw.get("assumptions")),
+        "scenarios": forecast_raw.get("scenarios") if isinstance(forecast_raw.get("scenarios"), Mapping) else {},
+    }
+    parameters_raw = payload.get("decision_parameters") if isinstance(payload.get("decision_parameters"), Mapping) else {}
     try:
-        horizon_numeric = int(horizon_years)
-    except (TypeError, ValueError) as exc:
-        raise LocalInvestmentPilotError("HORIZON_YEARS_INVALID") from exc
-    if horizon_numeric not in (1, 2, 3):
-        raise LocalInvestmentPilotError("HORIZON_YEARS_MUST_BE_1_TO_3")
-    horizon_override = parameters.get("horizon_override", False)
-    basis = parameters.get("horizon_override_basis") or []
-    rationale = _text(parameters.get("horizon_selection_rationale") or "IIOS 默认以 1 年作为年化回报参考期限。")
-    if not isinstance(horizon_override, bool) or not isinstance(basis, list):
-        raise LocalInvestmentPilotError("HORIZON_OVERRIDE_FIELDS_INVALID")
-    if horizon_numeric == 3:
-        if horizon_override is not True or not basis:
-            raise LocalInvestmentPilotError("THREE_YEAR_HORIZON_REQUIRES_EXPLICIT_OVERRIDE_AND_REASON")
-        if any(value not in {"MAJOR_INDUSTRY_LEADER", "MAJOR_INVESTMENT_CYCLE_OR_MAJOR_CAPEX"} for value in basis):
-            raise LocalInvestmentPilotError("THREE_YEAR_HORIZON_OVERRIDE_BASIS_INVALID")
-    elif horizon_override or basis:
-        raise LocalInvestmentPilotError("HORIZON_OVERRIDE_ONLY_ALLOWED_FOR_THREE_YEARS")
-    required_return = _decimal(parameters.get("required_return_annualized", "0.15"), "REQUIRED_RETURN_ANNUALIZED")
-    if required_return < FUNDAMENTAL_TARGET_ANNUALIZED_RETURN:
-        raise LocalInvestmentPilotError("REQUIRED_RETURN_CANNOT_BE_BELOW_15_PERCENT_CORE_HURDLE")
-    max_loss = _decimal(parameters.get("max_loss_pct", assessment["risk"]["max_loss_pct"] if assessment["risk"]["max_loss_pct"] != "UNKNOWN" else "25"), "MAX_LOSS_PCT")
-    if max_loss < 0 or max_loss >= 100:
-        raise LocalInvestmentPilotError("MAX_LOSS_PCT_MUST_BE_IN_0_TO_100_EXCLUSIVE")
+        horizon = int(parameters_raw.get("horizon_years", 1))
+    except (TypeError, ValueError):
+        horizon = 1
+    if horizon not in (1, 2, 3):
+        horizon = 1
+    override = parameters_raw.get("horizon_override", False)
+    override_basis = parameters_raw.get("horizon_override_basis") if isinstance(parameters_raw.get("horizon_override_basis"), list) else []
+    rationale = str(parameters_raw.get("horizon_selection_rationale") or "默认以 1 年作为年化回报参考期限。")
+    if horizon == 3:
+        allowed_basis = {"MAJOR_INDUSTRY_LEADER", "MAJOR_INVESTMENT_CYCLE_OR_MAJOR_CAPEX"}
+        if override is not True or not override_basis or any(item not in allowed_basis for item in override_basis):
+            horizon = 1
+            override = False
+            override_basis = []
+            rationale += " 3 年覆盖条件不足，已退回默认 1 年。"
+    elif override is not False or override_basis:
+        override = False
+        override_basis = []
+        rationale += " 期限覆盖未通过条件检查，已使用默认期限规则。"
+    try:
+        required_return = max(
+            FUNDAMENTAL_TARGET_ANNUALIZED_RETURN,
+            _number(parameters_raw.get("required_return_annualized", "0.15"), "REQUIRED_RETURN"),
+        )
+    except LocalInvestmentPilotError:
+        required_return = FUNDAMENTAL_TARGET_ANNUALIZED_RETURN
+    try:
+        max_loss = _number(parameters_raw.get("max_loss_pct", "25"), "MAX_LOSS_PCT")
+        if max_loss < 0 or max_loss >= 100:
+            max_loss = Decimal("25")
+    except LocalInvestmentPilotError:
+        max_loss = Decimal("25")
+
+    references = _collect_refs(assessment)
+    unknown_refs = sorted(references - source_ids)
+    after_cutoff_refs = [
+        source["source_id"] for source in sources
+        if source["source_id"] in references and source["time_status"] == "AFTER_CUTOFF"
+    ]
     return {
         "case": {
-            "case_id": case_seed["case_id"],
-            "company": company,
-            "market": case_seed["request"]["market"],
-            "symbol": case_seed["request"]["symbol"],
-            "currency": currency,
-            "as_of_date": as_of.isoformat(),
-            "current_position_pct": format(position_pct, "f"),
-            "venue_hint": case_seed["security_identity"]["venue_hint"],
+            "case_id": case["case_id"], "company": company, "market": normalized_market,
+            "symbol": case["request"]["symbol"], "currency": currency, "as_of_date": cutoff.isoformat(),
+            "current_position_pct": position, "venue_hint": case["security_identity"]["venue_hint"],
             "venue_hint_is_evidence": False,
-            "case_status": "PILOT_CASE_NOT_FORMALLY_ADMITTED",
         },
         "price_input": {
-            "price": format(price, "f"),
-            "currency": currency,
-            "observation_date": observation_date.isoformat(),
-            "known_at": known_at.isoformat(),
-            "assurance_label": PRICE_ASSURANCE,
-            "sources_claimed": source_claims,
-            "pit_time_status": price_time_status,
-            "pit_issues": price_issues,
-            "source_origin_verified": False,
-            "source_vintage_verified": False,
-            "source_use_rights_verified": False,
+            "price": format(price, "f"), "currency": currency, "observation_date": observation.isoformat(),
+            "known_at": known_at.isoformat(), "assurance_label": PRICE_ASSURANCE, "sources_claimed": claims,
+            "pit_time_status": "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY" if not price_issues else "PRICE_NOT_PIT_QUALIFIED",
+            "pit_issues": price_issues, "source_origin_verified": False, "source_use_rights_verified": False,
             "canonical_price_admission": False,
         },
         "evidence_register": sources,
         "assessment": assessment,
-        "forecast_valuation": forecast_valuation,
+        "forecast_valuation": forecast,
         "decision_parameters": {
-            "horizon_years": horizon_numeric,
-            "horizon_override": horizon_override,
-            "horizon_override_basis": [str(x) for x in basis],
-            "horizon_selection_rationale": rationale,
-            "required_return_annualized": format(required_return, "f"),
+            "horizon_years": horizon, "horizon_override": override, "horizon_override_basis": override_basis,
+            "horizon_selection_rationale": rationale, "required_return_annualized": format(required_return, "f"),
             "fundamental_target_annualized_return": format(FUNDAMENTAL_TARGET_ANNUALIZED_RETURN, "f"),
             "entry_return_cushion_threshold": format(BUY_ENTRY_RETURN_CUSHION_THRESHOLD, "f"),
             "max_loss_pct": format(max_loss, "f"),
         },
-        "notes": _text(payload.get("notes")),
-        "unresolved_evidence_references": unresolved_references,
-        "after_cutoff_sources": after_cutoff_sources,
-        "unknown_time_sources": unknown_time_sources,
+        "unresolved_evidence_references": unknown_refs,
+        "after_cutoff_evidence_references": after_cutoff_refs,
+        "notes": str(payload.get("notes") or ""),
     }
 
 
 def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
-    price_input = prepared["price_input"]
-    forecast = prepared["forecast_valuation"]
-    if price_input["pit_time_status"] != "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY":
+    if prepared["price_input"]["pit_time_status"] != "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY":
         return None, "PRICE_NOT_PIT_QUALIFIED"
+    forecast = prepared["forecast_valuation"]
     anchor = forecast.get("entry_value_reference_per_share")
-    if anchor is None:
-        return None, "ENTRY_VALUE_REFERENCE_MISSING"
-    try:
-        anchor_value = _positive(anchor, "ENTRY_VALUE_REFERENCE_PER_SHARE")
-    except LocalInvestmentPilotError:
-        return None, "ENTRY_VALUE_REFERENCE_INVALID"
-    scenario_input = forecast.get("scenarios")
-    if not isinstance(scenario_input, Mapping) or set(scenario_input) != set(SCENARIOS):
-        return None, "BEAR_BASE_BULL_SCENARIOS_REQUIRED"
-    return_gate_scenarios: dict[str, Any] = {}
-    populated = 0
-    for scenario_name in SCENARIOS:
-        row = scenario_input.get(scenario_name)
+    scenarios = forecast.get("scenarios") or {}
+    if anchor in (None, "") or not isinstance(scenarios, Mapping) or set(scenarios) != set(SCENARIOS):
+        return None, "ENTRY_REFERENCE_OR_BEAR_BASE_BULL_SCENARIOS_MISSING"
+    rows: dict[str, Any] = {}
+    for name in SCENARIOS:
+        row = scenarios.get(name)
         if not isinstance(row, Mapping):
-            return None, f"{scenario_name.upper()}_SCENARIO_MISSING"
-        probability = row.get("probability")
-        terminal = row.get("terminal_value_per_share")
-        distribution = row.get("cash_distributions_per_share", "0")
-        rationale = _text(row.get("rationale"))
-        if probability is None or terminal is None or not rationale:
-            return None, f"{scenario_name.upper()}_SCENARIO_INPUTS_INCOMPLETE"
-        populated += 1
-        return_gate_scenarios[scenario_name] = {
-            "probability": str(probability),
-            "terminal_value_per_share": str(terminal),
-            "cash_distributions_per_share": str(distribution),
-            "probability_rationale": rationale,
+            return None, f"{name.upper()}_SCENARIO_MISSING"
+        if row.get("probability") in (None, "") or row.get("terminal_value_per_share") in (None, "") or not str(row.get("rationale") or "").strip():
+            return None, f"{name.upper()}_SCENARIO_INPUTS_INCOMPLETE"
+        rows[name] = {
+            "probability": str(row["probability"]),
+            "terminal_value_per_share": str(row["terminal_value_per_share"]),
+            "cash_distributions_per_share": str(row.get("cash_distributions_per_share", "0")),
+            "probability_rationale": str(row["rationale"]),
         }
-    if populated != 3:
-        return None, "BEAR_BASE_BULL_SCENARIOS_REQUIRED"
     params = prepared["decision_parameters"]
-    return_gate = {
-        "entry_price": price_input["price"],
-        "entry_value_reference": format(anchor_value, "f"),
+    gate = {
+        "entry_price": prepared["price_input"]["price"],
+        "entry_value_reference": str(anchor),
         "horizon_years": str(params["horizon_years"]),
         "horizon_override": params["horizon_override"],
         "horizon_override_basis": params["horizon_override_basis"],
@@ -544,283 +356,196 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
         "buy_entry_return_cushion_threshold": params["entry_return_cushion_threshold"],
         "fundamental_target_annualized_return": params["fundamental_target_annualized_return"],
         "required_return_annualized": params["required_return_annualized"],
-        # This pilot calls the existing deterministic return solver directly. These
-        # records are model inputs only, not canonical Forecast/Valuation references.
         "lineage_version": "PILOT_NON_CANONICAL_MODEL_INPUTS",
         "canonical_forecast_ref": {"status": "PILOT_NON_CANONICAL"},
         "canonical_valuation_ref": {"status": "PILOT_NON_CANONICAL"},
-        "scenarios": return_gate_scenarios,
+        "scenarios": rows,
     }
     try:
-        metrics = calculate_return_metrics(return_gate, max_loss_pct=params["max_loss_pct"])
-    except (ValueError, KeyError, TypeError) as exc:
-        raise LocalInvestmentPilotError(f"RETURN_SCENARIO_CALCULATION_FAILED:{exc}") from exc
-    return _json_safe(metrics), None
+        result = calculate_return_metrics(gate, max_loss_pct=params["max_loss_pct"])
+        return _safe(result), None
+    except (ValueError, KeyError, TypeError, InvalidOperation) as exc:
+        return None, f"SCENARIO_CALCULATION_INCOMPLETE:{exc}"
 
 
-def _provisional_decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, metrics_reason: str | None) -> dict[str, Any]:
-    assessment = prepared["assessment"]
-    case = prepared["case"]
-    price_input = prepared["price_input"]
-    trust = assessment["trust"]["status"]
-    thesis = assessment["thesis"]["status"]
+def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, reason: str | None) -> dict[str, Any]:
+    a = prepared["assessment"]
+    c = prepared["case"]
+    p = prepared["price_input"]
     issues: list[str] = []
+    for name in ("trust", "reality", "quality", "thesis", "market_implied_expectation", "expectation_gap", "risk"):
+        valid = "INTACT" if name == "thesis" else "PASS"
+        if a[name]["status"] != valid:
+            issues.append(f"{name.upper()}_{a[name]['status']}")
+    if a["expectation_gap"]["direction"] != "POSITIVE":
+        issues.append(f"EXPECTATION_GAP_DIRECTION_{a['expectation_gap']['direction']}")
     if not prepared["evidence_register"]:
         issues.append("EVIDENCE_REGISTER_EMPTY")
-    if trust != "PASS":
-        issues.append(f"TRUST_STATUS_{trust}")
-    if assessment["reality"]["status"] != "PASS":
-        issues.append(f"REALITY_STATUS_{assessment['reality']['status']}")
-    if assessment["quality"]["status"] != "PASS":
-        issues.append(f"QUALITY_STATUS_{assessment['quality']['status']}")
-    if thesis != "INTACT":
-        issues.append(f"THESIS_STATUS_{thesis}")
-    if assessment["market_implied_expectation"]["status"] != "PASS":
-        issues.append(f"MIE_STATUS_{assessment['market_implied_expectation']['status']}")
-    if assessment["expectation_gap"]["status"] != "PASS":
-        issues.append(f"EXPECTATION_GAP_STATUS_{assessment['expectation_gap']['status']}")
-    if assessment["expectation_gap"]["direction"] != "POSITIVE":
-        issues.append(f"EXPECTATION_GAP_DIRECTION_{assessment['expectation_gap']['direction']}")
-    if assessment["risk"]["status"] != "PASS":
-        issues.append(f"RISK_STATUS_{assessment['risk']['status']}")
     if prepared["unresolved_evidence_references"]:
         issues.append("UNRESOLVED_EVIDENCE_REFERENCES")
-    if prepared["after_cutoff_sources"]:
-        issues.append("REFERENCED_SOURCE_AFTER_CUTOFF")
-    if prepared["unknown_time_sources"]:
-        issues.append("SOURCE_KNOWN_AT_MISSING_OR_INVALID")
-    if price_input["pit_time_status"] != "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY":
+    if prepared["after_cutoff_evidence_references"]:
+        issues.append("REFERENCED_EVIDENCE_AFTER_CUTOFF")
+    if p["pit_time_status"] != "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY":
         issues.append("PRICE_NOT_PIT_QUALIFIED")
-    if trust == "FAIL":
-        action = "NO-BUY"
-        reason = "Trust failure blocks new risk; this is not an automatic sell instruction."
-    elif thesis == "BROKEN":
-        action = "REVIEW_REQUIRED"
-        reason = "Thesis marked broken; existing holdings require explicit human reassessment."
+    if a["trust"]["status"] == "FAIL":
+        action, why = "NO-BUY", "信任审查失败，禁止新增风险；不表示自动卖出。"
+    elif a["thesis"]["status"] == "BROKEN":
+        action, why = "REVIEW_REQUIRED", "投资论点被标记为失效，现有持仓需要人工重新评估。"
     elif metrics is None:
-        action = "REVIEW_REQUIRED"
-        reason = f"No decision-grade price/return screen can be produced: {metrics_reason or 'UNKNOWN'}."
+        action, why = "REVIEW_REQUIRED", f"当前不能计算有效的价格/回报筛选：{reason or '输入不足'}。"
     elif not metrics.get("return_gate_pass", False):
-        action = "NO-BUY" if Decimal(case["current_position_pct"]) == 0 else "REVIEW_REQUIRED"
-        reason = "Current price fails at least one required return, entry-cushion or bear-loss threshold under the supplied scenario assumptions."
+        action = "NO-BUY" if Decimal(c["current_position_pct"]) == 0 else "REVIEW_REQUIRED"
+        why = "当前价未通过回报、安全边际或 Bear 损失约束；持仓不会被自动卖出。"
     elif issues:
-        action = "REVIEW_REQUIRED"
-        reason = "Price screen passes under the supplied assumptions, but one or more core evidence/assessment gates remain open."
+        action, why = "REVIEW_REQUIRED", "价格情景通过，但核心模块或证据引用仍有未解决问题。"
     else:
-        action = "BUY" if Decimal(case["current_position_pct"]) == 0 else "ADD"
-        reason = "All supplied pilot conditions pass; provisional action remains subject to human review and is not a canonical Decision."
+        action = "BUY" if Decimal(c["current_position_pct"]) == 0 else "ADD"
+        why = "所提供的试运行条件通过；仍需人工复核假设与原始来源。"
+    current_price_eligible = (
+        metrics is not None and Decimal(p["price"]) <= Decimal(str(metrics["target_entry_price"]))
+    )
     return {
         "status": PILOT_STATUS,
         "provisional_action": action,
-        "reason": reason,
+        "reason": why,
         "gating_issues": issues,
         "price_screen_status": (
-            "CURRENT_PRICE_AT_OR_BELOW_RETURN_RISK_CEILING"
-            if metrics is not None and Decimal(price_input["price"]) <= Decimal(str(metrics["target_entry_price"]))
-            else "CURRENT_PRICE_ABOVE_RETURN_RISK_CEILING"
-            if metrics is not None
+            "CURRENT_PRICE_AT_OR_BELOW_RETURN_RISK_CEILING" if current_price_eligible
+            else "CURRENT_PRICE_ABOVE_RETURN_RISK_CEILING" if metrics is not None
             else "UNKNOWN"
         ),
         "human_approval_required": True,
-        "human_final_decision_required": True,
-        "auto_execution": False,
-        "execution_authorized": False,
         "formal_decision_created": False,
+        "execution_authorized": False,
+        "auto_execution": False,
     }
 
 
-def _fmt(value: Any, missing: str = "未知 / UNKNOWN") -> str:
-    if value is None or value == "":
-        return missing
-    if isinstance(value, bool):
-        return "是" if value else "否"
-    if isinstance(value, (dict, list)):
-        return json.dumps(value, ensure_ascii=False, sort_keys=True)
-    return str(value)
-
-
 def _render_report(analysis: Mapping[str, Any]) -> str:
-    case = analysis["case"]
-    price = analysis["price_input"]
-    assess = analysis["assessment"]
-    calc = analysis["return_metrics"]
-    decision = analysis["decision"]
-    forecast = analysis["forecast_valuation"]
+    c, p = analysis["case"], analysis["price_input"]
+    a, f, calc, d = analysis["assessment"], analysis["forecast_valuation"], analysis["return_metrics"], analysis["decision"]
     params = analysis["decision_parameters"]
     lines = [
-        f"# IIOS 本地投资研究试运行报告：{case['company']}（{case['symbol']}）",
+        f"# IIOS 本地投资研究试运行：{c['company']}（{c['symbol']}）",
         "",
-        f"- 试运行 ID：{analysis['pilot_id']}",
-        f"- 市场 / 标的：{case['market']} / {case['symbol']}",
-        f"- 分析截止：{case['as_of_date']}（日期型截止按上海时间当日 00:00 解释）",
-        f"- 当前价：{price['price']} {case['currency']}；观察日期 {price['observation_date']}",
-        f"- 当前持仓：{case['current_position_pct']}%",
-        f"- 路径状态：**{PILOT_STATUS}**",
+        f"- 运行等级：**{PILOT_STATUS}**",
+        f"- 分析截止：{c['as_of_date']}；当前价：{p['price']} {c['currency']}（观察日 {p['observation_date']}）",
+        f"- 当前持仓：{c['current_position_pct']}%",
         "",
-        "> 本报告用于个人本地实际运行测试。人工价格、来源摘要和 AI/操作者评估均未形成正式 Evidence/PIT、Forecast、Valuation Admission、Decision Admission 或 canonical Run Receipt。报告给出的动作仅是试运行建议，最终决定由人作出，不会自动交易。",
+        "> 这是个人使用的本地试运行报告，不是正式 canonical Decision。人工价格/AI 分析/来源摘要未完成正式证据准入；建议只供人工审阅，不会自动下单。",
         "",
-        "## 1. 结论摘要",
+        "## 一、建议与回报筛选",
         "",
-        f"- 试运行建议：**{decision['provisional_action']}**",
-        f"- 判断理由：{decision['reason']}",
-        f"- 价格筛选：{decision['price_screen_status']}",
-        f"- 预期年化回报：{_fmt(calc.get('expected_annualized_return') if calc else None)}",
-        f"- 15% 年化目标：{_fmt(calc.get('fundamental_target_pass') if calc else None)}",
-        f"- Required Return（{params['required_return_annualized']}）：{_fmt(calc.get('required_return_pass') if calc else None)}",
-        f"- 目标入场价上限：{_fmt(calc.get('target_entry_price') if calc else None)}",
-        f"- 当前价低于 / 高于入场价上限：{_fmt(decision.get('price_screen_status'))}",
-        f"- 风险状态：{assess['risk']['status']}；Bear 损失上限：{params['max_loss_pct']}%",
-        "",
-        "## 2. Trust / Reality / Quality",
-        "",
-        f"- Trust：{assess['trust']['status']} — {_fmt(assess['trust'].get('summary'))}",
-        f"- Reality：{assess['reality']['status']} — {_fmt(assess['reality'].get('summary'))}",
-        f"- Quality：{assess['quality']['status']} — {_fmt(assess['quality'].get('summary'))}",
-        "",
-        "## 3. Thesis 与价值驱动因素",
-        "",
-        f"- Thesis 状态：{assess['thesis']['status']}",
-        f"- 核心投资论点：{_fmt(assess['thesis'].get('core_statement'))}",
-        "",
-        "### 价值驱动因素排序",
-        "",
-    ]
-    if assess["value_drivers"]:
-        for item in sorted(assess["value_drivers"], key=lambda row: row["rank"]):
-            refs = ", ".join(item.get("evidence_refs") or []) or "未绑定来源"
-            lines.append(f"{item['rank']}. **{item['driver']}**（{item['impact']}）：{_fmt(item.get('rationale'))}；来源引用：{refs}")
-    else:
-        lines.append("当前没有已录入的价值驱动因素。")
-    lines += ["", "### Thesis 失效条件", ""]
-    lines.extend(f"- {item}" for item in assess["thesis"]["break_conditions"]) if assess["thesis"]["break_conditions"] else lines.append("- 未提供；不得把空列表解释为没有风险。")
-    lines += ["", "### 重新评估触发器", ""]
-    lines.extend(f"- {item}" for item in assess["thesis"]["reassessment_triggers"]) if assess["thesis"]["reassessment_triggers"] else lines.append("- 未提供。")
-    lines += [
-        "",
-        "## 4. Forecast / Valuation / Return",
-        "",
-        f"- 模型：{_fmt(forecast.get('model'))}",
-        f"- 模型选择理由：{_fmt(forecast.get('model_rationale'))}",
-        f"- 入场安全边际参考价值：{_fmt(forecast.get('entry_value_reference_per_share'))} {case['currency']}/股",
-        f"- 独立情景概率是否校准：{'是' if forecast.get('probabilities_calibrated') else '否 / 尚未校准'}",
-        "",
-        "| 情景 | 概率 | 期末每股价值 | 现金分配 | 估算依据 |",
-        "|---|---:|---:|---:|---|",
-    ]
-    for name, label in (("bear", "Bear"), ("base", "Base"), ("bull", "Bull")):
-        row = forecast.get("scenarios", {}).get(name) or {}
-        lines.append(
-            f"| {label} | {_fmt(row.get('probability'))} | {_fmt(row.get('terminal_value_per_share'))} | "
-            f"{_fmt(row.get('cash_distributions_per_share', '0'))} | {_fmt(row.get('rationale'))} |"
-        )
-    if calc:
-        lines += [
-            "",
-            "| 回报 / 风险指标 | 结果 |",
-            "|---|---:|",
-            f"| 概率加权终值 | {calc['expected_terminal_wealth']} {case['currency']}/股 |",
-            f"| 预期总回报 | {calc['expected_total_return']} |",
-            f"| 预期年化回报（H={params['horizon_years']}Y） | {calc['expected_annualized_return']} |",
-            f"| 入场安全边际 | {calc['margin_of_safety']} |",
-            f"| Bear 情景回报 | {calc['bear_return']} |",
-            f"| 回报门槛对应的入场价上限 | {calc['target_entry_price_for_return']} |",
-            f"| 风险约束对应的入场价上限 | {_fmt(calc.get('target_entry_price_for_risk'))} |",
-            f"| **共同约束下的目标入场价上限** | **{calc['target_entry_price']}** |",
-        ]
-    else:
-        lines += ["", f"价格 / 回报计算未完成：{analysis['return_metrics_reason'] or '模型输入不完整'}。"]
-    lines += [
-        "",
-        "### 主要模型假设",
-        "",
-    ]
-    lines.extend(f"- {item}" for item in forecast.get("assumptions", [])) if forecast.get("assumptions") else lines.append("- 未提供。情景价值仅为模型输入，不是市场一致预期。")
-    lines += [
-        "",
-        "## 5. 市场隐含预期（MIE）与预期差",
-        "",
-        f"- MIE 可识别状态：{assess['market_implied_expectation']['status']}",
-        f"- MIE 结论：{_fmt(assess['market_implied_expectation'].get('summary'))}",
-        f"- 预期差状态：{assess['expectation_gap']['status']}",
-        f"- 预期差方向：{assess['expectation_gap']['direction']}",
-        f"- 预期差论据：{_fmt(assess['expectation_gap'].get('summary'))}",
-        "",
-        "若 MIE 的可行解集合、可识别性、稳定性或历史支持不足，应保留 UNKNOWN / NOT_IDENTIFIABLE，而不是用内在价值上行替代市场隐含预期。",
-        "",
-        "## 6. 风险与组合约束",
-        "",
-        f"- 风险状态：{assess['risk']['status']}",
-        f"- 风险说明：{_fmt(assess['risk'].get('summary'))}",
-    ]
-    risk_items = assess["risk"].get("items") or []
-    if risk_items:
-        lines.extend(f"- {item}" for item in risk_items)
-    else:
-        lines.append("- 未提供具体风险清单。")
-    lines += [
-        f"- 当前持仓：{case['current_position_pct']}%",
+        f"- 试运行建议：**{d['provisional_action']}**",
+        f"- 理由：{d['reason']}",
+        f"- 当前价筛选：{d['price_screen_status']}",
+        f"- 预期年化回报：{calc['expected_annualized_return'] if calc else 'UNKNOWN'}",
+        f"- 15% 年化门槛：{calc['fundamental_target_pass'] if calc else 'UNKNOWN'}",
+        f"- Required Return：{params['required_return_annualized']}；结果：{calc['required_return_pass'] if calc else 'UNKNOWN'}",
+        f"- 共同约束下目标入场价上限：{calc['target_entry_price'] if calc else 'UNKNOWN'}",
         f"- 最大 Bear 损失约束：{params['max_loss_pct']}%",
         "",
-        "## 7. 来源与截止时点",
+        "## 二、Trust / Reality / Quality",
         "",
-        f"- 价格 assurance：{price['assurance_label']}；已知时点校验：{price['pit_time_status']}",
-        "- 以上只表示时间字段符合 / 不符合本次试运行截止条件，不证明行情来源原始字节、数据使用权或来源身份。",
+        f"- Trust：{a['trust']['status']} — {a['trust'].get('summary') or '未知'}",
+        f"- Reality：{a['reality']['status']} — {a['reality'].get('summary') or '未知'}",
+        f"- Quality：{a['quality']['status']} — {a['quality'].get('summary') or '未知'}",
         "",
-        "| 来源 ID | 类型 | 标题 | known_at | 截止校验 | 摘要 |",
+        "## 三、Thesis 与价值驱动因素",
+        "",
+        f"- Thesis 状态：{a['thesis']['status']}",
+        f"- 核心论点：{a['thesis'].get('core_statement') or '未知'}",
+        "",
+    ]
+    drivers = sorted(a["value_drivers"], key=lambda x: x["rank"])
+    lines.extend(
+        f"{x['rank']}. {x['driver']}（{x['impact']}）：{x['rationale'] or '未提供'}"
+        for x in drivers
+    ) if drivers else lines.append("价值驱动因素未提供。")
+    lines.extend(["", "### Thesis 失效条件"])
+    lines.extend(f"- {x}" for x in a["thesis"]["break_conditions"]) if a["thesis"]["break_conditions"] else lines.append("- 未提供。")
+    lines.extend(["", "### 重新评估触发器"])
+    lines.extend(f"- {x}" for x in a["thesis"]["reassessment_triggers"]) if a["thesis"]["reassessment_triggers"] else lines.append("- 未提供。")
+    lines.extend([
+        "",
+        "## 四、Forecast / Valuation",
+        "",
+        f"- 模型：{f['model']}；选择理由：{f['model_rationale'] or '未提供'}",
+        f"- 安全边际参考价值：{f.get('entry_value_reference_per_share') or 'UNKNOWN'} {c['currency']}/股",
+        f"- 情景概率是否校准：{'是' if f['probabilities_calibrated'] else '否 / 未校准'}",
+        "",
+        "| 情景 | 概率 | 期末每股价值 | 每股现金分配 | 理由 |",
+        "|---|---:|---:|---:|---|",
+    ])
+    scenarios = f.get("scenarios") if isinstance(f.get("scenarios"), Mapping) else {}
+    for name, label in (("bear", "Bear"), ("base", "Base"), ("bull", "Bull")):
+        row = scenarios.get(name) if isinstance(scenarios.get(name), Mapping) else {}
+        lines.append(f"| {label} | {row.get('probability', 'UNKNOWN')} | {row.get('terminal_value_per_share', 'UNKNOWN')} | {row.get('cash_distributions_per_share', '0')} | {row.get('rationale', '未提供')} |")
+    if calc:
+        lines.extend([
+            "",
+            f"- 概率加权终值：{calc['expected_terminal_wealth']} {c['currency']}/股",
+            f"- 预期总回报：{calc['expected_total_return']}",
+            f"- 入场安全边际：{calc['margin_of_safety']}",
+            f"- Bear 情景回报：{calc['bear_return']}",
+            f"- 回报门槛入场上限：{calc['target_entry_price_for_return']}",
+            f"- 风险约束入场上限：{calc.get('target_entry_price_for_risk')}",
+        ])
+    else:
+        lines.append(f"回报计算尚未完成：{analysis['return_metrics_reason'] or '情景输入不足'}。")
+    lines.extend(["", "### 估值假设"])
+    lines.extend(f"- {x}" for x in f["assumptions"]) if f["assumptions"] else lines.append("- 未提供；不得将其解释为市场一致预期。")
+    lines.extend([
+        "",
+        "## 五、MIE 与预期差",
+        "",
+        f"- MIE：{a['market_implied_expectation']['status']} — {a['market_implied_expectation'].get('summary') or '未知'}",
+        f"- 预期差：{a['expectation_gap']['status']} / {a['expectation_gap']['direction']} — {a['expectation_gap'].get('summary') or '未知'}",
+        "- 若 MIE 无法识别或缺乏历史支持，不以内部估值代替市场隐含预期。",
+        "",
+        "## 六、风险与来源",
+        "",
+        f"- 风险：{a['risk']['status']} — {a['risk'].get('summary') or '未知'}",
+    ])
+    lines.extend(f"- {x}" for x in a["risk"]["items"]) if a["risk"]["items"] else lines.append("- 具体风险清单未提供。")
+    lines.extend([
+        "",
+        f"- 价格 assurance：{p['assurance_label']}；截止时点：{p['pit_time_status']}",
+        "- 来源时间校验只说明日期字段与 cutoff 的关系，不证明来源真实性、原始字节或使用权。",
+        "",
+        "| 来源 ID | 类型 | 标题 | known_at | 时间状态 | 摘要 |",
         "|---|---|---|---|---|---|",
-    ]
+    ])
     if analysis["evidence_register"]:
-        for item in analysis["evidence_register"]:
-            lines.append(
-                f"| {item['source_id']} | {item['source_class']} | {item['title']} | "
-                f"{_fmt(item.get('known_at'))} | {item['time_status']} | {item['summary']} |"
-            )
+        for row in analysis["evidence_register"]:
+            lines.append(f"| {row['source_id']} | {row['source_class']} | {row['title']} | {row['known_at'] or 'UNKNOWN'} | {row['time_status']} | {row['summary']} |")
     else:
-        lines.append("| — | — | 未提供来源清单 | UNKNOWN | UNKNOWN | 未提供来源事实；结论必须保持审慎 |")
-    lines += [
+        lines.append("| — | — | 未提供来源清单 | UNKNOWN | UNKNOWN | 结论应保持审慎 |")
+    lines.extend(["", "## 七、需人工处理的问题"])
+    lines.extend(f"- {x}" for x in d["gating_issues"]) if d["gating_issues"] else lines.append("- 所提供的试运行门槛均通过；仍需检查原始来源和估值假设。")
+    lines.extend([
         "",
-        "来源引用不等于正式 Evidence/PIT Admission。来源字节未在本流程中重新下载、核验或准入。",
+        "## 八、治理边界",
         "",
-        "## 8. 需要人工补齐 / 复核的问题",
+        "- 不创建正式 Evidence/PIT、Forecast/Valuation Admission、Decision Admission 或 Machine Publication。",
+        "- 本地 run-record 不等同于 canonical IIOS_RUN_RECEIPT。",
+        "- 人工最终审批必需；自动执行关闭。",
         "",
-    ]
-    issues = decision["gating_issues"]
-    if issues:
-        lines.extend(f"- {item}" for item in issues)
-    else:
-        lines.append("- 试运行输入所声明的关键模块状态均满足当前 provisional gate；仍须人工检查模型假设与原始来源。")
+    ])
     if analysis.get("notes"):
-        lines += ["", "## 操作者备注", "", analysis["notes"]]
-    lines += [
-        "",
-        "## 9. 非正式化声明",
-        "",
-        "- 运行等级：PILOT_NON_CANONICAL；试运行输出不是正式 IIOS Decision。",
-        "- 正式 Evidence/PIT Admission：未创建；来源使用权与原始字节未独立核验。",
-        "- 正式 Forecast / Valuation Admission：未创建；输入情景是假设而非准入对象。",
-        "- canonical Machine Publication / IIOS_RUN_RECEIPT：未创建。本地文件回放收据不是正式 Run Receipt。",
-        "- 人工最终审批：必需；自动下单与自动执行：关闭。",
-        "",
-    ]
+        lines.extend(["## 操作者备注", "", analysis["notes"], ""])
     return "\n".join(lines)
 
 
-def _build_artifacts(input_raw: bytes) -> tuple[str, bytes, bytes, bytes, dict[str, Any]]:
-    payload = _parse_json_object(input_raw, reason="PILOT_INPUT_JSON_INVALID")
-    prepared = _validate_pilot_input(payload)
-    metrics, metric_reason = _return_metrics(prepared)
-    decision = _provisional_decision(prepared, metrics, metric_reason)
-    input_sha = _sha256(input_raw)
-    pilot_id = "local-pilot-" + _sha256(_canonical({
-        "runner_version": PILOT_RUNNER_VERSION,
-        "input_sha256": input_sha,
-    }))[:24]
+def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], str]:
+    prepared = _prepare_input(payload)
+    metrics, reason = _return_metrics(prepared)
+    decision = _decision(prepared, metrics, reason)
     analysis = {
         "schema_version": PILOT_ANALYSIS_SCHEMA,
-        "runner_version": PILOT_RUNNER_VERSION,
-        "pilot_id": pilot_id,
+        "runner_version": "IIOS-LOCAL-PILOT-0.1",
+        "pilot_id": run_id,
         "status": PILOT_STATUS,
-        "input_sha256": input_sha,
         "case": prepared["case"],
         "price_input": prepared["price_input"],
         "evidence_register": prepared["evidence_register"],
@@ -828,157 +553,71 @@ def _build_artifacts(input_raw: bytes) -> tuple[str, bytes, bytes, bytes, dict[s
         "forecast_valuation": prepared["forecast_valuation"],
         "decision_parameters": prepared["decision_parameters"],
         "return_metrics": metrics,
-        "return_metrics_reason": metric_reason,
+        "return_metrics_reason": reason,
         "decision": decision,
-        "evidence_pit_summary": {
-            "source_count": len(prepared["evidence_register"]),
-            "after_cutoff_source_ids": prepared["after_cutoff_sources"],
-            "unknown_or_invalid_known_at_source_ids": prepared["unknown_time_sources"],
-            "unresolved_source_references": prepared["unresolved_evidence_references"],
-            "source_bytes_verified": False,
-            "source_origin_verified": False,
-            "source_use_rights_verified": False,
-            "formal_evidence_pit_admission": False,
-        },
         "governance": {
-            "status": PILOT_STATUS,
-            "canonical_price_admission": False,
-            "formal_evidence_pit_admission": False,
-            "formal_semantic_admission": False,
-            "formal_forecast_created": False,
-            "formal_valuation_admission": False,
-            "formal_decision_created": False,
-            "canonical_publication_created": False,
-            "canonical_run_receipt_created": False,
-            "pilot_receipt_created": True,
-            "human_approval_required": True,
-            "execution_authorized": False,
-            "auto_execution": False,
+            "status": PILOT_STATUS, "source_origin_verified": False,
+            "source_use_rights_verified": False, "formal_evidence_pit_admission": False,
+            "formal_forecast_created": False, "formal_valuation_admission": False,
+            "formal_decision_created": False, "canonical_publication_created": False,
+            "canonical_run_receipt_created": False, "human_approval_required": True,
+            "execution_authorized": False, "auto_execution": False,
         },
+        "notes": prepared["notes"],
     }
-    analysis_raw = _canonical(analysis) + b"\n"
-    report_raw = _render_report(analysis).encode("utf-8")
+    return analysis, _render_report(analysis)
+
+
+def _write_run(
+    input_path: Path, output_root: Path, *, replay_of: str | None = None
+) -> dict[str, Any]:
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    symbol = str((payload.get("case") or {}).get("symbol") or "candidate").replace(".", "-")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    run_id = f"local-pilot-{symbol}-{stamp}"
+    analysis, report = _analyse(payload, run_id)
+    run_dir = output_root / run_id
+    run_dir.mkdir(parents=True, exist_ok=False, mode=0o700)
+    _write_local(run_dir / "input.json", input_path.read_text(encoding="utf-8"))
+    _write_local(run_dir / "analysis.json", json.dumps(_safe(analysis), ensure_ascii=False, indent=2, allow_nan=False))
+    _write_local(run_dir / "report.md", report)
     receipt = {
         "receipt_schema": PILOT_RECEIPT_SCHEMA,
         "status": PILOT_STATUS,
-        "pilot_id": pilot_id,
-        "runner_version": PILOT_RUNNER_VERSION,
-        "input_sha256": input_sha,
-        "analysis_file_sha256": _sha256(analysis_raw),
-        "report_file_sha256": _sha256(report_raw),
-        "integrity_scope": "LOCAL_REPLAY_OF_THE_EXACT_INPUT_AND_DETERMINISTIC_OUTPUTS_ONLY",
-        "price_values_in_receipt": False,
-        "source_claims_in_receipt": False,
-        "source_origin_verified": False,
-        "source_vintage_verified": False,
-        "source_use_rights_verified": False,
-        "formal_evidence_pit_admission": False,
+        "pilot_id": run_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "replay_of": replay_of,
+        "input_file": "input.json",
+        "analysis_file": "analysis.json",
+        "report_file": "report.md",
         "formal_decision_created": False,
-        "canonical_publication_created": False,
         "canonical_run_receipt_created": False,
         "execution_authorized": False,
         "auto_execution": False,
     }
-    receipt_raw = _canonical(receipt) + b"\n"
-    return pilot_id, analysis_raw, report_raw, receipt_raw, receipt
-
-
-def _read_regular_child(directory: Path, name: str) -> bytes:
-    path = directory / name
-    if path.is_symlink() or not path.is_file():
-        raise LocalInvestmentPilotError(f"BUNDLE_FILE_MISSING_OR_SYMLINK:{name}")
-    return path.read_bytes()
-
-
-def verify_local_pilot_bundle(run_dir: str | Path) -> dict[str, Any]:
-    root = Path(run_dir).expanduser()
-    if root.is_symlink() or not root.is_dir():
-        raise LocalInvestmentPilotError("PILOT_BUNDLE_MUST_BE_DIRECTORY_NOT_SYMLINK")
-    root = _outside_repository(root, "PILOT_BUNDLE_PATH", must_exist=True)
-    input_raw = _read_regular_child(root, "input.json")
-    stored_analysis = _read_regular_child(root, "analysis.json")
-    stored_report = _read_regular_child(root, "report.md")
-    receipt_raw = _read_regular_child(root, "pilot_receipt.json")
-    receipt = _parse_json_object(receipt_raw, reason="PILOT_RECEIPT_JSON_INVALID")
-    expected_id, expected_analysis, expected_report, _expected_receipt, _receipt_obj = _build_artifacts(input_raw)
-    if stored_analysis != expected_analysis:
-        raise LocalInvestmentPilotError("PILOT_ANALYSIS_REPLAY_MISMATCH")
-    if stored_report != expected_report:
-        raise LocalInvestmentPilotError("PILOT_REPORT_REPLAY_MISMATCH")
-    if receipt.get("pilot_id") != expected_id or receipt.get("input_sha256") != _sha256(input_raw):
-        raise LocalInvestmentPilotError("PILOT_RECEIPT_INPUT_BINDING_MISMATCH")
-    if receipt.get("analysis_file_sha256") != _sha256(stored_analysis):
-        raise LocalInvestmentPilotError("PILOT_RECEIPT_ANALYSIS_HASH_MISMATCH")
-    if receipt.get("report_file_sha256") != _sha256(stored_report):
-        raise LocalInvestmentPilotError("PILOT_RECEIPT_REPORT_HASH_MISMATCH")
-    for flag in (
-        "source_origin_verified",
-        "source_vintage_verified",
-        "source_use_rights_verified",
-        "formal_evidence_pit_admission",
-        "formal_decision_created",
-        "canonical_publication_created",
-        "canonical_run_receipt_created",
-        "execution_authorized",
-        "auto_execution",
-    ):
-        if receipt.get(flag) is not False:
-            raise LocalInvestmentPilotError(f"PILOT_RECEIPT_FORBIDDEN_FLAG:{flag}")
+    _write_local(run_dir / "pilot_receipt.json", json.dumps(receipt, ensure_ascii=False, indent=2))
     if os.name != "nt":
-        if stat.S_IMODE(root.stat().st_mode) & 0o077:
-            raise LocalInvestmentPilotError("PILOT_BUNDLE_DIRECTORY_PERMISSIONS_TOO_OPEN")
-        for name in ("input.json", "analysis.json", "report.md", "pilot_receipt.json"):
-            if stat.S_IMODE((root / name).stat().st_mode) & 0o077:
-                raise LocalInvestmentPilotError(f"PILOT_BUNDLE_FILE_PERMISSIONS_TOO_OPEN:{name}")
+        run_dir.chmod(0o700)
     return {
-        "status": "PILOT_REPLAY_PASS",
-        "pilot_id": expected_id,
-        "analysis_file_sha256": _sha256(stored_analysis),
-        "report_file_sha256": _sha256(stored_report),
-        "receipt_file_sha256": _sha256(receipt_raw),
+        "status": "PILOT_REPLAY_RECOMPUTED" if replay_of else "PILOT_CREATED",
+        "pilot_id": run_id,
+        "provisional_action": analysis["decision"]["provisional_action"],
+        "replay_of": replay_of,
+        "run_dir": str(run_dir),
+        "report_path": str(run_dir / "report.md"),
         "formal_decision_created": False,
         "canonical_run_receipt_created": False,
         "auto_execution": False,
-        "run_dir": str(root),
     }
 
 
-def run_local_investment_pilot(*, input_path: str | Path, output_root: str | Path) -> dict[str, Any]:
-    input_file = _outside_repository(input_path, "PILOT_INPUT_PATH", must_exist=True)
-    if not input_file.is_file() or input_file.is_symlink():
-        raise LocalInvestmentPilotError("PILOT_INPUT_PATH_MUST_BE_REGULAR_FILE_NOT_SYMLINK")
-    input_raw = input_file.read_bytes()
-    pilot_id, analysis_raw, report_raw, receipt_raw, _receipt = _build_artifacts(input_raw)
-    root = _prepare_private_directory(output_root, "PILOT_OUTPUT_ROOT")
-    run_dir = root / pilot_id
-    if run_dir.exists() or run_dir.is_symlink():
-        replay = verify_local_pilot_bundle(run_dir)
-        return {**replay, "status": "PILOT_REUSED_IDENTICAL_INPUT", "replay_status": "PILOT_REPLAY_PASS"}
-    temp = Path(tempfile.mkdtemp(prefix=".pilot-tmp-", dir=str(root)))
-    try:
-        if os.name != "nt":
-            os.chmod(temp, 0o700)
-        _write_private_file(temp / "input.json", input_raw)
-        _write_private_file(temp / "analysis.json", analysis_raw)
-        _write_private_file(temp / "report.md", report_raw)
-        _write_private_file(temp / "pilot_receipt.json", receipt_raw)
-        if run_dir.exists() or run_dir.is_symlink():
-            raise LocalInvestmentPilotError("PILOT_OUTPUT_RUN_ALREADY_EXISTS_RACE")
-        os.rename(temp, run_dir)
-    except Exception:
-        shutil.rmtree(temp, ignore_errors=True)
-        raise
-    replay = verify_local_pilot_bundle(run_dir)
-    return {
-        **replay,
-        "status": "PILOT_CREATED",
-        "replay_status": replay["status"],
-        "provisional_action": json.loads(analysis_raw.decode("utf-8"))["decision"]["provisional_action"],
-        "run_dir": str(run_dir),
-    }
+def run_local_investment_pilot(*, input_path: str | Path, output_root: str | Path, replay_of: str | None = None) -> dict[str, Any]:
+    source = _outside_repo(input_path, "PILOT_INPUT_PATH", must_exist=True)
+    root = _private_dir(output_root, "PILOT_OUTPUT_ROOT")
+    return _write_run(source, root, replay_of=replay_of)
 
 
-def _build_template(
+def _template(
     *, company: str, symbol: str, market: str, as_of_date: str, current_position_pct: str,
     price: str, price_observation_date: str, price_known_at: str, price_source_claim: str,
 ) -> dict[str, Any]:
@@ -986,63 +625,37 @@ def _build_template(
     currency = "CNY" if seed["request"]["market"] == "CN-A" else "HKD"
     _positive(price, "CURRENT_PRICE")
     observation = _date(price_observation_date, "PRICE_OBSERVATION_DATE")
-    known_at = _local_datetime(price_known_at, "PRICE_KNOWN_AT", allow_date_only=False)
+    known_at = _datetime(price_known_at, "PRICE_KNOWN_AT", allow_date_only=False)
     if known_at.date() != observation:
         raise LocalInvestmentPilotError("PRICE_KNOWN_AT_DATE_MUST_MATCH_OBSERVATION_DATE")
-    if not _text(price_source_claim):
+    if not str(price_source_claim or "").strip():
         raise LocalInvestmentPilotError("PRICE_SOURCE_CLAIM_REQUIRED")
     return {
         "schema_version": PILOT_SCHEMA,
         "case": {
-            "company": _text(company),
-            "market": seed["request"]["market"],
-            "symbol": seed["request"]["symbol"],
-            "currency": currency,
-            "as_of_date": seed["temporal_scope"]["cutoff_date"],
+            "company": company, "market": seed["request"]["market"], "symbol": seed["request"]["symbol"],
+            "currency": currency, "as_of_date": seed["temporal_scope"]["cutoff_date"],
             "current_position_pct": seed["decision_context"]["current_position_pct"],
         },
         "price_input": {
-            "price": str(price),
-            "currency": currency,
-            "observation_date": observation.isoformat(),
-            "known_at": known_at.isoformat(),
-            "assurance_label": PRICE_ASSURANCE,
-            "sources_claimed": [_text(price_source_claim)],
+            "price": str(price), "currency": currency, "observation_date": observation.isoformat(),
+            "known_at": known_at.isoformat(), "assurance_label": PRICE_ASSURANCE,
+            "sources_claimed": [str(price_source_claim).strip()],
         },
         "evidence_register": [],
         "assessment": {
             "trust": {"status": "UNKNOWN", "summary": "尚未完成信任审查", "evidence_refs": []},
-            "reality": {"status": "UNKNOWN", "summary": "尚未完成公司经营现实审查", "evidence_refs": []},
+            "reality": {"status": "UNKNOWN", "summary": "尚未完成经营现实审查", "evidence_refs": []},
             "quality": {"status": "UNKNOWN", "summary": "尚未完成经济质量审查", "evidence_refs": []},
-            "thesis": {
-                "status": "UNKNOWN",
-                "core_statement": "",
-                "drivers": [],
-                "break_conditions": [],
-                "reassessment_triggers": [],
-                "evidence_refs": [],
-            },
+            "thesis": {"status": "UNKNOWN", "core_statement": "", "drivers": [], "break_conditions": [], "reassessment_triggers": [], "evidence_refs": []},
             "value_drivers": [],
-            "market_implied_expectation": {
-                "status": "NOT_IDENTIFIABLE",
-                "summary": "尚未提供足够历史价格 / 估值观察以识别 MIE",
-                "evidence_refs": [],
-            },
-            "expectation_gap": {
-                "status": "UNKNOWN",
-                "direction": "UNKNOWN",
-                "summary": "未验证独立预测与市场隐含预期之间的差异",
-                "evidence_refs": [],
-            },
-            "risk": {"status": "UNKNOWN", "summary": "尚未完成风险审查", "max_loss_pct": "25", "items": []},
+            "market_implied_expectation": {"status": "NOT_IDENTIFIABLE", "summary": "尚未足够识别市场隐含预期", "evidence_refs": []},
+            "expectation_gap": {"status": "UNKNOWN", "direction": "UNKNOWN", "summary": "尚未验证预期差", "evidence_refs": []},
+            "risk": {"status": "UNKNOWN", "summary": "尚未完成风险审查", "items": []},
         },
         "forecast_valuation": {
-            "model": "UNKNOWN",
-            "model_rationale": "",
-            "entry_value_reference_per_share": None,
-            "probabilities_calibrated": False,
-            "probability_calibration_basis": "",
-            "assumptions": [],
+            "model": "UNKNOWN", "model_rationale": "", "entry_value_reference_per_share": None,
+            "probabilities_calibrated": False, "assumptions": [],
             "scenarios": {
                 "bear": {"probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": "0", "rationale": ""},
                 "base": {"probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": "0", "rationale": ""},
@@ -1050,33 +663,12 @@ def _build_template(
             },
         },
         "decision_parameters": {
-            "horizon_years": 1,
-            "horizon_override": False,
-            "horizon_override_basis": [],
-            "horizon_selection_rationale": "默认以 1 年作为年化回报参考期限；只有重要行业龙头或重大投资/资本开支周期才显式覆盖为 3 年。",
-            "required_return_annualized": "0.15",
-            "max_loss_pct": "25",
+            "horizon_years": 1, "horizon_override": False, "horizon_override_basis": [],
+            "horizon_selection_rationale": "默认使用 1 年年化回报；符合例外条件时才显式切换为 3 年。",
+            "required_return_annualized": "0.15", "max_loss_pct": "25",
         },
-        "notes": "请补入截至 cutoff 的事实、独立预测及 MIE 评估。未知数据应保留 UNKNOWN / NOT_IDENTIFIABLE，不得编造。",
+        "notes": "缺失信息保留 UNKNOWN / NOT_IDENTIFIABLE，不要编造。请在截止时点内优先引用公告、财报和交易所资料。",
     }
-
-
-def _prompt_text(template_path: Path) -> str:
-    return (
-        "IIOS 本地投资试运行：结构化研究输入填写说明\n\n"
-        "请在本地打开 pilot-input JSON，并向 AI 提供该 JSON、你已取得的公司公告/财报事实摘要和来源链接。"
-        "要求 AI 返回完整 JSON，不得添加新顶层字段，必须保留 schema_version、case 和 price_input 不变。\n\n"
-        "填写 assessment 中的 Trust、Reality、Quality、Thesis、价值驱动排序、MIE、预期差和风险。"
-        "对每个事实/判断尽可能填 evidence_refs，引用 evidence_register.source_id。"
-        "给出 Bear/Base/Bull 三情景概率、期末每股价值、现金分配、逐项理由及入场安全边际参考价值。"
-        "当前价只来自操作者输入，不能把 price_input.assurance_label 改成来源已验证；人工价格不等于正式行情准入。\n\n"
-        "严格规则：资料不够时填写 UNKNOWN / NOT_IDENTIFIABLE，不能为了满足 schema 编造数字；"
-        "MIE 只有在可行解集合、可识别性、稳定性与历史支持均足够时才可标 PASS。"
-        "Scenario probabilities 是主观假设时必须保持 probabilities_calibrated=false，并披露假设。"
-        "正式 Decision、正式 Evidence/PIT、canonical Run Receipt、交易授权一律不创建。\n\n"
-        f"本地输入文件：{template_path}\n"
-        "将 AI 返回的 JSON 保存为该文件或另存后通过 --input 指定；不要把包含实际价格/来源细节的 JSON 提交 GitHub。"
-    )
 
 
 def create_pilot_template(
@@ -1084,42 +676,39 @@ def create_pilot_template(
     price: str, price_observation_date: str, price_known_at: str, price_source_claim: str,
     template_root: str | Path,
 ) -> dict[str, Any]:
-    root = _prepare_private_directory(template_root, "PILOT_TEMPLATE_ROOT")
-    template = _build_template(
+    root = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
+    payload = _template(
         company=company, symbol=symbol, market=market, as_of_date=as_of_date,
-        current_position_pct=current_position_pct, price=price,
-        price_observation_date=price_observation_date, price_known_at=price_known_at,
-        price_source_claim=price_source_claim,
+        current_position_pct=current_position_pct, price=price, price_observation_date=price_observation_date,
+        price_known_at=price_known_at, price_source_claim=price_source_claim,
     )
-    case_token = str(template["case"]["symbol"]).replace(".", "-")
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    input_path = root / f"pilot-input-{case_token}-{stamp}.json"
-    prompt_path = root / f"pilot-prompt-{case_token}-{stamp}.md"
-    _write_private_file(input_path, json.dumps(template, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8") + b"\n")
-    try:
-        _write_private_file(prompt_path, _prompt_text(input_path).encode("utf-8"))
-    except Exception:
-        input_path.unlink(missing_ok=True)
-        raise
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    token = str(payload["case"]["symbol"]).replace(".", "-")
+    input_path = root / f"pilot-input-{token}-{stamp}.json"
+    prompt_path = root / f"pilot-prompt-{token}-{stamp}.md"
+    _write_local(input_path, json.dumps(payload, ensure_ascii=False, indent=2))
+    prompt = (
+        "请依据我提供的公司原始公告/财报事实摘要与来源链接，填写这份 IIOS 试运行 JSON。"
+        "保留 schema_version、case、price_input 不变，只补齐 evidence_register、assessment、forecast_valuation 和 decision_parameters。"
+        "不要编造未知事实；未知写 UNKNOWN，MIE 不可识别时写 NOT_IDENTIFIABLE；情景概率若未校准请明确说明。"
+        "至少覆盖 Trust、Reality、Quality、Thesis、价值驱动排序、Bear/Base/Bull 估值情景、MIE/预期差和风险/失效条件。"
+        "当前价已经由人工输入，不能把 assurance_label 改成来源已验证。"
+        "输出只允许完整 JSON。AI/操作者判断属于试运行输入，不是正式证据准入。"
+    )
+    _write_local(prompt_path, prompt + "\n\n本地输入文件：" + str(input_path) + "\n")
     return {
-        "status": "PILOT_TEMPLATE_CREATED",
-        "input_template": str(input_path),
-        "analysis_prompt": str(prompt_path),
-        "case_id": f"RC-{template['case']['market']}-{template['case']['symbol'].replace('.', '-')}-{template['case']['as_of_date'].replace('-', '')}",
-        "template_has_real_price": True,
-        "private_storage_required": True,
+        "status": "PILOT_TEMPLATE_CREATED", "input_template": str(input_path),
+        "analysis_prompt": str(prompt_path), "private_local_storage": True,
         "formal_decision_created": False,
     }
 
 
 def _main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Local candidate-driven IIOS research pilot; non-canonical and analysis-only."
-    )
+    parser = argparse.ArgumentParser(description="Local candidate-driven IIOS pilot; non-canonical.")
     modes = parser.add_mutually_exclusive_group(required=True)
-    modes.add_argument("--create-template", action="store_true", help="create private input JSON and prompt for one A/H candidate")
+    modes.add_argument("--create-template", action="store_true")
     modes.add_argument("--input", help="run a completed private pilot input JSON")
-    modes.add_argument("--replay-run", help="recompute and verify one prior private pilot output directory")
+    modes.add_argument("--replay-run", help="re-run a previous local pilot's input.json")
     parser.add_argument("--template-root", default=str(Path.home() / ".iios-private" / "local-pilot" / "inputs"))
     parser.add_argument("--output-root", default=str(Path.home() / ".iios-private" / "local-pilot" / "runs"))
     parser.add_argument("--company")
@@ -1135,15 +724,11 @@ def _main(argv: list[str] | None = None) -> int:
     try:
         if args.create_template:
             required = {
-                "--company": args.company,
-                "--symbol": args.symbol,
-                "--as-of": args.as_of,
-                "--price": args.price,
-                "--price-date": args.price_date,
-                "--price-known-at": args.price_known_at,
-                "--price-source-claim": args.price_source_claim,
+                "--company": args.company, "--symbol": args.symbol, "--as-of": args.as_of,
+                "--price": args.price, "--price-date": args.price_date,
+                "--price-known-at": args.price_known_at, "--price-source-claim": args.price_source_claim,
             }
-            missing = [flag for flag, value in required.items() if not value]
+            missing = [key for key, value in required.items() if not value]
             if missing:
                 parser.error("--create-template requires " + ", ".join(missing))
             result = create_pilot_template(
@@ -1155,11 +740,16 @@ def _main(argv: list[str] | None = None) -> int:
         elif args.input:
             result = run_local_investment_pilot(input_path=args.input, output_root=args.output_root)
         else:
-            result = verify_local_pilot_bundle(args.replay_run)
-        print(json.dumps(_json_safe(result), ensure_ascii=False, indent=2, sort_keys=True))
+            prior = Path(args.replay_run).expanduser()
+            if not prior.is_dir():
+                raise LocalInvestmentPilotError("REPLAY_RUN_DIRECTORY_REQUIRED")
+            result = run_local_investment_pilot(
+                input_path=prior / "input.json", output_root=args.output_root, replay_of=prior.name
+            )
+        print(json.dumps(_safe(result), ensure_ascii=False, indent=2))
         return 0
     except (LocalInvestmentPilotError, OSError, ValueError, KeyError, TypeError) as exc:
-        print(json.dumps({"status": "BLOCKED", "reason": str(exc)}, ensure_ascii=False, sort_keys=True))
+        print(json.dumps({"status": "BLOCKED", "reason": str(exc)}, ensure_ascii=False))
         return 2
 
 
