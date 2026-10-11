@@ -826,7 +826,7 @@ def test_operator_price_snapshot_sync_tampering_blocks_decision_revision_write(t
         ("return_gate_entry_price", lambda value: ensure_return_gate(value).__setitem__("entry_price", "999.00"),
          "return gate entry_price is not synchronized to operator current price"),
         ("current_price", lambda value: value["input"]["current_price_observation"].__setitem__("price", "999.00"),
-         "expectation-gap input is not synchronized to operator current price"),
+         "return gate entry_price is not synchronized to operator current price"),
     )
     for name, mutate, expected_error in mutations:
         tampered = json.loads(json.dumps(persisted_snapshot))
