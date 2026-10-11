@@ -106,6 +106,7 @@ def build_operator_market_price_bundle(
 
     artifact = {
         "schema_version": POLICY_ID,
+        "policy_id": POLICY_ID,
         "record_class": "OPERATOR_ATTESTED_MARKET_PRICE_NOT_SOURCE_BYTE_VERIFIED",
         "operator_confirmed": True,
         "secondary_web_audit_performed": False,
