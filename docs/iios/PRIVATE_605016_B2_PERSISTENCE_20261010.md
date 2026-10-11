@@ -47,6 +47,20 @@ It does not mean that:
 
 The tool therefore reports PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED and retains source_vintage_review_required=true. A formal production run must wait for the independent source-vintage adjudication and real Host acceptance. No empty admission root or placeholder request bundle is created.
 
+## Offline persisted-copy verification after restart
+
+After an ingest invocation returns `PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED` or `ALREADY_PERSISTED_CORE_VALIDATED_NOT_PRODUCTION_ACCEPTED`, the private candidate is kept under the local private root. To verify that stored copy again after quitting Terminal or restarting the Mac, run the same launcher from Terminal with `--verify-existing`:
+
+```bash
+bash /path/to/Launch_IIOS_Private_605016_B2_Ingest.command --verify-existing
+```
+
+This mode does not download the Attempt 10 artifact and does not request the official source endpoints. It obtains the verifier code from public canonical `main`, then locally checks the stored case/cutoff, candidate fingerprint, receipt semantics/hash, restrictive filesystem modes, exact manifest-listed raw-file set, exact raw bytes and the unchanged Investment Core Evidence/PIT validator. It reports only hashes, counts and statuses; it does not print company facts or numeric quote values.
+
+Expected successful status: `VERIFIED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED`.
+
+Missing files, loose permissions, symlinks, unlisted files, altered bytes, altered receipt claims, or a failed Core/PIT validator must remain `BLOCKED`. This mode is a durable-copy integrity/replay check, not a fresh source-origin check, formal signed admission, production Host acceptance, or a Decision.
+
 ## Verification
 
 tests/test_iios_private_605016_b2_ingest_v01.py covers exact referenced-byte persistence, private permissions, idempotence, core-validator fail-closed behavior, repository-root rejection, path traversal and official price-hash mismatch. The dedicated workflow is contract-only; it does not access the user's private machine or run the real intake.
