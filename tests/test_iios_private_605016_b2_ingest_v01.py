@@ -353,6 +353,128 @@ def test_real_investment_core_validator_replays_exact_manifest_bytes(tmp_path: P
 
 
 
+
+def _persist_mock_candidate(tmp_path: Path) -> tuple[Path, dict]:
+    input_root = _input_root(tmp_path)
+    private_root = tmp_path / "private-data"
+    result = MODULE.ingest_private_b2_candidate(
+        private_root=private_root,
+        repository_root=tmp_path / "repo",
+        attempt10_root=input_root,
+        adjudicator=_fake_adjudicator,
+        core_validator=_fake_core_validator,
+    )
+    return private_root, result
+
+
+def test_offline_verifier_replays_existing_candidate_without_source_download(tmp_path: Path, monkeypatch) -> None:
+    private_root, persisted = _persist_mock_candidate(tmp_path)
+
+    def forbidden_download(*_args, **_kwargs):
+        raise AssertionError("offline verifier must not redownload source artifacts")
+
+    monkeypatch.setattr(MODULE, "_download_attempt10", forbidden_download)
+    result = MODULE.verify_existing_private_b2_candidate(
+        private_root=private_root,
+        repository_root=tmp_path / "repo",
+        core_validator=_fake_core_validator,
+    )
+
+    assert result["status"] == "VERIFIED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED"
+    assert result["official_source_refetched"] is False
+    assert result["candidate_count"] == 1
+    assert result["candidates"][0]["candidate_fingerprint"] == persisted["candidate_fingerprint"]
+    assert result["candidates"][0]["manifest_sha256"] == persisted["manifest_sha256"]
+    assert result["formal_signed_admission_created"] is False
+    assert result["production_host_accepted"] is False
+    assert result["decision_created"] is False
+    assert result["auto_execution"] is False
+
+
+def test_offline_verifier_blocks_tampered_persisted_raw_bytes(tmp_path: Path) -> None:
+    private_root, persisted = _persist_mock_candidate(tmp_path)
+    raw_file = Path(persisted["evidence_root"]) / "raw" / "sse-market.json"
+    raw_file.write_bytes(raw_file.read_bytes() + b"tampered")
+
+    with pytest.raises(MODULE.PrivateIngestError, match="EXISTING_PRIVATE_CANDIDATE_FAILED_CORE_REPLAY"):
+        MODULE.verify_existing_private_b2_candidate(
+            private_root=private_root,
+            repository_root=tmp_path / "repo",
+            core_validator=_fake_core_validator,
+        )
+
+
+def test_offline_verifier_blocks_receipt_semantics_tamper_even_with_rehashed_receipt(tmp_path: Path) -> None:
+    private_root, persisted = _persist_mock_candidate(tmp_path)
+    receipt_path = Path(persisted["receipt_path"])
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["production_host_accepted"] = True
+    core = {key: value for key, value in receipt.items() if key != "receipt_sha256"}
+    receipt["receipt_sha256"] = MODULE._sha256(MODULE._canonical_bytes(core))
+    receipt_path.write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(MODULE.PrivateIngestError, match="EXISTING_PRIVATE_RECEIPT_SEMANTICS_MISMATCH:production_host_accepted"):
+        MODULE.verify_existing_private_b2_candidate(
+            private_root=private_root,
+            repository_root=tmp_path / "repo",
+            core_validator=_fake_core_validator,
+        )
+
+
+def test_offline_verifier_blocks_unlisted_raw_file(tmp_path: Path) -> None:
+    private_root, persisted = _persist_mock_candidate(tmp_path)
+    extra = Path(persisted["evidence_root"]) / "raw" / "unlisted.bin"
+    extra.write_bytes(b"must-not-be-present")
+    os.chmod(extra, 0o600)
+
+    with pytest.raises(MODULE.PrivateIngestError, match="EXISTING_PRIVATE_RAW_FILE_SET_MISMATCH"):
+        MODULE.verify_existing_private_b2_candidate(
+            private_root=private_root,
+            repository_root=tmp_path / "repo",
+            core_validator=_fake_core_validator,
+        )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission-mode contract")
+def test_offline_verifier_blocks_loose_private_file_permissions(tmp_path: Path) -> None:
+    private_root, persisted = _persist_mock_candidate(tmp_path)
+    raw_file = Path(persisted["evidence_root"]) / "raw" / "sse-market.json"
+    os.chmod(raw_file, 0o644)
+
+    with pytest.raises(MODULE.PrivateIngestError, match="PRIVATE_CANDIDATE_FILE_PERMISSIONS_TOO_OPEN"):
+        MODULE.verify_existing_private_b2_candidate(
+            private_root=private_root,
+            repository_root=tmp_path / "repo",
+            core_validator=_fake_core_validator,
+        )
+
+
+def test_cli_verify_existing_flag_does_not_call_ingester(tmp_path: Path, monkeypatch, capsys) -> None:
+    private_root = tmp_path / "private-data"
+    (tmp_path / "repo").mkdir()
+    expected = {
+        "status": "VERIFIED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
+        "official_source_refetched": False,
+        "formal_signed_admission_created": False,
+        "production_host_accepted": False,
+        "decision_created": False,
+        "auto_execution": False,
+    }
+    monkeypatch.setattr(sys, "argv", [
+        "iios_private_605016_b2_ingest_v01.py",
+        "--private-root", str(private_root),
+        "--repository-root", str(tmp_path / "repo"),
+        "--verify-existing",
+    ])
+    monkeypatch.setattr(MODULE, "verify_existing_private_b2_candidate", lambda **_kwargs: expected)
+    monkeypatch.setattr(MODULE, "ingest_private_b2_candidate", lambda **_kwargs: pytest.fail("ingester must not run"))
+
+    code = MODULE.main()
+    output = capsys.readouterr().out
+    assert code == 0
+    assert '"official_source_refetched": false' in output
+
+
 def test_main_renders_validation_error_as_blocked_json_not_traceback(monkeypatch, capsys) -> None:
     monkeypatch.setattr(sys, "argv", ["iios_private_605016_b2_ingest_v01.py"])
     monkeypatch.setattr(
