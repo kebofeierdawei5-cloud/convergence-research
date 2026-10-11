@@ -64,7 +64,7 @@ The operator can manually enter a value without naming a source. If a source is 
 ### Batch MP-1 — typed local input (implemented on feature branch; acceptance pending)
 - Added `iios_mvp/operator_entered_price_decision_input_v01.py`: interactive local entry for CN-A/HK, locally generated `entered_at` / decision-cutoff timestamps, explicit operator confirmation, quote timestamp and explicit `valid_until`.
 - Added private content-addressed `price-input.json` + value/source-claim-redacted `receipt.json`, mode-restricted non-overwrite, ownership/path checks and deterministic replay/provenance-flag validation.
-- Added `tests/test_operator_entered_price_decision_input_v01.py` with 22 guardrail cases, including provenance escalation, timestamp, private-path redaction, tilde-expanded symlink, and storage boundaries and wired it into `.github/workflows/iios_private_scenario_analysis.yml`.
+- Added `tests/test_operator_entered_price_decision_input_v01.py` with 23 guardrail cases, including provenance escalation, timestamp, unsupported A-share prefixes, private-path redaction, tilde-expanded symlink, and storage boundaries and wired it into `.github/workflows/iios_private_scenario_analysis.yml`.
 - This is only typed input and replay integrity. It deliberately leaves `decision_chain_bound=false`, `formal_evidence_pit_admission=false`, and `formal_decision_authority=false`. Exact-head CI/review must pass before MP-1 is accepted.
 
 ### Batch MP-2 — decision-chain integration
