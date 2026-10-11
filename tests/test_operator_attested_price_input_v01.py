@@ -11,6 +11,7 @@ from iios_mvp.operator_attested_price_input_v01 import (
     OperatorPriceInputError,
     build_sanitized_receipt,
     persist_operator_price_input,
+    resolve_scenario_price,
     validate_operator_price_payload,
 )
 
@@ -140,3 +141,24 @@ def test_duplicate_case_symbol_observation_rejected():
     row = _record()
     with pytest.raises(OperatorPriceInputError, match="DUPLICATE_CASE_SYMBOL_OBSERVATION"):
         validate_operator_price_payload(_payload([row, dict(row)]))
+
+
+def test_scenario_resolver_returns_price_without_canonical_admission_or_decision_authority():
+    normalized = validate_operator_price_payload(_payload())
+    resolved = resolve_scenario_price(
+        normalized,
+        base_case_id="RC-CN-A-002001-20261009",
+        symbol="002001",
+    )
+    assert resolved["current_price"] == "12.34"
+    assert resolved["status"] == "OPERATOR_ATTESTED_SCENARIO_INPUT_ONLY"
+    assert resolved["may_feed_scenario_valuation"] is True
+    assert resolved["may_feed_canonical_current_price_resolver"] is False
+    assert resolved["may_create_formal_decision"] is False
+    assert resolved["decision_authority"] is False
+
+
+def test_scenario_resolver_requires_unique_case_and_symbol_match():
+    normalized = validate_operator_price_payload(_payload())
+    with pytest.raises(OperatorPriceInputError, match="SCENARIO_PRICE_MATCH_MUST_BE_UNIQUE"):
+        resolve_scenario_price(normalized, base_case_id="not-this-case", symbol="002001")
