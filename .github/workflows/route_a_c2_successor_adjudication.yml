@@ -1,0 +1,75 @@
+name: IIOS Route A C2 Cutoff-Safe Successor Adjudication
+
+on:
+  pull_request:
+    paths:
+      - "tools/route_a_c2_adjudicate.py"
+      - "tests/test_route_a_c2_adjudicate.py"
+      - ".github/workflows/route_a_c2_successor_adjudication.yml"
+      - "research/b2/**"
+      - "schemas/evidence_record_v0.1.schema.json"
+      - "schemas/company_evidence_manifest_v0.1.schema.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  c2-successor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate commit
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install validator dependencies
+        run: python -m pip install --disable-pip-version-check pytest jsonschema pypdf
+      - name: Compile tool and tests
+        run: python -m compileall -q tools/route_a_c2_adjudicate.py tests/test_route_a_c2_adjudicate.py research/b2
+      - name: Run C2 source-contract tests
+        run: PYTHONPATH=. python -m pytest -q tests/test_route_a_c2_adjudicate.py
+      - name: Download immutable original Run #8 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: iios-company-evidence-37938129274
+          run-id: 37938129274
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          path: /tmp/iios-c2-run8-artifact
+      - name: Reverify pinned raw bytes and run unchanged Core/PIT validator
+        run: |
+          python tools/route_a_c2_adjudicate.py \
+            --archive-dir /tmp/iios-c2-run8-artifact \
+            --out-dir /tmp/iios-c2-successor
+      - name: Assert fail-closed expected C2 disposition
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/iios-c2-successor/C2_SOURCE_ADJUDICATION_REPORT.json").read_text(encoding="utf-8"))
+          assert report["archive_raw_integrity_status"] == "INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION"
+          assert report["captured_raw_object_count_verified"] == 8
+          assert report["fact_locator_count"] == 13
+          assert report["b2_manifest_status"] == "BLOCKED"
+          assert report["missing_required_field_groups"] == ["market_price"]
+          assert report["market_price"]["status"] == "BLOCKED_UNKNOWN"
+          assert report["formal_signed_admission_created"] is False
+          assert report["production_host_accepted"] is False
+          assert report["decision_created"] is False
+          assert report["publication_created"] is False
+          assert report["run_receipt_created"] is False
+          assert report["execution_authorized"] is False
+          print("C2 successor source/PIT boundary: PASS; market_price remains UNKNOWN and blocks final admission")
+          PY
+      - name: Upload sanitized status report only
+        uses: actions/upload-artifact@v4
+        with:
+          name: c2-source-adjudication-report
+          path: /tmp/iios-c2-successor/C2_SOURCE_ADJUDICATION_REPORT.json
+          if-no-files-found: error
+          retention-days: 14
