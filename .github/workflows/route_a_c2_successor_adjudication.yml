@@ -119,16 +119,6 @@ jobs:
           assert "99.99" not in (out / "C2_SOURCE_ADJUDICATION_REPORT.json").read_text(encoding="utf-8")
           print("Synthetic positive path PASS: 13 filing facts + 1 operator-price fixture cover all seven Core/PIT groups; no actual quote or formal decision was used.")
           PY
-      - name: Prepare code-only source archive for one-time private local replay
-        run: |
-          git archive --format=zip --output=/tmp/iios-c2-local-source.zip HEAD tools/route_a_c2_adjudicate.py tools/iios_operator_market_price_attestation_v01.py tools/verify_company_evidence_intake.py tools/company_evidence_intake.py research/b2 schemas
-      - name: Upload temporary code-only local replay package
-        uses: actions/upload-artifact@v4
-        with:
-          name: c2-local-source-${{ github.run_id }}
-          path: /tmp/iios-c2-local-source.zip
-          if-no-files-found: error
-          retention-days: 1
       - name: Upload sanitized status report only
         uses: actions/upload-artifact@v4
         with:
