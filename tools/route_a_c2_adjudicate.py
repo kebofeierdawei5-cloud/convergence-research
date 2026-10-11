@@ -474,7 +474,7 @@ def build_successor_manifest(root: Path, *, archive_verification_method: str) ->
             "value": spec["value"],
             "observation_date": spec["observation_date"],
             "period": spec["period"],
-            "published_at": known_at,
+            "published_at": vintage["publication_date"],
             "known_at": known_at,
             "retrieved_at": retrieved_at,
             "effective_from": None,
