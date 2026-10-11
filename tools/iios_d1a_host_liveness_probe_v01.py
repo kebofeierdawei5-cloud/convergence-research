@@ -71,7 +71,7 @@ def probe_host(host: str = "127.0.0.1", port: int = 8765, timeout: int = 3) -> d
             }
             if not ok:
                 blockers.append(path.lstrip("/") + "_CONTRACT_MISMATCH")
-        except (OSError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        except (OSError, TimeoutError, http.client.HTTPException, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
             code = str(exc) if isinstance(exc, ValueError) and str(exc).isupper() else "ENDPOINT_UNAVAILABLE_OR_INVALID"
             probes[path] = {
                 "http_status": None,
