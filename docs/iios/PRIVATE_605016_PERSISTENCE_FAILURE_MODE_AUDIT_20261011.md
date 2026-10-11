@@ -94,3 +94,19 @@ The operator's `--verify-existing` run returned `BLOCKED / UNEXPECTED_PRIVATE_IN
 **Corrective change under review:** make `_validate_core()` establish the import root explicitly from the effective `repository_root` argument and propagate that argument through persist-time and offline replay call sites. A regression test constructs an isolated temporary canonical-runtime package, removes that path and cached package modules from the test process, and proves the default validator import succeeds only after the function bootstraps the repository path.
 
 **Operator action:** do not rerun ingestion, do not fetch Attempt 10, and do not contact official source endpoints. After the fix is merged, repeat only the existing-candidate read-only verification once. A PASS verifies local storage integrity only; source-vintage review and production Host acceptance remain separate gates.
+
+
+## 7. Final replay outcome after PR #327 — PASS — 2026-10-11
+
+The operator supplied the output of the read-only `--verify-existing` run after PR #327 had been merged.
+
+- Status: `VERIFIED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED`.
+- Candidate count: 1.
+- Candidate fingerprint: `c6b78f0185e27ddb089af723f1811ec00185775ca3dbbd679a933a887c566350`.
+- Private manifest SHA-256: `034a4b5de2693d725422d9fb740ba4d5364a63b6b080531ee15a9b1bfff1a7da`.
+- Evidence records: 11; artifact declarations: 11; unique physical raw files: 8; Core/PIT validator: PASS.
+- `official_source_refetched=false`; signed admission, production Host acceptance, request bundle and Decision remain false; Human Approval remains required; auto execution remains false.
+
+This closes the outstanding **local storage-integrity confirmation**. PR #327's import-path fix is no longer merely under review: it is merged to canonical `main`, and its exact-head private persistence contract completed 48/48 tests, with State Hygiene, independent red-team and the related workflow set passing.
+
+The record must not be over-interpreted. The replay does not establish the exact first-public timestamp of the 2026-10-08 historical quote. `exact_first_public_timestamp_verified=false` and `source_vintage_review_required=true` therefore remain in force. The next engineering task is a separate source-vintage/PIT policy adjudication; do not rerun ingestion or this already-passing storage verifier as a substitute for that work.
