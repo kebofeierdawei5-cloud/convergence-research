@@ -1,7 +1,7 @@
 # 605016 — Local Private B2/PIT Persistence — 2026-10-10
 
 **Scope:** persist the real official-HTTPS B2 candidate and exact raw bytes in a user-controlled local private data root.  
-**Status:** implementation candidate; exact-head contract tests required; no private host can be reached from GitHub-hosted CI.
+**Status:** operator-reported local private persistence PASS on 2026-10-11; a read-only offline replay after atomic promotion is the remaining storage-integrity confirmation. GitHub-hosted CI cannot inspect the user's private filesystem.
 
 ## One-launcher operation
 

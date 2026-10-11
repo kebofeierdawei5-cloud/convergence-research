@@ -184,6 +184,67 @@ def test_persists_only_manifest_referenced_bytes_and_keeps_production_gates_open
     assert receipt["receipt_sha256"]
 
 
+def test_raw_copy_preflights_all_hashes_before_creating_destination(tmp_path: Path) -> None:
+    source_root = tmp_path / "source"
+    (source_root / "raw").mkdir(parents=True)
+    good = b'{"valid":true}'
+    bad = b'{"valid":false}'
+    (source_root / "raw" / "good.json").write_bytes(good)
+    (source_root / "raw" / "bad.json").write_bytes(bad)
+    destination_root = tmp_path / "private-stage"
+
+    declarations = [
+        {
+            "evidence_id": "fact-good",
+            "relative_path": "raw/good.json",
+            "expected_size_bytes": len(good),
+            "expected_sha256": hashlib.sha256(good).hexdigest(),
+        },
+        {
+            "evidence_id": "fact-bad",
+            "relative_path": "raw/bad.json",
+            "expected_size_bytes": len(bad),
+            "expected_sha256": "0" * 64,
+        },
+    ]
+    with pytest.raises(MODULE.PrivateIngestError, match="RAW_ARTIFACT_EXACT_BYTES_MISMATCH"):
+        MODULE._copy_exact_artifacts(
+            source_root=source_root,
+            destination_root=destination_root,
+            declarations=declarations,
+        )
+    # A good earlier declaration must not be copied before a later hash fails.
+    assert not destination_root.exists()
+
+
+def test_raw_copy_rejects_symlinked_source_before_creating_destination(tmp_path: Path) -> None:
+    source_root = tmp_path / "source"
+    raw_dir = source_root / "raw"
+    raw_dir.mkdir(parents=True)
+    target = raw_dir / "original.json"
+    target.write_bytes(RAW)
+    link = raw_dir / "alias.json"
+    try:
+        link.symlink_to(target.name)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable in this test environment")
+    destination_root = tmp_path / "private-stage"
+
+    declarations = [{
+        "evidence_id": "fact-through-link",
+        "relative_path": "raw/alias.json",
+        "expected_size_bytes": len(RAW),
+        "expected_sha256": RAW_SHA,
+    }]
+    with pytest.raises(MODULE.PrivateIngestError, match="RAW_ARTIFACT_SOURCE_SYMLINK_FORBIDDEN"):
+        MODULE._copy_exact_artifacts(
+            source_root=source_root,
+            destination_root=destination_root,
+            declarations=declarations,
+        )
+    assert not destination_root.exists()
+
+
 def test_private_persistence_allows_multiple_evidence_records_to_share_exact_raw_source(
     tmp_path: Path,
 ) -> None:
@@ -218,7 +279,10 @@ def test_private_persistence_allows_multiple_evidence_records_to_share_exact_raw
     )
 
     assert result["status"] == "PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED"
-    assert result["raw_artifact_count"] == 2
+    assert result["raw_artifact_count"] == 2  # legacy alias: manifest declarations
+    assert result["raw_artifact_declaration_count"] == 2
+    assert result["unique_raw_file_count"] == 1
+    assert result["raw_artifact_count_semantics"] == "MANIFEST_DECLARATIONS_NOT_UNIQUE_FILES"
     persisted_raw = Path(result["evidence_root"]) / "raw" / "sse-market.json"
     assert persisted_raw.read_bytes() == RAW
     assert len([path for path in (Path(result["evidence_root"]) / "raw").iterdir() if path.is_file()]) == 1
@@ -232,6 +296,9 @@ def test_private_persistence_allows_multiple_evidence_records_to_share_exact_raw
     )
     assert verified["status"] == "VERIFIED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED"
     assert verified["candidates"][0]["raw_artifact_count"] == 2
+    assert verified["candidates"][0]["raw_artifact_declaration_count"] == 2
+    assert verified["candidates"][0]["unique_raw_file_count"] == 1
+    assert verified["candidates"][0]["raw_artifact_count_semantics"] == "MANIFEST_DECLARATIONS_NOT_UNIQUE_FILES"
 
 
 def test_shared_raw_path_with_conflicting_byte_contract_fails_before_any_write(tmp_path: Path) -> None:

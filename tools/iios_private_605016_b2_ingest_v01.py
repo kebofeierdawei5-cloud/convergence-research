@@ -685,64 +685,84 @@ def _copy_exact_artifacts(
 ) -> int:
     source_base = source_root.resolve(strict=True)
 
-    # The manifest contract is evidence-centric: multiple admitted facts may
-    # reference the same original PDF/HTML/JSON bytes, so raw_artifacts can
-    # legitimately contain repeated relative_path values. Preflight all shared
-    # path contracts before creating output. A path can be shared only when
-    # every declaration agrees on the exact size and SHA-256.
+    # First validate the whole manifest's path/hash contract, then load and
+    # verify every unique source byte object, and only then create/write the
+    # private destination. This keeps malformed later declarations from
+    # producing even a partial staged copy.
     normalized: list[tuple[Mapping[str, Any], PurePosixPath, str]] = []
-    path_contracts: dict[str, tuple[Any, Any]] = {}
+    path_contracts: dict[str, tuple[int, str]] = {}
     for declaration in declarations:
         if not isinstance(declaration, Mapping):
             raise PrivateIngestError("RAW_ARTIFACT_DECLARATION_INVALID")
         relative = _safe_relative_path(declaration.get("relative_path"))
         relative_key = relative.as_posix()
-        contract = (declaration.get("expected_size_bytes"), declaration.get("expected_sha256"))
+        expected_size = declaration.get("expected_size_bytes")
+        expected_hash = declaration.get("expected_sha256")
+        if (
+            type(expected_size) is not int
+            or expected_size < 0
+            or not isinstance(expected_hash, str)
+            or re.fullmatch(r"[0-9a-f]{64}", expected_hash) is None
+        ):
+            raise PrivateIngestError("RAW_ARTIFACT_DECLARATION_INVALID")
+        contract = (expected_size, expected_hash)
         previous = path_contracts.get(relative_key)
         if previous is not None and previous != contract:
             raise PrivateIngestError("RAW_ARTIFACT_PATH_CONTRACT_CONFLICT")
         path_contracts[relative_key] = contract
         normalized.append((declaration, relative, relative_key))
 
-    _make_private_directory(destination_root)
-    written_paths: set[str] = set()
-    verified_declarations = 0
-    for declaration, relative, relative_key in normalized:
-        source = (source_base / Path(*relative.parts)).resolve(strict=True)
+    source_bytes: dict[str, bytes] = {}
+    for _declaration, relative, relative_key in normalized:
+        if relative_key in source_bytes:
+            continue
+        unresolved_source = source_base
+        for part in relative.parts:
+            unresolved_source = unresolved_source / part
+            if unresolved_source.is_symlink():
+                raise PrivateIngestError("RAW_ARTIFACT_SOURCE_SYMLINK_FORBIDDEN")
+        try:
+            source = unresolved_source.resolve(strict=True)
+        except FileNotFoundError as exc:
+            raise PrivateIngestError("RAW_ARTIFACT_SOURCE_MISSING") from exc
         try:
             source.relative_to(source_base)
         except ValueError as exc:
             raise PrivateIngestError("RAW_ARTIFACT_PATH_ESCAPE") from exc
-        if not source.is_file() or source.is_symlink():
+        if not source.is_file():
             raise PrivateIngestError("RAW_ARTIFACT_SOURCE_NOT_REGULAR_FILE")
-        raw = source.read_bytes()
+        source_bytes[relative_key] = source.read_bytes()
+
+    # Compare each manifest declaration to the fully read-and-hashed source
+    # bytes before any destination directory or output file is created.
+    for declaration, _relative, relative_key in normalized:
+        raw = source_bytes[relative_key]
         expected_size = declaration.get("expected_size_bytes")
         expected_hash = declaration.get("expected_sha256")
-        if (
-            not isinstance(expected_size, int)
-            or len(raw) != expected_size
-            or not isinstance(expected_hash, str)
-            or _sha256(raw) != expected_hash
-        ):
+        if len(raw) != expected_size or _sha256(raw) != expected_hash:
             raise PrivateIngestError("RAW_ARTIFACT_EXACT_BYTES_MISMATCH")
 
-        # Re-verify every evidence reference above, but store a shared original
-        # source file only once. Receipts still count manifest declarations,
-        # not unique filesystem paths.
-        if relative_key not in written_paths:
-            target = destination_root.joinpath(*relative.parts)
-            _make_private_directory(target.parent)
-            try:
-                with target.open("xb") as handle:
-                    handle.write(raw)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.chmod(target, 0o600)
-            except FileExistsError as exc:
-                raise PrivateIngestError("RAW_ARTIFACT_WRITE_COLLISION") from exc
-            written_paths.add(relative_key)
-        verified_declarations += 1
-    return verified_declarations
+    _make_private_directory(destination_root)
+    written_paths: set[str] = set()
+    for _declaration, relative, relative_key in normalized:
+        # The bytes were captured and validated before writes, so every written
+        # byte is exactly the byte sequence whose size/hash the manifest names.
+        if relative_key in written_paths:
+            continue
+        target = destination_root.joinpath(*relative.parts)
+        _make_private_directory(target.parent)
+        try:
+            with target.open("xb") as handle:
+                handle.write(source_bytes[relative_key])
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(target, 0o600)
+        except FileExistsError as exc:
+            raise PrivateIngestError("RAW_ARTIFACT_WRITE_COLLISION") from exc
+        written_paths.add(relative_key)
+    # Backward-compatible receipt field: the count is evidence declarations,
+    # not unique physical raw files; shared source bytes are only written once.
+    return len(normalized)
 
 
 def _validate_core(
@@ -891,7 +911,11 @@ def _verify_private_candidate_contents(candidate_dir: Path, *, validator: Callab
     return {
         "candidate_fingerprint": fingerprint,
         "manifest_sha256": manifest_sha,
+        # Legacy field means declaration count; shared raw paths are counted separately.
         "raw_artifact_count": len(declarations),
+        "raw_artifact_declaration_count": len(declarations),
+        "unique_raw_file_count": len(expected_paths),
+        "raw_artifact_count_semantics": "MANIFEST_DECLARATIONS_NOT_UNIQUE_FILES",
         "evidence_record_count": len(manifest.get("evidence") or []),
         "core_validator_status": "PASS",
         "source_vintage_review_required": True,
@@ -1035,6 +1059,12 @@ def ingest_private_b2_candidate(
                 "manifest_path": str(destination / "company_evidence_manifest.json"),
                 "evidence_root": str(destination / "evidence_root"),
                 "raw_artifact_count": len(raw_declarations),
+                "raw_artifact_declaration_count": len(raw_declarations),
+                "unique_raw_file_count": len({
+                    _safe_relative_path(item.get("relative_path")).as_posix()
+                    for item in raw_declarations if isinstance(item, Mapping)
+                }),
+                "raw_artifact_count_semantics": "MANIFEST_DECLARATIONS_NOT_UNIQUE_FILES",
                 "evidence_record_count": len(manifest.get("evidence") or []),
                 "core_validator_status": "PASS",
                 "exact_first_public_timestamp_verified": False,
@@ -1137,6 +1167,12 @@ def ingest_private_b2_candidate(
             "evidence_root": str(destination / "evidence_root"),
             "receipt_path": str(destination / "PRIVATE_B2_PERSISTENCE_RECEIPT.json"),
             "raw_artifact_count": copied_count,
+            "raw_artifact_declaration_count": copied_count,
+            "unique_raw_file_count": len({
+                _safe_relative_path(item.get("relative_path")).as_posix()
+                for item in raw_declarations if isinstance(item, Mapping)
+            }),
+            "raw_artifact_count_semantics": "MANIFEST_DECLARATIONS_NOT_UNIQUE_FILES",
             "evidence_record_count": len(manifest.get("evidence") or []),
             "core_validator_status": "PASS",
             "exact_first_public_timestamp_verified": False,
