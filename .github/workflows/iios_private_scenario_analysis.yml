@@ -1,4 +1,5 @@
 name: IIOS Private Path A Scenario Analysis
+# Includes MP-1 operator-entered price intake; no private input or price values enter CI artifacts.
 
 on:
   pull_request:
