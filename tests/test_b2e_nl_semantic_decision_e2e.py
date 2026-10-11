@@ -948,7 +948,10 @@ def test_persisted_b2e_blocks_stale_operator_record_hash_before_decision(tmp_pat
 def test_persisted_b2e_blocks_wrong_operator_currency_before_decision(tmp_path):
     case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
     evidence_root, manifest, _manifest_path = _admitted_synthetic_manifest(tmp_path, case)
-    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case, currency="HKD")
+    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case)
+    # Keep the underlying A-share input valid (CNY), but tamper the case-side
+    # currency declaration so trusted resolution must reject the mismatch.
+    case["current_price_observation"]["currency"] = "HKD"
     run_root = tmp_path / "operator-price-currency-mismatch-run"
 
     with pytest.raises(B2EE2EError, match="OPERATOR_PRICE_CURRENCY_MISMATCH"):
