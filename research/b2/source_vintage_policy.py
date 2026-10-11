@@ -32,7 +32,7 @@ RULE_TITLE = "上海证券交易所交易规则（2026年修订）"
 RULE_DOCUMENT_NO = "上证发〔2026〕41号"
 RULE_PUBLISHED_ON = "2026-04-24"
 RULE_EFFECTIVE_ON = "2026-07-06"
-RULE_SECTIONS = {
+RULE_RAW_BYTES_LIMITATION = (\n    "Official page content and rule clauses were reviewed; the HTML/DOCX source bytes were "\n    "not materialized into the private evidence store in this run, so no rule-byte SHA-256 is claimed."\n)\nRULE_SECTIONS = {
     "3.7.2": "盘后固定价格交易以当日收盘价成交，交易时段为15:05至15:30。",
     "3.7.9": "15:05至15:30盘后固定价格交易阶段纳入即时行情，行情内容包括收盘价。",
     "5.1.1": "上交所每个交易日实时发布证券交易即时行情。",
@@ -180,6 +180,7 @@ def validate_source_vintage_adjudication(
         "price_observation_date": PRICE_OBSERVATION_DATE,
         "price_content_sha256": expected_price_sha256,
         "public_availability_upper_bound": PUBLIC_AVAILABILITY_UPPER_BOUND,
+        "cutoff_comparison": "PASS_UPPER_BOUND_STRICTLY_BEFORE_DATE_ONLY_CUTOFF_START",
         "exact_first_public_timestamp_verified": False,
         "source_endpoint_first_public_timestamp_verified": False,
         "source_vintage_review_required": False,
@@ -194,6 +195,7 @@ def validate_source_vintage_adjudication(
             "sections": RULE_SECTIONS,
             "raw_rule_bytes_materialized": False,
             "raw_rule_bytes_sha256": None,
+            "raw_rule_bytes_limitation": RULE_RAW_BYTES_LIMITATION,
         },
     }
     for field, value in expected.items():
