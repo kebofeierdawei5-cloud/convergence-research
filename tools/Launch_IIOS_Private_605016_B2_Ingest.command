@@ -29,8 +29,8 @@ fail() {
 }
 
 case "$MODE" in
-  ingest|--verify-existing) ;;
-  *) fail "参数应为 --verify-existing，或留空执行正式取证导入。" ;;
+  ingest|--verify-existing|--adjudicate-source-vintage) ;;
+  *) fail "参数可为 --verify-existing、--adjudicate-source-vintage，或留空执行正式取证导入。" ;;
 esac
 
 command -v git >/dev/null 2>&1 || fail "未找到 git。请先安装 Xcode Command Line Tools。"
@@ -59,6 +59,14 @@ if [ "$MODE" = "ingest" ]; then
   "$WORKDIR/venv/bin/python" "$WORKDIR/repo/tools/iios_private_605016_b2_ingest_v01.py" \
     --private-root "$PRIVATE_ROOT" \
     --repository-root "$WORKDIR/repo"
+elif [ "$MODE" = "--adjudicate-source-vintage" ]; then
+  printf '[IIOS] 仅基于已存在的本机私有副本进行来源时点上界裁决；不会下载 Attempt 10 或请求官方行情源。\n'
+  printf '[IIOS] 依据上交所现行交易规则建立收盘价公开可获得时间的保守上界；精确首次发布时间仍不声称已知。\n'
+  printf '[IIOS] 本步骤从公开 GitHub 获取代码，不需要 GitHub CLI 登录。\n\n'
+  "$WORKDIR/venv/bin/python" "$WORKDIR/repo/tools/iios_private_605016_b2_ingest_v01.py" \
+    --private-root "$PRIVATE_ROOT" \
+    --repository-root "$WORKDIR/repo" \
+    --adjudicate-source-vintage
 else
   printf '[IIOS] 只验证已存在的本机私有副本；不会下载 Attempt 10 或重新请求官方行情源。\n'
   printf '[IIOS] 本步骤仍需从公开 GitHub 获取验证代码，不需要 GitHub CLI 登录。\n\n'
@@ -68,4 +76,4 @@ else
     --verify-existing
 fi
 
-printf '\n[IIOS] 校验通过不等于生产 Host 验收；来源首次发布时间精度审查仍保留为待处理项。\n'
+printf '\n[IIOS] 精确首次发布时间仍未证实；该结果不等于正式签署准入、生产 Host 验收或投资决策授权。\n'

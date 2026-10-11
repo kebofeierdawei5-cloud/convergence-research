@@ -110,3 +110,17 @@ The operator supplied the output of the read-only `--verify-existing` run after 
 This closes the outstanding **local storage-integrity confirmation**. PR #327's import-path fix is no longer merely under review: it is merged to canonical `main`, and its exact-head private persistence contract completed 48/48 tests, with State Hygiene, independent red-team and the related workflow set passing.
 
 The record must not be over-interpreted. The replay does not establish the exact first-public timestamp of the 2026-10-08 historical quote. `exact_first_public_timestamp_verified=false` and `source_vintage_review_required=true` therefore remain in force. The next engineering task is a separate source-vintage/PIT policy adjudication; do not rerun ingestion or this already-passing storage verifier as a substitute for that work.
+
+
+## 8. C1 source-vintage/PIT bounded adjudication — 2026-10-11
+
+The local storage gate was closed by the operator's read-only replay (Section 7). PR [#329](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/329) now implements a separate bounded-public-availability adjudication:
+
+- Official source: SSE `上海证券交易所交易规则（2026年修订）`, document `上证发〔2026〕41号`, published 2026-04-24, effective 2026-07-06; URL: https://www.sse.com.cn/lawandrules/sselawsrules2025/stocks/exchange/c/c_20260424_10816482.shtml.
+- Rules §§3.7.2, 3.7.9 and 5.1.1 are used to justify `2026-10-08T15:30:00+08:00` as a conservative upper bound on public availability of the prior session's close. It is an upper bound for PIT ordering, not a claimed exact historical endpoint publication time.
+- The source-vintage receipt binds the previous event-time value, price evidence ID, original raw-byte SHA-256, policy/rule identity and strict cutoff comparison. It validates the exact stored raw price file again and re-runs the unchanged Core/PIT validator.
+- The original private candidate (fingerprint and manifest hash already recorded above) is never modified. Migration writes a new immutable content-addressed successor, validates it before atomic promotion, and retains the original for comparison/rollback. Re-running the migration is idempotent.
+- Exact endpoint first-public timestamp remains unknown by design: `exact_first_public_timestamp_verified=false`. The official rule page bytes were not materialized/hashes in this run; the policy records `raw_rule_bytes_materialized=false` and `raw_rule_bytes_sha256=null`.
+- Code CI on head `ddce63396904c9ab696ddfe784e8a3b94ab55b82`: private persistence contract **53/53 PASS**; B2 Evidence/PIT **31/31 PASS**; company Evidence/PIT **23/23 PASS**; B2 scope **3/3 PASS**; compile/shell/schema/diff checks pass. These are code tests, not a statement that the operator's private successor migration has executed.
+- Local successor migration is **not yet run**. Do not execute it before the PR is merged and the final docs-updated HEAD passes CI. After merge, use launcher `--adjudicate-source-vintage`; it needs public GitHub source access but does not need `gh` authentication and does not download Attempt 10 or query official market sources.
+- The new bound clears this specific cutoff-ordering issue only. It does not create formal signed admission, Production Host acceptance, a bundle, or a Decision and does not establish an exact endpoint first-public timestamp.

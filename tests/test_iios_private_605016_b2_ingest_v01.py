@@ -161,7 +161,9 @@ def test_persists_only_manifest_referenced_bytes_and_keeps_production_gates_open
 
     assert result["status"] == "PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED"
     assert result["core_validator_status"] == "PASS"
-    assert result["source_vintage_review_required"] is True
+    assert result["source_vintage_review_required"] is False
+    assert result["source_vintage_status"] == "BOUNDED_PUBLIC_AVAILABILITY_ACCEPTED_FOR_PIT"
+    assert result["public_availability_upper_bound"] == "2026-10-08T15:30:00+08:00"
     assert result["exact_first_public_timestamp_verified"] is False
     assert result["formal_signed_admission_created"] is False
     assert result["production_host_accepted"] is False
@@ -179,9 +181,125 @@ def test_persists_only_manifest_referenced_bytes_and_keeps_production_gates_open
 
     receipt = json.loads(Path(result["receipt_path"]).read_text(encoding="utf-8"))
     assert receipt["receipt_is_cryptographically_signed"] is False
-    assert receipt["source_vintage_review_required"] is True
+    assert receipt["source_vintage_review_required"] is False
+    assert receipt["source_vintage_status"] == "BOUNDED_PUBLIC_AVAILABILITY_ACCEPTED_FOR_PIT"
+    assert receipt["source_vintage_adjudication_sha256"]
+    assert receipt["official_price_known_at"] == "2026-10-08T15:30:00+08:00"
     assert "20.22" not in json.dumps(receipt)
     assert receipt["receipt_sha256"]
+
+
+def test_source_vintage_policy_sets_only_a_conservative_official_public_availability_bound(
+    tmp_path: Path,
+) -> None:
+    from research.b2.source_vintage_policy import (
+        PUBLIC_AVAILABILITY_UPPER_BOUND,
+        adjudicate_605016_source_vintage,
+        validate_source_vintage_adjudication,
+    )
+
+    raw_root = tmp_path / "source-root"
+    raw_path = raw_root / "raw" / "sse-market.json"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_bytes(RAW)
+    original = _manifest()
+    original_known_at = original["evidence"][0]["known_at"]
+
+    first = adjudicate_605016_source_vintage(
+        original,
+        raw_root=raw_root,
+        expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+        core_validator=_fake_core_validator,
+    )
+    replay = adjudicate_605016_source_vintage(
+        original,
+        raw_root=raw_root,
+        expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+        core_validator=_fake_core_validator,
+    )
+
+    assert first["status"] == "PASS"
+    assert first["evidence"][0]["known_at"] == PUBLIC_AVAILABILITY_UPPER_BOUND
+    assert first["evidence"][0]["known_at_basis"].startswith("OFFICIAL_SSE_PUBLIC_AVAILABILITY_UPPER_BOUND")
+    assert first["evidence"][0]["first_public_time_precision"] == (
+        "OFFICIAL_RULE_UPPER_BOUND_15_30; EXACT_ENDPOINT_FIRST_PUBLIC_TIMESTAMP_UNVERIFIED"
+    )
+    assert first["source_vintage_adjudication"]["decision"] == "BOUNDED_PUBLIC_AVAILABILITY_ACCEPTED_FOR_PIT"
+    assert first["source_vintage_adjudication"]["rule_source"]["raw_rule_bytes_materialized"] is False
+    assert first["source_vintage_adjudication"]["rule_source"]["raw_rule_bytes_sha256"] is None
+    assert first["source_vintage_adjudication"]["exact_first_public_timestamp_verified"] is False
+    assert first["status"] == "PASS"
+    assert first["validation_errors"] == []
+    assert original["evidence"][0]["known_at"] == original_known_at
+    assert replay["source_vintage_adjudication"]["adjudication_sha256"] == (
+        first["source_vintage_adjudication"]["adjudication_sha256"]
+    )
+    assert MODULE._candidate_fingerprint(replay) == MODULE._candidate_fingerprint(first)
+    state = validate_source_vintage_adjudication(
+        first,
+        raw_root=raw_root,
+        expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+    )
+    assert state["source_vintage_review_required"] is False
+    assert state["exact_first_public_timestamp_verified"] is False
+    assert raw_path.read_bytes() == RAW
+
+
+def test_source_vintage_policy_blocks_wrong_origin_or_changed_original_bytes(tmp_path: Path) -> None:
+    from research.b2.source_vintage_policy import (
+        SourceVintageAdjudicationError,
+        adjudicate_605016_source_vintage,
+    )
+
+    raw_root = tmp_path / "source-root"
+    raw_path = raw_root / "raw" / "sse-market.json"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_bytes(RAW)
+    bad_origin = _manifest()
+    bad_origin["evidence"][0]["source_ref"] = "https://example.com/605016"
+    with pytest.raises(SourceVintageAdjudicationError, match="SOURCE_VINTAGE_PRICE_SOURCE_ORIGIN_MISMATCH"):
+        adjudicate_605016_source_vintage(
+            bad_origin,
+            raw_root=raw_root,
+            expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+            core_validator=_fake_core_validator,
+        )
+
+    bad_bytes = _manifest()
+    raw_path.write_bytes(RAW + b"altered")
+    with pytest.raises(SourceVintageAdjudicationError, match="SOURCE_VINTAGE_RAW_SIZE_MISMATCH|SOURCE_VINTAGE_RAW_SHA256_MISMATCH"):
+        adjudicate_605016_source_vintage(
+            bad_bytes,
+            raw_root=raw_root,
+            expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+            core_validator=_fake_core_validator,
+        )
+
+
+def test_source_vintage_policy_replay_blocks_tampered_policy_record(tmp_path: Path) -> None:
+    from research.b2.source_vintage_policy import (
+        SourceVintageAdjudicationError,
+        adjudicate_605016_source_vintage,
+        validate_source_vintage_adjudication,
+    )
+
+    raw_root = tmp_path / "source-root"
+    raw_path = raw_root / "raw" / "sse-market.json"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_bytes(RAW)
+    manifest = adjudicate_605016_source_vintage(
+        _manifest(),
+        raw_root=raw_root,
+        expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+        core_validator=_fake_core_validator,
+    )
+    manifest["source_vintage_adjudication"]["rule_source"]["title"] = "tampered"
+    with pytest.raises(SourceVintageAdjudicationError, match="SOURCE_VINTAGE_ADJUDICATION_HASH_MISMATCH"):
+        validate_source_vintage_adjudication(
+            manifest,
+            raw_root=raw_root,
+            expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+        )
 
 
 def test_raw_copy_preflights_all_hashes_before_creating_destination(tmp_path: Path) -> None:
@@ -597,6 +715,133 @@ def _persist_mock_candidate(tmp_path: Path) -> tuple[Path, dict]:
     return private_root, result
 
 
+def _persist_legacy_unreviewed_candidate(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """Build a realistic v0.1 private candidate, without source re-fetch."""
+    repository_root = tmp_path / "repo"
+    repository_root.mkdir(exist_ok=True)
+    source_root = tmp_path / "legacy-source"
+    raw_path = source_root / "raw" / "sse-market.json"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_bytes(RAW)
+    manifest = _manifest()
+
+    private_root = tmp_path / "private-data"
+    MODULE._make_private_directory(private_root)
+    cases_root = private_root / "cases"
+    case_root = cases_root / MODULE.CASE_ID
+    MODULE._make_private_directory(cases_root)
+    MODULE._make_private_directory(case_root)
+    fingerprint = MODULE._candidate_fingerprint(manifest)
+    candidate_dir = case_root / fingerprint
+    MODULE._make_private_directory(candidate_dir)
+    evidence_root = candidate_dir / "evidence_root"
+    copied_count = MODULE._copy_exact_artifacts(
+        source_root=source_root,
+        destination_root=evidence_root,
+        declarations=manifest["raw_artifacts"],
+    )
+    assert copied_count == len(manifest["raw_artifacts"])
+
+    manifest_path = candidate_dir / "company_evidence_manifest.json"
+    _write_json(manifest_path, manifest)
+    os.chmod(manifest_path, 0o600)
+    price = manifest["evidence"][0]
+    receipt_core = {
+        "schema_version": "IIOS-LOCAL-PRIVATE-B2-PERSISTENCE-0.1",
+        "status": "PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
+        "case_id": MODULE.CASE_ID,
+        "cutoff_date": MODULE.CUTOFF_DATE,
+        "created_at": "2026-10-11T00:00:00+00:00",
+        "candidate_fingerprint": fingerprint,
+        "manifest_sha256": MODULE._sha256(manifest_path.read_bytes()),
+        "manifest_audit_sha256": manifest["audit"]["manifest_sha256"],
+        "official_price_source_sha256": MODULE.EXPECTED_PRICE_RAW_SHA256,
+        "official_price_observation_date": "2026-10-08",
+        "official_price_known_at": price["known_at"],
+        "official_price_known_at_basis": price["known_at_basis"],
+        "exact_first_public_timestamp_verified": False,
+        "source_vintage_review_required": True,
+        "evidence_record_count": len(manifest["evidence"]),
+        "raw_artifact_count": copied_count,
+        "admitted_field_group_count": len(MODULE.REQUIRED_FIELD_GROUPS_FOR_REPORT),
+        "missing_required_field_group_count": 0,
+        "core_validator": "iios_mvp.canonical_evidence_admission_v01.validate_company_evidence_manifest",
+        "core_validator_status": "PASS",
+        "storage_scope": "LOCAL_PRIVATE_INTERNAL_USE_ONLY",
+        "source_reuse_disposition": "RESTRICTED_NO_REDISTRIBUTION; private internal research use only",
+        "receipt_is_cryptographically_signed": False,
+        "formal_signed_admission_created": False,
+        "production_host_accepted": False,
+        "bundle_created": False,
+        "decision_created": False,
+        "human_approval_required": True,
+        "auto_execution": False,
+    }
+    receipt = dict(receipt_core)
+    receipt["receipt_sha256"] = MODULE._sha256(MODULE._canonical_bytes(receipt_core))
+    receipt_path = candidate_dir / "PRIVATE_B2_PERSISTENCE_RECEIPT.json"
+    _write_json(receipt_path, receipt)
+    os.chmod(receipt_path, 0o600)
+    return private_root, repository_root, candidate_dir
+
+
+def test_source_vintage_migration_creates_new_immutable_candidate_without_refetch(
+    tmp_path: Path, monkeypatch
+) -> None:
+    private_root, repository_root, original_dir = _persist_legacy_unreviewed_candidate(tmp_path)
+    original_manifest_bytes = (original_dir / "company_evidence_manifest.json").read_bytes()
+    original_raw_bytes = (original_dir / "evidence_root" / "raw" / "sse-market.json").read_bytes()
+
+    def forbidden_download(*_args, **_kwargs):
+        raise AssertionError("source-vintage migration must not download source data")
+
+    monkeypatch.setattr(MODULE, "_download_attempt10", forbidden_download)
+    result = MODULE.adjudicate_existing_private_b2_candidate(
+        private_root=private_root,
+        repository_root=repository_root,
+        core_validator=_fake_core_validator,
+    )
+
+    assert result["status"] == "SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED"
+    assert result["source_vintage_status"] == "BOUNDED_PUBLIC_AVAILABILITY_ACCEPTED_FOR_PIT"
+    assert result["source_vintage_review_required"] is False
+    assert result["exact_first_public_timestamp_verified"] is False
+    assert result["official_source_refetched"] is False
+    assert result["attempt10_downloaded"] is False
+    assert result["previous_candidate_retained"] is True
+    assert result["formal_signed_admission_created"] is False
+    assert result["production_host_accepted"] is False
+    assert result["decision_created"] is False
+    assert (original_dir / "company_evidence_manifest.json").read_bytes() == original_manifest_bytes
+    assert (original_dir / "evidence_root" / "raw" / "sse-market.json").read_bytes() == original_raw_bytes
+
+    replay = MODULE.verify_existing_private_b2_candidate(
+        private_root=private_root,
+        repository_root=repository_root,
+        core_validator=_fake_core_validator,
+    )
+    assert replay["candidate_count"] == 2
+    assert replay["active_candidate_fingerprint"] == result["candidate_fingerprint"]
+    assert replay["source_vintage_review_required"] is False
+    assert replay["official_source_refetched"] is False
+    old_candidates = [item for item in replay["candidates"] if item["source_vintage_review_required"]]
+    new_candidates = [item for item in replay["candidates"] if not item["source_vintage_review_required"]]
+    assert len(old_candidates) == 1
+    assert len(new_candidates) == 1
+    assert new_candidates[0]["candidate_fingerprint"] != old_candidates[0]["candidate_fingerprint"]
+    successor_dir = private_root / "cases" / MODULE.CASE_ID / result["candidate_fingerprint"]
+    assert (successor_dir / "evidence_root" / "raw" / "sse-market.json").read_bytes() == RAW
+
+    repeat = MODULE.adjudicate_existing_private_b2_candidate(
+        private_root=private_root,
+        repository_root=repository_root,
+        core_validator=_fake_core_validator,
+    )
+    assert repeat["status"] == "ALREADY_SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED"
+    assert repeat["candidate_fingerprint"] == result["candidate_fingerprint"]
+    assert len(list((private_root / "cases" / MODULE.CASE_ID).iterdir())) == 2
+
+
 def test_offline_verifier_replays_existing_candidate_without_source_download(tmp_path: Path, monkeypatch) -> None:
     private_root, persisted = _persist_mock_candidate(tmp_path)
 
@@ -740,6 +985,45 @@ def test_cli_verify_existing_flag_does_not_call_ingester(tmp_path: Path, monkeyp
     output = capsys.readouterr().out
     assert code == 0
     assert '"official_source_refetched": false' in output
+
+
+def test_cli_source_vintage_adjudication_mode_does_not_call_ingester(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    private_root = tmp_path / "private-data"
+    (tmp_path / "repo").mkdir()
+    expected = {
+        "status": "SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
+        "official_source_refetched": False,
+        "attempt10_downloaded": False,
+        "previous_candidate_retained": True,
+        "formal_signed_admission_created": False,
+        "production_host_accepted": False,
+        "decision_created": False,
+        "auto_execution": False,
+    }
+    monkeypatch.setattr(sys, "argv", [
+        "iios_private_605016_b2_ingest_v01.py",
+        "--private-root", str(private_root),
+        "--repository-root", str(tmp_path / "repo"),
+        "--adjudicate-source-vintage",
+    ])
+    monkeypatch.setattr(
+        MODULE,
+        "adjudicate_existing_private_b2_candidate",
+        lambda **_kwargs: expected,
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "ingest_private_b2_candidate",
+        lambda **_kwargs: pytest.fail("ingester must not run during source-vintage migration"),
+    )
+
+    code = MODULE.main()
+    output = capsys.readouterr().out
+    assert code == 0
+    assert '"official_source_refetched": false' in output
+    assert '"attempt10_downloaded": false' in output
 
 
 def test_main_renders_validation_error_as_blocked_json_not_traceback(monkeypatch, capsys) -> None:

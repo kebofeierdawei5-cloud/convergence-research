@@ -6,15 +6,16 @@ Date: 2026-10-10
 Authoritative current-state record:
 `docs/PROJECT_STATE_INDEX.md`
 
-## Latest 605016 local persistence status — 2026-10-10
+## Current 605016 private persistence and source-vintage status — 2026-10-11
 
-PR [#308](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/308) merged at `951726ed877678aebc4343832c25619ad9bff559`. It adds a bounded `curl` HTTPS failover after pinned Python HTTPS candidates are blocked, exact-current-listing-row recovery gating, sanitized source-fetch / exact-byte mismatch diagnostics, and a Bash/Zsh-compatible launcher prompt. It preserves TLS verification, HTTPS-only redirects, fixed official endpoints, exact PDF SHA/size/page-count verification, PIT and local-only raw persistence.
+- PR [#327](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/327) fixed the `--verify-existing` Core import path and merged. The operator subsequently confirmed read-only replay PASS: one existing private candidate, 11 evidence records/declarations, 8 unique raw files; Core/PIT PASS; no official source refetch.
+- PR [#328](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/328) synchronized the PASS into canonical State Index and audit records.
+- C1 PR [#329](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/329) implements a rule-bounded PIT successor from already-persisted raw bytes. Official SSE trading rules support a conservative public-availability upper bound of 2026-10-08 15:30 +08 for the 2026-10-08 close. It **does not** claim the historical endpoint's exact first-public timestamp; that flag remains false. Official rule raw bytes were not hashed in the current run, and this limitation is recorded.
+- Latest code-only exact-head CI: private contract 53/53 PASS; B2 Data Evidence PIT 31/31 PASS; company Evidence/PIT 23/23 PASS; B2 scope 3/3 PASS; compile/schema/shell/diff checks PASS. Final docs-updated HEAD must be checked again before merge.
+- Local migration has not yet run. Only after PR #329 merges with final-head CI PASS, run `tools/Launch_IIOS_Private_605016_B2_Ingest.command --adjudicate-source-vintage`. This uses public GitHub code, no GitHub CLI login, no Attempt 10 download and no official source refetch. It creates a new immutable candidate and leaves the prior candidate unchanged.
+- Formal signed admission, production Host acceptance, bundle, Decision, publication and execution remain NOT ACCEPTED.
 
-The exact-head contract workflow [#38061855545](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38061855545) passed **19/19** tests. The latest real official HTTPS B2 run [#38061855334](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38061855334) passed **ephemerally** with 11/11 records, 7/7 required Evidence/PIT groups and zero validation errors. Its sanitized artifact [#11673038135](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38061855334/artifacts/11673038135) excludes raw source bytes, numeric quote values and the full manifest. This run used the ordinary current-run announcement/PDF route; it does not claim the curl fallback was live-used. A prior fallback attempt received bytes that did not match the pinned exact-byte contract and remained blocked.
-
-**Next action:** rerun the same local `Launch_IIOS_Private_605016_B2_Ingest.command`; it clones canonical `main`. The Mac-local persistence has **not** yet been verified. If it blocks again, retain the structured endpoint or exact-byte diagnostics and do not weaken the SHA/size/PDF gate. Successful private persistence still does not mean signed admission, production Host acceptance, formal Decision/Report/Run Receipt or trade authorization. Exact first-public timestamp review remains open.
-
-Authoritative next-step detail is in `docs/PROJECT_STATE_INDEX.md`.
+Canonical source of truth remains `docs/PROJECT_STATE_INDEX.md`.
 
 ## Latest P0 status — 2026-10-10
 
