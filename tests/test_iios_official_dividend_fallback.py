@@ -560,9 +560,9 @@ def test_sse_price_all_transports_blocked_emit_only_sanitized_diagnostics(monkey
 
     assert str(caught.value) == "OFFICIAL_SSE_HTTPS_PRICE_FETCH_BLOCKED"
     assert caught.value.safe_diagnostics == [
-        {"endpoint": "SSE_DAYK_32042", "transport": "PYTHON_HTTPS", "outcome": "DNS_FAILURE"},
+        {"endpoint": "SSE_DAYK_32042", "transport": "PYTHON_HTTPS", "outcome": "PROXY_FAILURE"},
         {"endpoint": "SSE_DAYK_32042", "transport": "CURL_HTTPS", "outcome": "DNS_FAILURE"},
-        {"endpoint": "SSE_DAYK_32041", "transport": "PYTHON_HTTPS", "outcome": "DNS_FAILURE"},
+        {"endpoint": "SSE_DAYK_32041", "transport": "PYTHON_HTTPS", "outcome": "PROXY_FAILURE"},
         {"endpoint": "SSE_DAYK_32041", "transport": "CURL_HTTPS", "outcome": "DNS_FAILURE"},
     ]
     assert "secret local proxy host" not in json.dumps(caught.value.safe_diagnostics)
