@@ -734,14 +734,26 @@ def run(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if len(candidates) == 1 and not (has_extracted_receipt or has_extracted_manifest):
-        with tempfile.TemporaryDirectory(prefix="iios-c2-run8-") as temporary:
-            raw_root = Path(temporary) / "run8"
+        if operator_market_price_attestation_dir is not None:
+            # Keep a private working copy so a locally supplied attestation's raw-byte
+            # binding survives the function return. This directory must not be published.
+            raw_root = out_dir / "verified-intake"
+            if raw_root.exists() and any(raw_root.iterdir()):
+                raise ValueError("C2_PRIVATE_WORKING_ROOT_MUST_BE_EMPTY")
             _safe_extract_pinned_archive(candidates[0], raw_root)
             manifest, report = build_successor_manifest(
                 raw_root,
                 archive_verification_method="INDEPENDENT_REHASHED_PINNED_ZIP_BEFORE_EXTRACTION",
                 operator_market_price_attestation_dir=operator_market_price_attestation_dir,
             )
+        else:
+            with tempfile.TemporaryDirectory(prefix="iios-c2-run8-") as temporary:
+                raw_root = Path(temporary) / "run8"
+                _safe_extract_pinned_archive(candidates[0], raw_root)
+                manifest, report = build_successor_manifest(
+                    raw_root,
+                    archive_verification_method="INDEPENDENT_REHASHED_PINNED_ZIP_BEFORE_EXTRACTION",
+                )
     elif (
         not candidates
         and has_extracted_receipt
