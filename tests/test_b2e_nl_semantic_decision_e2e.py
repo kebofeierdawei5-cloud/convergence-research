@@ -288,13 +288,15 @@ def test_persisted_b2e_binds_private_operator_price_reference_and_replays_hashes
 
     receipt = validate_complete_run_receipt(run_root, "b2e-operator-price-run")
     assert receipt["run_status"] == "COMPLETE"
-    assert receipt["stage_receipt_hashes"] == state["stage_receipt_hashes"]
-    assert receipt["stage_chain_hash"] == state["stage_chain_hash"]
+    completed_state = json.loads(run_state_path(run_root, "b2e-operator-price-run").read_text(encoding="utf-8"))
+    assert completed_state["envelope"]["stage_state"] == "COMPLETE"
+    assert receipt["stage_receipt_hashes"] == completed_state["stage_receipt_hashes"]
+    assert receipt["stage_chain_hash"] == completed_state["stage_chain_hash"]
     decision_pending_index = next(
-        index for index, row in enumerate(state["envelope"]["stage_receipts"])
+        index for index, row in enumerate(completed_state["envelope"]["stage_receipts"])
         if row["stage_id"] == "DECISION_PENDING"
     )
-    assert receipt["stage_receipt_hashes"][decision_pending_index] == state["stage_receipt_hashes"][decision_pending_index]
+    assert receipt["stage_receipt_hashes"][decision_pending_index] == completed_state["stage_receipt_hashes"][decision_pending_index]
     # Run Receipt v0.2 binds stage hashes/chain rather than leaking private
     # operator-price values or bundle identifiers into the public receipt.
     assert reference["record_sha256"] not in json.dumps(receipt)
