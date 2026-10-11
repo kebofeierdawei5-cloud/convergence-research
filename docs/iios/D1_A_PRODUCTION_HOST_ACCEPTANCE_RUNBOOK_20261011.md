@@ -49,7 +49,7 @@ Expected: health status OK; ready status CONFIGURED_NOT_PRODUCTION_ACCEPTED and 
 
 Using an operator-staged bundle bound to the exact 605016 Case and cutoff, submit one explicit request to the Host's canonical-run endpoint. The Host must invoke the configured provider-backed runtime; a manual ChatGPT Web copy/paste is not an admissible substitute. Keep full prompts/responses and deployment secrets on the private host.
 
-The Host accepts a JSON body containing only a bundle_id. The corresponding bundle file is resolved under IIOS_HOST_HOST_BUNDLE_ROOT; its evidence manifest/root must resolve within IIOS_HOST_DATA_ROOT. The HTTP request never contains the bundle or evidence itself.
+The Host accepts a JSON body containing only a bundle_id. The corresponding bundle file is resolved under IIOS_HOST_BUNDLE_ROOT; its evidence manifest/root must resolve within IIOS_HOST_DATA_ROOT. The HTTP request never contains the bundle or evidence itself.
 
 Only after formal C1 / 605016 Evidence/PIT admission is complete, submit the pre-staged immutable case bundle using a private curl config file. Keep shell tracing off:
 
