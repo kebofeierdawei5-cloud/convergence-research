@@ -84,3 +84,9 @@ No production Host acceptance is claimed by this runbook. This assistant session
 ## Dependency made explicit
 
 The 605016 successor is currently a local Core/PIT-validated candidate, not formal signed Evidence/PIT admission; its source-vintage/final-use gate remains open. D1-A host configuration and liveness may be progressed in parallel, but the real D1 canonical 605016 request/provider-stage acceptance must wait for formal C1 Evidence/PIT admission. Do not substitute fixture records or another case and claim D1 acceptance.
+
+## Diagnostic: green live-provider workflow does not necessarily mean provider PASS
+
+The B2-D live-provider workflow is deliberately fail-closed and configured with continue-on-error for its live job. On run [#38127035406](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38127035406), the live job completed successfully but logged all required provider configuration fields as empty, emitted `BLOCKED_OR_FAILED`, and did not produce/independently verify a real live receipt. This run therefore has **zero production-acceptance credit**. Always inspect the live-job output and artifact disposition; job conclusion alone is insufficient.
+
+That diagnostic remains separate from the operator-managed D1-A Host. A real acceptance still requires a host-origin request and verified signed receipts inside the actual configured output root.
