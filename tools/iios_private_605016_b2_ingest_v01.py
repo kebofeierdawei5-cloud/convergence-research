@@ -679,21 +679,26 @@ def _adjudicate_source_vintage_manifest(
 
 def _candidate_fingerprint(manifest: Mapping[str, Any]) -> str:
     """Stable content identity that does not change solely with retrieval time."""
+    reviewed_vintage = isinstance(manifest.get("source_vintage_adjudication"), Mapping)
+    original_fields = (
+        "evidence_id", "subject_id", "field_id", "claim_type", "value",
+        "unit", "basis", "observation_date", "known_at", "known_at_basis",
+        "published_at", "source_ref", "artifact_id", "content_sha256",
+        "exact_bytes", "provenance_class", "status", "license_status",
+        "source_origin_adjudication",
+    )
+    reviewed_fields = ("source_vintage_adjudication_id", "first_public_time_precision")
     evidence_projection = []
     for item in manifest.get("evidence", []):
         if not isinstance(item, Mapping):
             raise PrivateIngestError("EVIDENCE_RECORD_INVALID_FOR_FINGERPRINT")
-        evidence_projection.append({
-            key: item.get(key)
-            for key in (
-                "evidence_id", "subject_id", "field_id", "claim_type", "value",
-                "unit", "basis", "observation_date", "known_at", "known_at_basis",
-                "published_at", "source_ref", "artifact_id", "content_sha256",
-                "exact_bytes", "provenance_class", "status", "license_status",
-                "source_origin_adjudication", "source_vintage_adjudication_id",
-                "first_public_time_precision",
-            )
-        })
+        projection = {key: item.get(key) for key in original_fields}
+        # Preserve byte-for-byte fingerprint compatibility for the existing v0.1
+        # candidate. The additional fields are part of identity only when the
+        # successor policy object exists and actually binds them.
+        if reviewed_vintage:
+            projection.update({key: item.get(key) for key in reviewed_fields})
+        evidence_projection.append(projection)
     evidence_projection.sort(key=lambda item: str(item["evidence_id"]))
     raw_projection = []
     for item in manifest.get("raw_artifacts", []):
@@ -714,7 +719,7 @@ def _candidate_fingerprint(manifest: Mapping[str, Any]) -> str:
         "evidence": evidence_projection,
         "raw_artifacts": raw_projection,
     }
-    if isinstance(manifest.get("source_vintage_adjudication"), Mapping):
+    if reviewed_vintage:
         stable["source_vintage_adjudication"] = manifest["source_vintage_adjudication"]
     return _sha256(_canonical_bytes(stable))
 
