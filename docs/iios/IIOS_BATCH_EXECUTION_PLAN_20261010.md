@@ -1,5 +1,21 @@
 # IIOS Batch Execution Plan — C0-aligned refresh 2026-10-11
 
+## ACTIVE EXECUTION ORDER — AUTHORITATIVE REFRESH (2026-10-11)
+
+This order supersedes the earlier “Immediate execution order” further below. The then-current Git `main` and `docs/PROJECT_STATE_INDEX.md` remain the state authority.
+
+1. **Batch 0 — narrow state reconciliation:** make the P0 incident workflow run on explicit `main` pushes, classify the observed failure-with-zero-jobs as unclassified (not a test failure and not a PASS), align the current plan/state surfaces, and retain the C0 local-first decision without making local model installation a dependency for deterministic work.
+2. **Batch 1 — private Path A scenario runner:** consume only the normalized private price record, bind it to versioned analysis-only scenario profiles, calculate price-return and downside constraints deterministically, emit private immutable JSON/Markdown/integrity receipt, and verify replay. Run both existing cases; no quote fetching and no formal Decision.
+3. **Parallel C1:** preserve the existing 605016 candidate and hashes. Resolve applicable SSE market-data use permission and authorized signer identity/scope. Do not repeat source ingestion. No signer or permission flag may be self-asserted.
+4. **Parallel C2:** preserve the pinned Xinhecheng 13-fact review; obtain the distinct authorized fact/use reviewer and record the permitted scope. `PUBLIC_ACCESS_REUSE_UNKNOWN` remains blocking until independently resolved.
+5. **Batch 2 — usability and valuation integrity:** only after the scenario runner works, verify the rendered reports and independently cross-check case assumptions, return/hurdle formulas, probability integrity, output hashes and repeat-run behavior.
+6. **Formal path:** C1/C2 formal admission and production Host work proceed only when their own gates pass. A genuine canonical company run still requires admitted evidence, authorized semantic producer, case-bound Forecast/Valuation/Risk/Position, Decision Admission, human approval boundary, publication/report QA, full `IIOS_RUN_RECEIPT`, and independent replay.
+
+**No local LLM/Ollama/model/API prerequisite applies to Batch 1, evidence signer code/key generation, or exchange-rights review.** The unresolved formal semantic-producer assurance remains an explicit separate gate; ordinary ChatGPT Free Web output must not be relabelled canonical.
+
+**Batch 0 CI anomaly:** run `38137977103` on `f632169f4da60a19f194b0abba109600c67e51f3` shows failure with zero jobs, while the workflow lacked an explicit push trigger. It is not evidence of failed test assertions. The explicit push trigger added by Batch 0 allows a subsequent main-commit run to produce real job/step evidence. If the result still contains zero jobs, escalate workflow/repository execution configuration without inferring code failure or success.
+
+
 **Plan class:** execution plan / canonical-main recovery  
 **Authority baseline for this refresh:** `main@18854586bd6cd71059d6da7d3beef4f1f61a8e64`  
 **State authority:** `docs/PROJECT_STATE_INDEX.md`  
@@ -293,10 +309,10 @@ The red-team must test both negative bypasses and one end-to-end positive real c
 6. **Persist each accepted batch:** merge the code and sync `PROJECT_STATE_INDEX.md` with exact SHA, validation outcome, non-claims and next gate.
 7. **Fail safely:** any incomplete required gate results in `BLOCKED` / `REVIEW_REQUIRED`; do not create a formal investment proposal or claim a completed Run Receipt by fallback.
 
-## 5. Immediate execution order
+## 5. Earlier immediate execution order (superseded by ACTIVE EXECUTION ORDER above)
 
 1. **C0 decision:** default to LOCAL_SINGLE_USER/local-first while reusing the existing canonical Host/CLI, Orchestrator, runtime factory, Store, report/QA and receipt/replay contracts. Do not rewrite components or add UI unless the actual product-entry pilot demonstrates a gap. The generic ChatGPT Free Web handoff remains NON-CANONICAL for formal decisions.
-2. **Parallel, safe work:** (a) retain C1's completed local/source-vintage candidate; do not repeat ingestion. Resolve the formal admission signer/authority contract and allowed-use basis for the SSE closing-price source before creating a signed admission; (b) obtain the required independent human/external sign-off for C2's 13 facts and narrow private-use boundary while keeping operator-attested price distinct; (c) have the operator run the existing local Ollama setup/configuration and GET-only host probe, recording only sanitized outputs. These are parallel tasks; a local config/health check is diagnostic only.
+2. **Parallel, safe work:** (a) retain C1's completed local/source-vintage candidate; do not repeat ingestion. Resolve the formal admission signer/authority contract and allowed-use basis for the SSE closing-price source before creating a signed admission; (b) obtain the required independent human/external sign-off for C2's 13 facts and narrow private-use boundary while keeping operator-attested price distinct; (c) prepare a genuine Host only if/when a compliant producer path is available, and run the GET-only Host probe only when a deployment exists; neither activity is a prerequisite for deterministic scenario analysis or signer/rights review. These are parallel tasks; a local config/health check is diagnostic only.
 3. **D1-A + D1:** only after C1 formal admission, execute one real 605016 host-origin canonical run. Use the same run for overlapping production Host evidence and end-to-end acceptance where possible, and separately evaluate each gate. Require genuine authorized producer receipts, seven-group admission, Forecast/Valuation lineage, Decision/Publication/report QA, complete `IIOS_RUN_RECEIPT`, and a clean replay.
 4. **D2:** after C2 independent fact/use review and formal seven-group Evidence/PIT admission, execute one real 002001 canonical run with case-bound Forecast/Valuation inputs and the same full receipt/replay gates. Do not repeat price web search; do not upgrade `OPERATOR_ATTESTED_MARKET_DATA` into `SOURCE_VINTAGE_VERIFIED`.
 5. **Final acceptance:** run fresh clean-room red-team against the actual supported local entry and real positive path; test bypasses, wrong case/cutoff, evidence tampering, missing/fixture-only outputs and replay mutation. Retain the canonical PILOT requirements including a fresh user-selected candidate and operator usability acceptance. Keep P0-LLM-001/P0-LLM-004 OPEN until their exact production criteria pass.
