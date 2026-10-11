@@ -134,3 +134,15 @@ From the existing 11 page-located extraction candidates, the 2026-10-09 buyback-
 - If no such original artifact and adequate permitted-use basis can be supplied, preserve `market_price=UNKNOWN`; do not weaken the Core/PIT validator or label overall B2 as PASS.
 
 **Non-claims:** No formal market-price admission, signed admission, production Host acceptance, Decision, Publication, complete Run Receipt or execution authority was created by this source search.
+
+
+## 8. Operator-submitted Stockstar market-price candidate — 2026-10-11
+
+**Disposition: `CANDIDATE_LOCATED_NOT_ADMITTED`.** `market_price` remains UNKNOWN and C2 remains BLOCKED.
+
+- The operator supplied the page locator https://stock.stockstar.com/RB2026100900002546.shtml together with a typed transcription of daily market fields. Direct retrieval of that exact page was unavailable in this review; no original response bytes, byte count, or SHA-256 were obtained. The typed transcription is not a substitute for the original source artifact.
+- A separate related Stockstar page, https://stock.stockstar.com/RB2026100800017267.shtml, is discoverable in public search with the publisher timestamp **2026-10-08 15:55:43 +08:00** and a report referring to the same security/session. That timestamp is before the case cutoff and is a useful source-vintage lead, but what was verified here is a search rendering, not a captured page response. No exact-byte integrity claim is made.
+- Stockstar's legal notice (https://info.stockstar.com/aboutus/disclaimer.htm) states that site content is protected and restricts unauthorized copying/reproduction and derivative use. The Shenzhen Stock Exchange's published trading rules (https://investor.szse.cn/disclosure/notice/t20060515_499577.html) state that exchange trading information belongs to SZSE and restrict unlicensed use/propagation. Neither the linked Stockstar page nor the related search result establishes an applicable grant for exact-byte retention in the private IIOS evidence store. This audit does not make a legal conclusion; it records that permission remains unverified.
+- No numeric quote value, article text, screenshot, or raw market-data bytes were added to public machine records. The existing machine report records the source locators and the blocked disposition only.
+
+**Narrow next step:** do not ask the operator to resend the same Stockstar URL or retype the value. Obtain an original historical quote export/statement from a source whose terms permit personal/internal research and private byte retention, or obtain explicit permission from the relevant data provider. Keep it in the private workspace; hash its exact bytes; bind security and observation date; verify cutoff-safe `known_at`; then run the independent unchanged Core/PIT validator. Until every step passes, keep `market_price=UNKNOWN`.

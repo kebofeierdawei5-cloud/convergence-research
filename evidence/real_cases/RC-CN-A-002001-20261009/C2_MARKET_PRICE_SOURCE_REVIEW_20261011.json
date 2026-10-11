@@ -65,6 +65,30 @@
       "use_permission_status": "UNRESOLVED",
       "decision": "EXCLUDED",
       "reason": "Existing page captures lack admitted date-specific known_at and permitted-use records; the K-line request failed capture and has no byte count or hash."
+    },
+    {
+      "source_id": "STOCKSTAR-USER-SUPPLIED-ARTICLE-20261009",
+      "url": "https://stock.stockstar.com/RB2026100900002546.shtml",
+      "source_authority": "SECONDARY_FINANCIAL_MEDIA",
+      "availability_review": "URL_SUPPLIED_BY_OPERATOR; DIRECT_PAGE_FETCH_UNAVAILABLE_IN_THIS_REVIEW",
+      "raw_payload_captured_for_2026_10_08": false,
+      "raw_payload_status": "NOT_CAPTURED_NO_SIZE_OR_SHA256",
+      "source_vintage_status": "EXACT_PUBLICATION_TIMESTAMP_NOT_VERIFIED; PAGE_IDENTIFIER_DATE_ALONE_DOES_NOT_ESTABLISH_CUTOFF_SAFE_KNOWN_AT",
+      "use_permission_status": "UNRESOLVED; PUBLISHER_LEGAL_NOTICE_DOES_NOT_ESTABLISH_EXACT_BYTE_PRIVATE_RETENTION_RIGHT",
+      "decision": "NOT_ADMITTED",
+      "reason": "The operator supplied the URL and a typed transcription of market fields, but no original bytes were provided or captured. This is a candidate locator, not an integrity-verified artifact; a value in chat does not satisfy the raw-byte, source-use, and PIT admission contract."
+    },
+    {
+      "source_id": "STOCKSTAR-RELATED-ARTICLE-PRECUTOFF-METADATA",
+      "url": "https://stock.stockstar.com/RB2026100800017267.shtml",
+      "source_authority": "SECONDARY_FINANCIAL_MEDIA",
+      "availability_review": "PUBLIC_SEARCH_RESULT_SHOWS_ARTICLE_TIMESTAMP_2026-10-08T15:55:43+08:00_AND_MATCHING_SECURITY_SESSION",
+      "raw_payload_captured_for_2026_10_08": false,
+      "raw_payload_status": "NOT_CAPTURED_NO_SIZE_OR_SHA256; SEARCH_RENDERING_ONLY",
+      "source_vintage_status": "PRE_CUTOFF_TIMESTAMP_CANDIDATE; NOT_RAW_BYTE_VERIFIED",
+      "use_permission_status": "UNRESOLVED; PUBLISHER_LEGAL_NOTICE_RESERVES_CONTENT_COPYING/REPRODUCTION; NO_SPECIFIC_PRIVATE_EVIDENCE_RETENTION_GRANT_VERIFIED",
+      "decision": "NOT_ADMITTED",
+      "reason": "This related page is useful to identify a secondary-source candidate with a publication timestamp before the case cutoff, but its original bytes have not been captured and the applicable private/internal retention permission is not established. It cannot close the formal market_price gate."
     }
   ],
   "source_review_conclusion": {
@@ -72,7 +96,9 @@
     "official_source_payload_integrity_verified": false,
     "date_specific_known_at_verified": false,
     "permitted_internal_use_verified": false,
-    "decision": "KEEP_MARKET_PRICE_UNKNOWN"
+    "decision": "KEEP_MARKET_PRICE_UNKNOWN",
+    "pre_cutoff_secondary_candidate_located": true,
+    "exact_candidate_raw_bytes_verified": false
   },
   "next_action": {
     "owner": "OPERATOR",
@@ -98,5 +124,15 @@
   "decision_created": false,
   "publication_created": false,
   "run_receipt_created": false,
-  "execution_authorized": false
+  "execution_authorized": false,
+  "operator_supplied_candidate_review": {
+    "review_date": "2026-10-11",
+    "supplied_url": "https://stock.stockstar.com/RB2026100900002546.shtml",
+    "related_pre_cutoff_candidate_url": "https://stock.stockstar.com/RB2026100800017267.shtml",
+    "related_candidate_timestamp_visible_in_public_search_result": "2026-10-08T15:55:43+08:00",
+    "disposition": "CANDIDATE_LOCATED_NOT_ADMITTED",
+    "quote_values_persisted": false,
+    "public_raw_bytes_persisted": false,
+    "next_step": "Provide an original quote artifact from a source whose terms permit personal/internal research and exact-byte private retention, or obtain explicit permission and then perform private raw-byte capture and independent PIT verification."
+  }
 }
