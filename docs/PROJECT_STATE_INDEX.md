@@ -30,9 +30,9 @@ Batch 0 narrow state reconciliation                     PASS ON MERGE; NO ECONOM
 Batch 1 private Path A scenario runner                  PASS / MERGED; 40 TESTS; ANALYSIS-ONLY
 Batch 1 macOS one-click launcher permission fix             PASS / MERGED PR #358; 12 CHECKS + 3 STATIC TESTS PASS; OPERATOR REPORTS SUCCESS / BUNDLE NOT INDEPENDENTLY REVIEWED
 Batch 2 Path A scenario integrity audit                    IN PROGRESS / PR #360 MERGED; 43 TESTS + 13 EXACT-HEAD CHECKS PASS; LOCAL BUNDLE REVIEW OPEN
-Operator-entered price decision-input track                 MP-1 + MP-2 + REPORT PASS / PRs #366/#368/#370; MP-3 MULTI-SLICE PASS / PRs #372/#375/#377/#378/#379 (B2-E 24/24; red-teams 8/8 + 15/15; MVP 412/412); LOCAL RECEIPT REVIEW + REMAINING MP-3 OPEN
+Operator-entered price decision-input track                 MP-1/2 + EXISTING MP-3 CORE TESTS PASS; RESIDUAL HARDENING PAUSED FOR LOCAL PILOT
 C0 Local-first architecture / product-entry decision     DECISION RECORDED; IMPLEMENTATION GATES OPEN
-P0 incident workflow zero-job anomaly                    OPEN / RUN 38143887553 ALSO ZERO JOBS; NO TEST ASSERTIONS EXECUTED
+P0 incident workflow zero-job anomaly                    OPEN / DIAGNOSTIC BACKLOG; NON-BLOCKING FOR LOCAL PILOT
 C1 formal Evidence/PIT admission                         OPEN / TRUST REGISTRY EMPTY; SSE PRICE RIGHTS UNGRANTED
 C2 independent fact/use sign-off                         OPEN / 13 LOCATORS PASS; INDEPENDENT SIGNER AND RIGHTS SCOPE PENDING
 D1-A operator host preparation                           RUNBOOK READY / SEPARATE TRACK; LOCAL MODEL NOT REQUIRED FOR C1/C2 SIGNER OR RIGHTS REVIEW
@@ -41,7 +41,22 @@ D1-A 605016 production Host acceptance                         RUNBOOK + LOOPBAC
 605016 source-vintage successor                           PASS / LOCAL CORE-VALIDATED CANDIDATE; FORMAL/HOST GATES OPEN
 Route A C2 / 新和成 002001                            PRIVATE CORE/PIT PASS (7/7; PRIOR INPUT); FORMAL/INDEPENDENT/HOST GATES OPEN
 Path A operator-attested price overlay               ANALYSIS-ONLY INTAKE IMPLEMENTATION; NO CANONICAL PRICE ADMISSION
+Local single-user complete pilot                     ACTIVE P0 PRIORITY; PILOT_NON_CANONICAL BEFORE FORMALIZATION
+Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
 ```
+
+### Execution-first local MVP priority (owner direction, 2026-10-11; supersedes earlier task ordering)
+
+The user has explicitly redirected IIOS delivery to **finish the core workflow and run it end-to-end in actual personal use before further optimization**. The governing decision and testable acceptance criteria are recorded in [Execution-first Local Single-User MVP Pivot](iios/LOCAL_SINGLE_USER_EXECUTION_FIRST_PIVOT_20261011.md).
+
+Immediate order:
+1. Pause additional MP-3 adversarial edge cases / anti-tamper expansion except defects that block the pilot or can silently distort an investment result.
+2. Implement a complete local, candidate-driven path using the existing company research, deterministic investment and report modules. The current fixed-profile Path A scenario calculator is not the final product.
+3. Permit an explicitly segregated `PILOT_NON_CANONICAL` run using manual price and free/manual AI handoff when needed. Do not bypass formal admission or claim a canonical Decision / complete canonical Run Receipt.
+4. C1/C2 signature and market-data rights gates remain necessary for the corresponding formal evidence/canonical claims but do not block development and use of the provisional pilot.
+5. Keep the P0 zero-job CI anomaly open as diagnostic backlog; it does not block local use.
+
+Minimum safeguards remain: cutoff/known-at and source disclosure, manual-price assurance, visible UNKNOWN/missing/conflict, deterministic calculations, private local persistence, Chinese report, human approval separation and no automatic trading. The priority is to run one real company through the workflow and use observed defects to drive iteration.
 
 ### Current blockers
 
