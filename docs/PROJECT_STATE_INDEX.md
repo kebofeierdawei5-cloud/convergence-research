@@ -28,7 +28,7 @@ P0 B3 persisted upstream write authorization             MERGED / EXACT-HEAD CI 
 P0 Canonical Runtime Callback Preflight                  MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL PASS
 Production P0-LLM-001 / P0-LLM-004                      OPEN / REAL-HOST ACCEPTANCE REQUIRED
 605016 source-vintage successor                           PASS / LOCAL CORE-VALIDATED CANDIDATE; FORMAL/HOST GATES OPEN
-Route A C2 / 新和成 002001                            CORE-VALIDATED EPHEMERAL CANDIDATE; B2 BLOCKED ON MARKET_PRICE; INDEPENDENT REVIEW OPEN
+Route A C2 / 新和成 002001                            OPERATOR PRICE PATH MERGED; PRIVATE CORE/PIT RUN PENDING; INDEPENDENT FACT REVIEW OPEN
 ```
 
 ### Current blockers
@@ -308,7 +308,7 @@ The primary Investment Core MVP path is **Route A — free-first single-company 
 
 **Cutoff defect:** Run #8's B2 manifest and report used `2026-10-09T23:59:59+08:00`, which conflicts with the IIOS date-only cutoff rule for `2026-10-09` (interpreted at the start of that date). The historic manifest must stay diagnostic; do not edit the timestamp and reuse its digest/fingerprint. The 2026-10-09 buyback-progress filing and any same-day close remain excluded unless independent pre-cutoff availability is established.
 
-**C2 next action (operator policy supersedes the previous price-source search request):** do not conduct another web search or ask for a vendor raw-price export after the operator directly supplies market price. Use the new OPERATOR_ATTESTED_MARKET_DATA evidence path to create a private attestation bundle with explicit security/date/cutoff binding and an operator-attested known_at; do not call it source-vintage verified. The previously supplied 002001 close has not yet been executed through the private bundle writer/Core validator. Its numeric value and value-bearing bundle must not be committed to this public repo or uploaded to public Actions artifacts. PR implementation is under feat/operator-market-price-attestation-20261011; see audit section 9. The 13 official-filing facts still require independent review, and formal admission/Host acceptance/Decision/Run Receipt remain open.
+**C2 next action (operator policy):** PR [#338](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/338) is PASS / MERGED / CANONICAL at `c7fc3ff37fab75e2d72a5ba2c4a995058a85ebec`. Do not run another price web search. Use the `OPERATOR_ATTESTED_MARKET_DATA` path for the already supplied close; this is a human-attested input class, not source-vintage verification. The private bundle exists and its archive SHA-256 was checked in the current working session, but actual-case execution of the merged C2 tool plus the unchanged seven-group Core/PIT validator has not been performed here. Keep the numeric value and bundle out of GitHub and public Actions artifacts. Next: locally run the private bundle against the pinned Run #8 ZIP, then independently review the 13 official filing facts. Formal admission, Host acceptance, Decision and Run Receipt remain open.
 
 The current result remains `BLOCKED_NOT_ADMITTED`; seven mandatory groups are not covered by admitted fact records. The C2 plan does not weaken cutoff, origin, reuse or Core/PIT requirements.
 
