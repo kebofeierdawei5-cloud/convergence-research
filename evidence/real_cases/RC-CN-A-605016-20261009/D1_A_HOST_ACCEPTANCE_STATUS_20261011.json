@@ -25,5 +25,11 @@
     "durable persistence and clean replay of admitted source/provider/run records",
     "separate reviewer sign-off"
   ],
-  "next_gate": "Run the real Host configuration check and host-origin provider smoke on the operator-controlled environment. Keep all secrets/raw responses private; attach only sanitized hashes/status and request independent review."
+  "next_gate": "Run the real Host configuration check and host-origin provider smoke on the operator-controlled environment. Keep all secrets/raw responses private; attach only sanitized hashes/status and request independent review.",
+  "c1_formal_evidence_pit_admission_required_for_605016_host_canonical_run": true,
+  "c1_formal_evidence_pit_admission_currently_passed": false,
+  "host_config_and_liveness_can_be_progressed_in_parallel": true,
+  "host_origin_605016_provider_invocation_blocked_until_c1_formal_admission": true,
+  "fixture_or_other_case_can_substitute_for_d1_acceptance": false,
+  "runbook_detail_updated": "LOCAL OLLAMA SETUP, PRIVATE ENV, CONFIG/HEALTH/READY PROBES AND PROTECTED POST HOST REQUEST EXAMPLE"
 }
