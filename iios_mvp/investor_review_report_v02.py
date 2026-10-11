@@ -952,7 +952,7 @@ def validate_investor_review_qa_v02(record: Any) -> None:
         raise ValueError("investor_review_qa_v02 fields are invalid")
     if record["qa_version"] != INVESTOR_QA_VERSION or record["qa_status"] not in {"PASS", "FAIL"}:
         raise ValueError("investor_review_qa_v02 version/status invalid")
-    expected_checks = {"publication_integrity", "publication_binding", "machine_surface_integrity", "human_surface_integrity", "deterministic_render_replay", "required_sections", "semantic_matrix_complete", "explicit_absence_handling", "human_auditability_contract", "decision_fidelity", "human_boundary", "non_authority"}
+    expected_checks = {"publication_integrity", "publication_binding", "machine_surface_integrity", "human_surface_integrity", "deterministic_render_replay", "required_sections", "semantic_matrix_complete", "explicit_absence_handling", "human_auditability_contract", "decision_fidelity", "human_boundary", "non_authority", "price_assurance_transparency"}
     if not isinstance(record["checks"], Mapping) or set(record["checks"]) != expected_checks:
         raise ValueError("investor_review_qa_v02 checks invalid")
     if any(v not in {"PASS", "FAIL"} for v in record["checks"].values()):
