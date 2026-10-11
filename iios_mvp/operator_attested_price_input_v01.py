@@ -244,6 +244,57 @@ def validate_operator_price_payload(payload: Any) -> dict[str, Any]:
     }
 
 
+def resolve_scenario_price(
+    normalized: Mapping[str, Any],
+    *,
+    base_case_id: str,
+    symbol: str,
+) -> dict[str, Any]:
+    """Resolve one explicit analysis-only price without constructing a canonical admission."""
+    if normalized.get("record_schema") != OPERATOR_PRICE_RECORD_SCHEMA:
+        raise OperatorPriceInputError("ANALYSIS_RECORD_SCHEMA_INVALID")
+    if normalized.get("status") != ANALYSIS_ONLY_STATUS:
+        raise OperatorPriceInputError("ANALYSIS_ONLY_STATUS_REQUIRED")
+    scope = normalized.get("scope_controls")
+    if not isinstance(scope, Mapping) or scope.get("may_feed_scenario_valuation") is not True:
+        raise OperatorPriceInputError("SCENARIO_VALUATION_SCOPE_NOT_GRANTED")
+    if scope.get("may_feed_canonical_current_price_resolver") is not False:
+        raise OperatorPriceInputError("CANONICAL_RESOLVER_MUST_REMAIN_BLOCKED")
+    matches = [
+        row for row in normalized.get("records", [])
+        if isinstance(row, Mapping)
+        and row.get("base_case_id") == base_case_id
+        and row.get("symbol") == symbol
+    ]
+    if len(matches) != 1:
+        raise OperatorPriceInputError("SCENARIO_PRICE_MATCH_MUST_BE_UNIQUE")
+    row = matches[0]
+    return {
+        "status": "OPERATOR_ATTESTED_SCENARIO_INPUT_ONLY",
+        "analysis_cutoff_date": normalized.get("analysis_cutoff_date"),
+        "base_case_id": base_case_id,
+        "market": row["market"],
+        "symbol": row["symbol"],
+        "exchange": row["exchange"],
+        "observation_date": row["observation_date"],
+        "current_price": row["price"],
+        "currency": row["currency"],
+        "unit": row["unit"],
+        "adjustment_semantics": row["adjustment_semantics"],
+        "operator_attested_known_at": row["operator_attested_known_at"],
+        "source_class": "OPERATOR_ATTESTED_MARKET_DATA",
+        "source_origin_verified": False,
+        "source_vintage_verified": False,
+        "source_use_rights_verified": False,
+        "canonical_price_admission": False,
+        "formal_evidence_pit_admission": False,
+        "may_feed_scenario_valuation": True,
+        "may_feed_canonical_current_price_resolver": False,
+        "may_create_formal_decision": False,
+        "decision_authority": False,
+    }
+
+
 def build_sanitized_receipt(normalized: Mapping[str, Any], *, input_sha256: str) -> dict[str, Any]:
     if not SHA256_RE.fullmatch(input_sha256):
         raise OperatorPriceInputError("INPUT_SHA256_INVALID")
