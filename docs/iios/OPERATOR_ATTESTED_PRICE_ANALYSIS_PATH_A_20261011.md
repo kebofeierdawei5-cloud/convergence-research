@@ -1,7 +1,7 @@
 # Path A — Operator-attested price input for private scenario analysis
 
 - Date: 2026-10-11
-- Status: IMPLEMENTATION ON FEATURE BRANCH; TESTED THROUGH DEDICATED CI AFTER MERGE ONLY IF CONFIRMED
+- Status: IMPLEMENTATION CANDIDATE; ANALYSIS-ONLY; NOT CANONICAL PRICE ADMISSION
 - Data handling: actual operator quote values and source labels stay in the operator's private file; this public document deliberately records no numerical quotes.
 - Runtime: deterministic Python only; no local LLM, Ollama, external model API, or paid provider is required.
 
