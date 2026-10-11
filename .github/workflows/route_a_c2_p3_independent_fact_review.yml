@@ -1,0 +1,70 @@
+name: IIOS Route A C2-P3 Separate-Method Fact Review
+
+on:
+  pull_request:
+    paths:
+      - "tools/route_a_c2_p3_independent_fact_review.py"
+      - "tests/test_route_a_c2_p3_independent_fact_review.py"
+      - ".github/workflows/route_a_c2_p3_independent_fact_review.yml"
+      - "docs/iios/C2_P3_INDEPENDENT_FACT_REVIEW_20261011.md"
+      - "evidence/real_cases/RC-CN-A-002001-20261009/C2_P3_INDEPENDENT_FACT_REVIEW_20261011.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  c2-p3-independent-method-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PDF parser and tests
+        run: python -m pip install --disable-pip-version-check pytest pypdf
+      - name: Compile separate review and tests
+        run: python -m py_compile tools/route_a_c2_p3_independent_fact_review.py tests/test_route_a_c2_p3_independent_fact_review.py
+      - name: Run review-contract tests
+        run: PYTHONPATH=. python -m pytest -q tests/test_route_a_c2_p3_independent_fact_review.py
+      - name: Download immutable original Run #8 capture
+        uses: actions/download-artifact@v4
+        with:
+          name: iios-company-evidence-37938129274
+          run-id: 37938129274
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          path: /tmp/c2-p3-run8
+      - name: Independently re-extract PDF locators and PIT/use boundaries
+        run: |
+          python tools/route_a_c2_p3_independent_fact_review.py \
+            --artifact-root /tmp/c2-p3-run8 \
+            --out /tmp/C2_P3_INDEPENDENT_FACT_REVIEW_20261011.json \
+            --artifact-digest-verified-by-download-action
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x = json.loads(Path("/tmp/C2_P3_INDEPENDENT_FACT_REVIEW_20261011.json").read_text(encoding="utf-8"))
+          assert x["fact_count"] == 13
+          assert x["fact_locator_pass_count"] == 13
+          assert x["all_fact_locators_pass"] is True
+          assert x["all_source_urls_https_official_szse"] is True
+          assert x["all_url_date_matches_intake_publication_date"] is True
+          assert x["all_conservative_known_at_before_cutoff"] is True
+          assert x["same_day_buyback_progress_excluded"] is True
+          assert x["source_reuse_rights_cleared"] is False
+          assert x["use_rights_review"] == "BLOCKED_UNKNOWN_REUSE_OR_RETENTION_RIGHTS"
+          assert x["independent_external_reviewer_signoff"] is False
+          assert x["market_price_value_in_report"] is False
+          assert x["formal_signed_admission_created"] is False
+          print("Separate-method C2-P3 review PASS; formal admission stays BLOCKED on unknown use rights and external sign-off.")
+          PY
+      - name: Upload sanitized review result only
+        uses: actions/upload-artifact@v4
+        with:
+          name: c2-p3-independent-fact-review
+          path: /tmp/C2_P3_INDEPENDENT_FACT_REVIEW_20261011.json
+          if-no-files-found: error
+          retention-days: 14

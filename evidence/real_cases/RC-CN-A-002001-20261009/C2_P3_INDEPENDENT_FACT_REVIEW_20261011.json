@@ -1,0 +1,33 @@
+{
+  "schema_version": "IIOS-C2-P3-INDEPENDENT-LOCAL-FACT-REVIEW-0.1",
+  "record_class": "SANITIZED_INDEPENDENT_METHOD_REVIEW_NOT_EXTERNAL_SIGNOFF",
+  "case_id": "RC-CN-A-002001-20261009",
+  "cutoff": "2026-10-09T00:00:00+08:00",
+  "pinned_archive_sha256": "0c7ddb34a4b77f7298309ae89ac8de96877a059656a811beefe7eabfe99a0ba1",
+  "fact_count": 13,
+  "fact_locator_pass_count": 13,
+  "all_fact_locators_pass": true,
+  "all_source_urls_https_official_szse": true,
+  "all_url_date_matches_intake_publication_date": true,
+  "all_conservative_known_at_before_cutoff": true,
+  "same_day_buyback_progress_excluded": true,
+  "source_reuse_rights_cleared": false,
+  "source_reuse_statuses": [
+    "PUBLIC_ACCESS_REUSE_UNKNOWN"
+  ],
+  "factual_claim_review": "PASS",
+  "cutoff_and_source_binding_review": "PASS",
+  "use_rights_review": "BLOCKED_UNKNOWN_REUSE_OR_RETENTION_RIGHTS",
+  "independent_external_reviewer_signoff": false,
+  "legal_opinion": false,
+  "market_price_value_in_report": false,
+  "secondary_market_price_web_audit_performed": false,
+  "formal_signed_admission_created": false,
+  "production_host_accepted": false,
+  "decision_created": false,
+  "publication_created": false,
+  "run_receipt_created": false,
+  "execution_authorized": false,
+  "overall_status": "FACT_AND_PIT_SECOND_PASS_PASS; FORMAL_ADMISSION_BLOCKED_ON_UNKNOWN_USE_RIGHTS_AND_EXTERNAL_REVIEW",
+  "next_gate": "A separate reviewer must sign off the 13 claims and fact-level private-use boundary. Unknown source reuse/retention rights stay blocking; do not repeat market-price web search."
+}
