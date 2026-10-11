@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
+import shutil
 import sys
 import tempfile
 import zipfile
@@ -24,7 +25,7 @@ from research.b2.company_evidence import (
     REQUIRED_COMPANY_FIELD_GROUPS,
     build_company_evidence_manifest,
 )
-from tools.verify_company_evidence_intake import verify_intake
+from tools.verify_company_evidence_intake import IndependentVerificationError, verify_intake
 
 
 CASE_ID = "RC-CN-A-002001-20261009"
@@ -293,6 +294,77 @@ def _safe_extract_pinned_archive(archive: Path, destination: Path) -> None:
         zf.extractall(destination)
 
 
+def _normalize_legacy_payload_defaults(
+    receipt: dict[str, Any],
+    intake_manifest: dict[str, Any],
+) -> dict[str, Any]:
+    """Create an in-memory compatibility projection for Run #8's pre-field receipt."""
+    source_specs = {
+        item.get("source_id"): item
+        for item in intake_manifest.get("sources", [])
+        if isinstance(item, dict)
+    }
+    rows = receipt.get("sources")
+    if not isinstance(rows, list) or len(rows) != len(source_specs):
+        raise ValueError("C2_LEGACY_RECEIPT_SOURCE_SET_MISMATCH")
+    normalized = json.loads(json.dumps(receipt))
+    for row in normalized["sources"]:
+        if not isinstance(row, dict):
+            raise ValueError("C2_LEGACY_RECEIPT_ROW_INVALID")
+        spec = source_specs.get(row.get("source_id"))
+        if spec is None:
+            raise ValueError("C2_LEGACY_RECEIPT_SOURCE_SPEC_MISSING")
+        expected = str(spec.get("expected_payload_type") or "ANY").strip().upper()
+        if expected != "ANY":
+            raise ValueError("C2_LEGACY_PAYLOAD_TYPE_NOT_DEFAULT_ANY")
+        # Only add defaults when the old manifest/receipt omitted the later,
+        # optional payload-contract fields. Never erase a recorded non-default.
+        old_expected = row.get("expected_payload_type")
+        old_status = row.get("payload_contract_status")
+        old_error = row.get("payload_contract_error")
+        if old_expected not in (None, "", "ANY"):
+            raise ValueError("C2_LEGACY_PAYLOAD_TYPE_NOT_DEFAULT_ANY")
+        if old_status not in (None, "", "NOT_CHECKED"):
+            raise ValueError("C2_LEGACY_PAYLOAD_STATUS_NOT_DEFAULT")
+        if old_error not in (None, ""):
+            raise ValueError("C2_LEGACY_PAYLOAD_ERROR_PRESENT")
+        row["expected_payload_type"] = "ANY"
+        row["payload_contract_status"] = "NOT_CHECKED"
+        row["payload_contract_error"] = None
+    return normalized
+
+
+def _verify_intake_with_legacy_defaults(
+    root: Path,
+    receipt: dict[str, Any],
+    intake_manifest: dict[str, Any],
+) -> dict[str, Any]:
+    """Verify the original first; support only missing optional defaults in a temp copy."""
+    try:
+        result = verify_intake(root)
+        result["raw_receipt_verification_method"] = "CURRENT_RECEIPT_CONTRACT"
+        return result
+    except IndependentVerificationError as exc:
+        if str(exc) != "EXPECTED_PAYLOAD_TYPE_BINDING_MISMATCH":
+            raise
+
+    normalized_receipt = _normalize_legacy_payload_defaults(receipt, intake_manifest)
+    with tempfile.TemporaryDirectory(prefix="iios-c2-legacy-receipt-view-") as temporary:
+        view_root = Path(temporary) / "run8"
+        shutil.copytree(root, view_root)
+        (view_root / "COMPANY_EVIDENCE_INTAKE_RECEIPT.json").write_text(
+            json.dumps(normalized_receipt, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+            encoding="utf-8",
+        )
+        # intake_manifest.json remains byte-identical, so its pinned manifest hash
+        # and every source_spec_sha256 contract continue to be checked unchanged.
+        result = verify_intake(view_root)
+    result["raw_receipt_verification_method"] = (
+        "LEGACY_OPTIONAL_PAYLOAD_DEFAULTS_NORMALIZED_IN_TEMPORARY_COPY"
+    )
+    return result
+
+
 def _verify_receipt_and_raw(root: Path) -> tuple[dict[str, Any], dict[str, dict[str, Any]], dict[str, Any]]:
     receipt = _load_json(root / "COMPANY_EVIDENCE_INTAKE_RECEIPT.json")
     intake_manifest = _load_json(root / "intake_manifest.json")
@@ -306,7 +378,7 @@ def _verify_receipt_and_raw(root: Path) -> tuple[dict[str, Any], dict[str, dict[
     if not isinstance(rows, list) or len(rows) != 9:
         raise ValueError("C2_SOURCE_RECEIPT_SET_MISMATCH")
     by_id = {str(row.get("source_id")): row for row in rows}
-    integrity = verify_intake(root)
+    integrity = _verify_intake_with_legacy_defaults(root, receipt, intake_manifest)
     if integrity.get("status") != "INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION":
         raise ValueError("C2_RAW_INTEGRITY_NOT_PASS")
     if integrity.get("raw_bytes_verified") != 8:
@@ -479,6 +551,7 @@ def build_successor_manifest(root: Path, *, archive_verification_method: str) ->
         "archive_sha256": EXPECTED_ARCHIVE_SHA256,
         "archive_sha256_verification_method": archive_verification_method,
         "archive_raw_integrity_status": integrity["status"],
+        "raw_receipt_verification_method": integrity.get("raw_receipt_verification_method", "UNSPECIFIED"),
         "captured_raw_object_count_verified": integrity["raw_bytes_verified"],
         "fact_locator_count": len(locator_results),
         "official_pdf_source_count": len(verified_sources),
