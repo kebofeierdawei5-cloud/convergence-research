@@ -89,3 +89,13 @@ Action A's audit deliverable is the capability map above plus the recommendation
 - P0-LLM-004 closed: **NO**
 - ChatGPT Free Web formally authorized: **NO**
 - Recommendation: **NO-GO for canonical Web semantic admission; GO only for non-canonical operator assistance.**
+
+## 8. Follow-up hard gate at formal semantic admission — 2026-10-11
+
+The original capability audit found that the manual ChatGPT Web producer remained active while its saved-response receipt explicitly set `provider_origin_verified=false`; the generic semantic admission boundary did not consume that false value. That finding prompted a narrow enforcement follow-up in PR for branch `feat/manual-web-semantic-fail-closed-guard-20261011`.
+
+The candidate change adds a deny gate at `admit_semantic_artifact`, the canonical semantic admission boundary. It rejects (a) `iios-chatgpt-web-semantic-producer` and (b) any renamed producer that retains the `IIOS-CHATGPT-WEB-OPERATOR-POLICY-` policy namespace, returning `NON_CANONICAL` because provider origin is unverified under frozen B0. Regression tests construct otherwise correctly hashed artifacts and producer receipts and verify that both the original identity and a renamed identity using the same unapproved policy are rejected before canonical admission.
+
+This does not authenticate the origin or create an alternative formal assurance class. It preserves the current policy: the manual Web route may be used for exploratory/non-canonical operator assistance, but it cannot feed formal semantic admission. The current request-intent / thesis-semantic handoff still does not implement the proposed two-round research flow. P0-LLM-001/P0-LLM-004, production Host acceptance, complete Run Receipt, and independent D1/D2 validation remain open.
+
+**Acceptance boundary:** only after this guard's exact-head contract, Investment Core CI, State Hygiene, C0 governance, B2 semantic admission and independent red-team checks pass should its state be promoted as canonical. The original Action A source-inspection record remains historical evidence of the gap found before this follow-up.
