@@ -353,7 +353,7 @@ def test_persisted_b2e_blocks_forged_operator_receipt_hash_before_decision(tmp_p
     run_root = tmp_path / "forged-operator-price-run"
     evidences = manifest["evidence"]
 
-    with pytest.raises(B2EE2EError, match="operator price input binding failed"):
+    with pytest.raises(B2EE2EError, match="cannot materialize private operator price input: OPERATOR_PRICE_RECEIPT_SHA256_MISMATCH"):
         run_b2e_conformance(
             raw_request=RAW,
             request_id="b2e-forged-operator-receipt",
