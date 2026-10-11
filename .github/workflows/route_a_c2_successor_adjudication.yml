@@ -5,6 +5,8 @@ on:
     paths:
       - "tools/route_a_c2_adjudicate.py"
       - "tests/test_route_a_c2_adjudicate.py"
+      - "tools/iios_operator_market_price_attestation_v01.py"
+      - "tests/test_operator_market_price_attestation_v01.py"
       - ".github/workflows/route_a_c2_successor_adjudication.yml"
       - "research/b2/**"
       - "schemas/evidence_record_v0.1.schema.json"
@@ -29,9 +31,9 @@ jobs:
       - name: Install validator dependencies
         run: python -m pip install --disable-pip-version-check pytest jsonschema pypdf
       - name: Compile tool and tests
-        run: python -m compileall -q tools/route_a_c2_adjudicate.py tests/test_route_a_c2_adjudicate.py research/b2
+        run: python -m compileall -q tools/route_a_c2_adjudicate.py tests/test_route_a_c2_adjudicate.py tools/iios_operator_market_price_attestation_v01.py tests/test_operator_market_price_attestation_v01.py research/b2
       - name: Run C2 source-contract tests
-        run: PYTHONPATH=. python -m pytest -q tests/test_route_a_c2_adjudicate.py
+        run: PYTHONPATH=. python -m pytest -q tests/test_route_a_c2_adjudicate.py tests/test_operator_market_price_attestation_v01.py
       - name: Download immutable original Run #8 artifact
         uses: actions/download-artifact@v4
         with:
