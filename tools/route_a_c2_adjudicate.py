@@ -25,7 +25,7 @@ from research.b2.company_evidence import (
     REQUIRED_COMPANY_FIELD_GROUPS,
     build_company_evidence_manifest,
 )
-from research.b2.evidence_contract import assert_pit, validate_evidence_record
+from research.b2.evidence_contract import assert_pit, parse_temporal, validate_evidence_record
 from tools.verify_company_evidence_intake import IndependentVerificationError, verify_intake
 
 
