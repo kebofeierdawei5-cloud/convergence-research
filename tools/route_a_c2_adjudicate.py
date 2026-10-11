@@ -353,7 +353,7 @@ def _verify_intake_with_legacy_defaults(
         view_root = Path(temporary) / "run8"
         shutil.copytree(root, view_root)
         (view_root / "COMPANY_EVIDENCE_INTAKE_RECEIPT.json").write_text(
-            json.dumps(normalized_receipt, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+            json.dumps(normalized_receipt, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
             encoding="utf-8",
         )
         # intake_manifest.json remains byte-identical, so its pinned manifest hash
