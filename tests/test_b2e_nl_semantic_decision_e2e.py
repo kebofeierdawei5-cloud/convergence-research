@@ -21,7 +21,8 @@ from iios_mvp.semantic_producer_admission_v01 import ProducerRegistration, Produ
 from iios_mvp.decision_admission import validate_decision_admission_receipt
 from tools.core04_final_300750_decision_e2e import build_case, load_inputs, admit_price
 from research.b2.company_evidence import REQUIRED_COMPANY_FIELD_GROUPS, build_company_evidence_manifest
-from iios_mvp.canonical_run_authority_v01 import run_state_path, CanonicalRunAuthorizationError, _validate_decision_pending_input_refs, authorize_decision_revision_write
+from iios_mvp.canonical_run_authority_v01 import run_state_path, run_receipt_path, validate_complete_run_receipt, CanonicalRunAuthorizationError, _validate_decision_pending_input_refs, authorize_decision_revision_write
+from iios_mvp.machine_publication import write_machine_publication
 from iios_mvp.store import read_snapshot, snapshot_path
 from iios_mvp.machine_publication import write_machine_publication
 from iios_mvp.investor_review_report_v02 import write_investor_review_report_v02
@@ -389,6 +390,21 @@ def test_persisted_b2e_blocks_forged_operator_receipt_hash_before_decision(tmp_p
     assert "DECISION_PENDING" not in stage_ids
     assert "DECISION_ADMITTED" not in stage_ids
     assert not list((run_root / "canonical-artifacts").glob("*.canonical-upstream-admissions.json")) if (run_root / "canonical-artifacts").exists() else True
+
+    # A blocked run cannot mint downstream publication or complete receipt artifacts.
+    with pytest.raises(ValueError, match="decision revision not found"):
+        write_machine_publication(
+            run_root,
+            decision_id="b2e-forged-operator-receipt",
+            published_at="2026-10-04T20:00:00+00:00",
+        )
+    with pytest.raises(
+        CanonicalRunAuthorizationError,
+        match="complete Run Receipt is absent",
+    ):
+        validate_complete_run_receipt(run_root, "b2e-forged-operator-receipt")
+    assert not run_receipt_path(run_root, "b2e-forged-operator-receipt").exists()
+    assert not list(run_root.rglob("*.publication.json"))
 
 
 def test_run_authority_rejects_malformed_operator_price_stage_pairs():
