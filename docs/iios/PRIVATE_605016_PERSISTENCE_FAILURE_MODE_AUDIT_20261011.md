@@ -83,3 +83,14 @@ bash "$HOME/Downloads/Launch_IIOS_Private_605016_B2_Ingest.command" --verify-exi
 Expected status: `VERIFIED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED`. This mode must not re-download the Attempt 10 artifact or request the official price/dividend source endpoints; it validates the already persisted copy.
 
 That read-only replay is a storage-integrity check only. It does not resolve the explicit source-vintage limitation: the official historical price endpoint does not establish its exact first-public timestamp. Source-vintage adjudication and genuine production Host acceptance remain separate gates before formal investment decisions or reports are authorized.
+
+
+## 6. Follow-up incident: read-only verifier import environment — 2026-10-11
+
+The operator's `--verify-existing` run returned `BLOCKED / UNEXPECTED_PRIVATE_INGEST_FAILURE` with `error_type=ModuleNotFoundError`. Its receipt explicitly reports `private_store_written=false`; no admission, Host acceptance, bundle or decision was created.
+
+**Root cause identified in the current entry-point path:** the default Core validator is imported by `_validate_core()`. The ingest path happened to add the repository root to `sys.path` while importing the official HTTPS adjudicator; the read-only verifier deliberately skips adjudication and never performed that setup. Therefore the verifier could fail to import `iios_mvp.canonical_evidence_admission_v01` before it inspected the persisted candidate. This is a Python import-environment defect, not evidence that the local candidate bytes or receipt are corrupt.
+
+**Corrective change under review:** make `_validate_core()` establish the import root explicitly from the effective `repository_root` argument and propagate that argument through persist-time and offline replay call sites. A regression test constructs an isolated temporary canonical-runtime package, removes that path and cached package modules from the test process, and proves the default validator import succeeds only after the function bootstraps the repository path.
+
+**Operator action:** do not rerun ingestion, do not fetch Attempt 10, and do not contact official source endpoints. After the fix is merged, repeat only the existing-candidate read-only verification once. A PASS verifies local storage integrity only; source-vintage review and production Host acceptance remain separate gates.
