@@ -843,7 +843,7 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
     # Materialize the exact final manifest here; the workspace is ephemeral
     # and the manifest/raw quote bytes are not uploaded as a workflow artifact.
     combined_manifest_path.write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\\n",
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
 
