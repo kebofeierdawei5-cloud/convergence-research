@@ -1,6 +1,6 @@
 # IIOS 最终架构方案与低成本快速交付计划
 
-- 日期：2026-10-10
+- 日期：2026-10-11
 - 状态：**PROPOSED — REVIEW REQUIRED；未合并前不是 Canonical Policy**
 - 范围：单用户 A/H 公司级投资决策 MVP 的产品边界、AI 交接、部署边界和分批验收计划
 - 依据：AGENTS.md、docs/PROJECT_STATE_INDEX.md、MVP v0.1 / v0.1.1、MVP Fast Launch Plan、B0 LLM Governance Freeze，以及产品有效性与架构简化审计（PR #310 / #311）
@@ -178,188 +178,195 @@ assurance = OPERATOR_ASSERTED_NOT_CRYPTOGRAPHICALLY_VERIFIED
 
 保留已有代码和历史记录；“暂缓”不等于立即删除。是否退役要由依赖和测试盘点确定，以窄 PR 分批移除真正不再需要的部署入口。
 
-## 5. 分批开发与落地计划
+## 5. 实施计划：嵌入现有规范路线，不新建平行批次体系
 
-每批执行单一目标、单个窄 PR（若属于不同风险/接受者则拆分），必须在开始时写明 Objective / User Value / Product Surface / Tests & Acceptance / Out of Scope。每批完成后先核对 canonical main 和 State Index，再从更新后的基线开展后续批次。
+### 5.1 当前权威状态与路线约束
 
-### Batch S0 — Final ADR + Existing Capability Map
+本计划不创建新的 B0–B5 或 S0–S6 生命周期，避免与仓库已有 B0 治理冻结、P0-LLM 问题编号及 PILOT-00～PILOT-04 发生冲突。
 
-**目标：** 冻结产品/治理决定，并防止平行实现。
+唯一当前状态依据仍是 \`docs/PROJECT_STATE_INDEX.md\`。现有 PILOT-00～04 的历史 PASS 继续保留原有意义，但它们主要证明已覆盖的 lifecycle / deterministic behavior；不能推断真实生产者来源、真实入口、完整语义产物链或 production Host 已验收。
 
-**工作：**
-1. 审阅 canonical main 中 Orchestrator、Case/Run Envelope、Store、Evidence/PIT admission、semantic producer、Forecast/Valuation admission、Decision write gate、Report QA、Run Receipt 和 Replay。
-2. 对每个能力分成：IMPLEMENTED + ACCEPTED、IMPLEMENTED BUT BOUNDED、CONTRACT/TEST-FIXTURE ONLY、MISSING、OPTIONAL/FUTURE。
-3. 决定 MANUAL_WEB_OPERATOR_ASSERTED 的正式保证等级、允许/禁止的产物和相应 B0 successor amendment；没有此批准，不得在实现里默认它可正式准入。
-4. 定义唯一默认入口、一个运行 profile、一个 artifact/receipt contract 与端到端验收。
+本轮工作的实际目标，是关闭现存的产品关键缺口，尤其是：
 
-**验收：**
-- 文档列出真实 repo 路径、现有实现、可复用 API、缺口及测试证据。
-- 明确任何 CI PASS 的作用范围与非声明。
-- 无运行时代码变更，无经济语义变更。
-- 后续工作不需要依赖聊天记录才能理解。
+- P0-LLM-001：真实用户投资请求必须进入唯一 Canonical Research Orchestrator；
+- P0-LLM-003：语义产物的来源/生产者与 stage/input/output lineage 必须满足经过批准的准入契约；
+- P0-LLM-004：真实自然语言/用户输入 → 模型推理 → 语义准入 → 正式决策的产品验收；
+- 当前真实公司证据链的 source-by-source Evidence/PIT admission 与本地私有持久化；
+- 完整正式 Decision / Publication / Human Report / Run Receipt / independent replay。
 
-**成本等级：** S（低）；这是整个方案最重要的降重步骤。
+每个开发任务仍须遵守 AGENTS.md 的 Objective / User Value / Product Surface / Test-Acceptance / Out-of-Scope 契约。完成一个任务后更新权威状态依据，再从最新 canonical main 开始下一项任务。不得把本文件中的建议批次直接当作已完成状态或新的 canonical policy。
 
-### Batch S1 — Minimal Local Launch + Canonical Ingress
+### 5.2 优化后的执行次序
 
-**目标：** 从单一入口创建真实 Case 并运行现有 Orchestrator；不先开发高级 UI。
+#### Action A — 一次性差距核对与治理裁定（低成本，先做）
 
-**工作：**
-1. 增加一个面向单用户的 launcher / 命令，自动处理本地环境检查、固定依赖、私有目录、版本和清晰错误提示。
-2. 接受 Market、Symbol、As-of/Cutoff、Current Position；确认自然语言解析字段后才生成规范 Case。
-3. 由应用代码创建工作区、run 状态、内部 bundle/manifest 路径和必要的私有 intake，不让用户手工编辑这些对象。
-4. 确保用户端研究无需 GitHub Actions、远程 Host、API key 或多个手工 environment variables。
-5. 优先复用现有 store；若需改变持久化策略，另出窄范围 ADR + migration / replay tests。
+**目标：** 用仓库真实代码和测试证据确定最小工作量，而不是重做一遍架构。
 
-**验收：**
-- 干净 Mac 用户环境下完成安装/启动测试。
-- 启动成功时进入唯一 Orchestrator；缺依赖/网络/证据时错误具体且 fail-closed。
-- 重新启动可发现既有 Case 与 run 记录；不覆盖旧数据。
-- 本地私有数据不进入 GitHub commits / public artifacts / logs。
-- 不声称 S1 就完成正式投资决策链。
+检查现有 Orchestrator、Case/Run Envelope、Store、Evidence/PIT、semantic producer、Forecast/Valuation admission、Decision write gates、Publication、Report QA、Run Receipt 和 Replay。对每项标明具体路径、调用入口、现有测试、测试范围与仍未证明的内容，分类为：
 
-**成本等级：** M（中）；以复用现有 API 为成本控制前提。
+- ACCEPTED / 可直接复用；
+- IMPLEMENTED / 仅有有限范围验收；
+- CONTRACT-ONLY / fixture-only；
+- MISSING / 真实缺口；
+- OPTIONAL / 暂缓。
 
-### Batch S2 — Official Evidence Intake + PIT Closure
-
-**目标：** 让一个真实公司所需的证据可以从官方来源获取或通过私有 intake 导入，并进入现有 Evidence/PIT 核心。
-
-**工作：**
-1. 只实现当前案例需要的官方源适配器和原始文件导入路径。
-2. 对每个原始文件验证允许的来源、HTTPS/传输规则、原始字节、size/hash、类型、日期、PIT 和复用/保存限制。
-3. 把“下载成功”“原始字节一致”“来源获准”“PIT 合格”“正式 admitted”分成独立状态。
-4. 当源不可用或 exact bytes 不符合合同，给出具体缺项并阻断受影响阶段；禁止静默使用二级来源替换。
+同时完成 ChatGPT Free Web 人工交接的治理决策。不得先假定 \`MANUAL_WEB_OPERATOR_ASSERTED\` 可以进入正式语义准入。必须由版本化的 B0 successor/amendment 明确此来源等级能否被接受、哪些语义产物可用、禁止声称什么，以及失败时的 BLOCKED / NON_CANONICAL 处理。在裁定完成前，人工网页输出只可作为非规范辅助材料，不得产生正式决策级产物。
 
 **验收：**
-- 至少一只真实公司覆盖当前要求的证据类别；每一类都有来源和 cutoff 说明。
-- 使用更改过的文件、错日期、错公司、错误来源进行负向测试，正式 admission 必须失败。
-- 本地私有持久化经过实际运行确认；CI artifact 仅含经审查的脱敏状态元数据。
-- 不引入完整 A02 / CSI800 数据平台作为前置依赖。
+- 输出一份有文件路径、调用关系、测试证据和具体缺口的能力映射；
+- 与 PROJECT_STATE_INDEX 和现有 PILOT 路线一致，不重开已通过且范围明确的旧批次；
+- 明确 ChatGPT Web 生产者契约 Go/No-Go；
+- 本动作不更改经济语义、不改运行时权限、不修改或弱化测试。
 
-**成本等级：** M–L（中至高，取决于官方端点和材料准入实际阻塞）。采用“一个当前案例需要的来源”控制范围。
+#### Action B — 先在现有本地路径证明真实输入与证据持久化（低至中成本）
 
-### Batch S3 — Two-Round Free Web Handoff + Semantic Admission
+**目标：** 不先造安装器或 UI，先验证已有本地入口、官方材料 intake 和私有存储能否在操作者环境真正工作。
 
-**目标：** 用最少的人工交接让 ChatGPT Free 提供研究推理，同时严格绑定输入/输出和阶段准入。
-
-**工作：**
-1. 按 Round A / Round B 生成可复制任务包；不要求每个内部阶段分别手动执行一次 ChatGPT 回调。
-2. 提供原始 response 导入命令/界面；导入前后保存 bytes、hash、case/cutoff/stage refs 和人工来源确认。
-3. 实施经 S0 批准的 operator-asserted producer contract 和 B0 successor/amendment；输出未明确授权时只作 non-canonical assistance。
-4. 将单份回答解析成独立 typed artifacts，逐项校验 schema、引用、身份、截止日、独立预测边界和阶段依赖。
-5. 失败时只请求或重导入未通过的阶段；不自动把模型回答修成 PASS、不让模型写 admission status。
-6. 记录 prompt version、原始回答、校验报告和所有人工修改。
+优先复用现有官方证据采集/私有导入工具及真实 Case；从现有候选中选取证据与截止时点最可验证的一家公司，不先假设某个候选一定通过。针对 605016，现有状态明确要求在操作者 Mac 上重新运行私有 B2 ingest 并确认本地持久化；若当前执行环境无法触达操作者 Mac，则必须把它记为待操作者运行的验收项，不将 GitHub CI 的 PASS_EPHEMERAL_B2 当成本地持久化证据。
 
 **验收：**
-- 两轮主要交接可产生完整必需的语义候选产物；有缺陷时仅受影响 artifact / stage 阻断。
-- Price-blind Forecast 输入中不存在 current price / valuation / market-implied values。
-- 结构正确但证据 ID 错误、case/cutoff 错误、模型来源声明自封、缺少 producer receipt 等对抗样本全部失败关闭。
-- 完整链路明确标记 provenance assurance；不会声称得到未验证的 ChatGPT server/model attestation。
-- 如果 S0 决定人工网页模式不能进入正式 semantic admission，则 S3 仅交付辅助模式，正式 Decision 必须保持阻断；不得绕过治理合同。
+- 原始文件按清单逐字节校验并写入用户私有目录；
+- 在持久化副本上重新执行原有核心 Evidence/PIT validator；
+- 重新启动后仍能读取相同案例和记录；
+- 源不可用、字节变化、cutoff 错误或准入缺项均安全阻断；
+- 私有数据不进入 GitHub commits、公开 workflow artifacts 或不受控日志。
 
-**成本等级：** M；最大未知量是现有语义生产者/准入接口是否可在不建新路径的情况下复用。
+**成本控制：** 先用现有 launcher / CLI；只有实际运行证明它不能可靠启动或错误信息无法诊断时，才修补启动体验。不要在证明内核可工作前重写启动系统。
 
-### Batch S4 — One Real-Company Vertical Slice
+#### Action C — 关闭语义生产者契约并完成最小 AI 交接（中等成本，依赖 Action A）
 
-**目标：** 以一只真实公司证明完整产品可用。建议优先从候选 301345.SZ 或已有真实公司案例中选一个，以证据可获得、cutoff 可固定、完整性可验收为选择标准；不预设未验证的公司一定能通过。
+**目标：** 使免费网页人工交接能按明确保证等级工作，而不是把它伪装成 API 或密码学 attestation。
 
-**工作：**
-1. 使用冻结后的代码版本和 as-of/cutoff 运行。
-2. 完成 Trust / Reality / Quality / Thesis / Value Drivers / Independent Forecast / Valuation / MIE / Expectation Gap / Risk / Position / Decision。
-3. 以确定性内核计算所有数值并验证收益门槛、风险和仓位约束。
-4. 生成 AI Proposal、Human Approval（未批准前标为 pending）、immutable Decision Revision、Machine Publication、中文人类报告、QA 与 complete Run Receipt。
-5. 保存完整输入/输出与依赖版本，执行独立 replay。
+治理允许的前提下，先实现两个可重试的研究交接包，降低人工操作次数：
 
-**验收：**
-- 从普通用户入口发起，不手工预构造关键 semantic / forecast / valuation admitted objects 来冒充完整产品运行。
-- 每个正式结果均绑定到正确公司、cutoff、证据清单、producer profile 和 stage lineage。
-- 缺失关键数据时可以产生完整的“阻塞报告/诊断记录”，但不得生成虚假的成功决策。
-- AI 输出与正式计算、报告和机器记录一致；人类审批与 AI 建议分开。
-- 完整 Run Receipt 可定位并重放依赖；独立检查者能复核本次运行。
-- 一家公司 PASS 只证明流程完整，不宣称投资策略已经有预测有效性。
+1. **Price-blind Round：** 仅使用截止时点内允许的经营/财务证据；输出 Reality、Quality、Thesis、Value Drivers、Independent Forecast、证据引用、假设与未知项。输入不得包含当前价格、估值、MIE 或仓位信息。
+2. **Price-aware Round：** 使用已准入的 Round 结果、正式行情证据与持仓约束；输出 Valuation/MIE 的推理与不确定性、Expectation Gap、Risk、Position 和 AI Decision Proposal。
 
-**成本等级：** L（高且不可省略）；这是对产品是否真的交付的核心验证。
+这两轮是用于降低交接成本的初始假设，不代表所有阶段可以失去独立的 schema / artifact / admission。导入器必须保存实际提交的 prompt 与原始回答、Case/cutoff/stage/input refs、导入者声明、时间和 hash。模型输出不得自行把状态标记为 admitted。若输出有问题，仅重试受影响的阶段，不自动修复为 PASS。
 
-### Batch S5 — Adversarial Acceptance + Pilot Usability
-
-**目标：** 证明简化没有减弱关键约束，并量化实际使用成本。
-
-**负向场景至少包括：**
-- 缺证据、错公司、错 cutoff、陈旧/冲突数据；
-- 修改原始文件、改变输出字节、伪造来源字段、非法语义 schema；
-- missing Forecast / Valuation / MIE 不可识别却被当成 PASS；
-- 在 forecast prompt 中注入 current price；
-- 通过 CLI、普通自由文本、报告或旧 artifact 绕过 Orchestrator / write gate；
-- 报告与 canonical decision 数值不一致；
-- Human Approval 未完成就替换 current approved decision；
-- 进程中断/重启、重复运行、replay；
-- 私有数据意外进入 GitHub 或日志；
-- ChatGPT 额度限制、输出格式异常、复制不完整时仍错误标记为成功。
+若治理裁定不允许网页人工输出进入正式 semantic admission，则此路径必须明确保持 NON-CANONICAL；正式决策暂停在对应门禁。项目不能绕过该决定去宣称完整 MVP。
 
 **验收：**
-- 所有决策权限相关负向场景必须 BLOCK / NON_CANONICAL / REVIEW_REQUIRED，不准弱化测试以获得 PASS。
-- 在真实 Mac 环境独立重放，审计者不依赖原开发者临场解释。
-- 以一次真实案例记录实际手工交接次数、每轮失败率、人工修订次数、运行耗时和部署问题；用数据决定是否值得做 UI。
-- 有限用户 pilot 通过后，才能标记 LOCAL_SINGLE_USER MVP usable。
+- producer assurance 声明真实、边界明确；
+- 正确的身份、截止时点和输入引用绑定到每项产物；
+- 模型无法写入权威状态、改写 admission 或绕过 Orchestrator；
+- price-blind 输入不存在当前价格泄漏；
+- 错公司、错 cutoff、错误 Evidence ID、伪造 producer 声明、缺项、格式异常等对抗测试均失败关闭；
+- 对两轮方案记录人工交接数、重试率与修订率，避免把两轮未经验证地固定成永久要求。
 
-**成本等级：** M–L。
+#### Action D — 在现有 PILOT / Investment Core 路线上完成一家公司端到端闭环（高价值、不可省略）
 
-### Batch S6 — 只有观察到真实摩擦后再优化交互
+**目标：** 以真实用户输入和真实材料，验证正式研究链路，而不是手工预构造 admitted semantic/forecast/valuation objects 来冒充生产执行。
 
-第一阶段不开发 Chrome Companion 或网页自动读取。若 S5 的实际使用数据证明交互成为主要瓶颈，再选择：
-- 薄本地页面，复用同一个应用服务；或
-- Chrome Side Panel，仅用于生成/复制 prompt、粘贴 response 与展示本地状态；不读取/抓取 ChatGPT 内部响应，不拥有正式业务逻辑。
+执行链至少包括：
 
-UI 不得建立第二套 Case/Run/Store，不参与准入决定，也不改变任何经济语义。S6 的验收以人工交互次数和错误率下降为依据，不以页面上线作为成功。
+用户输入与 Case identity
+→ 官方证据及 PIT
+→ Trust / Reality / Quality / Thesis / Value Drivers
+→ Independent Forecast
+→ Valuation / MIE / Expectation Gap
+→ Risk / Portfolio / Position
+→ AI Decision Proposal
+→ Deterministic Decision Admission
+→ Human Approval（未批准前保持 pending）
+→ Immutable Decision Revision / Machine Publication / Human Report / QA
+→ 完整 Run Receipt / Replay。
 
-## 6. 成本控制与进度控制
+**验收：**
+- 实际用户入口进入唯一 Orchestrator；
+- 正式产物均绑定正确市场、证券、cutoff、证据清单、producer policy 与 stage lineage；
+- 所有适用数值来自确定性内核，报告与机器对象一致；
+- 缺少关键输入时输出可读的阻塞诊断，但不得伪造完整投资决策；
+- 真实 Run Receipt 覆盖 B0 所需的完整上游与下游引用；
+- 从冻结输入执行独立 replay；不能以局部 CI、预制产物或报告可读性代替成功。
 
-### 6.1 不做未经差距审计的全面重构
+此 Action 的首个真实公司可以沿用现有案例或新用户候选，以 source completeness 与明确 cutoff 为准。它首先是工程运行可靠性验收，不是投资策略预测有效性证明。
 
-禁止一次性“清理整个 iios_mvp”“删掉大量 workflows”或重写 Store。先在 S0 标出依赖图、真实用户路径和已验收能力。删除或退役只通过独立窄 PR 进行，且需证明没有仍被 canonical 路径调用。
+#### Action E — 对抗性回归，并回到既有 PILOT 接受标准（中至高成本）
 
-### 6.2 每个批次设置 Stop/Go Gate
+不建立新的平行 MVP 接受体系；把新增的真实入口、producer lineage、Evidence/PIT 和 Run Receipt 验收加入现有规范的试点/红队执行协议中。
 
-- S0 不通过：暂停运行代码修改，不可先造 UI。
-- S1 不通过：不能声称本地部署完成。
-- S2 不通过：不能启动正式公司投资决策；具体缺项显示给用户。
-- S3 的 producer governance 未通过：Web 输出仅可用于 non-canonical 辅助分析。
-- S4 不通过：不能标记 MVP accepted。
-- S5 不通过：不开展交互美化或远程扩张。
+至少验证：
 
-### 6.3 不以未测量的时间或金额承诺“快速”
+- 缺数据、错公司、错 cutoff、过期或冲突证据；
+- 原始字节被修改、来源错误、PIT 不合格；
+- Forecast 缺失或受到 current price 污染；
+- MIE 不可识别却被强行标记为确定结论；
+- 自带 admitted 字段的外部 JSON、未授权 producer、stage lineage 断裂；
+- 绕过 Orchestrator、Decision write gate 或 Human Approval；
+- Report 与 Machine Publication / Decision 不一致；
+- 中断后恢复、重复执行、旧 Revision 不被覆盖、独立 replay；
+- 私有数据流入 GitHub 或不受控日志；
+- ChatGPT 限额/回答截断/格式异常时误报成功。
 
-当前属于静态架构规划，尚未完成本地干净环境实测，也未逐个复核所有现有 runtime/store API 的复用成本，因此不应编造绝对工期或现金成本。初步相对工作量是：S0 低；S1 中；S2 中至高；S3 中（有较大接口复用不确定性）；S4 高；S5 中至高；S6 可选。S0 的唯一目标就是尽快将未知量变成有证据的差距清单，以避免昂贵的试错重构。
+验收应继承现有 Fast Launch Plan 对真实公司、fresh candidate、无未决 P0、无证据替换及确定性重放的要求。现有历史 PILOT PASS 继续只表示原来覆盖的范围；当新增真实 LLM 路径验收未完成时，不得宣称 P0-LLM-001 / P0-LLM-004 已关闭。
 
-## 7. 产品验收的量化指标
+#### Action F — 只在测量后做安装与交互优化（可选）
 
-MVP 通过须同时满足：
+等实际运行路径已经成立，再根据故障和使用记录决定是否：
+- 改善一键启动与本地诊断；
+- 提供轻量本地页面；
+- 提供 Chrome Side Panel 以辅助生成/复制 prompt、粘贴 response 和查看本地状态。
 
-1. **一条正式入口：**真实用户输入最终到达现有 Canonical Research Orchestrator；没有平行的正式路径。
-2. **一个真实公司：**在固定 cutoff 下完成合法的端到端运行，或在资料确实缺失时得到明确且可审计的阻塞状态。
-3. **来源和时间可追溯：**所有正式证据有明示来源、时间、字节清单与准入范围。
-4. **预测独立：**Forecast 阶段输入不包含 current price / valuation / MIE；不存在隐藏价格泄漏。
-5. **所有数字可复算：**估值、预期回报、门槛、仓位及价格区间来自确定性内核，单位/币种明示。
-6. **正式推理有授权契约：**生产者保证等级、prompt、原始输出、stage lineage 与导入记录完整；不能把人工网页输出冒充密码学 attestation。
-7. **阻断有效：**关键事实缺失、输入冲突、producer 未获授权或 stage lineage 断裂时，不创建声称完整的正式 Decision。
-8. **输出一致：**Human report、Machine Publication、Decision Revision 和 Run Receipt 的关键字段完全一致。
-9. **历史可回放：**已冻结输入可重放，旧决策不会被覆盖。
-10. **隐私得到保护：**原始资料和用户持仓不进入 GitHub 公共产物。
-11. **人工批准保持独立：**AI proposal 不自动成为 Human-approved decision；auto execution 恒为 false。
-12. **实际成本可观察：**至少记录一次 pilot 的安装步骤、模型交接数、重试、失败和恢复成本。
+任何 UI 只能调用现有应用服务，不允许创建第二套业务状态或决策逻辑。不得构建自动读取 ChatGPT 网页响应的浏览器抓取路径。交互优化的验收依据是实测的操作次数、失败率、重试次数和恢复成本降低，而不是界面上线本身。
 
-## 8. 对现有审计和 State Index 的治理处理
+## 6. 依赖关系与 Go/No-Go 门槛
 
-- PR #310 / #311 是审计文档；它们不修改代码或投资语义，也没有关闭 P0-LLM-001 / P0-LLM-004。
-- 本文件合并前仅是提议，不改变 docs/PROJECT_STATE_INDEX.md 的唯一权威地位。
-- 本 ADR 被正式接受后，先更新 canonical State Index 的当前指令与批次入口，再执行 S1；不得把历史的 “next boundary” 直接解释成当前状态。
-- 各批次必须以最新 canonical main 为基线，按 AGENTS.md 保持窄 PR、测试和验收声明同步。
-- 不把某个历史 PASS、CI 结果、哈希匹配或可读报告扩张解释成更广泛的产品 PASS。
+建议按下列依赖推进，不把每个箭头理解成一个新的永久批次命名空间：
 
-## 9. 最终决策建议
+\`\`\`text
+Action A: code/gap map + producer policy decision
+             ↓
+Action B: local input + durable official evidence
+             ↓
+Action C: authorized / explicitly bounded AI handoff
+             ↓
+Action D: one real canonical company run + complete receipt/replay
+             ↓
+Action E: adversarial regression + existing pilot acceptance
+             ↓
+Action F: only measured UX / installer improvements
+\`\`\`
 
-**选择 Local-first + 现有 Orchestrator 复用 + 明确保证等级的人工 ChatGPT Web 适配器 + 单公司真实端到端验收。**
+B 与 C 在代码上可并行做窄范围准备，但正式端到端验收依赖二者都达到各自门槛。若 Action A 判定人工 ChatGPT Free 输出不允许进入正式语义准入，Action C 只能完成 non-canonical auxiliary workflow；必须另选一个符合现行治理的推理来源来继续正式路径，不能将正式决策门禁降级。
 
-这一方案最贴合原始个人投资需求，并把复杂度集中在真正有价值的地方：证据可信、预测独立、估值可复算、决策受权限控制和结果可复现。
+## 7. 成本控制原则
 
-低成本的关键不是把治理移除，而是避免重复实现；快速交付的关键不是跳过真实验收，而是先交付一条最短的完整垂直切片。先做 S0 的能力/缺口盘点与治理裁定，再按 S1–S5 逐批实现。UI/Chrome 交互增强只能在完整链路通过并观察到真实摩擦后进入可选 S6。
+- **先复用，再新增：**每个新模块都必须指出现有实现为什么不能满足需求。
+- **不先做 UI：**用 CLI/现有入口验证后再决定安装器或本地页面。
+- **不先迁移存储：**除非实测发现现有 Store 无法满足单机运行，不重写持久化。
+- **不清理全仓库：**不因 workflow 数量较多就批量删除；只有明确不在默认路径且确认没有依赖的才通过独立窄 PR 退役。
+- **以阻塞项为单位交付：**每个 PR 只关闭一个有证据支持的 P0/P1 缺口，并附带相应测试，不将不相关的治理/数据/交互改动捆绑。
+- **不编造工期或节省金额：**Action A 先把未知复用成本变成事实；在一家公司真实试点之前，只给出相对成本等级。
+
+## 8. 正式产品验收标准
+
+LOCAL_SINGLE_USER 只有同时满足以下条件才可标记为 MVP usable：
+
+1. 一条真实用户入口进入唯一 Canonical Research Orchestrator。
+2. 至少一个真实公司在固定 cutoff 下运行完成；无法完成时提供明确、可审计的阻塞原因。
+3. 所有正式证据均有来源、字节清单、时间边界和明确准入范围。
+4. 独立 Forecast 的输入保持 price-blind；所有适用数字由确定性核心计算。
+5. 语义生产者保证等级和输入/输出 lineage 符合经批准的契约。
+6. Decision、Approval、Publication、Report QA、Run Receipt 之间引用一致。
+7. 历史决策 append-only，并能从冻结输入独立重放。
+8. 未获批准的 AI Proposal 不替代 Human Decision；auto execution 恒为 false。
+9. 负向测试证明缺失、冲突、错绑、未授权来源及旁路不能产生正式 PASS。
+10. 本地原始资料和用户私有信息不进入 GitHub 公共产物。
+11. 完成现有 Fast Launch Plan 要求的控制公司与 fresh user-selected candidate 验收；任何旧 PASS 都不能代替新增真实 LLM 路径的验收。
+12. 实际测量安装/恢复成本、人工交接数、重试率和用户需要提供的材料量。
+
+## 9. 治理与状态同步
+
+- 此文档仍是提议；未被审阅和合并前不改变 canonical policy。
+- PR #310 / #311 是审计记录，不修改运行时、不关闭 P0。
+- PR #312 的内容不得被作为已实现架构或 MVP 通过的证明。
+- 正式接受后，按 AGENTS.md 和项目状态政策更新唯一权威 State Index，明确最新主线和下一项实际任务。
+- 已完成阶段按证据保留历史状态；不得为了使用新计划而重命名、重开或抹除已有 PILOT 结果。
+- 任何治理边界变更都必须有版本化 successor/adjudication、测试和明确非声明。
+
+## 10. 最终建议
+
+保留 LOCAL_SINGLE_USER 与现有核心复用方向；不采纳另起一套 B0–B5 / S0–S6 生命周期的做法。把工作映射回现有权威状态与 PILOT 接受框架，先做一次有证据的能力/缺口盘点，再优先验证本地真实输入和证据持久化、AI 生产者准入和一家公司完整链路。
+
+**最快的可信交付不是先搭建更多界面，而是尽快证明现有内核能通过唯一用户入口完成一次真实、合规、可重放的投资决策；然后只修复这条路径上已证实的阻塞。**
