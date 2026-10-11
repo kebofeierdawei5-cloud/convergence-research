@@ -594,6 +594,87 @@ def _download_attempt10(destination: Path) -> Path:
             pass
 
 
+def _price_evidence(manifest: Mapping[str, Any]) -> dict[str, Any]:
+    records = [
+        item for item in manifest.get("evidence", [])
+        if isinstance(item, Mapping) and item.get("evidence_id") == PRICE_EVIDENCE_ID
+    ]
+    if len(records) != 1:
+        raise PrivateIngestError("OFFICIAL_PRICE_EVIDENCE_RECORD_MISSING_OR_DUPLICATED")
+    return dict(records[0])
+
+
+def _source_vintage_state(
+    manifest: Mapping[str, Any],
+    *,
+    raw_root: Path,
+    repository_root: str | Path,
+) -> dict[str, Any]:
+    """Return the replay-verified PIT source-vintage state for old or successor candidates."""
+    price = _price_evidence(manifest)
+    adjudication = manifest.get("source_vintage_adjudication")
+    if adjudication is None:
+        if (
+            price.get("known_at") != "2026-10-08T15:00:00+08:00"
+            or "MARKET_SESSION_CLOSE_EVENT_TIME" not in str(price.get("known_at_basis", ""))
+        ):
+            raise PrivateIngestError("EXISTING_PRIVATE_SOURCE_VINTAGE_NEEDS_ADJUDICATION")
+        return {
+            "source_vintage_status": "REVIEW_REQUIRED_EXACT_ENDPOINT_FIRST_PUBLIC_TIMESTAMP",
+            "source_vintage_review_required": True,
+            "exact_first_public_timestamp_verified": False,
+            "adjudication_sha256": None,
+            "public_availability_upper_bound": None,
+        }
+
+    try:
+        import_root = Path(repository_root).expanduser().resolve(strict=True)
+    except OSError as exc:
+        raise PrivateIngestError("CORE_VALIDATOR_REPOSITORY_ROOT_MISSING") from exc
+    if not import_root.is_dir():
+        raise PrivateIngestError("CORE_VALIDATOR_REPOSITORY_ROOT_MISSING")
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
+    try:
+        from research.b2.source_vintage_policy import validate_source_vintage_adjudication
+
+        state = validate_source_vintage_adjudication(
+            manifest,
+            raw_root=raw_root,
+            expected_price_sha256=EXPECTED_PRICE_RAW_SHA256,
+        )
+    except ValueError as exc:
+        raise PrivateIngestError(str(exc)) from exc
+    return state
+
+
+def _adjudicate_source_vintage_manifest(
+    manifest: Mapping[str, Any],
+    *,
+    raw_root: Path,
+    repository_root: str | Path,
+) -> dict[str, Any]:
+    """Create/replay the deterministic official-rule upper-bound adjudication."""
+    try:
+        import_root = Path(repository_root).expanduser().resolve(strict=True)
+    except OSError as exc:
+        raise PrivateIngestError("CORE_VALIDATOR_REPOSITORY_ROOT_MISSING") from exc
+    if not import_root.is_dir():
+        raise PrivateIngestError("CORE_VALIDATOR_REPOSITORY_ROOT_MISSING")
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
+    try:
+        from research.b2.source_vintage_policy import adjudicate_605016_source_vintage
+
+        return adjudicate_605016_source_vintage(
+            manifest,
+            raw_root=raw_root,
+            expected_price_sha256=EXPECTED_PRICE_RAW_SHA256,
+        )
+    except ValueError as exc:
+        raise PrivateIngestError(str(exc)) from exc
+
+
 def _candidate_fingerprint(manifest: Mapping[str, Any]) -> str:
     """Stable content identity that does not change solely with retrieval time."""
     evidence_projection = []
