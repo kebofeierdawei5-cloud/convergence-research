@@ -69,6 +69,56 @@ jobs:
           assert report["execution_authorized"] is False
           print("C2 successor source/PIT boundary: PASS; market_price remains UNKNOWN and blocks final admission")
           PY
+      - name: Build explicitly synthetic operator-price fixture for positive-path test
+        run: |
+          python tools/iios_operator_market_price_attestation_v01.py \
+            --case-id RC-CN-A-002001-20261009 \
+            --market CN-A \
+            --symbol 002001 \
+            --company '浙江新和成股份有限公司' \
+            --cutoff-date 2026-10-09 \
+            --observation-date 2026-10-08 \
+            --close-price 99.99 \
+            --currency CNY \
+            --source-ref 'SYNTHETIC-CI-FIXTURE-NOT-REAL-MARKET-DATA' \
+            --out-dir /tmp/iios-c2-synthetic-attestation/c2-market-price-attestation \
+            --confirm-operator-attestation \
+            --confirm-known-by-cutoff
+      - name: End-to-end positive-path test of all seven Core/PIT groups with synthetic price
+        run: |
+          python tools/route_a_c2_adjudicate.py \
+            --archive-dir /tmp/iios-c2-run8-artifact \
+            --out-dir /tmp/iios-c2-successor-with-price-fixture \
+            --artifact-digest-verified-by-download-action \
+            --operator-market-price-attestation-dir /tmp/iios-c2-synthetic-attestation/c2-market-price-attestation
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          out = Path("/tmp/iios-c2-successor-with-price-fixture")
+          report = json.loads((out / "C2_SOURCE_ADJUDICATION_REPORT.json").read_text(encoding="utf-8"))
+          manifest = json.loads((out / "B2_COMPANY_EVIDENCE_MANIFEST.json").read_text(encoding="utf-8"))
+          assert report["archive_raw_integrity_status"] == "INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION"
+          assert report["captured_raw_object_count_verified"] == 8
+          assert report["fact_locator_count"] == 13
+          assert report["b2_manifest_status"] == "PASS"
+          assert report["missing_required_field_groups"] == []
+          assert len(manifest["evidence"]) == 14
+          assert manifest["status"] == "PASS"
+          assert manifest["validation_errors"] == []
+          assert report["market_price"]["status"] == "OPERATOR_ATTESTED_CORE_PIT_PASS_NOT_SOURCE_VERIFIED"
+          assert report["market_price"]["secondary_web_audit_performed"] is False
+          assert report["market_price"]["original_vendor_bytes_received"] is False
+          assert report["market_price"]["numeric_price_in_report"] is False
+          assert report["formal_signed_admission_created"] is False
+          assert report["production_host_accepted"] is False
+          assert report["decision_created"] is False
+          assert report["publication_created"] is False
+          assert report["run_receipt_created"] is False
+          assert report["execution_authorized"] is False
+          assert "99.99" not in (out / "C2_SOURCE_ADJUDICATION_REPORT.json").read_text(encoding="utf-8")
+          print("Synthetic positive path PASS: 13 filing facts + 1 operator-price fixture cover all seven Core/PIT groups; no actual quote or formal decision was used.")
+          PY
       - name: Upload sanitized status report only
         uses: actions/upload-artifact@v4
         with:
