@@ -653,6 +653,7 @@ def _adjudicate_source_vintage_manifest(
     *,
     raw_root: Path,
     repository_root: str | Path,
+    core_validator: Callable[..., list[str]] | None = None,
 ) -> dict[str, Any]:
     """Create/replay the deterministic official-rule upper-bound adjudication."""
     try:
@@ -670,6 +671,7 @@ def _adjudicate_source_vintage_manifest(
             manifest,
             raw_root=raw_root,
             expected_price_sha256=EXPECTED_PRICE_RAW_SHA256,
+            core_validator=core_validator,
         )
     except ValueError as exc:
         raise PrivateIngestError(str(exc)) from exc
@@ -1341,6 +1343,7 @@ def adjudicate_existing_private_b2_candidate(
         original_manifest,
         raw_root=source_candidate_dir / "evidence_root",
         repository_root=repository_root,
+        core_validator=core_validator,
     )
     return _persist_source_vintage_successor(
         source_candidate_dir=source_candidate_dir,
@@ -1401,6 +1404,7 @@ def ingest_private_b2_candidate(
             manifest,
             raw_root=raw_root,
             repository_root=repository_root,
+            core_validator=core_validator,
         )
         manifest_path.write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
