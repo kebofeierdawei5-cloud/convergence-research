@@ -38,12 +38,13 @@ With the private environment loaded, start the host bound to loopback and keep l
 
     python -m iios_mvp.canonical_host_v01 > "$IIOS_HOST_OUTPUT_ROOT/host.log" 2>&1 &
 
-In a second terminal, load the same protected env with tracing disabled and probe without verbose curl output:
+In a second terminal, load the same protected env with tracing disabled and run the loopback-only probe tool:
 
-    curl --silent --show-error "http://127.0.0.1:${IIOS_HOST_PORT:-8765}/healthz"
-    curl --silent --show-error "http://127.0.0.1:${IIOS_HOST_PORT:-8765}/readyz"
+    python tools/iios_d1a_host_liveness_probe_v01.py --host 127.0.0.1 --port "${IIOS_HOST_PORT:-8765}" --out "$IIOS_HOST_OUTPUT_ROOT/d1a-liveness-probe.json"
 
-Expected: health status OK; ready status CONFIGURED_NOT_PRODUCTION_ACCEPTED and runtime invocation false. These are liveness/configuration observations only.
+The tool performs GETs only (never POSTs or invokes the provider), rejects non-loopback targets, writes a mode-0600 report containing status codes, host version and response SHA-256 values only, and returns HOST_LIVENESS_PROBED_NOT_PRODUCTION_ACCEPTED when both contracts pass. The report path must not already exist.
+
+Expected: health status OK; readiness status CONFIGURED_NOT_PRODUCTION_ACCEPTED and runtime invocation false. These are liveness/configuration observations only. A successful probe is not Host acceptance.
 
 ## Phase 3 — real host-origin provider invocation
 
