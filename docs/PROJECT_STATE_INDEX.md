@@ -303,36 +303,13 @@ Therefore:
 
 The primary Investment Core MVP path is **Route A — free-first single-company evidence intake + public web discovery**. No LLM provider endpoint or API key is required for this Route A path. Public-web discovery, public-source capture, B2 preflight and artifact retention all run without an external LLM endpoint, paid search API or API key. Operator-supplied raw originals and manually supplied evidence remain supported when public URLs are unavailable or source bytes need to be supplied directly. B2-D remains an optional external-LLM integration adapter and is not an MVP gate.
 
-**Latest real capture: Run #8 succeeded as `PARTIAL_CAPTURE_VERIFIED_NOT_ADMITTED`.** Eight of nine declared source objects were retained and independently hash-verified; the public Eastmoney K-line endpoint failed on this run. The artifact and failure row were retained instead of discarding the other eight files. The existing B2 preflight executed successfully and correctly returned `BLOCKED_NOT_ADMITTED`.
+**C2 Run #8 artifact recheck — 2026-10-11:** the preserved archive SHA-256 `0c7ddb34a4b77f7298309ae89ac8de96877a059656a811beefe7eabfe99a0ba1` matched, and all eight captured raw files passed receipt size/hash replay. The ninth declared Eastmoney K-line source has no bytes. This is raw-integrity PASS only; evidence admission remains NOT_ADMITTED.
 
-**Latest Route A advance — PR #259, page-located fact extraction review.** A reproducible extractor now re-verifies raw source SHA-256/size, checks selected text terms against exact PDF page locators, and emitted 11 fact-level candidates from the H1 summary, H1 full report and 2026-09 buyback progress PDF. The review record is `docs/iios/ROUTE_A_FACT_EXTRACTION_REVIEW_20261009.md`; local machine-readable output is `ROUTE_A_FACT_EXTRACTION_REVIEW_20261009.json`.
+**Cutoff defect:** Run #8's B2 manifest and report used `2026-10-09T23:59:59+08:00`, which conflicts with the IIOS date-only cutoff rule for `2026-10-09` (interpreted at the start of that date). The historic manifest must stay diagnostic; do not edit the timestamp and reuse its digest/fingerprint. The 2026-10-09 buyback-progress filing and any same-day close remain excluded unless independent pre-cutoff availability is established.
 
-This advances beyond file-only capture, but does **not** change admission status: every candidate remains `known_at=null`, `provenance_class=UNKNOWN`, `status=UNKNOWN`, `admission_status=NOT_ADMITTED`; `admitted_field_groups=[]`. The report is useful for review and reproducible locator checking only. The extractor's test CI validates contracts, not official source-origin or economic truth.
+**C2 next action:** create a fact-level source ledger from the original, verified bytes. Review the pre-cutoff H1/Q1 and buyback-plan PDFs individually; retain exact page/table/row locators and source hashes; do not treat PDF text match alone as admission. Keep the dynamic issuer IR page and current Sohu/Eastmoney price pages UNKNOWN. Obtain a permitted official/free 2026-10-08 close or leave `market_price=UNKNOWN`; SZSE's data-service page says SSIC manages/distributes market data, so public accessibility is not an automatic reuse grant. See `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md`.
 
-Next action is **source-level adjudication and B2 Evidence/PIT admission**, not more LLM configuration:
-1. Independently verify each cited document's issuer/exchange identity and actual first-public timestamp; only then decide whether the proposed `known_at` can be admitted.
-2. Resolve the declared `PUBLIC_ACCESS_REUSE_UNKNOWN` license/reuse state.
-3. Convert individually reviewed facts to B2 Evidence Records and run the unchanged B2 validator; UNKNOWN must continue to fail closed.
-4. Capture a date-specific official/free market-price observation with defensible PIT/source vintage. Run #8's Eastmoney K-line row failed and has no bytes/hash; Sohu/Eastmoney quote/history page bytes are not admitted closing-price facts.
-5. Add any still-missing business-reality/capital-structure/trust facts. Only adequate admitted group coverage permits company-level valuation and decision.
-
-```text
-Public web discovery (no key; candidate URLs only)
-  ↓
-Route A raw capture + independent byte verification
-  ↓
-page-located fact extraction (11 candidates; text match PASS)
-  ↓
-source-origin / first-public-time / license adjudication (OPEN)
-  ↓
-B2 Evidence/PIT admission (currently BLOCKED_NOT_ADMITTED)
-  ↓
-market-price and remaining field-group gaps
-  ↓
-only after adequate admitted facts: company analysis / valuation / expectation gap / decision
-```
-
-Run #8 details remain in `docs/iios/ROUTE_A_CAPTURE_RC_CN_A_002001_20261009_RUN8.md`. The original Run #8 receipt, capture artifact and failed-source row remain unchanged. No source is promoted from a declared date, public-search snippet, PDF text match or successful download alone.
+The current result remains `BLOCKED_NOT_ADMITTED`; seven mandatory groups are not covered by admitted fact records. The C2 plan does not weaken cutoff, origin, reuse or Core/PIT requirements.
 
 B2-D3 real LLM provider invocation → B2-D1 independent verification → production-backed B2-E remains a separately tracked optional integration path. It does not block Route A acquisition, manual original intake, fact-level review, or free-first MVP development.
 
