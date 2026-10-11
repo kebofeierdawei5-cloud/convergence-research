@@ -30,7 +30,7 @@ Batch 0 narrow state reconciliation                     PASS ON MERGE; NO ECONOM
 Batch 1 private Path A scenario runner                  PASS / MERGED; 40 TESTS; ANALYSIS-ONLY
 Batch 1 macOS one-click launcher permission fix             PASS / MERGED PR #358; 12 CHECKS + 3 STATIC TESTS PASS; OPERATOR REPORTS SUCCESS / BUNDLE NOT INDEPENDENTLY REVIEWED
 Batch 2 Path A scenario integrity audit                    IN PROGRESS / PR #360 MERGED; 43 TESTS + 13 EXACT-HEAD CHECKS PASS; LOCAL BUNDLE REVIEW OPEN
-Operator-entered price decision-input track                 MP-1 TYPED INPUT + PRIVATE REPLAY IMPLEMENTED ON FEATURE BRANCH; EXACT-HEAD CI + RED-TEAM OPEN; DECISION BINDING NOT IMPLEMENTED
+Operator-entered price decision-input track                 MP-1 PASS / MERGED PR #366; 66 TESTS + 15/15 WORKFLOWS PASS; MP-2 DECISION BINDING OPEN
 C0 Local-first architecture / product-entry decision     DECISION RECORDED; IMPLEMENTATION GATES OPEN
 P0 incident workflow zero-job anomaly                    OPEN / RUN 38143887553 ALSO ZERO JOBS; NO TEST ASSERTIONS EXECUTED
 C1 formal Evidence/PIT admission                         OPEN / TRUST REGISTRY EMPTY; SSE PRICE RIGHTS UNGRANTED
