@@ -27,9 +27,10 @@ B2-F Full Independent Red-team                          PASS / CANONICAL
 P0 B3 persisted upstream write authorization             MERGED / EXACT-HEAD CI PASS
 P0 Canonical Runtime Callback Preflight                  MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL PASS
 Batch 0 narrow state reconciliation                     PASS ON MERGE; NO ECONOMIC SEMANTICS CHANGED
-Batch 1 private Path A scenario runner                  IMPLEMENTED IN PR / EXACT-HEAD CI PENDING / ANALYSIS-ONLY
+Batch 1 private Path A scenario runner                  PASS / MERGED; 40 TESTS; ANALYSIS-ONLY / MAC REPLAY PENDING
+Batch 1 macOS one-click launcher permission fix             IMPLEMENTED IN PR / STATIC TESTS PENDING / MAC REPLAY PENDING
 C0 Local-first architecture / product-entry decision     DECISION RECORDED; IMPLEMENTATION GATES OPEN
-P0 incident workflow zero-job anomaly                    OPEN / RUN 38143107853 ALSO ZERO JOBS; NO TEST ASSERTIONS EXECUTED
+P0 incident workflow zero-job anomaly                    OPEN / RUN 38143887553 ALSO ZERO JOBS; NO TEST ASSERTIONS EXECUTED
 C1 formal Evidence/PIT admission                         OPEN / TRUST REGISTRY EMPTY; SSE PRICE RIGHTS UNGRANTED
 C2 independent fact/use sign-off                         OPEN / 13 LOCATORS PASS; INDEPENDENT SIGNER AND RIGHTS SCOPE PENDING
 D1-A operator host preparation                           RUNBOOK READY / SEPARATE TRACK; LOCAL MODEL NOT REQUIRED FOR C1/C2 SIGNER OR RIGHTS REVIEW
