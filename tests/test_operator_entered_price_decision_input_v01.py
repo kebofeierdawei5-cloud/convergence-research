@@ -111,6 +111,29 @@ def test_replay_blocks_authority_flag_escalation(tmp_path):
         price_input.replay_bundle(result["bundle_path"])
 
 
+def test_replay_rejects_self_rehashed_source_verification_escalation(tmp_path):
+    root = private_root(tmp_path / "private")
+    result = price_input.create_bundle(
+        payload(), root, entered_at=ENTERED, decision_cutoff_at=CUTOFF
+    )
+    bundle = Path(result["bundle_path"])
+    price_path = bundle / "price-input.json"
+    edited = json.loads(price_path.read_text())
+    edited["source_origin_verified"] = True
+    record_bytes = price_input._canonical(edited) + b"\\n"
+    price_path.write_bytes(record_bytes)
+    receipt = price_input.build_receipt(edited, record_bytes=record_bytes)
+    (bundle / "receipt.json").write_bytes(price_input._canonical(receipt) + b"\\n")
+    renamed = root / receipt["bundle_id"]
+    bundle.rename(renamed)
+
+    with pytest.raises(
+        price_input.OperatorEnteredPriceError,
+        match="PROVENANCE_OR_AUTHORITY_FLAG_ESCALATED",
+    ):
+        price_input.replay_bundle(renamed)
+
+
 def test_missing_confirmation_fails_closed(tmp_path):
     with pytest.raises(price_input.OperatorEnteredPriceError, match="EXPLICIT_OPERATOR_CONFIRMATION_REQUIRED"):
         price_input.create_bundle(
