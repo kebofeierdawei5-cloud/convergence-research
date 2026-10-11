@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from copy import deepcopy
 
 from dataclasses import dataclass
 from typing import Any, Mapping
@@ -218,7 +219,10 @@ def _transition_pre_decision(
     operator_refs: tuple[str, ...] = ()
     operator_hashes: tuple[str, ...] = ()
     if operator_price_input_binding is not None:
-        operator_refs = (f"operator-price-input:{operator_price_input_binding['bundle_id']}",)
+        operator_refs = (
+            f"operator-price-input-record:{operator_price_input_binding['bundle_id']}",
+            f"operator-price-input-receipt:{operator_price_input_binding['bundle_id']}",
+        )
         operator_hashes = (
             str(operator_price_input_binding["record_sha256"]),
             str(operator_price_input_binding["receipt_sha256"]),
@@ -311,8 +315,9 @@ def run_b2e_conformance(
         created_at=created_at,
     )
 
+    case = deepcopy(dict(case))
     operator_price_binding: dict[str, Any] | None = None
-    current_price_observation = case.get("current_price_observation") if isinstance(case, Mapping) else None
+    current_price_observation = case.get("current_price_observation")
     if isinstance(current_price_observation, Mapping) and current_price_observation.get("price_input_class") == "OPERATOR_ATTESTED_MARKET_DATA":
         if operator_price_input_resolver is None:
             raise B2EE2EError("BLOCKED: trusted operator price input resolver is not registered")
@@ -328,6 +333,19 @@ def run_b2e_conformance(
             )
         except (KeyError, TypeError, ValueError, OSError) as exc:
             raise B2EE2EError(f"BLOCKED: operator price input binding failed: {exc}") from exc
+
+        # Synchronize the price-sensitive decision fields from the privately
+        # resolved record. These fields are derived only after record/receipt
+        # SHA verification and must never be silently left at a stale quote.
+        bound_price = str(operator_price_binding["price"])
+        bound_id = str(operator_price_binding["bundle_id"])
+        gap = case.get("expectation_gap")
+        if isinstance(gap, dict):
+            gap["price"] = bound_price
+            gap["price_observation_id"] = bound_id
+        return_gate = case.get("return_gate")
+        if isinstance(return_gate, dict):
+            return_gate["entry_price"] = bound_price
     elif isinstance(current_price_observation, Mapping) and current_price_observation.get("price_input_class") not in (None, "CANONICAL_ADMITTED_MARKET_DATA"):
         raise B2EE2EError("BLOCKED: unsupported current price input class")
 
