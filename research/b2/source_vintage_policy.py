@@ -17,7 +17,7 @@ import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 from urllib.parse import urlparse
 
 CASE_ID = "RC-CN-A-605016-20261009"
@@ -233,6 +233,7 @@ def adjudicate_605016_source_vintage(
     *,
     raw_root: Path,
     expected_price_sha256: str,
+    core_validator: Callable[..., list[str]] | None = None,
 ) -> dict[str, Any]:
     """Return a new, Core-validated manifest using a conservative publication bound."""
     if manifest.get("source_vintage_adjudication") is not None:
@@ -333,11 +334,11 @@ def adjudicate_605016_source_vintage(
     result["audit"] = {"manifest_sha256": _sha256(_canonical_bytes(audit_payload))}
 
     # Reuse the unchanged Investment Core contract. This gate does not relax it.
-    from research.b2.company_evidence import validate_company_evidence_manifest
+    if core_validator is None:
+        from research.b2.company_evidence import validate_company_evidence_manifest
 
-    errors = validate_company_evidence_manifest(
-        result, raw_root=raw_root, require_raw_verification=True
-    )
+        core_validator = validate_company_evidence_manifest
+    errors = list(core_validator(result, raw_root=raw_root, require_raw_verification=True))
     result["status"] = "PASS" if not errors else "BLOCKED"
     result["validation_errors"] = errors
     if errors:
