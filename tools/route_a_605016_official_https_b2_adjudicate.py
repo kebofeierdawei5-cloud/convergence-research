@@ -28,6 +28,7 @@ SSE_PRICE_URL = (
     "?begin=20261008&end=20261008"
     "&select=date,open,high,low,close,volume,amount"
 )
+SSE_PRICE_URL_CANDIDATES = (SSE_PRICE_URL, SSE_PRICE_URL.replace(":32042/", ":32041/"))
 PRICE_EVIDENCE_ID = "605016-SSE-HTTPS-DAILY-CLOSE-20261008"
 OLD_UNKNOWN_PRICE_EVIDENCE_ID = "605016-PRICE-CANDIDATE-20261009"
 EXPECTED_PRICE_RAW_SHA256 = "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480"
@@ -104,6 +105,120 @@ class OfficialDividendPdfBytesMismatch(ValueError):
         super().__init__("OFFICIAL_DIVIDEND_PDF_EXACT_BYTES_MISMATCH")
 
 
+
+class OfficialSSEPriceFetchBlocked(ValueError):
+    """All fixed official SSE price transport paths failed; retain only safe diagnostics."""
+
+    diagnostic_field = "source_fetch_diagnostics"
+
+    def __init__(self, diagnostics: list[dict[str, str]]) -> None:
+        self.safe_diagnostics = diagnostics
+        super().__init__("OFFICIAL_SSE_HTTPS_PRICE_FETCH_BLOCKED")
+
+
+def _safe_price_fetch_diagnostic(url: str, transport: str, response: dict[str, Any]) -> dict[str, str]:
+    port = urlparse(url).port
+    endpoint = "SSE_DAYK_32042" if port == 32042 else "SSE_DAYK_32041" if port == 32041 else "SSE_DAYK_UNEXPECTED_PORT"
+    return {
+        "endpoint": endpoint,
+        "transport": transport,
+        "outcome": _safe_transport_outcome(response),
+    }
+
+
+def _fetch_official_sse_price_via_curl(url: str, *, referer: str) -> dict[str, Any]:
+    """Use system curl only for the two fixed official SSE HTTPS price endpoints."""
+    if url not in SSE_PRICE_URL_CANDIDATES or urlparse(url).scheme.lower() != "https":
+        return {"url": url, "status": "BLOCKED", "error": "CURL_URL_NOT_ALLOWLISTED"}
+    curl = shutil.which("curl")
+    if not curl:
+        return {"url": url, "status": "BLOCKED", "error": "CURL_UNAVAILABLE"}
+
+    with tempfile.TemporaryDirectory(prefix="iios-605016-sse-price-") as temp_dir:
+        body_path = Path(temp_dir) / "response.json"
+        command = [
+            curl, "--location", "--max-redirs", "3",
+            "--connect-timeout", "4", "--max-time", "12",
+            "--proto", "=https", "--proto-redir", "=https",
+            "--fail", "--silent", "--show-error",
+            "--user-agent", "IIOS-official-sse-price/0.1",
+            "--referer", referer,
+            "--header", "Accept: application/json,*/*",
+            "--header", "Accept-Encoding: identity",
+            "--max-filesize", str(1024 * 1024),
+            "--output", str(body_path),
+            "--write-out", "%{http_code}\n%{url_effective}\n%{content_type}\n",
+            url,
+        ]
+        try:
+            completed = subprocess.run(
+                command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                check=False, timeout=14,
+            )
+        except subprocess.TimeoutExpired:
+            return {"url": url, "status": "BLOCKED", "error": "CURL_TIMEOUT"}
+        except OSError:
+            return {"url": url, "status": "BLOCKED", "error": "CURL_EXEC_FAILED"}
+
+        metadata = (completed.stdout or b"").decode("utf-8", errors="replace").splitlines()
+        status = int(metadata[0]) if metadata and metadata[0].isdigit() else 0
+        final_url = metadata[1] if len(metadata) > 1 else url
+        content_type = metadata[2] if len(metadata) > 2 else ""
+        if completed.returncode != 0:
+            result: dict[str, Any] = {
+                "url": url, "final_url": final_url, "status": "BLOCKED",
+                "error": "CURL_EXIT_" + str(completed.returncode),
+            }
+            if status:
+                result["http_status"] = status
+            return result
+        if not 200 <= status < 300:
+            return {
+                "url": url, "final_url": final_url, "status": "BLOCKED",
+                "error": "CURL_HTTP_RESPONSE_NOT_SUCCESS", "http_status": status,
+            }
+        final = urlparse(final_url)
+        if final.scheme.lower() != "https" or final.hostname != "yunhq.sse.com.cn":
+            return {
+                "url": url, "final_url": final_url, "status": "BLOCKED",
+                "error": "OFFICIAL_SSE_PRICE_TLS_ORIGIN_MISMATCH", "http_status": status,
+            }
+        if not body_path.is_file():
+            return {
+                "url": url, "final_url": final_url, "status": "BLOCKED",
+                "error": "CURL_BODY_MISSING", "http_status": status,
+            }
+        size = body_path.stat().st_size
+        if size > 1024 * 1024:
+            return {
+                "url": url, "final_url": final_url, "status": "BLOCKED",
+                "error": "CURL_RESPONSE_TOO_LARGE", "http_status": status,
+            }
+        body = body_path.read_bytes()
+        return {
+            "url": url, "final_url": final_url, "status": "CAPTURED",
+            "http_status": status, "content_type": content_type,
+            "size_bytes": len(body), "sha256": _sha256(body), "body": body,
+        }
+
+
+def _fetch_official_sse_price() -> dict[str, Any]:
+    """Try Python HTTPS, then HTTPS-only curl, across only the pinned SSE TLS ports."""
+    referer = "https://www.sse.com.cn/market/stockdata/overview/day/"
+    diagnostics: list[dict[str, str]] = []
+    for url in SSE_PRICE_URL_CANDIDATES:
+        response = fetch_https(url, referer=referer)
+        if response.get("status") == "CAPTURED":
+            return {**response, "transport": "PYTHON_HTTPS"}
+        diagnostics.append(_safe_price_fetch_diagnostic(url, "PYTHON_HTTPS", response))
+
+        response = _fetch_official_sse_price_via_curl(url, referer=referer)
+        if response.get("status") == "CAPTURED":
+            return {**response, "transport": "CURL_HTTPS"}
+        diagnostics.append(_safe_price_fetch_diagnostic(url, "CURL_HTTPS", response))
+
+    raise OfficialSSEPriceFetchBlocked(diagnostics)
+
 def _safe_transport_outcome(response: dict[str, Any]) -> str:
     status = response.get("http_status")
     if isinstance(status, int) and not 200 <= status < 300:
@@ -124,17 +239,25 @@ def _safe_transport_outcome(response: dict[str, Any]) -> str:
             "63": "RESPONSE_TOO_LARGE",
         }.get(curl_match.group(1), "CURL_FAILURE")
     low = error.lower()
-    if "temporary failure in name resolution" in low or "name or service not known" in low or "nodename nor servname" in low or "getaddrinfo failed" in low:
+    if (
+        "temporary failure in name resolution" in low
+        or "name or service not known" in low
+        or "nodename nor servname" in low
+        or "getaddrinfo failed" in low
+        or "dns" in low
+    ):
         return "DNS_FAILURE"
     if "timed out" in low or "timeout" in low:
         return "TIMEOUT"
     if "certificate_verify_failed" in low or "certificate" in low or "ssl:" in low or "tls" in low:
         return "TLS_FAILURE"
+    if "proxy" in low or "tunnel" in low:
+        return "PROXY_FAILURE"
     if "connection refused" in low:
         return "CONNECTION_REFUSED"
     if "connection reset" in low:
         return "CONNECTION_RESET"
-    if "network is unreachable" in low:
+    if "network is unreachable" in low or "network_unreachable" in low:
         return "NETWORK_UNREACHABLE"
     if "http error" in low:
         return "HTTP_FAILURE"
@@ -616,16 +739,16 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
 
     # Only query the official SSE HTTPS endpoint. Raw bytes and numeric fields are
     # confined to the ephemeral runner workspace and are never uploaded as artifacts.
-    source = fetch_https(
-        SSE_PRICE_URL,
-        referer="https://www.sse.com.cn/market/stockdata/overview/day/",
-    )
-    if source.get("status") != "CAPTURED":
-        raise ValueError("OFFICIAL_SSE_HTTPS_PRICE_FETCH_BLOCKED")
+    source = _fetch_official_sse_price()
     final_url = str(source.get("final_url") or source.get("url") or "")
     final = urlparse(final_url)
-    if final.scheme.lower() != "https" or final.hostname != "yunhq.sse.com.cn":
+    if (
+        final.scheme.lower() != "https"
+        or final.hostname != "yunhq.sse.com.cn"
+        or final.port not in {None, 443, 32041, 32042}
+    ):
         raise ValueError("OFFICIAL_SSE_PRICE_TLS_ORIGIN_MISMATCH")
+    source_url = str(source.get("url") or SSE_PRICE_URL)
     raw = source["body"]
     raw_sha = _sha256(raw)
     shape, row = _parse_daybar(raw)
@@ -659,7 +782,7 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
         "known_at": known_at,
         "known_at_basis": "MARKET_SESSION_CLOSE_EVENT_TIME; the daily bar is the finalized official close for the 2026-10-08 session. The API does not expose a separate first-published timestamp; this record does not claim to know when its historical JSON row was uploaded to the endpoint.",
         "retrieved_at": retrieved_at,
-        "source_ref": SSE_PRICE_URL,
+        "source_ref": source_url,
         "artifact_id": "ROUTE-A-RAW:SSE-HTTPS-DAYK-605016:" + raw_sha[:16],
         "content_sha256": raw_sha,
         "capture_sha256": raw_sha,
@@ -747,8 +870,8 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
         },
         "official_price_source": {
             "source_id": "PRICE-SSE-OFFICIAL-DAYK-2026-10-08",
-            "url": SSE_PRICE_URL,
-            "transport": "HTTPS_TLS_VERIFIED",
+            "url": source_url,
+            "transport": source.get("transport", "PYTHON_HTTPS"),
             "http_status": source.get("http_status"),
             "content_type": source.get("content_type"),
             "observation_date": "2026-10-08",

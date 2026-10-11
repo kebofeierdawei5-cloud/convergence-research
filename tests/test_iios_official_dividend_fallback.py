@@ -488,3 +488,109 @@ def test_prior_dividend_b2_builder_rejects_missing_or_untrusted_pdf_url(
             attempt10_root, base_out, followup_root,
             {"final_pdf_url": "http://untrusted.example/file.pdf"}, ledger,
         )
+
+
+
+def test_sse_price_capture_falls_back_to_https_curl_on_primary_url(monkeypatch) -> None:
+    calls: list[str] = []
+    raw = b'{"kline":[["20261008","1","2","1","1.5","10","15"]]}'
+
+    def python_blocked(url: str, **_kwargs):
+        calls.append("python:" + url)
+        return {"url": url, "status": "BLOCKED", "error": "URLError: NETWORK_UNREACHABLE"}
+
+    def curl_captured(url: str, *, referer: str):
+        calls.append("curl:" + url)
+        assert referer == "https://www.sse.com.cn/market/stockdata/overview/day/"
+        return {
+            "url": url, "final_url": url, "status": "CAPTURED", "http_status": 200,
+            "content_type": "application/json", "size_bytes": len(raw),
+            "sha256": hashlib.sha256(raw).hexdigest(), "body": raw,
+        }
+
+    monkeypatch.setattr(MODULE, "fetch_https", python_blocked)
+    monkeypatch.setattr(MODULE, "_fetch_official_sse_price_via_curl", curl_captured)
+    result = MODULE._fetch_official_sse_price()
+    assert result["transport"] == "CURL_HTTPS"
+    assert result["body"] == raw
+    assert result["url"] == MODULE.SSE_PRICE_URL
+    assert calls == ["python:" + MODULE.SSE_PRICE_URL, "curl:" + MODULE.SSE_PRICE_URL]
+
+
+def test_sse_price_capture_uses_only_pinned_secondary_port_after_transport_failure(
+    monkeypatch
+) -> None:
+    python_calls: list[str] = []
+    curl_calls: list[str] = []
+    raw = b"captured-on-official-alternate"
+
+    def python_fetch(url: str, **_kwargs):
+        python_calls.append(url)
+        if url == MODULE.SSE_PRICE_URL:
+            return {"url": url, "status": "BLOCKED", "error": "URLError: temporary failure in name resolution"}
+        return {
+            "url": url, "final_url": url, "status": "CAPTURED",
+            "http_status": 200, "content_type": "application/json", "body": raw,
+        }
+
+    def curl_fetch(url: str, **_kwargs):
+        curl_calls.append(url)
+        return {"url": url, "status": "BLOCKED", "error": "CURL_EXIT_6"}
+
+    monkeypatch.setattr(MODULE, "fetch_https", python_fetch)
+    monkeypatch.setattr(MODULE, "_fetch_official_sse_price_via_curl", curl_fetch)
+    result = MODULE._fetch_official_sse_price()
+    assert result["transport"] == "PYTHON_HTTPS"
+    assert result["url"] == MODULE.SSE_PRICE_URL_CANDIDATES[1]
+    assert python_calls == list(MODULE.SSE_PRICE_URL_CANDIDATES)
+    assert curl_calls == [MODULE.SSE_PRICE_URL]
+
+
+def test_sse_price_all_transports_blocked_emit_only_sanitized_diagnostics(monkeypatch) -> None:
+    def python_blocked(url: str, **_kwargs):
+        return {"url": url, "status": "BLOCKED", "error": "URLError: secret local proxy host"}
+
+    def curl_blocked(url: str, **_kwargs):
+        return {"url": url, "status": "BLOCKED", "error": "CURL_EXIT_6"}
+
+    monkeypatch.setattr(MODULE, "fetch_https", python_blocked)
+    monkeypatch.setattr(MODULE, "_fetch_official_sse_price_via_curl", curl_blocked)
+    with pytest.raises(MODULE.OfficialSSEPriceFetchBlocked) as caught:
+        MODULE._fetch_official_sse_price()
+
+    assert str(caught.value) == "OFFICIAL_SSE_HTTPS_PRICE_FETCH_BLOCKED"
+    assert caught.value.safe_diagnostics == [
+        {"endpoint": "SSE_DAYK_32042", "transport": "PYTHON_HTTPS", "outcome": "PROXY_FAILURE"},
+        {"endpoint": "SSE_DAYK_32042", "transport": "CURL_HTTPS", "outcome": "DNS_FAILURE"},
+        {"endpoint": "SSE_DAYK_32041", "transport": "PYTHON_HTTPS", "outcome": "PROXY_FAILURE"},
+        {"endpoint": "SSE_DAYK_32041", "transport": "CURL_HTTPS", "outcome": "DNS_FAILURE"},
+    ]
+    assert "secret local proxy host" not in json.dumps(caught.value.safe_diagnostics)
+
+
+def test_sse_price_curl_transport_is_tls_only_and_size_bounded(monkeypatch) -> None:
+    raw = b'{"kline":[]}'
+    monkeypatch.setattr(MODULE.shutil, "which", lambda name: "/usr/bin/curl" if name == "curl" else None)
+    observed = {}
+
+    def fake_run(command, **kwargs):
+        observed["command"] = command
+        observed["timeout"] = kwargs["timeout"]
+        output = Path(command[command.index("--output") + 1])
+        output.write_bytes(raw)
+        return type("Completed", (), {
+            "returncode": 0,
+            "stdout": f"200\n{MODULE.SSE_PRICE_URL}\napplication/json\n".encode("utf-8"),
+        })()
+
+    monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
+    response = MODULE._fetch_official_sse_price_via_curl(
+        MODULE.SSE_PRICE_URL, referer="https://www.sse.com.cn/market/stockdata/overview/day/"
+    )
+    command = observed["command"]
+    assert command[command.index("--proto") + 1] == "=https"
+    assert command[command.index("--proto-redir") + 1] == "=https"
+    assert command[command.index("--max-filesize") + 1] == str(1024 * 1024)
+    assert observed["timeout"] == 14
+    assert response["status"] == "CAPTURED"
+    assert response["body"] == raw
