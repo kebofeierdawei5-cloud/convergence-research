@@ -134,6 +134,53 @@ def test_replay_rejects_self_rehashed_source_verification_escalation(tmp_path):
         price_input.replay_bundle(renamed)
 
 
+def test_symbol_must_be_string_to_preserve_leading_zero_codes():
+    with pytest.raises(price_input.OperatorEnteredPriceError, match="SYMBOL_MUST_BE_NONEMPTY_STRING"):
+        price_input.validate_payload(
+            payload(symbol=2001), entered_at=ENTERED, decision_cutoff_at=CUTOFF
+        )
+
+
+def test_naive_timestamps_are_rejected():
+    with pytest.raises(price_input.OperatorEnteredPriceError, match="ENTERED_AT_TIMEZONE_REQUIRED"):
+        price_input.validate_payload(
+            payload(), entered_at=ENTERED.replace(tzinfo=None), decision_cutoff_at=CUTOFF
+        )
+    with pytest.raises(price_input.OperatorEnteredPriceError, match="DECISION_CUTOFF_AT_TIMEZONE_REQUIRED"):
+        price_input.validate_payload(
+            payload(), entered_at=ENTERED, decision_cutoff_at=CUTOFF.replace(tzinfo=None)
+        )
+
+
+def test_create_bundle_never_invents_a_cutoff_after_entry(tmp_path):
+    with pytest.raises(price_input.OperatorEnteredPriceError, match="DECISION_CUTOFF_MUST_FOLLOW_ENTRY_TIME"):
+        price_input.create_bundle(
+            payload(), tmp_path / "private", entered_at=ENTERED, decision_cutoff_at=ENTERED
+        )
+
+
+def test_replay_rejects_noncanonical_private_record_bytes(tmp_path):
+    root = private_root(tmp_path / "private")
+    result = price_input.create_bundle(
+        payload(), root, entered_at=ENTERED, decision_cutoff_at=CUTOFF
+    )
+    price_path = Path(result["bundle_path"]) / "price-input.json"
+    price_path.write_bytes(price_path.read_bytes() + b" ")
+    with pytest.raises(price_input.OperatorEnteredPriceError, match="RECORD_BYTES_NONCANONICAL"):
+        price_input.replay_bundle(result["bundle_path"])
+
+
+def test_replay_rejects_open_permissions_on_private_input(tmp_path):
+    root = private_root(tmp_path / "private")
+    result = price_input.create_bundle(
+        payload(), root, entered_at=ENTERED, decision_cutoff_at=CUTOFF
+    )
+    price_path = Path(result["bundle_path"]) / "price-input.json"
+    os.chmod(price_path, 0o644)
+    with pytest.raises(price_input.OperatorEnteredPriceError, match="PRICE_INPUT_FILE_PERMISSIONS_TOO_OPEN"):
+        price_input.replay_bundle(result["bundle_path"])
+
+
 def test_missing_confirmation_fails_closed(tmp_path):
     with pytest.raises(price_input.OperatorEnteredPriceError, match="EXPLICIT_OPERATOR_CONFIRMATION_REQUIRED"):
         price_input.create_bundle(
