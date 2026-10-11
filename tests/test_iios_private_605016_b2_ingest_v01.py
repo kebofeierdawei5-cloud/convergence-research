@@ -987,6 +987,45 @@ def test_cli_verify_existing_flag_does_not_call_ingester(tmp_path: Path, monkeyp
     assert '"official_source_refetched": false' in output
 
 
+def test_cli_source_vintage_adjudication_mode_does_not_call_ingester(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    private_root = tmp_path / "private-data"
+    (tmp_path / "repo").mkdir()
+    expected = {
+        "status": "SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
+        "official_source_refetched": False,
+        "attempt10_downloaded": False,
+        "previous_candidate_retained": True,
+        "formal_signed_admission_created": False,
+        "production_host_accepted": False,
+        "decision_created": False,
+        "auto_execution": False,
+    }
+    monkeypatch.setattr(sys, "argv", [
+        "iios_private_605016_b2_ingest_v01.py",
+        "--private-root", str(private_root),
+        "--repository-root", str(tmp_path / "repo"),
+        "--adjudicate-source-vintage",
+    ])
+    monkeypatch.setattr(
+        MODULE,
+        "adjudicate_existing_private_b2_candidate",
+        lambda **_kwargs: expected,
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "ingest_private_b2_candidate",
+        lambda **_kwargs: pytest.fail("ingester must not run during source-vintage migration"),
+    )
+
+    code = MODULE.main()
+    output = capsys.readouterr().out
+    assert code == 0
+    assert '"official_source_refetched": false' in output
+    assert '"attempt10_downloaded": false' in output
+
+
 def test_main_renders_validation_error_as_blocked_json_not_traceback(monkeypatch, capsys) -> None:
     monkeypatch.setattr(sys, "argv", ["iios_private_605016_b2_ingest_v01.py"])
     monkeypatch.setattr(
