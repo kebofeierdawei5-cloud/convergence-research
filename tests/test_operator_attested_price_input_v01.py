@@ -73,7 +73,7 @@ def test_multiple_current_case_prices_can_be_validated_as_separate_analysis_over
 
 
 def test_cutoff_is_start_of_day_and_known_at_must_precede_cutoff():
-    row = _record(known_at="2026-10-10T00:00:00+08:00")
+    row = _record(observation_date="2026-10-10", known_at="2026-10-10T00:00:00+08:00")
     with pytest.raises(OperatorPriceInputError, match="ATTESTED_KNOWN_AT_NOT_BEFORE_CUTOFF_START"):
         validate_operator_price_payload(_payload([row]))
 
