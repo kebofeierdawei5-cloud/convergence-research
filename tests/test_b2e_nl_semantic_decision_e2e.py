@@ -659,6 +659,109 @@ def _private_operator_price_bundle(tmp_path, case):
     return root, reference, resolver
 
 
+def test_operator_price_cannot_substitute_for_missing_company_evidence_manifest(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case)
+    run_root = tmp_path / "operator-price-without-evidence-run"
+
+    with pytest.raises(B2EE2EError, match="B2 Evidence/PIT manifest and raw_root"):
+        run_b2e_conformance(
+            raw_request=RAW,
+            request_id="b2e-operator-without-company-evidence",
+            run_id="b2e-operator-without-company-evidence",
+            created_at=CREATED,
+            request_interpreter=FixtureInterpreter(),
+            request_registry=_registries()[0],
+            semantic_producer=FixtureSemanticProducer(),
+            producer_registry=_registries()[1],
+            company="宁德时代",
+            evidence_refs=("E011",),
+            evidence_hashes=(E1,),
+            artifact_type="THESIS_ASSESSMENT",
+            semantic_prompt="test",
+            decision_relevance="Synthetic test of Evidence/PIT separation.",
+            case=case,
+            current_price_resolver=price_registry,
+            independent_forecast_resolver=forecast_registry,
+            upstream_authority_resolver=upstream_registry,
+            valuation_output_resolver=valuation_resolver,
+            operator_price_input_resolver=resolver,
+            operator_price_input_ref=reference,
+            run_root=str(run_root),
+            # Intentionally omit both evidence_manifest and evidence_root.
+        )
+
+    state = json.loads(
+        run_state_path(run_root, "b2e-operator-without-company-evidence").read_text(encoding="utf-8")
+    )
+    assert state["envelope"]["run_status"] == "BLOCKED"
+    stage_ids = [row["stage_id"] for row in state["envelope"]["stage_receipts"]]
+    assert "EVIDENCE_ADMITTED" not in stage_ids
+    assert "DECISION_PENDING" not in stage_ids
+    assert "DECISION_ADMITTED" not in stage_ids
+
+
+def test_operator_price_cannot_replace_a_required_company_evidence_group(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    evidence_root, valid_manifest, _manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    incomplete_manifest = build_company_evidence_manifest(
+        case_id=valid_manifest["case_id"],
+        market=valid_manifest["market"],
+        symbol=valid_manifest["symbol"],
+        company=valid_manifest["company"],
+        cutoff_date=valid_manifest["cutoff_date"],
+        evidence=valid_manifest["evidence"][:-1],
+        raw_artifacts=valid_manifest["raw_artifacts"][:-1],
+        required_field_groups=list(REQUIRED_COMPANY_FIELD_GROUPS),
+        raw_root=evidence_root,
+    )
+    assert incomplete_manifest["status"] == "BLOCKED"
+    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case)
+    evidences = incomplete_manifest["evidence"]
+    run_root = tmp_path / "operator-price-with-incomplete-evidence-run"
+
+    with pytest.raises(B2EE2EError, match="B2 Evidence/PIT admission failed"):
+        run_b2e_conformance(
+            raw_request=RAW,
+            request_id="b2e-operator-with-incomplete-company-evidence",
+            run_id="b2e-operator-with-incomplete-company-evidence",
+            created_at=CREATED,
+            request_interpreter=FixtureInterpreter(),
+            request_registry=_registries()[0],
+            semantic_producer=FixtureSemanticProducer(),
+            producer_registry=_registries()[1],
+            company="宁德时代",
+            evidence_refs=tuple(row["evidence_id"] for row in evidences),
+            evidence_hashes=tuple(row["content_sha256"] for row in evidences),
+            artifact_type="THESIS_ASSESSMENT",
+            semantic_prompt="test",
+            semantic_facts=tuple({
+                "evidence_id": row["evidence_id"],
+                "statement": "SYNTHETIC_TEST_ONLY",
+            } for row in evidences),
+            decision_relevance="Synthetic test of required company Evidence/PIT groups.",
+            case=case,
+            current_price_resolver=price_registry,
+            independent_forecast_resolver=forecast_registry,
+            upstream_authority_resolver=upstream_registry,
+            valuation_output_resolver=valuation_resolver,
+            operator_price_input_resolver=resolver,
+            operator_price_input_ref=reference,
+            run_root=str(run_root),
+            evidence_manifest=incomplete_manifest,
+            evidence_root=str(evidence_root),
+        )
+
+    state = json.loads(
+        run_state_path(run_root, "b2e-operator-with-incomplete-company-evidence").read_text(encoding="utf-8")
+    )
+    assert state["envelope"]["run_status"] == "BLOCKED"
+    stage_ids = [row["stage_id"] for row in state["envelope"]["stage_receipts"]]
+    assert "EVIDENCE_ADMITTED" not in stage_ids
+    assert "DECISION_PENDING" not in stage_ids
+    assert "DECISION_ADMITTED" not in stage_ids
+
+
 def test_p0_persisted_b2e_blocks_without_b2_evidence_pit_admission(tmp_path):
     case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
     root = tmp_path / "runs"
