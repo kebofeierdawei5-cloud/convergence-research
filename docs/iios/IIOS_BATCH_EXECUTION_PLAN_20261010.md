@@ -162,30 +162,15 @@ This closes the repository-CLI route/persistence integration test gap only.
 
 ### Batch C1 — actual 605016 (百龙创园) source bundle and B2/PIT admission
 
-**Status:** **CURRENT-MAIN RAW CAPTURE/INTEGRITY PASS / SOURCE-ORIGIN + EVIDENCE/PIT NOT ADMITTED**.
+**Status:** LOCAL PRIVATE CANDIDATE + BOUNDED SOURCE-VINTAGE SUCCESSOR PASS; FORMAL ADMISSION/HOST ACCEPTANCE OPEN.
 
-**Canonical implementation and actual capture**
-- PR #272 merged at `2978cdbc3f76f1ab1596896e3425c75661144a57`; exact accepted PR head `e8209d5de74a034db11b06574577bc8653759cdd`.
-- Case: `RC-CN-A-605016-20261009`; cutoff `2026-10-09`; source manifest: `manifests/company_cases/RC-CN-A-605016-20261009.json`.
-- Attempt 10 workflow #38026139364 succeeded against current-main-refresh code; artifact #11660285551 (8,526,921 bytes; retained temporarily under Actions retention).
-- 12/12 response bodies captured; 0 failed sources; 0 unregistered refs; 12/12 independent byte-size/SHA checks passed; 12/12 expected-payload contracts passed; 0 mismatches.
-- Independent status: `INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION`; `source_origin_verified=false`; one source has unknown PIT timing.
-- B2 preflight: `BLOCKED_NOT_ADMITTED`; all seven field groups uncovered; `evidence_admission=false`, `pit_admission=false`.
+- PR #329 is merged at `53b6896e9d63affd05d6d66cbddc5c0aa3bd81f6`. Its final HEAD passed private persistence 53/53, B2 Evidence/PIT 31/31, company Evidence/PIT 23/23, B2 scope 3/3, plus State Hygiene, C0 Governance, Investment Core and independent red-team.
+- Operator-confirmed successor result: `SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED`; 11 evidence records, 11 declarations, 8 unique raw files; Core/PIT PASS.
+- The new `known_at` uses the rule-derived upper bound `2026-10-08T15:30:00+08:00`, not the official endpoint's exact first-public timestamp. `exact_first_public_timestamp_verified=false` remains explicit; rule-page bytes were not materialized/hashed in the run.
+- The legacy candidate is retained unchanged. `official_source_refetched=false`, `attempt10_downloaded=false`. Do not rerun ingest or perform another C1 price acquisition for this closed storage/vintage gate.
+- Formal signed admission, a production Host-origin run, authorized semantic/Forecast/Valuation chain, Decision, publication, full Run Receipt and trade authorization remain separate and open.
 
-**Next actions — fact-level adjudication, not more capture-only changes**
-1. Preserve Artifact #11660285551 beyond the temporary Actions window, keeping intake receipt, manifest hash, exact source hashes and ledger together; do not claim permanent retention until a durable copy is confirmed.
-2. For every object, re-open exact bytes and recompute hash/size; confirm issuer/exchange identity, title, stock code, report/announcement number, period and date from document body; retain page/table/row locators.
-3. Verify first-public/known-at from an official source-backed index/event record, not retrieval time or URL date alone. Keep the unknown source as UNKNOWN.
-4. Review reuse/licensing separately from public accessibility; unresolved `PUBLIC_ACCESS_REUSE_UNKNOWN` remains explicit.
-5. Resolve the cutoff-correct 2026-10-09 closing price. Stockstar's reported CNY 20.28 close is a secondary cross-check only pending exact-byte capture and adjudication; do not use the 2026-09-30 close by default.
-6. Create fact-level B2 Evidence Records only for individually adjudicated facts; run unchanged B2/PIT validator and fresh independent red-team. A source group is covered only by admitted facts, never by captured source count.
-
-Audit record: `docs/iios/ROUTE_A_C1_605016_ATTEMPT10_ADJUDICATION_20261010.md`; full attempt history: `evidence/real_cases/RC-CN-A-605016-20261009/ROUTE_A_CAPTURE_ATTEMPTS_20261010.md`.
-
-**Decision gate:** Until all seven groups are covered by valid, case-bound and PIT-qualified `ADMITTED` Evidence Records, D1 may not produce formal valuation, expectation-gap decision, report/publication or complete `IIOS_RUN_RECEIPT`. Do not convert capture/integrity PASS into an economic-analysis PASS.
-
-**Price-date correction:** the exchange was closed Oct 1–7 and resumed Oct 8; cutoff Oct 9 requires the Oct 9 close when exact source verification is available. Keep the Oct 7 PILOT cutoff and Sep 30 price receipt separate.
-
+**PIT price-date correction:** the cutoff is date-only `2026-10-09` and is interpreted as the start of that date. The applicable market-price observation is the latest fully completed session before cutoff, `2026-10-08`, not the `2026-10-09` close. The date-only rule must not be changed to end-of-day merely to admit same-day data.
 ### Batch C2 — finish Route A evidence adjudication for 新和成 (002001.SZ)
 
 **Status:** PARTIAL CAPTURE VERIFIED / FACT CANDIDATES NOT ADMITTED; can proceed in parallel with C1.
