@@ -278,7 +278,7 @@ def test_b2e_rejects_operator_price_reference_without_trusted_resolver():
         "record_sha256": "a" * 64,
         "receipt_sha256": "b" * 64,
     }
-    with pytest.raises(B2EE2EError, match="trusted operator price input resolver is not registered"):
+    with pytest.raises(B2EE2EError, match="operator price input reference supplied without trusted resolver"):
         run_b2e_conformance(
             raw_request=RAW,
             request_id="b2e-no-operator-resolver",
