@@ -104,15 +104,17 @@
   },
   "next_action": {
     "owner": "INDEPENDENT_REVIEW_AND_PRODUCTION_HOST_WORKSTREAM",
-    "action": "Obtain a genuinely separate review of the 13 official-filing claims, source-date upper bounds, and private internal fact-level use boundary; in parallel continue the 605016 production Host acceptance critical path. Keep actual C2 values/manifests private.",
+    "action": "Obtain a genuinely separate review of the 13 official-filing claims, source-date upper bounds and private fact-level use boundary; in parallel continue actual 605016 production Host acceptance and authorized producer lineage.",
     "private_only": true,
     "github_raw_upload_allowed": false,
     "secondary_web_audit_required": false,
     "validation_required": [
-      "independent reviewer resolves 13 official-filing claims and use boundary",
-      "explicitly distinguish operator-attested price from vendor-source-verified price",
-      "formal signed Evidence/PIT admission remains a separate gate",
-      "production Host origin, genuine authorized stage outputs, and full IIOS_RUN_RECEIPT replay remain required for D2",
+      "independent reviewer adjudicates the 13 filing claims and source-date bounds",
+      "private fact-level use / redistribution boundary is explicitly adjudicated",
+      "operator-attested price remains distinct from source-vintage-verified data",
+      "formal signed Evidence/PIT admission is completed separately",
+      "605016 production Host and authorized producer origin/receipt path are accepted",
+      "D1/D2 Forecast/Valuation/Decision/Publication/full IIOS_RUN_RECEIPT replay remains gated",
       "human approval required; automatic execution remains false"
     ]
   },
@@ -209,5 +211,20 @@
     "same_day_buyback_progress_excluded": true,
     "allowed_use_boundary": "PRIVATE_FACT_LEVEL_USE_ONLY; unrestricted reuse not claimed",
     "independent_human_or_external_review_pending": true
+  },
+  "manual_web_semantic_admission_guard": {
+    "status": "PASS_MERGED_CANONICAL",
+    "pr_number": 342,
+    "merge_commit_sha": "a496b82b8cfbc2256a9affd3337f97fce305d217",
+    "enforcement_point": "iios_mvp.semantic_producer_admission_v01.admit_semantic_artifact",
+    "blocked_producer_id": "iios-chatgpt-web-semantic-producer",
+    "blocked_policy_prefix": "IIOS-CHATGPT-WEB-OPERATOR-POLICY-",
+    "renamed_id_policy_bypass_tested": true,
+    "exact_head_required_checks": "PASS",
+    "independent_redteam": "PASS",
+    "frozen_b0_amended": false,
+    "provider_origin_authenticated": false,
+    "p0_llm_001_open": true,
+    "p0_llm_004_open": true
   }
 }

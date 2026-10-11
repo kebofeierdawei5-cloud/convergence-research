@@ -99,3 +99,9 @@ The candidate change adds a deny gate at `admit_semantic_artifact`, the canonica
 This does not authenticate the origin or create an alternative formal assurance class. It preserves the current policy: the manual Web route may be used for exploratory/non-canonical operator assistance, but it cannot feed formal semantic admission. The current request-intent / thesis-semantic handoff still does not implement the proposed two-round research flow. P0-LLM-001/P0-LLM-004, production Host acceptance, complete Run Receipt, and independent D1/D2 validation remain open.
 
 **Acceptance boundary:** only after this guard's exact-head contract, Investment Core CI, State Hygiene, C0 governance, B2 semantic admission and independent red-team checks pass should its state be promoted as canonical. The original Action A source-inspection record remains historical evidence of the gap found before this follow-up.
+
+## 9. Follow-up status after PR #342
+
+The hard gate requested in section 6 is now **PASS / MERGED / CANONICAL** in PR [#342](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/342), merge commit `a496b82b8cfbc2256a9affd3337f97fce305d217`. The canonical semantic-admission boundary rejects the manual ChatGPT Web producer ID and any renamed producer retaining the unapproved Web operator-policy namespace. Exact-head B2 semantic admission, Core CI, State Hygiene, C0 Governance, B2-F red-team and associated required checks passed.
+
+The closure is deliberately narrow: the current manual Web output remains NON-CANONICAL only; no provider-origin authentication was added. P0-LLM-001 / P0-LLM-004 remain OPEN, the proposed two-round workflow is not implemented, and production Host acceptance/full Run Receipt replay remain outstanding.

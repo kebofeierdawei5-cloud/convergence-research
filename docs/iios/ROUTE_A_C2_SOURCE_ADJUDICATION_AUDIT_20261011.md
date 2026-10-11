@@ -179,3 +179,11 @@ From the existing 11 page-located extraction candidates, the 2026-10-09 buyback-
 - The sanitized run result contains no numeric price. It explicitly records `secondary_web_audit_performed=false`, `original_vendor_bytes_received=false`, and `source_verified_by_system=false`.
 
 **Still open:** independent review of the 13 official-filing claims, source-date bounds, and use boundary; formal signed Evidence/PIT admission; production Host acceptance; canonical D2 forecast/valuation/decision path; Publication; complete `IIOS_RUN_RECEIPT` and independent replay. All authority-creating outputs and execution authorization remain false. The primary 605016 production Host path continues in parallel.
+
+## 11. Manual Web semantic admission guard — canonical closure — 2026-10-11
+
+PR [#342](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/342) is **PASS / MERGED / CANONICAL** at `a496b82b8cfbc2256a9affd3337f97fce305d217`. The exact-head regression and governance checks passed, including B2 Semantic Producer Admission, Investment Core CI, State Hygiene, C0 Governance, B2-F fresh independent red-team, B00-B authority threat reproduction, B1 orchestrator, CORE-00, trusted runtime factory, Post-B04 red-team, and the associated pilot/provider checks.
+
+The canonical `admit_semantic_artifact` boundary now blocks the manual ChatGPT Web semantic producer and renamed producer identities that retain the unapproved `IIOS-CHATGPT-WEB-OPERATOR-POLICY-` namespace. This is fail-closed enforcement under the existing frozen B0 contract, not a governance downgrade or new source-origin assurance class. Manual Web handoff remains available only as non-canonical operator assistance; local hashes still do not authenticate OpenAI/model origin.
+
+**Remaining project gates:** P0-LLM-001 and P0-LLM-004 remain OPEN. No production Host-origin run, complete Run Receipt, independent replay, or formal canonical investment decision has been established. For C2, the next batch is a genuinely separate review of the 13 official-filing facts, conservative source-date upper bounds, and private fact-level-use boundary; no more market-price web search is required.
