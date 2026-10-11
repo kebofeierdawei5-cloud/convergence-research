@@ -824,9 +824,10 @@ def run_private_scenario_analysis(
     if run_dir.exists() or run_dir.is_symlink():
         replay = verify_private_scenario_bundle(run_dir)
         return {
+            **{key: value for key, value in replay.items() if key != "status"},
             "status": "SCENARIO_ANALYSIS_REUSED_IDENTICAL",
+            "replay_status": replay["status"],
             "run_dir": str(run_dir),
-            **replay,
         }
 
     temp_dir = Path(tempfile.mkdtemp(prefix=".scenario-tmp-", dir=str(root)))
@@ -845,9 +846,10 @@ def run_private_scenario_analysis(
         raise
     replay = verify_private_scenario_bundle(run_dir)
     return {
+        **{key: value for key, value in replay.items() if key != "status"},
         "status": "SCENARIO_ANALYSIS_CREATED",
+        "replay_status": replay["status"],
         "run_dir": str(run_dir),
-        **replay,
     }
 
 
