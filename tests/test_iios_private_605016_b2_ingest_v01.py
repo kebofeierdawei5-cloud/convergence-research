@@ -161,7 +161,9 @@ def test_persists_only_manifest_referenced_bytes_and_keeps_production_gates_open
 
     assert result["status"] == "PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED"
     assert result["core_validator_status"] == "PASS"
-    assert result["source_vintage_review_required"] is True
+    assert result["source_vintage_review_required"] is False
+    assert result["source_vintage_status"] == "BOUNDED_PUBLIC_AVAILABILITY_ACCEPTED_FOR_PIT"
+    assert result["public_availability_upper_bound"] == "2026-10-08T15:30:00+08:00"
     assert result["exact_first_public_timestamp_verified"] is False
     assert result["formal_signed_admission_created"] is False
     assert result["production_host_accepted"] is False
@@ -179,9 +181,125 @@ def test_persists_only_manifest_referenced_bytes_and_keeps_production_gates_open
 
     receipt = json.loads(Path(result["receipt_path"]).read_text(encoding="utf-8"))
     assert receipt["receipt_is_cryptographically_signed"] is False
-    assert receipt["source_vintage_review_required"] is True
+    assert receipt["source_vintage_review_required"] is False
+    assert receipt["source_vintage_status"] == "BOUNDED_PUBLIC_AVAILABILITY_ACCEPTED_FOR_PIT"
+    assert receipt["source_vintage_adjudication_sha256"]
+    assert receipt["official_price_known_at"] == "2026-10-08T15:30:00+08:00"
     assert "20.22" not in json.dumps(receipt)
     assert receipt["receipt_sha256"]
+
+
+def test_source_vintage_policy_sets_only_a_conservative_official_public_availability_bound(
+    tmp_path: Path,
+) -> None:
+    from research.b2.source_vintage_policy import (
+        PUBLIC_AVAILABILITY_UPPER_BOUND,
+        adjudicate_605016_source_vintage,
+        validate_source_vintage_adjudication,
+    )
+
+    raw_root = tmp_path / "source-root"
+    raw_path = raw_root / "raw" / "sse-market.json"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_bytes(RAW)
+    original = _manifest()
+    original_known_at = original["evidence"][0]["known_at"]
+
+    first = adjudicate_605016_source_vintage(
+        original,
+        raw_root=raw_root,
+        expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+        core_validator=_fake_core_validator,
+    )
+    replay = adjudicate_605016_source_vintage(
+        original,
+        raw_root=raw_root,
+        expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+        core_validator=_fake_core_validator,
+    )
+
+    assert first["status"] == "PASS"
+    assert first["evidence"][0]["known_at"] == PUBLIC_AVAILABILITY_UPPER_BOUND
+    assert first["evidence"][0]["known_at_basis"].startswith("OFFICIAL_SSE_PUBLIC_AVAILABILITY_UPPER_BOUND")
+    assert first["evidence"][0]["first_public_time_precision"] == (
+        "OFFICIAL_RULE_UPPER_BOUND_15_30; EXACT_ENDPOINT_FIRST_PUBLIC_TIMESTAMP_UNVERIFIED"
+    )
+    assert first["source_vintage_adjudication"]["decision"] == "BOUNDED_PUBLIC_AVAILABILITY_ACCEPTED_FOR_PIT"
+    assert first["source_vintage_adjudication"]["rule_source"]["raw_rule_bytes_materialized"] is False
+    assert first["source_vintage_adjudication"]["rule_source"]["raw_rule_bytes_sha256"] is None
+    assert first["source_vintage_adjudication"]["exact_first_public_timestamp_verified"] is False
+    assert first["status"] == "PASS"
+    assert first["validation_errors"] == []
+    assert original["evidence"][0]["known_at"] == original_known_at
+    assert replay["source_vintage_adjudication"]["adjudication_sha256"] == (
+        first["source_vintage_adjudication"]["adjudication_sha256"]
+    )
+    assert MODULE._candidate_fingerprint(replay) == MODULE._candidate_fingerprint(first)
+    state = validate_source_vintage_adjudication(
+        first,
+        raw_root=raw_root,
+        expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+    )
+    assert state["source_vintage_review_required"] is False
+    assert state["exact_first_public_timestamp_verified"] is False
+    assert raw_path.read_bytes() == RAW
+
+
+def test_source_vintage_policy_blocks_wrong_origin_or_changed_original_bytes(tmp_path: Path) -> None:
+    from research.b2.source_vintage_policy import (
+        SourceVintageAdjudicationError,
+        adjudicate_605016_source_vintage,
+    )
+
+    raw_root = tmp_path / "source-root"
+    raw_path = raw_root / "raw" / "sse-market.json"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_bytes(RAW)
+    bad_origin = _manifest()
+    bad_origin["evidence"][0]["source_ref"] = "https://example.com/605016"
+    with pytest.raises(SourceVintageAdjudicationError, match="SOURCE_VINTAGE_PRICE_SOURCE_ORIGIN_MISMATCH"):
+        adjudicate_605016_source_vintage(
+            bad_origin,
+            raw_root=raw_root,
+            expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+            core_validator=_fake_core_validator,
+        )
+
+    bad_bytes = _manifest()
+    raw_path.write_bytes(RAW + b"altered")
+    with pytest.raises(SourceVintageAdjudicationError, match="SOURCE_VINTAGE_RAW_SIZE_MISMATCH|SOURCE_VINTAGE_RAW_SHA256_MISMATCH"):
+        adjudicate_605016_source_vintage(
+            bad_bytes,
+            raw_root=raw_root,
+            expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+            core_validator=_fake_core_validator,
+        )
+
+
+def test_source_vintage_policy_replay_blocks_tampered_policy_record(tmp_path: Path) -> None:
+    from research.b2.source_vintage_policy import (
+        SourceVintageAdjudicationError,
+        adjudicate_605016_source_vintage,
+        validate_source_vintage_adjudication,
+    )
+
+    raw_root = tmp_path / "source-root"
+    raw_path = raw_root / "raw" / "sse-market.json"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_bytes(RAW)
+    manifest = adjudicate_605016_source_vintage(
+        _manifest(),
+        raw_root=raw_root,
+        expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+        core_validator=_fake_core_validator,
+    )
+    manifest["source_vintage_adjudication"]["rule_source"]["title"] = "tampered"
+    with pytest.raises(SourceVintageAdjudicationError, match="SOURCE_VINTAGE_ADJUDICATION_HASH_MISMATCH"):
+        validate_source_vintage_adjudication(
+            manifest,
+            raw_root=raw_root,
+            expected_price_sha256=MODULE.EXPECTED_PRICE_RAW_SHA256,
+        )
 
 
 def test_raw_copy_preflights_all_hashes_before_creating_destination(tmp_path: Path) -> None:
