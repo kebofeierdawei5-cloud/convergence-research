@@ -715,6 +715,133 @@ def _persist_mock_candidate(tmp_path: Path) -> tuple[Path, dict]:
     return private_root, result
 
 
+def _persist_legacy_unreviewed_candidate(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """Build a realistic v0.1 private candidate, without source re-fetch."""
+    repository_root = tmp_path / "repo"
+    repository_root.mkdir(exist_ok=True)
+    source_root = tmp_path / "legacy-source"
+    raw_path = source_root / "raw" / "sse-market.json"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_bytes(RAW)
+    manifest = _manifest()
+
+    private_root = tmp_path / "private-data"
+    MODULE._make_private_directory(private_root)
+    cases_root = private_root / "cases"
+    case_root = cases_root / MODULE.CASE_ID
+    MODULE._make_private_directory(cases_root)
+    MODULE._make_private_directory(case_root)
+    fingerprint = MODULE._candidate_fingerprint(manifest)
+    candidate_dir = case_root / fingerprint
+    MODULE._make_private_directory(candidate_dir)
+    evidence_root = candidate_dir / "evidence_root"
+    copied_count = MODULE._copy_exact_artifacts(
+        source_root=source_root,
+        destination_root=evidence_root,
+        declarations=manifest["raw_artifacts"],
+    )
+    assert copied_count == len(manifest["raw_artifacts"])
+
+    manifest_path = candidate_dir / "company_evidence_manifest.json"
+    _write_json(manifest_path, manifest)
+    os.chmod(manifest_path, 0o600)
+    price = manifest["evidence"][0]
+    receipt_core = {
+        "schema_version": "IIOS-LOCAL-PRIVATE-B2-PERSISTENCE-0.1",
+        "status": "PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
+        "case_id": MODULE.CASE_ID,
+        "cutoff_date": MODULE.CUTOFF_DATE,
+        "created_at": "2026-10-11T00:00:00+00:00",
+        "candidate_fingerprint": fingerprint,
+        "manifest_sha256": MODULE._sha256(manifest_path.read_bytes()),
+        "manifest_audit_sha256": manifest["audit"]["manifest_sha256"],
+        "official_price_source_sha256": MODULE.EXPECTED_PRICE_RAW_SHA256,
+        "official_price_observation_date": "2026-10-08",
+        "official_price_known_at": price["known_at"],
+        "official_price_known_at_basis": price["known_at_basis"],
+        "exact_first_public_timestamp_verified": False,
+        "source_vintage_review_required": True,
+        "evidence_record_count": len(manifest["evidence"]),
+        "raw_artifact_count": copied_count,
+        "admitted_field_group_count": len(MODULE.REQUIRED_FIELD_GROUPS_FOR_REPORT),
+        "missing_required_field_group_count": 0,
+        "core_validator": "iios_mvp.canonical_evidence_admission_v01.validate_company_evidence_manifest",
+        "core_validator_status": "PASS",
+        "storage_scope": "LOCAL_PRIVATE_INTERNAL_USE_ONLY",
+        "source_reuse_disposition": "RESTRICTED_NO_REDISTRIBUTION; private internal research use only",
+        "receipt_is_cryptographically_signed": False,
+        "formal_signed_admission_created": False,
+        "production_host_accepted": False,
+        "bundle_created": False,
+        "decision_created": False,
+        "human_approval_required": True,
+        "auto_execution": False,
+    }
+    receipt = dict(receipt_core)
+    receipt["receipt_sha256"] = MODULE._sha256(MODULE._canonical_bytes(receipt_core))
+    receipt_path = candidate_dir / "PRIVATE_B2_PERSISTENCE_RECEIPT.json"
+    _write_json(receipt_path, receipt)
+    os.chmod(receipt_path, 0o600)
+    return private_root, repository_root, candidate_dir
+
+
+def test_source_vintage_migration_creates_new_immutable_candidate_without_refetch(
+    tmp_path: Path, monkeypatch
+) -> None:
+    private_root, repository_root, original_dir = _persist_legacy_unreviewed_candidate(tmp_path)
+    original_manifest_bytes = (original_dir / "company_evidence_manifest.json").read_bytes()
+    original_raw_bytes = (original_dir / "evidence_root" / "raw" / "sse-market.json").read_bytes()
+
+    def forbidden_download(*_args, **_kwargs):
+        raise AssertionError("source-vintage migration must not download source data")
+
+    monkeypatch.setattr(MODULE, "_download_attempt10", forbidden_download)
+    result = MODULE.adjudicate_existing_private_b2_candidate(
+        private_root=private_root,
+        repository_root=repository_root,
+        core_validator=_fake_core_validator,
+    )
+
+    assert result["status"] == "SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED"
+    assert result["source_vintage_status"] == "BOUNDED_PUBLIC_AVAILABILITY_ACCEPTED_FOR_PIT"
+    assert result["source_vintage_review_required"] is False
+    assert result["exact_first_public_timestamp_verified"] is False
+    assert result["official_source_refetched"] is False
+    assert result["attempt10_downloaded"] is False
+    assert result["previous_candidate_retained"] is True
+    assert result["formal_signed_admission_created"] is False
+    assert result["production_host_accepted"] is False
+    assert result["decision_created"] is False
+    assert (original_dir / "company_evidence_manifest.json").read_bytes() == original_manifest_bytes
+    assert (original_dir / "evidence_root" / "raw" / "sse-market.json").read_bytes() == original_raw_bytes
+
+    replay = MODULE.verify_existing_private_b2_candidate(
+        private_root=private_root,
+        repository_root=repository_root,
+        core_validator=_fake_core_validator,
+    )
+    assert replay["candidate_count"] == 2
+    assert replay["active_candidate_fingerprint"] == result["candidate_fingerprint"]
+    assert replay["source_vintage_review_required"] is False
+    assert replay["official_source_refetched"] is False
+    old_candidates = [item for item in replay["candidates"] if item["source_vintage_review_required"]]
+    new_candidates = [item for item in replay["candidates"] if not item["source_vintage_review_required"]]
+    assert len(old_candidates) == 1
+    assert len(new_candidates) == 1
+    assert new_candidates[0]["candidate_fingerprint"] != old_candidates[0]["candidate_fingerprint"]
+    successor_dir = private_root / "cases" / MODULE.CASE_ID / result["candidate_fingerprint"]
+    assert (successor_dir / "evidence_root" / "raw" / "sse-market.json").read_bytes() == RAW
+
+    repeat = MODULE.adjudicate_existing_private_b2_candidate(
+        private_root=private_root,
+        repository_root=repository_root,
+        core_validator=_fake_core_validator,
+    )
+    assert repeat["status"] == "ALREADY_SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED"
+    assert repeat["candidate_fingerprint"] == result["candidate_fingerprint"]
+    assert len(list((private_root / "cases" / MODULE.CASE_ID).iterdir())) == 2
+
+
 def test_offline_verifier_replays_existing_candidate_without_source_download(tmp_path: Path, monkeypatch) -> None:
     private_root, persisted = _persist_mock_candidate(tmp_path)
 
