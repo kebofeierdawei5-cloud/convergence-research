@@ -124,3 +124,26 @@ The local storage gate was closed by the operator's read-only replay (Section 7)
 - Code CI on head `ddce63396904c9ab696ddfe784e8a3b94ab55b82`: private persistence contract **53/53 PASS**; B2 Evidence/PIT **31/31 PASS**; company Evidence/PIT **23/23 PASS**; B2 scope **3/3 PASS**; compile/shell/schema/diff checks pass. These are code tests, not a statement that the operator's private successor migration has executed.
 - Local successor migration is **not yet run**. Do not execute it before the PR is merged and the final docs-updated HEAD passes CI. After merge, use launcher `--adjudicate-source-vintage`; it needs public GitHub source access but does not need `gh` authentication and does not download Attempt 10 or query official market sources.
 - The new bound clears this specific cutoff-ordering issue only. It does not create formal signed admission, Production Host acceptance, a bundle, or a Decision and does not establish an exact endpoint first-public timestamp.
+
+## 9. Operator confirmation — C1 successor migration PASS — 2026-10-11
+
+The operator subsequently ran the merged launcher's offline source-vintage mode. Reported result:
+
+- Status: `SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED`.
+- Successor fingerprint: `9a4a1f2e22c982e12f09fc7858eba2ee06768cac59659734ab35ea450579bd3c`.
+- Manifest SHA-256: `90b1b4b77b28a0e8df36fb7737c7ade5a7ede85948246bcde0439cfc7bd1f72a`.
+- Source-vintage adjudication SHA-256: `e06240acec667926aaa453a7558f76d9f1763488fe5630f5916b180157c75535`.
+- Evidence records: 11; manifest raw-artifact declarations: 11; unique physical raw files: 8; Core validator: PASS.
+- `source_vintage_status=BOUNDED_PUBLIC_AVAILABILITY_ACCEPTED_FOR_PIT`; `source_vintage_review_required=false`; `public_availability_upper_bound=2026-10-08T15:30:00+08:00`.
+- `exact_first_public_timestamp_verified=false`; `official_source_refetched=false`; `attempt10_downloaded=false`; `previous_candidate_retained=true`.
+- Signed admission, production Host acceptance, bundle and Decision remain false; Human Approval remains required; auto execution remains false.
+
+This closes C1's local source-vintage successor migration. The limit remains explicit: the upper bound is rule-derived, not exact endpoint upload telemetry; the rule page bytes were not materialized/hashed in this run. No follow-up C1 ingest or price-source request is required.
+
+## 10. C2 / 新和成 next boundary — preserved Run #8 re-audit
+
+The Run #8 archive SHA-256 `0c7ddb34a4b77f7298309ae89ac8de96877a059656a811beefe7eabfe99a0ba1` independently matches the preserved archive, and all 8 captured raw objects match the intake receipt's sizes/SHA-256 values. This is a raw-integrity PASS only.
+
+The Run #8 B2 manifest uses `cutoff_date=2026-10-09T23:59:59+08:00`, inconsistent with the canonical date-only cutoff rule (start of 2026-10-09). Its old preflight remains diagnostic; do not patch the cutoff in place or re-use the old manifest digest/fingerprint. The 2026-10-09 buyback-progress notice and any same-day close stay excluded unless pre-cutoff availability is independently proven. See `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md`.
+
+Next step is C2 fact-level source adjudication under unchanged Core/PIT and conservative source-reuse conditions. C1 storage/source-vintage work is closed; production Host acceptance remains a separate gate.
