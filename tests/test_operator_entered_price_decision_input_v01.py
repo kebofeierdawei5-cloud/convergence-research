@@ -175,7 +175,7 @@ def test_stale_quote_and_future_timestamp_fail_closed():
         )
     with pytest.raises(price_input.OperatorEnteredPriceError, match="QUOTE_TIMESTAMP_AFTER_ENTRY_TIME"):
         price_input.validate_payload(
-            payload(quote_timestamp="2026-10-11T12:00:01+08:00"),
+            payload(quote_timestamp="2026-10-11T12:00:01+08:00", observation_date="2026-10-11"),
             entered_at=ENTERED, decision_cutoff_at=CUTOFF
         )
     with pytest.raises(price_input.OperatorEnteredPriceError, match="OBSERVATION_DATE_IN_FUTURE"):
