@@ -537,6 +537,8 @@ class FileSystemOperatorPriceInputResolver:
                 raise OperatorEnteredPriceError("OPERATOR_PRICE_VALUE_MISMATCH")
             if obs.get("currency") != record.get("currency") or obs.get("operator_input_adjustment_semantics", obs.get("adjustment_semantics")) != record.get("adjustment_semantics"):
                 raise OperatorEnteredPriceError("OPERATOR_PRICE_SEMANTICS_MISMATCH")
+            if obs.get("exchange") != record.get("exchange"):
+                raise OperatorEnteredPriceError("OPERATOR_PRICE_EXCHANGE_MISMATCH")
             expected_observed_at = (
                 quote_ts.isoformat()
                 if quote_ts is not None
@@ -550,7 +552,16 @@ class FileSystemOperatorPriceInputResolver:
                 raise OperatorEnteredPriceError("OPERATOR_PRICE_SOURCE_LABEL_MISMATCH")
             if "price_observation_admission_hash" in obs and obs.get("price_observation_admission_hash") not in (None, ""):
                 raise OperatorEnteredPriceError("OPERATOR_PRICE_MUST_NOT_CLAIM_CANONICAL_ADMISSION")
-            for flag in ("source_origin_verified", "source_vintage_verified", "source_use_rights_verified", "canonical_price_admission", "formal_evidence_pit_admission"):
+            for flag in (
+                "source_claim_verified",
+                "source_origin_verified",
+                "source_vintage_verified",
+                "source_use_rights_verified",
+                "raw_source_bytes_captured",
+                "canonical_exchange_price_admission",
+                "canonical_price_admission",
+                "formal_evidence_pit_admission",
+            ):
                 if obs.get(flag, False) is not False:
                     raise OperatorEnteredPriceError("OPERATOR_PRICE_PROVENANCE_FLAG_ESCALATED")
 
@@ -636,6 +647,8 @@ class FileSystemOperatorPriceInputResolver:
             "source_origin_verified": False,
             "source_vintage_verified": False,
             "source_use_rights_verified": False,
+            "raw_source_bytes_captured": False,
+            "canonical_exchange_price_admission": False,
             "canonical_price_admission": False,
             "formal_evidence_pit_admission": False,
         }

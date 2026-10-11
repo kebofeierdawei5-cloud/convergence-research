@@ -1031,9 +1031,12 @@ def authorize_decision_revision_write(
                 "BLOCKED: DECISION_PENDING operator-price hashes do not match snapshot input reference"
             )
         if (
-            current_price_observation.get("source_origin_verified") is not False
+            current_price_observation.get("source_claim_verified") is not False
+            or current_price_observation.get("source_origin_verified") is not False
             or current_price_observation.get("source_vintage_verified") is not False
             or current_price_observation.get("source_use_rights_verified") is not False
+            or current_price_observation.get("raw_source_bytes_captured") is not False
+            or current_price_observation.get("canonical_exchange_price_admission") is not False
             or current_price_observation.get("canonical_price_admission") is not False
             or current_price_observation.get("formal_evidence_pit_admission") is not False
             or "price_observation_admission_hash" in current_price_observation

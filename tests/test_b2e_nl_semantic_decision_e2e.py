@@ -1062,6 +1062,68 @@ def test_persisted_b2e_blocks_unsupported_operator_price_class(tmp_path):
     assert "DECISION_ADMITTED" not in stages
 
 
+def test_persisted_b2e_blocks_source_claim_assurance_escalation(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    evidence_root, manifest, _manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case)
+    case["current_price_observation"] = resolver.build_current_price_observation(
+        reference,
+        case_id=case["case_id"],
+        market=case["market"],
+        symbol=case["symbol"],
+        currency="CNY",
+        cutoff_date=__import__("datetime").date.fromisoformat(case["cutoff_date"]),
+        mie_reference_price_observation_id=case["current_price_observation"]["price_observation_id"],
+    )
+    case["current_price_observation"]["source_claim_verified"] = True
+    run_root = tmp_path / "operator-source-claim-escalation-run"
+
+    with pytest.raises(B2EE2EError, match="OPERATOR_PRICE_PROVENANCE_FLAG_ESCALATED"):
+        _run_persisted_operator_price_case(
+            case=case, price_registry=price_registry,
+            forecast_registry=forecast_registry, upstream_registry=upstream_registry,
+            valuation_resolver=valuation_resolver, evidence_root=evidence_root,
+            manifest=manifest, reference=reference, resolver=resolver,
+            run_root=run_root, run_id="b2e-operator-source-claim-escalation",
+        )
+    state = json.loads(run_state_path(run_root, "b2e-operator-source-claim-escalation").read_text(encoding="utf-8"))
+    assert state["envelope"]["run_status"] == "BLOCKED"
+    stages = [row["stage_id"] for row in state["envelope"]["stage_receipts"]]
+    assert "DECISION_PENDING" not in stages
+    assert "DECISION_ADMITTED" not in stages
+
+
+def test_persisted_b2e_blocks_exchange_metadata_tampering(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    evidence_root, manifest, _manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case)
+    case["current_price_observation"] = resolver.build_current_price_observation(
+        reference,
+        case_id=case["case_id"],
+        market=case["market"],
+        symbol=case["symbol"],
+        currency="CNY",
+        cutoff_date=__import__("datetime").date.fromisoformat(case["cutoff_date"]),
+        mie_reference_price_observation_id=case["current_price_observation"]["price_observation_id"],
+    )
+    case["current_price_observation"]["exchange"] = "SSE"
+    run_root = tmp_path / "operator-exchange-metadata-tamper-run"
+
+    with pytest.raises(B2EE2EError, match="OPERATOR_PRICE_EXCHANGE_MISMATCH"):
+        _run_persisted_operator_price_case(
+            case=case, price_registry=price_registry,
+            forecast_registry=forecast_registry, upstream_registry=upstream_registry,
+            valuation_resolver=valuation_resolver, evidence_root=evidence_root,
+            manifest=manifest, reference=reference, resolver=resolver,
+            run_root=run_root, run_id="b2e-operator-exchange-metadata-tamper",
+        )
+    state = json.loads(run_state_path(run_root, "b2e-operator-exchange-metadata-tamper").read_text(encoding="utf-8"))
+    assert state["envelope"]["run_status"] == "BLOCKED"
+    stages = [row["stage_id"] for row in state["envelope"]["stage_receipts"]]
+    assert "DECISION_PENDING" not in stages
+    assert "DECISION_ADMITTED" not in stages
+
+
 def test_p0_persisted_b2e_blocks_without_b2_evidence_pit_admission(tmp_path):
     case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
     root = tmp_path / "runs"

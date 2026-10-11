@@ -76,3 +76,25 @@ def test_operator_price_is_not_used_as_p4f_baseline_or_public_receipt_payload():
     assert 'return_gate["entry_price"] = bound_price' in b2e
     assert "current_price_assurance_limitation_codes" in report
     assert "operator_price_input_ref" not in report[report.index('"decision": {', report.index("def build_machine_surface")):report.index('"returns": returns', report.index("def build_machine_surface"))]
+
+
+def test_operator_price_provenance_guard_covers_all_claim_flags_and_exchange():
+    intake = (ROOT / "iios_mvp/operator_entered_price_decision_input_v01.py").read_text(encoding="utf-8")
+    authority = (ROOT / "iios_mvp/canonical_run_authority_v01.py").read_text(encoding="utf-8")
+
+    flags = (
+        "source_claim_verified",
+        "source_origin_verified",
+        "source_vintage_verified",
+        "source_use_rights_verified",
+        "raw_source_bytes_captured",
+        "canonical_exchange_price_admission",
+        "canonical_price_admission",
+        "formal_evidence_pit_admission",
+    )
+    for flag in flags:
+        assert f'"{flag}"' in intake
+        assert f'current_price_observation.get("{flag}") is not False' in authority
+
+    assert "OPERATOR_PRICE_EXCHANGE_MISMATCH" in intake
+    assert "operator-attested price attempts to claim source or canonical admission" in authority
