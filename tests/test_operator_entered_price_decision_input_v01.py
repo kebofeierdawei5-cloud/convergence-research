@@ -202,6 +202,17 @@ def test_wrong_exchange_or_currency_fails_closed():
         )
 
 
+def test_unsupported_a_share_code_prefix_is_rejected():
+    with pytest.raises(
+        price_input.OperatorEnteredPriceError,
+        match="UNSUPPORTED_A_SHARE_CODE_PREFIX",
+    ):
+        price_input.validate_payload(
+            payload(symbol="900001", exchange="SSE"),
+            entered_at=ENTERED, decision_cutoff_at=CUTOFF
+        )
+
+
 def test_hong_kong_input_preserves_leading_zero_and_uses_hkd():
     hk = payload(
         base_case_id="RC-HK-0700-20261012",
