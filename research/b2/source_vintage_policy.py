@@ -201,8 +201,8 @@ def validate_source_vintage_adjudication(
     for field, value in expected.items():
         if adjudication.get(field) != value:
             raise SourceVintageAdjudicationError("SOURCE_VINTAGE_ADJUDICATION_CONTRACT_MISMATCH:" + field)
-    if not isinstance(adjudication.get("previous_known_at"), str):
-        raise SourceVintageAdjudicationError("SOURCE_VINTAGE_PREVIOUS_KNOWN_AT_MISSING")
+    if adjudication.get("previous_known_at") != PRICE_EVENT_AT:
+        raise SourceVintageAdjudicationError("SOURCE_VINTAGE_PREVIOUS_KNOWN_AT_MISMATCH")
     if adjudication.get("policy_evaluation_mode") != "DETERMINISTIC_RULE_BOUND; NO_WALL_CLOCK_INPUT":
         raise SourceVintageAdjudicationError("SOURCE_VINTAGE_POLICY_EVALUATION_MODE_INVALID")
     price, raw_ref = _price_binding(manifest, expected_price_sha256)
@@ -257,6 +257,8 @@ def adjudicate_605016_source_vintage(
         raise SourceVintageAdjudicationError("SOURCE_VINTAGE_RULE_PUBLICATION_DATE_INVALID")
 
     previous_known_at = str(price.get("known_at"))
+    if previous_known_at != PRICE_EVENT_AT:
+        raise SourceVintageAdjudicationError("SOURCE_VINTAGE_ORIGINAL_EVENT_TIME_MISMATCH")
     adjudication_body = {
         "schema_version": "IIOS-SOURCE-VINTAGE-ADJUDICATION-0.1",
         "policy_id": POLICY_ID,
