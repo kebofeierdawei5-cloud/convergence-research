@@ -40,8 +40,8 @@ def _read_json(path: Path) -> dict[str, Any]:
     return value
 
 
-def _b2_cutoff_end_of_day(value: Any) -> str:
-    """Convert a date-only Route A cutoff to the normative +08:00 end of day."""
+def _b2_cutoff_instant(value: Any) -> str:
+    """Normalize a date-only cutoff to the canonical +08:00 start of day."""
     if not isinstance(value, str) or not value.strip():
         raise RouteAB2PreflightError("CASE_CUTOFF_REQUIRED")
     raw = value.strip()
@@ -50,7 +50,7 @@ def _b2_cutoff_end_of_day(value: Any) -> str:
             date.fromisoformat(raw)
         except ValueError as exc:
             raise RouteAB2PreflightError("CASE_CUTOFF_INVALID") from exc
-        return f"{raw}T23:59:59+08:00"
+        return f"{raw}T00:00:00+08:00"
     # An already-qualified B2 timestamp must remain explicit and timezone-aware.
     try:
         from datetime import datetime
@@ -181,7 +181,7 @@ def run_route_a_b2_preflight(
     case_id = str(receipt.get("case_id") or "").strip()
     if not case_id or case_id != intake_manifest.get("case_id"):
         raise RouteAB2PreflightError("ROUTE_A_CASE_ID_BINDING_MISMATCH")
-    cutoff = _b2_cutoff_end_of_day(intake_manifest.get("cutoff_date"))
+    cutoff = _b2_cutoff_instant(intake_manifest.get("cutoff_date"))
     b2_company = (company or "").strip() or f"{receipt.get('market')} {receipt.get('symbol')}"
 
     evidence_records = []

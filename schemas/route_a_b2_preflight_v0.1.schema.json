@@ -60,7 +60,7 @@
     },
     "cutoff_date": {
       "type": "string",
-      "pattern": "^\\d{4}-\\d{2}-\\d{2}T23:59:59\\+08:00$"
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T00:00:00\\+08:00$"
     },
     "intake_receipt_status": {
       "enum": [
