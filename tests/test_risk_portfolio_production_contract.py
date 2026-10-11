@@ -62,7 +62,8 @@ def test_tampering_is_detected():
 
 def test_schema_accepts_record():
     x = build_risk_portfolio_contract(case_id=CASE_ID, cutoff_date=CUTOFF, risk=risk(), portfolio=portfolio())
-    schema = load("schemas/risk_portfolio_production_v0.1.schema.json")
+    with open("schemas/risk_portfolio_production_v0.1.schema.json", encoding="utf-8") as schema_file:
+        schema = load(schema_file)
     assert list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(x)) == []
 
 def test_unknown_is_valid_state_but_not_ready():
