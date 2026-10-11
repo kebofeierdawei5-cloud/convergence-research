@@ -1,7 +1,7 @@
 # Action A — Capability Map and ChatGPT Free Web Governance Decision
 
 - Date: 2026-10-11
-- Status: **PROPOSED — REVIEW REQUIRED**. Until merged to canonical `main`, this file and its recommendation are DIAGNOSTIC, not canonical policy.
+- Status: **ACTION A AUDIT / GOVERNANCE RECOMMENDATION**. Under A0, this branch remains DIAGNOSTIC until merged to `main`; once merged, this is the canonical audit record, not a B0 amendment or a second State Index.
 - Canonical inspection baseline: `main` at `0e6ab65764298afa1fe723ad0a16b8683eb93276`
 - Scope: source/test capability map and producer-governance decision only.
 - No runtime code, economic semantics, test definition, source evidence, or user-private data was changed by this audit.
