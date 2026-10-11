@@ -26,6 +26,7 @@ B2-E Natural-Language → Semantic → Decision E2E          PASS / CANONICAL
 B2-F Full Independent Red-team                          PASS / CANONICAL
 P0 B3 persisted upstream write authorization             MERGED / EXACT-HEAD CI PASS
 P0 Canonical Runtime Callback Preflight                  MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL PASS
+C0 Local-first architecture / product-entry decision     DECISION RECORDED; IMPLEMENTATION GATES OPEN
 Production P0-LLM-001 / P0-LLM-004                      OPEN / REAL-HOST ACCEPTANCE REQUIRED
 D1-A 605016 production Host acceptance                         RUNBOOK + LOOPBACK PROBE TOOL CANONICAL; HOST PROBE OPEN; C1 FORMAL ADMISSION REQUIRED; GREEN B2-D JOB IS NOT LIVE-PROVIDER PROOF
 605016 source-vintage successor                           PASS / LOCAL CORE-VALIDATED CANDIDATE; FORMAL/HOST GATES OPEN
@@ -35,6 +36,8 @@ Route A C2 / 新和成 002001                            PRIVATE CORE/PIT PASS (
 ### Current blockers
 
 **Action A governance decision (2026-10-11, applying frozen B0; not a B0 amendment):** manual ChatGPT Free Web outputs are **NO-GO for formal/canonical semantic admission** because saved-response hashes do not authenticate OpenAI/model origin. PR [#342](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/342) is PASS / MERGED / CANONICAL at `a496b82b8cfbc2256a9affd3337f97fce305d217`; its fail-closed guard inside `admit_semantic_artifact` blocks both the currently registered manual producer ID and renamed IDs retaining the unapproved `IIOS-CHATGPT-WEB-OPERATOR-POLICY-` namespace. The handoff can remain available for explicitly NON-CANONICAL operator assistance; no canonical semantic admission may result. This change does not authenticate provider origin or close P0-LLM-001/P0-LLM-004, production Host acceptance, or the full Run Receipt path. The proposed Round A / Round B workflow is still not implemented. Governance audit and follow-up tests: [Action A Capability Map and Governance Decision](iios/ACTION_A_CAPABILITY_MAP_CHATGPT_WEB_GOVERNANCE_20261011.md).
+
+**C0 architecture/product-entry decision (2026-10-11):** adopt LOCAL_SINGLE_USER/local-first as the default deployment profile while reusing the existing canonical CLI/loopback Host, Orchestrator, runtime factory, Store/admission records, report QA and Run Receipt/replay path. Remote/multi-user deployment and new UI are deferred unless the real user-entry pilot demonstrates a need. The formal model route must satisfy the existing producer identity, model/version, signed-receipt and lineage contracts; local Ollama is the preferred no-paid-API candidate. The merged PR #342 guard remains in force: manual ChatGPT Free Web output is NON-CANONICAL for formal semantic admission. This is an architecture decision only and does not close P0-LLM-001/P0-LLM-004 or prove production use.
 
 **The company-level Investment Core MVP does NOT require an external LLM provider endpoint, paid search API, or API key.** Free-first Route A remains independent of optional provider integration. The remaining critical gates are production-runtime registration/deployment and actual source-by-source Evidence/PIT admission.
 
