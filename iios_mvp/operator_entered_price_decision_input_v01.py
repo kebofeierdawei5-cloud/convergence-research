@@ -347,6 +347,7 @@ def replay_bundle(bundle_path: str | Path) -> dict[str, Any]:
     if record.get("status") != STATUS or record.get("record_class") != "OPERATOR_ATTESTED_MARKET_DATA":
         raise OperatorEnteredPriceError("RECORD_STATUS_OR_CLASS_INVALID")
     if any(record.get(key) is not False for key in (
+        "local_clock_is_cryptographically_verified", "source_claim_verified",
         "source_origin_verified", "source_vintage_verified", "source_use_rights_verified",
         "raw_source_bytes_captured", "canonical_exchange_price_admission",
         "formal_evidence_pit_admission", "decision_chain_bound", "formal_decision_authority",
