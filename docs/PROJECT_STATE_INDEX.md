@@ -28,7 +28,7 @@ P0 B3 persisted upstream write authorization             MERGED / EXACT-HEAD CI 
 P0 Canonical Runtime Callback Preflight                  MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL PASS
 Production P0-LLM-001 / P0-LLM-004                      OPEN / REAL-HOST ACCEPTANCE REQUIRED
 605016 source-vintage successor                           PASS / LOCAL CORE-VALIDATED CANDIDATE; FORMAL/HOST GATES OPEN
-Route A C2 / 新和成 002001                            OPERATOR PRICE PATH MERGED; PRIVATE CORE/PIT RUN PENDING; INDEPENDENT FACT REVIEW OPEN
+Route A C2 / 新和成 002001                            PRIVATE CORE/PIT PASS (7/7; OPERATOR-ATTESTED); FORMAL/INDEPENDENT/HOST GATES OPEN
 ```
 
 ### Current blockers
@@ -308,9 +308,9 @@ The primary Investment Core MVP path is **Route A — free-first single-company 
 
 **Cutoff defect:** Run #8's B2 manifest and report used `2026-10-09T23:59:59+08:00`, which conflicts with the IIOS date-only cutoff rule for `2026-10-09` (interpreted at the start of that date). The historic manifest must stay diagnostic; do not edit the timestamp and reuse its digest/fingerprint. The 2026-10-09 buyback-progress filing and any same-day close remain excluded unless independent pre-cutoff availability is established.
 
-**C2 next action (operator policy):** PR [#338](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/338) is PASS / MERGED / CANONICAL at `c7fc3ff37fab75e2d72a5ba2c4a995058a85ebec`. Do not run another price web search. Use the `OPERATOR_ATTESTED_MARKET_DATA` path for the already supplied close; this is a human-attested input class, not source-vintage verification. The private bundle exists and its archive SHA-256 was checked in the current working session, but actual-case execution of the merged C2 tool plus the unchanged seven-group Core/PIT validator has not been performed here. Keep the numeric value and bundle out of GitHub and public Actions artifacts. Next: locally run the private bundle against the pinned Run #8 ZIP, then independently review the 13 official filing facts. Formal admission, Host acceptance, Decision and Run Receipt remain open.
+**C2 next action (operator policy):** PR [#338](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/338) and synthetic full-path PR [#340](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/340) are PASS / MERGED / CANONICAL. The actual private C2 run has now passed the unchanged Core/PIT validator ephemerally for all seven required groups, using `OPERATOR_ATTESTED_MARKET_DATA`; Run #8's eight captured raw objects and 13 PDF locators were reverified. No further web search/audit was done. This is not source-vintage verification, a formal signed admission, production Host acceptance, or a canonical Decision. The numeric value, private manifest and result bundle remain local-only. See audit section 10 and machine record `evidence/real_cases/RC-CN-A-002001-20261009/C2_MARKET_PRICE_SOURCE_REVIEW_20261011.json`.
 
-The current result remains `BLOCKED_NOT_ADMITTED`; seven mandatory groups are not covered by admitted fact records. The C2 plan does not weaken cutoff, origin, reuse or Core/PIT requirements.
+The formal C2 case remains `NOT_ADMITTED` pending a genuinely separate review of the 13 filing facts/source-date bounds/internal fact-level use boundary, signed Evidence/PIT admission, and production Host acceptance. Continue the 605016 production Host critical path in parallel. The C2 plan does not weaken cutoff or PIT requirements.
 
 B2-D3 real LLM provider invocation → B2-D1 independent verification → production-backed B2-E remains a separately tracked optional integration path. It does not block Route A acquisition, manual original intake, fact-level review, or free-first MVP development.
 

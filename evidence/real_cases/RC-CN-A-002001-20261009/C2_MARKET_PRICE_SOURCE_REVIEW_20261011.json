@@ -5,7 +5,7 @@
   "case_cutoff": "2026-10-09T00:00:00+08:00",
   "required_observation_date": "2026-10-08",
   "search_date": "2026-10-11",
-  "current_status": "OPERATOR_INPUT_RECEIVED_PRIVATE_CORE_VALIDATION_PENDING",
+  "current_status": "LOCAL_CORE_PIT_PASS_OPERATOR_ATTESTED; FORMAL_ADMISSION_PENDING",
   "admitted_source_id": null,
   "market_price_admission": false,
   "numeric_price_recorded": false,
@@ -96,24 +96,24 @@
     "official_source_payload_integrity_verified": false,
     "date_specific_known_at_verified": false,
     "permitted_internal_use_verified": false,
-    "decision": "KEEP_MARKET_PRICE_UNKNOWN",
+    "decision": "NO_EXTERNAL_PRICE_SOURCE_ADMITTED; OPERATOR_ATTESTATION_CORE_PIT_EPHEMERAL_PASS",
     "pre_cutoff_secondary_candidate_located": true,
-    "exact_candidate_raw_bytes_verified": false
+    "exact_candidate_raw_bytes_verified": false,
+    "operator_attested_price_core_pit_pass": true,
+    "formal_market_price_admission": false
   },
   "next_action": {
-    "owner": "LOCAL_OPERATOR_RUNTIME",
-    "action": "Execute the already-created private C2 operator-attestation bundle against the pinned Run #8 bytes using the merged local C2 tool; then review the 13 official filing facts separately.",
+    "owner": "INDEPENDENT_REVIEW_AND_PRODUCTION_HOST_WORKSTREAM",
+    "action": "Obtain a genuinely separate review of the 13 official-filing claims, source-date upper bounds, and private internal fact-level use boundary; in parallel continue the 605016 production Host acceptance critical path. Keep actual C2 values/manifests private.",
     "private_only": true,
     "github_raw_upload_allowed": false,
     "secondary_web_audit_required": false,
-    "explicit_attestation_required": true,
     "validation_required": [
-      "case/security/date binding for RC-CN-A-002001-20261009 / 002001 / 2026-10-08",
-      "exact SHA-256 of private operator-attestation bytes (not vendor source bytes)",
-      "operator-attested known_at at or before 2026-10-09T00:00:00+08:00",
-      "unchanged seven-group Core/PIT validator reports PASS",
-      "13 official filing facts independently reviewed",
-      "production Host acceptance and full D2 Run Receipt remain separate"
+      "independent reviewer resolves 13 official-filing claims and use boundary",
+      "explicitly distinguish operator-attested price from vendor-source-verified price",
+      "formal signed Evidence/PIT admission remains a separate gate",
+      "production Host origin, genuine authorized stage outputs, and full IIOS_RUN_RECEIPT replay remain required for D2",
+      "human approval required; automatic execution remains false"
     ]
   },
   "formal_signed_admission_created": false,
@@ -152,15 +152,62 @@
     "no_secondary_web_audit": true
   },
   "operator_market_price_attestation_implementation": {
-    "status": "PASS_MERGED_CANONICAL_PRIVATE_EXECUTION_PENDING",
+    "status": "PASS_MERGED_CANONICAL_AND_ACTUAL_PRIVATE_C2_CORE_PIT_PASS",
     "branch": "feat/operator-market-price-attestation-20261011",
     "pr_number": 338,
     "merge_commit_sha": "c7fc3ff37fab75e2d72a5ba2c4a995058a85ebec",
     "policy_id": "IIOS-OPERATOR-MARKET-PRICE-ATTESTATION-0.1",
+    "full_synthetic_c2_positive_path_ci": "PASS",
+    "positive_path_pr_number": 340,
+    "positive_path_merge_commit_sha": "3192a0865593a0970b4238a1f4ce4e54b0d81f90",
+    "actual_private_c2_core_pit_run": "PASS_EPHEMERAL_NOT_SOURCE_VERIFIED",
     "quote_value_written_to_public_repository": false,
-    "synthetic_contract_tests": "PASS",
-    "real_c2_price_bundle_core_run": "NOT_EXECUTED_IN_REPO_RUNTIME",
     "no_secondary_web_audit": true,
-    "core_pit_pass_not_yet_claimed": true
+    "formal_signed_admission_created": false,
+    "production_host_accepted": false
+  },
+  "actual_private_core_pit_run": {
+    "status": "PASS_EPHEMERAL_OPERATOR_ATTESTED_NOT_SOURCE_VINTAGE_VERIFIED",
+    "case_id": "RC-CN-A-002001-20261009",
+    "cutoff_date": "2026-10-09T00:00:00+08:00",
+    "run8_archive_sha256": "0c7ddb34a4b77f7298309ae89ac8de96877a059656a811beefe7eabfe99a0ba1",
+    "attestation_zip_sha256": "78cbc2ac41b00db6509d4578f931ffe6d9bfba59751121fba51ee5d0b86d5ad5",
+    "attestation_payload_sha256": "97568a2f416e922404290b66fbce820807115fcbd73931cdfed5f2ac27efb0fb",
+    "private_manifest_sha256": "bda2253bc98e089d87a5d2f04adb939c74be8f30e357195468e508e2f88d06ed",
+    "required_field_group_count": 7,
+    "admitted_field_groups": [
+      "business_reality",
+      "capital_structure",
+      "corporate_disclosures",
+      "financial_reality",
+      "market_price",
+      "security_identity",
+      "trust_governance_events"
+    ],
+    "missing_required_field_groups": [],
+    "official_filing_fact_locator_count": 13,
+    "preserved_raw_object_count_verified": 8,
+    "private_manifest_evidence_record_count": 14,
+    "secondary_web_audit_performed": false,
+    "numeric_price_in_public_report": false,
+    "operator_attestation_hash_proves_vendor_source_bytes": false,
+    "independent_external_fact_review": "PENDING",
+    "formal_signed_admission_created": false,
+    "production_host_accepted": false,
+    "decision_created": false,
+    "publication_created": false,
+    "run_receipt_created": false,
+    "execution_authorized": false
+  },
+  "second_pass_fact_review": {
+    "status": "LOCAL_SECOND_PASS_13_OF_13_LOCATORS_AND_PIT_BOUNDS_PASS_NOT_EXTERNAL_INDEPENDENT_REVIEW",
+    "review_date": "2026-10-11",
+    "fact_locator_terms_passed": 13,
+    "fact_locator_terms_total": 13,
+    "source_known_at_within_cutoff": 13,
+    "official_szse_domain_bindings": 13,
+    "same_day_buyback_progress_excluded": true,
+    "allowed_use_boundary": "PRIVATE_FACT_LEVEL_USE_ONLY; unrestricted reuse not claimed",
+    "independent_human_or_external_review_pending": true
   }
 }
