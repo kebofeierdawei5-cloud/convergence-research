@@ -836,6 +836,17 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
         raw_root=combined_root,
     )
 
+    # The local private ingester reads this manifest from the same temporary
+    # workspace. Before this write, the path still held the base candidate
+    # created before the official price evidence was added, even when this
+    # final in-memory candidate and the public-safe report both said PASS.
+    # Materialize the exact final manifest here; the workspace is ephemeral
+    # and the manifest/raw quote bytes are not uploaded as a workflow artifact.
+    combined_manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+
     admitted_groups = sorted({
         str(item.get("field_id", "")).split(".", 1)[0]
         for item in manifest.get("evidence", [])
@@ -871,7 +882,8 @@ def adjudicate(attempt10_root: Path, out_dir: Path) -> dict[str, Any]:
         "official_price_source": {
             "source_id": "PRICE-SSE-OFFICIAL-DAYK-2026-10-08",
             "url": source_url,
-            "transport": source.get("transport", "PYTHON_HTTPS"),
+            "transport": "HTTPS_TLS_VERIFIED",
+            "transport_method": source.get("transport", "PYTHON_HTTPS"),
             "http_status": source.get("http_status"),
             "content_type": source.get("content_type"),
             "observation_date": "2026-10-08",
