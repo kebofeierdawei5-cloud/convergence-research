@@ -7,7 +7,12 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import sys
 from typing import Any
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from research.b2.evidence_contract import assert_pit, parse_temporal, validate_evidence_record
 
