@@ -1,6 +1,9 @@
 name: IIOS P0 Canonical Entry Incident Reproduction
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     paths:
       - "docs/iios/P0_CANONICAL_ENTRY_INCIDENT_REPRODUCTION_20261009.md"
