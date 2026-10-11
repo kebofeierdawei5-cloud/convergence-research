@@ -911,7 +911,11 @@ def _verify_private_candidate_contents(candidate_dir: Path, *, validator: Callab
     return {
         "candidate_fingerprint": fingerprint,
         "manifest_sha256": manifest_sha,
+        # Legacy field means declaration count; shared raw paths are counted separately.
         "raw_artifact_count": len(declarations),
+        "raw_artifact_declaration_count": len(declarations),
+        "unique_raw_file_count": len(expected_paths),
+        "raw_artifact_count_semantics": "MANIFEST_DECLARATIONS_NOT_UNIQUE_FILES",
         "evidence_record_count": len(manifest.get("evidence") or []),
         "core_validator_status": "PASS",
         "source_vintage_review_required": True,
@@ -1055,6 +1059,12 @@ def ingest_private_b2_candidate(
                 "manifest_path": str(destination / "company_evidence_manifest.json"),
                 "evidence_root": str(destination / "evidence_root"),
                 "raw_artifact_count": len(raw_declarations),
+                "raw_artifact_declaration_count": len(raw_declarations),
+                "unique_raw_file_count": len({
+                    _safe_relative_path(item.get("relative_path")).as_posix()
+                    for item in raw_declarations if isinstance(item, Mapping)
+                }),
+                "raw_artifact_count_semantics": "MANIFEST_DECLARATIONS_NOT_UNIQUE_FILES",
                 "evidence_record_count": len(manifest.get("evidence") or []),
                 "core_validator_status": "PASS",
                 "exact_first_public_timestamp_verified": False,
@@ -1157,6 +1167,12 @@ def ingest_private_b2_candidate(
             "evidence_root": str(destination / "evidence_root"),
             "receipt_path": str(destination / "PRIVATE_B2_PERSISTENCE_RECEIPT.json"),
             "raw_artifact_count": copied_count,
+            "raw_artifact_declaration_count": copied_count,
+            "unique_raw_file_count": len({
+                _safe_relative_path(item.get("relative_path")).as_posix()
+                for item in raw_declarations if isinstance(item, Mapping)
+            }),
+            "raw_artifact_count_semantics": "MANIFEST_DECLARATIONS_NOT_UNIQUE_FILES",
             "evidence_record_count": len(manifest.get("evidence") or []),
             "core_validator_status": "PASS",
             "exact_first_public_timestamp_verified": False,
