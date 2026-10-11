@@ -17,6 +17,10 @@
 
 **Non-claim:** C0 does not close P0-LLM-001/P0-LLM-004, does not claim a real Host/provider run, does not admit C1/C2 evidence, and does not constitute MVP acceptance or investment-performance validation.
 
+
+
+**No-local-LLM boundary for admission/rights work (2026-10-11):** formal Evidence/PIT signer implementation, signer trust enrollment, official source-use review and written exchange permission requests are deterministic governance/data-rights work. They must not be held behind installing or configuring a local model. Local Ollama/model runtime work remains a separate integration lane; absence of a local LLM does not justify resetting or pausing C1/C2 signature and rights progress.
+
 ## 0.1 Parallel execution checkpoint — C1 / C2 / D1-A (2026-10-11)
 
 Current checkpoint record: `docs/iios/C1_C2_D1A_PARALLEL_GATE_EXECUTION_AUDIT_20261011.md`.

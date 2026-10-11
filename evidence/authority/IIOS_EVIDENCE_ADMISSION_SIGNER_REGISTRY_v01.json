@@ -1,0 +1,6 @@
+{
+  "schema_version": "IIOS-EVIDENCE-ADMISSION-SIGNER-REGISTRY-0.1",
+  "registry_status": "NO_TRUSTED_SIGNERS_REGISTERED",
+  "policy_ref": "docs/iios/EVIDENCE_ADMISSION_SIGNING_AND_MARKET_DATA_RIGHTS_GATE_20261011.md",
+  "signers": []
+}
