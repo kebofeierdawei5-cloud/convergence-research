@@ -92,3 +92,23 @@ def test_operator_attestation_rejects_case_source_and_value_mismatches(tmp_path)
     evidence["operator_attestation"]["source_ref"] = evidence["source_ref"]
     evidence["value"] = 999.0
     assert "OPERATOR_ATTESTATION:VALUE_MISMATCH" in validate_evidence_record(evidence)
+
+
+def test_cli_can_import_core_contract_when_started_outside_repository_root(tmp_path):
+    import os
+    import subprocess
+    import sys
+
+    script = Path(__file__).parents[1] / "tools" / "iios_operator_market_price_attestation_v01.py"
+    env = dict(os.environ)
+    env.pop("PYTHONPATH", None)
+    result = subprocess.run(
+        [sys.executable, str(script), "--help"],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "operator-attested market-price evidence bundle" in result.stdout
