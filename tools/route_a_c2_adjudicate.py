@@ -456,6 +456,8 @@ def _append_operator_market_price_attestation(
         raise ValueError("C2_OPERATOR_PRICE_CONFIRMATION_INVALID")
     if payload.get("original_vendor_bytes_received") is not False:
         raise ValueError("C2_OPERATOR_PRICE_VENDOR_BYTES_MUST_NOT_BE_CLAIMED")
+    if declaration.get("relative_path") != "raw/operator_market_price_attestation.json":
+        raise ValueError("C2_OPERATOR_PRICE_BUNDLE_RAW_PATH_INVALID")
     if declaration.get("expected_sha256") != digest or declaration.get("expected_size_bytes") != len(raw_bytes):
         raise ValueError("C2_OPERATOR_PRICE_BUNDLE_RAW_HASH_MISMATCH")
     if record.get("content_sha256") != digest or record.get("capture_sha256") != digest:
@@ -478,6 +480,9 @@ def _append_operator_market_price_attestation(
     if record.get("provenance_class") != "OPERATOR_ATTESTED_MARKET_DATA" or record.get("status") != "ADMITTED":
         raise ValueError("C2_OPERATOR_PRICE_PROVENANCE_INVALID")
     try:
+        operator_known_at = parse_temporal(payload.get("known_at"), "operator_price.known_at")
+        if operator_known_at.date().isoformat() != payload.get("observation_date"):
+            raise ValueError("known_at is not on the observation date")
         assert_pit(record, CUTOFF_INSTANT)
     except ValueError as exc:
         raise ValueError("C2_OPERATOR_PRICE_PIT_INVALID:" + str(exc)) from exc
@@ -680,7 +685,8 @@ def build_successor_manifest(root: Path, *, archive_verification_method: str, op
         },
         "b2_manifest_status": manifest["status"],
         "b2_manifest_sha256": manifest["audit"]["manifest_sha256"],
-        "candidate_fact_count": len(evidence),
+        "candidate_fact_count": len(FACT_SPECS),
+        "candidate_evidence_record_count": len(evidence),
         "admitted_field_groups": expected_admitted,
         "missing_required_field_groups": missing_groups,
         "b2_validation_errors": errors,
