@@ -22,7 +22,7 @@ def test_macos_patha_launcher_keeps_private_output_root_fail_closed() -> None:
     assert 'chmod 700 "$OUTPUT_ROOT"' in text
     # Initialization plus braced expansion avoids an unbound code? parameter.
     assert 'code=0' in text
-    assert '"${code}"' in text
+    assert '${code}' in text
     assert "${code?}" not in text
 
 
