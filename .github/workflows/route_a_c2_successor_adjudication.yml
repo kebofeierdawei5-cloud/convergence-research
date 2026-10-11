@@ -44,7 +44,8 @@ jobs:
         run: |
           python tools/route_a_c2_adjudicate.py \
             --archive-dir /tmp/iios-c2-run8-artifact \
-            --out-dir /tmp/iios-c2-successor
+            --out-dir /tmp/iios-c2-successor \
+            --artifact-digest-verified-by-download-action
       - name: Assert fail-closed expected C2 disposition
         run: |
           python - <<'PY'
