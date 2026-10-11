@@ -1,0 +1,102 @@
+{
+  "schema_version": "IIOS-ROUTE-A-C2-MARKET-PRICE-SOURCE-REVIEW-0.1",
+  "record_class": "MARKET_PRICE_SOURCE_SEARCH_DIAGNOSTIC_NOT_EVIDENCE_ADMISSION",
+  "case_id": "RC-CN-A-002001-20261009",
+  "case_cutoff": "2026-10-09T00:00:00+08:00",
+  "required_observation_date": "2026-10-08",
+  "search_date": "2026-10-11",
+  "current_status": "BLOCKED_UNKNOWN",
+  "admitted_source_id": null,
+  "market_price_admission": false,
+  "numeric_price_recorded": false,
+  "sources": [
+    {
+      "source_id": "SZSE-HISTORICAL-QUOTE-UI",
+      "url": "https://www.szse.cn/market/trend/index.html?code=002001",
+      "source_authority": "OFFICIAL_EXCHANGE_WEBSITE",
+      "availability_review": "OFFICIAL_HISTORICAL_QUOTE_UI_LOCATED",
+      "raw_payload_captured_for_2026_10_08": false,
+      "raw_payload_status": "NOT_CAPTURED_WEB_FETCH_TIMEOUT",
+      "source_vintage_status": "NOT_VERIFIED_FOR_THIS_RECORD",
+      "use_permission_status": "UNRESOLVED_MARKET_DATA_SERVICE_TERMS",
+      "decision": "NOT_ADMITTED",
+      "reason": "SZSE describes SSIC as exclusively authorized to manage/distribute SZSE securities information and describes end-of-day closes as market-data services. The research did not establish terms that permit exact-byte retention/use for this private IIOS record."
+    },
+    {
+      "source_id": "CNINFO-OFFICIAL-DATA-SERVICE",
+      "url": "https://webapi.cninfo.com.cn/",
+      "source_authority": "SHENZHEN_SECURITIES_INFORMATION_COMPANY_PLATFORM",
+      "availability_review": "QUOTE_CENTER_HISTORICAL_QUOTE_API_DOCS_AND_DATA_MALL_ADVERTISED",
+      "raw_payload_captured_for_2026_10_08": false,
+      "source_vintage_status": "NOT_VERIFIED_FOR_THIS_RECORD",
+      "use_permission_status": "UNRESOLVED_FREE_ACCESS_AND_LOCAL_RETENTION_TERMS",
+      "decision": "NOT_ADMITTED",
+      "reason": "Public landing page confirms the platform offers quotation/history and API/data-mall sections, but did not establish a free, unregistered and retention-permitted path for the exact 2026-10-08 close."
+    },
+    {
+      "source_id": "INVESTING-COM-HISTORICAL-PAGE",
+      "url": "https://cn.investing.com/equities/zhejiang-nhu-a-historical-data",
+      "source_authority": "SECONDARY_VENDOR",
+      "availability_review": "DATE_SPECIFIC_HISTORICAL_TABLE_VISIBLE",
+      "raw_payload_captured_for_2026_10_08": false,
+      "source_vintage_status": "NOT_ADMITTED",
+      "use_permission_status": "EXPLICIT_PRIOR_WRITTEN_PERMISSION_REQUIRED_FOR_USE_STORAGE_REPRODUCTION_DISPLAY_TRANSMISSION_OR_DISTRIBUTION",
+      "decision": "EXCLUDED",
+      "reason": "Terms prohibit use/storage/copying/displaying/modifying/transmitting/distributing the data without prior explicit written permission; page disclaimer says prices may not be exchange-provided and may be indicative. No quote value is copied into this report."
+    },
+    {
+      "source_id": "YAHOO-FINANCE-HISTORICAL",
+      "url": "https://finance.yahoo.com/",
+      "source_authority": "SECONDARY_VENDOR",
+      "availability_review": "NOT_CAPTURED_AS_EVIDENCE",
+      "raw_payload_captured_for_2026_10_08": false,
+      "source_vintage_status": "NOT_ADMITTED",
+      "use_permission_status": "AUTOMATED_COLLECTION_REQUIRES_EXPRESS_PRIOR_PERMISSION; NO_PRIVATE_RESEARCH_RETENTION_BASIS_VERIFIED",
+      "decision": "EXCLUDED",
+      "reason": "Terms prohibit automated data collection without express prior permission; the research did not establish a compliant raw-byte acquisition and retention path for this formal Evidence/PIT gate."
+    },
+    {
+      "source_id": "SOHU-EASTMONEY-PRESERVED-RUN8",
+      "url": null,
+      "source_authority": "SECONDARY_VENDOR",
+      "availability_review": "RAW_BYTES_EXIST_FOR_TWO_PAGES; HISTORICAL_KLINE_REQUEST_HAS_NO_BYTES",
+      "raw_payload_captured_for_2026_10_08": false,
+      "source_vintage_status": "NOT_ADMITTED",
+      "use_permission_status": "UNRESOLVED",
+      "decision": "EXCLUDED",
+      "reason": "Existing page captures lack admitted date-specific known_at and permitted-use records; the K-line request failed capture and has no byte count or hash."
+    }
+  ],
+  "source_review_conclusion": {
+    "permitted_free_source_found": false,
+    "official_source_payload_integrity_verified": false,
+    "date_specific_known_at_verified": false,
+    "permitted_internal_use_verified": false,
+    "decision": "KEEP_MARKET_PRICE_UNKNOWN"
+  },
+  "next_action": {
+    "owner": "OPERATOR",
+    "requested_artifact": "Original quote artifact for 002001 closing price on 2026-10-08, lawfully obtained from a source whose terms permit personal/internal research use",
+    "examples": [
+      "Broker-provided historical-price export or statement with source, code, date and close clearly visible",
+      "Official/provider quote file with documented personal/internal use permission"
+    ],
+    "private_only": true,
+    "github_raw_upload_allowed": false,
+    "typed_number_without_source_artifact_sufficient": false,
+    "automatic_admission": false,
+    "validation_required": [
+      "Exact raw bytes and SHA-256",
+      "Case/security/date binding",
+      "Source identity and permitted use review",
+      "Cutoff-safe known_at basis",
+      "Independent Core/PIT validation"
+    ]
+  },
+  "formal_signed_admission_created": false,
+  "production_host_accepted": false,
+  "decision_created": false,
+  "publication_created": false,
+  "run_receipt_created": false,
+  "execution_authorized": false
+}
