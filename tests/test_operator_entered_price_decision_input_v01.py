@@ -202,7 +202,7 @@ def test_operator_price_resolver_binds_exact_private_bundle_and_cutoff(tmp_path)
     cutoff = __import__("datetime").date(2026, 10, 12)
     observation = resolver.build_current_price_observation(
         reference,
-        case_id="RC-CN-A-002001-20261009",
+        case_id="RC-CN-A-002001-20261012",
         market="CN-A",
         symbol="002001",
         currency="CNY",
@@ -211,7 +211,7 @@ def test_operator_price_resolver_binds_exact_private_bundle_and_cutoff(tmp_path)
     )
     bound = resolver.resolve_operator_price_input(
         reference,
-        case_id="RC-CN-A-002001-20261009",
+        case_id="RC-CN-A-002001-20261012",
         market="CN-A",
         symbol="002001",
         currency="CNY",
@@ -241,7 +241,7 @@ def test_operator_price_resolver_fails_if_entry_is_not_before_cutoff_start(tmp_p
     ):
         resolver.resolve_operator_price_input(
             reference,
-            case_id="RC-CN-A-002001-20261009",
+            case_id="RC-CN-A-002001-20261012",
             market="CN-A",
             symbol="002001",
             currency="CNY",
@@ -260,14 +260,14 @@ def test_operator_price_resolver_rejects_wrong_case_symbol_and_ref_hash(tmp_path
         )
     with pytest.raises(price_input.OperatorEnteredPriceError, match="OPERATOR_PRICE_INSTRUMENT_MISMATCH"):
         resolver.resolve_operator_price_input(
-            reference, case_id="RC-CN-A-002001-20261009", market="CN-A", symbol="002353",
+            reference, case_id="RC-CN-A-002001-20261012", market="CN-A", symbol="002353",
             currency="CNY", cutoff_date=__import__("datetime").date(2026, 10, 12),
         )
     changed = dict(reference)
     changed["record_sha256"] = "0" * 64
     with pytest.raises(price_input.OperatorEnteredPriceError, match="OPERATOR_PRICE_BUNDLE_ID_HASH_MISMATCH"):
         resolver.resolve_operator_price_input(
-            changed, case_id="RC-CN-A-002001-20261009", market="CN-A", symbol="002001",
+            changed, case_id="RC-CN-A-002001-20261012", market="CN-A", symbol="002001",
             currency="CNY", cutoff_date=__import__("datetime").date(2026, 10, 12),
         )
 
@@ -278,7 +278,7 @@ def test_operator_price_resolver_rejects_forged_canonical_price_flags(tmp_path):
     resolver = price_input.FileSystemOperatorPriceInputResolver(root)
     observation = resolver.build_current_price_observation(
         reference,
-        case_id="RC-CN-A-002001-20261009",
+        case_id="RC-CN-A-002001-20261012",
         market="CN-A",
         symbol="002001",
         currency="CNY",
@@ -291,7 +291,7 @@ def test_operator_price_resolver_rejects_forged_canonical_price_flags(tmp_path):
         match="OPERATOR_PRICE_MUST_NOT_CLAIM_CANONICAL_ADMISSION",
     ):
         resolver.resolve_operator_price_input(
-            reference, case_id="RC-CN-A-002001-20261009", market="CN-A",
+            reference, case_id="RC-CN-A-002001-20261012", market="CN-A",
             symbol="002001", currency="CNY",
             cutoff_date=__import__("datetime").date(2026, 10, 12),
             current_price_observation=observation,
@@ -304,7 +304,7 @@ def test_operator_price_resolver_never_marks_unverified_mie_reference_as_price_e
     resolver = price_input.FileSystemOperatorPriceInputResolver(root)
     observation = resolver.build_current_price_observation(
         reference,
-        case_id="RC-CN-A-002001-20261009",
+        case_id="RC-CN-A-002001-20261012",
         market="CN-A",
         symbol="002001",
         currency="CNY",
@@ -312,7 +312,7 @@ def test_operator_price_resolver_never_marks_unverified_mie_reference_as_price_e
         mie_reference_price_observation_id="caller-provided-ref",
     )
     bound = resolver.resolve_operator_price_input(
-        reference, case_id="RC-CN-A-002001-20261009", market="CN-A",
+        reference, case_id="RC-CN-A-002001-20261012", market="CN-A",
         symbol="002001", currency="CNY",
         cutoff_date=__import__("datetime").date(2026, 10, 12),
         current_price_observation=observation,
@@ -320,7 +320,7 @@ def test_operator_price_resolver_never_marks_unverified_mie_reference_as_price_e
     assert bound["source_origin_verified"] is False
     assert bound["source_vintage_verified"] is False
     assert bound["formal_evidence_pit_admission"] is False
-    assert bound["decision_chain_bound"] is True
+    assert bound["decision_chain_bound"] is False
 
 
 def test_missing_confirmation_fails_closed(tmp_path):
