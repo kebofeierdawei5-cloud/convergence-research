@@ -27,6 +27,8 @@ If gh is absent, install GitHub CLI and run gh auth login once. The program does
 
 The private root is created with restrictive directory permissions; raw files and JSON files are mode 0600, directories are mode 0700, and writes are immutable/content-addressed. Re-running the same evidence candidate re-verifies it and returns the existing candidate rather than overwriting it. The tool refuses to write anywhere inside the public Git repository.
 
+A single original raw source file may support multiple distinct evidence records, so the manifest may contain multiple declarations with the same relative path. The ingester verifies every declaration independently, permits a shared path only when all declarations agree on expected size and SHA-256, and writes that path once. Conflicting size/hash contracts for the same path fail closed before the private staging destination is created. The offline verifier applies the same rule and separately validates every declaration through the unchanged Core/PIT validator.
+
 ## Acceptance boundary
 
 A successful local run means:

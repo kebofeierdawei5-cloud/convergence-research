@@ -184,6 +184,86 @@ def test_persists_only_manifest_referenced_bytes_and_keeps_production_gates_open
     assert receipt["receipt_sha256"]
 
 
+def test_private_persistence_allows_multiple_evidence_records_to_share_exact_raw_source(
+    tmp_path: Path,
+) -> None:
+    input_root = _input_root(tmp_path)
+    private_root = tmp_path / "private-data"
+
+    def shared_source_adjudicator(input_root: Path, out_root: Path) -> dict:
+        report = _fake_adjudicator(input_root, out_root)
+        manifest_path = out_root / "base-b2" / "COMBINED_B2_CANDIDATE_MANIFEST.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        original = manifest["evidence"][0]
+        shared = dict(original)
+        shared["evidence_id"] = "605016-IDENTITY-SHARED-SOURCE-FIXTURE"
+        shared["field_id"] = "security_identity.issuer_code"
+        shared["value"] = {"issuer_code": "605016"}
+        manifest["evidence"].append(shared)
+        manifest["raw_artifacts"].append({
+            "evidence_id": shared["evidence_id"],
+            "relative_path": manifest["raw_artifacts"][0]["relative_path"],
+            "expected_size_bytes": len(RAW),
+            "expected_sha256": RAW_SHA,
+        })
+        _write_json(manifest_path, manifest)
+        return report
+
+    result = MODULE.ingest_private_b2_candidate(
+        private_root=private_root,
+        repository_root=tmp_path / "repo",
+        attempt10_root=input_root,
+        adjudicator=shared_source_adjudicator,
+        core_validator=_fake_core_validator,
+    )
+
+    assert result["status"] == "PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED"
+    assert result["raw_artifact_count"] == 2
+    persisted_raw = Path(result["evidence_root"]) / "raw" / "sse-market.json"
+    assert persisted_raw.read_bytes() == RAW
+    assert len([path for path in (Path(result["evidence_root"]) / "raw").iterdir() if path.is_file()]) == 1
+
+    # The durable verifier must accept the same evidence-centric manifest while
+    # requiring exactly the one unique persisted byte path.
+    verified = MODULE.verify_existing_private_b2_candidate(
+        private_root=private_root,
+        repository_root=tmp_path / "repo",
+        core_validator=_fake_core_validator,
+    )
+    assert verified["status"] == "VERIFIED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED"
+    assert verified["candidates"][0]["raw_artifact_count"] == 2
+
+
+def test_shared_raw_path_with_conflicting_byte_contract_fails_before_any_write(tmp_path: Path) -> None:
+    source_root = tmp_path / "source"
+    raw_path = source_root / "raw" / "shared.json"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_bytes(RAW)
+    destination_root = tmp_path / "private-stage"
+
+    declarations = [
+        {
+            "evidence_id": "fact-a",
+            "relative_path": "raw/shared.json",
+            "expected_size_bytes": len(RAW),
+            "expected_sha256": RAW_SHA,
+        },
+        {
+            "evidence_id": "fact-b",
+            "relative_path": "raw/shared.json",
+            "expected_size_bytes": len(RAW),
+            "expected_sha256": "0" * 64,
+        },
+    ]
+    with pytest.raises(MODULE.PrivateIngestError, match="RAW_ARTIFACT_PATH_CONTRACT_CONFLICT"):
+        MODULE._copy_exact_artifacts(
+            source_root=source_root,
+            destination_root=destination_root,
+            declarations=declarations,
+        )
+    assert not destination_root.exists()
+
+
 def test_same_candidate_is_immutable_and_idempotent(tmp_path: Path) -> None:
     input_root = _input_root(tmp_path)
     private_root = tmp_path / "private-data"
@@ -286,12 +366,18 @@ def _make_real_core_validator_fixture(tmp_path: Path) -> tuple[dict, Path]:
     evidence = []
     raw_artifacts = []
     for index, field_group in enumerate(REQUIRED_COMPANY_FIELD_GROUPS):
-        relative_path = f"raw/{field_group}.json"
-        raw = json.dumps(
-            {"field_group": field_group, "fact_number": index},
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
+        if index in {0, 1}:
+            # Two facts sourced from the same official publication should have
+            # separate evidence declarations that reference one byte object.
+            relative_path = "raw/shared-official-publication.json"
+            raw = b'{"source":"one official publication","exact_bytes":true}'
+        else:
+            relative_path = f"raw/{field_group}.json"
+            raw = json.dumps(
+                {"field_group": field_group, "fact_number": index},
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
         raw_path = raw_root / relative_path
         raw_path.parent.mkdir(parents=True, exist_ok=True)
         raw_path.write_bytes(raw)

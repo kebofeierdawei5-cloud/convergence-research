@@ -684,17 +684,30 @@ def _copy_exact_artifacts(
     *, source_root: Path, destination_root: Path, declarations: list[Any]
 ) -> int:
     source_base = source_root.resolve(strict=True)
-    _make_private_directory(destination_root)
-    seen: set[str] = set()
-    copied = 0
+
+    # The manifest contract is evidence-centric: multiple admitted facts may
+    # reference the same original PDF/HTML/JSON bytes, so raw_artifacts can
+    # legitimately contain repeated relative_path values. Preflight all shared
+    # path contracts before creating output. A path can be shared only when
+    # every declaration agrees on the exact size and SHA-256.
+    normalized: list[tuple[Mapping[str, Any], PurePosixPath, str]] = []
+    path_contracts: dict[str, tuple[Any, Any]] = {}
     for declaration in declarations:
         if not isinstance(declaration, Mapping):
             raise PrivateIngestError("RAW_ARTIFACT_DECLARATION_INVALID")
         relative = _safe_relative_path(declaration.get("relative_path"))
         relative_key = relative.as_posix()
-        if relative_key in seen:
-            raise PrivateIngestError("RAW_ARTIFACT_PATH_DUPLICATED")
-        seen.add(relative_key)
+        contract = (declaration.get("expected_size_bytes"), declaration.get("expected_sha256"))
+        previous = path_contracts.get(relative_key)
+        if previous is not None and previous != contract:
+            raise PrivateIngestError("RAW_ARTIFACT_PATH_CONTRACT_CONFLICT")
+        path_contracts[relative_key] = contract
+        normalized.append((declaration, relative, relative_key))
+
+    _make_private_directory(destination_root)
+    written_paths: set[str] = set()
+    verified_declarations = 0
+    for declaration, relative, relative_key in normalized:
         source = (source_base / Path(*relative.parts)).resolve(strict=True)
         try:
             source.relative_to(source_base)
@@ -712,18 +725,24 @@ def _copy_exact_artifacts(
             or _sha256(raw) != expected_hash
         ):
             raise PrivateIngestError("RAW_ARTIFACT_EXACT_BYTES_MISMATCH")
-        target = destination_root.joinpath(*relative.parts)
-        _make_private_directory(target.parent)
-        try:
-            with target.open("xb") as handle:
-                handle.write(raw)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.chmod(target, 0o600)
-        except FileExistsError as exc:
-            raise PrivateIngestError("RAW_ARTIFACT_WRITE_COLLISION") from exc
-        copied += 1
-    return copied
+
+        # Re-verify every evidence reference above, but store a shared original
+        # source file only once. Receipts still count manifest declarations,
+        # not unique filesystem paths.
+        if relative_key not in written_paths:
+            target = destination_root.joinpath(*relative.parts)
+            _make_private_directory(target.parent)
+            try:
+                with target.open("xb") as handle:
+                    handle.write(raw)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.chmod(target, 0o600)
+            except FileExistsError as exc:
+                raise PrivateIngestError("RAW_ARTIFACT_WRITE_COLLISION") from exc
+            written_paths.add(relative_key)
+        verified_declarations += 1
+    return verified_declarations
 
 
 def _validate_core(
@@ -850,12 +869,16 @@ def _verify_private_candidate_contents(candidate_dir: Path, *, validator: Callab
     if not isinstance(declarations, list) or not declarations:
         raise PrivateIngestError("EXISTING_PRIVATE_RAW_DECLARATIONS_MISSING")
     expected_paths: set[str] = set()
+    persisted_path_contracts: dict[str, tuple[Any, Any]] = {}
     for declaration in declarations:
         if not isinstance(declaration, Mapping):
             raise PrivateIngestError("EXISTING_PRIVATE_RAW_DECLARATION_INVALID")
         relative = _safe_relative_path(declaration.get("relative_path")).as_posix()
-        if relative in expected_paths:
-            raise PrivateIngestError("EXISTING_PRIVATE_RAW_PATH_DUPLICATED")
+        contract = (declaration.get("expected_size_bytes"), declaration.get("expected_sha256"))
+        previous = persisted_path_contracts.get(relative)
+        if previous is not None and previous != contract:
+            raise PrivateIngestError("EXISTING_PRIVATE_RAW_PATH_CONTRACT_CONFLICT")
+        persisted_path_contracts[relative] = contract
         expected_paths.add(relative)
     actual_paths = {
         path.relative_to(raw_root).as_posix()
