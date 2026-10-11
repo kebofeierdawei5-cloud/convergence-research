@@ -5,6 +5,8 @@ on:
     paths:
       - "iios_mvp/canonical_signed_evidence_admission_v01.py"
       - "tests/test_canonical_signed_evidence_admission_v01.py"
+      - "iios_mvp/operator_attested_price_input_v01.py"
+      - "tests/test_operator_attested_price_input_v01.py"
       - "evidence/authority/IIOS_EVIDENCE_ADMISSION_SIGNER_REGISTRY_v01.json"
       - ".github/workflows/iios-signed-evidence-admission.yml"
   push:
@@ -31,9 +33,9 @@ jobs:
           python-version: "3.12"
       - name: Install minimal test dependencies
         run: python -m pip install --disable-pip-version-check pytest cryptography
-      - name: Compile signer and adversarial tests
-        run: python -m compileall -q iios_mvp/canonical_signed_evidence_admission_v01.py tests/test_canonical_signed_evidence_admission_v01.py
-      - name: Run signed-admission adversarial suite
+      - name: Compile deterministic admission and operator-price input gates
+        run: python -m compileall -q iios_mvp/canonical_signed_evidence_admission_v01.py iios_mvp/operator_attested_price_input_v01.py tests/test_canonical_signed_evidence_admission_v01.py tests/test_operator_attested_price_input_v01.py
+      - name: Run deterministic admission and operator-price input tests
         env:
           PYTHONPATH: .
-        run: python -m pytest -q tests/test_canonical_signed_evidence_admission_v01.py
+        run: python -m pytest -q tests/test_canonical_signed_evidence_admission_v01.py tests/test_operator_attested_price_input_v01.py
