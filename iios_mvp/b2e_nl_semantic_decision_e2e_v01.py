@@ -296,6 +296,7 @@ def run_b2e_conformance(
     upstream_authority_resolver: Any,
     valuation_output_resolver: Any,
     operator_price_input_resolver: Any | None = None,
+    operator_price_input_ref: Mapping[str, Any] | None = None,
     run_root: str | None = None,
     evidence_manifest: Mapping[str, Any] | None = None,
     evidence_root: str | None = None,
@@ -318,6 +319,39 @@ def run_b2e_conformance(
     case = deepcopy(dict(case))
     operator_price_binding: dict[str, Any] | None = None
     current_price_observation = case.get("current_price_observation")
+
+    # Preferred path: the private request bundle carries only the hashed
+    # bundle reference. Materialize the value from the local private store;
+    # never require the price to be copied into a public case/example file.
+    if operator_price_input_ref is not None:
+        if operator_price_input_resolver is None:
+            raise B2EE2EError("BLOCKED: operator price input reference supplied without trusted resolver")
+        if not isinstance(current_price_observation, Mapping):
+            raise B2EE2EError("BLOCKED: base case current_price_observation is required for MIE binding")
+        existing_class = current_price_observation.get("price_input_class", "CANONICAL_ADMITTED_MARKET_DATA")
+        if existing_class == "OPERATOR_ATTESTED_MARKET_DATA":
+            if current_price_observation.get("operator_price_input_ref") != dict(operator_price_input_ref):
+                raise B2EE2EError("BLOCKED: top-level operator price reference conflicts with case input")
+        elif existing_class == "CANONICAL_ADMITTED_MARKET_DATA":
+            try:
+                base_observation_id = str(current_price_observation.get("price_observation_id", "")).strip()
+                if not base_observation_id:
+                    raise ValueError("base case lacks a source-qualified MIE reference price ID")
+                current_price_observation = operator_price_input_resolver.build_current_price_observation(
+                    operator_price_input_ref,
+                    case_id=str(case["case_id"]),
+                    market=str(case["market"]),
+                    symbol=str(case["symbol"]),
+                    currency=str(current_price_observation.get("currency", "")),
+                    cutoff_date=__import__("datetime").date.fromisoformat(str(case["cutoff_date"])),
+                    mie_reference_price_observation_id=base_observation_id,
+                )
+                case["current_price_observation"] = current_price_observation
+            except (KeyError, TypeError, ValueError, OSError) as exc:
+                raise B2EE2EError(f"BLOCKED: cannot materialize private operator price input: {exc}") from exc
+        else:
+            raise B2EE2EError("BLOCKED: unsupported existing current price input class")
+
     if isinstance(current_price_observation, Mapping) and current_price_observation.get("price_input_class") == "OPERATOR_ATTESTED_MARKET_DATA":
         if operator_price_input_resolver is None:
             raise B2EE2EError("BLOCKED: trusted operator price input resolver is not registered")
