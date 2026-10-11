@@ -1403,7 +1403,7 @@ def ingest_private_b2_candidate(
             repository_root=repository_root,
         )
         manifest_path.write_text(
-            json.dumps(manifest, ensure_ascii=False, indent=2) + "\\n",
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
         price = _price_evidence(manifest)
@@ -1431,10 +1431,10 @@ def ingest_private_b2_candidate(
         if destination.is_symlink():
             raise PrivateIngestError("EXISTING_PRIVATE_CANDIDATE_MUST_NOT_BE_SYMLINK")
         if destination.exists():
-            existing = _validate_existing_candidate(
+            existing = _verify_private_candidate_contents(
                 destination, validator=core_validator, repository_root=repository_root
             )
-            if _candidate_fingerprint(existing["manifest"]) != fingerprint:
+            if existing["candidate_fingerprint"] != fingerprint:
                 raise PrivateIngestError("IMMUTABLE_PRIVATE_CANDIDATE_CONFLICT")
             return {
                 "status": "ALREADY_PERSISTED_CORE_VALIDATED_NOT_PRODUCTION_ACCEPTED",
@@ -1453,8 +1453,11 @@ def ingest_private_b2_candidate(
                 "raw_artifact_count_semantics": "MANIFEST_DECLARATIONS_NOT_UNIQUE_FILES",
                 "evidence_record_count": len(manifest.get("evidence") or []),
                 "core_validator_status": "PASS",
+                "source_vintage_status": existing["source_vintage_status"],
+                "source_vintage_adjudication_sha256": existing.get("source_vintage_adjudication_sha256"),
+                "public_availability_upper_bound": existing.get("public_availability_upper_bound"),
                 "exact_first_public_timestamp_verified": False,
-                "source_vintage_review_required": True,
+                "source_vintage_review_required": existing["source_vintage_review_required"],
                 "formal_signed_admission_created": False,
                 "production_host_accepted": False,
                 "bundle_created": False,
@@ -1552,6 +1555,9 @@ def ingest_private_b2_candidate(
             raise
 
         final_manifest = destination / "company_evidence_manifest.json"
+        final_verified = _verify_private_candidate_contents(
+            destination, validator=core_validator, repository_root=repository_root
+        )
         return {
             "status": "PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
             "case_id": CASE_ID,
@@ -1570,8 +1576,11 @@ def ingest_private_b2_candidate(
             "raw_artifact_count_semantics": "MANIFEST_DECLARATIONS_NOT_UNIQUE_FILES",
             "evidence_record_count": len(manifest.get("evidence") or []),
             "core_validator_status": "PASS",
+            "source_vintage_status": final_verified["source_vintage_status"],
+            "source_vintage_adjudication_sha256": final_verified.get("source_vintage_adjudication_sha256"),
+            "public_availability_upper_bound": final_verified.get("public_availability_upper_bound"),
             "exact_first_public_timestamp_verified": False,
-            "source_vintage_review_required": True,
+            "source_vintage_review_required": final_verified["source_vintage_review_required"],
             "formal_signed_admission_created": False,
             "production_host_accepted": False,
             "bundle_created": False,
