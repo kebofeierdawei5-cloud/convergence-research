@@ -568,7 +568,7 @@ class FileSystemOperatorPriceInputResolver:
             "raw_source_bytes_captured": False,
             "canonical_exchange_price_admission": False,
             "formal_evidence_pit_admission": False,
-            "decision_chain_bound": True,
+            "decision_chain_bound": False,
             "formal_decision_authority": False,
             "automatic_execution_authority": False,
         }
