@@ -22,3 +22,9 @@ The review records only fact ID, PDF member/page, raw PDF hash, locator status, 
 ## Boundary
 
 This is a fresh, separate-method local review, not an external reviewer or legal opinion. A truly separate reviewer still must resolve the official-filing claims and permitted private fact-level use/retention boundary. Factual and PIT checks do not promote the evidence to formal signed admission. No formal admission, production Host acceptance, Decision, Publication, complete IIOS_RUN_RECEIPT or execution authority is created.
+
+## Official use-terms signal — 2026-10-11
+
+The official [SZSE User Service Agreement](https://www.szse.cn/application/register/protocol/) says the service-platform operator owns the network-service intellectual property and bars sale/resale or commercial use of information obtained through those services (section 5.4). This is a relevant restriction signal, **not** an affirmative license for private retention, and the fetched agreement does not conclusively establish whether that platform-wide rule governs the static disclosure-PDF URLs used in this case. It also does not explicitly resolve noncommercial personal fact-level use.
+
+Therefore this review does not turn the source-use result into PASS. `PUBLIC_ACCESS_REUSE_UNKNOWN` remains the intake basis, and formal admission still requires a separate use-boundary determination. No legal opinion is given. The citation is recorded for reviewer follow-up; no market-price web audit was performed.
