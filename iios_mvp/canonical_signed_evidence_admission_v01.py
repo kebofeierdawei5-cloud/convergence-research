@@ -528,20 +528,30 @@ def _main(argv: list[str] | None = None) -> int:
         if args.command == "generate-keypair":
             result = generate_keypair(args.private_key_out, args.public_key_out)
         elif args.command == "sign":
+            if args.existing_envelope:
+                envelope, _ = _read_json(args.existing_envelope, "EXISTING_ENVELOPE")
+                existing_payload = envelope.get("payload")
+                if not isinstance(existing_payload, Mapping):
+                    raise SignedAdmissionError("EXISTING_ENVELOPE_PAYLOAD_INVALID")
+                payload_created_at = existing_payload.get("signed_payload_created_at")
+                if not isinstance(payload_created_at, str):
+                    raise SignedAdmissionError("EXISTING_ENVELOPE_CREATED_AT_MISSING")
+            else:
+                envelope = {"schema_version": SIGNED_ADMISSION_SCHEMA, "payload": {}, "signatures": []}
+                payload_created_at = args.signed_at
             payload = build_admission_payload(
                 manifest_path=args.manifest,
                 raw_root=args.raw_root,
                 rights_record_path=args.rights_record,
                 permission_evidence_path=args.permission_evidence,
                 decision=args.decision,
-                signed_at=args.signed_at,
+                signed_at=payload_created_at,
             )
             if args.existing_envelope:
-                envelope, _ = _read_json(args.existing_envelope, "EXISTING_ENVELOPE")
-                if envelope.get("payload") != payload:
+                if existing_payload != payload:
                     raise SignedAdmissionError("EXISTING_ENVELOPE_PAYLOAD_MISMATCH")
             else:
-                envelope = {"schema_version": SIGNED_ADMISSION_SCHEMA, "payload": payload, "signatures": []}
+                envelope["payload"] = payload
             result = add_signature(
                 envelope, signer_registry_path=args.registry, signer_key_id=args.signer_key_id,
                 private_key_path=args.private_key, signed_at=args.signed_at,
