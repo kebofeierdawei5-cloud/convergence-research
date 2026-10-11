@@ -712,7 +712,6 @@ def _copy_exact_artifacts(
         path_contracts[relative_key] = contract
         normalized.append((declaration, relative, relative_key))
 
-    source_paths: dict[str, Path] = {}
     source_bytes: dict[str, bytes] = {}
     for _declaration, relative, relative_key in normalized:
         if relative_key in source_bytes:
@@ -732,7 +731,6 @@ def _copy_exact_artifacts(
             raise PrivateIngestError("RAW_ARTIFACT_PATH_ESCAPE") from exc
         if not source.is_file():
             raise PrivateIngestError("RAW_ARTIFACT_SOURCE_NOT_REGULAR_FILE")
-        source_paths[relative_key] = source
         source_bytes[relative_key] = source.read_bytes()
 
     # Compare each manifest declaration to the fully read-and-hashed source
