@@ -1,3 +1,5 @@
+
+- **Action A manual-Web semantic gate follow-up (2026-10-11):** the fail-closed guard candidate in `iios_mvp/semantic_producer_admission_v01.py` blocks canonical semantic admission for `iios-chatgpt-web-semantic-producer` and the same unapproved policy namespace, while preserving non-canonical exploratory handoff. PR exact-head checks are pending; P0-LLM-001/P0-LLM-004 and production Host acceptance remain OPEN.
 # IIOS Project Status
 
 State classification: **CANONICAL SUMMARY**
