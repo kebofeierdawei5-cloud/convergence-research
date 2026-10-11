@@ -41,7 +41,8 @@ jobs:
         run: |
           python tools/route_a_c2_p3_independent_fact_review.py \
             --artifact-root /tmp/c2-p3-run8 \
-            --out /tmp/C2_P3_INDEPENDENT_FACT_REVIEW_20261011.json
+            --out /tmp/C2_P3_INDEPENDENT_FACT_REVIEW_20261011.json \
+            --artifact-digest-verified-by-download-action
           python - <<'PY'
           import json
           from pathlib import Path
