@@ -1,8 +1,8 @@
 # Operator-Entered Price — Decision Input Contract (2026-10-11)
 
 - Record class: governance/implementation contract proposal
-- Baseline: canonical `main@642867f216c7eac94c6c65e233dbb1190afc2108`
-- Status: **MP-1 + MP-2 + REPORT ASSURANCE PASS / PRs #366/#368/#370; MP-3 CROSS-LAYER + EVIDENCE/PIT + SNAPSHOT-TAMPER SLICES PASS / PRs #372/#375; LOCAL RECEIPT REVIEW + REMAINING MP-3 OPEN**
+- Baseline: canonical `main@a60e62cd6c39492b404fee1cbfc0511717726ee3`
+- Status: **MP-1 + MP-2 + REPORT ASSURANCE PASS / PRs #366/#368/#370; MP-3 CROSS-LAYER / EVIDENCE-PIT / SNAPSHOT / PROVENANCE / NO-PUBLICATION SLICES PASS / PRs #372/#375/#377/#378/#379; LOCAL RECEIPT REVIEW + REMAINING MP-3 OPEN**
 - Scope: initial A/H-share current-price entry is supplied manually by the operator; IIOS does not automatically fetch market quotes for this path.
 
 ## 1. Decision
@@ -80,9 +80,12 @@ The operator can manually enter a value without naming a source. If a source is 
 ### Batch MP-3 — adversarial and end-to-end acceptance (MULTIPLE SLICES PASS / REMAINDER OPEN)
 - **PR #372 cross-layer slice PASS:** both exact-head workflows passed (B2-E 14/14, B2-E red-team 7/7, B2 semantic admission 14/14, semantic red-team 15/15). It rejects a missing trusted resolver, conflicting top-level-vs-Case references, forged receipt SHA blocking a persisted run before Decision stage, and malformed Run Authority record/receipt pairs.
 - **PR #375 Evidence/PIT + snapshot-tamper slice PASS** at `642867f216c7eac94c6c65e233dbb1190afc2108`: both exact-head workflows passed (B2-E 17/17, B2-E red-team 7/7, B2 semantic admission 14/14, semantic red-team 15/15). With a valid private manual-price receipt, B2-E still blocks when the company Evidence/PIT manifest is missing or a required evidence group is incomplete. After a Decision is admitted, changing current price, expectation-gap price/ID or return-gate entry price causes Decision Revision authorization to fail; changing linked values together and recomputing the snapshot hash still cannot rebind to the existing Decision Admission.
-- **Remaining cross-layer negatives:** stale/changed record hash; wrong case/instrument/currency/exchange across full B2-E; unsupported input class; provenance-flag escalation; additional stage-bypass/Run Receipt replay tampering and re-validation of all downstream publication/report authorization paths. Failure must stay fail-closed with no Decision Admission/Publication/Run Receipt from a blocked run.
-- **Local acceptance still OPEN:** independently review one actual local private bundle/receipt and complete Run Receipt/replay with only sanitized status, analysis ID and hash-check outcomes. Never upload prices, source labels, raw source bytes, local manifests or private receipts.
-- Until all remaining gates pass, Path A remains analysis-only and software tests are not formal investment acceptance.
+- **PR #377 stale-reference/currency/provenance boundary slice PASS:** the exact-head B2-E workflow exercises stale record SHA with a bundle-ID prefix preserved, wrong Case ID, Case-side currency tampering, a source-origin assurance flag set to true, and unknown price class; every persisted run is BLOCKED before Decision.
+- **PR #378 full provenance flag and exchange identity closure PASS:** 9/9 exact-head checks passed, including `test-mvp` 412/412 and `pilot-02`. All eight flags are explicitly false on the operator input observation and rejected if escalated: source claim/origin/vintage/use rights, raw bytes captured, canonical exchange admission, canonical price admission, and formal Evidence/PIT admission. Exchange metadata on the current-price observation must match the private record.
+- **PR #379 blocked-run downstream artifact boundary PASS:** both exact-head B2-E and semantic-admission workflows passed; counts were B2-E 24/24, B2-E red-team 8/8, B2 semantic admission 14/14 and semantic red-team 15/15. A forged receipt hash causes a persisted run to be BLOCKED, with no Decision Admission; machine publication and complete Run Receipt creation are also rejected.
+- **Remaining cross-layer negatives:** deeper stage-bypass and replay-record tampering, additional instrument/exchange/currency/reference corruption permutations, and complete downstream publication/report authorization bypass coverage. Failures must remain fail-closed with no Decision Admission/Publication/Run Receipt from a blocked run.
+- **Local acceptance still OPEN:** independently review one actual local private bundle/receipt and complete Run Receipt/replay using only sanitized status, analysis ID and hash-check outcomes. Never upload prices, source labels, raw source bytes, local manifests or private receipts.
+- Until the remaining gates pass, Path A remains analysis-only and software tests are not formal investment acceptance.
 
 ## 7. Non-goals
 
