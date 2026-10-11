@@ -1,0 +1,22 @@
+IIOS Path A 私有情景分析一键工具（macOS）— 权限修复版
+
+1. 退出此前报错的终端窗口。
+2. 重新下载并解压修复版 ZIP；不要继续使用旧解压目录内的 .command 文件。
+3. 双击“ 双击运行_IIOS情景分析.command ”。
+4. 在文件选择窗口中，从 ~/.iios-private/analysis-inputs 选择此前保存的标准化私有记录：operator-attested-prices-path-a-<run-id>.json。
+   不要选择原始输入文件，也不要选择 *.receipt.json。
+5. 如果提示旧输出目录权限过宽，确认提示后选择“收紧权限”。它只会将 ~/.iios-private/scenario-analysis 这个目录的权限收紧为 700，不会删除或覆盖目录内文件；选择取消则安全停止。
+6. 等待终端输出完成后，Finder 会打开 ~/.iios-private/scenario-analysis。
+
+每次分析目录包含：
+- input.json：私有价格和原始人工来源声明副本
+- analysis.json：可机读计算结果
+- report.md：中文分析报告
+- receipt.json：脱敏完整性回执，不包含价格数值或来源标签
+
+重复选同一个标准化输入会验证并复用同一个不可覆盖分析目录；输入变化会创建新的分析 ID。
+工具从固定的 canonical GitHub 提交下载两个 Python 模块，并验证 Git blob SHA-1 后再运行。工具不抓取行情、不上传行情到 GitHub，不需要 LLM/Ollama/API key。
+
+如果 macOS 阻止打开：在 Finder 中按住 Control 点击 .command 文件，选择“打开”，然后按提示继续。
+
+注意：工具只生成 NON-CANONICAL 情景分析，不创建正式行情准入、正式 Forecast、正式 Decision、Publication 或交易授权。
