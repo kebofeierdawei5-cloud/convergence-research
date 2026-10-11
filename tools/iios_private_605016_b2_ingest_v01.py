@@ -17,15 +17,25 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
+import zipfile
 from typing import Any, Callable, Mapping
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 REPOSITORY_FULL_NAME = "kebofeierdawei5-cloud/convergence-research"
 ATTEMPT10_RUN_ID = "38026139364"
 ATTEMPT10_ARTIFACT_NAME = "iios-company-evidence-38026139364"
+ATTEMPT10_ARTIFACT_ID = "11660285551"
+ATTEMPT10_ARTIFACT_SIZE_BYTES = 8526921
+ATTEMPT10_ARTIFACT_SHA256 = "19916fee166b45a04430e4d2bb3131be2f0beab3140df4820793099d7d413f5c"
+GITHUB_API_VERSION = "2022-11-28"
+MAX_ATTEMPT10_ARCHIVE_FILES = 2000
+MAX_ATTEMPT10_UNPACKED_BYTES = 100 * 1024 * 1024
 CASE_ID = "RC-CN-A-605016-20261009"
 CUTOFF_DATE = "2026-10-09"
 PRICE_EVIDENCE_ID = "605016-SSE-HTTPS-DAILY-CLOSE-20261008"
@@ -133,34 +143,203 @@ def _preflight_attempt10(root: str | Path) -> Path:
     return base
 
 
-def _download_attempt10(destination: Path) -> Path:
-    gh = shutil.which("gh")
-    if not gh:
-        raise PrivateIngestError("GITHUB_CLI_REQUIRED_INSTALL_GH_AND_AUTHENTICATE")
-    auth = subprocess.run(
-        [gh, "auth", "status", "--hostname", "github.com"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-    )
-    if auth.returncode != 0:
-        raise PrivateIngestError("GITHUB_CLI_AUTH_REQUIRED_RUN_GH_AUTH_LOGIN")
+def _extract_verified_attempt10_archive(
+    archive_path: Path,
+    destination: Path,
+    *,
+    expected_sha256: str = ATTEMPT10_ARTIFACT_SHA256,
+    expected_size_bytes: int = ATTEMPT10_ARTIFACT_SIZE_BYTES,
+) -> Path:
+    """Verify the pinned artifact ZIP before safely extracting regular files only."""
+    if archive_path.is_symlink() or not archive_path.is_file():
+        raise PrivateIngestError("ATTEMPT10_ARCHIVE_NOT_REGULAR_FILE")
+    actual_size = archive_path.stat().st_size
+    if actual_size != expected_size_bytes:
+        raise PrivateIngestError("ATTEMPT10_ARTIFACT_ARCHIVE_SIZE_MISMATCH")
+    if _sha256(archive_path.read_bytes()) != expected_sha256:
+        raise PrivateIngestError("ATTEMPT10_ARTIFACT_ARCHIVE_SHA256_MISMATCH")
+
     _make_private_directory(destination)
-    command = [
-        gh, "run", "download", ATTEMPT10_RUN_ID,
-        "--repo", REPOSITORY_FULL_NAME,
-        "--name", ATTEMPT10_ARTIFACT_NAME,
-        "--dir", str(destination),
-    ]
-    result = subprocess.run(
-        command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False
-    )
-    if result.returncode != 0:
-        raise PrivateIngestError("ATTEMPT10_ARTIFACT_DOWNLOAD_FAILED_CHECK_GITHUB_ACTIONS_ACCESS")
+    destination_resolved = destination.resolve(strict=True)
+    seen: set[str] = set()
+    total_unpacked = 0
+    try:
+        with zipfile.ZipFile(archive_path, "r") as archive:
+            infos = archive.infolist()
+            if not infos or len(infos) > MAX_ATTEMPT10_ARCHIVE_FILES:
+                raise PrivateIngestError("ATTEMPT10_ARCHIVE_FILE_COUNT_INVALID")
+            for info in infos:
+                raw_name = info.filename
+                if not raw_name or "\\" in raw_name:
+                    raise PrivateIngestError("ATTEMPT10_ARCHIVE_PATH_INVALID")
+                name = raw_name[:-1] if info.is_dir() and raw_name.endswith("/") else raw_name
+                path = PurePosixPath(name)
+                if (
+                    not name or path.is_absolute()
+                    or any(part in {"", ".", ".."} for part in name.split("/"))
+                    or (path.parts and ":" in path.parts[0])
+                ):
+                    raise PrivateIngestError("ATTEMPT10_ARCHIVE_PATH_UNSAFE")
+                normalized = path.as_posix() + ("/" if info.is_dir() else "")
+                if normalized in seen:
+                    raise PrivateIngestError("ATTEMPT10_ARCHIVE_DUPLICATE_PATH")
+                seen.add(normalized)
+
+                unix_mode = (info.external_attr >> 16) & 0xFFFF
+                file_type = stat.S_IFMT(unix_mode)
+                if stat.S_ISLNK(unix_mode) or (file_type not in {0, stat.S_IFREG, stat.S_IFDIR}):
+                    raise PrivateIngestError("ATTEMPT10_ARCHIVE_SPECIAL_FILE_FORBIDDEN")
+                if info.is_dir():
+                    target = destination.joinpath(*path.parts)
+                    try:
+                        target.resolve(strict=False).relative_to(destination_resolved)
+                    except ValueError as exc:
+                        raise PrivateIngestError("ATTEMPT10_ARCHIVE_PATH_ESCAPE") from exc
+                    _make_private_directory(target)
+                    continue
+
+                total_unpacked += info.file_size
+                if info.file_size < 0 or total_unpacked > MAX_ATTEMPT10_UNPACKED_BYTES:
+                    raise PrivateIngestError("ATTEMPT10_ARCHIVE_UNPACKED_SIZE_LIMIT")
+                target = destination.joinpath(*path.parts)
+                try:
+                    target.resolve(strict=False).relative_to(destination_resolved)
+                except ValueError as exc:
+                    raise PrivateIngestError("ATTEMPT10_ARCHIVE_PATH_ESCAPE") from exc
+                _make_private_directory(target.parent)
+                try:
+                    with archive.open(info, "r") as source, target.open("xb") as output:
+                        shutil.copyfileobj(source, output, length=1024 * 1024)
+                        output.flush()
+                        os.fsync(output.fileno())
+                    os.chmod(target, 0o600)
+                except FileExistsError as exc:
+                    raise PrivateIngestError("ATTEMPT10_ARCHIVE_DUPLICATE_PATH") from exc
+    except zipfile.BadZipFile as exc:
+        raise PrivateIngestError("ATTEMPT10_ARTIFACT_ARCHIVE_INVALID_ZIP") from exc
+
     candidates = list(destination.rglob("intake_manifest.json"))
     if len(candidates) != 1:
         raise PrivateIngestError("ATTEMPT10_ARTIFACT_LAYOUT_AMBIGUOUS")
     return _preflight_attempt10(candidates[0].parent)
+
+
+class _NoRedirect(HTTPRedirectHandler):
+    """Return the API's 302 so credentials are never forwarded to blob storage."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+class _HTTPSOnlyRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if urlparse(newurl).scheme.lower() != "https":
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _request_attempt10_archive_url(token: str) -> str:
+    api_url = (
+        f"https://api.github.com/repos/{REPOSITORY_FULL_NAME}/actions/"
+        f"artifacts/{ATTEMPT10_ARTIFACT_ID}/zip"
+    )
+    request = Request(
+        api_url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": GITHUB_API_VERSION,
+            "User-Agent": "IIOS-private-B2-ingest",
+        },
+    )
+    opener = build_opener(_NoRedirect())
+    try:
+        with opener.open(request, timeout=30) as response:
+            raise PrivateIngestError("ATTEMPT10_ARTIFACT_REDIRECT_EXPECTED")
+    except HTTPError as exc:
+        if exc.code == 302:
+            location = exc.headers.get("Location", "")
+        elif exc.code in {401, 403}:
+            raise PrivateIngestError(
+                "GITHUB_ACTIONS_ARTIFACT_ACCESS_DENIED_CHECK_TOKEN_ACTIONS_READ"
+            ) from None
+        elif exc.code in {404, 410}:
+            raise PrivateIngestError(
+                "ATTEMPT10_ARTIFACT_MISSING_OR_EXPIRED_CHECK_CANONICAL_ARTIFACT"
+            ) from None
+        else:
+            raise PrivateIngestError(
+                f"ATTEMPT10_ARTIFACT_API_HTTP_{exc.code}"
+            ) from None
+    except (URLError, TimeoutError, OSError) as exc:
+        raise PrivateIngestError("ATTEMPT10_ARTIFACT_API_TRANSPORT_FAILED") from None
+    parsed = urlparse(location)
+    if parsed.scheme.lower() != "https" or not parsed.netloc:
+        raise PrivateIngestError("ATTEMPT10_ARTIFACT_DOWNLOAD_REDIRECT_INVALID")
+    return location
+
+
+def _download_attempt10(destination: Path) -> Path:
+    gh = shutil.which("gh")
+    if not gh:
+        raise PrivateIngestError("GITHUB_CLI_REQUIRED_INSTALL_GH_AND_AUTHENTICATE")
+    token_result = subprocess.run(
+        [gh, "auth", "token", "--hostname", "github.com"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    token = token_result.stdout.strip() if token_result.returncode == 0 else ""
+    if not token:
+        raise PrivateIngestError("GITHUB_CLI_TOKEN_UNAVAILABLE_RUN_GH_AUTH_LOGIN")
+
+    _make_private_directory(destination)
+    archive_path = destination.parent / "attempt10-artifact.zip"
+    try:
+        location = _request_attempt10_archive_url(token)
+        request = Request(location, headers={"User-Agent": "IIOS-private-B2-ingest"})
+        opener = build_opener(_HTTPSOnlyRedirect())
+        with opener.open(request, timeout=120) as response:
+            if urlparse(response.geturl()).scheme.lower() != "https":
+                raise PrivateIngestError("ATTEMPT10_ARTIFACT_DOWNLOAD_HTTPS_REQUIRED")
+            with archive_path.open("xb") as archive_file:
+                os.chmod(archive_path, 0o600)
+                digest = hashlib.sha256()
+                total = 0
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > ATTEMPT10_ARTIFACT_SIZE_BYTES:
+                        raise PrivateIngestError("ATTEMPT10_ARTIFACT_ARCHIVE_SIZE_MISMATCH")
+                    digest.update(chunk)
+                    archive_file.write(chunk)
+                archive_file.flush()
+                os.fsync(archive_file.fileno())
+        if total != ATTEMPT10_ARTIFACT_SIZE_BYTES:
+            raise PrivateIngestError("ATTEMPT10_ARTIFACT_ARCHIVE_SIZE_MISMATCH")
+        if digest.hexdigest() != ATTEMPT10_ARTIFACT_SHA256:
+            raise PrivateIngestError("ATTEMPT10_ARTIFACT_ARCHIVE_SHA256_MISMATCH")
+        return _extract_verified_attempt10_archive(archive_path, destination)
+    except HTTPError as exc:
+        if exc.code in {401, 403}:
+            raise PrivateIngestError(
+                "GITHUB_ACTIONS_ARTIFACT_ACCESS_DENIED_CHECK_TOKEN_ACTIONS_READ"
+            ) from None
+        if exc.code in {404, 410}:
+            raise PrivateIngestError(
+                "ATTEMPT10_ARTIFACT_MISSING_OR_EXPIRED_CHECK_CANONICAL_ARTIFACT"
+            ) from None
+        raise PrivateIngestError(f"ATTEMPT10_ARTIFACT_DOWNLOAD_HTTP_{exc.code}") from None
+    except (URLError, TimeoutError, OSError) as exc:
+        raise PrivateIngestError("ATTEMPT10_ARTIFACT_DOWNLOAD_TRANSPORT_FAILED") from None
+    finally:
+        try:
+            archive_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _candidate_fingerprint(manifest: Mapping[str, Any]) -> str:
