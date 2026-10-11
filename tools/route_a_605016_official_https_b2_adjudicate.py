@@ -147,7 +147,7 @@ def _fetch_official_sse_price_via_curl(url: str, *, referer: str) -> dict[str, A
             "--header", "Accept-Encoding: identity",
             "--max-filesize", str(1024 * 1024),
             "--output", str(body_path),
-            "--write-out", "%{http_code}\\n%{url_effective}\\n%{content_type}\\n",
+            "--write-out", "%{http_code}\n%{url_effective}\n%{content_type}\n",
             url,
         ]
         try:
