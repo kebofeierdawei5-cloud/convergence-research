@@ -293,7 +293,6 @@ def generate_keypair(private_key_path: str | Path, public_key_path: str | Path) 
     if private_path.resolve() == public_path.resolve():
         raise SignedAdmissionError("KEY_PATHS_MUST_DIFFER")
     private_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    os.chmod(private_path.parent, 0o700)
     public_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     private_key = Ed25519PrivateKey.generate()
     private_raw = private_key.private_bytes(
