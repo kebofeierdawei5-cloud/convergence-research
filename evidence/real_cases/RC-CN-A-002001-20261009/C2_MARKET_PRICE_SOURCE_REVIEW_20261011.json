@@ -5,7 +5,7 @@
   "case_cutoff": "2026-10-09T00:00:00+08:00",
   "required_observation_date": "2026-10-08",
   "search_date": "2026-10-11",
-  "current_status": "BLOCKED_UNKNOWN",
+  "current_status": "OPERATOR_INPUT_RECEIVED_PRIVATE_CORE_VALIDATION_PENDING",
   "admitted_source_id": null,
   "market_price_admission": false,
   "numeric_price_recorded": false,
@@ -102,17 +102,18 @@
   },
   "next_action": {
     "owner": "LOCAL_OPERATOR_RUNTIME",
-    "action": "Build and validate a private operator-attestation bundle from the already supplied C2 close; then rerun the unchanged C2 Core/PIT validator against the pinned Run #8 bytes.",
+    "action": "Execute the already-created private C2 operator-attestation bundle against the pinned Run #8 bytes using the merged local C2 tool; then review the 13 official filing facts separately.",
     "private_only": true,
     "github_raw_upload_allowed": false,
     "secondary_web_audit_required": false,
     "explicit_attestation_required": true,
     "validation_required": [
-      "case/security/date binding",
-      "exact SHA-256 of the operator-attestation bytes (not vendor bytes)",
-      "operator-attested known_at at or before case cutoff",
-      "unchanged Core/PIT validator",
-      "independent review of the 13 official-filing facts remains separate"
+      "case/security/date binding for RC-CN-A-002001-20261009 / 002001 / 2026-10-08",
+      "exact SHA-256 of private operator-attestation bytes (not vendor source bytes)",
+      "operator-attested known_at at or before 2026-10-09T00:00:00+08:00",
+      "unchanged seven-group Core/PIT validator reports PASS",
+      "13 official filing facts independently reviewed",
+      "production Host acceptance and full D2 Run Receipt remain separate"
     ]
   },
   "formal_signed_admission_created": false,
@@ -142,13 +143,23 @@
     "known_at_must_be_operator_attested_and_cutoff_safe": true,
     "numeric_quote_value_persisted_to_public_repository": false,
     "source_verification_claimed": false,
-    "current_case_bundle_executed": false
+    "current_case_bundle_executed": false,
+    "implementation_status": "PASS_MERGED_CANONICAL",
+    "pr_number": 338,
+    "merge_commit_sha": "c7fc3ff37fab75e2d72a5ba2c4a995058a85ebec",
+    "exact_head_test_status": "PASS",
+    "exact_head_default_c2_workflow_status": "PASS_EXPECTED_BLOCKED_WITHOUT_PRIVATE_BUNDLE",
+    "no_secondary_web_audit": true
   },
   "operator_market_price_attestation_implementation": {
-    "status": "IMPLEMENTATION_IN_REVIEW",
+    "status": "PASS_MERGED_CANONICAL_PRIVATE_EXECUTION_PENDING",
     "branch": "feat/operator-market-price-attestation-20261011",
+    "pr_number": 338,
+    "merge_commit_sha": "c7fc3ff37fab75e2d72a5ba2c4a995058a85ebec",
     "policy_id": "IIOS-OPERATOR-MARKET-PRICE-ATTESTATION-0.1",
     "quote_value_written_to_public_repository": false,
+    "synthetic_contract_tests": "PASS",
+    "real_c2_price_bundle_core_run": "NOT_EXECUTED_IN_REPO_RUNTIME",
     "no_secondary_web_audit": true,
     "core_pit_pass_not_yet_claimed": true
   }
