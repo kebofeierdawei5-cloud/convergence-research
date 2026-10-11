@@ -647,6 +647,8 @@ class FileSystemOperatorPriceInputResolver:
             "source_origin_verified": False,
             "source_vintage_verified": False,
             "source_use_rights_verified": False,
+            "raw_source_bytes_captured": False,
+            "canonical_exchange_price_admission": False,
             "canonical_price_admission": False,
             "formal_evidence_pit_admission": False,
         }
