@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import datetime
 import base64
 import hashlib
 import json
@@ -6,6 +7,7 @@ from jsonschema import Draft202012Validator
 from pathlib import Path
 import pytest
 
+from iios_mvp import operator_entered_price_decision_input_v01 as operator_price_input
 from iios_mvp.b2e_nl_semantic_decision_e2e_v01 import (
     B2EE2EError,
     run_b2e_conformance,
@@ -178,6 +180,95 @@ def test_b2e_full_control_plane_e2e():
     )
     schema = __import__("json").loads((Path(__file__).parents[1] / "schemas/b2e_nl_semantic_decision_e2e_v0.1.schema.json").read_text())
     Draft202012Validator(schema).validate(result.binding_receipt)
+
+
+def test_persisted_b2e_binds_private_operator_price_reference_and_replays_hashes(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    evidence_root, manifest, _manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    private_root = tmp_path / "operator-price-private"
+    private_root.mkdir(mode=0o700)
+    private_root.chmod(0o700)
+    bundle = operator_price_input.create_bundle(
+        {
+            "schema_version": operator_price_input.SCHEMA,
+            "base_case_id": case["case_id"],
+            "market": "CN-A",
+            "symbol": "300750",
+            "exchange": "SZSE",
+            "currency": "CNY",
+            "observation_date": "2026-09-30",
+            "price": "270.00",
+            "adjustment_semantics": "UNADJUSTED_CLOSE",
+            "quote_timestamp": "2026-09-30T15:00:00+08:00",
+            "valid_until": "2026-10-05T18:00:00+08:00",
+            "operator_confirmed": True,
+            "source_claim": "operator-supplied close; not source verified",
+        },
+        private_root,
+        entered_at=datetime.fromisoformat("2026-10-04T10:00:00+08:00"),
+        decision_cutoff_at=datetime.fromisoformat("2026-10-04T10:01:00+08:00"),
+    )
+    reference = {
+        "bundle_id": bundle["bundle_id"],
+        "record_sha256": bundle["record_sha256"],
+        "receipt_sha256": bundle["receipt_sha256"],
+    }
+    input_resolver = operator_price_input.FileSystemOperatorPriceInputResolver(private_root)
+    run_root = tmp_path / "operator-price-run"
+    evidences = manifest["evidence"]
+    result = run_b2e_conformance(
+        raw_request=RAW,
+        request_id="b2e-operator-price-request",
+        run_id="b2e-operator-price-run",
+        created_at=CREATED,
+        request_interpreter=FixtureInterpreter(),
+        request_registry=_registries()[0],
+        semantic_producer=FixtureSemanticProducer(),
+        producer_registry=_registries()[1],
+        company="宁德时代",
+        evidence_refs=tuple(row["evidence_id"] for row in evidences),
+        evidence_hashes=tuple(row["content_sha256"] for row in evidences),
+        artifact_type="THESIS_ASSESSMENT",
+        semantic_prompt="Assess the thesis from admitted evidence. Do not issue a decision.",
+        semantic_facts=tuple({
+            "evidence_id": row["evidence_id"],
+            "statement": "SYNTHETIC_TEST_ONLY",
+        } for row in evidences),
+        decision_relevance="Synthetic test of private operator price binding only.",
+        case=case,
+        current_price_resolver=price_registry,
+        independent_forecast_resolver=forecast_registry,
+        upstream_authority_resolver=upstream_registry,
+        valuation_output_resolver=valuation_resolver,
+        operator_price_input_resolver=input_resolver,
+        operator_price_input_ref=reference,
+        run_root=str(run_root),
+        evidence_manifest=manifest,
+        evidence_root=str(evidence_root),
+    )
+    projection = result.decision_admission["canonical_decision_projection"]
+    assert result.canonicality_status == "CANONICAL_RUN_IN_PROGRESS"
+    assert projection["current_price"] == "270.00"
+    assert projection["current_price_input_class"] == "OPERATOR_ATTESTED_MARKET_DATA"
+    assert projection["current_price_assurance"] == "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
+    assert projection["operator_price_input_ref"] == reference
+    assert projection["mie_reference_price_observation_id"] == case["current_price_observation"]["price_observation_id"]
+    assert result.binding_receipt["human_approval_is_required"] is True
+    assert result.binding_receipt["automatic_execution_is_forbidden"] is True
+
+    state = json.loads(run_state_path(run_root, "b2e-operator-price-run").read_text(encoding="utf-8"))
+    decision_pending = next(
+        row for row in state["envelope"]["stage_receipts"]
+        if row["stage_id"] == "DECISION_PENDING"
+    )
+    assert decision_pending["input_refs"][-2:] == [
+        f"operator-price-input-record:{reference['bundle_id']}",
+        f"operator-price-input-receipt:{reference['bundle_id']}",
+    ]
+    assert decision_pending["input_hashes"][-2:] == [
+        reference["record_sha256"],
+        reference["receipt_sha256"],
+    ]
 
 
 def test_b2e_nested_semantic_authority_is_blocked_recursively():
