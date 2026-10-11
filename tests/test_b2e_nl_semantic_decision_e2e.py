@@ -627,20 +627,29 @@ def _admitted_synthetic_manifest(tmp_path, case):
     return root, manifest, path
 
 
-def _private_operator_price_bundle(tmp_path, case):
+def _private_operator_price_bundle(
+    tmp_path,
+    case,
+    *,
+    base_case_id=None,
+    symbol="300750",
+    exchange="SZSE",
+    currency="CNY",
+    price="270.00",
+):
     root = tmp_path / "operator-price-private"
     root.mkdir(mode=0o700)
     root.chmod(0o700)
     bundle = operator_price_input.create_bundle(
         {
             "schema_version": operator_price_input.SCHEMA,
-            "base_case_id": case["case_id"],
+            "base_case_id": base_case_id or case["case_id"],
             "market": "CN-A",
-            "symbol": "300750",
-            "exchange": "SZSE",
-            "currency": "CNY",
+            "symbol": symbol,
+            "exchange": exchange,
+            "currency": currency,
             "observation_date": "2026-09-30",
-            "price": "270.00",
+            "price": price,
             "adjustment_semantics": "UNADJUSTED_CLOSE",
             "quote_timestamp": "2026-09-30T15:00:00+08:00",
             "valid_until": "2026-10-05T18:00:00+08:00",
@@ -658,6 +667,43 @@ def _private_operator_price_bundle(tmp_path, case):
     }
     resolver = operator_price_input.FileSystemOperatorPriceInputResolver(root)
     return root, reference, resolver
+
+
+def _run_persisted_operator_price_case(
+    *, case, price_registry, forecast_registry, upstream_registry, valuation_resolver,
+    evidence_root, manifest, reference, resolver, run_root, run_id,
+):
+    evidences = manifest["evidence"]
+    return run_b2e_conformance(
+        raw_request=RAW,
+        request_id=run_id,
+        run_id=run_id,
+        created_at=CREATED,
+        request_interpreter=FixtureInterpreter(),
+        request_registry=_registries()[0],
+        semantic_producer=FixtureSemanticProducer(),
+        producer_registry=_registries()[1],
+        company="宁德时代",
+        evidence_refs=tuple(row["evidence_id"] for row in evidences),
+        evidence_hashes=tuple(row["content_sha256"] for row in evidences),
+        artifact_type="THESIS_ASSESSMENT",
+        semantic_prompt="Assess the thesis from admitted evidence. Do not issue an action.",
+        semantic_facts=tuple({
+            "evidence_id": row["evidence_id"],
+            "statement": "SYNTHETIC_TEST_ONLY",
+        } for row in evidences),
+        decision_relevance="Synthetic MP-3 cross-layer boundary test.",
+        case=case,
+        current_price_resolver=price_registry,
+        independent_forecast_resolver=forecast_registry,
+        upstream_authority_resolver=upstream_registry,
+        valuation_output_resolver=valuation_resolver,
+        operator_price_input_resolver=resolver,
+        operator_price_input_ref=reference,
+        run_root=str(run_root),
+        evidence_manifest=manifest,
+        evidence_root=str(evidence_root),
+    )
 
 
 def test_operator_price_cannot_substitute_for_missing_company_evidence_manifest(tmp_path):
@@ -872,6 +918,145 @@ def test_operator_price_snapshot_sync_tampering_blocks_decision_revision_write(t
             snapshot=forged_consistent,
             decision_admission=result.decision_admission,
         )
+
+
+def test_persisted_b2e_blocks_stale_operator_record_hash_before_decision(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    evidence_root, manifest, _manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case)
+    forged = dict(reference)
+    forged["record_sha256"] = reference["record_sha256"][:24] + ("0" * 40)
+    assert forged["bundle_id"] == f"operator-price-{forged['record_sha256'][:24]}"
+    run_root = tmp_path / "operator-price-stale-record-hash-run"
+
+    with pytest.raises(B2EE2EError, match="OPERATOR_PRICE_RECORD_SHA256_MISMATCH"):
+        _run_persisted_operator_price_case(
+            case=case, price_registry=price_registry,
+            forecast_registry=forecast_registry, upstream_registry=upstream_registry,
+            valuation_resolver=valuation_resolver, evidence_root=evidence_root,
+            manifest=manifest, reference=forged, resolver=resolver,
+            run_root=run_root, run_id="b2e-operator-stale-record-hash",
+        )
+    state = json.loads(run_state_path(run_root, "b2e-operator-stale-record-hash").read_text(encoding="utf-8"))
+    assert state["envelope"]["run_status"] == "BLOCKED"
+    stages = [row["stage_id"] for row in state["envelope"]["stage_receipts"]]
+    assert "EVIDENCE_ADMITTED" not in stages
+    assert "DECISION_PENDING" not in stages
+    assert "DECISION_ADMITTED" not in stages
+
+
+def test_persisted_b2e_blocks_wrong_operator_currency_before_decision(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    evidence_root, manifest, _manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case, currency="HKD")
+    run_root = tmp_path / "operator-price-currency-mismatch-run"
+
+    with pytest.raises(B2EE2EError, match="OPERATOR_PRICE_CURRENCY_MISMATCH"):
+        _run_persisted_operator_price_case(
+            case=case, price_registry=price_registry,
+            forecast_registry=forecast_registry, upstream_registry=upstream_registry,
+            valuation_resolver=valuation_resolver, evidence_root=evidence_root,
+            manifest=manifest, reference=reference, resolver=resolver,
+            run_root=run_root, run_id="b2e-operator-currency-mismatch",
+        )
+    state = json.loads(run_state_path(run_root, "b2e-operator-currency-mismatch").read_text(encoding="utf-8"))
+    assert state["envelope"]["run_status"] == "BLOCKED"
+    stages = [row["stage_id"] for row in state["envelope"]["stage_receipts"]]
+    assert "EVIDENCE_ADMITTED" not in stages
+    assert "DECISION_PENDING" not in stages
+
+
+def test_persisted_b2e_blocks_operator_case_identity_mismatch_before_decision(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    evidence_root, manifest, _manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    _private_root, reference, resolver = _private_operator_price_bundle(
+        tmp_path, case, base_case_id="DIFFERENT-CASE-ID"
+    )
+    run_root = tmp_path / "operator-price-case-mismatch-run"
+
+    with pytest.raises(B2EE2EError, match="OPERATOR_PRICE_CASE_ID_MISMATCH"):
+        _run_persisted_operator_price_case(
+            case=case, price_registry=price_registry,
+            forecast_registry=forecast_registry, upstream_registry=upstream_registry,
+            valuation_resolver=valuation_resolver, evidence_root=evidence_root,
+            manifest=manifest, reference=reference, resolver=resolver,
+            run_root=run_root, run_id="b2e-operator-case-mismatch",
+        )
+    state = json.loads(run_state_path(run_root, "b2e-operator-case-mismatch").read_text(encoding="utf-8"))
+    assert state["envelope"]["run_status"] == "BLOCKED"
+    stages = [row["stage_id"] for row in state["envelope"]["stage_receipts"]]
+    assert "EVIDENCE_ADMITTED" not in stages
+    assert "DECISION_PENDING" not in stages
+
+
+def test_persisted_b2e_blocks_operator_source_assurance_flag_escalation(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    evidence_root, manifest, _manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    _private_root, reference, resolver = _private_operator_price_bundle(tmp_path, case)
+    case["current_price_observation"] = resolver.build_current_price_observation(
+        reference,
+        case_id=case["case_id"],
+        market=case["market"],
+        symbol=case["symbol"],
+        currency="CNY",
+        cutoff_date=__import__("datetime").date.fromisoformat(case["cutoff_date"]),
+        mie_reference_price_observation_id=case["current_price_observation"]["price_observation_id"],
+    )
+    case["current_price_observation"]["source_origin_verified"] = True
+    run_root = tmp_path / "operator-price-origin-escalation-run"
+
+    with pytest.raises(B2EE2EError, match="OPERATOR_PRICE_PROVENANCE_FLAG_ESCALATED"):
+        _run_persisted_operator_price_case(
+            case=case, price_registry=price_registry,
+            forecast_registry=forecast_registry, upstream_registry=upstream_registry,
+            valuation_resolver=valuation_resolver, evidence_root=evidence_root,
+            manifest=manifest, reference=reference, resolver=resolver,
+            run_root=run_root, run_id="b2e-operator-origin-escalation",
+        )
+    state = json.loads(run_state_path(run_root, "b2e-operator-origin-escalation").read_text(encoding="utf-8"))
+    assert state["envelope"]["run_status"] == "BLOCKED"
+    stages = [row["stage_id"] for row in state["envelope"]["stage_receipts"]]
+    assert "EVIDENCE_ADMITTED" not in stages
+    assert "DECISION_PENDING" not in stages
+    assert "DECISION_ADMITTED" not in stages
+
+
+def test_persisted_b2e_blocks_unsupported_operator_price_class(tmp_path):
+    case, price_registry, forecast_registry, upstream_registry, valuation_resolver = _case_and_resolvers()
+    evidence_root, manifest, _manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    case["current_price_observation"]["price_input_class"] = "SELF_ATTESTED_CANONICAL_PRICE"
+    run_root = tmp_path / "unsupported-price-class-run"
+
+    with pytest.raises(B2EE2EError, match="unsupported current price input class"):
+        run_b2e_conformance(
+            raw_request=RAW,
+            request_id="b2e-unsupported-price-class",
+            run_id="b2e-unsupported-price-class",
+            created_at=CREATED,
+            request_interpreter=FixtureInterpreter(),
+            request_registry=_registries()[0],
+            semantic_producer=FixtureSemanticProducer(),
+            producer_registry=_registries()[1],
+            company="宁德时代",
+            evidence_refs=tuple(row["evidence_id"] for row in manifest["evidence"]),
+            evidence_hashes=tuple(row["content_sha256"] for row in manifest["evidence"]),
+            artifact_type="THESIS_ASSESSMENT",
+            semantic_prompt="test",
+            decision_relevance="Synthetic negative test of unsupported price class.",
+            case=case,
+            current_price_resolver=price_registry,
+            independent_forecast_resolver=forecast_registry,
+            upstream_authority_resolver=upstream_registry,
+            valuation_output_resolver=valuation_resolver,
+            run_root=str(run_root),
+            evidence_manifest=manifest,
+            evidence_root=str(evidence_root),
+        )
+    state = json.loads(run_state_path(run_root, "b2e-unsupported-price-class").read_text(encoding="utf-8"))
+    assert state["envelope"]["run_status"] == "BLOCKED"
+    stages = [row["stage_id"] for row in state["envelope"]["stage_receipts"]]
+    assert "DECISION_PENDING" not in stages
+    assert "DECISION_ADMITTED" not in stages
 
 
 def test_p0_persisted_b2e_blocks_without_b2_evidence_pit_admission(tmp_path):
