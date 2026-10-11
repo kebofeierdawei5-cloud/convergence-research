@@ -34,8 +34,8 @@ jobs:
         with:
           name: iios-company-evidence-37938129274
           run-id: 37938129274
-          github-token: \${{ github.token }}
-          repository: \${{ github.repository }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
           path: /tmp/c2-p3-run8
       - name: Independently re-extract PDF locators and PIT/use boundaries
         run: |
