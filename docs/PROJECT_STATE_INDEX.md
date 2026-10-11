@@ -27,7 +27,7 @@ B2-F Full Independent Red-team                          PASS / CANONICAL
 P0 B3 persisted upstream write authorization             MERGED / EXACT-HEAD CI PASS
 P0 Canonical Runtime Callback Preflight                  MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL PASS
 Production P0-LLM-001 / P0-LLM-004                      OPEN / REAL-HOST ACCEPTANCE REQUIRED
-605016 private candidate + read-only replay               PASS / CANONICAL LOCAL ARTIFACT; PRODUCTION GATES OPEN
+605016 source-vintage successor                           PASS / LOCAL CORE-VALIDATED CANDIDATE; FORMAL/HOST GATES OPEN
 ```
 
 ### Current blockers
@@ -38,8 +38,8 @@ Production P0-LLM-001 / P0-LLM-004                      OPEN / REAL-HOST ACCEPTA
 
 - Batch B: the first-party loopback-first HTTP host is implemented in canonical main (PR #270; dedicated host contract 21/21). Trusted runtime factory implementation is now also merged in PR #274 (`a62e2304983cbdf28f0365f7fd55f53378c4adab`), exact head `14105076b1b69f626907e4eb8bdddf0893d84c23`, with 8/8 exact-head checks passing. It wires genuine provider-backed request/semantic producers plus read-only canonical admission resolvers, pins the Ed25519 runtime public key, and deliberately refuses synthetic upstream admissions. It is still **not a deployed/production-accepted host**: no real provider endpoint, secret/keypair, durable canonical admission store, or real host-origin run has been provisioned/replay-verified. The API-backed route remains unprovisioned; PR #296 additionally adds a free ChatGPT Web operator handoff for the request-intent and thesis-semantic callbacks without a local model, API endpoint or API key. That route is manual, its model origin is not cryptographically verified, and it does not close the production-host or formal Run Receipt lineage gates.
 - Runtime callback preflight: PR #283 merged at `d18251fe7541267dad49d04bad67ada54ab58e31`; exact validated PR head `a86457fcadeb951bbc89e0e0a0b8d747ef55b0b3`. All 8/8 triggered checks passed, including 23/23 preflight/factory/Host contract tests and a separately executed 5/5 adversarial suite. New command: `python -m iios_mvp.canonical_runtime_preflight_v01 --bundle-id <staged_bundle_id>`. It invokes the existing trusted factory's request interpreter and semantic producer and reuses signed Ed25519 provider-receipt verification. CI exercised control-flow with explicit fake bindings only; the actual operator-environment callback has NOT yet been run. The report explicitly says Evidence/PIT admission and semantic admission are unchecked and Decision/publication/Run Receipt are not created. P0-LLM-001/P0-LLM-004 remain OPEN.
-- Primary C1 case: `RC-CN-A-605016-20261009`. The original Attempt 10 capture (run #38026139364 / artifact #11660285551) passed independent byte/hash and payload checks for all 12 captured source files. PR #282's official dividend fact remains admitted for narrow internal fact-level use (PDF SHA-256 `1a153c20f908abbd48fdd63a651ecb0edde269f3e7dd0ea27a0b8ce420e5ea8c`). The latest official-HTTPS price run #38050190177 returned `PASS_EPHEMERAL_B2`: unchanged B2/PIT validator passed all seven required field groups, with price bytes 124 bytes / SHA-256 `45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480`. This supersedes the prior HTTP-only blocker for the ephemeral candidate, but it is not yet private durable admission or production Host acceptance. The endpoint does not expose an exact first-public timestamp; its `known_at` represents the market-session close event time and the caveat remains explicit. Eastmoney quote evidence remains excluded without prior written permission. The 2026-10-09 evening meeting resolution remains excluded under the original date-only cutoff.
-- Parallel C2 case: 新和成 (002001.SZ) still requires source-by-source B2/PIT adjudication, missing-field capture and authoritative 2026-10-09 market-price evidence.
+- Primary C1 case: `RC-CN-A-605016-20261009`. Official HTTPS evidence is privately persisted and the bounded successor has passed the unchanged Core/PIT validator. The original candidate remains intact; the new successor uses a deterministic official-rule-derived public-availability upper bound of `2026-10-08T15:30:00+08:00`. `exact_first_public_timestamp_verified=false` remains explicit. Formal signed admission, production Host acceptance and Decision remain open.
+- Parallel C2 case: 新和成 (002001.SZ) is the next evidence batch. The preserved Run #8 archive hash was independently re-verified and all eight captured raw objects match their receipt byte counts and SHA-256 values. A follow-up audit found that the historic Run #8 B2 manifest used an end-of-day timestamp for the date-only cutoff. It remains diagnostic/BLOCKED; see [C2 Source and PIT Adjudication Audit](iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md).
 - A successful CI, byte hash, URL/title match, or payload format check is not source-origin proof or PIT admission.
 
 The independent B2-F audit remains PASS / CANONICAL. Production host acceptance and real-company admission remain OPEN.
@@ -299,40 +299,17 @@ Therefore:
 
 ### Current next development batch
 
-**Current execution plan:** `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md` remains the governing plan. PR #276 closes the formal-write authorization gap; PR #278 adjudicates Attempt 10 sources; PR #282 admits the official H1 dividend implementation fact; PR #294/#302 and exact-head run #38050190177 pass the unchanged core B2/PIT validator ephemerally on the official HTTPS price source. The latest sanitized report is artifact #11669076729 and the machine record is `evidence/real_cases/RC-CN-A-605016-20261009/OFFICIAL_HTTPS_B2_ADJUDICATION_20261010.json`. Do not publish numeric quote values or raw bytes. **Next action is local private persistence**, not another provider search: run `tools/Launch_IIOS_Private_605016_B2_Ingest.command` on the operator Mac, preserve the exact structured result, then independently review the market-session-close `known_at` caveat. No cutoff or HTTPS rule was relaxed. Production acceptance remains separate: genuine configured-Host run through semantic/Forecast/Valuation admission, Decision Revision, Publication/report, full Run Receipt replay and independent red-team. P0-LLM-001/P0-LLM-004 remain OPEN.
+**Current execution plan:** `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md` remains governing. C1/605016 local persistence, read-only replay and the bounded source-vintage successor are now complete. **Next evidence batch: C2 / 新和成 (002001.SZ)**—adjudicate facts from the preserved Run #8 raw files, rebuild its manifest under the unchanged date-only cutoff contract, and keep all uncertain facts blocked. Primary 605016 production Host/semantic/Forecast/Valuation acceptance remains a separate open path. Do not publish numeric quote values or raw market data. P0-LLM-001/P0-LLM-004 remain OPEN.
 
 The primary Investment Core MVP path is **Route A — free-first single-company evidence intake + public web discovery**. No LLM provider endpoint or API key is required for this Route A path. Public-web discovery, public-source capture, B2 preflight and artifact retention all run without an external LLM endpoint, paid search API or API key. Operator-supplied raw originals and manually supplied evidence remain supported when public URLs are unavailable or source bytes need to be supplied directly. B2-D remains an optional external-LLM integration adapter and is not an MVP gate.
 
-**Latest real capture: Run #8 succeeded as `PARTIAL_CAPTURE_VERIFIED_NOT_ADMITTED`.** Eight of nine declared source objects were retained and independently hash-verified; the public Eastmoney K-line endpoint failed on this run. The artifact and failure row were retained instead of discarding the other eight files. The existing B2 preflight executed successfully and correctly returned `BLOCKED_NOT_ADMITTED`.
+**C2 Run #8 artifact recheck — 2026-10-11:** the preserved archive SHA-256 `0c7ddb34a4b77f7298309ae89ac8de96877a059656a811beefe7eabfe99a0ba1` matched, and all eight captured raw files passed receipt size/hash replay. The ninth declared Eastmoney K-line source has no bytes. This is raw-integrity PASS only; evidence admission remains NOT_ADMITTED.
 
-**Latest Route A advance — PR #259, page-located fact extraction review.** A reproducible extractor now re-verifies raw source SHA-256/size, checks selected text terms against exact PDF page locators, and emitted 11 fact-level candidates from the H1 summary, H1 full report and 2026-09 buyback progress PDF. The review record is `docs/iios/ROUTE_A_FACT_EXTRACTION_REVIEW_20261009.md`; local machine-readable output is `ROUTE_A_FACT_EXTRACTION_REVIEW_20261009.json`.
+**Cutoff defect:** Run #8's B2 manifest and report used `2026-10-09T23:59:59+08:00`, which conflicts with the IIOS date-only cutoff rule for `2026-10-09` (interpreted at the start of that date). The historic manifest must stay diagnostic; do not edit the timestamp and reuse its digest/fingerprint. The 2026-10-09 buyback-progress filing and any same-day close remain excluded unless independent pre-cutoff availability is established.
 
-This advances beyond file-only capture, but does **not** change admission status: every candidate remains `known_at=null`, `provenance_class=UNKNOWN`, `status=UNKNOWN`, `admission_status=NOT_ADMITTED`; `admitted_field_groups=[]`. The report is useful for review and reproducible locator checking only. The extractor's test CI validates contracts, not official source-origin or economic truth.
+**C2 next action:** create a fact-level source ledger from the original, verified bytes. Review the pre-cutoff H1/Q1 and buyback-plan PDFs individually; retain exact page/table/row locators and source hashes; do not treat PDF text match alone as admission. Keep the dynamic issuer IR page and current Sohu/Eastmoney price pages UNKNOWN. Obtain a permitted official/free 2026-10-08 close or leave `market_price=UNKNOWN`; SZSE's data-service page says SSIC manages/distributes market data, so public accessibility is not an automatic reuse grant. See `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md`.
 
-Next action is **source-level adjudication and B2 Evidence/PIT admission**, not more LLM configuration:
-1. Independently verify each cited document's issuer/exchange identity and actual first-public timestamp; only then decide whether the proposed `known_at` can be admitted.
-2. Resolve the declared `PUBLIC_ACCESS_REUSE_UNKNOWN` license/reuse state.
-3. Convert individually reviewed facts to B2 Evidence Records and run the unchanged B2 validator; UNKNOWN must continue to fail closed.
-4. Capture a date-specific official/free market-price observation with defensible PIT/source vintage. Run #8's Eastmoney K-line row failed and has no bytes/hash; Sohu/Eastmoney quote/history page bytes are not admitted closing-price facts.
-5. Add any still-missing business-reality/capital-structure/trust facts. Only adequate admitted group coverage permits company-level valuation and decision.
-
-```text
-Public web discovery (no key; candidate URLs only)
-  ↓
-Route A raw capture + independent byte verification
-  ↓
-page-located fact extraction (11 candidates; text match PASS)
-  ↓
-source-origin / first-public-time / license adjudication (OPEN)
-  ↓
-B2 Evidence/PIT admission (currently BLOCKED_NOT_ADMITTED)
-  ↓
-market-price and remaining field-group gaps
-  ↓
-only after adequate admitted facts: company analysis / valuation / expectation gap / decision
-```
-
-Run #8 details remain in `docs/iios/ROUTE_A_CAPTURE_RC_CN_A_002001_20261009_RUN8.md`. The original Run #8 receipt, capture artifact and failed-source row remain unchanged. No source is promoted from a declared date, public-search snippet, PDF text match or successful download alone.
+The current result remains `BLOCKED_NOT_ADMITTED`; seven mandatory groups are not covered by admitted fact records. The C2 plan does not weaken cutoff, origin, reuse or Core/PIT requirements.
 
 B2-D3 real LLM provider invocation → B2-D1 independent verification → production-backed B2-E remains a separately tracked optional integration path. It does not block Route A acquisition, manual original intake, fact-level review, or free-first MVP development.
 
@@ -2303,13 +2280,12 @@ Explicit non-claims:
 
 ## C1 — 605016 Bounded Source-Vintage / PIT Adjudication — 2026-10-11
 
-Status: **IMPLEMENTATION CI PASS / LOCAL SUCCESSOR MIGRATION NOT YET RUN**
+Status: **PASS / MERGED / CANONICAL / LOCAL SUCCESSOR MIGRATION REPORTED PASS**
 
-- Local candidate storage is no longer a blocker. Operator-confirmed replay returned `VERIFIED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED`; the established candidate still has 11 evidence records / 11 raw declarations / 8 unique physical raw files. Its old manifest bytes, receipt schema and fingerprint remain unchanged.
-- Official SSE 2026 trading rules (issued 2026-04-24, effective 2026-07-06; §§3.7.2, 3.7.9 and 5.1.1) support a conservative public-availability upper bound of `2026-10-08T15:30:00+08:00` for the official 2026-10-08 closing price, because the closing price is included in real-time quote during the 15:05–15:30 post-market fixed-price session. This is a rule-derived upper bound, **not** an assertion of the historical JSON endpoint's exact upload/first-public timestamp.
-- PR [#329](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/329) adds a deterministic policy receipt bound to case/cutoff, price evidence ID, existing private raw-byte SHA-256, official rule URL/version/clauses and a strict bound-before-cutoff comparison. It re-runs the unchanged Core/PIT validator.
-- Exact first-public timestamp stays explicitly unverified: `exact_first_public_timestamp_verified=false`. The rule webpage/document bytes were not materialized as raw source bytes in this run; `raw_rule_bytes_sha256=null` records that limit honestly.
-- The successor is written to a new content-addressed directory only after full byte, receipt, privacy and Core/PIT replay. The prior candidate is preserved unchanged. New receipt schema is `IIOS-LOCAL-PRIVATE-B2-PERSISTENCE-0.2`; old `0.1` candidates remain supported. Launcher mode `--adjudicate-source-vintage` uses only already-stored local bytes and does not download Attempt 10 or request official price/dividend endpoints.
-- Exact-head checks after the latest code-only fix: private persistence contract 53/53 PASS; B2 data Evidence/PIT tests 31/31 PASS; company Evidence/PIT tests 23/23 PASS; B2 scope 3/3 PASS; compile/schema/diff checks PASS. Documentation is being synchronized on this PR branch; rerun all relevant checks after the final documentation commit before merge.
-- **Not granted:** formal signed admission, Production Host acceptance, request bundle, Decision, publication, Human Approval or execution permission. Resolving the bounded PIT availability question does not claim exact endpoint timestamp telemetry and does not by itself authorize investment decisions.
-- **Operator action only after PR #329 is merged and exact final-head CI passes:** run the launcher's `--adjudicate-source-vintage` mode once; then preserve its sanitized result and confirm two candidates exist (legacy unchanged + bounded successor) and the successor reports Core/PIT PASS. Do not rerun ingest or fetch market sources for this migration.
+- PR [#329](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/329) is merged. Its final PR HEAD passed the private persistence contract (53/53), B2 data Evidence/PIT tests (31/31), company Evidence/PIT tests (23/23), B2 scope (3/3), State Hygiene, C0 Governance, Investment Core and independent B2-F red-team, plus the remaining triggered checks.
+- Operator-reported successor result: `SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED`. There are 11 evidence records, 11 raw declarations and 8 unique physical raw files. Core/PIT validator PASS; the original candidate remains unchanged; no official source was refetched.
+- The new `known_at` uses the conservative upper bound `2026-10-08T15:30:00+08:00`, derived from official SSE trading rules. It is not the exact historical endpoint upload time. `exact_first_public_timestamp_verified=false` remains explicit, as does the fact that rule-page bytes were not materialized and hashed in this run.
+- Formal signed admission, production Host acceptance, request bundle, Decision, publication and execution authority remain open.
+- **Immediate next evidence batch:** C2 / `RC-CN-A-002001-20261009`. The Run #8 source archive is preserved and independently verified, but its B2 manifest used an end-of-day cutoff timestamp incompatible with the canonical date-only cutoff rule. Keep it diagnostic/BLOCKED; rebuild a successor with the original raw bytes and correct date-only semantics. See `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md`.
+- Primary 605016 production Host acceptance remains a separate open critical path and must not be marked complete merely because its local source-vintage candidate passes.
+
