@@ -386,3 +386,105 @@ def test_wrong_pdf_hash_is_rejected_before_a_passing_capture_is_returned(tmp_pat
 
     with pytest.raises(ValueError, match="CANONICAL_DIVIDEND_SOURCE_PIN_MISMATCH"):
         MODULE._recover_dividend_from_prior_canonical_adjudication(tmp_path / "followup")
+
+
+
+def test_prior_dividend_b2_builder_binds_source_ref_to_validated_pdf_url(
+    tmp_path: Path, monkeypatch
+) -> None:
+    pdf_raw = _pdf_bytes()
+    final_pdf_url = MODULE.DIVIDEND_PDF_HTTPS_URLS[1]
+    monkeypatch.setattr(MODULE, "EXPECTED_DIVIDEND_PDF_SHA256", hashlib.sha256(pdf_raw).hexdigest())
+    monkeypatch.setattr(MODULE, "EXPECTED_DIVIDEND_PDF_SIZE", len(pdf_raw))
+
+    attempt10_root = tmp_path / "attempt10"
+    (attempt10_root / "raw").mkdir(parents=True)
+    (attempt10_root / "raw" / "prior.json").write_text("{}", encoding="utf-8")
+    base_out = tmp_path / "out" / "base-b2"
+    followup_root = tmp_path / "out" / "official-dividend-capture"
+    pdf_path = followup_root / "raw" / "SSE-2026-09-22-DIVIDEND-IMPLEMENTATION.pdf"
+    pdf_path.parent.mkdir(parents=True)
+    pdf_path.write_bytes(pdf_raw)
+
+    def fake_attempt10_adjudicate(_input_root: Path, output_root: Path) -> dict:
+        output_root.mkdir(parents=True, exist_ok=True)
+        (output_root / "SOURCE_ADJUDICATED_B2_CANDIDATE_MANIFEST.json").write_text(
+            json.dumps({"evidence": [], "raw_artifacts": []}), encoding="utf-8"
+        )
+        return {"status": "fixture-only"}
+    monkeypatch.setattr(MODULE, "adjudicate_attempt10", fake_attempt10_adjudicate)
+
+    observed: dict = {}
+
+    def fake_manifest_builder(**kwargs) -> dict:
+        observed.update(kwargs)
+        return {
+            "status": "PASS",
+            "validation_errors": [],
+            "audit": {"manifest_sha256": "a" * 64},
+            "evidence": kwargs["evidence"],
+            "raw_artifacts": kwargs["raw_artifacts"],
+        }
+    monkeypatch.setattr(MODULE, "build_company_evidence_manifest", fake_manifest_builder)
+
+    ledger = {
+        "source": {"source_id": "SSE-2026-09-22-DIVIDEND-IMPLEMENTATION"},
+        "evidence_record": {
+            "evidence_id": "605016-H1-DIVIDEND-IMPLEMENTED-202609",
+            "status": "ADMITTED",
+            "field_id": "capital_structure.dividend_implementation_2026H1",
+        },
+    }
+    dividend = {
+        "status": "RAW_PDF_CAPTURED_NOT_ADMITTED",
+        "final_pdf_url": final_pdf_url,
+        "pdf_capture": {"final_url": final_pdf_url, "sha256": hashlib.sha256(pdf_raw).hexdigest()},
+    }
+
+    summary, combined_root, manifest = MODULE._build_base_manifest_from_prior_dividend(
+        attempt10_root, base_out, followup_root, dividend, ledger
+    )
+
+    assert summary["combined_b2_manifest_status"] == "PASS"
+    assert observed["evidence"][-1]["source_ref"] == final_pdf_url
+    assert observed["evidence"][-1]["source_ref"].startswith("https://")
+    assert (base_out / "COMBINED_B2_CANDIDATE_MANIFEST.json").is_file()
+    assert combined_root.is_dir()
+    assert manifest["status"] == "PASS"
+
+
+def test_prior_dividend_b2_builder_rejects_missing_or_untrusted_pdf_url(
+    tmp_path: Path, monkeypatch
+) -> None:
+    pdf_raw = _pdf_bytes()
+    monkeypatch.setattr(MODULE, "EXPECTED_DIVIDEND_PDF_SHA256", hashlib.sha256(pdf_raw).hexdigest())
+    monkeypatch.setattr(MODULE, "EXPECTED_DIVIDEND_PDF_SIZE", len(pdf_raw))
+    attempt10_root = tmp_path / "attempt10"
+    attempt10_root.mkdir()
+    base_out = tmp_path / "out" / "base-b2"
+    followup_root = tmp_path / "out" / "official-dividend-capture"
+    pdf_path = followup_root / "raw" / "SSE-2026-09-22-DIVIDEND-IMPLEMENTATION.pdf"
+    pdf_path.parent.mkdir(parents=True)
+    pdf_path.write_bytes(pdf_raw)
+
+    def fake_attempt10_adjudicate(_input_root: Path, output_root: Path) -> dict:
+        output_root.mkdir(parents=True, exist_ok=True)
+        (output_root / "SOURCE_ADJUDICATED_B2_CANDIDATE_MANIFEST.json").write_text(
+            json.dumps({"evidence": [], "raw_artifacts": []}), encoding="utf-8"
+        )
+        return {}
+    monkeypatch.setattr(MODULE, "adjudicate_attempt10", fake_attempt10_adjudicate)
+    monkeypatch.setattr(
+        MODULE, "build_company_evidence_manifest",
+        lambda **kwargs: {"status": "PASS", "validation_errors": [], "audit": {"manifest_sha256": "b" * 64},
+                          "evidence": kwargs["evidence"], "raw_artifacts": kwargs["raw_artifacts"]},
+    )
+    ledger = {
+        "source": {"source_id": "SSE-2026-09-22-DIVIDEND-IMPLEMENTATION"},
+        "evidence_record": {"evidence_id": "605016-H1-DIVIDEND-IMPLEMENTED-202609"},
+    }
+    with pytest.raises(ValueError, match="RECOVERED_DIVIDEND_PDF_FINAL_URL_INVALID"):
+        MODULE._build_base_manifest_from_prior_dividend(
+            attempt10_root, base_out, followup_root,
+            {"final_pdf_url": "http://untrusted.example/file.pdf"}, ledger,
+        )
