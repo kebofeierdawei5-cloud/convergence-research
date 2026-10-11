@@ -17,6 +17,8 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import shutil
+import socket
+import ssl
 import stat
 import subprocess
 import sys
@@ -238,6 +240,158 @@ class _HTTPSOnlyRedirect(HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
+def _classify_python_transport_failure(exc: BaseException) -> str:
+    """Return a bounded diagnostic category without exposing URLs, headers or tokens."""
+    reason = exc.reason if isinstance(exc, URLError) else exc
+    if isinstance(reason, ssl.SSLCertVerificationError):
+        return "TLS_CERTIFICATE_VERIFY_FAILED"
+    if isinstance(reason, ssl.SSLError):
+        return "TLS_HANDSHAKE_FAILED"
+    if isinstance(reason, socket.gaierror):
+        return "DNS_LOOKUP_FAILED"
+    if isinstance(reason, (TimeoutError, socket.timeout)):
+        return "TIMEOUT"
+    message = str(reason).lower()
+    if "certificate_verify_failed" in message or "certificate verify failed" in message:
+        return "TLS_CERTIFICATE_VERIFY_FAILED"
+    if "ssl" in message or "tls" in message or "certificate" in message:
+        return "TLS_HANDSHAKE_FAILED"
+    if "name or service not known" in message or "temporary failure in name resolution" in message:
+        return "DNS_LOOKUP_FAILED"
+    if "timed out" in message or "timeout" in message:
+        return "TIMEOUT"
+    if "proxy" in message or "tunnel connection" in message:
+        return "PROXY_CONNECT_FAILED"
+    if "connection refused" in message:
+        return "CONNECTION_REFUSED"
+    if "connection reset" in message or "remote end closed" in message:
+        return "CONNECTION_RESET"
+    if "network is unreachable" in message or "no route to host" in message:
+        return "NETWORK_UNREACHABLE"
+    return "NETWORK_TRANSPORT_ERROR"
+
+
+def _classify_curl_transport_failure(stderr: str) -> str:
+    """Classify curl stderr without returning its raw text to the operator."""
+    message = stderr.lower()
+    if "certificate" in message or "ssl certificate problem" in message:
+        return "TLS_CERTIFICATE_VERIFY_FAILED"
+    if "could not resolve host" in message or "could not resolve proxy" in message:
+        return "DNS_LOOKUP_FAILED"
+    if "proxy" in message or "tunnel" in message:
+        return "PROXY_CONNECT_FAILED"
+    if "timed out" in message or "timeout" in message:
+        return "TIMEOUT"
+    if "connection refused" in message:
+        return "CONNECTION_REFUSED"
+    if "connection reset" in message:
+        return "CONNECTION_RESET"
+    if "network is unreachable" in message or "no route to host" in message:
+        return "NETWORK_UNREACHABLE"
+    return "NETWORK_TRANSPORT_ERROR"
+
+
+def _parse_artifact_api_response(status: int, location: str = "") -> str:
+    if status in {401, 403}:
+        raise PrivateIngestError(
+            "GITHUB_ACTIONS_ARTIFACT_ACCESS_DENIED_CHECK_TOKEN_ACTIONS_READ"
+        )
+    if status in {404, 410}:
+        raise PrivateIngestError(
+            "ATTEMPT10_ARTIFACT_MISSING_OR_EXPIRED_CHECK_CANONICAL_ARTIFACT"
+        )
+    if status != 302:
+        raise PrivateIngestError(f"ATTEMPT10_ARTIFACT_API_HTTP_{status}")
+    parsed = urlparse(location)
+    if parsed.scheme.lower() != "https" or not parsed.netloc:
+        raise PrivateIngestError("ATTEMPT10_ARTIFACT_DOWNLOAD_REDIRECT_INVALID")
+    return location
+
+
+def _curl_config_quote(value: str) -> str:
+    if "\r" in value or "\n" in value:
+        raise PrivateIngestError("ATTEMPT10_ARTIFACT_CURL_CONFIG_VALUE_INVALID")
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _parse_curl_dumped_headers(raw_headers: str) -> tuple[int | None, str]:
+    """Use only the final HTTP response block; never expose signed Location values."""
+    status: int | None = None
+    location = ""
+    for line in raw_headers.splitlines():
+        stripped = line.strip()
+        if stripped.upper().startswith("HTTP/"):
+            pieces = stripped.split()
+            status = int(pieces[1]) if len(pieces) > 1 and pieces[1].isdigit() else None
+            location = ""
+            continue
+        if status is not None and ":" in line:
+            name, value = line.split(":", 1)
+            if name.strip().casefold() == "location":
+                location = value.strip()
+    return status, location
+
+
+def _request_attempt10_archive_url_with_curl(token: str, python_reason: str) -> str:
+    """Use system curl only after Python HTTPS transport fails, with TLS on and no redirects."""
+    curl = shutil.which("curl")
+    if not curl:
+        raise PrivateIngestError(
+            f"ATTEMPT10_ARTIFACT_API_TRANSPORT_FAILED_PYTHON_{python_reason}_CURL_UNAVAILABLE"
+        ) from None
+    if not token or "\r" in token or "\n" in token:
+        raise PrivateIngestError("GITHUB_CLI_TOKEN_FORMAT_INVALID") from None
+
+    api_url = (
+        f"https://api.github.com/repos/{REPOSITORY_FULL_NAME}/actions/"
+        f"artifacts/{ATTEMPT10_ARTIFACT_ID}/zip"
+    )
+    config = "\n".join((
+        f"url = {_curl_config_quote(api_url)}",
+        "silent",
+        "show-error",
+        "max-redirs = 0",
+        "connect-timeout = 10",
+        "max-time = 30",
+        'proto = "=https"',
+        'dump-header = "-"',
+        'output = "/dev/null"',
+        f'header = {_curl_config_quote("Accept: application/vnd.github+json")}',
+        f'header = {_curl_config_quote("Authorization: Bearer " + token)}',
+        f'header = {_curl_config_quote("X-GitHub-Api-Version: " + GITHUB_API_VERSION)}',
+        f'user-agent = {_curl_config_quote("IIOS-private-B2-ingest")}',
+        "",
+    ))
+    # Use curl's stdin config: the bearer token never appears in the OS process arguments.
+    try:
+        result = subprocess.run(
+            [curl, "--config", "-"],
+            input=config,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=35,
+            check=False,
+        )
+    except (OSError, TimeoutError, subprocess.TimeoutExpired) as exc:
+        reason = _classify_python_transport_failure(exc)
+        raise PrivateIngestError(
+            f"ATTEMPT10_ARTIFACT_API_TRANSPORT_FAILED_PYTHON_{python_reason}_CURL_{reason}"
+        ) from None
+
+    if result.returncode != 0:
+        curl_reason = _classify_curl_transport_failure(result.stderr or "")
+        raise PrivateIngestError(
+            f"ATTEMPT10_ARTIFACT_API_TRANSPORT_FAILED_PYTHON_{python_reason}_CURL_{curl_reason}"
+        ) from None
+    status, location = _parse_curl_dumped_headers(result.stdout or "")
+    if status is None:
+        raise PrivateIngestError(
+            f"ATTEMPT10_ARTIFACT_API_TRANSPORT_FAILED_PYTHON_{python_reason}_CURL_NO_HTTP_RESPONSE"
+        ) from None
+    return _parse_artifact_api_response(status, location)
+
+
 def _request_attempt10_archive_url(token: str) -> str:
     api_url = (
         f"https://api.github.com/repos/{REPOSITORY_FULL_NAME}/actions/"
@@ -257,26 +411,12 @@ def _request_attempt10_archive_url(token: str) -> str:
         with opener.open(request, timeout=30) as response:
             raise PrivateIngestError("ATTEMPT10_ARTIFACT_REDIRECT_EXPECTED")
     except HTTPError as exc:
-        if exc.code == 302:
-            location = exc.headers.get("Location", "")
-        elif exc.code in {401, 403}:
-            raise PrivateIngestError(
-                "GITHUB_ACTIONS_ARTIFACT_ACCESS_DENIED_CHECK_TOKEN_ACTIONS_READ"
-            ) from None
-        elif exc.code in {404, 410}:
-            raise PrivateIngestError(
-                "ATTEMPT10_ARTIFACT_MISSING_OR_EXPIRED_CHECK_CANONICAL_ARTIFACT"
-            ) from None
-        else:
-            raise PrivateIngestError(
-                f"ATTEMPT10_ARTIFACT_API_HTTP_{exc.code}"
-            ) from None
+        return _parse_artifact_api_response(exc.code, exc.headers.get("Location", ""))
+    except PrivateIngestError:
+        raise
     except (URLError, TimeoutError, OSError) as exc:
-        raise PrivateIngestError("ATTEMPT10_ARTIFACT_API_TRANSPORT_FAILED") from None
-    parsed = urlparse(location)
-    if parsed.scheme.lower() != "https" or not parsed.netloc:
-        raise PrivateIngestError("ATTEMPT10_ARTIFACT_DOWNLOAD_REDIRECT_INVALID")
-    return location
+        python_reason = _classify_python_transport_failure(exc)
+        return _request_attempt10_archive_url_with_curl(token, python_reason)
 
 
 def _download_attempt10(destination: Path) -> Path:
