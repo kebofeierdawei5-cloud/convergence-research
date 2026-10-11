@@ -5,7 +5,7 @@ STATE = Path("docs/PROJECT_STATE_INDEX.md")
 
 def test_state_index_declares_single_current_authority():
     text = STATE.read_text(encoding="utf-8")
-    snapshot = re.search(r"(?m)^Snapshot: (\\d{4}-\\d{2}-\\d{2})$", text)
+    snapshot = re.search(r"(?m)^Snapshot: ([0-9]{4}-[0-9]{2}-[0-9]{2})$", text)
     assert snapshot, "canonical State Index must declare an ISO-date snapshot"
     authority_heading = f"## CURRENT ACTIVE DEVELOPMENT AUTHORITY — {snapshot.group(1)}"
     assert text.count(authority_heading) == 1
