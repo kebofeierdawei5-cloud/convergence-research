@@ -679,6 +679,43 @@ def test_offline_verifier_blocks_loose_private_file_permissions(tmp_path: Path) 
         )
 
 
+def test_default_core_validator_import_bootstraps_repository_root(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # Simulate the launcher's isolated Python process: the repository may not
+    # already be on sys.path, and the Core package has not been imported yet.
+    repository_root = tmp_path / "canonical-runtime"
+    package_root = repository_root / "iios_mvp"
+    package_root.mkdir(parents=True)
+    (package_root / "__init__.py").write_text("", encoding="utf-8")
+    (package_root / "canonical_evidence_admission_v01.py").write_text(
+        "def validate_company_evidence_manifest(manifest, *, raw_root, require_raw_verification):\\n"
+        "    assert require_raw_verification is True\\n"
+        "    return ['FIXTURE_CORE_IMPORT_FROM_REPOSITORY_ROOT']\\n",
+        encoding="utf-8",
+    )
+
+    # Remove equivalent path entries and cached modules so this test cannot
+    # pass by inheriting the test runner's normal import setup.
+    trimmed_path = [
+        entry for entry in sys.path
+        if Path(entry or ".").expanduser().resolve() != repository_root.resolve()
+    ]
+    monkeypatch.setattr(sys, "path", trimmed_path)
+    monkeypatch.delitem(sys.modules, "iios_mvp.canonical_evidence_admission_v01", raising=False)
+    monkeypatch.delitem(sys.modules, "iios_mvp", raising=False)
+
+    result = MODULE._validate_core(
+        {"status": "PASS"},
+        tmp_path / "raw",
+        None,
+        repository_root=repository_root,
+    )
+
+    assert result == ["FIXTURE_CORE_IMPORT_FROM_REPOSITORY_ROOT"]
+    assert sys.path[0] == str(repository_root.resolve())
+
+
 def test_cli_verify_existing_flag_does_not_call_ingester(tmp_path: Path, monkeypatch, capsys) -> None:
     private_root = tmp_path / "private-data"
     (tmp_path / "repo").mkdir()
