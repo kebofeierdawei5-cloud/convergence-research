@@ -203,13 +203,13 @@ Machine/human audit records: `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_202
 
 **Status:** RUNBOOK CANONICAL; REAL HOST ACCEPTANCE OPEN.
 
-- [D1-A runbook](https://github.com/kebofeierdawei5-cloud/convergence-research/blob/main/docs/iios/D1_A_PRODUCTION_HOST_ACCEPTANCE_RUNBOOK_20261011.md) defines configuration-only check, actual `/healthz` and `/readyz` probes, real host-origin request-intent/semantic invocation, Ed25519 receipt verification, durable persistence and clean replay.
+- [D1-A runbook](https://github.com/kebofeierdawei5-cloud/convergence-research/blob/main/docs/iios/D1_A_PRODUCTION_HOST_ACCEPTANCE_RUNBOOK_20261011.md) defines no-paid-key local Ollama setup, protected environment config, actual `/healthz` and `/readyz` probes, protected Host request, Ed25519 receipt verification, durable persistence and clean replay. Host config/liveness may run in parallel, but the real canonical case invocation must wait for formal C1 Evidence/PIT admission.
 - The sanitized machine status at `evidence/real_cases/RC-CN-A-605016-20261009/D1_A_HOST_ACCEPTANCE_STATUS_20261011.json` explicitly keeps host process, provider invocation, signed receipts, durable replay, canonical run and acceptance false. No real operator-host evidence was available in this task session.
 - A local `--check-config`, CI PASS, `healthz` or `readyz` alone cannot close D1-A. The host must invoke an authorized provider-backed factory. A local Ollama-compatible endpoint can avoid paid API keys under `SELF_HOSTED` + `AUTH_MODE=NONE` on loopback; the private Ed25519 signing key stays in the operator environment.
 
 ### Batch D1 — one real canonical 605016 run
 
-**Status:** BLOCKED on production Host acceptance and formally authorized semantic producer lineage. C1 evidence-candidate preparation passed, but that does not accept the production Host.
+**Status:** BLOCKED on formal C1 / 605016 Evidence/PIT admission, production Host acceptance and authorized semantic producer lineage. C1 candidate validation alone is insufficient. Host configuration and liveness can proceed in parallel, but the real canonical 605016 request/provider run cannot be accepted until signed C1 Evidence/PIT admission is complete.
 
 **Safety predecessor completed:** PR [#342](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/342) merged at `a496b82b8cfbc2256a9affd3337f97fce305d217`, adding a canonical fail-closed guard that rejects the unverified manual-Web producer from formal semantic admission. Next provision/deploy the actual Host, authorized producer key/receipt path and durable admission store; do not count test-fixture or manual Web response hashes as provider-origin proof.
 
