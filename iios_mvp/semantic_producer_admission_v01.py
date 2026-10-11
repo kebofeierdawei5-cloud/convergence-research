@@ -11,6 +11,13 @@ from iios_mvp.canonical_research_orchestrator import SEMANTIC_PRODUCER_TYPES, ca
 SEMANTIC_ADMISSION_VERSION = "IIOS-SEMANTIC-PRODUCER-ADMISSION-0.1"
 SEMANTIC_PRODUCER_RECEIPT_SCHEMA_VERSION = "IIOS-SEMANTIC-PRODUCER-RECEIPT-0.1"
 
+# The frozen B0 contract does not authorize manually copied web output as a
+# canonical semantic producer because saved-byte hashes do not authenticate
+# service-side origin. Keep this fail-closed deny boundary here, at formal
+# semantic admission, rather than relying on callers to honour a warning.
+NON_CANONICAL_MANUAL_WEB_PRODUCER_ID = "iios-chatgpt-web-semantic-producer"
+NON_CANONICAL_MANUAL_WEB_POLICY_PREFIX = "IIOS-CHATGPT-WEB-OPERATOR-POLICY-"
+
 SEMANTIC_ARTIFACT_TYPES = {
     "REALITY_INTERPRETATION",
     "TRUST_ASSESSMENT",
@@ -215,6 +222,19 @@ def admit_semantic_artifact(artifact: Mapping[str, Any], producer_receipt: Mappi
         raise SemanticAdmissionError(f"artifact missing required fields: {', '.join(missing)}")
     if artifact['schema_version'] != 'IIOS-LLM-SEMANTIC-ARTIFACT-0.1':
         raise SemanticAdmissionError('unsupported semantic artifact schema')
+    producer_id = artifact.get('producer_id')
+    policy_version = artifact.get('policy_version')
+    if (
+        producer_id == NON_CANONICAL_MANUAL_WEB_PRODUCER_ID
+        or (
+            isinstance(policy_version, str)
+            and policy_version.startswith(NON_CANONICAL_MANUAL_WEB_POLICY_PREFIX)
+        )
+    ):
+        raise SemanticAdmissionError(
+            'manual ChatGPT Web semantic output is NON_CANONICAL: '
+            'provider origin unverified under frozen B0'
+        )
     if artifact['artifact_type'] != context.artifact_type:
         raise SemanticAdmissionError('artifact_type mismatch')
     for field in ('case_id', 'market', 'symbol', 'company', 'cutoff_date', 'producer_type', 'producer_id', 'producer_version', 'policy_version'):
