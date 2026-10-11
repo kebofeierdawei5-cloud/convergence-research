@@ -992,12 +992,23 @@ def authorize_decision_revision_write(
     decision_pending = _receipt_for_stage(record, Stage.DECISION_PENDING)[1]
     decision_input_refs, decision_input_hashes = _validate_decision_pending_input_refs(decision_pending)
     current_price_observation = snapshot_input.get("current_price_observation")
-    input_class = (
-        current_price_observation.get("price_input_class", "CANONICAL_ADMITTED_MARKET_DATA")
-        if isinstance(current_price_observation, Mapping)
-        else "UNKNOWN"
-    )
-    if input_class == "OPERATOR_ATTESTED_MARKET_DATA":
+    if not isinstance(current_price_observation, Mapping):
+        # Existing non-v0.3 lifecycle compatibility snapshots may omit the
+        # typed Investment Core price object. Keep their old 2-input receipt
+        # contract, but never permit them to carry operator-price extensions.
+        if snapshot_input.get("contract_version") == "IIOS-INVESTMENT-CORE-0.3":
+            raise CanonicalRunAuthorizationError(
+                "BLOCKED: v0.3 Investment Core snapshot lacks current_price_observation"
+            )
+        if len(decision_input_refs) != 2 or len(decision_input_hashes) != 2:
+            raise CanonicalRunAuthorizationError(
+                "BLOCKED: legacy snapshot cannot carry operator-price stage extensions"
+            )
+    else:
+        input_class = current_price_observation.get(
+            "price_input_class", "CANONICAL_ADMITTED_MARKET_DATA"
+        )
+    if isinstance(current_price_observation, Mapping) and input_class == "OPERATOR_ATTESTED_MARKET_DATA":
         operator_ref = current_price_observation.get("operator_price_input_ref")
         if not isinstance(operator_ref, Mapping):
             raise CanonicalRunAuthorizationError("BLOCKED: operator price reference is absent from snapshot input")
@@ -1043,12 +1054,12 @@ def authorize_decision_revision_write(
             raise CanonicalRunAuthorizationError(
                 "BLOCKED: return gate entry_price is not synchronized to operator current price"
             )
-    elif input_class == "CANONICAL_ADMITTED_MARKET_DATA":
+    elif isinstance(current_price_observation, Mapping) and input_class == "CANONICAL_ADMITTED_MARKET_DATA":
         if len(decision_input_refs) != 2 or len(decision_input_hashes) != 2:
             raise CanonicalRunAuthorizationError(
                 "BLOCKED: canonical price path cannot carry operator-price stage extensions"
             )
-    else:
+    elif isinstance(current_price_observation, Mapping):
         raise CanonicalRunAuthorizationError("BLOCKED: unsupported current price input class in snapshot")
 
     if any((
