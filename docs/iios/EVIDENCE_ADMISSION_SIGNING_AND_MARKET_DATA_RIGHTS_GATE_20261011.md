@@ -2,7 +2,7 @@
 
 - Date: 2026-10-11
 - Type: implementation contract and actionable licensing workflow
-- State: IMPLEMENTED ON FEATURE BRANCH; NOT YET CANONICAL; NO SIGNER TRUSTED; NO EXCHANGE PRICE RIGHTS GRANTED
+- State: IMPLEMENTATION CONTRACT; NO SIGNER TRUSTED; NO EXCHANGE PRICE RIGHTS GRANTED; NO CASE FORMALLY ADMITTED
 - Runtime constraint: **No local LLM, Ollama, model installation, provider endpoint, or model API is required for this workstream.** Admission is deterministic code plus an explicitly authorized human signer.
 
 ## 1. Decision
