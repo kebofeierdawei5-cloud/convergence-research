@@ -120,10 +120,10 @@ def test_replay_rejects_self_rehashed_source_verification_escalation(tmp_path):
     price_path = bundle / "price-input.json"
     edited = json.loads(price_path.read_text())
     edited["source_origin_verified"] = True
-    record_bytes = price_input._canonical(edited) + b"\\n"
+    record_bytes = price_input._canonical(edited) + b"\n"
     price_path.write_bytes(record_bytes)
     receipt = price_input.build_receipt(edited, record_bytes=record_bytes)
-    (bundle / "receipt.json").write_bytes(price_input._canonical(receipt) + b"\\n")
+    (bundle / "receipt.json").write_bytes(price_input._canonical(receipt) + b"\n")
     renamed = root / receipt["bundle_id"]
     bundle.rename(renamed)
 
