@@ -4,7 +4,9 @@ import hashlib
 import json
 from pathlib import Path
 import os
+import stat
 import sys
+import zipfile
 import pytest
 
 from tools import iios_private_605016_b2_ingest_v01 as MODULE
@@ -353,6 +355,81 @@ def test_real_investment_core_validator_replays_exact_manifest_bytes(tmp_path: P
 
 
 
+
+
+def _make_test_artifact_zip(path: Path, extra_entries: list[tuple[str, bytes, int | None]] | None = None) -> tuple[str, int]:
+    payloads = [
+        ("capture/intake_manifest.json", json.dumps({
+            "case_id": MODULE.CASE_ID,
+            "symbol": "605016",
+            "cutoff_date": MODULE.CUTOFF_DATE,
+            "sources": [{"source_id": f"source-{i}"} for i in range(12)],
+        }).encode("utf-8"), None),
+        ("capture/COMPANY_EVIDENCE_INTAKE_RECEIPT.json", json.dumps({
+            "status": "CAPTURED_NOT_ADMITTED",
+            "sources": [{"source_id": f"source-{i}"} for i in range(12)],
+        }).encode("utf-8"), None),
+        ("capture/COMPANY_EVIDENCE_INTAKE_VERIFICATION.json", json.dumps({
+            "raw_bytes_verified": 12,
+            "payload_contract_mismatches": 0,
+        }).encode("utf-8"), None),
+    ]
+    payloads.extend(extra_entries or [])
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, content, unix_mode in payloads:
+            info = zipfile.ZipInfo(name)
+            if unix_mode is not None:
+                info.create_system = 3
+                info.external_attr = unix_mode << 16
+            archive.writestr(info, content)
+    return hashlib.sha256(path.read_bytes()).hexdigest(), path.stat().st_size
+
+
+def test_attempt10_archive_is_hash_checked_before_safe_extraction(tmp_path: Path) -> None:
+    archive = tmp_path / "attempt10.zip"
+    digest, size = _make_test_artifact_zip(archive)
+    destination = tmp_path / "unpacked"
+    result = MODULE._extract_verified_attempt10_archive(
+        archive, destination, expected_sha256=digest, expected_size_bytes=size,
+    )
+    assert result.name == "capture"
+    assert (result / "intake_manifest.json").is_file()
+    assert result.stat().st_mode & 0o077 == 0
+    assert (result / "intake_manifest.json").stat().st_mode & 0o077 == 0
+
+
+def test_attempt10_archive_digest_mismatch_blocks_before_extraction(tmp_path: Path) -> None:
+    archive = tmp_path / "attempt10.zip"
+    _digest, size = _make_test_artifact_zip(archive)
+    destination = tmp_path / "unpacked"
+    with pytest.raises(MODULE.PrivateIngestError, match="ATTEMPT10_ARTIFACT_ARCHIVE_SHA256_MISMATCH"):
+        MODULE._extract_verified_attempt10_archive(
+            archive, destination, expected_sha256="0" * 64, expected_size_bytes=size,
+        )
+    assert not destination.exists()
+
+
+def test_attempt10_archive_zip_slip_is_rejected(tmp_path: Path) -> None:
+    archive = tmp_path / "attempt10.zip"
+    digest, size = _make_test_artifact_zip(archive, [("../escaped.txt", b"not allowed", None)])
+    destination = tmp_path / "unpacked"
+    with pytest.raises(MODULE.PrivateIngestError, match="ATTEMPT10_ARCHIVE_PATH_UNSAFE"):
+        MODULE._extract_verified_attempt10_archive(
+            archive, destination, expected_sha256=digest, expected_size_bytes=size,
+        )
+    assert not (tmp_path / "escaped.txt").exists()
+
+
+def test_attempt10_archive_symlink_is_rejected(tmp_path: Path) -> None:
+    archive = tmp_path / "attempt10.zip"
+    digest, size = _make_test_artifact_zip(
+        archive, [("capture/link", b"target", stat.S_IFLNK | 0o777)]
+    )
+    destination = tmp_path / "unpacked"
+    with pytest.raises(MODULE.PrivateIngestError, match="ATTEMPT10_ARCHIVE_SPECIAL_FILE_FORBIDDEN"):
+        MODULE._extract_verified_attempt10_archive(
+            archive, destination, expected_sha256=digest, expected_size_bytes=size,
+        )
 
 def _persist_mock_candidate(tmp_path: Path) -> tuple[Path, dict]:
     input_root = _input_root(tmp_path)
