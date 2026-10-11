@@ -8,7 +8,7 @@ source verification, formal Evidence/PIT admission, or Decision-chain binding.
 
 import argparse
 import errno
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
@@ -498,22 +498,32 @@ class FileSystemOperatorPriceInputResolver:
         if record.get("record_class") != "OPERATOR_ATTESTED_MARKET_DATA":
             raise OperatorEnteredPriceError("OPERATOR_PRICE_CLASS_INVALID")
 
-        cutoff = datetime.combine(cutoff_date, time.min, tzinfo=SHANGHAI)
         entered_at = _parse_timestamp(record.get("entered_at"), "ENTERED_AT")
+        recorded_decision_cutoff = _parse_timestamp(
+            record.get("decision_cutoff_at"), "DECISION_CUTOFF_AT"
+        )
         valid_until = _parse_timestamp(record.get("valid_until"), "VALID_UNTIL")
         observation_date = _parse_date(record.get("observation_date"), "OBSERVATION_DATE")
         if observation_date > cutoff_date:
             raise OperatorEnteredPriceError("OPERATOR_PRICE_OBSERVATION_AFTER_CUTOFF")
-        if entered_at >= cutoff:
-            raise OperatorEnteredPriceError("OPERATOR_PRICE_ENTERED_AT_OR_AFTER_CUTOFF_START")
-        if valid_until <= cutoff:
-            raise OperatorEnteredPriceError("OPERATOR_PRICE_EXPIRED_BEFORE_CUTOFF_START")
+        # The Investment Core contract has a date-level PIT cutoff (known_at.date
+        # <= cutoff_date); do not reinterpret it as midnight and wrongly reject
+        # an input entered during that same date.
+        if entered_at.date() > cutoff_date or recorded_decision_cutoff.date() > cutoff_date:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_ENTERED_AFTER_CUTOFF_DATE")
+        if recorded_decision_cutoff <= entered_at:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_RECORDED_CUTOFF_NOT_AFTER_ENTRY")
+        # A date-level cutoff has no clock time. Require the input to remain
+        # valid beyond the whole cutoff date rather than guessing an intraday
+        # execution time.
+        if valid_until.date() <= cutoff_date:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_NOT_VALID_THROUGH_CUTOFF_DATE")
         quote_ts = (
             _parse_timestamp(record["quote_timestamp"], "QUOTE_TIMESTAMP")
             if record.get("quote_timestamp") is not None else None
         )
-        if quote_ts is not None and quote_ts >= cutoff:
-            raise OperatorEnteredPriceError("OPERATOR_PRICE_QUOTE_TIMESTAMP_AT_OR_AFTER_CUTOFF_START")
+        if quote_ts is not None and quote_ts.date() > cutoff_date:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_QUOTE_TIMESTAMP_AFTER_CUTOFF_DATE")
 
         if current_price_observation is not None:
             obs = current_price_observation
@@ -554,7 +564,9 @@ class FileSystemOperatorPriceInputResolver:
             "market": market,
             "symbol": str(symbol),
             "currency": currency,
+            "exchange": record["exchange"],
             "price": str(_parse_price(record["price"])),
+            "adjustment_semantics": record["adjustment_semantics"],
             "observation_date": observation_date.isoformat(),
             "quote_timestamp": quote_ts.isoformat() if quote_ts is not None else None,
             "observation_time_precision": "SOURCE_TIME_OPERATOR_CLAIM" if quote_ts is not None else "DATE_ONLY",
@@ -610,7 +622,8 @@ class FileSystemOperatorPriceInputResolver:
             "observed_at": observed_at,
             "known_at": bound["entered_at"],
             "source": "OPERATOR_ATTESTED_MARKET_DATA",
-            "adjustment_semantics": "UNADJUSTED_CLOSE",
+            "adjustment_semantics": bound["adjustment_semantics"],
+            "exchange": bound["exchange"],
             "observation_date": bound["observation_date"],
             "observation_time_precision": bound["observation_time_precision"],
             "price_input_class": "OPERATOR_ATTESTED_MARKET_DATA",
