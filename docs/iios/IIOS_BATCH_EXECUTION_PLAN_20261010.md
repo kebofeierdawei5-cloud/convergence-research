@@ -1,9 +1,21 @@
-# IIOS Batch Execution Plan — Refreshed 2026-10-11
+# IIOS Batch Execution Plan — C0-aligned refresh 2026-10-11
 
 **Plan class:** execution plan / canonical-main recovery  
-**Authority baseline for this refresh:** `main@00be321497baf9cf0352ae14b303c560bc5846b7`  
+**Authority baseline for this refresh:** `main@3684689fab0376473ac6f514c71b97fbb450363f`  
 **State authority:** `docs/PROJECT_STATE_INDEX.md`  
 **Purpose:** move IIOS from validated control-plane code to a real, fail-closed, single-company research run without making external LLM API credentials a Route A prerequisite.
+
+## 0. C0 — Architecture and product-entry decision (2026-10-11)
+
+**Decision:** use **LOCAL_SINGLE_USER / local-first** as the default MVP deployment profile, reusing the existing canonical CLI/first-party loopback Host, Orchestrator, trusted runtime factory, Store/admission records, report QA, complete Run Receipt and replay. The remote/multi-user profile, new UI, browser extension, database replacement and parallel orchestration remain deferred. See `docs/iios/C0_LOCAL_FIRST_ARCHITECTURE_AND_MVP_ENTRY_DECISION_20261011.md`.
+
+**Formal producer boundary:** the existing ChatGPT Free Web manual handoff is NON-CANONICAL only under frozen B0; it cannot be selected for formal semantic admission. Prefer the existing provider-neutral factory with an operator-controlled local Ollama-compatible runtime when its configured identity, model/version, signed receipts and lineage pass the existing contracts. No paid API key is a prerequisite; absence of a compliant runtime means BLOCKED, never silent manual-Web fallback.
+
+**Product-entry boundary:** a generic ChatGPT conversation saying “use IIOS” does not prove the repository runtime ran. Formal output must return from a supported local CLI/Host entry and bind to the canonical Run Envelope, stage receipts, admissions, Decision/Publication/report and full Run Receipt/replay. This decision does not itself connect the current chat surface to a local process.
+
+**Dependency rule:** safe local configuration/liveness and C1/C2 review can proceed in parallel. One actual 605016 Host-origin canonical run, after C1 formal Evidence/PIT admission, should provide overlapping D1-A/D1 evidence wherever each gate's own criteria are met; avoid a redundant smoke run unless an independently required test cannot be covered by the same run. C2 remains a parallel evidence track and D2 remains separately gated.
+
+**Non-claim:** C0 does not close P0-LLM-001/P0-LLM-004, does not claim a real Host/provider run, does not admit C1/C2 evidence, and does not constitute MVP acceptance or investment-performance validation.
 
 ## 1. Refreshed project state
 
@@ -147,7 +159,7 @@ This closes the repository-CLI route/persistence integration test gap only.
 
 **Remaining actions**
 1. Provision trusted bundle/data/output roots and the host auth token outside Git; deploy the host and record the deployed commit/config provenance.
-2. Choose the callback channel. The API-backed route remains `IIOS_CANONICAL_RUNTIME_FACTORY=iios_mvp.canonical_runtime_factory_v01:build_canonical_runtime` with HTTPS and a pinned Ed25519 keypair; the local-Ollama route from PR #285 is optional and is not required. For the user's no-local-model/no-paid-key requirement, use PR #296: `IIOS_CANONICAL_RUNTIME_FACTORY=iios_mvp.chatgpt_chat_runtime_v01:build_chatgpt_chat_runtime`, `IIOS_CANONICAL_ADMISSION_ROOT` and `IIOS_CHATGPT_HANDOFF_ROOT`. Run the unchanged `canonical-run` command, open the prompt emitted under the private handoff root, execute it in ChatGPT Free web UI, import the exact raw JSON with `python -m iios_mvp.chatgpt_chat_handoff_v01 import-response`, and rerun the same command. Repeat for the request-intent and thesis-semantic stages. Manual replies must remain marked `provider_origin_verified=false`; this path does not require provider API credentials but its receipt is not yet embedded in the formal complete `IIOS_RUN_RECEIPT`.
+2. Use the existing provider-neutral factory as the formal route, preferably with an operator-controlled local Ollama-compatible endpoint under the documented loopback + `SELF_HOSTED` + `AUTH_MODE=NONE` policy when the model meets the signed-receipt and lineage contracts. Configure `IIOS_CANONICAL_RUNTIME_FACTORY=iios_mvp.canonical_runtime_factory_v01:build_canonical_runtime` and the trusted provider identity/model/version/keypair in the protected host environment. Do not select `iios_mvp.chatgpt_chat_runtime_v01:build_chatgpt_chat_runtime` for formal decisions: the PR #342 fail-closed governance guard keeps copied ChatGPT Free Web responses NON-CANONICAL because saved-byte hashes do not authenticate model origin. This path remains available only for explicitly NON-CANONICAL operator assistance. A compliant local runtime needs no paid model API key; if no compliant producer is available, formal semantic admission stays BLOCKED.
 3. Ensure the bundle is prepared from the real case and admitted source bytes; never accept request-supplied paths or semantic assertions. The factory must resolve genuine current-price, independent forecast, upstream-authority and valuation records, all case/cutoff bound and independently replayable.
 4. Obtain one fresh host-origin run. Missing model output, missing evidence, absent references or wrong case identity must return `BLOCKED`, not fallback.
 5. Only after successful Evidence/PIT + semantic/Forecast/Valuation admission run publication/report/complete `IIOS_RUN_RECEIPT` replay and independent red-team.
@@ -206,6 +218,7 @@ Machine/human audit records: `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_202
 - [D1-A runbook](https://github.com/kebofeierdawei5-cloud/convergence-research/blob/main/docs/iios/D1_A_PRODUCTION_HOST_ACCEPTANCE_RUNBOOK_20261011.md) defines no-paid-key local Ollama setup, protected environment config, the loopback-only GET probe at `tools/iios_d1a_host_liveness_probe_v01.py`, protected Host request, Ed25519 receipt verification, durable persistence and clean replay. The probe utility is code-only until run on the operator's host; it never invokes the provider or claims acceptance. Host config/liveness may run in parallel, but the real canonical case invocation must wait for formal C1 Evidence/PIT admission.
 - The sanitized machine status at `evidence/real_cases/RC-CN-A-605016-20261009/D1_A_HOST_ACCEPTANCE_STATUS_20261011.json` explicitly keeps host process, provider invocation, signed receipts, durable replay, canonical run and acceptance false. No real operator-host evidence was available in this task session.
 - A local `--check-config`, CI PASS, `healthz` or `readyz` alone cannot close D1-A. The host must invoke an authorized provider-backed factory. A local Ollama-compatible endpoint can avoid paid API keys under `SELF_HOSTED` + `AUTH_MODE=NONE` on loopback; the private Ed25519 signing key stays in the operator environment.
+- Avoid a separate provider smoke run when the same exact 605016 host-origin run can satisfy the applicable D1-A provider/receipt evidence and D1 end-to-end acceptance. Run separate probes only for criteria not covered by the canonical run; always record each gate's own result independently.
 
 ### Batch D1 — one real canonical 605016 run
 
@@ -266,8 +279,8 @@ The red-team must test both negative bypasses and one end-to-end positive real c
 
 ## 5. Immediate execution order
 
-1. Canonical Host + trusted runtime factory + callback preflight are merged: PR #270 passed 21/21 host tests; PR #274 passed 8/8 exact-head checks; PR #283 passed 8/8 exact-head checks, 23/23 contract tests and 5/5 adversarial tests.
-2. To use a model without a local install or paid API key, start with the merged PR #296 manual ChatGPT web route and the operator loop in `docs/iios/P0_CHATGPT_FREE_WEB_RUNTIME_20261010.md`. It exercises the real free ChatGPT web UI through explicit copy/import/retry steps. For the separate API-backed route, use the existing callback preflight in the actual intended operator environment. Neither preflight nor manual handoff alone is host-origin production acceptance or a complete Run Receipt.
-3. C1's local persistence and bounded source-vintage candidate are complete; do not repeat C1 ingest. Continue C2 / 新和成 source-by-source fact adjudication under the original date-only cutoff. The 605016 production Host, authorized semantic/Forecast/Valuation chain and complete Run Receipt remain independently open; a provider callback cannot substitute for source admission.
-4. Run C2 (002001) source adjudication in parallel; after seven-group Evidence/PIT admission and case-bound Forecast/Valuation records are actually admitted, perform one real Host-origin canonical run.
-5. Complete publication/report, full `IIOS_RUN_RECEIPT` replay and fresh independent red-team. Keep P0-LLM-001/P0-LLM-004 OPEN until the real production path is accepted.
+1. **C0 decision:** default to LOCAL_SINGLE_USER/local-first while reusing the existing canonical Host/CLI, Orchestrator, runtime factory, Store, report/QA and receipt/replay contracts. Do not rewrite components or add UI unless the actual product-entry pilot demonstrates a gap. The generic ChatGPT Free Web handoff remains NON-CANONICAL for formal decisions.
+2. **Parallel, safe work:** prepare the local Host/runtime (protected environment, model/version/keypair validation and loopback liveness only); complete C1 formal Evidence/PIT admission; and continue C2 independent fact/use review. The configuration/liveness checks are diagnostic only. Do not repeat C1 ingest. Keep C2 `UNKNOWN`/`BLOCKED` if source-use/PIT review fails.
+3. **D1-A + D1:** only after C1 formal admission, execute one real 605016 host-origin canonical run. Use the same run for overlapping production Host evidence and end-to-end acceptance where possible, and separately evaluate each gate. Require genuine authorized producer receipts, seven-group admission, Forecast/Valuation lineage, Decision/Publication/report QA, complete `IIOS_RUN_RECEIPT`, and a clean replay.
+4. **D2:** after C2 independent fact/use review and formal seven-group Evidence/PIT admission, execute one real 002001 canonical run with case-bound Forecast/Valuation inputs and the same full receipt/replay gates.
+5. **Final acceptance:** run fresh clean-room red-team against the actual supported local entry and real positive path; test bypasses, wrong case/cutoff, evidence tampering, missing/fixture-only outputs and replay mutation. Retain the canonical PILOT requirements including a fresh user-selected candidate and operator usability acceptance. Keep P0-LLM-001/P0-LLM-004 OPEN until their exact production criteria pass.
