@@ -121,6 +121,55 @@ def test_v02_dual_surface_and_schema(tmp_path):
 
 
 
+def test_v02_operator_price_assurance_is_explicit_in_machine_and_human_surfaces(tmp_path):
+    publication, _ = _publication(tmp_path)
+    for target in (publication["ai_decision"], publication["decision_payload"]):
+        target["current_price_input_class"] = "OPERATOR_ATTESTED_MARKET_DATA"
+        target["current_price_assurance"] = "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
+    _reseal_publication(publication)
+
+    report = build_investor_review_report_v02(
+        publication=publication,
+        generated_at="2026-10-08T02:00:00+00:00",
+    )
+    surface_decision = report["machine_report"]["semantic_surface"]["decision"]
+    assert surface_decision["current_price_input_class"] == "OPERATOR_ATTESTED_MARKET_DATA"
+    assert surface_decision["current_price_assurance"] == "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
+    assert "SOURCE_ORIGIN_NOT_VERIFIED" in surface_decision["current_price_assurance_limitation_codes"]
+    assert "SOURCE_VINTAGE_NOT_VERIFIED" in surface_decision["current_price_assurance_limitation_codes"]
+    assert "SOURCE_USE_RIGHTS_NOT_VERIFIED" in surface_decision["current_price_assurance_limitation_codes"]
+    assert "NOT_FORMAL_EXCHANGE_PRICE_EVIDENCE" in surface_decision["current_price_assurance_limitation_codes"]
+    assert "operator_price_input_ref" not in surface_decision
+    assert "record_sha256" not in surface_decision["current_price_assurance_statement"]
+    assert "来源、时点与使用权均未经独立验证" in report["markdown"]
+    assert "不等同于正式准入交易所行情" in report["markdown"]
+
+    qa = qa_investor_review_v02(publication=publication, report=report)
+    assert qa["qa_status"] == "PASS"
+    assert qa["checks"]["price_assurance_transparency"] == "PASS"
+    Draft202012Validator(
+        json.loads(Path("schemas/investor_review_qa_v0.2.schema.json").read_text())
+    ).validate(qa)
+
+
+def test_v02_operator_price_class_cannot_be_paired_with_canonical_assurance(tmp_path):
+    publication, _ = _publication(tmp_path)
+    for target in (publication["ai_decision"], publication["decision_payload"]):
+        target["current_price_input_class"] = "OPERATOR_ATTESTED_MARKET_DATA"
+        target["current_price_assurance"] = "CANONICAL_PRICE_ADMISSION_VERIFIED"
+    _reseal_publication(publication)
+
+    try:
+        build_investor_review_report_v02(
+            publication=publication,
+            generated_at="2026-10-08T02:00:00+00:00",
+        )
+    except ValueError as exc:
+        assert "operator-attested price must retain" in str(exc)
+    else:
+        raise AssertionError("operator price with canonical assurance must fail closed")
+
+
 def test_v02_p0_required_return_pass_without_value_is_incomplete(tmp_path):
     publication, _ = _publication(tmp_path)
     payload = publication["decision_payload"]
