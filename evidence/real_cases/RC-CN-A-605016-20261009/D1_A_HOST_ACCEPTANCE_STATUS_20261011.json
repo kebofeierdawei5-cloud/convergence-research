@@ -52,5 +52,15 @@
     "independent_live_receipt_verification": false,
     "workflow_green_interpretation": "NOT_PROVIDER_SUCCESS: workflow uses continue-on-error/fail-closed exit handling",
     "acceptance_credit": "NONE"
-  }
+  },
+  "local_liveness_probe_utility": {
+    "path": "tools/iios_d1a_host_liveness_probe_v01.py",
+    "status": "CODE_ADDED_NOT_RUN_ON_OPERATOR_HOST",
+    "loopback_only": true,
+    "get_only": true,
+    "production_host_accepted": false,
+    "report_contains_raw_responses": false,
+    "report_mode": "0600"
+  },
+  "local_liveness_probe_executed": false
 }

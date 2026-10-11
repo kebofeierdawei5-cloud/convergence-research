@@ -27,7 +27,7 @@ B2-F Full Independent Red-team                          PASS / CANONICAL
 P0 B3 persisted upstream write authorization             MERGED / EXACT-HEAD CI PASS
 P0 Canonical Runtime Callback Preflight                  MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL PASS
 Production P0-LLM-001 / P0-LLM-004                      OPEN / REAL-HOST ACCEPTANCE REQUIRED
-D1-A 605016 production Host acceptance                         RUNBOOK CANONICAL; HOST PROBE OPEN; C1 FORMAL ADMISSION REQUIRED FOR REAL RUN; GREEN B2-D JOB IS NOT LIVE-PROVIDER PROOF
+D1-A 605016 production Host acceptance                         RUNBOOK + LOOPBACK PROBE TOOL CANONICAL; HOST PROBE OPEN; C1 FORMAL ADMISSION REQUIRED; GREEN B2-D JOB IS NOT LIVE-PROVIDER PROOF
 605016 source-vintage successor                           PASS / LOCAL CORE-VALIDATED CANDIDATE; FORMAL/HOST GATES OPEN
 Route A C2 / 新和成 002001                            PRIVATE CORE/PIT PASS (7/7; OPERATOR-ATTESTED); FORMAL/INDEPENDENT/HOST GATES OPEN
 ```
