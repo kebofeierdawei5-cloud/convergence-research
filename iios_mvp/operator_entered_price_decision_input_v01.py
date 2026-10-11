@@ -146,7 +146,12 @@ def validate_payload(payload: Any, *, entered_at: datetime, decision_cutoff_at: 
     if market == "CN-A":
         if not re.fullmatch(r"\d{6}", symbol):
             raise OperatorEnteredPriceError("A_SHARE_SYMBOL_MUST_BE_SIX_DIGITS")
-        expected_exchange = "SSE" if symbol.startswith(("60", "68", "90")) else "SZSE"
+        if symbol.startswith(("600", "601", "603", "605", "688", "689")):
+            expected_exchange = "SSE"
+        elif symbol.startswith(("000", "001", "002", "003", "300", "301")):
+            expected_exchange = "SZSE"
+        else:
+            raise OperatorEnteredPriceError("UNSUPPORTED_A_SHARE_CODE_PREFIX")
         if exchange != expected_exchange:
             raise OperatorEnteredPriceError("EXCHANGE_SYMBOL_MISMATCH")
         if currency != "CNY":
