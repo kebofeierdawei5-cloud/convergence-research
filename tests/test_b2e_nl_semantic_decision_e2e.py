@@ -253,8 +253,8 @@ def test_persisted_b2e_binds_private_operator_price_reference_and_replays_hashes
     assert projection["current_price_assurance"] == "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
     assert projection["operator_price_input_ref"] == reference
     assert projection["mie_reference_price_observation_id"] == case["current_price_observation"]["price_observation_id"]
-    assert result.binding_receipt["human_approval_is_required"] is True
-    assert result.binding_receipt["automatic_execution_is_forbidden"] is True
+    assert result.binding_receipt["human_approval_required"] is True
+    assert result.binding_receipt["auto_execution"] is False
 
     state = json.loads(run_state_path(run_root, "b2e-operator-price-run").read_text(encoding="utf-8"))
     decision_pending = next(
