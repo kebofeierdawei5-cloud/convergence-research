@@ -1,8 +1,8 @@
 # Operator-Entered Price — Decision Input Contract (2026-10-11)
 
 - Record class: governance/implementation contract proposal
-- Baseline: canonical `main@4a0994fa4c84d12eef77d81a17c25dabf9145d66`
-- Status: **MP-1 PASS / MERGED PR #366; MP-2 CORE PASS / MERGED PR #368; REPORT ASSURANCE SURFACE + LOCAL RECEIPT REVIEW + MP-3 OPEN**
+- Baseline: canonical `main@d6fe4855276a7e5425950fa89efbc6d20242646b`
+- Status: **MP-1 + MP-2 CORE + REPORT ASSURANCE PASS / MERGED PRs #366/#368/#370; LOCAL RECEIPT REVIEW + MP-3 OPEN**
 - Scope: initial A/H-share current-price entry is supplied manually by the operator; IIOS does not automatically fetch market quotes for this path.
 
 ## 1. Decision
@@ -74,7 +74,8 @@ The operator can manually enter a value without naming a source. If a source is 
 - Bound the input and receipt as two distinct hashes/references in `DECISION_PENDING`; Run Authority validates pair format, hash format, equality with the snapshot reference, price synchronization and non-escalated provenance flags.
 - Decision Admission preserves the input class and assurance; Human Approval remains required and automatic execution disabled.
 - Exact-head PR #368 passed 30/30 triggered workflow checks, including B2-E persisted integration, legacy Run Envelope replay and B2-F/Post-B04 independent red-team.
-- **Not yet complete:** human/machine investor report must render this price class and assurance clearly; one actual private local bundle/Run Receipt/replay must be independently reviewed. No private price value/source label/bundle is stored in Git.
+- **Report assurance completed in PR #370** (`d6fe4855276a7e5425950fa89efbc6d20242646b`): 6/6 exact-head checks passed, including dedicated investor-review QA and Post-B04 independent red-team. The machine surface records the price input class, assurance label and limitation codes; the Chinese report discloses non-verification/source-rights limits, and private bundle IDs/hashes are deliberately omitted. No private price value/source label/bundle is stored in Git.
+- **Still open:** independently review one actual local private bundle/receipt/Run Receipt replay using sanitized status and hash outcomes, then finish MP-3 cross-layer adversarial acceptance.
 
 ### Batch MP-3 — adversarial and end-to-end acceptance (OPEN)
 - Re-run negative tests at the entire B2-E/Decision Admission/Run Authority boundary for missing resolver, forged/mismatched top-level input ref, stale or changed record/receipt hashes, wrong case/instrument/currency, unsupported price class, price/gap/return-gate desynchronization, incomplete or mismatched stage reference pairs, legacy snapshots with injected operator-price extensions, source/canonical-admission flag escalation, and bypass attempts.
