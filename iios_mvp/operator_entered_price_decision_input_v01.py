@@ -232,6 +232,16 @@ def _private_root(path: Path) -> Path:
     return resolved
 
 
+def _assert_private_file(path: Path, label: str) -> None:
+    if path.is_symlink() or not path.is_file():
+        raise OperatorEnteredPriceError(f"{label}_MUST_BE_REGULAR_FILE_NOT_SYMLINK")
+    metadata = path.stat()
+    if hasattr(os, "getuid") and metadata.st_uid != os.getuid():
+        raise OperatorEnteredPriceError(f"{label}_OWNER_MISMATCH")
+    if stat.S_IMODE(metadata.st_mode) & 0o077:
+        raise OperatorEnteredPriceError(f"{label}_PERMISSIONS_TOO_OPEN")
+
+
 def _write_exclusive(path: Path, raw: bytes) -> None:
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_NOFOLLOW"):
@@ -314,8 +324,17 @@ def replay_bundle(bundle_path: str | Path) -> dict[str, Any]:
     directory = Path(bundle_path)
     if directory.is_symlink() or not directory.is_dir():
         raise OperatorEnteredPriceError("BUNDLE_MUST_BE_DIRECTORY_NOT_SYMLINK")
-    if stat.S_IMODE(directory.stat().st_mode) & 0o077:
+    resolved = directory.resolve(strict=True)
+    repo = REPOSITORY_ROOT.resolve(strict=True)
+    if resolved == repo or repo in resolved.parents:
+        raise OperatorEnteredPriceError("BUNDLE_MUST_BE_OUTSIDE_PUBLIC_REPOSITORY")
+    metadata = directory.stat()
+    if hasattr(os, "getuid") and metadata.st_uid != os.getuid():
+        raise OperatorEnteredPriceError("BUNDLE_OWNER_MISMATCH")
+    if stat.S_IMODE(metadata.st_mode) & 0o077:
         raise OperatorEnteredPriceError("BUNDLE_PERMISSIONS_TOO_OPEN")
+    _assert_private_file(directory / "price-input.json", "PRICE_INPUT_FILE")
+    _assert_private_file(directory / "receipt.json", "RECEIPT_FILE")
     record, record_raw = _read_json(directory / "price-input.json")
     receipt, receipt_raw = _read_json(directory / "receipt.json")
     expected = build_receipt(record, record_bytes=record_raw)
