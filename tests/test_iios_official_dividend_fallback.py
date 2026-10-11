@@ -491,6 +491,123 @@ def test_prior_dividend_b2_builder_rejects_missing_or_untrusted_pdf_url(
 
 
 
+def test_adjudicator_materializes_final_pass_manifest_and_private_price_contract(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from tools import iios_private_605016_b2_ingest_v01 as INGEST
+
+    attempt10_root = tmp_path / "attempt10"
+    attempt10_root.mkdir()
+    price_raw = json.dumps(
+        {"kline": [["20261008", 1, 2, 1, 1.5, 100, 1000]]},
+        separators=(",", ":"),
+    ).encode("utf-8")
+    price_sha = hashlib.sha256(price_raw).hexdigest()
+    monkeypatch.setattr(MODULE, "EXPECTED_PRICE_RAW_SHA256", price_sha)
+    monkeypatch.setattr(MODULE, "EXPECTED_PRICE_RAW_SIZE", len(price_raw))
+    monkeypatch.setattr(INGEST, "EXPECTED_PRICE_RAW_SHA256", price_sha)
+
+    monkeypatch.setattr(MODULE, "official_dividend_capture", lambda _root: {
+        "status": "BLOCKED",
+        "listing_request": {"status": "BLOCKED"},
+    })
+    dividend = {
+        "status": "RAW_PDF_CAPTURED_NOT_ADMITTED",
+        "final_pdf_url": MODULE.EXPECTED_DIVIDEND_PDF_URL,
+        "pdf_capture": {
+            "final_url": MODULE.EXPECTED_DIVIDEND_PDF_URL,
+            "sha256": MODULE.EXPECTED_DIVIDEND_PDF_SHA256,
+            "size_bytes": MODULE.EXPECTED_DIVIDEND_PDF_SIZE,
+        },
+        "prior_adjudication": {
+            "ledger_sha256": "c" * 64,
+            "listing_bytes_reverified_in_current_run": False,
+        },
+        "capture_mode": "TESTED_PRIOR_LISTING_REUSE",
+    }
+    monkeypatch.setattr(
+        MODULE,
+        "_recover_dividend_from_prior_canonical_adjudication",
+        lambda _root: (dividend, {"source": {}, "evidence_record": {}}),
+    )
+
+    base_evidence = [
+        {
+            "evidence_id": "fixture-" + group,
+            "field_id": group + ".fixture_fact",
+            "status": "ADMITTED",
+            "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+        }
+        for group in MODULE.REQUIRED_COMPANY_FIELD_GROUPS
+        if group != "market_price"
+    ]
+    stale_base_manifest = {
+        "case_id": MODULE.CASE_ID,
+        "cutoff_date": MODULE.CUTOFF_DATE,
+        "evidence": base_evidence,
+        "raw_artifacts": [],
+        "status": "BLOCKED",
+        "validation_errors": ["OFFICIAL_PRICE_NOT_YET_ATTACHED"],
+    }
+
+    def fake_build_base_manifest(_attempt10_root, base_out, _followup_root, _dividend, _ledger):
+        base_out.mkdir(parents=True, exist_ok=True)
+        raw_root = base_out / "combined-evidence-root"
+        raw_root.mkdir(parents=True)
+        (base_out / "COMBINED_B2_CANDIDATE_MANIFEST.json").write_text(
+            json.dumps(stale_base_manifest), encoding="utf-8"
+        )
+        return {
+            "combined_b2_manifest_status": "BLOCKED",
+            "validation_errors": ["OFFICIAL_PRICE_NOT_YET_ATTACHED"],
+        }, raw_root, stale_base_manifest
+
+    monkeypatch.setattr(MODULE, "_build_base_manifest_from_prior_dividend", fake_build_base_manifest)
+    monkeypatch.setattr(MODULE, "_fetch_official_sse_price", lambda: {
+        "status": "CAPTURED",
+        "url": MODULE.SSE_PRICE_URL,
+        "final_url": MODULE.SSE_PRICE_URL,
+        "transport": "PYTHON_HTTPS",
+        "http_status": 200,
+        "content_type": "application/json",
+        "body": price_raw,
+    })
+
+    def fake_manifest_builder(**kwargs):
+        return {
+            "schema_version": "IIOS-COMPANY-EVIDENCE-MANIFEST-0.1",
+            "case_id": kwargs["case_id"],
+            "market": kwargs["market"],
+            "symbol": kwargs["symbol"],
+            "company": kwargs["company"],
+            "cutoff_date": kwargs["cutoff_date"],
+            "required_field_groups": kwargs["required_field_groups"],
+            "evidence": kwargs["evidence"],
+            "raw_artifacts": kwargs["raw_artifacts"],
+            "audit": {"manifest_sha256": "d" * 64},
+            "status": "PASS",
+            "validation_errors": [],
+        }
+
+    monkeypatch.setattr(MODULE, "build_company_evidence_manifest", fake_manifest_builder)
+    output_root = tmp_path / "adjudication-output"
+    report = MODULE.adjudicate(attempt10_root, output_root)
+
+    final_manifest_path = output_root / "base-b2" / "COMBINED_B2_CANDIDATE_MANIFEST.json"
+    assert final_manifest_path.is_file()
+    final_manifest = json.loads(final_manifest_path.read_text(encoding="utf-8"))
+    assert report["overall"] == "PASS_EPHEMERAL_B2"
+    assert report["core_b2"]["candidate_manifest_status"] == "PASS"
+    assert final_manifest["status"] == "PASS"
+    assert final_manifest["validation_errors"] == []
+    assert final_manifest["audit"]["manifest_sha256"] == report["core_b2"]["candidate_manifest_sha256"]
+    price = next(item for item in final_manifest["evidence"] if item["evidence_id"] == MODULE.PRICE_EVIDENCE_ID)
+    assert price["content_sha256"] == price_sha
+    assert report["official_price_source"]["transport"] == "HTTPS_TLS_VERIFIED"
+    assert report["official_price_source"]["transport_method"] == "PYTHON_HTTPS"
+    assert INGEST._price_record_preflight(final_manifest, report)["content_sha256"] == price_sha
+
+
 def test_sse_price_capture_falls_back_to_https_curl_on_primary_url(monkeypatch) -> None:
     calls: list[str] = []
     raw = b'{"kline":[["20261008","1","2","1","1.5","10","15"]]}'
