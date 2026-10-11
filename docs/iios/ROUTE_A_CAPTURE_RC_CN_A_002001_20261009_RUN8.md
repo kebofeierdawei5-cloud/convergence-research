@@ -44,3 +44,13 @@ The active manifest no longer includes the previously flaky duplicate Sohu `app2
 The preflight generated artifact-level source records from the eight successfully captured files. Those records are explicitly `provenance_class=UNKNOWN` and `status=UNKNOWN`; therefore the existing B2 validator rejects them for PIT/field-group coverage. This is expected and correct: a file containing a report or a market page has not yet been mapped into admitted facts.
 
 Next action: review report publication identity and source vintage, extract individually scoped facts with page/table/row locators, bind each fact to an admitted evidence record and exact raw object, and run the existing B2 validator. Add a separate official/free source for operating-model/business-reality where needed. Do not use report data merely because the captured PDF hash matches.
+
+## Post-capture audit — 2026-10-11: date-only cutoff correction
+
+The preserved Run #8 ZIP was re-materialized from the user's existing non-Git file library and its SHA-256 was independently re-computed: `0c7ddb34a4b77f7298309ae89ac8de96877a059656a811beefe7eabfe99a0ba1`. All eight captured raw source objects matched the intake receipt's byte counts and SHA-256 values. The ninth declared Eastmoney K-line API source has no bytes/hash.
+
+**Important correction to interpretation:** the Run #8 B2 manifest and preflight record `cutoff_date=2026-10-09T23:59:59+08:00`. The governing IIOS rule for this case is a date-only cutoff of `2026-10-09`, interpreted as the start of that local date. Therefore the Run #8 preflight remains a historical diagnostic result, not canonical PIT proof. Do not change the cutoff in the old manifest or reuse its digest/fingerprint.
+
+Under the canonical cutoff, the 2026-10-09 buyback-progress filing is excluded unless availability before the cutoff instant is independently supported. A 2026-10-09 closing price is also after cutoff; a candidate close must be from the latest fully completed earlier session (2026-10-08) and have its own supportable source-vintage and permitted-use record.
+
+The raw-integrity PASS does not admit facts or clear the seven-group gate. See `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md` and the refreshed `Batch C2` section in `docs/iios/IIOS_BATCH_EXECUTION_PLAN_20261010.md`.
