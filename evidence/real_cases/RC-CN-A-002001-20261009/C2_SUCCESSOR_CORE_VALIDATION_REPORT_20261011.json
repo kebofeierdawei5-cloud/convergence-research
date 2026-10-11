@@ -1,0 +1,95 @@
+{
+  "admitted_field_groups": [
+    "business_reality",
+    "capital_structure",
+    "corporate_disclosures",
+    "financial_reality",
+    "security_identity",
+    "trust_governance_events"
+  ],
+  "archive_raw_integrity_status": "INDEPENDENT_INTEGRITY_VERIFIED_NOT_ADMISSION",
+  "archive_sha256": "0c7ddb34a4b77f7298309ae89ac8de96877a059656a811beefe7eabfe99a0ba1",
+  "archive_sha256_verification_method": "ACTIONS_DOWNLOAD_ARTIFACT_PINNED_SHA256_VERIFIED_BEFORE_EXTRACTION",
+  "b2_manifest_sha256": "f79f374d127e2d8580dfd56f9952f536e96a800d17d92e57123d5e0feb022390",
+  "b2_manifest_status": "BLOCKED",
+  "b2_validation_errors": [
+    "REQUIRED_FIELD_GROUPS_UNCOVERED:market_price"
+  ],
+  "candidate_fact_count": 13,
+  "captured_raw_object_count_verified": 8,
+  "case_id": "RC-CN-A-002001-20261009",
+  "cutoff_date": "2026-10-09T00:00:00+08:00",
+  "decision_created": false,
+  "excluded_sources": [
+    {
+      "reason": "Same-day 2026-10-09 publication is after the start-of-day cutoff.",
+      "source_id": "SZSE-2026-BUYBACK-PROGRESS-SEP"
+    },
+    {
+      "reason": "Dynamic page has no historical publication time.",
+      "source_id": "ISSUER-IR-PAGE-CURRENT"
+    },
+    {
+      "reason": "No admitted date-specific known_at or reuse disposition.",
+      "source_id": "PRICE-SOHU-HISTORY"
+    },
+    {
+      "reason": "No admitted date-specific known_at or reuse disposition.",
+      "source_id": "PRICE-EASTMONEY-QUOTE"
+    },
+    {
+      "reason": "Capture failed; no bytes and no hash.",
+      "source_id": "PRICE-EASTMONEY-KLINE-API"
+    }
+  ],
+  "execution_authorized": false,
+  "fact_locator_count": 13,
+  "formal_signed_admission_created": false,
+  "independent_review": "PENDING",
+  "market_price": {
+    "fake_or_inferred_record_created": false,
+    "reason": "No admitted date-specific permitted-use close-price evidence exists in the preserved Run #8 artifact.",
+    "required_observation_date": "2026-10-08",
+    "status": "BLOCKED_UNKNOWN"
+  },
+  "missing_required_field_groups": [
+    "market_price"
+  ],
+  "official_pdf_source_count": 3,
+  "production_host_accepted": false,
+  "publication_created": false,
+  "raw_receipt_verification_method": "LEGACY_OPTIONAL_PAYLOAD_DEFAULTS_NORMALIZED_IN_TEMPORARY_COPY",
+  "record_class": "C2_SUCCESSOR_CORE_VALIDATION_REPORT_NOT_FORMAL_SIGNED_ADMISSION",
+  "run_receipt_created": false,
+  "schema_version": "IIOS-ROUTE-A-C2-SUCCESSOR-ADJUDICATION-REPORT-0.1",
+  "source_vintage": {
+    "exact_first_public_timestamp_verified": false,
+    "status": "CONSERVATIVE_PUBLICATION_DATE_UPPER_BOUNDS",
+    "supporting_resolution_bytes_in_original_capture": false
+  },
+  "use_boundary": {
+    "raw_pdf_or_bulk_redistribution": false,
+    "status": "PRIVATE_INTERNAL_FACT_LEVEL_ONLY",
+    "unrestricted_reuse_claimed": false
+  },
+  "verified_fact_ids": [
+    "XHC-FACT-SECURITY-001",
+    "XHC-FACT-CORPORATE-H1-DISCLOSURE-001",
+    "XHC-FACT-FIN-REVENUE-H1-001",
+    "XHC-FACT-FIN-NET-PROFIT-H1-001",
+    "XHC-FACT-FIN-ADJ-PROFIT-H1-001",
+    "XHC-FACT-FIN-OCF-H1-001",
+    "XHC-FACT-BUSINESS-METHIONINE-H1-001",
+    "XHC-FACT-BUSINESS-PROJECTS-H1-001",
+    "XHC-FACT-FIN-RD-H1-001",
+    "XHC-FACT-FIN-SEGMENTS-H1-001",
+    "XHC-FACT-CAPITAL-ASSETS-H1-001",
+    "XHC-FACT-CAPITAL-DEBT-H1-001",
+    "XHC-FACT-TRUST-BUYBACK-PLAN-001"
+  ],
+  "verified_source_ids": [
+    "SZSE-2026-BUYBACK-PLAN",
+    "SZSE-2026-H1-FULL",
+    "SZSE-2026-H1-SUMMARY"
+  ]
+}

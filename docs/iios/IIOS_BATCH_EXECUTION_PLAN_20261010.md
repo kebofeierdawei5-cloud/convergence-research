@@ -1,7 +1,7 @@
-# IIOS Batch Execution Plan — Refreshed 2026-10-10
+# IIOS Batch Execution Plan — Refreshed 2026-10-11
 
 **Plan class:** execution plan / canonical-main recovery  
-**Authority baseline:** `main@d18251fe7541267dad49d04bad67ada54ab58e31`  
+**Authority baseline for this refresh:** `main@00be321497baf9cf0352ae14b303c560bc5846b7`  
 **State authority:** `docs/PROJECT_STATE_INDEX.md`  
 **Purpose:** move IIOS from validated control-plane code to a real, fail-closed, single-company research run without making external LLM API credentials a Route A prerequisite.
 
@@ -171,29 +171,34 @@ This closes the repository-CLI route/persistence integration test gap only.
 - Formal signed admission, a production Host-origin run, authorized semantic/Forecast/Valuation chain, Decision, publication, full Run Receipt and trade authorization remain separate and open.
 
 **PIT price-date correction:** the cutoff is date-only `2026-10-09` and is interpreted as the start of that date. The applicable market-price observation is the latest fully completed session before cutoff, `2026-10-08`, not the `2026-10-09` close. The date-only rule must not be changed to end-of-day merely to admit same-day data.
-### Batch C2 — finish Route A evidence adjudication for 新和成 (002001.SZ)
+### Batch C2 — 新和成 (002001.SZ) cutoff-safe successor adjudication
 
-**Status:** RAW BYTE INTEGRITY PASS / B2 NOT ADMITTED / CUTOFF-CONTRACT DEFECT IDENTIFIED.
+**Status: CORE-VALIDATED EPHEMERAL CANDIDATE / B2 BLOCKED ONLY ON MARKET_PRICE / INDEPENDENT REVIEW PENDING.**
 
-Run #8 archive SHA-256 and all 8 captured raw object sizes/SHA-256 values were independently re-verified on 2026-10-11. The archive remains outside Git. The ninth declared Eastmoney K-line source has no captured bytes and no asserted hash. All 11 extracted facts remain diagnostic until independently adjudicated.
+**Resolved breakpoint and exact-head execution**
 
-**Critical re-audit finding:** the historic Run #8 B2 manifest records `cutoff_date=2026-10-09T23:59:59+08:00`. This conflicts with the unchanged IIOS date-only cutoff contract, under which `2026-10-09` is the start of that local date. Do not patch the old manifest timestamp or reuse its digest/fingerprint. Retain its preflight as diagnostic and rebuild a successor against the original raw files.
+- PR [#333](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/333) corrected the Route A preflight implementation, regression tests and schema: a date-only cutoff `2026-10-09` is normalized to `2026-10-09T00:00:00+08:00`, matching the unchanged Core temporal contract. Explicit timezone-aware timestamps are preserved. The historic Run #8 manifest and preflight were not modified.
+- PR [#334](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/334) merged at `00be321497baf9cf0352ae14b303c560bc5846b7`. Exact-head workflow [#38121849097](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38121849097) passed its C2 contract tests, verified the pinned Run #8 artifact digest before extraction, replayed source-byte checks, validated 13 page-located fact candidates from three official SZSE PDFs, ran the unchanged canonical Core/PIT validator, and uploaded only a sanitized status report.
+- The original Run #8 archive SHA-256 remains `0c7ddb34a4b77f7298309ae89ac8de96877a059656a811beefe7eabfe99a0ba1`; all 8 captured raw files match their receipt size/hash. The uncaptured Eastmoney K-line source still has no bytes or hash.
+- Run #8 was created before the optional payload-contract fields were introduced. The verifier first rejected that legacy shape; the new tool handles only this exact missing-default case through an ephemeral copy and normalizes `expected_payload_type=ANY` / `payload_contract_status=NOT_CHECKED`. Original ZIP, receipt, manifest, raw bytes and old preflight stay untouched. All other verification failures remain blocking.
 
-**Actions**
-1. Keep the original Run #8 ZIP, receipt, intake manifest, source hashes and old B2 preflight unchanged. The ZIP hash and all 8 raw objects now have a fresh integrity recheck; no new raw source has been admitted.
-2. For the H1 full report, H1 summary, Q1 report and buyback-plan PDFs, independently bind each fact to the exact official SZSE PDF, validate issuer/code/report identity, preserve page/table/row locators and record a cautious no-redistribution/internal fact-level use class. Public access and matching PDF text alone are not admission.
-3. Keep the current issuer IR page without historical publication time as non-PIT evidence. The 2026-10-09 buyback-progress notice stays excluded unless an independently supported pre-cutoff timestamp is established.
-4. For market price, use only the latest fully completed session before the original date-only cutoff: 2026-10-08. Do not use the 2026-10-09 close or automatically promote the captured Sohu/Eastmoney pages. SZSE states that SSIC manages/distributes its market data; source terms and permitted internal research use must be separately reviewed. If no permitted official/free close is established, leave `market_price=UNKNOWN`.
-5. Build a successor manifest with the date-only cutoff, field-level facts, exact raw-byte binding, supported `known_at`, explicit reuse disposition and complete reason-coded unknown/rejected rows. Run the unchanged Core/PIT validator and fresh independent review.
-6. Do not publish numerical quote values or raw market-data bytes to the public repository.
+**Core/PIT successor result**
 
-**Pass criteria**
-- every admitted fact is case-bound and has official source identity, source-byte hash, field-level locator, cutoff-safe `known_at` basis and conservative use/reuse disposition;
-- the successor manifest covers all seven mandatory field groups without UNKNOWN placeholders;
-- the 2026-10-09 same-day filing and close are excluded under the start-of-day cutoff unless pre-cutoff availability is proven;
-- unchanged Core/PIT and independent review agree. Until then, C2 stays `BLOCKED_NOT_ADMITTED`.
+- Case cutoff is `2026-10-09T00:00:00+08:00`. Thirteen exact PDF page/term locators passed. The candidate manifest uses conservative publication-date upper bounds for `known_at`; `published_at` remains a date-level value. The exact intraday first-public timestamps remain unverified, and supporting board-resolution PDF bytes were not present in the original Run #8 capture.
+- The unchanged Core/PIT validator returned only `REQUIRED_FIELD_GROUPS_UNCOVERED:market_price`. The six other required groups are covered in the ephemeral candidate manifest; overall B2 status is still `BLOCKED`, not PASS.
+- The original Run #8 same-day 2026-10-09 buyback-progress notice and close remain excluded. The dynamic issuer IR page and Sohu/Eastmoney price pages are excluded; public access does not automatically establish source-vintage or allowed-use rights.
+- Sanitized machine report: `evidence/real_cases/RC-CN-A-002001-20261009/C2_SUCCESSOR_CORE_VALIDATION_REPORT_20261011.json`. It includes no raw PDF bytes, source numeric fact values or numeric market quote.
+
+**Next gates**
+
+1. Independent review the 13 page-located claims, source-date upper-bound basis and private internal fact-level use boundary. The exact first-public time and unrestricted reuse are not claimed.
+2. Resolve a permitted official/free 2026-10-08 close-price source with source-vintage/known-at and allowable internal-use terms. If not established, keep `market_price=UNKNOWN`; do not use 2026-10-09 close or infer a quote.
+3. Only after independent review and price admission may a new immutable successor be promoted and the unchanged seven-group Core/PIT gate rerun. No signed formal admission, production Host acceptance, Decision, Publication, complete Run Receipt or execution authority currently exists.
+
+**Pass criteria:** all seven required field groups are individually source/PIT/use-qualified; unchanged Core/PIT reports PASS; independent review is resolved; historic diagnostic inputs remain unchanged. The current candidate is a bounded advance, not final C2 admission.
 
 Machine/human audit record: `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md`.
+
 ### Batch D1 — one real canonical 605016 run
 
 **Status:** BLOCKED until B and C1 pass.
@@ -220,7 +225,7 @@ The canonical run must follow:
 
 **Status:** BLOCKED on C2; do not allow this parallel case to obscure the primary 605016 P0 acceptance.
 
-Apply the same full run/receipt/replay gates as D1. Use the 2026-10-09 cutoff and a separately verified October 9 price observation. Do not inherit the older PILOT-02 cutoff of October 7 or its September 30 price receipt.
+Apply the same full run/receipt/replay gates as D1. For the date-only case cutoff `2026-10-09`, source price must be the latest completed session before the cutoff: `2026-10-08`. Do not use the October 9 close or inherit the older PILOT-02 cutoff of October 7 / its September 30 price receipt.
 
 ### Batch E — fresh independent red-team and final MVP acceptance
 
