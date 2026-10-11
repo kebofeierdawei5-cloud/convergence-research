@@ -223,9 +223,10 @@ def validate_payload(payload: Any, *, entered_at: datetime, decision_cutoff_at: 
 
 
 def _private_root(path: Path) -> Path:
-    if path.is_symlink():
+    expanded = path.expanduser()
+    if expanded.is_symlink():
         raise OperatorEnteredPriceError("OUTPUT_ROOT_MUST_NOT_BE_SYMLINK")
-    resolved = path.expanduser().resolve(strict=False)
+    resolved = expanded.resolve(strict=False)
     repo = REPOSITORY_ROOT.resolve(strict=True)
     if resolved == repo or repo in resolved.parents:
         raise OperatorEnteredPriceError("OUTPUT_ROOT_MUST_BE_OUTSIDE_PUBLIC_REPOSITORY")
@@ -334,7 +335,7 @@ def create_bundle(payload: Mapping[str, Any], output_root: str | Path, *, entere
 
 
 def replay_bundle(bundle_path: str | Path) -> dict[str, Any]:
-    directory = Path(bundle_path)
+    directory = Path(bundle_path).expanduser()
     if directory.is_symlink() or not directory.is_dir():
         raise OperatorEnteredPriceError("BUNDLE_MUST_BE_DIRECTORY_NOT_SYMLINK")
     resolved = directory.resolve(strict=True)
