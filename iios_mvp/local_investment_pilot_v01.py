@@ -158,8 +158,8 @@ def _outside_repository(path: str | Path, field: str, *, must_exist: bool = Fals
     raw = Path(path).expanduser()
     if raw.is_symlink():
         raise LocalInvestmentPilotError(f"{field}_MUST_NOT_BE_SYMLINK")
-    if must_exist and not raw.is_file():
-        raise LocalInvestmentPilotError(f"{field}_MUST_BE_REGULAR_FILE")
+    if must_exist and not raw.exists():
+        raise LocalInvestmentPilotError(f"{field}_MUST_EXIST")
     resolved = raw.resolve(strict=must_exist)
     try:
         resolved.relative_to(REPOSITORY_ROOT)
@@ -318,6 +318,7 @@ def _normalise_assessment(raw: Any) -> dict[str, Any]:
     gap["direction"] = _status(gap.get("direction"), GAP_DIRECTIONS, "EXPECTATION_GAP_DIRECTION")
     risk["status"] = _status(risk.get("status"), {"PASS", "FAIL", "UNKNOWN"}, "RISK_STATUS")
     risk["max_loss_pct"] = _text(risk.get("max_loss_pct")) or "UNKNOWN"
+    risk["items"] = _list_of_text(risk.get("items"), "RISK_ITEMS")
     thesis["drivers"] = thesis.get("drivers") if isinstance(thesis.get("drivers"), list) else []
     thesis["break_conditions"] = _list_of_text(thesis.get("break_conditions"), "THESIS_BREAK_CONDITIONS")
     thesis["reassessment_triggers"] = _list_of_text(thesis.get("reassessment_triggers"), "REASSESSMENT_TRIGGERS")
@@ -944,6 +945,8 @@ def verify_local_pilot_bundle(run_dir: str | Path) -> dict[str, Any]:
 
 def run_local_investment_pilot(*, input_path: str | Path, output_root: str | Path) -> dict[str, Any]:
     input_file = _outside_repository(input_path, "PILOT_INPUT_PATH", must_exist=True)
+    if not input_file.is_file() or input_file.is_symlink():
+        raise LocalInvestmentPilotError("PILOT_INPUT_PATH_MUST_BE_REGULAR_FILE_NOT_SYMLINK")
     input_raw = input_file.read_bytes()
     pilot_id, analysis_raw, report_raw, receipt_raw, _receipt = _build_artifacts(input_raw)
     root = _prepare_private_directory(output_root, "PILOT_OUTPUT_ROOT")
