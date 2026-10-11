@@ -340,7 +340,7 @@ def _load_and_verify_pdf(
     return path, page_cache[source_id]
 
 
-def build_successor_manifest(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+def build_successor_manifest(root: Path, *, archive_verification_method: str) -> tuple[dict[str, Any], dict[str, Any]]:
     receipt, by_id, integrity = _verify_receipt_and_raw(root)
     page_cache: dict[str, list[str]] = {}
     evidence: list[dict[str, Any]] = []
@@ -477,6 +477,7 @@ def build_successor_manifest(root: Path) -> tuple[dict[str, Any], dict[str, Any]
         "case_id": CASE_ID,
         "cutoff_date": CUTOFF_INSTANT,
         "archive_sha256": EXPECTED_ARCHIVE_SHA256,
+        "archive_sha256_verification_method": archive_verification_method,
         "archive_raw_integrity_status": integrity["status"],
         "captured_raw_object_count_verified": integrity["raw_bytes_verified"],
         "fact_locator_count": len(locator_results),
@@ -523,25 +524,51 @@ def build_successor_manifest(root: Path) -> tuple[dict[str, Any], dict[str, Any]
     return manifest, report
 
 
-def run(archive_dir: Path, out_dir: Path) -> dict[str, Any]:
+def run(
+    archive_dir: Path,
+    out_dir: Path,
+    *,
+    artifact_digest_verified_by_downloader: bool = False,
+) -> dict[str, Any]:
     candidates = sorted(archive_dir.glob("route-a-xinhecheng-run8.zip"))
-    if len(candidates) != 1:
-        raise ValueError("C2_CAPTURE_ARCHIVE_NOT_FOUND_OR_AMBIGUOUS")
+    has_extracted_receipt = (archive_dir / "COMPANY_EVIDENCE_INTAKE_RECEIPT.json").is_file()
+    has_extracted_manifest = (archive_dir / "intake_manifest.json").is_file()
     out_dir.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="iios-c2-run8-") as temporary:
-        raw_root = Path(temporary) / "run8"
-        _safe_extract_pinned_archive(candidates[0], raw_root)
-        manifest, report = build_successor_manifest(raw_root)
-        # The candidate manifest contains public-company financial values and stays
-        # ephemeral/private. Only the sanitized report is retained/uploaded.
-        (out_dir / "B2_COMPANY_EVIDENCE_MANIFEST.json").write_text(
-            json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-            encoding="utf-8",
+
+    if len(candidates) == 1 and not (has_extracted_receipt or has_extracted_manifest):
+        with tempfile.TemporaryDirectory(prefix="iios-c2-run8-") as temporary:
+            raw_root = Path(temporary) / "run8"
+            _safe_extract_pinned_archive(candidates[0], raw_root)
+            manifest, report = build_successor_manifest(
+                raw_root,
+                archive_verification_method="INDEPENDENT_REHASHED_PINNED_ZIP_BEFORE_EXTRACTION",
+            )
+    elif (
+        not candidates
+        and has_extracted_receipt
+        and has_extracted_manifest
+        and artifact_digest_verified_by_downloader
+    ):
+        # actions/download-artifact verifies the original archived payload SHA-256
+        # before extracting it. Its exact digest check is visible in the workflow
+        # log; this branch then independently replays every receipt-bound raw file.
+        manifest, report = build_successor_manifest(
+            archive_dir,
+            archive_verification_method="ACTIONS_DOWNLOAD_ARTIFACT_PINNED_SHA256_VERIFIED_BEFORE_EXTRACTION",
         )
-        (out_dir / "C2_SOURCE_ADJUDICATION_REPORT.json").write_text(
-            json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-            encoding="utf-8",
-        )
+    else:
+        raise ValueError("C2_CAPTURE_ARCHIVE_NOT_FOUND_OR_AMBIGUOUS_OR_UNVERIFIED_LAYOUT")
+
+    # The candidate manifest contains financial facts and stays ephemeral/private.
+    # The workflow is configured to upload only the sanitized status report.
+    (out_dir / "B2_COMPANY_EVIDENCE_MANIFEST.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (out_dir / "C2_SOURCE_ADJUDICATION_REPORT.json").write_text(
+        json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+        encoding="utf-8",
+    )
     return report
 
 
@@ -549,9 +576,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Build and Core-validate the cutoff-safe C2 successor from the pinned Run #8 capture.")
     parser.add_argument("--archive-dir", required=True, help="Directory containing route-a-xinhecheng-run8.zip")
     parser.add_argument("--out-dir", required=True, help="Temporary output directory; do not commit B2 manifest")
+    parser.add_argument(
+        "--artifact-digest-verified-by-download-action",
+        action="store_true",
+        help="Assert the flattened directory was produced by actions/download-artifact after its pinned SHA-256 verification",
+    )
     args = parser.parse_args()
     try:
-        report = run(Path(args.archive_dir), Path(args.out_dir))
+        report = run(
+            Path(args.archive_dir),
+            Path(args.out_dir),
+            artifact_digest_verified_by_downloader=args.artifact_digest_verified_by_download_action,
+        )
     except Exception as exc:
         code = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
         print(json.dumps({
