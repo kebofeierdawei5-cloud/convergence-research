@@ -1124,6 +1124,233 @@ def verify_existing_private_b2_candidate(
     }
 
 
+def _persist_source_vintage_successor(
+    *,
+    source_candidate_dir: Path,
+    manifest: Mapping[str, Any],
+    private_root: Path,
+    repository_root: str | Path,
+    core_validator: Callable[..., list[str]] | None,
+) -> dict[str, Any]:
+    """Atomically persist a new immutable candidate while retaining its predecessor."""
+    raw_declarations = manifest.get("raw_artifacts")
+    if not isinstance(raw_declarations, list) or not raw_declarations:
+        raise PrivateIngestError("SOURCE_VINTAGE_SUCCESSOR_RAW_DECLARATIONS_MISSING")
+    vintage = _source_vintage_state(
+        manifest,
+        raw_root=source_candidate_dir / "evidence_root",
+        repository_root=repository_root,
+    )
+    if vintage["source_vintage_review_required"]:
+        raise PrivateIngestError("SOURCE_VINTAGE_SUCCESSOR_NOT_ADJUDICATED")
+    fingerprint = _candidate_fingerprint(manifest)
+    case_root = source_candidate_dir.parent
+    destination = case_root / fingerprint
+    if destination == source_candidate_dir:
+        raise PrivateIngestError("SOURCE_VINTAGE_SUCCESSOR_MUST_BE_NEW_IMMUTABLE_CANDIDATE")
+    if destination.is_symlink():
+        raise PrivateIngestError("EXISTING_PRIVATE_CANDIDATE_MUST_NOT_BE_SYMLINK")
+    if destination.exists():
+        checked = _verify_private_candidate_contents(
+            destination, validator=core_validator, repository_root=repository_root
+        )
+        if checked["candidate_fingerprint"] != fingerprint or checked["source_vintage_review_required"]:
+            raise PrivateIngestError("IMMUTABLE_SOURCE_VINTAGE_SUCCESSOR_CONFLICT")
+        return {
+            "status": "ALREADY_SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
+            **checked,
+            "case_id": CASE_ID,
+            "cutoff_date": CUTOFF_DATE,
+            "official_source_refetched": False,
+            "attempt10_downloaded": False,
+            "previous_candidate_retained": True,
+            "formal_signed_admission_created": False,
+            "production_host_accepted": False,
+            "bundle_created": False,
+            "decision_created": False,
+            "human_approval_required": True,
+            "auto_execution": False,
+        }
+
+    _make_private_directory(private_root)
+    stage_root = Path(tempfile.mkdtemp(prefix=".iios-source-vintage-stage-", dir=private_root))
+    os.chmod(stage_root, 0o700)
+    payload_root = stage_root / fingerprint
+    _make_private_directory(payload_root)
+    evidence_destination = payload_root / "evidence_root"
+    try:
+        copied_count = _copy_exact_artifacts(
+            source_root=source_candidate_dir / "evidence_root",
+            destination_root=evidence_destination,
+            declarations=raw_declarations,
+        )
+        if copied_count != len(raw_declarations):
+            raise PrivateIngestError("SOURCE_VINTAGE_SUCCESSOR_RAW_DECLARATION_COUNT_MISMATCH")
+
+        manifest_out = payload_root / "company_evidence_manifest.json"
+        with manifest_out.open("xb") as handle:
+            handle.write((json.dumps(dict(manifest), ensure_ascii=False, indent=2) + "\\n").encode("utf-8"))
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(manifest_out, 0o600)
+
+        copied_manifest = _read_object(manifest_out, "SOURCE_VINTAGE_SUCCESSOR_MANIFEST")
+        persisted_errors = _validate_core(
+            copied_manifest,
+            evidence_destination,
+            core_validator,
+            repository_root=repository_root,
+        )
+        if persisted_errors:
+            raise PrivateIngestError(
+                "SOURCE_VINTAGE_SUCCESSOR_CORE_VALIDATOR_BLOCKED:" + ",".join(persisted_errors[:8])
+            )
+        checked_vintage = _source_vintage_state(
+            copied_manifest,
+            raw_root=evidence_destination,
+            repository_root=repository_root,
+        )
+        if checked_vintage["adjudication_sha256"] != vintage["adjudication_sha256"]:
+            raise PrivateIngestError("SOURCE_VINTAGE_SUCCESSOR_ADJUDICATION_HASH_CHANGED")
+
+        price = _price_evidence(copied_manifest)
+        receipt_core = {
+            "schema_version": RECEIPT_SCHEMA_REVIEWED,
+            "status": "PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
+            "case_id": CASE_ID,
+            "cutoff_date": CUTOFF_DATE,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "candidate_fingerprint": fingerprint,
+            "manifest_sha256": _sha256(manifest_out.read_bytes()),
+            "manifest_audit_sha256": (copied_manifest.get("audit") or {}).get("manifest_sha256"),
+            "official_price_source_sha256": EXPECTED_PRICE_RAW_SHA256,
+            "official_price_observation_date": "2026-10-08",
+            "official_price_known_at": price.get("known_at"),
+            "official_price_known_at_basis": price.get("known_at_basis"),
+            "exact_first_public_timestamp_verified": False,
+            "source_vintage_review_required": False,
+            "source_vintage_status": SOURCE_VINTAGE_REVIEWED_STATUS,
+            "source_vintage_adjudication_sha256": checked_vintage["adjudication_sha256"],
+            "evidence_record_count": len(copied_manifest.get("evidence") or []),
+            "raw_artifact_count": copied_count,
+            "admitted_field_group_count": len(REQUIRED_FIELD_GROUPS_FOR_REPORT),
+            "missing_required_field_group_count": 0,
+            "core_validator": "iios_mvp.canonical_evidence_admission_v01.validate_company_evidence_manifest",
+            "core_validator_status": "PASS",
+            "storage_scope": "LOCAL_PRIVATE_INTERNAL_USE_ONLY",
+            "source_reuse_disposition": "RESTRICTED_NO_REDISTRIBUTION; private internal research use only",
+            "receipt_is_cryptographically_signed": False,
+            "formal_signed_admission_created": False,
+            "production_host_accepted": False,
+            "bundle_created": False,
+            "decision_created": False,
+            "human_approval_required": True,
+            "auto_execution": False,
+        }
+        receipt = dict(receipt_core)
+        receipt["receipt_sha256"] = _sha256(_canonical_bytes(receipt_core))
+        receipt_out = payload_root / "PRIVATE_B2_PERSISTENCE_RECEIPT.json"
+        with receipt_out.open("xb") as handle:
+            handle.write((json.dumps(receipt, ensure_ascii=False, indent=2) + "\\n").encode("utf-8"))
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(receipt_out, 0o600)
+
+        # Full privacy, receipt, raw-tree, fingerprint and Core replay before promotion.
+        _verify_private_candidate_contents(
+            payload_root, validator=core_validator, repository_root=repository_root
+        )
+        os.replace(payload_root, destination)
+    except Exception:
+        shutil.rmtree(stage_root, ignore_errors=True)
+        raise
+    shutil.rmtree(stage_root, ignore_errors=True)
+
+    checked = _verify_private_candidate_contents(
+        destination, validator=core_validator, repository_root=repository_root
+    )
+    return {
+        "status": "SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
+        **checked,
+        "case_id": CASE_ID,
+        "cutoff_date": CUTOFF_DATE,
+        "official_source_refetched": False,
+        "attempt10_downloaded": False,
+        "previous_candidate_retained": True,
+        "formal_signed_admission_created": False,
+        "production_host_accepted": False,
+        "bundle_created": False,
+        "decision_created": False,
+        "human_approval_required": True,
+        "auto_execution": False,
+    }
+
+
+def adjudicate_existing_private_b2_candidate(
+    *,
+    private_root: str | Path,
+    repository_root: str | Path = REPOSITORY_ROOT,
+    core_validator: Callable[..., list[str]] | None = None,
+) -> dict[str, Any]:
+    """Create a bounded source-vintage successor using only an already stored private candidate."""
+    private_root_path = _preflight_private_root(private_root, repository_root=repository_root)
+    existing = verify_existing_private_b2_candidate(
+        private_root=private_root_path,
+        repository_root=repository_root,
+        core_validator=core_validator,
+    )
+    reviewed = [
+        item for item in existing["candidates"]
+        if item.get("source_vintage_review_required") is False
+        and item.get("source_vintage_status") == SOURCE_VINTAGE_REVIEWED_STATUS
+    ]
+    if reviewed:
+        if len(reviewed) != 1:
+            raise PrivateIngestError("SOURCE_VINTAGE_REVIEWED_CANDIDATE_AMBIGUOUS")
+        active = reviewed[0]
+        return {
+            "status": "ALREADY_SOURCE_VINTAGE_ADJUDICATED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
+            **active,
+            "case_id": CASE_ID,
+            "cutoff_date": CUTOFF_DATE,
+            "official_source_refetched": False,
+            "attempt10_downloaded": False,
+            "previous_candidate_retained": True,
+            "formal_signed_admission_created": False,
+            "production_host_accepted": False,
+            "bundle_created": False,
+            "decision_created": False,
+            "human_approval_required": True,
+            "auto_execution": False,
+        }
+
+    unreviewed = [
+        item for item in existing["candidates"]
+        if item.get("source_vintage_review_required") is True
+    ]
+    if len(unreviewed) != 1:
+        raise PrivateIngestError("SOURCE_VINTAGE_UNREVIEWED_CANDIDATE_AMBIGUOUS")
+    source_fingerprint = unreviewed[0]["candidate_fingerprint"]
+    case_root = private_root_path / "cases" / CASE_ID
+    source_candidate_dir = case_root / source_fingerprint
+    original_manifest = _read_object(
+        source_candidate_dir / "company_evidence_manifest.json",
+        "EXISTING_PRIVATE_MANIFEST",
+    )
+    successor_manifest = _adjudicate_source_vintage_manifest(
+        original_manifest,
+        raw_root=source_candidate_dir / "evidence_root",
+        repository_root=repository_root,
+    )
+    return _persist_source_vintage_successor(
+        source_candidate_dir=source_candidate_dir,
+        manifest=successor_manifest,
+        private_root=private_root_path,
+        repository_root=repository_root,
+        core_validator=core_validator,
+    )
+
+
 def ingest_private_b2_candidate(
     *,
     private_root: str | Path,
