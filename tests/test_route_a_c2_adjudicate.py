@@ -6,6 +6,7 @@ from tools.route_a_c2_adjudicate import (
     EXPECTED_ARCHIVE_SHA256,
     FACT_SPECS,
     SOURCE_VINTAGE,
+    _normalize_legacy_payload_defaults,
 )
 
 
@@ -61,3 +62,38 @@ def test_source_vintage_bounds_are_before_the_cutoff_without_claiming_exact_time
     for source in SOURCE_VINTAGE.values():
         assert parse_temporal(source["known_at"], "known_at") < cutoff
         assert source["known_at"].startswith(source["publication_date"])
+
+
+
+def test_legacy_receipt_defaults_are_applied_to_a_copy_only():
+    receipt = {
+        "case_id": CASE_ID,
+        "sources": [{"source_id": "LEGACY-001"}],
+    }
+    manifest = {
+        "case_id": CASE_ID,
+        "sources": [{"source_id": "LEGACY-001"}],
+    }
+    normalized = _normalize_legacy_payload_defaults(receipt, manifest)
+    assert "expected_payload_type" not in receipt["sources"][0]
+    assert "payload_contract_status" not in receipt["sources"][0]
+    assert normalized["sources"][0]["expected_payload_type"] == "ANY"
+    assert normalized["sources"][0]["payload_contract_status"] == "NOT_CHECKED"
+    assert normalized["sources"][0]["payload_contract_error"] is None
+
+
+def test_legacy_receipt_adapter_refuses_to_erase_non_default_payload_contract():
+    receipt = {
+        "case_id": CASE_ID,
+        "sources": [{"source_id": "SOURCE-PDF", "expected_payload_type": "PDF"}],
+    }
+    manifest = {
+        "case_id": CASE_ID,
+        "sources": [{"source_id": "SOURCE-PDF", "expected_payload_type": "PDF"}],
+    }
+    try:
+        _normalize_legacy_payload_defaults(receipt, manifest)
+    except ValueError as exc:
+        assert str(exc) == "C2_LEGACY_PAYLOAD_TYPE_NOT_DEFAULT_ANY"
+    else:
+        raise AssertionError("non-default payload contract must remain blocked")
