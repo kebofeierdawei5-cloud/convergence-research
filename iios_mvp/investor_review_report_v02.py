@@ -381,6 +381,62 @@ def _human_auditability(
         "overall_status": "INCOMPLETE" if incomplete else "COMPLETE",
     }
 
+def _price_assurance_fields(decision: Mapping[str, Any]) -> dict[str, Any]:
+    """Produce an explicit, conservative report projection of current-price assurance.
+
+    Do not include private operator-price bundle identifiers or hashes in a
+    human/machine investor report. The assurance class and limitations are
+    enough for readers; immutable hashes remain bound in the canonical Run.
+    """
+    input_class = str(decision.get("current_price_input_class") or "UNKNOWN").strip().upper()
+    assurance = str(decision.get("current_price_assurance") or "NOT_PROVIDED").strip().upper()
+    if input_class == "OPERATOR_ATTESTED_MARKET_DATA":
+        if assurance != "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED":
+            raise ValueError("operator-attested price must retain OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED")
+        return {
+            "current_price_input_class": input_class,
+            "current_price_assurance": assurance,
+            "current_price_assurance_statement": (
+                "手动录入价格：来源、时点与使用权均未经独立验证；"
+                "不等同于正式准入交易所行情，也不构成公司 Evidence/PIT 事实。"
+            ),
+            "current_price_assurance_limitation_codes": [
+                "OPERATOR_SUPPLIED_VALUE",
+                "SOURCE_ORIGIN_NOT_VERIFIED",
+                "SOURCE_VINTAGE_NOT_VERIFIED",
+                "SOURCE_USE_RIGHTS_NOT_VERIFIED",
+                "NOT_FORMAL_EXCHANGE_PRICE_EVIDENCE",
+            ],
+        }
+    if input_class == "CANONICAL_ADMITTED_MARKET_DATA":
+        if assurance != "CANONICAL_PRICE_ADMISSION_VERIFIED":
+            raise ValueError("canonical current price must carry CANONICAL_PRICE_ADMISSION_VERIFIED")
+        return {
+            "current_price_input_class": input_class,
+            "current_price_assurance": assurance,
+            "current_price_assurance_statement": (
+                "价格已绑定 canonical 市场价格准入记录；"
+                "具体来源、时点与使用权限仍以该记录及相应准入门禁为准。"
+            ),
+            "current_price_assurance_limitation_codes": [
+                "CANONICAL_PRICE_ADMISSION_RECORD_BOUND",
+                "SOURCE_RIGHTS_REMAIN_GOVERNED_BY_ADMISSION_RECORD",
+            ],
+        }
+    if input_class not in {"UNKNOWN", "NOT_PROVIDED"}:
+        raise ValueError("unsupported current-price input class in investor report")
+    if assurance not in {"UNKNOWN", "NOT_PROVIDED"}:
+        raise ValueError("price assurance cannot be asserted without a supported input class")
+    return {
+        "current_price_input_class": "UNKNOWN",
+        "current_price_assurance": "NOT_PROVIDED",
+        "current_price_assurance_statement": (
+            "价格输入保证类别未提供；不得默认视为正式准入行情。"
+        ),
+        "current_price_assurance_limitation_codes": ["PRICE_ASSURANCE_NOT_PROVIDED"],
+    }
+
+
 def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
     validate_machine_publication(publication)
     case = publication["case"]
@@ -503,6 +559,7 @@ def build_machine_surface(publication: Mapping[str, Any]) -> dict[str, Any]:
             "investability_status": decision.get("investability_status"),
             "primary_reason": decision.get("primary_reason"),
             "current_price": decision.get("current_price"),
+            **_price_assurance_fields(decision),
             "target_entry_price": decision.get("target_entry_price"),
             "human_approval_required": decision.get("human_approval_required"),
             "auto_execution": decision.get("auto_execution"),
@@ -549,6 +606,7 @@ def render_investor_review_v02(publication: Mapping[str, Any], surface: Mapping[
         f"**当前动作：{_fmt(decision.get('action'))}。** {_decision_wording(decision)}",
         f"- Decision status：**{_fmt(decision.get('decision_status'))}**；Investability：**{_fmt(decision.get('investability_status'))}**。",
         f"- Current price：**{_fmt(decision.get('current_price'))}**；Actionable target entry：**{_fmt(decision.get('target_entry_price'))}**。",
+        f"- Price assurance / 价格保证：**{surface['decision']['current_price_input_class']} / {surface['decision']['current_price_assurance']}**；{surface['decision']['current_price_assurance_statement']}",
         f"- Expected annualized return：**{_fmt(returns.get('expected_annualized_return'))}**；Required return：**{_fmt(returns.get('required_return'))}**。",
         f"- New capital allowed：**{_fmt((publication['decision_payload'].get('gates') or {}).get('new_capital_allowed'))}**；Human Approval：**{_fmt(approval.get('approval_status'))}**。",
         f"- Human-review readiness：**{surface['human_review_readiness']}**；Human Auditability：**{surface['human_auditability']['overall_status']}**。",
@@ -764,6 +822,7 @@ def qa_investor_review_v02(*, publication: Mapping[str, Any], report: Mapping[st
         "semantic_matrix_complete": "PASS", "explicit_absence_handling": "PASS",
         "human_auditability_contract": "PASS",
         "decision_fidelity": "PASS", "human_boundary": "PASS", "non_authority": "PASS",
+        "price_assurance_transparency": "PASS",
     }
     issues: list[str] = []
     try:
@@ -798,6 +857,27 @@ def qa_investor_review_v02(*, publication: Mapping[str, Any], report: Mapping[st
             checks["deterministic_render_replay"] = "FAIL"; issues.append("deterministic_render_replay: regenerated report differs")
     except Exception as exc:
         checks["deterministic_render_replay"] = "FAIL"; issues.append(f"deterministic_render_replay: {exc}")
+    try:
+        expected_price = _price_assurance_fields(publication.get("ai_decision") or {})
+        reported_price = (
+            report.get("machine_report", {})
+            .get("semantic_surface", {})
+            .get("decision", {})
+        )
+        for key in (
+            "current_price_input_class",
+            "current_price_assurance",
+            "current_price_assurance_statement",
+            "current_price_assurance_limitation_codes",
+        ):
+            if reported_price.get(key) != expected_price[key]:
+                raise ValueError(f"machine report price assurance mismatch: {key}")
+        statement = str(expected_price["current_price_assurance_statement"])
+        if statement not in str(report.get("markdown", "")):
+            raise ValueError("human report omits current-price assurance statement")
+    except Exception as exc:
+        checks["price_assurance_transparency"] = "FAIL"
+        issues.append(f"price_assurance_transparency: {exc}")
     markdown = str(report.get("markdown", ""))
     missing_sections = [section for section in REQUIRED_SECTIONS if f"## {section}" not in markdown]
     if missing_sections:
