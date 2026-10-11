@@ -25,6 +25,7 @@ from research.b2.company_evidence import (
     REQUIRED_COMPANY_FIELD_GROUPS,
     build_company_evidence_manifest,
 )
+from research.b2.evidence_contract import assert_pit, validate_evidence_record
 from tools.verify_company_evidence_intake import IndependentVerificationError, verify_intake
 
 
@@ -412,7 +413,101 @@ def _load_and_verify_pdf(
     return path, page_cache[source_id]
 
 
-def build_successor_manifest(root: Path, *, archive_verification_method: str) -> tuple[dict[str, Any], dict[str, Any]]:
+
+
+def _append_operator_market_price_attestation(
+    *,
+    root: Path,
+    bundle_dir: Path,
+    evidence: list[dict[str, Any]],
+    raw_artifacts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Bind an explicit operator attestation to this exact C2 case without network retrieval."""
+    bundle_root = Path(bundle_dir).resolve()
+    payload_path = bundle_root / "raw" / "operator_market_price_attestation.json"
+    evidence_path = bundle_root / "evidence_record.json"
+    declaration_path = bundle_root / "raw_artifact_declaration.json"
+    if not payload_path.is_file() or not evidence_path.is_file() or not declaration_path.is_file():
+        raise ValueError("C2_OPERATOR_PRICE_BUNDLE_INCOMPLETE")
+    raw_bytes = payload_path.read_bytes()
+    digest = hashlib.sha256(raw_bytes).hexdigest()
+    try:
+        payload = json.loads(raw_bytes.decode("utf-8"))
+        record = _load_json(evidence_path)
+        declaration = _load_json(declaration_path)
+    except (UnicodeDecodeError, json.JSONDecodeError, OSError, ValueError) as exc:
+        raise ValueError("C2_OPERATOR_PRICE_BUNDLE_INVALID_JSON") from exc
+    if not isinstance(payload, dict) or not isinstance(record, dict) or not isinstance(declaration, dict):
+        raise ValueError("C2_OPERATOR_PRICE_BUNDLE_INVALID_SHAPE")
+    expected = {
+        "case_id": CASE_ID,
+        "market": "CN-A",
+        "symbol": "002001",
+        "company": "浙江新和成股份有限公司",
+        "cutoff_date": CUTOFF_INSTANT,
+        "observation_date": "2026-10-08",
+    }
+    for key, value in expected.items():
+        if payload.get(key) != value:
+            raise ValueError(f"C2_OPERATOR_PRICE_BINDING_MISMATCH:{key}")
+    if payload.get("record_class") != "OPERATOR_ATTESTED_MARKET_PRICE_NOT_SOURCE_BYTE_VERIFIED":
+        raise ValueError("C2_OPERATOR_PRICE_RECORD_CLASS_INVALID")
+    if payload.get("operator_confirmed") is not True or payload.get("secondary_web_audit_performed") is not False:
+        raise ValueError("C2_OPERATOR_PRICE_CONFIRMATION_INVALID")
+    if payload.get("original_vendor_bytes_received") is not False:
+        raise ValueError("C2_OPERATOR_PRICE_VENDOR_BYTES_MUST_NOT_BE_CLAIMED")
+    if declaration.get("expected_sha256") != digest or declaration.get("expected_size_bytes") != len(raw_bytes):
+        raise ValueError("C2_OPERATOR_PRICE_BUNDLE_RAW_HASH_MISMATCH")
+    if record.get("content_sha256") != digest or record.get("capture_sha256") != digest:
+        raise ValueError("C2_OPERATOR_PRICE_EVIDENCE_HASH_MISMATCH")
+    if declaration.get("evidence_id") != record.get("evidence_id"):
+        raise ValueError("C2_OPERATOR_PRICE_EVIDENCE_ID_MISMATCH")
+    attestation = record.get("operator_attestation")
+    if not isinstance(attestation, dict):
+        raise ValueError("C2_OPERATOR_PRICE_ATTESTATION_METADATA_MISSING")
+    for key in (
+        "policy_id", "operator_confirmed", "secondary_web_audit_performed",
+        "case_id", "market", "symbol", "company", "observation_date",
+        "close_price", "currency", "source_ref", "known_at", "known_at_basis",
+        "attested_at", "original_vendor_bytes_received",
+    ):
+        if attestation.get(key) != payload.get(key):
+            raise ValueError(f"C2_OPERATOR_PRICE_METADATA_MISMATCH:{key}")
+    if record.get("subject_id") != CASE_ID or record.get("field_id") != "market_price.close_price":
+        raise ValueError("C2_OPERATOR_PRICE_EVIDENCE_BINDING_MISMATCH")
+    if record.get("provenance_class") != "OPERATOR_ATTESTED_MARKET_DATA" or record.get("status") != "ADMITTED":
+        raise ValueError("C2_OPERATOR_PRICE_PROVENANCE_INVALID")
+    try:
+        assert_pit(record, CUTOFF_INSTANT)
+    except ValueError as exc:
+        raise ValueError("C2_OPERATOR_PRICE_PIT_INVALID:" + str(exc)) from exc
+
+    relative_path = "operator_attestations/operator_market_price_attestation.json"
+    target = root / relative_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() or target.is_symlink():
+        raise ValueError("C2_OPERATOR_PRICE_TARGET_ALREADY_EXISTS")
+    target.write_bytes(raw_bytes)
+    if target.stat().st_size != len(raw_bytes) or hashlib.sha256(target.read_bytes()).hexdigest() != digest:
+        raise ValueError("C2_OPERATOR_PRICE_PRIVATE_COPY_INTEGRITY_FAILURE")
+
+    bound_record = dict(record)
+    bound_record["artifact_id"] = relative_path
+    bound_record["source_locator"] = "private operator-attestation JSON / close_price"
+    errors = validate_evidence_record(bound_record)
+    if errors:
+        raise ValueError("C2_OPERATOR_PRICE_EVIDENCE_RECORD_INVALID:" + ";".join(errors))
+    evidence.append(bound_record)
+    raw_artifacts.append({
+        "evidence_id": bound_record["evidence_id"],
+        "relative_path": relative_path,
+        "expected_size_bytes": len(raw_bytes),
+        "expected_sha256": digest,
+    })
+    return bound_record
+
+
+def build_successor_manifest(root: Path, *, archive_verification_method: str, operator_market_price_attestation_dir: Path | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
     receipt, by_id, integrity = _verify_receipt_and_raw(root)
     page_cache: dict[str, list[str]] = {}
     evidence: list[dict[str, Any]] = []
@@ -509,6 +604,15 @@ def build_successor_manifest(root: Path, *, archive_verification_method: str) ->
             "known_at_upper_bound": known_at,
         })
 
+    operator_price_record = None
+    if operator_market_price_attestation_dir is not None:
+        operator_price_record = _append_operator_market_price_attestation(
+            root=root,
+            bundle_dir=operator_market_price_attestation_dir,
+            evidence=evidence,
+            raw_artifacts=raw_artifacts,
+        )
+
     manifest = build_company_evidence_manifest(
         case_id=CASE_ID,
         market="CN-A",
@@ -535,11 +639,18 @@ def build_successor_manifest(root: Path, *, archive_verification_method: str) ->
         if error.startswith("REQUIRED_FIELD_GROUPS_UNCOVERED:"):
             missing_groups = error.split(":", 1)[1].split(",")
             break
-    expected_admitted = sorted(set(REQUIRED_COMPANY_FIELD_GROUPS) - {"market_price"})
-    if manifest.get("status") != "BLOCKED" or missing_groups != ["market_price"]:
-        raise ValueError("C2_UNEXPECTED_CORE_RESULT")
-    if "market_price" in [x["field_id"].split(".", 1)[0] for x in evidence]:
-        raise ValueError("C2_MARKET_PRICE_MUST_NOT_BE_SYNTHESIZED")
+    if operator_price_record is None:
+        expected_admitted = sorted(set(REQUIRED_COMPANY_FIELD_GROUPS) - {"market_price"})
+        if manifest.get("status") != "BLOCKED" or missing_groups != ["market_price"]:
+            raise ValueError("C2_UNEXPECTED_CORE_RESULT")
+        if "market_price" in [x["field_id"].split(".", 1)[0] for x in evidence]:
+            raise ValueError("C2_MARKET_PRICE_MUST_NOT_BE_SYNTHESIZED")
+    else:
+        expected_admitted = sorted(REQUIRED_COMPANY_FIELD_GROUPS)
+        if manifest.get("status") != "PASS" or missing_groups:
+            raise ValueError("C2_OPERATOR_ATTESTED_PRICE_CORE_RESULT_NOT_PASS")
+        if len([x for x in evidence if x.get("provenance_class") == "OPERATOR_ATTESTED_MARKET_DATA"]) != 1:
+            raise ValueError("C2_OPERATOR_PRICE_MULTIPLICITY_INVALID")
     if any(x["id"] == "XHC-FACT-TRUST-BUYBACK-PROGRESS-001" for x in FACT_SPECS):
         raise ValueError("C2_CUTOFF_EXCLUDED_SAME_DAY_BUYBACK_NOTICE")
 
@@ -573,12 +684,25 @@ def build_successor_manifest(root: Path, *, archive_verification_method: str) ->
         "admitted_field_groups": expected_admitted,
         "missing_required_field_groups": missing_groups,
         "b2_validation_errors": errors,
-        "market_price": {
-            "status": "BLOCKED_UNKNOWN",
-            "required_observation_date": "2026-10-08",
-            "reason": "No admitted date-specific permitted-use close-price evidence exists in the preserved Run #8 artifact.",
-            "fake_or_inferred_record_created": False,
-        },
+        "market_price": (
+            {
+                "status": "OPERATOR_ATTESTED_CORE_PIT_PASS_NOT_SOURCE_VERIFIED",
+                "required_observation_date": "2026-10-08",
+                "evidence_id": operator_price_record["evidence_id"],
+                "known_at": operator_price_record["known_at"],
+                "secondary_web_audit_performed": False,
+                "original_vendor_bytes_received": False,
+                "numeric_price_in_report": False,
+                "source_verified_by_system": False,
+            }
+            if operator_price_record is not None
+            else {
+                "status": "BLOCKED_UNKNOWN",
+                "required_observation_date": "2026-10-08",
+                "reason": "No operator-attested price bundle was supplied; no secondary-web lookup is required by this path.",
+                "fake_or_inferred_record_created": False,
+            }
+        ),
         "excluded_sources": [
             {"source_id": "SZSE-2026-BUYBACK-PROGRESS-SEP", "reason": "Same-day 2026-10-09 publication is after the start-of-day cutoff."},
             {"source_id": "ISSUER-IR-PAGE-CURRENT", "reason": "Dynamic page has no historical publication time."},
@@ -602,6 +726,7 @@ def run(
     out_dir: Path,
     *,
     artifact_digest_verified_by_downloader: bool = False,
+    operator_market_price_attestation_dir: Path | None = None,
 ) -> dict[str, Any]:
     candidates = sorted(archive_dir.glob("route-a-xinhecheng-run8.zip"))
     has_extracted_receipt = (archive_dir / "COMPANY_EVIDENCE_INTAKE_RECEIPT.json").is_file()
@@ -615,6 +740,7 @@ def run(
             manifest, report = build_successor_manifest(
                 raw_root,
                 archive_verification_method="INDEPENDENT_REHASHED_PINNED_ZIP_BEFORE_EXTRACTION",
+                operator_market_price_attestation_dir=operator_market_price_attestation_dir,
             )
     elif (
         not candidates
@@ -628,6 +754,7 @@ def run(
         manifest, report = build_successor_manifest(
             archive_dir,
             archive_verification_method="ACTIONS_DOWNLOAD_ARTIFACT_PINNED_SHA256_VERIFIED_BEFORE_EXTRACTION",
+            operator_market_price_attestation_dir=operator_market_price_attestation_dir,
         )
     else:
         raise ValueError("C2_CAPTURE_ARCHIVE_NOT_FOUND_OR_AMBIGUOUS_OR_UNVERIFIED_LAYOUT")
@@ -654,12 +781,22 @@ def main() -> int:
         action="store_true",
         help="Assert the flattened directory was produced by actions/download-artifact after its pinned SHA-256 verification",
     )
+    parser.add_argument(
+        "--operator-market-price-attestation-dir",
+        default=None,
+        help="Private local bundle created by tools/iios_operator_market_price_attestation_v01.py; do not upload its value-bearing files to public GitHub",
+    )
     args = parser.parse_args()
     try:
         report = run(
             Path(args.archive_dir),
             Path(args.out_dir),
             artifact_digest_verified_by_downloader=args.artifact_digest_verified_by_download_action,
+            operator_market_price_attestation_dir=(
+                Path(args.operator_market_price_attestation_dir)
+                if args.operator_market_price_attestation_dir
+                else None
+            ),
         )
     except Exception as exc:
         code = str(exc) if isinstance(exc, ValueError) else type(exc).__name__
