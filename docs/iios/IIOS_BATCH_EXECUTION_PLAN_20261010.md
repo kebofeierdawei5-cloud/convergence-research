@@ -173,24 +173,27 @@ This closes the repository-CLI route/persistence integration test gap only.
 **PIT price-date correction:** the cutoff is date-only `2026-10-09` and is interpreted as the start of that date. The applicable market-price observation is the latest fully completed session before cutoff, `2026-10-08`, not the `2026-10-09` close. The date-only rule must not be changed to end-of-day merely to admit same-day data.
 ### Batch C2 — finish Route A evidence adjudication for 新和成 (002001.SZ)
 
-**Status:** PARTIAL CAPTURE VERIFIED / FACT CANDIDATES NOT ADMITTED; can proceed in parallel with C1.
+**Status:** RAW BYTE INTEGRITY PASS / B2 NOT ADMITTED / CUTOFF-CONTRACT DEFECT IDENTIFIED.
 
-Run #8 retained 8 of 9 declared sources and passed independent byte verification for the 8 captured objects. PR #259 added 11 page-located fact candidates from three PDFs; all remain `known_at=null`, `provenance_class=UNKNOWN`, `status=UNKNOWN`, `admission_status=NOT_ADMITTED`.
+Run #8 archive SHA-256 and all 8 captured raw object sizes/SHA-256 values were independently re-verified on 2026-10-11. The archive remains outside Git. The ninth declared Eastmoney K-line source has no captured bytes and no asserted hash. All 11 extracted facts remain diagnostic until independently adjudicated.
+
+**Critical re-audit finding:** the historic Run #8 B2 manifest records `cutoff_date=2026-10-09T23:59:59+08:00`. This conflicts with the unchanged IIOS date-only cutoff contract, under which `2026-10-09` is the start of that local date. Do not patch the old manifest timestamp or reuse its digest/fingerprint. Retain its preflight as diagnostic and rebuild a successor against the original raw files.
 
 **Actions**
-1. Preserve and verify the downloaded Run #8 ZIP outside Git. The GitHub Actions artifact is scheduled to expire on **2026-10-23 UTC**; do not rely on a short-lived Actions artifact as the only copy.
-2. Independently verify issuer/exchange document identity and first-public timestamp for each fact's source. URL path/filing heading/PDF text match is a candidate locator, not by itself proof of first-public time.
-3. Resolve the declared `PUBLIC_ACCESS_REUSE_UNKNOWN` status, keeping redistribution restrictions distinct from the ability to use an internally reviewed fact.
-4. Convert only adjudicated facts to B2 Evidence Records and run the current B2/PIT preflight. Keep all rejected/unknown rows and reason codes.
-5. Capture a date-specific free historical price observation for the case cutoff. Do not reuse the 2026-09-30 close for a 2026-10-09 cutoff without showing why it is the correct as-of observation.
-6. Fill any missing corporate-disclosure and other group coverage with official/free sources; source capture count is not group admission.
+1. Keep the original Run #8 ZIP, receipt, intake manifest, source hashes and old B2 preflight unchanged. The ZIP hash and all 8 raw objects now have a fresh integrity recheck; no new raw source has been admitted.
+2. For the H1 full report, H1 summary, Q1 report and buyback-plan PDFs, independently bind each fact to the exact official SZSE PDF, validate issuer/code/report identity, preserve page/table/row locators and record a cautious no-redistribution/internal fact-level use class. Public access and matching PDF text alone are not admission.
+3. Keep the current issuer IR page without historical publication time as non-PIT evidence. The 2026-10-09 buyback-progress notice stays excluded unless an independently supported pre-cutoff timestamp is established.
+4. For market price, use only the latest fully completed session before the original date-only cutoff: 2026-10-08. Do not use the 2026-10-09 close or automatically promote the captured Sohu/Eastmoney pages. SZSE states that SSIC manages/distributes its market data; source terms and permitted internal research use must be separately reviewed. If no permitted official/free close is established, leave `market_price=UNKNOWN`.
+5. Build a successor manifest with the date-only cutoff, field-level facts, exact raw-byte binding, supported `known_at`, explicit reuse disposition and complete reason-coded unknown/rejected rows. Run the unchanged Core/PIT validator and fresh independent review.
+6. Do not publish numerical quote values or raw market-data bytes to the public repository.
 
 **Pass criteria**
-- each admitted fact has independently supportable source origin, field-level locator, exact source-byte hash, known-at basis and legal/reuse disposition;
-- the B2 manifest covers all seven mandatory groups without UNKNOWN placeholders;
-- the original failed source row and any new acquisition failures remain explicit;
-- a fresh independent B2 review agrees with the validator outcome.
+- every admitted fact is case-bound and has official source identity, source-byte hash, field-level locator, cutoff-safe `known_at` basis and conservative use/reuse disposition;
+- the successor manifest covers all seven mandatory field groups without UNKNOWN placeholders;
+- the 2026-10-09 same-day filing and close are excluded under the start-of-day cutoff unless pre-cutoff availability is proven;
+- unchanged Core/PIT and independent review agree. Until then, C2 stays `BLOCKED_NOT_ADMITTED`.
 
+Machine/human audit record: `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md`.
 ### Batch D1 — one real canonical 605016 run
 
 **Status:** BLOCKED until B and C1 pass.
