@@ -1,10 +1,13 @@
 name: IIOS Private Path A Scenario Analysis
+# Includes MP-1 operator-entered price intake; no private input or price values enter CI artifacts.
 
 on:
   pull_request:
     paths:
       - "iios_mvp/private_scenario_analysis_v01.py"
       - "iios_mvp/operator_attested_price_input_v01.py"
+      - "iios_mvp/operator_entered_price_decision_input_v01.py"
+      - "tests/test_operator_entered_price_decision_input_v01.py"
       - "tests/test_private_scenario_analysis_v01.py"
       - ".github/workflows/iios_private_scenario_analysis.yml"
       - "docs/iios/PRIVATE_SCENARIO_ANALYSIS_PATH_A_V01_20261011.md"
@@ -14,6 +17,8 @@ on:
     paths:
       - "iios_mvp/private_scenario_analysis_v01.py"
       - "iios_mvp/operator_attested_price_input_v01.py"
+      - "iios_mvp/operator_entered_price_decision_input_v01.py"
+      - "tests/test_operator_entered_price_decision_input_v01.py"
       - "tests/test_private_scenario_analysis_v01.py"
       - ".github/workflows/iios_private_scenario_analysis.yml"
       - "docs/iios/PRIVATE_SCENARIO_ANALYSIS_PATH_A_V01_20261011.md"
@@ -37,6 +42,6 @@ jobs:
       - name: Compile IIOS modules
         run: python -m compileall -q iios_mvp
       - name: Test Path A private scenario runner and its intake contract
-        run: PYTHONPATH=. pytest -q tests/test_private_scenario_analysis_v01.py tests/test_operator_attested_price_input_v01.py
+        run: PYTHONPATH=. pytest -q tests/test_private_scenario_analysis_v01.py tests/test_operator_attested_price_input_v01.py tests/test_operator_entered_price_decision_input_v01.py
       - name: Check diff formatting
         run: git diff --check
