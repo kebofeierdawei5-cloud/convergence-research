@@ -173,7 +173,7 @@ This closes the repository-CLI route/persistence integration test gap only.
 **PIT price-date correction:** the cutoff is date-only `2026-10-09` and is interpreted as the start of that date. The applicable market-price observation is the latest fully completed session before cutoff, `2026-10-08`, not the `2026-10-09` close. The date-only rule must not be changed to end-of-day merely to admit same-day data.
 ### Batch C2 — 新和成 (002001.SZ) cutoff-safe successor adjudication
 
-**Status: ACTUAL PRIVATE CORE/PIT PASS (7/7; OPERATOR-ATTESTED) / PR #338 + #340 MERGED / INDEPENDENT FACT REVIEW, FORMAL ADMISSION AND PRODUCTION HOST OPEN.**
+**Status: ACTUAL PRIVATE CORE/PIT PASS (7/7; OPERATOR-ATTESTED) / PR #338 + #340 + #341 MERGED / INDEPENDENT FACT REVIEW, FORMAL ADMISSION AND PRODUCTION HOST OPEN.**
 
 **Resolved breakpoint and exact-head execution**
 
@@ -202,7 +202,9 @@ Machine/human audit records: `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_202
 
 ### Batch D1 — one real canonical 605016 run
 
-**Status:** BLOCKED until B and C1 pass.
+**Status:** BLOCKED on production Host acceptance and formally authorized semantic producer lineage. C1 evidence-candidate preparation passed, but that does not accept the production Host.
+
+**Immediate safety predecessor:** merge the fail-closed manual Web semantic guard (tracked by branch `feat/manual-web-semantic-fail-closed-guard-20261011`) before attempting any canonical manual-Web semantic stage. Then provision/deploy the actual Host, authorized producer key/receipt path and durable admission store; do not count test-fixture or manual Web response hashes as provider-origin proof.
 
 Run only the single user-selected company. Do not add CSI800/industry screening, broad dataset construction or auto-trading.
 
