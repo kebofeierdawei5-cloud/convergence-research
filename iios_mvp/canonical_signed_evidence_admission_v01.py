@@ -441,6 +441,7 @@ def verify_signed_admission(
     registry = _load_registry(signer_registry_path)
     seen_keys: set[str] = set()
     covered_roles: set[str] = set()
+    roles_by_signer: dict[str, set[str]] = {}
     signature_results = []
     for signature in signatures:
         if not isinstance(signature, Mapping):
@@ -451,6 +452,9 @@ def verify_signed_admission(
             raise SignedAdmissionError("SIGNER_DUPLICATE_OR_INVALID")
         seen_keys.add(key_id)
         signer, public_raw = _find_trusted_signer(registry, key_id, str(signed_at), str(payload.get("case_id")))
+        if decision == "ADMIT" and rights.get("expires_at"):
+            if _timestamp(str(signed_at), "SIGNED_AT") > _timestamp(rights.get("expires_at"), "RIGHTS_EXPIRES_AT"):
+                raise SignedAdmissionError("RIGHTS_PERMISSION_EXPIRED_AT_SIGNATURE")
         try:
             signature_raw = base64.b64decode(signature.get("signature_b64"), validate=True)
         except (TypeError, ValueError) as exc:
@@ -461,9 +465,16 @@ def verify_signed_admission(
             )
         except Exception as exc:
             raise SignedAdmissionError("SIGNATURE_VERIFICATION_FAILED:" + key_id) from exc
-        covered_roles.update(str(role) for role in signer.get("roles", []))
+        signer_roles = {str(role) for role in signer.get("roles", [])}
+        roles_by_signer[key_id] = signer_roles
+        covered_roles.update(signer_roles)
         signature_results.append({"signer_key_id": key_id, "verified": True})
     missing_roles = sorted(set(required_roles) - covered_roles)
+    if "INDEPENDENT_REVIEWER" in required_roles:
+        admission_signers = {key for key, roles in roles_by_signer.items() if "EVIDENCE_ADMISSION_SIGNER" in roles}
+        independent_reviewers = {key for key, roles in roles_by_signer.items() if "INDEPENDENT_REVIEWER" in roles}
+        if not admission_signers or not independent_reviewers or admission_signers.intersection(independent_reviewers):
+            missing_roles = sorted(set(missing_roles) | {"INDEPENDENT_REVIEWER_DISTINCT_SIGNER"})
     if decision == "ADMIT" and missing_roles:
         status = "SIGNATURES_PENDING"
     elif decision == "ADMIT":
