@@ -32,7 +32,11 @@ RULE_TITLE = "上海证券交易所交易规则（2026年修订）"
 RULE_DOCUMENT_NO = "上证发〔2026〕41号"
 RULE_PUBLISHED_ON = "2026-04-24"
 RULE_EFFECTIVE_ON = "2026-07-06"
-RULE_RAW_BYTES_LIMITATION = (\n    "Official page content and rule clauses were reviewed; the HTML/DOCX source bytes were "\n    "not materialized into the private evidence store in this run, so no rule-byte SHA-256 is claimed."\n)\nRULE_SECTIONS = {
+RULE_RAW_BYTES_LIMITATION = (
+    "Official page content and rule clauses were reviewed; the HTML/DOCX source bytes were "
+    "not materialized into the private evidence store in this run, so no rule-byte SHA-256 is claimed."
+)
+RULE_SECTIONS = {
     "3.7.2": "盘后固定价格交易以当日收盘价成交，交易时段为15:05至15:30。",
     "3.7.9": "15:05至15:30盘后固定价格交易阶段纳入即时行情，行情内容包括收盘价。",
     "5.1.1": "上交所每个交易日实时发布证券交易即时行情。",
