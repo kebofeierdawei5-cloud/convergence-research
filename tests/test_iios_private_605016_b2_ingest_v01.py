@@ -588,7 +588,7 @@ def test_artifact_api_transport_falls_back_to_curl_without_token_in_process_args
         captured["input"] = kwargs["input"]
         return MODULE.subprocess.CompletedProcess(
             args=args, returncode=0,
-            stdout="HTTP/2 302\\r\\nlocation: https://artifact-storage.example/signed-object\\r\\n\\r\\n",
+            stdout="HTTP/2 302\r\nlocation: https://artifact-storage.example/signed-object\r\n\r\n",
             stderr="",
         )
 
@@ -638,10 +638,10 @@ def test_artifact_api_response_maps_access_and_retention_failures() -> None:
 
 def test_curl_header_parser_uses_final_response_block() -> None:
     headers = (
-        "HTTP/1.1 200 Connection established\\r\\n\\r\\n"
-        "HTTP/2 302\\r\\n"
-        "location: https://artifact-storage.example/signed-object\\r\\n"
-        "content-length: 0\\r\\n\\r\\n"
+        "HTTP/1.1 200 Connection established\r\n\r\n"
+        "HTTP/2 302\r\n"
+        "location: https://artifact-storage.example/signed-object\r\n"
+        "content-length: 0\r\n\r\n"
     )
     status, location = MODULE._parse_curl_dumped_headers(headers)
     assert status == 302
