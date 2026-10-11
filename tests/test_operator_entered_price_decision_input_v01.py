@@ -27,7 +27,7 @@ def payload(**overrides):
         "price": "26.58",
         "adjustment_semantics": "UNADJUSTED_CLOSE",
         "quote_timestamp": "2026-10-09T15:00:00+08:00",
-        "valid_until": "2026-10-12T18:00:00+08:00",
+        "valid_until": "2026-10-13T18:00:00+08:00",
         "operator_confirmed": True,
         "source_claim": None,
     }
@@ -179,6 +179,165 @@ def test_replay_rejects_open_permissions_on_private_input(tmp_path):
     os.chmod(price_path, 0o644)
     with pytest.raises(price_input.OperatorEnteredPriceError, match="PRICE_INPUT_FILE_PERMISSIONS_TOO_OPEN"):
         price_input.replay_bundle(result["bundle_path"])
+
+
+def operator_reference(root: Path):
+    bundle = price_input.create_bundle(
+        payload(),
+        root,
+        entered_at=ENTERED,
+        decision_cutoff_at=CUTOFF,
+    )
+    return {
+        "bundle_id": bundle["bundle_id"],
+        "record_sha256": bundle["record_sha256"],
+        "receipt_sha256": bundle["receipt_sha256"],
+    }
+
+
+def test_operator_price_resolver_binds_exact_private_bundle_and_cutoff(tmp_path):
+    root = private_root(tmp_path / "private")
+    reference = operator_reference(root)
+    resolver = price_input.FileSystemOperatorPriceInputResolver(root)
+    cutoff = __import__("datetime").date(2026, 10, 12)
+    observation = resolver.build_current_price_observation(
+        reference,
+        case_id="RC-CN-A-002001-20261012",
+        market="CN-A",
+        symbol="002001",
+        currency="CNY",
+        cutoff_date=cutoff,
+        mie_reference_price_observation_id="official-price-ref-20261009",
+    )
+    bound = resolver.resolve_operator_price_input(
+        reference,
+        case_id="RC-CN-A-002001-20261012",
+        market="CN-A",
+        symbol="002001",
+        currency="CNY",
+        cutoff_date=cutoff,
+        current_price_observation=observation,
+    )
+    assert bound["status"] == "OPERATOR_PRICE_INPUT_BOUND"
+    assert bound["bundle_id"] == reference["bundle_id"]
+    assert bound["record_sha256"] == reference["record_sha256"]
+    assert bound["receipt_sha256"] == reference["receipt_sha256"]
+    assert bound["price"] == "26.58"
+    assert bound["record_class"] == "OPERATOR_ATTESTED_MARKET_DATA"
+    assert bound["formal_evidence_pit_admission"] is False
+    assert bound["source_origin_verified"] is False
+    assert bound["source_use_rights_verified"] is False
+    assert observation["price_observation_id"] == reference["bundle_id"]
+    assert observation["adjustment_semantics"] == "UNADJUSTED"
+    assert observation["operator_input_adjustment_semantics"] == "UNADJUSTED_CLOSE"
+    assert "price_observation_admission_hash" not in observation
+
+
+def test_operator_price_resolver_allows_intraday_entry_on_cutoff_date(tmp_path):
+    root = private_root(tmp_path / "private")
+    reference = operator_reference(root)
+    resolver = price_input.FileSystemOperatorPriceInputResolver(root)
+    result = resolver.resolve_operator_price_input(
+        reference,
+        case_id="RC-CN-A-002001-20261012",
+        market="CN-A",
+        symbol="002001",
+        currency="CNY",
+        cutoff_date=__import__("datetime").date(2026, 10, 12),
+    )
+    assert result["status"] == "OPERATOR_PRICE_INPUT_BOUND"
+
+
+def test_operator_price_resolver_blocks_input_entered_after_case_cutoff_date(tmp_path):
+    root = private_root(tmp_path / "private")
+    reference = operator_reference(root)
+    resolver = price_input.FileSystemOperatorPriceInputResolver(root)
+    with pytest.raises(
+        price_input.OperatorEnteredPriceError,
+        match="OPERATOR_PRICE_ENTERED_AFTER_CUTOFF_DATE",
+    ):
+        resolver.resolve_operator_price_input(
+            reference,
+            case_id="RC-CN-A-002001-20261012",
+            market="CN-A",
+            symbol="002001",
+            currency="CNY",
+            cutoff_date=__import__("datetime").date(2026, 10, 10),
+        )
+
+
+def test_operator_price_resolver_rejects_wrong_case_symbol_and_ref_hash(tmp_path):
+    root = private_root(tmp_path / "private")
+    reference = operator_reference(root)
+    resolver = price_input.FileSystemOperatorPriceInputResolver(root)
+    with pytest.raises(price_input.OperatorEnteredPriceError, match="OPERATOR_PRICE_CASE_ID_MISMATCH"):
+        resolver.resolve_operator_price_input(
+            reference, case_id="WRONG-CASE", market="CN-A", symbol="002001",
+            currency="CNY", cutoff_date=__import__("datetime").date(2026, 10, 12),
+        )
+    with pytest.raises(price_input.OperatorEnteredPriceError, match="OPERATOR_PRICE_INSTRUMENT_MISMATCH"):
+        resolver.resolve_operator_price_input(
+            reference, case_id="RC-CN-A-002001-20261012", market="CN-A", symbol="002353",
+            currency="CNY", cutoff_date=__import__("datetime").date(2026, 10, 12),
+        )
+    changed = dict(reference)
+    changed["record_sha256"] = "0" * 64
+    with pytest.raises(price_input.OperatorEnteredPriceError, match="OPERATOR_PRICE_BUNDLE_ID_HASH_MISMATCH"):
+        resolver.resolve_operator_price_input(
+            changed, case_id="RC-CN-A-002001-20261012", market="CN-A", symbol="002001",
+            currency="CNY", cutoff_date=__import__("datetime").date(2026, 10, 12),
+        )
+
+
+def test_operator_price_resolver_rejects_forged_canonical_price_flags(tmp_path):
+    root = private_root(tmp_path / "private")
+    reference = operator_reference(root)
+    resolver = price_input.FileSystemOperatorPriceInputResolver(root)
+    observation = resolver.build_current_price_observation(
+        reference,
+        case_id="RC-CN-A-002001-20261012",
+        market="CN-A",
+        symbol="002001",
+        currency="CNY",
+        cutoff_date=__import__("datetime").date(2026, 10, 12),
+        mie_reference_price_observation_id="official-price-ref-20261009",
+    )
+    observation["price_observation_admission_hash"] = "a" * 64
+    with pytest.raises(
+        price_input.OperatorEnteredPriceError,
+        match="OPERATOR_PRICE_MUST_NOT_CLAIM_CANONICAL_ADMISSION",
+    ):
+        resolver.resolve_operator_price_input(
+            reference, case_id="RC-CN-A-002001-20261012", market="CN-A",
+            symbol="002001", currency="CNY",
+            cutoff_date=__import__("datetime").date(2026, 10, 12),
+            current_price_observation=observation,
+        )
+
+
+def test_operator_price_resolver_never_marks_unverified_mie_reference_as_price_evidence(tmp_path):
+    root = private_root(tmp_path / "private")
+    reference = operator_reference(root)
+    resolver = price_input.FileSystemOperatorPriceInputResolver(root)
+    observation = resolver.build_current_price_observation(
+        reference,
+        case_id="RC-CN-A-002001-20261012",
+        market="CN-A",
+        symbol="002001",
+        currency="CNY",
+        cutoff_date=__import__("datetime").date(2026, 10, 12),
+        mie_reference_price_observation_id="caller-provided-ref",
+    )
+    bound = resolver.resolve_operator_price_input(
+        reference, case_id="RC-CN-A-002001-20261012", market="CN-A",
+        symbol="002001", currency="CNY",
+        cutoff_date=__import__("datetime").date(2026, 10, 12),
+        current_price_observation=observation,
+    )
+    assert bound["source_origin_verified"] is False
+    assert bound["source_vintage_verified"] is False
+    assert bound["formal_evidence_pit_admission"] is False
+    assert bound["decision_chain_bound"] is False
 
 
 def test_missing_confirmation_fails_closed(tmp_path):

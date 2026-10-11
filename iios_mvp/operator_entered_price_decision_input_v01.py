@@ -8,7 +8,7 @@ source verification, formal Evidence/PIT admission, or Decision-chain binding.
 
 import argparse
 import errno
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
@@ -332,6 +332,7 @@ def create_bundle(payload: Mapping[str, Any], output_root: str | Path, *, entere
         "bundle_id": bundle_id,
         "bundle_path": str(bundle_dir),
         "record_sha256": digest,
+        "receipt_sha256": _sha(receipt_bytes),
         "quote_values_redacted": True,
         "formal_evidence_pit_admission": False,
         "decision_chain_bound": False,
@@ -407,6 +408,241 @@ def replay_bundle(bundle_path: str | Path) -> dict[str, Any]:
         "decision_chain_bound": False,
         "formal_decision_authority": False,
     }
+
+
+class FileSystemOperatorPriceInputResolver:
+    """Validate local operator price bundles without converting them into market evidence.
+
+    The resolver is intentionally separate from CanonicalCurrentPriceResolver.
+    It verifies private bytes, explicit operator confirmation, case identity,
+    and that the value was entered before the Shanghai start-of-day cutoff.
+    It never sets source-origin/vintage/rights or formal Evidence/PIT to true.
+    """
+
+    def __init__(self, root: str | Path):
+        self.root = Path(root).expanduser()
+
+    def _root(self) -> Path:
+        if self.root.is_symlink():
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_ROOT_MUST_NOT_BE_SYMLINK")
+        root = self.root.resolve(strict=True)
+        repo = REPOSITORY_ROOT.resolve(strict=True)
+        if root == repo or repo in root.parents:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_ROOT_MUST_BE_OUTSIDE_PUBLIC_REPOSITORY")
+        if not root.is_dir():
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_ROOT_MUST_BE_DIRECTORY")
+        metadata = root.stat()
+        if hasattr(os, "getuid") and metadata.st_uid != os.getuid():
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_ROOT_OWNER_MISMATCH")
+        if stat.S_IMODE(metadata.st_mode) & 0o077:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_ROOT_PERMISSIONS_TOO_OPEN")
+        return root
+
+    @staticmethod
+    def _validate_reference(reference: Any) -> dict[str, str]:
+        if not isinstance(reference, Mapping):
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_INPUT_REF_MUST_BE_OBJECT")
+        required = {"bundle_id", "record_sha256", "receipt_sha256"}
+        if set(reference) != required:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_INPUT_REF_FIELDS_INVALID")
+        bundle_id = reference.get("bundle_id")
+        record_sha = reference.get("record_sha256")
+        receipt_sha = reference.get("receipt_sha256")
+        if not isinstance(bundle_id, str) or not re.fullmatch(r"operator-price-[0-9a-f]{24}", bundle_id):
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_BUNDLE_ID_INVALID")
+        if not isinstance(record_sha, str) or not _is_sha256(record_sha):
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_RECORD_SHA256_INVALID")
+        if not isinstance(receipt_sha, str) or not _is_sha256(receipt_sha):
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_RECEIPT_SHA256_INVALID")
+        if bundle_id != f"operator-price-{record_sha[:24]}":
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_BUNDLE_ID_HASH_MISMATCH")
+        return {"bundle_id": bundle_id, "record_sha256": record_sha, "receipt_sha256": receipt_sha}
+
+    def resolve_operator_price_input(
+        self,
+        reference: Mapping[str, Any],
+        *,
+        case_id: str,
+        market: str,
+        symbol: str,
+        currency: str,
+        cutoff_date: date,
+        current_price_observation: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        ref = self._validate_reference(reference)
+        root = self._root()
+        bundle_dir = root / ref["bundle_id"]
+        if bundle_dir.is_symlink() or not bundle_dir.is_dir():
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_BUNDLE_NOT_FOUND_OR_UNSAFE")
+
+        replay = replay_bundle(bundle_dir)
+        record, record_raw = _read_json(bundle_dir / "price-input.json")
+        receipt, receipt_raw = _read_json(bundle_dir / "receipt.json")
+        record_sha = _sha(record_raw)
+        receipt_sha = _sha(receipt_raw)
+        if record_sha != ref["record_sha256"]:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_RECORD_SHA256_MISMATCH")
+        if receipt_sha != ref["receipt_sha256"]:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_RECEIPT_SHA256_MISMATCH")
+        if replay.get("record_sha256") != record_sha or replay.get("bundle_id") != ref["bundle_id"]:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_REPLAY_BINDING_MISMATCH")
+
+        if record.get("base_case_id") != case_id:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_CASE_ID_MISMATCH")
+        if record.get("market") != market or record.get("symbol") != str(symbol):
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_INSTRUMENT_MISMATCH")
+        if record.get("currency") != currency:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_CURRENCY_MISMATCH")
+        if record.get("operator_confirmed") is not True:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_CONFIRMATION_REQUIRED")
+        if record.get("record_class") != "OPERATOR_ATTESTED_MARKET_DATA":
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_CLASS_INVALID")
+
+        entered_at = _parse_timestamp(record.get("entered_at"), "ENTERED_AT")
+        recorded_decision_cutoff = _parse_timestamp(
+            record.get("decision_cutoff_at"), "DECISION_CUTOFF_AT"
+        )
+        valid_until = _parse_timestamp(record.get("valid_until"), "VALID_UNTIL")
+        observation_date = _parse_date(record.get("observation_date"), "OBSERVATION_DATE")
+        if observation_date > cutoff_date:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_OBSERVATION_AFTER_CUTOFF")
+        # The Investment Core contract has a date-level PIT cutoff (known_at.date
+        # <= cutoff_date); do not reinterpret it as midnight and wrongly reject
+        # an input entered during that same date.
+        if entered_at.date() > cutoff_date or recorded_decision_cutoff.date() > cutoff_date:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_ENTERED_AFTER_CUTOFF_DATE")
+        if recorded_decision_cutoff <= entered_at:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_RECORDED_CUTOFF_NOT_AFTER_ENTRY")
+        # A date-level cutoff has no clock time. Require the input to remain
+        # valid beyond the whole cutoff date rather than guessing an intraday
+        # execution time.
+        if valid_until.date() <= cutoff_date:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_NOT_VALID_THROUGH_CUTOFF_DATE")
+        quote_ts = (
+            _parse_timestamp(record["quote_timestamp"], "QUOTE_TIMESTAMP")
+            if record.get("quote_timestamp") is not None else None
+        )
+        if quote_ts is not None and quote_ts.date() > cutoff_date:
+            raise OperatorEnteredPriceError("OPERATOR_PRICE_QUOTE_TIMESTAMP_AFTER_CUTOFF_DATE")
+
+        if current_price_observation is not None:
+            obs = current_price_observation
+            if obs.get("price_input_class") != "OPERATOR_ATTESTED_MARKET_DATA":
+                raise OperatorEnteredPriceError("OPERATOR_PRICE_INPUT_CLASS_MISMATCH")
+            if obs.get("price_observation_id") != ref["bundle_id"]:
+                raise OperatorEnteredPriceError("OPERATOR_PRICE_OBSERVATION_ID_MISMATCH")
+            if obs.get("operator_price_input_ref") != ref:
+                raise OperatorEnteredPriceError("OPERATOR_PRICE_INPUT_REF_MISMATCH")
+            if _parse_price(obs.get("price")) != _parse_price(record.get("price")):
+                raise OperatorEnteredPriceError("OPERATOR_PRICE_VALUE_MISMATCH")
+            if obs.get("currency") != record.get("currency") or obs.get("operator_input_adjustment_semantics", obs.get("adjustment_semantics")) != record.get("adjustment_semantics"):
+                raise OperatorEnteredPriceError("OPERATOR_PRICE_SEMANTICS_MISMATCH")
+            expected_observed_at = (
+                quote_ts.isoformat()
+                if quote_ts is not None
+                else datetime.combine(observation_date, time.min, tzinfo=SHANGHAI).isoformat()
+            )
+            if _parse_timestamp(obs.get("observed_at"), "CURRENT_PRICE_OBSERVED_AT") != _parse_timestamp(expected_observed_at, "EXPECTED_OBSERVED_AT"):
+                raise OperatorEnteredPriceError("OPERATOR_PRICE_OBSERVED_AT_MISMATCH")
+            if _parse_timestamp(obs.get("known_at"), "CURRENT_PRICE_KNOWN_AT") != entered_at:
+                raise OperatorEnteredPriceError("OPERATOR_PRICE_KNOWN_AT_MISMATCH")
+            if obs.get("source") != "OPERATOR_ATTESTED_MARKET_DATA":
+                raise OperatorEnteredPriceError("OPERATOR_PRICE_SOURCE_LABEL_MISMATCH")
+            if "price_observation_admission_hash" in obs and obs.get("price_observation_admission_hash") not in (None, ""):
+                raise OperatorEnteredPriceError("OPERATOR_PRICE_MUST_NOT_CLAIM_CANONICAL_ADMISSION")
+            for flag in ("source_origin_verified", "source_vintage_verified", "source_use_rights_verified", "canonical_price_admission", "formal_evidence_pit_admission"):
+                if obs.get(flag, False) is not False:
+                    raise OperatorEnteredPriceError("OPERATOR_PRICE_PROVENANCE_FLAG_ESCALATED")
+
+        return {
+            "status": "OPERATOR_PRICE_INPUT_BOUND",
+            "record_class": "OPERATOR_ATTESTED_MARKET_DATA",
+            "bundle_id": ref["bundle_id"],
+            "record_sha256": record_sha,
+            "receipt_sha256": receipt_sha,
+            "case_id": case_id,
+            "market": market,
+            "symbol": str(symbol),
+            "currency": currency,
+            "exchange": record["exchange"],
+            "price": str(_parse_price(record["price"])),
+            "adjustment_semantics": record["adjustment_semantics"],
+            "observation_date": observation_date.isoformat(),
+            "quote_timestamp": quote_ts.isoformat() if quote_ts is not None else None,
+            "observation_time_precision": "SOURCE_TIME_OPERATOR_CLAIM" if quote_ts is not None else "DATE_ONLY",
+            "entered_at": entered_at.isoformat(),
+            "valid_until": valid_until.isoformat(),
+            "source_claim_present": record.get("source_claim") is not None,
+            "source_claim_verified": False,
+            "source_origin_verified": False,
+            "source_vintage_verified": False,
+            "source_use_rights_verified": False,
+            "raw_source_bytes_captured": False,
+            "canonical_exchange_price_admission": False,
+            "formal_evidence_pit_admission": False,
+            "decision_chain_bound": False,
+            "formal_decision_authority": False,
+            "automatic_execution_authority": False,
+        }
+
+    def build_current_price_observation(
+        self,
+        reference: Mapping[str, Any],
+        *,
+        case_id: str,
+        market: str,
+        symbol: str,
+        currency: str,
+        cutoff_date: date,
+        mie_reference_price_observation_id: str,
+    ) -> dict[str, Any]:
+        if not isinstance(mie_reference_price_observation_id, str) or not mie_reference_price_observation_id.strip():
+            raise OperatorEnteredPriceError("MIE_REFERENCE_PRICE_OBSERVATION_ID_REQUIRED")
+        bound = self.resolve_operator_price_input(
+            reference,
+            case_id=case_id,
+            market=market,
+            symbol=symbol,
+            currency=currency,
+            cutoff_date=cutoff_date,
+        )
+        observed_at = (
+            bound["quote_timestamp"]
+            if bound["quote_timestamp"] is not None
+            else datetime.combine(
+                _parse_date(bound["observation_date"], "OBSERVATION_DATE"),
+                time.min,
+                tzinfo=SHANGHAI,
+            ).isoformat()
+        )
+        return {
+            "price": bound["price"],
+            "price_observation_id": bound["bundle_id"],
+            "currency": currency,
+            "observed_at": observed_at,
+            "known_at": bound["entered_at"],
+            "source": "OPERATOR_ATTESTED_MARKET_DATA",
+            # Normalize the no-adjustment concept to the canonical MIE vocabulary.
+            # Preserve the original operator-input label separately for replay/audit.
+            "adjustment_semantics": "UNADJUSTED",
+            "operator_input_adjustment_semantics": bound["adjustment_semantics"],
+            "exchange": bound["exchange"],
+            "observation_date": bound["observation_date"],
+            "observation_time_precision": bound["observation_time_precision"],
+            "price_input_class": "OPERATOR_ATTESTED_MARKET_DATA",
+            "operator_price_input_ref": self._validate_reference(reference),
+            "mie_reference_price_observation_id": mie_reference_price_observation_id,
+            "source_claim_verified": False,
+            "source_origin_verified": False,
+            "source_vintage_verified": False,
+            "source_use_rights_verified": False,
+            "canonical_price_admission": False,
+            "formal_evidence_pit_admission": False,
+        }
+
+
+def _is_sha256(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(ch in "0123456789abcdef" for ch in value)
 
 
 def _prompt_payload() -> dict[str, Any]:

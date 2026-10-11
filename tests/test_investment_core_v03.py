@@ -15,6 +15,7 @@ from iios_mvp.canonical_investment_admission_v01 import InMemoryCanonicalInvestm
 from iios_mvp.forecast_valuation_return_lineage_v01 import InMemoryCanonicalValuationOutputResolver
 from iios_mvp.market_observation_admission import AdmissionStatus, TemporalProvenance, VerifiedMarketEvidence, admit_market_valuation_observation
 from iios_mvp.engine import decide, replay, run_case, validate_case
+from iios_mvp import operator_entered_price_decision_input_v01 as operator_price_input
 from iios_mvp.market_implied_expectation import (
     CandidateCoverageAssessment,
     CandidateCoverageState,
@@ -318,6 +319,74 @@ def _rebind_return_lineage(c: dict) -> dict:
         valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
     )
     return rebound
+
+
+def test_v03_operator_entered_price_is_case_bound_but_not_formal_market_evidence(tmp_path):
+    c = case(price="100", price_observation_id="price-1")
+    cutoff = date(2026, 10, 4)
+    price_root = tmp_path / "operator-price"
+    price_root.mkdir(mode=0o700)
+    price_root.chmod(0o700)
+    entered_at = datetime.fromisoformat("2026-10-04T10:00:00+08:00")
+    decision_cutoff_at = datetime.fromisoformat("2026-10-04T10:01:00+08:00")
+    bundle = operator_price_input.create_bundle(
+        {
+            "schema_version": operator_price_input.SCHEMA,
+            "base_case_id": "V03-001",
+            "market": "CN-A",
+            "symbol": "300750",
+            "exchange": "SZSE",
+            "currency": "CNY",
+            "observation_date": "2026-10-02",
+            "price": "80",
+            "adjustment_semantics": "UNADJUSTED_CLOSE",
+            "quote_timestamp": "2026-10-02T15:00:00+08:00",
+            "valid_until": "2026-10-05T18:00:00+08:00",
+            "operator_confirmed": True,
+            "source_claim": None,
+        },
+        price_root,
+        entered_at=entered_at,
+        decision_cutoff_at=decision_cutoff_at,
+    )
+    reference = {
+        "bundle_id": bundle["bundle_id"],
+        "record_sha256": bundle["record_sha256"],
+        "receipt_sha256": bundle["receipt_sha256"],
+    }
+    resolver = operator_price_input.FileSystemOperatorPriceInputResolver(price_root)
+    observation = resolver.build_current_price_observation(
+        reference,
+        case_id="V03-001",
+        market="CN-A",
+        symbol="300750",
+        currency="CNY",
+        cutoff_date=cutoff,
+        mie_reference_price_observation_id="price-1",
+    )
+    c["current_price_observation"] = observation
+    c["expectation_gap"]["price"] = "80"
+    c["expectation_gap"]["price_observation_id"] = observation["price_observation_id"]
+    c["return_gate"]["entry_price"] = "80"
+
+    result = decide(
+        c,
+        evidence_root_resolver=EVIDENCE_ROOT_REGISTRY,
+        current_price_resolver=CURRENT_PRICE_REGISTRY,
+        independent_forecast_resolver=INDEPENDENT_FORECAST_REGISTRY,
+        upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
+        valuation_output_resolver=VALUATION_OUTPUT_RESOLVER,
+        operator_price_input_resolver=resolver,
+    )
+    assert result["validation"]["status"] == "PASS"
+    assert result["decision"]["current_price"] == "80"
+    assert result["decision"]["current_price_input_class"] == "OPERATOR_ATTESTED_MARKET_DATA"
+    assert result["decision"]["current_price_assurance"] == "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
+    assert result["decision"]["auto_execution"] is False
+    assert result["decision"]["human_approval_required"] is True
+    assert result["decision"]["operator_price_input_ref"]["record_sha256"] == reference["record_sha256"]
+    assert result["decision"]["operator_price_input_ref"]["receipt_sha256"] == reference["receipt_sha256"]
+    assert result["decision"]["mie_reference_price_observation_id"] == "price-1"
 
 
 def test_v03_risk_portfolio_contract_is_emitted_and_explicit():

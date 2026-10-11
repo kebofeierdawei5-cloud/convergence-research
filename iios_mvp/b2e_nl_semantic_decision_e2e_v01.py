@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from copy import deepcopy
 
 from dataclasses import dataclass
 from typing import Any, Mapping
@@ -126,6 +127,7 @@ def _transition_pre_decision(
     independent_forecast_resolver: Any,
     valuation_output_resolver: Any,
     created_at: str,
+    operator_price_input_binding: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     return_gate = case.get("return_gate")
     if not isinstance(return_gate, Mapping):
@@ -214,16 +216,29 @@ def _transition_pre_decision(
         producer_version=FORECAST_VALUATION_RETURN_LINEAGE_VERSION,
         created_at=created_at,
     )
+    operator_refs: tuple[str, ...] = ()
+    operator_hashes: tuple[str, ...] = ()
+    if operator_price_input_binding is not None:
+        operator_refs = (
+            f"operator-price-input-record:{operator_price_input_binding['bundle_id']}",
+            f"operator-price-input-receipt:{operator_price_input_binding['bundle_id']}",
+        )
+        operator_hashes = (
+            str(operator_price_input_binding["record_sha256"]),
+            str(operator_price_input_binding["receipt_sha256"]),
+        )
     orchestrator.transition(
         run_id,
         Stage.DECISION_PENDING,
         input_refs=(
             forecast_ref["forecast_id"],
             valuation_ref["admission_id"],
+            *operator_refs,
         ),
         input_hashes=(
             forecast_ref["admission_record_hash"],
             valuation_ref["admission_record_hash"],
+            *operator_hashes,
         ),
         created_at=created_at,
     )
@@ -280,6 +295,8 @@ def run_b2e_conformance(
     independent_forecast_resolver: Any,
     upstream_authority_resolver: Any,
     valuation_output_resolver: Any,
+    operator_price_input_resolver: Any | None = None,
+    operator_price_input_ref: Mapping[str, Any] | None = None,
     run_root: str | None = None,
     evidence_manifest: Mapping[str, Any] | None = None,
     evidence_root: str | None = None,
@@ -298,6 +315,73 @@ def run_b2e_conformance(
         raw_request=raw_request,
         created_at=created_at,
     )
+
+    case = deepcopy(dict(case))
+    operator_price_binding: dict[str, Any] | None = None
+    current_price_observation = case.get("current_price_observation")
+
+    # Preferred path: the private request bundle carries only the hashed
+    # bundle reference. Materialize the value from the local private store;
+    # never require the price to be copied into a public case/example file.
+    if operator_price_input_ref is not None:
+        if operator_price_input_resolver is None:
+            raise B2EE2EError("BLOCKED: operator price input reference supplied without trusted resolver")
+        if not isinstance(current_price_observation, Mapping):
+            raise B2EE2EError("BLOCKED: base case current_price_observation is required for MIE binding")
+        existing_class = current_price_observation.get("price_input_class", "CANONICAL_ADMITTED_MARKET_DATA")
+        if existing_class == "OPERATOR_ATTESTED_MARKET_DATA":
+            if current_price_observation.get("operator_price_input_ref") != dict(operator_price_input_ref):
+                raise B2EE2EError("BLOCKED: top-level operator price reference conflicts with case input")
+        elif existing_class == "CANONICAL_ADMITTED_MARKET_DATA":
+            try:
+                base_observation_id = str(current_price_observation.get("price_observation_id", "")).strip()
+                if not base_observation_id:
+                    raise ValueError("base case lacks a source-qualified MIE reference price ID")
+                current_price_observation = operator_price_input_resolver.build_current_price_observation(
+                    operator_price_input_ref,
+                    case_id=str(case["case_id"]),
+                    market=str(case["market"]),
+                    symbol=str(case["symbol"]),
+                    currency=str(current_price_observation.get("currency", "")),
+                    cutoff_date=__import__("datetime").date.fromisoformat(str(case["cutoff_date"])),
+                    mie_reference_price_observation_id=base_observation_id,
+                )
+                case["current_price_observation"] = current_price_observation
+            except (KeyError, TypeError, ValueError, OSError) as exc:
+                raise B2EE2EError(f"BLOCKED: cannot materialize private operator price input: {exc}") from exc
+        else:
+            raise B2EE2EError("BLOCKED: unsupported existing current price input class")
+
+    if isinstance(current_price_observation, Mapping) and current_price_observation.get("price_input_class") == "OPERATOR_ATTESTED_MARKET_DATA":
+        if operator_price_input_resolver is None:
+            raise B2EE2EError("BLOCKED: trusted operator price input resolver is not registered")
+        try:
+            operator_price_binding = operator_price_input_resolver.resolve_operator_price_input(
+                current_price_observation.get("operator_price_input_ref"),
+                case_id=str(case["case_id"]),
+                market=str(case["market"]),
+                symbol=str(case["symbol"]),
+                currency=str(current_price_observation.get("currency", "")),
+                cutoff_date=__import__("datetime").date.fromisoformat(str(case["cutoff_date"])),
+                current_price_observation=current_price_observation,
+            )
+        except (KeyError, TypeError, ValueError, OSError) as exc:
+            raise B2EE2EError(f"BLOCKED: operator price input binding failed: {exc}") from exc
+
+        # Synchronize the price-sensitive decision fields from the privately
+        # resolved record. These fields are derived only after record/receipt
+        # SHA verification and must never be silently left at a stale quote.
+        bound_price = str(operator_price_binding["price"])
+        bound_id = str(operator_price_binding["bundle_id"])
+        gap = case.get("expectation_gap")
+        if isinstance(gap, dict):
+            gap["price"] = bound_price
+            gap["price_observation_id"] = bound_id
+        return_gate = case.get("return_gate")
+        if isinstance(return_gate, dict):
+            return_gate["entry_price"] = bound_price
+    elif isinstance(current_price_observation, Mapping) and current_price_observation.get("price_input_class") not in (None, "CANONICAL_ADMITTED_MARKET_DATA"):
+        raise B2EE2EError("BLOCKED: unsupported current price input class")
 
     if sha256(admitted.research_case) != admitted.case_hash:
         if run_root is not None:
@@ -443,6 +527,7 @@ def run_b2e_conformance(
         independent_forecast_resolver=independent_forecast_resolver,
         valuation_output_resolver=valuation_output_resolver,
         created_at=created_at,
+        operator_price_input_binding=operator_price_binding,
     )
 
     canonical_decision = decide_v03(
@@ -451,6 +536,7 @@ def run_b2e_conformance(
         independent_forecast_resolver=independent_forecast_resolver,
         upstream_authority_resolver=upstream_authority_resolver,
         valuation_output_resolver=valuation_output_resolver,
+        operator_price_input_resolver=operator_price_input_resolver,
     )
     snapshot = _build_snapshot(case=projected_case, decision=canonical_decision)
     decision_admission = admit_canonical_decision(
@@ -460,6 +546,7 @@ def run_b2e_conformance(
         independent_forecast_resolver=independent_forecast_resolver,
         upstream_authority_resolver=upstream_authority_resolver,
         valuation_output_resolver=valuation_output_resolver,
+        operator_price_input_resolver=operator_price_input_resolver,
     )
 
     return_metrics_hash = sha256(canonical_decision.get("return_metrics") or {})

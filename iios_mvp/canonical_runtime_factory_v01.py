@@ -23,6 +23,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from .canonical_current_price import FileSystemCanonicalCurrentPriceRegistry
+from .operator_entered_price_decision_input_v01 import FileSystemOperatorPriceInputResolver
 from .canonical_independent_forecast import FileSystemCanonicalIndependentForecastRegistry
 from .canonical_investment_admission_v01 import (
     ADMITTED_STATUS,
@@ -669,6 +670,9 @@ def build_canonical_runtime(
         upstream_authority_resolver=upstream_resolver,
         valuation_output_resolver=FileSystemCanonicalValuationOutputResolver(
             admission_root, admission_resolver=upstream_resolver
+        ),
+        operator_price_input_resolver=FileSystemOperatorPriceInputResolver(
+            Path(str(values.get("IIOS_OPERATOR_PRICE_INPUT_ROOT", "~/.iios-private/operator-entered-prices"))).expanduser()
         ),
     )
     return validate_canonical_runtime_bindings(runtime)

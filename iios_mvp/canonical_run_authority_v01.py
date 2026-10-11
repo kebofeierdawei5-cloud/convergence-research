@@ -481,6 +481,46 @@ def _require_content_addressed_artifact(
     return path
 
 
+def _validate_decision_pending_input_refs(decision_pending: Mapping[str, Any]) -> tuple[list[str], list[str]]:
+    """Validate legacy Forecast/Valuation inputs plus optional paired operator-price hashes."""
+    refs = decision_pending.get("input_refs")
+    hashes = decision_pending.get("input_hashes")
+    if not isinstance(refs, list) or not isinstance(hashes, list) or len(refs) != len(hashes):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: DECISION_PENDING refs/hashes are not positionally bound"
+        )
+    if len(refs) < 2 or any(not isinstance(item, str) or not item for item in refs):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: DECISION_PENDING omits required Forecast/Valuation input refs"
+        )
+    if any(not is_sha256(item) for item in hashes):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: DECISION_PENDING input hashes must be SHA-256"
+        )
+    extras = refs[2:]
+    if not extras:
+        return refs, hashes
+    if len(extras) != 2 or len(hashes[2:]) != 2:
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: DECISION_PENDING permits only a paired operator-price record/receipt extension"
+        )
+    record_match = re.fullmatch(
+        r"operator-price-input-record:(operator-price-[0-9a-f]{24})", extras[0]
+    )
+    receipt_match = re.fullmatch(
+        r"operator-price-input-receipt:(operator-price-[0-9a-f]{24})", extras[1]
+    )
+    if (
+        record_match is None
+        or receipt_match is None
+        or record_match.group(1) != receipt_match.group(1)
+    ):
+        raise CanonicalRunAuthorizationError(
+            "BLOCKED: DECISION_PENDING operator-price refs must be a matched record/receipt pair"
+        )
+    return refs, hashes
+
+
 def _validate_canonical_upstream_admissions(
     root: str | Path,
     record: Mapping[str, Any],
@@ -822,9 +862,10 @@ def _validate_canonical_upstream_admissions(
     _require_content_addressed_artifact(root, suffix="valuation-admission", payload=valuation_admission)
     _require_content_addressed_artifact(root, suffix="valuation-output", payload=valuation_output)
 
+    decision_input_refs, decision_input_hashes = _validate_decision_pending_input_refs(decision_pending)
     if (
-        decision_pending.get("input_refs") != [parsed_forecast_ref.forecast_id, parsed_valuation_ref.admission_id]
-        or decision_pending.get("input_hashes") != [parsed_forecast_ref.admission_record_hash, parsed_valuation_ref.admission_record_hash]
+        decision_input_refs[:2] != [parsed_forecast_ref.forecast_id, parsed_valuation_ref.admission_id]
+        or decision_input_hashes[:2] != [parsed_forecast_ref.admission_record_hash, parsed_valuation_ref.admission_record_hash]
     ):
         raise CanonicalRunAuthorizationError(
             "BLOCKED: DECISION_PENDING does not bind admitted Forecast and Valuation records"
@@ -948,6 +989,79 @@ def authorize_decision_revision_write(
     if evidence_stage["output_refs"] != expected_refs or evidence_stage["output_hashes"] != expected_hashes:
         raise CanonicalRunAuthorizationError("BLOCKED: Evidence stage receipts differ from the admitted Manifest")
     _validate_canonical_upstream_admissions(root, record)
+    decision_pending = _receipt_for_stage(record, Stage.DECISION_PENDING)[1]
+    decision_input_refs, decision_input_hashes = _validate_decision_pending_input_refs(decision_pending)
+    current_price_observation = snapshot_input.get("current_price_observation")
+    if not isinstance(current_price_observation, Mapping):
+        # Existing non-v0.3 lifecycle compatibility snapshots may omit the
+        # typed Investment Core price object. Keep their old 2-input receipt
+        # contract, but never permit them to carry operator-price extensions.
+        if snapshot_input.get("contract_version") == "IIOS-INVESTMENT-CORE-0.3":
+            raise CanonicalRunAuthorizationError(
+                "BLOCKED: v0.3 Investment Core snapshot lacks current_price_observation"
+            )
+        if len(decision_input_refs) != 2 or len(decision_input_hashes) != 2:
+            raise CanonicalRunAuthorizationError(
+                "BLOCKED: legacy snapshot cannot carry operator-price stage extensions"
+            )
+    else:
+        input_class = current_price_observation.get(
+            "price_input_class", "CANONICAL_ADMITTED_MARKET_DATA"
+        )
+    if isinstance(current_price_observation, Mapping) and input_class == "OPERATOR_ATTESTED_MARKET_DATA":
+        operator_ref = current_price_observation.get("operator_price_input_ref")
+        if not isinstance(operator_ref, Mapping):
+            raise CanonicalRunAuthorizationError("BLOCKED: operator price reference is absent from snapshot input")
+        bundle_id = str(operator_ref.get("bundle_id", ""))
+        record_hash = str(operator_ref.get("record_sha256", ""))
+        receipt_hash = str(operator_ref.get("receipt_sha256", ""))
+        if (
+            not re.fullmatch(r"operator-price-[0-9a-f]{24}", bundle_id)
+            or not is_sha256(record_hash)
+            or not is_sha256(receipt_hash)
+            or bundle_id != f"operator-price-{record_hash[:24]}"
+            or decision_input_refs != [
+                decision_input_refs[0], decision_input_refs[1],
+                f"operator-price-input-record:{bundle_id}",
+                f"operator-price-input-receipt:{bundle_id}",
+            ]
+            or decision_input_hashes[2:] != [record_hash, receipt_hash]
+        ):
+            raise CanonicalRunAuthorizationError(
+                "BLOCKED: DECISION_PENDING operator-price hashes do not match snapshot input reference"
+            )
+        if (
+            current_price_observation.get("source_origin_verified") is not False
+            or current_price_observation.get("source_vintage_verified") is not False
+            or current_price_observation.get("source_use_rights_verified") is not False
+            or current_price_observation.get("canonical_price_admission") is not False
+            or current_price_observation.get("formal_evidence_pit_admission") is not False
+            or "price_observation_admission_hash" in current_price_observation
+        ):
+            raise CanonicalRunAuthorizationError(
+                "BLOCKED: operator-attested price attempts to claim source or canonical admission"
+            )
+        gap = snapshot_input.get("expectation_gap")
+        if isinstance(gap, Mapping) and (
+            str(gap.get("price")) != str(current_price_observation.get("price"))
+            or str(gap.get("price_observation_id")) != bundle_id
+        ):
+            raise CanonicalRunAuthorizationError(
+                "BLOCKED: expectation-gap input is not synchronized to operator current price"
+            )
+        return_gate = snapshot_input.get("return_gate")
+        if isinstance(return_gate, Mapping) and str(return_gate.get("entry_price")) != str(current_price_observation.get("price")):
+            raise CanonicalRunAuthorizationError(
+                "BLOCKED: return gate entry_price is not synchronized to operator current price"
+            )
+    elif isinstance(current_price_observation, Mapping) and input_class == "CANONICAL_ADMITTED_MARKET_DATA":
+        if len(decision_input_refs) != 2 or len(decision_input_hashes) != 2:
+            raise CanonicalRunAuthorizationError(
+                "BLOCKED: canonical price path cannot carry operator-price stage extensions"
+            )
+    elif isinstance(current_price_observation, Mapping):
+        raise CanonicalRunAuthorizationError("BLOCKED: unsupported current price input class in snapshot")
+
     if any((
         str(envelope["case_id"]) != str(snapshot_identity["case_id"]),
         str(envelope["market"]).upper() != str(snapshot_identity["market"]),

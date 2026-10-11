@@ -29,6 +29,9 @@ class CanonicalRuntimeBindings:
     independent_forecast_resolver: Any
     upstream_authority_resolver: Any
     valuation_output_resolver: Any
+    # Optional for existing canonical-price runs; required only when a case
+    # explicitly selects OPERATOR_ATTESTED_MARKET_DATA.
+    operator_price_input_resolver: Any | None = None
 
 
 RUNTIME_REQUIRED_BINDINGS = (
@@ -61,6 +64,12 @@ def validate_canonical_runtime_bindings(runtime: Any) -> CanonicalRuntimeBinding
     ]
     if missing:
         raise ValueError("runtime has missing bindings: " + ", ".join(missing))
+
+    operator_price_resolver = getattr(runtime, "operator_price_input_resolver", None)
+    if operator_price_resolver is not None and not callable(
+        getattr(operator_price_resolver, "resolve_operator_price_input", None)
+    ):
+        raise ValueError("operator_price_input_resolver must implement resolve_operator_price_input")
 
     interpreter = runtime.request_interpreter
     interpreter_fields = (

@@ -187,14 +187,29 @@ def _require_snapshot_price_binding(
     if not isinstance(observation, Mapping):
         raise ValueError("materialized MIE observation_basis is required")
 
+    if observation.get("cutoff_date") != snapshot.get("cutoff_date"):
+        raise ValueError("MIE observation_basis.cutoff_date must equal snapshot.cutoff_date")
+    if current_price_observation.get("price_input_class") == "OPERATOR_ATTESTED_MARKET_DATA":
+        # The operator-entered decision price is not a P4-F provenance row.
+        # Bind it to the separate source-qualified MIE calibration observation;
+        # never rewrite or substitute the P4-F market_price evidence.
+        reference_id = current_price_observation.get("mie_reference_price_observation_id")
+        if not isinstance(reference_id, str) or reference_id != observation.get("price_observation_id"):
+            raise ValueError("operator price MIE reference ID must match source-qualified observation_basis")
+        if observation.get("currency") != current_price_observation.get("currency"):
+            raise ValueError("MIE observation_basis.currency must equal operator current-price currency")
+        if observation.get("adjustment_semantics") != current_price_observation.get("adjustment_semantics"):
+            raise ValueError("MIE observation_basis.adjustment_semantics must equal operator current-price semantics")
+        if _parse_date(observation.get("observation_date"), "MIE observation_basis.observation_date") > _parse_date(snapshot.get("cutoff_date"), "snapshot.cutoff_date"):
+            raise ValueError("source-qualified MIE calibration observation is after snapshot cutoff")
+        return
+
     observed_date = _parse_datetime(
         current_price_observation.get("observed_at"),
         "current_price_observation.observed_at",
     ).date()
     if observation.get("observation_date") != observed_date.isoformat():
         raise ValueError("MIE observation_basis.observation_date must equal current_price_observation.observed_at date")
-    if observation.get("cutoff_date") != snapshot.get("cutoff_date"):
-        raise ValueError("MIE observation_basis.cutoff_date must equal snapshot.cutoff_date")
     if observation.get("price_observation_id") != current_price_observation.get("price_observation_id"):
         raise ValueError("MIE observation_basis.price_observation_id must equal current_price_observation.price_observation_id")
     if observation.get("currency") != current_price_observation.get("currency"):

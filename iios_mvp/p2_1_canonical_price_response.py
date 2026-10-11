@@ -288,8 +288,45 @@ def _assumption_fingerprint(expectation: Mapping[str, Any]) -> str:
     return _hash(assumptions)
 
 
-def _reference_price(expectation: Mapping[str, Any], observation: Mapping[str, Any]) -> Decimal:
+def _reference_price(
+    expectation: Mapping[str, Any],
+    observation: Mapping[str, Any],
+    provenance: Mapping[str, Mapping[str, Any]] | None = None,
+) -> tuple[Decimal, Decimal]:
+    """Return (MIE calibration price, decision current price).
+
+    Canonical quotes use the same admitted observation for both values. An
+    operator-entered decision price is separately typed: the MIE formula stays
+    anchored to its source-qualified baseline price, while the operator value
+    is used only as the current price presented to decision-entry evaluation.
+    The operator value never becomes P4-F provenance.
+    """
     basis = expectation.get("observation_basis") or {}
+    current_price = _dec(observation.get("price"), "current_price_observation.price")
+    if current_price <= 0:
+        raise ValueError("current price must be > 0")
+
+    if observation.get("price_input_class") == "OPERATOR_ATTESTED_MARKET_DATA":
+        if observation.get("mie_reference_price_observation_id") != basis.get("price_observation_id"):
+            raise ValueError("P2.1 operator price MIE reference ID does not match the source-qualified snapshot")
+        if basis.get("currency") != observation.get("currency"):
+            raise ValueError("P2.1 MIE currency does not match operator current price")
+        if basis.get("adjustment_semantics") != observation.get("adjustment_semantics"):
+            raise ValueError("P2.1 MIE adjustment semantics do not match operator current price")
+        if provenance is None:
+            raise ValueError("P2.1 P4-F provenance is required to resolve the MIE calibration price")
+        record = provenance.get(str(basis.get("price_observation_id", "")))
+        if not isinstance(record, Mapping):
+            raise ValueError("P2.1 MIE calibration price provenance is missing")
+        if record.get("variable") != "market_price" or record.get("unit") != observation.get("currency"):
+            raise ValueError("P2.1 MIE calibration price provenance semantics mismatch")
+        if record.get("value") is None:
+            raise ValueError("P2.1 MIE calibration price provenance value is missing")
+        model_reference_price = _dec(record["value"], "P2.1 MIE calibration market price")
+        if model_reference_price <= 0:
+            raise ValueError("P2.1 MIE calibration market price must be > 0")
+        return model_reference_price, current_price
+
     observed_date = _datetime(
         observation.get("observed_at"),
         "current_price_observation.observed_at",
@@ -302,10 +339,7 @@ def _reference_price(expectation: Mapping[str, Any], observation: Mapping[str, A
         raise ValueError("P2.1 MIE currency does not match canonical current price")
     if basis.get("adjustment_semantics") != observation.get("adjustment_semantics"):
         raise ValueError("P2.1 MIE adjustment semantics do not match canonical current price")
-    price = _dec(observation.get("price"), "current_price_observation.price")
-    if price <= 0:
-        raise ValueError("canonical current price must be > 0")
-    return price
+    return current_price, current_price
 
 
 def _reference_interval(requirement: Mapping[str, Any]) -> tuple[Decimal, Decimal]:
@@ -506,7 +540,10 @@ def build_canonical_price_response(
         raise ValueError("canonical independent forecast resolver is required")
 
     expectation = _materialized_expectation(snapshot, market_expectation_id)
-    reference_price = _reference_price(expectation, current_price_observation)
+    provenance = _provenance_index(snapshot, cutoff)
+    model_reference_price, decision_current_price = _reference_price(
+        expectation, current_price_observation, provenance
+    )
     family = str(expectation.get("market_model", "")).strip()
     if family not in SUPPORTED_MODEL_FAMILIES:
         raise ValueError(f"P2.1 unsupported model family: {family}")
@@ -527,8 +564,6 @@ def build_canonical_price_response(
     direction = ComparisonDirection(
         str(requirement.get("comparison_direction", ComparisonDirection.HIGHER_IS_BETTER.value))
     )
-    provenance = _provenance_index(snapshot, cutoff)
-
     nested_evidence = set(snapshot.get("mie_set", {}).get("evidence_ids") or [])
     nested_evidence.update(expectation.get("evidence_ids") or [])
     nested_evidence.update(requirement.get("evidence_ids") or [])
@@ -549,7 +584,7 @@ def build_canonical_price_response(
     form, formula_id, candidate_low, candidate_high, slope_low, intercept_low, slope_high, intercept_high = _model_relation(
         expectation=expectation,
         requirement=requirement,
-        reference_price=reference_price,
+        reference_price=model_reference_price,
         candidate_price=candidate,
         provenance=provenance,
     )
@@ -558,8 +593,8 @@ def build_canonical_price_response(
     ref_form, _ref_formula, ref_low, ref_high, _ref_sl, _ref_il, _ref_sh, _ref_ih = _model_relation(
         expectation=expectation,
         requirement=requirement,
-        reference_price=reference_price,
-        candidate_price=reference_price,
+        reference_price=model_reference_price,
+        candidate_price=model_reference_price,
         provenance=provenance,
     )
     if ref_form != form or ref_low != reference_low or ref_high != reference_high:
@@ -609,7 +644,7 @@ def build_canonical_price_response(
         representation=str(expectation.get("representation", "")),
         qualification=str(expectation.get("qualification", "")),
         price_observation_id=str(current_price_observation["price_observation_id"]),
-        reference_price=reference_price,
+        reference_price=decision_current_price,
         candidate_price=candidate,
         response_form=form,
         formula_id=formula_id,
