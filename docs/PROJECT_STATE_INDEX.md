@@ -2286,3 +2286,16 @@ Explicit non-claims:
 - **Correction in review:** explicitly bootstrap the effective repository root in shared `_validate_core()`; propagate the caller-supplied root into persist-time validation and offline replay. Add a regression test with an isolated temporary Core package and no inherited module cache/path.
 - **Safety boundary:** this is an import-path correction only. Do not rerun ingestion or download Attempt 10. The only operator follow-up after merge is one read-only replay against the existing private candidate.
 - **Not yet closed:** local replay has not passed; first-public timestamp remains unverified, and production Host acceptance, signed admission and decision creation remain false.
+
+
+## 605016 read-only private-copy replay — PASS — 2026-10-11
+
+- **Operator-confirmed replay outcome:** `VERIFIED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED`.
+- Existing candidate count: 1; evidence records: 11; manifest raw-artifact declarations: 11; unique physical raw files: 8. The legacy `raw_artifact_count` is declaration count, not physical-file count.
+- Candidate fingerprint: `c6b78f0185e27ddb089af723f1811ec00185775ca3dbbd679a933a887c566350`.
+- Private manifest SHA-256: `034a4b5de2693d725422d9fb740ba4d5364a63b6b080531ee15a9b1bfff1a7da`.
+- Core/PIT validator: PASS. `official_source_refetched=false`; the operator ran the read-only verifier after PR #327, with no new Attempt 10 or market-source retrieval.
+- **PR #327** (https://github.com/kebofeierdawei5-cloud/convergence-research/pull/327) fixed the shared Core validator's import environment and added an isolated-import regression test; merged as `5ed399259a9e4b33e5687074739336eb1ba202c9`. Exact-head private B2 contract tests: 48/48 PASS; State Hygiene and independent red-team PASS; all 11 associated workflows succeeded.
+- **Resolved:** the local read-only-verification `ModuleNotFoundError` incident and persisted-copy replay gate.
+- **Still blocked / not admitted:** `exact_first_public_timestamp_verified=false`, `source_vintage_review_required=true`; no formal signed admission, production Host acceptance, request bundle, or decision. Human approval remains required; automatic execution remains false.
+- **Next canonical boundary:** resolve the price-evidence source-vintage policy using official/reproducible evidence. Do not rerun ingest or storage verification just to revisit this closed gate. Do not promote a candidate into a decision until the source-vintage gate is explicitly adjudicated under the governing PIT contract.
