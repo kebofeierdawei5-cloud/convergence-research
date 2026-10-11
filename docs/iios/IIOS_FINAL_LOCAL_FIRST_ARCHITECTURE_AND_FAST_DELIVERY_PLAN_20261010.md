@@ -188,9 +188,9 @@ assurance = OPERATOR_ASSERTED_NOT_CRYPTOGRAPHICALLY_VERIFIED
 
 本轮工作的实际目标，是关闭现存的产品关键缺口，尤其是：
 
-- P0-LLM-001：真实用户投资请求必须进入唯一 Canonical Research Orchestrator；
-- P0-LLM-003：语义产物的来源/生产者与 stage/input/output lineage 必须满足经过批准的准入契约；
-- P0-LLM-004：真实自然语言/用户输入 → 模型推理 → 语义准入 → 正式决策的产品验收；
+- 当前明确开放的 P0-LLM-001：真实用户投资请求必须进入唯一 Canonical Research Orchestrator；
+- 当前明确开放的 P0-LLM-004：真实自然语言/用户输入 → 模型推理 → 语义准入 → 正式决策的产品验收；
+- 对 ChatGPT Free Web 人工交接路径，单独核对 P0-LLM-003 的生产者真实性和 lineage 契约。现有 B2-C 的 signed external provider binding PASS 不能自动证明人工网页路径符合契约；同样也不能据此声称 P0-LLM-003 在所有路径上仍未解决。
 - 当前真实公司证据链的 source-by-source Evidence/PIT admission 与本地私有持久化；
 - 完整正式 Decision / Publication / Human Report / Run Receipt / independent replay。
 
@@ -360,7 +360,7 @@ LOCAL_SINGLE_USER 只有同时满足以下条件才可标记为 MVP usable：
 
 - 此文档仍是提议；未被审阅和合并前不改变 canonical policy。
 - PR #310 / #311 是审计记录，不修改运行时、不关闭 P0。
-- PR #312 的内容不得被作为已实现架构或 MVP 通过的证明。
+- PR #312 的内容不得被作为已实现架构或 MVP 通过的证明；它不关闭规范状态索引中仍开放的 P0-LLM-001 / P0-LLM-004，也不预判 ChatGPT Web 路径的 producer 契约已经批准。
 - 正式接受后，按 AGENTS.md 和项目状态政策更新唯一权威 State Index，明确最新主线和下一项实际任务。
 - 已完成阶段按证据保留历史状态；不得为了使用新计划而重命名、重开或抹除已有 PILOT 结果。
 - 任何治理边界变更都必须有版本化 successor/adjudication、测试和明确非声明。
