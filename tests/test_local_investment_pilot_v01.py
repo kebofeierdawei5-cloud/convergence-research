@@ -131,7 +131,7 @@ def test_unknown_mie_keeps_pilot_action_at_review_required(tmp_path):
     analysis = json.loads((Path(result["run_dir"]) / "analysis.json").read_text(encoding="utf-8"))
     assert analysis["return_metrics"]["fundamental_target_pass"] is True
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
-    assert "MIE_NOT_IDENTIFIABLE" in analysis["decision"]["gating_issues"]
+    assert "MARKET_IMPLIED_EXPECTATION_NOT_IDENTIFIABLE" in analysis["decision"]["gating_issues"]
 
 
 def test_quote_after_date_only_cutoff_is_not_used_for_price_math(tmp_path):
