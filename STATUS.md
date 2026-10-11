@@ -1,3 +1,4 @@
+- **Action A manual-Web semantic gate (2026-10-11):** PR [#342](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/342) is PASS / MERGED / CANONICAL at `a496b82b8cfbc2256a9affd3337f97fce305d217`. Canonical semantic admission now fails closed for the manual ChatGPT Web producer and renamed IDs retaining its unapproved policy namespace. This keeps the Web callback non-canonical only; it does not authenticate origin, close P0-LLM-001/P0-LLM-004, or accept the production Host.
 
 - **Action A manual-Web semantic gate follow-up (2026-10-11):** the fail-closed guard candidate in `iios_mvp/semantic_producer_admission_v01.py` blocks canonical semantic admission for `iios-chatgpt-web-semantic-producer` and the same unapproved policy namespace, while preserving non-canonical exploratory handoff. PR exact-head checks are pending; P0-LLM-001/P0-LLM-004 and production Host acceptance remain OPEN.
 # IIOS Project Status
