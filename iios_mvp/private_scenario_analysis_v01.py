@@ -562,9 +562,9 @@ def _render_report(analyses: list[dict[str, Any]], *, analysis_id: str) -> str:
     lines = [
         "# IIOS 本地私有情景分析",
         "",
-        f"- 分析 ID：\`{analysis_id}\`",
-        f"- Runner：\`{SCENARIO_RUNNER_VERSION}\`",
-        f"- Profile 集：\`{SCENARIO_PROFILE_SET_VERSION}\`",
+        f"- 分析 ID：`{analysis_id}`",
+        f"- Runner：`{SCENARIO_RUNNER_VERSION}`",
+        f"- Profile 集：`{SCENARIO_PROFILE_SET_VERSION}`",
         "- 性质：**PRIVATE_SCENARIO_ANALYSIS_ONLY / NON-CANONICAL**",
         "",
         "> **重要边界：** 价格来自人工确认的未复权收盘价。行情来源原始字节、精确首次公开时间及使用权没有通过正式准入。本价格更新只进行情景分析，不表示同一截止时点的全部公司证据已重做 PIT 验证；不创建正式 Forecast、Valuation Admission、Decision、Publication、完整 Run Receipt 或交易授权。",
@@ -579,10 +579,10 @@ def _render_report(analyses: list[dict[str, Any]], *, analysis_id: str) -> str:
             "",
             f"## {case['company']}（{case['symbol']}.{case['exchange']}）",
             "",
-            f"- 基础 Case：\`{case['case_id']}\`",
+            f"- 基础 Case：`{case['case_id']}`",
             f"- 行情日期：{case['price_observation_date']}；人工输入价格：**¥{case['current_price_cny']}** / 股",
             f"- 分析截止：{case['analysis_overlay_cutoff_date']}（仅价格 overlay，不是新 Case PIT）",
-            f"- 估值模型：{profile['model']}；假设版本：\`{profile['profile_id']}\`",
+            f"- 估值模型：{profile['model']}；假设版本：`{profile['profile_id']}`",
             f"- 假设性质：{profile['assumption_class']}",
             f"- 概率是否校准：{'是' if profile['probabilities_calibrated'] else '否'}",
             "",
@@ -608,7 +608,7 @@ def _render_report(analyses: list[dict[str, Any]], *, analysis_id: str) -> str:
             f"| **两项约束共同决定的条件性入场价上限** | **¥{returns['binding_conditional_entry_price_ceiling_cny']}** |",
             f"| 当前价格相对该上限的差额 | ¥{returns['headroom_to_binding_ceiling_cny']} |",
             "",
-            f"**价格情景筛选：** \`{returns['conditional_price_screen']}\`。这是基于本组假设的计算标签，不是 IIOS BUY/ADD/NO-BUY/Decision。",
+            f"**价格情景筛选：** `{returns['conditional_price_screen']}`。这是基于本组假设的计算标签，不是 IIOS BUY/ADD/NO-BUY/Decision。",
             "",
             "**本情景假设的限制：**",
         ])
@@ -751,9 +751,8 @@ def verify_private_scenario_bundle(run_dir: str | Path) -> dict[str, Any]:
     stored_report = _read_regular_child(root, "report.md")
     stored_receipt = _read_regular_child(root, "receipt.json")
     analysis_id, expected_input, expected_analysis, expected_report, expected_receipt, receipt = _build_artifacts(input_raw)
-    if stored_input := expected_input:
-        if _sha256(input_raw) != receipt["input_sha256"]:
-            raise PrivateScenarioAnalysisError("BUNDLE_INPUT_HASH_MISMATCH")
+    if _sha256(input_raw) != receipt["input_sha256"]:
+        raise PrivateScenarioAnalysisError("BUNDLE_INPUT_HASH_MISMATCH")
     if stored_analysis != expected_analysis:
         raise PrivateScenarioAnalysisError("BUNDLE_ANALYSIS_REPLAY_MISMATCH")
     if stored_report != expected_report:
