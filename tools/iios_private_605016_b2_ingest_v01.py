@@ -1191,7 +1191,7 @@ def _persist_source_vintage_successor(
 
         manifest_out = payload_root / "company_evidence_manifest.json"
         with manifest_out.open("xb") as handle:
-            handle.write((json.dumps(dict(manifest), ensure_ascii=False, indent=2) + "\\n").encode("utf-8"))
+            handle.write((json.dumps(dict(manifest), ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
             handle.flush()
             os.fsync(handle.fileno())
         os.chmod(manifest_out, 0o600)
@@ -1253,7 +1253,7 @@ def _persist_source_vintage_successor(
         receipt["receipt_sha256"] = _sha256(_canonical_bytes(receipt_core))
         receipt_out = payload_root / "PRIVATE_B2_PERSISTENCE_RECEIPT.json"
         with receipt_out.open("xb") as handle:
-            handle.write((json.dumps(receipt, ensure_ascii=False, indent=2) + "\\n").encode("utf-8"))
+            handle.write((json.dumps(receipt, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
             handle.flush()
             os.fsync(handle.fileno())
         os.chmod(receipt_out, 0o600)
