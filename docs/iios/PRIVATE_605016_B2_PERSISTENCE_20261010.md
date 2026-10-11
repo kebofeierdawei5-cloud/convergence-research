@@ -63,7 +63,7 @@ Missing files, loose permissions, symlinks, unlisted files, altered bytes, alter
 
 ## Verification
 
-tests/test_iios_private_605016_b2_ingest_v01.py covers exact referenced-byte persistence, private permissions, idempotence, core-validator fail-closed behavior, repository-root rejection, path traversal and official price-hash mismatch. The dedicated workflow is contract-only; it does not access the user's private machine or run the real intake.
+tests/test_iios_private_605016_b2_ingest_v01.py covers exact referenced-byte persistence, private permissions, idempotence, core-validator fail-closed behavior, repository-root rejection, path traversal, official price-hash mismatch, source-free post-persistence replay, modified bytes/receipt, unlisted files and loose permissions. The workflow compiles the Python code, validates launcher shell syntax, and runs contract tests; it does not access the user's private machine or run the real intake.
 
 
 ## Network-failure recovery added after operator report
