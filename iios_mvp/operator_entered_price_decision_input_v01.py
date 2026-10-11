@@ -99,6 +99,12 @@ def _now_shanghai() -> datetime:
     return datetime.now(timezone.utc).astimezone(SHANGHAI)
 
 
+def _as_shanghai(value: Any, field: str) -> datetime:
+    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+        raise OperatorEnteredPriceError(f"{field}_TIMEZONE_REQUIRED")
+    return value.astimezone(SHANGHAI)
+
+
 def _parse_price(value: Any) -> Decimal:
     if isinstance(value, bool):
         raise OperatorEnteredPriceError("PRICE_MUST_BE_POSITIVE_FINITE_NUMBER")
@@ -130,7 +136,10 @@ def validate_payload(payload: Any, *, entered_at: datetime, decision_cutoff_at: 
 
     case_id = payload.get("base_case_id")
     market = payload.get("market")
-    symbol = str(payload.get("symbol", "")).strip()
+    raw_symbol = payload.get("symbol")
+    if not isinstance(raw_symbol, str) or not raw_symbol.strip():
+        raise OperatorEnteredPriceError("SYMBOL_MUST_BE_NONEMPTY_STRING")
+    symbol = raw_symbol.strip()
     exchange = payload.get("exchange")
     currency = payload.get("currency")
     if not isinstance(case_id, str) or not case_id.strip():
@@ -158,8 +167,8 @@ def validate_payload(payload: Any, *, entered_at: datetime, decision_cutoff_at: 
     price = _parse_price(payload.get("price"))
     observation_date = _parse_date(payload.get("observation_date"), "OBSERVATION_DATE")
 
-    entry = entered_at.astimezone(SHANGHAI)
-    cutoff = decision_cutoff_at.astimezone(SHANGHAI)
+    entry = _as_shanghai(entered_at, "ENTERED_AT")
+    cutoff = _as_shanghai(decision_cutoff_at, "DECISION_CUTOFF_AT")
     if cutoff <= entry:
         raise OperatorEnteredPriceError("DECISION_CUTOFF_MUST_FOLLOW_ENTRY_TIME")
     if observation_date > entry.date():
@@ -286,10 +295,15 @@ def build_receipt(record: Mapping[str, Any], *, record_bytes: bytes) -> dict[str
 
 
 def create_bundle(payload: Mapping[str, Any], output_root: str | Path, *, entered_at: datetime | None = None, decision_cutoff_at: datetime | None = None) -> dict[str, Any]:
-    entry = (entered_at or _now_shanghai()).astimezone(SHANGHAI)
-    cutoff = (decision_cutoff_at or _now_shanghai()).astimezone(SHANGHAI)
+    entry = _as_shanghai(entered_at if entered_at is not None else _now_shanghai(), "ENTERED_AT")
+    if decision_cutoff_at is None:
+        cutoff = _as_shanghai(_now_shanghai(), "DECISION_CUTOFF_AT")
+        if cutoff <= entry:
+            cutoff = _as_shanghai(_now_shanghai(), "DECISION_CUTOFF_AT")
+    else:
+        cutoff = _as_shanghai(decision_cutoff_at, "DECISION_CUTOFF_AT")
     if cutoff <= entry:
-        cutoff = entry + timedelta(microseconds=1)
+        raise OperatorEnteredPriceError("DECISION_CUTOFF_MUST_FOLLOW_ENTRY_TIME")
     normalized = validate_payload(payload, entered_at=entry, decision_cutoff_at=cutoff)
     record_bytes = _canonical(normalized) + b"\n"
     digest = _sha(record_bytes)
@@ -337,6 +351,8 @@ def replay_bundle(bundle_path: str | Path) -> dict[str, Any]:
     _assert_private_file(directory / "receipt.json", "RECEIPT_FILE")
     record, record_raw = _read_json(directory / "price-input.json")
     receipt, receipt_raw = _read_json(directory / "receipt.json")
+    if _canonical(record) + b"\\n" != record_raw:
+        raise OperatorEnteredPriceError("RECORD_BYTES_NONCANONICAL")
     expected = build_receipt(record, record_bytes=record_raw)
     if receipt != expected:
         raise OperatorEnteredPriceError("RECEIPT_CONTENT_MISMATCH")
