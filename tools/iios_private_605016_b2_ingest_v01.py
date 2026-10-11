@@ -329,6 +329,180 @@ def _validate_existing_candidate(
     }
 
 
+
+def _require_private_entry(path: Path, *, label: str) -> None:
+    """Reject symlinks, unexpected file types, loose POSIX modes and owner drift."""
+    if path.is_symlink():
+        raise PrivateIngestError(label + "_MUST_NOT_BE_SYMLINK")
+    if not path.exists():
+        raise PrivateIngestError(label + "_MISSING")
+    if not path.is_dir() and not path.is_file():
+        raise PrivateIngestError(label + "_TYPE_UNSAFE")
+    if hasattr(os, "getuid") and path.stat().st_uid != os.getuid():
+        raise PrivateIngestError(label + "_OWNER_MISMATCH")
+    if os.name != "nt" and (path.stat().st_mode & 0o077):
+        kind = "DIRECTORY" if path.is_dir() else "FILE"
+        raise PrivateIngestError(label + "_" + kind + "_PERMISSIONS_TOO_OPEN")
+
+
+def _verify_private_tree_permissions(root: Path, *, label: str) -> None:
+    """Walk without following symlinks and enforce private modes for every entry."""
+    _require_private_entry(root, label=label)
+    if not root.is_dir():
+        raise PrivateIngestError(label + "_MUST_BE_DIRECTORY")
+    for current, directories, files in os.walk(root, topdown=True, followlinks=False):
+        current_path = Path(current)
+        for name in directories:
+            _require_private_entry(current_path / name, label=label)
+        for name in files:
+            _require_private_entry(current_path / name, label=label)
+
+
+def _verify_private_candidate_contents(candidate_dir: Path, *, validator: Callable[..., list[str]] | None) -> dict[str, Any]:
+    """Check persisted metadata, privacy, exact file set and original Core/PIT validator."""
+    _verify_private_tree_permissions(candidate_dir, label="PRIVATE_CANDIDATE")
+    existing = _validate_existing_candidate(candidate_dir, validator=validator)
+    manifest = existing["manifest"]
+    receipt = existing["receipt"]
+
+    if manifest.get("case_id") != CASE_ID:
+        raise PrivateIngestError("EXISTING_PRIVATE_CASE_ID_MISMATCH")
+    if manifest.get("cutoff_date") != CUTOFF_DATE:
+        raise PrivateIngestError("EXISTING_PRIVATE_CUTOFF_MISMATCH")
+    if str(manifest.get("market", "")).upper() != "CN-A" or str(manifest.get("symbol", "")) != "605016":
+        raise PrivateIngestError("EXISTING_PRIVATE_SECURITY_IDENTITY_MISMATCH")
+    if manifest.get("status") != "PASS" or manifest.get("validation_errors") != []:
+        raise PrivateIngestError("EXISTING_PRIVATE_MANIFEST_STATUS_INVALID")
+    if manifest.get("required_field_groups") != list(REQUIRED_FIELD_GROUPS_FOR_REPORT):
+        raise PrivateIngestError("EXISTING_PRIVATE_REQUIRED_GROUPS_MISMATCH")
+
+    fingerprint = _candidate_fingerprint(manifest)
+    if candidate_dir.name != fingerprint:
+        raise PrivateIngestError("EXISTING_PRIVATE_DIRECTORY_FINGERPRINT_MISMATCH")
+    if receipt.get("schema_version") != RECEIPT_SCHEMA:
+        raise PrivateIngestError("EXISTING_PRIVATE_RECEIPT_SCHEMA_MISMATCH")
+
+    manifest_path = candidate_dir / "company_evidence_manifest.json"
+    manifest_sha = _sha256(manifest_path.read_bytes())
+    expected_receipt = {
+        "status": "PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
+        "case_id": CASE_ID,
+        "cutoff_date": CUTOFF_DATE,
+        "candidate_fingerprint": fingerprint,
+        "manifest_sha256": manifest_sha,
+        "manifest_audit_sha256": (manifest.get("audit") or {}).get("manifest_sha256"),
+        "official_price_source_sha256": EXPECTED_PRICE_RAW_SHA256,
+        "official_price_observation_date": "2026-10-08",
+        "exact_first_public_timestamp_verified": False,
+        "source_vintage_review_required": True,
+        "evidence_record_count": len(manifest.get("evidence") or []),
+        "raw_artifact_count": len(manifest.get("raw_artifacts") or []),
+        "admitted_field_group_count": len(REQUIRED_FIELD_GROUPS_FOR_REPORT),
+        "missing_required_field_group_count": 0,
+        "core_validator_status": "PASS",
+        "storage_scope": "LOCAL_PRIVATE_INTERNAL_USE_ONLY",
+        "source_reuse_disposition": "RESTRICTED_NO_REDISTRIBUTION; private internal research use only",
+        "receipt_is_cryptographically_signed": False,
+        "formal_signed_admission_created": False,
+        "production_host_accepted": False,
+        "bundle_created": False,
+        "decision_created": False,
+        "human_approval_required": True,
+        "auto_execution": False,
+    }
+    for field, expected_value in expected_receipt.items():
+        if receipt.get(field) != expected_value:
+            raise PrivateIngestError("EXISTING_PRIVATE_RECEIPT_SEMANTICS_MISMATCH:" + field)
+    if not isinstance(receipt.get("created_at"), str) or not receipt["created_at"].strip():
+        raise PrivateIngestError("EXISTING_PRIVATE_RECEIPT_CREATED_AT_MISSING")
+
+    raw_root = candidate_dir / "evidence_root"
+    declarations = manifest.get("raw_artifacts")
+    if not isinstance(declarations, list) or not declarations:
+        raise PrivateIngestError("EXISTING_PRIVATE_RAW_DECLARATIONS_MISSING")
+    expected_paths: set[str] = set()
+    for declaration in declarations:
+        if not isinstance(declaration, Mapping):
+            raise PrivateIngestError("EXISTING_PRIVATE_RAW_DECLARATION_INVALID")
+        relative = _safe_relative_path(declaration.get("relative_path")).as_posix()
+        if relative in expected_paths:
+            raise PrivateIngestError("EXISTING_PRIVATE_RAW_PATH_DUPLICATED")
+        expected_paths.add(relative)
+    actual_paths = {
+        path.relative_to(raw_root).as_posix()
+        for path in raw_root.rglob("*")
+        if path.is_file()
+    }
+    if actual_paths != expected_paths:
+        raise PrivateIngestError("EXISTING_PRIVATE_RAW_FILE_SET_MISMATCH")
+
+    return {
+        "candidate_fingerprint": fingerprint,
+        "manifest_sha256": manifest_sha,
+        "raw_artifact_count": len(declarations),
+        "evidence_record_count": len(manifest.get("evidence") or []),
+        "core_validator_status": "PASS",
+        "source_vintage_review_required": True,
+        "exact_first_public_timestamp_verified": False,
+        "formal_signed_admission_created": False,
+        "production_host_accepted": False,
+        "decision_created": False,
+        "human_approval_required": True,
+        "auto_execution": False,
+    }
+
+
+def verify_existing_private_b2_candidate(
+    *,
+    private_root: str | Path,
+    repository_root: str | Path = REPOSITORY_ROOT,
+    core_validator: Callable[..., list[str]] | None = None,
+) -> dict[str, Any]:
+    """Verify only the already-persisted private candidate; never fetch source data."""
+    private_root_path = _preflight_private_root(private_root, repository_root=repository_root)
+    if not private_root_path.exists():
+        raise PrivateIngestError("PRIVATE_CASE_STORE_MISSING")
+    _require_private_entry(private_root_path, label="PRIVATE_ROOT")
+    cases_root = private_root_path / "cases"
+    case_root = cases_root / CASE_ID
+    _require_private_entry(cases_root, label="PRIVATE_CASES_ROOT")
+    _require_private_entry(case_root, label="PRIVATE_CASE_ROOT")
+    if not cases_root.is_dir() or not case_root.is_dir():
+        raise PrivateIngestError("PRIVATE_CASE_STORE_LAYOUT_INVALID")
+
+    candidate_dirs: list[Path] = []
+    for entry in case_root.iterdir():
+        if entry.is_symlink() or not entry.is_dir():
+            raise PrivateIngestError("PRIVATE_CASE_ENTRY_TYPE_UNSAFE")
+        name = entry.name
+        if len(name) != 64 or any(char not in "0123456789abcdef" for char in name):
+            raise PrivateIngestError("PRIVATE_CANDIDATE_DIRECTORY_NAME_INVALID")
+        candidate_dirs.append(entry)
+    if not candidate_dirs:
+        raise PrivateIngestError("PRIVATE_B2_CANDIDATE_NOT_FOUND")
+
+    verified = [
+        _verify_private_candidate_contents(candidate, validator=core_validator)
+        for candidate in sorted(candidate_dirs, key=lambda item: item.name)
+    ]
+    return {
+        "status": "VERIFIED_PRIVATE_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
+        "case_id": CASE_ID,
+        "cutoff_date": CUTOFF_DATE,
+        "candidate_count": len(verified),
+        "candidates": verified,
+        "official_source_refetched": False,
+        "source_vintage_review_required": True,
+        "exact_first_public_timestamp_verified": False,
+        "formal_signed_admission_created": False,
+        "production_host_accepted": False,
+        "bundle_created": False,
+        "decision_created": False,
+        "human_approval_required": True,
+        "auto_execution": False,
+    }
+
+
 def ingest_private_b2_candidate(
     *,
     private_root: str | Path,
@@ -549,13 +723,24 @@ def main() -> int:
         help="Optional already-downloaded genuine Attempt 10 artifact directory; normally omitted.",
     )
     parser.add_argument("--repository-root", type=Path, default=REPOSITORY_ROOT)
+    parser.add_argument(
+        "--verify-existing",
+        action="store_true",
+        help="Read and revalidate an existing local private candidate without fetching source data.",
+    )
     args = parser.parse_args()
     try:
-        result = ingest_private_b2_candidate(
-            private_root=args.private_root,
-            repository_root=args.repository_root,
-            attempt10_root=args.attempt10_root,
-        )
+        if args.verify_existing:
+            result = verify_existing_private_b2_candidate(
+                private_root=args.private_root,
+                repository_root=args.repository_root,
+            )
+        else:
+            result = ingest_private_b2_candidate(
+                private_root=args.private_root,
+                repository_root=args.repository_root,
+                attempt10_root=args.attempt10_root,
+            )
     except PrivateIngestError as exc:
         print(json.dumps({
             "status": "BLOCKED",
