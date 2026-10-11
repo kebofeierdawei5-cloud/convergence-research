@@ -580,7 +580,7 @@ def test_sse_price_curl_transport_is_tls_only_and_size_bounded(monkeypatch) -> N
         output.write_bytes(raw)
         return type("Completed", (), {
             "returncode": 0,
-            "stdout": f"200\\n{MODULE.SSE_PRICE_URL}\\napplication/json\\n".encode("utf-8"),
+            "stdout": f"200\n{MODULE.SSE_PRICE_URL}\napplication/json\n".encode("utf-8"),
         })()
 
     monkeypatch.setattr(MODULE.subprocess, "run", fake_run)
