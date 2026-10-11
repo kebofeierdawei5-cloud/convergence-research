@@ -257,3 +257,23 @@ def test_independent_reviewer_role_requires_second_distinct_key(tmp_path):
     )
     assert completed["status"] == "FORMALLY_ADMITTED"
     assert {x["signer_key_id"] for x in completed["verified_signatures"]} == {"owner-test", "reviewer-test"}
+
+
+def test_one_key_cannot_self_certify_as_both_admission_signer_and_independent_reviewer(tmp_path):
+    payload, manifest, raw_root, rights, permission = _create_envelope(
+        tmp_path, required_roles=["EVIDENCE_ADMISSION_SIGNER", "INDEPENDENT_REVIEWER"]
+    )
+    registry, keys = _make_registry(tmp_path, roles_by_key={
+        "owner-test": ["EVIDENCE_ADMISSION_SIGNER", "INDEPENDENT_REVIEWER"],
+    })
+    envelope = {"schema_version": SIGNED_ADMISSION_SCHEMA, "payload": payload, "signatures": []}
+    envelope = add_signature(
+        envelope, signer_registry_path=registry, signer_key_id="owner-test",
+        private_key_path=keys["owner-test"], signed_at=SIGNED_AT,
+    )
+    result = verify_signed_admission(
+        envelope, manifest_path=manifest, raw_root=raw_root, rights_record_path=rights,
+        permission_evidence_path=permission, signer_registry_path=registry,
+    )
+    assert result["status"] == "SIGNATURES_PENDING"
+    assert "INDEPENDENT_REVIEWER_DISTINCT_SIGNER" in result["missing_signer_roles"]
