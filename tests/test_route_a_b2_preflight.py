@@ -11,7 +11,7 @@ from tools import company_evidence_intake as intake
 from tools.route_a_b2_preflight import (
     REPORT_FILENAME,
     RouteAB2PreflightError,
-    _b2_cutoff_end_of_day,
+    _b2_cutoff_instant,
     run_route_a_b2_preflight,
 )
 from tools.verify_company_evidence_intake import IndependentVerificationError
@@ -73,8 +73,22 @@ def test_cli_imports_b2_contract_when_started_outside_repo_root(tmp_path):
     assert "usage: route_a_b2_preflight.py" in completed.stdout
 
 
-def test_date_only_cutoff_is_expanded_to_eod_plus_0800():
-    assert _b2_cutoff_end_of_day("2026-10-09") == "2026-10-09T23:59:59+08:00"
+def test_date_only_cutoff_uses_start_of_day_plus_0800():
+    assert _b2_cutoff_instant("2026-10-09") == "2026-10-09T00:00:00+08:00"
+
+
+def test_explicit_timezone_cutoff_is_preserved():
+    explicit = "2026-10-09T15:00:00+08:00"
+    assert _b2_cutoff_instant(explicit) == explicit
+
+
+def test_b2_preflight_writes_canonical_start_of_day_cutoff(tmp_path):
+    root, _ = _capture(tmp_path)
+    report = run_route_a_b2_preflight(root, company="TESTCO")
+    b2_manifest = json.loads((root / "B2_COMPANY_EVIDENCE_MANIFEST.json").read_text(encoding="utf-8"))
+    assert b2_manifest["cutoff_date"] == "2026-10-09T00:00:00+08:00"
+    assert report["cutoff_date"] == "2026-10-09T00:00:00+08:00"
+    assert report["status"] == "BLOCKED_NOT_ADMITTED"
 
 
 def test_b2_preflight_reuses_exact_bytes_but_keeps_declared_known_at_unknown(tmp_path):
