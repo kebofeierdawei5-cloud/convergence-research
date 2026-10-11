@@ -16,6 +16,8 @@ The existing route stores the exact prompt and imported response bytes, binds th
 
 The frozen [B0 LLM Governance Boundary](B0_LLM_CANONICAL_EXECUTION_GOVERNANCE_FREEZE_20261007.md) requires an authorized producer boundary and semantic provenance bound to producer, version/policy, stage and input/output lineage. It also explicitly rejects treating arbitrary external JSON as canonical semantic evidence. No canonical B0 successor authorizing the weaker operator-asserted assurance tier was found on the inspected mainline. Until such a successor exists, current formal admission should fail closed for this channel.
 
+**Implementation mismatch found:** this NO-GO is not yet enforced as a hard runtime denial. `build_chatgpt_chat_runtime` currently registers the manual producer as active, and generic local semantic admission does not consume the handoff's `provider_origin_verified=false` as an authorization gate. The current source inspection therefore does not prove the adapter is technically prevented from reaching formal semantic admission when its other inputs are supplied. Treat this as a governance/runtime enforcement gap: do not select this adapter for formal decisions; the next narrow implementation PR must fail closed as `BLOCKED` / `NON_CANONICAL` before formal semantic admission, and add a regression proving that behavior. This must not be “fixed” by weakening or changing the frozen producer-authenticity contract.
+
 This recommendation does **not** change or close P0-LLM-001 / P0-LLM-004; both remain OPEN. It does not establish investment-strategy predictive validity, source admission, local Mac persistence, production-host acceptance, or a completed real-company run.
 
 ## 2. Canonical sources inspected
