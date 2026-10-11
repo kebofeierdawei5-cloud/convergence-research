@@ -191,13 +191,14 @@ This closes the repository-CLI route/persistence integration test gap only.
 
 **Next gates**
 
-1. Independent review the 13 page-located claims, source-date upper-bound basis and private internal fact-level use boundary. The exact first-public time and unrestricted reuse are not claimed.
-2. Resolve a permitted official/free 2026-10-08 close-price source with source-vintage/known-at and allowable internal-use terms. If not established, keep `market_price=UNKNOWN`; do not use 2026-10-09 close or infer a quote.
-3. Only after independent review and price admission may a new immutable successor be promoted and the unchanged seven-group Core/PIT gate rerun. No signed formal admission, production Host acceptance, Decision, Publication, complete Run Receipt or execution authority currently exists.
+1. Independently review the 13 page-located claims, conservative source-date upper bounds and private internal fact-level use boundary. Exact first-public intraday timestamps and unrestricted reuse are not claimed.
+2. The 2026-10-11 public-web search did **not** establish a permitted free price source. The official SZSE historical quote UI exists, but a date-specific raw response was not captured and its use-permission boundary remains unresolved; the official CNINFO platform advertises quote/history/API/data-mall features without proving a free retention-permitted route. Investing.com explicitly requires prior written permission for use/storage/copying; Yahoo automated collection is not authorized; Sohu/Eastmoney remain excluded. Machine record: `evidence/real_cases/RC-CN-A-002001-20261009/C2_MARKET_PRICE_SOURCE_REVIEW_20261011.json`.
+3. **Next action: operator-supplied original price evidence**, acquired from a source whose terms permit personal/internal research use, for the 2026-10-08 close of 002001. The original artifact must remain in the user's private workspace, never be uploaded to public GitHub. A typed number without source bytes is insufficient; source identity, byte hash, date/security binding, permitted-use basis and cutoff-safe `known_at` must be reviewed. If no suitable artifact exists or the review fails, retain `market_price=UNKNOWN` and leave B2 BLOCKED.
+4. Only after the independent fact review and price source adjudication pass may a new immutable successor be built and the unchanged seven-group Core/PIT validator rerun. No signed formal admission, production Host acceptance, Decision, Publication, complete Run Receipt or execution authority exists.
 
-**Pass criteria:** all seven required field groups are individually source/PIT/use-qualified; unchanged Core/PIT reports PASS; independent review is resolved; historic diagnostic inputs remain unchanged. The current candidate is a bounded advance, not final C2 admission.
+**Pass criteria:** all seven required field groups are individually source/PIT/use-qualified; unchanged Core/PIT reports PASS; independent review is resolved; historical diagnostics remain unchanged. The current candidate is a bounded advance, not final C2 admission.
 
-Machine/human audit record: `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md`.
+Machine/human audit records: `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md` and `evidence/real_cases/RC-CN-A-002001-20261009/C2_MARKET_PRICE_SOURCE_REVIEW_20261011.json`.
 
 ### Batch D1 — one real canonical 605016 run
 
