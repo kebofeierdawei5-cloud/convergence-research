@@ -101,22 +101,18 @@
     "exact_candidate_raw_bytes_verified": false
   },
   "next_action": {
-    "owner": "OPERATOR",
-    "requested_artifact": "Original quote artifact for 002001 closing price on 2026-10-08, lawfully obtained from a source whose terms permit personal/internal research use",
-    "examples": [
-      "Broker-provided historical-price export or statement with source, code, date and close clearly visible",
-      "Official/provider quote file with documented personal/internal use permission"
-    ],
+    "owner": "LOCAL_OPERATOR_RUNTIME",
+    "action": "Build and validate a private operator-attestation bundle from the already supplied C2 close; then rerun the unchanged C2 Core/PIT validator against the pinned Run #8 bytes.",
     "private_only": true,
     "github_raw_upload_allowed": false,
-    "typed_number_without_source_artifact_sufficient": false,
-    "automatic_admission": false,
+    "secondary_web_audit_required": false,
+    "explicit_attestation_required": true,
     "validation_required": [
-      "Exact raw bytes and SHA-256",
-      "Case/security/date binding",
-      "Source identity and permitted use review",
-      "Cutoff-safe known_at basis",
-      "Independent Core/PIT validation"
+      "case/security/date binding",
+      "exact SHA-256 of the operator-attestation bytes (not vendor bytes)",
+      "operator-attested known_at at or before case cutoff",
+      "unchanged Core/PIT validator",
+      "independent review of the 13 official-filing facts remains separate"
     ]
   },
   "formal_signed_admission_created": false,
@@ -134,5 +130,26 @@
     "quote_values_persisted": false,
     "public_raw_bytes_persisted": false,
     "next_step": "Provide an original quote artifact from a source whose terms permit personal/internal research and exact-byte private retention, or obtain explicit permission and then perform private raw-byte capture and independent PIT verification."
+  },
+  "operator_direct_input_policy": {
+    "instruction_received_on": "2026-10-11",
+    "policy": "When market-price data is missing, ask the operator directly for the security, observation date, and price. Do not perform a second web search/audit after a direct operator-supplied price unless explicitly requested.",
+    "evidence_class": "OPERATOR_ATTESTED_MARKET_DATA",
+    "secondary_web_audit_required": false,
+    "original_vendor_bytes_required": false,
+    "exact_operator_attestation_bundle_required": true,
+    "observation_date_must_precede_or_match_cutoff": true,
+    "known_at_must_be_operator_attested_and_cutoff_safe": true,
+    "numeric_quote_value_persisted_to_public_repository": false,
+    "source_verification_claimed": false,
+    "current_case_bundle_executed": false
+  },
+  "operator_market_price_attestation_implementation": {
+    "status": "IMPLEMENTATION_IN_REVIEW",
+    "branch": "feat/operator-market-price-attestation-20261011",
+    "policy_id": "IIOS-OPERATOR-MARKET-PRICE-ATTESTATION-0.1",
+    "quote_value_written_to_public_repository": false,
+    "no_secondary_web_audit": true,
+    "core_pit_pass_not_yet_claimed": true
   }
 }

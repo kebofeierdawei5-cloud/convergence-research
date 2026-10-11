@@ -130,7 +130,8 @@
         "EVENT_PUBLICATION_VERIFIED",
         "VENDOR_PIT_QUERY",
         "DERIVED_FROM_ADMITTED_RAW",
-        "UNKNOWN"
+        "UNKNOWN",
+        "OPERATOR_ATTESTED_MARKET_DATA"
       ]
     },
     "status": {
@@ -194,6 +195,88 @@
         "KNOWN_RESTRICTED",
         "UNKNOWN"
       ]
+    },
+    "operator_attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "operator_confirmed",
+        "secondary_web_audit_performed",
+        "case_id",
+        "market",
+        "symbol",
+        "company",
+        "observation_date",
+        "close_price",
+        "currency",
+        "source_ref",
+        "known_at",
+        "known_at_basis",
+        "attested_at",
+        "original_vendor_bytes_received"
+      ],
+      "properties": {
+        "policy_id": {
+          "const": "IIOS-OPERATOR-MARKET-PRICE-ATTESTATION-0.1"
+        },
+        "operator_confirmed": {
+          "const": true
+        },
+        "secondary_web_audit_performed": {
+          "const": false
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "market": {
+          "enum": [
+            "CN-A",
+            "HK"
+          ]
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1
+        },
+        "company": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "close_price": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,4})?$"
+        },
+        "currency": {
+          "enum": [
+            "CNY",
+            "HKD"
+          ]
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "known_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "known_at_basis": {
+          "const": "OPERATOR_ATTESTS_AVAILABLE_BY_END_OF_OBSERVATION_DATE"
+        },
+        "attested_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "original_vendor_bytes_received": {
+          "const": false
+        }
+      }
     }
   },
   "allOf": [
@@ -234,6 +317,34 @@
           "known_at": {
             "type": "string",
             "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "provenance_class": {
+            "const": "OPERATOR_ATTESTED_MARKET_DATA"
+          }
+        },
+        "required": [
+          "provenance_class"
+        ]
+      },
+      "then": {
+        "required": [
+          "operator_attestation",
+          "observation_date",
+          "value",
+          "currency"
+        ],
+        "properties": {
+          "field_id": {
+            "pattern": "^market_price\\."
+          },
+          "status": {
+            "const": "ADMITTED"
           }
         }
       }

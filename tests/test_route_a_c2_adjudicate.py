@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from tools.route_a_c2_adjudicate import (
     CASE_ID,
     CUTOFF_INSTANT,
@@ -97,3 +99,82 @@ def test_legacy_receipt_adapter_refuses_to_erase_non_default_payload_contract():
         assert str(exc) == "C2_LEGACY_PAYLOAD_TYPE_NOT_DEFAULT_ANY"
     else:
         raise AssertionError("non-default payload contract must remain blocked")
+
+
+def test_operator_attested_price_completes_only_the_price_group_without_web_reaudit(tmp_path):
+    from research.b2.company_evidence import build_company_evidence_manifest
+    from tools.iios_operator_market_price_attestation_v01 import build_operator_market_price_bundle
+    from tools.route_a_c2_adjudicate import _append_operator_market_price_attestation
+
+    bundle = tmp_path / "attestation"
+    build_operator_market_price_bundle(
+        case_id=CASE_ID,
+        market="CN-A",
+        symbol="002001",
+        company="浙江新和成股份有限公司",
+        cutoff_date=CUTOFF_INSTANT,
+        observation_date="2026-10-08",
+        close_price="123.45",
+        currency="CNY",
+        source_ref="OPERATOR-PROVIDED:synthetic test source",
+        out_dir=bundle,
+        operator_confirmed=True,
+        known_by_cutoff_confirmed=True,
+        attested_at="2026-10-11T12:00:00+08:00",
+    )
+    root = tmp_path / "rawroot"
+    root.mkdir()
+    evidence = []
+    raw_artifacts = []
+    record = _append_operator_market_price_attestation(
+        root=root,
+        bundle_dir=bundle,
+        evidence=evidence,
+        raw_artifacts=raw_artifacts,
+    )
+    manifest = build_company_evidence_manifest(
+        case_id=CASE_ID,
+        market="CN-A",
+        symbol="002001",
+        company="浙江新和成股份有限公司",
+        cutoff_date=CUTOFF_INSTANT,
+        evidence=evidence,
+        raw_artifacts=raw_artifacts,
+        required_field_groups=["market_price"],
+        raw_root=root,
+    )
+    assert record["provenance_class"] == "OPERATOR_ATTESTED_MARKET_DATA"
+    assert manifest["status"] == "PASS"
+    assert manifest["validation_errors"] == []
+    assert (root / "operator_attestations" / "operator_market_price_attestation.json").is_file()
+
+
+def test_operator_price_bundle_is_bound_to_c2_security_and_date(tmp_path):
+    from tools.iios_operator_market_price_attestation_v01 import build_operator_market_price_bundle
+    from tools.route_a_c2_adjudicate import _append_operator_market_price_attestation
+
+    bundle = tmp_path / "attestation"
+    build_operator_market_price_bundle(
+        case_id=CASE_ID,
+        market="CN-A",
+        symbol="000001",
+        company="WRONG",
+        cutoff_date=CUTOFF_INSTANT,
+        observation_date="2026-10-08",
+        close_price="123.45",
+        currency="CNY",
+        source_ref="OPERATOR-PROVIDED:synthetic test source",
+        out_dir=bundle,
+        operator_confirmed=True,
+        known_by_cutoff_confirmed=True,
+        attested_at="2026-10-11T12:00:00+08:00",
+    )
+    root = tmp_path / "rawroot"
+    root.mkdir()
+    with pytest.raises(ValueError, match="C2_OPERATOR_PRICE_BINDING_MISMATCH:symbol"):
+        _append_operator_market_price_attestation(
+            root=root,
+            bundle_dir=bundle,
+            evidence=[],
+            raw_artifacts=[],
+        )

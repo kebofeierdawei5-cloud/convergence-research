@@ -8,6 +8,7 @@ KNOWN_PROVENANCE = {
     "EVENT_PUBLICATION_VERIFIED",
     "VENDOR_PIT_QUERY",
     "DERIVED_FROM_ADMITTED_RAW",
+    "OPERATOR_ATTESTED_MARKET_DATA",
     "UNKNOWN",
 }
 
@@ -84,6 +85,49 @@ def validate_evidence_record(evidence: Any) -> list[str]:
     status = evidence.get("status")
     if status not in {"ADMITTED", "CONDITIONAL", "UNKNOWN", "BLOCKED"}:
         errors.append("STATUS:invalid")
+    if evidence.get("provenance_class") == "OPERATOR_ATTESTED_MARKET_DATA":
+        attestation = evidence.get("operator_attestation")
+        if not str(evidence.get("field_id", "")).startswith("market_price."):
+            errors.append("OPERATOR_ATTESTATION:MARKET_PRICE_FIELD_ONLY")
+        if status != "ADMITTED":
+            errors.append("OPERATOR_ATTESTATION:STATUS_MUST_BE_ADMITTED")
+        if not isinstance(attestation, dict):
+            errors.append("OPERATOR_ATTESTATION:REQUIRED")
+        else:
+            if attestation.get("policy_id") != "IIOS-OPERATOR-MARKET-PRICE-ATTESTATION-0.1":
+                errors.append("OPERATOR_ATTESTATION:POLICY_ID_INVALID")
+            if attestation.get("operator_confirmed") is not True:
+                errors.append("OPERATOR_ATTESTATION:OPERATOR_CONFIRMATION_REQUIRED")
+            if attestation.get("secondary_web_audit_performed") is not False:
+                errors.append("OPERATOR_ATTESTATION:SECONDARY_WEB_AUDIT_FLAG_INVALID")
+            if attestation.get("original_vendor_bytes_received") is not False:
+                errors.append("OPERATOR_ATTESTATION:RAW_VENDOR_BYTES_MUST_NOT_BE_CLAIMED")
+            if attestation.get("case_id") != evidence.get("subject_id"):
+                errors.append("OPERATOR_ATTESTATION:CASE_BINDING_MISMATCH")
+            if attestation.get("source_ref") != evidence.get("source_ref"):
+                errors.append("OPERATOR_ATTESTATION:SOURCE_REF_MISMATCH")
+            if attestation.get("known_at") != evidence.get("known_at"):
+                errors.append("OPERATOR_ATTESTATION:KNOWN_AT_MISMATCH")
+            if attestation.get("observation_date") != evidence.get("observation_date"):
+                errors.append("OPERATOR_ATTESTATION:OBSERVATION_DATE_MISMATCH")
+            if evidence.get("currency") != attestation.get("currency"):
+                errors.append("OPERATOR_ATTESTATION:CURRENCY_MISMATCH")
+            if attestation.get("known_at_basis") != "OPERATOR_ATTESTS_AVAILABLE_BY_END_OF_OBSERVATION_DATE":
+                errors.append("OPERATOR_ATTESTATION:KNOWN_AT_BASIS_INVALID")
+            close = attestation.get("close_price")
+            value = evidence.get("value")
+            try:
+                from decimal import Decimal, InvalidOperation
+                if Decimal(str(close)) != Decimal(str(value)):
+                    errors.append("OPERATOR_ATTESTATION:VALUE_MISMATCH")
+                if not Decimal(str(close)).is_finite() or Decimal(str(close)) <= 0:
+                    errors.append("OPERATOR_ATTESTATION:CLOSE_PRICE_INVALID")
+            except (InvalidOperation, TypeError, ValueError):
+                errors.append("OPERATOR_ATTESTATION:CLOSE_PRICE_INVALID")
+            try:
+                parse_temporal(attestation.get("attested_at"), "operator_attestation.attested_at")
+            except ValueError:
+                errors.append("OPERATOR_ATTESTATION:ATTESTED_AT_INVALID")
     known_raw = evidence.get("known_at")
     known_missing = known_raw is None or (
         isinstance(known_raw, str) and not known_raw.strip()

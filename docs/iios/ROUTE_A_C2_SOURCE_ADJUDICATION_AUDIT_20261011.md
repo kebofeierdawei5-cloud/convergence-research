@@ -146,3 +146,21 @@ From the existing 11 page-located extraction candidates, the 2026-10-09 buyback-
 - No numeric quote value, article text, screenshot, or raw market-data bytes were added to public machine records. The existing machine report records the source locators and the blocked disposition only.
 
 **Narrow next step:** do not ask the operator to resend the same Stockstar URL or retype the value. Obtain an original historical quote export/statement from a source whose terms permit personal/internal research and private byte retention, or obtain explicit permission from the relevant data provider. Keep it in the private workspace; hash its exact bytes; bind security and observation date; verify cutoff-safe `known_at`; then run the independent unchanged Core/PIT validator. Until every step passes, keep `market_price=UNKNOWN`.
+
+
+## 9. Operator-direct market-price input policy and implementation — 2026-10-11
+
+**Operator direction:** when market-price information is needed, ask the operator directly for the security, observation date, and price. After a direct operator-supplied price, do **not** perform a second web search or source-page audit unless the operator explicitly requests one. This supersedes the earlier instruction in sections 7–8 to keep asking for a source artifact or continue searching.
+
+**Evidence boundary:** the system records such input as OPERATOR_ATTESTED_MARKET_DATA, not as SOURCE_VINTAGE_VERIFIED. The input carries an explicit operator assertion that the value was available by the declared known_at, plus security/date/cutoff bindings and a SHA-256 over the private attestation JSON. The hash proves the exact attestation bytes only; it does not prove the linked publisher's source bytes or independently verify the quote. The numeric value and value-bearing attestation must remain in the operator's private workspace and must never be committed to this public repository or uploaded as a public Actions artifact.
+
+**Implementation:** the PR for branch feat/operator-market-price-attestation-20261011 adds the evidence provenance class, narrow validation restrictions (market_price.* only), a local bundle writer, explicit cutoff confirmation, and an optional private-bundle path in the C2 successor tool. The default CI path remains unchanged and blocked on the missing operator bundle; CI must not receive the real quote value. The test-only synthetic quote is not evidence for this case.
+
+**Next execution order:**
+
+1. Run the private bundle writer for the already supplied 002001 close. Do not fetch or re-audit the Stockstar URL. The writer defaults known_at to 23:59:59 +08:00 on the observation date and requires explicit operator confirmation that it is cutoff-safe.
+2. Run the C2 successor locally using the original pinned Run #8 archive plus the private bundle. The unchanged Core/PIT validator must report all seven required groups covered; otherwise remain BLOCKED and inspect the exact validator errors.
+3. Keep the 13 official-filing source/vintage independent review as a separate gate. A Core/PIT pass on the operator-attested price alone is not formal signed admission, production Host acceptance, a canonical Decision, Publication, or Run Receipt.
+4. Continue the primary 605016 production Host acceptance critical path in parallel; do not let the C2 price-source web-search loop delay it.
+
+**Non-claims:** the direct user input has not yet been executed through the private bundle tool in this repository runtime. No C2 PASS, formal admission, production Host acceptance, Decision, Publication, complete Run Receipt, or execution authority is claimed by this policy amendment.
