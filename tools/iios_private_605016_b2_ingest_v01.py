@@ -44,6 +44,8 @@ CUTOFF_DATE = "2026-10-09"
 PRICE_EVIDENCE_ID = "605016-SSE-HTTPS-DAILY-CLOSE-20261008"
 EXPECTED_PRICE_RAW_SHA256 = "45c8eece737c57ec11deb34ad099dcc8f9f88f9c5e080be53992d2ec707b3480"
 RECEIPT_SCHEMA = "IIOS-LOCAL-PRIVATE-B2-PERSISTENCE-0.1"
+RECEIPT_SCHEMA_REVIEWED = "IIOS-LOCAL-PRIVATE-B2-PERSISTENCE-0.2"
+SOURCE_VINTAGE_REVIEWED_STATUS = "BOUNDED_PUBLIC_AVAILABILITY_ACCEPTED_FOR_PIT"
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_ATTEMPT10_FILES = (
     "intake_manifest.json",
@@ -605,7 +607,8 @@ def _candidate_fingerprint(manifest: Mapping[str, Any]) -> str:
                 "unit", "basis", "observation_date", "known_at", "known_at_basis",
                 "published_at", "source_ref", "artifact_id", "content_sha256",
                 "exact_bytes", "provenance_class", "status", "license_status",
-                "source_origin_adjudication",
+                "source_origin_adjudication", "source_vintage_adjudication_id",
+                "first_public_time_precision",
             )
         })
     evidence_projection.sort(key=lambda item: str(item["evidence_id"]))
@@ -628,6 +631,8 @@ def _candidate_fingerprint(manifest: Mapping[str, Any]) -> str:
         "evidence": evidence_projection,
         "raw_artifacts": raw_projection,
     }
+    if isinstance(manifest.get("source_vintage_adjudication"), Mapping):
+        stable["source_vintage_adjudication"] = manifest["source_vintage_adjudication"]
     return _sha256(_canonical_bytes(stable))
 
 
@@ -874,11 +879,15 @@ def _verify_private_candidate_contents(
     fingerprint = _candidate_fingerprint(manifest)
     if candidate_dir.name != fingerprint:
         raise PrivateIngestError("EXISTING_PRIVATE_DIRECTORY_FINGERPRINT_MISMATCH")
-    if receipt.get("schema_version") != RECEIPT_SCHEMA:
-        raise PrivateIngestError("EXISTING_PRIVATE_RECEIPT_SCHEMA_MISMATCH")
-
     manifest_path = candidate_dir / "company_evidence_manifest.json"
     manifest_sha = _sha256(manifest_path.read_bytes())
+    raw_root = candidate_dir / "evidence_root"
+    vintage = _source_vintage_state(
+        manifest, raw_root=raw_root, repository_root=repository_root
+    )
+    expected_schema = RECEIPT_SCHEMA_REVIEWED if not vintage["source_vintage_review_required"] else RECEIPT_SCHEMA
+    if receipt.get("schema_version") != expected_schema:
+        raise PrivateIngestError("EXISTING_PRIVATE_RECEIPT_SCHEMA_MISMATCH")
     expected_receipt = {
         "status": "PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
         "case_id": CASE_ID,
@@ -889,7 +898,7 @@ def _verify_private_candidate_contents(
         "official_price_source_sha256": EXPECTED_PRICE_RAW_SHA256,
         "official_price_observation_date": "2026-10-08",
         "exact_first_public_timestamp_verified": False,
-        "source_vintage_review_required": True,
+        "source_vintage_review_required": vintage["source_vintage_review_required"],
         "evidence_record_count": len(manifest.get("evidence") or []),
         "raw_artifact_count": len(manifest.get("raw_artifacts") or []),
         "admitted_field_group_count": len(REQUIRED_FIELD_GROUPS_FOR_REPORT),
@@ -905,13 +914,19 @@ def _verify_private_candidate_contents(
         "human_approval_required": True,
         "auto_execution": False,
     }
+    if not vintage["source_vintage_review_required"]:
+        expected_receipt.update({
+            "source_vintage_status": SOURCE_VINTAGE_REVIEWED_STATUS,
+            "source_vintage_adjudication_sha256": vintage["adjudication_sha256"],
+            "official_price_known_at": vintage["public_availability_upper_bound"],
+            "official_price_known_at_basis": _price_evidence(manifest)["known_at_basis"],
+        })
     for field, expected_value in expected_receipt.items():
         if receipt.get(field) != expected_value:
             raise PrivateIngestError("EXISTING_PRIVATE_RECEIPT_SEMANTICS_MISMATCH:" + field)
     if not isinstance(receipt.get("created_at"), str) or not receipt["created_at"].strip():
         raise PrivateIngestError("EXISTING_PRIVATE_RECEIPT_CREATED_AT_MISSING")
 
-    raw_root = candidate_dir / "evidence_root"
     declarations = manifest.get("raw_artifacts")
     if not isinstance(declarations, list) or not declarations:
         raise PrivateIngestError("EXISTING_PRIVATE_RAW_DECLARATIONS_MISSING")
@@ -945,8 +960,14 @@ def _verify_private_candidate_contents(
         "raw_artifact_count_semantics": "MANIFEST_DECLARATIONS_NOT_UNIQUE_FILES",
         "evidence_record_count": len(manifest.get("evidence") or []),
         "core_validator_status": "PASS",
-        "source_vintage_review_required": True,
+        "source_vintage_status": (
+            SOURCE_VINTAGE_REVIEWED_STATUS if not vintage["source_vintage_review_required"]
+            else "REVIEW_REQUIRED_EXACT_ENDPOINT_FIRST_PUBLIC_TIMESTAMP"
+        ),
+        "source_vintage_review_required": vintage["source_vintage_review_required"],
         "exact_first_public_timestamp_verified": False,
+        "source_vintage_adjudication_sha256": vintage.get("adjudication_sha256"),
+        "public_availability_upper_bound": vintage.get("public_availability_upper_bound"),
         "formal_signed_admission_created": False,
         "production_host_accepted": False,
         "decision_created": False,
@@ -997,7 +1018,21 @@ def verify_existing_private_b2_candidate(
         "candidate_count": len(verified),
         "candidates": verified,
         "official_source_refetched": False,
-        "source_vintage_review_required": True,
+        "active_candidate_fingerprint": next(
+            (item["candidate_fingerprint"] for item in reversed(verified)
+             if item.get("source_vintage_review_required") is False),
+            verified[-1]["candidate_fingerprint"],
+        ),
+        "source_vintage_review_required": next(
+            (item["source_vintage_review_required"] for item in reversed(verified)
+             if item.get("source_vintage_review_required") is False),
+            True,
+        ),
+        "source_vintage_status": next(
+            (item["source_vintage_status"] for item in reversed(verified)
+             if item.get("source_vintage_review_required") is False),
+            "REVIEW_REQUIRED_EXACT_ENDPOINT_FIRST_PUBLIC_TIMESTAMP",
+        ),
         "exact_first_public_timestamp_verified": False,
         "formal_signed_admission_created": False,
         "production_host_accepted": False,
@@ -1053,7 +1088,17 @@ def ingest_private_b2_candidate(
             raise PrivateIngestError("EPHEMERAL_B2_MANIFEST_HAS_ERRORS")
         if not isinstance(manifest.get("audit"), Mapping):
             raise PrivateIngestError("EPHEMERAL_B2_AUDIT_MISSING")
-        price = _price_record_preflight(manifest, ephemeral_report)
+        _price_record_preflight(manifest, ephemeral_report)
+        manifest = _adjudicate_source_vintage_manifest(
+            manifest,
+            raw_root=raw_root,
+            repository_root=repository_root,
+        )
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\\n",
+            encoding="utf-8",
+        )
+        price = _price_evidence(manifest)
         core_errors = _validate_core(
             manifest, raw_root, core_validator, repository_root=repository_root
         )
@@ -1138,7 +1183,7 @@ def ingest_private_b2_candidate(
                 raise PrivateIngestError("PERSISTED_RAW_ARTIFACT_COUNT_MISMATCH")
 
             receipt_core = {
-                "schema_version": RECEIPT_SCHEMA,
+                "schema_version": RECEIPT_SCHEMA_REVIEWED,
                 "status": "PERSISTED_B2_CANDIDATE_CORE_VALIDATOR_PASS_NOT_PRODUCTION_ACCEPTED",
                 "case_id": CASE_ID,
                 "cutoff_date": CUTOFF_DATE,
@@ -1149,9 +1194,13 @@ def ingest_private_b2_candidate(
                 "official_price_source_sha256": EXPECTED_PRICE_RAW_SHA256,
                 "official_price_observation_date": "2026-10-08",
                 "official_price_known_at": price.get("known_at"),
-                "official_price_known_at_basis": "MARKET_SESSION_CLOSE_EVENT_TIME; the endpoint does not disclose the exact first-public timestamp for the historical row.",
+                "official_price_known_at_basis": price.get("known_at_basis"),
                 "exact_first_public_timestamp_verified": False,
-                "source_vintage_review_required": True,
+                "source_vintage_review_required": False,
+                "source_vintage_status": SOURCE_VINTAGE_REVIEWED_STATUS,
+                "source_vintage_adjudication_sha256": (
+                    manifest["source_vintage_adjudication"]["adjudication_sha256"]
+                ),
                 "evidence_record_count": len(manifest.get("evidence") or []),
                 "raw_artifact_count": copied_count,
                 "admitted_field_group_count": len(REQUIRED_FIELD_GROUPS_FOR_REPORT),
@@ -1249,15 +1298,26 @@ def main() -> int:
         help="Optional already-downloaded genuine Attempt 10 artifact directory; normally omitted.",
     )
     parser.add_argument("--repository-root", type=Path, default=REPOSITORY_ROOT)
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--verify-existing",
         action="store_true",
-        help="Read and revalidate an existing local private candidate without fetching source data.",
+        help="Read and revalidate existing local private candidates without fetching source data.",
+    )
+    mode.add_argument(
+        "--adjudicate-source-vintage",
+        action="store_true",
+        help="Create an immutable rule-bounded successor from existing local raw bytes; no source fetch.",
     )
     args = parser.parse_args()
     try:
         if args.verify_existing:
             result = verify_existing_private_b2_candidate(
+                private_root=args.private_root,
+                repository_root=args.repository_root,
+            )
+        elif args.adjudicate_source_vintage:
+            result = adjudicate_existing_private_b2_candidate(
                 private_root=args.private_root,
                 repository_root=args.repository_root,
             )
