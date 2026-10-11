@@ -4,7 +4,7 @@
 - Record class: architecture/product-scope decision; documentation-only
 - Decision baseline: `main@3684689fab0376473ac6f514c71b97fbb450363f`
 - State authority: `docs/PROJECT_STATE_INDEX.md`
-- Status in this branch: proposed for canonical promotion by PR; it does not claim runtime or MVP acceptance
+- Status on canonical main: DECISION RECORDED / CANONICAL; implementation gates remain open. This record does not claim runtime or MVP acceptance
 - Scope: reconcile product-effectiveness audit #310, local-single-user red-team #311, and Local-first proposal #312 with the existing canonical batch/PILOT acceptance framework.
 
 ## 1. Decision
