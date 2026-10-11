@@ -1,22 +1,20 @@
 # IIOS Project Status
 
 State classification: **CANONICAL SUMMARY**
-Date: 2026-10-10
+Date: 2026-10-11
 
 Authoritative current-state record:
 `docs/PROJECT_STATE_INDEX.md`
 
-## Current 605016 private persistence and source-vintage status — 2026-10-11
+## Current C1 / C2 evidence status — 2026-10-11
 
-- PR [#327](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/327) fixed the `--verify-existing` Core import path and merged. The operator subsequently confirmed read-only replay PASS: one existing private candidate, 11 evidence records/declarations, 8 unique raw files; Core/PIT PASS; no official source refetch.
-- PR [#328](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/328) synchronized the PASS into canonical State Index and audit records.
-- C1 PR [#329](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/329) implements a rule-bounded PIT successor from already-persisted raw bytes. Official SSE trading rules support a conservative public-availability upper bound of 2026-10-08 15:30 +08 for the 2026-10-08 close. It **does not** claim the historical endpoint's exact first-public timestamp; that flag remains false. Official rule raw bytes were not hashed in the current run, and this limitation is recorded.
-- Latest code-only exact-head CI: private contract 53/53 PASS; B2 Data Evidence PIT 31/31 PASS; company Evidence/PIT 23/23 PASS; B2 scope 3/3 PASS; compile/schema/shell/diff checks PASS. Final docs-updated HEAD must be checked again before merge.
-- Local migration has not yet run. Only after PR #329 merges with final-head CI PASS, run `tools/Launch_IIOS_Private_605016_B2_Ingest.command --adjudicate-source-vintage`. This uses public GitHub code, no GitHub CLI login, no Attempt 10 download and no official source refetch. It creates a new immutable candidate and leaves the prior candidate unchanged.
-- Formal signed admission, production Host acceptance, bundle, Decision, publication and execution remain NOT ACCEPTED.
+- **C1 / 605016:** the operator reported a successful bounded source-vintage successor migration. The candidate contains 11 evidence records and 8 unique raw files; Core/PIT validator PASS. The exact endpoint first-public timestamp remains unverified. Formal signed admission and production Host acceptance are not granted.
+- **C1 exact-head checks:** private persistence 53/53 PASS; B2 data Evidence/PIT 31/31 PASS; company Evidence/PIT 23/23 PASS; B2 scope 3/3 PASS; State Hygiene, C0 Governance, Investment Core and independent red-team PASS.
+- **Next evidence task: C2 / 新和成 (002001.SZ).** The Run #8 archive hash and all eight captured raw objects independently verify. The old Run #8 B2 manifest uses an end-of-day timestamp that conflicts with the canonical date-only cutoff rule. Preserve it as diagnostic only; rebuild under the correct cutoff, leave the 2026-10-09 same-day buyback notice and any same-day close out, and keep B2 BLOCKED until seven-group Evidence/PIT admission passes.
+- C2 source audit: docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md. The audit is diagnostic and does not admit facts or assert reuse rights.
+- Primary 605016 production Host/semantic/Forecast/Valuation and complete Run Receipt replay remain an independent open critical path. No formal Decision or automatic execution is authorized.
 
-Canonical source of truth remains `docs/PROJECT_STATE_INDEX.md`.
-
+Canonical source of truth remains docs/PROJECT_STATE_INDEX.md.
 ## Latest P0 status — 2026-10-10
 
 P0 Batch B3 is merged in PR [#276](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/276), merge commit `d3582621918b285f29b4573c2618c1072247885c`. Formal Decision Revision, Publication and Report writers now revalidate persisted upstream admissions and fail closed when those bytes are missing.
