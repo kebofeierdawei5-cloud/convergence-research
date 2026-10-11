@@ -277,3 +277,17 @@ def test_one_key_cannot_self_certify_as_both_admission_signer_and_independent_re
     )
     assert result["status"] == "SIGNATURES_PENDING"
     assert "INDEPENDENT_REVIEWER_DISTINCT_SIGNER" in result["missing_signer_roles"]
+
+
+def test_public_company_disclosure_admission_requires_independent_reviewer(tmp_path):
+    manifest, raw_root, _ = _make_manifest(tmp_path)
+    rights, permission = _write_rights(
+        tmp_path, source_class="PUBLIC_COMPANY_DISCLOSURE",
+        status="ALLOWED", basis_kind="OFFICIAL_TERMS_REVIEWED",
+        required_roles=["EVIDENCE_ADMISSION_SIGNER"],
+    )
+    with pytest.raises(SignedAdmissionError, match="PUBLIC_COMPANY_DISCLOSURE_REQUIRES_INDEPENDENT_REVIEWER"):
+        build_admission_payload(
+            manifest_path=manifest, raw_root=raw_root, rights_record_path=rights,
+            permission_evidence_path=permission, decision="ADMIT", signed_at=SIGNED_AT,
+        )
