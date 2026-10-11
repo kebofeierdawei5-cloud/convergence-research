@@ -13,7 +13,7 @@ This order supersedes the earlier “Immediate execution order” further below.
 
 **No local LLM/Ollama/model/API prerequisite applies to Batch 1, evidence signer code/key generation, or exchange-rights review.** The unresolved formal semantic-producer assurance remains an explicit separate gate; ordinary ChatGPT Free Web output must not be relabelled canonical.
 
-**Batch 0 CI anomaly:** run `38137977103` on `f632169f4da60a19f194b0abba109600c67e51f3` shows failure with zero jobs, while the workflow lacked an explicit push trigger. It is not evidence of failed test assertions. The explicit push trigger added by Batch 0 allows a subsequent main-commit run to produce real job/step evidence. If the result still contains zero jobs, escalate workflow/repository execution configuration without inferring code failure or success.
+**Batch 0 CI anomaly:** run `38137977103` on `f632169f4da60a19f194b0abba109600c67e51f3` shows failure with zero jobs, while the workflow lacked an explicit push trigger. It is not evidence of failed test assertions. Follow-up after Batch 0: the explicit push trigger did NOT resolve the anomaly; run `38143107853` at `main@e06669fc6093669e2bfd657a8679c6d061d414e3` again reports `failure` with zero jobs. Keep this item OPEN and investigate workflow execution/check-suite configuration in a separate narrow CI repair. It is not a test assertion failure and cannot be treated as PASS. This specific anomaly does not replace or mask the dedicated Batch 1 scenario-analysis test workflow.
 
 
 **Plan class:** execution plan / canonical-main recovery  
