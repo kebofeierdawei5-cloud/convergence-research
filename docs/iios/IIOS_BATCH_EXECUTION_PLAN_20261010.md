@@ -19,10 +19,12 @@ This order supersedes all following historical task ordering. Current `main` and
 - Show manual price/source assurance and `PILOT_NON_CANONICAL` status clearly.
 - Persist locally and replay/recompute, require human approval separation, and never execute trades.
 
+**Operator-price software acceptance checkpoint (2026-10-11):** MP-1/MP-2 and the report-assurance surface are merged in PRs #366/#368/#370. MP-3 cross-layer, company Evidence/PIT isolation, snapshot-tamper, provenance, blocked-run no-publication and complete Run Receipt replay test slices are merged in PRs #372/#375/#377/#378/#379/#383. PR #383 completes a synthetic successful operator-price run through Decision Admission → Machine Publication → investor report → COMPLETE Run Envelope → complete Run Receipt, checks the receipt stage hashes/chain against the final Run Envelope, and rejects a tampered-then-rehashed Run Receipt. This is code/CI evidence only, not evidence that the operator's Mac has executed or replayed a real bundle. The execution-first order therefore pauses residual MP-3 permutations and proceeds to a clearly labelled `PILOT_NON_CANONICAL` local single-company run; actual sanitized private bundle/receipt/replay review remains open. No formal Evidence/PIT or investment Decision is implied.
+
 **Historical-order notice:** the Batch 0/1/2/C1/C2/formal-host sequence below documents completed milestones and formalization tracks; it is no longer the order that must finish before the local pilot.
 
 **Plan class:** execution plan / canonical-main recovery  
-**Authority baseline for this refresh:** `main@18854586bd6cd71059d6da7d3beef4f1f61a8e64`  
+**Authority baseline for this refresh:** `main@c22c75d3bfce4e044cbadb155f5645f6384f014c`  
 **State authority:** `docs/PROJECT_STATE_INDEX.md`  
 **Purpose:** move IIOS from validated control-plane code to a real, fail-closed, single-company research run without making external LLM API credentials a Route A prerequisite.
 
