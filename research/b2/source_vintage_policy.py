@@ -74,14 +74,14 @@ def _cutoff_datetime(cutoff_date: str) -> datetime:
 
 def _safe_relative_path(value: Any) -> PurePosixPath:
     if not isinstance(value, str) or not value.strip() or chr(92) in value:
-        raise SourceVintageAdjudicationError("SOURCE_VINTAGE_RAW_PATH_INVALID")
+        raise SourceVintageAdjudicationError("RAW_ARTIFACT_RELATIVE_PATH_UNSAFE")
     path = PurePosixPath(value)
     if (
         path.is_absolute()
         or any(part in {"", ".", ".."} for part in value.split("/"))
         or (path.parts and ":" in path.parts[0])
     ):
-        raise SourceVintageAdjudicationError("SOURCE_VINTAGE_RAW_PATH_INVALID")
+        raise SourceVintageAdjudicationError("RAW_ARTIFACT_RELATIVE_PATH_UNSAFE")
     return path
 
 
@@ -347,7 +347,7 @@ def adjudicate_605016_source_vintage(
     result["validation_errors"] = errors
     if errors:
         raise SourceVintageAdjudicationError(
-            "SOURCE_VINTAGE_SUCCESSOR_CORE_VALIDATOR_BLOCKED:" + ",".join(errors[:8])
+            "CORE_OWNED_B2_PIT_VALIDATOR_BLOCKED:" + ",".join(errors[:8])
         )
     validate_source_vintage_adjudication(
         result, raw_root=raw_root, expected_price_sha256=expected_price_sha256
