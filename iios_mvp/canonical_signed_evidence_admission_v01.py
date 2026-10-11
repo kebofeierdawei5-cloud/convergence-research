@@ -178,6 +178,8 @@ def _validate_rights_record(
         raise SignedAdmissionError("REQUIRED_SIGNER_ROLES_INVALID")
     if "EVIDENCE_ADMISSION_SIGNER" not in required_roles:
         raise SignedAdmissionError("EVIDENCE_ADMISSION_SIGNER_ROLE_REQUIRED")
+    if source_class == "PUBLIC_COMPANY_DISCLOSURE" and "INDEPENDENT_REVIEWER" not in required_roles:
+        raise SignedAdmissionError("PUBLIC_COMPANY_DISCLOSURE_REQUIRES_INDEPENDENT_REVIEWER")
 
     if decision == "ADMIT":
         if status != "ALLOWED":
