@@ -173,7 +173,7 @@ This closes the repository-CLI route/persistence integration test gap only.
 **PIT price-date correction:** the cutoff is date-only `2026-10-09` and is interpreted as the start of that date. The applicable market-price observation is the latest fully completed session before cutoff, `2026-10-08`, not the `2026-10-09` close. The date-only rule must not be changed to end-of-day merely to admit same-day data.
 ### Batch C2 — 新和成 (002001.SZ) cutoff-safe successor adjudication
 
-**Status: ACTUAL PRIVATE CORE/PIT PASS (7/7; OPERATOR-ATTESTED) / PR #338 + #340 + #341 MERGED / INDEPENDENT FACT REVIEW, FORMAL ADMISSION AND PRODUCTION HOST OPEN.**
+**Status: ACTUAL PRIVATE CORE/PIT PASS (7/7; OPERATOR-ATTESTED) / C2-P3 SEPARATE-METHOD CI PASS (13/13) / PR #345 MERGED / USE RIGHTS AND EXTERNAL SIGN-OFF OPEN.**
 
 **Resolved breakpoint and exact-head execution**
 
@@ -192,12 +192,20 @@ This closes the repository-CLI route/persistence integration test gap only.
 **Next gates**
 
 1. **Completed:** direct operator-provided close handled through the private `OPERATOR_ATTESTED_MARKET_DATA` path; no second web audit was performed. The actual private run of the merged tool passed all seven Core/PIT groups with 14 evidence records (13 official filing candidates plus one operator-attested price), while preserving the pinned Run #8 bytes. See audit section 10 for hashes; numeric values and the private manifest remain off GitHub.
-2. **Next: independent C2 fact review.** A genuinely separate reviewer must adjudicate the 13 page-located official-filing claims, conservative source-date `known_at` upper bounds, and private fact-level use/redistribution boundary. The local second-pass checks (13/13 locators, source-date bounds and source-domain bindings) are useful preparation but are not an independent external review or legal opinion.
+2. **Completed: separate-method C2-P3 review in CI.** PR [#345](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/345) and exact-head workflow [#38126026797](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38126026797) passed by re-opening the pinned Run #8 capture, independently extracting the 13 PDF locator sets and validating original member hashes, official HTTPS source bindings and conservative `known_at` bounds. This is not a separate human/external reviewer or legal opinion. The output explicitly shows all sources remain `PUBLIC_ACCESS_REUSE_UNKNOWN`, so the independent human/use-rights review is still the current blocker.
 3. After that review, prepare a new immutable case successor and complete formal signed Evidence/PIT admission. Preserve the operator-attested market-price class as distinct from source-vintage-verified price data. Do not repeat price web search unless the operator explicitly asks.
 4. **D2 remains blocked** until the independent fact review and signed admission pass, then production Host acceptance is demonstrated. Only after genuine authorized stages are available may D2 proceed through Forecast/Valuation/Decision/Publication, complete `IIOS_RUN_RECEIPT`, and independent replay. No formal admission, Host acceptance, Decision, Publication, receipt or execution authority is currently claimed.
 **Pass criteria:** all seven required field groups are individually source/PIT/use-qualified; unchanged Core/PIT reports PASS; independent review is resolved; historical diagnostics remain unchanged. The current candidate is a bounded advance, not final C2 admission.
 
 Machine/human audit records: `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md` and `evidence/real_cases/RC-CN-A-002001-20261009/C2_MARKET_PRICE_SOURCE_REVIEW_20261011.json`. Normative operator-attestation policy: `docs/iios/OPERATOR_MARKET_PRICE_ATTESTATION_v0.1.md`.
+
+### Batch D1-A — production Host acceptance runbook and evidence gate
+
+**Status:** RUNBOOK CANONICAL; REAL HOST ACCEPTANCE OPEN.
+
+- [D1-A runbook](https://github.com/kebofeierdawei5-cloud/convergence-research/blob/main/docs/iios/D1_A_PRODUCTION_HOST_ACCEPTANCE_RUNBOOK_20261011.md) defines configuration-only check, actual `/healthz` and `/readyz` probes, real host-origin request-intent/semantic invocation, Ed25519 receipt verification, durable persistence and clean replay.
+- The sanitized machine status at `evidence/real_cases/RC-CN-A-605016-20261009/D1_A_HOST_ACCEPTANCE_STATUS_20261011.json` explicitly keeps host process, provider invocation, signed receipts, durable replay, canonical run and acceptance false. No real operator-host evidence was available in this task session.
+- A local `--check-config`, CI PASS, `healthz` or `readyz` alone cannot close D1-A. The host must invoke an authorized provider-backed factory. A local Ollama-compatible endpoint can avoid paid API keys under `SELF_HOSTED` + `AUTH_MODE=NONE` on loopback; the private Ed25519 signing key stays in the operator environment.
 
 ### Batch D1 — one real canonical 605016 run
 
