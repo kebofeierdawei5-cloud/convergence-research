@@ -167,6 +167,7 @@ def admit_canonical_decision(
     independent_forecast_resolver: Any | None = None,
     upstream_authority_resolver: Any | None = None,
     valuation_output_resolver: Any | None = None,
+    operator_price_input_resolver: Any | None = None,
 ) -> dict[str, Any]:
     """Re-run the canonical v0.3 Decision Kernel and issue a binding admission receipt."""
     from .investment_core_contract_v03 import decide_v03, validate_case_v03
@@ -178,6 +179,7 @@ def admit_canonical_decision(
         independent_forecast_resolver=independent_forecast_resolver,
         upstream_authority_resolver=upstream_authority_resolver,
         valuation_output_resolver=valuation_output_resolver,
+        operator_price_input_resolver=operator_price_input_resolver,
     )
     if validation["status"] != "PASS":
         raise ValueError(
@@ -191,6 +193,7 @@ def admit_canonical_decision(
         independent_forecast_resolver=independent_forecast_resolver,
         upstream_authority_resolver=upstream_authority_resolver,
         valuation_output_resolver=valuation_output_resolver,
+        operator_price_input_resolver=operator_price_input_resolver,
     )
     snapshot_core = _snapshot_core(snapshot)
     snapshot_identity = _identity_from_input(snapshot_core["input"])
