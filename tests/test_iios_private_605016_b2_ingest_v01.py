@@ -366,12 +366,18 @@ def _make_real_core_validator_fixture(tmp_path: Path) -> tuple[dict, Path]:
     evidence = []
     raw_artifacts = []
     for index, field_group in enumerate(REQUIRED_COMPANY_FIELD_GROUPS):
-        relative_path = f"raw/{field_group}.json"
-        raw = json.dumps(
-            {"field_group": field_group, "fact_number": index},
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
+        if index in {0, 1}:
+            # Two facts sourced from the same official publication should have
+            # separate evidence declarations that reference one byte object.
+            relative_path = "raw/shared-official-publication.json"
+            raw = b'{"source":"one official publication","exact_bytes":true}'
+        else:
+            relative_path = f"raw/{field_group}.json"
+            raw = json.dumps(
+                {"field_group": field_group, "fact_number": index},
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
         raw_path = raw_root / relative_path
         raw_path.parent.mkdir(parents=True, exist_ok=True)
         raw_path.write_bytes(raw)
