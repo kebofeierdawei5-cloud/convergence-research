@@ -308,7 +308,7 @@ def test_persisted_b2e_binds_private_operator_price_reference_and_replays_hashes
     forged_receipt["stage_receipt_hashes"][decision_pending_index] = "0" * 64
     forged_core = {key: value for key, value in forged_receipt.items() if key != "receipt_hash"}
     forged_receipt["receipt_hash"] = canonical_hash(forged_core)
-    receipt_file.write_text(json.dumps(forged_receipt, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+    receipt_file.write_text(json.dumps(forged_receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     with pytest.raises(
         CanonicalRunAuthorizationError,
         match="Run Receipt stage_receipt_hashes does not match Run Envelope",
