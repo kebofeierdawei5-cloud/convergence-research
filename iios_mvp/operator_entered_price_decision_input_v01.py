@@ -535,7 +535,7 @@ class FileSystemOperatorPriceInputResolver:
                 raise OperatorEnteredPriceError("OPERATOR_PRICE_INPUT_REF_MISMATCH")
             if _parse_price(obs.get("price")) != _parse_price(record.get("price")):
                 raise OperatorEnteredPriceError("OPERATOR_PRICE_VALUE_MISMATCH")
-            if obs.get("currency") != record.get("currency") or obs.get("adjustment_semantics") != record.get("adjustment_semantics"):
+            if obs.get("currency") != record.get("currency") or obs.get("operator_input_adjustment_semantics", obs.get("adjustment_semantics")) != record.get("adjustment_semantics"):
                 raise OperatorEnteredPriceError("OPERATOR_PRICE_SEMANTICS_MISMATCH")
             expected_observed_at = (
                 quote_ts.isoformat()
@@ -622,7 +622,10 @@ class FileSystemOperatorPriceInputResolver:
             "observed_at": observed_at,
             "known_at": bound["entered_at"],
             "source": "OPERATOR_ATTESTED_MARKET_DATA",
-            "adjustment_semantics": bound["adjustment_semantics"],
+            # Normalize the no-adjustment concept to the canonical MIE vocabulary.
+            # Preserve the original operator-input label separately for replay/audit.
+            "adjustment_semantics": "UNADJUSTED",
+            "operator_input_adjustment_semantics": bound["adjustment_semantics"],
             "exchange": bound["exchange"],
             "observation_date": bound["observation_date"],
             "observation_time_precision": bound["observation_time_precision"],
