@@ -2,7 +2,7 @@
 
 - Record class: governance/implementation contract proposal
 - Baseline: canonical `main@70d146f3e5589829d334e18d0198692eed4fcd81`
-- Status: **OWNER-DIRECTED INPUT MODE; IMPLEMENTATION AND RED-TEAM ACCEPTANCE OPEN**
+- Status: **MP-1 PASS / MERGED at `c0eeb8c7543aec8939de7b29d84ac35b62044fdf`; MP-2/MP-3 OPEN**
 - Scope: initial A/H-share current-price entry is supplied manually by the operator; IIOS does not automatically fetch market quotes for this path.
 
 ## 1. Decision
