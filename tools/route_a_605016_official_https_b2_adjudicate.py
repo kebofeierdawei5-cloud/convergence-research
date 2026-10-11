@@ -239,17 +239,25 @@ def _safe_transport_outcome(response: dict[str, Any]) -> str:
             "63": "RESPONSE_TOO_LARGE",
         }.get(curl_match.group(1), "CURL_FAILURE")
     low = error.lower()
-    if "temporary failure in name resolution" in low or "name or service not known" in low or "nodename nor servname" in low or "getaddrinfo failed" in low:
+    if (
+        "temporary failure in name resolution" in low
+        or "name or service not known" in low
+        or "nodename nor servname" in low
+        or "getaddrinfo failed" in low
+        or "dns" in low
+    ):
         return "DNS_FAILURE"
     if "timed out" in low or "timeout" in low:
         return "TIMEOUT"
     if "certificate_verify_failed" in low or "certificate" in low or "ssl:" in low or "tls" in low:
         return "TLS_FAILURE"
+    if "proxy" in low or "tunnel" in low:
+        return "PROXY_FAILURE"
     if "connection refused" in low:
         return "CONNECTION_REFUSED"
     if "connection reset" in low:
         return "CONNECTION_RESET"
-    if "network is unreachable" in low:
+    if "network is unreachable" in low or "network_unreachable" in low:
         return "NETWORK_UNREACHABLE"
     if "http error" in low:
         return "HTTP_FAILURE"
