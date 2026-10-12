@@ -45,11 +45,13 @@ Local single-user complete pilot                     ACTIVE P0 PRIORITY; PILOT_N
 Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
 ```
 
-### Personal local investment pilot — response-file handoff (2026-10-12)
+### Personal local investment pilot — response-file handoff and report-quality gates (2026-10-12)
 
-The one-click macOS pilot now hands the large ChatGPT response through a dedicated UTF-8 JSON file in `~/.iios-private/local-pilot/inputs/`, rather than reading the response from `pbpaste` or asking the user to paste long JSON into Terminal. The wizard creates and opens the response file in TextEdit, prints its exact path, and reads/validates it when the user presses Enter. Empty, truncated, or structurally invalid JSON produces an actionable error and can be corrected in place without restarting the wizard. Prompt copy-to-clipboard remains; response copy-to-clipboard does not.
+The one-click macOS pilot hands the large ChatGPT response through a dedicated UTF-8 JSON file in `~/.iios-private/local-pilot/inputs/`, not through `pbpaste` and not through long Terminal pastes. The wizard opens the response file in TextEdit and reads/validates it on Enter. Empty, truncated, or structurally invalid JSON produces an actionable message and can be corrected in place without restarting the wizard.
 
-This is a usability repair to the existing `PILOT_NON_CANONICAL` workflow only. It does not change Evidence/PIT/Forecast/Valuation admission, canonical Decision authority, or human approval requirements.
+The report-quality follow-up explicitly resolves structured evidence references against `evidence_register` across assessment and forecast/valuation inputs, labels missing IDs as unresolved, preserves structured risk/assumption records for readable rendering, removes fragile Markdown tables in favor of portable headings/lists, and normalizes value-driver display numbering. The guided date entry rejects observation dates equal to or later than a date-only cutoff and asks again; lower-level PIT validation remains fail-closed.
+
+This is a usability/reporting repair to `PILOT_NON_CANONICAL` only. It does not change formal Evidence/PIT/Forecast/Valuation admission, canonical Decision authority, or human approval requirements.
 
 ### Execution-first local MVP priority (owner direction, 2026-10-11; supersedes earlier task ordering)
 
