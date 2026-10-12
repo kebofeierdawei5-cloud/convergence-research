@@ -289,6 +289,45 @@ def test_quote_after_date_only_cutoff_is_not_used_for_price_math(tmp_path):
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
 
 
+def test_explicit_timestamp_cutoff_allows_same_day_attested_price_for_pilot_only():
+    payload = _payload(cutoff="2026-10-09")
+    payload["case"]["as_of_timestamp"] = "2026-10-09T15:30:00+08:00"
+    payload["price_input"]["observation_date"] = "2026-10-09"
+    payload["price_input"]["known_at"] = "2026-10-09T15:00:00+08:00"
+
+    prepared = _prepare_input(payload)
+
+    assert prepared["case"]["cutoff_semantics"] == "EXPLICIT_TIMESTAMP"
+    assert prepared["case"]["as_of_timestamp"] == "2026-10-09T15:30:00+08:00"
+    assert prepared["price_input"]["pit_time_status"] == "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY"
+    assert prepared["price_input"]["canonical_price_admission"] is False
+    assert prepared["price_input"]["source_origin_verified"] is False
+    assert prepared["price_input"]["source_use_rights_verified"] is False
+
+
+def test_explicit_timestamp_cutoff_rejects_price_known_after_cutoff():
+    payload = _payload(cutoff="2026-10-09")
+    payload["case"]["as_of_timestamp"] = "2026-10-09T14:59:00+08:00"
+    payload["price_input"]["observation_date"] = "2026-10-09"
+    payload["price_input"]["known_at"] = "2026-10-09T15:00:00+08:00"
+
+    prepared = _prepare_input(payload)
+
+    assert prepared["price_input"]["pit_time_status"] == "PRICE_NOT_PIT_QUALIFIED"
+    assert "PRICE_KNOWN_AFTER_EXPLICIT_TIMESTAMP_CUTOFF" in prepared["price_input"]["pit_issues"]
+
+
+def test_explicit_timestamp_cutoff_must_be_timezone_aware_and_match_as_of_date():
+    payload = _payload(cutoff="2026-10-09")
+    payload["case"]["as_of_timestamp"] = "2026-10-09T15:30:00"
+    with pytest.raises(LocalInvestmentPilotError, match="AS_OF_TIMESTAMP_MUST_INCLUDE_TIMEZONE"):
+        _prepare_input(payload)
+
+    payload["case"]["as_of_timestamp"] = "2026-10-10T15:30:00+08:00"
+    with pytest.raises(LocalInvestmentPilotError, match="AS_OF_TIMESTAMP_DATE_MUST_MATCH_AS_OF_DATE"):
+        _prepare_input(payload)
+
+
 def test_incomplete_valuation_produces_report_without_inventing_returns(tmp_path):
     payload = _payload()
     payload["forecast_valuation"]["entry_value_reference_per_share"] = None
