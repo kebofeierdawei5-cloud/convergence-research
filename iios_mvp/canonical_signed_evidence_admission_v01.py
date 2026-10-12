@@ -446,6 +446,108 @@ def prepare_signer_enrollment_request(
 
 
 
+def prepare_rights_adjudication_draft(
+    *,
+    case_id: str,
+    source_class: str,
+    out_path: str | Path,
+    request_note: str,
+    candidate_permission_evidence_path: str | Path | None = None,
+    requested_at: str | None = None,
+) -> dict[str, Any]:
+    """Write an UNKNOWN-by-default rights record draft; never decide permission automatically."""
+    case_id = str(case_id or "").strip()
+    if not re.fullmatch(r"RC-[A-Z0-9-]{8,80}", case_id):
+        raise SignedAdmissionError("RIGHTS_DRAFT_CASE_ID_INVALID")
+    if source_class not in _ALLOWED_SOURCE_CLASSES:
+        raise SignedAdmissionError("RIGHTS_SOURCE_CLASS_INVALID")
+    note = str(request_note or "").strip()
+    if not note:
+        raise SignedAdmissionError("RIGHTS_DRAFT_REQUEST_NOTE_REQUIRED")
+    requested_at = requested_at or datetime.now(timezone.utc).isoformat()
+    _timestamp(requested_at, "REQUESTED_AT")
+
+    repository_root = Path(__file__).resolve().parents[1]
+    target = Path(out_path).expanduser()
+    if target.is_symlink():
+        raise SignedAdmissionError("RIGHTS_DRAFT_PATH_MUST_NOT_BE_SYMLINK")
+    resolved = target.resolve(strict=False)
+    if resolved == repository_root or repository_root in resolved.parents:
+        raise SignedAdmissionError("RIGHTS_DRAFT_MUST_BE_OUTSIDE_REPOSITORY")
+    if target.exists():
+        raise SignedAdmissionError("RIGHTS_DRAFT_PATH_ALREADY_EXISTS")
+
+    candidate = {"provided": False, "sha256": None}
+    if candidate_permission_evidence_path is not None:
+        instrument = Path(candidate_permission_evidence_path).expanduser()
+        if instrument.is_symlink() or not instrument.is_file():
+            raise SignedAdmissionError("CANDIDATE_PERMISSION_INSTRUMENT_MUST_BE_REGULAR_FILE")
+        instrument_resolved = instrument.resolve(strict=True)
+        if instrument_resolved == repository_root or repository_root in instrument_resolved.parents:
+            raise SignedAdmissionError("PERMISSION_INSTRUMENT_MUST_BE_OUTSIDE_REPOSITORY")
+        candidate = {"provided": True, "sha256": _sha256(instrument.read_bytes())}
+
+    required_roles = ["EVIDENCE_ADMISSION_SIGNER"]
+    if source_class == "PUBLIC_COMPANY_DISCLOSURE":
+        required_roles.append("INDEPENDENT_REVIEWER")
+
+    draft = {
+        "schema_version": RIGHTS_SCHEMA,
+        "record_status": "DRAFT_NOT_ADJUDICATED",
+        "case_id": case_id,
+        "source_class": source_class,
+        "status": "UNKNOWN",
+        "basis_kind": "UNKNOWN",
+        "permission_instrument_id": None,
+        "permission_evidence_sha256": None,
+        "allowed_uses": [],
+        "required_signer_roles": required_roles,
+        "expires_at": None,
+        "draft_metadata": {
+            "requested_at": requested_at,
+            "request_note": note,
+            "candidate_permission_instrument_present": candidate["provided"],
+            "candidate_permission_instrument_sha256": candidate["sha256"],
+            "instrument_identity_verified": False,
+            "scope_review_completed": False,
+            "rights_holder_authorization_verified": False,
+            "legal_review_claimed": False,
+            "formal_admission_authorized": False,
+        },
+        "notes": [
+            "This is an UNKNOWN-by-default working draft, not a permission determination or legal opinion.",
+            "A provided instrument hash identifies the submitted bytes only; it does not prove authenticity, applicability, validity or permission scope.",
+            "Do not change status to ALLOWED until an authorized reviewer confirms the exact instrument and PRIVATE_STORAGE, LOCAL_COMPUTATION, INTERNAL_DISPLAY and retention scope as applicable.",
+            "EXCHANGE_MARKET_DATA and VENDOR_MARKET_DATA require a suitable license or explicit written permission. Public visibility alone is insufficient.",
+            "OPERATOR_ATTESTED_MARKET_DATA cannot be source-admitted by this signed-admission contract.",
+            "Trust enrollment/signatures are separate from rights permission; neither substitutes for the other.",
+        ],
+    }
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(draft, handle, ensure_ascii=False, sort_keys=True, indent=2)
+            handle.write("\\n")
+    except Exception:
+        target.unlink(missing_ok=True)
+        raise
+    if os.name != "nt":
+        os.chmod(target, 0o600)
+    return {
+        "status": "RIGHTS_DRAFT_CREATED_UNKNOWN_NOT_ADMITTED",
+        "draft_path": str(target),
+        "case_id": case_id,
+        "source_class": source_class,
+        "rights_status": "UNKNOWN",
+        "required_signer_roles": required_roles,
+        "candidate_permission_instrument_present": candidate["provided"],
+        "rights_permission_granted": False,
+        "formal_admission_created": False,
+    }
+
+
+
 def add_signature(
     envelope: Mapping[str, Any],
     *,
@@ -634,6 +736,13 @@ def _main(argv: list[str] | None = None) -> int:
     enroll.add_argument("--authorization-note", required=True)
     enroll.add_argument("--requested-at")
     enroll.add_argument("--out", required=True)
+    rights_draft = commands.add_parser("prepare-rights-draft")
+    rights_draft.add_argument("--case-id", required=True)
+    rights_draft.add_argument("--source-class", required=True, choices=tuple(sorted(_ALLOWED_SOURCE_CLASSES)))
+    rights_draft.add_argument("--candidate-permission-evidence")
+    rights_draft.add_argument("--request-note", required=True)
+    rights_draft.add_argument("--requested-at")
+    rights_draft.add_argument("--out", required=True)
     sign = commands.add_parser("sign")
     sign.add_argument("--manifest", required=True)
     sign.add_argument("--raw-root", required=True)
@@ -668,6 +777,15 @@ def _main(argv: list[str] | None = None) -> int:
                 valid_from=args.valid_from,
                 authorization_note=args.authorization_note,
                 out_path=args.out,
+                requested_at=args.requested_at,
+            )
+        elif args.command == "prepare-rights-draft":
+            result = prepare_rights_adjudication_draft(
+                case_id=args.case_id,
+                source_class=args.source_class,
+                out_path=args.out,
+                request_note=args.request_note,
+                candidate_permission_evidence_path=args.candidate_permission_evidence,
                 requested_at=args.requested_at,
             )
         elif args.command == "sign":
