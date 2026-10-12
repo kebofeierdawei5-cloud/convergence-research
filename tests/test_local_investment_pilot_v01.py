@@ -556,8 +556,8 @@ def test_thesis_break_stress_is_not_probability_weighted_and_missing_stress_gate
 
     assert analysis["thesis_break_stress_review"]["status"] == "PASS"
     assert analysis["thesis_break_stress_review"]["probability_weighted"] is False
-    assert analysis["thesis_break_stress_review"]["stress_terminal_wealth"] == "80"
-    assert analysis["thesis_break_stress_review"]["stress_total_return"] == "-0.2"
+    assert str(analysis["thesis_break_stress_review"]["stress_terminal_wealth"]) == "80"
+    assert str(analysis["thesis_break_stress_review"]["stress_total_return"]) == "-0.2"
     assert analysis["return_metrics"]["expected_terminal_wealth"] != analysis["thesis_break_stress_review"]["stress_terminal_wealth"]
     assert "不纳入 Bear/Base/Bull 概率加权" in report
 
