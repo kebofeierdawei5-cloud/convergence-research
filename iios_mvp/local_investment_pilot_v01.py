@@ -705,6 +705,37 @@ def create_pilot_template(
     }
 
 
+
+def _extract_json_object(text: str) -> dict[str, Any]:
+    """Accept plain JSON or one JSON object wrapped in a ChatGPT code fence."""
+    raw = str(text or "").strip()
+    if not raw:
+        raise LocalInvestmentPilotError("CHATGPT_JSON_EMPTY")
+    raw = re.sub(r"^\s*```(?:json)?\s*", "", raw, count=1, flags=re.IGNORECASE)
+    raw = re.sub(r"\s*```\s*$", "", raw, count=1)
+    start = raw.find("{")
+    if start < 0:
+        raise LocalInvestmentPilotError("CHATGPT_JSON_OBJECT_NOT_FOUND")
+    try:
+        value, _end = json.JSONDecoder().raw_decode(raw[start:])
+    except json.JSONDecodeError as exc:
+        raise LocalInvestmentPilotError("CHATGPT_JSON_INVALID_COPY_THE_COMPLETE_JSON_OBJECT") from exc
+    if not isinstance(value, dict):
+        raise LocalInvestmentPilotError("CHATGPT_JSON_OBJECT_REQUIRED")
+    return value
+
+
+def _ask(prompt: str, default: str | None = None) -> str:
+    suffix = f" [{default}]" if default is not None else ""
+    while True:
+        raw = input(f"{prompt}{suffix}: ").strip()
+        if raw:
+            return raw
+        if default is not None:
+            return default
+        print("这一项需要填写。")
+
+
 def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Local candidate-driven IIOS pilot; non-canonical.")
     modes = parser.add_mutually_exclusive_group(required=True)
