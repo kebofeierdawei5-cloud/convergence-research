@@ -528,7 +528,7 @@ def prepare_rights_adjudication_draft(
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             json.dump(draft, handle, ensure_ascii=False, sort_keys=True, indent=2)
-            handle.write("\\n")
+            handle.write("\n")
     except Exception:
         target.unlink(missing_ok=True)
         raise
