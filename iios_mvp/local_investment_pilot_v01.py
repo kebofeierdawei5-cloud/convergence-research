@@ -1456,12 +1456,12 @@ def run_guided_wizard(
         except LocalInvestmentPilotError as exc:
             print(f"日期格式错误：{exc}。请按 YYYY-MM-DD 输入，例如 2026-10-12。")
 
-    print("\n请选择分析截止口径（不需要自己输入时区）：")
+    print("\n请选择分析截止口径（默认按收盘后分析，无需手写时区）：")
     print("  1 = 严格日期级截止：截止日 00:00（+08:00），只能使用此前日期已知的信息")
-    print("  2 = 截止日收盘后：自动使用截止日 15:30（+08:00），允许截止日收盘价")
-    print("  3 = 自定义时点：高级选项，格式示例 2026-10-12T15:30:00+08:00")
+    print("  2 = 收盘后分析（推荐默认）：自动使用截止日 15:30（+08:00），允许截止日收盘价")
+    print("  3 = 自定义时点：仅特殊情况使用，例如 2026-10-12T15:30:00+08:00")
     while True:
-        cutoff_mode = _ask("分析截止口径 1/2/3", "1")
+        cutoff_mode = _ask("分析截止口径 1/2/3", "2")
         custom_cutoff = ""
         if cutoff_mode == "3":
             custom_cutoff = _ask(
@@ -1515,32 +1515,34 @@ def run_guided_wizard(
             print(f"价格观察日期不合法：{exc}")
             print("请填写真实交易日；本程序不会把周末自动改成交易日，也不会自动修改截止日期。")
     default_known_at = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI).isoformat()
-    while True:
-        known_at = _ask(
-            "价格可获得时间 ISO 8601（需含时区；默认按 15:00；可按你实际核实时间修改）",
-            default_known_at,
-        )
-        try:
-            parsed_known_at = _datetime(known_at, "PRICE_KNOWN_AT", allow_date_only=False)
-            if parsed_known_at.date() != observation:
-                raise LocalInvestmentPilotError("PRICE_KNOWN_AT_DATE_MUST_MATCH_OBSERVATION_DATE")
-            if parsed_known_at > cutoff_instant:
-                raise LocalInvestmentPilotError("PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP")
-            known_at = parsed_known_at.isoformat()
-            break
-        except LocalInvestmentPilotError as exc:
-            print(f"价格可获得时点不符合截止约束：{exc}")
-    source_claim = _ask(
-        "价格来源说明（如为人工输入，请明确未独立核验）",
-        f"用户手动提供的 {price}；未从交易所或行情供应商独立核验",
-    )
+    print("\n价格时点：1 = 收盘价/按 15:00 处理（默认）；2 = 非收盘价/指定实际时点")
+    time_mode = _ask("价格时点 1/2", "1")
+    if time_mode == "1":
+        known_at = default_known_at
+    else:
+        while True:
+            known_at = _ask(
+                "价格可获得时间（必须包含时区，例如 2026-10-12T13:30:00+08:00）"
+            )
+            try:
+                parsed_known_at = _datetime(known_at, "PRICE_KNOWN_AT", allow_date_only=False)
+                if parsed_known_at.date() != observation:
+                    raise LocalInvestmentPilotError("PRICE_KNOWN_AT_DATE_MUST_MATCH_OBSERVATION_DATE")
+                if parsed_known_at > cutoff_instant:
+                    raise LocalInvestmentPilotError("PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP")
+                known_at = parsed_known_at.isoformat()
+                break
+            except LocalInvestmentPilotError as exc:
+                print(f"价格可获得时点不符合截止约束：{exc}")
+                print("请检查日期与截止时点。")
+    source_claim = f"用户手动提供的 {price}；按 {'收盘价 15:00' if time_mode == '1' else '操作者指定时点'} 处理；未从交易所或行情供应商独立核验"
     print("\n请核对：")
     print(f"  {company} / {symbol} / {market}")
     if symbol != symbol_input.strip().upper().replace(" ", ""):
         print(f"  股票代码已规范化：{symbol_input} → {symbol}")
     cutoff_display = cutoff_timestamp or (cutoff.isoformat() + " 00:00:00+08:00（日期级截止）")
     print(f"  分析截止 {cutoff_display}；价格 {price}；观察日 {observation.isoformat()}；持仓 {position}%")
-    print("  价格只按人工输入处理，不表示来源已验证。")
+    print(f"  价格时间：{known_at}；价格来源：人工输入、未独立核验。")
     if _ask("确认并继续？1 = 继续，0 = 退出", "1") != "1":
         return {"status": "CANCELLED", "formal_decision_created": False}
 
