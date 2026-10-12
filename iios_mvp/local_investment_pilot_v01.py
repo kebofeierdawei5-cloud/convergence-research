@@ -823,6 +823,7 @@ def run_guided_wizard(
 def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Local candidate-driven IIOS pilot; non-canonical.")
     modes = parser.add_mutually_exclusive_group(required=True)
+    modes.add_argument("--wizard", action="store_true", help="run the simple guided investment workflow")
     modes.add_argument("--create-template", action="store_true")
     modes.add_argument("--input", help="run a completed private pilot input JSON")
     modes.add_argument("--replay-run", help="re-run a previous local pilot's input.json")
@@ -839,7 +840,9 @@ def _main(argv: list[str] | None = None) -> int:
     parser.add_argument("--price-source-claim")
     args = parser.parse_args(argv)
     try:
-        if args.create_template:
+        if args.wizard:
+            result = run_guided_wizard(template_root=args.template_root, output_root=args.output_root)
+        elif args.create_template:
             required = {
                 "--company": args.company, "--symbol": args.symbol, "--as-of": args.as_of,
                 "--price": args.price, "--price-date": args.price_date,
@@ -865,7 +868,7 @@ def _main(argv: list[str] | None = None) -> int:
             )
         print(json.dumps(_safe(result), ensure_ascii=False, indent=2))
         return 0
-    except (LocalInvestmentPilotError, OSError, ValueError, KeyError, TypeError) as exc:
+    except (LocalInvestmentPilotError, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
         print(json.dumps({"status": "BLOCKED", "reason": str(exc)}, ensure_ascii=False))
         return 2
 
