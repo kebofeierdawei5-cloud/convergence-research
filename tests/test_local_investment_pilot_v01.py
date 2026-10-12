@@ -83,9 +83,22 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
             "probabilities_calibrated": False,
             "assumptions": ["Synthetic assumptions; not forecasts."],
             "scenarios": {
-                "bear": {"probability": "0.20", "terminal_value_per_share": "120", "cash_distributions_per_share": "0", "rationale": "synthetic bear"},
+                "bear": {
+                    "probability": "0.20", "terminal_value_per_share": "120", "cash_distributions_per_share": "0",
+                    "rationale": "synthetic bear", "failure_trigger": "core volume growth fails",
+                    "operating_impact": "volume and profit miss base case", "valuation_mechanism": "lower normalized EPS and multiple",
+                },
                 "base": {"probability": "0.50", "terminal_value_per_share": "150", "cash_distributions_per_share": "0", "rationale": "synthetic base"},
                 "bull": {"probability": "0.30", "terminal_value_per_share": "180", "cash_distributions_per_share": "0", "rationale": "synthetic bull"},
+            },
+            "thesis_break_stress": {
+                "failure_trigger": "core thesis fails",
+                "operating_impact": "profit recovery does not occur and margins contract",
+                "valuation_method": "normalized downside earnings at a compressed multiple",
+                "terminal_value_per_share": "80",
+                "cash_distributions_per_share": "0",
+                "rationale": "synthetic thesis-break case, not a forecast",
+                "evidence_refs": ["E1"],
             },
         },
         "decision_parameters": {
@@ -515,6 +528,74 @@ def test_invalid_three_year_override_falls_back_to_default_horizon(tmp_path):
     analysis = json.loads((Path(result["run_dir"]) / "analysis.json").read_text(encoding="utf-8"))
     assert analysis["decision_parameters"]["horizon_years"] == 1
     assert "3 年覆盖条件不足" in analysis["decision_parameters"]["horizon_selection_rationale"]
+
+
+
+def test_explicit_note_price_conflict_forces_review_required(tmp_path):
+    payload = _payload(price="19.51")
+    payload["notes"] = "用户手动提供的19.74；本次未独立核验价格来源。"
+    result = run_local_investment_pilot(
+        input_path=_write_input(tmp_path, payload),
+        output_root=tmp_path / "private-runs",
+    )
+    analysis = json.loads((Path(result["run_dir"]) / "analysis.json").read_text(encoding="utf-8"))
+    report = (Path(result["run_dir"]) / "report.md").read_text(encoding="utf-8")
+
+    assert analysis["price_input"]["price"] == "19.51"
+    assert analysis["notes_price_conflicts"] == ["19.74"]
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert "OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT" in analysis["decision"]["gating_issues"]
+    assert "当前价：19.51 CNY" in report
+    assert "19.74" in report
+    assert "带标签的备注股价一致性：**CONFLICT**" in report
+
+
+def test_thesis_break_stress_is_not_probability_weighted_and_missing_stress_gates_action():
+    payload = _payload()
+    analysis, report = _analyse(payload, "TEST-STRESS")
+
+    assert analysis["thesis_break_stress_review"]["status"] == "PASS"
+    assert analysis["thesis_break_stress_review"]["probability_weighted"] is False
+    assert analysis["thesis_break_stress_review"]["stress_terminal_wealth"] == "80"
+    assert analysis["thesis_break_stress_review"]["stress_total_return"] == "-0.2"
+    assert analysis["return_metrics"]["expected_terminal_wealth"] != analysis["thesis_break_stress_review"]["stress_terminal_wealth"]
+    assert "不纳入 Bear/Base/Bull 概率加权" in report
+
+    payload["forecast_valuation"].pop("thesis_break_stress")
+    missing_analysis, _missing_report = _analyse(payload, "TEST-STRESS-MISSING")
+    assert missing_analysis["return_metrics"] is not None
+    assert missing_analysis["thesis_break_stress_review"]["status"] == "MISSING"
+    assert missing_analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert "THESIS_BREAK_STRESS_MISSING" in missing_analysis["decision"]["gating_issues"]
+
+
+def test_bear_failure_path_must_be_explicit():
+    payload = _payload()
+    payload["forecast_valuation"]["scenarios"]["bear"]["operating_impact"] = ""
+    analysis, report = _analyse(payload, "TEST-BEAR-PATH")
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert "BEAR_FAILURE_PATH_INCOMPLETE" in analysis["decision"]["gating_issues"]
+    assert "经营影响路径：" in report
+
+
+def test_thesis_break_stress_must_be_more_severe_than_bear():
+    payload = _payload()
+    payload["forecast_valuation"]["thesis_break_stress"]["terminal_value_per_share"] = "125"
+    analysis, report = _analyse(payload, "TEST-STRESS-NOT-WORSE")
+    assert analysis["thesis_break_stress_review"]["status"] == "REVIEW_REQUIRED"
+    assert "THESIS_BREAK_STRESS_NOT_MORE_SEVERE_THAN_BEAR" in analysis["decision"]["gating_issues"]
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+
+
+def test_bear_base_bull_total_wealth_ordering_is_required():
+    payload = _payload()
+    payload["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] = "160"
+    analysis, report = _analyse(payload, "TEST-SCENARIO-ORDER")
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == "SCENARIO_WEALTH_ORDERING_INCONSISTENT"
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert "SCENARIO_WEALTH_ORDERING_INCONSISTENT" in analysis["decision"]["gating_issues"]
+
 
 
 def test_pilot_receipt_never_claims_canonical_authority(tmp_path):
