@@ -53,6 +53,22 @@ python -m iios_mvp.canonical_signed_evidence_admission_v01 generate-keypair \
 
 The key-generation command refuses to overwrite existing files and refuses a private-key path inside the repository. Register only the public key after an explicit human authorization step. The empty registry means no signature is trusted until that step occurs.
 
+Before any key is added to the trusted registry, prepare a private enrollment proposal for review. Generate the public/private keypair in a private local folder, then run the proposal command (replace role, scope, label and dates with the explicitly approved values):
+
+```bash
+python -m iios_mvp.canonical_signed_evidence_admission_v01 prepare-enrollment-request \
+  --public-key "$HOME/.iios-private/keys/evidence-admission-ed25519.public.json" \
+  --signer-key-id "OWNER-C1-20261012" \
+  --display-label "owner-admission-signer" \
+  --role EVIDENCE_ADMISSION_SIGNER \
+  --case-scope "RC-CN-A-605016-20261009" \
+  --valid-from "2026-10-13T00:00:00+08:00" \
+  --authorization-note "Owner-approved identity/scope; complete only after explicit review" \
+  --out "$HOME/.iios-private/keys/owner-admission-enrollment-request.json"
+```
+
+The output is a mode-0600, local-only request with status `PROPOSED_NOT_TRUSTED`. It includes only the public key and proposed role/scope—not the private key—and explicitly records that no trust-registry mutation occurred. It rejects wildcard case scopes and combined admission/reviewer roles. The request is not an authorization: the owner must separately approve the identity, scope and validity, and the canonical registry remains unchanged until that approval is intentionally applied. Prepare a separate request and a separate key for `INDEPENDENT_REVIEWER`; that signer must not be the same key id as the admission signer.
+
 After the relevant rights record and exact permission bytes exist, create/add a signature:
 
 ```bash
