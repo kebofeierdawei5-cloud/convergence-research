@@ -6,7 +6,7 @@ REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 fail() {
   printf '\nIIOS 启动失败：%s\n' "$1"
   if command -v osascript >/dev/null 2>&1; then
-    osascript -e 'display dialog (item 1 of argv) buttons {"好"} default button "好" with title "IIOS 投资分析"' "$1" >/dev/null 2>&1 || true
+    osascript -e 'on run argv' -e 'display dialog (item 1 of argv) buttons {"好"} default button "好" with title "IIOS 投资分析"' -e 'end run' "$1" >/dev/null 2>&1 || true
   fi
   read -r -p '按回车关闭窗口…' _ || true
   exit 1
