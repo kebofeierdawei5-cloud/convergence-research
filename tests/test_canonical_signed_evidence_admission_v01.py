@@ -19,6 +19,7 @@ from iios_mvp.canonical_signed_evidence_admission_v01 import (
     add_signature,
     generate_keypair,
     prepare_signer_enrollment_request,
+    prepare_rights_adjudication_draft,
     build_admission_payload,
     verify_signed_admission,
 )
@@ -238,6 +239,68 @@ def test_enrollment_request_rejects_public_key_fingerprint_mismatch(tmp_path):
             out_path=tmp_path / "private" / "enrollment-request.json",
             requested_at="2026-10-12T12:00:00+08:00",
         )
+
+
+def test_rights_draft_defaults_to_unknown_and_does_not_claim_permission(tmp_path):
+    instrument = tmp_path / "private" / "candidate-terms.pdf"
+    instrument.parent.mkdir(parents=True)
+    instrument.write_bytes(b"synthetic terms bytes; not an actual license")
+    out_path = tmp_path / "private" / "rights-draft.json"
+    result = prepare_rights_adjudication_draft(
+        case_id="RC-CN-A-002001-20261009",
+        source_class="PUBLIC_COMPANY_DISCLOSURE",
+        out_path=out_path,
+        request_note="Human reviewer must decide applicability and permitted private fact-level use.",
+        candidate_permission_evidence_path=instrument,
+        requested_at="2026-10-12T12:00:00+08:00",
+    )
+    draft = json.loads(out_path.read_text(encoding="utf-8"))
+    assert result["status"] == "RIGHTS_DRAFT_CREATED_UNKNOWN_NOT_ADMITTED"
+    assert draft["schema_version"] == RIGHTS_SCHEMA
+    assert draft["record_status"] == "DRAFT_NOT_ADJUDICATED"
+    assert draft["status"] == "UNKNOWN"
+    assert draft["basis_kind"] == "UNKNOWN"
+    assert draft["permission_instrument_id"] is None
+    assert draft["permission_evidence_sha256"] is None
+    assert draft["allowed_uses"] == []
+    assert draft["required_signer_roles"] == ["EVIDENCE_ADMISSION_SIGNER", "INDEPENDENT_REVIEWER"]
+    assert draft["draft_metadata"]["candidate_permission_instrument_sha256"] == _sha(instrument.read_bytes())
+    assert draft["draft_metadata"]["rights_holder_authorization_verified"] is False
+    assert draft["draft_metadata"]["formal_admission_authorized"] is False
+    assert str(instrument.resolve()) not in out_path.read_text(encoding="utf-8")
+    if os.name != "nt":
+        assert (out_path.stat().st_mode & 0o777) == 0o600
+
+
+def test_rights_draft_for_exchange_price_does_not_treat_public_access_as_permission(tmp_path):
+    out_path = tmp_path / "private" / "sse-rights-draft.json"
+    result = prepare_rights_adjudication_draft(
+        case_id="RC-CN-A-605016-20261009",
+        source_class="EXCHANGE_MARKET_DATA",
+        out_path=out_path,
+        request_note="Written license/use scope is still pending.",
+        requested_at="2026-10-12T12:00:00+08:00",
+    )
+    draft = json.loads(out_path.read_text(encoding="utf-8"))
+    assert result["rights_status"] == "UNKNOWN"
+    assert draft["status"] == "UNKNOWN"
+    assert draft["allowed_uses"] == []
+    assert draft["permission_evidence_sha256"] is None
+    assert "Public visibility alone is insufficient" in " ".join(draft["notes"])
+
+
+def test_rights_draft_never_writes_inside_repository(tmp_path):
+    from iios_mvp.canonical_signed_evidence_admission_v01 import __file__ as module_file
+    repo_root = Path(module_file).resolve().parents[1]
+    with pytest.raises(SignedAdmissionError, match="RIGHTS_DRAFT_MUST_BE_OUTSIDE_REPOSITORY"):
+        prepare_rights_adjudication_draft(
+            case_id=CASE_ID,
+            source_class="PUBLIC_COMPANY_DISCLOSURE",
+            out_path=repo_root / "must-not-be-created-rights-draft.json",
+            request_note="test",
+            requested_at="2026-10-12T12:00:00+08:00",
+        )
+    assert not (repo_root / "must-not-be-created-rights-draft.json").exists()
 
 
 def test_signed_admission_requires_trusted_signature_and_exact_core_pit_bytes(tmp_path):

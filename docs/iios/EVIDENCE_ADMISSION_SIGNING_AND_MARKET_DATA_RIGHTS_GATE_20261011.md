@@ -69,6 +69,22 @@ python -m iios_mvp.canonical_signed_evidence_admission_v01 prepare-enrollment-re
 
 The output is a mode-0600, local-only request with status `PROPOSED_NOT_TRUSTED`. It includes only the public key and proposed role/scope—not the private key—and explicitly records that no trust-registry mutation occurred. It rejects wildcard case scopes and combined admission/reviewer roles. The request is not an authorization: the owner must separately approve the identity, scope and validity, and the canonical registry remains unchanged until that approval is intentionally applied. Prepare a separate request and a separate key for `INDEPENDENT_REVIEWER`; that signer must not be the same key id as the admission signer.
 
+### Prepare a rights adjudication draft (always UNKNOWN by default)
+
+For a specific Case and source class, the CLI can now create a private rights-record draft. This helper deliberately does not infer permission from public access, a URL, a downloaded file or a matching hash. Even when an exact candidate instrument is supplied, it only computes a candidate byte hash and leaves the canonical permission fields unset.
+
+~~~bash
+python -m iios_mvp.canonical_signed_evidence_admission_v01 prepare-rights-draft \
+  --case-id "RC-CN-A-605016-20261009" \
+  --source-class EXCHANGE_MARKET_DATA \
+  --request-note "Written permission for private storage, local computation and internal display is still pending." \
+  --out "$HOME/.iios-private/rights/RC-CN-A-605016-20261009-rights-draft.json"
+~~~
+
+For a PUBLIC_COMPANY_DISCLOSURE case such as C2, the helper adds INDEPENDENT_REVIEWER to the required signer roles. If a candidate permission/terms file already exists outside the repository, pass --candidate-permission-evidence with its local path; the file stays local and only its SHA-256 is recorded as a candidate hash.
+
+The draft output is mode 0600 and contains status UNKNOWN, basis_kind UNKNOWN, no allowed uses, no admitted permission instrument and formal_admission_authorized false. Human review must establish whether the instrument is authentic/applicable and exactly which uses and retention scope it grants; source-use authorization and trusted signer enrollment remain independent gates.
+
 After the relevant rights record and exact permission bytes exist, create/add a signature:
 
 ```bash
