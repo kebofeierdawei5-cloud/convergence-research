@@ -220,10 +220,12 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
         "SZ002810",
         "1",
         "2026-10-12",
+        "",
         "0",
         "19.74",
         "2026-10-12",
         "2026-10-09",
+        "",
         "人工输入",
         "0",
     ])
@@ -234,7 +236,7 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
     )
     output = capsys.readouterr().out
     assert result["status"] == "CANCELLED"
-    assert "日期不符合当前 PIT 规则" in output
+    assert "价格日期/时点不符合当前 PIT 规则" in output
     assert "请重新输入" in output
     assert "观察日 2026-10-09" in output
     assert not (tmp_path / "inputs").exists()
