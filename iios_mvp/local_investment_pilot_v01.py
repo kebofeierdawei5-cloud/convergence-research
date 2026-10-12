@@ -257,17 +257,46 @@ def _resolve_cutoff_timestamp(case_raw: Mapping[str, Any], cutoff: date) -> tupl
 def _validate_guided_observation_date(
     observation: date, cutoff: date, *, cutoff_timestamp: datetime | None = None
 ) -> date:
-    """Date-only cutoff stays start-of-day; explicit cutoff permits dates up to cutoff day, then known_at is checked separately."""
+    """Require a weekday observation date and preserve strict point-in-time cutoff semantics."""
+    if observation.weekday() >= 5:
+        raise LocalInvestmentPilotError(
+            "PRICE_OBSERVATION_MUST_BE_TRADING_WEEKDAY: 输入日期是周六或周日；"
+            "A 股/港股常规收盘价应填写实际交易日日期。程序不会把周末日期自动改成周五。"
+        )
     if cutoff_timestamp is None:
         if observation >= cutoff:
             raise LocalInvestmentPilotError(
                 "PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF: "
-                "日期级截止按截止日 00:00（+08:00）处理；同日行情请明确填写截止时点。"
+                "日期级截止按截止日 00:00（+08:00）处理；同日行情请在向导选择“2 = 截止日收盘后”。"
             )
         return observation
     if observation > cutoff:
         raise LocalInvestmentPilotError("PRICE_OBSERVATION_AFTER_TIMESTAMP_CUTOFF")
     return observation
+
+
+def _latest_weekday_on_or_before(value: date) -> date:
+    """Return a weekday no later than value; exchange holiday calendars are not checked."""
+    candidate = value
+    while candidate.weekday() >= 5:
+        candidate -= timedelta(days=1)
+    return candidate
+
+
+def _guided_cutoff_timestamp(
+    cutoff: date, mode: str, custom_timestamp: str = ""
+) -> tuple[datetime, str | None]:
+    """Offer safe, labeled cutoff choices; common users never need to type timezone syntax."""
+    if mode == "1":
+        return _resolve_cutoff_timestamp({}, cutoff)
+    if mode == "2":
+        raw = f"{cutoff.isoformat()}T15:30:00+08:00"
+        return _resolve_cutoff_timestamp({"as_of_timestamp": raw}, cutoff)
+    if mode == "3":
+        if not str(custom_timestamp or "").strip():
+            raise LocalInvestmentPilotError("CUSTOM_AS_OF_TIMESTAMP_REQUIRED")
+        return _resolve_cutoff_timestamp({"as_of_timestamp": custom_timestamp}, cutoff)
+    raise LocalInvestmentPilotError("CUTOFF_MODE_MUST_BE_1_2_OR_3")
 
 
 
@@ -1243,6 +1272,106 @@ def _assert_response_preserves_operator_inputs(
         )
 
 
+def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
+    """Reject a mostly untouched template before creating a misleading empty report."""
+    missing: list[str] = []
+
+    evidence = payload.get("evidence_register")
+    source_rows = evidence if isinstance(evidence, list) else []
+    has_usable_source = any(
+        isinstance(row, Mapping)
+        and all(str(row.get(key) or "").strip() for key in ("source_id", "title", "source_ref", "known_at", "summary"))
+        and str(row.get("source_ref") or "").strip().upper() not in {"UNKNOWN", "N/A", "NONE"}
+        for row in source_rows
+    )
+    if not has_usable_source:
+        missing.append("至少一条可追溯来源（source_id/title/source_ref/known_at/summary）")
+
+    assessment = payload.get("assessment")
+    if not isinstance(assessment, Mapping):
+        assessment = {}
+    required_summaries = (
+        ("trust", "尚未完成信任审查", "Trust 结论与理由"),
+        ("reality", "尚未完成经营现实审查", "Reality 结论与理由"),
+        ("quality", "尚未完成经济质量审查", "Quality 结论与理由"),
+        ("market_implied_expectation", "尚未足够识别市场隐含预期", "MIE 判断与理由"),
+        ("expectation_gap", "尚未验证预期差", "预期差判断与理由"),
+        ("risk", "尚未完成风险审查", "主要风险与理由"),
+    )
+    for key, placeholder, label in required_summaries:
+        section = assessment.get(key)
+        section = section if isinstance(section, Mapping) else {}
+        summary = str(section.get("summary") or "").strip()
+        if not summary or summary == placeholder:
+            missing.append(label)
+
+    thesis = assessment.get("thesis")
+    thesis = thesis if isinstance(thesis, Mapping) else {}
+    for key, label in (
+        ("core_statement", "核心投资论点"),
+        ("drivers", "Thesis 价值驱动因素"),
+        ("break_conditions", "Thesis 失效条件"),
+        ("reassessment_triggers", "重新评估触发器"),
+    ):
+        value = thesis.get(key)
+        if isinstance(value, list):
+            filled = any(str(item or "").strip() for item in value)
+        else:
+            filled = bool(str(value or "").strip())
+        if not filled:
+            missing.append(label)
+    value_drivers = assessment.get("value_drivers")
+    if not isinstance(value_drivers, list) or not value_drivers:
+        missing.append("价值驱动因素排序")
+    risk = assessment.get("risk")
+    risk_items = risk.get("items") if isinstance(risk, Mapping) else None
+    if not isinstance(risk_items, list) or not risk_items:
+        missing.append("结构化风险清单")
+
+    valuation = payload.get("forecast_valuation")
+    valuation = valuation if isinstance(valuation, Mapping) else {}
+    if not str(valuation.get("model_rationale") or "").strip():
+        missing.append("估值模型选择理由")
+    assumptions = valuation.get("assumptions")
+    if not isinstance(assumptions, list) or not any(str(item or "").strip() for item in assumptions):
+        missing.append("估值假设（无法估值时写明原因与缺口）")
+    scenarios = valuation.get("scenarios")
+    scenarios = scenarios if isinstance(scenarios, Mapping) else {}
+    for scenario_name, label in (("bear", "Bear"), ("base", "Base"), ("bull", "Bull")):
+        scenario = scenarios.get(scenario_name)
+        scenario = scenario if isinstance(scenario, Mapping) else {}
+        if not str(scenario.get("rationale") or "").strip():
+            missing.append(f"{label} 情景分析理由")
+    bear = scenarios.get("bear")
+    bear = bear if isinstance(bear, Mapping) else {}
+    for key, label in (
+        ("failure_trigger", "Bear 失效触发条件"),
+        ("operating_impact", "Bear 经营影响路径"),
+        ("valuation_mechanism", "Bear 估值传导机制"),
+    ):
+        if not str(bear.get(key) or "").strip():
+            missing.append(label)
+
+    stress = valuation.get("thesis_break_stress")
+    stress = stress if isinstance(stress, Mapping) else {}
+    for key, label in (
+        ("failure_trigger", "独立压力测试失效触发条件"),
+        ("operating_impact", "独立压力测试经营影响路径"),
+        ("valuation_method", "独立压力测试估值方法"),
+        ("rationale", "独立压力测试推理"),
+    ):
+        if not str(stress.get(key) or "").strip():
+            missing.append(label)
+
+    if missing:
+        labels = "；".join(dict.fromkeys(missing))
+        raise LocalInvestmentPilotError(
+            "CHATGPT_RESPONSE_INCOMPLETE：研究回答仍有空白或保留模板占位内容："
+            + labels
+            + "。本次尚未生成报告。请直接补齐当前已打开的 pilot-chatgpt-response JSON 文件并保存，再回到终端按回车；不用重跑向导，也不要把 JSON 粘贴到终端。"
+        )
+
+
 def _ask(prompt: str, default: str | None = None) -> str:
     suffix = f" [{default}]" if default is not None else ""
     while True:
@@ -1273,34 +1402,71 @@ def run_guided_wizard(
         raise LocalInvestmentPilotError("MARKET_CHOICE_MUST_BE_1_OR_2")
     market = "CN-A" if market_choice == "1" else "HK"
     symbol = _normalize_guided_symbol(symbol_input, market)
-    cutoff = _date(_ask("分析截止日 YYYY-MM-DD", today.isoformat()), "AS_OF_DATE")
     while True:
-        raw_cutoff_timestamp = _ask(
-            "分析截止时点 ISO 8601（可留空；要使用当日收盘价时请明确填写晚于价格可获得时间的时点）",
-            "",
-        )
         try:
-            cutoff_instant, cutoff_timestamp = _resolve_cutoff_timestamp(
-                {"as_of_timestamp": raw_cutoff_timestamp}, cutoff
+            cutoff = _date(_ask("分析截止日 YYYY-MM-DD", today.isoformat()), "AS_OF_DATE")
+            break
+        except LocalInvestmentPilotError as exc:
+            print(f"日期格式错误：{exc}。请按 YYYY-MM-DD 输入，例如 2026-10-12。")
+
+    print("\n请选择分析截止口径（不需要自己输入时区）：")
+    print("  1 = 严格日期级截止：截止日 00:00（+08:00），只能使用此前日期已知的信息")
+    print("  2 = 截止日收盘后：自动使用截止日 15:30（+08:00），允许截止日收盘价")
+    print("  3 = 自定义时点：高级选项，格式示例 2026-10-12T15:30:00+08:00")
+    while True:
+        cutoff_mode = _ask("分析截止口径 1/2/3", "1")
+        custom_cutoff = ""
+        if cutoff_mode == "3":
+            custom_cutoff = _ask(
+                "自定义截止时点（必须含时区，例如 2026-10-12T15:30:00+08:00）"
+            )
+        try:
+            cutoff_instant, cutoff_timestamp = _guided_cutoff_timestamp(
+                cutoff, cutoff_mode, custom_cutoff
             )
             break
         except LocalInvestmentPilotError as exc:
-            print(f"截止时点不符合规则：{exc}")
-    position = _ask("当前持仓百分比", "0")
-    price = _ask("你核实的股价")
-    # Skip weekends for the default, but holiday calendars are not fetched here.
-    default_price_date = _previous_weekday(cutoff).isoformat()
+            print(f"截止口径输入有误：{exc}")
+            print("请选 1、2 或 3；普通收盘后分析通常选择 2，不要只输入日期。")
+
     while True:
-        date_rule = "不得晚于截止日；同日行情需已设置合适的明确截止时点" if cutoff_timestamp else "必须早于分析截止日"
-        observation = _date(_ask(f"该价格观察日期 YYYY-MM-DD（{date_rule}）", default_price_date), "PRICE_OBSERVATION_DATE")
+        position = _ask("当前持仓百分比（例如空仓填 0）", "0")
         try:
+            build_research_case(symbol, cutoff.isoformat(), position, market=market)
+            break
+        except (LocalInvestmentPilotError, ValueError, TypeError) as exc:
+            print(f"持仓比例不合法：{exc}。请按百分比填写，例如 0 或 10。")
+
+    while True:
+        price = _ask("你核实的股价（必须大于 0）")
+        try:
+            _positive(price, "CURRENT_PRICE")
+            break
+        except LocalInvestmentPilotError as exc:
+            print(f"股价输入不合法：{exc}。请只输入价格数字，例如 19.74。")
+
+    # No holiday-calendar lookup is performed; weekends are rejected below.
+    default_price_date = (
+        _latest_weekday_on_or_before(cutoff)
+        if cutoff_timestamp else _previous_weekday(cutoff)
+    ).isoformat()
+    while True:
+        date_rule = (
+            "不得晚于截止日；选择 2 时可以填写截止日当天"
+            if cutoff_timestamp else "必须早于分析截止日"
+        )
+        try:
+            observation = _date(
+                _ask(f"该价格观察日期 YYYY-MM-DD（{date_rule}）", default_price_date),
+                "PRICE_OBSERVATION_DATE",
+            )
             _validate_guided_observation_date(
                 observation, cutoff, cutoff_timestamp=cutoff_instant if cutoff_timestamp else None
             )
             break
         except LocalInvestmentPilotError as exc:
-            print(f"价格日期/时点不符合当前 PIT 规则：{exc}")
-            print("请重新输入；系统不会自动修改分析截止日或价格观察日。")
+            print(f"价格观察日期不合法：{exc}")
+            print("请填写真实交易日；本程序不会把周末自动改成交易日，也不会自动修改截止日期。")
     default_known_at = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI).isoformat()
     while True:
         known_at = _ask(
@@ -1347,9 +1513,15 @@ def run_guided_wizard(
     template_path = Path(template_result["input_template"])
     prompt_path = Path(template_result["analysis_prompt"])
     prompt = prompt_path.read_text(encoding="utf-8") + (
-        "\n\n请根据我上传的模板 JSON 和公司公告/财报材料填写它，保留 case 与 price_input 不变。"
-        "只返回一个完整 JSON 对象；未知写 UNKNOWN，MIE 无法识别时写 NOT_IDENTIFIABLE。"
-        "不要编造事实，不要把人工价格标记为已验证。"
+        "\n\n研究执行要求：请在分析截止时点之前，主动查阅并引用可访问的公开资料；优先公司公告/定期报告、交易所披露、监管文件，"
+        "其次使用可靠行业资料。每条关键事实必须登记 source_id、title、source_class、source_ref（完整 URL 或文件定位）、"
+        "published_at、known_at、summary；只写截止时点前可获得的信息，无法确定 known_at 时明确标记 UNKNOWN。"
+        "必须完成 Trust、Reality、Quality、Thesis、价值驱动因素排序、风险清单、MIE/预期差、估值模型和假设、Bear/Base/Bull 情景，"
+        "并提供独立且不纳入概率加权的 thesis_break_stress。Bear 要明确失败触发、经营影响路径和估值传导机制。"
+        "不要只原样返回模板，也不要用空字符串替代研究；若事实或估值确实无法识别，请写明具体原因、证据缺口和需要人工核实的事项，"
+        "保留 UNKNOWN / NOT_IDENTIFIABLE，不得编造数字。"
+        "保留 schema_version、case、price_input 原样不变，尤其不得更改人工输入股价、观察日期、known_at 或把价格标记为已验证。"
+        "只返回一个完整 JSON 对象，不要用 Markdown 代码围栏，也不要附加 JSON 以外的说明文字。"
     )
 
     private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
@@ -1382,6 +1554,7 @@ def run_guided_wizard(
             payload = _read_json_response_file(response_path)
             _assert_response_preserves_operator_inputs(template_path, payload)
             _prepare_input(payload)
+            _validate_guided_research_response(payload)
             break
         except (OSError, ValueError, KeyError, TypeError) as exc:
             print(f"暂未继续：{exc}")

@@ -53,6 +53,12 @@ The report-quality follow-up explicitly resolves structured evidence references 
 
 This is a usability/reporting repair to `PILOT_NON_CANONICAL` only. Explicit timestamp support is for the provisional local pilot's time-bound checks; it does not change the date-only Core/PIT contract, formal Evidence/PIT/Forecast/Valuation admission, canonical Decision authority, or human approval requirements.
 
+### Local pilot guided-input / empty-response gate (2026-10-12)
+
+The macOS one-click wizard now offers named cutoff modes: date-only start-of-day (strict prior-date data), same-day close plus 15:30 +08:00, or an advanced explicit timezone-aware timestamp. Common same-day-close runs no longer require manually typing an ISO timestamp. Price-date parsing errors are caught within the prompt, weekend quote observation dates are rejected rather than silently treated as market closes, invalid prices/positions are re-prompted, and the wizard states that exchange holiday calendars are not queried.
+
+Before generating a report, the guided response handoff now rejects a mostly untouched template: it requires at least one traceable evidence-register row and substantive Trust/Reality/Quality/MIE/expectation-gap/risk summaries, Thesis content, value drivers, scenario rationales, Bear failure path, model rationale/assumptions, and a standalone thesis-break stress explanation. Explicit UNKNOWN conclusions are allowed only when the response supplies a real explanation. An incomplete response remains open for correction in the same private response JSON; no empty report is generated. This is a usability gate for the personal PILOT_NON_CANONICAL path and does not certify evidence truth, data rights, formal admission, or investment validity.
+
 ### C1/C2 signer enrollment preparation (2026-10-12)
 
 The signed Evidence/PIT CLI now supports `prepare-enrollment-request` and `prepare-rights-draft`. Signer enrollment proposals validate an Ed25519 public key and remain `PROPOSED_NOT_TRUSTED`; they exclude private keys, reject wildcard case scopes and combined admission/reviewer roles, and cannot modify the canonical registry. Rights drafts remain `UNKNOWN` by default, have no allowed uses or admitted permission instrument, and record any supplied candidate instrument hash only as a candidate. Neither command decides legal/data-use rights, enrolls a signer or admits Evidence/PIT. Owner authorization, separate independent review, written permission where required, and exact instrument verification remain open gates.

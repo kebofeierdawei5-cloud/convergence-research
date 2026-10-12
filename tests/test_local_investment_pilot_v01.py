@@ -17,6 +17,8 @@ from iios_mvp.local_investment_pilot_v01 import (
     _prepare_input,
     _assert_response_preserves_operator_inputs,
     _validate_guided_observation_date,
+    _guided_cutoff_timestamp,
+    _validate_guided_research_response,
     run_guided_wizard,
     run_local_investment_pilot,
 )
@@ -255,7 +257,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
         "SZ002810",
         "1",
         "2026-10-12",
-        "2026-10-12T15:30:00+08:00",
+        "2",
         "0",
         "19.74",
         "2026-10-12",
@@ -300,7 +302,7 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
         "SZ002810",
         "1",
         "2026-10-12",
-        "",
+        "1",
         "0",
         "19.74",
         "2026-10-12",
@@ -316,8 +318,8 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
     )
     output = capsys.readouterr().out
     assert result["status"] == "CANCELLED"
-    assert "价格日期/时点不符合当前 PIT 规则" in output
-    assert "请重新输入" in output
+    assert "价格观察日期不合法" in output
+    assert "PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF" in output
     assert "观察日 2026-10-09" in output
     assert not (tmp_path / "inputs").exists()
 
@@ -483,6 +485,60 @@ def test_guided_observation_date_accepts_same_day_only_with_explicit_cutoff():
     assert _validate_guided_observation_date(same_day, same_day, cutoff_timestamp=instant) == same_day
     with pytest.raises(LocalInvestmentPilotError, match="PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF"):
         _validate_guided_observation_date(same_day, same_day)
+
+
+def test_guided_cutoff_modes_remove_timezone_syntax_from_common_path():
+    cutoff = date(2026, 10, 12)
+
+    instant, timestamp = _guided_cutoff_timestamp(cutoff, "1")
+    assert timestamp is None
+    assert instant.isoformat() == "2026-10-12T00:00:00+08:00"
+
+    instant, timestamp = _guided_cutoff_timestamp(cutoff, "2")
+    assert timestamp == "2026-10-12T15:30:00+08:00"
+    assert instant.isoformat() == timestamp
+
+    with pytest.raises(LocalInvestmentPilotError, match="AS_OF_TIMESTAMP_MUST_INCLUDE_TIMEZONE"):
+        _guided_cutoff_timestamp(cutoff, "3", "2026-10-12")
+    with pytest.raises(LocalInvestmentPilotError, match="CUTOFF_MODE_MUST_BE_1_2_OR_3"):
+        _guided_cutoff_timestamp(cutoff, "2026-10-12")
+
+
+def test_guided_observation_date_rejects_weekends_instead_of_treating_them_as_market_closes():
+    saturday = date(2026, 10, 10)
+    cutoff = date(2026, 10, 12)
+    with pytest.raises(LocalInvestmentPilotError, match="PRICE_OBSERVATION_MUST_BE_TRADING_WEEKDAY"):
+        _validate_guided_observation_date(
+            saturday, cutoff, cutoff_timestamp=None
+        )
+
+
+def test_guided_research_response_blocks_an_untouched_or_mostly_empty_template():
+    payload = _payload()
+    _validate_guided_research_response(payload)
+
+    payload["evidence_register"] = []
+    payload["assessment"]["trust"]["summary"] = "尚未完成信任审查"
+    payload["assessment"]["thesis"]["core_statement"] = ""
+    payload["forecast_valuation"]["thesis_break_stress"]["rationale"] = ""
+
+    with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_RESPONSE_INCOMPLETE"):
+        _validate_guided_research_response(payload)
+
+
+def test_guided_research_response_allows_explicit_unknowns_with_real_explanations():
+    payload = _payload()
+    for section, summary in (
+        ("trust", "当前未能独立验证最终控制人与审计质量，列为 UNKNOWN，需人工复核年报附注。"),
+        ("reality", "关键产品需求数据尚不充分，因此经营现实暂列 UNKNOWN。"),
+        ("quality", "现金流与利润需跨周期验证，暂列 UNKNOWN。"),
+        ("market_implied_expectation", "无法从可获得历史一致预期识别市场隐含假设，列为 NOT_IDENTIFIABLE。"),
+        ("expectation_gap", "由于市场隐含预期不可识别，预期差方向未知。"),
+        ("risk", "未能完成全部风险量化，当前结论需人工复核。"),
+    ):
+        payload["assessment"][section]["status"] = "UNKNOWN"
+        payload["assessment"][section]["summary"] = summary
+    _validate_guided_research_response(payload)
 
 
 def test_incomplete_valuation_produces_report_without_inventing_returns(tmp_path):
