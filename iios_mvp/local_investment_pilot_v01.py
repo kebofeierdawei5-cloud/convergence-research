@@ -988,8 +988,6 @@ def run_guided_wizard(
         print(f"  股票代码已规范化：{symbol_input} → {symbol}")
     print(f"  截止日 {cutoff.isoformat()}；价格 {price}；观察日 {observation.isoformat()}；持仓 {position}%")
     print("  价格只按人工输入处理，不表示来源已验证。")
-    if observation >= cutoff:
-        print("  日期提醒：日级 PIT 截止时点按截止日 00:00（+08:00）处理；截止日当天 15:00 的价格不会用于回报/目标买入价计算。请优先使用截止日前最近一个已完成交易日的价格。")
     if _ask("确认并继续？1 = 继续，0 = 退出", "1") != "1":
         return {"status": "CANCELLED", "formal_decision_created": False}
 
