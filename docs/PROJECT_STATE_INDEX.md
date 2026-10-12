@@ -45,6 +45,12 @@ Local single-user complete pilot                     ACTIVE P0 PRIORITY; PILOT_N
 Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
 ```
 
+### Personal local investment pilot — response-file handoff (2026-10-12)
+
+The one-click macOS pilot now hands the large ChatGPT response through a dedicated UTF-8 JSON file in `~/.iios-private/local-pilot/inputs/`, rather than reading the response from `pbpaste` or asking the user to paste long JSON into Terminal. The wizard creates and opens the response file in TextEdit, prints its exact path, and reads/validates it when the user presses Enter. Empty, truncated, or structurally invalid JSON produces an actionable error and can be corrected in place without restarting the wizard. Prompt copy-to-clipboard remains; response copy-to-clipboard does not.
+
+This is a usability repair to the existing `PILOT_NON_CANONICAL` workflow only. It does not change Evidence/PIT/Forecast/Valuation admission, canonical Decision authority, or human approval requirements.
+
 ### Execution-first local MVP priority (owner direction, 2026-10-11; supersedes earlier task ordering)
 
 The user has explicitly redirected IIOS delivery to **finish the core workflow and run it end-to-end in actual personal use before further optimization**. The governing decision and testable acceptance criteria are recorded in [Execution-first Local Single-User MVP Pivot](iios/LOCAL_SINGLE_USER_EXECUTION_FIRST_PIVOT_20261011.md).
