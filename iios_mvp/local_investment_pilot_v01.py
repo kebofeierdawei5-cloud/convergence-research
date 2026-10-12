@@ -747,6 +747,20 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     return value
 
 
+def _read_json_response_file(path: str | Path) -> dict[str, Any]:
+    """Read the full ChatGPT response from a UTF-8 file, not the terminal input buffer."""
+    response_path = Path(path).expanduser()
+    try:
+        raw = response_path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise LocalInvestmentPilotError("CHATGPT_RESPONSE_FILE_NOT_FOUND") from exc
+    except OSError as exc:
+        raise LocalInvestmentPilotError("CHATGPT_RESPONSE_FILE_READ_FAILED") from exc
+    if not raw.strip():
+        raise LocalInvestmentPilotError("CHATGPT_RESPONSE_FILE_EMPTY")
+    return _extract_json_object(raw)
+
+
 def _ask(prompt: str, default: str | None = None) -> str:
     suffix = f" [{default}]" if default is not None else ""
     while True:
@@ -764,12 +778,12 @@ def run_guided_wizard(
     template_root: str | Path | None = None,
     output_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Ask minimal questions, hand the template to ChatGPT, then run and open the report."""
+    """Run guided research using a dedicated file for the potentially large ChatGPT JSON."""
     template_root = template_root or (Path.home() / ".iios-private" / "local-pilot" / "inputs")
     output_root = output_root or (Path.home() / ".iios-private" / "local-pilot" / "runs")
     today = date.today()
     print("\nIIOS 投资分析｜简易向导")
-    print("填写标的和价格后，程序会打开 ChatGPT。复制完整 JSON 回答，报告会自动生成。")
+    print("填写标的和价格后，程序会打开 ChatGPT；完成回答后保存到指定 JSON 文件，报告自动生成。")
     company = _ask("公司名称")
     symbol_input = _ask("股票代码（可输入 SZ002810、002810.SZ 或 002810）")
     market_choice = _ask("市场：1 = A 股，2 = 港股", "1")
@@ -816,21 +830,40 @@ def run_guided_wizard(
         "不要编造事实，不要把人工价格标记为已验证。"
     )
 
+    private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
+    response_stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    response_path = private_inputs / f"pilot-chatgpt-response-{symbol.replace('.', '-')}-{response_stamp}.json"
+    _write_local(response_path, "")
+
     if sys.platform == "darwin":
-        # These are ordinary user-requested desktop actions; no background service or API is used.
+        # The prompt is copied to the clipboard; the large response is always handed off via a file.
         subprocess.run(["pbcopy"], input=prompt, text=True, check=True, timeout=5)
         subprocess.run(["open", "https://chatgpt.com/"], check=False, timeout=5)
         subprocess.run(["open", "-R", str(template_path)], check=False, timeout=5)
-        print("\n已打开 ChatGPT 和模板所在的 Finder 窗口；研究提示已复制。")
-        print("在 ChatGPT 粘贴提示，上传 JSON 模板和要参考的公司公告/财报。")
-        input("复制 ChatGPT 返回的完整 JSON 后，回到此窗口按回车自动继续…")
-        clipboard = subprocess.run(["pbpaste"], capture_output=True, text=True, check=True, timeout=5).stdout
-        payload = _extract_json_object(clipboard)
+        subprocess.run(["open", "-a", "TextEdit", str(response_path)], check=False, timeout=5)
+        print("\n已打开 ChatGPT、模板所在的 Finder 窗口和 JSON 结果文件；研究提示已复制到剪贴板。")
     else:
         print("\n研究提示：\n" + prompt)
-        print(f"模板文件：{template_path}")
-        completed_path = _ask("将 ChatGPT 返回的 JSON 保存为文件后，输入文件路径")
-        payload = json.loads(Path(completed_path).expanduser().read_text(encoding="utf-8"))
+        print(f"输入模板文件：{template_path}")
+
+    print(f"\nChatGPT 完整回答的保存位置：\n{response_path}")
+    print("操作步骤：")
+    print("  1. 在 ChatGPT 粘贴研究提示，上传输入模板和需要引用的公司公告/财报材料。")
+    print("  2. 复制 ChatGPT 返回的完整 JSON；粘贴到上面指定的 JSON 文件中并保存。")
+    print("  3. 回到本终端只按回车键。不要把整段 JSON 粘贴到终端。")
+    if sys.platform == "darwin":
+        print("  提示：JSON 文件已用 TextEdit 打开；粘贴后按 Command+S 保存。")
+
+    while True:
+        input("保存结果文件后，按回车读取并校验；若校验失败，修正文件后再次按回车…")
+        try:
+            payload = _read_json_response_file(response_path)
+            _prepare_input(payload)
+            break
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            print(f"暂未继续：{exc}")
+            print(f"请检查并保存这个文件后重试：{response_path}")
+            print("无需重新填写标的；也不需要把 JSON 粘贴到终端。按 Control-C 可退出。")
 
     # Validate the response before saving or running calculations.
     _prepare_input(payload)
@@ -846,6 +879,7 @@ def run_guided_wizard(
         subprocess.run(["open", str(report_path)], check=False, timeout=5)
     print("\n下次分析另一个标的，只需双击同一个启动器。")
     return result
+
 
 
 def _main(argv: list[str] | None = None) -> int:
