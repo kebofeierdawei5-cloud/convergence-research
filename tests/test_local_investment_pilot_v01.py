@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import subprocess
 
 import pytest
 
 from iios_mvp.local_investment_pilot_v01 import (
     LocalInvestmentPilotError,
     PILOT_SCHEMA,
-    LocalInvestmentPilotError,
     run_local_investment_pilot,
 )
 
@@ -217,3 +217,14 @@ def test_extract_json_object_blocks_incomplete_clipboard_response():
     source = fence + 'json\n{"schema_version": '
     with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_JSON_INVALID"):
         _extract_json_object(source)
+
+
+def test_root_one_click_launcher_uses_the_guided_entry_and_has_valid_bash():
+    root = Path(__file__).resolve().parents[1]
+    launcher = root / "启动IIOS投资分析.command"
+    result = subprocess.run(["bash", "-n", str(launcher)], capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+    content = launcher.read_text(encoding="utf-8")
+    assert 'python3 -m iios_mvp.local_investment_pilot_v01 --wizard' in content
+    assert "--create-template" not in content
+    assert "git pull" not in content
