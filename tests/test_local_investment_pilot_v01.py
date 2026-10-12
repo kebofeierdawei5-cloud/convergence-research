@@ -391,6 +391,7 @@ def test_uncertain_timing_for_referenced_evidence_forces_review_required(tmp_pat
     assert analysis["return_metrics"] is not None
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
     assert "REFERENCED_EVIDENCE_TIMING_UNCERTAIN" in analysis["decision"]["gating_issues"]
+    assert "被引用来源缺少可靠的截止前已知时点" in report
     assert "E1" in report
 
 
