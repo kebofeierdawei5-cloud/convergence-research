@@ -16,6 +16,7 @@ from iios_mvp.local_investment_pilot_v01 import (
     _analyse,
     _prepare_input,
     _validate_guided_observation_date,
+    run_guided_wizard,
     run_local_investment_pilot,
 )
 
@@ -209,6 +210,34 @@ def test_guided_observation_date_must_precede_date_only_cutoff():
         _validate_guided_observation_date(cutoff, cutoff)
     with pytest.raises(LocalInvestmentPilotError, match="PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF"):
         _validate_guided_observation_date(date(2026, 10, 13), cutoff)
+
+
+def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monkeypatch, capsys):
+    import builtins
+
+    answers = iter([
+        "山东赫达",
+        "SZ002810",
+        "1",
+        "2026-10-12",
+        "0",
+        "19.74",
+        "2026-10-12",
+        "2026-10-09",
+        "人工输入",
+        "0",
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
+    result = run_guided_wizard(
+        template_root=tmp_path / "inputs",
+        output_root=tmp_path / "runs",
+    )
+    output = capsys.readouterr().out
+    assert result["status"] == "CANCELLED"
+    assert "日期不符合当前 PIT 规则" in output
+    assert "请重新输入" in output
+    assert "观察日 2026-10-09" in output
+    assert not (tmp_path / "inputs").exists()
 
 
 def test_candidate_driven_pilot_uses_existing_return_solver_and_outputs_chinese_report(tmp_path):
