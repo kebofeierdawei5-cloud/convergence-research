@@ -753,7 +753,15 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     else:
         lines.append("- 来源登记表为空；所有正文中的证据编号如无登记记录，均不能视为已解析。")
     lines.extend(["## 七、需人工处理的问题", ""])
-    lines.extend(f"- {x}" for x in d["gating_issues"]) if d["gating_issues"] else lines.append("- 所提供的试运行门槛均通过；仍需检查原始来源和估值假设。")
+    issue_explanations = {
+        "REFERENCED_EVIDENCE_TIMING_UNCERTAIN": (
+            "被引用来源缺少可靠的截止前已知时点；日期精度不足或时间字段缺失/无效，不能用它支持 BUY/ADD。"
+        ),
+    }
+    lines.extend(
+        f"- {issue}：{issue_explanations[issue]}" if issue in issue_explanations else f"- {issue}"
+        for issue in d["gating_issues"]
+    ) if d["gating_issues"] else lines.append("- 所提供的试运行门槛均通过；仍需检查原始来源和估值假设。")
     lines.extend([
         "",
         "## 八、治理边界",
