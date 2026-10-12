@@ -570,6 +570,14 @@ def test_replay_reruns_the_saved_input_and_matches_return_calculation(tmp_path):
     assert replay_analysis["decision"]["provisional_action"] == first_analysis["decision"]["provisional_action"]
 
 
+def test_prepare_input_rejects_weekend_price_observation_dates():
+    payload = _payload(cutoff="2026-10-12")
+    payload["price_input"]["observation_date"] = "2026-10-10"
+    payload["price_input"]["known_at"] = "2026-10-10T15:00:00+08:00"
+    with pytest.raises(LocalInvestmentPilotError, match="PRICE_OBSERVATION_MUST_BE_TRADING_WEEKDAY"):
+        _prepare_input(payload)
+
+
 def test_manual_price_cannot_be_relabelled_as_source_verified(tmp_path):
     payload = _payload()
     payload["price_input"]["assurance_label"] = "CANONICAL_PRICE_ADMISSION_VERIFIED"

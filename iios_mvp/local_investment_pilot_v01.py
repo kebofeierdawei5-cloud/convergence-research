@@ -359,6 +359,11 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
 
     price = _positive(price_raw.get("price"), "CURRENT_PRICE")
     observation = _date(price_raw.get("observation_date"), "PRICE_OBSERVATION_DATE")
+    if observation.weekday() >= 5:
+        raise LocalInvestmentPilotError(
+            "PRICE_OBSERVATION_MUST_BE_TRADING_WEEKDAY: 输入日期是周六或周日；"
+            "A 股/港股常规收盘价应填写实际交易日日期。"
+        )
     known_at = _datetime(price_raw.get("known_at"), "PRICE_KNOWN_AT", allow_date_only=False)
     price_issues: list[str] = []
     if known_at.date() != observation:
