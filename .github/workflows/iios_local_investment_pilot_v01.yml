@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "iios_mvp/local_investment_pilot_v01.py"
+      - "iios_mvp/canonical_signed_evidence_admission_v01.py"
+      - "tests/test_canonical_signed_evidence_admission_v01.py"
       - "iios_mvp/research_intake.py"
       - "iios_mvp/investment_core_contract_v03.py"
       - "tests/test_local_investment_pilot_v01.py"
