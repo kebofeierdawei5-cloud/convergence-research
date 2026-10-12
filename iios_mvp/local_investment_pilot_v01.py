@@ -257,7 +257,7 @@ def _resolve_cutoff_timestamp(case_raw: Mapping[str, Any], cutoff: date) -> tupl
 def _validate_guided_observation_date(
     observation: date, cutoff: date, *, cutoff_timestamp: datetime | None = None
 ) -> date:
-    """Date-only cutoff stays start-of-day; explicit same-day cutoffs are allowed only after the quote time."""
+    """Date-only cutoff stays start-of-day; explicit cutoff permits dates up to cutoff day, then known_at is checked separately."""
     if cutoff_timestamp is None:
         if observation >= cutoff:
             raise LocalInvestmentPilotError(
