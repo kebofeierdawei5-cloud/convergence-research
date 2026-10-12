@@ -999,6 +999,33 @@ def _read_json_response_file(path: str | Path) -> dict[str, Any]:
     return _extract_json_object(raw)
 
 
+
+def _assert_response_preserves_operator_inputs(
+    template_path: str | Path, payload: Mapping[str, Any]
+) -> None:
+    """Fail closed if the AI response changes operator-owned case or price fields."""
+    path = Path(template_path).expanduser()
+    try:
+        template = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise LocalInvestmentPilotError("OPERATOR_INPUT_TEMPLATE_NOT_FOUND") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise LocalInvestmentPilotError("OPERATOR_INPUT_TEMPLATE_UNREADABLE") from exc
+
+    mismatched_sections = [
+        field for field in ("case", "price_input")
+        if payload.get(field) != template.get(field)
+    ]
+    if mismatched_sections:
+        sections = ", ".join(mismatched_sections)
+        raise LocalInvestmentPilotError(
+            "CHATGPT_CHANGED_OPERATOR_CONTROLLED_FIELDS: "
+            + sections
+            + "; 请将本地输入模板中的这些字段原样复制回结果 JSON 并保存后重试。"
+            + " 本次分析尚未生成，系统不会静默接受 AI 改写的标的、截止时点或人工股价。"
+        )
+
+
 def _ask(prompt: str, default: str | None = None) -> str:
     suffix = f" [{default}]" if default is not None else ""
     while True:
@@ -1136,6 +1163,7 @@ def run_guided_wizard(
         input("保存结果文件后，按回车读取并校验；若校验失败，修正文件后再次按回车…")
         try:
             payload = _read_json_response_file(response_path)
+            _assert_response_preserves_operator_inputs(template_path, payload)
             _prepare_input(payload)
             break
         except (OSError, ValueError, KeyError, TypeError) as exc:
