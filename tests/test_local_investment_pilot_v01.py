@@ -8,6 +8,7 @@ import pytest
 from iios_mvp.local_investment_pilot_v01 import (
     LocalInvestmentPilotError,
     PILOT_SCHEMA,
+    LocalInvestmentPilotError,
     run_local_investment_pilot,
 )
 
@@ -197,3 +198,22 @@ def test_pilot_receipt_never_claims_canonical_authority(tmp_path):
     assert receipt["formal_decision_created"] is False
     assert receipt["canonical_run_receipt_created"] is False
     assert receipt["auto_execution"] is False
+
+
+def test_extract_json_object_accepts_chatgpt_code_fence_and_leading_text():
+    from iios_mvp.local_investment_pilot_v01 import _extract_json_object
+
+    fence = chr(96) * 3
+    source = 'Here is the result:\n' + fence + 'json\n{"schema_version": "IIOS-LOCAL-INVESTMENT-PILOT-0.1", "value": 2}\n' + fence
+    result = _extract_json_object(source)
+    assert result["schema_version"] == PILOT_SCHEMA
+    assert result["value"] == 2
+
+
+def test_extract_json_object_blocks_incomplete_clipboard_response():
+    from iios_mvp.local_investment_pilot_v01 import _extract_json_object
+
+    fence = chr(96) * 3
+    source = fence + 'json\n{"schema_version": '
+    with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_JSON_INVALID"):
+        _extract_json_object(source)
