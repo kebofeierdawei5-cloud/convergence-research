@@ -371,6 +371,29 @@ def test_explicit_timestamp_cutoff_must_be_timezone_aware_and_match_as_of_date()
         _prepare_input(payload)
 
 
+@pytest.mark.parametrize(
+    ("known_at", "expected_status"),
+    [
+        ("2026-10-10", "KNOWN_AT_PRECISION_INSUFFICIENT"),
+        ("", "UNKNOWN"),
+        ("not-a-date", "KNOWN_AT_INVALID"),
+    ],
+)
+def test_uncertain_timing_for_referenced_evidence_forces_review_required(tmp_path, known_at, expected_status):
+    payload = _payload(cutoff="2026-10-10")
+    payload["evidence_register"][0]["known_at"] = known_at
+
+    prepared = _prepare_input(payload)
+    assert prepared["evidence_register"][0]["time_status"] == expected_status
+    assert prepared["uncertain_timing_evidence_references"] == ["E1"]
+
+    analysis, report = _analyse(payload, "TEST-TIMING-UNKNOWN")
+    assert analysis["return_metrics"] is not None
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert "REFERENCED_EVIDENCE_TIMING_UNCERTAIN" in analysis["decision"]["gating_issues"]
+    assert "E1" in report
+
+
 def test_guided_observation_date_accepts_same_day_only_with_explicit_cutoff():
     from datetime import datetime, timedelta, timezone
 
