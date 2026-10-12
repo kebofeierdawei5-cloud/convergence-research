@@ -67,7 +67,7 @@ python -m iios_mvp.canonical_signed_evidence_admission_v01 prepare-enrollment-re
   --out "$HOME/.iios-private/keys/owner-admission-enrollment-request.json"
 ```
 
-The output is a mode-0600, local-only request with status \`PROPOSED_NOT_TRUSTED\`. It includes only the public key and proposed role/scope—not the private key—and explicitly records that no trust-registry mutation occurred. It rejects wildcard case scopes and combined admission/reviewer roles. The request is not an authorization: the owner must separately approve the identity, scope and validity, and the canonical registry remains unchanged until that approval is intentionally applied. Prepare a separate request and a separate key for \`INDEPENDENT_REVIEWER\`; that signer must not be the same key id as the admission signer.
+The output is a mode-0600, local-only request with status `PROPOSED_NOT_TRUSTED`. It includes only the public key and proposed role/scope—not the private key—and explicitly records that no trust-registry mutation occurred. It rejects wildcard case scopes and combined admission/reviewer roles. The request is not an authorization: the owner must separately approve the identity, scope and validity, and the canonical registry remains unchanged until that approval is intentionally applied. Prepare a separate request and a separate key for `INDEPENDENT_REVIEWER`; that signer must not be the same key id as the admission signer.
 
 ### Prepare a rights adjudication draft (always UNKNOWN by default)
 
