@@ -242,13 +242,31 @@ def _format_text_block(value: Any) -> list[str]:
     return rendered or ["未提供"]
 
 
-def _validate_guided_observation_date(observation: date, cutoff: date) -> date:
-    """A date-only cutoff is midnight at the start of that date; same-day quotes cannot qualify."""
-    if observation >= cutoff:
-        raise LocalInvestmentPilotError(
-            "PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF: "
-            "现行日期级截止按截止日 00:00（+08:00）处理，请填写截止日前已完成交易日的价格观察日期。"
-        )
+def _resolve_cutoff_timestamp(case_raw: Mapping[str, Any], cutoff: date) -> tuple[datetime, str | None]:
+    """Keep legacy date-only semantics unless an explicit, same-date timezone-aware instant is supplied."""
+    cutoff_start = datetime.combine(cutoff, time.min, tzinfo=SHANGHAI)
+    raw = str(case_raw.get("as_of_timestamp") or "").strip()
+    if not raw:
+        return cutoff_start, None
+    instant = _datetime(raw, "AS_OF_TIMESTAMP", allow_date_only=False)
+    if instant.date() != cutoff:
+        raise LocalInvestmentPilotError("AS_OF_TIMESTAMP_DATE_MUST_MATCH_AS_OF_DATE")
+    return instant, instant.isoformat()
+
+
+def _validate_guided_observation_date(
+    observation: date, cutoff: date, *, cutoff_timestamp: datetime | None = None
+) -> date:
+    """Date-only cutoff stays start-of-day; explicit cutoff permits dates up to cutoff day, then known_at is checked separately."""
+    if cutoff_timestamp is None:
+        if observation >= cutoff:
+            raise LocalInvestmentPilotError(
+                "PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF: "
+                "日期级截止按截止日 00:00（+08:00）处理；同日行情请明确填写截止时点。"
+            )
+        return observation
+    if observation > cutoff:
+        raise LocalInvestmentPilotError("PRICE_OBSERVATION_AFTER_TIMESTAMP_CUTOFF")
     return observation
 
 
@@ -280,6 +298,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     market = str(case_raw.get("market") or "CN-A")
     symbol = str(case_raw.get("symbol") or "").strip()
     cutoff = _date(case_raw.get("as_of_date"), "AS_OF_DATE")
+    cutoff_instant, cutoff_timestamp = _resolve_cutoff_timestamp(case_raw, cutoff)
     position_raw = str(case_raw.get("current_position_pct", "0"))
     case = build_research_case(symbol, cutoff.isoformat(), position_raw, market=market)
     position = str(case["request"]["current_position_pct"])
@@ -291,14 +310,16 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     price = _positive(price_raw.get("price"), "CURRENT_PRICE")
     observation = _date(price_raw.get("observation_date"), "PRICE_OBSERVATION_DATE")
     known_at = _datetime(price_raw.get("known_at"), "PRICE_KNOWN_AT", allow_date_only=False)
-    cutoff_start = datetime.combine(cutoff, time.min, tzinfo=SHANGHAI)
     price_issues: list[str] = []
     if known_at.date() != observation:
         price_issues.append("PRICE_KNOWN_AT_DATE_MISMATCH")
     if observation > cutoff:
         price_issues.append("PRICE_OBSERVATION_AFTER_CUTOFF")
-    if known_at > cutoff_start:
-        price_issues.append("PRICE_KNOWN_AFTER_DATE_ONLY_CUTOFF")
+    if known_at > cutoff_instant:
+        price_issues.append(
+            "PRICE_KNOWN_AFTER_EXPLICIT_TIMESTAMP_CUTOFF"
+            if cutoff_timestamp else "PRICE_KNOWN_AFTER_DATE_ONLY_CUTOFF"
+        )
     if str(price_raw.get("assurance_label") or "") != PRICE_ASSURANCE:
         raise LocalInvestmentPilotError("PRICE_MUST_REMAIN_OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED")
     claims = _items(price_raw.get("sources_claimed"))
@@ -321,7 +342,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
                 source_time = _datetime(known_text, f"{source_id}_KNOWN_AT")
                 source_time_status = (
                     "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
-                    if source_time <= cutoff_start else "AFTER_CUTOFF"
+                    if source_time <= cutoff_instant else "AFTER_CUTOFF"
                 )
             except LocalInvestmentPilotError:
                 source_time_status = "KNOWN_AT_INVALID"
@@ -430,6 +451,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "case": {
             "case_id": case["case_id"], "company": company, "market": normalized_market,
             "symbol": case["request"]["symbol"], "currency": currency, "as_of_date": cutoff.isoformat(),
+            "as_of_timestamp": cutoff_timestamp,
+            "cutoff_semantics": "EXPLICIT_TIMESTAMP" if cutoff_timestamp else "DATE_ONLY_START_OF_DAY",
             "current_position_pct": position, "venue_hint": case["security_identity"]["venue_hint"],
             "venue_hint_is_evidence": False,
         },
@@ -562,7 +585,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f"# IIOS 本地投资研究试运行：{c['company']}（{c['symbol']}）",
         "",
         f"- 运行等级：**{PILOT_STATUS}**",
-        f"- 分析截止：{c['as_of_date']}；当前价：{p['price']} {c['currency']}（观察日 {p['observation_date']}）",
+        f"- 分析截止：{c.get('as_of_timestamp') or (c['as_of_date'] + ' 00:00:00+08:00（日期级截止）')}；当前价：{p['price']} {c['currency']}（观察日 {p['observation_date']}，价格可获得时点 {p['known_at']}）",
         f"- 当前持仓：{c['current_position_pct']}%",
         "",
         "> 这是个人使用的本地试运行报告，不是正式 canonical Decision。人工价格/AI 分析/来源摘要未完成正式证据准入；建议只供人工审阅，不会自动下单。",
@@ -823,8 +846,13 @@ def run_local_investment_pilot(*, input_path: str | Path, output_root: str | Pat
 def _template(
     *, company: str, symbol: str, market: str, as_of_date: str, current_position_pct: str,
     price: str, price_observation_date: str, price_known_at: str, price_source_claim: str,
+    as_of_timestamp: str | None = None,
 ) -> dict[str, Any]:
     seed = build_research_case(symbol, as_of_date, current_position_pct, market=market)
+    cutoff = _date(as_of_date, "AS_OF_DATE")
+    _cutoff_instant, normalized_cutoff_timestamp = _resolve_cutoff_timestamp(
+        {"as_of_timestamp": as_of_timestamp}, cutoff
+    )
     currency = "CNY" if seed["request"]["market"] == "CN-A" else "HKD"
     _positive(price, "CURRENT_PRICE")
     observation = _date(price_observation_date, "PRICE_OBSERVATION_DATE")
@@ -838,6 +866,8 @@ def _template(
         "case": {
             "company": company, "market": seed["request"]["market"], "symbol": seed["request"]["symbol"],
             "currency": currency, "as_of_date": seed["temporal_scope"]["cutoff_date"],
+            "as_of_timestamp": normalized_cutoff_timestamp,
+            "cutoff_semantics": "EXPLICIT_TIMESTAMP" if normalized_cutoff_timestamp else "DATE_ONLY_START_OF_DAY",
             "current_position_pct": seed["decision_context"]["current_position_pct"],
         },
         "price_input": {
@@ -877,13 +907,14 @@ def _template(
 def create_pilot_template(
     *, company: str, symbol: str, market: str, as_of_date: str, current_position_pct: str,
     price: str, price_observation_date: str, price_known_at: str, price_source_claim: str,
-    template_root: str | Path,
+    template_root: str | Path, as_of_timestamp: str | None = None,
 ) -> dict[str, Any]:
     root = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
     payload = _template(
         company=company, symbol=symbol, market=market, as_of_date=as_of_date,
         current_position_pct=current_position_pct, price=price, price_observation_date=price_observation_date,
         price_known_at=price_known_at, price_source_claim=price_source_claim,
+        as_of_timestamp=as_of_timestamp,
     )
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     token = str(payload["case"]["symbol"]).replace(".", "-")
@@ -971,25 +1002,55 @@ def run_guided_wizard(
     market = "CN-A" if market_choice == "1" else "HK"
     symbol = _normalize_guided_symbol(symbol_input, market)
     cutoff = _date(_ask("分析截止日 YYYY-MM-DD", today.isoformat()), "AS_OF_DATE")
+    while True:
+        raw_cutoff_timestamp = _ask(
+            "分析截止时点 ISO 8601（可留空；要使用当日收盘价时请明确填写晚于价格可获得时间的时点）",
+            "",
+        )
+        try:
+            cutoff_instant, cutoff_timestamp = _resolve_cutoff_timestamp(
+                {"as_of_timestamp": raw_cutoff_timestamp}, cutoff
+            )
+            break
+        except LocalInvestmentPilotError as exc:
+            print(f"截止时点不符合规则：{exc}")
     position = _ask("当前持仓百分比", "0")
     price = _ask("你核实的股价")
     # Skip weekends for the default, but holiday calendars are not fetched here.
     default_price_date = _previous_weekday(cutoff).isoformat()
     while True:
-        observation = _date(_ask("该价格观察日期 YYYY-MM-DD（必须早于分析截止日）", default_price_date), "PRICE_OBSERVATION_DATE")
+        date_rule = "不得晚于截止日；同日行情需已设置合适的明确截止时点" if cutoff_timestamp else "必须早于分析截止日"
+        observation = _date(_ask(f"该价格观察日期 YYYY-MM-DD（{date_rule}）", default_price_date), "PRICE_OBSERVATION_DATE")
         try:
-            _validate_guided_observation_date(observation, cutoff)
+            _validate_guided_observation_date(
+                observation, cutoff, cutoff_timestamp=cutoff_instant if cutoff_timestamp else None
+            )
             break
         except LocalInvestmentPilotError as exc:
-            print(f"日期不符合当前 PIT 规则：{exc}")
-            print("请重新输入；系统不会自动把截止日改成前一天，也不会偷偷改写价格观察日。")
-    source_claim = _ask("价格来源简述", "人工输入；来源未独立核验")
-    known_at = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI).isoformat()
+            print(f"价格日期/时点不符合当前 PIT 规则：{exc}")
+            print("请重新输入；系统不会自动修改分析截止日或价格观察日。")
+    default_known_at = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI).isoformat()
+    while True:
+        known_at = _ask(
+            "价格可获得时间 ISO 8601（需含时区；默认按 15:00；可按你实际核实时间修改）",
+            default_known_at,
+        )
+        try:
+            parsed_known_at = _datetime(known_at, "PRICE_KNOWN_AT", allow_date_only=False)
+            if parsed_known_at.date() != observation:
+                raise LocalInvestmentPilotError("PRICE_KNOWN_AT_DATE_MUST_MATCH_OBSERVATION_DATE")
+            if parsed_known_at > cutoff_instant:
+                raise LocalInvestmentPilotError("PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP")
+            known_at = parsed_known_at.isoformat()
+            break
+        except LocalInvestmentPilotError as exc:
+            print(f"价格可获得时点不符合截止约束：{exc}")
     print("\n请核对：")
     print(f"  {company} / {symbol} / {market}")
     if symbol != symbol_input.strip().upper().replace(" ", ""):
         print(f"  股票代码已规范化：{symbol_input} → {symbol}")
-    print(f"  截止日 {cutoff.isoformat()}；价格 {price}；观察日 {observation.isoformat()}；持仓 {position}%")
+    cutoff_display = cutoff_timestamp or (cutoff.isoformat() + " 00:00:00+08:00（日期级截止）")
+    print(f"  分析截止 {cutoff_display}；价格 {price}；观察日 {observation.isoformat()}；持仓 {position}%")
     print("  价格只按人工输入处理，不表示来源已验证。")
     if _ask("确认并继续？1 = 继续，0 = 退出", "1") != "1":
         return {"status": "CANCELLED", "formal_decision_created": False}
@@ -1005,6 +1066,7 @@ def run_guided_wizard(
         price_known_at=known_at,
         price_source_claim=source_claim,
         template_root=template_root,
+        as_of_timestamp=cutoff_timestamp,
     )
     template_path = Path(template_result["input_template"])
     prompt_path = Path(template_result["analysis_prompt"])
@@ -1079,6 +1141,7 @@ def _main(argv: list[str] | None = None) -> int:
     parser.add_argument("--symbol")
     parser.add_argument("--market", default="CN-A")
     parser.add_argument("--as-of")
+    parser.add_argument("--as-of-timestamp", help="optional explicit ISO 8601 cutoff instant with timezone")
     parser.add_argument("--position", default="0")
     parser.add_argument("--price")
     parser.add_argument("--price-date")
@@ -1101,7 +1164,7 @@ def _main(argv: list[str] | None = None) -> int:
                 company=args.company, symbol=args.symbol, market=args.market, as_of_date=args.as_of,
                 current_position_pct=args.position, price=args.price, price_observation_date=args.price_date,
                 price_known_at=args.price_known_at, price_source_claim=args.price_source_claim,
-                template_root=args.template_root,
+                template_root=args.template_root, as_of_timestamp=args.as_of_timestamp,
             )
         elif args.input:
             result = run_local_investment_pilot(input_path=args.input, output_root=args.output_root)
