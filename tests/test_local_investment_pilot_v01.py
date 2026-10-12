@@ -171,7 +171,7 @@ def test_evidence_references_in_assessment_and_valuation_are_resolved_or_explici
         }
     ]
     prepared = _prepare_input(payload)
-    assert prepared["referenced_evidence_ids"] == ["E-ASSUMPTION-MISSING", "E1", "E-RISK-MISSING"]
+    assert prepared["referenced_evidence_ids"] == ["E-ASSUMPTION-MISSING", "E-RISK-MISSING", "E1"]
     assert prepared["unresolved_evidence_references"] == ["E-ASSUMPTION-MISSING", "E-RISK-MISSING"]
 
 
