@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 import subprocess
 
@@ -9,6 +10,8 @@ import pytest
 from iios_mvp.local_investment_pilot_v01 import (
     LocalInvestmentPilotError,
     PILOT_SCHEMA,
+    _normalize_guided_symbol,
+    _previous_weekday,
     run_local_investment_pilot,
 )
 
@@ -95,6 +98,26 @@ def _write_input(tmp_path: Path, payload: dict | None = None) -> Path:
     path = tmp_path / "pilot-input.json"
     path.write_text(json.dumps(payload or _payload(), ensure_ascii=False, indent=2), encoding="utf-8")
     return path
+
+
+@pytest.mark.parametrize(
+    ("market", "raw", "expected"),
+    [
+        ("CN-A", "SZ002810", "002810.SZ"),
+        ("CN-A", "SH600000", "600000.SH"),
+        ("CN-A", "BJ430047", "430047.BJ"),
+        ("CN-A", "002810", "002810"),
+        ("HK", "HK00700", "00700.HK"),
+        ("HK", "00700", "00700"),
+    ],
+)
+def test_guided_entry_normalizes_common_symbol_formats(market, raw, expected):
+    assert _normalize_guided_symbol(raw, market) == expected
+
+
+def test_default_price_date_skips_weekends_but_does_not_guess_exchange_holidays():
+    assert _previous_weekday(date(2026, 10, 12)) == date(2026, 10, 9)
+    assert _previous_weekday(date(2026, 10, 13)) == date(2026, 10, 12)
 
 
 def test_candidate_driven_pilot_uses_existing_return_solver_and_outputs_chinese_report(tmp_path):
