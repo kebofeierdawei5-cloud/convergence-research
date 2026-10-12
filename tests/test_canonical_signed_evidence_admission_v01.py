@@ -188,7 +188,6 @@ def test_enrollment_request_is_private_proposal_and_never_registers_a_signer(tmp
     assert request["trusted_signer_created"] is False
     assert request["registry_mutation_performed"] is False
     assert request["private_key_included"] is False
-    assert request["private_key_included"] is False
     assert request["signer"]["public_key_sha256"] == generated["public_key_sha256"]
     assert request["signer"]["roles"] == ["EVIDENCE_ADMISSION_SIGNER"]
     assert request["signer"]["case_scopes"] == ["RC-CN-A-605016-20261009"]
