@@ -147,6 +147,112 @@ def _items(value: Any) -> list[str]:
     return [str(item).strip() for item in value if str(item).strip()]
 
 
+def _records(value: Any) -> list[Any]:
+    """Preserve structured records in the machine-readable analysis while accepting plain text."""
+    if not isinstance(value, list):
+        return []
+    result: list[Any] = []
+    for item in value:
+        if isinstance(item, Mapping):
+            result.append(dict(item))
+        elif str(item).strip():
+            result.append(str(item).strip())
+    return result
+
+
+def _humanize_item(value: Any) -> str:
+    """Render either a string or a structured assumption/risk record as readable Chinese prose."""
+    if not isinstance(value, Mapping):
+        return " ".join(str(value or "").splitlines()).strip() or "未提供"
+    item = value
+    identifier = str(item.get("assumption_id") or item.get("risk_id") or item.get("id") or "").strip()
+    name = str(item.get("name") or item.get("title") or item.get("driver") or item.get("description") or "").strip()
+    parts: list[str] = []
+    prefix = "｜".join(part for part in (identifier, name) if part)
+    if prefix:
+        parts.append(prefix)
+    values = item.get("values")
+    if isinstance(values, Mapping) and values:
+        parts.append("参数：" + "；".join(f"{key}={_humanize_item(val)}" for key, val in values.items()))
+    elif item.get("value_cny_per_share") not in (None, ""):
+        parts.append(f"每股金额：{item['value_cny_per_share']} CNY")
+    for key, label in (
+        ("severity", "严重程度"), ("likelihood", "发生可能性"), ("confidence", "置信度"),
+        ("classification", "类别"), ("not_a_fact", "非事实声明"),
+    ):
+        if item.get(key) not in (None, ""):
+            parts.append(f"{label}：{_humanize_item(item[key])}")
+    for key, label in (
+        ("basis", "依据"), ("rationale", "理由"), ("description", "说明"),
+        ("monitoring_trigger", "监控触发条件"),
+    ):
+        if item.get(key) not in (None, "") and not (key == "description" and name == str(item.get(key))):
+            parts.append(f"{label}：{' '.join(str(item[key]).splitlines()).strip()}")
+    refs = item.get("evidence_refs")
+    if isinstance(refs, list) and refs:
+        parts.append("证据引用：" + "、".join(str(ref) for ref in refs))
+    if not parts:
+        return "；".join(f"{key}={_humanize_item(val)}" for key, val in item.items())
+    return "。".join(parts)
+
+
+def _format_text_block(value: Any) -> list[str]:
+    """Normalize embedded list markers/newlines in AI-authored multiline fields."""
+    raw = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+    groups: list[tuple[str, list[str]]] = []
+    paragraph: list[str] = []
+    list_items: list[str] = []
+
+    def flush_paragraph() -> None:
+        nonlocal paragraph
+        if paragraph:
+            groups.append(("paragraph", [" ".join(paragraph)]))
+            paragraph = []
+
+    def flush_list() -> None:
+        nonlocal list_items
+        if list_items:
+            groups.append(("list", list_items))
+            list_items = []
+
+    for raw_line in raw.split("\n"):
+        line = raw_line.strip()
+        if not line:
+            flush_paragraph()
+            flush_list()
+            continue
+        match = re.match(r"^(?:[-*+]\s+|\d+\s*[.)]\s+)(.+)$", line)
+        if match:
+            flush_paragraph()
+            list_items.append(match.group(1).strip())
+        else:
+            flush_list()
+            paragraph.append(line)
+    flush_paragraph()
+    flush_list()
+
+    rendered: list[str] = []
+    for kind, contents in groups:
+        if rendered:
+            rendered.append("")
+        if kind == "list":
+            rendered.extend(f"- {line}" for line in contents)
+        else:
+            rendered.append(contents[0])
+    return rendered or ["未提供"]
+
+
+def _validate_guided_observation_date(observation: date, cutoff: date) -> date:
+    """A date-only cutoff is midnight at the start of that date; same-day quotes cannot qualify."""
+    if observation >= cutoff:
+        raise LocalInvestmentPilotError(
+            "PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF: "
+            "现行日期级截止按截止日 00:00（+08:00）处理，请填写截止日前已完成交易日的价格观察日期。"
+        )
+    return observation
+
+
+
 def _collect_refs(value: Any) -> set[str]:
     result: set[str] = set()
     if isinstance(value, Mapping):
@@ -253,7 +359,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     )
     assessment["thesis"]["break_conditions"] = _items(assessment["thesis"].get("break_conditions"))
     assessment["thesis"]["reassessment_triggers"] = _items(assessment["thesis"].get("reassessment_triggers"))
-    assessment["risk"]["items"] = _items(assessment["risk"].get("items"))
+    assessment["risk"]["items"] = _records(assessment["risk"].get("items"))
     value_drivers = raw_assessment.get("value_drivers") or []
     assessment["value_drivers"] = [
         {
@@ -274,7 +380,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "model_rationale": str(forecast_raw.get("model_rationale") or ""),
         "entry_value_reference_per_share": forecast_raw.get("entry_value_reference_per_share"),
         "probabilities_calibrated": forecast_raw.get("probabilities_calibrated") is True,
-        "assumptions": _items(forecast_raw.get("assumptions")),
+        "assumptions": _records(forecast_raw.get("assumptions")),
         "scenarios": forecast_raw.get("scenarios") if isinstance(forecast_raw.get("scenarios"), Mapping) else {},
     }
     parameters_raw = payload.get("decision_parameters") if isinstance(payload.get("decision_parameters"), Mapping) else {}
@@ -312,7 +418,9 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     except LocalInvestmentPilotError:
         max_loss = Decimal("25")
 
-    references = _collect_refs(assessment)
+    # Resolve every structured evidence reference from assessment and valuation inputs,
+    # before any structured risk/assumption objects are rendered for human readers.
+    references = _collect_refs({"assessment": raw_assessment, "forecast_valuation": forecast_raw})
     unknown_refs = sorted(references - source_ids)
     after_cutoff_refs = [
         source["source_id"] for source in sources
@@ -342,6 +450,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             "entry_return_cushion_threshold": format(BUY_ENTRY_RETURN_CUSHION_THRESHOLD, "f"),
             "max_loss_pct": format(max_loss, "f"),
         },
+        "referenced_evidence_ids": sorted(references),
         "unresolved_evidence_references": unknown_refs,
         "after_cutoff_evidence_references": after_cutoff_refs,
         "notes": str(payload.get("notes") or ""),
@@ -478,47 +587,69 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "## 三、Thesis 与价值驱动因素",
         "",
         f"- Thesis 状态：{a['thesis']['status']}",
-        f"- 核心论点：{a['thesis'].get('core_statement') or '未知'}",
+        "",
+        "### 核心论点",
         "",
     ]
-    drivers = sorted(a["value_drivers"], key=lambda x: x["rank"])
-    lines.extend(
-        f"{x['rank']}. {x['driver']}（{x['impact']}）：{x['rationale'] or '未提供'}"
-        for x in drivers
-    ) if drivers else lines.append("价值驱动因素未提供。")
-    lines.extend(["", "### Thesis 失效条件"])
+    lines.extend(_format_text_block(a["thesis"].get("core_statement")))
+    lines.extend(["", "### 价值驱动因素", ""])
+    drivers = sorted(a["value_drivers"], key=lambda x: (x["rank"], x["driver"]))
+    if drivers:
+        for display_rank, item in enumerate(drivers, start=1):
+            lines.extend([
+                f"{display_rank}. **{item['driver']}**（影响：{item['impact']}）",
+                f"   {item['rationale'] or '未提供理由。'}",
+            ])
+            if item.get("evidence_refs"):
+                lines.append("   证据引用：" + "、".join(item["evidence_refs"]))
+            lines.append("")
+    else:
+        lines.extend(["价值驱动因素未提供。", ""])
+    lines.extend(["### Thesis 失效条件", ""])
     lines.extend(f"- {x}" for x in a["thesis"]["break_conditions"]) if a["thesis"]["break_conditions"] else lines.append("- 未提供。")
-    lines.extend(["", "### 重新评估触发器"])
+    lines.extend(["", "### 重新评估触发器", ""])
     lines.extend(f"- {x}" for x in a["thesis"]["reassessment_triggers"]) if a["thesis"]["reassessment_triggers"] else lines.append("- 未提供。")
     lines.extend([
         "",
         "## 四、Forecast / Valuation",
         "",
-        f"- 模型：{f['model']}；选择理由：{f['model_rationale'] or '未提供'}",
+        f"- 模型：{f['model']}",
+        f"- 模型选择理由：{f['model_rationale'] or '未提供'}",
         f"- 安全边际参考价值：{f.get('entry_value_reference_per_share') or 'UNKNOWN'} {c['currency']}/股",
         f"- 情景概率是否校准：{'是' if f['probabilities_calibrated'] else '否 / 未校准'}",
         "",
-        "| 情景 | 概率 | 期末每股价值 | 每股现金分配 | 理由 |",
-        "|---|---:|---:|---:|---|",
     ])
     scenarios = f.get("scenarios") if isinstance(f.get("scenarios"), Mapping) else {}
     for name, label in (("bear", "Bear"), ("base", "Base"), ("bull", "Bull")):
         row = scenarios.get(name) if isinstance(scenarios.get(name), Mapping) else {}
-        lines.append(f"| {label} | {row.get('probability', 'UNKNOWN')} | {row.get('terminal_value_per_share', 'UNKNOWN')} | {row.get('cash_distributions_per_share', '0')} | {row.get('rationale', '未提供')} |")
+        lines.extend([
+            f"### {label} 情景",
+            "",
+            f"- 情景概率：{row.get('probability', 'UNKNOWN')}",
+            f"- 期末每股价值：{row.get('terminal_value_per_share', 'UNKNOWN')} {c['currency']}",
+            f"- 每股现金分配：{row.get('cash_distributions_per_share', '0')} {c['currency']}",
+            f"- 情景理由：{' '.join(str(row.get('rationale') or '未提供').splitlines()).strip()}",
+            "",
+        ])
     if calc:
         lines.extend([
+            "- 概率加权终值：" + str(calc["expected_terminal_wealth"]) + f" {c['currency']}/股",
+            "- 预期总回报：" + str(calc["expected_total_return"]),
+            "- 入场安全边际：" + str(calc["margin_of_safety"]),
+            "- Bear 情景回报：" + str(calc["bear_return"]),
+            "- 回报门槛入场上限：" + str(calc["target_entry_price_for_return"]),
+            "- 风险约束入场上限：" + str(calc.get("target_entry_price_for_risk")),
             "",
-            f"- 概率加权终值：{calc['expected_terminal_wealth']} {c['currency']}/股",
-            f"- 预期总回报：{calc['expected_total_return']}",
-            f"- 入场安全边际：{calc['margin_of_safety']}",
-            f"- Bear 情景回报：{calc['bear_return']}",
-            f"- 回报门槛入场上限：{calc['target_entry_price_for_return']}",
-            f"- 风险约束入场上限：{calc.get('target_entry_price_for_risk')}",
         ])
     else:
-        lines.append(f"回报计算尚未完成：{analysis['return_metrics_reason'] or '情景输入不足'}。")
-    lines.extend(["", "### 估值假设"])
-    lines.extend(f"- {x}" for x in f["assumptions"]) if f["assumptions"] else lines.append("- 未提供；不得将其解释为市场一致预期。")
+        lines.extend([f"回报计算尚未完成：{analysis['return_metrics_reason'] or '情景输入不足'}。", ""])
+    lines.extend(["### 估值假设", ""])
+    assumptions = f.get("assumptions") if isinstance(f.get("assumptions"), list) else []
+    if assumptions:
+        for item in assumptions:
+            lines.append("- " + _humanize_item(item))
+    else:
+        lines.append("- 未提供；不得将其解释为市场一致预期。")
     lines.extend([
         "",
         "## 五、MIE 与预期差",
@@ -527,25 +658,59 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f"- 预期差：{a['expectation_gap']['status']} / {a['expectation_gap']['direction']} — {a['expectation_gap'].get('summary') or '未知'}",
         "- 若 MIE 无法识别或缺乏历史支持，不以内部估值代替市场隐含预期。",
         "",
-        "## 六、风险与来源",
+        "## 六、风险与证据引用核对",
         "",
-        f"- 风险：{a['risk']['status']} — {a['risk'].get('summary') or '未知'}",
+        f"- 风险状态：{a['risk']['status']} — {a['risk'].get('summary') or '未知'}",
     ])
-    lines.extend(f"- {x}" for x in a["risk"]["items"]) if a["risk"]["items"] else lines.append("- 具体风险清单未提供。")
+    risk_items = a["risk"].get("items") or []
+    if risk_items:
+        for item in risk_items:
+            lines.append("- " + _humanize_item(item))
+    else:
+        lines.append("- 具体风险清单未提供。")
     lines.extend([
         "",
-        f"- 价格 assurance：{p['assurance_label']}；截止时点：{p['pit_time_status']}",
-        "- 来源时间校验只说明日期字段与 cutoff 的关系，不证明来源真实性、原始字节或使用权。",
+        f"- 价格 assurance：{p['assurance_label']}",
+        f"- 价格时间状态：{p['pit_time_status']}",
+        "- 日期字段的时间检查不证明来源真实性、原始字节完整性或使用权。",
         "",
-        "| 来源 ID | 类型 | 标题 | known_at | 时间状态 | 摘要 |",
-        "|---|---|---|---|---|---|",
+        "### 证据引用解析状态",
+        "",
     ])
-    if analysis["evidence_register"]:
-        for row in analysis["evidence_register"]:
-            lines.append(f"| {row['source_id']} | {row['source_class']} | {row['title']} | {row['known_at'] or 'UNKNOWN'} | {row['time_status']} | {row['summary']} |")
+    evidence_rows = analysis.get("evidence_register") or []
+    evidence_by_id = {
+        str(row.get("source_id")): row
+        for row in evidence_rows
+        if isinstance(row, Mapping) and row.get("source_id")
+    }
+    referenced = sorted(set(analysis.get("referenced_evidence_ids") or []))
+    unresolved = sorted(set(analysis.get("unresolved_evidence_references") or []))
+    lines.append(f"- 结构化引用 ID 数：{len(referenced)}；在来源登记表中找到记录：{len([ref for ref in referenced if ref in evidence_by_id])}；未解析：{len(unresolved)}。")
+    if referenced:
+        for ref in referenced:
+            if ref in evidence_by_id:
+                row = evidence_by_id[ref]
+                lines.append(
+                    f"- **{ref}**：已登记，尚未完成正式证据准入；时间状态：{row.get('time_status', 'UNKNOWN')}；来源：{row.get('source_ref') or 'UNKNOWN'}。"
+                )
+            else:
+                lines.append(f"- **{ref}**：**未解析**。本次输入没有该 ID 对应的 evidence_register 记录，不能将正文描述视为完成来源核验。")
     else:
-        lines.append("| — | — | 未提供来源清单 | UNKNOWN | UNKNOWN | 结论应保持审慎 |")
-    lines.extend(["", "## 七、需人工处理的问题"])
+        lines.append("- 未发现结构化证据引用 ID；这不等于没有引用事实，也不表示证据链已完成。")
+    lines.extend(["", "### 来源登记记录", ""])
+    if evidence_rows:
+        for row in evidence_rows:
+            lines.extend([
+                f"- **{row['source_id']} — {row['title']}**",
+                f"  类型：{row['source_class']}；known_at：{row['known_at'] or 'UNKNOWN'}；时间状态：{row['time_status']}。",
+                f"  来源位置：{row['source_ref']}。",
+                f"  摘要：{' '.join(str(row['summary']).splitlines()).strip()}",
+                "  正式证据准入：未完成。",
+                "",
+            ])
+    else:
+        lines.append("- 来源登记表为空；所有正文中的证据编号如无登记记录，均不能视为已解析。")
+    lines.extend(["## 七、需人工处理的问题", ""])
     lines.extend(f"- {x}" for x in d["gating_issues"]) if d["gating_issues"] else lines.append("- 所提供的试运行门槛均通过；仍需检查原始来源和估值假设。")
     lines.extend([
         "",
@@ -557,8 +722,19 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
     ])
     if analysis.get("notes"):
-        lines.extend(["## 操作者备注", "", analysis["notes"], ""])
-    return "\n".join(lines)
+        lines.extend(["## 操作者备注", ""])
+        lines.extend(_format_text_block(analysis["notes"]))
+        lines.append("")
+    # Keep markdown portable: no pipe tables; remove repeated blank lines and trailing whitespace.
+    cleaned: list[str] = []
+    for line in lines:
+        line = str(line).rstrip()
+        if not line and (not cleaned or not cleaned[-1]):
+            continue
+        cleaned.append(line)
+    while cleaned and not cleaned[-1]:
+        cleaned.pop()
+    return "\n".join(cleaned) + "\n"
 
 
 def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], str]:
@@ -573,6 +749,9 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "case": prepared["case"],
         "price_input": prepared["price_input"],
         "evidence_register": prepared["evidence_register"],
+        "referenced_evidence_ids": prepared["referenced_evidence_ids"],
+        "unresolved_evidence_references": prepared["unresolved_evidence_references"],
+        "after_cutoff_evidence_references": prepared["after_cutoff_evidence_references"],
         "assessment": prepared["assessment"],
         "forecast_valuation": prepared["forecast_valuation"],
         "decision_parameters": prepared["decision_parameters"],
@@ -796,7 +975,14 @@ def run_guided_wizard(
     price = _ask("你核实的股价")
     # Skip weekends for the default, but holiday calendars are not fetched here.
     default_price_date = _previous_weekday(cutoff).isoformat()
-    observation = _date(_ask("该价格观察日期 YYYY-MM-DD", default_price_date), "PRICE_OBSERVATION_DATE")
+    while True:
+        observation = _date(_ask("该价格观察日期 YYYY-MM-DD（必须早于分析截止日）", default_price_date), "PRICE_OBSERVATION_DATE")
+        try:
+            _validate_guided_observation_date(observation, cutoff)
+            break
+        except LocalInvestmentPilotError as exc:
+            print(f"日期不符合当前 PIT 规则：{exc}")
+            print("请重新输入；系统不会自动把截止日改成前一天，也不会偷偷改写价格观察日。")
     source_claim = _ask("价格来源简述", "人工输入；来源未独立核验")
     known_at = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI).isoformat()
     print("\n请核对：")
@@ -805,8 +991,6 @@ def run_guided_wizard(
         print(f"  股票代码已规范化：{symbol_input} → {symbol}")
     print(f"  截止日 {cutoff.isoformat()}；价格 {price}；观察日 {observation.isoformat()}；持仓 {position}%")
     print("  价格只按人工输入处理，不表示来源已验证。")
-    if observation >= cutoff:
-        print("  日期提醒：日级 PIT 截止时点按截止日 00:00（+08:00）处理；截止日当天 15:00 的价格不会用于回报/目标买入价计算。请优先使用截止日前最近一个已完成交易日的价格。")
     if _ask("确认并继续？1 = 继续，0 = 退出", "1") != "1":
         return {"status": "CANCELLED", "formal_decision_created": False}
 
