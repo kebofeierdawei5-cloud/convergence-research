@@ -13,6 +13,9 @@ from iios_mvp.local_investment_pilot_v01 import (
     _normalize_guided_symbol,
     _previous_weekday,
     _read_json_response_file,
+    _prepare_input,
+    _render_report,
+    _validate_guided_observation_date,
     run_local_investment_pilot,
 )
 
@@ -146,6 +149,63 @@ def test_guided_wizard_uses_a_file_for_chatgpt_response_not_pbpaste():
     assert "pbpaste" not in content
     assert "_read_json_response_file(response_path)" in content
     assert '["open", "-a", "TextEdit", str(response_path)]' in content
+
+
+def test_evidence_references_in_assessment_and_valuation_are_resolved_or_explicitly_unresolved():
+    payload = _payload()
+    payload["assessment"]["risk"]["items"] = [
+        {
+            "risk_id": "R-1",
+            "name": "synthetic risk",
+            "description": "risk text",
+            "evidence_refs": ["E-RISK-MISSING"],
+        }
+    ]
+    payload["forecast_valuation"]["assumptions"] = [
+        {
+            "assumption_id": "A-1",
+            "name": "synthetic assumption",
+            "values": {"base_eps": "1.15"},
+            "evidence_refs": ["E-ASSUMPTION-MISSING"],
+        }
+    ]
+    prepared = _prepare_input(payload)
+    assert prepared["referenced_evidence_ids"] == ["E-ASSUMPTION-MISSING", "E1", "E-RISK-MISSING"]
+    assert prepared["unresolved_evidence_references"] == ["E-ASSUMPTION-MISSING", "E-RISK-MISSING"]
+
+
+def test_report_uses_portable_prose_instead_of_markdown_tables_and_python_dict_repr(tmp_path):
+    payload = _payload()
+    payload["assessment"]["value_drivers"] = [
+        {"rank": 1, "driver": "growth A", "impact": "POSITIVE", "rationale": "reason A", "evidence_refs": ["E1"]},
+        {"rank": 1, "driver": "growth B", "impact": "MIXED", "rationale": "reason B", "evidence_refs": ["E-MISSING"]},
+    ]
+    payload["assessment"]["risk"]["items"] = [
+        {"risk_id": "R-1", "name": "cash collection", "severity": "HIGH", "description": "synthetic risk", "monitoring_trigger": "receivables rise", "evidence_refs": ["E-MISSING"]}
+    ]
+    payload["forecast_valuation"]["assumptions"] = [
+        {"assumption_id": "A-1", "name": "base EPS", "values": {"bear_eps": "0.75", "base_eps": "1.15"}, "basis": "synthetic assumption", "evidence_refs": ["E1"]}
+    ]
+    analysis, report = __import__("iios_mvp.local_investment_pilot_v01", fromlist=["_analyse"])._analyse(payload, "TEST-RUN")
+    assert "|---" not in report
+    assert "| 情景 |" not in report
+    assert "A-1｜base EPS" in report
+    assert "R-1｜cash collection" in report
+    assert "**E-MISSING**：**未解析**" in report
+    assert "1. **growth A**" in report
+    assert "2. **growth B**" in report
+    assert "{'assumption_id':" not in report
+    assert analysis["unresolved_evidence_references"] == ["E-MISSING"]
+
+
+def test_guided_observation_date_must_precede_date_only_cutoff():
+    from datetime import date
+    cutoff = date(2026, 10, 12)
+    assert _validate_guided_observation_date(date(2026, 10, 9), cutoff) == date(2026, 10, 9)
+    with pytest.raises(LocalInvestmentPilotError, match="PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF"):
+        _validate_guided_observation_date(cutoff, cutoff)
+    with pytest.raises(LocalInvestmentPilotError, match="PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF"):
+        _validate_guided_observation_date(date(2026, 10, 13), cutoff)
 
 
 def test_candidate_driven_pilot_uses_existing_return_solver_and_outputs_chinese_report(tmp_path):
