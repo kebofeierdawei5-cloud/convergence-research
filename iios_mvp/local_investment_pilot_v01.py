@@ -335,15 +335,26 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         if not source_id or source_id in source_ids:
             continue
         source_ids.add(source_id)
-        known_text = str(row.get("known_at") or "")
+        known_text = str(row.get("known_at") or "").strip()
         source_time_status = "UNKNOWN"
         if known_text:
             try:
-                source_time = _datetime(known_text, f"{source_id}_KNOWN_AT")
-                source_time_status = (
-                    "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
-                    if source_time <= cutoff_instant else "AFTER_CUTOFF"
-                )
+                if len(known_text) == 10:
+                    # A calendar date on the cutoff day does not establish whether the
+                    # source was known before the cutoff instant. Never infer midnight.
+                    known_date = _date(known_text, f"{source_id}_KNOWN_AT")
+                    if known_date < cutoff:
+                        source_time_status = "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+                    elif known_date > cutoff:
+                        source_time_status = "AFTER_CUTOFF"
+                    else:
+                        source_time_status = "KNOWN_AT_PRECISION_INSUFFICIENT"
+                else:
+                    source_time = _datetime(known_text, f"{source_id}_KNOWN_AT")
+                    source_time_status = (
+                        "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+                        if source_time <= cutoff_instant else "AFTER_CUTOFF"
+                    )
             except LocalInvestmentPilotError:
                 source_time_status = "KNOWN_AT_INVALID"
         sources.append({
@@ -447,6 +458,11 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         source["source_id"] for source in sources
         if source["source_id"] in references and source["time_status"] == "AFTER_CUTOFF"
     ]
+    uncertain_timing_refs = [
+        source["source_id"] for source in sources
+        if source["source_id"] in references
+        and source["time_status"] in {"UNKNOWN", "KNOWN_AT_INVALID", "KNOWN_AT_PRECISION_INSUFFICIENT"}
+    ]
     return {
         "case": {
             "case_id": case["case_id"], "company": company, "market": normalized_market,
@@ -476,6 +492,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "referenced_evidence_ids": sorted(references),
         "unresolved_evidence_references": unknown_refs,
         "after_cutoff_evidence_references": after_cutoff_refs,
+        "uncertain_timing_evidence_references": uncertain_timing_refs,
         "notes": str(payload.get("notes") or ""),
     }
 
@@ -541,6 +558,8 @@ def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, re
         issues.append("UNRESOLVED_EVIDENCE_REFERENCES")
     if prepared["after_cutoff_evidence_references"]:
         issues.append("REFERENCED_EVIDENCE_AFTER_CUTOFF")
+    if prepared["uncertain_timing_evidence_references"]:
+        issues.append("REFERENCED_EVIDENCE_TIMING_UNCERTAIN")
     if p["pit_time_status"] != "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY":
         issues.append("PRICE_NOT_PIT_QUALIFIED")
     if a["trust"]["status"] == "FAIL":
@@ -775,6 +794,7 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "referenced_evidence_ids": prepared["referenced_evidence_ids"],
         "unresolved_evidence_references": prepared["unresolved_evidence_references"],
         "after_cutoff_evidence_references": prepared["after_cutoff_evidence_references"],
+        "uncertain_timing_evidence_references": prepared["uncertain_timing_evidence_references"],
         "assessment": prepared["assessment"],
         "forecast_valuation": prepared["forecast_valuation"],
         "decision_parameters": prepared["decision_parameters"],
