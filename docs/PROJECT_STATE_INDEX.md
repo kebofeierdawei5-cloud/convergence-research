@@ -49,9 +49,9 @@ Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED 
 
 The one-click macOS pilot hands the large ChatGPT response through a dedicated UTF-8 JSON file in `~/.iios-private/local-pilot/inputs/`, not through `pbpaste` and not through long Terminal pastes. The wizard opens the response file in TextEdit and reads/validates it on Enter. Empty, truncated, or structurally invalid JSON produces an actionable message and can be corrected in place without restarting the wizard.
 
-The report-quality follow-up explicitly resolves structured evidence references against `evidence_register` across assessment and forecast/valuation inputs, labels missing IDs as unresolved, preserves structured risk/assumption records for readable rendering, removes fragile Markdown tables in favor of portable headings/lists, and normalizes value-driver display numbering. The guided date entry rejects observation dates equal to or later than a date-only cutoff and asks again; lower-level PIT validation remains fail-closed.
+The report-quality follow-up explicitly resolves structured evidence references against `evidence_register` across assessment and forecast/valuation inputs, labels missing IDs as unresolved, preserves structured risk/assumption records for readable rendering, removes fragile Markdown tables in favor of portable headings/lists, and normalizes value-driver display numbering. The guided workflow preserves strict date-only PIT behavior when no time is entered; an optional timezone-aware `case.as_of_timestamp` now enables same-day pilot observations only when their stated `known_at` is at or before the explicit cutoff. The output records which cutoff semantics were used. Source authenticity, rights and formal/canonical admission remain unproved.
 
-This is a usability/reporting repair to `PILOT_NON_CANONICAL` only. It does not change formal Evidence/PIT/Forecast/Valuation admission, canonical Decision authority, or human approval requirements.
+This is a usability/reporting repair to `PILOT_NON_CANONICAL` only. Explicit timestamp support is for the provisional local pilot's time-bound checks; it does not change the date-only Core/PIT contract, formal Evidence/PIT/Forecast/Valuation admission, canonical Decision authority, or human approval requirements.
 
 ### C1/C2 signer enrollment preparation (2026-10-12)
 
