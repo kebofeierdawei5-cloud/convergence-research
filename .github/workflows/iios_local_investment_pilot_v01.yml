@@ -10,7 +10,8 @@ on:
       - ".github/workflows/iios_local_investment_pilot_v01.yml"
       - "docs/iios/LOCAL_INVESTMENT_PILOT_V01_GUIDE_20261011.md"
       - "启动IIOS投资分析.command"
-      - "启动IIOS投资分析.command"
+      - "README.md"
+      - "docs/PROJECT_STATE_INDEX.md"
   push:
     branches: [main]
     paths:
@@ -20,6 +21,8 @@ on:
       - "tests/test_local_investment_pilot_v01.py"
       - ".github/workflows/iios_local_investment_pilot_v01.yml"
       - "docs/iios/LOCAL_INVESTMENT_PILOT_V01_GUIDE_20261011.md"
+      - "README.md"
+      - "docs/PROJECT_STATE_INDEX.md"
 
 permissions:
   contents: read

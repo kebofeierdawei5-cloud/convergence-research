@@ -12,6 +12,7 @@ from iios_mvp.local_investment_pilot_v01 import (
     PILOT_SCHEMA,
     _normalize_guided_symbol,
     _previous_weekday,
+    _read_json_response_file,
     run_local_investment_pilot,
 )
 
@@ -118,6 +119,33 @@ def test_guided_entry_normalizes_common_symbol_formats(market, raw, expected):
 def test_default_price_date_skips_weekends_but_does_not_guess_exchange_holidays():
     assert _previous_weekday(date(2026, 10, 12)) == date(2026, 10, 9)
     assert _previous_weekday(date(2026, 10, 13)) == date(2026, 10, 12)
+
+
+def test_response_file_reader_accepts_large_json_without_terminal_paste(tmp_path):
+    response_path = tmp_path / "chatgpt-response.json"
+    large_payload = {
+        "schema_version": PILOT_SCHEMA,
+        "large_notes": "x" * 1_000_000,
+    }
+    response_path.write_text(json.dumps(large_payload), encoding="utf-8")
+    result = _read_json_response_file(response_path)
+    assert result["schema_version"] == PILOT_SCHEMA
+    assert len(result["large_notes"]) == 1_000_000
+
+
+def test_response_file_reader_rejects_empty_file_with_actionable_error(tmp_path):
+    response_path = tmp_path / "chatgpt-response.json"
+    response_path.write_text("", encoding="utf-8")
+    with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_RESPONSE_FILE_EMPTY"):
+        _read_json_response_file(response_path)
+
+
+def test_guided_wizard_uses_a_file_for_chatgpt_response_not_pbpaste():
+    source = Path(__file__).resolve().parents[1] / "iios_mvp" / "local_investment_pilot_v01.py"
+    content = source.read_text(encoding="utf-8")
+    assert "pbpaste" not in content
+    assert "_read_json_response_file(response_path)" in content
+    assert '["open", "-a", "TextEdit", str(response_path)]' in content
 
 
 def test_candidate_driven_pilot_uses_existing_return_solver_and_outputs_chinese_report(tmp_path):
