@@ -2,7 +2,7 @@
 
 ## Personal local use — simplest launch
 
-For the personal Mac workflow, update to the latest `main` and double-click the repository-root **`启动IIOS投资分析.command`**. The guided flow asks for the company/code, market, cutoff, position and manually checked price; opens ChatGPT and the input template; then takes the copied JSON response from the clipboard and opens the Chinese report automatically. No long terminal command, manual JSON path, paid API key, or local model is required.
+For the personal Mac workflow, update to the latest `main` and double-click the repository-root **`启动IIOS投资分析.command`**. The guided flow asks for the company/code, market, cutoff, position and manually checked price; opens ChatGPT, the input template, and a dedicated JSON response file. Paste the full ChatGPT response into that file, save it, then press Enter in Terminal; the program validates it and opens the Chinese report automatically. The full response is no longer read from the clipboard or pasted into Terminal. No long terminal command, manual JSON path, paid API key, or local model is required.
 
 This first-run path is explicitly `PILOT_NON_CANONICAL`: it is for real-world workflow testing, not formal evidence admission or a canonical Decision. Use [the short guide](docs/iios/LOCAL_INVESTMENT_PILOT_V01_GUIDE_20261011.md).
 
