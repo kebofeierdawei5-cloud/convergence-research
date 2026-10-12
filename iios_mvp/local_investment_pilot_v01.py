@@ -1198,17 +1198,19 @@ def create_pilot_template(
     prompt_path = root / f"pilot-prompt-{token}-{stamp}.md"
     _write_local(input_path, json.dumps(payload, ensure_ascii=False, indent=2))
     prompt = (
-        "请依据我提供的公司原始公告/财报事实摘要与来源链接，填写这份 IIOS 试运行 JSON。"
-        "保留 schema_version、case、price_input 不变，只补齐 evidence_register、assessment、forecast_valuation 和 decision_parameters。"
-        "不要编造未知事实；未知写 UNKNOWN，MIE 不可识别时写 NOT_IDENTIFIABLE；情景概率若未校准请明确说明。"
-        "至少覆盖 Trust、Reality、Quality、Thesis、价值驱动排序、Bear/Base/Bull 估值情景、独立论点失效压力测试、MIE/预期差和风险/失效条件。"
-        "Bear 必须写清 failure_trigger、operating_impact 和 valuation_mechanism。若投资论点依赖利润率/盈利恢复，Bear 必须测试恢复失败而不是默认保留大部分恢复。"
-        "独立 thesis_break_stress 必须写清失效触发、经营影响、估值方法、数值期末价值、现金分配与推理；它不参与概率加权，且期末总财富必须低于 Bear。资料不足以估值时请留空，系统会要求 REVIEW_REQUIRED。"
-        "不要在自由文本 notes 中重述与 price_input.price 不同的现价；当前股价以结构化 price_input 为唯一计算输入。"
-        "当前价已经由人工输入，不能把 assurance_label 改成来源已验证。"
-        "输出只允许完整 JSON。AI/操作者判断属于试运行输入，不是正式证据准入。"
+        "你是 IIOS 的个人股票研究助手。请主动联网检索并完成截止时点内的研究，不要要求用户先上传这份模板或另外寻找公告。"
+        "模板 JSON 将直接附在本提示中。先从公司/交易所/监管机构公开资料取证，再判断 Trust、Reality、Quality、Thesis、价值驱动、"
+        "估值与预期差、风险。返回时必须保留 schema_version、case、price_input 原样不变，只补研究字段。"
+        "证据应给出可直接打开的来源 URL、标题、发布日期/已知时点与事实摘要；优先使用公司定期报告、公告、交易所与监管文件。"
+        "不得为了填满字段编造事实、URL、财务数字或所谓市场一致预期。对于 MIE，不具备可核实的一致预期/市场定价证据时，明确使用 NOT_IDENTIFIABLE 并解释原因。"
+        "请用可解释的显式假设建立 Bear/Base/Bull 数值情景；情景是估算而非已披露事实，说明盈利/利润率/销量等驱动及估值倍数来源。"
+        "概率之和必须为 1；期末总财富次序必须 Bear ≤ Base ≤ Bull。若无法有根据地估算某情景，请明确报告其不可识别及缺少什么依据，不要捏造。"
+        "Bear 必须明确写 failure_trigger、operating_impact 和 valuation_mechanism；若论点依赖盈利恢复，Bear 必须检验恢复失败。"
+        "独立 thesis_break_stress 必须另行量化失效后的每股期末价值和现金分配，并明确估值方法、触发条件、经营影响与理由；不参与概率加权，且须比 Bear 更悲观。"
+        "不要在 notes 中重述与 price_input.price 不同的现价；当前股价只取结构化 price_input。不能将人工价格标为已验证。"
+        "未知事实用 UNKNOWN，并解释缺口；研究结论可以是 REVIEW_REQUIRED，但不可以把整个结构留空。只返回一个完整 JSON 对象，不要输出代码围栏或额外说明。"
     )
-    _write_local(prompt_path, prompt + "\n\n本地输入文件：" + str(input_path) + "\n")
+    _write_local(prompt_path, prompt + "\n")
     return {
         "status": "PILOT_TEMPLATE_CREATED", "input_template": str(input_path),
         "analysis_prompt": str(prompt_path), "private_local_storage": True,
@@ -1517,16 +1519,21 @@ def run_guided_wizard(
     )
     template_path = Path(template_result["input_template"])
     prompt_path = Path(template_result["analysis_prompt"])
-    prompt = prompt_path.read_text(encoding="utf-8") + (
-        "\n\n研究执行要求：请在分析截止时点之前，主动查阅并引用可访问的公开资料；优先公司公告/定期报告、交易所披露、监管文件，"
-        "其次使用可靠行业资料。每条关键事实必须登记 source_id、title、source_class、source_ref（完整 URL 或文件定位）、"
-        "published_at、known_at、summary；只写截止时点前可获得的信息，无法确定 known_at 时明确标记 UNKNOWN。"
-        "必须完成 Trust、Reality、Quality、Thesis、价值驱动因素排序、风险清单、MIE/预期差、估值模型和假设、Bear/Base/Bull 情景，"
-        "并提供独立且不纳入概率加权的 thesis_break_stress。Bear 要明确失败触发、经营影响路径和估值传导机制。"
-        "不要只原样返回模板，也不要用空字符串替代研究；若事实或估值确实无法识别，请写明具体原因、证据缺口和需要人工核实的事项，"
-        "保留 UNKNOWN / NOT_IDENTIFIABLE，不得编造数字。"
-        "保留 schema_version、case、price_input 原样不变，尤其不得更改人工输入股价、观察日期、known_at 或把价格标记为已验证。"
-        "只返回一个完整 JSON 对象，不要用 Markdown 代码围栏，也不要附加 JSON 以外的说明文字。"
+    template_payload = json.loads(template_path.read_text(encoding="utf-8"))
+    prompt = (
+        prompt_path.read_text(encoding="utf-8")
+        + "\n\n【本次完整 JSON 模板——无需上传单独模板文件】\n"
+        + json.dumps(template_payload, ensure_ascii=False, indent=2, allow_nan=False)
+        + "\n\n【执行要求】\n"
+        + "基于上方模板直接研究并填充同一个 JSON 对象。优先联网搜索并核对截止时点前的公司公告、定期报告、交易所披露、监管文件；"
+        + "不要求操作者另行上传公告或模板。来源登记至少填写 source_id、title、source_class、source_ref（可直接打开的 URL）、published_at、known_at、summary。"
+        + "最多优先列出 8 条对结论最重要的来源，确保每条来源真实且支持对应事实；不知道的时间明确写 UNKNOWN。"
+        + "必须完成 Trust、Reality、Quality、Thesis、价值驱动因素排序、风险清单、MIE/预期差、估值模型和假设、Bear/Base/Bull 数值情景以及独立 thesis_break_stress。"
+        + "请填写 entry_value_reference_per_share，以及三种情景各自 probability、terminal_value_per_share、cash_distributions_per_share、rationale；概率合计为 1。"
+        + "请填写 thesis_break_stress 的 failure_trigger、operating_impact、valuation_method、terminal_value_per_share、cash_distributions_per_share、rationale，且其期末总财富必须低于 Bear。"
+        + "不要只原样返回模板，不允许把核心研究字段全部留空。若无法识别必须具体解释原因和证据缺口；数字估值可以建立透明、可追责的假设，但不得把假设伪装为披露事实。"
+        + "严格保留 schema_version、case、price_input 原样不变，尤其不得更改人工股价、观察日期、known_at 或 price assurance 标签。"
+        + "只返回完整 JSON，不要代码围栏或额外说明。"
     )
 
     private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
@@ -1538,18 +1545,17 @@ def run_guided_wizard(
         # The prompt is copied to the clipboard; the large response is always handed off via a file.
         subprocess.run(["pbcopy"], input=prompt, text=True, check=True, timeout=5)
         subprocess.run(["open", "https://chatgpt.com/"], check=False, timeout=5)
-        subprocess.run(["open", "-R", str(template_path)], check=False, timeout=5)
         subprocess.run(["open", "-a", "TextEdit", str(response_path)], check=False, timeout=5)
-        print("\n已打开 ChatGPT、模板所在的 Finder 窗口和 JSON 结果文件；研究提示已复制到剪贴板。")
+        print("\n已打开 ChatGPT 和 JSON 结果文件；完整输入模板与研究指令已复制到剪贴板，无需另行上传模板文件。")
     else:
         print("\n研究提示：\n" + prompt)
         print(f"输入模板文件：{template_path}")
 
     print(f"\nChatGPT 完整回答的保存位置：\n{response_path}")
-    print("操作步骤：")
-    print("  1. 在 ChatGPT 粘贴研究提示，上传输入模板和需要引用的公司公告/财报材料。")
-    print("  2. 复制 ChatGPT 返回的完整 JSON；粘贴到上面指定的 JSON 文件中并保存。")
-    print("  3. 回到本终端只按回车键。不要把整段 JSON 粘贴到终端。")
+    print("操作步骤（只需在 ChatGPT 与这个结果文件之间复制一次）：")
+    print("  1. 在已打开的 ChatGPT 对话中粘贴剪贴板中的完整研究提示并发送；提示里已经包含本次 JSON 模板，不用上传模板或另找公告。")
+    print("  2. 复制 ChatGPT 返回的完整 JSON，覆盖上面已打开的 JSON 结果文件并保存。")
+    print("  3. 回到本终端按回车。不要把 JSON 粘贴到终端，也不要手工填写 JSON 字段。")
     if sys.platform == "darwin":
         print("  提示：JSON 文件已用 TextEdit 打开；粘贴后按 Command+S 保存。")
 
