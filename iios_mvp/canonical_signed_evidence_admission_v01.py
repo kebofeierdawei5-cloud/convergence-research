@@ -426,7 +426,7 @@ def prepare_signer_enrollment_request(
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             json.dump(request, handle, ensure_ascii=False, sort_keys=True, indent=2)
-            handle.write("\\n")
+            handle.write("\n")
     except Exception:
         target.unlink(missing_ok=True)
         raise
