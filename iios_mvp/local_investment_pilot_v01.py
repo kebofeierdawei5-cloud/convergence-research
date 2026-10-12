@@ -593,7 +593,11 @@ def _thesis_break_stress_review(prepared: Mapping[str, Any]) -> dict[str, Any]:
     forecast = prepared["forecast_valuation"]
     stress = forecast.get("thesis_break_stress")
     if not isinstance(stress, Mapping) or not any(
-        value not in (None, "", []) for value in stress.values()
+        stress.get(field) not in (None, "", [])
+        for field in (
+            "failure_trigger", "operating_impact", "valuation_method",
+            "terminal_value_per_share", "rationale", "evidence_refs",
+        )
     ):
         return {
             "status": "MISSING",
