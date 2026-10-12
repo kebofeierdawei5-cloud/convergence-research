@@ -14,6 +14,8 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
+import sys
 from typing import Any, Mapping
 
 from .investment_core_contract_v03 import (
@@ -703,9 +705,125 @@ def create_pilot_template(
     }
 
 
+
+def _extract_json_object(text: str) -> dict[str, Any]:
+    """Accept plain JSON or one JSON object wrapped in a ChatGPT code fence."""
+    raw = str(text or "").strip()
+    if not raw:
+        raise LocalInvestmentPilotError("CHATGPT_JSON_EMPTY")
+    raw = re.sub(r"^\s*```(?:json)?\s*", "", raw, count=1, flags=re.IGNORECASE)
+    raw = re.sub(r"\s*```\s*$", "", raw, count=1)
+    start = raw.find("{")
+    if start < 0:
+        raise LocalInvestmentPilotError("CHATGPT_JSON_OBJECT_NOT_FOUND")
+    try:
+        value, _end = json.JSONDecoder().raw_decode(raw[start:])
+    except json.JSONDecodeError as exc:
+        raise LocalInvestmentPilotError("CHATGPT_JSON_INVALID_COPY_THE_COMPLETE_JSON_OBJECT") from exc
+    if not isinstance(value, dict):
+        raise LocalInvestmentPilotError("CHATGPT_JSON_OBJECT_REQUIRED")
+    return value
+
+
+def _ask(prompt: str, default: str | None = None) -> str:
+    suffix = f" [{default}]" if default is not None else ""
+    while True:
+        raw = input(f"{prompt}{suffix}: ").strip()
+        if raw:
+            return raw
+        if default is not None:
+            return default
+        print("这一项需要填写。")
+
+
+
+def run_guided_wizard(
+    *,
+    template_root: str | Path | None = None,
+    output_root: str | Path | None = None,
+) -> dict[str, Any]:
+    """Ask minimal questions, hand the template to ChatGPT, then run and open the report."""
+    template_root = template_root or (Path.home() / ".iios-private" / "local-pilot" / "inputs")
+    output_root = output_root or (Path.home() / ".iios-private" / "local-pilot" / "runs")
+    today = date.today()
+    print("\nIIOS 投资分析｜简易向导")
+    print("填写标的和价格后，程序会打开 ChatGPT。复制完整 JSON 回答，报告会自动生成。")
+    company = _ask("公司名称")
+    symbol = _ask("股票代码")
+    market_choice = _ask("市场：1 = A 股，2 = 港股", "1")
+    if market_choice not in {"1", "2"}:
+        raise LocalInvestmentPilotError("MARKET_CHOICE_MUST_BE_1_OR_2")
+    market = "CN-A" if market_choice == "1" else "HK"
+    cutoff = _date(_ask("分析截止日 YYYY-MM-DD", today.isoformat()), "AS_OF_DATE")
+    position = _ask("当前持仓百分比", "0")
+    price = _ask("你核实的股价")
+    default_price_date = (cutoff - timedelta(days=1)).isoformat()
+    observation = _date(_ask("该价格观察日期 YYYY-MM-DD", default_price_date), "PRICE_OBSERVATION_DATE")
+    source_claim = _ask("价格来源简述", "人工输入；来源未独立核验")
+    known_at = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI).isoformat()
+    print("\n请核对：")
+    print(f"  {company} / {symbol} / {market}")
+    print(f"  截止日 {cutoff.isoformat()}；价格 {price}；观察日 {observation.isoformat()}；持仓 {position}%")
+    print("  价格只按人工输入处理，不表示来源已验证。")
+    if _ask("确认并继续？1 = 继续，0 = 退出", "1") != "1":
+        return {"status": "CANCELLED", "formal_decision_created": False}
+
+    template_result = create_pilot_template(
+        company=company,
+        symbol=symbol,
+        market=market,
+        as_of_date=cutoff.isoformat(),
+        current_position_pct=position,
+        price=price,
+        price_observation_date=observation.isoformat(),
+        price_known_at=known_at,
+        price_source_claim=source_claim,
+        template_root=template_root,
+    )
+    template_path = Path(template_result["input_template"])
+    prompt_path = Path(template_result["analysis_prompt"])
+    prompt = prompt_path.read_text(encoding="utf-8") + (
+        "\n\n请根据我上传的模板 JSON 和公司公告/财报材料填写它，保留 case 与 price_input 不变。"
+        "只返回一个完整 JSON 对象；未知写 UNKNOWN，MIE 无法识别时写 NOT_IDENTIFIABLE。"
+        "不要编造事实，不要把人工价格标记为已验证。"
+    )
+
+    if sys.platform == "darwin":
+        # These are ordinary user-requested desktop actions; no background service or API is used.
+        subprocess.run(["pbcopy"], input=prompt, text=True, check=True, timeout=5)
+        subprocess.run(["open", "https://chatgpt.com/"], check=False, timeout=5)
+        subprocess.run(["open", "-R", str(template_path)], check=False, timeout=5)
+        print("\n已打开 ChatGPT 和模板所在的 Finder 窗口；研究提示已复制。")
+        print("在 ChatGPT 粘贴提示，上传 JSON 模板和要参考的公司公告/财报。")
+        input("复制 ChatGPT 返回的完整 JSON 后，回到此窗口按回车自动继续…")
+        clipboard = subprocess.run(["pbpaste"], capture_output=True, text=True, check=True, timeout=5).stdout
+        payload = _extract_json_object(clipboard)
+    else:
+        print("\n研究提示：\n" + prompt)
+        print(f"模板文件：{template_path}")
+        completed_path = _ask("将 ChatGPT 返回的 JSON 保存为文件后，输入文件路径")
+        payload = json.loads(Path(completed_path).expanduser().read_text(encoding="utf-8"))
+
+    # Validate the response before saving or running calculations.
+    _prepare_input(payload)
+    private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    completed = private_inputs / f"pilot-completed-{symbol.replace('.', '-')}-{stamp}.json"
+    _write_local(completed, json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False))
+    result = run_local_investment_pilot(input_path=completed, output_root=output_root)
+    print("\n分析完成：")
+    print(json.dumps(_safe(result), ensure_ascii=False, indent=2))
+    report_path = result.get("report_path")
+    if report_path and sys.platform == "darwin":
+        subprocess.run(["open", str(report_path)], check=False, timeout=5)
+    print("\n下次分析另一个标的，只需双击同一个启动器。")
+    return result
+
+
 def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Local candidate-driven IIOS pilot; non-canonical.")
     modes = parser.add_mutually_exclusive_group(required=True)
+    modes.add_argument("--wizard", action="store_true", help="run the simple guided investment workflow")
     modes.add_argument("--create-template", action="store_true")
     modes.add_argument("--input", help="run a completed private pilot input JSON")
     modes.add_argument("--replay-run", help="re-run a previous local pilot's input.json")
@@ -722,7 +840,9 @@ def _main(argv: list[str] | None = None) -> int:
     parser.add_argument("--price-source-claim")
     args = parser.parse_args(argv)
     try:
-        if args.create_template:
+        if args.wizard:
+            result = run_guided_wizard(template_root=args.template_root, output_root=args.output_root)
+        elif args.create_template:
             required = {
                 "--company": args.company, "--symbol": args.symbol, "--as-of": args.as_of,
                 "--price": args.price, "--price-date": args.price_date,
@@ -748,7 +868,7 @@ def _main(argv: list[str] | None = None) -> int:
             )
         print(json.dumps(_safe(result), ensure_ascii=False, indent=2))
         return 0
-    except (LocalInvestmentPilotError, OSError, ValueError, KeyError, TypeError) as exc:
+    except (LocalInvestmentPilotError, OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as exc:
         print(json.dumps({"status": "BLOCKED", "reason": str(exc)}, ensure_ascii=False))
         return 2
 

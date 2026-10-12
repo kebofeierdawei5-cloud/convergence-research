@@ -50,6 +50,9 @@ Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED 
 The user has explicitly redirected IIOS delivery to **finish the core workflow and run it end-to-end in actual personal use before further optimization**. The governing decision and testable acceptance criteria are recorded in [Execution-first Local Single-User MVP Pivot](iios/LOCAL_SINGLE_USER_EXECUTION_FIRST_PIVOT_20261011.md).
 
 Immediate order:
+
+**Simplified personal app entry (2026-10-12):** the normal operator entry is now the repository-root `启动IIOS投资分析.command`. It launches the guided wizard, asks only the basic company/market/price/position inputs, opens ChatGPT, copies the research prompt to the clipboard, reveals the template, accepts the copied JSON response back in Terminal, runs the pilot and opens the Chinese report. This is a usability shell around the existing `PILOT_NON_CANONICAL` engine—not a second investment engine and not a formal/canonical admission path. Follow [the simplified quick-start](iios/LOCAL_INVESTMENT_PILOT_V01_GUIDE_20261011.md); low-level CLI flags are fallback/developer options, not the user-facing workflow.
+
 1. Pause additional MP-3 adversarial edge cases / anti-tamper expansion except defects that block the pilot or can silently distort an investment result.
 2. Implement a complete local, candidate-driven path using the existing company research, deterministic investment and report modules. The current fixed-profile Path A scenario calculator is not the final product.
 3. Permit an explicitly segregated `PILOT_NON_CANONICAL` run using manual price and free/manual AI handoff when needed. Do not bypass formal admission or claim a canonical Decision / complete canonical Run Receipt.

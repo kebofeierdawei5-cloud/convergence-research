@@ -1,5 +1,13 @@
 # IIOS — Intelligent Investment Operating System
 
+## Personal local use — simplest launch
+
+For the personal Mac workflow, update to the latest `main` and double-click the repository-root **`启动IIOS投资分析.command`**. The guided flow asks for the company/code, market, cutoff, position and manually checked price; opens ChatGPT and the input template; then takes the copied JSON response from the clipboard and opens the Chinese report automatically. No long terminal command, manual JSON path, paid API key, or local model is required.
+
+This first-run path is explicitly `PILOT_NON_CANONICAL`: it is for real-world workflow testing, not formal evidence admission or a canonical Decision. Use [the short guide](docs/iios/LOCAL_INVESTMENT_PILOT_V01_GUIDE_20261011.md).
+
+---
+
 ## Project purpose
 
 IIOS is a single-company, candidate-driven investment decision system for China A-shares and Hong Kong equities. Its purpose is to make investment analysis and decisions more repeatable, auditable, point-in-time reproducible, and resistant to LLM failure modes.
