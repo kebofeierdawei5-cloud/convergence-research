@@ -90,6 +90,28 @@ def _datetime(value: Any, field: str, *, allow_date_only: bool = True) -> dateti
     return parsed.astimezone(SHANGHAI)
 
 
+def _normalize_guided_symbol(value: Any, market: str) -> str:
+    """Normalize common retail quote prefixes without weakening the core symbol contract."""
+    raw = str(value or "").strip().upper().replace(" ", "")
+    if market == "CN-A":
+        match = re.fullmatch(r"(SH|SZ|BJ)(\d{6})", raw)
+        if match:
+            return f"{match.group(2)}.{match.group(1)}"
+    elif market == "HK":
+        match = re.fullmatch(r"HK(\d{4,5})", raw)
+        if match:
+            return f"{match.group(1)}.HK"
+    return raw
+
+
+def _previous_weekday(value: date) -> date:
+    """Return the prior Monday-Friday date; exchange holidays still need operator checking."""
+    candidate = value - timedelta(days=1)
+    while candidate.weekday() >= 5:
+        candidate -= timedelta(days=1)
+    return candidate
+
+
 def _outside_repo(path: str | Path, field: str, *, must_exist: bool = False) -> Path:
     raw = Path(path).expanduser()
     if must_exist and not raw.is_file():
@@ -749,22 +771,28 @@ def run_guided_wizard(
     print("\nIIOS 投资分析｜简易向导")
     print("填写标的和价格后，程序会打开 ChatGPT。复制完整 JSON 回答，报告会自动生成。")
     company = _ask("公司名称")
-    symbol = _ask("股票代码")
+    symbol_input = _ask("股票代码（可输入 SZ002810、002810.SZ 或 002810）")
     market_choice = _ask("市场：1 = A 股，2 = 港股", "1")
     if market_choice not in {"1", "2"}:
         raise LocalInvestmentPilotError("MARKET_CHOICE_MUST_BE_1_OR_2")
     market = "CN-A" if market_choice == "1" else "HK"
+    symbol = _normalize_guided_symbol(symbol_input, market)
     cutoff = _date(_ask("分析截止日 YYYY-MM-DD", today.isoformat()), "AS_OF_DATE")
     position = _ask("当前持仓百分比", "0")
     price = _ask("你核实的股价")
-    default_price_date = (cutoff - timedelta(days=1)).isoformat()
+    # Skip weekends for the default, but holiday calendars are not fetched here.
+    default_price_date = _previous_weekday(cutoff).isoformat()
     observation = _date(_ask("该价格观察日期 YYYY-MM-DD", default_price_date), "PRICE_OBSERVATION_DATE")
     source_claim = _ask("价格来源简述", "人工输入；来源未独立核验")
     known_at = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI).isoformat()
     print("\n请核对：")
     print(f"  {company} / {symbol} / {market}")
+    if symbol != symbol_input.strip().upper().replace(" ", ""):
+        print(f"  股票代码已规范化：{symbol_input} → {symbol}")
     print(f"  截止日 {cutoff.isoformat()}；价格 {price}；观察日 {observation.isoformat()}；持仓 {position}%")
     print("  价格只按人工输入处理，不表示来源已验证。")
+    if observation >= cutoff:
+        print("  日期提醒：日级 PIT 截止时点按截止日 00:00（+08:00）处理；截止日当天 15:00 的价格不会用于回报/目标买入价计算。请优先使用截止日前最近一个已完成交易日的价格。")
     if _ask("确认并继续？1 = 继续，0 = 退出", "1") != "1":
         return {"status": "CANCELLED", "formal_decision_created": False}
 
