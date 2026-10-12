@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import stat
 import sys
@@ -327,6 +328,124 @@ def generate_keypair(private_key_path: str | Path, public_key_path: str | Path) 
     return {"public_key_sha256": public_doc["public_key_sha256"], "algorithm": "Ed25519"}
 
 
+def prepare_signer_enrollment_request(
+    public_key_path: str | Path,
+    *,
+    signer_key_id: str,
+    display_label: str,
+    role: str,
+    case_scopes: list[str],
+    valid_from: str,
+    authorization_note: str,
+    out_path: str | Path,
+    requested_at: str | None = None,
+) -> dict[str, Any]:
+    """Write a private proposal for human review; this never mutates the trusted registry."""
+    public_doc, _public_doc_bytes = _read_json(public_key_path, "PUBLIC_KEY_DOCUMENT")
+    if public_doc.get("algorithm") != "Ed25519":
+        raise SignedAdmissionError("SIGNER_PUBLIC_KEY_ALGORITHM_UNSUPPORTED")
+    try:
+        public_raw = base64.b64decode(public_doc.get("public_key_b64"), validate=True)
+    except (TypeError, ValueError) as exc:
+        raise SignedAdmissionError("SIGNER_PUBLIC_KEY_INVALID_BASE64") from exc
+    if len(public_raw) != 32:
+        raise SignedAdmissionError("SIGNER_PUBLIC_KEY_LENGTH_INVALID")
+    public_sha = _sha256(public_raw)
+    if public_doc.get("public_key_sha256") != public_sha:
+        raise SignedAdmissionError("SIGNER_PUBLIC_KEY_FINGERPRINT_MISMATCH")
+
+    key_id = str(signer_key_id or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{2,63}", key_id):
+        raise SignedAdmissionError("SIGNER_KEY_ID_FORMAT_INVALID")
+    label = str(display_label or "").strip()
+    if not label:
+        raise SignedAdmissionError("SIGNER_DISPLAY_LABEL_REQUIRED")
+    allowed_roles = {"EVIDENCE_ADMISSION_SIGNER", "INDEPENDENT_REVIEWER"}
+    if role not in allowed_roles:
+        raise SignedAdmissionError("SIGNER_ROLE_INVALID")
+    # Exactly one role per enrollment proposal preserves distinct-key reviewer semantics.
+    roles = [role]
+    scopes = [str(scope).strip() for scope in case_scopes if str(scope).strip()]
+    if not scopes or len(scopes) != len(case_scopes) or len(set(scopes)) != len(scopes):
+        raise SignedAdmissionError("SIGNER_CASE_SCOPES_REQUIRED_UNIQUE")
+    if "*" in scopes:
+        raise SignedAdmissionError("WILDCARD_SIGNER_SCOPE_NOT_ALLOWED_IN_ENROLLMENT_REQUEST")
+    if any(not re.fullmatch(r"RC-[A-Z0-9-]{8,80}", scope) for scope in scopes):
+        raise SignedAdmissionError("SIGNER_CASE_SCOPE_FORMAT_INVALID")
+    if not str(authorization_note or "").strip():
+        raise SignedAdmissionError("SIGNER_AUTHORIZATION_NOTE_REQUIRED")
+    _timestamp(valid_from, "SIGNER_VALID_FROM")
+    requested_at = requested_at or datetime.now(timezone.utc).isoformat()
+    requested_time = _timestamp(requested_at, "REQUESTED_AT")
+    valid_from_time = _timestamp(valid_from, "SIGNER_VALID_FROM")
+    if valid_from_time < requested_time:
+        raise SignedAdmissionError("SIGNER_VALID_FROM_BEFORE_REQUEST_TIME")
+
+    repository_root = Path(__file__).resolve().parents[1]
+    target = Path(out_path).expanduser()
+    if target.is_symlink():
+        raise SignedAdmissionError("ENROLLMENT_REQUEST_PATH_MUST_NOT_BE_SYMLINK")
+    resolved = target.resolve(strict=False)
+    if resolved == repository_root or repository_root in resolved.parents:
+        raise SignedAdmissionError("ENROLLMENT_REQUEST_MUST_BE_OUTSIDE_REPOSITORY")
+    if target.exists():
+        raise SignedAdmissionError("ENROLLMENT_REQUEST_PATH_ALREADY_EXISTS")
+
+    request = {
+        "schema_version": "IIOS-EVIDENCE-SIGNER-ENROLLMENT-REQUEST-0.1",
+        "request_status": "PROPOSED_NOT_TRUSTED",
+        "requested_at": requested_at,
+        "signer": {
+            "signer_key_id": key_id,
+            "display_label": label,
+            "algorithm": "Ed25519",
+            "public_key_b64": base64.b64encode(public_raw).decode("ascii"),
+            "public_key_sha256": public_sha,
+            "roles": roles,
+            "status": "PROPOSED_NOT_TRUSTED",
+            "case_scopes": scopes,
+            "valid_from": valid_from,
+            "valid_until": None,
+            "revoked_at": None,
+        },
+        "authorization_note": str(authorization_note).strip(),
+        "registry_mutation_performed": False,
+        "trusted_signer_created": False,
+        "private_key_included": False,
+        "human_authorization_required": True,
+        "independent_signoff_required_for_admission": True,
+        "notes": [
+            "This request is a proposal only and is not an enrollment or authorization.",
+            "The canonical trust registry must remain unchanged until the owner explicitly approves the proposed identity, role, case scope and validity.",
+            "The private key is not included; it must remain in the operator-controlled private directory.",
+            "An INDEPENDENT_REVIEWER must use a different signer key id from the EVIDENCE_ADMISSION_SIGNER.",
+        ],
+    }
+    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(request, handle, ensure_ascii=False, sort_keys=True, indent=2)
+            handle.write("\\n")
+    except Exception:
+        target.unlink(missing_ok=True)
+        raise
+    if os.name != "nt":
+        os.chmod(target, 0o600)
+    return {
+        "status": "ENROLLMENT_REQUEST_CREATED_NOT_TRUSTED",
+        "request_path": str(target),
+        "signer_key_id": key_id,
+        "role": role,
+        "case_scopes": scopes,
+        "public_key_sha256": public_sha,
+        "trusted_signer_created": False,
+        "registry_mutation_performed": False,
+        "private_key_included": False,
+    }
+
+
+
 def add_signature(
     envelope: Mapping[str, Any],
     *,
@@ -505,6 +624,16 @@ def _main(argv: list[str] | None = None) -> int:
     gen = commands.add_parser("generate-keypair")
     gen.add_argument("--private-key-out", required=True)
     gen.add_argument("--public-key-out", required=True)
+    enroll = commands.add_parser("prepare-enrollment-request")
+    enroll.add_argument("--public-key", required=True)
+    enroll.add_argument("--signer-key-id", required=True)
+    enroll.add_argument("--display-label", required=True)
+    enroll.add_argument("--role", required=True, choices=("EVIDENCE_ADMISSION_SIGNER", "INDEPENDENT_REVIEWER"))
+    enroll.add_argument("--case-scope", action="append", required=True, help="repeat once per explicit case id")
+    enroll.add_argument("--valid-from", required=True)
+    enroll.add_argument("--authorization-note", required=True)
+    enroll.add_argument("--requested-at")
+    enroll.add_argument("--out", required=True)
     sign = commands.add_parser("sign")
     sign.add_argument("--manifest", required=True)
     sign.add_argument("--raw-root", required=True)
@@ -529,6 +658,18 @@ def _main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "generate-keypair":
             result = generate_keypair(args.private_key_out, args.public_key_out)
+        elif args.command == "prepare-enrollment-request":
+            result = prepare_signer_enrollment_request(
+                args.public_key,
+                signer_key_id=args.signer_key_id,
+                display_label=args.display_label,
+                role=args.role,
+                case_scopes=args.case_scope,
+                valid_from=args.valid_from,
+                authorization_note=args.authorization_note,
+                out_path=args.out,
+                requested_at=args.requested_at,
+            )
         elif args.command == "sign":
             if args.existing_envelope:
                 envelope, _ = _read_json(args.existing_envelope, "EXISTING_ENVELOPE")
