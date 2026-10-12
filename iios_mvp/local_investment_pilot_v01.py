@@ -285,6 +285,27 @@ def _collect_refs(value: Any) -> set[str]:
     return result
 
 
+
+def _find_note_price_conflicts(notes: Any, structured_price: Decimal) -> list[str]:
+    """Flag explicitly labelled price claims in free text that differ from price_input.price."""
+    text = str(notes or "")
+    pattern = re.compile(
+        r"(?:当前价(?:格)?|现价|股价|收盘价|手动提供(?:的)?(?:价格|股价)?|"
+        r"人工输入(?:的)?(?:价格|股价)?|报价)\s*(?:(?:为|是|[:：=])\s*)?(\d+(?:\.\d+)?)"
+    )
+    conflicts: list[str] = []
+    for match in pattern.finditer(text):
+        try:
+            quoted = Decimal(match.group(1))
+        except InvalidOperation:
+            continue
+        if quoted.is_finite() and quoted != structured_price:
+            rendered = format(quoted, "f")
+            if rendered not in conflicts:
+                conflicts.append(rendered)
+    return conflicts
+
+
 def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     if payload.get("schema_version") != PILOT_SCHEMA:
         raise LocalInvestmentPilotError("PILOT_INPUT_SCHEMA_MISMATCH")
@@ -407,6 +428,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     assessment["thesis"]["drivers"] = assessment["thesis"].get("drivers") if isinstance(assessment["thesis"].get("drivers"), list) else []
 
     forecast_raw = payload.get("forecast_valuation") if isinstance(payload.get("forecast_valuation"), Mapping) else {}
+    stress_raw = forecast_raw.get("thesis_break_stress")
+    stress_raw = stress_raw if isinstance(stress_raw, Mapping) else {}
     forecast = {
         "model": str(forecast_raw.get("model") or "UNKNOWN"),
         "model_rationale": str(forecast_raw.get("model_rationale") or ""),
@@ -414,6 +437,15 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "probabilities_calibrated": forecast_raw.get("probabilities_calibrated") is True,
         "assumptions": _records(forecast_raw.get("assumptions")),
         "scenarios": forecast_raw.get("scenarios") if isinstance(forecast_raw.get("scenarios"), Mapping) else {},
+        "thesis_break_stress": {
+            "failure_trigger": str(stress_raw.get("failure_trigger") or ""),
+            "operating_impact": str(stress_raw.get("operating_impact") or ""),
+            "valuation_method": str(stress_raw.get("valuation_method") or ""),
+            "terminal_value_per_share": stress_raw.get("terminal_value_per_share"),
+            "cash_distributions_per_share": str(stress_raw.get("cash_distributions_per_share", "0")),
+            "rationale": str(stress_raw.get("rationale") or ""),
+            "evidence_refs": _items(stress_raw.get("evidence_refs")),
+        },
     }
     parameters_raw = payload.get("decision_parameters") if isinstance(payload.get("decision_parameters"), Mapping) else {}
     try:
@@ -493,6 +525,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "unresolved_evidence_references": unknown_refs,
         "after_cutoff_evidence_references": after_cutoff_refs,
         "uncertain_timing_evidence_references": uncertain_timing_refs,
+        "notes_price_conflicts": _find_note_price_conflicts(payload.get("notes"), price),
         "notes": str(payload.get("notes") or ""),
     }
 
@@ -518,6 +551,19 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
             "cash_distributions_per_share": str(row.get("cash_distributions_per_share", "0")),
             "probability_rationale": str(row["rationale"]),
         }
+    try:
+        scenario_wealth = {
+            name: _number(rows[name]["terminal_value_per_share"], f"SCENARIO_{name}_TERMINAL")
+            + _number(rows[name]["cash_distributions_per_share"], f"SCENARIO_{name}_DISTRIBUTIONS")
+            for name in SCENARIOS
+        }
+    except LocalInvestmentPilotError as exc:
+        return None, f"SCENARIO_CALCULATION_INCOMPLETE:{exc}"
+    if not (
+        scenario_wealth["bear"] <= scenario_wealth["base"] <= scenario_wealth["bull"]
+    ):
+        return None, "SCENARIO_WEALTH_ORDERING_INCONSISTENT"
+
     params = prepared["decision_parameters"]
     gate = {
         "entry_price": prepared["price_input"]["price"],
@@ -541,7 +587,90 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
         return None, f"SCENARIO_CALCULATION_INCOMPLETE:{exc}"
 
 
-def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, reason: str | None) -> dict[str, Any]:
+
+def _thesis_break_stress_review(prepared: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate an independent, non-probability-weighted thesis-break stress case."""
+    forecast = prepared["forecast_valuation"]
+    stress = forecast.get("thesis_break_stress")
+    if not isinstance(stress, Mapping) or not any(
+        value not in (None, "", []) for value in stress.values()
+    ):
+        return {
+            "status": "MISSING",
+            "issues": ["THESIS_BREAK_STRESS_MISSING"],
+            "stress_terminal_wealth": None,
+            "stress_total_return": None,
+            "stress_downside_pct": None,
+            "probability_weighted": False,
+        }
+
+    issues: list[str] = []
+    bear = (forecast.get("scenarios") or {}).get("bear")
+    required_bear_fields = ("failure_trigger", "operating_impact", "valuation_mechanism")
+    if not isinstance(bear, Mapping) or any(
+        not str(bear.get(field) or "").strip() for field in required_bear_fields
+    ):
+        issues.append("BEAR_FAILURE_PATH_INCOMPLETE")
+
+    required_stress_fields = ("failure_trigger", "operating_impact", "valuation_method", "rationale")
+    if any(not str(stress.get(field) or "").strip() for field in required_stress_fields):
+        issues.append("THESIS_BREAK_STRESS_INPUTS_INCOMPLETE")
+
+    stress_wealth: Decimal | None = None
+    try:
+        terminal_raw = stress.get("terminal_value_per_share")
+        if terminal_raw in (None, ""):
+            raise LocalInvestmentPilotError("STRESS_TERMINAL_VALUE_MISSING")
+        terminal = _number(terminal_raw, "THESIS_BREAK_STRESS_TERMINAL")
+        distributions = _number(
+            stress.get("cash_distributions_per_share", "0"),
+            "THESIS_BREAK_STRESS_DISTRIBUTIONS",
+        )
+        if terminal < 0 or distributions < 0:
+            raise LocalInvestmentPilotError("THESIS_BREAK_STRESS_VALUES_MUST_BE_NONNEGATIVE")
+        stress_wealth = terminal + distributions
+    except LocalInvestmentPilotError:
+        issues.append("THESIS_BREAK_STRESS_VALUE_INVALID")
+
+    bear_wealth: Decimal | None = None
+    if stress_wealth is not None:
+        try:
+            if not isinstance(bear, Mapping):
+                raise LocalInvestmentPilotError("BEAR_SCENARIO_MISSING")
+            bear_terminal = _number(bear.get("terminal_value_per_share"), "BEAR_TERMINAL")
+            bear_distributions = _number(
+                bear.get("cash_distributions_per_share", "0"),
+                "BEAR_DISTRIBUTIONS",
+            )
+            if bear_terminal < 0 or bear_distributions < 0:
+                raise LocalInvestmentPilotError("BEAR_VALUES_MUST_BE_NONNEGATIVE")
+            bear_wealth = bear_terminal + bear_distributions
+        except LocalInvestmentPilotError:
+            issues.append("THESIS_BREAK_STRESS_BEAR_COMPARISON_UNAVAILABLE")
+        if bear_wealth is not None and stress_wealth >= bear_wealth:
+            issues.append("THESIS_BREAK_STRESS_NOT_MORE_SEVERE_THAN_BEAR")
+
+    stress_return: Decimal | None = None
+    stress_downside_pct: Decimal | None = None
+    price_input = prepared["price_input"]
+    if stress_wealth is not None and price_input["pit_time_status"] == "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY":
+        entry = _positive(price_input["price"], "CURRENT_PRICE")
+        stress_return = stress_wealth / entry - Decimal("1")
+        stress_downside_pct = (Decimal("1") - stress_wealth / entry) * Decimal("100")
+
+    return {
+        "status": "PASS" if not issues else "REVIEW_REQUIRED",
+        "issues": issues,
+        "stress_terminal_wealth": stress_wealth,
+        "bear_terminal_wealth_for_comparison": bear_wealth,
+        "stress_total_return": stress_return,
+        "stress_downside_pct": stress_downside_pct,
+        "probability_weighted": False,
+    }
+
+
+
+def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, reason: str | None, stress_review: Mapping[str, Any] | None = None) -> dict[str, Any]:
     a = prepared["assessment"]
     c = prepared["case"]
     p = prepared["price_input"]
@@ -562,6 +691,12 @@ def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, re
         issues.append("REFERENCED_EVIDENCE_TIMING_UNCERTAIN")
     if p["pit_time_status"] != "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY":
         issues.append("PRICE_NOT_PIT_QUALIFIED")
+    if prepared.get("notes_price_conflicts"):
+        issues.append("OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT")
+    if reason == "SCENARIO_WEALTH_ORDERING_INCONSISTENT":
+        issues.append("SCENARIO_WEALTH_ORDERING_INCONSISTENT")
+    if stress_review:
+        issues.extend(issue for issue in (stress_review.get("issues") or []) if issue not in issues)
     if a["trust"]["status"] == "FAIL":
         action, why = "NO-BUY", "信任审查失败，禁止新增风险；不表示自动卖出。"
     elif a["thesis"]["status"] == "BROKEN":
@@ -600,11 +735,21 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     c, p = analysis["case"], analysis["price_input"]
     a, f, calc, d = analysis["assessment"], analysis["forecast_valuation"], analysis["return_metrics"], analysis["decision"]
     params = analysis["decision_parameters"]
+    stress = f.get("thesis_break_stress") if isinstance(f.get("thesis_break_stress"), Mapping) else {}
+    stress_review = analysis.get("thesis_break_stress_review") or {}
+    conflicts = analysis.get("notes_price_conflicts") or []
+    price_consistency_line = (
+        f"- 带标签的备注股价一致性：**CONFLICT** — 检测到 {'、'.join(str(item) for item in conflicts)}，"
+        f"但唯一计算用价为 {p['price']} {c['currency']}；本次必须 REVIEW_REQUIRED。"
+        if conflicts else
+        "- 带标签的备注股价一致性：未发现与结构化当前价冲突的明确表述；所有回报计算仅使用上方结构化当前价。"
+    )
     lines = [
         f"# IIOS 本地投资研究试运行：{c['company']}（{c['symbol']}）",
         "",
         f"- 运行等级：**{PILOT_STATUS}**",
         f"- 分析截止：{c.get('as_of_timestamp') or (c['as_of_date'] + ' 00:00:00+08:00（日期级截止）')}；当前价：{p['price']} {c['currency']}（观察日 {p['observation_date']}，价格可获得时点 {p['known_at']}）",
+        price_consistency_line,
         f"- 当前持仓：{c['current_position_pct']}%",
         "",
         "> 这是个人使用的本地试运行报告，不是正式 canonical Decision。人工价格/AI 分析/来源摘要未完成正式证据准入；建议只供人工审阅，不会自动下单。",
@@ -671,8 +816,38 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             f"- 期末每股价值：{row.get('terminal_value_per_share', 'UNKNOWN')} {c['currency']}",
             f"- 每股现金分配：{row.get('cash_distributions_per_share', '0')} {c['currency']}",
             f"- 情景理由：{' '.join(str(row.get('rationale') or '未提供').splitlines()).strip()}",
+            *(
+                [
+                    f"- 下行情景触发条件：{' '.join(str(row.get('failure_trigger') or '未提供').splitlines()).strip()}",
+                    f"- 经营影响路径：{' '.join(str(row.get('operating_impact') or '未提供').splitlines()).strip()}",
+                    f"- 估值传导机制：{' '.join(str(row.get('valuation_mechanism') or '未提供').splitlines()).strip()}",
+                ] if name == "bear" else []
+            ),
             "",
         ])
+    stress_terminal_display = stress.get("terminal_value_per_share")
+    stress_terminal_display = "UNKNOWN" if stress_terminal_display in (None, "") else stress_terminal_display
+    stress_distribution_display = stress.get("cash_distributions_per_share")
+    stress_distribution_display = "UNKNOWN" if stress_distribution_display in (None, "") else stress_distribution_display
+    stress_wealth = stress_review.get("stress_terminal_wealth")
+    stress_return = stress_review.get("stress_total_return")
+    stress_downside = stress_review.get("stress_downside_pct")
+    lines.extend([
+        "### 独立论点失效压力测试（不纳入 Bear/Base/Bull 概率加权）",
+        "",
+        f"- 校验状态：{stress_review.get('status', 'MISSING')}",
+        f"- 失效触发条件：{' '.join(str(stress.get('failure_trigger') or '未提供').splitlines()).strip()}",
+        f"- 经营影响路径：{' '.join(str(stress.get('operating_impact') or '未提供').splitlines()).strip()}",
+        f"- 估值方法：{' '.join(str(stress.get('valuation_method') or '未提供').splitlines()).strip()}",
+        f"- 压力期末每股价值：{stress_terminal_display} {c['currency']}",
+        f"- 压力情景每股现金分配：{stress_distribution_display} {c['currency']}",
+        f"- 压力期末总财富：{stress_wealth if stress_wealth is not None else 'UNKNOWN'} {c['currency']}/股",
+        f"- 按当前输入价计算的压力回报：{stress_return if stress_return is not None else 'UNKNOWN'}",
+        f"- 对应压力下跌幅度：{stress_downside if stress_downside is not None else 'UNKNOWN'}%",
+        "- 这是一项独立、非概率加权压力测试；不能将其混入概率加权预期回报。无法量化、缺少 Bear 失败路径或未比 Bear 更悲观时，系统要求 REVIEW_REQUIRED。",
+        f"- 压力测试理由：{' '.join(str(stress.get('rationale') or '未提供').splitlines()).strip()}",
+        "",
+    ])
     if calc:
         lines.extend([
             "- 概率加权终值：" + str(calc["expected_terminal_wealth"]) + f" {c['currency']}/股",
@@ -754,6 +929,30 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         lines.append("- 来源登记表为空；所有正文中的证据编号如无登记记录，均不能视为已解析。")
     lines.extend(["## 七、需人工处理的问题", ""])
     issue_explanations = {
+        "OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT": (
+            "操作者备注包含与结构化当前价不一致的明确股价表述；回报计算只使用结构化价格，但必须先更正或确认备注。"
+        ),
+        "SCENARIO_WEALTH_ORDERING_INCONSISTENT": (
+            "Bear/Base/Bull 情景期末总财富未按 Bear ≤ Base ≤ Bull 排列；不要把该组概率加权回报用于投资判断。"
+        ),
+        "BEAR_FAILURE_PATH_INCOMPLETE": (
+            "Bear 情景缺少明确的失效触发条件、经营影响路径或估值传导机制，尚未证明覆盖核心投资论点失败。"
+        ),
+        "THESIS_BREAK_STRESS_MISSING": (
+            "缺少独立的论点失效压力测试；不得仅凭概率加权回报超过门槛判断投资论点已通过。"
+        ),
+        "THESIS_BREAK_STRESS_INPUTS_INCOMPLETE": (
+            "独立论点失效压力测试缺少触发条件、经营影响、估值方法或推理说明。"
+        ),
+        "THESIS_BREAK_STRESS_VALUE_INVALID": (
+            "独立论点失效压力测试缺少有效的非负期末价值/现金分配金额，压力回报不能核算。"
+        ),
+        "THESIS_BREAK_STRESS_BEAR_COMPARISON_UNAVAILABLE": (
+            "无法将独立压力情景与 Bear 情景的期末总财富进行比较。"
+        ),
+        "THESIS_BREAK_STRESS_NOT_MORE_SEVERE_THAN_BEAR": (
+            "独立压力情景的期末总财富并不低于 Bear 情景，不能作为更严重的独立下行情景。"
+        ),
         "REFERENCED_EVIDENCE_TIMING_UNCERTAIN": (
             "被引用来源缺少可靠的截止前已知时点；日期精度不足或时间字段缺失/无效，不能用它支持 BUY/ADD。"
         ),
@@ -790,7 +989,8 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
 def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], str]:
     prepared = _prepare_input(payload)
     metrics, reason = _return_metrics(prepared)
-    decision = _decision(prepared, metrics, reason)
+    stress_review = _thesis_break_stress_review(prepared)
+    decision = _decision(prepared, metrics, reason, stress_review)
     analysis = {
         "schema_version": PILOT_ANALYSIS_SCHEMA,
         "runner_version": "IIOS-LOCAL-PILOT-0.1",
@@ -808,6 +1008,8 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "decision_parameters": prepared["decision_parameters"],
         "return_metrics": metrics,
         "return_metrics_reason": reason,
+        "thesis_break_stress_review": stress_review,
+        "notes_price_conflicts": prepared["notes_price_conflicts"],
         "decision": decision,
         "governance": {
             "status": PILOT_STATUS, "source_origin_verified": False,
@@ -918,9 +1120,17 @@ def _template(
             "model": "UNKNOWN", "model_rationale": "", "entry_value_reference_per_share": None,
             "probabilities_calibrated": False, "assumptions": [],
             "scenarios": {
-                "bear": {"probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": "0", "rationale": ""},
+                "bear": {
+                    "probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": "0",
+                    "rationale": "", "failure_trigger": "", "operating_impact": "", "valuation_mechanism": "",
+                },
                 "base": {"probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": "0", "rationale": ""},
                 "bull": {"probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": "0", "rationale": ""},
+            },
+            "thesis_break_stress": {
+                "failure_trigger": "", "operating_impact": "", "valuation_method": "",
+                "terminal_value_per_share": None, "cash_distributions_per_share": "0",
+                "rationale": "", "evidence_refs": [],
             },
         },
         "decision_parameters": {
@@ -953,7 +1163,10 @@ def create_pilot_template(
         "请依据我提供的公司原始公告/财报事实摘要与来源链接，填写这份 IIOS 试运行 JSON。"
         "保留 schema_version、case、price_input 不变，只补齐 evidence_register、assessment、forecast_valuation 和 decision_parameters。"
         "不要编造未知事实；未知写 UNKNOWN，MIE 不可识别时写 NOT_IDENTIFIABLE；情景概率若未校准请明确说明。"
-        "至少覆盖 Trust、Reality、Quality、Thesis、价值驱动排序、Bear/Base/Bull 估值情景、MIE/预期差和风险/失效条件。"
+        "至少覆盖 Trust、Reality、Quality、Thesis、价值驱动排序、Bear/Base/Bull 估值情景、独立论点失效压力测试、MIE/预期差和风险/失效条件。"
+        "Bear 必须写清 failure_trigger、operating_impact 和 valuation_mechanism。若投资论点依赖利润率/盈利恢复，Bear 必须测试恢复失败而不是默认保留大部分恢复。"
+        "独立 thesis_break_stress 必须写清失效触发、经营影响、估值方法、数值期末价值、现金分配与推理；它不参与概率加权，且期末总财富必须低于 Bear。资料不足以估值时请留空，系统会要求 REVIEW_REQUIRED。"
+        "不要在自由文本 notes 中重述与 price_input.price 不同的现价；当前股价以结构化 price_input 为唯一计算输入。"
         "当前价已经由人工输入，不能把 assurance_label 改成来源已验证。"
         "输出只允许完整 JSON。AI/操作者判断属于试运行输入，不是正式证据准入。"
     )
