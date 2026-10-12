@@ -19,6 +19,7 @@ from iios_mvp.local_investment_pilot_v01 import (
     _validate_guided_observation_date,
     _guided_cutoff_timestamp,
     _validate_guided_research_response,
+    _build_response_repair_prompt,
     run_guided_wizard,
     run_local_investment_pilot,
 )
@@ -292,6 +293,11 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert saved["price_input"]["assurance_label"] == "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
     assert result["formal_decision_created"] is False
     assert result["auto_execution"] is False
+    output = capsys.readouterr().out
+    assert "本次完整 JSON 模板" in output
+    assert '"schema_version": "IIOS-LOCAL-INVESTMENT-PILOT-0.1"' in output
+    assert "不要求操作者另行上传公告或模板" in output
+    assert "上传输入模板和需要引用的公司公告/财报材料" not in output
 
 
 def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monkeypatch, capsys):
@@ -322,6 +328,20 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
     assert "PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF" in output
     assert "观察日 2026-10-09" in output
     assert not (tmp_path / "inputs").exists()
+
+
+def test_response_repair_prompt_includes_validation_feedback_template_and_prior_answer(tmp_path):
+    response_path = tmp_path / "response.json"
+    response_path.write_text('{"assessment": {}}', encoding="utf-8")
+    prompt = _build_response_repair_prompt(
+        original_prompt='{"schema_version": "test-template"}',
+        response_path=response_path,
+        validation_error="CHATGPT_RESPONSE_INCOMPLETE: missing thesis",
+    )
+    assert "CHATGPT_RESPONSE_INCOMPLETE: missing thesis" in prompt
+    assert '"schema_version": "test-template"' in prompt
+    assert '{"assessment": {}}' in prompt
+    assert "不要让用户手工编辑 JSON" in prompt
 
 
 def test_candidate_driven_pilot_uses_existing_return_solver_and_outputs_chinese_report(tmp_path):
