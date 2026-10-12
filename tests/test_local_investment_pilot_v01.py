@@ -257,7 +257,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
         "SZ002810",
         "1",
         "2026-10-12",
-        "2026-10-12T15:30:00+08:00",
+        "2",
         "0",
         "19.74",
         "2026-10-12",
@@ -302,7 +302,7 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
         "SZ002810",
         "1",
         "2026-10-12",
-        "",
+        "1",
         "0",
         "19.74",
         "2026-10-12",
@@ -318,8 +318,8 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
     )
     output = capsys.readouterr().out
     assert result["status"] == "CANCELLED"
-    assert "价格日期/时点不符合当前 PIT 规则" in output
-    assert "请重新输入" in output
+    assert "价格观察日期不合法" in output
+    assert "PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF" in output
     assert "观察日 2026-10-09" in output
     assert not (tmp_path / "inputs").exists()
 
