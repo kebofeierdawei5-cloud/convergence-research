@@ -1342,6 +1342,10 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
     assumptions = valuation.get("assumptions")
     if not isinstance(assumptions, list) or not any(str(item or "").strip() for item in assumptions):
         missing.append("估值假设（无法估值时写明原因与缺口）")
+    entry_reference = valuation.get("entry_value_reference_per_share")
+    if entry_reference in (None, ""):
+        missing.append("安全边际参考价值/每股估值锚点")
+
     scenarios = valuation.get("scenarios")
     scenarios = scenarios if isinstance(scenarios, Mapping) else {}
     for scenario_name, label in (("bear", "Bear"), ("base", "Base"), ("bull", "Bull")):
@@ -1349,6 +1353,13 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
         scenario = scenario if isinstance(scenario, Mapping) else {}
         if not str(scenario.get("rationale") or "").strip():
             missing.append(f"{label} 情景分析理由")
+        for key, field_label in (
+            ("probability", "情景概率"),
+            ("terminal_value_per_share", "期末每股价值"),
+            ("cash_distributions_per_share", "每股现金分配"),
+        ):
+            if scenario.get(key) in (None, ""):
+                missing.append(f"{label}{field_label}")
     bear = scenarios.get("bear")
     bear = bear if isinstance(bear, Mapping) else {}
     for key, label in (
@@ -1369,6 +1380,12 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
     ):
         if not str(stress.get(key) or "").strip():
             missing.append(label)
+    for key, label in (
+        ("terminal_value_per_share", "独立压力测试期末每股价值"),
+        ("cash_distributions_per_share", "独立压力测试每股现金分配"),
+    ):
+        if stress.get(key) in (None, ""):
+            missing.append(label)
 
     if missing:
         labels = "；".join(dict.fromkeys(missing))
@@ -1377,6 +1394,29 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
             + labels
             + "。本次尚未生成报告。请直接补齐当前已打开的 pilot-chatgpt-response JSON 文件并保存，再回到终端按回车；不用重跑向导，也不要把 JSON 粘贴到终端。"
         )
+
+
+def _build_response_repair_prompt(
+    *, original_prompt: str, response_path: str | Path, validation_error: str
+) -> str:
+    """Build a one-paste repair request so the user does not manually edit dozens of JSON fields."""
+    path = Path(response_path).expanduser()
+    try:
+        previous_response = path.read_text(encoding="utf-8")
+    except OSError:
+        previous_response = ""
+    return (
+        "上一轮 IIOS 股票研究回答未通过本地格式/完整性校验。请修复并重新完成研究，不要让用户手工编辑 JSON。"
+        "\n\n【校验反馈】\n" + validation_error
+        + "\n\n【必须遵守】\n"
+        "1. 以下是本次唯一基准模板与全部研究要求。必须完整保留 schema_version、case、price_input 的所有值，尤其人工股价、观察日、known_at、截止时点和 assurance_label。"
+        "2. 不要要求用户上传模板或额外寻找公告；请主动联网搜索截止时点前公开可访问的公司公告、交易所披露与监管文件。"
+        "3. 修复缺失结构字段并填写数值估值情景；研究假设和事实来源要分开。不得编造来源、财务数字或市场一致预期。"
+        "4. 如果确实无法识别，字段仍要保留结构，并在 summary/rationale 中具体解释未知原因、证据缺口及需要人工确认的事项。"
+        "5. 请返回一个完整 JSON 对象，不要代码围栏和 JSON 以外的文字。"
+        + "\n\n【原始研究提示及完整基准模板】\n" + original_prompt
+        + "\n\n【上次失败的完整回答，请在此基础上修复】\n" + previous_response
+    )
 
 
 def _ask(prompt: str, default: str | None = None) -> str:
@@ -1548,8 +1588,7 @@ def run_guided_wizard(
         subprocess.run(["open", "-a", "TextEdit", str(response_path)], check=False, timeout=5)
         print("\n已打开 ChatGPT 和 JSON 结果文件；完整输入模板与研究指令已复制到剪贴板，无需另行上传模板文件。")
     else:
-        print("\n研究提示：\n" + prompt)
-        print(f"输入模板文件：{template_path}")
+        print("\n研究提示（已包含本次完整 JSON 模板）：\n" + prompt)
 
     print(f"\nChatGPT 完整回答的保存位置：\n{response_path}")
     print("操作步骤（只需在 ChatGPT 与这个结果文件之间复制一次）：")
@@ -1569,8 +1608,24 @@ def run_guided_wizard(
             break
         except (OSError, ValueError, KeyError, TypeError) as exc:
             print(f"暂未继续：{exc}")
-            print(f"请检查并保存这个文件后重试：{response_path}")
-            print("无需重新填写标的；也不需要把 JSON 粘贴到终端。按 Control-C 可退出。")
+            if isinstance(exc, LocalInvestmentPilotError) and not str(exc).startswith(
+                ("CHATGPT_RESPONSE_FILE_READ_FAILED", "CHATGPT_RESPONSE_FILE_NOT_FOUND")
+            ):
+                repair_prompt = _build_response_repair_prompt(
+                    original_prompt=prompt, response_path=response_path, validation_error=str(exc)
+                )
+                if sys.platform == "darwin":
+                    try:
+                        subprocess.run(["pbcopy"], input=repair_prompt, text=True, check=True, timeout=5)
+                        print("\n已将自动修复提示复制到剪贴板。请切回已打开的 ChatGPT 对话，直接粘贴并发送；")
+                        print("然后复制新的完整 JSON 覆盖同一个结果文件，保存后回到终端按回车。")
+                        print("不需要手工修改几十个 JSON 字段，也不需要重新填写公司和股价。")
+                    except (OSError, subprocess.SubprocessError):
+                        print("\n无法自动复制修复提示；请检查当前结果文件后重试，或按 Control-C 退出。")
+                else:
+                    print("\n自动修复提示：\n" + repair_prompt)
+            print(f"当前响应文件：{response_path}")
+            print("无需重新填写标的；按 Control-C 可退出。")
 
     # Validate the response before saving or running calculations.
     _prepare_input(payload)
