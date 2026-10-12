@@ -1198,17 +1198,19 @@ def create_pilot_template(
     prompt_path = root / f"pilot-prompt-{token}-{stamp}.md"
     _write_local(input_path, json.dumps(payload, ensure_ascii=False, indent=2))
     prompt = (
-        "请依据我提供的公司原始公告/财报事实摘要与来源链接，填写这份 IIOS 试运行 JSON。"
-        "保留 schema_version、case、price_input 不变，只补齐 evidence_register、assessment、forecast_valuation 和 decision_parameters。"
-        "不要编造未知事实；未知写 UNKNOWN，MIE 不可识别时写 NOT_IDENTIFIABLE；情景概率若未校准请明确说明。"
-        "至少覆盖 Trust、Reality、Quality、Thesis、价值驱动排序、Bear/Base/Bull 估值情景、独立论点失效压力测试、MIE/预期差和风险/失效条件。"
-        "Bear 必须写清 failure_trigger、operating_impact 和 valuation_mechanism。若投资论点依赖利润率/盈利恢复，Bear 必须测试恢复失败而不是默认保留大部分恢复。"
-        "独立 thesis_break_stress 必须写清失效触发、经营影响、估值方法、数值期末价值、现金分配与推理；它不参与概率加权，且期末总财富必须低于 Bear。资料不足以估值时请留空，系统会要求 REVIEW_REQUIRED。"
-        "不要在自由文本 notes 中重述与 price_input.price 不同的现价；当前股价以结构化 price_input 为唯一计算输入。"
-        "当前价已经由人工输入，不能把 assurance_label 改成来源已验证。"
-        "输出只允许完整 JSON。AI/操作者判断属于试运行输入，不是正式证据准入。"
+        "你是 IIOS 的个人股票研究助手。请主动联网检索并完成截止时点内的研究，不要要求用户先上传这份模板或另外寻找公告。"
+        "模板 JSON 将直接附在本提示中。先从公司/交易所/监管机构公开资料取证，再判断 Trust、Reality、Quality、Thesis、价值驱动、"
+        "估值与预期差、风险。返回时必须保留 schema_version、case、price_input 原样不变，只补研究字段。"
+        "证据应给出可直接打开的来源 URL、标题、发布日期/已知时点与事实摘要；优先使用公司定期报告、公告、交易所与监管文件。"
+        "不得为了填满字段编造事实、URL、财务数字或所谓市场一致预期。对于 MIE，不具备可核实的一致预期/市场定价证据时，明确使用 NOT_IDENTIFIABLE 并解释原因。"
+        "请用可解释的显式假设建立 Bear/Base/Bull 数值情景；情景是估算而非已披露事实，说明盈利/利润率/销量等驱动及估值倍数来源。"
+        "概率之和必须为 1；期末总财富次序必须 Bear ≤ Base ≤ Bull。若无法有根据地估算某情景，请明确报告其不可识别及缺少什么依据，不要捏造。"
+        "Bear 必须明确写 failure_trigger、operating_impact 和 valuation_mechanism；若论点依赖盈利恢复，Bear 必须检验恢复失败。"
+        "独立 thesis_break_stress 必须另行量化失效后的每股期末价值和现金分配，并明确估值方法、触发条件、经营影响与理由；不参与概率加权，且须比 Bear 更悲观。"
+        "不要在 notes 中重述与 price_input.price 不同的现价；当前股价只取结构化 price_input。不能将人工价格标为已验证。"
+        "未知事实用 UNKNOWN，并解释缺口；研究结论可以是 REVIEW_REQUIRED，但不可以把整个结构留空。只返回一个完整 JSON 对象，不要输出代码围栏或额外说明。"
     )
-    _write_local(prompt_path, prompt + "\n\n本地输入文件：" + str(input_path) + "\n")
+    _write_local(prompt_path, prompt + "\n")
     return {
         "status": "PILOT_TEMPLATE_CREATED", "input_template": str(input_path),
         "analysis_prompt": str(prompt_path), "private_local_storage": True,
@@ -1340,6 +1342,10 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
     assumptions = valuation.get("assumptions")
     if not isinstance(assumptions, list) or not any(str(item or "").strip() for item in assumptions):
         missing.append("估值假设（无法估值时写明原因与缺口）")
+    entry_reference = valuation.get("entry_value_reference_per_share")
+    if entry_reference in (None, ""):
+        missing.append("安全边际参考价值/每股估值锚点")
+
     scenarios = valuation.get("scenarios")
     scenarios = scenarios if isinstance(scenarios, Mapping) else {}
     for scenario_name, label in (("bear", "Bear"), ("base", "Base"), ("bull", "Bull")):
@@ -1347,6 +1353,13 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
         scenario = scenario if isinstance(scenario, Mapping) else {}
         if not str(scenario.get("rationale") or "").strip():
             missing.append(f"{label} 情景分析理由")
+        for key, field_label in (
+            ("probability", "情景概率"),
+            ("terminal_value_per_share", "期末每股价值"),
+            ("cash_distributions_per_share", "每股现金分配"),
+        ):
+            if scenario.get(key) in (None, ""):
+                missing.append(f"{label}{field_label}")
     bear = scenarios.get("bear")
     bear = bear if isinstance(bear, Mapping) else {}
     for key, label in (
@@ -1367,6 +1380,12 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
     ):
         if not str(stress.get(key) or "").strip():
             missing.append(label)
+    for key, label in (
+        ("terminal_value_per_share", "独立压力测试期末每股价值"),
+        ("cash_distributions_per_share", "独立压力测试每股现金分配"),
+    ):
+        if stress.get(key) in (None, ""):
+            missing.append(label)
 
     if missing:
         labels = "；".join(dict.fromkeys(missing))
@@ -1375,6 +1394,29 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
             + labels
             + "。本次尚未生成报告。请直接补齐当前已打开的 pilot-chatgpt-response JSON 文件并保存，再回到终端按回车；不用重跑向导，也不要把 JSON 粘贴到终端。"
         )
+
+
+def _build_response_repair_prompt(
+    *, original_prompt: str, response_path: str | Path, validation_error: str
+) -> str:
+    """Build a one-paste repair request so the user does not manually edit dozens of JSON fields."""
+    path = Path(response_path).expanduser()
+    try:
+        previous_response = path.read_text(encoding="utf-8")
+    except OSError:
+        previous_response = ""
+    return (
+        "上一轮 IIOS 股票研究回答未通过本地格式/完整性校验。请修复并重新完成研究，不要让用户手工编辑 JSON。"
+        "\n\n【校验反馈】\n" + validation_error
+        + "\n\n【必须遵守】\n"
+        "1. 以下是本次唯一基准模板与全部研究要求。必须完整保留 schema_version、case、price_input 的所有值，尤其人工股价、观察日、known_at、截止时点和 assurance_label。"
+        "2. 不要要求用户上传模板或额外寻找公告；请主动联网搜索截止时点前公开可访问的公司公告、交易所披露与监管文件。"
+        "3. 修复缺失结构字段并填写数值估值情景；研究假设和事实来源要分开。不得编造来源、财务数字或市场一致预期。"
+        "4. 如果确实无法识别，字段仍要保留结构，并在 summary/rationale 中具体解释未知原因、证据缺口及需要人工确认的事项。"
+        "5. 请返回一个完整 JSON 对象，不要代码围栏和 JSON 以外的文字。"
+        + "\n\n【原始研究提示及完整基准模板】\n" + original_prompt
+        + "\n\n【上次失败的完整回答，请在此基础上修复】\n" + previous_response
+    )
 
 
 def _ask(prompt: str, default: str | None = None) -> str:
@@ -1517,16 +1559,21 @@ def run_guided_wizard(
     )
     template_path = Path(template_result["input_template"])
     prompt_path = Path(template_result["analysis_prompt"])
-    prompt = prompt_path.read_text(encoding="utf-8") + (
-        "\n\n研究执行要求：请在分析截止时点之前，主动查阅并引用可访问的公开资料；优先公司公告/定期报告、交易所披露、监管文件，"
-        "其次使用可靠行业资料。每条关键事实必须登记 source_id、title、source_class、source_ref（完整 URL 或文件定位）、"
-        "published_at、known_at、summary；只写截止时点前可获得的信息，无法确定 known_at 时明确标记 UNKNOWN。"
-        "必须完成 Trust、Reality、Quality、Thesis、价值驱动因素排序、风险清单、MIE/预期差、估值模型和假设、Bear/Base/Bull 情景，"
-        "并提供独立且不纳入概率加权的 thesis_break_stress。Bear 要明确失败触发、经营影响路径和估值传导机制。"
-        "不要只原样返回模板，也不要用空字符串替代研究；若事实或估值确实无法识别，请写明具体原因、证据缺口和需要人工核实的事项，"
-        "保留 UNKNOWN / NOT_IDENTIFIABLE，不得编造数字。"
-        "保留 schema_version、case、price_input 原样不变，尤其不得更改人工输入股价、观察日期、known_at 或把价格标记为已验证。"
-        "只返回一个完整 JSON 对象，不要用 Markdown 代码围栏，也不要附加 JSON 以外的说明文字。"
+    template_payload = json.loads(template_path.read_text(encoding="utf-8"))
+    prompt = (
+        prompt_path.read_text(encoding="utf-8")
+        + "\n\n【本次完整 JSON 模板——无需上传单独模板文件】\n"
+        + json.dumps(template_payload, ensure_ascii=False, indent=2, allow_nan=False)
+        + "\n\n【执行要求】\n"
+        + "基于上方模板直接研究并填充同一个 JSON 对象。优先联网搜索并核对截止时点前的公司公告、定期报告、交易所披露、监管文件；"
+        + "不要求操作者另行上传公告或模板。来源登记至少填写 source_id、title、source_class、source_ref（可直接打开的 URL）、published_at、known_at、summary。"
+        + "最多优先列出 8 条对结论最重要的来源，确保每条来源真实且支持对应事实；不知道的时间明确写 UNKNOWN。"
+        + "必须完成 Trust、Reality、Quality、Thesis、价值驱动因素排序、风险清单、MIE/预期差、估值模型和假设、Bear/Base/Bull 数值情景以及独立 thesis_break_stress。"
+        + "请填写 entry_value_reference_per_share，以及三种情景各自 probability、terminal_value_per_share、cash_distributions_per_share、rationale；概率合计为 1。"
+        + "请填写 thesis_break_stress 的 failure_trigger、operating_impact、valuation_method、terminal_value_per_share、cash_distributions_per_share、rationale，且其期末总财富必须低于 Bear。"
+        + "不要只原样返回模板，不允许把核心研究字段全部留空。若无法识别必须具体解释原因和证据缺口；数字估值可以建立透明、可追责的假设，但不得把假设伪装为披露事实。"
+        + "严格保留 schema_version、case、price_input 原样不变，尤其不得更改人工股价、观察日期、known_at 或 price assurance 标签。"
+        + "只返回完整 JSON，不要代码围栏或额外说明。"
     )
 
     private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
@@ -1538,18 +1585,16 @@ def run_guided_wizard(
         # The prompt is copied to the clipboard; the large response is always handed off via a file.
         subprocess.run(["pbcopy"], input=prompt, text=True, check=True, timeout=5)
         subprocess.run(["open", "https://chatgpt.com/"], check=False, timeout=5)
-        subprocess.run(["open", "-R", str(template_path)], check=False, timeout=5)
         subprocess.run(["open", "-a", "TextEdit", str(response_path)], check=False, timeout=5)
-        print("\n已打开 ChatGPT、模板所在的 Finder 窗口和 JSON 结果文件；研究提示已复制到剪贴板。")
+        print("\n已打开 ChatGPT 和 JSON 结果文件；完整输入模板与研究指令已复制到剪贴板，无需另行上传模板文件。")
     else:
-        print("\n研究提示：\n" + prompt)
-        print(f"输入模板文件：{template_path}")
+        print("\n研究提示（已包含本次完整 JSON 模板）：\n" + prompt)
 
     print(f"\nChatGPT 完整回答的保存位置：\n{response_path}")
-    print("操作步骤：")
-    print("  1. 在 ChatGPT 粘贴研究提示，上传输入模板和需要引用的公司公告/财报材料。")
-    print("  2. 复制 ChatGPT 返回的完整 JSON；粘贴到上面指定的 JSON 文件中并保存。")
-    print("  3. 回到本终端只按回车键。不要把整段 JSON 粘贴到终端。")
+    print("操作步骤（只需在 ChatGPT 与这个结果文件之间复制一次）：")
+    print("  1. 在已打开的 ChatGPT 对话中粘贴剪贴板中的完整研究提示并发送；提示里已经包含本次 JSON 模板，不用上传模板或另找公告。")
+    print("  2. 复制 ChatGPT 返回的完整 JSON，覆盖上面已打开的 JSON 结果文件并保存。")
+    print("  3. 回到本终端按回车。不要把 JSON 粘贴到终端，也不要手工填写 JSON 字段。")
     if sys.platform == "darwin":
         print("  提示：JSON 文件已用 TextEdit 打开；粘贴后按 Command+S 保存。")
 
@@ -1563,8 +1608,24 @@ def run_guided_wizard(
             break
         except (OSError, ValueError, KeyError, TypeError) as exc:
             print(f"暂未继续：{exc}")
-            print(f"请检查并保存这个文件后重试：{response_path}")
-            print("无需重新填写标的；也不需要把 JSON 粘贴到终端。按 Control-C 可退出。")
+            if isinstance(exc, LocalInvestmentPilotError) and not str(exc).startswith(
+                ("CHATGPT_RESPONSE_FILE_READ_FAILED", "CHATGPT_RESPONSE_FILE_NOT_FOUND")
+            ):
+                repair_prompt = _build_response_repair_prompt(
+                    original_prompt=prompt, response_path=response_path, validation_error=str(exc)
+                )
+                if sys.platform == "darwin":
+                    try:
+                        subprocess.run(["pbcopy"], input=repair_prompt, text=True, check=True, timeout=5)
+                        print("\n已将自动修复提示复制到剪贴板。请切回已打开的 ChatGPT 对话，直接粘贴并发送；")
+                        print("然后复制新的完整 JSON 覆盖同一个结果文件，保存后回到终端按回车。")
+                        print("不需要手工修改几十个 JSON 字段，也不需要重新填写公司和股价。")
+                    except (OSError, subprocess.SubprocessError):
+                        print("\n无法自动复制修复提示；请检查当前结果文件后重试，或按 Control-C 退出。")
+                else:
+                    print("\n自动修复提示：\n" + repair_prompt)
+            print(f"当前响应文件：{response_path}")
+            print("无需重新填写标的；按 Control-C 可退出。")
 
     # Validate the response before saving or running calculations.
     _prepare_input(payload)
