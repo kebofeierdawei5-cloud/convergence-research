@@ -212,6 +212,53 @@ def test_guided_observation_date_must_precede_date_only_cutoff():
         _validate_guided_observation_date(date(2026, 10, 13), cutoff)
 
 
+def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path, monkeypatch, capsys):
+    import builtins
+    import iios_mvp.local_investment_pilot_v01 as pilot
+
+    source_claim = "用户手动提供的19.74；本次未从交易所或行情供应商独立核验"
+    answers = iter([
+        "山东赫达",
+        "SZ002810",
+        "1",
+        "2026-10-12",
+        "2026-10-12T15:30:00+08:00",
+        "0",
+        "19.74",
+        "2026-10-12",
+        "2026-10-12T15:00:00+08:00",
+        source_claim,
+        "1",
+        "",
+    ])
+    monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
+
+    def completed_response(_response_path):
+        template_paths = list((tmp_path / "inputs").glob("pilot-input-*.json"))
+        assert len(template_paths) == 1
+        template = json.loads(template_paths[0].read_text(encoding="utf-8"))
+        canned = _payload(cutoff="2026-10-12")
+        for key in ("evidence_register", "assessment", "forecast_valuation", "decision_parameters", "notes"):
+            template[key] = canned[key]
+        return template
+
+    monkeypatch.setattr(pilot, "_read_json_response_file", completed_response)
+    result = run_guided_wizard(
+        template_root=tmp_path / "inputs",
+        output_root=tmp_path / "runs",
+    )
+
+    assert result["status"] == "PILOT_CREATED"
+    completed_files = list((tmp_path / "inputs").glob("pilot-completed-*.json"))
+    assert len(completed_files) == 1
+    saved = json.loads(completed_files[0].read_text(encoding="utf-8"))
+    assert saved["price_input"]["price"] == "19.74"
+    assert saved["price_input"]["sources_claimed"] == [source_claim]
+    assert saved["price_input"]["assurance_label"] == "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
+    assert result["formal_decision_created"] is False
+    assert result["auto_execution"] is False
+
+
 def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monkeypatch, capsys):
     import builtins
 

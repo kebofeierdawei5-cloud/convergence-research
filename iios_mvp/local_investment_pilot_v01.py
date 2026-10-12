@@ -1073,6 +1073,10 @@ def run_guided_wizard(
             break
         except LocalInvestmentPilotError as exc:
             print(f"价格可获得时点不符合截止约束：{exc}")
+    source_claim = _ask(
+        "价格来源说明（如为人工输入，请明确未独立核验）",
+        f"用户手动提供的 {price}；未从交易所或行情供应商独立核验",
+    )
     print("\n请核对：")
     print(f"  {company} / {symbol} / {market}")
     if symbol != symbol_input.strip().upper().replace(" ", ""):
