@@ -55,7 +55,7 @@ This is a usability/reporting repair to `PILOT_NON_CANONICAL` only. It does not 
 
 ### C1/C2 signer enrollment preparation (2026-10-12)
 
-The signed Evidence/PIT CLI now supports `prepare-enrollment-request`: it validates a generated Ed25519 public-key document and writes a mode-0600 local proposal with explicit signer role, case scope, validity and rationale. The proposal is `PROPOSED_NOT_TRUSTED`, excludes the private key, rejects wildcard scopes and combined admission/reviewer roles, and cannot modify the canonical signer registry. Owner authorization and a separate independent reviewer key are still required; the trusted registry remains intentionally empty until the approved enrollment is applied. Source-use rights and the applicable exact permission instrument remain independent mandatory gates.
+The signed Evidence/PIT CLI now supports `prepare-enrollment-request` and `prepare-rights-draft`. Signer enrollment proposals validate an Ed25519 public key and remain `PROPOSED_NOT_TRUSTED`; they exclude private keys, reject wildcard case scopes and combined admission/reviewer roles, and cannot modify the canonical registry. Rights drafts remain `UNKNOWN` by default, have no allowed uses or admitted permission instrument, and record any supplied candidate instrument hash only as a candidate. Neither command decides legal/data-use rights, enrolls a signer or admits Evidence/PIT. Owner authorization, separate independent review, written permission where required, and exact instrument verification remain open gates.
 
 ### Execution-first local MVP priority (owner direction, 2026-10-11; supersedes earlier task ordering)
 
