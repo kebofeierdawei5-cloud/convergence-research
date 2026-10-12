@@ -13,8 +13,8 @@ from iios_mvp.local_investment_pilot_v01 import (
     _normalize_guided_symbol,
     _previous_weekday,
     _read_json_response_file,
+    _analyse,
     _prepare_input,
-    _render_report,
     _validate_guided_observation_date,
     run_local_investment_pilot,
 )
@@ -176,6 +176,7 @@ def test_evidence_references_in_assessment_and_valuation_are_resolved_or_explici
 
 def test_report_uses_portable_prose_instead_of_markdown_tables_and_python_dict_repr(tmp_path):
     payload = _payload()
+    payload["evidence_register"] = []
     payload["assessment"]["value_drivers"] = [
         {"rank": 1, "driver": "growth A", "impact": "POSITIVE", "rationale": "reason A", "evidence_refs": ["E1"]},
         {"rank": 1, "driver": "growth B", "impact": "MIXED", "rationale": "reason B", "evidence_refs": ["E-MISSING"]},
@@ -186,16 +187,18 @@ def test_report_uses_portable_prose_instead_of_markdown_tables_and_python_dict_r
     payload["forecast_valuation"]["assumptions"] = [
         {"assumption_id": "A-1", "name": "base EPS", "values": {"bear_eps": "0.75", "base_eps": "1.15"}, "basis": "synthetic assumption", "evidence_refs": ["E1"]}
     ]
-    analysis, report = __import__("iios_mvp.local_investment_pilot_v01", fromlist=["_analyse"])._analyse(payload, "TEST-RUN")
+    analysis, report = _analyse(payload, "TEST-RUN")
     assert "|---" not in report
     assert "| 情景 |" not in report
     assert "A-1｜base EPS" in report
     assert "R-1｜cash collection" in report
     assert "**E-MISSING**：**未解析**" in report
+    assert "**E1**：**未解析**" in report
+    assert "来源登记表为空" in report
     assert "1. **growth A**" in report
     assert "2. **growth B**" in report
     assert "{'assumption_id':" not in report
-    assert analysis["unresolved_evidence_references"] == ["E-MISSING"]
+    assert analysis["unresolved_evidence_references"] == ["E1", "E-MISSING"]
 
 
 def test_guided_observation_date_must_precede_date_only_cutoff():
