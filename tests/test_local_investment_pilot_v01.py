@@ -15,6 +15,7 @@ from iios_mvp.local_investment_pilot_v01 import (
     _read_json_response_file,
     _analyse,
     _prepare_input,
+    _assert_response_preserves_operator_inputs,
     _validate_guided_observation_date,
     run_guided_wizard,
     run_local_investment_pilot,
@@ -210,6 +211,25 @@ def test_guided_observation_date_must_precede_date_only_cutoff():
         _validate_guided_observation_date(cutoff, cutoff)
     with pytest.raises(LocalInvestmentPilotError, match="PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF"):
         _validate_guided_observation_date(date(2026, 10, 13), cutoff)
+
+
+def test_ai_response_must_preserve_operator_owned_case_and_price_input(tmp_path):
+    template_path = _write_input(tmp_path, _payload(cutoff="2026-10-10"))
+    payload = json.loads(template_path.read_text(encoding="utf-8"))
+
+    # Exact preservation of the template's operator-controlled sections is accepted.
+    _assert_response_preserves_operator_inputs(template_path, payload)
+
+    # A changed price is rejected instead of silently overriding the operator's quote.
+    payload["price_input"]["price"] = "19.51"
+    with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_CHANGED_OPERATOR_CONTROLLED_FIELDS: price_input"):
+        _assert_response_preserves_operator_inputs(template_path, payload)
+
+    # Changes to case identity/cutoff are also rejected.
+    payload = json.loads(template_path.read_text(encoding="utf-8"))
+    payload["case"]["as_of_date"] = "2026-10-11"
+    with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_CHANGED_OPERATOR_CONTROLLED_FIELDS: case"):
+        _assert_response_preserves_operator_inputs(template_path, payload)
 
 
 def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path, monkeypatch, capsys):
