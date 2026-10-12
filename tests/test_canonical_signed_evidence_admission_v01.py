@@ -4,6 +4,7 @@ import base64
 from datetime import datetime
 import hashlib
 import json
+import os
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
@@ -16,6 +17,8 @@ from iios_mvp.canonical_signed_evidence_admission_v01 import (
     SIGNER_REGISTRY_SCHEMA,
     SignedAdmissionError,
     add_signature,
+    generate_keypair,
+    prepare_signer_enrollment_request,
     build_admission_payload,
     verify_signed_admission,
 )
@@ -161,6 +164,80 @@ def _create_envelope(tmp_path: Path, *, source_class="EXCHANGE_MARKET_DATA", sta
         signed_at=SIGNED_AT,
     )
     return payload, manifest_path, raw_root, rights_path, permission_path
+
+
+def test_enrollment_request_is_private_proposal_and_never_registers_a_signer(tmp_path):
+    private_path = tmp_path / "private" / "admission.key"
+    public_path = tmp_path / "public" / "admission.public.json"
+    out_path = tmp_path / "private" / "enrollment-request.json"
+    generated = generate_keypair(private_path, public_path)
+    result = prepare_signer_enrollment_request(
+        public_path,
+        signer_key_id="OWNER-C1-20261012",
+        display_label="owner-admission-signer",
+        role="EVIDENCE_ADMISSION_SIGNER",
+        case_scopes=["RC-CN-A-605016-20261009"],
+        valid_from="2026-10-13T00:00:00+08:00",
+        authorization_note="Owner identity and scope require explicit human approval; test fixture only.",
+        out_path=out_path,
+        requested_at="2026-10-12T12:00:00+08:00",
+    )
+    request = json.loads(out_path.read_text(encoding="utf-8"))
+    assert result["status"] == "ENROLLMENT_REQUEST_CREATED_NOT_TRUSTED"
+    assert request["request_status"] == "PROPOSED_NOT_TRUSTED"
+    assert request["trusted_signer_created"] is False
+    assert request["registry_mutation_performed"] is False
+    assert request["private_key_included"] is False
+    assert request["signer"]["public_key_sha256"] == generated["public_key_sha256"]
+    assert request["signer"]["roles"] == ["EVIDENCE_ADMISSION_SIGNER"]
+    assert request["signer"]["case_scopes"] == ["RC-CN-A-605016-20261009"]
+    assert private_path.read_text(encoding="ascii").strip() not in out_path.read_text(encoding="utf-8")
+    if os.name != "nt":
+        assert (out_path.stat().st_mode & 0o777) == 0o600
+
+
+def test_enrollment_request_rejects_wildcard_and_combined_roles(tmp_path):
+    private_path = tmp_path / "private" / "admission.key"
+    public_path = tmp_path / "public" / "admission.public.json"
+    generate_keypair(private_path, public_path)
+    common = dict(
+        signer_key_id="OWNER-C1-20261012",
+        display_label="reviewer-proposal",
+        valid_from="2026-10-13T00:00:00+08:00",
+        authorization_note="Test only; no trusted enrollment.",
+        requested_at="2026-10-12T12:00:00+08:00",
+    )
+    with pytest.raises(SignedAdmissionError, match="WILDCARD_SIGNER_SCOPE_NOT_ALLOWED"):
+        prepare_signer_enrollment_request(
+            public_path, **common, role="EVIDENCE_ADMISSION_SIGNER",
+            case_scopes=["*"], out_path=tmp_path / "private" / "wildcard.json"
+        )
+    with pytest.raises(SignedAdmissionError, match="SIGNER_ROLE_INVALID"):
+        prepare_signer_enrollment_request(
+            public_path, **common, role="EVIDENCE_ADMISSION_SIGNER,INDEPENDENT_REVIEWER",
+            case_scopes=[CASE_ID], out_path=tmp_path / "private" / "bad-role.json"
+        )
+
+
+def test_enrollment_request_rejects_public_key_fingerprint_mismatch(tmp_path):
+    private_path = tmp_path / "private" / "admission.key"
+    public_path = tmp_path / "public" / "admission.public.json"
+    generate_keypair(private_path, public_path)
+    doc = json.loads(public_path.read_text(encoding="utf-8"))
+    doc["public_key_sha256"] = "0" * 64
+    public_path.write_text(json.dumps(doc), encoding="utf-8")
+    with pytest.raises(SignedAdmissionError, match="SIGNER_PUBLIC_KEY_FINGERPRINT_MISMATCH"):
+        prepare_signer_enrollment_request(
+            public_path,
+            signer_key_id="OWNER-C1-20261012",
+            display_label="owner-admission-signer",
+            role="EVIDENCE_ADMISSION_SIGNER",
+            case_scopes=[CASE_ID],
+            valid_from="2026-10-13T00:00:00+08:00",
+            authorization_note="Test only.",
+            out_path=tmp_path / "private" / "enrollment-request.json",
+            requested_at="2026-10-12T12:00:00+08:00",
+        )
 
 
 def test_signed_admission_requires_trusted_signature_and_exact_core_pit_bytes(tmp_path):

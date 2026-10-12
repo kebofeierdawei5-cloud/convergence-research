@@ -53,13 +53,17 @@ The report-quality follow-up explicitly resolves structured evidence references 
 
 This is a usability/reporting repair to `PILOT_NON_CANONICAL` only. It does not change formal Evidence/PIT/Forecast/Valuation admission, canonical Decision authority, or human approval requirements.
 
+### C1/C2 signer enrollment preparation (2026-10-12)
+
+The signed Evidence/PIT CLI now supports `prepare-enrollment-request`: it validates a generated Ed25519 public-key document and writes a mode-0600 local proposal with explicit signer role, case scope, validity and rationale. The proposal is `PROPOSED_NOT_TRUSTED`, excludes the private key, rejects wildcard scopes and combined admission/reviewer roles, and cannot modify the canonical signer registry. Owner authorization and a separate independent reviewer key are still required; the trusted registry remains intentionally empty until the approved enrollment is applied. Source-use rights and the applicable exact permission instrument remain independent mandatory gates.
+
 ### Execution-first local MVP priority (owner direction, 2026-10-11; supersedes earlier task ordering)
 
 The user has explicitly redirected IIOS delivery to **finish the core workflow and run it end-to-end in actual personal use before further optimization**. The governing decision and testable acceptance criteria are recorded in [Execution-first Local Single-User MVP Pivot](iios/LOCAL_SINGLE_USER_EXECUTION_FIRST_PIVOT_20261011.md).
 
 Immediate order:
 
-**Simplified personal app entry (2026-10-12):** the normal operator entry is now the repository-root `启动IIOS投资分析.command`. It launches the guided wizard, asks only the basic company/market/price/position inputs, opens ChatGPT, copies the research prompt to the clipboard, reveals the template, accepts the copied JSON response back in Terminal, runs the pilot and opens the Chinese report. This is a usability shell around the existing `PILOT_NON_CANONICAL` engine—not a second investment engine and not a formal/canonical admission path. Follow [the simplified quick-start](iios/LOCAL_INVESTMENT_PILOT_V01_GUIDE_20261011.md); low-level CLI flags are fallback/developer options, not the user-facing workflow.
+**Simplified personal app entry (2026-10-12):** the normal operator entry is now the repository-root `启动IIOS投资分析.command`. It launches the guided wizard, asks only the basic company/market/price/position inputs, opens ChatGPT and the input template, copies the research prompt to the clipboard, opens a dedicated JSON response file in TextEdit, reads the saved file when the operator presses Enter, runs the pilot and opens the Chinese report. The complete response is never pasted into Terminal. This is a usability shell around the existing `PILOT_NON_CANONICAL` engine—not a second investment engine and not a formal/canonical admission path. Follow [the simplified quick-start](iios/LOCAL_INVESTMENT_PILOT_V01_GUIDE_20261011.md); low-level CLI flags are fallback/developer options, not the user-facing workflow.
 
 1. Pause additional MP-3 adversarial edge cases / anti-tamper expansion except defects that block the pilot or can silently distort an investment result.
 2. Implement a complete local, candidate-driven path using the existing company research, deterministic investment and report modules. The current fixed-profile Path A scenario calculator is not the final product.
