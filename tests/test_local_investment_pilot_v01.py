@@ -199,7 +199,7 @@ def test_report_uses_portable_prose_instead_of_markdown_tables_and_python_dict_r
     assert "1. **growth A**" in report
     assert "2. **growth B**" in report
     assert "{'assumption_id':" not in report
-    assert analysis["unresolved_evidence_references"] == ["E1", "E-MISSING"]
+    assert analysis["unresolved_evidence_references"] == ["E-MISSING", "E1"]
 
 
 def test_guided_observation_date_must_precede_date_only_cutoff():
