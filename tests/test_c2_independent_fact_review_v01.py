@@ -67,6 +67,20 @@ def _report() -> dict:
     }
 
 
+def test_pinned_repository_c2_archive_builds_the_expected_review_packet():
+    from iios_mvp.c2_independent_fact_review_v01 import SOURCE_REPORT_RELATIVE
+
+    repo_root = Path(__file__).resolve().parents[1]
+    report_path = repo_root / SOURCE_REPORT_RELATIVE
+    document = json.loads(report_path.read_text(encoding="utf-8"))
+    packet = build_review_packet(document, source_report_ref=SOURCE_REPORT_RELATIVE)
+
+    assert len(packet["facts"]) == 13
+    assert packet["machine_review_provenance"]["workflow_run_id"] == 38126026797
+    assert packet["independent_review"]["review_status"] == "PENDING"
+    assert all(fact["machine_reuse_status"] == "PUBLIC_ACCESS_REUSE_UNKNOWN" for fact in packet["facts"])
+
+
 def test_review_packet_contains_thirteen_pending_facts_and_never_claims_admission():
     packet = build_review_packet(_report(), source_report_ref="test-review-report.json")
 
