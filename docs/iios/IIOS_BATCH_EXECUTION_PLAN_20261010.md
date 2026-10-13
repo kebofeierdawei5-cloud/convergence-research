@@ -1,15 +1,18 @@
-# IIOS Batch Execution Plan — C0-aligned refresh 2026-10-11
+# IIOS Batch Execution Plan — execution-first baseline refresh 2026-10-13
 
 ## ACTIVE EXECUTION ORDER — EXECUTION-FIRST LOCAL MVP PIVOT (2026-10-11)
 
 This order supersedes all following historical task ordering. Current `main` and `docs/PROJECT_STATE_INDEX.md` remain state authorities. This is a priority change, not an amendment to frozen investment semantics.
 
-1. **Freeze scope:** pause residual MP-3 anti-tamper permutations and further P0 zero-job debugging. Preserve current tests and open diagnostic records; do not let speculative hardening block actual local use.
-2. **Map the existing runnable chain once:** identify the missing joins between user-selected candidate/cutoff/position/manual price, official/source inputs, Reality/Quality/Thesis/Value Drivers, Forecast, Valuation/MIE/Expectation Gap, Risk/Positioning, decision proposal, Chinese report, private run record and replay. Reuse current modules—no second engine/store/report pipeline.
-3. **Implement one local entry plus provisional end-to-end mode:** no paid quote API, paid LLM key, GitHub Actions runtime, remote production Host or local model installation required. Free/manual AI handoff is allowed only as `PILOT_NON_CANONICAL`; its origin limitations and missing evidence stay explicit.
-4. **Run one real company on the user's Mac:** produce a Chinese human report, machine-readable output, a private pilot receipt and replay/recompute outcome. Keep private quote values, source payloads, prompts and local bundle out of public Git. Record operator-run facts as operator-observed until independently inspected.
-5. **Do not blur the assurance boundary:** formal Evidence/PIT admission, source-use rights, authorized signing, trusted producer lineage and formal Decision/Run Receipt remain mandatory for canonical claims. These requirements do not block a separately labelled provisional end-to-end pilot.
-6. **After the first actual run, iterate against real defects:** correctness of inputs/math/module linkage, useful report content, missing-data behavior, repeatability and startup friction precede speculative hardening.
+### Current batch sequence (2026-10-13; supersedes older batch order when inconsistent)
+
+0. **Baseline audit — complete with explicit limits.** Archive review is recorded in `docs/iios/BATCH0_LOCAL_PILOT_BASELINE_AUDIT_20261013.md`. The archived 002810 response is stale against the current stress-case contract, and the actual Mac output bundle is still unverified. Do not redo the company research or declare a real-run PASS.
+1. **Core investment-chain integration — next.** Reuse existing IIOS calculations and research/report modules; connect candidate, cutoff, manual price, structured research, return gate and decision/report output into one usable provisional path. Do not duplicate the core engine.
+2. **Real single-company run and immediate defect loop.** As soon as the minimum integrated slice works, run a current-contract response through the local launcher and inspect the actual private bundle. Use an existing case as a reference, and fix defects that affect results, missing-data behavior, readability or startup flow.
+3. **Reliability and reproducibility.** Complete run/output binding and a true prior-run versus recomputation comparison. A second run labelled "replay" is not a replay acceptance unless outputs are compared.
+4. **Cross-company acceptance and lifecycle linkage.** Exercise a materially different second company; then wire necessary portfolio constraints, monitoring/reassessment and validation/replay using existing modules.
+
+**Parallel track:** C1/C2 rights, independent review and authorized signing continue separately. Formal admission and production Host gates constrain canonical claims, not a clearly labelled `PILOT_NON_CANONICAL` development run. Keep P0 zero-job diagnostics and residual adversarial expansions non-blocking unless a demonstrated defect can change or misrepresent an investment result.
 
 ### First-run acceptance
 
