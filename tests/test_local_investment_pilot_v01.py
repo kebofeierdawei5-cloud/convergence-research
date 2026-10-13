@@ -1079,3 +1079,36 @@ def test_local_pilot_report_exposes_missing_portfolio_package_as_unknown():
     assert "组合风险预算与条件仓位包" in report
     assert "本次实际获准新增仓位：0%" in report
 
+
+
+def test_operator_prompt_uses_controlling_tty_when_python_runs_from_heredoc(monkeypatch):
+    import builtins
+    import io
+    from unittest.mock import mock_open
+    import iios_mvp.local_investment_pilot_v01 as pilot
+
+    monkeypatch.setattr(pilot.sys, "stdin", io.StringIO("python source already consumed"))
+    monkeypatch.setattr(pilot.sys.stdin, "isatty", lambda: False)
+    tty = mock_open(read_data="1\\n")
+    monkeypatch.setattr(builtins, "open", tty)
+
+    assert pilot._read_operator_prompt("portfolio budget? ") == "1\\n"
+    tty.assert_called_once_with("/dev/tty", "r+", encoding="utf-8", buffering=1)
+    tty().write.assert_called_once_with("portfolio budget? ")
+
+
+def test_operator_prompt_returns_actionable_error_when_no_tty_available(monkeypatch):
+    import builtins
+    import io
+    import iios_mvp.local_investment_pilot_v01 as pilot
+
+    monkeypatch.setattr(pilot.sys, "stdin", io.StringIO("python source already consumed"))
+    monkeypatch.setattr(pilot.sys.stdin, "isatty", lambda: False)
+
+    def no_tty(*args, **kwargs):
+        raise OSError("not a tty")
+
+    monkeypatch.setattr(builtins, "open", no_tty)
+    with pytest.raises(LocalInvestmentPilotError, match="INTERACTIVE_TERMINAL_UNAVAILABLE"):
+        pilot._read_operator_prompt("portfolio budget? ")
+
