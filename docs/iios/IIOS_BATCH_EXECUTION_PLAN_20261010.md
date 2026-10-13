@@ -249,6 +249,10 @@ This closes the repository-CLI route/persistence integration test gap only.
 
 Machine/human audit records: `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md` and `evidence/real_cases/RC-CN-A-002001-20261009/C2_MARKET_PRICE_SOURCE_REVIEW_20261011.json`. Normative operator-attestation policy: `docs/iios/OPERATOR_MARKET_PRICE_ATTESTATION_v0.1.md`.
 
+### C2 independent fact/use review packet preparation — 2026-10-13
+
+**Status: PACKET GENERATOR IMPLEMENTED; ACTUAL INDEPENDENT REVIEW AND FORMAL ADMISSION OPEN.** The helper `python -m iios_mvp.c2_independent_fact_review_v01` takes the pinned, sanitized C2-P3 result archive and emits a private review template for the 13 field-level claims. It preserves source IDs, official PDF URLs, physical page, byte hash/size and conservative `known_at` bound, while keeping all independent reviewer decisions and permitted-use/retention terms `PENDING`. It is designed to save review preparation effort, not to substitute for reviewing the actual private PDF bytes. The packet output is mode 0600 outside Git and contains no raw PDFs or numeric quote values. The separate human reviewer must complete the per-fact and scope fields, and the resulting case-bound manifest/rights record must be reconciled and signed through the existing authorized workflow. No C2 fact or operator-attested price is admitted by creating a packet.
+
 ### Batch D1-A — production Host acceptance runbook and evidence gate
 
 **Status:** RUNBOOK CANONICAL; REAL HOST ACCEPTANCE OPEN.
