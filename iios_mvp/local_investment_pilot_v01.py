@@ -1029,7 +1029,11 @@ def _decision(
     if not buy_add_package_complete:
         extra_gates.append("BUY_ADD_PACKAGE_NOT_PROVIDED")
     if portfolio_status == "UNKNOWN":
-        extra_gates.append("PORTFOLIO_CONSTRAINT_NOT_PROVIDED")
+        extra_gates.append(
+            "PORTFOLIO_CONSTRAINT_NOT_PROVIDED"
+            if not package or package.get("status") == "NOT_PROVIDED"
+            else "PORTFOLIO_CONSTRAINT_OR_PACKAGE_UNRESOLVED"
+        )
     if thesis_admission_status != "ADMITTED":
         extra_gates.append("FORMAL_THESIS_ADMISSION_NOT_CREATED")
 
@@ -1072,18 +1076,18 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     package = analysis.get("portfolio_package") if isinstance(analysis.get("portfolio_package"), Mapping) else {}
     portfolio_lines = [
         "",
-        "## 一点五、组合风险预算与条件仓位包",
+        "### 补充：组合风险预算与条件仓位包",
         "",
         f"- 仓位包状态：**{package.get('status', 'NOT_PROVIDED')}**",
         f"- 组合约束状态：{package.get('constraint_status', 'UNKNOWN')}；操作者新增资金许可：{package.get('can_add', False)}",
-        f"- 组合可承受该标的论点失效损失：{package.get('portfolio_risk_budget_pct_nav') if package.get('portfolio_risk_budget_pct_nav') is not None else '未提供'}% NAV",
+        f"- 组合可承受该标的论点失效损失：{str(package.get('portfolio_risk_budget_pct_nav')) + '% NAV' if package.get('portfolio_risk_budget_pct_nav') is not None else '未提供'}",
         f"- 操作者入场区间：{('—'.join(package.get('entry_zone')) + ' ' + c['currency']) if package.get('entry_zone') else '未提供'}；当前价格区间位置：{package.get('current_price_zone_status', 'UNKNOWN')}",
         f"- Thesis-break stress 每股期末财富：{package.get('stress_terminal_wealth_per_share') if package.get('stress_terminal_wealth_per_share') is not None else 'UNKNOWN'} {c['currency']}",
-        f"- 在入场区间上沿的 stress 损失：{package.get('stress_loss_at_entry_zone_high_pct') if package.get('stress_loss_at_entry_zone_high_pct') is not None else 'UNKNOWN'}%",
-        f"- 风险预算推导仓位上限：{package.get('risk_budget_max_position_pct') if package.get('risk_budget_max_position_pct') is not None else '不约束/UNKNOWN'}%；集中度上限：{package.get('policy_max_position_pct') if package.get('policy_max_position_pct') is not None else '未提供'}%",
-        f"- 风险预算后条件最大仓位：{package.get('effective_max_position_pct') if package.get('effective_max_position_pct') is not None else 'UNKNOWN'}%；条件初始仓位：{package.get('conditional_initial_position_pct') if package.get('conditional_initial_position_pct') is not None else 'UNKNOWN'}%；条件目标仓位：{package.get('conditional_target_position_pct') if package.get('conditional_target_position_pct') is not None else 'UNKNOWN'}%",
+        f"- 在入场区间上沿的 stress 损失：{str(package.get('stress_loss_at_entry_zone_high_pct')) + '%' if package.get('stress_loss_at_entry_zone_high_pct') is not None else 'UNKNOWN'}",
+        f"- 风险预算推导仓位上限：{str(package.get('risk_budget_max_position_pct')) + '%' if package.get('risk_budget_max_position_pct') is not None else '不约束/UNKNOWN'}；集中度上限：{str(package.get('policy_max_position_pct')) + '%' if package.get('policy_max_position_pct') is not None else '未提供'}",
+        f"- 风险预算后条件最大仓位：{str(package.get('effective_max_position_pct')) + '%' if package.get('effective_max_position_pct') is not None else 'UNKNOWN'}；条件初始仓位：{str(package.get('conditional_initial_position_pct')) + '%' if package.get('conditional_initial_position_pct') is not None else 'UNKNOWN'}；条件目标仓位：{str(package.get('conditional_target_position_pct')) + '%' if package.get('conditional_target_position_pct') is not None else 'UNKNOWN'}",
         f"- 当前仓位是否高于推导上限：{package.get('current_position_over_effective_max') if package.get('current_position_over_effective_max') is not None else 'UNKNOWN'}",
-        f"- 条件建议仓位：{package.get('conditional_proposed_position_pct') if package.get('conditional_proposed_position_pct') is not None else '无（至少一个门槛未满足）'}%；本次实际获准新增仓位：0%",
+        f"- 条件建议仓位：{str(package.get('conditional_proposed_position_pct')) + '%' if package.get('conditional_proposed_position_pct') is not None else '无（至少一个门槛未满足）'}；本次实际获准新增仓位：0%",
         f"- 风险/组合合同：{package.get('risk_portfolio_contract_status', 'NOT_CREATED')}；合同结构验证不等于正式准入。",
         f"- 说明：{package.get('reason', '未提供个人组合约束；组合状态维持 UNKNOWN。')}",
         "- 本节仅为非正式条件测算；不会自动减仓或加仓，也不替代正式 Thesis/证据/估值准入及人工批准。",
@@ -1113,7 +1117,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f"- 理由：{d['reason']}",
         f"- 价格层独立筛选：{d.get('price_screen_action', 'UNKNOWN')}；状态：{d['price_screen_status']}",
         f"- 核心决策策略预演：{d.get('core_policy_evaluation', {}).get('action', 'NOT_RUN')} → 有效试运行建议 {d.get('core_policy_evaluation', {}).get('effective_pilot_action', d['provisional_action'])} / {d.get('core_policy_evaluation', {}).get('primary_reason', 'UNKNOWN')}",
-        "- 注意：策略预演使用非正式研究输入；本次未创建正式 Decision，且组合约束、正式 Thesis Admission 和完整仓位包仍需补齐。",
+        "- 注意：策略预演使用非正式研究输入；本次未创建正式 Decision。组合约束和仓位包状态见下一节；正式 Thesis Admission 与人工审批仍未完成。",
         f"- 预期年化回报：{calc['expected_annualized_return'] if calc else 'UNKNOWN'}",
         f"- 15% 年化门槛：{calc['fundamental_target_pass'] if calc else 'UNKNOWN'}",
         f"- Required Return：{params['required_return_annualized']}；结果：{calc['required_return_pass'] if calc else 'UNKNOWN'}",
