@@ -15,8 +15,6 @@ from iios_mvp.c2_independent_fact_review_v01 import (
     build_review_packet,
     prepare_review_packet,
 )
-from iios_mvp.canonical_signed_evidence_admission_v01 import _sha256
-
 
 def _report() -> dict:
     source_ids = [
