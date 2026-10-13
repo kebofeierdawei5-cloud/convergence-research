@@ -213,10 +213,34 @@ def test_report_uses_portable_prose_instead_of_markdown_tables_and_python_dict_r
     assert "**E-MISSING**：**未解析**" in report
     assert "**E1**：**未解析**" in report
     assert "来源登记表为空" in report
-    assert "1. **growth A**" in report
-    assert "2. **growth B**" in report
+    assert "**价值驱动因素 1：growth A**" in report
+    assert "**价值驱动因素 2：growth B**" in report
     assert "{'assumption_id':" not in report
     assert analysis["unresolved_evidence_references"] == ["E-MISSING", "E1"]
+
+
+def test_report_keeps_source_url_punctuation_outside_link_and_renders_risk_summary():
+    payload = _payload()
+    payload["evidence_register"][0]["source_ref"] = "https://example.invalid/facts.pdf"
+    payload["assessment"]["value_drivers"] = [
+        {"rank": 1, "driver": "增长驱动 A", "impact": "POSITIVE", "rationale": "说明 A", "evidence_refs": ["E1"]},
+        {"rank": 2, "driver": "增长驱动 B", "impact": "MIXED", "rationale": "说明 B", "evidence_refs": ["E1"]},
+    ]
+    payload["assessment"]["risk"]["items"] = [
+        {
+            "risk_id": "R-DETAIL",
+            "title": "应收账款风险",
+            "severity": "HIGH",
+            "summary": "应收账款增速持续高于收入增速，回款风险上升。",
+            "evidence_refs": ["E1"],
+        }
+    ]
+    _analysis, report = _analyse(payload, "TEST-REPORT-RENDER")
+
+    assert "**价值驱动因素 1：增长驱动 A**" in report
+    assert "**价值驱动因素 2：增长驱动 B**" in report
+    assert "摘要：应收账款增速持续高于收入增速，回款风险上升。" in report
+    assert "来源位置：<https://example.invalid/facts.pdf>。" in report
 
 
 def test_guided_observation_date_must_precede_date_only_cutoff():
