@@ -789,6 +789,10 @@ def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, re
         and stress_review.get("status") == "PASS"
     )
 
+    portfolio_status = "UNKNOWN"
+    thesis_admission_status = "NOT_ADMITTED"
+    buy_add_package_complete = False
+    can_add = False
     core_policy = evaluate_production_decision(
         validation_pass=validation_pass,
         trust_status=a["trust"]["status"],
@@ -798,17 +802,17 @@ def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, re
         value_driver_status=value_driver_status,
         valuation_status=valuation_status,
         forecast_status=forecast_status,
-        thesis_admission_status="NOT_ADMITTED",
+        thesis_admission_status=thesis_admission_status,
         risk_status=a["risk"]["status"],
-        portfolio_status="UNKNOWN",
+        portfolio_status=portfolio_status,
         position_pct=position_pct,
         gap_status=a["expectation_gap"]["status"],
         gap_positive=a["expectation_gap"]["direction"] == "POSITIVE",
         expected_annualized_return=expected_return,
         return_gate_pass=bool(metrics is not None and metrics.get("return_gate_pass", False)),
         risk_gate_pass=risk_gate_pass,
-        can_add=False,
-        package_complete=False,
+        can_add=can_add,
+        package_complete=buy_add_package_complete,
         return_metrics_ready=metrics is not None,
         mie_policy=MIE_POLICY_OPTIONAL_EXPLANATORY,
         mie_material_contradiction=False,
@@ -864,11 +868,11 @@ def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, re
         final_action = "REVIEW_REQUIRED"
         reason_text = "策略内核预演出现资本行动，但当前研究输入没有正式 Thesis/Forecast/Valuation Admission；已降级为人工复核。"
         extra_gates.append("NON_CANONICAL_SEMANTICS_CANNOT_AUTHORIZE_CAPITAL_ACTION")
-    if not core_policy["package_complete"]:
+    if not buy_add_package_complete:
         extra_gates.append("BUY_ADD_PACKAGE_NOT_PROVIDED")
-    if core_policy["portfolio_status"] == "UNKNOWN":
+    if portfolio_status == "UNKNOWN":
         extra_gates.append("PORTFOLIO_CONSTRAINT_NOT_PROVIDED")
-    if core_policy["thesis_admission_status"] != "ADMITTED":
+    if thesis_admission_status != "ADMITTED":
         extra_gates.append("FORMAL_THESIS_ADMISSION_NOT_CREATED")
 
     issues = list(dict.fromkeys(issues + extra_gates))
@@ -888,9 +892,9 @@ def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, re
             "action": core_policy["action"],
             "primary_reason": primary_reason,
             "decision_scope": core_policy["decision_scope"],
-            "portfolio_status": "UNKNOWN",
-            "thesis_admission_status": "NOT_ADMITTED",
-            "buy_add_package_complete": False,
+            "portfolio_status": portfolio_status,
+            "thesis_admission_status": thesis_admission_status,
+            "buy_add_package_complete": buy_add_package_complete,
             "formal_decision_created": False,
             "execution_authorized": False,
         },
