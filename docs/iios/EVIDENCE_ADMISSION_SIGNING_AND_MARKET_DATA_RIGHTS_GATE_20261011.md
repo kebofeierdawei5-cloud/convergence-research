@@ -103,6 +103,22 @@ python -m iios_mvp.canonical_signed_evidence_admission_v01 sign \
 
 For an additional independent signature, pass the existing envelope with `--existing-envelope`, use the independent reviewer's registered key id and key, and write a new output path. Run the `verify` subcommand after all required signers have signed. These are illustrative commands: the current empty trust registry intentionally makes them fail closed until a public key is formally registered.
 
+
+## 2.1 Read-only preflight before any signing attempt (added 2026-10-13)
+
+Use the new `preflight` subcommand to see which prerequisites are missing before attempting to sign a specific private case. This is intended to reduce repeated failed signing attempts; it is not an admission operation.
+
+```bash
+python -m iios_mvp.canonical_signed_evidence_admission_v01 preflight \
+  --manifest "$IIOS_PRIVATE_CASE/manifest.json" \
+  --raw-root "$IIOS_PRIVATE_CASE/raw" \
+  --rights-record "$IIOS_PRIVATE_CASE/rights-adjudication.json" \
+  --permission-evidence "$IIOS_PRIVATE_CASE/permission-instrument.pdf" \
+  --registry "evidence/authority/IIOS_EVIDENCE_ADMISSION_SIGNER_REGISTRY_v01.json"
+```
+
+The command runs the unchanged Core/PIT validator with raw-byte verification, checks the case-bound rights record and exact permission-instrument byte hash, and lists active trusted signers in the required case/role scope. It returns `BLOCKED` when a required item is absent/invalid or rights are not `ALLOWED`. If prerequisites are met, it returns `READY_FOR_SIGNATURE_NOT_ADMITTED`; that means only that the signing workflow may be prepared. A permitted rights instrument must be independently reviewed, signer trust/role/scope must already be authorized, the authorized signature(s) must still be created, and the signed envelope must pass the `verify` command before any formal admission can be claimed. `preflight` never changes the signer registry or creates signatures, admission, Decision, publication, Run Receipt, or execution authorization. A preflight on a public synthetic test manifest is only a unit-test result and does not clear the real 605016 case.
+
 ## 3. Rights evidence policy (must be data-class-specific)
 
 The code accepts only the following bases for an `ADMIT`:
