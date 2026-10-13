@@ -18,6 +18,8 @@ import subprocess
 import sys
 from typing import Any, Mapping
 
+from .decision_kernel_v03 import evaluate_production_decision
+from .decision_state_machine_v01 import MIE_POLICY_OPTIONAL_EXPLANATORY
 from .investment_core_contract_v03 import (
     BUY_ENTRY_RETURN_CUSHION_THRESHOLD,
     FUNDAMENTAL_TARGET_ANNUALIZED_RETURN,
@@ -709,6 +711,13 @@ def _thesis_break_stress_review(prepared: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, reason: str | None, stress_review: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Route the provisional pilot through the frozen IIOS decision-policy kernel.
+
+    This is still a non-canonical preview: semantic fields originate in an
+    operator/AI research response, formal Thesis Admission is absent, and portfolio
+    constraints plus a complete BUY/ADD package are not collected by this pilot.
+    Those absent gates must remain visible rather than being fabricated as PASS.
+    """
     a = prepared["assessment"]
     c = prepared["case"]
     p = prepared["price_input"]
@@ -735,39 +744,168 @@ def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, re
         issues.append("SCENARIO_WEALTH_ORDERING_INCONSISTENT")
     if stress_review:
         issues.extend(issue for issue in (stress_review.get("issues") or []) if issue not in issues)
-    if a["trust"]["status"] == "FAIL":
-        action, why = "NO-BUY", "信任审查失败，禁止新增风险；不表示自动卖出。"
-    elif a["thesis"]["status"] == "BROKEN":
-        action, why = "REVIEW_REQUIRED", "投资论点被标记为失效，现有持仓需要人工重新评估。"
-    elif metrics is None:
-        action, why = "REVIEW_REQUIRED", f"当前不能计算有效的价格/回报筛选：{reason or '输入不足'}。"
-    elif not metrics.get("return_gate_pass", False):
-        action = "NO-BUY" if Decimal(c["current_position_pct"]) == 0 else "REVIEW_REQUIRED"
-        why = "当前价未通过回报、安全边际或 Bear 损失约束；持仓不会被自动卖出。"
-    elif issues:
-        action, why = "REVIEW_REQUIRED", "价格情景通过，但核心模块或证据引用仍有未解决问题。"
-    else:
-        action = "BUY" if Decimal(c["current_position_pct"]) == 0 else "ADD"
-        why = "所提供的试运行条件通过；仍需人工复核假设与原始来源。"
-    current_price_eligible = (
-        metrics is not None and Decimal(p["price"]) <= Decimal(str(metrics["target_entry_price"]))
+
+    # Input/provenance faults are distinct from economic assessment states.
+    validation_blockers = {
+        "EVIDENCE_REGISTER_EMPTY",
+        "UNRESOLVED_EVIDENCE_REFERENCES",
+        "REFERENCED_EVIDENCE_AFTER_CUTOFF",
+        "REFERENCED_EVIDENCE_TIMING_UNCERTAIN",
+        "PRICE_NOT_PIT_QUALIFIED",
+        "OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT",
+        "SCENARIO_WEALTH_ORDERING_INCONSISTENT",
+        "BEAR_FAILURE_PATH_INCOMPLETE",
+        "THESIS_BREAK_STRESS_INPUTS_INCOMPLETE",
+        "THESIS_BREAK_STRESS_VALUE_INVALID",
+        "THESIS_BREAK_STRESS_BEAR_COMPARISON_UNAVAILABLE",
+        "THESIS_BREAK_STRESS_NOT_MORE_SEVERE_THAN_BEAR",
+        "THESIS_BREAK_STRESS_MISSING",
+    }
+    validation_pass = not any(issue in validation_blockers for issue in issues)
+
+    # This pilot schema does not request or fabricate portfolio approval.
+    position_pct = Decimal(c["current_position_pct"])
+    expected_return = (
+        None if metrics is None
+        else Decimal(str(metrics["expected_annualized_return"]))
     )
+    value_driver_status = (
+        "PASS" if a["value_drivers"] and all(
+            row["impact"] != "UNKNOWN" and str(row.get("rationale") or "").strip()
+            for row in a["value_drivers"]
+        ) else "UNKNOWN"
+    )
+    valuation_status = (
+        "PASS" if metrics is not None
+        and prepared["forecast_valuation"].get("entry_value_reference_per_share") not in (None, "")
+        else "UNKNOWN"
+    )
+    forecast_status = "PASS" if metrics is not None else "UNKNOWN"
+    risk_gate_pass = bool(
+        metrics is not None
+        and metrics.get("risk_pass", False)
+        and a["risk"]["status"] == "PASS"
+        and stress_review is not None
+        and stress_review.get("status") == "PASS"
+    )
+
+    portfolio_status = "UNKNOWN"
+    thesis_admission_status = "NOT_ADMITTED"
+    buy_add_package_complete = False
+    can_add = False
+    core_policy = evaluate_production_decision(
+        validation_pass=validation_pass,
+        trust_status=a["trust"]["status"],
+        thesis_status=a["thesis"]["status"],
+        reality_status=a["reality"]["status"],
+        quality_gate_status=a["quality"]["status"],
+        value_driver_status=value_driver_status,
+        valuation_status=valuation_status,
+        forecast_status=forecast_status,
+        thesis_admission_status=thesis_admission_status,
+        risk_status=a["risk"]["status"],
+        portfolio_status=portfolio_status,
+        position_pct=position_pct,
+        gap_status=a["expectation_gap"]["status"],
+        gap_positive=a["expectation_gap"]["direction"] == "POSITIVE",
+        expected_annualized_return=expected_return,
+        return_gate_pass=bool(metrics is not None and metrics.get("return_gate_pass", False)),
+        risk_gate_pass=risk_gate_pass,
+        can_add=can_add,
+        package_complete=buy_add_package_complete,
+        return_metrics_ready=metrics is not None,
+        mie_policy=MIE_POLICY_OPTIONAL_EXPLANATORY,
+        mie_material_contradiction=False,
+    )
+
+    # Keep the price screen useful without converting a non-canonical response into
+    # an authorized investment action.
+    price_screen_pass = bool(metrics is not None and metrics.get("return_gate_pass", False))
+    if metrics is None:
+        price_screen_status = "UNKNOWN"
+        price_screen_action = "PRICE_SCREEN_UNRESOLVED"
+    elif price_screen_pass:
+        price_screen_status = "CURRENT_PRICE_AT_OR_BELOW_RETURN_RISK_CEILING"
+        price_screen_action = "PRICE_SCREEN_PASS"
+    else:
+        price_screen_status = "CURRENT_PRICE_ABOVE_RETURN_RISK_CEILING"
+        price_screen_action = "PRICE_SCREEN_FAIL"
+
+    core_reason_text = {
+        "RETURN_OR_CASE_VALIDATION_UNRESOLVED": "输入、截止时点、引用或回报计算存在未解决问题。",
+        "TRUST_NOT_PASS_REQUIRES_REVIEW": "Trust 未达到 PASS，按 IIOS 决策优先级要求人工复核。",
+        "THESIS_BROKEN": "投资论点被标记为失效；当前输入尚未完成正式准入，需人工重新评估。",
+        "THESIS_UNKNOWN": "投资论点状态未知，不能形成确定行动。",
+        "RISK_UNKNOWN": "风险状态未知，不能形成确定行动。",
+        "RISK_GATE_FAILED": "风险门槛未通过。",
+        "PORTFOLIO_CONSTRAINT_UNKNOWN": "当前流程没有可用的组合容量/仓位约束状态，不能批准新增资金或加仓。",
+        "PORTFOLIO_CONSTRAINT_BLOCKED": "组合约束阻止新增资金。",
+        "THESIS_ADMISSION_NOT_VALID": "试运行研究结果尚未形成正式 Thesis Admission。",
+        "BUY_ADD_POSITION_PACKAGE_INCOMPLETE": "缺少完整入场区间、初始/目标/最大仓位及监控触发条件包。",
+        "PRIMARY_VALUATION_NOT_ADMITTED": "估值仅是试运行假设，尚未形成正式估值准入。",
+        "INDEPENDENT_FORECAST_NOT_ADMITTED": "情景是试运行假设，尚未形成正式独立预测准入。",
+        "POSITIVE_EXPECTATION_GAP_AND_RETURN_PRICE_GATES_PASS": "价格/回报筛选通过，但此路径不授权交易。",
+        "CURRENT_PRICE_ABOVE_TARGET_ENTRY_PRICE": "当前价未通过回报/风险入场门槛。",
+        "FUNDAMENTAL_RETURN_OR_REQUIRED_RETURN_GATE_FAILED": "回报门槛未通过。",
+        "POSITIVE_EXPECTATION_GAP_UNRESOLVED": "预期差不可识别或尚未完成判断。",
+        "NO_POSITIVE_EXPECTATION_GAP": "没有通过的正向预期差。",
+        "REALITY_GATE_NOT_PASS": "经营现实判断尚未达到 PASS。",
+        "QUALITY_GATE_UNRESOLVED": "经济质量仍是有条件或未知状态。",
+        "QUALITY_GATE_FAILED": "经济质量门槛未通过。",
+        "VALUE_DRIVER_GATE_NOT_PASS": "价值驱动因素尚未完整。",
+    }
+    primary_reason = core_policy["primary_reason"]
+    reason_text = core_reason_text.get(
+        primary_reason,
+        "核心决策策略要求复核；当前结论只是非正式研究预演。",
+    )
+    final_action = core_policy["action"]
+    extra_gates: list[str] = []
+    if not validation_pass:
+        extra_gates.append("CORE_POLICY_LOCAL_VALIDATION_NOT_PASS")
+    extra_gates.append(f"CORE_POLICY_{primary_reason}")
+    if core_policy["action"] in {"BUY", "ADD", "EXIT", "REDUCE"}:
+        final_action = "REVIEW_REQUIRED"
+        reason_text = "策略内核预演出现资本行动，但当前研究输入没有正式 Thesis/Forecast/Valuation Admission；已降级为人工复核。"
+        extra_gates.append("NON_CANONICAL_SEMANTICS_CANNOT_AUTHORIZE_CAPITAL_ACTION")
+    if not buy_add_package_complete:
+        extra_gates.append("BUY_ADD_PACKAGE_NOT_PROVIDED")
+    if portfolio_status == "UNKNOWN":
+        extra_gates.append("PORTFOLIO_CONSTRAINT_NOT_PROVIDED")
+    if thesis_admission_status != "ADMITTED":
+        extra_gates.append("FORMAL_THESIS_ADMISSION_NOT_CREATED")
+
+    issues = list(dict.fromkeys(issues + extra_gates))
     return {
         "status": PILOT_STATUS,
-        "provisional_action": action,
-        "reason": why,
+        "provisional_action": final_action,
+        "reason": reason_text,
         "gating_issues": issues,
-        "price_screen_status": (
-            "CURRENT_PRICE_AT_OR_BELOW_RETURN_RISK_CEILING" if current_price_eligible
-            else "CURRENT_PRICE_ABOVE_RETURN_RISK_CEILING" if metrics is not None
-            else "UNKNOWN"
-        ),
+        "price_screen_status": price_screen_status,
+        "price_screen_action": price_screen_action,
+        "core_policy_evaluation": {
+            "status": "PILOT_POLICY_PREVIEW_NOT_CANONICAL",
+            "policy_input_class": "OPERATOR_AI_RESEARCH_RESPONSE_NOT_FORMALLY_ADMITTED",
+            "decision_kernel_version": core_policy["decision_kernel_version"],
+            "decision_policy_version": core_policy["decision_policy_version"],
+            "precedence_version": core_policy["precedence_version"],
+            "action": core_policy["action"],
+            "effective_pilot_action": final_action,
+            "capital_action_downgraded": core_policy["action"] in {"BUY", "ADD", "EXIT", "REDUCE"},
+            "kernel_new_capital_allowed": bool(core_policy["new_capital_allowed"]),
+            "primary_reason": primary_reason,
+            "decision_scope": core_policy["decision_scope"],
+            "portfolio_status": portfolio_status,
+            "thesis_admission_status": thesis_admission_status,
+            "buy_add_package_complete": buy_add_package_complete,
+            "formal_decision_created": False,
+            "execution_authorized": False,
+        },
         "human_approval_required": True,
         "formal_decision_created": False,
         "execution_authorized": False,
         "auto_execution": False,
     }
-
 
 def _render_report(analysis: Mapping[str, Any]) -> str:
     c, p = analysis["case"], analysis["price_input"]
@@ -796,6 +934,9 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
         f"- 试运行建议：**{d['provisional_action']}**",
         f"- 理由：{d['reason']}",
+        f"- 价格层独立筛选：{d.get('price_screen_action', 'UNKNOWN')}；状态：{d['price_screen_status']}",
+        f"- 核心决策策略预演：{d.get('core_policy_evaluation', {}).get('action', 'NOT_RUN')} → 有效试运行建议 {d.get('core_policy_evaluation', {}).get('effective_pilot_action', d['provisional_action'])} / {d.get('core_policy_evaluation', {}).get('primary_reason', 'UNKNOWN')}",
+        "- 注意：策略预演使用非正式研究输入；本次未创建正式 Decision，且组合约束、正式 Thesis Admission 和完整仓位包仍需补齐。",
         f"- 当前价筛选：{d['price_screen_status']}",
         f"- 预期年化回报：{calc['expected_annualized_return'] if calc else 'UNKNOWN'}",
         f"- 15% 年化门槛：{calc['fundamental_target_pass'] if calc else 'UNKNOWN'}",

@@ -7,10 +7,12 @@ This order supersedes all following historical task ordering. Current `main` and
 ### Current batch sequence (2026-10-13; supersedes older batch order when inconsistent)
 
 0. **Baseline audit — complete with explicit limits.** Archive review is recorded in `docs/iios/BATCH0_LOCAL_PILOT_BASELINE_AUDIT_20261013.md`. The archived 002810 response is stale against the current stress-case contract, and the actual Mac output bundle is still unverified. Do not redo the company research or declare a real-run PASS.
-1. **Core investment-chain integration — next.** Reuse existing IIOS calculations and research/report modules; connect candidate, cutoff, manual price, structured research, return gate and decision/report output into one usable provisional path. Do not duplicate the core engine.
+1. **Core decision-policy integration — in progress in PR #404.** The local pilot now invokes the shared `evaluate_production_decision` kernel while continuing to use the existing deterministic return/entry-price solver. Keep the price-only screen separate from the final provisional action. The pilot schema does not currently collect portfolio capacity, formal Thesis Admission, or a complete BUY/ADD position package, so these remain UNKNOWN / NOT_ADMITTED / INCOMPLETE and must not be fabricated as PASS. Non-canonical AI inputs cannot produce a capital-action proposal; any BUY/ADD/EXIT/REDUCE kernel preview is demoted to `REVIEW_REQUIRED`.
 2. **Real single-company run and immediate defect loop.** As soon as the minimum integrated slice works, run a current-contract response through the local launcher and inspect the actual private bundle. Use an existing case as a reference, and fix defects that affect results, missing-data behavior, readability or startup flow.
 3. **Reliability and reproducibility.** Complete run/output binding and a true prior-run versus recomputation comparison. A second run labelled "replay" is not a replay acceptance unless outputs are compared.
 4. **Cross-company acceptance and lifecycle linkage.** Exercise a materially different second company; then wire necessary portfolio constraints, monitoring/reassessment and validation/replay using existing modules.
+
+**Batch 1 boundary:** this batch wires the existing policy kernel and discloses missing gates. It does not implement the full portfolio position package, formal Thesis Admission, true replay comparison or production Host. Those remain later-batch responsibilities; a passing price screen is not itself a decision-ready action.
 
 **Parallel track:** C1/C2 rights, independent review and authorized signing continue separately. Formal admission and production Host gates constrain canonical claims, not a clearly labelled `PILOT_NON_CANONICAL` development run. Keep P0 zero-job diagnostics and residual adversarial expansions non-blocking unless a demonstrated defect can change or misrepresent an investment result.
 
@@ -18,6 +20,7 @@ This order supersedes all following historical task ordering. Current `main` and
 
 - Accept a user-selected A/H company, not only the two hard-coded Path A scenario profiles.
 - Reuse current IIOS module logic to surface action/provisional action, 15% annualized hurdle, entry-price zone, expected return, key drivers/assumptions, risks, thesis breaks and reassessment triggers.
+- Show the core decision-kernel preview reason separately from the price-screen result; missing portfolio and formal-admission gates must remain explicit and must not be silently converted into an actionable BUY/ADD.
 - Keep missing/stale/untrusted items UNKNOWN and make their effect on the conclusion explicit.
 - Show manual price/source assurance and `PILOT_NON_CANONICAL` status clearly.
 - Persist locally and replay/recompute, require human approval separation, and never execute trades.

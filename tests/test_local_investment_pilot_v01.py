@@ -350,7 +350,13 @@ def test_candidate_driven_pilot_uses_existing_return_solver_and_outputs_chinese_
     analysis = json.loads((bundle / "analysis.json").read_text(encoding="utf-8"))
     report = (bundle / "report.md").read_text(encoding="utf-8")
     assert analysis["status"] == "PILOT_NON_CANONICAL"
-    assert analysis["decision"]["provisional_action"] == "BUY"
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert analysis["decision"]["price_screen_action"] == "PRICE_SCREEN_PASS"
+    assert analysis["decision"]["core_policy_evaluation"]["status"] == "PILOT_POLICY_PREVIEW_NOT_CANONICAL"
+    assert analysis["decision"]["core_policy_evaluation"]["action"] == "REVIEW_REQUIRED"
+    assert analysis["decision"]["core_policy_evaluation"]["primary_reason"] == "PORTFOLIO_CONSTRAINT_UNKNOWN"
+    assert analysis["decision"]["core_policy_evaluation"]["thesis_admission_status"] == "NOT_ADMITTED"
+    assert analysis["decision"]["core_policy_evaluation"]["buy_add_package_complete"] is False
     assert analysis["return_metrics"]["fundamental_target_pass"] is True
     assert analysis["return_metrics"]["target_entry_price"] == "130.4347826086956521739130435"
     assert "PILOT_NON_CANONICAL" in report
@@ -365,7 +371,27 @@ def test_price_above_return_and_risk_entry_ceiling_is_no_buy_when_flat(tmp_path)
     result = run_local_investment_pilot(input_path=input_path, output_root=tmp_path / "private-runs")
     analysis = json.loads((Path(result["run_dir"]) / "analysis.json").read_text(encoding="utf-8"))
     assert analysis["return_metrics"]["return_gate_pass"] is False
-    assert analysis["decision"]["provisional_action"] == "NO-BUY"
+    assert analysis["decision"]["price_screen_action"] == "PRICE_SCREEN_FAIL"
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert "PORTFOLIO_CONSTRAINT_NOT_PROVIDED" in analysis["decision"]["gating_issues"]
+
+
+def test_core_kernel_capital_action_is_downgraded_without_formal_admission():
+    payload = _payload()
+    payload["case"]["current_position_pct"] = "5"
+    payload["assessment"]["thesis"]["status"] = "BROKEN"
+    analysis, _report = _analyse(payload, "TEST-CORE-KERNEL-DEMOTION")
+    decision = analysis["decision"]
+
+    # The shared IIOS policy kernel sees the thesis-exit precedence, but the
+    # non-canonical AI response cannot itself authorize an EXIT recommendation.
+    assert decision["core_policy_evaluation"]["action"] == "EXIT"
+    assert decision["core_policy_evaluation"]["capital_action_downgraded"] is True
+    assert decision["core_policy_evaluation"]["effective_pilot_action"] == "REVIEW_REQUIRED"
+    assert decision["provisional_action"] == "REVIEW_REQUIRED"
+    assert decision["formal_decision_created"] is False
+    assert decision["execution_authorized"] is False
+    assert "NON_CANONICAL_SEMANTICS_CANNOT_AUTHORIZE_CAPITAL_ACTION" in decision["gating_issues"]
 
 
 def test_unknown_mie_keeps_pilot_action_at_review_required(tmp_path):
