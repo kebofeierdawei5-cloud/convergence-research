@@ -21,6 +21,7 @@ from typing import Any, Mapping
 
 from .decision_kernel_v03 import evaluate_production_decision
 from .decision_state_machine_v01 import MIE_POLICY_OPTIONAL_EXPLANATORY
+from .local_pilot_portfolio_package_v01 import build_local_pilot_portfolio_package
 from .investment_core_contract_v03 import (
     BUY_ENTRY_RETURN_CUSHION_THRESHOLD,
     FUNDAMENTAL_TARGET_ANNUALIZED_RETURN,
@@ -50,6 +51,7 @@ REPLAY_COMPARISON_FIELDS = (
     "assessment",
     "forecast_valuation",
     "decision_parameters",
+    "portfolio_package",
     "return_metrics",
     "return_metrics_reason",
     "thesis_break_stress_review",
@@ -699,6 +701,11 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "uncertain_timing_evidence_references": uncertain_timing_refs,
         "notes_price_conflicts": _find_note_price_conflicts(payload.get("notes"), price),
         "notes": str(payload.get("notes") or ""),
+        "operator_portfolio_context": (
+            dict(payload["operator_portfolio_context"])
+            if isinstance(payload.get("operator_portfolio_context"), Mapping)
+            else None
+        ),
     }
 
 
@@ -846,7 +853,13 @@ def _thesis_break_stress_review(prepared: Mapping[str, Any]) -> dict[str, Any]:
 
 
 
-def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, reason: str | None, stress_review: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def _decision(
+    prepared: Mapping[str, Any],
+    metrics: Mapping[str, Any] | None,
+    reason: str | None,
+    stress_review: Mapping[str, Any] | None = None,
+    portfolio_package: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Route the provisional pilot through the frozen IIOS decision-policy kernel.
 
     This is still a non-canonical preview: semantic fields originate in an
@@ -899,8 +912,21 @@ def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, re
     }
     validation_pass = not any(issue in validation_blockers for issue in issues)
 
-    # This pilot schema does not request or fabricate portfolio approval.
+    # Operator-entered package fields may inform this preview only after the
+    # existing risk/portfolio contract has structurally validated them. They
+    # never create formal portfolio admission or execution authority.
     position_pct = Decimal(c["current_position_pct"])
+    package = portfolio_package or {}
+    contract_ready = package.get("risk_portfolio_contract_status") == "STRUCTURAL_VALIDATION_PASS_NOT_ADMITTED"
+    readiness = package.get("contract_readiness") if isinstance(package.get("contract_readiness"), Mapping) else {}
+    portfolio_status = "UNKNOWN"
+    if package.get("constraint_status") == "BLOCKED":
+        portfolio_status = "BLOCKED"
+    elif package.get("constraint_status") == "PASS" and contract_ready and readiness.get("package_ready"):
+        portfolio_status = "PASS"
+    thesis_admission_status = "NOT_ADMITTED"
+    buy_add_package_complete = bool(contract_ready and readiness.get("package_ready"))
+    can_add = bool(package.get("can_add") is True and portfolio_status == "PASS")
     expected_return = (
         None if metrics is None
         else Decimal(str(metrics["expected_annualized_return"]))
@@ -925,10 +951,6 @@ def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, re
         and stress_review.get("status") == "PASS"
     )
 
-    portfolio_status = "UNKNOWN"
-    thesis_admission_status = "NOT_ADMITTED"
-    buy_add_package_complete = False
-    can_add = False
     core_policy = evaluate_production_decision(
         validation_pass=validation_pass,
         trust_status=a["trust"]["status"],
@@ -1007,7 +1029,11 @@ def _decision(prepared: Mapping[str, Any], metrics: Mapping[str, Any] | None, re
     if not buy_add_package_complete:
         extra_gates.append("BUY_ADD_PACKAGE_NOT_PROVIDED")
     if portfolio_status == "UNKNOWN":
-        extra_gates.append("PORTFOLIO_CONSTRAINT_NOT_PROVIDED")
+        extra_gates.append(
+            "PORTFOLIO_CONSTRAINT_NOT_PROVIDED"
+            if not package or package.get("status") == "NOT_PROVIDED"
+            else "PORTFOLIO_CONSTRAINT_OR_PACKAGE_UNRESOLVED"
+        )
     if thesis_admission_status != "ADMITTED":
         extra_gates.append("FORMAL_THESIS_ADMISSION_NOT_CREATED")
 
@@ -1047,6 +1073,25 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     c, p = analysis["case"], analysis["price_input"]
     a, f, calc, d = analysis["assessment"], analysis["forecast_valuation"], analysis["return_metrics"], analysis["decision"]
     params = analysis["decision_parameters"]
+    package = analysis.get("portfolio_package") if isinstance(analysis.get("portfolio_package"), Mapping) else {}
+    portfolio_lines = [
+        "",
+        "### 补充：组合风险预算与条件仓位包",
+        "",
+        f"- 仓位包状态：**{package.get('status', 'NOT_PROVIDED')}**",
+        f"- 组合约束状态：{package.get('constraint_status', 'UNKNOWN')}；操作者新增资金许可：{package.get('can_add', False)}",
+        f"- 组合可承受该标的论点失效损失：{str(package.get('portfolio_risk_budget_pct_nav')) + '% NAV' if package.get('portfolio_risk_budget_pct_nav') is not None else '未提供'}",
+        f"- 操作者入场区间：{('—'.join(package.get('entry_zone')) + ' ' + c['currency']) if package.get('entry_zone') else '未提供'}；当前价格区间位置：{package.get('current_price_zone_status', 'UNKNOWN')}",
+        f"- Thesis-break stress 每股期末财富：{package.get('stress_terminal_wealth_per_share') if package.get('stress_terminal_wealth_per_share') is not None else 'UNKNOWN'} {c['currency']}",
+        f"- 在入场区间上沿的 stress 损失：{str(package.get('stress_loss_at_entry_zone_high_pct')) + '%' if package.get('stress_loss_at_entry_zone_high_pct') is not None else 'UNKNOWN'}",
+        f"- 风险预算推导仓位上限：{str(package.get('risk_budget_max_position_pct')) + '%' if package.get('risk_budget_max_position_pct') is not None else '不约束/UNKNOWN'}；集中度上限：{str(package.get('policy_max_position_pct')) + '%' if package.get('policy_max_position_pct') is not None else '未提供'}",
+        f"- 风险预算后条件最大仓位：{str(package.get('effective_max_position_pct')) + '%' if package.get('effective_max_position_pct') is not None else 'UNKNOWN'}；条件初始仓位：{str(package.get('conditional_initial_position_pct')) + '%' if package.get('conditional_initial_position_pct') is not None else 'UNKNOWN'}；条件目标仓位：{str(package.get('conditional_target_position_pct')) + '%' if package.get('conditional_target_position_pct') is not None else 'UNKNOWN'}",
+        f"- 当前仓位是否高于推导上限：{package.get('current_position_over_effective_max') if package.get('current_position_over_effective_max') is not None else 'UNKNOWN'}",
+        f"- 条件建议仓位：{str(package.get('conditional_proposed_position_pct')) + '%' if package.get('conditional_proposed_position_pct') is not None else '无（至少一个门槛未满足）'}；本次实际获准新增仓位：0%",
+        f"- 风险/组合合同：{package.get('risk_portfolio_contract_status', 'NOT_CREATED')}；合同结构验证不等于正式准入。",
+        f"- 说明：{package.get('reason', '未提供个人组合约束；组合状态维持 UNKNOWN。')}",
+        "- 本节仅为非正式条件测算；不会自动减仓或加仓，也不替代正式 Thesis/证据/估值准入及人工批准。",
+    ]
     stress = f.get("thesis_break_stress") if isinstance(f.get("thesis_break_stress"), Mapping) else {}
     stress_review = analysis.get("thesis_break_stress_review") or {}
     conflicts = analysis.get("notes_price_conflicts") or []
@@ -1072,12 +1117,13 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f"- 理由：{d['reason']}",
         f"- 价格层独立筛选：{d.get('price_screen_action', 'UNKNOWN')}；状态：{d['price_screen_status']}",
         f"- 核心决策策略预演：{d.get('core_policy_evaluation', {}).get('action', 'NOT_RUN')} → 有效试运行建议 {d.get('core_policy_evaluation', {}).get('effective_pilot_action', d['provisional_action'])} / {d.get('core_policy_evaluation', {}).get('primary_reason', 'UNKNOWN')}",
-        "- 注意：策略预演使用非正式研究输入；本次未创建正式 Decision，且组合约束、正式 Thesis Admission 和完整仓位包仍需补齐。",
+        "- 注意：策略预演使用非正式研究输入；本次未创建正式 Decision。组合约束和仓位包状态见下一节；正式 Thesis Admission 与人工审批仍未完成。",
         f"- 预期年化回报：{calc['expected_annualized_return'] if calc else 'UNKNOWN'}",
         f"- 15% 年化门槛：{calc['fundamental_target_pass'] if calc else 'UNKNOWN'}",
         f"- Required Return：{params['required_return_annualized']}；结果：{calc['required_return_pass'] if calc else 'UNKNOWN'}",
         f"- 共同约束下目标入场价上限：{calc['target_entry_price'] if calc else 'UNKNOWN'}",
         f"- 最大 Bear 损失约束：{params['max_loss_pct']}%",
+        *portfolio_lines,
         "",
         "## 二、Trust / Reality / Quality",
         "",
@@ -1305,7 +1351,21 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
     prepared = _prepare_input(payload)
     metrics, reason = _return_metrics(prepared)
     stress_review = _thesis_break_stress_review(prepared)
-    decision = _decision(prepared, metrics, reason, stress_review)
+    portfolio_package = build_local_pilot_portfolio_package(
+        operator_context=prepared.get("operator_portfolio_context"),
+        case=prepared["case"],
+        price_input=prepared["price_input"],
+        decision_parameters=prepared["decision_parameters"],
+        assessment=prepared["assessment"],
+        forecast_valuation=prepared["forecast_valuation"],
+        return_metrics=metrics,
+        stress_review=stress_review,
+        evidence_register=prepared["evidence_register"],
+        unresolved_evidence_ids=prepared["unresolved_evidence_references"],
+        after_cutoff_evidence_ids=prepared["after_cutoff_evidence_references"],
+        uncertain_timing_evidence_ids=prepared["uncertain_timing_evidence_references"],
+    )
+    decision = _decision(prepared, metrics, reason, stress_review, portfolio_package)
     analysis = {
         "schema_version": PILOT_ANALYSIS_SCHEMA,
         "runner_version": "IIOS-LOCAL-PILOT-0.1",
@@ -1321,6 +1381,7 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "assessment": prepared["assessment"],
         "forecast_valuation": prepared["forecast_valuation"],
         "decision_parameters": prepared["decision_parameters"],
+        "portfolio_package": portfolio_package,
         "return_metrics": metrics,
         "return_metrics_reason": reason,
         "thesis_break_stress_review": stress_review,
@@ -1742,6 +1803,82 @@ def _ask(prompt: str, default: str | None = None) -> str:
 
 
 
+def _ask_operator_portfolio_context() -> dict[str, Any] | None:
+    """Collect optional personal portfolio limits separately from AI research."""
+    print("\n个人组合与仓位包（可选）")
+    print("如暂时不填写，系统会把组合约束保持为 UNKNOWN，不给出条件仓位。")
+    print("填写的数据保存在本机私有输入中，不会上传 GitHub；它们也不会授权实际交易。")
+    while True:
+        choice = _ask("是否填写组合风险预算和仓位限制？0 = 跳过，1 = 填写", "0")
+        if choice in {"0", "1"}:
+            break
+        print("请输入 0 或 1。")
+    if choice == "0":
+        return None
+
+    print("组合约束状态：1 = 已核实 PASS，2 = BLOCKED，3 = UNKNOWN")
+    while True:
+        status_choice = _ask("组合约束状态 1/2/3", "3")
+        if status_choice in {"1", "2", "3"}:
+            break
+        print("请输入 1、2 或 3。")
+    constraint_status = {"1": "PASS", "2": "BLOCKED", "3": "UNKNOWN"}[status_choice]
+    if constraint_status != "PASS":
+        print("组合约束未通过；保留当前状态，不采集条件仓位，也不会允许新增资金。")
+        return {"constraint_status": constraint_status, "can_add": False}
+
+    while True:
+        can_add_choice = _ask("按你的真实现金与组合限制，是否允许增加该标的风险敞口？1 = 是，0 = 否", "0")
+        if can_add_choice in {"0", "1"}:
+            break
+        print("请输入 0 或 1。")
+
+    def ask_percent(prompt: str) -> str:
+        while True:
+            raw = _ask(prompt)
+            try:
+                value = _number(raw, "PERCENT_INPUT")
+                if value < 0 or value > 100:
+                    raise LocalInvestmentPilotError("百分比必须在 0 到 100 之间。")
+                return format(value, "f")
+            except (LocalInvestmentPilotError, ValueError) as exc:
+                print(f"输入无效：{exc}。请填写 0 到 100 之间的百分比。")
+
+    def ask_positive(prompt: str) -> str:
+        while True:
+            raw = _ask(prompt)
+            try:
+                return format(_positive(raw, "PRICE_ZONE"), "f")
+            except LocalInvestmentPilotError as exc:
+                print(f"输入无效：{exc}。请填写大于 0 的价格。")
+
+    risk_budget = ask_percent("论点失效压力情景下，该标的最多允许损失组合净资产的百分比（例如 1）")
+    while True:
+        low = ask_positive("你愿意考虑入场的价格区间下沿")
+        high = ask_positive("你愿意考虑入场的价格区间上沿")
+        if Decimal(low) <= Decimal(high):
+            break
+        print("入场区间下沿不得高于上沿，请重新输入两个价格。")
+    while True:
+        initial = ask_percent("初始建仓占组合净资产百分比（例如 1）")
+        target = ask_percent("目标仓位占组合净资产百分比（例如 4）")
+        maximum = ask_percent("允许的最大单股仓位占组合净资产百分比（例如 8）")
+        if Decimal(initial) <= Decimal(target) <= Decimal(maximum):
+            break
+        print("仓位必须满足：初始仓位 ≤ 目标仓位 ≤ 最大仓位。请重新输入三个百分比。")
+
+    return {
+        "constraint_status": constraint_status,
+        "can_add": can_add_choice == "1",
+        "risk_budget_pct_nav": risk_budget,
+        "entry_zone_low": low,
+        "entry_zone_high": high,
+        "initial_position_pct": initial,
+        "target_position_pct": target,
+        "max_position_pct": maximum,
+    }
+
+
 def run_guided_wizard(
     *,
     template_root: str | Path | None = None,
@@ -1940,8 +2077,12 @@ def run_guided_wizard(
             print(f"当前响应文件：{response_path}")
             print("无需重新填写标的；按 Control-C 可退出。")
 
-    # Validate the response before saving or running calculations.
+    # Validate the response before collecting any optional operator-only
+    # portfolio inputs. AI research output never gets to author these limits.
     _prepare_input(payload)
+    portfolio_context = _ask_operator_portfolio_context()
+    if portfolio_context is not None:
+        payload["operator_portfolio_context"] = portfolio_context
     private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     completed = private_inputs / f"pilot-completed-{symbol.replace('.', '-')}-{stamp}.json"

@@ -290,6 +290,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
         "1",
         "1",
         "",
+        "0",
     ])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
 
@@ -843,4 +844,238 @@ def test_replay_blocks_a_prior_bundle_without_hash_manifest(tmp_path):
             output_root=output_root,
             replay_of=first["pilot_id"],
         )
+
+
+
+# Operator-attested non-canonical portfolio-package tests. These test sizing math
+# and fail-closed gates only; they are not evidence of investment validity.
+from iios_mvp.local_pilot_portfolio_package_v01 import build_local_pilot_portfolio_package
+
+
+def _portfolio_package_args(**overrides):
+    args = {
+        "operator_context": {
+            "constraint_status": "PASS",
+            "can_add": True,
+            "risk_budget_pct_nav": "1",
+            "entry_zone_low": "90",
+            "entry_zone_high": "100",
+            "initial_position_pct": "1",
+            "target_position_pct": "4",
+            "max_position_pct": "8",
+        },
+        "case": {"case_id": "RC-CN-A-TEST", "as_of_date": "2026-10-10", "current_position_pct": "0"},
+        "price_input": {"price": "95"},
+        "decision_parameters": {"max_loss_pct": "25"},
+        "assessment": {
+            "risk": {"status": "PASS", "evidence_refs": ["E1"], "items": []},
+            "thesis": {"break_conditions": ["key margin fails"], "reassessment_triggers": ["next quarterly report"]},
+        },
+        "forecast_valuation": {
+            "thesis_break_stress": {
+                "terminal_value_per_share": "50", "cash_distributions_per_share": "0"
+            }
+        },
+        "return_metrics": {"return_gate_pass": True},
+        "stress_review": {"status": "PASS", "stress_terminal_wealth": "50", "issues": []},
+        "evidence_register": [{"source_id": "E1", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}],
+        "unresolved_evidence_ids": [],
+        "after_cutoff_evidence_ids": [],
+        "uncertain_timing_evidence_ids": [],
+    }
+    args.update(overrides)
+    return args
+
+
+def test_portfolio_package_uses_thesis_break_stress_to_cap_position():
+    result = build_local_pilot_portfolio_package(**_portfolio_package_args())
+    assert result["risk_portfolio_contract_status"] == "STRUCTURAL_VALIDATION_PASS_NOT_ADMITTED"
+    assert result["stress_loss_at_entry_zone_high_pct"] == "50.0"
+    assert result["risk_budget_max_position_pct"] == "2"
+    assert result["effective_max_position_pct"] == "2"
+    assert result["conditional_initial_position_pct"] == "1"
+    assert result["conditional_target_position_pct"] == "2"
+    assert result["conditional_proposed_position_pct"] == "2"
+    assert result["status"] == "CONDITIONAL_PACKAGE_READY_NOT_AUTHORIZED"
+    assert result["authorized_new_position_pct"] == "0"
+    assert result["formal_decision_created"] is False
+    assert result["execution_authorized"] is False
+
+
+def test_portfolio_package_is_unknown_when_operator_skips():
+    result = build_local_pilot_portfolio_package(**_portfolio_package_args(operator_context=None))
+    assert result["status"] == "NOT_PROVIDED"
+    assert result["constraint_status"] == "UNKNOWN"
+    assert result["effective_max_position_pct"] is None
+    assert result["authorized_new_position_pct"] == "0"
+
+
+def test_portfolio_package_blocks_when_price_is_outside_entry_zone():
+    result = build_local_pilot_portfolio_package(**_portfolio_package_args(price_input={"price": "101"}))
+    assert result["current_price_zone_status"] == "ABOVE_ENTRY_ZONE"
+    assert result["conditional_proposed_position_pct"] is None
+    assert result["status"] == "REVIEW_REQUIRED"
+    assert result["authorized_new_position_pct"] == "0"
+
+
+def test_portfolio_package_does_not_auto_reduce_an_existing_over_limit_position():
+    args = _portfolio_package_args(
+        case={"case_id": "RC-CN-A-TEST", "as_of_date": "2026-10-10", "current_position_pct": "3"}
+    )
+    result = build_local_pilot_portfolio_package(**args)
+    assert result["effective_max_position_pct"] == "2"
+    assert result["current_position_over_effective_max"] is True
+    assert result["conditional_proposed_position_pct"] is None
+    assert result["authorized_new_position_pct"] == "0"
+    assert result["execution_authorized"] is False
+
+
+def test_portfolio_package_blocks_risk_references_with_uncertain_timing():
+    result = build_local_pilot_portfolio_package(
+        **_portfolio_package_args(uncertain_timing_evidence_ids=["E1"])
+    )
+    assert result["risk_portfolio_contract_status"] == "BLOCKED"
+    assert result["conditional_proposed_position_pct"] is None
+    assert result["authorized_new_position_pct"] == "0"
+
+
+def test_portfolio_package_rejects_misordered_position_bands():
+    result = build_local_pilot_portfolio_package(
+        **_portfolio_package_args(operator_context={
+            "constraint_status": "PASS", "can_add": True, "risk_budget_pct_nav": "1",
+            "entry_zone_low": "90", "entry_zone_high": "100",
+            "initial_position_pct": "5", "target_position_pct": "4", "max_position_pct": "8",
+        })
+    )
+    assert result["status"] == "BLOCKED_INVALID_OPERATOR_CONTEXT"
+    assert "POSITION_BOUNDS" in result["reason"]
+    assert result["authorized_new_position_pct"] == "0"
+
+
+def test_local_pilot_report_exposes_missing_portfolio_package_as_unknown():
+    from iios_mvp.local_investment_pilot_v01 import _analyse
+
+    analysis, report = _analyse(_payload(), "local-pilot-test-package")
+    assert analysis["portfolio_package"]["status"] == "NOT_PROVIDED"
+    assert analysis["decision"]["core_policy_evaluation"]["portfolio_status"] == "UNKNOWN"
+    assert analysis["decision"]["execution_authorized"] is False
+    assert "组合风险预算与条件仓位包" in report
+    assert "实际获准新增仓位：0%" in report
+
+
+
+# Operator-attested non-canonical portfolio-package tests. These test sizing math
+# and fail-closed gates only; they are not evidence of investment validity.
+from iios_mvp.local_pilot_portfolio_package_v01 import build_local_pilot_portfolio_package
+
+
+def _portfolio_package_args(**overrides):
+    args = {
+        "operator_context": {
+            "constraint_status": "PASS",
+            "can_add": True,
+            "risk_budget_pct_nav": "1",
+            "entry_zone_low": "90",
+            "entry_zone_high": "100",
+            "initial_position_pct": "1",
+            "target_position_pct": "4",
+            "max_position_pct": "8",
+        },
+        "case": {"case_id": "RC-CN-A-TEST", "as_of_date": "2026-10-10", "current_position_pct": "0"},
+        "price_input": {"price": "95"},
+        "decision_parameters": {"max_loss_pct": "25"},
+        "assessment": {
+            "risk": {"status": "PASS", "evidence_refs": ["E1"], "items": []},
+            "thesis": {"break_conditions": ["key margin fails"], "reassessment_triggers": ["next quarterly report"]},
+        },
+        "forecast_valuation": {
+            "thesis_break_stress": {
+                "terminal_value_per_share": "50", "cash_distributions_per_share": "0"
+            }
+        },
+        "return_metrics": {"return_gate_pass": True},
+        "stress_review": {"status": "PASS", "stress_terminal_wealth": "50", "issues": []},
+        "evidence_register": [{"source_id": "E1", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}],
+        "unresolved_evidence_ids": [],
+        "after_cutoff_evidence_ids": [],
+        "uncertain_timing_evidence_ids": [],
+    }
+    args.update(overrides)
+    return args
+
+
+def test_portfolio_package_uses_thesis_break_stress_to_cap_position():
+    result = build_local_pilot_portfolio_package(**_portfolio_package_args())
+    assert result["risk_portfolio_contract_status"] == "STRUCTURAL_VALIDATION_PASS_NOT_ADMITTED"
+    assert result["stress_loss_at_entry_zone_high_pct"] == "50.0"
+    assert result["risk_budget_max_position_pct"] == "2"
+    assert result["effective_max_position_pct"] == "2"
+    assert result["conditional_initial_position_pct"] == "1"
+    assert result["conditional_target_position_pct"] == "2"
+    assert result["conditional_proposed_position_pct"] == "2"
+    assert result["status"] == "CONDITIONAL_PACKAGE_READY_NOT_AUTHORIZED"
+    assert result["authorized_new_position_pct"] == "0"
+    assert result["formal_decision_created"] is False
+    assert result["execution_authorized"] is False
+
+
+def test_portfolio_package_is_unknown_when_operator_skips():
+    result = build_local_pilot_portfolio_package(**_portfolio_package_args(operator_context=None))
+    assert result["status"] == "NOT_PROVIDED"
+    assert result["constraint_status"] == "UNKNOWN"
+    assert result["effective_max_position_pct"] is None
+    assert result["authorized_new_position_pct"] == "0"
+
+
+def test_portfolio_package_blocks_when_price_is_outside_entry_zone():
+    result = build_local_pilot_portfolio_package(**_portfolio_package_args(price_input={"price": "101"}))
+    assert result["current_price_zone_status"] == "ABOVE_ENTRY_ZONE"
+    assert result["conditional_proposed_position_pct"] is None
+    assert result["status"] == "REVIEW_REQUIRED"
+    assert result["authorized_new_position_pct"] == "0"
+
+
+def test_portfolio_package_does_not_auto_reduce_an_existing_over_limit_position():
+    args = _portfolio_package_args(
+        case={"case_id": "RC-CN-A-TEST", "as_of_date": "2026-10-10", "current_position_pct": "3"}
+    )
+    result = build_local_pilot_portfolio_package(**args)
+    assert result["effective_max_position_pct"] == "2"
+    assert result["current_position_over_effective_max"] is True
+    assert result["conditional_proposed_position_pct"] is None
+    assert result["authorized_new_position_pct"] == "0"
+    assert result["execution_authorized"] is False
+
+
+def test_portfolio_package_blocks_risk_references_with_uncertain_timing():
+    result = build_local_pilot_portfolio_package(
+        **_portfolio_package_args(uncertain_timing_evidence_ids=["E1"])
+    )
+    assert result["risk_portfolio_contract_status"] == "BLOCKED"
+    assert result["conditional_proposed_position_pct"] is None
+    assert result["authorized_new_position_pct"] == "0"
+
+
+def test_portfolio_package_rejects_misordered_position_bands():
+    result = build_local_pilot_portfolio_package(
+        **_portfolio_package_args(operator_context={
+            "constraint_status": "PASS", "can_add": True, "risk_budget_pct_nav": "1",
+            "entry_zone_low": "90", "entry_zone_high": "100",
+            "initial_position_pct": "5", "target_position_pct": "4", "max_position_pct": "8",
+        })
+    )
+    assert result["status"] == "BLOCKED_INVALID_OPERATOR_CONTEXT"
+    assert "POSITION_BOUNDS" in result["reason"]
+    assert result["authorized_new_position_pct"] == "0"
+
+
+def test_local_pilot_report_exposes_missing_portfolio_package_as_unknown():
+    from iios_mvp.local_investment_pilot_v01 import _analyse
+
+    analysis, report = _analyse(_payload(), "local-pilot-test-package")
+    assert analysis["portfolio_package"]["status"] == "NOT_PROVIDED"
+    assert analysis["decision"]["core_policy_evaluation"]["portfolio_status"] == "UNKNOWN"
+    assert analysis["decision"]["execution_authorized"] is False
+    assert "组合风险预算与条件仓位包" in report
+    assert "本次实际获准新增仓位：0%" in report
 
