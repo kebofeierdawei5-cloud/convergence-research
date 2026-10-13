@@ -28,7 +28,7 @@ P0 B3 persisted upstream write authorization             MERGED / EXACT-HEAD CI 
 P0 Canonical Runtime Callback Preflight                  MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL PASS
 Batch 0 narrow state reconciliation                     PASS ON MERGE; NO ECONOMIC SEMANTICS CHANGED
 Local MVP Batch 0 baseline audit (revised plan)          BASELINE ESTABLISHED / ARCHIVED RESPONSE CONTRACT FAIL / MAC RUN BUNDLE OPEN
-Local MVP Batch 1 IIOS decision-kernel integration             IN PR / POLICY PREVIEW WIRED / CORE PACKAGE + MAC RUN OPEN
+Local MVP Batch 1 IIOS decision-kernel integration             MERGED PR #404 / 17-OF-17 EXACT-HEAD CHECKS PASS / MAC RUN OPEN
 Batch 1 private Path A scenario runner                  PASS / MERGED; 40 TESTS; ANALYSIS-ONLY
 Batch 1 macOS one-click launcher permission fix             PASS / MERGED PR #358; 12 CHECKS + 3 STATIC TESTS PASS; OPERATOR REPORTS SUCCESS / BUNDLE NOT INDEPENDENTLY REVIEWED
 Batch 2 Path A scenario integrity audit                    IN PROGRESS / PR #360 MERGED; 43 TESTS + 13 EXACT-HEAD CHECKS PASS; LOCAL BUNDLE REVIEW OPEN
@@ -59,13 +59,13 @@ Audit record: `docs/iios/BATCH0_LOCAL_PILOT_BASELINE_AUDIT_20261013.md`.
 
 ### Local MVP Batch 1 — shared decision policy integration (2026-10-13; implementation PR open)
 
-Implementation proposal: PR #404, branch `implementation/batch1-core-decision-integration-20261013`.
+Implementation: PR [#404](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/404), merged at `0a1fc7a83f78108ce154e8c8eea17054ea159cf9`; 17/17 exact-head checks passed, including the dedicated local-pilot workflow (47 tests), compile/diff checks, Investment Core, MVP, scope/state hygiene and independent red-team workflows.
 
 - The local pilot now routes provisional decision-policy evaluation through the shared `evaluate_production_decision` kernel instead of relying solely on a separate hand-written action branch. The deterministic return/entry-price calculation continues to use the existing v0.3 contract.
 - Price eligibility is reported separately from overall decision readiness. A price screen can pass while the overall proposed action remains `REVIEW_REQUIRED`.
 - The pilot does not invent a PASS for missing portfolio capacity, formal Thesis Admission or the complete BUY/ADD position package. These missing gates remain visible and block promotion of the kernel preview into an actionable capital proposal.
 - Any kernel BUY/ADD/EXIT/REDUCE suggested from non-canonical AI response fields is demoted to `REVIEW_REQUIRED`; no formal Decision, canonical admission, execution authority or automatic trade is produced.
-- This is a provisional-policy integration, not a production-host or real Mac acceptance. Merge status and exact-head CI must be verified before promoting the code milestone. The actual private Mac run bundle remains NOT VERIFIED.
+- This is a provisional-policy integration, not a production-host or real Mac acceptance. The code milestone is merged and its exact-head CI passed; the actual private Mac run bundle remains NOT VERIFIED.
 
 ### Personal local investment pilot — response-file handoff and report-quality gates (2026-10-12)
 
