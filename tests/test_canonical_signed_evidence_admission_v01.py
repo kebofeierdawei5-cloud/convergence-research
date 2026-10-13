@@ -17,6 +17,7 @@ from iios_mvp.canonical_signed_evidence_admission_v01 import (
     SIGNER_REGISTRY_SCHEMA,
     SignedAdmissionError,
     add_signature,
+    build_admission_preflight_report,
     generate_keypair,
     prepare_signer_enrollment_request,
     prepare_rights_adjudication_draft,
@@ -417,6 +418,103 @@ def test_one_key_cannot_self_certify_as_both_admission_signer_and_independent_re
     )
     assert result["status"] == "SIGNATURES_PENDING"
     assert "INDEPENDENT_REVIEWER_DISTINCT_SIGNER" in result["missing_signer_roles"]
+
+
+def test_preflight_blocks_unknown_rights_and_empty_signer_registry_without_mutating_inputs(tmp_path):
+    manifest, raw_root, _ = _make_manifest(tmp_path)
+    rights, permission = _write_rights(tmp_path, status="UNKNOWN", basis_kind="UNKNOWN")
+    registry = tmp_path / "empty-registry.json"
+    registry_payload = {
+        "schema_version": SIGNER_REGISTRY_SCHEMA,
+        "registry_status": "NO_TRUSTED_SIGNERS_REGISTERED",
+        "signers": [],
+    }
+    registry.write_text(json.dumps(registry_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    before = registry.read_bytes()
+
+    result = build_admission_preflight_report(
+        manifest_path=manifest,
+        raw_root=raw_root,
+        rights_record_path=rights,
+        permission_evidence_path=permission,
+        signer_registry_path=registry,
+        checked_at=SIGNED_AT,
+    )
+
+    assert result["status"] == "BLOCKED"
+    assert result["core_pit_validation"] == "PASS"
+    assert result["rights_status"] == "UNKNOWN"
+    assert "ADMISSION_BLOCKED_RIGHTS_NOT_ALLOWED" in result["blockers"]
+    assert "NO_TRUSTED_SIGNERS_REGISTERED" in result["blockers"]
+    assert result["formal_signed_admission_created"] is False
+    assert result["canonical_registry_mutated"] is False
+    assert result["decision_created"] is False
+    assert result["run_receipt_created"] is False
+    assert registry.read_bytes() == before
+
+
+def test_preflight_can_report_ready_but_never_admitted_when_all_gates_are_present(tmp_path):
+    payload, manifest, raw_root, rights, permission = _create_envelope(
+        tmp_path,
+        source_class="PUBLIC_COMPANY_DISCLOSURE",
+        basis_kind="OFFICIAL_TERMS_REVIEWED",
+        required_roles=["EVIDENCE_ADMISSION_SIGNER", "INDEPENDENT_REVIEWER"],
+    )
+    registry, _keys = _make_registry(tmp_path)
+    registry_payload = json.loads(registry.read_text(encoding="utf-8"))
+    registry_payload["registry_status"] = "ACTIVE_TEST_FIXTURE_FOR_PREFLIGHT_UNIT_TEST"
+    registry.write_text(json.dumps(registry_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    registry_before = registry.read_bytes()
+    rights_before = rights.read_bytes()
+    manifest_before = manifest.read_bytes()
+
+    result = build_admission_preflight_report(
+        manifest_path=manifest,
+        raw_root=raw_root,
+        rights_record_path=rights,
+        permission_evidence_path=permission,
+        signer_registry_path=registry,
+        checked_at=SIGNED_AT,
+    )
+
+    assert result["status"] == "READY_FOR_SIGNATURE_NOT_ADMITTED"
+    assert result["core_pit_validation"] == "PASS"
+    assert result["permission_instrument_bytes_match_rights_record"] is True
+    assert result["available_trusted_signers_by_required_role"]["EVIDENCE_ADMISSION_SIGNER"] == ["owner-test"]
+    assert result["available_trusted_signers_by_required_role"]["INDEPENDENT_REVIEWER"] == ["reviewer-test"]
+    assert result["formal_signed_admission_created"] is False
+    assert result["canonical_registry_mutated"] is False
+    assert "FORMALLY_ADMITTED" not in result["status"]
+    assert registry.read_bytes() == registry_before
+    assert rights.read_bytes() == rights_before
+    assert manifest.read_bytes() == manifest_before
+
+
+def test_preflight_requires_distinct_admission_and_independent_reviewer_signers(tmp_path):
+    _payload, manifest, raw_root, rights, permission = _create_envelope(
+        tmp_path,
+        source_class="PUBLIC_COMPANY_DISCLOSURE",
+        basis_kind="OFFICIAL_TERMS_REVIEWED",
+        required_roles=["EVIDENCE_ADMISSION_SIGNER", "INDEPENDENT_REVIEWER"],
+    )
+    registry, _keys = _make_registry(tmp_path, roles_by_key={
+        "owner-test": ["EVIDENCE_ADMISSION_SIGNER", "INDEPENDENT_REVIEWER"],
+    })
+    registry_payload = json.loads(registry.read_text(encoding="utf-8"))
+    registry_payload["registry_status"] = "ACTIVE_TEST_FIXTURE_FOR_PREFLIGHT_UNIT_TEST"
+    registry.write_text(json.dumps(registry_payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+    result = build_admission_preflight_report(
+        manifest_path=manifest,
+        raw_root=raw_root,
+        rights_record_path=rights,
+        permission_evidence_path=permission,
+        signer_registry_path=registry,
+        checked_at=SIGNED_AT,
+    )
+
+    assert result["status"] == "BLOCKED"
+    assert "INDEPENDENT_REVIEWER_MUST_BE_DISTINCT_TRUSTED_SIGNER" in result["blockers"]
 
 
 def test_public_company_disclosure_admission_requires_independent_reviewer(tmp_path):

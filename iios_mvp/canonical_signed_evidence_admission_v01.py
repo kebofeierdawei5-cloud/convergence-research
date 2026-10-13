@@ -720,6 +720,160 @@ def verify_signed_admission(
     }
 
 
+def build_admission_preflight_report(
+    *,
+    manifest_path: str | Path,
+    raw_root: str | Path,
+    rights_record_path: str | Path,
+    permission_evidence_path: str | Path | None,
+    signer_registry_path: str | Path,
+    checked_at: str | None = None,
+) -> dict[str, Any]:
+    """Report blockers before a human-authorized signature; never sign or mutate trust."""
+    checked_at = checked_at or datetime.now(timezone.utc).isoformat()
+    _timestamp(checked_at, "CHECKED_AT")
+    blockers: list[str] = []
+    manifest: dict[str, Any] = {}
+    rights: dict[str, Any] = {}
+    registry: dict[str, Any] = {}
+    case_id: str | None = None
+    source_class: str | None = None
+    rights_status: str | None = None
+    required_roles: list[str] = []
+    core_status = "UNKNOWN"
+    permission_hash_match = False
+
+    try:
+        manifest, _manifest_bytes = _read_json(manifest_path, "EVIDENCE_MANIFEST")
+        case_candidate = manifest.get("case_id")
+        case_id = str(case_candidate) if isinstance(case_candidate, str) and case_candidate.strip() else None
+        if not case_id:
+            blockers.append("MANIFEST_CASE_ID_REQUIRED")
+        try:
+            errors = validate_company_evidence_manifest(
+                manifest, raw_root=raw_root, require_raw_verification=True
+            )
+            if errors:
+                blockers.extend("CORE_PIT:" + str(error) for error in errors)
+                core_status = "FAIL"
+            else:
+                core_status = "PASS"
+        except Exception as exc:
+            blockers.append("CORE_PIT_VALIDATION_ERROR:" + type(exc).__name__)
+            core_status = "FAIL"
+    except (OSError, SignedAdmissionError) as exc:
+        blockers.append(str(exc))
+
+    try:
+        rights, _rights_bytes = _read_json(rights_record_path, "RIGHTS_RECORD")
+        source_class = str(rights.get("source_class") or "")
+        rights_status = str(rights.get("status") or "")
+        if case_id and rights.get("case_id") != case_id:
+            blockers.append("RIGHTS_RECORD_CASE_MISMATCH")
+        raw_roles = rights.get("required_signer_roles")
+        if isinstance(raw_roles, list) and all(isinstance(role, str) for role in raw_roles):
+            required_roles = list(raw_roles)
+        else:
+            blockers.append("REQUIRED_SIGNER_ROLES_INVALID")
+        if rights_status != "ALLOWED":
+            blockers.append("ADMISSION_BLOCKED_RIGHTS_NOT_ALLOWED")
+        if source_class == "OPERATOR_ATTESTED_MARKET_DATA":
+            blockers.append("OPERATOR_ATTESTED_PRICE_CANNOT_BE_SOURCE_ADMITTED")
+        if permission_evidence_path is None:
+            blockers.append("PERMISSION_EVIDENCE_FILE_REQUIRED")
+        else:
+            permission_path = Path(permission_evidence_path).expanduser()
+            if permission_path.is_symlink() or not permission_path.is_file():
+                blockers.append("PERMISSION_EVIDENCE_MUST_BE_REGULAR_FILE")
+            else:
+                permission_hash = _sha256(permission_path.read_bytes())
+                permission_hash_match = rights.get("permission_evidence_sha256") == permission_hash
+                if not permission_hash_match:
+                    blockers.append("PERMISSION_EVIDENCE_HASH_MISMATCH")
+                if case_id:
+                    try:
+                        _validate_rights_record(
+                            rights,
+                            case_id=case_id,
+                            decision="ADMIT",
+                            signed_at=checked_at,
+                            permission_evidence_sha256=permission_hash,
+                        )
+                    except SignedAdmissionError as exc:
+                        reason = str(exc)
+                        if reason not in blockers:
+                            blockers.append(reason)
+    except (OSError, SignedAdmissionError) as exc:
+        blockers.append(str(exc))
+
+    signer_candidates: dict[str, list[str]] = {role: [] for role in required_roles}
+    registry_status = "UNKNOWN"
+    try:
+        registry = _load_registry(signer_registry_path)
+        registry_status = str(registry.get("registry_status") or "UNKNOWN")
+        if registry_status == "TEST_ONLY":
+            blockers.append("TEST_ONLY_SIGNER_REGISTRY_NOT_AUTHORITY")
+        signer_rows = registry.get("signers", [])
+        if not signer_rows:
+            blockers.append("NO_TRUSTED_SIGNERS_REGISTERED")
+        elif case_id:
+            for row in signer_rows:
+                if not isinstance(row, Mapping):
+                    continue
+                key_id = row.get("signer_key_id")
+                if not isinstance(key_id, str) or not key_id:
+                    continue
+                try:
+                    signer, _public_raw = _find_trusted_signer(
+                        registry, key_id, checked_at, case_id
+                    )
+                except SignedAdmissionError:
+                    continue
+                roles = signer.get("roles", [])
+                for role in signer_candidates:
+                    if role in roles:
+                        signer_candidates[role].append(key_id)
+            for role, candidates in signer_candidates.items():
+                if not candidates:
+                    blockers.append("NO_ACTIVE_IN_SCOPE_SIGNER_FOR_ROLE:" + role)
+            if "INDEPENDENT_REVIEWER" in required_roles:
+                admissions = set(signer_candidates.get("EVIDENCE_ADMISSION_SIGNER", []))
+                reviewers = set(signer_candidates.get("INDEPENDENT_REVIEWER", []))
+                if not (admissions - reviewers) or not (reviewers - admissions):
+                    blockers.append("INDEPENDENT_REVIEWER_MUST_BE_DISTINCT_TRUSTED_SIGNER")
+    except (OSError, SignedAdmissionError) as exc:
+        blockers.append(str(exc))
+
+    blockers = list(dict.fromkeys(blockers))
+    return {
+        "schema_version": "IIOS-SIGNED-EVIDENCE-PIT-PREFLIGHT-0.1",
+        "status": "READY_FOR_SIGNATURE_NOT_ADMITTED" if not blockers else "BLOCKED",
+        "checked_at": checked_at,
+        "case_id": case_id,
+        "market": manifest.get("market") if manifest else None,
+        "symbol": manifest.get("symbol") if manifest else None,
+        "cutoff_date": manifest.get("cutoff_date") if manifest else None,
+        "core_pit_validation": core_status,
+        "source_class": source_class,
+        "rights_status": rights_status,
+        "permission_instrument_bytes_match_rights_record": permission_hash_match,
+        "signer_registry_status": registry_status,
+        "available_trusted_signers_by_required_role": signer_candidates,
+        "required_signer_roles": required_roles,
+        "blockers": blockers,
+        "formal_signed_admission_created": False,
+        "canonical_registry_mutated": False,
+        "decision_created": False,
+        "publication_created": False,
+        "run_receipt_created": False,
+        "execution_authorized": False,
+        "notes": [
+            "Preflight is readiness information only; it does not sign, admit Evidence/PIT, grant data rights, or mutate the signer registry.",
+            "A READY_FOR_SIGNATURE_NOT_ADMITTED status still requires the authorized signature workflow and independent final verification.",
+        ],
+    }
+
+
 def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="IIOS signed Evidence/PIT admission; no LLM dependency.")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -755,6 +909,13 @@ def _main(argv: list[str] | None = None) -> int:
     sign.add_argument("--decision", required=True, choices=("ADMIT", "BLOCK"))
     sign.add_argument("--out", required=True)
     sign.add_argument("--existing-envelope")
+    preflight = commands.add_parser("preflight")
+    preflight.add_argument("--manifest", required=True)
+    preflight.add_argument("--raw-root", required=True)
+    preflight.add_argument("--rights-record", required=True)
+    preflight.add_argument("--permission-evidence")
+    preflight.add_argument("--registry", required=True)
+    preflight.add_argument("--checked-at")
     verify = commands.add_parser("verify")
     verify.add_argument("--envelope", required=True)
     verify.add_argument("--manifest", required=True)
@@ -788,6 +949,17 @@ def _main(argv: list[str] | None = None) -> int:
                 candidate_permission_evidence_path=args.candidate_permission_evidence,
                 requested_at=args.requested_at,
             )
+        elif args.command == "preflight":
+            result = build_admission_preflight_report(
+                manifest_path=args.manifest,
+                raw_root=args.raw_root,
+                rights_record_path=args.rights_record,
+                permission_evidence_path=args.permission_evidence,
+                signer_registry_path=args.registry,
+                checked_at=args.checked_at,
+            )
+            print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+            return 0 if result["status"] == "READY_FOR_SIGNATURE_NOT_ADMITTED" else 2
         elif args.command == "sign":
             if args.existing_envelope:
                 envelope, _ = _read_json(args.existing_envelope, "EXISTING_ENVELOPE")

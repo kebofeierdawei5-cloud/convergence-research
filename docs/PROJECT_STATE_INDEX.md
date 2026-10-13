@@ -65,6 +65,10 @@ Before generating a report, the guided response handoff now rejects a mostly unt
 
 The signed Evidence/PIT CLI now supports `prepare-enrollment-request` and `prepare-rights-draft`. Signer enrollment proposals validate an Ed25519 public key and remain `PROPOSED_NOT_TRUSTED`; they exclude private keys, reject wildcard case scopes and combined admission/reviewer roles, and cannot modify the canonical registry. Rights drafts remain `UNKNOWN` by default, have no allowed uses or admitted permission instrument, and record any supplied candidate instrument hash only as a candidate. Neither command decides legal/data-use rights, enrolls a signer or admits Evidence/PIT. Owner authorization, separate independent review, written permission where required, and exact instrument verification remain open gates.
 
+### C1 formal-admission preflight (2026-10-13)
+
+A read-only `preflight` subcommand has been added to `iios_mvp.canonical_signed_evidence_admission_v01`. It checks the unchanged Core/PIT validator against raw bytes, the case-bound rights record and exact permission-instrument hash, and eligible trusted signer/role/case-scope coverage. It returns `BLOCKED` or `READY_FOR_SIGNATURE_NOT_ADMITTED`; the latter is not admission. It never signs, changes the trusted registry, grants rights, or creates Decision/Publication/Run Receipt/execution authorization. Exact-head Signed Evidence Admission Gate CI passed 36 tests, and relevant Investment Core/MVP/local-pilot checks passed for this head. **Actual C1 remains BLOCKED**: canonical trusted signer registry is empty and exchange-market-price use permission is not established. No private case manifest, market quote, raw source bytes, or key material was added to Git.
+
 ### Execution-first local MVP priority (owner direction, 2026-10-11; supersedes earlier task ordering)
 
 The user has explicitly redirected IIOS delivery to **finish the core workflow and run it end-to-end in actual personal use before further optimization**. The governing decision and testable acceptance criteria are recorded in [Execution-first Local Single-User MVP Pivot](iios/LOCAL_SINGLE_USER_EXECUTION_FIRST_PIVOT_20261011.md).
