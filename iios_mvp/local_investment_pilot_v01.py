@@ -185,8 +185,8 @@ def _humanize_item(value: Any) -> str:
         if item.get(key) not in (None, ""):
             parts.append(f"{label}：{_humanize_item(item[key])}")
     for key, label in (
-        ("basis", "依据"), ("rationale", "理由"), ("description", "说明"),
-        ("monitoring_trigger", "监控触发条件"),
+        ("summary", "摘要"), ("basis", "依据"), ("rationale", "理由"),
+        ("description", "说明"), ("monitoring_trigger", "监控触发条件"),
     ):
         if item.get(key) not in (None, "") and not (key == "description" and name == str(item.get(key))):
             parts.append(f"{label}：{' '.join(str(item[key]).splitlines()).strip()}")
@@ -196,6 +196,14 @@ def _humanize_item(value: Any) -> str:
     if not parts:
         return "；".join(f"{key}={_humanize_item(val)}" for key, val in item.items())
     return "。".join(parts)
+
+
+def _source_ref_markdown(value: Any) -> str:
+    """Keep terminal punctuation outside a URL so Markdown does not absorb it into the link."""
+    raw = str(value or "UNKNOWN").strip()
+    if raw.lower().startswith(("https://", "http://")):
+        return f"<{raw}>"
+    return f"`{raw}`"
 
 
 def _format_text_block(value: Any) -> list[str]:
@@ -937,7 +945,6 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f"- 价格层独立筛选：{d.get('price_screen_action', 'UNKNOWN')}；状态：{d['price_screen_status']}",
         f"- 核心决策策略预演：{d.get('core_policy_evaluation', {}).get('action', 'NOT_RUN')} → 有效试运行建议 {d.get('core_policy_evaluation', {}).get('effective_pilot_action', d['provisional_action'])} / {d.get('core_policy_evaluation', {}).get('primary_reason', 'UNKNOWN')}",
         "- 注意：策略预演使用非正式研究输入；本次未创建正式 Decision，且组合约束、正式 Thesis Admission 和完整仓位包仍需补齐。",
-        f"- 当前价筛选：{d['price_screen_status']}",
         f"- 预期年化回报：{calc['expected_annualized_return'] if calc else 'UNKNOWN'}",
         f"- 15% 年化门槛：{calc['fundamental_target_pass'] if calc else 'UNKNOWN'}",
         f"- Required Return：{params['required_return_annualized']}；结果：{calc['required_return_pass'] if calc else 'UNKNOWN'}",
@@ -963,7 +970,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     if drivers:
         for display_rank, item in enumerate(drivers, start=1):
             lines.extend([
-                f"{display_rank}. **{item['driver']}**（影响：{item['impact']}）",
+                f"**价值驱动因素 {display_rank}：{item['driver']}**（影响：{item['impact']}）",
                 f"   {item['rationale'] or '未提供理由。'}",
             ])
             if item.get("evidence_refs"):
@@ -1086,8 +1093,9 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         for ref in referenced:
             if ref in evidence_by_id:
                 row = evidence_by_id[ref]
+                source_ref = _source_ref_markdown(row.get("source_ref"))
                 lines.append(
-                    f"- **{ref}**：已登记，尚未完成正式证据准入；时间状态：{row.get('time_status', 'UNKNOWN')}；来源：{row.get('source_ref') or 'UNKNOWN'}。"
+                    f"- **{ref}**：已登记，尚未完成正式证据准入；时间状态：{row.get('time_status', 'UNKNOWN')}；来源：{source_ref}。"
                 )
             else:
                 lines.append(f"- **{ref}**：**未解析**。本次输入没有该 ID 对应的 evidence_register 记录，不能将正文描述视为完成来源核验。")
@@ -1099,7 +1107,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             lines.extend([
                 f"- **{row['source_id']} — {row['title']}**",
                 f"  类型：{row['source_class']}；known_at：{row['known_at'] or 'UNKNOWN'}；时间状态：{row['time_status']}。",
-                f"  来源位置：{row['source_ref']}。",
+                f"  来源位置：{_source_ref_markdown(row['source_ref'])}。",
                 f"  摘要：{' '.join(str(row['summary']).splitlines()).strip()}",
                 "  正式证据准入：未完成。",
                 "",
