@@ -44,11 +44,11 @@ def _report() -> dict:
         "archive_record_schema": "IIOS-C2-P3-CI-RESULT-ARCHIVE-0.1",
         "ci_provenance": {
             "workflow_name": "IIOS Route A C2-P3 Separate-Method Fact Review",
-            "workflow_run_id": 12345,
-            "workflow_run_url": "https://github.com/example/repo/actions/runs/12345",
-            "workflow_head_sha": "a" * 40,
-            "downloaded_artifact_zip_sha256": "b" * 64,
-            "original_report_json_sha256": "c" * 64,
+            "workflow_run_id": 38126026797,
+            "workflow_run_url": "https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/38126026797",
+            "workflow_head_sha": "dc402876288074745623eab10e67ed06252fd9ff",
+            "downloaded_artifact_zip_sha256": "7d68870b2823c02f08c765fa9ed9fe015e4e47f592d8f0dc85b04f7e8245cc1e",
+            "original_report_json_sha256": "6c8b261e9b666e9193627ef7334edc367148d998570e9c36bce577845c78a3f7",
         },
         "result": {
             "case_id": EXPECTED_CASE_ID,
@@ -111,6 +111,13 @@ def test_review_packet_rejects_wrong_case_cutoff_or_incomplete_locator_report():
     report = _report()
     report["result"]["fact_locator_pass_count"] = 12
     with pytest.raises(ReviewPacketError, match="SOURCE_REVIEW_LOCATOR_COUNT_NOT_PASS"):
+        build_review_packet(report, source_report_ref="test")
+
+
+def test_review_packet_rejects_a_substituted_ci_archive_even_if_case_and_facts_match():
+    report = _report()
+    report["ci_provenance"]["workflow_run_id"] = 38126026798
+    with pytest.raises(ReviewPacketError, match="SOURCE_REVIEW_PROVENANCE_MISMATCH"):
         build_review_packet(report, source_report_ref="test")
 
 
