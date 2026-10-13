@@ -16,6 +16,17 @@
 
 **不要把完整 JSON 粘贴到终端。** 整个流程只需在 ChatGPT 粘贴研究提示，再把完整回答复制进专用 JSON 文件。模板文件仍作为本地审计副本保存在 `~/.iios-private/local-pilot/inputs/`，但无需上传给 ChatGPT。
 
+## 如何理解新增的决策策略预演
+
+本地试运行会调用 IIOS 现有 Decision Kernel 评估行动优先级，但这仍然只是 `PILOT_NON_CANONICAL` 预演，不创建正式 Decision。
+
+报告现在把两件事分开显示：
+
+- **价格层独立筛选**：使用当前人工输入价格和现有确定性回报/入场价计算，显示 `PRICE_SCREEN_PASS`、`PRICE_SCREEN_FAIL` 或 `PRICE_SCREEN_UNRESOLVED`。
+- **核心决策策略预演**：依据 Trust、论点、风险、回报以及缺失的决策条件，显示策略内核的行动和首要原因。
+
+即使价格层筛选通过，当前向导仍未收集正式 Thesis Admission、组合容量/仓位约束状态和完整 BUY/ADD 仓位包。因此总体试运行行动可能仍为 `REVIEW_REQUIRED`。这是有意保留的决策门槛，不表示价格计算失败，也不能靠把状态手动改成 PASS 来绕过。非正式 AI 输入即使触发 BUY/ADD/EXIT/REDUCE，也会被降级为人工复核。
+
 ## 输出在哪里
 
 输入和结果仅保存在本机私有目录：
