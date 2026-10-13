@@ -290,6 +290,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
         "1",
         "1",
         "",
+        "0",
     ])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
 
