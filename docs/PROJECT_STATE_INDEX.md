@@ -1,10 +1,10 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-11
+Snapshot: 2026-10-13
 Authority: this file is the **only canonical Current State Index**.
 
-## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-11
+## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-13
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
@@ -27,6 +27,7 @@ B2-F Full Independent Red-team                          PASS / CANONICAL
 P0 B3 persisted upstream write authorization             MERGED / EXACT-HEAD CI PASS
 P0 Canonical Runtime Callback Preflight                  MERGED / EXACT-HEAD CONTRACT + ADVERSARIAL PASS
 Batch 0 narrow state reconciliation                     PASS ON MERGE; NO ECONOMIC SEMANTICS CHANGED
+Local MVP Batch 0 baseline audit (revised plan)          BASELINE ESTABLISHED / ARCHIVED RESPONSE CONTRACT FAIL / MAC RUN BUNDLE OPEN
 Batch 1 private Path A scenario runner                  PASS / MERGED; 40 TESTS; ANALYSIS-ONLY
 Batch 1 macOS one-click launcher permission fix             PASS / MERGED PR #358; 12 CHECKS + 3 STATIC TESTS PASS; OPERATOR REPORTS SUCCESS / BUNDLE NOT INDEPENDENTLY REVIEWED
 Batch 2 Path A scenario integrity audit                    IN PROGRESS / PR #360 MERGED; 43 TESTS + 13 EXACT-HEAD CHECKS PASS; LOCAL BUNDLE REVIEW OPEN
@@ -44,6 +45,16 @@ Path A operator-attested price overlay               ANALYSIS-ONLY INTAKE IMPLEM
 Local single-user complete pilot                     ACTIVE P0 PRIORITY; PILOT_NON_CANONICAL BEFORE FORMALIZATION
 Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
 ```
+
+### Local MVP Batch 0 baseline audit (2026-10-13)
+
+Audit record: `docs/iios/BATCH0_LOCAL_PILOT_BASELINE_AUDIT_20261013.md`.
+
+- The archived `IIOS_Pilot_Response_山东赫达_002810_20261012.json` was reviewed as a research response/input, together with its separate narrative summary. These artifacts are in the user's Library, not the public repository; neither proves that the current local runner generated a bound output bundle.
+- The archived response predates the current response contract and lacks `forecast_valuation.thesis_break_stress`, which current validation requires. It must be repaired/regenerated through the current handoff; do not weaken current validation.
+- The visible response preserves conservative states (Trust UNKNOWN; MIE NOT_IDENTIFIABLE; expectation gap UNKNOWN; Risk UNKNOWN) and uncalibrated scenario assumptions. It does not establish formal evidence admission or a canonical BUY/ADD.
+- Source review also found that the current local pilot receipt has no output-file hashes and the replay-labelled path does not compare a prior output against recomputation. This is a concrete reliability-batch gap, not Batch 0 evidence of replay success.
+- **Batch 0 status:** enough baseline is recorded to proceed to core integration. The actual private macOS output bundle and current-run receipt remain NOT VERIFIED and do not block work on the non-canonical pilot. No quote values or private payloads were copied into Git.
 
 ### Personal local investment pilot — response-file handoff and report-quality gates (2026-10-12)
 
