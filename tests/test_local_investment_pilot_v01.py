@@ -22,6 +22,7 @@ from iios_mvp.local_investment_pilot_v01 import (
     _build_response_repair_prompt,
     run_guided_wizard,
     run_local_investment_pilot,
+    verify_local_pilot_bundle,
 )
 
 
@@ -632,10 +633,15 @@ def test_replay_reruns_the_saved_input_and_matches_return_calculation(tmp_path):
     )
     first_analysis = json.loads((Path(first["run_dir"]) / "analysis.json").read_text(encoding="utf-8"))
     replay_analysis = json.loads((Path(replay["run_dir"]) / "analysis.json").read_text(encoding="utf-8"))
-    assert replay["status"] == "PILOT_REPLAY_RECOMPUTED"
+    assert replay["status"] == "PILOT_REPLAY_MATCHED"
     assert replay["replay_of"] == first["pilot_id"]
+    assert replay["replay_comparison"]["status"] == "MATCH"
+    assert replay["replay_comparison"]["hash_verification"] == "PASS"
+    assert "decision" in replay["replay_comparison"]["compared_fields"]
     assert replay_analysis["return_metrics"] == first_analysis["return_metrics"]
     assert replay_analysis["decision"]["provisional_action"] == first_analysis["decision"]["provisional_action"]
+    receipt = json.loads((Path(replay["run_dir"]) / "pilot_receipt.json").read_text(encoding="utf-8"))
+    assert receipt["replay_comparison"]["status"] == "MATCH"
 
 
 def test_prepare_input_rejects_weekend_price_observation_dates():
@@ -767,3 +773,74 @@ def test_root_one_click_launcher_uses_the_guided_entry_and_has_valid_bash():
     assert 'python3 -m iios_mvp.local_investment_pilot_v01 --wizard' in content
     assert "--create-template" not in content
     assert "git pull" not in content
+
+def test_run_receipt_binds_exact_input_analysis_and_report_bytes(tmp_path):
+    result = run_local_investment_pilot(
+        input_path=_write_input(tmp_path),
+        output_root=tmp_path / "private-runs",
+    )
+    bundle = Path(result["run_dir"])
+    receipt = json.loads((bundle / "pilot_receipt.json").read_text(encoding="utf-8"))
+
+    assert set(receipt["file_manifest"]) == {"input.json", "analysis.json", "report.md"}
+    checked = verify_local_pilot_bundle(bundle)
+    assert checked["status"] == "PILOT_BUNDLE_HASH_CHECK_PASS"
+    assert checked["pilot_id"] == result["pilot_id"]
+    assert checked["hash_algorithm"] == "SHA-256"
+    assert all(item["byte_size"] >= 0 and len(item["sha256"]) == 64 for item in checked["verified_files"])
+
+
+@pytest.mark.parametrize("filename", ["input.json", "analysis.json", "report.md"])
+def test_read_only_bundle_checker_blocks_changed_output_bytes(tmp_path, filename):
+    result = run_local_investment_pilot(
+        input_path=_write_input(tmp_path),
+        output_root=tmp_path / "private-runs",
+    )
+    target = Path(result["run_dir"]) / filename
+    target.write_bytes(target.read_bytes() + b"\n# changed after receipt\n")
+
+    with pytest.raises(LocalInvestmentPilotError, match=f"RUN_BUNDLE_HASH_MISMATCH:{filename}"):
+        verify_local_pilot_bundle(Path(result["run_dir"]))
+
+
+def test_replay_reports_decision_material_mismatch_instead_of_claiming_success(tmp_path, monkeypatch):
+    import iios_mvp.local_investment_pilot_v01 as pilot
+
+    output_root = tmp_path / "private-runs"
+    first = run_local_investment_pilot(input_path=_write_input(tmp_path), output_root=output_root)
+    original_analyse = pilot._analyse
+
+    def drifted_analyse(payload, run_id):
+        analysis, _report = original_analyse(payload, run_id)
+        analysis["assessment"]["quality"]["summary"] = "synthetic replay drift"
+        return analysis, pilot._render_report(analysis)
+
+    monkeypatch.setattr(pilot, "_analyse", drifted_analyse)
+    replay = run_local_investment_pilot(
+        input_path=Path(first["run_dir"]) / "input.json",
+        output_root=output_root,
+        replay_of=first["pilot_id"],
+    )
+    assert replay["status"] == "PILOT_REPLAY_MISMATCH"
+    assert replay["replay_comparison"]["status"] == "MISMATCH"
+    assert "assessment" in replay["replay_comparison"]["mismatched_fields"]
+    receipt = json.loads((Path(replay["run_dir"]) / "pilot_receipt.json").read_text(encoding="utf-8"))
+    assert receipt["replay_comparison"]["status"] == "MISMATCH"
+
+
+def test_replay_blocks_a_prior_bundle_without_hash_manifest(tmp_path):
+    input_path = _write_input(tmp_path)
+    output_root = tmp_path / "private-runs"
+    first = run_local_investment_pilot(input_path=input_path, output_root=output_root)
+    receipt_path = Path(first["run_dir"]) / "pilot_receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt.pop("file_manifest", None)
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+    with pytest.raises(LocalInvestmentPilotError, match="RUN_BUNDLE_HASH_MANIFEST_MISSING"):
+        run_local_investment_pilot(
+            input_path=Path(first["run_dir"]) / "input.json",
+            output_root=output_root,
+            replay_of=first["pilot_id"],
+        )
+
