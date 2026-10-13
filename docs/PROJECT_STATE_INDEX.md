@@ -111,6 +111,14 @@ This is a usability/reporting repair to `PILOT_NON_CANONICAL` only. Explicit tim
 - **Real-user feature acceptance still open:** the package implementation is merged and server-side test/workflow verified, but the new portfolio prompt/conditional-sizing output has not yet run on the user's Mac. A fresh local run is required. The report remains `PILOT_NON_CANONICAL`; conditional sizing never means an authorized position, which remains 0%, until formal gates and human approval are independently met. No private portfolio values are committed.
 - Next after real-run confirmation: focus on 605016's actual expansion contribution using disclosed project capacity, ramp, volumes, selling prices, costs, and actual contribution where identified; do not infer realized earnings from capex progress alone.
 
+### Portfolio prompt EOF incident and terminal-input fix (2026-10-13)
+
+- **Operator incident:** the fixed-input 605016 launcher invokes its Python driver from a heredoc. The newly added optional portfolio prompt used builtin `input()`, which read the exhausted source stream and raised `EOFError` before the run could finish. This was an implementation defect, not an operator-input error.
+- PR [#417](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/417) merged at `67d22036269bcff4bab20cda3d076a3b739e0e0c`. The prompt reader now uses the macOS controlling terminal when Python is executing from non-interactive stdin, preserves the normal prompt path, and emits an actionable error when no terminal is available. The dedicated local-pilot suite passed **63/63 tests**, and Investment Core CI, MVP Pilot, B00-B, Post-B04 and PILOT-02 checks all passed on the exact PR head.
+- A replacement 605016 package was rebuilt with the repaired source fallback SHA. Archive integrity, executable bit, bash syntax, bundled payload identity/price/cutoff, and presence of the repair note were verified in the build environment.
+- **Still open:** the repaired package has not yet been run on the user's Mac. The prior attempt stopped before run generation; its diagnostic output is not an accepted investment run. Continue with the replacement package and inspect the resulting first-run + replay bundle. Do not ask the operator to retry the broken archive.
+- No portfolio input or quote was committed to Git. The feature remains `PILOT_NON_CANONICAL`; actual authorized new position remains 0%.
+
 ### 605016 expansion project's realized-contribution research checkpoint (2026-10-13)
 
 - Public-first evidence note added: [`605016_EXPANSION_PROJECT_REALIZED_CONTRIBUTION_REVIEW_20261013.md`](iios/605016_EXPANSION_PROJECT_REALIZED_CONTRIBUTION_REVIEW_20261013.md). It uses the 2026H1 report/major operating data disclosure and the 2026-08-21 revised exchange inquiry response.
