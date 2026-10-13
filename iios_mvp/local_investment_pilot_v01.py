@@ -252,8 +252,8 @@ def _replay_comparison(previous_analysis: Mapping[str, Any], recomputed_analysis
     """Compare stable decision-material fields while ignoring the volatile run ID."""
     mismatched = []
     for field in REPLAY_COMPARISON_FIELDS:
-        before = json.dumps(previous_analysis.get(field), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        after = json.dumps(recomputed_analysis.get(field), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        before = json.dumps(_safe(previous_analysis.get(field)), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        after = json.dumps(_safe(recomputed_analysis.get(field)), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         if before != after:
             mismatched.append(field)
     return {
