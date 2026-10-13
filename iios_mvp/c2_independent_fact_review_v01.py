@@ -25,6 +25,10 @@ SOURCE_REPORT_RELATIVE = (
     "evidence/real_cases/RC-CN-A-002001-20261009/"
     "C2_P3_FACT_REVIEW_CI_RESULT_38126026797.json"
 )
+EXPECTED_WORKFLOW_RUN_ID = 38126026797
+EXPECTED_WORKFLOW_HEAD_SHA = "dc402876288074745623eab10e67ed06252fd9ff"
+EXPECTED_ARTIFACT_ZIP_SHA256 = "7d68870b2823c02f08c765fa9ed9fe015e4e47f592d8f0dc85b04f7e8245cc1e"
+EXPECTED_ORIGINAL_REPORT_SHA256 = "6c8b261e9b666e9193627ef7334edc367148d998570e9c36bce577845c78a3f7"
 SOURCE_URLS = {
     "SZSE-2026-H1-SUMMARY": (
         "https://disc.static.szse.cn/disc/disk03/finalpage/2026-08-20/"
@@ -65,6 +69,13 @@ def build_review_packet(document: Mapping[str, Any], *, source_report_ref: str) 
     provenance = document.get("ci_provenance")
     if not isinstance(result, Mapping) or not isinstance(provenance, Mapping):
         raise ReviewPacketError("SOURCE_REVIEW_REPORT_RESULT_OR_PROVENANCE_MISSING")
+    if (
+        provenance.get("workflow_run_id") != EXPECTED_WORKFLOW_RUN_ID
+        or provenance.get("workflow_head_sha") != EXPECTED_WORKFLOW_HEAD_SHA
+        or provenance.get("downloaded_artifact_zip_sha256") != EXPECTED_ARTIFACT_ZIP_SHA256
+        or provenance.get("original_report_json_sha256") != EXPECTED_ORIGINAL_REPORT_SHA256
+    ):
+        raise ReviewPacketError("SOURCE_REVIEW_PROVENANCE_MISMATCH")
     if result.get("case_id") != EXPECTED_CASE_ID or result.get("cutoff") != EXPECTED_CUTOFF:
         raise ReviewPacketError("SOURCE_REVIEW_CASE_OR_CUTOFF_MISMATCH")
     if result.get("fact_count") != EXPECTED_FACT_COUNT:
