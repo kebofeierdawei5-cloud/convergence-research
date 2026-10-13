@@ -1799,6 +1799,82 @@ def _ask(prompt: str, default: str | None = None) -> str:
 
 
 
+def _ask_operator_portfolio_context() -> dict[str, Any] | None:
+    """Collect optional personal portfolio limits separately from AI research."""
+    print("\n个人组合与仓位包（可选）")
+    print("如暂时不填写，系统会把组合约束保持为 UNKNOWN，不给出条件仓位。")
+    print("填写的数据保存在本机私有输入中，不会上传 GitHub；它们也不会授权实际交易。")
+    while True:
+        choice = _ask("是否填写组合风险预算和仓位限制？0 = 跳过，1 = 填写", "0")
+        if choice in {"0", "1"}:
+            break
+        print("请输入 0 或 1。")
+    if choice == "0":
+        return None
+
+    print("组合约束状态：1 = 已核实 PASS，2 = BLOCKED，3 = UNKNOWN")
+    while True:
+        status_choice = _ask("组合约束状态 1/2/3", "3")
+        if status_choice in {"1", "2", "3"}:
+            break
+        print("请输入 1、2 或 3。")
+    constraint_status = {"1": "PASS", "2": "BLOCKED", "3": "UNKNOWN"}[status_choice]
+    if constraint_status != "PASS":
+        print("组合约束未通过；保留当前状态，不采集条件仓位，也不会允许新增资金。")
+        return {"constraint_status": constraint_status, "can_add": False}
+
+    while True:
+        can_add_choice = _ask("按你的真实现金与组合限制，是否允许增加该标的风险敞口？1 = 是，0 = 否", "0")
+        if can_add_choice in {"0", "1"}:
+            break
+        print("请输入 0 或 1。")
+
+    def ask_percent(prompt: str) -> str:
+        while True:
+            raw = _ask(prompt)
+            try:
+                value = _number(raw, "PERCENT_INPUT")
+                if value < 0 or value > 100:
+                    raise LocalInvestmentPilotError("百分比必须在 0 到 100 之间。")
+                return format(value, "f")
+            except (LocalInvestmentPilotError, ValueError) as exc:
+                print(f"输入无效：{exc}。请填写 0 到 100 之间的百分比。")
+
+    def ask_positive(prompt: str) -> str:
+        while True:
+            raw = _ask(prompt)
+            try:
+                return format(_positive(raw, "PRICE_ZONE"), "f")
+            except LocalInvestmentPilotError as exc:
+                print(f"输入无效：{exc}。请填写大于 0 的价格。")
+
+    risk_budget = ask_percent("论点失效压力情景下，该标的最多允许损失组合净资产的百分比（例如 1）")
+    while True:
+        low = ask_positive("你愿意考虑入场的价格区间下沿")
+        high = ask_positive("你愿意考虑入场的价格区间上沿")
+        if Decimal(low) <= Decimal(high):
+            break
+        print("入场区间下沿不得高于上沿，请重新输入两个价格。")
+    while True:
+        initial = ask_percent("初始建仓占组合净资产百分比（例如 1）")
+        target = ask_percent("目标仓位占组合净资产百分比（例如 4）")
+        maximum = ask_percent("允许的最大单股仓位占组合净资产百分比（例如 8）")
+        if Decimal(initial) <= Decimal(target) <= Decimal(maximum):
+            break
+        print("仓位必须满足：初始仓位 ≤ 目标仓位 ≤ 最大仓位。请重新输入三个百分比。")
+
+    return {
+        "constraint_status": constraint_status,
+        "can_add": can_add_choice == "1",
+        "risk_budget_pct_nav": risk_budget,
+        "entry_zone_low": low,
+        "entry_zone_high": high,
+        "initial_position_pct": initial,
+        "target_position_pct": target,
+        "max_position_pct": maximum,
+    }
+
+
 def run_guided_wizard(
     *,
     template_root: str | Path | None = None,
