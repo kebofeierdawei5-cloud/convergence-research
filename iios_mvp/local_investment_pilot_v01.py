@@ -10,6 +10,7 @@ solver. Formal admission and canonical Decision code remain unchanged.
 import argparse
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -35,6 +36,28 @@ PILOT_RECEIPT_SCHEMA = "IIOS-LOCAL-PILOT-RUN-RECORD-0.1"
 SHANGHAI = timezone(timedelta(hours=8))
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PRICE_ASSURANCE = "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
+BUNDLE_FILENAMES = ("input.json", "analysis.json", "report.md")
+REPLAY_COMPARISON_FIELDS = (
+    "schema_version",
+    "status",
+    "case",
+    "price_input",
+    "evidence_register",
+    "referenced_evidence_ids",
+    "unresolved_evidence_references",
+    "after_cutoff_evidence_references",
+    "uncertain_timing_evidence_references",
+    "assessment",
+    "forecast_valuation",
+    "decision_parameters",
+    "return_metrics",
+    "return_metrics_reason",
+    "thesis_break_stress_review",
+    "notes_price_conflicts",
+    "decision",
+    "governance",
+    "notes",
+)
 
 
 class LocalInvestmentPilotError(ValueError):
@@ -136,6 +159,111 @@ def _write_local(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
     if os.name != "nt":
         path.chmod(0o600)
+
+
+def _fingerprint_file(path: Path) -> dict[str, Any]:
+    """Return SHA-256 and byte size for one regular output file."""
+    digest = hashlib.sha256()
+    byte_size = 0
+    try:
+        with path.open("rb") as stream:
+            while True:
+                block = stream.read(1024 * 1024)
+                if not block:
+                    break
+                digest.update(block)
+                byte_size += len(block)
+    except OSError as exc:
+        raise LocalInvestmentPilotError(f"RUN_BUNDLE_FILE_UNREADABLE:{path.name}") from exc
+    return {"sha256": digest.hexdigest(), "byte_size": byte_size}
+
+
+def _verify_run_bundle(run_path: str | Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Verify a local pilot receipt's hashes against the exact input/analysis/report bytes."""
+    try:
+        run_dir = Path(run_path).expanduser().resolve(strict=True)
+    except OSError as exc:
+        raise LocalInvestmentPilotError("RUN_BUNDLE_DIRECTORY_NOT_FOUND") from exc
+    if not run_dir.is_dir():
+        raise LocalInvestmentPilotError("RUN_BUNDLE_DIRECTORY_REQUIRED")
+    try:
+        run_dir.relative_to(REPOSITORY_ROOT.resolve())
+    except ValueError:
+        pass
+    else:
+        raise LocalInvestmentPilotError("RUN_BUNDLE_MUST_BE_OUTSIDE_REPOSITORY")
+
+    receipt_path = run_dir / "pilot_receipt.json"
+    try:
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise LocalInvestmentPilotError("RUN_RECEIPT_MISSING") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise LocalInvestmentPilotError("RUN_RECEIPT_UNREADABLE") from exc
+    if not isinstance(receipt, Mapping) or receipt.get("receipt_schema") != PILOT_RECEIPT_SCHEMA:
+        raise LocalInvestmentPilotError("RUN_RECEIPT_SCHEMA_MISMATCH")
+    if receipt.get("status") != PILOT_STATUS:
+        raise LocalInvestmentPilotError("RUN_RECEIPT_NOT_PILOT_NON_CANONICAL")
+    if str(receipt.get("pilot_id") or "") != run_dir.name:
+        raise LocalInvestmentPilotError("RUN_RECEIPT_PILOT_ID_MISMATCH")
+    for key, expected_name in (
+        ("input_file", "input.json"),
+        ("analysis_file", "analysis.json"),
+        ("report_file", "report.md"),
+    ):
+        if receipt.get(key) != expected_name:
+            raise LocalInvestmentPilotError(f"RUN_RECEIPT_FILENAME_MISMATCH:{key}")
+
+    manifest = receipt.get("file_manifest")
+    if not isinstance(manifest, Mapping):
+        raise LocalInvestmentPilotError("RUN_BUNDLE_HASH_MANIFEST_MISSING")
+    for filename in BUNDLE_FILENAMES:
+        expected = manifest.get(filename)
+        if not isinstance(expected, Mapping):
+            raise LocalInvestmentPilotError(f"RUN_BUNDLE_HASH_MISSING:{filename}")
+        expected_hash = str(expected.get("sha256") or "")
+        expected_size = expected.get("byte_size")
+        if not re.fullmatch(r"[0-9a-f]{64}", expected_hash) or not isinstance(expected_size, int) or expected_size < 0:
+            raise LocalInvestmentPilotError(f"RUN_BUNDLE_HASH_RECORD_INVALID:{filename}")
+        actual = _fingerprint_file(run_dir / filename)
+        if actual != {"sha256": expected_hash, "byte_size": expected_size}:
+            raise LocalInvestmentPilotError(f"RUN_BUNDLE_HASH_MISMATCH:{filename}")
+    return dict(receipt), {name: dict(manifest[name]) for name in BUNDLE_FILENAMES}
+
+
+def verify_local_pilot_bundle(run_path: str | Path) -> dict[str, Any]:
+    """Read-only check of a run's input, analysis and report against its receipt."""
+    receipt, manifest = _verify_run_bundle(run_path)
+    return {
+        "status": "PILOT_BUNDLE_HASH_CHECK_PASS",
+        "pilot_id": receipt["pilot_id"],
+        "hash_algorithm": "SHA-256",
+        "verified_files": [
+            {"name": name, "byte_size": manifest[name]["byte_size"], "sha256": manifest[name]["sha256"]}
+            for name in BUNDLE_FILENAMES
+        ],
+        "formal_decision_created": False,
+        "execution_authorized": False,
+        "auto_execution": False,
+    }
+
+
+def _replay_comparison(previous_analysis: Mapping[str, Any], recomputed_analysis: Mapping[str, Any]) -> dict[str, Any]:
+    """Compare stable decision-material fields while ignoring the volatile run ID."""
+    mismatched = []
+    for field in REPLAY_COMPARISON_FIELDS:
+        before = json.dumps(previous_analysis.get(field), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        after = json.dumps(recomputed_analysis.get(field), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if before != after:
+            mismatched.append(field)
+    return {
+        "mode": "DECISION_MATERIAL_FIELDS_V1",
+        "status": "MATCH" if not mismatched else "MISMATCH",
+        "hash_verification": "PASS",
+        "prior_pilot_id": previous_analysis.get("pilot_id"),
+        "compared_fields": list(REPLAY_COMPARISON_FIELDS),
+        "mismatched_fields": mismatched,
+    }
 
 
 def _status(value: Any, allowed: set[str]) -> str:
@@ -1214,16 +1342,44 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
 def _write_run(
     input_path: Path, output_root: Path, *, replay_of: str | None = None
 ) -> dict[str, Any]:
-    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    try:
+        input_text = input_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise LocalInvestmentPilotError("PILOT_INPUT_FILE_UNREADABLE") from exc
+
+    previous_analysis: dict[str, Any] | None = None
+    if replay_of:
+        if replay_of in {".", ".."} or Path(replay_of).name != replay_of or "/" in replay_of:
+            raise LocalInvestmentPilotError("REPLAY_PILOT_ID_INVALID")
+        prior_dir = (output_root / replay_of).resolve(strict=True)
+        if prior_dir.parent != output_root.resolve():
+            raise LocalInvestmentPilotError("REPLAY_RUN_MUST_BE_DIRECT_CHILD_OF_OUTPUT_ROOT")
+        previous_receipt, previous_manifest = _verify_run_bundle(prior_dir)
+        source = input_path.resolve(strict=True)
+        if source != (prior_dir / "input.json").resolve(strict=True):
+            raise LocalInvestmentPilotError("REPLAY_INPUT_MUST_BE_THE_VERIFIED_PRIOR_INPUT")
+        if _fingerprint_file(source) != previous_manifest["input.json"]:
+            raise LocalInvestmentPilotError("REPLAY_INPUT_HASH_CHANGED_AFTER_VERIFICATION")
+        try:
+            previous_analysis = json.loads((prior_dir / "analysis.json").read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise LocalInvestmentPilotError("REPLAY_PRIOR_ANALYSIS_UNREADABLE") from exc
+        if not isinstance(previous_analysis, dict) or previous_analysis.get("pilot_id") != previous_receipt.get("pilot_id"):
+            raise LocalInvestmentPilotError("REPLAY_PRIOR_ANALYSIS_PILOT_ID_MISMATCH")
+
+    payload = json.loads(input_text)
     symbol = str((payload.get("case") or {}).get("symbol") or "candidate").replace(".", "-")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     run_id = f"local-pilot-{symbol}-{stamp}"
     analysis, report = _analyse(payload, run_id)
     run_dir = output_root / run_id
     run_dir.mkdir(parents=True, exist_ok=False, mode=0o700)
-    _write_local(run_dir / "input.json", input_path.read_text(encoding="utf-8"))
+    _write_local(run_dir / "input.json", input_text)
     _write_local(run_dir / "analysis.json", json.dumps(_safe(analysis), ensure_ascii=False, indent=2, allow_nan=False))
     _write_local(run_dir / "report.md", report)
+
+    file_manifest = {name: _fingerprint_file(run_dir / name) for name in BUNDLE_FILENAMES}
+    replay_comparison = _replay_comparison(previous_analysis, analysis) if previous_analysis is not None else None
     receipt = {
         "receipt_schema": PILOT_RECEIPT_SCHEMA,
         "status": PILOT_STATUS,
@@ -1233,6 +1389,8 @@ def _write_run(
         "input_file": "input.json",
         "analysis_file": "analysis.json",
         "report_file": "report.md",
+        "file_manifest": file_manifest,
+        "replay_comparison": replay_comparison,
         "formal_decision_created": False,
         "canonical_run_receipt_created": False,
         "execution_authorized": False,
@@ -1241,18 +1399,22 @@ def _write_run(
     _write_local(run_dir / "pilot_receipt.json", json.dumps(receipt, ensure_ascii=False, indent=2))
     if os.name != "nt":
         run_dir.chmod(0o700)
+    if replay_of:
+        result_status = "PILOT_REPLAY_MATCHED" if replay_comparison and replay_comparison["status"] == "MATCH" else "PILOT_REPLAY_MISMATCH"
+    else:
+        result_status = "PILOT_CREATED"
     return {
-        "status": "PILOT_REPLAY_RECOMPUTED" if replay_of else "PILOT_CREATED",
+        "status": result_status,
         "pilot_id": run_id,
         "provisional_action": analysis["decision"]["provisional_action"],
         "replay_of": replay_of,
+        "replay_comparison": replay_comparison,
         "run_dir": str(run_dir),
         "report_path": str(run_dir / "report.md"),
         "formal_decision_created": False,
         "canonical_run_receipt_created": False,
         "auto_execution": False,
     }
-
 
 def run_local_investment_pilot(*, input_path: str | Path, output_root: str | Path, replay_of: str | None = None) -> dict[str, Any]:
     source = _outside_repo(input_path, "PILOT_INPUT_PATH", must_exist=True)
@@ -1801,7 +1963,8 @@ def _main(argv: list[str] | None = None) -> int:
     modes.add_argument("--wizard", action="store_true", help="run the simple guided investment workflow")
     modes.add_argument("--create-template", action="store_true")
     modes.add_argument("--input", help="run a completed private pilot input JSON")
-    modes.add_argument("--replay-run", help="re-run a previous local pilot's input.json")
+    modes.add_argument("--replay-run", help="verify a prior bundle then recompute and compare decision-material fields")
+    modes.add_argument("--check-run", help="read-only SHA-256 check of a local run bundle")
     parser.add_argument("--template-root", default=str(Path.home() / ".iios-private" / "local-pilot" / "inputs"))
     parser.add_argument("--output-root", default=str(Path.home() / ".iios-private" / "local-pilot" / "runs"))
     parser.add_argument("--company")
@@ -1835,10 +1998,15 @@ def _main(argv: list[str] | None = None) -> int:
             )
         elif args.input:
             result = run_local_investment_pilot(input_path=args.input, output_root=args.output_root)
+        elif args.check_run:
+            result = verify_local_pilot_bundle(args.check_run)
         else:
-            prior = Path(args.replay_run).expanduser()
+            prior = Path(args.replay_run).expanduser().resolve()
             if not prior.is_dir():
                 raise LocalInvestmentPilotError("REPLAY_RUN_DIRECTORY_REQUIRED")
+            expected_root = Path(args.output_root).expanduser().resolve()
+            if prior.parent != expected_root:
+                raise LocalInvestmentPilotError("REPLAY_RUN_MUST_BE_DIRECT_CHILD_OF_OUTPUT_ROOT; set --output-root to its parent")
             result = run_local_investment_pilot(
                 input_path=prior / "input.json", output_root=args.output_root, replay_of=prior.name
             )
