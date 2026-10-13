@@ -62,6 +62,9 @@ REPLAY_COMPARISON_FIELDS = (
 )
 
 
+_ORIGINAL_INPUT = input
+
+
 class LocalInvestmentPilotError(ValueError):
     """Bad local pilot input or unavailable pilot output."""
 
@@ -1791,10 +1794,37 @@ def _build_response_repair_prompt(
     )
 
 
+def _read_operator_prompt(prompt: str) -> str:
+    """Read an operator prompt from a controlling terminal even when stdin is a Python heredoc.
+
+    The dedicated 605016 launcher executes its Python driver from stdin. In that
+    mode, builtin input() sees the already-consumed source stream and raises
+    EOFError. When using the real builtin with non-interactive stdin, read from
+    /dev/tty instead. Tests that replace builtin input() keep their normal path.
+    """
+    if not sys.stdin.isatty() and input is _ORIGINAL_INPUT:
+        try:
+            with open("/dev/tty", "r+", encoding="utf-8", buffering=1) as tty:
+                tty.write(prompt)
+                tty.flush()
+                raw = tty.readline()
+        except OSError as exc:
+            raise LocalInvestmentPilotError(
+                "INTERACTIVE_TERMINAL_UNAVAILABLE: 无法从 /dev/tty 读取交互输入。"
+                "请在 macOS Terminal 中启动 .command 文件，而不是以无终端的后台/重定向方式运行。"
+            ) from exc
+        if raw == "":
+            raise LocalInvestmentPilotError(
+                "INTERACTIVE_TERMINAL_INPUT_CLOSED: 终端输入已关闭；尚未完成组合预算输入。"
+            )
+        return raw
+    return input(prompt)
+
+
 def _ask(prompt: str, default: str | None = None) -> str:
     suffix = f" [{default}]" if default is not None else ""
     while True:
-        raw = input(f"{prompt}{suffix}: ").strip()
+        raw = _read_operator_prompt(f"{prompt}{suffix}: ").strip()
         if raw:
             return raw
         if default is not None:
