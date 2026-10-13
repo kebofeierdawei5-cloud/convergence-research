@@ -376,6 +376,24 @@ def test_price_above_return_and_risk_entry_ceiling_is_no_buy_when_flat(tmp_path)
     assert "PORTFOLIO_CONSTRAINT_NOT_PROVIDED" in analysis["decision"]["gating_issues"]
 
 
+def test_core_kernel_capital_action_is_downgraded_without_formal_admission():
+    payload = _payload()
+    payload["case"]["current_position_pct"] = "5"
+    payload["assessment"]["thesis"]["status"] = "BROKEN"
+    analysis, _report = _analyse(payload, "TEST-CORE-KERNEL-DEMOTION")
+    decision = analysis["decision"]
+
+    # The shared IIOS policy kernel sees the thesis-exit precedence, but the
+    # non-canonical AI response cannot itself authorize an EXIT recommendation.
+    assert decision["core_policy_evaluation"]["action"] == "EXIT"
+    assert decision["core_policy_evaluation"]["capital_action_downgraded"] is True
+    assert decision["core_policy_evaluation"]["effective_pilot_action"] == "REVIEW_REQUIRED"
+    assert decision["provisional_action"] == "REVIEW_REQUIRED"
+    assert decision["formal_decision_created"] is False
+    assert decision["execution_authorized"] is False
+    assert "NON_CANONICAL_SEMANTICS_CANNOT_AUTHORIZE_CAPITAL_ACTION" in decision["gating_issues"]
+
+
 def test_unknown_mie_keeps_pilot_action_at_review_required(tmp_path):
     payload = _payload()
     payload["assessment"]["market_implied_expectation"]["status"] = "NOT_IDENTIFIABLE"
