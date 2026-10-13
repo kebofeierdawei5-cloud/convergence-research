@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import sys
 from typing import Any, Mapping
 
@@ -215,9 +216,11 @@ def _ensure_private_output_path(path: Path) -> None:
 def prepare_review_packet(
     *, report_path: str | Path, output_path: str | Path | None = None
 ) -> dict[str, Any]:
-    report = Path(report_path).expanduser()
-    document = _read_report(report)
     repo_root = Path(__file__).resolve().parents[1]
+    report = Path(report_path).expanduser()
+    if not report.is_absolute() and not report.exists():
+        report = repo_root / report
+    document = _read_report(report)
     try:
         source_ref = report.resolve(strict=True).relative_to(repo_root).as_posix()
     except ValueError:
@@ -230,9 +233,13 @@ def prepare_review_packet(
     else:
         output = Path(output_path).expanduser()
     _ensure_private_output_path(output)
+    parent_existed = output.parent.exists()
     output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     if os.name != "nt":
-        os.chmod(output.parent, 0o700)
+        if not parent_existed:
+            os.chmod(output.parent, 0o700)
+        elif stat.S_IMODE(output.parent.stat().st_mode) & 0o077:
+            raise ReviewPacketError("OUTPUT_PARENT_PERMISSIONS_TOO_OPEN")
     fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
