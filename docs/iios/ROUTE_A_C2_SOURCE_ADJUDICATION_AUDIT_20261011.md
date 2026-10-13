@@ -187,3 +187,20 @@ PR [#342](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/342
 The canonical `admit_semantic_artifact` boundary now blocks the manual ChatGPT Web semantic producer and renamed producer identities that retain the unapproved `IIOS-CHATGPT-WEB-OPERATOR-POLICY-` namespace. This is fail-closed enforcement under the existing frozen B0 contract, not a governance downgrade or new source-origin assurance class. Manual Web handoff remains available only as non-canonical operator assistance; local hashes still do not authenticate OpenAI/model origin.
 
 **Remaining project gates:** P0-LLM-001 and P0-LLM-004 remain OPEN. No production Host-origin run, complete Run Receipt, independent replay, or formal canonical investment decision has been established. For C2, the next batch is a genuinely separate review of the 13 official-filing facts, conservative source-date upper bounds, and private fact-level-use boundary; no more market-price web search is required.
+
+## 6. Prepared independent fact/use review packet (2026-10-13)
+
+The helper `python -m iios_mvp.c2_independent_fact_review_v01` creates a private reviewer packet from the pinned, sanitized C2-P3 machine review archive. Default output is under `~/.iios-private/reviews/` with mode 0600 (parent directory mode 0700). It copies only the thirteen fact IDs/labels, official PDF URLs, physical page locators, source byte hashes/sizes and conservative `known_at` bounds. It does not copy PDF bytes or numeric market-price values.
+
+Run from the canonical repository checkout:
+
+```bash
+python -m iios_mvp.c2_independent_fact_review_v01 \
+  --source-report evidence/real_cases/RC-CN-A-002001-20261009/C2_P3_FACT_REVIEW_CI_RESULT_38126026797.json
+```
+
+The output is explicitly `TEMPLATE_PENDING_NOT_REVIEWED`. It leaves the reviewer identity, independence declaration, each fact check, private-use scope, retention/backup limits, permission instrument and final disposition as `PENDING`. The helper refuses a changed case/cutoff, a report without 13/13 machine locator/date checks, duplicated or unmapped fact rows, an upgraded reuse status, or a report containing a numeric market-price value. Its tests establish packet construction and private-file handling only; they do not independently verify the original PDF bytes or authorize any use.
+
+A genuinely separate reviewer must inspect the exact private PDF bytes and the cited page/row for each fact, assess the conservative publication-time bound, and explicitly adjudicate fact-level private storage/computation/internal display/retention and derived-output scope. Any unknown or rejected row remains unresolved. The reviewer must not merely repeat the machine CI conclusion or use this template as evidence of their own identity. Once a real review is complete, the case-bound manifest and rights record must be reconciled and re-hashed, then the existing signed-admission contract must be executed with distinct registered admission and independent-reviewer keys. This packet is not itself cryptographically bound into that envelope and cannot replace it.
+
+C2 is still **NOT FORMALLY ADMITTED**. Company-disclosure reuse/retention remains `PUBLIC_ACCESS_REUSE_UNKNOWN` pending the separate review and an applicable rights disposition; the operator-attested 002001 market price is a different evidence class and remains excluded from source-admission claims.
