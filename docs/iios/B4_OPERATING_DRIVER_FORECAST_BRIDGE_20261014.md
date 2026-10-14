@@ -16,11 +16,13 @@ IIOS-OPERATING-DRIVER-FORECAST-0.1 carries:
 - Product/line capacity and historical actuals: production, sales volume, net realized ASP and variable cost per unit.
 - Bear/Base/Bull operating inputs: production, sales volume, net ASP, variable unit cost, cash fixed operating expenses (excluding D&A), depreciation/amortization, finance costs, tax-rate ratio, cash capex and working-capital change.
 - Each scalar carries value, unit, data_class, basis, evidence_refs and note.
+- Historical actuals are calculation-eligible only as `OBSERVED_ACTUAL`; issuer forecasts or analyst assumptions cannot leak into the actuals bridge. Bear/Base/Bull forward scenarios accept only `ISSUER_FORECAST` or `ANALYST_ASSUMPTION`; do not move a realized-actual label into a forward scenario without building an explicit forecast.
 - Known reported/issuer numbers require resolved source references and cutoff-compatible source timing for use in calculations. Analyst assumptions are permitted only as labeled assumptions. Unknown fields remain null.
+- Duplicate/malformed product rows invalidate that scenario's aggregate totals; the engine must not choose one conflicting duplicate silently.
 
 ## Deterministic calculations
 
-For each product: revenue = sales volume × net ASP; variable cost = sales volume × variable unit cost. The scenario bridge calculates contribution after variable cost, EBITDA, EBIT, pre-tax profit and simplified after-tax net profit when required inputs are available. A free-cash-flow proxy is calculated only when EBIT/tax, D&A, capex and working-capital change are all available. Production utilization is shown only when production and annual capacity are both available; an over-capacity result produces a review finding rather than silent adjustment.
+For each product: revenue = sales volume × net ASP; variable cost = sales volume × variable unit cost. The scenario bridge calculates contribution after variable cost, EBITDA, EBIT, pre-tax profit and simplified after-tax net profit when required inputs are available. A free-cash-flow proxy is calculated only when EBIT/tax, D&A, capex and working-capital change are all available. Production utilization is shown only when production and annual capacity are both available and the relevant period is explicitly a full year (for example `2026FY`). Quarter, half-year, multi-year and unknown period labels do not permit dividing production by annual nameplate capacity; utilization remains UNKNOWN with `CAPACITY_PERIOD_ALIGNMENT_UNKNOWN`. An aligned full-year over-capacity result produces a review finding rather than silent adjustment.
 
 ## Explicit non-claims
 

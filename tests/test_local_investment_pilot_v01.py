@@ -1010,6 +1010,62 @@ def test_operating_driver_forecast_allows_working_capital_release_but_rejects_in
     assert any("TAX_RATE_MUST_BE_RATIO_0_TO_1" in issue for issue in base["issues"])
 
 
+
+def test_historical_actuals_do_not_use_issuer_forecast_values():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+    payload = _driver_payload()
+    payload["product_lines"][0]["historical_actuals"]["net_asp_cny_per_tonne"] = _driver_measure(
+        "1000", "CNY/tonne", "ISSUER_FORECAST", ["E1"], "Forecast mislabeled inside historical actuals"
+    )
+    source = [{"source_id": "E1", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    result = evaluate_operating_driver_forecast(payload, evidence_register=source)
+    actual = result["product_lines"][0]["historical_actual_bridge"]
+    assert actual["revenue_cny"] is None
+    assert result["historical_actuals_status"] == "NOT_IDENTIFIABLE_OR_INCOMPLETE"
+    assert any("DATA_CLASS_NOT_ALLOWED_FOR_CONTEXT" in issue for issue in result["input_issues"])
+
+
+def test_forward_scenario_does_not_silently_reuse_observed_actual_as_forecast():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+    payload = _driver_payload()
+    payload["scenarios"]["base"]["product_lines"][0]["net_asp_cny_per_tonne"] = _driver_measure(
+        "1000", "CNY/tonne", "OBSERVED_ACTUAL", ["E1"], "Historical realized ASP incorrectly used as forward estimate"
+    )
+    source = [{"source_id": "E1", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    result = evaluate_operating_driver_forecast(payload, evidence_register=source)
+    base = result["scenarios"]["base"]
+    assert base["revenue_cny"] is None
+    assert base["net_profit_cny"] is None
+    assert any("DATA_CLASS_NOT_ALLOWED_FOR_CONTEXT" in issue for issue in base["issues"])
+
+
+def test_duplicate_product_rows_block_scenario_totals_instead_of_selecting_one():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+    payload = _driver_payload()
+    payload["scenarios"]["base"]["product_lines"].append(
+        dict(payload["scenarios"]["base"]["product_lines"][0])
+    )
+    source = [{"source_id": "E1", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    result = evaluate_operating_driver_forecast(payload, evidence_register=source)
+    base = result["scenarios"]["base"]
+    assert base["revenue_cny"] is None
+    assert base["variable_cost_cny"] is None
+    assert base["net_profit_cny"] is None
+    assert base["product_lines"][0]["revenue_cny"] is None
+    assert any("DUPLICATE_PRODUCT_ID" in issue for issue in base["issues"])
+
+
+def test_capacity_utilization_is_unknown_for_partial_year_forecast_period():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+    payload = _driver_payload()
+    payload["forecast_period"] = "2026Q4"
+    source = [{"source_id": "E1", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    result = evaluate_operating_driver_forecast(payload, evidence_register=source)
+    base = result["scenarios"]["base"]
+    assert base["product_lines"][0]["production_utilization"] is None
+    assert any("CAPACITY_PERIOD_ALIGNMENT_UNKNOWN" in issue for issue in base["issues"])
+
+
 # B4 operating-driver bridge regression tests end here.
 
 # Operator-attested non-canonical portfolio-package tests. These test sizing math
