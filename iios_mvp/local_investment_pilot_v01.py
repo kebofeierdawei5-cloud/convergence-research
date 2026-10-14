@@ -1623,6 +1623,44 @@ def _template(
                 "rationale": "", "evidence_refs": [],
             },
         },
+        "valuation_transmission": {
+            "schema_version": VALUATION_TRANSMISSION_SCHEMA,
+            "model_family": "UNKNOWN",
+            "valuation_model_name": "UNKNOWN",
+            "earnings_period": "UNKNOWN",
+            "summary": "未完成 B5 经营结果到每股估值的传导；若模型类别、期间、项目归属、存量业务替代或稀释股数不可识别，应保留 NOT_LINKED。",
+            "scenarios": {
+                "bear": {
+                    "ownership_ratio": {"value": None, "unit": "ratio", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                    "displaced_existing_after_tax_profit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；须扣除存量业务被替代的税后归属利润"},
+                    "basic_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；按实际普通股股数填写"},
+                    "convertible_bond_incremental_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；可明确为 0，但须说明转股口径"},
+                    "other_dilution_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；可明确为 0，但须说明口径"},
+                    "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；须与主估值模型一致"}
+                },
+                "base": {
+                    "ownership_ratio": {"value": None, "unit": "ratio", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                    "displaced_existing_after_tax_profit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；须扣除存量业务被替代的税后归属利润"},
+                    "basic_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；按实际普通股股数填写"},
+                    "convertible_bond_incremental_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；可明确为 0，但须说明转股口径"},
+                    "other_dilution_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；可明确为 0，但须说明口径"},
+                    "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；须与主估值模型一致"}
+                },
+                "bull": {
+                    "ownership_ratio": {"value": None, "unit": "ratio", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                    "displaced_existing_after_tax_profit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；须扣除存量业务被替代的税后归属利润"},
+                    "basic_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；按实际普通股股数填写"},
+                    "convertible_bond_incremental_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；可明确为 0，但须说明转股口径"},
+                    "other_dilution_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；可明确为 0，但须说明口径"},
+                    "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；须与主估值模型一致"}
+                }
+            }
+        },
+        "operator_valuation_context": {
+            "selected_model_family": "UNKNOWN",
+            "baseline_includes_project": None,
+            "input_owner": "OPERATOR"
+        },
         "operating_driver_forecast": {
             "schema_version": "IIOS-OPERATING-DRIVER-FORECAST-0.1",
             "scope": "UNKNOWN",
@@ -1701,6 +1739,15 @@ def create_pilot_template(
         "不要在 notes 中重述与 price_input.price 不同的现价；当前股价只取结构化 price_input。不能将人工价格标为已验证。"
         "未知事实用 UNKNOWN，并解释缺口；研究结论可以是 REVIEW_REQUIRED，但不可以把整个结构留空。只返回一个完整 JSON 对象，不要输出代码围栏或额外说明。"
     )
+    b5_transmission_instructions = (
+        "\\n\\nB5 估值传导要求（IIOS-VALUATION-TRANSMISSION-0.1）："
+        "必须保留 valuation_transmission 节点和 Bear/Base/Bull 三个情景。valuation_model_name 必须逐字匹配 forecast_valuation.model；model_family 必须准确分类为 EPS_MULTIPLE、FCF_DCF、DDM、SOTP、RNPV、OTHER 或 UNKNOWN；earnings_period 必须与 operating_driver_forecast.forecast_period 完全一致。"
+        "operator_valuation_context 是操作者拥有的字段，必须原样保留模板中的 UNKNOWN/null，不得替操作者选择估值模型或判断原估值是否已包含项目；操作者稍后会在本地独立确认。"
+        "本批只有 EPS_MULTIPLE 适配器可传导。每个情景必须提供 ownership_ratio、displaced_existing_after_tax_profit_cny、basic_shares、convertible_bond_incremental_shares、other_dilution_shares、pe_multiple_x，均用 {value,unit,data_class,basis,evidence_refs,note} 结构。"
+        "ownership_ratio 是 0–1 的比例；被替代存量业务税后归属利润为非负 CNY；股数单位 shares，填写实际普通股数量而非百万股；可转债潜在新增股数和其他稀释股数可明确为 0，但须说明依据。P/E 倍数单位 x。"
+        "事实/发行人预测必须有可解析且截止时间兼容的 evidence_refs；分析假设须标为 ANALYST_ASSUMPTION 并解释依据，不能伪装成事实。缺少项目税后净利润、所有权比例、存量业务蚕食、股数/可转债稀释、期间或模型一致性时保持 NOT_LINKED。"
+        "仅当操作者明确确认现有 Bear/Base/Bull 每股终值及入场价值锚均不含该项目时，方可将稀释口径增量加到三个情景，并以 Base 增量同步调整入场价值锚；如已经包含则只显示敏感性、不重复相加；如不确定则不修改原估值。论点失效压力测试不自动加回项目价值。"
+    )
     driver_instructions = (
         "\n\n经营驱动因素树要求（IIOS-OPERATING-DRIVER-FORECAST-0.1）："
         "必须保留 operating_driver_forecast 节点。scope 可为 PROJECT_INCREMENTAL、PRODUCT_LINE、COMPANY_WIDE 或 UNKNOWN。"
@@ -1726,6 +1773,7 @@ def create_pilot_template(
             "若本次截止日晚于历史公开材料，必须检索截止日前最新公开披露后再判断项目当前状态；不要把旧的调试阶段描述直接外推到新截止日。"
         )
     prompt += driver_instructions
+    prompt += b5_transmission_instructions
     _write_local(prompt_path, prompt + "\n")
     return {
         "status": "PILOT_TEMPLATE_CREATED", "input_template": str(input_path),
@@ -1782,7 +1830,7 @@ def _assert_response_preserves_operator_inputs(
         raise LocalInvestmentPilotError("OPERATOR_INPUT_TEMPLATE_UNREADABLE") from exc
 
     mismatched_sections = [
-        field for field in ("case", "price_input")
+        field for field in ("case", "price_input", "operator_valuation_context")
         if payload.get(field) != template.get(field)
     ]
     if mismatched_sections:
