@@ -998,6 +998,18 @@ def test_operating_driver_forecast_keeps_actual_asp_unknown_and_flags_capacity_m
     assert any("ABOVE_NAMEPLATE_CAPACITY" in issue for issue in base["issues"])
 
 
+def test_operating_driver_forecast_allows_working_capital_release_but_rejects_invalid_tax_rate():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+    payload = _driver_payload()
+    payload["scenarios"]["base"]["change_working_capital_cny"] = _driver_measure("-3000", "CNY", "ANALYST_ASSUMPTION", [], "Working-capital release")
+    payload["scenarios"]["base"]["tax_rate"] = _driver_measure("-0.1", "ratio", "ANALYST_ASSUMPTION", [], "Deliberately invalid tax ratio")
+    result = evaluate_operating_driver_forecast(payload, evidence_register=[{"source_id": "E1", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}])
+    base = result["scenarios"]["base"]
+    assert base["change_working_capital_cny"] == "-3000"
+    assert base["unlevered_fcf_proxy_cny"] is None
+    assert any("TAX_RATE_MUST_BE_RATIO_0_TO_1" in issue for issue in base["issues"])
+
+
 # B4 operating-driver bridge regression tests end here.
 
 # Operator-attested non-canonical portfolio-package tests. These test sizing math
