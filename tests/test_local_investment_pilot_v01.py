@@ -124,6 +124,29 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
             "scenarios": {"bear": {}, "base": {}, "bull": {}},
             "limitations": ["Synthetic test only."],
         },
+        "valuation_transmission": {
+            "schema_version": "IIOS-VALUATION-TRANSMISSION-0.1",
+            "model_family": "UNKNOWN",
+            "valuation_model_name": "UNKNOWN",
+            "earnings_period": "UNKNOWN",
+            "summary": "Synthetic B5 bridge left intentionally unlinked.",
+            "scenarios": {
+                name: {
+                    "ownership_ratio": {"value": None, "unit": "ratio", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "Synthetic unknown"},
+                    "displaced_existing_after_tax_profit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "Synthetic unknown"},
+                    "basic_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "Synthetic unknown"},
+                    "convertible_bond_incremental_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "Synthetic unknown"},
+                    "other_dilution_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "Synthetic unknown"},
+                    "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "Synthetic unknown"},
+                }
+                for name in ("bear", "base", "bull")
+            },
+        },
+        "operator_valuation_context": {
+            "selected_model_family": "UNKNOWN",
+            "baseline_includes_project": None,
+            "input_owner": "OPERATOR",
+        },
         "notes": "Synthetic pytest fixture only.",
     }
 
