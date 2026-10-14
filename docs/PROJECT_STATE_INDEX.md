@@ -1,10 +1,10 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-13
+Snapshot: 2026-10-14
 Authority: this file is the **only canonical Current State Index**.
 
-## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-13
+## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-14
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
@@ -30,7 +30,7 @@ Batch 0 narrow state reconciliation                     PASS ON MERGE; NO ECONOM
 Local MVP Batch 0 baseline audit (revised plan)          BASELINE ESTABLISHED / ARCHIVED RESPONSE CONTRACT FAIL / MAC RUN BUNDLE OPEN
 Local MVP Batch 1 IIOS decision-kernel integration             MERGED PR #404 / 17-OF-17 EXACT-HEAD CHECKS PASS / MAC RUN OPEN
 Batch 1 private Path A scenario runner                  PASS / MERGED; 40 TESTS; ANALYSIS-ONLY
-Batch 1 macOS local pilot + hash-bound replay             PR #411/#417 MERGED; POST-#417 MAC RUN PASS WITH SCOPE LIMIT; reports byte-identical, receipts match included outputs, 20/20 decision-material fields equal; ZIP excludes input.json so input hash not independently recomputed; portfolio wizard skip preserved UNKNOWN / authorized new position 0%
+Batch 1 macOS local pilot + hash-bound replay             PR #411/#417 MERGED; POST-#417 MAC RUN + REPLAY ACCEPTED WITH SCOPE LIMIT; portfolio wizard now defaults to collect after PR #422; full answered-package Mac rerun PENDING
 Batch 2 Path A scenario integrity audit                    IN PROGRESS / PR #360 MERGED; 43 TESTS + 13 EXACT-HEAD CHECKS PASS; LOCAL BUNDLE REVIEW OPEN
 Operator-entered price decision-input track                 MP-1/2 + REPORT ASSURANCE PASS; MP-3 MULTI-SLICE + COMPLETE RECEIPT-REPLAY TEST PASS / PRs #372/#375/#377/#378/#379/#383; LOCAL PRIVATE RUN REVIEW + RESIDUAL BYPASS CASES OPEN
 C0 Local-first architecture / product-entry decision     DECISION RECORDED; IMPLEMENTATION GATES OPEN
@@ -46,6 +46,14 @@ Path A operator-attested price overlay               ANALYSIS-ONLY INTAKE IMPLEM
 Local single-user complete pilot                     ACTIVE P0 PRIORITY; PILOT_NON_CANONICAL BEFORE FORMALIZATION
 Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
 ```
+
+### B3 — close the local portfolio-context slice (2026-10-14)
+
+- PR [#422](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/422) merged at `9bd48288ae88ca5b5bc172663dfc2d3872d3b968`.
+- The standard wizard now defaults to collecting operator-owned portfolio risk budget and position limits; skipping requires explicit `0`. No decision policy or sizing formula changed.
+- Exact PR head `5d6733689f538b8ab9444d14c8f5fe6babeee7a0`: dedicated local-pilot workflow `64 passed`; all 7 triggered workflows succeeded.
+- **Still pending:** a new real macOS 605016 run using the merged `main`, completing the portfolio prompts from actual operator constraints, and reviewing `report.md`, `analysis.json`, and `pilot_receipt.json` from that run. CI does not substitute for this run.
+- If the operator cannot confirm portfolio constraints, preserve `UNKNOWN`; no conditional size is implied and authorized new position remains `0%`. The pilot remains `PILOT_NON_CANONICAL`; this usability change does not create a formal Decision or trade authorization.
 
 ### Local MVP Batch 0 baseline audit (2026-10-13)
 
