@@ -1949,6 +1949,29 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
     if not isinstance(drivers.get("product_lines"), list):
         missing.append("经营驱动因素树 product_lines 数组")
 
+    transmission = payload.get("valuation_transmission")
+    transmission = transmission if isinstance(transmission, Mapping) else {}
+    if transmission.get("schema_version") != VALUATION_TRANSMISSION_SCHEMA:
+        missing.append("B5 valuation_transmission schema_version")
+    if not str(transmission.get("summary") or "").strip():
+        missing.append("B5 估值传导结论/未知项说明")
+    transmission_scenarios = transmission.get("scenarios")
+    transmission_scenarios = transmission_scenarios if isinstance(transmission_scenarios, Mapping) else {}
+    for name in ("bear", "base", "bull"):
+        scenario = transmission_scenarios.get(name)
+        if not isinstance(scenario, Mapping):
+            missing.append(f"B5 {name.upper()} 估值传导情景结构")
+            continue
+        for key in (
+            "ownership_ratio", "displaced_existing_after_tax_profit_cny", "basic_shares",
+            "convertible_bond_incremental_shares", "other_dilution_shares", "pe_multiple_x",
+        ):
+            if not isinstance(scenario.get(key), Mapping):
+                missing.append(f"B5 {name.upper()} {key} 结构")
+    for key in ("model_family", "valuation_model_name", "earnings_period"):
+        if not str(transmission.get(key) or "").strip():
+            missing.append(f"B5 {key}")
+
     stress = valuation.get("thesis_break_stress")
     stress = stress if isinstance(stress, Mapping) else {}
     for key, label in (
@@ -1990,7 +2013,7 @@ def _build_response_repair_prompt(
         + "\n\n【必须遵守】\n"
         "1. 以下是本次唯一基准模板与全部研究要求。必须完整保留 schema_version、case、price_input 的所有值，尤其人工股价、观察日、known_at、截止时点和 assurance_label。"
         "2. 不要要求用户上传模板或额外寻找公告；请主动联网搜索截止时点前公开可访问的公司公告、交易所披露与监管文件。"
-        "3. 修复缺失结构字段并填写数值估值情景及经营驱动因素树；研究假设和事实来源要分开。不得编造来源、财务数字或市场一致预期。"
+        "3. 修复缺失结构字段并填写数值估值情景、经营驱动因素树和 B5 估值传导结构；研究假设和事实来源要分开。不得编造来源、财务数字或市场一致预期。"
         "4. 如果确实无法识别，字段仍要保留结构，并在 summary/rationale 中具体解释未知原因、证据缺口及需要人工确认的事项。"
         "5. 请返回一个完整 JSON 对象，不要代码围栏和 JSON 以外的文字。"
         + "\n\n【原始研究提示及完整基准模板】\n" + original_prompt
@@ -2110,6 +2133,50 @@ def _ask_operator_portfolio_context() -> dict[str, Any] | None:
         "initial_position_pct": initial,
         "target_position_pct": target,
         "max_position_pct": maximum,
+    }
+
+
+def _ask_operator_valuation_context() -> dict[str, Any]:
+    """Collect the primary model choice and project-in-baseline scope from the operator, not the AI."""
+    print("\\nB5 主估值模型确认（由你选择，不让 AI 替你选模型）")
+    print("  1 = EPS / 市盈率倍数（本批支持项目增量传导）")
+    print("  2 = DCF / 自由现金流折现")
+    print("  3 = DDM / 股利折现")
+    print("  4 = SOTP / 分部估值")
+    print("  5 = RNPV / 风险调整净现值")
+    print("  6 = 其他模型")
+    print("  0 = 暂不确认（不进行 B5 每股传导）")
+    choices = {
+        "1": "EPS_MULTIPLE",
+        "2": "FCF_DCF",
+        "3": "DDM",
+        "4": "SOTP",
+        "5": "RNPV",
+        "6": "OTHER",
+        "0": "UNKNOWN",
+    }
+    while True:
+        choice = _ask("你确认本次主估值模型类型 0–6", "0")
+        if choice in choices:
+            break
+        print("请输入 0 到 6。")
+    family = choices[choice]
+    baseline_includes_project: bool | None = None
+    if family == "EPS_MULTIPLE":
+        print("请确认报告中的每股终值和安全边际估值锚是否已经包含此项目/扩产的价值。")
+        print("  1 = 已包含（不可再叠加）")
+        print("  2 = 明确不包含（符合条件时可传导增量）")
+        print("  0 = 无法确认（保持原估值，不叠加）")
+        while True:
+            scope_choice = _ask("原估值的项目包含范围 0/1/2", "0")
+            if scope_choice in {"0", "1", "2"}:
+                break
+            print("请输入 0、1 或 2。")
+        baseline_includes_project = {"0": None, "1": True, "2": False}[scope_choice]
+    return {
+        "selected_model_family": family,
+        "baseline_includes_project": baseline_includes_project,
+        "input_owner": "OPERATOR",
     }
 
 
@@ -2317,6 +2384,7 @@ def run_guided_wizard(
     portfolio_context = _ask_operator_portfolio_context()
     if portfolio_context is not None:
         payload["operator_portfolio_context"] = portfolio_context
+    payload["operator_valuation_context"] = _ask_operator_valuation_context()
     private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     completed = private_inputs / f"pilot-completed-{symbol.replace('.', '-')}-{stamp}.json"
