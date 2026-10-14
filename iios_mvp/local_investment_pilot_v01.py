@@ -22,6 +22,7 @@ from typing import Any, Mapping
 from .decision_kernel_v03 import evaluate_production_decision
 from .decision_state_machine_v01 import MIE_POLICY_OPTIONAL_EXPLANATORY
 from .local_pilot_portfolio_package_v01 import build_local_pilot_portfolio_package
+from .operating_driver_forecast_v01 import evaluate_operating_driver_forecast, render_operating_driver_section
 from .investment_core_contract_v03 import (
     BUY_ENTRY_RETURN_CUSHION_THRESHOLD,
     FUNDAMENTAL_TARGET_ANNUALIZED_RETURN,
@@ -50,6 +51,7 @@ REPLAY_COMPARISON_FIELDS = (
     "uncertain_timing_evidence_references",
     "assessment",
     "forecast_valuation",
+    "operating_driver_forecast",
     "decision_parameters",
     "portfolio_package",
     "return_metrics",
@@ -605,6 +607,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     assessment["thesis"]["drivers"] = assessment["thesis"].get("drivers") if isinstance(assessment["thesis"].get("drivers"), list) else []
 
     forecast_raw = payload.get("forecast_valuation") if isinstance(payload.get("forecast_valuation"), Mapping) else {}
+    raw_driver_forecast = payload.get("operating_driver_forecast")
     stress_raw = forecast_raw.get("thesis_break_stress")
     stress_raw = stress_raw if isinstance(stress_raw, Mapping) else {}
     forecast = {
@@ -661,7 +664,11 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
 
     # Resolve every structured evidence reference from assessment and valuation inputs,
     # before any structured risk/assumption objects are rendered for human readers.
-    references = _collect_refs({"assessment": raw_assessment, "forecast_valuation": forecast_raw})
+    references = _collect_refs({
+        "assessment": raw_assessment,
+        "forecast_valuation": forecast_raw,
+        "operating_driver_forecast": raw_driver_forecast,
+    })
     unknown_refs = sorted(references - source_ids)
     after_cutoff_refs = [
         source["source_id"] for source in sources
@@ -672,6 +679,13 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         if source["source_id"] in references
         and source["time_status"] in {"UNKNOWN", "KNOWN_AT_INVALID", "KNOWN_AT_PRECISION_INSUFFICIENT"}
     ]
+    operating_driver_forecast = evaluate_operating_driver_forecast(
+        raw_driver_forecast,
+        evidence_register=sources,
+        unresolved_evidence_ids=unknown_refs,
+        after_cutoff_evidence_ids=after_cutoff_refs,
+        uncertain_timing_evidence_ids=uncertain_timing_refs,
+    )
     return {
         "case": {
             "case_id": case["case_id"], "company": company, "market": normalized_market,
@@ -691,6 +705,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "evidence_register": sources,
         "assessment": assessment,
         "forecast_valuation": forecast,
+        "operating_driver_forecast": operating_driver_forecast,
         "decision_parameters": {
             "horizon_years": horizon, "horizon_override": override, "horizon_override_basis": override_basis,
             "horizon_selection_rationale": rationale, "required_return_annualized": format(required_return, "f"),
@@ -1230,6 +1245,11 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             lines.append("- " + _humanize_item(item))
     else:
         lines.append("- 未提供；不得将其解释为市场一致预期。")
+    lines.extend(render_operating_driver_section(
+        analysis.get("operating_driver_forecast") or {},
+        f.get("scenarios") if isinstance(f.get("scenarios"), Mapping) else {},
+        c["currency"],
+    ))
     lines.extend([
         "",
         "## 五、MIE 与预期差",
@@ -1383,6 +1403,7 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "uncertain_timing_evidence_references": prepared["uncertain_timing_evidence_references"],
         "assessment": prepared["assessment"],
         "forecast_valuation": prepared["forecast_valuation"],
+        "operating_driver_forecast": prepared["operating_driver_forecast"],
         "decision_parameters": prepared["decision_parameters"],
         "portfolio_package": portfolio_package,
         "return_metrics": metrics,
@@ -1546,6 +1567,45 @@ def _template(
                 "rationale": "", "evidence_refs": [],
             },
         },
+        "operating_driver_forecast": {
+            "schema_version": "IIOS-OPERATING-DRIVER-FORECAST-0.1",
+            "scope": "UNKNOWN",
+            "status": "UNKNOWN",
+            "actuals_period": "UNKNOWN",
+            "forecast_period": "UNKNOWN",
+            "summary": "尚未完成经营驱动因素分析；请解释已识别与不可识别的驱动。",
+            "product_lines": [],
+            "scenarios": {
+            "bear": {
+                "product_lines": [],
+                "fixed_cash_opex_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "depreciation_amortization_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "finance_cost_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "tax_rate": {"value": None, "unit": "ratio", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "cash_capex_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "change_working_capital_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"}
+            },
+            "base": {
+                "product_lines": [],
+                "fixed_cash_opex_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "depreciation_amortization_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "finance_cost_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "tax_rate": {"value": None, "unit": "ratio", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "cash_capex_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "change_working_capital_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"}
+            },
+            "bull": {
+                "product_lines": [],
+                "fixed_cash_opex_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "depreciation_amortization_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "finance_cost_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "tax_rate": {"value": None, "unit": "ratio", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "cash_capex_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                "change_working_capital_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"}
+            }
+            },
+            "limitations": [],
+        },
         "decision_parameters": {
             "horizon_years": 1, "horizon_override": False, "horizon_override_basis": [],
             "horizon_selection_rationale": "默认使用 1 年年化回报；符合例外条件时才显式切换为 3 年。",
@@ -1585,6 +1645,30 @@ def create_pilot_template(
         "不要在 notes 中重述与 price_input.price 不同的现价；当前股价只取结构化 price_input。不能将人工价格标为已验证。"
         "未知事实用 UNKNOWN，并解释缺口；研究结论可以是 REVIEW_REQUIRED，但不可以把整个结构留空。只返回一个完整 JSON 对象，不要输出代码围栏或额外说明。"
     )
+    driver_instructions = (
+        "\n\n经营驱动因素树要求（IIOS-OPERATING-DRIVER-FORECAST-0.1）："
+        "必须保留 operating_driver_forecast 节点。scope 可为 PROJECT_INCREMENTAL、PRODUCT_LINE、COMPANY_WIDE 或 UNKNOWN。"
+        "product_lines 为按产品/服务行分别列出的数组，每行含 product_id、product_name、capacity_tonnes_per_year 和 historical_actuals。"
+        "historical_actuals 含 production_tonnes、sales_volume_tonnes、net_asp_cny_per_tonne、variable_cost_cny_per_tonne。"
+        "Bear/Base/Bull 各自含 product_lines；每行使用同样四个度量：production_tonnes、sales_volume_tonnes、net_asp_cny_per_tonne、variable_cost_cny_per_tonne。"
+        "每个度量都使用对象 {value,unit,data_class,basis,evidence_refs,note}；data_class 只能为 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION、UNKNOWN。"
+        "未知值必须 value=null 且 data_class=UNKNOWN；事实/发行人预测必须列出能直接支撑该数字的 evidence_refs，无法把来源和口径对齐时不要把数字标成事实。"
+        "产品容量单位 tonnes/year；产量与销量 tonnes；净售价和单位变动成本 CNY/tonne；现金费用/折旧/融资成本/资本开支/营运资金变动 CNY；tax_rate 是 0 至 1 之间的比例。"
+        "Bear/Base/Bull 另含 fixed_cash_opex_cny、depreciation_amortization_cny、finance_cost_cny、tax_rate、cash_capex_cny、change_working_capital_cny。固定现金运营费用不得重复包含折旧。"
+        "收入按销售量×净售价，不得用产量或总产品收入反推净售价；变动成本按销售量×单位变动成本。change_working_capital_cny 为正表示占用现金，负数表示释放。"
+        "若没有同口径产销量、实际净售价或单位成本，务必保留 UNKNOWN；可以另列清晰标记为 ISSUER_FORECAST 或 ANALYST_ASSUMPTION 的情景值，但不得将这些值称为已实现结果。"
+        "报告产品收入结构、产能利用率（只有同期间产量与年产能可比时才计算）、EBITDA、EBIT、税前利润、净利润和自由现金流代理，并列出缺失驱动与估值传导限制。"
+        "该经营桥不会自动替代每股 Bear/Base/Bull 估值；不清楚项目增量利润、存量业务替代/蚕食、税后归属利润和稀释股数时，不计算项目 EPS 或每股估值贡献。"
+    )
+    if symbol.replace(".SH", "").replace(".SZ", "") == "605016":
+        driver_instructions += (
+            "\n\n百龙创园（605016）专属注意：国内功能糖干燥扩产项目与泰国智慧工厂必须分开；尽可能按异麦芽酮糖粉体、低聚半乳糖粉体、乳果糖粉体分别列行。"
+            "既有产品收入除以产量不是已验证的实际 ASP，因为收入取决于销量且受库存、粉液形态、规格与产品组合影响。"
+            "公开申报中的设计产能、预测单价/净利润及 7,800/10,400/13,000 吨爬坡计划只能按发行人预测或计划标注，不能当作实际产销量或已实现利润。"
+            "项目年份第 3/4/5 年与自然年释放计划存在 RAMP_CALENDAR_BASIS_UNRECONCILED 待核口径；不要自行强行对齐，解释缺少的正式投产日、月度产量、产品销量、净成交价、单位成本、转固/折旧及营运资金证据。"
+            "若本次截止日晚于历史公开材料，必须检索截止日前最新公开披露后再判断项目当前状态；不要把旧的调试阶段描述直接外推到新截止日。"
+        )
+    prompt += driver_instructions
     _write_local(prompt_path, prompt + "\n")
     return {
         "status": "PILOT_TEMPLATE_CREATED", "input_template": str(input_path),
@@ -1745,6 +1829,21 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
         if not str(bear.get(key) or "").strip():
             missing.append(label)
 
+    drivers = payload.get("operating_driver_forecast")
+    drivers = drivers if isinstance(drivers, Mapping) else {}
+    if drivers.get("schema_version") != "IIOS-OPERATING-DRIVER-FORECAST-0.1":
+        missing.append("经营驱动因素树 schema_version")
+    driver_summary = str(drivers.get("summary") or "").strip()
+    if not driver_summary or driver_summary == "尚未完成经营驱动因素分析；请解释已识别与不可识别的驱动。":
+        missing.append("经营驱动因素树结论与不可识别缺口说明")
+    scenario_tree = drivers.get("scenarios")
+    scenario_tree = scenario_tree if isinstance(scenario_tree, Mapping) else {}
+    for name in ("bear", "base", "bull"):
+        if not isinstance(scenario_tree.get(name), Mapping):
+            missing.append(f"经营驱动因素树 {name.upper()} 情景结构")
+    if not isinstance(drivers.get("product_lines"), list):
+        missing.append("经营驱动因素树 product_lines 数组")
+
     stress = valuation.get("thesis_break_stress")
     stress = stress if isinstance(stress, Mapping) else {}
     for key, label in (
@@ -1786,7 +1885,7 @@ def _build_response_repair_prompt(
         + "\n\n【必须遵守】\n"
         "1. 以下是本次唯一基准模板与全部研究要求。必须完整保留 schema_version、case、price_input 的所有值，尤其人工股价、观察日、known_at、截止时点和 assurance_label。"
         "2. 不要要求用户上传模板或额外寻找公告；请主动联网搜索截止时点前公开可访问的公司公告、交易所披露与监管文件。"
-        "3. 修复缺失结构字段并填写数值估值情景；研究假设和事实来源要分开。不得编造来源、财务数字或市场一致预期。"
+        "3. 修复缺失结构字段并填写数值估值情景及经营驱动因素树；研究假设和事实来源要分开。不得编造来源、财务数字或市场一致预期。"
         "4. 如果确实无法识别，字段仍要保留结构，并在 summary/rationale 中具体解释未知原因、证据缺口及需要人工确认的事项。"
         "5. 请返回一个完整 JSON 对象，不要代码围栏和 JSON 以外的文字。"
         + "\n\n【原始研究提示及完整基准模板】\n" + original_prompt
