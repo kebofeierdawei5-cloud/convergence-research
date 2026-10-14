@@ -1834,12 +1834,12 @@ def _ask(prompt: str, default: str | None = None) -> str:
 
 
 def _ask_operator_portfolio_context() -> dict[str, Any] | None:
-    """Collect optional personal portfolio limits separately from AI research."""
-    print("\n个人组合与仓位包（可选）")
-    print("如暂时不填写，系统会把组合约束保持为 UNKNOWN，不给出条件仓位。")
+    """Collect operator-owned portfolio limits; default into this step to avoid accidental skips."""
+    print("\n个人组合与仓位包（建议填写）")
+    print("直接回车默认进入填写；如确实暂时不填写，请明确输入 0。跳过后组合约束保持 UNKNOWN，不生成条件仓位。")
     print("填写的数据保存在本机私有输入中，不会上传 GitHub；它们也不会授权实际交易。")
     while True:
-        choice = _ask("是否填写组合风险预算和仓位限制？0 = 跳过，1 = 填写", "0")
+        choice = _ask("是否填写组合风险预算和仓位限制？0 = 明确跳过，1 = 填写", "1")
         if choice in {"0", "1"}:
             break
         print("请输入 0 或 1。")
