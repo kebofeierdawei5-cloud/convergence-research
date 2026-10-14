@@ -121,10 +121,11 @@ def _normalise_measure(
 
     # Quantities, capacity, selling price, expenses and tax rate cannot be negative.
     # A change in working capital is signed: positive consumes cash, negative releases cash.
+    metric_name = field.rsplit(".", 1)[-1]
     if claimed is not None:
-        if field != "change_working_capital_cny" and claimed < 0:
+        if metric_name != "change_working_capital_cny" and claimed < 0:
             issues.append(f"{field}:NEGATIVE_VALUE_NOT_ALLOWED")
-        if field == "tax_rate" and not (Decimal("0") <= claimed <= Decimal("1")):
+        if metric_name == "tax_rate" and not (Decimal("0") <= claimed <= Decimal("1")):
             issues.append(f"{field}:TAX_RATE_MUST_BE_RATIO_0_TO_1")
 
     evidence_status = "NOT_REQUIRED_FOR_ASSUMPTION"
