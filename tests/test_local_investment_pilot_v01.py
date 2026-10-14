@@ -1091,6 +1091,133 @@ def test_capacity_utilization_is_unknown_for_partial_year_forecast_period():
     assert any("CAPACITY_PERIOD_ALIGNMENT_UNKNOWN" in issue for issue in base["issues"])
 
 
+
+def _b5_measure(value, unit, data_class="ANALYST_ASSUMPTION", refs=None, basis="Explicit synthetic B5 test assumption"):
+    return {
+        "value": value, "unit": unit, "data_class": data_class,
+        "basis": basis, "evidence_refs": list(refs or []), "note": basis,
+    }
+
+
+def _b5_ready_payload():
+    payload = _payload(cutoff="2026-10-10")
+    payload["operating_driver_forecast"] = _driver_payload()
+    payload["forecast_valuation"]["model"] = "Synthetic EPS x PE"
+    payload["forecast_valuation"]["entry_value_reference_per_share"] = "150"
+    payload["forecast_valuation"]["scenarios"] = {
+        "bear": {
+            "probability": "0.20", "terminal_value_per_share": "120", "cash_distributions_per_share": "0",
+            "rationale": "synthetic bear", "failure_trigger": "project economics miss",
+            "operating_impact": "incremental profits shrink", "valuation_mechanism": "lower EPS x PE",
+        },
+        "base": {"probability": "0.50", "terminal_value_per_share": "150", "cash_distributions_per_share": "0", "rationale": "synthetic base"},
+        "bull": {"probability": "0.30", "terminal_value_per_share": "180", "cash_distributions_per_share": "0", "rationale": "synthetic bull"},
+    }
+    rows = {}
+    for name in ("bear", "base", "bull"):
+        rows[name] = {
+            "ownership_ratio": _b5_measure("0.8", "ratio"),
+            "displaced_existing_after_tax_profit_cny": _b5_measure("10000", "CNY"),
+            "basic_shares": _b5_measure("1000000", "shares", "OBSERVED_ACTUAL", ["E1"], "Synthetic source-backed basic shares"),
+            "convertible_bond_incremental_shares": _b5_measure("100000", "shares"),
+            "other_dilution_shares": _b5_measure("10000", "shares"),
+            "pe_multiple_x": _b5_measure("10", "x"),
+        }
+    payload["valuation_transmission"] = {
+        "schema_version": "IIOS-VALUATION-TRANSMISSION-0.1",
+        "model_family": "EPS_MULTIPLE",
+        "valuation_model_name": "Synthetic EPS x PE",
+        "earnings_period": "2026FY",
+        "summary": "Synthetic test bridge; no real company fact.",
+        "scenarios": rows,
+    }
+    payload["operator_valuation_context"] = {
+        "selected_model_family": "EPS_MULTIPLE",
+        "baseline_includes_project": False,
+        "input_owner": "OPERATOR",
+    }
+    return payload
+
+
+def test_b5_transmits_project_profit_to_per_share_scenarios_and_entry_anchor():
+    payload = _b5_ready_payload()
+    analysis, report = _analyse(payload, "TEST-B5-APPLY")
+    bridge = analysis["valuation_transmission"]
+
+    assert bridge["status"] == "APPLIED_TO_PER_SHARE_SCENARIOS"
+    assert bridge["applied_to_per_share_scenarios"] is True
+    assert bridge["scenarios"]["bear"]["incremental_attributable_profit_cny"] == "185000.0"
+    assert Decimal(bridge["scenarios"]["bear"]["value_delta_per_share_basic"]) > Decimal(
+        bridge["scenarios"]["bear"]["value_delta_per_share_diluted"]
+    )
+    assert analysis["forecast_valuation"]["scenarios"]["bear"]["b5_baseline_terminal_value_per_share"] == "120"
+    assert Decimal(analysis["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"]) > Decimal("120")
+    assert Decimal(analysis["forecast_valuation"]["entry_value_reference_per_share"]) > Decimal("150")
+    assert analysis["return_metrics"] is not None
+    assert "B5：经营结果到每股估值的传导" in report
+    assert "论点失效压力测试不自动加回项目价值" in report
+
+
+def test_b5_never_adds_project_twice_when_operator_says_baseline_includes_it():
+    payload = _b5_ready_payload()
+    payload["operator_valuation_context"]["baseline_includes_project"] = True
+    analysis, _ = _analyse(payload, "TEST-B5-ALREADY-INCLUDED")
+    assert analysis["valuation_transmission"]["status"] == "CALCULATED_NOT_APPLIED_BASELINE_ALREADY_INCLUDES_PROJECT"
+    assert analysis["valuation_transmission"]["applied_to_per_share_scenarios"] is False
+    assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
+    assert analysis["forecast_valuation"]["entry_value_reference_per_share"] == "150"
+
+
+def test_b5_keeps_original_valuation_when_project_baseline_scope_is_unknown():
+    payload = _b5_ready_payload()
+    payload["operator_valuation_context"]["baseline_includes_project"] = None
+    analysis, _ = _analyse(payload, "TEST-B5-BASELINE-UNKNOWN")
+    assert analysis["valuation_transmission"]["status"] == "CALCULATED_NOT_APPLIED_BASELINE_SCOPE_UNKNOWN"
+    assert analysis["valuation_transmission"]["applied_to_per_share_scenarios"] is False
+    assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
+    assert analysis["forecast_valuation"]["entry_value_reference_per_share"] == "150"
+
+
+def test_b5_missing_cannibalization_blocks_all_scenario_value_changes():
+    payload = _b5_ready_payload()
+    payload["valuation_transmission"]["scenarios"]["base"]["displaced_existing_after_tax_profit_cny"] = {
+        "value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "",
+        "evidence_refs": [], "note": "Cannibalization not identified",
+    }
+    analysis, _ = _analyse(payload, "TEST-B5-CANNIBALIZATION-UNKNOWN")
+    assert analysis["valuation_transmission"]["status"] == "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID"
+    assert analysis["valuation_transmission"]["applied_to_per_share_scenarios"] is False
+    assert all(
+        analysis["forecast_valuation"]["scenarios"][name]["terminal_value_per_share"] == base
+        for name, base in (("bear", "120"), ("base", "150"), ("bull", "180"))
+    )
+
+
+def test_b5_refuses_cross_period_profit_to_valuation_mapping():
+    payload = _b5_ready_payload()
+    payload["valuation_transmission"]["earnings_period"] = "2027FY"
+    analysis, _ = _analyse(payload, "TEST-B5-PERIOD-MISMATCH")
+    assert analysis["valuation_transmission"]["status"] == "NOT_LINKED_PERIOD_MISMATCH"
+    assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
+
+
+def test_b5_does_not_apply_eps_multiple_formula_to_sotp_or_dcf():
+    payload = _b5_ready_payload()
+    payload["operator_valuation_context"]["selected_model_family"] = "SOTP"
+    analysis, _ = _analyse(payload, "TEST-B5-UNSUPPORTED-MODEL")
+    assert analysis["valuation_transmission"]["status"] == "NOT_LINKED_UNSUPPORTED_MODEL_FAMILY"
+    assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
+
+
+def test_b5_dilution_uses_basic_plus_convertible_and_other_shares():
+    payload = _b5_ready_payload()
+    analysis, _ = _analyse(payload, "TEST-B5-DILUTION")
+    bear = analysis["valuation_transmission"]["scenarios"]["bear"]
+    assert bear["diluted_shares"] == "1110000"
+    assert Decimal(bear["diluted_eps_delta"]) == Decimal("185000") / Decimal("1110000")
+    assert Decimal(bear["value_delta_per_share_diluted"]) < Decimal(bear["value_delta_per_share_basic"])
+
+
 # B4 operating-driver bridge regression tests end here.
 
 # Operator-attested non-canonical portfolio-package tests. These test sizing math
