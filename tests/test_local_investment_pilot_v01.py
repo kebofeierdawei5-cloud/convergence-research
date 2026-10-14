@@ -847,6 +847,28 @@ def test_replay_blocks_a_prior_bundle_without_hash_manifest(tmp_path):
 
 
 
+def test_portfolio_context_prompt_defaults_to_fill_not_silent_skip(monkeypatch):
+    import iios_mvp.local_investment_pilot_v01 as pilot
+
+    # Pressing Enter at the first portfolio prompt must enter the collection
+    # flow. These answers are operator-owned, not AI-authored portfolio fields.
+    answers = iter(["", "1", "1", "1", "90", "100", "1", "4", "8"])
+    monkeypatch.setattr(pilot, "_read_operator_prompt", lambda _prompt: next(answers))
+
+    context = pilot._ask_operator_portfolio_context()
+
+    assert context == {
+        "constraint_status": "PASS",
+        "can_add": True,
+        "risk_budget_pct_nav": "1",
+        "entry_zone_low": "90",
+        "entry_zone_high": "100",
+        "initial_position_pct": "1",
+        "target_position_pct": "4",
+        "max_position_pct": "8",
+    }
+
+
 # Operator-attested non-canonical portfolio-package tests. These test sizing math
 # and fail-closed gates only; they are not evidence of investment validity.
 from iios_mvp.local_pilot_portfolio_package_v01 import build_local_pilot_portfolio_package
