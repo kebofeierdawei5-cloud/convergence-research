@@ -113,6 +113,17 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
             "required_return_annualized": "0.15",
             "max_loss_pct": "25",
         },
+        "operating_driver_forecast": {
+            "schema_version": "IIOS-OPERATING-DRIVER-FORECAST-0.1",
+            "scope": "UNKNOWN",
+            "status": "UNKNOWN",
+            "actuals_period": "UNKNOWN",
+            "forecast_period": "UNKNOWN",
+            "summary": "Synthetic pilot driver tree; actual product-specific quantities, net ASP and unit costs remain UNKNOWN.",
+            "product_lines": [],
+            "scenarios": {"bear": {}, "base": {}, "bull": {}},
+            "limitations": ["Synthetic test only."],
+        },
         "notes": "Synthetic pytest fixture only.",
     }
 
@@ -299,7 +310,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
         assert len(template_paths) == 1
         template = json.loads(template_paths[0].read_text(encoding="utf-8"))
         canned = _payload(cutoff="2026-10-12")
-        for key in ("evidence_register", "assessment", "forecast_valuation", "decision_parameters", "notes"):
+        for key in ("evidence_register", "assessment", "forecast_valuation", "operating_driver_forecast", "decision_parameters", "notes"):
             template[key] = canned[key]
         return template
 
@@ -322,6 +333,9 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert "本次完整 JSON 模板" in output
     assert '"schema_version": "IIOS-LOCAL-INVESTMENT-PILOT-0.1"' in output
     assert "不要求操作者另行上传公告或模板" in output
+    prompt_files = list((tmp_path / "inputs").glob("pilot-prompt-*.md"))
+    assert len(prompt_files) == 1
+    assert "经营驱动因素树要求（IIOS-OPERATING-DRIVER-FORECAST-0.1）" in prompt_files[0].read_text(encoding="utf-8")
     assert "上传输入模板和需要引用的公司公告/财报材料" not in output
 
 
@@ -868,6 +882,135 @@ def test_portfolio_context_prompt_defaults_to_fill_not_silent_skip(monkeypatch):
         "max_position_pct": "8",
     }
 
+
+def _driver_measure(value, unit, data_class="ANALYST_ASSUMPTION", refs=None, basis="explicit synthetic assumption"):
+    return {
+        "value": value, "unit": unit, "data_class": data_class, "basis": basis,
+        "evidence_refs": list(refs or []), "note": basis,
+    }
+
+
+def _driver_payload():
+    observed = lambda value, unit: _driver_measure(value, unit, "OBSERVED_ACTUAL", ["E1"], "Synthetic test actual with source ID")
+    forecast = lambda value, unit: _driver_measure(value, unit, "ISSUER_FORECAST", ["E1"], "Synthetic test issuer forecast")
+    assumption = lambda value, unit: _driver_measure(value, unit, "ANALYST_ASSUMPTION", [], "Explicit synthetic scenario assumption")
+    result = {
+        "schema_version": "IIOS-OPERATING-DRIVER-FORECAST-0.1", "scope": "PROJECT_INCREMENTAL",
+        "status": "PARTIAL", "actuals_period": "2025FY", "forecast_period": "2026FY",
+        "summary": "Synthetic test case; not real company facts.",
+        "product_lines": [{
+            "product_id": "product_a", "product_name": "示例产品",
+            "capacity_tonnes_per_year": forecast("1000", "tonnes/year"),
+            "historical_actuals": {
+                "production_tonnes": observed("800", "tonnes"),
+                "sales_volume_tonnes": observed("750", "tonnes"),
+                "net_asp_cny_per_tonne": observed("1000", "CNY/tonne"),
+                "variable_cost_cny_per_tonne": observed("400", "CNY/tonne"),
+            },
+        }], "scenarios": {}, "limitations": ["Synthetic data only."],
+    }
+    for name, production, sales in (("bear", "700", "650"), ("base", "800", "750"), ("bull", "900", "850")):
+        result["scenarios"][name] = {
+            "product_lines": [{
+                "product_id": "product_a", "production_tonnes": assumption(production, "tonnes"),
+                "sales_volume_tonnes": assumption(sales, "tonnes"),
+                "net_asp_cny_per_tonne": assumption("1000", "CNY/tonne"),
+                "variable_cost_cny_per_tonne": assumption("400", "CNY/tonne"),
+            }],
+            "fixed_cash_opex_cny": assumption("50000", "CNY"),
+            "depreciation_amortization_cny": assumption("10000", "CNY"),
+            "finance_cost_cny": assumption("5000", "CNY"),
+            "tax_rate": assumption("0.25", "ratio"),
+            "cash_capex_cny": assumption("20000", "CNY"),
+            "change_working_capital_cny": assumption("3000", "CNY"),
+        }
+    return result
+
+
+def test_operating_driver_bridge_calculates_volume_price_cost_and_cash_flow():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+    source = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    driver = evaluate_operating_driver_forecast(_driver_payload(), evidence_register=source)
+    bear = driver["scenarios"]["bear"]
+    assert driver["scope"] == "PROJECT_INCREMENTAL"
+    assert driver["historical_actuals_status"] == "PRODUCT_LINE_ACTUALS_TYPED_NOT_FORMALLY_ADMITTED"
+    assert driver["status"] == "SCENARIOS_CALCULATED"
+    assert bear["revenue_cny"] == "650000"
+    assert bear["variable_cost_cny"] == "260000"
+    assert bear["contribution_after_variable_cost_cny"] == "390000"
+    assert bear["ebitda_cny"] == "340000"
+    assert bear["ebit_cny"] == "330000"
+    assert bear["profit_before_tax_cny"] == "325000"
+    assert bear["net_profit_cny"] == "243750.00"
+    assert bear["unlevered_fcf_proxy_cny"] == "234500.00"
+    assert driver["valuation_transmission"]["status"] == "NOT_LINKED_TO_PER_SHARE_VALUE"
+    assert driver["formal_forecast_admission_created"] is False
+
+
+def test_operating_driver_forecast_refuses_unreferenced_actual_numbers():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+    payload = _driver_payload()
+    payload["scenarios"]["base"]["product_lines"][0]["net_asp_cny_per_tonne"] = _driver_measure("1000", "CNY/tonne", "OBSERVED_ACTUAL", [], "Claimed actual without source")
+    result = evaluate_operating_driver_forecast(payload, evidence_register=[])
+    base = result["scenarios"]["base"]
+    assert base["revenue_cny"] is None
+    assert any("SOURCE_REFERENCE_REQUIRED" in issue for issue in base["issues"])
+    assert base["net_profit_cny"] is None
+
+
+def test_operating_driver_forecast_preserves_unknown_revenue_when_asp_is_missing():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+    payload = _driver_payload()
+    payload["scenarios"]["base"]["product_lines"][0]["net_asp_cny_per_tonne"] = {
+        "value": None, "unit": "CNY/tonne", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [],
+        "note": "No product-specific realized net selling price."
+    }
+    result = evaluate_operating_driver_forecast(payload, evidence_register=[{"source_id": "E1", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}])
+    base = result["scenarios"]["base"]
+    assert base["revenue_cny"] is None
+    assert base["net_profit_cny"] is None
+    assert "total_revenue" in base["missing_inputs"]
+
+
+def test_operating_driver_forecast_rejects_wrong_units():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+    payload = _driver_payload()
+    payload["scenarios"]["bear"]["product_lines"][0]["sales_volume_tonnes"] = _driver_measure("650", "kg", "ANALYST_ASSUMPTION", [], "Deliberate wrong unit")
+    result = evaluate_operating_driver_forecast(payload, evidence_register=[{"source_id": "E1", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}])
+    bear = result["scenarios"]["bear"]
+    assert bear["revenue_cny"] is None
+    assert any("UNIT_MISMATCH" in issue for issue in bear["issues"])
+
+
+def test_operating_driver_forecast_keeps_actual_asp_unknown_and_flags_capacity_mismatch():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+    payload = _driver_payload()
+    payload["product_lines"][0]["historical_actuals"]["net_asp_cny_per_tonne"] = {
+        "value": None, "unit": "CNY/tonne", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [],
+        "note": "Only aggregate revenue and production were available."
+    }
+    payload["scenarios"]["base"]["product_lines"][0]["production_tonnes"] = _driver_measure("1200", "tonnes", "ANALYST_ASSUMPTION", [], "Deliberate capacity overrun")
+    result = evaluate_operating_driver_forecast(payload, evidence_register=[{"source_id": "E1", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}])
+    actual = result["product_lines"][0]["historical_actual_bridge"]
+    base = result["scenarios"]["base"]
+    assert actual["revenue_cny"] is None
+    assert result["historical_actuals_status"] == "NOT_IDENTIFIABLE_OR_INCOMPLETE"
+    assert any("ABOVE_NAMEPLATE_CAPACITY" in issue for issue in base["issues"])
+
+
+def test_operating_driver_forecast_allows_working_capital_release_but_rejects_invalid_tax_rate():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+    payload = _driver_payload()
+    payload["scenarios"]["base"]["change_working_capital_cny"] = _driver_measure("-3000", "CNY", "ANALYST_ASSUMPTION", [], "Working-capital release")
+    payload["scenarios"]["base"]["tax_rate"] = _driver_measure("-0.1", "ratio", "ANALYST_ASSUMPTION", [], "Deliberately invalid tax ratio")
+    result = evaluate_operating_driver_forecast(payload, evidence_register=[{"source_id": "E1", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}])
+    base = result["scenarios"]["base"]
+    assert base["change_working_capital_cny"] == "-3000"
+    assert base["unlevered_fcf_proxy_cny"] is None
+    assert any("TAX_RATE_MUST_BE_RATIO_0_TO_1" in issue for issue in base["issues"])
+
+
+# B4 operating-driver bridge regression tests end here.
 
 # Operator-attested non-canonical portfolio-package tests. These test sizing math
 # and fail-closed gates only; they are not evidence of investment validity.
