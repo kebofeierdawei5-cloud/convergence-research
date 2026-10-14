@@ -30,7 +30,7 @@ Batch 0 narrow state reconciliation                     PASS ON MERGE; NO ECONOM
 Local MVP Batch 0 baseline audit (revised plan)          BASELINE ESTABLISHED / ARCHIVED RESPONSE CONTRACT FAIL / MAC RUN BUNDLE OPEN
 Local MVP Batch 1 IIOS decision-kernel integration             MERGED PR #404 / 17-OF-17 EXACT-HEAD CHECKS PASS / MAC RUN OPEN
 Batch 1 private Path A scenario runner                  PASS / MERGED; 40 TESTS; ANALYSIS-ONLY
-Batch 1 macOS local pilot + hash-bound replay             PR #411/#417 MERGED; POST-#417 MAC RUN + REPLAY ACCEPTED WITH SCOPE LIMIT; portfolio wizard now defaults to collect after PR #422; full answered-package Mac rerun PENDING
+Batch 1 macOS local pilot + hash-bound replay             PR #411/#417 MERGED; POST-#417 MAC RUN + REPLAY ACCEPTED WITH SCOPE LIMIT; PR #422 fixed default prompt; real Mac rerun with completed portfolio package DEFERRED / PENDING
 Batch 2 Path A scenario integrity audit                    IN PROGRESS / PR #360 MERGED; 43 TESTS + 13 EXACT-HEAD CHECKS PASS; LOCAL BUNDLE REVIEW OPEN
 Operator-entered price decision-input track                 MP-1/2 + REPORT ASSURANCE PASS; MP-3 MULTI-SLICE + COMPLETE RECEIPT-REPLAY TEST PASS / PRs #372/#375/#377/#378/#379/#383; LOCAL PRIVATE RUN REVIEW + RESIDUAL BYPASS CASES OPEN
 C0 Local-first architecture / product-entry decision     DECISION RECORDED; IMPLEMENTATION GATES OPEN
@@ -45,6 +45,7 @@ Route A C2 / 新和成 002001                            PRIVATE CORE/PIT PASS (
 Path A operator-attested price overlay               ANALYSIS-ONLY INTAKE IMPLEMENTATION; NO CANONICAL PRICE ADMISSION
 Local single-user complete pilot                     ACTIVE P0 PRIORITY; PILOT_NON_CANONICAL BEFORE FORMALIZATION
 Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
+B4 operating-driver forecast bridge                    MERGED PR #424; LOCAL PILOT 70 PASS; CORE 412 PASS; RED-TEAM 7 PASS; 7 TRIGGERED WORKFLOWS SUCCESS
 ```
 
 ### B3 — close the local portfolio-context slice (2026-10-14)
@@ -54,6 +55,15 @@ Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED 
 - Exact PR head `5d6733689f538b8ab9444d14c8f5fe6babeee7a0`: dedicated local-pilot workflow `64 passed`; all 7 triggered workflows succeeded.
 - **Still pending:** a new real macOS 605016 run using the merged `main`, completing the portfolio prompts from actual operator constraints, and reviewing `report.md`, `analysis.json`, and `pilot_receipt.json` from that run. CI does not substitute for this run.
 - If the operator cannot confirm portfolio constraints, preserve `UNKNOWN`; no conditional size is implied and authorized new position remains `0%`. The pilot remains `PILOT_NON_CANONICAL`; this usability change does not create a formal Decision or trade authorization.
+
+### B4 — operating-driver forecast bridge (2026-10-14)
+
+- PR [#424](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/424) merged at `7cc511207a391ce9fac988cc24b6415a0011f138`.
+- Added `IIOS-OPERATING-DRIVER-FORECAST-0.1` and wired it into the local `PILOT_NON_CANONICAL` prompt, normalizer, analysis, report and replay comparison. It separates `OBSERVED_ACTUAL`, `ISSUER_FORECAST`, `ANALYST_ASSUMPTION` and `UNKNOWN`; actual/issuer values need a registered, cutoff-compatible source reference to be calculation-usable.
+- Per-product/scenario bridge computes sales × net ASP, sales × variable cost, EBITDA, EBIT, pre-tax and simplified after-tax earnings, plus a free-cash-flow proxy only when required inputs are present. Units are checked; missing values remain UNKNOWN; working-capital release may be negative and tax-rate ratios must be 0–1.
+- Exact-head acceptance: local pilot **70 passed**; investment-core CI **412 passed**; independent red-team **7 passed**; all **7 triggered workflows succeeded**. These are repository tests, not a live Mac/chat-response run.
+- Actual project contribution for 百龙创园 remains NOT_IDENTIFIABLE where project-specific actual shipments, net selling prices, unit variable costs, attribution and dilution are not publicly reconciled. The bridge explicitly reports `NOT_LINKED_TO_PER_SHARE_VALUE`; B5 must not infer project EPS or overwrite the human-selected valuation model.
+- B3 Mac run with portfolio questions answered remains DEFERRED / PENDING and may be resumed after core code delivery. Do not mark local acceptance passed until a real run is reviewed.
 
 ### Local MVP Batch 0 baseline audit (2026-10-13)
 
