@@ -9,6 +9,7 @@ capital action.
 """
 
 from decimal import Decimal, InvalidOperation
+import re
 from typing import Any, Mapping
 
 OPERATING_DRIVER_SCHEMA = "IIOS-OPERATING-DRIVER-FORECAST-0.1"
@@ -186,20 +187,44 @@ def _normalise_product_measure_set(
     unresolved_refs: set[str],
     after_cutoff_refs: set[str],
     uncertain_refs: set[str],
+    allowed_data_classes: set[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
     row = raw if isinstance(raw, Mapping) else {}
-    return {
-        key: _normalise_measure(
+    result: dict[str, dict[str, Any]] = {}
+    for key, unit in fields.items():
+        field = f"{prefix}.{key}"
+        measure = _normalise_measure(
             row.get(key),
-            field=f"{prefix}.{key}",
+            field=field,
             expected_unit=unit,
             sources_by_id=sources_by_id,
             unresolved_refs=unresolved_refs,
             after_cutoff_refs=after_cutoff_refs,
             uncertain_refs=uncertain_refs,
         )
-        for key, unit in fields.items()
-    }
+        # Context matters: history is not allowed to borrow forecast values,
+        # and forward scenarios cannot silently relabel an observed actual as a
+        # forward estimate. Keep the claim visible, but never use it in math.
+        data_class = str(measure.get("data_class") or "UNKNOWN")
+        if (
+            allowed_data_classes is not None
+            and data_class != "UNKNOWN"
+            and data_class not in allowed_data_classes
+        ):
+            measure["value"] = None
+            measure["calculation_usable"] = False
+            measure["evidence_status"] = "DATA_CLASS_NOT_ALLOWED_FOR_CONTEXT"
+            measure.setdefault("issues", []).append(
+                f"{field}:DATA_CLASS_NOT_ALLOWED_FOR_CONTEXT"
+            )
+        result[key] = measure
+    return result
+
+
+def _is_full_year_period(period: Any) -> bool:
+    """Only compare a period's production against annual nameplate capacity for an explicitly full year."""
+    label = "".join(str(period or "").upper().split())
+    return bool(re.fullmatch(r"(?:\d{4}FY|FY\d{4}|\d{4}年度|\d{4}全年)", label))
 
 
 def _product_profit_bridge(
@@ -207,6 +232,7 @@ def _product_profit_bridge(
     product_name: str,
     metrics: Mapping[str, Mapping[str, Any]],
     capacity: Mapping[str, Any] | None = None,
+    period_basis: str | None = None,
 ) -> dict[str, Any]:
     production = _value(metrics.get("production_tonnes"))
     sales_volume = _value(metrics.get("sales_volume_tonnes"))
@@ -215,10 +241,15 @@ def _product_profit_bridge(
     capacity_value = _value(capacity)
     revenue = sales_volume * asp if sales_volume is not None and asp is not None else None
     variable_cost = sales_volume * unit_cost if sales_volume is not None and unit_cost is not None else None
-    utilization = production / capacity_value if production is not None and capacity_value is not None and capacity_value > 0 else None
+    utilization = None
     issues: list[str] = []
-    if utilization is not None and utilization > Decimal("1"):
-        issues.append("PRODUCTION_ABOVE_NAMEPLATE_CAPACITY_CHECK_PERIOD_OR_SCOPE")
+    if production is not None and capacity_value is not None and capacity_value > 0:
+        if not _is_full_year_period(period_basis):
+            issues.append("CAPACITY_PERIOD_ALIGNMENT_UNKNOWN")
+        else:
+            utilization = production / capacity_value
+            if utilization > Decimal("1"):
+                issues.append("PRODUCTION_ABOVE_NAMEPLATE_CAPACITY_CHECK_PERIOD_OR_SCOPE")
     return {
         "product_id": product_id,
         "product_name": product_name,
@@ -238,6 +269,7 @@ def _calculate_scenario(
     scenario_name: str,
     raw: Any,
     products: list[dict[str, Any]],
+    period_basis: str,
     sources_by_id: Mapping[str, Mapping[str, Any]],
     unresolved_refs: set[str],
     after_cutoff_refs: set[str],
@@ -248,15 +280,21 @@ def _calculate_scenario(
     raw_products = raw_products if isinstance(raw_products, list) else []
     rows_by_id: dict[str, Mapping[str, Any]] = {}
     issues: list[str] = []
+    structure_valid = True
     for index, row in enumerate(raw_products):
         if not isinstance(row, Mapping):
             issues.append(f"{scenario_name}:PRODUCT_ROW_{index}_INVALID")
+            structure_valid = False
             continue
         product_id = str(row.get("product_id") or "").strip()
         if not product_id:
             issues.append(f"{scenario_name}:PRODUCT_ID_MISSING")
+            structure_valid = False
         elif product_id in rows_by_id:
             issues.append(f"{scenario_name}:DUPLICATE_PRODUCT_ID:{product_id}")
+            structure_valid = False
+            # Conflicting duplicate rows are ambiguous; do not select either value.
+            rows_by_id[product_id] = {}
         else:
             rows_by_id[product_id] = row
     expected_ids = {str(product.get("product_id") or "") for product in products}
@@ -270,9 +308,9 @@ def _calculate_scenario(
 
     product_results: list[dict[str, Any]] = []
     product_revenues: list[Decimal] = []
-    revenues_complete = bool(products) and not missing_ids and not extra_ids
+    revenues_complete = bool(products) and structure_valid and not missing_ids and not extra_ids
     product_costs: list[Decimal] = []
-    costs_complete = bool(products) and not missing_ids and not extra_ids
+    costs_complete = bool(products) and structure_valid and not missing_ids and not extra_ids
     volume_total = Decimal("0")
     production_total = Decimal("0")
     all_volume_known = bool(products)
@@ -294,9 +332,12 @@ def _calculate_scenario(
             unresolved_refs,
             after_cutoff_refs,
             uncertain_refs,
+            allowed_data_classes={"ISSUER_FORECAST", "ANALYST_ASSUMPTION"},
         )
         capacity = product["capacity_tonnes_per_year"]
-        result = _product_profit_bridge(product_id, product["product_name"], measures, capacity)
+        result = _product_profit_bridge(
+            product_id, product["product_name"], measures, capacity, period_basis=period_basis
+        )
         product_results.append(result)
         p_volume = _value(measures.get("sales_volume_tonnes"))
         p_production = _value(measures.get("production_tonnes"))
@@ -330,6 +371,7 @@ def _calculate_scenario(
         unresolved_refs,
         after_cutoff_refs,
         uncertain_refs,
+        allowed_data_classes={"ISSUER_FORECAST", "ANALYST_ASSUMPTION"},
     )
     for measure in scenario_measures.values():
         issues.extend(measure.get("issues") or [])
@@ -523,8 +565,12 @@ def evaluate_operating_driver_forecast(
             unresolved_refs,
             after_cutoff_refs,
             uncertain_refs,
+            allowed_data_classes={"OBSERVED_ACTUAL"},
         )
-        actual_bridge = _product_profit_bridge(product_id, product_name, actuals, capacity)
+        actual_bridge = _product_profit_bridge(
+            product_id, product_name, actuals, capacity,
+            period_basis=str(raw.get("actuals_period") or "UNKNOWN"),
+        )
         for measure in [capacity, *actuals.values()]:
             if measure.get("issues"):
                 input_issues.extend(measure["issues"])
@@ -544,11 +590,13 @@ def evaluate_operating_driver_forecast(
         })
 
     scenarios_raw = raw.get("scenarios") if isinstance(raw.get("scenarios"), Mapping) else {}
+    forecast_period = str(raw.get("forecast_period") or "UNKNOWN")
     scenarios = {
         name: _calculate_scenario(
             name,
             scenarios_raw.get(name),
             product_lines,
+            forecast_period,
             sources_by_id,
             unresolved_refs,
             after_cutoff_refs,
@@ -582,7 +630,7 @@ def evaluate_operating_driver_forecast(
         "scope": scope,
         "summary": summary,
         "actuals_period": str(raw.get("actuals_period") or "UNKNOWN"),
-        "forecast_period": str(raw.get("forecast_period") or "UNKNOWN"),
+        "forecast_period": forecast_period,
         "product_lines": product_lines,
         "scenarios": scenarios,
         "input_issues": sorted(set(input_issues)),
