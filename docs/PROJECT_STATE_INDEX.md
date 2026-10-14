@@ -46,6 +46,7 @@ Path A operator-attested price overlay               ANALYSIS-ONLY INTAKE IMPLEM
 Local single-user complete pilot                     ACTIVE P0 PRIORITY; PILOT_NON_CANONICAL BEFORE FORMALIZATION
 Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
 B4 operating-driver forecast bridge                    MERGED PR #424 + #426 SAFEGUARDS; LOCAL PILOT 74 PASS; RED-TEAM 7 PASS; 7 TRIGGERED WORKFLOWS SUCCESS
+B5 valuation transmission / entry price mapping          MERGED PR #428; LOCAL PILOT 81 PASS; 7/7 TRIGGERED WORKFLOWS SUCCESS; EPS_MULTIPLE ONLY
 ```
 
 ### B3 — close the local portfolio-context slice (2026-10-14)
@@ -65,6 +66,15 @@ B4 operating-driver forecast bridge                    MERGED PR #424 + #426 SAF
 - Actual project contribution for 百龙创园 remains NOT_IDENTIFIABLE where project-specific actual shipments, net selling prices, unit variable costs, attribution and dilution are not publicly reconciled. The bridge explicitly reports `NOT_LINKED_TO_PER_SHARE_VALUE`; B5 must not infer project EPS or overwrite the human-selected valuation model.
 - B3 Mac run with portfolio questions answered remains DEFERRED / PENDING and may be resumed after core code delivery. Do not mark local acceptance passed until a real run is reviewed.
 - Post-merge calculation-integrity follow-up PR [#426](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/426) merged at `fb23f396128dfe73f84302f1e2d91d341101ccc6`; exact PR head `81cccf1305621a48c556a17f63d3a46f4e4edc9b` passed 74/74 local-pilot tests, 7/7 independent red-team tests, and all 7 triggered workflows. It prevents forecast/actual data-class leakage, makes duplicate product rows non-calculable, and preserves UNKNOWN utilization unless the period is explicitly a full year. This is code/CI evidence only; no new real Mac run is claimed.
+
+### B5 — project earnings to per-share value and entry-price mapping (2026-10-14)
+
+- PR [#428](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/428) merged at `f6de0db1320693b9dff1e73846cf8c78a19c63ff`; exact PR head `2ff8cb4dc1da671d2dcccd4f232f7e76feed57c3` passed **81/81 local-pilot tests** and all **7 triggered workflows**.
+- Added the typed `IIOS-VALUATION-TRANSMISSION-0.1` adapter to the existing B4 → local analysis → report → v0.3 return/entry-price solver path. The operator, not AI, selects the primary model family and confirms whether the baseline valuation already includes the project.
+- EPS-multiple incremental transmission is the only supported formula in B5. It accounts for project after-tax profit, ownership, displaced existing-business after-tax profit, basic shares, convertible-bond/other dilution and P/E multiple. It updates all three scenario terminal values and the Base entry-value anchor atomically only when each link is calculation-usable and the operator explicitly confirms the existing valuation excludes the project.
+- If the existing valuation already includes the project, it reports sensitivity without double counting; if scope/model/period/attribution/cannibalization/dilution is unknown or inconsistent, original valuation is preserved and transmission remains NOT_LINKED. DCF/FCF, DDM, SOTP and RNPV are not run through the EPS formula.
+- This is provisional pilot output only. The 81-test CI acceptance is not a new real macOS run, formal valuation admission, canonical Decision, or trade authorization. B3 Mac completion remains pending.
+- The active B6 slice is documented below in the execution plan; B6 is a derived user-facing investment feature because no existing canonical B6 specification was found.
 
 ### Local MVP Batch 0 baseline audit (2026-10-13)
 
