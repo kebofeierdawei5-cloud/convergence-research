@@ -486,7 +486,7 @@ def evaluate_valuation_transmission(
         "valuation_model_name": model_name or "UNKNOWN",
         "scenarios": result_scenarios,
         "entry_value_reference_baseline_per_share": (
-            _format(forecast_valuation.get("entry_value_reference_per_share"))
+            str(forecast_valuation.get("entry_value_reference_per_share"))
             if forecast_valuation.get("entry_value_reference_per_share") not in (None, "") else None
         ),
         "formal_valuation_admission_created": False,
