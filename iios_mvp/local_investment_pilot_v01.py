@@ -23,6 +23,11 @@ from .decision_kernel_v03 import evaluate_production_decision
 from .decision_state_machine_v01 import MIE_POLICY_OPTIONAL_EXPLANATORY
 from .local_pilot_portfolio_package_v01 import build_local_pilot_portfolio_package
 from .operating_driver_forecast_v01 import evaluate_operating_driver_forecast, render_operating_driver_section
+from .valuation_transmission_v01 import (
+    VALUATION_TRANSMISSION_SCHEMA,
+    evaluate_valuation_transmission,
+    render_valuation_transmission_section,
+)
 from .investment_core_contract_v03 import (
     BUY_ENTRY_RETURN_CUSHION_THRESHOLD,
     FUNDAMENTAL_TARGET_ANNUALIZED_RETURN,
@@ -52,6 +57,8 @@ REPLAY_COMPARISON_FIELDS = (
     "assessment",
     "forecast_valuation",
     "operating_driver_forecast",
+    "valuation_transmission",
+    "operator_valuation_context",
     "decision_parameters",
     "portfolio_package",
     "return_metrics",
@@ -608,6 +615,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
 
     forecast_raw = payload.get("forecast_valuation") if isinstance(payload.get("forecast_valuation"), Mapping) else {}
     raw_driver_forecast = payload.get("operating_driver_forecast")
+    raw_valuation_transmission = payload.get("valuation_transmission")
+    raw_operator_valuation_context = payload.get("operator_valuation_context")
     stress_raw = forecast_raw.get("thesis_break_stress")
     stress_raw = stress_raw if isinstance(stress_raw, Mapping) else {}
     forecast = {
@@ -668,6 +677,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "assessment": raw_assessment,
         "forecast_valuation": forecast_raw,
         "operating_driver_forecast": raw_driver_forecast,
+        "valuation_transmission": raw_valuation_transmission,
     })
     unknown_refs = sorted(references - source_ids)
     after_cutoff_refs = [
@@ -686,6 +696,44 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         after_cutoff_evidence_ids=after_cutoff_refs,
         uncertain_timing_evidence_ids=uncertain_timing_refs,
     )
+    allowed_model_families = {"EPS_MULTIPLE", "FCF_DCF", "DDM", "SOTP", "RNPV", "OTHER", "UNKNOWN"}
+    operator_context_raw = raw_operator_valuation_context if isinstance(raw_operator_valuation_context, Mapping) else {}
+    selected_model_family = str(operator_context_raw.get("selected_model_family") or "UNKNOWN").strip().upper()
+    if selected_model_family not in allowed_model_families:
+        selected_model_family = "UNKNOWN"
+    baseline_includes_raw = operator_context_raw.get("baseline_includes_project")
+    baseline_includes_project = baseline_includes_raw if isinstance(baseline_includes_raw, bool) else None
+    operator_valuation_context = {
+        "selected_model_family": selected_model_family,
+        "baseline_includes_project": baseline_includes_project,
+        "input_owner": "OPERATOR",
+    }
+    valuation_transmission = evaluate_valuation_transmission(
+        raw_valuation_transmission,
+        operating_driver_forecast=operating_driver_forecast,
+        forecast_valuation=forecast,
+        operator_context=operator_valuation_context,
+        evidence_register=sources,
+        unresolved_evidence_ids=unknown_refs,
+        after_cutoff_evidence_ids=after_cutoff_refs,
+        uncertain_timing_evidence_ids=uncertain_timing_refs,
+    )
+    if valuation_transmission.get("applied_to_per_share_scenarios") is True:
+        original_scenarios = forecast.get("scenarios") if isinstance(forecast.get("scenarios"), Mapping) else {}
+        adjusted_scenarios = {
+            key: dict(value) if isinstance(value, Mapping) else value
+            for key, value in original_scenarios.items()
+        }
+        for scenario_name in SCENARIOS:
+            scenario_row = adjusted_scenarios.get(scenario_name)
+            bridge_row = valuation_transmission.get("scenarios", {}).get(scenario_name, {})
+            if isinstance(scenario_row, dict) and isinstance(bridge_row, Mapping):
+                scenario_row["b5_baseline_terminal_value_per_share"] = scenario_row.get("terminal_value_per_share")
+                scenario_row["terminal_value_per_share"] = bridge_row.get("adjusted_terminal_value_per_share")
+                scenario_row["b5_transmission_applied"] = True
+        forecast["scenarios"] = adjusted_scenarios
+        forecast["b5_baseline_entry_value_reference_per_share"] = forecast.get("entry_value_reference_per_share")
+        forecast["entry_value_reference_per_share"] = valuation_transmission.get("entry_value_reference_adjusted_per_share")
     return {
         "case": {
             "case_id": case["case_id"], "company": company, "market": normalized_market,
@@ -706,6 +754,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "assessment": assessment,
         "forecast_valuation": forecast,
         "operating_driver_forecast": operating_driver_forecast,
+        "valuation_transmission": valuation_transmission,
+        "operator_valuation_context": operator_valuation_context,
         "decision_parameters": {
             "horizon_years": horizon, "horizon_override": override, "horizon_override_basis": override_basis,
             "horizon_selection_rationale": rationale, "required_return_annualized": format(required_return, "f"),
@@ -1250,6 +1300,10 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f.get("scenarios") if isinstance(f.get("scenarios"), Mapping) else {},
         c["currency"],
     ))
+    lines.extend(render_valuation_transmission_section(
+        analysis.get("valuation_transmission") or {},
+        c["currency"],
+    ))
     lines.extend([
         "",
         "## 五、MIE 与预期差",
@@ -1404,6 +1458,8 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "assessment": prepared["assessment"],
         "forecast_valuation": prepared["forecast_valuation"],
         "operating_driver_forecast": prepared["operating_driver_forecast"],
+        "valuation_transmission": prepared["valuation_transmission"],
+        "operator_valuation_context": prepared["operator_valuation_context"],
         "decision_parameters": prepared["decision_parameters"],
         "portfolio_package": portfolio_package,
         "return_metrics": metrics,
@@ -1567,6 +1623,44 @@ def _template(
                 "rationale": "", "evidence_refs": [],
             },
         },
+        "valuation_transmission": {
+            "schema_version": VALUATION_TRANSMISSION_SCHEMA,
+            "model_family": "UNKNOWN",
+            "valuation_model_name": "UNKNOWN",
+            "earnings_period": "UNKNOWN",
+            "summary": "未完成 B5 经营结果到每股估值的传导；若模型类别、期间、项目归属、存量业务替代或稀释股数不可识别，应保留 NOT_LINKED。",
+            "scenarios": {
+                "bear": {
+                    "ownership_ratio": {"value": None, "unit": "ratio", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                    "displaced_existing_after_tax_profit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；须扣除存量业务被替代的税后归属利润"},
+                    "basic_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；按实际普通股股数填写"},
+                    "convertible_bond_incremental_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；可明确为 0，但须说明转股口径"},
+                    "other_dilution_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；可明确为 0，但须说明口径"},
+                    "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；须与主估值模型一致"}
+                },
+                "base": {
+                    "ownership_ratio": {"value": None, "unit": "ratio", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                    "displaced_existing_after_tax_profit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；须扣除存量业务被替代的税后归属利润"},
+                    "basic_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；按实际普通股股数填写"},
+                    "convertible_bond_incremental_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；可明确为 0，但须说明转股口径"},
+                    "other_dilution_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；可明确为 0，但须说明口径"},
+                    "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；须与主估值模型一致"}
+                },
+                "bull": {
+                    "ownership_ratio": {"value": None, "unit": "ratio", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"},
+                    "displaced_existing_after_tax_profit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；须扣除存量业务被替代的税后归属利润"},
+                    "basic_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；按实际普通股股数填写"},
+                    "convertible_bond_incremental_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；可明确为 0，但须说明转股口径"},
+                    "other_dilution_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；可明确为 0，但须说明口径"},
+                    "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；须与主估值模型一致"}
+                }
+            }
+        },
+        "operator_valuation_context": {
+            "selected_model_family": "UNKNOWN",
+            "baseline_includes_project": None,
+            "input_owner": "OPERATOR"
+        },
         "operating_driver_forecast": {
             "schema_version": "IIOS-OPERATING-DRIVER-FORECAST-0.1",
             "scope": "UNKNOWN",
@@ -1645,6 +1739,15 @@ def create_pilot_template(
         "不要在 notes 中重述与 price_input.price 不同的现价；当前股价只取结构化 price_input。不能将人工价格标为已验证。"
         "未知事实用 UNKNOWN，并解释缺口；研究结论可以是 REVIEW_REQUIRED，但不可以把整个结构留空。只返回一个完整 JSON 对象，不要输出代码围栏或额外说明。"
     )
+    b5_transmission_instructions = (
+        "\n\nB5 估值传导要求（IIOS-VALUATION-TRANSMISSION-0.1）："
+        "必须保留 valuation_transmission 节点和 Bear/Base/Bull 三个情景。valuation_model_name 必须逐字匹配 forecast_valuation.model；model_family 必须准确分类为 EPS_MULTIPLE、FCF_DCF、DDM、SOTP、RNPV、OTHER 或 UNKNOWN；earnings_period 必须与 operating_driver_forecast.forecast_period 完全一致。"
+        "operator_valuation_context 是操作者拥有的字段，必须原样保留模板中的 UNKNOWN/null，不得替操作者选择估值模型或判断原估值是否已包含项目；操作者稍后会在本地独立确认。"
+        "本批只有 EPS_MULTIPLE 适配器可传导。每个情景必须提供 ownership_ratio、displaced_existing_after_tax_profit_cny、basic_shares、convertible_bond_incremental_shares、other_dilution_shares、pe_multiple_x，均用 {value,unit,data_class,basis,evidence_refs,note} 结构。"
+        "ownership_ratio 是 0–1 的比例；被替代存量业务税后归属利润为非负 CNY；股数单位 shares，填写实际普通股数量而非百万股；可转债潜在新增股数和其他稀释股数可明确为 0，但须说明依据。P/E 倍数单位 x。"
+        "事实/发行人预测必须有可解析且截止时间兼容的 evidence_refs；分析假设须标为 ANALYST_ASSUMPTION 并解释依据，不能伪装成事实。缺少项目税后净利润、所有权比例、存量业务蚕食、股数/可转债稀释、期间或模型一致性时保持 NOT_LINKED。"
+        "仅当操作者明确确认现有 Bear/Base/Bull 每股终值及入场价值锚均不含该项目时，方可将稀释口径增量加到三个情景，并以 Base 增量同步调整入场价值锚；如已经包含则只显示敏感性、不重复相加；如不确定则不修改原估值。论点失效压力测试不自动加回项目价值。"
+    )
     driver_instructions = (
         "\n\n经营驱动因素树要求（IIOS-OPERATING-DRIVER-FORECAST-0.1）："
         "必须保留 operating_driver_forecast 节点。scope 可为 PROJECT_INCREMENTAL、PRODUCT_LINE、COMPANY_WIDE 或 UNKNOWN。"
@@ -1670,6 +1773,7 @@ def create_pilot_template(
             "若本次截止日晚于历史公开材料，必须检索截止日前最新公开披露后再判断项目当前状态；不要把旧的调试阶段描述直接外推到新截止日。"
         )
     prompt += driver_instructions
+    prompt += b5_transmission_instructions
     _write_local(prompt_path, prompt + "\n")
     return {
         "status": "PILOT_TEMPLATE_CREATED", "input_template": str(input_path),
@@ -1726,7 +1830,7 @@ def _assert_response_preserves_operator_inputs(
         raise LocalInvestmentPilotError("OPERATOR_INPUT_TEMPLATE_UNREADABLE") from exc
 
     mismatched_sections = [
-        field for field in ("case", "price_input")
+        field for field in ("case", "price_input", "operator_valuation_context")
         if payload.get(field) != template.get(field)
     ]
     if mismatched_sections:
@@ -1845,6 +1949,30 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
     if not isinstance(drivers.get("product_lines"), list):
         missing.append("经营驱动因素树 product_lines 数组")
 
+    transmission = payload.get("valuation_transmission")
+    transmission = transmission if isinstance(transmission, Mapping) else {}
+    if transmission.get("schema_version") != VALUATION_TRANSMISSION_SCHEMA:
+        missing.append("B5 valuation_transmission schema_version")
+    transmission_summary = str(transmission.get("summary") or "").strip()
+    if not transmission_summary or transmission_summary == "未完成 B5 经营结果到每股估值的传导；若模型类别、期间、项目归属、存量业务替代或稀释股数不可识别，应保留 NOT_LINKED。":
+        missing.append("B5 估值传导结论/未知项说明")
+    transmission_scenarios = transmission.get("scenarios")
+    transmission_scenarios = transmission_scenarios if isinstance(transmission_scenarios, Mapping) else {}
+    for name in ("bear", "base", "bull"):
+        scenario = transmission_scenarios.get(name)
+        if not isinstance(scenario, Mapping):
+            missing.append(f"B5 {name.upper()} 估值传导情景结构")
+            continue
+        for key in (
+            "ownership_ratio", "displaced_existing_after_tax_profit_cny", "basic_shares",
+            "convertible_bond_incremental_shares", "other_dilution_shares", "pe_multiple_x",
+        ):
+            if not isinstance(scenario.get(key), Mapping):
+                missing.append(f"B5 {name.upper()} {key} 结构")
+    for key in ("model_family", "valuation_model_name", "earnings_period"):
+        if not str(transmission.get(key) or "").strip():
+            missing.append(f"B5 {key}")
+
     stress = valuation.get("thesis_break_stress")
     stress = stress if isinstance(stress, Mapping) else {}
     for key, label in (
@@ -1886,7 +2014,7 @@ def _build_response_repair_prompt(
         + "\n\n【必须遵守】\n"
         "1. 以下是本次唯一基准模板与全部研究要求。必须完整保留 schema_version、case、price_input 的所有值，尤其人工股价、观察日、known_at、截止时点和 assurance_label。"
         "2. 不要要求用户上传模板或额外寻找公告；请主动联网搜索截止时点前公开可访问的公司公告、交易所披露与监管文件。"
-        "3. 修复缺失结构字段并填写数值估值情景及经营驱动因素树；研究假设和事实来源要分开。不得编造来源、财务数字或市场一致预期。"
+        "3. 修复缺失结构字段并填写数值估值情景、经营驱动因素树和 B5 估值传导结构；研究假设和事实来源要分开。不得编造来源、财务数字或市场一致预期。"
         "4. 如果确实无法识别，字段仍要保留结构，并在 summary/rationale 中具体解释未知原因、证据缺口及需要人工确认的事项。"
         "5. 请返回一个完整 JSON 对象，不要代码围栏和 JSON 以外的文字。"
         + "\n\n【原始研究提示及完整基准模板】\n" + original_prompt
@@ -2006,6 +2134,50 @@ def _ask_operator_portfolio_context() -> dict[str, Any] | None:
         "initial_position_pct": initial,
         "target_position_pct": target,
         "max_position_pct": maximum,
+    }
+
+
+def _ask_operator_valuation_context() -> dict[str, Any]:
+    """Collect the primary model choice and project-in-baseline scope from the operator, not the AI."""
+    print("\nB5 主估值模型确认（由你选择，不让 AI 替你选模型）")
+    print("  1 = EPS / 市盈率倍数（本批支持项目增量传导）")
+    print("  2 = DCF / 自由现金流折现")
+    print("  3 = DDM / 股利折现")
+    print("  4 = SOTP / 分部估值")
+    print("  5 = RNPV / 风险调整净现值")
+    print("  6 = 其他模型")
+    print("  0 = 暂不确认（不进行 B5 每股传导）")
+    choices = {
+        "1": "EPS_MULTIPLE",
+        "2": "FCF_DCF",
+        "3": "DDM",
+        "4": "SOTP",
+        "5": "RNPV",
+        "6": "OTHER",
+        "0": "UNKNOWN",
+    }
+    while True:
+        choice = _ask("你确认本次主估值模型类型 0–6", "0")
+        if choice in choices:
+            break
+        print("请输入 0 到 6。")
+    family = choices[choice]
+    baseline_includes_project: bool | None = None
+    if family == "EPS_MULTIPLE":
+        print("请确认报告中的每股终值和安全边际估值锚是否已经包含此项目/扩产的价值。")
+        print("  1 = 已包含（不可再叠加）")
+        print("  2 = 明确不包含（符合条件时可传导增量）")
+        print("  0 = 无法确认（保持原估值，不叠加）")
+        while True:
+            scope_choice = _ask("原估值的项目包含范围 0/1/2", "0")
+            if scope_choice in {"0", "1", "2"}:
+                break
+            print("请输入 0、1 或 2。")
+        baseline_includes_project = {"0": None, "1": True, "2": False}[scope_choice]
+    return {
+        "selected_model_family": family,
+        "baseline_includes_project": baseline_includes_project,
+        "input_owner": "OPERATOR",
     }
 
 
@@ -2213,6 +2385,7 @@ def run_guided_wizard(
     portfolio_context = _ask_operator_portfolio_context()
     if portfolio_context is not None:
         payload["operator_portfolio_context"] = portfolio_context
+    payload["operator_valuation_context"] = _ask_operator_valuation_context()
     private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     completed = private_inputs / f"pilot-completed-{symbol.replace('.', '-')}-{stamp}.json"
