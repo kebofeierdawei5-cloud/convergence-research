@@ -325,6 +325,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
         "1",
         "",
         "0",
+        "0",
     ])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
 
@@ -333,7 +334,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
         assert len(template_paths) == 1
         template = json.loads(template_paths[0].read_text(encoding="utf-8"))
         canned = _payload(cutoff="2026-10-12")
-        for key in ("evidence_register", "assessment", "forecast_valuation", "operating_driver_forecast", "decision_parameters", "notes"):
+        for key in ("evidence_register", "assessment", "forecast_valuation", "operating_driver_forecast", "valuation_transmission", "decision_parameters", "notes"):
             template[key] = canned[key]
         return template
 
@@ -359,6 +360,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     prompt_files = list((tmp_path / "inputs").glob("pilot-prompt-*.md"))
     assert len(prompt_files) == 1
     assert "经营驱动因素树要求（IIOS-OPERATING-DRIVER-FORECAST-0.1）" in prompt_files[0].read_text(encoding="utf-8")
+    assert "B5 估值传导要求（IIOS-VALUATION-TRANSMISSION-0.1）" in prompt_files[0].read_text(encoding="utf-8")
     assert "上传输入模板和需要引用的公司公告/财报材料" not in output
 
 
