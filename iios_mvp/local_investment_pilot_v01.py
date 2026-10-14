@@ -23,6 +23,11 @@ from .decision_kernel_v03 import evaluate_production_decision
 from .decision_state_machine_v01 import MIE_POLICY_OPTIONAL_EXPLANATORY
 from .local_pilot_portfolio_package_v01 import build_local_pilot_portfolio_package
 from .operating_driver_forecast_v01 import evaluate_operating_driver_forecast, render_operating_driver_section
+from .valuation_transmission_v01 import (
+    VALUATION_TRANSMISSION_SCHEMA,
+    evaluate_valuation_transmission,
+    render_valuation_transmission_section,
+)
 from .investment_core_contract_v03 import (
     BUY_ENTRY_RETURN_CUSHION_THRESHOLD,
     FUNDAMENTAL_TARGET_ANNUALIZED_RETURN,
@@ -52,6 +57,8 @@ REPLAY_COMPARISON_FIELDS = (
     "assessment",
     "forecast_valuation",
     "operating_driver_forecast",
+    "valuation_transmission",
+    "operator_valuation_context",
     "decision_parameters",
     "portfolio_package",
     "return_metrics",
@@ -608,6 +615,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
 
     forecast_raw = payload.get("forecast_valuation") if isinstance(payload.get("forecast_valuation"), Mapping) else {}
     raw_driver_forecast = payload.get("operating_driver_forecast")
+    raw_valuation_transmission = payload.get("valuation_transmission")
+    raw_operator_valuation_context = payload.get("operator_valuation_context")
     stress_raw = forecast_raw.get("thesis_break_stress")
     stress_raw = stress_raw if isinstance(stress_raw, Mapping) else {}
     forecast = {
@@ -668,6 +677,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "assessment": raw_assessment,
         "forecast_valuation": forecast_raw,
         "operating_driver_forecast": raw_driver_forecast,
+        "valuation_transmission": raw_valuation_transmission,
     })
     unknown_refs = sorted(references - source_ids)
     after_cutoff_refs = [
@@ -686,6 +696,44 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         after_cutoff_evidence_ids=after_cutoff_refs,
         uncertain_timing_evidence_ids=uncertain_timing_refs,
     )
+    allowed_model_families = {"EPS_MULTIPLE", "FCF_DCF", "DDM", "SOTP", "RNPV", "OTHER", "UNKNOWN"}
+    operator_context_raw = raw_operator_valuation_context if isinstance(raw_operator_valuation_context, Mapping) else {}
+    selected_model_family = str(operator_context_raw.get("selected_model_family") or "UNKNOWN").strip().upper()
+    if selected_model_family not in allowed_model_families:
+        selected_model_family = "UNKNOWN"
+    baseline_includes_raw = operator_context_raw.get("baseline_includes_project")
+    baseline_includes_project = baseline_includes_raw if isinstance(baseline_includes_raw, bool) else None
+    operator_valuation_context = {
+        "selected_model_family": selected_model_family,
+        "baseline_includes_project": baseline_includes_project,
+        "input_owner": "OPERATOR",
+    }
+    valuation_transmission = evaluate_valuation_transmission(
+        raw_valuation_transmission,
+        operating_driver_forecast=operating_driver_forecast,
+        forecast_valuation=forecast,
+        operator_context=operator_valuation_context,
+        evidence_register=sources,
+        unresolved_evidence_ids=unknown_refs,
+        after_cutoff_evidence_ids=after_cutoff_refs,
+        uncertain_timing_evidence_ids=uncertain_timing_refs,
+    )
+    if valuation_transmission.get("applied_to_per_share_scenarios") is True:
+        original_scenarios = forecast.get("scenarios") if isinstance(forecast.get("scenarios"), Mapping) else {}
+        adjusted_scenarios = {
+            key: dict(value) if isinstance(value, Mapping) else value
+            for key, value in original_scenarios.items()
+        }
+        for scenario_name in SCENARIOS:
+            scenario_row = adjusted_scenarios.get(scenario_name)
+            bridge_row = valuation_transmission.get("scenarios", {}).get(scenario_name, {})
+            if isinstance(scenario_row, dict) and isinstance(bridge_row, Mapping):
+                scenario_row["b5_baseline_terminal_value_per_share"] = scenario_row.get("terminal_value_per_share")
+                scenario_row["terminal_value_per_share"] = bridge_row.get("adjusted_terminal_value_per_share")
+                scenario_row["b5_transmission_applied"] = True
+        forecast["scenarios"] = adjusted_scenarios
+        forecast["b5_baseline_entry_value_reference_per_share"] = forecast.get("entry_value_reference_per_share")
+        forecast["entry_value_reference_per_share"] = valuation_transmission.get("entry_value_reference_adjusted_per_share")
     return {
         "case": {
             "case_id": case["case_id"], "company": company, "market": normalized_market,
@@ -706,6 +754,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "assessment": assessment,
         "forecast_valuation": forecast,
         "operating_driver_forecast": operating_driver_forecast,
+        "valuation_transmission": valuation_transmission,
+        "operator_valuation_context": operator_valuation_context,
         "decision_parameters": {
             "horizon_years": horizon, "horizon_override": override, "horizon_override_basis": override_basis,
             "horizon_selection_rationale": rationale, "required_return_annualized": format(required_return, "f"),
@@ -1250,6 +1300,10 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f.get("scenarios") if isinstance(f.get("scenarios"), Mapping) else {},
         c["currency"],
     ))
+    lines.extend(render_valuation_transmission_section(
+        analysis.get("valuation_transmission") or {},
+        c["currency"],
+    ))
     lines.extend([
         "",
         "## 五、MIE 与预期差",
@@ -1404,6 +1458,8 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "assessment": prepared["assessment"],
         "forecast_valuation": prepared["forecast_valuation"],
         "operating_driver_forecast": prepared["operating_driver_forecast"],
+        "valuation_transmission": prepared["valuation_transmission"],
+        "operator_valuation_context": prepared["operator_valuation_context"],
         "decision_parameters": prepared["decision_parameters"],
         "portfolio_package": portfolio_package,
         "return_metrics": metrics,
