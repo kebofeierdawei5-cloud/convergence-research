@@ -259,9 +259,9 @@ def _calculate_scenario(
         else:
             rows_by_id[product_id] = row
     expected_ids = {str(product.get("product_id") or "") for product in products}
+    missing_ids = sorted(expected_ids - set(rows_by_id))
+    extra_ids = sorted(set(rows_by_id) - expected_ids)
     if expected_ids:
-        missing_ids = sorted(expected_ids - set(rows_by_id))
-        extra_ids = sorted(set(rows_by_id) - expected_ids)
         if missing_ids:
             issues.append(f"{scenario_name}:PRODUCT_LINES_MISSING:{','.join(missing_ids)}")
         if extra_ids:
@@ -269,9 +269,9 @@ def _calculate_scenario(
 
     product_results: list[dict[str, Any]] = []
     product_revenues: list[Decimal] = []
-    revenues_complete = bool(products) and not (expected_ids - set(rows_by_id))
+    revenues_complete = bool(products) and not missing_ids and not extra_ids
     product_costs: list[Decimal] = []
-    costs_complete = bool(products) and not (expected_ids - set(rows_by_id))
+    costs_complete = bool(products) and not missing_ids and not extra_ids
     volume_total = Decimal("0")
     production_total = Decimal("0")
     all_volume_known = bool(products)
@@ -367,7 +367,7 @@ def _calculate_scenario(
                 "revenue_mix_ratio": _render(share),
             })
 
-    if revenue is not None and net_profit is not None:
+    if revenue is not None and net_profit is not None and fcf is not None:
         calculation_status = "SCENARIO_ARITHMETIC_COMPLETE"
     elif revenue is not None:
         calculation_status = "PARTIAL_SCENARIO_BRIDGE"
@@ -386,9 +386,6 @@ def _calculate_scenario(
         "change_working_capital": change_wc,
     }
     missing_inputs.extend(name for name, value in metric_values.items() if value is None)
-    if any(item in issues for item in ()):  # Keeps issue generation separate from missing values.
-        pass
-
     return {
         "scenario": scenario_name,
         "calculation_status": calculation_status,
@@ -560,7 +557,8 @@ def evaluate_operating_driver_forecast(
     }
     any_revenue = any(result.get("revenue_cny") is not None for result in scenarios.values())
     all_net_profit = all(result.get("net_profit_cny") is not None for result in scenarios.values())
-    status = "UNKNOWN" if not product_lines or not any_revenue else ("SCENARIOS_CALCULATED" if all_net_profit else "PARTIAL")
+    all_fcf = all(result.get("unlevered_fcf_proxy_cny") is not None for result in scenarios.values())
+    status = "UNKNOWN" if not product_lines or not any_revenue else ("SCENARIOS_CALCULATED" if all_net_profit and all_fcf else "PARTIAL")
     historical_status = (
         "PRODUCT_LINE_ACTUALS_TYPED_NOT_FORMALLY_ADMITTED"
         if actuals_complete else "NOT_IDENTIFIABLE_OR_INCOMPLETE"
