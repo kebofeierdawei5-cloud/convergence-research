@@ -1740,7 +1740,7 @@ def create_pilot_template(
         "未知事实用 UNKNOWN，并解释缺口；研究结论可以是 REVIEW_REQUIRED，但不可以把整个结构留空。只返回一个完整 JSON 对象，不要输出代码围栏或额外说明。"
     )
     b5_transmission_instructions = (
-        "\\n\\nB5 估值传导要求（IIOS-VALUATION-TRANSMISSION-0.1）："
+        "\n\nB5 估值传导要求（IIOS-VALUATION-TRANSMISSION-0.1）："
         "必须保留 valuation_transmission 节点和 Bear/Base/Bull 三个情景。valuation_model_name 必须逐字匹配 forecast_valuation.model；model_family 必须准确分类为 EPS_MULTIPLE、FCF_DCF、DDM、SOTP、RNPV、OTHER 或 UNKNOWN；earnings_period 必须与 operating_driver_forecast.forecast_period 完全一致。"
         "operator_valuation_context 是操作者拥有的字段，必须原样保留模板中的 UNKNOWN/null，不得替操作者选择估值模型或判断原估值是否已包含项目；操作者稍后会在本地独立确认。"
         "本批只有 EPS_MULTIPLE 适配器可传导。每个情景必须提供 ownership_ratio、displaced_existing_after_tax_profit_cny、basic_shares、convertible_bond_incremental_shares、other_dilution_shares、pe_multiple_x，均用 {value,unit,data_class,basis,evidence_refs,note} 结构。"
@@ -2138,7 +2138,7 @@ def _ask_operator_portfolio_context() -> dict[str, Any] | None:
 
 def _ask_operator_valuation_context() -> dict[str, Any]:
     """Collect the primary model choice and project-in-baseline scope from the operator, not the AI."""
-    print("\\nB5 主估值模型确认（由你选择，不让 AI 替你选模型）")
+    print("\nB5 主估值模型确认（由你选择，不让 AI 替你选模型）")
     print("  1 = EPS / 市盈率倍数（本批支持项目增量传导）")
     print("  2 = DCF / 自由现金流折现")
     print("  3 = DDM / 股利折现")
