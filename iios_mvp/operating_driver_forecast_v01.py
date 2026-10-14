@@ -293,6 +293,8 @@ def _calculate_scenario(
         elif product_id in rows_by_id:
             issues.append(f"{scenario_name}:DUPLICATE_PRODUCT_ID:{product_id}")
             structure_valid = False
+            # Conflicting duplicate rows are ambiguous; do not select either value.
+            rows_by_id[product_id] = {}
         else:
             rows_by_id[product_id] = row
     expected_ids = {str(product.get("product_id") or "") for product in products}
