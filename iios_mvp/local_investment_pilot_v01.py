@@ -1953,7 +1953,8 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
     transmission = transmission if isinstance(transmission, Mapping) else {}
     if transmission.get("schema_version") != VALUATION_TRANSMISSION_SCHEMA:
         missing.append("B5 valuation_transmission schema_version")
-    if not str(transmission.get("summary") or "").strip():
+    transmission_summary = str(transmission.get("summary") or "").strip()
+    if not transmission_summary or transmission_summary == "未完成 B5 经营结果到每股估值的传导；若模型类别、期间、项目归属、存量业务替代或稀释股数不可识别，应保留 NOT_LINKED。":
         missing.append("B5 估值传导结论/未知项说明")
     transmission_scenarios = transmission.get("scenarios")
     transmission_scenarios = transmission_scenarios if isinstance(transmission_scenarios, Mapping) else {}
