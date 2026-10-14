@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from datetime import date
 from pathlib import Path
 import subprocess
@@ -1146,7 +1147,7 @@ def test_b5_transmits_project_profit_to_per_share_scenarios_and_entry_anchor():
 
     assert bridge["status"] == "APPLIED_TO_PER_SHARE_SCENARIOS"
     assert bridge["applied_to_per_share_scenarios"] is True
-    assert bridge["scenarios"]["bear"]["incremental_attributable_profit_cny"] == "185000.0"
+    assert Decimal(bridge["scenarios"]["bear"]["incremental_attributable_profit_cny"]) == Decimal("185000")
     assert Decimal(bridge["scenarios"]["bear"]["value_delta_per_share_basic"]) > Decimal(
         bridge["scenarios"]["bear"]["value_delta_per_share_diluted"]
     )
