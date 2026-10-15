@@ -334,5 +334,5 @@ def test_stream_command_creates_private_log_and_streams_output(tmp_path: Path) -
         log_path,
     )
     assert return_code == 0
-    assert log_path.read_text(encoding="utf-8") == "IIOS_STREAM_OK\\n"
+    assert log_path.read_text(encoding="utf-8") == "IIOS_STREAM_OK\n"
     assert log_path.stat().st_mode & 0o777 == 0o600
