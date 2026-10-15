@@ -913,7 +913,7 @@ def _price_zone_sensitivity(
             "price_cap": format(target_cap, "f"),
             "tied_constraints": [row["code"] for row in tied],
         }
-        status = "PASS"
+        status = "CALCULATED"
         issues = []
 
     if target_cap is None:
@@ -954,7 +954,7 @@ def _price_zone_sensitivity(
             })
         else:
             sensitivity.append({
-                "multiplier": multiplier, "price": format(p, "f"), "status": "PASS",
+                "multiplier": multiplier, "price": format(p, "f"), "status": "CALCULATED",
                 "expected_annualized_return": metrics.get("expected_annualized_return"),
                 "entry_return_cushion": metrics.get("entry_return_cushion"),
                 "bear_return": metrics.get("bear_return"),
@@ -969,7 +969,7 @@ def _price_zone_sensitivity(
                 "issues": [],
             })
     midpoint = next((row for row in sensitivity if row["multiplier"] == "1.00"), None)
-    if midpoint and midpoint.get("status") == "PASS":
+    if midpoint and midpoint.get("status") == "CALCULATED":
         for key in ("expected_annualized_return", "entry_return_cushion", "bear_return"):
             if Decimal(str(midpoint[key])) != Decimal(str(return_metrics[key])):
                 issues.append(f"CURRENT_PRICE_SENSITIVITY_MISMATCH:{key}")
@@ -1023,6 +1023,11 @@ def _render_price_zone_sensitivity_section(result: Mapping[str, Any]) -> list[st
             + f"年化回报≥15% {item.get('fundamental_target_pass')}；"
             + f"Required Return {item.get('required_return_pass')}；Bear 风险上限 {item.get('risk_pass')}；"
             + f"全部价格门槛 {item.get('return_gate_pass')}",
+            "  对应价格上限："
+            + f"安全垫 {item.get('target_entry_price_for_entry_cushion') or 'UNKNOWN'}；"
+            + f"年化回报15% {item.get('target_entry_price_for_return') or 'UNKNOWN'}；"
+            + f"Required Return {item.get('target_entry_price_for_required_return') or 'UNKNOWN'}；"
+            + f"Bear 风险 {item.get('target_entry_price_for_risk') or 'UNKNOWN'}",
         ])
     lines.extend([
         "", "- 解释边界：以上仅说明价格本身是否满足现有回报/风险上限。即使全部价格门槛通过，Trust、Thesis、MIE/预期差、正式证据和组合约束等任一既有条件未知/阻塞时，不能据此升级投资行动.", "",
