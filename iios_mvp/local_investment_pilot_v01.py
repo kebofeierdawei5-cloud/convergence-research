@@ -2623,7 +2623,7 @@ def run_guided_wizard(
     previous_response_signature = initial_response_signature
     while True:
         print(
-            "\\n等待 ChatGPT 完整 JSON 保存到结果文件；保存后会自动读取（无需按回车）。",
+            "\n等待 ChatGPT 完整 JSON 保存到结果文件；保存后会自动读取（无需按回车）。",
             flush=True,
         )
         print("如需立即检查也可按回车；按 Control-C 退出。", flush=True)
@@ -2650,13 +2650,13 @@ def run_guided_wizard(
                 if sys.platform == "darwin":
                     try:
                         subprocess.run(["pbcopy"], input=repair_prompt, text=True, check=True, timeout=5)
-                        print("\\n已将自动修复提示复制到剪贴板。请切回已打开的 ChatGPT 对话，直接粘贴并发送；")
+                        print("\n已将自动修复提示复制到剪贴板。请切回已打开的 ChatGPT 对话，直接粘贴并发送；")
                         print("然后复制新的完整 JSON 覆盖同一个结果文件并保存；系统会自动检测新版本。")
                         print("不需要手工修改几十个 JSON 字段，也不需要重新填写公司和股价。", flush=True)
                     except (OSError, subprocess.SubprocessError):
-                        print("\\n无法自动复制修复提示；请切回结果文件修正后保存，系统将自动重试。按 Control-C 可退出。", flush=True)
+                        print("\n无法自动复制修复提示；请切回结果文件修正后保存，系统将自动重试。按 Control-C 可退出。", flush=True)
                 else:
-                    print("\\n自动修复提示：\\n" + repair_prompt, flush=True)
+                    print("\n自动修复提示：\n" + repair_prompt, flush=True)
             print(f"当前响应文件：{response_path}", flush=True)
             print("无需重新填写标的；修正文件并保存后会自动重试；按 Control-C 可退出。", flush=True)
 
