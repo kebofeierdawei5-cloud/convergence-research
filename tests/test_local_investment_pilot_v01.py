@@ -334,16 +334,22 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     ])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
 
-    def completed_response(_response_path):
+    def simulate_saved_response(response_path, *, previous_signature):
+        # Simulate the operator pasting ChatGPT's complete response into TextEdit
+        # and saving it. The real file watcher remains bypassed only in this
+        # wizard orchestration test; dedicated tests exercise watcher behavior.
         template_paths = list((tmp_path / "inputs").glob("pilot-input-*.json"))
         assert len(template_paths) == 1
         template = json.loads(template_paths[0].read_text(encoding="utf-8"))
         canned = _payload(cutoff="2026-10-12")
         for key in ("evidence_register", "assessment", "forecast_valuation", "operating_driver_forecast", "valuation_transmission", "decision_parameters", "notes"):
             template[key] = canned[key]
-        return template
+        Path(response_path).write_text(json.dumps(template, ensure_ascii=False), encoding="utf-8")
+        signature = pilot._response_file_signature(response_path)
+        assert signature is not None and signature != previous_signature
+        return signature
 
-    monkeypatch.setattr(pilot, "_read_json_response_file", completed_response)
+    monkeypatch.setattr(pilot, "_wait_for_response_file_change", simulate_saved_response)
     result = run_guided_wizard(
         template_root=tmp_path / "inputs",
         output_root=tmp_path / "runs",
