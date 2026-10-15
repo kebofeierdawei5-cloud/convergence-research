@@ -14,9 +14,11 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import select
-import time as _time
 import re
+import select
+import subprocess
+import sys
+import time as _time
 import subprocess
 import sys
 from typing import Any, Mapping
@@ -2052,7 +2054,7 @@ def _wait_for_response_file_change(
     automatically. Pressing Enter is optional; Ctrl-C cancels the wait.
     """
     response_path = Path(path).expanduser()
-    candidate: tuple[int, int] | None = None
+    candidate: tuple[int, int, str] | None = None
     candidate_since = 0.0
     try:
         can_read_terminal = bool(sys.stdin.isatty())
