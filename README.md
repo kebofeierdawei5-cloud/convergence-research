@@ -6,6 +6,8 @@ For the personal Mac workflow, update to the latest `main` and double-click the 
 
 This first-run path is explicitly `PILOT_NON_CANONICAL`: it is for real-world workflow testing, not formal evidence admission or a canonical Decision. Use [the short guide](docs/iios/LOCAL_INVESTMENT_PILOT_V01_GUIDE_20261011.md).
 
+For the dedicated **first run + output-hash checks + genuine Replay + Replay output-hash checks**, use the root [「验收IIOS全流程与Replay.command」](验收IIOS全流程与Replay.command) after it is merged into current main. See the [full Mac acceptance runbook](docs/iios/MACOS_FULL_RUN_AND_REPLAY_ACCEPTANCE_20261015.md). The acceptance harness is not a canonical Decision and must be run on the operator's Mac; CI is not a substitute.
+
 ---
 
 ## Project purpose
