@@ -86,7 +86,7 @@ B6 price zone / binding cap / sensitivity ladder           MERGED PR #430; LOCAL
 - The output is explicitly price-screen-only and records `decision_action_changed=false`; it never promotes an overall action. Missing/invalid return inputs preserve UNKNOWN. B6 adds no thresholds or data sources and is not a canonical Decision.
 - These are exact-head CI results, not a new real macOS user run. The immediate next validation priority is the current-main Mac end-to-end run and replay review; the prior B3 run with complete portfolio inputs remains pending.
 
-- The active B6 slice is documented below in the execution plan; B6 is a derived user-facing investment feature because no existing canonical B6 specification was found.
+- B6 is now closed as a provisional code milestone. Next user-visible acceptance is one real macOS end-to-end run and replay on current `main` before expanding scope.
 
 ### Local MVP Batch 0 baseline audit (2026-10-13)
 
