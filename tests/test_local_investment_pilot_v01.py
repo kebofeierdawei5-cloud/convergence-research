@@ -5,6 +5,8 @@ from decimal import Decimal
 from datetime import date
 from pathlib import Path
 import subprocess
+import threading
+import time as _time
 
 import pytest
 
@@ -14,6 +16,8 @@ from iios_mvp.local_investment_pilot_v01 import (
     _normalize_guided_symbol,
     _previous_weekday,
     _read_json_response_file,
+    _response_file_signature,
+    _wait_for_response_file_change,
     _analyse,
     _prepare_input,
     _assert_response_preserves_operator_inputs,
@@ -324,22 +328,27 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
         "2026-10-12",
         "1",
         "1",
-        "",
         "0",
         "0",
     ])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
 
-    def completed_response(_response_path):
+    def simulate_saved_response(response_path, *, previous_signature):
+        # Simulate the operator pasting ChatGPT's complete response into TextEdit
+        # and saving it. The real file watcher remains bypassed only in this
+        # wizard orchestration test; dedicated tests exercise watcher behavior.
         template_paths = list((tmp_path / "inputs").glob("pilot-input-*.json"))
         assert len(template_paths) == 1
         template = json.loads(template_paths[0].read_text(encoding="utf-8"))
         canned = _payload(cutoff="2026-10-12")
         for key in ("evidence_register", "assessment", "forecast_valuation", "operating_driver_forecast", "valuation_transmission", "decision_parameters", "notes"):
             template[key] = canned[key]
-        return template
+        Path(response_path).write_text(json.dumps(template, ensure_ascii=False), encoding="utf-8")
+        signature = pilot._response_file_signature(response_path)
+        assert signature is not None and signature != previous_signature
+        return signature
 
-    monkeypatch.setattr(pilot, "_read_json_response_file", completed_response)
+    monkeypatch.setattr(pilot, "_wait_for_response_file_change", simulate_saved_response)
     result = run_guided_wizard(
         template_root=tmp_path / "inputs",
         output_root=tmp_path / "runs",
@@ -1575,3 +1584,58 @@ def test_operator_prompt_returns_actionable_error_when_no_tty_available(monkeypa
     with pytest.raises(LocalInvestmentPilotError, match="INTERACTIVE_TERMINAL_UNAVAILABLE"):
         pilot._read_operator_prompt("portfolio budget? ")
 
+
+
+def test_saved_response_file_is_detected_automatically_after_stable_write(tmp_path: Path):
+    """The wizard must resume after Save; pressing Enter is not required."""
+    response_path = tmp_path / "pilot-chatgpt-response.json"
+    response_path.write_text("", encoding="utf-8")
+    initial_signature = _response_file_signature(response_path)
+    assert initial_signature is not None
+
+    def simulate_textedit_save():
+        _time.sleep(0.04)
+        response_path.write_text('{"partial":', encoding="utf-8")
+        _time.sleep(0.04)
+        response_path.write_text('{"complete": true, "company": "纽威股份"}', encoding="utf-8")
+
+    writer = threading.Thread(target=simulate_textedit_save, daemon=True)
+    writer.start()
+    saved_signature = _wait_for_response_file_change(
+        response_path,
+        previous_signature=initial_signature,
+        poll_interval=0.01,
+        stable_seconds=0.04,
+    )
+    writer.join(timeout=1)
+    assert not writer.is_alive()
+    assert saved_signature != initial_signature
+    assert json.loads(response_path.read_text(encoding="utf-8")) == {
+        "complete": True,
+        "company": "纽威股份",
+    }
+
+
+def test_response_file_watcher_ignores_existing_unsaved_stale_content(tmp_path: Path):
+    """A previously read invalid response must be replaced/saved before re-checking."""
+    response_path = tmp_path / "pilot-chatgpt-response.json"
+    response_path.write_text('{"version": 1}', encoding="utf-8")
+    old_signature = _response_file_signature(response_path)
+    assert old_signature is not None
+
+    def simulate_repair_save():
+        _time.sleep(0.05)
+        response_path.write_text('{"version": 2}', encoding="utf-8")
+
+    writer = threading.Thread(target=simulate_repair_save, daemon=True)
+    writer.start()
+    new_signature = _wait_for_response_file_change(
+        response_path,
+        previous_signature=old_signature,
+        poll_interval=0.01,
+        stable_seconds=0.04,
+    )
+    writer.join(timeout=1)
+    assert not writer.is_alive()
+    assert new_signature != old_signature
+    assert json.loads(response_path.read_text(encoding="utf-8"))["version"] == 2
