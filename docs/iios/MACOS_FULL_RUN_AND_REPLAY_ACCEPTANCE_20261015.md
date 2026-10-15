@@ -28,6 +28,12 @@ git -C "$HOME/projects/convergence-research" status --short
 - 如果没有输出，再单独执行这一行：
 
 ```bash
+git -C "$HOME/projects/convergence-research" switch main
+```
+
+确认成功切到 `main` 后，再单独执行：
+
+```bash
 git -C "$HOME/projects/convergence-research" pull --ff-only origin main
 ```
 
