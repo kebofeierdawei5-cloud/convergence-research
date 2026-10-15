@@ -6,6 +6,7 @@ This module orchestrates the existing pilot CLI; it does not implement a second
 valuation, decision, receipt, or replay engine.
 """
 
+import codecs
 import json
 import os
 import re
@@ -111,12 +112,29 @@ def _stream_command(command: list[str], log_path: Path) -> int:
             raise AcceptanceError(f"COMMAND_START_FAILED:{command[0]}:{exc}") from exc
 
         assert process.stdout is not None
+        # Do not iterate by lines: input() prompts commonly end with ":" and
+        # have no newline. Line iteration would hide the prompt until after
+        # the operator enters input. Read available bytes immediately and
+        # decode incrementally so prompts and mixed Chinese UTF-8 remain live.
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         try:
-            for line in process.stdout:
-                sys.stdout.write(line)
+            while True:
+                raw = os.read(process.stdout.fileno(), 4096)
+                if not raw:
+                    tail = decoder.decode(b"", final=True)
+                    if tail:
+                        sys.stdout.write(tail)
+                        sys.stdout.flush()
+                        log.write(tail)
+                    break
+                text = decoder.decode(raw)
+                if not text:
+                    continue
+                sys.stdout.write(text)
                 sys.stdout.flush()
-                log.write(line)
-                log.flush()
+                log.write(text)
+                if "\\n" in text:
+                    log.flush()
         except KeyboardInterrupt:
             process.terminate()
             try:
