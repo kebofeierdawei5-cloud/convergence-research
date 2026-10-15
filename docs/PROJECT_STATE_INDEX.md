@@ -50,6 +50,7 @@ Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED 
 B4 operating-driver forecast bridge                    MERGED PR #424 + #426 SAFEGUARDS; LOCAL PILOT 74 PASS; RED-TEAM 7 PASS; 7 TRIGGERED WORKFLOWS SUCCESS
 B5 valuation transmission / entry price mapping          MERGED PR #428; LOCAL PILOT 81 PASS; 7/7 TRIGGERED WORKFLOWS SUCCESS; EPS_MULTIPLE ONLY
 B6 price zone / binding cap / sensitivity ladder           MERGED PR #430; LOCAL PILOT 87 PASS; 7/7 TRIGGERED WORKFLOWS SUCCESS; PRICE SCREEN ONLY
+Local Mac full-run + Replay acceptance harness             PR #433; REAL MAC RUN + REPLAY OPEN until operator run and artifact review
 ```
 
 ### B3 — close the local portfolio-context slice (2026-10-14)
