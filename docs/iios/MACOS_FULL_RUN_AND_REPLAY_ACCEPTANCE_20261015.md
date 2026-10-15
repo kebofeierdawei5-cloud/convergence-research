@@ -12,15 +12,42 @@
 
 **只有你自己的 Mac 完成实际运行并产出私有文件包后，才能完成 Mac 验收。Linux/GitHub CI 仅验证代码与测试，不代替真实 Mac 验收。**
 
-## 一、运行前准备
+## 一、运行前准备与首次启用
 
-1. 在 Finder 打开你现有的本地仓库目录：项目名为 convergence-research。
-2. 将仓库更新到本次验收脚本 PR 合并后的最新 main。打开 GitHub 的项目主分支页面，确认本次新增的两个文件已存在：
-   - 根目录的「验收IIOS全流程与Replay.command」
-   - iios_mvp/local_run_replay_acceptance_v01.py
-3. 确认根目录仍有原来的「启动IIOS投资分析.command」和 iios_mvp/local_investment_pilot_v01.py。不要单独下载一个 Python 文件去替换仓库中的文件，也不要把脚本移动到其他目录。
-4. Mac 需要 Python 3.10 或更新版本。无需安装本地大模型、无需配置付费 API key，也无需登录 GitHub CLI。研究阶段仍由你在浏览器中使用 ChatGPT 完成。
-5. 不要先删除历史运行目录。脚本不需要清理旧文件；旧记录保留有利于故障排查和选择指定运行包。
+### 第一次启用“自动更新本机代码”
+
+需要说明一个引导限制：已经在本机的旧版启动脚本不可能自动获得自己尚未包含的更新代码。因此，如果你本机已有的「验收IIOS全流程与Replay.command」尚不包含“安全更新 origin/main”逻辑，必须先完成这一次性引导更新；从那以后，每次双击新版本都会先自动更新本机仓库，再启动验收。
+
+如果你的仓库目录仍是 `$HOME/projects/convergence-research`，在终端**单独执行下面这一行**，先检查本地修改：
+
+```bash
+git -C "$HOME/projects/convergence-research" status --short
+```
+
+- 如果命令有输出，先保留并自行提交/备份这些本地修改；不要继续 pull，也不要删除文件。
+- 如果没有输出，再单独执行这一行：
+
+```bash
+git -C "$HOME/projects/convergence-research" switch main
+```
+
+确认成功切到 `main` 后，再单独执行：
+
+```bash
+git -C "$HOME/projects/convergence-research" pull --ff-only origin main
+```
+
+如果你的仓库路径不同，只替换路径部分。若该命令失败或报告分叉，停止并保留完整错误；不要运行 `git reset --hard`。完成这一次更新后，确认仓库根目录已有「验收IIOS全流程与Replay.command」和 `tools/iios_update_local_main_v01.sh`。
+
+### 后续每次运行都会自动更新
+
+1. 在 Finder 中双击仓库根目录的「验收IIOS全流程与Replay.command」。
+2. 启动器会先确认这是 Git 仓库、配置了 `origin` 且工作区干净，随后获取 `origin/main` 并验证本机代码版本。
+3. 如果本机 `main` 落后，脚本只执行 `git merge --ff-only origin/main`；如果在干净的其他分支上启动，它会切换到 `main`，并保留原分支指针。
+4. 如果存在未提交/未跟踪文件、分支分叉、本机独有提交、网络故障或更新后版本校验失败，脚本会停止，不启动投资分析；它不会自动 stash、reset、强制覆盖或删除本机文件。处理完成后重新双击即可。
+5. 更新成功后，程序才检查并启动与当前 main 对应的 Python 模块。
+
+Mac 需要 Python 3.10 或更新版本。无需安装本地大模型、无需配置付费 API key，也无需登录 GitHub CLI。研究阶段仍由你在浏览器中使用 ChatGPT 完成。不要删除历史运行目录；脚本不需要清理旧文件。
 
 ## 二、建议首次完整运行：只双击一个文件
 
