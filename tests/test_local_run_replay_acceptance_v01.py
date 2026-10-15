@@ -188,3 +188,138 @@ def test_inspect_bundle_rejects_world_readable_output(tmp_path: Path) -> None:
     (run_dir / "report.md").chmod(0o644)
     with pytest.raises(acceptance.AcceptanceError, match="FILE_PERMISSIONS_TOO_OPEN"):
         acceptance._inspect_bundle(run_dir, expected_replay_of=None)
+
+
+UPDATE_HELPER = REPO_ROOT / "tools" / "iios_update_local_main_v01.sh"
+
+
+def test_acceptance_launcher_updates_local_main_before_importing_current_modules() -> None:
+    content = LAUNCHER.read_text(encoding="utf-8")
+    update_call = 'bash "$REPO_ROOT/tools/iios_update_local_main_v01.sh" "$REPO_ROOT"'
+    module_check = '[[ ! -f "$REPO_ROOT/iios_mvp/local_run_replay_acceptance_v01.py" ]]'
+    assert update_call in content
+    assert module_check in content
+    assert content.index(update_call) < content.index(module_check)
+    assert "未能安全更新到最新 origin/main" in content
+
+
+def test_local_main_updater_has_valid_bash_syntax() -> None:
+    result = subprocess.run(
+        ["bash", "-n", str(UPDATE_HELPER)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def _git(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        ["git", *args],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if check and result.returncode != 0:
+        raise AssertionError(f"git {' '.join(args)} failed: {result.stdout}\n{result.stderr}")
+    return result
+
+
+def _git_remote_and_checkout(tmp_path: Path) -> tuple[Path, Path, Path]:
+    import shutil
+
+    remote = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    checkout = tmp_path / "checkout"
+    remote_result = subprocess.run(
+        ["git", "init", "--bare", "--initial-branch=main", str(remote)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert remote_result.returncode == 0, remote_result.stderr
+    seed.mkdir()
+    _git(tmp_path, "init", "--initial-branch=main", str(seed))
+    _git(seed, "config", "user.email", "iios-test@example.invalid")
+    _git(seed, "config", "user.name", "IIOS acceptance test")
+    (seed / "tools").mkdir()
+    shutil.copy2(UPDATE_HELPER, seed / "tools" / UPDATE_HELPER.name)
+    (seed / "README.md").write_text("baseline\n", encoding="utf-8")
+    _git(seed, "add", "-A")
+    _git(seed, "commit", "-m", "baseline")
+    _git(seed, "remote", "add", "origin", str(remote))
+    _git(seed, "push", "-u", "origin", "main")
+    _git(tmp_path, "clone", str(remote), str(checkout))
+    _git(checkout, "config", "user.email", "iios-test@example.invalid")
+    _git(checkout, "config", "user.name", "IIOS acceptance test")
+    return remote, seed, checkout
+
+
+def _push_remote_update(seed: Path) -> str:
+    (seed / "README.md").write_text("updated from origin/main\n", encoding="utf-8")
+    _git(seed, "add", "README.md")
+    _git(seed, "commit", "-m", "remote update")
+    _git(seed, "push", "origin", "main")
+    return _git(seed, "rev-parse", "HEAD").stdout.strip()
+
+
+def _run_update(checkout: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["bash", str(UPDATE_HELPER), str(checkout)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_updater_fast_forwards_clean_local_main_to_origin_main(tmp_path: Path) -> None:
+    _remote, seed, checkout = _git_remote_and_checkout(tmp_path)
+    expected_head = _push_remote_update(seed)
+    result = _run_update(checkout)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _git(checkout, "branch", "--show-current").stdout.strip() == "main"
+    assert _git(checkout, "rev-parse", "HEAD").stdout.strip() == expected_head
+    assert (checkout / "README.md").read_text(encoding="utf-8") == "updated from origin/main\n"
+    assert _git(checkout, "status", "--porcelain", "--untracked-files=all").stdout == ""
+    assert "本机代码更新并复核成功" in result.stdout
+
+
+def test_updater_refuses_dirty_worktree_without_overwriting_local_file(tmp_path: Path) -> None:
+    _remote, seed, checkout = _git_remote_and_checkout(tmp_path)
+    _push_remote_update(seed)
+    local_note = checkout / "operator-notes.txt"
+    local_note.write_text("keep this private work\n", encoding="utf-8")
+    before_head = _git(checkout, "rev-parse", "HEAD").stdout.strip()
+    result = _run_update(checkout)
+    assert result.returncode == 20
+    assert local_note.read_text(encoding="utf-8") == "keep this private work\n"
+    assert _git(checkout, "rev-parse", "HEAD").stdout.strip() == before_head
+    assert "未执行更新" in result.stdout + result.stderr
+
+
+def test_updater_switches_clean_feature_checkout_to_main_and_preserves_feature_ref(tmp_path: Path) -> None:
+    _remote, seed, checkout = _git_remote_and_checkout(tmp_path)
+    _git(checkout, "switch", "-c", "operator-work")
+    _push_remote_update(seed)
+    expected_head = _git(seed, "rev-parse", "HEAD").stdout.strip()
+    result = _run_update(checkout)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _git(checkout, "branch", "--show-current").stdout.strip() == "main"
+    assert _git(checkout, "rev-parse", "HEAD").stdout.strip() == expected_head
+    assert _git(checkout, "show-ref", "--verify", "refs/heads/operator-work").returncode == 0
+
+
+def test_updater_refuses_diverged_main_without_rewriting_local_or_remote_commit(tmp_path: Path) -> None:
+    _remote, seed, checkout = _git_remote_and_checkout(tmp_path)
+    (checkout / "local-only.txt").write_text("local commit stays\n", encoding="utf-8")
+    _git(checkout, "add", "local-only.txt")
+    _git(checkout, "commit", "-m", "local-only")
+    local_head = _git(checkout, "rev-parse", "HEAD").stdout.strip()
+    remote_head = _push_remote_update(seed)
+    result = _run_update(checkout)
+    assert result.returncode == 20
+    assert _git(checkout, "rev-parse", "HEAD").stdout.strip() == local_head
+    assert _git(checkout, "rev-parse", "refs/remotes/origin/main").stdout.strip() == remote_head
+    assert (checkout / "local-only.txt").read_text(encoding="utf-8") == "local commit stays\n"
+    assert "已分叉" in result.stdout + result.stderr
