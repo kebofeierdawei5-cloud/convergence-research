@@ -1,12 +1,14 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-14
+Snapshot: 2026-10-15
 Authority: this file is the **only canonical Current State Index**.
 
 ## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-14
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
+
+**Next user-visible acceptance:** one real macOS run and replay on current `main`, completing the portfolio and B5 model/baseline prompts, then reviewing `report.md`, `analysis.json`, and `pilot_receipt.json`. Do not start B7 scope expansion before this run exposes concrete functional gaps.
 
 The records below are cumulative milestone history. A milestone's historical “next boundary” is **time-local** and MUST NOT be interpreted as the current development instruction.
 
@@ -47,6 +49,7 @@ Local single-user complete pilot                     ACTIVE P0 PRIORITY; PILOT_N
 Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
 B4 operating-driver forecast bridge                    MERGED PR #424 + #426 SAFEGUARDS; LOCAL PILOT 74 PASS; RED-TEAM 7 PASS; 7 TRIGGERED WORKFLOWS SUCCESS
 B5 valuation transmission / entry price mapping          MERGED PR #428; LOCAL PILOT 81 PASS; 7/7 TRIGGERED WORKFLOWS SUCCESS; EPS_MULTIPLE ONLY
+B6 price zone / binding cap / sensitivity ladder           MERGED PR #430; LOCAL PILOT 87 PASS; 7/7 TRIGGERED WORKFLOWS SUCCESS; PRICE SCREEN ONLY
 ```
 
 ### B3 — close the local portfolio-context slice (2026-10-14)
@@ -74,6 +77,15 @@ B5 valuation transmission / entry price mapping          MERGED PR #428; LOCAL P
 - EPS-multiple incremental transmission is the only supported formula in B5. It accounts for project after-tax profit, ownership, displaced existing-business after-tax profit, basic shares, convertible-bond/other dilution and P/E multiple. It updates all three scenario terminal values and the Base entry-value anchor atomically only when each link is calculation-usable and the operator explicitly confirms the existing valuation excludes the project.
 - If the existing valuation already includes the project, it reports sensitivity without double counting; if scope/model/period/attribution/cannibalization/dilution is unknown or inconsistent, original valuation is preserved and transmission remains NOT_LINKED. DCF/FCF, DDM, SOTP and RNPV are not run through the EPS formula.
 - This is provisional pilot output only. The 81-test CI acceptance is not a new real macOS run, formal valuation admission, canonical Decision, or trade authorization. B3 Mac completion remains pending.
+
+### B6 — current price zone, binding cap and sensitivity ladder (2026-10-15)
+
+- PR [#430](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/430) merged at `bebf0abe8cc666e010b4d5a5cdcd634a5dfbd11b`. Exact head `6b7665d559cbfddda4518658b8df3ba3123024f3`: **87/87 local-pilot tests passed** and all **7 triggered workflows succeeded**.
+- Adds `IIOS-PRICE-ZONE-SENSITIVITY-0.1` to machine-readable analysis and the Chinese report. It identifies the lowest existing cap among the 15% entry-return cushion, 15% annualized return hurdle, Required Return and the existing Bear-loss cap; ties remain visible.
+- Classifies current price versus the combined entry-price cap and entry-value reference. The 90% / 100% / 110% sensitivity ladder reuses the existing `_return_metrics` → v0.3 `calculate_return_metrics` path and uses the prepared post-B5 valuation, including a valid B5-adjusted anchor where applicable. The 100% row is checked against the primary current-price result.
+- The output is explicitly price-screen-only and records `decision_action_changed=false`; it never promotes an overall action. Missing/invalid return inputs preserve UNKNOWN. B6 adds no thresholds or data sources and is not a canonical Decision.
+- These are exact-head CI results, not a new real macOS user run. The immediate next validation priority is the current-main Mac end-to-end run and replay review; the prior B3 run with complete portfolio inputs remains pending.
+
 - The active B6 slice is documented below in the execution plan; B6 is a derived user-facing investment feature because no existing canonical B6 specification was found.
 
 ### Local MVP Batch 0 baseline audit (2026-10-13)
