@@ -28,4 +28,14 @@ fi
 cd "$REPO_ROOT"
 export PYTHONPATH="$REPO_ROOT"
 export PYTHONUNBUFFERED=1
-exec python3 -m iios_mvp.local_run_replay_acceptance_v01
+
+# Do not use exec: keep a double-clicked Finder Terminal window open so the
+# result/exit code can be read and copied after the acceptance run finishes.
+if python3 -m iios_mvp.local_run_replay_acceptance_v01; then
+  status=0
+else
+  status=$?
+fi
+printf '\nIIOS 全流程与 Replay 验收结束，退出码：%s\n' "$status"
+read -r -p '按回车关闭窗口…' _ || true
+exit "$status"
