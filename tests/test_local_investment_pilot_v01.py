@@ -328,7 +328,6 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
         "2026-10-12",
         "1",
         "1",
-        "",
         "0",
         "0",
     ])
