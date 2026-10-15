@@ -1219,6 +1219,83 @@ def test_b5_dilution_uses_basic_plus_convertible_and_other_shares():
     assert Decimal(bear["value_delta_per_share_diluted"]) < Decimal(bear["value_delta_per_share_basic"])
 
 
+def test_b6_names_binding_entry_price_constraint_from_existing_caps():
+    payload = _b5_ready_payload()
+    analysis, _ = _analyse(payload, "TEST-B6-BINDING-CAP")
+    zone = analysis["price_zone_sensitivity"]
+    metrics = analysis["return_metrics"]
+    assert zone["status"] == "PASS"
+    caps = [Decimal(row["price_cap"]) for row in zone["price_caps"] if row["price_cap"] is not None]
+    assert Decimal(zone["target_entry_price"]) == min(caps)
+    assert Decimal(zone["binding_constraint"]["price_cap"]) == min(caps)
+    assert zone["binding_constraint"]["tied_constraints"]
+    assert zone["price_screen_only"] is True
+    assert zone["decision_action_changed"] is False
+    assert Decimal(zone["target_entry_price"]) == Decimal(metrics["target_entry_price"])
+
+
+def test_b6_sensitivity_ladder_reuses_solver_and_matches_current_price_metrics():
+    payload = _b5_ready_payload()
+    analysis, report = _analyse(payload, "TEST-B6-SENSITIVITY")
+    zone = analysis["price_zone_sensitivity"]
+    ladder = zone["sensitivity_ladder"]
+    assert [row["multiplier"] for row in ladder] == ["0.90", "1.00", "1.10"]
+    assert [Decimal(row["price"]) for row in ladder] == [Decimal("90.00"), Decimal("100"), Decimal("110.0")]
+    assert all(row["status"] == "PASS" for row in ladder)
+    assert Decimal(ladder[0]["expected_annualized_return"]) > Decimal(ladder[1]["expected_annualized_return"])
+    assert Decimal(ladder[1]["expected_annualized_return"]) > Decimal(ladder[2]["expected_annualized_return"])
+    assert Decimal(ladder[0]["entry_return_cushion"]) > Decimal(ladder[1]["entry_return_cushion"])
+    assert Decimal(ladder[1]["entry_return_cushion"]) > Decimal(ladder[2]["entry_return_cushion"])
+    assert Decimal(ladder[1]["expected_annualized_return"]) == Decimal(analysis["return_metrics"]["expected_annualized_return"])
+    assert Decimal(ladder[1]["bear_return"]) == Decimal(analysis["return_metrics"]["bear_return"])
+    assert "B6：当前价格区间与约束敏感性" in report
+    assert "不是买入指令" in report
+
+
+def test_b6_preserves_unknown_when_return_inputs_are_incomplete():
+    payload = _b5_ready_payload()
+    payload["forecast_valuation"]["entry_value_reference_per_share"] = None
+    analysis, report = _analyse(payload, "TEST-B6-UNKNOWN")
+    zone = analysis["price_zone_sensitivity"]
+    assert analysis["return_metrics"] is None
+    assert zone["status"] == "UNKNOWN"
+    assert zone["target_entry_price"] is None
+    assert zone["current_price_zone"] == "UNKNOWN"
+    assert all(row["status"] == "UNKNOWN" for row in zone["sensitivity_ladder"])
+    assert "UNKNOWN" in report
+
+
+def test_b6_uses_b5_adjusted_entry_value_reference_not_the_old_anchor():
+    payload = _b5_ready_payload()
+    analysis, _ = _analyse(payload, "TEST-B6-B5-ADJUSTED-ANCHOR")
+    bridge = analysis["valuation_transmission"]
+    zone = analysis["price_zone_sensitivity"]
+    assert bridge["status"] == "APPLIED_TO_PER_SHARE_SCENARIOS"
+    assert Decimal(analysis["forecast_valuation"]["entry_value_reference_per_share"]) > Decimal("150")
+    assert Decimal(zone["entry_value_reference_per_share"]) == Decimal(
+        analysis["forecast_valuation"]["entry_value_reference_per_share"]
+    )
+    assert Decimal(zone["price_caps"][0]["price_cap"]) == Decimal(
+        analysis["return_metrics"]["target_entry_price_for_entry_cushion"]
+    )
+
+
+def test_b6_price_screen_never_promotes_overall_decision():
+    payload = _b5_ready_payload()
+    payload["price_input"]["price"] = "10"
+    payload["price_input"]["known_at"] = "2026-10-09T15:00:00+08:00"
+    payload["price_input"]["observation_date"] = "2026-10-09"
+    before, _ = _analyse(payload, "TEST-B6-PRICE-ONLY")
+    zone = before["price_zone_sensitivity"]
+    assert zone["price_screen_only"] is True
+    assert zone["decision_action_changed"] is False
+    assert any(row["return_gate_pass"] is True for row in zone["sensitivity_ladder"])
+    assert before["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert before["decision"]["provisional_action"] not in {"BUY", "ADD", "HOLD"}
+
+
+
+
 # B4 operating-driver bridge regression tests end here.
 
 # Operator-attested non-canonical portfolio-package tests. These test sizing math
