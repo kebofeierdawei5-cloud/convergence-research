@@ -2026,22 +2026,26 @@ def _read_json_response_file(path: str | Path) -> dict[str, Any]:
     return _extract_json_object(raw)
 
 
-def _response_file_signature(path: str | Path) -> tuple[int, int] | None:
-    """Return size and nanosecond mtime so a saved response can be detected reliably."""
+def _response_file_signature(path: str | Path) -> tuple[int, int, str] | None:
+    """Return a content-aware signature so even same-size saves are detected."""
+    response_path = Path(path).expanduser()
     try:
-        stat = Path(path).expanduser().stat()
+        content = response_path.read_bytes()
+        stat = response_path.stat()
     except OSError:
         return None
-    return stat.st_size, stat.st_mtime_ns
+    # Content hash makes detection robust even on filesystems whose timestamp
+    # precision is too coarse to distinguish two quick saves of equal length.
+    return stat.st_size, stat.st_mtime_ns, hashlib.sha256(content).hexdigest()
 
 
 def _wait_for_response_file_change(
     path: str | Path,
     *,
-    previous_signature: tuple[int, int] | None,
+    previous_signature: tuple[int, int, str] | None,
     poll_interval: float = 0.25,
     stable_seconds: float = 0.75,
-) -> tuple[int, int]:
+) -> tuple[int, int, str]:
     """Wait until a non-empty response file changes and remains stable.
 
     The operator can save the ChatGPT JSON in TextEdit and the wizard resumes
