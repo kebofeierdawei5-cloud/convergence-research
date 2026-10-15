@@ -6,7 +6,7 @@ For the personal Mac workflow, update to the latest `main` and double-click the 
 
 This first-run path is explicitly `PILOT_NON_CANONICAL`: it is for real-world workflow testing, not formal evidence admission or a canonical Decision. Use [the short guide](docs/iios/LOCAL_INVESTMENT_PILOT_V01_GUIDE_20261011.md).
 
-For the dedicated **first run + output-hash checks + genuine Replay + Replay output-hash checks**, use the root [「验收IIOS全流程与Replay.command」](验收IIOS全流程与Replay.command) after it is merged into current main. See the [full Mac acceptance runbook](docs/iios/MACOS_FULL_RUN_AND_REPLAY_ACCEPTANCE_20261015.md). The acceptance harness is not a canonical Decision and must be run on the operator's Mac; CI is not a substitute.
+For the dedicated **first run + output-hash checks + genuine Replay + Replay output-hash checks**, use the root [「验收IIOS全流程与Replay.command」](验收IIOS全流程与Replay.command). It now safely fetches `origin/main` and fast-forwards the local checkout before starting, but refuses dirty worktrees or diverged local history instead of overwriting local changes. Because an older copy cannot update code that it does not yet contain, the first upgrade to this version requires a one-time `git status --short` check and then `git pull --ff-only origin main` in the local repository; all later launches include the update step. See the [full Mac acceptance runbook](docs/iios/MACOS_FULL_RUN_AND_REPLAY_ACCEPTANCE_20261015.md). The acceptance harness is not a canonical Decision and must be run on the operator's Mac; CI is not a substitute.
 
 ---
 
