@@ -1224,7 +1224,7 @@ def test_b6_names_binding_entry_price_constraint_from_existing_caps():
     analysis, _ = _analyse(payload, "TEST-B6-BINDING-CAP")
     zone = analysis["price_zone_sensitivity"]
     metrics = analysis["return_metrics"]
-    assert zone["status"] == "PASS"
+    assert zone["status"] == "CALCULATED"
     caps = [Decimal(row["price_cap"]) for row in zone["price_caps"] if row["price_cap"] is not None]
     assert Decimal(zone["target_entry_price"]) == min(caps)
     assert Decimal(zone["binding_constraint"]["price_cap"]) == min(caps)
@@ -1241,7 +1241,7 @@ def test_b6_sensitivity_ladder_reuses_solver_and_matches_current_price_metrics()
     ladder = zone["sensitivity_ladder"]
     assert [row["multiplier"] for row in ladder] == ["0.90", "1.00", "1.10"]
     assert [Decimal(row["price"]) for row in ladder] == [Decimal("90.00"), Decimal("100"), Decimal("110.0")]
-    assert all(row["status"] == "PASS" for row in ladder)
+    assert all(row["status"] == "CALCULATED" for row in ladder)
     assert Decimal(ladder[0]["expected_annualized_return"]) > Decimal(ladder[1]["expected_annualized_return"])
     assert Decimal(ladder[1]["expected_annualized_return"]) > Decimal(ladder[2]["expected_annualized_return"])
     assert Decimal(ladder[0]["entry_return_cushion"]) > Decimal(ladder[1]["entry_return_cushion"])
@@ -1295,6 +1295,18 @@ def test_b6_price_screen_never_promotes_overall_decision():
 
 
 
+
+
+
+def test_b6_invalid_return_scenario_input_keeps_price_interpretation_unknown():
+    payload = _b5_ready_payload()
+    payload["forecast_valuation"]["scenarios"]["base"]["probability"] = "not-a-number"
+    analysis, _ = _analyse(payload, "TEST-B6-INVALID")
+    zone = analysis["price_zone_sensitivity"]
+    assert analysis["return_metrics"] is None
+    assert zone["status"] == "UNKNOWN"
+    assert zone["target_entry_price"] is None
+    assert all(row["status"] == "UNKNOWN" for row in zone["sensitivity_ladder"])
 
 # B4 operating-driver bridge regression tests end here.
 
