@@ -14,6 +14,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import select
+import time as _time
 import re
 import subprocess
 import sys
@@ -2024,6 +2026,65 @@ def _read_json_response_file(path: str | Path) -> dict[str, Any]:
     return _extract_json_object(raw)
 
 
+def _response_file_signature(path: str | Path) -> tuple[int, int] | None:
+    """Return size and nanosecond mtime so a saved response can be detected reliably."""
+    try:
+        stat = Path(path).expanduser().stat()
+    except OSError:
+        return None
+    return stat.st_size, stat.st_mtime_ns
+
+
+def _wait_for_response_file_change(
+    path: str | Path,
+    *,
+    previous_signature: tuple[int, int] | None,
+    poll_interval: float = 0.25,
+    stable_seconds: float = 0.75,
+) -> tuple[int, int]:
+    """Wait until a non-empty response file changes and remains stable.
+
+    The operator can save the ChatGPT JSON in TextEdit and the wizard resumes
+    automatically. Pressing Enter is optional; Ctrl-C cancels the wait.
+    """
+    response_path = Path(path).expanduser()
+    candidate: tuple[int, int] | None = None
+    candidate_since = 0.0
+    try:
+        can_read_terminal = bool(sys.stdin.isatty())
+    except (AttributeError, OSError):
+        can_read_terminal = False
+
+    while True:
+        current = _response_file_signature(response_path)
+        now = _time.monotonic()
+        if current is not None and current[0] > 0 and current != previous_signature:
+            if current != candidate:
+                candidate = current
+                candidate_since = now
+            elif now - candidate_since >= stable_seconds:
+                return current
+        else:
+            candidate = None
+            candidate_since = 0.0
+
+        if can_read_terminal:
+            try:
+                ready, _, _ = select.select([sys.stdin], [], [], poll_interval)
+            except (OSError, ValueError):
+                can_read_terminal = False
+                _time.sleep(poll_interval)
+                continue
+            if ready:
+                # Consume Enter so it cannot answer an unrelated later prompt.
+                sys.stdin.readline()
+                latest = _response_file_signature(response_path)
+                if latest is None or latest[0] == 0 or latest == previous_signature:
+                    print("尚未检测到结果文件的新内容；请确认已在 TextEdit 按 Command+S 保存。继续等待文件更新。", flush=True)
+        else:
+            _time.sleep(poll_interval)
+
+
 
 def _assert_response_preserves_operator_inputs(
     template_path: str | Path, payload: Mapping[str, Any]
@@ -2540,6 +2601,7 @@ def run_guided_wizard(
     response_stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     response_path = private_inputs / f"pilot-chatgpt-response-{symbol.replace('.', '-')}-{response_stamp}.json"
     _write_local(response_path, "")
+    initial_response_signature = _response_file_signature(response_path)
 
     if sys.platform == "darwin":
         # The prompt is copied to the clipboard; the large response is always handed off via a file.
@@ -2558,8 +2620,18 @@ def run_guided_wizard(
     if sys.platform == "darwin":
         print("  提示：JSON 文件已用 TextEdit 打开；粘贴后按 Command+S 保存。")
 
+    previous_response_signature = initial_response_signature
     while True:
-        input("保存结果文件后，按回车读取并校验；若校验失败，修正文件后再次按回车…")
+        print(
+            "\\n等待 ChatGPT 完整 JSON 保存到结果文件；保存后会自动读取（无需按回车）。",
+            flush=True,
+        )
+        print("如需立即检查也可按回车；按 Control-C 退出。", flush=True)
+        response_signature = _wait_for_response_file_change(
+            response_path,
+            previous_signature=previous_response_signature,
+        )
+        print("已检测到结果文件更新且写入稳定，正在读取并校验……", flush=True)
         try:
             payload = _read_json_response_file(response_path)
             _assert_response_preserves_operator_inputs(template_path, payload)
@@ -2567,7 +2639,8 @@ def run_guided_wizard(
             _validate_guided_research_response(payload)
             break
         except (OSError, ValueError, KeyError, TypeError) as exc:
-            print(f"暂未继续：{exc}")
+            previous_response_signature = response_signature
+            print(f"暂未继续：{exc}", flush=True)
             if isinstance(exc, LocalInvestmentPilotError) and not str(exc).startswith(
                 ("CHATGPT_RESPONSE_FILE_READ_FAILED", "CHATGPT_RESPONSE_FILE_NOT_FOUND")
             ):
@@ -2577,15 +2650,15 @@ def run_guided_wizard(
                 if sys.platform == "darwin":
                     try:
                         subprocess.run(["pbcopy"], input=repair_prompt, text=True, check=True, timeout=5)
-                        print("\n已将自动修复提示复制到剪贴板。请切回已打开的 ChatGPT 对话，直接粘贴并发送；")
-                        print("然后复制新的完整 JSON 覆盖同一个结果文件，保存后回到终端按回车。")
-                        print("不需要手工修改几十个 JSON 字段，也不需要重新填写公司和股价。")
+                        print("\\n已将自动修复提示复制到剪贴板。请切回已打开的 ChatGPT 对话，直接粘贴并发送；")
+                        print("然后复制新的完整 JSON 覆盖同一个结果文件并保存；系统会自动检测新版本。")
+                        print("不需要手工修改几十个 JSON 字段，也不需要重新填写公司和股价。", flush=True)
                     except (OSError, subprocess.SubprocessError):
-                        print("\n无法自动复制修复提示；请检查当前结果文件后重试，或按 Control-C 退出。")
+                        print("\\n无法自动复制修复提示；请切回结果文件修正后保存，系统将自动重试。按 Control-C 可退出。", flush=True)
                 else:
-                    print("\n自动修复提示：\n" + repair_prompt)
-            print(f"当前响应文件：{response_path}")
-            print("无需重新填写标的；按 Control-C 可退出。")
+                    print("\\n自动修复提示：\\n" + repair_prompt, flush=True)
+            print(f"当前响应文件：{response_path}", flush=True)
+            print("无需重新填写标的；修正文件并保存后会自动重试；按 Control-C 可退出。", flush=True)
 
     # Validate the response before collecting any optional operator-only
     # portfolio inputs. AI research output never gets to author these limits.
