@@ -351,11 +351,11 @@ def test_stream_command_shows_prompt_before_child_receives_input(tmp_path: Path)
         "print('\\n收到=' + value)"
     )
     driver_code = (
-        "import sys\\n"
-        "from pathlib import Path\\n"
-        "from iios_mvp import local_run_replay_acceptance_v01 as acceptance\\n"
+        "import sys\n"
+        "from pathlib import Path\n"
+        "from iios_mvp import local_run_replay_acceptance_v01 as acceptance\n"
         "raise SystemExit(acceptance._stream_command("
-        "[sys.executable, '-c', " + repr(child_code) + "], Path(sys.argv[1])))\\n"
+        "[sys.executable, '-c', " + repr(child_code) + "], Path(sys.argv[1])))\n"
     )
     process = subprocess.Popen(
         [sys.executable, "-c", driver_code, str(log_path)],
@@ -386,7 +386,7 @@ def test_stream_command_shows_prompt_before_child_receives_input(tmp_path: Path)
             assert chunk, f"Driver exited before showing prompt; output={seen!r}"
             seen.extend(chunk)
 
-        process.stdin.write("纽威股份\\n".encode("utf-8"))
+        process.stdin.write("纽威股份\n".encode("utf-8"))
         process.stdin.flush()
         tail = process.stdout.read().decode("utf-8", errors="replace")
         assert process.wait(timeout=5) == 0, tail
