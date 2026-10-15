@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -323,3 +324,15 @@ def test_updater_refuses_diverged_main_without_rewriting_local_or_remote_commit(
     assert _git(checkout, "rev-parse", "refs/remotes/origin/main").stdout.strip() == remote_head
     assert (checkout / "local-only.txt").read_text(encoding="utf-8") == "local commit stays\n"
     assert "已分叉" in result.stdout + result.stderr
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX private-log permission contract")
+def test_stream_command_creates_private_log_and_streams_output(tmp_path: Path) -> None:
+    log_path = tmp_path / "stream.log"
+    return_code = acceptance._stream_command(
+        [sys.executable, "-c", "print('IIOS_STREAM_OK')"],
+        log_path,
+    )
+    assert return_code == 0
+    assert log_path.read_text(encoding="utf-8") == "IIOS_STREAM_OK\n"
+    assert log_path.stat().st_mode & 0o777 == 0o600

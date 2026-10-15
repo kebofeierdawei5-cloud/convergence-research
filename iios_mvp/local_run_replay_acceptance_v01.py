@@ -91,7 +91,9 @@ def _stream_command(command: list[str], log_path: Path) -> int:
     """Run a command with terminal-visible output and a private, complete log."""
     with log_path.open("x", encoding="utf-8") as log:
         if os.name != "nt":
-            log.chmod(0o600)
+            # chmod is a filesystem operation; TextIOWrapper has no chmod method.
+            # LOG_ROOT is already private, and this tightens the file itself.
+            log_path.chmod(0o600)
         try:
             process = subprocess.Popen(
                 command,
