@@ -59,6 +59,7 @@ REPLAY_COMPARISON_FIELDS = (
     "operating_driver_forecast",
     "valuation_transmission",
     "operator_valuation_context",
+    "price_zone_sensitivity",
     "decision_parameters",
     "portfolio_package",
     "return_metrics",
@@ -834,6 +835,205 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
         return None, f"SCENARIO_CALCULATION_INCOMPLETE:{exc}"
 
 
+def _price_zone_sensitivity(
+    prepared: Mapping[str, Any],
+    return_metrics: Mapping[str, Any] | None,
+    return_metrics_reason: str | None,
+) -> dict[str, Any]:
+    """Explain existing price caps and recompute 90/100/110% prices with the existing solver."""
+    currency = str((prepared.get("case") or {}).get("currency") or "UNKNOWN")
+    current_raw = (prepared.get("price_input") or {}).get("price")
+    try:
+        current = _positive(current_raw, "B6_CURRENT_PRICE")
+    except LocalInvestmentPilotError:
+        current = None
+
+    if return_metrics is None or current is None:
+        reason = return_metrics_reason or ("CURRENT_PRICE_INVALID" if current is None else "RETURN_METRICS_UNKNOWN")
+        return {
+            "schema_version": "IIOS-PRICE-ZONE-SENSITIVITY-0.1",
+            "status": "UNKNOWN",
+            "price_screen_only": True,
+            "decision_action_changed": False,
+            "currency": currency,
+            "current_price": format(current, "f") if current is not None else None,
+            "target_entry_price": None,
+            "entry_value_reference_per_share": None,
+            "binding_constraint": {"code": "UNKNOWN", "label": "未知", "price_cap": None, "tied_constraints": []},
+            "current_price_zone": "UNKNOWN",
+            "current_price_vs_reference": "UNKNOWN",
+            "price_caps": [],
+            "sensitivity_ladder": [
+                {
+                    "multiplier": multiplier, "price": None, "status": "UNKNOWN",
+                    "expected_annualized_return": None, "entry_return_cushion": None, "bear_return": None,
+                    "buy_entry_return_cushion_pass": None, "fundamental_target_pass": None,
+                    "required_return_pass": None, "risk_pass": None, "return_gate_pass": None,
+                    "target_entry_price_for_entry_cushion": None, "target_entry_price_for_return": None,
+                    "target_entry_price_for_required_return": None, "target_entry_price_for_risk": None,
+                    "issues": [reason],
+                }
+                for multiplier in ("0.90", "1.00", "1.10")
+            ],
+            "issues": [reason],
+            "interpretation": "价格层未能完成计算；UNKNOWN 不表示价格合理或可买。",
+        }
+
+    anchor_raw = (prepared.get("forecast_valuation") or {}).get("entry_value_reference_per_share")
+    try:
+        anchor = _positive(anchor_raw, "B6_ENTRY_VALUE_REFERENCE")
+    except LocalInvestmentPilotError:
+        anchor = None
+
+    cap_specs = (
+        ("entry_cushion_15pct", "15% 入场回报安全垫", return_metrics.get("target_entry_price_for_entry_cushion")),
+        ("annualized_return_15pct", "预期年化回报 ≥ 15%", return_metrics.get("target_entry_price_for_return")),
+        ("required_return", "预期年化回报 ≥ Required Return", return_metrics.get("target_entry_price_for_required_return")),
+        ("bear_loss_risk", "Bear 损失不超过风险上限", return_metrics.get("target_entry_price_for_risk")),
+    )
+    caps: list[dict[str, Any]] = []
+    for code, label, raw_value in cap_specs:
+        try:
+            value = _number(raw_value, f"B6_{code}") if raw_value is not None else None
+        except LocalInvestmentPilotError:
+            value = None
+        caps.append({"code": code, "label": label, "price_cap": format(value, "f") if value is not None else None})
+    usable_caps = [row for row in caps if row["price_cap"] is not None]
+    if not usable_caps:
+        binding = {"code": "UNKNOWN", "label": "未知", "price_cap": None, "tied_constraints": []}
+        target_cap = None
+        status = "PARTIAL"
+        issues = ["NO_VALID_PRICE_CAPS"]
+    else:
+        target_cap = min(Decimal(row["price_cap"]) for row in usable_caps)
+        tied = [row for row in usable_caps if Decimal(row["price_cap"]) == target_cap]
+        binding = {
+            "code": tied[0]["code"] if len(tied) == 1 else "TIED_CONSTRAINTS",
+            "label": "；".join(row["label"] for row in tied),
+            "price_cap": format(target_cap, "f"),
+            "tied_constraints": [row["code"] for row in tied],
+        }
+        status = "PASS"
+        issues = []
+
+    if target_cap is None:
+        current_zone = "UNKNOWN"
+    elif current <= target_cap:
+        current_zone = "AT_OR_BELOW_ALL_GATES_ENTRY_PRICE"
+    elif anchor is not None and current <= anchor:
+        current_zone = "ABOVE_ENTRY_CAP_BUT_AT_OR_BELOW_REFERENCE_VALUE"
+    elif anchor is not None and current > anchor:
+        current_zone = "ABOVE_REFERENCE_VALUE"
+    else:
+        current_zone = "ABOVE_ENTRY_CAP_REFERENCE_UNKNOWN"
+    if anchor is None:
+        current_vs_reference = "UNKNOWN"
+    elif current <= anchor:
+        current_vs_reference = "AT_OR_BELOW_REFERENCE_VALUE"
+    else:
+        current_vs_reference = "ABOVE_REFERENCE_VALUE"
+
+    prepared_price = prepared.get("price_input") if isinstance(prepared.get("price_input"), Mapping) else {}
+    sensitivity: list[dict[str, Any]] = []
+    for multiplier in ("0.90", "1.00", "1.10"):
+        p = current * Decimal(multiplier)
+        variant = dict(prepared)
+        variant_price = dict(prepared_price)
+        variant_price["price"] = format(p, "f")
+        variant["price_input"] = variant_price
+        metrics, reason = _return_metrics(variant)
+        if metrics is None:
+            sensitivity.append({
+                "multiplier": multiplier, "price": format(p, "f"), "status": "UNKNOWN",
+                "expected_annualized_return": None, "entry_return_cushion": None, "bear_return": None,
+                "buy_entry_return_cushion_pass": None, "fundamental_target_pass": None,
+                "required_return_pass": None, "risk_pass": None, "return_gate_pass": None,
+                "target_entry_price_for_entry_cushion": None, "target_entry_price_for_return": None,
+                "target_entry_price_for_required_return": None, "target_entry_price_for_risk": None,
+                "issues": [reason or "SENSITIVITY_RETURN_CALCULATION_UNKNOWN"],
+            })
+        else:
+            sensitivity.append({
+                "multiplier": multiplier, "price": format(p, "f"), "status": "PASS",
+                "expected_annualized_return": metrics.get("expected_annualized_return"),
+                "entry_return_cushion": metrics.get("entry_return_cushion"),
+                "bear_return": metrics.get("bear_return"),
+                "buy_entry_return_cushion_pass": metrics.get("buy_entry_return_cushion_pass"),
+                "fundamental_target_pass": metrics.get("fundamental_target_pass"),
+                "required_return_pass": metrics.get("required_return_pass"),
+                "risk_pass": metrics.get("risk_pass"), "return_gate_pass": metrics.get("return_gate_pass"),
+                "target_entry_price_for_entry_cushion": metrics.get("target_entry_price_for_entry_cushion"),
+                "target_entry_price_for_return": metrics.get("target_entry_price_for_return"),
+                "target_entry_price_for_required_return": metrics.get("target_entry_price_for_required_return"),
+                "target_entry_price_for_risk": metrics.get("target_entry_price_for_risk"),
+                "issues": [],
+            })
+    midpoint = next((row for row in sensitivity if row["multiplier"] == "1.00"), None)
+    if midpoint and midpoint.get("status") == "PASS":
+        for key in ("expected_annualized_return", "entry_return_cushion", "bear_return"):
+            if Decimal(str(midpoint[key])) != Decimal(str(return_metrics[key])):
+                issues.append(f"CURRENT_PRICE_SENSITIVITY_MISMATCH:{key}")
+                status = "REVIEW_REQUIRED"
+                break
+
+    return {
+        "schema_version": "IIOS-PRICE-ZONE-SENSITIVITY-0.1",
+        "status": status, "price_screen_only": True, "decision_action_changed": False,
+        "currency": currency, "current_price": format(current, "f"),
+        "target_entry_price": format(target_cap, "f") if target_cap is not None else None,
+        "entry_value_reference_per_share": format(anchor, "f") if anchor is not None else None,
+        "binding_constraint": binding, "current_price_zone": current_zone,
+        "current_price_vs_reference": current_vs_reference, "price_caps": caps,
+        "sensitivity_ladder": sensitivity, "issues": issues,
+        "interpretation": "本节仅解释价格层约束，不构成 BUY/ADD/HOLD 指令，也不覆盖 Trust、Thesis、MIE/预期差、组合限制或其他既有决策门槛。",
+    }
+
+
+def _render_price_zone_sensitivity_section(result: Mapping[str, Any]) -> list[str]:
+    """Render B6 price-zone and three-point sensitivity in Chinese."""
+    row = result if isinstance(result, Mapping) else {}
+    lines = [
+        "", "### B6：当前价格区间与约束敏感性（仅价格层，不是买入指令）", "",
+        f"- 计算状态：**{row.get('status', 'UNKNOWN')}**",
+        f"- 当前价：{row.get('current_price') or 'UNKNOWN'} {row.get('currency', '')}",
+        f"- 共同约束下目标入场价上限：{row.get('target_entry_price') or 'UNKNOWN'} {row.get('currency', '')}",
+        f"- 当前价格区间：{row.get('current_price_zone', 'UNKNOWN')}",
+        f"- 相对安全边际参考价值：{row.get('current_price_vs_reference', 'UNKNOWN')}；参考价值 {row.get('entry_value_reference_per_share') or 'UNKNOWN'} {row.get('currency', '')}",
+        f"- 当前起作用的最低入场价约束：{(row.get('binding_constraint') or {}).get('label', 'UNKNOWN')}；对应上限 {(row.get('binding_constraint') or {}).get('price_cap') or 'UNKNOWN'} {row.get('currency', '')}",
+        "", "#### 各价格约束上限",
+    ]
+    caps = row.get("price_caps") if isinstance(row.get("price_caps"), list) else []
+    if caps:
+        for item in caps:
+            lines.append(f"- {item.get('label', item.get('code', 'UNKNOWN'))}：{item.get('price_cap') or 'UNKNOWN'} {row.get('currency', '')}")
+    else:
+        lines.append("- 无可用价格约束上限；回报或估值数据不足。")
+    lines.extend(["", "#### 当前价的 90% / 100% / 110% 情景"])
+    ladder = row.get("sensitivity_ladder") if isinstance(row.get("sensitivity_ladder"), list) else []
+    for item in ladder:
+        label = f"{Decimal(item['multiplier']) * 100:.0f}%"
+        if item.get("status") != "PASS":
+            lines.append(f"- {label} 当前价 = {item.get('price') or 'UNKNOWN'}：UNKNOWN（{'; '.join(item.get('issues') or [])}）")
+            continue
+        lines.extend([
+            f"- {label} 当前价 = {item.get('price')} {row.get('currency', '')}",
+            f"  预期年化回报 {item.get('expected_annualized_return')}；入场回报安全垫 {item.get('entry_return_cushion')}；Bear 回报 {item.get('bear_return')}",
+            "  价格门槛："
+            + f"安全垫≥15% {item.get('buy_entry_return_cushion_pass')}；"
+            + f"年化回报≥15% {item.get('fundamental_target_pass')}；"
+            + f"Required Return {item.get('required_return_pass')}；Bear 风险上限 {item.get('risk_pass')}；"
+            + f"全部价格门槛 {item.get('return_gate_pass')}",
+        ])
+    lines.extend([
+        "", "- 解释边界：以上仅说明价格本身是否满足现有回报/风险上限。即使全部价格门槛通过，Trust、Thesis、MIE/预期差、正式证据和组合约束等任一既有条件未知/阻塞时，不能据此升级投资行动.", "",
+    ])
+    if row.get("issues"):
+        lines.extend(["#### B6 待复核问题", ""])
+        lines.extend(f"- {issue}" for issue in row["issues"])
+    return lines
+
+
+
 
 def _thesis_break_stress_review(prepared: Mapping[str, Any]) -> dict[str, Any]:
     """Validate an independent, non-probability-weighted thesis-break stress case."""
@@ -1191,6 +1391,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f"- Required Return：{params['required_return_annualized']}；结果：{calc['required_return_pass'] if calc else 'UNKNOWN'}",
         f"- 共同约束下目标入场价上限：{calc['target_entry_price'] if calc else 'UNKNOWN'}",
         f"- 最大 Bear 损失约束：{params['max_loss_pct']}%",
+        *_render_price_zone_sensitivity_section(analysis.get("price_zone_sensitivity") or {}),
         *portfolio_lines,
         "",
         "## 二、Trust / Reality / Quality",
@@ -1428,6 +1629,7 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
     prepared = _prepare_input(payload)
     metrics, reason = _return_metrics(prepared)
     stress_review = _thesis_break_stress_review(prepared)
+    price_zone_sensitivity = _price_zone_sensitivity(prepared, metrics, reason)
     portfolio_package = build_local_pilot_portfolio_package(
         operator_context=prepared.get("operator_portfolio_context"),
         case=prepared["case"],
@@ -1463,6 +1665,7 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "decision_parameters": prepared["decision_parameters"],
         "portfolio_package": portfolio_package,
         "return_metrics": metrics,
+        "price_zone_sensitivity": price_zone_sensitivity,
         "return_metrics_reason": reason,
         "thesis_break_stress_review": stress_review,
         "notes_price_conflicts": prepared["notes_price_conflicts"],
