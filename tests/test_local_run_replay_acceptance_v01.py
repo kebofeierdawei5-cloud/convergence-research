@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import select
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -336,3 +338,65 @@ def test_stream_command_creates_private_log_and_streams_output(tmp_path: Path) -
     assert return_code == 0
     assert log_path.read_text(encoding="utf-8") == "IIOS_STREAM_OK\n"
     assert log_path.stat().st_mode & 0o777 == 0o600
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX interactive-prompt streaming test")
+def test_stream_command_shows_prompt_before_child_receives_input(tmp_path: Path) -> None:
+    """Regression: a prompt without a newline must be visible before stdin is sent."""
+    log_path = tmp_path / "interactive-prompt.log"
+    child_code = (
+        "import sys; "
+        "print('公司名称:', end='', flush=True); "
+        "value = input(); "
+        "print('\\n收到=' + value)"
+    )
+    driver_code = (
+        "import sys\n"
+        "from pathlib import Path\n"
+        "from iios_mvp import local_run_replay_acceptance_v01 as acceptance\n"
+        "raise SystemExit(acceptance._stream_command("
+        "[sys.executable, '-c', " + repr(child_code) + "], Path(sys.argv[1])))\n"
+    )
+    process = subprocess.Popen(
+        [sys.executable, "-c", driver_code, str(log_path)],
+        cwd=str(REPO_ROOT),
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=0,
+    )
+    assert process.stdin is not None
+    assert process.stdout is not None
+    prompt = "公司名称:".encode("utf-8")
+    seen = bytearray()
+    deadline = time.monotonic() + 5
+    try:
+        while not seen.endswith(prompt):
+            remaining = deadline - time.monotonic()
+            assert remaining > 0, (
+                "Prompt was not displayed before input was sent; "
+                f"captured output={seen!r}"
+            )
+            ready, _, _ = select.select([process.stdout], [], [], remaining)
+            assert ready, (
+                "Prompt was not displayed before input was sent; "
+                f"captured output={seen!r}"
+            )
+            chunk = os.read(process.stdout.fileno(), 1)
+            assert chunk, f"Driver exited before showing prompt; output={seen!r}"
+            seen.extend(chunk)
+
+        process.stdin.write("纽威股份\n".encode("utf-8"))
+        process.stdin.flush()
+        tail = process.stdout.read().decode("utf-8", errors="replace")
+        assert process.wait(timeout=5) == 0, tail
+        assert "收到=纽威股份" in tail
+        full_log = log_path.read_text(encoding="utf-8")
+        assert "公司名称:" in full_log
+        assert "收到=纽威股份" in full_log
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+        process.stdin.close()
+        process.stdout.close()
