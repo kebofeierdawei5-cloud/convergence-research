@@ -18,11 +18,25 @@ fi
 if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3,10) else 1)' >/dev/null 2>&1; then
   fail '需要 Python 3.10 或更新版本。'
 fi
+if ! command -v git >/dev/null 2>&1; then
+  fail '没有找到 Git。请安装/启用 Git 后重新双击验收入口。'
+fi
+if [[ ! -f "$REPO_ROOT/tools/iios_update_local_main_v01.sh" ]]; then
+  fail '未找到安全更新器。请先从 GitHub 获取完整的新版 convergence-research 仓库；不能只复制单个启动文件。'
+fi
+
+# Refresh the local checkout first. The updater refuses dirty worktrees and
+# non-fast-forward histories; it never resets or deletes operator changes.
+if ! bash "$REPO_ROOT/tools/iios_update_local_main_v01.sh" "$REPO_ROOT"; then
+  fail '本机仓库未能安全更新到最新 origin/main。验收尚未启动；请阅读上方原因，保留本地改动后处理。'
+fi
+
+# These checks happen AFTER updating, so the module versions match this launcher.
 if [[ ! -f "$REPO_ROOT/iios_mvp/local_investment_pilot_v01.py" ]]; then
-  fail '未找到 IIOS 本地分析模块。请确认这是最新 canonical main 仓库根目录，并已更新到最新版本。'
+  fail '更新后仍未找到 IIOS 本地分析模块；请保留终端输出并反馈。'
 fi
 if [[ ! -f "$REPO_ROOT/iios_mvp/local_run_replay_acceptance_v01.py" ]]; then
-  fail '未找到全流程与 Replay 验收模块。请先更新仓库到包含此脚本的最新 canonical main。'
+  fail '更新后仍未找到全流程与 Replay 验收模块；请保留终端输出并反馈。'
 fi
 
 cd "$REPO_ROOT"
