@@ -22,6 +22,10 @@ on:
     branches: [main]
     paths:
       - "iios_mvp/local_investment_pilot_v01.py"
+      - "iios_mvp/local_run_replay_acceptance_v01.py"
+      - "tests/test_local_run_replay_acceptance_v01.py"
+      - "验收IIOS全流程与Replay.command"
+      - "docs/iios/MACOS_FULL_RUN_AND_REPLAY_ACCEPTANCE_20261015.md"
       - "iios_mvp/research_intake.py"
       - "iios_mvp/investment_core_contract_v03.py"
       - "tests/test_local_investment_pilot_v01.py"
