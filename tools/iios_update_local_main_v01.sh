@@ -44,7 +44,7 @@ fi
 
 printf '正在安全检查本机仓库：%s\n' "$ROOT"
 printf '当前分支：%s\n' "$BRANCH"
-printf '远端：%s\n' "$ORIGIN_URL"
+printf '远端 origin：已配置\n'
 
 if ! git -C "$ROOT" fetch --no-tags origin refs/heads/main:refs/remotes/origin/main; then
   fail '从 origin 获取 main 失败。请检查网络、远端权限和 GitHub 可访问性；未修改工作文件。'
