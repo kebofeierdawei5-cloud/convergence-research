@@ -1,10 +1,10 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-15
+Snapshot: 2026-10-16
 Authority: this file is the **only canonical Current State Index**.
 
-## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-15
+## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-16
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
@@ -50,7 +50,7 @@ Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED 
 B4 operating-driver forecast bridge                    MERGED PR #424 + #426 SAFEGUARDS; LOCAL PILOT 74 PASS; RED-TEAM 7 PASS; 7 TRIGGERED WORKFLOWS SUCCESS
 B5 valuation transmission / entry price mapping          MERGED PR #428; LOCAL PILOT 81 PASS; 7/7 TRIGGERED WORKFLOWS SUCCESS; EPS_MULTIPLE ONLY
 B6 price zone / binding cap / sensitivity ladder           MERGED PR #430; LOCAL PILOT 87 PASS; 7/7 TRIGGERED WORKFLOWS SUCCESS; PRICE SCREEN ONLY
-Local Mac full-run + Replay acceptance harness             PR #433/#434 MERGED; SAFE LOCAL-MAIN UPDATE; 104 TESTS + 11 RELEVANT EXACT-HEAD WORKFLOWS PASS; REAL MAC RUN + REPLAY OPEN
+Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437 MERGED; SAFE LOCAL-MAIN UPDATE; 108 LOCAL-PILOT TESTS + 7 RELEVANT WORKFLOWS PASS; LIVE PROMPTS + AUTO-DETECT SAVED CHATGPT JSON; REAL MAC RUN + REPLAY OPEN
 ```
 
 ### B3 — close the local portfolio-context slice (2026-10-14)
