@@ -141,7 +141,12 @@ def _extract_cli_result(log_path: Path, expected_statuses: Iterable[str]) -> dic
             continue
         if not isinstance(item, dict) or item.get("status") not in expected:
             continue
-        if isinstance(item.get("pilot_id"), str) and isinstance(item.get("run_dir"), str):
+        has_run_identity = isinstance(item.get("pilot_id"), str)
+        has_required_path = (
+            isinstance(item.get("run_dir"), str)
+            or item.get("status") == "PILOT_BUNDLE_HASH_CHECK_PASS"
+        )
+        if has_run_identity and has_required_path:
             candidates.append((index, item))
     if not candidates:
         raise AcceptanceError(
