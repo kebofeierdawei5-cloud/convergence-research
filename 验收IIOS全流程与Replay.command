@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd -P)"
 
 fail() {
   printf '\nIIOS 全流程与 Replay 验收启动失败：%s\n' "$1"
