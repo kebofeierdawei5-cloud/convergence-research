@@ -1014,7 +1014,7 @@ def _render_price_zone_sensitivity_section(result: Mapping[str, Any]) -> list[st
     ladder = row.get("sensitivity_ladder") if isinstance(row.get("sensitivity_ladder"), list) else []
     for item in ladder:
         label = f"{Decimal(item['multiplier']) * 100:.0f}%"
-        if item.get("status") != "PASS":
+        if item.get("status") != "CALCULATED":
             lines.append(f"- {label} 当前价 = {item.get('price') or 'UNKNOWN'}：UNKNOWN（{'; '.join(item.get('issues') or [])}）")
             continue
         lines.extend([
