@@ -1639,3 +1639,61 @@ def test_response_file_watcher_ignores_existing_unsaved_stale_content(tmp_path: 
     assert not writer.is_alive()
     assert new_signature != old_signature
     assert json.loads(response_path.read_text(encoding="utf-8"))["version"] == 2
+
+def test_response_file_picker_can_import_saved_json_without_destroying_source(tmp_path: Path, monkeypatch):
+    import types
+
+    target = tmp_path / "pilot-chatgpt-response-target.json"
+    target.write_text("", encoding="utf-8")
+    saved_elsewhere = tmp_path / "pilot-chatgpt-response-saved.json"
+    content = '{"schema_version":"test","case":{"symbol":"603699"}}'
+    saved_elsewhere.write_text(content, encoding="utf-8")
+
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+
+    def fake_run(command, **kwargs):
+        assert command[0] == "osascript"
+        assert kwargs["check"] is True
+        return types.SimpleNamespace(stdout=str(saved_elsewhere) + "\\n")
+
+    monkeypatch.setattr(pilot.subprocess, "run", fake_run)
+    assert pilot._choose_saved_response_file(target) is True
+    assert target.read_text(encoding="utf-8") == content
+    assert saved_elsewhere.read_text(encoding="utf-8") == content
+    assert pilot._response_file_signature(target)[0] == len(content.encode("utf-8"))
+
+
+def test_response_file_diagnostic_identifies_empty_target_without_leaking_contents(tmp_path: Path):
+    target = tmp_path / "pilot-chatgpt-response.json"
+    target.write_text("", encoding="utf-8")
+    diagnostic = pilot._response_file_diagnostic(target)
+    assert str(target) in diagnostic
+    assert "0 字节" in diagnostic
+    assert "文件存在" in diagnostic
+
+
+def test_enter_force_rechecks_nonempty_response_even_when_signature_is_unchanged(tmp_path: Path, monkeypatch, capsys):
+    class EnterTerminal:
+        def isatty(self):
+            return True
+
+        def readline(self):
+            return "\\n"
+
+    response_path = tmp_path / "pilot-chatgpt-response.json"
+    response_path.write_text('{"version": 1}', encoding="utf-8")
+    signature = _response_file_signature(response_path)
+    assert signature is not None
+
+    terminal = EnterTerminal()
+    monkeypatch.setattr(pilot.sys, "stdin", terminal)
+    monkeypatch.setattr(pilot.select, "select", lambda *_args, **_kwargs: ([terminal], [], []))
+    detected = _wait_for_response_file_change(
+        response_path,
+        previous_signature=signature,
+        poll_interval=0.001,
+        stable_seconds=1.0,
+    )
+    assert detected == signature
+    assert "重新校验当前文件" in capsys.readouterr().out
+
