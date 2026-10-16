@@ -1448,9 +1448,9 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         lines.extend([
             f"### {label} 情景",
             "",
-            f"- 情景概率：{row.get('probability', 'UNKNOWN')}",
-            f"- 期末每股价值：{row.get('terminal_value_per_share', 'UNKNOWN')} {c['currency']}",
-            f"- 每股现金分配：{row.get('cash_distributions_per_share', '0')} {c['currency']}",
+            f"- 情景概率：{('UNKNOWN' if row.get('probability') in (None, '') else row.get('probability'))}",
+            f"- 期末每股价值：{('UNKNOWN' if row.get('terminal_value_per_share') in (None, '') else row.get('terminal_value_per_share'))} {c['currency']}",
+            f"- 每股现金分配：{('UNKNOWN' if row.get('cash_distributions_per_share', '0') in (None, '') else row.get('cash_distributions_per_share', '0'))} {c['currency']}",
             f"- 情景理由：{' '.join(str(row.get('rationale') or '未提供').splitlines()).strip()}",
             *(
                 [
