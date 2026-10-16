@@ -1507,6 +1507,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         analysis.get("operating_driver_forecast") or {},
         f.get("scenarios") if isinstance(f.get("scenarios"), Mapping) else {},
         c["currency"],
+        valuation_transmission=analysis.get("valuation_transmission") or {},
     ))
     lines.extend(render_valuation_transmission_section(
         analysis.get("valuation_transmission") or {},

@@ -1167,13 +1167,22 @@ def test_b5_transmits_project_profit_to_per_share_scenarios_and_entry_anchor():
     assert Decimal(analysis["forecast_valuation"]["entry_value_reference_per_share"]) > Decimal("150")
     assert analysis["return_metrics"] is not None
     assert "B5：经营结果到每股估值的传导" in report
+    assert "B5 当前传导状态：APPLIED_TO_PER_SHARE_SCENARIOS" in report
+    assert "B5 传导后的每股估值情景终值" in report
+    assert "价值传导仍需后续估值层完成" not in report
+    assert "尚未与此经营桥接连通" not in report
+    assert "B5 已按明确的 EPS_MULTIPLE 增量桥接" in report
     assert "论点失效压力测试不自动加回项目价值" in report
 
 
 def test_b5_never_adds_project_twice_when_operator_says_baseline_includes_it():
     payload = _b5_ready_payload()
     payload["operator_valuation_context"]["baseline_includes_project"] = True
-    analysis, _ = _analyse(payload, "TEST-B5-ALREADY-INCLUDED")
+    analysis, report = _analyse(payload, "TEST-B5-ALREADY-INCLUDED")
+    assert "B5 当前传导状态：CALCULATED_NOT_APPLIED_BASELINE_ALREADY_INCLUDES_PROJECT" in report
+    assert "基准已含项目、未重复叠加的每股估值情景终值" in report
+    assert "B5 因防止重复计价而没有二次叠加" in report
+    assert "价值传导仍需后续估值层完成" not in report
     assert analysis["valuation_transmission"]["status"] == "CALCULATED_NOT_APPLIED_BASELINE_ALREADY_INCLUDES_PROJECT"
     assert analysis["valuation_transmission"]["applied_to_per_share_scenarios"] is False
     assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
@@ -1196,7 +1205,10 @@ def test_b5_missing_cannibalization_blocks_all_scenario_value_changes():
         "value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "",
         "evidence_refs": [], "note": "Cannibalization not identified",
     }
-    analysis, _ = _analyse(payload, "TEST-B5-CANNIBALIZATION-UNKNOWN")
+    analysis, report = _analyse(payload, "TEST-B5-CANNIBALIZATION-UNKNOWN")
+    assert "B5 当前传导状态：NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID" in report
+    assert "当前 B5 状态为 NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID" in report
+    assert "价值传导仍需后续估值层完成" not in report
     assert analysis["valuation_transmission"]["status"] == "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID"
     assert analysis["valuation_transmission"]["applied_to_per_share_scenarios"] is False
     assert all(
