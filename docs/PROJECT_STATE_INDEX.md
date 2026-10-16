@@ -49,9 +49,17 @@ Local single-user complete pilot                     ACTIVE P0 PRIORITY; PILOT_N
 Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
 B4 operating-driver forecast bridge                    MERGED PR #424 + #426 SAFEGUARDS; LOCAL PILOT 74 PASS; RED-TEAM 7 PASS; 7 TRIGGERED WORKFLOWS SUCCESS
 B5 valuation transmission / entry price mapping          MERGED PR #428; LOCAL PILOT 81 PASS; 7/7 TRIGGERED WORKFLOWS SUCCESS; EPS_MULTIPLE ONLY
-B6 price zone / binding cap / sensitivity ladder           MERGED PR #430; LOCAL PILOT 87 PASS; 7/7 TRIGGERED WORKFLOWS SUCCESS; PRICE SCREEN ONLY
-Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 MERGED; SAFE LOCAL-MAIN UPDATE; 111 LOCAL-PILOT + ACCEPTANCE TESTS + 6 PR WORKFLOWS PASS; LIVE PROMPTS + AUTO-DETECT + FILE-PICKER RECOVERY; REAL MAC RUN + REPLAY OPEN
+B6 price zone / binding cap / sensitivity ladder           PR #430 MERGED; PR #440 REPORT FIX MERGED; 111 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; PRICE SCREEN ONLY
+Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 MERGED; SAFE LOCAL-MAIN UPDATE; 111 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; LIVE PROMPTS + AUTO-DETECT + FILE-PICKER RECOVERY; REAL MAC RUN + REPLAY OPEN
 ```
+
+### B6 report-rendering correction — 2026-10-16
+
+- A source-level audit found a concrete mismatch in the Chinese report renderer: the B6 calculator emits `status="CALCULATED"` for successful 90% / 100% / 110% sensitivity rows, while the renderer checked for `"PASS"`. Consequently, valid computed rows were displayed as UNKNOWN in `report.md` even though `analysis.json` held the calculations.
+- PR [#440](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/440) merged at `0f7c2630e94ff4feddcb021f1f3f4e34fcbada30`. The renderer now matches the actual status contract; the B6 report regression asserts each successful row renders the price and cannot be labelled UNKNOWN.
+- Exact-head verification: local-pilot and acceptance-wrapper suite **111 passed**; 6/6 triggered workflows succeeded (local pilot, investment-core CI, MVP pilot, PILOT-02, independent post-B04 red-team, authority threat reproduction).
+- No return/valuation formulas, threshold, scenario, decision status or authorization changed. This is a correctness fix to existing B6, not B7 expansion.
+- Actual macOS run + Replay remains OPEN; CI is not a substitute. The operator's repeated response-file handoff issue and unavailable recovery-script download are deferred to avoid further churn. Do not claim the live 603699 run completed, and do not begin broad B7 scope without a concrete user-visible gap and bounded specification.
 
 ### Response-file handoff recovery — 2026-10-16
 
