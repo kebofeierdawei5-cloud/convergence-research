@@ -50,8 +50,15 @@ Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED 
 B4 operating-driver forecast bridge                    MERGED PR #424 + #426 SAFEGUARDS; LOCAL PILOT 74 PASS; RED-TEAM 7 PASS; 7 TRIGGERED WORKFLOWS SUCCESS
 B5 valuation transmission / entry price mapping          MERGED PR #428; LOCAL PILOT 81 PASS; 7/7 TRIGGERED WORKFLOWS SUCCESS; EPS_MULTIPLE ONLY
 B6 price zone / binding cap / sensitivity ladder           MERGED PR #430; LOCAL PILOT 87 PASS; 7/7 TRIGGERED WORKFLOWS SUCCESS; PRICE SCREEN ONLY
-Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437 MERGED; SAFE LOCAL-MAIN UPDATE; 108 LOCAL-PILOT TESTS + 7 RELEVANT WORKFLOWS PASS; LIVE PROMPTS + AUTO-DETECT SAVED CHATGPT JSON; REAL MAC RUN + REPLAY OPEN
+Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 MERGED; SAFE LOCAL-MAIN UPDATE; 111 LOCAL-PILOT + ACCEPTANCE TESTS + 6 PR WORKFLOWS PASS; LIVE PROMPTS + AUTO-DETECT + FILE-PICKER RECOVERY; REAL MAC RUN + REPLAY OPEN
 ```
+
+### Response-file handoff recovery — 2026-10-16
+
+- Operator-reported symptom: the live wizard repeatedly printed “尚未检测到结果文件的新内容” after the operator said the response had been saved. In the existing implementation this message is emitted only from the Enter-triggered check when the watched target is unreadable/missing, empty, or has the same signature as the previous response. The previous message did not disclose which filesystem condition applied; the user's actual Mac filesystem state was not independently accessible from the repository session.
+- PR [#438](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/438) merged at `581535d15ab46ebbbf801a37741ecf3a51440578`. The wizard now prints the exact watched path, readable byte count and modification time when diagnosis is needed. On macOS, Enter opens a file chooser if the watched target is empty/unreadable so the operator may select the already-saved JSON; the source is preserved and the content still passes the original schema/operator-input checks. Enter also forces revalidation of a non-empty file when its signature is unchanged. The wizard's instructions no longer direct the operator to press Enter as a required step.
+- Exact PR-head verification: local pilot + acceptance-wrapper tests **111 passed**; six triggered workflows succeeded: Investment Core, MVP Pilot, Local Investment Pilot, PILOT-02, independent post-B04 red-team, and authority threat reproduction.
+- This closes the code/diagnostic defect, not live macOS acceptance. The current real Mac run may still be waiting on older in-memory code; the operator must use the one-click response-file recovery helper or update/restart with current main before this code path is active. Review/replay acceptance remains open.
 
 ### B3 — close the local portfolio-context slice (2026-10-14)
 
