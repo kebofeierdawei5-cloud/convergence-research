@@ -1263,10 +1263,10 @@ def test_b6_sensitivity_ladder_reuses_solver_and_matches_current_price_metrics()
     # The calculator's success status is CALCULATED, not PASS. Successful
     # rows must be rendered with their computed prices instead of UNKNOWN.
     assert "- 90% 当前价 = 90.00 CNY" in report
-    assert "- 100% 当前价 = 100 CNY" in report
+    assert "- 100% 当前价 = 100.00 CNY" in report
     assert "- 110% 当前价 = 110.00 CNY" in report
     assert "- 90% 当前价 = 90.00：UNKNOWN" not in report
-    assert "- 100% 当前价 = 100：UNKNOWN" not in report
+    assert "- 100% 当前价 = 100.00：UNKNOWN" not in report
     assert "- 110% 当前价 = 110.00：UNKNOWN" not in report
     assert "不是买入指令" in report
 
