@@ -808,6 +808,28 @@ def test_extract_json_object_accepts_chatgpt_code_fence_and_leading_text():
     assert result["value"] == 2
 
 
+def test_extract_json_object_repairs_malformed_url_punctuation_escapes():
+    from iios_mvp.local_investment_pilot_v01 import _extract_json_object
+
+    # Regression from the 2026-10-16 pasted response: the text normalizer
+    # inserted invalid JSON escapes before URL colons and a domain dot.
+    source = r'{"source_ref":"https\://static.cninfo.com.cn/report.pdf",' \
+        r'"issuer_ref":"https\://www\.wuxiapptec.com/news"}'
+    result = _extract_json_object(source)
+    assert result["source_ref"] == "https://static.cninfo.com.cn/report.pdf"
+    assert result["issuer_ref"] == "https://www.wuxiapptec.com/news"
+
+
+def test_extract_json_object_reports_json_parse_location():
+    from iios_mvp.local_investment_pilot_v01 import _extract_json_object
+
+    with pytest.raises(
+        LocalInvestmentPilotError,
+        match=r"CHATGPT_JSON_INVALID.*第 1 行，第 \d+ 列",
+    ):
+        _extract_json_object(r'{"source_ref":"bad\q"}')
+
+
 def test_extract_json_object_blocks_incomplete_clipboard_response():
     from iios_mvp.local_investment_pilot_v01 import _extract_json_object
 
