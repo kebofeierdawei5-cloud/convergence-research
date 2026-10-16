@@ -667,9 +667,21 @@ def render_operating_driver_section(
     forecast: Mapping[str, Any],
     valuation_scenarios: Mapping[str, Any] | None,
     currency: str = "CNY",
+    valuation_transmission: Mapping[str, Any] | None = None,
 ) -> list[str]:
-    """Render a readable Chinese driver-to-earnings bridge without claiming admission."""
+    """Render the operating bridge without contradicting the actual B5 transmission result."""
     driver = forecast if isinstance(forecast, Mapping) else {}
+    b5 = valuation_transmission if isinstance(valuation_transmission, Mapping) else None
+    b5_status = str(b5.get("status") or "UNKNOWN") if b5 is not None else "NOT_PROVIDED"
+    b5_applied = bool(
+        b5 is not None
+        and b5_status == "APPLIED_TO_PER_SHARE_SCENARIOS"
+        and b5.get("applied_to_per_share_scenarios") is True
+    )
+    baseline_already_includes = (
+        b5 is not None
+        and b5_status == "CALCULATED_NOT_APPLIED_BASELINE_ALREADY_INCLUDES_PROJECT"
+    )
     lines = [
         "",
         "### 经营驱动因素与独立预测桥（B4）",
@@ -718,6 +730,14 @@ def render_operating_driver_section(
     for name in SCENARIOS:
         result = driver.get("scenarios", {}).get(name, {}) if isinstance(driver.get("scenarios"), Mapping) else {}
         value_row = v_scenarios.get(name, {}) if isinstance(v_scenarios.get(name), Mapping) else {}
+        if value_row.get("b5_transmission_applied") is True:
+            valuation_label = "B5 传导后的每股估值情景终值"
+        elif baseline_already_includes:
+            valuation_label = "基准已含项目、未重复叠加的每股估值情景终值"
+        elif b5 is None:
+            valuation_label = "每股估值情景终值（本节未接收 B5 状态）"
+        else:
+            valuation_label = "未应用 B5 增量的每股估值情景终值"
         lines.extend([
             f"**{name.upper()}**",
             f"- 桥接计算状态：{result.get('calculation_status', 'SCENARIO_ECONOMICS_NOT_IDENTIFIABLE')}",
@@ -725,7 +745,7 @@ def render_operating_driver_section(
             f"- 收入：{result.get('revenue_cny') or 'UNKNOWN'}；变动成本：{result.get('variable_cost_cny') or 'UNKNOWN'}；扣变动成本贡献：{result.get('contribution_after_variable_cost_cny') or 'UNKNOWN'}",
             f"- EBITDA / EBIT / 税前利润 / 净利润：{result.get('ebitda_cny') or 'UNKNOWN'} / {result.get('ebit_cny') or 'UNKNOWN'} / {result.get('profit_before_tax_cny') or 'UNKNOWN'} / {result.get('net_profit_cny') or 'UNKNOWN'}",
             f"- 资本开支 / 营运资金变动 / 自由现金流代理：{result.get('cash_capex_cny') or 'UNKNOWN'} / {result.get('change_working_capital_cny') or 'UNKNOWN'} / {result.get('unlevered_fcf_proxy_cny') or 'UNKNOWN'}",
-            f"- 既有每股估值情景终值（尚未与此经营桥接连通）：{value_row.get('terminal_value_per_share', 'UNKNOWN')} {currency}",
+            f"- {valuation_label}：{value_row.get('terminal_value_per_share', 'UNKNOWN')} {currency}",
         ])
         mix = result.get("revenue_mix") or []
         if mix:
@@ -749,16 +769,40 @@ def render_operating_driver_section(
         lines.append("")
     lines.extend([
         "- 解释：模型按产品“销量×净售价”计算收入，按销量×单位变动成本计算直接变动成本，再扣现金固定运营费用及折旧得到 EBITDA/EBIT；税前利润额外扣融资成本。自由现金流代理 = EBIT − 正 EBIT 对应现金税 + 折旧 − 资本开支 − 营运资金增加（营运资金释放可为负值）。",
-        "- 这是情景经营桥，不是实际已实现净利润，也不自动计入公司 Base EPS 或覆盖原有每股估值情景；价值传导仍需后续估值层完成。",
-        "",
-        "#### 估值传导缺口",
-        "",
-        f"- 状态：{driver.get('valuation_transmission', {}).get('status', 'NOT_LINKED_TO_PER_SHARE_VALUE') if isinstance(driver.get('valuation_transmission'), Mapping) else 'NOT_LINKED_TO_PER_SHARE_VALUE'}",
-        f"- 原因：{driver.get('valuation_transmission', {}).get('reason', '没有可验证的经营结果到每股价值桥接。') if isinstance(driver.get('valuation_transmission'), Mapping) else '没有可验证的经营结果到每股价值桥接。'}",
     ])
-    transmission = driver.get("valuation_transmission") if isinstance(driver.get("valuation_transmission"), Mapping) else {}
-    if transmission.get("required_bridge_inputs"):
-        lines.append("- 后续需补齐：" + "；".join(str(x) for x in transmission["required_bridge_inputs"]))
+    if b5_applied:
+        lines.append("- 传导边界：这只是情景经营桥，不代表实际已实现净利润。当前 B5 已按明确的 EPS_MULTIPLE 增量桥接，将稀释口径的项目增量传导至 Bear/Base/Bull 每股终值与 Base 估值锚；仍是非正式试运行，不构成正式准入或 Decision。")
+    elif baseline_already_includes:
+        lines.append("- 传导边界：这只是情景经营桥，不代表实际已实现净利润。操作者已确认原每股估值基准包含该项目，B5 因防止重复计价而没有二次叠加；原终值和 Base 估值锚保持不变。")
+    elif b5 is not None:
+        lines.append(f"- 传导边界：这只是情景经营桥，不代表实际已实现净利润。当前 B5 状态为 {b5_status}；此状态下项目增量未应用到每股终值，具体原因见下方 B5 详情。不得将项目增量默认为已计入估值。")
+    else:
+        lines.append("- 传导边界：这只是情景经营桥，不代表实际已实现净利润；本节未接收到 B5 传导状态，不得据此假定项目增量已计入每股估值。")
+    lines.extend([
+        "",
+        "#### B4 / B5 估值传导衔接状态",
+        "",
+    ])
+    if b5 is not None:
+        lines.extend([
+            f"- B5 当前传导状态：{b5_status}",
+            f"- B5 传导结论：{b5.get('summary') or '未提供结论。'}",
+        ])
+        if b5_applied:
+            lines.append("- 已应用：Bear/Base/Bull 情景终值和 Base 估值锚使用 B5 调整后的值。")
+        elif baseline_already_includes:
+            lines.append("- 未重复叠加：原基准已包含项目，保留原估值以避免双重计价。")
+        else:
+            issues = b5.get("input_issues") if isinstance(b5.get("input_issues"), list) else []
+            lines.append("- 尚未应用每股价值增量；" + ("；".join(str(x) for x in issues) if issues else "具体缺口见下方 B5 详情。"))
+    else:
+        legacy_transmission = driver.get("valuation_transmission") if isinstance(driver.get("valuation_transmission"), Mapping) else {}
+        lines.extend([
+            f"- B5 状态：NOT_PROVIDED；B4 局部传导状态：{legacy_transmission.get('status', 'NOT_LINKED_TO_PER_SHARE_VALUE')}",
+            f"- B4 局部说明：{legacy_transmission.get('reason', '未提供可验证的经营结果到每股价值桥接。')}",
+        ])
+        if legacy_transmission.get("required_bridge_inputs"):
+            lines.append("- B5 待补齐： " + "；".join(str(x) for x in legacy_transmission["required_bridge_inputs"]))
     if driver.get("input_issues"):
         lines.extend(["", "#### 输入结构/来源问题", ""])
         lines.extend(f"- {issue}" for issue in driver["input_issues"])
