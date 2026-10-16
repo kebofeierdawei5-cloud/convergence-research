@@ -47,11 +47,19 @@ Route A C2 / 新和成 002001                            PRIVATE CORE/PIT PASS (
 Path A operator-attested price overlay               ANALYSIS-ONLY INTAKE IMPLEMENTATION; NO CANONICAL PRICE ADMISSION
 Local single-user complete pilot                     ACTIVE P0 PRIORITY; PILOT_NON_CANONICAL BEFORE FORMALIZATION
 Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
-B4 operating-driver forecast bridge                    MERGED PR #424 + #426 SAFEGUARDS; LOCAL PILOT 74 PASS; RED-TEAM 7 PASS; 7 TRIGGERED WORKFLOWS SUCCESS
+B4 operating-driver forecast bridge                    PR #424 + #426 MERGED; PR #442 REPORT CONSISTENCY FIX MERGED; 111 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 RELEVANT WORKFLOWS SUCCESS
 B5 valuation transmission / entry price mapping          MERGED PR #428; LOCAL PILOT 81 PASS; 7/7 TRIGGERED WORKFLOWS SUCCESS; EPS_MULTIPLE ONLY
 B6 price zone / binding cap / sensitivity ladder           PR #430 MERGED; PR #440 REPORT FIX MERGED; 111 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; PRICE SCREEN ONLY
-Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 MERGED; SAFE LOCAL-MAIN UPDATE; 111 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; LIVE PROMPTS + AUTO-DETECT + FILE-PICKER RECOVERY; REAL MAC RUN + REPLAY OPEN
+Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 MERGED; SAFE LOCAL-MAIN UPDATE; 111 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE-FILE RECOVERY CODE + B4/B5 REPORT CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 ```
+
+### B4/B5 report-consistency correction — 2026-10-16
+
+- A source audit found that the B4 Chinese report was reading its nested B4-local `NOT_LINKED_TO_PER_SHARE_VALUE` status even when the separate B5 adapter had applied a valid EPS_MULTIPLE bridge and the adjusted values were already used by the return solver/B6.
+- PR [#442](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/442) merged at `fed56d58298ebe2d4fad4cf83d287a7ad45b65bd`. The report now receives the actual B5 transmission result, labels scenario terminal values by the actual apply state, explains the no-double-count path when the baseline already includes the project, and retains explicit unresolved states when B5 cannot apply.
+- Regression coverage now exercises three contract paths: transmission applied; baseline already includes project; and incomplete B5 bridge. Exact-head local-pilot + acceptance-wrapper suite passed **111 tests**; all **6/6 applicable PR workflows succeeded**.
+- No operating forecast, per-share formula, return hurdle, decision action, or authority changed. This is a report-coherence correction to existing B4/B5 functionality.
+- Live macOS run/replay remains open. Continue bounded review of existing B4-B6 reporting/decision-output correctness; do not claim the pending 603699 run completed.
 
 ### B6 report-rendering correction — 2026-10-16
 
