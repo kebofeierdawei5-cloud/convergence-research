@@ -1803,6 +1803,11 @@ def test_b4_report_preserves_numeric_zero_in_operating_bridge_fields():
     report = "\n".join(render_operating_driver_section(
         forecast,
         {"bear": {"terminal_value_per_share": 0}},
+        valuation_transmission={
+            "status": "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID",
+            "applied_to_per_share_scenarios": False,
+            "summary": "synthetic test",
+        },
     ))
     assert "按已可用的销量×净售价计算收入：0；销量×单位变动成本：0。" in report
     assert "- 产量 / 销量：0 / 0 吨" in report
@@ -1849,6 +1854,11 @@ def test_b4_report_renders_missing_operating_bridge_fields_as_unknown():
     report = "\n".join(render_operating_driver_section(
         forecast,
         {"bear": {"terminal_value_per_share": None}},
+        valuation_transmission={
+            "status": "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID",
+            "applied_to_per_share_scenarios": False,
+            "summary": "synthetic test",
+        },
     ))
     assert "按已可用的销量×净售价计算收入：UNKNOWN；销量×单位变动成本：UNKNOWN。" in report
     assert "- 产量 / 销量：UNKNOWN / UNKNOWN 吨" in report
