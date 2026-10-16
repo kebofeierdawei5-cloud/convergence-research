@@ -2004,10 +2004,37 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     start = raw.find("{")
     if start < 0:
         raise LocalInvestmentPilotError("CHATGPT_JSON_OBJECT_NOT_FOUND")
+    candidate = raw[start:]
+    decoder = json.JSONDecoder()
+    parse_error: json.JSONDecodeError | None = None
     try:
-        value, _end = json.JSONDecoder().raw_decode(raw[start:])
-    except json.JSONDecodeError as exc:
-        raise LocalInvestmentPilotError("CHATGPT_JSON_INVALID_COPY_THE_COMPLETE_JSON_OBJECT") from exc
+        value, _end = decoder.raw_decode(candidate)
+    except json.JSONDecodeError as first_error:
+        # A recurring copy/normalization artifact inserts a backslash before
+        # URL punctuation (for example, https\:// and www\.). Those are
+        # not legal JSON escapes. Repair only these two unambiguous URL forms,
+        # and only after strict JSON parsing has failed; all other malformed
+        # JSON remains fail-closed.
+        normalized = re.sub(r"(?i)\b(https?)\\://", r"\1://", candidate)
+        normalized = re.sub(r"(?i)\bwww\\\.", "www.", normalized)
+        if normalized != candidate:
+            try:
+                value, _end = decoder.raw_decode(normalized)
+            except json.JSONDecodeError as exc:
+                parse_error = exc
+        else:
+            parse_error = first_error
+
+    if parse_error is not None:
+        detail = (
+            f"{parse_error.msg}（第 {parse_error.lineno} 行，第 "
+            f"{parse_error.colno} 列）"
+        )
+        raise LocalInvestmentPilotError(
+            "CHATGPT_JSON_INVALID_COPY_THE_COMPLETE_JSON_OBJECT: "
+            f"{detail}。请确保网址中的冒号/句点前没有多余反斜杠；"
+            "程序已尝试修正常见的 https\\:// 与 www\\. 写法。"
+        ) from parse_error
     if not isinstance(value, dict):
         raise LocalInvestmentPilotError("CHATGPT_JSON_OBJECT_REQUIRED")
     return value
