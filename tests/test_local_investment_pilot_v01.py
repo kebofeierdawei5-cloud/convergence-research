@@ -10,6 +10,8 @@ import time as _time
 
 import pytest
 
+import iios_mvp.local_investment_pilot_v01 as pilot
+
 from iios_mvp.local_investment_pilot_v01 import (
     LocalInvestmentPilotError,
     PILOT_SCHEMA,
@@ -1654,7 +1656,7 @@ def test_response_file_picker_can_import_saved_json_without_destroying_source(tm
     def fake_run(command, **kwargs):
         assert command[0] == "osascript"
         assert kwargs["check"] is True
-        return types.SimpleNamespace(stdout=str(saved_elsewhere) + "\\n")
+        return types.SimpleNamespace(stdout=str(saved_elsewhere) + "\n")
 
     monkeypatch.setattr(pilot.subprocess, "run", fake_run)
     assert pilot._choose_saved_response_file(target) is True
@@ -1678,7 +1680,7 @@ def test_enter_force_rechecks_nonempty_response_even_when_signature_is_unchanged
             return True
 
         def readline(self):
-            return "\\n"
+            return "\n"
 
     response_path = tmp_path / "pilot-chatgpt-response.json"
     response_path.write_text('{"version": 1}', encoding="utf-8")
