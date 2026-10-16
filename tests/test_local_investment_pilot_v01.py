@@ -1242,6 +1242,39 @@ def test_b5_dilution_uses_basic_plus_convertible_and_other_shares():
     assert Decimal(bear["value_delta_per_share_diluted"]) < Decimal(bear["value_delta_per_share_basic"])
 
 
+def test_b5_does_not_apply_when_explicit_cash_distributions_are_unknown():
+    payload = _b5_ready_payload()
+    payload["forecast_valuation"]["scenarios"]["base"]["cash_distributions_per_share"] = None
+
+    analysis, report = _analyse(payload, "TEST-B5-UNKNOWN-DISTRIBUTIONS")
+    bridge = analysis["valuation_transmission"]
+
+    assert analysis["return_metrics"] is None
+    assert bridge["status"] == "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID"
+    assert bridge["applied_to_per_share_scenarios"] is False
+    assert "BASE:CASH_DISTRIBUTIONS_UNKNOWN" in bridge["input_issues"]
+    assert analysis["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] == "120"
+    assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
+    assert analysis["forecast_valuation"]["scenarios"]["bull"]["terminal_value_per_share"] == "180"
+    assert "- 每股现金分配：UNKNOWN CNY" in report
+    assert "每股现金分配：None CNY" not in report
+
+
+def test_null_valuation_fields_render_as_unknown_in_json_report_sections():
+    payload = _b5_ready_payload()
+    payload["forecast_valuation"]["scenarios"]["bear"]["probability"] = None
+    payload["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] = None
+
+    analysis, report = _analyse(payload, "TEST-NULL-VALUATION-RENDER")
+    assert analysis["forecast_valuation"]["scenarios"]["bear"]["probability"] is None
+    assert analysis["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] is None
+    assert "- 情景概率：UNKNOWN" in report
+    assert "- 期末每股价值：UNKNOWN CNY" in report
+    assert "- 未应用 B5 增量的每股估值情景终值：UNKNOWN CNY" in report
+    assert "情景概率：None" not in report
+    assert "None CNY" not in report
+
+
 def test_b6_names_binding_entry_price_constraint_from_existing_caps():
     payload = _b5_ready_payload()
     analysis, _ = _analyse(payload, "TEST-B6-BINDING-CAP")
@@ -1271,6 +1304,18 @@ def test_b6_sensitivity_ladder_reuses_solver_and_matches_current_price_metrics()
     assert Decimal(ladder[1]["entry_return_cushion"]) > Decimal(ladder[2]["entry_return_cushion"])
     assert Decimal(ladder[1]["expected_annualized_return"]) == Decimal(analysis["return_metrics"]["expected_annualized_return"])
     assert Decimal(ladder[1]["bear_return"]) == Decimal(analysis["return_metrics"]["bear_return"])
+    metrics = analysis["return_metrics"]
+    assert zone["target_entry_price"] == metrics["target_entry_price"]
+    assert f"- 共同约束下目标入场价上限：{metrics['target_entry_price']} CNY" in report
+    assert f"- 共同约束下目标入场价上限：{zone['target_entry_price']} CNY" in report
+    for row in ladder:
+        for key in (
+            "target_entry_price_for_entry_cushion",
+            "target_entry_price_for_return",
+            "target_entry_price_for_required_return",
+            "target_entry_price_for_risk",
+        ):
+            assert row[key] == metrics[key]
     assert "B6：当前价格区间与约束敏感性" in report
     # The calculator's success status is CALCULATED, not PASS. Successful
     # rows must be rendered with their computed prices instead of UNKNOWN.
