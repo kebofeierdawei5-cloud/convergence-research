@@ -738,6 +738,10 @@ def render_operating_driver_section(
             valuation_label = "每股估值情景终值（本节未接收 B5 状态）"
         else:
             valuation_label = "未应用 B5 增量的每股估值情景终值"
+        scenario_terminal_value = value_row.get("terminal_value_per_share")
+        scenario_terminal_display = (
+            "UNKNOWN" if scenario_terminal_value in (None, "") else scenario_terminal_value
+        )
         lines.extend([
             f"**{name.upper()}**",
             f"- 桥接计算状态：{result.get('calculation_status', 'SCENARIO_ECONOMICS_NOT_IDENTIFIABLE')}",
@@ -745,7 +749,7 @@ def render_operating_driver_section(
             f"- 收入：{result.get('revenue_cny') or 'UNKNOWN'}；变动成本：{result.get('variable_cost_cny') or 'UNKNOWN'}；扣变动成本贡献：{result.get('contribution_after_variable_cost_cny') or 'UNKNOWN'}",
             f"- EBITDA / EBIT / 税前利润 / 净利润：{result.get('ebitda_cny') or 'UNKNOWN'} / {result.get('ebit_cny') or 'UNKNOWN'} / {result.get('profit_before_tax_cny') or 'UNKNOWN'} / {result.get('net_profit_cny') or 'UNKNOWN'}",
             f"- 资本开支 / 营运资金变动 / 自由现金流代理：{result.get('cash_capex_cny') or 'UNKNOWN'} / {result.get('change_working_capital_cny') or 'UNKNOWN'} / {result.get('unlevered_fcf_proxy_cny') or 'UNKNOWN'}",
-            f"- {valuation_label}：{value_row.get('terminal_value_per_share', 'UNKNOWN')} {currency}",
+            f"- {valuation_label}：{scenario_terminal_display} {currency}",
         ])
         mix = result.get("revenue_mix") or []
         if mix:

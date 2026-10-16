@@ -329,13 +329,23 @@ def evaluate_valuation_transmission(
             issues.append(f"{name.upper()}:BASELINE_TERMINAL_VALUE_MISSING")
 
         distributions = None
-        dist_raw = base_row.get("cash_distributions_per_share", "0") if isinstance(base_row, Mapping) else None
-        try:
-            distributions = _decimal(dist_raw if dist_raw not in (None, "") else "0", f"forecast_valuation.{name}.cash_distributions_per_share")
-            if distributions < 0:
-                issues.append(f"{name.upper()}:CASH_DISTRIBUTIONS_NEGATIVE")
-        except ValueError:
-            issues.append(f"{name.upper()}:CASH_DISTRIBUTIONS_INVALID")
+        if not isinstance(base_row, Mapping):
+            dist_raw = None
+        elif "cash_distributions_per_share" not in base_row:
+            # An omitted legacy field defaults to zero, matching the return solver.
+            dist_raw = "0"
+        else:
+            # An explicit null/empty value is UNKNOWN, not evidence of zero.
+            dist_raw = base_row.get("cash_distributions_per_share")
+        if dist_raw in (None, ""):
+            issues.append(f"{name.upper()}:CASH_DISTRIBUTIONS_UNKNOWN")
+        else:
+            try:
+                distributions = _decimal(dist_raw, f"forecast_valuation.{name}.cash_distributions_per_share")
+                if distributions < 0:
+                    issues.append(f"{name.upper()}:CASH_DISTRIBUTIONS_NEGATIVE")
+            except ValueError:
+                issues.append(f"{name.upper()}:CASH_DISTRIBUTIONS_INVALID")
 
         hypothetically_adjusted = (
             baseline_terminal + value_delta_diluted
