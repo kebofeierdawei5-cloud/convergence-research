@@ -8,7 +8,7 @@ Authority: this file is the **only canonical Current State Index**.
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
-**Next user-visible acceptance:** one real macOS run and replay on current `main`, completing the portfolio and B5 model/baseline prompts, then reviewing `report.md`, `analysis.json`, and `pilot_receipt.json`. B4-B6 source review has now also closed the reproduced explicit-null cash-distribution gate and null-rendering defects in PR #444, with 113 local-pilot/acceptance tests and 6/6 relevant workflows passing. This remains code/CI evidence only. Do not start B7 scope expansion before the real run's output exposes concrete functional gaps.
+**Next user-visible acceptance:** one real macOS run and replay on current `main`, completing the portfolio and B5 model/baseline prompts, then reviewing `report.md`, `analysis.json`, and `pilot_receipt.json`. PR #444 corrected explicit-null cash-distribution handling and nullable valuation rendering; PR #446 extended B4 scalar rendering so typed numeric zero stays `0` while `null`/empty stays `UNKNOWN`. Exact-head validation on PR #446 passed 115 local-pilot/acceptance tests, 412 Investment Core tests, 7 independent red-team tests, and all 6 applicable PR workflows. This remains code/CI evidence only; the 603699 macOS full-run and Replay bundle is still absent/unverified. Do not start B7 scope expansion before the real run's output exposes concrete functional gaps.
 
 The records below are cumulative milestone history. A milestone's historical “next boundary” is **time-local** and MUST NOT be interpreted as the current development instruction.
 
@@ -47,10 +47,10 @@ Route A C2 / 新和成 002001                            PRIVATE CORE/PIT PASS (
 Path A operator-attested price overlay               ANALYSIS-ONLY INTAKE IMPLEMENTATION; NO CANONICAL PRICE ADMISSION
 Local single-user complete pilot                     ACTIVE P0 PRIORITY; PILOT_NON_CANONICAL BEFORE FORMALIZATION
 Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
-B4 operating-driver forecast bridge                    PR #424 + #426 + #442 + #444 MERGED; 113 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 RELEVANT WORKFLOWS SUCCESS
-B5 valuation transmission / entry price mapping          PR #428 + #444 MERGED; explicit-null cash distributions BLOCK transmission; 113 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 RELEVANT WORKFLOWS SUCCESS; EPS_MULTIPLE ONLY
-B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 MERGED; report/JSON target-price cap assertions; 113 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; PRICE SCREEN ONLY
-Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 MERGED; SAFE LOCAL-MAIN UPDATE; 113 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
+B4 operating-driver forecast bridge                    PR #424 + #426 + #442 + #444 + #446 MERGED; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; numeric zero / UNKNOWN report consistency; 6/6 PR WORKFLOWS SUCCESS
+B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 MERGED; explicit-null cash distributions BLOCK transmission; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; EPS_MULTIPLE ONLY
+B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 MERGED; report/JSON target-price cap assertions; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; PRICE SCREEN ONLY
+Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 ```
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
@@ -61,6 +61,14 @@ Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#43
 - Exact-head verification: local pilot + acceptance wrapper **113 passed**; investment-core CI **412 passed**; independent post-B04 red-team **7 passed**; all **6/6 applicable PR workflows succeeded**.
 - No return formula, 15% annualized hurdle, entry cushion, risk ceiling, overall decision precedence or authorization rule changed. This is a bounded correction to existing B4-B6 behavior, not B7.
 - The live macOS run and Replay remain OPEN. CI does not prove that the user's local runner is updated or that the pending 603699 output bundle exists.
+
+### B4 scalar zero/UNKNOWN report consistency — 2026-10-16
+
+- PR [#446](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/446) merged at `0251505c6bc1bbd128158998f1b263809c218053`.
+- The operating-driver renderer now treats only `None` and empty scalar strings as `UNKNOWN`; it does not collapse a valid numeric `0` to `UNKNOWN`. Coverage includes historical operating-bridge revenue/cost and scenario volume, revenue, contribution, profit, capex, working capital and FCF-proxy fields.
+- Exact-head verification: local pilot + acceptance wrapper **115 passed**; Investment Core **412 passed**; independent post-B04 red-team **7 passed**; all **6/6 applicable PR workflows succeeded**.
+- This is report serialization consistency only. It does not change the calculation contract or any B5/B6 logic, 15% return hurdle, entry cushion, risk cap, decision priority or authorization.
+- Actual macOS full-run and Replay on 603699 remains OPEN. The PR tests do not establish that the user's local checkout was updated or that the required output bundle exists.
 
 ### B4/B5 report-consistency correction — 2026-10-16
 
