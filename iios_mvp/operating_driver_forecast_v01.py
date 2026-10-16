@@ -663,6 +663,11 @@ def _display(measure: Any) -> str:
     return f"{value} {measure.get('unit') or ''}".strip()
 
 
+def _display_optional_scalar(value: Any) -> str:
+    """Render missing scalar values as UNKNOWN without collapsing numeric zero."""
+    return "UNKNOWN" if value is None or value == "" else str(value)
+
+
 def render_operating_driver_section(
     forecast: Mapping[str, Any],
     valuation_scenarios: Mapping[str, Any] | None,
@@ -720,7 +725,7 @@ def render_operating_driver_section(
             suffix = f"；类别 {data_class}" + (f"；证据引用 {refs}" if refs else "")
             lines.append(f"  - {label}：{_display(measure)}{suffix}")
         bridge = product.get("historical_actual_bridge") if isinstance(product.get("historical_actual_bridge"), Mapping) else {}
-        lines.append(f"  - 按已可用的销量×净售价计算收入：{bridge.get('revenue_cny') or 'UNKNOWN'}；销量×单位变动成本：{bridge.get('variable_cost_cny') or 'UNKNOWN'}。")
+        lines.append(f"  - 按已可用的销量×净售价计算收入：{_display_optional_scalar(bridge.get('revenue_cny'))}；销量×单位变动成本：{_display_optional_scalar(bridge.get('variable_cost_cny'))}。")
         if bridge.get("production_utilization") is not None:
             lines.append(f"  - 产能利用率（产量/年产能）：{Decimal(bridge['production_utilization']) * Decimal('100')}%（仅当期间与容量口径可比时成立）")
         for issue in bridge.get("issues") or []:
@@ -745,10 +750,10 @@ def render_operating_driver_section(
         lines.extend([
             f"**{name.upper()}**",
             f"- 桥接计算状态：{result.get('calculation_status', 'SCENARIO_ECONOMICS_NOT_IDENTIFIABLE')}",
-            f"- 产量 / 销量：{result.get('production_volume_tonnes') or 'UNKNOWN'} / {result.get('sales_volume_tonnes') or 'UNKNOWN'} 吨",
-            f"- 收入：{result.get('revenue_cny') or 'UNKNOWN'}；变动成本：{result.get('variable_cost_cny') or 'UNKNOWN'}；扣变动成本贡献：{result.get('contribution_after_variable_cost_cny') or 'UNKNOWN'}",
-            f"- EBITDA / EBIT / 税前利润 / 净利润：{result.get('ebitda_cny') or 'UNKNOWN'} / {result.get('ebit_cny') or 'UNKNOWN'} / {result.get('profit_before_tax_cny') or 'UNKNOWN'} / {result.get('net_profit_cny') or 'UNKNOWN'}",
-            f"- 资本开支 / 营运资金变动 / 自由现金流代理：{result.get('cash_capex_cny') or 'UNKNOWN'} / {result.get('change_working_capital_cny') or 'UNKNOWN'} / {result.get('unlevered_fcf_proxy_cny') or 'UNKNOWN'}",
+            f"- 产量 / 销量：{_display_optional_scalar(result.get('production_volume_tonnes'))} / {_display_optional_scalar(result.get('sales_volume_tonnes'))} 吨",
+            f"- 收入：{_display_optional_scalar(result.get('revenue_cny'))}；变动成本：{_display_optional_scalar(result.get('variable_cost_cny'))}；扣变动成本贡献：{_display_optional_scalar(result.get('contribution_after_variable_cost_cny'))}",
+            f"- EBITDA / EBIT / 税前利润 / 净利润：{_display_optional_scalar(result.get('ebitda_cny'))} / {_display_optional_scalar(result.get('ebit_cny'))} / {_display_optional_scalar(result.get('profit_before_tax_cny'))} / {_display_optional_scalar(result.get('net_profit_cny'))}",
+            f"- 资本开支 / 营运资金变动 / 自由现金流代理：{_display_optional_scalar(result.get('cash_capex_cny'))} / {_display_optional_scalar(result.get('change_working_capital_cny'))} / {_display_optional_scalar(result.get('unlevered_fcf_proxy_cny'))}",
             f"- {valuation_label}：{scenario_terminal_display} {currency}",
         ])
         mix = result.get("revenue_mix") or []

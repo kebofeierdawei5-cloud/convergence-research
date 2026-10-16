@@ -11,6 +11,7 @@ import time as _time
 import pytest
 
 import iios_mvp.local_investment_pilot_v01 as pilot
+from iios_mvp.operating_driver_forecast_v01 import render_operating_driver_section
 
 from iios_mvp.local_investment_pilot_v01 import (
     LocalInvestmentPilotError,
@@ -1764,3 +1765,104 @@ def test_enter_force_rechecks_nonempty_response_even_when_signature_is_unchanged
     assert detected == signature
     assert "重新校验当前文件" in capsys.readouterr().out
 
+
+
+def test_b4_report_preserves_numeric_zero_in_operating_bridge_fields():
+    zero = {
+        "calculation_status": "SCENARIO_ARITHMETIC_COMPLETE",
+        "production_volume_tonnes": 0,
+        "sales_volume_tonnes": 0,
+        "revenue_cny": 0,
+        "variable_cost_cny": 0,
+        "contribution_after_variable_cost_cny": 0,
+        "ebitda_cny": 0,
+        "ebit_cny": 0,
+        "profit_before_tax_cny": 0,
+        "net_profit_cny": 0,
+        "cash_capex_cny": 0,
+        "change_working_capital_cny": 0,
+        "unlevered_fcf_proxy_cny": 0,
+    }
+    forecast = {
+        "status": "CALCULATED",
+        "product_lines": [
+            {
+                "product_id": "P1",
+                "product_name": "测试产品",
+                "capacity_tonnes_per_year": {"value": "100", "unit": "吨"},
+                "historical_actuals": {},
+                "historical_actual_bridge": {
+                    "revenue_cny": 0,
+                    "variable_cost_cny": 0,
+                    "issues": [],
+                },
+            }
+        ],
+        "scenarios": {"bear": zero},
+    }
+    report = "\n".join(render_operating_driver_section(
+        forecast,
+        {"bear": {"terminal_value_per_share": 0}},
+        valuation_transmission={
+            "status": "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID",
+            "applied_to_per_share_scenarios": False,
+            "summary": "synthetic test",
+        },
+    ))
+    assert "按已可用的销量×净售价计算收入：0；销量×单位变动成本：0。" in report
+    assert "- 产量 / 销量：0 / 0 吨" in report
+    assert "- 收入：0；变动成本：0；扣变动成本贡献：0" in report
+    assert "- EBITDA / EBIT / 税前利润 / 净利润：0 / 0 / 0 / 0" in report
+    assert "- 资本开支 / 营运资金变动 / 自由现金流代理：0 / 0 / 0" in report
+    assert "未应用 B5 增量的每股估值情景终值：0 CNY" in report
+
+
+def test_b4_report_renders_missing_operating_bridge_fields_as_unknown():
+    forecast = {
+        "status": "CALCULATED",
+        "product_lines": [
+            {
+                "product_id": "P1",
+                "product_name": "测试产品",
+                "capacity_tonnes_per_year": {"value": "100", "unit": "吨"},
+                "historical_actuals": {},
+                "historical_actual_bridge": {
+                    "revenue_cny": None,
+                    "variable_cost_cny": "",
+                    "issues": [],
+                },
+            }
+        ],
+        "scenarios": {
+            "bear": {
+                "calculation_status": "PARTIAL_SCENARIO_BRIDGE",
+                "production_volume_tonnes": None,
+                "sales_volume_tonnes": "",
+                "revenue_cny": None,
+                "variable_cost_cny": "",
+                "contribution_after_variable_cost_cny": None,
+                "ebitda_cny": None,
+                "ebit_cny": "",
+                "profit_before_tax_cny": None,
+                "net_profit_cny": "",
+                "cash_capex_cny": None,
+                "change_working_capital_cny": "",
+                "unlevered_fcf_proxy_cny": None,
+            }
+        },
+    }
+    report = "\n".join(render_operating_driver_section(
+        forecast,
+        {"bear": {"terminal_value_per_share": None}},
+        valuation_transmission={
+            "status": "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID",
+            "applied_to_per_share_scenarios": False,
+            "summary": "synthetic test",
+        },
+    ))
+    assert "按已可用的销量×净售价计算收入：UNKNOWN；销量×单位变动成本：UNKNOWN。" in report
+    assert "- 产量 / 销量：UNKNOWN / UNKNOWN 吨" in report
+    assert "- 收入：UNKNOWN；变动成本：UNKNOWN；扣变动成本贡献：UNKNOWN" in report
+    assert "- EBITDA / EBIT / 税前利润 / 净利润：UNKNOWN / UNKNOWN / UNKNOWN / UNKNOWN" in report
+    assert "- 资本开支 / 营运资金变动 / 自由现金流代理：UNKNOWN / UNKNOWN / UNKNOWN" in report
+    assert "未应用 B5 增量的每股估值情景终值：UNKNOWN CNY" in report
