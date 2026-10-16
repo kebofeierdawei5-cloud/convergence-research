@@ -2039,6 +2039,123 @@ def _response_file_signature(path: str | Path) -> tuple[int, int, str] | None:
     return stat.st_size, stat.st_mtime_ns, hashlib.sha256(content).hexdigest()
 
 
+def _response_file_diagnostic(path: str | Path) -> str:
+    """Report metadata about the watched path without exposing response contents."""
+    response_path = Path(path).expanduser()
+    try:
+        resolved = response_path.resolve()
+    except OSError:
+        resolved = response_path
+    try:
+        stat = response_path.stat()
+    except FileNotFoundError:
+        return f"目标路径：{resolved}；文件不存在。请在文件选择窗口中选取实际保存的 JSON。"
+    except OSError as exc:
+        return (
+            f"目标路径：{resolved}；文件状态无法读取："
+            f"{type(exc).__name__}: {exc}。请在文件选择窗口中选取实际保存的 JSON。"
+        )
+    try:
+        content = response_path.read_bytes()
+    except OSError as exc:
+        return (
+            f"目标路径：{resolved}；磁盘记录大小={stat.st_size} 字节，但当前无法读取："
+            f"{type(exc).__name__}: {exc}。请检查文件是否被锁定，或选择另一个已保存文件。"
+        )
+    modified = datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(timespec="seconds")
+    if not content:
+        return (
+            f"目标路径：{resolved}；文件存在但当前读取为 0 字节；"
+            f"磁盘记录大小={stat.st_size} 字节；最后修改={modified}。"
+        )
+    return (
+        f"目标路径：{resolved}；当前可读取 {len(content)} 字节；"
+        f"最后修改={modified}。系统正在等待文件内容变更或接受手动重检。"
+    )
+
+
+def _choose_saved_response_file(target_path: str | Path) -> bool:
+    """Let the operator import an already-saved response if TextEdit wrote elsewhere."""
+    if sys.platform != "darwin":
+        print("当前平台不支持 macOS 文件选择窗口；请确认响应内容写入上方指定路径。", flush=True)
+        return False
+
+    script = (
+        'POSIX path of (choose file with prompt '
+        '"请选择已经保存的 ChatGPT 完整 JSON 文件；原文件不会被删除")'
+    )
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=120,
+        )
+    except subprocess.CalledProcessError:
+        print("已取消文件选择；程序继续等待指定结果文件更新。", flush=True)
+        return False
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(
+            f"无法打开 macOS 文件选择窗口：{type(exc).__name__}: {exc}。"
+            "程序继续等待；也可以重新按回车尝试。",
+            flush=True,
+        )
+        return False
+
+    selected_text = result.stdout.strip()
+    if not selected_text:
+        print("文件选择窗口没有返回路径；程序继续等待。", flush=True)
+        return False
+
+    selected_path = Path(selected_text).expanduser()
+    target = Path(target_path).expanduser()
+    try:
+        selected_resolved = selected_path.resolve(strict=True)
+        target_resolved = target.resolve()
+        content = selected_path.read_bytes()
+    except OSError as exc:
+        print(
+            f"无法读取所选文件：{type(exc).__name__}: {exc}；"
+            "原结果文件未改动，程序继续等待。",
+            flush=True,
+        )
+        return False
+
+    if not content.strip():
+        print("所选文件当前为空；原结果文件未改动。请选择已保存且包含完整 JSON 的文件。", flush=True)
+        return False
+    if selected_resolved == target_resolved:
+        print("所选文件就是指定结果文件，但当前内容仍为空或不可读；原结果文件未改动。", flush=True)
+        return False
+
+    temporary = target.with_name(target.name + f".import-{os.getpid()}.tmp")
+    try:
+        temporary.write_bytes(content)
+        if os.name != "nt":
+            temporary.chmod(0o600)
+        os.replace(temporary, target)
+    except OSError as exc:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        print(
+            f"无法导入所选文件到指定结果路径：{type(exc).__name__}: {exc}；"
+            "所选原文件未改动，程序继续等待。",
+            flush=True,
+        )
+        return False
+
+    print(
+        f"已将所选文件的 {len(content)} 字节复制到指定响应路径；"
+        "所选原文件保留不变。系统将自动读取并校验。",
+        flush=True,
+    )
+    return True
+
+
 def _wait_for_response_file_change(
     path: str | Path,
     *,
@@ -2083,8 +2200,24 @@ def _wait_for_response_file_change(
                 # Consume Enter so it cannot answer an unrelated later prompt.
                 sys.stdin.readline()
                 latest = _response_file_signature(response_path)
-                if latest is None or latest[0] == 0 or latest == previous_signature:
-                    print("尚未检测到结果文件的新内容；请确认已在 TextEdit 按 Command+S 保存。继续等待文件更新。", flush=True)
+                if latest is None or latest[0] == 0:
+                    print("按回车触发了文件检查，但指定结果路径当前没有可读取的非空内容。", flush=True)
+                    print(_response_file_diagnostic(response_path), flush=True)
+                    print(
+                        "现在打开文件选择窗口，可选择你实际保存的 JSON；"
+                        "导入时会保留原文件，不需要重新研究或重新填写标的。",
+                        flush=True,
+                    )
+                    _choose_saved_response_file(response_path)
+                elif latest == previous_signature:
+                    # Explicit Enter means the operator requests a fresh validation
+                    # even when file metadata/content did not change since the prior read.
+                    print(
+                        "指定结果文件当前非空，但内容签名与上次读取相同；"
+                        "按回车请求重新校验当前文件。",
+                        flush=True,
+                    )
+                    return latest
         else:
             _time.sleep(poll_interval)
 
@@ -2620,9 +2753,9 @@ def run_guided_wizard(
     print("操作步骤（只需在 ChatGPT 与这个结果文件之间复制一次）：")
     print("  1. 在已打开的 ChatGPT 对话中粘贴剪贴板中的完整研究提示并发送；提示里已经包含本次 JSON 模板，不用上传模板或另找公告。")
     print("  2. 复制 ChatGPT 返回的完整 JSON，覆盖上面已打开的 JSON 结果文件并保存。")
-    print("  3. 回到本终端按回车。不要把 JSON 粘贴到终端，也不要手工填写 JSON 字段。")
+    print("  3. 保存后等待程序自动检测；通常无需按回车。不要把 JSON 粘贴到终端，也不要手工填写 JSON 字段。")
     if sys.platform == "darwin":
-        print("  提示：JSON 文件已用 TextEdit 打开；粘贴后按 Command+S 保存。")
+        print("  提示：JSON 文件已用 TextEdit 打开；粘贴后按 Command+S 保存。若按回车检查时目标文件仍为空，程序会打开文件选择窗口供你选择实际保存的 JSON。")
 
     previous_response_signature = initial_response_signature
     while True:
