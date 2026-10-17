@@ -1585,6 +1585,33 @@ def test_b5_rejects_negative_adjusted_terminal_value_and_preserves_original_scen
     assert "不得将项目增量默认为已计入估值" in report
 
 
+def test_b5_negative_counterfactual_does_not_block_confirmed_project_inclusive_baseline():
+    payload = _b5_ready_payload()
+    payload["operator_valuation_context"]["baseline_includes_project"] = True
+    # The hypothetical "add the project again" scenario is negative, but this
+    # counterfactual is not applied because the operator says the baseline already
+    # includes the project. The unchanged primary valuation should remain usable.
+    payload["valuation_transmission"]["scenarios"]["bear"]["displaced_existing_after_tax_profit_cny"] = _b5_measure(
+        "100000000", "CNY"
+    )
+
+    analysis, report = _analyse(payload, "TEST-B5-NEGATIVE-COUNTERFACTUAL-INCLUDED-BASELINE")
+    bridge = analysis["valuation_transmission"]
+
+    assert bridge["status"] == "CALCULATED_NOT_APPLIED_BASELINE_ALREADY_INCLUDES_PROJECT"
+    assert bridge["applied_to_per_share_scenarios"] is False
+    assert Decimal(bridge["scenarios"]["bear"]["hypothetical_terminal_value_if_added_per_share"]) < 0
+    assert bridge["scenarios"]["bear"]["adjusted_terminal_value_per_share"] is None
+    assert analysis["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] == "120"
+    assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
+    assert analysis["forecast_valuation"]["scenarios"]["bull"]["terminal_value_per_share"] == "180"
+    assert analysis["forecast_valuation"]["entry_value_reference_per_share"] == "150"
+    assert analysis["return_metrics"] is not None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is not None
+    assert "B5 因防止重复计价而没有二次叠加" in report
+    assert "回报计算尚未完成" not in report
+
+
 def test_b5_never_adds_project_twice_when_operator_says_baseline_includes_it():
     payload = _b5_ready_payload()
     payload["operator_valuation_context"]["baseline_includes_project"] = True
