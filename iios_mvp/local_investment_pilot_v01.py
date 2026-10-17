@@ -318,7 +318,7 @@ def _is_identifiable_evidence_text(value: Any) -> bool:
     }
     chinese_placeholders = {
         "未知", "不详", "不明确", "未提供", "未提供标题", "未提供事实摘要",
-        "来源未知", "缺失", "待补充", "待核实",
+        "未提供依据", "无依据", "暂无依据", "概率未知", "来源未知", "缺失", "待补充", "待核实",
     }
     return normalized not in placeholders and raw not in chinese_placeholders
 
@@ -1299,8 +1299,10 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
         row = scenarios.get(name)
         if not isinstance(row, Mapping):
             return None, f"{name.upper()}_SCENARIO_MISSING"
-        if row.get("probability") in (None, "") or row.get("terminal_value_per_share") in (None, "") or not str(row.get("rationale") or "").strip():
+        if row.get("probability") in (None, "") or row.get("terminal_value_per_share") in (None, ""):
             return None, f"{name.upper()}_SCENARIO_INPUTS_INCOMPLETE"
+        if not _is_identifiable_evidence_text(row.get("rationale")):
+            return None, f"{name.upper()}_SCENARIO_PROBABILITY_RATIONALE_NOT_IDENTIFIABLE"
         rows[name] = {
             "probability": str(row["probability"]),
             "terminal_value_per_share": str(row["terminal_value_per_share"]),

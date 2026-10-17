@@ -1817,6 +1817,26 @@ def test_b6_sensitivity_ladder_reuses_solver_and_matches_current_price_metrics()
     assert "不是买入指令" in report
 
 
+@pytest.mark.parametrize(
+    "placeholder",
+    ["UNKNOWN", "N/A", "NOT_IDENTIFIABLE", "TBD", "未提供依据", "概率未知"],
+)
+def test_scenario_probability_with_placeholder_rationale_blocks_return_and_entry_price(placeholder):
+    payload = _b5_ready_payload()
+    payload["forecast_valuation"]["scenarios"]["base"]["rationale"] = placeholder
+
+    analysis, report = _analyse(payload, f"TEST-SCENARIO-PLACEHOLDER-PROBABILITY-RATIONALE-{placeholder}")
+
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == "BASE_SCENARIO_PROBABILITY_RATIONALE_NOT_IDENTIFIABLE"
+    assert analysis["price_zone_sensitivity"]["status"] == "UNKNOWN"
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert all(row["status"] == "UNKNOWN" for row in analysis["price_zone_sensitivity"]["sensitivity_ladder"])
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert "B6：当前价格区间与约束敏感性" in report
+    assert "UNKNOWN" in report
+
+
 def test_b6_preserves_unknown_when_return_inputs_are_incomplete():
     payload = _b5_ready_payload()
     payload["forecast_valuation"]["entry_value_reference_per_share"] = None
