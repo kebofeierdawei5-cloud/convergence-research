@@ -13,7 +13,11 @@ from iios_mvp.canonical_investment_admission_v01 import (
 from iios_mvp.canonical_independent_forecast import (
     InMemoryCanonicalIndependentForecastRegistry,
 )
-from iios_mvp.engine import decide, replay, run_case
+from iios_mvp.engine import decide, replay, run_case, sha256_obj
+from iios_mvp.investor_review_report_v02 import (
+    INVESTOR_QA_VERSION,
+    validate_investor_review_qa_v02,
+)
 from iios_mvp.forecast_valuation_return_lineage_v01 import (
     InMemoryCanonicalValuationOutputResolver,
     build_canonical_valuation_output,
@@ -275,3 +279,44 @@ def test_forecast_registry_remains_immutable_on_conflicting_same_id_bytes():
     conflicting["value"] = "20"
     with pytest.raises(ValueError, match="different bytes"):
         registry.admit_independent_forecast(conflicting)
+
+
+
+def test_redteam_report_qa_cannot_drop_operator_price_assurance_check():
+    required_checks = {
+        "publication_integrity",
+        "publication_binding",
+        "machine_surface_integrity",
+        "human_surface_integrity",
+        "deterministic_render_replay",
+        "required_sections",
+        "semantic_matrix_complete",
+        "explicit_absence_handling",
+        "human_auditability_contract",
+        "decision_fidelity",
+        "human_boundary",
+        "non_authority",
+        "price_assurance_transparency",
+    }
+    qa = {
+        "qa_version": INVESTOR_QA_VERSION,
+        "qa_id": "MP3-REDTEAM-QA-CHECKSET",
+        "report_id": "MP3-REDTEAM-REPORT",
+        "report_hash": "a" * 64,
+        "publication_id": "MP3-REDTEAM-PUBLICATION",
+        "publication_hash": "b" * 64,
+        "qa_status": "PASS",
+        "checks": {key: "PASS" for key in required_checks},
+        "issues": [],
+        "policy_effect": "REPORT_ONLY_PROJECTION",
+    }
+    qa["qa_hash"] = sha256_obj(qa)
+    validate_investor_review_qa_v02(qa)
+
+    # Adversarial case: remove the assurance check and reseal the outer hash.
+    # Hash resealing must not bypass the semantic key-set contract.
+    tampered = {**qa, "checks": dict(qa["checks"])}
+    tampered["checks"].pop("price_assurance_transparency")
+    tampered["qa_hash"] = sha256_obj({key: value for key, value in tampered.items() if key != "qa_hash"})
+    with pytest.raises(ValueError, match="checks invalid"):
+        validate_investor_review_qa_v02(tampered)
