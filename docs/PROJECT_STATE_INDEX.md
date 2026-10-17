@@ -54,7 +54,7 @@ B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 +
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 + #462 + #464 + #465 MERGED; operator Bear-loss cap/Required Return preserved, placeholder probability rationale blocks price outputs; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 MERGED; evidence/rationale sentinels fail closed, operator risk/return policy protected, invalid explicit policy inputs reject, PASS states require identifiable explanations; latest #469 162 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations and own resolved evidence links; latest #471 164 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -109,6 +109,13 @@ B8 bounded investment-result red-team                          PR #456 + #457 + 
 - PR [#469](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/469) merged at `9d5df6c1a439a9b4e87d471bc97000dc99ea59c1`. A core assessment such as Trust/Risk/Reality/Quality could previously keep `status=PASS` with `summary=UNKNOWN`; Thesis could keep `INTACT` with an unidentifiable core statement. The normalizer now downgrades the relevant state to `UNKNOWN`, retains the original input status, and records the explanation issue. Thesis uses `core_statement` as its explanation field. Exact head passed **162/162 local-pilot + Replay tests** and **6/6 workflows**.
 - These checks make policy inputs and status/explanation fields consistent; they do not prove that a substantive analyst rationale is true or economically sufficient, nor do they create formal admission/Decision authority.
 - **Real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** The user deferred the ZIP because the upload limit was reached. CI evidence is not operator-environment acceptance.
+
+### B8 follow-up — assessment-level evidence linkage (2026-10-17)
+
+- PR [#471](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/471) merged at `b07e0b76378706618044cfed1a1eb9c298e90a89`. A positive gate could previously claim `PASS` (or Thesis `INTACT`) without its own section-level evidence references, while an unrelated source elsewhere in the register was sufficient to make the register non-empty. The pilot now requires passing core assessment gates to have at least one uniquely resolved, cutoff-compatible source reference; missing, unresolved, duplicate, untraceable or temporally invalid links downgrade the gate to `UNKNOWN` and add `ASSESSMENT_PASS_EVIDENCE_LINK_NOT_RESOLVED`.
+- The exact PR #471 head passed **164/164 local-pilot + Replay tests** and **6/6 triggered workflows**. The fix validates linkage only; it does not prove source truth, rights, formal admission or that the substantive analysis is correct.
+- PRs [#468](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/468) and [#469](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/469) remain recorded above as the preceding policy-input and status/explanation safeguards.
+- **The actual macOS full-run + Replay ZIP audit remains OPEN / NOT VERIFIED.** The operator deferred ZIP delivery because the upload limit was reached; repository CI is not Mac acceptance.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
