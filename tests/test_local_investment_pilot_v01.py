@@ -35,6 +35,7 @@ from iios_mvp.local_investment_pilot_v01 import (
 
 
 def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
+    forecast_year = int(cutoff[:4]) + 1
     return {
         "schema_version": PILOT_SCHEMA,
         "case": {
@@ -90,7 +91,10 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
         },
         "forecast_valuation": {
             "model": "SYNTHETIC EPS x PE",
+            "model_family": "EPS_MULTIPLE",
             "model_rationale": "synthetic test only",
+            "valuation_terminal_date": f"{forecast_year}-12-31",
+            "valuation_terminal_date_basis": "Synthetic fixture: explicit FY endpoint assumption.",
             "entry_value_reference_per_share": "150",
             "probabilities_calibrated": False,
             "assumptions": ["Synthetic assumptions; not forecasts."],
@@ -126,7 +130,7 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
             "scope": "UNKNOWN",
             "status": "UNKNOWN",
             "actuals_period": "UNKNOWN",
-            "forecast_period": "UNKNOWN",
+            "forecast_period": f"{forecast_year}FY",
             "summary": "Synthetic pilot driver tree; actual product-specific quantities, net ASP and unit costs remain UNKNOWN.",
             "product_lines": [],
             "scenarios": {"bear": {}, "base": {}, "bull": {}},
@@ -151,7 +155,7 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
             },
         },
         "operator_valuation_context": {
-            "selected_model_family": "UNKNOWN",
+            "selected_model_family": "EPS_MULTIPLE",
             "baseline_includes_project": None,
             "input_owner": "OPERATOR",
         },
@@ -436,7 +440,11 @@ def test_candidate_driven_pilot_uses_existing_return_solver_and_outputs_chinese_
     assert analysis["decision"]["core_policy_evaluation"]["thesis_admission_status"] == "NOT_ADMITTED"
     assert analysis["decision"]["core_policy_evaluation"]["buy_add_package_complete"] is False
     assert analysis["return_metrics"]["fundamental_target_pass"] is True
-    assert analysis["return_metrics"]["target_entry_price"] == "130.4347826086956521739130435"
+    elapsed_days = (date(2027, 12, 31) - date(2026, 10, 10)).days
+    year_fraction = Decimal(elapsed_days) / Decimal("365")
+    expected_return_cap = Decimal("153") / (Decimal("1.15").ln() * year_fraction).exp()
+    assert abs(Decimal(analysis["return_metrics"]["target_entry_price_for_return"]) - expected_return_cap) < Decimal("1e-20")
+    assert analysis["return_metrics"]["annualization_year_fraction"] == str(year_fraction)
     assert "PILOT_NON_CANONICAL" in report
     assert "MIE" in report
     assert analysis["governance"]["formal_decision_created"] is False
@@ -1372,6 +1380,65 @@ def test_b5_transmits_project_profit_to_per_share_scenarios_and_entry_anchor():
     assert "B5 已按明确的 EPS_MULTIPLE 增量桥接" in report
     assert "论点失效压力测试不自动加回项目价值" in report
 
+
+
+def test_operator_selected_sotp_blocks_eps_multiple_price_calculation():
+    payload = _b5_ready_payload()
+    payload["operator_valuation_context"]["selected_model_family"] = "SOTP"
+    analysis, report = _analyse(payload, "TEST-PRIMARY-MODEL-MISMATCH")
+
+    contract = analysis["valuation_model_consistency"]
+    assert contract["status"] == "MODEL_FAMILY_MISMATCH"
+    assert contract["operator_selected_model_family"] == "SOTP"
+    assert contract["calculation_model_family"] == "EPS_MULTIPLE"
+    assert contract["primary_model_price_calculation_eligible"] is False
+    assert contract["scenario_values_role"] == "ALTERNATIVE_OR_UNRESOLVED_ONLY"
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == "PRIMARY_VALUATION_MODEL_NOT_ELIGIBLE:MODEL_FAMILY_MISMATCH"
+    assert analysis["price_zone_sensitivity"]["status"] == "UNKNOWN"
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert "操作者选择的主模型类别：SOTP" in report
+    assert "当前情景实际计算模型类别：EPS_MULTIPLE" in report
+    assert "不进入预期回报、目标入场价或 B6 价格敏感性计算" in report
+
+
+def test_calendar_day_terminal_date_controls_annualization_and_return_cap():
+    payload = _payload(price="144.30", cutoff="2026-10-16")
+    analysis, report = _analyse(payload, "TEST-DATE-ANNUALIZATION")
+    timing = analysis["valuation_timing"]
+    metrics = analysis["return_metrics"]
+
+    assert timing["status"] == "PASS"
+    assert timing["valuation_terminal_date"] == "2027-12-31"
+    assert timing["elapsed_calendar_days"] == 441
+    assert Decimal(timing["annualization_year_fraction"]) == Decimal("441") / Decimal("365")
+    assert Decimal(metrics["annualization_year_fraction"]) == Decimal("441") / Decimal("365")
+    ratio = Decimal(metrics["expected_terminal_wealth"]) / Decimal("144.30")
+    expected_annualized = (ratio.ln() / (Decimal("441") / Decimal("365"))).exp() - Decimal("1")
+    assert abs(Decimal(metrics["expected_annualized_return"]) - expected_annualized) < Decimal("1e-24")
+    expected_cap = Decimal(metrics["expected_terminal_wealth"]) / (
+        Decimal("1.15").ln() * (Decimal("441") / Decimal("365"))
+    ).exp()
+    assert abs(Decimal(metrics["target_entry_price_for_return"]) - expected_cap) < Decimal("1e-24")
+    assert "441" in report
+    assert "ACT/365F_DATE_ONLY" in report
+
+
+def test_missing_or_period_mismatched_terminal_date_blocks_return_metrics():
+    payload = _payload()
+    payload["forecast_valuation"]["valuation_terminal_date"] = None
+    missing, _ = _analyse(payload, "TEST-MISSING-TERMINAL-DATE")
+    assert missing["valuation_timing"]["status"] == "VALUATION_TERMINAL_DATE_MISSING"
+    assert missing["return_metrics"] is None
+    assert missing["price_zone_sensitivity"]["status"] == "UNKNOWN"
+
+    mismatch_payload = _payload()
+    mismatch_payload["forecast_valuation"]["valuation_terminal_date"] = "2029-12-31"
+    mismatch, _ = _analyse(mismatch_payload, "TEST-PERIOD-MISMATCH")
+    assert mismatch["valuation_timing"]["status"] == "VALUATION_TERMINAL_DATE_FORECAST_PERIOD_MISMATCH"
+    assert mismatch["return_metrics"] is None
+    assert mismatch["price_zone_sensitivity"]["target_entry_price"] is None
 
 def test_b5_never_adds_project_twice_when_operator_says_baseline_includes_it():
     payload = _b5_ready_payload()
