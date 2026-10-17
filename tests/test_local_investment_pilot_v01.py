@@ -389,14 +389,17 @@ def test_guided_observation_date_must_precede_date_only_cutoff():
 def test_assessment_gate_status_downgrades_when_summary_is_placeholder(section, status, placeholder):
     payload = _payload()
     payload["assessment"][section]["status"] = status
-    payload["assessment"][section]["summary"] = placeholder
+    if section == "thesis":
+        payload["assessment"][section]["core_statement"] = placeholder
+    else:
+        payload["assessment"][section]["summary"] = placeholder
 
     analysis, report = _analyse(payload, f"TEST-ASSESSMENT-SUMMARY-PLACEHOLDER-{section}")
 
     normalized = analysis["assessment"][section]
     assert normalized["status"] == "UNKNOWN"
     assert normalized["status_input"] == status
-    assert normalized["summary_issues"] == ["ASSESSMENT_SUMMARY_NOT_IDENTIFIABLE"]
+    assert normalized["status_issues"] == ["ASSESSMENT_EXPLANATION_NOT_IDENTIFIABLE"]
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
     assert analysis["decision"]["provisional_action"] not in {"BUY", "ADD", "HOLD"}
     assert "输入标签 " + status in report
