@@ -720,7 +720,7 @@ def _infer_model_family_from_name(value: Any) -> str:
         return "OTHER"
     if (
         "EPS_MULTIPLE" in name
-        or ("EPS" in words and ("PE" in words or "MULTIPLE" in words or re.search(r"\\bP\\s*/\\s*E\\b", name)))
+        or ("EPS" in words and ("PE" in words or "MULTIPLE" in words or re.search(r"\bP\s*/\s*E\b", name)))
     ):
         return "EPS_MULTIPLE"
     return "UNKNOWN"
@@ -1909,6 +1909,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
         f"- 操作者选择的主模型类别：{model_contract.get('operator_selected_model_family', 'UNKNOWN')}",
         f"- 当前情景实际计算模型类别：{model_contract.get('calculation_model_family', 'UNKNOWN')}（{model_contract.get('calculation_model_name', 'UNKNOWN')}）",
+        f"- 从模型名称独立识别类别：{model_contract.get('model_name_inferred_family', 'UNKNOWN')}；名称/类别交叉校验：{model_contract.get('model_family_name_crosscheck', 'UNKNOWN')}",
         f"- 一致性状态：**{model_contract.get('status', 'UNKNOWN')}**；可用于主模型价格计算：{model_contract.get('primary_model_price_calculation_eligible', False)}",
         f"- B5 传导状态：{model_contract.get('valuation_transmission_status', 'UNKNOWN')}；经营预测范围：{model_contract.get('operating_forecast_scope', 'UNKNOWN')}",
         *(["- 门禁原因：" + "; ".join(model_contract.get("issues") or [])] if model_contract.get("issues") else []),
