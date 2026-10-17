@@ -1574,14 +1574,14 @@ def test_b5_rejects_negative_adjusted_terminal_value_and_preserves_original_scen
     analysis, report = _analyse(payload, "TEST-B5-NEGATIVE-ADJUSTED-TERMINAL")
     bridge = analysis["valuation_transmission"]
 
-    assert bridge["status"] == "NOT_LINKED_ADJUSTED_TERMINAL_VALUE_INVALID"
+    assert bridge["status"] == "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID"
     assert bridge["applied_to_per_share_scenarios"] is False
-    assert "ADJUSTED_TERMINAL_VALUE_NEGATIVE_OR_UNKNOWN:BEAR" in bridge["input_issues"]
+    assert "BEAR:ADJUSTED_TERMINAL_VALUE_NEGATIVE" in bridge["input_issues"]
     assert analysis["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] == "120"
     assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
     assert analysis["forecast_valuation"]["scenarios"]["bull"]["terminal_value_per_share"] == "180"
     assert analysis["return_metrics"] is None
-    assert "B5 当前传导状态：NOT_LINKED_ADJUSTED_TERMINAL_VALUE_INVALID" in report
+    assert "B5 当前传导状态：NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID" in report
     assert "不得将项目增量默认为已计入估值" in report
 
 
