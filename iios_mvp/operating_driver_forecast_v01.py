@@ -127,8 +127,10 @@ def _normalise_measure(
     if claimed is not None:
         if metric_name != "change_working_capital_cny" and claimed < 0:
             issues.append(f"{field}:NEGATIVE_VALUE_NOT_ALLOWED")
-        if metric_name in {"tax_rate", "cost_of_revenue_ratio"} and not (Decimal("0") <= claimed <= Decimal("1")):
-            issues.append(f"{field}:RATIO_MUST_BE_0_TO_1")
+        if metric_name == "tax_rate" and not (Decimal("0") <= claimed <= Decimal("1")):
+            issues.append(f"{field}:TAX_RATE_MUST_BE_RATIO_0_TO_1")
+        if metric_name == "cost_of_revenue_ratio" and not (Decimal("0") <= claimed <= Decimal("1")):
+            issues.append(f"{field}:COST_OF_REVENUE_RATIO_MUST_BE_0_TO_1")
 
     evidence_status = "NOT_REQUIRED_FOR_ASSUMPTION"
     if data_class in {"OBSERVED_ACTUAL", "ISSUER_FORECAST"}:
