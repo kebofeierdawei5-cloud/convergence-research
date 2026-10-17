@@ -352,7 +352,16 @@ def evaluate_valuation_transmission(
             if baseline_terminal is not None and value_delta_diluted is not None
             else None
         )
-        if hypothetically_adjusted is not None and hypothetically_adjusted < 0:
+        if (
+            hypothetically_adjusted is not None
+            and hypothetically_adjusted < 0
+            and baseline_includes is not True
+        ):
+            # A negative counterfactual terminal value blocks an application that
+            # would add the project twice or introduce that value into the baseline.
+            # When the operator has confirmed that the existing baseline already
+            # includes the project, this hypothetical is not applied; keep it visible
+            # as a counterfactual without blocking return metrics on the unchanged baseline.
             issues.append(f"{name.upper()}:ADJUSTED_TERMINAL_VALUE_NEGATIVE")
 
         normalized[name] = {
