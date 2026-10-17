@@ -981,9 +981,9 @@ def test_b4_links_explicit_service_revenue_and_reconciles_valuation_bridge():
     prepared = _prepare_input(payload)
     b4 = prepared["operating_driver_forecast"]
     assert b4["status"] == "SCENARIOS_CALCULATED"
-    assert b4["scenarios"]["bear"]["revenue_cny"] == "1000"
-    assert b4["scenarios"]["bear"]["variable_cost_cny"] == "500.00"
-    assert b4["scenarios"]["bear"]["net_profit_cny"] == "272.0000"
+    assert Decimal(b4["scenarios"]["bear"]["revenue_cny"]) == Decimal("1000")
+    assert Decimal(b4["scenarios"]["bear"]["variable_cost_cny"]) == Decimal("500")
+    assert Decimal(b4["scenarios"]["bear"]["net_profit_cny"]) == Decimal("272")
     assert b4["valuation_reconciliation"]["status"] == "MATCH"
     assert all(
         b4["valuation_reconciliation"]["scenarios"][name]["status"] == "MATCH"
