@@ -454,8 +454,6 @@ def _calculate_scenario(
         "cash_capex": capex,
         "change_working_capital": change_wc,
     }
-    if variable_cost is None:
-        metric_values["cost_of_revenue_ratio"] = cost_ratio
     missing_inputs.extend(name for name, value in metric_values.items() if value is None)
     return {
         "scenario": scenario_name,
