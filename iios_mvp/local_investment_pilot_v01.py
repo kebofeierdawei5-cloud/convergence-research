@@ -824,8 +824,18 @@ def _build_valuation_timing(
         except ValueError:
             issues.append("VALUATION_TERMINAL_DATE_INVALID")
 
+    basis_token = re.sub(r"[^A-Z0-9]+", "_", terminal_basis.upper()).strip("_")
     if not terminal_basis:
         issues.append("VALUATION_TERMINAL_DATE_BASIS_MISSING")
+    elif basis_token in {
+        "", "UNKNOWN", "N_A", "NA", "NONE", "NULL", "NOT_IDENTIFIABLE",
+        "UNIDENTIFIABLE", "UNSPECIFIED", "NOT_SPECIFIED", "TBD", "NOT_PROVIDED",
+        "NOT_AVAILABLE", "UNAVAILABLE", "UNVERIFIED", "UNCONFIRMED", "NOT_KNOWN",
+        "BASIS_UNKNOWN", "UNKNOWN_BASIS",
+    }:
+        # A non-empty sentinel is not evidence of what the terminal date represents.
+        # Keep the downstream return/entry-price solver fail-closed.
+        issues.append("VALUATION_TERMINAL_DATE_BASIS_NOT_IDENTIFIABLE")
 
     fiscal = re.fullmatch(r"(\d{4})FY", period)
     if fiscal is None:
