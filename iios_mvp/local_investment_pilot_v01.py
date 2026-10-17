@@ -490,6 +490,180 @@ def _find_note_price_conflicts(notes: Any, structured_price: Decimal) -> list[st
     return conflicts
 
 
+def _link_b4_cost_ratio_assumptions(
+    raw_driver_forecast: Any, forecast_valuation: Mapping[str, Any]
+) -> tuple[Any, list[dict[str, Any]]]:
+    """Reuse the exact scenario COGS ratio already stated in valuation assumptions.
+
+    This is a same-case assumption link, not a new estimate or a source-fact upgrade.
+    Explicit B4 values supplied by the operator/model are never overwritten.
+    """
+    if not isinstance(raw_driver_forecast, Mapping):
+        return raw_driver_forecast, []
+    assumptions = forecast_valuation.get("assumptions")
+    assumptions = assumptions if isinstance(assumptions, list) else []
+    candidates: dict[str, list[dict[str, Any]]] = {name: [] for name in SCENARIOS}
+    for assumption in assumptions:
+        if not isinstance(assumption, Mapping):
+            continue
+        data_class = str(assumption.get("data_class") or "UNKNOWN").strip().upper()
+        if data_class not in {"ANALYST_ASSUMPTION", "ISSUER_FORECAST"}:
+            continue
+        values = assumption.get("values")
+        if not isinstance(values, Mapping):
+            continue
+        for scenario_name in SCENARIOS:
+            key = f"{scenario_name}_cost_of_revenue_ratio"
+            if values.get(key) not in (None, ""):
+                candidates[scenario_name].append({
+                    "value": values[key],
+                    "data_class": data_class,
+                    "assumption_id": str(assumption.get("assumption_id") or ""),
+                    "assumption_name": str(assumption.get("name") or ""),
+                    "basis": str(assumption.get("basis") or "").strip(),
+                })
+
+    linked = dict(raw_driver_forecast)
+    scenarios = linked.get("scenarios")
+    scenarios = dict(scenarios) if isinstance(scenarios, Mapping) else {}
+    links: list[dict[str, Any]] = []
+    for scenario_name in SCENARIOS:
+        row = scenarios.get(scenario_name)
+        if not isinstance(row, Mapping):
+            continue
+        scenario_row = dict(row)
+        if "cost_of_revenue_ratio" in scenario_row:
+            continue
+        options = candidates[scenario_name]
+        distinct_values = {str(item["value"]) for item in options}
+        if len(distinct_values) != 1:
+            if len(distinct_values) > 1:
+                links.append({
+                    "scenario": scenario_name,
+                    "field": "cost_of_revenue_ratio",
+                    "status": "CONFLICTING_VALUATION_ASSUMPTIONS_NOT_LINKED",
+                    "candidate_values": sorted(distinct_values),
+                })
+            continue
+        source = options[0]
+        value = source["value"]
+        source_label = " ".join(
+            part for part in (source["assumption_id"], source["assumption_name"]) if part
+        ) or "forecast_valuation.assumptions"
+        basis = (
+            f"复用估值假设 {source_label} 中同一情景的成本率 {value}；"
+            "不另行估计，以保持 B4 与主估值桥的假设一致。"
+        )
+        if source["basis"]:
+            basis += f" 原假设依据：{source['basis']}"
+        scenario_row["cost_of_revenue_ratio"] = {
+            "value": value,
+            "unit": "ratio",
+            "data_class": source["data_class"],
+            "basis": basis,
+            "evidence_refs": [],
+            "note": "由同一主估值情景假设交叉引用；不是实际结果或额外独立证据。",
+        }
+        scenarios[scenario_name] = scenario_row
+        links.append({
+            "scenario": scenario_name,
+            "field": "cost_of_revenue_ratio",
+            "status": "LINKED_SAME_SCENARIO_ASSUMPTION",
+            "source_assumption_id": source["assumption_id"] or None,
+            "source_assumption_name": source["assumption_name"] or None,
+            "value": str(value),
+            "data_class": source["data_class"],
+        })
+    linked["scenarios"] = scenarios
+    return linked, links
+
+
+def _reconcile_b4_valuation_bridge(
+    driver_forecast: Mapping[str, Any], forecast_valuation: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Cross-check overlapping aggregate operating metrics without conflating FCF definitions."""
+    driver_scenarios = driver_forecast.get("scenarios")
+    driver_scenarios = driver_scenarios if isinstance(driver_scenarios, Mapping) else {}
+    valuation_scenarios = forecast_valuation.get("scenarios")
+    valuation_scenarios = valuation_scenarios if isinstance(valuation_scenarios, Mapping) else {}
+    field_pairs = (
+        ("revenue_cny", "revenue_cny"),
+        ("variable_cost_cny", "cost_of_revenue_cny"),
+        ("contribution_after_variable_cost_cny", "gross_profit_cny"),
+        ("fixed_cash_opex_cny", "fixed_cash_opex_cny"),
+        ("ebitda_cny", "ebitda_cny"),
+        ("depreciation_amortization_cny", "depreciation_amortization_cny"),
+        ("ebit_cny", "ebit_cny"),
+        ("finance_cost_cny", "finance_cost_cny"),
+        ("profit_before_tax_cny", "pretax_profit_cny"),
+        ("tax_rate", "tax_rate"),
+        ("net_profit_cny", "net_profit_proxy_cny"),
+        ("cash_capex_cny", "cash_capex_cny"),
+        ("change_working_capital_cny", "change_working_capital_cny"),
+    )
+    scenario_results: dict[str, Any] = {}
+    all_match = True
+    any_mismatch = False
+    for scenario_name in SCENARIOS:
+        driver_row = driver_scenarios.get(scenario_name)
+        driver_row = driver_row if isinstance(driver_row, Mapping) else {}
+        valuation_row = valuation_scenarios.get(scenario_name)
+        valuation_row = valuation_row if isinstance(valuation_row, Mapping) else {}
+        bridge = valuation_row.get("operating_financial_bridge")
+        bridge = bridge if isinstance(bridge, Mapping) else {}
+        checks: list[dict[str, Any]] = []
+        for driver_field, valuation_field in field_pairs:
+            left, right = driver_row.get(driver_field), bridge.get(valuation_field)
+            if left in (None, "") or right in (None, ""):
+                checks.append({
+                    "driver_field": driver_field, "valuation_field": valuation_field,
+                    "status": "NOT_COMPARABLE", "driver_value": left, "valuation_value": right,
+                })
+                all_match = False
+                continue
+            try:
+                left_num, right_num = Decimal(str(left)), Decimal(str(right))
+            except (InvalidOperation, ValueError):
+                left_num = right_num = None
+            if left_num is None or right_num is None:
+                check_status = "NOT_COMPARABLE"
+                all_match = False
+            else:
+                tolerance = Decimal("0.000001") if driver_field == "tax_rate" else Decimal("1")
+                check_status = "MATCH" if abs(left_num - right_num) <= tolerance else "MISMATCH"
+                if check_status == "MISMATCH":
+                    any_mismatch = True
+                    all_match = False
+            checks.append({
+                "driver_field": driver_field, "valuation_field": valuation_field,
+                "status": check_status, "driver_value": left, "valuation_value": right,
+            })
+        scenario_results[scenario_name] = {
+            "status": (
+                "MISMATCH" if any(item["status"] == "MISMATCH" for item in checks)
+                else "MATCH" if checks and all(item["status"] == "MATCH" for item in checks)
+                else "PARTIAL"
+            ),
+            "checks": checks,
+        }
+    status = "MISMATCH" if any_mismatch else "MATCH" if all_match else "PARTIAL"
+    return {
+        "schema_version": "IIOS-B4-VALUATION-BRIDGE-RECONCILIATION-0.1",
+        "status": status,
+        "scenarios": scenario_results,
+        "excluded_metrics": [{
+            "field": "free_cash_flow_proxy_cny",
+            "reason": (
+                "B4 使用 EBIT 税后现金流口径（unlevered proxy）；主估值 financial bridge "
+                "使用 net_profit_proxy + D&A − CapEx − 营运资金（含融资成本影响）。"
+                "两者口径不同，不应要求数值相等。"
+            ),
+        }],
+        "formal_admission_created": False,
+        "decision_authority": False,
+    }
+
+
 def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     if payload.get("schema_version") != PILOT_SCHEMA:
         raise LocalInvestmentPilotError("PILOT_INPUT_SCHEMA_MISMATCH")
