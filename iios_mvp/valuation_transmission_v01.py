@@ -412,7 +412,22 @@ def evaluate_valuation_transmission(
                 + (normalized[name]["distributions"] or Decimal("0"))
                 for name in SCENARIOS
             }
-            if not (
+            invalid_adjusted_terminals = [
+                name for name in SCENARIOS
+                if normalized[name].get("hypothetically_adjusted_terminal") is None
+                or normalized[name]["hypothetically_adjusted_terminal"] < 0
+            ]
+            if invalid_adjusted_terminals:
+                result.update({
+                    "status": "NOT_LINKED_ADJUSTED_TERMINAL_VALUE_INVALID",
+                    "summary": "至少一个 B5 传导后的每股终值为负数或不可计算；不能把它用作有效股权终值，原每股估值保持不变。",
+                    "input_issues": [
+                        f"ADJUSTED_TERMINAL_VALUE_NEGATIVE_OR_UNKNOWN:{name.upper()}"
+                        for name in invalid_adjusted_terminals
+                    ],
+                })
+                all_scenarios_valid = False
+            elif not (
                 adjusted_wealth["bear"] <= adjusted_wealth["base"] <= adjusted_wealth["bull"]
             ):
                 result.update({
