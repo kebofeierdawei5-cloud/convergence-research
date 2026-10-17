@@ -54,7 +54,7 @@ B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 +
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 MERGED; confirmed project-inclusive baseline may continue through existing return/target-entry calculations; invalid numeric-assumption basis blocks dependent price output; 138 LOCAL-PILOT + Replay tests and 6/6 workflows PASS; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 MERGED; duplicate/untraceable evidence IDs, placeholder source fields, terminal-date and assumption-basis sentinels fail closed; B5 no-double-count/negative-counterfactual regression; latest #460 138 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 MERGED; duplicate/untraceable evidence, terminal-date/assumption-basis sentinels fail closed; B5 no-double-count path regression; guided AI response cannot alter/omit operator Bear-loss cap; #462 138 local-pilot+Replay tests + 8/8 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -86,6 +86,14 @@ B8 bounded investment-result red-team                          PR #456 + #457 + 
 - PR [#460](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/460) fixed a reproduced assumption-quality gap in the shared B4/B5 typed-measure normalizer. Numeric measures whose only basis/rationale is `UNKNOWN`, `N/A`, `NOT_IDENTIFIABLE`, `TBD`, or `未提供依据` are now calculation-unusable and expose `BASIS_NOT_IDENTIFIABLE`. Dependent B4 net-profit/FCF or B5 transmission, return and target-entry/B6 values remain unresolved. It preserves the operator's raw claimed scalar for inspection, but does not use it as a calculation input. Exact head passed **138/138 local-pilot + Replay tests** and all **6/6 triggered workflows**.
 - These changes preserve the existing formulas and 15% annualized-return hurdle; they do not validate the economics of a genuine analyst assumption or grant decision/execution authority.
 - **Actual macOS full-run + Replay bundle remains OPEN / NOT VERIFIED.** Repository CI and red-team outcomes do not close the user's deferred private ZIP review.
+
+### B8 follow-up — operator-owned Bear-loss cap (2026-10-17)
+
+- A bounded risk-input audit confirmed that `decision_parameters.max_loss_pct` directly feeds the Bear-loss return gate and the B6 risk price ceiling, but the guided-response integrity check did not compare it against the private operator template. A ChatGPT response could silently change the default from 25% to a looser value, making the shown price ceiling depend on an AI-altered risk preference.
+- PR [#462](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/462) merged at `b3f551c58180e848afc19627ac2d959ab5e31e54`. Guided responses must now preserve the template's `max_loss_pct` exactly; a changed or omitted field is rejected. The operator may intentionally adjust it in the private template before sending the research prompt.
+- The guide now distinguishes this per-share Bear-loss cap from the separate portfolio-NAV stress risk budget. The default `25` is a pilot-template default, not a drawdown guarantee. This PR does not change the default, return formula, 15% hurdle, B6 solver, or execution authority.
+- Exact PR #462 head passed **138/138 local-pilot + Replay tests** and **8/8 triggered workflows**.
+- **The real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** This code/CI evidence does not replace the user's deferred private run-bundle audit.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
