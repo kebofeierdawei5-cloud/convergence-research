@@ -9,7 +9,7 @@
 - Added an explicit valuation_terminal_date and basis, with forecast-period compatibility checks. The return solver accepts an optional date-derived annualization_year_fraction; the selected 1Y/3Y decision reference remains separately validated.
 - Annualized return and annualized return-hurdle entry price now use ACT/365F calendar days from cutoff date to terminal date. Missing/inconsistent timing fails closed to UNKNOWN.
 - No valuation family was auto-selected or converted to EPS_MULTIPLE; 15% return hurdle, risk caps, decision precedence and non-execution authority are unchanged.
-- Regression coverage covers model mismatch, falsely self-labelled SOTP, missing date/basis, forecast-period mismatch, and 441-day ACT/365F calculations. Exact PR head `5957832e4000d7c01a3fa905e9aecb73b6f406b7` passed 122 local-pilot/Replay tests and 23 PR checks. PR #452 adds explicit UNKNOWN/PRODUCT_LINE/PROJECT_INCREMENTAL scope regressions; latest checks are pending. PR #451 is merged, while fresh Mac full-run/Replay acceptance remains open.
+- Regression coverage covers model mismatch, falsely self-labelled SOTP, missing date/basis, forecast-period mismatch, 441-day ACT/365F calculations, and unresolved operating scopes. PR #452 merged as `8f49fda08a05c681ee262cf3d12f86016be8966e`; its exact head `101dfa425af85fb1c8c8d8cfa0fb73b531f1ec73` passed 123 local-pilot/Replay tests and all 17 PR checks. Both code changes are merged; fresh Mac full-run/Replay acceptance remains open.
 
 
 ### 2026-10-09 — Route A Run #8 Partial Capture Retained + B2 Preflight (No Provider Credentials)

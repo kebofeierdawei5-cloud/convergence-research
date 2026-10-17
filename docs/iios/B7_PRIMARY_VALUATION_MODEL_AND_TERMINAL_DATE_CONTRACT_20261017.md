@@ -1,6 +1,6 @@
 # B7 — Primary Valuation Model and Terminal-Date Contract
 
-**Status:** Core fix merged in PR #451 at `b3f325bcc2e6177ddf05a0932c82197cb3c8d8d1`; PR #452 adds a fail-closed operating-scope guard and updates canonical state. Live Mac full-run + Replay acceptance remains open.  
+**Status:** PR #451 merged at `b3f325bcc2e6177ddf05a0932c82197cb3c8d8d1`; PR #452 merged at `8f49fda08a05c681ee262cf3d12f86016be8966e`. Exact PR #452 head passed 123 local-pilot + Replay tests and 17/17 checks. Live Mac full-run + Replay acceptance remains open.  
 **Scope:** Local single-user investment pilot only. This does not create a canonical investment Decision.
 
 ## Problem confirmed from source
@@ -35,7 +35,7 @@ The current period-alignment check understands annual YYYYFY labels and accepts 
 
 ## Automated verification and acceptance boundary
 
-- At exact PR head `5957832e4000d7c01a3fa905e9aecb73b6f406b7`, the dedicated local-pilot workflow compiled the pilot/core files and launchers, ran local pilot + Replay acceptance tests (**122 passed**), and passed diff check. All 23 PR checks passed. PR #452 adds an unresolved-scope test beyond that code head; its exact-head checks are pending.
+- At exact PR #452 head `101dfa425af85fb1c8c8d8cfa0fb73b531f1ec73`, the dedicated local-pilot workflow compiled the pilot/core files and launchers, ran local pilot + Replay acceptance tests (**123 passed**), and passed diff check. All 17 PR checks passed.
 - The added negative test confirms that missing `valuation_terminal_date_basis` blocks return metrics and B6 even if a JSON input bypasses wizard validation.
 - A fresh Mac full-run and same-run comparison of `analysis.json`, `report.md`, and `pilot_receipt.json` remain required; CI does not establish the real ChatGPT response or on-device workflow.
 
