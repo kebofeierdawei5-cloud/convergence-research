@@ -1563,6 +1563,28 @@ def test_missing_or_period_mismatched_terminal_date_blocks_return_metrics():
     assert mismatch["return_metrics"] is None
     assert mismatch["price_zone_sensitivity"]["target_entry_price"] is None
 
+def test_b5_rejects_negative_adjusted_terminal_value_and_preserves_original_scenarios():
+    payload = _b5_ready_payload()
+    # Keep Base/Bull changes modest, but make Bear's displaced-profit assumption
+    # so large that the incremental EPS-multiple bridge would imply negative equity value.
+    payload["valuation_transmission"]["scenarios"]["bear"]["displaced_existing_after_tax_profit_cny"] = _b5_measure(
+        "100000000", "CNY"
+    )
+
+    analysis, report = _analyse(payload, "TEST-B5-NEGATIVE-ADJUSTED-TERMINAL")
+    bridge = analysis["valuation_transmission"]
+
+    assert bridge["status"] == "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID"
+    assert bridge["applied_to_per_share_scenarios"] is False
+    assert "BEAR:ADJUSTED_TERMINAL_VALUE_NEGATIVE" in bridge["input_issues"]
+    assert analysis["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] == "120"
+    assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
+    assert analysis["forecast_valuation"]["scenarios"]["bull"]["terminal_value_per_share"] == "180"
+    assert analysis["return_metrics"] is None
+    assert "B5 当前传导状态：NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID" in report
+    assert "不得将项目增量默认为已计入估值" in report
+
+
 def test_b5_never_adds_project_twice_when_operator_says_baseline_includes_it():
     payload = _b5_ready_payload()
     payload["operator_valuation_context"]["baseline_includes_project"] = True
