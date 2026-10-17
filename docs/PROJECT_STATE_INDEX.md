@@ -49,12 +49,12 @@ Route A C2 / 新和成 002001                            PRIVATE CORE/PIT PASS (
 Path A operator-attested price overlay               ANALYSIS-ONLY INTAKE IMPLEMENTATION; NO CANONICAL PRICE ADMISSION
 Local single-user complete pilot                     ACTIVE P0 PRIORITY; PILOT_NON_CANONICAL BEFORE FORMALIZATION
 Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
-B4 operating-driver forecast bridge                    PR #424 + #426 + #442 + #444 + #446 + #460 MERGED; placeholder-only numeric-assumption basis fails closed; PR #460 exact head 138 LOCAL-PILOT + Replay tests and 6/6 workflows PASS
-B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 + #459 + #460 MERGED; no-double-count baseline path preserved when unapplied negative counterfactual exists; placeholder-only numeric-assumption basis blocks transmission; 138 LOCAL-PILOT + Replay tests and 6/6 workflows PASS; EPS_MULTIPLE ONLY
-B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 MERGED; confirmed project-inclusive baseline may continue through existing return/target-entry calculations; invalid numeric-assumption basis blocks dependent price output; 138 LOCAL-PILOT + Replay tests and 6/6 workflows PASS; PRICE SCREEN ONLY
+B4 operating-driver forecast bridge                    PR #424 + #426 + #442 + #444 + #446 + #460 MERGED; placeholder-only numeric-assumption basis fails closed; 138 LOCAL-PILOT + Replay tests / 6/6 workflows on #460
+B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 + #459 + #460 MERGED; no-double-count baseline path preserved when unapplied negative counterfactual exists; placeholder-only numeric-assumption basis blocks transmission; EPS_MULTIPLE ONLY
+B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 + #462 + #464 + #465 MERGED; operator Bear-loss cap/Required Return preserved, placeholder probability rationale blocks price outputs; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 MERGED; duplicate/untraceable evidence, terminal-date/assumption-basis sentinels fail closed; B5 no-double-count path regression; guided AI response cannot alter/omit operator Bear-loss cap; #462 138 local-pilot+Replay tests + 8/8 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 MERGED; evidence traceability and unknown sentinels fail closed; B5 no-double-count, operator risk/return policy preservation and stress rationale regressions; latest #466 151 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -94,6 +94,14 @@ B8 bounded investment-result red-team                          PR #456 + #457 + 
 - The guide now distinguishes this per-share Bear-loss cap from the separate portfolio-NAV stress risk budget. The default `25` is a pilot-template default, not a drawdown guarantee. This PR does not change the default, return formula, 15% hurdle, B6 solver, or execution authority.
 - Exact PR #462 head passed **138/138 local-pilot + Replay tests** and **8/8 triggered workflows**.
 - **The real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** This code/CI evidence does not replace the user's deferred private run-bundle audit.
+
+### B8 follow-up — scenario rationale, operator policy and stress-readiness (2026-10-17)
+
+- PR [#464](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/464) merged at `39f1b29042fd80525cb89c95000159a31a908da0`. Scenario probabilities had required only a non-empty rationale, allowing `UNKNOWN`, `N/A`, `TBD`, and Chinese placeholder text to pass to the weighted-return solver. The local pilot now blocks return metrics and target-entry/B6 outputs whenever a Bear/Base/Bull probability rationale is placeholder-only. Exact head passed **144/144 local-pilot + Replay tests** and **6/6 workflows**.
+- PR [#465](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/465) merged at `5a45db91bf9c78be21a8844094b0f0a8163995d6`. The guided response validator now preserves both `decision_parameters.max_loss_pct` and `required_return_annualized` exactly from the private template. A response cannot loosen a Bear-loss cap or reset an operator's stricter Required Return (e.g. 20%) to 15%; operators may change these inputs in the template themselves before requesting research. Exact head passed **138/138 local-pilot + Replay tests** and **8/8 workflows**.
+- PR [#466](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/466) merged at `3d5e9689c6412d944622ff4904264d9dfe5dbf22`. Bear failure-path and independent thesis-break stress required text fields now reject placeholder-only descriptions; the stress review remains `REVIEW_REQUIRED` and conditional position sizing stays absent when the trigger/impact/method/rationale cannot be identified. Exact head passed **151/151 local-pilot + Replay tests** and **6/6 workflows**.
+- These are narrow corrections to existing input provenance, assumption completeness and policy ownership. They do not alter probability values, valuation formulas, the 15% minimum hurdle, the risk solver, or trade authority.
+- **Real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** It was explicitly deferred because the upload limit was reached; all CI evidence is code-level evidence only.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
