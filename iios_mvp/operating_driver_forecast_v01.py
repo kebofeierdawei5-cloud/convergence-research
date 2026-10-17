@@ -49,6 +49,26 @@ def _render(value: Decimal | None) -> str | None:
     return None if value is None else format(value, "f")
 
 
+def _is_identifiable_basis(value: Any) -> bool:
+    """A numeric assumption needs an identifiable rationale, not a placeholder token."""
+    raw = str(value or "").strip()
+    if not raw:
+        return False
+    normalized = re.sub(r"[^A-Z0-9]+", "_", raw.upper()).strip("_")
+    placeholders = {
+        "UNKNOWN", "N_A", "NA", "NONE", "NULL", "NOT_IDENTIFIABLE",
+        "UNIDENTIFIABLE", "UNSPECIFIED", "NOT_SPECIFIED", "TBD", "NOT_PROVIDED",
+        "NOT_AVAILABLE", "UNAVAILABLE", "UNVERIFIED", "UNCONFIRMED", "NOT_KNOWN",
+        "UNKNOWN_BASIS", "BASIS_UNKNOWN", "NO_BASIS", "NO_RATIONALE",
+        "MISSING", "UNRESOLVED",
+    }
+    chinese_placeholders = {
+        "未知", "不详", "不明确", "未提供", "未提供依据", "无依据",
+        "待补充", "待核实", "缺失",
+    }
+    return normalized not in placeholders and raw not in chinese_placeholders
+
+
 def _unknown_measure(unit: str, note: str = "未识别或未提供") -> dict[str, Any]:
     return {
         "value": None,
@@ -120,6 +140,8 @@ def _normalise_measure(
         issues.append(f"{field}:UNIT_MISMATCH_EXPECTED_{expected_unit}")
     if not basis:
         issues.append(f"{field}:BASIS_REQUIRED")
+    elif not _is_identifiable_basis(basis):
+        issues.append(f"{field}:BASIS_NOT_IDENTIFIABLE")
 
     # Quantities, capacity, selling price, expenses and tax rate cannot be negative.
     # A change in working capital is signed: positive consumes cash, negative releases cash.
