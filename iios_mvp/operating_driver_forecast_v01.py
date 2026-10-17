@@ -29,6 +29,7 @@ GLOBAL_MEASURES = {
     "depreciation_amortization_cny": "CNY",
     "finance_cost_cny": "CNY",
     "tax_rate": "ratio",
+    "cost_of_revenue_ratio": "ratio",
     "cash_capex_cny": "CNY",
     "change_working_capital_cny": "CNY",
 }
@@ -128,6 +129,8 @@ def _normalise_measure(
             issues.append(f"{field}:NEGATIVE_VALUE_NOT_ALLOWED")
         if metric_name == "tax_rate" and not (Decimal("0") <= claimed <= Decimal("1")):
             issues.append(f"{field}:TAX_RATE_MUST_BE_RATIO_0_TO_1")
+        if metric_name == "cost_of_revenue_ratio" and not (Decimal("0") <= claimed <= Decimal("1")):
+            issues.append(f"{field}:COST_OF_REVENUE_RATIO_MUST_BE_0_TO_1")
 
     evidence_status = "NOT_REQUIRED_FOR_ASSUMPTION"
     if data_class in {"OBSERVED_ACTUAL", "ISSUER_FORECAST"}:
@@ -239,10 +242,22 @@ def _product_profit_bridge(
     asp = _value(metrics.get("net_asp_cny_per_tonne"))
     unit_cost = _value(metrics.get("variable_cost_cny_per_tonne"))
     capacity_value = _value(capacity)
-    revenue = sales_volume * asp if sales_volume is not None and asp is not None else None
-    variable_cost = sales_volume * unit_cost if sales_volume is not None and unit_cost is not None else None
+    calculated_revenue = sales_volume * asp if sales_volume is not None and asp is not None else None
+    direct_revenue = _value(metrics.get("revenue_cny"))
+    calculated_variable_cost = sales_volume * unit_cost if sales_volume is not None and unit_cost is not None else None
+    direct_variable_cost = _value(metrics.get("variable_cost_cny"))
     utilization = None
     issues: list[str] = []
+    if calculated_revenue is not None and direct_revenue is not None and calculated_revenue != direct_revenue:
+        issues.append("EXPLICIT_REVENUE_CONFLICTS_WITH_VOLUME_X_ASP")
+        revenue = None
+    else:
+        revenue = calculated_revenue if calculated_revenue is not None else direct_revenue
+    if calculated_variable_cost is not None and direct_variable_cost is not None and calculated_variable_cost != direct_variable_cost:
+        issues.append("EXPLICIT_VARIABLE_COST_CONFLICTS_WITH_VOLUME_X_UNIT_COST")
+        variable_cost = None
+    else:
+        variable_cost = calculated_variable_cost if calculated_variable_cost is not None else direct_variable_cost
     if production is not None and capacity_value is not None and capacity_value > 0:
         if not _is_full_year_period(period_basis):
             issues.append("CAPACITY_PERIOD_ALIGNMENT_UNKNOWN")
@@ -326,6 +341,8 @@ def _calculate_scenario(
                 "sales_volume_tonnes": "tonnes",
                 "net_asp_cny_per_tonne": "CNY/tonne",
                 "variable_cost_cny_per_tonne": "CNY/tonne",
+                "revenue_cny": "CNY",
+                "variable_cost_cny": "CNY",
             },
             f"{scenario_name}.{product_id}",
             sources_by_id,
@@ -378,6 +395,17 @@ def _calculate_scenario(
 
     revenue = sum(product_revenues, Decimal("0")) if revenues_complete else None
     variable_cost = sum(product_costs, Decimal("0")) if costs_complete else None
+    cost_ratio = _value(scenario_measures.get("cost_of_revenue_ratio"))
+    variable_cost_basis = "PRODUCT_LEVEL_COSTS" if costs_complete else None
+    if variable_cost is not None and revenue is not None and cost_ratio is not None:
+        ratio_implied_cost = revenue * cost_ratio
+        if variable_cost != ratio_implied_cost:
+            issues.append("AGGREGATE_COST_RATIO_CONFLICTS_WITH_PRODUCT_LEVEL_COSTS")
+            variable_cost = None
+            variable_cost_basis = None
+    elif variable_cost is None and revenue is not None and cost_ratio is not None:
+        variable_cost = revenue * cost_ratio
+        variable_cost_basis = "AGGREGATE_COST_OF_REVENUE_RATIO"
     contribution = revenue - variable_cost if revenue is not None and variable_cost is not None else None
     fixed_opex = _value(scenario_measures.get("fixed_cash_opex_cny"))
     da = _value(scenario_measures.get("depreciation_amortization_cny"))
@@ -437,6 +465,8 @@ def _calculate_scenario(
         "sales_volume_tonnes": _render(volume_total) if all_volume_known else None,
         "revenue_cny": _render(revenue),
         "variable_cost_cny": _render(variable_cost),
+        "variable_cost_basis": variable_cost_basis,
+        "cost_of_revenue_ratio": _render(cost_ratio),
         "contribution_after_variable_cost_cny": _render(contribution),
         "fixed_cash_opex_cny": _render(fixed_opex),
         "ebitda_cny": _render(ebitda),
@@ -752,6 +782,7 @@ def render_operating_driver_section(
             f"- 桥接计算状态：{result.get('calculation_status', 'SCENARIO_ECONOMICS_NOT_IDENTIFIABLE')}",
             f"- 产量 / 销量：{_display_optional_scalar(result.get('production_volume_tonnes'))} / {_display_optional_scalar(result.get('sales_volume_tonnes'))} 吨",
             f"- 收入：{_display_optional_scalar(result.get('revenue_cny'))}；变动成本：{_display_optional_scalar(result.get('variable_cost_cny'))}；扣变动成本贡献：{_display_optional_scalar(result.get('contribution_after_variable_cost_cny'))}",
+            f"- 成本率：{_display_optional_scalar(result.get('cost_of_revenue_ratio'))}；变动成本计算口径：{result.get('variable_cost_basis') or 'UNKNOWN'}",
             f"- EBITDA / EBIT / 税前利润 / 净利润：{_display_optional_scalar(result.get('ebitda_cny'))} / {_display_optional_scalar(result.get('ebit_cny'))} / {_display_optional_scalar(result.get('profit_before_tax_cny'))} / {_display_optional_scalar(result.get('net_profit_cny'))}",
             f"- 资本开支 / 营运资金变动 / 自由现金流代理：{_display_optional_scalar(result.get('cash_capex_cny'))} / {_display_optional_scalar(result.get('change_working_capital_cny'))} / {_display_optional_scalar(result.get('unlevered_fcf_proxy_cny'))}",
             f"- {valuation_label}：{scenario_terminal_display} {currency}",
@@ -776,8 +807,48 @@ def render_operating_driver_section(
                     f"产能利用率 {_display({'value': str(Decimal(product['production_utilization']) * Decimal('100')), 'unit': '%', 'calculation_usable': True}) if product.get('production_utilization') is not None else 'UNKNOWN'}。"
                 )
         lines.append("")
+    reconciliation = driver.get("valuation_reconciliation")
+    if isinstance(reconciliation, Mapping):
+        lines.extend([
+            "",
+            "#### B4 与主估值经营桥一致性复核",
+            "",
+            f"- 总体复核状态：{reconciliation.get('status', 'UNKNOWN')}",
+        ])
+        links = driver.get("cross_node_assumption_links")
+        if isinstance(links, list) and links:
+            linked_descriptions = [
+                f"{item.get('scenario', 'UNKNOWN').upper()} {item.get('field', 'UNKNOWN')}={item.get('value', 'UNKNOWN')}（{item.get('source_assumption_id') or item.get('source_assumption_name') or '同一估值假设'}）"
+                for item in links if isinstance(item, Mapping) and item.get("status") == "LINKED_SAME_SCENARIO_ASSUMPTION"
+            ]
+            if linked_descriptions:
+                lines.append("- 跨节点共享假设：" + "；".join(linked_descriptions))
+        scenario_checks = reconciliation.get("scenarios") if isinstance(reconciliation.get("scenarios"), Mapping) else {}
+        for scenario_name in SCENARIOS:
+            check_row = scenario_checks.get(scenario_name) if isinstance(scenario_checks.get(scenario_name), Mapping) else {}
+            checks = check_row.get("checks") if isinstance(check_row.get("checks"), list) else []
+            mismatches = [
+                str(item.get("driver_field"))
+                for item in checks if isinstance(item, Mapping) and item.get("status") == "MISMATCH"
+            ]
+            not_comparable = [
+                str(item.get("driver_field"))
+                for item in checks if isinstance(item, Mapping) and item.get("status") == "NOT_COMPARABLE"
+            ]
+            detail = []
+            if mismatches:
+                detail.append("不一致字段：" + "、".join(mismatches))
+            if not_comparable:
+                detail.append("未能比较字段：" + "、".join(not_comparable))
+            lines.append(
+                f"- {scenario_name.upper()}：{check_row.get('status', 'UNKNOWN')}"
+                + (f"；{'；'.join(detail)}" if detail else "")
+            )
+        for excluded in reconciliation.get("excluded_metrics") or []:
+            if isinstance(excluded, Mapping):
+                lines.append(f"- 未作数值相等比较：{excluded.get('field', 'UNKNOWN')}；{excluded.get('reason', '')}")
     lines.extend([
-        "- 解释：模型按产品“销量×净售价”计算收入，按销量×单位变动成本计算直接变动成本，再扣现金固定运营费用及折旧得到 EBITDA/EBIT；税前利润额外扣融资成本。自由现金流代理 = EBIT − 正 EBIT 对应现金税 + 折旧 − 资本开支 − 营运资金增加（营运资金释放可为负值）。",
+        "- 解释：模型按销量×净售价计算产品收入；当业务是研发/测试等服务、实物吨位口径不可识别时，也可使用明确标记的直接业务线收入假设。变动成本优先按销量×单位成本计算；若该口径不可用，可复用同一估值情景中明确给出的营业成本率。再扣固定现金运营费用及折旧得到 EBITDA/EBIT，税前利润额外扣融资成本。自由现金流代理 = EBIT − 正 EBIT 对应现金税 + 折旧 − 资本开支 − 营运资金增加（营运资金释放可为负值）。",
     ])
     if b5_applied:
         lines.append("- 传导边界：这只是情景经营桥，不代表实际已实现净利润。当前 B5 已按明确的 EPS_MULTIPLE 增量桥接，将稀释口径的项目增量传导至 Bear/Base/Bull 每股终值与 Base 估值锚；仍是非正式试运行，不构成正式准入或 Decision。")

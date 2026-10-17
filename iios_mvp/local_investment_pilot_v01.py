@@ -288,6 +288,15 @@ def _status(value: Any, allowed: set[str]) -> str:
     return item if item in allowed else "UNKNOWN"
 
 
+def _assessment_status_for_report(section: Mapping[str, Any]) -> str:
+    """Show both the conservative gate status and any non-canonical source label."""
+    status = str(section.get("status") or "UNKNOWN")
+    source_label = str(section.get("status_input") or "").strip().upper()
+    if source_label and source_label != status:
+        return f"{status}（输入标签 {source_label}；已按本地决策枚举归一化）"
+    return status
+
+
 def _items(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
@@ -490,6 +499,192 @@ def _find_note_price_conflicts(notes: Any, structured_price: Decimal) -> list[st
     return conflicts
 
 
+def _link_b4_cost_ratio_assumptions(
+    raw_driver_forecast: Any, forecast_valuation: Mapping[str, Any]
+) -> tuple[Any, list[dict[str, Any]]]:
+    """Reuse the exact scenario COGS ratio already stated in valuation assumptions.
+
+    This is a same-case assumption link, not a new estimate or a source-fact upgrade.
+    Explicit B4 values supplied by the operator/model are never overwritten.
+    """
+    if not isinstance(raw_driver_forecast, Mapping):
+        return raw_driver_forecast, []
+    assumptions = forecast_valuation.get("assumptions")
+    assumptions = assumptions if isinstance(assumptions, list) else []
+    candidates: dict[str, list[dict[str, Any]]] = {name: [] for name in SCENARIOS}
+    for assumption in assumptions:
+        if not isinstance(assumption, Mapping):
+            continue
+        data_class = str(assumption.get("data_class") or "UNKNOWN").strip().upper()
+        if data_class not in {"ANALYST_ASSUMPTION", "ISSUER_FORECAST"}:
+            continue
+        values = assumption.get("values")
+        if not isinstance(values, Mapping):
+            continue
+        for scenario_name in SCENARIOS:
+            key = f"{scenario_name}_cost_of_revenue_ratio"
+            if values.get(key) not in (None, ""):
+                candidates[scenario_name].append({
+                    "value": values[key],
+                    "data_class": data_class,
+                    "assumption_id": str(assumption.get("assumption_id") or ""),
+                    "assumption_name": str(assumption.get("name") or ""),
+                    "basis": str(assumption.get("basis") or "").strip(),
+                })
+
+    linked = dict(raw_driver_forecast)
+    scenarios = linked.get("scenarios")
+    scenarios = dict(scenarios) if isinstance(scenarios, Mapping) else {}
+    links: list[dict[str, Any]] = []
+    for scenario_name in SCENARIOS:
+        row = scenarios.get(scenario_name)
+        if not isinstance(row, Mapping):
+            continue
+        scenario_row = dict(row)
+        if "cost_of_revenue_ratio" in scenario_row:
+            continue
+        options = candidates[scenario_name]
+        distinct_values = {str(item["value"]) for item in options}
+        if len(distinct_values) != 1:
+            if len(distinct_values) > 1:
+                links.append({
+                    "scenario": scenario_name,
+                    "field": "cost_of_revenue_ratio",
+                    "status": "CONFLICTING_VALUATION_ASSUMPTIONS_NOT_LINKED",
+                    "candidate_values": sorted(distinct_values),
+                })
+            continue
+        source = options[0]
+        value = source["value"]
+        source_label = " ".join(
+            part for part in (source["assumption_id"], source["assumption_name"]) if part
+        ) or "forecast_valuation.assumptions"
+        basis = (
+            f"复用估值假设 {source_label} 中同一情景的成本率 {value}；"
+            "不另行估计，以保持 B4 与主估值桥的假设一致。"
+        )
+        if source["basis"]:
+            basis += f" 原假设依据：{source['basis']}"
+        scenario_row["cost_of_revenue_ratio"] = {
+            "value": value,
+            "unit": "ratio",
+            "data_class": source["data_class"],
+            "basis": basis,
+            "evidence_refs": [],
+            "note": "由同一主估值情景假设交叉引用；不是实际结果或额外独立证据。",
+        }
+        scenarios[scenario_name] = scenario_row
+        links.append({
+            "scenario": scenario_name,
+            "field": "cost_of_revenue_ratio",
+            "status": "LINKED_SAME_SCENARIO_ASSUMPTION",
+            "source_assumption_id": source["assumption_id"] or None,
+            "source_assumption_name": source["assumption_name"] or None,
+            "value": str(value),
+            "data_class": source["data_class"],
+        })
+    linked["scenarios"] = scenarios
+    return linked, links
+
+
+def _reconcile_b4_valuation_bridge(
+    driver_forecast: Mapping[str, Any], forecast_valuation: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Cross-check overlapping aggregate operating metrics without conflating FCF definitions."""
+    driver_scenarios = driver_forecast.get("scenarios")
+    driver_scenarios = driver_scenarios if isinstance(driver_scenarios, Mapping) else {}
+    valuation_scenarios = forecast_valuation.get("scenarios")
+    valuation_scenarios = valuation_scenarios if isinstance(valuation_scenarios, Mapping) else {}
+    if not any(
+        isinstance(row, Mapping) and isinstance(row.get("operating_financial_bridge"), Mapping)
+        for row in valuation_scenarios.values()
+    ):
+        return {
+            "schema_version": "IIOS-B4-VALUATION-BRIDGE-RECONCILIATION-0.1",
+            "status": "NOT_PROVIDED",
+            "scenarios": {},
+            "excluded_metrics": [],
+            "formal_admission_created": False,
+            "decision_authority": False,
+        }
+    field_pairs = (
+        ("revenue_cny", "revenue_cny"),
+        ("variable_cost_cny", "cost_of_revenue_cny"),
+        ("contribution_after_variable_cost_cny", "gross_profit_cny"),
+        ("fixed_cash_opex_cny", "fixed_cash_opex_cny"),
+        ("ebitda_cny", "ebitda_cny"),
+        ("depreciation_amortization_cny", "depreciation_amortization_cny"),
+        ("ebit_cny", "ebit_cny"),
+        ("finance_cost_cny", "finance_cost_cny"),
+        ("profit_before_tax_cny", "pretax_profit_cny"),
+        ("tax_rate", "tax_rate"),
+        ("net_profit_cny", "net_profit_proxy_cny"),
+        ("cash_capex_cny", "cash_capex_cny"),
+        ("change_working_capital_cny", "change_working_capital_cny"),
+    )
+    scenario_results: dict[str, Any] = {}
+    all_match = True
+    any_mismatch = False
+    for scenario_name in SCENARIOS:
+        driver_row = driver_scenarios.get(scenario_name)
+        driver_row = driver_row if isinstance(driver_row, Mapping) else {}
+        valuation_row = valuation_scenarios.get(scenario_name)
+        valuation_row = valuation_row if isinstance(valuation_row, Mapping) else {}
+        bridge = valuation_row.get("operating_financial_bridge")
+        bridge = bridge if isinstance(bridge, Mapping) else {}
+        checks: list[dict[str, Any]] = []
+        for driver_field, valuation_field in field_pairs:
+            left, right = driver_row.get(driver_field), bridge.get(valuation_field)
+            if left in (None, "") or right in (None, ""):
+                checks.append({
+                    "driver_field": driver_field, "valuation_field": valuation_field,
+                    "status": "NOT_COMPARABLE", "driver_value": left, "valuation_value": right,
+                })
+                all_match = False
+                continue
+            try:
+                left_num, right_num = Decimal(str(left)), Decimal(str(right))
+            except (InvalidOperation, ValueError):
+                left_num = right_num = None
+            if left_num is None or right_num is None:
+                check_status = "NOT_COMPARABLE"
+                all_match = False
+            else:
+                tolerance = Decimal("0.000001") if driver_field == "tax_rate" else Decimal("1")
+                check_status = "MATCH" if abs(left_num - right_num) <= tolerance else "MISMATCH"
+                if check_status == "MISMATCH":
+                    any_mismatch = True
+                    all_match = False
+            checks.append({
+                "driver_field": driver_field, "valuation_field": valuation_field,
+                "status": check_status, "driver_value": left, "valuation_value": right,
+            })
+        scenario_results[scenario_name] = {
+            "status": (
+                "MISMATCH" if any(item["status"] == "MISMATCH" for item in checks)
+                else "MATCH" if checks and all(item["status"] == "MATCH" for item in checks)
+                else "PARTIAL"
+            ),
+            "checks": checks,
+        }
+    status = "MISMATCH" if any_mismatch else "MATCH" if all_match else "PARTIAL"
+    return {
+        "schema_version": "IIOS-B4-VALUATION-BRIDGE-RECONCILIATION-0.1",
+        "status": status,
+        "scenarios": scenario_results,
+        "excluded_metrics": [{
+            "field": "free_cash_flow_proxy_cny",
+            "reason": (
+                "B4 使用 EBIT 税后现金流口径（unlevered proxy）；主估值 financial bridge "
+                "使用 net_profit_proxy + D&A − CapEx − 营运资金（含融资成本影响）。"
+                "两者口径不同，不应要求数值相等。"
+            ),
+        }],
+        "formal_admission_created": False,
+        "decision_authority": False,
+    }
+
+
 def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     if payload.get("schema_version") != PILOT_SCHEMA:
         raise LocalInvestmentPilotError("PILOT_INPUT_SCHEMA_MISMATCH")
@@ -545,7 +740,22 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         if not source_id or source_id in source_ids:
             continue
         source_ids.add(source_id)
-        known_text = str(row.get("known_at") or "").strip()
+        known_at_original = str(row.get("known_at") or "").strip()
+        known_text = known_at_original
+        known_at_precision = "DATE_ONLY" if len(known_text) == 10 else "TIMESTAMP_OR_OFFSET_DATETIME"
+        explicit_date_only_unknown_time = re.fullmatch(
+            r"(\d{4}-\d{2}-\d{2})\s*[;；,，]\s*"
+            r"(?:具体时分|具体时间|时分|时间|exact time|time(?: of day)?)\s*"
+            r"(?:[:：]\s*)?(?:UNKNOWN|未知|不详|not known)",
+            known_at_original,
+            flags=re.IGNORECASE,
+        )
+        if explicit_date_only_unknown_time:
+            # Treat an explicit "date known, clock time unknown" annotation as
+            # a date-level timestamp, not as malformed data. Preserve the raw
+            # annotation below so precision is not silently upgraded.
+            known_text = explicit_date_only_unknown_time.group(1)
+            known_at_precision = "DATE_ONLY_EXPLICIT_TIME_UNKNOWN"
         source_time_status = "UNKNOWN"
         if known_text:
             try:
@@ -573,6 +783,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             "source_class": str(row.get("source_class") or "UNKNOWN"),
             "source_ref": str(row.get("source_ref") or "UNKNOWN"),
             "known_at": known_text or None,
+            "known_at_original": known_at_original or None,
+            "known_at_precision": known_at_precision if known_text else "UNKNOWN",
             "time_status": source_time_status,
             "summary": str(row.get("summary") or "未提供事实摘要"),
             "raw_sha256_claimed": row.get("raw_sha256_claimed"),
@@ -589,14 +801,33 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "expectation_gap": {"PASS", "UNKNOWN", "BLOCKED", "AMBIGUOUS", "INCOMPATIBLE"},
         "risk": {"PASS", "FAIL", "UNKNOWN"},
     }
+    status_aliases = {
+        "trust": {"PASS_WITH_LIMITATIONS": "REVALIDATION"},
+        "reality": {"SUPPORTED_WITH_MATERIAL_CAVEATS": "CONDITIONAL"},
+        "quality": {"HIGH_QUALITY_WITH_CYCLICAL_AND_POLICY_RISKS": "CONDITIONAL"},
+        "thesis": {"CONDITIONALLY_VALID": "WATCH"},
+        # This means the analyst's own case does not clear the return hurdle;
+        # it is not a measured market-implied expectation gap.
+        "expectation_gap": {"ANALYST_CASE_INDICATES_INSUFFICIENT_RETURN": "UNKNOWN"},
+        # MATERIAL describes risk severity, not an explicit PASS/FAIL gate result.
+        "risk": {"MATERIAL": "UNKNOWN"},
+    }
     assessment: dict[str, Any] = {}
     for name, states in allowed_assessment.items():
         raw = raw_assessment.get(name) if isinstance(raw_assessment.get(name), Mapping) else {}
         assessment[name] = dict(raw)
-        assessment[name]["status"] = _status(raw.get("status"), states)
+        raw_status = str(raw.get("status") or "UNKNOWN").strip().upper()
+        normalized_status = status_aliases.get(name, {}).get(raw_status, raw_status)
+        assessment[name]["status_input"] = raw_status
+        assessment[name]["status"] = _status(normalized_status, states)
         assessment[name]["summary"] = str(raw.get("summary") or "")
+    direction_aliases = {
+        "CURRENT_PRICE_ABOVE_RISK_ADJUSTED_ENTRY_REFERENCE": "NEGATIVE",
+    }
+    raw_direction = str(assessment["expectation_gap"].get("direction") or "UNKNOWN").strip().upper()
+    assessment["expectation_gap"]["direction_input"] = raw_direction
     assessment["expectation_gap"]["direction"] = _status(
-        assessment["expectation_gap"].get("direction"),
+        direction_aliases.get(raw_direction, raw_direction),
         {"POSITIVE", "NEUTRAL", "NEGATIVE", "UNKNOWN"},
     )
     assessment["thesis"]["break_conditions"] = _items(assessment["thesis"].get("break_conditions"))
@@ -606,9 +837,12 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     assessment["value_drivers"] = [
         {
             "rank": int(item.get("rank", index)),
-            "driver": str(item.get("driver") or "未命名价值驱动因素"),
+            "driver": str(item.get("driver") or item.get("name") or item.get("title") or "未命名价值驱动因素"),
+            # Status such as OBSERVED_AND_FORECAST is not an impact direction.
+            # Keep it for display/audit, but do not infer POSITIVE or a passing gate.
+            "source_status": str(item.get("status") or "UNKNOWN"),
             "impact": _status(item.get("impact"), {"POSITIVE", "NEGATIVE", "MIXED", "UNKNOWN"}),
-            "rationale": str(item.get("rationale") or ""),
+            "rationale": str(item.get("rationale") or item.get("summary") or item.get("mechanism") or ""),
             "evidence_refs": _items(item.get("evidence_refs")),
         }
         for index, item in enumerate(value_drivers, start=1) if isinstance(item, Mapping)
@@ -639,6 +873,9 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             "evidence_refs": _items(stress_raw.get("evidence_refs")),
         },
     }
+    raw_driver_forecast, linked_cost_ratio_assumptions = _link_b4_cost_ratio_assumptions(
+        raw_driver_forecast, forecast
+    )
     parameters_raw = payload.get("decision_parameters") if isinstance(payload.get("decision_parameters"), Mapping) else {}
     try:
         horizon = int(parameters_raw.get("horizon_years", 1))
@@ -698,6 +935,11 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         unresolved_evidence_ids=unknown_refs,
         after_cutoff_evidence_ids=after_cutoff_refs,
         uncertain_timing_evidence_ids=uncertain_timing_refs,
+    )
+    if linked_cost_ratio_assumptions:
+        operating_driver_forecast["cross_node_assumption_links"] = linked_cost_ratio_assumptions
+    operating_driver_forecast["valuation_reconciliation"] = _reconcile_b4_valuation_bridge(
+        operating_driver_forecast, forecast
     )
     allowed_model_families = {"EPS_MULTIPLE", "FCF_DCF", "DDM", "SOTP", "RNPV", "OTHER", "UNKNOWN"}
     operator_context_raw = raw_operator_valuation_context if isinstance(raw_operator_valuation_context, Mapping) else {}
@@ -1403,13 +1645,13 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
         "## 二、Trust / Reality / Quality",
         "",
-        f"- Trust：{a['trust']['status']} — {a['trust'].get('summary') or '未知'}",
-        f"- Reality：{a['reality']['status']} — {a['reality'].get('summary') or '未知'}",
-        f"- Quality：{a['quality']['status']} — {a['quality'].get('summary') or '未知'}",
+        f"- Trust：{_assessment_status_for_report(a['trust'])} — {a['trust'].get('summary') or '未知'}",
+        f"- Reality：{_assessment_status_for_report(a['reality'])} — {a['reality'].get('summary') or '未知'}",
+        f"- Quality：{_assessment_status_for_report(a['quality'])} — {a['quality'].get('summary') or '未知'}",
         "",
         "## 三、Thesis 与价值驱动因素",
         "",
-        f"- Thesis 状态：{a['thesis']['status']}",
+        f"- Thesis 状态：{_assessment_status_for_report(a['thesis'])}",
         "",
         "### 核心论点",
         "",
@@ -1518,12 +1760,12 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "## 五、MIE 与预期差",
         "",
         f"- MIE：{a['market_implied_expectation']['status']} — {a['market_implied_expectation'].get('summary') or '未知'}",
-        f"- 预期差：{a['expectation_gap']['status']} / {a['expectation_gap']['direction']} — {a['expectation_gap'].get('summary') or '未知'}",
+        f"- 预期差：{_assessment_status_for_report(a['expectation_gap'])} / {a['expectation_gap']['direction']}{'（输入方向标签 ' + str(a['expectation_gap'].get('direction_input')) + '）' if a['expectation_gap'].get('direction_input') and str(a['expectation_gap'].get('direction_input')).upper() != str(a['expectation_gap']['direction']).upper() else ''} — {a['expectation_gap'].get('summary') or '未知'}",
         "- 若 MIE 无法识别或缺乏历史支持，不以内部估值代替市场隐含预期。",
         "",
         "## 六、风险与证据引用核对",
         "",
-        f"- 风险状态：{a['risk']['status']} — {a['risk'].get('summary') or '未知'}",
+        f"- 风险状态：{_assessment_status_for_report(a['risk'])} — {a['risk'].get('summary') or '未知'}",
     ])
     risk_items = a["risk"].get("items") or []
     if risk_items:
@@ -1566,7 +1808,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         for row in evidence_rows:
             lines.extend([
                 f"- **{row['source_id']} — {row['title']}**",
-                f"  类型：{row['source_class']}；known_at：{row['known_at'] or 'UNKNOWN'}；时间状态：{row['time_status']}。",
+                f"  类型：{row['source_class']}；known_at：{row['known_at'] or 'UNKNOWN'}；时间精度：{'仅日期，原始标注具体时分未知' if row.get('known_at_precision') == 'DATE_ONLY_EXPLICIT_TIME_UNKNOWN' else '仅日期' if row.get('known_at_precision') == 'DATE_ONLY' else '时间戳' if row.get('known_at_precision') == 'TIMESTAMP_OR_OFFSET_DATETIME' else 'UNKNOWN'}；时间状态：{row['time_status']}。",
                 f"  来源位置：{_source_ref_markdown(row['source_ref'])}。",
                 f"  摘要：{' '.join(str(row['summary']).splitlines()).strip()}",
                 "  正式证据准入：未完成。",
