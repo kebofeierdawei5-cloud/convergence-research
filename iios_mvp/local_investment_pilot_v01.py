@@ -303,6 +303,26 @@ def _items(value: Any) -> list[str]:
     return [str(item).strip() for item in value if str(item).strip()]
 
 
+def _is_identifiable_evidence_text(value: Any) -> bool:
+    """Reject blank and placeholder-only source locators/context from resolving citations."""
+    raw = str(value or "").strip()
+    if not raw:
+        return False
+    normalized = re.sub(r"[^A-Z0-9]+", "_", raw.upper()).strip("_")
+    placeholders = {
+        "UNKNOWN", "N_A", "NA", "NONE", "NULL", "NOT_IDENTIFIABLE",
+        "UNIDENTIFIABLE", "UNSPECIFIED", "NOT_SPECIFIED", "TBD", "NOT_PROVIDED",
+        "NOT_AVAILABLE", "UNAVAILABLE", "UNVERIFIED", "UNCONFIRMED", "NOT_KNOWN",
+        "UNKNOWN_SOURCE", "SOURCE_UNKNOWN", "NO_SOURCE", "NO_LOCATOR", "MISSING",
+        "UNRESOLVED", "NOT_ADMITTED", "NOT_VERIFIED",
+    }
+    chinese_placeholders = {
+        "未知", "不详", "不明确", "未提供", "未提供标题", "未提供事实摘要",
+        "来源未知", "缺失", "待补充", "待核实",
+    }
+    return normalized not in placeholders and raw not in chinese_placeholders
+
+
 def _records(value: Any) -> list[Any]:
     """Preserve structured records in the machine-readable analysis while accepting plain text."""
     if not isinstance(value, list):
@@ -931,6 +951,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     sources: list[dict[str, Any]] = []
     source_ids: set[str] = set()
     duplicate_source_ids: set[str] = set()
+    untraceable_evidence_fields: dict[str, list[str]] = {}
     for row in payload.get("evidence_register") or []:
         if not isinstance(row, Mapping):
             continue
@@ -944,6 +965,12 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             duplicate_source_ids.add(source_id)
             continue
         source_ids.add(source_id)
+        invalid_source_fields = [
+            field for field in ("title", "source_ref", "summary")
+            if not _is_identifiable_evidence_text(row.get(field))
+        ]
+        if invalid_source_fields:
+            untraceable_evidence_fields[source_id] = invalid_source_fields
         known_at_original = str(row.get("known_at") or "").strip()
         known_text = known_at_original
         known_at_precision = "DATE_ONLY" if len(known_text) == 10 else "TIMESTAMP_OR_OFFSET_DATETIME"
@@ -1127,7 +1154,9 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "valuation_transmission": raw_valuation_transmission,
     })
     unknown_refs = sorted(
-        (references - source_ids) | (references & duplicate_source_ids)
+        (references - source_ids)
+        | (references & duplicate_source_ids)
+        | (references & set(untraceable_evidence_fields))
     )
     after_cutoff_refs = [
         source["source_id"] for source in sources
@@ -1219,6 +1248,10 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         },
         "evidence_register": sources,
         "duplicate_evidence_ids": sorted(duplicate_source_ids),
+        "untraceable_evidence_ids": sorted(untraceable_evidence_fields),
+        "untraceable_evidence_fields": {
+            source_id: fields for source_id, fields in sorted(untraceable_evidence_fields.items())
+        },
         "assessment": assessment,
         "forecast_valuation": forecast,
         "operating_driver_forecast": operating_driver_forecast,
@@ -1636,6 +1669,12 @@ def _decision(
     )
     if referenced_duplicate_ids:
         issues.append("DUPLICATE_EVIDENCE_SOURCE_IDS")
+    referenced_untraceable_ids = (
+        set(prepared.get("referenced_evidence_ids") or [])
+        & set(prepared.get("untraceable_evidence_ids") or [])
+    )
+    if referenced_untraceable_ids:
+        issues.append("UNTRACEABLE_EVIDENCE_SOURCE_RECORDS")
     if prepared["after_cutoff_evidence_references"]:
         issues.append("REFERENCED_EVIDENCE_AFTER_CUTOFF")
     if prepared["uncertain_timing_evidence_references"]:
@@ -1660,6 +1699,7 @@ def _decision(
         "EVIDENCE_REGISTER_EMPTY",
         "UNRESOLVED_EVIDENCE_REFERENCES",
         "DUPLICATE_EVIDENCE_SOURCE_IDS",
+        "UNTRACEABLE_EVIDENCE_SOURCE_RECORDS",
         "REFERENCED_EVIDENCE_AFTER_CUTOFF",
         "REFERENCED_EVIDENCE_TIMING_UNCERTAIN",
         "PRICE_NOT_PIT_QUALIFIED",
@@ -2072,11 +2112,33 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             + "、".join(duplicate_evidence_ids)
             + "；这些 ID 无法唯一对应来源记录，凡被引用均按未解决处理。"
         )
+    untraceable_evidence_ids = sorted(set(analysis.get("untraceable_evidence_ids") or []))
+    untraceable_evidence_fields = (
+        analysis.get("untraceable_evidence_fields")
+        if isinstance(analysis.get("untraceable_evidence_fields"), Mapping) else {}
+    )
+    if untraceable_evidence_ids:
+        lines.append(
+            "- 来源登记关键内容缺失/为占位值的 ID："
+            + "、".join(untraceable_evidence_ids)
+            + "；若被引用，则按未解决证据处理。"
+        )
     if referenced:
         for ref in referenced:
             if ref in duplicate_evidence_ids:
                 lines.append(
                     f"- **{ref}**：**来源 ID 重复登记，引用无法唯一解析**；不得作为已解决证据支持结论。"
+                )
+            elif ref in untraceable_evidence_ids:
+                fields = untraceable_evidence_fields.get(ref, [])
+                field_labels = {
+                    "title": "标题",
+                    "source_ref": "来源位置",
+                    "summary": "事实摘要",
+                }
+                missing_labels = "、".join(field_labels.get(field, field) for field in fields) or "来源描述"
+                lines.append(
+                    f"- **{ref}**：**引用无法完成来源定位**；不可识别字段：{missing_labels}；不得作为已解决证据支持结论。"
                 )
             elif ref in evidence_by_id:
                 row = evidence_by_id[ref]
@@ -2189,6 +2251,8 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "price_input": prepared["price_input"],
         "evidence_register": prepared["evidence_register"],
         "duplicate_evidence_ids": prepared["duplicate_evidence_ids"],
+        "untraceable_evidence_ids": prepared["untraceable_evidence_ids"],
+        "untraceable_evidence_fields": prepared["untraceable_evidence_fields"],
         "referenced_evidence_ids": prepared["referenced_evidence_ids"],
         "unresolved_evidence_references": prepared["unresolved_evidence_references"],
         "after_cutoff_evidence_references": prepared["after_cutoff_evidence_references"],
