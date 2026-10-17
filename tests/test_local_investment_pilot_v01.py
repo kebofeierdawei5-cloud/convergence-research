@@ -883,6 +883,11 @@ def test_research_status_aliases_known_at_precision_and_value_driver_schema():
     assert source["time_status"] == "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
     assert "E1" not in prepared["uncertain_timing_evidence_references"]
 
+    report = pilot._render_report(_analyse(payload, "test-status-aliases"))
+    assert "输入标签 PASS_WITH_LIMITATIONS" in report
+    assert "持续经营业务收入增长" in report
+    assert "订单和收入推动长期价值，但需验证兑现。" in report
+
 
 def test_b4_links_explicit_service_revenue_and_reconciles_valuation_bridge():
     payload = _payload(cutoff="2026-10-10")
