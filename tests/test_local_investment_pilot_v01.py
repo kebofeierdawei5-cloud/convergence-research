@@ -839,6 +839,160 @@ def test_extract_json_object_blocks_incomplete_clipboard_response():
         _extract_json_object(source)
 
 
+def test_research_status_aliases_known_at_precision_and_value_driver_schema():
+    payload = _payload(cutoff="2026-10-10")
+    payload["evidence_register"][0]["known_at"] = "2026-08-30；具体时分 UNKNOWN"
+    payload["assessment"]["trust"]["status"] = "PASS_WITH_LIMITATIONS"
+    payload["assessment"]["reality"]["status"] = "SUPPORTED_WITH_MATERIAL_CAVEATS"
+    payload["assessment"]["quality"]["status"] = "HIGH_QUALITY_WITH_CYCLICAL_AND_POLICY_RISKS"
+    payload["assessment"]["thesis"]["status"] = "CONDITIONALLY_VALID"
+    payload["assessment"]["expectation_gap"] = {
+        "status": "ANALYST_CASE_INDICATES_INSUFFICIENT_RETURN",
+        "direction": "CURRENT_PRICE_ABOVE_RISK_ADJUSTED_ENTRY_REFERENCE",
+        "summary": "Analyst case return is below hurdle; not market consensus.",
+        "evidence_refs": ["E1"],
+    }
+    payload["assessment"]["risk"]["status"] = "MATERIAL"
+    payload["assessment"]["value_drivers"] = [{
+        "rank": 1,
+        "name": "持续经营业务收入增长",
+        "status": "OBSERVED_AND_FORECAST",
+        "summary": "订单和收入推动长期价值，但需验证兑现。",
+        "evidence_refs": ["E1"],
+    }]
+
+    prepared = _prepare_input(payload)
+    assessment = prepared["assessment"]
+    source = prepared["evidence_register"][0]
+
+    assert assessment["trust"]["status"] == "REVALIDATION"
+    assert assessment["trust"]["status_input"] == "PASS_WITH_LIMITATIONS"
+    assert assessment["reality"]["status"] == "CONDITIONAL"
+    assert assessment["quality"]["status"] == "CONDITIONAL"
+    assert assessment["thesis"]["status"] == "WATCH"
+    assert assessment["expectation_gap"]["status"] == "UNKNOWN"
+    assert assessment["expectation_gap"]["direction"] == "NEGATIVE"
+    assert assessment["risk"]["status"] == "UNKNOWN"
+    assert assessment["value_drivers"][0]["driver"] == "持续经营业务收入增长"
+    assert assessment["value_drivers"][0]["rationale"] == "订单和收入推动长期价值，但需验证兑现。"
+    assert assessment["value_drivers"][0]["impact"] == "UNKNOWN"
+    assert assessment["value_drivers"][0]["source_status"] == "OBSERVED_AND_FORECAST"
+    assert source["known_at"] == "2026-08-30"
+    assert source["known_at_original"] == "2026-08-30；具体时分 UNKNOWN"
+    assert source["known_at_precision"] == "DATE_ONLY_EXPLICIT_TIME_UNKNOWN"
+    assert source["time_status"] == "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+    assert "E1" not in prepared["uncertain_timing_evidence_references"]
+
+
+def test_b4_links_explicit_service_revenue_and_reconciles_valuation_bridge():
+    payload = _payload(cutoff="2026-10-10")
+    scenario_values = {
+        "bear": {
+            "revenue": 1000, "cost_ratio": 0.50, "fixed": 100, "da": 50,
+            "finance": 10, "tax": 0.20, "capex": 80, "wc": 10,
+        },
+        "base": {
+            "revenue": 2000, "cost_ratio": 0.45, "fixed": 150, "da": 100,
+            "finance": 20, "tax": 0.20, "capex": 100, "wc": 20,
+        },
+        "bull": {
+            "revenue": 3000, "cost_ratio": 0.40, "fixed": 200, "da": 120,
+            "finance": 30, "tax": 0.20, "capex": 130, "wc": 30,
+        },
+    }
+
+    def measure(value, unit):
+        return {
+            "value": value,
+            "unit": unit,
+            "data_class": "ANALYST_ASSUMPTION",
+            "basis": "Synthetic assumption for regression test only.",
+            "evidence_refs": [],
+            "note": "Not an actual result.",
+        }
+
+    payload["forecast_valuation"]["assumptions"] = [{
+        "assumption_id": "A2",
+        "name": "成本率",
+        "values": {
+            f"{name}_cost_of_revenue_ratio": row["cost_ratio"]
+            for name, row in scenario_values.items()
+        },
+        "data_class": "ANALYST_ASSUMPTION",
+        "basis": "Synthetic same-scenario cost-of-revenue ratio.",
+        "evidence_refs": [],
+    }]
+
+    payload["operating_driver_forecast"] = {
+        "schema_version": "IIOS-OPERATING-DRIVER-FORECAST-0.1",
+        "scope": "COMPANY_WIDE",
+        "actuals_period": "2026H1",
+        "forecast_period": "2027FY",
+        "summary": "Service company forecast uses direct segment revenue assumptions; tonnage metrics remain unknown.",
+        "product_lines": [{
+            "product_id": "SERVICE",
+            "product_name": "研发/测试服务",
+            "capacity_tonnes_per_year": {
+                "value": None, "unit": "tonnes/year", "data_class": "UNKNOWN",
+                "basis": "", "evidence_refs": [], "note": "Not a tonne-based service.",
+            },
+            "historical_actuals": {},
+        }],
+        "scenarios": {},
+    }
+
+    for name, row in scenario_values.items():
+        revenue = row["revenue"]
+        cogs = revenue * row["cost_ratio"]
+        gross_profit = revenue - cogs
+        ebitda = gross_profit - row["fixed"]
+        ebit = ebitda - row["da"]
+        pretax = ebit - row["finance"]
+        net_profit = pretax * (1 - row["tax"])
+        payload["operating_driver_forecast"]["scenarios"][name] = {
+            "product_lines": [{
+                "product_id": "SERVICE",
+                "revenue_cny": measure(revenue, "CNY"),
+            }],
+            "fixed_cash_opex_cny": measure(row["fixed"], "CNY"),
+            "depreciation_amortization_cny": measure(row["da"], "CNY"),
+            "finance_cost_cny": measure(row["finance"], "CNY"),
+            "tax_rate": measure(row["tax"], "ratio"),
+            "cash_capex_cny": measure(row["capex"], "CNY"),
+            "change_working_capital_cny": measure(row["wc"], "CNY"),
+        }
+        payload["forecast_valuation"]["scenarios"][name]["operating_financial_bridge"] = {
+            "revenue_cny": revenue,
+            "cost_of_revenue_cny": cogs,
+            "gross_profit_cny": gross_profit,
+            "fixed_cash_opex_cny": row["fixed"],
+            "ebitda_cny": ebitda,
+            "depreciation_amortization_cny": row["da"],
+            "ebit_cny": ebit,
+            "finance_cost_cny": row["finance"],
+            "pretax_profit_cny": pretax,
+            "tax_rate": row["tax"],
+            "net_profit_proxy_cny": net_profit,
+            "cash_capex_cny": row["capex"],
+            "change_working_capital_cny": row["wc"],
+            "free_cash_flow_proxy_cny": net_profit + row["da"] - row["capex"] - row["wc"],
+        }
+
+    prepared = _prepare_input(payload)
+    b4 = prepared["operating_driver_forecast"]
+    assert b4["status"] == "SCENARIOS_CALCULATED"
+    assert b4["scenarios"]["bear"]["revenue_cny"] == "1000"
+    assert b4["scenarios"]["bear"]["variable_cost_cny"] == "500.00"
+    assert b4["scenarios"]["bear"]["net_profit_cny"] == "272.0000"
+    assert b4["valuation_reconciliation"]["status"] == "MATCH"
+    assert all(
+        b4["valuation_reconciliation"]["scenarios"][name]["status"] == "MATCH"
+        for name in ("bear", "base", "bull")
+    )
+    assert b4["cross_node_assumption_links"][0]["status"] == "LINKED_SAME_SCENARIO_ASSUMPTION"
+    assert "free_cash_flow_proxy_cny" in b4["valuation_reconciliation"]["excluded_metrics"][0]["field"]
+
+
 def test_root_one_click_launcher_uses_the_guided_entry_and_has_valid_bash():
     root = Path(__file__).resolve().parents[1]
     launcher = root / "启动IIOS投资分析.command"
