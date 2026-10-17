@@ -8,7 +8,9 @@ Authority: this file is the **only canonical Current State Index**.
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
-**Next user-visible acceptance:** a real macOS full-run and Replay on current `main`, reviewing `report.md`, `analysis.json`, and `pilot_receipt.json`. PR #451 (primary-model and terminal-date contracts) and PR #452 (unresolved-scope guard) are merged; PR #452 exact head `101dfa425af85fb1c8c8d8cfa0fb73b531f1ec73` passed 123 local-pilot + Replay tests and 17/17 PR checks. This is code/CI evidence only; the 603699 macOS full-run and Replay bundle remains absent/unverified. Run a fresh Mac pilot with explicit model-family/scope/terminal-date fields, then compare `analysis.json`, `report.md`, and `pilot_receipt.json` from that same run before marking B7 accepted.
+**Deferred acceptance item:** a real macOS full-run + Replay on current `main` is still required before B7 can be marked accepted. On 2026-10-17, the operator explicitly deferred ZIP delivery because the chat upload limit was reached; this is a scheduling deferral, not a pass. The private 603699 run bundle is still absent from this review and remains OPEN / NOT VERIFIED. When the ZIP can be uploaded, review `input.json`, `analysis.json`, `report.md`, and `pilot_receipt.json` from the first run and Replay plus the acceptance log.
+
+**Next active code batch:** continue a bounded source-level red-team of the existing B4–B7 local investment-result path. Fix only reproduced defects that could misstate evidence traceability, model/timing gates, return/target-entry/B6 outputs, or JSON/report consistency. Do not expand unrelated data-rights workflows, production Host, P0 diagnostics, anti-tamper, or trading features. This work does not substitute for the deferred Mac acceptance.
 
 The records below are cumulative milestone history. A milestone's historical “next boundary” is **time-local** and MUST NOT be interpreted as the current development instruction.
 
@@ -51,7 +53,8 @@ B4 operating-driver forecast bridge                    PR #424 + #426 + #442 + #
 B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 MERGED; explicit-null cash distributions BLOCK transmission; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; EPS_MULTIPLE ONLY
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 MERGED; report/JSON target-price cap assertions; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
-B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; UNKNOWN/N/A/unspecified terminal-date basis fails closed; 123 local-pilot+Replay tests + 6/6 triggered workflows passed on #454; real Mac full-run + Replay acceptance OPEN
+B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
+B8 bounded evidence traceability audit                          PR #456 + #457 MERGED; referenced duplicate IDs and placeholder-only title/locator/summary fail closed; PR #457 130 local-pilot+Replay tests + 6/6 triggered workflows PASS; Mac ZIP review deferred
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -67,6 +70,14 @@ B7 primary-model + terminal-date contract                    PR #451 + #452 + #4
 - PR [#454](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/454) merged at `11a1b03e4268937900e5c825b8a35b984ebd33c8`. The validator now fails closed for normalized non-identifiable sentinels; return metrics and target entry prices remain unresolved and the provisional action stays `REVIEW_REQUIRED`.
 - The exact PR head passed **123/123 local-pilot + Replay tests** and all **6/6 triggered workflows**. No valuation formula, 15% annualized-return hurdle, risk cap, decision precedence, or execution authority changed.
 - **The actual Mac full-run + Replay bundle remains OPEN / not verified.** This fix and its CI do not substitute for the deferred private output review.
+
+### B8 — bounded evidence traceability red-team (2026-10-17)
+
+- PR [#456](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/456) merged at `c559e981de6e184156d6f6dcd8cd06dccd688491`. It fixed a silent duplicate-ID case: duplicate `evidence_register.source_id` entries are now retained as an explicit ambiguity, and any cited duplicate ID is unresolved and blocks decision readiness with `REVIEW_REQUIRED`.
+- PR [#457](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/457) merged at `f2b1c2bb5716808351eb00cf0eaba1e9c1d02b7d`. The direct private `--input` path previously could bypass the wizard's completeness check and treat a cited source record with placeholder-only `title`, `source_ref`, or `summary` as resolved. Those cited records now remain unresolved; machine JSON and the Chinese report disclose the field-level problem and decision readiness remains blocked.
+- Exact PR #456 head passed **125/125** local-pilot + Replay tests and all **6/6** triggered workflows. Exact PR #457 head passed **130/130** local-pilot + Replay tests and all **6/6** triggered workflows.
+- This validates only source-record identifiability and reference handling. It does not prove source URL reachability, truth, rights, or formal Evidence/PIT admission. Metrics may remain visible as non-canonical arithmetic, but a referenced source-integrity fault prevents the result being treated as decision-ready.
+- **The real macOS full-run + Replay ZIP audit remains deferred / OPEN / NOT VERIFIED.** These code fixes and CI do not replace the private run-bundle review.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
