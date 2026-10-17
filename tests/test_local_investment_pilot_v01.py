@@ -290,6 +290,31 @@ def test_unreferenced_duplicate_evidence_id_is_disclosed_without_false_reference
     assert "来源登记表重复 ID：E-UNUSED" in report
 
 
+@pytest.mark.parametrize(
+    ("field", "placeholder"),
+    [
+        ("source_ref", "UNKNOWN"),
+        ("source_ref", "N/A"),
+        ("title", "UNKNOWN"),
+        ("summary", "未提供事实摘要"),
+        ("summary", "TBD"),
+    ],
+)
+def test_referenced_evidence_with_placeholder_locator_or_context_is_unresolved(field, placeholder):
+    payload = _payload()
+    payload["evidence_register"][0][field] = placeholder
+
+    analysis, report = _analyse(payload, f"TEST-UNTRACEABLE-SOURCE-{field}-{placeholder}")
+
+    assert analysis["untraceable_evidence_ids"] == ["E1"]
+    assert field in analysis["untraceable_evidence_fields"]["E1"]
+    assert "E1" in analysis["referenced_evidence_ids"]
+    assert "E1" in analysis["unresolved_evidence_references"]
+    assert "UNTRACEABLE_EVIDENCE_SOURCE_RECORDS" in analysis["decision"]["gating_issues"]
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert "**E1**：**引用无法完成来源定位**" in report
+
+
 def test_report_uses_portable_prose_instead_of_markdown_tables_and_python_dict_repr(tmp_path):
     payload = _payload()
     payload["evidence_register"] = []
