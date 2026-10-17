@@ -251,8 +251,14 @@ def _product_profit_bridge(
     if calculated_revenue is not None and direct_revenue is not None and calculated_revenue != direct_revenue:
         issues.append("EXPLICIT_REVENUE_CONFLICTS_WITH_VOLUME_X_ASP")
         revenue = None
+        revenue_basis = None
     else:
         revenue = calculated_revenue if calculated_revenue is not None else direct_revenue
+        revenue_basis = (
+            "VOLUME_X_NET_ASP" if calculated_revenue is not None
+            else "DIRECT_REPORTED_REVENUE" if direct_revenue is not None
+            else None
+        )
     if calculated_variable_cost is not None and direct_variable_cost is not None and calculated_variable_cost != direct_variable_cost:
         issues.append("EXPLICIT_VARIABLE_COST_CONFLICTS_WITH_VOLUME_X_UNIT_COST")
         variable_cost = None
@@ -273,6 +279,7 @@ def _product_profit_bridge(
         "net_asp_cny_per_tonne": _render(asp),
         "variable_cost_cny_per_tonne": _render(unit_cost),
         "revenue_cny": _render(revenue),
+        "revenue_basis": revenue_basis,
         "variable_cost_cny": _render(variable_cost),
         "production_utilization": _render(utilization),
         "issues": issues,
@@ -589,6 +596,7 @@ def evaluate_operating_driver_forecast(
                 "sales_volume_tonnes": "tonnes",
                 "net_asp_cny_per_tonne": "CNY/tonne",
                 "variable_cost_cny_per_tonne": "CNY/tonne",
+                "revenue_cny": "CNY",
             },
             f"{product_id}.historical_actuals",
             sources_by_id,
@@ -748,6 +756,7 @@ def render_operating_driver_section(
             ("sales_volume_tonnes", "实际销量"),
             ("net_asp_cny_per_tonne", "实际净售价"),
             ("variable_cost_cny_per_tonne", "单位变动成本"),
+            ("revenue_cny", "已披露历史收入"),
         ):
             measure = actuals.get(key)
             data_class = measure.get("data_class", "UNKNOWN") if isinstance(measure, Mapping) else "UNKNOWN"
@@ -755,7 +764,10 @@ def render_operating_driver_section(
             suffix = f"；类别 {data_class}" + (f"；证据引用 {refs}" if refs else "")
             lines.append(f"  - {label}：{_display(measure)}{suffix}")
         bridge = product.get("historical_actual_bridge") if isinstance(product.get("historical_actual_bridge"), Mapping) else {}
-        lines.append(f"  - 按已可用的销量×净售价计算收入：{_display_optional_scalar(bridge.get('revenue_cny'))}；销量×单位变动成本：{_display_optional_scalar(bridge.get('variable_cost_cny'))}。")
+        lines.append(
+            f"  - 历史收入：{_display_optional_scalar(bridge.get('revenue_cny'))}；识别口径：{bridge.get('revenue_basis') or 'UNKNOWN'}；"
+            f"销量×单位变动成本：{_display_optional_scalar(bridge.get('variable_cost_cny'))}。"
+        )
         if bridge.get("production_utilization") is not None:
             lines.append(f"  - 产能利用率（产量/年产能）：{Decimal(bridge['production_utilization']) * Decimal('100')}%（仅当期间与容量口径可比时成立）")
         for issue in bridge.get("issues") or []:
