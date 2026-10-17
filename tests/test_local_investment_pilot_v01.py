@@ -2006,7 +2006,7 @@ def test_b4_report_preserves_numeric_zero_in_operating_bridge_fields():
             "summary": "synthetic test",
         },
     ))
-    assert "按已可用的销量×净售价计算收入：0；销量×单位变动成本：0。" in report
+    assert "历史收入：0；识别口径：UNKNOWN；销量×单位变动成本：0。" in report
     assert "- 产量 / 销量：0 / 0 吨" in report
     assert "- 收入：0；变动成本：0；扣变动成本贡献：0" in report
     assert "- EBITDA / EBIT / 税前利润 / 净利润：0 / 0 / 0 / 0" in report
@@ -2057,7 +2057,7 @@ def test_b4_report_renders_missing_operating_bridge_fields_as_unknown():
             "summary": "synthetic test",
         },
     ))
-    assert "按已可用的销量×净售价计算收入：UNKNOWN；销量×单位变动成本：UNKNOWN。" in report
+    assert "历史收入：UNKNOWN；识别口径：UNKNOWN；销量×单位变动成本：UNKNOWN。" in report
     assert "- 产量 / 销量：UNKNOWN / UNKNOWN 吨" in report
     assert "- 收入：UNKNOWN；变动成本：UNKNOWN；扣变动成本贡献：UNKNOWN" in report
     assert "- EBITDA / EBIT / 税前利润 / 净利润：UNKNOWN / UNKNOWN / UNKNOWN / UNKNOWN" in report
