@@ -127,7 +127,7 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
         },
         "operating_driver_forecast": {
             "schema_version": "IIOS-OPERATING-DRIVER-FORECAST-0.1",
-            "scope": "UNKNOWN",
+            "scope": "COMPANY_WIDE",
             "status": "UNKNOWN",
             "actuals_period": "UNKNOWN",
             "forecast_period": f"{forecast_year}FY",
@@ -1414,6 +1414,22 @@ def test_operator_selected_sotp_blocks_eps_multiple_price_calculation():
     assert forged_analysis["return_metrics"] is None
     assert forged_analysis["price_zone_sensitivity"]["target_entry_price"] is None
 
+
+
+def test_unknown_or_product_line_scope_with_unlinked_b5_blocks_price_outputs():
+    for scope in ("UNKNOWN", "PRODUCT_LINE", "PROJECT_INCREMENTAL"):
+        payload = _payload()
+        payload["operating_driver_forecast"]["scope"] = scope
+        payload["valuation_transmission"]["model_family"] = "UNKNOWN"
+        analysis, report = _analyse(payload, f"TEST-UNRESOLVED-SCOPE-{scope}")
+
+        contract = analysis["valuation_model_consistency"]
+        assert contract["status"] == "OPERATING_SCOPE_OR_B5_TRANSMISSION_NOT_RESOLVED"
+        assert contract["primary_model_price_calculation_eligible"] is False
+        assert analysis["return_metrics"] is None
+        assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+        assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+        assert "B5 传导状态" in report
 
 def test_calendar_day_terminal_date_controls_annualization_and_return_cap():
     payload = _payload(price="144.30", cutoff="2026-10-16")

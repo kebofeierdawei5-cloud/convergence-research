@@ -5,11 +5,11 @@
 ### 2026-10-17 — Pilot Primary Valuation Model + Terminal-Date Contract
 
 - Added a separate forecast_valuation.model_family field for the model actually used to calculate scenario terminal values, compared against the operator-owned selected_model_family.
-- If the model families are unknown or mismatch, the pilot preserves the values as alternative/unresolved research inputs but blocks return metrics, target entry price, and B6 price sensitivity. An unsupported B5 bridge also blocks price calculation when the operating forecast is explicitly project-incremental.
+- If the selected, declared, or name-parsed model family is unknown or conflicts, the pilot preserves the values as alternative/unresolved research inputs but blocks return metrics, target entry price, and B6 price sensitivity. When B5 is not accepted, any scope other than explicitly `COMPANY_WIDE` also blocks price calculation; missing scope is not treated as company-wide.
 - Added an explicit valuation_terminal_date and basis, with forecast-period compatibility checks. The return solver accepts an optional date-derived annualization_year_fraction; the selected 1Y/3Y decision reference remains separately validated.
 - Annualized return and annualized return-hurdle entry price now use ACT/365F calendar days from cutoff date to terminal date. Missing/inconsistent timing fails closed to UNKNOWN.
 - No valuation family was auto-selected or converted to EPS_MULTIPLE; 15% return hurdle, risk caps, decision precedence and non-execution authority are unchanged.
-- Regression coverage covers model mismatch, missing date/basis, forecast-period mismatch, and 441-day ACT/365F calculations. Dedicated local-pilot + Replay workflow passed 122 tests; all 14 PR checks passed at code head `dafa95cb6c14c3c64bf8856788dacf11819e6a0f`. Fresh Mac full-run/Replay acceptance remains open.
+- Regression coverage covers model mismatch, falsely self-labelled SOTP, missing date/basis, forecast-period mismatch, and 441-day ACT/365F calculations. Exact PR head `5957832e4000d7c01a3fa905e9aecb73b6f406b7` passed 122 local-pilot/Replay tests and 23 PR checks. PR #452 adds explicit UNKNOWN/PRODUCT_LINE/PROJECT_INCREMENTAL scope regressions; latest checks are pending. PR #451 is merged, while fresh Mac full-run/Replay acceptance remains open.
 
 
 ### 2026-10-09 — Route A Run #8 Partial Capture Retained + B2 Preflight (No Provider Credentials)
