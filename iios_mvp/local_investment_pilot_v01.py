@@ -2865,6 +2865,15 @@ def _assert_response_preserves_operator_inputs(
         field for field in ("case", "price_input", "operator_valuation_context")
         if payload.get(field) != template.get(field)
     ]
+    template_parameters = template.get("decision_parameters")
+    template_parameters = template_parameters if isinstance(template_parameters, Mapping) else {}
+    response_parameters = payload.get("decision_parameters")
+    response_parameters = response_parameters if isinstance(response_parameters, Mapping) else {}
+    # The LLM must not silently loosen or tighten the operator-owned Bear-loss cap:
+    # it directly changes risk_pass and the B6 risk price ceiling. The operator may
+    # intentionally change this value in the local template before requesting research.
+    if response_parameters.get("max_loss_pct") != template_parameters.get("max_loss_pct"):
+        mismatched_sections.append("decision_parameters.max_loss_pct")
     if mismatched_sections:
         sections = ", ".join(mismatched_sections)
         raise LocalInvestmentPilotError(
