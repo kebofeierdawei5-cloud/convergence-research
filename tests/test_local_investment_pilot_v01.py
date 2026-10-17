@@ -942,7 +942,16 @@ def test_b4_links_explicit_service_revenue_and_reconciles_valuation_bridge():
                 "value": None, "unit": "tonnes/year", "data_class": "UNKNOWN",
                 "basis": "", "evidence_refs": [], "note": "Not a tonne-based service.",
             },
-            "historical_actuals": {},
+            "historical_actuals": {
+                "revenue_cny": {
+                    "value": 250000,
+                    "unit": "CNY",
+                    "data_class": "OBSERVED_ACTUAL",
+                    "basis": "Synthetic observed segment revenue for regression testing only.",
+                    "evidence_refs": ["E1"],
+                    "note": "Source is a synthetic fixture, not real issuer evidence.",
+                },
+            },
         }],
         "scenarios": {},
     }
@@ -987,6 +996,12 @@ def test_b4_links_explicit_service_revenue_and_reconciles_valuation_bridge():
     prepared = _prepare_input(payload)
     b4 = prepared["operating_driver_forecast"]
     assert b4["status"] == "SCENARIOS_CALCULATED"
+    historical_bridge = b4["product_lines"][0]["historical_actual_bridge"]
+    assert Decimal(historical_bridge["revenue_cny"]) == Decimal("250000")
+    assert historical_bridge["revenue_basis"] == "DIRECT_REPORTED_REVENUE"
+    historical_render = render_operating_driver_section(b4, payload["forecast_valuation"]["scenarios"])
+    assert "已披露历史收入：250000 CNY" in "\\n".join(historical_render)
+    assert "识别口径：DIRECT_REPORTED_REVENUE" in "\\n".join(historical_render)
     assert Decimal(b4["scenarios"]["bear"]["revenue_cny"]) == Decimal("1000")
     assert Decimal(b4["scenarios"]["bear"]["variable_cost_cny"]) == Decimal("500")
     assert Decimal(b4["scenarios"]["bear"]["net_profit_cny"]) == Decimal("272")
