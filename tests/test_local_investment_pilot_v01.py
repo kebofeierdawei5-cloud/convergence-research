@@ -376,16 +376,6 @@ def test_guided_observation_date_must_precede_date_only_cutoff():
         _validate_guided_observation_date(date(2026, 10, 13), cutoff)
 
 
-@pytest.mark.parametrize(
-    ("section", "status", "placeholder"),
-    [
-        ("trust", "PASS", "UNKNOWN"),
-        ("reality", "PASS", "TBD"),
-        ("quality", "PASS", "N/A"),
-        ("thesis", "INTACT", "NOT_IDENTIFIABLE"),
-        ("risk", "PASS", "未提供依据"),
-    ],
-)
 def test_assessment_pass_or_intact_requires_its_own_resolved_evidence_reference():
     payload = _payload()
     payload["assessment"]["trust"]["evidence_refs"] = []
@@ -414,6 +404,16 @@ def test_assessment_pass_with_unresolved_reference_is_not_preserved():
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
 
 
+@pytest.mark.parametrize(
+    ("section", "status", "placeholder"),
+    [
+        ("trust", "PASS", "UNKNOWN"),
+        ("reality", "PASS", "TBD"),
+        ("quality", "PASS", "N/A"),
+        ("thesis", "INTACT", "NOT_IDENTIFIABLE"),
+        ("risk", "PASS", "未提供依据"),
+    ],
+)
 def test_assessment_gate_status_downgrades_when_summary_is_placeholder(section, status, placeholder):
     payload = _payload()
     payload["assessment"][section]["status"] = status
