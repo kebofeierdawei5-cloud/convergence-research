@@ -413,6 +413,25 @@ def test_ai_response_must_preserve_operator_owned_case_and_price_input(tmp_path)
         _assert_response_preserves_operator_inputs(template_path, payload)
 
 
+@pytest.mark.parametrize(
+    ("field", "invalid_value", "error_code"),
+    [
+        ("required_return_annualized", "TBD", "REQUIRED_RETURN_POLICY_INVALID"),
+        ("required_return_annualized", None, "REQUIRED_RETURN_POLICY_INVALID"),
+        ("max_loss_pct", "N/A", "MAX_LOSS_PCT_POLICY_INVALID"),
+        ("max_loss_pct", None, "MAX_LOSS_PCT_POLICY_INVALID"),
+        ("max_loss_pct", "100", "MAX_LOSS_PCT_OUT_OF_RANGE"),
+        ("max_loss_pct", "-1", "MAX_LOSS_PCT_OUT_OF_RANGE"),
+    ],
+)
+def test_invalid_explicit_risk_or_return_policy_input_fails_closed(field, invalid_value, error_code):
+    payload = _payload()
+    payload["decision_parameters"][field] = invalid_value
+
+    with pytest.raises(LocalInvestmentPilotError, match=error_code):
+        _analyse(payload, f"TEST-INVALID-POLICY-{field}-{invalid_value}")
+
+
 def test_ai_response_must_preserve_operator_required_return_hurdle(tmp_path):
     template_payload = _payload(cutoff="2026-10-10")
     template_payload["decision_parameters"]["required_return_annualized"] = "0.20"

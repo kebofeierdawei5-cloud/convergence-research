@@ -1132,18 +1132,24 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         override_basis = []
         rationale += " 期限覆盖未通过条件检查，已使用默认期限规则。"
     try:
-        required_return = max(
-            FUNDAMENTAL_TARGET_ANNUALIZED_RETURN,
-            _number(parameters_raw.get("required_return_annualized", "0.15"), "REQUIRED_RETURN"),
+        requested_required_return = _number(
+            parameters_raw.get("required_return_annualized", "0.15"),
+            "REQUIRED_RETURN",
         )
-    except LocalInvestmentPilotError:
-        required_return = FUNDAMENTAL_TARGET_ANNUALIZED_RETURN
+    except LocalInvestmentPilotError as exc:
+        # A present but malformed policy value is not the same as an omitted
+        # legacy field/default. Do not silently loosen the user's hurdle.
+        raise LocalInvestmentPilotError("REQUIRED_RETURN_POLICY_INVALID") from exc
+    required_return = max(
+        FUNDAMENTAL_TARGET_ANNUALIZED_RETURN,
+        requested_required_return,
+    )
     try:
         max_loss = _number(parameters_raw.get("max_loss_pct", "25"), "MAX_LOSS_PCT")
-        if max_loss < 0 or max_loss >= 100:
-            max_loss = Decimal("25")
-    except LocalInvestmentPilotError:
-        max_loss = Decimal("25")
+    except LocalInvestmentPilotError as exc:
+        raise LocalInvestmentPilotError("MAX_LOSS_PCT_POLICY_INVALID") from exc
+    if max_loss < 0 or max_loss >= 100:
+        raise LocalInvestmentPilotError("MAX_LOSS_PCT_OUT_OF_RANGE")
 
     # Resolve every structured evidence reference from assessment and valuation inputs,
     # before any structured risk/assumption objects are rendered for human readers.
