@@ -758,6 +758,7 @@ def _build_valuation_timing(
     cutoff_date: Any,
     forecast_period: Any,
     valuation_terminal_date: Any,
+    valuation_terminal_date_basis: Any,
 ) -> dict[str, Any]:
     """Bind annualization to the explicit valuation endpoint, not a nominal horizon label."""
     cutoff_text = str(cutoff_date or "").strip()
@@ -770,6 +771,7 @@ def _build_valuation_timing(
         cutoff = date.fromisoformat(cutoff_text)
     except (TypeError, ValueError):
         issues.append("VALUATION_CUTOFF_DATE_INVALID")
+    terminal_basis = str(valuation_terminal_date_basis or "").strip()
     if not terminal_text:
         issues.append("VALUATION_TERMINAL_DATE_MISSING")
     elif not re.fullmatch(r"\d{4}-\d{2}-\d{2}", terminal_text):
@@ -779,6 +781,9 @@ def _build_valuation_timing(
             terminal = date.fromisoformat(terminal_text)
         except ValueError:
             issues.append("VALUATION_TERMINAL_DATE_INVALID")
+
+    if not terminal_basis:
+        issues.append("VALUATION_TERMINAL_DATE_BASIS_MISSING")
 
     fiscal = re.fullmatch(r"(\d{4})FY", period)
     if fiscal is None:
@@ -812,6 +817,7 @@ def _build_valuation_timing(
         "cutoff_date": cutoff.isoformat() if cutoff else cutoff_text or None,
         "forecast_period": period or "UNKNOWN",
         "valuation_terminal_date": terminal.isoformat() if terminal else None,
+        "valuation_terminal_date_basis": terminal_basis or None,
         "period_alignment_status": period_alignment,
         "elapsed_calendar_days": elapsed_days,
         "day_count_convention": "ACT/365F_DATE_ONLY",
@@ -1116,6 +1122,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         cutoff_date=cutoff.isoformat(),
         forecast_period=operating_driver_forecast.get("forecast_period"),
         valuation_terminal_date=forecast.get("valuation_terminal_date"),
+        valuation_terminal_date_basis=forecast.get("valuation_terminal_date_basis"),
     )
     if valuation_transmission.get("applied_to_per_share_scenarios") is True:
         original_scenarios = forecast.get("scenarios") if isinstance(forecast.get("scenarios"), Mapping) else {}
@@ -1871,6 +1878,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
         f"- 预测期间：{timing_contract.get('forecast_period', 'UNKNOWN')}",
         f"- 显式估值终点日期：{timing_contract.get('valuation_terminal_date') or 'UNKNOWN'}",
+        f"- 终点日期依据：{timing_contract.get('valuation_terminal_date_basis') or 'UNKNOWN'}",
         f"- 截止日到估值终点的日历天数：{timing_contract.get('elapsed_calendar_days') if timing_contract.get('elapsed_calendar_days') is not None else 'UNKNOWN'}",
         f"- 年化折算年数：{timing_contract.get('annualization_year_fraction') or 'UNKNOWN'}；日计数：{timing_contract.get('day_count_convention', 'UNKNOWN')}",
         f"- 期限门禁：**{timing_contract.get('status', 'UNKNOWN')}**；期间对齐：{timing_contract.get('period_alignment_status', 'UNKNOWN')}",
