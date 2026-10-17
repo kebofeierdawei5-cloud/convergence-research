@@ -699,6 +699,33 @@ def _normalize_model_family(value: Any) -> str:
     return family if family in PRIMARY_MODEL_FAMILIES else "UNKNOWN"
 
 
+def _infer_model_family_from_name(value: Any) -> str:
+    """Infer only when the model name exposes a known family marker; never trust family self-label alone."""
+    name = str(value or "").strip().upper()
+    if not name:
+        return "UNKNOWN"
+    words = set(re.findall(r"[A-Z0-9]+", name))
+    normalized = re.sub(r"[^A-Z0-9]+", " ", name).strip()
+    if "SOTP" in words or "SUM OF THE PARTS" in normalized or "SUM OF PARTS" in normalized:
+        return "SOTP"
+    if "RNPV" in words or "R NPV" in normalized or "RISK ADJUSTED NPV" in normalized:
+        return "RNPV"
+    if "DDM" in words or "DIVIDEND DISCOUNT" in normalized:
+        return "DDM"
+    if "FCF_DCF" in name or ("FCF" in words and "DCF" in words):
+        return "FCF_DCF"
+    if "DCF" in words or "DISCOUNTED CASH FLOW" in normalized:
+        return "FCF_DCF"
+    if "OTHER" in words and len(words) <= 3:
+        return "OTHER"
+    if (
+        "EPS_MULTIPLE" in name
+        or ("EPS" in words and ("PE" in words or "MULTIPLE" in words or re.search(r"\\bP\\s*/\\s*E\\b", name)))
+    ):
+        return "EPS_MULTIPLE"
+    return "UNKNOWN"
+
+
 def _build_valuation_model_consistency(
     *,
     operator_model_family: Any,
@@ -711,6 +738,7 @@ def _build_valuation_model_consistency(
     selected = _normalize_model_family(operator_model_family)
     calculated = _normalize_model_family(forecast_model_family)
     name = str(model_name or "").strip() or "UNKNOWN"
+    inferred_from_name = _infer_model_family_from_name(name)
     scope = str(operating_driver_forecast.get("scope") or "UNKNOWN").strip().upper()
     transmission_status = str(valuation_transmission.get("status") or "NOT_LINKED").strip().upper()
     issues: list[str] = []
@@ -726,6 +754,12 @@ def _build_valuation_model_consistency(
     elif name.upper() in {"", "UNKNOWN", "NONE", "NULL"}:
         status = "CALCULATION_MODEL_NAME_UNKNOWN"
         issues.append("FORECAST_VALUATION_MODEL_NAME_UNKNOWN")
+    elif inferred_from_name == "UNKNOWN":
+        status = "CALCULATION_MODEL_NAME_FAMILY_NOT_IDENTIFIABLE"
+        issues.append("FORECAST_VALUATION_MODEL_NAME_DOES_NOT_IDENTIFY_MODEL_FAMILY")
+    elif inferred_from_name != calculated:
+        status = "CALCULATION_MODEL_NAME_FAMILY_MISMATCH"
+        issues.append("FORECAST_VALUATION_MODEL_NAME_CONFLICTS_WITH_DECLARED_CALCULATION_FAMILY")
     else:
         status = "MATCH"
     eligible = status == "MATCH"
@@ -743,6 +777,12 @@ def _build_valuation_model_consistency(
         "operator_selected_model_family": selected,
         "calculation_model_family": calculated,
         "calculation_model_name": name,
+        "model_name_inferred_family": inferred_from_name,
+        "model_family_name_crosscheck": (
+            "MATCH" if inferred_from_name == calculated and inferred_from_name != "UNKNOWN"
+            else "NOT_IDENTIFIABLE" if inferred_from_name == "UNKNOWN"
+            else "MISMATCH"
+        ),
         "operating_forecast_scope": scope,
         "valuation_transmission_status": transmission_status,
         "primary_model_price_calculation_eligible": eligible,
