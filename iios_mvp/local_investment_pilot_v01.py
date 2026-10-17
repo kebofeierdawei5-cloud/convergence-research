@@ -852,6 +852,9 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             "evidence_refs": _items(stress_raw.get("evidence_refs")),
         },
     }
+    raw_driver_forecast, linked_cost_ratio_assumptions = _link_b4_cost_ratio_assumptions(
+        raw_driver_forecast, forecast
+    )
     parameters_raw = payload.get("decision_parameters") if isinstance(payload.get("decision_parameters"), Mapping) else {}
     try:
         horizon = int(parameters_raw.get("horizon_years", 1))
@@ -911,6 +914,11 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         unresolved_evidence_ids=unknown_refs,
         after_cutoff_evidence_ids=after_cutoff_refs,
         uncertain_timing_evidence_ids=uncertain_timing_refs,
+    )
+    if linked_cost_ratio_assumptions:
+        operating_driver_forecast["cross_node_assumption_links"] = linked_cost_ratio_assumptions
+    operating_driver_forecast["valuation_reconciliation"] = _reconcile_b4_valuation_bridge(
+        operating_driver_forecast, forecast
     )
     allowed_model_families = {"EPS_MULTIPLE", "FCF_DCF", "DDM", "SOTP", "RNPV", "OTHER", "UNKNOWN"}
     operator_context_raw = raw_operator_valuation_context if isinstance(raw_operator_valuation_context, Mapping) else {}
