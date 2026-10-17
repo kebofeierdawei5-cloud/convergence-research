@@ -1909,7 +1909,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
         f"- 操作者选择的主模型类别：{model_contract.get('operator_selected_model_family', 'UNKNOWN')}",
         f"- 当前情景实际计算模型类别：{model_contract.get('calculation_model_family', 'UNKNOWN')}（{model_contract.get('calculation_model_name', 'UNKNOWN')}）",
-        f"- 从模型名称独立识别类别：{model_contract.get('model_name_inferred_family', 'UNKNOWN')}；名称/类别交叉校验：{model_contract.get('model_family_name_crosscheck', 'UNKNOWN')}",
+        f"- 根据模型名称解析出的类别：{model_contract.get('model_name_inferred_family', 'UNKNOWN')}；名称/类别交叉校验：{model_contract.get('model_family_name_crosscheck', 'UNKNOWN')}",
         f"- 一致性状态：**{model_contract.get('status', 'UNKNOWN')}**；可用于主模型价格计算：{model_contract.get('primary_model_price_calculation_eligible', False)}",
         f"- B5 传导状态：{model_contract.get('valuation_transmission_status', 'UNKNOWN')}；经营预测范围：{model_contract.get('operating_forecast_scope', 'UNKNOWN')}",
         *(["- 门禁原因：" + "; ".join(model_contract.get("issues") or [])] if model_contract.get("issues") else []),
@@ -2444,7 +2444,7 @@ def create_pilot_template(
     b5_transmission_instructions = (
         "\n\nB5 估值传导要求（IIOS-VALUATION-TRANSMISSION-0.1）："
         "必须保留 valuation_transmission 节点和 Bear/Base/Bull 三个情景。valuation_model_name 必须逐字匹配 forecast_valuation.model；model_family 必须准确分类为 EPS_MULTIPLE、FCF_DCF、DDM、SOTP、RNPV、OTHER 或 UNKNOWN；earnings_period 必须与 operating_driver_forecast.forecast_period 完全一致。"
-        "forecast_valuation.model_family 必须明确填写实际生成 Bear/Base/Bull 终值和入场参考锚的估值模型类别（仅允许 EPS_MULTIPLE、FCF_DCF、DDM、SOTP、RNPV、OTHER、UNKNOWN），不得把操作者选定模型抄成实际计算模型。操作者选择与计算模型不同将阻断回报/目标入场价计算，不能悄悄覆盖；未支持模型只能标为替代情景。"
+        "forecast_valuation.model_family 必须明确填写实际生成 Bear/Base/Bull 终值和入场参考锚的估值模型类别（仅允许 EPS_MULTIPLE、FCF_DCF、DDM、SOTP、RNPV、OTHER、UNKNOWN），不得把操作者选定模型抄成实际计算模型。forecast_valuation.model 的人类可读名称还必须带有可识别的模型族标记，例如 EPS_MULTIPLE/EPS×P/E、FCF_DCF/DCF、DDM、SOTP、RNPV 或 OTHER；代码会从名称解析模型族并与 model_family 交叉核对，无法识别或不一致时阻断价格计算。此交叉核对是防止字段自相矛盾的一致性检查，不代表系统已独立证明所有情景数值确实由该公式计算。操作者选择与计算模型不同将阻断回报/目标入场价计算，不能悄悄覆盖；未支持模型只能标为替代情景。"
         "forecast_valuation.valuation_terminal_date 必须填写终值真正对应的 ISO 日期 YYYY-MM-DD；valuation_terminal_date_basis 说明该日期对应的报告期间/财年终点依据。不得仅因默认 horizon=1Y 就把 2027FY 终值当成一年后价值。日期缺失、早于/等于 cutoff 或与 forecast_period 年份明显不兼容时，年化回报和目标入场价必须保持 UNKNOWN。年化使用 ACT/365F 的实际日历天数；decision_parameters.horizon_years 仍单独保留为决策参考期限。"
         "operator_valuation_context 是操作者拥有的字段，必须原样保留模板中的 UNKNOWN/null，不得替操作者选择估值模型或判断原估值是否已包含项目；操作者稍后会在本地独立确认。"
         "本批只有 EPS_MULTIPLE 适配器可传导。每个情景必须提供 ownership_ratio、displaced_existing_after_tax_profit_cny、basic_shares、convertible_bond_incremental_shares、other_dilution_shares、pe_multiple_x，均用 {value,unit,data_class,basis,evidence_refs,note} 结构。"
