@@ -239,6 +239,57 @@ def test_evidence_references_in_assessment_and_valuation_are_resolved_or_explici
     assert prepared["unresolved_evidence_references"] == ["E-ASSUMPTION-MISSING", "E-RISK-MISSING"]
 
 
+def test_duplicate_referenced_evidence_id_is_ambiguous_and_blocks_decision():
+    payload = _payload()
+    payload["evidence_register"].append({
+        "source_id": "E1",
+        "title": "Conflicting duplicate source",
+        "source_class": "MEDIA",
+        "source_ref": "https://conflict.example.invalid/changed.pdf",
+        "published_at": "2026-10-10",
+        "known_at": "2026-10-10T12:00:00+08:00",
+        "summary": "Conflicting duplicate record for the same evidence ID.",
+    })
+
+    analysis, report = _analyse(payload, "TEST-DUPLICATE-SOURCE-ID")
+
+    assert analysis["duplicate_evidence_ids"] == ["E1"]
+    assert "E1" in analysis["referenced_evidence_ids"]
+    assert "E1" in analysis["unresolved_evidence_references"]
+    assert "DUPLICATE_EVIDENCE_SOURCE_IDS" in analysis["decision"]["gating_issues"]
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert analysis["return_metrics"] is not None  # duplicate refs invalidate decision readiness, not arithmetic alone
+    assert "来源登记表重复 ID：E1" in report
+    assert "**E1**：**来源 ID 重复登记，引用无法唯一解析**" in report
+
+
+def test_unreferenced_duplicate_evidence_id_is_disclosed_without_false_reference_block():
+    payload = _payload()
+    payload["evidence_register"].append({
+        "source_id": "E-UNUSED",
+        "title": "First unused record",
+        "source_class": "ISSUER_PRIMARY",
+        "source_ref": "https://example.invalid/unused-a.pdf",
+        "known_at": "2026-08-30",
+        "summary": "First unused record.",
+    })
+    payload["evidence_register"].append({
+        "source_id": "E-UNUSED",
+        "title": "Second unused record",
+        "source_class": "MEDIA",
+        "source_ref": "https://example.invalid/unused-b.pdf",
+        "known_at": "2026-08-31",
+        "summary": "Conflicting second unused record.",
+    })
+
+    analysis, report = _analyse(payload, "TEST-UNREFERENCED-DUPLICATE-SOURCE-ID")
+
+    assert analysis["duplicate_evidence_ids"] == ["E-UNUSED"]
+    assert "E-UNUSED" not in analysis["referenced_evidence_ids"]
+    assert "DUPLICATE_EVIDENCE_SOURCE_IDS" not in analysis["decision"]["gating_issues"]
+    assert "来源登记表重复 ID：E-UNUSED" in report
+
+
 def test_report_uses_portable_prose_instead_of_markdown_tables_and_python_dict_repr(tmp_path):
     payload = _payload()
     payload["evidence_register"] = []
