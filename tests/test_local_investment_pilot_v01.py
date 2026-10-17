@@ -11,7 +11,7 @@ import time as _time
 import pytest
 
 import iios_mvp.local_investment_pilot_v01 as pilot
-from iios_mvp.operating_driver_forecast_v01 import render_operating_driver_section
+from iios_mvp.operating_driver_forecast_v01 import render_operating_driver_section, evaluate_operating_driver_forecast
 
 from iios_mvp.local_investment_pilot_v01 import (
     LocalInvestmentPilotError,
@@ -1264,6 +1264,40 @@ def test_operating_driver_bridge_calculates_volume_price_cost_and_cash_flow():
     assert bear["unlevered_fcf_proxy_cny"] == "234500.00"
     assert driver["valuation_transmission"]["status"] == "NOT_LINKED_TO_PER_SHARE_VALUE"
     assert driver["formal_forecast_admission_created"] is False
+
+
+@pytest.mark.parametrize(
+    "placeholder",
+    ["UNKNOWN", "N/A", "NOT_IDENTIFIABLE", "TBD", "未提供依据"],
+)
+def test_operating_driver_numeric_assumption_with_placeholder_basis_is_not_calculated(placeholder):
+    payload = _driver_payload()
+    payload["scenarios"]["base"]["tax_rate"]["basis"] = placeholder
+    source = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(payload, evidence_register=source)
+    base = result["scenarios"]["base"]
+
+    assert base["net_profit_cny"] is None
+    assert base["unlevered_fcf_proxy_cny"] is None
+    assert "base.tax_rate:BASIS_NOT_IDENTIFIABLE" in base["issues"]
+    assert base["calculation_status"] == "PARTIAL_SCENARIO_BRIDGE"
+
+
+def test_b5_numeric_assumption_with_placeholder_basis_blocks_transmission_and_price():
+    payload = _b5_ready_payload()
+    payload["valuation_transmission"]["scenarios"]["base"]["pe_multiple_x"]["basis"] = "N/A"
+
+    analysis, report = _analyse(payload, "TEST-B5-PLACEHOLDER-ASSUMPTION-BASIS")
+    bridge = analysis["valuation_transmission"]
+
+    assert bridge["status"] == "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID"
+    assert bridge["applied_to_per_share_scenarios"] is False
+    assert "valuation_transmission.base.pe_multiple_x:BASIS_NOT_IDENTIFIABLE" in bridge["input_issues"]
+    assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert "不得将项目增量默认为已计入估值" in report
 
 
 def test_operating_driver_forecast_refuses_unreferenced_actual_numbers():
