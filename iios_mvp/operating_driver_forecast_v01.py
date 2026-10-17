@@ -29,6 +29,7 @@ GLOBAL_MEASURES = {
     "depreciation_amortization_cny": "CNY",
     "finance_cost_cny": "CNY",
     "tax_rate": "ratio",
+    "cost_of_revenue_ratio": "ratio",
     "cash_capex_cny": "CNY",
     "change_working_capital_cny": "CNY",
 }
@@ -126,8 +127,8 @@ def _normalise_measure(
     if claimed is not None:
         if metric_name != "change_working_capital_cny" and claimed < 0:
             issues.append(f"{field}:NEGATIVE_VALUE_NOT_ALLOWED")
-        if metric_name == "tax_rate" and not (Decimal("0") <= claimed <= Decimal("1")):
-            issues.append(f"{field}:TAX_RATE_MUST_BE_RATIO_0_TO_1")
+        if metric_name in {"tax_rate", "cost_of_revenue_ratio"} and not (Decimal("0") <= claimed <= Decimal("1")):
+            issues.append(f"{field}:RATIO_MUST_BE_0_TO_1")
 
     evidence_status = "NOT_REQUIRED_FOR_ASSUMPTION"
     if data_class in {"OBSERVED_ACTUAL", "ISSUER_FORECAST"}:
@@ -239,10 +240,22 @@ def _product_profit_bridge(
     asp = _value(metrics.get("net_asp_cny_per_tonne"))
     unit_cost = _value(metrics.get("variable_cost_cny_per_tonne"))
     capacity_value = _value(capacity)
-    revenue = sales_volume * asp if sales_volume is not None and asp is not None else None
-    variable_cost = sales_volume * unit_cost if sales_volume is not None and unit_cost is not None else None
+    calculated_revenue = sales_volume * asp if sales_volume is not None and asp is not None else None
+    direct_revenue = _value(metrics.get("revenue_cny"))
+    calculated_variable_cost = sales_volume * unit_cost if sales_volume is not None and unit_cost is not None else None
+    direct_variable_cost = _value(metrics.get("variable_cost_cny"))
     utilization = None
     issues: list[str] = []
+    if calculated_revenue is not None and direct_revenue is not None and calculated_revenue != direct_revenue:
+        issues.append("EXPLICIT_REVENUE_CONFLICTS_WITH_VOLUME_X_ASP")
+        revenue = None
+    else:
+        revenue = calculated_revenue if calculated_revenue is not None else direct_revenue
+    if calculated_variable_cost is not None and direct_variable_cost is not None and calculated_variable_cost != direct_variable_cost:
+        issues.append("EXPLICIT_VARIABLE_COST_CONFLICTS_WITH_VOLUME_X_UNIT_COST")
+        variable_cost = None
+    else:
+        variable_cost = calculated_variable_cost if calculated_variable_cost is not None else direct_variable_cost
     if production is not None and capacity_value is not None and capacity_value > 0:
         if not _is_full_year_period(period_basis):
             issues.append("CAPACITY_PERIOD_ALIGNMENT_UNKNOWN")
@@ -326,6 +339,8 @@ def _calculate_scenario(
                 "sales_volume_tonnes": "tonnes",
                 "net_asp_cny_per_tonne": "CNY/tonne",
                 "variable_cost_cny_per_tonne": "CNY/tonne",
+                "revenue_cny": "CNY",
+                "variable_cost_cny": "CNY",
             },
             f"{scenario_name}.{product_id}",
             sources_by_id,
