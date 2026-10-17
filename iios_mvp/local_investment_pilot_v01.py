@@ -719,7 +719,22 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         if not source_id or source_id in source_ids:
             continue
         source_ids.add(source_id)
-        known_text = str(row.get("known_at") or "").strip()
+        known_at_original = str(row.get("known_at") or "").strip()
+        known_text = known_at_original
+        known_at_precision = "DATE_ONLY" if len(known_text) == 10 else "TIMESTAMP_OR_OFFSET_DATETIME"
+        explicit_date_only_unknown_time = re.fullmatch(
+            r"(\d{4}-\d{2}-\d{2})\s*[;；,，]\s*"
+            r"(?:具体时分|具体时间|时分|时间|exact time|time(?: of day)?)\s*"
+            r"(?:[:：]\s*)?(?:UNKNOWN|未知|不详|not known)",
+            known_at_original,
+            flags=re.IGNORECASE,
+        )
+        if explicit_date_only_unknown_time:
+            # Treat an explicit "date known, clock time unknown" annotation as
+            # a date-level timestamp, not as malformed data. Preserve the raw
+            # annotation below so precision is not silently upgraded.
+            known_text = explicit_date_only_unknown_time.group(1)
+            known_at_precision = "DATE_ONLY_EXPLICIT_TIME_UNKNOWN"
         source_time_status = "UNKNOWN"
         if known_text:
             try:
@@ -747,6 +762,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             "source_class": str(row.get("source_class") or "UNKNOWN"),
             "source_ref": str(row.get("source_ref") or "UNKNOWN"),
             "known_at": known_text or None,
+            "known_at_original": known_at_original or None,
+            "known_at_precision": known_at_precision if known_text else "UNKNOWN",
             "time_status": source_time_status,
             "summary": str(row.get("summary") or "未提供事实摘要"),
             "raw_sha256_claimed": row.get("raw_sha256_claimed"),
@@ -763,14 +780,33 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "expectation_gap": {"PASS", "UNKNOWN", "BLOCKED", "AMBIGUOUS", "INCOMPATIBLE"},
         "risk": {"PASS", "FAIL", "UNKNOWN"},
     }
+    status_aliases = {
+        "trust": {"PASS_WITH_LIMITATIONS": "REVALIDATION"},
+        "reality": {"SUPPORTED_WITH_MATERIAL_CAVEATS": "CONDITIONAL"},
+        "quality": {"HIGH_QUALITY_WITH_CYCLICAL_AND_POLICY_RISKS": "CONDITIONAL"},
+        "thesis": {"CONDITIONALLY_VALID": "WATCH"},
+        # This means the analyst's own case does not clear the return hurdle;
+        # it is not a measured market-implied expectation gap.
+        "expectation_gap": {"ANALYST_CASE_INDICATES_INSUFFICIENT_RETURN": "UNKNOWN"},
+        # MATERIAL describes risk severity, not an explicit PASS/FAIL gate result.
+        "risk": {"MATERIAL": "UNKNOWN"},
+    }
     assessment: dict[str, Any] = {}
     for name, states in allowed_assessment.items():
         raw = raw_assessment.get(name) if isinstance(raw_assessment.get(name), Mapping) else {}
         assessment[name] = dict(raw)
-        assessment[name]["status"] = _status(raw.get("status"), states)
+        raw_status = str(raw.get("status") or "UNKNOWN").strip().upper()
+        normalized_status = status_aliases.get(name, {}).get(raw_status, raw_status)
+        assessment[name]["status_input"] = raw_status
+        assessment[name]["status"] = _status(normalized_status, states)
         assessment[name]["summary"] = str(raw.get("summary") or "")
+    direction_aliases = {
+        "CURRENT_PRICE_ABOVE_RISK_ADJUSTED_ENTRY_REFERENCE": "NEGATIVE",
+    }
+    raw_direction = str(assessment["expectation_gap"].get("direction") or "UNKNOWN").strip().upper()
+    assessment["expectation_gap"]["direction_input"] = raw_direction
     assessment["expectation_gap"]["direction"] = _status(
-        assessment["expectation_gap"].get("direction"),
+        direction_aliases.get(raw_direction, raw_direction),
         {"POSITIVE", "NEUTRAL", "NEGATIVE", "UNKNOWN"},
     )
     assessment["thesis"]["break_conditions"] = _items(assessment["thesis"].get("break_conditions"))
@@ -780,9 +816,12 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     assessment["value_drivers"] = [
         {
             "rank": int(item.get("rank", index)),
-            "driver": str(item.get("driver") or "未命名价值驱动因素"),
+            "driver": str(item.get("driver") or item.get("name") or item.get("title") or "未命名价值驱动因素"),
+            # Status such as OBSERVED_AND_FORECAST is not an impact direction.
+            # Keep it for display/audit, but do not infer POSITIVE or a passing gate.
+            "source_status": str(item.get("status") or "UNKNOWN"),
             "impact": _status(item.get("impact"), {"POSITIVE", "NEGATIVE", "MIXED", "UNKNOWN"}),
-            "rationale": str(item.get("rationale") or ""),
+            "rationale": str(item.get("rationale") or item.get("summary") or item.get("mechanism") or ""),
             "evidence_refs": _items(item.get("evidence_refs")),
         }
         for index, item in enumerate(value_drivers, start=1) if isinstance(item, Mapping)
