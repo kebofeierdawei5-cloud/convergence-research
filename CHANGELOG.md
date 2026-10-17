@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### 2026-10-17 — Pilot Primary Valuation Model + Terminal-Date Contract
+
+- Added a separate forecast_valuation.model_family field for the model actually used to calculate scenario terminal values, compared against the operator-owned selected_model_family.
+- If the model families are unknown or mismatch, the pilot preserves the values as alternative/unresolved research inputs but blocks return metrics, target entry price, and B6 price sensitivity. An unsupported B5 bridge also blocks price calculation when the operating forecast is explicitly project-incremental.
+- Added an explicit valuation_terminal_date and basis, with forecast-period compatibility checks. The return solver accepts an optional date-derived annualization_year_fraction; the selected 1Y/3Y decision reference remains separately validated.
+- Annualized return and annualized return-hurdle entry price now use ACT/365F calendar days from cutoff date to terminal date. Missing/inconsistent timing fails closed to UNKNOWN.
+- No valuation family was auto-selected or converted to EPS_MULTIPLE; 15% return hurdle, risk caps, decision precedence and non-execution authority are unchanged.
+- Regression coverage covers model mismatch, missing date/basis, forecast-period mismatch, and 441-day ACT/365F calculations. Dedicated local-pilot + Replay workflow passed 122 tests; all 14 PR checks passed at code head `dafa95cb6c14c3c64bf8856788dacf11819e6a0f`. Fresh Mac full-run/Replay acceptance remains open.
+
+
 ### 2026-10-09 — Route A Run #8 Partial Capture Retained + B2 Preflight (No Provider Credentials)
 
 - Run #8 / `37938129274` completed SUCCESS using the canonical partial-capture final gate.

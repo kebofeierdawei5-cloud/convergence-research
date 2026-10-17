@@ -685,6 +685,191 @@ def _reconcile_b4_valuation_bridge(
     }
 
 
+PRIMARY_MODEL_FAMILIES = frozenset({
+    "EPS_MULTIPLE", "FCF_DCF", "DDM", "SOTP", "RNPV", "OTHER", "UNKNOWN",
+})
+_B5_PROJECT_TRANSMISSION_ACCEPTED = frozenset({
+    "APPLIED_TO_PER_SHARE_SCENARIOS",
+    "CALCULATED_NOT_APPLIED_BASELINE_ALREADY_INCLUDES_PROJECT",
+})
+
+
+def _normalize_model_family(value: Any) -> str:
+    family = str(value or "UNKNOWN").strip().upper()
+    return family if family in PRIMARY_MODEL_FAMILIES else "UNKNOWN"
+
+
+def _infer_model_family_from_name(value: Any) -> str:
+    """Infer only when the model name exposes a known family marker; never trust family self-label alone."""
+    name = str(value or "").strip().upper()
+    if not name:
+        return "UNKNOWN"
+    words = set(re.findall(r"[A-Z0-9]+", name))
+    normalized = re.sub(r"[^A-Z0-9]+", " ", name).strip()
+    if "SOTP" in words or "SUM OF THE PARTS" in normalized or "SUM OF PARTS" in normalized:
+        return "SOTP"
+    if "RNPV" in words or "R NPV" in normalized or "RISK ADJUSTED NPV" in normalized:
+        return "RNPV"
+    if "DDM" in words or "DIVIDEND DISCOUNT" in normalized:
+        return "DDM"
+    if "FCF_DCF" in name or ("FCF" in words and "DCF" in words):
+        return "FCF_DCF"
+    if "DCF" in words or "DISCOUNTED CASH FLOW" in normalized:
+        return "FCF_DCF"
+    if "OTHER" in words and len(words) <= 3:
+        return "OTHER"
+    if (
+        "EPS_MULTIPLE" in name
+        or ("EPS" in words and ("PE" in words or "MULTIPLE" in words or re.search(r"\bP\s*/\s*E\b", name)))
+    ):
+        return "EPS_MULTIPLE"
+    return "UNKNOWN"
+
+
+def _build_valuation_model_consistency(
+    *,
+    operator_model_family: Any,
+    forecast_model_family: Any,
+    model_name: Any,
+    operating_driver_forecast: Mapping[str, Any],
+    valuation_transmission: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Keep the operator-owned primary model separate from the model that generated values."""
+    selected = _normalize_model_family(operator_model_family)
+    calculated = _normalize_model_family(forecast_model_family)
+    name = str(model_name or "").strip() or "UNKNOWN"
+    inferred_from_name = _infer_model_family_from_name(name)
+    scope = str(operating_driver_forecast.get("scope") or "UNKNOWN").strip().upper()
+    transmission_status = str(valuation_transmission.get("status") or "NOT_LINKED").strip().upper()
+    issues: list[str] = []
+    if selected == "UNKNOWN":
+        status = "OPERATOR_MODEL_NOT_CONFIRMED"
+        issues.append("OPERATOR_SELECTED_MODEL_FAMILY_UNKNOWN")
+    elif calculated == "UNKNOWN":
+        status = "CALCULATION_MODEL_FAMILY_UNKNOWN"
+        issues.append("FORECAST_VALUATION_MODEL_FAMILY_UNKNOWN")
+    elif selected != calculated:
+        status = "MODEL_FAMILY_MISMATCH"
+        issues.append("OPERATOR_MODEL_FAMILY_DIFFERS_FROM_CALCULATION_MODEL_FAMILY")
+    elif name.upper() in {"", "UNKNOWN", "NONE", "NULL"}:
+        status = "CALCULATION_MODEL_NAME_UNKNOWN"
+        issues.append("FORECAST_VALUATION_MODEL_NAME_UNKNOWN")
+    elif inferred_from_name == "UNKNOWN":
+        status = "CALCULATION_MODEL_NAME_FAMILY_NOT_IDENTIFIABLE"
+        issues.append("FORECAST_VALUATION_MODEL_NAME_DOES_NOT_IDENTIFY_MODEL_FAMILY")
+    elif inferred_from_name != calculated:
+        status = "CALCULATION_MODEL_NAME_FAMILY_MISMATCH"
+        issues.append("FORECAST_VALUATION_MODEL_NAME_CONFLICTS_WITH_DECLARED_CALCULATION_FAMILY")
+    else:
+        status = "MATCH"
+    eligible = status == "MATCH"
+    if (
+        eligible
+        and scope == "PROJECT_INCREMENTAL"
+        and transmission_status not in _B5_PROJECT_TRANSMISSION_ACCEPTED
+    ):
+        eligible = False
+        status = "PROJECT_INCREMENTAL_TRANSMISSION_NOT_APPLIED"
+        issues.append("PROJECT_INCREMENTAL_VALUE_NOT_TRANSMITTED_TO_PER_SHARE_SCENARIOS")
+    return {
+        "schema_version": "IIOS-PRIMARY-VALUATION-MODEL-CONSISTENCY-0.1",
+        "status": status,
+        "operator_selected_model_family": selected,
+        "calculation_model_family": calculated,
+        "calculation_model_name": name,
+        "model_name_inferred_family": inferred_from_name,
+        "model_family_name_crosscheck": (
+            "MATCH" if inferred_from_name == calculated and inferred_from_name != "UNKNOWN"
+            else "NOT_IDENTIFIABLE" if inferred_from_name == "UNKNOWN"
+            else "MISMATCH"
+        ),
+        "operating_forecast_scope": scope,
+        "valuation_transmission_status": transmission_status,
+        "primary_model_price_calculation_eligible": eligible,
+        "scenario_values_role": "PRIMARY_MODEL" if eligible else "ALTERNATIVE_OR_UNRESOLVED_ONLY",
+        "issues": issues,
+        "formal_decision_created": False,
+        "decision_authority": False,
+    }
+
+
+def _build_valuation_timing(
+    *,
+    cutoff_date: Any,
+    forecast_period: Any,
+    valuation_terminal_date: Any,
+    valuation_terminal_date_basis: Any,
+) -> dict[str, Any]:
+    """Bind annualization to the explicit valuation endpoint, not a nominal horizon label."""
+    cutoff_text = str(cutoff_date or "").strip()
+    period = str(forecast_period or "UNKNOWN").strip().upper()
+    terminal_text = str(valuation_terminal_date or "").strip()
+    issues: list[str] = []
+    cutoff: date | None = None
+    terminal: date | None = None
+    try:
+        cutoff = date.fromisoformat(cutoff_text)
+    except (TypeError, ValueError):
+        issues.append("VALUATION_CUTOFF_DATE_INVALID")
+    terminal_basis = str(valuation_terminal_date_basis or "").strip()
+    if not terminal_text:
+        issues.append("VALUATION_TERMINAL_DATE_MISSING")
+    elif not re.fullmatch(r"\d{4}-\d{2}-\d{2}", terminal_text):
+        issues.append("VALUATION_TERMINAL_DATE_INVALID")
+    else:
+        try:
+            terminal = date.fromisoformat(terminal_text)
+        except ValueError:
+            issues.append("VALUATION_TERMINAL_DATE_INVALID")
+
+    if not terminal_basis:
+        issues.append("VALUATION_TERMINAL_DATE_BASIS_MISSING")
+
+    fiscal = re.fullmatch(r"(\d{4})FY", period)
+    if fiscal is None:
+        issues.append("FORECAST_FY_PERIOD_NOT_IDENTIFIABLE")
+    elif terminal is not None:
+        fiscal_year = int(fiscal.group(1))
+        # Fiscal years may end in the named calendar year or in the following
+        # calendar year; the date itself must be explicit in the model response.
+        if terminal.year not in {fiscal_year, fiscal_year + 1}:
+            issues.append("VALUATION_TERMINAL_DATE_FORECAST_PERIOD_MISMATCH")
+
+    elapsed_days: int | None = None
+    year_fraction: str | None = None
+    if cutoff is not None and terminal is not None:
+        elapsed_days = (terminal - cutoff).days
+        if elapsed_days <= 0:
+            issues.append("VALUATION_TERMINAL_DATE_NOT_AFTER_CUTOFF")
+        else:
+            year_fraction = format(Decimal(elapsed_days) / Decimal("365"), "f")
+
+    status = issues[0] if issues else "PASS"
+    if status == "PASS":
+        period_alignment = "YEAR_COMPATIBLE_FISCAL_END_EXPLICIT_BUT_NOT_INDEPENDENTLY_VERIFIED"
+    elif fiscal is None:
+        period_alignment = "NOT_IDENTIFIABLE"
+    else:
+        period_alignment = "MISMATCH_OR_INVALID"
+    return {
+        "schema_version": "IIOS-VALUATION-TIMING-0.1",
+        "status": status,
+        "cutoff_date": cutoff.isoformat() if cutoff else cutoff_text or None,
+        "forecast_period": period or "UNKNOWN",
+        "valuation_terminal_date": terminal.isoformat() if terminal else None,
+        "valuation_terminal_date_basis": terminal_basis or None,
+        "period_alignment_status": period_alignment,
+        "elapsed_calendar_days": elapsed_days,
+        "day_count_convention": "ACT/365F_DATE_ONLY",
+        "annualization_year_fraction": year_fraction,
+        "annualized_return_formula": "(expected_terminal_wealth / current_price) ** (1 / annualization_year_fraction) - 1",
+        "return_hurdle_entry_price_formula": "expected_terminal_wealth / (1 + target_annualized_return) ** annualization_year_fraction",
+        "issues": issues,
+        "formal_decision_created": False,
+        "decision_authority": False,
+    }
+
+
 def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     if payload.get("schema_version") != PILOT_SCHEMA:
         raise LocalInvestmentPilotError("PILOT_INPUT_SCHEMA_MISMATCH")
@@ -858,7 +1043,10 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     stress_raw = stress_raw if isinstance(stress_raw, Mapping) else {}
     forecast = {
         "model": str(forecast_raw.get("model") or "UNKNOWN"),
+        "model_family": _normalize_model_family(forecast_raw.get("model_family")),
         "model_rationale": str(forecast_raw.get("model_rationale") or ""),
+        "valuation_terminal_date": forecast_raw.get("valuation_terminal_date"),
+        "valuation_terminal_date_basis": str(forecast_raw.get("valuation_terminal_date_basis") or ""),
         "entry_value_reference_per_share": forecast_raw.get("entry_value_reference_per_share"),
         "probabilities_calibrated": forecast_raw.get("probabilities_calibrated") is True,
         "assumptions": _records(forecast_raw.get("assumptions")),
@@ -963,6 +1151,19 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         after_cutoff_evidence_ids=after_cutoff_refs,
         uncertain_timing_evidence_ids=uncertain_timing_refs,
     )
+    valuation_model_consistency = _build_valuation_model_consistency(
+        operator_model_family=operator_valuation_context["selected_model_family"],
+        forecast_model_family=forecast.get("model_family"),
+        model_name=forecast.get("model"),
+        operating_driver_forecast=operating_driver_forecast,
+        valuation_transmission=valuation_transmission,
+    )
+    valuation_timing = _build_valuation_timing(
+        cutoff_date=cutoff.isoformat(),
+        forecast_period=operating_driver_forecast.get("forecast_period"),
+        valuation_terminal_date=forecast.get("valuation_terminal_date"),
+        valuation_terminal_date_basis=forecast.get("valuation_terminal_date_basis"),
+    )
     if valuation_transmission.get("applied_to_per_share_scenarios") is True:
         original_scenarios = forecast.get("scenarios") if isinstance(forecast.get("scenarios"), Mapping) else {}
         adjusted_scenarios = {
@@ -1001,6 +1202,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "operating_driver_forecast": operating_driver_forecast,
         "valuation_transmission": valuation_transmission,
         "operator_valuation_context": operator_valuation_context,
+        "valuation_model_consistency": valuation_model_consistency,
+        "valuation_timing": valuation_timing,
         "decision_parameters": {
             "horizon_years": horizon, "horizon_override": override, "horizon_override_basis": override_basis,
             "horizon_selection_rationale": rationale, "required_return_annualized": format(required_return, "f"),
@@ -1023,6 +1226,12 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+    model_consistency = prepared.get("valuation_model_consistency") or {}
+    if model_consistency.get("primary_model_price_calculation_eligible") is not True:
+        return None, f"PRIMARY_VALUATION_MODEL_NOT_ELIGIBLE:{model_consistency.get('status', 'UNKNOWN')}"
+    valuation_timing = prepared.get("valuation_timing") or {}
+    if valuation_timing.get("status") != "PASS":
+        return None, f"VALUATION_TIMING_NOT_RESOLVED:{valuation_timing.get('status', 'UNKNOWN')}"
     if prepared["price_input"]["pit_time_status"] != "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY":
         return None, "PRICE_NOT_PIT_QUALIFIED"
     forecast = prepared["forecast_valuation"]
@@ -1061,6 +1270,7 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
         "entry_price": prepared["price_input"]["price"],
         "entry_value_reference": str(anchor),
         "horizon_years": str(params["horizon_years"]),
+        "annualization_year_fraction": str(valuation_timing["annualization_year_fraction"]),
         "horizon_override": params["horizon_override"],
         "horizon_override_basis": params["horizon_override_basis"],
         "horizon_selection_rationale": params["horizon_selection_rationale"],
@@ -1406,6 +1616,12 @@ def _decision(
         issues.append("PRICE_NOT_PIT_QUALIFIED")
     if prepared.get("notes_price_conflicts"):
         issues.append("OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT")
+    model_consistency = prepared.get("valuation_model_consistency") or {}
+    if model_consistency.get("primary_model_price_calculation_eligible") is not True:
+        issues.append("PRIMARY_VALUATION_MODEL_NOT_DECISION_ELIGIBLE")
+    valuation_timing = prepared.get("valuation_timing") or {}
+    if valuation_timing.get("status") != "PASS":
+        issues.append("VALUATION_TIMING_NOT_RESOLVED")
     if reason == "SCENARIO_WEALTH_ORDERING_INCONSISTENT":
         issues.append("SCENARIO_WEALTH_ORDERING_INCONSISTENT")
     if stress_review:
@@ -1426,6 +1642,8 @@ def _decision(
         "THESIS_BREAK_STRESS_BEAR_COMPARISON_UNAVAILABLE",
         "THESIS_BREAK_STRESS_NOT_MORE_SEVERE_THAN_BEAR",
         "THESIS_BREAK_STRESS_MISSING",
+        "PRIMARY_VALUATION_MODEL_NOT_DECISION_ELIGIBLE",
+        "VALUATION_TIMING_NOT_RESOLVED",
     }
     validation_pass = not any(issue in validation_blockers for issue in issues)
 
@@ -1678,10 +1896,37 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
         "## 四、Forecast / Valuation",
         "",
-        f"- 模型：{f['model']}",
+        f"- 模型名称：{f['model']}",
         f"- 模型选择理由：{f['model_rationale'] or '未提供'}",
-        f"- 安全边际参考价值：{f.get('entry_value_reference_per_share') or 'UNKNOWN'} {c['currency']}/股",
+        f"- 主估值参考锚（不是 15% 回报门槛价格，也不是 MIE）：{f.get('entry_value_reference_per_share') or 'UNKNOWN'} {c['currency']}/股",
         f"- 情景概率是否校准：{'是' if f['probabilities_calibrated'] else '否 / 未校准'}",
+        "",
+    ])
+    model_contract = analysis.get("valuation_model_consistency") or {}
+    timing_contract = analysis.get("valuation_timing") or {}
+    lines.extend([
+        "### 主估值模型一致性门禁",
+        "",
+        f"- 操作者选择的主模型类别：{model_contract.get('operator_selected_model_family', 'UNKNOWN')}",
+        f"- 当前情景实际计算模型类别：{model_contract.get('calculation_model_family', 'UNKNOWN')}（{model_contract.get('calculation_model_name', 'UNKNOWN')}）",
+        f"- 根据模型名称解析出的类别：{model_contract.get('model_name_inferred_family', 'UNKNOWN')}；名称/类别交叉校验：{model_contract.get('model_family_name_crosscheck', 'UNKNOWN')}",
+        f"- 一致性状态：**{model_contract.get('status', 'UNKNOWN')}**；可用于主模型价格计算：{model_contract.get('primary_model_price_calculation_eligible', False)}",
+        f"- B5 传导状态：{model_contract.get('valuation_transmission_status', 'UNKNOWN')}；经营预测范围：{model_contract.get('operating_forecast_scope', 'UNKNOWN')}",
+        *(["- 门禁原因：" + "; ".join(model_contract.get("issues") or [])] if model_contract.get("issues") else []),
+        *([] if model_contract.get("primary_model_price_calculation_eligible") is True else ["- 本报告保留的情景价值只作为替代模型/未确认模型研究输入，不进入预期回报、目标入场价或 B6 价格敏感性计算。"]),
+        "",
+        "### 估值终点与年化期限契约",
+        "",
+        f"- 预测期间：{timing_contract.get('forecast_period', 'UNKNOWN')}",
+        f"- 显式估值终点日期：{timing_contract.get('valuation_terminal_date') or 'UNKNOWN'}",
+        f"- 终点日期依据：{timing_contract.get('valuation_terminal_date_basis') or 'UNKNOWN'}",
+        f"- 截止日到估值终点的日历天数：{timing_contract.get('elapsed_calendar_days') if timing_contract.get('elapsed_calendar_days') is not None else 'UNKNOWN'}",
+        f"- 年化折算年数：{timing_contract.get('annualization_year_fraction') or 'UNKNOWN'}；日计数：{timing_contract.get('day_count_convention', 'UNKNOWN')}",
+        f"- 期限门禁：**{timing_contract.get('status', 'UNKNOWN')}**；期间对齐：{timing_contract.get('period_alignment_status', 'UNKNOWN')}",
+        f"- 年化公式：{timing_contract.get('annualized_return_formula', 'UNKNOWN')}",
+        f"- 15% 回报门槛价格公式：{timing_contract.get('return_hurdle_entry_price_formula', 'UNKNOWN')}",
+        *(["- 期限缺口：" + "; ".join(timing_contract.get("issues") or [])] if timing_contract.get("issues") else []),
+        "- horizon_years 仍表示决策参考期限；年化回报与回报门槛价格使用截止日到显式估值终点的实际日历天数，不再把不同口径默认为相同的一年。",
         "",
     ])
     scenarios = f.get("scenarios") if isinstance(f.get("scenarios"), Mapping) else {}
@@ -1912,6 +2157,8 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "operating_driver_forecast": prepared["operating_driver_forecast"],
         "valuation_transmission": prepared["valuation_transmission"],
         "operator_valuation_context": prepared["operator_valuation_context"],
+        "valuation_model_consistency": prepared["valuation_model_consistency"],
+        "valuation_timing": prepared["valuation_timing"],
         "decision_parameters": prepared["decision_parameters"],
         "portfolio_package": portfolio_package,
         "return_metrics": metrics,
@@ -2060,7 +2307,9 @@ def _template(
             "risk": {"status": "UNKNOWN", "summary": "尚未完成风险审查", "items": []},
         },
         "forecast_valuation": {
-            "model": "UNKNOWN", "model_rationale": "", "entry_value_reference_per_share": None,
+            "model": "UNKNOWN", "model_family": "UNKNOWN", "model_rationale": "",
+            "valuation_terminal_date": None, "valuation_terminal_date_basis": "",
+            "entry_value_reference_per_share": None,
             "probabilities_calibrated": False, "assumptions": [],
             "scenarios": {
                 "bear": {
@@ -2195,6 +2444,8 @@ def create_pilot_template(
     b5_transmission_instructions = (
         "\n\nB5 估值传导要求（IIOS-VALUATION-TRANSMISSION-0.1）："
         "必须保留 valuation_transmission 节点和 Bear/Base/Bull 三个情景。valuation_model_name 必须逐字匹配 forecast_valuation.model；model_family 必须准确分类为 EPS_MULTIPLE、FCF_DCF、DDM、SOTP、RNPV、OTHER 或 UNKNOWN；earnings_period 必须与 operating_driver_forecast.forecast_period 完全一致。"
+        "forecast_valuation.model_family 必须明确填写实际生成 Bear/Base/Bull 终值和入场参考锚的估值模型类别（仅允许 EPS_MULTIPLE、FCF_DCF、DDM、SOTP、RNPV、OTHER、UNKNOWN），不得把操作者选定模型抄成实际计算模型。forecast_valuation.model 的人类可读名称还必须带有可识别的模型族标记，例如 EPS_MULTIPLE/EPS×P/E、FCF_DCF/DCF、DDM、SOTP、RNPV 或 OTHER；代码会从名称解析模型族并与 model_family 交叉核对，无法识别或不一致时阻断价格计算。此交叉核对是防止字段自相矛盾的一致性检查，不代表系统已独立证明所有情景数值确实由该公式计算。操作者选择与计算模型不同将阻断回报/目标入场价计算，不能悄悄覆盖；未支持模型只能标为替代情景。"
+        "forecast_valuation.valuation_terminal_date 必须填写终值真正对应的 ISO 日期 YYYY-MM-DD；valuation_terminal_date_basis 说明该日期对应的报告期间/财年终点依据。不得仅因默认 horizon=1Y 就把 2027FY 终值当成一年后价值。日期缺失、早于/等于 cutoff 或与 forecast_period 年份明显不兼容时，年化回报和目标入场价必须保持 UNKNOWN。年化使用 ACT/365F 的实际日历天数；decision_parameters.horizon_years 仍单独保留为决策参考期限。"
         "operator_valuation_context 是操作者拥有的字段，必须原样保留模板中的 UNKNOWN/null，不得替操作者选择估值模型或判断原估值是否已包含项目；操作者稍后会在本地独立确认。"
         "本批只有 EPS_MULTIPLE 适配器可传导。每个情景必须提供 ownership_ratio、displaced_existing_after_tax_profit_cny、basic_shares、convertible_bond_incremental_shares、other_dilution_shares、pe_multiple_x，均用 {value,unit,data_class,basis,evidence_refs,note} 结构。"
         "ownership_ratio 是 0–1 的比例；被替代存量业务税后归属利润为非负 CNY；股数单位 shares，填写实际普通股数量而非百万股；可转债潜在新增股数和其他稀释股数可明确为 0，但须说明依据。P/E 倍数单位 x。"
@@ -2582,6 +2833,21 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
     assumptions = valuation.get("assumptions")
     if not isinstance(assumptions, list) or not any(str(item or "").strip() for item in assumptions):
         missing.append("估值假设（无法估值时写明原因与缺口）")
+    model_family = str(valuation.get("model_family") or "").strip().upper()
+    if model_family not in PRIMARY_MODEL_FAMILIES:
+        missing.append("实际计算主估值模型类别（model_family）")
+    terminal_date_raw = valuation.get("valuation_terminal_date")
+    terminal_date_ok = False
+    if isinstance(terminal_date_raw, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", terminal_date_raw):
+        try:
+            _date(terminal_date_raw, "VALUATION_TERMINAL_DATE")
+            terminal_date_ok = True
+        except LocalInvestmentPilotError:
+            terminal_date_ok = False
+    if not terminal_date_ok:
+        missing.append("明确的估值终点日期（valuation_terminal_date，YYYY-MM-DD）")
+    if not str(valuation.get("valuation_terminal_date_basis") or "").strip():
+        missing.append("估值终点日期对应预测期间的依据（valuation_terminal_date_basis）")
     entry_reference = valuation.get("entry_value_reference_per_share")
     if entry_reference in (None, ""):
         missing.append("安全边际参考价值/每股估值锚点")

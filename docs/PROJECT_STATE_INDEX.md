@@ -8,7 +8,7 @@ Authority: this file is the **only canonical Current State Index**.
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
-**Next user-visible acceptance:** one real macOS run and replay on current `main`, completing the portfolio and B5 model/baseline prompts, then reviewing `report.md`, `analysis.json`, and `pilot_receipt.json`. PR #444 corrected explicit-null cash-distribution handling and nullable valuation rendering; PR #446 extended B4 scalar rendering so typed numeric zero stays `0` while `null`/empty stays `UNKNOWN`. Exact-head validation on PR #446 passed 115 local-pilot/acceptance tests, 412 Investment Core tests, 7 independent red-team tests, and all 6 applicable PR workflows. This remains code/CI evidence only; the 603699 macOS full-run and Replay bundle is still absent/unverified. Do not start B7 scope expansion before the real run's output exposes concrete functional gaps.
+**Next user-visible acceptance:** a real macOS full-run and Replay on current `main`, reviewing `report.md`, `analysis.json`, and `pilot_receipt.json`. The 603699 bundle remains absent/unverified. The newly audited WuXi AppTec report exposed two specific investment-calculation gaps, so narrow B7 correction is now justified: (1) operator-selected model versus actual calculation model was not a mandatory input to the price solver; (2) the 2027FY endpoint was not bound to the annualization period. PR #451 adds those two fail-closed contracts without broadening into hash/Replay infrastructure. Exact-head CI is code evidence only; after merge, run a fresh Mac pilot with explicit model-family and terminal-date fields and compare JSON/report values before calling B7 accepted.
 
 The records below are cumulative milestone history. A milestone's historical “next boundary” is **time-local** and MUST NOT be interpreted as the current development instruction.
 
@@ -51,7 +51,15 @@ B4 operating-driver forecast bridge                    PR #424 + #426 + #442 + #
 B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 MERGED; explicit-null cash distributions BLOCK transmission; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; EPS_MULTIPLE ONLY
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 MERGED; report/JSON target-price cap assertions; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
+B7 primary-model + terminal-date contract                    PR #451 OPEN; mismatch/unknown model and missing/invalid endpoint/basis block return/B6; tested code head 122/122 local-pilot+Replay tests and 14/14 PR checks passed; fresh Mac full-run + Replay not yet accepted
 ```
+
+### B7 — primary valuation model and terminal-date contract (2026-10-17)
+
+- Source red-team confirmed that `selected_model_family=SOTP` could coexist with EPS_MULTIPLE-calculated scenario values feeding target entry price; B5's `NOT_LINKED` status did not block the existing return solver. The return solver also treated the policy/reference `horizon_years` as the actual terminal-value holding period.
+- PR [#451](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/451) introduces separate operator-selected and actually calculated model families; unknown/mismatched model families are retained as alternative research values and block return/entry-price/B6 outputs. A project-incremental forecast also blocks price output unless B5 has applied the increment or the baseline was confirmed to include it.
+- An explicit valuation terminal date and its basis now produce elapsed calendar days and an ACT/365F year fraction for annualized return and return-hurdle price. Decision reference horizon and the 1Y/3Y exception policy remain separate. Missing date/basis, unsupported period semantics, date ordering or forecast-year mismatch fail closed.
+- Exact-head tests passed **122/122** including Replay acceptance; all **14/14 PR checks** passed on tested code head `dafa95cb6c14c3c64bf8856788dacf11819e6a0f`. Fresh exact-head checks run again after the latest state/documentation edits. Do not mark B7 accepted until the Mac full-run produces `analysis.json`, `report.md`, and `pilot_receipt.json` from the same run, and return/entry-price parity is verified.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 

@@ -131,6 +131,14 @@ def calculate_return_metrics(
         path="return_gate",
     )
     horizon = _dec(horizon_selection["horizon_years"], "return_gate.horizon_years")
+    annualization_horizon = horizon
+    if return_gate.get("annualization_year_fraction") not in (None, ""):
+        annualization_horizon = _dec(
+            return_gate["annualization_year_fraction"],
+            "return_gate.annualization_year_fraction",
+        )
+        if annualization_horizon <= 0:
+            raise ValueError("return_gate.annualization_year_fraction must be > 0")
     threshold = _dec(return_gate["buy_entry_return_cushion_threshold"], "return_gate.buy_entry_return_cushion_threshold")
     target = _dec(return_gate["fundamental_target_annualized_return"], "return_gate.fundamental_target_annualized_return")
     rr = _dec(return_gate["required_return_annualized"], "return_gate.required_return_annualized")
@@ -171,7 +179,7 @@ def calculate_return_metrics(
         for name in SCENARIOS
     )
     total_return = expected_wealth / entry - Decimal("1")
-    annualized_return = _annualize(expected_wealth / entry, horizon)
+    annualized_return = _annualize(expected_wealth / entry, annualization_horizon)
     entry_cushion = entry_ref / entry - Decimal("1")
     mos = Decimal("1") - (entry / entry_ref)
     entry_pass = entry_cushion >= threshold
@@ -181,10 +189,10 @@ def calculate_return_metrics(
     risk_pass = True if risk_rate is None else bear_return >= -risk_rate
 
     target_entry_price_for_return = _price_cap_for_annualized_return(
-        expected_wealth, target, horizon
+        expected_wealth, target, annualization_horizon
     )
     target_entry_price_for_required_return = _price_cap_for_annualized_return(
-        expected_wealth, rr, horizon
+        expected_wealth, rr, annualization_horizon
     )
     target_entry_price_for_entry_cushion = entry_ref / (Decimal("1") + threshold)
     target_entry_price_for_risk = _price_cap_for_risk(wealth["bear"], risk_rate)
@@ -202,6 +210,7 @@ def calculate_return_metrics(
         "entry_return_cushion": entry_cushion,
         "margin_of_safety": mos,
         "horizon_years": horizon_selection["horizon_years"],
+        "annualization_year_fraction": annualization_horizon,
         "horizon_override": horizon_selection["horizon_override"],
         "horizon_override_basis": horizon_selection["horizon_override_basis"],
         "horizon_selection_rationale": horizon_selection["horizon_selection_rationale"],
