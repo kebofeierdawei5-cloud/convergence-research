@@ -51,7 +51,7 @@ B4 operating-driver forecast bridge                    PR #424 + #426 + #442 + #
 B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 MERGED; explicit-null cash distributions BLOCK transmission; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; EPS_MULTIPLE ONLY
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 MERGED; report/JSON target-price cap assertions; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
-B7 primary-model + terminal-date contract                    PR #451 + #452 MERGED; model/name mismatch, unlinked non-COMPANY_WIDE scope, missing/invalid endpoint/basis block return/B6; 123/123 local-pilot+Replay tests + 17/17 PR checks passed; fresh Mac full-run + Replay acceptance OPEN
+B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; UNKNOWN/N/A/unspecified terminal-date basis fails closed; 123 local-pilot+Replay tests + 6/6 triggered workflows passed on #454; real Mac full-run + Replay acceptance OPEN
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -60,6 +60,13 @@ B7 primary-model + terminal-date contract                    PR #451 + #452 MERG
 - PR [#451](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/451) merged at `b3f325bcc2e6177ddf05a0932c82197cb3c8d8d1`. It introduces separate operator-selected and declared calculation model families, plus deterministic parsing of the human-readable model name. Unknown, mismatched or name-conflicting families remain alternative research values and block return/entry-price/B6 outputs. A project-incremental forecast also blocks price output unless B5 has applied the increment or the baseline was confirmed to include it.
 - An explicit valuation terminal date and its basis now produce elapsed calendar days and an ACT/365F year fraction for annualized return and return-hurdle price. Decision reference horizon and the 1Y/3Y exception policy remain separate. Missing date/basis, unsupported period semantics, date ordering or forecast-year mismatch fail closed.
 - PR #452 merged at `8f49fda08a05c681ee262cf3d12f86016be8966e`. Its exact head `101dfa425af85fb1c8c8d8cfa0fb73b531f1ec73` passed **123/123** local-pilot + Replay tests and **17/17** PR checks, including unresolved-scope regressions. This remains code/CI evidence only. B7 is not fully accepted until the Mac full-run produces `analysis.json`, `report.md`, and `pilot_receipt.json` from the same run and return/entry-price parity is verified.
+
+### B7 follow-up — unidentified terminal-date basis sentinels (2026-10-17)
+
+- A targeted code red-team found that a non-empty sentinel such as `UNKNOWN`, `N/A`, `NOT_IDENTIFIABLE`, or `TBD` satisfied the terminal-date-basis check. That could incorrectly enable annualized-return, target-entry-price and B6 calculations without an identifiable basis.
+- PR [#454](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/454) merged at `11a1b03e4268937900e5c825b8a35b984ebd33c8`. The validator now fails closed for normalized non-identifiable sentinels; return metrics and target entry prices remain unresolved and the provisional action stays `REVIEW_REQUIRED`.
+- The exact PR head passed **123/123 local-pilot + Replay tests** and all **6/6 triggered workflows**. No valuation formula, 15% annualized-return hurdle, risk cap, decision precedence, or execution authority changed.
+- **The actual Mac full-run + Replay bundle remains OPEN / not verified.** This fix and its CI do not substitute for the deferred private output review.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
