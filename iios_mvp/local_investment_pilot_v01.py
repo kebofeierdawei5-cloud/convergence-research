@@ -1060,6 +1060,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         )
         explanation_identifiable = _is_identifiable_evidence_text(explanation)
         assessment[name]["summary"] = summary
+        assessment[name]["evidence_refs"] = _items(raw.get("evidence_refs"))
         assessment[name]["status_issues"] = (
             [] if explanation_identifiable else ["ASSESSMENT_EXPLANATION_NOT_IDENTIFIABLE"]
         )
@@ -1189,6 +1190,28 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         if source["source_id"] in references
         and source["time_status"] in {"UNKNOWN", "KNOWN_AT_INVALID", "KNOWN_AT_PRECISION_INSUFFICIENT"}
     ]
+
+    # A passing Trust/Reality/Quality/MIE/Expectation Gap/Risk claim, or an INTACT
+    # Thesis, must be linked to at least one uniquely resolved, cutoff-compatible
+    # evidence ID. A source elsewhere in the register is not support for every gate.
+    for name, section in assessment.items():
+        status = section.get("status")
+        requires_evidence = status == "PASS" or (name == "thesis" and status == "INTACT")
+        if not requires_evidence:
+            continue
+        refs = _items(section.get("evidence_refs"))
+        refs_unresolved = (
+            not refs
+            or any(ref not in source_ids for ref in refs)
+            or bool(set(refs) & set(unknown_refs))
+            or bool(set(refs) & set(after_cutoff_refs))
+            or bool(set(refs) & set(uncertain_timing_refs))
+        )
+        if refs_unresolved:
+            section["status"] = "UNKNOWN"
+            status_issues = list(section.get("status_issues") or [])
+            status_issues.append("ASSESSMENT_PASS_EVIDENCE_LINK_NOT_RESOLVED")
+            section["status_issues"] = list(dict.fromkeys(status_issues))
     operating_driver_forecast = evaluate_operating_driver_forecast(
         raw_driver_forecast,
         evidence_register=sources,
@@ -1681,6 +1704,8 @@ def _decision(
         valid = "INTACT" if name == "thesis" else "PASS"
         if a[name]["status"] != valid:
             issues.append(f"{name.upper()}_{a[name]['status']}")
+        for status_issue in a[name].get("status_issues") or []:
+            issues.append(f"{name.upper()}_{status_issue}")
     if a["expectation_gap"]["direction"] != "POSITIVE":
         issues.append(f"EXPECTATION_GAP_DIRECTION_{a['expectation_gap']['direction']}")
     if not prepared["evidence_register"]:
