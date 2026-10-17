@@ -376,6 +376,32 @@ def test_guided_observation_date_must_precede_date_only_cutoff():
         _validate_guided_observation_date(date(2026, 10, 13), cutoff)
 
 
+@pytest.mark.parametrize(
+    ("section", "status", "placeholder"),
+    [
+        ("trust", "PASS", "UNKNOWN"),
+        ("reality", "PASS", "TBD"),
+        ("quality", "PASS", "N/A"),
+        ("thesis", "INTACT", "NOT_IDENTIFIABLE"),
+        ("risk", "PASS", "未提供依据"),
+    ],
+)
+def test_assessment_gate_status_downgrades_when_summary_is_placeholder(section, status, placeholder):
+    payload = _payload()
+    payload["assessment"][section]["status"] = status
+    payload["assessment"][section]["summary"] = placeholder
+
+    analysis, report = _analyse(payload, f"TEST-ASSESSMENT-SUMMARY-PLACEHOLDER-{section}")
+
+    normalized = analysis["assessment"][section]
+    assert normalized["status"] == "UNKNOWN"
+    assert normalized["status_input"] == status
+    assert normalized["summary_issues"] == ["ASSESSMENT_SUMMARY_NOT_IDENTIFIABLE"]
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert f"{section.upper()}_NOT_PASS" in " ".join(analysis["decision"]["gating_issues"]) or section == "thesis"
+    assert "输入标签 " + status in report
+
+
 def test_ai_response_must_preserve_operator_owned_case_and_price_input(tmp_path):
     template_path = _write_input(tmp_path, _payload(cutoff="2026-10-10"))
     payload = json.loads(template_path.read_text(encoding="utf-8"))
