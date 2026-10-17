@@ -782,6 +782,7 @@ def render_operating_driver_section(
             f"- 桥接计算状态：{result.get('calculation_status', 'SCENARIO_ECONOMICS_NOT_IDENTIFIABLE')}",
             f"- 产量 / 销量：{_display_optional_scalar(result.get('production_volume_tonnes'))} / {_display_optional_scalar(result.get('sales_volume_tonnes'))} 吨",
             f"- 收入：{_display_optional_scalar(result.get('revenue_cny'))}；变动成本：{_display_optional_scalar(result.get('variable_cost_cny'))}；扣变动成本贡献：{_display_optional_scalar(result.get('contribution_after_variable_cost_cny'))}",
+            f"- 成本率：{_display_optional_scalar(result.get('cost_of_revenue_ratio'))}；变动成本计算口径：{result.get('variable_cost_basis') or 'UNKNOWN'}",
             f"- EBITDA / EBIT / 税前利润 / 净利润：{_display_optional_scalar(result.get('ebitda_cny'))} / {_display_optional_scalar(result.get('ebit_cny'))} / {_display_optional_scalar(result.get('profit_before_tax_cny'))} / {_display_optional_scalar(result.get('net_profit_cny'))}",
             f"- 资本开支 / 营运资金变动 / 自由现金流代理：{_display_optional_scalar(result.get('cash_capex_cny'))} / {_display_optional_scalar(result.get('change_working_capital_cny'))} / {_display_optional_scalar(result.get('unlevered_fcf_proxy_cny'))}",
             f"- {valuation_label}：{scenario_terminal_display} {currency}",
@@ -806,8 +807,48 @@ def render_operating_driver_section(
                     f"产能利用率 {_display({'value': str(Decimal(product['production_utilization']) * Decimal('100')), 'unit': '%', 'calculation_usable': True}) if product.get('production_utilization') is not None else 'UNKNOWN'}。"
                 )
         lines.append("")
+    reconciliation = driver.get("valuation_reconciliation")
+    if isinstance(reconciliation, Mapping):
+        lines.extend([
+            "",
+            "#### B4 与主估值经营桥一致性复核",
+            "",
+            f"- 总体复核状态：{reconciliation.get('status', 'UNKNOWN')}",
+        ])
+        links = driver.get("cross_node_assumption_links")
+        if isinstance(links, list) and links:
+            linked_descriptions = [
+                f"{item.get('scenario', 'UNKNOWN').upper()} {item.get('field', 'UNKNOWN')}={item.get('value', 'UNKNOWN')}（{item.get('source_assumption_id') or item.get('source_assumption_name') or '同一估值假设'}）"
+                for item in links if isinstance(item, Mapping) and item.get("status") == "LINKED_SAME_SCENARIO_ASSUMPTION"
+            ]
+            if linked_descriptions:
+                lines.append("- 跨节点共享假设：" + "；".join(linked_descriptions))
+        scenario_checks = reconciliation.get("scenarios") if isinstance(reconciliation.get("scenarios"), Mapping) else {}
+        for scenario_name in SCENARIOS:
+            check_row = scenario_checks.get(scenario_name) if isinstance(scenario_checks.get(scenario_name), Mapping) else {}
+            checks = check_row.get("checks") if isinstance(check_row.get("checks"), list) else []
+            mismatches = [
+                str(item.get("driver_field"))
+                for item in checks if isinstance(item, Mapping) and item.get("status") == "MISMATCH"
+            ]
+            not_comparable = [
+                str(item.get("driver_field"))
+                for item in checks if isinstance(item, Mapping) and item.get("status") == "NOT_COMPARABLE"
+            ]
+            detail = []
+            if mismatches:
+                detail.append("不一致字段：" + "、".join(mismatches))
+            if not_comparable:
+                detail.append("未能比较字段：" + "、".join(not_comparable))
+            lines.append(
+                f"- {scenario_name.upper()}：{check_row.get('status', 'UNKNOWN')}"
+                + (f"；{'；'.join(detail)}" if detail else "")
+            )
+        for excluded in reconciliation.get("excluded_metrics") or []:
+            if isinstance(excluded, Mapping):
+                lines.append(f"- 未作数值相等比较：{excluded.get('field', 'UNKNOWN')}；{excluded.get('reason', '')}")
     lines.extend([
-        "- 解释：模型按产品“销量×净售价”计算收入，按销量×单位变动成本计算直接变动成本，再扣现金固定运营费用及折旧得到 EBITDA/EBIT；税前利润额外扣融资成本。自由现金流代理 = EBIT − 正 EBIT 对应现金税 + 折旧 − 资本开支 − 营运资金增加（营运资金释放可为负值）。",
+        "- 解释：模型按销量×净售价计算产品收入；当业务是研发/测试等服务、实物吨位口径不可识别时，也可使用明确标记的直接业务线收入假设。变动成本优先按销量×单位成本计算；若该口径不可用，可复用同一估值情景中明确给出的营业成本率。再扣固定现金运营费用及折旧得到 EBITDA/EBIT，税前利润额外扣融资成本。自由现金流代理 = EBIT − 正 EBIT 对应现金税 + 折旧 − 资本开支 − 营运资金增加（营运资金释放可为负值）。",
     ])
     if b5_applied:
         lines.append("- 传导边界：这只是情景经营桥，不代表实际已实现净利润。当前 B5 已按明确的 EPS_MULTIPLE 增量桥接，将稀释口径的项目增量传导至 Bear/Base/Bull 每股终值与 Base 估值锚；仍是非正式试运行，不构成正式准入或 Decision。")
