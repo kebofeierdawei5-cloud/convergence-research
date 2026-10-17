@@ -1433,6 +1433,13 @@ def test_missing_or_period_mismatched_terminal_date_blocks_return_metrics():
     assert missing["return_metrics"] is None
     assert missing["price_zone_sensitivity"]["status"] == "UNKNOWN"
 
+    basis_payload = _payload()
+    basis_payload["forecast_valuation"]["valuation_terminal_date_basis"] = ""
+    basis_missing, _ = _analyse(basis_payload, "TEST-MISSING-TERMINAL-DATE-BASIS")
+    assert basis_missing["valuation_timing"]["status"] == "VALUATION_TERMINAL_DATE_BASIS_MISSING"
+    assert basis_missing["return_metrics"] is None
+    assert basis_missing["price_zone_sensitivity"]["target_entry_price"] is None
+
     mismatch_payload = _payload()
     mismatch_payload["forecast_valuation"]["valuation_terminal_date"] = "2029-12-31"
     mismatch, _ = _analyse(mismatch_payload, "TEST-PERIOD-MISMATCH")
