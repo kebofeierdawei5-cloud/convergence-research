@@ -1052,15 +1052,21 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         assessment[name]["status_input"] = raw_status
         normalized_status = _status(normalized_status, states)
         summary = str(raw.get("summary") or "")
-        summary_identifiable = _is_identifiable_evidence_text(summary)
+        # Thesis uses core_statement as its required explanatory field; the other
+        # assessment sections use summary. Do not apply a summary-only check to Thesis.
+        explanation = (
+            raw.get("core_statement") if name == "thesis"
+            else raw.get("summary")
+        )
+        explanation_identifiable = _is_identifiable_evidence_text(explanation)
         assessment[name]["summary"] = summary
-        assessment[name]["summary_issues"] = (
-            [] if summary_identifiable else ["ASSESSMENT_SUMMARY_NOT_IDENTIFIABLE"]
+        assessment[name]["status_issues"] = (
+            [] if explanation_identifiable else ["ASSESSMENT_EXPLANATION_NOT_IDENTIFIABLE"]
         )
         # Do not let a machine status such as PASS/INTACT survive when its
         # accompanying explanation is empty or only an UNKNOWN/TBD placeholder.
         assessment[name]["status"] = (
-            normalized_status if summary_identifiable else "UNKNOWN"
+            normalized_status if explanation_identifiable else "UNKNOWN"
         )
     direction_aliases = {
         "CURRENT_PRICE_ABOVE_RISK_ADJUSTED_ENTRY_REFERENCE": "NEGATIVE",
