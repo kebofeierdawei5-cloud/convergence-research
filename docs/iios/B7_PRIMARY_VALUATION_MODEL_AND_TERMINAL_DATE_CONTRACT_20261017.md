@@ -27,7 +27,7 @@ The return solver validated the nominal horizon_years and used it for both annua
 - Annualized return is (expected_terminal_wealth / current_price) ** (1 / year_fraction) - 1.
 - The 15% annualized-return entry cap is expected_terminal_wealth / (1 + 0.15) ** year_fraction. The Bear loss cap and entry-cushion cap retain their existing independent definitions; the overall target remains the minimum of the existing applicable caps.
 - decision_parameters.horizon_years remains the policy/reference horizon and continues to use the existing 1–3Y validation and 3Y exception rules. It is no longer silently used as a substitute for a calendar-date-derived holding period.
-- Missing or invalid endpoint, missing date basis, endpoint on/before the cutoff, non-identifiable supported forecast-period label, or material period-year mismatch blocks the return solver and keeps B6 values UNKNOWN.
+- Missing or invalid endpoint, missing or non-identifiable date basis (including sentinel values such as UNKNOWN/N/A/TBD), endpoint on/before the cutoff, non-identifiable supported forecast-period label, or material period-year mismatch blocks the return solver and keeps B6 values UNKNOWN.
 
 ## Conservative boundary
 
@@ -36,7 +36,7 @@ The current period-alignment check understands annual YYYYFY labels and accepts 
 ## Automated verification and acceptance boundary
 
 - At exact PR #452 head `101dfa425af85fb1c8c8d8cfa0fb73b531f1ec73`, the dedicated local-pilot workflow compiled the pilot/core files and launchers, ran local pilot + Replay acceptance tests (**123 passed**), and passed diff check. All 17 PR checks passed.
-- The added negative test confirms that missing `valuation_terminal_date_basis` blocks return metrics and B6 even if a JSON input bypasses wizard validation.
+- Negative tests confirm that missing `valuation_terminal_date_basis` and non-empty unknown sentinels (UNKNOWN/N/A/NOT_IDENTIFIABLE/TBD) block return metrics and B6 even if a JSON input bypasses wizard validation. PR #454 exact head passed 123 local-pilot + Replay tests and all 6 triggered workflows.
 - A fresh Mac full-run and same-run comparison of `analysis.json`, `report.md`, and `pilot_receipt.json` remain required; CI does not establish the real ChatGPT response or on-device workflow.
 
 ## Not changed
