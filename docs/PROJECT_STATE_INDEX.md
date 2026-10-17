@@ -54,7 +54,7 @@ B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 +
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 + #462 + #464 + #465 MERGED; operator Bear-loss cap/Required Return preserved, placeholder probability rationale blocks price outputs; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 MERGED; evidence traceability and unknown sentinels fail closed; B5 no-double-count, operator risk/return policy preservation and stress rationale regressions; latest #466 151 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 MERGED; evidence/rationale sentinels fail closed, operator risk/return policy protected, invalid explicit policy inputs reject, PASS states require identifiable explanations; latest #469 162 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -102,6 +102,13 @@ B8 bounded investment-result red-team                          PR #456 + #457 + 
 - PR [#466](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/466) merged at `3d5e9689c6412d944622ff4904264d9dfe5dbf22`. Bear failure-path and independent thesis-break stress required text fields now reject placeholder-only descriptions; the stress review remains `REVIEW_REQUIRED` and conditional position sizing stays absent when the trigger/impact/method/rationale cannot be identified. Exact head passed **151/151 local-pilot + Replay tests** and **6/6 workflows**.
 - These are narrow corrections to existing input provenance, assumption completeness and policy ownership. They do not alter probability values, valuation formulas, the 15% minimum hurdle, the risk solver, or trade authority.
 - **Real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** It was explicitly deferred because the upload limit was reached; all CI evidence is code-level evidence only.
+
+### B8 follow-up — invalid policy values and assessment status/explanation consistency (2026-10-17)
+
+- PR [#468](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/468) merged at `ffb75d11c06696d200d3519864e83e66f33da760`. The direct JSON path previously replaced a present-but-invalid `required_return_annualized` with 15% or a present-but-invalid/out-of-range `max_loss_pct` with 25%. It now raises a clear input error in those cases. Only omitted legacy fields retain the existing documented defaults. Exact head passed **157/157 local-pilot + Replay tests** and **6/6 workflows**.
+- PR [#469](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/469) merged at `9d5df6c1a439a9b4e87d471bc97000dc99ea59c1`. A core assessment such as Trust/Risk/Reality/Quality could previously keep `status=PASS` with `summary=UNKNOWN`; Thesis could keep `INTACT` with an unidentifiable core statement. The normalizer now downgrades the relevant state to `UNKNOWN`, retains the original input status, and records the explanation issue. Thesis uses `core_statement` as its explanation field. Exact head passed **162/162 local-pilot + Replay tests** and **6/6 workflows**.
+- These checks make policy inputs and status/explanation fields consistent; they do not prove that a substantive analyst rationale is true or economically sufficient, nor do they create formal admission/Decision authority.
+- **Real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** The user deferred the ZIP because the upload limit was reached. CI evidence is not operator-environment acceptance.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
