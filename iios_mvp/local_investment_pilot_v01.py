@@ -288,6 +288,15 @@ def _status(value: Any, allowed: set[str]) -> str:
     return item if item in allowed else "UNKNOWN"
 
 
+def _assessment_status_for_report(section: Mapping[str, Any]) -> str:
+    """Show both the conservative gate status and any non-canonical source label."""
+    status = str(section.get("status") or "UNKNOWN")
+    source_label = str(section.get("status_input") or "").strip().upper()
+    if source_label and source_label != status:
+        return f"{status}（输入标签 {source_label}；已按本地决策枚举归一化）"
+    return status
+
+
 def _items(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
@@ -1624,13 +1633,13 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
         "## 二、Trust / Reality / Quality",
         "",
-        f"- Trust：{a['trust']['status']} — {a['trust'].get('summary') or '未知'}",
-        f"- Reality：{a['reality']['status']} — {a['reality'].get('summary') or '未知'}",
-        f"- Quality：{a['quality']['status']} — {a['quality'].get('summary') or '未知'}",
+        f"- Trust：{_assessment_status_for_report(a['trust'])} — {a['trust'].get('summary') or '未知'}",
+        f"- Reality：{_assessment_status_for_report(a['reality'])} — {a['reality'].get('summary') or '未知'}",
+        f"- Quality：{_assessment_status_for_report(a['quality'])} — {a['quality'].get('summary') or '未知'}",
         "",
         "## 三、Thesis 与价值驱动因素",
         "",
-        f"- Thesis 状态：{a['thesis']['status']}",
+        f"- Thesis 状态：{_assessment_status_for_report(a['thesis'])}",
         "",
         "### 核心论点",
         "",
@@ -1739,12 +1748,12 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "## 五、MIE 与预期差",
         "",
         f"- MIE：{a['market_implied_expectation']['status']} — {a['market_implied_expectation'].get('summary') or '未知'}",
-        f"- 预期差：{a['expectation_gap']['status']} / {a['expectation_gap']['direction']} — {a['expectation_gap'].get('summary') or '未知'}",
+        f"- 预期差：{_assessment_status_for_report(a['expectation_gap'])} / {a['expectation_gap']['direction']}{'（输入方向标签 ' + str(a['expectation_gap'].get('direction_input')) + '）' if a['expectation_gap'].get('direction_input') and str(a['expectation_gap'].get('direction_input')).upper() != str(a['expectation_gap']['direction']).upper() else ''} — {a['expectation_gap'].get('summary') or '未知'}",
         "- 若 MIE 无法识别或缺乏历史支持，不以内部估值代替市场隐含预期。",
         "",
         "## 六、风险与证据引用核对",
         "",
-        f"- 风险状态：{a['risk']['status']} — {a['risk'].get('summary') or '未知'}",
+        f"- 风险状态：{_assessment_status_for_report(a['risk'])} — {a['risk'].get('summary') or '未知'}",
     ])
     risk_items = a["risk"].get("items") or []
     if risk_items:
