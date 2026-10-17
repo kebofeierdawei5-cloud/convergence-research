@@ -394,6 +394,24 @@ def test_ai_response_must_preserve_operator_owned_case_and_price_input(tmp_path)
     with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_CHANGED_OPERATOR_CONTROLLED_FIELDS: case"):
         _assert_response_preserves_operator_inputs(template_path, payload)
 
+    # The model must not change the risk cap that feeds the Bear-loss pass/fail
+    # and B6 price ceiling. Operators can edit the local template themselves.
+    payload = json.loads(template_path.read_text(encoding="utf-8"))
+    payload["decision_parameters"]["max_loss_pct"] = "90"
+    with pytest.raises(
+        LocalInvestmentPilotError,
+        match=r"CHATGPT_CHANGED_OPERATOR_CONTROLLED_FIELDS: decision_parameters\.max_loss_pct",
+    ):
+        _assert_response_preserves_operator_inputs(template_path, payload)
+
+    payload = json.loads(template_path.read_text(encoding="utf-8"))
+    payload["decision_parameters"].pop("max_loss_pct")
+    with pytest.raises(
+        LocalInvestmentPilotError,
+        match=r"CHATGPT_CHANGED_OPERATOR_CONTROLLED_FIELDS: decision_parameters\.max_loss_pct",
+    ):
+        _assert_response_preserves_operator_inputs(template_path, payload)
+
 
 def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path, monkeypatch, capsys):
     import builtins
