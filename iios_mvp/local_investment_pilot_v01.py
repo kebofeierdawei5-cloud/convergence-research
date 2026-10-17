@@ -930,11 +930,18 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
 
     sources: list[dict[str, Any]] = []
     source_ids: set[str] = set()
+    duplicate_source_ids: set[str] = set()
     for row in payload.get("evidence_register") or []:
         if not isinstance(row, Mapping):
             continue
         source_id = str(row.get("source_id") or "").strip()
-        if not source_id or source_id in source_ids:
+        if not source_id:
+            continue
+        if source_id in source_ids:
+            # A repeated ID is ambiguous even if the first row looks usable.
+            # Preserve the first row for display, but prevent references to this
+            # ID from being treated as uniquely resolved.
+            duplicate_source_ids.add(source_id)
             continue
         source_ids.add(source_id)
         known_at_original = str(row.get("known_at") or "").strip()
@@ -1119,7 +1126,9 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "operating_driver_forecast": raw_driver_forecast,
         "valuation_transmission": raw_valuation_transmission,
     })
-    unknown_refs = sorted(references - source_ids)
+    unknown_refs = sorted(
+        (references - source_ids) | (references & duplicate_source_ids)
+    )
     after_cutoff_refs = [
         source["source_id"] for source in sources
         if source["source_id"] in references and source["time_status"] == "AFTER_CUTOFF"
@@ -1209,6 +1218,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             "canonical_price_admission": False,
         },
         "evidence_register": sources,
+        "duplicate_evidence_ids": sorted(duplicate_source_ids),
         "assessment": assessment,
         "forecast_valuation": forecast,
         "operating_driver_forecast": operating_driver_forecast,
@@ -1620,6 +1630,12 @@ def _decision(
         issues.append("EVIDENCE_REGISTER_EMPTY")
     if prepared["unresolved_evidence_references"]:
         issues.append("UNRESOLVED_EVIDENCE_REFERENCES")
+    referenced_duplicate_ids = (
+        set(prepared.get("referenced_evidence_ids") or [])
+        & set(prepared.get("duplicate_evidence_ids") or [])
+    )
+    if referenced_duplicate_ids:
+        issues.append("DUPLICATE_EVIDENCE_SOURCE_IDS")
     if prepared["after_cutoff_evidence_references"]:
         issues.append("REFERENCED_EVIDENCE_AFTER_CUTOFF")
     if prepared["uncertain_timing_evidence_references"]:
@@ -1643,6 +1659,7 @@ def _decision(
     validation_blockers = {
         "EVIDENCE_REGISTER_EMPTY",
         "UNRESOLVED_EVIDENCE_REFERENCES",
+        "DUPLICATE_EVIDENCE_SOURCE_IDS",
         "REFERENCED_EVIDENCE_AFTER_CUTOFF",
         "REFERENCED_EVIDENCE_TIMING_UNCERTAIN",
         "PRICE_NOT_PIT_QUALIFIED",
@@ -2048,9 +2065,20 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     referenced = sorted(set(analysis.get("referenced_evidence_ids") or []))
     unresolved = sorted(set(analysis.get("unresolved_evidence_references") or []))
     lines.append(f"- 结构化引用 ID 数：{len(referenced)}；在来源登记表中找到记录：{len([ref for ref in referenced if ref in evidence_by_id])}；未解析：{len(unresolved)}。")
+    duplicate_evidence_ids = sorted(set(analysis.get("duplicate_evidence_ids") or []))
+    if duplicate_evidence_ids:
+        lines.append(
+            "- 来源登记表重复 ID："
+            + "、".join(duplicate_evidence_ids)
+            + "；这些 ID 无法唯一对应来源记录，凡被引用均按未解决处理。"
+        )
     if referenced:
         for ref in referenced:
-            if ref in evidence_by_id:
+            if ref in duplicate_evidence_ids:
+                lines.append(
+                    f"- **{ref}**：**来源 ID 重复登记，引用无法唯一解析**；不得作为已解决证据支持结论。"
+                )
+            elif ref in evidence_by_id:
                 row = evidence_by_id[ref]
                 source_ref = _source_ref_markdown(row.get("source_ref"))
                 lines.append(
@@ -2160,6 +2188,7 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "case": prepared["case"],
         "price_input": prepared["price_input"],
         "evidence_register": prepared["evidence_register"],
+        "duplicate_evidence_ids": prepared["duplicate_evidence_ids"],
         "referenced_evidence_ids": prepared["referenced_evidence_ids"],
         "unresolved_evidence_references": prepared["unresolved_evidence_references"],
         "after_cutoff_evidence_references": prepared["after_cutoff_evidence_references"],
