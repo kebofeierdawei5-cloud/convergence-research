@@ -394,7 +394,7 @@ def _calculate_scenario(
     revenue = sum(product_revenues, Decimal("0")) if revenues_complete else None
     variable_cost = sum(product_costs, Decimal("0")) if costs_complete else None
     cost_ratio = _value(scenario_measures.get("cost_of_revenue_ratio"))
-    variable_cost_basis = "PRODUCT_LEVEL_VOLUME_X_UNIT_COST" if costs_complete else None
+    variable_cost_basis = "PRODUCT_LEVEL_COSTS" if costs_complete else None
     if variable_cost is not None and revenue is not None and cost_ratio is not None:
         ratio_implied_cost = revenue * cost_ratio
         if variable_cost != ratio_implied_cost:
