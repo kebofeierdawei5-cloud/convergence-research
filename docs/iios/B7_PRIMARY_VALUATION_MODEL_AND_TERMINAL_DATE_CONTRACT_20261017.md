@@ -1,6 +1,6 @@
 # B7 — Primary Valuation Model and Terminal-Date Contract
 
-**Status:** PR #451 merged at `b3f325bcc2e6177ddf05a0932c82197cb3c8d8d1`; PR #452 merged at `8f49fda08a05c681ee262cf3d12f86016be8966e`. Exact PR #452 head passed 123 local-pilot + Replay tests and 17/17 checks. Live Mac full-run + Replay acceptance remains open.  
+**Status:** PR #451 merged at `b3f325bcc2e6177ddf05a0932c82197cb3c8d8d1`; PR #452 merged at `8f49fda08a05c681ee262cf3d12f86016be8966e`; PR #454 merged at `11a1b03e4268937900e5c825b8a35b984ebd33c8` rejects unknown terminal-date basis sentinels. Code/CI checks pass; live Mac full-run + Replay acceptance remains OPEN / NOT VERIFIED and was explicitly deferred on 2026-10-17 due to the upload limit.  
 **Scope:** Local single-user investment pilot only. This does not create a canonical investment Decision.
 
 ## Problem confirmed from source
