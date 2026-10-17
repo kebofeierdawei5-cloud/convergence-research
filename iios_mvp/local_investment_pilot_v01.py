@@ -1575,12 +1575,12 @@ def _thesis_break_stress_review(prepared: Mapping[str, Any]) -> dict[str, Any]:
     bear = (forecast.get("scenarios") or {}).get("bear")
     required_bear_fields = ("failure_trigger", "operating_impact", "valuation_mechanism")
     if not isinstance(bear, Mapping) or any(
-        not str(bear.get(field) or "").strip() for field in required_bear_fields
+        not _is_identifiable_evidence_text(bear.get(field)) for field in required_bear_fields
     ):
         issues.append("BEAR_FAILURE_PATH_INCOMPLETE")
 
     required_stress_fields = ("failure_trigger", "operating_impact", "valuation_method", "rationale")
-    if any(not str(stress.get(field) or "").strip() for field in required_stress_fields):
+    if any(not _is_identifiable_evidence_text(stress.get(field)) for field in required_stress_fields):
         issues.append("THESIS_BREAK_STRESS_INPUTS_INCOMPLETE")
 
     stress_wealth: Decimal | None = None
