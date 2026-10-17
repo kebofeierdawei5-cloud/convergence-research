@@ -1402,6 +1402,18 @@ def test_operator_selected_sotp_blocks_eps_multiple_price_calculation():
     assert "当前情景实际计算模型类别：EPS_MULTIPLE" in report
     assert "不进入预期回报、目标入场价或 B6 价格敏感性计算" in report
 
+    # Red-team against a response that self-labels EPS x P/E values as SOTP.
+    forged = _b5_ready_payload()
+    forged["operator_valuation_context"]["selected_model_family"] = "SOTP"
+    forged["forecast_valuation"]["model_family"] = "SOTP"
+    forged["forecast_valuation"]["model"] = "Synthetic EPS x PE"
+    forged_analysis, _ = _analyse(forged, "TEST-FORGED-MODEL-FAMILY")
+    forged_contract = forged_analysis["valuation_model_consistency"]
+    assert forged_contract["status"] == "CALCULATION_MODEL_NAME_FAMILY_MISMATCH"
+    assert forged_contract["model_name_inferred_family"] == "EPS_MULTIPLE"
+    assert forged_analysis["return_metrics"] is None
+    assert forged_analysis["price_zone_sensitivity"]["target_entry_price"] is None
+
 
 def test_calendar_day_terminal_date_controls_annualization_and_return_cap():
     payload = _payload(price="144.30", cutoff="2026-10-16")
