@@ -2871,11 +2871,13 @@ def _assert_response_preserves_operator_inputs(
     template_parameters = template_parameters if isinstance(template_parameters, Mapping) else {}
     response_parameters = payload.get("decision_parameters")
     response_parameters = response_parameters if isinstance(response_parameters, Mapping) else {}
-    # The LLM must not silently loosen or tighten the operator-owned Bear-loss cap:
-    # it directly changes risk_pass and the B6 risk price ceiling. The operator may
-    # intentionally change this value in the local template before requesting research.
-    if response_parameters.get("max_loss_pct") != template_parameters.get("max_loss_pct"):
-        mismatched_sections.append("decision_parameters.max_loss_pct")
+    # These operator-owned policy parameters directly shape return/risk gates and
+    # B6 entry-price ceilings. The LLM may explain the case, but must not silently
+    # lower the required-return hurdle or loosen/tighten the Bear-loss cap.
+    # The operator may intentionally edit either value in the private template first.
+    for policy_field in ("max_loss_pct", "required_return_annualized"):
+        if response_parameters.get(policy_field) != template_parameters.get(policy_field):
+            mismatched_sections.append(f"decision_parameters.{policy_field}")
     if mismatched_sections:
         sections = ", ".join(mismatched_sections)
         raise LocalInvestmentPilotError(

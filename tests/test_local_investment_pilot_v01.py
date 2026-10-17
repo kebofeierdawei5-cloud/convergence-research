@@ -413,6 +413,30 @@ def test_ai_response_must_preserve_operator_owned_case_and_price_input(tmp_path)
         _assert_response_preserves_operator_inputs(template_path, payload)
 
 
+def test_ai_response_must_preserve_operator_required_return_hurdle(tmp_path):
+    template_payload = _payload(cutoff="2026-10-10")
+    template_payload["decision_parameters"]["required_return_annualized"] = "0.20"
+    template_path = _write_input(tmp_path, template_payload)
+    response = json.loads(template_path.read_text(encoding="utf-8"))
+
+    # A response that silently reverts the operator's 20% hurdle to the 15% floor
+    # must not be accepted as if the original policy had never been changed.
+    response["decision_parameters"]["required_return_annualized"] = "0.15"
+    with pytest.raises(
+        LocalInvestmentPilotError,
+        match=r"CHATGPT_CHANGED_OPERATOR_CONTROLLED_FIELDS: decision_parameters\.required_return_annualized",
+    ):
+        _assert_response_preserves_operator_inputs(template_path, response)
+
+    response = json.loads(template_path.read_text(encoding="utf-8"))
+    response["decision_parameters"].pop("required_return_annualized")
+    with pytest.raises(
+        LocalInvestmentPilotError,
+        match=r"CHATGPT_CHANGED_OPERATOR_CONTROLLED_FIELDS: decision_parameters\.required_return_annualized",
+    ):
+        _assert_response_preserves_operator_inputs(template_path, response)
+
+
 def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path, monkeypatch, capsys):
     import builtins
     import iios_mvp.local_investment_pilot_v01 as pilot
