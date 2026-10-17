@@ -378,6 +378,17 @@ def _calculate_scenario(
 
     revenue = sum(product_revenues, Decimal("0")) if revenues_complete else None
     variable_cost = sum(product_costs, Decimal("0")) if costs_complete else None
+    cost_ratio = _value(scenario_measures.get("cost_of_revenue_ratio"))
+    variable_cost_basis = "PRODUCT_LEVEL_VOLUME_X_UNIT_COST" if costs_complete else None
+    if variable_cost is not None and revenue is not None and cost_ratio is not None:
+        ratio_implied_cost = revenue * cost_ratio
+        if variable_cost != ratio_implied_cost:
+            issues.append("AGGREGATE_COST_RATIO_CONFLICTS_WITH_PRODUCT_LEVEL_COSTS")
+            variable_cost = None
+            variable_cost_basis = None
+    elif variable_cost is None and revenue is not None and cost_ratio is not None:
+        variable_cost = revenue * cost_ratio
+        variable_cost_basis = "AGGREGATE_COST_OF_REVENUE_RATIO"
     contribution = revenue - variable_cost if revenue is not None and variable_cost is not None else None
     fixed_opex = _value(scenario_measures.get("fixed_cash_opex_cny"))
     da = _value(scenario_measures.get("depreciation_amortization_cny"))
@@ -428,6 +439,8 @@ def _calculate_scenario(
         "cash_capex": capex,
         "change_working_capital": change_wc,
     }
+    if variable_cost is None:
+        metric_values["cost_of_revenue_ratio"] = cost_ratio
     missing_inputs.extend(name for name, value in metric_values.items() if value is None)
     return {
         "scenario": scenario_name,
@@ -437,6 +450,8 @@ def _calculate_scenario(
         "sales_volume_tonnes": _render(volume_total) if all_volume_known else None,
         "revenue_cny": _render(revenue),
         "variable_cost_cny": _render(variable_cost),
+        "variable_cost_basis": variable_cost_basis,
+        "cost_of_revenue_ratio": _render(cost_ratio),
         "contribution_after_variable_cost_cny": _render(contribution),
         "fixed_cash_opex_cny": _render(fixed_opex),
         "ebitda_cny": _render(ebitda),
