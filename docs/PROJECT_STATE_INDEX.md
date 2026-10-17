@@ -49,12 +49,12 @@ Route A C2 / 新和成 002001                            PRIVATE CORE/PIT PASS (
 Path A operator-attested price overlay               ANALYSIS-ONLY INTAKE IMPLEMENTATION; NO CANONICAL PRICE ADMISSION
 Local single-user complete pilot                     ACTIVE P0 PRIORITY; PILOT_NON_CANONICAL BEFORE FORMALIZATION
 Residual MP-3 adversarial expansion                  PAUSED EXCEPT DEMONSTRATED PILOT-BLOCKING DEFECTS
-B4 operating-driver forecast bridge                    PR #424 + #426 + #442 + #444 + #446 MERGED; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; numeric zero / UNKNOWN report consistency; 6/6 PR WORKFLOWS SUCCESS
-B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 MERGED; explicit-null cash distributions BLOCK transmission; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; EPS_MULTIPLE ONLY
-B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 MERGED; report/JSON target-price cap assertions; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; PRICE SCREEN ONLY
+B4 operating-driver forecast bridge                    PR #424 + #426 + #442 + #444 + #446 + #460 MERGED; placeholder-only numeric-assumption basis fails closed; PR #460 exact head 138 LOCAL-PILOT + Replay tests and 6/6 workflows PASS
+B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 + #459 + #460 MERGED; no-double-count baseline path preserved when unapplied negative counterfactual exists; placeholder-only numeric-assumption basis blocks transmission; 138 LOCAL-PILOT + Replay tests and 6/6 workflows PASS; EPS_MULTIPLE ONLY
+B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 MERGED; confirmed project-inclusive baseline may continue through existing return/target-entry calculations; invalid numeric-assumption basis blocks dependent price output; 138 LOCAL-PILOT + Replay tests and 6/6 workflows PASS; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded evidence traceability audit                          PR #456 + #457 MERGED; referenced duplicate IDs and placeholder-only title/locator/summary fail closed; PR #457 130 local-pilot+Replay tests + 6/6 triggered workflows PASS; Mac ZIP review deferred
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 MERGED; duplicate/untraceable evidence IDs, placeholder source fields, terminal-date and assumption-basis sentinels fail closed; B5 no-double-count/negative-counterfactual regression; latest #460 138 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -78,6 +78,14 @@ B8 bounded evidence traceability audit                          PR #456 + #457 M
 - Exact PR #456 head passed **125/125** local-pilot + Replay tests and all **6/6** triggered workflows. Exact PR #457 head passed **130/130** local-pilot + Replay tests and all **6/6** triggered workflows.
 - This validates only source-record identifiability and reference handling. It does not prove source URL reachability, truth, rights, or formal Evidence/PIT admission. Metrics may remain visible as non-canonical arithmetic, but a referenced source-integrity fault prevents the result being treated as decision-ready.
 - **The real macOS full-run + Replay ZIP audit remains deferred / OPEN / NOT VERIFIED.** These code fixes and CI do not replace the private run-bundle review.
+
+### B8 follow-up — B5 no-double-count and assumption-basis red-team (2026-10-17)
+
+- PR [#458](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/458) is a regression-test-only change. The initial claim that negative adjusted B5 terminal values could be applied was disproved by the existing scenario issue gate; the merged test records that the bridge remains `NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID`, does not apply, preserves original scenarios and leaves return metrics unresolved. Its exact head passed **131/131 local-pilot + Replay tests**.
+- PR [#459](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/459) fixed an adjacent false-blocking path: when the operator explicitly confirms the baseline already includes the project, a negative hypothetical value from adding the project a second time is retained as a counterfactual but does not block the unchanged baseline's return and B6 calculation. The original Bear/Base/Bull values and entry anchor remain unchanged; there is no second application. Exact head passed **132/132 local-pilot + Replay tests** and all **6/6 triggered workflows**.
+- PR [#460](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/460) fixed a reproduced assumption-quality gap in the shared B4/B5 typed-measure normalizer. Numeric measures whose only basis/rationale is `UNKNOWN`, `N/A`, `NOT_IDENTIFIABLE`, `TBD`, or `未提供依据` are now calculation-unusable and expose `BASIS_NOT_IDENTIFIABLE`. Dependent B4 net-profit/FCF or B5 transmission, return and target-entry/B6 values remain unresolved. It preserves the operator's raw claimed scalar for inspection, but does not use it as a calculation input. Exact head passed **138/138 local-pilot + Replay tests** and all **6/6 triggered workflows**.
+- These changes preserve the existing formulas and 15% annualized-return hurdle; they do not validate the economics of a genuine analyst assumption or grant decision/execution authority.
+- **Actual macOS full-run + Replay bundle remains OPEN / NOT VERIFIED.** Repository CI and red-team outcomes do not close the user's deferred private ZIP review.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
