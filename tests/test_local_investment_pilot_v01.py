@@ -942,7 +942,16 @@ def test_b4_links_explicit_service_revenue_and_reconciles_valuation_bridge():
                 "value": None, "unit": "tonnes/year", "data_class": "UNKNOWN",
                 "basis": "", "evidence_refs": [], "note": "Not a tonne-based service.",
             },
-            "historical_actuals": {},
+            "historical_actuals": {
+                "revenue_cny": {
+                    "value": 250000,
+                    "unit": "CNY",
+                    "data_class": "OBSERVED_ACTUAL",
+                    "basis": "Synthetic observed segment revenue for regression testing only.",
+                    "evidence_refs": ["E1"],
+                    "note": "Source is a synthetic fixture, not real issuer evidence.",
+                },
+            },
         }],
         "scenarios": {},
     }
@@ -987,6 +996,12 @@ def test_b4_links_explicit_service_revenue_and_reconciles_valuation_bridge():
     prepared = _prepare_input(payload)
     b4 = prepared["operating_driver_forecast"]
     assert b4["status"] == "SCENARIOS_CALCULATED"
+    historical_bridge = b4["product_lines"][0]["historical_actual_bridge"]
+    assert Decimal(historical_bridge["revenue_cny"]) == Decimal("250000")
+    assert historical_bridge["revenue_basis"] == "DIRECT_REPORTED_REVENUE"
+    historical_render = render_operating_driver_section(b4, payload["forecast_valuation"]["scenarios"])
+    assert "已披露历史收入：250000 CNY" in "\\n".join(historical_render)
+    assert "识别口径：DIRECT_REPORTED_REVENUE" in "\\n".join(historical_render)
     assert Decimal(b4["scenarios"]["bear"]["revenue_cny"]) == Decimal("1000")
     assert Decimal(b4["scenarios"]["bear"]["variable_cost_cny"]) == Decimal("500")
     assert Decimal(b4["scenarios"]["bear"]["net_profit_cny"]) == Decimal("272")
@@ -1991,7 +2006,7 @@ def test_b4_report_preserves_numeric_zero_in_operating_bridge_fields():
             "summary": "synthetic test",
         },
     ))
-    assert "按已可用的销量×净售价计算收入：0；销量×单位变动成本：0。" in report
+    assert "历史收入：0；识别口径：UNKNOWN；销量×单位变动成本：0。" in report
     assert "- 产量 / 销量：0 / 0 吨" in report
     assert "- 收入：0；变动成本：0；扣变动成本贡献：0" in report
     assert "- EBITDA / EBIT / 税前利润 / 净利润：0 / 0 / 0 / 0" in report
@@ -2042,7 +2057,7 @@ def test_b4_report_renders_missing_operating_bridge_fields_as_unknown():
             "summary": "synthetic test",
         },
     ))
-    assert "按已可用的销量×净售价计算收入：UNKNOWN；销量×单位变动成本：UNKNOWN。" in report
+    assert "历史收入：UNKNOWN；识别口径：UNKNOWN；销量×单位变动成本：UNKNOWN。" in report
     assert "- 产量 / 销量：UNKNOWN / UNKNOWN 吨" in report
     assert "- 收入：UNKNOWN；变动成本：UNKNOWN；扣变动成本贡献：UNKNOWN" in report
     assert "- EBITDA / EBIT / 税前利润 / 净利润：UNKNOWN / UNKNOWN / UNKNOWN / UNKNOWN" in report
