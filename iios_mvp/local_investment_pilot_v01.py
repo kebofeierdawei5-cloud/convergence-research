@@ -1194,7 +1194,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     # A passing Trust/Reality/Quality/MIE/Expectation Gap/Risk claim, or an INTACT
     # Thesis, must be linked to at least one uniquely resolved, cutoff-compatible
     # evidence ID. A source elsewhere in the register is not support for every gate.
-    for name, section in assessment.items():
+    for name in allowed_assessment:
+        section = assessment[name]
         status = section.get("status")
         requires_evidence = status == "PASS" or (name == "thesis" and status == "INTACT")
         if not requires_evidence:
