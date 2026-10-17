@@ -904,6 +904,37 @@ def test_thesis_break_stress_must_be_more_severe_than_bear():
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
 
 
+@pytest.mark.parametrize(
+    ("target", "field", "placeholder", "expected_issue"),
+    [
+        ("bear", "failure_trigger", "UNKNOWN", "BEAR_FAILURE_PATH_INCOMPLETE"),
+        ("bear", "operating_impact", "TBD", "BEAR_FAILURE_PATH_INCOMPLETE"),
+        ("stress", "failure_trigger", "N/A", "THESIS_BREAK_STRESS_INPUTS_INCOMPLETE"),
+        ("stress", "operating_impact", "NOT_IDENTIFIABLE", "THESIS_BREAK_STRESS_INPUTS_INCOMPLETE"),
+        ("stress", "valuation_method", "未提供依据", "THESIS_BREAK_STRESS_INPUTS_INCOMPLETE"),
+        ("stress", "rationale", "概率未知", "THESIS_BREAK_STRESS_INPUTS_INCOMPLETE"),
+    ],
+)
+def test_bear_and_thesis_break_stress_reject_placeholder_only_rationales(
+    target, field, placeholder, expected_issue
+):
+    payload = _payload()
+    if target == "bear":
+        payload["forecast_valuation"]["scenarios"]["bear"][field] = placeholder
+    else:
+        payload["forecast_valuation"]["thesis_break_stress"][field] = placeholder
+
+    analysis, _report = _analyse(payload, f"TEST-STRESS-PLACEHOLDER-{target}-{field}")
+    stress_review = analysis["thesis_break_stress_review"]
+
+    assert stress_review["status"] == "REVIEW_REQUIRED"
+    assert expected_issue in stress_review["issues"]
+    assert expected_issue in analysis["decision"]["gating_issues"]
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    package = analysis["portfolio_package"]
+    assert package.get("conditional_proposed_position_pct") is None
+
+
 def test_bear_base_bull_total_wealth_ordering_is_required():
     payload = _payload()
     payload["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] = "160"
