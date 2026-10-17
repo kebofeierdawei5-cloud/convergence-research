@@ -1,6 +1,6 @@
 # B7 — Primary Valuation Model and Terminal-Date Contract
 
-**Status:** Proposed implementation on branch b07-primary-model-terminal-date-20261017; test/workflow verification pending.  
+**Status:** Implementation on branch b07-primary-model-terminal-date-20261017; automated tests/workflows passed at code head dafa95cb6c14c3c64bf8856788dacf11819e6a0f (122 local-pilot/Replay tests and 14 PR checks); live Mac full-run + Replay acceptance remains open.  
 **Scope:** Local single-user investment pilot only. This does not create a canonical investment Decision.
 
 ## Problem confirmed from source
@@ -27,11 +27,17 @@ The return solver validated the nominal horizon_years and used it for both annua
 - Annualized return is (expected_terminal_wealth / current_price) ** (1 / year_fraction) - 1.
 - The 15% annualized-return entry cap is expected_terminal_wealth / (1 + 0.15) ** year_fraction. The Bear loss cap and entry-cushion cap retain their existing independent definitions; the overall target remains the minimum of the existing applicable caps.
 - decision_parameters.horizon_years remains the policy/reference horizon and continues to use the existing 1–3Y validation and 3Y exception rules. It is no longer silently used as a substitute for a calendar-date-derived holding period.
-- Missing or invalid endpoint, endpoint on/before the cutoff, non-identifiable supported forecast-period label, or material period-year mismatch blocks the return solver and keeps B6 values UNKNOWN.
+- Missing or invalid endpoint, missing date basis, endpoint on/before the cutoff, non-identifiable supported forecast-period label, or material period-year mismatch blocks the return solver and keeps B6 values UNKNOWN.
 
 ## Conservative boundary
 
 The current period-alignment check understands annual YYYYFY labels and accepts a terminal-date calendar year equal to the labelled year or the following year, allowing fiscal years that end in the following calendar year. It does not independently prove the issuer's fiscal year-end date; the model must explicitly supply the endpoint and its basis, and the report labels period alignment as not independently verified. Additional half-year/quarter period validators should be added only with explicit calendar semantics rather than guessed.
+
+## Automated verification and acceptance boundary
+
+- At code head `dafa95cb6c14c3c64bf8856788dacf11819e6a0f`, the dedicated local-pilot workflow compiled the pilot/core files and launchers, ran local pilot + Replay acceptance tests (**122 passed**), and passed diff check. All 14 PR checks passed at that head.
+- The added negative test confirms that missing `valuation_terminal_date_basis` blocks return metrics and B6 even if a JSON input bypasses wizard validation.
+- A fresh Mac full-run and same-run comparison of `analysis.json`, `report.md`, and `pilot_receipt.json` remain required; CI does not establish the real ChatGPT response or on-device workflow.
 
 ## Not changed
 
