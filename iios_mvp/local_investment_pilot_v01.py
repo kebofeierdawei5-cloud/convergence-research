@@ -595,6 +595,18 @@ def _reconcile_b4_valuation_bridge(
     driver_scenarios = driver_scenarios if isinstance(driver_scenarios, Mapping) else {}
     valuation_scenarios = forecast_valuation.get("scenarios")
     valuation_scenarios = valuation_scenarios if isinstance(valuation_scenarios, Mapping) else {}
+    if not any(
+        isinstance(row, Mapping) and isinstance(row.get("operating_financial_bridge"), Mapping)
+        for row in valuation_scenarios.values()
+    ):
+        return {
+            "schema_version": "IIOS-B4-VALUATION-BRIDGE-RECONCILIATION-0.1",
+            "status": "NOT_PROVIDED",
+            "scenarios": {},
+            "excluded_metrics": [],
+            "formal_admission_created": False,
+            "decision_authority": False,
+        }
     field_pairs = (
         ("revenue_cny", "revenue_cny"),
         ("variable_cost_cny", "cost_of_revenue_cny"),
