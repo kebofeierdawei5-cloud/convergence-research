@@ -87,7 +87,7 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
                 "summary": "synthetic test gap",
                 "evidence_refs": ["E1"],
             },
-            "risk": {"status": "PASS", "summary": "synthetic risk", "max_loss_pct": "25", "items": ["synthetic downside"]},
+            "risk": {"status": "PASS", "summary": "synthetic risk", "max_loss_pct": "25", "items": ["synthetic downside"], "evidence_refs": ["E1"]},
         },
         "forecast_valuation": {
             "model": "SYNTHETIC EPS x PE",
@@ -374,6 +374,34 @@ def test_guided_observation_date_must_precede_date_only_cutoff():
         _validate_guided_observation_date(cutoff, cutoff)
     with pytest.raises(LocalInvestmentPilotError, match="PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF"):
         _validate_guided_observation_date(date(2026, 10, 13), cutoff)
+
+
+def test_assessment_pass_or_intact_requires_its_own_resolved_evidence_reference():
+    payload = _payload()
+    payload["assessment"]["trust"]["evidence_refs"] = []
+
+    analysis, report = _analyse(payload, "TEST-ASSESSMENT-PASS-NO-REF")
+    trust = analysis["assessment"]["trust"]
+
+    assert trust["status_input"] == "PASS"
+    assert trust["status"] == "UNKNOWN"
+    assert "ASSESSMENT_PASS_EVIDENCE_LINK_NOT_RESOLVED" in trust["status_issues"]
+    assert "TRUST_ASSESSMENT_PASS_EVIDENCE_LINK_NOT_RESOLVED" in analysis["decision"]["gating_issues"]
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert "输入标签 PASS" in report
+
+
+def test_assessment_pass_with_unresolved_reference_is_not_preserved():
+    payload = _payload()
+    payload["assessment"]["expectation_gap"]["evidence_refs"] = ["E-MISSING"]
+
+    analysis, _report = _analyse(payload, "TEST-ASSESSMENT-PASS-UNRESOLVED-REF")
+    gap = analysis["assessment"]["expectation_gap"]
+
+    assert gap["status"] == "UNKNOWN"
+    assert "ASSESSMENT_PASS_EVIDENCE_LINK_NOT_RESOLVED" in gap["status_issues"]
+    assert "EXPECTATION_GAP_ASSESSMENT_PASS_EVIDENCE_LINK_NOT_RESOLVED" in analysis["decision"]["gating_issues"]
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
 
 
 @pytest.mark.parametrize(
