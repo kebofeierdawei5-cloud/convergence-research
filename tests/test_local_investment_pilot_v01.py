@@ -87,7 +87,19 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
                 "summary": "synthetic test gap",
                 "evidence_refs": ["E1"],
             },
-            "risk": {"status": "PASS", "summary": "synthetic risk", "max_loss_pct": "25", "items": ["synthetic downside"], "evidence_refs": ["E1"]},
+            "risk": {
+                "status": "PASS",
+                "summary": "synthetic risk",
+                "max_loss_pct": "25",
+                "items": [{
+                    "risk_id": "R-SYNTHETIC",
+                    "name": "synthetic downside",
+                    "description": "synthetic risk item for tests",
+                    "monitoring_trigger": "synthetic metric misses threshold for two periods",
+                    "evidence_refs": ["E1"],
+                }],
+                "evidence_refs": ["E1"],
+            },
         },
         "forecast_valuation": {
             "model": "SYNTHETIC EPS x PE",
@@ -668,6 +680,22 @@ def test_duplicate_structured_risk_ids_downgrade_all_conflicting_risk_rows():
     )
     assert "RISK_DUPLICATE_RISK_ID_NOT_IDENTIFIABLE" in analysis["decision"]["gating_issues"]
     assert "多个结构化风险项使用相同 risk_id" in report
+
+
+def test_legacy_plain_text_risk_list_remains_renderable_but_cannot_claim_pass():
+    payload = _payload()
+    payload["assessment"]["risk"]["items"] = ["应收账款回款风险"]
+
+    analysis, report = _analyse(payload, "TEST-LEGACY-PLAIN-TEXT-RISK")
+
+    risk = analysis["assessment"]["risk"]
+    assert risk["status_input"] == "PASS"
+    assert risk["status"] == "UNKNOWN"
+    assert "ITEMS_REQUIRE_STRUCTURED_MONITORING" in risk["status_issues"]
+    assert "RISK_ITEMS_REQUIRE_STRUCTURED_MONITORING" in analysis["decision"]["gating_issues"]
+    assert "应收账款回款风险" in report
+    assert "不能证明每项风险都有独立证据和可执行监控触发器" in report
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
 
 
 def test_risk_pass_is_preserved_with_identifiable_structured_risk_item():

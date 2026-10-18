@@ -1175,6 +1175,16 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         risk_status_issues.append("ITEMS_NOT_IDENTIFIABLE")
     if risk_items_missing_monitoring_trigger:
         risk_status_issues.append("RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE")
+    legacy_plain_text_risk_items = [
+        item for item in assessment["risk"]["items"]
+        if not isinstance(item, Mapping)
+    ]
+    if legacy_plain_text_risk_items:
+        # Keep text visible for legacy readers, but text alone cannot prove that
+        # each risk has its own evidence and actionable monitoring trigger.
+        if assessment["risk"]["status"] == "PASS":
+            assessment["risk"]["status"] = "UNKNOWN"
+        risk_status_issues.append("ITEMS_REQUIRE_STRUCTURED_MONITORING")
 
     risk_ids: dict[str, list[int]] = {}
     for index, item in enumerate(assessment["risk"]["items"]):
@@ -2556,6 +2566,9 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         ),
         "RISK_ITEMS_NOT_IDENTIFIABLE": (
             "风险门禁原标为 PASS，但结构化风险清单为空，或至少一项风险只有 UNKNOWN/TBD 等占位文本；风险状态已降为 UNKNOWN。"
+        ),
+        "RISK_ITEMS_REQUIRE_STRUCTURED_MONITORING": (
+            "当前风险清单仍有纯文本条目。文本会保留显示，但不能证明每项风险都有独立证据和可执行监控触发器，因此整体风险状态不能视为 PASS。"
         ),
         "RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED": (
             "至少一个结构化风险项没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容；整体风险状态不能视为 PASS。"
