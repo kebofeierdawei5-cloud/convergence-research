@@ -1173,7 +1173,10 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             "operating_impact": str(stress_raw.get("operating_impact") or ""),
             "valuation_method": str(stress_raw.get("valuation_method") or ""),
             "terminal_value_per_share": stress_raw.get("terminal_value_per_share"),
-            "cash_distributions_per_share": str(stress_raw.get("cash_distributions_per_share", "0")),
+            "cash_distributions_per_share": (
+                str(stress_raw.get("cash_distributions_per_share"))
+                if stress_raw.get("cash_distributions_per_share") is not None else None
+            ),
             "rationale": str(stress_raw.get("rationale") or ""),
             "evidence_refs": _items(stress_raw.get("evidence_refs")),
         },
