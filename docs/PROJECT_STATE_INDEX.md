@@ -54,7 +54,7 @@ B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 +
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 + #462 + #464 + #465 MERGED; operator Bear-loss cap/Required Return preserved, placeholder probability rationale blocks price outputs; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 + #477 + #479 + #481 + #483 + #484 + #486 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations/evidence, value-driver fields/rank/row-level evidence, structured-risk items, thesis break/monitoring triggers, primary-model rationale, scenario/stress/B5 cash-distribution inputs and B4 cross-node assumption basis fail closed on placeholders or omissions; latest #486 199 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 + #477 + #479 + #481 + #483 + #484 + #486 + #488 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations/evidence, value-driver fields/rank uniqueness/row-level evidence, structured-risk items, thesis break/monitoring triggers, primary-model rationale, scenario/stress/B5 cash-distribution inputs and B4 cross-node assumption basis fail closed on placeholders or omissions; latest #488 200 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -171,6 +171,13 @@ B8 bounded investment-result red-team                          PR #456 + #457 + 
 - The link layer now validates the **original** assumption basis before cross-linking. Missing or placeholder-only bases are not linked; B4 does not use those cost ratios, dependent scenario profit remains UNKNOWN, and machine JSON plus the Chinese report show `ASSUMPTION_BASIS_NOT_IDENTIFIABLE_NOT_LINKED`. A valid source basis still enables the existing same-scenario link.
 - Exact PR #486 head passed **199/199 local-pilot + Replay tests** and all **6/6 triggered workflows**. No valuation formula, 15% hurdle, operator risk cap, or execution authority changed.
 - **Real macOS full-run + Replay ZIP acceptance remains OPEN / NOT VERIFIED.** GitHub CI does not substitute for the private Mac bundle review.
+
+### B8 follow-up — duplicate value-driver ranking (2026-10-18)
+
+- PR [#488](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/488) merged at `eaa260176cb913a11f5a9b57c609d029033aec71`. Positive-integer validation alone allowed two otherwise identifiable value drivers to share rank `1`; both rows could remain `PASS`, making the ranked order ambiguous.
+- The pilot now checks rank uniqueness after normalizing all value-driver rows. Every row sharing a duplicate rank is downgraded to `UNKNOWN` with `DUPLICATE_RANK_NOT_IDENTIFIABLE`; the reason is present in each row's JSON, the Chinese report, and the decision gating issues. Unique rank values remain unaffected.
+- Exact PR #488 head passed **200/200 local-pilot + Replay tests** and **6/6 triggered workflows**. No valuation formula, return policy or trade authority changed.
+- **Real macOS full-run + Replay ZIP acceptance remains OPEN / NOT VERIFIED.**
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
