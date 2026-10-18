@@ -1402,12 +1402,14 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
             return None, f"{name.upper()}_SCENARIO_MISSING"
         if row.get("probability") in (None, "") or row.get("terminal_value_per_share") in (None, ""):
             return None, f"{name.upper()}_SCENARIO_INPUTS_INCOMPLETE"
+        if row.get("cash_distributions_per_share") in (None, ""):
+            return None, f"{name.upper()}_SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED"
         if not _is_identifiable_evidence_text(row.get("rationale")):
             return None, f"{name.upper()}_SCENARIO_PROBABILITY_RATIONALE_NOT_IDENTIFIABLE"
         rows[name] = {
             "probability": str(row["probability"]),
             "terminal_value_per_share": str(row["terminal_value_per_share"]),
-            "cash_distributions_per_share": str(row.get("cash_distributions_per_share", "0")),
+            "cash_distributions_per_share": str(row["cash_distributions_per_share"]),
             "probability_rationale": str(row["rationale"]),
         }
     try:
@@ -1685,29 +1687,35 @@ def _thesis_break_stress_review(prepared: Mapping[str, Any]) -> dict[str, Any]:
         issues.append("THESIS_BREAK_STRESS_INPUTS_INCOMPLETE")
 
     stress_wealth: Decimal | None = None
-    try:
-        terminal_raw = stress.get("terminal_value_per_share")
-        if terminal_raw in (None, ""):
-            raise LocalInvestmentPilotError("STRESS_TERMINAL_VALUE_MISSING")
-        terminal = _number(terminal_raw, "THESIS_BREAK_STRESS_TERMINAL")
-        distributions = _number(
-            stress.get("cash_distributions_per_share", "0"),
-            "THESIS_BREAK_STRESS_DISTRIBUTIONS",
-        )
-        if terminal < 0 or distributions < 0:
-            raise LocalInvestmentPilotError("THESIS_BREAK_STRESS_VALUES_MUST_BE_NONNEGATIVE")
-        stress_wealth = terminal + distributions
-    except LocalInvestmentPilotError:
-        issues.append("THESIS_BREAK_STRESS_VALUE_INVALID")
+    if stress.get("cash_distributions_per_share") in (None, ""):
+        issues.append("THESIS_BREAK_STRESS_CASH_DISTRIBUTIONS_UNRESOLVED")
+    else:
+        try:
+            terminal_raw = stress.get("terminal_value_per_share")
+            if terminal_raw in (None, ""):
+                raise LocalInvestmentPilotError("STRESS_TERMINAL_VALUE_MISSING")
+            terminal = _number(terminal_raw, "THESIS_BREAK_STRESS_TERMINAL")
+            distributions = _number(
+                stress.get("cash_distributions_per_share"),
+                "THESIS_BREAK_STRESS_DISTRIBUTIONS",
+            )
+            if terminal < 0 or distributions < 0:
+                raise LocalInvestmentPilotError("THESIS_BREAK_STRESS_VALUES_MUST_BE_NONNEGATIVE")
+            stress_wealth = terminal + distributions
+        except LocalInvestmentPilotError:
+            issues.append("THESIS_BREAK_STRESS_VALUE_INVALID")
 
     bear_wealth: Decimal | None = None
     if stress_wealth is not None:
         try:
             if not isinstance(bear, Mapping):
                 raise LocalInvestmentPilotError("BEAR_SCENARIO_MISSING")
+            if bear.get("cash_distributions_per_share") in (None, ""):
+                issues.append("THESIS_BREAK_STRESS_BEAR_CASH_DISTRIBUTIONS_UNRESOLVED")
+                raise LocalInvestmentPilotError("BEAR_CASH_DISTRIBUTIONS_UNRESOLVED")
             bear_terminal = _number(bear.get("terminal_value_per_share"), "BEAR_TERMINAL")
             bear_distributions = _number(
-                bear.get("cash_distributions_per_share", "0"),
+                bear.get("cash_distributions_per_share"),
                 "BEAR_DISTRIBUTIONS",
             )
             if bear_terminal < 0 or bear_distributions < 0:
@@ -1796,6 +1804,8 @@ def _decision(
         issues.append("VALUATION_TIMING_NOT_RESOLVED")
     if reason == "SCENARIO_WEALTH_ORDERING_INCONSISTENT":
         issues.append("SCENARIO_WEALTH_ORDERING_INCONSISTENT")
+    if reason and reason.endswith("_SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED"):
+        issues.append("SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED")
     if stress_review:
         issues.extend(issue for issue in (stress_review.get("issues") or []) if issue not in issues)
 
@@ -1810,9 +1820,12 @@ def _decision(
         "PRICE_NOT_PIT_QUALIFIED",
         "OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT",
         "SCENARIO_WEALTH_ORDERING_INCONSISTENT",
+        "SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED",
         "BEAR_FAILURE_PATH_INCOMPLETE",
         "THESIS_BREAK_STRESS_INPUTS_INCOMPLETE",
         "THESIS_BREAK_STRESS_VALUE_INVALID",
+        "THESIS_BREAK_STRESS_CASH_DISTRIBUTIONS_UNRESOLVED",
+        "THESIS_BREAK_STRESS_BEAR_CASH_DISTRIBUTIONS_UNRESOLVED",
         "THESIS_BREAK_STRESS_BEAR_COMPARISON_UNAVAILABLE",
         "THESIS_BREAK_STRESS_NOT_MORE_SEVERE_THAN_BEAR",
         "THESIS_BREAK_STRESS_MISSING",
@@ -2120,7 +2133,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             "",
             f"- 情景概率：{('UNKNOWN' if row.get('probability') in (None, '') else row.get('probability'))}",
             f"- 期末每股价值：{('UNKNOWN' if row.get('terminal_value_per_share') in (None, '') else row.get('terminal_value_per_share'))} {c['currency']}",
-            f"- 每股现金分配：{('UNKNOWN' if row.get('cash_distributions_per_share', '0') in (None, '') else row.get('cash_distributions_per_share', '0'))} {c['currency']}",
+            f"- 每股现金分配：{('UNKNOWN' if row.get('cash_distributions_per_share') in (None, '') else row.get('cash_distributions_per_share'))} {c['currency']}",
             f"- 情景理由：{' '.join(str(row.get('rationale') or '未提供').splitlines()).strip()}",
             *(
                 [
@@ -2296,6 +2309,15 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         ),
         "THESIS_BREAK_STRESS_VALUE_INVALID": (
             "独立论点失效压力测试缺少有效的非负期末价值/现金分配金额，压力回报不能核算。"
+        ),
+        "SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED": (
+            "Bear/Base/Bull 至少一个情景未明确提供每股现金分配（包括明确为 0）；不能将缺失字段默认为零，因此回报、目标入场价和 B6 保持未知。"
+        ),
+        "THESIS_BREAK_STRESS_CASH_DISTRIBUTIONS_UNRESOLVED": (
+            "独立论点失效压力测试未明确提供每股现金分配；不能将缺失字段默认为零，压力总财富与风险准备状态未解决。"
+        ),
+        "THESIS_BREAK_STRESS_BEAR_CASH_DISTRIBUTIONS_UNRESOLVED": (
+            "Bear 情景未明确提供每股现金分配；独立压力情景与 Bear 的总财富比较未解决。"
         ),
         "THESIS_BREAK_STRESS_BEAR_COMPARISON_UNAVAILABLE": (
             "无法将独立压力情景与 Bear 情景的期末总财富进行比较。"
