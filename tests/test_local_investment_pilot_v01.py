@@ -630,7 +630,7 @@ def test_structured_risk_item_requires_its_own_resolved_cutoff_compatible_eviden
     risk = analysis["assessment"]["risk"]
     normalized = risk["items"][0]
     assert risk["status"] == "UNKNOWN"
-    assert "RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED" in risk["status_issues"]
+    assert "ITEM_EVIDENCE_LINK_NOT_RESOLVED" in risk["status_issues"]
     assert normalized["status"] == "UNKNOWN"
     assert "RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED" in normalized["status_issues"]
     assert "RISK_RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED" in analysis["decision"]["gating_issues"]
