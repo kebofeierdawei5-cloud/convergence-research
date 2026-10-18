@@ -3150,6 +3150,6 @@ def test_b5_incomplete_counterfactual_does_not_block_confirmed_project_inclusive
     assert analysis["return_metrics"] is not None
     assert analysis["price_zone_sensitivity"]["target_entry_price"] is not None
     assert "MATCH_BASELINE_PROJECT_INCLUDED_B5_DIAGNOSTIC_ONLY" in report
-    assert "B5 未完成的反事实传导未阻断已确认包含项目的原估值" in report
+    assert "非阻断性说明：操作者已确认现有估值基准包含该项目" in report
     assert "回报计算尚未完成" not in report
 
