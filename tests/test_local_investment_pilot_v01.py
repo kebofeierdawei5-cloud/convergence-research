@@ -485,6 +485,21 @@ def test_value_driver_gate_downgrades_placeholder_only_subfields(field, placehol
     assert expected_issue in report
 
 
+@pytest.mark.parametrize("invalid_rank", ["TBD", None, 0, -1, 1.5])
+def test_invalid_value_driver_rank_downgrades_row_without_crashing(invalid_rank):
+    payload = _payload()
+    payload["assessment"]["value_drivers"][0]["rank"] = invalid_rank
+
+    analysis, report = _analyse(payload, f"TEST-VALUE-DRIVER-RANK-{invalid_rank}")
+
+    driver = analysis["assessment"]["value_drivers"][0]
+    assert driver["rank"] == 1
+    assert driver["status"] == "UNKNOWN"
+    assert "RANK_NOT_IDENTIFIABLE" in driver["status_issues"]
+    assert "VALUE_DRIVER_RANK_NOT_IDENTIFIABLE" in analysis["decision"]["gating_issues"]
+    assert "按输入顺序临时展示" in report
+
+
 @pytest.mark.parametrize(
     "evidence_refs",
     [
