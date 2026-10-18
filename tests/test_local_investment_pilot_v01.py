@@ -1315,6 +1315,9 @@ def test_thesis_break_stress_is_not_probability_weighted_and_missing_stress_gate
     assert str(analysis["thesis_break_stress_review"]["stress_terminal_wealth"]) == "80"
     assert str(analysis["thesis_break_stress_review"]["stress_total_return"]) == "-0.2"
     assert analysis["return_metrics"]["expected_terminal_wealth"] != analysis["thesis_break_stress_review"]["stress_terminal_wealth"]
+    assert "PASS 仅表示压力输入可识别、数值可计算且压力总财富低于 Bear" in report
+    assert "不表示这一下跌幅度符合投资者损失容忍度" in report
+    assert "Bear 损失上限单独按 Bear 情景核验" in report
     assert "不纳入 Bear/Base/Bull 概率加权" in report
 
     payload["forecast_valuation"].pop("thesis_break_stress")
