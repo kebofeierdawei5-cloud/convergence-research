@@ -466,6 +466,38 @@ def _calculate_scenario(
         if ebit is not None and tax_rate is not None and da is not None and capex is not None and change_wc is not None
         else None
     )
+
+    capacity_overrun_issues = sorted({
+        issue
+        for product in product_results
+        for issue in (product.get("issues") or [])
+        if issue == "PRODUCTION_ABOVE_NAMEPLATE_CAPACITY_CHECK_PERIOD_OR_SCOPE"
+    })
+    capacity_period_alignment_unknown = any(
+        "CAPACITY_PERIOD_ALIGNMENT_UNKNOWN" in (product.get("issues") or [])
+        for product in product_results
+    )
+    diagnostic_net_profit = net_profit if capacity_overrun_issues else None
+    diagnostic_fcf = fcf if capacity_overrun_issues else None
+    financial_outputs_decision_usable = not capacity_overrun_issues
+    if capacity_overrun_issues:
+        # For an explicitly full-year forecast, production above a known annual
+        # nameplate capacity is an unresolved physical operating constraint.
+        # Keep unconstrained arithmetic for review, but do not expose it as
+        # usable net profit/FCF because B5 could otherwise price infeasible volume.
+        net_profit = None
+        fcf = None
+        issues.append(
+            f"{scenario_name}:CAPACITY_CONSTRAINT_UNRESOLVED_FINANCIAL_OUTPUTS_NOT_DECISION_USABLE"
+        )
+
+    if capacity_overrun_issues:
+        capacity_feasibility_status = "UNRESOLVED_OVER_NAMEPLATE_CAPACITY"
+    elif capacity_period_alignment_unknown:
+        capacity_feasibility_status = "PERIOD_ALIGNMENT_UNKNOWN"
+    else:
+        capacity_feasibility_status = "NO_OVERRUN_IDENTIFIED"
+
     revenue_mix = []
     if revenue is not None and revenue > 0:
         for product in product_results:
@@ -519,6 +551,14 @@ def _calculate_scenario(
         "cash_capex_cny": _render(capex),
         "change_working_capital_cny": _render(change_wc),
         "unlevered_fcf_proxy_cny": _render(fcf),
+        "capacity_feasibility_status": capacity_feasibility_status,
+        "financial_outputs_decision_usable": financial_outputs_decision_usable,
+        "diagnostic_net_profit_if_capacity_resolved_cny": _render(diagnostic_net_profit),
+        "diagnostic_unlevered_fcf_proxy_if_capacity_resolved_cny": _render(diagnostic_fcf),
+        "unresolved_constraints": (
+            ["PRODUCTION_ABOVE_NAMEPLATE_CAPACITY"]
+            if capacity_overrun_issues else []
+        ),
         "revenue_mix": revenue_mix,
         "missing_inputs": missing_inputs,
         "issues": sorted(set(issues)),
@@ -830,6 +870,7 @@ def render_operating_driver_section(
             f"- 成本率：{_display_optional_scalar(result.get('cost_of_revenue_ratio'))}；变动成本计算口径：{result.get('variable_cost_basis') or 'UNKNOWN'}",
             f"- EBITDA / EBIT / 税前利润 / 净利润：{_display_optional_scalar(result.get('ebitda_cny'))} / {_display_optional_scalar(result.get('ebit_cny'))} / {_display_optional_scalar(result.get('profit_before_tax_cny'))} / {_display_optional_scalar(result.get('net_profit_cny'))}",
             f"- 资本开支 / 营运资金变动 / 自由现金流代理：{_display_optional_scalar(result.get('cash_capex_cny'))} / {_display_optional_scalar(result.get('change_working_capital_cny'))} / {_display_optional_scalar(result.get('unlevered_fcf_proxy_cny'))}",
+            f"- 产能可行性：{result.get('capacity_feasibility_status', 'UNKNOWN')}；财务结果可用于下游估值：{result.get('financial_outputs_decision_usable', False)}",
             f"- {valuation_label}：{scenario_terminal_display} {currency}",
         ])
         mix = result.get("revenue_mix") or []
@@ -838,6 +879,13 @@ def render_operating_driver_section(
                 f"{row.get('product_name')} {Decimal(row['revenue_mix_ratio']) * Decimal('100')}%"
                 for row in mix if row.get("revenue_mix_ratio") is not None
             ))
+        if result.get("capacity_feasibility_status") == "UNRESOLVED_OVER_NAMEPLATE_CAPACITY":
+            lines.append(
+                "  - 产能约束未闭合：当前产量假设超过已登记的全年名义产能；净利润/FCF 已停止用于下游 B5 传导。"
+                "仅供诊断的条件算术值（待产能/期间/范围核实）：净利润 "
+                f"{_display_optional_scalar(result.get('diagnostic_net_profit_if_capacity_resolved_cny'))}；"
+                f"FCF {_display_optional_scalar(result.get('diagnostic_unlevered_fcf_proxy_if_capacity_resolved_cny'))}。"
+            )
         if result.get("missing_inputs"):
             lines.append("  - 尚缺：" + "、".join(result["missing_inputs"]))
         if result.get("issues"):
