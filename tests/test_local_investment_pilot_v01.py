@@ -698,10 +698,49 @@ def test_legacy_plain_text_risk_list_remains_renderable_but_cannot_claim_pass():
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "expected_issue"),
+    [
+        ("risk_id", None, "RISK_ITEM_ID_NOT_IDENTIFIABLE"),
+        ("risk_id", "UNKNOWN", "RISK_ITEM_ID_NOT_IDENTIFIABLE"),
+        ("severity", None, "RISK_ITEM_SEVERITY_NOT_IDENTIFIABLE"),
+        ("severity", "UNKNOWN", "RISK_ITEM_SEVERITY_NOT_IDENTIFIABLE"),
+        ("severity", "SEVEREISH", "RISK_ITEM_SEVERITY_NOT_IDENTIFIABLE"),
+    ],
+)
+def test_structured_risk_items_require_stable_id_and_recognized_severity(field, value, expected_issue):
+    payload = _payload()
+    item = {
+        "risk_id": "R-1",
+        "severity": "HIGH",
+        "name": "应收账款回款恶化",
+        "description": "应收账款增速持续高于收入增速，回款周期拉长。",
+        "monitoring_trigger": "连续两个季度经营现金流低于净利润。",
+        "evidence_refs": ["E1"],
+    }
+    if value is None:
+        item.pop(field, None)
+    else:
+        item[field] = value
+    payload["assessment"]["risk"]["items"] = [item]
+
+    analysis, report = _analyse(payload, "TEST-RISK-ITEM-ID-SEVERITY")
+
+    risk = analysis["assessment"]["risk"]
+    normalized = risk["items"][0]
+    assert risk["status"] == "UNKNOWN"
+    assert expected_issue in risk["status_issues"]
+    assert normalized["status"] == "UNKNOWN"
+    assert expected_issue in normalized["status_issues"]
+    assert expected_issue in analysis["decision"]["gating_issues"]
+    assert expected_issue in report
+
+
 def test_risk_pass_is_preserved_with_identifiable_structured_risk_item():
     payload = _payload()
     payload["assessment"]["risk"]["items"] = [{
         "risk_id": "R-1",
+        "severity": "HIGH",
         "name": "应收账款回款恶化",
         "description": "应收账款增速持续高于收入增速，回款周期拉长。",
         "monitoring_trigger": "连续两个季度经营现金流低于净利润。",
