@@ -144,6 +144,10 @@ def evaluate_valuation_transmission(
     earnings_period = str(raw.get("earnings_period") or "UNKNOWN").strip()
     operating_period = str(operating_driver_forecast.get("forecast_period") or "UNKNOWN").strip()
     input_issues: list[str] = []
+    # Diagnostics about a hypothetical second application must not be confused
+    # with blockers when the operator confirms the existing baseline already
+    # includes the project and no adjustment will be applied.
+    counterfactual_issues: list[str] = []
 
     result = _blocked("NOT_LINKED", "B5 估值传导尚未建立；现有每股估值与价格筛选保持不变。")
     result.update({
@@ -152,6 +156,7 @@ def evaluate_valuation_transmission(
         "earnings_period": earnings_period,
         "valuation_model_name": model_name or "UNKNOWN",
         "input_issues": input_issues,
+        "counterfactual_issues": counterfactual_issues,
     })
 
     if selected_family == "UNKNOWN":
@@ -421,9 +426,18 @@ def evaluate_valuation_transmission(
                 + (normalized[name]["distributions"] or Decimal("0"))
                 for name in SCENARIOS
             }
-            if not (
+            adjusted_ordering_valid = (
                 adjusted_wealth["bear"] <= adjusted_wealth["base"] <= adjusted_wealth["bull"]
-            ):
+            )
+            if not adjusted_ordering_valid and baseline_includes is True:
+                # This is a counterfactual "add the project again" view. The
+                # confirmed, unchanged baseline is not priced from these values.
+                # Preserve the anomaly for transparency without blocking the
+                # baseline's return/entry-price/B6 calculations.
+                counterfactual_issues.append(
+                    "COUNTERFACTUAL_ADJUSTED_SCENARIO_WEALTH_ORDERING_INCONSISTENT"
+                )
+            if not adjusted_ordering_valid and baseline_includes is not True:
                 result.update({
                     "status": "NOT_LINKED_ADJUSTED_SCENARIO_ORDERING_INCONSISTENT",
                     "summary": "传导后的 Bear/Base/Bull 总财富次序不一致；为避免把错序概率加权，原估值保持不变。",
@@ -504,6 +518,7 @@ def evaluate_valuation_transmission(
         "earnings_period": earnings_period,
         "valuation_model_name": model_name or "UNKNOWN",
         "scenarios": result_scenarios,
+        "counterfactual_issues": sorted(set(counterfactual_issues)),
         "entry_value_reference_baseline_per_share": (
             str(forecast_valuation.get("entry_value_reference_per_share"))
             if forecast_valuation.get("entry_value_reference_per_share") not in (None, "") else None
@@ -566,6 +581,18 @@ def render_valuation_transmission_section(transmission: Mapping[str, Any], curre
     if result.get("input_issues"):
         lines.extend(["", "#### B5 传导未解决问题", ""])
         lines.extend(f"- {issue}" for issue in result["input_issues"])
+    counterfactual_explanations = {
+        "COUNTERFACTUAL_ADJUSTED_SCENARIO_WEALTH_ORDERING_INCONSISTENT": (
+            "“假设再加一次项目”的反事实 Bear/Base/Bull 总财富顺序不符合 Bear ≤ Base ≤ Bull；"
+            "由于操作者确认现有基准已含项目，该反事实未用于回报、目标入场价或 B6 计算。"
+        ),
+    }
+    if result.get("counterfactual_issues"):
+        lines.extend(["", "#### 非阻断性反事实诊断（未参与价格计算）", ""])
+        lines.extend(
+            f"- {counterfactual_explanations.get(issue, issue)}"
+            for issue in result["counterfactual_issues"]
+        )
     lines.extend([
         "",
         "- 适用范围：本批只实现 EPS_MULTIPLE 增量传导。DCF/FCF、DDM、SOTP、RNPV 等必须有各自可验证的模型公式/桥接，不能套用 EPS 倍数公式。",
