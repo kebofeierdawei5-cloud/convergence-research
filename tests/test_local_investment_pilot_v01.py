@@ -656,6 +656,53 @@ def test_risk_pass_is_preserved_with_identifiable_structured_risk_item():
     assert analysis["assessment"]["risk"]["items"][0]["evidence_refs"] == ["E1"]
 
 
+def test_risk_item_legacy_trigger_alias_and_operating_fields_are_preserved_and_rendered():
+    payload = _payload()
+    payload["assessment"]["risk"]["items"] = [{
+        "risk_id": "R1",
+        "severity": "HIGH",
+        "name": "外销敞口及海外资本开支周期",
+        "trigger": "外销订单或海外交付持续走弱。",
+        "operating_impact": "总收入、产能利用及固定费用吸收同步走弱。",
+        "valuation_mechanism": "下调可持续 EPS 并降低 P/E 倍数。",
+        "evidence_refs": ["E1"],
+    }]
+
+    analysis, report = _analyse(payload, "TEST-RISK-LEGACY-TRIGGER-ALIAS")
+
+    risk = analysis["assessment"]["risk"]
+    item = risk["items"][0]
+    assert risk["status"] == "PASS"
+    assert item["monitoring_trigger"] == "外销订单或海外交付持续走弱。"
+    assert item["monitoring_trigger_source_field"] == "trigger"
+    assert item["status"] == "PASS"
+    assert "触发条件：" not in report
+    assert "监控触发条件：外销订单或海外交付持续走弱。" in report
+    assert "经营影响：总收入、产能利用及固定费用吸收同步走弱。" in report
+    assert "估值传导机制：下调可持续 EPS 并降低 P/E 倍数。" in report
+
+
+def test_risk_report_renders_full_structured_risk_thesis_fields():
+    payload = _payload()
+    payload["assessment"]["risk"]["items"] = [{
+        "risk_id": "R-REPORT",
+        "severity": "HIGH",
+        "name": "利润与经营现金流背离",
+        "trigger": "经营现金流多期显著低于归母净利润。",
+        "operating_impact": "应收、存货与票据可能占用更多现金。",
+        "valuation_mechanism": "下调现金转换假设并提高安全边际。",
+        "evidence_refs": ["E1"],
+    }]
+
+    _analysis, report = _analyse(payload, "TEST-RISK-FIELDS-REPORT")
+
+    assert "R-REPORT｜利润与经营现金流背离" in report
+    assert "严重程度：HIGH" in report
+    assert "监控触发条件：经营现金流多期显著低于归母净利润。" in report
+    assert "经营影响：应收、存货与票据可能占用更多现金。" in report
+    assert "估值传导机制：下调现金转换假设并提高安全边际。" in report
+
+
 @pytest.mark.parametrize(
     ("refs", "source_change"),
     [
