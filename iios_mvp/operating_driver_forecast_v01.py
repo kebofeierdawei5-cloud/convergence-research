@@ -433,8 +433,19 @@ def _calculate_scenario(
             variable_cost = None
             variable_cost_basis = None
     elif variable_cost is None and revenue is not None and cost_ratio is not None:
-        variable_cost = revenue * cost_ratio
-        variable_cost_basis = "AGGREGATE_COST_OF_REVENUE_RATIO"
+        product_cost_conflict = any(
+            "EXPLICIT_VARIABLE_COST_CONFLICTS_WITH_VOLUME_X_UNIT_COST" in (row.get("issues") or [])
+            for row in product_results
+        )
+        if product_cost_conflict:
+            # Do not overwrite a contradiction between explicit product-level
+            # cost declarations with an aggregate ratio. The ratio may be used
+            # as a fallback when product cost is simply unavailable, but a
+            # conflicting declared cost basis requires human/analyst resolution.
+            issues.append("AGGREGATE_COST_RATIO_FALLBACK_BLOCKED_BY_PRODUCT_COST_CONFLICT")
+        else:
+            variable_cost = revenue * cost_ratio
+            variable_cost_basis = "AGGREGATE_COST_OF_REVENUE_RATIO"
     contribution = revenue - variable_cost if revenue is not None and variable_cost is not None else None
     fixed_opex = _value(scenario_measures.get("fixed_cash_opex_cny"))
     da = _value(scenario_measures.get("depreciation_amortization_cny"))
