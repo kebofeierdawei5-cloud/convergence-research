@@ -1459,6 +1459,27 @@ def test_extract_json_object_reports_json_parse_location():
         _extract_json_object(r'{"source_ref":"bad\q"}')
 
 
+@pytest.mark.parametrize(
+    "known_at",
+    [
+        "2026-08-30；具体披露时分 UNKNOWN",
+        "2026-08-30；具体披露时间 UNKNOWN",
+    ],
+)
+def test_explicit_unknown_disclosure_time_keeps_valid_date_only_precision(known_at):
+    payload = _payload(cutoff="2026-10-10")
+    payload["evidence_register"][0]["known_at"] = known_at
+
+    prepared = _prepare_input(payload)
+    source = prepared["evidence_register"][0]
+
+    assert source["known_at"] == "2026-08-30"
+    assert source["known_at_original"] == known_at
+    assert source["known_at_precision"] == "DATE_ONLY_EXPLICIT_TIME_UNKNOWN"
+    assert source["time_status"] == "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+    assert "E1" not in prepared["uncertain_timing_evidence_references"]
+
+
 def test_extract_json_object_blocks_incomplete_clipboard_response():
     from iios_mvp.local_investment_pilot_v01 import _extract_json_object
 
