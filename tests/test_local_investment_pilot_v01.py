@@ -2078,6 +2078,12 @@ def test_operating_driver_forecast_keeps_actual_asp_unknown_and_flags_capacity_m
     assert actual["revenue_cny"] is None
     assert result["historical_actuals_status"] == "NOT_IDENTIFIABLE_OR_INCOMPLETE"
     assert any("ABOVE_NAMEPLATE_CAPACITY" in issue for issue in base["issues"])
+    assert base["capacity_feasibility_status"] == "UNRESOLVED_OVER_NAMEPLATE_CAPACITY"
+    assert base["financial_outputs_decision_usable"] is False
+    assert base["net_profit_cny"] is None
+    assert base["unlevered_fcf_proxy_cny"] is None
+    assert base["diagnostic_net_profit_if_capacity_resolved_cny"] is not None
+    assert base["diagnostic_unlevered_fcf_proxy_if_capacity_resolved_cny"] is not None
 
 
 def test_operating_driver_forecast_allows_working_capital_release_but_rejects_invalid_tax_rate():
@@ -3199,4 +3205,29 @@ def test_b5_incomplete_counterfactual_does_not_block_confirmed_project_inclusive
     assert "MATCH_BASELINE_PROJECT_INCLUDED_B5_DIAGNOSTIC_ONLY" in report
     assert "非阻断性说明：操作者已确认现有估值基准包含该项目" in report
     assert "回报计算尚未完成" not in report
+
+
+def test_b4_overcapacity_scenario_does_not_feed_b5_or_target_entry_price():
+    payload = _b5_ready_payload()
+    # Nameplate is 1,000 tonnes/year; the scenario claims 1,200 tonnes for
+    # an explicitly full-year forecast and provides no capacity expansion bridge.
+    payload["operating_driver_forecast"]["scenarios"]["base"]["product_lines"][0]["production_tonnes"] = _driver_measure(
+        "1200", "tonnes", "ANALYST_ASSUMPTION", [], "Unreconciled volume above nameplate capacity"
+    )
+
+    analysis, report = _analyse(payload, "TEST-B4-OVERCAPACITY-B5-BLOCK")
+
+    driver = analysis["operating_driver_forecast"]["scenarios"]["base"]
+    assert driver["net_profit_cny"] is None
+    assert driver["unlevered_fcf_proxy_cny"] is None
+    assert driver["financial_outputs_decision_usable"] is False
+    assert analysis["valuation_transmission"]["status"] == "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID"
+    assert analysis["valuation_transmission"]["applied_to_per_share_scenarios"] is False
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert "产能约束未闭合" in report
+    assert "财务结果可用于下游估值：False" in report
+
+
 
