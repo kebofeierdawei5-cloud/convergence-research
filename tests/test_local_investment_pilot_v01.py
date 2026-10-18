@@ -78,7 +78,16 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
                 "evidence_refs": ["E1"],
             },
             "value_drivers": [
-                {"rank": 1, "driver": "volume growth", "impact": "POSITIVE", "rationale": "synthetic", "evidence_refs": ["E1"]}
+                {
+                    "rank": 1,
+                    "driver": "volume growth",
+                    "driver_type": "VOLUME",
+                    "historical_evidence": "Synthetic prior-period shipped-volume trend; illustrative test basis only.",
+                    "valuation_transmission": "More shipped volume at unchanged net ASP and unit cost increases revenue and contribution profit before fixed costs.",
+                    "impact": "POSITIVE",
+                    "rationale": "Synthetic test driver with an explicit historical baseline and per-share value mechanism.",
+                    "evidence_refs": ["E1"],
+                }
             ],
             "market_implied_expectation": {"status": "PASS", "summary": "synthetic test only", "evidence_refs": ["E1"]},
             "expectation_gap": {
@@ -483,6 +492,8 @@ def test_thesis_intact_is_preserved_with_identifiable_break_and_reassessment_tri
         ("driver", "TBD", "DRIVER_NAME_NOT_IDENTIFIABLE"),
         ("impact", "UNKNOWN", "IMPACT_NOT_IDENTIFIABLE"),
         ("rationale", "N/A", "RATIONALE_NOT_IDENTIFIABLE"),
+        ("historical_evidence", "UNKNOWN", "HISTORICAL_EVIDENCE_NOT_IDENTIFIABLE"),
+        ("valuation_transmission", "TBD", "VALUATION_TRANSMISSION_NOT_IDENTIFIABLE"),
     ],
 )
 def test_value_driver_gate_downgrades_placeholder_only_subfields(field, placeholder, expected_issue):
@@ -599,6 +610,10 @@ def test_value_driver_gate_passes_with_identifiable_name_impact_and_rationale():
     driver = analysis["assessment"]["value_drivers"][0]
     assert driver["status"] == "PASS"
     assert driver["status_issues"] == []
+    assert driver["historical_evidence"].startswith("Synthetic prior-period")
+    assert driver["valuation_transmission"].startswith("More shipped volume")
+    assert "历史依据：Synthetic prior-period" in report
+    assert "价值传导：More shipped volume" in report
     assert "内容门禁：PASS" in report
 
 
