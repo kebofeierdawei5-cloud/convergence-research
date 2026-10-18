@@ -54,7 +54,7 @@ B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 +
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 + #462 + #464 + #465 MERGED; operator Bear-loss cap/Required Return preserved, placeholder probability rationale blocks price outputs; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 + #477 + #479 + #481 + #483 + #484 + #486 + #488 + #490 + #492 + #494 + #497 + #498 + #499 + #501 + #502 + #504 MERGED; evidence/status, value-driver fields, risk-item evidence/trigger aliases and stress readiness fail closed and are rendered; legacy text risks remain visible but cannot make the Risk gate PASS; latest #504 216 local-pilot+Replay tests + 6/6 workflows PASS; current-main Mac full-run + Replay acceptance OPEN / NOT VERIFIED
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 + #477 + #479 + #481 + #483 + #484 + #486 + #488 + #490 + #492 + #494 + #497 + #498 + #499 + #501 + #502 + #504 + #506 MERGED; evidence/status, value-driver fields, risk-item ID/severity/evidence/trigger aliases and stress readiness fail closed and are rendered; legacy text risks remain visible but cannot make Risk PASS; latest #506 221 local-pilot+Replay tests + 6/6 workflows PASS; current-main Mac full-run + Replay acceptance OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -236,6 +236,13 @@ B8 bounded investment-result red-team                          PR #456 + #457 + 
 - Exact PR #504 head passed **216/216 local-pilot + Replay tests** and all **6/6 triggered workflows**. No return/valuation formulas, risk caps or execution authority changed.
 - The stale duplicate PR #496 was closed after reapplying the change on current main in #504.
 - **Real current-main macOS full-run + Replay remains OPEN / NOT VERIFIED.** The historical ZIP's internal integrity and Replay parity do not establish that the newly merged build has run on the operator's Mac.
+
+### B8 follow-up — structured risk identity and severity completeness (2026-10-18)
+
+- PR [#506](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/506) merged at `0420287b3ea49aaf5e128d43508f8e7f916c49c3`. Earlier risk gates validated readable risk names/details, a monitoring trigger and row-level evidence, but could still let an item without a stable `risk_id` or with missing/placeholder/unsupported `severity` remain PASS. Duplicate-ID handling only covers IDs that are present.
+- Structured risk rows now require a non-placeholder stable ID and a recognized ordinal severity (CRITICAL, VERY_HIGH, HIGH, MEDIUM_HIGH, MEDIUM, MEDIUM_LOW, LOW, VERY_LOW, plus supported Chinese labels). Invalid fields mark the item UNKNOWN, downgrade an otherwise PASS Risk assessment, and expose `RISK_ITEM_ID_NOT_IDENTIFIABLE` or `RISK_ITEM_SEVERITY_NOT_IDENTIFIABLE` in machine JSON, report and decision gate.
+- Exact PR #506 head passed **221/221 local-pilot + Replay tests** and all **6/6 triggered workflows**. No return/valuation formulas, required-return floor, Bear-loss cap, or execution authority changed.
+- **Current-main macOS full-run + Replay remains OPEN / NOT VERIFIED.** The uploaded historical ZIP predates these changes and is not acceptance evidence for the current build.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
