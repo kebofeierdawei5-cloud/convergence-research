@@ -2317,7 +2317,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             "独立论点失效压力测试未明确提供每股现金分配；不能将缺失字段默认为零，压力总财富与风险准备状态未解决。"
         ),
         "THESIS_BREAK_STRESS_BEAR_CASH_DISTRIBUTIONS_UNRESOLVED": (
-            "Bear 情景未明确提供每股现金分配；独立压力情景与 Bear 的总财富比较未解决。"
+            "Bear 情景未明确提供每股现金分配；不能将缺失字段默认为零，独立压力情景与 Bear 的总财富比较未解决。"
         ),
         "THESIS_BREAK_STRESS_BEAR_COMPARISON_UNAVAILABLE": (
             "无法将独立压力情景与 Bear 情景的期末总财富进行比较。"
