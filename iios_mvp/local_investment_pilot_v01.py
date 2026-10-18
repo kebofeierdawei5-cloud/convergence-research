@@ -2330,7 +2330,8 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     lines.extend([
         "### 独立论点失效压力测试（不纳入 Bear/Base/Bull 概率加权）",
         "",
-        f"- 校验状态：{stress_review.get('status', 'MISSING')}",
+        f"- 压力情景结构/可比性校验：{stress_review.get('status', 'MISSING')}",
+        "- 状态口径：PASS 仅表示压力输入可识别、数值可计算且压力总财富低于 Bear；不表示这一下跌幅度符合投资者损失容忍度，也不构成风险门槛通过。Bear 损失上限单独按 Bear 情景核验，独立压力测试用于反证，不纳入概率加权。",
         f"- 失效触发条件：{' '.join(str(stress.get('failure_trigger') or '未提供').splitlines()).strip()}",
         f"- 经营影响路径：{' '.join(str(stress.get('operating_impact') or '未提供').splitlines()).strip()}",
         f"- 估值方法：{' '.join(str(stress.get('valuation_method') or '未提供').splitlines()).strip()}",
