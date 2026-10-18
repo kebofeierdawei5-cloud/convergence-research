@@ -1248,6 +1248,23 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         and source["time_status"] in {"UNKNOWN", "KNOWN_AT_INVALID", "KNOWN_AT_PRECISION_INSUFFICIENT"}
     ]
 
+    # Each ranked driver is a decision-relevant claim of its own; section-level
+    # Thesis citations cannot silently stand in for evidence linked to each row.
+    for driver in assessment["value_drivers"]:
+        refs = _items(driver.get("evidence_refs"))
+        refs_unresolved = (
+            not refs
+            or any(ref not in source_ids for ref in refs)
+            or bool(set(refs) & set(unknown_refs))
+            or bool(set(refs) & set(after_cutoff_refs))
+            or bool(set(refs) & set(uncertain_timing_refs))
+        )
+        if refs_unresolved:
+            driver["status"] = "UNKNOWN"
+            driver_issues = list(driver.get("status_issues") or [])
+            driver_issues.append("DRIVER_EVIDENCE_LINK_NOT_RESOLVED")
+            driver["status_issues"] = list(dict.fromkeys(driver_issues))
+
     # A passing Trust/Reality/Quality/MIE/Expectation Gap/Risk claim, or an INTACT
     # Thesis, must be linked to at least one uniquely resolved, cutoff-compatible
     # evidence ID. A source elsewhere in the register is not support for every gate.
@@ -1861,6 +1878,11 @@ def _decision(
             row.get("status") == "PASS" for row in a["value_drivers"]
         ) else "UNKNOWN"
     )
+    for row in a["value_drivers"]:
+        for status_issue in row.get("status_issues") or []:
+            issue = f"VALUE_DRIVER_{status_issue}"
+            if issue not in issues:
+                issues.append(issue)
     valuation_status = (
         "PASS" if metrics is not None
         and prepared["forecast_valuation"].get("entry_value_reference_per_share") not in (None, "")
@@ -2070,6 +2092,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "DRIVER_NAME_NOT_IDENTIFIABLE": "驱动因素名称为空或仅为占位文本。",
         "IMPACT_NOT_IDENTIFIABLE": "影响方向未知，不能作为已确认的价值驱动因素。",
         "RATIONALE_NOT_IDENTIFIABLE": "驱动机制/理由为空或仅为占位文本。",
+        "DRIVER_EVIDENCE_LINK_NOT_RESOLVED": "该价值驱动因素没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容。",
     }
     if drivers:
         for display_rank, item in enumerate(drivers, start=1):
