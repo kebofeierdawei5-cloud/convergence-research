@@ -1334,7 +1334,9 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     assessment["risk"]["items"] = normalized_risk_items
     if unresolved_risk_item_refs:
         risk_status_issues = list(assessment["risk"].get("status_issues") or [])
-        risk_status_issues.append("RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED")
+        # Section issue codes receive the RISK_ prefix during decision aggregation;
+        # avoid double-prefixing the canonical decision-level issue code.
+        risk_status_issues.append("ITEM_EVIDENCE_LINK_NOT_RESOLVED")
         if "PASS" == assessment["risk"].get("status"):
             assessment["risk"]["status"] = "UNKNOWN"
         assessment["risk"]["status_issues"] = list(dict.fromkeys(risk_status_issues))
