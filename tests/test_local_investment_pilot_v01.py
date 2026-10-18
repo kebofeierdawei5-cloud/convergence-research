@@ -433,6 +433,76 @@ def test_assessment_gate_status_downgrades_when_summary_is_placeholder(section, 
     assert "输入标签 " + status in report
 
 
+@pytest.mark.parametrize(
+    ("field", "placeholder", "expected_issue"),
+    [
+        ("driver", "TBD", "DRIVER_NAME_NOT_IDENTIFIABLE"),
+        ("impact", "UNKNOWN", "IMPACT_NOT_IDENTIFIABLE"),
+        ("rationale", "N/A", "RATIONALE_NOT_IDENTIFIABLE"),
+    ],
+)
+def test_value_driver_gate_downgrades_placeholder_only_subfields(field, placeholder, expected_issue):
+    payload = _payload()
+    payload["assessment"]["value_drivers"][0][field] = placeholder
+
+    analysis, report = _analyse(payload, f"TEST-VALUE-DRIVER-PLACEHOLDER-{field}")
+
+    driver = analysis["assessment"]["value_drivers"][0]
+    assert driver["status"] == "UNKNOWN"
+    assert expected_issue in driver["status_issues"]
+    assert "内容门禁：UNKNOWN" in report
+    assert expected_issue in report
+
+
+def test_value_driver_gate_passes_with_identifiable_name_impact_and_rationale():
+    analysis, report = _analyse(_payload(), "TEST-VALUE-DRIVER-IDENTIFIABLE")
+
+    driver = analysis["assessment"]["value_drivers"][0]
+    assert driver["status"] == "PASS"
+    assert driver["status_issues"] == []
+    assert "内容门禁：PASS" in report
+
+
+@pytest.mark.parametrize(
+    "risk_items",
+    [
+        [],
+        ["UNKNOWN"],
+        [{"risk_id": "R-1", "name": "UNKNOWN", "summary": "TBD"}],
+        [{"risk_id": "R-1", "name": "应收账款风险", "description": "N/A"}],
+    ],
+)
+def test_risk_pass_downgrades_when_structured_risk_items_are_missing_or_placeholder_only(risk_items):
+    payload = _payload()
+    payload["assessment"]["risk"]["items"] = risk_items
+
+    analysis, report = _analyse(payload, "TEST-RISK-ITEMS-PLACEHOLDER")
+
+    risk = analysis["assessment"]["risk"]
+    assert risk["status"] == "UNKNOWN"
+    assert risk["status_input"] == "PASS"
+    assert "ITEMS_NOT_IDENTIFIABLE" in risk["status_issues"]
+    assert "RISK_UNKNOWN" in analysis["decision"]["gating_issues"]
+    assert "RISK_ITEMS_NOT_IDENTIFIABLE" in analysis["decision"]["gating_issues"]
+    assert "风险门禁原标为 PASS" in report
+
+
+def test_risk_pass_is_preserved_with_identifiable_structured_risk_item():
+    payload = _payload()
+    payload["assessment"]["risk"]["items"] = [{
+        "risk_id": "R-1",
+        "name": "应收账款回款恶化",
+        "description": "应收账款增速持续高于收入增速，回款周期拉长。",
+        "monitoring_trigger": "连续两个季度经营现金流低于净利润。",
+        "evidence_refs": ["E1"],
+    }]
+
+    analysis, _report = _analyse(payload, "TEST-RISK-ITEMS-IDENTIFIABLE")
+
+    assert analysis["assessment"]["risk"]["status"] == "PASS"
+    assert analysis["assessment"]["risk"]["status_issues"] == []
+
+
 def test_ai_response_must_preserve_operator_owned_case_and_price_input(tmp_path):
     template_path = _write_input(tmp_path, _payload(cutoff="2026-10-10"))
     payload = json.loads(template_path.read_text(encoding="utf-8"))
