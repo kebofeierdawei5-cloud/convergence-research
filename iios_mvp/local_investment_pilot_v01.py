@@ -1128,11 +1128,25 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(item, Mapping):
             continue
         driver = str(item.get("driver") or item.get("name") or item.get("title") or "未命名价值驱动因素")
+        raw_rank = item.get("rank", index)
+        try:
+            numeric_rank = Decimal(str(raw_rank))
+            if not numeric_rank.is_finite() or numeric_rank < 1 or numeric_rank != numeric_rank.to_integral_value():
+                raise ValueError("RANK_NOT_POSITIVE_INTEGER")
+            rank = int(numeric_rank)
+        except (InvalidOperation, TypeError, ValueError, OverflowError):
+            # Keep rendering/replay stable without pretending the supplied rank was valid.
+            rank = index
+            rank_invalid = True
+        else:
+            rank_invalid = False
         # Status such as OBSERVED_AND_FORECAST is not an impact direction.
         # Keep it for display/audit, but do not infer POSITIVE or a passing gate.
         impact = _status(item.get("impact"), {"POSITIVE", "NEGATIVE", "MIXED", "UNKNOWN"})
         rationale = str(item.get("rationale") or item.get("summary") or item.get("mechanism") or "")
         driver_issues: list[str] = []
+        if rank_invalid:
+            driver_issues.append("RANK_NOT_IDENTIFIABLE")
         if not _is_identifiable_evidence_text(driver):
             driver_issues.append("DRIVER_NAME_NOT_IDENTIFIABLE")
         if impact == "UNKNOWN":
@@ -1140,7 +1154,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         if not _is_identifiable_evidence_text(rationale):
             driver_issues.append("RATIONALE_NOT_IDENTIFIABLE")
         assessment["value_drivers"].append({
-            "rank": int(item.get("rank", index)),
+            "rank": rank,
             "driver": driver,
             "source_status": str(item.get("status") or "UNKNOWN"),
             "impact": impact,
@@ -2093,6 +2107,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "IMPACT_NOT_IDENTIFIABLE": "影响方向未知，不能作为已确认的价值驱动因素。",
         "RATIONALE_NOT_IDENTIFIABLE": "驱动机制/理由为空或仅为占位文本。",
         "DRIVER_EVIDENCE_LINK_NOT_RESOLVED": "该价值驱动因素没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容。",
+        "RANK_NOT_IDENTIFIABLE": "排名字段不是有效的正整数；为避免中断报告，按输入顺序临时展示，但该驱动因素不通过内容门禁。",
     }
     if drivers:
         for display_rank, item in enumerate(drivers, start=1):
