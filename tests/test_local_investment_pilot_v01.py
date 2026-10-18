@@ -1440,6 +1440,29 @@ def test_b4_links_explicit_service_revenue_and_reconciles_valuation_bridge():
     assert b4["cross_node_assumption_links"][0]["status"] == "LINKED_SAME_SCENARIO_ASSUMPTION"
     assert "free_cash_flow_proxy_cny" in b4["valuation_reconciliation"]["excluded_metrics"][0]["field"]
 
+    # Same-scenario reuse must not turn a placeholder/missing source basis into
+    # a seemingly identifiable B4 basis merely by wrapping it in generated prose.
+    for invalid_basis in ("UNKNOWN", "N/A", "TBD", "未提供依据", ""):
+        bad_payload = json.loads(json.dumps(payload))
+        bad_payload["forecast_valuation"]["assumptions"][0]["basis"] = invalid_basis
+        bad_analysis, bad_report = _analyse(
+            bad_payload, f"TEST-B4-INVALID-CROSS-NODE-BASIS-{invalid_basis or 'EMPTY'}"
+        )
+        bad_b4 = bad_analysis["operating_driver_forecast"]
+        bad_links = bad_b4["cross_node_assumption_links"]
+        assert len(bad_links) == 3
+        assert all(
+            link["status"] == "ASSUMPTION_BASIS_NOT_IDENTIFIABLE_NOT_LINKED"
+            for link in bad_links
+        )
+        assert bad_b4["scenarios"]["bear"]["net_profit_cny"] is None
+        assert bad_b4["scenarios"]["base"]["net_profit_cny"] is None
+        assert bad_b4["scenarios"]["bull"]["net_profit_cny"] is None
+        assert "原始依据为空或仅为 UNKNOWN/N/A/TBD 等占位文本" in bad_report
+        assert "LINKED_SAME_SCENARIO_ASSUMPTION" not in [
+            link["status"] for link in bad_links
+        ]
+
 
 def test_root_one_click_launcher_uses_the_guided_entry_and_has_valid_bash():
     root = Path(__file__).resolve().parents[1]
