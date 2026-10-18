@@ -676,8 +676,7 @@ def test_risk_item_legacy_trigger_alias_and_operating_fields_are_preserved_and_r
     assert item["monitoring_trigger"] == "外销订单或海外交付持续走弱。"
     assert item["monitoring_trigger_source_field"] == "trigger"
     assert item["status"] == "PASS"
-    assert "触发条件：" not in report
-    assert "监控触发条件：外销订单或海外交付持续走弱。" in report
+    assert report.count("监控触发条件：外销订单或海外交付持续走弱。") == 1
     assert "经营影响：总收入、产能利用及固定费用吸收同步走弱。" in report
     assert "估值传导机制：下调可持续 EPS 并降低 P/E 倍数。" in report
 
