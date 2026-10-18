@@ -576,6 +576,24 @@ def _link_b4_cost_ratio_assumptions(
         if "cost_of_revenue_ratio" in scenario_row:
             continue
         options = candidates[scenario_name]
+        unusable_basis_options = [
+            item for item in options
+            if not _is_identifiable_evidence_text(item.get("basis"))
+        ]
+        options = [
+            item for item in options
+            if _is_identifiable_evidence_text(item.get("basis"))
+        ]
+        for unusable in unusable_basis_options:
+            links.append({
+                "scenario": scenario_name,
+                "field": "cost_of_revenue_ratio",
+                "status": "ASSUMPTION_BASIS_NOT_IDENTIFIABLE_NOT_LINKED",
+                "source_assumption_id": unusable["assumption_id"] or None,
+                "source_assumption_name": unusable["assumption_name"] or None,
+                "basis": unusable["basis"] or None,
+                "issues": ["ASSUMPTION_BASIS_NOT_IDENTIFIABLE"],
+            })
         distinct_values = {str(item["value"]) for item in options}
         if len(distinct_values) != 1:
             if len(distinct_values) > 1:
@@ -2227,12 +2245,38 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             lines.append("- " + _humanize_item(item))
     else:
         lines.append("- 未提供；不得将其解释为市场一致预期。")
+    b4_report_source = analysis.get("operating_driver_forecast") or {}
     lines.extend(render_operating_driver_section(
-        analysis.get("operating_driver_forecast") or {},
+        b4_report_source,
         f.get("scenarios") if isinstance(f.get("scenarios"), Mapping) else {},
         c["currency"],
         valuation_transmission=analysis.get("valuation_transmission") or {},
     ))
+    assumption_links = b4_report_source.get("cross_node_assumption_links")
+    if isinstance(assumption_links, list) and assumption_links:
+        lines.extend(["", "#### B4 与估值假设的交叉引用", ""])
+        for link in assumption_links:
+            if not isinstance(link, Mapping):
+                continue
+            scenario_label = str(link.get("scenario") or "UNKNOWN").upper()
+            status = str(link.get("status") or "UNKNOWN")
+            if status == "ASSUMPTION_BASIS_NOT_IDENTIFIABLE_NOT_LINKED":
+                lines.append(
+                    f"- {scenario_label} 成本率：未复用估值假设 "
+                    f"{link.get('source_assumption_id') or link.get('source_assumption_name') or '未命名假设'}；"
+                    "原始依据为空或仅为 UNKNOWN/N/A/TBD 等占位文本，B4 不把该成本率用于计算。"
+                )
+            elif status == "LINKED_SAME_SCENARIO_ASSUMPTION":
+                lines.append(
+                    f"- {scenario_label} 成本率：已复用同情景估值假设 "
+                    f"{link.get('source_assumption_id') or link.get('source_assumption_name') or '未命名假设'}；"
+                    "该引用不构成独立证据或正式准入。"
+                )
+            else:
+                lines.append(
+                    f"- {scenario_label} 成本率：未完成交叉引用（{status}）；B4 不进行隐式补值。"
+                )
+        lines.append("")
     lines.extend(render_valuation_transmission_section(
         analysis.get("valuation_transmission") or {},
         c["currency"],
