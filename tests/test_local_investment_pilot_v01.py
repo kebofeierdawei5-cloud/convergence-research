@@ -1982,6 +1982,53 @@ def test_b5_numeric_assumption_with_placeholder_basis_blocks_transmission_and_pr
     assert "不得将项目增量默认为已计入估值" in report
 
 
+def test_b4_aggregate_cost_ratio_does_not_override_explicit_product_cost_conflict():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+
+    payload = _driver_payload()
+    # Sales volume * unit cost = 750 * 400 = 300,000, while the same
+    # product explicitly declares total variable cost as 350,000. An
+    # aggregate ratio must not silently choose a third cost amount.
+    payload["scenarios"]["base"]["product_lines"][0]["variable_cost_cny"] = _driver_measure(
+        "350000", "CNY", "ANALYST_ASSUMPTION", [], "Conflicting explicit total product variable cost"
+    )
+    payload["scenarios"]["base"]["cost_of_revenue_ratio"] = _driver_measure(
+        "0.6", "ratio", "ANALYST_ASSUMPTION", [], "Explicit synthetic aggregate cost ratio"
+    )
+    source = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(payload, evidence_register=source)
+    base = result["scenarios"]["base"]
+
+    assert base["revenue_cny"] == "750000"
+    assert base["variable_cost_cny"] is None
+    assert base["net_profit_cny"] is None
+    assert base["unlevered_fcf_proxy_cny"] is None
+    assert "EXPLICIT_VARIABLE_COST_CONFLICTS_WITH_VOLUME_X_UNIT_COST" in base["issues"]
+    assert "AGGREGATE_COST_RATIO_FALLBACK_BLOCKED_BY_PRODUCT_COST_CONFLICT" in base["issues"]
+    assert base["calculation_status"] == "PARTIAL_SCENARIO_BRIDGE"
+
+
+def test_b4_aggregate_cost_ratio_can_fill_missing_product_cost_without_a_conflict():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+
+    payload = _driver_payload()
+    payload["scenarios"]["base"]["product_lines"][0].pop("variable_cost_cny_per_tonne")
+    payload["scenarios"]["base"]["cost_of_revenue_ratio"] = _driver_measure(
+        "0.6", "ratio", "ANALYST_ASSUMPTION", [], "Explicit synthetic aggregate cost ratio"
+    )
+    source = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(payload, evidence_register=source)
+    base = result["scenarios"]["base"]
+
+    assert base["variable_cost_cny"] == "450000.0"
+    assert base["variable_cost_basis"] == "AGGREGATE_COST_OF_REVENUE_RATIO"
+    assert base["net_profit_cny"] is not None
+    assert base["unlevered_fcf_proxy_cny"] is not None
+    assert "AGGREGATE_COST_RATIO_FALLBACK_BLOCKED_BY_PRODUCT_COST_CONFLICT" not in base["issues"]
+
+
 def test_operating_driver_forecast_refuses_unreferenced_actual_numbers():
     from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
     payload = _driver_payload()
