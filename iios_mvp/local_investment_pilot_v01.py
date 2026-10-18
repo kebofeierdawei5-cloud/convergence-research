@@ -1225,7 +1225,13 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         # Status such as OBSERVED_AND_FORECAST is not an impact direction.
         # Keep it for display/audit, but do not infer POSITIVE or a passing gate.
         impact = _status(item.get("impact"), {"POSITIVE", "NEGATIVE", "MIXED", "UNKNOWN"})
-        rationale = str(item.get("rationale") or item.get("summary") or item.get("mechanism") or "")
+        driver_type = str(item.get("type") or item.get("driver_type") or item.get("category") or "").strip()
+        historical_evidence = str(item.get("historical_evidence") or item.get("historical_basis") or "").strip()
+        valuation_transmission = str(item.get("valuation_transmission") or "").strip()
+        rationale = str(
+            item.get("rationale") or item.get("summary") or item.get("mechanism")
+            or valuation_transmission or ""
+        )
         driver_issues: list[str] = []
         if rank_invalid:
             driver_issues.append("RANK_NOT_IDENTIFIABLE")
@@ -1238,6 +1244,9 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         assessment["value_drivers"].append({
             "rank": rank,
             "driver": driver,
+            "driver_type": driver_type,
+            "historical_evidence": historical_evidence,
+            "valuation_transmission": valuation_transmission,
             "source_status": str(item.get("status") or "UNKNOWN"),
             "impact": impact,
             "rationale": rationale,
@@ -2246,10 +2255,22 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     }
     if drivers:
         for display_rank, item in enumerate(drivers, start=1):
-            lines.extend([
-                f"**价值驱动因素 {display_rank}：{item['driver']}**（影响：{item['impact']}；内容门禁：{item.get('status', 'UNKNOWN')}）",
-                f"   {item['rationale'] or '未提供理由。'}",
-            ])
+            lines.append(
+                f"**价值驱动因素 {display_rank}：{item['driver']}**"
+                f"（影响：{item['impact']}；内容门禁：{item.get('status', 'UNKNOWN')}）"
+            )
+            if item.get("driver_type"):
+                lines.append(f"   类型：{item['driver_type']}")
+            if item.get("historical_evidence"):
+                lines.append(f"   历史依据：{item['historical_evidence']}")
+            if item.get("valuation_transmission"):
+                lines.append(f"   价值传导：{item['valuation_transmission']}")
+                if item.get("rationale") and item["rationale"] != item["valuation_transmission"]:
+                    lines.append(f"   研究理由：{item['rationale']}")
+            elif item.get("rationale"):
+                lines.append(f"   {item['rationale']}")
+            elif not item.get("historical_evidence"):
+                lines.append("   未提供理由。")
             if item.get("status_issues"):
                 lines.append("   内容门禁问题：" + "；".join(
                     f"{issue}（{driver_issue_explanations.get(issue, issue)}）"

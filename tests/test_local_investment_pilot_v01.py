@@ -550,6 +550,36 @@ def test_value_driver_requires_its_own_resolved_evidence_link(evidence_refs):
     assert "该价值驱动因素没有自己的可追溯截止时点证据" in report
 
 
+def test_value_driver_legacy_evidence_and_transmission_fields_are_preserved_and_rendered():
+    payload = _payload()
+    payload["assessment"]["value_drivers"] = [{
+        "rank": 1,
+        "name": "出口市场收入增长与订单兑现",
+        "type": "REVENUE_GROWTH_AND_MIX",
+        "historical_evidence": "2025年外销主营业务收入同比增长38.51%，外销毛利率41.81%。",
+        "valuation_transmission": "出口订单若持续兑现，将提高收入与利润；订单延期可能压低固定费用吸收率和估值倍数。",
+        "evidence_refs": ["E1"],
+    }]
+
+    analysis, report = _analyse(payload, "TEST-VALUE-DRIVER-LEGACY-FIELDS")
+
+    item = analysis["assessment"]["value_drivers"][0]
+    # Missing direction stays UNKNOWN: the normalizer must not infer positive
+    # impact merely from a growth-oriented label or causal narrative.
+    assert item["impact"] == "UNKNOWN"
+    assert item["status"] == "UNKNOWN"
+    assert item["status_issues"] == ["IMPACT_NOT_IDENTIFIABLE"]
+    assert item["driver_type"] == "REVENUE_GROWTH_AND_MIX"
+    assert item["historical_evidence"].startswith("2025年外销主营业务收入同比增长")
+    assert item["valuation_transmission"].startswith("出口订单若持续兑现")
+    assert item["rationale"] == item["valuation_transmission"]
+    assert "类型：REVENUE_GROWTH_AND_MIX" in report
+    assert "历史依据：2025年外销主营业务收入同比增长38.51%" in report
+    assert "价值传导：出口订单若持续兑现" in report
+    assert "未提供理由。" not in report
+    assert "RATIONALE_NOT_IDENTIFIABLE" not in item["status_issues"]
+
+
 def test_value_driver_gate_passes_with_identifiable_name_impact_and_rationale():
     analysis, report = _analyse(_payload(), "TEST-VALUE-DRIVER-IDENTIFIABLE")
 
