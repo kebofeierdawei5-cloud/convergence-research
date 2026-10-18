@@ -1021,7 +1021,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         known_at_precision = "DATE_ONLY" if len(known_text) == 10 else "TIMESTAMP_OR_OFFSET_DATETIME"
         explicit_date_only_unknown_time = re.fullmatch(
             r"(\d{4}-\d{2}-\d{2})\s*[;；,，]\s*"
-            r"(?:具体时分|具体时间|时分|时间|exact time|time(?: of day)?)\s*"
+            r"(?:具体披露时分|具体披露时间|披露时分|披露时间|具体时分|具体时间|时分|时间|exact time|time(?: of day)?)\s*"
             r"(?:[:：]\s*)?(?:UNKNOWN|未知|不详|not known)",
             known_at_original,
             flags=re.IGNORECASE,
