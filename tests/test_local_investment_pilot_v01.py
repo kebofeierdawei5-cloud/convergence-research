@@ -608,6 +608,37 @@ def test_structured_risk_item_requires_identifiable_monitoring_trigger(trigger):
     assert "明确且非占位的监控触发条件" in report
 
 
+def test_duplicate_structured_risk_ids_downgrade_all_conflicting_risk_rows():
+    payload = _payload()
+    template = {
+        "risk_id": "R-1",
+        "name": "应收账款回款恶化",
+        "description": "应收账款增速持续高于收入增速，回款周期拉长。",
+        "monitoring_trigger": "连续两个季度经营现金流低于净利润。",
+        "evidence_refs": ["E1"],
+    }
+    second = dict(template)
+    second.update({
+        "name": "客户集中度恶化",
+        "description": "最大客户收入占比持续提升，单一客户依赖度上升。",
+        "monitoring_trigger": "最大客户收入占比连续两个季度上升。",
+    })
+    payload["assessment"]["risk"]["items"] = [template, second]
+
+    analysis, report = _analyse(payload, "TEST-DUPLICATE-RISK-ID")
+
+    risk = analysis["assessment"]["risk"]
+    assert risk["status"] == "UNKNOWN"
+    assert "DUPLICATE_RISK_ID_NOT_IDENTIFIABLE" in risk["status_issues"]
+    assert all(item["status"] == "UNKNOWN" for item in risk["items"])
+    assert all(
+        "DUPLICATE_RISK_ID_NOT_IDENTIFIABLE" in item["status_issues"]
+        for item in risk["items"]
+    )
+    assert "RISK_DUPLICATE_RISK_ID_NOT_IDENTIFIABLE" in analysis["decision"]["gating_issues"]
+    assert "多个结构化风险项使用相同 risk_id" in report
+
+
 def test_risk_pass_is_preserved_with_identifiable_structured_risk_item():
     payload = _payload()
     payload["assessment"]["risk"]["items"] = [{
