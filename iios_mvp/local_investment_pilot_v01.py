@@ -1150,15 +1150,41 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         item for item in assessment["risk"]["items"]
         if not _risk_item_is_identifiable(item)
     ]
-    if assessment["risk"]["status"] == "PASS" and (
-        not assessment["risk"]["items"] or invalid_risk_items
-    ):
-        assessment["risk"]["status"] = "UNKNOWN"
-        risk_status_issues = list(assessment["risk"].get("status_issues") or [])
+    risk_status_issues = list(assessment["risk"].get("status_issues") or [])
+    if not assessment["risk"]["items"] or invalid_risk_items:
+        if assessment["risk"]["status"] == "PASS":
+            assessment["risk"]["status"] = "UNKNOWN"
         risk_status_issues.append("ITEMS_NOT_IDENTIFIABLE")
-        if risk_items_missing_monitoring_trigger:
-            risk_status_issues.append("RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE")
-        assessment["risk"]["status_issues"] = list(dict.fromkeys(risk_status_issues))
+    if risk_items_missing_monitoring_trigger:
+        risk_status_issues.append("RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE")
+
+    risk_ids: dict[str, list[int]] = {}
+    for index, item in enumerate(assessment["risk"]["items"]):
+        if not isinstance(item, Mapping):
+            continue
+        raw_risk_id = item.get("risk_id")
+        if raw_risk_id in (None, ""):
+            continue
+        normalized_risk_id = str(raw_risk_id).strip().upper()
+        if not _is_identifiable_evidence_text(normalized_risk_id):
+            continue
+        risk_ids.setdefault(normalized_risk_id, []).append(index)
+    duplicate_risk_ids = {
+        risk_id: indices for risk_id, indices in risk_ids.items() if len(indices) > 1
+    }
+    if duplicate_risk_ids:
+        for risk_id, indices in duplicate_risk_ids.items():
+            for index in indices:
+                item = dict(assessment["risk"]["items"][index])
+                item["status"] = "UNKNOWN"
+                item_issues = list(item.get("status_issues") or [])
+                item_issues.append("DUPLICATE_RISK_ID_NOT_IDENTIFIABLE")
+                item["status_issues"] = list(dict.fromkeys(item_issues))
+                assessment["risk"]["items"][index] = item
+        if assessment["risk"]["status"] == "PASS":
+            assessment["risk"]["status"] = "UNKNOWN"
+        risk_status_issues.append("DUPLICATE_RISK_ID_NOT_IDENTIFIABLE")
+    assessment["risk"]["status_issues"] = list(dict.fromkeys(risk_status_issues))
 
     value_drivers = raw_assessment.get("value_drivers") or []
     assessment["value_drivers"] = []
@@ -2490,6 +2516,9 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         ),
         "RISK_RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE": (
             "至少一个结构化风险项缺少明确且非占位的监控触发条件；整体风险状态已降为 UNKNOWN。"
+        ),
+        "RISK_DUPLICATE_RISK_ID_NOT_IDENTIFIABLE": (
+            "多个结构化风险项使用相同 risk_id；对应条目均降为 UNKNOWN，以免后续监控/复核无法唯一定位。"
         ),
         "THESIS_BREAK_CONDITIONS_NOT_IDENTIFIABLE": (
             "Thesis 原标为 INTACT，但失效条件列表为空或仅有 UNKNOWN/TBD 等占位文本；论点完整性降为 UNKNOWN。"
