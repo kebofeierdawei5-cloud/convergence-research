@@ -3240,24 +3240,24 @@ def test_required_return_below_15_percent_remains_independent_from_fundamental_h
     payload["forecast_valuation"]["scenarios"] = {
         "bear": {
             "probability": "0.20",
-            "terminal_value_per_share": "90",
+            "terminal_value_per_share": "100",
             "cash_distributions_per_share": "0",
-            "rationale": "synthetic bear case with a 90 CNY terminal wealth",
+            "rationale": "synthetic bear case with a 100 CNY terminal wealth",
             "failure_trigger": "core driver underperforms",
             "operating_impact": "earnings remain below base",
             "valuation_mechanism": "lower normalized EPS",
         },
         "base": {
             "probability": "0.50",
-            "terminal_value_per_share": "103",
+            "terminal_value_per_share": "115",
             "cash_distributions_per_share": "0",
-            "rationale": "synthetic base case with a 103 CNY terminal wealth",
+            "rationale": "synthetic base case with a 115 CNY terminal wealth",
         },
         "bull": {
             "probability": "0.30",
-            "terminal_value_per_share": "110",
+            "terminal_value_per_share": "125",
             "cash_distributions_per_share": "0",
-            "rationale": "synthetic bull case with a 110 CNY terminal wealth",
+            "rationale": "synthetic bull case with a 125 CNY terminal wealth",
         },
     }
 
