@@ -1301,6 +1301,10 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             driver_issues.append("IMPACT_NOT_IDENTIFIABLE")
         if not _is_identifiable_evidence_text(rationale):
             driver_issues.append("RATIONALE_NOT_IDENTIFIABLE")
+        if not _is_identifiable_evidence_text(historical_evidence):
+            driver_issues.append("HISTORICAL_EVIDENCE_NOT_IDENTIFIABLE")
+        if not _is_identifiable_evidence_text(valuation_transmission):
+            driver_issues.append("VALUATION_TRANSMISSION_NOT_IDENTIFIABLE")
         assessment["value_drivers"].append({
             "rank": rank,
             "driver": driver,
@@ -2332,6 +2336,8 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "DRIVER_NAME_NOT_IDENTIFIABLE": "驱动因素名称为空或仅为占位文本。",
         "IMPACT_NOT_IDENTIFIABLE": "影响方向未知，不能作为已确认的价值驱动因素。",
         "RATIONALE_NOT_IDENTIFIABLE": "驱动机制/理由为空或仅为占位文本。",
+        "HISTORICAL_EVIDENCE_NOT_IDENTIFIABLE": "没有给出可识别的历史经营依据，无法验证驱动的基线或变化起点。",
+        "VALUATION_TRANSMISSION_NOT_IDENTIFIABLE": "没有说明驱动如何传导到收入、利润、现金流或每股价值。",
         "DRIVER_EVIDENCE_LINK_NOT_RESOLVED": "该价值驱动因素没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容。",
         "RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED": "至少一个结构化风险项没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容；整体风险状态不能视为 PASS。",
 
@@ -2346,16 +2352,12 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             )
             if item.get("driver_type"):
                 lines.append(f"   类型：{item['driver_type']}")
-            if item.get("historical_evidence"):
-                lines.append(f"   历史依据：{item['historical_evidence']}")
-            if item.get("valuation_transmission"):
-                lines.append(f"   价值传导：{item['valuation_transmission']}")
-                if item.get("rationale") and item["rationale"] != item["valuation_transmission"]:
-                    lines.append(f"   研究理由：{item['rationale']}")
-            elif item.get("rationale"):
-                lines.append(f"   {item['rationale']}")
-            elif not item.get("historical_evidence"):
-                lines.append("   未提供理由。")
+            lines.append(f"   历史依据：{item.get('historical_evidence') or 'UNKNOWN'}")
+            lines.append(f"   价值传导：{item.get('valuation_transmission') or 'UNKNOWN'}")
+            if item.get("rationale") and item["rationale"] != item.get("valuation_transmission"):
+                lines.append(f"   研究理由：{item['rationale']}")
+            elif not item.get("rationale") and not item.get("valuation_transmission"):
+                lines.append("   研究理由：UNKNOWN")
             if item.get("status_issues"):
                 lines.append("   内容门禁问题：" + "；".join(
                     f"{issue}（{driver_issue_explanations.get(issue, issue)}）"
