@@ -1306,6 +1306,39 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             driver_issues.append("DRIVER_EVIDENCE_LINK_NOT_RESOLVED")
             driver["status_issues"] = list(dict.fromkeys(driver_issues))
 
+    # Structured risk items are separate decision-relevant claims. A general Risk
+    # section citation cannot silently resolve an item's missing/broken own citation.
+    unresolved_risk_item_refs: list[str] = []
+    normalized_risk_items = list(assessment["risk"].get("items") or [])
+    for index, item in enumerate(normalized_risk_items, start=1):
+        if not isinstance(item, Mapping):
+            # Legacy plain-text risk lists remain supported under section-level evidence.
+            continue
+        refs = _items(item.get("evidence_refs"))
+        refs_unresolved = (
+            not refs
+            or any(ref not in source_ids for ref in refs)
+            or bool(set(refs) & set(unknown_refs))
+            or bool(set(refs) & set(after_cutoff_refs))
+            or bool(set(refs) & set(uncertain_timing_refs))
+        )
+        if refs_unresolved:
+            risk_item = dict(item)
+            risk_item["status"] = "UNKNOWN"
+            risk_item_issues = list(risk_item.get("status_issues") or [])
+            risk_item_issues.append("RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED")
+            risk_item["status_issues"] = list(dict.fromkeys(risk_item_issues))
+            normalized_risk_items[index - 1] = risk_item
+            label = str(item.get("risk_id") or item.get("name") or item.get("title") or f"ITEM_{index}")
+            unresolved_risk_item_refs.append(label)
+    assessment["risk"]["items"] = normalized_risk_items
+    if unresolved_risk_item_refs:
+        risk_status_issues = list(assessment["risk"].get("status_issues") or [])
+        risk_status_issues.append("RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED")
+        if "PASS" == assessment["risk"].get("status"):
+            assessment["risk"]["status"] = "UNKNOWN"
+        assessment["risk"]["status_issues"] = list(dict.fromkeys(risk_status_issues))
+
     # A passing Trust/Reality/Quality/MIE/Expectation Gap/Risk claim, or an INTACT
     # Thesis, must be linked to at least one uniquely resolved, cutoff-compatible
     # evidence ID. A source elsewhere in the register is not support for every gate.
@@ -2134,6 +2167,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "IMPACT_NOT_IDENTIFIABLE": "影响方向未知，不能作为已确认的价值驱动因素。",
         "RATIONALE_NOT_IDENTIFIABLE": "驱动机制/理由为空或仅为占位文本。",
         "DRIVER_EVIDENCE_LINK_NOT_RESOLVED": "该价值驱动因素没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容。",
+        "RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED": "至少一个结构化风险项没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容；整体风险状态不能视为 PASS。",
         "RANK_NOT_IDENTIFIABLE": "排名字段不是有效的正整数；为避免中断报告，按输入顺序临时展示，但该驱动因素不通过内容门禁。",
         "DUPLICATE_RANK_NOT_IDENTIFIABLE": "多个价值驱动因素使用相同排名，排序不唯一；相关条目均降为 UNKNOWN。",
     }
