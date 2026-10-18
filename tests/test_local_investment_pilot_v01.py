@@ -1742,6 +1742,43 @@ def test_b5_transmits_project_profit_to_per_share_scenarios_and_entry_anchor():
 
 
 
+@pytest.mark.parametrize("rationale", ["UNKNOWN", "N/A", "TBD", "未提供依据"])
+def test_primary_model_placeholder_rationale_blocks_return_entry_price_and_b6(rationale):
+    payload = _b5_ready_payload()
+    payload["forecast_valuation"]["model_rationale"] = rationale
+
+    analysis, report = _analyse(payload, f"TEST-PRIMARY-MODEL-RATIONALE-{rationale}")
+
+    contract = analysis["valuation_model_consistency"]
+    assert contract["status"] == "MODEL_RATIONALE_NOT_IDENTIFIABLE"
+    assert contract["model_rationale_identifiable"] is False
+    assert "FORECAST_VALUATION_MODEL_RATIONALE_NOT_IDENTIFIABLE" in contract["issues"]
+    assert contract["primary_model_price_calculation_eligible"] is False
+    assert contract["scenario_values_role"] == "ALTERNATIVE_OR_UNRESOLVED_ONLY"
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == "PRIMARY_VALUATION_MODEL_NOT_ELIGIBLE:MODEL_RATIONALE_NOT_IDENTIFIABLE"
+    assert analysis["price_zone_sensitivity"]["status"] == "UNKNOWN"
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert "FORECAST_VALUATION_MODEL_RATIONALE_NOT_IDENTIFIABLE" in report
+    assert "不进入预期回报、目标入场价或 B6 价格敏感性计算" in report
+
+
+def test_primary_model_identifiable_rationale_keeps_price_screen_eligible():
+    payload = _b5_ready_payload()
+    payload["forecast_valuation"]["model_rationale"] = (
+        "EPS_MULTIPLE 适用于以可持续归母净利润为主驱动的成熟业务，"
+        "估值使用正常化 EPS 与可比估值区间交叉检查。"
+    )
+    analysis, _report = _analyse(payload, "TEST-PRIMARY-MODEL-RATIONALE-IDENTIFIABLE")
+
+    contract = analysis["valuation_model_consistency"]
+    assert contract["status"] == "MATCH"
+    assert contract["model_rationale_identifiable"] is True
+    assert contract["primary_model_price_calculation_eligible"] is True
+    assert analysis["return_metrics"] is not None
+
+
 def test_operator_selected_sotp_blocks_eps_multiple_price_calculation():
     payload = _b5_ready_payload()
     payload["operator_valuation_context"]["selected_model_family"] = "SOTP"
