@@ -485,6 +485,30 @@ def test_value_driver_gate_downgrades_placeholder_only_subfields(field, placehol
     assert expected_issue in report
 
 
+@pytest.mark.parametrize(
+    "evidence_refs",
+    [
+        None,
+        ["E-DOES-NOT-EXIST"],
+    ],
+)
+def test_value_driver_requires_its_own_resolved_evidence_link(evidence_refs):
+    payload = _payload()
+    driver = payload["assessment"]["value_drivers"][0]
+    if evidence_refs is None:
+        driver.pop("evidence_refs")
+    else:
+        driver["evidence_refs"] = evidence_refs
+
+    analysis, report = _analyse(payload, "TEST-VALUE-DRIVER-EVIDENCE-LINK")
+
+    normalized = analysis["assessment"]["value_drivers"][0]
+    assert normalized["status"] == "UNKNOWN"
+    assert "DRIVER_EVIDENCE_LINK_NOT_RESOLVED" in normalized["status_issues"]
+    assert "VALUE_DRIVER_DRIVER_EVIDENCE_LINK_NOT_RESOLVED" in analysis["decision"]["gating_issues"]
+    assert "该价值驱动因素没有自己的可追溯截止时点证据" in report
+
+
 def test_value_driver_gate_passes_with_identifiable_name_impact_and_rationale():
     analysis, report = _analyse(_payload(), "TEST-VALUE-DRIVER-IDENTIFIABLE")
 
