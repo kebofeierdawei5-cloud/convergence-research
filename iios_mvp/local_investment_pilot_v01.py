@@ -3029,6 +3029,17 @@ def create_pilot_template(
         "不要在 notes 中重述与 price_input.price 不同的现价；当前股价只取结构化 price_input。不能将人工价格标为已验证。"
         "未知事实用 UNKNOWN，并解释缺口；研究结论可以是 REVIEW_REQUIRED，但不可以把整个结构留空。只返回一个完整 JSON 对象，不要输出代码围栏或额外说明。"
     )
+    investment_thesis_chain_instructions = (
+        "\\n\\n核心投资判断链：必须逐项回答以下六个问题，并把答案落到现有 JSON 字段中；不得新增顶层字段，也不得用空泛口号代替因果解释。"
+        "1. 公司究竟靠什么赚钱：识别关键产品/服务、客户与应用、销量/价格/产品组合、单位经济、利润率、资本占用和现金来源；区分经常性经营与一次性/周期性收益。写入 assessment.thesis.core_statement、assessment.thesis.drivers 和 assessment.value_drivers。"
+        "2. 未来最重要的变化是什么：按价值重要性排序，不要罗列宏观热点；指出未来 1 年（如有明确理由再用 2–3 年）最可能改变收入、单位利润、现金流或每股价值的变量，说明起点、预期变化、时间和可观测指标。写入 assessment.value_drivers 与 operating_driver_forecast。"
+        "3. 为什么相信变化会发生：把每个关键变化连接到截止时点前已公开的具体证据、证据日期、业务机制和反证；区分领先指标/结果指标、公司指引/分析师假设/历史事实，不得把管理层目标当成已实现结果。写入 evidence_register、assessment.value_drivers.historical_evidence 与 rationale。"
+        "4. 变化如何进入每股价值：明确写出“销量/价格/组合/利用率 → 收入 → 单位毛利与费用 → EBIT/净利润 → 资本开支/营运资金/FCF → 稀释股数与每股盈利 → 估值”的可验证传导链；说明关键假设、量纲、期间、约束、潜在蚕食与稀释，避免重复计价。使用 operating_driver_forecast、valuation_transmission 和 forecast_valuation.scenarios；无法闭合的环节保留 UNKNOWN/NOT_LINKED。"
+        "5. 当前价格已反映多少：price_input.price 是本次唯一现价，不得覆盖。分清外部可验证的市场隐含预期（MIE）、市场可比估值和内部估值；只有存在独立、截止时点兼容的定价/一致预期证据时才量化 MIE。缺少证据就将 assessment.market_implied_expectation 标为 NOT_IDENTIFIABLE，并具体解释哪些隐含增长、利润率、资本回报或估值倍数无法反推；绝不能把自己的 Base 估值伪装成市场预期。assessment.expectation_gap 必须说明市场预期与独立经营推演在方向、规模、时间或概率上有何差异；无法量化时明确方向也不可识别。"
+        "6. 哪些事实要求改变看法：写出会证伪核心论点或使情景切换的可观察指标、阈值/方向、验证时间和对应经营/估值影响；区分暂时波动与结构性恶化。落入 assessment.thesis.break_conditions、assessment.thesis.reassessment_triggers、assessment.risk.items 的监控触发项以及 Bear.failure_trigger / operating_impact / valuation_mechanism。"
+        "每个排名靠前的 value driver 都应尽量填写 driver_type、historical_evidence、valuation_transmission、impact、rationale 和其自身的 evidence_refs；证据只证明事实，不自动证明因果，因果需另给机制。Bear/Base/Bull 应由经营驱动假设产生有意义的差异，而不是只改终值或概率；说明情景间销量、净售价、单位成本、利润率、现金转化、资本开支和估值倍数发生哪些变化以及依据。"
+        "最终要判断的是“按输入价格是否值得承担风险”，而不是只判断公司是否优秀或值得研究。请提供足以让本地决策引擎复算的输入，不要另造顶层 action/target-price 字段，也不要在研究回答中声称已发出 BUY/ADD/交易指令；15% 年化门槛、共同约束入场价与暂定动作由本地既有计算器独立计算。"
+    )
     b5_transmission_instructions = (
         "\n\nB5 估值传导要求（IIOS-VALUATION-TRANSMISSION-0.1）："
         "必须保留 valuation_transmission 节点和 Bear/Base/Bull 三个情景。valuation_model_name 必须逐字匹配 forecast_valuation.model；model_family 必须准确分类为 EPS_MULTIPLE、FCF_DCF、DDM、SOTP、RNPV、OTHER 或 UNKNOWN；earnings_period 必须与 operating_driver_forecast.forecast_period 完全一致。"
@@ -3064,6 +3075,7 @@ def create_pilot_template(
             "项目年份第 3/4/5 年与自然年释放计划存在 RAMP_CALENDAR_BASIS_UNRECONCILED 待核口径；不要自行强行对齐，解释缺少的正式投产日、月度产量、产品销量、净成交价、单位成本、转固/折旧及营运资金证据。"
             "若本次截止日晚于历史公开材料，必须检索截止日前最新公开披露后再判断项目当前状态；不要把旧的调试阶段描述直接外推到新截止日。"
         )
+    prompt += investment_thesis_chain_instructions
     prompt += driver_instructions
     prompt += b5_transmission_instructions
     _write_local(prompt_path, prompt + "\n")

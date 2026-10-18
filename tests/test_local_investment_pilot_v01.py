@@ -1004,6 +1004,16 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert len(prompt_files) == 1
     assert "经营驱动因素树要求（IIOS-OPERATING-DRIVER-FORECAST-0.1）" in prompt_files[0].read_text(encoding="utf-8")
     assert "B5 估值传导要求（IIOS-VALUATION-TRANSMISSION-0.1）" in prompt_files[0].read_text(encoding="utf-8")
+    prompt_text = prompt_files[0].read_text(encoding="utf-8")
+    assert "核心投资判断链：必须逐项回答以下六个问题" in prompt_text
+    assert "公司究竟靠什么赚钱" in prompt_text
+    assert "未来最重要的变化是什么" in prompt_text
+    assert "为什么相信变化会发生" in prompt_text
+    assert "变化如何进入每股价值" in prompt_text
+    assert "当前价格已反映多少" in prompt_text
+    assert "哪些事实要求改变看法" in prompt_text
+    assert "绝不能把自己的 Base 估值伪装成市场预期" in prompt_text
+    assert "15% 年化门槛、共同约束入场价与暂定动作由本地既有计算器独立计算" in prompt_text
     assert "上传输入模板和需要引用的公司公告/财报材料" not in output
 
 
