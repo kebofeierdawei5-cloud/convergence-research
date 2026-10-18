@@ -1457,6 +1457,30 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             assessment["risk"]["status"] = "UNKNOWN"
         assessment["risk"]["status_issues"] = list(dict.fromkeys(risk_status_issues))
 
+    # A section-level PASS must not override a child risk row whose own status
+    # is UNKNOWN, FAIL, or unsupported. Preserve the supplied row status for audit,
+    # but downgrade the overall assessment and surface a canonical issue.
+    normalized_risk_items = list(assessment["risk"].get("items") or [])
+    nonpassing_risk_items = []
+    for index, item in enumerate(normalized_risk_items):
+        if not isinstance(item, Mapping):
+            continue
+        item_status = str(item.get("status") or "UNKNOWN").strip().upper()
+        if item_status == "PASS":
+            continue
+        nonpassing_risk_items.append(item)
+        if not list(item.get("status_issues") or []):
+            item = dict(item)
+            item["status_issues"] = ["RISK_ITEM_STATUS_NOT_PASS"]
+            normalized_risk_items[index] = item
+    if nonpassing_risk_items:
+        assessment["risk"]["items"] = normalized_risk_items
+        risk_status_issues = list(assessment["risk"].get("status_issues") or [])
+        risk_status_issues.append("RISK_ITEM_STATUS_NOT_PASS")
+        if assessment["risk"].get("status") == "PASS":
+            assessment["risk"]["status"] = "UNKNOWN"
+        assessment["risk"]["status_issues"] = list(dict.fromkeys(risk_status_issues))
+
     # A passing Trust/Reality/Quality/MIE/Expectation Gap/Risk claim, or an INTACT
     # Thesis, must be linked to at least one uniquely resolved, cutoff-compatible
     # evidence ID. A source elsewhere in the register is not support for every gate.
@@ -2616,6 +2640,9 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         ),
         "RISK_ITEM_SEVERITY_NOT_IDENTIFIABLE": (
             "至少一个结构化风险项缺少受支持的严重程度分级；该风险排序与组合风险判断不能视为完整。"
+        ),
+        "RISK_ITEM_STATUS_NOT_PASS": (
+            "至少一个结构化风险项的行级状态不是 PASS；整体风险状态不能继续标为 PASS，已降为 UNKNOWN。"
         ),
         "RISK_DUPLICATE_RISK_ID_NOT_IDENTIFIABLE": (
             "多个结构化风险项使用相同 risk_id；对应条目均降为 UNKNOWN，以免后续监控/复核无法唯一定位。"
