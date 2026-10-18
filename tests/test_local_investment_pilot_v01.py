@@ -583,6 +583,31 @@ def test_risk_pass_downgrades_when_structured_risk_items_are_missing_or_placehol
     assert "风险门禁原标为 PASS" in report
 
 
+@pytest.mark.parametrize("trigger", [None, "", "UNKNOWN", "TBD", "未提供依据"])
+def test_structured_risk_item_requires_identifiable_monitoring_trigger(trigger):
+    payload = _payload()
+    item = {
+        "risk_id": "R-TRIGGER",
+        "name": "应收账款回款恶化",
+        "description": "应收账款增速持续高于收入增速，回款周期拉长。",
+        "evidence_refs": ["E1"],
+    }
+    if trigger is not None:
+        item["monitoring_trigger"] = trigger
+    payload["assessment"]["risk"]["items"] = [item]
+
+    analysis, report = _analyse(payload, "TEST-RISK-ITEM-MONITORING-TRIGGER")
+
+    risk = analysis["assessment"]["risk"]
+    normalized = risk["items"][0]
+    assert risk["status"] == "UNKNOWN"
+    assert "RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE" in risk["status_issues"]
+    assert normalized["status"] == "UNKNOWN"
+    assert "RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE" in normalized["status_issues"]
+    assert "RISK_RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE" in analysis["decision"]["gating_issues"]
+    assert "明确且非占位的监控触发条件" in report
+
+
 def test_risk_pass_is_preserved_with_identifiable_structured_risk_item():
     payload = _payload()
     payload["assessment"]["risk"]["items"] = [{
