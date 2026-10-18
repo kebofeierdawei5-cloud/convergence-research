@@ -1771,6 +1771,27 @@ def _b5_ready_payload():
     return payload
 
 
+@pytest.mark.parametrize("scenario_name", ["bear", "base", "bull"])
+def test_b5_does_not_apply_project_transmission_when_cash_distribution_is_omitted(scenario_name):
+    payload = _b5_ready_payload()
+    payload["forecast_valuation"]["scenarios"][scenario_name].pop("cash_distributions_per_share")
+
+    analysis, report = _analyse(payload, f"TEST-B5-MISSING-DISTRIBUTIONS-{scenario_name}")
+
+    bridge = analysis["valuation_transmission"]
+    assert bridge["status"] == "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID"
+    assert bridge["applied_to_per_share_scenarios"] is False
+    assert f"{scenario_name.upper()}:CASH_DISTRIBUTIONS_UNKNOWN" in bridge["input_issues"]
+    assert analysis["forecast_valuation"]["entry_value_reference_per_share"] == "150"
+    assert analysis["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] == "120"
+    assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
+    assert analysis["forecast_valuation"]["scenarios"]["bull"]["terminal_value_per_share"] == "180"
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert "CASH_DISTRIBUTIONS_UNKNOWN" in report
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+
+
 def test_b5_transmits_project_profit_to_per_share_scenarios_and_entry_anchor():
     payload = _b5_ready_payload()
     analysis, report = _analyse(payload, "TEST-B5-APPLY")

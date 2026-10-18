@@ -332,8 +332,8 @@ def evaluate_valuation_transmission(
         if not isinstance(base_row, Mapping):
             dist_raw = None
         elif "cash_distributions_per_share" not in base_row:
-            # An omitted legacy field defaults to zero, matching the return solver.
-            dist_raw = "0"
+            # An omitted field is unknown, not a zero-distribution claim.
+            dist_raw = None
         else:
             # An explicit null/empty value is UNKNOWN, not evidence of zero.
             dist_raw = base_row.get("cash_distributions_per_share")
