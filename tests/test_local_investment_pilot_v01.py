@@ -3125,3 +3125,31 @@ def test_b4_report_renders_missing_operating_bridge_fields_as_unknown():
     assert "- EBITDA / EBIT / 税前利润 / 净利润：UNKNOWN / UNKNOWN / UNKNOWN / UNKNOWN" in report
     assert "- 资本开支 / 营运资金变动 / 自由现金流代理：UNKNOWN / UNKNOWN / UNKNOWN" in report
     assert "未应用 B5 增量的每股估值情景终值：UNKNOWN CNY" in report
+
+def test_b5_incomplete_counterfactual_does_not_block_confirmed_project_inclusive_primary_valuation():
+    payload = _b5_ready_payload()
+    payload["operator_valuation_context"]["baseline_includes_project"] = True
+    payload["valuation_transmission"]["scenarios"]["base"]["displaced_existing_after_tax_profit_cny"] = {
+        "value": None,
+        "unit": "CNY",
+        "data_class": "UNKNOWN",
+        "basis": "",
+        "evidence_refs": [],
+        "note": "Counterfactual cannibalization is not identifiable; existing baseline already includes the project.",
+    }
+
+    analysis, report = _analyse(payload, "TEST-B5-INCOMPLETE-COUNTERFACTUAL-INCLUDED-BASELINE")
+
+    assert analysis["valuation_transmission"]["status"] == "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID"
+    assert analysis["valuation_transmission"]["applied_to_per_share_scenarios"] is False
+    assert all(
+        analysis["forecast_valuation"]["scenarios"][name]["terminal_value_per_share"] == base
+        for name, base in (("bear", "120"), ("base", "150"), ("bull", "180"))
+    )
+    assert analysis["forecast_valuation"]["entry_value_reference_per_share"] == "150"
+    assert analysis["return_metrics"] is not None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is not None
+    assert "MATCH_BASELINE_PROJECT_INCLUDED_B5_DIAGNOSTIC_ONLY" in report
+    assert "B5 未完成的反事实传导未阻断已确认包含项目的原估值" in report
+    assert "回报计算尚未完成" not in report
+
