@@ -841,16 +841,31 @@ def _build_valuation_model_consistency(
         if status == "MATCH":
             status = "MODEL_RATIONALE_NOT_IDENTIFIABLE"
     eligible = status == "MATCH"
+    baseline_confirmed_included = valuation_transmission.get("baseline_includes_project") is True
     if (
         eligible
         and scope != "COMPANY_WIDE"
         and transmission_status not in _B5_PROJECT_TRANSMISSION_ACCEPTED
+        and not baseline_confirmed_included
     ):
         eligible = False
         status = "OPERATING_SCOPE_OR_B5_TRANSMISSION_NOT_RESOLVED"
         issues.append(
             "B5_TRANSMISSION_NOT_ACCEPTED_OUTSIDE_EXPLICIT_COMPANY_WIDE_SCOPE"
         )
+    elif (
+        eligible
+        and scope != "COMPANY_WIDE"
+        and transmission_status not in _B5_PROJECT_TRANSMISSION_ACCEPTED
+        and baseline_confirmed_included
+    ):
+        # B5 is an optional incremental bridge. If the operator confirms that
+        # the existing per-share baseline already includes the project, an
+        # incomplete/unapplied counterfactual bridge must not invalidate that
+        # unchanged primary valuation. Preserve an explicit diagnostic while
+        # keeping the independently verified model identity as the price basis.
+        status = "MATCH_BASELINE_PROJECT_INCLUDED_B5_DIAGNOSTIC_ONLY"
+        issues.append("B5_NOT_APPLIED_BASELINE_CONFIRMED_PROJECT_INCLUDED")
     return {
         "schema_version": "IIOS-PRIMARY-VALUATION-MODEL-CONSISTENCY-0.1",
         "status": status,
