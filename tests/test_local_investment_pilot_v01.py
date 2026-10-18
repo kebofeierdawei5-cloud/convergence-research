@@ -434,6 +434,37 @@ def test_assessment_gate_status_downgrades_when_summary_is_placeholder(section, 
 
 
 @pytest.mark.parametrize(
+    ("field", "value", "expected_issue"),
+    [
+        ("break_conditions", [], "BREAK_CONDITIONS_NOT_IDENTIFIABLE"),
+        ("break_conditions", ["UNKNOWN"], "BREAK_CONDITIONS_NOT_IDENTIFIABLE"),
+        ("reassessment_triggers", [], "REASSESSMENT_TRIGGERS_NOT_IDENTIFIABLE"),
+        ("reassessment_triggers", ["TBD"], "REASSESSMENT_TRIGGERS_NOT_IDENTIFIABLE"),
+    ],
+)
+def test_thesis_intact_downgrades_when_break_or_monitoring_triggers_are_unidentifiable(field, value, expected_issue):
+    payload = _payload()
+    payload["assessment"]["thesis"][field] = value
+
+    analysis, report = _analyse(payload, f"TEST-THESIS-TRIGGERS-{field}")
+
+    thesis = analysis["assessment"]["thesis"]
+    assert thesis["status"] == "UNKNOWN"
+    assert thesis["status_input"] == "INTACT"
+    assert expected_issue in thesis["status_issues"]
+    assert "THESIS_" + expected_issue in analysis["decision"]["gating_issues"]
+    assert "Thesis 状态：UNKNOWN" in report
+
+
+def test_thesis_intact_is_preserved_with_identifiable_break_and_reassessment_triggers():
+    analysis, _report = _analyse(_payload(), "TEST-THESIS-TRIGGERS-IDENTIFIABLE")
+
+    thesis = analysis["assessment"]["thesis"]
+    assert thesis["status"] == "INTACT"
+    assert thesis["status_issues"] == []
+
+
+@pytest.mark.parametrize(
     ("field", "placeholder", "expected_issue"),
     [
         ("driver", "TBD", "DRIVER_NAME_NOT_IDENTIFIABLE"),
