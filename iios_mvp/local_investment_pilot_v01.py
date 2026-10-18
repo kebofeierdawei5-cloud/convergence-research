@@ -1181,6 +1181,15 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             "status": "PASS" if not driver_issues else "UNKNOWN",
             "status_issues": driver_issues,
         })
+    rank_counts: dict[int, int] = {}
+    for driver in assessment["value_drivers"]:
+        rank_counts[driver["rank"]] = rank_counts.get(driver["rank"], 0) + 1
+    for driver in assessment["value_drivers"]:
+        if rank_counts[driver["rank"]] > 1:
+            driver["status"] = "UNKNOWN"
+            driver_issues = list(driver.get("status_issues") or [])
+            driver_issues.append("DUPLICATE_RANK_NOT_IDENTIFIABLE")
+            driver["status_issues"] = list(dict.fromkeys(driver_issues))
     assessment["thesis"]["core_statement"] = str(assessment["thesis"].get("core_statement") or "")
     assessment["thesis"]["drivers"] = assessment["thesis"].get("drivers") if isinstance(assessment["thesis"].get("drivers"), list) else []
 
@@ -2126,6 +2135,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "RATIONALE_NOT_IDENTIFIABLE": "驱动机制/理由为空或仅为占位文本。",
         "DRIVER_EVIDENCE_LINK_NOT_RESOLVED": "该价值驱动因素没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容。",
         "RANK_NOT_IDENTIFIABLE": "排名字段不是有效的正整数；为避免中断报告，按输入顺序临时展示，但该驱动因素不通过内容门禁。",
+        "DUPLICATE_RANK_NOT_IDENTIFIABLE": "多个价值驱动因素使用相同排名，排序不唯一；相关条目均降为 UNKNOWN。",
     }
     if drivers:
         for display_rank, item in enumerate(drivers, start=1):
