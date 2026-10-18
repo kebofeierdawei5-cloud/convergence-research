@@ -2386,6 +2386,35 @@ def test_b5_negative_counterfactual_does_not_block_confirmed_project_inclusive_b
     assert "回报计算尚未完成" not in report
 
 
+def test_b5_unapplied_counterfactual_ordering_does_not_block_included_baseline():
+    payload = _b5_ready_payload()
+    payload["operator_valuation_context"]["baseline_includes_project"] = True
+    # The baseline itself remains Bear < Base < Bull. A deliberately large
+    # hypothetical Base displaced-profit value makes the "add the project
+    # again" counterfactual reorder scenarios; it must not be used as a gate
+    # for the confirmed project-inclusive baseline.
+    payload["valuation_transmission"]["scenarios"]["base"]["displaced_existing_after_tax_profit_cny"] = _b5_measure(
+        "10000000", "CNY"
+    )
+
+    analysis, report = _analyse(payload, "TEST-B5-COUNTERFACTUAL-ORDERING-INCLUDED-BASELINE")
+    bridge = analysis["valuation_transmission"]
+
+    assert bridge["status"] == "CALCULATED_NOT_APPLIED_BASELINE_ALREADY_INCLUDES_PROJECT"
+    assert bridge["applied_to_per_share_scenarios"] is False
+    assert "COUNTERFACTUAL_ADJUSTED_SCENARIO_WEALTH_ORDERING_INCONSISTENT" in bridge["counterfactual_issues"]
+    assert bridge["scenarios"]["base"]["adjusted_terminal_value_per_share"] is None
+    assert analysis["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] == "120"
+    assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
+    assert analysis["forecast_valuation"]["scenarios"]["bull"]["terminal_value_per_share"] == "180"
+    assert analysis["forecast_valuation"]["entry_value_reference_per_share"] == "150"
+    assert analysis["return_metrics"] is not None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is not None
+    assert "非阻断性反事实诊断（未参与价格计算）" in report
+    assert "未用于回报、目标入场价或 B6 计算" in report
+    assert "回报计算尚未完成" not in report
+
+
 def test_b5_never_adds_project_twice_when_operator_says_baseline_includes_it():
     payload = _b5_ready_payload()
     payload["operator_valuation_context"]["baseline_includes_project"] = True
