@@ -54,7 +54,7 @@ B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 +
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 + #462 + #464 + #465 MERGED; operator Bear-loss cap/Required Return preserved, placeholder probability rationale blocks price outputs; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations and own resolved evidence links, value-driver subfields and structured-risk items fail closed on placeholders; latest #473 173 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations/evidence, value-driver fields, structured-risk items and thesis break/monitoring triggers fail closed on placeholders; latest #475 178 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -123,6 +123,13 @@ B8 bounded investment-result red-team                          PR #456 + #457 + 
 - The pilot now assigns each value-driver row `PASS` only when its name, impact direction, and rationale are identifiable; otherwise the row is `UNKNOWN` with field-level issue codes. JSON and Chinese report expose the row gate and issues.
 - A Risk section that claims `PASS` now downgrades to `UNKNOWN` when the structured risk list is empty or any item lacks an identifiable risk label/detail. Substantive items remain eligible; the downgrade and reason are emitted into the machine analysis and Chinese report.
 - Exact PR #473 head passed **173/173 local-pilot + Replay tests** and all **6/6 triggered workflows**. No valuation formula, scenario probability, required-return hurdle, Bear-loss cap, portfolio sizing rule, or execution authority changed.
+- **The real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** GitHub CI is not operator-environment acceptance.
+
+### B8 follow-up — Thesis break and monitoring trigger identifiability (2026-10-18)
+
+- PR [#475](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/475) merged at `8a47257b3944509a5fc578964c983909a3eccc38`. The local input path could previously keep Thesis `INTACT` even when `break_conditions` or `reassessment_triggers` were empty or contained only `UNKNOWN`/`TBD` placeholders; the guided-response checker’s non-empty checks did not protect direct input execution.
+- The pilot now downgrades `INTACT` to `UNKNOWN` if either list is empty or contains non-identifiable placeholder-only entries. The JSON retains the field-level issue codes, while the Chinese report states why thesis integrity/monitorability was not established. Explicit, identifiable lists preserve the prior status.
+- Exact PR #475 head passed **178/178 local-pilot + Replay tests** and all **6/6 triggered workflows**. No return, valuation, price-zone, risk-cap or execution logic changed.
 - **The real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** GitHub CI is not operator-environment acceptance.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
