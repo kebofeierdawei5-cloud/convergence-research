@@ -1092,6 +1092,19 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     )
     assessment["thesis"]["break_conditions"] = _items(assessment["thesis"].get("break_conditions"))
     assessment["thesis"]["reassessment_triggers"] = _items(assessment["thesis"].get("reassessment_triggers"))
+    thesis_quality_issues: list[str] = []
+    if assessment["thesis"]["status"] == "INTACT":
+        break_conditions = assessment["thesis"]["break_conditions"]
+        reassessment_triggers = assessment["thesis"]["reassessment_triggers"]
+        if not break_conditions or any(not _is_identifiable_evidence_text(item) for item in break_conditions):
+            thesis_quality_issues.append("BREAK_CONDITIONS_NOT_IDENTIFIABLE")
+        if not reassessment_triggers or any(not _is_identifiable_evidence_text(item) for item in reassessment_triggers):
+            thesis_quality_issues.append("REASSESSMENT_TRIGGERS_NOT_IDENTIFIABLE")
+        if thesis_quality_issues:
+            assessment["thesis"]["status"] = "UNKNOWN"
+            status_issues = list(assessment["thesis"].get("status_issues") or [])
+            status_issues.extend(thesis_quality_issues)
+            assessment["thesis"]["status_issues"] = list(dict.fromkeys(status_issues))
     assessment["risk"]["items"] = _records(assessment["risk"].get("items"))
     if assessment["risk"]["status"] == "PASS" and (
         not assessment["risk"]["items"]
@@ -2284,6 +2297,12 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         ),
         "RISK_ITEMS_NOT_IDENTIFIABLE": (
             "风险门禁原标为 PASS，但结构化风险清单为空，或至少一项风险只有 UNKNOWN/TBD 等占位文本；风险状态已降为 UNKNOWN。"
+        ),
+        "THESIS_BREAK_CONDITIONS_NOT_IDENTIFIABLE": (
+            "Thesis 原标为 INTACT，但失效条件列表为空或仅有 UNKNOWN/TBD 等占位文本；论点完整性降为 UNKNOWN。"
+        ),
+        "THESIS_REASSESSMENT_TRIGGERS_NOT_IDENTIFIABLE": (
+            "Thesis 原标为 INTACT，但重新评估触发器为空或仅有 UNKNOWN/TBD 等占位文本；监控条件未能被识别。"
         ),
         "CORE_POLICY_VALUE_DRIVER_GATE_NOT_PASS": (
             "价值驱动因素名称、影响方向或驱动理由存在未知/占位内容；价值驱动门禁不能视为通过。"
