@@ -3279,4 +3279,4 @@ def test_required_return_below_15_percent_remains_independent_from_fundamental_h
     assert metrics["target_entry_price"] == metrics["target_entry_price_for_return"]
     assert "Required Return：0.10；结果：True" in report
     assert "15% 年化门槛：False" in report
-\n
+
