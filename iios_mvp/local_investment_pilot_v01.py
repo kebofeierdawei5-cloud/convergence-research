@@ -1388,10 +1388,11 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         # A present but malformed policy value is not the same as an omitted
         # legacy field/default. Do not silently loosen the user's hurdle.
         raise LocalInvestmentPilotError("REQUIRED_RETURN_POLICY_INVALID") from exc
-    required_return = max(
-        FUNDAMENTAL_TARGET_ANNUALIZED_RETURN,
-        requested_required_return,
-    )
+    # Keep the operator's Required Return distinct from the fixed 15%
+    # fundamental annualized-return hurdle. The return solver applies both
+    # independent caps; raising a lower opportunity-cost benchmark to 15% here
+    # would misstate the benchmark and its pass/fail result.
+    required_return = requested_required_return
     try:
         max_loss = _number(parameters_raw.get("max_loss_pct", "25"), "MAX_LOSS_PCT")
     except LocalInvestmentPilotError as exc:
