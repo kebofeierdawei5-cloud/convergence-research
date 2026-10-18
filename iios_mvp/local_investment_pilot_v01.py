@@ -319,8 +319,20 @@ def _is_identifiable_evidence_text(value: Any) -> bool:
     chinese_placeholders = {
         "未知", "不详", "不明确", "未提供", "未提供标题", "未提供事实摘要",
         "未提供依据", "无依据", "暂无依据", "概率未知", "来源未知", "缺失", "待补充", "待核实",
+        "未命名价值驱动因素",
     }
     return normalized not in placeholders and raw not in chinese_placeholders
+
+
+def _risk_item_is_identifiable(item: Any) -> bool:
+    """Require structured risk entries to name a risk and describe it beyond placeholder text."""
+    if not isinstance(item, Mapping):
+        return _is_identifiable_evidence_text(item)
+    identity_fields = ("name", "title", "driver", "description", "summary")
+    detail_fields = ("summary", "description", "rationale", "monitoring_trigger")
+    has_identity = any(_is_identifiable_evidence_text(item.get(key)) for key in identity_fields)
+    has_detail = any(_is_identifiable_evidence_text(item.get(key)) for key in detail_fields)
+    return has_identity and has_detail
 
 
 def _records(value: Any) -> list[Any]:
@@ -1081,20 +1093,42 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     assessment["thesis"]["break_conditions"] = _items(assessment["thesis"].get("break_conditions"))
     assessment["thesis"]["reassessment_triggers"] = _items(assessment["thesis"].get("reassessment_triggers"))
     assessment["risk"]["items"] = _records(assessment["risk"].get("items"))
+    if assessment["risk"]["status"] == "PASS" and (
+        not assessment["risk"]["items"]
+        or any(not _risk_item_is_identifiable(item) for item in assessment["risk"]["items"])
+    ):
+        assessment["risk"]["status"] = "UNKNOWN"
+        risk_status_issues = list(assessment["risk"].get("status_issues") or [])
+        risk_status_issues.append("ITEMS_NOT_IDENTIFIABLE")
+        assessment["risk"]["status_issues"] = list(dict.fromkeys(risk_status_issues))
+
     value_drivers = raw_assessment.get("value_drivers") or []
-    assessment["value_drivers"] = [
-        {
+    assessment["value_drivers"] = []
+    for index, item in enumerate(value_drivers, start=1):
+        if not isinstance(item, Mapping):
+            continue
+        driver = str(item.get("driver") or item.get("name") or item.get("title") or "未命名价值驱动因素")
+        # Status such as OBSERVED_AND_FORECAST is not an impact direction.
+        # Keep it for display/audit, but do not infer POSITIVE or a passing gate.
+        impact = _status(item.get("impact"), {"POSITIVE", "NEGATIVE", "MIXED", "UNKNOWN"})
+        rationale = str(item.get("rationale") or item.get("summary") or item.get("mechanism") or "")
+        driver_issues: list[str] = []
+        if not _is_identifiable_evidence_text(driver):
+            driver_issues.append("DRIVER_NAME_NOT_IDENTIFIABLE")
+        if impact == "UNKNOWN":
+            driver_issues.append("IMPACT_NOT_IDENTIFIABLE")
+        if not _is_identifiable_evidence_text(rationale):
+            driver_issues.append("RATIONALE_NOT_IDENTIFIABLE")
+        assessment["value_drivers"].append({
             "rank": int(item.get("rank", index)),
-            "driver": str(item.get("driver") or item.get("name") or item.get("title") or "未命名价值驱动因素"),
-            # Status such as OBSERVED_AND_FORECAST is not an impact direction.
-            # Keep it for display/audit, but do not infer POSITIVE or a passing gate.
+            "driver": driver,
             "source_status": str(item.get("status") or "UNKNOWN"),
-            "impact": _status(item.get("impact"), {"POSITIVE", "NEGATIVE", "MIXED", "UNKNOWN"}),
-            "rationale": str(item.get("rationale") or item.get("summary") or item.get("mechanism") or ""),
+            "impact": impact,
+            "rationale": rationale,
             "evidence_refs": _items(item.get("evidence_refs")),
-        }
-        for index, item in enumerate(value_drivers, start=1) if isinstance(item, Mapping)
-    ]
+            "status": "PASS" if not driver_issues else "UNKNOWN",
+            "status_issues": driver_issues,
+        })
     assessment["thesis"]["core_statement"] = str(assessment["thesis"].get("core_statement") or "")
     assessment["thesis"]["drivers"] = assessment["thesis"].get("drivers") if isinstance(assessment["thesis"].get("drivers"), list) else []
 
@@ -1787,8 +1821,7 @@ def _decision(
     )
     value_driver_status = (
         "PASS" if a["value_drivers"] and all(
-            row["impact"] != "UNKNOWN" and str(row.get("rationale") or "").strip()
-            for row in a["value_drivers"]
+            row.get("status") == "PASS" for row in a["value_drivers"]
         ) else "UNKNOWN"
     )
     valuation_status = (
@@ -1996,12 +2029,22 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     lines.extend(_format_text_block(a["thesis"].get("core_statement")))
     lines.extend(["", "### 价值驱动因素", ""])
     drivers = sorted(a["value_drivers"], key=lambda x: (x["rank"], x["driver"]))
+    driver_issue_explanations = {
+        "DRIVER_NAME_NOT_IDENTIFIABLE": "驱动因素名称为空或仅为占位文本。",
+        "IMPACT_NOT_IDENTIFIABLE": "影响方向未知，不能作为已确认的价值驱动因素。",
+        "RATIONALE_NOT_IDENTIFIABLE": "驱动机制/理由为空或仅为占位文本。",
+    }
     if drivers:
         for display_rank, item in enumerate(drivers, start=1):
             lines.extend([
-                f"**价值驱动因素 {display_rank}：{item['driver']}**（影响：{item['impact']}）",
+                f"**价值驱动因素 {display_rank}：{item['driver']}**（影响：{item['impact']}；内容门禁：{item.get('status', 'UNKNOWN')}）",
                 f"   {item['rationale'] or '未提供理由。'}",
             ])
+            if item.get("status_issues"):
+                lines.append("   内容门禁问题：" + "；".join(
+                    f"{issue}（{driver_issue_explanations.get(issue, issue)}）"
+                    for issue in item["status_issues"]
+                ))
             if item.get("evidence_refs"):
                 lines.append("   证据引用：" + "、".join(item["evidence_refs"]))
             lines.append("")
@@ -2238,6 +2281,12 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         ),
         "THESIS_BREAK_STRESS_NOT_MORE_SEVERE_THAN_BEAR": (
             "独立压力情景的期末总财富并不低于 Bear 情景，不能作为更严重的独立下行情景。"
+        ),
+        "RISK_ITEMS_NOT_IDENTIFIABLE": (
+            "风险门禁原标为 PASS，但结构化风险清单为空，或至少一项风险只有 UNKNOWN/TBD 等占位文本；风险状态已降为 UNKNOWN。"
+        ),
+        "CORE_POLICY_VALUE_DRIVER_GATE_NOT_PASS": (
+            "价值驱动因素名称、影响方向或驱动理由存在未知/占位内容；价值驱动门禁不能视为通过。"
         ),
         "REFERENCED_EVIDENCE_TIMING_UNCERTAIN": (
             "被引用来源缺少可靠的截止前已知时点；日期精度不足或时间字段缺失/无效，不能用它支持 BUY/ADD。"
