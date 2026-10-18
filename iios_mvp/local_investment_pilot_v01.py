@@ -329,10 +329,14 @@ def _risk_item_is_identifiable(item: Any) -> bool:
     if not isinstance(item, Mapping):
         return _is_identifiable_evidence_text(item)
     identity_fields = ("name", "title", "driver", "description", "summary")
-    detail_fields = ("summary", "description", "rationale")
+    detail_fields = (
+        "summary", "description", "rationale", "operating_impact", "valuation_mechanism"
+    )
     has_identity = any(_is_identifiable_evidence_text(item.get(key)) for key in identity_fields)
     has_detail = any(_is_identifiable_evidence_text(item.get(key)) for key in detail_fields)
-    has_monitoring_trigger = _is_identifiable_evidence_text(item.get("monitoring_trigger"))
+    has_monitoring_trigger = _is_identifiable_evidence_text(
+        item.get("monitoring_trigger") or item.get("trigger")
+    )
     return has_identity and has_detail and has_monitoring_trigger
 
 
@@ -374,6 +378,7 @@ def _humanize_item(value: Any) -> str:
     for key, label in (
         ("summary", "摘要"), ("basis", "依据"), ("rationale", "理由"),
         ("description", "说明"), ("monitoring_trigger", "监控触发条件"),
+        ("operating_impact", "经营影响"), ("valuation_mechanism", "估值传导机制"),
     ):
         if item.get(key) not in (None, "") and not (key == "description" and name == str(item.get(key))):
             parts.append(f"{label}：{' '.join(str(item[key]).splitlines()).strip()}")
@@ -1137,6 +1142,13 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     for index, item in enumerate(normalized_risk_items):
         if not isinstance(item, Mapping):
             continue
+        # Earlier guided research used "trigger" for the same per-risk monitoring
+        # condition. Preserve compatibility while standardizing the analysis schema.
+        if item.get("monitoring_trigger") in (None, "") and item.get("trigger") not in (None, ""):
+            item = dict(item)
+            item["monitoring_trigger"] = item["trigger"]
+            item["monitoring_trigger_source_field"] = "trigger"
+            normalized_risk_items[index] = item
         if not _is_identifiable_evidence_text(item.get("monitoring_trigger")):
             risk_items_missing_monitoring_trigger = True
             risk_item = dict(item)
