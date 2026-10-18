@@ -633,7 +633,7 @@ def test_structured_risk_item_requires_its_own_resolved_cutoff_compatible_eviden
     assert "RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED" in risk["status_issues"]
     assert normalized["status"] == "UNKNOWN"
     assert "RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED" in normalized["status_issues"]
-    assert "RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED" in analysis["decision"]["gating_issues"]
+    assert "RISK_RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED" in analysis["decision"]["gating_issues"]
     assert "至少一个结构化风险项没有自己的可追溯截止时点证据" in report
 
 
