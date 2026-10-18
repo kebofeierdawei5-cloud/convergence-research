@@ -1157,6 +1157,16 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         risk_status_issues.append("ITEMS_NOT_IDENTIFIABLE")
     if risk_items_missing_monitoring_trigger:
         risk_status_issues.append("RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE")
+    legacy_plain_text_risk_items = [
+        item for item in assessment["risk"]["items"]
+        if not isinstance(item, Mapping)
+    ]
+    if legacy_plain_text_risk_items:
+        # Keep legacy text display/read compatibility, but it cannot prove that each
+        # risk has a trackable trigger and its own evidence link.
+        if assessment["risk"]["status"] == "PASS":
+            assessment["risk"]["status"] = "UNKNOWN"
+        risk_status_issues.append("RISK_ITEMS_REQUIRE_STRUCTURED_MONITORING")
 
     risk_ids: dict[str, list[int]] = {}
     for index, item in enumerate(assessment["risk"]["items"]):
@@ -2516,6 +2526,9 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         ),
         "RISK_RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE": (
             "至少一个结构化风险项缺少明确且非占位的监控触发条件；整体风险状态已降为 UNKNOWN。"
+        ),
+        "RISK_RISK_ITEMS_REQUIRE_STRUCTURED_MONITORING": (
+            "当前风险清单仍有纯文本条目；文本可保留显示，但不能证明每项风险都具备独立证据与可执行监控触发器，因此整体风险状态不能视为 PASS。"
         ),
         "RISK_DUPLICATE_RISK_ID_NOT_IDENTIFIABLE": (
             "多个结构化风险项使用相同 risk_id；对应条目均降为 UNKNOWN，以免后续监控/复核无法唯一定位。"
