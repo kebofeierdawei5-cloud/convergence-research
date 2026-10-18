@@ -1044,6 +1044,60 @@ def test_explicit_note_price_conflict_forces_review_required(tmp_path):
     assert "带标签的备注股价一致性：**CONFLICT**" in report
 
 
+@pytest.mark.parametrize("scenario_name", ["bear", "base", "bull"])
+def test_missing_scenario_cash_distributions_do_not_silently_default_to_zero(scenario_name):
+    payload = _payload()
+    payload["forecast_valuation"]["scenarios"][scenario_name].pop("cash_distributions_per_share")
+
+    analysis, report = _analyse(payload, f"TEST-MISSING-SCENARIO-DISTRIBUTIONS-{scenario_name}")
+
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == f"{scenario_name.upper()}_SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED"
+    assert analysis["price_zone_sensitivity"]["status"] == "UNKNOWN"
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert "SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED" in analysis["decision"]["gating_issues"]
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert f"### {scenario_name.title()} 情景" in report
+    assert "- 每股现金分配：UNKNOWN CNY" in report
+    assert "不能将缺失字段默认为零" in report
+
+
+def test_explicit_zero_scenario_cash_distributions_remain_calculable():
+    payload = _payload()
+    for row in payload["forecast_valuation"]["scenarios"].values():
+        row["cash_distributions_per_share"] = "0"
+
+    analysis, _report = _analyse(payload, "TEST-EXPLICIT-ZERO-DISTRIBUTIONS")
+
+    assert analysis["return_metrics"] is not None
+    assert analysis["price_zone_sensitivity"]["status"] != "UNKNOWN"
+    assert "SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED" not in analysis["decision"]["gating_issues"]
+
+
+@pytest.mark.parametrize(
+    ("target", "field", "expected_issue"),
+    [
+        ("stress", "cash_distributions_per_share", "THESIS_BREAK_STRESS_CASH_DISTRIBUTIONS_UNRESOLVED"),
+        ("bear", "cash_distributions_per_share", "THESIS_BREAK_STRESS_BEAR_CASH_DISTRIBUTIONS_UNRESOLVED"),
+    ],
+)
+def test_missing_stress_or_bear_cash_distributions_blocks_stress_readiness(target, field, expected_issue):
+    payload = _payload()
+    if target == "stress":
+        payload["forecast_valuation"]["thesis_break_stress"].pop(field)
+    else:
+        payload["forecast_valuation"]["scenarios"]["bear"].pop(field)
+
+    analysis, report = _analyse(payload, f"TEST-MISSING-STRESS-DISTRIBUTIONS-{target}")
+
+    assert analysis["thesis_break_stress_review"]["status"] == "REVIEW_REQUIRED"
+    assert expected_issue in analysis["thesis_break_stress_review"]["issues"]
+    assert expected_issue in analysis["decision"]["gating_issues"]
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert analysis["portfolio_package"].get("conditional_proposed_position_pct") is None
+    assert "不能将缺失字段默认为零" in report
+
+
 def test_thesis_break_stress_is_not_probability_weighted_and_missing_stress_gates_action():
     payload = _payload()
     analysis, report = _analyse(payload, "TEST-STRESS")
