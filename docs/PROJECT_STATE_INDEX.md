@@ -54,7 +54,7 @@ B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 +
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 + #462 + #464 + #465 MERGED; operator Bear-loss cap/Required Return preserved, placeholder probability rationale blocks price outputs; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 + #477 + #479 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations/evidence, value-driver fields, structured-risk items, thesis break/monitoring triggers, primary-model rationale and scenario/stress cash-distribution inputs fail closed on placeholders or omissions; latest #479 189 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 + #477 + #479 + #481 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations/evidence, value-driver fields, structured-risk items, thesis break/monitoring triggers, primary-model rationale, and scenario/stress/B5 cash-distribution inputs fail closed on placeholders or omissions; latest #481 192 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -145,6 +145,13 @@ B8 bounded investment-result red-team                          PR #456 + #457 + 
 - Missing scenario distribution input now produces an explicit unresolved reason, preserves the displayed value as UNKNOWN, and blocks return metrics, target-entry price and B6. Missing distribution input in the independent stress or Bear comparison blocks stress readiness and conditional portfolio sizing. An explicitly supplied `"0"` remains a valid assumption.
 - Exact PR #479 head passed **189/189 local-pilot + Replay tests** and all **6/6 triggered workflows**. No formula or trading authority changed.
 - **The real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** GitHub CI is not private Mac acceptance.
+
+### B8 follow-up — B5 bridge cash-distribution completeness (2026-10-18)
+
+- PR [#481](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/481) merged at `93af9876be751ee2eb39b7a4c2a0ebaf6ec53664`. The primary return path had been corrected by PR #479, but B5's independent valuation-transmission module still treated a missing legacy `cash_distributions_per_share` as zero. That allowed a bridge to be treated as complete and potentially apply project value against a scenario whose total-wealth basis was underspecified.
+- B5 now treats an omitted distribution exactly like explicit null/empty: `CASH_DISTRIBUTIONS_UNKNOWN`. Because the bridge is atomic, any scenario omission blocks the full transmission and preserves all original scenario terminal values and the entry-value anchor. Explicit zero is still valid.
+- Exact PR #481 head passed **192/192 local-pilot + Replay tests** and all **6/6 triggered workflows**.
+- **Real macOS full-run + Replay ZIP acceptance remains OPEN / NOT VERIFIED.** GitHub CI does not substitute for the operator's actual Mac full-run and Replay.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
