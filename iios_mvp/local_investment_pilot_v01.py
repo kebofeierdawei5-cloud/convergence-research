@@ -387,7 +387,9 @@ def _humanize_item(value: Any) -> str:
         parts.append("证据引用：" + "、".join(str(ref) for ref in refs))
     if not parts:
         return "；".join(f"{key}={_humanize_item(val)}" for key, val in item.items())
-    return "。".join(parts)
+    # These are labeled fields, not separate paragraphs; join them with semicolons
+    # so sentence-final punctuation in source prose does not become doubled periods.
+    return "；".join(parts)
 
 
 def _source_ref_markdown(value: Any) -> str:
