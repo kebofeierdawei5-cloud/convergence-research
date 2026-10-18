@@ -325,14 +325,15 @@ def _is_identifiable_evidence_text(value: Any) -> bool:
 
 
 def _risk_item_is_identifiable(item: Any) -> bool:
-    """Require structured risk entries to name a risk and describe it beyond placeholder text."""
+    """Require structured risk entries to name the risk, describe it, and define its monitoring trigger."""
     if not isinstance(item, Mapping):
         return _is_identifiable_evidence_text(item)
     identity_fields = ("name", "title", "driver", "description", "summary")
-    detail_fields = ("summary", "description", "rationale", "monitoring_trigger")
+    detail_fields = ("summary", "description", "rationale")
     has_identity = any(_is_identifiable_evidence_text(item.get(key)) for key in identity_fields)
     has_detail = any(_is_identifiable_evidence_text(item.get(key)) for key in detail_fields)
-    return has_identity and has_detail
+    has_monitoring_trigger = _is_identifiable_evidence_text(item.get("monitoring_trigger"))
+    return has_identity and has_detail and has_monitoring_trigger
 
 
 def _records(value: Any) -> list[Any]:
@@ -1131,13 +1132,32 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             status_issues.extend(thesis_quality_issues)
             assessment["thesis"]["status_issues"] = list(dict.fromkeys(status_issues))
     assessment["risk"]["items"] = _records(assessment["risk"].get("items"))
+    risk_items_missing_monitoring_trigger = False
+    normalized_risk_items = list(assessment["risk"]["items"])
+    for index, item in enumerate(normalized_risk_items):
+        if not isinstance(item, Mapping):
+            continue
+        if not _is_identifiable_evidence_text(item.get("monitoring_trigger")):
+            risk_items_missing_monitoring_trigger = True
+            risk_item = dict(item)
+            risk_item["status"] = "UNKNOWN"
+            risk_item_issues = list(risk_item.get("status_issues") or [])
+            risk_item_issues.append("RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE")
+            risk_item["status_issues"] = list(dict.fromkeys(risk_item_issues))
+            normalized_risk_items[index] = risk_item
+    assessment["risk"]["items"] = normalized_risk_items
+    invalid_risk_items = [
+        item for item in assessment["risk"]["items"]
+        if not _risk_item_is_identifiable(item)
+    ]
     if assessment["risk"]["status"] == "PASS" and (
-        not assessment["risk"]["items"]
-        or any(not _risk_item_is_identifiable(item) for item in assessment["risk"]["items"])
+        not assessment["risk"]["items"] or invalid_risk_items
     ):
         assessment["risk"]["status"] = "UNKNOWN"
         risk_status_issues = list(assessment["risk"].get("status_issues") or [])
         risk_status_issues.append("ITEMS_NOT_IDENTIFIABLE")
+        if risk_items_missing_monitoring_trigger:
+            risk_status_issues.append("RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE")
         assessment["risk"]["status_issues"] = list(dict.fromkeys(risk_status_issues))
 
     value_drivers = raw_assessment.get("value_drivers") or []
@@ -2342,6 +2362,13 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     if risk_items:
         for item in risk_items:
             lines.append("- " + _humanize_item(item))
+            if isinstance(item, Mapping) and item.get("status_issues"):
+                lines.append(
+                    "  风险项门禁："
+                    + str(item.get("status") or "UNKNOWN")
+                    + "；"
+                    + "；".join(item["status_issues"])
+                )
     else:
         lines.append("- 具体风险清单未提供。")
     lines.extend([
@@ -2460,6 +2487,9 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         ),
         "RISK_RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED": (
             "至少一个结构化风险项没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容；整体风险状态不能视为 PASS。"
+        ),
+        "RISK_RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE": (
+            "至少一个结构化风险项缺少明确且非占位的监控触发条件；整体风险状态已降为 UNKNOWN。"
         ),
         "THESIS_BREAK_CONDITIONS_NOT_IDENTIFIABLE": (
             "Thesis 原标为 INTACT，但失效条件列表为空或仅有 UNKNOWN/TBD 等占位文本；论点完整性降为 UNKNOWN。"
