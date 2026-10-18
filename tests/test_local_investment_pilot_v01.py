@@ -597,6 +597,44 @@ def test_risk_pass_is_preserved_with_identifiable_structured_risk_item():
 
     assert analysis["assessment"]["risk"]["status"] == "PASS"
     assert analysis["assessment"]["risk"]["status_issues"] == []
+    assert analysis["assessment"]["risk"]["items"][0]["evidence_refs"] == ["E1"]
+
+
+@pytest.mark.parametrize(
+    ("refs", "source_change"),
+    [
+        (None, None),
+        (["E-RISK-MISSING"], None),
+        (["E1"], "AFTER_CUTOFF"),
+        (["E1"], "KNOWN_AT_INVALID"),
+    ],
+)
+def test_structured_risk_item_requires_its_own_resolved_cutoff_compatible_evidence(refs, source_change):
+    payload = _payload()
+    item = {
+        "risk_id": "R-OWN-EVIDENCE",
+        "name": "应收账款回款恶化",
+        "description": "应收账款增速持续高于收入增速，回款周期拉长。",
+        "monitoring_trigger": "连续两个季度经营现金流低于净利润。",
+    }
+    if refs is not None:
+        item["evidence_refs"] = refs
+    payload["assessment"]["risk"]["items"] = [item]
+    if source_change == "AFTER_CUTOFF":
+        payload["evidence_register"][0]["known_at"] = "2026-10-11T10:00:00+08:00"
+    elif source_change == "KNOWN_AT_INVALID":
+        payload["evidence_register"][0]["known_at"] = "not-a-date"
+
+    analysis, report = _analyse(payload, "TEST-RISK-ITEM-OWN-EVIDENCE")
+
+    risk = analysis["assessment"]["risk"]
+    normalized = risk["items"][0]
+    assert risk["status"] == "UNKNOWN"
+    assert "RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED" in risk["status_issues"]
+    assert normalized["status"] == "UNKNOWN"
+    assert "RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED" in normalized["status_issues"]
+    assert "RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED" in analysis["decision"]["gating_issues"]
+    assert "至少一个结构化风险项没有自己的可追溯截止时点证据" in report
 
 
 def test_ai_response_must_preserve_operator_owned_case_and_price_input(tmp_path):
