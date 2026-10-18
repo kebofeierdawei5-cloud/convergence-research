@@ -93,6 +93,7 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
                 "max_loss_pct": "25",
                 "items": [{
                     "risk_id": "R-SYNTHETIC",
+                    "severity": "HIGH",
                     "name": "synthetic downside",
                     "description": "synthetic risk item for tests",
                     "monitoring_trigger": "synthetic metric misses threshold for two periods",
