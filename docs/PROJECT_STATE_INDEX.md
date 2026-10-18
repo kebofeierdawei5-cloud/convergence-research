@@ -54,7 +54,7 @@ B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 +
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 + #462 + #464 + #465 MERGED; operator Bear-loss cap/Required Return preserved, placeholder probability rationale blocks price outputs; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 + #477 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations/evidence, value-driver fields, structured-risk items, thesis break/monitoring triggers and primary-model rationale fail closed on placeholders; latest #477 183 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 + #477 + #479 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations/evidence, value-driver fields, structured-risk items, thesis break/monitoring triggers, primary-model rationale and scenario/stress cash-distribution inputs fail closed on placeholders or omissions; latest #479 189 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -138,6 +138,13 @@ B8 bounded investment-result red-team                          PR #456 + #457 + 
 - The model consistency result now additionally requires an identifiable `model_rationale`. Placeholder-only rationale exposes `FORECAST_VALUATION_MODEL_RATIONALE_NOT_IDENTIFIABLE`, sets model eligibility false, and leaves return metrics, target entry price, and B6 sensitivity unresolved. Human report and machine JSON expose the reason. Model-name/family matching and valid-rationale path preserve existing calculations.
 - Exact PR #477 head passed **183/183 local-pilot + Replay tests** and all **6/6 triggered workflows**. No model formula, scenario values, 15% return floor, operator Required Return, Bear-loss cap, or execution authority changed.
 - **The real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** GitHub CI does not substitute for the deferred private bundle audit.
+
+### B8 follow-up — missing cash-distribution assumptions (2026-10-18)
+
+- PR [#479](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/479) merged at `aa3a7dd292e4cc557387ff66eeb2d0e75698f3eb`. The direct input path previously used `get(..., "0")` for omitted `cash_distributions_per_share`, so a missing Bear/Base/Bull field could be treated as zero in expected return and B6; omitted stress and Bear distribution values were similarly treated as zero in the independent thesis-break wealth comparison. The report also displayed omitted scenario distributions as zero.
+- Missing scenario distribution input now produces an explicit unresolved reason, preserves the displayed value as UNKNOWN, and blocks return metrics, target-entry price and B6. Missing distribution input in the independent stress or Bear comparison blocks stress readiness and conditional portfolio sizing. An explicitly supplied `"0"` remains a valid assumption.
+- Exact PR #479 head passed **189/189 local-pilot + Replay tests** and all **6/6 triggered workflows**. No formula or trading authority changed.
+- **The real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** GitHub CI is not private Mac acceptance.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
