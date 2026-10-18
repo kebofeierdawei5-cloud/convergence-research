@@ -500,6 +500,32 @@ def test_invalid_value_driver_rank_downgrades_row_without_crashing(invalid_rank)
     assert "按输入顺序临时展示" in report
 
 
+def test_duplicate_value_driver_ranks_downgrade_all_conflicting_rows():
+    payload = _payload()
+    first = payload["assessment"]["value_drivers"][0]
+    second = dict(first)
+    second.update({
+        "rank": first.get("rank", 1),
+        "driver": "成本改善",
+        "rationale": "单位成本下降扩大利润率，但需对照原料价格与产能利用率验证。",
+        "evidence_refs": ["E1"],
+    })
+    payload["assessment"]["value_drivers"].append(second)
+
+    analysis, report = _analyse(payload, "TEST-VALUE-DRIVER-DUPLICATE-RANK")
+
+    drivers = analysis["assessment"]["value_drivers"]
+    assert len(drivers) == 2
+    assert [driver["rank"] for driver in drivers] == [1, 1]
+    assert all(driver["status"] == "UNKNOWN" for driver in drivers)
+    assert all(
+        "DUPLICATE_RANK_NOT_IDENTIFIABLE" in driver["status_issues"]
+        for driver in drivers
+    )
+    assert "VALUE_DRIVER_DUPLICATE_RANK_NOT_IDENTIFIABLE" in analysis["decision"]["gating_issues"]
+    assert report.count("排序不唯一") == 2
+
+
 @pytest.mark.parametrize(
     "evidence_refs",
     [
