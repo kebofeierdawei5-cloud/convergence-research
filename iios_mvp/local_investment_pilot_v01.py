@@ -329,10 +329,14 @@ def _risk_item_is_identifiable(item: Any) -> bool:
     if not isinstance(item, Mapping):
         return _is_identifiable_evidence_text(item)
     identity_fields = ("name", "title", "driver", "description", "summary")
-    detail_fields = ("summary", "description", "rationale")
+    detail_fields = (
+        "summary", "description", "rationale", "operating_impact", "valuation_mechanism"
+    )
     has_identity = any(_is_identifiable_evidence_text(item.get(key)) for key in identity_fields)
     has_detail = any(_is_identifiable_evidence_text(item.get(key)) for key in detail_fields)
-    has_monitoring_trigger = _is_identifiable_evidence_text(item.get("monitoring_trigger"))
+    has_monitoring_trigger = _is_identifiable_evidence_text(
+        item.get("monitoring_trigger") or item.get("trigger")
+    )
     return has_identity and has_detail and has_monitoring_trigger
 
 
@@ -374,6 +378,7 @@ def _humanize_item(value: Any) -> str:
     for key, label in (
         ("summary", "摘要"), ("basis", "依据"), ("rationale", "理由"),
         ("description", "说明"), ("monitoring_trigger", "监控触发条件"),
+        ("operating_impact", "经营影响"), ("valuation_mechanism", "估值传导机制"),
     ):
         if item.get(key) not in (None, "") and not (key == "description" and name == str(item.get(key))):
             parts.append(f"{label}：{' '.join(str(item[key]).splitlines()).strip()}")
@@ -382,7 +387,9 @@ def _humanize_item(value: Any) -> str:
         parts.append("证据引用：" + "、".join(str(ref) for ref in refs))
     if not parts:
         return "；".join(f"{key}={_humanize_item(val)}" for key, val in item.items())
-    return "。".join(parts)
+    # These are labeled fields, not separate paragraphs; join them with semicolons
+    # so sentence-final punctuation in source prose does not become doubled periods.
+    return "；".join(parts)
 
 
 def _source_ref_markdown(value: Any) -> str:
@@ -1137,6 +1144,13 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     for index, item in enumerate(normalized_risk_items):
         if not isinstance(item, Mapping):
             continue
+        # Earlier guided research used "trigger" for the same per-risk monitoring
+        # condition. Preserve compatibility while standardizing the analysis schema.
+        if item.get("monitoring_trigger") in (None, "") and item.get("trigger") not in (None, ""):
+            item = dict(item)
+            item["monitoring_trigger"] = item["trigger"]
+            item["monitoring_trigger_source_field"] = "trigger"
+            normalized_risk_items[index] = item
         if not _is_identifiable_evidence_text(item.get("monitoring_trigger")):
             risk_items_missing_monitoring_trigger = True
             risk_item = dict(item)
@@ -1144,6 +1158,10 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             risk_item_issues = list(risk_item.get("status_issues") or [])
             risk_item_issues.append("RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE")
             risk_item["status_issues"] = list(dict.fromkeys(risk_item_issues))
+            normalized_risk_items[index] = risk_item
+        else:
+            risk_item = dict(item)
+            risk_item.setdefault("status", "PASS")
             normalized_risk_items[index] = risk_item
     assessment["risk"]["items"] = normalized_risk_items
     invalid_risk_items = [
@@ -2388,13 +2406,11 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     if risk_items:
         for item in risk_items:
             lines.append("- " + _humanize_item(item))
-            if isinstance(item, Mapping) and item.get("status_issues"):
-                lines.append(
-                    "  风险项门禁："
-                    + str(item.get("status") or "UNKNOWN")
-                    + "；"
-                    + "；".join(item["status_issues"])
-                )
+            if isinstance(item, Mapping) and item.get("status") is not None:
+                gate_line = "  风险项门禁：" + str(item.get("status") or "UNKNOWN")
+                if item.get("status_issues"):
+                    gate_line += "；" + "；".join(item["status_issues"])
+                lines.append(gate_line)
     else:
         lines.append("- 具体风险清单未提供。")
     lines.extend([
