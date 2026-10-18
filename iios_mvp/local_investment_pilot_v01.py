@@ -1927,7 +1927,15 @@ def _decision(
         if a[name]["status"] != valid:
             issues.append(f"{name.upper()}_{a[name]['status']}")
         for status_issue in a[name].get("status_issues") or []:
-            issues.append(f"{name.upper()}_{status_issue}")
+            # Risk-item issue codes already carry the RISK_ITEM namespace. Avoid
+            # turning them into confusing RISK_RISK_ITEM decision codes.
+            issue = (
+                status_issue
+                if name == "risk" and status_issue.startswith("RISK_ITEM_")
+                else f"{name.upper()}_{status_issue}"
+            )
+            if issue not in issues:
+                issues.append(issue)
     if a["expectation_gap"]["direction"] != "POSITIVE":
         issues.append(f"EXPECTATION_GAP_DIRECTION_{a['expectation_gap']['direction']}")
     if not prepared["evidence_register"]:
@@ -2527,10 +2535,10 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "RISK_ITEMS_NOT_IDENTIFIABLE": (
             "风险门禁原标为 PASS，但结构化风险清单为空，或至少一项风险只有 UNKNOWN/TBD 等占位文本；风险状态已降为 UNKNOWN。"
         ),
-        "RISK_RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED": (
+        "RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED": (
             "至少一个结构化风险项没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容；整体风险状态不能视为 PASS。"
         ),
-        "RISK_RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE": (
+        "RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE": (
             "至少一个结构化风险项缺少明确且非占位的监控触发条件；整体风险状态已降为 UNKNOWN。"
         ),
         "RISK_DUPLICATE_RISK_ID_NOT_IDENTIFIABLE": (
