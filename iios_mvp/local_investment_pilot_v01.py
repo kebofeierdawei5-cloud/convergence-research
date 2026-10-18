@@ -324,8 +324,20 @@ def _is_identifiable_evidence_text(value: Any) -> bool:
     return normalized not in placeholders and raw not in chinese_placeholders
 
 
+def _risk_item_severity_is_identifiable(value: Any) -> bool:
+    """Only explicit, recognized ordinal severity values qualify for a complete risk row."""
+    raw = str(value or "").strip()
+    normalized = re.sub(r"[^A-Z0-9]+", "_", raw.upper()).strip("_")
+    allowed = {
+        "CRITICAL", "VERY_HIGH", "HIGH", "MEDIUM_HIGH",
+        "MEDIUM", "MEDIUM_LOW", "LOW", "VERY_LOW",
+    }
+    chinese_aliases = {"极高", "高", "中高", "中", "中低", "低"}
+    return normalized in allowed or raw in chinese_aliases
+
+
 def _risk_item_is_identifiable(item: Any) -> bool:
-    """Require structured risk entries to name the risk, describe it, and define its monitoring trigger."""
+    """Require a stable ID, recognized severity, descriptive detail and monitoring trigger."""
     if not isinstance(item, Mapping):
         return _is_identifiable_evidence_text(item)
     identity_fields = ("name", "title", "driver", "description", "summary")
@@ -337,7 +349,9 @@ def _risk_item_is_identifiable(item: Any) -> bool:
     has_monitoring_trigger = _is_identifiable_evidence_text(
         item.get("monitoring_trigger") or item.get("trigger")
     )
-    return has_identity and has_detail and has_monitoring_trigger
+    has_risk_id = _is_identifiable_evidence_text(item.get("risk_id"))
+    has_severity = _risk_item_severity_is_identifiable(item.get("severity"))
+    return has_identity and has_detail and has_monitoring_trigger and has_risk_id and has_severity
 
 
 def _records(value: Any) -> list[Any]:
@@ -1163,6 +1177,23 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             risk_item = dict(item)
             risk_item.setdefault("status", "PASS")
             normalized_risk_items[index] = risk_item
+    risk_items_missing_id = False
+    risk_items_missing_severity = False
+    for index, item in enumerate(normalized_risk_items):
+        if not isinstance(item, Mapping):
+            continue
+        item_issues = list(item.get("status_issues") or [])
+        if not _is_identifiable_evidence_text(item.get("risk_id")):
+            risk_items_missing_id = True
+            item_issues.append("RISK_ITEM_ID_NOT_IDENTIFIABLE")
+        if not _risk_item_severity_is_identifiable(item.get("severity")):
+            risk_items_missing_severity = True
+            item_issues.append("RISK_ITEM_SEVERITY_NOT_IDENTIFIABLE")
+        if item_issues:
+            item = dict(item)
+            item["status"] = "UNKNOWN"
+            item["status_issues"] = list(dict.fromkeys(item_issues))
+            normalized_risk_items[index] = item
     assessment["risk"]["items"] = normalized_risk_items
     invalid_risk_items = [
         item for item in assessment["risk"]["items"]
@@ -1175,6 +1206,10 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         risk_status_issues.append("ITEMS_NOT_IDENTIFIABLE")
     if risk_items_missing_monitoring_trigger:
         risk_status_issues.append("RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE")
+    if risk_items_missing_id:
+        risk_status_issues.append("RISK_ITEM_ID_NOT_IDENTIFIABLE")
+    if risk_items_missing_severity:
+        risk_status_issues.append("RISK_ITEM_SEVERITY_NOT_IDENTIFIABLE")
     legacy_plain_text_risk_items = [
         item for item in assessment["risk"]["items"]
         if not isinstance(item, Mapping)
@@ -2575,6 +2610,12 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         ),
         "RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE": (
             "至少一个结构化风险项缺少明确且非占位的监控触发条件；整体风险状态已降为 UNKNOWN。"
+        ),
+        "RISK_ITEM_ID_NOT_IDENTIFIABLE": (
+            "至少一个结构化风险项缺少稳定、非占位的 risk_id；后续监控与复核无法可靠定位该风险。"
+        ),
+        "RISK_ITEM_SEVERITY_NOT_IDENTIFIABLE": (
+            "至少一个结构化风险项缺少受支持的严重程度分级；该风险排序与组合风险判断不能视为完整。"
         ),
         "RISK_DUPLICATE_RISK_ID_NOT_IDENTIFIABLE": (
             "多个结构化风险项使用相同 risk_id；对应条目均降为 UNKNOWN，以免后续监控/复核无法唯一定位。"
