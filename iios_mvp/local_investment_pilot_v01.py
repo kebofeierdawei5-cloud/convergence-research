@@ -763,10 +763,11 @@ def _build_valuation_model_consistency(
     operator_model_family: Any,
     forecast_model_family: Any,
     model_name: Any,
+    model_rationale: Any,
     operating_driver_forecast: Mapping[str, Any],
     valuation_transmission: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Keep the operator-owned primary model separate from the model that generated values."""
+    """Keep the primary model identity and its selection rationale independently identifiable."""
     selected = _normalize_model_family(operator_model_family)
     calculated = _normalize_model_family(forecast_model_family)
     name = str(model_name or "").strip() or "UNKNOWN"
@@ -794,6 +795,11 @@ def _build_valuation_model_consistency(
         issues.append("FORECAST_VALUATION_MODEL_NAME_CONFLICTS_WITH_DECLARED_CALCULATION_FAMILY")
     else:
         status = "MATCH"
+    model_rationale_identifiable = _is_identifiable_evidence_text(model_rationale)
+    if not model_rationale_identifiable:
+        issues.append("FORECAST_VALUATION_MODEL_RATIONALE_NOT_IDENTIFIABLE")
+        if status == "MATCH":
+            status = "MODEL_RATIONALE_NOT_IDENTIFIABLE"
     eligible = status == "MATCH"
     if (
         eligible
@@ -811,6 +817,7 @@ def _build_valuation_model_consistency(
         "operator_selected_model_family": selected,
         "calculation_model_family": calculated,
         "calculation_model_name": name,
+        "model_rationale_identifiable": model_rationale_identifiable,
         "model_name_inferred_family": inferred_from_name,
         "model_family_name_crosscheck": (
             "MATCH" if inferred_from_name == calculated and inferred_from_name != "UNKNOWN"
@@ -1298,6 +1305,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         operator_model_family=operator_valuation_context["selected_model_family"],
         forecast_model_family=forecast.get("model_family"),
         model_name=forecast.get("model"),
+        model_rationale=forecast.get("model_rationale"),
         operating_driver_forecast=operating_driver_forecast,
         valuation_transmission=valuation_transmission,
     )
