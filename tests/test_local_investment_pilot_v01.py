@@ -755,6 +755,31 @@ def test_risk_pass_is_preserved_with_identifiable_structured_risk_item():
     assert analysis["assessment"]["risk"]["items"][0]["evidence_refs"] == ["E1"]
 
 
+@pytest.mark.parametrize("item_status", ["UNKNOWN", "FAIL", "TBD"])
+def test_overall_risk_pass_is_blocked_by_nonpassing_structured_item_status(item_status):
+    payload = _payload()
+    payload["assessment"]["risk"]["items"] = [{
+        "risk_id": "R-STATUS",
+        "severity": "HIGH",
+        "name": "应收账款回款恶化",
+        "description": "应收账款增速持续高于收入增速，回款周期拉长。",
+        "monitoring_trigger": "连续两个季度经营现金流低于净利润。",
+        "evidence_refs": ["E1"],
+        "status": item_status,
+    }]
+
+    analysis, report = _analyse(payload, "TEST-RISK-CHILD-STATUS-CONSISTENCY")
+
+    risk = analysis["assessment"]["risk"]
+    item = risk["items"][0]
+    assert risk["status"] == "UNKNOWN"
+    assert "RISK_ITEM_STATUS_NOT_PASS" in risk["status_issues"]
+    assert item["status"] == item_status
+    assert "RISK_ITEM_STATUS_NOT_PASS" in item["status_issues"]
+    assert "RISK_ITEM_STATUS_NOT_PASS" in analysis["decision"]["gating_issues"]
+    assert "整体风险状态不能继续标为 PASS，已降为 UNKNOWN" in report
+
+
 def test_risk_item_legacy_trigger_alias_and_operating_fields_are_preserved_and_rendered():
     payload = _payload()
     payload["assessment"]["risk"]["items"] = [{
