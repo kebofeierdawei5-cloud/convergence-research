@@ -3231,3 +3231,52 @@ def test_b4_overcapacity_scenario_does_not_feed_b5_or_target_entry_price():
 
 
 
+
+
+def test_required_return_below_15_percent_remains_independent_from_fundamental_hurdle():
+    payload = _b5_ready_payload()
+    payload["operator_valuation_context"]["baseline_includes_project"] = True
+    payload["decision_parameters"]["required_return_annualized"] = "0.10"
+    payload["forecast_valuation"]["scenarios"] = {
+        "bear": {
+            "probability": "0.20",
+            "terminal_value_per_share": "90",
+            "cash_distributions_per_share": "0",
+            "rationale": "synthetic bear case with a 90 CNY terminal wealth",
+            "failure_trigger": "core driver underperforms",
+            "operating_impact": "earnings remain below base",
+            "valuation_mechanism": "lower normalized EPS",
+        },
+        "base": {
+            "probability": "0.50",
+            "terminal_value_per_share": "103",
+            "cash_distributions_per_share": "0",
+            "rationale": "synthetic base case with a 103 CNY terminal wealth",
+        },
+        "bull": {
+            "probability": "0.30",
+            "terminal_value_per_share": "110",
+            "cash_distributions_per_share": "0",
+            "rationale": "synthetic bull case with a 110 CNY terminal wealth",
+        },
+    }
+
+    analysis, report = _analyse(payload, "TEST-REQUIRED-RETURN-INDEPENDENT-OF-15-PCT")
+    metrics = analysis["return_metrics"]
+    params = analysis["decision_parameters"]
+
+    assert params["required_return_annualized"] == "0.10"
+    assert params["fundamental_target_annualized_return"] == "0.15"
+    assert Decimal("0.10") <= Decimal(metrics["expected_annualized_return"]) < Decimal("0.15")
+    assert metrics["required_return_pass"] is True
+    assert metrics["fundamental_target_pass"] is False
+    assert metrics["return_gate_pass"] is False
+    assert Decimal(metrics["target_entry_price_for_return"]) < Decimal(
+        metrics["target_entry_price_for_required_return"]
+    )
+    # Preserving the 10% benchmark does not relax the independent 15% hurdle:
+    # the 15% target-return cap remains the binding entry-price ceiling.
+    assert metrics["target_entry_price"] == metrics["target_entry_price_for_return"]
+    assert "Required Return：0.10；结果：True" in report
+    assert "15% 年化门槛：False" in report
+\n
