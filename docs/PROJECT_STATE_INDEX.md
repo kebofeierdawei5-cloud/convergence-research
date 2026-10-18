@@ -54,7 +54,7 @@ B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 +
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 + #462 + #464 + #465 MERGED; operator Bear-loss cap/Required Return preserved, placeholder probability rationale blocks price outputs; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 + #477 + #479 + #481 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations/evidence, value-driver fields, structured-risk items, thesis break/monitoring triggers, primary-model rationale, and scenario/stress/B5 cash-distribution inputs fail closed on placeholders or omissions; latest #481 192 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 + #477 + #479 + #481 + #483 + #484 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations/evidence, value-driver fields/rank/row-level evidence, structured-risk items, thesis break/monitoring triggers, primary-model rationale, and scenario/stress/B5 cash-distribution inputs fail closed on placeholders or omissions; latest #484 199 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -152,6 +152,18 @@ B8 bounded investment-result red-team                          PR #456 + #457 + 
 - B5 now treats an omitted distribution exactly like explicit null/empty: `CASH_DISTRIBUTIONS_UNKNOWN`. Because the bridge is atomic, any scenario omission blocks the full transmission and preserves all original scenario terminal values and the entry-value anchor. Explicit zero is still valid.
 - Exact PR #481 head passed **192/192 local-pilot + Replay tests** and all **6/6 triggered workflows**.
 - **Real macOS full-run + Replay ZIP acceptance remains OPEN / NOT VERIFIED.** GitHub CI does not substitute for the operator's actual Mac full-run and Replay.
+
+### B8 follow-up — row-level value-driver evidence linkage (2026-10-18)
+
+- PR [#483](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/483) merged at `ff7e63c9f444f277bf8c4b62c13c4adeabae6042`. Before this fix, a value-driver row could have a meaningful name, impact and rationale and still be marked `PASS` with no evidence of its own, even if the Thesis section had a general citation.
+- Each ranked value-driver row must now cite at least one uniquely resolved, cutoff-compatible source. Missing, unresolved, duplicate, untraceable, after-cutoff or timing-uncertain row references downgrade that row to `UNKNOWN`, expose `DRIVER_EVIDENCE_LINK_NOT_RESOLVED` in JSON and the Chinese report, and propagate to decision gating issues. Exact PR #483 head passed **194/194 local-pilot + Replay tests** and **6/6 triggered workflows**.
+- No formulas, required-return policy, risk cap or authority changed. **Real Mac full-run + Replay remains OPEN / NOT VERIFIED.**
+
+### B8 follow-up — malformed value-driver rank robustness (2026-10-18)
+
+- PR [#484](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/484) merged at `624c1c771fa6e17fcb9d7378118a889aee6d93ea`. The direct research JSON path previously converted the submitted `rank` with `int(...)` without validation, so `TBD`, null, zero, negative or fractional ranks could abort run/report generation.
+- Only positive integral ranks are accepted. An invalid rank is temporarily displayed by input order for stable diagnostics but marked `UNKNOWN` with `RANK_NOT_IDENTIFIABLE`; this fallback is not treated as an accepted ranking. JSON, the Chinese report and decision gating issues preserve the reason rather than crashing.
+- Exact PR #484 head passed **199/199 local-pilot + Replay tests** and **6/6 triggered workflows**. No valuation, expected-return or sizing formula changed. **Real Mac full-run + Replay remains OPEN / NOT VERIFIED.**
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
