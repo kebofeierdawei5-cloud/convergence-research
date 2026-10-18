@@ -54,7 +54,7 @@ B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 +
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 + #462 + #464 + #465 MERGED; operator Bear-loss cap/Required Return preserved, placeholder probability rationale blocks price outputs; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 + #477 + #479 + #481 + #483 + #484 + #486 + #488 + #490 + #492 + #494 + #497 + #498 + #499 + #501 + #502 + #504 + #506 MERGED; evidence/status, value-driver fields, risk-item ID/severity/evidence/trigger aliases and stress readiness fail closed and are rendered; legacy text risks remain visible but cannot make Risk PASS; latest #506 221 local-pilot+Replay tests + 6/6 workflows PASS; current-main Mac full-run + Replay acceptance OPEN / NOT VERIFIED
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 + #477 + #479 + #481 + #483 + #484 + #486 + #488 + #490 + #492 + #494 + #497 + #498 + #499 + #501 + #502 + #504 + #506 + #508 MERGED; evidence/status, value-driver fields, risk-item ID/severity/evidence/trigger aliases, child/section Risk status consistency and stress readiness fail closed and are rendered; legacy text risks remain visible but cannot make Risk PASS; latest #508 224 local-pilot+Replay tests + 6/6 workflows PASS; current-main Mac full-run + Replay acceptance OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -243,6 +243,13 @@ B8 bounded investment-result red-team                          PR #456 + #457 + 
 - Structured risk rows now require a non-placeholder stable ID and a recognized ordinal severity (CRITICAL, VERY_HIGH, HIGH, MEDIUM_HIGH, MEDIUM, MEDIUM_LOW, LOW, VERY_LOW, plus supported Chinese labels). Invalid fields mark the item UNKNOWN, downgrade an otherwise PASS Risk assessment, and expose `RISK_ITEM_ID_NOT_IDENTIFIABLE` or `RISK_ITEM_SEVERITY_NOT_IDENTIFIABLE` in machine JSON, report and decision gate.
 - Exact PR #506 head passed **221/221 local-pilot + Replay tests** and all **6/6 triggered workflows**. No return/valuation formulas, required-return floor, Bear-loss cap, or execution authority changed.
 - **Current-main macOS full-run + Replay remains OPEN / NOT VERIFIED.** The uploaded historical ZIP predates these changes and is not acceptance evidence for the current build.
+
+### B8 follow-up — risk child/section status consistency (2026-10-18)
+
+- PR [#508](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/508) merged at `0e2b3f8d3a3fa6ca9089ec7819e734c2f357315f`. A structured risk row with complete identifying fields and resolved evidence could carry an explicit `status=UNKNOWN`, `FAIL`, or an unsupported status while its containing Risk section remained `PASS`; the section gate checked identifiability and evidence but not the row's own status.
+- The normalizer now preserves the supplied row status for audit and downgrades a section-level Risk `PASS` to `UNKNOWN` whenever a structured row is not `PASS`. It emits `RISK_ITEM_STATUS_NOT_PASS` into row/section issues, decision gating issues, and the Chinese report. Regression coverage includes `UNKNOWN`, `FAIL`, and `TBD`.
+- Exact-head verification: the local-pilot + Replay workflow reported **224 passed**; all **6/6 triggered workflows** succeeded. No valuation formula, required-return hurdle, loss cap, position-sizing rule, or execution authority changed.
+- **Current-main macOS full-run + Replay acceptance remains OPEN / NOT VERIFIED.** Green GitHub CI does not substitute for the operator's current-main run and private output-bundle review.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
