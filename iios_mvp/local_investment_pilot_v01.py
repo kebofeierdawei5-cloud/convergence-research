@@ -1157,6 +1157,10 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             risk_item_issues.append("RISK_ITEM_MONITORING_TRIGGER_NOT_IDENTIFIABLE")
             risk_item["status_issues"] = list(dict.fromkeys(risk_item_issues))
             normalized_risk_items[index] = risk_item
+        else:
+            risk_item = dict(item)
+            risk_item.setdefault("status", "PASS")
+            normalized_risk_items[index] = risk_item
     assessment["risk"]["items"] = normalized_risk_items
     invalid_risk_items = [
         item for item in assessment["risk"]["items"]
@@ -2400,13 +2404,11 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     if risk_items:
         for item in risk_items:
             lines.append("- " + _humanize_item(item))
-            if isinstance(item, Mapping) and item.get("status_issues"):
-                lines.append(
-                    "  风险项门禁："
-                    + str(item.get("status") or "UNKNOWN")
-                    + "；"
-                    + "；".join(item["status_issues"])
-                )
+            if isinstance(item, Mapping) and item.get("status") is not None:
+                gate_line = "  风险项门禁：" + str(item.get("status") or "UNKNOWN")
+                if item.get("status_issues"):
+                    gate_line += "；" + "；".join(item["status_issues"])
+                lines.append(gate_line)
     else:
         lines.append("- 具体风险清单未提供。")
     lines.extend([
