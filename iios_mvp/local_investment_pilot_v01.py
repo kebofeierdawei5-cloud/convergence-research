@@ -2168,7 +2168,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "RATIONALE_NOT_IDENTIFIABLE": "驱动机制/理由为空或仅为占位文本。",
         "DRIVER_EVIDENCE_LINK_NOT_RESOLVED": "该价值驱动因素没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容。",
         "RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED": "至少一个结构化风险项没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容；整体风险状态不能视为 PASS。",
-        "RISK_RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED": "至少一个结构化风险项没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容；整体风险状态不能视为 PASS。",
+
         "RANK_NOT_IDENTIFIABLE": "排名字段不是有效的正整数；为避免中断报告，按输入顺序临时展示，但该驱动因素不通过内容门禁。",
         "DUPLICATE_RANK_NOT_IDENTIFIABLE": "多个价值驱动因素使用相同排名，排序不唯一；相关条目均降为 UNKNOWN。",
     }
@@ -2457,6 +2457,9 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         ),
         "RISK_ITEMS_NOT_IDENTIFIABLE": (
             "风险门禁原标为 PASS，但结构化风险清单为空，或至少一项风险只有 UNKNOWN/TBD 等占位文本；风险状态已降为 UNKNOWN。"
+        ),
+        "RISK_RISK_ITEM_EVIDENCE_LINK_NOT_RESOLVED": (
+            "至少一个结构化风险项没有自己的可追溯截止时点证据，或其引用无法唯一解析/时点不兼容；整体风险状态不能视为 PASS。"
         ),
         "THESIS_BREAK_CONDITIONS_NOT_IDENTIFIABLE": (
             "Thesis 原标为 INTACT，但失效条件列表为空或仅有 UNKNOWN/TBD 等占位文本；论点完整性降为 UNKNOWN。"
