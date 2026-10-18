@@ -54,7 +54,7 @@ B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 +
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 + #462 + #464 + #465 MERGED; operator Bear-loss cap/Required Return preserved, placeholder probability rationale blocks price outputs; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations and own resolved evidence links; latest #471 164 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations and own resolved evidence links, value-driver subfields and structured-risk items fail closed on placeholders; latest #473 173 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -116,6 +116,14 @@ B8 bounded investment-result red-team                          PR #456 + #457 + 
 - The exact PR #471 head passed **164/164 local-pilot + Replay tests** and **6/6 triggered workflows**. The fix validates linkage only; it does not prove source truth, rights, formal admission or that the substantive analysis is correct.
 - PRs [#468](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/468) and [#469](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/469) remain recorded above as the preceding policy-input and status/explanation safeguards.
 - **The actual macOS full-run + Replay ZIP audit remains OPEN / NOT VERIFIED.** The operator deferred ZIP delivery because the upload limit was reached; repository CI is not Mac acceptance.
+
+### B8 follow-up — value-driver and structured-risk item identifiability (2026-10-18)
+
+- PR [#473](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/473) merged at `17b8241c11b6e0bb7382d54b796ebc8a2e9f1c6e`. Previously, a value-driver row could satisfy the gate with a non-empty placeholder rationale such as `N/A`, and an overall Risk `PASS` could coexist with an empty list or a risk item whose identifying/detail fields were placeholder-only.
+- The pilot now assigns each value-driver row `PASS` only when its name, impact direction, and rationale are identifiable; otherwise the row is `UNKNOWN` with field-level issue codes. JSON and Chinese report expose the row gate and issues.
+- A Risk section that claims `PASS` now downgrades to `UNKNOWN` when the structured risk list is empty or any item lacks an identifiable risk label/detail. Substantive items remain eligible; the downgrade and reason are emitted into the machine analysis and Chinese report.
+- Exact PR #473 head passed **173/173 local-pilot + Replay tests** and all **6/6 triggered workflows**. No valuation formula, scenario probability, required-return hurdle, Bear-loss cap, portfolio sizing rule, or execution authority changed.
+- **The real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** GitHub CI is not operator-environment acceptance.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
