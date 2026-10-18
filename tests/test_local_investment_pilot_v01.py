@@ -701,6 +701,7 @@ def test_risk_report_renders_full_structured_risk_thesis_fields():
     assert "监控触发条件：经营现金流多期显著低于归母净利润。" in report
     assert "经营影响：应收、存货与票据可能占用更多现金。" in report
     assert "估值传导机制：下调现金转换假设并提高安全边际。" in report
+    assert "风险项门禁：PASS" in report
 
 
 @pytest.mark.parametrize(
