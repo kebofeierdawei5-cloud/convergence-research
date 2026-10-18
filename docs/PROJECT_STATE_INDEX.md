@@ -54,7 +54,7 @@ B5 valuation transmission / entry price mapping          PR #428 + #444 + #446 +
 B6 price zone / binding cap / sensitivity ladder           PR #430 + #440 + #444 + #446 + #459 + #460 + #462 + #464 + #465 MERGED; operator Bear-loss cap/Required Return preserved, placeholder probability rationale blocks price outputs; PRICE SCREEN ONLY
 Local Mac full-run + Replay acceptance harness             PR #433/#434/#436/#437/#438 + #440 + #442 + #444 + #446 MERGED; SAFE LOCAL-MAIN UPDATE; 115 LOCAL-PILOT + ACCEPTANCE TESTS PASS; 6/6 PR WORKFLOWS SUCCESS; RESPONSE RECOVERY + B4-B6 ZERO/UNKNOWN/NULL CONSISTENCY; REAL MAC RUN + REPLAY OPEN
 B7 primary-model + terminal-date contract                    PR #451 + #452 + #454 MERGED; unknown terminal-date basis fails closed; real Mac full-run + Replay OPEN / NOT VERIFIED
-B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations/evidence, value-driver fields, structured-risk items and thesis break/monitoring triggers fail closed on placeholders; latest #475 178 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
+B8 bounded investment-result red-team                          PR #456 + #457 + #458 + #459 + #460 + #462 + #464 + #465 + #466 + #468 + #469 + #471 + #473 + #475 + #477 MERGED; evidence/rationale sentinels fail closed, operator policy preserved, PASS/INTACT require identifiable explanations/evidence, value-driver fields, structured-risk items, thesis break/monitoring triggers and primary-model rationale fail closed on placeholders; latest #477 183 local-pilot+Replay tests + 6/6 workflows PASS; Mac ZIP review OPEN / NOT VERIFIED
 ```
 
 ### B7 — primary valuation model and terminal-date contract (2026-10-17)
@@ -131,6 +131,13 @@ B8 bounded investment-result red-team                          PR #456 + #457 + 
 - The pilot now downgrades `INTACT` to `UNKNOWN` if either list is empty or contains non-identifiable placeholder-only entries. The JSON retains the field-level issue codes, while the Chinese report states why thesis integrity/monitorability was not established. Explicit, identifiable lists preserve the prior status.
 - Exact PR #475 head passed **178/178 local-pilot + Replay tests** and all **6/6 triggered workflows**. No return, valuation, price-zone, risk-cap or execution logic changed.
 - **The real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** GitHub CI is not operator-environment acceptance.
+
+### B8 follow-up — primary model-selection rationale identifiability (2026-10-18)
+
+- PR [#477](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/477) merged at `cacd855fd84fbc5794403f07235b4879fffbac91`. The primary valuation-model eligibility gate previously checked operator-selected family, calculation family, and the family inferred from model name, but did not require the stated model-selection rationale to be identifiable. Thus `UNKNOWN`/`N/A` could coexist with a MATCH model identity and leave return/entry-price/B6 calculations enabled.
+- The model consistency result now additionally requires an identifiable `model_rationale`. Placeholder-only rationale exposes `FORECAST_VALUATION_MODEL_RATIONALE_NOT_IDENTIFIABLE`, sets model eligibility false, and leaves return metrics, target entry price, and B6 sensitivity unresolved. Human report and machine JSON expose the reason. Model-name/family matching and valid-rationale path preserve existing calculations.
+- Exact PR #477 head passed **183/183 local-pilot + Replay tests** and all **6/6 triggered workflows**. No model formula, scenario values, 15% return floor, operator Required Return, Bear-loss cap, or execution authority changed.
+- **The real macOS full-run + Replay ZIP review remains OPEN / NOT VERIFIED.** GitHub CI does not substitute for the deferred private bundle audit.
 
 ### B4-B6 unknown-state and report/JSON consistency correction — 2026-10-16
 
