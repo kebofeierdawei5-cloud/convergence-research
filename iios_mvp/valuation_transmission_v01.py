@@ -553,6 +553,13 @@ def render_valuation_transmission_section(transmission: Mapping[str, Any], curre
         "- 稀释后股数 = 基础股数 + 可转债潜在新增股数 + 其他潜在稀释股数。稀释处理是显式情景输入，不以当前股数冒充完全稀释股数。",
         "",
     ]
+    if (
+        result.get("baseline_includes_project") is True
+        and result.get("status") == "NOT_LINKED_INPUT_INCOMPLETE_OR_INVALID"
+    ):
+        lines.extend([
+            "- 非阻断性说明：操作者已确认现有估值基准包含该项目；本次 B5 增量反事实因输入缺项而未计算/未应用。该未应用桥接缺项不应单独阻断未修改主估值的回报、入场价与 B6 计算，但仍需保留并审阅下方缺项诊断。",
+        ])
     scenarios = result.get("scenarios") if isinstance(result.get("scenarios"), Mapping) else {}
     for name, label in (("bear", "Bear"), ("base", "Base"), ("bull", "Bull")):
         row = scenarios.get(name) if isinstance(scenarios.get(name), Mapping) else {}
