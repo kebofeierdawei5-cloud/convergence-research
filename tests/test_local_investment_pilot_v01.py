@@ -3568,6 +3568,9 @@ def test_replay_comparison_includes_derived_valuation_and_evidence_integrity_fie
 def test_hong_kong_dated_cash_distribution_uses_ex_date_before_record_date():
     payload = _b5_ready_payload()
     payload["case"]["market"] = "HK"
+    payload["case"]["symbol"] = "0700.HK"
+    payload["case"]["currency"] = "HKD"
+    payload["price_input"]["currency"] = "HKD"
     forecast = payload["forecast_valuation"]
     forecast["cash_distribution_review"] = {
         "status": "KNOWN_FUTURE_DISTRIBUTIONS",
@@ -3604,6 +3607,10 @@ def test_hong_kong_dated_cash_distribution_uses_ex_date_before_record_date():
 def test_dated_distribution_rejects_cross_market_record_ex_date_order(market, record_date, ex_date):
     payload = _b5_ready_payload()
     payload["case"]["market"] = market
+    if market == "HK":
+        payload["case"]["symbol"] = "0700.HK"
+        payload["case"]["currency"] = "HKD"
+        payload["price_input"]["currency"] = "HKD"
     forecast = payload["forecast_valuation"]
     forecast["cash_distribution_review"] = {
         "status": "KNOWN_FUTURE_DISTRIBUTIONS",
