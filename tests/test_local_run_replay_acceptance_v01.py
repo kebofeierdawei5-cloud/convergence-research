@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import select
 import subprocess
 import sys
 import time
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -23,8 +25,13 @@ def _write_json(path: Path, value: object) -> None:
         path.chmod(0o600)
 
 
-def _bundle(tmp_path: Path, *, replay_of: str | None = None) -> Path:
-    run_dir = tmp_path / "local-pilot-TEST-20261015T123456Z"
+def _bundle(
+    tmp_path: Path,
+    *,
+    replay_of: str | None = None,
+    run_dir_name: str | None = None,
+) -> Path:
+    run_dir = tmp_path / (run_dir_name or "local-pilot-TEST-20261015T123456Z")
     run_dir.mkdir(mode=0o700)
     if os.name != "nt":
         run_dir.chmod(0o700)
@@ -57,6 +64,13 @@ def _bundle(tmp_path: Path, *, replay_of: str | None = None) -> Path:
     (run_dir / "input.json").write_text('{"schema_version":"test"}', encoding="utf-8")
     (run_dir / "report.md").write_text("# IIOS test report\n", encoding="utf-8")
     _write_json(run_dir / "analysis.json", analysis)
+    receipt["file_manifest"] = {}
+    for filename in ("input.json", "analysis.json", "report.md"):
+        payload = (run_dir / filename).read_bytes()
+        receipt["file_manifest"][filename] = {
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "byte_size": len(payload),
+        }
     _write_json(run_dir / "pilot_receipt.json", receipt)
     if os.name != "nt":
         (run_dir / "input.json").chmod(0o600)
@@ -400,3 +414,113 @@ def test_stream_command_shows_prompt_before_child_receives_input(tmp_path: Path)
             process.wait()
         process.stdin.close()
         process.stdout.close()
+
+
+def test_acceptance_bundle_includes_first_run_replay_logs_and_verified_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = tmp_path / "runs"
+    run_root.mkdir(mode=0o700)
+    original = _bundle(
+        run_root,
+        run_dir_name="local-pilot-ORIGINAL-20261019T120000Z",
+    )
+    replay = _bundle(
+        run_root,
+        replay_of=original.name,
+        run_dir_name="local-pilot-REPLAY-20261019T120100Z",
+    )
+    monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
+
+    log_root = tmp_path / "acceptance-logs"
+    log_root.mkdir(mode=0o700)
+    log_path = log_root / "current-run.log"
+    log_path.write_text("original + replay acceptance log\n", encoding="utf-8")
+    if os.name != "nt":
+        log_path.chmod(0o600)
+    monkeypatch.setattr(acceptance, "LOG_ROOT", log_root)
+
+    bundle_root = tmp_path / "private" / "acceptance-bundles"
+    monkeypatch.setattr(acceptance, "ACCEPTANCE_BUNDLE_ROOT", bundle_root)
+    comparison = {
+        "mode": "DECISION_MATERIAL_FIELDS_V1",
+        "status": "MATCH",
+        "hash_verification": "PASS",
+        "prior_pilot_id": original.name,
+        "compared_fields": ["decision", "valuation_timing"],
+        "mismatched_fields": [],
+    }
+    archive_path = acceptance._create_acceptance_bundle(
+        original_dir=original,
+        replay_dir=replay,
+        log_paths=[log_path],
+        comparison=comparison,
+        prompt_issues=[],
+    )
+
+    assert archive_path.is_file()
+    if os.name != "nt":
+        assert archive_path.stat().st_mode & 0o077 == 0
+    with zipfile.ZipFile(archive_path, "r") as archive:
+        assert archive.testzip() is None
+        names = set(archive.namelist())
+        first_analysis = f"first_run/{original.name}/analysis.json"
+        replay_analysis = f"replay_run/{replay.name}/analysis.json"
+        assert first_analysis in names
+        assert replay_analysis in names
+        assert f"first_run/{original.name}/pilot_receipt.json" in names
+        assert f"replay_run/{replay.name}/pilot_receipt.json" in names
+        assert "acceptance_logs/current-run.log" in names
+        assert "acceptance_summary.json" in names
+        assert "bundle_manifest.json" in names
+
+        summary = json.loads(archive.read("acceptance_summary.json"))
+        assert summary["overall_status"] == "PASS"
+        assert summary["technical_status"] == "PASS"
+        assert summary["first_run"]["pilot_id"] == original.name
+        assert summary["replay_run"]["pilot_id"] == replay.name
+        assert summary["replay_comparison"] == comparison
+        assert summary["formal_decision_created"] is False
+        assert summary["execution_authorized"] is False
+        assert summary["auto_execution"] is False
+
+        manifest = json.loads(archive.read("bundle_manifest.json"))
+        assert manifest["hash_algorithm"] == "SHA-256"
+        assert manifest["manifest_excludes_self"] is True
+        for record in manifest["files"]:
+            payload = archive.read(record["path"])
+            assert len(payload) == record["byte_size"]
+            assert hashlib.sha256(payload).hexdigest() == record["sha256"]
+
+
+def test_acceptance_bundle_rejects_run_artifact_drift_from_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = tmp_path / "runs"
+    run_root.mkdir(mode=0o700)
+    original = _bundle(
+        run_root,
+        run_dir_name="local-pilot-ORIGINAL-20261019T130000Z",
+    )
+    replay = _bundle(
+        run_root,
+        replay_of=original.name,
+        run_dir_name="local-pilot-REPLAY-20261019T130100Z",
+    )
+    monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
+    (original / "analysis.json").write_text('{"changed":true}\n', encoding="utf-8")
+
+    with pytest.raises(
+        acceptance.AcceptanceError,
+        match="ACCEPTANCE_BUNDLE_SOURCE_HASH_MISMATCH:first_run:analysis.json",
+    ):
+        acceptance._create_acceptance_bundle(
+            original_dir=original,
+            replay_dir=replay,
+            log_paths=[],
+            comparison={"status": "MATCH", "hash_verification": "PASS", "mismatched_fields": []},
+            prompt_issues=[],
+        )
+    assert not (tmp_path / "acceptance-bundles").exists()
