@@ -7,11 +7,13 @@ valuation, decision, receipt, or replay engine.
 """
 
 import codecs
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -22,6 +24,7 @@ PILOT_ROOT = PRIVATE_ROOT / "local-pilot"
 INPUT_ROOT = PILOT_ROOT / "inputs"
 RUN_ROOT = PILOT_ROOT / "runs"
 LOG_ROOT = PILOT_ROOT / "acceptance-logs"
+ACCEPTANCE_BUNDLE_ROOT = PILOT_ROOT / "acceptance-bundles"
 
 PILOT_MODULE = "iios_mvp.local_investment_pilot_v01"
 PILOT_STATUS = "PILOT_NON_CANONICAL"
@@ -71,7 +74,7 @@ def _ensure_private_directory(path: Path) -> None:
 def _prepare_private_roots() -> None:
     # Apply from outer to inner. No private input, price, or research result is
     # written into Git; the existing pilot continues to own the run bundle.
-    for path in (PRIVATE_ROOT, PILOT_ROOT, INPUT_ROOT, RUN_ROOT, LOG_ROOT):
+    for path in (PRIVATE_ROOT, PILOT_ROOT, INPUT_ROOT, RUN_ROOT, LOG_ROOT, ACCEPTANCE_BUNDLE_ROOT):
         _ensure_private_directory(path)
 
 
@@ -180,8 +183,11 @@ def _run_cli(
     *,
     stage: str,
     expected_statuses: Iterable[str],
+    log_paths: list[Path] | None = None,
 ) -> dict[str, Any]:
     log_path = _new_log(stage)
+    if log_paths is not None:
+        log_paths.append(log_path)
     command = [sys.executable, "-m", PILOT_MODULE, *args]
     return_code = _stream_command(command, log_path)
     if return_code != 0:
@@ -208,6 +214,207 @@ def _assert_private_mode(path: Path, *, directory: bool) -> None:
     if mode & 0o077:
         kind = "DIRECTORY" if directory else "FILE"
         raise AcceptanceError(f"{kind}_PERMISSIONS_TOO_OPEN:{path}:{mode:04o}")
+
+
+def _current_code_revision() -> str | None:
+    """Return the checked-out Git commit for audit provenance without requiring network access."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(REPOSITORY_ROOT), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    value = result.stdout.strip().lower()
+    return value if result.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", value) else None
+
+
+def _create_acceptance_bundle(
+    *,
+    original_dir: Path,
+    replay_dir: Path,
+    log_paths: Iterable[Path],
+    comparison: dict[str, Any],
+    prompt_issues: list[str],
+) -> Path:
+    """Create a private audit ZIP containing both runs and their full acceptance evidence."""
+    original_dir = original_dir.expanduser().resolve(strict=True)
+    replay_dir = replay_dir.expanduser().resolve(strict=True)
+    run_root = RUN_ROOT.resolve(strict=True)
+    if original_dir.parent != run_root or replay_dir.parent != run_root:
+        raise AcceptanceError("ACCEPTANCE_BUNDLE_RUNS_MUST_BE_DIRECT_CHILDREN_OF_PRIVATE_RUN_ROOT")
+    if original_dir == replay_dir or not RESULT_ID_PATTERN.fullmatch(original_dir.name) or not RESULT_ID_PATTERN.fullmatch(replay_dir.name):
+        raise AcceptanceError("ACCEPTANCE_BUNDLE_RUN_IDENTITIES_INVALID")
+
+    original_receipt = _read_json(original_dir / "pilot_receipt.json", "ORIGINAL_RUN_RECEIPT")
+    replay_receipt = _read_json(replay_dir / "pilot_receipt.json", "REPLAY_RUN_RECEIPT")
+    if original_receipt.get("pilot_id") != original_dir.name or original_receipt.get("replay_of") is not None:
+        raise AcceptanceError("ACCEPTANCE_BUNDLE_ORIGINAL_RUN_IDENTITY_INVALID")
+    if replay_receipt.get("pilot_id") != replay_dir.name or replay_receipt.get("replay_of") != original_dir.name:
+        raise AcceptanceError("ACCEPTANCE_BUNDLE_REPLAY_PARENT_INVALID")
+
+    entries: dict[str, bytes] = {}
+    run_summaries: dict[str, dict[str, Any]] = {}
+    for label, run_dir, receipt in (
+        ("first_run", original_dir, original_receipt),
+        ("replay_run", replay_dir, replay_receipt),
+    ):
+        manifest = receipt.get("file_manifest")
+        if not isinstance(manifest, dict):
+            raise AcceptanceError(f"ACCEPTANCE_BUNDLE_SOURCE_HASH_MANIFEST_MISSING:{label}")
+        for filename in ("input.json", "analysis.json", "report.md"):
+            file_path = run_dir / filename
+            if file_path.is_symlink() or not file_path.is_file():
+                raise AcceptanceError(f"ACCEPTANCE_BUNDLE_SOURCE_FILE_MISSING_OR_SYMLINK:{label}:{filename}")
+            try:
+                payload = file_path.read_bytes()
+            except OSError as exc:
+                raise AcceptanceError(f"ACCEPTANCE_BUNDLE_SOURCE_FILE_UNREADABLE:{label}:{filename}") from exc
+            expected = manifest.get(filename)
+            if not isinstance(expected, dict):
+                raise AcceptanceError(f"ACCEPTANCE_BUNDLE_SOURCE_HASH_MISSING:{label}:{filename}")
+            expected_hash = str(expected.get("sha256") or "")
+            expected_size = expected.get("byte_size")
+            actual_hash = hashlib.sha256(payload).hexdigest()
+            if (
+                not re.fullmatch(r"[0-9a-f]{64}", expected_hash)
+                or not isinstance(expected_size, int)
+                or isinstance(expected_size, bool)
+                or expected_size != len(payload)
+                or expected_hash != actual_hash
+            ):
+                raise AcceptanceError(f"ACCEPTANCE_BUNDLE_SOURCE_HASH_MISMATCH:{label}:{filename}")
+            entries[f"{label}/{run_dir.name}/{filename}"] = payload
+
+        receipt_path = run_dir / "pilot_receipt.json"
+        if receipt_path.is_symlink() or not receipt_path.is_file():
+            raise AcceptanceError(f"ACCEPTANCE_BUNDLE_RECEIPT_MISSING_OR_SYMLINK:{label}")
+        entries[f"{label}/{run_dir.name}/pilot_receipt.json"] = receipt_path.read_bytes()
+        analysis = _read_json(run_dir / "analysis.json", f"{label.upper()}_ANALYSIS")
+        decision = analysis.get("decision") if isinstance(analysis.get("decision"), dict) else {}
+        run_summaries[label] = {
+            "pilot_id": run_dir.name,
+            "replay_of": receipt.get("replay_of"),
+            "provisional_action": decision.get("provisional_action"),
+            "file_manifest": {
+                name: dict(manifest[name]) for name in ("input.json", "analysis.json", "report.md")
+            },
+        }
+
+    log_root = LOG_ROOT.resolve(strict=True)
+    log_entries: list[str] = []
+    for supplied_path in log_paths:
+        if supplied_path.is_symlink():
+            raise AcceptanceError(f"ACCEPTANCE_BUNDLE_LOG_MUST_NOT_BE_SYMLINK:{supplied_path.name}")
+        try:
+            log_path = supplied_path.resolve(strict=True)
+        except OSError as exc:
+            raise AcceptanceError(f"ACCEPTANCE_BUNDLE_LOG_MISSING:{supplied_path.name}") from exc
+        if log_path.parent != log_root or not log_path.is_file():
+            raise AcceptanceError(f"ACCEPTANCE_BUNDLE_LOG_OUTSIDE_PRIVATE_LOG_ROOT:{supplied_path.name}")
+        archive_name = f"acceptance_logs/{log_path.name}"
+        if archive_name in entries:
+            continue
+        entries[archive_name] = log_path.read_bytes()
+        log_entries.append(archive_name)
+
+    status = "REVIEW_REQUIRED" if prompt_issues else "PASS"
+    summary = {
+        "bundle_schema": "IIOS-LOCAL-ACCEPTANCE-BUNDLE-0.1",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "code_revision": _current_code_revision(),
+        "overall_status": status,
+        "technical_status": "PASS",
+        "input_completeness_status": "REVIEW_REQUIRED" if prompt_issues else "PASS",
+        "input_completeness_issues": list(prompt_issues),
+        "first_run": run_summaries["first_run"],
+        "replay_run": run_summaries["replay_run"],
+        "replay_comparison": comparison,
+        "acceptance_log_files": sorted(log_entries),
+        "formal_decision_created": False,
+        "canonical_run_receipt_created": False,
+        "execution_authorized": False,
+        "auto_execution": False,
+        "note": "Private audit package. Contains the original and Replay analysis inputs/results and local logs; it is not a formal decision or trade authorization.",
+    }
+    entries["acceptance_summary.json"] = json.dumps(
+        summary, ensure_ascii=False, indent=2, sort_keys=True
+    ).encode("utf-8")
+    bundle_manifest = {
+        "manifest_schema": "IIOS-LOCAL-ACCEPTANCE-BUNDLE-MANIFEST-0.1",
+        "hash_algorithm": "SHA-256",
+        "manifest_excludes_self": True,
+        "files": [
+            {
+                "path": name,
+                "byte_size": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+            for name, payload in sorted(entries.items())
+        ],
+    }
+    manifest_bytes = json.dumps(
+        bundle_manifest, ensure_ascii=False, indent=2, sort_keys=True
+    ).encode("utf-8")
+    archive_entries = dict(entries)
+    archive_entries["bundle_manifest.json"] = manifest_bytes
+
+    _ensure_private_directory(ACCEPTANCE_BUNDLE_ROOT)
+    archive_path = ACCEPTANCE_BUNDLE_ROOT / (
+        f"iios-acceptance-{original_dir.name}-replay-{replay_dir.name}.zip"
+    )
+    if archive_path.exists() or archive_path.is_symlink():
+        raise AcceptanceError("ACCEPTANCE_BUNDLE_DESTINATION_ALREADY_EXISTS")
+    temporary_path = ACCEPTANCE_BUNDLE_ROOT / f".{archive_path.name}.{_stamp()}.tmp"
+    try:
+        with temporary_path.open("xb"):
+            pass
+        if os.name != "nt":
+            temporary_path.chmod(0o600)
+        with zipfile.ZipFile(
+            temporary_path, mode="w", compression=zipfile.ZIP_DEFLATED, compresslevel=6
+        ) as archive:
+            for name, payload in sorted(archive_entries.items()):
+                archive.writestr(name, payload)
+        if os.name != "nt":
+            temporary_path.chmod(0o600)
+        with zipfile.ZipFile(temporary_path, mode="r") as archive:
+            bad_member = archive.testzip()
+            if bad_member is not None:
+                raise AcceptanceError(f"ACCEPTANCE_BUNDLE_ZIP_CORRUPT:{bad_member}")
+            if set(archive.namelist()) != set(archive_entries):
+                raise AcceptanceError("ACCEPTANCE_BUNDLE_ARCHIVE_MEMBERS_MISMATCH")
+            for record in bundle_manifest["files"]:
+                archived_payload = archive.read(record["path"])
+                if (
+                    len(archived_payload) != record["byte_size"]
+                    or hashlib.sha256(archived_payload).hexdigest() != record["sha256"]
+                ):
+                    raise AcceptanceError(f"ACCEPTANCE_BUNDLE_ARCHIVE_HASH_MISMATCH:{record['path']}")
+        temporary_path.replace(archive_path)
+        if os.name != "nt":
+            archive_path.chmod(0o600)
+            if archive_path.stat().st_mode & 0o077:
+                raise AcceptanceError("ACCEPTANCE_BUNDLE_FILE_PERMISSIONS_NOT_PRIVATE")
+        return archive_path
+    except Exception as exc:
+        try:
+            temporary_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        if archive_path.exists() and not temporary_path.exists():
+            try:
+                archive_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        if isinstance(exc, AcceptanceError):
+            raise
+        if isinstance(exc, (OSError, ValueError, zipfile.BadZipFile)):
+            raise AcceptanceError(f"ACCEPTANCE_BUNDLE_CREATE_FAILED:{type(exc).__name__}:{exc}") from exc
+        raise
 
 
 def _inspect_bundle(run_dir: Path, *, expected_replay_of: str | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -353,7 +560,12 @@ def _select_run(*, original_only: bool) -> Path:
         print("编号无效，请输入列表中的编号。")
 
 
-def _verify_and_replay(original_dir: Path) -> int:
+def _verify_and_replay(
+    original_dir: Path,
+    *,
+    preceding_logs: Iterable[Path] = (),
+) -> int:
+    audit_logs = list(preceding_logs)
     original_dir = original_dir.expanduser().resolve(strict=True)
     if original_dir.parent != RUN_ROOT.resolve():
         raise AcceptanceError(f"RUN_DIRECTORY_NOT_DIRECT_CHILD_OF_PRIVATE_RUN_ROOT:{original_dir}")
@@ -365,6 +577,7 @@ def _verify_and_replay(original_dir: Path) -> int:
         ["--check-run", str(original_dir)],
         stage=f"check-original-{original_dir.name}",
         expected_statuses={"PILOT_BUNDLE_HASH_CHECK_PASS"},
+        log_paths=audit_logs,
     )
     original_analysis, original_receipt = _inspect_bundle(original_dir, expected_replay_of=None)
 
@@ -373,6 +586,7 @@ def _verify_and_replay(original_dir: Path) -> int:
         ["--replay-run", str(original_dir), "--output-root", str(RUN_ROOT)],
         stage=f"replay-{original_dir.name}",
         expected_statuses={"PILOT_REPLAY_MATCHED", "PILOT_REPLAY_MISMATCH"},
+        log_paths=audit_logs,
     )
     if replay_result.get("status") != "PILOT_REPLAY_MATCHED":
         mismatches = replay_result.get("replay_comparison", {}).get("mismatched_fields", [])
@@ -410,6 +624,7 @@ def _verify_and_replay(original_dir: Path) -> int:
         ["--check-run", str(replay_dir)],
         stage=f"check-replay-{replay_dir.name}",
         expected_statuses={"PILOT_BUNDLE_HASH_CHECK_PASS"},
+        log_paths=audit_logs,
     )
 
     prompt_issues = _prompt_completion_issues(original_analysis)
@@ -417,14 +632,26 @@ def _verify_and_replay(original_dir: Path) -> int:
     if prompt_issues != replay_prompt_issues:
         raise AcceptanceError("REPLAY_PROMPT_COMPLETENESS_DRIFT")
 
+    acceptance_bundle = _create_acceptance_bundle(
+        original_dir=original_dir,
+        replay_dir=replay_dir,
+        log_paths=audit_logs,
+        comparison=comparison,
+        prompt_issues=prompt_issues,
+    )
+
     print("\n[4/4] 全流程结果")
     print(f"  首次运行：{original_dir}")
     print(f"  Replay 运行：{replay_dir}")
     print(f"  首次报告：{original_dir / 'report.md'}")
     print(f"  首次分析：{original_dir / 'analysis.json'}")
     print(f"  首次记录：{original_dir / 'pilot_receipt.json'}")
+    print(f"  Replay 报告：{replay_dir / 'report.md'}")
+    print(f"  Replay 分析：{replay_dir / 'analysis.json'}")
+    print(f"  Replay 记录：{replay_dir / 'pilot_receipt.json'}")
     print(f"  Replay 比较：MATCH（比较字段数：{len(comparison.get('compared_fields', []))}）")
     print("  首次包哈希：PASS；Replay 包哈希：PASS")
+    print(f"  完整审计交接 ZIP（首次运行 + Replay + 日志 + SHA-256 清单，仅本机私有保存）：{acceptance_bundle}")
     print("  非正式试运行 / 不创建正式 Decision / 不授权交易：已核验")
 
     if prompt_issues:
@@ -496,7 +723,7 @@ def main() -> int:
             run_dir = Path(str(result.get("run_dir", ""))).expanduser().resolve(strict=True)
             if run_dir != (RUN_ROOT / pilot_id).resolve():
                 raise AcceptanceError("WIZARD_RESULT_RUN_PATH_MISMATCH")
-            return _verify_and_replay(run_dir)
+            return _verify_and_replay(run_dir, preceding_logs=[wizard_log])
         if choice == "2":
             return _verify_and_replay(_select_run(original_only=True))
         if choice == "3":
