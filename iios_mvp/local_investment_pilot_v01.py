@@ -3041,13 +3041,15 @@ def _template(
             "valuation_terminal_date": None, "valuation_terminal_date_basis": "",
             "entry_value_reference_per_share": None,
             "probabilities_calibrated": False, "assumptions": [],
+            "cash_distribution_review": {"status": "UNKNOWN", "summary": "", "evidence_refs": []},
             "scenarios": {
                 "bear": {
-                    "probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": "0",
+                    "probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": None,
+                    "cash_distribution_events": [],
                     "rationale": "", "failure_trigger": "", "operating_impact": "", "valuation_mechanism": "",
                 },
-                "base": {"probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": "0", "rationale": ""},
-                "bull": {"probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": "0", "rationale": ""},
+                "base": {"probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": None, "cash_distribution_events": [], "rationale": ""},
+                "bull": {"probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": None, "cash_distribution_events": [], "rationale": ""},
             },
             "thesis_break_stress": {
                 "failure_trigger": "", "operating_impact": "", "valuation_method": "",
