@@ -3336,3 +3336,24 @@ def test_confirmed_interactive_sotp_is_preserved_as_operator_choice(monkeypatch)
     assert context["selected_model_family"] == "SOTP"
     assert context["selection_source"] == "INTERACTIVE_OPERATOR_PROMPT"
     assert context["selection_confirmed"] is True
+
+
+def test_value_driver_accepts_observed_basis_and_transmission_aliases():
+    payload = _payload()
+    driver = payload["assessment"]["value_drivers"][0]
+    driver.pop("historical_evidence", None)
+    driver.pop("valuation_transmission", None)
+    driver["observed_basis"] = "FY2025 synthetic shipped-volume baseline."
+    driver["transmission"] = "Volume × net ASP less unit variable cost reaches contribution profit and EPS."
+    driver["unresolved_inputs"] = ["Next-year unit volume", "Net ASP"]
+    prepared = _prepare_input(payload)
+    normalized = prepared["assessment"]["value_drivers"][0]
+    assert normalized["historical_evidence"] == driver["observed_basis"]
+    assert normalized["valuation_transmission"] == driver["transmission"]
+    assert normalized["unresolved_inputs"] == driver["unresolved_inputs"]
+    assert normalized["status"] == "PASS"
+    _, report = _analyse(payload, "TEST-VALUE-DRIVER-ALIASES")
+    assert "历史依据：FY2025 synthetic shipped-volume baseline." in report
+    assert "价值传导：Volume × net ASP less unit variable cost reaches contribution profit and EPS." in report
+    assert "尚待验证的经营输入：" in report
+    assert "Next-year unit volume" in report
