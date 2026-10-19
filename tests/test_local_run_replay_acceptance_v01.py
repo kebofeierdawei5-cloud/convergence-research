@@ -524,3 +524,27 @@ def test_acceptance_bundle_rejects_run_artifact_drift_from_receipt(
             prompt_issues=[],
         )
     assert not (tmp_path / "acceptance-bundles").exists()
+
+
+def test_standalone_current_main_bootstrap_is_syntax_valid_and_non_destructive() -> None:
+    launcher = REPO_ROOT / "IIOS_独立安全启动当前主线.command"
+    result = subprocess.run(
+        ["bash", "-n", str(launcher)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+    content = launcher.read_text(encoding="utf-8")
+    assert "https://github.com/kebofeierdawei5-cloud/convergence-research.git" in content
+    assert 'git ls-remote "$CANONICAL_URL" refs/heads/main' in content
+    assert 'git clone --branch main --single-branch "$CANONICAL_URL"' in content
+    assert 'SOURCE_ROOT="$PRIVATE_ROOT/source"' in content
+    assert "iios_mvp.local_run_replay_acceptance_v01" in content
+    assert "PILOT_NON_CANONICAL" in (
+        REPO_ROOT / "iios_mvp" / "local_investment_pilot_v01.py"
+    ).read_text(encoding="utf-8")
+    assert "git reset --hard" not in content
+    assert "git clean -fd" not in content
+    assert "rm -rf" not in content
