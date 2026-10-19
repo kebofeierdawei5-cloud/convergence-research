@@ -1790,9 +1790,23 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
                 return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_INVALID"
             if tax_amount < 0 or tax_amount >= gross_amount or abs((gross_amount - tax_amount) - amount) > Decimal("0.000001"):
                 return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_GROSS_TAX_NET_MISMATCH"
-            if not (
-                cutoff_date < record_date < ex_date <= payment_date <= terminal_date
-            ):
+            market = str((prepared.get("case") or {}).get("market") or "UNKNOWN").strip().upper()
+            if market == "CN-A":
+                # Mainland A-share practice: the record date precedes the ex-date;
+                # a buyer entering after the cutoff must still be able to qualify
+                # on the record date before the ex-date adjustment.
+                dates_eligible = cutoff_date < record_date < ex_date <= payment_date <= terminal_date
+            elif market == "HK":
+                # Hong Kong T+2 practice: the ex-date is normally before the last
+                # registration/record date (and can coincide with the second ex-date
+                # under special book-close arrangements). Do not impose A-share order
+                # on Hong Kong entitlements.
+                dates_eligible = cutoff_date < ex_date <= record_date <= payment_date <= terminal_date
+            else:
+                # Unknown market or exceptional announced chronology needs review,
+                # not an inferred cross-market convention.
+                dates_eligible = False
+            if not dates_eligible:
                 return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_DATES_NOT_ELIGIBLE_FROM_CUTOFF"
             if event.get("eligible_if_entered_at_cutoff") is not True:
                 return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_ENTRY_ELIGIBILITY_NOT_CONFIRMED"
@@ -4074,7 +4088,7 @@ def run_guided_wizard(
         + "请填写 entry_value_reference_per_share，以及三种情景各自 probability、terminal_value_per_share、cash_distributions_per_share、cash_distribution_events、rationale；概率合计为 1。"
         + "cash_distribution_review.status 必须是 KNOWN_FUTURE_DISTRIBUTIONS 或 NO_FUTURE_DISTRIBUTIONS_CONFIRMED，并给出 summary 和 cutoff-compatible evidence_refs。"
         + "核查截至截止时点已公告的股利/现金分配，优先使用公司、交易所或监管机构的实施公告；每个 cash_distribution_events 项必须填写 gross_amount_per_share（公告税前金额）、tax_amount_per_share、amount_per_share（扣税后的计算金额）、tax_basis、tax_rationale、record_date、ex_date、payment_date、eligible_if_entered_at_cutoff、eligibility_basis、evidence_refs。"
-        + "只有税前、税额、税后净额满足 gross_amount_per_share - tax_amount_per_share = amount_per_share，税务口径/持有期限假设具体可追责，并明确 cutoff 时点买入能否满足股权登记资格（eligible_if_entered_at_cutoff=true）时，才可以把分红计入回报；登记日须晚于本次分析截止日，除息日须晚于登记日，支付日在除息日或之后。若持有期限对应税率或买入资格无法确定，就保持 UNKNOWN 并阻断回报/目标入场价，不得把公告税前金额直接当税后收益，也不得将不符合资格的分红计入新买入的收益。"
+        + "只有税前、税额、税后净额满足 gross_amount_per_share - tax_amount_per_share = amount_per_share，税务口径/持有期限假设具体可追责，并明确 cutoff 时点买入能否满足分红资格（eligible_if_entered_at_cutoff=true）时，才可以把分红计入回报。日期顺序必须按标的市场核验，不可把 A 股与港股规则混用：CN-A 通常为 cutoff < record_date < ex_date；HK 通常为 cutoff < ex_date <= record_date（考虑 T+2 与除净安排）；所有市场支付日须处在除净/登记及估值终点的合理顺序内。若公告的特殊安排不符合该市场通常顺序，或截止时点买入资格无法证实，保留 UNKNOWN 并阻断回报/目标入场价，不要猜测修正日期。不得把公告税前金额直接当税后收益，也不得将不符合资格的分红计入新买入的收益。"
         + "每情景 cash_distributions_per_share 必须等于这些日期明确、税后金额明确、买入资格确认的现金流金额合计。若已核实未来期间无分配，填 0、空事件列表并用截止日前官方证据说明；若未能确定，不得填 0 冒充无分配，保持 UNKNOWN。日期化现金流使用实际支付日期，不能一律假设在终值日支付。"
         + "请填写 thesis_break_stress 的 failure_trigger、operating_impact、valuation_method、terminal_value_per_share、cash_distributions_per_share、rationale，且其期末总财富必须低于 Bear。"
         + "不要只原样返回模板，不允许把核心研究字段全部留空。若无法识别必须具体解释原因和证据缺口；数字估值可以建立透明、可追责的假设，但不得把假设伪装为披露事实。"
