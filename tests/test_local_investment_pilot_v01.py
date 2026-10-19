@@ -58,8 +58,8 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
             {
                 "source_id": "E1",
                 "title": "示例公司 2026 H1 报告",
-                "source_class": "ISSUER_PRIMARY",
-                "source_ref": "https://example.invalid/h1.pdf",
+                "source_class": "EXCHANGE_PRIMARY",
+                "source_ref": "https://static.sse.com.cn/synthetic-tests/300750-h1.pdf",
                 "published_at": "2026-08-30",
                 "known_at": "2026-08-30",
                 "summary": "Synthetic test source; not real evidence.",
@@ -67,8 +67,8 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
             {
                 "source_id": "E2",
                 "title": "Synthetic no-future-distribution review support",
-                "source_class": "ISSUER_PRIMARY",
-                "source_ref": "https://example.invalid/distribution-review.pdf",
+                "source_class": "EXCHANGE_PRIMARY",
+                "source_ref": "https://static.sse.com.cn/synthetic-tests/distribution-review.pdf",
                 "published_at": "2026-08-29",
                 "known_at": "2026-08-29",
                 "summary": "Synthetic test source used only for the explicit distribution review; not real evidence.",
@@ -3635,3 +3635,95 @@ def test_dated_distribution_rejects_cross_market_record_ex_date_order(market, re
     analysis, _ = _analyse(payload, "TEST-CROSS-MARKET-DISTRIBUTION-ORDER")
     assert analysis["return_metrics"] is None
     assert analysis["return_metrics_reason"] == "BEAR_CASH_DISTRIBUTION_EVENT_1_DATES_NOT_ELIGIBLE_FROM_CUTOFF"
+
+
+def test_rehosted_dividend_source_cannot_pass_by_self_declared_source_class():
+    payload = _payload()
+    payload["evidence_register"][1]["source_class"] = "EXCHANGE_PRIMARY"
+    payload["evidence_register"][1]["source_ref"] = "https://finance.sina.com.cn/rehosted/dividend-notice.html"
+    payload["forecast_valuation"]["cash_distribution_review"]["summary"] = "已核实中期分红。"
+
+    analysis, report = _analyse(payload, "TEST-REHOSTED-DIVIDEND-SOURCE")
+    evidence = next(row for row in analysis["evidence_register"] if row["source_id"] == "E2")
+    review = analysis["forecast_valuation"]["cash_distribution_review"]
+
+    assert evidence["source_url_host"] == "finance.sina.com.cn"
+    assert evidence["source_domain_class_status"] == "DOMAIN_NOT_ALLOWLISTED_AS_PRIMARY"
+    assert evidence["cash_distribution_primary_domain_eligible"] is False
+    assert review["source_validation_status"] == "BLOCKED_SOURCE_DOMAIN_CLASS_OR_CUTOFF_REVIEW"
+    assert review["formal_evidence_pit_admission"] is False
+    assert review["analyst_supplied_summary_unverified"] == "已核实中期分红。"
+    assert "已核实" not in review["summary"]
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert "CASH_DISTRIBUTION_SOURCE_DOMAIN_CLASS_NOT_ACCEPTED" in analysis["decision"]["gating_issues"]
+    assert "URL 主机名：finance.sina.com.cn" in report
+    assert "正式证据准入：未完成" in report
+
+
+def test_official_exchange_domain_match_is_not_misreported_as_formal_admission():
+    payload = _payload(cutoff="2026-10-12")
+    payload["evidence_register"][1]["source_class"] = "EXCHANGE_PRIMARY"
+    payload["evidence_register"][1]["source_ref"] = (
+        "http://static.sse.com.cn/disclosure/listedinfo/announcement/c/new/"
+        "2026-10-13/603699_20261013_QYJT.pdf"
+    )
+    payload["forecast_valuation"]["cash_distribution_review"] = {
+        "status": "KNOWN_FUTURE_DISTRIBUTIONS",
+        "summary": "模型输入声明有一笔未来分红。",
+        "evidence_refs": ["E2"],
+    }
+    event = {
+        "amount_per_share": "0.42",
+        "gross_amount_per_share": "0.42",
+        "tax_amount_per_share": "0",
+        "tax_basis": "Synthetic test tax treatment",
+        "tax_rationale": "Synthetic fixture assumes no tax withheld",
+        "record_date": "2026-10-20",
+        "ex_date": "2026-10-21",
+        "payment_date": "2026-10-23",
+        "eligible_if_entered_at_cutoff": True,
+        "eligibility_basis": "Synthetic fixture confirms entry before record date",
+        "evidence_refs": ["E2"],
+    }
+    for row in payload["forecast_valuation"]["scenarios"].values():
+        row["cash_distributions_per_share"] = "0.42"
+        row["cash_distribution_events"] = [dict(event)]
+
+    analysis, report = _analyse(payload, "TEST-OFFICIAL-EXCHANGE-DOMAIN-NOT-ADMITTED")
+    evidence = next(row for row in analysis["evidence_register"] if row["source_id"] == "E2")
+    review = analysis["forecast_valuation"]["cash_distribution_review"]
+
+    assert evidence["source_domain_class_status"] == "OFFICIAL_EXCHANGE_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED"
+    assert evidence["cash_distribution_primary_domain_eligible"] is True
+    assert review["source_validation_status"] == "OFFICIAL_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED"
+    assert review["formal_evidence_pit_admission"] is False
+    assert "未全部独立确认" in review["summary"]
+    assert analysis["return_metrics"] is not None
+    assert "模型输入声明，非正式证据准入" in report
+    assert "正式证据准入：未完成" in report
+    assert "source_domain_class_status" not in report
+
+
+def test_confirmed_model_selection_neutralizes_stale_ai_confirmation_rationale():
+    payload = _b5_ready_payload()
+    payload["operator_valuation_context"].update({
+        "selected_model_family": "SOTP",
+        "selection_source": "INTERACTIVE_OPERATOR_PROMPT",
+        "selection_confirmed": True,
+    })
+    payload["forecast_valuation"]["model_rationale"] = (
+        "操作者尚待本地确认主估值模型；当前草稿用 EPS_MULTIPLE 估算每股价值。"
+    )
+
+    analysis, report = _analyse(payload, "TEST-STALE-MODEL-CONFIRMATION-WORDING")
+    forecast = analysis["forecast_valuation"]
+
+    assert forecast["model_rationale_status"] == "STALE_OPERATOR_CONFIRMATION_LANGUAGE_NEUTRALIZED"
+    assert "操作者尚待本地确认" not in forecast["model_rationale"]
+    assert "操作者尚待本地确认" in forecast["model_rationale_original_untrusted"]
+    assert "操作者尚待本地确认" not in report
+    assert "旧稿待确认措辞已按本次本地操作者确认记录清理" in report
+    assert "操作者选择的主模型类别：SOTP" in report
+    assert "当前情景实际计算模型类别：EPS_MULTIPLE" in report
+    assert analysis["return_metrics"] is None
