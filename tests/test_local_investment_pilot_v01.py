@@ -3377,6 +3377,9 @@ def test_evidence_date_with_unknown_clock_time_is_not_marked_invalid():
     assert normalized["known_at_precision"] == "DATE_ONLY_EXPLICIT_TIME_UNKNOWN"
     assert normalized["time_status"] == "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
     assert "E1" not in prepared["uncertain_timing_evidence_references"]
+    _, report = _analyse(payload, "TEST-PUBLISHED-DATE-REPORT")
+    assert "published_at：2026-08-30" in report
+    assert "时间依据：KNOWN_AT_DATE_ONLY" in report
 
 
 def test_unknown_dynamic_page_time_stays_unknown_and_preserves_published_at_text():
