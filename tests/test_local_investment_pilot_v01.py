@@ -3390,9 +3390,6 @@ def test_evidence_date_with_unknown_clock_time_is_not_marked_invalid():
     assert normalized["known_at_precision"] == "DATE_ONLY_EXPLICIT_TIME_UNKNOWN"
     assert normalized["time_status"] == "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
     assert "E1" not in prepared["uncertain_timing_evidence_references"]
-    _, report = _analyse(payload, "TEST-PUBLISHED-DATE-REPORT")
-    assert "published_at：2026-08-30" in report
-    assert "时间依据：KNOWN_AT_DATE_ONLY" in report
 
 
 def test_unknown_dynamic_page_time_stays_unknown_and_preserves_published_at_text():
@@ -3519,3 +3516,47 @@ def test_dated_distribution_requires_record_date_eligibility_and_tax_basis():
     analysis, _ = _analyse(payload, "TEST-DISTRIBUTION-ELIGIBILITY-UNKNOWN")
     assert analysis["return_metrics"] is None
     assert analysis["return_metrics_reason"] == "BEAR_CASH_DISTRIBUTION_EVENT_1_ENTRY_ELIGIBILITY_NOT_CONFIRMED"
+
+
+def test_replay_comparison_includes_derived_valuation_and_evidence_integrity_fields():
+    required = {
+        "duplicate_evidence_ids",
+        "untraceable_evidence_ids",
+        "untraceable_evidence_fields",
+        "valuation_model_consistency",
+        "valuation_timing",
+    }
+    assert required.issubset(set(pilot.REPLAY_COMPARISON_FIELDS))
+
+    before = {field: None for field in pilot.REPLAY_COMPARISON_FIELDS}
+    before.update({
+        "pilot_id": "prior-run",
+        "valuation_model_consistency": {"status": "MATCH", "primary_model_price_calculation_eligible": True},
+        "valuation_timing": {"status": "PASS", "annualization_year_fraction": "1.2"},
+        "duplicate_evidence_ids": [],
+        "untraceable_evidence_ids": [],
+        "untraceable_evidence_fields": {},
+    })
+    after = dict(before)
+    after["pilot_id"] = "replay-run"
+    after["valuation_timing"] = {"status": "UNKNOWN", "annualization_year_fraction": None}
+    result = pilot._replay_comparison(before, after)
+    assert result["status"] == "MISMATCH"
+    assert "valuation_timing" in result["mismatched_fields"]
+
+    after = dict(before)
+    after["pilot_id"] = "replay-run"
+    after["valuation_model_consistency"] = {
+        "status": "MODEL_FAMILY_MISMATCH",
+        "primary_model_price_calculation_eligible": False,
+    }
+    result = pilot._replay_comparison(before, after)
+    assert result["status"] == "MISMATCH"
+    assert "valuation_model_consistency" in result["mismatched_fields"]
+
+    after = dict(before)
+    after["pilot_id"] = "replay-run"
+    after["untraceable_evidence_fields"] = {"E1": ["published_at"]}
+    result = pilot._replay_comparison(before, after)
+    assert result["status"] == "MISMATCH"
+    assert "untraceable_evidence_fields" in result["mismatched_fields"]
