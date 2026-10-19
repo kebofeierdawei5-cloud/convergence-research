@@ -52,6 +52,9 @@ REPLAY_COMPARISON_FIELDS = (
     "case",
     "price_input",
     "evidence_register",
+    "duplicate_evidence_ids",
+    "untraceable_evidence_ids",
+    "untraceable_evidence_fields",
     "referenced_evidence_ids",
     "unresolved_evidence_references",
     "after_cutoff_evidence_references",
@@ -61,6 +64,8 @@ REPLAY_COMPARISON_FIELDS = (
     "operating_driver_forecast",
     "valuation_transmission",
     "operator_valuation_context",
+    "valuation_model_consistency",
+    "valuation_timing",
     "price_zone_sensitivity",
     "decision_parameters",
     "portfolio_package",
@@ -1839,7 +1844,7 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
         }
 
     # Preserve the prior scenario-total-wealth ordering contract. Timing and tax
-    # metadata change the return calculation, not the requirement that Bear <= Base <= Bull.
+    # metadata change return arithmetic, not the requirement Bear <= Base <= Bull.
     try:
         scenario_wealth = {
             name: _number(rows[name]["terminal_value_per_share"], f"SCENARIO_{name}_TERMINAL")
