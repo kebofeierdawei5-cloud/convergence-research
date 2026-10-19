@@ -1707,6 +1707,50 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
     scenarios = forecast.get("scenarios") or {}
     if anchor in (None, "") or not isinstance(scenarios, Mapping) or set(scenarios) != set(SCENARIOS):
         return None, "ENTRY_REFERENCE_OR_BEAR_BASE_BULL_SCENARIOS_MISSING"
+
+    # Zero is only acceptable when the analyst explicitly confirms no future
+    # distribution over the holding horizon; positive amounts require dated,
+    # evidence-linked cashflows instead of an implicit terminal-date assumption.
+    review = forecast.get("cash_distribution_review")
+    if not isinstance(review, Mapping):
+        return None, "CASH_DISTRIBUTION_REVIEW_NOT_RESOLVED"
+    review_status = str(review.get("status") or "UNKNOWN").strip().upper()
+    if review_status not in {"KNOWN_FUTURE_DISTRIBUTIONS", "NO_FUTURE_DISTRIBUTIONS_CONFIRMED"}:
+        return None, "CASH_DISTRIBUTION_REVIEW_NOT_RESOLVED"
+    if not _is_identifiable_evidence_text(review.get("summary")):
+        return None, "CASH_DISTRIBUTION_REVIEW_RATIONALE_NOT_IDENTIFIABLE"
+    review_refs = _items(review.get("evidence_refs"))
+    if not review_refs:
+        return None, "CASH_DISTRIBUTION_REVIEW_EVIDENCE_MISSING"
+    evidence_by_id = {
+        str(item.get("source_id")): item
+        for item in (prepared.get("evidence_register") or [])
+        if isinstance(item, Mapping) and item.get("source_id")
+    }
+    blocked_source_ids = (
+        set(prepared.get("unresolved_evidence_references") or [])
+        | set(prepared.get("after_cutoff_evidence_references") or [])
+        | set(prepared.get("uncertain_timing_evidence_references") or [])
+    )
+    bad_timing = {"UNKNOWN", "KNOWN_AT_INVALID", "KNOWN_AT_PRECISION_INSUFFICIENT", "AFTER_CUTOFF"}
+    primary_classes = {"ISSUER_PRIMARY", "EXCHANGE_PRIMARY", "REGULATOR_PRIMARY"}
+    for ref in review_refs:
+        source = evidence_by_id.get(str(ref))
+        if (
+            source is None or str(ref) in blocked_source_ids
+            or source.get("time_status") in bad_timing
+            or str(source.get("source_class") or "").upper() not in primary_classes
+        ):
+            return None, "CASH_DISTRIBUTION_REVIEW_EVIDENCE_NOT_CUTOFF_COMPATIBLE_PRIMARY"
+
+    cutoff_date = _date((prepared.get("case") or {}).get("as_of_date"), "CASE_AS_OF_DATE")
+    try:
+        terminal_date = _date(forecast.get("valuation_terminal_date"), "VALUATION_TERMINAL_DATE")
+    except LocalInvestmentPilotError:
+        return None, "VALUATION_TERMINAL_DATE_NOT_IDENTIFIABLE"
+    if terminal_date <= cutoff_date:
+        return None, "VALUATION_TERMINAL_DATE_NOT_AFTER_CUTOFF"
+
     rows: dict[str, Any] = {}
     for name in SCENARIOS:
         row = scenarios.get(name)
@@ -1718,24 +1762,59 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
             return None, f"{name.upper()}_SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED"
         if not _is_identifiable_evidence_text(row.get("rationale")):
             return None, f"{name.upper()}_SCENARIO_PROBABILITY_RATIONALE_NOT_IDENTIFIABLE"
+        try:
+            distributions = _number(row.get("cash_distributions_per_share"), f"SCENARIO_{name}_DISTRIBUTIONS")
+        except LocalInvestmentPilotError:
+            return None, f"{name.upper()}_SCENARIO_CASH_DISTRIBUTIONS_INVALID"
+        events_raw = row.get("cash_distribution_events") or []
+        if not isinstance(events_raw, list):
+            return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENTS_INVALID"
+        normalized_events: list[dict[str, Any]] = []
+        event_total = Decimal("0")
+        for index, event in enumerate(events_raw, start=1):
+            if not isinstance(event, Mapping):
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_INVALID"
+            try:
+                amount = _positive(event.get("amount_per_share"), f"{name.upper()}_DISTRIBUTION_{index}_AMOUNT")
+                payment_date = _date(event.get("payment_date"), f"{name.upper()}_DISTRIBUTION_{index}_PAYMENT_DATE")
+            except LocalInvestmentPilotError:
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_INVALID"
+            if payment_date <= cutoff_date or payment_date > terminal_date:
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_DATE_OUTSIDE_HOLDING_HORIZON"
+            event_refs = _items(event.get("evidence_refs"))
+            if not event_refs:
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_EVIDENCE_MISSING"
+            for ref in event_refs:
+                source = evidence_by_id.get(str(ref))
+                if (
+                    source is None or str(ref) in blocked_source_ids
+                    or source.get("time_status") in bad_timing
+                    or str(source.get("source_class") or "").upper() not in primary_classes
+                ):
+                    return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_EVIDENCE_NOT_CUTOFF_COMPATIBLE_PRIMARY"
+            years = Decimal((payment_date - cutoff_date).days) / Decimal("365")
+            event_total += amount
+            normalized_events.append({
+                "amount_per_share": str(amount),
+                "payment_date": payment_date.isoformat(),
+                "evidence_refs": event_refs,
+                "year_fraction_from_entry": format(years, "f"),
+            })
+        if review_status == "NO_FUTURE_DISTRIBUTIONS_CONFIRMED":
+            if distributions != 0 or normalized_events:
+                return None, "CASH_DISTRIBUTION_REVIEW_CONTRADICTS_SCENARIO_INPUT"
+        else:
+            if not normalized_events or distributions <= 0:
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_TIMING_UNRESOLVED"
+            if abs(event_total - distributions) > Decimal("0.000001"):
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_TOTAL_MISMATCH"
         rows[name] = {
             "probability": str(row["probability"]),
             "terminal_value_per_share": str(row["terminal_value_per_share"]),
             "cash_distributions_per_share": str(row["cash_distributions_per_share"]),
+            "cash_distribution_events": normalized_events,
             "probability_rationale": str(row["rationale"]),
         }
-    try:
-        scenario_wealth = {
-            name: _number(rows[name]["terminal_value_per_share"], f"SCENARIO_{name}_TERMINAL")
-            + _number(rows[name]["cash_distributions_per_share"], f"SCENARIO_{name}_DISTRIBUTIONS")
-            for name in SCENARIOS
-        }
-    except LocalInvestmentPilotError as exc:
-        return None, f"SCENARIO_CALCULATION_INCOMPLETE:{exc}"
-    if not (
-        scenario_wealth["bear"] <= scenario_wealth["base"] <= scenario_wealth["bull"]
-    ):
-        return None, "SCENARIO_WEALTH_ORDERING_INCONSISTENT"
 
     params = prepared["decision_parameters"]
     gate = {
