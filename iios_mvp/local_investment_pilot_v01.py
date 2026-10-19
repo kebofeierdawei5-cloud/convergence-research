@@ -2582,7 +2582,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             f"- 期末每股价值：{('UNKNOWN' if row.get('terminal_value_per_share') in (None, '') else row.get('terminal_value_per_share'))} {c['currency']}",
             f"- 每股现金分配合计：{('UNKNOWN' if row.get('cash_distributions_per_share') in (None, '') else row.get('cash_distributions_per_share'))} {c['currency']}",
             *(
-                [f"- 支付日 {event.get('payment_date', 'UNKNOWN')}：每股 {event.get('amount_per_share', 'UNKNOWN')}；证据 {', '.join(event.get('evidence_refs') or []) or 'UNKNOWN'}"
+                [f"- 登记日 {event.get('record_date', 'UNKNOWN')}；除息日 {event.get('ex_date', 'UNKNOWN')}；支付日 {event.get('payment_date', 'UNKNOWN')}；税前 {event.get('gross_amount_per_share', 'UNKNOWN')}；税额 {event.get('tax_amount_per_share', 'UNKNOWN')}；计入每股税后现金流 {event.get('amount_per_share', 'UNKNOWN')}；税务口径 {event.get('tax_basis', 'UNKNOWN')}；买入资格 {event.get('eligible_if_entered_at_cutoff', 'UNKNOWN')}（{event.get('eligibility_basis', 'UNKNOWN')}）；证据 {', '.join(event.get('evidence_refs') or []) or 'UNKNOWN'}"
                  for event in (row.get("cash_distribution_events") or []) if isinstance(event, Mapping)]
                 if isinstance(row.get("cash_distribution_events"), list) else []
             ),
@@ -4055,7 +4055,9 @@ def run_guided_wizard(
         + "必须完成 Trust、Reality、Quality、Thesis、价值驱动因素排序、风险清单、MIE/预期差、估值模型和假设、Bear/Base/Bull 数值情景以及独立 thesis_break_stress。"
         + "请填写 entry_value_reference_per_share，以及三种情景各自 probability、terminal_value_per_share、cash_distributions_per_share、cash_distribution_events、rationale；概率合计为 1。"
         + "cash_distribution_review.status 必须是 KNOWN_FUTURE_DISTRIBUTIONS 或 NO_FUTURE_DISTRIBUTIONS_CONFIRMED，并给出 summary 和 cutoff-compatible evidence_refs。"
-        + "核查截至截止时点已公告的股利/现金分配，优先使用公司、交易所或监管机构的实施公告；每个 cash_distribution_events 项填写 amount_per_share、payment_date、evidence_refs。每情景 cash_distributions_per_share 必须等于这些带日期事件的金额合计。若已确认未来期间无分配，填 0、空事件列表并用官方证据说明；若未能确定，不得填 0 冒充无分配，保持 UNKNOWN 并让回报/目标入场价不计算。日期化现金流使用实际支付日期，不能一律假设在终值日支付。"
+        + "核查截至截止时点已公告的股利/现金分配，优先使用公司、交易所或监管机构的实施公告；每个 cash_distribution_events 项必须填写 gross_amount_per_share（公告税前金额）、tax_amount_per_share、amount_per_share（扣税后的计算金额）、tax_basis、tax_rationale、record_date、ex_date、payment_date、eligible_if_entered_at_cutoff、eligibility_basis、evidence_refs。"
+        + "只有税前、税额、税后净额满足 gross_amount_per_share - tax_amount_per_share = amount_per_share，税务口径/持有期限假设具体可追责，并明确 cutoff 时点买入能否满足股权登记资格（eligible_if_entered_at_cutoff=true）时，才可以把分红计入回报；登记日须晚于本次分析截止日，除息日须晚于登记日，支付日在除息日或之后。若持有期限对应税率或买入资格无法确定，就保持 UNKNOWN 并阻断回报/目标入场价，不得把公告税前金额直接当税后收益，也不得将不符合资格的分红计入新买入的收益。"
+        + "每情景 cash_distributions_per_share 必须等于这些日期明确、税后金额明确、买入资格确认的现金流金额合计。若已核实未来期间无分配，填 0、空事件列表并用截止日前官方证据说明；若未能确定，不得填 0 冒充无分配，保持 UNKNOWN。日期化现金流使用实际支付日期，不能一律假设在终值日支付。"
         + "请填写 thesis_break_stress 的 failure_trigger、operating_impact、valuation_method、terminal_value_per_share、cash_distributions_per_share、rationale，且其期末总财富必须低于 Bear。"
         + "不要只原样返回模板，不允许把核心研究字段全部留空。若无法识别必须具体解释原因和证据缺口；数字估值可以建立透明、可追责的假设，但不得把假设伪装为披露事实。"
         + "严格保留 schema_version、case、price_input 原样不变，尤其不得更改人工股价、观察日期、known_at 或 price assurance 标签。"
