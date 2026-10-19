@@ -3563,3 +3563,68 @@ def test_replay_comparison_includes_derived_valuation_and_evidence_integrity_fie
     result = pilot._replay_comparison(before, after)
     assert result["status"] == "MISMATCH"
     assert "untraceable_evidence_fields" in result["mismatched_fields"]
+
+
+def test_hong_kong_dated_cash_distribution_uses_ex_date_before_record_date():
+    payload = _b5_ready_payload()
+    payload["case"]["market"] = "HK"
+    forecast = payload["forecast_valuation"]
+    forecast["cash_distribution_review"] = {
+        "status": "KNOWN_FUTURE_DISTRIBUTIONS",
+        "summary": "Synthetic official HK distribution chronology for market-specific unit test.",
+        "evidence_refs": ["E2"],
+    }
+    for row in forecast["scenarios"].values():
+        row["cash_distributions_per_share"] = "1.00"
+        row["cash_distribution_events"] = [{
+            "gross_amount_per_share": "1.10",
+            "tax_amount_per_share": "0.10",
+            "amount_per_share": "1.00",
+            "tax_basis": "Synthetic explicit test assumption",
+            "tax_rationale": "Synthetic gross 1.10 minus tax 0.10 equals net 1.00.",
+            "record_date": "2026-10-21",
+            "ex_date": "2026-10-20",
+            "payment_date": "2026-10-30",
+            "eligible_if_entered_at_cutoff": True,
+            "eligibility_basis": "Synthetic case: cutoff is before the announced Hong Kong ex-date and entitlement dates.",
+            "evidence_refs": ["E1"],
+        }]
+    analysis, _ = _analyse(payload, "TEST-HK-DATED-DISTRIBUTION")
+    assert analysis["return_metrics"] is not None
+    assert analysis["return_metrics"]["expected_annualized_return_method"] == "PROBABILITY_WEIGHTED_DATED_CASH_FLOW_IRR"
+
+
+@pytest.mark.parametrize(
+    ("market", "record_date", "ex_date"),
+    [
+        ("CN-A", "2026-10-21", "2026-10-20"),
+        ("HK", "2026-10-20", "2026-10-21"),
+    ],
+)
+def test_dated_distribution_rejects_cross_market_record_ex_date_order(market, record_date, ex_date):
+    payload = _b5_ready_payload()
+    payload["case"]["market"] = market
+    forecast = payload["forecast_valuation"]
+    forecast["cash_distribution_review"] = {
+        "status": "KNOWN_FUTURE_DISTRIBUTIONS",
+        "summary": "Synthetic dated cash distribution chronology cross-market rejection test.",
+        "evidence_refs": ["E2"],
+    }
+    for row in forecast["scenarios"].values():
+        row["cash_distributions_per_share"] = "1.00"
+        row["cash_distribution_events"] = [{
+            "gross_amount_per_share": "1.10",
+            "tax_amount_per_share": "0.10",
+            "amount_per_share": "1.00",
+            "tax_basis": "Synthetic explicit test assumption",
+            "tax_rationale": "Synthetic gross 1.10 minus tax 0.10 equals net 1.00.",
+            "record_date": record_date,
+            "ex_date": ex_date,
+            "payment_date": "2026-10-30",
+            "eligible_if_entered_at_cutoff": True,
+            "eligibility_basis": "Synthetic cross-market chronology test.",
+            "evidence_refs": ["E1"],
+        }]
+    analysis, _ = _analyse(payload, "TEST-CROSS-MARKET-DISTRIBUTION-ORDER")
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == "BEAR_CASH_DISTRIBUTION_EVENT_1_DATES_NOT_ELIGIBLE_FROM_CUTOFF"
