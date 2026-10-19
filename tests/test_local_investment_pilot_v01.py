@@ -3305,3 +3305,34 @@ def test_required_return_below_15_percent_remains_independent_from_fundamental_h
     assert "Required Return：0.10；结果：True" in report
     assert "15% 年化门槛：False" in report
 
+
+
+def test_operator_model_prompt_records_unknown_as_unconfirmed(monkeypatch, capsys):
+    monkeypatch.setattr(pilot, "_ask", lambda _prompt, default=None: "0")
+    context = pilot._ask_operator_valuation_context()
+    assert context["selected_model_family"] == "UNKNOWN"
+    assert context["selection_source"] == "INTERACTIVE_OPERATOR_PROMPT"
+    assert context["selection_confirmed"] is False
+    assert "操作者明确确认：否" in capsys.readouterr().out
+
+
+def test_unconfirmed_interactive_model_selection_cannot_be_reinterpreted_as_sotp():
+    payload = _payload()
+    payload["operator_valuation_context"] = {
+        "selected_model_family": "SOTP",
+        "baseline_includes_project": None,
+        "input_owner": "OPERATOR",
+        "selection_source": "INTERACTIVE_OPERATOR_PROMPT",
+        "selection_confirmed": False,
+    }
+    prepared = _prepare_input(payload)
+    assert prepared["operator_valuation_context"]["selected_model_family"] == "UNKNOWN"
+    assert prepared["operator_valuation_context"]["selection_confirmed"] is False
+
+
+def test_confirmed_interactive_sotp_is_preserved_as_operator_choice(monkeypatch):
+    monkeypatch.setattr(pilot, "_ask", lambda _prompt, default=None: "4")
+    context = pilot._ask_operator_valuation_context()
+    assert context["selected_model_family"] == "SOTP"
+    assert context["selection_source"] == "INTERACTIVE_OPERATOR_PROMPT"
+    assert context["selection_confirmed"] is True
