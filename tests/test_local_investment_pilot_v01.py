@@ -3418,8 +3418,16 @@ def test_dated_cash_distribution_changes_irr_and_target_entry_price_correctly():
     for row in forecast["scenarios"].values():
         row["cash_distributions_per_share"] = "1"
         row["cash_distribution_events"] = [{
-            "amount_per_share": "1",
+            "gross_amount_per_share": "1.10",
+            "tax_amount_per_share": "0.10",
+            "amount_per_share": "1.00",
+            "tax_basis": "Synthetic test assumption; explicit tax/holding-period basis.",
+            "tax_rationale": "Synthetic test assumption: gross 1.10 less tax 0.10 equals net 1.00.",
+            "record_date": "2026-10-19",
+            "ex_date": "2026-10-20",
             "payment_date": "2026-10-20",
+            "eligible_if_entered_at_cutoff": True,
+            "eligibility_basis": "Synthetic test assumption: cutoff precedes record date, so new entry at cutoff qualifies.",
             "evidence_refs": ["E1"],
         }]
     analysis, report = _analyse(payload, "TEST-DATED-DISTRIBUTION-IRR")
@@ -3427,7 +3435,8 @@ def test_dated_cash_distribution_changes_irr_and_target_entry_price_correctly():
     assert analysis["return_metrics"]["expected_annualized_return_method"] == "PROBABILITY_WEIGHTED_DATED_CASH_FLOW_IRR"
     assert analysis["return_metrics"]["return_price_cap_method"] == "PRESENT_VALUE_OF_PROBABILITY_WEIGHTED_DATED_CASH_FLOWS"
     assert Decimal(analysis["return_metrics"]["target_entry_price_for_return"]) > Decimal("0")
-    assert "支付日 2026-10-20：每股 1" in report
+    assert "登记日 2026-10-19；除息日 2026-10-20；支付日 2026-10-20" in report
+    assert "税前 1.10；税额 0.10；计入每股税后现金流 1.00" in report
 
 
 def test_distribution_review_must_explicitly_confirm_no_future_payouts_for_zero_to_count():
@@ -3438,3 +3447,59 @@ def test_distribution_review_must_explicitly_confirm_no_future_payouts_for_zero_
     analysis, _ = _analyse(payload, "TEST-DISTRIBUTION-UNKNOWN")
     assert analysis["return_metrics"] is None
     assert analysis["return_metrics_reason"] == "CASH_DISTRIBUTION_REVIEW_NOT_RESOLVED"
+
+
+def test_dated_distribution_tax_arithmetic_must_reconcile():
+    payload = _b5_ready_payload()
+    forecast = payload["forecast_valuation"]
+    forecast["cash_distribution_review"] = {
+        "status": "KNOWN_FUTURE_DISTRIBUTIONS",
+        "summary": "Synthetic official distribution implementation for tax arithmetic check.",
+        "evidence_refs": ["E1"],
+    }
+    for row in forecast["scenarios"].values():
+        row["cash_distributions_per_share"] = "1.00"
+        row["cash_distribution_events"] = [{
+            "gross_amount_per_share": "1.10",
+            "tax_amount_per_share": "0.05",
+            "amount_per_share": "1.00",
+            "tax_basis": "Synthetic explicit assumption",
+            "tax_rationale": "Synthetic tax assumption",
+            "record_date": "2026-10-19",
+            "ex_date": "2026-10-20",
+            "payment_date": "2026-10-20",
+            "eligible_if_entered_at_cutoff": True,
+            "eligibility_basis": "Synthetic cutoff-before-record-date assumption",
+            "evidence_refs": ["E1"],
+        }]
+    analysis, _ = _analyse(payload, "TEST-DISTRIBUTION-TAX-MISMATCH")
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == "BEAR_CASH_DISTRIBUTION_EVENT_1_GROSS_TAX_NET_MISMATCH"
+
+
+def test_dated_distribution_requires_record_date_eligibility_and_tax_basis():
+    payload = _b5_ready_payload()
+    forecast = payload["forecast_valuation"]
+    forecast["cash_distribution_review"] = {
+        "status": "KNOWN_FUTURE_DISTRIBUTIONS",
+        "summary": "Synthetic dated payout with unresolved eligibility.",
+        "evidence_refs": ["E1"],
+    }
+    for row in forecast["scenarios"].values():
+        row["cash_distributions_per_share"] = "1.00"
+        row["cash_distribution_events"] = [{
+            "gross_amount_per_share": "1.10",
+            "tax_amount_per_share": "0.10",
+            "amount_per_share": "1.00",
+            "tax_basis": "Synthetic explicit assumption",
+            "tax_rationale": "Synthetic tax assumption",
+            "record_date": "2026-10-19",
+            "ex_date": "2026-10-20",
+            "payment_date": "2026-10-20",
+            "eligible_if_entered_at_cutoff": False,
+            "eligibility_basis": "Synthetic purchase occurs after record date.",
+            "evidence_refs": ["E1"],
+        }]
+    analysis, _ = _analyse(payload, "TEST-DISTRIBUTION-ELIGIBILITY-UNKNOWN")
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == "BEAR_CASH_DISTRIBUTION_EVENT_1_ENTRY_ELIGIBILITY_NOT_CONFIRMED"
