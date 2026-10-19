@@ -2558,7 +2558,12 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             "",
             f"- 情景概率：{('UNKNOWN' if row.get('probability') in (None, '') else row.get('probability'))}",
             f"- 期末每股价值：{('UNKNOWN' if row.get('terminal_value_per_share') in (None, '') else row.get('terminal_value_per_share'))} {c['currency']}",
-            f"- 每股现金分配：{('UNKNOWN' if row.get('cash_distributions_per_share') in (None, '') else row.get('cash_distributions_per_share'))} {c['currency']}",
+            f"- 每股现金分配合计：{('UNKNOWN' if row.get('cash_distributions_per_share') in (None, '') else row.get('cash_distributions_per_share'))} {c['currency']}",
+            *(
+                [f"- 支付日 {event.get('payment_date', 'UNKNOWN')}：每股 {event.get('amount_per_share', 'UNKNOWN')}；证据 {', '.join(event.get('evidence_refs') or []) or 'UNKNOWN'}"
+                 for event in (row.get("cash_distribution_events") or []) if isinstance(event, Mapping)]
+                if isinstance(row.get("cash_distribution_events"), list) else []
+            ),
             f"- 情景理由：{' '.join(str(row.get('rationale') or '未提供').splitlines()).strip()}",
             *(
                 [
