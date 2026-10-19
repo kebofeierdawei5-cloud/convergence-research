@@ -375,7 +375,7 @@ def test_report_uses_portable_prose_instead_of_markdown_tables_and_python_dict_r
     assert "**价值驱动因素 1：growth A**" in report
     assert "**价值驱动因素 2：growth B**" in report
     assert "{'assumption_id':" not in report
-    assert analysis["unresolved_evidence_references"] == ["E-MISSING", "E1"]
+    assert analysis["unresolved_evidence_references"] == ["E-MISSING", "E1", "E2"]
 
 
 def test_report_keeps_source_url_punctuation_outside_link_and_renders_risk_summary():
