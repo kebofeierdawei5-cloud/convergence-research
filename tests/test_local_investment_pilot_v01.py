@@ -63,6 +63,15 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
                 "published_at": "2026-08-30",
                 "known_at": "2026-08-30",
                 "summary": "Synthetic test source; not real evidence.",
+            },
+            {
+                "source_id": "E2",
+                "title": "Synthetic no-future-distribution review support",
+                "source_class": "ISSUER_PRIMARY",
+                "source_ref": "https://example.invalid/distribution-review.pdf",
+                "published_at": "2026-08-29",
+                "known_at": "2026-08-29",
+                "summary": "Synthetic test source used only for the explicit distribution review; not real evidence.",
             }
         ],
         "assessment": {
@@ -120,6 +129,11 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
             "entry_value_reference_per_share": "150",
             "probabilities_calibrated": False,
             "assumptions": ["Synthetic assumptions; not forecasts."],
+            "cash_distribution_review": {
+                "status": "NO_FUTURE_DISTRIBUTIONS_CONFIRMED",
+                "summary": "Synthetic fixture only: no distributions scheduled in the test horizon.",
+                "evidence_refs": ["E2"],
+            },
             "scenarios": {
                 "bear": {
                     "probability": "0.20", "terminal_value_per_share": "120", "cash_distributions_per_share": "0",
@@ -257,7 +271,7 @@ def test_evidence_references_in_assessment_and_valuation_are_resolved_or_explici
         }
     ]
     prepared = _prepare_input(payload)
-    assert prepared["referenced_evidence_ids"] == ["E-ASSUMPTION-MISSING", "E-RISK-MISSING", "E1"]
+    assert prepared["referenced_evidence_ids"] == ["E-ASSUMPTION-MISSING", "E-RISK-MISSING", "E1", "E2"]
     assert prepared["unresolved_evidence_references"] == ["E-ASSUMPTION-MISSING", "E-RISK-MISSING"]
 
 
@@ -361,7 +375,7 @@ def test_report_uses_portable_prose_instead_of_markdown_tables_and_python_dict_r
     assert "**价值驱动因素 1：growth A**" in report
     assert "**价值驱动因素 2：growth B**" in report
     assert "{'assumption_id':" not in report
-    assert analysis["unresolved_evidence_references"] == ["E-MISSING", "E1"]
+    assert analysis["unresolved_evidence_references"] == ["E-MISSING", "E1", "E2"]
 
 
 def test_report_keeps_source_url_punctuation_outside_link_and_renders_risk_summary():
@@ -1247,8 +1261,7 @@ def test_uncertain_timing_for_referenced_evidence_forces_review_required(tmp_pat
     payload = _payload(cutoff="2026-10-10")
     payload["evidence_register"][0]["known_at"] = known_at
     if known_at in {"", "not-a-date"}:
-        # The fallback rule may use a known official publication date, so these
-        # cases deliberately make both known_at and published_at unavailable.
+        # No dated publication fallback exists in these deliberately unknown cases.
         payload["evidence_register"][0]["published_at"] = "UNKNOWN"
 
     prepared = _prepare_input(payload)
@@ -1419,7 +1432,7 @@ def test_missing_scenario_cash_distributions_do_not_silently_default_to_zero(sce
     assert "SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED" in analysis["decision"]["gating_issues"]
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
     assert f"### {scenario_name.title()} 情景" in report
-    assert "- 每股现金分配：UNKNOWN CNY" in report
+    assert "- 每股现金分配合计：UNKNOWN CNY" in report
     assert "不能将缺失字段默认为零" in report
 
 
@@ -2579,7 +2592,7 @@ def test_b5_does_not_apply_when_explicit_cash_distributions_are_unknown():
     assert analysis["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] == "120"
     assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
     assert analysis["forecast_valuation"]["scenarios"]["bull"]["terminal_value_per_share"] == "180"
-    assert "- 每股现金分配：UNKNOWN CNY" in report
+    assert "- 每股现金分配合计：UNKNOWN CNY" in report
     assert "每股现金分配：None CNY" not in report
 
 
@@ -3393,3 +3406,116 @@ def test_unknown_dynamic_page_time_stays_unknown_and_preserves_published_at_text
     assert normalized["time_status"] == "UNKNOWN"
     assert normalized["time_basis"] == "TIME_NOT_IDENTIFIABLE"
     assert "E1" in prepared["uncertain_timing_evidence_references"]
+
+
+def test_positive_cash_distribution_without_dates_blocks_return_metrics():
+    payload = _b5_ready_payload()
+    payload["forecast_valuation"]["cash_distribution_review"] = {
+        "status": "KNOWN_FUTURE_DISTRIBUTIONS",
+        "summary": "Synthetic distribution is assumed announced.",
+        "evidence_refs": ["E1"],
+    }
+    for row in payload["forecast_valuation"]["scenarios"].values():
+        row["cash_distributions_per_share"] = "1"
+        row["cash_distribution_events"] = []
+    analysis, _ = _analyse(payload, "TEST-DISTRIBUTION-DATE-MISSING")
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == "BEAR_CASH_DISTRIBUTION_TIMING_UNRESOLVED"
+
+
+def test_dated_cash_distribution_changes_irr_and_target_entry_price_correctly():
+    payload = _b5_ready_payload()
+    forecast = payload["forecast_valuation"]
+    forecast["cash_distribution_review"] = {
+        "status": "KNOWN_FUTURE_DISTRIBUTIONS",
+        "summary": "Synthetic official distribution implementation for date-aware calculation test.",
+        "evidence_refs": ["E1"],
+    }
+    for row in forecast["scenarios"].values():
+        row["cash_distributions_per_share"] = "1"
+        row["cash_distribution_events"] = [{
+            "gross_amount_per_share": "1.10",
+            "tax_amount_per_share": "0.10",
+            "amount_per_share": "1.00",
+            "tax_basis": "Synthetic test assumption; explicit tax/holding-period basis.",
+            "tax_rationale": "Synthetic test assumption: gross 1.10 less tax 0.10 equals net 1.00.",
+            "record_date": "2026-10-19",
+            "ex_date": "2026-10-20",
+            "payment_date": "2026-10-20",
+            "eligible_if_entered_at_cutoff": True,
+            "eligibility_basis": "Synthetic test assumption: cutoff precedes record date, so new entry at cutoff qualifies.",
+            "evidence_refs": ["E1"],
+        }]
+    analysis, report = _analyse(payload, "TEST-DATED-DISTRIBUTION-IRR")
+    assert analysis["return_metrics"] is not None
+    assert analysis["return_metrics"]["expected_annualized_return_method"] == "PROBABILITY_WEIGHTED_DATED_CASH_FLOW_IRR"
+    assert analysis["return_metrics"]["return_price_cap_method"] == "PRESENT_VALUE_OF_PROBABILITY_WEIGHTED_DATED_CASH_FLOWS"
+    assert Decimal(analysis["return_metrics"]["target_entry_price_for_return"]) > Decimal("0")
+    assert "登记日 2026-10-19；除息日 2026-10-20；支付日 2026-10-20" in report
+    assert "税前 1.10；税额 0.10；计入每股税后现金流 1.00" in report
+
+
+def test_distribution_review_must_explicitly_confirm_no_future_payouts_for_zero_to_count():
+    payload = _b5_ready_payload()
+    payload["forecast_valuation"]["cash_distribution_review"] = {
+        "status": "UNKNOWN", "summary": "", "evidence_refs": []
+    }
+    analysis, _ = _analyse(payload, "TEST-DISTRIBUTION-UNKNOWN")
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == "CASH_DISTRIBUTION_REVIEW_NOT_RESOLVED"
+
+
+def test_dated_distribution_tax_arithmetic_must_reconcile():
+    payload = _b5_ready_payload()
+    forecast = payload["forecast_valuation"]
+    forecast["cash_distribution_review"] = {
+        "status": "KNOWN_FUTURE_DISTRIBUTIONS",
+        "summary": "Synthetic official distribution implementation for tax arithmetic check.",
+        "evidence_refs": ["E1"],
+    }
+    for row in forecast["scenarios"].values():
+        row["cash_distributions_per_share"] = "1.00"
+        row["cash_distribution_events"] = [{
+            "gross_amount_per_share": "1.10",
+            "tax_amount_per_share": "0.05",
+            "amount_per_share": "1.00",
+            "tax_basis": "Synthetic explicit assumption",
+            "tax_rationale": "Synthetic tax assumption",
+            "record_date": "2026-10-19",
+            "ex_date": "2026-10-20",
+            "payment_date": "2026-10-20",
+            "eligible_if_entered_at_cutoff": True,
+            "eligibility_basis": "Synthetic cutoff-before-record-date assumption",
+            "evidence_refs": ["E1"],
+        }]
+    analysis, _ = _analyse(payload, "TEST-DISTRIBUTION-TAX-MISMATCH")
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == "BEAR_CASH_DISTRIBUTION_EVENT_1_GROSS_TAX_NET_MISMATCH"
+
+
+def test_dated_distribution_requires_record_date_eligibility_and_tax_basis():
+    payload = _b5_ready_payload()
+    forecast = payload["forecast_valuation"]
+    forecast["cash_distribution_review"] = {
+        "status": "KNOWN_FUTURE_DISTRIBUTIONS",
+        "summary": "Synthetic dated payout with unresolved eligibility.",
+        "evidence_refs": ["E1"],
+    }
+    for row in forecast["scenarios"].values():
+        row["cash_distributions_per_share"] = "1.00"
+        row["cash_distribution_events"] = [{
+            "gross_amount_per_share": "1.10",
+            "tax_amount_per_share": "0.10",
+            "amount_per_share": "1.00",
+            "tax_basis": "Synthetic explicit assumption",
+            "tax_rationale": "Synthetic tax assumption",
+            "record_date": "2026-10-19",
+            "ex_date": "2026-10-20",
+            "payment_date": "2026-10-20",
+            "eligible_if_entered_at_cutoff": False,
+            "eligibility_basis": "Synthetic purchase occurs after record date.",
+            "evidence_refs": ["E1"],
+        }]
+    analysis, _ = _analyse(payload, "TEST-DISTRIBUTION-ELIGIBILITY-UNKNOWN")
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == "BEAR_CASH_DISTRIBUTION_EVENT_1_ENTRY_ELIGIBILITY_NOT_CONFIRMED"
