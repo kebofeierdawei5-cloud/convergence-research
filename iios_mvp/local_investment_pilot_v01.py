@@ -1387,6 +1387,10 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "entry_value_reference_per_share": forecast_raw.get("entry_value_reference_per_share"),
         "probabilities_calibrated": forecast_raw.get("probabilities_calibrated") is True,
         "assumptions": _records(forecast_raw.get("assumptions")),
+        "cash_distribution_review": (
+            dict(forecast_raw.get("cash_distribution_review"))
+            if isinstance(forecast_raw.get("cash_distribution_review"), Mapping) else {}
+        ),
         "scenarios": forecast_raw.get("scenarios") if isinstance(forecast_raw.get("scenarios"), Mapping) else {},
         "thesis_break_stress": {
             "failure_trigger": str(stress_raw.get("failure_trigger") or ""),
