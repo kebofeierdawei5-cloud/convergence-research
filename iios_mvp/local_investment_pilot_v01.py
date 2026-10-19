@@ -20,6 +20,7 @@ import subprocess
 import sys
 import time as _time
 from typing import Any, Mapping
+from urllib.parse import urlsplit
 
 from .decision_kernel_v03 import evaluate_production_decision
 from .decision_state_machine_v01 import MIE_POLICY_OPTIONAL_EXPLANATORY
@@ -981,6 +982,142 @@ def _build_valuation_timing(
     }
 
 
+
+_OFFICIAL_EXCHANGE_DOMAINS = (
+    "sse.com.cn",
+    "szse.cn",
+    "cninfo.com.cn",
+    "hkexnews.hk",
+    "hkex.com.hk",
+)
+_OFFICIAL_REGULATOR_DOMAINS = (
+    "csrc.gov.cn",
+    "chinatax.gov.cn",
+    "gov.cn",
+    "mof.gov.cn",
+    "pbc.gov.cn",
+    "samr.gov.cn",
+    "ndrc.gov.cn",
+    "miit.gov.cn",
+)
+
+
+def _host_under_domains(host: str, domains: tuple[str, ...]) -> bool:
+    return any(host == domain or host.endswith("." + domain) for domain in domains)
+
+
+def _primary_source_domain_check(source_ref: Any, source_class: Any) -> dict[str, Any]:
+    """Conservative URL-host/class consistency check; never formal evidence admission."""
+    declared = str(source_class or "UNKNOWN").strip().upper()
+    ref = str(source_ref or "").strip()
+    try:
+        parsed = urlsplit(ref)
+        host = (parsed.hostname or "").lower().rstrip(".")
+    except ValueError:
+        parsed = None
+        host = ""
+    if parsed is None or parsed.scheme.lower() not in {"http", "https"} or not host:
+        return {
+            "host": host or None,
+            "status": "SOURCE_URL_INVALID",
+            "cash_distribution_eligible": False,
+        }
+    exchange_host = _host_under_domains(host, _OFFICIAL_EXCHANGE_DOMAINS)
+    regulator_host = _host_under_domains(host, _OFFICIAL_REGULATOR_DOMAINS)
+    if declared == "EXCHANGE_PRIMARY" and exchange_host:
+        status = "OFFICIAL_EXCHANGE_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED"
+    elif declared == "REGULATOR_PRIMARY" and regulator_host:
+        status = "OFFICIAL_REGULATOR_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED"
+    elif declared == "ISSUER_PRIMARY":
+        status = (
+            "SOURCE_CLASS_DOMAIN_MISMATCH"
+            if exchange_host or regulator_host
+            else "ISSUER_DOMAIN_NOT_INDEPENDENTLY_VERIFIED"
+        )
+    elif declared in {"EXCHANGE_PRIMARY", "REGULATOR_PRIMARY"}:
+        status = "SOURCE_CLASS_DOMAIN_MISMATCH" if exchange_host or regulator_host else "DOMAIN_NOT_ALLOWLISTED_AS_PRIMARY"
+    else:
+        status = "SOURCE_CLASS_NOT_PRIMARY"
+    return {
+        "host": host,
+        "status": status,
+        "cash_distribution_eligible": status in {
+            "OFFICIAL_EXCHANGE_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED",
+            "OFFICIAL_REGULATOR_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED",
+        },
+    }
+
+
+def _normalize_cash_distribution_review(raw_review: Any, evidence_register: list[dict[str, Any]]) -> dict[str, Any]:
+    """Preserve analyst claims while preventing model-supplied text from asserting verification."""
+    if not isinstance(raw_review, Mapping):
+        return {}
+    review = dict(raw_review)
+    analyst_summary = str(review.get("summary") or "")
+    review["analyst_supplied_summary_unverified"] = analyst_summary
+    review["formal_evidence_pit_admission"] = False
+    refs = _items(review.get("evidence_refs"))
+    evidence_by_id = {
+        str(row.get("source_id")): row for row in evidence_register
+        if isinstance(row, Mapping) and row.get("source_id")
+    }
+    acceptable_time_status = "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+    has_identifiable_summary = _is_identifiable_evidence_text(analyst_summary)
+    referenced = [evidence_by_id.get(str(ref)) for ref in refs]
+    all_primary_domains_match = bool(refs) and all(
+        source is not None and source.get("cash_distribution_primary_domain_eligible") is True
+        for source in referenced
+    )
+    all_cutoff_compatible = bool(refs) and all(
+        source is not None and source.get("time_status") == acceptable_time_status
+        for source in referenced
+    )
+    if not has_identifiable_summary:
+        validation_status = "REVIEW_SUMMARY_NOT_IDENTIFIABLE"
+        qualified_summary = analyst_summary
+    elif not refs:
+        validation_status = "EVIDENCE_REFERENCES_MISSING"
+        qualified_summary = "模型输入未提供可解析的现金分配核查证据引用；未来现金分配状态尚未核实，正式证据准入未完成。"
+    elif not all_primary_domains_match:
+        validation_status = "BLOCKED_SOURCE_DOMAIN_CLASS_OR_CUTOFF_REVIEW"
+        qualified_summary = "模型输入声称的现金分配状态未通过官方交易所/监管域名与来源类别一致性检查；未获准作为已核实现金流，正式证据准入未完成。"
+    elif not all_cutoff_compatible:
+        validation_status = "BLOCKED_SOURCE_DOMAIN_CLASS_OR_CUTOFF_REVIEW"
+        qualified_summary = "引用来源的域名/类别检查通过，但披露时点与研究截止时点的兼容性尚未解决；不得表述为已核实，正式证据准入未完成。"
+    else:
+        validation_status = "OFFICIAL_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED"
+        qualified_summary = "引用 URL 主机名与官方交易所/监管域及声明类别匹配，但链接内容真实性、公告发布时间与正式证据准入仍未全部独立确认；不得将模型声明表述为已核实。"
+    review["source_validation_status"] = validation_status
+    review["summary"] = qualified_summary
+    return review
+
+
+def _neutralize_stale_model_confirmation_language(
+    forecast: dict[str, Any], operator_context: Mapping[str, Any]
+) -> None:
+    """Do not let old AI-draft wording contradict a later explicit operator confirmation."""
+    rationale = str(forecast.get("model_rationale") or "")
+    if not rationale:
+        forecast["model_rationale_status"] = "MODEL_RATIONALE_NOT_PROVIDED"
+        return
+    patterns = (
+        re.compile(r"操作者.{0,12}(?:尚待|仍待|待|尚需|需要|尚未).{0,12}(?:本地)?确认", re.IGNORECASE),
+        re.compile(r"\b(?:operator|user)\b.{0,24}\b(?:pending|awaiting|needs? to)\b.{0,16}\bconfirmation\b", re.IGNORECASE),
+    )
+    if operator_context.get("selection_confirmed") is True:
+        original = rationale
+        for pattern in patterns:
+            rationale = pattern.sub(
+                "【旧稿待确认措辞已按本次本地操作者确认记录清理】", rationale
+            )
+        if rationale != original:
+            forecast["model_rationale_original_untrusted"] = original
+            forecast["model_rationale"] = rationale
+            forecast["model_rationale_status"] = "STALE_OPERATOR_CONFIRMATION_LANGUAGE_NEUTRALIZED"
+            return
+    forecast["model_rationale_status"] = "AS_PROVIDED"
+
+
 def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     if payload.get("schema_version") != PILOT_SCHEMA:
         raise LocalInvestmentPilotError("PILOT_INPUT_SCHEMA_MISMATCH")
@@ -1115,11 +1252,15 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             else:
                 source_time_status = "KNOWN_AT_PRECISION_INSUFFICIENT"
             time_basis = "PUBLISHED_DATE_ONLY_FALLBACK"
+        domain_check = _primary_source_domain_check(row.get("source_ref"), row.get("source_class"))
         sources.append({
             "source_id": source_id,
             "title": str(row.get("title") or "未提供标题"),
             "source_class": str(row.get("source_class") or "UNKNOWN"),
             "source_ref": str(row.get("source_ref") or "UNKNOWN"),
+            "source_url_host": domain_check["host"],
+            "source_domain_class_status": domain_check["status"],
+            "cash_distribution_primary_domain_eligible": domain_check["cash_distribution_eligible"],
             "known_at": known_text or None,
             "known_at_original": known_at_original or None,
             "published_at": published_at_original or None,
@@ -1378,6 +1519,9 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     assessment["thesis"]["drivers"] = assessment["thesis"].get("drivers") if isinstance(assessment["thesis"].get("drivers"), list) else []
 
     forecast_raw = payload.get("forecast_valuation") if isinstance(payload.get("forecast_valuation"), Mapping) else {}
+    cash_distribution_review = _normalize_cash_distribution_review(
+        forecast_raw.get("cash_distribution_review"), sources
+    )
     raw_driver_forecast = payload.get("operating_driver_forecast")
     raw_valuation_transmission = payload.get("valuation_transmission")
     raw_operator_valuation_context = payload.get("operator_valuation_context")
@@ -1392,10 +1536,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "entry_value_reference_per_share": forecast_raw.get("entry_value_reference_per_share"),
         "probabilities_calibrated": forecast_raw.get("probabilities_calibrated") is True,
         "assumptions": _records(forecast_raw.get("assumptions")),
-        "cash_distribution_review": (
-            dict(forecast_raw.get("cash_distribution_review"))
-            if isinstance(forecast_raw.get("cash_distribution_review"), Mapping) else {}
-        ),
+        "cash_distribution_review": cash_distribution_review,
         "scenarios": forecast_raw.get("scenarios") if isinstance(forecast_raw.get("scenarios"), Mapping) else {},
         "thesis_break_stress": {
             "failure_trigger": str(stress_raw.get("failure_trigger") or ""),
@@ -1608,6 +1749,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "selection_source": selection_source,
         "selection_confirmed": selection_confirmed,
     }
+    _neutralize_stale_model_confirmation_language(forecast, operator_valuation_context)
     valuation_transmission = evaluate_valuation_transmission(
         raw_valuation_transmission,
         operating_driver_forecast=operating_driver_forecast,
@@ -1747,6 +1889,8 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
             or str(source.get("source_class") or "").upper() not in primary_classes
         ):
             return None, "CASH_DISTRIBUTION_REVIEW_EVIDENCE_NOT_CUTOFF_COMPATIBLE_PRIMARY"
+        if source.get("cash_distribution_primary_domain_eligible") is not True:
+            return None, "CASH_DISTRIBUTION_REVIEW_SOURCE_DOMAIN_CLASS_NOT_ACCEPTED"
 
     cutoff_date = _date((prepared.get("case") or {}).get("as_of_date"), "CASE_AS_OF_DATE")
     try:
@@ -1825,6 +1969,8 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
                     or str(source.get("source_class") or "").upper() not in primary_classes
                 ):
                     return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_EVIDENCE_NOT_CUTOFF_COMPATIBLE_PRIMARY"
+                if source.get("cash_distribution_primary_domain_eligible") is not True:
+                    return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_SOURCE_DOMAIN_CLASS_NOT_ACCEPTED"
             years = Decimal((payment_date - cutoff_date).days) / Decimal("365")
             event_total += amount
             normalized_events.append({
@@ -2259,6 +2405,11 @@ def _decision(
         issues.append("SCENARIO_WEALTH_ORDERING_INCONSISTENT")
     if reason and reason.endswith("_SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED"):
         issues.append("SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED")
+    if reason and (
+        "CASH_DISTRIBUTION_REVIEW_SOURCE_DOMAIN_CLASS_NOT_ACCEPTED" in reason
+        or ("_CASH_DISTRIBUTION_EVENT_" in reason and "SOURCE_DOMAIN_CLASS_NOT_ACCEPTED" in reason)
+    ):
+        issues.append("CASH_DISTRIBUTION_SOURCE_DOMAIN_CLASS_NOT_ACCEPTED")
     if stress_review:
         issues.extend(issue for issue in (stress_review.get("issues") or []) if issue not in issues)
 
@@ -2274,6 +2425,7 @@ def _decision(
         "OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT",
         "SCENARIO_WEALTH_ORDERING_INCONSISTENT",
         "SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED",
+        "CASH_DISTRIBUTION_SOURCE_DOMAIN_CLASS_NOT_ACCEPTED",
         "BEAR_FAILURE_PATH_INCOMPLETE",
         "THESIS_BREAK_STRESS_INPUTS_INCOMPLETE",
         "THESIS_BREAK_STRESS_VALUE_INVALID",
@@ -2570,8 +2722,8 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "## 四、Forecast / Valuation",
         "",
         f"- 模型名称：{f['model']}",
-        f"- 模型选择理由：{f['model_rationale'] or '未提供'}",
-        f"- 现金分配核查：{(f.get('cash_distribution_review') or {}).get('status', 'UNKNOWN')}；{(f.get('cash_distribution_review') or {}).get('summary', '未提供') or '未提供'}；证据 {', '.join((f.get('cash_distribution_review') or {}).get('evidence_refs') or []) or 'UNKNOWN'}",
+        f"- 模型选择理由（清理状态 {f.get('model_rationale_status', 'UNKNOWN')}）：{f['model_rationale'] or '未提供'}",
+        f"- 现金分配核查（模型输入声明，非正式证据准入）：{(f.get('cash_distribution_review') or {}).get('status', 'UNKNOWN')}；来源域名/类别核验：{(f.get('cash_distribution_review') or {}).get('source_validation_status', 'UNKNOWN')}；正式证据准入：未完成；{(f.get('cash_distribution_review') or {}).get('summary', '未提供') or '未提供'}；证据 {', '.join((f.get('cash_distribution_review') or {}).get('evidence_refs') or []) or 'UNKNOWN'}。
         f"- 主估值参考锚（不是 15% 回报门槛价格，也不是 MIE）：{f.get('entry_value_reference_per_share') or 'UNKNOWN'} {c['currency']}/股",
         f"- 情景概率是否校准：{'是' if f['probabilities_calibrated'] else '否 / 未校准'}",
         "",
@@ -2798,7 +2950,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         for row in evidence_rows:
             lines.extend([
                 f"- **{row['source_id']} — {row['title']}**",
-                f"  类型：{row['source_class']}；published_at：{row.get('published_at') or 'UNKNOWN'}；known_at：{row['known_at'] or 'UNKNOWN'}；时间依据：{row.get('time_basis', 'UNKNOWN')}；时间精度：{'仅日期，原始标注具体时分未知' if row.get('known_at_precision') == 'DATE_ONLY_EXPLICIT_TIME_UNKNOWN' else '仅日期' if row.get('known_at_precision') == 'DATE_ONLY' else '时间戳' if row.get('known_at_precision') == 'TIMESTAMP_OR_OFFSET_DATETIME' else 'UNKNOWN'}；时间状态：{row['time_status']}。",
+                f"  类型：{row['source_class']}；URL 主机名：{row.get('source_url_host') or 'UNKNOWN'}；域名/类别检查：{row.get('source_domain_class_status', 'UNKNOWN')}；published_at：{row.get('published_at') or 'UNKNOWN'}；known_at：{row['known_at'] or 'UNKNOWN'}；时间依据：{row.get('time_basis', 'UNKNOWN')}；时间精度：{'仅日期，原始标注具体时分未知' if row.get('known_at_precision') == 'DATE_ONLY_EXPLICIT_TIME_UNKNOWN' else '仅日期' if row.get('known_at_precision') == 'DATE_ONLY' else '时间戳' if row.get('known_at_precision') == 'TIMESTAMP_OR_OFFSET_DATETIME' else 'UNKNOWN'}；时间状态：{row['time_status']}。",
                 f"  来源位置：{_source_ref_markdown(row['source_ref'])}。",
                 f"  摘要：{' '.join(str(row['summary']).splitlines()).strip()}",
                 "  正式证据准入：未完成。",
@@ -2828,6 +2980,9 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         ),
         "SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED": (
             "Bear/Base/Bull 至少一个情景未明确提供每股现金分配（包括明确为 0）；不能将缺失字段默认为零，因此回报、目标入场价和 B6 保持未知。"
+        ),
+        "CASH_DISTRIBUTION_SOURCE_DOMAIN_CLASS_NOT_ACCEPTED": (
+            "分红/现金分配证据的 URL 主机名与声明来源类别不匹配、未在允许的交易所/监管域名清单内，或发行人域名无法独立确认；不得据此核算现金流，回报、目标入场价和 B6 保持未知。"
         ),
         "THESIS_BREAK_STRESS_CASH_DISTRIBUTIONS_UNRESOLVED": (
             "独立论点失效压力测试未明确提供每股现金分配；不能将缺失字段默认为零，压力总财富与风险准备状态未解决。"
