@@ -52,6 +52,9 @@ REPLAY_COMPARISON_FIELDS = (
     "case",
     "price_input",
     "evidence_register",
+    "duplicate_evidence_ids",
+    "untraceable_evidence_ids",
+    "untraceable_evidence_fields",
     "referenced_evidence_ids",
     "unresolved_evidence_references",
     "after_cutoff_evidence_references",
@@ -61,6 +64,8 @@ REPLAY_COMPARISON_FIELDS = (
     "operating_driver_forecast",
     "valuation_transmission",
     "operator_valuation_context",
+    "valuation_model_consistency",
+    "valuation_timing",
     "price_zone_sensitivity",
     "decision_parameters",
     "portfolio_package",
@@ -1839,7 +1844,7 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
         }
 
     # Preserve the prior scenario-total-wealth ordering contract. Timing and tax
-    # metadata change the return calculation, not the requirement that Bear <= Base <= Bull.
+    # metadata change return arithmetic, not the requirement Bear <= Base <= Bull.
     try:
         scenario_wealth = {
             name: _number(rows[name]["terminal_value_per_share"], f"SCENARIO_{name}_TERMINAL")
@@ -2779,7 +2784,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         for row in evidence_rows:
             lines.extend([
                 f"- **{row['source_id']} — {row['title']}**",
-                f"  类型：{row['source_class']}；published_at：{row.get('published_at') or 'UNKNOWN'}；known_at：{row['known_at'] or 'UNKNOWN'}；时间依据：{row.get('time_basis', 'UNKNOWN')}；时间精度：{'仅日期，原始标注具体时分未知' if row.get('known_at_precision') == 'DATE_ONLY_EXPLICIT_TIME_UNKNOWN' else '仅日期' if row.get('known_at_precision') == 'DATE_ONLY' else '时间戳' if row.get('known_at_precision') == 'TIMESTAMP_OR_OFFSET_DATETIME' else 'UNKNOWN'}；时间状态：{row['time_status']}。",
+                f"  类型：{row['source_class']}；known_at：{row['known_at'] or 'UNKNOWN'}；时间精度：{'仅日期，原始标注具体时分未知' if row.get('known_at_precision') == 'DATE_ONLY_EXPLICIT_TIME_UNKNOWN' else '仅日期' if row.get('known_at_precision') == 'DATE_ONLY' else '时间戳' if row.get('known_at_precision') == 'TIMESTAMP_OR_OFFSET_DATETIME' else 'UNKNOWN'}；时间状态：{row['time_status']}。",
                 f"  来源位置：{_source_ref_markdown(row['source_ref'])}。",
                 f"  摘要：{' '.join(str(row['summary']).splitlines()).strip()}",
                 "  正式证据准入：未完成。",
