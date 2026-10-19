@@ -866,6 +866,7 @@ def test_structured_risk_item_requires_its_own_resolved_cutoff_compatible_eviden
         payload["evidence_register"][0]["known_at"] = "2026-10-11T10:00:00+08:00"
     elif source_change == "KNOWN_AT_INVALID":
         payload["evidence_register"][0]["known_at"] = "not-a-date"
+        payload["evidence_register"][0]["published_at"] = "UNKNOWN"
 
     analysis, report = _analyse(payload, "TEST-RISK-ITEM-OWN-EVIDENCE")
 
@@ -1245,6 +1246,10 @@ def test_explicit_timestamp_cutoff_must_be_timezone_aware_and_match_as_of_date()
 def test_uncertain_timing_for_referenced_evidence_forces_review_required(tmp_path, known_at, expected_status):
     payload = _payload(cutoff="2026-10-10")
     payload["evidence_register"][0]["known_at"] = known_at
+    if known_at in {"", "not-a-date"}:
+        # The fallback rule may use a known official publication date, so these
+        # cases deliberately make both known_at and published_at unavailable.
+        payload["evidence_register"][0]["published_at"] = "UNKNOWN"
 
     prepared = _prepare_input(payload)
     assert prepared["evidence_register"][0]["time_status"] == expected_status
