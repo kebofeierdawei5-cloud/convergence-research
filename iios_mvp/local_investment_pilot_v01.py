@@ -1286,8 +1286,19 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         # Keep it for display/audit, but do not infer POSITIVE or a passing gate.
         impact = _status(item.get("impact"), {"POSITIVE", "NEGATIVE", "MIXED", "UNKNOWN"})
         driver_type = str(item.get("type") or item.get("driver_type") or item.get("category") or "").strip()
-        historical_evidence = str(item.get("historical_evidence") or item.get("historical_basis") or "").strip()
-        valuation_transmission = str(item.get("valuation_transmission") or "").strip()
+        # Accept the current prompt's documented aliases without losing the
+        # source wording: older/research-facing inputs use observed_basis and
+        # transmission, while the normalized analysis schema uses
+        # historical_evidence and valuation_transmission.
+        historical_evidence = str(
+            item.get("historical_evidence") or item.get("historical_basis")
+            or item.get("observed_basis") or item.get("historical_observation") or ""
+        ).strip()
+        valuation_transmission = str(
+            item.get("valuation_transmission") or item.get("transmission")
+            or item.get("value_transmission") or ""
+        ).strip()
+        unresolved_inputs = _items(item.get("unresolved_inputs"))
         rationale = str(
             item.get("rationale") or item.get("summary") or item.get("mechanism")
             or valuation_transmission or ""
@@ -1311,6 +1322,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             "driver_type": driver_type,
             "historical_evidence": historical_evidence,
             "valuation_transmission": valuation_transmission,
+            "unresolved_inputs": unresolved_inputs,
             "source_status": str(item.get("status") or "UNKNOWN"),
             "impact": impact,
             "rationale": rationale,
@@ -2364,6 +2376,10 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
                 lines.append(f"   类型：{item['driver_type']}")
             lines.append(f"   历史依据：{item.get('historical_evidence') or 'UNKNOWN'}")
             lines.append(f"   价值传导：{item.get('valuation_transmission') or 'UNKNOWN'}")
+            unresolved_inputs = item.get("unresolved_inputs") if isinstance(item.get("unresolved_inputs"), list) else []
+            if unresolved_inputs:
+                lines.append("   尚待验证的经营输入：")
+                lines.extend(f"   - {gap}" for gap in unresolved_inputs)
             if item.get("rationale") and item["rationale"] != item.get("valuation_transmission"):
                 lines.append(f"   研究理由：{item['rationale']}")
             elif not item.get("rationale") and not item.get("valuation_transmission"):
