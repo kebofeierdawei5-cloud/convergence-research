@@ -120,6 +120,11 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
             "entry_value_reference_per_share": "150",
             "probabilities_calibrated": False,
             "assumptions": ["Synthetic assumptions; not forecasts."],
+            "cash_distribution_review": {
+                "status": "NO_FUTURE_DISTRIBUTIONS_CONFIRMED",
+                "summary": "Synthetic fixture only: no distributions scheduled in the test horizon.",
+                "evidence_refs": ["E1"],
+            },
             "scenarios": {
                 "bear": {
                     "probability": "0.20", "terminal_value_per_share": "120", "cash_distributions_per_share": "0",
@@ -3385,3 +3390,51 @@ def test_unknown_dynamic_page_time_stays_unknown_and_preserves_published_at_text
     assert normalized["time_status"] == "UNKNOWN"
     assert normalized["time_basis"] == "TIME_NOT_IDENTIFIABLE"
     assert "E1" in prepared["uncertain_timing_evidence_references"]
+
+
+def test_positive_cash_distribution_without_dates_blocks_return_metrics():
+    payload = _b5_ready_payload()
+    payload["forecast_valuation"]["cash_distribution_review"] = {
+        "status": "KNOWN_FUTURE_DISTRIBUTIONS",
+        "summary": "Synthetic distribution is assumed announced.",
+        "evidence_refs": ["E1"],
+    }
+    for row in payload["forecast_valuation"]["scenarios"].values():
+        row["cash_distributions_per_share"] = "1"
+        row["cash_distribution_events"] = []
+    analysis, _ = _analyse(payload, "TEST-DISTRIBUTION-DATE-MISSING")
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == "BEAR_CASH_DISTRIBUTION_TIMING_UNRESOLVED"
+
+
+def test_dated_cash_distribution_changes_irr_and_target_entry_price_correctly():
+    payload = _b5_ready_payload()
+    forecast = payload["forecast_valuation"]
+    forecast["cash_distribution_review"] = {
+        "status": "KNOWN_FUTURE_DISTRIBUTIONS",
+        "summary": "Synthetic official distribution implementation for date-aware calculation test.",
+        "evidence_refs": ["E1"],
+    }
+    for row in forecast["scenarios"].values():
+        row["cash_distributions_per_share"] = "1"
+        row["cash_distribution_events"] = [{
+            "amount_per_share": "1",
+            "payment_date": "2026-10-20",
+            "evidence_refs": ["E1"],
+        }]
+    analysis, report = _analyse(payload, "TEST-DATED-DISTRIBUTION-IRR")
+    assert analysis["return_metrics"] is not None
+    assert analysis["return_metrics"]["expected_annualized_return_method"] == "PROBABILITY_WEIGHTED_DATED_CASH_FLOW_IRR"
+    assert analysis["return_metrics"]["return_price_cap_method"] == "PRESENT_VALUE_OF_PROBABILITY_WEIGHTED_DATED_CASH_FLOWS"
+    assert Decimal(analysis["return_metrics"]["target_entry_price_for_return"]) > Decimal("0")
+    assert "支付日 2026-10-20：每股 1" in report
+
+
+def test_distribution_review_must_explicitly_confirm_no_future_payouts_for_zero_to_count():
+    payload = _b5_ready_payload()
+    payload["forecast_valuation"]["cash_distribution_review"] = {
+        "status": "UNKNOWN", "summary": "", "evidence_refs": []
+    }
+    analysis, _ = _analyse(payload, "TEST-DISTRIBUTION-UNKNOWN")
+    assert analysis["return_metrics"] is None
+    assert analysis["return_metrics_reason"] == "CASH_DISTRIBUTION_REVIEW_NOT_RESOLVED"
