@@ -1,10 +1,10 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-18
+Snapshot: 2026-10-19
 Authority: this file is the **only canonical Current State Index**.
 
-## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-18
+## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-19
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
@@ -14,7 +14,9 @@ Authority: this file is the **only canonical Current State Index**.
 
 **B11/B12 completion and boundary:** B11 and B12 are complete on canonical `main` as an operator-authorized continuation while B9's private artifact upload is deferred. B11 changes the generated research prompt and its contract test; B12 adds per-driver missing-history/missing-transmission diagnostics and explicit report output. Neither introduces new top-level JSON fields or changes return/entry-price calculations. The source changes were tested by the relevant CI/workflow matrix, but remain **PILOT_NON_CANONICAL** and do not waive the B9 local-run evidence requirement. Do not add more generic gates without a concrete, reproducible issue.
 
-**Next task — B13 real-company analysis-quality application:** continue with an evidence-backed analysis on an already specified real company case using its existing cutoff, operator-attested price and portfolio inputs unchanged. Apply the B11 prompt chain and B12 value-driver diagnostics to the actual business drivers, driver-specific evidence, financial transmission, independent Bear/Base/Bull assumptions, MIE/expectation gap, target entry price and thesis-reassessment triggers. Use public primary sources and label missing items UNKNOWN; do not claim this substitutes for or passes B9. After B13, review whether a materially useful investment-analysis improvement remains; avoid unrelated infrastructure scope. **B9 remains independently OPEN / NOT VERIFIED** until its first-run/Replay JSON, reports, receipts, hashes and acceptance log can be inspected.
+**B13 five repair batches — driven by the 2026-10-18 uploaded 603699 pilot audit:** PR #522 records the operator's explicit main-model choice and confirmation provenance (unconfirmed must remain UNKNOWN); PR #527 maps prompt-schema aliases `observed_basis` / `transmission` into normalized value-driver fields and retains unresolved inputs; PR #528 preserves `published_at`, date precision, and explicit unknown-clock/dynamic-page semantics without upgrading evidence to formal PIT admission; PR #529 requires evidence-backed dividend review, record/ex/payment dates, purchase eligibility and gross/tax/net reconciliation before dated-cashflow IRR and return-entry price computation; PR #530 extends Replay comparisons to evidence-integrity fields, `valuation_model_consistency`, and `valuation_timing`. These fixes are scoped to concrete defects in the audited pilot, not a new infrastructure track. The same tests and final PR heads must pass before they are treated as complete.
+
+**Next acceptance task — fresh current-main macOS run and Replay:** after the five repair PRs are merged and their workflows pass, rerun the one-click full flow and Replay on current canonical main, then inspect first-run and Replay `input.json`, `analysis.json`, `report.md`, `pilot_receipt.json`, hash manifests, and acceptance log. Old artifacts from before these schema/valuation changes are useful for defect reproduction but cannot demonstrate the repaired end-to-end behavior. **B9 remains independently OPEN / NOT VERIFIED** until that fresh bundle and log are reviewed. Keep operator-provided price and case cutoff unchanged unless the operator explicitly starts a new case.
 
 Keep C1/C2 rights and formal-admission work, production Host/provider setup, P0 zero-job diagnostics, anti-tamper expansion, local-model/API work, screening and auto-trading outside this delivery sequence unless the operator changes scope. These tracks neither substitute for the B9 review nor block the explicitly non-canonical single-user pilot.
 
