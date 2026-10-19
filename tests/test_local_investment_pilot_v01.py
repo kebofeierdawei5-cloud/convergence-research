@@ -1419,7 +1419,7 @@ def test_missing_scenario_cash_distributions_do_not_silently_default_to_zero(sce
     assert "SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED" in analysis["decision"]["gating_issues"]
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
     assert f"### {scenario_name.title()} 情景" in report
-    assert "- 每股现金分配：UNKNOWN CNY" in report
+    assert "- 每股现金分配合计：UNKNOWN CNY" in report
     assert "不能将缺失字段默认为零" in report
 
 
@@ -2579,7 +2579,7 @@ def test_b5_does_not_apply_when_explicit_cash_distributions_are_unknown():
     assert analysis["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] == "120"
     assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
     assert analysis["forecast_valuation"]["scenarios"]["bull"]["terminal_value_per_share"] == "180"
-    assert "- 每股现金分配：UNKNOWN CNY" in report
+    assert "- 每股现金分配合计：UNKNOWN CNY" in report
     assert "每股现金分配：None CNY" not in report
 
 
