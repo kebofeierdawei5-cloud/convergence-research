@@ -2723,7 +2723,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
         f"- 模型名称：{f['model']}",
         f"- 模型选择理由（清理状态 {f.get('model_rationale_status', 'UNKNOWN')}）：{f['model_rationale'] or '未提供'}",
-        f"- 现金分配核查（模型输入声明，非正式证据准入）：{(f.get('cash_distribution_review') or {}).get('status', 'UNKNOWN')}；来源域名/类别核验：{(f.get('cash_distribution_review') or {}).get('source_validation_status', 'UNKNOWN')}；正式证据准入：未完成；{(f.get('cash_distribution_review') or {}).get('summary', '未提供') or '未提供'}；证据 {', '.join((f.get('cash_distribution_review') or {}).get('evidence_refs') or []) or 'UNKNOWN'}。
+        f"- 现金分配核查（模型输入声明，非正式证据准入）：{(f.get('cash_distribution_review') or {}).get('status', 'UNKNOWN')}；来源域名/类别核验：{(f.get('cash_distribution_review') or {}).get('source_validation_status', 'UNKNOWN')}；正式证据准入：未完成；{(f.get('cash_distribution_review') or {}).get('summary', '未提供') or '未提供'}；证据 {', '.join((f.get('cash_distribution_review') or {}).get('evidence_refs') or []) or 'UNKNOWN'}。",
         f"- 主估值参考锚（不是 15% 回报门槛价格，也不是 MIE）：{f.get('entry_value_reference_per_share') or 'UNKNOWN'} {c['currency']}/股",
         f"- 情景概率是否校准：{'是' if f['probabilities_calibrated'] else '否 / 未校准'}",
         "",
