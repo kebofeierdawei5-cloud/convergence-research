@@ -1540,12 +1540,22 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     selected_model_family = str(operator_context_raw.get("selected_model_family") or "UNKNOWN").strip().upper()
     if selected_model_family not in allowed_model_families:
         selected_model_family = "UNKNOWN"
+    selection_source = str(
+        operator_context_raw.get("selection_source") or "LEGACY_OPERATOR_INPUT_UNVERIFIED"
+    ).strip().upper()
+    selection_confirmed = operator_context_raw.get("selection_confirmed") is True
+    # A wizard's explicit "0 = 暂不确认" is authoritative: downstream code must
+    # not reinterpret any stale/AI-supplied family as an operator confirmation.
+    if selection_source == "INTERACTIVE_OPERATOR_PROMPT" and not selection_confirmed:
+        selected_model_family = "UNKNOWN"
     baseline_includes_raw = operator_context_raw.get("baseline_includes_project")
     baseline_includes_project = baseline_includes_raw if isinstance(baseline_includes_raw, bool) else None
     operator_valuation_context = {
         "selected_model_family": selected_model_family,
         "baseline_includes_project": baseline_includes_project,
         "input_owner": "OPERATOR",
+        "selection_source": selection_source,
+        "selection_confirmed": selection_confirmed,
     }
     valuation_transmission = evaluate_valuation_transmission(
         raw_valuation_transmission,
@@ -2388,6 +2398,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "### 主估值模型一致性门禁",
         "",
         f"- 操作者选择的主模型类别：{model_contract.get('operator_selected_model_family', 'UNKNOWN')}",
+        f"- 模型选择来源：{(analysis.get('operator_valuation_context') or {}).get('selection_source', 'LEGACY_OPERATOR_INPUT_UNVERIFIED')}；操作者是否明确确认：{(analysis.get('operator_valuation_context') or {}).get('selection_confirmed', False)}",
         f"- 当前情景实际计算模型类别：{model_contract.get('calculation_model_family', 'UNKNOWN')}（{model_contract.get('calculation_model_name', 'UNKNOWN')}）",
         f"- 根据模型名称解析出的类别：{model_contract.get('model_name_inferred_family', 'UNKNOWN')}；名称/类别交叉校验：{model_contract.get('model_family_name_crosscheck', 'UNKNOWN')}",
         f"- 一致性状态：**{model_contract.get('status', 'UNKNOWN')}**；可用于主模型价格计算：{model_contract.get('primary_model_price_calculation_eligible', False)}",
@@ -3729,10 +3740,17 @@ def _ask_operator_valuation_context() -> dict[str, Any]:
                 break
             print("请输入 0、1 或 2。")
         baseline_includes_project = {"0": None, "1": True, "2": False}[scope_choice]
+    confirmed = family != "UNKNOWN"
+    print(
+        f"已记录主估值模型选择：{family}；操作者明确确认：{'是' if confirmed else '否'}",
+        flush=True,
+    )
     return {
         "selected_model_family": family,
         "baseline_includes_project": baseline_includes_project,
         "input_owner": "OPERATOR",
+        "selection_source": "INTERACTIVE_OPERATOR_PROMPT",
+        "selection_confirmed": confirmed,
     }
 
 
