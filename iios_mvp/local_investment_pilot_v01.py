@@ -1387,6 +1387,10 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "entry_value_reference_per_share": forecast_raw.get("entry_value_reference_per_share"),
         "probabilities_calibrated": forecast_raw.get("probabilities_calibrated") is True,
         "assumptions": _records(forecast_raw.get("assumptions")),
+        "cash_distribution_review": (
+            dict(forecast_raw.get("cash_distribution_review"))
+            if isinstance(forecast_raw.get("cash_distribution_review"), Mapping) else {}
+        ),
         "scenarios": forecast_raw.get("scenarios") if isinstance(forecast_raw.get("scenarios"), Mapping) else {},
         "thesis_break_stress": {
             "failure_trigger": str(stress_raw.get("failure_trigger") or ""),
@@ -1703,6 +1707,50 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
     scenarios = forecast.get("scenarios") or {}
     if anchor in (None, "") or not isinstance(scenarios, Mapping) or set(scenarios) != set(SCENARIOS):
         return None, "ENTRY_REFERENCE_OR_BEAR_BASE_BULL_SCENARIOS_MISSING"
+
+    # Zero is only acceptable when the analyst explicitly confirms no future
+    # distribution over the holding horizon; positive amounts require dated,
+    # evidence-linked cashflows instead of an implicit terminal-date assumption.
+    review = forecast.get("cash_distribution_review")
+    if not isinstance(review, Mapping):
+        return None, "CASH_DISTRIBUTION_REVIEW_NOT_RESOLVED"
+    review_status = str(review.get("status") or "UNKNOWN").strip().upper()
+    if review_status not in {"KNOWN_FUTURE_DISTRIBUTIONS", "NO_FUTURE_DISTRIBUTIONS_CONFIRMED"}:
+        return None, "CASH_DISTRIBUTION_REVIEW_NOT_RESOLVED"
+    if not _is_identifiable_evidence_text(review.get("summary")):
+        return None, "CASH_DISTRIBUTION_REVIEW_RATIONALE_NOT_IDENTIFIABLE"
+    review_refs = _items(review.get("evidence_refs"))
+    if not review_refs:
+        return None, "CASH_DISTRIBUTION_REVIEW_EVIDENCE_MISSING"
+    evidence_by_id = {
+        str(item.get("source_id")): item
+        for item in (prepared.get("evidence_register") or [])
+        if isinstance(item, Mapping) and item.get("source_id")
+    }
+    blocked_source_ids = (
+        set(prepared.get("unresolved_evidence_references") or [])
+        | set(prepared.get("after_cutoff_evidence_references") or [])
+        | set(prepared.get("uncertain_timing_evidence_references") or [])
+    )
+    bad_timing = {"UNKNOWN", "KNOWN_AT_INVALID", "KNOWN_AT_PRECISION_INSUFFICIENT", "AFTER_CUTOFF"}
+    primary_classes = {"ISSUER_PRIMARY", "EXCHANGE_PRIMARY", "REGULATOR_PRIMARY"}
+    for ref in review_refs:
+        source = evidence_by_id.get(str(ref))
+        if (
+            source is None or str(ref) in blocked_source_ids
+            or source.get("time_status") in bad_timing
+            or str(source.get("source_class") or "").upper() not in primary_classes
+        ):
+            return None, "CASH_DISTRIBUTION_REVIEW_EVIDENCE_NOT_CUTOFF_COMPATIBLE_PRIMARY"
+
+    cutoff_date = _date((prepared.get("case") or {}).get("as_of_date"), "CASE_AS_OF_DATE")
+    try:
+        terminal_date = _date(forecast.get("valuation_terminal_date"), "VALUATION_TERMINAL_DATE")
+    except LocalInvestmentPilotError:
+        return None, "VALUATION_TERMINAL_DATE_NOT_IDENTIFIABLE"
+    if terminal_date <= cutoff_date:
+        return None, "VALUATION_TERMINAL_DATE_NOT_AFTER_CUTOFF"
+
     rows: dict[str, Any] = {}
     for name in SCENARIOS:
         row = scenarios.get(name)
@@ -1714,12 +1762,84 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
             return None, f"{name.upper()}_SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED"
         if not _is_identifiable_evidence_text(row.get("rationale")):
             return None, f"{name.upper()}_SCENARIO_PROBABILITY_RATIONALE_NOT_IDENTIFIABLE"
+        try:
+            distributions = _number(row.get("cash_distributions_per_share"), f"SCENARIO_{name}_DISTRIBUTIONS")
+        except LocalInvestmentPilotError:
+            return None, f"{name.upper()}_SCENARIO_CASH_DISTRIBUTIONS_INVALID"
+        events_raw = row.get("cash_distribution_events") or []
+        if not isinstance(events_raw, list):
+            return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENTS_INVALID"
+        normalized_events: list[dict[str, Any]] = []
+        event_total = Decimal("0")
+        for index, event in enumerate(events_raw, start=1):
+            if not isinstance(event, Mapping):
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_INVALID"
+            try:
+                amount = _positive(event.get("amount_per_share"), f"{name.upper()}_DISTRIBUTION_{index}_NET_AMOUNT")
+                gross_amount = _positive(event.get("gross_amount_per_share"), f"{name.upper()}_DISTRIBUTION_{index}_GROSS_AMOUNT")
+                tax_amount = _number(event.get("tax_amount_per_share"), f"{name.upper()}_DISTRIBUTION_{index}_TAX_AMOUNT")
+                record_date = _date(event.get("record_date"), f"{name.upper()}_DISTRIBUTION_{index}_RECORD_DATE")
+                ex_date = _date(event.get("ex_date"), f"{name.upper()}_DISTRIBUTION_{index}_EX_DATE")
+                payment_date = _date(event.get("payment_date"), f"{name.upper()}_DISTRIBUTION_{index}_PAYMENT_DATE")
+            except LocalInvestmentPilotError:
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_INVALID"
+            if tax_amount < 0 or tax_amount >= gross_amount or abs((gross_amount - tax_amount) - amount) > Decimal("0.000001"):
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_GROSS_TAX_NET_MISMATCH"
+            if not (
+                cutoff_date < record_date < ex_date <= payment_date <= terminal_date
+            ):
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_DATES_NOT_ELIGIBLE_FROM_CUTOFF"
+            if event.get("eligible_if_entered_at_cutoff") is not True:
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_ENTRY_ELIGIBILITY_NOT_CONFIRMED"
+            if not _is_identifiable_evidence_text(event.get("eligibility_basis")):
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_ELIGIBILITY_BASIS_NOT_IDENTIFIABLE"
+            if not _is_identifiable_evidence_text(event.get("tax_basis")) or not _is_identifiable_evidence_text(event.get("tax_rationale")):
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_TAX_BASIS_NOT_IDENTIFIABLE"
+            event_refs = _items(event.get("evidence_refs"))
+            if not event_refs:
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_EVIDENCE_MISSING"
+            for ref in event_refs:
+                source = evidence_by_id.get(str(ref))
+                if (
+                    source is None or str(ref) in blocked_source_ids
+                    or source.get("time_status") in bad_timing
+                    or str(source.get("source_class") or "").upper() not in primary_classes
+                ):
+                    return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_EVIDENCE_NOT_CUTOFF_COMPATIBLE_PRIMARY"
+            years = Decimal((payment_date - cutoff_date).days) / Decimal("365")
+            event_total += amount
+            normalized_events.append({
+                "amount_per_share": str(amount),
+                "gross_amount_per_share": str(gross_amount),
+                "tax_amount_per_share": str(tax_amount),
+                "tax_basis": str(event.get("tax_basis")),
+                "tax_rationale": str(event.get("tax_rationale")),
+                "record_date": record_date.isoformat(),
+                "ex_date": ex_date.isoformat(),
+                "payment_date": payment_date.isoformat(),
+                "eligible_if_entered_at_cutoff": True,
+                "eligibility_basis": str(event.get("eligibility_basis")),
+                "evidence_refs": event_refs,
+                "year_fraction_from_entry": format(years, "f"),
+            })
+        if review_status == "NO_FUTURE_DISTRIBUTIONS_CONFIRMED":
+            if distributions != 0 or normalized_events:
+                return None, "CASH_DISTRIBUTION_REVIEW_CONTRADICTS_SCENARIO_INPUT"
+        else:
+            if not normalized_events or distributions <= 0:
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_TIMING_UNRESOLVED"
+            if abs(event_total - distributions) > Decimal("0.000001"):
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_TOTAL_MISMATCH"
         rows[name] = {
             "probability": str(row["probability"]),
             "terminal_value_per_share": str(row["terminal_value_per_share"]),
             "cash_distributions_per_share": str(row["cash_distributions_per_share"]),
+            "cash_distribution_events": normalized_events,
             "probability_rationale": str(row["rationale"]),
         }
+
+    # Preserve the prior scenario-total-wealth ordering contract. Timing and tax
+    # metadata change the return calculation, not the requirement that Bear <= Base <= Bull.
     try:
         scenario_wealth = {
             name: _number(rows[name]["terminal_value_per_share"], f"SCENARIO_{name}_TERMINAL")
@@ -1728,9 +1848,7 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
         }
     except LocalInvestmentPilotError as exc:
         return None, f"SCENARIO_CALCULATION_INCOMPLETE:{exc}"
-    if not (
-        scenario_wealth["bear"] <= scenario_wealth["base"] <= scenario_wealth["bull"]
-    ):
+    if not (scenario_wealth["bear"] <= scenario_wealth["base"] <= scenario_wealth["bull"]):
         return None, "SCENARIO_WEALTH_ORDERING_INCONSISTENT"
 
     params = prepared["decision_parameters"]
@@ -2434,6 +2552,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
         f"- 模型名称：{f['model']}",
         f"- 模型选择理由：{f['model_rationale'] or '未提供'}",
+        f"- 现金分配核查：{(f.get('cash_distribution_review') or {}).get('status', 'UNKNOWN')}；{(f.get('cash_distribution_review') or {}).get('summary', '未提供') or '未提供'}；证据 {', '.join((f.get('cash_distribution_review') or {}).get('evidence_refs') or []) or 'UNKNOWN'}",
         f"- 主估值参考锚（不是 15% 回报门槛价格，也不是 MIE）：{f.get('entry_value_reference_per_share') or 'UNKNOWN'} {c['currency']}/股",
         f"- 情景概率是否校准：{'是' if f['probabilities_calibrated'] else '否 / 未校准'}",
         "",
@@ -2474,7 +2593,12 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             "",
             f"- 情景概率：{('UNKNOWN' if row.get('probability') in (None, '') else row.get('probability'))}",
             f"- 期末每股价值：{('UNKNOWN' if row.get('terminal_value_per_share') in (None, '') else row.get('terminal_value_per_share'))} {c['currency']}",
-            f"- 每股现金分配：{('UNKNOWN' if row.get('cash_distributions_per_share') in (None, '') else row.get('cash_distributions_per_share'))} {c['currency']}",
+            f"- 每股现金分配合计：{('UNKNOWN' if row.get('cash_distributions_per_share') in (None, '') else row.get('cash_distributions_per_share'))} {c['currency']}",
+            *(
+                [f"- 登记日 {event.get('record_date', 'UNKNOWN')}；除息日 {event.get('ex_date', 'UNKNOWN')}；支付日 {event.get('payment_date', 'UNKNOWN')}；税前 {event.get('gross_amount_per_share', 'UNKNOWN')}；税额 {event.get('tax_amount_per_share', 'UNKNOWN')}；计入每股税后现金流 {event.get('amount_per_share', 'UNKNOWN')}；税务口径 {event.get('tax_basis', 'UNKNOWN')}；买入资格 {event.get('eligible_if_entered_at_cutoff', 'UNKNOWN')}（{event.get('eligibility_basis', 'UNKNOWN')}）；证据 {', '.join(event.get('evidence_refs') or []) or 'UNKNOWN'}"
+                 for event in (row.get("cash_distribution_events") or []) if isinstance(event, Mapping)]
+                if isinstance(row.get("cash_distribution_events"), list) else []
+            ),
             f"- 情景理由：{' '.join(str(row.get('rationale') or '未提供').splitlines()).strip()}",
             *(
                 [
@@ -2655,7 +2779,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         for row in evidence_rows:
             lines.extend([
                 f"- **{row['source_id']} — {row['title']}**",
-                f"  类型：{row['source_class']}；published_at：{row.get('published_at') or 'UNKNOWN'}；known_at：{row['known_at'] or 'UNKNOWN'}；时间依据：{row.get('time_basis', 'UNKNOWN')}；时间精度：{'仅日期，原始标注具体时分未知' if row.get('known_at_precision') == 'DATE_ONLY_EXPLICIT_TIME_UNKNOWN' else '仅日期' if row.get('known_at_precision') == 'DATE_ONLY' else '时间戳' if row.get('known_at_precision') == 'TIMESTAMP_OR_OFFSET_DATETIME' else 'UNKNOWN'}；时间状态：{row['time_status']}。",
+                f"  类型：{row['source_class']}；known_at：{row['known_at'] or 'UNKNOWN'}；时间精度：{'仅日期，原始标注具体时分未知' if row.get('known_at_precision') == 'DATE_ONLY_EXPLICIT_TIME_UNKNOWN' else '仅日期' if row.get('known_at_precision') == 'DATE_ONLY' else '时间戳' if row.get('known_at_precision') == 'TIMESTAMP_OR_OFFSET_DATETIME' else 'UNKNOWN'}；时间状态：{row['time_status']}。",
                 f"  来源位置：{_source_ref_markdown(row['source_ref'])}。",
                 f"  摘要：{' '.join(str(row['summary']).splitlines()).strip()}",
                 "  正式证据准入：未完成。",
@@ -2958,13 +3082,15 @@ def _template(
             "valuation_terminal_date": None, "valuation_terminal_date_basis": "",
             "entry_value_reference_per_share": None,
             "probabilities_calibrated": False, "assumptions": [],
+            "cash_distribution_review": {"status": "UNKNOWN", "summary": "", "evidence_refs": []},
             "scenarios": {
                 "bear": {
-                    "probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": "0",
+                    "probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": None,
+                    "cash_distribution_events": [],
                     "rationale": "", "failure_trigger": "", "operating_impact": "", "valuation_mechanism": "",
                 },
-                "base": {"probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": "0", "rationale": ""},
-                "bull": {"probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": "0", "rationale": ""},
+                "base": {"probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": None, "cash_distribution_events": [], "rationale": ""},
+                "bull": {"probability": None, "terminal_value_per_share": None, "cash_distributions_per_share": None, "cash_distribution_events": [], "rationale": ""},
             },
             "thesis_break_stress": {
                 "failure_trigger": "", "operating_impact": "", "valuation_method": "",
@@ -3940,7 +4066,11 @@ def run_guided_wizard(
         + "不要求操作者另行上传公告或模板。来源登记至少填写 source_id、title、source_class、source_ref（可直接打开的 URL）、published_at、known_at、summary。"
         + "最多优先列出 8 条对结论最重要的来源，确保每条来源真实且支持对应事实；不知道的时间明确写 UNKNOWN。"
         + "必须完成 Trust、Reality、Quality、Thesis、价值驱动因素排序、风险清单、MIE/预期差、估值模型和假设、Bear/Base/Bull 数值情景以及独立 thesis_break_stress。"
-        + "请填写 entry_value_reference_per_share，以及三种情景各自 probability、terminal_value_per_share、cash_distributions_per_share、rationale；概率合计为 1。"
+        + "请填写 entry_value_reference_per_share，以及三种情景各自 probability、terminal_value_per_share、cash_distributions_per_share、cash_distribution_events、rationale；概率合计为 1。"
+        + "cash_distribution_review.status 必须是 KNOWN_FUTURE_DISTRIBUTIONS 或 NO_FUTURE_DISTRIBUTIONS_CONFIRMED，并给出 summary 和 cutoff-compatible evidence_refs。"
+        + "核查截至截止时点已公告的股利/现金分配，优先使用公司、交易所或监管机构的实施公告；每个 cash_distribution_events 项必须填写 gross_amount_per_share（公告税前金额）、tax_amount_per_share、amount_per_share（扣税后的计算金额）、tax_basis、tax_rationale、record_date、ex_date、payment_date、eligible_if_entered_at_cutoff、eligibility_basis、evidence_refs。"
+        + "只有税前、税额、税后净额满足 gross_amount_per_share - tax_amount_per_share = amount_per_share，税务口径/持有期限假设具体可追责，并明确 cutoff 时点买入能否满足股权登记资格（eligible_if_entered_at_cutoff=true）时，才可以把分红计入回报；登记日须晚于本次分析截止日，除息日须晚于登记日，支付日在除息日或之后。若持有期限对应税率或买入资格无法确定，就保持 UNKNOWN 并阻断回报/目标入场价，不得把公告税前金额直接当税后收益，也不得将不符合资格的分红计入新买入的收益。"
+        + "每情景 cash_distributions_per_share 必须等于这些日期明确、税后金额明确、买入资格确认的现金流金额合计。若已核实未来期间无分配，填 0、空事件列表并用截止日前官方证据说明；若未能确定，不得填 0 冒充无分配，保持 UNKNOWN。日期化现金流使用实际支付日期，不能一律假设在终值日支付。"
         + "请填写 thesis_break_stress 的 failure_trigger、operating_impact、valuation_method、terminal_value_per_share、cash_distributions_per_share、rationale，且其期末总财富必须低于 Bear。"
         + "不要只原样返回模板，不允许把核心研究字段全部留空。若无法识别必须具体解释原因和证据缺口；数字估值可以建立透明、可追责的假设，但不得把假设伪装为披露事实。"
         + "严格保留 schema_version、case、price_input 原样不变，尤其不得更改人工股价、观察日期、known_at 或 price assurance 标签。"
