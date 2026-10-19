@@ -63,6 +63,15 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
                 "published_at": "2026-08-30",
                 "known_at": "2026-08-30",
                 "summary": "Synthetic test source; not real evidence.",
+            },
+            {
+                "source_id": "E2",
+                "title": "Synthetic no-future-distribution review support",
+                "source_class": "ISSUER_PRIMARY",
+                "source_ref": "https://example.invalid/distribution-review.pdf",
+                "published_at": "2026-08-29",
+                "known_at": "2026-08-29",
+                "summary": "Synthetic test source used only for the explicit distribution review; not real evidence.",
             }
         ],
         "assessment": {
@@ -123,7 +132,7 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
             "cash_distribution_review": {
                 "status": "NO_FUTURE_DISTRIBUTIONS_CONFIRMED",
                 "summary": "Synthetic fixture only: no distributions scheduled in the test horizon.",
-                "evidence_refs": ["E1"],
+                "evidence_refs": ["E2"],
             },
             "scenarios": {
                 "bear": {
@@ -262,7 +271,7 @@ def test_evidence_references_in_assessment_and_valuation_are_resolved_or_explici
         }
     ]
     prepared = _prepare_input(payload)
-    assert prepared["referenced_evidence_ids"] == ["E-ASSUMPTION-MISSING", "E-RISK-MISSING", "E1"]
+    assert prepared["referenced_evidence_ids"] == ["E-ASSUMPTION-MISSING", "E-RISK-MISSING", "E1", "E2"]
     assert prepared["unresolved_evidence_references"] == ["E-ASSUMPTION-MISSING", "E-RISK-MISSING"]
 
 
@@ -871,6 +880,7 @@ def test_structured_risk_item_requires_its_own_resolved_cutoff_compatible_eviden
         payload["evidence_register"][0]["known_at"] = "2026-10-11T10:00:00+08:00"
     elif source_change == "KNOWN_AT_INVALID":
         payload["evidence_register"][0]["known_at"] = "not-a-date"
+        payload["evidence_register"][0]["published_at"] = "UNKNOWN"
 
     analysis, report = _analyse(payload, "TEST-RISK-ITEM-OWN-EVIDENCE")
 
@@ -1250,6 +1260,9 @@ def test_explicit_timestamp_cutoff_must_be_timezone_aware_and_match_as_of_date()
 def test_uncertain_timing_for_referenced_evidence_forces_review_required(tmp_path, known_at, expected_status):
     payload = _payload(cutoff="2026-10-10")
     payload["evidence_register"][0]["known_at"] = known_at
+    if known_at in {"", "not-a-date"}:
+        # No dated publication fallback exists in these deliberately unknown cases.
+        payload["evidence_register"][0]["published_at"] = "UNKNOWN"
 
     prepared = _prepare_input(payload)
     assert prepared["evidence_register"][0]["time_status"] == expected_status
