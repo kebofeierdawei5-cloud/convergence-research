@@ -116,6 +116,45 @@ def _price_cap_for_risk(
     return bear_wealth / (Decimal("1") - max_loss_rate)
 
 
+def _cash_flow_present_value(
+    cashflows: list[tuple[Decimal, Decimal]],
+    annual_rate: Decimal,
+) -> Decimal:
+    """Present value of positive per-share cash flows at their year fractions."""
+    if annual_rate <= Decimal("-1"):
+        raise ValueError("annualized rate must be greater than -100%")
+    total = Decimal("0")
+    for amount, year_fraction in cashflows:
+        if amount < 0 or year_fraction <= 0:
+            raise ValueError("dated cash flows require non-negative amounts and positive year fractions")
+        total += amount / _compound_factor(annual_rate, year_fraction)
+    return total
+
+
+def _solve_cash_flow_irr(
+    entry_price: Decimal,
+    cashflows: list[tuple[Decimal, Decimal]],
+) -> Decimal:
+    """Solve the IRR of expected probability-weighted dated cash flows."""
+    if not cashflows or not any(amount > 0 for amount, _ in cashflows):
+        raise ValueError("dated cashflow IRR requires positive future cash flows")
+    low = Decimal("-0.999999999")
+    high = Decimal("1000000")
+    if _cash_flow_present_value(cashflows, low) < entry_price:
+        raise ValueError("dated cashflow IRR is below the supported lower bound")
+    if _cash_flow_present_value(cashflows, high) > entry_price:
+        raise ValueError("dated cashflow IRR is above the supported upper bound")
+    for _ in range(180):
+        mid = (low + high) / Decimal("2")
+        if _cash_flow_present_value(cashflows, mid) > entry_price:
+            low = mid
+        else:
+            high = mid
+        if high - low < Decimal("1e-18"):
+            break
+    return (low + high) / Decimal("2")
+
+
 def calculate_return_metrics(
     return_gate: dict[str, Any],
     *,
@@ -156,8 +195,9 @@ def calculate_return_metrics(
         risk_rate = _dec(max_loss_pct, "risk.max_loss_pct") / Decimal("100")
 
     scenarios = return_gate["scenarios"]
-    probabilities = []
-    wealth = {}
+    probabilities: dict[str, Decimal] = {}
+    wealth: dict[str, Decimal] = {}
+    normalized_scenarios: dict[str, dict[str, Any]] = {}
     for name in SCENARIOS:
         item = scenarios[name]
         p = _dec(item["probability"], f"return_gate.scenarios.{name}.probability")
@@ -170,30 +210,97 @@ def calculate_return_metrics(
             raise ValueError(f"return_gate.scenarios.{name} terminal value/distributions must be >= 0")
         if not rationale:
             raise ValueError(f"return_gate.scenarios.{name}.probability_rationale is required")
-        probabilities.append(p)
+        events_raw = item.get("cash_distribution_events") or []
+        if not isinstance(events_raw, list):
+            raise ValueError(f"return_gate.scenarios.{name}.cash_distribution_events must be a list")
+        normalized_events: list[dict[str, str]] = []
+        event_total = Decimal("0")
+        for index, event in enumerate(events_raw, start=1):
+            if not isinstance(event, dict):
+                raise ValueError(f"return_gate.scenarios.{name}.cash_distribution_events[{index}] must be an object")
+            amount = _dec(
+                event.get("amount_per_share"),
+                f"return_gate.scenarios.{name}.cash_distribution_events[{index}].amount_per_share",
+            )
+            year_fraction = _dec(
+                event.get("year_fraction_from_entry"),
+                f"return_gate.scenarios.{name}.cash_distribution_events[{index}].year_fraction_from_entry",
+            )
+            if amount <= 0 or year_fraction <= 0 or year_fraction > annualization_horizon:
+                raise ValueError(
+                    f"return_gate.scenarios.{name}.cash_distribution_events[{index}] "
+                    "requires positive amount and a date inside the holding horizon"
+                )
+            event_total += amount
+            normalized_events.append({
+                "amount_per_share": str(amount),
+                "year_fraction_from_entry": str(year_fraction),
+            })
+        if normalized_events and abs(event_total - distributions) > Decimal("0.000001"):
+            raise ValueError(
+                f"return_gate.scenarios.{name}.cash_distribution_events total must equal cash_distributions_per_share"
+            )
+        probabilities[name] = p
         wealth[name] = terminal + distributions
-    if sum(probabilities, Decimal("0")) != Decimal("1"):
+        normalized_scenarios[name] = {
+            "terminal_value_per_share": terminal,
+            "cash_distributions_per_share": distributions,
+            "cash_distribution_events": normalized_events,
+        }
+    if sum(probabilities.values(), Decimal("0")) != Decimal("1"):
         raise ValueError("scenario probabilities must sum exactly to 1")
-    expected_wealth = sum(
-        _dec(scenarios[name]["probability"], f"return_gate.scenarios.{name}.probability") * wealth[name]
-        for name in SCENARIOS
-    )
+    expected_wealth = sum(probabilities[name] * wealth[name] for name in SCENARIOS)
     total_return = expected_wealth / entry - Decimal("1")
-    annualized_return = _annualize(expected_wealth / entry, annualization_horizon)
+
+    dated_cashflows_active = any(
+        normalized_scenarios[name]["cash_distribution_events"] for name in SCENARIOS
+    )
+    probability_weighted_cashflows: list[tuple[Decimal, Decimal]] = []
+    for name in SCENARIOS:
+        p = probabilities[name]
+        item = normalized_scenarios[name]
+        if item["cash_distribution_events"]:
+            probability_weighted_cashflows.extend(
+                (p * _dec(event["amount_per_share"], f"{name}.distribution.amount"),
+                 _dec(event["year_fraction_from_entry"], f"{name}.distribution.year_fraction"))
+                for event in item["cash_distribution_events"]
+            )
+            probability_weighted_cashflows.append(
+                (p * item["terminal_value_per_share"], annualization_horizon)
+            )
+        else:
+            # Legacy callers without dated events retain the historical
+            # convention: all declared cash distributions are retained as cash
+            # through the terminal date. The personal pilot validates dates
+            # before it sends known future distributions to this solver.
+            probability_weighted_cashflows.append((p * wealth[name], annualization_horizon))
+
+    if dated_cashflows_active:
+        annualized_return = _solve_cash_flow_irr(entry, probability_weighted_cashflows)
+        target_entry_price_for_return = _cash_flow_present_value(
+            probability_weighted_cashflows, target
+        )
+        target_entry_price_for_required_return = _cash_flow_present_value(
+            probability_weighted_cashflows, rr
+        )
+        annualized_return_method = "PROBABILITY_WEIGHTED_DATED_CASH_FLOW_IRR"
+        return_price_cap_method = "PRESENT_VALUE_OF_PROBABILITY_WEIGHTED_DATED_CASH_FLOWS"
+    else:
+        annualized_return = _annualize(expected_wealth / entry, annualization_horizon)
+        target_entry_price_for_return = _price_cap_for_annualized_return(
+            expected_wealth, target, annualization_horizon
+        )
+        target_entry_price_for_required_return = _price_cap_for_annualized_return(
+            expected_wealth, rr, annualization_horizon
+        )
+        annualized_return_method = "ANNUALIZED_EXPECTED_TERMINAL_WEALTH"
+        return_price_cap_method = "TERMINAL_WEALTH_DISCOUNTED_OVER_HOLDING_HORIZON"
     entry_cushion = entry_ref / entry - Decimal("1")
     mos = Decimal("1") - (entry / entry_ref)
     entry_pass = entry_cushion >= threshold
     target_pass = annualized_return >= target
     rr_pass = annualized_return >= rr
     bear_return = wealth["bear"] / entry - Decimal("1")
-    risk_pass = True if risk_rate is None else bear_return >= -risk_rate
-
-    target_entry_price_for_return = _price_cap_for_annualized_return(
-        expected_wealth, target, annualization_horizon
-    )
-    target_entry_price_for_required_return = _price_cap_for_annualized_return(
-        expected_wealth, rr, annualization_horizon
-    )
     target_entry_price_for_entry_cushion = entry_ref / (Decimal("1") + threshold)
     target_entry_price_for_risk = _price_cap_for_risk(wealth["bear"], risk_rate)
 
@@ -218,6 +325,8 @@ def calculate_return_metrics(
         "expected_terminal_wealth": expected_wealth,
         "expected_total_return": total_return,
         "expected_annualized_return": annualized_return,
+        "expected_annualized_return_method": annualized_return_method,
+        "return_price_cap_method": return_price_cap_method,
         "buy_entry_return_cushion_pass": entry_pass,
         "fundamental_target_pass": target_pass,
         "required_return_pass": rr_pass,
