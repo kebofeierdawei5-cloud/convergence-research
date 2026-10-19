@@ -1843,6 +1843,19 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
             "probability_rationale": str(row["rationale"]),
         }
 
+    # Preserve the prior scenario-total-wealth ordering contract. Timing and tax
+    # metadata change return arithmetic, not the requirement Bear <= Base <= Bull.
+    try:
+        scenario_wealth = {
+            name: _number(rows[name]["terminal_value_per_share"], f"SCENARIO_{name}_TERMINAL")
+            + _number(rows[name]["cash_distributions_per_share"], f"SCENARIO_{name}_DISTRIBUTIONS")
+            for name in SCENARIOS
+        }
+    except LocalInvestmentPilotError as exc:
+        return None, f"SCENARIO_CALCULATION_INCOMPLETE:{exc}"
+    if not (scenario_wealth["bear"] <= scenario_wealth["base"] <= scenario_wealth["bull"]):
+        return None, "SCENARIO_WEALTH_ORDERING_INCONSISTENT"
+
     params = prepared["decision_parameters"]
     gate = {
         "entry_price": prepared["price_input"]["price"],
