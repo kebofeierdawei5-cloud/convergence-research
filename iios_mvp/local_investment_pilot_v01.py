@@ -1046,42 +1046,70 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         if invalid_source_fields:
             untraceable_evidence_fields[source_id] = invalid_source_fields
         known_at_original = str(row.get("known_at") or "").strip()
+        published_at_original = str(row.get("published_at") or "").strip()
         known_text = known_at_original
         known_at_precision = "DATE_ONLY" if len(known_text) == 10 else "TIMESTAMP_OR_OFFSET_DATETIME"
         explicit_date_only_unknown_time = re.fullmatch(
             r"(\d{4}-\d{2}-\d{2})\s*[;；,，]\s*"
-            r"(?:具体披露时分|具体披露时间|披露时分|披露时间|具体时分|具体时间|时分|时间|exact time|time(?: of day)?)\s*"
+            r"(?:确切发布时间|确切披露时间|具体披露时分|具体披露时间|披露时分|披露时间|具体时分|具体时间|时分|时间|exact time|time(?: of day)?)\s*"
             r"(?:[:：]\s*)?(?:UNKNOWN|未知|不详|not known)",
             known_at_original,
             flags=re.IGNORECASE,
         )
         if explicit_date_only_unknown_time:
-            # Treat an explicit "date known, clock time unknown" annotation as
-            # a date-level timestamp, not as malformed data. Preserve the raw
-            # annotation below so precision is not silently upgraded.
+            # A dated official disclosure with unknown clock time remains a
+            # date-level fact; never upgrade its precision to midnight.
             known_text = explicit_date_only_unknown_time.group(1)
             known_at_precision = "DATE_ONLY_EXPLICIT_TIME_UNKNOWN"
         source_time_status = "UNKNOWN"
+        time_basis = "UNKNOWN"
         if known_text:
             try:
                 if len(known_text) == 10:
-                    # A calendar date on the cutoff day does not establish whether the
-                    # source was known before the cutoff instant. Never infer midnight.
+                    # A date before the cutoff day is compatible with the cutoff,
+                    # but this pilot still does not formally admit PIT evidence.
                     known_date = _date(known_text, f"{source_id}_KNOWN_AT")
                     if known_date < cutoff:
                         source_time_status = "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+                        time_basis = "KNOWN_AT_DATE_ONLY"
                     elif known_date > cutoff:
                         source_time_status = "AFTER_CUTOFF"
+                        time_basis = "KNOWN_AT_DATE_ONLY"
                     else:
                         source_time_status = "KNOWN_AT_PRECISION_INSUFFICIENT"
+                        time_basis = "KNOWN_AT_DATE_ONLY"
                 else:
                     source_time = _datetime(known_text, f"{source_id}_KNOWN_AT")
                     source_time_status = (
                         "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
                         if source_time <= cutoff_instant else "AFTER_CUTOFF"
                     )
+                    time_basis = "KNOWN_AT_TIMESTAMP"
             except LocalInvestmentPilotError:
-                source_time_status = "KNOWN_AT_INVALID"
+                unknown_clock_annotation = bool(re.search(
+                    r"(?:UNKNOWN|未知|不详|确切更新时间未知|更新时间UNKNOWN|检索时可访问)",
+                    known_at_original,
+                    flags=re.IGNORECASE,
+                ))
+                source_time_status = "UNKNOWN" if unknown_clock_annotation else "KNOWN_AT_INVALID"
+                time_basis = "TIME_NOT_IDENTIFIABLE" if unknown_clock_annotation else "KNOWN_AT_INVALID"
+        # If a model supplies a separate, parseable official publication date,
+        # use it only as date-level compatibility evidence when known_at itself
+        # is unavailable/unknown. Keep both raw fields so the fallback is auditable.
+        published_date = None
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", published_at_original):
+            try:
+                published_date = _date(published_at_original, f"{source_id}_PUBLISHED_AT")
+            except LocalInvestmentPilotError:
+                published_date = None
+        if published_date is not None and source_time_status in {"UNKNOWN", "KNOWN_AT_INVALID"}:
+            if published_date < cutoff:
+                source_time_status = "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+            elif published_date > cutoff:
+                source_time_status = "AFTER_CUTOFF"
+            else:
+                source_time_status = "KNOWN_AT_PRECISION_INSUFFICIENT"
+            time_basis = "PUBLISHED_DATE_ONLY_FALLBACK"
         sources.append({
             "source_id": source_id,
             "title": str(row.get("title") or "未提供标题"),
@@ -1089,8 +1117,10 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             "source_ref": str(row.get("source_ref") or "UNKNOWN"),
             "known_at": known_text or None,
             "known_at_original": known_at_original or None,
+            "published_at": published_at_original or None,
             "known_at_precision": known_at_precision if known_text else "UNKNOWN",
             "time_status": source_time_status,
+            "time_basis": time_basis,
             "summary": str(row.get("summary") or "未提供事实摘要"),
             "raw_sha256_claimed": row.get("raw_sha256_claimed"),
             "formal_evidence_pit_admission": False,
@@ -2625,7 +2655,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         for row in evidence_rows:
             lines.extend([
                 f"- **{row['source_id']} — {row['title']}**",
-                f"  类型：{row['source_class']}；known_at：{row['known_at'] or 'UNKNOWN'}；时间精度：{'仅日期，原始标注具体时分未知' if row.get('known_at_precision') == 'DATE_ONLY_EXPLICIT_TIME_UNKNOWN' else '仅日期' if row.get('known_at_precision') == 'DATE_ONLY' else '时间戳' if row.get('known_at_precision') == 'TIMESTAMP_OR_OFFSET_DATETIME' else 'UNKNOWN'}；时间状态：{row['time_status']}。",
+                f"  类型：{row['source_class']}；published_at：{row.get('published_at') or 'UNKNOWN'}；known_at：{row['known_at'] or 'UNKNOWN'}；时间依据：{row.get('time_basis', 'UNKNOWN')}；时间精度：{'仅日期，原始标注具体时分未知' if row.get('known_at_precision') == 'DATE_ONLY_EXPLICIT_TIME_UNKNOWN' else '仅日期' if row.get('known_at_precision') == 'DATE_ONLY' else '时间戳' if row.get('known_at_precision') == 'TIMESTAMP_OR_OFFSET_DATETIME' else 'UNKNOWN'}；时间状态：{row['time_status']}。",
                 f"  来源位置：{_source_ref_markdown(row['source_ref'])}。",
                 f"  摘要：{' '.join(str(row['summary']).splitlines()).strip()}",
                 "  正式证据准入：未完成。",
