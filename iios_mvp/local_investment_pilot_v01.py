@@ -1775,12 +1775,26 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
             if not isinstance(event, Mapping):
                 return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_INVALID"
             try:
-                amount = _positive(event.get("amount_per_share"), f"{name.upper()}_DISTRIBUTION_{index}_AMOUNT")
+                amount = _positive(event.get("amount_per_share"), f"{name.upper()}_DISTRIBUTION_{index}_NET_AMOUNT")
+                gross_amount = _positive(event.get("gross_amount_per_share"), f"{name.upper()}_DISTRIBUTION_{index}_GROSS_AMOUNT")
+                tax_amount = _number(event.get("tax_amount_per_share"), f"{name.upper()}_DISTRIBUTION_{index}_TAX_AMOUNT")
+                record_date = _date(event.get("record_date"), f"{name.upper()}_DISTRIBUTION_{index}_RECORD_DATE")
+                ex_date = _date(event.get("ex_date"), f"{name.upper()}_DISTRIBUTION_{index}_EX_DATE")
                 payment_date = _date(event.get("payment_date"), f"{name.upper()}_DISTRIBUTION_{index}_PAYMENT_DATE")
             except LocalInvestmentPilotError:
                 return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_INVALID"
-            if payment_date <= cutoff_date or payment_date > terminal_date:
-                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_DATE_OUTSIDE_HOLDING_HORIZON"
+            if tax_amount < 0 or tax_amount >= gross_amount or abs((gross_amount - tax_amount) - amount) > Decimal("0.000001"):
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_GROSS_TAX_NET_MISMATCH"
+            if not (
+                cutoff_date < record_date < ex_date <= payment_date <= terminal_date
+            ):
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_DATES_NOT_ELIGIBLE_FROM_CUTOFF"
+            if event.get("eligible_if_entered_at_cutoff") is not True:
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_ENTRY_ELIGIBILITY_NOT_CONFIRMED"
+            if not _is_identifiable_evidence_text(event.get("eligibility_basis")):
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_ELIGIBILITY_BASIS_NOT_IDENTIFIABLE"
+            if not _is_identifiable_evidence_text(event.get("tax_basis")) or not _is_identifiable_evidence_text(event.get("tax_rationale")):
+                return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_TAX_BASIS_NOT_IDENTIFIABLE"
             event_refs = _items(event.get("evidence_refs"))
             if not event_refs:
                 return None, f"{name.upper()}_CASH_DISTRIBUTION_EVENT_{index}_EVIDENCE_MISSING"
@@ -1796,7 +1810,15 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
             event_total += amount
             normalized_events.append({
                 "amount_per_share": str(amount),
+                "gross_amount_per_share": str(gross_amount),
+                "tax_amount_per_share": str(tax_amount),
+                "tax_basis": str(event.get("tax_basis")),
+                "tax_rationale": str(event.get("tax_rationale")),
+                "record_date": record_date.isoformat(),
+                "ex_date": ex_date.isoformat(),
                 "payment_date": payment_date.isoformat(),
+                "eligible_if_entered_at_cutoff": True,
+                "eligibility_basis": str(event.get("eligibility_basis")),
                 "evidence_refs": event_refs,
                 "year_fraction_from_entry": format(years, "f"),
             })
