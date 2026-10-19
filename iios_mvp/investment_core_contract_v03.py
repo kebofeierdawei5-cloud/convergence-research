@@ -301,6 +301,7 @@ def calculate_return_metrics(
     target_pass = annualized_return >= target
     rr_pass = annualized_return >= rr
     bear_return = wealth["bear"] / entry - Decimal("1")
+    risk_pass = True if risk_rate is None else bear_return >= -risk_rate
     target_entry_price_for_entry_cushion = entry_ref / (Decimal("1") + threshold)
     target_entry_price_for_risk = _price_cap_for_risk(wealth["bear"], risk_rate)
 
