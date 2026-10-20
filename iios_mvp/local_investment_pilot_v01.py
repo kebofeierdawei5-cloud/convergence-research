@@ -3001,6 +3001,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             "",
             f"- 情景概率：{('UNKNOWN' if row.get('probability') in (None, '') else row.get('probability'))}",
             f"- 期末每股价值：{('UNKNOWN' if row.get('terminal_value_per_share') in (None, '') else row.get('terminal_value_per_share'))} {c['currency']}",
+            *([f"- EPS_MULTIPLE 原始声明终值（仅供审计，不进入主计算）：{row.get('declared_terminal_value_before_eps_multiple_calculation')} {c['currency']}" ] if row.get('eps_multiple_calculation_applied') is True else []),
             f"- 每股现金分配合计：{('UNKNOWN' if row.get('cash_distributions_per_share') in (None, '') else row.get('cash_distributions_per_share'))} {c['currency']}",
             *(
                 [f"- 登记日 {event.get('record_date', 'UNKNOWN')}；除息日 {event.get('ex_date', 'UNKNOWN')}；支付日 {event.get('payment_date', 'UNKNOWN')}；税前 {event.get('gross_amount_per_share', 'UNKNOWN')}；税额 {event.get('tax_amount_per_share', 'UNKNOWN')}；计入每股税后现金流 {event.get('amount_per_share', 'UNKNOWN')}；税务口径 {event.get('tax_basis', 'UNKNOWN')}；买入资格 {event.get('eligible_if_entered_at_cutoff', 'UNKNOWN')}（{event.get('eligibility_basis', 'UNKNOWN')}）；证据 {', '.join(event.get('evidence_refs') or []) or 'UNKNOWN'}"
