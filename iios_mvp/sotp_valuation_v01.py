@@ -291,6 +291,17 @@ def evaluate_sotp_valuation(
                 raise ValueError(
                     f"{scenario_name.upper()}:SEPARATE_MINORITY_INTERESTS_ADJUSTMENT_CONFLICTS_WITH_ATTRIBUTABLE_SEGMENT_PROFIT"
                 )
+            other_adjustments, other_norm = _measure(
+                parent.get("other_adjustments_cny"),
+                field=f"{scenario_name}.other_adjustments_cny",
+                unit="CNY",
+                evidence_by_id=evidence_by_id,
+                unresolved_evidence_ids=unresolved,
+                after_cutoff_evidence_ids=after_cutoff,
+                uncertain_timing_evidence_ids=uncertain,
+                allow_negative=True,
+                allow_zero=True,
+            )
             diluted_shares, diluted_shares_norm = _measure(
                 scenario.get("diluted_shares"),
                 field=f"{scenario_name}.diluted_shares",
