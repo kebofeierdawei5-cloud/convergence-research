@@ -3854,6 +3854,8 @@ def test_sotp_primary_calculation_overrides_draft_per_share_values_and_closes_pr
     assert "SOTP：分部估值到每股终值的计算链" in report
     assert "Σ（已归属于上市公司股东的分部净利润 × 分部 P/E）" in report
     assert "SOTP 每股终值：80 CNY" in report
+    assert "减资本化母公司税后成本与少数股东权益" not in report
+    assert "未扣除未分配母公司层面税后成本的分部净利润" in report
     assert "B5 的 EPS_MULTIPLE 增量适配器不能用于 SOTP" in report
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
 

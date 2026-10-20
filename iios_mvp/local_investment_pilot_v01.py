@@ -1797,8 +1797,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         forecast["entry_value_reference_per_share"] = sotp_valuation["scenarios"]["base"]["terminal_value_per_share"]
         forecast["model_rationale_original_untrusted"] = forecast.get("model_rationale")
         forecast["model_rationale"] = (
-            "SOTP 终值由本地 SOTP 适配器复算：逐分部归属净利润乘以各自 P/E，"
-            "减资本化母公司税后成本与少数股东权益，加减净现金/净负债和显式调整，"
+            "SOTP 终值由本地 SOTP 适配器复算：使用按上市公司股东口径计算、且未扣除未分配母公司层面税后成本的分部净利润分别乘以各自 P/E，"
+            "再减资本化母公司税后成本，加减不重复计价的净现金/净负债及其他显式调整，"
             "最后除以稀释后股数；详细输入、期间、证据引用与算术见 sotp_valuation。"
         )
         forecast["model"] = "SOTP (segment attributable net profit x segment P/E plus explicit parent-level adjustments)"
