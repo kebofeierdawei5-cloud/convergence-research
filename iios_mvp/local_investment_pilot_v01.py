@@ -1933,8 +1933,6 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             "EPS_MULTIPLE 主估值终值由本地适配器复算：Bear/Base/Bull 每股终值分别为结构化 EPS × P/E；"
             "原始模型声明值保留为未信任诊断，不直接用于回报或入场价格。详细输入与算术见 eps_multiple_valuation。"
         )
-        forecast["model_name_original_untrusted"] = forecast.get("model")
-        forecast["model"] = "EPS_MULTIPLE / EPS x P/E (local structured adapter)"
     sotp_valuation = evaluate_sotp_valuation(
         raw_sotp_valuation,
         selected_model_family=operator_valuation_context["selected_model_family"],
@@ -2969,6 +2967,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f"- 一致性状态：**{model_contract.get('status', 'UNKNOWN')}**；可用于主模型价格计算：{model_contract.get('primary_model_price_calculation_eligible', False)}",
         f"- B5 传导状态：{model_contract.get('valuation_transmission_status', 'UNKNOWN')}；经营预测范围：{model_contract.get('operating_forecast_scope', 'UNKNOWN')}",
         f"- SOTP 适配器计算状态：{model_contract.get('sotp_calculation_status', 'UNKNOWN')}",
+        f"- EPS_MULTIPLE 主估值适配器计算状态：{model_contract.get('eps_multiple_calculation_status', 'UNKNOWN')}",
         *(["- 门禁原因：" + "; ".join(model_contract.get("issues") or [])] if model_contract.get("issues") else []),
         *([] if model_contract.get("primary_model_price_calculation_eligible") is True else ["- 本报告保留的情景价值只作为替代模型/未确认模型研究输入，不进入预期回报、目标入场价或 B6 价格敏感性计算。"]),
         "",
