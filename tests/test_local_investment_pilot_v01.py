@@ -2342,13 +2342,15 @@ def test_operator_selected_sotp_blocks_eps_multiple_price_calculation():
     analysis, report = _analyse(payload, "TEST-PRIMARY-MODEL-MISMATCH")
 
     contract = analysis["valuation_model_consistency"]
-    assert contract["status"] == "MODEL_FAMILY_MISMATCH"
+    assert contract["status"] == "SOTP_CALCULATION_NOT_ELIGIBLE"
+    assert "OPERATOR_MODEL_FAMILY_DIFFERS_FROM_CALCULATION_MODEL_FAMILY" in contract["issues"]
+    assert "SOTP_ADAPTER_NOT_CALCULATED" in contract["issues"]
     assert contract["operator_selected_model_family"] == "SOTP"
     assert contract["calculation_model_family"] == "EPS_MULTIPLE"
     assert contract["primary_model_price_calculation_eligible"] is False
     assert contract["scenario_values_role"] == "ALTERNATIVE_OR_UNRESOLVED_ONLY"
     assert analysis["return_metrics"] is None
-    assert analysis["return_metrics_reason"] == "PRIMARY_VALUATION_MODEL_NOT_ELIGIBLE:MODEL_FAMILY_MISMATCH"
+    assert analysis["return_metrics_reason"] == "PRIMARY_VALUATION_MODEL_NOT_ELIGIBLE:SOTP_CALCULATION_NOT_ELIGIBLE"
     assert analysis["price_zone_sensitivity"]["status"] == "UNKNOWN"
     assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
@@ -2363,7 +2365,8 @@ def test_operator_selected_sotp_blocks_eps_multiple_price_calculation():
     forged["forecast_valuation"]["model"] = "Synthetic EPS x PE"
     forged_analysis, _ = _analyse(forged, "TEST-FORGED-MODEL-FAMILY")
     forged_contract = forged_analysis["valuation_model_consistency"]
-    assert forged_contract["status"] == "CALCULATION_MODEL_NAME_FAMILY_MISMATCH"
+    assert forged_contract["status"] == "SOTP_CALCULATION_NOT_ELIGIBLE"
+    assert "FORECAST_VALUATION_MODEL_NAME_CONFLICTS_WITH_DECLARED_CALCULATION_FAMILY" in forged_contract["issues"]
     assert forged_contract["model_name_inferred_family"] == "EPS_MULTIPLE"
     assert forged_analysis["return_metrics"] is None
     assert forged_analysis["price_zone_sensitivity"]["target_entry_price"] is None
