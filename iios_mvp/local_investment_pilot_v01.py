@@ -1771,6 +1771,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         expected_forecast_period=operating_driver_forecast.get("forecast_period"),
         expected_terminal_date=forecast.get("valuation_terminal_date"),
         evidence_register=sources,
+        expected_currency=currency,
         unresolved_evidence_ids=unknown_refs,
         after_cutoff_evidence_ids=after_cutoff_refs,
         uncertain_timing_evidence_ids=uncertain_timing_refs,
@@ -3515,6 +3516,7 @@ def create_pilot_template(
         "\\n\\nSOTP 主估值计算契约（IIOS-SOTP-VALUATION-0.1）："
         "操作者尚未确认模型时，也请把 sotp_valuation 作为独立候选计算节点：若公司分部口径与数据足以支持，应提供清楚标记为事实/发行人预测/分析假设的输入；不要替操作者选择主模型。最终只有操作者本地选定 SOTP 时，本节点才进入主估值计算，否则保持诊断性备用输入。"
         "若主估值模型采用 SOTP，必须填写可复算的 sotp_valuation 节点；本版本只支持 SEGMENT_ATTRIBUTABLE_NET_PROFIT_X_SEGMENT_PE。"
+        "注意：SOTP v0.1 金额字段全部为 CNY，尚无 HKD/CNY 汇率转换合同；个股币种非 CNY 时不得提交可用于主估值的 SOTP，不得把 CNY 输入或 CNY/股结果标成 HKD，系统将阻断该路径。"
         "Bear/Base/Bull 必须使用完全相同的 segment_id 与 segment_name 集合，每个分部填写 attributable_net_profit_cny 与 pe_multiple_x，均用 {value,unit,data_class,basis,evidence_refs,note} 结构。"
         "归属净利润必须是分部层面归属于上市公司股东的预测净利润，单位 CNY；P/E 单位 x。两项只允许 ISSUER_FORECAST 或 ANALYST_ASSUMPTION；发行人预测必须有可解析、截止时点兼容的 evidence_refs，分析假设必须写明可识别的推理依据。分部亏损业务当前不支持直接套用正 P/E，不得把负利润乘正倍数当作合理价值；应明确保留 UNKNOWN 并说明需要另建模型。"
         "每个分部归属净利润必须是已扣除该分部非控股股东损益、归属于上市公司股东的预测净利润（单位 CNY），并且不含尚未分摊的母公司中央税后费用。已按上市公司股东口径计算的分部利润，不得再扣除同一业务的少数股东权益，否则会重复扣减；如果只有未扣非控股股东损益的合并口径利润，本方法不能直接用于计算。"

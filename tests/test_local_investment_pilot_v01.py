@@ -3830,6 +3830,49 @@ def test_sotp_adapter_computes_segment_values_parent_adjustments_and_per_share_v
     assert Decimal(result["scenarios"]["bull"]["terminal_value_per_share"]) == Decimal("113.6")
 
 
+
+def test_sotp_v01_rejects_non_cny_case_currency_without_fx_conversion():
+    from iios_mvp.sotp_valuation_v01 import evaluate_sotp_valuation
+
+    payload = _sotp_ready_payload()
+    result = evaluate_sotp_valuation(
+        payload["sotp_valuation"],
+        selected_model_family="SOTP",
+        expected_forecast_period="2027FY",
+        expected_terminal_date="2027-12-31",
+        evidence_register=[],
+        expected_currency="HKD",
+    )
+
+    assert result["status"] == "SOTP_CURRENCY_NOT_SUPPORTED"
+    assert result["scenarios"] == {}
+    assert "SOTP_V0_1_CNY_ONLY" in result["issues"]
+    assert result["formal_valuation_admission_created"] is False
+    assert result["decision_authority"] is False
+
+
+def test_hkd_case_cannot_apply_cny_sotp_to_hkd_return_or_entry_price():
+    payload = _sotp_ready_payload()
+    payload["case"].update({
+        "company": "Synthetic HK issuer",
+        "market": "HK",
+        "symbol": "0700",
+        "currency": "HKD",
+    })
+    payload["price_input"].update({"price": "300", "currency": "HKD"})
+    # Keep source locators synthetic: this test exercises currency isolation, not admission.
+    analysis, report = _analyse(payload, "TEST-HKD-SOTP-CURRENCY-BLOCK")
+
+    assert analysis["case"]["currency"] == "HKD"
+    assert analysis["sotp_valuation"]["status"] == "SOTP_CURRENCY_NOT_SUPPORTED"
+    assert analysis["valuation_model_consistency"]["primary_model_price_calculation_eligible"] is False
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert all(row["status"] == "UNKNOWN" for row in analysis["price_zone_sensitivity"]["sensitivity_ladder"])
+    assert "不得把 CNY/股重标为其他币种" in report
+    assert "币种边界：v0.1 输入字段和计算值固定为 CNY" in report
+
+
 def test_sotp_primary_calculation_overrides_draft_per_share_values_and_closes_price_math():
     payload = _sotp_ready_payload()
     original_draft_terminals = {
