@@ -4,8 +4,9 @@ from __future__ import annotations
 
 Version 0.1 supports one deliberately narrow method:
 sum(segment attributable net profit × segment P/E), subtract capitalized
-parent-level after-tax costs and minority interests, add signed net cash/debt
-and other signed equity adjustments, then divide by diluted shares.
+parent-level after-tax costs, add signed net cash/debt and other explicit equity
+adjustments, then divide by diluted shares. Minority effects already reflected in
+attributable segment profit must not be deducted a second time.
 
 It does not infer missing values, does not reuse the EPS_MULTIPLE B5 formula,
 and does not create formal valuation admission or decision authority.
@@ -286,29 +287,11 @@ def evaluate_sotp_valuation(
                 allow_negative=True,
                 allow_zero=True,
             )
-            minority, minority_norm = _measure(
-                parent.get("minority_interests_cny"),
-                field=f"{scenario_name}.minority_interests_cny",
-                unit="CNY",
-                evidence_by_id=evidence_by_id,
-                unresolved_evidence_ids=unresolved,
-                after_cutoff_evidence_ids=after_cutoff,
-                uncertain_timing_evidence_ids=uncertain,
-                allow_negative=False,
-                allow_zero=True,
-            )
-            other_adjustments, other_norm = _measure(
-                parent.get("other_adjustments_cny"),
-                field=f"{scenario_name}.other_adjustments_cny",
-                unit="CNY",
-                evidence_by_id=evidence_by_id,
-                unresolved_evidence_ids=unresolved,
-                after_cutoff_evidence_ids=after_cutoff,
-                uncertain_timing_evidence_ids=uncertain,
-                allow_negative=True,
-                allow_zero=True,
-            )
-            diluted_shares, diluted_shares_norm = _measure(
+            if "minority_interests_cny" in parent:
+                raise ValueError(
+                    f"{scenario_name.upper()}:SEPARATE_MINORITY_INTERESTS_ADJUSTMENT_CONFLICTS_WITH_ATTRIBUTABLE_SEGMENT_PROFIT"
+                )
+                        diluted_shares, diluted_shares_norm = _measure(
                 scenario.get("diluted_shares"),
                 field=f"{scenario_name}.diluted_shares",
                 unit="shares",
@@ -328,7 +311,6 @@ def evaluate_sotp_valuation(
                 segment_equity_value
                 - central_cost_value
                 + net_cash_debt
-                - minority
                 + other_adjustments
             )
             if equity_value <= 0:
@@ -343,7 +325,6 @@ def evaluate_sotp_valuation(
                     "central_cost_multiple_x": central_multiple_norm,
                     "capitalized_central_cost_value_cny": _fmt(central_cost_value),
                     "net_cash_debt_cny": net_cash_debt_norm,
-                    "minority_interests_cny": minority_norm,
                     "other_adjustments_cny": other_norm,
                 },
                 "diluted_shares": diluted_shares_norm,
@@ -389,8 +370,9 @@ def evaluate_sotp_valuation(
         "method": SOTP_METHOD,
         "selected_for_primary_model": True,
         "summary": (
-            "按分部归属净利润分别乘以各自 P/E 倍数求和，再减去资本化母公司税后成本与少数股东权益、"
-            "加减净现金/净负债及其他显式调整，最后除以稀释后股数。所有金额与倍数均为显式输入；"
+            "按分部归属净利润分别乘以各自 P/E 倍数求和，再减去资本化母公司税后成本，"
+            "加减不重复计价的净现金/净负债及其他显式调整，最后除以稀释后股数。分部利润须已按上市公司股东口径计量；"
+            "不会对已反映于归母利润的同一批少数股东权益再次扣减。所有金额与倍数均为显式输入；"
             "模型未自动补零，结果仍属非正式研究测算。"
         ),
         "analyst_supplied_summary": summary,
@@ -413,7 +395,7 @@ def render_sotp_valuation_section(result: Mapping[str, Any], currency: str) -> l
         f"- 计算状态：**{data.get('status', 'UNKNOWN')}**；方法：{data.get('method', SOTP_METHOD)}",
         f"- 是否选为主估值模型：{data.get('selected_for_primary_model', False)}",
         f"- 预测期间 / 估值终点：{data.get('forecast_period') or 'UNKNOWN'} / {data.get('valuation_terminal_date') or 'UNKNOWN'}",
-        f"- 公式：Σ（分部归属净利润 × 分部 P/E）−（母公司税后成本 × 母公司成本倍数）+ 净现金/净负债 − 少数股东权益 + 其他调整；再除以稀释后股数。",
+        f"- 公式：Σ（已归属于上市公司股东的分部净利润 × 分部 P/E）−（母公司税后成本 × 母公司成本倍数）+ 不重复计价的净现金/净负债 + 其他显式调整；再除以稀释后股数。",
         f"- 说明：{data.get('summary') or '未计算'}",
         "- 适用边界：B5 的 EPS_MULTIPLE 增量适配器不能用于 SOTP；不将项目 EPS 倍数增量套到 SOTP 分部估值。",
         "- 正式估值准入：未创建；本结果不创建 Decision 或交易授权。",
@@ -440,7 +422,6 @@ def render_sotp_valuation_section(result: Mapping[str, Any], currency: str) -> l
             f"- 分部权益价值合计：{row.get('segment_equity_value_cny') or 'UNKNOWN'} CNY",
             f"- 资本化母公司税后成本：{parent.get('capitalized_central_cost_value_cny') or 'UNKNOWN'} CNY",
             f"- 净现金/净负债：{(parent.get('net_cash_debt_cny') or {}).get('value', 'UNKNOWN')} CNY",
-            f"- 少数股东权益扣减：{(parent.get('minority_interests_cny') or {}).get('value', 'UNKNOWN')} CNY",
             f"- 其他调整：{(parent.get('other_adjustments_cny') or {}).get('value', 'UNKNOWN')} CNY",
             f"- 总股权价值 / 稀释后股数：{row.get('total_equity_value_cny') or 'UNKNOWN'} CNY / {(row.get('diluted_shares') or {}).get('value', 'UNKNOWN')}",
             f"- SOTP 每股终值：{row.get('terminal_value_per_share') or 'UNKNOWN'} {currency}",
