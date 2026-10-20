@@ -44,6 +44,19 @@ def _bundle(
         "decision": {"provisional_action": "REVIEW_REQUIRED"},
         "valuation_transmission": {"status": "NOT_LINKED"},
         "price_zone_sensitivity": {"status": "UNKNOWN"},
+        "sotp_valuation": {"status": "NOT_SELECTED", "scenarios": {}, "issues": []},
+        "valuation_model_consistency": {
+            "status": "UNKNOWN",
+            "primary_model_price_calculation_eligible": False,
+        },
+        "valuation_timing": {"status": "UNKNOWN", "issues": []},
+        "return_metrics_reason": "Synthetic fixture only.",
+        "duplicate_evidence_ids": [],
+        "untraceable_evidence_ids": [],
+        "untraceable_evidence_fields": {},
+        "unresolved_evidence_references": [],
+        "after_cutoff_evidence_references": [],
+        "uncertain_timing_evidence_references": [],
         "governance": {
             "formal_decision_created": False,
             "canonical_run_receipt_created": False,
@@ -176,12 +189,59 @@ def test_non_eps_model_does_not_require_eps_project_scope_flag() -> None:
     assert issues == []
 
 
-def test_inspect_bundle_checks_required_current_b5_b6_fields_and_no_trade_flags(tmp_path: Path) -> None:
+def test_inspect_bundle_checks_required_current_investment_result_fields_and_no_trade_flags(tmp_path: Path) -> None:
     run_dir = _bundle(tmp_path)
     analysis, receipt = acceptance._inspect_bundle(run_dir, expected_replay_of=None)
     assert analysis["valuation_transmission"]
     assert analysis["price_zone_sensitivity"]
+    assert analysis["sotp_valuation"]["status"] == "NOT_SELECTED"
+    assert analysis["valuation_model_consistency"]["primary_model_price_calculation_eligible"] is False
+    assert analysis["valuation_timing"]["status"] == "UNKNOWN"
     assert receipt["status"] == acceptance.PILOT_STATUS
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "sotp_valuation",
+        "valuation_model_consistency",
+        "valuation_timing",
+        "return_metrics_reason",
+        "unresolved_evidence_references",
+    ],
+)
+def test_inspect_bundle_rejects_missing_new_investment_contract_field(tmp_path: Path, field: str) -> None:
+    run_dir = _bundle(tmp_path)
+    analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
+    analysis.pop(field)
+    _write_json(run_dir / "analysis.json", analysis)
+
+    with pytest.raises(
+        acceptance.AcceptanceError,
+        match=f"ANALYSIS_MISSING_REQUIRED_FIELDS:.*{field}",
+    ):
+        acceptance._inspect_bundle(run_dir, expected_replay_of=None)
+
+
+@pytest.mark.parametrize(
+    ("field", "invalid_value", "error_code"),
+    [
+        ("sotp_valuation", None, "SOTP_VALUATION_MISSING_OR_INVALID"),
+        ("valuation_model_consistency", {}, "VALUATION_MODEL_CONSISTENCY_MISSING_OR_INVALID"),
+        ("valuation_timing", None, "VALUATION_TIMING_MISSING_OR_INVALID"),
+        ("unresolved_evidence_references", {}, "EVIDENCE_DIAGNOSTIC_LIST_MISSING_OR_INVALID"),
+    ],
+)
+def test_inspect_bundle_rejects_malformed_new_investment_contract_field(
+    tmp_path: Path, field: str, invalid_value: object, error_code: str
+) -> None:
+    run_dir = _bundle(tmp_path)
+    analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
+    analysis[field] = invalid_value
+    _write_json(run_dir / "analysis.json", analysis)
+
+    with pytest.raises(acceptance.AcceptanceError, match=error_code):
+        acceptance._inspect_bundle(run_dir, expected_replay_of=None)
 
 
 def test_inspect_bundle_rejects_wrong_replay_parent(tmp_path: Path) -> None:
