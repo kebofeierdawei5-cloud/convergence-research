@@ -24,6 +24,7 @@ from iios_mvp.local_investment_pilot_v01 import (
     _analyse,
     _prepare_input,
     _assert_response_preserves_operator_inputs,
+    _restore_operator_controlled_fields_from_template,
     _validate_guided_observation_date,
     _guided_cutoff_timestamp,
     _validate_guided_research_response,
@@ -940,6 +941,54 @@ def test_ai_response_must_preserve_operator_owned_case_and_price_input(tmp_path)
         _assert_response_preserves_operator_inputs(template_path, payload)
 
 
+def test_guided_response_restores_all_operator_controlled_fields_from_local_template(tmp_path):
+    template_payload = _payload(cutoff="2026-10-10")
+    template_payload["operator_valuation_context"] = {
+        "selected_model_family": "SOTP",
+        "selection_source": "INTERACTIVE_OPERATOR_PROMPT",
+        "selection_confirmed": False,
+    }
+    template_payload["decision_parameters"]["max_loss_pct"] = "25"
+    template_payload["decision_parameters"]["required_return_annualized"] = "0.20"
+    template_path = _write_input(tmp_path, template_payload)
+    template_bytes_before = template_path.read_bytes()
+
+    response = json.loads(template_bytes_before.decode("utf-8"))
+    response["case"]["symbol"] = "999999"
+    response["case"]["as_of_date"] = "2030-01-01"
+    response["price_input"]["price"] = "1"
+    response["operator_valuation_context"]["selected_model_family"] = "EPS_MULTIPLE"
+    response["decision_parameters"]["max_loss_pct"] = "90"
+    response["decision_parameters"]["required_return_annualized"] = "0.15"
+    response["notes"] = "Keep model-authored research notes; only operator controls are restored."
+
+    restored = _restore_operator_controlled_fields_from_template(template_path, response)
+
+    assert restored == [
+        "case", "price_input", "operator_valuation_context",
+        "decision_parameters.max_loss_pct", "decision_parameters.required_return_annualized",
+    ]
+    assert response["case"] == template_payload["case"]
+    assert response["price_input"] == template_payload["price_input"]
+    assert response["operator_valuation_context"] == template_payload["operator_valuation_context"]
+    assert response["decision_parameters"]["max_loss_pct"] == "25"
+    assert response["decision_parameters"]["required_return_annualized"] == "0.20"
+    assert response["notes"] == "Keep model-authored research notes; only operator controls are restored."
+    assert template_path.read_bytes() == template_bytes_before
+    _assert_response_preserves_operator_inputs(template_path, response)
+
+
+def test_operator_field_recovery_fails_closed_if_trusted_template_is_incomplete(tmp_path):
+    template_path = _write_input(tmp_path, _payload())
+    template = json.loads(template_path.read_text(encoding="utf-8"))
+    del template["decision_parameters"]["required_return_annualized"]
+    template_path.write_text(json.dumps(template), encoding="utf-8")
+    response = json.loads(template_path.read_text(encoding="utf-8"))
+
+    with pytest.raises(LocalInvestmentPilotError, match="OPERATOR_INPUT_TEMPLATE_POLICY_FIELD_MISSING:required_return_annualized"):
+        _restore_operator_controlled_fields_from_template(template_path, response)
+
+
 @pytest.mark.parametrize(
     ("field", "invalid_value", "error_code"),
     [
@@ -1096,6 +1145,9 @@ def test_response_repair_prompt_includes_validation_feedback_template_and_prior_
     assert '"schema_version": "test-template"' in prompt
     assert '{"assessment": {}}' in prompt
     assert "不要让用户手工编辑 JSON" in prompt
+    assert "operator_valuation_context" in prompt
+    assert "decision_parameters.max_loss_pct" in prompt
+    assert "decision_parameters.required_return_annualized" in prompt
 
 
 def test_candidate_driven_pilot_uses_existing_return_solver_and_outputs_chinese_report(tmp_path):
