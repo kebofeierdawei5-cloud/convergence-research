@@ -45,6 +45,7 @@ def _bundle(
         "valuation_transmission": {"status": "NOT_LINKED"},
         "price_zone_sensitivity": {"status": "UNKNOWN"},
         "sotp_valuation": {"status": "NOT_SELECTED", "scenarios": {}, "issues": []},
+        "eps_multiple_valuation": {"status": "NOT_SELECTED", "scenarios": {}, "issues": [], "selected_for_primary_model": False},
         "valuation_model_consistency": {
             "status": "UNKNOWN",
             "primary_model_price_calculation_eligible": False,
@@ -204,6 +205,7 @@ def test_inspect_bundle_checks_required_current_investment_result_fields_and_no_
     "field",
     [
         "sotp_valuation",
+        "eps_multiple_valuation",
         "valuation_model_consistency",
         "valuation_timing",
         "return_metrics_reason",
@@ -227,6 +229,7 @@ def test_inspect_bundle_rejects_missing_new_investment_contract_field(tmp_path: 
     ("field", "invalid_value", "error_code"),
     [
         ("sotp_valuation", None, "SOTP_VALUATION_MISSING_OR_INVALID"),
+        ("eps_multiple_valuation", None, "EPS_MULTIPLE_VALUATION_MISSING_OR_INVALID"),
         ("valuation_model_consistency", {}, "VALUATION_MODEL_CONSISTENCY_MISSING_OR_INVALID"),
         ("valuation_timing", None, "VALUATION_TIMING_MISSING_OR_INVALID"),
         ("unresolved_evidence_references", {}, "EVIDENCE_DIAGNOSTIC_LIST_MISSING_OR_INVALID"),
