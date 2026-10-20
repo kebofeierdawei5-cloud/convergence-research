@@ -415,6 +415,7 @@ def render_sotp_valuation_section(result: Mapping[str, Any], currency: str) -> l
         f"- 预测期间 / 估值终点：{data.get('forecast_period') or 'UNKNOWN'} / {data.get('valuation_terminal_date') or 'UNKNOWN'}",
         f"- 公式：Σ（分部归属净利润 × 分部 P/E）−（母公司税后成本 × 母公司成本倍数）+ 净现金/净负债 − 少数股东权益 + 其他调整；再除以稀释后股数。",
         f"- 说明：{data.get('summary') or '未计算'}",
+        "- 适用边界：B5 的 EPS_MULTIPLE 增量适配器不能用于 SOTP；不将项目 EPS 倍数增量套到 SOTP 分部估值。",
         "- 正式估值准入：未创建；本结果不创建 Decision 或交易授权。",
         "",
     ]
