@@ -3347,7 +3347,6 @@ def _template(
                         "central_cost_after_tax_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "母公司税后经常性成本；正数表示成本，显式为零也须说明依据"},
                         "central_cost_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "仅在母公司成本大于零时用于资本化"},
                         "net_cash_debt_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "有符号数；正数为净现金，负数为净负债"},
-                        "minority_interests_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "少数股东权益扣减，显式为零也须说明依据"},
                         "other_adjustments_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "有符号数；其他明确、未重复计价的股权价值调整"}
                     },
                     "diluted_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "稀释后股数，单位为股而不是百万股"}
@@ -3358,7 +3357,6 @@ def _template(
                         "central_cost_after_tax_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "母公司税后经常性成本；正数表示成本，显式为零也须说明依据"},
                         "central_cost_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "仅在母公司成本大于零时用于资本化"},
                         "net_cash_debt_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "有符号数；正数为净现金，负数为净负债"},
-                        "minority_interests_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "少数股东权益扣减，显式为零也须说明依据"},
                         "other_adjustments_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "有符号数；其他明确、未重复计价的股权价值调整"}
                     },
                     "diluted_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "稀释后股数，单位为股而不是百万股"}
@@ -3369,7 +3367,6 @@ def _template(
                         "central_cost_after_tax_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "母公司税后经常性成本；正数表示成本，显式为零也须说明依据"},
                         "central_cost_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "仅在母公司成本大于零时用于资本化"},
                         "net_cash_debt_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "有符号数；正数为净现金，负数为净负债"},
-                        "minority_interests_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "少数股东权益扣减，显式为零也须说明依据"},
                         "other_adjustments_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "有符号数；其他明确、未重复计价的股权价值调整"}
                     },
                     "diluted_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "稀释后股数，单位为股而不是百万股"}
@@ -3520,8 +3517,8 @@ def create_pilot_template(
         "若主估值模型采用 SOTP，必须填写可复算的 sotp_valuation 节点；本版本只支持 SEGMENT_ATTRIBUTABLE_NET_PROFIT_X_SEGMENT_PE。"
         "Bear/Base/Bull 必须使用完全相同的 segment_id 与 segment_name 集合，每个分部填写 attributable_net_profit_cny 与 pe_multiple_x，均用 {value,unit,data_class,basis,evidence_refs,note} 结构。"
         "归属净利润必须是分部层面归属于上市公司股东的预测净利润，单位 CNY；P/E 单位 x。两项只允许 ISSUER_FORECAST 或 ANALYST_ASSUMPTION；发行人预测必须有可解析、截止时点兼容的 evidence_refs，分析假设必须写明可识别的推理依据。分部亏损业务当前不支持直接套用正 P/E，不得把负利润乘正倍数当作合理价值；应明确保留 UNKNOWN 并说明需要另建模型。"
-        "每种情景还必须显式填写 parent_level_adjustments：central_cost_after_tax_cny（正数成本）、central_cost_multiple_x、net_cash_debt_cny（有符号数，正数净现金/负数净负债）、minority_interests_cny（正数扣减）和 other_adjustments_cny（有符号数），以及 diluted_shares（整数股数，不是百万股）。不得缺省为零；如明确为零，也要在 basis 中给出依据。"
-        "计算公式必须是 Σ（分部归属净利润 × 分部 P/E）−（母公司税后成本 × 母公司成本倍数）+ 净现金/净负债 − 少数股东权益 + 其他调整，再除以稀释后股数；结果生成 Bear/Base/Bull 终值，Base 每股值作为主估值参考锚。所有分部、期间、股数、现金/债务、少数股东和母公司成本须避免重复计价。"
+        "每个分部归属净利润必须是已扣除该分部非控股股东损益、归属于上市公司股东的预测净利润（单位 CNY），并且不含尚未分摊的母公司中央税后费用。已按上市公司股东口径计算的分部利润，不得再扣除同一业务的少数股东权益，否则会重复扣减；如果只有未扣非控股股东损益的合并口径利润，本方法不能直接用于计算。"
+        "计算公式必须是 Σ（已归属于上市公司股东的分部净利润 × 分部 P/E）−（母公司税后成本 × 母公司成本倍数）+ 不重复计价的净现金/净负债 + 其他显式调整，再除以稀释后股数；结果生成 Bear/Base/Bull 终值，Base 每股值作为主估值参考锚。每个分部利润应与上市公司股东权益口径一致，不能再次扣同一分部的少数股东权益。所有分部、期间、股数、现金/债务及母公司成本须避免重复计价。"
         "sotp_valuation.forecast_period 必须与 operating_driver_forecast.forecast_period 一致，valuation_terminal_date 必须与 forecast_valuation.valuation_terminal_date 一致。数值、证据、期间、分部集合或 Bear≤Base≤Bull 任一项不成立时，不要在 forecast_valuation 中用手填每股终值冒充已计算 SOTP；保留缺口，系统会阻断回报、目标入场价与 B6。"
         "此 SOTP 算术仍为 PILOT_NON_CANONICAL，并不代表正式证据或估值准入。B5 的 EPS_MULTIPLE 增量适配器不能用于 SOTP。"
     )

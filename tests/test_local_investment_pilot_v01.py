@@ -3781,7 +3781,6 @@ def _sotp_ready_payload():
                 "central_cost_after_tax_cny": _sotp_measure("200000000", "CNY"),
                 "central_cost_multiple_x": _sotp_measure(central_cost_multiple, "x"),
                 "net_cash_debt_cny": _sotp_measure("2000000000", "CNY", basis="Explicit signed net-cash assumption"),
-                "minority_interests_cny": _sotp_measure("1000000000", "CNY"),
                 "other_adjustments_cny": _sotp_measure("0", "CNY", basis="No additional adjustments in this synthetic fixture"),
             },
             "diluted_shares": _sotp_measure("1000000000", "shares", basis="Explicit synthetic diluted share count"),
@@ -3825,10 +3824,10 @@ def test_sotp_adapter_computes_segment_values_parent_adjustments_and_per_share_v
     assert Decimal(bear["segments"][0]["segment_equity_value_cny"]) == Decimal("32000000000")
     assert Decimal(bear["segment_equity_value_cny"]) == Decimal("50000000000")
     assert Decimal(bear["parent_level_adjustments"]["capitalized_central_cost_value_cny"]) == Decimal("1600000000")
-    assert Decimal(bear["total_equity_value_cny"]) == Decimal("49400000000")
-    assert Decimal(bear["terminal_value_per_share"]) == Decimal("49.4")
-    assert Decimal(result["scenarios"]["base"]["terminal_value_per_share"]) == Decimal("79")
-    assert Decimal(result["scenarios"]["bull"]["terminal_value_per_share"]) == Decimal("112.6")
+    assert Decimal(bear["total_equity_value_cny"]) == Decimal("50400000000")
+    assert Decimal(bear["terminal_value_per_share"]) == Decimal("50.4")
+    assert Decimal(result["scenarios"]["base"]["terminal_value_per_share"]) == Decimal("80")
+    assert Decimal(result["scenarios"]["bull"]["terminal_value_per_share"]) == Decimal("113.6")
 
 
 def test_sotp_primary_calculation_overrides_draft_per_share_values_and_closes_price_math():
@@ -3844,8 +3843,8 @@ def test_sotp_primary_calculation_overrides_draft_per_share_values_and_closes_pr
     assert analysis["valuation_model_consistency"]["calculation_model_family"] == "SOTP"
     assert analysis["valuation_model_consistency"]["sotp_calculation_status"] == "CALCULATED"
     assert analysis["valuation_model_consistency"]["primary_model_price_calculation_eligible"] is True
-    assert analysis["forecast_valuation"]["entry_value_reference_per_share"] == "79"
-    for name, expected in (("bear", "49.4"), ("base", "79"), ("bull", "112.6")):
+    assert analysis["forecast_valuation"]["entry_value_reference_per_share"] == "80"
+    for name, expected in (("bear", "50.4"), ("base", "80"), ("bull", "113.6")):
         row = analysis["forecast_valuation"]["scenarios"][name]
         assert row["declared_terminal_value_before_sotp_calculation"] == original_draft_terminals[name]
         assert Decimal(row["terminal_value_per_share"]) == Decimal(expected)
@@ -3853,8 +3852,8 @@ def test_sotp_primary_calculation_overrides_draft_per_share_values_and_closes_pr
     assert analysis["return_metrics"] is not None
     assert analysis["price_zone_sensitivity"]["target_entry_price"] is not None
     assert "SOTP：分部估值到每股终值的计算链" in report
-    assert "Σ（分部归属净利润 × 分部 P/E）" in report
-    assert "SOTP 每股终值：79 CNY" in report
+    assert "Σ（已归属于上市公司股东的分部净利润 × 分部 P/E）" in report
+    assert "SOTP 每股终值：80 CNY" in report
     assert "B5 的 EPS_MULTIPLE 增量适配器不能用于 SOTP" in report
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
 
@@ -3935,3 +3934,25 @@ def test_sotp_candidate_is_not_applied_when_operator_selects_another_model():
     assert analysis["forecast_valuation"]["entry_value_reference_per_share"] == "150"
     assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
     assert analysis["return_metrics"] is not None
+
+
+def test_sotp_rejects_separate_minority_adjustment_with_attributable_segment_profit():
+    from iios_mvp.sotp_valuation_v01 import evaluate_sotp_valuation
+
+    payload = _sotp_ready_payload()
+    payload["sotp_valuation"]["scenarios"]["base"]["parent_level_adjustments"]["minority_interests_cny"] = _sotp_measure(
+        "1000000000", "CNY", basis="Deliberately overlapping minority interest value."
+    )
+    result = evaluate_sotp_valuation(
+        payload["sotp_valuation"],
+        selected_model_family="SOTP",
+        expected_forecast_period="2027FY",
+        expected_terminal_date="2027-12-31",
+        evidence_register=[],
+    )
+
+    assert result["status"] == "SOTP_INPUT_INCOMPLETE_OR_INVALID"
+    assert any(
+        "SEPARATE_MINORITY_INTERESTS_ADJUSTMENT_CONFLICTS_WITH_ATTRIBUTABLE_SEGMENT_PROFIT" in issue
+        for issue in result["issues"]
+    )
