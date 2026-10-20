@@ -173,6 +173,18 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
             "scenarios": {"bear": {}, "base": {}, "bull": {}},
             "limitations": ["Synthetic test only."],
         },
+        "eps_multiple_valuation": {
+            "schema_version": "IIOS-EPS-MULTIPLE-VALUATION-0.1",
+            "calculation_method": "EPS_PER_SHARE_X_PE_MULTIPLE",
+            "summary": "Synthetic test assumption: terminal value is explicitly recalculated as EPS times P/E.",
+            "forecast_period": f"{forecast_year}FY",
+            "valuation_terminal_date": f"{forecast_year}-12-31",
+            "scenarios": {
+                "bear": {"rationale": "Synthetic bear EPS and multiple.", "eps_per_share": {"value": "10", "unit": "CNY/share", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic EPS fixture.", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": "12", "unit": "x", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic low multiple.", "evidence_refs": [], "note": ""}},
+                "base": {"rationale": "Synthetic base EPS and multiple.", "eps_per_share": {"value": "10", "unit": "CNY/share", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic EPS fixture.", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": "15", "unit": "x", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic base multiple.", "evidence_refs": [], "note": ""}},
+                "bull": {"rationale": "Synthetic bull EPS and multiple.", "eps_per_share": {"value": "10", "unit": "CNY/share", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic EPS fixture.", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": "18", "unit": "x", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic high multiple.", "evidence_refs": [], "note": ""}}
+            }
+        },
         "sotp_valuation": {
             "schema_version": "IIOS-SOTP-VALUATION-0.1",
             "calculation_method": "SEGMENT_ATTRIBUTABLE_NET_PROFIT_X_SEGMENT_PE",
@@ -206,6 +218,18 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
         },
         "notes": "Synthetic pytest fixture only.",
     }
+
+
+def _sync_eps_multiple_values(payload: dict, terminal_values: dict[str, object]) -> None:
+    """Keep synthetic EPS×P/E assumptions aligned when a test intentionally changes its scenario values."""
+    node = payload["eps_multiple_valuation"]
+    node["forecast_period"] = payload["operating_driver_forecast"]["forecast_period"]
+    node["valuation_terminal_date"] = payload["forecast_valuation"]["valuation_terminal_date"]
+    for name, terminal_value in terminal_values.items():
+        value = Decimal(str(terminal_value))
+        row = node["scenarios"][name]
+        row["eps_per_share"]["value"] = format(value / Decimal("10"), "f")
+        row["pe_multiple_x"]["value"] = "10"
 
 
 def _write_input(tmp_path: Path, payload: dict | None = None) -> Path:
@@ -1404,6 +1428,7 @@ def test_incomplete_valuation_produces_report_without_inventing_returns(tmp_path
     payload = _payload()
     payload["forecast_valuation"]["entry_value_reference_per_share"] = None
     payload["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] = None
+    payload["eps_multiple_valuation"]["scenarios"]["base"]["eps_per_share"]["value"] = None
     result = run_local_investment_pilot(input_path=_write_input(tmp_path, payload), output_root=tmp_path / "private-runs")
     analysis = json.loads((Path(result["run_dir"]) / "analysis.json").read_text(encoding="utf-8"))
     report = (Path(result["run_dir"]) / "report.md").read_text(encoding="utf-8")
@@ -1606,9 +1631,10 @@ def test_bear_and_thesis_break_stress_reject_placeholder_only_rationales(
 def test_bear_base_bull_total_wealth_ordering_is_required():
     payload = _payload()
     payload["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] = "160"
+    _sync_eps_multiple_values(payload, {"bear": "160", "base": "150", "bull": "180"})
     analysis, report = _analyse(payload, "TEST-SCENARIO-ORDER")
     assert analysis["return_metrics"] is None
-    assert analysis["return_metrics_reason"] == "SCENARIO_WEALTH_ORDERING_INCONSISTENT"
+    assert analysis["return_metrics_reason"] == "PRIMARY_VALUATION_MODEL_NOT_ELIGIBLE:EPS_MULTIPLE_CALCULATION_NOT_ELIGIBLE"
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
     assert "SCENARIO_WEALTH_ORDERING_INCONSISTENT" in analysis["decision"]["gating_issues"]
 
@@ -2663,6 +2689,7 @@ def test_null_valuation_fields_render_as_unknown_in_json_report_sections():
     payload = _b5_ready_payload()
     payload["forecast_valuation"]["scenarios"]["bear"]["probability"] = None
     payload["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] = None
+    payload["eps_multiple_valuation"]["scenarios"]["bear"]["eps_per_share"]["value"] = None
 
     analysis, report = _analyse(payload, "TEST-NULL-VALUATION-RENDER")
     assert analysis["forecast_valuation"]["scenarios"]["bear"]["probability"] is None
@@ -3366,6 +3393,7 @@ def test_required_return_below_15_percent_remains_independent_from_fundamental_h
             "rationale": "synthetic bull case with a 125 CNY terminal wealth",
         },
     }
+    _sync_eps_multiple_values(payload, {"bear": "100", "base": "115", "bull": "125"})
 
     analysis, report = _analyse(payload, "TEST-REQUIRED-RETURN-INDEPENDENT-OF-15-PCT")
     metrics = analysis["return_metrics"]
@@ -3851,6 +3879,43 @@ def _sotp_ready_payload():
         },
     }
     return payload
+
+
+def test_primary_eps_multiple_adapter_recomputes_values_and_entry_anchor_locally():
+    payload = _payload()
+    payload["forecast_valuation"]["entry_value_reference_per_share"] = "777"
+    payload["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] = "999"
+    payload["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] = "888"
+    payload["forecast_valuation"]["scenarios"]["bull"]["terminal_value_per_share"] = "777"
+
+    analysis, report = _analyse(payload, "TEST-EPS-MULTIPLE-LOCAL-RECALC")
+    adapter = analysis["eps_multiple_valuation"]
+
+    assert adapter["status"] == "CALCULATED"
+    assert adapter["scenarios"]["base"]["calculation"]["arithmetic"] == "10 × 15 = 150"
+    assert analysis["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] == "120"
+    assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
+    assert analysis["forecast_valuation"]["scenarios"]["bull"]["terminal_value_per_share"] == "180"
+    assert analysis["forecast_valuation"]["entry_value_reference_per_share"] == "150"
+    assert analysis["forecast_valuation"]["scenarios"]["base"]["declared_terminal_value_before_eps_multiple_calculation"] == "888"
+    assert analysis["forecast_valuation"]["declared_entry_value_reference_before_eps_multiple_calculation"] == "777"
+    assert analysis["valuation_model_consistency"]["primary_model_price_calculation_eligible"] is True
+    assert analysis["return_metrics"] is not None
+    assert "EPS_MULTIPLE：每股盈利 × 市盈率的主估值计算链" in report
+    assert "10 × 15 = 150" in report
+
+
+def test_primary_eps_multiple_missing_structured_input_blocks_return_and_entry_price():
+    payload = _payload()
+    payload["eps_multiple_valuation"]["scenarios"]["base"]["eps_per_share"]["value"] = None
+
+    analysis, report = _analyse(payload, "TEST-EPS-MULTIPLE-MISSING-EPS")
+    assert analysis["eps_multiple_valuation"]["status"] == "INPUT_INCOMPLETE_OR_INVALID"
+    assert analysis["valuation_model_consistency"]["primary_model_price_calculation_eligible"] is False
+    assert "EPS_MULTIPLE_ADAPTER_NOT_CALCULATED" in analysis["valuation_model_consistency"]["issues"]
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert "EPS_MULTIPLE_CALCULATION_NOT_ELIGIBLE" in report
 
 
 def test_sotp_adapter_computes_segment_values_parent_adjustments_and_per_share_value():
