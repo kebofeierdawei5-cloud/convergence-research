@@ -17,6 +17,7 @@ from typing import Any, Mapping
 
 SOTP_VALUATION_SCHEMA = "IIOS-SOTP-VALUATION-0.1"
 SOTP_METHOD = "SEGMENT_ATTRIBUTABLE_NET_PROFIT_X_SEGMENT_PE"
+SOTP_INPUT_CURRENCY = "CNY"
 SCENARIOS = ("bear", "base", "bull")
 ALLOWED_DATA_CLASSES = {"ISSUER_FORECAST", "ANALYST_ASSUMPTION"}
 UNIDENTIFIABLE_TEXT = {
@@ -124,6 +125,7 @@ def evaluate_sotp_valuation(
     expected_forecast_period: Any,
     expected_terminal_date: Any,
     evidence_register: list[dict[str, Any]],
+    expected_currency: Any = SOTP_INPUT_CURRENCY,
     unresolved_evidence_ids: list[str] | set[str] | None = None,
     after_cutoff_evidence_ids: list[str] | set[str] | None = None,
     uncertain_timing_evidence_ids: list[str] | set[str] | None = None,
@@ -134,6 +136,13 @@ def evaluate_sotp_valuation(
             **_blocked("NOT_SELECTED", "操作者未选择 SOTP；本适配器不参与主估值计算。"),
             "selected_for_primary_model": False,
         }
+    case_currency = str(expected_currency or "").strip().upper()
+    if case_currency != SOTP_INPUT_CURRENCY:
+        return _blocked(
+            "SOTP_CURRENCY_NOT_SUPPORTED",
+            f"当前 SOTP v0.1 的金额输入与每股终值固定以 {SOTP_INPUT_CURRENCY} 计价；本案例币种为 {case_currency or 'UNKNOWN'}。不得把 CNY/股重标为其他币种，也不得将其带入主估值回报、目标入场价或 B6。",
+            ["SOTP_V0_1_CNY_ONLY", f"SOTP_CASE_CURRENCY_NOT_CNY:{case_currency or 'UNKNOWN'}"],
+        )
     if not isinstance(raw, Mapping):
         return _blocked(
             "SOTP_INPUT_MISSING",
@@ -221,7 +230,7 @@ def evaluate_sotp_valuation(
                 profit, profit_norm = _measure(
                     segment.get("attributable_net_profit_cny"),
                     field=f"{scenario_name}.{segment_id}.attributable_net_profit_cny",
-                    unit="CNY",
+                    unit=SOTP_INPUT_CURRENCY,
                     evidence_by_id=evidence_by_id,
                     unresolved_evidence_ids=unresolved,
                     after_cutoff_evidence_ids=after_cutoff,
@@ -257,7 +266,7 @@ def evaluate_sotp_valuation(
             central_cost, central_cost_norm = _measure(
                 parent.get("central_cost_after_tax_cny"),
                 field=f"{scenario_name}.central_cost_after_tax_cny",
-                unit="CNY",
+                unit=SOTP_INPUT_CURRENCY,
                 evidence_by_id=evidence_by_id,
                 unresolved_evidence_ids=unresolved,
                 after_cutoff_evidence_ids=after_cutoff,
@@ -279,7 +288,7 @@ def evaluate_sotp_valuation(
             net_cash_debt, net_cash_debt_norm = _measure(
                 parent.get("net_cash_debt_cny"),
                 field=f"{scenario_name}.net_cash_debt_cny",
-                unit="CNY",
+                unit=SOTP_INPUT_CURRENCY,
                 evidence_by_id=evidence_by_id,
                 unresolved_evidence_ids=unresolved,
                 after_cutoff_evidence_ids=after_cutoff,
@@ -294,7 +303,7 @@ def evaluate_sotp_valuation(
             other_adjustments, other_norm = _measure(
                 parent.get("other_adjustments_cny"),
                 field=f"{scenario_name}.other_adjustments_cny",
-                unit="CNY",
+                unit=SOTP_INPUT_CURRENCY,
                 evidence_by_id=evidence_by_id,
                 unresolved_evidence_ids=unresolved,
                 after_cutoff_evidence_ids=after_cutoff,
@@ -407,6 +416,7 @@ def render_sotp_valuation_section(result: Mapping[str, Any], currency: str) -> l
         f"- 是否选为主估值模型：{data.get('selected_for_primary_model', False)}",
         f"- 预测期间 / 估值终点：{data.get('forecast_period') or 'UNKNOWN'} / {data.get('valuation_terminal_date') or 'UNKNOWN'}",
         f"- 公式：Σ（已归属于上市公司股东的分部净利润 × 分部 P/E）−（母公司税后成本 × 母公司成本倍数）+ 不重复计价的净现金/净负债 + 其他显式调整；再除以稀释后股数。",
+        "- 币种边界：v0.1 输入字段和计算值固定为 CNY；未实现 CNY/HKD 汇率校正，非 CNY 个股币种会阻断，不能自动换汇或重标。",
         f"- 说明：{data.get('summary') or '未计算'}",
         "- 适用边界：B5 的 EPS_MULTIPLE 增量适配器不能用于 SOTP；不将项目 EPS 倍数增量套到 SOTP 分部估值。",
         "- 正式估值准入：未创建；本结果不创建 Decision 或交易授权。",
