@@ -3904,6 +3904,8 @@ def test_primary_eps_multiple_adapter_recomputes_values_and_entry_anchor_locally
     assert analysis["return_metrics"] is not None
     assert "EPS_MULTIPLE：每股盈利 × 市盈率的主估值计算链" in report
     assert "10 × 15 = 150" in report
+    assert "EPS_MULTIPLE 原始声明终值（仅供审计，不进入主计算）：888 CNY" in report
+    assert "EPS_MULTIPLE 原始声明锚（仅供审计，不进入主计算）：777" in report
 
 
 def test_primary_eps_multiple_missing_structured_input_blocks_return_and_entry_price():
