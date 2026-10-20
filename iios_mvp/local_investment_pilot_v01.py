@@ -839,10 +839,20 @@ def _evaluate_primary_eps_multiple_valuation(
     if not _is_identifiable_evidence_text(summary):
         return blocked("RATIONALE_NOT_IDENTIFIABLE", "EPS_MULTIPLE_SUMMARY_NOT_IDENTIFIABLE")
     period = str(raw.get("forecast_period") or "").strip().upper()
+    expected_period = str(expected_forecast_period or "").strip().upper()
     terminal_date = str(raw.get("valuation_terminal_date") or "").strip()
-    if period != str(expected_forecast_period or "").strip().upper():
+    expected_date = str(expected_terminal_date or "").strip()
+    if (
+        not _is_identifiable_evidence_text(period)
+        or not _is_identifiable_evidence_text(expected_period)
+        or period != expected_period
+    ):
         return blocked("PERIOD_MISMATCH", "EPS_MULTIPLE_FORECAST_PERIOD_MISMATCH")
-    if not terminal_date or terminal_date != str(expected_terminal_date or "").strip():
+    if (
+        not _is_identifiable_evidence_text(terminal_date)
+        or not _is_identifiable_evidence_text(expected_date)
+        or terminal_date != expected_date
+    ):
         return blocked("TERMINAL_DATE_MISMATCH", "EPS_MULTIPLE_TERMINAL_DATE_MISMATCH")
     inputs = raw.get("scenarios")
     if not isinstance(inputs, Mapping) or set(inputs) != set(SCENARIOS):
