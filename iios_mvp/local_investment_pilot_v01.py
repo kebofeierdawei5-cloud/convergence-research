@@ -845,9 +845,13 @@ def _build_valuation_model_consistency(
     else:
         status = "MATCH"
     model_rationale_identifiable = _is_identifiable_evidence_text(model_rationale)
-    if calculated == "SOTP" and str(sotp_calculation_status or "UNKNOWN").upper() != "CALCULATED" and status == "MATCH":
+    if selected == "SOTP" and str(sotp_calculation_status or "UNKNOWN").upper() != "CALCULATED":
+        # The operator's selected SOTP must actually be calculated. Preserve any
+        # model-family/name mismatch as a diagnostic issue, but make the missing
+        # SOTP calculation the primary blocker for return/entry-price/B6 output.
+        if "SOTP_ADAPTER_NOT_CALCULATED" not in issues:
+            issues.append("SOTP_ADAPTER_NOT_CALCULATED")
         status = "SOTP_CALCULATION_NOT_ELIGIBLE"
-        issues.append("SOTP_ADAPTER_NOT_CALCULATED")
     if not model_rationale_identifiable:
         issues.append("FORECAST_VALUATION_MODEL_RATIONALE_NOT_IDENTIFIABLE")
         if status == "MATCH":
