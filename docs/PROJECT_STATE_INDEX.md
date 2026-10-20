@@ -100,6 +100,7 @@ B20 SOTP CNY/HKD currency safety                            PR #539 MERGED; 262 
 B21 SOTP adapter explicit currency requirement                   PR #541 MERGED; 263 Local Investment Pilot tests PASS; 15/15 exact-head workflows PASS incl. independent red-team; missing/unknown/non-CNY currency blocks; Mac Replay OPEN / NOT VERIFIED
 B22 full-run acceptance contract coverage                         PR #543 MERGED; 272 Local Pilot + acceptance-wrapper tests PASS; 15/15 exact-head workflows PASS incl. independent red-team; SOTP/model-consistency/timing/return-reason + evidence diagnostics required; Mac Replay OPEN / NOT VERIFIED
 B23 recurring macOS .command permission failure                 IN PROGRESS; 4th occurrence recorded; replace raw download handoff with Unix-mode-preserving ZIP artifact; test mode + no-chmod fallback; B9 remains OPEN
+B24 guided-response operator-field recovery                 IN PROGRESS; restore AI-mutated case/price/model-selection/risk-and-return fields from the trusted local template in memory; preserve raw response and record restored paths in completed private input; fail closed if template authority is incomplete; exact-head tests pending
 B19 SOTP report formula consistency after NCI correction        PR #538 MERGED; exact-head 15/15 workflows PASS incl. Local Pilot + independent red-team; no arithmetic change; real Mac acceptance remains open
 ```
 
