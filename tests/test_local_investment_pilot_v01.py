@@ -2328,6 +2328,7 @@ def _b5_ready_payload():
         "baseline_includes_project": False,
         "input_owner": "OPERATOR",
     }
+    _sync_eps_multiple_values(payload, {"bear": "120", "base": "150", "bull": "180"})
     return payload
 
 
