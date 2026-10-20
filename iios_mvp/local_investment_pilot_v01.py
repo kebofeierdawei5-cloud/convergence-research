@@ -1928,11 +1928,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         forecast["scenarios"] = normalized_scenarios
         forecast["declared_entry_value_reference_before_eps_multiple_calculation"] = forecast.get("entry_value_reference_per_share")
         forecast["entry_value_reference_per_share"] = eps_multiple_valuation["scenarios"]["base"]["terminal_value_per_share"]
-        forecast["model_rationale_original_untrusted"] = forecast.get("model_rationale")
-        forecast["model_rationale"] = (
-            "EPS_MULTIPLE 主估值终值由本地适配器复算：Bear/Base/Bull 每股终值分别为结构化 EPS × P/E；"
-            "原始模型声明值保留为未信任诊断，不直接用于回报或入场价格。详细输入与算术见 eps_multiple_valuation。"
-        )
+        # Preserve the analyst's model-selection/fit rationale independently from arithmetic.
+        # The separate adapter report carries the local EPS × P/E calculation.
     sotp_valuation = evaluate_sotp_valuation(
         raw_sotp_valuation,
         selected_model_family=operator_valuation_context["selected_model_family"],
