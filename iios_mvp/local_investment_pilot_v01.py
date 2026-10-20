@@ -3511,6 +3511,18 @@ def _template(
                 "rationale": "", "evidence_refs": [],
             },
         },
+        "eps_multiple_valuation": {
+            "schema_version": EPS_MULTIPLE_VALUATION_SCHEMA,
+            "calculation_method": EPS_MULTIPLE_VALUATION_METHOD,
+            "summary": "",
+            "forecast_period": "UNKNOWN",
+            "valuation_terminal_date": None,
+            "scenarios": {
+                "bear": {"rationale": "", "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}},
+                "base": {"rationale": "", "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}},
+                "bull": {"rationale": "", "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}}
+            }
+        },
         "sotp_valuation": {
             "schema_version": "IIOS-SOTP-VALUATION-0.1",
             "calculation_method": "SEGMENT_ATTRIBUTABLE_NET_PROFIT_X_SEGMENT_PE",
@@ -3677,6 +3689,14 @@ def create_pilot_template(
         "每个排名靠前的 value driver 都应尽量填写 driver_type、historical_evidence、valuation_transmission、impact、rationale 和其自身的 evidence_refs；证据只证明事实，不自动证明因果，因果需另给机制。Bear/Base/Bull 应由经营驱动假设产生有意义的差异，而不是只改终值或概率；说明情景间销量、净售价、单位成本、利润率、现金转化、资本开支和估值倍数发生哪些变化以及依据。"
         "最终要判断的是“按输入价格是否值得承担风险”，而不是只判断公司是否优秀或值得研究。请提供足以让本地决策引擎复算的输入，不要另造顶层 action/target-price 字段，也不要在研究回答中声称已发出 BUY/ADD/交易指令；15% 年化门槛、共同约束入场价与暂定动作由本地既有计算器独立计算。"
     )
+    eps_multiple_instructions = (
+        "\\n\\nEPS_MULTIPLE 主估值计算契约（IIOS-EPS-MULTIPLE-VALUATION-0.1）："
+        "必须保留 eps_multiple_valuation 节点；forecast_period 与 operating_driver_forecast.forecast_period 一致，valuation_terminal_date 与 forecast_valuation.valuation_terminal_date 一致。"
+        "Bear/Base/Bull 每个情景都填 rationale、eps_per_share 与 pe_multiple_x；两项均采用 {value,unit,data_class,basis,evidence_refs,note} 结构。"
+        "eps_per_share 单位为本次个股币种/share（CNY/share 或 HKD/share），数值为同一预测期间的正每股盈利；pe_multiple_x 单位为 x，数值为正 P/E 倍数。data_class 只能是 ISSUER_FORECAST 或 ANALYST_ASSUMPTION；发行人预测必须提供截止前 evidence_refs，分析假设必须说明推导与倍数依据。"
+        "若公司预计亏损、EPS 或倍数不可识别，保留 UNKNOWN/null 并说明原因，不能使用负 EPS 乘正 P/E 伪造价值。Bear/Base/Bull 本地复算后须满足终值次序 Bear≤Base≤Bull。"
+        "本地程序会使用结构化 EPS×P/E 复算终值，并以 Base 复算值作为主估值锚；forecast_valuation 中模型直接填写的终值和锚只保留为未信任诊断，不是 EPS_MULTIPLE 主计算来源。任一输入缺失、单位/期间/证据错误或情景次序不成立时，回报、目标入场价和 B6 必须保持 UNKNOWN。该计算只验证明示假设的算术，不证明假设真实、倍数合理或正式估值准入。"
+    )
     b5_transmission_instructions = (
         "\n\nB5 估值传导要求（IIOS-VALUATION-TRANSMISSION-0.1）："
         "必须保留 valuation_transmission 节点和 Bear/Base/Bull 三个情景。valuation_model_name 必须逐字匹配 forecast_valuation.model；model_family 必须准确分类为 EPS_MULTIPLE、FCF_DCF、DDM、SOTP、RNPV、OTHER 或 UNKNOWN；earnings_period 必须与 operating_driver_forecast.forecast_period 完全一致。"
@@ -3726,6 +3746,7 @@ def create_pilot_template(
         )
     prompt += investment_thesis_chain_instructions
     prompt += driver_instructions
+    prompt += eps_multiple_instructions
     prompt += b5_transmission_instructions
     prompt += sotp_instructions
     _write_local(prompt_path, prompt + "\n")
