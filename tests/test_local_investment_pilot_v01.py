@@ -3653,7 +3653,8 @@ def test_rehosted_dividend_source_cannot_pass_by_self_declared_source_class():
     assert review["source_validation_status"] == "BLOCKED_SOURCE_DOMAIN_CLASS_OR_CUTOFF_REVIEW"
     assert review["formal_evidence_pit_admission"] is False
     assert review["analyst_supplied_summary_unverified"] == "已核实中期分红。"
-    assert "已核实" not in review["summary"]
+    assert "已核实中期分红" not in review["summary"]
+    assert "不得作为已核实现金流" in review["summary"]
     assert analysis["return_metrics"] is None
     assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
     assert "CASH_DISTRIBUTION_SOURCE_DOMAIN_CLASS_NOT_ACCEPTED" in analysis["decision"]["gating_issues"]
