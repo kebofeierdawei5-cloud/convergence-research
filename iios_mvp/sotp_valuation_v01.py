@@ -291,7 +291,7 @@ def evaluate_sotp_valuation(
                 raise ValueError(
                     f"{scenario_name.upper()}:SEPARATE_MINORITY_INTERESTS_ADJUSTMENT_CONFLICTS_WITH_ATTRIBUTABLE_SEGMENT_PROFIT"
                 )
-                        diluted_shares, diluted_shares_norm = _measure(
+            diluted_shares, diluted_shares_norm = _measure(
                 scenario.get("diluted_shares"),
                 field=f"{scenario_name}.diluted_shares",
                 unit="shares",
