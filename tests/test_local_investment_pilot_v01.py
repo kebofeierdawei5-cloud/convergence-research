@@ -3815,6 +3815,7 @@ def test_sotp_adapter_computes_segment_values_parent_adjustments_and_per_share_v
         selected_model_family="SOTP",
         expected_forecast_period="2027FY",
         expected_terminal_date="2027-12-31",
+        expected_currency="CNY",
         evidence_register=evidence,
     )
 
@@ -3829,6 +3830,26 @@ def test_sotp_adapter_computes_segment_values_parent_adjustments_and_per_share_v
     assert Decimal(result["scenarios"]["base"]["terminal_value_per_share"]) == Decimal("80")
     assert Decimal(result["scenarios"]["bull"]["terminal_value_per_share"]) == Decimal("113.6")
 
+
+
+
+def test_sotp_adapter_requires_explicit_case_currency():
+    from iios_mvp.sotp_valuation_v01 import evaluate_sotp_valuation
+
+    payload = _sotp_ready_payload()
+    result = evaluate_sotp_valuation(
+        payload["sotp_valuation"],
+        selected_model_family="SOTP",
+        expected_forecast_period="2027FY",
+        expected_terminal_date="2027-12-31",
+        evidence_register=[],
+    )
+
+    assert result["status"] == "SOTP_CURRENCY_NOT_SUPPORTED"
+    assert result["scenarios"] == {}
+    assert "SOTP_CASE_CURRENCY_NOT_CNY:UNKNOWN" in result["issues"]
+    assert result["formal_valuation_admission_created"] is False
+    assert result["decision_authority"] is False
 
 
 def test_sotp_v01_rejects_non_cny_case_currency_without_fx_conversion():
@@ -3930,6 +3951,7 @@ def test_sotp_requires_same_segment_universe_and_valid_typed_evidence():
         selected_model_family="SOTP",
         expected_forecast_period="2027FY",
         expected_terminal_date="2027-12-31",
+        expected_currency="CNY",
         evidence_register=[],
     )
     assert result["status"] == "SOTP_SEGMENT_UNIVERSE_MISMATCH"
@@ -3945,6 +3967,7 @@ def test_sotp_requires_same_segment_universe_and_valid_typed_evidence():
         selected_model_family="SOTP",
         expected_forecast_period="2027FY",
         expected_terminal_date="2027-12-31",
+        expected_currency="CNY",
         evidence_register=[],
     )
     assert result["status"] == "SOTP_INPUT_INCOMPLETE_OR_INVALID"
@@ -3993,6 +4016,7 @@ def test_sotp_rejects_separate_minority_adjustment_with_attributable_segment_pro
         selected_model_family="SOTP",
         expected_forecast_period="2027FY",
         expected_terminal_date="2027-12-31",
+        expected_currency="CNY",
         evidence_register=[],
     )
 

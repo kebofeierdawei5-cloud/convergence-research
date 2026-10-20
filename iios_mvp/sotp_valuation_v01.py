@@ -125,7 +125,7 @@ def evaluate_sotp_valuation(
     expected_forecast_period: Any,
     expected_terminal_date: Any,
     evidence_register: list[dict[str, Any]],
-    expected_currency: Any = SOTP_INPUT_CURRENCY,
+    expected_currency: Any = None,
     unresolved_evidence_ids: list[str] | set[str] | None = None,
     after_cutoff_evidence_ids: list[str] | set[str] | None = None,
     uncertain_timing_evidence_ids: list[str] | set[str] | None = None,
