@@ -1,0 +1,39 @@
+name: IIOS macOS launcher distribution
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "*.command"
+      - "tools/package_macos_launchers_v01.py"
+      - "tests/test_macos_launcher_distribution_v01.py"
+      - "docs/MACOS_COMMAND_PERMISSION_INCIDENT_20261020.md"
+      - ".github/workflows/macos-launcher-distribution.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  package-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build launcher distribution and verify Unix permissions
+        run: |
+          python tools/package_macos_launchers_v01.py --output-dir dist --commit-sha "$GITHUB_SHA"
+      - name: Test package mode and no-chmod recovery guidance
+        run: |
+          python -m pytest -q tests/test_macos_launcher_distribution_v01.py
+      - name: Upload permission-preserving launcher ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: IIOS-macos-launchers-${{ github.sha }}
+          path: dist/IIOS-macos-launchers-*.zip
+          if-no-files-found: error
+          retention-days: 30
