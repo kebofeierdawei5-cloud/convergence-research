@@ -46,6 +46,7 @@ REQUIRED_ANALYSIS_FIELDS = (
     "operating_driver_forecast",
     "valuation_transmission",
     "sotp_valuation",
+    "eps_multiple_valuation",
     "valuation_model_consistency",
     "valuation_timing",
     "return_metrics",
@@ -479,6 +480,16 @@ def _inspect_bundle(run_dir: Path, *, expected_replay_of: str | None = None) -> 
         or not isinstance(sotp.get("scenarios"), dict)
     ):
         raise AcceptanceError(f"SOTP_VALUATION_MISSING_OR_INVALID:{run_dir.name}")
+    eps_multiple = analysis.get("eps_multiple_valuation")
+    if (
+        not isinstance(eps_multiple, dict)
+        or not isinstance(eps_multiple.get("status"), str)
+        or not isinstance(eps_multiple.get("scenarios"), dict)
+        or not isinstance(eps_multiple.get("issues"), list)
+        or not isinstance(eps_multiple.get("selected_for_primary_model"), bool)
+        or (eps_multiple.get("status") == "CALCULATED" and eps_multiple.get("selected_for_primary_model") is not True)
+    ):
+        raise AcceptanceError(f"EPS_MULTIPLE_VALUATION_MISSING_OR_INVALID:{run_dir.name}")
     model_consistency = analysis.get("valuation_model_consistency")
     if (
         not isinstance(model_consistency, dict)
