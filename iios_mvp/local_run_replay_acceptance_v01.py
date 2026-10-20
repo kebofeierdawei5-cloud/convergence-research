@@ -36,14 +36,24 @@ REQUIRED_ANALYSIS_FIELDS = (
     "price_input",
     "assessment",
     "evidence_register",
+    "duplicate_evidence_ids",
+    "untraceable_evidence_ids",
+    "untraceable_evidence_fields",
+    "unresolved_evidence_references",
+    "after_cutoff_evidence_references",
+    "uncertain_timing_evidence_references",
     "forecast_valuation",
     "operating_driver_forecast",
     "valuation_transmission",
+    "sotp_valuation",
+    "valuation_model_consistency",
+    "valuation_timing",
+    "return_metrics",
+    "return_metrics_reason",
     "operator_valuation_context",
     "price_zone_sensitivity",
     "decision_parameters",
     "portfolio_package",
-    "return_metrics",
     "thesis_break_stress_review",
     "decision",
     "governance",
@@ -462,6 +472,36 @@ def _inspect_bundle(run_dir: Path, *, expected_replay_of: str | None = None) -> 
         raise AcceptanceError(f"B5_VALUATION_TRANSMISSION_MISSING:{run_dir.name}")
     if not isinstance(analysis.get("price_zone_sensitivity"), dict):
         raise AcceptanceError(f"B6_PRICE_ZONE_SENSITIVITY_MISSING:{run_dir.name}")
+    sotp = analysis.get("sotp_valuation")
+    if (
+        not isinstance(sotp, dict)
+        or not isinstance(sotp.get("status"), str)
+        or not isinstance(sotp.get("scenarios"), dict)
+    ):
+        raise AcceptanceError(f"SOTP_VALUATION_MISSING_OR_INVALID:{run_dir.name}")
+    model_consistency = analysis.get("valuation_model_consistency")
+    if (
+        not isinstance(model_consistency, dict)
+        or not isinstance(model_consistency.get("status"), str)
+        or not isinstance(model_consistency.get("primary_model_price_calculation_eligible"), bool)
+    ):
+        raise AcceptanceError(f"VALUATION_MODEL_CONSISTENCY_MISSING_OR_INVALID:{run_dir.name}")
+    valuation_timing = analysis.get("valuation_timing")
+    if not isinstance(valuation_timing, dict) or not isinstance(valuation_timing.get("status"), str):
+        raise AcceptanceError(f"VALUATION_TIMING_MISSING_OR_INVALID:{run_dir.name}")
+    if analysis.get("return_metrics_reason") is not None and not isinstance(analysis.get("return_metrics_reason"), str):
+        raise AcceptanceError(f"RETURN_METRICS_REASON_INVALID:{run_dir.name}")
+    for field in (
+        "duplicate_evidence_ids",
+        "untraceable_evidence_ids",
+        "unresolved_evidence_references",
+        "after_cutoff_evidence_references",
+        "uncertain_timing_evidence_references",
+    ):
+        if not isinstance(analysis.get(field), list):
+            raise AcceptanceError(f"EVIDENCE_DIAGNOSTIC_LIST_MISSING_OR_INVALID:{run_dir.name}:{field}")
+    if not isinstance(analysis.get("untraceable_evidence_fields"), dict):
+        raise AcceptanceError(f"EVIDENCE_DIAGNOSTIC_MAP_MISSING_OR_INVALID:{run_dir.name}:untraceable_evidence_fields")
 
     governance = analysis.get("governance")
     if not isinstance(governance, dict):
