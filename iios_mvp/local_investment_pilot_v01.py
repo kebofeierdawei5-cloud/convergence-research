@@ -8,6 +8,7 @@ solver. Formal admission and canonical Decision code remain unchanged.
 """
 
 import argparse
+import copy
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 import hashlib
@@ -3818,6 +3819,50 @@ def _wait_for_response_file_change(
 
 
 
+def _restore_operator_controlled_fields_from_template(
+    template_path: str | Path, payload: dict[str, Any]
+) -> list[str]:
+    """Discard AI rewrites of operator-owned values and restore them from the local template.
+
+    The original ChatGPT response file is not edited. The caller records the
+    restored field paths in the private completed-input copy before validation.
+    """
+    path = Path(template_path).expanduser()
+    try:
+        template = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise LocalInvestmentPilotError("OPERATOR_INPUT_TEMPLATE_NOT_FOUND") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise LocalInvestmentPilotError("OPERATOR_INPUT_TEMPLATE_UNREADABLE") from exc
+    if not isinstance(template, Mapping):
+        raise LocalInvestmentPilotError("OPERATOR_INPUT_TEMPLATE_UNREADABLE")
+
+    restored: list[str] = []
+    # These entire sections are controlled by the operator/generated local
+    # template, not by the research model. Missing sections are restored too.
+    for field in ("case", "price_input", "operator_valuation_context"):
+        if field not in template:
+            raise LocalInvestmentPilotError(f"OPERATOR_INPUT_TEMPLATE_FIELD_MISSING:{field}")
+        if payload.get(field) != template[field]:
+            payload[field] = copy.deepcopy(template[field])
+            restored.append(field)
+
+    template_parameters = template.get("decision_parameters")
+    if not isinstance(template_parameters, Mapping):
+        raise LocalInvestmentPilotError("OPERATOR_INPUT_TEMPLATE_DECISION_PARAMETERS_INVALID")
+    response_parameters = payload.get("decision_parameters")
+    if not isinstance(response_parameters, dict):
+        response_parameters = {}
+        payload["decision_parameters"] = response_parameters
+    for field in ("max_loss_pct", "required_return_annualized"):
+        if field not in template_parameters:
+            raise LocalInvestmentPilotError(f"OPERATOR_INPUT_TEMPLATE_POLICY_FIELD_MISSING:{field}")
+        if response_parameters.get(field) != template_parameters[field]:
+            response_parameters[field] = copy.deepcopy(template_parameters[field])
+            restored.append(f"decision_parameters.{field}")
+    return restored
+
+
 def _assert_response_preserves_operator_inputs(
     template_path: str | Path, payload: Mapping[str, Any]
 ) -> None:
@@ -4045,7 +4090,7 @@ def _build_response_repair_prompt(
         "上一轮 IIOS 股票研究回答未通过本地格式/完整性校验。请修复并重新完成研究，不要让用户手工编辑 JSON。"
         "\n\n【校验反馈】\n" + validation_error
         + "\n\n【必须遵守】\n"
-        "1. 以下是本次唯一基准模板与全部研究要求。必须完整保留 schema_version、case、price_input 的所有值，尤其人工股价、观察日、known_at、截止时点和 assurance_label。"
+        "1. 以下是本次唯一基准模板与全部研究要求。必须完整保留 schema_version、case、price_input、operator_valuation_context 的所有值；还必须原样保留 decision_parameters.max_loss_pct 与 decision_parameters.required_return_annualized。它们是人工控制输入，不是待研究或优化的参数，不能改值、删键、换类型或重新推断。以模板中的原始 JSON 为唯一依据。尤其人工股价、观察日、known_at、截止时点、assurance_label、模型选择和两个政策参数一律不得改写。"
         "2. 不要要求用户上传模板或额外寻找公告；请主动联网搜索截止时点前公开可访问的公司公告、交易所披露与监管文件。"
         "3. 修复缺失结构字段并填写数值估值情景、经营驱动因素树和 B5 估值传导结构；研究假设和事实来源要分开。不得编造来源、财务数字或市场一致预期。"
         "4. 如果确实无法识别，字段仍要保留结构，并在 summary/rationale 中具体解释未知原因、证据缺口及需要人工确认的事项。"
@@ -4409,6 +4454,25 @@ def run_guided_wizard(
         print("已检测到结果文件更新且写入稳定，正在读取并校验……", flush=True)
         try:
             payload = _read_json_response_file(response_path)
+            # Never trust AI-authored copies of operator controls. Restore only
+            # these fields from the trusted local template; leave the raw response
+            # file untouched and record the exact paths in the completed input.
+            payload.pop("_local_operator_controlled_field_recovery", None)
+            restored_fields = _restore_operator_controlled_fields_from_template(template_path, payload)
+            if restored_fields:
+                payload["_local_operator_controlled_field_recovery"] = {
+                    "status": "RESTORED_BEFORE_VALIDATION",
+                    "fields": restored_fields,
+                    "source_template": Path(template_path).name,
+                    "method": "LOCAL_TEMPLATE_OVERRIDES_AI_RESPONSE",
+                    "raw_response_file_modified": False,
+                }
+                print(
+                    "[WARN] 已丢弃 ChatGPT 对人工控制字段的改写，并从本地模板恢复："
+                    + ", ".join(restored_fields)
+                    + "。原始 ChatGPT 响应文件未修改；恢复清单将随本次私有输入保存。",
+                    flush=True,
+                )
             _assert_response_preserves_operator_inputs(template_path, payload)
             _prepare_input(payload)
             _validate_guided_research_response(payload)
