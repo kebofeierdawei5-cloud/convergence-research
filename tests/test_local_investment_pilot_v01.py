@@ -172,6 +172,14 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
             "scenarios": {"bear": {}, "base": {}, "bull": {}},
             "limitations": ["Synthetic test only."],
         },
+        "sotp_valuation": {
+            "schema_version": "IIOS-SOTP-VALUATION-0.1",
+            "calculation_method": "SEGMENT_ATTRIBUTABLE_NET_PROFIT_X_SEGMENT_PE",
+            "summary": "",
+            "forecast_period": "UNKNOWN",
+            "valuation_terminal_date": None,
+            "scenarios": {"bear": {}, "base": {}, "bull": {}},
+        },
         "valuation_transmission": {
             "schema_version": "IIOS-VALUATION-TRANSMISSION-0.1",
             "model_family": "UNKNOWN",
@@ -3728,3 +3736,199 @@ def test_confirmed_model_selection_neutralizes_stale_ai_confirmation_rationale()
     assert "操作者选择的主模型类别：SOTP" in report
     assert "当前情景实际计算模型类别：EPS_MULTIPLE" in report
     assert analysis["return_metrics"] is None
+
+
+def _sotp_measure(value, unit, data_class="ANALYST_ASSUMPTION", refs=None, basis="Explicit synthetic SOTP test assumption"):
+    return {
+        "value": str(value),
+        "unit": unit,
+        "data_class": data_class,
+        "basis": basis,
+        "evidence_refs": list(refs or []),
+        "note": basis,
+    }
+
+
+def _sotp_ready_payload():
+    payload = _payload(cutoff="2026-10-10")
+    payload["operator_valuation_context"] = {
+        "selected_model_family": "SOTP",
+        "baseline_includes_project": None,
+        "input_owner": "OPERATOR",
+        "selection_source": "INTERACTIVE_OPERATOR_PROMPT",
+        "selection_confirmed": True,
+    }
+
+    def scenario(profits, multiples, central_cost_multiple, rationale):
+        segments = []
+        for segment_id, segment_name, profit, multiple in (
+            ("valves_core", "Core industrial valves", profits[0], multiples[0]),
+            ("specialty", "Specialty valves", profits[1], multiples[1]),
+        ):
+            segments.append({
+                "segment_id": segment_id,
+                "segment_name": segment_name,
+                "attributable_net_profit_cny": _sotp_measure(profit, "CNY"),
+                "pe_multiple_x": _sotp_measure(multiple, "x"),
+            })
+        return {
+            "rationale": rationale,
+            "segments": segments,
+            "parent_level_adjustments": {
+                "central_cost_after_tax_cny": _sotp_measure("200000000", "CNY"),
+                "central_cost_multiple_x": _sotp_measure(central_cost_multiple, "x"),
+                "net_cash_debt_cny": _sotp_measure("2000000000", "CNY", basis="Explicit signed net-cash assumption"),
+                "minority_interests_cny": _sotp_measure("1000000000", "CNY"),
+                "other_adjustments_cny": _sotp_measure("0", "CNY", basis="No additional adjustments in this synthetic fixture"),
+            },
+            "diluted_shares": _sotp_measure("1000000000", "shares", basis="Explicit synthetic diluted share count"),
+        }
+
+    payload["sotp_valuation"] = {
+        "schema_version": "IIOS-SOTP-VALUATION-0.1",
+        "calculation_method": "SEGMENT_ATTRIBUTABLE_NET_PROFIT_X_SEGMENT_PE",
+        "summary": "Synthetic test only: use distinct segment P/E values and explicit parent-level adjustments.",
+        "forecast_period": "2027FY",
+        "valuation_terminal_date": "2027-12-31",
+        "scenarios": {
+            "bear": scenario(["4000000000", "2000000000"], ["8", "9"], "8", "Synthetic downside segment profits and compressed multiples."),
+            "base": scenario(["5000000000", "2500000000"], ["10", "12"], "10", "Synthetic base segment profits and segment-specific multiples."),
+            "bull": scenario(["6000000000", "3000000000"], ["12", "14"], "12", "Synthetic upside segment profits and expanded multiples."),
+        },
+    }
+    return payload
+
+
+def test_sotp_adapter_computes_segment_values_parent_adjustments_and_per_share_value():
+    from iios_mvp.sotp_valuation_v01 import evaluate_sotp_valuation
+
+    payload = _sotp_ready_payload()
+    raw = payload["sotp_valuation"]
+    evidence = [
+        {"source_id": "E1", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"},
+        {"source_id": "E2", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"},
+    ]
+    result = evaluate_sotp_valuation(
+        raw,
+        selected_model_family="SOTP",
+        expected_forecast_period="2027FY",
+        expected_terminal_date="2027-12-31",
+        evidence_register=evidence,
+    )
+
+    assert result["status"] == "CALCULATED"
+    assert result["formal_valuation_admission_created"] is False
+    bear = result["scenarios"]["bear"]
+    assert Decimal(bear["segments"][0]["segment_equity_value_cny"]) == Decimal("32000000000")
+    assert Decimal(bear["segment_equity_value_cny"]) == Decimal("50000000000")
+    assert Decimal(bear["parent_level_adjustments"]["capitalized_central_cost_value_cny"]) == Decimal("1600000000")
+    assert Decimal(bear["total_equity_value_cny"]) == Decimal("49400000000")
+    assert Decimal(bear["terminal_value_per_share"]) == Decimal("49.4")
+    assert Decimal(result["scenarios"]["base"]["terminal_value_per_share"]) == Decimal("79")
+    assert Decimal(result["scenarios"]["bull"]["terminal_value_per_share"]) == Decimal("112.6")
+
+
+def test_sotp_primary_calculation_overrides_draft_per_share_values_and_closes_price_math():
+    payload = _sotp_ready_payload()
+    original_draft_terminals = {
+        name: row["terminal_value_per_share"]
+        for name, row in payload["forecast_valuation"]["scenarios"].items()
+    }
+    analysis, report = _analyse(payload, "TEST-SOTP-PRIMARY-VALUATION")
+
+    assert analysis["sotp_valuation"]["status"] == "CALCULATED"
+    assert analysis["valuation_model_consistency"]["operator_selected_model_family"] == "SOTP"
+    assert analysis["valuation_model_consistency"]["calculation_model_family"] == "SOTP"
+    assert analysis["valuation_model_consistency"]["sotp_calculation_status"] == "CALCULATED"
+    assert analysis["valuation_model_consistency"]["primary_model_price_calculation_eligible"] is True
+    assert analysis["forecast_valuation"]["entry_value_reference_per_share"] == "79"
+    for name, expected in (("bear", "49.4"), ("base", "79"), ("bull", "112.6")):
+        row = analysis["forecast_valuation"]["scenarios"][name]
+        assert row["declared_terminal_value_before_sotp_calculation"] == original_draft_terminals[name]
+        assert Decimal(row["terminal_value_per_share"]) == Decimal(expected)
+        assert row["sotp_calculation_applied"] is True
+    assert analysis["return_metrics"] is not None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is not None
+    assert "SOTP：分部估值到每股终值的计算链" in report
+    assert "Σ（分部归属净利润 × 分部 P/E）" in report
+    assert "SOTP 每股终值：79 CNY" in report
+    assert "B5 的 EPS_MULTIPLE 增量适配器不能用于 SOTP" in report
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+
+
+def test_sotp_missing_segment_inputs_block_return_entry_price_and_b6_without_eps_fallback():
+    payload = _sotp_ready_payload()
+    payload["sotp_valuation"]["scenarios"]["base"]["segments"] = []
+
+    analysis, report = _analyse(payload, "TEST-SOTP-MISSING-SEGMENT-INPUT")
+    assert analysis["sotp_valuation"]["status"] == "SOTP_INPUT_INCOMPLETE_OR_INVALID"
+    assert analysis["valuation_model_consistency"]["primary_model_price_calculation_eligible"] is False
+    assert analysis["valuation_model_consistency"]["status"] == "SOTP_CALCULATION_NOT_ELIGIBLE"
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert all(row["status"] == "UNKNOWN" for row in analysis["price_zone_sensitivity"]["sensitivity_ladder"])
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert "SOTP_CALCULATION_NOT_ELIGIBLE" in report
+    assert "不进入预期回报、目标入场价或 B6 价格敏感性计算" in report
+
+
+def test_sotp_requires_same_segment_universe_and_valid_typed_evidence():
+    from iios_mvp.sotp_valuation_v01 import evaluate_sotp_valuation
+
+    payload = _sotp_ready_payload()
+    raw = payload["sotp_valuation"]
+    raw["scenarios"]["bull"]["segments"].pop()
+    result = evaluate_sotp_valuation(
+        raw,
+        selected_model_family="SOTP",
+        expected_forecast_period="2027FY",
+        expected_terminal_date="2027-12-31",
+        evidence_register=[],
+    )
+    assert result["status"] == "SOTP_SEGMENT_UNIVERSE_MISMATCH"
+
+    payload = _sotp_ready_payload()
+    raw = payload["sotp_valuation"]
+    raw["scenarios"]["base"]["segments"][0]["attributable_net_profit_cny"] = _sotp_measure(
+        "5000000000", "CNY", data_class="ISSUER_FORECAST", refs=[],
+        basis="Synthetic issuer-forecast field intentionally missing a source reference",
+    )
+    result = evaluate_sotp_valuation(
+        raw,
+        selected_model_family="SOTP",
+        expected_forecast_period="2027FY",
+        expected_terminal_date="2027-12-31",
+        evidence_register=[],
+    )
+    assert result["status"] == "SOTP_INPUT_INCOMPLETE_OR_INVALID"
+    assert "ISSUER_FORECAST_EVIDENCE_REQUIRED" in result["issues"][0]
+
+
+def test_sotp_selected_without_adapter_blocks_even_when_draft_claims_sotp():
+    payload = _payload()
+    payload["operator_valuation_context"]["selected_model_family"] = "SOTP"
+    payload["sotp_valuation"] = None
+    payload["forecast_valuation"]["model"] = "SOTP"
+    payload["forecast_valuation"]["model_family"] = "SOTP"
+    payload["forecast_valuation"]["model_rationale"] = "A synthetic SOTP claim without segment calculations."
+    analysis, _report = _analyse(payload, "TEST-SOTP-NO-ADAPTER")
+    assert analysis["sotp_valuation"]["status"] == "SOTP_INPUT_MISSING"
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert analysis["valuation_model_consistency"]["primary_model_price_calculation_eligible"] is False
+
+
+def test_sotp_candidate_is_not_applied_when_operator_selects_another_model():
+    payload = _sotp_ready_payload()
+    payload["operator_valuation_context"] = {
+        "selected_model_family": "EPS_MULTIPLE",
+        "baseline_includes_project": None,
+        "input_owner": "OPERATOR",
+    }
+    analysis, _report = _analyse(payload, "TEST-SOTP-NOT-SELECTED")
+
+    assert analysis["sotp_valuation"]["status"] == "NOT_SELECTED"
+    assert analysis["forecast_valuation"]["model_family"] == "EPS_MULTIPLE"
+    assert analysis["forecast_valuation"]["entry_value_reference_per_share"] == "150"
+    assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
+    assert analysis["return_metrics"] is not None
