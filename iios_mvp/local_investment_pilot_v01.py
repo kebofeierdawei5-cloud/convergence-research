@@ -45,6 +45,8 @@ PILOT_SCHEMA = "IIOS-LOCAL-INVESTMENT-PILOT-0.1"
 PILOT_ANALYSIS_SCHEMA = "IIOS-LOCAL-INVESTMENT-PILOT-ANALYSIS-0.1"
 PILOT_STATUS = "PILOT_NON_CANONICAL"
 PILOT_RECEIPT_SCHEMA = "IIOS-LOCAL-PILOT-RUN-RECORD-0.1"
+EPS_MULTIPLE_VALUATION_SCHEMA = "IIOS-EPS-MULTIPLE-VALUATION-0.1"
+EPS_MULTIPLE_VALUATION_METHOD = "EPS_PER_SHARE_X_PE_MULTIPLE"
 SHANGHAI = timezone(timedelta(hours=8))
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PRICE_ASSURANCE = "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
@@ -67,6 +69,7 @@ REPLAY_COMPARISON_FIELDS = (
     "operating_driver_forecast",
     "valuation_transmission",
     "sotp_valuation",
+    "eps_multiple_valuation",
     "operator_valuation_context",
     "valuation_model_consistency",
     "valuation_timing",
@@ -807,6 +810,127 @@ def _infer_model_family_from_name(value: Any) -> str:
     return "UNKNOWN"
 
 
+def _evaluate_primary_eps_multiple_valuation(
+    raw: Any, *, selected_model_family: Any, expected_forecast_period: Any,
+    expected_terminal_date: Any, expected_currency: Any,
+    evidence_register: list[dict[str, Any]],
+    unresolved_evidence_ids: list[str] | set[str] | None = None,
+    after_cutoff_evidence_ids: list[str] | set[str] | None = None,
+    uncertain_timing_evidence_ids: list[str] | set[str] | None = None,
+) -> dict[str, Any]:
+    """Recompute scenario terminal values from typed EPS and P/E inputs."""
+    def blocked(status: str, issue: str = "", summary: str = "") -> dict[str, Any]:
+        return {"schema_version": EPS_MULTIPLE_VALUATION_SCHEMA, "status": status,
+                "method": EPS_MULTIPLE_VALUATION_METHOD, "selected_for_primary_model": False,
+                "summary": summary or "没有生成可用于主估值的完整复算结果。",
+                "forecast_period": None, "valuation_terminal_date": None, "scenarios": {},
+                "issues": [issue] if issue else [], "formal_valuation_admission_created": False,
+                "decision_authority": False}
+    if str(selected_model_family or "UNKNOWN").strip().upper() != "EPS_MULTIPLE":
+        return blocked("NOT_SELECTED", summary="操作者未选择 EPS_MULTIPLE；适配器不参与主估值。")
+    currency = str(expected_currency or "").strip().upper()
+    if currency not in {"CNY", "HKD"}:
+        return blocked("CURRENCY_NOT_SUPPORTED", f"EPS_MULTIPLE_CURRENCY_NOT_SUPPORTED:{currency or 'UNKNOWN'}")
+    if not isinstance(raw, Mapping) or raw.get("schema_version") != EPS_MULTIPLE_VALUATION_SCHEMA:
+        return blocked("INPUT_MISSING_OR_SCHEMA_MISMATCH", "EPS_MULTIPLE_INPUT_OBJECT_OR_SCHEMA_INVALID")
+    if str(raw.get("calculation_method") or "").strip().upper() != EPS_MULTIPLE_VALUATION_METHOD:
+        return blocked("METHOD_UNSUPPORTED", "EPS_MULTIPLE_METHOD_UNSUPPORTED")
+    summary = str(raw.get("summary") or "").strip()
+    if not _is_identifiable_evidence_text(summary):
+        return blocked("RATIONALE_NOT_IDENTIFIABLE", "EPS_MULTIPLE_SUMMARY_NOT_IDENTIFIABLE")
+    period = str(raw.get("forecast_period") or "").strip().upper()
+    terminal_date = str(raw.get("valuation_terminal_date") or "").strip()
+    if period != str(expected_forecast_period or "").strip().upper():
+        return blocked("PERIOD_MISMATCH", "EPS_MULTIPLE_FORECAST_PERIOD_MISMATCH")
+    if not terminal_date or terminal_date != str(expected_terminal_date or "").strip():
+        return blocked("TERMINAL_DATE_MISMATCH", "EPS_MULTIPLE_TERMINAL_DATE_MISMATCH")
+    inputs = raw.get("scenarios")
+    if not isinstance(inputs, Mapping) or set(inputs) != set(SCENARIOS):
+        return blocked("SCENARIOS_INCOMPLETE", "EPS_MULTIPLE_REQUIRES_BEAR_BASE_BULL")
+    evidence = {str(item.get("source_id")): item for item in evidence_register
+                if isinstance(item, Mapping) and item.get("source_id")}
+    unresolved, after, uncertain = (set(unresolved_evidence_ids or []),
+                                    set(after_cutoff_evidence_ids or []),
+                                    set(uncertain_timing_evidence_ids or []))
+    outputs: dict[str, Any] = {}
+    try:
+        for name in SCENARIOS:
+            row = inputs[name]
+            if not isinstance(row, Mapping) or not _is_identifiable_evidence_text(row.get("rationale")):
+                raise ValueError(f"{name.upper()}_RATIONALE_NOT_IDENTIFIABLE")
+            measures: dict[str, Any] = {}
+            for key, unit in (("eps_per_share", f"{currency}/share"), ("pe_multiple_x", "x")):
+                measure = row.get(key)
+                if not isinstance(measure, Mapping):
+                    raise ValueError(f"{name.upper()}_{key.upper()}_OBJECT_REQUIRED")
+                if str(measure.get("unit") or "").strip().lower() != unit.lower():
+                    raise ValueError(f"{name.upper()}_{key.upper()}_UNIT_MISMATCH")
+                data_class = str(measure.get("data_class") or "").strip().upper()
+                if data_class not in {"ISSUER_FORECAST", "ANALYST_ASSUMPTION"}:
+                    raise ValueError(f"{name.upper()}_{key.upper()}_DATA_CLASS_INVALID")
+                basis = str(measure.get("basis") or "").strip()
+                if not _is_identifiable_evidence_text(basis):
+                    raise ValueError(f"{name.upper()}_{key.upper()}_BASIS_NOT_IDENTIFIABLE")
+                number = _positive(measure.get("value"), f"{name.upper()}_{key.upper()}")
+                refs_raw = measure.get("evidence_refs") or []
+                if not isinstance(refs_raw, list):
+                    raise ValueError(f"{name.upper()}_{key.upper()}_EVIDENCE_REFS_INVALID")
+                refs = list(dict.fromkeys(str(ref).strip() for ref in refs_raw if str(ref).strip()))
+                if data_class == "ISSUER_FORECAST" and not refs:
+                    raise ValueError(f"{name.upper()}_{key.upper()}_ISSUER_FORECAST_EVIDENCE_REQUIRED")
+                for ref in refs:
+                    source = evidence.get(ref)
+                    if (source is None or ref in unresolved or ref in after or ref in uncertain
+                            or source.get("time_status") != "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"):
+                        raise ValueError(f"{name.upper()}_{key.upper()}_EVIDENCE_NOT_CUTOFF_COMPATIBLE:{ref}")
+                measures[key] = {"value": format(number, "f"), "unit": unit, "data_class": data_class,
+                                 "basis": basis, "evidence_refs": refs, "note": str(measure.get("note") or ""),
+                                 "formal_evidence_pit_admission": False}
+            eps = _number(measures["eps_per_share"]["value"], f"{name.upper()}_EPS")
+            pe = _number(measures["pe_multiple_x"]["value"], f"{name.upper()}_PE")
+            terminal = eps * pe
+            outputs[name] = {"rationale": str(row.get("rationale") or "").strip(),
+                             "eps_per_share": measures["eps_per_share"], "pe_multiple_x": measures["pe_multiple_x"],
+                             "calculation": {"formula": "EPS_PER_SHARE × PE_MULTIPLE",
+                                             "arithmetic": f"{eps} × {pe} = {terminal}"},
+                             "terminal_value_per_share": format(terminal, "f")}
+    except (ValueError, LocalInvestmentPilotError) as exc:
+        return blocked("INPUT_INCOMPLETE_OR_INVALID", str(exc))
+    terminals = {name: _number(outputs[name]["terminal_value_per_share"], name) for name in SCENARIOS}
+    if not terminals["bear"] <= terminals["base"] <= terminals["bull"]:
+        return blocked("SCENARIO_ORDERING_INCONSISTENT", "EPS_MULTIPLE_SCENARIO_ORDERING_INCONSISTENT")
+    return {"schema_version": EPS_MULTIPLE_VALUATION_SCHEMA, "status": "CALCULATED",
+            "method": EPS_MULTIPLE_VALUATION_METHOD, "selected_for_primary_model": True,
+            "summary": "本地适配器独立复算 Bear/Base/Bull 每股终值 = 结构化 EPS × P/E；不从自由文本反推 EPS/P/E。",
+            "analyst_supplied_summary_unverified": summary, "forecast_period": period,
+            "valuation_terminal_date": terminal_date, "currency": currency, "scenarios": outputs,
+            "issues": [], "formal_valuation_admission_created": False, "decision_authority": False}
+
+
+def _render_primary_eps_multiple_section(result: Mapping[str, Any], currency: str) -> list[str]:
+    data = result if isinstance(result, Mapping) else {}
+    lines = ["", "### EPS_MULTIPLE：每股盈利 × 市盈率的主估值计算链", "",
+             f"- 计算状态：**{data.get('status', 'UNKNOWN')}**；方法：{data.get('method', EPS_MULTIPLE_VALUATION_METHOD)}",
+             f"- 是否由操作者选为主模型：{data.get('selected_for_primary_model', False)}",
+             f"- 预测期间 / 估值终点：{data.get('forecast_period') or 'UNKNOWN'} / {data.get('valuation_terminal_date') or 'UNKNOWN'}",
+             f"- 说明：{data.get('summary') or '未计算'}",
+             "- 边界：本计算只证明明示 EPS 与 P/E 的乘法可复算，不证明预测可信、P/E 校准充分或正式估值准入。",
+             "- 正式估值准入：未创建；本结果不创建 Decision 或交易授权。", ""]
+    scenarios = data.get("scenarios") if isinstance(data.get("scenarios"), Mapping) else {}
+    for name, label in (("bear", "Bear"), ("base", "Base"), ("bull", "Bull")):
+        row = scenarios.get(name) if isinstance(scenarios.get(name), Mapping) else {}
+        eps = row.get("eps_per_share") if isinstance(row.get("eps_per_share"), Mapping) else {}
+        pe = row.get("pe_multiple_x") if isinstance(row.get("pe_multiple_x"), Mapping) else {}
+        lines.extend([f"**{label} 情景**", f"- 情景理由：{row.get('rationale') or 'UNKNOWN'}",
+                      f"- EPS：{eps.get('value', 'UNKNOWN')} {eps.get('unit', currency + '/share')}；依据：{eps.get('basis', 'UNKNOWN')}",
+                      f"- P/E：{pe.get('value', 'UNKNOWN')}x；依据：{pe.get('basis', 'UNKNOWN')}",
+                      f"- 本地复算：{(row.get('calculation') or {}).get('arithmetic', 'UNKNOWN')}",
+                      f"- 每股终值：{row.get('terminal_value_per_share') or 'UNKNOWN'} {currency}", ""])
+    if data.get("issues"):
+        lines.extend(["#### EPS_MULTIPLE 未解决问题", ""] + [f"- {item}" for item in data.get("issues") or []])
+    return lines
+
+
 def _build_valuation_model_consistency(
     *,
     operator_model_family: Any,
@@ -816,6 +940,7 @@ def _build_valuation_model_consistency(
     operating_driver_forecast: Mapping[str, Any],
     valuation_transmission: Mapping[str, Any],
     sotp_calculation_status: Any = "NOT_SELECTED",
+    eps_multiple_calculation_status: Any = "NOT_SELECTED",
 ) -> dict[str, Any]:
     """Keep the primary model identity and its selection rationale independently identifiable."""
     selected = _normalize_model_family(operator_model_family)
@@ -853,6 +978,10 @@ def _build_valuation_model_consistency(
         if "SOTP_ADAPTER_NOT_CALCULATED" not in issues:
             issues.append("SOTP_ADAPTER_NOT_CALCULATED")
         status = "SOTP_CALCULATION_NOT_ELIGIBLE"
+    if selected == "EPS_MULTIPLE" and str(eps_multiple_calculation_status or "UNKNOWN").upper() != "CALCULATED":
+        if "EPS_MULTIPLE_ADAPTER_NOT_CALCULATED" not in issues:
+            issues.append("EPS_MULTIPLE_ADAPTER_NOT_CALCULATED")
+        status = "EPS_MULTIPLE_CALCULATION_NOT_ELIGIBLE"
     if not model_rationale_identifiable:
         issues.append("FORECAST_VALUATION_MODEL_RATIONALE_NOT_IDENTIFIABLE")
         if status == "MATCH":
@@ -902,6 +1031,7 @@ def _build_valuation_model_consistency(
         "operating_forecast_scope": scope,
         "valuation_transmission_status": transmission_status,
         "sotp_calculation_status": str(sotp_calculation_status or "NOT_SELECTED").upper(),
+        "eps_multiple_calculation_status": str(eps_multiple_calculation_status or "NOT_SELECTED").upper(),
         "primary_model_price_calculation_eligible": eligible,
         "scenario_values_role": "PRIMARY_MODEL" if eligible else "ALTERNATIVE_OR_UNRESOLVED_ONLY",
         "issues": issues,
@@ -1540,6 +1670,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     raw_driver_forecast = payload.get("operating_driver_forecast")
     raw_valuation_transmission = payload.get("valuation_transmission")
     raw_sotp_valuation = payload.get("sotp_valuation")
+    raw_eps_multiple_valuation = payload.get("eps_multiple_valuation")
     raw_operator_valuation_context = payload.get("operator_valuation_context")
     stress_raw = forecast_raw.get("thesis_break_stress")
     stress_raw = stress_raw if isinstance(stress_raw, Mapping) else {}
@@ -1766,6 +1897,44 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "selection_source": selection_source,
         "selection_confirmed": selection_confirmed,
     }
+    eps_multiple_valuation = _evaluate_primary_eps_multiple_valuation(
+        raw_eps_multiple_valuation,
+        selected_model_family=operator_valuation_context["selected_model_family"],
+        expected_forecast_period=operating_driver_forecast.get("forecast_period"),
+        expected_terminal_date=forecast.get("valuation_terminal_date"),
+        expected_currency=currency,
+        evidence_register=sources,
+        unresolved_evidence_ids=unknown_refs,
+        after_cutoff_evidence_ids=after_cutoff_refs,
+        uncertain_timing_evidence_ids=uncertain_timing_refs,
+    )
+    if (
+        operator_valuation_context["selected_model_family"] == "EPS_MULTIPLE"
+        and eps_multiple_valuation.get("status") == "CALCULATED"
+        and forecast.get("model_family") == "EPS_MULTIPLE"
+        and _infer_model_family_from_name(forecast.get("model")) == "EPS_MULTIPLE"
+    ):
+        original_scenarios = forecast.get("scenarios") if isinstance(forecast.get("scenarios"), Mapping) else {}
+        normalized_scenarios = {
+            key: dict(value) if isinstance(value, Mapping) else {}
+            for key, value in original_scenarios.items()
+        }
+        for scenario_name in SCENARIOS:
+            scenario_row = normalized_scenarios.get(scenario_name, {})
+            scenario_row["declared_terminal_value_before_eps_multiple_calculation"] = scenario_row.get("terminal_value_per_share")
+            scenario_row["terminal_value_per_share"] = eps_multiple_valuation["scenarios"][scenario_name]["terminal_value_per_share"]
+            scenario_row["eps_multiple_calculation_applied"] = True
+            normalized_scenarios[scenario_name] = scenario_row
+        forecast["scenarios"] = normalized_scenarios
+        forecast["declared_entry_value_reference_before_eps_multiple_calculation"] = forecast.get("entry_value_reference_per_share")
+        forecast["entry_value_reference_per_share"] = eps_multiple_valuation["scenarios"]["base"]["terminal_value_per_share"]
+        forecast["model_rationale_original_untrusted"] = forecast.get("model_rationale")
+        forecast["model_rationale"] = (
+            "EPS_MULTIPLE 主估值终值由本地适配器复算：Bear/Base/Bull 每股终值分别为结构化 EPS × P/E；"
+            "原始模型声明值保留为未信任诊断，不直接用于回报或入场价格。详细输入与算术见 eps_multiple_valuation。"
+        )
+        forecast["model_name_original_untrusted"] = forecast.get("model")
+        forecast["model"] = "EPS_MULTIPLE / EPS x P/E (local structured adapter)"
     sotp_valuation = evaluate_sotp_valuation(
         raw_sotp_valuation,
         selected_model_family=operator_valuation_context["selected_model_family"],
@@ -1824,6 +1993,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         operating_driver_forecast=operating_driver_forecast,
         valuation_transmission=valuation_transmission,
         sotp_calculation_status=sotp_valuation.get("status", "UNKNOWN"),
+        eps_multiple_calculation_status=eps_multiple_valuation.get("status", "UNKNOWN"),
     )
     valuation_timing = _build_valuation_timing(
         cutoff_date=cutoff.isoformat(),
@@ -1871,6 +2041,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         },
         "assessment": assessment,
         "forecast_valuation": forecast,
+        "eps_multiple_valuation": eps_multiple_valuation,
         "operating_driver_forecast": operating_driver_forecast,
         "valuation_transmission": valuation_transmission,
         "sotp_valuation": sotp_valuation,
@@ -2914,6 +3085,10 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
                     f"- {scenario_label} 成本率：未完成交叉引用（{status}）；B4 不进行隐式补值。"
                 )
         lines.append("")
+    lines.extend(_render_primary_eps_multiple_section(
+        analysis.get("eps_multiple_valuation") or {},
+        c["currency"],
+    ))
     lines.extend(render_sotp_valuation_section(
         analysis.get("sotp_valuation") or {},
         c["currency"],
