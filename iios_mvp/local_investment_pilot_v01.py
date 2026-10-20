@@ -26,6 +26,7 @@ from .decision_kernel_v03 import evaluate_production_decision
 from .decision_state_machine_v01 import MIE_POLICY_OPTIONAL_EXPLANATORY
 from .local_pilot_portfolio_package_v01 import build_local_pilot_portfolio_package
 from .operating_driver_forecast_v01 import evaluate_operating_driver_forecast, render_operating_driver_section
+from .sotp_valuation_v01 import evaluate_sotp_valuation, render_sotp_valuation_section
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
     evaluate_valuation_transmission,
@@ -64,6 +65,7 @@ REPLAY_COMPARISON_FIELDS = (
     "forecast_valuation",
     "operating_driver_forecast",
     "valuation_transmission",
+    "sotp_valuation",
     "operator_valuation_context",
     "valuation_model_consistency",
     "valuation_timing",
@@ -812,6 +814,7 @@ def _build_valuation_model_consistency(
     model_rationale: Any,
     operating_driver_forecast: Mapping[str, Any],
     valuation_transmission: Mapping[str, Any],
+    sotp_calculation_status: Any = "NOT_SELECTED",
 ) -> dict[str, Any]:
     """Keep the primary model identity and its selection rationale independently identifiable."""
     selected = _normalize_model_family(operator_model_family)
@@ -842,14 +845,23 @@ def _build_valuation_model_consistency(
     else:
         status = "MATCH"
     model_rationale_identifiable = _is_identifiable_evidence_text(model_rationale)
+    if selected == "SOTP" and str(sotp_calculation_status or "UNKNOWN").upper() != "CALCULATED":
+        # The operator's selected SOTP must actually be calculated. Preserve any
+        # model-family/name mismatch as a diagnostic issue, but make the missing
+        # SOTP calculation the primary blocker for return/entry-price/B6 output.
+        if "SOTP_ADAPTER_NOT_CALCULATED" not in issues:
+            issues.append("SOTP_ADAPTER_NOT_CALCULATED")
+        status = "SOTP_CALCULATION_NOT_ELIGIBLE"
     if not model_rationale_identifiable:
         issues.append("FORECAST_VALUATION_MODEL_RATIONALE_NOT_IDENTIFIABLE")
         if status == "MATCH":
             status = "MODEL_RATIONALE_NOT_IDENTIFIABLE"
     eligible = status == "MATCH"
     baseline_confirmed_included = valuation_transmission.get("baseline_includes_project") is True
+    sotp_primary_calculated = calculated == "SOTP" and str(sotp_calculation_status or "UNKNOWN").upper() == "CALCULATED"
     if (
         eligible
+        and not sotp_primary_calculated
         and scope != "COMPANY_WIDE"
         and transmission_status not in _B5_PROJECT_TRANSMISSION_ACCEPTED
         and not baseline_confirmed_included
@@ -861,6 +873,7 @@ def _build_valuation_model_consistency(
         )
     elif (
         eligible
+        and not sotp_primary_calculated
         and scope != "COMPANY_WIDE"
         and transmission_status not in _B5_PROJECT_TRANSMISSION_ACCEPTED
         and baseline_confirmed_included
@@ -887,6 +900,7 @@ def _build_valuation_model_consistency(
         ),
         "operating_forecast_scope": scope,
         "valuation_transmission_status": transmission_status,
+        "sotp_calculation_status": str(sotp_calculation_status or "NOT_SELECTED").upper(),
         "primary_model_price_calculation_eligible": eligible,
         "scenario_values_role": "PRIMARY_MODEL" if eligible else "ALTERNATIVE_OR_UNRESOLVED_ONLY",
         "issues": issues,
@@ -1524,6 +1538,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     )
     raw_driver_forecast = payload.get("operating_driver_forecast")
     raw_valuation_transmission = payload.get("valuation_transmission")
+    raw_sotp_valuation = payload.get("sotp_valuation")
     raw_operator_valuation_context = payload.get("operator_valuation_context")
     stress_raw = forecast_raw.get("thesis_break_stress")
     stress_raw = stress_raw if isinstance(stress_raw, Mapping) else {}
@@ -1603,6 +1618,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "forecast_valuation": forecast_raw,
         "operating_driver_forecast": raw_driver_forecast,
         "valuation_transmission": raw_valuation_transmission,
+        "sotp_valuation": raw_sotp_valuation,
     })
     unknown_refs = sorted(
         (references - source_ids)
@@ -1749,6 +1765,44 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "selection_source": selection_source,
         "selection_confirmed": selection_confirmed,
     }
+    sotp_valuation = evaluate_sotp_valuation(
+        raw_sotp_valuation,
+        selected_model_family=operator_valuation_context["selected_model_family"],
+        expected_forecast_period=operating_driver_forecast.get("forecast_period"),
+        expected_terminal_date=forecast.get("valuation_terminal_date"),
+        evidence_register=sources,
+        unresolved_evidence_ids=unknown_refs,
+        after_cutoff_evidence_ids=after_cutoff_refs,
+        uncertain_timing_evidence_ids=uncertain_timing_refs,
+    )
+    if (
+        operator_valuation_context["selected_model_family"] == "SOTP"
+        and sotp_valuation.get("status") == "CALCULATED"
+    ):
+        # Only independently recomputed SOTP values can enter the primary price path.
+        # Preserve input values as untrusted diagnostics for audit.
+        original_scenarios = forecast.get("scenarios") if isinstance(forecast.get("scenarios"), Mapping) else {}
+        normalized_scenarios = {
+            key: dict(value) if isinstance(value, Mapping) else {}
+            for key, value in original_scenarios.items()
+        }
+        for scenario_name in ("bear", "base", "bull"):
+            scenario_row = normalized_scenarios.get(scenario_name, {})
+            scenario_row["declared_terminal_value_before_sotp_calculation"] = scenario_row.get("terminal_value_per_share")
+            scenario_row["terminal_value_per_share"] = sotp_valuation["scenarios"][scenario_name]["terminal_value_per_share"]
+            scenario_row["sotp_calculation_applied"] = True
+            normalized_scenarios[scenario_name] = scenario_row
+        forecast["scenarios"] = normalized_scenarios
+        forecast["declared_entry_value_reference_before_sotp_calculation"] = forecast.get("entry_value_reference_per_share")
+        forecast["entry_value_reference_per_share"] = sotp_valuation["scenarios"]["base"]["terminal_value_per_share"]
+        forecast["model_rationale_original_untrusted"] = forecast.get("model_rationale")
+        forecast["model_rationale"] = (
+            "SOTP 终值由本地 SOTP 适配器复算：逐分部归属净利润乘以各自 P/E，"
+            "减资本化母公司税后成本与少数股东权益，加减净现金/净负债和显式调整，"
+            "最后除以稀释后股数；详细输入、期间、证据引用与算术见 sotp_valuation。"
+        )
+        forecast["model"] = "SOTP (segment attributable net profit x segment P/E plus explicit parent-level adjustments)"
+        forecast["model_family"] = "SOTP"
     _neutralize_stale_model_confirmation_language(forecast, operator_valuation_context)
     valuation_transmission = evaluate_valuation_transmission(
         raw_valuation_transmission,
@@ -1767,6 +1821,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         model_rationale=forecast.get("model_rationale"),
         operating_driver_forecast=operating_driver_forecast,
         valuation_transmission=valuation_transmission,
+        sotp_calculation_status=sotp_valuation.get("status", "UNKNOWN"),
     )
     valuation_timing = _build_valuation_timing(
         cutoff_date=cutoff.isoformat(),
@@ -1816,6 +1871,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "forecast_valuation": forecast,
         "operating_driver_forecast": operating_driver_forecast,
         "valuation_transmission": valuation_transmission,
+        "sotp_valuation": sotp_valuation,
         "operator_valuation_context": operator_valuation_context,
         "valuation_model_consistency": valuation_model_consistency,
         "valuation_timing": valuation_timing,
@@ -2739,6 +2795,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f"- 根据模型名称解析出的类别：{model_contract.get('model_name_inferred_family', 'UNKNOWN')}；名称/类别交叉校验：{model_contract.get('model_family_name_crosscheck', 'UNKNOWN')}",
         f"- 一致性状态：**{model_contract.get('status', 'UNKNOWN')}**；可用于主模型价格计算：{model_contract.get('primary_model_price_calculation_eligible', False)}",
         f"- B5 传导状态：{model_contract.get('valuation_transmission_status', 'UNKNOWN')}；经营预测范围：{model_contract.get('operating_forecast_scope', 'UNKNOWN')}",
+        f"- SOTP 适配器计算状态：{model_contract.get('sotp_calculation_status', 'UNKNOWN')}",
         *(["- 门禁原因：" + "; ".join(model_contract.get("issues") or [])] if model_contract.get("issues") else []),
         *([] if model_contract.get("primary_model_price_calculation_eligible") is True else ["- 本报告保留的情景价值只作为替代模型/未确认模型研究输入，不进入预期回报、目标入场价或 B6 价格敏感性计算。"]),
         "",
@@ -2855,6 +2912,10 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
                     f"- {scenario_label} 成本率：未完成交叉引用（{status}）；B4 不进行隐式补值。"
                 )
         lines.append("")
+    lines.extend(render_sotp_valuation_section(
+        analysis.get("sotp_valuation") or {},
+        c["currency"],
+    ))
     lines.extend(render_valuation_transmission_section(
         analysis.get("valuation_transmission") or {},
         c["currency"],
@@ -3101,6 +3162,7 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "forecast_valuation": prepared["forecast_valuation"],
         "operating_driver_forecast": prepared["operating_driver_forecast"],
         "valuation_transmission": prepared["valuation_transmission"],
+        "sotp_valuation": prepared["sotp_valuation"],
         "operator_valuation_context": prepared["operator_valuation_context"],
         "valuation_model_consistency": prepared["valuation_model_consistency"],
         "valuation_timing": prepared["valuation_timing"],
@@ -3272,6 +3334,48 @@ def _template(
                 "rationale": "", "evidence_refs": [],
             },
         },
+        "sotp_valuation": {
+            "schema_version": "IIOS-SOTP-VALUATION-0.1",
+            "calculation_method": "SEGMENT_ATTRIBUTABLE_NET_PROFIT_X_SEGMENT_PE",
+            "summary": "",
+            "forecast_period": "UNKNOWN",
+            "valuation_terminal_date": None,
+            "scenarios": {
+                "bear": {
+                    "rationale": "", "segments": [],
+                    "parent_level_adjustments": {
+                        "central_cost_after_tax_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "母公司税后经常性成本；正数表示成本，显式为零也须说明依据"},
+                        "central_cost_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "仅在母公司成本大于零时用于资本化"},
+                        "net_cash_debt_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "有符号数；正数为净现金，负数为净负债"},
+                        "minority_interests_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "少数股东权益扣减，显式为零也须说明依据"},
+                        "other_adjustments_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "有符号数；其他明确、未重复计价的股权价值调整"}
+                    },
+                    "diluted_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "稀释后股数，单位为股而不是百万股"}
+                },
+                "base": {
+                    "rationale": "", "segments": [],
+                    "parent_level_adjustments": {
+                        "central_cost_after_tax_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "母公司税后经常性成本；正数表示成本，显式为零也须说明依据"},
+                        "central_cost_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "仅在母公司成本大于零时用于资本化"},
+                        "net_cash_debt_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "有符号数；正数为净现金，负数为净负债"},
+                        "minority_interests_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "少数股东权益扣减，显式为零也须说明依据"},
+                        "other_adjustments_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "有符号数；其他明确、未重复计价的股权价值调整"}
+                    },
+                    "diluted_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "稀释后股数，单位为股而不是百万股"}
+                },
+                "bull": {
+                    "rationale": "", "segments": [],
+                    "parent_level_adjustments": {
+                        "central_cost_after_tax_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "母公司税后经常性成本；正数表示成本，显式为零也须说明依据"},
+                        "central_cost_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "仅在母公司成本大于零时用于资本化"},
+                        "net_cash_debt_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "有符号数；正数为净现金，负数为净负债"},
+                        "minority_interests_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "少数股东权益扣减，显式为零也须说明依据"},
+                        "other_adjustments_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "有符号数；其他明确、未重复计价的股权价值调整"}
+                    },
+                    "diluted_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "稀释后股数，单位为股而不是百万股"}
+                }
+            }
+        },
         "valuation_transmission": {
             "schema_version": VALUATION_TRANSMISSION_SCHEMA,
             "model_family": "UNKNOWN",
@@ -3410,6 +3514,17 @@ def create_pilot_template(
         "事实/发行人预测必须有可解析且截止时间兼容的 evidence_refs；分析假设须标为 ANALYST_ASSUMPTION 并解释依据，不能伪装成事实。缺少项目税后净利润、所有权比例、存量业务蚕食、股数/可转债稀释、期间或模型一致性时保持 NOT_LINKED。"
         "仅当操作者明确确认现有 Bear/Base/Bull 每股终值及入场价值锚均不含该项目时，方可将稀释口径增量加到三个情景，并以 Base 增量同步调整入场价值锚；如已经包含则只显示敏感性、不重复相加；如不确定则不修改原估值。论点失效压力测试不自动加回项目价值。"
     )
+    sotp_instructions = (
+        "\\n\\nSOTP 主估值计算契约（IIOS-SOTP-VALUATION-0.1）："
+        "操作者尚未确认模型时，也请把 sotp_valuation 作为独立候选计算节点：若公司分部口径与数据足以支持，应提供清楚标记为事实/发行人预测/分析假设的输入；不要替操作者选择主模型。最终只有操作者本地选定 SOTP 时，本节点才进入主估值计算，否则保持诊断性备用输入。"
+        "若主估值模型采用 SOTP，必须填写可复算的 sotp_valuation 节点；本版本只支持 SEGMENT_ATTRIBUTABLE_NET_PROFIT_X_SEGMENT_PE。"
+        "Bear/Base/Bull 必须使用完全相同的 segment_id 与 segment_name 集合，每个分部填写 attributable_net_profit_cny 与 pe_multiple_x，均用 {value,unit,data_class,basis,evidence_refs,note} 结构。"
+        "归属净利润必须是分部层面归属于上市公司股东的预测净利润，单位 CNY；P/E 单位 x。两项只允许 ISSUER_FORECAST 或 ANALYST_ASSUMPTION；发行人预测必须有可解析、截止时点兼容的 evidence_refs，分析假设必须写明可识别的推理依据。分部亏损业务当前不支持直接套用正 P/E，不得把负利润乘正倍数当作合理价值；应明确保留 UNKNOWN 并说明需要另建模型。"
+        "每种情景还必须显式填写 parent_level_adjustments：central_cost_after_tax_cny（正数成本）、central_cost_multiple_x、net_cash_debt_cny（有符号数，正数净现金/负数净负债）、minority_interests_cny（正数扣减）和 other_adjustments_cny（有符号数），以及 diluted_shares（整数股数，不是百万股）。不得缺省为零；如明确为零，也要在 basis 中给出依据。"
+        "计算公式必须是 Σ（分部归属净利润 × 分部 P/E）−（母公司税后成本 × 母公司成本倍数）+ 净现金/净负债 − 少数股东权益 + 其他调整，再除以稀释后股数；结果生成 Bear/Base/Bull 终值，Base 每股值作为主估值参考锚。所有分部、期间、股数、现金/债务、少数股东和母公司成本须避免重复计价。"
+        "sotp_valuation.forecast_period 必须与 operating_driver_forecast.forecast_period 一致，valuation_terminal_date 必须与 forecast_valuation.valuation_terminal_date 一致。数值、证据、期间、分部集合或 Bear≤Base≤Bull 任一项不成立时，不要在 forecast_valuation 中用手填每股终值冒充已计算 SOTP；保留缺口，系统会阻断回报、目标入场价与 B6。"
+        "此 SOTP 算术仍为 PILOT_NON_CANONICAL，并不代表正式证据或估值准入。B5 的 EPS_MULTIPLE 增量适配器不能用于 SOTP。"
+    )
     driver_instructions = (
         "\n\n经营驱动因素树要求（IIOS-OPERATING-DRIVER-FORECAST-0.1）："
         "必须保留 operating_driver_forecast 节点。scope 可为 PROJECT_INCREMENTAL、PRODUCT_LINE、COMPANY_WIDE 或 UNKNOWN。"
@@ -3437,6 +3552,7 @@ def create_pilot_template(
     prompt += investment_thesis_chain_instructions
     prompt += driver_instructions
     prompt += b5_transmission_instructions
+    prompt += sotp_instructions
     _write_local(prompt_path, prompt + "\n")
     return {
         "status": "PILOT_TEMPLATE_CREATED", "input_template": str(input_path),
@@ -3860,6 +3976,12 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
             missing.append(f"经营驱动因素树 {name.upper()} 情景结构")
     if not isinstance(drivers.get("product_lines"), list):
         missing.append("经营驱动因素树 product_lines 数组")
+
+    sotp = payload.get("sotp_valuation")
+    if not isinstance(sotp, Mapping) or sotp.get("schema_version") != "IIOS-SOTP-VALUATION-0.1":
+        missing.append("SOTP sotp_valuation schema_version")
+    elif not isinstance(sotp.get("scenarios"), Mapping) or any(not isinstance(sotp["scenarios"].get(name), Mapping) for name in ("bear", "base", "bull")):
+        missing.append("SOTP Bear/Base/Bull 情景结构")
 
     transmission = payload.get("valuation_transmission")
     transmission = transmission if isinstance(transmission, Mapping) else {}
