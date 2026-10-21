@@ -47,6 +47,9 @@ PILOT_STATUS = "PILOT_NON_CANONICAL"
 PILOT_RECEIPT_SCHEMA = "IIOS-LOCAL-PILOT-RUN-RECORD-0.1"
 EPS_MULTIPLE_VALUATION_SCHEMA = "IIOS-EPS-MULTIPLE-VALUATION-0.1"
 EPS_MULTIPLE_VALUATION_METHOD = "EPS_PER_SHARE_X_PE_MULTIPLE"
+EPS_EARNINGS_BRIDGE_SCHEMA = "IIOS-EPS-EARNINGS-BRIDGE-0.1"
+EPS_EARNINGS_BRIDGE_METHOD = "B4_NET_PROFIT_PROXY_MINUS_NCI_PLUS_ADJUSTMENTS_DIVIDED_BY_DILUTED_SHARES"
+EPS_EPS_MATCH_TOLERANCE = Decimal("0.005")
 SHANGHAI = timezone(timedelta(hours=8))
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PRICE_ASSURANCE = "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
@@ -70,6 +73,7 @@ REPLAY_COMPARISON_FIELDS = (
     "valuation_transmission",
     "sotp_valuation",
     "eps_multiple_valuation",
+    "eps_earnings_bridge",
     "operator_valuation_context",
     "valuation_model_consistency",
     "valuation_timing",
@@ -810,10 +814,342 @@ def _infer_model_family_from_name(value: Any) -> str:
     return "UNKNOWN"
 
 
+def _eps_source_domain_class_matches(source: Mapping[str, Any]) -> bool:
+    """Return true only for a supported primary class matched to its official domain."""
+    source_class = str(source.get("source_class") or "").strip().upper()
+    domain_status = str(source.get("source_domain_class_status") or "").strip().upper()
+    return (
+        source_class == "EXCHANGE_PRIMARY"
+        and domain_status == "OFFICIAL_EXCHANGE_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED"
+    ) or (
+        source_class == "REGULATOR_PRIMARY"
+        and domain_status == "OFFICIAL_REGULATOR_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED"
+    )
+
+
+def _evaluate_eps_earnings_bridge(
+    raw: Any, *, selected_model_family: Any, expected_forecast_period: Any,
+    expected_terminal_date: Any, expected_currency: Any,
+    operating_driver_forecast: Mapping[str, Any],
+    valuation_transmission: Mapping[str, Any],
+    operator_baseline_includes_project: bool | None,
+    evidence_register: list[dict[str, Any]],
+    unresolved_evidence_ids: list[str] | set[str] | None = None,
+    after_cutoff_evidence_ids: list[str] | set[str] | None = None,
+    uncertain_timing_evidence_ids: list[str] | set[str] | None = None,
+) -> dict[str, Any]:
+    """Reconcile forecast EPS to B4 company-wide net-profit proxy and diluted shares."""
+    def result(status: str, scenarios: Mapping[str, Any] | None = None,
+               issues: list[str] | None = None, *, period: str | None = None,
+               terminal_date: str | None = None, currency: str | None = None) -> dict[str, Any]:
+        clean_issues = list(dict.fromkeys(str(item) for item in (issues or []) if str(item).strip()))
+        eligible = status in {
+            "CALCULATED", "ASSUMPTION_ONLY", "MIXED_CALCULATED_AND_ASSUMPTION_ONLY",
+        }
+        return {
+            "schema_version": EPS_EARNINGS_BRIDGE_SCHEMA,
+            "status": status,
+            "method": EPS_EARNINGS_BRIDGE_METHOD,
+            "forecast_period": period,
+            "valuation_terminal_date": terminal_date,
+            "currency": currency,
+            "scenarios": dict(scenarios or {}),
+            "issues": clean_issues,
+            "primary_eps_price_calculation_eligible": eligible,
+            "formal_evidence_pit_admission_created": False,
+            "formal_forecast_admission_created": False,
+            "decision_authority": False,
+        }
+
+    if str(selected_model_family or "UNKNOWN").strip().upper() != "EPS_MULTIPLE":
+        return result("NOT_SELECTED")
+    currency = str(expected_currency or "").strip().upper()
+    period = str(expected_forecast_period or "").strip().upper()
+    terminal_date = str(expected_terminal_date or "").strip()
+    if currency not in {"CNY", "HKD"}:
+        return result("NOT_LINKED", issues=[f"EPS_BRIDGE_CURRENCY_NOT_SUPPORTED:{currency or 'UNKNOWN'}"])
+    if not isinstance(raw, Mapping) or raw.get("schema_version") != EPS_MULTIPLE_VALUATION_SCHEMA:
+        return result("NOT_LINKED", issues=["EPS_BRIDGE_INPUT_SCHEMA_MISSING_OR_INVALID"])
+    if not _is_identifiable_evidence_text(period) or not _is_identifiable_evidence_text(terminal_date):
+        return result("NOT_LINKED", issues=["EPS_BRIDGE_FORECAST_PERIOD_OR_TERMINAL_DATE_UNKNOWN"])
+    inputs = raw.get("scenarios")
+    if not isinstance(inputs, Mapping) or set(inputs) != set(SCENARIOS):
+        return result("NOT_LINKED", issues=["EPS_BRIDGE_REQUIRES_BEAR_BASE_BULL"])
+
+    evidence = {
+        str(item.get("source_id")): item for item in evidence_register
+        if isinstance(item, Mapping) and item.get("source_id")
+    }
+    unresolved = set(unresolved_evidence_ids or [])
+    after = set(after_cutoff_evidence_ids or [])
+    uncertain = set(uncertain_timing_evidence_ids or [])
+
+    def normalized_refs(raw_measure: Mapping[str, Any], *, label: str, data_class: str) -> list[str]:
+        refs_raw = raw_measure.get("evidence_refs") or []
+        if not isinstance(refs_raw, list):
+            raise ValueError(f"{label}_EVIDENCE_REFS_INVALID")
+        refs = list(dict.fromkeys(str(ref).strip() for ref in refs_raw if str(ref).strip()))
+        if data_class == "ISSUER_FORECAST" and not refs:
+            raise ValueError(f"{label}_ISSUER_FORECAST_EVIDENCE_REQUIRED")
+        for ref in refs:
+            source = evidence.get(ref)
+            if (
+                source is None or ref in unresolved or ref in after or ref in uncertain
+                or source.get("time_status") != "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+            ):
+                raise ValueError(f"{label}_EVIDENCE_NOT_CUTOFF_COMPATIBLE:{ref}")
+            if data_class == "ISSUER_FORECAST" and not _eps_source_domain_class_matches(source):
+                raise ValueError(f"{label}_ISSUER_FORECAST_SOURCE_CLASS_OR_DOMAIN_NOT_VERIFIED:{ref}")
+        return refs
+
+    def typed_measure(
+        raw_measure: Any, *, label: str, required_unit: str, expected_period: str,
+        required_measure: str | None = None, signed: bool = False,
+    ) -> dict[str, Any]:
+        if not isinstance(raw_measure, Mapping):
+            raise ValueError(f"{label}_OBJECT_REQUIRED")
+        if str(raw_measure.get("unit") or "").strip().lower() != required_unit.lower():
+            raise ValueError(f"{label}_UNIT_MISMATCH")
+        measure_name = str(raw_measure.get("measure") or "").strip().upper()
+        if required_measure and measure_name != required_measure:
+            raise ValueError(f"{label}_MEASURE_MISMATCH:{measure_name or 'UNKNOWN'}")
+        if str(raw_measure.get("forecast_period") or "").strip().upper() != expected_period:
+            raise ValueError(f"{label}_FORECAST_PERIOD_MISMATCH")
+        data_class = str(raw_measure.get("data_class") or "").strip().upper()
+        if data_class not in {"ISSUER_FORECAST", "ANALYST_ASSUMPTION"}:
+            raise ValueError(f"{label}_DATA_CLASS_INVALID")
+        basis = str(raw_measure.get("basis") or "").strip()
+        if not _is_identifiable_evidence_text(basis):
+            raise ValueError(f"{label}_BASIS_NOT_IDENTIFIABLE")
+        number = _number(raw_measure.get("value"), label) if signed else _positive(raw_measure.get("value"), label)
+        refs = normalized_refs(raw_measure, label=label, data_class=data_class)
+        return {
+            "value": format(number, "f"),
+            "unit": required_unit,
+            "measure": measure_name or required_measure,
+            "data_class": data_class,
+            "basis": basis,
+            "evidence_refs": refs,
+            "forecast_period": expected_period,
+            "note": str(raw_measure.get("note") or ""),
+            "formal_evidence_pit_admission": False,
+        }
+
+    driver_scenarios = operating_driver_forecast.get("scenarios")
+    driver_scenarios = driver_scenarios if isinstance(driver_scenarios, Mapping) else {}
+    driver_scope = str(operating_driver_forecast.get("scope") or "UNKNOWN").strip().upper()
+    b5_status = str(valuation_transmission.get("status") or "UNKNOWN").strip().upper()
+    scenario_outputs: dict[str, Any] = {}
+    issues: list[str] = []
+    for name in SCENARIOS:
+        try:
+            row = inputs[name]
+            if not isinstance(row, Mapping):
+                raise ValueError(f"{name.upper()}_EPS_BRIDGE_SCENARIO_OBJECT_REQUIRED")
+            eps_raw = row.get("eps_per_share")
+            if not isinstance(eps_raw, Mapping):
+                raise ValueError(f"{name.upper()}_EPS_OBJECT_REQUIRED")
+            declared_class = str(eps_raw.get("data_class") or "").strip().upper()
+            if declared_class not in {"ISSUER_FORECAST", "ANALYST_ASSUMPTION"}:
+                raise ValueError(f"{name.upper()}_EPS_DATA_CLASS_INVALID")
+            eps_basis = str(eps_raw.get("basis") or "").strip()
+            if not _is_identifiable_evidence_text(eps_basis):
+                raise ValueError(f"{name.upper()}_EPS_BASIS_NOT_IDENTIFIABLE")
+            if str(eps_raw.get("unit") or "").strip().lower() != f"{currency}/share".lower():
+                raise ValueError(f"{name.upper()}_EPS_UNIT_MISMATCH")
+            declared_eps = _positive(eps_raw.get("value"), f"{name.upper()}_DECLARED_EPS")
+            eps_refs = normalized_refs(eps_raw, label=f"{name.upper()}_EPS", data_class=declared_class)
+            raw_bridge = eps_raw.get("earnings_bridge")
+            if raw_bridge is None:
+                derivation = str(eps_raw.get("assumption_derivation") or "").strip()
+                if declared_class == "ANALYST_ASSUMPTION" and _is_identifiable_evidence_text(derivation):
+                    scenario_outputs[name] = {
+                        "status": "ASSUMPTION_ONLY",
+                        "declared_eps_per_share": format(declared_eps, "f"),
+                        "calculated_eps_per_share": None,
+                        "absolute_difference_per_share": None,
+                        "rounding_tolerance_per_share": format(EPS_EPS_MATCH_TOLERANCE, "f"),
+                        "eps_match": None,
+                        "derivation_class": "ANALYST_ASSUMPTION",
+                        "assumption_derivation": derivation,
+                        "basis": eps_basis,
+                        "evidence_refs": eps_refs,
+                        "note": "未提供可复核的 B4 净利润归属桥与同期间加权平均稀释股数；该 EPS 仅作为明确标记的分析假设。",
+                        "formal_evidence_pit_admission": False,
+                    }
+                    continue
+                if declared_class == "ISSUER_FORECAST":
+                    raise ValueError(f"{name.upper()}_ISSUER_FORECAST_EARNINGS_BRIDGE_REQUIRED")
+                raise ValueError(f"{name.upper()}_ANALYST_ASSUMPTION_DERIVATION_NOT_IDENTIFIABLE")
+
+            if not isinstance(raw_bridge, Mapping):
+                raise ValueError(f"{name.upper()}_EPS_EARNINGS_BRIDGE_OBJECT_INVALID")
+            if raw_bridge.get("schema_version") != EPS_EARNINGS_BRIDGE_SCHEMA:
+                raise ValueError(f"{name.upper()}_EPS_EARNINGS_BRIDGE_SCHEMA_MISMATCH")
+            if str(raw_bridge.get("calculation_method") or "").strip().upper() != EPS_EARNINGS_BRIDGE_METHOD:
+                raise ValueError(f"{name.upper()}_EPS_EARNINGS_BRIDGE_METHOD_UNSUPPORTED")
+            if str(raw_bridge.get("forecast_period") or "").strip().upper() != period:
+                raise ValueError(f"{name.upper()}_EPS_BRIDGE_FORECAST_PERIOD_MISMATCH")
+            if str(raw_bridge.get("valuation_terminal_date") or "").strip() != terminal_date:
+                raise ValueError(f"{name.upper()}_EPS_BRIDGE_TERMINAL_DATE_MISMATCH")
+            if str(raw_bridge.get("scope") or "").strip().upper() != "COMPANY_WIDE":
+                raise ValueError(f"{name.upper()}_EPS_BRIDGE_SCOPE_MUST_BE_COMPANY_WIDE")
+            if driver_scope != "COMPANY_WIDE":
+                raise ValueError(f"{name.upper()}_EPS_BRIDGE_CANNOT_USE_NON_COMPANY_WIDE_B4:{driver_scope}")
+            if str(operating_driver_forecast.get("forecast_period") or "").strip().upper() != period:
+                raise ValueError(f"{name.upper()}_B4_EPS_BRIDGE_PERIOD_MISMATCH")
+            driver_row = driver_scenarios.get(name)
+            if not isinstance(driver_row, Mapping) or driver_row.get("financial_outputs_decision_usable") is not True:
+                raise ValueError(f"{name.upper()}_B4_COMPANY_WIDE_NET_PROFIT_PROXY_NOT_USABLE")
+            try:
+                b4_net_profit_proxy = _positive(driver_row.get("net_profit_cny"), f"{name.upper()}_B4_NET_PROFIT_PROXY")
+            except LocalInvestmentPilotError:
+                raise ValueError(f"{name.upper()}_B4_NET_PROFIT_PROXY_UNKNOWN_OR_NONPOSITIVE")
+
+            project_treatment = str(raw_bridge.get("project_profit_treatment") or "").strip().upper()
+            if project_treatment not in {
+                "INCLUDED_IN_COMPANY_WIDE_BASELINE",
+                "EXCLUDED_FROM_COMPANY_WIDE_BASELINE",
+                "NO_PROJECT_INCREMENTAL_ADJUSTMENT",
+            }:
+                raise ValueError(f"{name.upper()}_PROJECT_PROFIT_TREATMENT_NOT_IDENTIFIABLE")
+            if project_treatment == "INCLUDED_IN_COMPANY_WIDE_BASELINE":
+                if operator_baseline_includes_project is not True:
+                    raise ValueError(f"{name.upper()}_PROJECT_BASELINE_INCLUSION_NOT_OPERATOR_CONFIRMED")
+                if b5_status == "APPLIED_TO_PER_SHARE_SCENARIOS":
+                    raise ValueError(f"{name.upper()}_PROJECT_INCREMENTAL_PROFIT_DOUBLE_COUNT_RISK")
+            elif project_treatment == "EXCLUDED_FROM_COMPANY_WIDE_BASELINE":
+                if operator_baseline_includes_project is not False:
+                    raise ValueError(f"{name.upper()}_PROJECT_BASELINE_EXCLUSION_NOT_OPERATOR_CONFIRMED")
+                if b5_status != "APPLIED_TO_PER_SHARE_SCENARIOS":
+                    raise ValueError(f"{name.upper()}_PROJECT_INCREMENTAL_NOT_TRANSMITTED_FROM_EXCLUDED_BASELINE")
+            elif b5_status == "APPLIED_TO_PER_SHARE_SCENARIOS":
+                raise ValueError(f"{name.upper()}_PROJECT_TREATMENT_CONTRADICTS_B5_INCREMENT")
+
+            nci = typed_measure(
+                raw_bridge.get("non_controlling_interests_cny"),
+                label=f"{name.upper()}_NON_CONTROLLING_INTERESTS",
+                required_unit=currency,
+                expected_period=period,
+                required_measure="NON_CONTROLLING_INTERESTS_AFTER_TAX",
+                signed=False,
+            )
+            other_adjustment = typed_measure(
+                raw_bridge.get("other_after_tax_attribution_adjustment_cny"),
+                label=f"{name.upper()}_OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT",
+                required_unit=currency,
+                expected_period=period,
+                required_measure="OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT",
+                signed=True,
+            )
+            shares = typed_measure(
+                raw_bridge.get("diluted_shares"),
+                label=f"{name.upper()}_WEIGHTED_AVERAGE_DILUTED_SHARES",
+                required_unit="shares",
+                expected_period=period,
+                required_measure="WEIGHTED_AVERAGE_DILUTED_SHARES",
+                signed=False,
+            )
+            if _number(nci["value"], f"{name.upper()}_NCI") < 0:
+                raise ValueError(f"{name.upper()}_NON_CONTROLLING_INTERESTS_MUST_BE_NONNEGATIVE")
+            if b5_status in {"APPLIED_TO_PER_SHARE_SCENARIOS", "CALCULATED_NOT_APPLIED_BASELINE_ALREADY_INCLUDES_PROJECT"}:
+                b5_rows = valuation_transmission.get("scenarios")
+                b5_rows = b5_rows if isinstance(b5_rows, Mapping) else {}
+                b5_row = b5_rows.get(name)
+                b5_row = b5_row if isinstance(b5_row, Mapping) else {}
+                b5_shares = b5_row.get("diluted_shares")
+                if not isinstance(b5_shares, Mapping) or b5_shares.get("value") in (None, ""):
+                    raise ValueError(f"{name.upper()}_B5_DILUTED_SHARES_NOT_RECONCILED")
+                if _positive(b5_shares.get("value"), f"{name.upper()}_B5_DILUTED_SHARES") != _positive(shares["value"], f"{name.upper()}_EPS_DILUTED_SHARES"):
+                    raise ValueError(f"{name.upper()}_EPS_B5_DILUTED_SHARE_DENOMINATOR_MISMATCH")
+
+            nci_value = _number(nci["value"], f"{name.upper()}_NCI")
+            other_value = _number(other_adjustment["value"], f"{name.upper()}_OTHER_ADJUSTMENT")
+            attributable_net_profit = b4_net_profit_proxy - nci_value + other_value
+            if attributable_net_profit <= 0:
+                raise ValueError(f"{name.upper()}_NET_PROFIT_ATTRIBUTABLE_TO_LISTED_SHAREHOLDERS_NOT_POSITIVE")
+            share_count = _positive(shares["value"], f"{name.upper()}_DILUTED_SHARES")
+            calculated_eps = attributable_net_profit / share_count
+            difference = abs(calculated_eps - declared_eps)
+            eps_match = difference <= EPS_EPS_MATCH_TOLERANCE
+            scenario_status = "CALCULATED" if eps_match else "EPS_MISMATCH"
+            scenario_outputs[name] = {
+                "status": scenario_status,
+                "forecast_period": period,
+                "valuation_terminal_date": terminal_date,
+                "scope": "COMPANY_WIDE",
+                "project_profit_treatment": project_treatment,
+                "b4_net_profit_proxy_cny": format(b4_net_profit_proxy, "f"),
+                "non_controlling_interests": nci,
+                "other_after_tax_attribution_adjustment": other_adjustment,
+                "net_profit_attributable_to_listed_shareholders": {
+                    "value": format(attributable_net_profit, "f"),
+                    "unit": currency,
+                    "measure": "NET_PROFIT_ATTRIBUTABLE_TO_LISTED_COMPANY_SHAREHOLDERS",
+                    "formula": "B4_NET_PROFIT_PROXY - NON_CONTROLLING_INTERESTS + OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT",
+                    "arithmetic": f"{b4_net_profit_proxy} - {nci_value} + ({other_value}) = {attributable_net_profit}",
+                },
+                "diluted_shares": shares,
+                "declared_eps_per_share": format(declared_eps, "f"),
+                "calculated_eps_per_share": format(calculated_eps, "f"),
+                "absolute_difference_per_share": format(difference, "f"),
+                "rounding_tolerance_per_share": format(EPS_EPS_MATCH_TOLERANCE, "f"),
+                "eps_match": eps_match,
+                "formula": "NET_PROFIT_ATTRIBUTABLE_TO_LISTED_COMPANY_SHAREHOLDERS / WEIGHTED_AVERAGE_DILUTED_SHARES",
+                "arithmetic": f"{attributable_net_profit} {currency} / {share_count} shares = {calculated_eps} {currency}/share",
+                "declared_eps_evidence_refs": eps_refs,
+                "formal_evidence_pit_admission": False,
+            }
+            if not eps_match:
+                issues.append(
+                    f"{name.upper()}_DECLARED_EPS_DOES_NOT_MATCH_NET_PROFIT_ATTRIBUTABLE_DIVIDED_BY_DILUTED_SHARES"
+                )
+        except (ValueError, LocalInvestmentPilotError) as exc:
+            issue = str(exc)
+            issues.append(issue)
+            scenario_outputs[name] = {
+                "status": "NOT_LINKED",
+                "declared_eps_per_share": None,
+                "calculated_eps_per_share": None,
+                "absolute_difference_per_share": None,
+                "rounding_tolerance_per_share": format(EPS_EPS_MATCH_TOLERANCE, "f"),
+                "eps_match": False,
+                "issues": [issue],
+                "formal_evidence_pit_admission": False,
+            }
+
+    statuses = [str((scenario_outputs.get(name) or {}).get("status") or "NOT_LINKED") for name in SCENARIOS]
+    if any(status == "EPS_MISMATCH" for status in statuses):
+        overall = "EPS_MISMATCH"
+    elif all(status == "CALCULATED" for status in statuses):
+        overall = "CALCULATED"
+    elif all(status == "ASSUMPTION_ONLY" for status in statuses):
+        overall = "ASSUMPTION_ONLY"
+    elif all(status in {"CALCULATED", "ASSUMPTION_ONLY"} for status in statuses):
+        overall = "MIXED_CALCULATED_AND_ASSUMPTION_ONLY"
+    else:
+        overall = "NOT_LINKED"
+    if overall in {"CALCULATED", "ASSUMPTION_ONLY", "MIXED_CALCULATED_AND_ASSUMPTION_ONLY"}:
+        summary = {
+            "CALCULATED": "Bear/Base/Bull EPS 已与 B4 整公司净利润代理、上市公司股东归属调整和同期间加权平均稀释股数完成算术核对。",
+            "ASSUMPTION_ONLY": "Bear/Base/Bull EPS 均明确标为分析假设，但未提供可独立复算的公司净利润/稀释股数桥。",
+            "MIXED_CALCULATED_AND_ASSUMPTION_ONLY": "EPS 同时包含可复算的净利润/稀释股数情景与明确标记的分析假设情景；请逐情景审阅。",
+        }[overall]
+    elif overall == "EPS_MISMATCH":
+        summary = "至少一个情景的申报 EPS 与净利润归属桥 ÷ 加权平均稀释股数不一致；主估值价格链已阻断，没有静默覆盖任一数字。"
+    else:
+        summary = "EPS 到整公司净利润、上市公司股东归属调整和同期间加权平均稀释股数的传导链不完整或不可协调；主估值价格链应保持 UNKNOWN。"
+    return {
+        **result(overall, scenario_outputs, issues, period=period, terminal_date=terminal_date, currency=currency),
+        "summary": summary,
+    }
+
+
 def _evaluate_primary_eps_multiple_valuation(
     raw: Any, *, selected_model_family: Any, expected_forecast_period: Any,
     expected_terminal_date: Any, expected_currency: Any,
     evidence_register: list[dict[str, Any]],
+    eps_earnings_bridge: Mapping[str, Any] | None = None,
     unresolved_evidence_ids: list[str] | set[str] | None = None,
     after_cutoff_evidence_ids: list[str] | set[str] | None = None,
     uncertain_timing_evidence_ids: list[str] | set[str] | None = None,
@@ -878,6 +1214,20 @@ def _evaluate_primary_eps_multiple_valuation(
                 data_class = str(measure.get("data_class") or "").strip().upper()
                 if data_class not in {"ISSUER_FORECAST", "ANALYST_ASSUMPTION"}:
                     raise ValueError(f"{name.upper()}_{key.upper()}_DATA_CLASS_INVALID")
+                if key == "eps_per_share":
+                    bridge_data = eps_earnings_bridge if isinstance(eps_earnings_bridge, Mapping) else {}
+                    bridge_rows = bridge_data.get("scenarios") if isinstance(bridge_data.get("scenarios"), Mapping) else {}
+                    bridge_row = bridge_rows.get(name) if isinstance(bridge_rows.get(name), Mapping) else {}
+                    bridge_status = str(bridge_row.get("status") or "NOT_LINKED").upper()
+                    allowed_bridge_statuses = {"CALCULATED", "ASSUMPTION_ONLY"}
+                    if bridge_status not in allowed_bridge_statuses:
+                        raise ValueError(f"{name.upper()}_EPS_EARNINGS_BRIDGE_NOT_ELIGIBLE:{bridge_status}")
+                    if data_class == "ISSUER_FORECAST" and bridge_status != "CALCULATED":
+                        raise ValueError(f"{name.upper()}_ISSUER_FORECAST_EPS_REQUIRES_CALCULATED_EARNINGS_BRIDGE")
+                    if data_class == "ANALYST_ASSUMPTION" and bridge_status == "ASSUMPTION_ONLY":
+                        derivation = str(measure.get("assumption_derivation") or "").strip()
+                        if not _is_identifiable_evidence_text(derivation):
+                            raise ValueError(f"{name.upper()}_ANALYST_ASSUMPTION_DERIVATION_NOT_IDENTIFIABLE")
                 basis = str(measure.get("basis") or "").strip()
                 if not _is_identifiable_evidence_text(basis):
                     raise ValueError(f"{name.upper()}_{key.upper()}_BASIS_NOT_IDENTIFIABLE")
@@ -893,14 +1243,25 @@ def _evaluate_primary_eps_multiple_valuation(
                     if (source is None or ref in unresolved or ref in after or ref in uncertain
                             or source.get("time_status") != "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"):
                         raise ValueError(f"{name.upper()}_{key.upper()}_EVIDENCE_NOT_CUTOFF_COMPATIBLE:{ref}")
+                    if data_class == "ISSUER_FORECAST" and not _eps_source_domain_class_matches(source):
+                        raise ValueError(f"{name.upper()}_{key.upper()}_ISSUER_FORECAST_SOURCE_CLASS_OR_DOMAIN_NOT_VERIFIED:{ref}")
                 measures[key] = {"value": format(number, "f"), "unit": unit, "data_class": data_class,
                                  "basis": basis, "evidence_refs": refs, "note": str(measure.get("note") or ""),
                                  "formal_evidence_pit_admission": False}
+                if key == "eps_per_share":
+                    measures[key]["assumption_derivation"] = str(measure.get("assumption_derivation") or "").strip()
+                    bridge_data = eps_earnings_bridge if isinstance(eps_earnings_bridge, Mapping) else {}
+                    bridge_rows = bridge_data.get("scenarios") if isinstance(bridge_data.get("scenarios"), Mapping) else {}
+                    measures[key]["earnings_bridge_status"] = str((bridge_rows.get(name) or {}).get("status") or "NOT_LINKED")
             eps = _number(measures["eps_per_share"]["value"], f"{name.upper()}_EPS")
             pe = _number(measures["pe_multiple_x"]["value"], f"{name.upper()}_PE")
             terminal = eps * pe
+            bridge_data = eps_earnings_bridge if isinstance(eps_earnings_bridge, Mapping) else {}
+            bridge_rows = bridge_data.get("scenarios") if isinstance(bridge_data.get("scenarios"), Mapping) else {}
+            bridge_row = bridge_rows.get(name) if isinstance(bridge_rows.get(name), Mapping) else {}
             outputs[name] = {"rationale": str(row.get("rationale") or "").strip(),
                              "eps_per_share": measures["eps_per_share"], "pe_multiple_x": measures["pe_multiple_x"],
+                             "earnings_bridge": dict(bridge_row),
                              "calculation": {"formula": "EPS_PER_SHARE × PE_MULTIPLE",
                                              "arithmetic": f"{eps} × {pe} = {terminal}"},
                              "terminal_value_per_share": format(terminal, "f")}
@@ -915,6 +1276,67 @@ def _evaluate_primary_eps_multiple_valuation(
             "analyst_supplied_summary_unverified": summary, "forecast_period": period,
             "valuation_terminal_date": terminal_date, "currency": currency, "scenarios": outputs,
             "issues": [], "formal_valuation_admission_created": False, "decision_authority": False}
+
+
+def _render_eps_earnings_bridge_section(result: Mapping[str, Any], currency: str) -> list[str]:
+    data = result if isinstance(result, Mapping) else {}
+    lines = [
+        "",
+        "### EPS 来源与净利润/稀释股数传导核对",
+        "",
+        f"- 桥接状态：**{data.get('status', 'UNKNOWN')}**；期间 / 终值日：{data.get('forecast_period') or 'UNKNOWN'} / {data.get('valuation_terminal_date') or 'UNKNOWN'}",
+        f"- 是否允许进入 EPS_MULTIPLE 价格计算：{data.get('primary_eps_price_calculation_eligible', False)}",
+        f"- 说明：{data.get('summary') or 'EPS 桥接未完成。'}",
+        f"- 匹配容差：每股绝对差异不超过 {data.get('scenarios', {}).get('base', {}).get('rounding_tolerance_per_share', '0.005')} {currency}/share；超出容差不覆盖申报 EPS，而是阻断主价格计算。",
+        "- 证据边界：官方交易所/监管域名与类别匹配不等于内容核实，也不等于正式 Evidence/PIT 准入。",
+        "",
+    ]
+    scenarios = data.get("scenarios") if isinstance(data.get("scenarios"), Mapping) else {}
+    for name, label in (("bear", "Bear"), ("base", "Base"), ("bull", "Bull")):
+        row = scenarios.get(name) if isinstance(scenarios.get(name), Mapping) else {}
+        lines.extend([f"**{label} 情景 EPS 桥接：{row.get('status', 'NOT_LINKED')}**"])
+        if row.get("status") == "ASSUMPTION_ONLY":
+            lines.extend([
+                f"- 申报 EPS：{row.get('declared_eps_per_share') or 'UNKNOWN'} {currency}/share",
+                f"- 分析假设推导：{row.get('assumption_derivation') or 'UNKNOWN'}",
+                f"- 依据：{row.get('basis') or 'UNKNOWN'}",
+                "- 未提供完整的 B4 整公司净利润归属桥与同期间加权平均稀释股数；该数值仅是分析假设，不是已核实发行人预测。",
+                "",
+            ])
+            continue
+        if row.get("status") in {"CALCULATED", "EPS_MISMATCH"}:
+            profit = row.get("net_profit_attributable_to_listed_shareholders")
+            profit = profit if isinstance(profit, Mapping) else {}
+            shares = row.get("diluted_shares")
+            shares = shares if isinstance(shares, Mapping) else {}
+            lines.extend([
+                f"- B4 整公司净利润代理：{row.get('b4_net_profit_proxy_cny') or 'UNKNOWN'} {currency}",
+                f"- 非控股股东损益扣减：{(row.get('non_controlling_interests') or {}).get('value', 'UNKNOWN')} {currency}",
+                f"- 其他税后归属调整：{(row.get('other_after_tax_attribution_adjustment') or {}).get('value', 'UNKNOWN')} {currency}",
+                f"- 上市公司股东归属净利润：{profit.get('arithmetic') or 'UNKNOWN'}",
+                f"- 加权平均稀释股数：{shares.get('value', 'UNKNOWN')} shares；期间：{shares.get('forecast_period', 'UNKNOWN')}",
+                f"- 计算 EPS：{row.get('arithmetic') or 'UNKNOWN'}",
+                f"- 申报 EPS / 计算 EPS / 绝对差异：{row.get('declared_eps_per_share') or 'UNKNOWN'} / {row.get('calculated_eps_per_share') or 'UNKNOWN'} / {row.get('absolute_difference_per_share') or 'UNKNOWN'}",
+                f"- 项目利润处理：{row.get('project_profit_treatment') or 'UNKNOWN'}",
+            ])
+            if row.get("status") == "EPS_MISMATCH":
+                lines.append("- **不一致：申报 EPS 与净利润/稀释股数复算差异超过容差；主估值、回报、目标入场价与 B6 应保持 UNKNOWN。**")
+            lines.append("")
+        else:
+            for issue in row.get("issues") or []:
+                lines.append(f"- 未解决：{issue}")
+            if not row.get("issues"):
+                lines.append("- 缺少足以重建此情景的净利润归属、稀释股数或期间/来源链。")
+            lines.append("")
+    if data.get("issues"):
+        lines.extend(["#### EPS 桥接未解决问题", ""] + [f"- {item}" for item in data.get("issues") or []])
+        lines.append("")
+    lines.extend([
+        "- 方法边界：B4 的净利润代理不是自动确认的归母净利润；本地仅按明示的非控股股东损益与其他税后归属调整复算。",
+        "- 决策边界：桥接算术与时点/来源类别检查不创建正式预测、估值准入、Decision 或交易授权。",
+        "",
+    ])
+    return lines
 
 
 def _render_primary_eps_multiple_section(result: Mapping[str, Any], currency: str) -> list[str]:
@@ -1910,6 +2332,20 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "selection_source": selection_source,
         "selection_confirmed": selection_confirmed,
     }
+    eps_earnings_bridge = _evaluate_eps_earnings_bridge(
+        raw_eps_multiple_valuation,
+        selected_model_family=operator_valuation_context["selected_model_family"],
+        expected_forecast_period=operating_driver_forecast.get("forecast_period"),
+        expected_terminal_date=forecast.get("valuation_terminal_date"),
+        expected_currency=currency,
+        operating_driver_forecast=operating_driver_forecast,
+        valuation_transmission=valuation_transmission,
+        operator_baseline_includes_project=operator_valuation_context["baseline_includes_project"],
+        evidence_register=sources,
+        unresolved_evidence_ids=unknown_refs,
+        after_cutoff_evidence_ids=after_cutoff_refs,
+        uncertain_timing_evidence_ids=uncertain_timing_refs,
+    )
     eps_multiple_valuation = _evaluate_primary_eps_multiple_valuation(
         raw_eps_multiple_valuation,
         selected_model_family=operator_valuation_context["selected_model_family"],
@@ -1917,6 +2353,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         expected_terminal_date=forecast.get("valuation_terminal_date"),
         expected_currency=currency,
         evidence_register=sources,
+        eps_earnings_bridge=eps_earnings_bridge,
         unresolved_evidence_ids=unknown_refs,
         after_cutoff_evidence_ids=after_cutoff_refs,
         uncertain_timing_evidence_ids=uncertain_timing_refs,
@@ -2072,6 +2509,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "assessment": assessment,
         "forecast_valuation": forecast,
         "eps_multiple_valuation": eps_multiple_valuation,
+        "eps_earnings_bridge": eps_earnings_bridge,
         "operating_driver_forecast": operating_driver_forecast,
         "valuation_transmission": valuation_transmission,
         "sotp_valuation": sotp_valuation,
@@ -3131,6 +3569,10 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
                     f"- {scenario_label} 成本率：未完成交叉引用（{status}）；B4 不进行隐式补值。"
                 )
         lines.append("")
+    lines.extend(_render_eps_earnings_bridge_section(
+        analysis.get("eps_earnings_bridge") or {},
+        c["currency"],
+    ))
     lines.extend(_render_primary_eps_multiple_section(
         analysis.get("eps_multiple_valuation") or {},
         c["currency"],
@@ -3401,6 +3843,7 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "assessment": prepared["assessment"],
         "forecast_valuation": prepared["forecast_valuation"],
         "eps_multiple_valuation": prepared["eps_multiple_valuation"],
+        "eps_earnings_bridge": prepared["eps_earnings_bridge"],
         "operating_driver_forecast": prepared["operating_driver_forecast"],
         "valuation_transmission": prepared["valuation_transmission"],
         "sotp_valuation": prepared["sotp_valuation"],
