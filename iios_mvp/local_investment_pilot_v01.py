@@ -981,6 +981,8 @@ def _evaluate_primary_eps_multiple_valuation(
                 driver_row = driver_scenarios.get(name)
                 if not isinstance(driver_row, Mapping) or driver_row.get("financial_outputs_decision_usable") is not True:
                     raise ValueError(f"{name.upper()}_EPS_BRIDGE_B4_FINANCIAL_OUTPUTS_NOT_DECISION_USABLE")
+                if currency != "CNY":
+                    raise ValueError(f"{name.upper()}_B4_NET_PROFIT_CURRENCY_NOT_SUPPORTED_FOR_CASE")
                 b4_profit = _positive(driver_row.get("net_profit_cny"), f"{name.upper()}_B4_NET_PROFIT_CNY")
                 attribution_adjustment, adjustment_norm = _normalize_eps_bridge_measure(
                     bridge.get("profit_attribution_adjustment_cny"),
@@ -993,23 +995,24 @@ def _evaluate_primary_eps_multiple_valuation(
                 if attributable_profit <= 0:
                     raise ValueError(f"{name.upper()}_EPS_BRIDGE_ATTRIBUTABLE_PROFIT_NOT_POSITIVE")
                 reconciliation_tolerance = max(Decimal("1"), abs(b4_profit) * Decimal("0.000001"))
-                if not isinstance(bridge.get("net_profit_attributable_cny"), Mapping):
+                if not isinstance(bridge.get("net_profit_attributable"), Mapping):
                     raise ValueError(f"{name.upper()}_EPS_BRIDGE_ATTRIBUTABLE_PROFIT_RECONCILIATION_REQUIRED")
                 declared_parent_profit, _declared_parent_profit_norm = _normalize_eps_bridge_measure(
-                    bridge.get("net_profit_attributable_cny"),
+                    bridge.get("net_profit_attributable"),
                     field=f"{name.upper()}_EPS_BRIDGE_NET_PROFIT_ATTRIBUTABLE_CNY",
-                    unit="CNY", evidence_by_id=evidence, unresolved_evidence_ids=unresolved,
+                    unit=currency, evidence_by_id=evidence, unresolved_evidence_ids=unresolved,
                     after_cutoff_evidence_ids=after, uncertain_timing_evidence_ids=uncertain,
                 )
                 if abs(attributable_profit - declared_parent_profit) > reconciliation_tolerance:
                     raise ValueError(f"{name.upper()}_EPS_BRIDGE_B4_NET_PROFIT_ATTRIBUTION_MISMATCH")
+                attributable_norm = _declared_parent_profit_norm
                 b4_profit_text = format(b4_profit, "f")
                 bridge_profit_basis = "B4_COMPANY_WIDE_NET_PROFIT_MINUS_EXPLICIT_ATTRIBUTION_ADJUSTMENT"
             elif source_mode == "INDEPENDENT_COMPANY_WIDE_BASELINE":
                 if driver_scope != "PROJECT_INCREMENTAL":
                     raise ValueError(f"{name.upper()}_EPS_BRIDGE_INDEPENDENT_BASELINE_REQUIRES_PROJECT_INCREMENTAL_B4_SCOPE")
                 attributable_profit, attributable_norm = _normalize_eps_bridge_measure(
-                    bridge.get("net_profit_attributable_cny"),
+                    bridge.get("net_profit_attributable"),
                     field=f"{name.upper()}_EPS_BRIDGE_NET_PROFIT_ATTRIBUTABLE_CNY",
                     unit="CNY", evidence_by_id=evidence, unresolved_evidence_ids=unresolved,
                     after_cutoff_evidence_ids=after, uncertain_timing_evidence_ids=uncertain,
@@ -1037,7 +1040,7 @@ def _evaluate_primary_eps_multiple_valuation(
                 + (shares_norm.get("evidence_refs") or [])
                 + ((adjustment_norm or {}).get("evidence_refs") or [])
                 + ((attributable_norm if source_mode == "INDEPENDENT_COMPANY_WIDE_BASELINE" else {}).get("evidence_refs") or [])
-                + (bridge.get("net_profit_attributable_cny", {}).get("evidence_refs") or [])
+                + (attributable_norm.get("evidence_refs") or [])
             ))
             normalized_derived_eps = {
                 "value": format(derived_eps, "f"), "unit": f"{currency}/share",
@@ -1054,7 +1057,8 @@ def _evaluate_primary_eps_multiple_valuation(
                 "share_count_basis": "WEIGHTED_AVERAGE_DILUTED_SHARES",
                 "b4_net_profit_cny": b4_profit_text,
                 "profit_attribution_adjustment_cny": adjustment_norm,
-                "net_profit_attributable_cny": format(attributable_profit, "f"),
+                "net_profit_attributable": attributable_norm,
+                "attributable_net_profit_calculated": format(attributable_profit, "f"),
                 "diluted_weighted_average_shares": shares_norm,
                 "derived_eps_per_share": format(derived_eps, "f"),
                 "declared_eps_per_share": format(declared_eps, "f"),
@@ -1106,7 +1110,7 @@ def _render_primary_eps_multiple_section(result: Mapping[str, Any], currency: st
         lines.extend([
             f"**{label} 情景**", f"- 情景理由：{row.get('rationale') or 'UNKNOWN'}",
             f"- EPS 来源/勾稽：{bridge.get('status', 'UNKNOWN')}；来源模式：{bridge.get('source_mode', 'UNKNOWN')}；期间：{bridge.get('earnings_period', 'UNKNOWN')}；项目包含状态：{bridge.get('includes_project', 'UNKNOWN')}",
-            f"- B4 公司整体净利润：{bridge.get('b4_net_profit_cny') or 'UNKNOWN'} CNY；归属上市公司股东净利润：{bridge.get('net_profit_attributable_cny') or 'UNKNOWN'} CNY；稀释加权平均股数：{(bridge.get('diluted_weighted_average_shares') or {}).get('value', 'UNKNOWN')}",
+            f"- B4 公司整体净利润：{bridge.get('b4_net_profit_cny') or 'UNKNOWN'} CNY；归属上市公司股东净利润：{(bridge.get('net_profit_attributable') or {}).get('value', 'UNKNOWN')} {(bridge.get('net_profit_attributable') or {}).get('unit', currency)}；稀释加权平均股数：{(bridge.get('diluted_weighted_average_shares') or {}).get('value', 'UNKNOWN')}",
             f"- 归属净利润/稀释股数复算 EPS：{bridge.get('derived_eps_per_share') or 'UNKNOWN'}；声明 EPS：{bridge.get('declared_eps_per_share') or 'UNKNOWN'}；差异：{bridge.get('declared_eps_minus_derived_eps') or 'UNKNOWN'}；容差：{bridge.get('eps_reconciliation_tolerance') or 'UNKNOWN'}",
             f"- EPS：{eps.get('value', 'UNKNOWN')} {eps.get('unit', currency + '/share')}；依据：{eps.get('basis', 'UNKNOWN')}",
             f"- P/E：{pe.get('value', 'UNKNOWN')}x；依据：{pe.get('basis', 'UNKNOWN')}",
@@ -3764,9 +3768,9 @@ def _template(
             "forecast_period": "UNKNOWN",
             "valuation_terminal_date": None,
             "scenarios": {
-                "bear": {"rationale": "", "earnings_bridge": {"schema_version": EPS_EARNINGS_BRIDGE_SCHEMA, "source_mode": "UNKNOWN", "earnings_period": "UNKNOWN", "profit_scope": "UNKNOWN", "includes_project": None, "share_count_basis": "UNKNOWN", "summary": "", "profit_attribution_adjustment_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "net_profit_attributable_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "diluted_weighted_average_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}}, "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}},
-                "base": {"rationale": "", "earnings_bridge": {"schema_version": EPS_EARNINGS_BRIDGE_SCHEMA, "source_mode": "UNKNOWN", "earnings_period": "UNKNOWN", "profit_scope": "UNKNOWN", "includes_project": None, "share_count_basis": "UNKNOWN", "summary": "", "profit_attribution_adjustment_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "net_profit_attributable_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "diluted_weighted_average_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}}, "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}},
-                "bull": {"rationale": "", "earnings_bridge": {"schema_version": EPS_EARNINGS_BRIDGE_SCHEMA, "source_mode": "UNKNOWN", "earnings_period": "UNKNOWN", "profit_scope": "UNKNOWN", "includes_project": None, "share_count_basis": "UNKNOWN", "summary": "", "profit_attribution_adjustment_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "net_profit_attributable_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "diluted_weighted_average_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}}, "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}}
+                "bear": {"rationale": "", "earnings_bridge": {"schema_version": EPS_EARNINGS_BRIDGE_SCHEMA, "source_mode": "UNKNOWN", "earnings_period": "UNKNOWN", "profit_scope": "UNKNOWN", "includes_project": None, "share_count_basis": "UNKNOWN", "summary": "", "profit_attribution_adjustment_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "net_profit_attributable": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "diluted_weighted_average_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}}, "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}},
+                "base": {"rationale": "", "earnings_bridge": {"schema_version": EPS_EARNINGS_BRIDGE_SCHEMA, "source_mode": "UNKNOWN", "earnings_period": "UNKNOWN", "profit_scope": "UNKNOWN", "includes_project": None, "share_count_basis": "UNKNOWN", "summary": "", "profit_attribution_adjustment_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "net_profit_attributable": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "diluted_weighted_average_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}}, "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}},
+                "bull": {"rationale": "", "earnings_bridge": {"schema_version": EPS_EARNINGS_BRIDGE_SCHEMA, "source_mode": "UNKNOWN", "earnings_period": "UNKNOWN", "profit_scope": "UNKNOWN", "includes_project": None, "share_count_basis": "UNKNOWN", "summary": "", "profit_attribution_adjustment_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "net_profit_attributable": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "diluted_weighted_average_shares": {"value": None, "unit": "shares", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}}, "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}}
             }
         },
         "sotp_valuation": {
@@ -3939,8 +3943,8 @@ def create_pilot_template(
         "\\n\\nEPS_MULTIPLE 主估值计算契约（IIOS-EPS-MULTIPLE-VALUATION-0.1）："
         "必须保留 eps_multiple_valuation 节点；forecast_period 与 operating_driver_forecast.forecast_period 一致，valuation_terminal_date 与 forecast_valuation.valuation_terminal_date 一致。"
         "Bear/Base/Bull 每个情景除 rationale、eps_per_share 与 pe_multiple_x 外，必须填 earnings_bridge，schema_version=IIOS-EPS-EARNINGS-BRIDGE-0.1；其利润范围必须是 COMPANY_WIDE_ATTRIBUTABLE_TO_LISTED_SHAREHOLDERS，earnings_period 与 operating_driver_forecast.forecast_period 一致，includes_project 明确为 true/false，share_count_basis 固定为 WEIGHTED_AVERAGE_DILUTED_SHARES。"
-        "如果 operating_driver_forecast.scope=COMPANY_WIDE，且 B4 各情景 financial_outputs_decision_usable=true，应使用 source_mode=B4_COMPANY_WIDE_NET_PROFIT_RECONCILED：本地读取 B4 net_profit_cny，扣除显式 profit_attribution_adjustment_cny，得到上市公司股东归属净利润；并填写 net_profit_attributable_cny 与此数值对账。profit_attribution_adjustment_cny 的单位 CNY、data_class/basis/evidence_refs 必须完整，值可正/负/零但不得无依据补零。"
-        "如果 B4.scope=PROJECT_INCREMENTAL，不能拿该项目的利润当成公司整体利润；可使用 source_mode=INDEPENDENT_COMPANY_WIDE_BASELINE，但必须另行填写整个上市公司股东归属净利润 net_profit_attributable_cny、稀释加权平均股数及充分的来源/假设依据，明确该利润是公司整体基准而不是项目增量，项目只允许通过有效 B5 再单独传导。其他 B4 scope 或 B4 公司整体财务桥未通过时，保留 UNKNOWN，不得绕过 B4 缺口改用未勾稽的自由文本 EPS。"
+        "如果 operating_driver_forecast.scope=COMPANY_WIDE，且 B4 各情景 financial_outputs_decision_usable=true，应使用 source_mode=B4_COMPANY_WIDE_NET_PROFIT_RECONCILED：本地读取 B4 net_profit_cny，扣除显式 profit_attribution_adjustment_cny，得到上市公司股东归属净利润；并填写 net_profit_attributable 与此数值对账。profit_attribution_adjustment_cny 的单位 CNY、data_class/basis/evidence_refs 必须完整，值可正/负/零但不得无依据补零。"
+        "如果 B4.scope=PROJECT_INCREMENTAL，不能拿该项目的利润当成公司整体利润；可使用 source_mode=INDEPENDENT_COMPANY_WIDE_BASELINE，但必须另行填写整个上市公司股东归属净利润 net_profit_attributable、稀释加权平均股数及充分的来源/假设依据，明确该利润是公司整体基准而不是项目增量，项目只允许通过有效 B5 再单独传导。其他 B4 scope 或 B4 公司整体财务桥未通过时，保留 UNKNOWN，不得绕过 B4 缺口改用未勾稽的自由文本 EPS。"
         "本地独立复算 EPS = 归属净利润 ÷ 稀释加权平均股数，并对账声明 eps_per_share；容差 max(0.01 元/股, 复算 EPS 绝对值的 1%)。B4 模式还须满足 B4 公司整体净利润 = 归属净利润 + attribution adjustment，容差 max(1 元, B4 净利润绝对值百万分之一)。若声明 EPS、利润归属、期间、稀释股数口径、项目包含状态有冲突，EPS_MULTIPLE 不得进入主估值/回报/目标入场价/B6。"
         "本地程序会以已勾稽 EPS × P/E 复算终值，并以 Base 复算值作为主估值锚；forecast_valuation 中模型直接填写的终值和锚只保留为未信任诊断。Bear/Base/Bull 本地复算后须满足终值次序 Bear≤Base≤Bull。任一输入缺失、单位/期间/来源/利润桥/股数错误或情景次序不成立时，回报、目标入场价和 B6 必须保持 UNKNOWN。该计算不证明预测事实或倍数合理，也不代表正式估值准入。"
     )
