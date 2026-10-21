@@ -41,6 +41,18 @@ def _bundle(
         "pilot_id": run_dir.name,
         "status": acceptance.PILOT_STATUS,
         **{key: {} for key in acceptance.REQUIRED_ANALYSIS_FIELDS},
+        "price_input": {
+            "entry_assumption": {
+                "schema_version": "IIOS-ENTRY-PRICE-ASSUMPTION-0.1",
+                "mode": "HYPOTHETICAL_ENTRY_AT_INPUT_PRICE_ON_CUTOFF_DATE",
+                "hypothetical_entry_date": "2026-10-15",
+                "actual_execution_status": "NOT_CONFIRMED",
+                "actual_execution_confirmed": False,
+                "execution_guaranteed": False,
+                "dividend_entitlement_status": "CONDITIONAL_ON_HYPOTHETICAL_ENTRY",
+                "actual_dividend_entitlement_confirmed": False,
+            }
+        },
         "decision": {"provisional_action": "REVIEW_REQUIRED"},
         "valuation_transmission": {"status": "NOT_LINKED"},
         "price_zone_sensitivity": {"status": "UNKNOWN"},
@@ -196,6 +208,15 @@ def test_inspect_bundle_rejects_wrong_eps_multiple_schema_or_method(tmp_path: Pa
     analysis["eps_multiple_valuation"]["schema_version"] = "wrong-schema"
     _write_json(run_dir / "analysis.json", analysis)
     with pytest.raises(acceptance.AcceptanceError, match="EPS_MULTIPLE_VALUATION_MISSING_OR_INVALID"):
+        acceptance._inspect_bundle(run_dir, expected_replay_of=None)
+
+
+def test_inspect_bundle_rejects_missing_or_unsafe_entry_price_assumption(tmp_path: Path) -> None:
+    run_dir = _bundle(tmp_path)
+    analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
+    analysis["price_input"]["entry_assumption"]["actual_execution_confirmed"] = True
+    _write_json(run_dir / "analysis.json", analysis)
+    with pytest.raises(acceptance.AcceptanceError, match="ENTRY_PRICE_ASSUMPTION_MISSING_OR_UNSAFE"):
         acceptance._inspect_bundle(run_dir, expected_replay_of=None)
 
 
