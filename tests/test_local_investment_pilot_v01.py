@@ -1638,7 +1638,6 @@ def test_bear_base_bull_total_wealth_ordering_is_required():
     assert analysis["return_metrics_reason"] == "PRIMARY_VALUATION_MODEL_NOT_ELIGIBLE:EPS_MULTIPLE_CALCULATION_NOT_ELIGIBLE"
     assert "EPS_MULTIPLE_SCENARIO_ORDERING_INCONSISTENT" in analysis["valuation_model_consistency"]["issues"]
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
-    assert "EPS_MULTIPLE_SCENARIO_ORDERING_INCONSISTENT" in analysis["valuation_model_consistency"]["issues"]
 
 
 
