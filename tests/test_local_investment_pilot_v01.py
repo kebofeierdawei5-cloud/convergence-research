@@ -2038,6 +2038,142 @@ def test_run_receipt_binds_exact_input_analysis_and_report_bytes(tmp_path):
     assert all(item["byte_size"] >= 0 and len(item["sha256"]) == 64 for item in checked["verified_files"])
 
 
+def _write_captured_research_input(tmp_path: Path) -> tuple[Path, Path, tuple[int, int, str]]:
+    response_path = tmp_path / "chatgpt-response-original.txt"
+    response_text = json.dumps(_payload(), ensure_ascii=False, indent=2)
+    response_path.write_text(response_text, encoding="utf-8")
+    signature = pilot._response_file_signature(response_path)
+    assert signature is not None
+    payload = _payload()
+    payload["_local_research_response_provenance"] = {
+        "schema_version": pilot.LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
+        "status": "CAPTURED_RAW_CHATGPT_RESPONSE",
+        "source_filename": response_path.name,
+        "sha256": signature[2],
+        "byte_size": signature[0],
+        "capture_stage": "VALIDATED_RAW_RESPONSE_BEFORE_LOCAL_OPERATOR_FIELD_RECOVERY",
+        "validation_status": "PASSED",
+        "raw_response_file_modified_by_runner": False,
+    }
+    input_path = _write_input(tmp_path, payload)
+    return input_path, response_path, signature
+
+
+def test_run_receipt_preserves_exact_raw_chatgpt_response_and_hash(tmp_path: Path):
+    input_path, response_path, signature = _write_captured_research_input(tmp_path)
+    result = run_local_investment_pilot(
+        input_path=input_path,
+        output_root=tmp_path / "private-runs",
+        research_response_path=response_path,
+        expected_research_response_sha256=signature[2],
+        expected_research_response_byte_size=signature[0],
+    )
+    run_dir = Path(result["run_dir"])
+    raw_path = run_dir / pilot.RAW_RESEARCH_RESPONSE_FILENAME
+    receipt = json.loads((run_dir / "pilot_receipt.json").read_text(encoding="utf-8"))
+    assert raw_path.read_bytes() == response_path.read_bytes()
+    assert raw_path.stat().st_mode & 0o077 == 0
+    fp = pilot._fingerprint_file(raw_path)
+    assert receipt["research_response_provenance"]["status"] == "CAPTURED_RAW_CHATGPT_RESPONSE"
+    assert receipt["research_response_provenance"]["sha256"] == fp["sha256"] == signature[2]
+    assert receipt["research_response_provenance"]["byte_size"] == fp["byte_size"] == signature[0]
+    assert receipt["research_response_provenance"]["origin_pilot_id"] == result["pilot_id"]
+    assert receipt["file_manifest"][pilot.RAW_RESEARCH_RESPONSE_FILENAME] == fp
+    analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
+    report = (run_dir / "report.md").read_text(encoding="utf-8")
+    assert analysis["research_response_provenance"]["sha256"] == fp["sha256"]
+    assert analysis["research_response_provenance"]["byte_size"] == fp["byte_size"]
+    assert "原始 ChatGPT 响应来源链" in report
+    assert fp["sha256"] in report
+    verified = verify_local_pilot_bundle(run_dir)
+    assert pilot.RAW_RESEARCH_RESPONSE_FILENAME in {item["name"] for item in verified["verified_files"]}
+
+
+def test_replay_copies_raw_chatgpt_response_from_hash_verified_parent(tmp_path: Path):
+    input_path, response_path, signature = _write_captured_research_input(tmp_path)
+    output_root = tmp_path / "private-runs"
+    first = run_local_investment_pilot(
+        input_path=input_path,
+        output_root=output_root,
+        research_response_path=response_path,
+        expected_research_response_sha256=signature[2],
+        expected_research_response_byte_size=signature[0],
+    )
+    replay = run_local_investment_pilot(
+        input_path=Path(first["run_dir"]) / "input.json",
+        output_root=output_root,
+        replay_of=first["pilot_id"],
+    )
+    first_dir, replay_dir = Path(first["run_dir"]), Path(replay["run_dir"])
+    first_raw = first_dir / pilot.RAW_RESEARCH_RESPONSE_FILENAME
+    replay_raw = replay_dir / pilot.RAW_RESEARCH_RESPONSE_FILENAME
+    replay_receipt = json.loads((replay_dir / "pilot_receipt.json").read_text(encoding="utf-8"))
+    assert replay["status"] == "PILOT_REPLAY_MATCHED"
+    assert replay["replay_comparison"]["status"] == "MATCH"
+    assert replay_raw.read_bytes() == first_raw.read_bytes() == response_path.read_bytes()
+    assert replay_receipt["research_response_provenance"]["status"] == "INHERITED_FROM_VERIFIED_PRIOR_RUN"
+    assert replay_receipt["research_response_provenance"]["origin_pilot_id"] == first["pilot_id"]
+    assert replay_receipt["research_response_provenance"]["source_pilot_id"] == first["pilot_id"]
+    first_analysis = json.loads((first_dir / "analysis.json").read_text(encoding="utf-8"))
+    replay_analysis = json.loads((replay_dir / "analysis.json").read_text(encoding="utf-8"))
+    first_report = (first_dir / "report.md").read_text(encoding="utf-8")
+    replay_report = (replay_dir / "report.md").read_text(encoding="utf-8")
+    assert first_analysis["research_response_provenance"] == replay_analysis["research_response_provenance"]
+    assert first_report == replay_report
+    assert verify_local_pilot_bundle(replay_dir)["status"] == "PILOT_BUNDLE_HASH_CHECK_PASS"
+
+
+def test_guided_run_rejects_changed_response_after_validation_signature(tmp_path: Path):
+    input_path, response_path, signature = _write_captured_research_input(tmp_path)
+    response_path.write_text(response_path.read_text(encoding="utf-8") + "\nchanged", encoding="utf-8")
+    with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_RESPONSE_CHANGED_AFTER_VALIDATION"):
+        run_local_investment_pilot(
+            input_path=input_path,
+            output_root=tmp_path / "private-runs",
+            research_response_path=response_path,
+            expected_research_response_sha256=signature[2],
+            expected_research_response_byte_size=signature[0],
+        )
+
+
+def test_read_only_bundle_checker_blocks_changed_raw_chatgpt_response_bytes(tmp_path: Path):
+    input_path, response_path, signature = _write_captured_research_input(tmp_path)
+    result = run_local_investment_pilot(
+        input_path=input_path,
+        output_root=tmp_path / "private-runs",
+        research_response_path=response_path,
+        expected_research_response_sha256=signature[2],
+        expected_research_response_byte_size=signature[0],
+    )
+    raw_path = Path(result["run_dir"]) / pilot.RAW_RESEARCH_RESPONSE_FILENAME
+    raw_path.write_bytes(raw_path.read_bytes() + b"tampered")
+
+    with pytest.raises(LocalInvestmentPilotError, match="RUN_BUNDLE_HASH_MISMATCH:chatgpt_response_raw.txt"):
+        verify_local_pilot_bundle(Path(result["run_dir"]))
+
+
+def test_replay_comparison_includes_raw_research_response_provenance():
+    before = {"research_response_provenance": {"status": "RAW_CHATGPT_RESPONSE_HASH_BOUND", "sha256": "a" * 64}}
+    after = {"research_response_provenance": {"status": "RAW_CHATGPT_RESPONSE_HASH_BOUND", "sha256": "b" * 64}}
+    comparison = pilot._replay_comparison(before, after)
+    assert comparison["status"] == "MISMATCH"
+    assert "research_response_provenance" in comparison["mismatched_fields"]
+
+
+def test_input_cannot_claim_raw_chatgpt_response_without_captured_file(tmp_path: Path):
+    payload = _payload()
+    payload["_local_research_response_provenance"] = {
+        "status": "CAPTURED_RAW_CHATGPT_RESPONSE",
+        "sha256": "a" * 64,
+        "byte_size": 10,
+    }
+    with pytest.raises(LocalInvestmentPilotError, match="INPUT_CLAIMS_CHATGPT_RESPONSE_WITHOUT_VERIFIABLE_CAPTURE"):
+        run_local_investment_pilot(
+            input_path=_write_input(tmp_path, payload),
+            output_root=tmp_path / "private-runs",
+        )
+
+
 @pytest.mark.parametrize("filename", ["input.json", "analysis.json", "report.md"])
 def test_read_only_bundle_checker_blocks_changed_output_bytes(tmp_path, filename):
     result = run_local_investment_pilot(

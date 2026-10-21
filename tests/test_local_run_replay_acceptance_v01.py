@@ -575,6 +575,35 @@ def test_acceptance_bundle_includes_first_run_replay_logs_and_verified_manifest(
         replay_of=original.name,
         run_dir_name="local-pilot-REPLAY-20261019T120100Z",
     )
+
+    # A fresh guided run must keep the exact ChatGPT response in each run bundle.
+    # The Replay copy is byte-identical and is explicitly linked to the original.
+    raw_bytes = b'{ "response": "synthetic raw ChatGPT response" }'
+    raw_fp = {"sha256": hashlib.sha256(raw_bytes).hexdigest(), "byte_size": len(raw_bytes)}
+    for run_dir, response_status, origin_id, source_id in (
+        (original, "CAPTURED_RAW_CHATGPT_RESPONSE", original.name, original.name),
+        (replay, "INHERITED_FROM_VERIFIED_PRIOR_RUN", original.name, original.name),
+    ):
+        raw_file = run_dir / acceptance.RAW_RESEARCH_RESPONSE_FILENAME
+        raw_file.write_bytes(raw_bytes)
+        if os.name != "nt":
+            raw_file.chmod(0o600)
+        receipt_path = run_dir / "pilot_receipt.json"
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["file_manifest"][acceptance.RAW_RESEARCH_RESPONSE_FILENAME] = dict(raw_fp)
+        receipt["research_response_provenance"] = {
+            "schema_version": "IIOS-LOCAL-RESEARCH-RESPONSE-PROVENANCE-0.1",
+            "status": response_status,
+            "file": acceptance.RAW_RESEARCH_RESPONSE_FILENAME,
+            "source_filename": "synthetic-response.txt",
+            "sha256": raw_fp["sha256"],
+            "byte_size": raw_fp["byte_size"],
+            "origin_pilot_id": origin_id,
+            "source_pilot_id": source_id,
+            "capture_method": "SYNTHETIC_TEST_FIXTURE",
+            "raw_response_modified_by_runner": False,
+        }
+        _write_json(receipt_path, receipt)
     monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
 
     log_root = tmp_path / "acceptance-logs"
@@ -615,6 +644,11 @@ def test_acceptance_bundle_includes_first_run_replay_logs_and_verified_manifest(
         assert replay_analysis in names
         assert f"first_run/{original.name}/pilot_receipt.json" in names
         assert f"replay_run/{replay.name}/pilot_receipt.json" in names
+        first_raw = f"first_run/{original.name}/{acceptance.RAW_RESEARCH_RESPONSE_FILENAME}"
+        replay_raw = f"replay_run/{replay.name}/{acceptance.RAW_RESEARCH_RESPONSE_FILENAME}"
+        assert first_raw in names
+        assert replay_raw in names
+        assert archive.read(first_raw) == archive.read(replay_raw) == raw_bytes
         assert "acceptance_logs/current-run.log" in names
         assert "acceptance_summary.json" in names
         assert "bundle_manifest.json" in names
@@ -624,6 +658,9 @@ def test_acceptance_bundle_includes_first_run_replay_logs_and_verified_manifest(
         assert summary["technical_status"] == "PASS"
         assert summary["first_run"]["pilot_id"] == original.name
         assert summary["replay_run"]["pilot_id"] == replay.name
+        assert summary["first_run"]["research_response_provenance"]["status"] == "CAPTURED_RAW_CHATGPT_RESPONSE"
+        assert summary["replay_run"]["research_response_provenance"]["status"] == "INHERITED_FROM_VERIFIED_PRIOR_RUN"
+        assert summary["first_run"]["research_response_provenance"]["sha256"] == raw_fp["sha256"]
         assert summary["replay_comparison"] == comparison
         assert summary["formal_decision_created"] is False
         assert summary["execution_authorized"] is False
