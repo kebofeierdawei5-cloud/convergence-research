@@ -180,9 +180,9 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
             "forecast_period": f"{forecast_year}FY",
             "valuation_terminal_date": f"{forecast_year}-12-31",
             "scenarios": {
-                "bear": {"rationale": "Synthetic bear EPS and multiple.", "eps_per_share": {"value": "10", "unit": "CNY/share", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic EPS fixture.", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": "12", "unit": "x", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic low multiple.", "evidence_refs": [], "note": ""}},
-                "base": {"rationale": "Synthetic base EPS and multiple.", "eps_per_share": {"value": "10", "unit": "CNY/share", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic EPS fixture.", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": "15", "unit": "x", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic base multiple.", "evidence_refs": [], "note": ""}},
-                "bull": {"rationale": "Synthetic bull EPS and multiple.", "eps_per_share": {"value": "10", "unit": "CNY/share", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic EPS fixture.", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": "18", "unit": "x", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic high multiple.", "evidence_refs": [], "note": ""}}
+                "bear": {"rationale": "Synthetic bear EPS and multiple.", "eps_per_share": {"value": "10", "unit": "CNY/share", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic EPS fixture.", "assumption_derivation": "Synthetic, explicitly declared analyst scenario EPS; not an issuer forecast and not independently bridged to company earnings.", "earnings_bridge": None, "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": "12", "unit": "x", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic low multiple.", "evidence_refs": [], "note": ""}},
+                "base": {"rationale": "Synthetic base EPS and multiple.", "eps_per_share": {"value": "10", "unit": "CNY/share", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic EPS fixture.", "assumption_derivation": "Synthetic, explicitly declared analyst scenario EPS; not an issuer forecast and not independently bridged to company earnings.", "earnings_bridge": None, "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": "15", "unit": "x", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic base multiple.", "evidence_refs": [], "note": ""}},
+                "bull": {"rationale": "Synthetic bull EPS and multiple.", "eps_per_share": {"value": "10", "unit": "CNY/share", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic EPS fixture.", "assumption_derivation": "Synthetic, explicitly declared analyst scenario EPS; not an issuer forecast and not independently bridged to company earnings.", "earnings_bridge": None, "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": "18", "unit": "x", "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic high multiple.", "evidence_refs": [], "note": ""}}
             }
         },
         "sotp_valuation": {
@@ -3970,6 +3970,230 @@ def test_primary_eps_multiple_missing_structured_input_blocks_return_and_entry_p
     assert analysis["return_metrics"] is None
     assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
     assert "EPS_MULTIPLE_CALCULATION_NOT_ELIGIBLE" in report
+
+
+def _b27_eps_bridge_payload(*, declared_eps=None, source_class="EXCHANGE_PRIMARY", project_treatment="NO_PROJECT_INCREMENTAL_ADJUSTMENT", b5_status="NOT_LINKED"):
+    payload = _payload(cutoff="2026-10-10")
+    raw = payload["eps_multiple_valuation"]
+    payload["case"]["currency"] = "CNY"
+    for name in ("bear", "base", "bull"):
+        eps = raw["scenarios"][name]["eps_per_share"]
+        eps["value"] = str((declared_eps or {}).get(name, "10"))
+        eps["unit"] = "CNY/share"
+        eps["data_class"] = "ISSUER_FORECAST"
+        eps["basis"] = "Synthetic declared issuer EPS fixture for bridge unit tests; not real company evidence."
+        eps["assumption_derivation"] = ""
+        eps["evidence_refs"] = ["E1"]
+        eps["earnings_bridge"] = {
+            "schema_version": "IIOS-EPS-EARNINGS-BRIDGE-0.1",
+            "calculation_method": "B4_NET_PROFIT_PROXY_MINUS_NCI_PLUS_ADJUSTMENTS_DIVIDED_BY_DILUTED_SHARES",
+            "forecast_period": raw["forecast_period"],
+            "valuation_terminal_date": raw["valuation_terminal_date"],
+            "scope": "COMPANY_WIDE",
+            "project_profit_treatment": project_treatment,
+            "non_controlling_interests_after_tax": {
+                "value": "0", "unit": "CNY", "measure": "NON_CONTROLLING_INTERESTS_AFTER_TAX",
+                "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic explicit zero for test only.",
+                "evidence_refs": [], "forecast_period": raw["forecast_period"], "note": "",
+            },
+            "other_after_tax_attribution_adjustment": {
+                "value": "0", "unit": "CNY", "measure": "OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT",
+                "data_class": "ANALYST_ASSUMPTION", "basis": "Synthetic explicit zero adjustment for test only.",
+                "evidence_refs": [], "forecast_period": raw["forecast_period"], "note": "",
+            },
+            "diluted_shares": {
+                "value": "1000000", "unit": "shares", "measure": "WEIGHTED_AVERAGE_DILUTED_SHARES",
+                "data_class": "ISSUER_FORECAST", "basis": "Synthetic same-period diluted share count for test only.",
+                "evidence_refs": ["E1"], "forecast_period": raw["forecast_period"], "note": "",
+            },
+        }
+    return {
+        "raw": raw,
+        "operating_driver_forecast": {
+            "scope": "COMPANY_WIDE",
+            "forecast_period": raw["forecast_period"],
+            "status": "SCENARIOS_CALCULATED",
+            "scenarios": {
+                name: {"net_profit_cny": "10000000", "financial_outputs_decision_usable": True}
+                for name in ("bear", "base", "bull")
+            },
+        },
+        "valuation_transmission": {"status": b5_status, "scenarios": {}},
+        "operator_baseline_includes_project": True if project_treatment == "INCLUDED_IN_COMPANY_WIDE_BASELINE" else False if project_treatment == "EXCLUDED_FROM_COMPANY_WIDE_BASELINE" else None,
+        "evidence_register": [{
+            "source_id": "E1",
+            "source_class": source_class,
+            "source_domain_class_status": (
+                "OFFICIAL_EXCHANGE_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED"
+                if source_class == "EXCHANGE_PRIMARY"
+                else "OFFICIAL_REGULATOR_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED"
+                if source_class == "REGULATOR_PRIMARY"
+                else "SOURCE_CLASS_NOT_PRIMARY"
+            ),
+            "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED",
+        }],
+    }
+
+
+def _run_b27_eps_bridge(case, unresolved=None):
+    return pilot._evaluate_eps_earnings_bridge(
+        case["raw"],
+        selected_model_family="EPS_MULTIPLE",
+        expected_forecast_period=case["raw"]["forecast_period"],
+        expected_terminal_date=case["raw"]["valuation_terminal_date"],
+        expected_currency="CNY",
+        operating_driver_forecast=case["operating_driver_forecast"],
+        valuation_transmission=case["valuation_transmission"],
+        operator_baseline_includes_project=case["operator_baseline_includes_project"],
+        evidence_register=case["evidence_register"],
+        unresolved_evidence_ids=unresolved or [],
+        after_cutoff_evidence_ids=[],
+        uncertain_timing_evidence_ids=[],
+    )
+
+
+def test_b27_issuer_eps_bridge_matches_company_net_profit_proxy_and_diluted_shares():
+    case = _b27_eps_bridge_payload()
+    bridge = _run_b27_eps_bridge(case)
+
+    assert bridge["status"] == "CALCULATED"
+    assert bridge["primary_eps_price_calculation_eligible"] is True
+    base = bridge["scenarios"]["base"]
+    assert base["status"] == "CALCULATED"
+    assert base["net_profit_attributable_to_listed_shareholders"]["arithmetic"] == "10000000 - 0 + (0) = 10000000"
+    assert base["arithmetic"] == "10000000 CNY / 1000000 shares = 10 CNY/share"
+    assert base["declared_eps_per_share"] == "10"
+    assert base["eps_match"] is True
+    assert base["formal_evidence_pit_admission"] is False
+
+
+def test_b27_declared_eps_mismatch_blocks_the_eps_multiple_adapter_without_overwriting():
+    case = _b27_eps_bridge_payload(declared_eps={"bear": "10", "base": "10.1", "bull": "10"})
+    bridge = _run_b27_eps_bridge(case)
+
+    assert bridge["status"] == "EPS_MISMATCH"
+    assert bridge["scenarios"]["base"]["status"] == "EPS_MISMATCH"
+    assert bridge["scenarios"]["base"]["declared_eps_per_share"] == "10.1"
+    assert bridge["scenarios"]["base"]["calculated_eps_per_share"] == "10"
+    adapter = pilot._evaluate_primary_eps_multiple_valuation(
+        case["raw"],
+        selected_model_family="EPS_MULTIPLE",
+        expected_forecast_period=case["raw"]["forecast_period"],
+        expected_terminal_date=case["raw"]["valuation_terminal_date"],
+        expected_currency="CNY",
+        evidence_register=case["evidence_register"],
+        eps_earnings_bridge=bridge,
+    )
+    assert adapter["status"] == "INPUT_INCOMPLETE_OR_INVALID"
+    assert any("BASE_EPS_EARNINGS_BRIDGE_NOT_ELIGIBLE:EPS_MISMATCH" in issue for issue in adapter["issues"])
+
+
+def test_b27_issuer_eps_bridge_fails_closed_on_unverified_source_class_or_domain():
+    case = _b27_eps_bridge_payload(source_class="SECONDARY_MEDIA")
+    bridge = _run_b27_eps_bridge(case)
+
+    assert bridge["status"] == "NOT_LINKED"
+    assert any("ISSUER_FORECAST_SOURCE_CLASS_OR_DOMAIN_NOT_VERIFIED:E1" in issue for issue in bridge["issues"])
+    assert bridge["primary_eps_price_calculation_eligible"] is False
+
+
+def test_b27_project_profit_cannot_be_double_counted_over_an_applied_b5_increment():
+    case = _b27_eps_bridge_payload(
+        project_treatment="INCLUDED_IN_COMPANY_WIDE_BASELINE",
+        b5_status="APPLIED_TO_PER_SHARE_SCENARIOS",
+    )
+    bridge = _run_b27_eps_bridge(case)
+
+    assert bridge["status"] == "NOT_LINKED"
+    assert any("PROJECT_INCREMENTAL_PROFIT_DOUBLE_COUNT_RISK" in issue for issue in bridge["issues"])
+    assert bridge["primary_eps_price_calculation_eligible"] is False
+
+
+def test_b27_eps_bridge_requires_company_wide_b4_scope_and_same_period_diluted_shares():
+    case = _b27_eps_bridge_payload()
+    case["operating_driver_forecast"]["scope"] = "PROJECT_INCREMENTAL"
+    bridge = _run_b27_eps_bridge(case)
+    assert bridge["status"] == "NOT_LINKED"
+    assert any("EPS_BRIDGE_CANNOT_USE_NON_COMPANY_WIDE_B4:PROJECT_INCREMENTAL" in issue for issue in bridge["issues"])
+
+    case = _b27_eps_bridge_payload()
+    case["raw"]["scenarios"]["base"]["eps_per_share"]["earnings_bridge"]["diluted_shares"]["forecast_period"] = "2026FY"
+    bridge = _run_b27_eps_bridge(case)
+    assert bridge["status"] == "NOT_LINKED"
+    assert any("WEIGHTED_AVERAGE_DILUTED_SHARES_FORECAST_PERIOD_MISMATCH" in issue for issue in bridge["issues"])
+
+
+def test_b27_hkd_eps_without_fx_contract_remains_assumption_only_not_cny_calculation():
+    case = _b27_eps_bridge_payload()
+    raw = case["raw"]
+    for name in ("bear", "base", "bull"):
+        eps = raw["scenarios"][name]["eps_per_share"]
+        eps["unit"] = "HKD/share"
+        eps["data_class"] = "ANALYST_ASSUMPTION"
+        eps["basis"] = "Synthetic HKD analyst scenario assumption."
+        eps["assumption_derivation"] = "A disclosed hypothetical EPS path in HKD; no CNY-to-HKD conversion is asserted."
+        eps["evidence_refs"] = []
+        eps["earnings_bridge"] = None
+
+    bridge = pilot._evaluate_eps_earnings_bridge(
+        raw,
+        selected_model_family="EPS_MULTIPLE",
+        expected_forecast_period=raw["forecast_period"],
+        expected_terminal_date=raw["valuation_terminal_date"],
+        expected_currency="HKD",
+        operating_driver_forecast=case["operating_driver_forecast"],
+        valuation_transmission=case["valuation_transmission"],
+        operator_baseline_includes_project=None,
+        evidence_register=[],
+    )
+    assert bridge["status"] == "ASSUMPTION_ONLY"
+    assert bridge["primary_eps_price_calculation_eligible"] is True
+    assert bridge["scenarios"]["base"]["status"] == "ASSUMPTION_ONLY"
+    assert "FX" in bridge["scenarios"]["base"]["note"]
+
+
+def test_b27_eps_multiple_adapter_rejects_issuer_pe_with_unverified_source_domain():
+    case = _b27_eps_bridge_payload()
+    bridge = _run_b27_eps_bridge(case)
+    assert bridge["status"] == "CALCULATED"
+
+    case["raw"]["scenarios"]["base"]["pe_multiple_x"]["data_class"] = "ISSUER_FORECAST"
+    case["raw"]["scenarios"]["base"]["pe_multiple_x"]["evidence_refs"] = ["E2"]
+    case["evidence_register"].append({
+        "source_id": "E2",
+        "source_class": "SECONDARY_MEDIA",
+        "source_domain_class_status": "SOURCE_CLASS_NOT_PRIMARY",
+        "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED",
+    })
+    adapter = pilot._evaluate_primary_eps_multiple_valuation(
+        case["raw"],
+        selected_model_family="EPS_MULTIPLE",
+        expected_forecast_period=case["raw"]["forecast_period"],
+        expected_terminal_date=case["raw"]["valuation_terminal_date"],
+        expected_currency="CNY",
+        evidence_register=case["evidence_register"],
+        eps_earnings_bridge=bridge,
+    )
+    assert adapter["status"] == "INPUT_INCOMPLETE_OR_INVALID"
+    assert any("BASE_PE_MULTIPLE_X_ISSUER_FORECAST_SOURCE_CLASS_OR_DOMAIN_NOT_VERIFIED:E2" in issue for issue in adapter["issues"])
+
+
+def test_b27_missing_issuer_bridge_blocks_primary_eps_price_path():
+    payload = _payload()
+    for name in ("bear", "base", "bull"):
+        eps = payload["eps_multiple_valuation"]["scenarios"][name]["eps_per_share"]
+        eps["data_class"] = "ISSUER_FORECAST"
+        eps["evidence_refs"] = ["E1"]
+        eps["earnings_bridge"] = None
+
+    analysis, report = _analyse(payload, "TEST-B27-ISSUER-EPS-BRIDGE-MISSING")
+
+    assert analysis["eps_earnings_bridge"]["status"] == "NOT_LINKED"
+    assert analysis["eps_multiple_valuation"]["status"] == "INPUT_INCOMPLETE_OR_INVALID"
+    assert analysis["valuation_model_consistency"]["primary_model_price_calculation_eligible"] is False
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert "ISSUER_FORECAST_EARNINGS_BRIDGE_REQUIRED" in report
 
 
 def test_sotp_adapter_computes_segment_values_parent_adjustments_and_per_share_value():
