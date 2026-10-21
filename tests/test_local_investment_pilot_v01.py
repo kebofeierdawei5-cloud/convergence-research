@@ -1635,6 +1635,7 @@ def test_bear_base_bull_total_wealth_ordering_is_required():
     analysis, report = _analyse(payload, "TEST-SCENARIO-ORDER")
     assert analysis["return_metrics"] is None
     assert analysis["return_metrics_reason"] == "PRIMARY_VALUATION_MODEL_NOT_ELIGIBLE:EPS_MULTIPLE_CALCULATION_NOT_ELIGIBLE"
+    assert "EPS_MULTIPLE_SCENARIO_ORDERING_INCONSISTENT" in analysis["valuation_model_consistency"]["issues"]
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
     assert "SCENARIO_WEALTH_ORDERING_INCONSISTENT" in analysis["decision"]["gating_issues"]
 
