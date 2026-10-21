@@ -4315,6 +4315,7 @@ def _write_run(
         # Keep a stable, analysis-level link to the byte-exact raw response. Do
         # not include a run-specific captured/inherited status here, otherwise
         # the same evidence would cause artificial first-run/Replay drift.
+        # Record only the source basename in outputs; never expose its absolute private path.
         analysis["research_response_provenance"] = {
             "schema_version": LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
             "status": "RAW_CHATGPT_RESPONSE_HASH_BOUND",
