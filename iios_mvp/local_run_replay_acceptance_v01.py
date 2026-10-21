@@ -47,6 +47,7 @@ REQUIRED_ANALYSIS_FIELDS = (
     "valuation_transmission",
     "sotp_valuation",
     "eps_multiple_valuation",
+    "eps_earnings_bridge",
     "valuation_model_consistency",
     "valuation_timing",
     "return_metrics",
@@ -507,6 +508,51 @@ def _inspect_bundle(run_dir: Path, *, expected_replay_of: str | None = None) -> 
         or (eps_multiple.get("status") == "CALCULATED" and set(eps_multiple.get("scenarios", {})) != {"bear", "base", "bull"})
     ):
         raise AcceptanceError(f"EPS_MULTIPLE_VALUATION_MISSING_OR_INVALID:{run_dir.name}")
+    eps_bridge = analysis.get("eps_earnings_bridge")
+    eps_bridge_allowed_statuses = {
+        "CALCULATED", "ASSUMPTION_ONLY", "MIXED_CALCULATED_AND_ASSUMPTION_ONLY",
+    }
+    if (
+        not isinstance(eps_bridge, dict)
+        or eps_bridge.get("schema_version") != "IIOS-EPS-EARNINGS-BRIDGE-0.1"
+        or eps_bridge.get("method") != "B4_NET_PROFIT_PROXY_MINUS_NCI_PLUS_ADJUSTMENTS_DIVIDED_BY_DILUTED_SHARES"
+        or not isinstance(eps_bridge.get("status"), str)
+        or not isinstance(eps_bridge.get("scenarios"), dict)
+        or not isinstance(eps_bridge.get("issues"), list)
+        or not isinstance(eps_bridge.get("primary_eps_price_calculation_eligible"), bool)
+    ):
+        raise AcceptanceError(f"EPS_EARNINGS_BRIDGE_MISSING_OR_INVALID:{run_dir.name}")
+    selected_model = analysis.get("operator_valuation_context")
+    selected_model = selected_model if isinstance(selected_model, dict) else {}
+    if str(selected_model.get("selected_model_family") or "UNKNOWN").upper() == "EPS_MULTIPLE":
+        if eps_multiple.get("status") == "CALCULATED":
+            if (
+                eps_bridge.get("status") not in eps_bridge_allowed_statuses
+                or eps_bridge.get("primary_eps_price_calculation_eligible") is not True
+                or set(eps_bridge.get("scenarios", {})) != {"bear", "base", "bull"}
+                or any(
+                    not isinstance(eps_bridge["scenarios"].get(name), dict)
+                    or eps_bridge["scenarios"][name].get("status") not in {"CALCULATED", "ASSUMPTION_ONLY"}
+                    for name in ("bear", "base", "bull")
+                )
+            ):
+                raise AcceptanceError(f"EPS_MULTIPLE_CALCULATED_WITHOUT_ELIGIBLE_EARNINGS_BRIDGE:{run_dir.name}")
+        else:
+            price_zone = analysis.get("price_zone_sensitivity")
+            if (
+                analysis.get("return_metrics") is not None
+                or not isinstance(price_zone, dict)
+                or price_zone.get("target_entry_price") is not None
+            ):
+                raise AcceptanceError(f"EPS_MULTIPLE_INELIGIBLE_BRIDGE_DID_NOT_BLOCK_PRICE_OUTPUTS:{run_dir.name}")
+    if eps_bridge.get("status") in {"NOT_LINKED", "EPS_MISMATCH"}:
+        price_zone = analysis.get("price_zone_sensitivity")
+        if (
+            analysis.get("return_metrics") is not None
+            or (isinstance(price_zone, dict) and price_zone.get("target_entry_price") is not None)
+        ):
+            raise AcceptanceError(f"EPS_EARNINGS_BRIDGE_FAILURE_DID_NOT_FAIL_CLOSED:{run_dir.name}")
+
     model_consistency = analysis.get("valuation_model_consistency")
     if (
         not isinstance(model_consistency, dict)
