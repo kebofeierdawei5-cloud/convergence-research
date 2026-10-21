@@ -310,6 +310,12 @@ def test_inspect_bundle_checks_eps_bridge_price_gating(
         },
     })
     analysis["eps_multiple_valuation"]["status"] = adapter_status
+    if adapter_status == "CALCULATED":
+        analysis["eps_multiple_valuation"]["selected_for_primary_model"] = True
+        analysis["eps_multiple_valuation"]["scenarios"] = {
+            name: {"terminal_value_per_share": "100"}
+            for name in ("bear", "base", "bull")
+        }
     analysis["return_metrics"] = return_metrics
     analysis["price_zone_sensitivity"]["target_entry_price"] = target_entry_price
     _write_json(run_dir / "analysis.json", analysis)
