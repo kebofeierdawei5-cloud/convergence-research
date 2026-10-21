@@ -473,6 +473,20 @@ def _inspect_bundle(run_dir: Path, *, expected_replay_of: str | None = None) -> 
         raise AcceptanceError(f"B5_VALUATION_TRANSMISSION_MISSING:{run_dir.name}")
     if not isinstance(analysis.get("price_zone_sensitivity"), dict):
         raise AcceptanceError(f"B6_PRICE_ZONE_SENSITIVITY_MISSING:{run_dir.name}")
+    price_input = analysis.get("price_input")
+    entry_assumption = price_input.get("entry_assumption") if isinstance(price_input, dict) else None
+    if (
+        not isinstance(entry_assumption, dict)
+        or entry_assumption.get("schema_version") != "IIOS-ENTRY-PRICE-ASSUMPTION-0.1"
+        or entry_assumption.get("mode") != "HYPOTHETICAL_ENTRY_AT_INPUT_PRICE_ON_CUTOFF_DATE"
+        or not isinstance(entry_assumption.get("hypothetical_entry_date"), str)
+        or entry_assumption.get("actual_execution_status") != "NOT_CONFIRMED"
+        or entry_assumption.get("actual_execution_confirmed") is not False
+        or entry_assumption.get("execution_guaranteed") is not False
+        or entry_assumption.get("dividend_entitlement_status") != "CONDITIONAL_ON_HYPOTHETICAL_ENTRY"
+        or entry_assumption.get("actual_dividend_entitlement_confirmed") is not False
+    ):
+        raise AcceptanceError(f"ENTRY_PRICE_ASSUMPTION_MISSING_OR_UNSAFE:{run_dir.name}")
     sotp = analysis.get("sotp_valuation")
     if (
         not isinstance(sotp, dict)

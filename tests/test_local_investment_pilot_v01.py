@@ -1468,6 +1468,47 @@ def test_prepare_input_rejects_weekend_price_observation_dates():
         _prepare_input(payload)
 
 
+def test_entry_price_is_explicitly_hypothetical_and_never_claims_a_fill():
+    payload = _payload(cutoff="2026-10-16")
+    payload["case"]["as_of_timestamp"] = "2026-10-16T15:30:00+08:00"
+    payload["price_input"]["observation_date"] = "2026-10-16"
+    payload["price_input"]["known_at"] = "2026-10-16T15:00:00+08:00"
+
+    prepared = _prepare_input(payload)
+    entry = prepared["price_input"]["entry_assumption"]
+
+    assert entry["schema_version"] == "IIOS-ENTRY-PRICE-ASSUMPTION-0.1"
+    assert entry["mode"] == "HYPOTHETICAL_ENTRY_AT_INPUT_PRICE_ON_CUTOFF_DATE"
+    assert entry["hypothetical_entry_date"] == "2026-10-16"
+    assert entry["price_observation_vs_cutoff"] == "SAME_CALENDAR_DATE"
+    assert entry["price_known_before_cutoff"] is True
+    assert entry["actual_execution_status"] == "NOT_CONFIRMED"
+    assert entry["actual_execution_confirmed"] is False
+    assert entry["execution_guaranteed"] is False
+    assert entry["actual_dividend_entitlement_confirmed"] is False
+
+    analysis, report = _analyse(payload, "TEST-HYPOTHETICAL-ENTRY-NOT-A-FILL")
+    returned_entry = analysis["price_input"]["entry_assumption"]
+    assert returned_entry == entry
+    assert "反事实测算" in report
+    assert "实际成交：未确认，不保证能以该价格成交" in report
+    assert "不代表实际成交或实际分红权益已确认" in report
+
+
+def test_prior_date_price_is_labelled_as_a_reference_not_a_fresh_execution_quote():
+    payload = _payload(cutoff="2026-10-12")
+    payload["price_input"]["observation_date"] = "2026-10-09"
+    payload["price_input"]["known_at"] = "2026-10-09T15:00:00+08:00"
+
+    prepared = _prepare_input(payload)
+    entry = prepared["price_input"]["entry_assumption"]
+
+    assert entry["price_observation_vs_cutoff"] == "PRIOR_DATE_REFERENCE"
+    assert entry["hypothetical_entry_date"] == "2026-10-12"
+    assert entry["actual_execution_confirmed"] is False
+    assert entry["execution_guaranteed"] is False
+
+
 def test_manual_price_cannot_be_relabelled_as_source_verified(tmp_path):
     payload = _payload()
     payload["price_input"]["assurance_label"] = "CANONICAL_PRICE_ADMISSION_VERIFIED"
@@ -3547,6 +3588,12 @@ def test_dated_cash_distribution_changes_irr_and_target_entry_price_correctly():
     assert Decimal(analysis["return_metrics"]["target_entry_price_for_return"]) > Decimal("0")
     assert "登记日 2026-10-19；除息日 2026-10-20；支付日 2026-10-20" in report
     assert "税前 1.10；税额 0.10；计入每股税后现金流 1.00" in report
+    event = analysis["forecast_valuation"]["scenarios"]["base"]["cash_distribution_events"][0]
+    assert event["eligible_if_entered_at_cutoff"] is True
+    assert event["eligibility_assumption"] == "CONDITIONAL_ON_HYPOTHETICAL_ENTRY_AT_INPUT_PRICE_ON_CUTOFF_DATE"
+    assert event["actual_execution_confirmed"] is False
+    assert event["actual_dividend_entitlement_confirmed"] is False
+    assert "条件性；实际成交/实际权益未确认" in report
 
 
 def test_distribution_review_must_explicitly_confirm_no_future_payouts_for_zero_to_count():

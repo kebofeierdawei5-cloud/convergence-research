@@ -2041,6 +2041,27 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             "pit_time_status": "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY" if not price_issues else "PRICE_NOT_PIT_QUALIFIED",
             "pit_issues": price_issues, "source_origin_verified": False, "source_use_rights_verified": False,
             "canonical_price_admission": False,
+            "entry_assumption": {
+                "schema_version": "IIOS-ENTRY-PRICE-ASSUMPTION-0.1",
+                "mode": "HYPOTHETICAL_ENTRY_AT_INPUT_PRICE_ON_CUTOFF_DATE",
+                "hypothetical_entry_date": cutoff.isoformat(),
+                "price_observation_date": observation.isoformat(),
+                "price_observation_vs_cutoff": (
+                    "SAME_CALENDAR_DATE" if observation == cutoff
+                    else "PRIOR_DATE_REFERENCE" if observation < cutoff
+                    else "AFTER_CUTOFF_NOT_ELIGIBLE"
+                ),
+                "price_known_before_cutoff": known_at < cutoff_instant,
+                "actual_execution_status": "NOT_CONFIRMED",
+                "actual_execution_confirmed": False,
+                "execution_guaranteed": False,
+                "dividend_entitlement_status": "CONDITIONAL_ON_HYPOTHETICAL_ENTRY",
+                "actual_dividend_entitlement_confirmed": False,
+                "note": (
+                    "回报/目标入场价是条件性反事实测算，假设在分析截止日以输入参考价格买入；"
+                    "price_input 是观测价而非成交回报，不证明实际可按该价格成交，也不证明实际分红权益。"
+                ),
+            },
         },
         "evidence_register": sources,
         "duplicate_evidence_ids": sorted(duplicate_source_ids),
@@ -2221,6 +2242,9 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
                 "ex_date": ex_date.isoformat(),
                 "payment_date": payment_date.isoformat(),
                 "eligible_if_entered_at_cutoff": True,
+                "eligibility_assumption": "CONDITIONAL_ON_HYPOTHETICAL_ENTRY_AT_INPUT_PRICE_ON_CUTOFF_DATE",
+                "actual_execution_confirmed": False,
+                "actual_dividend_entitlement_confirmed": False,
                 "eligibility_basis": str(event.get("eligibility_basis")),
                 "evidence_refs": event_refs,
                 "year_fraction_from_entry": format(years, "f"),
@@ -2273,6 +2297,14 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
     }
     try:
         result = calculate_return_metrics(gate, max_loss_pct=params["max_loss_pct"])
+        # Keep the source-validated dated events for the published forecast JSON.
+        # The shared return solver intentionally returns only arithmetic outputs,
+        # not the full source/tax/entitlement metadata needed for audit display.
+        if isinstance(prepared, dict):
+            prepared["_validated_cash_distribution_events"] = {
+                name: [dict(event) for event in rows[name]["cash_distribution_events"]]
+                for name in SCENARIOS
+            }
         return _safe(result), None
     except (ValueError, KeyError, TypeError, InvalidOperation) as exc:
         return None, f"SCENARIO_CALCULATION_INCOMPLETE:{exc}"
@@ -2875,6 +2907,8 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
         f"- 运行等级：**{PILOT_STATUS}**",
         f"- 分析截止：{c.get('as_of_timestamp') or (c['as_of_date'] + ' 00:00:00+08:00（日期级截止）')}；当前价：{p['price']} {c['currency']}（观察日 {p['observation_date']}，价格可获得时点 {p['known_at']}）",
+        f"- 入场价口径：假设在截止日以输入参考价 {p['price']} {c['currency']} 买入的反事实测算；实际成交：未确认，不保证能以该价格成交。",
+        f"- 参考价时效：{(p.get('entry_assumption') or {}).get('price_observation_vs_cutoff', 'UNKNOWN')}；分红资格只表示该反事实入场下的条件判断，不代表实际成交或实际分红权益已确认。",
         price_consistency_line,
         f"- 当前持仓：{c['current_position_pct']}%",
         "",
@@ -3008,7 +3042,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             *([f"- EPS_MULTIPLE 原始声明终值（仅供审计，不进入主计算）：{row.get('declared_terminal_value_before_eps_multiple_calculation')} {c['currency']}" ] if row.get('eps_multiple_calculation_applied') is True else []),
             f"- 每股现金分配合计：{('UNKNOWN' if row.get('cash_distributions_per_share') in (None, '') else row.get('cash_distributions_per_share'))} {c['currency']}",
             *(
-                [f"- 登记日 {event.get('record_date', 'UNKNOWN')}；除息日 {event.get('ex_date', 'UNKNOWN')}；支付日 {event.get('payment_date', 'UNKNOWN')}；税前 {event.get('gross_amount_per_share', 'UNKNOWN')}；税额 {event.get('tax_amount_per_share', 'UNKNOWN')}；计入每股税后现金流 {event.get('amount_per_share', 'UNKNOWN')}；税务口径 {event.get('tax_basis', 'UNKNOWN')}；买入资格 {event.get('eligible_if_entered_at_cutoff', 'UNKNOWN')}（{event.get('eligibility_basis', 'UNKNOWN')}）；证据 {', '.join(event.get('evidence_refs') or []) or 'UNKNOWN'}"
+                [f"- 登记日 {event.get('record_date', 'UNKNOWN')}；除息日 {event.get('ex_date', 'UNKNOWN')}；支付日 {event.get('payment_date', 'UNKNOWN')}；税前 {event.get('gross_amount_per_share', 'UNKNOWN')}；税额 {event.get('tax_amount_per_share', 'UNKNOWN')}；计入每股税后现金流 {event.get('amount_per_share', 'UNKNOWN')}；税务口径 {event.get('tax_basis', 'UNKNOWN')}；假设截止日按输入参考价入场的分红资格 {event.get('eligible_if_entered_at_cutoff', 'UNKNOWN')}（条件性；实际成交/实际权益未确认；{event.get('eligibility_basis', 'UNKNOWN')}）；证据 {', '.join(event.get('evidence_refs') or []) or 'UNKNOWN'}"
                  for event in (row.get("cash_distribution_events") or []) if isinstance(event, Mapping)]
                 if isinstance(row.get("cash_distribution_events"), list) else []
             ),
@@ -3315,6 +3349,23 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
 def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], str]:
     prepared = _prepare_input(payload)
     metrics, reason = _return_metrics(prepared)
+    # Persist conditional entitlement metadata to the published scenario JSON
+    # only after the return solver validated all dates, tax arithmetic, sources,
+    # and hypothetical eligibility. Failed/unknown calculations never promote
+    # an unverified dividend event to a normalized eligible cashflow.
+    validated_distribution_events = prepared.pop("_validated_cash_distribution_events", None)
+    if isinstance(metrics, Mapping) and isinstance(validated_distribution_events, Mapping):
+        forecast = prepared.get("forecast_valuation")
+        forecast = forecast if isinstance(forecast, dict) else None
+        scenario_inputs = forecast.get("scenarios") if isinstance(forecast, dict) else None
+        if isinstance(scenario_inputs, dict):
+            for scenario_name in SCENARIOS:
+                source_row = scenario_inputs.get(scenario_name)
+                normalized_events = validated_distribution_events.get(scenario_name)
+                if isinstance(source_row, dict) and isinstance(normalized_events, list):
+                    source_row["cash_distribution_events"] = [
+                        dict(event) for event in normalized_events if isinstance(event, Mapping)
+                    ]
     stress_review = _thesis_break_stress_review(prepared)
     price_zone_sensitivity = _price_zone_sensitivity(prepared, metrics, reason)
     portfolio_package = build_local_pilot_portfolio_package(
@@ -4618,7 +4669,8 @@ def run_guided_wizard(
         + "请填写 entry_value_reference_per_share，以及三种情景各自 probability、terminal_value_per_share、cash_distributions_per_share、cash_distribution_events、rationale；概率合计为 1。"
         + "cash_distribution_review.status 必须是 KNOWN_FUTURE_DISTRIBUTIONS 或 NO_FUTURE_DISTRIBUTIONS_CONFIRMED，并给出 summary 和 cutoff-compatible evidence_refs。"
         + "核查截至截止时点已公告的股利/现金分配，优先使用公司、交易所或监管机构的实施公告；每个 cash_distribution_events 项必须填写 gross_amount_per_share（公告税前金额）、tax_amount_per_share、amount_per_share（扣税后的计算金额）、tax_basis、tax_rationale、record_date、ex_date、payment_date、eligible_if_entered_at_cutoff、eligibility_basis、evidence_refs。"
-        + "只有税前、税额、税后净额满足 gross_amount_per_share - tax_amount_per_share = amount_per_share，税务口径/持有期限假设具体可追责，并明确 cutoff 时点买入能否满足分红资格（eligible_if_entered_at_cutoff=true）时，才可以把分红计入回报。日期顺序必须按标的市场核验，不可把 A 股与港股规则混用：CN-A 通常为 cutoff < record_date < ex_date；HK 通常为 cutoff < ex_date <= record_date（考虑 T+2 与除净安排）；所有市场支付日须处在除净/登记及估值终点的合理顺序内。若公告的特殊安排不符合该市场通常顺序，或截止时点买入资格无法证实，保留 UNKNOWN 并阻断回报/目标入场价，不要猜测修正日期。不得把公告税前金额直接当税后收益，也不得将不符合资格的分红计入新买入的收益。"
+        + "注意：price_input 是观测/参考价，不是成交回报。程序的收益与目标入场价是反事实测算，假设在分析截止日以该输入价格买入；程序不会声称该价位实际可成交，也不会声称实际分红权益已产生。eligible_if_entered_at_cutoff 只回答“若在截止日按输入参考价假设成交，日期与市场规则是否支持资格”，不能表示成交保证或已取得权益。"
+        + "只有税前、税额、税后净额满足 gross_amount_per_share - tax_amount_per_share = amount_per_share，税务口径/持有期限假设具体可追责，并明确该反事实入场是否可符合分红资格（eligible_if_entered_at_cutoff=true）时，才可以把分红计入条件性回报。日期顺序必须按标的市场核验，不可把 A 股与港股规则混用：CN-A 通常为 cutoff < record_date < ex_date；HK 通常为 cutoff < ex_date <= record_date（考虑 T+2 与除净安排）；所有市场支付日须处在除净/登记及估值终点的合理顺序内。若公告的特殊安排不符合该市场通常顺序，或条件性买入资格无法证实，保留 UNKNOWN 并阻断回报/目标入场价，不要猜测修正日期。不得把公告税前金额直接当税后收益，也不得将不符合资格的分红计入新买入的收益。"
         + "每情景 cash_distributions_per_share 必须等于这些日期明确、税后金额明确、买入资格确认的现金流金额合计。若已核实未来期间无分配，填 0、空事件列表并用截止日前官方证据说明；若未能确定，不得填 0 冒充无分配，保持 UNKNOWN。日期化现金流使用实际支付日期，不能一律假设在终值日支付。"
         + "请填写 thesis_break_stress 的 failure_trigger、operating_impact、valuation_method、terminal_value_per_share、cash_distributions_per_share、rationale，且其期末总财富必须低于 Bear。"
         + "不要只原样返回模板，不允许把核心研究字段全部留空。若无法识别必须具体解释原因和证据缺口；数字估值可以建立透明、可追责的假设，但不得把假设伪装为披露事实。"
