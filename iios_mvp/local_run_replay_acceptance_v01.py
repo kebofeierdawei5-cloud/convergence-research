@@ -812,11 +812,16 @@ def main() -> int:
         print(f"私有运行目录：{RUN_ROOT}")
         print(f"私有日志目录：{LOG_ROOT}")
         print("本脚本只编排已有本地试运行与 Replay，不访问付费 API，不使用本地模型，不下单。\n")
-        print("  1 = 新建分析 → 首次运行包校验 → Replay → Replay 包校验（推荐）")
-        print("  2 = 对已有首次运行执行校验 + Replay（不重新进行 ChatGPT 研究）")
-        print("  3 = 只校验已有运行包（不运行 Replay）")
-        print("  0 = 退出")
-        choice = input("请选择 [1]：").strip() or "1"
+        if os.environ.get("IIOS_ACCEPTANCE_AUTO_START") == "1":
+            # Distribution launcher skips the secondary menu and starts full acceptance.
+            print("一键启动模式：自动进入完整分析 → 首轮包哈希校验 → Replay → Replay 包哈希校验。")
+            choice = "1"
+        else:
+            print("  1 = 新建分析 → 首次运行包校验 → Replay → Replay 包校验（推荐）")
+            print("  2 = 对已有首次运行执行校验 + Replay（不重新进行 ChatGPT 研究）")
+            print("  3 = 只校验已有运行包（不运行 Replay）")
+            print("  0 = 退出")
+            choice = input("请选择 [1]：").strip() or "1"
         if choice == "0":
             print("已退出，没有新建分析或修改旧运行包。")
             return 0
