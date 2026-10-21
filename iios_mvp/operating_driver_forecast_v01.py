@@ -479,7 +479,6 @@ def _calculate_scenario(
     )
     diagnostic_net_profit = net_profit if capacity_overrun_issues else None
     diagnostic_fcf = fcf if capacity_overrun_issues else None
-    financial_outputs_decision_usable = not capacity_overrun_issues
     if capacity_overrun_issues:
         # For an explicitly full-year forecast, production above a known annual
         # nameplate capacity is an unresolved physical operating constraint.
@@ -516,6 +515,19 @@ def _calculate_scenario(
         calculation_status = "PARTIAL_SCENARIO_BRIDGE"
     else:
         calculation_status = "SCENARIO_ECONOMICS_NOT_IDENTIFIABLE"
+
+    # "Decision usable" means the complete downstream financial bridge exists,
+    # not merely that no explicit capacity-overrun issue was found.
+    financial_outputs_decision_usable = (
+        not capacity_overrun_issues
+        and calculation_status == "SCENARIO_ARITHMETIC_COMPLETE"
+        and net_profit is not None
+        and fcf is not None
+    )
+    if not financial_outputs_decision_usable and not capacity_overrun_issues:
+        issues.append(
+            f"{scenario_name}:FINANCIAL_OUTPUTS_INCOMPLETE_NOT_DECISION_USABLE"
+        )
 
     missing_inputs = []
     metric_values = {
