@@ -211,6 +211,23 @@ def test_inspect_bundle_rejects_wrong_eps_multiple_schema_or_method(tmp_path: Pa
         acceptance._inspect_bundle(run_dir, expected_replay_of=None)
 
 
+def test_inspect_bundle_rejects_calculated_eps_without_reconciled_earnings_bridge(tmp_path: Path) -> None:
+    run_dir = _bundle(tmp_path)
+    analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
+    adapter = analysis["eps_multiple_valuation"]
+    adapter.update({
+        "status": "CALCULATED",
+        "selected_for_primary_model": True,
+        "scenarios": {
+            name: {"terminal_value_per_share": "100"}
+            for name in ("bear", "base", "bull")
+        },
+    })
+    _write_json(run_dir / "analysis.json", analysis)
+    with pytest.raises(acceptance.AcceptanceError, match="EPS_MULTIPLE_EARNINGS_BRIDGE_MISSING_OR_INVALID"):
+        acceptance._inspect_bundle(run_dir, expected_replay_of=None)
+
+
 def test_inspect_bundle_rejects_missing_or_unsafe_entry_price_assumption(tmp_path: Path) -> None:
     run_dir = _bundle(tmp_path)
     analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
