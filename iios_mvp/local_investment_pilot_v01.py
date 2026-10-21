@@ -310,14 +310,22 @@ def _verify_run_bundle(run_path: str | Path) -> tuple[dict[str, Any], dict[str, 
     except (OSError, json.JSONDecodeError) as exc:
         raise LocalInvestmentPilotError("RUN_INPUT_UNREADABLE_FOR_RESPONSE_PROVENANCE") from exc
     input_provenance = input_payload.get("_local_research_response_provenance") if isinstance(input_payload, Mapping) else None
-    if isinstance(input_provenance, Mapping):
-        if RAW_RESEARCH_RESPONSE_FILENAME not in manifest:
-            raise LocalInvestmentPilotError("RUN_INPUT_CLAIMS_RESEARCH_RESPONSE_WITHOUT_CAPTURE")
+    if RAW_RESEARCH_RESPONSE_FILENAME in manifest:
         if (
-            input_provenance.get("sha256") != manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("sha256")
+            not isinstance(input_provenance, Mapping)
+            or input_provenance.get("schema_version") != LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA
+            or input_provenance.get("status") != "CAPTURED_RAW_CHATGPT_RESPONSE"
+            or not isinstance(input_provenance.get("source_filename"), str)
+            or not input_provenance.get("source_filename")
+            or Path(input_provenance["source_filename"]).name != input_provenance["source_filename"]
+            or "/" in input_provenance["source_filename"]
+            or "\\" in input_provenance["source_filename"]
+            or input_provenance.get("sha256") != manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("sha256")
             or input_provenance.get("byte_size") != manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("byte_size")
         ):
             raise LocalInvestmentPilotError("RUN_INPUT_RESEARCH_RESPONSE_PROVENANCE_MISMATCH")
+    elif isinstance(input_provenance, Mapping):
+        raise LocalInvestmentPilotError("RUN_INPUT_CLAIMS_RESEARCH_RESPONSE_WITHOUT_CAPTURE")
     return dict(receipt), {name: dict(manifest[name]) for name in manifest_names}
 
 
@@ -4174,8 +4182,11 @@ def _write_run(
             previous_response = previous_receipt.get("research_response_provenance")
             if not isinstance(previous_response, Mapping) or previous_response.get("status") not in _RESEARCH_RESPONSE_PRESENT_STATUSES:
                 raise LocalInvestmentPilotError("REPLAY_RESEARCH_RESPONSE_PROVENANCE_INVALID")
-            if isinstance(input_response_claim, Mapping) and (
-                input_response_claim.get("sha256") != response_fp["sha256"]
+            if (
+                not isinstance(input_response_claim, Mapping)
+                or input_response_claim.get("schema_version") != LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA
+                or input_response_claim.get("status") != "CAPTURED_RAW_CHATGPT_RESPONSE"
+                or input_response_claim.get("sha256") != response_fp["sha256"]
                 or input_response_claim.get("byte_size") != response_fp["byte_size"]
             ):
                 raise LocalInvestmentPilotError("REPLAY_INPUT_RESEARCH_RESPONSE_PROVENANCE_MISMATCH")
@@ -4248,9 +4259,15 @@ def _write_run(
         if not isinstance(input_response_claim, Mapping):
             raise LocalInvestmentPilotError("CHATGPT_RESPONSE_INPUT_PROVENANCE_MISSING")
         if (
-            input_response_claim.get("sha256") != response_fp["sha256"]
-            or input_response_claim.get("byte_size") != response_fp["byte_size"]
+            input_response_claim.get("schema_version") != LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA
             or input_response_claim.get("status") != "CAPTURED_RAW_CHATGPT_RESPONSE"
+            or not isinstance(input_response_claim.get("source_filename"), str)
+            or not input_response_claim.get("source_filename")
+            or Path(input_response_claim["source_filename"]).name != input_response_claim["source_filename"]
+            or "/" in input_response_claim["source_filename"]
+            or "\\" in input_response_claim["source_filename"]
+            or input_response_claim.get("sha256") != response_fp["sha256"]
+            or input_response_claim.get("byte_size") != response_fp["byte_size"]
         ):
             raise LocalInvestmentPilotError("CHATGPT_RESPONSE_INPUT_PROVENANCE_MISMATCH")
         response_provenance = {
