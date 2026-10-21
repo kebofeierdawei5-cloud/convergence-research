@@ -628,14 +628,19 @@ def _inspect_bundle(run_dir: Path, *, expected_replay_of: str | None = None) -> 
             raise AcceptanceError(f"RUN_RAW_RESEARCH_RESPONSE_MISSING_OR_SYMLINK:{run_dir.name}")
         if not isinstance(provenance, dict) or provenance.get("status") not in RESEARCH_RESPONSE_PRESENT_STATUSES:
             raise AcceptanceError(f"RUN_RAW_RESEARCH_RESPONSE_PROVENANCE_INVALID:{run_dir.name}")
-        response_hash = _sha256_file(response_path)
+        try:
+            response_payload = response_path.read_bytes()
+            response_size = len(response_payload)
+            response_hash = hashlib.sha256(response_payload).hexdigest()
+        except OSError as exc:
+            raise AcceptanceError(f"RUN_RAW_RESEARCH_RESPONSE_UNREADABLE:{run_dir.name}") from exc
         if (
             provenance.get("file") != RAW_RESEARCH_RESPONSE_FILENAME
             or provenance.get("sha256") != response_hash
-            or provenance.get("byte_size") != response_path.stat().st_size
+            or provenance.get("byte_size") != response_size
             or not isinstance(manifest.get(RAW_RESEARCH_RESPONSE_FILENAME), dict)
             or manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("sha256") != response_hash
-            or manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("byte_size") != response_path.stat().st_size
+            or manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("byte_size") != response_size
         ):
             raise AcceptanceError(f"RUN_RAW_RESEARCH_RESPONSE_HASH_MISMATCH:{run_dir.name}")
     elif isinstance(provenance, dict) and provenance.get("status") in RESEARCH_RESPONSE_PRESENT_STATUSES:
