@@ -84,6 +84,7 @@ REPLAY_COMPARISON_FIELDS = (
     "valuation_model_consistency",
     "valuation_timing",
     "price_zone_sensitivity",
+    "research_response_provenance",
     "decision_parameters",
     "portfolio_package",
     "return_metrics",
@@ -4293,6 +4294,32 @@ def _write_run(
         response_provenance["source_pilot_id"] = run_id
 
     analysis, report = _analyse(payload_for_analysis, run_id)
+    if isinstance(input_response_claim, Mapping):
+        # Keep a stable, analysis-level link to the byte-exact raw response. Do
+        # not include a run-specific captured/inherited status here, otherwise
+        # the same evidence would cause artificial first-run/Replay drift.
+        analysis["research_response_provenance"] = {
+            "schema_version": LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
+            "status": "RAW_CHATGPT_RESPONSE_HASH_BOUND",
+            "file": RAW_RESEARCH_RESPONSE_FILENAME,
+            "source_filename": input_response_claim.get("source_filename"),
+            "sha256": input_response_claim.get("sha256"),
+            "byte_size": input_response_claim.get("byte_size"),
+            "capture_stage": input_response_claim.get("capture_stage"),
+            "validation_status": input_response_claim.get("validation_status"),
+            "local_operator_field_recovery": payload.get("_local_operator_controlled_field_recovery"),
+            "formal_source_admission": False,
+            "raw_response_modified_by_runner": False,
+        }
+        report = _render_report(analysis)
+        report += (
+            "\n\n## 原始 ChatGPT 响应来源链\n\n"
+            f"- 原始响应文件：{RAW_RESEARCH_RESPONSE_FILENAME}（私有运行包内逐字节快照）\n"
+            f"- 原始响应 SHA-256：{input_response_claim['sha256']}\n"
+            f"- 原始响应字节数：{input_response_claim['byte_size']}\n"
+            f"- 本地校验阶段：{input_response_claim.get('capture_stage', 'UNKNOWN')}；字段结构校验：{input_response_claim.get('validation_status', 'UNKNOWN')}\n"
+            "- 本节只证明响应文本与本地输入之间的字节级关联，不证明响应中的事实/来源真实，也不构成正式 Evidence/PIT 准入。\n"
+        )
     run_dir = output_root / run_id
     run_dir.mkdir(parents=True, exist_ok=False, mode=0o700)
     _write_local(run_dir / "input.json", input_text)
