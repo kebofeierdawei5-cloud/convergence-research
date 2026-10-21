@@ -2575,6 +2575,39 @@ def test_unknown_or_product_line_scope_with_unlinked_b5_blocks_price_outputs():
         assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
         assert "B5 传导状态" in report
 
+def test_explicit_rolling_ntm_dates_align_with_one_year_terminal_timing():
+    timing = pilot._build_valuation_timing(
+        cutoff_date="2026-10-16",
+        forecast_period="NTM_2026-10-17_TO_2027-10-16",
+        valuation_terminal_date="2027-10-16",
+        valuation_terminal_date_basis="Explicit rolling twelve-month period from the day after the cutoff through 2027-10-16.",
+    )
+    assert timing["status"] == "PASS"
+    assert timing["period_alignment_status"] == "ROLLING_12_MONTHS_EXPLICIT_DATES_ALIGNED_NOT_INDEPENDENTLY_VERIFIED"
+    assert timing["elapsed_calendar_days"] == 365
+    assert Decimal(timing["annualization_year_fraction"]) == Decimal("1")
+
+    mismatched = pilot._build_valuation_timing(
+        cutoff_date="2026-10-16",
+        forecast_period="NTM_2026-10-18_TO_2027-10-16",
+        valuation_terminal_date="2027-10-16",
+        valuation_terminal_date_basis="Explicit but intentionally mismatched rolling forecast dates.",
+    )
+    assert mismatched["status"] == "FORECAST_NTM_PERIOD_START_MISMATCH"
+    assert mismatched["period_alignment_status"] == "MISMATCH_OR_INVALID"
+
+
+def test_blocked_primary_model_is_labeled_candidate_in_report():
+    payload = _payload()
+    payload["operator_valuation_context"]["selected_model_family"] = "SOTP"
+    analysis, report = _analyse(payload, "TEST-BLOCKED-PRIMARY-MODEL-REPORT")
+
+    assert analysis["valuation_model_consistency"]["primary_model_price_calculation_eligible"] is False
+    assert "候选模型（未获主模型门禁批准）：" in report
+    assert "研究回答中的候选模型理由（未经主模型门禁认可）" in report
+    assert "候选模型参考锚（主模型门禁未通过，仅供诊断）" in report
+
+
 def test_calendar_day_terminal_date_controls_annualization_and_return_cap():
     payload = _payload(price="144.30", cutoff="2026-10-16")
     analysis, report = _analyse(payload, "TEST-DATE-ANNUALIZATION")
