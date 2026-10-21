@@ -54,6 +54,12 @@ SHANGHAI = timezone(timedelta(hours=8))
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PRICE_ASSURANCE = "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
 BUNDLE_FILENAMES = ("input.json", "analysis.json", "report.md")
+RAW_RESEARCH_RESPONSE_FILENAME = "chatgpt_response_raw.txt"
+LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA = "IIOS-LOCAL-RESEARCH-RESPONSE-PROVENANCE-0.1"
+_RESEARCH_RESPONSE_PRESENT_STATUSES = {
+    "CAPTURED_RAW_CHATGPT_RESPONSE",
+    "INHERITED_FROM_VERIFIED_PRIOR_RUN",
+}
 REPLAY_COMPARISON_FIELDS = (
     "schema_version",
     "status",
@@ -194,6 +200,11 @@ def _write_local(path: Path, content: str) -> None:
         path.chmod(0o600)
 
 
+def _fingerprint_bytes(content: bytes) -> dict[str, Any]:
+    """Return SHA-256 and byte size for an immutable in-memory byte sequence."""
+    return {"sha256": hashlib.sha256(content).hexdigest(), "byte_size": len(content)}
+
+
 def _fingerprint_file(path: Path) -> dict[str, Any]:
     """Return SHA-256 and byte size for one regular output file."""
     digest = hashlib.sha256()
@@ -250,18 +261,63 @@ def _verify_run_bundle(run_path: str | Path) -> tuple[dict[str, Any], dict[str, 
     manifest = receipt.get("file_manifest")
     if not isinstance(manifest, Mapping):
         raise LocalInvestmentPilotError("RUN_BUNDLE_HASH_MANIFEST_MISSING")
-    for filename in BUNDLE_FILENAMES:
+    allowed_names = set(BUNDLE_FILENAMES) | {RAW_RESEARCH_RESPONSE_FILENAME}
+    unexpected_names = sorted(str(name) for name in set(manifest) - allowed_names)
+    if unexpected_names:
+        raise LocalInvestmentPilotError(
+            "RUN_BUNDLE_HASH_MANIFEST_HAS_UNEXPECTED_FILES:" + ",".join(unexpected_names)
+        )
+    manifest_names = list(BUNDLE_FILENAMES)
+    if RAW_RESEARCH_RESPONSE_FILENAME in manifest:
+        manifest_names.append(RAW_RESEARCH_RESPONSE_FILENAME)
+    for filename in manifest_names:
         expected = manifest.get(filename)
         if not isinstance(expected, Mapping):
             raise LocalInvestmentPilotError(f"RUN_BUNDLE_HASH_MISSING:{filename}")
         expected_hash = str(expected.get("sha256") or "")
         expected_size = expected.get("byte_size")
-        if not re.fullmatch(r"[0-9a-f]{64}", expected_hash) or not isinstance(expected_size, int) or expected_size < 0:
+        if (
+            not re.fullmatch(r"[0-9a-f]{64}", expected_hash)
+            or not isinstance(expected_size, int)
+            or isinstance(expected_size, bool)
+            or expected_size < 0
+        ):
             raise LocalInvestmentPilotError(f"RUN_BUNDLE_HASH_RECORD_INVALID:{filename}")
-        actual = _fingerprint_file(run_dir / filename)
+        file_path = run_dir / filename
+        if file_path.is_symlink() or not file_path.is_file():
+            raise LocalInvestmentPilotError(f"RUN_BUNDLE_FILE_MISSING_OR_SYMLINK:{filename}")
+        actual = _fingerprint_file(file_path)
         if actual != {"sha256": expected_hash, "byte_size": expected_size}:
             raise LocalInvestmentPilotError(f"RUN_BUNDLE_HASH_MISMATCH:{filename}")
-    return dict(receipt), {name: dict(manifest[name]) for name in BUNDLE_FILENAMES}
+
+    provenance = receipt.get("research_response_provenance")
+    if RAW_RESEARCH_RESPONSE_FILENAME in manifest:
+        if not isinstance(provenance, Mapping) or provenance.get("status") not in _RESEARCH_RESPONSE_PRESENT_STATUSES:
+            raise LocalInvestmentPilotError("RUN_RESEARCH_RESPONSE_PROVENANCE_MISSING_OR_INVALID")
+        response_fingerprint = manifest[RAW_RESEARCH_RESPONSE_FILENAME]
+        if (
+            provenance.get("file") != RAW_RESEARCH_RESPONSE_FILENAME
+            or provenance.get("sha256") != response_fingerprint.get("sha256")
+            or provenance.get("byte_size") != response_fingerprint.get("byte_size")
+        ):
+            raise LocalInvestmentPilotError("RUN_RESEARCH_RESPONSE_PROVENANCE_HASH_MISMATCH")
+    elif isinstance(provenance, Mapping) and provenance.get("status") in _RESEARCH_RESPONSE_PRESENT_STATUSES:
+        raise LocalInvestmentPilotError("RUN_RESEARCH_RESPONSE_FILE_MISSING_FROM_MANIFEST")
+
+    try:
+        input_payload = json.loads((run_dir / "input.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise LocalInvestmentPilotError("RUN_INPUT_UNREADABLE_FOR_RESPONSE_PROVENANCE") from exc
+    input_provenance = input_payload.get("_local_research_response_provenance") if isinstance(input_payload, Mapping) else None
+    if isinstance(input_provenance, Mapping):
+        if RAW_RESEARCH_RESPONSE_FILENAME not in manifest:
+            raise LocalInvestmentPilotError("RUN_INPUT_CLAIMS_RESEARCH_RESPONSE_WITHOUT_CAPTURE")
+        if (
+            input_provenance.get("sha256") != manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("sha256")
+            or input_provenance.get("byte_size") != manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("byte_size")
+        ):
+            raise LocalInvestmentPilotError("RUN_INPUT_RESEARCH_RESPONSE_PROVENANCE_MISMATCH")
+    return dict(receipt), {name: dict(manifest[name]) for name in manifest_names}
 
 
 def verify_local_pilot_bundle(run_path: str | Path) -> dict[str, Any]:
@@ -273,7 +329,7 @@ def verify_local_pilot_bundle(run_path: str | Path) -> dict[str, Any]:
         "hash_algorithm": "SHA-256",
         "verified_files": [
             {"name": name, "byte_size": manifest[name]["byte_size"], "sha256": manifest[name]["sha256"]}
-            for name in BUNDLE_FILENAMES
+            for name in (*BUNDLE_FILENAMES, *((RAW_RESEARCH_RESPONSE_FILENAME,) if RAW_RESEARCH_RESPONSE_FILENAME in manifest else ()))
         ],
         "formal_decision_created": False,
         "execution_authorized": False,
@@ -4056,15 +4112,35 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
 
 
 def _write_run(
-    input_path: Path, output_root: Path, *, replay_of: str | None = None
+    input_path: Path,
+    output_root: Path,
+    *,
+    replay_of: str | None = None,
+    research_response_path: str | Path | None = None,
+    expected_research_response_sha256: str | None = None,
+    expected_research_response_byte_size: int | None = None,
 ) -> dict[str, Any]:
     try:
         input_text = input_path.read_text(encoding="utf-8")
     except OSError as exc:
         raise LocalInvestmentPilotError("PILOT_INPUT_FILE_UNREADABLE") from exc
+    try:
+        payload = json.loads(input_text)
+    except json.JSONDecodeError as exc:
+        raise LocalInvestmentPilotError("PILOT_INPUT_JSON_INVALID") from exc
+    if not isinstance(payload, dict):
+        raise LocalInvestmentPilotError("PILOT_INPUT_JSON_OBJECT_REQUIRED")
 
+    input_response_claim = payload.get("_local_research_response_provenance")
     previous_analysis: dict[str, Any] | None = None
+    previous_receipt: dict[str, Any] | None = None
+    previous_manifest: dict[str, Any] = {}
+    prior_dir: Path | None = None
+    response_bytes: bytes | None = None
+
     if replay_of:
+        if research_response_path is not None:
+            raise LocalInvestmentPilotError("REPLAY_RESEARCH_RESPONSE_MUST_INHERIT_FROM_VERIFIED_PARENT")
         if replay_of in {".", ".."} or Path(replay_of).name != replay_of or "/" in replay_of:
             raise LocalInvestmentPilotError("REPLAY_PILOT_ID_INVALID")
         prior_dir = (output_root / replay_of).resolve(strict=True)
@@ -4083,18 +4159,159 @@ def _write_run(
         if not isinstance(previous_analysis, dict) or previous_analysis.get("pilot_id") != previous_receipt.get("pilot_id"):
             raise LocalInvestmentPilotError("REPLAY_PRIOR_ANALYSIS_PILOT_ID_MISMATCH")
 
-    payload = json.loads(input_text)
-    symbol = str((payload.get("case") or {}).get("symbol") or "candidate").replace(".", "-")
+        if RAW_RESEARCH_RESPONSE_FILENAME in previous_manifest:
+            response_path = prior_dir / RAW_RESEARCH_RESPONSE_FILENAME
+            if response_path.is_symlink() or not response_path.is_file():
+                raise LocalInvestmentPilotError("REPLAY_RESEARCH_RESPONSE_SOURCE_MISSING_OR_SYMLINK")
+            try:
+                response_bytes = response_path.read_bytes()
+            except OSError as exc:
+                raise LocalInvestmentPilotError("REPLAY_RESEARCH_RESPONSE_SOURCE_UNREADABLE") from exc
+            response_fp = _fingerprint_bytes(response_bytes)
+            if response_fp != previous_manifest[RAW_RESEARCH_RESPONSE_FILENAME]:
+                raise LocalInvestmentPilotError("REPLAY_RESEARCH_RESPONSE_SOURCE_HASH_CHANGED")
+            previous_response = previous_receipt.get("research_response_provenance")
+            if not isinstance(previous_response, Mapping) or previous_response.get("status") not in _RESEARCH_RESPONSE_PRESENT_STATUSES:
+                raise LocalInvestmentPilotError("REPLAY_RESEARCH_RESPONSE_PROVENANCE_INVALID")
+            if isinstance(input_response_claim, Mapping) and (
+                input_response_claim.get("sha256") != response_fp["sha256"]
+                or input_response_claim.get("byte_size") != response_fp["byte_size"]
+            ):
+                raise LocalInvestmentPilotError("REPLAY_INPUT_RESEARCH_RESPONSE_PROVENANCE_MISMATCH")
+            response_provenance = {
+                "schema_version": LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
+                "status": "INHERITED_FROM_VERIFIED_PRIOR_RUN",
+                "file": RAW_RESEARCH_RESPONSE_FILENAME,
+                "sha256": response_fp["sha256"],
+                "byte_size": response_fp["byte_size"],
+                "origin_pilot_id": previous_response.get("origin_pilot_id") or previous_receipt.get("pilot_id"),
+                "source_pilot_id": previous_receipt.get("pilot_id"),
+                "capture_method": "BYTE_COPY_FROM_HASH_VERIFIED_PARENT_RUN",
+                "raw_response_modified_by_runner": False,
+                "note": "原始 ChatGPT 响应从哈希验证通过的父运行包逐字节复制；不在 Replay 阶段重新请求或生成研究回答。",
+            }
+        else:
+            if isinstance(input_response_claim, Mapping):
+                raise LocalInvestmentPilotError("REPLAY_INPUT_CLAIMS_RESEARCH_RESPONSE_NOT_PRESENT_IN_PARENT")
+            response_provenance = {
+                "schema_version": LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
+                "status": "NOT_AVAILABLE_IN_LEGACY_PARENT_RUN",
+                "file": None,
+                "sha256": None,
+                "byte_size": None,
+                "origin_pilot_id": None,
+                "source_pilot_id": previous_receipt.get("pilot_id"),
+                "capture_method": "LEGACY_PARENT_HAS_NO_RAW_RESPONSE_CAPTURE",
+                "raw_response_modified_by_runner": False,
+            }
+    elif research_response_path is not None:
+        raw_path = Path(research_response_path).expanduser()
+        if raw_path.is_symlink():
+            raise LocalInvestmentPilotError("CHATGPT_RESPONSE_SOURCE_MUST_NOT_BE_SYMLINK")
+        try:
+            raw_path = raw_path.resolve(strict=True)
+        except OSError as exc:
+            raise LocalInvestmentPilotError("CHATGPT_RESPONSE_SOURCE_NOT_FOUND") from exc
+        if not raw_path.is_file():
+            raise LocalInvestmentPilotError("CHATGPT_RESPONSE_SOURCE_NOT_REGULAR_FILE")
+        if (
+            not isinstance(expected_research_response_sha256, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", expected_research_response_sha256)
+            or not isinstance(expected_research_response_byte_size, int)
+            or isinstance(expected_research_response_byte_size, bool)
+            or expected_research_response_byte_size < 1
+        ):
+            raise LocalInvestmentPilotError("CHATGPT_RESPONSE_EXPECTED_FINGERPRINT_REQUIRED")
+        try:
+            response_bytes = raw_path.read_bytes()
+        except OSError as exc:
+            raise LocalInvestmentPilotError("CHATGPT_RESPONSE_SOURCE_UNREADABLE") from exc
+        response_fp = _fingerprint_bytes(response_bytes)
+        if (
+            response_fp["sha256"] != expected_research_response_sha256
+            or response_fp["byte_size"] != expected_research_response_byte_size
+        ):
+            raise LocalInvestmentPilotError("CHATGPT_RESPONSE_CHANGED_AFTER_VALIDATION")
+        try:
+            raw_response_text = response_bytes.decode("utf-8")
+            _extract_json_object(raw_response_text)
+        except (UnicodeDecodeError, LocalInvestmentPilotError) as exc:
+            raise LocalInvestmentPilotError("CHATGPT_RESPONSE_RAW_SNAPSHOT_NO_LONGER_VALID") from exc
+        current_signature = _response_file_signature(raw_path)
+        if (
+            current_signature is None
+            or current_signature[0] != expected_research_response_byte_size
+            or current_signature[2] != expected_research_response_sha256
+        ):
+            raise LocalInvestmentPilotError("CHATGPT_RESPONSE_CHANGED_DURING_SNAPSHOT")
+        if not isinstance(input_response_claim, Mapping):
+            raise LocalInvestmentPilotError("CHATGPT_RESPONSE_INPUT_PROVENANCE_MISSING")
+        if (
+            input_response_claim.get("sha256") != response_fp["sha256"]
+            or input_response_claim.get("byte_size") != response_fp["byte_size"]
+            or input_response_claim.get("status") != "CAPTURED_RAW_CHATGPT_RESPONSE"
+        ):
+            raise LocalInvestmentPilotError("CHATGPT_RESPONSE_INPUT_PROVENANCE_MISMATCH")
+        response_provenance = {
+            "schema_version": LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
+            "status": "CAPTURED_RAW_CHATGPT_RESPONSE",
+            "file": RAW_RESEARCH_RESPONSE_FILENAME,
+            "source_filename": raw_path.name,
+            "sha256": response_fp["sha256"],
+            "byte_size": response_fp["byte_size"],
+            "origin_pilot_id": None,
+            "source_pilot_id": None,
+            "capture_method": "BYTE_SNAPSHOT_OF_STABLE_VALIDATED_CHATGPT_RESPONSE",
+            "response_validation_status": "PASSED_BEFORE_LOCAL_OPERATOR_FIELD_RESTORATION",
+            "local_operator_field_recovery": payload.get("_local_operator_controlled_field_recovery"),
+            "raw_response_modified_by_runner": False,
+        }
+    else:
+        if isinstance(input_response_claim, Mapping):
+            raise LocalInvestmentPilotError("INPUT_CLAIMS_CHATGPT_RESPONSE_WITHOUT_VERIFIABLE_CAPTURE")
+        response_provenance = {
+            "schema_version": LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
+            "status": "NOT_CAPTURED_DIRECT_OR_LEGACY_INPUT",
+            "file": None,
+            "sha256": None,
+            "byte_size": None,
+            "origin_pilot_id": None,
+            "source_pilot_id": None,
+            "capture_method": "NO_GUIDED_CHATGPT_RESPONSE_FILE_SUPPLIED",
+            "raw_response_modified_by_runner": False,
+        }
+
+    # Provenance is hash-bound in input.json, but removed before analysis so it
+    # cannot change analytical semantics or Replay equality.
+    payload_for_analysis = dict(payload)
+    payload_for_analysis.pop("_local_research_response_provenance", None)
+    symbol = str((payload_for_analysis.get("case") or {}).get("symbol") or "candidate").replace(".", "-")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     run_id = f"local-pilot-{symbol}-{stamp}"
-    analysis, report = _analyse(payload, run_id)
+    if response_provenance.get("status") == "CAPTURED_RAW_CHATGPT_RESPONSE":
+        response_provenance["origin_pilot_id"] = run_id
+        response_provenance["source_pilot_id"] = run_id
+
+    analysis, report = _analyse(payload_for_analysis, run_id)
     run_dir = output_root / run_id
     run_dir.mkdir(parents=True, exist_ok=False, mode=0o700)
     _write_local(run_dir / "input.json", input_text)
     _write_local(run_dir / "analysis.json", json.dumps(_safe(analysis), ensure_ascii=False, indent=2, allow_nan=False))
     _write_local(run_dir / "report.md", report)
+    if response_bytes is not None:
+        raw_response_path = run_dir / RAW_RESEARCH_RESPONSE_FILENAME
+        try:
+            raw_response_path.write_bytes(response_bytes)
+        except OSError as exc:
+            raise LocalInvestmentPilotError("RUN_RESEARCH_RESPONSE_SNAPSHOT_WRITE_FAILED") from exc
+        if os.name != "nt":
+            raw_response_path.chmod(0o600)
 
     file_manifest = {name: _fingerprint_file(run_dir / name) for name in BUNDLE_FILENAMES}
+    if response_bytes is not None:
+        file_manifest[RAW_RESEARCH_RESPONSE_FILENAME] = _fingerprint_file(run_dir / RAW_RESEARCH_RESPONSE_FILENAME)
+        if file_manifest[RAW_RESEARCH_RESPONSE_FILENAME] != _fingerprint_bytes(response_bytes):
+            raise LocalInvestmentPilotError("RUN_RESEARCH_RESPONSE_SNAPSHOT_HASH_MISMATCH")
     replay_comparison = _replay_comparison(previous_analysis, analysis) if previous_analysis is not None else None
     receipt = {
         "receipt_schema": PILOT_RECEIPT_SCHEMA,
@@ -4106,6 +4323,7 @@ def _write_run(
         "analysis_file": "analysis.json",
         "report_file": "report.md",
         "file_manifest": file_manifest,
+        "research_response_provenance": response_provenance,
         "replay_comparison": replay_comparison,
         "formal_decision_created": False,
         "canonical_run_receipt_created": False,
@@ -4125,6 +4343,7 @@ def _write_run(
         "provisional_action": analysis["decision"]["provisional_action"],
         "replay_of": replay_of,
         "replay_comparison": replay_comparison,
+        "research_response_provenance_status": response_provenance.get("status"),
         "run_dir": str(run_dir),
         "report_path": str(run_dir / "report.md"),
         "formal_decision_created": False,
@@ -4132,10 +4351,26 @@ def _write_run(
         "auto_execution": False,
     }
 
-def run_local_investment_pilot(*, input_path: str | Path, output_root: str | Path, replay_of: str | None = None) -> dict[str, Any]:
+
+def run_local_investment_pilot(
+    *,
+    input_path: str | Path,
+    output_root: str | Path,
+    replay_of: str | None = None,
+    research_response_path: str | Path | None = None,
+    expected_research_response_sha256: str | None = None,
+    expected_research_response_byte_size: int | None = None,
+) -> dict[str, Any]:
     source = _outside_repo(input_path, "PILOT_INPUT_PATH", must_exist=True)
     root = _private_dir(output_root, "PILOT_OUTPUT_ROOT")
-    return _write_run(source, root, replay_of=replay_of)
+    return _write_run(
+        source,
+        root,
+        replay_of=replay_of,
+        research_response_path=research_response_path,
+        expected_research_response_sha256=expected_research_response_sha256,
+        expected_research_response_byte_size=expected_research_response_byte_size,
+    )
 
 
 def _template(
@@ -5373,10 +5608,13 @@ def run_guided_wizard(
         print("已检测到结果文件更新且写入稳定，正在读取并校验……", flush=True)
         try:
             payload = _read_json_response_file(response_path)
+            if _response_file_signature(response_path) != response_signature:
+                raise LocalInvestmentPilotError("CHATGPT_RESPONSE_CHANGED_DURING_VALIDATION")
             # Never trust AI-authored copies of operator controls. Restore only
             # these fields from the trusted local template; leave the raw response
             # file untouched and record the exact paths in the completed input.
             payload.pop("_local_operator_controlled_field_recovery", None)
+            payload.pop("_local_research_response_provenance", None)
             restored_fields = _restore_operator_controlled_fields_from_template(template_path, payload)
             if restored_fields:
                 payload["_local_operator_controlled_field_recovery"] = {
@@ -5395,6 +5633,16 @@ def run_guided_wizard(
             _assert_response_preserves_operator_inputs(template_path, payload)
             _prepare_input(payload)
             _validate_guided_research_response(payload)
+            payload["_local_research_response_provenance"] = {
+                "schema_version": LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
+                "status": "CAPTURED_RAW_CHATGPT_RESPONSE",
+                "source_filename": response_path.name,
+                "sha256": response_signature[2],
+                "byte_size": response_signature[0],
+                "capture_stage": "VALIDATED_RAW_RESPONSE_BEFORE_LOCAL_OPERATOR_FIELD_RECOVERY",
+                "validation_status": "PASSED",
+                "raw_response_file_modified_by_runner": False,
+            }
             break
         except (OSError, ValueError, KeyError, TypeError) as exc:
             previous_response_signature = response_signature
@@ -5429,7 +5677,13 @@ def run_guided_wizard(
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     completed = private_inputs / f"pilot-completed-{symbol.replace('.', '-')}-{stamp}.json"
     _write_local(completed, json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False))
-    result = run_local_investment_pilot(input_path=completed, output_root=output_root)
+    result = run_local_investment_pilot(
+        input_path=completed,
+        output_root=output_root,
+        research_response_path=response_path,
+        expected_research_response_sha256=response_signature[2],
+        expected_research_response_byte_size=response_signature[0],
+    )
     print("\n分析完成：")
     print(json.dumps(_safe(result), ensure_ascii=False, indent=2))
     report_path = result.get("report_path")
