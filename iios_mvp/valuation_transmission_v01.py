@@ -125,6 +125,7 @@ def evaluate_valuation_transmission(
     unresolved_evidence_ids: list[str] | None = None,
     after_cutoff_evidence_ids: list[str] | None = None,
     uncertain_timing_evidence_ids: list[str] | None = None,
+    expected_currency: Any = None,
 ) -> dict[str, Any]:
     """Calculate a project-to-per-share bridge and apply it only on a complete valid path."""
     if not isinstance(raw, Mapping):
@@ -169,6 +170,18 @@ def evaluate_valuation_transmission(
         result.update({
             "status": "NOT_LINKED_UNSUPPORTED_MODEL_FAMILY",
             "summary": f"操作者选择的模型类别为 {selected_family}；B5 本批只实现 EPS_MULTIPLE 传导，不用该公式冒充 DCF、DDM、SOTP 或 RNPV。",
+        })
+        return result
+    case_currency = str(expected_currency or "").strip().upper()
+    if case_currency and case_currency != "CNY":
+        result.update({
+            "status": "NOT_LINKED_CURRENCY_NOT_SUPPORTED",
+            "summary": (
+                f"B5 v0.1 的项目利润及每股增量以 CNY 计量，而本证券计价币种为 {case_currency}；"
+                "没有已验证的货币转换输入，不能将 CNY/股增量直接加到其他币种的 EPS_MULTIPLE 基准。"
+                "本地保留原有每股情景，不进行传导或自动换汇。"
+            ),
+            "input_issues": ["B5_CNY_INCREMENT_TO_NON_CNY_SECURITY_CURRENCY_NOT_SUPPORTED"],
         })
         return result
     if input_family != selected_family:
