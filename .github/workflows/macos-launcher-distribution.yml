@@ -27,6 +27,9 @@ jobs:
       - name: Build launcher distribution and verify Unix permissions
         run: |
           python tools/package_macos_launchers_v01.py --output-dir dist --commit-sha "$GITHUB_SHA"
+      - name: Install launcher packaging test dependency
+        run: |
+          python -m pip install --disable-pip-version-check pytest
       - name: Test package mode and no-chmod recovery guidance
         run: |
           python -m pytest -q tests/test_macos_launcher_distribution_v01.py
