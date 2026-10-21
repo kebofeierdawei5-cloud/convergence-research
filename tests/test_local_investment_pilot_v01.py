@@ -3941,7 +3941,7 @@ def test_eps_multiple_issuer_forecast_requires_official_primary_source_linkage(m
     assert adapter["status"] == "CALCULATED"
     assert adapter["scenarios"]["base"][measure_key]["data_class"] == "ISSUER_FORECAST"
     assert adapter["scenarios"]["base"][measure_key]["evidence_refs"] == ["E1"]
-    assert "formally" not in report.lower() or "formal" in report.lower()
+    assert adapter["scenarios"]["base"][measure_key]["formal_evidence_pit_admission"] is False
 
 
 @pytest.mark.parametrize(
