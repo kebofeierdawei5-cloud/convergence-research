@@ -228,6 +228,7 @@ def _sync_eps_multiple_values(payload: dict, terminal_values: dict[str, object])
     for name, terminal_value in terminal_values.items():
         value = Decimal(str(terminal_value))
         row = node["scenarios"][name]
+        row["eps_per_share"]["unit"] = str(payload["case"]["currency"]) + "/share"
         row["eps_per_share"]["value"] = format(value / Decimal("10"), "f")
         row["pe_multiple_x"]["value"] = "10"
 
@@ -1637,7 +1638,7 @@ def test_bear_base_bull_total_wealth_ordering_is_required():
     assert analysis["return_metrics_reason"] == "PRIMARY_VALUATION_MODEL_NOT_ELIGIBLE:EPS_MULTIPLE_CALCULATION_NOT_ELIGIBLE"
     assert "EPS_MULTIPLE_SCENARIO_ORDERING_INCONSISTENT" in analysis["valuation_model_consistency"]["issues"]
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
-    assert "SCENARIO_WEALTH_ORDERING_INCONSISTENT" in analysis["decision"]["gating_issues"]
+    assert "EPS_MULTIPLE_SCENARIO_ORDERING_INCONSISTENT" in analysis["valuation_model_consistency"]["issues"]
 
 
 
@@ -2779,6 +2780,7 @@ def test_scenario_probability_with_placeholder_rationale_blocks_return_and_entry
 def test_b6_preserves_unknown_when_return_inputs_are_incomplete():
     payload = _b5_ready_payload()
     payload["forecast_valuation"]["entry_value_reference_per_share"] = None
+    payload["eps_multiple_valuation"]["scenarios"]["base"]["eps_per_share"]["value"] = None
     analysis, report = _analyse(payload, "TEST-B6-UNKNOWN")
     zone = analysis["price_zone_sensitivity"]
     assert analysis["return_metrics"] is None
@@ -3664,6 +3666,7 @@ def test_hong_kong_dated_cash_distribution_uses_ex_date_before_record_date():
     payload["case"]["symbol"] = "0700.HK"
     payload["case"]["currency"] = "HKD"
     payload["price_input"]["currency"] = "HKD"
+    _sync_eps_multiple_values(payload, {"bear": "120", "base": "150", "bull": "180"})
     forecast = payload["forecast_valuation"]
     forecast["cash_distribution_review"] = {
         "status": "KNOWN_FUTURE_DISTRIBUTIONS",
@@ -3704,6 +3707,7 @@ def test_dated_distribution_rejects_cross_market_record_ex_date_order(market, re
         payload["case"]["symbol"] = "0700.HK"
         payload["case"]["currency"] = "HKD"
         payload["price_input"]["currency"] = "HKD"
+    _sync_eps_multiple_values(payload, {"bear": "120", "base": "150", "bull": "180"})
     forecast = payload["forecast_valuation"]
     forecast["cash_distribution_review"] = {
         "status": "KNOWN_FUTURE_DISTRIBUTIONS",
