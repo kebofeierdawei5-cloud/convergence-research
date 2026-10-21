@@ -316,7 +316,12 @@ def _assessment_status_for_report(section: Mapping[str, Any]) -> str:
 def _items(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [str(item).strip() for item in value if str(item).strip()]
+    result: list[str] = []
+    for item in value:
+        rendered = _humanize_item(item) if isinstance(item, Mapping) else str(item).strip()
+        if rendered:
+            result.append(rendered)
+    return result
 
 
 def _is_identifiable_evidence_text(value: Any) -> bool:
@@ -406,6 +411,9 @@ def _humanize_item(value: Any) -> str:
         if item.get(key) not in (None, ""):
             parts.append(f"{label}：{_humanize_item(item[key])}")
     for key, label in (
+        ("condition", "条件"), ("measurement", "验证方法"), ("effect", "影响"),
+        ("trigger", "触发条件"), ("metric", "监控指标"), ("threshold", "触发阈值"),
+        ("decision_effect", "决策影响"),
         ("summary", "摘要"), ("basis", "依据"), ("rationale", "理由"),
         ("description", "说明"), ("monitoring_trigger", "监控触发条件"),
         ("operating_impact", "经营影响"), ("valuation_mechanism", "估值传导机制"),
@@ -3474,6 +3482,12 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         if conflicts else
         "- 带标签的备注股价一致性：未发现与结构化当前价冲突的明确表述；所有回报计算仅使用上方结构化当前价。"
     )
+    model_contract = analysis.get("valuation_model_consistency") or {}
+    model_anchor_label = (
+        "主估值参考锚"
+        if model_contract.get("primary_model_price_calculation_eligible") is True
+        else "候选模型参考锚（主模型门禁未通过，仅供诊断）"
+    )
     lines = [
         f"# IIOS 本地投资研究试运行：{c['company']}（{c['symbol']}）",
         "",
@@ -3568,7 +3582,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f"- 模型名称：{f['model']}",
         f"- 模型选择理由（清理状态 {f.get('model_rationale_status', 'UNKNOWN')}）：{f['model_rationale'] or '未提供'}",
         f"- 现金分配核查（模型输入声明，非正式证据准入）：{(f.get('cash_distribution_review') or {}).get('status', 'UNKNOWN')}；来源域名/类别核验：{(f.get('cash_distribution_review') or {}).get('source_validation_status', 'UNKNOWN')}；正式证据准入：未完成；{(f.get('cash_distribution_review') or {}).get('summary', '未提供') or '未提供'}；证据 {', '.join((f.get('cash_distribution_review') or {}).get('evidence_refs') or []) or 'UNKNOWN'}。",
-        f"- 主估值参考锚（不是 15% 回报门槛价格，也不是 MIE）：{f.get('entry_value_reference_per_share') or 'UNKNOWN'} {c['currency']}/股",
+        f"- {model_anchor_label}（不是 15% 回报门槛价格，也不是 MIE）：{f.get('entry_value_reference_per_share') or 'UNKNOWN'} {c['currency']}/股",
         f"- EPS_MULTIPLE 原始声明锚（仅供审计，不进入主计算）：{f.get('declared_entry_value_reference_before_eps_multiple_calculation', 'UNKNOWN')}",
         f"- 情景概率是否校准：{'是' if f['probabilities_calibrated'] else '否 / 未校准'}",
         "",
