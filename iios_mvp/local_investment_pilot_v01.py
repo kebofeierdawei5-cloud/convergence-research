@@ -2297,6 +2297,14 @@ def _return_metrics(prepared: Mapping[str, Any]) -> tuple[dict[str, Any] | None,
     }
     try:
         result = calculate_return_metrics(gate, max_loss_pct=params["max_loss_pct"])
+        # Keep the source-validated dated events for the published forecast JSON.
+        # The shared return solver intentionally returns only arithmetic outputs,
+        # not the full source/tax/entitlement metadata needed for audit display.
+        if isinstance(prepared, dict):
+            prepared["_validated_cash_distribution_events"] = {
+                name: [dict(event) for event in rows[name]["cash_distribution_events"]]
+                for name in SCENARIOS
+            }
         return _safe(result), None
     except (ValueError, KeyError, TypeError, InvalidOperation) as exc:
         return None, f"SCENARIO_CALCULATION_INCOMPLETE:{exc}"
@@ -3345,19 +3353,16 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
     # only after the return solver validated all dates, tax arithmetic, sources,
     # and hypothetical eligibility. Failed/unknown calculations never promote
     # an unverified dividend event to a normalized eligible cashflow.
-    if isinstance(metrics, Mapping):
+    validated_distribution_events = prepared.pop("_validated_cash_distribution_events", None)
+    if isinstance(metrics, Mapping) and isinstance(validated_distribution_events, Mapping):
         forecast = prepared.get("forecast_valuation")
         forecast = forecast if isinstance(forecast, dict) else None
         scenario_inputs = forecast.get("scenarios") if isinstance(forecast, dict) else None
-        scenario_metrics = metrics.get("scenarios")
-        if isinstance(scenario_inputs, dict) and isinstance(scenario_metrics, Mapping):
+        if isinstance(scenario_inputs, dict):
             for scenario_name in SCENARIOS:
                 source_row = scenario_inputs.get(scenario_name)
-                metric_row = scenario_metrics.get(scenario_name)
-                if not isinstance(source_row, dict) or not isinstance(metric_row, Mapping):
-                    continue
-                normalized_events = metric_row.get("cash_distribution_events")
-                if isinstance(normalized_events, list):
+                normalized_events = validated_distribution_events.get(scenario_name)
+                if isinstance(source_row, dict) and isinstance(normalized_events, list):
                     source_row["cash_distribution_events"] = [
                         dict(event) for event in normalized_events if isinstance(event, Mapping)
                     ]
