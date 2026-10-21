@@ -4109,6 +4109,75 @@ def test_b27_project_profit_cannot_be_double_counted_over_an_applied_b5_incremen
     assert bridge["primary_eps_price_calculation_eligible"] is False
 
 
+def test_b27_eps_bridge_requires_company_wide_b4_scope_and_same_period_diluted_shares():
+    case = _b27_eps_bridge_payload()
+    case["operating_driver_forecast"]["scope"] = "PROJECT_INCREMENTAL"
+    bridge = _run_b27_eps_bridge(case)
+    assert bridge["status"] == "NOT_LINKED"
+    assert any("EPS_BRIDGE_CANNOT_USE_NON_COMPANY_WIDE_B4:PROJECT_INCREMENTAL" in issue for issue in bridge["issues"])
+
+    case = _b27_eps_bridge_payload()
+    case["raw"]["scenarios"]["base"]["eps_per_share"]["earnings_bridge"]["diluted_shares"]["forecast_period"] = "2026FY"
+    bridge = _run_b27_eps_bridge(case)
+    assert bridge["status"] == "NOT_LINKED"
+    assert any("WEIGHTED_AVERAGE_DILUTED_SHARES_FORECAST_PERIOD_MISMATCH" in issue for issue in bridge["issues"])
+
+
+def test_b27_hkd_eps_without_fx_contract_remains_assumption_only_not_cny_calculation():
+    case = _b27_eps_bridge_payload()
+    raw = case["raw"]
+    for name in ("bear", "base", "bull"):
+        eps = raw["scenarios"][name]["eps_per_share"]
+        eps["unit"] = "HKD/share"
+        eps["data_class"] = "ANALYST_ASSUMPTION"
+        eps["basis"] = "Synthetic HKD analyst scenario assumption."
+        eps["assumption_derivation"] = "A disclosed hypothetical EPS path in HKD; no CNY-to-HKD conversion is asserted."
+        eps["evidence_refs"] = []
+        eps["earnings_bridge"] = None
+
+    bridge = pilot._evaluate_eps_earnings_bridge(
+        raw,
+        selected_model_family="EPS_MULTIPLE",
+        expected_forecast_period=raw["forecast_period"],
+        expected_terminal_date=raw["valuation_terminal_date"],
+        expected_currency="HKD",
+        operating_driver_forecast=case["operating_driver_forecast"],
+        valuation_transmission=case["valuation_transmission"],
+        operator_baseline_includes_project=None,
+        evidence_register=[],
+    )
+    assert bridge["status"] == "ASSUMPTION_ONLY"
+    assert bridge["primary_eps_price_calculation_eligible"] is True
+    assert bridge["scenarios"]["base"]["status"] == "ASSUMPTION_ONLY"
+    assert "FX" in bridge["scenarios"]["base"]["note"]
+
+
+def test_b27_eps_multiple_adapter_rejects_issuer_pe_with_unverified_source_domain():
+    case = _b27_eps_bridge_payload()
+    bridge = _run_b27_eps_bridge(case)
+    assert bridge["status"] == "CALCULATED"
+
+    case["raw"]["scenarios"]["base"]["pe_multiple_x"]["data_class"] = "ISSUER_FORECAST"
+    case["raw"]["scenarios"]["base"]["pe_multiple_x"]["evidence_refs"] = ["E2"]
+    case["evidence_register"].append({
+        "source_id": "E2",
+        "source_class": "SECONDARY_MEDIA",
+        "source_domain_class_status": "SOURCE_CLASS_NOT_PRIMARY",
+        "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED",
+    })
+    adapter = pilot._evaluate_primary_eps_multiple_valuation(
+        case["raw"],
+        selected_model_family="EPS_MULTIPLE",
+        expected_forecast_period=case["raw"]["forecast_period"],
+        expected_terminal_date=case["raw"]["valuation_terminal_date"],
+        expected_currency="CNY",
+        evidence_register=case["evidence_register"],
+        eps_earnings_bridge=bridge,
+    )
+    assert adapter["status"] == "INPUT_INCOMPLETE_OR_INVALID"
+    assert any("BASE_PE_MULTIPLE_X_ISSUER_FORECAST_SOURCE_CLASS_OR_DOMAIN_NOT_VERIFIED:E2" in issue for issue in adapter["issues"])
+
+
 def test_b27_missing_issuer_bridge_blocks_primary_eps_price_path():
     payload = _payload()
     for name in ("bear", "base", "bull"):
