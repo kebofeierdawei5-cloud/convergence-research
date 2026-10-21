@@ -7,11 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PACKAGER = REPO_ROOT / "tools" / "package_macos_launchers_v01.py"
-COMMANDS = (
-    "IIOS_独立安全启动当前主线.command",
-    "启动IIOS投资分析.command",
-    "验收IIOS全流程与Replay.command",
-)
+ONE_CLICK_COMMAND = "IIOS_一键启用并验收.command"
 
 
 def test_packager_creates_zip_with_executable_posix_mode_and_readme(tmp_path: Path) -> None:
@@ -35,17 +31,28 @@ def test_packager_creates_zip_with_executable_posix_mode_and_readme(tmp_path: Pa
 
     with zipfile.ZipFile(archives[0]) as zf:
         names = set(zf.namelist())
-        assert set(COMMANDS).issubset(names)
+        assert names == {ONE_CLICK_COMMAND, "先看我_只需双击.txt"}
         readmes = [name for name in names if name.endswith(".txt")]
-        assert readmes
+        assert readmes == ["先看我_只需双击.txt"]
         readme = zf.read(readmes[0]).decode("utf-8")
         assert "/bin/bash" in readme
+        assert "双击唯一的启动文件" in readme
         assert "chmod" in readme
-        for filename in COMMANDS:
-            info = zf.getinfo(filename)
-            assert info.create_system == 3
-            assert ((info.external_attr >> 16) & 0o777) == 0o755
-            assert zf.read(filename).startswith(b"#!/bin/bash")
+        info = zf.getinfo(ONE_CLICK_COMMAND)
+        assert info.create_system == 3
+        assert ((info.external_attr >> 16) & 0o777) == 0o755
+        launcher_bytes = zf.read(ONE_CLICK_COMMAND)
+        assert launcher_bytes.startswith(b"#!/bin/bash")
+        assert b"IIOS_ACCEPTANCE_AUTO_START=1 python3 -m iios_mvp.local_run_replay_acceptance_v01" in launcher_bytes
+
+
+def test_one_click_launcher_forces_full_flow_without_secondary_menu() -> None:
+    launcher = (REPO_ROOT / "IIOS_独立安全启动当前主线.command").read_text(encoding="utf-8")
+    acceptance_module = (REPO_ROOT / "iios_mvp" / "local_run_replay_acceptance_v01.py").read_text(encoding="utf-8")
+    assert "IIOS_ACCEPTANCE_AUTO_START=1 python3 -m iios_mvp.local_run_replay_acceptance_v01" in launcher
+    assert 'if os.environ.get("IIOS_ACCEPTANCE_AUTO_START") == "1":' in acceptance_module
+    assert 'choice = "1"' in acceptance_module
+    assert 'choice = input("请选择 [1]：").strip() or "1"' in acceptance_module
 
 
 def test_current_e2e_runbook_covers_permission_json_recovery_b27_and_private_outputs() -> None:
@@ -57,7 +64,7 @@ def test_current_e2e_runbook_covers_permission_json_recovery_b27_and_private_out
     ).read_text(encoding="utf-8")
 
     required_controls = (
-        "IIOS_独立安全启动当前主线.command",
+        "IIOS_一键启用并验收.command",
         "/bin/bash",
         "CHATGPT_JSON_INVALID_COPY_THE_COMPLETE_JSON_OBJECT",
         "CHATGPT_JSON_TRAILING_CONTENT_AFTER_OBJECT",
@@ -67,6 +74,7 @@ def test_current_e2e_runbook_covers_permission_json_recovery_b27_and_private_out
         "acceptance-bundles",
         "不要把 JSON 粘贴到 Terminal",
         "不要关闭 Gatekeeper",
+        "自动进入完整分析",
     )
     missing = [item for item in required_controls if item not in runbook]
     assert not missing, f"current Mac E2E runbook is missing controls: {missing}"
