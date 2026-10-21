@@ -48,6 +48,41 @@ def test_packager_creates_zip_with_executable_posix_mode_and_readme(tmp_path: Pa
             assert zf.read(filename).startswith(b"#!/bin/bash")
 
 
+def test_current_e2e_runbook_covers_permission_json_recovery_b27_and_private_outputs() -> None:
+    runbook = (
+        REPO_ROOT
+        / "docs"
+        / "iios"
+        / "MACOS_REAL_E2E_ACCEPTANCE_RUNBOOK_20261021.md"
+    ).read_text(encoding="utf-8")
+
+    required_controls = (
+        "IIOS_独立安全启动当前主线.command",
+        "/bin/bash",
+        "CHATGPT_JSON_INVALID_COPY_THE_COMPLETE_JSON_OBJECT",
+        "CHATGPT_JSON_TRAILING_CONTENT_AFTER_OBJECT",
+        "CHATGPT_JSON_INVALID_CODE_FENCE_NOT_CLOSED",
+        "_local_operator_controlled_field_recovery",
+        "eps_earnings_bridge",
+        "acceptance-bundles",
+        "不要把 JSON 粘贴到 Terminal",
+        "不要关闭 Gatekeeper",
+    )
+    missing = [item for item in required_controls if item not in runbook]
+    assert not missing, f"current Mac E2E runbook is missing controls: {missing}"
+
+
+def test_historical_mac_acceptance_guide_points_to_current_runbook() -> None:
+    guide = (
+        REPO_ROOT
+        / "docs"
+        / "iios"
+        / "MACOS_FULL_RUN_AND_REPLAY_ACCEPTANCE_20261015.md"
+    ).read_text(encoding="utf-8")
+    assert "MACOS_REAL_E2E_ACCEPTANCE_RUNBOOK_20261021.md" in guide
+    assert "follow the 2026-10-21 runbook" in guide or "使用本文" in guide
+
+
 def test_no_chmod_fallback_is_documented_in_project_incident_record() -> None:
     content = (REPO_ROOT / "docs" / "MACOS_COMMAND_PERMISSION_INCIDENT_20261020.md").read_text(encoding="utf-8")
     assert "/bin/bash" in content

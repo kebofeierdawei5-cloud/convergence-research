@@ -1,3 +1,5 @@
+> **Current instructions as of 2026-10-21:** use [MACOS_REAL_E2E_ACCEPTANCE_RUNBOOK_20261021.md](MACOS_REAL_E2E_ACCEPTANCE_RUNBOOK_20261021.md). It is authoritative for launcher ZIP download, isolated current-main bootstrap, the /bin/bash permission fallback, ChatGPT JSON recovery and B27 EPS-bridge checks. If this historical guide differs, follow the 2026-10-21 runbook. Historical acceptance notes below are retained for audit context.
+
 # IIOS：真实 Mac 全流程运行与 Replay 验收指引（2026-10-15）
 
 ## 本次目标

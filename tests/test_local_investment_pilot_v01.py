@@ -1753,6 +1753,39 @@ def test_extract_json_object_blocks_incomplete_clipboard_response():
         _extract_json_object(source)
 
 
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        " trailing explanation must not be silently ignored",
+        '\\n{"second_object": true}',
+        '\\n\\\u0060\\\u0060\\\u0060 trailing text',
+    ],
+)
+def test_redteam_chatgpt_json_rejects_trailing_text_second_object_and_broken_fence(suffix):
+    from iios_mvp.local_investment_pilot_v01 import _extract_json_object
+
+    source = '{"schema_version": "IIOS-LOCAL-INVESTMENT-PILOT-0.1", "value": 1}' + suffix
+    with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_JSON_TRAILING_CONTENT_AFTER_OBJECT"):
+        _extract_json_object(source)
+
+
+def test_redteam_chatgpt_json_requires_closed_code_fence():
+    from iios_mvp.local_investment_pilot_v01 import _extract_json_object
+
+    fence = chr(96) * 3
+    source = fence + 'json\\n{"schema_version": "IIOS-LOCAL-INVESTMENT-PILOT-0.1"}'
+    with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_JSON_INVALID_CODE_FENCE_NOT_CLOSED"):
+        _extract_json_object(source)
+
+
+def test_redteam_url_escape_repair_does_not_ignore_trailing_text():
+    from iios_mvp.local_investment_pilot_v01 import _extract_json_object
+
+    source = r'{"source_ref":"https\\://example.com/a.pdf"} trailing note'
+    with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_JSON_TRAILING_CONTENT_AFTER_OBJECT"):
+        _extract_json_object(source)
+
+
 def test_research_status_aliases_known_at_precision_and_value_driver_schema():
     payload = _payload(cutoff="2026-10-10")
     payload["evidence_register"][0]["known_at"] = "2026-08-30；具体时分 UNKNOWN"
