@@ -4331,7 +4331,7 @@ def create_pilot_template(
         "最终要判断的是“按输入价格是否值得承担风险”，而不是只判断公司是否优秀或值得研究。请提供足以让本地决策引擎复算的输入，不要另造顶层 action/target-price 字段，也不要在研究回答中声称已发出 BUY/ADD/交易指令；15% 年化门槛、共同约束入场价与暂定动作由本地既有计算器独立计算。"
     )
     eps_multiple_instructions = (
-        "\\\\n\\\\nEPS_MULTIPLE 主估值计算契约（IIOS-EPS-MULTIPLE-VALUATION-0.1 / B27 EPS earnings bridge）："
+        "\n\nEPS_MULTIPLE 主估值计算契约（IIOS-EPS-MULTIPLE-VALUATION-0.1 / B27 EPS earnings bridge）："
         "必须保留 eps_multiple_valuation 节点；forecast_period 与 operating_driver_forecast.forecast_period 一致，valuation_terminal_date 与 forecast_valuation.valuation_terminal_date 一致。"
         "Bear/Base/Bull 每个情景都填 rationale、eps_per_share 与 pe_multiple_x。每个 measure 至少使用 {value,unit,data_class,basis,evidence_refs,note}；eps_per_share 还要填 assumption_derivation 与 earnings_bridge（不可计算时可为 null，但不得因此把 ISSUER_FORECAST 冒充成可复算）。"
         "eps_per_share 单位为个股币种/share（CNY/share 或 HKD/share），必须为同一期间的正 EPS；P/E 的 unit 为 x。数据类别只允许 ISSUER_FORECAST 或 ANALYST_ASSUMPTION。发行人 EPS 必须提供 cutoff 前 evidence_refs，且来源类别须为 EXCHANGE_PRIMARY/REGULATOR_PRIMARY 并与官方域名状态匹配；域名匹配不是内容核实或正式 Evidence/PIT 准入。"
