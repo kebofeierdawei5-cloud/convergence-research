@@ -4408,8 +4408,8 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     raw = str(text or "").strip()
     if not raw:
         raise LocalInvestmentPilotError("CHATGPT_JSON_EMPTY")
-    raw = re.sub(r"^\\s*```(?:json)?\\s*", "", raw, count=1, flags=re.IGNORECASE)
-    raw = re.sub(r"\\s*```\\s*$", "", raw, count=1)
+    raw = re.sub(r"^\s*```(?:json)?\s*", "", raw, count=1, flags=re.IGNORECASE)
+    raw = re.sub(r"\s*```\s*$", "", raw, count=1)
     start = raw.find("{")
     if start < 0:
         raise LocalInvestmentPilotError("CHATGPT_JSON_OBJECT_NOT_FOUND")
@@ -4426,8 +4426,8 @@ def _extract_json_object(text: str) -> dict[str, Any]:
         # not legal JSON escapes. Repair only these two unambiguous URL forms,
         # and only after strict JSON parsing has failed; all other malformed
         # JSON remains fail-closed.
-        normalized = re.sub(r"(?i)\\b(https?)\\\\://", r"\\1://", candidate)
-        normalized = re.sub(r"(?i)\\bwww\\\\\\.", "www.", normalized)
+        normalized = re.sub(r"(?i)\b(https?)\\://", r"\1://", candidate)
+        normalized = re.sub(r"(?i)\bwww\\\.", "www.", normalized)
         if normalized != candidate:
             parsed_candidate = normalized
             try:
