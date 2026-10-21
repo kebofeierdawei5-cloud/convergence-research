@@ -876,6 +876,72 @@ def _evaluate_eps_earnings_bridge(
     if not isinstance(inputs, Mapping) or set(inputs) != set(SCENARIOS):
         return result("NOT_LINKED", issues=["EPS_BRIDGE_REQUIRES_BEAR_BASE_BULL"])
 
+    if currency == "HKD":
+        # B4 monetary outputs are denominated in CNY and no FX-conversion contract
+        # exists in this pilot. Preserve explicit HKD analyst assumptions without
+        # pretending the CNY company-wide earnings proxy can produce HKD EPS.
+        assumption_rows: dict[str, Any] = {}
+        for name in SCENARIOS:
+            row = inputs.get(name)
+            eps_raw = row.get("eps_per_share") if isinstance(row, Mapping) else None
+            if not isinstance(eps_raw, Mapping):
+                assumption_rows[name] = {
+                    "status": "NOT_LINKED",
+                    "issues": [f"{name.upper()}_EPS_OBJECT_REQUIRED"],
+                    "declared_eps_per_share": None,
+                    "calculated_eps_per_share": None,
+                    "eps_match": False,
+                    "formal_evidence_pit_admission": False,
+                }
+                continue
+            try:
+                if str(eps_raw.get("data_class") or "").strip().upper() != "ANALYST_ASSUMPTION":
+                    raise ValueError(f"{name.upper()}_HKD_ISSUER_EPS_BRIDGE_REQUIRES_FX_CONTRACT")
+                if str(eps_raw.get("unit") or "").strip().lower() != "hkd/share":
+                    raise ValueError(f"{name.upper()}_EPS_UNIT_MISMATCH")
+                declared = _positive(eps_raw.get("value"), f"{name.upper()}_DECLARED_EPS")
+                basis = str(eps_raw.get("basis") or "").strip()
+                derivation = str(eps_raw.get("assumption_derivation") or "").strip()
+                if not _is_identifiable_evidence_text(basis) or not _is_identifiable_evidence_text(derivation):
+                    raise ValueError(f"{name.upper()}_ANALYST_ASSUMPTION_DERIVATION_NOT_IDENTIFIABLE")
+                assumption_rows[name] = {
+                    "status": "ASSUMPTION_ONLY",
+                    "declared_eps_per_share": format(declared, "f"),
+                    "calculated_eps_per_share": None,
+                    "absolute_difference_per_share": None,
+                    "rounding_tolerance_per_share": format(EPS_EPS_MATCH_TOLERANCE, "f"),
+                    "eps_match": None,
+                    "derivation_class": "ANALYST_ASSUMPTION",
+                    "assumption_derivation": derivation,
+                    "basis": basis,
+                    "evidence_refs": list(eps_raw.get("evidence_refs") or []),
+                    "note": "B4 金额口径为 CNY，当前没有可用的 FX 传导合同；保留 HKD 分析假设，不伪造 CNY 到 HKD 的 EPS 桥。",
+                    "formal_evidence_pit_admission": False,
+                }
+            except (ValueError, LocalInvestmentPilotError) as exc:
+                assumption_rows[name] = {
+                    "status": "NOT_LINKED",
+                    "issues": [str(exc)],
+                    "declared_eps_per_share": None,
+                    "calculated_eps_per_share": None,
+                    "absolute_difference_per_share": None,
+                    "rounding_tolerance_per_share": format(EPS_EPS_MATCH_TOLERANCE, "f"),
+                    "eps_match": False,
+                    "formal_evidence_pit_admission": False,
+                }
+        hkd_statuses = [str((assumption_rows.get(name) or {}).get("status")) for name in SCENARIOS]
+        if all(value == "ASSUMPTION_ONLY" for value in hkd_statuses):
+            return {
+                **result("ASSUMPTION_ONLY", assumption_rows, period=period, terminal_date=terminal_date, currency=currency),
+                "summary": "HKD EPS 仅保留为明确的分析假设；B4 的 CNY 金额未经过未经授权的汇率换算。",
+            }
+        return {
+            **result("NOT_LINKED", assumption_rows, [
+                "HKD_COMPANY_EPS_BRIDGE_UNAVAILABLE_WITHOUT_EXPLICIT_FX_CONTRACT"
+            ], period=period, terminal_date=terminal_date, currency=currency),
+            "summary": "HKD 公司盈利桥需要显式、期间匹配且可审计的汇率合同；不把 CNY 盈利代理直接除以 HKD 股数。",
+        }
+
     evidence = {
         str(item.get("source_id")): item for item in evidence_register
         if isinstance(item, Mapping) and item.get("source_id")
@@ -1027,7 +1093,7 @@ def _evaluate_eps_earnings_bridge(
                 raise ValueError(f"{name.upper()}_PROJECT_TREATMENT_CONTRADICTS_B5_INCREMENT")
 
             nci = typed_measure(
-                raw_bridge.get("non_controlling_interests_cny"),
+                raw_bridge.get("non_controlling_interests_after_tax"),
                 label=f"{name.upper()}_NON_CONTROLLING_INTERESTS",
                 required_unit=currency,
                 expected_period=period,
@@ -1035,7 +1101,7 @@ def _evaluate_eps_earnings_bridge(
                 signed=False,
             )
             other_adjustment = typed_measure(
-                raw_bridge.get("other_after_tax_attribution_adjustment_cny"),
+                raw_bridge.get("other_after_tax_attribution_adjustment"),
                 label=f"{name.upper()}_OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT",
                 required_unit=currency,
                 expected_period=period,
