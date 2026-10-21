@@ -987,7 +987,11 @@ def _evaluate_eps_earnings_bridge(
         basis = str(raw_measure.get("basis") or "").strip()
         if not _is_identifiable_evidence_text(basis):
             raise ValueError(f"{label}_BASIS_NOT_IDENTIFIABLE")
-        number = _number(raw_measure.get("value"), label) if signed else _positive(raw_measure.get("value"), label)
+        number = (
+            _number(raw_measure.get("value"), label)
+            if signed or required_measure == "NON_CONTROLLING_INTERESTS_AFTER_TAX"
+            else _positive(raw_measure.get("value"), label)
+        )
         refs = normalized_refs(raw_measure, label=label, data_class=data_class)
         return {
             "value": format(number, "f"),
@@ -4091,9 +4095,9 @@ def _template(
             "forecast_period": "UNKNOWN",
             "valuation_terminal_date": None,
             "scenarios": {
-                "bear": {"rationale": "", "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}},
-                "base": {"rationale": "", "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}},
-                "bull": {"rationale": "", "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}}
+                "bear": {"rationale": "", "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "assumption_derivation": "", "earnings_bridge": None, "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}},
+                "base": {"rationale": "", "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "assumption_derivation": "", "earnings_bridge": None, "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}},
+                "bull": {"rationale": "", "eps_per_share": {"value": None, "unit": f"{currency}/share", "data_class": "UNKNOWN", "basis": "", "assumption_derivation": "", "earnings_bridge": None, "evidence_refs": [], "note": ""}, "pe_multiple_x": {"value": None, "unit": "x", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": ""}}
             }
         },
         "sotp_valuation": {
@@ -4263,12 +4267,16 @@ def create_pilot_template(
         "最终要判断的是“按输入价格是否值得承担风险”，而不是只判断公司是否优秀或值得研究。请提供足以让本地决策引擎复算的输入，不要另造顶层 action/target-price 字段，也不要在研究回答中声称已发出 BUY/ADD/交易指令；15% 年化门槛、共同约束入场价与暂定动作由本地既有计算器独立计算。"
     )
     eps_multiple_instructions = (
-        "\\n\\nEPS_MULTIPLE 主估值计算契约（IIOS-EPS-MULTIPLE-VALUATION-0.1）："
+        "\\\\n\\\\nEPS_MULTIPLE 主估值计算契约（IIOS-EPS-MULTIPLE-VALUATION-0.1 / B27 EPS earnings bridge）："
         "必须保留 eps_multiple_valuation 节点；forecast_period 与 operating_driver_forecast.forecast_period 一致，valuation_terminal_date 与 forecast_valuation.valuation_terminal_date 一致。"
-        "Bear/Base/Bull 每个情景都填 rationale、eps_per_share 与 pe_multiple_x；两项均采用 {value,unit,data_class,basis,evidence_refs,note} 结构。"
-        "eps_per_share 单位为本次个股币种/share（CNY/share 或 HKD/share），数值为同一预测期间的正每股盈利；pe_multiple_x 单位为 x，数值为正 P/E 倍数。data_class 只能是 ISSUER_FORECAST 或 ANALYST_ASSUMPTION；发行人预测必须提供截止前 evidence_refs，分析假设必须说明推导与倍数依据。"
-        "若公司预计亏损、EPS 或倍数不可识别，保留 UNKNOWN/null 并说明原因，不能使用负 EPS 乘正 P/E 伪造价值。Bear/Base/Bull 本地复算后须满足终值次序 Bear≤Base≤Bull。"
-        "本地程序会使用结构化 EPS×P/E 复算终值，并以 Base 复算值作为主估值锚；forecast_valuation 中模型直接填写的终值和锚只保留为未信任诊断，不是 EPS_MULTIPLE 主计算来源。任一输入缺失、单位/期间/证据错误或情景次序不成立时，回报、目标入场价和 B6 必须保持 UNKNOWN。该计算只验证明示假设的算术，不证明假设真实、倍数合理或正式估值准入。"
+        "Bear/Base/Bull 每个情景都填 rationale、eps_per_share 与 pe_multiple_x。每个 measure 至少使用 {value,unit,data_class,basis,evidence_refs,note}；eps_per_share 还要填 assumption_derivation 与 earnings_bridge（不可计算时可为 null，但不得因此把 ISSUER_FORECAST 冒充成可复算）。"
+        "eps_per_share 单位为个股币种/share（CNY/share 或 HKD/share），必须为同一期间的正 EPS；P/E 的 unit 为 x。数据类别只允许 ISSUER_FORECAST 或 ANALYST_ASSUMPTION。发行人 EPS 必须提供 cutoff 前 evidence_refs，且来源类别须为 EXCHANGE_PRIMARY/REGULATOR_PRIMARY 并与官方域名状态匹配；域名匹配不是内容核实或正式 Evidence/PIT 准入。"
+        "凡声明 ISSUER_FORECAST 的 EPS，都必须提供 earnings_bridge 对象，schema_version=IIOS-EPS-EARNINGS-BRIDGE-0.1、calculation_method=B4_NET_PROFIT_PROXY_MINUS_NCI_PLUS_ADJUSTMENTS_DIVIDED_BY_DILUTED_SHARES、forecast_period 与估值终点一致、scope=COMPANY_WIDE。不可拿 PROJECT_INCREMENTAL/PRODUCT_LINE EBIT、EBITDA 或项目增量利润代替整家公司净利润。"
+        "earnings_bridge 必须包含 project_profit_treatment（INCLUDED_IN_COMPANY_WIDE_BASELINE / EXCLUDED_FROM_COMPANY_WIDE_BASELINE / NO_PROJECT_INCREMENTAL_ADJUSTMENT 之一）、non_controlling_interests_after_tax、other_after_tax_attribution_adjustment、diluted_shares；每个数值对象均须包含 value、unit、measure、data_class、basis、evidence_refs、forecast_period、note。非控股股东损益必须非负，其他税后归属调整可正可负，diluted_shares 必须是同一期间加权平均稀释股数的实际 shares 数量，而非百万股。CNY 桥接使用 CNY；本地 B4 未提供 HKD 换算合同，不能把 CNY 利润直接除以 HKD 股数，HKD 只能保留有明确推导说明的 ANALYST_ASSUMPTION 路径。"
+        "本地桥接先取 B4 scope=COMPANY_WIDE 且可用的 net_profit_cny 代理，再减非控股股东税后损益、加其他税后归属调整，除以 weighted average diluted shares，得到计算 EPS，并与申报 EPS 比较；每股绝对差异需不超过 0.005 才视为匹配。差异超出容差时报告 EPS_MISMATCH，不得静默覆写任一数值，必须阻断主估值、回报、目标入场价与 B6。"
+        "项目利润不得重复计价：若基线已含项目须得到操作者显式确认且 B5 不得再次加入；若基线不含项目，则需操作者显式确认并由 B5 已传导；未知处理方式一律阻断。发行人桥中净利润调整与稀释股数须有可识别口径与同期间依据，发行人预测证据引用必须时点兼容且类别/域名一致。"
+        "纯 ANALYST_ASSUMPTION 在未提供完整桥接时，须给出清楚、可审计的 assumption_derivation，且保持 ASSUMPTION_ONLY；不得声称它已由公司净利润/稀释股数证实。桥接对象一旦提供但口径/期间/来源/分母不匹配，就失败关闭，不得退化为假设路径。亏损 EPS 或不可识别值保留 UNKNOWN/null，不用负 EPS 乘正 P/E 伪造价值。"
+        "本地程序使用 EPS×P/E 复算每股终值和 Base 主估值锚；forecast_valuation 中模型填写的终值/锚仅作未信任诊断。任一输入、EPS 桥、P/E 或情景次序不合格时，回报、目标入场价、B6 均须 UNKNOWN。此处算术和来源类别校验不等于验证预测真实性、倍数公允性或正式估值准入。"
     )
     b5_transmission_instructions = (
         "\n\nB5 估值传导要求（IIOS-VALUATION-TRANSMISSION-0.1）："
