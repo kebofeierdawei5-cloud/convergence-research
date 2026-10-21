@@ -37,7 +37,7 @@ from iios_mvp.local_investment_pilot_v01 import (
 
 def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
     forecast_year = int(cutoff[:4]) + 1
-    return {
+    payload = {
         "schema_version": PILOT_SCHEMA,
         "case": {
             "company": "示例公司",
@@ -218,6 +218,8 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
         },
         "notes": "Synthetic pytest fixture only.",
     }
+    _populate_b27_companywide_fixture(payload)
+    return payload
 
 
 def _sync_eps_multiple_values(payload: dict, terminal_values: dict[str, object]) -> None:
@@ -2060,6 +2062,65 @@ def _driver_measure(value, unit, data_class="ANALYST_ASSUMPTION", refs=None, bas
         "value": value, "unit": unit, "data_class": data_class, "basis": basis,
         "evidence_refs": list(refs or []), "note": basis,
     }
+
+
+def _populate_b27_companywide_fixture(payload: dict) -> None:
+    """Give the generic synthetic fixture a fully reconciled company-wide B4 -> EPS path."""
+    currency = str(payload["case"]["currency"])
+    period = str(payload["operating_driver_forecast"]["forecast_period"])
+    driver = payload["operating_driver_forecast"]
+    measure = lambda value, unit, data_class="ANALYST_ASSUMPTION", refs=None, basis="Explicit synthetic fixture assumption":
+        _driver_measure(str(value), unit, data_class, refs or [], basis)
+    driver.update({
+        "scope": "COMPANY_WIDE",
+        "status": "UNKNOWN",
+        "actuals_period": "2025FY",
+        "forecast_period": period,
+        "summary": "Synthetic whole-company operations used only to test B4 net profit -> attributable profit -> diluted EPS reconciliation.",
+        "product_lines": [{
+            "product_id": "COMPANY_CORE",
+            "product_name": "Synthetic company-wide core operations",
+            "capacity_tonnes_per_year": measure("1500", "tonnes/year", basis="Synthetic full-year company-wide capacity"),
+            "historical_actuals": {
+                "production_tonnes": measure("1000", "tonnes", "OBSERVED_ACTUAL", ["E1"], "Synthetic 2025FY actuals for B4 reconciliation tests."),
+                "sales_volume_tonnes": measure("900", "tonnes", "OBSERVED_ACTUAL", ["E1"], "Synthetic 2025FY actuals for B4 reconciliation tests."),
+                "net_asp_cny_per_tonne": measure("28000000", "CNY/tonne", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical ASP for tests only."),
+                "variable_cost_cny_per_tonne": measure("14000000", "CNY/tonne", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical unit cost for tests only."),
+            },
+        }],
+        "scenarios": {},
+        "limitations": ["Synthetic test assumptions only; not real company forecasts."],
+    })
+    for name in ("bear", "base", "bull"):
+        driver["scenarios"][name] = {
+            "product_lines": [{
+                "product_id": "COMPANY_CORE",
+                "production_tonnes": measure("1200", "tonnes", basis="Synthetic full-year production assumption below 1500-tonne capacity"),
+                "sales_volume_tonnes": measure("1000", "tonnes", basis="Synthetic full-year sales assumption"),
+                "net_asp_cny_per_tonne": measure("30000000", "CNY/tonne", basis="Synthetic scenario ASP assumption"),
+                "variable_cost_cny_per_tonne": measure("15000000", "CNY/tonne", basis="Synthetic scenario unit-cost assumption"),
+            }],
+            "fixed_cash_opex_cny": measure("1000000000", "CNY", basis="Synthetic annual fixed cash expense"),
+            "depreciation_amortization_cny": measure("1000000000", "CNY", basis="Synthetic annual D&A"),
+            "finance_cost_cny": measure("500000000", "CNY", basis="Synthetic annual finance cost"),
+            "tax_rate": measure("0.20", "ratio", basis="Synthetic tax-rate assumption"),
+            "cash_capex_cny": measure("1000000000", "CNY", basis="Synthetic annual cash capex"),
+            "change_working_capital_cny": measure("0", "CNY", basis="Synthetic annual working-capital change"),
+        }
+    for name in ("bear", "base", "bull"):
+        row = payload["eps_multiple_valuation"]["scenarios"][name]
+        row["earnings_bridge"] = {
+            "schema_version": "IIOS-EPS-EARNINGS-BRIDGE-0.1",
+            "source_mode": "B4_COMPANY_WIDE_NET_PROFIT_RECONCILED",
+            "earnings_period": period,
+            "profit_scope": "COMPANY_WIDE_ATTRIBUTABLE_TO_LISTED_SHAREHOLDERS",
+            "includes_project": True,
+            "share_count_basis": "WEIGHTED_AVERAGE_DILUTED_SHARES",
+            "summary": "Synthetic fixture: B4 whole-company net profit less an explicit parent-attribution adjustment reconciles to attributable earnings; then divide by weighted-average diluted shares.",
+            "profit_attribution_adjustment_cny": measure("0", "CNY", basis="Synthetic zero NCI/attribution adjustment assumption, not a real issuer claim"),
+            "net_profit_attributable": measure("10000000000", "CNY", basis="Synthetic attributable-profit reconciliation target for tests"),
+            "diluted_weighted_average_shares": measure("1000000000", "shares", basis="Synthetic weighted-average diluted-share denominator"),
+        }
 
 
 def _driver_payload():
