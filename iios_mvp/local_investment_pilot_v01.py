@@ -893,6 +893,20 @@ def _evaluate_primary_eps_multiple_valuation(
                     if (source is None or ref in unresolved or ref in after or ref in uncertain
                             or source.get("time_status") != "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"):
                         raise ValueError(f"{name.upper()}_{key.upper()}_EVIDENCE_NOT_CUTOFF_COMPATIBLE:{ref}")
+                    if data_class == "ISSUER_FORECAST":
+                        source_class = str(source.get("source_class") or "").strip().upper()
+                        domain_status = str(source.get("source_domain_class_status") or "").strip().upper()
+                        official_class_domain_match = (
+                            source_class == "EXCHANGE_PRIMARY"
+                            and domain_status == "OFFICIAL_EXCHANGE_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED"
+                        ) or (
+                            source_class == "REGULATOR_PRIMARY"
+                            and domain_status == "OFFICIAL_REGULATOR_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED"
+                        )
+                        if not official_class_domain_match:
+                            raise ValueError(
+                                f"{name.upper()}_{key.upper()}_ISSUER_FORECAST_SOURCE_CLASS_OR_DOMAIN_NOT_VERIFIED:{ref}"
+                            )
                 measures[key] = {"value": format(number, "f"), "unit": unit, "data_class": data_class,
                                  "basis": basis, "evidence_refs": refs, "note": str(measure.get("note") or ""),
                                  "formal_evidence_pit_admission": False}
