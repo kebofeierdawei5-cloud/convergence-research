@@ -91,6 +91,13 @@ def test_historical_mac_acceptance_guide_points_to_current_runbook() -> None:
     assert "follow the 2026-10-21 runbook" in guide or "使用本文" in guide
 
 
+def test_packaging_workflow_installs_pytest_before_running_packaging_tests() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "macos-launcher-distribution.yml").read_text(encoding="utf-8")
+    install_pos = workflow.index("python -m pip install --disable-pip-version-check pytest")
+    test_pos = workflow.index("python -m pytest -q tests/test_macos_launcher_distribution_v01.py")
+    assert install_pos < test_pos
+
+
 def test_no_chmod_fallback_is_documented_in_project_incident_record() -> None:
     content = (REPO_ROOT / "docs" / "MACOS_COMMAND_PERMISSION_INCIDENT_20261020.md").read_text(encoding="utf-8")
     assert "/bin/bash" in content
