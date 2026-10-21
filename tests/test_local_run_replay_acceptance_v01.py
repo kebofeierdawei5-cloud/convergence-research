@@ -292,7 +292,7 @@ def test_inspect_bundle_rejects_malformed_new_investment_contract_field(
     [
         ("EPS_MISMATCH", "INPUT_INCOMPLETE_OR_INVALID", None, None, None),
         ("NOT_LINKED", "INPUT_INCOMPLETE_OR_INVALID", None, None, None),
-        ("EPS_MISMATCH", "CALCULATED", {"expected_annualized_return": "0.2"}, "80", "EPS_MULTIPLE_INELIGIBLE_BRIDGE_DID_NOT_FAIL_CLOSED"),
+        ("EPS_MISMATCH", "CALCULATED", {"expected_annualized_return": "0.2"}, "80", "EPS_MULTIPLE_CALCULATED_WITHOUT_ELIGIBLE_EARNINGS_BRIDGE"),
     ],
 )
 def test_inspect_bundle_checks_eps_bridge_price_gating(
