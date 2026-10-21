@@ -4,7 +4,7 @@ State classification: **CANONICAL**
 Snapshot: 2026-10-21
 Authority: this file is the **only canonical Current State Index**.
 
-## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-20
+## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-21
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
