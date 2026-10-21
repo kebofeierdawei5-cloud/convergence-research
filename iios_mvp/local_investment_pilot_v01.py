@@ -3341,6 +3341,26 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
 def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], str]:
     prepared = _prepare_input(payload)
     metrics, reason = _return_metrics(prepared)
+    # Persist conditional entitlement metadata to the published scenario JSON
+    # only after the return solver validated all dates, tax arithmetic, sources,
+    # and hypothetical eligibility. Failed/unknown calculations never promote
+    # an unverified dividend event to a normalized eligible cashflow.
+    if isinstance(metrics, Mapping):
+        forecast = prepared.get("forecast_valuation")
+        forecast = forecast if isinstance(forecast, dict) else None
+        scenario_inputs = forecast.get("scenarios") if isinstance(forecast, dict) else None
+        scenario_metrics = metrics.get("scenarios")
+        if isinstance(scenario_inputs, dict) and isinstance(scenario_metrics, Mapping):
+            for scenario_name in SCENARIOS:
+                source_row = scenario_inputs.get(scenario_name)
+                metric_row = scenario_metrics.get(scenario_name)
+                if not isinstance(source_row, dict) or not isinstance(metric_row, Mapping):
+                    continue
+                normalized_events = metric_row.get("cash_distribution_events")
+                if isinstance(normalized_events, list):
+                    source_row["cash_distribution_events"] = [
+                        dict(event) for event in normalized_events if isinstance(event, Mapping)
+                    ]
     stress_review = _thesis_break_stress_review(prepared)
     price_zone_sensitivity = _price_zone_sensitivity(prepared, metrics, reason)
     portfolio_package = build_local_pilot_portfolio_package(
