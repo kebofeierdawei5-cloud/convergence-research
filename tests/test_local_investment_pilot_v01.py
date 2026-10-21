@@ -223,16 +223,49 @@ def _payload(*, price: str = "100", cutoff: str = "2026-10-10") -> dict:
 
 
 def _sync_eps_multiple_values(payload: dict, terminal_values: dict[str, object]) -> None:
-    """Keep synthetic EPS×P/E assumptions aligned when a test intentionally changes its scenario values."""
+    """Align synthetic declared EPS, earnings bridge, and B4 scenario math for controlled tests."""
     node = payload["eps_multiple_valuation"]
-    node["forecast_period"] = payload["operating_driver_forecast"]["forecast_period"]
+    driver = payload["operating_driver_forecast"]
+    node["forecast_period"] = driver["forecast_period"]
     node["valuation_terminal_date"] = payload["forecast_valuation"]["valuation_terminal_date"]
+    currency = str(payload["case"]["currency"])
+    scope = str(driver.get("scope") or "UNKNOWN").upper()
+    operator_baseline = payload.get("operator_valuation_context", {}).get("baseline_includes_project")
     for name, terminal_value in terminal_values.items():
         value = Decimal(str(terminal_value))
+        eps_value = value / Decimal("10")
         row = node["scenarios"][name]
-        row["eps_per_share"]["unit"] = str(payload["case"]["currency"]) + "/share"
-        row["eps_per_share"]["value"] = format(value / Decimal("10"), "f")
+        row["eps_per_share"]["unit"] = currency + "/share"
+        row["eps_per_share"]["value"] = format(eps_value, "f")
         row["pe_multiple_x"]["value"] = "10"
+        bridge = row["earnings_bridge"]
+        bridge["earnings_period"] = driver["forecast_period"]
+        bridge["includes_project"] = operator_baseline if isinstance(operator_baseline, bool) else bridge.get("includes_project", True)
+        shares_measure = bridge["diluted_weighted_average_shares"]
+        shares = Decimal(str(shares_measure["value"]))
+        attributed_profit = eps_value * shares
+        if scope == "COMPANY_WIDE":
+            bridge["source_mode"] = "B4_COMPANY_WIDE_NET_PROFIT_RECONCILED"
+            bridge["net_profit_attributable"]["unit"] = "CNY"
+            bridge["net_profit_attributable"]["value"] = format(attributed_profit, "f")
+            bridge["profit_attribution_adjustment_cny"]["value"] = "0"
+            b4_row = driver["scenarios"][name]
+            line = b4_row["product_lines"][0]
+            volume = Decimal(str(line["sales_volume_tonnes"]["value"]))
+            unit_cost = Decimal(str(line["variable_cost_cny_per_tonne"]["value"]))
+            tax = Decimal(str(b4_row["tax_rate"]["value"]))
+            fixed = Decimal(str(b4_row["fixed_cash_opex_cny"]["value"]))
+            da = Decimal(str(b4_row["depreciation_amortization_cny"]["value"]))
+            finance = Decimal(str(b4_row["finance_cost_cny"]["value"]))
+            required_pretax = attributed_profit / (Decimal("1") - tax)
+            required_contribution = required_pretax + fixed + da + finance
+            line["net_asp_cny_per_tonne"]["value"] = format(unit_cost + required_contribution / volume, "f")
+        elif scope == "PROJECT_INCREMENTAL":
+            bridge["source_mode"] = "INDEPENDENT_COMPANY_WIDE_BASELINE"
+            bridge["net_profit_attributable"]["unit"] = currency
+            bridge["net_profit_attributable"]["value"] = format(attributed_profit, "f")
+        else:
+            bridge["source_mode"] = "UNKNOWN"
 
 
 def _write_input(tmp_path: Path, payload: dict | None = None) -> Path:
