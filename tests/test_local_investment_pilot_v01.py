@@ -4105,7 +4105,7 @@ def test_b27_project_profit_cannot_be_double_counted_over_an_applied_b5_incremen
     bridge = _run_b27_eps_bridge(case)
 
     assert bridge["status"] == "NOT_LINKED"
-    assert any("PROJECT_PROFIT_DOUBLE_COUNT_RISK" in issue for issue in bridge["issues"])
+    assert any("PROJECT_INCREMENTAL_PROFIT_DOUBLE_COUNT_RISK" in issue for issue in bridge["issues"])
     assert bridge["primary_eps_price_calculation_eligible"] is False
 
 
