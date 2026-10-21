@@ -1091,7 +1091,7 @@ def _evaluate_eps_earnings_bridge(
             elif project_treatment == "EXCLUDED_FROM_COMPANY_WIDE_BASELINE":
                 if operator_baseline_includes_project is not False:
                     raise ValueError(f"{name.upper()}_PROJECT_BASELINE_EXCLUSION_NOT_OPERATOR_CONFIRMED")
-                if b5_status != "APPLIED_TO_PER_SHARE_SCENARIOS":
+                if b5_status not in {"APPLIED_TO_PER_SHARE_SCENARIOS", "PENDING_VALIDATION"}:
                     raise ValueError(f"{name.upper()}_PROJECT_INCREMENTAL_NOT_TRANSMITTED_FROM_EXCLUDED_BASELINE")
             elif b5_status == "APPLIED_TO_PER_SHARE_SCENARIOS":
                 raise ValueError(f"{name.upper()}_PROJECT_TREATMENT_CONTRADICTS_B5_INCREMENT")
@@ -2409,7 +2409,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         expected_terminal_date=forecast.get("valuation_terminal_date"),
         expected_currency=currency,
         operating_driver_forecast=operating_driver_forecast,
-        valuation_transmission=valuation_transmission,
+        valuation_transmission={"status": "PENDING_VALIDATION", "applied_to_per_share_scenarios": False},
         operator_baseline_includes_project=operator_valuation_context["baseline_includes_project"],
         evidence_register=sources,
         unresolved_evidence_ids=unknown_refs,
@@ -2500,6 +2500,70 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         after_cutoff_evidence_ids=after_cutoff_refs,
         uncertain_timing_evidence_ids=uncertain_timing_refs,
     )
+    if operator_valuation_context["selected_model_family"] == "EPS_MULTIPLE":
+        # Revalidate project inclusion against the actual B5 result after B5 has
+        # evaluated its complete input. The initial bridge pass uses PENDING_VALIDATION
+        # to avoid a circular dependency: B5 needs the recalculated EPS terminal value.
+        final_eps_earnings_bridge = _evaluate_eps_earnings_bridge(
+            raw_eps_multiple_valuation,
+            selected_model_family=operator_valuation_context["selected_model_family"],
+            expected_forecast_period=operating_driver_forecast.get("forecast_period"),
+            expected_terminal_date=forecast.get("valuation_terminal_date"),
+            expected_currency=currency,
+            operating_driver_forecast=operating_driver_forecast,
+            valuation_transmission=valuation_transmission,
+            operator_baseline_includes_project=operator_valuation_context["baseline_includes_project"],
+            evidence_register=sources,
+            unresolved_evidence_ids=unknown_refs,
+            after_cutoff_evidence_ids=after_cutoff_refs,
+            uncertain_timing_evidence_ids=uncertain_timing_refs,
+        )
+        eps_earnings_bridge = final_eps_earnings_bridge
+        eps_multiple_valuation = _evaluate_primary_eps_multiple_valuation(
+            raw_eps_multiple_valuation,
+            selected_model_family=operator_valuation_context["selected_model_family"],
+            expected_forecast_period=operating_driver_forecast.get("forecast_period"),
+            expected_terminal_date=forecast.get("valuation_terminal_date"),
+            expected_currency=currency,
+            evidence_register=sources,
+            eps_earnings_bridge=eps_earnings_bridge,
+            unresolved_evidence_ids=unknown_refs,
+            after_cutoff_evidence_ids=after_cutoff_refs,
+            uncertain_timing_evidence_ids=uncertain_timing_refs,
+        )
+        if eps_multiple_valuation.get("status") != "CALCULATED":
+            # Do not leave an EPS×P/E number in the primary terminal-value slot after
+            # the final B5/project-inclusion revalidation invalidates the EPS bridge.
+            scenario_rows = forecast.get("scenarios") if isinstance(forecast.get("scenarios"), Mapping) else {}
+            restored_rows = {
+                key: dict(value) if isinstance(value, Mapping) else value
+                for key, value in scenario_rows.items()
+            }
+            for scenario_name in SCENARIOS:
+                row = restored_rows.get(scenario_name)
+                if not isinstance(row, dict):
+                    continue
+                if "declared_terminal_value_before_eps_multiple_calculation" in row:
+                    row["terminal_value_per_share"] = row.get("declared_terminal_value_before_eps_multiple_calculation")
+                row.pop("eps_multiple_calculation_applied", None)
+                row.pop("b5_baseline_terminal_value_per_share", None)
+                row.pop("b5_transmission_applied", None)
+            forecast["scenarios"] = restored_rows
+            forecast["entry_value_reference_per_share"] = forecast.get(
+                "declared_entry_value_reference_before_eps_multiple_calculation",
+                forecast.get("entry_value_reference_per_share"),
+            )
+            forecast.pop("b5_baseline_entry_value_reference_per_share", None)
+            if valuation_transmission.get("applied_to_per_share_scenarios") is True:
+                rejected_status = valuation_transmission.get("status")
+                valuation_transmission = dict(valuation_transmission)
+                valuation_transmission["pre_eps_bridge_status"] = rejected_status
+                valuation_transmission["status"] = "NOT_LINKED_EPS_EARNINGS_BRIDGE_INELIGIBLE"
+                valuation_transmission["applied_to_per_share_scenarios"] = False
+                valuation_transmission["input_issues"] = list(dict.fromkeys([
+                    *(valuation_transmission.get("input_issues") or []),
+                    "EPS_EARNINGS_BRIDGE_NOT_ELIGIBLE_AFTER_B5_REVALIDATION",
+                ]))
     valuation_model_consistency = _build_valuation_model_consistency(
         operator_model_family=operator_valuation_context["selected_model_family"],
         forecast_model_family=forecast.get("model_family"),
