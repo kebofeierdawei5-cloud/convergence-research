@@ -483,11 +483,14 @@ def _inspect_bundle(run_dir: Path, *, expected_replay_of: str | None = None) -> 
     eps_multiple = analysis.get("eps_multiple_valuation")
     if (
         not isinstance(eps_multiple, dict)
+        or eps_multiple.get("schema_version") != "IIOS-EPS-MULTIPLE-VALUATION-0.1"
+        or eps_multiple.get("method") != "EPS_PER_SHARE_X_PE_MULTIPLE"
         or not isinstance(eps_multiple.get("status"), str)
         or not isinstance(eps_multiple.get("scenarios"), dict)
         or not isinstance(eps_multiple.get("issues"), list)
         or not isinstance(eps_multiple.get("selected_for_primary_model"), bool)
         or (eps_multiple.get("status") == "CALCULATED" and eps_multiple.get("selected_for_primary_model") is not True)
+        or (eps_multiple.get("status") == "CALCULATED" and set(eps_multiple.get("scenarios", {})) != {"bear", "base", "bull"})
     ):
         raise AcceptanceError(f"EPS_MULTIPLE_VALUATION_MISSING_OR_INVALID:{run_dir.name}")
     model_consistency = analysis.get("valuation_model_consistency")
