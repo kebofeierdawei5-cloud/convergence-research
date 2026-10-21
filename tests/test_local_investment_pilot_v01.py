@@ -526,6 +526,34 @@ def test_thesis_intact_downgrades_when_break_or_monitoring_triggers_are_unidenti
     assert "Thesis 状态：UNKNOWN" in report
 
 
+def test_structured_thesis_triggers_are_rendered_as_readable_text_not_python_dict_repr():
+    payload = _payload()
+    payload["assessment"]["thesis"]["break_conditions"] = [{
+        "condition": "核心产品毛利率连续两个季度同比下滑",
+        "measurement": "季度分产品毛利率同比",
+        "threshold": "连续两个季度为负增长",
+        "effect": "下调收入质量与可持续利润率判断",
+        "evidence_refs": ["E1"],
+    }]
+    payload["assessment"]["thesis"]["reassessment_triggers"] = [{
+        "trigger": "下一次定期报告披露",
+        "metric": "核心产品收入增速与经营现金流",
+        "threshold": "收入减速且现金流转化同步恶化",
+        "decision_effect": "重新评估基准情景与估值倍数",
+        "evidence_refs": ["E1"],
+    }]
+
+    analysis, report = _analyse(payload, "TEST-THESIS-STRUCTURED-TRIGGERS")
+
+    assert "核心产品毛利率连续两个季度同比下滑" in analysis["assessment"]["thesis"]["break_conditions"][0]
+    assert "验证方法：季度分产品毛利率同比" in analysis["assessment"]["thesis"]["break_conditions"][0]
+    assert "决策影响：重新评估基准情景与估值倍数" in analysis["assessment"]["thesis"]["reassessment_triggers"][0]
+    assert "{'condition':" not in report
+    assert "{'trigger':" not in report
+    assert "验证方法：季度分产品毛利率同比" in report
+    assert "决策影响：重新评估基准情景与估值倍数" in report
+
+
 def test_thesis_intact_is_preserved_with_identifiable_break_and_reassessment_triggers():
     analysis, _report = _analyse(_payload(), "TEST-THESIS-TRIGGERS-IDENTIFIABLE")
 
@@ -2148,6 +2176,8 @@ def test_operating_driver_bridge_calculates_volume_price_cost_and_cash_flow():
     assert bear["profit_before_tax_cny"] == "325000"
     assert bear["net_profit_cny"] == "243750.00"
     assert bear["unlevered_fcf_proxy_cny"] == "234500.00"
+    assert bear["calculation_status"] == "SCENARIO_ARITHMETIC_COMPLETE"
+    assert bear["financial_outputs_decision_usable"] is True
     assert driver["valuation_transmission"]["status"] == "NOT_LINKED_TO_PER_SHARE_VALUE"
     assert driver["formal_forecast_admission_created"] is False
 
@@ -2168,6 +2198,7 @@ def test_operating_driver_numeric_assumption_with_placeholder_basis_is_not_calcu
     assert base["unlevered_fcf_proxy_cny"] is None
     assert "base.tax_rate:BASIS_NOT_IDENTIFIABLE" in base["issues"]
     assert base["calculation_status"] == "PARTIAL_SCENARIO_BRIDGE"
+    assert base["financial_outputs_decision_usable"] is False
 
 
 def test_b5_numeric_assumption_with_placeholder_basis_blocks_transmission_and_price():
@@ -2256,6 +2287,8 @@ def test_operating_driver_forecast_preserves_unknown_revenue_when_asp_is_missing
     assert base["revenue_cny"] is None
     assert base["net_profit_cny"] is None
     assert "total_revenue" in base["missing_inputs"]
+    assert base["calculation_status"] == "SCENARIO_ECONOMICS_NOT_IDENTIFIABLE"
+    assert base["financial_outputs_decision_usable"] is False
 
 
 def test_operating_driver_forecast_rejects_wrong_units():
