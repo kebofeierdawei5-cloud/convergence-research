@@ -45,7 +45,7 @@ def _bundle(
         "valuation_transmission": {"status": "NOT_LINKED"},
         "price_zone_sensitivity": {"status": "UNKNOWN"},
         "sotp_valuation": {"status": "NOT_SELECTED", "scenarios": {}, "issues": []},
-        "eps_multiple_valuation": {"status": "NOT_SELECTED", "scenarios": {}, "issues": [], "selected_for_primary_model": False},
+        "eps_multiple_valuation": {"schema_version": "IIOS-EPS-MULTIPLE-VALUATION-0.1", "method": "EPS_PER_SHARE_X_PE_MULTIPLE", "status": "NOT_SELECTED", "scenarios": {}, "issues": [], "selected_for_primary_model": False},
         "valuation_model_consistency": {
             "status": "UNKNOWN",
             "primary_model_price_calculation_eligible": False,
@@ -188,6 +188,15 @@ def test_non_eps_model_does_not_require_eps_project_scope_flag() -> None:
         },
     })
     assert issues == []
+
+
+def test_inspect_bundle_rejects_wrong_eps_multiple_schema_or_method(tmp_path: Path) -> None:
+    run_dir = _bundle(tmp_path)
+    analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
+    analysis["eps_multiple_valuation"]["schema_version"] = "wrong-schema"
+    _write_json(run_dir / "analysis.json", analysis)
+    with pytest.raises(acceptance.AcceptanceError, match="EPS_MULTIPLE_VALUATION_MISSING_OR_INVALID"):
+        acceptance._inspect_bundle(run_dir, expected_replay_of=None)
 
 
 def test_inspect_bundle_checks_required_current_investment_result_fields_and_no_trade_flags(tmp_path: Path) -> None:
