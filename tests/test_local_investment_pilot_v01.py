@@ -2051,8 +2051,8 @@ def _write_captured_research_input(tmp_path: Path) -> tuple[Path, Path, tuple[in
         "source_filename": response_path.name,
         "sha256": signature[2],
         "byte_size": signature[0],
-        "capture_stage": "VALIDATED_RAW_RESPONSE_BEFORE_LOCAL_OPERATOR_FIELD_RECOVERY",
-        "validation_status": "PASSED",
+        "capture_stage": "RAW_RESPONSE_HASHED_ON_STABLE_SAVE_BEFORE_LOCAL_OPERATOR_FIELD_RECOVERY",
+        "validation_status": "JSON_OBJECT_PARSE_PASSED; COMPLETED_INPUT_REQUIRED_FIELDS_PASSED_AFTER_LOCAL_OPERATOR_FIELD_RECOVERY",
         "raw_response_file_modified_by_runner": False,
     }
     input_path = _write_input(tmp_path, payload)
@@ -2075,6 +2075,9 @@ def test_run_receipt_preserves_exact_raw_chatgpt_response_and_hash(tmp_path: Pat
     assert raw_path.stat().st_mode & 0o077 == 0
     fp = pilot._fingerprint_file(raw_path)
     assert receipt["research_response_provenance"]["status"] == "CAPTURED_RAW_CHATGPT_RESPONSE"
+    assert receipt["research_response_provenance"]["response_validation_status"] == (
+        "RAW_JSON_OBJECT_PARSE_PASSED; NORMALIZED_INPUT_REQUIRED_FIELDS_PASSED_AFTER_OPERATOR_FIELD_RESTORATION"
+    )
     assert receipt["research_response_provenance"]["sha256"] == fp["sha256"] == signature[2]
     assert receipt["research_response_provenance"]["byte_size"] == fp["byte_size"] == signature[0]
     assert receipt["research_response_provenance"]["origin_pilot_id"] == result["pilot_id"]

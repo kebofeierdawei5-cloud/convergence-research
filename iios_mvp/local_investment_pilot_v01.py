@@ -4280,7 +4280,7 @@ def _write_run(
             "origin_pilot_id": None,
             "source_pilot_id": None,
             "capture_method": "BYTE_SNAPSHOT_OF_STABLE_VALIDATED_CHATGPT_RESPONSE",
-            "response_validation_status": "PASSED_BEFORE_LOCAL_OPERATOR_FIELD_RESTORATION",
+            "response_validation_status": "RAW_JSON_OBJECT_PARSE_PASSED; NORMALIZED_INPUT_REQUIRED_FIELDS_PASSED_AFTER_OPERATOR_FIELD_RESTORATION",
             "local_operator_field_recovery": payload.get("_local_operator_controlled_field_recovery"),
             "raw_response_modified_by_runner": False,
         }
@@ -5684,8 +5684,8 @@ def run_guided_wizard(
                 "source_filename": response_path.name,
                 "sha256": response_signature[2],
                 "byte_size": response_signature[0],
-                "capture_stage": "VALIDATED_RAW_RESPONSE_BEFORE_LOCAL_OPERATOR_FIELD_RECOVERY",
-                "validation_status": "PASSED",
+                "capture_stage": "RAW_RESPONSE_HASHED_ON_STABLE_SAVE_BEFORE_LOCAL_OPERATOR_FIELD_RECOVERY",
+                "validation_status": "JSON_OBJECT_PARSE_PASSED; COMPLETED_INPUT_REQUIRED_FIELDS_PASSED_AFTER_LOCAL_OPERATOR_FIELD_RECOVERY",
                 "raw_response_file_modified_by_runner": False,
             }
             break
