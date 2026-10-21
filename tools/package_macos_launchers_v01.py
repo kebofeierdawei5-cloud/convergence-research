@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Build a macOS IIOS launcher ZIP with explicit Unix executable modes.
+"""Build a one-click macOS IIOS acceptance ZIP with a single entrypoint.
 
-Raw browser downloads of .command files do not reliably preserve execute bits.
-This package writes 100755 to each command's ZIP central-directory external
-attributes, then reads the archive back and verifies those bits before publish.
+The ZIP contains exactly one executable .command launcher and one short README.
+The launcher is sourced from the audited canonical-main bootstrap, renamed for
+the distribution, and starts the complete first-run + Replay flow automatically.
 """
 from __future__ import annotations
 
@@ -14,34 +14,31 @@ import subprocess
 import zipfile
 from pathlib import Path
 
-COMMAND_FILES = (
-    "IIOS_独立安全启动当前主线.command",
-    "启动IIOS投资分析.command",
-    "验收IIOS全流程与Replay.command",
-)
-README_NAME = "先看我_IIOS命令文件权限与启动说明.txt"
+SOURCE_LAUNCHER = "IIOS_独立安全启动当前主线.command"
+LAUNCHER_NAME = "IIOS_一键启用并验收.command"
+README_NAME = "先看我_只需双击.txt"
 
 
 def readme(commit_sha: str) -> str:
-    return f"""IIOS macOS 启动器发行包
+    return f"""IIOS 一键启用与端到端验收
 对应 canonical main 提交：{commit_sha}
 
-推荐方式：
-1. 从 GitHub Actions 的 IIOS macOS launcher distribution 工作流下载本 ZIP。
-2. 在 Finder 中解压 ZIP。
-3. 双击 IIOS_独立安全启动当前主线.command，启动最新 canonical main 的本地全流程与 Replay。
+只需：
+1. 在 Finder 中解压这个 ZIP。
+2. 双击唯一的启动文件：{LAUNCHER_NAME}。
 
-如果 macOS 仍提示“没有执行权限”，无需 chmod，也无需关闭系统安全保护：
-1. 打开 Terminal。
-2. 输入：/bin/bash （末尾保留一个空格）。
-3. 将解压后的 IIOS_独立安全启动当前主线.command 拖入 Terminal。
-4. 按回车运行。
+启动器会自动取得并核验公开仓库 canonical main，在 ~/.iios-private/source/ 建立隔离副本，
+随后直接进入完整的“首次研究 → 运行包哈希检查 → 真正 Replay → Replay 包哈希检查”流程。
+不需要手动执行 Git 命令，不需要再选菜单，不会 reset/覆盖已有项目目录。
+ChatGPT 研究回答、必要的风险/估值确认仍由操作者完成人工确认；不会跳过投资判断所需的人工步骤。
+不需要付费 API key 或本地模型；不自动下单，结果仍标记 PILOT_NON_CANONICAL。
 
-若文件直接位于 Downloads，也可运行：
-/bin/bash "$HOME/Downloads/IIOS_独立安全启动当前主线.command"
+如果 macOS 仍提示“没有执行权限”，不要反复 chmod，也不要关闭 Gatekeeper：
+打开 Terminal，输入 /bin/bash（末尾留空格），将 {LAUNCHER_NAME} 拖进去并按回车。
+若文件位于 Downloads，也可以运行：
+/bin/bash "$HOME/Downloads/{LAUNCHER_NAME}"
 
-这个方式由 Bash 读取文本脚本，不依赖脚本文件自身具有执行位。
-请只使用 canonical 仓库产生的发行包。研究输入、报告、回执、日志与审计 ZIP 应保留在 ~/.iios-private/，不要提交到 Git。
+输入、报告、回执、日志与审计 ZIP 只保存在 ~/.iios-private/，不要上传到 GitHub。
 """
 
 
@@ -56,33 +53,33 @@ def _write_zip_entry(zf: zipfile.ZipFile, name: str, data: bytes, mode: int) -> 
 def build_package(repo_root: Path, output_dir: Path, commit_sha: str) -> Path:
     repo_root = repo_root.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    files: list[tuple[str, bytes]] = []
-    for filename in COMMAND_FILES:
-        path = repo_root / filename
-        if path.is_symlink() or not path.is_file():
-            raise FileNotFoundError(f"Expected regular launcher is missing: {filename}")
-        data = path.read_bytes()
-        if not data.startswith(b"#!/bin/bash"):
-            raise ValueError(f"Launcher has no Bash shebang: {filename}")
-        files.append((filename, data))
+    source = repo_root / SOURCE_LAUNCHER
+    if source.is_symlink() or not source.is_file():
+        raise FileNotFoundError(f"Expected regular launcher is missing: {SOURCE_LAUNCHER}")
+    data = source.read_bytes()
+    if not data.startswith(b"#!/bin/bash"):
+        raise ValueError(f"Launcher has no Bash shebang: {SOURCE_LAUNCHER}")
+    if b"IIOS_ACCEPTANCE_AUTO_START=1 python3 -m iios_mvp.local_run_replay_acceptance_v01" not in data:
+        raise ValueError("Source launcher does not enable the one-click full E2E acceptance path")
 
     out = output_dir / f"IIOS-macos-launchers-{commit_sha[:12]}.zip"
     with zipfile.ZipFile(out, "w") as zf:
-        for filename, data in files:
-            _write_zip_entry(zf, filename, data, 0o755)
+        _write_zip_entry(zf, LAUNCHER_NAME, data, 0o755)
         _write_zip_entry(zf, README_NAME, readme(commit_sha).encode("utf-8"), 0o644)
 
     with zipfile.ZipFile(out, "r") as zf:
-        for filename in COMMAND_FILES:
-            info = zf.getinfo(filename)
-            mode = (info.external_attr >> 16) & 0o777
-            if info.create_system != 3 or mode != 0o755:
-                raise RuntimeError(f"Executable mode lost in ZIP for {filename}: {oct(mode)}")
-        if README_NAME not in zf.namelist():
-            raise RuntimeError("Permission/startup README missing from ZIP")
-        for info in zf.infolist():
-            if info.filename.endswith(".command") and not zf.read(info.filename).startswith(b"#!/bin/bash"):
-                raise RuntimeError(f"Invalid launcher bytes: {info.filename}")
+        expected_names = {LAUNCHER_NAME, README_NAME}
+        if set(zf.namelist()) != expected_names:
+            raise RuntimeError(f"Package must contain exactly one launcher and one README: {zf.namelist()!r}")
+        info = zf.getinfo(LAUNCHER_NAME)
+        mode = (info.external_attr >> 16) & 0o777
+        if info.create_system != 3 or mode != 0o755:
+            raise RuntimeError(f"Executable mode lost in ZIP: {oct(mode)}")
+        if not zf.read(LAUNCHER_NAME).startswith(b"#!/bin/bash"):
+            raise RuntimeError("Invalid launcher bytes")
+        package_readme = zf.read(README_NAME).decode("utf-8")
+        if LAUNCHER_NAME not in package_readme or "/bin/bash" not in package_readme:
+            raise RuntimeError("One-click startup or no-exec-bit fallback guidance missing")
     return out
 
 
@@ -106,7 +103,9 @@ def main() -> int:
         parser.error("--commit-sha must contain at least 12 hexadecimal characters")
     out = build_package(Path.cwd(), Path(args.output_dir), commit_sha)
     print(f"PACKAGE_CREATED={out}")
-    print(f"COMMAND_FILE_UNIX_MODE=100755 ({', '.join(COMMAND_FILES)})")
+    print(f"ONE_CLICK_LAUNCHER={LAUNCHER_NAME}")
+    print("ZIP_CONTENTS=1 executable launcher + 1 README")
+    print("COMMAND_FILE_UNIX_MODE=100755")
     return 0
 
 
