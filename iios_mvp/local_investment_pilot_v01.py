@@ -1014,7 +1014,7 @@ def _evaluate_primary_eps_multiple_valuation(
                 attributable_profit, attributable_norm = _normalize_eps_bridge_measure(
                     bridge.get("net_profit_attributable"),
                     field=f"{name.upper()}_EPS_BRIDGE_NET_PROFIT_ATTRIBUTABLE_CNY",
-                    unit="CNY", evidence_by_id=evidence, unresolved_evidence_ids=unresolved,
+                    unit=currency, evidence_by_id=evidence, unresolved_evidence_ids=unresolved,
                     after_cutoff_evidence_ids=after, uncertain_timing_evidence_ids=uncertain,
                 )
                 bridge_profit_basis = "INDEPENDENT_COMPANY_WIDE_ATTRIBUTABLE_EARNINGS_BASELINE; NOT DERIVED FROM PROJECT-INCREMENTAL B4"
@@ -1074,7 +1074,7 @@ def _evaluate_primary_eps_multiple_valuation(
                 "declared_eps_per_share": measures["eps_per_share"],
                 "earnings_bridge": bridge_output, "pe_multiple_x": measures["pe_multiple_x"],
                 "calculation": {
-                    "formula": "(COMPANY_ATTRIBUTABLE_NET_PROFIT_CNY / DILUTED_WEIGHTED_AVERAGE_SHARES) × PE_MULTIPLE",
+                    "formula": "(COMPANY_ATTRIBUTABLE_NET_PROFIT_IN_CASE_CURRENCY / DILUTED_WEIGHTED_AVERAGE_SHARES) × PE_MULTIPLE",
                     "arithmetic": f"({attributable_profit} / {shares}) × {pe} = {terminal}",
                 },
                 "terminal_value_per_share": format(terminal, "f"),
