@@ -7,13 +7,13 @@
 推荐从 GitHub Actions 获取带权限元数据的启动器 ZIP，而不是逐个下载 .command 文本文件：
 
 1. 打开 [IIOS macOS launcher distribution 工作流](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/workflows/macos-launcher-distribution.yml)。
-2. 选择 main 分支，运行一次 **Run workflow**；等待成功后打开该次运行并下载 **IIOS-macos-launchers-SHA.zip** artifact。只使用成功工作流产物。
+2. 打开最新一次 **main 分支成功运行**，下载其中的 **IIOS-macos-launchers-SHA.zip** artifact。合并本次打包更新后，该工作流会自动运行；如果暂时没有成功运行记录，再选择 main 手动点击 **Run workflow**。只使用成功工作流产物。
 3. 在 Finder 中解压 ZIP，并阅读其中的 **先看我_IIOS命令文件权限与启动说明.txt**。
-4. 首选启动 **IIOS_独立安全启动当前主线.command**。该启动器先解析公开仓库 main 的准确 SHA，再在 **~/.iios-private/source/** 内复用或建立经过校验的独立副本；不会 reset、stash、覆盖或清理你已有的项目目录。
-5. **如果 Finder 报“没有执行权限”，不要运行 chmod、不要关闭 Gatekeeper，也不要再反复双击。** 打开 Terminal，输入 **/bin/bash **（末尾保留一个空格），把刚解压的 **IIOS_独立安全启动当前主线.command** 拖进终端，按回车。也可将下面路径替换成文件的真实位置后运行：
+4. 首选启动 **IIOS_一键启用并验收.command**。该启动器先解析公开仓库 main 的准确 SHA，再在 **~/.iios-private/source/** 内复用或建立经过校验的独立副本；不会 reset、stash、覆盖或清理你已有的项目目录。
+5. **如果 Finder 报“没有执行权限”，不要运行 chmod、不要关闭 Gatekeeper，也不要再反复双击。** 打开 Terminal，输入 **/bin/bash **（末尾保留一个空格），把刚解压的 **IIOS_一键启用并验收.command** 拖进终端，按回车。也可将下面路径替换成文件的真实位置后运行：
 
 ~~~~bash
-/bin/bash "$HOME/Downloads/IIOS_独立安全启动当前主线.command"
+/bin/bash "$HOME/Downloads/IIOS_一键启用并验收.command"
 ~~~~
 
 ZIP 打包测试会检查三个启动器在 ZIP 中的 POSIX mode 为 **100755**；显式 /bin/bash 调用是不依赖文件执行位的回退。不要把单独下载的旧脚本当成当前版本。
@@ -36,14 +36,13 @@ ZIP 打包测试会检查三个启动器在 ZIP 中的 POSIX mode 为 **100755**
 
 所有运行必须维持 **PILOT_NON_CANONICAL**。本流程不会生成正式 Decision、不代表真实成交或分红资格，也不自动下单。
 
-## 3. 运行脚本：菜单只选 1
+## 3. 一键进入完整验收
 
-启动器会将当前 canonical main 的完整代码放在一个独立、私有、按 SHA 命名的副本中，然后调用现有验收模块：
+解压后只需双击 **IIOS_一键启用并验收.command**。发行 ZIP 中只包含这一个可执行启动器和一份简短说明，不再暴露多个容易选错的启动入口。
 
-- **1 — 新建分析 → 首次运行包校验 → Replay → Replay 包校验**：本次完整验收选择这一项。
-- 2 — 对已有首次运行包校验并 Replay：只有已经产生首次运行包而不想再次联网研究时才使用。
-- 3 — 只校验已有运行包：不执行 Replay，不等于完成端到端验收。
-- 0 — 退出。
+启动器会自动解析并核验公开仓库 canonical main 的 SHA，在 **~/.iios-private/source/** 内复用或建立隔离副本，然后**自动进入完整分析流程：新建分析 → 首轮运行包哈希校验 → 真正 Replay → Replay 包哈希校验**，不再要求你先选 1/2/3 菜单。
+
+你仍然需要按向导完成标的、价格/截止时间、ChatGPT 研究响应，以及组合风险和主估值模型等必要人工确认。这些不是启动障碍，而是研究输入与投资授权边界，不能为了做到一键而预填或绕过。
 
 不需要手动执行 Git 命令，不需要安装本地 LLM 或配置付费 API。启动器使用 GitHub 公开仓库获取代码；研究和估值交接仍通过浏览器 ChatGPT 完成。
 
