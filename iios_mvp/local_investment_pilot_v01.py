@@ -4404,31 +4404,34 @@ def create_pilot_template(
 
 
 def _extract_json_object(text: str) -> dict[str, Any]:
-    """Accept plain JSON or one JSON object wrapped in a ChatGPT code fence."""
+    """Accept one JSON object, optionally fenced, and reject every non-whitespace suffix."""
     raw = str(text or "").strip()
     if not raw:
         raise LocalInvestmentPilotError("CHATGPT_JSON_EMPTY")
-    raw = re.sub(r"^\s*```(?:json)?\s*", "", raw, count=1, flags=re.IGNORECASE)
-    raw = re.sub(r"\s*```\s*$", "", raw, count=1)
+    raw = re.sub(r"^\\s*```(?:json)?\\s*", "", raw, count=1, flags=re.IGNORECASE)
+    raw = re.sub(r"\\s*```\\s*$", "", raw, count=1)
     start = raw.find("{")
     if start < 0:
         raise LocalInvestmentPilotError("CHATGPT_JSON_OBJECT_NOT_FOUND")
     candidate = raw[start:]
+    parsed_candidate = candidate
     decoder = json.JSONDecoder()
     parse_error: json.JSONDecodeError | None = None
+    parsed_end: int | None = None
     try:
-        value, _end = decoder.raw_decode(candidate)
+        value, parsed_end = decoder.raw_decode(candidate)
     except json.JSONDecodeError as first_error:
         # A recurring copy/normalization artifact inserts a backslash before
-        # URL punctuation (for example, https\:// and www\.). Those are
+        # URL punctuation (for example, https\\:// and www\\.). Those are
         # not legal JSON escapes. Repair only these two unambiguous URL forms,
         # and only after strict JSON parsing has failed; all other malformed
         # JSON remains fail-closed.
-        normalized = re.sub(r"(?i)\b(https?)\\://", r"\1://", candidate)
-        normalized = re.sub(r"(?i)\bwww\\\.", "www.", normalized)
+        normalized = re.sub(r"(?i)\\b(https?)\\\\://", r"\\1://", candidate)
+        normalized = re.sub(r"(?i)\\bwww\\\\\\.", "www.", normalized)
         if normalized != candidate:
+            parsed_candidate = normalized
             try:
-                value, _end = decoder.raw_decode(normalized)
+                value, parsed_end = decoder.raw_decode(normalized)
             except json.JSONDecodeError as exc:
                 parse_error = exc
         else:
@@ -4444,10 +4447,23 @@ def _extract_json_object(text: str) -> dict[str, Any]:
             f"{detail}。请确保网址中的冒号/句点前没有多余反斜杠；"
             "程序已尝试修正常见的 https\\:// 与 www\\. 写法。"
         ) from parse_error
+
+    if parsed_end is None:
+        raise LocalInvestmentPilotError("CHATGPT_JSON_INVALID_NO_COMPLETE_OBJECT")
+    trailing = parsed_candidate[parsed_end:]
+    if trailing.strip():
+        # Previously raw_decode's end offset was ignored, meaning valid JSON
+        # followed by a second object or prose could be silently accepted.
+        # Only optional leading prose and one optional surrounding code fence
+        # are tolerated; nothing may follow the first complete JSON object.
+        raise LocalInvestmentPilotError(
+            "CHATGPT_JSON_TRAILING_CONTENT_AFTER_OBJECT: "
+            "检测到完整 JSON 对象后仍有额外内容。请只保留一个完整 JSON 对象；"
+            "删除第二个对象、尾随解释文字或未闭合的 Markdown 代码围栏后再保存。"
+        )
     if not isinstance(value, dict):
         raise LocalInvestmentPilotError("CHATGPT_JSON_OBJECT_REQUIRED")
     return value
-
 
 def _read_json_response_file(path: str | Path) -> dict[str, Any]:
     """Read the full ChatGPT response from a UTF-8 file, not the terminal input buffer."""
