@@ -30,6 +30,11 @@ PILOT_MODULE = "iios_mvp.local_investment_pilot_v01"
 PILOT_STATUS = "PILOT_NON_CANONICAL"
 ANALYSIS_SCHEMA = "IIOS-LOCAL-INVESTMENT-PILOT-ANALYSIS-0.1"
 RECEIPT_SCHEMA = "IIOS-LOCAL-PILOT-RUN-RECORD-0.1"
+RAW_RESEARCH_RESPONSE_FILENAME = "chatgpt_response_raw.txt"
+RESEARCH_RESPONSE_PRESENT_STATUSES = {
+    "CAPTURED_RAW_CHATGPT_RESPONSE",
+    "INHERITED_FROM_VERIFIED_PRIOR_RUN",
+}
 RESULT_ID_PATTERN = re.compile(r"^local-pilot-[A-Za-z0-9._-]+$")
 REQUIRED_ANALYSIS_FIELDS = (
     "case",
@@ -277,7 +282,22 @@ def _create_acceptance_bundle(
         manifest = receipt.get("file_manifest")
         if not isinstance(manifest, dict):
             raise AcceptanceError(f"ACCEPTANCE_BUNDLE_SOURCE_HASH_MANIFEST_MISSING:{label}")
-        for filename in ("input.json", "analysis.json", "report.md"):
+        allowed_manifest_names = {"input.json", "analysis.json", "report.md", RAW_RESEARCH_RESPONSE_FILENAME}
+        if set(manifest) - allowed_manifest_names:
+            raise AcceptanceError(f"ACCEPTANCE_BUNDLE_SOURCE_MANIFEST_HAS_UNEXPECTED_FILES:{label}")
+        response_provenance = receipt.get("research_response_provenance")
+        response_is_expected = (
+            isinstance(response_provenance, dict)
+            and response_provenance.get("status") in RESEARCH_RESPONSE_PRESENT_STATUSES
+        )
+        if response_is_expected and RAW_RESEARCH_RESPONSE_FILENAME not in manifest:
+            raise AcceptanceError(f"ACCEPTANCE_BUNDLE_RAW_RESEARCH_RESPONSE_MISSING:{label}")
+        if RAW_RESEARCH_RESPONSE_FILENAME in manifest and not response_is_expected:
+            raise AcceptanceError(f"ACCEPTANCE_BUNDLE_RAW_RESEARCH_RESPONSE_PROVENANCE_INVALID:{label}")
+        file_names = ["input.json", "analysis.json", "report.md"]
+        if RAW_RESEARCH_RESPONSE_FILENAME in manifest:
+            file_names.append(RAW_RESEARCH_RESPONSE_FILENAME)
+        for filename in file_names:
             file_path = run_dir / filename
             if file_path.is_symlink() or not file_path.is_file():
                 raise AcceptanceError(f"ACCEPTANCE_BUNDLE_SOURCE_FILE_MISSING_OR_SYMLINK:{label}:{filename}")
@@ -300,6 +320,12 @@ def _create_acceptance_bundle(
             ):
                 raise AcceptanceError(f"ACCEPTANCE_BUNDLE_SOURCE_HASH_MISMATCH:{label}:{filename}")
             entries[f"{label}/{run_dir.name}/{filename}"] = payload
+            if filename == RAW_RESEARCH_RESPONSE_FILENAME and (
+                response_provenance.get("file") != filename
+                or response_provenance.get("sha256") != actual_hash
+                or response_provenance.get("byte_size") != len(payload)
+            ):
+                raise AcceptanceError(f"ACCEPTANCE_BUNDLE_RAW_RESEARCH_RESPONSE_PROVENANCE_HASH_MISMATCH:{label}")
 
         receipt_path = run_dir / "pilot_receipt.json"
         if receipt_path.is_symlink() or not receipt_path.is_file():
@@ -311,9 +337,12 @@ def _create_acceptance_bundle(
             "pilot_id": run_dir.name,
             "replay_of": receipt.get("replay_of"),
             "provisional_action": decision.get("provisional_action"),
-            "file_manifest": {
-                name: dict(manifest[name]) for name in ("input.json", "analysis.json", "report.md")
-            },
+            "file_manifest": {name: dict(value) for name, value in manifest.items()},
+            "research_response_provenance": (
+                dict(receipt["research_response_provenance"])
+                if isinstance(receipt.get("research_response_provenance"), dict)
+                else {"status": "NOT_RECORDED_LEGACY_RECEIPT"}
+            ),
         }
 
     log_root = LOG_ROOT.resolve(strict=True)
@@ -350,7 +379,7 @@ def _create_acceptance_bundle(
         "canonical_run_receipt_created": False,
         "execution_authorized": False,
         "auto_execution": False,
-        "note": "Private audit package. Contains the original and Replay analysis inputs/results and local logs; it is not a formal decision or trade authorization.",
+        "note": "Private audit package. Contains original and Replay inputs/results, available raw ChatGPT response capture, provenance receipts and local logs; it is not a formal decision or trade authorization.",
     }
     entries["acceptance_summary.json"] = json.dumps(
         summary, ensure_ascii=False, indent=2, sort_keys=True
@@ -588,6 +617,29 @@ def _inspect_bundle(run_dir: Path, *, expected_replay_of: str | None = None) -> 
             raise AcceptanceError(f"RECEIPT_NO_TRADE_BOUNDARY_NOT_FALSE:{run_dir.name}:{field}")
     if receipt.get("canonical_run_receipt_created") is not False:
         raise AcceptanceError(f"NON_CANONICAL_RECEIPT_FLAG_INVALID:{run_dir.name}")
+
+    manifest = receipt.get("file_manifest")
+    provenance = receipt.get("research_response_provenance")
+    if not isinstance(manifest, dict):
+        raise AcceptanceError(f"RUN_HASH_MANIFEST_MISSING:{run_dir.name}")
+    if RAW_RESEARCH_RESPONSE_FILENAME in manifest:
+        response_path = run_dir / RAW_RESEARCH_RESPONSE_FILENAME
+        if response_path.is_symlink() or not response_path.is_file():
+            raise AcceptanceError(f"RUN_RAW_RESEARCH_RESPONSE_MISSING_OR_SYMLINK:{run_dir.name}")
+        if not isinstance(provenance, dict) or provenance.get("status") not in RESEARCH_RESPONSE_PRESENT_STATUSES:
+            raise AcceptanceError(f"RUN_RAW_RESEARCH_RESPONSE_PROVENANCE_INVALID:{run_dir.name}")
+        response_hash = _sha256_file(response_path)
+        if (
+            provenance.get("file") != RAW_RESEARCH_RESPONSE_FILENAME
+            or provenance.get("sha256") != response_hash
+            or provenance.get("byte_size") != response_path.stat().st_size
+            or not isinstance(manifest.get(RAW_RESEARCH_RESPONSE_FILENAME), dict)
+            or manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("sha256") != response_hash
+            or manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("byte_size") != response_path.stat().st_size
+        ):
+            raise AcceptanceError(f"RUN_RAW_RESEARCH_RESPONSE_HASH_MISMATCH:{run_dir.name}")
+    elif isinstance(provenance, dict) and provenance.get("status") in RESEARCH_RESPONSE_PRESENT_STATUSES:
+        raise AcceptanceError(f"RUN_RAW_RESEARCH_RESPONSE_MISSING_FROM_MANIFEST:{run_dir.name}")
     return analysis, receipt
 
 
