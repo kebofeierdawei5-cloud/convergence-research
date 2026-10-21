@@ -3349,6 +3349,7 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "uncertain_timing_evidence_references": prepared["uncertain_timing_evidence_references"],
         "assessment": prepared["assessment"],
         "forecast_valuation": prepared["forecast_valuation"],
+        "eps_multiple_valuation": prepared["eps_multiple_valuation"],
         "operating_driver_forecast": prepared["operating_driver_forecast"],
         "valuation_transmission": prepared["valuation_transmission"],
         "sotp_valuation": prepared["sotp_valuation"],
