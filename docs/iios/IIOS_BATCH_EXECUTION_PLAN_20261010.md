@@ -33,6 +33,20 @@ The active order prioritizes real user-visible investment functionality over inf
 **State authority:** `docs/PROJECT_STATE_INDEX.md`  
 **Purpose:** move IIOS from validated control-plane code to a real, fail-closed, single-company research run without making external LLM API credentials a Route A prerequisite.
 
+## Current Core-Function Execution Order — 2026-10-21
+
+This section supersedes earlier checkpoint text below that says the next core batch is B7 or that the B-series is still at B6. Keep the historical records for audit context; use the canonical State Index and this section for the active sequence.
+
+**Product boundary:** continue the user's local single-user research pilot. No local LLM, Ollama installation, paid provider API endpoint or API key is a prerequisite for the B-series investment calculation path. Manual ChatGPT Web research responses and operator-entered prices remain non-canonical pilot inputs; they must not be promoted to formal semantic/Evidence/PIT admission, a canonical Decision or execution permission.
+
+**Completed code batches:** B4 operating-driver forecast, B5 EPS_MULTIPLE valuation transmission, B6 price-zone/entry-price sensitivity, B7 model-family and terminal-date contract, B8 bounded investment-output red-team, B16 cash-distribution source identity, B17–B21 SOTP calculation/currency safeguards, B22 replay acceptance schema, B23 permission-preserving Mac launcher packaging, B24 operator-field recovery, and B25 local EPS × P/E primary calculation are merged. For B25, PR [#547](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/547) has 15/15 successful workflow runs on its exact PR head.
+
+**Active batch:** B26 / PR [#549](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/549) checks that measures labelled `ISSUER_FORECAST` cite cutoff-compatible evidence whose declared primary-source class also matches an official exchange/regulator domain. Do not merge until all applicable workflows, the Local Investment Pilot suite and independent red-team are green on the final exact head.
+
+**Next ordered acceptance after B26:** perform one fresh current-main Mac full-run and independent Replay using the permission-preserving launcher ZIP and the existing user-selected 603699 test case contract. Review first-run and Replay `input.json`, `analysis.json`, `report.md`, `pilot_receipt.json`, and acceptance/hash records together. The price observation/cutoff must remain case-bound; do not substitute a new quote during Replay. Verify B4/B5/B6 values and reasons, EPS_MULTIPLE arithmetic, current-price return, target entry price, binding cap, and the 90/100/110% sensitivity ladder are consistent between machine JSON and Chinese report. A CI PASS is not Mac acceptance; a successful local pilot remains `PILOT_NON_CANONICAL` and requires human review, without formal admission or trade authority.
+
+**Do not expand the critical path:** no new screening/universe work, automatic ordering, local model, parallel store/orchestrator, broad anti-tamper platform, or rights-registry project as a substitute for this acceptance. Formal Host/semantic-producer/Evidence-PIT admission and P0-LLM closure remain separate governance gates, explicitly OPEN until their own evidence exists.
+
 ## 0. C0 — Architecture and product-entry decision (2026-10-11)
 
 **Decision:** use **LOCAL_SINGLE_USER / local-first** as the default MVP deployment profile, reusing the existing canonical CLI/first-party loopback Host, Orchestrator, trusted runtime factory, Store/admission records, report QA, complete Run Receipt and replay. The remote/multi-user profile, new UI, browser extension, database replacement and parallel orchestration remain deferred. See `docs/iios/C0_LOCAL_FIRST_ARCHITECTURE_AND_MVP_ENTRY_DECISION_20261011.md`.
