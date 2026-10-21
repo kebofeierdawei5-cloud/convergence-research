@@ -951,6 +951,7 @@ def _build_valuation_model_consistency(
     valuation_transmission: Mapping[str, Any],
     sotp_calculation_status: Any = "NOT_SELECTED",
     eps_multiple_calculation_status: Any = "NOT_SELECTED",
+    eps_multiple_calculation_issues: list[str] | None = None,
 ) -> dict[str, Any]:
     """Keep the primary model identity and its selection rationale independently identifiable."""
     selected = _normalize_model_family(operator_model_family)
@@ -988,6 +989,8 @@ def _build_valuation_model_consistency(
         if "SOTP_ADAPTER_NOT_CALCULATED" not in issues:
             issues.append("SOTP_ADAPTER_NOT_CALCULATED")
         status = "SOTP_CALCULATION_NOT_ELIGIBLE"
+    if selected == "EPS_MULTIPLE" and eps_multiple_calculation_issues:
+        issues.extend(str(issue) for issue in eps_multiple_calculation_issues if str(issue).strip())
     if selected == "EPS_MULTIPLE" and str(eps_multiple_calculation_status or "UNKNOWN").upper() != "CALCULATED":
         if "EPS_MULTIPLE_ADAPTER_NOT_CALCULATED" not in issues:
             issues.append("EPS_MULTIPLE_ADAPTER_NOT_CALCULATED")
@@ -1999,6 +2002,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         valuation_transmission=valuation_transmission,
         sotp_calculation_status=sotp_valuation.get("status", "UNKNOWN"),
         eps_multiple_calculation_status=eps_multiple_valuation.get("status", "UNKNOWN"),
+        eps_multiple_calculation_issues=eps_multiple_valuation.get("issues", []),
     )
     valuation_timing = _build_valuation_timing(
         cutoff_date=cutoff.isoformat(),
