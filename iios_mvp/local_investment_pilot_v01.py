@@ -1596,14 +1596,45 @@ def _build_valuation_timing(
         issues.append("VALUATION_TERMINAL_DATE_BASIS_NOT_IDENTIFIABLE")
 
     fiscal = re.fullmatch(r"(\d{4})FY", period)
-    if fiscal is None:
+    rolling = re.fullmatch(
+        r"NTM_(\d{4}-\d{2}-\d{2})_TO_(\d{4}-\d{2}-\d{2})",
+        period,
+    )
+    period_alignment = "NOT_IDENTIFIABLE"
+    if fiscal is not None:
+        period_alignment = "YEAR_COMPATIBLE_FISCAL_END_EXPLICIT_BUT_NOT_INDEPENDENTLY_VERIFIED"
+        if terminal is not None:
+            fiscal_year = int(fiscal.group(1))
+            # Fiscal years may end in the named calendar year or in the following
+            # calendar year; the date itself must be explicit in the model response.
+            if terminal.year not in {fiscal_year, fiscal_year + 1}:
+                issues.append("VALUATION_TERMINAL_DATE_FORECAST_PERIOD_MISMATCH")
+                period_alignment = "MISMATCH_OR_INVALID"
+    elif rolling is not None:
+        # Explicit rolling-12-month forecasts are compatible with a one-year
+        # decision horizon when their dates align with the cutoff and terminal.
+        # Dates establish the arithmetic window, not the truth of the forecast.
+        rolling_issues: list[str] = []
+        try:
+            rolling_start = date.fromisoformat(rolling.group(1))
+            rolling_end = date.fromisoformat(rolling.group(2))
+        except ValueError:
+            rolling_issues.append("FORECAST_NTM_PERIOD_DATES_INVALID")
+        else:
+            if cutoff is None or rolling_start != cutoff.fromordinal(cutoff.toordinal() + 1):
+                rolling_issues.append("FORECAST_NTM_PERIOD_START_MISMATCH")
+            if terminal is None or rolling_end != terminal:
+                rolling_issues.append("VALUATION_TERMINAL_DATE_FORECAST_PERIOD_MISMATCH")
+            period_days = (rolling_end - rolling_start).days + 1
+            if period_days not in {365, 366}:
+                rolling_issues.append("FORECAST_NTM_PERIOD_NOT_ONE_YEAR")
+        issues.extend(rolling_issues)
+        period_alignment = (
+            "ROLLING_12_MONTHS_EXPLICIT_DATES_ALIGNED_NOT_INDEPENDENTLY_VERIFIED"
+            if not rolling_issues else "MISMATCH_OR_INVALID"
+        )
+    else:
         issues.append("FORECAST_FY_PERIOD_NOT_IDENTIFIABLE")
-    elif terminal is not None:
-        fiscal_year = int(fiscal.group(1))
-        # Fiscal years may end in the named calendar year or in the following
-        # calendar year; the date itself must be explicit in the model response.
-        if terminal.year not in {fiscal_year, fiscal_year + 1}:
-            issues.append("VALUATION_TERMINAL_DATE_FORECAST_PERIOD_MISMATCH")
 
     elapsed_days: int | None = None
     year_fraction: str | None = None
@@ -1615,12 +1646,6 @@ def _build_valuation_timing(
             year_fraction = format(Decimal(elapsed_days) / Decimal("365"), "f")
 
     status = issues[0] if issues else "PASS"
-    if status == "PASS":
-        period_alignment = "YEAR_COMPATIBLE_FISCAL_END_EXPLICIT_BUT_NOT_INDEPENDENTLY_VERIFIED"
-    elif fiscal is None:
-        period_alignment = "NOT_IDENTIFIABLE"
-    else:
-        period_alignment = "MISMATCH_OR_INVALID"
     return {
         "schema_version": "IIOS-VALUATION-TIMING-0.1",
         "status": status,
@@ -3483,10 +3508,21 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "- 带标签的备注股价一致性：未发现与结构化当前价冲突的明确表述；所有回报计算仅使用上方结构化当前价。"
     )
     model_contract = analysis.get("valuation_model_consistency") or {}
+    primary_model_eligible = model_contract.get("primary_model_price_calculation_eligible") is True
     model_anchor_label = (
         "主估值参考锚"
-        if model_contract.get("primary_model_price_calculation_eligible") is True
+        if primary_model_eligible
         else "候选模型参考锚（主模型门禁未通过，仅供诊断）"
+    )
+    model_name_label = (
+        "主估值计算模型"
+        if primary_model_eligible
+        else "候选模型（未获主模型门禁批准）"
+    )
+    model_rationale_label = (
+        "主模型选择理由"
+        if primary_model_eligible
+        else "研究回答中的候选模型理由（未经主模型门禁认可）"
     )
     lines = [
         f"# IIOS 本地投资研究试运行：{c['company']}（{c['symbol']}）",
@@ -3579,8 +3615,8 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
         "## 四、Forecast / Valuation",
         "",
-        f"- 模型名称：{f['model']}",
-        f"- 模型选择理由（清理状态 {f.get('model_rationale_status', 'UNKNOWN')}）：{f['model_rationale'] or '未提供'}",
+        f"- {model_name_label}：{f['model']}",
+        f"- {model_rationale_label}（清理状态 {f.get('model_rationale_status', 'UNKNOWN')}）：{f['model_rationale'] or '未提供'}",
         f"- 现金分配核查（模型输入声明，非正式证据准入）：{(f.get('cash_distribution_review') or {}).get('status', 'UNKNOWN')}；来源域名/类别核验：{(f.get('cash_distribution_review') or {}).get('source_validation_status', 'UNKNOWN')}；正式证据准入：未完成；{(f.get('cash_distribution_review') or {}).get('summary', '未提供') or '未提供'}；证据 {', '.join((f.get('cash_distribution_review') or {}).get('evidence_refs') or []) or 'UNKNOWN'}。",
         f"- {model_anchor_label}（不是 15% 回报门槛价格，也不是 MIE）：{f.get('entry_value_reference_per_share') or 'UNKNOWN'} {c['currency']}/股",
         f"- EPS_MULTIPLE 原始声明锚（仅供审计，不进入主计算）：{f.get('declared_entry_value_reference_before_eps_multiple_calculation', 'UNKNOWN')}",
