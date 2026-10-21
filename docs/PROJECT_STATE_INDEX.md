@@ -2783,6 +2783,20 @@ Status: **PASS / MERGED / CANONICAL / LOCAL SUCCESSOR MIGRATION REPORTED PASS**
 - **Immediate next evidence batch:** C2 / `RC-CN-A-002001-20261009`. The Run #8 source archive is preserved and independently verified, but its B2 manifest used an end-of-day cutoff timestamp incompatible with the canonical date-only cutoff rule. Keep it diagnostic/BLOCKED; rebuild a successor with the original raw bytes and correct date-only semantics. See `docs/iios/ROUTE_A_C2_SOURCE_ADJUDICATION_AUDIT_20261011.md`.
 - Primary 605016 production Host acceptance remains a separate open critical path and must not be marked complete merely because its local source-vintage candidate passes.
 
+
+## Local ChatGPT research-response provenance — 2026-10-21
+
+Status: **IMPLEMENTATION MERGED PENDING FRESH MACOS REPLAY / SOURCE-TRUTH ADMISSION REMAINS OPEN**
+
+- **Why this batch:** the first real 603699 E2E acceptance package verified input/analysis/report bytes, but did not include the exact ChatGPT response text. The analyst could replay the normalized input, but could not directly audit the raw response-to-normalized-input relationship from the ZIP alone.
+- **Implementation under PR #562:** for fresh guided runs, after response syntax/required-field validation and before the local operator-field recovery metadata is added, the runner captures the response file bytes to private `chatgpt_response_raw.txt`. The completed input carries only a path-free basename, SHA-256, byte size and capture-stage metadata. The runner rechecks the expected fingerprint immediately before snapshotting.
+- The raw response file is hash/size bound into `pilot_receipt.json` and the run manifest. `analysis.json` and `report.md` show the same stable response digest and explicitly state that this proves byte linkage only—not the truth of AI-authored facts, external-source content, formal Evidence/PIT admission, or investment-decision authority.
+- Replay copies the raw response bytes from its hash-verified parent; it does not ask ChatGPT to produce the answer again. The raw response provenance is included in Replay comparison, and the private acceptance ZIP includes both raw response snapshots plus the outer bundle hash manifest. Original/replay reports remain semantically identical.
+- **Compatibility:** historical runs created without raw response capture remain verifiable/replayable and are explicitly marked `NOT_AVAILABLE_IN_LEGACY_PARENT_RUN` or `NOT_CAPTURED_DIRECT_OR_LEGACY_INPUT`; the system does not fabricate a response. If a completed input claims a raw response but the capture/hash link is missing or inconsistent, replay fails closed.
+- **Privacy boundary:** raw answer text and research inputs remain under `~/.iios-private/` with private file permissions. Do not commit the response file or acceptance ZIP to GitHub; it can contain sensitive research/portfolio context.
+- **Validation:** exact PR head `2bb09148326b6226143e897cbf57eb8afac3d80f`: Local Investment Pilot + Replay `309 passed`; Investment Core CI `412 passed`; MVP Pilot, PILOT-02 Xinhecheng, B00-B authority threat reproduction and independent Post-B04 red-team all passed. Fresh Mac operation still required to verify the release path. This remains `PILOT_NON_CANONICAL`, not a formal decision or trade authorization.
+- **Next gate:** after merge, run a fresh Mac one-click analysis and Replay from canonical main. Confirm the ZIP has the raw response under both first_run and replay_run; both SHA-256/byte size values match; response provenance status differs only as CAPTURED vs INHERITED; comparison is MATCH; and overall input completeness is resolved independently.
+
 ## Personal local ChatGPT handoff — first real macOS E2E Replay audit — 2026-10-21
 
 Status: **TECHNICAL REPLAY PASS / COMPLETE INPUT ACCEPTANCE OPEN / NO FORMAL DECISION**
