@@ -3925,6 +3925,52 @@ def test_primary_eps_multiple_missing_structured_input_blocks_return_and_entry_p
     assert "EPS_MULTIPLE_CALCULATION_NOT_ELIGIBLE" in report
 
 
+@pytest.mark.parametrize(
+    "measure_key",
+    ["eps_per_share", "pe_multiple_x"],
+)
+def test_eps_multiple_issuer_forecast_requires_official_primary_source_linkage(measure_key):
+    payload = _payload()
+    measure = payload["eps_multiple_valuation"]["scenarios"]["base"][measure_key]
+    measure["data_class"] = "ISSUER_FORECAST"
+    measure["evidence_refs"] = ["E1"]
+
+    analysis, report = _analyse(payload, "TEST-EPS-ISSUER-FORECAST-PRIMARY")
+    adapter = analysis["eps_multiple_valuation"]
+
+    assert adapter["status"] == "CALCULATED"
+    assert adapter["scenarios"]["base"][measure_key]["data_class"] == "ISSUER_FORECAST"
+    assert adapter["scenarios"]["base"][measure_key]["evidence_refs"] == ["E1"]
+    assert "formally" not in report.lower() or "formal" in report.lower()
+
+
+@pytest.mark.parametrize(
+    ("source_class", "source_ref"),
+    [
+        ("SECONDARY_MEDIA", "https://example.com/issuer-forecast"),
+        ("EXCHANGE_PRIMARY", "https://example.com/issuer-forecast"),
+        ("ISSUER_PRIMARY", "https://ir.example.com/issuer-forecast"),
+    ],
+)
+def test_eps_multiple_issuer_forecast_blocks_nonverified_source_class_or_domain(source_class, source_ref):
+    payload = _payload()
+    payload["evidence_register"][0]["source_class"] = source_class
+    payload["evidence_register"][0]["source_ref"] = source_ref
+    measure = payload["eps_multiple_valuation"]["scenarios"]["base"]["eps_per_share"]
+    measure["data_class"] = "ISSUER_FORECAST"
+    measure["evidence_refs"] = ["E1"]
+
+    analysis, report = _analyse(payload, "TEST-EPS-ISSUER-FORECAST-SOURCE-MISMATCH")
+    adapter = analysis["eps_multiple_valuation"]
+
+    assert adapter["status"] == "INPUT_INCOMPLETE_OR_INVALID"
+    assert "BASE_EPS_PER_SHARE_ISSUER_FORECAST_SOURCE_CLASS_OR_DOMAIN_NOT_VERIFIED:E1" in adapter["issues"]
+    assert analysis["valuation_model_consistency"]["primary_model_price_calculation_eligible"] is False
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert "ISSUER_FORECAST_SOURCE_CLASS_OR_DOMAIN_NOT_VERIFIED" in report
+
+
 def test_sotp_adapter_computes_segment_values_parent_adjustments_and_per_share_value():
     from iios_mvp.sotp_valuation_v01 import evaluate_sotp_valuation
 
