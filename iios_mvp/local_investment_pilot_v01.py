@@ -4408,12 +4408,23 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     raw = str(text or "").strip()
     if not raw:
         raise LocalInvestmentPilotError("CHATGPT_JSON_EMPTY")
-    raw = re.sub(r"^\s*```(?:json)?\s*", "", raw, count=1, flags=re.IGNORECASE)
-    raw = re.sub(r"\s*```\s*$", "", raw, count=1)
+    has_leading_fence = bool(re.match(r"^\s*```(?:json)?\s*", raw, flags=re.IGNORECASE))
+    if has_leading_fence:
+        raw = re.sub(r"^\s*```(?:json)?\s*", "", raw, count=1, flags=re.IGNORECASE)
     start = raw.find("{")
     if start < 0:
         raise LocalInvestmentPilotError("CHATGPT_JSON_OBJECT_NOT_FOUND")
     candidate = raw[start:]
+    fence_opened_before_object = has_leading_fence or bool(
+        re.search(r"```(?:json)?\s*$", raw[:start], flags=re.IGNORECASE)
+    )
+    if fence_opened_before_object:
+        closing_fence = re.search(r"\s*```[ \t\r\n]*$", candidate)
+        if closing_fence is None:
+            raise LocalInvestmentPilotError(
+                "CHATGPT_JSON_INVALID_CODE_FENCE_NOT_CLOSED: 请复制完整代码围栏内的 JSON，包含结束的三个反引号。"
+            )
+        candidate = candidate[:closing_fence.start()]
     parsed_candidate = candidate
     decoder = json.JSONDecoder()
     parse_error: json.JSONDecodeError | None = None
