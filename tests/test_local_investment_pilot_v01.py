@@ -2684,6 +2684,7 @@ def test_b5_rejects_negative_adjusted_terminal_value_and_preserves_original_scen
 def test_b5_negative_counterfactual_does_not_block_confirmed_project_inclusive_baseline():
     payload = _b5_ready_payload()
     payload["operator_valuation_context"]["baseline_includes_project"] = True
+    _sync_eps_multiple_values(payload, {"bear": "120", "base": "150", "bull": "180"})
     # The hypothetical "add the project again" scenario is negative, but this
     # counterfactual is not applied because the operator says the baseline already
     # includes the project. The unchanged primary valuation should remain usable.
@@ -2711,6 +2712,7 @@ def test_b5_negative_counterfactual_does_not_block_confirmed_project_inclusive_b
 def test_b5_unapplied_counterfactual_ordering_does_not_block_included_baseline():
     payload = _b5_ready_payload()
     payload["operator_valuation_context"]["baseline_includes_project"] = True
+    _sync_eps_multiple_values(payload, {"bear": "120", "base": "150", "bull": "180"})
     # The baseline itself remains Bear < Base < Bull. A deliberately large
     # hypothetical Base displaced-profit value makes the "add the project
     # again" counterfactual reorder scenarios; it must not be used as a gate
@@ -2740,6 +2742,7 @@ def test_b5_unapplied_counterfactual_ordering_does_not_block_included_baseline()
 def test_b5_never_adds_project_twice_when_operator_says_baseline_includes_it():
     payload = _b5_ready_payload()
     payload["operator_valuation_context"]["baseline_includes_project"] = True
+    _sync_eps_multiple_values(payload, {"bear": "120", "base": "150", "bull": "180"})
     analysis, report = _analyse(payload, "TEST-B5-ALREADY-INCLUDED")
     assert "B5 当前传导状态：CALCULATED_NOT_APPLIED_BASELINE_ALREADY_INCLUDES_PROJECT" in report
     assert "基准已含项目、未重复叠加的每股估值情景终值" in report
@@ -3453,6 +3456,7 @@ def test_b4_report_renders_missing_operating_bridge_fields_as_unknown():
 def test_b5_incomplete_counterfactual_does_not_block_confirmed_project_inclusive_primary_valuation():
     payload = _b5_ready_payload()
     payload["operator_valuation_context"]["baseline_includes_project"] = True
+    _sync_eps_multiple_values(payload, {"bear": "120", "base": "150", "bull": "180"})
     payload["valuation_transmission"]["scenarios"]["base"]["displaced_existing_after_tax_profit_cny"] = {
         "value": None,
         "unit": "CNY",
@@ -3507,6 +3511,7 @@ def test_b4_overcapacity_scenario_does_not_feed_b5_or_target_entry_price():
 def test_required_return_below_15_percent_remains_independent_from_fundamental_hurdle():
     payload = _b5_ready_payload()
     payload["operator_valuation_context"]["baseline_includes_project"] = True
+    _sync_eps_multiple_values(payload, {"bear": "120", "base": "150", "bull": "180"})
     payload["decision_parameters"]["required_return_annualized"] = "0.10"
     payload["forecast_valuation"]["scenarios"] = {
         "bear": {
@@ -3806,6 +3811,7 @@ def test_hong_kong_dated_cash_distribution_uses_ex_date_before_record_date():
     payload["case"]["symbol"] = "0700.HK"
     payload["case"]["currency"] = "HKD"
     payload["price_input"]["currency"] = "HKD"
+    payload["operator_valuation_context"]["baseline_includes_project"] = True
     _sync_eps_multiple_values(payload, {"bear": "120", "base": "150", "bull": "180"})
     forecast = payload["forecast_valuation"]
     forecast["cash_distribution_review"] = {
@@ -3847,6 +3853,7 @@ def test_dated_distribution_rejects_cross_market_record_ex_date_order(market, re
         payload["case"]["symbol"] = "0700.HK"
         payload["case"]["currency"] = "HKD"
         payload["price_input"]["currency"] = "HKD"
+    payload["operator_valuation_context"]["baseline_includes_project"] = True
     _sync_eps_multiple_values(payload, {"bear": "120", "base": "150", "bull": "180"})
     forecast = payload["forecast_valuation"]
     forecast["cash_distribution_review"] = {
@@ -4038,7 +4045,7 @@ def test_primary_eps_multiple_adapter_recomputes_values_and_entry_anchor_locally
     adapter = analysis["eps_multiple_valuation"]
 
     assert adapter["status"] == "CALCULATED"
-    assert adapter["scenarios"]["base"]["calculation"]["arithmetic"] == "10 × 15 = 150"
+    assert adapter["scenarios"]["base"]["calculation"]["arithmetic"] == "(10000000000 / 1000000000) × 15 = 150"
     assert analysis["forecast_valuation"]["scenarios"]["bear"]["terminal_value_per_share"] == "120"
     assert analysis["forecast_valuation"]["scenarios"]["base"]["terminal_value_per_share"] == "150"
     assert analysis["forecast_valuation"]["scenarios"]["bull"]["terminal_value_per_share"] == "180"
@@ -4064,6 +4071,81 @@ def test_primary_eps_multiple_missing_structured_input_blocks_return_and_entry_p
     assert analysis["return_metrics"] is None
     assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
     assert "EPS_MULTIPLE_CALCULATION_NOT_ELIGIBLE" in report
+
+
+def test_primary_eps_multiple_blocks_declared_eps_that_does_not_reconcile_to_company_earnings():
+    payload = _payload()
+    payload["eps_multiple_valuation"]["scenarios"]["base"]["eps_per_share"]["value"] = "12"
+
+    analysis, report = _analyse(payload, "TEST-EPS-BRIDGE-DECLARED-EPS-MISMATCH")
+
+    adapter = analysis["eps_multiple_valuation"]
+    assert adapter["status"] == "INPUT_INCOMPLETE_OR_INVALID"
+    assert any("BASE_EPS_BRIDGE_DECLARED_EPS_MISMATCH" in issue for issue in adapter["issues"])
+    assert analysis["valuation_model_consistency"]["primary_model_price_calculation_eligible"] is False
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+    assert "EPS_MULTIPLE_ADAPTER_NOT_CALCULATED" in analysis["valuation_model_consistency"]["issues"]
+    assert "EPS_MULTIPLE_CALCULATION_NOT_ELIGIBLE" in report
+
+
+def test_primary_eps_multiple_cannot_use_project_incremental_profit_as_company_eps():
+    payload = _b5_ready_payload()
+    for row in payload["eps_multiple_valuation"]["scenarios"].values():
+        row["earnings_bridge"]["source_mode"] = "B4_COMPANY_WIDE_NET_PROFIT_RECONCILED"
+
+    analysis, _report = _analyse(payload, "TEST-EPS-BRIDGE-PROJECT-AS-COMPANY")
+
+    assert analysis["eps_multiple_valuation"]["status"] == "INPUT_INCOMPLETE_OR_INVALID"
+    assert any("BEAR_EPS_BRIDGE_B4_SOURCE_REQUIRES_COMPANY_WIDE_SCOPE" in issue
+               for issue in analysis["eps_multiple_valuation"]["issues"])
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+
+
+def test_primary_eps_multiple_rejects_share_count_that_is_not_weighted_average_diluted():
+    payload = _payload()
+    payload["eps_multiple_valuation"]["scenarios"]["base"]["earnings_bridge"]["share_count_basis"] = "PERIOD_END_BASIC_SHARES"
+
+    analysis, _report = _analyse(payload, "TEST-EPS-BRIDGE-BASIC-SHARES")
+
+    assert analysis["eps_multiple_valuation"]["status"] == "INPUT_INCOMPLETE_OR_INVALID"
+    assert any("BASE_EPS_BRIDGE_SHARE_COUNT_BASIS_NOT_DILUTED_WEIGHTED_AVERAGE" in issue
+               for issue in analysis["eps_multiple_valuation"]["issues"])
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+
+
+def test_primary_eps_multiple_rejects_project_inclusion_conflict_with_operator_context():
+    payload = _payload()
+    payload["operator_valuation_context"]["baseline_includes_project"] = False
+
+    analysis, _report = _analyse(payload, "TEST-EPS-BRIDGE-PROJECT-BOUNDARY-CONFLICT")
+
+    assert analysis["eps_multiple_valuation"]["status"] == "INPUT_INCOMPLETE_OR_INVALID"
+    assert any("BEAR_EPS_BRIDGE_PROJECT_INCLUSION_CONFLICTS_WITH_OPERATOR_CONTEXT" in issue
+               for issue in analysis["eps_multiple_valuation"]["issues"])
+    assert analysis["return_metrics"] is None
+    assert analysis["price_zone_sensitivity"]["target_entry_price"] is None
+
+
+def test_primary_eps_multiple_reconciles_b4_profit_attribution_adjustment():
+    payload = _payload()
+    base = payload["eps_multiple_valuation"]["scenarios"]["base"]["earnings_bridge"]
+    base["profit_attribution_adjustment_cny"]["value"] = "1000000000"
+    base["net_profit_attributable"]["value"] = "9000000000"
+    payload["eps_multiple_valuation"]["scenarios"]["base"]["eps_per_share"]["value"] = "9"
+
+    analysis, report = _analyse(payload, "TEST-EPS-BRIDGE-NCI-ADJUSTMENT")
+
+    adapter = analysis["eps_multiple_valuation"]
+    assert adapter["status"] == "CALCULATED"
+    bridge = adapter["scenarios"]["base"]["earnings_bridge"]
+    assert bridge["reconciliation_status"] == "MATCH"
+    assert bridge["attributable_net_profit_calculated"] == "9000000000"
+    assert bridge["derived_eps_per_share"] == "9"
+    assert adapter["scenarios"]["base"]["terminal_value_per_share"] == "135"
+    assert "9000000000 / 1000000000" in report
 
 
 def test_sotp_adapter_computes_segment_values_parent_adjustments_and_per_share_value():
