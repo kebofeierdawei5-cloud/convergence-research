@@ -126,7 +126,7 @@ printf '研究输入、报告、回执、验收日志及审计 ZIP 都保留在 
 cd "$SELECTED_ROOT"
 export PYTHONPATH="$SELECTED_ROOT"
 export PYTHONUNBUFFERED=1
-if python3 -m iios_mvp.local_run_replay_acceptance_v01; then
+if IIOS_ACCEPTANCE_AUTO_START=1 python3 -m iios_mvp.local_run_replay_acceptance_v01; then
   status=0
 else
   status=$?
