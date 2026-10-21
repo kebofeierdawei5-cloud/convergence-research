@@ -58,6 +58,14 @@ def _bundle(
         "price_zone_sensitivity": {"status": "UNKNOWN"},
         "sotp_valuation": {"status": "NOT_SELECTED", "scenarios": {}, "issues": []},
         "eps_multiple_valuation": {"schema_version": "IIOS-EPS-MULTIPLE-VALUATION-0.1", "method": "EPS_PER_SHARE_X_PE_MULTIPLE", "status": "NOT_SELECTED", "scenarios": {}, "issues": [], "selected_for_primary_model": False},
+        "eps_earnings_bridge": {
+            "schema_version": "IIOS-EPS-EARNINGS-BRIDGE-0.1",
+            "method": "B4_NET_PROFIT_PROXY_MINUS_NCI_PLUS_ADJUSTMENTS_DIVIDED_BY_DILUTED_SHARES",
+            "status": "NOT_SELECTED",
+            "scenarios": {},
+            "issues": [],
+            "primary_eps_price_calculation_eligible": False,
+        },
         "valuation_model_consistency": {
             "status": "UNKNOWN",
             "primary_model_price_calculation_eligible": False,
@@ -236,6 +244,7 @@ def test_inspect_bundle_checks_required_current_investment_result_fields_and_no_
     [
         "sotp_valuation",
         "eps_multiple_valuation",
+        "eps_earnings_bridge",
         "valuation_model_consistency",
         "valuation_timing",
         "return_metrics_reason",
@@ -260,6 +269,7 @@ def test_inspect_bundle_rejects_missing_new_investment_contract_field(tmp_path: 
     [
         ("sotp_valuation", None, "SOTP_VALUATION_MISSING_OR_INVALID"),
         ("eps_multiple_valuation", None, "EPS_MULTIPLE_VALUATION_MISSING_OR_INVALID"),
+        ("eps_earnings_bridge", None, "EPS_EARNINGS_BRIDGE_MISSING_OR_INVALID"),
         ("valuation_model_consistency", {}, "VALUATION_MODEL_CONSISTENCY_MISSING_OR_INVALID"),
         ("valuation_timing", None, "VALUATION_TIMING_MISSING_OR_INVALID"),
         ("unresolved_evidence_references", {}, "EVIDENCE_DIAGNOSTIC_LIST_MISSING_OR_INVALID"),
@@ -275,6 +285,41 @@ def test_inspect_bundle_rejects_malformed_new_investment_contract_field(
 
     with pytest.raises(acceptance.AcceptanceError, match=error_code):
         acceptance._inspect_bundle(run_dir, expected_replay_of=None)
+
+
+@pytest.mark.parametrize(
+    ("bridge_status", "adapter_status", "return_metrics", "target_entry_price", "error"),
+    [
+        ("EPS_MISMATCH", "INPUT_INCOMPLETE_OR_INVALID", None, None, None),
+        ("NOT_LINKED", "INPUT_INCOMPLETE_OR_INVALID", None, None, None),
+        ("EPS_MISMATCH", "CALCULATED", {"expected_annualized_return": "0.2"}, "80", "EPS_MULTIPLE_INELIGIBLE_BRIDGE_DID_NOT_FAIL_CLOSED"),
+    ],
+)
+def test_inspect_bundle_checks_eps_bridge_price_gating(
+    tmp_path: Path, bridge_status, adapter_status, return_metrics, target_entry_price, error
+) -> None:
+    run_dir = _bundle(tmp_path)
+    analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
+    analysis["operator_valuation_context"] = {"selected_model_family": "EPS_MULTIPLE"}
+    analysis["eps_earnings_bridge"].update({
+        "status": bridge_status,
+        "primary_eps_price_calculation_eligible": bridge_status not in {"EPS_MISMATCH", "NOT_LINKED"},
+        "scenarios": {
+            name: {"status": "EPS_MISMATCH" if bridge_status == "EPS_MISMATCH" else "NOT_LINKED"}
+            for name in ("bear", "base", "bull")
+        },
+    })
+    analysis["eps_multiple_valuation"]["status"] = adapter_status
+    analysis["return_metrics"] = return_metrics
+    analysis["price_zone_sensitivity"]["target_entry_price"] = target_entry_price
+    _write_json(run_dir / "analysis.json", analysis)
+
+    if error:
+        with pytest.raises(acceptance.AcceptanceError, match=error):
+            acceptance._inspect_bundle(run_dir, expected_replay_of=None)
+    else:
+        inspected, _receipt = acceptance._inspect_bundle(run_dir, expected_replay_of=None)
+        assert inspected["eps_earnings_bridge"]["status"] == bridge_status
 
 
 def test_inspect_bundle_rejects_wrong_replay_parent(tmp_path: Path) -> None:
