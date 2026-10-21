@@ -46,6 +46,15 @@ def test_packager_creates_zip_with_executable_posix_mode_and_readme(tmp_path: Pa
         assert b"IIOS_ACCEPTANCE_AUTO_START=1 python3 -m iios_mvp.local_run_replay_acceptance_v01" in launcher_bytes
 
 
+def test_one_click_launcher_forces_full_flow_without_secondary_menu() -> None:
+    launcher = (REPO_ROOT / "IIOS_独立安全启动当前主线.command").read_text(encoding="utf-8")
+    acceptance_module = (REPO_ROOT / "iios_mvp" / "local_run_replay_acceptance_v01.py").read_text(encoding="utf-8")
+    assert "IIOS_ACCEPTANCE_AUTO_START=1 python3 -m iios_mvp.local_run_replay_acceptance_v01" in launcher
+    assert 'if os.environ.get("IIOS_ACCEPTANCE_AUTO_START") == "1":' in acceptance_module
+    assert 'choice = "1"' in acceptance_module
+    assert 'choice = input("请选择 [1]：").strip() or "1"' in acceptance_module
+
+
 def test_current_e2e_runbook_covers_permission_json_recovery_b27_and_private_outputs() -> None:
     runbook = (
         REPO_ROOT
