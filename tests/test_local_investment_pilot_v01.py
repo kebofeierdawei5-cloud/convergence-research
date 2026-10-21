@@ -3926,11 +3926,18 @@ def test_primary_eps_multiple_missing_structured_input_blocks_return_and_entry_p
 
 
 @pytest.mark.parametrize(
-    "measure_key",
-    ["eps_per_share", "pe_multiple_x"],
+    ("measure_key", "source_class", "source_ref"),
+    [
+        ("eps_per_share", "EXCHANGE_PRIMARY", "https://static.sse.com.cn/synthetic-tests/issuer-forecast.pdf"),
+        ("pe_multiple_x", "REGULATOR_PRIMARY", "https://www.csrc.gov.cn/synthetic-tests/valuation-guidance.html"),
+    ],
 )
-def test_eps_multiple_issuer_forecast_requires_official_primary_source_linkage(measure_key):
+def test_eps_multiple_issuer_forecast_requires_official_primary_source_linkage(
+    measure_key, source_class, source_ref
+):
     payload = _payload()
+    payload["evidence_register"][0]["source_class"] = source_class
+    payload["evidence_register"][0]["source_ref"] = source_ref
     measure = payload["eps_multiple_valuation"]["scenarios"]["base"][measure_key]
     measure["data_class"] = "ISSUER_FORECAST"
     measure["evidence_refs"] = ["E1"]
