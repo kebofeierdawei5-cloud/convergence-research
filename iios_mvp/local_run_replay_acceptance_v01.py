@@ -507,6 +507,27 @@ def _inspect_bundle(run_dir: Path, *, expected_replay_of: str | None = None) -> 
         or (eps_multiple.get("status") == "CALCULATED" and set(eps_multiple.get("scenarios", {})) != {"bear", "base", "bull"})
     ):
         raise AcceptanceError(f"EPS_MULTIPLE_VALUATION_MISSING_OR_INVALID:{run_dir.name}")
+    if eps_multiple.get("status") == "CALCULATED":
+        for scenario_name in ("bear", "base", "bull"):
+            scenario = eps_multiple["scenarios"].get(scenario_name)
+            bridge = scenario.get("earnings_bridge") if isinstance(scenario, dict) else None
+            shares = bridge.get("diluted_weighted_average_shares") if isinstance(bridge, dict) else None
+            if (
+                not isinstance(bridge, dict)
+                or bridge.get("schema_version") != "IIOS-EPS-EARNINGS-BRIDGE-0.1"
+                or bridge.get("status") != "RECONCILED"
+                or bridge.get("reconciliation_status") != "MATCH"
+                or bridge.get("profit_scope") != "COMPANY_WIDE_ATTRIBUTABLE_TO_LISTED_SHAREHOLDERS"
+                or bridge.get("share_count_basis") != "WEIGHTED_AVERAGE_DILUTED_SHARES"
+                or bridge.get("includes_project") not in (True, False)
+                or not isinstance(shares, dict)
+                or shares.get("unit") != "shares"
+                or bridge.get("derived_eps_per_share") in (None, "")
+                or bridge.get("declared_eps_per_share") in (None, "")
+            ):
+                raise AcceptanceError(
+                    f"EPS_MULTIPLE_EARNINGS_BRIDGE_MISSING_OR_INVALID:{run_dir.name}:{scenario_name}"
+                )
     model_consistency = analysis.get("valuation_model_consistency")
     if (
         not isinstance(model_consistency, dict)
