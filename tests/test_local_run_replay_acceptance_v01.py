@@ -588,8 +588,26 @@ def test_acceptance_bundle_includes_first_run_replay_logs_and_verified_manifest(
         raw_file.write_bytes(raw_bytes)
         if os.name != "nt":
             raw_file.chmod(0o600)
+        input_path = run_dir / "input.json"
+        input_payload = json.loads(input_path.read_text(encoding="utf-8"))
+        input_payload["_local_research_response_provenance"] = {
+            "schema_version": acceptance.RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
+            "status": "CAPTURED_RAW_CHATGPT_RESPONSE",
+            "source_filename": "synthetic-response.txt",
+            "sha256": raw_fp["sha256"],
+            "byte_size": raw_fp["byte_size"],
+            "capture_stage": "VALIDATED_RAW_RESPONSE_BEFORE_LOCAL_OPERATOR_FIELD_RECOVERY",
+            "validation_status": "PASSED",
+            "raw_response_file_modified_by_runner": False,
+        }
+        _write_json(input_path, input_payload)
         receipt_path = run_dir / "pilot_receipt.json"
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        input_bytes = input_path.read_bytes()
+        receipt["file_manifest"]["input.json"] = {
+            "sha256": hashlib.sha256(input_bytes).hexdigest(),
+            "byte_size": len(input_bytes),
+        }
         receipt["file_manifest"][acceptance.RAW_RESEARCH_RESPONSE_FILENAME] = dict(raw_fp)
         receipt["research_response_provenance"] = {
             "schema_version": "IIOS-LOCAL-RESEARCH-RESPONSE-PROVENANCE-0.1",
@@ -673,6 +691,66 @@ def test_acceptance_bundle_includes_first_run_replay_logs_and_verified_manifest(
             payload = archive.read(record["path"])
             assert len(payload) == record["byte_size"]
             assert hashlib.sha256(payload).hexdigest() == record["sha256"]
+
+
+def test_acceptance_bundle_rejects_raw_response_not_bound_by_input_provenance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = tmp_path / "runs"
+    run_root.mkdir(mode=0o700)
+    original = _bundle(run_root, run_dir_name="local-pilot-ORIGINAL-RAW-MISMATCH-20261019T140000Z")
+    replay = _bundle(run_root, replay_of=original.name, run_dir_name="local-pilot-REPLAY-RAW-MISMATCH-20261019T140100Z")
+
+    raw_bytes = b'{"answer":"synthetic raw"}'
+    raw_file = original / acceptance.RAW_RESEARCH_RESPONSE_FILENAME
+    raw_file.write_bytes(raw_bytes)
+    if os.name != "nt":
+        raw_file.chmod(0o600)
+    raw_fp = {"sha256": hashlib.sha256(raw_bytes).hexdigest(), "byte_size": len(raw_bytes)}
+
+    input_path = original / "input.json"
+    _write_json(input_path, {
+        "schema_version": "test",
+        "_local_research_response_provenance": {
+            "schema_version": acceptance.RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
+            "status": "CAPTURED_RAW_CHATGPT_RESPONSE",
+            "source_filename": "synthetic-response.txt",
+            "sha256": "0" * 64,
+            "byte_size": len(raw_bytes),
+        },
+    })
+    receipt_path = original / "pilot_receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    input_bytes = input_path.read_bytes()
+    receipt["file_manifest"]["input.json"] = {
+        "sha256": hashlib.sha256(input_bytes).hexdigest(),
+        "byte_size": len(input_bytes),
+    }
+    receipt["file_manifest"][acceptance.RAW_RESEARCH_RESPONSE_FILENAME] = raw_fp
+    receipt["research_response_provenance"] = {
+        "schema_version": acceptance.RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
+        "status": "CAPTURED_RAW_CHATGPT_RESPONSE",
+        "file": acceptance.RAW_RESEARCH_RESPONSE_FILENAME,
+        "sha256": raw_fp["sha256"],
+        "byte_size": raw_fp["byte_size"],
+        "origin_pilot_id": original.name,
+        "source_pilot_id": original.name,
+    }
+    _write_json(receipt_path, receipt)
+
+    monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
+    with pytest.raises(
+        acceptance.AcceptanceError,
+        match="ACCEPTANCE_BUNDLE_INPUT_RAW_RESPONSE_PROVENANCE_MISMATCH:first_run",
+    ):
+        acceptance._create_acceptance_bundle(
+            original_dir=original,
+            replay_dir=replay,
+            log_paths=[],
+            comparison={"status": "MATCH", "hash_verification": "PASS", "mismatched_fields": []},
+            prompt_issues=[],
+        )
 
 
 def test_acceptance_bundle_rejects_run_artifact_drift_from_receipt(
