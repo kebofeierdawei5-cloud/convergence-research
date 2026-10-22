@@ -82,12 +82,12 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 
 验收包装器按顺序完成以下操作，不需要用户自己拼接另一套 Replay 命令：
 
-1. **首次运行包校验**：对 input.json、analysis.json、report.md 以及新向导生成的 chatgpt_response_raw.txt 的 SHA-256/字节数与 pilot_receipt.json 清单核对；旧运行包若无原始响应，仅标记为 legacy/not captured，不补造响应文件。
+1. **首次运行包校验**：对 input.json、analysis.json、report.md 以及新向导生成的 chatgpt_response_raw.txt 的 SHA-256/字节数与 pilot_receipt.json 清单核对；同时交叉核验 input.json 的原始响应声明、运行收据与响应文件的哈希/字节数；旧运行包若无原始响应，仅标记为 legacy/not captured，不补造响应文件。
 2. **结构与权限校验**：检查运行 ID、必需字段、目录/文件权限、假设入场语义、分红权益条件语义、B5/B6 和 EPS 盈利桥接字段；正式决策与自动交易权限必须保持关闭。
 3. **真正的 Replay**：读取首次运行保存的原始 input.json 重新计算，而非复制报告。
 4. **决策材料比较**：要求 PILOT_REPLAY_MATCHED、比较状态 MATCH、hash_verification=PASS 且 mismatched_fields=[]；原始响应来源链的 SHA-256/字节数也进入 analysis.json 的 Replay 比较字段。
 5. **Replay 自身包校验**：对 Replay 输出的文件再次核对哈希/字节数，并验证 replay_of 指回首次运行。
-6. **本机私有审计 ZIP**：生成包含首次运行、Replay、两份逐字节一致的原始 ChatGPT 响应快照（若首次运行具备）、收据、哈希/字节数清单、比较结果和所选验收日志的交接包。
+6. **本机私有审计 ZIP**：生成包含首次运行、Replay、两份逐字节一致的原始 ChatGPT 响应快照（若首次运行具备）、收据、哈希/字节数清单、比较结果和所选验收日志的交接包。打包器会独立重核 input.json 对原始回答的声明，若输入、收据、原文快照之间的 SHA-256 或字节数不匹配，将拒绝生成 ZIP。
 
 脚本终端最后必须显示首轮包哈希 PASS、Replay 包哈希 PASS 以及 MATCH 才算技术验收通过。若出现 [BLOCKED]、REPLAY_MISMATCH、mismatched_fields 非空或退出码非 0，不要记为通过。
 
