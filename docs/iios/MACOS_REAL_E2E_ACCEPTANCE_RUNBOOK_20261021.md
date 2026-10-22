@@ -53,7 +53,7 @@ ZIP 打包测试会检查唯一启动器在 ZIP 中的 POSIX mode 为 **100755**
 1. 切换到 ChatGPT，粘贴提示并发送。等待回答全部生成。
 2. 复制 **完整 JSON 对象**，不是开头几百行、不是摘要，也不要复制两个候选 JSON 对象。若回答使用 JSON 代码围栏，应连同完整对象一起复制。
 3. 切回向导自动打开的 **pilot-chatgpt-response-标的代码-时间戳.json**。全选文件现有内容，粘贴完整回答，再按 **Command+S** 保存。
-4. 不要把 JSON 粘贴到 Terminal，不要手动把文本拆成多个文件，不要为了修错而直接改输入模板。保存后，等待程序检测到大小、修改时间和 SHA-256 内容签名稳定；一般无需再按回车。
+4. 不要把 JSON 粘贴到 Terminal，不要手动把文本拆成多个文件，不要为了修错而直接改输入模板。保存后，等待程序检测到大小、修改时间和 SHA-256 内容签名稳定；一般无需再按回车。校验通过后，新版本会将原始回答的精确字节复制为运行包中的 `chatgpt_response_raw.txt`；原始响应文件不会被修写。
 5. 程序在生成分析前依次检查 JSON 语法、单对象边界、必需研究字段、数值/数据类别结构和 PIT 引用约束。任何一项失败都会阻止分析，不会因为 JSON 可解析就自动视为研究合格。
 
 ### JSON 格式不通过时的恢复流程
@@ -95,7 +95,7 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 
 所有输入和结果仅保存在 Mac 本地私有目录：
 
-- 输入模板、原始响应、修复后的完成输入：**~/.iios-private/local-pilot/inputs/**
+- 输入模板、原始响应、修复后的完成输入：**~/.iios-private/local-pilot/inputs/**；运行包内的 `chatgpt_response_raw.txt` 是通过校验后的原文快照，与 `input.json`、`pilot_receipt.json` 中的 SHA-256/字节数交叉绑定。
 - 首轮和 Replay：**~/.iios-private/local-pilot/runs/<pilot_id>/**
 - 验收日志：**~/.iios-private/local-pilot/acceptance-logs/**
 - 验收交接 ZIP：**~/.iios-private/local-pilot/acceptance-bundles/**
@@ -110,6 +110,7 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - 标的、价格、观察时点、known_at、截止时点与币种是否准确；价格是否明确为人工输入、未独立核验。
 - eps_earnings_bridge 的公司范围、预测期间、非控股股东损益、其他税后归属调整、稀释股数单位/期间、EPS 差异与来源引用是否可复核。
 - B4/B5 是否把项目增量利润误当成集团净利润或重复加总；B6 绑定约束及 90%/100%/110% 梯度是否与回报和目标入场价一致。
+- 原始 ChatGPT 回答是否在首轮与 Replay 中逐字节一致，SHA-256/字节数是否同时与 `input.json` 来源声明、两份 `pilot_receipt.json`、`analysis.json` 和中文报告来源链一致；原始回答未被程序或人工修复过程覆写。旧运行包未采集原文时只能记录 `NOT_AVAILABLE_IN_LEGACY_PARENT_RUN`，不得伪造回填。
 - 来源时间是否符合截止日；未知事实是否保留 UNKNOWN；报告和 JSON 的判断、价值情景与风险是否一致。
 - governance.formal_decision_created、canonical_run_receipt_created、execution_authorized、auto_execution 必须为 false；这仍然不是正式投资决策或交易授权。
 
