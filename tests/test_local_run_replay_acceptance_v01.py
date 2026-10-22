@@ -753,6 +753,64 @@ def test_acceptance_bundle_rejects_raw_response_not_bound_by_input_provenance(
         )
 
 
+@pytest.mark.parametrize(
+    "malformed_provenance",
+    [
+        "CAPTURED_RAW_CHATGPT_RESPONSE",
+        ["CAPTURED_RAW_CHATGPT_RESPONSE"],
+        True,
+        1,
+    ],
+)
+def test_acceptance_bundle_rejects_malformed_input_response_claim_without_raw_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    malformed_provenance: object,
+) -> None:
+    """A non-object provenance claim must not be downgraded to a legacy run."""
+    run_root = tmp_path / "runs"
+    run_root.mkdir(mode=0o700)
+    original = _bundle(
+        run_root,
+        run_dir_name="local-pilot-ORIGINAL-MALFORMED-RAW-CLAIM-20261022T100000Z",
+    )
+    replay = _bundle(
+        run_root,
+        replay_of=original.name,
+        run_dir_name="local-pilot-REPLAY-MALFORMED-RAW-CLAIM-20261022T100100Z",
+    )
+
+    input_path = original / "input.json"
+    input_payload = json.loads(input_path.read_text(encoding="utf-8"))
+    input_payload["_local_research_response_provenance"] = malformed_provenance
+    _write_json(input_path, input_payload)
+
+    # Keep the ordinary input artifact hash self-consistent so the test reaches
+    # the independent provenance-claim gate rather than failing on byte drift.
+    receipt_path = original / "pilot_receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    input_bytes = input_path.read_bytes()
+    receipt["file_manifest"]["input.json"] = {
+        "sha256": hashlib.sha256(input_bytes).hexdigest(),
+        "byte_size": len(input_bytes),
+    }
+    _write_json(receipt_path, receipt)
+
+    monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
+    with pytest.raises(
+        acceptance.AcceptanceError,
+        match="ACCEPTANCE_BUNDLE_INPUT_CLAIMS_RAW_RESPONSE_WITHOUT_FILE:first_run",
+    ):
+        acceptance._create_acceptance_bundle(
+            original_dir=original,
+            replay_dir=replay,
+            log_paths=[],
+            comparison={"status": "MATCH", "hash_verification": "PASS", "mismatched_fields": []},
+            prompt_issues=[],
+        )
+
+
+
 def test_acceptance_bundle_rejects_run_artifact_drift_from_receipt(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
