@@ -2829,3 +2829,12 @@ Status: **IMPLEMENTATION MERGED / EXACT-HEAD WORKFLOWS PASS / FRESH MAC E2E REPL
 - **Boundary:** this closes only a code-level acceptance ZIP provenance gap. No AI-authored fact is thereby verified, and no formal Evidence/PIT admission, formal Decision, or execution authority is created. Original/replay runs and ZIPs remain private under `~/.iios-private/`; historical bundles remain immutable.
 - **Next gate remains:** perform and independently review a fresh current-main Mac full run + Replay using the fixed 603699 input documented in the current runbook. Verify both raw snapshots, input/receipt/outer-manifest bindings, Replay MATCH, B4/B5/B6 and EPS bridge/report parity, plus portfolio/model completeness. CI does not close Mac acceptance.
 
+## Run-bundle verifier malformed response-claim guard — 2026-10-22
+
+Status: **IMPLEMENTATION MERGED / EXACT-HEAD WORKFLOWS PASS / FRESH MAC E2E REPLAY OPEN**
+
+- **Finding:** after PR #568 hardened the acceptance ZIP builder, the read-only local run-bundle verifier still treated only mapping-shaped `input.json._local_research_response_provenance` values as claims. A non-null malformed JSON value could therefore bypass the pre-archive verifier even though the final packaging gate would reject the same input.
+- **Fix:** PR [#570](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/570) merged as `322cf682d11e34cc5ad15ed37e637c7bc13f2ffb`. The run-bundle verifier now blocks every non-null value of the provenance field when no raw response is present; genuine legacy runs with an absent or null claim remain supported when the receipt declares no capture.
+- **Regression evidence:** exact PR head `21e6636384206d130cf9a2834a4d5e32f9f857f7` passed **6/6 associated workflows**, including Local Investment Pilot, Investment Core CI, MVP Investment Core, PILOT-02, B00-B authority reproduction, and independent Post-B04 red-team. Local Investment Pilot + Replay/acceptance passed **318 tests**. Four malformed variants use a resealed input hash entry so the test reaches the provenance claim guard.
+- **Boundary and next gate:** this closes the same-class fail-open path in both the read-only run verifier and final acceptance ZIP builder. It does not establish truth of AI research, source admission, a formal Decision, or trade authority. **Fresh current-main macOS full-run + Replay and private-bundle review remain OPEN / NOT VERIFIED**; the operator must run the current launcher and retain all records privately under `~/.iios-private/`.
+
