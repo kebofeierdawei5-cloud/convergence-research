@@ -2082,6 +2082,34 @@ def test_run_bundle_verifier_rejects_malformed_response_claim_without_capture(
 
 
 
+@pytest.mark.parametrize(
+    "malformed_receipt_provenance",
+    [
+        "CAPTURED_RAW_CHATGPT_RESPONSE",
+        ["CAPTURED_RAW_CHATGPT_RESPONSE"],
+        True,
+        1,
+        {"schema_version": pilot.LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA, "status": "UNKNOWN"},
+    ],
+)
+def test_run_bundle_verifier_rejects_malformed_receipt_response_provenance(
+    tmp_path: Path,
+    malformed_receipt_provenance: object,
+) -> None:
+    result = run_local_investment_pilot(
+        input_path=_write_input(tmp_path),
+        output_root=tmp_path / "private-runs",
+    )
+    run_dir = Path(result["run_dir"])
+    receipt_path = run_dir / "pilot_receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["research_response_provenance"] = malformed_receipt_provenance
+    receipt_path.write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    with pytest.raises(LocalInvestmentPilotError, match="RUN_RESEARCH_RESPONSE_PROVENANCE_INVALID"):
+        verify_local_pilot_bundle(run_dir)
+
+
 def _write_captured_research_input(tmp_path: Path) -> tuple[Path, Path, tuple[int, int, str]]:
     response_path = tmp_path / "chatgpt-response-original.txt"
     response_text = json.dumps(_payload(), ensure_ascii=False, indent=2)
