@@ -31,6 +31,7 @@ PILOT_STATUS = "PILOT_NON_CANONICAL"
 ANALYSIS_SCHEMA = "IIOS-LOCAL-INVESTMENT-PILOT-ANALYSIS-0.1"
 RECEIPT_SCHEMA = "IIOS-LOCAL-PILOT-RUN-RECORD-0.1"
 RAW_RESEARCH_RESPONSE_FILENAME = "chatgpt_response_raw.txt"
+RESEARCH_RESPONSE_PROVENANCE_SCHEMA = "IIOS-LOCAL-RESEARCH-RESPONSE-PROVENANCE-0.1"
 RESEARCH_RESPONSE_PRESENT_STATUSES = {
     "CAPTURED_RAW_CHATGPT_RESPONSE",
     "INHERITED_FROM_VERIFIED_PRIOR_RUN",
@@ -326,6 +327,25 @@ def _create_acceptance_bundle(
                 or response_provenance.get("byte_size") != len(payload)
             ):
                 raise AcceptanceError(f"ACCEPTANCE_BUNDLE_RAW_RESEARCH_RESPONSE_PROVENANCE_HASH_MISMATCH:{label}")
+
+        input_payload = _read_json(run_dir / "input.json", f"{label.upper()}_INPUT")
+        input_response_provenance = input_payload.get("_local_research_response_provenance")
+        if RAW_RESEARCH_RESPONSE_FILENAME in manifest:
+            if (
+                not isinstance(input_response_provenance, dict)
+                or input_response_provenance.get("schema_version") != RESEARCH_RESPONSE_PROVENANCE_SCHEMA
+                or input_response_provenance.get("status") != "CAPTURED_RAW_CHATGPT_RESPONSE"
+                or not isinstance(input_response_provenance.get("source_filename"), str)
+                or not input_response_provenance.get("source_filename")
+                or Path(input_response_provenance["source_filename"]).name != input_response_provenance["source_filename"]
+                or "/" in input_response_provenance["source_filename"]
+                or "\\" in input_response_provenance["source_filename"]
+                or input_response_provenance.get("sha256") != manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("sha256")
+                or input_response_provenance.get("byte_size") != manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("byte_size")
+            ):
+                raise AcceptanceError(f"ACCEPTANCE_BUNDLE_INPUT_RAW_RESPONSE_PROVENANCE_MISMATCH:{label}")
+        elif isinstance(input_response_provenance, dict):
+            raise AcceptanceError(f"ACCEPTANCE_BUNDLE_INPUT_CLAIMS_RAW_RESPONSE_WITHOUT_FILE:{label}")
 
         receipt_path = run_dir / "pilot_receipt.json"
         if receipt_path.is_symlink() or not receipt_path.is_file():
