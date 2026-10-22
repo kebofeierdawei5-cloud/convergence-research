@@ -765,7 +765,7 @@ def test_acceptance_bundle_rejects_raw_response_not_bound_by_input_provenance(
 def test_acceptance_bundle_rejects_malformed_input_response_claim_without_raw_file(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    malformed_provenance: Any,
+    malformed_provenance: object,
 ) -> None:
     """A non-object provenance claim must not be downgraded to a legacy run."""
     run_root = tmp_path / "runs"
