@@ -693,6 +693,51 @@ def test_acceptance_bundle_includes_first_run_replay_logs_and_verified_manifest(
             assert hashlib.sha256(payload).hexdigest() == record["sha256"]
 
 
+@pytest.mark.parametrize(
+    "malformed_receipt_provenance",
+    [
+        "CAPTURED_RAW_CHATGPT_RESPONSE",
+        ["CAPTURED_RAW_CHATGPT_RESPONSE"],
+        True,
+        1,
+        {"schema_version": acceptance.RESEARCH_RESPONSE_PROVENANCE_SCHEMA, "status": "UNKNOWN"},
+    ],
+)
+def test_acceptance_bundle_rejects_malformed_receipt_response_provenance_without_raw_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    malformed_receipt_provenance: object,
+) -> None:
+    run_root = tmp_path / "runs"
+    run_root.mkdir(mode=0o700)
+    original = _bundle(
+        run_root,
+        run_dir_name="local-pilot-ORIGINAL-MALFORMED-RECEIPT-CLAIM-20261022T110000Z",
+    )
+    replay = _bundle(
+        run_root,
+        replay_of=original.name,
+        run_dir_name="local-pilot-REPLAY-MALFORMED-RECEIPT-CLAIM-20261022T110100Z",
+    )
+    receipt_path = original / "pilot_receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["research_response_provenance"] = malformed_receipt_provenance
+    _write_json(receipt_path, receipt)
+
+    monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
+    with pytest.raises(
+        acceptance.AcceptanceError,
+        match="ACCEPTANCE_BUNDLE_RECEIPT_RAW_RESPONSE_PROVENANCE_INVALID:first_run",
+    ):
+        acceptance._create_acceptance_bundle(
+            original_dir=original,
+            replay_dir=replay,
+            log_paths=[],
+            comparison={"status": "MATCH", "hash_verification": "PASS", "mismatched_fields": []},
+            prompt_issues=[],
+        )
+
+
 def test_acceptance_bundle_rejects_raw_response_not_bound_by_input_provenance(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
