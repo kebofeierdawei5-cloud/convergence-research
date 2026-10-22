@@ -324,7 +324,13 @@ def _verify_run_bundle(run_path: str | Path) -> tuple[dict[str, Any], dict[str, 
             or input_provenance.get("byte_size") != manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("byte_size")
         ):
             raise LocalInvestmentPilotError("RUN_INPUT_RESEARCH_RESPONSE_PROVENANCE_MISMATCH")
-    elif isinstance(input_provenance, Mapping):
+    elif (
+        isinstance(input_payload, Mapping)
+        and "_local_research_response_provenance" in input_payload
+        and input_provenance is not None
+    ):
+        # The field's presence with a non-null value is a claim even when malformed.
+        # Only absent/null claims may follow the legacy no-capture path.
         raise LocalInvestmentPilotError("RUN_INPUT_CLAIMS_RESEARCH_RESPONSE_WITHOUT_CAPTURE")
     return dict(receipt), {name: dict(manifest[name]) for name in manifest_names}
 
