@@ -60,6 +60,10 @@ _RESEARCH_RESPONSE_PRESENT_STATUSES = {
     "CAPTURED_RAW_CHATGPT_RESPONSE",
     "INHERITED_FROM_VERIFIED_PRIOR_RUN",
 }
+_RESEARCH_RESPONSE_ABSENT_STATUSES = {
+    "NOT_CAPTURED_DIRECT_OR_LEGACY_INPUT",
+    "NOT_AVAILABLE_IN_LEGACY_PARENT_RUN",
+}
 REPLAY_COMPARISON_FIELDS = (
     "schema_version",
     "status",
@@ -304,6 +308,13 @@ def _verify_run_bundle(run_path: str | Path) -> tuple[dict[str, Any], dict[str, 
             raise LocalInvestmentPilotError("RUN_RESEARCH_RESPONSE_PROVENANCE_HASH_MISMATCH")
     elif isinstance(provenance, Mapping) and provenance.get("status") in _RESEARCH_RESPONSE_PRESENT_STATUSES:
         raise LocalInvestmentPilotError("RUN_RESEARCH_RESPONSE_FILE_MISSING_FROM_MANIFEST")
+    elif provenance is not None and (
+        not isinstance(provenance, Mapping)
+        or provenance.get("schema_version") != LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA
+        or provenance.get("status") not in _RESEARCH_RESPONSE_ABSENT_STATUSES
+        or any(provenance.get(field) is not None for field in ("file", "sha256", "byte_size"))
+    ):
+        raise LocalInvestmentPilotError("RUN_RESEARCH_RESPONSE_PROVENANCE_INVALID")
 
     try:
         input_payload = json.loads((run_dir / "input.json").read_text(encoding="utf-8"))
