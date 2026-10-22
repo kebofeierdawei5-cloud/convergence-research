@@ -344,7 +344,12 @@ def _create_acceptance_bundle(
                 or input_response_provenance.get("byte_size") != manifest[RAW_RESEARCH_RESPONSE_FILENAME].get("byte_size")
             ):
                 raise AcceptanceError(f"ACCEPTANCE_BUNDLE_INPUT_RAW_RESPONSE_PROVENANCE_MISMATCH:{label}")
-        elif isinstance(input_response_provenance, dict):
+        elif (
+            "_local_research_response_provenance" in input_payload
+            and input_response_provenance is not None
+        ):
+            # Historical runs are compatible only when they make no response claim.
+            # A malformed non-object value is still a claim and must not be treated as legacy.
             raise AcceptanceError(f"ACCEPTANCE_BUNDLE_INPUT_CLAIMS_RAW_RESPONSE_WITHOUT_FILE:{label}")
 
         receipt_path = run_dir / "pilot_receipt.json"
