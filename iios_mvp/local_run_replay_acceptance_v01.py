@@ -36,6 +36,10 @@ RESEARCH_RESPONSE_PRESENT_STATUSES = {
     "CAPTURED_RAW_CHATGPT_RESPONSE",
     "INHERITED_FROM_VERIFIED_PRIOR_RUN",
 }
+RESEARCH_RESPONSE_ABSENT_STATUSES = {
+    "NOT_CAPTURED_DIRECT_OR_LEGACY_INPUT",
+    "NOT_AVAILABLE_IN_LEGACY_PARENT_RUN",
+}
 RESULT_ID_PATTERN = re.compile(r"^local-pilot-[A-Za-z0-9._-]+$")
 REQUIRED_ANALYSIS_FIELDS = (
     "case",
@@ -295,6 +299,14 @@ def _create_acceptance_bundle(
             raise AcceptanceError(f"ACCEPTANCE_BUNDLE_RAW_RESEARCH_RESPONSE_MISSING:{label}")
         if RAW_RESEARCH_RESPONSE_FILENAME in manifest and not response_is_expected:
             raise AcceptanceError(f"ACCEPTANCE_BUNDLE_RAW_RESEARCH_RESPONSE_PROVENANCE_INVALID:{label}")
+        if RAW_RESEARCH_RESPONSE_FILENAME not in manifest and response_provenance is not None and not response_is_expected:
+            if (
+                not isinstance(response_provenance, dict)
+                or response_provenance.get("schema_version") != RESEARCH_RESPONSE_PROVENANCE_SCHEMA
+                or response_provenance.get("status") not in RESEARCH_RESPONSE_ABSENT_STATUSES
+                or any(response_provenance.get(field) is not None for field in ("file", "sha256", "byte_size"))
+            ):
+                raise AcceptanceError(f"ACCEPTANCE_BUNDLE_RECEIPT_RAW_RESPONSE_PROVENANCE_INVALID:{label}")
         file_names = ["input.json", "analysis.json", "report.md"]
         if RAW_RESEARCH_RESPONSE_FILENAME in manifest:
             file_names.append(RAW_RESEARCH_RESPONSE_FILENAME)
