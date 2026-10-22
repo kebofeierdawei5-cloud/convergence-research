@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from decimal import Decimal
 from datetime import date
@@ -2036,6 +2037,49 @@ def test_run_receipt_binds_exact_input_analysis_and_report_bytes(tmp_path):
     assert checked["pilot_id"] == result["pilot_id"]
     assert checked["hash_algorithm"] == "SHA-256"
     assert all(item["byte_size"] >= 0 and len(item["sha256"]) == 64 for item in checked["verified_files"])
+
+
+@pytest.mark.parametrize(
+    "malformed_provenance",
+    [
+        "CAPTURED_RAW_CHATGPT_RESPONSE",
+        ["CAPTURED_RAW_CHATGPT_RESPONSE"],
+        True,
+        1,
+    ],
+)
+def test_run_bundle_verifier_rejects_malformed_response_claim_without_capture(
+    tmp_path: Path,
+    malformed_provenance: object,
+) -> None:
+    result = run_local_investment_pilot(
+        input_path=_write_input(tmp_path),
+        output_root=tmp_path / "private-runs",
+    )
+    run_dir = Path(result["run_dir"])
+    input_path = run_dir / "input.json"
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    payload["_local_research_response_provenance"] = malformed_provenance
+    input_bytes = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+    input_path.write_bytes(input_bytes)
+
+    receipt_path = run_dir / "pilot_receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["file_manifest"]["input.json"] = {
+        "sha256": hashlib.sha256(input_bytes).hexdigest(),
+        "byte_size": len(input_bytes),
+    }
+    receipt_path.write_text(
+        json.dumps(receipt, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        LocalInvestmentPilotError,
+        match="RUN_INPUT_CLAIMS_RESEARCH_RESPONSE_WITHOUT_CAPTURE",
+    ):
+        verify_local_pilot_bundle(run_dir)
+
 
 
 def _write_captured_research_input(tmp_path: Path) -> tuple[Path, Path, tuple[int, int, str]]:
