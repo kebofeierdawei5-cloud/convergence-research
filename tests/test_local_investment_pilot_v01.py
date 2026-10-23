@@ -1149,7 +1149,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     prompt_text = prompt_files[0].read_text(encoding="utf-8")
     assert "核心投资判断链：必须逐项回答以下六个问题" in prompt_text
     assert "IIOS-RESEARCH-PATCH-0.1" in output
-    assert "不要重新输出上面的整份 600+ 行模板" in output
+    assert "不要重复输出上面的整份 600+ 行模板" in output
     assert "公司究竟靠什么赚钱" in prompt_text
     assert "未来最重要的变化是什么" in prompt_text
     assert "为什么相信变化会发生" in prompt_text
