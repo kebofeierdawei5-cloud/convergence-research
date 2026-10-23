@@ -5757,7 +5757,7 @@ def run_guided_wizard(
     }
   }
 }
-research 是需要覆盖到可信模板上的稀疏补丁，只放本轮有证据或明确分析假设需要更新的字段；不要输出空数组、空对象或默认占位字段来凑结构。 omitted fields will be inherited from the local trusted template. 对象字段按字段递归合并；数组如 evidence_register、drivers、risk.items、cash_distribution_events 和 product_lines 则整体替换，必须把该数组中需要保留的条目一次性写全。
+research 是需要覆盖到可信模板上的稀疏补丁，只放本轮有证据或明确分析假设需要更新的字段；不要输出空数组、空对象或默认占位字段来凑结构。 omitted fields will be inherited from the local trusted template. 未提供的字段会继承本地可信模板默认值。对象字段按字段递归合并；数组如 evidence_register、drivers、risk.items、cash_distribution_events 和 product_lines 则整体替换，必须把该数组中需要保留的条目一次性写全。
 不要把 schema_version、case、price_input、operator_valuation_context、decision_parameters 放进 research；这些由本地可信模板提供并锁定。研究和假设仍须遵守前文所有证据、估值、分红、期间、币种及情景约束。不得通过省略必须研究的事实来隐藏问题：关键结论、Bear/Base/Bull、独立 thesis_break_stress、经营驱动因素树、EPS_MULTIPLE、SOTP 候选输入和 B5 结构仍需尽力提供；确实未知的关键字段应在相应 summary/rationale 中说明缺口。
 旧版完整 IIOS JSON 对象仍可接收；但本次优先使用紧凑补丁协议，以避免回答过长被截断。只返回一个符合该协议的 JSON 对象，不要 Markdown 代码围栏或 JSON 以外的文字。"""
     )
