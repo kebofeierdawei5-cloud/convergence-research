@@ -326,6 +326,64 @@ def _render_audit_summary_markdown(summary: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+
+def _audit_summary_sidecar_path(archive_path: Path) -> Path:
+    """Return the directly readable private summary path alongside an acceptance ZIP."""
+    return archive_path.with_name(f"{archive_path.stem}.AUDIT_SUMMARY.md")
+
+
+def _write_audit_summary_sidecar(archive_path: Path, payload: bytes) -> Path:
+    """Write a no-clobber, owner-only copy of the summary already stored in the ZIP."""
+    sidecar = _audit_summary_sidecar_path(archive_path)
+    if sidecar.exists() or sidecar.is_symlink():
+        raise AcceptanceError("AUDIT_SUMMARY_SIDECAR_DESTINATION_ALREADY_EXISTS")
+    temporary = sidecar.with_name(f".{sidecar.name}.{_stamp()}.tmp")
+    try:
+        with temporary.open("xb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if os.name != "nt":
+            temporary.chmod(0o600)
+            if temporary.stat().st_mode & 0o077:
+                raise AcceptanceError("AUDIT_SUMMARY_SIDECAR_TEMP_PERMISSIONS_NOT_PRIVATE")
+        temporary.replace(sidecar)
+        if os.name != "nt":
+            sidecar.chmod(0o600)
+            if sidecar.stat().st_mode & 0o077:
+                raise AcceptanceError("AUDIT_SUMMARY_SIDECAR_PERMISSIONS_NOT_PRIVATE")
+        if sidecar.read_bytes() != payload:
+            raise AcceptanceError("AUDIT_SUMMARY_SIDECAR_CONTENT_MISMATCH")
+        return sidecar
+    except Exception:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+
+
+def _open_audit_summary_sidecar(sidecar: Path) -> bool:
+    """On macOS, open the generated summary without requiring the user to unzip the bundle."""
+    if (
+        sys.platform != "darwin"
+        or os.environ.get("IIOS_DISABLE_AUTO_OPEN_AUDIT_SUMMARY") == "1"
+        or sidecar.is_symlink()
+        or not sidecar.is_file()
+    ):
+        return False
+    try:
+        subprocess.Popen(
+            ["open", str(sidecar)],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError:
+        return False
+    return True
+
 def _create_acceptance_bundle(
     *,
     original_dir: Path,
@@ -550,6 +608,19 @@ def _create_acceptance_bundle(
             archive_path.chmod(0o600)
             if archive_path.stat().st_mode & 0o077:
                 raise AcceptanceError("ACCEPTANCE_BUNDLE_FILE_PERMISSIONS_NOT_PRIVATE")
+        try:
+            summary_sidecar = _write_audit_summary_sidecar(
+                archive_path, entries["AUDIT_SUMMARY.md"]
+            )
+            print(f"独立审核摘要已保存（无需解压 ZIP）：{summary_sidecar}")
+        except (OSError, AcceptanceError) as sidecar_error:
+            # A convenience copy must never replace or invalidate the already
+            # verified evidence ZIP. The same summary remains inside the ZIP.
+            print(
+                f"[WARN] 独立审核摘要副本未创建：{sidecar_error}；"
+                "请查看验收 ZIP 内的 AUDIT_SUMMARY.md。",
+                file=sys.stderr,
+            )
         return archive_path
     except Exception as exc:
         try:
@@ -933,7 +1004,13 @@ def _verify_and_replay(
     print(f"  Replay 比较：MATCH（比较字段数：{len(comparison.get('compared_fields', []))}）")
     print("  首次包哈希：PASS；Replay 包哈希：PASS")
     print(f"  完整审计交接 ZIP（首次运行 + Replay + 日志 + SHA-256 清单，仅本机私有保存）：{acceptance_bundle}")
-    print("  审核时优先打开 ZIP 内的 AUDIT_SUMMARY.md；需要逐项核验时再查看首轮/Replay 的 JSON、报告、回执与哈希清单。")
+    summary_sidecar = _audit_summary_sidecar_path(acceptance_bundle)
+    if summary_sidecar.is_file() and not summary_sidecar.is_symlink():
+        print(f"  独立审核摘要（无需解压 ZIP）：{summary_sidecar}")
+        if _open_audit_summary_sidecar(summary_sidecar):
+            print("  已请求 macOS 打开独立审核摘要；如未打开，可直接使用上方路径。")
+    else:
+        print("  审核摘要位于 ZIP 内的 AUDIT_SUMMARY.md；独立副本不可用。")
     print("  非正式试运行 / 不创建正式 Decision / 不授权交易：已核验")
 
     if prompt_issues:
