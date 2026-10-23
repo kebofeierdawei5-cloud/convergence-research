@@ -4,7 +4,7 @@ State classification: **CANONICAL**
 Snapshot: 2026-10-23
 Authority: this file is the **only canonical Current State Index**.
 
-**Current operator direction (2026-10-23):** continue code development while the private Mac full-run + Replay is deferred. The current bounded implementation batch addresses the reproduced JSON trailing-comma syntax failure without weakening the boundary against truncated responses, second JSON objects, or trailing prose. Local Mac acceptance remains OPEN / NOT VERIFIED; do not infer a successful investment run from a parser fix.
+**Current operator direction (2026-10-23):** continue bounded code development while the private Mac full-run + Replay is deferred. B28's JSON recovery and B29's compact handoff/audit summary are merged; the current usability continuation adds a directly readable private audit-summary sidecar without modifying the accepted ZIP evidence or investment calculations. Local Mac acceptance remains OPEN / NOT VERIFIED; do not infer a successful investment run from code/CI results.
 
 ## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-23
 
@@ -119,6 +119,7 @@ B25 auditable primary EPS_MULTIPLE arithmetic                 MERGED / EXACT-HEA
 B27 primary EPS provenance / operating-to-per-share bridge                 MERGED / EXACT-HEAD CI PASS; PR #553; 15/15 workflows and 295 Local Pilot + Replay/acceptance tests passed; missing/mismatched company-wide earnings, attribution, period/currency, diluted-share or project-profit lineage blocks return/target price/B6; real Mac full-run + Replay remains OPEN / NOT VERIFIED
 B28 deterministic JSON trailing-comma recovery                          MERGED in PR #576 as `3b9f659110833e7bc19b6a81ff7c768fddc681f8`; exact head `034f592e38416956bceee6cbaf9c96b9514cfde9` passed 335 Local Investment Pilot + Replay/acceptance tests and 15/15 associated workflows; only commas immediately before `}`/`]` outside JSON strings are removed in-memory; raw response remains unchanged; malformed internal commas, truncated responses and trailing text still fail closed; real Mac E2E remains OPEN / NOT VERIFIED
 B29 compact research-patch handoff and one-screen audit index         MERGED in PR #578 as `5b22e66c8f84c81ca4172c04bf3dad2a2645a482`; exact head `1b621bfed8b81bdc287b9c51733006fc599f332e` passed 339 Local Investment Pilot + Replay/acceptance tests and 15/15 associated workflows; `IIOS-RESEARCH-PATCH-0.1` recursively merges sparse research fields into the trusted local template, preserves operator-owned roots and raw response hashes, and adds `AUDIT_SUMMARY.md` to the private acceptance ZIP without removing the full evidence package; real Mac end-to-end acceptance remains OPEN / NOT VERIFIED
+B30 direct audit-summary entry                                          IMPLEMENTATION ON PR; writes a private owner-only sibling summary identical to the ZIP member and attempts to open it on macOS; ZIP remains the full evidence authority and fallback; real Mac acceptance remains OPEN / NOT VERIFIED
 B19 SOTP report formula consistency after NCI correction        PR #538 MERGED; exact-head 15/15 workflows PASS incl. Local Pilot + independent red-team; no arithmetic change; real Mac acceptance remains open
 ```
 
@@ -2852,3 +2853,13 @@ Status: **IMPLEMENTATION MERGED / EXACT-HEAD WORKFLOWS PASS / FRESH MAC E2E REPL
 - **Boundary:** the three provenance layers—input claim, run verification, and archive packaging—now independently fail closed on non-null malformed claims and inconsistent no-capture receipt metadata. This is code-integrity evidence only; it does not prove AI-authored claims true, admit formal Evidence/PIT, create a formal Decision, or authorize trading. Private responses/runs/ZIPs remain under `~/.iios-private/`.
 - **Next gate remains:** fresh current-main macOS full-run + Replay with the fixed 603699 test case, followed by independent review of the private bundle. Confirm identical original/Replay raw snapshots, consistent input/receipt/archive hashes, Replay MATCH, B4/B5/B6 and EPS bridge/report parity, plus complete portfolio/model context. The current CI evidence does not close Mac acceptance.
 
+
+
+## B30 — Direct audit-summary entry without ZIP extraction — 2026-10-23
+
+Status: **IMPLEMENTATION ON PR / EXACT-HEAD CI PENDING / REAL MAC ACCEPTANCE OPEN**
+
+- **Problem:** B29 put `AUDIT_SUMMARY.md` inside the private acceptance ZIP, but the operator still had to locate and extract the ZIP just to see the one-screen index.
+- **Change:** the acceptance wrapper writes a sibling file ending in `.AUDIT_SUMMARY.md` from the exact same bytes as the ZIP member, using no-clobber creation, a temporary file and atomic rename. On POSIX, the sidecar is owner-only (`0600`). The macOS flow attempts to open the sidecar with an argument-vector `open` call; this is best-effort and can be disabled with `IIOS_DISABLE_AUTO_OPEN_AUDIT_SUMMARY=1`. The full ZIP and its manifest are unchanged and remain the evidence package of record.
+- **Regression coverage:** tests compare sidecar bytes with the ZIP member, check private permissions, and verify macOS-only opening/opt-out behavior.
+- **Boundary:** this changes only the audit entrypoint. It does not alter source bytes, replay comparison, investment calculations, Evidence/PIT admission, formal Decision, or execution authority. Fresh macOS full-run + Replay remain OPEN / NOT VERIFIED.
