@@ -738,6 +738,91 @@ def test_open_audit_summary_sidecar_respects_opt_out_and_non_macos(
     assert acceptance._open_audit_summary_sidecar(sidecar) is False
 
 
+def test_summarize_analysis_readiness_reads_existing_statuses_and_keeps_unknowns() -> None:
+    readiness = acceptance._summarize_analysis_readiness({
+        "valuation_model_consistency": {
+            "status": "PRIMARY_MODEL_NOT_ELIGIBLE",
+            "operator_selected_model_family": "SOTP",
+            "calculation_model_family": "UNKNOWN",
+        },
+        "operating_driver_forecast": {"status": "REVIEW_REQUIRED"},
+        "valuation_transmission": {"status": "NOT_LINKED"},
+        "eps_earnings_bridge": {"status": "BLOCKED"},
+        "eps_multiple_valuation": {"status": "NOT_SELECTED"},
+        "sotp_valuation": {"status": "BLOCKED"},
+        "valuation_timing": {"status": "UNKNOWN"},
+        "price_zone_sensitivity": {"status": "UNKNOWN"},
+        "portfolio_package": {"status": "NOT_PROVIDED"},
+        "decision": {"return_metrics_ready": False},
+    })
+
+    assert readiness["selected_model_family"] == "SOTP"
+    assert readiness["calculation_model_family"] == "UNKNOWN"
+    assert readiness["valuation_model_consistency"] == "PRIMARY_MODEL_NOT_ELIGIBLE"
+    assert readiness["operating_driver_forecast"] == "REVIEW_REQUIRED"
+    assert readiness["valuation_transmission"] == "NOT_LINKED"
+    assert readiness["eps_earnings_bridge"] == "BLOCKED"
+    assert readiness["return_metrics_readiness"] == "NOT_READY"
+
+    missing = acceptance._summarize_analysis_readiness({})
+    assert all(value == "UNKNOWN" for value in missing.values())
+
+
+def test_audit_summary_renders_first_run_and_replay_gate_status_side_by_side() -> None:
+    summary = {
+        "technical_status": "PASS",
+        "input_completeness_status": "REVIEW_REQUIRED",
+        "overall_status": "REVIEW_REQUIRED",
+        "first_run": {
+            "pilot_id": "local-pilot-first",
+            "provisional_action": "REVIEW_REQUIRED",
+            "analysis_readiness": {
+                "selected_model_family": "SOTP",
+                "calculation_model_family": "UNKNOWN",
+                "operating_driver_forecast": "REVIEW_REQUIRED",
+                "valuation_transmission": "NOT_LINKED",
+                "valuation_model_consistency": "PRIMARY_MODEL_NOT_ELIGIBLE",
+                "eps_earnings_bridge": "BLOCKED",
+                "eps_multiple_valuation": "NOT_SELECTED",
+                "sotp_valuation": "BLOCKED",
+                "valuation_timing": "UNKNOWN",
+                "price_zone_sensitivity": "UNKNOWN",
+                "return_metrics_readiness": "NOT_READY",
+                "portfolio_package": "NOT_PROVIDED",
+            },
+        },
+        "replay_run": {
+            "pilot_id": "local-pilot-replay",
+            "provisional_action": "REVIEW_REQUIRED",
+            "analysis_readiness": {
+                "selected_model_family": "SOTP",
+                "calculation_model_family": "UNKNOWN",
+                "operating_driver_forecast": "REVIEW_REQUIRED",
+                "valuation_transmission": "NOT_LINKED",
+                "valuation_model_consistency": "PRIMARY_MODEL_NOT_ELIGIBLE",
+                "eps_earnings_bridge": "BLOCKED",
+                "eps_multiple_valuation": "NOT_SELECTED",
+                "sotp_valuation": "BLOCKED",
+                "valuation_timing": "UNKNOWN",
+                "price_zone_sensitivity": "UNKNOWN",
+                "return_metrics_readiness": "NOT_READY",
+                "portfolio_package": "NOT_PROVIDED",
+            },
+        },
+        "replay_comparison": {"status": "MATCH", "hash_verification": "PASS", "mismatched_fields": []},
+        "input_completeness_issues": ["主估值模型未通过"],
+    }
+
+    rendered = acceptance._render_audit_summary_markdown(summary)
+    assert "## 核心分析链路状态" in rendered
+    assert "仅读取首轮和 Replay 已保存的 analysis.json 状态，不重新计算" in rendered
+    assert "| 主模型一致性 | PRIMARY_MODEL_NOT_ELIGIBLE | PRIMARY_MODEL_NOT_ELIGIBLE |" in rendered
+    assert "| EPS 盈利桥 | BLOCKED | BLOCKED |" in rendered
+    assert "| 回报指标可用性（引擎记录） | NOT_READY | NOT_READY |" in rendered
+    assert "UNKNOWN" in rendered
+    assert "请勿把技术验收 PASS 解释为投资结论 PASS" in rendered
+
+
 @pytest.mark.parametrize(
     "malformed_receipt_provenance",
     [
