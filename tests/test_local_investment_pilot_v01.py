@@ -1815,6 +1815,49 @@ def test_redteam_url_escape_repair_does_not_ignore_trailing_text():
         _extract_json_object(source)
 
 
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        ('{"a": 1,}', {"a": 1}),
+        ('{"a": [1, 2,],}', {"a": [1, 2]}),
+        (r'{"source_ref":"https\://example.com/a.pdf","items":[1,],}', {
+            "source_ref": "https://example.com/a.pdf",
+            "items": [1],
+        }),
+        (r'{"text":"literal ,} and escaped quote \",] here","items":[1,2,],}', {
+            "text": 'literal ,} and escaped quote ",] here',
+            "items": [1, 2],
+        }),
+    ],
+)
+def test_redteam_chatgpt_json_repairs_only_trailing_commas_outside_strings(source, expected):
+    from iios_mvp.local_investment_pilot_v01 import _extract_json_object
+
+    assert _extract_json_object(source) == expected
+
+
+def test_redteam_trailing_comma_repair_does_not_bypass_trailing_content_gate():
+    from iios_mvp.local_investment_pilot_v01 import _extract_json_object
+
+    with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_JSON_TRAILING_CONTENT_AFTER_OBJECT"):
+        _extract_json_object('{"a": 1,} trailing text')
+
+
+def test_redteam_trailing_comma_repair_does_not_accept_non_trailing_malformed_comma():
+    from iios_mvp.local_investment_pilot_v01 import _extract_json_object
+
+    with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_JSON_INVALID_COPY_THE_COMPLETE_JSON_OBJECT"):
+        _extract_json_object('{"a": 1,, "b": 2}')
+
+
+def test_redteam_trailing_comma_repair_does_not_complete_truncated_object():
+    from iios_mvp.local_investment_pilot_v01 import _extract_json_object
+
+    with pytest.raises(LocalInvestmentPilotError, match="CHATGPT_JSON_INVALID_COPY_THE_COMPLETE_JSON_OBJECT"):
+        _extract_json_object('{"a": {"b": 1,}')
+
+
+
 def test_research_status_aliases_known_at_precision_and_value_driver_schema():
     payload = _payload(cutoff="2026-10-10")
     payload["evidence_register"][0]["known_at"] = "2026-08-30；具体时分 UNKNOWN"
