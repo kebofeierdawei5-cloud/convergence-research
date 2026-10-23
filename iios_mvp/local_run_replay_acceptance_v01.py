@@ -254,6 +254,43 @@ def _current_code_revision() -> str | None:
     return value if result.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", value) else None
 
 
+
+def _summarize_analysis_readiness(analysis: Mapping[str, Any]) -> dict[str, str]:
+    """Read existing model/earnings/risk gate statuses without re-running any calculation."""
+    def section_status(key: str) -> str:
+        section = analysis.get(key)
+        if not isinstance(section, Mapping):
+            return "UNKNOWN"
+        value = section.get("status")
+        return value.strip() if isinstance(value, str) and value.strip() else "UNKNOWN"
+
+    model_consistency = analysis.get("valuation_model_consistency")
+    model_consistency = model_consistency if isinstance(model_consistency, Mapping) else {}
+    selected_model = model_consistency.get("operator_selected_model_family")
+    calculation_model = model_consistency.get("calculation_model_family")
+    decision = analysis.get("decision")
+    decision = decision if isinstance(decision, Mapping) else {}
+    return_ready = decision.get("return_metrics_ready")
+    return {
+        "selected_model_family": selected_model.strip() if isinstance(selected_model, str) and selected_model.strip() else "UNKNOWN",
+        "calculation_model_family": calculation_model.strip() if isinstance(calculation_model, str) and calculation_model.strip() else "UNKNOWN",
+        "operating_driver_forecast": section_status("operating_driver_forecast"),
+        "valuation_transmission": section_status("valuation_transmission"),
+        "valuation_model_consistency": section_status("valuation_model_consistency"),
+        "eps_earnings_bridge": section_status("eps_earnings_bridge"),
+        "eps_multiple_valuation": section_status("eps_multiple_valuation"),
+        "sotp_valuation": section_status("sotp_valuation"),
+        "valuation_timing": section_status("valuation_timing"),
+        "price_zone_sensitivity": section_status("price_zone_sensitivity"),
+        "return_metrics_readiness": (
+            "READY" if return_ready is True else
+            "NOT_READY" if return_ready is False else
+            "UNKNOWN"
+        ),
+        "portfolio_package": section_status("portfolio_package"),
+    }
+
+
 def _render_audit_summary_markdown(summary: Mapping[str, Any]) -> str:
     """Render a one-screen audit index without replacing the underlying evidence."""
     comparison = summary.get("replay_comparison")
@@ -285,6 +322,41 @@ def _render_audit_summary_markdown(summary: Mapping[str, Any]) -> str:
         ("provisional_action", "暂定状态（非正式决策）"),
     ):
         lines.append(f"| {label} | {first.get(key) or 'UNKNOWN'} | {replay.get(key) or 'UNKNOWN'} |")
+
+    first_readiness = first.get("analysis_readiness")
+    first_readiness = first_readiness if isinstance(first_readiness, dict) else {}
+    replay_readiness = replay.get("analysis_readiness")
+    replay_readiness = replay_readiness if isinstance(replay_readiness, dict) else {}
+    lines.extend([
+        "",
+        "## 核心分析链路状态",
+        "",
+        "> 仅读取首轮和 Replay 已保存的 analysis.json 状态，不重新计算。状态摘要不是投资审核通过；缺失字段显示 UNKNOWN。",
+        "",
+        "| 检查项 | 首轮 | Replay |",
+        "|---|---|---|",
+    ])
+    for key, label in (
+        ("selected_model_family", "操作者选择的主模型"),
+        ("calculation_model_family", "实际计算模型"),
+        ("operating_driver_forecast", "经营驱动推演"),
+        ("valuation_transmission", "B5 估值传导"),
+        ("valuation_model_consistency", "主模型一致性"),
+        ("eps_earnings_bridge", "EPS 盈利桥"),
+        ("eps_multiple_valuation", "EPS_MULTIPLE 计算状态"),
+        ("sotp_valuation", "SOTP 计算状态"),
+        ("valuation_timing", "估值终点/期间"),
+        ("price_zone_sensitivity", "价格区间/敏感性"),
+        ("return_metrics_readiness", "回报指标可用性（引擎记录）"),
+        ("portfolio_package", "组合风险输入"),
+    ):
+        first_value = first_readiness.get(key)
+        replay_value = replay_readiness.get(key)
+        if not isinstance(first_value, str) or not first_value.strip():
+            first_value = "UNKNOWN"
+        if not isinstance(replay_value, str) or not replay_value.strip():
+            replay_value = "UNKNOWN"
+        lines.append(f"| {label} | {first_value} | {replay_value} |")
 
     lines.extend([
         "",
@@ -504,6 +576,7 @@ def _create_acceptance_bundle(
             "pilot_id": run_dir.name,
             "replay_of": receipt.get("replay_of"),
             "provisional_action": decision.get("provisional_action"),
+            "analysis_readiness": _summarize_analysis_readiness(analysis),
             "file_manifest": {name: dict(value) for name, value in manifest.items()},
             "research_response_provenance": (
                 dict(receipt["research_response_provenance"])
