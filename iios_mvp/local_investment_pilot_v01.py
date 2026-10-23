@@ -4656,7 +4656,7 @@ def create_pilot_template(
     prompt = (
         "你是 IIOS 的个人股票研究助手。请主动联网检索并完成截止时点内的研究，不要要求用户先上传这份模板或另外寻找公告。"
         "模板 JSON 将直接附在本提示中。先从公司/交易所/监管机构公开资料取证，再判断 Trust、Reality、Quality、Thesis、价值驱动、"
-        "估值与预期差、风险。返回时必须保留 schema_version、case、price_input 原样不变，只补研究字段。"
+        "估值与预期差、风险。schema_version、case、price_input、operator_valuation_context 和 decision_parameters 由本地可信模板保护并自动合并，不需要在回答里重复；最终输出格式见本提示末尾的“紧凑研究补丁 JSON 协议”。"
         "证据应给出可直接打开的来源 URL、标题、发布日期/已知时点与事实摘要；优先使用公司定期报告、公告、交易所与监管文件。"
         "不得为了填满字段编造事实、URL、财务数字或所谓市场一致预期。对于 MIE，不具备可核实的一致预期/市场定价证据时，明确使用 NOT_IDENTIFIABLE 并解释原因。"
         "请用可解释的显式假设建立 Bear/Base/Bull 数值情景；情景是估算而非已披露事实，说明盈利/利润率/销量等驱动及估值倍数来源。"
@@ -4748,6 +4748,78 @@ def create_pilot_template(
         "formal_decision_created": False,
     }
 
+
+
+def _expand_research_patch_with_template(
+    template_path: str | Path, response: Mapping[str, Any]
+) -> tuple[dict[str, Any], str, list[str]]:
+    """Merge the compact AI research patch onto the trusted local template.
+
+    Legacy full-object responses remain accepted. Patch responses are deliberately
+    sparse: omitted fields inherit the template's UNKNOWN/null/default structure.
+    Operator-owned roots can never be supplied inside a patch.
+    """
+    if response.get("response_mode") != "IIOS-RESEARCH-PATCH-0.1":
+        return dict(response), "FULL_OBJECT", []
+
+    if set(response) != {"response_mode", "research"}:
+        raise LocalInvestmentPilotError(
+            "CHATGPT_RESEARCH_PATCH_ENVELOPE_INVALID: compact response must contain only "
+            "response_mode and research."
+        )
+    research = response.get("research")
+    if not isinstance(research, Mapping) or not research:
+        raise LocalInvestmentPilotError(
+            "CHATGPT_RESEARCH_PATCH_BODY_REQUIRED: research must be a non-empty JSON object."
+        )
+
+    path = Path(template_path).expanduser()
+    try:
+        template = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise LocalInvestmentPilotError(
+            "TRUSTED_PILOT_TEMPLATE_UNREADABLE_FOR_PATCH_MERGE"
+        ) from exc
+    if not isinstance(template, dict) or template.get("schema_version") != PILOT_SCHEMA:
+        raise LocalInvestmentPilotError(
+            "TRUSTED_PILOT_TEMPLATE_SCHEMA_INVALID_FOR_PATCH_MERGE"
+        )
+
+    protected_roots = {
+        "schema_version",
+        "case",
+        "price_input",
+        "operator_valuation_context",
+        "decision_parameters",
+    }
+    forbidden = sorted(set(research) & protected_roots)
+    if forbidden:
+        raise LocalInvestmentPilotError(
+            "CHATGPT_RESEARCH_PATCH_CONTAINS_OPERATOR_OWNED_FIELDS:"
+            + ",".join(forbidden)
+        )
+    allowed_roots = set(template) - protected_roots
+    unknown = sorted(set(research) - allowed_roots)
+    if unknown:
+        raise LocalInvestmentPilotError(
+            "CHATGPT_RESEARCH_PATCH_UNKNOWN_TOP_LEVEL_FIELDS:" + ",".join(unknown)
+        )
+
+    def merge(base: Any, overlay: Any) -> Any:
+        if isinstance(base, Mapping) and isinstance(overlay, Mapping):
+            result: dict[str, Any] = {}
+            for key, value in base.items():
+                result[key] = merge(value, overlay[key]) if key in overlay else value
+            for key, value in overlay.items():
+                if key not in base:
+                    result[key] = value
+            return result
+        # Arrays are intentionally replaced atomically to prevent silently
+        # mixing old evidence/events/scenario rows with newly generated rows.
+        return overlay
+
+    expanded = merge(template, research)
+    return expanded, "COMPACT_PATCH_MERGED_WITH_TRUSTED_TEMPLATE", sorted(research)
 
 
 def _remove_json_trailing_commas(text: str) -> str:
@@ -5345,23 +5417,16 @@ def _validate_guided_research_response(payload: Mapping[str, Any]) -> None:
 def _build_response_repair_prompt(
     *, original_prompt: str, response_path: str | Path, validation_error: str
 ) -> str:
-    """Build a one-paste repair request so the user does not manually edit dozens of JSON fields."""
-    path = Path(response_path).expanduser()
-    try:
-        previous_response = path.read_text(encoding="utf-8")
-    except OSError:
-        previous_response = ""
+    """Build a short repair request; do not retransmit the huge template and prior answer."""
     return (
-        "上一轮 IIOS 股票研究回答未通过本地格式/完整性校验。请修复并重新完成研究，不要让用户手工编辑 JSON。"
-        "\n\n【校验反馈】\n" + validation_error
-        + "\n\n【必须遵守】\n"
-        "1. 以下是本次唯一基准模板与全部研究要求。必须完整保留 schema_version、case、price_input、operator_valuation_context 的所有值；还必须原样保留 decision_parameters.max_loss_pct 与 decision_parameters.required_return_annualized。它们是人工控制输入，不是待研究或优化的参数，不能改值、删键、换类型或重新推断。以模板中的原始 JSON 为唯一依据。尤其人工股价、观察日、known_at、截止时点、assurance_label、模型选择和两个政策参数一律不得改写。"
-        "2. 不要要求用户上传模板或额外寻找公告；请主动联网搜索截止时点前公开可访问的公司公告、交易所披露与监管文件。"
-        "3. 修复缺失结构字段并填写数值估值情景、经营驱动因素树和 B5 估值传导结构；研究假设和事实来源要分开。不得编造来源、财务数字或市场一致预期。"
-        "4. 如果确实无法识别，字段仍要保留结构，并在 summary/rationale 中具体解释未知原因、证据缺口及需要人工确认的事项。"
-        "5. 请返回一个完整 JSON 对象，不要代码围栏和 JSON 以外的文字。"
-        + "\n\n【原始研究提示及完整基准模板】\n" + original_prompt
-        + "\n\n【上次失败的完整回答，请在此基础上修复】\n" + previous_response
+        "上一条完整研究提示和你的上一份回答已在当前对话中，无需重新复制模板，也不要再次输出数百行完整输入文件。"
+        "\n\n【本地校验反馈】\n" + validation_error
+        + "\n\n请重新检查上一份回答，输出一个简短、完整、严格可解析的 JSON 对象，使用本轮研究提示末尾定义的 "
+        "IIOS-RESEARCH-PATCH-0.1 紧凑研究补丁协议。对象只能含 response_mode 与 research 两个顶层键。"
+        "只输出需要修改/补充的研究字段；不要返回 schema_version、case、price_input、operator_valuation_context 或 decision_parameters。"
+        "本地程序会把补丁合并进受信任的原始模板，并继续执行既有完整性、证据与估值校验。"
+        "不要补造未知事实、来源、财务数字或市场一致预期。不要把截断回答强行闭合；请完整输出新的补丁对象。"
+        "\n\n不要让用户手工编辑 JSON；只返回一个 JSON 对象，不要代码围栏或额外说明。"
     )
 
 
@@ -5680,7 +5745,21 @@ def run_guided_wizard(
         + "请填写 thesis_break_stress 的 failure_trigger、operating_impact、valuation_method、terminal_value_per_share、cash_distributions_per_share、rationale，且其期末总财富必须低于 Bear。"
         + "不要只原样返回模板，不允许把核心研究字段全部留空。若无法识别必须具体解释原因和证据缺口；数字估值可以建立透明、可追责的假设，但不得把假设伪装为披露事实。"
         + "严格保留 schema_version、case、price_input 原样不变，尤其不得更改人工股价、观察日期、known_at 或 price assurance 标签。"
-        + "只返回完整 JSON，不要代码围栏或额外说明。"
+        + """【紧凑研究补丁 JSON 协议（最高优先级，覆盖前文“返回完整对象”的旧措辞）】
+不要重复输出上面的整份 600+ 行模板。只返回一个紧凑 JSON 对象。最外层只能有 response_mode 与 research 两个键，形状如下（仅示意，research 内容必须来自本次真实研究，不能照抄示例值）：
+{
+  "response_mode": "IIOS-RESEARCH-PATCH-0.1",
+  "research": {
+    "assessment": {
+      "trust": {
+        "summary": "填写由本轮证据支持的结论和缺口"
+      }
+    }
+  }
+}
+research 是需要覆盖到可信模板上的稀疏补丁，只放本轮有证据或明确分析假设需要更新的字段；不要输出空数组、空对象或默认占位字段来凑结构。 omitted fields will be inherited from the local trusted template. 未提供的字段会继承本地可信模板默认值。对象字段按字段递归合并；数组如 evidence_register、drivers、risk.items、cash_distribution_events 和 product_lines 则整体替换，必须把该数组中需要保留的条目一次性写全。
+不要把 schema_version、case、price_input、operator_valuation_context、decision_parameters 放进 research；这些由本地可信模板提供并锁定。研究和假设仍须遵守前文所有证据、估值、分红、期间、币种及情景约束。不得通过省略必须研究的事实来隐藏问题：关键结论、Bear/Base/Bull、独立 thesis_break_stress、经营驱动因素树、EPS_MULTIPLE、SOTP 候选输入和 B5 结构仍需尽力提供；确实未知的关键字段应在相应 summary/rationale 中说明缺口。
+旧版完整 IIOS JSON 对象仍可接收；但本次优先使用紧凑补丁协议，以避免回答过长被截断。只返回一个符合该协议的 JSON 对象，不要 Markdown 代码围栏或 JSON 以外的文字。"""
     )
 
     private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
@@ -5694,14 +5773,14 @@ def run_guided_wizard(
         subprocess.run(["pbcopy"], input=prompt, text=True, check=True, timeout=5)
         subprocess.run(["open", "https://chatgpt.com/"], check=False, timeout=5)
         subprocess.run(["open", "-a", "TextEdit", str(response_path)], check=False, timeout=5)
-        print("\n已打开 ChatGPT 和 JSON 结果文件；完整输入模板与研究指令已复制到剪贴板，无需另行上传模板文件。")
+        print("\n已打开 ChatGPT 和 JSON 结果文件；研究提示与完整基准模板已复制到剪贴板。ChatGPT 只需返回紧凑研究补丁，本地会自动合并模板，不需要复制整份大 JSON。")
     else:
         print("\n研究提示（已包含本次完整 JSON 模板）：\n" + prompt)
 
     print(f"\nChatGPT 完整回答的保存位置：\n{response_path}")
     print("操作步骤（只需在 ChatGPT 与这个结果文件之间复制一次）：")
     print("  1. 在已打开的 ChatGPT 对话中粘贴剪贴板中的完整研究提示并发送；提示里已经包含本次 JSON 模板，不用上传模板或另找公告。")
-    print("  2. 复制 ChatGPT 返回的完整 JSON，覆盖上面已打开的 JSON 结果文件并保存。")
+    print("  2. 复制 ChatGPT 返回的紧凑研究补丁 JSON，覆盖上面已打开的结果文件并保存；本地将补齐模板默认结构并锁定人工控制字段。")
     print("  3. 保存后等待程序自动检测；通常无需按回车。不要把 JSON 粘贴到终端，也不要手工填写 JSON 字段。")
     if sys.platform == "darwin":
         print("  提示：JSON 文件已用 TextEdit 打开；粘贴后按 Command+S 保存。若按回车检查时目标文件仍为空，程序会打开文件选择窗口供你选择实际保存的 JSON。")
@@ -5719,7 +5798,10 @@ def run_guided_wizard(
         )
         print("已检测到结果文件更新且写入稳定，正在读取并校验……", flush=True)
         try:
-            payload = _read_json_response_file(response_path)
+            response_object = _read_json_response_file(response_path)
+            payload, response_format, merged_top_level_fields = _expand_research_patch_with_template(
+                template_path, response_object
+            )
             if _response_file_signature(response_path) != response_signature:
                 raise LocalInvestmentPilotError("CHATGPT_RESPONSE_CHANGED_DURING_VALIDATION")
             # Never trust AI-authored copies of operator controls. Restore only
@@ -5751,8 +5833,8 @@ def run_guided_wizard(
                 "source_filename": response_path.name,
                 "sha256": response_signature[2],
                 "byte_size": response_signature[0],
-                "capture_stage": "RAW_RESPONSE_HASHED_ON_STABLE_SAVE_BEFORE_LOCAL_OPERATOR_FIELD_RECOVERY",
-                "validation_status": "JSON_OBJECT_PARSE_PASSED; COMPLETED_INPUT_REQUIRED_FIELDS_PASSED_AFTER_LOCAL_OPERATOR_FIELD_RECOVERY",
+                "capture_stage": "RAW_RESPONSE_HASHED_ON_STABLE_SAVE_BEFORE_LOCAL_TEMPLATE_MERGE_AND_OPERATOR_FIELD_RECOVERY",
+                "validation_status": "JSON_OBJECT_PARSE_PASSED; RESPONSE_FORMAT=" + response_format + "; MERGED_FIELDS=" + ",".join(merged_top_level_fields) + "; COMPLETED_INPUT_REQUIRED_FIELDS_PASSED_AFTER_LOCAL_OPERATOR_FIELD_RECOVERY",
                 "raw_response_file_modified_by_runner": False,
             }
             break
