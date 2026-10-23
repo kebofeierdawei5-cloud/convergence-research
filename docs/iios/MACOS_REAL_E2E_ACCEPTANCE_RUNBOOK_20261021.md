@@ -87,7 +87,9 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 3. **真正的 Replay**：读取首次运行保存的原始 input.json 重新计算，而非复制报告。
 4. **决策材料比较**：要求 PILOT_REPLAY_MATCHED、比较状态 MATCH、hash_verification=PASS 且 mismatched_fields=[]；原始响应来源链的 SHA-256/字节数也进入 analysis.json 的 Replay 比较字段。
 5. **Replay 自身包校验**：对 Replay 输出的文件再次核对哈希/字节数，并验证 replay_of 指回首次运行。
-6. **本机私有审计 ZIP + 免解压摘要**：生成包含首次运行、Replay、两份逐字节一致的原始 ChatGPT 响应快照（若首次运行具备）、收据、哈希/字节数清单、比较结果和所选验收日志的交接包。打包器会独立重核 input.json 对原始回答的声明，若输入、收据、原文快照之间的 SHA-256 或字节数不匹配，将拒绝生成 ZIP。另在同一私有目录写出与 ZIP 内 `AUDIT_SUMMARY.md` 逐字节一致的独立摘要副本；不会覆盖已有文件，POSIX 权限为 `0600`。在 macOS 上，脚本会尝试自动打开这份摘要；自动打开失败或摘要副本不可用时，ZIP 内摘要仍保留为后备入口。
+6. **本机私有审计 ZIP + 免解压摘要**：生成包含首次运行、Replay、两份逐字节一致的原始 ChatGPT 响应快照（若首次运行具备）、收据、哈希/字节数清单、比较结果和所选验收日志的交接包。打包器会独立重核 input.json 对原始回答的声明，若输入、收据、原文快照之间的 SHA-256 或字节数不匹配，将拒绝生成 ZIP。另在同一私有目录写出与 ZIP 内 `AUDIT_SUMMARY.md` 逐字节一致的独立摘要副本；不会覆盖已有文件，POSIX 权限为 `0600`。在 macOS 上，脚本会尝试自动打开这份摘要；自动打开失败或摘要副本不可用时，ZIP 内摘要仍保留为后备入口。 摘要中“核心分析链路状态”并排显示首轮和 Replay 已保存的主模型选择/计算类别、经营驱动、B5、EPS 盈利桥、EPS_MULTIPLE/SOTP、估值时点、回报指标可用性及组合输入状态；它只读取现成 `analysis.json`，不重新计算，不把 UNKNOWN/NOT_READY 提升为 PASS。
+
+独立摘要新增的“核心分析链路状态”用于快速定位首轮/Replay 的研究链路缺口，不替代 JSON、报告、回执和 SHA-256 manifest 的逐项审核，也不是投资结论或正式准入结果。
 
 脚本终端最后必须显示首轮包哈希 PASS、Replay 包哈希 PASS 以及 MATCH 才算技术验收通过。若出现 [BLOCKED]、REPLAY_MISMATCH、mismatched_fields 非空或退出码非 0，不要记为通过。
 
