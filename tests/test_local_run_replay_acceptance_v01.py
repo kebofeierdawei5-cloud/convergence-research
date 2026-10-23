@@ -669,7 +669,13 @@ def test_acceptance_bundle_includes_first_run_replay_logs_and_verified_manifest(
         assert archive.read(first_raw) == archive.read(replay_raw) == raw_bytes
         assert "acceptance_logs/current-run.log" in names
         assert "acceptance_summary.json" in names
+        assert "AUDIT_SUMMARY.md" in names
         assert "bundle_manifest.json" in names
+        audit_summary = archive.read("AUDIT_SUMMARY.md").decode("utf-8")
+        assert "## 总体结果" in audit_summary
+        assert "## 首轮与 Replay" in audit_summary
+        assert "技术验收" in audit_summary
+        assert "formal_decision_created" not in audit_summary
 
         summary = json.loads(archive.read("acceptance_summary.json"))
         assert summary["overall_status"] == "PASS"
