@@ -4762,7 +4762,7 @@ def _remove_json_trailing_commas(text: str) -> str:
             output.append(char)
             if escaped:
                 escaped = False
-            elif char == "\\\\":
+            elif char == "\\":
                 escaped = True
             elif char == '"':
                 in_string = False
@@ -4777,7 +4777,7 @@ def _remove_json_trailing_commas(text: str) -> str:
 
         if char == ",":
             lookahead = index + 1
-            while lookahead < len(text) and text[lookahead] in " \\t\\r\\n":
+            while lookahead < len(text) and text[lookahead] in " \t\r\n":
                 lookahead += 1
             if lookahead < len(text) and text[lookahead] in "}]":
                 index += 1
@@ -4821,8 +4821,8 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     # (2) trailing commas immediately before '}' or ']' outside JSON strings.
     # The raw response file is never rewritten. Incomplete strings/objects,
     # non-trailing malformed commas, and any non-whitespace suffix still fail.
-    url_normalized = re.sub(r"(?i)\\b(https?)\\\\://", r"\\1://", candidate)
-    url_normalized = re.sub(r"(?i)\\bwww\\\\\\.", "www.", url_normalized)
+    url_normalized = re.sub(r"(?i)\b(https?)\\://", r"\1://", candidate)
+    url_normalized = re.sub(r"(?i)\bwww\\\.", "www.", url_normalized)
     candidates = [candidate]
     if url_normalized != candidate:
         candidates.append(url_normalized)
@@ -4852,8 +4852,8 @@ def _extract_json_object(text: str) -> dict[str, Any]:
         )
         raise LocalInvestmentPilotError(
             "CHATGPT_JSON_INVALID_COPY_THE_COMPLETE_JSON_OBJECT: "
-            f"{detail}。请确保网址中的冒号/句点前没有多余反斜杠；"
-            "程序已尝试修正常见的 https\\:// 与 www\\. 写法。"
+            f"{detail}。程序已尝试修复明确的 URL 转义与对象/数组闭合前的尾随逗号；"
+            "如果仍失败，请检查响应是否被截断；其余 JSON 语法错误不会自动改写。"
         ) from parse_error
 
     if parsed_end is None:
