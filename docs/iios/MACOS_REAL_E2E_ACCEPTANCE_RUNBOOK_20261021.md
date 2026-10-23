@@ -7,8 +7,8 @@
 推荐从 GitHub Actions 获取带权限元数据的启动器 ZIP，而不是逐个下载 .command 文本文件：
 
 1. 打开 [IIOS macOS launcher distribution 工作流](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/workflows/macos-launcher-distribution.yml)。
-2. 打开最新一次 **main 分支成功运行**，下载其中的 **IIOS-macos-launchers-SHA.zip** artifact。合并本次打包更新后，该工作流会自动运行；如果暂时没有成功运行记录，再选择 main 手动点击 **Run workflow**。只使用成功工作流产物。
-3. 在 Finder 中解压 ZIP，并阅读其中的 **先看我_只需双击.txt**。
+2. 打开最新一次 **main 分支成功运行**，确认状态为 **Success**，下载名称形如 `IIOS-macos-launchers-<完整提交 SHA>` 的 artifact。GitHub 页面上的 artifact 标签通常不带 `.zip` 后缀；下载 artifact 得到的外层 ZIP 内，才包含发行包 `IIOS-macos-launchers-<SHA 前 12 位>.zip`。核对运行分支为 `main` 和该运行的 head SHA；只使用成功运行的产物。若没有新的成功运行，再选择 `main` 手动点击 **Run workflow**。
+3. 在 Finder 中先解压 GitHub artifact 下载得到的外层 ZIP；找到里面的发行 ZIP `IIOS-macos-launchers-<SHA 前 12 位>.zip`，再解压一次。第二次解压后的目录才包含 **IIOS_一键启用并验收.command** 和 **先看我_只需双击.txt**；请先阅读说明文件。
 4. 首选启动 **IIOS_一键启用并验收.command**。该启动器先解析公开仓库 main 的准确 SHA，再在 **~/.iios-private/source/** 内复用或建立经过校验的独立副本；不会 reset、stash、覆盖或清理你已有的项目目录。
 5. **如果 Finder 报“没有执行权限”，不要运行 chmod、不要关闭 Gatekeeper，也不要再反复双击。** 打开 Terminal，输入 **/bin/bash **（末尾保留一个空格），把刚解压的 **IIOS_一键启用并验收.command** 拖进终端，按回车。也可将下面路径替换成文件的真实位置后运行：
 
