@@ -5745,21 +5745,21 @@ def run_guided_wizard(
         + "请填写 thesis_break_stress 的 failure_trigger、operating_impact、valuation_method、terminal_value_per_share、cash_distributions_per_share、rationale，且其期末总财富必须低于 Bear。"
         + "不要只原样返回模板，不允许把核心研究字段全部留空。若无法识别必须具体解释原因和证据缺口；数字估值可以建立透明、可追责的假设，但不得把假设伪装为披露事实。"
         + "严格保留 schema_version、case、price_input 原样不变，尤其不得更改人工股价、观察日期、known_at 或 price assurance 标签。"
-        + "【紧凑研究补丁 JSON 协议（最高优先级，覆盖前文“返回完整对象”的旧措辞）】不要重新输出上面的整份 600+ 行模板。只返回一个紧凑 JSON 对象，结构必须严格如下：
+        + """【紧凑研究补丁 JSON 协议（最高优先级，覆盖前文“返回完整对象”的旧措辞）】
+不要重复输出上面的整份 600+ 行模板。只返回一个紧凑 JSON 对象。最外层只能有 response_mode 与 research 两个键，形状如下（仅示意，research 内容必须来自本次真实研究，不能照抄示例值）：
 {
   "response_mode": "IIOS-RESEARCH-PATCH-0.1",
   "research": {
-    "evidence_register": [],
-    "assessment": {},
-    "forecast_valuation": {},
-    "eps_multiple_valuation": {},
-    "sotp_valuation": {},
-    "valuation_transmission": {},
-    "operating_driver_forecast": {},
-    "notes": ""
+    "assessment": {
+      "trust": {
+        "summary": "填写由本轮证据支持的结论和缺口"
+      }
+    }
   }
 }
-这是一个字段补丁，不是最终的 IIOS 输入文件。research 中只放你本轮有证据或明确分析假设需要更新的字段；省略未填写的默认字段，由本地程序从可信基准模板合并。对象字段按字段合并；数组如 evidence_register、drivers、risk.items、cash_distribution_events 和 product_lines 则整体替换，必须把该数组中需要保留的条目一次性写全。不要把 schema_version、case、price_input、operator_valuation_context、decision_parameters 放进 research；这些由本地可信模板提供并锁定。研究和假设仍须遵守前文所有证据、估值、分红、期间、币种及情景约束。不得通过省略必须研究的事实来隐藏问题：关键结论、Bear/Base/Bull、独立 thesis_break_stress、经营驱动因素树、EPS_MULTIPLE、SOTP 候选输入和 B5 结构仍需尽力提供；确实未知的关键字段应在相应 summary/rationale 中说明缺口。只返回上述协议的单个 JSON 对象，不要 Markdown 代码围栏或 JSON 以外的文字。"
+research 是需要覆盖到可信模板上的稀疏补丁，只放本轮有证据或明确分析假设需要更新的字段；不要输出空数组、空对象或默认占位字段来凑结构。 omitted fields will be inherited from the local trusted template. 对象字段按字段递归合并；数组如 evidence_register、drivers、risk.items、cash_distribution_events 和 product_lines 则整体替换，必须把该数组中需要保留的条目一次性写全。
+不要把 schema_version、case、price_input、operator_valuation_context、decision_parameters 放进 research；这些由本地可信模板提供并锁定。研究和假设仍须遵守前文所有证据、估值、分红、期间、币种及情景约束。不得通过省略必须研究的事实来隐藏问题：关键结论、Bear/Base/Bull、独立 thesis_break_stress、经营驱动因素树、EPS_MULTIPLE、SOTP 候选输入和 B5 结构仍需尽力提供；确实未知的关键字段应在相应 summary/rationale 中说明缺口。
+旧版完整 IIOS JSON 对象仍可接收；但本次优先使用紧凑补丁协议，以避免回答过长被截断。只返回一个符合该协议的 JSON 对象，不要 Markdown 代码围栏或 JSON 以外的文字。"""
     )
 
     private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
