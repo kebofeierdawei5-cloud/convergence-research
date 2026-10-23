@@ -254,6 +254,78 @@ def _current_code_revision() -> str | None:
     return value if result.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", value) else None
 
 
+def _render_audit_summary_markdown(summary: Mapping[str, Any]) -> str:
+    """Render a one-screen audit index without replacing the underlying evidence."""
+    comparison = summary.get("replay_comparison")
+    comparison = comparison if isinstance(comparison, Mapping) else {}
+    lines = [
+        "# IIOS 本地验收审核摘要",
+        "",
+        "> 本摘要用于快速定位结论和证据文件；不替代 input/analysis/report/receipt、哈希清单或人工投资审查。",
+        "",
+        "## 总体结果",
+        "",
+        f"- 技术验收：**{summary.get('technical_status', 'UNKNOWN')}**",
+        f"- 输入完整性：**{summary.get('input_completeness_status', 'UNKNOWN')}**",
+        f"- 综合状态：**{summary.get('overall_status', 'UNKNOWN')}**",
+        f"- 代码提交：{summary.get('code_revision') or 'UNKNOWN'}",
+        f"- 生成时间：{summary.get('generated_at') or 'UNKNOWN'}",
+        "",
+        "## 首轮与 Replay",
+        "",
+        "| 项目 | 首轮 | Replay |",
+        "|---|---|---|",
+    ]
+    first = summary.get("first_run", {})
+    replay = summary.get("replay_run", {})
+    first = first if isinstance(first, Mapping) else {}
+    replay = replay if isinstance(replay, Mapping) else {}
+    for key, label in (
+        ("pilot_id", "运行 ID"),
+        ("provisional_action", "暂定状态（非正式决策）"),
+    ):
+        lines.append(f"| {label} | {first.get(key) or 'UNKNOWN'} | {replay.get(key) or 'UNKNOWN'} |")
+
+    lines.extend([
+        "",
+        f"- Replay 比较：**{comparison.get('status', 'UNKNOWN')}**",
+        f"- 哈希验证：**{comparison.get('hash_verification', 'UNKNOWN')}**",
+        f"- 不一致字段：{json.dumps(comparison.get('mismatched_fields', 'UNKNOWN'), ensure_ascii=False)}",
+        "",
+        "## 输入完整性问题",
+        "",
+    ])
+    issues = summary.get("input_completeness_issues")
+    if isinstance(issues, list) and issues:
+        lines.extend(f"- {item}" for item in issues)
+    else:
+        lines.append("- 无已登记的输入完整性问题。")
+    lines.extend([
+        "",
+        "## 优先审核文件",
+        "",
+        "- first_run/<运行 ID>/analysis.json：研究结论、风险、模型和引擎输出。",
+        "- first_run/<运行 ID>/report.md：首轮中文报告。",
+        "- first_run/<运行 ID>/input.json：模板合并后的计算输入及来源声明。",
+        "- first_run/<运行 ID>/pilot_receipt.json：首轮回执及哈希清单。",
+        "- replay_run/<运行 ID>/analysis.json 与 report.md：Replay 复算结果。",
+        "- replay_run/<运行 ID>/pilot_receipt.json：Replay 回执与比较结果。",
+        "- bundle_manifest.json：本审核 ZIP 内每个文件的 SHA-256 与字节数。",
+        "- acceptance_logs/：本次验收日志。",
+        "",
+        "## 权限与结论边界",
+        "",
+        f"- 正式决策已创建：{summary.get('formal_decision_created', False)}",
+        f"- 正式运行收据已创建：{summary.get('canonical_run_receipt_created', False)}",
+        f"- 交易已授权：{summary.get('execution_authorized', False)}",
+        f"- 自动交易：{summary.get('auto_execution', False)}",
+        "",
+        "**请勿把技术验收 PASS 解释为投资结论 PASS。** 独立核验事实来源、估值假设、预期差、组合约束和价格可买性；未识别的信息必须保留 UNKNOWN/REVIEW_REQUIRED。",
+        "",
+    ])
+    return "\n".join(lines)
+
+
 def _create_acceptance_bundle(
     *,
     original_dir: Path,
@@ -421,6 +493,7 @@ def _create_acceptance_bundle(
     entries["acceptance_summary.json"] = json.dumps(
         summary, ensure_ascii=False, indent=2, sort_keys=True
     ).encode("utf-8")
+    entries["AUDIT_SUMMARY.md"] = _render_audit_summary_markdown(summary).encode("utf-8")
     bundle_manifest = {
         "manifest_schema": "IIOS-LOCAL-ACCEPTANCE-BUNDLE-MANIFEST-0.1",
         "hash_algorithm": "SHA-256",
