@@ -933,6 +933,7 @@ def _verify_and_replay(
     print(f"  Replay 比较：MATCH（比较字段数：{len(comparison.get('compared_fields', []))}）")
     print("  首次包哈希：PASS；Replay 包哈希：PASS")
     print(f"  完整审计交接 ZIP（首次运行 + Replay + 日志 + SHA-256 清单，仅本机私有保存）：{acceptance_bundle}")
+    print("  审核时优先打开 ZIP 内的 AUDIT_SUMMARY.md；需要逐项核验时再查看首轮/Replay 的 JSON、报告、回执与哈希清单。")
     print("  非正式试运行 / 不创建正式 Decision / 不授权交易：已核验")
 
     if prompt_issues:
