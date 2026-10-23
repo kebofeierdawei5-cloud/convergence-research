@@ -30,6 +30,7 @@ from iios_mvp.local_investment_pilot_v01 import (
     _guided_cutoff_timestamp,
     _validate_guided_research_response,
     _build_response_repair_prompt,
+    _expand_research_patch_with_template,
     run_guided_wizard,
     run_local_investment_pilot,
     verify_local_pilot_bundle,
@@ -1187,21 +1188,106 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
     assert not (tmp_path / "inputs").exists()
 
 
-def test_response_repair_prompt_includes_validation_feedback_template_and_prior_answer(tmp_path):
+def test_response_repair_prompt_is_compact_and_reuses_existing_chat_context(tmp_path):
     response_path = tmp_path / "response.json"
     response_path.write_text('{"assessment": {}}', encoding="utf-8")
     prompt = _build_response_repair_prompt(
-        original_prompt='{"schema_version": "test-template"}',
+        original_prompt='{"schema_version": "large-template-must-not-be-repeated"}',
         response_path=response_path,
         validation_error="CHATGPT_RESPONSE_INCOMPLETE: missing thesis",
     )
     assert "CHATGPT_RESPONSE_INCOMPLETE: missing thesis" in prompt
-    assert '"schema_version": "test-template"' in prompt
-    assert '{"assessment": {}}' in prompt
+    assert "IIOS-RESEARCH-PATCH-0.1" in prompt
     assert "不要让用户手工编辑 JSON" in prompt
     assert "operator_valuation_context" in prompt
-    assert "decision_parameters.max_loss_pct" in prompt
-    assert "decision_parameters.required_return_annualized" in prompt
+    assert "decision_parameters" in prompt
+    assert "large-template-must-not-be-repeated" not in prompt
+    assert '{"assessment": {}}' not in prompt
+
+
+def test_compact_research_patch_merges_into_trusted_template_and_preserves_operator_inputs(tmp_path):
+    template = {
+        "schema_version": PILOT_SCHEMA,
+        "case": {"symbol": "603699", "as_of_date": "2026-10-16"},
+        "price_input": {"price": "37.59", "assurance_label": "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"},
+        "operator_valuation_context": {"selected_model_family": "UNKNOWN", "baseline_includes_project": None},
+        "decision_parameters": {"required_return_annualized": "0.15", "max_loss_pct": "25"},
+        "evidence_register": [],
+        "assessment": {
+            "trust": {"status": "UNKNOWN", "summary": "模板默认", "evidence_refs": []},
+            "thesis": {"status": "UNKNOWN", "drivers": [], "break_conditions": []},
+        },
+        "forecast_valuation": {
+            "scenarios": {
+                "bear": {"probability": None, "rationale": ""},
+                "base": {"probability": None, "rationale": ""},
+                "bull": {"probability": None, "rationale": ""},
+            }
+        },
+        "notes": "模板注记",
+    }
+    template_path = tmp_path / "template.json"
+    template_path.write_text(json.dumps(template, ensure_ascii=False), encoding="utf-8")
+    response = {
+        "response_mode": "IIOS-RESEARCH-PATCH-0.1",
+        "research": {
+            "assessment": {"trust": {"summary": "依据官方年报进行初审"}},
+            "evidence_register": [{"source_id": "E1", "title": "官方年报"}],
+            "forecast_valuation": {"scenarios": {"base": {"probability": 0.55, "rationale": "明确标注为分析师假设"}}},
+        },
+    }
+
+    merged, response_format, supplied_fields = _expand_research_patch_with_template(template_path, response)
+
+    assert response_format == "COMPACT_PATCH_MERGED_WITH_TRUSTED_TEMPLATE"
+    assert supplied_fields == ["assessment", "evidence_register", "forecast_valuation"]
+    assert merged["assessment"]["trust"]["status"] == "UNKNOWN"
+    assert merged["assessment"]["trust"]["summary"] == "依据官方年报进行初审"
+    assert merged["assessment"]["trust"]["evidence_refs"] == []
+    assert merged["assessment"]["thesis"]["drivers"] == []
+    assert merged["forecast_valuation"]["scenarios"]["base"]["probability"] == 0.55
+    assert merged["forecast_valuation"]["scenarios"]["bear"]["probability"] is None
+    assert merged["case"] == template["case"]
+    assert merged["price_input"] == template["price_input"]
+    assert merged["operator_valuation_context"] == template["operator_valuation_context"]
+    assert merged["decision_parameters"] == template["decision_parameters"]
+    assert response["response_mode"] == "IIOS-RESEARCH-PATCH-0.1"
+
+
+@pytest.mark.parametrize(
+    "research, expected_error",
+    [
+        ({"price_input": {"price": "1"}}, "CHATGPT_RESEARCH_PATCH_CONTAINS_OPERATOR_OWNED_FIELDS"),
+        ({"new_top_level_field": True}, "CHATGPT_RESEARCH_PATCH_UNKNOWN_TOP_LEVEL_FIELDS"),
+    ],
+)
+def test_compact_research_patch_rejects_operator_controlled_or_unknown_top_level_fields(
+    tmp_path, research, expected_error
+):
+    template = {
+        "schema_version": PILOT_SCHEMA,
+        "case": {},
+        "price_input": {},
+        "operator_valuation_context": {},
+        "decision_parameters": {},
+        "assessment": {},
+        "notes": "",
+    }
+    template_path = tmp_path / "template.json"
+    template_path.write_text(json.dumps(template), encoding="utf-8")
+    response = {"response_mode": "IIOS-RESEARCH-PATCH-0.1", "research": research}
+    with pytest.raises(LocalInvestmentPilotError, match=expected_error):
+        _expand_research_patch_with_template(template_path, response)
+
+
+def test_full_json_response_remains_backward_compatible_with_no_patch_envelope(tmp_path):
+    legacy = {"schema_version": PILOT_SCHEMA, "case": {"symbol": "603699"}}
+    merged, response_format, supplied_fields = _expand_research_patch_with_template(
+        tmp_path / "does-not-need-to-exist.json", legacy
+    )
+    assert merged == legacy
+    assert response_format == "FULL_OBJECT"
+    assert supplied_fields == []
 
 
 def test_candidate_driven_pilot_uses_existing_return_solver_and_outputs_chinese_report(tmp_path):
