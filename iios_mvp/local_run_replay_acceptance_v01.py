@@ -257,7 +257,7 @@ def _current_code_revision() -> str | None:
 def _render_audit_summary_markdown(summary: Mapping[str, Any]) -> str:
     """Render a one-screen audit index without replacing the underlying evidence."""
     comparison = summary.get("replay_comparison")
-    comparison = comparison if isinstance(comparison, Mapping) else {}
+    comparison = comparison if isinstance(comparison, dict) else {}
     lines = [
         "# IIOS 本地验收审核摘要",
         "",
@@ -278,8 +278,8 @@ def _render_audit_summary_markdown(summary: Mapping[str, Any]) -> str:
     ]
     first = summary.get("first_run", {})
     replay = summary.get("replay_run", {})
-    first = first if isinstance(first, Mapping) else {}
-    replay = replay if isinstance(replay, Mapping) else {}
+    first = first if isinstance(first, dict) else {}
+    replay = replay if isinstance(replay, dict) else {}
     for key, label in (
         ("pilot_id", "运行 ID"),
         ("provisional_action", "暂定状态（非正式决策）"),
