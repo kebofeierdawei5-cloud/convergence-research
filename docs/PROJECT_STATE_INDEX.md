@@ -1,10 +1,12 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-21
+Snapshot: 2026-10-23
 Authority: this file is the **only canonical Current State Index**.
 
-## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-21
+**Current operator direction (2026-10-23):** continue code development while the private Mac full-run + Replay is deferred. The current bounded implementation batch addresses the reproduced JSON trailing-comma syntax failure without weakening the boundary against truncated responses, second JSON objects, or trailing prose. Local Mac acceptance remains OPEN / NOT VERIFIED; do not infer a successful investment run from a parser fix.
+
+## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-23
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
@@ -110,11 +112,12 @@ B18 SOTP minority double-count repair                          PR #537 MERGED; 2
 B20 SOTP CNY/HKD currency safety                            PR #539 MERGED; 262 Local Investment Pilot tests PASS; 15/15 exact-head workflows PASS incl. independent red-team; non-CNY blocks before calculation; Mac Replay acceptance OPEN / NOT VERIFIED
 B21 SOTP adapter explicit currency requirement                   PR #541 MERGED; 263 Local Investment Pilot tests PASS; 15/15 exact-head workflows PASS incl. independent red-team; missing/unknown/non-CNY currency blocks; Mac Replay OPEN / NOT VERIFIED
 B22 full-run acceptance contract coverage                         PR #543 MERGED; 272 Local Pilot + acceptance-wrapper tests PASS; 15/15 exact-head workflows PASS incl. independent red-team; SOTP/model-consistency/timing/return-reason + evidence diagnostics required; Mac Replay OPEN / NOT VERIFIED
-B23 recurring macOS .command permission failure                 IN PROGRESS; 4th occurrence recorded; replace raw download handoff with Unix-mode-preserving ZIP artifact; test mode + no-chmod fallback; verify actual Actions ZIP artifact; B9 remains OPEN
+B23 recurring macOS .command permission failure                 MERGED / EXACT-HEAD CI PASS; PR #545; ZIP packaging preserves mode 100755 and documents /bin/bash fallback; current-main bootstrap resolves the canonical main SHA over Git HTTPS; real Mac run + Replay remains OPEN / NOT VERIFIED
 B24 guided-response operator-field recovery                 MERGED / EXACT-HEAD CI PASS; PR #546, merge 66a9a0ec2c4992d87881603e15fde07572f1f2e6; 15/15 workflows passed; five operator-owned paths restored from local template in memory; raw response preserved
 B26 hypothetical entry-price/execution and dividend entitlement                 MERGED / EXACT-HEAD CI PASS; PR #548, merge 4342b8335b58c61c1141820df2d784db6bd98f5c; 15/15 workflows PASS; 282 Local Pilot + Replay/acceptance tests PASS
 B25 auditable primary EPS_MULTIPLE arithmetic                 MERGED / EXACT-HEAD CI PASS; PR #547, merge 446dd432770701e9094ce900afeaa206eb335a68; 15/15 workflows PASS; 279 Local Pilot + Replay/acceptance tests PASS
-B27 primary EPS provenance / operating-to-per-share bridge                 NEXT; tie EPS to listed-shareholder earnings and diluted shares without mixing project-incremental and company-wide profit; mismatch/missing lineage blocks return/target price/B6; explicit analyst assumptions remain labeled; test exact arithmetic, period alignment, double counting and shares-basis failures
+B27 primary EPS provenance / operating-to-per-share bridge                 MERGED / EXACT-HEAD CI PASS; PR #553; 15/15 workflows and 295 Local Pilot + Replay/acceptance tests passed; missing/mismatched company-wide earnings, attribution, period/currency, diluted-share or project-profit lineage blocks return/target price/B6; real Mac full-run + Replay remains OPEN / NOT VERIFIED
+B28 deterministic JSON trailing-comma recovery                          PR #575 implementation; exact-head CI PASS — 335 Local Investment Pilot + Replay/acceptance tests and 15/15 associated workflows succeeded; only commas immediately before `}`/`]` outside JSON strings are removed in-memory; raw response remains unchanged; malformed internal commas, truncated responses and trailing text still fail closed; real Mac E2E remains OPEN / NOT VERIFIED
 B19 SOTP report formula consistency after NCI correction        PR #538 MERGED; exact-head 15/15 workflows PASS incl. Local Pilot + independent red-team; no arithmetic change; real Mac acceptance remains open
 ```
 
