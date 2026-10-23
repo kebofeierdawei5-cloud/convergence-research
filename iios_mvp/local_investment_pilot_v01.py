@@ -4750,6 +4750,44 @@ def create_pilot_template(
 
 
 
+def _remove_json_trailing_commas(text: str) -> str:
+    """Remove commas directly before JSON container closers, never inside strings."""
+    output: list[str] = []
+    in_string = False
+    escaped = False
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if in_string:
+            output.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+
+        if char == '"':
+            in_string = True
+            output.append(char)
+            index += 1
+            continue
+
+        if char == ",":
+            lookahead = index + 1
+            while lookahead < len(text) and text[lookahead] in " \\t\\r\\n":
+                lookahead += 1
+            if lookahead < len(text) and text[lookahead] in "}]":
+                index += 1
+                continue
+
+        output.append(char)
+        index += 1
+    return "".join(output)
+
+
 def _extract_json_object(text: str) -> dict[str, Any]:
     """Accept one JSON object, optionally fenced, and reject every non-whitespace suffix."""
     raw = str(text or "").strip()
@@ -4776,24 +4814,36 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     decoder = json.JSONDecoder()
     parse_error: json.JSONDecodeError | None = None
     parsed_end: int | None = None
-    try:
-        value, parsed_end = decoder.raw_decode(candidate)
-    except json.JSONDecodeError as first_error:
-        # A recurring copy/normalization artifact inserts a backslash before
-        # URL punctuation (for example, https\\:// and www\\.). Those are
-        # not legal JSON escapes. Repair only these two unambiguous URL forms,
-        # and only after strict JSON parsing has failed; all other malformed
-        # JSON remains fail-closed.
-        normalized = re.sub(r"(?i)\b(https?)\\://", r"\1://", candidate)
-        normalized = re.sub(r"(?i)\bwww\\\.", "www.", normalized)
-        if normalized != candidate:
-            parsed_candidate = normalized
-            try:
-                value, parsed_end = decoder.raw_decode(normalized)
-            except json.JSONDecodeError as exc:
-                parse_error = exc
-        else:
-            parse_error = first_error
+
+    # Attempt strict parsing first. If it fails, apply only deterministic,
+    # syntax-preserving repairs for two known copy artifacts:
+    # (1) backslashes accidentally inserted before URL punctuation;
+    # (2) trailing commas immediately before '}' or ']' outside JSON strings.
+    # The raw response file is never rewritten. Incomplete strings/objects,
+    # non-trailing malformed commas, and any non-whitespace suffix still fail.
+    url_normalized = re.sub(r"(?i)\\b(https?)\\\\://", r"\\1://", candidate)
+    url_normalized = re.sub(r"(?i)\\bwww\\\\\\.", "www.", url_normalized)
+    candidates = [candidate]
+    if url_normalized != candidate:
+        candidates.append(url_normalized)
+    for base_candidate in list(candidates):
+        comma_repaired = _remove_json_trailing_commas(base_candidate)
+        if comma_repaired != base_candidate:
+            candidates.append(comma_repaired)
+
+    seen_candidates: set[str] = set()
+    for candidate_variant in candidates:
+        if candidate_variant in seen_candidates:
+            continue
+        seen_candidates.add(candidate_variant)
+        try:
+            value, parsed_end = decoder.raw_decode(candidate_variant)
+        except json.JSONDecodeError as exc:
+            parse_error = exc
+            continue
+        parsed_candidate = candidate_variant
+        parse_error = None
+        break
 
     if parse_error is not None:
         detail = (
