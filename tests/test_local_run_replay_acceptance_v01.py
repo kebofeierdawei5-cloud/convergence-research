@@ -651,8 +651,12 @@ def test_acceptance_bundle_includes_first_run_replay_logs_and_verified_manifest(
     )
 
     assert archive_path.is_file()
+    summary_sidecar = acceptance._audit_summary_sidecar_path(archive_path)
+    assert summary_sidecar.is_file()
+    assert summary_sidecar.read_bytes()
     if os.name != "nt":
         assert archive_path.stat().st_mode & 0o077 == 0
+        assert summary_sidecar.stat().st_mode & 0o077 == 0
     with zipfile.ZipFile(archive_path, "r") as archive:
         assert archive.testzip() is None
         names = set(archive.namelist())
@@ -671,7 +675,9 @@ def test_acceptance_bundle_includes_first_run_replay_logs_and_verified_manifest(
         assert "acceptance_summary.json" in names
         assert "AUDIT_SUMMARY.md" in names
         assert "bundle_manifest.json" in names
-        audit_summary = archive.read("AUDIT_SUMMARY.md").decode("utf-8")
+        audit_summary_bytes = archive.read("AUDIT_SUMMARY.md")
+        assert summary_sidecar.read_bytes() == audit_summary_bytes
+        audit_summary = audit_summary_bytes.decode("utf-8")
         assert "## 总体结果" in audit_summary
         assert "## 首轮与 Replay" in audit_summary
         assert "技术验收" in audit_summary
@@ -697,6 +703,39 @@ def test_acceptance_bundle_includes_first_run_replay_logs_and_verified_manifest(
             payload = archive.read(record["path"])
             assert len(payload) == record["byte_size"]
             assert hashlib.sha256(payload).hexdigest() == record["sha256"]
+
+
+def test_open_audit_summary_sidecar_is_macos_only_and_uses_argument_vector(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sidecar = tmp_path / "private-summary.AUDIT_SUMMARY.md"
+    sidecar.write_text("# private audit summary\n", encoding="utf-8")
+    called: list[tuple[list[str], dict[str, object]]] = []
+
+    def fake_popen(command: list[str], **kwargs: object) -> object:
+        called.append((command, kwargs))
+        return object()
+
+    monkeypatch.setattr(acceptance.sys, "platform", "darwin")
+    monkeypatch.setattr(acceptance.subprocess, "Popen", fake_popen)
+    monkeypatch.delenv("IIOS_DISABLE_AUTO_OPEN_AUDIT_SUMMARY", raising=False)
+    assert acceptance._open_audit_summary_sidecar(sidecar) is True
+    assert called[0][0] == ["open", str(sidecar)]
+    assert called[0][1].get("shell", False) is False
+
+
+def test_open_audit_summary_sidecar_respects_opt_out_and_non_macos(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sidecar = tmp_path / "private-summary.AUDIT_SUMMARY.md"
+    sidecar.write_text("# private audit summary\n", encoding="utf-8")
+    monkeypatch.setattr(acceptance.sys, "platform", "linux")
+    assert acceptance._open_audit_summary_sidecar(sidecar) is False
+    monkeypatch.setattr(acceptance.sys, "platform", "darwin")
+    monkeypatch.setenv("IIOS_DISABLE_AUTO_OPEN_AUDIT_SUMMARY", "1")
+    assert acceptance._open_audit_summary_sidecar(sidecar) is False
 
 
 @pytest.mark.parametrize(

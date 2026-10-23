@@ -87,7 +87,7 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 3. **真正的 Replay**：读取首次运行保存的原始 input.json 重新计算，而非复制报告。
 4. **决策材料比较**：要求 PILOT_REPLAY_MATCHED、比较状态 MATCH、hash_verification=PASS 且 mismatched_fields=[]；原始响应来源链的 SHA-256/字节数也进入 analysis.json 的 Replay 比较字段。
 5. **Replay 自身包校验**：对 Replay 输出的文件再次核对哈希/字节数，并验证 replay_of 指回首次运行。
-6. **本机私有审计 ZIP**：生成包含首次运行、Replay、两份逐字节一致的原始 ChatGPT 响应快照（若首次运行具备）、收据、哈希/字节数清单、比较结果和所选验收日志的交接包。打包器会独立重核 input.json 对原始回答的声明，若输入、收据、原文快照之间的 SHA-256 或字节数不匹配，将拒绝生成 ZIP。
+6. **本机私有审计 ZIP + 免解压摘要**：生成包含首次运行、Replay、两份逐字节一致的原始 ChatGPT 响应快照（若首次运行具备）、收据、哈希/字节数清单、比较结果和所选验收日志的交接包。打包器会独立重核 input.json 对原始回答的声明，若输入、收据、原文快照之间的 SHA-256 或字节数不匹配，将拒绝生成 ZIP。另在同一私有目录写出与 ZIP 内 `AUDIT_SUMMARY.md` 逐字节一致的独立摘要副本；不会覆盖已有文件，POSIX 权限为 `0600`。在 macOS 上，脚本会尝试自动打开这份摘要；自动打开失败或摘要副本不可用时，ZIP 内摘要仍保留为后备入口。
 
 脚本终端最后必须显示首轮包哈希 PASS、Replay 包哈希 PASS 以及 MATCH 才算技术验收通过。若出现 [BLOCKED]、REPLAY_MISMATCH、mismatched_fields 非空或退出码非 0，不要记为通过。
 
@@ -98,10 +98,10 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - 输入模板、原始响应、修复后的完成输入：**~/.iios-private/local-pilot/inputs/**
 - 首轮和 Replay：**~/.iios-private/local-pilot/runs/<pilot_id>/**
 - 验收日志：**~/.iios-private/local-pilot/acceptance-logs/**
-- 验收交接 ZIP：**~/.iios-private/local-pilot/acceptance-bundles/**
+- 验收交接 ZIP 与免解压审核摘要：**~/.iios-private/local-pilot/acceptance-bundles/**（同一目录；摘要以 `.AUDIT_SUMMARY.md` 结尾）
 - 当前主线独立代码副本：**~/.iios-private/source/convergence-research-main-<SHA>/**
 
-遇到失败请保留原始文件，不要直接改 analysis.json、report.md、pilot_receipt.json 或 input.json 来修饰结果。记下终端的完整错误、退出码和日志路径。可以将验收交接 ZIP 提供给审计者检查；不要把含价格、完整研究输入和组合细节的文件提交到 GitHub。
+遇到失败请保留原始文件，不要直接改 analysis.json、report.md、pilot_receipt.json 或 input.json 来修饰结果。记下终端的完整错误、退出码和日志路径。可先直接打开同目录的独立 `.AUDIT_SUMMARY.md` 查看状态，无需解压 ZIP；完整审计时仍以 ZIP 内文件、manifest 和收据为准。可以将验收交接 ZIP 提供给审计者检查；不要把含价格、完整研究输入和组合细节的文件提交到 GitHub。
 
 ## 8. 人工红队复核清单
 
