@@ -4861,3 +4861,48 @@ def test_sotp_rejects_separate_minority_adjustment_with_attributable_segment_pro
         "SEPARATE_MINORITY_INTERESTS_ADJUSTMENT_CONFLICTS_WITH_ATTRIBUTABLE_SEGMENT_PROFIT" in issue
         for issue in result["issues"]
     )
+
+def test_pilot_separates_calculation_readiness_from_forecast_and_valuation_admission():
+    analysis, _report = _analyse(_payload(), "TEST-CALCULATION-VS-ADMISSION")
+    decision = analysis["decision"]["core_policy_evaluation"]
+
+    assert decision["forecast_gate_status"] == "UNKNOWN"
+    assert decision["valuation_gate_status"] == "UNKNOWN"
+    assert decision["computation_readiness"]["scenario_return_calculation"] == "CALCULATED"
+    assert decision["computation_readiness"]["primary_valuation_calculation"] == "CALCULATED_ELIGIBLE"
+    assert decision["computation_readiness"]["formal_forecast_admission"] == "NOT_ADMITTED"
+    assert decision["computation_readiness"]["formal_valuation_admission"] == "NOT_ADMITTED"
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert analysis["governance"]["formal_decision_created"] is False
+    assert analysis["governance"]["auto_execution"] is False
+
+
+def test_unidentifiable_mie_downgrades_positive_expectation_gap_claim():
+    payload = _payload()
+    payload["assessment"]["market_implied_expectation"]["status"] = "NOT_IDENTIFIABLE"
+    payload["assessment"]["expectation_gap"]["status"] = "PASS"
+    payload["assessment"]["expectation_gap"]["direction"] = "POSITIVE"
+
+    analysis, _report = _analyse(payload, "TEST-MIE-GAP-CONSISTENCY")
+    gap = analysis["assessment"]["expectation_gap"]
+
+    assert gap["status"] == "UNKNOWN"
+    assert gap["direction"] == "UNKNOWN"
+    assert "EXPECTATION_GAP_REQUIRES_IDENTIFIABLE_MARKET_EXPECTATION" in gap["status_issues"]
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+    assert analysis["governance"]["formal_decision_created"] is False
+    assert analysis["governance"]["auto_execution"] is False
+
+
+def test_unknown_expectation_gap_direction_cannot_become_positive_policy_input():
+    payload = _payload()
+    payload["assessment"]["market_implied_expectation"]["status"] = "PASS"
+    payload["assessment"]["expectation_gap"]["status"] = "UNKNOWN"
+    payload["assessment"]["expectation_gap"]["direction"] = "POSITIVE"
+
+    analysis, _report = _analyse(payload, "TEST-GAP-STATUS-DIRECTION-CONSISTENCY")
+    assert analysis["assessment"]["expectation_gap"]["status"] == "UNKNOWN"
+    assert analysis["decision"]["core_policy_evaluation"]["primary_reason"] != (
+        "POSITIVE_EXPECTATION_GAP_AND_RETURN_PRICE_GATES_PASS"
+    )
+    assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
