@@ -147,6 +147,8 @@ def test_v02_operator_price_assurance_is_explicit_in_machine_and_human_surfaces(
     qa = qa_investor_review_v02(publication=publication, report=report)
     assert qa["qa_status"] == "PASS"
     assert qa["checks"]["price_assurance_transparency"] == "PASS"
+    # Protect the exact validator contract that failed on pre-fix HEAD b028f7aa.
+    validate_investor_review_qa_v02(qa)
     Draft202012Validator(
         json.loads(Path("schemas/investor_review_qa_v0.2.schema.json").read_text())
     ).validate(qa)
