@@ -4866,8 +4866,8 @@ def test_pilot_separates_calculation_readiness_from_forecast_and_valuation_admis
     analysis, _report = _analyse(_payload(), "TEST-CALCULATION-VS-ADMISSION")
     decision = analysis["decision"]["core_policy_evaluation"]
 
-    assert decision["upstream_gate_status"]["forecast"] == "UNKNOWN"
-    assert decision["upstream_gate_status"]["valuation"] == "UNKNOWN"
+    assert decision["forecast_gate_status"] == "UNKNOWN"
+    assert decision["valuation_gate_status"] == "UNKNOWN"
     assert decision["computation_readiness"]["scenario_return_calculation"] == "CALCULATED"
     assert decision["computation_readiness"]["primary_valuation_calculation"] == "CALCULATED_ELIGIBLE"
     assert decision["computation_readiness"]["formal_forecast_admission"] == "NOT_ADMITTED"

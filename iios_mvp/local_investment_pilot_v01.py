@@ -3572,6 +3572,8 @@ def _decision(
             "decision_scope": core_policy["decision_scope"],
             "portfolio_status": portfolio_status,
             "thesis_admission_status": thesis_admission_status,
+            "forecast_gate_status": forecast_status,
+            "valuation_gate_status": valuation_status,
             "buy_add_package_complete": buy_add_package_complete,
             "computation_readiness": {
                 "scenario_return_calculation": (
