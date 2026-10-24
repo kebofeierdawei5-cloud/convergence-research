@@ -1,12 +1,12 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-23
+Snapshot: 2026-10-24
 Authority: this file is the **only canonical Current State Index**.
 
-**Current operator direction (2026-10-23):** B28 JSON recovery, B29 compact research-patch handoff, B30 direct private audit-summary sidecar, and B31 first-run/Replay gate-status comparison are merged. B30 exact-head evidence: 341 Local Investment Pilot + Replay/acceptance tests and 15/15 workflows. B31 exact-head evidence: 343 tests and 15/15 workflows. These changes lower audit friction while reading existing outputs only; local macOS full-run + Replay remains OPEN / NOT VERIFIED.
+**Current operator direction (2026-10-24):** B28–B31 usability improvements are merged; B32 (PR #583) is merged after exact-head regression coverage. B32 separates calculation readiness from formal Forecast/Valuation admission and blocks expectation-gap PASS when MIE is not identifiable/PASS. Exact PR head `1ad65031f0cf11e73553a8d072882a84fda6751d`: **346 Local Investment Pilot + Replay/acceptance tests passed** and **6/6 triggered PR checks passed**. No valuation formula, 15% hurdle, Required Return, horizon semantics, MIE BUY-gate policy, or execution authority changed. The confirmed next investment-function gap is a genuine price-blind Round A → frozen forecast → price-aware Round B workflow; current pilot currently supplies `price_input` in the same prompt as forecast reasoning. Current-main real macOS full-run + Replay remains OPEN / NOT VERIFIED.
 
-## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-23
+## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-24
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
@@ -121,6 +121,7 @@ B28 deterministic JSON trailing-comma recovery                          MERGED i
 B29 compact research-patch handoff and one-screen audit index         MERGED in PR #578 as `5b22e66c8f84c81ca4172c04bf3dad2a2645a482`; exact head `1b621bfed8b81bdc287b9c51733006fc599f332e` passed 339 Local Investment Pilot + Replay/acceptance tests and 15/15 associated workflows; `IIOS-RESEARCH-PATCH-0.1` recursively merges sparse research fields into the trusted local template, preserves operator-owned roots and raw response hashes, and adds `AUDIT_SUMMARY.md` to the private acceptance ZIP without removing the full evidence package; real Mac end-to-end acceptance remains OPEN / NOT VERIFIED
 B30 direct audit-summary entry                                          MERGED PR #580 as `cb4ecf98fd5ad414029bcb7b86d37091b1f9aca5`; exact PR head `34c5e331533155472126c60d8a4d74774ab65b3e` passed 341 Local Investment Pilot + Replay/acceptance tests and 15/15 PR workflows; private `.AUDIT_SUMMARY.md` is byte-identical to ZIP member, owner-only, and best-effort opened on macOS; real Mac acceptance remains OPEN / NOT VERIFIED
 B31 first-run/Replay investment-chain status summary                  MERGED PR #581 as `bbf3d6e4129a904c2cb1ddb03e75dc5eff007b88`; exact PR head `0a2c85ed7dc8a304fafedfa021f223dbb4ed040c` passed 343 Local Investment Pilot + Replay/acceptance tests and 15/15 workflows; side-by-side status table reads stored fields only and preserves UNKNOWN/NOT_READY; real Mac acceptance remains OPEN / NOT VERIFIED
+B32 red-team: calculation vs. admission + MIE/gap coherence          MERGED PR #583 as `ac9eab4b7da4787b9df1f8315de0b26be66bf222`; exact head `1ad65031f0cf11e73553a8d072882a84fda6751d` passed 346 Local Investment Pilot + Replay/acceptance tests and 6/6 triggered PR checks; pilot returns/valuation no longer masquerade as formal Forecast/Valuation admission; an MIE non-PASS claim cannot coexist with a decision-usable expectation-gap PASS; no new universal MIE gate; real Mac E2E remains OPEN / NOT VERIFIED
 B19 SOTP report formula consistency after NCI correction        PR #538 MERGED; exact-head 15/15 workflows PASS incl. Local Pilot + independent red-team; no arithmetic change; real Mac acceptance remains open
 ```
 
