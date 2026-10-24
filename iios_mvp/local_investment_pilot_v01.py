@@ -2093,6 +2093,22 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         direction_aliases.get(raw_direction, raw_direction),
         {"POSITIVE", "NEUTRAL", "NEGATIVE", "UNKNOWN"},
     )
+    # A positive/quantified gap cannot be called verified when the market-side
+    # expectation itself is not identifiable. Keep the analyst's original claim
+    # for audit, but downgrade the decision-usable state to UNKNOWN.
+    mie_status = str(assessment["market_implied_expectation"].get("status") or "UNKNOWN").upper()
+    gap = assessment["expectation_gap"]
+    if mie_status != "PASS" and gap.get("status") == "PASS":
+        gap["status_input"] = gap.get("status")
+        gap["status"] = "UNKNOWN"
+        gap["direction_input"] = gap.get("direction", "UNKNOWN")
+        gap["direction"] = "UNKNOWN"
+        gap.setdefault("status_issues", []).append(
+            "EXPECTATION_GAP_REQUIRES_IDENTIFIABLE_MARKET_EXPECTATION"
+        )
+        gap["consistency_note"] = (
+            "市场隐含预期尚未通过可识别性检查，不能把预期差声明当作已验证的市场比较结果。"
+        )
     assessment["thesis"]["break_conditions"] = _items(assessment["thesis"].get("break_conditions"))
     assessment["thesis"]["reassessment_triggers"] = _items(assessment["thesis"].get("reassessment_triggers"))
     thesis_quality_issues: list[str] = []
@@ -3425,12 +3441,18 @@ def _decision(
             issue = f"VALUE_DRIVER_{status_issue}"
             if issue not in issues:
                 issues.append(issue)
-    valuation_status = (
-        "PASS" if metrics is not None
+    # Keep calculation availability separate from formal admission status.
+    # The local browser-handoff pilot has no formal Forecast or Valuation Admission,
+    # even when the numeric scenario solver can calculate a return.
+    valuation_calculation_ready = bool(
+        metrics is not None
+        and model_consistency.get("primary_model_price_calculation_eligible") is True
+        and valuation_timing.get("status") == "PASS"
         and prepared["forecast_valuation"].get("entry_value_reference_per_share") not in (None, "")
-        else "UNKNOWN"
     )
-    forecast_status = "PASS" if metrics is not None else "UNKNOWN"
+    scenario_return_calculation_ready = metrics is not None
+    valuation_status = "UNKNOWN"
+    forecast_status = "UNKNOWN"
     risk_gate_pass = bool(
         metrics is not None
         and metrics.get("risk_pass", False)
@@ -3453,7 +3475,10 @@ def _decision(
         portfolio_status=portfolio_status,
         position_pct=position_pct,
         gap_status=a["expectation_gap"]["status"],
-        gap_positive=a["expectation_gap"]["direction"] == "POSITIVE",
+        gap_positive=(
+            a["expectation_gap"]["status"] == "PASS"
+            and a["expectation_gap"]["direction"] == "POSITIVE"
+        ),
         expected_annualized_return=expected_return,
         return_gate_pass=bool(metrics is not None and metrics.get("return_gate_pass", False)),
         risk_gate_pass=risk_gate_pass,
@@ -3548,6 +3573,17 @@ def _decision(
             "portfolio_status": portfolio_status,
             "thesis_admission_status": thesis_admission_status,
             "buy_add_package_complete": buy_add_package_complete,
+            "computation_readiness": {
+                "scenario_return_calculation": (
+                    "CALCULATED" if scenario_return_calculation_ready else "NOT_READY"
+                ),
+                "primary_valuation_calculation": (
+                    "CALCULATED_ELIGIBLE" if valuation_calculation_ready else "NOT_READY"
+                ),
+                "formal_forecast_admission": "NOT_ADMITTED",
+                "formal_valuation_admission": "NOT_ADMITTED",
+                "note": "计算可用性不等于独立预测或估值已正式准入；本次仍为 PILOT_NON_CANONICAL。",
+            },
             "formal_decision_created": False,
             "execution_authorized": False,
         },
