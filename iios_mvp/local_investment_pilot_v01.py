@@ -2105,6 +2105,7 @@ def _prepare_cycle_normalized_profit_inputs(
     after_cutoff_evidence_ids: list[str] | set[str] | None = None,
     uncertain_timing_evidence_ids: list[str] | set[str] | None = None,
     expected_currency: Any = "CNY",
+    selected_model_family: Any = "UNKNOWN",
 ) -> dict[str, Any]:
     """Validate explicit normalized-profit input choices before the EPS bridge.
 
@@ -2155,6 +2156,7 @@ def _prepare_cycle_normalized_profit_inputs(
         norm_period = _cycle_normalization_period(profile.get("normalization_period"))
         norm_method = str(profile.get("normalization_method") or "").strip()
         norm_basis = str(profile.get("normalization_basis") or "").strip()
+        selected_model = str(selected_model_family or "UNKNOWN").strip().upper()
         driver_status = str(cycle.get("status") or "UNKNOWN").upper()
         profile_status = str(profile.get("status") or "UNKNOWN").upper()
         synthetic_id = not driver_id or driver_id.startswith("CYCLE_DRIVER_")
@@ -2232,6 +2234,8 @@ def _prepare_cycle_normalized_profit_inputs(
                 issues.append("NORMALIZATION_METRIC_MUST_BE_COMPANY_WIDE_NET_PROFIT_PROXY")
             if norm_scope != "COMPANY_WIDE" or b4_scope != "COMPANY_WIDE":
                 issues.append("NORMALIZATION_AND_B4_MUST_BOTH_BE_COMPANY_WIDE")
+            if selected_model != "EPS_MULTIPLE":
+                issues.append("NORMALIZED_NET_PROFIT_CANDIDATE_SUPPORTED_ONLY_BY_EPS_MULTIPLE_ADAPTER")
             if currency != "CNY" or norm_unit != "CNY" or _cycle_normalization_unit(range_row.get("unit")) != "CNY":
                 issues.append("NORMALIZATION_INPUT_REQUIRES_EXPLICIT_CNY_UNIT_WITHOUT_CONVERSION")
             if (
@@ -2325,18 +2329,79 @@ def _prepare_cycle_normalized_profit_inputs(
         str(row.get("action") or "").upper() == "ADOPT_AS_B4_NET_PROFIT_PROXY"
         for rows in decisions.values() for row in rows
     )
+    invalid_decision = any(
+        row.get("status") == "INVALID_DECISION"
+        for rows in decisions.values() for row in rows
+    )
+    rejected = any(
+        str(row.get("action") or "").upper() == "REJECT"
+        for rows in decisions.values() for row in rows
+    )
     blocked = any(row.get("status") in {"ADOPTION_BLOCKED", "ADOPTION_CONFLICT", "INVALID_DECISION"} for row in selected_inputs.values())
     applied = any(row.get("status") == "ADOPTED_FOR_EPS_BRIDGE" for row in selected_inputs.values())
+    adopted_rows = [row for row in selected_inputs.values() if row.get("status") == "ADOPTED_FOR_EPS_BRIDGE"]
+    adopted_driver_ids = {str(row.get("driver_id") or "") for row in adopted_rows}
+    if requested and not blocked and applied and (
+        len(adopted_rows) != len(SCENARIOS)
+        or len(adopted_driver_ids) != 1
+        or any(selected_inputs[name].get("status") != "ADOPTED_FOR_EPS_BRIDGE" for name in SCENARIOS)
+    ):
+        blocked = True
+        for name in SCENARIOS:
+            selected_inputs[name] = {
+                **selected_inputs[name],
+                "status": "ADOPTION_BLOCKED",
+                "calculation_input_used": False,
+                "issues": list(dict.fromkeys([
+                    *(selected_inputs[name].get("issues") or []),
+                    "NORMALIZED_ADOPTION_REQUIRES_BEAR_BASE_BULL_FROM_ONE_CYCLE_DRIVER",
+                ])),
+            }
+        for name in SCENARIOS:
+            for decision in decisions[name]:
+                if str(decision.get("action") or "").upper() == "ADOPT_AS_B4_NET_PROFIT_PROXY":
+                    decision["status"] = "ADOPTION_BLOCKED"
+                    decision["calculation_input_used"] = False
+                    decision["issues"] = list(dict.fromkeys([
+                        *(decision.get("issues") or []),
+                        "NORMALIZED_ADOPTION_REQUIRES_BEAR_BASE_BULL_FROM_ONE_CYCLE_DRIVER",
+                    ]))
+        applied = False
+    if requested and blocked:
+        # An invalid/blocked point must not permit partial replacement of only one
+        # scenario while the other scenarios silently continue using old B4 values.
+        for name in SCENARIOS:
+            selected_inputs[name] = {
+                **selected_inputs[name],
+                "status": "ADOPTION_BLOCKED",
+                "calculation_input_used": False,
+                "issues": list(dict.fromkeys([
+                    *(selected_inputs[name].get("issues") or []),
+                    "NORMALIZED_ADOPTION_SET_NOT_FULLY_VALID",
+                ])),
+            }
+        for name in SCENARIOS:
+            for decision in decisions[name]:
+                if str(decision.get("action") or "").upper() == "ADOPT_AS_B4_NET_PROFIT_PROXY":
+                    decision["status"] = "ADOPTION_BLOCKED"
+                    decision["calculation_input_used"] = False
+        applied = False
     return {
         "schema_version": "IIOS-NORMALIZED-EARNINGS-B4-INPUT-SELECTION-0.1",
         "status": (
-            "ADOPTION_BLOCKED" if requested and blocked
+            "INVALID_DECISION" if invalid_decision
+            else "ADOPTION_BLOCKED" if requested and blocked
             else "ADOPTED_FOR_EPS_BRIDGE" if applied
-            else "REJECTED_OR_COMPARISON_ONLY" if requested
+            else "REJECTED_OR_COMPARISON_ONLY" if rejected or requested
             else "NO_ADOPTION_REQUESTED"
         ),
         "requested": requested,
         "applied_to_eps_bridge": applied,
+        "issues": (
+            ["NORMALIZED_INPUT_ACTION_INVALID"] if invalid_decision
+            else ["NORMALIZED_ADOPTION_SET_NOT_FULLY_VALID"] if requested and blocked
+            else []
+        ),
         "scenarios": selected_inputs,
         "decisions_by_scenario": {
             name: rows for name, rows in decisions.items()
@@ -3364,6 +3429,16 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "selection_source": selection_source,
         "selection_confirmed": selection_confirmed,
     }
+    normalized_earnings_input_selection = _prepare_cycle_normalized_profit_inputs(
+        assessment=assessment,
+        operating_driver_forecast=operating_driver_forecast,
+        evidence_register=sources,
+        unresolved_evidence_ids=unknown_refs,
+        after_cutoff_evidence_ids=after_cutoff_refs,
+        uncertain_timing_evidence_ids=uncertain_timing_refs,
+        expected_currency=currency,
+        selected_model_family=operator_valuation_context["selected_model_family"],
+    )
     eps_earnings_bridge = _evaluate_eps_earnings_bridge(
         raw_eps_multiple_valuation,
         selected_model_family=operator_valuation_context["selected_model_family"],
@@ -3377,6 +3452,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         unresolved_evidence_ids=unknown_refs,
         after_cutoff_evidence_ids=after_cutoff_refs,
         uncertain_timing_evidence_ids=uncertain_timing_refs,
+        normalized_earnings_input_selection=normalized_earnings_input_selection,
     )
     eps_multiple_valuation = _evaluate_primary_eps_multiple_valuation(
         raw_eps_multiple_valuation,
@@ -3479,6 +3555,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             unresolved_evidence_ids=unknown_refs,
             after_cutoff_evidence_ids=after_cutoff_refs,
             uncertain_timing_evidence_ids=uncertain_timing_refs,
+            normalized_earnings_input_selection=normalized_earnings_input_selection,
         )
         eps_earnings_bridge = final_eps_earnings_bridge
         eps_multiple_valuation = _evaluate_primary_eps_multiple_valuation(
@@ -3616,6 +3693,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "forecast_valuation": forecast,
         "eps_multiple_valuation": eps_multiple_valuation,
         "eps_earnings_bridge": eps_earnings_bridge,
+        "normalized_earnings_input_selection": normalized_earnings_input_selection,
         "cycle_normalization_reconciliation": cycle_normalization_reconciliation,
         "operating_driver_forecast": operating_driver_forecast,
         "valuation_transmission": valuation_transmission,
