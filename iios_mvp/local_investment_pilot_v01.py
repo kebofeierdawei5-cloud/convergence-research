@@ -2107,7 +2107,7 @@ def _build_cycle_normalization_reconciliation(
     adapter_rows = adapter_rows if isinstance(adapter_rows, Mapping) else {}
     value_rows = forecast_valuation.get("scenarios")
     value_rows = value_rows if isinstance(value_rows, Mapping) else {}
-    b4_scope = str(operating_driver_forecast.get("scope") or "UNKNOWN").strip().upper()
+    b4_scope = _cycle_normalization_scope(operating_driver_forecast.get("scope"))
     b4_period = _cycle_normalization_period(operating_driver_forecast.get("forecast_period"))
     selected_model = str(operator_valuation_context.get("selected_model_family") or "UNKNOWN").strip().upper()
     eps_adapter_status = str(eps_multiple_valuation.get("status") or "UNKNOWN").strip().upper()
@@ -2225,53 +2225,81 @@ def _build_cycle_normalization_reconciliation(
                 b4_link_status = "EXPLICIT_ID_MATCH"
 
             b4_usable = b4.get("financial_outputs_decision_usable") is True
-            eps_trace_status = "NOT_TRACEABLE"
-            eps_transmitted: bool | None = False
+            eps_input_raw = eps.get("b4_net_profit_proxy_cny")
+            try:
+                eps_input_numeric = Decimal(str(eps_input_raw)) if eps_input_raw not in (None, "") else None
+                if eps_input_numeric is not None and not eps_input_numeric.is_finite():
+                    eps_input_numeric = None
+            except (InvalidOperation, TypeError, ValueError):
+                eps_input_numeric = None
+            eps_row_calculated = (
+                str(eps.get("status") or "UNKNOWN").upper() == "CALCULATED"
+                and eps.get("calculated_eps_per_share") not in (None, "")
+            )
+            eps_bridge_calculated = str(eps_earnings_bridge.get("status") or "UNKNOWN").upper() == "CALCULATED"
+            b4_eps_input_matches = (
+                b4_numeric is not None and eps_input_numeric is not None
+                and b4_numeric == eps_input_numeric
+            )
+            normalized_eps_input_matches = (
+                normalized_numeric is not None and eps_input_numeric is not None
+                and normalized_numeric == eps_input_numeric
+            )
+            eps_bridge_uses_b4_proxy = (
+                metric_family == "B4_NET_PROFIT_PROXY"
+                and b4_usable and eps_bridge_calculated and eps_row_calculated
+                and b4_eps_input_matches
+                and str(operating_driver_forecast.get("forecast_period") or "").strip().upper()
+                == str(eps_earnings_bridge.get("forecast_period") or "").strip().upper()
+            )
+
+            # Current implementation deliberately does not consume normalized-range
+            # values as direct calculation inputs. Numeric equality is diagnostic only.
+            eps_transmitted = False
             if dimensions_status != "MATCHED_ON_METRIC_UNIT_PERIOD_SCOPE" or normalized_numeric is None or b4_numeric is None:
                 eps_trace_status = "UNKNOWN_DIMENSIONS_OR_VALUES"
-                eps_transmitted = None
             elif metric_family != "B4_NET_PROFIT_PROXY":
                 eps_trace_status = "METRIC_DOES_NOT_FEED_CURRENT_EPS_BRIDGE"
             elif b4_link_status != "EXPLICIT_ID_MATCH":
                 eps_trace_status = "NO_VALID_EXPLICIT_CYCLE_LINK"
             elif numeric_match is not True:
-                eps_trace_status = "B4_NUMERIC_VALUE_DIFFERS_FROM_NORMALIZED_RANGE"
+                eps_trace_status = "NORMALIZED_VALUE_DIFFERS_FROM_B4_EPS_INPUT"
             elif not b4_usable:
                 eps_trace_status = "B4_OUTPUT_NOT_DECISION_USABLE"
-            elif str(eps_earnings_bridge.get("status") or "UNKNOWN").upper() != "CALCULATED":
+            elif not eps_bridge_calculated or not eps_row_calculated:
                 eps_trace_status = "EPS_EARNINGS_BRIDGE_NOT_CALCULATED"
-            elif str(eps.get("status") or "UNKNOWN").upper() != "CALCULATED" or eps.get("calculated_eps_per_share") in (None, ""):
-                eps_trace_status = "SCENARIO_EPS_NOT_CALCULATED"
-            elif str(operating_driver_forecast.get("forecast_period") or "").strip().upper() != str(eps_earnings_bridge.get("forecast_period") or "").strip().upper():
-                eps_trace_status = "B4_EPS_PERIOD_MISMATCH"
+            elif not b4_eps_input_matches:
+                eps_trace_status = "EPS_BRIDGE_INPUT_DIFFERS_FROM_B4_OUTPUT"
+            elif not normalized_eps_input_matches:
+                eps_trace_status = "NORMALIZED_VALUE_DIFFERS_FROM_EPS_BRIDGE_INPUT"
             else:
-                eps_trace_status = "NUMERICALLY_TRACEABLE_THROUGH_B4_EPS_BRIDGE"
-                eps_transmitted = True
+                eps_trace_status = "B4_AND_EPS_CHAIN_NUMERICALLY_MATCH_NORMALIZED_VALUE_BUT_IT_IS_NOT_A_DIRECT_INPUT"
 
-            primary_trace_status = "NOT_TRACEABLE"
+            primary_numeric_equivalence: bool | None = False
+            primary_trace_status = "NORMALIZED_VALUE_NOT_A_DIRECT_PRIMARY_MODEL_INPUT"
             primary_transmitted: bool | None = False
-            if eps_transmitted is None:
+            if dimensions_status != "MATCHED_ON_METRIC_UNIT_PERIOD_SCOPE" or normalized_numeric is None or b4_numeric is None:
                 primary_trace_status = "UNKNOWN_UPSTREAM_RECONCILIATION"
-                primary_transmitted = None
-            elif eps_transmitted is not True:
-                primary_trace_status = "NOT_TRACEABLE_FROM_NORMALIZED_EARNINGS_TO_EPS"
+                primary_numeric_equivalence = None
+            elif metric_family != "B4_NET_PROFIT_PROXY" or b4_link_status != "EXPLICIT_ID_MATCH":
+                primary_trace_status = "NO_VALID_EPS_CHAIN_FOR_NORMALIZED_RANGE"
+            elif numeric_match is not True or not eps_bridge_uses_b4_proxy or not normalized_eps_input_matches:
+                primary_trace_status = "NORMALIZED_VALUE_NOT_NUMERICALLY_EQUIVALENT_TO_EPS_INPUT"
             elif selected_model != "EPS_MULTIPLE":
                 primary_trace_status = "NOT_VERIFIABLE_BY_SELECTED_PRIMARY_MODEL"
-                primary_transmitted = None
-            elif eps_adapter_status != "CALCULATED":
-                primary_trace_status = "EPS_MULTIPLE_ADAPTER_NOT_CALCULATED"
-            elif primary_value_eligible is not True:
-                primary_trace_status = "PRIMARY_MODEL_PRICE_CALCULATION_NOT_ELIGIBLE"
+                primary_numeric_equivalence = None
+            elif eps_adapter_status != "CALCULATED" or primary_value_eligible is not True:
+                primary_trace_status = "EPS_MULTIPLE_PRIMARY_CALCULATION_NOT_ELIGIBLE"
             elif adapter.get("terminal_value_per_share") in (None, "") or primary.get("terminal_value_per_share") in (None, ""):
                 primary_trace_status = "PRIMARY_TERMINAL_VALUE_UNKNOWN"
-                primary_transmitted = None
+                primary_numeric_equivalence = None
             else:
                 primary_trace_status = (
-                    "NUMERICALLY_TRACEABLE_THROUGH_B4_EPS_MULTIPLE_TO_PRIMARY_VALUE"
+                    "B4_EPS_MULTIPLE_CHAIN_NUMERICALLY_EQUIVALENT_BUT_NORMALIZED_VALUE_NOT_A_DIRECT_INPUT"
                     if not b5_applied
-                    else "NUMERICALLY_TRACEABLE_THROUGH_B4_EPS_MULTIPLE_AND_B5_TO_PRIMARY_VALUE"
+                    else "B4_EPS_MULTIPLE_B5_CHAIN_NUMERICALLY_EQUIVALENT_BUT_NORMALIZED_VALUE_NOT_A_DIRECT_INPUT"
                 )
-                primary_transmitted = True
+                primary_numeric_equivalence = True
 
             scenario_results[scenario] = {
                 "scenario": scenario,
@@ -2293,9 +2321,12 @@ def _build_cycle_normalization_reconciliation(
                 "normalization_value_equals_b4": numeric_match,
                 "basis_consistency_status": basis_status,
                 "eps_transmission_status": eps_trace_status,
+                "eps_bridge_uses_b4_net_profit_proxy": eps_bridge_uses_b4_proxy,
+                "normalized_value_numerically_matches_eps_input": normalized_eps_input_matches,
                 "transmitted_to_eps": eps_transmitted,
                 "primary_terminal_value_per_share": str(primary.get("terminal_value_per_share")) if primary.get("terminal_value_per_share") not in (None, "") else None,
                 "primary_value_transmission_status": primary_trace_status,
+                "primary_value_numerically_equivalent_to_normalized_range": primary_numeric_equivalence,
                 "transmitted_to_primary_per_share_value": primary_transmitted,
                 "b5_status": b5_status,
                 "b5_applied_to_primary_scenario": b5_applied,
@@ -2325,7 +2356,7 @@ def _build_cycle_normalization_reconciliation(
         "formal_evidence_pit_admission": False,
         "forecast_valuation_overridden": False,
         "decision_authority": False,
-        "note": "该对象仅核对指标/范围/单位/期间/数值与可计算下游链；数值相等不证明来源起点，正常化盈利不会自动覆盖 B4/EPS/B5。",
+        "note": "当前实现不把正常化范围值直接作为 B4/EPS/B5 计算输入。对象区分数值相等、显式 ID 关联和下游 B4→EPS→主估值链；正常化值直接传入 EPS/主估值均保持 False，除非未来明确实现并验证独立的输入合同。",
     }
 
 
@@ -4184,7 +4215,7 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
                 row for row in reconciliation_drivers
                 if isinstance(row, Mapping) and str(row.get("driver_id") or "") == driver_id
             ]
-            reconciliation_row = matches[0] if len(matches) == 1 else {}
+            reconciliation_row = matches[0] if matches else {}
             scenario_reconciliation = reconciliation_row.get("scenarios") if isinstance(reconciliation_row.get("scenarios"), Mapping) else {}
             reconciliation_scenario = scenario_reconciliation.get(scenario) if isinstance(scenario_reconciliation.get(scenario), Mapping) else {}
             lines.append(
@@ -4194,10 +4225,13 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
                 f"B4 明示链接：{show(reconciliation_scenario.get('b4_link_status'))}"
             )
             lines.append(
-                f"- EPS 传导：{show(reconciliation_scenario.get('eps_transmission_status'))}；"
-                f"是否传入 EPS：{show(reconciliation_scenario.get('transmitted_to_eps'))}；"
-                f"主估值每股传导：{show(reconciliation_scenario.get('primary_value_transmission_status'))}；"
-                f"是否传入主估值：{show(reconciliation_scenario.get('transmitted_to_primary_per_share_value'))}；"
+                f"EPS 链核对：{show(reconciliation_scenario.get('eps_transmission_status'))}；"
+                f"B4→EPS 桥使用 B4 净利润代理：{show(reconciliation_scenario.get('eps_bridge_uses_b4_net_profit_proxy'))}；"
+                f"正常化值与 EPS 输入数值相等：{show(reconciliation_scenario.get('normalized_value_numerically_matches_eps_input'))}；"
+                f"正常化值直接传入 EPS：{show(reconciliation_scenario.get('transmitted_to_eps'))}；"
+                f"主估值链核对：{show(reconciliation_scenario.get('primary_value_transmission_status'))}；"
+                f"正常化值与主估值链数值等价：{show(reconciliation_scenario.get('primary_value_numerically_equivalent_to_normalized_range'))}；"
+                f"正常化值直接传入主估值：{show(reconciliation_scenario.get('transmitted_to_primary_per_share_value'))}；"
                 f"正常化依据机器核验：{show(reconciliation_scenario.get('basis_consistency_status'))}"
             )
         if not cycle_drivers:
