@@ -3699,7 +3699,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
     ]
     lines.extend(_format_text_block(a["thesis"].get("core_statement")))
-    lines.extend(["", "### 价值驱动因素", ""])
+    lines.extend(["", "### 行业周期与正常化盈利", ""])
     drivers = sorted(a["value_drivers"], key=lambda x: (x["rank"], x["driver"]))
     driver_issue_explanations = {
         "DRIVER_NAME_NOT_IDENTIFIABLE": "驱动因素名称为空或仅为占位文本。",
@@ -3713,6 +3713,40 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "RANK_NOT_IDENTIFIABLE": "排名字段不是有效的正整数；为避免中断报告，按输入顺序临时展示，但该驱动因素不通过内容门禁。",
         "DUPLICATE_RANK_NOT_IDENTIFIABLE": "多个价值驱动因素使用相同排名，排序不唯一；相关条目均降为 UNKNOWN。",
     }
+    cycle_drivers = [
+        item for item in drivers
+        if str(item.get("driver_type") or "").strip().upper() == "INDUSTRY_CYCLE"
+    ]
+    if cycle_drivers:
+        for cycle_rank, item in enumerate(cycle_drivers, start=1):
+            lines.append(
+                f"**周期判断 {cycle_rank}：{item['driver']}**"
+                f"（影响：{item['impact']}；内容门禁：{item.get('status', 'UNKNOWN')}）"
+            )
+            lines.append(f"   周期证据/拐点信号：{item.get('historical_evidence') or 'UNKNOWN'}")
+            lines.append(f"   周期到每股价值的传导：{item.get('valuation_transmission') or 'UNKNOWN'}")
+            if item.get("rationale"):
+                lines.append(f"   研究理由与反证：{item['rationale']}")
+            unresolved_inputs = item.get("unresolved_inputs") if isinstance(item.get("unresolved_inputs"), list) else []
+            if unresolved_inputs:
+                lines.append("   尚待验证的周期/经营输入：" + "；".join(str(gap) for gap in unresolved_inputs))
+            if item.get("status_issues"):
+                lines.append("   内容门禁问题：" + "；".join(
+                    f"{issue}（{driver_issue_explanations.get(issue, issue)}）"
+                    for issue in item["status_issues"]
+                ))
+            if item.get("evidence_refs"):
+                lines.append("   证据引用：" + "、".join(item["evidence_refs"]))
+            lines.append("")
+    else:
+        lines.extend([
+            "- 周期阶段/拐点：NOT_IDENTIFIABLE（未提供 driver_type=INDUSTRY_CYCLE 的结构化研究条目）。",
+            "- 此状态不代表行业/公司不存在周期性；应核对库存、订单/交付、净售价、产能利用率、单位成本、利润率、资本开支与现金转化等适用指标。",
+            "- 在证据不足时，不应把当前盈利直接当作全周期正常化盈利，也不应仅凭当前低 P/E 判断便宜。",
+            ""
+        ])
+    lines.extend(["", "### 价值驱动因素", ""])
+    drivers = [item for item in drivers if item not in cycle_drivers]
     if drivers:
         for display_rank, item in enumerate(drivers, start=1):
             lines.append(
@@ -3739,7 +3773,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             if item.get("evidence_refs"):
                 lines.append("   证据引用：" + "、".join(item["evidence_refs"]))
             lines.append("")
-    else:
+    elif not cycle_drivers:
         lines.extend(["价值驱动因素未提供。", ""])
     lines.extend(["### Thesis 失效条件", ""])
     lines.extend(f"- {x}" for x in a["thesis"]["break_conditions"]) if a["thesis"]["break_conditions"] else lines.append("- 未提供。")
