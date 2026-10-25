@@ -4741,6 +4741,9 @@ def create_pilot_template(
         "\\n\\n核心投资判断链：必须逐项回答以下六个问题，并把答案落到现有 JSON 字段中；不得新增顶层字段，也不得用空泛口号代替因果解释。"
         "1. 公司究竟靠什么赚钱：识别关键产品/服务、客户与应用、销量/价格/产品组合、单位经济、利润率、资本占用和现金来源；区分经常性经营与一次性/周期性收益。写入 assessment.thesis.core_statement、assessment.thesis.drivers 和 assessment.value_drivers。"
         "2. 未来最重要的变化是什么：按价值重要性排序，不要罗列宏观热点；指出未来 1 年（如有明确理由再用 2–3 年）最可能改变收入、单位利润、现金流或每股价值的变量，说明起点、预期变化、时间和可观测指标。写入 assessment.value_drivers 与 operating_driver_forecast。"
+         "2A. 对周期敏感的行业/业务，必须单独识别行业/公司周期位置（扩张、过热、收缩、筑底、复苏或 UNKNOWN），给出截止时点前的证据、反证、领先指标与滞后指标；用 value_drivers 中 driver_type=INDUSTRY_CYCLE 的驱动行承载，不新增顶层字段。若证据不足，周期阶段保留 UNKNOWN，不强行贴标签。"
+         "必须区别真实需求复苏与补库存、渠道备货、关税/政策导致的提前拉货、低基数和一次性收益；说明这些因素分别对未来销量、净售价、产能利用率、单位成本、毛利率、营运资金和现金流的方向/持续时间意味着什么。不得把短期发货/收入高增直接外推为可持续需求。"
+         "对周期性盈利估值，明确区分当前盈利、正常化/全周期盈利和峰值/谷底盈利；解释为什么当前 P/E 可能在周期高点显得虚低、在周期低点显得虚高。只有证据足以支持时才给正常化盈利/利润率；否则在情景中保留区间或 UNKNOWN，并说明需要哪些数据才能确认周期拐点。"
         "3. 为什么相信变化会发生：把每个关键变化连接到截止时点前已公开的具体证据、证据日期、业务机制和反证；区分领先指标/结果指标、公司指引/分析师假设/历史事实，不得把管理层目标当成已实现结果。写入 evidence_register、assessment.value_drivers.historical_evidence 与 rationale。"
         "4. 变化如何进入每股价值：明确写出“销量/价格/组合/利用率 → 收入 → 单位毛利与费用 → EBIT/净利润 → 资本开支/营运资金/FCF → 稀释股数与每股盈利 → 估值”的可验证传导链；说明关键假设、量纲、期间、约束、潜在蚕食与稀释，避免重复计价。使用 operating_driver_forecast、valuation_transmission 和 forecast_valuation.scenarios；无法闭合的环节保留 UNKNOWN/NOT_LINKED。"
         "5. 当前价格已反映多少：price_input.price 是本次唯一现价，不得覆盖。分清外部可验证的市场隐含预期（MIE）、市场可比估值和内部估值；只有存在独立、截止时点兼容的定价/一致预期证据时才量化 MIE。缺少证据就将 assessment.market_implied_expectation 标为 NOT_IDENTIFIABLE，并具体解释哪些隐含增长、利润率、资本回报或估值倍数无法反推；绝不能把自己的 Base 估值伪装成市场预期。assessment.expectation_gap 必须说明市场预期与独立经营推演在方向、规模、时间或概率上有何差异；无法量化时明确方向也不可识别。"
@@ -5071,8 +5074,8 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
         "本轮唯一输入为末尾列出的公司身份、截止时点、证据登记结构和公司侧字段；当前价格、当前持仓、估值选择、市场隐含预期、预期差及组合约束均未提供。"
         "不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
         "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。"
-        "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。"
-        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。Bear/Base/Bull 应来自显式经营假设；未知值保持 UNKNOWN。"
+        "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。对周期敏感的业务，要明确周期阶段、拐点证据、反证及领先/滞后指标，并区分真实复苏与补库存、提前拉货或一次性因素；说明全周期正常化盈利与当前盈利的区别。周期状态无法识别时写 UNKNOWN，不强行判断。"
+        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。若有周期驱动，必须将周期位置/拐点及其证据/反证写入 value_drivers 的 driver_type、historical_evidence、rationale、impact、valuation_transmission 与 evidence_refs；Bear/Base/Bull 需反映不同周期路径，未知值保持 UNKNOWN。"
         "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。"
         "Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
         "【Round A 允许输入】\n"
@@ -5105,7 +5108,8 @@ def _build_price_aware_round_b_prompt(*, base_prompt: str, payload: Mapping[str,
         + json.dumps(prompt_input, ensure_ascii=False, indent=2, allow_nan=False)
         + "\n【Round B 输出约束】只返回 IIOS-RESEARCH-PATCH-0.1 紧凑 JSON。research 只允许 evidence_register、assessment、forecast_valuation、eps_multiple_valuation、valuation_transmission、sotp_valuation；assessment 只允许 market_implied_expectation、expectation_gap。"
         + "不得更改 Round A 的公司侧字段。若返回 evidence_register，必须原样保留全部 Round A 来源记录，并可在其后追加新来源。"
-        + "只有存在独立、截止时点兼容、可核验的市场定价/一致预期证据时才量化 MIE/预期差；否则 MIE=NOT_IDENTIFIABLE、预期差=UNKNOWN。内部 Base 估值或条件反推不能冒充市场隐含预期。"
+        + "估值时必须检视冻结的周期判断：不要无条件把当前峰值利润资本化，也不要把谷底亏损机械当成常态；正常化盈利必须有历史/供需/产能利用率/价格和成本证据支持，证据不足就做区间或 UNKNOWN。若高增长可能来自补库存、渠道备货、关税/政策提前拉货或低基数，需单独检验其持续性及回吐风险，并映射到销量、净售价、利润率、营运资金/FCF 和 EPS 情景。不得改写 Round A 对周期证据的原始判断。"
+         + "只有存在独立、截止时点兼容、可核验的市场定价/一致预期证据时才量化 MIE/预期差；否则 MIE=NOT_IDENTIFIABLE、预期差=UNKNOWN。内部 Base 估值或条件反推不能冒充市场隐含预期。"
         + "不要修改人工控制字段，不声称正式准入、实际成交、实际分红或交易授权。"
     )
     return prompt, prompt_input, frozen_sha

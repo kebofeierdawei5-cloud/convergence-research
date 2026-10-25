@@ -40,7 +40,9 @@ Manual ChatGPT Free Web handoff remains `PILOT_NON_CANONICAL`; hashes demonstrat
 
 ## Decision on scope
 
-The next code work is **not** a new valuation model family, new screener, provider API integration, broad anti-tamper project or generic gate expansion. It is the smallest end-to-end change that removes current-price leakage from independent forecasting and makes both rounds auditable and replayable.
+**Operator priority update (2026-10-25): core-function completion comes before the full test/acceptance round.** The former B34 real-Mac acceptance gate is deferred and non-blocking during development; it remains OPEN / NOT VERIFIED, not passed. Continue grouped feature work on one branch and run the comprehensive test/Replay/red-team matrix only after the core scope is frozen. Do not add a PR or trigger the full test matrix per micro-batch.
+
+The code scope remains **not** a new valuation model family, new screener, provider API integration, broad anti-tamper project or generic gate expansion. The immediate core-function improvement is explicit industry-cycle position and inflection evidence, normalized through-cycle earnings, and a grounded bridge from the cycle to per-share earnings/cash/value. Follow with report prioritization and monitoring/reassessment/usability gaps as required by implementation findings. Price-blind/price-aware stage separation and fail-closed handling remain in force.
 
 ## Execution batches
 
@@ -48,8 +50,10 @@ The next code work is **not** a new valuation model family, new screener, provid
 |---|---|---|---|
 | B32 | Calculation vs. admission semantics; MIE/gap consistency | Exact-head tests prove unknown admission remains unknown; MIE non-PASS prevents expectation-gap PASS; gap direction cannot override gap status; 346 pilot/replay tests and 6/6 PR checks passed | Merged; no economic formula or MIE policy change |
 | B33 | True price-blind Round A / price-aware Round B | 350 Local Pilot + Replay/acceptance tests and 6/6 workflows passed; Round-A allowlist excludes price/position/valuation/MIE/gap fields; frozen company artifact and two-round lineage are hash-bound; Round B cannot patch frozen Round-A fields; receipt/report/bundle verification and Replay comparison include phase summary | Merged PR #585; real Mac acceptance remains open |
-| B34 | Real Mac current-main two-round full-run + independent Replay | Review the actual two prompts, both raw response hashes, frozen Round-A artifact, private input, report, receipt/manifests and Replay comparison; verify valuation/EPS math and JSON/report parity | Next acceptance gate; OPEN / NOT VERIFIED |
-| B35 | Evidence-driven defect-only follow-up and state sync | Every change traces to a reproducible B34 finding with regression test; no generic expansion | After actual Mac bundle review only |
+| B34 | Core function: explicit industry-cycle and through-cycle earnings reasoning | Round A records cycle phase only when identifiable; evidence and counter-evidence distinguish real recovery from restocking, pull-forward or one-off benefit; Round B connects normalized earnings/cash to valuation without rewriting frozen Round-A fields | Active development; unified tests deferred |
+| B35 | Investor-facing report prioritization and monitoring/usability completion | Report explains earnings engine, next material change, evidence, per-share transmission, price-implied requirements, failure path and reassessment triggers; simplify operator handoff without weakening field protections | After B34 core work on the same branch; test later |
+| B36 | Unified validation and current-main Mac acceptance | Exact-head compile/schema/contract tests, full pilot+Replay, independent red-team, relevant CI, then real Mac full run, Replay and private bundle review | After core scope freeze; OPEN / NOT RUN |
+| B37 | Grouped remediation and state sync | Fix only findings from the unified gate; retest narrow affected areas during repair, then one final unified gate | After B36 findings |
 
 ## Acceptance and frozen investment semantics
 
