@@ -3728,15 +3728,56 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     else:
         executive_summary_lines.append("  - 重新评估触发器：UNKNOWN")
     executive_risk_items = a.get("risk", {}).get("items") if isinstance(a.get("risk"), Mapping) else []
-    if isinstance(executive_risk_items, list):
-        for risk_item in executive_risk_items[:3]:
-            if isinstance(risk_item, Mapping):
-                risk_name = risk_item.get("name") or risk_item.get("title") or risk_item.get("risk_id") or "未命名风险"
-                risk_trigger = risk_item.get("monitoring_trigger") or risk_item.get("trigger") or "UNKNOWN"
-                executive_summary_lines.append(
-                    f"  - 风险监控：{summary_text(risk_name, limit=100)} → {summary_text(risk_trigger, limit=220)}"
-                )
+    executive_summary_lines.append("- 可执行监控与复核清单：见下方，不会把未给出的日期/阈值自动补成事实。")
     executive_summary_lines.extend([
+        "",
+        "### 持仓监控与重新评估清单",
+        "",
+        "- 规则：每条监控项只复用已提供的研究内容；缺少阈值、频率、核对日期或证据时明确标记 UNKNOWN，不自动创建日历提醒，也不自动执行买卖。",
+        "",
+    ])
+    if executive_breaks:
+        for item in executive_breaks:
+            executive_summary_lines.append(
+                f"- [ ] **论点失效条件**：{summary_text(item, limit=500)}"
+                "；触发后：重新评估 Thesis、Bear/Base/Bull 路径及估值传导。"
+            )
+    else:
+        executive_summary_lines.append("- [ ] 论点失效条件：UNKNOWN；需补充可观察的失效证据。")
+    if executive_triggers:
+        for item in executive_triggers:
+            executive_summary_lines.append(
+                f"- [ ] **重新评估触发器**：{summary_text(item, limit=500)}"
+                "；触发后：刷新相关证据、经营预测、MIE（如可识别）、回报和入场价。"
+            )
+    else:
+        executive_summary_lines.append("- [ ] 重新评估触发器：UNKNOWN；需补充明确触发条件。")
+    structured_risk_items = [
+        item for item in (executive_risk_items if isinstance(executive_risk_items, list) else [])
+        if isinstance(item, Mapping)
+    ]
+    if structured_risk_items:
+        for risk_item in structured_risk_items:
+            risk_id = risk_item.get("risk_id") or "UNKNOWN"
+            risk_name = risk_item.get("name") or risk_item.get("title") or risk_item.get("driver") or "未命名风险"
+            severity = risk_item.get("severity") or "UNKNOWN"
+            metric = risk_item.get("metric") or "UNKNOWN"
+            threshold = risk_item.get("threshold") or "UNKNOWN"
+            trigger = risk_item.get("monitoring_trigger") or risk_item.get("trigger") or "UNKNOWN"
+            decision_effect = risk_item.get("decision_effect") or risk_item.get("effect") or "触发后动作 UNKNOWN"
+            evidence_refs = risk_item.get("evidence_refs") if isinstance(risk_item.get("evidence_refs"), list) else []
+            executive_summary_lines.extend([
+                f"- [ ] **风险 {summary_text(risk_id, limit=80)}：{summary_text(risk_name, limit=160)}**（严重度：{summary_text(severity, limit=60)}；状态：{risk_item.get('status', 'UNKNOWN')}）",
+                f"  - 监控指标：{summary_text(metric, limit=180)}；阈值/方向：{summary_text(threshold, limit=180)}",
+                f"  - 监控触发条件：{summary_text(trigger, limit=320)}",
+                f"  - 触发后的决策影响：{summary_text(decision_effect, limit=240)}",
+                f"  - 证据引用：{'、'.join(str(x) for x in evidence_refs) if evidence_refs else 'UNKNOWN'}",
+            ])
+    else:
+        executive_summary_lines.append("- [ ] 结构化风险监控项：UNKNOWN；风险清单未提供可定位的项目。")
+    executive_summary_lines.extend([
+        "",
+        "- 复核时点/频率：使用研究文本中明确给出的值；没有明确值的项目仍为 UNKNOWN，当前版本不生成日历提醒。",
         "",
         "> 本摘要只重排并提取下文已存在的研究字段，不生成新事实或新结论；UNKNOWN/NOT_IDENTIFIABLE 保持原状态。",
         "",
