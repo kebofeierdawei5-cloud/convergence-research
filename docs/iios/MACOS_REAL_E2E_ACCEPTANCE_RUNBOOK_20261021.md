@@ -42,33 +42,44 @@ ZIP 打包测试会检查唯一启动器在 ZIP 中的 POSIX mode 为 **100755**
 
 启动器会自动解析并核验公开仓库 canonical main 的 SHA，在 **~/.iios-private/source/** 内复用或建立隔离副本，然后**自动进入完整分析流程：新建分析 → 首轮运行包哈希校验 → 真正 Replay → Replay 包哈希校验**，不再要求你先选 1/2/3 菜单。
 
-你仍然需要按向导完成标的、价格/截止时间、ChatGPT 研究响应，以及组合风险和主估值模型等必要人工确认。这些不是启动障碍，而是研究输入与投资授权边界，不能为了做到一键而预填或绕过。
+你仍然需要按向导完成标的、价格/截止时间、Round A 与 Round B 两次 ChatGPT 研究响应，以及组合风险和主估值模型等必要人工确认。这些不是启动障碍，而是研究输入与投资授权边界，不能为了做到一键而预填或绕过。
 
 不需要手动执行 Git 命令，不需要安装本地 LLM 或配置付费 API。启动器使用 GitHub 公开仓库获取代码；研究和估值交接仍通过浏览器 ChatGPT 完成。
 
-## 4. ChatGPT 研究回答：必须保存完整、单一 JSON
+## 4. ChatGPT 研究回答：必须分两轮，分别保存两个 JSON 补丁
 
-向导会打开 ChatGPT 页面、一个专用 JSON 响应文件，并把完整研究提示和本次输入模板复制到剪贴板。
+**B33 起，独立经营预测与价格感知估值分成两次独立请求。不要把两轮合并成一次，也不要跳过 Round A。**
 
-1. 切换到 ChatGPT，粘贴提示并发送。等待回答全部生成。
-2. 复制 ChatGPT 返回的 **紧凑研究补丁 JSON**（顶层含 `response_mode` 与 `research`），不再复制 600+ 行的完整 IIOS 模板。不要复制多个对象或只复制其中一部分。
-3. 切回向导自动打开的 **pilot-chatgpt-response-标的代码-时间戳.json**。全选文件现有内容，粘贴完整补丁对象，再按 **Command+S** 保存。程序会在内存中将研究补丁与本地可信模板递归合并，自动保留遗漏的默认结构和所有人工控制字段。
-4. 不要把 JSON 粘贴到 Terminal，不要手动把文本拆成多个文件，不要为了修错而直接改输入模板。保存后，等待程序检测到大小、修改时间和 SHA-256 内容签名稳定；一般无需再按回车。
-5. 程序在生成分析前依次检查 JSON 语法、单对象边界、必需研究字段、数值/数据类别结构和 PIT 引用约束。任何一项失败都会阻止分析，不会因为 JSON 可解析就自动视为研究合格。
+### Round A — 价格盲公司研究（先执行）
+
+向导先复制 Round A 专用提示，并打开单独文件 `pilot-chatgpt-round-a-response-标的代码-时间戳.json`。第一轮只接收公司身份、分析截止时点、证据登记、Trust/Reality/Quality/Thesis/价值驱动/Risk 与经营驱动预测字段；不接收结构化当前价格、当前持仓、操作者估值选择、MIE、预期差或组合约束。
+
+1. 切换到 ChatGPT，粘贴 Round A 提示并发送。
+2. 等待第一轮完整回答，只复制一个符合 `IIOS-RESEARCH-PATCH-0.1` 协议的紧凑 JSON 对象，保存到 **Round A 专用响应文件**，按 Command+S。
+3. 本地会验证该补丁只能更新公司侧字段，并检查 JSON、输入保护和文件稳定性。通过后，将公司侧 artifact 冻结并生成 SHA-256。只有通过此步骤，程序才会生成 Round B 提示。
+
+Round A 不得输出 MIE、expectation_gap、主估值、目标入场价或 BUY/ADD/HOLD/REDUCE/EXIT。不要把第一轮复制到 Round B 文件。
+
+### Round B — 价格感知估值与预期差（Round A 冻结后执行）
+
+Round A 验证成功后，程序才会复制 Round B 提示并打开另一个文件 `pilot-chatgpt-round-b-response-标的代码-时间戳.json`。第二轮接收受保护的价格输入和冻结的 Round A 公司侧研究结果，用于估值、MIE、预期差和价格相关分析。Round B 不得改写 Round A 的 Trust/Reality/Quality/Thesis/价值驱动/Risk 或经营驱动预测；需要修改第一轮结论时，当前工作流应失败/复核，不得静默覆盖。
+
+1. 切换到 ChatGPT，粘贴新复制的 Round B 提示并发送。
+2. 复制一个紧凑补丁 JSON 对象，保存到 **Round B 专用响应文件**，按 Command+S。
+3. 程序会合并 Round B 补丁到第一轮冻结输入，恢复并保护操作者字段，执行完整字段与估值计算校验；通过后才生成分析报告。
 
 ### JSON 格式不通过时的恢复流程
 
-当前程序支持紧凑研究补丁协议 `IIOS-RESEARCH-PATCH-0.1`，并兼容旧版完整对象。它会递归合并本地可信模板，保留人工控制字段；数组按整个数组替换。解析阶段还会自动修复明确、无歧义的 URL 反斜杠（**https\\://**、**www\\.**）和字符串外、闭合符号 `}` / `]` 前的尾随逗号。所有修复仅在内存中处理，原始响应文件不改写。程序不会自动补齐被截断的响应、未闭合字符串、中间缺失内容或对象后的额外文本；这些情况仍会阻断，避免把不完整研究结果当成完整答案。
+程序支持 `IIOS-RESEARCH-PATCH-0.1` 紧凑补丁，并兼容旧版完整对象输入。当前向导的两阶段路径要求分别通过 Round A 和 Round B 的字段白名单；不允许用完整对象绕过阶段隔离。程序将补丁递归合并到本地可信模板并保留人工控制字段；数组整体替换。解析阶段会在内存中修复明确、无歧义的 URL 反斜杠和字符串外、闭合符号前的尾随逗号，原始响应文件不会被改写。截断响应、未闭合字符串、对象后的多余文字或跨阶段字段仍然失败关闭。
 
-- **CHATGPT_JSON_INVALID_COPY_THE_COMPLETE_JSON_OBJECT**：程序先自动尝试 URL 转义与安全尾随逗号修复；如果仍失败，会复制一个短修复提示到剪贴板。切回同一 ChatGPT 对话粘贴并发送，让它重新输出紧凑补丁对象，再覆盖同一个响应文件。修复提示不会重复粘贴整份模板和上一轮长回答。不要手工补写 JSON 尾部，也不要把被截断的响应强行闭合。
-- **CHATGPT_JSON_TRAILING_CONTENT_AFTER_OBJECT**：对象后还有解释文字、第二个 JSON 对象或未配对的代码围栏。只保留一个完整 JSON 对象后重试。
-- **CHATGPT_JSON_INVALID_CODE_FENCE_NOT_CLOSED**：代码围栏没有完整结束。请让 ChatGPT 返回完整对象，或返回成不带代码围栏的纯 JSON。
-- **CHATGPT_RESPONSE_FILE_EMPTY**、**CHATGPT_RESPONSE_FILE_NOT_FOUND**，或终端一直没有检测到更新：核对终端显示的准确文件路径与 TextEdit 标题。先在 TextEdit 中保存；如果响应确实保存在别处，按一次回车触发检查，并在文件选择窗口选择真正保存的 JSON。不要另起向导，也不要删掉旧输入。
-- **CHATGPT_CHANGED_OPERATOR_CONTROLLED_FIELDS**：当前主线会先将 case、price_input、operator_valuation_context 以及 decision_parameters.max_loss_pct、decision_parameters.required_return_annualized 从可信本地模板恢复，并把恢复字段写入私有完成输入的 _local_operator_controlled_field_recovery 记录；原始 ChatGPT 响应文件不被改写。终端若显示 [WARN]，先阅读恢复清单；它本身不是让你手工更改真实价格或风险政策的指令。如果随后出现其他完整性错误，再按新错误的修复提示继续。
-- 若修复后的内容与上次字节数相同也无需改名：程序以内容 SHA-256 辅助判断保存是否有变化。等待期间不要反复按回车；可按 Control-C 安全退出，已存在的文件会保留。
+- **Round A 字段越界**：不要手动改补丁；程序会给出本轮修复提示。使用同一 ChatGPT 对话修正 Round A 响应并保存到原 Round A 文件。Round A 尚未冻结时不应开始 Round B。
+- **Round B 字段越界或试图改写首轮预测**：按提示修复 Round B 响应并覆盖保存到原 Round B 文件。已冻结的 Round A 不会因第二轮格式错误而重做。
+- **CHATGPT_JSON_INVALID_COPY_THE_COMPLETE_JSON_OBJECT**：仅保留一个完整 JSON 对象；使用自动复制的修复提示重新生成本轮补丁。不要手工补写尾部或拼接两个对象。
+- **CHATGPT_JSON_TRAILING_CONTENT_AFTER_OBJECT**：删除对象后的解释文字、第二个对象或未配对代码围栏，让 ChatGPT 输出单个完整 JSON 对象。
+- **CHATGPT_RESPONSE_FILE_EMPTY / NOT_FOUND**：核对终端显示的本轮准确文件路径，先保存 TextEdit；若另存他处，按回车并选择真实文件。不要在 Round A 和 Round B 之间选错文件，也不要重新填写标的和价格。
+- **CHATGPT_CHANGED_OPERATOR_CONTROLLED_FIELDS**：本地仍会从可信模板恢复人工控制字段并记录恢复清单；原始响应文件不被改写。恢复不意味着系统可以自行改变价格或投资政策。
 
-**重要：** ChatGPT 返回的研究数字、来源链接和结论仍需要审计。通过 JSON 格式校验不等于来源真实，也不等于所有字段已正式 Evidence/PIT 准入。
-
+**重要：** Round A 与 Round B 的提示文本、原始响应哈希、冻结 artifact 哈希及阶段状态会进入本地输入的研究阶段来源链，报告和回执会显示摘要，Replay 会检查摘要一致性。哈希证明字节关联与阶段输入边界，不证明 AI 事实正确，也不构成正式 Evidence/PIT、Forecast 或 Valuation Admission。
 ## 5. 向导继续执行后的操作者输入
 
 JSON 通过后，向导会要求你回答组合/风险上下文，并独立确认主估值模型。请基于实际情况填写，不要为了得到 PASS 而虚构数据：
@@ -82,12 +93,12 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 
 验收包装器按顺序完成以下操作，不需要用户自己拼接另一套 Replay 命令：
 
-1. **首次运行包校验**：对 input.json、analysis.json、report.md 以及新向导生成的 chatgpt_response_raw.txt 的 SHA-256/字节数与 pilot_receipt.json 清单核对；同时交叉核验 input.json 的原始响应声明、运行收据与响应文件的哈希/字节数；旧运行包若无原始响应，仅标记为 legacy/not captured，不补造响应文件。
+1. **首次运行包校验**：对 input.json、analysis.json、report.md 及 Round B 的 chatgpt_response_raw.txt 按 pilot_receipt.json 中 SHA-256/字节数清单核对。Round A 的实际提示、原始响应文本、哈希和冻结 artifact 摘要存于 input.json 的 _local_research_round_a_provenance；核对其提示内容确实只含价格盲 allowlist，且其 hash/byte_size 与 analysis/report/receipt 的 research_rounds 摘要一致。Round B 的 prompt/context/frozen-artifact SHA 也应绑定到 input.json。旧运行包若无双阶段谱系，只标记 legacy/not captured，不补造阶段记录。
 2. **结构与权限校验**：检查运行 ID、必需字段、目录/文件权限、假设入场语义、分红权益条件语义、B5/B6 和 EPS 盈利桥接字段；正式决策与自动交易权限必须保持关闭。
 3. **真正的 Replay**：读取首次运行保存的原始 input.json 重新计算，而非复制报告。
 4. **决策材料比较**：要求 PILOT_REPLAY_MATCHED、比较状态 MATCH、hash_verification=PASS 且 mismatched_fields=[]；原始响应来源链的 SHA-256/字节数也进入 analysis.json 的 Replay 比较字段。
 5. **Replay 自身包校验**：对 Replay 输出的文件再次核对哈希/字节数，并验证 replay_of 指回首次运行。
-6. **本机私有审计 ZIP + 免解压摘要**：生成包含首次运行、Replay、两份逐字节一致的原始 ChatGPT 响应快照（若首次运行具备）、收据、哈希/字节数清单、比较结果和所选验收日志的交接包。打包器会独立重核 input.json 对原始回答的声明，若输入、收据、原文快照之间的 SHA-256 或字节数不匹配，将拒绝生成 ZIP。另在同一私有目录写出与 ZIP 内 `AUDIT_SUMMARY.md` 逐字节一致的独立摘要副本；不会覆盖已有文件，POSIX 权限为 `0600`。在 macOS 上，脚本会尝试自动打开这份摘要；自动打开失败或摘要副本不可用时，ZIP 内摘要仍保留为后备入口。 摘要中“核心分析链路状态”并排显示首轮和 Replay 已保存的主模型选择/计算类别、经营驱动、B5、EPS 盈利桥、EPS_MULTIPLE/SOTP、估值时点、回报指标可用性及组合输入状态；它只读取现成 `analysis.json`，不重新计算，不把 UNKNOWN/NOT_READY 提升为 PASS。
+6. **本机私有审计 ZIP + 免解压摘要**：生成包含首次运行、Replay、Round B 原始响应的首轮/Replay 逐字节快照（若本次运行具备）、Round A 原始响应与提示的 input.json 谱系、收据、哈希/字节数清单、research_rounds 阶段摘要、比较结果和所选验收日志的交接包。打包器会独立重核 input.json 对原始回答的声明，若输入、收据、原文快照之间的 SHA-256 或字节数不匹配，将拒绝生成 ZIP。另在同一私有目录写出与 ZIP 内 `AUDIT_SUMMARY.md` 逐字节一致的独立摘要副本；不会覆盖已有文件，POSIX 权限为 `0600`。在 macOS 上，脚本会尝试自动打开这份摘要；自动打开失败或摘要副本不可用时，ZIP 内摘要仍保留为后备入口。 摘要中“核心分析链路状态”并排显示首轮和 Replay 已保存的主模型选择/计算类别、经营驱动、B5、EPS 盈利桥、EPS_MULTIPLE/SOTP、估值时点、回报指标可用性及组合输入状态；它只读取现成 `analysis.json`，不重新计算，不把 UNKNOWN/NOT_READY 提升为 PASS。
 
 独立摘要新增的“核心分析链路状态”用于快速定位首轮/Replay 的研究链路缺口，不替代 JSON、报告、回执和 SHA-256 manifest 的逐项审核，也不是投资结论或正式准入结果。
 
@@ -110,6 +121,9 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 即使 Replay 完全 MATCH，仍需查看首次运行和 Replay 两份中文报告及 analysis.json：
 
 - 标的、价格、观察时点、known_at、截止时点与币种是否准确；价格是否明确为人工输入、未独立核验。
+- 实际 Round A 提示上下文是否仅由公司身份、截止时点、证据登记与公司侧字段构成；不得包含 `price_input`、`case.current_position_pct`、`operator_valuation_context`、MIE 或预期差字段。
+- Round A 原始提示/响应 SHA-256 与冻结 artifact SHA-256 是否一致；Round B 是否消费同一个冻结 artifact；Round B 是否未改写首轮 assessment 与 operating_driver_forecast。
+- `analysis.json` 与 `pilot_receipt.json` 的 `research_rounds` 是否完全一致；Replay 的比较字段包含 `research_rounds` 且状态为 MATCH。
 - eps_earnings_bridge 的公司范围、预测期间、非控股股东损益、其他税后归属调整、稀释股数单位/期间、EPS 差异与来源引用是否可复核。
 - B4/B5 是否把项目增量利润误当成集团净利润或重复加总；B6 绑定约束及 90%/100%/110% 梯度是否与回报和目标入场价一致。
 - 来源时间是否符合截止日；未知事实是否保留 UNKNOWN；报告和 JSON 的判断、价值情景与风险是否一致。
