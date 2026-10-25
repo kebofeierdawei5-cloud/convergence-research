@@ -1906,7 +1906,7 @@ def _normalize_cycle_profile(raw: Any) -> dict[str, Any]:
             "stage_evidence": "UNKNOWN", "counter_evidence": "UNKNOWN", "reversal_signals": [],
             "current_earnings": {"status": "UNKNOWN", "value": None, "unit": "UNKNOWN", "period": "UNKNOWN", "basis": "UNKNOWN", "data_class": "UNKNOWN", "evidence_refs": []},
             "normalization_method": "UNKNOWN", "normalization_metric": "UNKNOWN",
-            "normalization_unit": "UNKNOWN", "normalization_period": "UNKNOWN",
+            "normalization_scope": "UNKNOWN", "normalization_unit": "UNKNOWN", "normalization_period": "UNKNOWN",
             "normalization_basis": "UNKNOWN", "normalization_evidence_refs": [],
             "normalized_earnings_range": {name: {"status": "UNKNOWN", "value": None, "unit": "UNKNOWN", "period": "UNKNOWN", "basis": "UNKNOWN", "data_class": "UNKNOWN", "evidence_refs": []} for name in ("bear", "base", "bull")},
             "price_calculation_applied": False,
@@ -1933,6 +1933,19 @@ def _normalize_cycle_profile(raw: Any) -> dict[str, Any]:
     confidence = confidence_raw if confidence_raw in {"HIGH", "MEDIUM", "LOW", "UNKNOWN"} else "UNKNOWN"
     method = text_value("normalization_method", "normalized_earnings_method", "method", default="UNKNOWN")
     metric = text_value("normalization_metric", "normalized_earnings_metric", "metric", default="UNKNOWN")
+    scope_raw = text_value("normalization_scope", "normalized_earnings_scope", default="UNKNOWN")
+    scope_token = re.sub(r"[^A-Z0-9一-龥]+", "_", scope_raw.upper()).strip("_")
+    scope_aliases = {
+        "COMPANY_WIDE": "COMPANY_WIDE", "COMPANYWIDE": "COMPANY_WIDE",
+        "COMPANY_LEVEL": "COMPANY_WIDE", "CONSOLIDATED": "COMPANY_WIDE",
+        "公司整体": "COMPANY_WIDE", "全公司": "COMPANY_WIDE", "合并口径": "COMPANY_WIDE",
+        "PROJECT_INCREMENTAL": "PROJECT_INCREMENTAL", "PROJECT": "PROJECT_INCREMENTAL",
+        "项目增量": "PROJECT_INCREMENTAL", "项目口径": "PROJECT_INCREMENTAL",
+        "SEGMENT": "SEGMENT", "BUSINESS_SEGMENT": "SEGMENT", "PRODUCT_LINE": "SEGMENT",
+        "分部": "SEGMENT", "业务线": "SEGMENT",
+        "UNKNOWN": "UNKNOWN", "NOT_IDENTIFIABLE": "UNKNOWN", "未知": "UNKNOWN",
+    }
+    normalization_scope = scope_aliases.get(scope_token, scope_aliases.get(scope_raw, "UNKNOWN"))
     unit = text_value("normalization_unit", "normalized_earnings_unit", "unit", default="UNKNOWN")
     period = text_value("normalization_period", "normalized_earnings_period", "period", default="UNKNOWN")
     basis = text_value("normalization_basis", "normalized_earnings_basis", "basis", default="UNKNOWN")
@@ -2003,10 +2016,316 @@ def _normalize_cycle_profile(raw: Any) -> dict[str, Any]:
         "stage_evidence": "；".join(_items(stage_evidence)) if isinstance(stage_evidence, list) else str(stage_evidence or "").strip() or "UNKNOWN",
         "counter_evidence": "；".join(_items(counter_evidence)) if isinstance(counter_evidence, list) else str(counter_evidence or "").strip() or "UNKNOWN",
         "reversal_signals": reversal_signals, "current_earnings": current,
-        "normalization_method": method, "normalization_metric": metric, "normalization_unit": unit,
-        "normalization_period": period, "normalization_basis": basis, "normalization_evidence_refs": refs,
+        "normalization_method": method, "normalization_metric": metric, "normalization_scope": normalization_scope,
+        "normalization_unit": unit, "normalization_period": period, "normalization_basis": basis,
+        "normalization_evidence_refs": refs,
         "normalized_earnings_range": normalized_range, "price_calculation_applied": False,
         "note": "正常化盈利是显式研究声明；本字段本身不会覆盖 B4/EPS/B5 输入。",
+    }
+
+
+def _cycle_normalization_metric_family(value: Any) -> str:
+    """Map only explicit, unambiguous normalized-earnings labels to current B4 measures."""
+    token = re.sub(r"[^A-Z0-9一-龥]+", "", str(value or "").strip().upper())
+    net_profit_aliases = {
+        "COMPANYWIDENETPROFITPROXY", "COMPANYWIDENETPROFIT",
+        "B4NETPROFITCNYPROXY", "CONSOLIDATEDNETPROFITBEFORENCI",
+        "公司整体净利润代理", "合并净利润扣除少数股东前",
+    }
+    fcf_aliases = {
+        "UNLEVEREDFCFPROXY", "UNLEVEREDFCFPROXYCNY",
+        "FREECASHFLOWPROXY", "无杠杆自由现金流代理", "自由现金流代理",
+    }
+    if token in net_profit_aliases:
+        return "B4_NET_PROFIT_PROXY"
+    if token in fcf_aliases:
+        return "B4_UNLEVERED_FCF_PROXY"
+    return "UNKNOWN"
+
+
+def _cycle_normalization_scope(value: Any) -> str:
+    token = re.sub(r"[^A-Z0-9一-龥]+", "_", str(value or "").strip().upper()).strip("_")
+    aliases = {
+        "COMPANY_WIDE": "COMPANY_WIDE", "COMPANYWIDE": "COMPANY_WIDE",
+        "COMPANY_LEVEL": "COMPANY_WIDE", "CONSOLIDATED": "COMPANY_WIDE",
+        "公司整体": "COMPANY_WIDE", "全公司": "COMPANY_WIDE", "合并口径": "COMPANY_WIDE",
+        "PROJECT_INCREMENTAL": "PROJECT_INCREMENTAL", "PROJECT": "PROJECT_INCREMENTAL",
+        "项目增量": "PROJECT_INCREMENTAL", "项目口径": "PROJECT_INCREMENTAL",
+        "SEGMENT": "SEGMENT", "BUSINESS_SEGMENT": "SEGMENT", "PRODUCT_LINE": "SEGMENT",
+        "分部": "SEGMENT", "业务线": "SEGMENT",
+        "UNKNOWN": "UNKNOWN", "NOT_IDENTIFIABLE": "UNKNOWN", "未知": "UNKNOWN",
+    }
+    return aliases.get(token, aliases.get(str(value or "").strip(), "UNKNOWN"))
+
+
+def _cycle_normalization_unit(value: Any) -> str:
+    """Recognize the same CNY unit; never convert scale or currency implicitly."""
+    token = re.sub(r"\s+", "", str(value or "").strip().upper())
+    if token in {"CNY", "RMB", "人民币元", "元人民币"}:
+        return "CNY"
+    return token or "UNKNOWN"
+
+
+def _cycle_normalization_period(value: Any) -> str:
+    return re.sub(r"\s+", "", str(value or "").strip().upper()) or "UNKNOWN"
+
+
+def _build_cycle_normalization_reconciliation(
+    *,
+    assessment: Mapping[str, Any],
+    operating_driver_forecast: Mapping[str, Any],
+    eps_earnings_bridge: Mapping[str, Any],
+    eps_multiple_valuation: Mapping[str, Any],
+    valuation_transmission: Mapping[str, Any],
+    forecast_valuation: Mapping[str, Any],
+    valuation_model_consistency: Mapping[str, Any],
+    operator_valuation_context: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Compare normalized range points with B4 and report only verifiable downstream lineage.
+
+    This is a diagnostic reconciliation, not an earnings override or formal admission.
+    Numeric equality alone is not treated as proof of origin; it is reported separately
+    from explicit cycle-ID linkage and calculated EPS_MULTIPLE transmission.
+    """
+    value_drivers = assessment.get("value_drivers")
+    value_drivers = value_drivers if isinstance(value_drivers, list) else []
+    cycle_drivers = [
+        row for row in value_drivers
+        if isinstance(row, Mapping) and str(row.get("driver_type") or "").strip().upper() == "INDUSTRY_CYCLE"
+    ]
+    id_counts: dict[str, int] = {}
+    for row in cycle_drivers:
+        driver_id = str(row.get("driver_id") or "").strip()
+        if driver_id:
+            id_counts[driver_id] = id_counts.get(driver_id, 0) + 1
+
+    b4_rows = operating_driver_forecast.get("scenarios")
+    b4_rows = b4_rows if isinstance(b4_rows, Mapping) else {}
+    eps_rows = eps_earnings_bridge.get("scenarios")
+    eps_rows = eps_rows if isinstance(eps_rows, Mapping) else {}
+    adapter_rows = eps_multiple_valuation.get("scenarios")
+    adapter_rows = adapter_rows if isinstance(adapter_rows, Mapping) else {}
+    value_rows = forecast_valuation.get("scenarios")
+    value_rows = value_rows if isinstance(value_rows, Mapping) else {}
+    b4_scope = str(operating_driver_forecast.get("scope") or "UNKNOWN").strip().upper()
+    b4_period = _cycle_normalization_period(operating_driver_forecast.get("forecast_period"))
+    selected_model = str(operator_valuation_context.get("selected_model_family") or "UNKNOWN").strip().upper()
+    eps_adapter_status = str(eps_multiple_valuation.get("status") or "UNKNOWN").strip().upper()
+    primary_value_eligible = valuation_model_consistency.get("primary_model_price_calculation_eligible") is True
+    b5_status = str(valuation_transmission.get("status") or "UNKNOWN").strip().upper()
+    b5_applied = valuation_transmission.get("applied_to_per_share_scenarios") is True
+
+    reconciled_drivers: list[dict[str, Any]] = []
+    for cycle in cycle_drivers:
+        driver_id = str(cycle.get("driver_id") or "").strip()
+        profile = cycle.get("cycle_profile") if isinstance(cycle.get("cycle_profile"), Mapping) else {}
+        range_rows = profile.get("normalized_earnings_range")
+        range_rows = range_rows if isinstance(range_rows, Mapping) else {}
+        metric_text = str(profile.get("normalization_metric") or "UNKNOWN")
+        metric_family = _cycle_normalization_metric_family(metric_text)
+        norm_scope = _cycle_normalization_scope(profile.get("normalization_scope"))
+        norm_profile_unit = _cycle_normalization_unit(profile.get("normalization_unit"))
+        norm_profile_period = _cycle_normalization_period(profile.get("normalization_period"))
+        basis_text = str(profile.get("normalization_basis") or "").strip()
+        if basis_text and basis_text.upper() not in {"UNKNOWN", "N/A", "NONE", "NOT_IDENTIFIABLE"}:
+            basis_status = "STATED_NOT_MACHINE_VERIFIABLE"
+        else:
+            basis_status = "UNKNOWN"
+        duplicate_id = bool(driver_id and id_counts.get(driver_id, 0) > 1)
+        synthetic_id = driver_id.startswith("CYCLE_DRIVER_")
+        scenario_results: dict[str, Any] = {}
+        for scenario in SCENARIOS:
+            normalized = range_rows.get(scenario)
+            normalized = normalized if isinstance(normalized, Mapping) else {}
+            b4 = b4_rows.get(scenario)
+            b4 = b4 if isinstance(b4, Mapping) else {}
+            eps = eps_rows.get(scenario)
+            eps = eps if isinstance(eps, Mapping) else {}
+            adapter = adapter_rows.get(scenario)
+            adapter = adapter if isinstance(adapter, Mapping) else {}
+            primary = value_rows.get(scenario)
+            primary = primary if isinstance(primary, Mapping) else {}
+
+            if metric_family == "B4_NET_PROFIT_PROXY":
+                b4_field = "net_profit_cny"
+            elif metric_family == "B4_UNLEVERED_FCF_PROXY":
+                b4_field = "unlevered_fcf_proxy_cny"
+            else:
+                b4_field = None
+
+            normalized_value = normalized.get("value")
+            b4_value = b4.get(b4_field) if b4_field else None
+            issues: list[str] = []
+            if duplicate_id:
+                dimensions_status = "AMBIGUOUS_DUPLICATE_DRIVER_ID"
+                issues.append("DUPLICATE_DRIVER_ID")
+            elif synthetic_id:
+                dimensions_status = "SYNTHETIC_DRIVER_ID_NOT_TRACEABLE"
+                issues.append("DRIVER_ID_NOT_OPERATOR_IDENTIFIABLE")
+            elif metric_family == "UNKNOWN":
+                dimensions_status = "UNKNOWN_METRIC_SEMANTICS"
+                issues.append("NORMALIZATION_METRIC_NOT_MAPPED_TO_B4_MEASURE")
+            elif norm_scope == "UNKNOWN" or b4_scope == "UNKNOWN":
+                dimensions_status = "UNKNOWN_SCOPE"
+                issues.append("NORMALIZATION_OR_B4_SCOPE_UNKNOWN")
+            elif norm_scope != b4_scope:
+                dimensions_status = "SCOPE_MISMATCH"
+                issues.append("NORMALIZATION_SCOPE_DIFFERS_FROM_B4_SCOPE")
+            elif norm_profile_unit != "CNY" or _cycle_normalization_unit(normalized.get("unit")) != norm_profile_unit:
+                dimensions_status = "UNIT_MISMATCH_OR_UNSUPPORTED_SCALE"
+                issues.append("NORMALIZATION_UNIT_MISMATCH_OR_SCALE_CONVERSION_REQUIRED")
+            elif (
+                norm_profile_period == "UNKNOWN"
+                or _cycle_normalization_period(normalized.get("period")) != norm_profile_period
+                or norm_profile_period != b4_period
+            ):
+                dimensions_status = "PERIOD_MISMATCH_OR_UNKNOWN"
+                issues.append("NORMALIZATION_PERIOD_MUST_MATCH_RANGE_AND_B4_FORECAST_PERIOD")
+            elif normalized.get("status") != "REPORTED_NOT_FORMALLY_ADMITTED" or normalized_value in (None, ""):
+                dimensions_status = "NORMALIZED_VALUE_NOT_USABLE_FOR_COMPARISON"
+                issues.append("NORMALIZED_RANGE_POINT_INCOMPLETE_OR_INVALID")
+            else:
+                dimensions_status = "MATCHED_ON_METRIC_UNIT_PERIOD_SCOPE"
+
+            b4_numeric: Decimal | None = None
+            normalized_numeric: Decimal | None = None
+            numeric_match: bool | None = None
+            numeric_comparison_status = "NOT_COMPARABLE"
+            difference = None
+            if dimensions_status == "MATCHED_ON_METRIC_UNIT_PERIOD_SCOPE":
+                try:
+                    normalized_numeric = Decimal(str(normalized_value))
+                    b4_numeric = Decimal(str(b4_value)) if b4_value not in (None, "") else None
+                    if not normalized_numeric.is_finite() or (b4_numeric is not None and not b4_numeric.is_finite()):
+                        raise InvalidOperation
+                except (InvalidOperation, TypeError, ValueError):
+                    normalized_numeric = None
+                    b4_numeric = None
+                if normalized_numeric is not None and b4_numeric is not None:
+                    numeric_match = normalized_numeric == b4_numeric
+                    difference = format(b4_numeric - normalized_numeric, "f")
+                    numeric_comparison_status = "NUMERICALLY_EQUAL" if numeric_match else "NUMERICALLY_DIFFERENT"
+                else:
+                    numeric_comparison_status = "B4_OR_NORMALIZED_VALUE_UNKNOWN"
+
+            raw_ids = b4.get("cycle_driver_ids")
+            raw_ids = raw_ids if isinstance(raw_ids, list) else []
+            b4_link_status = "NO_EXPLICIT_ID_LINK"
+            if duplicate_id:
+                b4_link_status = "AMBIGUOUS_DUPLICATE_DRIVER_ID"
+            elif synthetic_id:
+                b4_link_status = "SYNTHETIC_DRIVER_ID_NOT_TRACEABLE"
+            elif str(b4.get("cycle_link_status") or "").upper() == "INVALID":
+                b4_link_status = "INVALID_LINK_INPUT"
+            elif (
+                driver_id
+                and driver_id in [str(value).strip() for value in raw_ids]
+                and str(b4.get("cycle_link_status") or "").upper() == "IDS_RECORDED_NOT_VALIDATED"
+            ):
+                b4_link_status = "EXPLICIT_ID_MATCH"
+
+            b4_usable = b4.get("financial_outputs_decision_usable") is True
+            eps_trace_status = "NOT_TRACEABLE"
+            eps_transmitted: bool | None = False
+            if dimensions_status != "MATCHED_ON_METRIC_UNIT_PERIOD_SCOPE" or normalized_numeric is None or b4_numeric is None:
+                eps_trace_status = "UNKNOWN_DIMENSIONS_OR_VALUES"
+                eps_transmitted = None
+            elif metric_family != "B4_NET_PROFIT_PROXY":
+                eps_trace_status = "METRIC_DOES_NOT_FEED_CURRENT_EPS_BRIDGE"
+            elif b4_link_status != "EXPLICIT_ID_MATCH":
+                eps_trace_status = "NO_VALID_EXPLICIT_CYCLE_LINK"
+            elif numeric_match is not True:
+                eps_trace_status = "B4_NUMERIC_VALUE_DIFFERS_FROM_NORMALIZED_RANGE"
+            elif not b4_usable:
+                eps_trace_status = "B4_OUTPUT_NOT_DECISION_USABLE"
+            elif str(eps_earnings_bridge.get("status") or "UNKNOWN").upper() != "CALCULATED":
+                eps_trace_status = "EPS_EARNINGS_BRIDGE_NOT_CALCULATED"
+            elif str(eps.get("status") or "UNKNOWN").upper() != "CALCULATED" or eps.get("calculated_eps_per_share") in (None, ""):
+                eps_trace_status = "SCENARIO_EPS_NOT_CALCULATED"
+            elif str(operating_driver_forecast.get("forecast_period") or "").strip().upper() != str(eps_earnings_bridge.get("forecast_period") or "").strip().upper():
+                eps_trace_status = "B4_EPS_PERIOD_MISMATCH"
+            else:
+                eps_trace_status = "NUMERICALLY_TRACEABLE_THROUGH_B4_EPS_BRIDGE"
+                eps_transmitted = True
+
+            primary_trace_status = "NOT_TRACEABLE"
+            primary_transmitted: bool | None = False
+            if eps_transmitted is None:
+                primary_trace_status = "UNKNOWN_UPSTREAM_RECONCILIATION"
+                primary_transmitted = None
+            elif eps_transmitted is not True:
+                primary_trace_status = "NOT_TRACEABLE_FROM_NORMALIZED_EARNINGS_TO_EPS"
+            elif selected_model != "EPS_MULTIPLE":
+                primary_trace_status = "NOT_VERIFIABLE_BY_SELECTED_PRIMARY_MODEL"
+                primary_transmitted = None
+            elif eps_adapter_status != "CALCULATED":
+                primary_trace_status = "EPS_MULTIPLE_ADAPTER_NOT_CALCULATED"
+            elif primary_value_eligible is not True:
+                primary_trace_status = "PRIMARY_MODEL_PRICE_CALCULATION_NOT_ELIGIBLE"
+            elif adapter.get("terminal_value_per_share") in (None, "") or primary.get("terminal_value_per_share") in (None, ""):
+                primary_trace_status = "PRIMARY_TERMINAL_VALUE_UNKNOWN"
+                primary_transmitted = None
+            else:
+                primary_trace_status = (
+                    "NUMERICALLY_TRACEABLE_THROUGH_B4_EPS_MULTIPLE_TO_PRIMARY_VALUE"
+                    if not b5_applied
+                    else "NUMERICALLY_TRACEABLE_THROUGH_B4_EPS_MULTIPLE_AND_B5_TO_PRIMARY_VALUE"
+                )
+                primary_transmitted = True
+
+            scenario_results[scenario] = {
+                "scenario": scenario,
+                "normalized_value": str(normalized_value) if normalized_value not in (None, "") else None,
+                "normalized_unit": str(normalized.get("unit") or "UNKNOWN"),
+                "normalized_period": str(normalized.get("period") or "UNKNOWN"),
+                "normalized_data_class": str(normalized.get("data_class") or "UNKNOWN"),
+                "normalization_metric": metric_text,
+                "metric_family": metric_family,
+                "normalization_scope": norm_scope,
+                "b4_field": b4_field,
+                "b4_value": str(b4_value) if b4_value not in (None, "") else None,
+                "b4_scope": b4_scope,
+                "b4_period": str(operating_driver_forecast.get("forecast_period") or "UNKNOWN"),
+                "b4_link_status": b4_link_status,
+                "typed_dimensions_status": dimensions_status,
+                "numeric_comparison_status": numeric_comparison_status,
+                "b4_minus_normalized_value": difference,
+                "normalization_value_equals_b4": numeric_match,
+                "basis_consistency_status": basis_status,
+                "eps_transmission_status": eps_trace_status,
+                "transmitted_to_eps": eps_transmitted,
+                "primary_terminal_value_per_share": str(primary.get("terminal_value_per_share")) if primary.get("terminal_value_per_share") not in (None, "") else None,
+                "primary_value_transmission_status": primary_trace_status,
+                "transmitted_to_primary_per_share_value": primary_transmitted,
+                "b5_status": b5_status,
+                "b5_applied_to_primary_scenario": b5_applied,
+                "issues": issues,
+            }
+        reconciled_drivers.append({
+            "driver_id": driver_id or None,
+            "driver_name": str(cycle.get("driver") or "UNKNOWN"),
+            "driver_status": str(cycle.get("status") or "UNKNOWN"),
+            "cycle_profile_status": str(profile.get("status") or "UNKNOWN"),
+            "normalization_metric": metric_text,
+            "normalization_scope": norm_scope,
+            "normalization_unit": str(profile.get("normalization_unit") or "UNKNOWN"),
+            "normalization_period": str(profile.get("normalization_period") or "UNKNOWN"),
+            "normalization_basis_status": basis_status,
+            "normalization_price_calculation_applied": profile.get("price_calculation_applied") is True,
+            "scenarios": scenario_results,
+        })
+
+    status = "DIAGNOSTIC_ONLY" if reconciled_drivers else "NOT_IDENTIFIABLE"
+    return {
+        "schema_version": "IIOS-CYCLE-NORMALIZATION-RECONCILIATION-0.1",
+        "status": status,
+        "drivers": reconciled_drivers,
+        "numeric_comparison_semantics": "B4 minus normalized range; exact Decimal comparison, no tolerance and no unit/FX conversion",
+        "basis_semantics": "Free-text normalization basis is reported but not machine-verified",
+        "formal_evidence_pit_admission": False,
+        "forecast_valuation_overridden": False,
+        "decision_authority": False,
+        "note": "该对象仅核对指标/范围/单位/期间/数值与可计算下游链；数值相等不证明来源起点，正常化盈利不会自动覆盖 B4/EPS/B5。",
     }
 
 
@@ -2885,6 +3204,16 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         forecast["scenarios"] = adjusted_scenarios
         forecast["b5_baseline_entry_value_reference_per_share"] = forecast.get("entry_value_reference_per_share")
         forecast["entry_value_reference_per_share"] = valuation_transmission.get("entry_value_reference_adjusted_per_share")
+    cycle_normalization_reconciliation = _build_cycle_normalization_reconciliation(
+        assessment=assessment,
+        operating_driver_forecast=operating_driver_forecast,
+        eps_earnings_bridge=eps_earnings_bridge,
+        eps_multiple_valuation=eps_multiple_valuation,
+        valuation_transmission=valuation_transmission,
+        forecast_valuation=forecast,
+        valuation_model_consistency=valuation_model_consistency,
+        operator_valuation_context=operator_valuation_context,
+    )
     return {
         "case": {
             "case_id": case["case_id"], "company": company, "market": normalized_market,
@@ -2932,6 +3261,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "forecast_valuation": forecast,
         "eps_multiple_valuation": eps_multiple_valuation,
         "eps_earnings_bridge": eps_earnings_bridge,
+        "cycle_normalization_reconciliation": cycle_normalization_reconciliation,
         "operating_driver_forecast": operating_driver_forecast,
         "valuation_transmission": valuation_transmission,
         "sotp_valuation": sotp_valuation,
@@ -3820,7 +4150,7 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
             f"- 反证：{show(profile.get('counter_evidence'))}",
             f"- 反转/失效信号：{'；'.join(list_values(profile.get('reversal_signals'))) or 'UNKNOWN'}",
             f"- 当前盈利参照：{show(current.get('value'))} {show(current.get('unit'))}；期间 {show(current.get('period'))}；类别 {show(current.get('data_class'))}；依据 {show(current.get('basis'))}；状态 {show(current.get('status'))}",
-            f"- 正常化方法 / 指标 / 单位：{show(profile.get('normalization_method'))} / {show(profile.get('normalization_metric'))} / {show(profile.get('normalization_unit'))}；期间 {show(profile.get('normalization_period'))}；依据 {show(profile.get('normalization_basis'))}",
+            f"- 正常化方法 / 指标 / 范围 / 单位：{show(profile.get('normalization_method'))} / {show(profile.get('normalization_metric'))} / {show(profile.get('normalization_scope'))} / {show(profile.get('normalization_unit'))}；期间 {show(profile.get('normalization_period'))}；依据 {show(profile.get('normalization_basis'))}",
             f"- 正常化范围状态：{show(profile.get('status'))}；本字段自动进入估值：{show(profile.get('price_calculation_applied'))}",
         ])
         for scenario, label in (("bear", "Bear"), ("base", "Base"), ("bull", "Bull")):
@@ -3843,9 +4173,33 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
             f"- B5 状态 / 每股增量（稀释口径）：{show(b5_row.get('status', b5.get('status')))} / {show(b5_row.get('value_delta_per_share_diluted'))}",
             f"- 主估值情景终值：{show(val.get('terminal_value_per_share'))} {currency}；主模型价格计算可用：{show((analysis.get('valuation_model_consistency') or {}).get('primary_model_price_calculation_eligible'))}",
         ])
+        reconciliation = analysis.get("cycle_normalization_reconciliation")
+        reconciliation = reconciliation if isinstance(reconciliation, Mapping) else {}
+        reconciliation_drivers = reconciliation.get("drivers")
+        reconciliation_drivers = reconciliation_drivers if isinstance(reconciliation_drivers, list) else []
         for item in cycle_drivers:
             driver_id = str(item.get("driver_id") or "")
             lines.append(f"- 对周期驱动 {show(driver_id)} 的关联：{scenario_link_status(ids, driver_id, str(b4.get('cycle_link_status') or 'NOT_PROVIDED'))}；无有效显式链接时不声称本情景采用该正常化范围。")
+            matches = [
+                row for row in reconciliation_drivers
+                if isinstance(row, Mapping) and str(row.get("driver_id") or "") == driver_id
+            ]
+            reconciliation_row = matches[0] if len(matches) == 1 else {}
+            scenario_reconciliation = reconciliation_row.get("scenarios") if isinstance(reconciliation_row.get("scenarios"), Mapping) else {}
+            reconciliation_scenario = scenario_reconciliation.get(scenario) if isinstance(scenario_reconciliation.get(scenario), Mapping) else {}
+            lines.append(
+                f"- 正常化口径 ↔ B4：{show(reconciliation_scenario.get('typed_dimensions_status'))}；"
+                f"数值对账：{show(reconciliation_scenario.get('numeric_comparison_status'))}；"
+                f"B4−正常化值：{show(reconciliation_scenario.get('b4_minus_normalized_value'))}；"
+                f"B4 明示链接：{show(reconciliation_scenario.get('b4_link_status'))}"
+            )
+            lines.append(
+                f"- EPS 传导：{show(reconciliation_scenario.get('eps_transmission_status'))}；"
+                f"是否传入 EPS：{show(reconciliation_scenario.get('transmitted_to_eps'))}；"
+                f"主估值每股传导：{show(reconciliation_scenario.get('primary_value_transmission_status'))}；"
+                f"是否传入主估值：{show(reconciliation_scenario.get('transmitted_to_primary_per_share_value'))}；"
+                f"正常化依据机器核验：{show(reconciliation_scenario.get('basis_consistency_status'))}"
+            )
         if not cycle_drivers:
             lines.append("- 周期到 B4 的显式关联：NOT_IDENTIFIABLE。")
         lines.append("")
@@ -5510,7 +5864,7 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
         "不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
         "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。"
         "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。对周期敏感的业务，要明确周期阶段、拐点证据、反证及领先/滞后指标，并区分真实复苏与补库存、提前拉货或一次性因素；说明全周期正常化盈利与当前盈利的区别。周期状态无法识别时写 UNKNOWN，不强行判断。Thesis 失效条件和重新评估触发器应尽量写成可观察的“指标→阈值/方向→检查频率/时点→触发后重新评估什么”；不要用空泛的“持续关注”，也不要编造阈值/日期。"
-        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。若有周期驱动，必须使用唯一 driver_id，并在 cycle_profile 中填写 stage（TROUGH/EARLY_RECOVERY/MID_CYCLE/PEAK/DOWNTURN/STRUCTURAL_SHIFT/UNKNOWN）、confidence、stage_evidence、counter_evidence、reversal_signals、current_earnings（value/unit/period/basis/data_class/evidence_refs）、normalization_method/metric/unit/period/basis/evidence_refs，以及 Bear/Base/Bull 的 normalized_earnings_range（每个情景至少含 value/unit/period/basis/data_class/evidence_refs）。正常化盈利缺少依据时写 UNKNOWN，不要为了补齐字段创造数字；这组数字只是研究声明，不自动进入估值。"
+        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。若有周期驱动，必须使用唯一 driver_id，并在 cycle_profile 中填写 stage（TROUGH/EARLY_RECOVERY/MID_CYCLE/PEAK/DOWNTURN/STRUCTURAL_SHIFT/UNKNOWN）、confidence、stage_evidence、counter_evidence、reversal_signals、current_earnings（value/unit/period/basis/data_class/evidence_refs）、normalization_method/metric（建议使用 COMPANY_WIDE_NET_PROFIT_PROXY 或 UNLEVERED_FCF_PROXY 等明确标签，无法识别时为 UNKNOWN）/scope（COMPANY_WIDE/PROJECT_INCREMENTAL/SEGMENT/UNKNOWN）/unit/period/basis/evidence_refs，以及 Bear/Base/Bull 的 normalized_earnings_range（每个情景至少含 value/unit/period/basis/data_class/evidence_refs）。正常化盈利缺少依据时写 UNKNOWN，不要为了补齐字段创造数字；这组数字只是研究声明，不自动进入估值。"
         "B4 operating_driver_forecast 的 Bear/Base/Bull scenario 若确实由某个周期判断驱动，写入 cycle_driver_ids，值必须与 value_drivers[].driver_id 完全一致；不能明确对应时输出空列表，不要按文字相似度猜关联。结构化 Thesis 失效条件/重新评估触发器及 risk.items 也可写 linked_driver_ids，用同一批 ID 让报告连接观察指标与周期假设。Bear/Base/Bull 需反映不同周期路径，未知值保持 UNKNOWN。"
         "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。"
         "Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
