@@ -3658,6 +3658,90 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         if primary_model_eligible
         else "研究回答中的候选模型理由（未经主模型门禁认可）"
     )
+    def summary_text(value: Any, *, limit: int = 360) -> str:
+        text = " ".join(str(value or "").split())
+        if not text or text.upper() in {"UNKNOWN", "N/A", "TBD"}:
+            return "UNKNOWN"
+        return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
+
+    executive_drivers = sorted(
+        a.get("value_drivers") or [],
+        key=lambda item: (item.get("rank", 999), item.get("driver", "")),
+    )
+    executive_cycle_drivers = [
+        item for item in executive_drivers
+        if str(item.get("driver_type") or "").strip().upper() == "INDUSTRY_CYCLE"
+    ]
+    executive_mie = a.get("market_implied_expectation") or {}
+    executive_gap = a.get("expectation_gap") or {}
+    executive_scenarios = f.get("scenarios") if isinstance(f.get("scenarios"), Mapping) else {}
+    executive_bear = executive_scenarios.get("bear") if isinstance(executive_scenarios.get("bear"), Mapping) else {}
+    executive_base = executive_scenarios.get("base") if isinstance(executive_scenarios.get("base"), Mapping) else {}
+    executive_stress = f.get("thesis_break_stress") if isinstance(f.get("thesis_break_stress"), Mapping) else {}
+    executive_summary_lines = [
+        "",
+        "## 核心投资判断摘要",
+        "",
+        f"- 公司靠什么赚钱：{summary_text(a['thesis'].get('core_statement'))}",
+        f"- 论点状态：{_assessment_status_for_report(a['thesis'])}；Trust：{_assessment_status_for_report(a['trust'])}；Reality：{_assessment_status_for_report(a['reality'])}；Quality：{_assessment_status_for_report(a['quality'])}",
+        "- 最重要的变化与价值传导：",
+    ]
+    if executive_drivers:
+        for driver in executive_drivers[:3]:
+            executive_summary_lines.extend([
+                f"  - {driver.get('rank', 'UNKNOWN')}. {summary_text(driver.get('driver'), limit=180)}（影响 {driver.get('impact', 'UNKNOWN')}；内容门禁 {driver.get('status', 'UNKNOWN')}）",
+                f"    - 起点/证据：{summary_text(driver.get('historical_evidence'))}",
+                f"    - 传导机制：{summary_text(driver.get('valuation_transmission'))}",
+            ])
+    else:
+        executive_summary_lines.append("  - UNKNOWN：没有可识别的结构化价值驱动因素。")
+    if executive_cycle_drivers:
+        executive_summary_lines.append(
+            "- 周期与正常化盈利：" + "；".join(
+                f"{summary_text(item.get('driver'), limit=100)}（{item.get('status', 'UNKNOWN')}）"
+                for item in executive_cycle_drivers[:2]
+            )
+        )
+    else:
+        executive_summary_lines.append(
+            "- 周期与正常化盈利：NOT_IDENTIFIABLE；不得直接把当前盈利或低 P/E 当作全周期常态/便宜的证据。"
+        )
+    executive_summary_lines.extend([
+        f"- 当前价与内部估值：参考价 {p.get('price', 'UNKNOWN')} {c.get('currency', '')}；Base 情景终值 {executive_base.get('terminal_value_per_share', 'UNKNOWN')}；内部估值锚 {f.get('entry_value_reference_per_share') or 'UNKNOWN'}。内部估值不是市场隐含预期。",
+        f"- 回报/入场筛选：预期年化回报 {calc.get('expected_annualized_return', 'UNKNOWN') if calc else 'UNKNOWN'}；15% 门槛 {calc.get('fundamental_target_pass', 'UNKNOWN') if calc else 'UNKNOWN'}；目标入场价上限 {calc.get('target_entry_price', 'UNKNOWN') if calc else 'UNKNOWN'}。",
+        f"- 市场隐含预期与预期差：MIE {executive_mie.get('status', 'UNKNOWN')} — {summary_text(executive_mie.get('summary'))}；预期差 {_assessment_status_for_report(executive_gap)} / {executive_gap.get('direction', 'UNKNOWN')} — {summary_text(executive_gap.get('summary'))}。MIE 不可识别时，不把内部估值包装成市场共识。",
+        f"- 下行情景与论点失效：Bear 终值 {executive_bear.get('terminal_value_per_share', 'UNKNOWN')}；独立 thesis-break stress 终值 {executive_stress.get('terminal_value_per_share', 'UNKNOWN')}（非概率加权）。",
+        "- 什么事实会改变判断：",
+    ])
+    executive_breaks = _items(a["thesis"].get("break_conditions"))
+    executive_triggers = _items(a["thesis"].get("reassessment_triggers"))
+    if executive_breaks:
+        executive_summary_lines.extend(
+            f"  - 论点失效条件：{summary_text(item)}" for item in executive_breaks[:3]
+        )
+    else:
+        executive_summary_lines.append("  - 论点失效条件：UNKNOWN")
+    if executive_triggers:
+        executive_summary_lines.extend(
+            f"  - 重新评估触发器：{summary_text(item)}" for item in executive_triggers[:3]
+        )
+    else:
+        executive_summary_lines.append("  - 重新评估触发器：UNKNOWN")
+    executive_risk_items = a.get("risk", {}).get("items") if isinstance(a.get("risk"), Mapping) else []
+    if isinstance(executive_risk_items, list):
+        for risk_item in executive_risk_items[:3]:
+            if isinstance(risk_item, Mapping):
+                risk_name = risk_item.get("name") or risk_item.get("title") or risk_item.get("risk_id") or "未命名风险"
+                risk_trigger = risk_item.get("monitoring_trigger") or risk_item.get("trigger") or "UNKNOWN"
+                executive_summary_lines.append(
+                    f"  - 风险监控：{summary_text(risk_name, limit=100)} → {summary_text(risk_trigger, limit=220)}"
+                )
+    executive_summary_lines.extend([
+        "",
+        "> 本摘要只重排并提取下文已存在的研究字段，不生成新事实或新结论；UNKNOWN/NOT_IDENTIFIABLE 保持原状态。",
+        "",
+    ])
+
     lines = [
         f"# IIOS 本地投资研究试运行：{c['company']}（{c['symbol']}）",
         "",
@@ -3669,7 +3753,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f"- 当前持仓：{c['current_position_pct']}%",
         "",
         "> 这是个人使用的本地试运行报告，不是正式 canonical Decision。人工价格/AI 分析/来源摘要未完成正式证据准入；建议只供人工审阅，不会自动下单。",
-        "",
+        *executive_summary_lines,
         "## 一、建议与回报筛选",
         "",
         f"- 试运行建议：**{d['provisional_action']}**",
@@ -4781,7 +4865,7 @@ def create_pilot_template(
         "3. 为什么相信变化会发生：把每个关键变化连接到截止时点前已公开的具体证据、证据日期、业务机制和反证；区分领先指标/结果指标、公司指引/分析师假设/历史事实，不得把管理层目标当成已实现结果。写入 evidence_register、assessment.value_drivers.historical_evidence 与 rationale。"
         "4. 变化如何进入每股价值：明确写出“销量/价格/组合/利用率 → 收入 → 单位毛利与费用 → EBIT/净利润 → 资本开支/营运资金/FCF → 稀释股数与每股盈利 → 估值”的可验证传导链；说明关键假设、量纲、期间、约束、潜在蚕食与稀释，避免重复计价。使用 operating_driver_forecast、valuation_transmission 和 forecast_valuation.scenarios；无法闭合的环节保留 UNKNOWN/NOT_LINKED。"
         "5. 当前价格已反映多少：price_input.price 是本次唯一现价，不得覆盖。分清外部可验证的市场隐含预期（MIE）、市场可比估值和内部估值；只有存在独立、截止时点兼容的定价/一致预期证据时才量化 MIE。缺少证据就将 assessment.market_implied_expectation 标为 NOT_IDENTIFIABLE，并具体解释哪些隐含增长、利润率、资本回报或估值倍数无法反推；绝不能把自己的 Base 估值伪装成市场预期。assessment.expectation_gap 必须说明市场预期与独立经营推演在方向、规模、时间或概率上有何差异；无法量化时明确方向也不可识别。"
-        "6. 哪些事实要求改变看法：写出会证伪核心论点或使情景切换的可观察指标、阈值/方向、验证时间和对应经营/估值影响；区分暂时波动与结构性恶化。落入 assessment.thesis.break_conditions、assessment.thesis.reassessment_triggers、assessment.risk.items 的监控触发项以及 Bear.failure_trigger / operating_impact / valuation_mechanism。"
+        "6. 哪些事实要求改变看法：写出会证伪核心论点或使情景切换的可观察指标、阈值/方向、验证时间和对应经营/估值影响；区分暂时波动与结构性恶化。落入 assessment.thesis.break_conditions、assessment.thesis.reassessment_triggers、assessment.risk.items 的监控触发项以及 Bear.failure_trigger / operating_impact / valuation_mechanism。每个重评触发器尽量用可执行格式表达：监控指标 → 阈值/方向 → 检查频率或下次核对时点 → 触发后的决策影响/待重新回答的问题；风险项 monitoring_trigger 也要具体可观察，不能只写“关注行业变化/持续跟踪”。没有依据支持数值阈值或时间时写 UNKNOWN/未识别，不得捏造日期或精确阈值。"
         "每个排名靠前的 value driver 都应尽量填写 driver_type、historical_evidence、valuation_transmission、impact、rationale 和其自身的 evidence_refs；证据只证明事实，不自动证明因果，因果需另给机制。Bear/Base/Bull 应由经营驱动假设产生有意义的差异，而不是只改终值或概率；说明情景间销量、净售价、单位成本、利润率、现金转化、资本开支和估值倍数发生哪些变化以及依据。"
         "最终要判断的是“按输入价格是否值得承担风险”，而不是只判断公司是否优秀或值得研究。请提供足以让本地决策引擎复算的输入，不要另造顶层 action/target-price 字段，也不要在研究回答中声称已发出 BUY/ADD/交易指令；15% 年化门槛、共同约束入场价与暂定动作由本地既有计算器独立计算。"
     )
@@ -5108,7 +5192,7 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
         "本轮唯一输入为末尾列出的公司身份、截止时点、证据登记结构和公司侧字段；当前价格、当前持仓、估值选择、市场隐含预期、预期差及组合约束均未提供。"
         "不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
         "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。"
-        "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。对周期敏感的业务，要明确周期阶段、拐点证据、反证及领先/滞后指标，并区分真实复苏与补库存、提前拉货或一次性因素；说明全周期正常化盈利与当前盈利的区别。周期状态无法识别时写 UNKNOWN，不强行判断。"
+        "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。对周期敏感的业务，要明确周期阶段、拐点证据、反证及领先/滞后指标，并区分真实复苏与补库存、提前拉货或一次性因素；说明全周期正常化盈利与当前盈利的区别。周期状态无法识别时写 UNKNOWN，不强行判断。Thesis 失效条件和重新评估触发器应尽量写成可观察的“指标→阈值/方向→检查频率/时点→触发后重新评估什么”；不要用空泛的“持续关注”，也不要编造阈值/日期。"
         "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。若有周期驱动，必须将周期位置/拐点及其证据/反证写入 value_drivers 的 driver_type、historical_evidence、rationale、impact、valuation_transmission 与 evidence_refs；Bear/Base/Bull 需反映不同周期路径，未知值保持 UNKNOWN。"
         "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。"
         "Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
