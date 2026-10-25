@@ -2614,13 +2614,14 @@ def _prepare_cycle_normalized_profit_inputs(
         "status": (
             "INVALID_DECISION" if invalid_decision
             else "ADOPTION_BLOCKED" if requested and blocked
-            else "ADOPTED_FOR_EPS_BRIDGE" if applied
+            else "CANDIDATE_VALIDATED_AWAITING_EPS_BRIDGE" if applied
             else "REJECTED_OR_COMPARISON_ONLY" if rejected or requested
             else "COMPARISON_ONLY" if explicit_comparison_only
             else "NO_ADOPTION_REQUESTED"
         ),
         "requested": requested,
-        "applied_to_eps_bridge": applied,
+        "candidate_selection_validated": applied,
+        "applied_to_eps_bridge": False,
         "issues": (
             ["NORMALIZED_INPUT_ACTION_INVALID"] if invalid_decision
             else ["NORMALIZED_ADOPTION_SET_NOT_FULLY_VALID"] if requested and blocked
@@ -2635,6 +2636,77 @@ def _prepare_cycle_normalized_profit_inputs(
         "decision_authority": False,
         "note": "此处仅明确选择 EPS 桥采用的公司整体净利润候选来源，不覆盖 B4 原始经营预测或 FCF，也不创建正式准入/投资授权。",
     }
+
+
+def _finalize_normalized_earnings_input_selection(
+    selection: Mapping[str, Any],
+    eps_earnings_bridge: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Report actual EPS bridge use; fail closed if any of Bear/Base/Bull did not consume it."""
+    result = dict(selection)
+    result["applied_to_eps_bridge"] = False
+    if result.get("requested") is not True:
+        return result
+    status = str(result.get("status") or "UNKNOWN").upper()
+    if status not in {"CANDIDATE_VALIDATED_AWAITING_EPS_BRIDGE", "ADOPTED_FOR_EPS_BRIDGE"}:
+        return result
+
+    bridge_rows = eps_earnings_bridge.get("scenarios")
+    bridge_rows = bridge_rows if isinstance(bridge_rows, Mapping) else {}
+    diagnostics: dict[str, Any] = {}
+    all_applied = True
+    for name in SCENARIOS:
+        row = bridge_rows.get(name)
+        row = row if isinstance(row, Mapping) else {}
+        source = str(row.get("earnings_input_source") or "UNKNOWN").upper()
+        applied = (
+            source == "NORMALIZED_EARNINGS_CANDIDATE"
+            and row.get("normalized_earnings_input_applied") is True
+        )
+        diagnostics[name] = {
+            "status": str(row.get("status") or "UNKNOWN"),
+            "earnings_input_source": source,
+            "normalized_earnings_input_applied": applied,
+            "issues": list(row.get("issues") or []) if isinstance(row.get("issues"), list) else [],
+        }
+        all_applied = all_applied and applied
+
+    result["eps_bridge_scenario_diagnostics"] = diagnostics
+    result["eps_bridge_result_status"] = str(eps_earnings_bridge.get("status") or "UNKNOWN")
+    if all_applied:
+        result["status"] = "ADOPTED_FOR_EPS_BRIDGE"
+        result["applied_to_eps_bridge"] = True
+        return result
+
+    issue = "NORMALIZED_CANDIDATE_NOT_USED_IN_ALL_BEAR_BASE_BULL_EPS_BRIDGES"
+    result["status"] = "ADOPTION_BLOCKED"
+    result["candidate_selection_validated"] = result.get("candidate_selection_validated") is True
+    result["applied_to_eps_bridge"] = False
+    result["issues"] = list(dict.fromkeys([*(result.get("issues") or []), issue]))
+    for scenario in SCENARIOS:
+        row = result.get("scenarios", {}).get(scenario)
+        if isinstance(row, Mapping):
+            result["scenarios"][scenario] = {
+                **row,
+                "status": "ADOPTION_BLOCKED",
+                "calculation_input_used": False,
+                "issues": list(dict.fromkeys([*(row.get("issues") or []), issue])),
+            }
+        decisions = result.get("decisions_by_scenario", {}).get(scenario)
+        if isinstance(decisions, list):
+            updated_decisions = []
+            for decision in decisions:
+                if isinstance(decision, Mapping) and str(decision.get("action") or "").upper() == "ADOPT_AS_B4_NET_PROFIT_PROXY":
+                    updated_decisions.append({
+                        **decision,
+                        "status": "ADOPTION_BLOCKED",
+                        "calculation_input_used": False,
+                        "issues": list(dict.fromkeys([*(decision.get("issues") or []), issue])),
+                    })
+                else:
+                    updated_decisions.append(decision)
+            result["decisions_by_scenario"][scenario] = updated_decisions
+    return result
 
 
 def _cycle_normalization_metric_family(value: Any) -> str:
@@ -3705,6 +3777,28 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         uncertain_timing_evidence_ids=uncertain_timing_refs,
         normalized_earnings_input_selection=normalized_earnings_input_selection,
     )
+    normalized_earnings_input_selection = _finalize_normalized_earnings_input_selection(
+        normalized_earnings_input_selection, eps_earnings_bridge
+    )
+    if (
+        normalized_earnings_input_selection.get("requested") is True
+        and normalized_earnings_input_selection.get("status") == "ADOPTION_BLOCKED"
+    ):
+        eps_earnings_bridge = _evaluate_eps_earnings_bridge(
+            raw_eps_multiple_valuation,
+            selected_model_family=operator_valuation_context["selected_model_family"],
+            expected_forecast_period=operating_driver_forecast.get("forecast_period"),
+            expected_terminal_date=forecast.get("valuation_terminal_date"),
+            expected_currency=currency,
+            operating_driver_forecast=operating_driver_forecast,
+            valuation_transmission={"status": "PENDING_VALIDATION", "applied_to_per_share_scenarios": False},
+            operator_baseline_includes_project=operator_valuation_context["baseline_includes_project"],
+            evidence_register=sources,
+            unresolved_evidence_ids=unknown_refs,
+            after_cutoff_evidence_ids=after_cutoff_refs,
+            uncertain_timing_evidence_ids=uncertain_timing_refs,
+            normalized_earnings_input_selection=normalized_earnings_input_selection,
+        )
     eps_multiple_valuation = _evaluate_primary_eps_multiple_valuation(
         raw_eps_multiple_valuation,
         selected_model_family=operator_valuation_context["selected_model_family"],
@@ -3809,6 +3903,29 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             normalized_earnings_input_selection=normalized_earnings_input_selection,
         )
         eps_earnings_bridge = final_eps_earnings_bridge
+        normalized_earnings_input_selection = _finalize_normalized_earnings_input_selection(
+            normalized_earnings_input_selection, eps_earnings_bridge
+        )
+        if (
+            normalized_earnings_input_selection.get("requested") is True
+            and normalized_earnings_input_selection.get("status") == "ADOPTION_BLOCKED"
+        ):
+            final_eps_earnings_bridge = _evaluate_eps_earnings_bridge(
+                raw_eps_multiple_valuation,
+                selected_model_family=operator_valuation_context["selected_model_family"],
+                expected_forecast_period=operating_driver_forecast.get("forecast_period"),
+                expected_terminal_date=forecast.get("valuation_terminal_date"),
+                expected_currency=currency,
+                operating_driver_forecast=operating_driver_forecast,
+                valuation_transmission=valuation_transmission,
+                operator_baseline_includes_project=operator_valuation_context["baseline_includes_project"],
+                evidence_register=sources,
+                unresolved_evidence_ids=unknown_refs,
+                after_cutoff_evidence_ids=after_cutoff_refs,
+                uncertain_timing_evidence_ids=uncertain_timing_refs,
+                normalized_earnings_input_selection=normalized_earnings_input_selection,
+            )
+            eps_earnings_bridge = final_eps_earnings_bridge
         eps_multiple_valuation = _evaluate_primary_eps_multiple_valuation(
             raw_eps_multiple_valuation,
             selected_model_family=operator_valuation_context["selected_model_family"],
