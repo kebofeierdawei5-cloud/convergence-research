@@ -320,6 +320,26 @@ def _calculate_scenario(
     uncertain_refs: set[str],
 ) -> dict[str, Any]:
     scenario = raw if isinstance(raw, Mapping) else {}
+    cycle_link_field_present = "cycle_driver_ids" in scenario
+    cycle_driver_ids: list[str] = []
+    cycle_link_issues: list[str] = []
+    cycle_link_status = "NOT_PROVIDED"
+    if cycle_link_field_present:
+        raw_cycle_ids = scenario.get("cycle_driver_ids")
+        if not isinstance(raw_cycle_ids, list):
+            cycle_link_status = "INVALID"
+            cycle_link_issues.append("CYCLE_DRIVER_IDS_MUST_BE_A_LIST")
+        else:
+            for raw_id in raw_cycle_ids:
+                if not isinstance(raw_id, str) or not raw_id.strip():
+                    cycle_link_issues.append("CYCLE_DRIVER_ID_INVALID")
+                    continue
+                driver_id = raw_id.strip()
+                if driver_id in cycle_driver_ids:
+                    cycle_link_issues.append("DUPLICATE_CYCLE_DRIVER_ID")
+                    continue
+                cycle_driver_ids.append(driver_id)
+            cycle_link_status = "INVALID" if cycle_link_issues else ("IDS_RECORDED_NOT_VALIDATED" if cycle_driver_ids else "EMPTY_EXPLICIT_LIST")
     raw_products = scenario.get("product_lines")
     raw_products = raw_products if isinstance(raw_products, list) else []
     rows_by_id: dict[str, Mapping[str, Any]] = {}
@@ -541,7 +561,7 @@ def _calculate_scenario(
         "change_working_capital": change_wc,
     }
     missing_inputs.extend(name for name, value in metric_values.items() if value is None)
-    return {
+    result = {
         "scenario": scenario_name,
         "calculation_status": calculation_status,
         "product_lines": product_results,
@@ -578,6 +598,12 @@ def _calculate_scenario(
         "eps_impact": None,
         "per_share_value_impact": None,
     }
+    if cycle_link_field_present:
+        result["cycle_driver_ids"] = cycle_driver_ids
+        result["cycle_link_status"] = cycle_link_status
+        if cycle_link_issues:
+            result["cycle_link_issues"] = sorted(set(cycle_link_issues))
+    return result
 
 
 def evaluate_operating_driver_forecast(
@@ -885,6 +911,13 @@ def render_operating_driver_section(
             f"- 产能可行性：{result.get('capacity_feasibility_status', 'UNKNOWN')}；财务结果可用于下游估值：{result.get('financial_outputs_decision_usable', False)}",
             f"- {valuation_label}：{scenario_terminal_display} {currency}",
         ])
+        if "cycle_link_status" in result:
+            explicit_cycle_ids = result.get("cycle_driver_ids") if isinstance(result.get("cycle_driver_ids"), list) else []
+            lines.append(
+                f"- 明示周期驱动 ID：{'、'.join(str(item) for item in explicit_cycle_ids) if explicit_cycle_ids else 'UNKNOWN / 空列表'}；链接状态：{result.get('cycle_link_status')}（仅登记引用，不代表自动验证或正常化盈利已进入估值）"
+            )
+            if result.get("cycle_link_issues"):
+                lines.append("- 周期链接输入问题：" + "；".join(result["cycle_link_issues"]))
         mix = result.get("revenue_mix") or []
         if mix:
             lines.append("  - 收入产品结构：" + "；".join(

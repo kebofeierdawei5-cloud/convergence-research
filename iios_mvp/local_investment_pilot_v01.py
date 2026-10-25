@@ -1897,6 +1897,119 @@ def _neutralize_stale_model_confirmation_language(
     forecast["model_rationale_status"] = "AS_PROVIDED"
 
 
+
+def _normalize_cycle_profile(raw: Any) -> dict[str, Any]:
+    """Keep cycle stage and normalized earnings as a non-admitted research statement."""
+    if not isinstance(raw, Mapping):
+        return {
+            "status": "NOT_PROVIDED", "stage": "UNKNOWN", "confidence": "UNKNOWN",
+            "stage_evidence": "UNKNOWN", "counter_evidence": "UNKNOWN", "reversal_signals": [],
+            "current_earnings": {"status": "UNKNOWN", "value": None, "unit": "UNKNOWN", "period": "UNKNOWN", "basis": "UNKNOWN", "data_class": "UNKNOWN", "evidence_refs": []},
+            "normalization_method": "UNKNOWN", "normalization_metric": "UNKNOWN",
+            "normalization_unit": "UNKNOWN", "normalization_period": "UNKNOWN",
+            "normalization_basis": "UNKNOWN", "normalization_evidence_refs": [],
+            "normalized_earnings_range": {name: {"status": "UNKNOWN", "value": None, "unit": "UNKNOWN", "period": "UNKNOWN", "basis": "UNKNOWN", "data_class": "UNKNOWN", "evidence_refs": []} for name in ("bear", "base", "bull")},
+            "price_calculation_applied": False,
+        }
+    def text_value(*keys: str, default: str = "") -> str:
+        for key in keys:
+            value = raw.get(key)
+            if value is not None and str(value).strip():
+                return str(value).strip()
+        return default
+    stage_raw = text_value("stage", "cycle_stage", "current_stage").strip()
+    stage_token = re.sub(r"[^A-Z0-9一-龥]+", "_", stage_raw.upper()).strip("_")
+    stage_aliases = {
+        "TROUGH": "TROUGH", "BOTTOM": "TROUGH", "谷底": "TROUGH", "底部": "TROUGH",
+        "EARLY_RECOVERY": "EARLY_RECOVERY", "RECOVERY_EARLY": "EARLY_RECOVERY", "复苏初期": "EARLY_RECOVERY", "早期复苏": "EARLY_RECOVERY",
+        "MID_CYCLE": "MID_CYCLE", "MIDCYCLE": "MID_CYCLE", "中周期": "MID_CYCLE",
+        "PEAK": "PEAK", "TOP": "PEAK", "峰值": "PEAK", "顶部": "PEAK",
+        "DOWNTURN": "DOWNTURN", "DOWN_CYCLE": "DOWNTURN", "下行": "DOWNTURN", "下行期": "DOWNTURN",
+        "STRUCTURAL_SHIFT": "STRUCTURAL_SHIFT", "STRUCTURAL": "STRUCTURAL_SHIFT", "结构性变化": "STRUCTURAL_SHIFT",
+        "UNKNOWN": "UNKNOWN", "NOT_IDENTIFIABLE": "UNKNOWN", "未知": "UNKNOWN", "不明确": "UNKNOWN",
+    }
+    stage = stage_aliases.get(stage_token, stage_aliases.get(stage_raw, "UNKNOWN"))
+    confidence_raw = text_value("confidence", "stage_confidence", default="UNKNOWN").upper()
+    confidence = confidence_raw if confidence_raw in {"HIGH", "MEDIUM", "LOW", "UNKNOWN"} else "UNKNOWN"
+    method = text_value("normalization_method", "normalized_earnings_method", "method", default="UNKNOWN")
+    metric = text_value("normalization_metric", "normalized_earnings_metric", "metric", default="UNKNOWN")
+    unit = text_value("normalization_unit", "normalized_earnings_unit", "unit", default="UNKNOWN")
+    period = text_value("normalization_period", "normalized_earnings_period", "period", default="UNKNOWN")
+    basis = text_value("normalization_basis", "normalized_earnings_basis", "basis", default="UNKNOWN")
+    refs_raw = raw.get("normalization_evidence_refs", raw.get("evidence_refs", []))
+    refs = [str(value).strip() for value in refs_raw if str(value).strip()] if isinstance(refs_raw, list) else []
+    def point(raw_point: Any, default_unit: str, default_period: str, default_basis: str, default_class: str) -> dict[str, Any]:
+        if isinstance(raw_point, Mapping):
+            source = raw_point
+        elif raw_point is not None and raw_point != "":
+            source = {"value": raw_point}
+        else:
+            source = {}
+        raw_value = source.get("value", source.get("amount"))
+        value: str | None = None
+        value_status = "UNKNOWN"
+        if raw_value not in (None, ""):
+            try:
+                number = Decimal(str(raw_value))
+                if number.is_finite():
+                    value, value_status = format(number, "f"), "REPORTED_NUMERIC"
+                else:
+                    value_status = "INVALID_NONFINITE"
+            except (InvalidOperation, TypeError, ValueError):
+                value_status = "INVALID_NUMERIC"
+        point_unit = str(source.get("unit") or default_unit or "UNKNOWN").strip() or "UNKNOWN"
+        point_period = str(source.get("period") or default_period or "UNKNOWN").strip() or "UNKNOWN"
+        point_basis = str(source.get("basis") or default_basis or "UNKNOWN").strip() or "UNKNOWN"
+        class_raw = str(source.get("data_class") or default_class or "UNKNOWN").strip().upper()
+        data_class = class_raw if class_raw in {"OBSERVED_ACTUAL", "ISSUER_FORECAST", "ANALYST_ASSUMPTION", "UNKNOWN"} else "UNKNOWN"
+        point_refs_raw = source.get("evidence_refs", source.get("normalization_evidence_refs", refs))
+        point_refs = [str(item).strip() for item in point_refs_raw if str(item).strip()] if isinstance(point_refs_raw, list) else []
+        complete = value is not None and all(x.upper() not in {"UNKNOWN", "N/A", "NONE", "NOT_IDENTIFIABLE"} for x in (point_unit, point_period, point_basis)) and data_class != "UNKNOWN"
+        status = "REPORTED_NOT_FORMALLY_ADMITTED" if complete else ("PARTIAL" if value is not None or value_status.startswith("INVALID") else "UNKNOWN")
+        return {"status": status, "value": value, "value_status": value_status, "unit": point_unit, "period": point_period, "basis": point_basis, "data_class": data_class, "evidence_refs": point_refs}
+    current = point(
+        raw.get("current_earnings", raw.get("current_earnings_reference")),
+        str(raw.get("current_earnings_unit") or "UNKNOWN"),
+        str(raw.get("current_earnings_period") or "UNKNOWN"),
+        str(raw.get("current_earnings_basis") or "UNKNOWN"),
+        str(raw.get("current_earnings_data_class") or "UNKNOWN"),
+    )
+    raw_range = raw.get("normalized_earnings_range", raw.get("through_cycle_earnings_range"))
+    raw_range = raw_range if isinstance(raw_range, Mapping) else {}
+    normalized_range = {}
+    for name in ("bear", "base", "bull"):
+        row = raw_range.get(name, raw_range.get(name.title(), raw_range.get(name.upper())))
+        normalized_range[name] = point(row, unit, period, basis, "UNKNOWN")
+    rows = [normalized_range[name] for name in ("bear", "base", "bull")]
+    all_reported = all(row.get("status") == "REPORTED_NOT_FORMALLY_ADMITTED" for row in rows)
+    compatible = len({row.get("unit") for row in rows}) == 1 and len({row.get("period") for row in rows}) == 1
+    method_known = method.upper() not in {"", "UNKNOWN", "N/A", "NOT_IDENTIFIABLE"}
+    metric_known = metric.upper() not in {"", "UNKNOWN", "N/A", "NOT_IDENTIFIABLE"}
+    basis_known = basis.upper() not in {"", "UNKNOWN", "N/A", "NOT_IDENTIFIABLE"}
+    if all_reported and compatible and method_known and metric_known and basis_known:
+        status = "NORMALIZED_RANGE_REPORTED_NOT_RECONCILED"
+    elif stage != "UNKNOWN" and current.get("value") is None and not any(row.get("value") is not None for row in rows):
+        status = "STAGE_ONLY"
+    elif stage == "UNKNOWN" and current.get("value") is None and not any(row.get("value") is not None for row in rows) and not refs:
+        status = "NOT_IDENTIFIABLE"
+    else:
+        status = "PARTIAL"
+    stage_evidence = raw.get("stage_evidence", raw.get("historical_evidence", ""))
+    counter_evidence = raw.get("counter_evidence", raw.get("counter_signals", ""))
+    reversals = raw.get("reversal_signals", raw.get("turning_point_signals", []))
+    reversal_signals = _items(reversals) if isinstance(reversals, list) else ([str(reversals).strip()] if str(reversals or "").strip() else [])
+    return {
+        "status": status, "stage": stage, "stage_input": stage_raw or "UNKNOWN", "confidence": confidence,
+        "stage_evidence": "；".join(_items(stage_evidence)) if isinstance(stage_evidence, list) else str(stage_evidence or "").strip() or "UNKNOWN",
+        "counter_evidence": "；".join(_items(counter_evidence)) if isinstance(counter_evidence, list) else str(counter_evidence or "").strip() or "UNKNOWN",
+        "reversal_signals": reversal_signals, "current_earnings": current,
+        "normalization_method": method, "normalization_metric": metric, "normalization_unit": unit,
+        "normalization_period": period, "normalization_basis": basis, "normalization_evidence_refs": refs,
+        "normalized_earnings_range": normalized_range, "price_calculation_applied": False,
+        "note": "正常化盈利是显式研究声明；本字段本身不会覆盖 B4/EPS/B5 输入。",
+    }
+
+
 def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     if payload.get("schema_version") != PILOT_SCHEMA:
         raise LocalInvestmentPilotError("PILOT_INPUT_SCHEMA_MISMATCH")
@@ -2123,6 +2236,17 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         gap["consistency_note"] = (
             "市场隐含预期尚未通过可识别性检查，不能把预期差声明当作已验证的市场比较结果。"
         )
+    for source_key, preserved_key in (
+        ("break_conditions", "break_condition_items"),
+        ("reassessment_triggers", "reassessment_trigger_items"),
+    ):
+        original_items = assessment["thesis"].get(source_key)
+        if isinstance(original_items, list):
+            structured_items = [dict(item) for item in original_items if isinstance(item, Mapping)]
+            if structured_items:
+                assessment["thesis"][preserved_key] = structured_items
+        if isinstance(assessment["thesis"].get(preserved_key), list):
+            assessment["thesis"][preserved_key] = _records(assessment["thesis"][preserved_key])
     assessment["thesis"]["break_conditions"] = _items(assessment["thesis"].get("break_conditions"))
     assessment["thesis"]["reassessment_triggers"] = _items(assessment["thesis"].get("reassessment_triggers"))
     thesis_quality_issues: list[str] = []
@@ -2257,6 +2381,14 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         # Keep it for display/audit, but do not infer POSITIVE or a passing gate.
         impact = _status(item.get("impact"), {"POSITIVE", "NEGATIVE", "MIXED", "UNKNOWN"})
         driver_type = str(item.get("type") or item.get("driver_type") or item.get("category") or "").strip()
+        driver_id = str(item.get("driver_id") or item.get("id") or "").strip()
+        is_cycle_driver = driver_type.upper() == "INDUSTRY_CYCLE"
+        if is_cycle_driver and not _is_identifiable_evidence_text(driver_id):
+            driver_id = f"CYCLE_DRIVER_{rank}"
+        cycle_profile_raw = item.get("cycle_profile")
+        if not isinstance(cycle_profile_raw, Mapping) and is_cycle_driver:
+            cycle_profile_raw = item
+        cycle_profile = _normalize_cycle_profile(cycle_profile_raw) if is_cycle_driver else {"status": "NOT_APPLICABLE", "price_calculation_applied": False}
         # Accept the current prompt's documented aliases without losing the
         # source wording: older/research-facing inputs use observed_basis and
         # transmission, while the normalized analysis schema uses
@@ -2290,7 +2422,9 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         assessment["value_drivers"].append({
             "rank": rank,
             "driver": driver,
+            "driver_id": driver_id or None,
             "driver_type": driver_type,
+            "cycle_profile": cycle_profile,
             "historical_evidence": historical_evidence,
             "valuation_transmission": valuation_transmission,
             "unresolved_inputs": unresolved_inputs,
@@ -2302,9 +2436,18 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             "status_issues": driver_issues,
         })
     rank_counts: dict[int, int] = {}
+    cycle_id_counts: dict[str, int] = {}
     for driver in assessment["value_drivers"]:
         rank_counts[driver["rank"]] = rank_counts.get(driver["rank"], 0) + 1
+        if str(driver.get("driver_type") or "").upper() == "INDUSTRY_CYCLE" and driver.get("driver_id"):
+            key = str(driver["driver_id"])
+            cycle_id_counts[key] = cycle_id_counts.get(key, 0) + 1
     for driver in assessment["value_drivers"]:
+        if str(driver.get("driver_type") or "").upper() == "INDUSTRY_CYCLE" and driver.get("driver_id") and cycle_id_counts.get(str(driver["driver_id"]), 0) > 1:
+            driver["status"] = "UNKNOWN"
+            driver["status_issues"] = list(dict.fromkeys(list(driver.get("status_issues") or []) + ["DUPLICATE_DRIVER_ID_NOT_IDENTIFIABLE"]))
+            if isinstance(driver.get("cycle_profile"), dict):
+                driver["cycle_profile"]["status"] = "DUPLICATE_DRIVER_ID_NOT_IDENTIFIABLE"
         if rank_counts[driver["rank"]] > 1:
             driver["status"] = "UNKNOWN"
             driver_issues = list(driver.get("status_issues") or [])
@@ -3609,6 +3752,112 @@ def _decision(
         "auto_execution": False,
     }
 
+
+def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
+    """Render only explicit links across cycle profiles, operating cases, EPS, valuation and monitoring."""
+    assessment = analysis.get("assessment") if isinstance(analysis.get("assessment"), Mapping) else {}
+    drivers = assessment.get("value_drivers") if isinstance(assessment.get("value_drivers"), list) else []
+    cycle_drivers = [item for item in drivers if isinstance(item, Mapping) and str(item.get("driver_type") or "").strip().upper() == "INDUSTRY_CYCLE"]
+    operating = analysis.get("operating_driver_forecast") if isinstance(analysis.get("operating_driver_forecast"), Mapping) else {}
+    b4_scenarios = operating.get("scenarios") if isinstance(operating.get("scenarios"), Mapping) else {}
+    eps_bridge = analysis.get("eps_earnings_bridge") if isinstance(analysis.get("eps_earnings_bridge"), Mapping) else {}
+    eps_scenarios = eps_bridge.get("scenarios") if isinstance(eps_bridge.get("scenarios"), Mapping) else {}
+    b5 = analysis.get("valuation_transmission") if isinstance(analysis.get("valuation_transmission"), Mapping) else {}
+    b5_scenarios = b5.get("scenarios") if isinstance(b5.get("scenarios"), Mapping) else {}
+    forecast = analysis.get("forecast_valuation") if isinstance(analysis.get("forecast_valuation"), Mapping) else {}
+    value_scenarios = forecast.get("scenarios") if isinstance(forecast.get("scenarios"), Mapping) else {}
+    thesis = assessment.get("thesis") if isinstance(assessment.get("thesis"), Mapping) else {}
+    risk = assessment.get("risk") if isinstance(assessment.get("risk"), Mapping) else {}
+    def show(value: Any) -> str:
+        return "UNKNOWN" if value is None or value == "" else str(value)
+    def list_values(raw: Any) -> list[str]:
+        if isinstance(raw, str):
+            return [raw.strip()] if raw.strip() else []
+        if isinstance(raw, list):
+            return [str(value).strip() for value in raw if str(value).strip()]
+        return []
+    def linked_ids(item: Any) -> list[str]:
+        if not isinstance(item, Mapping):
+            return []
+        return list_values(item.get("linked_driver_ids", item.get("cycle_driver_ids", item.get("driver_ids", []))))
+    lines = [
+        "", "### 跨层因果链：行业周期 → 正常化盈利 → EPS/FCF → 每股价值 → 持仓复核", "",
+        "- 本节只对账现有字段，不重算或覆盖主估值；正常化盈利是独立研究声明，只有指标、单位、期间和 B4→EPS→B5 桥接一致时才算连接。",
+        "- 没有 driver_id / cycle_driver_ids / linked_driver_ids 精确相等时标记 NO_EXPLICIT_ID_LINK；不按文字相似度猜测关联。", "",
+    ]
+    if not cycle_drivers:
+        lines.append("- 行业周期驱动：NOT_IDENTIFIABLE；这不表示业务无周期性。B4、EPS 与 B5 仍按各自门禁显示，不将当前盈利直接当成正常化盈利。")
+    for item in cycle_drivers:
+        driver_id = str(item.get("driver_id") or "UNKNOWN")
+        profile = item.get("cycle_profile") if isinstance(item.get("cycle_profile"), Mapping) else {}
+        current = profile.get("current_earnings") if isinstance(profile.get("current_earnings"), Mapping) else {}
+        normal_range = profile.get("normalized_earnings_range") if isinstance(profile.get("normalized_earnings_range"), Mapping) else {}
+        lines.extend([
+            "", f"**周期驱动：{show(driver_id)} — {show(item.get('driver'))}**（驱动门禁：{show(item.get('status'))}；周期画像：{show(profile.get('status'))}）",
+            f"- 周期阶段 / 置信度：{show(profile.get('stage'))} / {show(profile.get('confidence'))}",
+            f"- 拐点/阶段依据：{show(profile.get('stage_evidence'))}",
+            f"- 反证：{show(profile.get('counter_evidence'))}",
+            f"- 反转/失效信号：{'；'.join(list_values(profile.get('reversal_signals'))) or 'UNKNOWN'}",
+            f"- 当前盈利参照：{show(current.get('value'))} {show(current.get('unit'))}；期间 {show(current.get('period'))}；类别 {show(current.get('data_class'))}；依据 {show(current.get('basis'))}；状态 {show(current.get('status'))}",
+            f"- 正常化方法 / 指标 / 单位：{show(profile.get('normalization_method'))} / {show(profile.get('normalization_metric'))} / {show(profile.get('normalization_unit'))}；期间 {show(profile.get('normalization_period'))}；依据 {show(profile.get('normalization_basis'))}",
+            f"- 正常化范围状态：{show(profile.get('status'))}；本字段自动进入估值：{show(profile.get('price_calculation_applied'))}",
+        ])
+        for scenario, label in (("bear", "Bear"), ("base", "Base"), ("bull", "Bull")):
+            row = normal_range.get(scenario) if isinstance(normal_range.get(scenario), Mapping) else {}
+            lines.append(f"  - 正常化 {label}：{show(row.get('value'))} {show(row.get('unit'))}；期间 {show(row.get('period'))}；依据 {show(row.get('basis'))}；状态 {show(row.get('status'))}")
+        lines.append(f"- 正常化范围证据引用：{'、'.join(list_values(profile.get('normalization_evidence_refs'))) or 'UNKNOWN'}")
+        lines.append("")
+    lines.extend(["#### Bear / Base / Bull 的显式传导对账", ""])
+    for scenario, label in (("bear", "Bear"), ("base", "Base"), ("bull", "Bull")):
+        b4 = b4_scenarios.get(scenario) if isinstance(b4_scenarios.get(scenario), Mapping) else {}
+        eps = eps_scenarios.get(scenario) if isinstance(eps_scenarios.get(scenario), Mapping) else {}
+        b5_row = b5_scenarios.get(scenario) if isinstance(b5_scenarios.get(scenario), Mapping) else {}
+        val = value_scenarios.get(scenario) if isinstance(value_scenarios.get(scenario), Mapping) else {}
+        ids = list_values(b4.get("cycle_driver_ids"))
+        lines.extend([
+            f"**{label}**",
+            f"- B4 状态 / 明示周期 ID：{show(b4.get('calculation_status'))} / {'、'.join(ids) if ids else 'UNKNOWN'}；链接状态：{show(b4.get('cycle_link_status', 'NOT_PROVIDED'))}",
+            f"- B4 净利润 / FCF 代理：{show(b4.get('net_profit_cny'))} / {show(b4.get('unlevered_fcf_proxy_cny'))}；完整财务输出可用于下游：{show(b4.get('financial_outputs_decision_usable'))}",
+            f"- EPS 桥状态 / 计算 EPS：{show(eps.get('status'))} / {show(eps.get('calculated_eps_per_share'))}；申报 EPS：{show(eps.get('declared_eps_per_share'))}",
+            f"- B5 状态 / 每股增量（稀释口径）：{show(b5_row.get('status', b5.get('status')))} / {show(b5_row.get('value_delta_per_share_diluted'))}",
+            f"- 主估值情景终值：{show(val.get('terminal_value_per_share'))}；主模型价格计算可用：{show((analysis.get('valuation_model_consistency') or {}).get('primary_model_price_calculation_eligible'))}",
+        ])
+        for item in cycle_drivers:
+            driver_id = str(item.get("driver_id") or "")
+            lines.append(f"- 对周期驱动 {show(driver_id)} 的关联：{'EXPLICIT_ID_MATCH' if driver_id and driver_id in ids else 'NO_EXPLICIT_ID_LINK'}；无显式链接时不声称本情景采用该正常化范围。")
+        if not cycle_drivers:
+            lines.append("- 周期到 B4 的显式关联：NOT_IDENTIFIABLE。")
+        lines.append("")
+    for label, field in (("论点失效条件", "break_condition_items"), ("重新评估触发器", "reassessment_trigger_items")):
+        records = thesis.get(field) if isinstance(thesis.get(field), list) else []
+        if records:
+            lines.append(f"#### {label}与周期驱动的关联")
+            for record in records:
+                if isinstance(record, Mapping):
+                    ids = linked_ids(record)
+                    matched = [str(item.get("driver_id")) for item in cycle_drivers if str(item.get("driver_id") or "") in ids]
+                    lines.append(f"- {show(_humanize_item(record))}；linked_driver_ids：{'、'.join(ids) if ids else 'UNKNOWN'}；匹配周期驱动：{'、'.join(matched) if matched else 'NO_EXPLICIT_ID_LINK'}")
+            lines.append("")
+    risk_items = risk.get("items") if isinstance(risk.get("items"), list) else []
+    if risk_items:
+        lines.append("#### 结构化风险监控与周期驱动的关联")
+        for record in risk_items:
+            if not isinstance(record, Mapping):
+                continue
+            ids = linked_ids(record)
+            matched = [str(item.get("driver_id")) for item in cycle_drivers if str(item.get("driver_id") or "") in ids]
+            lines.append(f"- {show(record.get('risk_id'))} / {show(record.get('name') or record.get('title') or record.get('driver'))}；监控条件：{show(record.get('monitoring_trigger') or record.get('trigger'))}；阈值：{show(record.get('threshold'))}；关联周期驱动：{'、'.join(matched) if matched else 'NO_EXPLICIT_ID_LINK'}")
+        lines.append("")
+    if not thesis.get("break_condition_items") and thesis.get("break_conditions"):
+        lines.append("- Thesis 失效条件是自由文本，当前无可核验的 structured linked_driver_ids：UNKNOWN。")
+    if not thesis.get("reassessment_trigger_items") and thesis.get("reassessment_triggers"):
+        lines.append("- Thesis 重新评估条件是自由文本，当前无可核验的 structured linked_driver_ids：UNKNOWN。")
+    lines.extend([
+        "- 对账规则：数值存在不等于口径可比；周期正常化盈利仍需指标、单位、期间、依据及与 B4/EPS/B5 一致的显式桥接。该节不会改变 15% 门槛、目标入场价、MIE 或 BUY/ADD/HOLD/REDUCE/EXIT 字段。", ""
+    ])
+    return lines
+
+
 def _render_report(analysis: Mapping[str, Any]) -> str:
     c, p = analysis["case"], analysis["price_input"]
     a, f, calc, d = analysis["assessment"], analysis["forecast_valuation"], analysis["return_metrics"], analysis["decision"]
@@ -4067,6 +4316,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         analysis.get("valuation_transmission") or {},
         c["currency"],
     ))
+    lines.extend(_render_cycle_value_chain_section(analysis))
     lines.extend([
         "",
         "## 五、MIE 与预期差",
@@ -5239,7 +5489,8 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
         "不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
         "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。"
         "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。对周期敏感的业务，要明确周期阶段、拐点证据、反证及领先/滞后指标，并区分真实复苏与补库存、提前拉货或一次性因素；说明全周期正常化盈利与当前盈利的区别。周期状态无法识别时写 UNKNOWN，不强行判断。Thesis 失效条件和重新评估触发器应尽量写成可观察的“指标→阈值/方向→检查频率/时点→触发后重新评估什么”；不要用空泛的“持续关注”，也不要编造阈值/日期。"
-        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。若有周期驱动，必须将周期位置/拐点及其证据/反证写入 value_drivers 的 driver_type、historical_evidence、rationale、impact、valuation_transmission 与 evidence_refs；Bear/Base/Bull 需反映不同周期路径，未知值保持 UNKNOWN。"
+        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。若有周期驱动，必须使用唯一 driver_id，并在 cycle_profile 中填写 stage（TROUGH/EARLY_RECOVERY/MID_CYCLE/PEAK/DOWNTURN/STRUCTURAL_SHIFT/UNKNOWN）、confidence、stage_evidence、counter_evidence、reversal_signals、current_earnings（value/unit/period/basis/data_class/evidence_refs）、normalization_method/metric/unit/period/basis/evidence_refs，以及 Bear/Base/Bull 的 normalized_earnings_range。正常化盈利缺少依据时写 UNKNOWN，不要为了补齐字段创造数字；这组数字只是研究声明，不自动进入估值。"
+        "B4 operating_driver_forecast 的 Bear/Base/Bull scenario 若确实由某个周期判断驱动，写入 cycle_driver_ids，值必须与 value_drivers[].driver_id 完全一致；不能明确对应时输出空列表，不要按文字相似度猜关联。结构化 Thesis 失效条件/重新评估触发器及 risk.items 也可写 linked_driver_ids，用同一批 ID 让报告连接观察指标与周期假设。Bear/Base/Bull 需反映不同周期路径，未知值保持 UNKNOWN。"
         "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。"
         "Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
         "【Round A 允许输入】\n"
@@ -5272,7 +5523,7 @@ def _build_price_aware_round_b_prompt(*, base_prompt: str, payload: Mapping[str,
         + json.dumps(prompt_input, ensure_ascii=False, indent=2, allow_nan=False)
         + "\n【Round B 输出约束】只返回 IIOS-RESEARCH-PATCH-0.1 紧凑 JSON。research 只允许 evidence_register、assessment、forecast_valuation、eps_multiple_valuation、valuation_transmission、sotp_valuation；assessment 只允许 market_implied_expectation、expectation_gap。"
         + "不得更改 Round A 的公司侧字段。若返回 evidence_register，必须原样保留全部 Round A 来源记录，并可在其后追加新来源。"
-        + "估值时必须检视冻结的周期判断：不要无条件把当前峰值利润资本化，也不要把谷底亏损机械当成常态；正常化盈利必须有历史/供需/产能利用率/价格和成本证据支持，证据不足就做区间或 UNKNOWN。若高增长可能来自补库存、渠道备货、关税/政策提前拉货或低基数，需单独检验其持续性及回吐风险，并映射到销量、净售价、利润率、营运资金/FCF 和 EPS 情景。不得改写 Round A 对周期证据的原始判断。"
+        + "估值时必须检视冻结的周期判断：不要无条件把当前峰值利润资本化，也不要把谷底亏损机械当成常态；正常化盈利必须有历史/供需/产能利用率/价格和成本证据支持，证据不足就做区间或 UNKNOWN。若高增长可能来自补库存、渠道备货、关税/政策提前拉货或低基数，需单独检验其持续性及回吐风险，并映射到销量、净售价、利润率、营运资金/FCF 和 EPS 情景。不得改写 Round A 对周期证据的原始判断。只有当 B4 情景显式 cycle_driver_ids 指向冻结周期 driver_id 时，才能声明该情景与周期判断有明确链接；正常化盈利范围如果没有进入相同期间、同一指标/单位且可追溯的 B4→EPS→B5 计算链，必须标记未对账，不得默默替换主估值数值。"
          + "只有存在独立、截止时点兼容、可核验的市场定价/一致预期证据时才量化 MIE/预期差；否则 MIE=NOT_IDENTIFIABLE、预期差=UNKNOWN。内部 Base 估值或条件反推不能冒充市场隐含预期。"
         + "不要修改人工控制字段，不声称正式准入、实际成交、实际分红或交易授权。"
     )
