@@ -3758,6 +3758,13 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
     assessment = analysis.get("assessment") if isinstance(analysis.get("assessment"), Mapping) else {}
     drivers = assessment.get("value_drivers") if isinstance(assessment.get("value_drivers"), list) else []
     cycle_drivers = [item for item in drivers if isinstance(item, Mapping) and str(item.get("driver_type") or "").strip().upper() == "INDUSTRY_CYCLE"]
+    cycle_id_counts: dict[str, int] = {}
+    for cycle_item in cycle_drivers:
+        cycle_id = str(cycle_item.get("driver_id") or "").strip()
+        if cycle_id:
+            cycle_id_counts[cycle_id] = cycle_id_counts.get(cycle_id, 0) + 1
+    case = analysis.get("case") if isinstance(analysis.get("case"), Mapping) else {}
+    currency = str(case.get("currency") or "UNKNOWN")
     operating = analysis.get("operating_driver_forecast") if isinstance(analysis.get("operating_driver_forecast"), Mapping) else {}
     b4_scenarios = operating.get("scenarios") if isinstance(operating.get("scenarios"), Mapping) else {}
     eps_bridge = analysis.get("eps_earnings_bridge") if isinstance(analysis.get("eps_earnings_bridge"), Mapping) else {}
@@ -3780,6 +3787,20 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
         if not isinstance(item, Mapping):
             return []
         return list_values(item.get("linked_driver_ids", item.get("cycle_driver_ids", item.get("driver_ids", []))))
+    def monitoring_link_status(ids: list[str]) -> str:
+        ambiguous = [value for value in ids if cycle_id_counts.get(value, 0) > 1]
+        matched = [value for value in ids if cycle_id_counts.get(value, 0) == 1]
+        if matched:
+            return "EXPLICIT_ID_MATCH:" + "、".join(matched)
+        if ambiguous:
+            return "AMBIGUOUS_DUPLICATE_DRIVER_ID:" + "、".join(ambiguous)
+        return "NO_EXPLICIT_ID_LINK"
+    def scenario_link_status(ids: list[str], driver_id: str, status: str) -> str:
+        if status == "INVALID":
+            return "INVALID_LINK_INPUT"
+        if driver_id and cycle_id_counts.get(driver_id, 0) > 1:
+            return "AMBIGUOUS_DUPLICATE_DRIVER_ID"
+        return "EXPLICIT_ID_MATCH" if driver_id and driver_id in ids and status == "IDS_RECORDED_NOT_VALIDATED" else "NO_EXPLICIT_ID_LINK"
     lines = [
         "", "### 跨层因果链：行业周期 → 正常化盈利 → EPS/FCF → 每股价值 → 持仓复核", "",
         "- 本节只对账现有字段，不重算或覆盖主估值；正常化盈利是独立研究声明，只有指标、单位、期间和 B4→EPS→B5 桥接一致时才算连接。",
@@ -3820,11 +3841,11 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
             f"- B4 净利润 / FCF 代理：{show(b4.get('net_profit_cny'))} / {show(b4.get('unlevered_fcf_proxy_cny'))}；完整财务输出可用于下游：{show(b4.get('financial_outputs_decision_usable'))}",
             f"- EPS 桥状态 / 计算 EPS：{show(eps.get('status'))} / {show(eps.get('calculated_eps_per_share'))}；申报 EPS：{show(eps.get('declared_eps_per_share'))}",
             f"- B5 状态 / 每股增量（稀释口径）：{show(b5_row.get('status', b5.get('status')))} / {show(b5_row.get('value_delta_per_share_diluted'))}",
-            f"- 主估值情景终值：{show(val.get('terminal_value_per_share'))}；主模型价格计算可用：{show((analysis.get('valuation_model_consistency') or {}).get('primary_model_price_calculation_eligible'))}",
+            f"- 主估值情景终值：{show(val.get('terminal_value_per_share'))} {currency}；主模型价格计算可用：{show((analysis.get('valuation_model_consistency') or {}).get('primary_model_price_calculation_eligible'))}",
         ])
         for item in cycle_drivers:
             driver_id = str(item.get("driver_id") or "")
-            lines.append(f"- 对周期驱动 {show(driver_id)} 的关联：{'EXPLICIT_ID_MATCH' if driver_id and driver_id in ids else 'NO_EXPLICIT_ID_LINK'}；无显式链接时不声称本情景采用该正常化范围。")
+            lines.append(f"- 对周期驱动 {show(driver_id)} 的关联：{scenario_link_status(ids, driver_id, str(b4.get('cycle_link_status') or 'NOT_PROVIDED'))}；无有效显式链接时不声称本情景采用该正常化范围。")
         if not cycle_drivers:
             lines.append("- 周期到 B4 的显式关联：NOT_IDENTIFIABLE。")
         lines.append("")
@@ -3835,8 +3856,8 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
             for record in records:
                 if isinstance(record, Mapping):
                     ids = linked_ids(record)
-                    matched = [str(item.get("driver_id")) for item in cycle_drivers if str(item.get("driver_id") or "") in ids]
-                    lines.append(f"- {show(_humanize_item(record))}；linked_driver_ids：{'、'.join(ids) if ids else 'UNKNOWN'}；匹配周期驱动：{'、'.join(matched) if matched else 'NO_EXPLICIT_ID_LINK'}")
+                    match_status = monitoring_link_status(ids)
+                    lines.append(f"- {show(_humanize_item(record))}；linked_driver_ids：{'、'.join(ids) if ids else 'UNKNOWN'}；匹配周期驱动：{match_status}")
             lines.append("")
     risk_items = risk.get("items") if isinstance(risk.get("items"), list) else []
     if risk_items:
@@ -3845,8 +3866,8 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
             if not isinstance(record, Mapping):
                 continue
             ids = linked_ids(record)
-            matched = [str(item.get("driver_id")) for item in cycle_drivers if str(item.get("driver_id") or "") in ids]
-            lines.append(f"- {show(record.get('risk_id'))} / {show(record.get('name') or record.get('title') or record.get('driver'))}；监控条件：{show(record.get('monitoring_trigger') or record.get('trigger'))}；阈值：{show(record.get('threshold'))}；关联周期驱动：{'、'.join(matched) if matched else 'NO_EXPLICIT_ID_LINK'}")
+            match_status = monitoring_link_status(ids)
+            lines.append(f"- {show(record.get('risk_id'))} / {show(record.get('name') or record.get('title') or record.get('driver'))}；监控条件：{show(record.get('monitoring_trigger') or record.get('trigger'))}；阈值：{show(record.get('threshold'))}；关联周期驱动：{match_status}")
         lines.append("")
     if not thesis.get("break_condition_items") and thesis.get("break_conditions"):
         lines.append("- Thesis 失效条件是自由文本，当前无可核验的 structured linked_driver_ids：UNKNOWN。")
