@@ -2234,8 +2234,17 @@ def _validate_normalized_profit_calculation(
                 or source.get("time_status") != "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
             ):
                 issues.append(f"NORMALIZATION_OBSERVATION_EVIDENCE_NOT_CUTOFF_COMPATIBLE:{ref}")
-            elif str(source.get("source_class") or "").strip().upper() not in {"ISSUER_PRIMARY", "EXCHANGE_PRIMARY", "REGULATOR_PRIMARY"}:
-                issues.append(f"NORMALIZATION_OBSERVATION_SOURCE_NOT_PRIMARY:{ref}")
+            else:
+                source_class = str(source.get("source_class") or "").strip().upper()
+                domain_status = str(source.get("source_domain_class_status") or "").strip().upper()
+                if source_class == "EXCHANGE_PRIMARY":
+                    if domain_status != "OFFICIAL_EXCHANGE_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED":
+                        issues.append(f"NORMALIZATION_OBSERVATION_EXCHANGE_DOMAIN_NOT_MATCHED:{ref}")
+                elif source_class == "REGULATOR_PRIMARY":
+                    if domain_status != "OFFICIAL_REGULATOR_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED":
+                        issues.append(f"NORMALIZATION_OBSERVATION_REGULATOR_DOMAIN_NOT_MATCHED:{ref}")
+                else:
+                    issues.append(f"NORMALIZATION_OBSERVATION_REQUIRES_EXCHANGE_OR_REGULATOR_DOMAIN_MATCH:{ref}")
         input_terms.append({
             "period": period, "value": format(value, "f"), "unit": "CNY",
             "weight": format(weight, "f"), "data_class": data_class,
@@ -4852,9 +4861,12 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
         for decision_row in scenario_decisions:
             if not isinstance(decision_row, Mapping):
                 continue
+            formula_check = decision_row.get("normalization_calculation_validation")
+            formula_check = formula_check if isinstance(formula_check, Mapping) else {}
             lines.append(
                 f"- 正常化候选处置：{show(decision_row.get('driver_id'))} / {show(decision_row.get('action'))} / {show(decision_row.get('status'))}；"
                 f"候选值 {show(decision_row.get('candidate_value', decision_row.get('normalized_value')))}；"
+                f"历史公式复算：{show(formula_check.get('status'))}，复算值 {show(formula_check.get('calculated_value'))}，权重合计 {show(formula_check.get('weights_sum'))}，输入期间 {'、'.join(list_values(formula_check.get('input_periods'))) or 'UNKNOWN'}；"
                 f"实际进入计算 {show(decision_row.get('calculation_input_used'))}；"
                 f"理由 {show(decision_row.get('decision_reason'))}；"
                 f"证据 { '、'.join(list_values(decision_row.get('evidence_refs'))) or 'UNKNOWN' }；"
@@ -6224,7 +6236,7 @@ def create_pilot_template(
         "2. 未来最重要的变化是什么：按价值重要性排序，不要罗列宏观热点；指出未来 1 年（如有明确理由再用 2–3 年）最可能改变收入、单位利润、现金流或每股价值的变量，说明起点、预期变化、时间和可观测指标。写入 assessment.value_drivers 与 operating_driver_forecast。"
          "2A. 对周期敏感的行业/业务，必须单独识别行业/公司周期位置（扩张、过热、收缩、筑底、复苏或 UNKNOWN），给出截止时点前的证据、反证、领先指标与滞后指标；用 value_drivers 中 driver_type=INDUSTRY_CYCLE 的驱动行承载，不新增顶层字段。若证据不足，周期阶段保留 UNKNOWN，不强行贴标签。"
          "必须区别真实需求复苏与补库存、渠道备货、关税/政策导致的提前拉货、低基数和一次性收益；说明这些因素分别对未来销量、净售价、产能利用率、单位成本、毛利率、营运资金和现金流的方向/持续时间意味着什么。不得把短期发货/收入高增直接外推为可持续需求。"
-         "对周期性盈利估值，明确区分当前盈利、正常化/全周期盈利和峰值/谷底盈利；解释为什么当前 P/E 可能在周期高点显得虚低、在周期低点显得虚高。只有证据足以支持时才给正常化盈利/利润率；否则在情景中保留区间或 UNKNOWN，并说明需要哪些数据才能确认周期拐点。"
+         "对周期性盈利估值，明确区分当前盈利、正常化/全周期盈利和峰值/谷底盈利；解释为什么当前 P/E 可能在周期高点显得虚低、在周期低点显得虚高。只有证据足以支持时才给正常化盈利/利润率；否则在情景中保留区间或 UNKNOWN，并说明需要哪些数据才能确认周期拐点。 如果希望正常化净利润作为 EPS 桥候选输入，必须提供 normalization_calculation，使用 IIOS-NORMALIZATION-CALCULATION-0.1 的 WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT 方法，输入至少 3 个 cutoff 前完整财年的 OBSERVED_ACTUAL 净利润、CNY 单位、正权重合计 1、逐项官方交易所/监管来源引用，声明值必须精确等于本地可复算结果。未提供或校验不通过时只能比较，不得采用。"
          "如果希望把正常化盈利选为 B4→EPS 桥的候选公司整体净利润输入，必须在 cycle_profile.b4_input_decisions 为 Bear/Base/Bull 分别明确填写 action（COMPARISON_ONLY、REJECT、ADOPT_AS_B4_NET_PROFIT_PROXY）及理由。默认/缺失项是 COMPARISON_ONLY。只允许三个情景全部选择同一个唯一周期 driver_id 的 ADOPT，且指标为公司整体净利润代理、范围 COMPANY_WIDE、币种 CNY、期间与 B4 完全一致、数值/依据完整、证据引用 cutoff 兼容，并且 B4 三情景用 cycle_driver_ids 精确关联该 driver_id；否则不能进入 EPS 桥。该选择只影响 B4→EPS 桥的净利润输入来源，不覆盖 B4 原始经营计算或 FCF。"
         "3. 为什么相信变化会发生：把每个关键变化连接到截止时点前已公开的具体证据、证据日期、业务机制和反证；区分领先指标/结果指标、公司指引/分析师假设/历史事实，不得把管理层目标当成已实现结果。写入 evidence_register、assessment.value_drivers.historical_evidence 与 rationale。"
         "4. 变化如何进入每股价值：明确写出“销量/价格/组合/利用率 → 收入 → 单位毛利与费用 → EBIT/净利润 → 资本开支/营运资金/FCF → 稀释股数与每股盈利 → 估值”的可验证传导链；说明关键假设、量纲、期间、约束、潜在蚕食与稀释，避免重复计价。使用 operating_driver_forecast、valuation_transmission 和 forecast_valuation.scenarios；无法闭合的环节保留 UNKNOWN/NOT_LINKED。"
@@ -6557,8 +6569,8 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
         "不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
         "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。"
         "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。对周期敏感的业务，要明确周期阶段、拐点证据、反证及领先/滞后指标，并区分真实复苏与补库存、提前拉货或一次性因素；说明全周期正常化盈利与当前盈利的区别。周期状态无法识别时写 UNKNOWN，不强行判断。Thesis 失效条件和重新评估触发器应尽量写成可观察的“指标→阈值/方向→检查频率/时点→触发后重新评估什么”；不要用空泛的“持续关注”，也不要编造阈值/日期。"
-        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。若有周期驱动，必须使用唯一 driver_id，并在 cycle_profile 中填写 stage（TROUGH/EARLY_RECOVERY/MID_CYCLE/PEAK/DOWNTURN/STRUCTURAL_SHIFT/UNKNOWN）、confidence、stage_evidence、counter_evidence、reversal_signals、current_earnings（value/unit/period/basis/data_class/evidence_refs）、normalization_method/metric（建议使用 COMPANY_WIDE_NET_PROFIT_PROXY 或 UNLEVERED_FCF_PROXY 等明确标签，无法识别时为 UNKNOWN）/scope（COMPANY_WIDE/PROJECT_INCREMENTAL/SEGMENT/UNKNOWN）/unit/period/basis/evidence_refs，以及 Bear/Base/Bull 的 normalized_earnings_range（每个情景至少含 value/unit/period/basis/data_class/evidence_refs）。正常化盈利缺少依据时写 UNKNOWN，不要为了补齐字段创造数字；这组数字只是研究声明，不自动进入估值。"
-        "每个周期驱动可在 cycle_profile.b4_input_decisions 中按 bear/base/bull 显式选择 action=COMPARISON_ONLY、REJECT 或 ADOPT_AS_B4_NET_PROFIT_PROXY，并为 REJECT/ADOPT 写明 reason。默认/缺失 action 一律 COMPARISON_ONLY；只有三个情景全部选择同一个周期驱动的 ADOPT，且净利润指标、COMPANY_WIDE 范围、CNY 单位、B4 同期间、有效唯一 driver_id、B4 精确 ID 关联、完整归属依据及截止时点兼容证据都通过，本地才将该组正常化值用作 EPS 桥的候选净利润输入。不能满足时明确保留 COMPARISON_ONLY/REJECT 或显示 ADOPTION_BLOCKED；不得只覆盖一个情景。该选择不会覆盖 B4 原始经营树或 FCF，不创建正式 Forecast/Valuation Admission。"
+        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。若有周期驱动，必须使用唯一 driver_id，并在 cycle_profile 中填写 stage（TROUGH/EARLY_RECOVERY/MID_CYCLE/PEAK/DOWNTURN/STRUCTURAL_SHIFT/UNKNOWN）、confidence、stage_evidence、counter_evidence、reversal_signals、current_earnings（value/unit/period/basis/data_class/evidence_refs）、normalization_method/metric（建议使用 COMPANY_WIDE_NET_PROFIT_PROXY 或 UNLEVERED_FCF_PROXY 等明确标签，无法识别时为 UNKNOWN）/scope（COMPANY_WIDE/PROJECT_INCREMENTAL/SEGMENT/UNKNOWN）/unit/period/basis/evidence_refs，以及 Bear/Base/Bull 的 normalized_earnings_range（每个情景至少含 value/unit/period/basis/data_class/evidence_refs；只有希望候选进入 EPS 桥时才需要 normalization_calculation）。没有可复算计算单时，保留比较研究，不得采用为 EPS 输入。"
+        "每个周期驱动可在 cycle_profile.b4_input_decisions 中按 bear/base/bull 显式选择 action=COMPARISON_ONLY、REJECT 或 ADOPT_AS_B4_NET_PROFIT_PROXY，并为 REJECT/ADOPT 写明 reason。默认/缺失 action 一律 COMPARISON_ONLY；只有三个情景全部选择同一个周期驱动的 ADOPT，且净利润指标、COMPANY_WIDE 范围、CNY 单位、B4 同期间、有效唯一 driver_id、B4 精确 ID 关联、完整归属依据及截止时点兼容证据都通过，本地才将该组正常化值用作 EPS 桥的候选净利润输入。每个被采用的情景必须含 normalization_calculation：schema_version=IIOS-NORMALIZATION-CALCULATION-0.1、method=WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT、target_measure=COMPANY_WIDE_NET_PROFIT_PROXY、target_scope=COMPANY_WIDE、output_unit=CNY、output_period 与 B4 相同、weight_basis 解释加权依据，observations 至少 3 项；每项包含 period（FY20xx 或 20xxFY 完整财年且早于预测财年）、value、unit=CNY、data_class=OBSERVED_ACTUAL、weight、evidence_refs。所有权重必须大于 0 且不超过 1，总和精确等于 1；期间不得重复；每条来源必须是 cutoff 兼容且官方域名/类别匹配的交易所或监管一手来源。声明正常化值必须与本地 Decimal 复算结果完全一致，输出 data_class 必须为 ANALYST_ASSUMPTION。不能满足时明确保留 COMPARISON_ONLY/REJECT 或显示 ADOPTION_BLOCKED；不得只覆盖一个情景。该选择不会覆盖 B4 原始经营树或 FCF，不创建正式 Forecast/Valuation Admission。"
         "B4 operating_driver_forecast 的 Bear/Base/Bull scenario 若确实由某个周期判断驱动，写入 cycle_driver_ids，值必须与 value_drivers[].driver_id 完全一致；不能明确对应时输出空列表，不要按文字相似度猜关联。结构化 Thesis 失效条件/重新评估触发器及 risk.items 也可写 linked_driver_ids，用同一批 ID 让报告连接观察指标与周期假设。Bear/Base/Bull 需反映不同周期路径，未知值保持 UNKNOWN。"
         "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。"
         "Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
