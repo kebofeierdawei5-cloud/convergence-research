@@ -4502,8 +4502,8 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         rb = research_rounds.get("round_b") if isinstance(research_rounds.get("round_b"), Mapping) else {}
         lines.extend([
             "- Round A：PRICE_BLIND_COMPANY_RESEARCH；未提供当前价格、持仓、估值选择、MIE 或预期差字段。",
-            f"- Round A prompt SHA-256：{ra.get('prompt_sha256')}；原始响应 SHA-256：{ra.get('response_sha256')}；冻结 artifact SHA-256：{ra.get('frozen_artifact_sha256')}。",
-            f"- Round B：PRICE_AWARE_VALUATION_MIE_EXPECTATION_GAP；消费冻结 artifact SHA-256：{rb.get('consumes_frozen_artifact_sha256')}；原始响应 SHA-256：{rb.get('response_sha256')}。",
+            f"- Round A prompt SHA-256：{ra.get('prompt_sha256')}；原始响应 SHA-256：{ra.get('response_sha256')}；冻结 artifact SHA-256：{ra.get('frozen_artifact_sha256')}；响应导入：{ra.get('response_import_mode', 'UNKNOWN')}。",
+            f"- Round B：PRICE_AWARE_VALUATION_MIE_EXPECTATION_GAP；消费冻结 artifact SHA-256：{rb.get('consumes_frozen_artifact_sha256')}；原始响应 SHA-256：{rb.get('response_sha256')}；响应导入：{rb.get('response_import_mode', 'UNKNOWN')}。",
             "- 哈希绑定只证明本地两阶段谱系可复核，不证明事实正确，也不代表正式预测/估值准入。",
         ])
     else:
@@ -5530,6 +5530,49 @@ def _build_price_aware_round_b_prompt(*, base_prompt: str, payload: Mapping[str,
     return prompt, prompt_input, frozen_sha
 
 
+
+def _coerce_research_response_envelope(
+    response: Mapping[str, Any], *, phase: str
+) -> tuple[dict[str, Any], str]:
+    """Import a full IIOS JSON using only the active round's research allowlist.
+
+    The source response stays byte-for-byte intact. Operator-owned roots continue to
+    come from the trusted local template and are never copied from the model response.
+    """
+    if response.get("response_mode") == "IIOS-RESEARCH-PATCH-0.1":
+        return dict(response), "COMPACT_RESEARCH_PATCH_AS_RETURNED"
+    if response.get("schema_version") != PILOT_SCHEMA:
+        return dict(response), "UNRECOGNIZED_RESPONSE_SHAPE"
+    if phase == "ROUND_A":
+        allowed_roots = ("evidence_register", "assessment", "operating_driver_forecast")
+        allowed_assessment = set(ROUND_A_ASSESSMENT_FIELDS)
+    elif phase == "ROUND_B":
+        allowed_roots = ("evidence_register", "assessment", "forecast_valuation", "eps_multiple_valuation", "valuation_transmission", "sotp_valuation")
+        allowed_assessment = set(ROUND_B_ASSESSMENT_FIELDS)
+    else:
+        raise LocalInvestmentPilotError("RESEARCH_ROUND_PHASE_UNSUPPORTED")
+    research: dict[str, Any] = {}
+    for key in allowed_roots:
+        if key == "assessment":
+            raw_assessment = response.get("assessment")
+            if isinstance(raw_assessment, Mapping):
+                selected = {
+                    name: copy.deepcopy(raw_assessment[name])
+                    for name in allowed_assessment
+                    if name in raw_assessment
+                }
+                if selected:
+                    research["assessment"] = selected
+        elif key in response:
+            research[key] = copy.deepcopy(response[key])
+    if not research:
+        raise LocalInvestmentPilotError(f"{phase}_FULL_OBJECT_HAS_NO_ALLOWLISTED_RESEARCH_FIELDS")
+    return (
+        {"response_mode": "IIOS-RESEARCH-PATCH-0.1", "research": research},
+        f"FULL_PILOT_OBJECT_FILTERED_TO_{phase}_ALLOWLIST",
+    )
+
+
 def _validate_research_round_patch(response: Mapping[str, Any], *, phase: str, base_payload: Mapping[str, Any]) -> None:
     if not isinstance(response, Mapping) or set(response) != {"response_mode", "research"}:
         raise LocalInvestmentPilotError(f"{phase}_PATCH_ENVELOPE_INVALID")
@@ -5640,6 +5683,7 @@ def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]
             "response_byte_size": a.get("response_byte_size"), "frozen_artifact_sha256": actual_sha,
             "price_input_supplied": False, "operator_position_supplied": False,
             "market_expectation_and_valuation_fields_supplied": False,
+            **({"response_import_mode": a.get("response_import_mode")} if a.get("response_import_mode") else {}),
         },
         "round_b": {
             "phase": "PRICE_AWARE_VALUATION_MIE_EXPECTATION_GAP", "prompt_filename": b.get("prompt_filename"),
@@ -5647,6 +5691,7 @@ def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]
             "response_filename": b.get("response_filename"), "response_sha256": response_claim.get("sha256"),
             "response_byte_size": response_claim.get("byte_size"), "consumes_frozen_artifact_sha256": actual_sha,
             "price_input_supplied": True,
+            **({"response_import_mode": b.get("response_import_mode")} if b.get("response_import_mode") else {}),
         },
         "formal_forecast_admission": "NOT_ADMITTED", "formal_valuation_admission": "NOT_ADMITTED",
         "formal_decision_created": False, "execution_authorized": False, "auto_execution": False,
@@ -6471,6 +6516,7 @@ def run_guided_wizard(
         print("检测到 Round A 响应已保存，正在验证阶段边界……", flush=True)
         try:
             response_object = _read_json_response_file(response_path)
+            response_object, round_a_import_mode = _coerce_research_response_envelope(response_object, phase="ROUND_A")
             _validate_research_round_patch(response_object, phase="ROUND_A", base_payload=template_payload)
             payload, response_format, merged_top_level_fields = _expand_research_patch_with_template(template_path, response_object)
             if _response_file_signature(response_path) != response_signature:
@@ -6518,6 +6564,7 @@ def run_guided_wizard(
         "prompt_input_payload": round_a_prompt_input,
         "response_filename": round_a_response_path.name, "raw_response_text": round_a_raw_response,
         "response_sha256": round_a_response_fp["sha256"], "response_byte_size": round_a_response_fp["byte_size"],
+        "response_import_mode": round_a_import_mode,
         "frozen_company_side_artifact": frozen_artifact, "frozen_artifact_sha256": frozen_sha,
         "formal_forecast_admission": "NOT_ADMITTED", "formal_valuation_admission": "NOT_ADMITTED",
     }
@@ -6555,6 +6602,7 @@ def run_guided_wizard(
         print("检测到 Round B 响应已保存，正在验证阶段边界和研究内容……", flush=True)
         try:
             response_object = _read_json_response_file(response_path)
+            response_object, round_b_import_mode = _coerce_research_response_envelope(response_object, phase="ROUND_B")
             _validate_research_round_patch(response_object, phase="ROUND_B", base_payload=round_a_base_payload)
             payload, response_format, merged_top_level_fields = _expand_research_patch_with_template(round_a_completed_path, response_object)
             if _response_file_signature(response_path) != response_signature:
@@ -6577,7 +6625,8 @@ def run_guided_wizard(
                 "prompt_filename": round_b_prompt_path.name, "prompt_text": round_b_prompt,
                 "prompt_sha256": round_b_prompt_fp["sha256"], "prompt_byte_size": round_b_prompt_fp["byte_size"],
                 "prompt_input_payload": round_b_prompt_input, "frozen_artifact_sha256": round_b_frozen_sha,
-                "response_filename": round_b_response_path.name, "response_sha256": response_signature[2],
+                "response_filename": round_b_response_path.name, "response_import_mode": round_b_import_mode,
+                "response_sha256": response_signature[2],
                 "response_byte_size": response_signature[0],
             }
             payload["_local_research_response_provenance"] = {
