@@ -4,7 +4,7 @@
 
 This document consolidates the first and second red-team reviews against the original IIOS investment purpose: **at this price, is the company worth buying, what future change drives value, what is already implied by the market, and what facts would invalidate the thesis?** The target product remains a personal single-user local-first research workflow, free-first, no paid provider API requirement, no local LLM requirement for the personal pilot, no screening-universe expansion, and no automatic trading.
 
-Audited implementation baseline before this update: `main@d0cd990aaf866b9f93f34eb328487c975c689809`. B32 has since merged as `ac9eab4b7da4787b9df1f8315de0b26be66bf222`. This is a code/contract audit, not a claim that current-main macOS acceptance or investment performance is verified.
+Audited implementation baseline before B32 was `main@d0cd990aaf866b9f93f34eb328487c975c689809`. B32 is merged as `ac9eab4b7da4787b9df1f8315de0b26be66bf222`; B33 is now merged as `main@9162a6adadbeacda984d2253ce1f776b9c00cd60`. B33 exact tested head `d364bb3ede436cd8cd7151bc63ff8e480442ceda` passed 350 Local Investment Pilot + Replay/acceptance tests and 6/6 triggered workflows. This is code/CI evidence, not a claim that current-main macOS acceptance or investment performance is verified.
 
 ## Consolidated findings
 
@@ -47,10 +47,9 @@ The next code work is **not** a new valuation model family, new screener, provid
 | Batch | Work | Acceptance criteria | Boundary |
 |---|---|---|---|
 | B32 | Calculation vs. admission semantics; MIE/gap consistency | Exact-head tests prove unknown admission remains unknown; MIE non-PASS prevents expectation-gap PASS; gap direction cannot override gap status; 346 pilot/replay tests and 6/6 PR checks passed | Merged; no economic formula or MIE policy change |
-| B33 | True price-blind Round A and price-aware Round B guided workflow | Actual Round A prompt/template contains no price, operator valuation choice, MIE/gap, position or portfolio context; Round A forecast is frozen and input hash-bound; Round B gets protected price + frozen Round A; raw responses/round provenance survive in private inputs, reports, receipts and Replay | Next development batch |
-| B34 | Adversarial/replay/report verification of two-round lineage | Tamper, missing-round, altered-price, altered-Round-A, swapped-response and Replay mismatch tests fail closed; JSON/report/receipt agree; neither phase can modify operator-owned controls | Only proceed after B33 API/lineage is stable |
-| B35 | Real Mac current-main full-run + independent Replay audit | Review first-run/Replay inputs, two raw response records, output receipts/manifests, prompt phase boundary, valuation/EPS math, report/JSON parity and Replay comparison | Open until operator-environment evidence is independently reviewed |
-| B36 | Defect-only follow-up and state sync | Every change traces to a concrete B35 finding with regression test; no generic expansion | No broad new scope |
+| B33 | True price-blind Round A / price-aware Round B | 350 Local Pilot + Replay/acceptance tests and 6/6 workflows passed; Round-A allowlist excludes price/position/valuation/MIE/gap fields; frozen company artifact and two-round lineage are hash-bound; Round B cannot patch frozen Round-A fields; receipt/report/bundle verification and Replay comparison include phase summary | Merged PR #585; real Mac acceptance remains open |
+| B34 | Real Mac current-main two-round full-run + independent Replay | Review the actual two prompts, both raw response hashes, frozen Round-A artifact, private input, report, receipt/manifests and Replay comparison; verify valuation/EPS math and JSON/report parity | Next acceptance gate; OPEN / NOT VERIFIED |
+| B35 | Evidence-driven defect-only follow-up and state sync | Every change traces to a reproducible B34 finding with regression test; no generic expansion | After actual Mac bundle review only |
 
 ## Acceptance and frozen investment semantics
 
