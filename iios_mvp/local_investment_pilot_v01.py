@@ -1204,7 +1204,14 @@ def _evaluate_eps_earnings_bridge(
                     raise ValueError(f"{name.upper()}_NORMALIZED_NET_PROFIT_INPUT_UNKNOWN_OR_NONPOSITIVE")
                 earnings_input_source = "NORMALIZED_EARNINGS_CANDIDATE"
                 earnings_input_source_driver_id = str(selected_normalized_input.get("driver_id") or "")
-                earnings_input_source_refs = list(selected_normalized_input.get("evidence_refs") or [])
+                formula_validation = selected_normalized_input.get("normalization_calculation_validation")
+                formula_validation = formula_validation if isinstance(formula_validation, Mapping) else {}
+                formula_refs = formula_validation.get("evidence_refs")
+                formula_refs = formula_refs if isinstance(formula_refs, list) else []
+                earnings_input_source_refs = list(dict.fromkeys([
+                    *(selected_normalized_input.get("evidence_refs") or []),
+                    *(str(ref).strip() for ref in formula_refs if str(ref).strip()),
+                ]))
                 b4_calculated_net_profit_proxy = driver_row.get("net_profit_cny")
             else:
                 if selected_normalized_input.get("status") in {"ADOPTION_BLOCKED", "ADOPTION_CONFLICT", "INVALID_DECISION"}:
@@ -4863,10 +4870,16 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
                 continue
             formula_check = decision_row.get("normalization_calculation_validation")
             formula_check = formula_check if isinstance(formula_check, Mapping) else {}
+            formula_terms = formula_check.get("inputs") if isinstance(formula_check.get("inputs"), list) else []
+            formula_math = "；".join(
+                f"{show(term.get('period'))}: {show(term.get('value'))} × {show(term.get('weight'))} = {show(term.get('weighted_contribution'))} CNY [refs: {'、'.join(list_values(term.get('evidence_refs'))) or 'UNKNOWN'}]"
+                for term in formula_terms if isinstance(term, Mapping)
+            ) or "UNKNOWN"
             lines.append(
                 f"- 正常化候选处置：{show(decision_row.get('driver_id'))} / {show(decision_row.get('action'))} / {show(decision_row.get('status'))}；"
                 f"候选值 {show(decision_row.get('candidate_value', decision_row.get('normalized_value')))}；"
-                f"历史公式复算：{show(formula_check.get('status'))}，复算值 {show(formula_check.get('calculated_value'))}，权重合计 {show(formula_check.get('weights_sum'))}，输入期间 {'、'.join(list_values(formula_check.get('input_periods'))) or 'UNKNOWN'}；"
+                f"历史公式复算：{show(formula_check.get('status'))}，声明值−复算值 {show(formula_check.get('difference_declared_minus_calculated'))}，复算值 {show(formula_check.get('calculated_value'))}，权重合计 {show(formula_check.get('weights_sum'))}，加权依据 {show(formula_check.get('weight_basis'))}；"
+                f"逐项计算：{formula_math}；输入期间 {'、'.join(list_values(formula_check.get('input_periods'))) or 'UNKNOWN'}；"
                 f"实际进入计算 {show(decision_row.get('calculation_input_used'))}；"
                 f"理由 {show(decision_row.get('decision_reason'))}；"
                 f"证据 { '、'.join(list_values(decision_row.get('evidence_refs'))) or 'UNKNOWN' }；"
