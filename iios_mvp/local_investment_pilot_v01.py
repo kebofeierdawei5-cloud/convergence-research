@@ -2339,6 +2339,10 @@ def _prepare_cycle_normalized_profit_inputs(
         str(row.get("action") or "").upper() == "REJECT"
         for rows in decisions.values() for row in rows
     )
+    explicit_comparison_only = any(
+        str(row.get("action") or "").upper() == "COMPARISON_ONLY" and row.get("decision_explicit") is True
+        for rows in decisions.values() for row in rows
+    )
     blocked = any(row.get("status") in {"ADOPTION_BLOCKED", "ADOPTION_CONFLICT", "INVALID_DECISION"} for row in selected_inputs.values())
     applied = any(row.get("status") == "ADOPTED_FOR_EPS_BRIDGE" for row in selected_inputs.values())
     adopted_rows = [row for row in selected_inputs.values() if row.get("status") == "ADOPTED_FOR_EPS_BRIDGE"]
@@ -2395,6 +2399,7 @@ def _prepare_cycle_normalized_profit_inputs(
             else "ADOPTION_BLOCKED" if requested and blocked
             else "ADOPTED_FOR_EPS_BRIDGE" if applied
             else "REJECTED_OR_COMPARISON_ONLY" if rejected or requested
+            else "COMPARISON_ONLY" if explicit_comparison_only
             else "NO_ADOPTION_REQUESTED"
         ),
         "requested": requested,
@@ -4641,6 +4646,19 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
             f"- B5 状态 / 每股增量（稀释口径）：{show(b5_row.get('status', b5.get('status')))} / {show(b5_row.get('value_delta_per_share_diluted'))}",
             f"- 主估值情景终值：{show(val.get('terminal_value_per_share'))} {currency}；主模型价格计算可用：{show((analysis.get('valuation_model_consistency') or {}).get('primary_model_price_calculation_eligible'))}",
         ])
+        decision_sets = input_selection.get("decisions_by_scenario") if isinstance(input_selection.get("decisions_by_scenario"), Mapping) else {}
+        scenario_decisions = decision_sets.get(scenario) if isinstance(decision_sets.get(scenario), list) else []
+        for decision_row in scenario_decisions:
+            if not isinstance(decision_row, Mapping):
+                continue
+            lines.append(
+                f"- 正常化候选处置：{show(decision_row.get('driver_id'))} / {show(decision_row.get('action'))} / {show(decision_row.get('status'))}；"
+                f"候选值 {show(decision_row.get('candidate_value', decision_row.get('normalized_value')))}；"
+                f"实际进入计算 {show(decision_row.get('calculation_input_used'))}；"
+                f"理由 {show(decision_row.get('decision_reason'))}；"
+                f"证据 { '、'.join(list_values(decision_row.get('evidence_refs'))) or 'UNKNOWN' }；"
+                f"校验问题 { '；'.join(list_values(decision_row.get('issues'))) or '无' }"
+            )
         reconciliation = analysis.get("cycle_normalization_reconciliation")
         reconciliation = reconciliation if isinstance(reconciliation, Mapping) else {}
         reconciliation_drivers = reconciliation.get("drivers")
