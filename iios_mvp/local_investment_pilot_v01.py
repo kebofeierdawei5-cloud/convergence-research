@@ -2037,7 +2037,14 @@ def _normalize_cycle_profile(raw: Any) -> dict[str, Any]:
         point_refs = [str(item).strip() for item in point_refs_raw if str(item).strip()] if isinstance(point_refs_raw, list) else []
         complete = value is not None and all(x.upper() not in {"UNKNOWN", "N/A", "NONE", "NOT_IDENTIFIABLE"} for x in (point_unit, point_period, point_basis)) and data_class != "UNKNOWN"
         status = "REPORTED_NOT_FORMALLY_ADMITTED" if complete else ("PARTIAL" if value is not None or value_status.startswith("INVALID") else "UNKNOWN")
-        return {"status": status, "value": value, "value_status": value_status, "unit": point_unit, "period": point_period, "basis": point_basis, "data_class": data_class, "evidence_refs": point_refs}
+        calculation_raw = source.get("normalization_calculation", source.get("calculation"))
+        calculation = dict(calculation_raw) if isinstance(calculation_raw, Mapping) else None
+        return {
+            "status": status, "value": value, "value_status": value_status,
+            "unit": point_unit, "period": point_period, "basis": point_basis,
+            "data_class": data_class, "evidence_refs": point_refs,
+            "normalization_calculation": calculation,
+        }
     current = point(
         raw.get("current_earnings", raw.get("current_earnings_reference")),
         str(raw.get("current_earnings_unit") or "UNKNOWN"),
@@ -2097,6 +2104,180 @@ def _normalize_cycle_profile(raw: Any) -> dict[str, Any]:
         "b4_input_decisions": b4_input_decisions,
         "price_calculation_applied": False,
         "note": "正常化盈利是显式研究声明；本字段本身不会覆盖 B4/EPS/B5 输入。",
+    }
+
+
+def _validate_normalized_profit_calculation(
+    *,
+    raw_calculation: Any,
+    declared_value: Any,
+    declared_unit: Any,
+    declared_period: Any,
+    expected_period: Any,
+    evidence_register: list[dict[str, Any]],
+    unresolved_evidence_ids: list[str] | set[str] | None = None,
+    after_cutoff_evidence_ids: list[str] | set[str] | None = None,
+    uncertain_timing_evidence_ids: list[str] | set[str] | None = None,
+) -> dict[str, Any]:
+    """Recompute one normalized company-wide net-profit estimate from typed annual actuals."""
+    issues: list[str] = []
+    if not isinstance(raw_calculation, Mapping):
+        return {
+            "status": "CALCULATION_CONTRACT_MISSING",
+            "method": "UNKNOWN",
+            "calculated_value": None,
+            "input_periods": [],
+            "evidence_refs": [],
+            "weights_sum": None,
+            "issues": ["NORMALIZATION_CALCULATION_OBJECT_REQUIRED"],
+            "formal_evidence_pit_admission": False,
+        }
+    calc = raw_calculation
+    schema = str(calc.get("schema_version") or "").strip()
+    method = str(calc.get("method") or calc.get("formula_type") or "").strip().upper()
+    target_measure = str(calc.get("target_measure") or "").strip().upper()
+    target_scope = _cycle_normalization_scope(calc.get("target_scope", calc.get("scope")))
+    target_unit = _cycle_normalization_unit(calc.get("output_unit", calc.get("unit")))
+    target_period = _cycle_normalization_period(calc.get("output_period", calc.get("forecast_period")))
+    forecast_period = _cycle_normalization_period(expected_period)
+    declared_unit_norm = _cycle_normalization_unit(declared_unit)
+    declared_period_norm = _cycle_normalization_period(declared_period)
+    basis = str(calc.get("weight_basis") or calc.get("basis") or "").strip()
+    if schema != "IIOS-NORMALIZATION-CALCULATION-0.1":
+        issues.append("NORMALIZATION_CALCULATION_SCHEMA_MISMATCH")
+    if method != "WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT":
+        issues.append("NORMALIZATION_FORMULA_TYPE_UNSUPPORTED")
+    if target_measure != "COMPANY_WIDE_NET_PROFIT_PROXY":
+        issues.append("NORMALIZATION_CALCULATION_TARGET_MEASURE_MISMATCH")
+    if target_scope != "COMPANY_WIDE":
+        issues.append("NORMALIZATION_CALCULATION_SCOPE_MUST_BE_COMPANY_WIDE")
+    if target_unit != "CNY" or declared_unit_norm != "CNY":
+        issues.append("NORMALIZATION_CALCULATION_REQUIRES_CNY_UNIT")
+    if (
+        target_period == "UNKNOWN"
+        or target_period != forecast_period
+        or declared_period_norm != forecast_period
+    ):
+        issues.append("NORMALIZATION_CALCULATION_PERIOD_MISMATCH")
+    if not _is_identifiable_evidence_text(basis):
+        issues.append("NORMALIZATION_WEIGHT_BASIS_NOT_IDENTIFIABLE")
+
+    observations = calc.get("observations")
+    if not isinstance(observations, list) or len(observations) < 3:
+        issues.append("NORMALIZATION_REQUIRES_AT_LEAST_THREE_TYPED_FULL_YEAR_OBSERVATIONS")
+        observations = observations if isinstance(observations, list) else []
+    sources = {
+        str(row.get("source_id")): row for row in evidence_register
+        if isinstance(row, Mapping) and str(row.get("source_id") or "").strip()
+    }
+    unresolved = set(unresolved_evidence_ids or [])
+    after_cutoff = set(after_cutoff_evidence_ids or [])
+    uncertain = set(uncertain_timing_evidence_ids or [])
+    weights: list[Decimal] = []
+    input_terms: list[dict[str, Any]] = []
+    input_periods: list[str] = []
+    all_refs: list[str] = []
+    years: list[int] = []
+    calculated = Decimal("0")
+    for index, raw_observation in enumerate(observations, start=1):
+        if not isinstance(raw_observation, Mapping):
+            issues.append(f"NORMALIZATION_OBSERVATION_{index}_OBJECT_REQUIRED")
+            continue
+        period = _cycle_normalization_period(raw_observation.get("period"))
+        period_match = re.fullmatch(r"FY(20\d{2})|(20\d{2})FY", period)
+        if not period_match:
+            issues.append(f"NORMALIZATION_OBSERVATION_{index}_MUST_BE_FULL_FISCAL_YEAR")
+            year = None
+        else:
+            year = int(period_match.group(1) or period_match.group(2))
+            years.append(year)
+        if period in input_periods:
+            issues.append(f"NORMALIZATION_OBSERVATION_PERIOD_DUPLICATED:{period}")
+        input_periods.append(period)
+        if period_match and forecast_period != "UNKNOWN":
+            target_match = re.fullmatch(r"FY(20\d{2})|(20\d{2})FY", forecast_period)
+            if not target_match or year is None:
+                issues.append("NORMALIZATION_TARGET_PERIOD_MUST_IDENTIFY_FISCAL_YEAR")
+            elif year >= int(target_match.group(1) or target_match.group(2)):
+                issues.append(f"NORMALIZATION_OBSERVATION_NOT_HISTORICAL:{period}")
+
+        if _cycle_normalization_unit(raw_observation.get("unit")) != "CNY":
+            issues.append(f"NORMALIZATION_OBSERVATION_{index}_UNIT_MUST_BE_CNY")
+        data_class = str(raw_observation.get("data_class") or "").strip().upper()
+        if data_class != "OBSERVED_ACTUAL":
+            issues.append(f"NORMALIZATION_OBSERVATION_{index}_MUST_BE_OBSERVED_ACTUAL")
+        try:
+            value = Decimal(str(raw_observation.get("value")))
+            weight = Decimal(str(raw_observation.get("weight")))
+            if not value.is_finite() or not weight.is_finite():
+                raise InvalidOperation
+            if weight <= 0 or weight > 1:
+                issues.append(f"NORMALIZATION_OBSERVATION_{index}_WEIGHT_OUT_OF_RANGE")
+        except (InvalidOperation, TypeError, ValueError):
+            issues.append(f"NORMALIZATION_OBSERVATION_{index}_VALUE_OR_WEIGHT_INVALID")
+            continue
+        weights.append(weight)
+        calculated += value * weight
+
+        refs_raw = raw_observation.get("evidence_refs")
+        refs = list(dict.fromkeys(str(ref).strip() for ref in refs_raw if str(ref).strip())) if isinstance(refs_raw, list) else []
+        if not refs:
+            issues.append(f"NORMALIZATION_OBSERVATION_{index}_EVIDENCE_REQUIRED")
+        for ref in refs:
+            all_refs.append(ref)
+            source = sources.get(ref)
+            if (
+                source is None or ref in unresolved or ref in after_cutoff or ref in uncertain
+                or source.get("time_status") != "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+            ):
+                issues.append(f"NORMALIZATION_OBSERVATION_EVIDENCE_NOT_CUTOFF_COMPATIBLE:{ref}")
+            elif str(source.get("source_class") or "").strip().upper() not in {"ISSUER_PRIMARY", "EXCHANGE_PRIMARY", "REGULATOR_PRIMARY"}:
+                issues.append(f"NORMALIZATION_OBSERVATION_SOURCE_NOT_PRIMARY:{ref}")
+        input_terms.append({
+            "period": period, "value": format(value, "f"), "unit": "CNY",
+            "weight": format(weight, "f"), "data_class": data_class,
+            "evidence_refs": refs,
+            "weighted_contribution": format(value * weight, "f"),
+        })
+
+    if len(set(years)) != len(years):
+        issues.append("NORMALIZATION_OBSERVATION_FISCAL_YEAR_DUPLICATED")
+    if weights and sum(weights, Decimal("0")) != Decimal("1"):
+        issues.append("NORMALIZATION_WEIGHTS_MUST_SUM_EXACTLY_TO_ONE")
+    try:
+        declared = Decimal(str(declared_value))
+        if not declared.is_finite():
+            raise InvalidOperation
+        if declared != calculated:
+            issues.append("NORMALIZATION_DECLARED_VALUE_DIFFERS_FROM_RECOMPUTED_FORMULA")
+    except (InvalidOperation, TypeError, ValueError):
+        declared = None
+        issues.append("NORMALIZATION_DECLARED_VALUE_INVALID")
+
+    unique_issues = list(dict.fromkeys(issues))
+    return {
+        "schema_version": "IIOS-NORMALIZATION-CALCULATION-0.1",
+        "status": "FORMULA_RECOMPUTED_NOT_ADMITTED" if not unique_issues else "CALCULATION_BLOCKED",
+        "method": method or "UNKNOWN",
+        "target_measure": target_measure or "UNKNOWN",
+        "target_scope": target_scope,
+        "output_unit": target_unit,
+        "output_period": target_period,
+        "declared_value": format(declared, "f") if declared is not None else None,
+        "calculated_value": format(calculated, "f") if len(input_terms) == len(observations) and observations else None,
+        "difference_declared_minus_calculated": (
+            format(declared - calculated, "f")
+            if declared is not None and len(input_terms) == len(observations) and observations else None
+        ),
+        "input_periods": input_periods,
+        "inputs": input_terms,
+        "evidence_refs": list(dict.fromkeys(all_refs)),
+        "weights_sum": format(sum(weights, Decimal("0")), "f") if weights else None,
+        "weight_basis": basis or "UNKNOWN",
+        "issues": unique_issues,
+        "formal_evidence_pit_admission": False,
+        "formal_forecast_admission": False,
+        "decision_authority": False,
     }
 
 
@@ -2257,8 +2438,21 @@ def _prepare_cycle_normalized_profit_inputs(
             data_class = str(range_row.get("data_class") or "").strip().upper()
             if data_class not in {"ISSUER_FORECAST", "ANALYST_ASSUMPTION"}:
                 issues.append("NORMALIZED_INPUT_DATA_CLASS_MUST_BE_FORECAST_OR_ANALYST_ASSUMPTION")
+            calculation_validation = _validate_normalized_profit_calculation(
+                raw_calculation=range_row.get("normalization_calculation"),
+                declared_value=range_row.get("value"),
+                declared_unit=range_row.get("unit"),
+                declared_period=range_row.get("period"),
+                expected_period=b4_period,
+                evidence_register=evidence_register,
+                unresolved_evidence_ids=unresolved,
+                after_cutoff_evidence_ids=after_cutoff,
+                uncertain_timing_evidence_ids=uncertain,
+            )
+            if calculation_validation.get("status") != "FORMULA_RECOMPUTED_NOT_ADMITTED":
+                issues.extend(calculation_validation.get("issues") or ["NORMALIZATION_CALCULATION_NOT_VALID"])
             try:
-                normalized_value = _positive(range_row.get("value"), f"{scenario.upper()}_NORMALIZED_NET_PROFIT")
+                normalized_value = _positive(calculation_validation.get("calculated_value"), f"{scenario.upper()}_NORMALIZED_NET_PROFIT")
             except LocalInvestmentPilotError:
                 normalized_value = None
                 issues.append("NORMALIZED_NET_PROFIT_MUST_BE_KNOWN_AND_POSITIVE")
@@ -2284,6 +2478,7 @@ def _prepare_cycle_normalized_profit_inputs(
             normalized = dict(base_record)
             normalized.update({
                 "candidate_value": format(normalized_value, "f") if normalized_value is not None else None,
+                "normalization_calculation_validation": calculation_validation,
                 "evidence_refs": refs,
                 "status": "ADOPTION_CANDIDATE_VALIDATED" if not issues else "ADOPTION_BLOCKED",
                 "issues": list(dict.fromkeys(issues)),
