@@ -1979,7 +1979,7 @@ def _normalize_cycle_profile(raw: Any) -> dict[str, Any]:
     normalized_range = {}
     for name in ("bear", "base", "bull"):
         row = raw_range.get(name, raw_range.get(name.title(), raw_range.get(name.upper())))
-        normalized_range[name] = point(row, unit, period, basis, "UNKNOWN")
+        normalized_range[name] = point(row, unit, period, basis, str(raw.get("normalization_data_class") or "UNKNOWN"))
     rows = [normalized_range[name] for name in ("bear", "base", "bull")]
     all_reported = all(row.get("status") == "REPORTED_NOT_FORMALLY_ADMITTED" for row in rows)
     compatible = len({row.get("unit") for row in rows}) == 1 and len({row.get("period") for row in rows}) == 1
@@ -5489,7 +5489,7 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
         "不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
         "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。"
         "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。对周期敏感的业务，要明确周期阶段、拐点证据、反证及领先/滞后指标，并区分真实复苏与补库存、提前拉货或一次性因素；说明全周期正常化盈利与当前盈利的区别。周期状态无法识别时写 UNKNOWN，不强行判断。Thesis 失效条件和重新评估触发器应尽量写成可观察的“指标→阈值/方向→检查频率/时点→触发后重新评估什么”；不要用空泛的“持续关注”，也不要编造阈值/日期。"
-        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。若有周期驱动，必须使用唯一 driver_id，并在 cycle_profile 中填写 stage（TROUGH/EARLY_RECOVERY/MID_CYCLE/PEAK/DOWNTURN/STRUCTURAL_SHIFT/UNKNOWN）、confidence、stage_evidence、counter_evidence、reversal_signals、current_earnings（value/unit/period/basis/data_class/evidence_refs）、normalization_method/metric/unit/period/basis/evidence_refs，以及 Bear/Base/Bull 的 normalized_earnings_range。正常化盈利缺少依据时写 UNKNOWN，不要为了补齐字段创造数字；这组数字只是研究声明，不自动进入估值。"
+        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。若有周期驱动，必须使用唯一 driver_id，并在 cycle_profile 中填写 stage（TROUGH/EARLY_RECOVERY/MID_CYCLE/PEAK/DOWNTURN/STRUCTURAL_SHIFT/UNKNOWN）、confidence、stage_evidence、counter_evidence、reversal_signals、current_earnings（value/unit/period/basis/data_class/evidence_refs）、normalization_method/metric/unit/period/basis/evidence_refs，以及 Bear/Base/Bull 的 normalized_earnings_range（每个情景至少含 value/unit/period/basis/data_class/evidence_refs）。正常化盈利缺少依据时写 UNKNOWN，不要为了补齐字段创造数字；这组数字只是研究声明，不自动进入估值。"
         "B4 operating_driver_forecast 的 Bear/Base/Bull scenario 若确实由某个周期判断驱动，写入 cycle_driver_ids，值必须与 value_drivers[].driver_id 完全一致；不能明确对应时输出空列表，不要按文字相似度猜关联。结构化 Thesis 失效条件/重新评估触发器及 risk.items 也可写 linked_driver_ids，用同一批 ID 让报告连接观察指标与周期假设。Bear/Base/Bull 需反映不同周期路径，未知值保持 UNKNOWN。"
         "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。"
         "Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
