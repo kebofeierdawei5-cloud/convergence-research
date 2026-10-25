@@ -2113,6 +2113,7 @@ def _validate_normalized_profit_calculation(
     declared_value: Any,
     declared_unit: Any,
     declared_period: Any,
+    declared_data_class: Any,
     expected_period: Any,
     evidence_register: list[dict[str, Any]],
     unresolved_evidence_ids: list[str] | set[str] | None = None,
@@ -2161,6 +2162,8 @@ def _validate_normalized_profit_calculation(
         issues.append("NORMALIZATION_CALCULATION_PERIOD_MISMATCH")
     if not _is_identifiable_evidence_text(basis):
         issues.append("NORMALIZATION_WEIGHT_BASIS_NOT_IDENTIFIABLE")
+    if str(declared_data_class or "").strip().upper() != "ANALYST_ASSUMPTION":
+        issues.append("WEIGHTED_HISTORICAL_NORMALIZATION_MUST_BE_ANALYST_ASSUMPTION")
 
     observations = calc.get("observations")
     if not isinstance(observations, list) or len(observations) < 3:
@@ -2443,6 +2446,7 @@ def _prepare_cycle_normalized_profit_inputs(
                 declared_value=range_row.get("value"),
                 declared_unit=range_row.get("unit"),
                 declared_period=range_row.get("period"),
+                declared_data_class=range_row.get("data_class"),
                 expected_period=b4_period,
                 evidence_register=evidence_register,
                 unresolved_evidence_ids=unresolved,
