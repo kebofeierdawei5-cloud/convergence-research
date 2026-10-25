@@ -1909,6 +1909,7 @@ def _normalize_cycle_profile(raw: Any) -> dict[str, Any]:
             "normalization_scope": "UNKNOWN", "normalization_unit": "UNKNOWN", "normalization_period": "UNKNOWN",
             "normalization_basis": "UNKNOWN", "normalization_evidence_refs": [],
             "normalized_earnings_range": {name: {"status": "UNKNOWN", "value": None, "unit": "UNKNOWN", "period": "UNKNOWN", "basis": "UNKNOWN", "data_class": "UNKNOWN", "evidence_refs": []} for name in ("bear", "base", "bull")},
+            "b4_input_decisions": {name: {"action": "COMPARISON_ONLY", "reason": "No explicit adoption/rejection decision was provided.", "decision_explicit": False} for name in ("bear", "base", "bull")},
             "price_calculation_applied": False,
         }
     def text_value(*keys: str, default: str = "") -> str:
@@ -1993,6 +1994,22 @@ def _normalize_cycle_profile(raw: Any) -> dict[str, Any]:
     for name in ("bear", "base", "bull"):
         row = raw_range.get(name, raw_range.get(name.title(), raw_range.get(name.upper())))
         normalized_range[name] = point(row, unit, period, basis, str(raw.get("normalization_data_class") or "UNKNOWN"))
+    raw_decisions = raw.get("b4_input_decisions")
+    raw_decisions = raw_decisions if isinstance(raw_decisions, Mapping) else {}
+    allowed_decisions = {"COMPARISON_ONLY", "REJECT", "ADOPT_AS_B4_NET_PROFIT_PROXY"}
+    b4_input_decisions: dict[str, dict[str, Any]] = {}
+    for scenario_name in ("bear", "base", "bull"):
+        raw_decision = raw_decisions.get(scenario_name)
+        raw_decision = raw_decision if isinstance(raw_decision, Mapping) else {}
+        action_raw = str(raw_decision.get("action") or "").strip().upper()
+        action = action_raw if action_raw in allowed_decisions else ("COMPARISON_ONLY" if not action_raw else "INVALID_ACTION")
+        reason = str(raw_decision.get("reason") or "").strip()
+        b4_input_decisions[scenario_name] = {
+            "action": action,
+            "reason": reason or ("No explicit decision reason supplied." if action == "COMPARISON_ONLY" and not action_raw else "UNKNOWN"),
+            "decision_explicit": bool(action_raw),
+            "action_input": action_raw or "NOT_PROVIDED",
+        }
     rows = [normalized_range[name] for name in ("bear", "base", "bull")]
     all_reported = all(row.get("status") == "REPORTED_NOT_FORMALLY_ADMITTED" for row in rows)
     compatible = len({row.get("unit") for row in rows}) == 1 and len({row.get("period") for row in rows}) == 1
@@ -2019,8 +2036,262 @@ def _normalize_cycle_profile(raw: Any) -> dict[str, Any]:
         "normalization_method": method, "normalization_metric": metric, "normalization_scope": normalization_scope,
         "normalization_unit": unit, "normalization_period": period, "normalization_basis": basis,
         "normalization_evidence_refs": refs,
-        "normalized_earnings_range": normalized_range, "price_calculation_applied": False,
+        "normalized_earnings_range": normalized_range,
+        "b4_input_decisions": b4_input_decisions,
+        "price_calculation_applied": False,
         "note": "正常化盈利是显式研究声明；本字段本身不会覆盖 B4/EPS/B5 输入。",
+    }
+
+
+def _prepare_cycle_normalized_profit_inputs(
+    *,
+    assessment: Mapping[str, Any],
+    operating_driver_forecast: Mapping[str, Any],
+    evidence_register: list[dict[str, Any]],
+    unresolved_evidence_ids: list[str] | set[str] | None = None,
+    after_cutoff_evidence_ids: list[str] | set[str] | None = None,
+    uncertain_timing_evidence_ids: list[str] | set[str] | None = None,
+    expected_currency: Any = "CNY",
+) -> dict[str, Any]:
+    """Validate explicit normalized-profit input choices before the EPS bridge.
+
+    This does not mutate or replace B4's calculated product/operating outputs. An
+    explicitly selected normalized earnings point can be used as the alternate
+    company-wide net-profit input to the existing EPS earnings bridge only when
+    its source, scope, period, units, scenario ID link and calculation metadata
+    satisfy this contract. No explicit choice means comparison-only.
+    """
+    value_drivers = assessment.get("value_drivers")
+    value_drivers = value_drivers if isinstance(value_drivers, list) else []
+    cycle_drivers = [
+        row for row in value_drivers
+        if isinstance(row, Mapping) and str(row.get("driver_type") or "").strip().upper() == "INDUSTRY_CYCLE"
+    ]
+    id_counts: dict[str, int] = {}
+    for row in cycle_drivers:
+        driver_id = str(row.get("driver_id") or "").strip()
+        if driver_id:
+            id_counts[driver_id] = id_counts.get(driver_id, 0) + 1
+
+    b4_scenarios = operating_driver_forecast.get("scenarios")
+    b4_scenarios = b4_scenarios if isinstance(b4_scenarios, Mapping) else {}
+    b4_scope = _cycle_normalization_scope(operating_driver_forecast.get("scope"))
+    b4_period = _cycle_normalization_period(operating_driver_forecast.get("forecast_period"))
+    currency = str(expected_currency or "UNKNOWN").strip().upper()
+    sources = {
+        str(row.get("source_id")): row for row in evidence_register
+        if isinstance(row, Mapping) and str(row.get("source_id") or "").strip()
+    }
+    unresolved = set(unresolved_evidence_ids or [])
+    after_cutoff = set(after_cutoff_evidence_ids or [])
+    uncertain = set(uncertain_timing_evidence_ids or [])
+    candidate_by_scenario: dict[str, list[dict[str, Any]]] = {name: [] for name in SCENARIOS}
+    decisions: dict[str, list[dict[str, Any]]] = {name: [] for name in SCENARIOS}
+
+    for cycle in cycle_drivers:
+        driver_id = str(cycle.get("driver_id") or "").strip()
+        profile = cycle.get("cycle_profile") if isinstance(cycle.get("cycle_profile"), Mapping) else {}
+        ranges = profile.get("normalized_earnings_range")
+        ranges = ranges if isinstance(ranges, Mapping) else {}
+        raw_decisions = profile.get("b4_input_decisions")
+        raw_decisions = raw_decisions if isinstance(raw_decisions, Mapping) else {}
+        metric_text = str(profile.get("normalization_metric") or "UNKNOWN")
+        metric_family = _cycle_normalization_metric_family(metric_text)
+        norm_scope = _cycle_normalization_scope(profile.get("normalization_scope"))
+        norm_unit = _cycle_normalization_unit(profile.get("normalization_unit"))
+        norm_period = _cycle_normalization_period(profile.get("normalization_period"))
+        norm_method = str(profile.get("normalization_method") or "").strip()
+        norm_basis = str(profile.get("normalization_basis") or "").strip()
+        driver_status = str(cycle.get("status") or "UNKNOWN").upper()
+        profile_status = str(profile.get("status") or "UNKNOWN").upper()
+        synthetic_id = not driver_id or driver_id.startswith("CYCLE_DRIVER_")
+        duplicate_id = bool(driver_id and id_counts.get(driver_id, 0) > 1)
+
+        for scenario in SCENARIOS:
+            decision_raw = raw_decisions.get(scenario)
+            decision_raw = decision_raw if isinstance(decision_raw, Mapping) else {}
+            action = str(decision_raw.get("action") or "COMPARISON_ONLY").strip().upper()
+            reason = str(decision_raw.get("reason") or "").strip()
+            range_row = ranges.get(scenario)
+            range_row = range_row if isinstance(range_row, Mapping) else {}
+            b4 = b4_scenarios.get(scenario)
+            b4 = b4 if isinstance(b4, Mapping) else {}
+            b4_ids = b4.get("cycle_driver_ids")
+            b4_ids = [str(value).strip() for value in b4_ids if str(value).strip()] if isinstance(b4_ids, list) else []
+            base_record: dict[str, Any] = {
+                "scenario": scenario,
+                "action": action if action else "COMPARISON_ONLY",
+                "decision_explicit": decision_raw.get("decision_explicit") is True,
+                "decision_reason": reason or "UNKNOWN",
+                "driver_id": driver_id or None,
+                "normalization_metric": metric_text,
+                "metric_family": metric_family,
+                "normalization_scope": norm_scope,
+                "normalization_method": norm_method or "UNKNOWN",
+                "normalization_basis": norm_basis or "UNKNOWN",
+                "normalized_value": str(range_row.get("value")) if range_row.get("value") not in (None, "") else None,
+                "unit": str(range_row.get("unit") or "UNKNOWN"),
+                "period": str(range_row.get("period") or "UNKNOWN"),
+                "data_class": str(range_row.get("data_class") or "UNKNOWN"),
+                "evidence_refs": list(range_row.get("evidence_refs") or []) if isinstance(range_row.get("evidence_refs"), list) else [],
+                "b4_value_before_normalization_choice": str(b4.get("net_profit_cny")) if b4.get("net_profit_cny") not in (None, "") else None,
+                "b4_calculation_status": str(b4.get("calculation_status") or "UNKNOWN"),
+                "b4_financial_outputs_decision_usable": b4.get("financial_outputs_decision_usable") is True,
+                "b4_cycle_link_status": str(b4.get("cycle_link_status") or "NOT_PROVIDED"),
+                "b4_cycle_driver_ids": b4_ids,
+                "calculation_input_used": False,
+                "formal_evidence_pit_admission": False,
+                "formal_forecast_admission": False,
+                "decision_authority": False,
+                "issues": [],
+            }
+
+            if action == "COMPARISON_ONLY":
+                base_record.update({"status": "COMPARISON_ONLY", "issues": []})
+                decisions[scenario].append(base_record)
+                continue
+            if action == "REJECT":
+                base_record.update({
+                    "status": "REJECTED",
+                    "issues": [] if _is_identifiable_evidence_text(reason) else ["REJECTION_REASON_NOT_IDENTIFIABLE"],
+                })
+                decisions[scenario].append(base_record)
+                continue
+            if action != "ADOPT_AS_B4_NET_PROFIT_PROXY":
+                base_record.update({"status": "INVALID_DECISION", "issues": ["NORMALIZED_INPUT_ACTION_INVALID"]})
+                decisions[scenario].append(base_record)
+                if action in {"INVALID_ACTION", ""}:
+                    candidate_by_scenario[scenario].append(base_record)
+                continue
+
+            issues: list[str] = []
+            if not _is_identifiable_evidence_text(reason):
+                issues.append("ADOPTION_REASON_NOT_IDENTIFIABLE")
+            if duplicate_id:
+                issues.append("DUPLICATE_CYCLE_DRIVER_ID")
+            if synthetic_id:
+                issues.append("CYCLE_DRIVER_ID_NOT_OPERATOR_IDENTIFIABLE")
+            if driver_status != "PASS":
+                issues.append("CYCLE_DRIVER_EVIDENCE_GATE_NOT_PASS")
+            if profile_status != "NORMALIZED_RANGE_REPORTED_NOT_RECONCILED":
+                issues.append("NORMALIZED_RANGE_PROFILE_NOT_COMPLETE")
+            if metric_family != "B4_NET_PROFIT_PROXY":
+                issues.append("NORMALIZATION_METRIC_MUST_BE_COMPANY_WIDE_NET_PROFIT_PROXY")
+            if norm_scope != "COMPANY_WIDE" or b4_scope != "COMPANY_WIDE":
+                issues.append("NORMALIZATION_AND_B4_MUST_BOTH_BE_COMPANY_WIDE")
+            if currency != "CNY" or norm_unit != "CNY" or _cycle_normalization_unit(range_row.get("unit")) != "CNY":
+                issues.append("NORMALIZATION_INPUT_REQUIRES_EXPLICIT_CNY_UNIT_WITHOUT_CONVERSION")
+            if (
+                norm_period == "UNKNOWN"
+                or _cycle_normalization_period(range_row.get("period")) != norm_period
+                or norm_period != b4_period
+            ):
+                issues.append("NORMALIZATION_PERIOD_MUST_MATCH_B4_FORECAST_PERIOD")
+            if not _is_identifiable_evidence_text(norm_method):
+                issues.append("NORMALIZATION_METHOD_NOT_IDENTIFIABLE")
+            if not _is_identifiable_evidence_text(norm_basis):
+                issues.append("NORMALIZATION_BASIS_NOT_IDENTIFIABLE")
+            if range_row.get("status") != "REPORTED_NOT_FORMALLY_ADMITTED":
+                issues.append("NORMALIZED_RANGE_POINT_NOT_COMPLETE")
+            data_class = str(range_row.get("data_class") or "").strip().upper()
+            if data_class not in {"ISSUER_FORECAST", "ANALYST_ASSUMPTION"}:
+                issues.append("NORMALIZED_INPUT_DATA_CLASS_MUST_BE_FORECAST_OR_ANALYST_ASSUMPTION")
+            try:
+                normalized_value = _positive(range_row.get("value"), f"{scenario.upper()}_NORMALIZED_NET_PROFIT")
+            except LocalInvestmentPilotError:
+                normalized_value = None
+                issues.append("NORMALIZED_NET_PROFIT_MUST_BE_KNOWN_AND_POSITIVE")
+            refs_raw = range_row.get("evidence_refs")
+            refs = list(dict.fromkeys(str(value).strip() for value in refs_raw if str(value).strip())) if isinstance(refs_raw, list) else []
+            if not refs:
+                issues.append("NORMALIZED_INPUT_EVIDENCE_REQUIRED")
+            for ref in refs:
+                source = sources.get(ref)
+                if (
+                    source is None or ref in unresolved or ref in after_cutoff or ref in uncertain
+                    or source.get("time_status") != "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+                ):
+                    issues.append(f"NORMALIZED_INPUT_EVIDENCE_NOT_CUTOFF_COMPATIBLE:{ref}")
+                elif data_class == "ISSUER_FORECAST" and not _eps_source_domain_class_matches(source):
+                    issues.append(f"NORMALIZED_ISSUER_FORECAST_SOURCE_CLASS_OR_DOMAIN_NOT_VERIFIED:{ref}")
+            link_status = str(b4.get("cycle_link_status") or "").strip().upper()
+            if link_status == "INVALID":
+                issues.append("B4_CYCLE_LINK_INPUT_INVALID")
+            elif driver_id not in b4_ids or link_status != "IDS_RECORDED_NOT_VALIDATED":
+                issues.append("B4_SCENARIO_MUST_EXPLICITLY_LINK_SELECTED_CYCLE_DRIVER_ID")
+
+            normalized = dict(base_record)
+            normalized.update({
+                "candidate_value": format(normalized_value, "f") if normalized_value is not None else None,
+                "evidence_refs": refs,
+                "status": "ADOPTION_CANDIDATE_VALIDATED" if not issues else "ADOPTION_BLOCKED",
+                "issues": list(dict.fromkeys(issues)),
+            })
+            candidate_by_scenario[scenario].append(normalized)
+            decisions[scenario].append(normalized)
+
+    selected_inputs: dict[str, dict[str, Any]] = {}
+    for scenario in SCENARIOS:
+        candidates = candidate_by_scenario[scenario]
+        explicit_invalid_decisions = [row for row in decisions[scenario] if row.get("status") == "INVALID_DECISION"]
+        if len(candidates) > 1:
+            for row in candidates:
+                row["status"] = "ADOPTION_CONFLICT"
+                row["calculation_input_used"] = False
+                row["issues"] = list(dict.fromkeys([*(row.get("issues") or []), "MULTIPLE_NORMALIZED_INPUT_DECISIONS_FOR_SCENARIO"]))
+            selected_inputs[scenario] = {
+                "status": "ADOPTION_CONFLICT", "calculation_input_used": False,
+                "issues": ["MULTIPLE_NORMALIZED_INPUT_DECISIONS_FOR_SCENARIO"],
+            }
+            continue
+        if explicit_invalid_decisions:
+            selected_inputs[scenario] = {
+                "status": "INVALID_DECISION", "calculation_input_used": False,
+                "issues": ["NORMALIZED_INPUT_ACTION_INVALID"],
+            }
+            continue
+        if not candidates:
+            selected_inputs[scenario] = {
+                "status": "NO_ADOPTION_REQUESTED", "calculation_input_used": False, "issues": [],
+            }
+            continue
+        candidate = candidates[0]
+        if candidate.get("status") != "ADOPTION_CANDIDATE_VALIDATED":
+            selected_inputs[scenario] = {
+                "status": "ADOPTION_BLOCKED",
+                "driver_id": candidate.get("driver_id"),
+                "calculation_input_used": False,
+                "issues": list(candidate.get("issues") or []),
+            }
+            continue
+        candidate["status"] = "ADOPTED_FOR_EPS_BRIDGE"
+        candidate["calculation_input_used"] = True
+        selected_inputs[scenario] = dict(candidate)
+
+    requested = any(
+        str(row.get("action") or "").upper() == "ADOPT_AS_B4_NET_PROFIT_PROXY"
+        for rows in decisions.values() for row in rows
+    )
+    blocked = any(row.get("status") in {"ADOPTION_BLOCKED", "ADOPTION_CONFLICT", "INVALID_DECISION"} for row in selected_inputs.values())
+    applied = any(row.get("status") == "ADOPTED_FOR_EPS_BRIDGE" for row in selected_inputs.values())
+    return {
+        "schema_version": "IIOS-NORMALIZED-EARNINGS-B4-INPUT-SELECTION-0.1",
+        "status": (
+            "ADOPTION_BLOCKED" if requested and blocked
+            else "ADOPTED_FOR_EPS_BRIDGE" if applied
+            else "REJECTED_OR_COMPARISON_ONLY" if requested
+            else "NO_ADOPTION_REQUESTED"
+        ),
+        "requested": requested,
+        "applied_to_eps_bridge": applied,
+        "scenarios": selected_inputs,
+        "decisions_by_scenario": {
+            name: rows for name, rows in decisions.items()
+        },
+        "formal_evidence_pit_admission": False,
+        "formal_forecast_admission": False,
+        "decision_authority": False,
+        "note": "此处仅明确选择 EPS 桥采用的公司整体净利润候选来源，不覆盖 B4 原始经营预测或 FCF，也不创建正式准入/投资授权。",
     }
 
 
