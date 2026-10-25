@@ -1165,8 +1165,13 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert analysis["research_rounds"]["round_b"]["response_sha256"]
     assert receipt["research_rounds"] == analysis["research_rounds"]
     assert pilot.verify_local_pilot_bundle(run_dir)["status"] == "PILOT_BUNDLE_HASH_CHECK_PASS"
-
-
+    replay = pilot.run_local_investment_pilot(
+        input_path=run_dir / "input.json",
+        output_root=tmp_path / "runs",
+        replay_of=run_dir.name,
+    )
+    assert replay["status"] == "PILOT_REPLAY_MATCHED"
+    assert replay["replay_comparison"]["status"] == "MATCH"
 
 def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monkeypatch, capsys):
     import builtins
