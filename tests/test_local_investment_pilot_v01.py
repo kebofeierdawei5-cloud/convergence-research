@@ -1092,42 +1092,40 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     import iios_mvp.local_investment_pilot_v01 as pilot
 
     source_claim = "用户手动提供的 19.74；按 收盘价 15:00 处理；未从交易所或行情供应商独立核验"
-    answers = iter([
-        "山东赫达",
-        "SZ002810",
-        "1",
-        "2026-10-12",
-        "2",
-        "0",
-        "19.74",
-        "2026-10-12",
-        "1",
-        "1",
-        "0",
-        "0",
-    ])
+    answers = iter(["山东赫达", "SZ002810", "1", "2026-10-12", "2", "0", "19.74", "2026-10-12", "1", "1", "0", "0"])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
 
     def simulate_saved_response(response_path, *, previous_signature):
-        # Simulate the operator pasting ChatGPT's complete response into TextEdit
-        # and saving it. The real file watcher remains bypassed only in this
-        # wizard orchestration test; dedicated tests exercise watcher behavior.
         template_paths = list((tmp_path / "inputs").glob("pilot-input-*.json"))
         assert len(template_paths) == 1
-        template = json.loads(template_paths[0].read_text(encoding="utf-8"))
         canned = _payload(cutoff="2026-10-12")
-        for key in ("evidence_register", "assessment", "forecast_valuation", "operating_driver_forecast", "valuation_transmission", "decision_parameters", "notes"):
-            template[key] = canned[key]
-        Path(response_path).write_text(json.dumps(template, ensure_ascii=False), encoding="utf-8")
+        if "round-a" in Path(response_path).name:
+            response_object = {
+                "response_mode": "IIOS-RESEARCH-PATCH-0.1",
+                "research": {
+                    "evidence_register": canned["evidence_register"],
+                    "assessment": {key: canned["assessment"][key] for key in ("trust", "reality", "quality", "thesis", "value_drivers", "risk")},
+                    "operating_driver_forecast": canned["operating_driver_forecast"],
+                },
+            }
+        else:
+            response_object = {
+                "response_mode": "IIOS-RESEARCH-PATCH-0.1",
+                "research": {
+                    "assessment": {key: canned["assessment"][key] for key in ("market_implied_expectation", "expectation_gap")},
+                    "forecast_valuation": canned["forecast_valuation"],
+                    "eps_multiple_valuation": canned["eps_multiple_valuation"],
+                    "valuation_transmission": canned["valuation_transmission"],
+                    "sotp_valuation": canned["sotp_valuation"],
+                },
+            }
+        Path(response_path).write_text(json.dumps(response_object, ensure_ascii=False), encoding="utf-8")
         signature = pilot._response_file_signature(response_path)
         assert signature is not None and signature != previous_signature
         return signature
 
     monkeypatch.setattr(pilot, "_wait_for_response_file_change", simulate_saved_response)
-    result = run_guided_wizard(
-        template_root=tmp_path / "inputs",
-        output_root=tmp_path / "runs",
-    )
+    result = run_guided_wizard(template_root=tmp_path / "inputs", output_root=tmp_path / "runs")
 
     assert result["status"] == "PILOT_CREATED"
     completed_files = list((tmp_path / "inputs").glob("pilot-completed-*.json"))
@@ -1136,29 +1134,35 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert saved["price_input"]["price"] == "19.74"
     assert saved["price_input"]["sources_claimed"] == [source_claim]
     assert saved["price_input"]["assurance_label"] == "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
-    assert result["formal_decision_created"] is False
-    assert result["auto_execution"] is False
+    assert result["formal_decision_created"] is False and result["auto_execution"] is False
     output = capsys.readouterr().out
-    assert "本次完整 JSON 模板" in output
-    assert '"schema_version": "IIOS-LOCAL-INVESTMENT-PILOT-0.1"' in output
-    assert "不要求操作者另行上传公告或模板" in output
-    prompt_files = list((tmp_path / "inputs").glob("pilot-prompt-*.md"))
-    assert len(prompt_files) == 1
-    assert "经营驱动因素树要求（IIOS-OPERATING-DRIVER-FORECAST-0.1）" in prompt_files[0].read_text(encoding="utf-8")
-    assert "B5 估值传导要求（IIOS-VALUATION-TRANSMISSION-0.1）" in prompt_files[0].read_text(encoding="utf-8")
-    prompt_text = prompt_files[0].read_text(encoding="utf-8")
-    assert "核心投资判断链：必须逐项回答以下六个问题" in prompt_text
-    assert "IIOS-RESEARCH-PATCH-0.1" in output
-    assert "不要重复输出上面的整份 600+ 行模板" in output
-    assert "公司究竟靠什么赚钱" in prompt_text
-    assert "未来最重要的变化是什么" in prompt_text
-    assert "为什么相信变化会发生" in prompt_text
-    assert "变化如何进入每股价值" in prompt_text
-    assert "当前价格已反映多少" in prompt_text
-    assert "哪些事实要求改变看法" in prompt_text
-    assert "绝不能把自己的 Base 估值伪装成市场预期" in prompt_text
-    assert "15% 年化门槛、共同约束入场价与暂定动作由本地既有计算器独立计算" in prompt_text
-    assert "上传输入模板和需要引用的公司公告/财报材料" not in output
+    assert "Round A 价格盲研究提示" in output and "Round B 价格感知估值/MIE/预期差提示" in output
+    round_a_paths = list((tmp_path / "inputs").glob("pilot-prompt-round-a-*.md"))
+    round_b_paths = list((tmp_path / "inputs").glob("pilot-prompt-round-b-*.md"))
+    assert len(round_a_paths) == 1 and len(round_b_paths) == 1
+    round_a_text = round_a_paths[0].read_text(encoding="utf-8")
+    round_b_text = round_b_paths[0].read_text(encoding="utf-8")
+    assert "IIOS Round A" in round_a_text
+    template = json.loads(list((tmp_path / "inputs").glob("pilot-input-*.json"))[0].read_text(encoding="utf-8"))
+    phase_a = pilot._round_a_prompt_input(template)
+    phase_a_text = json.dumps(phase_a, ensure_ascii=False, indent=2)
+    for prohibited_key in ('"price_input"', '"current_position_pct"', '"operator_valuation_context"', '"market_implied_expectation"', '"expectation_gap"'):
+        assert prohibited_key not in phase_a_text
+    assert "核心投资判断链：必须逐项回答以下六个问题" in round_b_text
+    assert "当前价格已反映多少" in round_b_text
+    assert "绝不能把自己的 Base 估值伪装成市场预期" in round_b_text
+    assert "IIOS-RESEARCH-PATCH-0.1" in round_a_text and "IIOS-RESEARCH-PATCH-0.1" in round_b_text
+
+    run_dir = Path(result["run_dir"])
+    analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
+    receipt = json.loads((run_dir / "pilot_receipt.json").read_text(encoding="utf-8"))
+    assert analysis["research_rounds"]["status"] == "TWO_ROUND_LINEAGE_HASH_BOUND_NOT_FORMAL_ADMISSION"
+    assert analysis["research_rounds"]["price_blind_round_a_verified"] is True
+    assert analysis["research_rounds"]["round_a"]["response_sha256"]
+    assert analysis["research_rounds"]["round_b"]["response_sha256"]
+    assert receipt["research_rounds"] == analysis["research_rounds"]
+    assert pilot.verify_local_pilot_bundle(run_dir)["status"] == "PILOT_BUNDLE_HASH_CHECK_PASS"
+
 
 
 def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monkeypatch, capsys):
@@ -4906,3 +4910,42 @@ def test_unknown_expectation_gap_direction_cannot_become_positive_policy_input()
         "POSITIVE_EXPECTATION_GAP_AND_RETURN_PRICE_GATES_PASS"
     )
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
+
+
+def test_price_blind_round_a_projection_excludes_price_position_and_valuation():
+    payload = _payload(price="123.45")
+    payload["case"]["current_position_pct"] = "16"
+    payload["operator_valuation_context"] = {"selected_model_family": "SOTP"}
+    phase_a = pilot._round_a_prompt_input(payload)
+    prompt = pilot._build_price_blind_round_a_prompt(payload)
+    serialized = json.dumps(phase_a, ensure_ascii=False, indent=2, allow_nan=False)
+    assert pilot._validate_round_a_prompt_projection(phase_a) is True
+    for prohibited_key in ('"price_input"', '"current_position_pct"', '"operator_valuation_context"', '"market_implied_expectation"', '"expectation_gap"'):
+        assert prohibited_key not in serialized
+    assert serialized in prompt
+
+
+def test_round_a_patch_rejects_price_aware_assessment_fields():
+    response = {"response_mode":"IIOS-RESEARCH-PATCH-0.1","research":{"assessment":{"expectation_gap":{"status":"PASS"}}}}
+    with pytest.raises(LocalInvestmentPilotError, match="ROUND_A_ASSESSMENT_FIELDS_NOT_ALLOWED"):
+        pilot._validate_research_round_patch(response, phase="ROUND_A", base_payload=_payload())
+
+
+def test_round_b_patch_cannot_mutate_frozen_round_a_fields():
+    response = {"response_mode":"IIOS-RESEARCH-PATCH-0.1","research":{"assessment":{"thesis":{"status":"BROKEN"}}}}
+    with pytest.raises(LocalInvestmentPilotError, match="ROUND_B_ASSESSMENT_FIELDS_NOT_ALLOWED"):
+        pilot._validate_research_round_patch(response, phase="ROUND_B", base_payload=_payload())
+
+
+def test_round_b_prompt_receives_price_only_after_round_a_artifact_is_frozen():
+    payload = _payload(price="123.45")
+    payload["case"]["current_position_pct"] = "16"
+    frozen = pilot._round_a_frozen_artifact(payload)
+    prompt, phase_b, artifact_sha = pilot._build_price_aware_round_b_prompt(base_prompt="Round B price-aware base instructions", payload=payload)
+    assert artifact_sha == pilot._canonical_json_sha256(frozen)
+    assert phase_b["price_input"] == payload["price_input"]
+    assert "123.45" in prompt and artifact_sha in prompt
+    assert phase_b["assessment"]["thesis"] == frozen["assessment"]["thesis"]
+    assert "operator_valuation_context" not in phase_b and "decision_parameters" not in phase_b
+
+

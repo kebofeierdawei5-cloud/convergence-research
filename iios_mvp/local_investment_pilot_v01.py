@@ -6018,138 +6018,172 @@ def run_guided_wizard(
     template_path = Path(template_result["input_template"])
     prompt_path = Path(template_result["analysis_prompt"])
     template_payload = json.loads(template_path.read_text(encoding="utf-8"))
-    prompt = (
-        prompt_path.read_text(encoding="utf-8")
-        + "\n\n【本次完整 JSON 模板——无需上传单独模板文件】\n"
-        + json.dumps(template_payload, ensure_ascii=False, indent=2, allow_nan=False)
-        + "\n\n【执行要求】\n"
-        + "基于上方模板直接研究并填充同一个 JSON 对象。优先联网搜索并核对截止时点前的公司公告、定期报告、交易所披露、监管文件；"
-        + "不要求操作者另行上传公告或模板。来源登记至少填写 source_id、title、source_class、source_ref（可直接打开的 URL）、published_at、known_at、summary。"
-        + "最多优先列出 8 条对结论最重要的来源，确保每条来源真实且支持对应事实；不知道的时间明确写 UNKNOWN。"
-        + "必须完成 Trust、Reality、Quality、Thesis、价值驱动因素排序、风险清单、MIE/预期差、估值模型和假设、Bear/Base/Bull 数值情景以及独立 thesis_break_stress。"
-        + "请填写 entry_value_reference_per_share，以及三种情景各自 probability、terminal_value_per_share、cash_distributions_per_share、cash_distribution_events、rationale；概率合计为 1。"
-        + "cash_distribution_review.status 必须是 KNOWN_FUTURE_DISTRIBUTIONS 或 NO_FUTURE_DISTRIBUTIONS_CONFIRMED，并给出 summary 和 cutoff-compatible evidence_refs。"
-        + "核查截至截止时点已公告的股利/现金分配，优先使用公司、交易所或监管机构的实施公告；每个 cash_distribution_events 项必须填写 gross_amount_per_share（公告税前金额）、tax_amount_per_share、amount_per_share（扣税后的计算金额）、tax_basis、tax_rationale、record_date、ex_date、payment_date、eligible_if_entered_at_cutoff、eligibility_basis、evidence_refs。"
-        + "注意：price_input 是观测/参考价，不是成交回报。程序的收益与目标入场价是反事实测算，假设在分析截止日以该输入价格买入；程序不会声称该价位实际可成交，也不会声称实际分红权益已产生。eligible_if_entered_at_cutoff 只回答“若在截止日按输入参考价假设成交，日期与市场规则是否支持资格”，不能表示成交保证或已取得权益。"
-        + "只有税前、税额、税后净额满足 gross_amount_per_share - tax_amount_per_share = amount_per_share，税务口径/持有期限假设具体可追责，并明确该反事实入场是否可符合分红资格（eligible_if_entered_at_cutoff=true）时，才可以把分红计入条件性回报。日期顺序必须按标的市场核验，不可把 A 股与港股规则混用：CN-A 通常为 cutoff < record_date < ex_date；HK 通常为 cutoff < ex_date <= record_date（考虑 T+2 与除净安排）；所有市场支付日须处在除净/登记及估值终点的合理顺序内。若公告的特殊安排不符合该市场通常顺序，或条件性买入资格无法证实，保留 UNKNOWN 并阻断回报/目标入场价，不要猜测修正日期。不得把公告税前金额直接当税后收益，也不得将不符合资格的分红计入新买入的收益。"
-        + "每情景 cash_distributions_per_share 必须等于这些日期明确、税后金额明确、买入资格确认的现金流金额合计。若已核实未来期间无分配，填 0、空事件列表并用截止日前官方证据说明；若未能确定，不得填 0 冒充无分配，保持 UNKNOWN。日期化现金流使用实际支付日期，不能一律假设在终值日支付。"
-        + "请填写 thesis_break_stress 的 failure_trigger、operating_impact、valuation_method、terminal_value_per_share、cash_distributions_per_share、rationale，且其期末总财富必须低于 Bear。"
-        + "不要只原样返回模板，不允许把核心研究字段全部留空。若无法识别必须具体解释原因和证据缺口；数字估值可以建立透明、可追责的假设，但不得把假设伪装为披露事实。"
-        + "严格保留 schema_version、case、price_input 原样不变，尤其不得更改人工股价、观察日期、known_at 或 price assurance 标签。"
-        + """【紧凑研究补丁 JSON 协议（最高优先级，覆盖前文“返回完整对象”的旧措辞）】
-不要重复输出上面的整份 600+ 行模板。只返回一个紧凑 JSON 对象。最外层只能有 response_mode 与 research 两个键，形状如下（仅示意，research 内容必须来自本次真实研究，不能照抄示例值）：
-{
-  "response_mode": "IIOS-RESEARCH-PATCH-0.1",
-  "research": {
-    "assessment": {
-      "trust": {
-        "summary": "填写由本轮证据支持的结论和缺口"
-      }
-    }
-  }
-}
-research 是需要覆盖到可信模板上的稀疏补丁，只放本轮有证据或明确分析假设需要更新的字段；不要输出空数组、空对象或默认占位字段来凑结构。 omitted fields will be inherited from the local trusted template. 未提供的字段会继承本地可信模板默认值。对象字段按字段递归合并；数组如 evidence_register、drivers、risk.items、cash_distribution_events 和 product_lines 则整体替换，必须把该数组中需要保留的条目一次性写全。
-不要把 schema_version、case、price_input、operator_valuation_context、decision_parameters 放进 research；这些由本地可信模板提供并锁定。研究和假设仍须遵守前文所有证据、估值、分红、期间、币种及情景约束。不得通过省略必须研究的事实来隐藏问题：关键结论、Bear/Base/Bull、独立 thesis_break_stress、经营驱动因素树、EPS_MULTIPLE、SOTP 候选输入和 B5 结构仍需尽力提供；确实未知的关键字段应在相应 summary/rationale 中说明缺口。
-旧版完整 IIOS JSON 对象仍可接收；但本次优先使用紧凑补丁协议，以避免回答过长被截断。只返回一个符合该协议的 JSON 对象，不要 Markdown 代码围栏或 JSON 以外的文字。"""
-    )
-
     private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
-    response_stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    response_path = private_inputs / f"pilot-chatgpt-response-{symbol.replace('.', '-')}-{response_stamp}.json"
-    _write_local(response_path, "")
-    initial_response_signature = _response_file_signature(response_path)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    safe_symbol = symbol.replace(".", "-")
+
+    # Round A uses an explicit allowlist. The full price-bearing template is never sent in this stage.
+    round_a_prompt_input = _round_a_prompt_input(template_payload)
+    prompt = _build_price_blind_round_a_prompt(template_payload)
+    round_a_prompt_path = private_inputs / f"pilot-prompt-round-a-{safe_symbol}-{stamp}.md"
+    _write_local(round_a_prompt_path, prompt)
+    prompt = round_a_prompt_path.read_text(encoding="utf-8")
+    round_a_prompt_fp = _text_fingerprint(prompt)
+    round_a_response_path = private_inputs / f"pilot-chatgpt-round-a-response-{safe_symbol}-{stamp}.json"
+    _write_local(round_a_response_path, "")
+    initial_response_signature = _response_file_signature(round_a_response_path)
 
     if sys.platform == "darwin":
-        # The prompt is copied to the clipboard; the large response is always handed off via a file.
         subprocess.run(["pbcopy"], input=prompt, text=True, check=True, timeout=5)
         subprocess.run(["open", "https://chatgpt.com/"], check=False, timeout=5)
-        subprocess.run(["open", "-a", "TextEdit", str(response_path)], check=False, timeout=5)
-        print("\n已打开 ChatGPT 和 JSON 结果文件；研究提示与完整基准模板已复制到剪贴板。ChatGPT 只需返回紧凑研究补丁，本地会自动合并模板，不需要复制整份大 JSON。")
+        subprocess.run(["open", "-a", "TextEdit", str(round_a_response_path)], check=False, timeout=5)
+        print("\nRound A 已准备：价格盲研究提示与专用 JSON 文件已打开；此阶段不会显示结构化股价、持仓或估值字段。")
     else:
-        print("\n研究提示（已包含本次完整 JSON 模板）：\n" + prompt)
+        print("\nRound A 价格盲研究提示：\n" + prompt)
+    print(f"\nRound A 原始响应保存位置：\n{round_a_response_path}")
+    print("Round A 只研究公司现实、质量、论点、价值驱动、风险与独立经营预测。保存并通过校验后，程序才会生成 Round B。")
 
-    print(f"\nChatGPT 完整回答的保存位置：\n{response_path}")
-    print("操作步骤（只需在 ChatGPT 与这个结果文件之间复制一次）：")
-    print("  1. 在已打开的 ChatGPT 对话中粘贴剪贴板中的完整研究提示并发送；提示里已经包含本次 JSON 模板，不用上传模板或另找公告。")
-    print("  2. 复制 ChatGPT 返回的紧凑研究补丁 JSON，覆盖上面已打开的结果文件并保存；本地将补齐模板默认结构并锁定人工控制字段。")
-    print("  3. 保存后等待程序自动检测；通常无需按回车。不要把 JSON 粘贴到终端，也不要手工填写 JSON 字段。")
-    if sys.platform == "darwin":
-        print("  提示：JSON 文件已用 TextEdit 打开；粘贴后按 Command+S 保存。若按回车检查时目标文件仍为空，程序会打开文件选择窗口供你选择实际保存的 JSON。")
-
+    # --- Round A: price-blind company-side research ---
+    response_path = round_a_response_path
     previous_response_signature = initial_response_signature
     while True:
-        print(
-            "\n等待 ChatGPT 完整 JSON 保存到结果文件；保存后会自动读取（无需按回车）。",
-            flush=True,
-        )
-        print("如需立即检查也可按回车；按 Control-C 退出。", flush=True)
-        response_signature = _wait_for_response_file_change(
-            response_path,
-            previous_signature=previous_response_signature,
-        )
-        print("已检测到结果文件更新且写入稳定，正在读取并校验……", flush=True)
+        print("\n等待 Round A ChatGPT 研究补丁保存并完成校验……", flush=True)
+        response_signature = _wait_for_response_file_change(response_path, previous_signature=previous_response_signature)
+        print("检测到 Round A 响应已保存，正在验证阶段边界……", flush=True)
         try:
             response_object = _read_json_response_file(response_path)
-            payload, response_format, merged_top_level_fields = _expand_research_patch_with_template(
-                template_path, response_object
-            )
+            _validate_research_round_patch(response_object, phase="ROUND_A", base_payload=template_payload)
+            payload, response_format, merged_top_level_fields = _expand_research_patch_with_template(template_path, response_object)
             if _response_file_signature(response_path) != response_signature:
-                raise LocalInvestmentPilotError("CHATGPT_RESPONSE_CHANGED_DURING_VALIDATION")
-            # Never trust AI-authored copies of operator controls. Restore only
-            # these fields from the trusted local template; leave the raw response
-            # file untouched and record the exact paths in the completed input.
+                raise LocalInvestmentPilotError("ROUND_A_RESPONSE_CHANGED_DURING_VALIDATION")
             payload.pop("_local_operator_controlled_field_recovery", None)
             payload.pop("_local_research_response_provenance", None)
             restored_fields = _restore_operator_controlled_fields_from_template(template_path, payload)
             if restored_fields:
                 payload["_local_operator_controlled_field_recovery"] = {
-                    "status": "RESTORED_BEFORE_VALIDATION",
-                    "fields": restored_fields,
+                    "status": "RESTORED_BEFORE_VALIDATION", "fields": restored_fields,
                     "source_template": Path(template_path).name,
-                    "method": "LOCAL_TEMPLATE_OVERRIDES_AI_RESPONSE",
-                    "raw_response_file_modified": False,
+                    "method": "LOCAL_TEMPLATE_OVERRIDES_AI_RESPONSE", "raw_response_file_modified": False,
                 }
-                print(
-                    "[WARN] 已丢弃 ChatGPT 对人工控制字段的改写，并从本地模板恢复："
-                    + ", ".join(restored_fields)
-                    + "。原始 ChatGPT 响应文件未修改；恢复清单将随本次私有输入保存。",
-                    flush=True,
-                )
+            _assert_response_preserves_operator_inputs(template_path, payload)
+            break
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            previous_response_signature = response_signature
+            print(f"Round A 暂未继续：{exc}", flush=True)
+            if isinstance(exc, LocalInvestmentPilotError) and not str(exc).startswith(("CHATGPT_RESPONSE_FILE_READ_FAILED", "CHATGPT_RESPONSE_FILE_NOT_FOUND")):
+                repair_prompt = _build_response_repair_prompt(original_prompt=prompt, response_path=response_path, validation_error=str(exc))
+                if sys.platform == "darwin":
+                    try:
+                        subprocess.run(["pbcopy"], input=repair_prompt, text=True, check=True, timeout=5)
+                        print("\nRound A 修复提示已复制。请切回 ChatGPT 粘贴发送，再覆盖保存同一个 Round A 响应文件。")
+                    except (OSError, subprocess.SubprocessError):
+                        print("\n无法自动复制 Round A 修复提示；请按错误内容修正本阶段响应。")
+                else:
+                    print("\nRound A 修复提示：\n" + repair_prompt, flush=True)
+            print(f"Round A 当前响应文件：{response_path}", flush=True)
+            print("修正后保存会自动重试；无需重新填写标的或价格。按 Control-C 可退出。", flush=True)
+
+    try:
+        round_a_raw_response = response_path.read_bytes().decode("utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise LocalInvestmentPilotError("ROUND_A_RAW_RESPONSE_READ_FAILED") from exc
+    round_a_response_fp = _text_fingerprint(round_a_raw_response)
+    if round_a_response_fp["sha256"] != response_signature[2] or round_a_response_fp["byte_size"] != response_signature[0]:
+        raise LocalInvestmentPilotError("ROUND_A_RAW_RESPONSE_FINGERPRINT_CHANGED")
+    frozen_artifact = _round_a_frozen_artifact(payload)
+    frozen_sha = _canonical_json_sha256(frozen_artifact)
+    round_a_provenance = {
+        "schema_version": ROUND_A_PROVENANCE_SCHEMA, "phase": "PRICE_BLIND_COMPANY_RESEARCH",
+        "prompt_filename": round_a_prompt_path.name, "prompt_text": prompt,
+        "prompt_sha256": round_a_prompt_fp["sha256"], "prompt_byte_size": round_a_prompt_fp["byte_size"],
+        "prompt_input_payload": round_a_prompt_input,
+        "response_filename": round_a_response_path.name, "raw_response_text": round_a_raw_response,
+        "response_sha256": round_a_response_fp["sha256"], "response_byte_size": round_a_response_fp["byte_size"],
+        "frozen_company_side_artifact": frozen_artifact, "frozen_artifact_sha256": frozen_sha,
+        "formal_forecast_admission": "NOT_ADMITTED", "formal_valuation_admission": "NOT_ADMITTED",
+    }
+    payload["_local_research_round_a_provenance"] = round_a_provenance
+    round_a_completed_path = private_inputs / f"pilot-round-a-frozen-{safe_symbol}-{stamp}.json"
+    _write_local(round_a_completed_path, json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False))
+
+    # --- Round B: only now introduce the protected reference price ---
+    base_prompt = prompt_path.read_text(encoding="utf-8")
+    round_b_prompt, round_b_prompt_input, round_b_frozen_sha = _build_price_aware_round_b_prompt(base_prompt=base_prompt, payload=payload)
+    if round_b_frozen_sha != frozen_sha:
+        raise LocalInvestmentPilotError("ROUND_B_FROZEN_ARTIFACT_HASH_CHANGED_DURING_PROMPT_BUILD")
+    round_b_prompt_path = private_inputs / f"pilot-prompt-round-b-{safe_symbol}-{stamp}.md"
+    _write_local(round_b_prompt_path, round_b_prompt)
+    round_b_prompt = round_b_prompt_path.read_text(encoding="utf-8")
+    round_b_prompt_fp = _text_fingerprint(round_b_prompt)
+    round_b_response_path = private_inputs / f"pilot-chatgpt-round-b-response-{safe_symbol}-{stamp}.json"
+    _write_local(round_b_response_path, "")
+    round_b_initial_signature = _response_file_signature(round_b_response_path)
+
+    if sys.platform == "darwin":
+        subprocess.run(["pbcopy"], input=round_b_prompt, text=True, check=True, timeout=5)
+        subprocess.run(["open", "-a", "TextEdit", str(round_b_response_path)], check=False, timeout=5)
+        print("\nRound A 已冻结。Round B 价格感知估值/MIE/预期差提示已复制到剪贴板；请在 ChatGPT 中发送，并保存到单独的 Round B JSON 文件。")
+    else:
+        print("\nRound B 价格感知估值/MIE/预期差提示：\n" + round_b_prompt)
+    print(f"\nRound B 原始响应保存位置：\n{round_b_response_path}")
+    prompt, response_path = round_b_prompt, round_b_response_path
+    round_a_base_payload = json.loads(round_a_completed_path.read_text(encoding="utf-8"))
+    previous_response_signature = round_b_initial_signature
+
+    while True:
+        print("\n等待 Round B ChatGPT 研究补丁保存并完成完整 IIOS 字段校验……", flush=True)
+        response_signature = _wait_for_response_file_change(response_path, previous_signature=previous_response_signature)
+        print("检测到 Round B 响应已保存，正在验证阶段边界和研究内容……", flush=True)
+        try:
+            response_object = _read_json_response_file(response_path)
+            _validate_research_round_patch(response_object, phase="ROUND_B", base_payload=round_a_base_payload)
+            payload, response_format, merged_top_level_fields = _expand_research_patch_with_template(round_a_completed_path, response_object)
+            if _response_file_signature(response_path) != response_signature:
+                raise LocalInvestmentPilotError("ROUND_B_RESPONSE_CHANGED_DURING_VALIDATION")
+            payload.pop("_local_operator_controlled_field_recovery", None)
+            payload.pop("_local_research_response_provenance", None)
+            restored_fields = _restore_operator_controlled_fields_from_template(template_path, payload)
+            if restored_fields:
+                payload["_local_operator_controlled_field_recovery"] = {
+                    "status": "RESTORED_BEFORE_VALIDATION", "fields": restored_fields,
+                    "source_template": Path(template_path).name,
+                    "method": "LOCAL_TEMPLATE_OVERRIDES_AI_RESPONSE", "raw_response_file_modified": False,
+                }
             _assert_response_preserves_operator_inputs(template_path, payload)
             _prepare_input(payload)
             _validate_guided_research_response(payload)
+            payload["_local_research_round_a_provenance"] = round_a_provenance
+            payload["_local_research_round_b_provenance"] = {
+                "schema_version": ROUND_B_PROVENANCE_SCHEMA, "phase": "PRICE_AWARE_VALUATION_MIE_EXPECTATION_GAP",
+                "prompt_filename": round_b_prompt_path.name, "prompt_text": round_b_prompt,
+                "prompt_sha256": round_b_prompt_fp["sha256"], "prompt_byte_size": round_b_prompt_fp["byte_size"],
+                "prompt_input_payload": round_b_prompt_input, "frozen_artifact_sha256": round_b_frozen_sha,
+                "response_filename": round_b_response_path.name, "response_sha256": response_signature[2],
+                "response_byte_size": response_signature[0],
+            }
             payload["_local_research_response_provenance"] = {
-                "schema_version": LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
-                "status": "CAPTURED_RAW_CHATGPT_RESPONSE",
-                "source_filename": response_path.name,
-                "sha256": response_signature[2],
-                "byte_size": response_signature[0],
-                "capture_stage": "RAW_RESPONSE_HASHED_ON_STABLE_SAVE_BEFORE_LOCAL_TEMPLATE_MERGE_AND_OPERATOR_FIELD_RECOVERY",
-                "validation_status": "JSON_OBJECT_PARSE_PASSED; RESPONSE_FORMAT=" + response_format + "; MERGED_FIELDS=" + ",".join(merged_top_level_fields) + "; COMPLETED_INPUT_REQUIRED_FIELDS_PASSED_AFTER_LOCAL_OPERATOR_FIELD_RECOVERY",
+                "schema_version": LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA, "status": "CAPTURED_RAW_CHATGPT_RESPONSE",
+                "source_filename": response_path.name, "sha256": response_signature[2], "byte_size": response_signature[0],
+                "capture_stage": "ROUND_B_RAW_RESPONSE_HASHED_ON_STABLE_SAVE_BEFORE_LOCAL_TEMPLATE_MERGE_AND_OPERATOR_FIELD_RECOVERY",
+                "validation_status": "ROUND_A_PRICE_BLIND_STAGE_FROZEN; JSON_OBJECT_PARSE_PASSED; RESPONSE_FORMAT=" + response_format + "; MERGED_FIELDS=" + ",".join(merged_top_level_fields) + "; FULL_RESEARCH_REQUIRED_FIELDS_PASSED_AFTER_OPERATOR_FIELD_RESTORATION",
                 "raw_response_file_modified_by_runner": False,
             }
             break
         except (OSError, ValueError, KeyError, TypeError) as exc:
             previous_response_signature = response_signature
-            print(f"暂未继续：{exc}", flush=True)
-            if isinstance(exc, LocalInvestmentPilotError) and not str(exc).startswith(
-                ("CHATGPT_RESPONSE_FILE_READ_FAILED", "CHATGPT_RESPONSE_FILE_NOT_FOUND")
-            ):
-                repair_prompt = _build_response_repair_prompt(
-                    original_prompt=prompt, response_path=response_path, validation_error=str(exc)
-                )
+            print(f"Round B 暂未继续：{exc}", flush=True)
+            if isinstance(exc, LocalInvestmentPilotError) and not str(exc).startswith(("CHATGPT_RESPONSE_FILE_READ_FAILED", "CHATGPT_RESPONSE_FILE_NOT_FOUND")):
+                repair_prompt = _build_response_repair_prompt(original_prompt=prompt, response_path=response_path, validation_error=str(exc))
                 if sys.platform == "darwin":
                     try:
                         subprocess.run(["pbcopy"], input=repair_prompt, text=True, check=True, timeout=5)
-                        print("\n已将自动修复提示复制到剪贴板。请切回已打开的 ChatGPT 对话，直接粘贴并发送；")
-                        print("然后复制新的完整 JSON 覆盖同一个结果文件并保存；系统会自动检测新版本。")
-                        print("不需要手工修改几十个 JSON 字段，也不需要重新填写公司和股价。", flush=True)
+                        print("\nRound B 修复提示已复制。请切回 ChatGPT 粘贴发送，再覆盖保存同一个 Round B 响应文件。")
                     except (OSError, subprocess.SubprocessError):
-                        print("\n无法自动复制修复提示；请切回结果文件修正后保存，系统将自动重试。按 Control-C 可退出。", flush=True)
+                        print("\n无法自动复制 Round B 修复提示；请按错误内容修正本阶段响应。")
                 else:
-                    print("\n自动修复提示：\n" + repair_prompt, flush=True)
-            print(f"当前响应文件：{response_path}", flush=True)
-            print("无需重新填写标的；修正文件并保存后会自动重试；按 Control-C 可退出。", flush=True)
+                    print("\nRound B 修复提示：\n" + repair_prompt, flush=True)
+            print(f"Round B 当前响应文件：{response_path}", flush=True)
+            print("修正后保存会自动重试；Round A 已冻结，无需重新填写标的或重做第一轮。按 Control-C 可退出。", flush=True)
 
     # Validate the response before collecting any optional operator-only
     # portfolio inputs. AI research output never gets to author these limits.
