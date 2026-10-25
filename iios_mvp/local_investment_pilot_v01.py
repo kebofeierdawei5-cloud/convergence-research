@@ -955,6 +955,7 @@ def _evaluate_eps_earnings_bridge(
             "schema_version": EPS_EARNINGS_BRIDGE_SCHEMA,
             "status": status,
             "method": EPS_EARNINGS_BRIDGE_METHOD,
+            "input_source_semantics": "DEFAULT_B4_CALCULATED_NET_PROFIT; NORMALIZED_EARNINGS_CANDIDATE_ONLY_WITH_EXPLICIT_VALIDATED_ADOPTION",
             "forecast_period": period,
             "valuation_terminal_date": terminal_date,
             "currency": currency,
@@ -1307,7 +1308,8 @@ def _evaluate_eps_earnings_bridge(
                     "value": format(attributable_net_profit, "f"),
                     "unit": currency,
                     "measure": "NET_PROFIT_ATTRIBUTABLE_TO_LISTED_COMPANY_SHAREHOLDERS",
-                    "formula": "B4_NET_PROFIT_PROXY - NON_CONTROLLING_INTERESTS + OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT",
+                    "formula": "SELECTED_COMPANY_WIDE_NET_PROFIT_INPUT - NON_CONTROLLING_INTERESTS + OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT",
+                    "input_source": earnings_input_source,
                     "arithmetic": f"{b4_net_profit_proxy} - {nci_value} + ({other_value}) = {attributable_net_profit}",
                 },
                 "diluted_shares": shares,
@@ -6024,6 +6026,7 @@ def create_pilot_template(
          "2A. 对周期敏感的行业/业务，必须单独识别行业/公司周期位置（扩张、过热、收缩、筑底、复苏或 UNKNOWN），给出截止时点前的证据、反证、领先指标与滞后指标；用 value_drivers 中 driver_type=INDUSTRY_CYCLE 的驱动行承载，不新增顶层字段。若证据不足，周期阶段保留 UNKNOWN，不强行贴标签。"
          "必须区别真实需求复苏与补库存、渠道备货、关税/政策导致的提前拉货、低基数和一次性收益；说明这些因素分别对未来销量、净售价、产能利用率、单位成本、毛利率、营运资金和现金流的方向/持续时间意味着什么。不得把短期发货/收入高增直接外推为可持续需求。"
          "对周期性盈利估值，明确区分当前盈利、正常化/全周期盈利和峰值/谷底盈利；解释为什么当前 P/E 可能在周期高点显得虚低、在周期低点显得虚高。只有证据足以支持时才给正常化盈利/利润率；否则在情景中保留区间或 UNKNOWN，并说明需要哪些数据才能确认周期拐点。"
+         "如果希望把正常化盈利选为 B4→EPS 桥的候选公司整体净利润输入，必须在 cycle_profile.b4_input_decisions 为 Bear/Base/Bull 分别明确填写 action（COMPARISON_ONLY、REJECT、ADOPT_AS_B4_NET_PROFIT_PROXY）及理由。默认/缺失项是 COMPARISON_ONLY。只允许三个情景全部选择同一个唯一周期 driver_id 的 ADOPT，且指标为公司整体净利润代理、范围 COMPANY_WIDE、币种 CNY、期间与 B4 完全一致、数值/依据完整、证据引用 cutoff 兼容，并且 B4 三情景用 cycle_driver_ids 精确关联该 driver_id；否则不能进入 EPS 桥。该选择只影响 B4→EPS 桥的净利润输入来源，不覆盖 B4 原始经营计算或 FCF。"
         "3. 为什么相信变化会发生：把每个关键变化连接到截止时点前已公开的具体证据、证据日期、业务机制和反证；区分领先指标/结果指标、公司指引/分析师假设/历史事实，不得把管理层目标当成已实现结果。写入 evidence_register、assessment.value_drivers.historical_evidence 与 rationale。"
         "4. 变化如何进入每股价值：明确写出“销量/价格/组合/利用率 → 收入 → 单位毛利与费用 → EBIT/净利润 → 资本开支/营运资金/FCF → 稀释股数与每股盈利 → 估值”的可验证传导链；说明关键假设、量纲、期间、约束、潜在蚕食与稀释，避免重复计价。使用 operating_driver_forecast、valuation_transmission 和 forecast_valuation.scenarios；无法闭合的环节保留 UNKNOWN/NOT_LINKED。"
         "5. 当前价格已反映多少：price_input.price 是本次唯一现价，不得覆盖。分清外部可验证的市场隐含预期（MIE）、市场可比估值和内部估值；只有存在独立、截止时点兼容的定价/一致预期证据时才量化 MIE。缺少证据就将 assessment.market_implied_expectation 标为 NOT_IDENTIFIABLE，并具体解释哪些隐含增长、利润率、资本回报或估值倍数无法反推；绝不能把自己的 Base 估值伪装成市场预期。assessment.expectation_gap 必须说明市场预期与独立经营推演在方向、规模、时间或概率上有何差异；无法量化时明确方向也不可识别。"
@@ -6038,7 +6041,7 @@ def create_pilot_template(
         "eps_per_share 单位为个股币种/share（CNY/share 或 HKD/share），必须为同一期间的正 EPS；P/E 的 unit 为 x。数据类别只允许 ISSUER_FORECAST 或 ANALYST_ASSUMPTION。发行人 EPS 必须提供 cutoff 前 evidence_refs，且来源类别须为 EXCHANGE_PRIMARY/REGULATOR_PRIMARY 并与官方域名状态匹配；域名匹配不是内容核实或正式 Evidence/PIT 准入。"
         "凡声明 ISSUER_FORECAST 的 EPS，都必须提供 earnings_bridge 对象，schema_version=IIOS-EPS-EARNINGS-BRIDGE-0.1、calculation_method=B4_NET_PROFIT_PROXY_MINUS_NCI_PLUS_ADJUSTMENTS_DIVIDED_BY_DILUTED_SHARES、forecast_period 与估值终点一致、scope=COMPANY_WIDE。不可拿 PROJECT_INCREMENTAL/PRODUCT_LINE EBIT、EBITDA 或项目增量利润代替整家公司净利润。"
         "earnings_bridge 必须包含 project_profit_treatment（INCLUDED_IN_COMPANY_WIDE_BASELINE / EXCLUDED_FROM_COMPANY_WIDE_BASELINE / NO_PROJECT_INCREMENTAL_ADJUSTMENT 之一）、non_controlling_interests_after_tax、other_after_tax_attribution_adjustment、diluted_shares；每个数值对象均须包含 value、unit、measure、data_class、basis、evidence_refs、forecast_period、note。非控股股东损益必须非负，其他税后归属调整可正可负，diluted_shares 必须是同一期间加权平均稀释股数的实际 shares 数量，而非百万股。CNY 桥接使用 CNY；本地 B4 未提供 HKD 换算合同，不能把 CNY 利润直接除以 HKD 股数，HKD 只能保留有明确推导说明的 ANALYST_ASSUMPTION 路径。"
-        "本地桥接先取 B4 scope=COMPANY_WIDE 且可用的 net_profit_cny 代理，再减非控股股东税后损益、加其他税后归属调整，除以 weighted average diluted shares，得到计算 EPS，并与申报 EPS 比较；每股绝对差异需不超过 0.005 才视为匹配。差异超出容差时报告 EPS_MISMATCH，不得静默覆写任一数值，必须阻断主估值、回报、目标入场价与 B6。"
+        "本地桥接默认取 B4 scope=COMPANY_WIDE 且可用的 net_profit_cny 代理；只有 cycle_profile.b4_input_decisions 三情景完整一致地显式选择 ADOPT_AS_B4_NET_PROFIT_PROXY 且本地候选输入合同全部通过时，才改用该正常化净利润候选，并同时保存原 B4 计算值、候选值、决策理由、driver_id、证据 refs 与差额，不能静默覆盖 B4/FCF。随后减非控股股东税后损益、加其他税后归属调整，除以 weighted average diluted shares，得到计算 EPS，并与申报 EPS 比较；每股绝对差异需不超过 0.005 才视为匹配。差异超出容差时报告 EPS_MISMATCH，不得静默覆写任一数字，必须阻断主估值、回报、目标入场价与 B6。"
         "项目利润不得重复计价：若基线已含项目须得到操作者显式确认且 B5 不得再次加入；若基线不含项目，则需操作者显式确认并由 B5 已传导；未知处理方式一律阻断。发行人桥中净利润调整与稀释股数须有可识别口径与同期间依据，发行人预测证据引用必须时点兼容且类别/域名一致。"
         "纯 ANALYST_ASSUMPTION 在未提供完整桥接时，须给出清楚、可审计的 assumption_derivation，且保持 ASSUMPTION_ONLY；不得声称它已由公司净利润/稀释股数证实。桥接对象一旦提供但口径/期间/来源/分母不匹配，就失败关闭，不得退化为假设路径。亏损 EPS 或不可识别值保留 UNKNOWN/null，不用负 EPS 乘正 P/E 伪造价值。"
         "本地程序使用 EPS×P/E 复算每股终值和 Base 主估值锚；forecast_valuation 中模型填写的终值/锚仅作未信任诊断。任一输入、EPS 桥、P/E 或情景次序不合格时，回报、目标入场价、B6 均须 UNKNOWN。此处算术和来源类别校验不等于验证预测真实性、倍数公允性或正式估值准入。"
