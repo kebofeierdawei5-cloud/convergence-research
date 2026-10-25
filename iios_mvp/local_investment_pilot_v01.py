@@ -941,8 +941,9 @@ def _evaluate_eps_earnings_bridge(
     unresolved_evidence_ids: list[str] | set[str] | None = None,
     after_cutoff_evidence_ids: list[str] | set[str] | None = None,
     uncertain_timing_evidence_ids: list[str] | set[str] | None = None,
+    normalized_earnings_input_selection: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Reconcile forecast EPS to B4 company-wide net-profit proxy and diluted shares."""
+    """Reconcile forecast EPS to a validated B4 or explicitly adopted normalized net-profit input."""
     def result(status: str, scenarios: Mapping[str, Any] | None = None,
                issues: list[str] | None = None, *, period: str | None = None,
                terminal_date: str | None = None, currency: str | None = None) -> dict[str, Any]:
@@ -1111,6 +1112,16 @@ def _evaluate_eps_earnings_bridge(
 
     driver_scenarios = operating_driver_forecast.get("scenarios")
     driver_scenarios = driver_scenarios if isinstance(driver_scenarios, Mapping) else {}
+    normalized_selection = normalized_earnings_input_selection if isinstance(normalized_earnings_input_selection, Mapping) else {}
+    normalized_selection_status = str(normalized_selection.get("status") or "NO_ADOPTION_REQUESTED").upper()
+    if normalized_selection.get("requested") is True and normalized_selection_status in {"ADOPTION_BLOCKED", "INVALID_DECISION"}:
+        return result(
+            "NOT_LINKED",
+            issues=["NORMALIZED_EARNINGS_INPUT_SELECTION_BLOCKED"] + list(normalized_selection.get("issues") or []),
+            period=period, terminal_date=terminal_date, currency=currency,
+        )
+    normalized_selected_rows = normalized_selection.get("scenarios")
+    normalized_selected_rows = normalized_selected_rows if isinstance(normalized_selected_rows, Mapping) else {}
     driver_scope = str(operating_driver_forecast.get("scope") or "UNKNOWN").strip().upper()
     b5_status = str(valuation_transmission.get("status") or "UNKNOWN").strip().upper()
     scenario_outputs: dict[str, Any] = {}
@@ -1173,12 +1184,38 @@ def _evaluate_eps_earnings_bridge(
             if str(operating_driver_forecast.get("forecast_period") or "").strip().upper() != period:
                 raise ValueError(f"{name.upper()}_B4_EPS_BRIDGE_PERIOD_MISMATCH")
             driver_row = driver_scenarios.get(name)
-            if not isinstance(driver_row, Mapping) or driver_row.get("financial_outputs_decision_usable") is not True:
-                raise ValueError(f"{name.upper()}_B4_COMPANY_WIDE_NET_PROFIT_PROXY_NOT_USABLE")
-            try:
-                b4_net_profit_proxy = _positive(driver_row.get("net_profit_cny"), f"{name.upper()}_B4_NET_PROFIT_PROXY")
-            except LocalInvestmentPilotError:
-                raise ValueError(f"{name.upper()}_B4_NET_PROFIT_PROXY_UNKNOWN_OR_NONPOSITIVE")
+            driver_row = driver_row if isinstance(driver_row, Mapping) else {}
+            selected_normalized_input = normalized_selected_rows.get(name)
+            selected_normalized_input = selected_normalized_input if isinstance(selected_normalized_input, Mapping) else {}
+            normalized_input_applied = (
+                normalized_selected_input.get("status") == "ADOPTED_FOR_EPS_BRIDGE"
+                and selected_normalized_input.get("calculation_input_used") is True
+            )
+            if normalized_input_applied:
+                try:
+                    b4_net_profit_proxy = _positive(
+                        selected_normalized_input.get("candidate_value"),
+                        f"{name.upper()}_NORMALIZED_NET_PROFIT_INPUT",
+                    )
+                except LocalInvestmentPilotError:
+                    raise ValueError(f"{name.upper()}_NORMALIZED_NET_PROFIT_INPUT_UNKNOWN_OR_NONPOSITIVE")
+                earnings_input_source = "NORMALIZED_EARNINGS_CANDIDATE"
+                earnings_input_source_driver_id = str(selected_normalized_input.get("driver_id") or "")
+                earnings_input_source_refs = list(selected_normalized_input.get("evidence_refs") or [])
+                b4_calculated_net_profit_proxy = driver_row.get("net_profit_cny")
+            else:
+                if selected_normalized_input.get("status") in {"ADOPTION_BLOCKED", "ADOPTION_CONFLICT", "INVALID_DECISION"}:
+                    raise ValueError(f"{name.upper()}_NORMALIZED_EARNINGS_INPUT_SELECTION_NOT_VALID")
+                if driver_row.get("financial_outputs_decision_usable") is not True:
+                    raise ValueError(f"{name.upper()}_B4_COMPANY_WIDE_NET_PROFIT_PROXY_NOT_USABLE")
+                try:
+                    b4_net_profit_proxy = _positive(driver_row.get("net_profit_cny"), f"{name.upper()}_B4_NET_PROFIT_PROXY")
+                except LocalInvestmentPilotError:
+                    raise ValueError(f"{name.upper()}_B4_NET_PROFIT_PROXY_UNKNOWN_OR_NONPOSITIVE")
+                earnings_input_source = "B4_CALCULATED_NET_PROFIT_PROXY"
+                earnings_input_source_driver_id = None
+                earnings_input_source_refs = []
+                b4_calculated_net_profit_proxy = driver_row.get("net_profit_cny")
 
             project_treatment = str(raw_bridge.get("project_profit_treatment") or "").strip().upper()
             if project_treatment not in {
@@ -1253,6 +1290,14 @@ def _evaluate_eps_earnings_bridge(
                 "valuation_terminal_date": terminal_date,
                 "scope": "COMPANY_WIDE",
                 "project_profit_treatment": project_treatment,
+                "earnings_input_source": earnings_input_source,
+                "earnings_input_source_driver_id": earnings_input_source_driver_id,
+                "earnings_input_source_evidence_refs": earnings_input_source_refs,
+                "normalized_earnings_input_applied": normalized_input_applied,
+                "b4_calculated_net_profit_proxy_cny": (
+                    str(b4_calculated_net_profit_proxy)
+                    if b4_calculated_net_profit_proxy not in (None, "") else None
+                ),
                 "b4_net_profit_proxy_cny": format(b4_net_profit_proxy, "f"),
                 "non_controlling_interests": nci,
                 "other_after_tax_attribution_adjustment": other_adjustment,
@@ -1303,12 +1348,20 @@ def _evaluate_eps_earnings_bridge(
         overall = "MIXED_CALCULATED_AND_ASSUMPTION_ONLY"
     else:
         overall = "NOT_LINKED"
+    normalized_source_used = any(
+        isinstance(scenario_outputs.get(name), Mapping)
+        and scenario_outputs[name].get("earnings_input_source") == "NORMALIZED_EARNINGS_CANDIDATE"
+        and scenario_outputs[name].get("normalized_earnings_input_applied") is True
+        for name in SCENARIOS
+    )
     if overall in {"CALCULATED", "ASSUMPTION_ONLY", "MIXED_CALCULATED_AND_ASSUMPTION_ONLY"}:
         summary = {
             "CALCULATED": "Bear/Base/Bull EPS 已与 B4 整公司净利润代理、上市公司股东归属调整和同期间加权平均稀释股数完成算术核对。",
             "ASSUMPTION_ONLY": "Bear/Base/Bull EPS 均明确标为分析假设，但未提供可独立复算的公司净利润/稀释股数桥。",
             "MIXED_CALCULATED_AND_ASSUMPTION_ONLY": "EPS 同时包含可复算的净利润/稀释股数情景与明确标记的分析假设情景；请逐情景审阅。",
         }[overall]
+        if normalized_source_used:
+            summary += " 至少一个情景明确采用了经本地合同核对的正常化净利润候选作为 EPS 桥输入；B4 原始经营预测仍保留为独立对照，不被覆盖。"
     elif overall == "EPS_MISMATCH":
         summary = "至少一个情景的申报 EPS 与净利润归属桥 ÷ 加权平均稀释股数不一致；主估值价格链已阻断，没有静默覆盖任一数字。"
     else:
