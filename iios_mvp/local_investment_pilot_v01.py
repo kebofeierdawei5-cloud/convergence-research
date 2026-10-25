@@ -3659,7 +3659,10 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         else "研究回答中的候选模型理由（未经主模型门禁认可）"
     )
     def summary_text(value: Any, *, limit: int = 360) -> str:
-        text = " ".join(str(value or "").split())
+        # Do not collapse numeric 0 / boolean False into UNKNOWN.
+        if value is None:
+            return "UNKNOWN"
+        text = " ".join(str(value).split())
         if not text or text.upper() in {"UNKNOWN", "N/A", "TBD"}:
             return "UNKNOWN"
         return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
@@ -3762,7 +3765,9 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
             risk_name = risk_item.get("name") or risk_item.get("title") or risk_item.get("driver") or "未命名风险"
             severity = risk_item.get("severity") or "UNKNOWN"
             metric = risk_item.get("metric") or "UNKNOWN"
-            threshold = risk_item.get("threshold") or "UNKNOWN"
+            threshold = risk_item.get("threshold")
+            if threshold is None or threshold == "":
+                threshold = "UNKNOWN"
             trigger = risk_item.get("monitoring_trigger") or risk_item.get("trigger") or "UNKNOWN"
             decision_effect = risk_item.get("decision_effect") or risk_item.get("effect") or "触发后动作 UNKNOWN"
             evidence_refs = risk_item.get("evidence_refs") if isinstance(risk_item.get("evidence_refs"), list) else []
