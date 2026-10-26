@@ -6036,6 +6036,15 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
                 f"{show(item.get('product_id'))}: normalized production−sales={show(item.get('normalized_production_minus_sales_tonnes'))} tonnes; historical gap={show(item.get('historical_production_minus_sales_tonnes'))}; change from history={show(item.get('normalized_minus_historical_gap_tonnes'))}; status={show(item.get('status'))}; treatment={show(item.get('treatment'))}; reason={show(item.get('reason'))}; refs={'、'.join(list_values(item.get('evidence_refs'))) or 'UNKNOWN'}"
                 for item in production_sales_balances if isinstance(item, Mapping)
             ) or "UNKNOWN"
+            inventory_wc_check = formula_check.get("inventory_working_capital_reconciliation") if isinstance(formula_check.get("inventory_working_capital_reconciliation"), Mapping) else {}
+            inventory_wc_text = (
+                f"status={show(inventory_wc_check.get('status'))}; inventory component={show(inventory_wc_check.get('inventory_change_total_cny'))} CNY; "
+                f"non-inventory component={show(inventory_wc_check.get('non_inventory_change_working_capital_cny'))} CNY; "
+                f"company total={show(inventory_wc_check.get('company_wide_change_working_capital_cny'))} CNY; "
+                f"recomputed sum={show(inventory_wc_check.get('recomputed_total_cny'))} CNY; "
+                f"difference={show(inventory_wc_check.get('difference_from_company_wide_cny'))} CNY; "
+                f"issues={'、'.join(list_values(inventory_wc_check.get('issues'))) or 'none'}"
+            ) if inventory_wc_check else "NOT_APPLICABLE"
             if operating_bridge:
                 operating_math += (
                     f"；总收入 {show(operating_bridge.get('revenue_cny'))} CNY；总变动成本 {show(operating_bridge.get('variable_cost_cny'))} CNY；"
@@ -6058,7 +6067,7 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
                 f"候选值 {show(decision_row.get('candidate_value', decision_row.get('normalized_value')))}；"
                 f"历史公式复算：{show(formula_check.get('status'))}，声明值−复算值 {show(formula_check.get('difference_declared_minus_calculated'))}，复算值 {show(formula_check.get('calculated_value'))}，权重合计 {show(formula_check.get('weights_sum'))}，加权依据 {show(formula_check.get('weight_basis'))}；"
                 f"公式方法：{show(formula_check.get('method'))}；逐项计算：{formula_math}；"
-                f"经营桥算术：{operating_math or '不适用'}；B4 产品范围/产能核对：{product_scope_text}；历史实际对正常化偏差：{historical_comparison_text}；产量/销量平衡及营运资金处理：{production_sales_balance_text}；"
+                f"经营桥算术：{operating_math or '不适用'}；B4 产品范围/产能核对：{product_scope_text}；历史实际对正常化偏差：{historical_comparison_text}；产量/销量平衡及营运资金处理：{production_sales_balance_text}；库存/非库存营运资金总额勾稽：{inventory_wc_text}；"
                 f"方法交叉核对：{show(method_reconciliation.get('status'))}；选定方法 {show(method_reconciliation.get('selected_method'))}；备选结果 {cross_check_text}；处置 {show(method_reconciliation.get('resolution'))}；理由 {show(method_reconciliation.get('reason'))}；差异 {divergence_text}；"
                 f"输入期间 {'、'.join(list_values(formula_check.get('input_periods'))) or 'UNKNOWN'}；"
                 f"实际进入计算 {show(decision_row.get('calculation_input_used'))}；"
