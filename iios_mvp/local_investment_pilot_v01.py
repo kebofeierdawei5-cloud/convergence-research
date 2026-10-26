@@ -2265,6 +2265,7 @@ def _validate_normalized_operating_driver_bridge(
     product_calculations: list[dict[str, Any]] = []
     capacity_checks: list[dict[str, Any]] = []
     historical_comparison_rows: list[dict[str, Any]] = []
+    contribution_bridge_rows: list[dict[str, Any]] = []
     production_sales_balance_rows: list[dict[str, Any]] = []
     inventory_wc_treatment_product_ids: list[str] = []
     inventory_wc_inputs: list[dict[str, Any]] = []
@@ -2586,6 +2587,77 @@ def _validate_normalized_operating_driver_bridge(
             "issues": list(dict.fromkeys(balance_issues)),
         }
         production_sales_balance_rows.append(balance_row)
+
+        # Use qualified B4 history to decompose the normalized product contribution delta.
+        # Historical quantity, net ASP and unit cost must all pass the source gate.
+        def qualified_history_value(field_name: str) -> Decimal | None:
+            record = historical_actuals.get(field_name)
+            record = record if isinstance(record, Mapping) else {}
+            if record.get("status") != "HISTORICAL_ACTUAL_PRIMARY_SOURCE_QUALIFIED":
+                return None
+            try:
+                value = Decimal(str(record.get("value")))
+                return value if value.is_finite() and value >= 0 else None
+            except (InvalidOperation, TypeError, ValueError):
+                return None
+
+        historical_sales_for_bridge = qualified_history_value("sales_volume_tonnes")
+        historical_asp_for_bridge = qualified_history_value("net_asp_cny_per_tonne")
+        historical_unit_cost_for_bridge = qualified_history_value("variable_cost_cny_per_tonne")
+        contribution_bridge: dict[str, Any] = {
+            "status": "HISTORICAL_ACTUAL_NOT_QUALIFIED",
+            "historical_period": str(b4_product.get("historical_actuals_period") or "UNKNOWN"),
+            "historical_sales_volume_tonnes": format(historical_sales_for_bridge, "f") if historical_sales_for_bridge is not None else None,
+            "historical_net_asp_cny_per_tonne": format(historical_asp_for_bridge, "f") if historical_asp_for_bridge is not None else None,
+            "historical_variable_cost_cny_per_tonne": format(historical_unit_cost_for_bridge, "f") if historical_unit_cost_for_bridge is not None else None,
+            "historical_contribution_cny": None,
+            "normalized_contribution_cny": format(line_revenue - line_variable_cost, "f") if line_revenue is not None and line_variable_cost is not None else None,
+            "total_contribution_delta_cny": None,
+            "volume_effect_cny": None,
+            "net_asp_effect_cny": None,
+            "unit_variable_cost_effect_cny": None,
+            "sum_of_effects_cny": None,
+            "reconciliation_difference_cny": None,
+            "formula": "VOLUME_EFFECT=(Vn-Vh)*(Ph-Ch); NET_ASP_EFFECT=Vn*(Pn-Ph); UNIT_COST_EFFECT=-Vn*(Cn-Ch); sum of effects must equal normalized contribution minus historical contribution",
+        }
+        if (
+            historical_sales_for_bridge is not None
+            and historical_asp_for_bridge is not None
+            and historical_unit_cost_for_bridge is not None
+        ):
+            historical_contribution = historical_sales_for_bridge * historical_asp_for_bridge - historical_sales_for_bridge * historical_unit_cost_for_bridge
+            normalized_contribution = (
+                volume * asp - volume * unit_cost
+                if volume is not None and asp is not None and unit_cost is not None else None
+            )
+            if normalized_contribution is None:
+                contribution_bridge["status"] = "NORMALIZED_INPUT_NOT_IDENTIFIABLE"
+            else:
+                volume_effect = (volume - historical_sales_for_bridge) * (historical_asp_for_bridge - historical_unit_cost_for_bridge)
+                net_asp_effect = volume * (asp - historical_asp_for_bridge)
+                unit_cost_effect = -volume * (unit_cost - historical_unit_cost_for_bridge)
+                sum_effects = volume_effect + net_asp_effect + unit_cost_effect
+                total_delta = normalized_contribution - historical_contribution
+                difference = total_delta - sum_effects
+                contribution_bridge.update({
+                    "status": "ADDITIVE_RECONCILED" if difference == 0 else "ADDITIVE_RECONCILIATION_FAILED",
+                    "historical_contribution_cny": format(historical_contribution, "f"),
+                    "normalized_contribution_cny": format(normalized_contribution, "f"),
+                    "total_contribution_delta_cny": format(total_delta, "f"),
+                    "volume_effect_cny": format(volume_effect, "f"),
+                    "net_asp_effect_cny": format(net_asp_effect, "f"),
+                    "unit_variable_cost_effect_cny": format(unit_cost_effect, "f"),
+                    "sum_of_effects_cny": format(sum_effects, "f"),
+                    "reconciliation_difference_cny": format(difference, "f"),
+                })
+                if difference != 0:
+                    lines_complete = False
+                    issues.append(f"NORMALIZATION_CONTRIBUTION_BRIDGE_RECONCILIATION_FAILED:{product_id}")
+        contribution_bridge_rows.append({
+            "product_id": product_id or None,
+            "product_name": product_name or "UNKNOWN",
+            **contribution_bridge,
+        })
         historical_comparison_rows.append({
             "product_id": product_id or None,
             "product_name": product_name or "UNKNOWN",
@@ -2605,6 +2677,7 @@ def _validate_normalized_operating_driver_bridge(
             "variable_cost_cny": format(line_variable_cost, "f") if line_variable_cost is not None else None,
             "contribution_cny": format(line_revenue - line_variable_cost, "f") if line_revenue is not None and line_variable_cost is not None else None,
             "historical_comparison": historical_comparison,
+            "contribution_bridge": contribution_bridge,
             "production_sales_balance": balance_row,
         })
 
@@ -2807,6 +2880,7 @@ def _validate_normalized_operating_driver_bridge(
         "evidence_refs": list(dict.fromkeys(all_refs)),
         "product_scope_reconciliation": product_scope_reconciliation,
         "historical_deviation_reconciliation": historical_comparison_rows,
+        "contribution_bridge_reconciliation": contribution_bridge_rows,
         "production_sales_balance_reconciliation": production_sales_balance_rows,
         "inventory_working_capital_reconciliation": inventory_wc_reconciliation,
         "coverage_status": coverage_status,
@@ -6015,6 +6089,10 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
                 f"{show(line.get('product_id'))} {show(line.get('product_name'))}: production {show(line.get('production_tonnes'))} t / B4 annual capacity {show(line.get('capacity_tonnes_per_year'))} t [{show(line.get('capacity_feasibility_status'))}]; sales volume {show(line.get('sales_volume_tonnes'))} t × ASP {show(line.get('net_asp_cny_per_tonne'))} = revenue {show(line.get('revenue_cny'))} CNY; unit cost {show(line.get('variable_cost_cny_per_tonne'))}; variable cost {show(line.get('variable_cost_cny'))}; contribution {show(line.get('contribution_cny'))}"
                 for line in operating_lines if isinstance(line, Mapping)
             )
+            contribution_attribution_text = "；".join(
+                f"{show(line.get('product_id'))}: status={show((line.get('contribution_bridge') or {}).get('status'))}; total delta={show((line.get('contribution_bridge') or {}).get('total_contribution_delta_cny'))} CNY; volume effect={show((line.get('contribution_bridge') or {}).get('volume_effect_cny'))}; net ASP effect={show((line.get('contribution_bridge') or {}).get('net_asp_effect_cny'))}; unit cost effect={show((line.get('contribution_bridge') or {}).get('unit_variable_cost_effect_cny'))}; effect sum={show((line.get('contribution_bridge') or {}).get('sum_of_effects_cny'))}; check difference={show((line.get('contribution_bridge') or {}).get('reconciliation_difference_cny'))}"
+                for line in operating_lines if isinstance(line, Mapping)
+            ) or "历史基准不合格/UNKNOWN"
             product_scope_check = formula_check.get("product_scope_reconciliation") if isinstance(formula_check.get("product_scope_reconciliation"), Mapping) else {}
             product_scope_text = (
                 f"{show(product_scope_check.get('status'))}; B4 IDs={','.join(list_values(product_scope_check.get('b4_product_ids'))) or 'UNKNOWN'}; "
@@ -6067,7 +6145,7 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
                 f"候选值 {show(decision_row.get('candidate_value', decision_row.get('normalized_value')))}；"
                 f"历史公式复算：{show(formula_check.get('status'))}，声明值−复算值 {show(formula_check.get('difference_declared_minus_calculated'))}，复算值 {show(formula_check.get('calculated_value'))}，权重合计 {show(formula_check.get('weights_sum'))}，加权依据 {show(formula_check.get('weight_basis'))}；"
                 f"公式方法：{show(formula_check.get('method'))}；逐项计算：{formula_math}；"
-                f"经营桥算术：{operating_math or '不适用'}；B4 产品范围/产能核对：{product_scope_text}；历史实际对正常化偏差：{historical_comparison_text}；产量/销量平衡及营运资金处理：{production_sales_balance_text}；库存/非库存营运资金总额勾稽：{inventory_wc_text}；"
+                f"经营桥算术：{operating_math or '不适用'}；销量/净售价/单位成本贡献变动归因：{contribution_attribution_text}；B4 产品范围/产能核对：{product_scope_text}；历史实际对正常化偏差：{historical_comparison_text}；产量/销量平衡及营运资金处理：{production_sales_balance_text}；库存/非库存营运资金总额勾稽：{inventory_wc_text}；"
                 f"方法交叉核对：{show(method_reconciliation.get('status'))}；选定方法 {show(method_reconciliation.get('selected_method'))}；备选结果 {cross_check_text}；处置 {show(method_reconciliation.get('resolution'))}；理由 {show(method_reconciliation.get('reason'))}；差异 {divergence_text}；"
                 f"输入期间 {'、'.join(list_values(formula_check.get('input_periods'))) or 'UNKNOWN'}；"
                 f"实际进入计算 {show(decision_row.get('calculation_input_used'))}；"
