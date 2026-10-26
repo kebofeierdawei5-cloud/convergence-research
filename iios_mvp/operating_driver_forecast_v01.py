@@ -16,6 +16,12 @@ OPERATING_DRIVER_SCHEMA = "IIOS-OPERATING-DRIVER-FORECAST-0.1"
 SCENARIOS = ("bear", "base", "bull")
 DATA_CLASSES = {"OBSERVED_ACTUAL", "ISSUER_FORECAST", "ANALYST_ASSUMPTION", "UNKNOWN"}
 SCOPES = {"PROJECT_INCREMENTAL", "PRODUCT_LINE", "COMPANY_WIDE", "UNKNOWN"}
+INVENTORY_WORKING_CAPITAL_TREATMENTS = {
+    "INCLUDED_IN_CHANGE_WORKING_CAPITAL",
+    "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL",
+    "NOT_APPLICABLE",
+    "UNKNOWN",
+}
 
 PRODUCT_MEASURES = {
     "capacity_tonnes_per_year": "tonnes/year",
@@ -47,6 +53,23 @@ def _decimal(value: Any, field: str) -> Decimal:
 
 def _render(value: Decimal | None) -> str | None:
     return None if value is None else format(value, "f")
+
+
+def _normalise_product_name(value: Any) -> str:
+    """Collapse leading, trailing and repeated Unicode whitespace in product labels."""
+    return " ".join(str(value or "").split())
+
+
+def _normalise_inventory_working_capital_treatment(value: Any) -> str:
+    """Normalize the explicit inventory inclusion contract without guessing."""
+    raw = " ".join(str(value or "UNKNOWN").split()).upper()
+    aliases = {
+        "INCLUDED": "INCLUDED_IN_CHANGE_WORKING_CAPITAL",
+        "EXCLUDED": "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL",
+        "INCLUDED_IN_TOTAL_WORKING_CAPITAL": "INCLUDED_IN_CHANGE_WORKING_CAPITAL",
+        "EXCLUDED_FROM_TOTAL_WORKING_CAPITAL": "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL",
+    }
+    return aliases.get(raw, raw)
 
 
 def _is_identifiable_basis(value: Any) -> bool:
@@ -264,6 +287,21 @@ def _product_profit_bridge(
     asp = _value(metrics.get("net_asp_cny_per_tonne"))
     unit_cost = _value(metrics.get("variable_cost_cny_per_tonne"))
     capacity_value = _value(capacity)
+    inventory_change_tonnes = production - sales_volume if production is not None and sales_volume is not None else None
+    inventory_cash_impact_proxy = (
+        Decimal("0") if inventory_change_tonnes == 0
+        else inventory_change_tonnes * unit_cost
+        if inventory_change_tonnes is not None and unit_cost is not None
+        else None
+    )
+    if inventory_change_tonnes is None:
+        production_sales_balance_status = "NOT_IDENTIFIABLE"
+    elif inventory_change_tonnes > 0:
+        production_sales_balance_status = "PRODUCTION_EXCEEDS_SALES_INVENTORY_BUILD"
+    elif inventory_change_tonnes < 0:
+        production_sales_balance_status = "SALES_EXCEEDS_PRODUCTION_INVENTORY_DRAWDOWN"
+    else:
+        production_sales_balance_status = "BALANCED_NO_INVENTORY_CHANGE"
     calculated_revenue = sales_volume * asp if sales_volume is not None and asp is not None else None
     direct_revenue = _value(metrics.get("revenue_cny"))
     calculated_variable_cost = sales_volume * unit_cost if sales_volume is not None and unit_cost is not None else None
@@ -295,9 +333,16 @@ def _product_profit_bridge(
                 issues.append("PRODUCTION_ABOVE_NAMEPLATE_CAPACITY_CHECK_PERIOD_OR_SCOPE")
     return {
         "product_id": product_id,
-        "product_name": product_name,
+        "product_name": _normalise_product_name(product_name),
         "production_tonnes": _render(production),
         "sales_volume_tonnes": _render(sales_volume),
+        "inventory_change_tonnes": _render(inventory_change_tonnes),
+        "production_sales_balance_status": production_sales_balance_status,
+        "inventory_cash_impact_proxy_cny": _render(inventory_cash_impact_proxy),
+        "inventory_cash_impact_proxy_basis": (
+            "PRODUCTION_MINUS_SALES_X_VARIABLE_UNIT_COST_PROXY"
+            if inventory_cash_impact_proxy is not None else None
+        ),
         "net_asp_cny_per_tonne": _render(asp),
         "variable_cost_cny_per_tonne": _render(unit_cost),
         "revenue_cny": _render(revenue),
@@ -453,6 +498,78 @@ def _calculate_scenario(
     tax_rate = _value(scenario_measures.get("tax_rate"))
     capex = _value(scenario_measures.get("cash_capex_cny"))
     change_wc = _value(scenario_measures.get("change_working_capital_cny"))
+    inventory_treatment = _normalise_inventory_working_capital_treatment(
+        scenario.get("inventory_working_capital_treatment")
+    )
+    tonnage_basis_present = any(
+        _value(product.get("capacity_tonnes_per_year")) is not None
+        or _value(result.get("inputs", {}).get("production_tonnes")) is not None
+        or _value(result.get("inputs", {}).get("sales_volume_tonnes")) is not None
+        for product, result in zip(products, product_results)
+    )
+    inventory_balance_complete = bool(product_results) and all(
+        result.get("inventory_change_tonnes") is not None for result in product_results
+    )
+    zero_inventory_movement = inventory_balance_complete and all(
+        _decimal(result.get("inventory_change_tonnes"), "INVENTORY_CHANGE_TONNES") == 0
+        for result in product_results
+    )
+    inventory_proxy_complete = inventory_balance_complete and all(
+        result.get("inventory_cash_impact_proxy_cny") is not None for result in product_results
+    )
+    inventory_cash_proxy_total = (
+        sum(
+            (
+                _decimal(result["inventory_cash_impact_proxy_cny"], "INVENTORY_CASH_IMPACT_PROXY")
+                for result in product_results
+            ),
+            Decimal("0"),
+        )
+        if inventory_proxy_complete else None
+    )
+    effective_change_wc: Decimal | None = None
+    inventory_reconciliation_issues: list[str] = []
+    if inventory_treatment not in INVENTORY_WORKING_CAPITAL_TREATMENTS:
+        inventory_reconciliation_status = "INVALID_INVENTORY_WORKING_CAPITAL_TREATMENT"
+        inventory_reconciliation_issues.append("INVENTORY_WORKING_CAPITAL_TREATMENT_INVALID")
+    elif not tonnage_basis_present:
+        effective_change_wc = change_wc
+        inventory_reconciliation_status = "NOT_APPLICABLE_NO_TONNAGE_BASIS"
+    elif inventory_treatment == "INCLUDED_IN_CHANGE_WORKING_CAPITAL":
+        effective_change_wc = change_wc
+        inventory_reconciliation_status = (
+            "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL"
+            if inventory_balance_complete
+            else "INVENTORY_MOVEMENT_NOT_IDENTIFIABLE_TOTAL_WORKING_CAPITAL_DECLARED_INCLUDED"
+        )
+    elif inventory_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL":
+        if not inventory_balance_complete:
+            inventory_reconciliation_status = "INVENTORY_BALANCE_NOT_IDENTIFIABLE_FOR_EXCLUDED_WORKING_CAPITAL"
+            inventory_reconciliation_issues.append("INVENTORY_BALANCE_REQUIRED_WHEN_WORKING_CAPITAL_EXCLUDES_INVENTORY")
+        elif not inventory_proxy_complete:
+            inventory_reconciliation_status = "INVENTORY_COST_PROXY_UNAVAILABLE_FOR_EXCLUDED_WORKING_CAPITAL"
+            inventory_reconciliation_issues.append("INVENTORY_COST_PROXY_REQUIRED_BUT_UNAVAILABLE")
+        elif change_wc is None:
+            inventory_reconciliation_status = "NON_INVENTORY_WORKING_CAPITAL_AMOUNT_UNKNOWN"
+            inventory_reconciliation_issues.append("NON_INVENTORY_WORKING_CAPITAL_AMOUNT_REQUIRED")
+        else:
+            effective_change_wc = change_wc + inventory_cash_proxy_total
+            inventory_reconciliation_status = "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL"
+    elif inventory_treatment == "NOT_APPLICABLE":
+        if zero_inventory_movement:
+            effective_change_wc = change_wc
+            inventory_reconciliation_status = "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED"
+        else:
+            inventory_reconciliation_status = "NOT_APPLICABLE_CONTRADICTS_TONNAGE_INVENTORY_BASIS"
+            inventory_reconciliation_issues.append("INVENTORY_TREATMENT_NOT_APPLICABLE_DESPITE_NONZERO_OR_UNKNOWN_BALANCE")
+    else:
+        if zero_inventory_movement:
+            effective_change_wc = change_wc
+            inventory_reconciliation_status = "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED"
+        else:
+            inventory_reconciliation_status = "INVENTORY_WORKING_CAPITAL_TREATMENT_REQUIRED"
+            inventory_reconciliation_issues.append("INVENTORY_WORKING_CAPITAL_TREATMENT_REQUIRED_FOR_NONZERO_OR_UNKNOWN_BALANCE")
+    issues.extend(inventory_reconciliation_issues)
 
     ebitda = contribution - fixed_opex if contribution is not None and fixed_opex is not None else None
     ebit = ebitda - da if ebitda is not None and da is not None else None
@@ -462,8 +579,8 @@ def _calculate_scenario(
         if pbt is not None and tax_rate is not None else None
     )
     fcf = (
-        ebit - max(ebit, Decimal("0")) * tax_rate + da - capex - change_wc
-        if ebit is not None and tax_rate is not None and da is not None and capex is not None and change_wc is not None
+        ebit - max(ebit, Decimal("0")) * tax_rate + da - capex - effective_change_wc
+        if ebit is not None and tax_rate is not None and da is not None and capex is not None and effective_change_wc is not None
         else None
     )
 
@@ -539,6 +656,10 @@ def _calculate_scenario(
         "tax_rate": tax_rate,
         "cash_capex": capex,
         "change_working_capital": change_wc,
+        "effective_change_working_capital": effective_change_wc,
+        "inventory_working_capital_reconciliation": (
+            None if effective_change_wc is not None else inventory_reconciliation_status
+        ),
     }
     missing_inputs.extend(name for name, value in metric_values.items() if value is None)
     return {
@@ -562,6 +683,10 @@ def _calculate_scenario(
         "net_profit_cny": _render(net_profit),
         "cash_capex_cny": _render(capex),
         "change_working_capital_cny": _render(change_wc),
+        "effective_change_working_capital_cny": _render(effective_change_wc),
+        "inventory_working_capital_treatment": inventory_treatment,
+        "inventory_cash_impact_proxy_cny": _render(inventory_cash_proxy_total),
+        "inventory_reconciliation_status": inventory_reconciliation_status,
         "unlevered_fcf_proxy_cny": _render(fcf),
         "capacity_feasibility_status": capacity_feasibility_status,
         "financial_outputs_decision_usable": financial_outputs_decision_usable,
@@ -655,7 +780,7 @@ def evaluate_operating_driver_forecast(
             actuals_complete = False
             continue
         product_id = str(row.get("product_id") or "").strip()
-        product_name = str(row.get("product_name") or "").strip()
+        product_name = _normalise_product_name(row.get("product_name"))
         if not product_id or not product_name:
             input_issues.append(f"PRODUCT_ROW_{index}_IDENTITY_REQUIRED")
             actuals_complete = False
@@ -740,6 +865,8 @@ def evaluate_operating_driver_forecast(
     limits = [str(x).strip() for x in limits if str(x).strip()] if isinstance(limits, list) else []
     limits.extend([
         "发行人预测、年化产能释放计划与实际产销量不是同一概念；不得将计划数字写成已实现业绩。",
+        "产量−销量的差额作为产品级库存变动处理；FCF 必须声明营运资金是否已包含库存，未闭合时保留 UNKNOWN，不把库存现金影响重复计算或漏算。",
+        "库存现金影响使用产销差额×单位变动成本作为简化代理，不等同于完整财务报表存货计价（可能遗漏固定制造成本、在制品、损耗及产品结构差异）。",
         "情景数字只描述所填驱动假设下的经营桥接，不自动替代现有 Bear/Base/Bull 每股估值。",
         "尚未建立可靠的公司归属净利润、稀释后股数、存量业务替代/蚕食与每股价值传导链。",
         "数值计算结果仍是 PILOT_NON_CANONICAL；不构成正式 Forecast/Valuation Admission 或投资授权。",
@@ -853,6 +980,10 @@ def render_operating_driver_section(
             f"  - 历史收入：{_display_optional_scalar(bridge.get('revenue_cny'))}；识别口径：{bridge.get('revenue_basis') or 'UNKNOWN'}；"
             f"销量×单位变动成本：{_display_optional_scalar(bridge.get('variable_cost_cny'))}。"
         )
+        lines.append(
+            f"  - 历史产销差额（产量−销量）：{_display_optional_scalar(bridge.get('inventory_change_tonnes'))} 吨；"
+            f"库存现金影响代理：{_display_optional_scalar(bridge.get('inventory_cash_impact_proxy_cny'))} CNY（产销差额×单位变动成本，仅为代理）。"
+        )
         if bridge.get("production_utilization") is not None:
             lines.append(f"  - 产能利用率（产量/年产能）：{Decimal(bridge['production_utilization']) * Decimal('100')}%（仅当期间与容量口径可比时成立）")
         for issue in bridge.get("issues") or []:
@@ -881,7 +1012,8 @@ def render_operating_driver_section(
             f"- 收入：{_display_optional_scalar(result.get('revenue_cny'))}；变动成本：{_display_optional_scalar(result.get('variable_cost_cny'))}；扣变动成本贡献：{_display_optional_scalar(result.get('contribution_after_variable_cost_cny'))}",
             f"- 成本率：{_display_optional_scalar(result.get('cost_of_revenue_ratio'))}；变动成本计算口径：{result.get('variable_cost_basis') or 'UNKNOWN'}",
             f"- EBITDA / EBIT / 税前利润 / 净利润：{_display_optional_scalar(result.get('ebitda_cny'))} / {_display_optional_scalar(result.get('ebit_cny'))} / {_display_optional_scalar(result.get('profit_before_tax_cny'))} / {_display_optional_scalar(result.get('net_profit_cny'))}",
-            f"- 资本开支 / 营运资金变动 / 自由现金流代理：{_display_optional_scalar(result.get('cash_capex_cny'))} / {_display_optional_scalar(result.get('change_working_capital_cny'))} / {_display_optional_scalar(result.get('unlevered_fcf_proxy_cny'))}",
+            f"- 资本开支 / 声明营运资金变动 / 纳入 FCF 的有效营运资金变动 / 自由现金流代理：{_display_optional_scalar(result.get('cash_capex_cny'))} / {_display_optional_scalar(result.get('change_working_capital_cny'))} / {_display_optional_scalar(result.get('effective_change_working_capital_cny'))} / {_display_optional_scalar(result.get('unlevered_fcf_proxy_cny'))}",
+            f"- 库存衔接：{result.get('inventory_reconciliation_status', 'UNKNOWN')}；处理口径：{result.get('inventory_working_capital_treatment', 'UNKNOWN')}；库存现金影响代理：{_display_optional_scalar(result.get('inventory_cash_impact_proxy_cny'))} CNY（产销差额×单位变动成本，非完整会计存货估值）。",
             f"- 产能可行性：{result.get('capacity_feasibility_status', 'UNKNOWN')}；财务结果可用于下游估值：{result.get('financial_outputs_decision_usable', False)}",
             f"- {valuation_label}：{scenario_terminal_display} {currency}",
         ])
@@ -907,6 +1039,8 @@ def render_operating_driver_section(
                 lines.append(
                     f"  - {product['product_name']}：产量 {_display(product['inputs'].get('production_tonnes'))}；"
                     f"销量 {_display(product['inputs'].get('sales_volume_tonnes'))}；"
+                    f"产销差额（产量−销量）{_display_optional_scalar(product.get('inventory_change_tonnes'))} 吨；"
+                    f"库存现金影响代理 {_display_optional_scalar(product.get('inventory_cash_impact_proxy_cny'))} CNY；"
                     f"净售价 {_display(product['inputs'].get('net_asp_cny_per_tonne'))}；"
                     f"单位变动成本 {_display(product['inputs'].get('variable_cost_cny_per_tonne'))}；"
                     f"产能利用率 {_display({'value': str(Decimal(product['production_utilization']) * Decimal('100')), 'unit': '%', 'calculation_usable': True}) if product.get('production_utilization') is not None else 'UNKNOWN'}。"
