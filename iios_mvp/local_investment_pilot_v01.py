@@ -2046,11 +2046,17 @@ def _normalize_cycle_profile(raw: Any) -> dict[str, Any]:
         status = "REPORTED_NOT_FORMALLY_ADMITTED" if complete else ("PARTIAL" if value is not None or value_status.startswith("INVALID") else "UNKNOWN")
         calculation_raw = source.get("normalization_calculation", source.get("calculation"))
         calculation = dict(calculation_raw) if isinstance(calculation_raw, Mapping) else None
+        cross_checks_raw = source.get("normalization_cross_checks")
+        cross_checks = [dict(item) for item in cross_checks_raw if isinstance(item, Mapping)] if isinstance(cross_checks_raw, list) else []
+        method_reconciliation_raw = source.get("normalization_method_reconciliation")
+        method_reconciliation = dict(method_reconciliation_raw) if isinstance(method_reconciliation_raw, Mapping) else {}
         return {
             "status": status, "value": value, "value_status": value_status,
             "unit": point_unit, "period": point_period, "basis": point_basis,
             "data_class": data_class, "evidence_refs": point_refs,
             "normalization_calculation": calculation,
+            "normalization_cross_checks": cross_checks,
+            "normalization_method_reconciliation": method_reconciliation,
         }
     current = point(
         raw.get("current_earnings", raw.get("current_earnings_reference")),
@@ -2747,6 +2753,102 @@ def _prepare_cycle_normalized_profit_inputs(
             )
             if calculation_validation.get("status") != "FORMULA_RECOMPUTED_NOT_ADMITTED":
                 issues.extend(calculation_validation.get("issues") or ["NORMALIZATION_CALCULATION_NOT_VALID"])
+
+            cross_check_results: list[dict[str, Any]] = []
+            cross_check_values: list[Decimal] = []
+            raw_cross_checks = range_row.get("normalization_cross_checks")
+            raw_cross_checks = raw_cross_checks if isinstance(raw_cross_checks, list) else []
+            for cross_index, raw_cross in enumerate(raw_cross_checks, start=1):
+                if not isinstance(raw_cross, Mapping):
+                    cross_check_results.append({
+                        "label": f"CROSS_CHECK_{cross_index}",
+                        "status": "CALCULATION_BLOCKED",
+                        "issues": ["NORMALIZATION_CROSS_CHECK_MUST_BE_OBJECT"],
+                    })
+                    issues.append("NORMALIZATION_CROSS_CHECK_MUST_BE_OBJECT")
+                    continue
+                cross_validation = _validate_normalized_profit_calculation(
+                    raw_calculation=raw_cross.get("normalization_calculation", raw_cross.get("calculation")),
+                    declared_value=raw_cross.get("value", raw_cross.get("declared_value")),
+                    declared_unit=raw_cross.get("unit", range_row.get("unit")),
+                    declared_period=raw_cross.get("period", range_row.get("period")),
+                    declared_data_class=raw_cross.get("data_class", "ANALYST_ASSUMPTION"),
+                    expected_period=b4_period,
+                    evidence_register=evidence_register,
+                    unresolved_evidence_ids=unresolved,
+                    after_cutoff_evidence_ids=after_cutoff,
+                    uncertain_timing_evidence_ids=uncertain,
+                )
+                try:
+                    cross_value = Decimal(str(cross_validation.get("calculated_value")))
+                    if not cross_value.is_finite():
+                        raise InvalidOperation
+                    cross_check_values.append(cross_value)
+                except (InvalidOperation, TypeError, ValueError):
+                    cross_value = None
+                cross_check_results.append({
+                    "label": str(raw_cross.get("label") or f"CROSS_CHECK_{cross_index}"),
+                    "status": cross_validation.get("status"),
+                    "method": cross_validation.get("method"),
+                    "declared_value": str(raw_cross.get("value", raw_cross.get("declared_value")) or "UNKNOWN"),
+                    "calculated_value": cross_validation.get("calculated_value"),
+                    "issues": list(cross_validation.get("issues") or []),
+                    "validation": cross_validation,
+                })
+            primary_value_raw = calculation_validation.get("calculated_value")
+            try:
+                primary_value = Decimal(str(primary_value_raw))
+                if not primary_value.is_finite():
+                    raise InvalidOperation
+            except (InvalidOperation, TypeError, ValueError):
+                primary_value = None
+            valid_cross_values = [
+                Decimal(str(row["calculated_value"]))
+                for row in cross_check_results
+                if row.get("status") == "FORMULA_RECOMPUTED_NOT_ADMITTED" and row.get("calculated_value") not in (None, "")
+            ]
+            divergences = [
+                {"label": row["label"], "calculated_value": row["calculated_value"],
+                 "difference_from_selected_cny": format(Decimal(str(row["calculated_value"])) - primary_value, "f")}
+                for row in cross_check_results
+                if row.get("status") == "FORMULA_RECOMPUTED_NOT_ADMITTED"
+                and primary_value is not None and row.get("calculated_value") not in (None, "")
+                and Decimal(str(row["calculated_value"])) != primary_value
+            ]
+            raw_method_reconciliation = range_row.get("normalization_method_reconciliation")
+            raw_method_reconciliation = raw_method_reconciliation if isinstance(raw_method_reconciliation, Mapping) else {}
+            resolution = str(raw_method_reconciliation.get("resolution") or "").strip().upper()
+            resolution_reason = str(raw_method_reconciliation.get("reason") or "").strip()
+            method_reconciliation_status = "NOT_APPLICABLE"
+            if raw_cross_checks:
+                if any(row.get("status") != "FORMULA_RECOMPUTED_NOT_ADMITTED" for row in cross_check_results):
+                    method_reconciliation_status = "CROSS_CHECK_INVALID"
+                    issues.append("NORMALIZATION_METHOD_CROSS_CHECK_INVALID")
+                elif divergences:
+                    if resolution == "KEEP_SELECTED_METHOD_WITH_EXPLANATION" and _is_identifiable_evidence_text(resolution_reason):
+                        method_reconciliation_status = "DIVERGENCE_EXPLAINED_SELECTED_METHOD_RETAINED"
+                    elif resolution == "BLOCK_ADOPTION":
+                        method_reconciliation_status = "DIVERGENCE_EXPLICITLY_BLOCKED"
+                        issues.append("NORMALIZATION_METHOD_DIVERGENCE_EXPLICITLY_BLOCKS_ADOPTION")
+                    else:
+                        method_reconciliation_status = "DIVERGENCE_REQUIRES_EXPLANATION_OR_BLOCK"
+                        issues.append("NORMALIZATION_METHOD_DIVERGENCE_REQUIRES_EXPLICIT_RESOLUTION")
+                else:
+                    method_reconciliation_status = "MATCHED_ALL_CROSS_CHECKS"
+                    if resolution not in {"", "NO_DIVERGENCE"}:
+                        issues.append("NORMALIZATION_METHOD_RECONCILIATION_RESOLUTION_CONTRADICTS_MATCHED_VALUES")
+            method_reconciliation = {
+                "status": method_reconciliation_status,
+                "resolution": resolution or ("NO_DIVERGENCE" if raw_cross_checks and not divergences else "NOT_PROVIDED"),
+                "reason": resolution_reason or "UNKNOWN",
+                "selected_method": calculation_validation.get("method"),
+                "selected_value": calculation_validation.get("calculated_value"),
+                "cross_checks": cross_check_results,
+                "divergences": divergences,
+                "all_cross_checks_recomputed": bool(raw_cross_checks) and all(
+                    row.get("status") == "FORMULA_RECOMPUTED_NOT_ADMITTED" for row in cross_check_results
+                ),
+            }
             try:
                 normalized_value = _positive(calculation_validation.get("calculated_value"), f"{scenario.upper()}_NORMALIZED_NET_PROFIT")
             except LocalInvestmentPilotError:
@@ -2775,6 +2877,7 @@ def _prepare_cycle_normalized_profit_inputs(
             normalized.update({
                 "candidate_value": format(normalized_value, "f") if normalized_value is not None else None,
                 "normalization_calculation_validation": calculation_validation,
+                "normalization_method_reconciliation": method_reconciliation,
                 "evidence_refs": refs,
                 "status": "ADOPTION_CANDIDATE_VALIDATED" if not issues else "ADOPTION_BLOCKED",
                 "issues": list(dict.fromkeys(issues)),
