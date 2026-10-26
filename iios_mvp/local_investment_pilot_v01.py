@@ -2308,7 +2308,7 @@ def _validate_normalized_operating_driver_bridge(
                     capacity = None
         except (InvalidOperation, TypeError, ValueError):
             capacity = None
-        capacity_status = "B4_CAPACITY_UNKNOWN"
+        capacity_status = str(b4_product.get("capacity_status") or "B4_CAPACITY_UNKNOWN") if capacity is None else "B4_CAPACITY_SOURCE_QUALIFIED"
         utilization = None
         if capacity is not None and not full_year_period:
             capacity_status = "PERIOD_ALIGNMENT_UNKNOWN"
@@ -2327,6 +2327,9 @@ def _validate_normalized_operating_driver_bridge(
         capacity_checks.append({
             "product_id": product_id or None,
             "b4_capacity_tonnes_per_year": format(capacity, "f") if capacity is not None else None,
+            "b4_capacity_source_status": str(b4_product.get("capacity_status") or "B4_CAPACITY_UNKNOWN"),
+            "b4_capacity_data_class": str(b4_product.get("capacity_data_class") or "UNKNOWN"),
+            "b4_capacity_evidence_refs": list(b4_product.get("capacity_evidence_refs") or []) if isinstance(b4_product.get("capacity_evidence_refs"), list) else [],
             "normalized_production_tonnes": format(production, "f") if production is not None else None,
             "production_utilization_ratio": format(utilization, "f") if utilization is not None else None,
             "status": capacity_status,
@@ -2734,7 +2737,6 @@ def _prepare_cycle_normalized_profit_inputs(
     b4_scenarios = b4_scenarios if isinstance(b4_scenarios, Mapping) else {}
     b4_scope = _cycle_normalization_scope(operating_driver_forecast.get("scope"))
     b4_period = _cycle_normalization_period(operating_driver_forecast.get("forecast_period"))
-    b4_product_context = _cycle_normalization_b4_product_context(operating_driver_forecast)
     currency = str(expected_currency or "UNKNOWN").strip().upper()
     sources = {
         str(row.get("source_id")): row for row in evidence_register
@@ -2743,6 +2745,13 @@ def _prepare_cycle_normalized_profit_inputs(
     unresolved = set(unresolved_evidence_ids or [])
     after_cutoff = set(after_cutoff_evidence_ids or [])
     uncertain = set(uncertain_timing_evidence_ids or [])
+    b4_product_context = _cycle_normalization_b4_product_context(
+        operating_driver_forecast,
+        evidence_register=evidence_register,
+        unresolved_evidence_ids=unresolved,
+        after_cutoff_evidence_ids=after_cutoff,
+        uncertain_timing_evidence_ids=uncertain,
+    )
     candidate_by_scenario: dict[str, list[dict[str, Any]]] = {name: [] for name in SCENARIOS}
     decisions: dict[str, list[dict[str, Any]]] = {name: [] for name in SCENARIOS}
 
@@ -3247,11 +3256,19 @@ def _cycle_normalization_period(value: Any) -> str:
     return re.sub(r"\s+", "", str(value or "").strip().upper()) or "UNKNOWN"
 
 
-def _cycle_normalization_b4_product_context(operating_driver_forecast: Mapping[str, Any]) -> dict[str, Any]:
-    """Return B4's canonical product identities and known annual capacity values.
+def _cycle_normalization_b4_product_context(
+    operating_driver_forecast: Mapping[str, Any],
+    *,
+    evidence_register: list[dict[str, Any]],
+    unresolved_evidence_ids: list[str] | set[str] | None = None,
+    after_cutoff_evidence_ids: list[str] | set[str] | None = None,
+    uncertain_timing_evidence_ids: list[str] | set[str] | None = None,
+) -> dict[str, Any]:
+    """Return B4 product identity and only source-qualified annual capacity constraints.
 
-    This is a scope/constraint cross-check only. It does not verify source truth,
-    formally admit B4, or convert an unknown capacity into an estimate.
+    Capacity values are hard constraints only when they are explicitly typed,
+    cutoff-compatible, and linked to a recognized official exchange/regulator
+    domain. An analyst-entered capacity is never promoted to a factual ceiling.
     """
     raw_rows = operating_driver_forecast.get("product_lines")
     raw_rows = raw_rows if isinstance(raw_rows, list) else []
@@ -3268,12 +3285,20 @@ def _cycle_normalization_b4_product_context(operating_driver_forecast: Mapping[s
     ):
         issues.append("B4_PRODUCT_IDENTITY_INPUT_ISSUES_PRESENT")
 
+    sources = {
+        str(row.get("source_id")): row for row in evidence_register
+        if isinstance(row, Mapping) and str(row.get("source_id") or "").strip()
+    }
+    unresolved = set(unresolved_evidence_ids or [])
+    after_cutoff = set(after_cutoff_evidence_ids or [])
+    uncertain = set(uncertain_timing_evidence_ids or [])
+
     for index, row in enumerate(raw_rows, start=1):
         if not isinstance(row, Mapping):
             issues.append(f"B4_PRODUCT_CONTEXT_ROW_{index}_INVALID")
             continue
         product_id = str(row.get("product_id") or "").strip()
-        product_name = re.sub(r"\s+", " ", str(row.get("product_name") or "").strip())
+        product_name = re.sub(r"\\s+", " ", str(row.get("product_name") or "").strip())
         if not product_id or not product_name:
             issues.append(f"B4_PRODUCT_CONTEXT_ROW_{index}_IDENTITY_MISSING")
             continue
@@ -3283,24 +3308,69 @@ def _cycle_normalization_b4_product_context(operating_driver_forecast: Mapping[s
 
         raw_capacity = row.get("capacity_tonnes_per_year")
         capacity_value = None
-        capacity_status = "UNKNOWN"
-        if isinstance(raw_capacity, Mapping) and raw_capacity.get("calculation_usable") is True:
-            raw_value = raw_capacity.get("value")
-            raw_unit = str(raw_capacity.get("unit") or "").strip().lower()
-            if raw_value not in (None, "") and raw_unit == "tonnes/year":
-                try:
-                    parsed_capacity = Decimal(str(raw_value))
-                    if parsed_capacity.is_finite() and parsed_capacity >= 0:
-                        capacity_value = parsed_capacity
-                        capacity_status = "KNOWN_B4_TYPED_CAPACITY"
-                except (InvalidOperation, TypeError, ValueError):
-                    pass
+        capacity_status = "CAPACITY_UNKNOWN"
+        capacity_data_class = "UNKNOWN"
+        capacity_refs: list[str] = []
+        if not isinstance(raw_capacity, Mapping):
+            capacity_status = "CAPACITY_INPUT_NOT_TYPED"
+        else:
+            capacity_data_class = str(raw_capacity.get("data_class") or "UNKNOWN").strip().upper()
+            refs_raw = raw_capacity.get("evidence_refs")
+            capacity_refs = list(dict.fromkeys(
+                str(ref).strip() for ref in refs_raw if str(ref).strip()
+            )) if isinstance(refs_raw, list) else []
+            if capacity_data_class not in {"OBSERVED_ACTUAL", "ISSUER_FORECAST"}:
+                capacity_status = "CAPACITY_CLASS_NOT_FACTUAL_OR_ISSUER_FORECAST"
+            elif not capacity_refs:
+                capacity_status = "CAPACITY_EVIDENCE_REFS_MISSING"
+            else:
+                refs_are_qualified = True
+                for ref in capacity_refs:
+                    source = sources.get(ref)
+                    if (
+                        source is None or ref in unresolved or ref in after_cutoff or ref in uncertain
+                        or source.get("time_status") != "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+                    ):
+                        refs_are_qualified = False
+                        break
+                    source_class = str(source.get("source_class") or "").strip().upper()
+                    domain_status = str(source.get("source_domain_class_status") or "").strip().upper()
+                    if source_class == "EXCHANGE_PRIMARY":
+                        if domain_status != "OFFICIAL_EXCHANGE_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED":
+                            refs_are_qualified = False
+                            break
+                    elif source_class == "REGULATOR_PRIMARY":
+                        if domain_status != "OFFICIAL_REGULATOR_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED":
+                            refs_are_qualified = False
+                            break
+                    else:
+                        refs_are_qualified = False
+                        break
+
+                if not refs_are_qualified:
+                    capacity_status = "CAPACITY_SOURCE_NOT_CUTOFF_COMPATIBLE_OFFICIAL_PRIMARY"
+                elif raw_capacity.get("calculation_usable") is not True:
+                    capacity_status = "CAPACITY_INPUT_NOT_CALCULATION_USABLE"
+                elif str(raw_capacity.get("unit") or "").strip().lower() != "tonnes/year":
+                    capacity_status = "CAPACITY_UNIT_NOT_TONNES_PER_YEAR"
+                else:
+                    try:
+                        parsed_capacity = Decimal(str(raw_capacity.get("value")))
+                        if parsed_capacity.is_finite() and parsed_capacity >= 0:
+                            capacity_value = parsed_capacity
+                            capacity_status = "KNOWN_B4_PRIMARY_SOURCE_CAPACITY"
+                        else:
+                            capacity_status = "CAPACITY_VALUE_INVALID"
+                    except (InvalidOperation, TypeError, ValueError):
+                        capacity_status = "CAPACITY_VALUE_INVALID"
 
         product_context[product_id] = {
             "product_id": product_id,
             "product_name": product_name,
             "capacity_tonnes_per_year": format(capacity_value, "f") if capacity_value is not None else None,
             "capacity_status": capacity_status,
+            "capacity_data_class": capacity_data_class,
+            "capacity_evidence_refs": capacity_refs,
         }
 
     return {
@@ -3310,7 +3380,6 @@ def _cycle_normalization_b4_product_context(operating_driver_forecast: Mapping[s
         "issues": list(dict.fromkeys(issues)),
         "capacity_values_are_constraints_not_verified_facts": True,
     }
-
 
 def _build_cycle_normalization_reconciliation(
     *,
