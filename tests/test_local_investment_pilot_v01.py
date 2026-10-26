@@ -2601,6 +2601,44 @@ def test_b42_sales_exceeding_production_models_inventory_release():
     assert base["unlevered_fcf_proxy_cny"] == "299500.00"
 
 
+def test_b43_b4_reconciliation_compares_effective_not_raw_working_capital():
+    from iios_mvp.local_investment_pilot_v01 import _reconcile_b4_valuation_bridge
+
+    driver = {
+        "scenarios": {
+            name: {
+                "change_working_capital_cny": "3000",
+                "effective_change_working_capital_cny": "23000",
+            } if name == "base" else {}
+            for name in ("bear", "base", "bull")
+        }
+    }
+    valuation = {
+        "scenarios": {
+            "base": {
+                "operating_financial_bridge": {
+                    # The main valuation bridge states total WC including the
+                    # inventory proxy; B4's raw non-inventory component is 3,000.
+                    "change_working_capital_cny": "23000",
+                }
+            }
+        }
+    }
+
+    result = _reconcile_b4_valuation_bridge(driver, valuation)
+    base_checks = result["scenarios"]["base"]["checks"]
+    wc_checks = [
+        row for row in base_checks
+        if row["valuation_field"] == "change_working_capital_cny"
+    ]
+
+    assert len(wc_checks) == 1
+    assert wc_checks[0]["driver_field"] == "effective_change_working_capital_cny"
+    assert wc_checks[0]["status"] == "MATCH"
+    assert wc_checks[0]["driver_value"] == "23000"
+    assert wc_checks[0]["valuation_value"] == "23000"
+
+
 def test_b42_product_names_collapse_unicode_whitespace_and_blank_names_fail_closed():
     from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
 
