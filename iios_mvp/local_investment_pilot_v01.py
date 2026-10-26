@@ -2114,6 +2114,269 @@ def _normalize_cycle_profile(raw: Any) -> dict[str, Any]:
     }
 
 
+def _validate_normalized_operating_driver_bridge(
+    *,
+    raw_calculation: Any,
+    declared_value: Any,
+    declared_unit: Any,
+    declared_period: Any,
+    declared_data_class: Any,
+    expected_period: Any,
+    evidence_register: list[dict[str, Any]],
+    unresolved_evidence_ids: list[str] | set[str] | None = None,
+    after_cutoff_evidence_ids: list[str] | set[str] | None = None,
+    uncertain_timing_evidence_ids: list[str] | set[str] | None = None,
+) -> dict[str, Any]:
+    """Recompute normalized company earnings and an FCF cross-check from operating drivers."""
+    issues: list[str] = []
+    if not isinstance(raw_calculation, Mapping):
+        raw_calculation = {}
+    calc = raw_calculation
+    schema = str(calc.get("schema_version") or "").strip()
+    method = str(calc.get("method") or "").strip().upper()
+    target_measure = str(calc.get("target_measure") or "").strip().upper()
+    scope = _cycle_normalization_scope(calc.get("target_scope", calc.get("scope")))
+    output_unit = _cycle_normalization_unit(calc.get("output_unit", calc.get("unit")))
+    output_period = _cycle_normalization_period(calc.get("output_period", calc.get("forecast_period")))
+    declared_unit_norm = _cycle_normalization_unit(declared_unit)
+    declared_period_norm = _cycle_normalization_period(declared_period)
+    expected_period_norm = _cycle_normalization_period(expected_period)
+    if schema != "IIOS-NORMALIZATION-CALCULATION-0.1":
+        issues.append("NORMALIZATION_CALCULATION_SCHEMA_MISMATCH")
+    if method != "NORMALIZED_OPERATING_DRIVER_BRIDGE":
+        issues.append("NORMALIZATION_FORMULA_TYPE_UNSUPPORTED")
+    if target_measure != "COMPANY_WIDE_NET_PROFIT_PROXY":
+        issues.append("NORMALIZATION_CALCULATION_TARGET_MEASURE_MISMATCH")
+    if scope != "COMPANY_WIDE":
+        issues.append("NORMALIZATION_CALCULATION_SCOPE_MUST_BE_COMPANY_WIDE")
+    if output_unit != "CNY" or declared_unit_norm != "CNY":
+        issues.append("NORMALIZATION_CALCULATION_REQUIRES_CNY_UNIT")
+    if output_period == "UNKNOWN" or output_period != expected_period_norm or declared_period_norm != expected_period_norm:
+        issues.append("NORMALIZATION_CALCULATION_PERIOD_MISMATCH")
+    if str(declared_data_class or "").strip().upper() != "ANALYST_ASSUMPTION":
+        issues.append("NORMALIZED_OPERATING_BRIDGE_OUTPUT_MUST_BE_ANALYST_ASSUMPTION")
+    coverage_status = str(calc.get("coverage_status") or "").strip().upper()
+    coverage_basis = str(calc.get("coverage_basis") or "").strip()
+    if coverage_status != "ALL_MATERIAL_REVENUE_LINES_INCLUDED":
+        issues.append("NORMALIZATION_OPERATING_BRIDGE_COVERAGE_NOT_CONFIRMED")
+    if not _is_identifiable_evidence_text(coverage_basis):
+        issues.append("NORMALIZATION_OPERATING_BRIDGE_COVERAGE_BASIS_NOT_IDENTIFIABLE")
+
+    sources = {
+        str(row.get("source_id")): row for row in evidence_register
+        if isinstance(row, Mapping) and str(row.get("source_id") or "").strip()
+    }
+    unresolved = set(unresolved_evidence_ids or [])
+    after_cutoff = set(after_cutoff_evidence_ids or [])
+    uncertain = set(uncertain_timing_evidence_ids or [])
+    all_refs: list[str] = []
+    validated_inputs: dict[str, dict[str, Any]] = {}
+    calc_cache: dict[str, Decimal | None] = {}
+
+    def parse_measure(raw_measure: Any, *, key: str, expected_unit: str, allow_negative: bool = False,
+                      minimum: Decimal | None = None, maximum: Decimal | None = None) -> Decimal | None:
+        field_issues: list[str] = []
+        if not isinstance(raw_measure, Mapping):
+            issues.append(f"NORMALIZATION_OPERATING_INPUT_OBJECT_REQUIRED:{key}")
+            validated_inputs[key] = {"value": None, "unit": expected_unit, "status": "UNKNOWN", "issues": ["INPUT_OBJECT_REQUIRED"]}
+            return None
+        unit = _cycle_normalization_unit(raw_measure.get("unit"))
+        if expected_unit != "CNY":
+            unit = str(raw_measure.get("unit") or "").strip().lower()
+            if unit != expected_unit.lower():
+                field_issues.append(f"UNIT_MISMATCH_EXPECTED_{expected_unit}")
+        elif unit != "CNY":
+            field_issues.append("UNIT_MISMATCH_EXPECTED_CNY")
+        period = _cycle_normalization_period(raw_measure.get("period"))
+        if period != output_period:
+            field_issues.append("PERIOD_MUST_MATCH_NORMALIZATION_OUTPUT")
+        data_class = str(raw_measure.get("data_class") or "").strip().upper()
+        if data_class != "ANALYST_ASSUMPTION":
+            field_issues.append("NORMALIZED_OPERATING_INPUT_MUST_BE_ANALYST_ASSUMPTION")
+        basis = str(raw_measure.get("basis") or "").strip()
+        if not _is_identifiable_evidence_text(basis):
+            field_issues.append("INPUT_BASIS_NOT_IDENTIFIABLE")
+        refs_raw = raw_measure.get("evidence_refs")
+        refs = list(dict.fromkeys(str(ref).strip() for ref in refs_raw if str(ref).strip())) if isinstance(refs_raw, list) else []
+        if not refs:
+            field_issues.append("INPUT_EVIDENCE_REFS_REQUIRED")
+        for ref in refs:
+            all_refs.append(ref)
+            source = sources.get(ref)
+            if (
+                source is None or ref in unresolved or ref in after_cutoff or ref in uncertain
+                or source.get("time_status") != "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+            ):
+                field_issues.append(f"INPUT_EVIDENCE_NOT_CUTOFF_COMPATIBLE:{ref}")
+                continue
+            source_class = str(source.get("source_class") or "").strip().upper()
+            domain_status = str(source.get("source_domain_class_status") or "").strip().upper()
+            if source_class == "EXCHANGE_PRIMARY":
+                if domain_status != "OFFICIAL_EXCHANGE_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED":
+                    field_issues.append(f"INPUT_EXCHANGE_DOMAIN_NOT_MATCHED:{ref}")
+            elif source_class == "REGULATOR_PRIMARY":
+                if domain_status != "OFFICIAL_REGULATOR_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED":
+                    field_issues.append(f"INPUT_REGULATOR_DOMAIN_NOT_MATCHED:{ref}")
+            else:
+                field_issues.append(f"INPUT_REQUIRES_EXCHANGE_OR_REGULATOR_DOMAIN_MATCH:{ref}")
+        try:
+            value = Decimal(str(raw_measure.get("value")))
+            if not value.is_finite():
+                raise InvalidOperation
+            if not allow_negative and value < 0:
+                field_issues.append("NEGATIVE_VALUE_NOT_ALLOWED")
+            if minimum is not None and value < minimum:
+                field_issues.append(f"VALUE_BELOW_MINIMUM_{minimum}")
+            if maximum is not None and value > maximum:
+                field_issues.append(f"VALUE_ABOVE_MAXIMUM_{maximum}")
+        except (InvalidOperation, TypeError, ValueError):
+            value = None
+            field_issues.append("VALUE_MUST_BE_FINITE_NUMERIC")
+        issues.extend(f"{key}:{item}" for item in field_issues)
+        validated_inputs[key] = {
+            "value": format(value, "f") if value is not None else None,
+            "unit": expected_unit,
+            "period": period,
+            "data_class": data_class,
+            "basis": basis or "UNKNOWN",
+            "evidence_refs": refs,
+            "status": "PASS" if not field_issues and value is not None else "BLOCKED",
+            "issues": field_issues,
+        }
+        calc_cache[key] = value
+        return value
+
+    product_rows = calc.get("product_lines")
+    product_rows = product_rows if isinstance(product_rows, list) else []
+    if not product_rows:
+        issues.append("NORMALIZATION_OPERATING_BRIDGE_REQUIRES_PRODUCT_LINES")
+    product_ids: set[str] = set()
+    product_calculations: list[dict[str, Any]] = []
+    revenue_total = Decimal("0")
+    variable_cost_total = Decimal("0")
+    lines_complete = bool(product_rows)
+    for index, product in enumerate(product_rows, start=1):
+        if not isinstance(product, Mapping):
+            issues.append(f"NORMALIZATION_PRODUCT_LINE_{index}_OBJECT_REQUIRED")
+            lines_complete = False
+            continue
+        product_id = str(product.get("product_id") or "").strip()
+        product_name = str(product.get("product_name") or "").strip()
+        if not product_id or product_id in product_ids:
+            issues.append(f"NORMALIZATION_PRODUCT_LINE_{index}_IDENTITY_MISSING_OR_DUPLICATE")
+            lines_complete = False
+        product_ids.add(product_id)
+        prefix = f"product_lines[{product_id or index}]"
+        volume = parse_measure(product.get("normalized_sales_volume_tonnes"), key=f"{prefix}.normalized_sales_volume_tonnes",
+                               expected_unit="tonnes", minimum=Decimal("0"))
+        asp = parse_measure(product.get("normalized_net_asp_cny_per_tonne"), key=f"{prefix}.normalized_net_asp_cny_per_tonne",
+                            expected_unit="CNY/tonne", minimum=Decimal("0"))
+        unit_cost = parse_measure(product.get("normalized_variable_cost_cny_per_tonne"), key=f"{prefix}.normalized_variable_cost_cny_per_tonne",
+                                  expected_unit="CNY/tonne", minimum=Decimal("0"))
+        if volume is None or asp is None or unit_cost is None:
+            lines_complete = False
+            line_revenue = line_variable_cost = None
+        else:
+            line_revenue = volume * asp
+            line_variable_cost = volume * unit_cost
+            revenue_total += line_revenue
+            variable_cost_total += line_variable_cost
+        product_calculations.append({
+            "product_id": product_id or None,
+            "product_name": product_name or "UNKNOWN",
+            "sales_volume_tonnes": format(volume, "f") if volume is not None else None,
+            "net_asp_cny_per_tonne": format(asp, "f") if asp is not None else None,
+            "variable_cost_cny_per_tonne": format(unit_cost, "f") if unit_cost is not None else None,
+            "revenue_cny": format(line_revenue, "f") if line_revenue is not None else None,
+            "variable_cost_cny": format(line_variable_cost, "f") if line_variable_cost is not None else None,
+            "contribution_cny": format(line_revenue - line_variable_cost, "f") if line_revenue is not None and line_variable_cost is not None else None,
+        })
+
+    global_specs = [
+        ("fixed_cash_opex_cny", "CNY", False, Decimal("0"), None),
+        ("depreciation_amortization_cny", "CNY", False, Decimal("0"), None),
+        ("finance_cost_cny", "CNY", False, Decimal("0"), None),
+        ("tax_rate", "ratio", False, Decimal("0"), Decimal("1")),
+        ("cash_capex_cny", "CNY", False, Decimal("0"), None),
+        ("change_working_capital_cny", "CNY", True, None, None),
+    ]
+    global_values: dict[str, Decimal | None] = {}
+    for field, unit, allow_negative, minimum, maximum in global_specs:
+        global_values[field] = parse_measure(
+            calc.get("operating_assumptions", {}).get(field) if isinstance(calc.get("operating_assumptions"), Mapping) else None,
+            key=f"operating_assumptions.{field}",
+            expected_unit=unit, allow_negative=allow_negative, minimum=minimum, maximum=maximum,
+        )
+    tax_rate = global_values["tax_rate"]
+    fixed_opex = global_values["fixed_cash_opex_cny"]
+    da = global_values["depreciation_amortization_cny"]
+    finance = global_values["finance_cost_cny"]
+    capex = global_values["cash_capex_cny"]
+    change_wc = global_values["change_working_capital_cny"]
+    all_globals_complete = all(value is not None for value in global_values.values())
+    revenue = revenue_total if lines_complete else None
+    variable_cost = variable_cost_total if lines_complete else None
+    contribution = revenue - variable_cost if revenue is not None and variable_cost is not None else None
+    ebitda = contribution - fixed_opex if contribution is not None and fixed_opex is not None else None
+    ebit = ebitda - da if ebitda is not None and da is not None else None
+    pbt = ebit - finance if ebit is not None and finance is not None else None
+    net_profit = pbt - max(pbt, Decimal("0")) * tax_rate if pbt is not None and tax_rate is not None else None
+    fcf = (
+        ebit - max(ebit, Decimal("0")) * tax_rate + da - capex - change_wc
+        if ebit is not None and tax_rate is not None and da is not None and capex is not None and change_wc is not None else None
+    )
+    try:
+        declared = Decimal(str(declared_value))
+        if not declared.is_finite():
+            raise InvalidOperation
+        if declared != net_profit:
+            issues.append("NORMALIZED_OPERATING_BRIDGE_DECLARED_VALUE_DIFFERS_FROM_RECOMPUTED_NET_PROFIT")
+    except (InvalidOperation, TypeError, ValueError):
+        declared = None
+        issues.append("NORMALIZATION_DECLARED_VALUE_INVALID")
+
+    unique_issues = list(dict.fromkeys(issues))
+    complete = lines_complete and all_globals_complete and net_profit is not None and fcf is not None and not unique_issues
+    return {
+        "schema_version": "IIOS-NORMALIZATION-CALCULATION-0.1",
+        "status": "FORMULA_RECOMPUTED_NOT_ADMITTED" if complete else "CALCULATION_BLOCKED",
+        "method": method or "UNKNOWN",
+        "target_measure": target_measure or "UNKNOWN",
+        "target_scope": scope,
+        "output_unit": output_unit,
+        "output_period": output_period,
+        "declared_value": format(declared, "f") if declared is not None else None,
+        "calculated_value": format(net_profit, "f") if net_profit is not None else None,
+        "difference_declared_minus_calculated": format(declared - net_profit, "f") if declared is not None and net_profit is not None else None,
+        "operating_bridge": {
+            "product_lines": product_calculations,
+            "revenue_cny": format(revenue, "f") if revenue is not None else None,
+            "variable_cost_cny": format(variable_cost, "f") if variable_cost is not None else None,
+            "contribution_after_variable_cost_cny": format(contribution, "f") if contribution is not None else None,
+            "fixed_cash_opex_cny": format(fixed_opex, "f") if fixed_opex is not None else None,
+            "ebitda_cny": format(ebitda, "f") if ebitda is not None else None,
+            "depreciation_amortization_cny": format(da, "f") if da is not None else None,
+            "ebit_cny": format(ebit, "f") if ebit is not None else None,
+            "finance_cost_cny": format(finance, "f") if finance is not None else None,
+            "profit_before_tax_cny": format(pbt, "f") if pbt is not None else None,
+            "tax_rate": format(tax_rate, "f") if tax_rate is not None else None,
+            "net_profit_cny": format(net_profit, "f") if net_profit is not None else None,
+            "cash_capex_cny": format(capex, "f") if capex is not None else None,
+            "change_working_capital_cny": format(change_wc, "f") if change_wc is not None else None,
+            "unlevered_fcf_proxy_cny": format(fcf, "f") if fcf is not None else None,
+            "formula": "NET_PROFIT = (SUM(Volume * NetASP - Volume * UnitVariableCost) - FixedCashOpex - D&A - FinanceCost) - MAX(PBT, 0) * TaxRate; FCF = EBIT - MAX(EBIT, 0) * TaxRate + D&A - CashCapex - ChangeWorkingCapital",
+        },
+        "inputs": validated_inputs,
+        "evidence_refs": list(dict.fromkeys(all_refs)),
+        "coverage_status": coverage_status,
+        "coverage_basis": coverage_basis or "UNKNOWN",
+        "issues": unique_issues,
+        "formal_evidence_pit_admission": False,
+        "formal_forecast_admission": False,
+        "decision_authority": False,
+    }
+
+
 def _validate_normalized_profit_calculation(
     *,
     raw_calculation: Any,
@@ -2143,6 +2406,19 @@ def _validate_normalized_profit_calculation(
     calc = raw_calculation
     schema = str(calc.get("schema_version") or "").strip()
     method = str(calc.get("method") or calc.get("formula_type") or "").strip().upper()
+    if method == "NORMALIZED_OPERATING_DRIVER_BRIDGE":
+        return _validate_normalized_operating_driver_bridge(
+            raw_calculation=raw_calculation,
+            declared_value=declared_value,
+            declared_unit=declared_unit,
+            declared_period=declared_period,
+            declared_data_class=declared_data_class,
+            expected_period=expected_period,
+            evidence_register=evidence_register,
+            unresolved_evidence_ids=unresolved_evidence_ids,
+            after_cutoff_evidence_ids=after_cutoff_evidence_ids,
+            uncertain_timing_evidence_ids=uncertain_timing_evidence_ids,
+        )
     target_measure = str(calc.get("target_measure") or "").strip().upper()
     target_scope = _cycle_normalization_scope(calc.get("target_scope", calc.get("scope")))
     target_unit = _cycle_normalization_unit(calc.get("output_unit", calc.get("unit")))
