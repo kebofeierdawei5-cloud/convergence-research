@@ -2755,7 +2755,6 @@ def _prepare_cycle_normalized_profit_inputs(
                 issues.extend(calculation_validation.get("issues") or ["NORMALIZATION_CALCULATION_NOT_VALID"])
 
             cross_check_results: list[dict[str, Any]] = []
-            cross_check_values: list[Decimal] = []
             raw_cross_checks = range_row.get("normalization_cross_checks")
             raw_cross_checks = raw_cross_checks if isinstance(raw_cross_checks, list) else []
             for cross_index, raw_cross in enumerate(raw_cross_checks, start=1):
@@ -2780,17 +2779,15 @@ def _prepare_cycle_normalized_profit_inputs(
                     uncertain_timing_evidence_ids=uncertain,
                 )
                 try:
-                    cross_value = Decimal(str(cross_validation.get("calculated_value")))
-                    if not cross_value.is_finite():
-                        raise InvalidOperation
-                    cross_check_values.append(cross_value)
-                except (InvalidOperation, TypeError, ValueError):
-                    cross_value = None
                 cross_check_results.append({
                     "label": str(raw_cross.get("label") or f"CROSS_CHECK_{cross_index}"),
                     "status": cross_validation.get("status"),
                     "method": cross_validation.get("method"),
-                    "declared_value": str(raw_cross.get("value", raw_cross.get("declared_value")) or "UNKNOWN"),
+                    "declared_value": str(
+                        raw_cross.get("value")
+                        if raw_cross.get("value") not in (None, "")
+                        else raw_cross.get("declared_value", "UNKNOWN")
+                    ),
                     "calculated_value": cross_validation.get("calculated_value"),
                     "issues": list(cross_validation.get("issues") or []),
                     "validation": cross_validation,
@@ -2802,11 +2799,6 @@ def _prepare_cycle_normalized_profit_inputs(
                     raise InvalidOperation
             except (InvalidOperation, TypeError, ValueError):
                 primary_value = None
-            valid_cross_values = [
-                Decimal(str(row["calculated_value"]))
-                for row in cross_check_results
-                if row.get("status") == "FORMULA_RECOMPUTED_NOT_ADMITTED" and row.get("calculated_value") not in (None, "")
-            ]
             divergences = [
                 {"label": row["label"], "calculated_value": row["calculated_value"],
                  "difference_from_selected_cny": format(Decimal(str(row["calculated_value"])) - primary_value, "f")}
@@ -5397,13 +5389,17 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
                 f"{show(row.get('label'))}: {show(row.get('calculated_value'))} CNY，较选定方法差额 {show(row.get('difference_from_selected_cny'))} CNY"
                 for row in (method_reconciliation.get("divergences") or []) if isinstance(row, Mapping)
             ) or "无已识别差异/未提供交叉核对"
+            cross_check_text = "；".join(
+                f"{show(row.get('label'))}/{show(row.get('method'))}: {show(row.get('calculated_value'))} CNY，状态 {show(row.get('status'))}"
+                for row in (method_reconciliation.get("cross_checks") or []) if isinstance(row, Mapping)
+            ) or "未提供替代方法"
             lines.append(
                 f"- 正常化候选处置：{show(decision_row.get('driver_id'))} / {show(decision_row.get('action'))} / {show(decision_row.get('status'))}；"
                 f"候选值 {show(decision_row.get('candidate_value', decision_row.get('normalized_value')))}；"
                 f"历史公式复算：{show(formula_check.get('status'))}，声明值−复算值 {show(formula_check.get('difference_declared_minus_calculated'))}，复算值 {show(formula_check.get('calculated_value'))}，权重合计 {show(formula_check.get('weights_sum'))}，加权依据 {show(formula_check.get('weight_basis'))}；"
                 f"公式方法：{show(formula_check.get('method'))}；逐项计算：{formula_math}；"
                 f"经营桥算术：{operating_math or '不适用'}；"
-                f"方法交叉核对：{show(method_reconciliation.get('status'))}；处置 {show(method_reconciliation.get('resolution'))}；理由 {show(method_reconciliation.get('reason'))}；差异 {divergence_text}；"
+                f"方法交叉核对：{show(method_reconciliation.get('status'))}；选定方法 {show(method_reconciliation.get('selected_method'))}；备选结果 {cross_check_text}；处置 {show(method_reconciliation.get('resolution'))}；理由 {show(method_reconciliation.get('reason'))}；差异 {divergence_text}；"
                 f"输入期间 {'、'.join(list_values(formula_check.get('input_periods'))) or 'UNKNOWN'}；"
                 f"实际进入计算 {show(decision_row.get('calculation_input_used'))}；"
                 f"理由 {show(decision_row.get('decision_reason'))}；"
@@ -7108,7 +7104,7 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
         "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。"
         "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。对周期敏感的业务，要明确周期阶段、拐点证据、反证及领先/滞后指标，并区分真实复苏与补库存、提前拉货或一次性因素；说明全周期正常化盈利与当前盈利的区别。周期状态无法识别时写 UNKNOWN，不强行判断。Thesis 失效条件和重新评估触发器应尽量写成可观察的“指标→阈值/方向→检查频率/时点→触发后重新评估什么”；不要用空泛的“持续关注”，也不要编造阈值/日期。"
         "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。若有周期驱动，必须使用唯一 driver_id，并在 cycle_profile 中填写 stage（TROUGH/EARLY_RECOVERY/MID_CYCLE/PEAK/DOWNTURN/STRUCTURAL_SHIFT/UNKNOWN）、confidence、stage_evidence、counter_evidence、reversal_signals、current_earnings（value/unit/period/basis/data_class/evidence_refs）、normalization_method/metric（建议使用 COMPANY_WIDE_NET_PROFIT_PROXY 或 UNLEVERED_FCF_PROXY 等明确标签，无法识别时为 UNKNOWN）/scope（COMPANY_WIDE/PROJECT_INCREMENTAL/SEGMENT/UNKNOWN）/unit/period/basis/evidence_refs，以及 Bear/Base/Bull 的 normalized_earnings_range（每个情景至少含 value/unit/period/basis/data_class/evidence_refs；只有希望候选进入 EPS 桥时才需要 normalization_calculation）。没有可复算计算单时，保留比较研究，不得采用为 EPS 输入。"
-        "每个周期驱动可在 cycle_profile.b4_input_decisions 中按 bear/base/bull 显式选择 action=COMPARISON_ONLY、REJECT 或 ADOPT_AS_B4_NET_PROFIT_PROXY，并为 REJECT/ADOPT 写明 reason。默认/缺失 action 一律 COMPARISON_ONLY；只有三个情景全部选择同一个周期驱动的 ADOPT，且净利润指标、COMPANY_WIDE 范围、CNY 单位、B4 同期间、有效唯一 driver_id、B4 精确 ID 关联、完整归属依据及截止时点兼容证据都通过，本地才将该组正常化值用作 EPS 桥的候选净利润输入。每个被采用的情景必须含 normalization_calculation，schema_version=IIOS-NORMALIZATION-CALCULATION-0.1、target_measure=COMPANY_WIDE_NET_PROFIT_PROXY、target_scope=COMPANY_WIDE、output_unit=CNY、output_period 与 B4 相同，输出 data_class=ANALYST_ASSUMPTION；支持两种 method。方法一 WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT：weight_basis 与至少 3 项 observations；每项含 period（FY20xx 或 20xxFY 完整历史财年且早于预测财年）、value、unit=CNY、data_class=OBSERVED_ACTUAL、weight、evidence_refs；权重各自大于 0、总和精确为 1、期间不重复、来源截止时点兼容且官方交易所/监管域名匹配。方法二 NORMALIZED_OPERATING_DRIVER_BRIDGE：coverage_status=ALL_MATERIAL_REVENUE_LINES_INCLUDED 且 coverage_basis 说明边界；product_lines 至少一条，每条有唯一 product_id/product_name 与 normalized_sales_volume_tonnes（unit=tonnes）、normalized_net_asp_cny_per_tonne（unit=CNY/tonne）、normalized_variable_cost_cny_per_tonne（unit=CNY/tonne）；另在 operating_assumptions 提供 fixed_cash_opex_cny、depreciation_amortization_cny、finance_cost_cny、tax_rate（0–1）、cash_capex_cny、change_working_capital_cny，各项都要包含 value/unit/data_class=ANALYST_ASSUMPTION/basis/evidence_refs/period。所有经营假设都需有可识别依据与 cutoff 兼容且官方交易所/监管域名匹配的证据；净利润按销量×净售价−销量×单位变动成本汇总，扣固定现金费用、折旧摊销与财务费用后计算税后净利润，同时输出 FCF 代理；本地复算必须精确等于声明值。可选 normalization_cross_checks 用另一方法做完整复算；若结果与选定方法不相等，必须填写 normalization_method_reconciliation.resolution=KEEP_SELECTED_METHOD_WITH_EXPLANATION 并给出可识别 reason，或填写 BLOCK_ADOPTION。没有有效解释就阻断采纳。不能满足时明确保留 COMPARISON_ONLY/REJECT 或显示 ADOPTION_BLOCKED；不得只覆盖一个情景。该选择不会覆盖 B4 原始经营树或 FCF，不创建正式 Forecast/Valuation Admission。"
+        "每个周期驱动可在 cycle_profile.b4_input_decisions 中按 bear/base/bull 显式选择 action=COMPARISON_ONLY、REJECT 或 ADOPT_AS_B4_NET_PROFIT_PROXY，并为 REJECT/ADOPT 写明 reason。默认/缺失 action 一律 COMPARISON_ONLY；只有三个情景全部选择同一个周期驱动的 ADOPT，且净利润指标、COMPANY_WIDE 范围、CNY 单位、B4 同期间、有效唯一 driver_id、B4 精确 ID 关联、完整归属依据及截止时点兼容证据都通过，本地才将该组正常化值用作 EPS 桥的候选净利润输入。每个被采用的情景必须含 normalization_calculation，schema_version=IIOS-NORMALIZATION-CALCULATION-0.1、target_measure=COMPANY_WIDE_NET_PROFIT_PROXY、target_scope=COMPANY_WIDE、output_unit=CNY、output_period 与 B4 相同，输出 data_class=ANALYST_ASSUMPTION；支持两种 method。方法一 WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT：weight_basis 与至少 3 项 observations；每项含 period（FY20xx 或 20xxFY 完整历史财年且早于预测财年）、value、unit=CNY、data_class=OBSERVED_ACTUAL、weight、evidence_refs；权重各自大于 0、总和精确为 1、期间不重复、来源截止时点兼容且官方交易所/监管域名匹配。方法二 NORMALIZED_OPERATING_DRIVER_BRIDGE：coverage_status=ALL_MATERIAL_REVENUE_LINES_INCLUDED 且 coverage_basis 说明边界；product_lines 至少一条，每条有唯一 product_id/product_name 与 normalized_sales_volume_tonnes（unit=tonnes）、normalized_net_asp_cny_per_tonne（unit=CNY/tonne）、normalized_variable_cost_cny_per_tonne（unit=CNY/tonne）；另在 operating_assumptions 提供 fixed_cash_opex_cny、depreciation_amortization_cny、finance_cost_cny、tax_rate（0–1）、cash_capex_cny、change_working_capital_cny，各项都要包含 value/unit/data_class=ANALYST_ASSUMPTION/basis/evidence_refs/period。所有经营假设都需有可识别依据与 cutoff 兼容且官方交易所/监管域名匹配的证据；净利润按销量×净售价−销量×单位变动成本汇总，扣固定现金费用、折旧摊销与财务费用后计算税后净利润，同时输出 FCF 代理；本地复算必须精确等于声明值。可选 normalization_cross_checks: [{label,value,unit,period,data_class,normalization_calculation}] 用另一方法做完整复算；每个交叉核对独立通过同一套复算合同并与选定方法比较。若结果与选定方法不相等，必须填写 normalization_method_reconciliation={resolution:KEEP_SELECTED_METHOD_WITH_EXPLANATION,reason:可识别原因}，或 resolution=BLOCK_ADOPTION；没有有效解释、交叉核对不合格或明确阻断时，候选采纳失败。不能满足时明确保留 COMPARISON_ONLY/REJECT 或显示 ADOPTION_BLOCKED；不得只覆盖一个情景。该选择不会覆盖 B4 原始经营树或 FCF，不创建正式 Forecast/Valuation Admission。"
         "B4 operating_driver_forecast 的 Bear/Base/Bull scenario 若确实由某个周期判断驱动，写入 cycle_driver_ids，值必须与 value_drivers[].driver_id 完全一致；不能明确对应时输出空列表，不要按文字相似度猜关联。结构化 Thesis 失效条件/重新评估触发器及 risk.items 也可写 linked_driver_ids，用同一批 ID 让报告连接观察指标与周期假设。Bear/Base/Bull 需反映不同周期路径，未知值保持 UNKNOWN。"
         "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。"
         "Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
