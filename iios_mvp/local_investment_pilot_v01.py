@@ -2177,7 +2177,6 @@ def _validate_normalized_operating_driver_bridge(
     uncertain = set(uncertain_timing_evidence_ids or [])
     all_refs: list[str] = []
     validated_inputs: dict[str, dict[str, Any]] = {}
-    calc_cache: dict[str, Decimal | None] = {}
 
     def parse_measure(raw_measure: Any, *, key: str, expected_unit: str, allow_negative: bool = False,
                       minimum: Decimal | None = None, maximum: Decimal | None = None) -> Decimal | None:
@@ -2249,7 +2248,6 @@ def _validate_normalized_operating_driver_bridge(
             "status": "PASS" if not field_issues and value is not None else "BLOCKED",
             "issues": field_issues,
         }
-        calc_cache[key] = value
         return value
 
     product_rows = calc.get("product_lines")
@@ -2778,7 +2776,6 @@ def _prepare_cycle_normalized_profit_inputs(
                     after_cutoff_evidence_ids=after_cutoff,
                     uncertain_timing_evidence_ids=uncertain,
                 )
-                try:
                 cross_check_results.append({
                     "label": str(raw_cross.get("label") or f"CROSS_CHECK_{cross_index}"),
                     "status": cross_validation.get("status"),
@@ -2789,6 +2786,8 @@ def _prepare_cycle_normalized_profit_inputs(
                         else raw_cross.get("declared_value", "UNKNOWN")
                     ),
                     "calculated_value": cross_validation.get("calculated_value"),
+                    "difference_declared_minus_calculated": cross_validation.get("difference_declared_minus_calculated"),
+                    "evidence_refs": list(cross_validation.get("evidence_refs") or []),
                     "issues": list(cross_validation.get("issues") or []),
                     "validation": cross_validation,
                 })
@@ -5390,7 +5389,7 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
                 for row in (method_reconciliation.get("divergences") or []) if isinstance(row, Mapping)
             ) or "无已识别差异/未提供交叉核对"
             cross_check_text = "；".join(
-                f"{show(row.get('label'))}/{show(row.get('method'))}: {show(row.get('calculated_value'))} CNY，状态 {show(row.get('status'))}"
+                f"{show(row.get('label'))}/{show(row.get('method'))}: {show(row.get('calculated_value'))} CNY；声明值−复算值 {show(row.get('difference_declared_minus_calculated'))}；refs={'、'.join(list_values(row.get('evidence_refs'))) or 'UNKNOWN'}；状态 {show(row.get('status'))}"
                 for row in (method_reconciliation.get("cross_checks") or []) if isinstance(row, Mapping)
             ) or "未提供替代方法"
             lines.append(
