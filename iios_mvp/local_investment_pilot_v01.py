@@ -5370,12 +5370,41 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
             formula_math = "；".join(
                 f"{show(term.get('period'))}: {show(term.get('value'))} × {show(term.get('weight'))} = {show(term.get('weighted_contribution'))} CNY [refs: {'、'.join(list_values(term.get('evidence_refs'))) or 'UNKNOWN'}]"
                 for term in formula_terms if isinstance(term, Mapping)
-            ) or "UNKNOWN"
+            )
+            if isinstance(formula_check.get("inputs"), Mapping):
+                formula_math = "；".join(
+                    f"{key}: {show(term.get('value'))} {show(term.get('unit'))}; basis={show(term.get('basis'))}; refs={'、'.join(list_values(term.get('evidence_refs'))) or 'UNKNOWN'}; status={show(term.get('status'))}"
+                    for key, term in formula_check["inputs"].items() if isinstance(term, Mapping)
+                )
+            if not formula_math:
+                formula_math = "UNKNOWN"
+            operating_bridge = formula_check.get("operating_bridge") if isinstance(formula_check.get("operating_bridge"), Mapping) else {}
+            operating_lines = operating_bridge.get("product_lines") if isinstance(operating_bridge.get("product_lines"), list) else []
+            operating_math = "；".join(
+                f"{show(line.get('product_id'))} {show(line.get('product_name'))}: volume {show(line.get('sales_volume_tonnes'))} t × ASP {show(line.get('net_asp_cny_per_tonne'))} = revenue {show(line.get('revenue_cny'))} CNY; unit cost {show(line.get('variable_cost_cny_per_tonne'))}; variable cost {show(line.get('variable_cost_cny'))}; contribution {show(line.get('contribution_cny'))}"
+                for line in operating_lines if isinstance(line, Mapping)
+            )
+            if operating_bridge:
+                operating_math += (
+                    f"；总收入 {show(operating_bridge.get('revenue_cny'))} CNY；总变动成本 {show(operating_bridge.get('variable_cost_cny'))} CNY；"
+                    f"EBITDA {show(operating_bridge.get('ebitda_cny'))} CNY；EBIT {show(operating_bridge.get('ebit_cny'))} CNY；"
+                    f"税前利润 {show(operating_bridge.get('profit_before_tax_cny'))} CNY；净利润 {show(operating_bridge.get('net_profit_cny'))} CNY；"
+                    f"FCF 代理 {show(operating_bridge.get('unlevered_fcf_proxy_cny'))} CNY"
+                )
+            method_reconciliation = decision_row.get("normalization_method_reconciliation")
+            method_reconciliation = method_reconciliation if isinstance(method_reconciliation, Mapping) else {}
+            divergence_text = "；".join(
+                f"{show(row.get('label'))}: {show(row.get('calculated_value'))} CNY，较选定方法差额 {show(row.get('difference_from_selected_cny'))} CNY"
+                for row in (method_reconciliation.get("divergences") or []) if isinstance(row, Mapping)
+            ) or "无已识别差异/未提供交叉核对"
             lines.append(
                 f"- 正常化候选处置：{show(decision_row.get('driver_id'))} / {show(decision_row.get('action'))} / {show(decision_row.get('status'))}；"
                 f"候选值 {show(decision_row.get('candidate_value', decision_row.get('normalized_value')))}；"
                 f"历史公式复算：{show(formula_check.get('status'))}，声明值−复算值 {show(formula_check.get('difference_declared_minus_calculated'))}，复算值 {show(formula_check.get('calculated_value'))}，权重合计 {show(formula_check.get('weights_sum'))}，加权依据 {show(formula_check.get('weight_basis'))}；"
-                f"逐项计算：{formula_math}；输入期间 {'、'.join(list_values(formula_check.get('input_periods'))) or 'UNKNOWN'}；"
+                f"公式方法：{show(formula_check.get('method'))}；逐项计算：{formula_math}；"
+                f"经营桥算术：{operating_math or '不适用'}；"
+                f"方法交叉核对：{show(method_reconciliation.get('status'))}；处置 {show(method_reconciliation.get('resolution'))}；理由 {show(method_reconciliation.get('reason'))}；差异 {divergence_text}；"
+                f"输入期间 {'、'.join(list_values(formula_check.get('input_periods'))) or 'UNKNOWN'}；"
                 f"实际进入计算 {show(decision_row.get('calculation_input_used'))}；"
                 f"理由 {show(decision_row.get('decision_reason'))}；"
                 f"证据 { '、'.join(list_values(decision_row.get('evidence_refs'))) or 'UNKNOWN' }；"
@@ -6745,7 +6774,7 @@ def create_pilot_template(
         "2. 未来最重要的变化是什么：按价值重要性排序，不要罗列宏观热点；指出未来 1 年（如有明确理由再用 2–3 年）最可能改变收入、单位利润、现金流或每股价值的变量，说明起点、预期变化、时间和可观测指标。写入 assessment.value_drivers 与 operating_driver_forecast。"
          "2A. 对周期敏感的行业/业务，必须单独识别行业/公司周期位置（扩张、过热、收缩、筑底、复苏或 UNKNOWN），给出截止时点前的证据、反证、领先指标与滞后指标；用 value_drivers 中 driver_type=INDUSTRY_CYCLE 的驱动行承载，不新增顶层字段。若证据不足，周期阶段保留 UNKNOWN，不强行贴标签。"
          "必须区别真实需求复苏与补库存、渠道备货、关税/政策导致的提前拉货、低基数和一次性收益；说明这些因素分别对未来销量、净售价、产能利用率、单位成本、毛利率、营运资金和现金流的方向/持续时间意味着什么。不得把短期发货/收入高增直接外推为可持续需求。"
-         "对周期性盈利估值，明确区分当前盈利、正常化/全周期盈利和峰值/谷底盈利；解释为什么当前 P/E 可能在周期高点显得虚低、在周期低点显得虚高。只有证据足以支持时才给正常化盈利/利润率；否则在情景中保留区间或 UNKNOWN，并说明需要哪些数据才能确认周期拐点。 如果希望正常化净利润作为 EPS 桥候选输入，必须提供 normalization_calculation，使用 IIOS-NORMALIZATION-CALCULATION-0.1 的 WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT 方法，输入至少 3 个 cutoff 前完整财年的 OBSERVED_ACTUAL 净利润、CNY 单位、正权重合计 1、逐项官方交易所/监管来源引用，声明值必须精确等于本地可复算结果。未提供或校验不通过时只能比较，不得采用。"
+         "对周期性盈利估值，明确区分当前盈利、正常化/全周期盈利和峰值/谷底盈利；解释为什么当前 P/E 可能在周期高点显得虚低、在周期低点显得虚高。只有证据足以支持时才给正常化盈利/利润率；否则在情景中保留区间或 UNKNOWN，并说明需要哪些数据才能确认周期拐点。 如果希望正常化净利润作为 EPS 桥候选输入，必须提供 IIOS-NORMALIZATION-CALCULATION-0.1 的 normalization_calculation，支持 WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT（至少三个历史完整财年的 OBSERVED_ACTUAL 净利润、正权重合计 1、逐项官方交易所/监管引用）或 NORMALIZED_OPERATING_DRIVER_BRIDGE（销量×净售价、销量×单位变动成本、固定费用、折旧、财务费用、税率、资本开支和营运资金的完整结构化计算）；所有输入要有截止时点兼容的官方交易所/监管证据与清晰依据，且本地 Decimal 复算值必须精确匹配声明。可用 normalization_cross_checks 交叉核对两种方法；若不一致，明确解释保留哪一方法或阻断采纳。缺少计算单或校验不通过时只能比较，不得采用。"
          "如果希望把正常化盈利选为 B4→EPS 桥的候选公司整体净利润输入，必须在 cycle_profile.b4_input_decisions 为 Bear/Base/Bull 分别明确填写 action（COMPARISON_ONLY、REJECT、ADOPT_AS_B4_NET_PROFIT_PROXY）及理由。默认/缺失项是 COMPARISON_ONLY。只允许三个情景全部选择同一个唯一周期 driver_id 的 ADOPT，且指标为公司整体净利润代理、范围 COMPANY_WIDE、币种 CNY、期间与 B4 完全一致、数值/依据完整、证据引用 cutoff 兼容，并且 B4 三情景用 cycle_driver_ids 精确关联该 driver_id；否则不能进入 EPS 桥。该选择只影响 B4→EPS 桥的净利润输入来源，不覆盖 B4 原始经营计算或 FCF。"
         "3. 为什么相信变化会发生：把每个关键变化连接到截止时点前已公开的具体证据、证据日期、业务机制和反证；区分领先指标/结果指标、公司指引/分析师假设/历史事实，不得把管理层目标当成已实现结果。写入 evidence_register、assessment.value_drivers.historical_evidence 与 rationale。"
         "4. 变化如何进入每股价值：明确写出“销量/价格/组合/利用率 → 收入 → 单位毛利与费用 → EBIT/净利润 → 资本开支/营运资金/FCF → 稀释股数与每股盈利 → 估值”的可验证传导链；说明关键假设、量纲、期间、约束、潜在蚕食与稀释，避免重复计价。使用 operating_driver_forecast、valuation_transmission 和 forecast_valuation.scenarios；无法闭合的环节保留 UNKNOWN/NOT_LINKED。"
@@ -7079,7 +7108,7 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
         "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。"
         "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。对周期敏感的业务，要明确周期阶段、拐点证据、反证及领先/滞后指标，并区分真实复苏与补库存、提前拉货或一次性因素；说明全周期正常化盈利与当前盈利的区别。周期状态无法识别时写 UNKNOWN，不强行判断。Thesis 失效条件和重新评估触发器应尽量写成可观察的“指标→阈值/方向→检查频率/时点→触发后重新评估什么”；不要用空泛的“持续关注”，也不要编造阈值/日期。"
         "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。若有周期驱动，必须使用唯一 driver_id，并在 cycle_profile 中填写 stage（TROUGH/EARLY_RECOVERY/MID_CYCLE/PEAK/DOWNTURN/STRUCTURAL_SHIFT/UNKNOWN）、confidence、stage_evidence、counter_evidence、reversal_signals、current_earnings（value/unit/period/basis/data_class/evidence_refs）、normalization_method/metric（建议使用 COMPANY_WIDE_NET_PROFIT_PROXY 或 UNLEVERED_FCF_PROXY 等明确标签，无法识别时为 UNKNOWN）/scope（COMPANY_WIDE/PROJECT_INCREMENTAL/SEGMENT/UNKNOWN）/unit/period/basis/evidence_refs，以及 Bear/Base/Bull 的 normalized_earnings_range（每个情景至少含 value/unit/period/basis/data_class/evidence_refs；只有希望候选进入 EPS 桥时才需要 normalization_calculation）。没有可复算计算单时，保留比较研究，不得采用为 EPS 输入。"
-        "每个周期驱动可在 cycle_profile.b4_input_decisions 中按 bear/base/bull 显式选择 action=COMPARISON_ONLY、REJECT 或 ADOPT_AS_B4_NET_PROFIT_PROXY，并为 REJECT/ADOPT 写明 reason。默认/缺失 action 一律 COMPARISON_ONLY；只有三个情景全部选择同一个周期驱动的 ADOPT，且净利润指标、COMPANY_WIDE 范围、CNY 单位、B4 同期间、有效唯一 driver_id、B4 精确 ID 关联、完整归属依据及截止时点兼容证据都通过，本地才将该组正常化值用作 EPS 桥的候选净利润输入。每个被采用的情景必须含 normalization_calculation：schema_version=IIOS-NORMALIZATION-CALCULATION-0.1、method=WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT、target_measure=COMPANY_WIDE_NET_PROFIT_PROXY、target_scope=COMPANY_WIDE、output_unit=CNY、output_period 与 B4 相同、weight_basis 解释加权依据，observations 至少 3 项；每项包含 period（FY20xx 或 20xxFY 完整财年且早于预测财年）、value、unit=CNY、data_class=OBSERVED_ACTUAL、weight、evidence_refs。所有权重必须大于 0 且不超过 1，总和精确等于 1；期间不得重复；每条来源必须是 cutoff 兼容且官方域名/类别匹配的交易所或监管一手来源。声明正常化值必须与本地 Decimal 复算结果完全一致，输出 data_class 必须为 ANALYST_ASSUMPTION。不能满足时明确保留 COMPARISON_ONLY/REJECT 或显示 ADOPTION_BLOCKED；不得只覆盖一个情景。该选择不会覆盖 B4 原始经营树或 FCF，不创建正式 Forecast/Valuation Admission。"
+        "每个周期驱动可在 cycle_profile.b4_input_decisions 中按 bear/base/bull 显式选择 action=COMPARISON_ONLY、REJECT 或 ADOPT_AS_B4_NET_PROFIT_PROXY，并为 REJECT/ADOPT 写明 reason。默认/缺失 action 一律 COMPARISON_ONLY；只有三个情景全部选择同一个周期驱动的 ADOPT，且净利润指标、COMPANY_WIDE 范围、CNY 单位、B4 同期间、有效唯一 driver_id、B4 精确 ID 关联、完整归属依据及截止时点兼容证据都通过，本地才将该组正常化值用作 EPS 桥的候选净利润输入。每个被采用的情景必须含 normalization_calculation，schema_version=IIOS-NORMALIZATION-CALCULATION-0.1、target_measure=COMPANY_WIDE_NET_PROFIT_PROXY、target_scope=COMPANY_WIDE、output_unit=CNY、output_period 与 B4 相同，输出 data_class=ANALYST_ASSUMPTION；支持两种 method。方法一 WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT：weight_basis 与至少 3 项 observations；每项含 period（FY20xx 或 20xxFY 完整历史财年且早于预测财年）、value、unit=CNY、data_class=OBSERVED_ACTUAL、weight、evidence_refs；权重各自大于 0、总和精确为 1、期间不重复、来源截止时点兼容且官方交易所/监管域名匹配。方法二 NORMALIZED_OPERATING_DRIVER_BRIDGE：coverage_status=ALL_MATERIAL_REVENUE_LINES_INCLUDED 且 coverage_basis 说明边界；product_lines 至少一条，每条有唯一 product_id/product_name 与 normalized_sales_volume_tonnes（unit=tonnes）、normalized_net_asp_cny_per_tonne（unit=CNY/tonne）、normalized_variable_cost_cny_per_tonne（unit=CNY/tonne）；另在 operating_assumptions 提供 fixed_cash_opex_cny、depreciation_amortization_cny、finance_cost_cny、tax_rate（0–1）、cash_capex_cny、change_working_capital_cny，各项都要包含 value/unit/data_class=ANALYST_ASSUMPTION/basis/evidence_refs/period。所有经营假设都需有可识别依据与 cutoff 兼容且官方交易所/监管域名匹配的证据；净利润按销量×净售价−销量×单位变动成本汇总，扣固定现金费用、折旧摊销与财务费用后计算税后净利润，同时输出 FCF 代理；本地复算必须精确等于声明值。可选 normalization_cross_checks 用另一方法做完整复算；若结果与选定方法不相等，必须填写 normalization_method_reconciliation.resolution=KEEP_SELECTED_METHOD_WITH_EXPLANATION 并给出可识别 reason，或填写 BLOCK_ADOPTION。没有有效解释就阻断采纳。不能满足时明确保留 COMPARISON_ONLY/REJECT 或显示 ADOPTION_BLOCKED；不得只覆盖一个情景。该选择不会覆盖 B4 原始经营树或 FCF，不创建正式 Forecast/Valuation Admission。"
         "B4 operating_driver_forecast 的 Bear/Base/Bull scenario 若确实由某个周期判断驱动，写入 cycle_driver_ids，值必须与 value_drivers[].driver_id 完全一致；不能明确对应时输出空列表，不要按文字相似度猜关联。结构化 Thesis 失效条件/重新评估触发器及 risk.items 也可写 linked_driver_ids，用同一批 ID 让报告连接观察指标与周期假设。Bear/Base/Bull 需反映不同周期路径，未知值保持 UNKNOWN。"
         "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。"
         "Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
