@@ -11,7 +11,7 @@ Close the operating bridge gap where revenue and variable cost are based on sale
 For each product line:
 
 - `inventory_change_tonnes = production_tonnes - sales_volume_tonnes` when both inputs are calculation-usable.
-- Positive difference means inventory build / potential cash use; negative difference means inventory drawdown / potential cash release; zero means no modeled production-sales inventory movement.
+- Positive difference means inventory build / potential cash use; negative difference means inventory drawdown / potential cash release; zero means no modeled production-sales inventory movement. This is a **production-sales balance proxy**, not a full beginning-to-ending inventory ledger; opening inventory, work in process, yields/losses, transfers and other accounting adjustments are not reconstructed.
 - `inventory_cash_impact_proxy_cny = inventory_change_tonnes × variable_cost_cny_per_tonne` only when this proxy is identifiable. It is a simplified variable-cost proxy, **not** full accounting inventory valuation; it may omit fixed manufacturing cost, work in process, yield loss, product mix and inventory valuation adjustments.
 - `inventory_working_capital_treatment` must be one of:
   - `INCLUDED_IN_CHANGE_WORKING_CAPITAL`: the supplied `change_working_capital_cny` is total working-capital change and already includes inventory movement; do not add the inventory proxy again.
