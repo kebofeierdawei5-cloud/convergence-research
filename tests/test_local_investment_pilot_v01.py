@@ -2580,6 +2580,27 @@ def test_b42_nonzero_production_sales_gap_without_working_capital_treatment_bloc
     assert base["financial_outputs_decision_usable"] is False
 
 
+def test_b42_sales_exceeding_production_models_inventory_release():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+
+    payload = _driver_payload()
+    base_product = payload["scenarios"]["base"]["product_lines"][0]
+    base_product["production_tonnes"] = _driver_measure("700", "tonnes", "ANALYST_ASSUMPTION", [], "Synthetic production below sales")
+    base_product["sales_volume_tonnes"] = _driver_measure("750", "tonnes", "ANALYST_ASSUMPTION", [], "Synthetic sales above production")
+    payload["scenarios"]["base"]["inventory_working_capital_treatment"] = "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL"
+    source = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(payload, evidence_register=source)
+    base = result["scenarios"]["base"]
+
+    product = base["product_lines"][0]
+    assert product["inventory_change_tonnes"] == "-50"
+    assert product["production_sales_balance_status"] == "SALES_EXCEEDS_PRODUCTION_INVENTORY_DRAWDOWN"
+    assert product["inventory_cash_impact_proxy_cny"] == "-20000"
+    assert base["effective_change_working_capital_cny"] == "-17000"
+    assert base["unlevered_fcf_proxy_cny"] == "299500.00"
+
+
 def test_b42_product_names_collapse_unicode_whitespace_and_blank_names_fail_closed():
     from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
 
