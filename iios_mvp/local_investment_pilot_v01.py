@@ -782,7 +782,7 @@ def _link_b4_cost_ratio_assumptions(
 def _reconcile_b4_valuation_bridge(
     driver_forecast: Mapping[str, Any], forecast_valuation: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Cross-check overlapping aggregate operating metrics without conflating FCF definitions."""
+    """Cross-check overlapping metrics and reconcile valuation WC to B4's FCF-effective total."""
     driver_scenarios = driver_forecast.get("scenarios")
     driver_scenarios = driver_scenarios if isinstance(driver_scenarios, Mapping) else {}
     valuation_scenarios = forecast_valuation.get("scenarios")
@@ -812,7 +812,9 @@ def _reconcile_b4_valuation_bridge(
         ("tax_rate", "tax_rate"),
         ("net_profit_cny", "net_profit_proxy_cny"),
         ("cash_capex_cny", "cash_capex_cny"),
-        ("change_working_capital_cny", "change_working_capital_cny"),
+        # Compare the FCF-effective total, not the raw B4 input which may exclude
+        # the inventory proxy when inventory_working_capital_treatment=EXCLUDED.
+        ("effective_change_working_capital_cny", "change_working_capital_cny"),
     )
     scenario_results: dict[str, Any] = {}
     all_match = True
