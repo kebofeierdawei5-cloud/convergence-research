@@ -1,14 +1,16 @@
 # IIOS Project State Index
 
 State classification: **CANONICAL**
-Snapshot: 2026-10-25
+Snapshot: 2026-10-26
 Authority: this file is the **only canonical Current State Index**.
 
-**Current operator direction (2026-10-25):** B28–B32 are merged; B33 (PR #585) is now merged as `9162a6adadbeacda984d2253ce1f776b9c00cd60`. B33 separates the guided personal pilot into a price-blind Round A and price-aware Round B, freezes/hash-binds the company-side forecast artifact, restricts each phase's patch schema, and places phase lineage in the private input, analysis, report, receipt and Replay comparison. Exact tested B33 head `d364bb3ede436cd8cd7151bc63ff8e480442ceda`: **350 Local Investment Pilot + Replay/acceptance tests passed** and **6/6 triggered workflows passed** after one retry of a transient external-source timeout in PILOT-02. B32 calculation/admission semantics and MIE/gap coherence fixes remain in force. Investment formulas, 15% hurdle, Required Return, horizon semantics, optional/explanatory MIE policy, and no-auto-execution boundary are unchanged. **Current-main real macOS two-round full-run + independent Replay remains OPEN / NOT VERIFIED.**
+**Current operator direction (2026-10-26):** B33 (PR #585) remains the last merged local-pilot feature; its two-round price-blind/price-aware boundary is in force and real macOS full-run + independent Replay remains OPEN / NOT VERIFIED. Per the operator's explicit new instruction, B42 is being prepared on branch `feat/b42-inventory-working-capital-20261026` from canonical `main@2fd009b10bd4b13467ebdd8b2692eab62a772878` to reconcile production-sales inventory balance with working-capital assumptions and normalize product-name whitespace. B42 is branch-only and unmerged; unified tests, Replay and CI are deliberately deferred at this stage. This bounded code batch does not waive B33 Mac acceptance or create formal Forecast/Valuation admission, a canonical Decision, or execution authority.
 
-## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-25
+## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-26
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
+
+**B42 branch-only change proposal — NOT MERGED / NOT CANONICAL:** branch `feat/b42-inventory-working-capital-20261026` starts from `2fd009b10bd4b13467ebdd8b2692eab62a772878`. It adds per-product production-minus-sales inventory balance, an explicit inventory inclusion/exclusion treatment for working capital, an effective working-capital input to FCF, and Unicode-whitespace normalization for product names. Regression cases have been authored but not executed; the operator explicitly deferred unified tests, Replay and CI. Do not infer PASS or change any real macOS acceptance status from this branch-only implementation.
 
 **B16 — source identity and cash-distribution report consistency: MERGED / EXACT-HEAD CI PASS.** PR [#535](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/535) was merged as `a9b6dbe94cb0ebcad92f8c52234f1446b23165df`; the final clean head passed all **6/6** triggered workflows, including Local Investment Pilot and independent red-team. Cash-distribution evidence used by pilot return arithmetic now requires a recognized exchange/regulator URL hostname consistent with the declared primary-source class. A source-domain/class match still does **not** constitute content verification or formal Evidence/PIT admission. Reports retain that admission is incomplete and do not trust a model-supplied “verified” summary. The model-confirmation report wording is also normalized after explicit local operator confirmation.
 
