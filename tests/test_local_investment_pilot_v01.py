@@ -2510,12 +2510,13 @@ def _driver_payload():
             "tax_rate": assumption("0.25", "ratio"),
             "cash_capex_cny": assumption("20000", "CNY"),
             "change_working_capital_cny": assumption("3000", "CNY"),
+            "inventory_working_capital_treatment": "INCLUDED_IN_CHANGE_WORKING_CAPITAL",
         }
     return result
 
 
 def test_operating_driver_bridge_calculates_volume_price_cost_and_cash_flow():
-    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast, render_operating_driver_section
     source = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
     driver = evaluate_operating_driver_forecast(_driver_payload(), evidence_register=source)
     bear = driver["scenarios"]["bear"]
@@ -2534,6 +2535,65 @@ def test_operating_driver_bridge_calculates_volume_price_cost_and_cash_flow():
     assert bear["financial_outputs_decision_usable"] is True
     assert driver["valuation_transmission"]["status"] == "NOT_LINKED_TO_PER_SHARE_VALUE"
     assert driver["formal_forecast_admission_created"] is False
+    base = driver["scenarios"]["base"]
+    assert base["product_lines"][0]["inventory_change_tonnes"] == "50"
+    assert base["inventory_reconciliation_status"] == "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL"
+    report = "\n".join(render_operating_driver_section(driver, {}))
+    assert "库存衔接" in report
+    assert "产销差额（产量−销量）" in report
+
+
+def test_b42_inventory_delta_is_explicit_and_excluded_inventory_is_added_to_working_capital():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+
+    payload = _driver_payload()
+    payload["scenarios"]["base"]["inventory_working_capital_treatment"] = "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL"
+    source = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    result = evaluate_operating_driver_forecast(payload, evidence_register=source)
+    base = result["scenarios"]["base"]
+
+    product = base["product_lines"][0]
+    assert product["inventory_change_tonnes"] == "50"
+    assert product["production_sales_balance_status"] == "PRODUCTION_EXCEEDS_SALES_INVENTORY_BUILD"
+    assert product["inventory_cash_impact_proxy_cny"] == "20000"
+    assert base["inventory_cash_impact_proxy_cny"] == "20000"
+    assert base["effective_change_working_capital_cny"] == "23000"
+    assert base["inventory_reconciliation_status"] == "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL"
+    assert base["unlevered_fcf_proxy_cny"] == "259500.00"
+    assert base["financial_outputs_decision_usable"] is True
+
+
+def test_b42_nonzero_production_sales_gap_without_working_capital_treatment_blocks_fcf():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+
+    payload = _driver_payload()
+    payload["scenarios"]["base"]["inventory_working_capital_treatment"] = "UNKNOWN"
+    source = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    result = evaluate_operating_driver_forecast(payload, evidence_register=source)
+    base = result["scenarios"]["base"]
+
+    assert base["net_profit_cny"] == "288750.00"
+    assert base["unlevered_fcf_proxy_cny"] is None
+    assert base["effective_change_working_capital_cny"] is None
+    assert base["inventory_reconciliation_status"] == "INVENTORY_WORKING_CAPITAL_TREATMENT_REQUIRED"
+    assert "INVENTORY_WORKING_CAPITAL_TREATMENT_REQUIRED_FOR_NONZERO_OR_UNKNOWN_BALANCE" in base["issues"]
+    assert base["financial_outputs_decision_usable"] is False
+
+
+def test_b42_product_names_collapse_unicode_whitespace_and_blank_names_fail_closed():
+    from iios_mvp.operating_driver_forecast_v01 import evaluate_operating_driver_forecast
+
+    source = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    payload = _driver_payload()
+    payload["product_lines"][0]["product_name"] = " \u3000示例\t\n 产品　 "
+    result = evaluate_operating_driver_forecast(payload, evidence_register=source)
+    assert result["product_lines"][0]["product_name"] == "示例 产品"
+
+    blank_payload = _driver_payload()
+    blank_payload["product_lines"][0]["product_name"] = " \u3000\t\n "
+    blank_result = evaluate_operating_driver_forecast(blank_payload, evidence_register=source)
+    assert blank_result["product_lines"] == []
+    assert "PRODUCT_ROW_0_IDENTITY_REQUIRED" in blank_result["input_issues"]
 
 
 @pytest.mark.parametrize(
