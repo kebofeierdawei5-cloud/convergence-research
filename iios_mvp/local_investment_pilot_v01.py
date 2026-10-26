@@ -2348,7 +2348,23 @@ def _validate_normalized_operating_driver_bridge(
         })
 
     expected_product_ids = set(str(value) for value in b4_products)
-    actual_product_ids = {str(row.get("product_id") or "").strip() for row in product_rows if isinstance(row, Mapping) and str(row.get("product_id") or "").strip()}
+    raw_normalization_ids = [
+        str(row.get("product_id") or "").strip()
+        for row in product_rows if isinstance(row, Mapping) and str(row.get("product_id") or "").strip()
+    ]
+    actual_product_ids = set(raw_normalization_ids)
+    normalized_id_counts: dict[str, int] = {}
+    for normalized_id in raw_normalization_ids:
+        normalized_id_counts[normalized_id] = normalized_id_counts.get(normalized_id, 0) + 1
+    duplicate_normalization_product_ids = sorted(
+        product_id for product_id, count in normalized_id_counts.items() if count > 1
+    )
+    invalid_normalization_row_count = sum(
+        1 for row in product_rows
+        if not isinstance(row, Mapping)
+        or not str(row.get("product_id") or "").strip()
+        or not str(row.get("product_name") or "").strip()
+    )
     missing_product_ids = sorted(expected_product_ids - actual_product_ids)
     extra_product_ids = sorted(actual_product_ids - expected_product_ids)
     product_name_mismatches: list[dict[str, str]] = []
@@ -2375,7 +2391,9 @@ def _validate_normalized_operating_driver_bridge(
         issues.append("NORMALIZATION_PRODUCT_NAME_DIFFERS_FROM_B4_IDENTITY")
     product_scope_status = (
         "PASS" if b4_context_status == "PASS" and not missing_product_ids
-        and not extra_product_ids and not product_name_mismatches else "BLOCKED"
+        and not extra_product_ids and not product_name_mismatches
+        and not duplicate_normalization_product_ids and invalid_normalization_row_count == 0
+        else "BLOCKED"
     )
     product_scope_reconciliation = {
         "status": product_scope_status,
@@ -2384,6 +2402,8 @@ def _validate_normalized_operating_driver_bridge(
         "normalization_product_ids": sorted(actual_product_ids),
         "missing_b4_product_ids": missing_product_ids,
         "extra_normalization_product_ids": extra_product_ids,
+        "duplicate_normalization_product_ids": duplicate_normalization_product_ids,
+        "invalid_normalization_row_count": invalid_normalization_row_count,
         "product_name_mismatches": product_name_mismatches,
         "b4_context_issues": list(b4_context.get("issues") or []) if isinstance(b4_context.get("issues"), list) else [],
         "capacity_checks": capacity_checks,
@@ -5548,6 +5568,8 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
                 f"normalization IDs={','.join(list_values(product_scope_check.get('normalization_product_ids'))) or 'UNKNOWN'}; "
                 f"missing={','.join(list_values(product_scope_check.get('missing_b4_product_ids'))) or 'none'}; "
                 f"extra={','.join(list_values(product_scope_check.get('extra_normalization_product_ids'))) or 'none'}; "
+                f"duplicates={','.join(list_values(product_scope_check.get('duplicate_normalization_product_ids'))) or 'none'}; "
+                f"invalid rows={show(product_scope_check.get('invalid_normalization_row_count'))}; "
                 f"capacity overruns={','.join(list_values(product_scope_check.get('capacity_overrun_product_ids'))) or 'none'}"
             ) if product_scope_check else "NOT_AVAILABLE"
             if operating_bridge:
