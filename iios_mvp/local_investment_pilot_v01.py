@@ -2496,7 +2496,7 @@ def _validate_normalized_operating_driver_bridge(
         inventory_treatments = {
             "INVENTORY_BUILD_INCLUDED_IN_GLOBAL_CHANGE_WORKING_CAPITAL",
             "INVENTORY_RELEASE_INCLUDED_IN_GLOBAL_CHANGE_WORKING_CAPITAL",
-            "INVENTORY_POSITION_NORMALIZED_TO_BALANCE_IN_GLOBAL_CHANGE_WORKING_CAPITAL",
+            "INVENTORY_GAP_RECONCILED_IN_GLOBAL_CHANGE_WORKING_CAPITAL",
         }
         allowed_balance_treatments = inventory_treatments | {
             "NON_INVENTORY_TIMING_OR_SCOPE_DIFFERENCE",
@@ -2537,15 +2537,15 @@ def _validate_normalized_operating_driver_bridge(
                 inventory_wc_treatment_product_ids.append(product_id)
                 if normalized_production_sales_gap > 0 and balance_treatment not in {
                     "INVENTORY_BUILD_INCLUDED_IN_GLOBAL_CHANGE_WORKING_CAPITAL",
-                    "INVENTORY_POSITION_NORMALIZED_TO_BALANCE_IN_GLOBAL_CHANGE_WORKING_CAPITAL",
+                    "INVENTORY_GAP_RECONCILED_IN_GLOBAL_CHANGE_WORKING_CAPITAL",
                 }:
                     balance_issues.append("PRODUCTION_SALES_TREATMENT_CONFLICTS_WITH_POSITIVE_PRODUCTION_GAP")
                 if normalized_production_sales_gap < 0 and balance_treatment not in {
                     "INVENTORY_RELEASE_INCLUDED_IN_GLOBAL_CHANGE_WORKING_CAPITAL",
-                    "INVENTORY_POSITION_NORMALIZED_TO_BALANCE_IN_GLOBAL_CHANGE_WORKING_CAPITAL",
+                    "INVENTORY_GAP_RECONCILED_IN_GLOBAL_CHANGE_WORKING_CAPITAL",
                 }:
                     balance_issues.append("PRODUCTION_SALES_TREATMENT_CONFLICTS_WITH_NEGATIVE_PRODUCTION_GAP")
-                if normalized_production_sales_gap == 0 and gap_delta_from_history not in (None, Decimal("0")) and balance_treatment != "INVENTORY_POSITION_NORMALIZED_TO_BALANCE_IN_GLOBAL_CHANGE_WORKING_CAPITAL":
+                if normalized_production_sales_gap == 0 and gap_delta_from_history not in (None, Decimal("0")) and balance_treatment != "INVENTORY_GAP_RECONCILED_IN_GLOBAL_CHANGE_WORKING_CAPITAL":
                     balance_issues.append("ZERO_GAP_WITH_HISTORICAL_GAP_CHANGE_REQUIRES_NORMALIZED_INVENTORY_TREATMENT")
 
             balance_status = "RECONCILED_NOT_FORMALLY_ADMITTED" if not balance_issues else "RECONCILIATION_BLOCKED"
@@ -7371,7 +7371,7 @@ def create_pilot_template(
         "2. 未来最重要的变化是什么：按价值重要性排序，不要罗列宏观热点；指出未来 1 年（如有明确理由再用 2–3 年）最可能改变收入、单位利润、现金流或每股价值的变量，说明起点、预期变化、时间和可观测指标。写入 assessment.value_drivers 与 operating_driver_forecast。"
          "2A. 对周期敏感的行业/业务，必须单独识别行业/公司周期位置（扩张、过热、收缩、筑底、复苏或 UNKNOWN），给出截止时点前的证据、反证、领先指标与滞后指标；用 value_drivers 中 driver_type=INDUSTRY_CYCLE 的驱动行承载，不新增顶层字段。若证据不足，周期阶段保留 UNKNOWN，不强行贴标签。"
          "必须区别真实需求复苏与补库存、渠道备货、关税/政策导致的提前拉货、低基数和一次性收益；说明这些因素分别对未来销量、净售价、产能利用率、单位成本、毛利率、营运资金和现金流的方向/持续时间意味着什么。不得把短期发货/收入高增直接外推为可持续需求。"
-         "对周期性盈利估值，明确区分当前盈利、正常化/全周期盈利和峰值/谷底盈利；解释为什么当前 P/E 可能在周期高点显得虚低、在周期低点显得虚高。只有证据足以支持时才给正常化盈利/利润率；否则在情景中保留区间或 UNKNOWN，并说明需要哪些数据才能确认周期拐点。 如果希望正常化净利润作为 EPS 桥候选输入，必须提供 IIOS-NORMALIZATION-CALCULATION-0.1 的 normalization_calculation，支持 WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT（至少三个历史完整财年的 OBSERVED_ACTUAL 净利润、正权重合计 1、逐项官方交易所/监管引用）或 NORMALIZED_OPERATING_DRIVER_BRIDGE（销量×净售价、销量×单位变动成本、固定费用、折旧、财务费用、税率、资本开支和营运资金的完整结构化计算；每条必须额外提供 normalized_production_tonnes；产品 ID 与名称集合必须逐项匹配 B4，不得漏项或增加未映射产品；若 B4 提供来源合格的完整年度产能，正常化产量不得超过产能。每条产品线必须核对 normalized_production_tonnes 与 normalized_sales_volume_tonnes：任一期间产量与销量有非零差额，或与合格历史产量−销量差额不同，都必须提供 production_sales_reconciliation={reason,treatment,evidence_refs}。treatment 允许 INVENTORY_BUILD_INCLUDED_IN_GLOBAL_CHANGE_WORKING_CAPITAL、INVENTORY_RELEASE_INCLUDED_IN_GLOBAL_CHANGE_WORKING_CAPITAL、INVENTORY_POSITION_NORMALIZED_TO_BALANCE_IN_GLOBAL_CHANGE_WORKING_CAPITAL 或 NON_INVENTORY_TIMING_OR_SCOPE_DIFFERENCE；涉及库存时变动须明确计入 company-wide change_working_capital_cny。理由必须可识别，证据引用必须截止时点兼容且官方交易所/监管域名匹配；缺失/不符时阻断候选采纳。对 B4 中来源合格的 OBSERVED_ACTUAL 且正常化值与历史实际不相等的每项指标，必须在该产品行提供 historical_deviation_explanations[字段名]={reason,evidence_refs}。理由应具体说明周期位置、产品结构、产能/项目变化、价格/成本周期或其他可辨认机制；引用须截止时点兼容且官方交易所/监管域名匹配。不设任意固定偏差阈值来免除解释；缺少理由或来源不合格时阻断候选采纳。历史值无法可靠识别时显示 UNKNOWN，不把不可比数据冒充基准。所有输入要有截止时点兼容的官方交易所/监管证据与清晰依据，且本地 Decimal 复算值必须精确匹配声明。可用 normalization_cross_checks 交叉核对两种方法；若不一致，明确解释保留哪一方法或阻断采纳。缺少计算单或校验不通过时只能比较，不得采用。"
+         "对周期性盈利估值，明确区分当前盈利、正常化/全周期盈利和峰值/谷底盈利；解释为什么当前 P/E 可能在周期高点显得虚低、在周期低点显得虚高。只有证据足以支持时才给正常化盈利/利润率；否则在情景中保留区间或 UNKNOWN，并说明需要哪些数据才能确认周期拐点。 如果希望正常化净利润作为 EPS 桥候选输入，必须提供 IIOS-NORMALIZATION-CALCULATION-0.1 的 normalization_calculation，支持 WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT（至少三个历史完整财年的 OBSERVED_ACTUAL 净利润、正权重合计 1、逐项官方交易所/监管引用）或 NORMALIZED_OPERATING_DRIVER_BRIDGE（销量×净售价、销量×单位变动成本、固定费用、折旧、财务费用、税率、资本开支和营运资金的完整结构化计算；每条必须额外提供 normalized_production_tonnes；产品 ID 与名称集合必须逐项匹配 B4，不得漏项或增加未映射产品；若 B4 提供来源合格的完整年度产能，正常化产量不得超过产能。每条产品线必须核对 normalized_production_tonnes 与 normalized_sales_volume_tonnes：任一期间产量与销量有非零差额，或与合格历史产量−销量差额不同，都必须提供 production_sales_reconciliation={reason,treatment,evidence_refs}。treatment 允许 INVENTORY_BUILD_INCLUDED_IN_GLOBAL_CHANGE_WORKING_CAPITAL、INVENTORY_RELEASE_INCLUDED_IN_GLOBAL_CHANGE_WORKING_CAPITAL、INVENTORY_GAP_RECONCILED_IN_GLOBAL_CHANGE_WORKING_CAPITAL 或 NON_INVENTORY_TIMING_OR_SCOPE_DIFFERENCE；涉及库存时变动须明确计入 company-wide change_working_capital_cny。理由必须可识别，证据引用必须截止时点兼容且官方交易所/监管域名匹配；缺失/不符时阻断候选采纳。对 B4 中来源合格的 OBSERVED_ACTUAL 且正常化值与历史实际不相等的每项指标，必须在该产品行提供 historical_deviation_explanations[字段名]={reason,evidence_refs}。理由应具体说明周期位置、产品结构、产能/项目变化、价格/成本周期或其他可辨认机制；引用须截止时点兼容且官方交易所/监管域名匹配。不设任意固定偏差阈值来免除解释；缺少理由或来源不合格时阻断候选采纳。历史值无法可靠识别时显示 UNKNOWN，不把不可比数据冒充基准。所有输入要有截止时点兼容的官方交易所/监管证据与清晰依据，且本地 Decimal 复算值必须精确匹配声明。可用 normalization_cross_checks 交叉核对两种方法；若不一致，明确解释保留哪一方法或阻断采纳。缺少计算单或校验不通过时只能比较，不得采用。"
          "如果希望把正常化盈利选为 B4→EPS 桥的候选公司整体净利润输入，必须在 cycle_profile.b4_input_decisions 为 Bear/Base/Bull 分别明确填写 action（COMPARISON_ONLY、REJECT、ADOPT_AS_B4_NET_PROFIT_PROXY）及理由。默认/缺失项是 COMPARISON_ONLY。只允许三个情景全部选择同一个唯一周期 driver_id 的 ADOPT，且指标为公司整体净利润代理、范围 COMPANY_WIDE、币种 CNY、期间与 B4 完全一致、数值/依据完整、证据引用 cutoff 兼容，并且 B4 三情景用 cycle_driver_ids 精确关联该 driver_id；否则不能进入 EPS 桥。该选择只影响 B4→EPS 桥的净利润输入来源，不覆盖 B4 原始经营计算或 FCF。"
         "3. 为什么相信变化会发生：把每个关键变化连接到截止时点前已公开的具体证据、证据日期、业务机制和反证；区分领先指标/结果指标、公司指引/分析师假设/历史事实，不得把管理层目标当成已实现结果。写入 evidence_register、assessment.value_drivers.historical_evidence 与 rationale。"
         "4. 变化如何进入每股价值：明确写出“销量/价格/组合/利用率 → 收入 → 单位毛利与费用 → EBIT/净利润 → 资本开支/营运资金/FCF → 稀释股数与每股盈利 → 估值”的可验证传导链；说明关键假设、量纲、期间、约束、潜在蚕食与稀释，避免重复计价。使用 operating_driver_forecast、valuation_transmission 和 forecast_valuation.scenarios；无法闭合的环节保留 UNKNOWN/NOT_LINKED。"
