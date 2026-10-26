@@ -657,9 +657,6 @@ def _calculate_scenario(
         "cash_capex": capex,
         "change_working_capital": change_wc,
         "effective_change_working_capital": effective_change_wc,
-        "inventory_working_capital_reconciliation": (
-            None if effective_change_wc is not None else inventory_reconciliation_status
-        ),
     }
     missing_inputs.extend(name for name, value in metric_values.items() if value is None)
     return {
