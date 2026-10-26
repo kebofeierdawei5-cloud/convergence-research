@@ -2264,6 +2264,7 @@ def _validate_normalized_operating_driver_bridge(
     product_ids: set[str] = set()
     product_calculations: list[dict[str, Any]] = []
     capacity_checks: list[dict[str, Any]] = []
+    historical_comparison_rows: list[dict[str, Any]] = []
     capacity_overrun_ids: list[str] = []
     revenue_total = Decimal("0")
     variable_cost_total = Decimal("0")
@@ -2335,6 +2336,117 @@ def _validate_normalized_operating_driver_bridge(
             "status": capacity_status,
             "period_is_explicit_full_year": full_year_period,
         })
+        historical_actuals = b4_product.get("historical_actuals") if isinstance(b4_product.get("historical_actuals"), Mapping) else {}
+        raw_deviation_explanations = product.get("historical_deviation_explanations")
+        raw_deviation_explanations = raw_deviation_explanations if isinstance(raw_deviation_explanations, Mapping) else {}
+        historical_comparison: dict[str, dict[str, Any]] = {}
+        normalized_measures = [
+            ("normalized_production_tonnes", "production_tonnes", production),
+            ("normalized_sales_volume_tonnes", "sales_volume_tonnes", volume),
+            ("normalized_net_asp_cny_per_tonne", "net_asp_cny_per_tonne", asp),
+            ("normalized_variable_cost_cny_per_tonne", "variable_cost_cny_per_tonne", unit_cost),
+        ]
+        for normalized_field, actual_field, normalized_value in normalized_measures:
+            history = historical_actuals.get(actual_field)
+            history = history if isinstance(history, Mapping) else {}
+            history_status = str(history.get("status") or "HISTORICAL_ACTUAL_NOT_QUALIFIED")
+            history_value_raw = history.get("value")
+            history_refs = list(history.get("evidence_refs") or []) if isinstance(history.get("evidence_refs"), list) else []
+            comparison: dict[str, Any] = {
+                "normalized_field": normalized_field,
+                "historical_field": actual_field,
+                "historical_period": str(b4_product.get("historical_actuals_period") or "UNKNOWN"),
+                "historical_status": history_status,
+                "historical_value": None,
+                "historical_evidence_refs": history_refs,
+                "normalized_value": format(normalized_value, "f") if normalized_value is not None else None,
+                "absolute_delta": None,
+                "relative_change_pct": None,
+                "comparison_status": "HISTORY_UNKNOWN",
+                "deviation_explanation": None,
+                "deviation_evidence_refs": [],
+            }
+            try:
+                history_value = Decimal(str(history_value_raw))
+                if history_status != "HISTORICAL_ACTUAL_PRIMARY_SOURCE_QUALIFIED" or not history_value.is_finite():
+                    raise InvalidOperation
+            except (InvalidOperation, TypeError, ValueError):
+                if history_status == "HISTORICAL_ACTUAL_PRIMARY_SOURCE_QUALIFIED":
+                    comparison["historical_status"] = "HISTORY_VALUE_INVALID"
+                comparison["comparison_status"] = "HISTORICAL_ACTUAL_NOT_QUALIFIED"
+                historical_comparison[normalized_field] = comparison
+                continue
+
+            all_refs.extend(str(ref) for ref in history_refs if str(ref).strip())
+            comparison["historical_value"] = format(history_value, "f")
+            if normalized_value is None:
+                comparison["comparison_status"] = "NORMALIZED_VALUE_UNKNOWN"
+                lines_complete = False
+                issues.append(f"NORMALIZATION_HISTORICAL_COMPARISON_NORMALIZED_VALUE_UNKNOWN:{product_id}:{normalized_field}")
+                historical_comparison[normalized_field] = comparison
+                continue
+
+            delta = normalized_value - history_value
+            comparison["absolute_delta"] = format(delta, "f")
+            if history_value != 0:
+                comparison["relative_change_pct"] = format((delta / history_value) * Decimal("100"), "f")
+            if delta == 0:
+                comparison["comparison_status"] = "MATCHED_TO_HISTORICAL_ACTUAL"
+                historical_comparison[normalized_field] = comparison
+                continue
+
+            raw_explanation = raw_deviation_explanations.get(normalized_field)
+            raw_explanation = raw_explanation if isinstance(raw_explanation, Mapping) else {}
+            reason = str(raw_explanation.get("reason") or "").strip()
+            refs_raw = raw_explanation.get("evidence_refs")
+            deviation_refs = list(dict.fromkeys(
+                str(ref).strip() for ref in refs_raw if str(ref).strip()
+            )) if isinstance(refs_raw, list) else []
+            explanation_issues: list[str] = []
+            if not _is_identifiable_evidence_text(reason):
+                explanation_issues.append("DEVIATION_REASON_NOT_IDENTIFIABLE")
+            if not deviation_refs:
+                explanation_issues.append("DEVIATION_EVIDENCE_REFS_REQUIRED")
+            for ref in deviation_refs:
+                all_refs.append(ref)
+                source = sources.get(ref)
+                if (
+                    source is None or ref in unresolved or ref in after_cutoff or ref in uncertain
+                    or source.get("time_status") != "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+                ):
+                    explanation_issues.append(f"DEVIATION_EVIDENCE_NOT_CUTOFF_COMPATIBLE:{ref}")
+                    continue
+                source_class = str(source.get("source_class") or "").strip().upper()
+                domain_status = str(source.get("source_domain_class_status") or "").strip().upper()
+                if source_class == "EXCHANGE_PRIMARY":
+                    if domain_status != "OFFICIAL_EXCHANGE_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED":
+                        explanation_issues.append(f"DEVIATION_EXCHANGE_DOMAIN_NOT_MATCHED:{ref}")
+                elif source_class == "REGULATOR_PRIMARY":
+                    if domain_status != "OFFICIAL_REGULATOR_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED":
+                        explanation_issues.append(f"DEVIATION_REGULATOR_DOMAIN_NOT_MATCHED:{ref}")
+                else:
+                    explanation_issues.append(f"DEVIATION_REQUIRES_EXCHANGE_OR_REGULATOR_PRIMARY:{ref}")
+
+            comparison["deviation_explanation"] = reason or "UNKNOWN"
+            comparison["deviation_evidence_refs"] = deviation_refs
+            comparison["explanation_issues"] = list(dict.fromkeys(explanation_issues))
+            if explanation_issues:
+                comparison["comparison_status"] = "DEVIATION_UNEXPLAINED_BLOCKS_ADOPTION"
+                lines_complete = False
+                issues.append(f"NORMALIZATION_HISTORICAL_DEVIATION_EXPLANATION_REQUIRED:{product_id}:{normalized_field}")
+                issues.extend(
+                    f"NORMALIZATION_HISTORICAL_DEVIATION:{product_id}:{normalized_field}:{item}"
+                    for item in explanation_issues
+                )
+            else:
+                comparison["comparison_status"] = "DEVIATION_EXPLAINED_NOT_FORMALLY_ADMITTED"
+            historical_comparison[normalized_field] = comparison
+
+        historical_comparison_rows.append({
+            "product_id": product_id or None,
+            "product_name": product_name or "UNKNOWN",
+            "comparison_fields": historical_comparison,
+        })
         product_calculations.append({
             "product_id": product_id or None,
             "product_name": product_name or "UNKNOWN",
@@ -2348,6 +2460,7 @@ def _validate_normalized_operating_driver_bridge(
             "revenue_cny": format(line_revenue, "f") if line_revenue is not None else None,
             "variable_cost_cny": format(line_variable_cost, "f") if line_variable_cost is not None else None,
             "contribution_cny": format(line_revenue - line_variable_cost, "f") if line_revenue is not None and line_variable_cost is not None else None,
+            "historical_comparison": historical_comparison,
         })
 
     expected_product_ids = set(str(value) for value in b4_products)
@@ -2492,6 +2605,7 @@ def _validate_normalized_operating_driver_bridge(
         "inputs": validated_inputs,
         "evidence_refs": list(dict.fromkeys(all_refs)),
         "product_scope_reconciliation": product_scope_reconciliation,
+        "historical_deviation_reconciliation": historical_comparison_rows,
         "coverage_status": coverage_status,
         "coverage_basis": coverage_basis or "UNKNOWN",
         "issues": unique_issues,
@@ -3364,6 +3478,71 @@ def _cycle_normalization_b4_product_context(
                     except (InvalidOperation, TypeError, ValueError):
                         capacity_status = "CAPACITY_VALUE_INVALID"
 
+        raw_historical_actuals = row.get("historical_actuals")
+        raw_historical_actuals = raw_historical_actuals if isinstance(raw_historical_actuals, Mapping) else {}
+        historical_actuals: dict[str, dict[str, Any]] = {}
+        historical_specs = {
+            "production_tonnes": "tonnes",
+            "sales_volume_tonnes": "tonnes",
+            "net_asp_cny_per_tonne": "CNY/tonne",
+            "variable_cost_cny_per_tonne": "CNY/tonne",
+        }
+        for actual_field, expected_unit in historical_specs.items():
+            measure = raw_historical_actuals.get(actual_field)
+            history_record: dict[str, Any] = {
+                "value": None, "unit": expected_unit, "data_class": "UNKNOWN",
+                "status": "HISTORICAL_ACTUAL_NOT_QUALIFIED", "evidence_refs": [],
+            }
+            if isinstance(measure, Mapping):
+                data_class = str(measure.get("data_class") or "UNKNOWN").strip().upper()
+                refs_raw = measure.get("evidence_refs")
+                refs = list(dict.fromkeys(
+                    str(ref).strip() for ref in refs_raw if str(ref).strip()
+                )) if isinstance(refs_raw, list) else []
+                history_record["data_class"] = data_class
+                history_record["evidence_refs"] = refs
+                if data_class != "OBSERVED_ACTUAL":
+                    history_record["status"] = "HISTORY_CLASS_NOT_OBSERVED_ACTUAL"
+                elif measure.get("calculation_usable") is not True:
+                    history_record["status"] = "HISTORY_INPUT_NOT_CALCULATION_USABLE"
+                elif str(measure.get("unit") or "").strip() != expected_unit:
+                    history_record["status"] = "HISTORY_UNIT_MISMATCH"
+                elif not refs:
+                    history_record["status"] = "HISTORY_EVIDENCE_REFS_MISSING"
+                else:
+                    refs_qualified = True
+                    for ref in refs:
+                        source = sources.get(ref)
+                        if (
+                            source is None or ref in unresolved or ref in after_cutoff or ref in uncertain
+                            or source.get("time_status") != "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"
+                        ):
+                            refs_qualified = False
+                            break
+                        source_class = str(source.get("source_class") or "").strip().upper()
+                        domain_status = str(source.get("source_domain_class_status") or "").strip().upper()
+                        if source_class == "EXCHANGE_PRIMARY":
+                            refs_qualified = domain_status == "OFFICIAL_EXCHANGE_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED"
+                        elif source_class == "REGULATOR_PRIMARY":
+                            refs_qualified = domain_status == "OFFICIAL_REGULATOR_DOMAIN_CLASS_MATCH_NOT_FORMALLY_ADMITTED"
+                        else:
+                            refs_qualified = False
+                        if not refs_qualified:
+                            break
+                    if not refs_qualified:
+                        history_record["status"] = "HISTORY_SOURCE_NOT_CUTOFF_COMPATIBLE_OFFICIAL_PRIMARY"
+                    else:
+                        try:
+                            history_value = Decimal(str(measure.get("value")))
+                            if history_value.is_finite() and history_value >= 0:
+                                history_record["value"] = format(history_value, "f")
+                                history_record["status"] = "HISTORICAL_ACTUAL_PRIMARY_SOURCE_QUALIFIED"
+                            else:
+                                history_record["status"] = "HISTORY_VALUE_INVALID"
+                        except (InvalidOperation, TypeError, ValueError):
+                            history_record["status"] = "HISTORY_VALUE_INVALID"
+            historical_actuals[actual_field] = history_record
+
         product_context[product_id] = {
             "product_id": product_id,
             "product_name": product_name,
@@ -3371,6 +3550,8 @@ def _cycle_normalization_b4_product_context(
             "capacity_status": capacity_status,
             "capacity_data_class": capacity_data_class,
             "capacity_evidence_refs": capacity_refs,
+            "historical_actuals": historical_actuals,
+            "historical_actuals_period": str(operating_driver_forecast.get("actuals_period") or "UNKNOWN"),
         }
 
     return {
@@ -5641,6 +5822,12 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
                 f"invalid rows={show(product_scope_check.get('invalid_normalization_row_count'))}; "
                 f"capacity overruns={','.join(list_values(product_scope_check.get('capacity_overrun_product_ids'))) or 'none'}"
             ) if product_scope_check else "NOT_AVAILABLE"
+            historical_comparisons = formula_check.get("historical_deviation_reconciliation") if isinstance(formula_check.get("historical_deviation_reconciliation"), list) else []
+            historical_comparison_text = "；".join(
+                f"{show(product_row.get('product_id'))} {show(product_row.get('product_name'))} / {metric}: history={show(comp.get('historical_value'))} ({show(comp.get('historical_period'))}); normalized={show(comp.get('normalized_value'))}; delta={show(comp.get('absolute_delta'))}; change={show(comp.get('relative_change_pct'))}%; status={show(comp.get('comparison_status'))}; reason={show(comp.get('deviation_explanation'))}; historical_refs={'、'.join(list_values(comp.get('historical_evidence_refs'))) or 'UNKNOWN'}; deviation_refs={'、'.join(list_values(comp.get('deviation_evidence_refs'))) or 'UNKNOWN'}"
+                for product_row in historical_comparisons if isinstance(product_row, Mapping)
+                for metric, comp in (product_row.get("comparison_fields") or {}).items() if isinstance(comp, Mapping)
+            ) or "历史实际不可识别/无可比数据"
             if operating_bridge:
                 operating_math += (
                     f"；总收入 {show(operating_bridge.get('revenue_cny'))} CNY；总变动成本 {show(operating_bridge.get('variable_cost_cny'))} CNY；"
@@ -5663,7 +5850,7 @@ def _render_cycle_value_chain_section(analysis: Mapping[str, Any]) -> list[str]:
                 f"候选值 {show(decision_row.get('candidate_value', decision_row.get('normalized_value')))}；"
                 f"历史公式复算：{show(formula_check.get('status'))}，声明值−复算值 {show(formula_check.get('difference_declared_minus_calculated'))}，复算值 {show(formula_check.get('calculated_value'))}，权重合计 {show(formula_check.get('weights_sum'))}，加权依据 {show(formula_check.get('weight_basis'))}；"
                 f"公式方法：{show(formula_check.get('method'))}；逐项计算：{formula_math}；"
-                f"经营桥算术：{operating_math or '不适用'}；B4 产品范围/产能核对：{product_scope_text}；"
+                f"经营桥算术：{operating_math or '不适用'}；B4 产品范围/产能核对：{product_scope_text}；历史实际对正常化偏差：{historical_comparison_text}；"
                 f"方法交叉核对：{show(method_reconciliation.get('status'))}；选定方法 {show(method_reconciliation.get('selected_method'))}；备选结果 {cross_check_text}；处置 {show(method_reconciliation.get('resolution'))}；理由 {show(method_reconciliation.get('reason'))}；差异 {divergence_text}；"
                 f"输入期间 {'、'.join(list_values(formula_check.get('input_periods'))) or 'UNKNOWN'}；"
                 f"实际进入计算 {show(decision_row.get('calculation_input_used'))}；"
@@ -7035,7 +7222,7 @@ def create_pilot_template(
         "2. 未来最重要的变化是什么：按价值重要性排序，不要罗列宏观热点；指出未来 1 年（如有明确理由再用 2–3 年）最可能改变收入、单位利润、现金流或每股价值的变量，说明起点、预期变化、时间和可观测指标。写入 assessment.value_drivers 与 operating_driver_forecast。"
          "2A. 对周期敏感的行业/业务，必须单独识别行业/公司周期位置（扩张、过热、收缩、筑底、复苏或 UNKNOWN），给出截止时点前的证据、反证、领先指标与滞后指标；用 value_drivers 中 driver_type=INDUSTRY_CYCLE 的驱动行承载，不新增顶层字段。若证据不足，周期阶段保留 UNKNOWN，不强行贴标签。"
          "必须区别真实需求复苏与补库存、渠道备货、关税/政策导致的提前拉货、低基数和一次性收益；说明这些因素分别对未来销量、净售价、产能利用率、单位成本、毛利率、营运资金和现金流的方向/持续时间意味着什么。不得把短期发货/收入高增直接外推为可持续需求。"
-         "对周期性盈利估值，明确区分当前盈利、正常化/全周期盈利和峰值/谷底盈利；解释为什么当前 P/E 可能在周期高点显得虚低、在周期低点显得虚高。只有证据足以支持时才给正常化盈利/利润率；否则在情景中保留区间或 UNKNOWN，并说明需要哪些数据才能确认周期拐点。 如果希望正常化净利润作为 EPS 桥候选输入，必须提供 IIOS-NORMALIZATION-CALCULATION-0.1 的 normalization_calculation，支持 WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT（至少三个历史完整财年的 OBSERVED_ACTUAL 净利润、正权重合计 1、逐项官方交易所/监管引用）或 NORMALIZED_OPERATING_DRIVER_BRIDGE（销量×净售价、销量×单位变动成本、固定费用、折旧、财务费用、税率、资本开支和营运资金的完整结构化计算；每条必须额外提供 normalized_production_tonnes；产品 ID 与名称集合必须逐项匹配 B4，不得漏项或增加未映射产品；若 B4 提供完整年度产能，正常化产量不得超过产能）。所有输入要有截止时点兼容的官方交易所/监管证据与清晰依据，且本地 Decimal 复算值必须精确匹配声明。可用 normalization_cross_checks 交叉核对两种方法；若不一致，明确解释保留哪一方法或阻断采纳。缺少计算单或校验不通过时只能比较，不得采用。"
+         "对周期性盈利估值，明确区分当前盈利、正常化/全周期盈利和峰值/谷底盈利；解释为什么当前 P/E 可能在周期高点显得虚低、在周期低点显得虚高。只有证据足以支持时才给正常化盈利/利润率；否则在情景中保留区间或 UNKNOWN，并说明需要哪些数据才能确认周期拐点。 如果希望正常化净利润作为 EPS 桥候选输入，必须提供 IIOS-NORMALIZATION-CALCULATION-0.1 的 normalization_calculation，支持 WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT（至少三个历史完整财年的 OBSERVED_ACTUAL 净利润、正权重合计 1、逐项官方交易所/监管引用）或 NORMALIZED_OPERATING_DRIVER_BRIDGE（销量×净售价、销量×单位变动成本、固定费用、折旧、财务费用、税率、资本开支和营运资金的完整结构化计算；每条必须额外提供 normalized_production_tonnes；产品 ID 与名称集合必须逐项匹配 B4，不得漏项或增加未映射产品；若 B4 提供来源合格的完整年度产能，正常化产量不得超过产能。对 B4 中来源合格的 OBSERVED_ACTUAL 且正常化值与历史实际不相等的每项指标，必须在该产品行提供 historical_deviation_explanations[字段名]={reason,evidence_refs}。理由应具体说明周期位置、产品结构、产能/项目变化、价格/成本周期或其他可辨认机制；引用须截止时点兼容且官方交易所/监管域名匹配。不设任意固定偏差阈值来免除解释；缺少理由或来源不合格时阻断候选采纳。历史值无法可靠识别时显示 UNKNOWN，不把不可比数据冒充基准。所有输入要有截止时点兼容的官方交易所/监管证据与清晰依据，且本地 Decimal 复算值必须精确匹配声明。可用 normalization_cross_checks 交叉核对两种方法；若不一致，明确解释保留哪一方法或阻断采纳。缺少计算单或校验不通过时只能比较，不得采用。"
          "如果希望把正常化盈利选为 B4→EPS 桥的候选公司整体净利润输入，必须在 cycle_profile.b4_input_decisions 为 Bear/Base/Bull 分别明确填写 action（COMPARISON_ONLY、REJECT、ADOPT_AS_B4_NET_PROFIT_PROXY）及理由。默认/缺失项是 COMPARISON_ONLY。只允许三个情景全部选择同一个唯一周期 driver_id 的 ADOPT，且指标为公司整体净利润代理、范围 COMPANY_WIDE、币种 CNY、期间与 B4 完全一致、数值/依据完整、证据引用 cutoff 兼容，并且 B4 三情景用 cycle_driver_ids 精确关联该 driver_id；否则不能进入 EPS 桥。该选择只影响 B4→EPS 桥的净利润输入来源，不覆盖 B4 原始经营计算或 FCF。"
         "3. 为什么相信变化会发生：把每个关键变化连接到截止时点前已公开的具体证据、证据日期、业务机制和反证；区分领先指标/结果指标、公司指引/分析师假设/历史事实，不得把管理层目标当成已实现结果。写入 evidence_register、assessment.value_drivers.historical_evidence 与 rationale。"
         "4. 变化如何进入每股价值：明确写出“销量/价格/组合/利用率 → 收入 → 单位毛利与费用 → EBIT/净利润 → 资本开支/营运资金/FCF → 稀释股数与每股盈利 → 估值”的可验证传导链；说明关键假设、量纲、期间、约束、潜在蚕食与稀释，避免重复计价。使用 operating_driver_forecast、valuation_transmission 和 forecast_valuation.scenarios；无法闭合的环节保留 UNKNOWN/NOT_LINKED。"
