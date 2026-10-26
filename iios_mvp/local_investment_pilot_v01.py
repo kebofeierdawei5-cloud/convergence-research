@@ -2267,6 +2267,7 @@ def _validate_normalized_operating_driver_bridge(
     historical_comparison_rows: list[dict[str, Any]] = []
     production_sales_balance_rows: list[dict[str, Any]] = []
     inventory_wc_treatment_product_ids: list[str] = []
+    inventory_wc_inputs: list[dict[str, Any]] = []
     capacity_overrun_ids: list[str] = []
     revenue_total = Decimal("0")
     variable_cost_total = Decimal("0")
@@ -2535,6 +2536,20 @@ def _validate_normalized_operating_driver_bridge(
 
             if balance_treatment in inventory_treatments:
                 inventory_wc_treatment_product_ids.append(product_id)
+                inventory_wc_amount = parse_measure(
+                    raw_balance.get("inventory_change_working_capital_cny"),
+                    key=f"{prefix}.production_sales_reconciliation.inventory_change_working_capital_cny",
+                    expected_unit="CNY",
+                    allow_negative=True,
+                )
+                if inventory_wc_amount is None:
+                    balance_issues.append("INVENTORY_WORKING_CAPITAL_AMOUNT_REQUIRED_AND_VALID")
+                else:
+                    inventory_wc_inputs.append({
+                        "product_id": product_id,
+                        "value": inventory_wc_amount,
+                        "declared_value": format(inventory_wc_amount, "f"),
+                    })
                 if normalized_production_sales_gap > 0 and balance_treatment not in {
                     "INVENTORY_BUILD_INCLUDED_IN_GLOBAL_CHANGE_WORKING_CAPITAL",
                     "INVENTORY_GAP_RECONCILED_IN_GLOBAL_CHANGE_WORKING_CAPITAL",
@@ -2679,19 +2694,62 @@ def _validate_normalized_operating_driver_bridge(
     finance = global_values["finance_cost_cny"]
     capex = global_values["cash_capex_cny"]
     change_wc = global_values["change_working_capital_cny"]
-    if inventory_wc_treatment_product_ids and change_wc is None:
-        lines_complete = False
-        issues.append(
-            "NORMALIZATION_INVENTORY_GAP_REQUIRES_CALCULATION_USABLE_CHANGE_WORKING_CAPITAL:"
-            + ",".join(sorted(set(inventory_wc_treatment_product_ids)))
+    inventory_wc_reconciliation: dict[str, Any] = {
+        "status": "NOT_APPLICABLE",
+        "product_inventory_change_working_capital_cny": [],
+        "inventory_change_total_cny": None,
+        "non_inventory_change_working_capital_cny": None,
+        "company_wide_change_working_capital_cny": format(change_wc, "f") if change_wc is not None else None,
+        "recomputed_total_cny": None,
+        "difference_from_company_wide_cny": None,
+        "issues": [],
+    }
+    if inventory_wc_treatment_product_ids:
+        operating_assumptions = calc.get("operating_assumptions")
+        operating_assumptions = operating_assumptions if isinstance(operating_assumptions, Mapping) else {}
+        non_inventory_wc = parse_measure(
+            operating_assumptions.get("non_inventory_change_working_capital_cny"),
+            key="operating_assumptions.non_inventory_change_working_capital_cny",
+            expected_unit="CNY",
+            allow_negative=True,
         )
-        for row in production_sales_balance_rows:
-            if row.get("product_id") in inventory_wc_treatment_product_ids:
-                row["status"] = "RECONCILIATION_BLOCKED"
-                row["issues"] = list(dict.fromkeys([
-                    *(row.get("issues") or []),
-                    "CHANGE_WORKING_CAPITAL_INPUT_NOT_CALCULATION_USABLE",
-                ]))
+        inventory_total = sum((row["value"] for row in inventory_wc_inputs), Decimal("0"))
+        inventory_amounts_complete = len(inventory_wc_inputs) == len(set(inventory_wc_treatment_product_ids))
+        wc_issues: list[str] = []
+        if not inventory_amounts_complete:
+            wc_issues.append("PRODUCT_LEVEL_INVENTORY_WORKING_CAPITAL_AMOUNT_MISSING")
+        if change_wc is None:
+            wc_issues.append("COMPANY_WIDE_CHANGE_WORKING_CAPITAL_NOT_CALCULATION_USABLE")
+        if non_inventory_wc is None:
+            wc_issues.append("NON_INVENTORY_CHANGE_WORKING_CAPITAL_NOT_CALCULATION_USABLE")
+        recomputed_wc = inventory_total + non_inventory_wc if inventory_amounts_complete and non_inventory_wc is not None else None
+        difference_wc = change_wc - recomputed_wc if change_wc is not None and recomputed_wc is not None else None
+        if difference_wc is not None and difference_wc != 0:
+            wc_issues.append("INVENTORY_PLUS_NON_INVENTORY_WORKING_CAPITAL_DOES_NOT_MATCH_COMPANY_WIDE_TOTAL")
+        inventory_wc_reconciliation = {
+            "status": "RECONCILED_NOT_FORMALLY_ADMITTED" if not wc_issues else "RECONCILIATION_BLOCKED",
+            "product_inventory_change_working_capital_cny": [
+                {"product_id": row["product_id"], "value_cny": format(row["value"], "f")}
+                for row in inventory_wc_inputs
+            ],
+            "inventory_change_total_cny": format(inventory_total, "f") if inventory_amounts_complete else None,
+            "non_inventory_change_working_capital_cny": format(non_inventory_wc, "f") if non_inventory_wc is not None else None,
+            "company_wide_change_working_capital_cny": format(change_wc, "f") if change_wc is not None else None,
+            "recomputed_total_cny": format(recomputed_wc, "f") if recomputed_wc is not None else None,
+            "difference_from_company_wide_cny": format(difference_wc, "f") if difference_wc is not None else None,
+            "formula": "SUM(product inventory change in working capital) + non-inventory change in working capital = company-wide change_working_capital_cny; positive is cash use, negative is cash release",
+            "issues": wc_issues,
+        }
+        if wc_issues:
+            lines_complete = False
+            issues.extend(f"NORMALIZATION_WORKING_CAPITAL_RECONCILIATION:{item}" for item in wc_issues)
+            for row in production_sales_balance_rows:
+                if row.get("product_id") in inventory_wc_treatment_product_ids:
+                    row["status"] = "RECONCILIATION_BLOCKED"
+                    row["issues"] = list(dict.fromkeys([
+                        *(row.get("issues") or []),
+                        "COMPANY_WIDE_WORKING_CAPITAL_RECONCILIATION_FAILED",
+                    ]))
     all_globals_complete = all(value is not None for value in global_values.values())
     revenue = revenue_total if lines_complete else None
     variable_cost = variable_cost_total if lines_complete else None
@@ -2750,6 +2808,7 @@ def _validate_normalized_operating_driver_bridge(
         "product_scope_reconciliation": product_scope_reconciliation,
         "historical_deviation_reconciliation": historical_comparison_rows,
         "production_sales_balance_reconciliation": production_sales_balance_rows,
+        "inventory_working_capital_reconciliation": inventory_wc_reconciliation,
         "coverage_status": coverage_status,
         "coverage_basis": coverage_basis or "UNKNOWN",
         "issues": unique_issues,
@@ -7371,7 +7430,7 @@ def create_pilot_template(
         "2. 未来最重要的变化是什么：按价值重要性排序，不要罗列宏观热点；指出未来 1 年（如有明确理由再用 2–3 年）最可能改变收入、单位利润、现金流或每股价值的变量，说明起点、预期变化、时间和可观测指标。写入 assessment.value_drivers 与 operating_driver_forecast。"
          "2A. 对周期敏感的行业/业务，必须单独识别行业/公司周期位置（扩张、过热、收缩、筑底、复苏或 UNKNOWN），给出截止时点前的证据、反证、领先指标与滞后指标；用 value_drivers 中 driver_type=INDUSTRY_CYCLE 的驱动行承载，不新增顶层字段。若证据不足，周期阶段保留 UNKNOWN，不强行贴标签。"
          "必须区别真实需求复苏与补库存、渠道备货、关税/政策导致的提前拉货、低基数和一次性收益；说明这些因素分别对未来销量、净售价、产能利用率、单位成本、毛利率、营运资金和现金流的方向/持续时间意味着什么。不得把短期发货/收入高增直接外推为可持续需求。"
-         "对周期性盈利估值，明确区分当前盈利、正常化/全周期盈利和峰值/谷底盈利；解释为什么当前 P/E 可能在周期高点显得虚低、在周期低点显得虚高。只有证据足以支持时才给正常化盈利/利润率；否则在情景中保留区间或 UNKNOWN，并说明需要哪些数据才能确认周期拐点。 如果希望正常化净利润作为 EPS 桥候选输入，必须提供 IIOS-NORMALIZATION-CALCULATION-0.1 的 normalization_calculation，支持 WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT（至少三个历史完整财年的 OBSERVED_ACTUAL 净利润、正权重合计 1、逐项官方交易所/监管引用）或 NORMALIZED_OPERATING_DRIVER_BRIDGE（销量×净售价、销量×单位变动成本、固定费用、折旧、财务费用、税率、资本开支和营运资金的完整结构化计算；每条必须额外提供 normalized_production_tonnes；产品 ID 与名称集合必须逐项匹配 B4，不得漏项或增加未映射产品；若 B4 提供来源合格的完整年度产能，正常化产量不得超过产能。每条产品线必须核对 normalized_production_tonnes 与 normalized_sales_volume_tonnes：任一期间产量与销量有非零差额，或与合格历史产量−销量差额不同，都必须提供 production_sales_reconciliation={reason,treatment,evidence_refs}。treatment 允许 INVENTORY_BUILD_INCLUDED_IN_GLOBAL_CHANGE_WORKING_CAPITAL、INVENTORY_RELEASE_INCLUDED_IN_GLOBAL_CHANGE_WORKING_CAPITAL、INVENTORY_GAP_RECONCILED_IN_GLOBAL_CHANGE_WORKING_CAPITAL 或 NON_INVENTORY_TIMING_OR_SCOPE_DIFFERENCE；涉及库存时变动须明确计入 company-wide change_working_capital_cny。理由必须可识别，证据引用必须截止时点兼容且官方交易所/监管域名匹配；缺失/不符时阻断候选采纳。对 B4 中来源合格的 OBSERVED_ACTUAL 且正常化值与历史实际不相等的每项指标，必须在该产品行提供 historical_deviation_explanations[字段名]={reason,evidence_refs}。理由应具体说明周期位置、产品结构、产能/项目变化、价格/成本周期或其他可辨认机制；引用须截止时点兼容且官方交易所/监管域名匹配。不设任意固定偏差阈值来免除解释；缺少理由或来源不合格时阻断候选采纳。历史值无法可靠识别时显示 UNKNOWN，不把不可比数据冒充基准。所有输入要有截止时点兼容的官方交易所/监管证据与清晰依据，且本地 Decimal 复算值必须精确匹配声明。可用 normalization_cross_checks 交叉核对两种方法；若不一致，明确解释保留哪一方法或阻断采纳。缺少计算单或校验不通过时只能比较，不得采用。"
+         "对周期性盈利估值，明确区分当前盈利、正常化/全周期盈利和峰值/谷底盈利；解释为什么当前 P/E 可能在周期高点显得虚低、在周期低点显得虚高。只有证据足以支持时才给正常化盈利/利润率；否则在情景中保留区间或 UNKNOWN，并说明需要哪些数据才能确认周期拐点。 如果希望正常化净利润作为 EPS 桥候选输入，必须提供 IIOS-NORMALIZATION-CALCULATION-0.1 的 normalization_calculation，支持 WEIGHTED_MEAN_OF_HISTORICAL_FULL_YEAR_NET_PROFIT（至少三个历史完整财年的 OBSERVED_ACTUAL 净利润、正权重合计 1、逐项官方交易所/监管引用）或 NORMALIZED_OPERATING_DRIVER_BRIDGE（销量×净售价、销量×单位变动成本、固定费用、折旧、财务费用、税率、资本开支和营运资金的完整结构化计算；每条必须额外提供 normalized_production_tonnes；产品 ID 与名称集合必须逐项匹配 B4，不得漏项或增加未映射产品；若 B4 提供来源合格的完整年度产能，正常化产量不得超过产能。每条产品线必须核对 normalized_production_tonnes 与 normalized_sales_volume_tonnes：任一期间产量与销量有非零差额，或与合格历史产量−销量差额不同，都必须提供 production_sales_reconciliation={reason,treatment,evidence_refs}。treatment 允许 INVENTORY_BUILD_INCLUDED_IN_GLOBAL_CHANGE_WORKING_CAPITAL、INVENTORY_RELEASE_INCLUDED_IN_GLOBAL_CHANGE_WORKING_CAPITAL、INVENTORY_GAP_RECONCILED_IN_GLOBAL_CHANGE_WORKING_CAPITAL 或 NON_INVENTORY_TIMING_OR_SCOPE_DIFFERENCE；涉及库存时必须在 production_sales_reconciliation.inventory_change_working_capital_cny 提供 {value,unit=CNY,data_class=ANALYST_ASSUMPTION,basis,evidence_refs,period}，并在 operating_assumptions.non_inventory_change_working_capital_cny 提供相同结构的公司非库存营运资金变动；两者与各产品库存变动加总后必须精确等于 operating_assumptions.change_working_capital_cny（正数为现金占用，负数为现金释放），不得只用文字声明“已包含”。缺少任何金额或数值不一致时阻断候选采纳。理由必须可识别，证据引用必须截止时点兼容且官方交易所/监管域名匹配；缺失/不符时阻断候选采纳。对 B4 中来源合格的 OBSERVED_ACTUAL 且正常化值与历史实际不相等的每项指标，必须在该产品行提供 historical_deviation_explanations[字段名]={reason,evidence_refs}。理由应具体说明周期位置、产品结构、产能/项目变化、价格/成本周期或其他可辨认机制；引用须截止时点兼容且官方交易所/监管域名匹配。不设任意固定偏差阈值来免除解释；缺少理由或来源不合格时阻断候选采纳。历史值无法可靠识别时显示 UNKNOWN，不把不可比数据冒充基准。所有输入要有截止时点兼容的官方交易所/监管证据与清晰依据，且本地 Decimal 复算值必须精确匹配声明。可用 normalization_cross_checks 交叉核对两种方法；若不一致，明确解释保留哪一方法或阻断采纳。缺少计算单或校验不通过时只能比较，不得采用。"
          "如果希望把正常化盈利选为 B4→EPS 桥的候选公司整体净利润输入，必须在 cycle_profile.b4_input_decisions 为 Bear/Base/Bull 分别明确填写 action（COMPARISON_ONLY、REJECT、ADOPT_AS_B4_NET_PROFIT_PROXY）及理由。默认/缺失项是 COMPARISON_ONLY。只允许三个情景全部选择同一个唯一周期 driver_id 的 ADOPT，且指标为公司整体净利润代理、范围 COMPANY_WIDE、币种 CNY、期间与 B4 完全一致、数值/依据完整、证据引用 cutoff 兼容，并且 B4 三情景用 cycle_driver_ids 精确关联该 driver_id；否则不能进入 EPS 桥。该选择只影响 B4→EPS 桥的净利润输入来源，不覆盖 B4 原始经营计算或 FCF。"
         "3. 为什么相信变化会发生：把每个关键变化连接到截止时点前已公开的具体证据、证据日期、业务机制和反证；区分领先指标/结果指标、公司指引/分析师假设/历史事实，不得把管理层目标当成已实现结果。写入 evidence_register、assessment.value_drivers.historical_evidence 与 rationale。"
         "4. 变化如何进入每股价值：明确写出“销量/价格/组合/利用率 → 收入 → 单位毛利与费用 → EBIT/净利润 → 资本开支/营运资金/FCF → 稀释股数与每股盈利 → 估值”的可验证传导链；说明关键假设、量纲、期间、约束、潜在蚕食与稀释，避免重复计价。使用 operating_driver_forecast、valuation_transmission 和 forecast_valuation.scenarios；无法闭合的环节保留 UNKNOWN/NOT_LINKED。"
