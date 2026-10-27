@@ -174,7 +174,8 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
             for scenario in ("bear", "base", "bull")
         ],
         "normalized_fcf": {
-            "metric": "UNLEVERED_FCF_CNY",
+            "metric": "UNLEVERED_FCF_PROXY_CNY",
+            "method": "B4_UNLEVERED_FCF_PROXY_EBIT_AFTER_TAX_PLUS_DA_MINUS_CASH_CAPEX_MINUS_EFFECTIVE_WC_V0.1",
             "scope": "COMPANY_WIDE",
             "reference_period": "FY2026",
             "period": "FY2027",
