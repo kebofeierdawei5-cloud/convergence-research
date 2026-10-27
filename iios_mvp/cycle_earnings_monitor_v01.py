@@ -382,7 +382,7 @@ def _evaluate_cash_flow_path(
     """Keep cash/FCF attribution independent from net-profit attribution; never invent a normalized FCF bridge."""
     allowed_channels = {
         "OPERATING_CASH_CONVERSION", "WORKING_CAPITAL", "INVENTORY_MOVEMENT",
-        "CAPEX", "NON_CASH_EARNINGS", "FINANCE_CASH_COST", "TAX_CASH_TIMING",
+        "CAPEX", "NON_CASH_EARNINGS", "FINANCING_CASH_FLOW", "TAX_CASH_TIMING",
         "NO_DIRECT_CASH_EFFECT", "UNKNOWN",
     }
     allowed_directions = {
@@ -396,7 +396,7 @@ def _evaluate_cash_flow_path(
         "INVENTORY_MOVEMENT": "inventory_cash_impact_proxy_cny",
         "CAPEX": "cash_capex_cny",
         "NON_CASH_EARNINGS": "depreciation_amortization_cny",
-        "FINANCE_CASH_COST": "finance_cost_cny",
+        "FINANCING_CASH_FLOW": None,
         "TAX_CASH_TIMING": None,
     }
     triggers_by_id = {
@@ -530,9 +530,14 @@ def _evaluate_cash_flow_path(
                 uncertain_refs=uncertain_refs,
                 allow_negative=True,
             )
-            effect_basis = _text(raw_effect.get("basis")) or None if isinstance(raw_effect, Mapping) else None
-            effect_data_class = _text(raw_effect.get("data_class")).upper() or None if isinstance(raw_effect, Mapping) else None
+            if isinstance(raw_effect, Mapping):
+                effect_basis = _text(raw_effect.get("basis")) or None
+                effect_data_class = _text(raw_effect.get("data_class")).upper() or None
             item_issues.extend(effect_issues)
+            if not effect_refs:
+                item_issues.append("CASH_FLOW_QUANTIFIED_AMOUNT_EVIDENCE_REQUIRED")
+            elif not trigger_refs or not set(effect_refs).intersection(trigger_refs):
+                item_issues.append("CASH_FLOW_AMOUNT_EVIDENCE_NOT_SHARED_WITH_REVIEW_TRIGGER")
             if effect is not None:
                 if effect > 0 and direction != "IMPROVES_FCF":
                     item_issues.append("POSITIVE_FCF_EFFECT_DIRECTION_MISMATCH")
@@ -547,6 +552,11 @@ def _evaluate_cash_flow_path(
                 item_issues.append(f"B4_CASH_CONTEXT_AMOUNT_UNAVAILABLE_FOR_QUANTIFIED_CHANNEL:{channel}")
             if context.get("financial_outputs_decision_usable") is not True:
                 item_issues.append("B4_CASH_CONTEXT_NOT_DECISION_USABLE")
+            if channel in {"WORKING_CAPITAL", "INVENTORY_MOVEMENT"}:
+                reconciliation_status = _text(context_fields.get("inventory_reconciliation_status")).upper()
+                blocked_tokens = ("NOT_IDENTIFIABLE", "UNAVAILABLE", "INVALID", "REQUIRED", "UNKNOWN")
+                if not reconciliation_status or any(token in reconciliation_status for token in blocked_tokens):
+                    item_issues.append("B4_INVENTORY_WORKING_CAPITAL_RECONCILIATION_NOT_IDENTIFIABLE")
         elif raw_effect not in (None, ""):
             item_issues.append("UNQUANTIFIED_CASH_FLOW_ASSESSMENT_MUST_NOT_SUPPLY_AMOUNT")
 
