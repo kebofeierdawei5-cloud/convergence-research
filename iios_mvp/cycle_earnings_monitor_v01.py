@@ -655,7 +655,7 @@ def _evaluate_normalized_fcf_bridge(
     after_cutoff_refs: set[str],
     uncertain_refs: set[str],
 ) -> dict[str, Any]:
-    """Build an independent normalized-FCF bridge and reconcile B4-minus-normalized FCF."""
+    """Build B48 normalized-FCF and B49 measured component-level variance bridges."""
     empty = {
         "status": "NOT_IDENTIFIABLE",
         "normalized_fcf": {"status": "NOT_IDENTIFIABLE", "scenarios": {}, "issues": ["NORMALIZED_FCF_NOT_PROVIDED"]},
@@ -930,7 +930,11 @@ def _evaluate_normalized_fcf_bridge(
             component_issues.append("NORMALIZED_FCF_INVENTORY_RECONCILIATION_NOT_PASS")
         inventory_proxy: Decimal | None = None
         raw_inventory_proxy = components_raw.get("inventory_cash_impact_proxy_cny")
-        if raw_inventory_proxy not in (None, ""):
+        if raw_inventory_proxy not in (None, "") and not (
+            isinstance(raw_inventory_proxy, Mapping)
+            and raw_inventory_proxy.get("value") in (None, "")
+            and treatment != "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL"
+        ):
             inventory_proxy, proxy_issues, proxy_refs = _money(
                 raw_inventory_proxy,
                 field=f"normalized_fcf.{name}.cash_components.inventory_cash_impact_proxy_cny",
@@ -1090,7 +1094,11 @@ def _evaluate_normalized_fcf_bridge(
             row_issues.append("B4_INVENTORY_WORKING_CAPITAL_RECONCILIATION_NOT_IDENTIFIABLE")
         inventory_proxy: Decimal | None = None
         raw_inventory_proxy = b4_row.get("inventory_cash_impact_proxy_cny")
-        if raw_inventory_proxy not in (None, ""):
+        if raw_inventory_proxy not in (None, "") and not (
+            isinstance(raw_inventory_proxy, Mapping)
+            and raw_inventory_proxy.get("value") in (None, "")
+            and inventory_treatment != "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL"
+        ):
             try:
                 inventory_proxy = _scenario_decimal(
                     raw_inventory_proxy, f"b4.{name}.inventory_cash_impact_proxy_cny"
@@ -1558,7 +1566,7 @@ def _evaluate_normalized_fcf_bridge(
         "formal_forecast_admission_created": False,
         "formal_valuation_admission_created": False,
         "decision_authority": False,
-        "note": "先独立核对参考 FCF + 逐项调整 = 正常化 FCF 中枢，再对比 B4 FCF；最后由单独的 FCF 归因行对账差异。库存/营运资金/资本开支仍采用各自通道和符号，任何一层失败均不得宣称 FCF 已对账。",
+        "note": "B48 先核对参考 FCF + 逐项调整 = 正常化 FCF 中枢；B49 再按经营现金转换、非现金收益、资本开支、营运资金、库存五类实测 B4−正常化组件差额并逐类核对归因。库存已包含在营运资金时单列库存贡献必须为零；任一组件、类别或总额不一致均不得宣称 FCF 已对账。",
     }
 
 
@@ -2361,6 +2369,20 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
             f"{comp_row.get('status', 'NOT_COMPARABLE')}"
         )
         contributions = component_row.get("contributions_cny") if isinstance(component_row.get("contributions_cny"), Mapping) else {}
+        b4_component_detail = component_row.get("b4_cash_components") if isinstance(component_row.get("b4_cash_components"), Mapping) else {}
+        norm_component_detail = component_row.get("normalized_cash_components") if isinstance(component_row.get("normalized_cash_components"), Mapping) else {}
+        def _bridge_component_value(row: Mapping[str, Any], key: str) -> str:
+            value = row.get(key)
+            return str(value) if value not in (None, "") else "UNKNOWN"
+        lines.append(
+            f"  - B49 B4 / 正常化组件值：EBIT {_bridge_component_value(b4_component_detail, 'ebit_cny')} / {_bridge_component_value(norm_component_detail, 'ebit_cny')}；"
+            f"税率 {_bridge_component_value(b4_component_detail, 'tax_rate')} / {_bridge_component_value(norm_component_detail, 'tax_rate')}；"
+            f"D&A {_bridge_component_value(b4_component_detail, 'depreciation_amortization_cny')} / {_bridge_component_value(norm_component_detail, 'depreciation_amortization_cny')}；"
+            f"CapEx {_bridge_component_value(b4_component_detail, 'cash_capex_cny')} / {_bridge_component_value(norm_component_detail, 'cash_capex_cny')}；"
+            f"原始 WC {_bridge_component_value(b4_component_detail, 'change_working_capital_cny')} / {_bridge_component_value(norm_component_detail, 'change_working_capital_cny')}；"
+            f"有效 WC {_bridge_component_value(b4_component_detail, 'effective_change_working_capital_cny')} / {_bridge_component_value(norm_component_detail, 'effective_change_working_capital_cny')}；"
+            f"库存代理 {_bridge_component_value(b4_component_detail, 'inventory_cash_impact_proxy_cny')} / {_bridge_component_value(norm_component_detail, 'inventory_cash_impact_proxy_cny')}"
+        )
         lines.append(
             f"  - B49 组件差额贡献（经营现金转换 / 非现金收益 / 资本开支 / 营运资金 / 库存）："
             f"{contributions.get('OPERATING_CASH_CONVERSION', 'UNKNOWN')} / {contributions.get('NON_CASH_EARNINGS', 'UNKNOWN')} / "
