@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from copy import deepcopy
-
+from iios_mvp.local_investment_pilot_v01 import REPLAY_COMPARISON_FIELDS
 from iios_mvp.cycle_earnings_monitor_v01 import (
     CYCLE_EARNINGS_MONITOR_SCHEMA,
     evaluate_cycle_earnings_monitor,
@@ -55,6 +54,7 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
         "normalized_earnings": {
             "metric": "NET_PROFIT_CNY",
             "scope": "COMPANY_WIDE",
+            "reference_period": "FY2026",
             "period": "FY2027",
             "normalization_basis": "以已披露盈利为基数，逐项调整周期与结构性差异",
             "scenarios": {
@@ -199,3 +199,7 @@ def test_unknown_input_keeps_all_downstream_authority_false():
     assert result["formal_forecast_admission_created"] is False
     assert result["formal_valuation_admission_created"] is False
     assert result["decision_authority"] is False
+
+
+def test_cycle_earnings_monitor_is_in_replay_comparison_contract():
+    assert "cycle_earnings_monitor" in REPLAY_COMPARISON_FIELDS
