@@ -1348,6 +1348,9 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
                 f"渠道 {item.get('channel', 'UNKNOWN')}；方向 {item.get('direction', 'UNKNOWN')}；"
                 f"量化状态 {item.get('quantification_status', 'UNKNOWN')}；"
                 f"独立现金流影响 {item.get('cash_flow_effect_cny') or 'UNKNOWN'} CNY；"
+                f"依据 {item.get('cash_flow_effect_basis') or 'UNKNOWN'}；"
+                f"数据类别 {item.get('cash_flow_effect_data_class') or 'UNKNOWN'}；"
+                f"金额证据 { '、'.join(item.get('cash_flow_effect_evidence_refs') or []) or 'UNKNOWN' }；"
                 f"复核触发器 {item.get('review_trigger_id', 'UNKNOWN')}；状态 {item.get('status', 'UNKNOWN')}"
             )
             for issue in item.get("issues") or []:
