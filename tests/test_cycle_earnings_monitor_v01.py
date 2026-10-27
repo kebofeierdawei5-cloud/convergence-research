@@ -390,7 +390,7 @@ def test_variance_transmission_blocked_when_upstream_attribution_is_unreconciled
     assert "UPSTREAM_VARIANCE_ATTRIBUTION_NOT_RECONCILED" in transmission["issues"]
 
 
-def test_variance_transmission_does_not_use_sotp_or_an_unselected_eps_adapter() -> None:
+def test_variance_transmission_requires_selected_eps_multiple_adapter() -> None:
     raw, b4, evidence = _valid_case()
     bridge, adapter = _eps_transmission_inputs()
     adapter["selected_for_primary_model"] = False
@@ -401,3 +401,32 @@ def test_variance_transmission_does_not_use_sotp_or_an_unselected_eps_adapter() 
     assert transmission["status"] == "REVIEW_REQUIRED"
     assert transmission["scenarios"]["bull"]["constant_pe_value_sensitivity_per_share"] is None
     assert "PRIMARY_EPS_MULTIPLE_ADAPTER_NOT_CALCULATED_AND_SELECTED" in transmission["issues"]
+
+
+def test_variance_transmission_is_not_applicable_to_sotp() -> None:
+    raw, b4, evidence = _valid_case()
+    bridge, adapter = _eps_transmission_inputs()
+    result = evaluate_cycle_earnings_monitor(
+        raw,
+        operating_driver_forecast=b4,
+        forecast_valuation={
+            "model_family": "SOTP",
+            "model": "SOTP",
+            "entry_value_reference_per_share": "10",
+            "scenarios": {
+                "bear": {"terminal_value_per_share": "8"},
+                "base": {"terminal_value_per_share": "10"},
+                "bull": {"terminal_value_per_share": "12"},
+            },
+        },
+        valuation_model_consistency={"primary_model_price_calculation_eligible": True},
+        valuation_timing={"status": "PASS"},
+        evidence_register=evidence,
+        eps_earnings_bridge=bridge,
+        eps_multiple_valuation=adapter,
+    )
+    transmission = result["variance_transmission"]
+
+    assert transmission["status"] == "REVIEW_REQUIRED"
+    assert transmission["scenarios"]["base"]["constant_pe_value_sensitivity_per_share"] is None
+    assert "CURRENT_PRIMARY_MODEL_IS_NOT_EPS_MULTIPLE" in transmission["issues"]
