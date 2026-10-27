@@ -137,11 +137,13 @@ def _build_per_share_value_context(
     forecast_valuation: Mapping[str, Any] | None,
     valuation_model_consistency: Mapping[str, Any] | None,
     valuation_timing: Mapping[str, Any] | None,
+    valuation_transmission: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Read the existing selected primary-model results; do not recalculate value."""
     forecast = forecast_valuation if isinstance(forecast_valuation, Mapping) else {}
     consistency = valuation_model_consistency if isinstance(valuation_model_consistency, Mapping) else {}
     timing = valuation_timing if isinstance(valuation_timing, Mapping) else {}
+    b5 = valuation_transmission if isinstance(valuation_transmission, Mapping) else {}
     issues: list[str] = []
     model_family = _text(forecast.get("model_family") or "UNKNOWN").upper()
     if model_family in {"", "UNKNOWN"}:
@@ -171,10 +173,18 @@ def _build_per_share_value_context(
         except ValueError:
             value = None
             issues.append(f"PRIMARY_MODEL_{name.upper()}_PER_SHARE_VALUE_NOT_IDENTIFIABLE")
+        source_path: list[str] = []
+        if row.get("eps_multiple_calculation_applied") is True:
+            source_path.append("EPS_MULTIPLE_ADAPTER")
+        if row.get("sotp_calculation_applied") is True:
+            source_path.append("SOTP_ADAPTER")
+        if row.get("b5_transmission_applied") is True:
+            source_path.append("B5_VALUE_ADJUSTMENT")
         scenarios[name] = {
             "scenario": name,
             "terminal_value_per_share": _format(value),
             "source_status": "READ_FROM_SELECTED_PRIMARY_MODEL_OUTPUT" if value is not None else "UNKNOWN",
+            "calculation_path_markers": source_path or ["PRIMARY_VALUE_SOURCE_MARKER_NOT_PRESENT"],
         }
     if set(values) == set(SCENARIOS) and not (values["bear"] <= values["base"] <= values["bull"]):
         issues.append("PRIMARY_MODEL_PER_SHARE_SCENARIO_ORDER_INVALID")
@@ -185,6 +195,7 @@ def _build_per_share_value_context(
         "model_name": _text(forecast.get("model")) or "UNKNOWN",
         "entry_value_reference_per_share": _format(entry_anchor),
         "valuation_timing_status": _text(timing.get("status")) or "UNKNOWN",
+        "b5_transmission_status": _text(b5.get("status")) or "UNKNOWN",
         "scenarios": scenarios,
         "issues": sorted(set(issues)),
         "formula_recomputed_from_normalized_earnings": False,
@@ -199,6 +210,7 @@ def evaluate_cycle_earnings_monitor(
     forecast_valuation: Mapping[str, Any] | None = None,
     valuation_model_consistency: Mapping[str, Any] | None = None,
     valuation_timing: Mapping[str, Any] | None = None,
+    valuation_transmission: Mapping[str, Any] | None = None,
     assessment: Mapping[str, Any] | None = None,
     evidence_register: list[Mapping[str, Any]] | None = None,
     unresolved_evidence_ids: list[str] | None = None,
@@ -538,7 +550,7 @@ def evaluate_cycle_earnings_monitor(
     )
 
     per_share_value = _build_per_share_value_context(
-        forecast_valuation, valuation_model_consistency, valuation_timing
+        forecast_valuation, valuation_model_consistency, valuation_timing, valuation_transmission
     )
     comparison_issues = (
         [] if comparison_status == "DIAGNOSTIC_ONLY_NOT_A_VALUATION_INPUT"
@@ -707,7 +719,7 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
     lines.extend([
         "",
         "#### 当前主估值每股价值节点（只读上下文，不重新计算）",
-        f"- 价值节点状态：{value_node.get('status', 'NOT_IDENTIFIABLE')}；主模型：{value_node.get('model_family', 'UNKNOWN')} / {value_node.get('model_name', 'UNKNOWN')}；估值时点状态：{value_node.get('valuation_timing_status', 'UNKNOWN')}",
+        f"- 价值节点状态：{value_node.get('status', 'NOT_IDENTIFIABLE')}；主模型：{value_node.get('model_family', 'UNKNOWN')} / {value_node.get('model_name', 'UNKNOWN')}；估值时点状态：{value_node.get('valuation_timing_status', 'UNKNOWN')}；B5 传导状态：{value_node.get('b5_transmission_status', 'UNKNOWN')}",
         f"- 入场估值锚：{value_node.get('entry_value_reference_per_share') or 'UNKNOWN'}；是否由本节点用正常化盈利重算：{value_node.get('formula_recomputed_from_normalized_earnings', False)}",
     ])
     value_scenarios = value_node.get("scenarios") if isinstance(value_node.get("scenarios"), Mapping) else {}
@@ -716,6 +728,7 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
         compare_row = comparison.get("scenarios", {}).get(name, {}) if isinstance(comparison.get("scenarios"), Mapping) else {}
         lines.append(
             f"- {name.upper()} 每股终值：{value_row.get('terminal_value_per_share') or 'UNKNOWN'}；"
+            f"计算链标记：{' + '.join(value_row.get('calculation_path_markers') or []) or 'UNKNOWN'}；"
             f"正常化净利润中枢：{compare_row.get('normalized_point_net_profit_cny') or 'UNKNOWN'}；"
             f"B4 净利润：{compare_row.get('b4_forecast_net_profit_cny') or 'UNKNOWN'}；"
             f"差额：{compare_row.get('b4_minus_normalized_cny') or 'UNKNOWN'}"
