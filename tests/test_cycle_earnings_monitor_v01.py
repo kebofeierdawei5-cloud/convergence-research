@@ -528,3 +528,42 @@ def test_cash_flow_evidence_must_overlap_linked_review_trigger_evidence() -> Non
         for issue in result["cash_flow_path"]["issues"]
     )
     assert result["status"] == "REVIEW_REQUIRED"
+
+
+def test_quantified_cash_flow_assessment_preserves_typed_basis_and_evidence() -> None:
+    raw, b4, evidence = _valid_case()
+    raw["review_triggers"][0]["evidence_refs"] = ["E_ACTUAL", "E_COUNTER"]
+    for row in b4["scenarios"].values():
+        row.update({
+            "financial_outputs_decision_usable": True,
+            "cash_capex_cny": "20",
+            "change_working_capital_cny": "12",
+            "effective_change_working_capital_cny": "12",
+            "inventory_cash_impact_proxy_cny": "2",
+            "inventory_working_capital_treatment": "INCLUDED_IN_CHANGE_WORKING_CAPITAL",
+            "inventory_reconciliation_status": "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL",
+            "depreciation_amortization_cny": "3",
+            "finance_cost_cny": "1",
+            "unlevered_fcf_proxy_cny": "40",
+        })
+    assessment = raw["cash_flow_assessments"][1]
+    amount = _measure("5", basis="相对正常化营运资金假设，库存周转改善释放现金")
+    amount["evidence_refs"] = ["E_ACTUAL"]
+    assessment.update({
+        "channel": "WORKING_CAPITAL",
+        "direction": "IMPROVES_FCF",
+        "quantification_status": "QUANTIFIED",
+        "cash_flow_effect_cny": amount,
+        "evidence_refs": ["E_ACTUAL", "E_COUNTER"],
+    })
+    result = _evaluate(raw, b4, evidence)
+    item = result["cash_flow_path"]["scenarios"]["base"][0]
+
+    assert result["cash_flow_path"]["status"] == "CASH_FLOW_PATH_LINKS_COMPLETE_DIAGNOSTIC_ONLY"
+    assert item["status"] == "CLASSIFIED_DIAGNOSTIC_ONLY"
+    assert item["cash_flow_effect_cny"] == "5"
+    assert item["cash_flow_effect_basis"] == "相对正常化营运资金假设，库存周转改善释放现金"
+    assert item["cash_flow_effect_data_class"] == "ANALYST_ASSUMPTION"
+    assert item["cash_flow_effect_evidence_refs"] == ["E_ACTUAL"]
+    assert result["cash_flow_path"]["cash_flow_amounts_aggregated"] is False
+    assert result["cash_flow_path"]["fcf_variance_reconciled"] is False
