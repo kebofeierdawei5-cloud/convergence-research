@@ -17,6 +17,28 @@ def _measure(value: str, *, data_class: str = "ANALYST_ASSUMPTION", basis: str =
     }
 
 
+def _evaluate(raw: dict, b4: dict, evidence: list[dict], **kwargs) -> dict:
+    return evaluate_cycle_earnings_monitor(
+        raw,
+        operating_driver_forecast=b4,
+        forecast_valuation={
+            "model_family": "EPS_MULTIPLE",
+            "model": "EPS_MULTIPLE",
+            "entry_value_reference_per_share": "10",
+            "scenarios": {
+                "bear": {"terminal_value_per_share": "8"},
+                "base": {"terminal_value_per_share": "10"},
+                "bull": {"terminal_value_per_share": "12"},
+            },
+        },
+        valuation_model_consistency={"primary_model_price_calculation_eligible": True},
+        valuation_timing={"status": "PASS"},
+        assessment={},
+        evidence_register=evidence,
+        **kwargs,
+    )
+
+
 def _valid_case() -> tuple[dict, dict, list[dict]]:
     raw = {
         "schema_version": CYCLE_EARNINGS_MONITOR_SCHEMA,
@@ -136,7 +158,7 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
 
 def test_complete_cycle_earnings_review_chain_is_diagnostic_only():
     raw, b4, evidence = _valid_case()
-    result = evaluate_cycle_earnings_monitor(raw, operating_driver_forecast=b4, assessment={}, evidence_register=evidence)
+    result = _evaluate(raw, b4, evidence)
 
     assert result["status"] == "CHAIN_IDENTIFIABLE_NON_ADMITTED"
     assert result["industry_cycle"]["phase"] == "RECOVERY"
@@ -151,7 +173,7 @@ def test_complete_cycle_earnings_review_chain_is_diagnostic_only():
 def test_period_or_scope_mismatch_blocks_comparison_and_chain_pass():
     raw, b4, evidence = _valid_case()
     raw["normalized_earnings"]["period"] = "FY2028"
-    result = evaluate_cycle_earnings_monitor(raw, operating_driver_forecast=b4, assessment={}, evidence_register=evidence)
+    result = _evaluate(raw, b4, evidence)
 
     assert result["status"] == "REVIEW_REQUIRED"
     assert "NORMALIZED_EARNINGS_PERIOD_MISMATCH_B4" in result["normalized_earnings"]["issues"]
@@ -163,7 +185,7 @@ def test_missing_counter_evidence_and_reversal_signal_fail_closed():
     raw, b4, evidence = _valid_case()
     raw["industry_cycle"]["counter_evidence_refs"] = []
     raw["industry_cycle"]["reversal_signals"] = []
-    result = evaluate_cycle_earnings_monitor(raw, operating_driver_forecast=b4, assessment={}, evidence_register=evidence)
+    result = _evaluate(raw, b4, evidence)
 
     assert result["status"] == "REVIEW_REQUIRED"
     assert any("industry_cycle_counter_evidence:EVIDENCE_REFERENCE_REQUIRED" == issue for issue in result["industry_cycle"]["issues"])
@@ -173,7 +195,7 @@ def test_missing_counter_evidence_and_reversal_signal_fail_closed():
 def test_reported_base_plus_signed_adjustments_must_reconcile_to_normalized_point():
     raw, b4, evidence = _valid_case()
     raw["normalized_earnings"]["scenarios"]["base"]["adjustments"][0]["amount_cny"]["value"] = "15"
-    result = evaluate_cycle_earnings_monitor(raw, operating_driver_forecast=b4, assessment={}, evidence_register=evidence)
+    result = _evaluate(raw, b4, evidence)
 
     assert result["status"] == "REVIEW_REQUIRED"
     assert any("NORMALIZED_POINT_DOES_NOT_RECONCILE_TO_REFERENCE_PLUS_ADJUSTMENTS" in issue for issue in result["normalized_earnings"]["issues"])
@@ -181,10 +203,7 @@ def test_reported_base_plus_signed_adjustments_must_reconcile_to_normalized_poin
 
 def test_after_cutoff_evidence_does_not_support_cycle_or_normalized_earnings():
     raw, b4, evidence = _valid_case()
-    result = evaluate_cycle_earnings_monitor(
-        raw, operating_driver_forecast=b4, assessment={}, evidence_register=evidence,
-        after_cutoff_evidence_ids=["E_COUNTER"],
-    )
+    result = _evaluate(raw, b4, evidence, after_cutoff_evidence_ids=["E_COUNTER"])
 
     assert result["status"] == "REVIEW_REQUIRED"
     assert any("EVIDENCE_SOURCE_AFTER_CUTOFF:E_COUNTER" in issue for issue in result["industry_cycle"]["issues"])
@@ -203,3 +222,26 @@ def test_unknown_input_keeps_all_downstream_authority_false():
 
 def test_cycle_earnings_monitor_is_in_replay_comparison_contract():
     assert "cycle_earnings_monitor" in REPLAY_COMPARISON_FIELDS
+
+
+def test_missing_b4_scenario_profit_blocks_aggregate_comparison_status():
+    raw, b4, evidence = _valid_case()
+    b4["scenarios"]["base"]["net_profit_cny"] = None
+    result = _evaluate(raw, b4, evidence)
+    assert result["b4_comparison"]["status"] == "NOT_COMPARABLE_PERIOD_SCOPE_OR_NORMALIZED_EARNINGS_INCOMPLETE"
+    assert result["status"] == "REVIEW_REQUIRED"
+
+
+def test_primary_per_share_value_context_requires_eligible_model_and_timing():
+    raw, b4, evidence = _valid_case()
+    result = evaluate_cycle_earnings_monitor(
+        raw,
+        operating_driver_forecast=b4,
+        forecast_valuation={"model_family": "EPS_MULTIPLE", "entry_value_reference_per_share": "10", "scenarios": {"bear": {"terminal_value_per_share": "8"}, "base": {"terminal_value_per_share": "10"}, "bull": {"terminal_value_per_share": "12"}}},
+        valuation_model_consistency={"primary_model_price_calculation_eligible": False},
+        valuation_timing={"status": "UNKNOWN"},
+        assessment={}, evidence_register=evidence,
+    )
+    assert result["per_share_value"]["status"] == "NOT_IDENTIFIABLE"
+    assert "PRIMARY_MODEL_PRICE_CALCULATION_NOT_ELIGIBLE" in result["per_share_value"]["issues"]
+    assert result["status"] == "REVIEW_REQUIRED"
