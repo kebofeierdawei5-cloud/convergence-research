@@ -508,10 +508,8 @@ def _evaluate_cash_flow_path(
             required=True,
         )
         item_issues.extend(ref_issues)
-        trigger_refs = {
-            _text(ref) for ref in (trigger.get("evidence_refs") or [])
-            if _text(ref)
-        } if isinstance(trigger, Mapping) else set()
+        raw_trigger_refs = trigger.get("evidence_refs") if isinstance(trigger, Mapping) and isinstance(trigger.get("evidence_refs"), list) else []
+        trigger_refs = {_text(ref) for ref in raw_trigger_refs if _text(ref)}
         if not trigger_refs:
             item_issues.append("REVIEW_TRIGGER_EVIDENCE_REQUIRED_FOR_CASH_FLOW_LINK")
         elif not set(refs).intersection(trigger_refs):
@@ -519,8 +517,11 @@ def _evaluate_cash_flow_path(
 
         raw_effect = row.get("cash_flow_effect_cny")
         effect: Decimal | None = None
+        effect_refs: list[str] = []
+        effect_basis: str | None = None
+        effect_data_class: str | None = None
         if quant_status == "QUANTIFIED":
-            effect, effect_issues, _ = _money(
+            effect, effect_issues, effect_refs = _money(
                 raw_effect,
                 field=f"cash_flow_assessment.{scenario}.{attribution_id or index}.cash_flow_effect_cny",
                 sources_by_id=sources_by_id,
@@ -529,6 +530,8 @@ def _evaluate_cash_flow_path(
                 uncertain_refs=uncertain_refs,
                 allow_negative=True,
             )
+            effect_basis = _text(raw_effect.get("basis")) or None if isinstance(raw_effect, Mapping) else None
+            effect_data_class = _text(raw_effect.get("data_class")).upper() or None if isinstance(raw_effect, Mapping) else None
             item_issues.extend(effect_issues)
             if effect is not None:
                 if effect > 0 and direction != "IMPROVES_FCF":
@@ -565,6 +568,9 @@ def _evaluate_cash_flow_path(
             "direction": direction,
             "quantification_status": quant_status,
             "cash_flow_effect_cny": _format(effect) if effect is not None and not item_issues else None,
+            "cash_flow_effect_basis": effect_basis if effect is not None and not item_issues else None,
+            "cash_flow_effect_data_class": effect_data_class if effect is not None and not item_issues else None,
+            "cash_flow_effect_evidence_refs": effect_refs if effect is not None and not item_issues else [],
             "rationale": rationale or "UNKNOWN",
             "evidence_refs": refs,
             "status": status,
