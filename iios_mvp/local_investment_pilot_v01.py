@@ -4741,6 +4741,7 @@ def _template(
                     },
                 },
                 "review_triggers": [],
+                "variance_attribution": [],
             },
             "limitations": [],
         },
@@ -5119,7 +5120,7 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
         "不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
         "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。"
         "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。"
-        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。Bear/Base/Bull 应来自显式经营假设；未知值保持 UNKNOWN。operating_driver_forecast 内必须附带 cycle_earnings_monitor，明确行业周期阶段/支持证据/反证/领先指标/反转信号；对 Bear/Base/Bull 分别给出带来源的参考净利润、明确的 reference_period（参考盈利期间）、逐项正常化调整及低/中/高区间；参考期间与正常化目标期间需分别填写，不得混用；每个持仓复核触发器必须含 driver_id 和从 INDUSTRY_CYCLE → NORMALIZED_EARNINGS → EPS_OR_FCF → PER_SHARE_VALUE → POSITION_REVIEW 的因果路径。无法识别的字段不得伪造。"
+        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。Bear/Base/Bull 应来自显式经营假设；未知值保持 UNKNOWN。operating_driver_forecast 内必须附带 cycle_earnings_monitor，明确行业周期阶段/支持证据/反证/领先指标/反转信号；对 Bear/Base/Bull 分别给出带来源的参考净利润、明确的 reference_period（参考盈利期间）、逐项正常化调整及低/中/高区间；参考期间与正常化目标期间需分别填写，不得混用；每个持仓复核触发器必须含 driver_id 和从 INDUSTRY_CYCLE → NORMALIZED_EARNINGS → EPS_OR_FCF → PER_SHARE_VALUE → POSITION_REVIEW 的因果路径。还必须提供 variance_attribution：对 Bear/Base/Bull 分别解释“B4 净利润 − 正常化净利润中枢”的差额；正数表示 B4 较高，负数表示 B4 较低；每项贡献须包含 attribution_id、scenario、driver_id、category、rationale、typed amount_cny 和 review_trigger_id，且触发器 driver_id 必须匹配。各情景贡献合计须在 ±1 元内对账差额，不可解释残差不得伪装为已归因。即使差额为 0，也须明确给出有理由的零差异确认行。此归因只作诊断，不能改写 B4/B5/B6 或成为估值输入。无法识别的字段不得伪造。"
         "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。cycle_earnings_monitor 必须位于 operating_driver_forecast 内，不能新增顶层字段。"
         "Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
         "【Round A 允许输入】\n"
