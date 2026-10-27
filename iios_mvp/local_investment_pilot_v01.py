@@ -2533,19 +2533,6 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     operating_driver_forecast["valuation_reconciliation"] = _reconcile_b4_valuation_bridge(
         operating_driver_forecast, forecast
     )
-    raw_cycle_monitor = (
-        raw_driver_forecast.get("cycle_earnings_monitor")
-        if isinstance(raw_driver_forecast, Mapping) else None
-    )
-    cycle_earnings_monitor = evaluate_cycle_earnings_monitor(
-        raw_cycle_monitor,
-        operating_driver_forecast=operating_driver_forecast,
-        assessment=assessment,
-        evidence_register=sources,
-        unresolved_evidence_ids=unknown_refs,
-        after_cutoff_evidence_ids=after_cutoff_refs,
-        uncertain_timing_evidence_ids=uncertain_timing_refs,
-    )
     allowed_model_families = {"EPS_MULTIPLE", "FCF_DCF", "DDM", "SOTP", "RNPV", "OTHER", "UNKNOWN"}
     operator_context_raw = raw_operator_valuation_context if isinstance(raw_operator_valuation_context, Mapping) else {}
     selected_model_family = str(operator_context_raw.get("selected_model_family") or "UNKNOWN").strip().upper()
@@ -2763,6 +2750,22 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         forecast["scenarios"] = adjusted_scenarios
         forecast["b5_baseline_entry_value_reference_per_share"] = forecast.get("entry_value_reference_per_share")
         forecast["entry_value_reference_per_share"] = valuation_transmission.get("entry_value_reference_adjusted_per_share")
+    raw_cycle_monitor = (
+        raw_driver_forecast.get("cycle_earnings_monitor")
+        if isinstance(raw_driver_forecast, Mapping) else None
+    )
+    cycle_earnings_monitor = evaluate_cycle_earnings_monitor(
+        raw_cycle_monitor,
+        operating_driver_forecast=operating_driver_forecast,
+        forecast_valuation=forecast,
+        valuation_model_consistency=valuation_model_consistency,
+        valuation_timing=valuation_timing,
+        assessment=assessment,
+        evidence_register=sources,
+        unresolved_evidence_ids=unknown_refs,
+        after_cutoff_evidence_ids=after_cutoff_refs,
+        uncertain_timing_evidence_ids=uncertain_timing_refs,
+    )
     return {
         "case": {
             "case_id": case["case_id"], "company": company, "market": normalized_market,
