@@ -67,6 +67,7 @@ def _unknown(reason: str = "未提供行业周期、正常化盈利和复核触�
         "summary": reason,
         "b4_comparison": {"status": "NOT_COMPARABLE", "scenarios": {}, "note": "不修改或替代 B4 情景。"},
         "variance_attribution": {"status": "NOT_COMPARABLE", "scenarios": {}, "issues": ["B4_NORMALIZED_COMPARISON_NOT_IDENTIFIABLE"], "sign_convention": "B4_FORECAST_MINUS_NORMALIZED_EARNINGS"},
+        "variance_transmission": {"status": "NOT_IDENTIFIABLE", "scenarios": {}, "issues": ["VARIANCE_TRANSMISSION_CONTEXT_NOT_PROVIDED"], "valuation_input_eligible": False},
         "per_share_value": {"status": "NOT_IDENTIFIABLE", "model_family": "UNKNOWN", "scenarios": {}, "issues": ["PRIMARY_PER_SHARE_VALUE_CONTEXT_NOT_PROVIDED"], "formula_recomputed_from_normalized_earnings": False},
         "valuation_input_eligible": False,
         "formal_forecast_admission_created": False,
@@ -204,6 +205,164 @@ def _build_per_share_value_context(
     }
 
 
+def _build_variance_transmission_context(
+    *,
+    variance_attribution: Mapping[str, Any],
+    eps_earnings_bridge: Mapping[str, Any] | None,
+    eps_multiple_valuation: Mapping[str, Any] | None,
+    per_share_value: Mapping[str, Any],
+    normalized_earnings_period: str,
+    b4_forecast_period: str,
+) -> dict[str, Any]:
+    """Translate reconciled net-profit differences into conditional EPS/P-E sensitivities only."""
+    blocked_upstream = variance_attribution.get("status") != "ALL_SCENARIOS_RECONCILED_DIAGNOSTIC_ONLY"
+    bridge = eps_earnings_bridge if isinstance(eps_earnings_bridge, Mapping) else {}
+    adapter = eps_multiple_valuation if isinstance(eps_multiple_valuation, Mapping) else {}
+    value_context = per_share_value if isinstance(per_share_value, Mapping) else {}
+    period = _text(normalized_earnings_period).upper()
+    b4_period = _text(b4_forecast_period).upper()
+    bridge_period = _text(bridge.get("forecast_period")).upper()
+    adapter_period = _text(adapter.get("forecast_period")).upper()
+    adapter_date = _text(adapter.get("valuation_terminal_date"))
+    bridge_date = _text(bridge.get("valuation_terminal_date"))
+    issues: list[str] = []
+    if blocked_upstream:
+        issues.append("UPSTREAM_VARIANCE_ATTRIBUTION_NOT_RECONCILED")
+    if bridge.get("primary_eps_price_calculation_eligible") is not True:
+        issues.append("EPS_EARNINGS_BRIDGE_NOT_ELIGIBLE")
+    if _text(bridge.get("currency")).upper() != "CNY":
+        issues.append("EPS_BRIDGE_CURRENCY_MUST_BE_CNY_FOR_CNY_NET_PROFIT_DELTA")
+    if not period or period != b4_period or bridge_period != period:
+        issues.append("EPS_BRIDGE_AND_NORMALIZED_EARNINGS_PERIOD_MISMATCH")
+    if adapter.get("status") != "CALCULATED" or adapter.get("selected_for_primary_model") is not True:
+        issues.append("PRIMARY_EPS_MULTIPLE_ADAPTER_NOT_CALCULATED_AND_SELECTED")
+    if _text(adapter.get("currency")).upper() != "CNY":
+        issues.append("PRIMARY_EPS_MULTIPLE_CURRENCY_MUST_BE_CNY")
+    if not period or adapter_period != period or not adapter_date or bridge_date != adapter_date:
+        issues.append("EPS_BRIDGE_AND_PRIMARY_ADAPTER_PERIOD_OR_TERMINAL_DATE_MISMATCH")
+    if _text(value_context.get("model_family")).upper() != "EPS_MULTIPLE":
+        issues.append("CURRENT_PRIMARY_MODEL_IS_NOT_EPS_MULTIPLE")
+    if value_context.get("status") != "IDENTIFIABLE_CURRENT_PRIMARY_VALUE_CONTEXT_NON_ADMITTED":
+        issues.append("CURRENT_PRIMARY_PER_SHARE_VALUE_CONTEXT_NOT_IDENTIFIABLE")
+
+    variance_scenarios = variance_attribution.get("scenarios")
+    variance_scenarios = variance_scenarios if isinstance(variance_scenarios, Mapping) else {}
+    bridge_scenarios = bridge.get("scenarios")
+    bridge_scenarios = bridge_scenarios if isinstance(bridge_scenarios, Mapping) else {}
+    adapter_scenarios = adapter.get("scenarios")
+    adapter_scenarios = adapter_scenarios if isinstance(adapter_scenarios, Mapping) else {}
+    value_scenarios = value_context.get("scenarios")
+    value_scenarios = value_scenarios if isinstance(value_scenarios, Mapping) else {}
+    results: dict[str, dict[str, Any]] = {}
+    all_scenarios_calculated = not blocked_upstream
+    for name in SCENARIOS:
+        row_issues = list(issues)
+        variance_row = variance_scenarios.get(name) if isinstance(variance_scenarios.get(name), Mapping) else {}
+        bridge_row = bridge_scenarios.get(name) if isinstance(bridge_scenarios.get(name), Mapping) else {}
+        adapter_row = adapter_scenarios.get(name) if isinstance(adapter_scenarios.get(name), Mapping) else {}
+        value_row = value_scenarios.get(name) if isinstance(value_scenarios.get(name), Mapping) else {}
+        if variance_row.get("status") != "RECONCILED_DIAGNOSTIC_ONLY":
+            row_issues.append("SCENARIO_VARIANCE_NOT_RECONCILED")
+        if bridge_row.get("status") != "CALCULATED" or bridge_row.get("eps_match") is not True:
+            row_issues.append("SCENARIO_EPS_BRIDGE_NOT_CALCULATED_OR_NOT_MATCHED")
+        shares_measure = bridge_row.get("diluted_shares")
+        shares_measure = shares_measure if isinstance(shares_measure, Mapping) else {}
+        try:
+            if _text(shares_measure.get("unit")).lower() != "shares":
+                raise ValueError("DILUTED_SHARES_UNIT_MUST_BE_SHARES")
+            shares = _decimal(shares_measure.get("value"), f"{name}.diluted_shares")
+            if shares <= 0:
+                raise ValueError("DILUTED_SHARES_MUST_BE_POSITIVE")
+        except ValueError as exc:
+            shares = None
+            row_issues.append(str(exc))
+        pe_measure = adapter_row.get("pe_multiple_x")
+        pe_measure = pe_measure if isinstance(pe_measure, Mapping) else {}
+        try:
+            if _text(pe_measure.get("unit")).lower() != "x":
+                raise ValueError("PE_MULTIPLE_UNIT_MUST_BE_X")
+            pe = _decimal(pe_measure.get("value"), f"{name}.pe_multiple_x")
+            if pe <= 0:
+                raise ValueError("PE_MULTIPLE_MUST_BE_POSITIVE")
+        except ValueError as exc:
+            pe = None
+            row_issues.append(str(exc))
+        try:
+            terminal_value = _decimal(adapter_row.get("terminal_value_per_share"), f"{name}.adapter_terminal_value")
+            current_value = _decimal(value_row.get("terminal_value_per_share"), f"{name}.primary_terminal_value")
+            if terminal_value != current_value:
+                row_issues.append("PRIMARY_VALUE_DOES_NOT_MATCH_SELECTED_EPS_MULTIPLE_ADAPTER")
+        except ValueError:
+            row_issues.append("PRIMARY_OR_ADAPTER_TERMINAL_VALUE_NOT_IDENTIFIABLE")
+        try:
+            difference = _decimal(
+                variance_row.get("b4_minus_normalized_net_profit_cny"),
+                f"{name}.b4_minus_normalized_net_profit_cny",
+            )
+        except ValueError:
+            difference = None
+            row_issues.append("NET_PROFIT_DIFFERENCE_NOT_IDENTIFIABLE")
+        raw_items = variance_row.get("items") if isinstance(variance_row.get("items"), list) else []
+        item_outputs: list[dict[str, Any]] = []
+        for item in raw_items:
+            if not isinstance(item, Mapping):
+                row_issues.append("VARIANCE_ATTRIBUTION_ITEM_INVALID")
+                continue
+            if item.get("issues"):
+                row_issues.append(f"ATTRIBUTION_ITEM_NOT_USABLE:{_text(item.get('attribution_id')) or 'UNKNOWN'}")
+                continue
+            try:
+                amount = _decimal(item.get("amount_cny"), "ATTRIBUTION_AMOUNT_CNY")
+                if shares is None or pe is None:
+                    raise ValueError("EPS_OR_PE_INPUT_NOT_IDENTIFIABLE")
+                eps_sensitivity = amount / shares
+                value_sensitivity = eps_sensitivity * pe
+                item_outputs.append({
+                    "attribution_id": _text(item.get("attribution_id")) or "UNKNOWN",
+                    "driver_id": _text(item.get("driver_id")) or "UNKNOWN",
+                    "review_trigger_id": _text(item.get("review_trigger_id")) or "UNKNOWN",
+                    "amount_cny": _format(amount),
+                    "implied_eps_sensitivity_per_share": _format(eps_sensitivity),
+                    "constant_pe_value_sensitivity_per_share": _format(value_sensitivity),
+                    "sensitivity_status": "CONDITIONAL_DIAGNOSTIC_ONLY",
+                })
+            except ValueError:
+                row_issues.append(f"ATTRIBUTION_SENSITIVITY_NOT_IDENTIFIABLE:{_text(item.get('attribution_id')) or 'UNKNOWN'}")
+        row_status = "CONSTANT_PE_SENSITIVITY_DIAGNOSTIC_ONLY" if not row_issues and shares is not None and pe is not None and difference is not None else "NOT_IDENTIFIABLE"
+        if row_status != "CONSTANT_PE_SENSITIVITY_DIAGNOSTIC_ONLY":
+            all_scenarios_calculated = False
+        results[name] = {
+            "scenario": name,
+            "status": row_status,
+            "b4_minus_normalized_net_profit_cny": _format(difference),
+            "diluted_shares": _format(shares),
+            "pe_multiple_x": _format(pe),
+            "implied_eps_sensitivity_per_share": _format(difference / shares) if difference is not None and shares is not None and shares > 0 else None,
+            "constant_pe_value_sensitivity_per_share": _format((difference / shares) * pe) if difference is not None and shares is not None and shares > 0 and pe is not None and pe > 0 else None,
+            "items": item_outputs,
+            "issues": sorted(set(row_issues)),
+        }
+    status = "ALL_SCENARIOS_CONSTANT_PE_SENSITIVITY_DIAGNOSTIC_ONLY" if all_scenarios_calculated else (
+        "BLOCKED_UPSTREAM_VARIANCE_ATTRIBUTION_NOT_RECONCILED" if blocked_upstream else "REVIEW_REQUIRED"
+    )
+    return {
+        "status": status,
+        "method": "NET_PROFIT_VARIANCE_CNY / DILUTED_SHARES × CURRENT_SCENARIO_PE",
+        "currency": "CNY",
+        "assumptions": [
+            "仅在净利润口径、期间、CNY 货币、稀释股数和 EPS_MULTIPLE 主估值链均可核对时计算。",
+            "假设非控股股东损益、其他税后归属调整、稀释股数和 P/E 倍数保持不变；该结果是条件敏感性，不是新的 EPS 预测或每股价值。",
+            "该节点不改写 B4/B5/B6、主估值、目标入场价、回报率或决策；不适用于 SOTP，也不自动成为估值输入。",
+        ],
+        "scenarios": results,
+        "issues": sorted(set(issues)),
+        "valuation_input_eligible": False,
+        "formal_forecast_admission_created": False,
+        "formal_valuation_admission_created": False,
+        "decision_authority": False,
+    }
+
+
 def evaluate_cycle_earnings_monitor(
     raw: Any,
     *,
@@ -212,6 +371,8 @@ def evaluate_cycle_earnings_monitor(
     valuation_model_consistency: Mapping[str, Any] | None = None,
     valuation_timing: Mapping[str, Any] | None = None,
     valuation_transmission: Mapping[str, Any] | None = None,
+    eps_earnings_bridge: Mapping[str, Any] | None = None,
+    eps_multiple_valuation: Mapping[str, Any] | None = None,
     assessment: Mapping[str, Any] | None = None,
     evidence_register: list[Mapping[str, Any]] | None = None,
     unresolved_evidence_ids: list[str] | None = None,
@@ -680,6 +841,14 @@ def evaluate_cycle_earnings_monitor(
     per_share_value = _build_per_share_value_context(
         forecast_valuation, valuation_model_consistency, valuation_timing, valuation_transmission
     )
+    variance_transmission = _build_variance_transmission_context(
+        variance_attribution=variance_attribution,
+        eps_earnings_bridge=eps_earnings_bridge,
+        eps_multiple_valuation=eps_multiple_valuation,
+        per_share_value=per_share_value,
+        normalized_earnings_period=earnings_period,
+        b4_forecast_period=b4_period,
+    )
     comparison_issues = (
         [] if comparison_status == "DIAGNOSTIC_ONLY_NOT_A_VALUATION_INPUT"
         else ["B4_NORMALIZED_EARNINGS_COMPARISON_NOT_IDENTIFIABLE"]
@@ -763,6 +932,7 @@ def evaluate_cycle_earnings_monitor(
         "review_triggers": trigger_result,
         "b4_comparison": {"status": comparison_status, "scenarios": comparisons, "issues": comparison_issues, "note": "比较结果仅作诊断，不替代 B4 经营预测。"},
         "variance_attribution": variance_attribution,
+        "variance_transmission": variance_transmission,
         "per_share_value": per_share_value,
         "issues": all_issues,
         "summary": summary,
@@ -784,7 +954,7 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
     variance_node = data.get("variance_attribution") if isinstance(data.get("variance_attribution"), Mapping) else {}
     lines = [
         "",
-        "### B44：行业周期 → 正常化盈利 → 每股价值 → 持仓复核",
+        "### B44–B46：行业周期 → 正常化盈利 → 每股价值 → 持仓复核",
         "",
         f"- 因果链状态：**{data.get('status', 'NOT_IDENTIFIABLE')}**",
         f"- 研究摘要：{data.get('summary', '未提供。')}",
@@ -891,6 +1061,36 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
         )
     for issue in value_node.get("issues") or []:
         lines.append(f"- 价值节点待复核：{issue}")
+    transmission = data.get("variance_transmission") if isinstance(data.get("variance_transmission"), Mapping) else {}
+    lines.extend([
+        "",
+        "#### B46：盈利差异 → EPS / 固定 P/E 每股价值敏感性（非估值输入）",
+        f"- 传导状态：{transmission.get('status', 'NOT_IDENTIFIABLE')}；方法：{transmission.get('method', 'UNKNOWN')}",
+    ])
+    for assumption in transmission.get("assumptions") or []:
+        lines.append(f"- 假设边界：{assumption}")
+    transmission_scenarios = transmission.get("scenarios") if isinstance(transmission.get("scenarios"), Mapping) else {}
+    for name in SCENARIOS:
+        tx = transmission_scenarios.get(name) if isinstance(transmission_scenarios.get(name), Mapping) else {}
+        lines.append(
+            f"- {name.upper()}：B4−正常化净利润 {tx.get('b4_minus_normalized_net_profit_cny') or 'UNKNOWN'} CNY；"
+            f"稀释股数 {tx.get('diluted_shares') or 'UNKNOWN'}；P/E {tx.get('pe_multiple_x') or 'UNKNOWN'}x；"
+            f"隐含 EPS 敏感性 {tx.get('implied_eps_sensitivity_per_share') or 'UNKNOWN'} CNY/股；"
+            f"固定 P/E 价值敏感性 {tx.get('constant_pe_value_sensitivity_per_share') or 'UNKNOWN'} CNY/股；"
+            f"状态 {tx.get('status', 'NOT_IDENTIFIABLE')}"
+        )
+        for item in tx.get("items") or []:
+            lines.append(
+                f"  - 归因 {item.get('attribution_id', 'UNKNOWN')} / driver {item.get('driver_id', 'UNKNOWN')}："
+                f"利润差异贡献 {item.get('amount_cny') or 'UNKNOWN'} CNY；"
+                f"EPS 敏感性 {item.get('implied_eps_sensitivity_per_share') or 'UNKNOWN'} CNY/股；"
+                f"固定 P/E 价值敏感性 {item.get('constant_pe_value_sensitivity_per_share') or 'UNKNOWN'} CNY/股；"
+                f"触发器 {item.get('review_trigger_id', 'UNKNOWN')}"
+            )
+        for issue in tx.get("issues") or []:
+            lines.append(f"  - 未解决：{issue}")
+    for issue in transmission.get("issues") or []:
+        lines.append(f"- 传导诊断未解决：{issue}")
     lines.extend(["", "#### 持仓复核触发器（不是自动交易指令）"])
     trigger_items = triggers.get("items") if isinstance(triggers.get("items"), list) else []
     if not trigger_items:
