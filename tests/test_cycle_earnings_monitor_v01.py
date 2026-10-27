@@ -187,6 +187,40 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
                         "basis": "正常化 FCF 参考基准，须在正式研究中由可审计数据替换或证明",
                         "evidence_refs": ["E_ACTUAL"],
                     },
+                    "cash_components": {
+                        "ebit_cny": {
+                            "value": {"bear": "50", "base": "60", "bull": "70"}[scenario],
+                            "unit": "CNY", "data_class": "ANALYST_ASSUMPTION", "basis": "测试用 EBIT 代理值",
+                            "evidence_refs": ["E_ACTUAL"],
+                        },
+                        "tax_rate": {
+                            "value": "0.2", "unit": "ratio", "data_class": "ANALYST_ASSUMPTION",
+                            "basis": "测试用税率假设", "evidence_refs": ["E_ACTUAL"],
+                        },
+                        "depreciation_amortization_cny": {
+                            "value": {"bear": "10", "base": "12", "bull": "14"}[scenario],
+                            "unit": "CNY", "data_class": "ANALYST_ASSUMPTION", "basis": "测试用折旧摊销代理值",
+                            "evidence_refs": ["E_ACTUAL"],
+                        },
+                        "cash_capex_cny": {
+                            "value": "5", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION", "basis": "测试用现金资本开支",
+                            "evidence_refs": ["E_ACTUAL"],
+                        },
+                        "change_working_capital_cny": {
+                            "value": "5", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION", "basis": "测试用原始营运资金变动",
+                            "evidence_refs": ["E_ACTUAL"],
+                        },
+                        "effective_change_working_capital_cny": {
+                            "value": "5", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION", "basis": "测试用有效营运资金变动",
+                            "evidence_refs": ["E_ACTUAL"],
+                        },
+                        "inventory_cash_impact_proxy_cny": {
+                            "value": "0", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION", "basis": "测试用库存现金影响代理",
+                            "evidence_refs": ["E_ACTUAL"],
+                        },
+                        "inventory_working_capital_treatment": "INCLUDED_IN_CHANGE_WORKING_CAPITAL",
+                        "inventory_reconciliation_status": "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL",
+                    },
                     "adjustments": [
                         {
                             "adjustment_id": f"{scenario}_{category.lower()}_normalization",
