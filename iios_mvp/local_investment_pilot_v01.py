@@ -2761,6 +2761,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         valuation_model_consistency=valuation_model_consistency,
         valuation_timing=valuation_timing,
         valuation_transmission=valuation_transmission,
+        eps_earnings_bridge=eps_earnings_bridge,
+        eps_multiple_valuation=eps_multiple_valuation,
         assessment=assessment,
         evidence_register=sources,
         unresolved_evidence_ids=unknown_refs,
