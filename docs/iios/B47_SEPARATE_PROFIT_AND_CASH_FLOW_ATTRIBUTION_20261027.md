@@ -14,19 +14,19 @@ For every evaluated B45 attribution item and scenario, `cash_flow_assessments` m
 
 - `scenario` and `attribution_id` matching the profit-attribution item;
 - identical `driver_id` and `review_trigger_id`;
-- channel, direction, quantification status, a meaningful rationale, and cutoff-compatible `evidence_refs`. At least one cash-assessment source reference must overlap the linked review trigger's evidence references.
+- channel, direction, quantification status, a meaningful rationale, and cutoff-compatible `evidence_refs`. At least one cash-assessment source reference must overlap the linked review trigger's evidence references. If an amount is quantified, its own typed-measure evidence references must also be nonempty, cutoff-compatible, and overlap the trigger's evidence references.
 
 A missing row, duplicate row, orphan row, changed driver or trigger link, unresolved source, after-cutoff evidence, or timing-uncertain evidence is a review blocker for the cash-flow path and the overall diagnostic chain.
 
 ## Cash-flow contract
 
-Channels: `OPERATING_CASH_CONVERSION`, `WORKING_CAPITAL`, `INVENTORY_MOVEMENT`, `CAPEX`, `NON_CASH_EARNINGS`, `FINANCE_CASH_COST`, `TAX_CASH_TIMING`, `NO_DIRECT_CASH_EFFECT`, `UNKNOWN`.
+Channels: `OPERATING_CASH_CONVERSION`, `WORKING_CAPITAL`, `INVENTORY_MOVEMENT`, `CAPEX`, `NON_CASH_EARNINGS`, `FINANCING_CASH_FLOW`, `TAX_CASH_TIMING`, `NO_DIRECT_CASH_EFFECT`, `UNKNOWN`.
 
 Directions: `IMPROVES_FCF`, `REDUCES_FCF`, `MIXED_OR_TIMING_DEPENDENT`, `NO_DIRECT_EFFECT`, `UNKNOWN`.
 
 Quantification status: `QUANTIFIED`, `QUALITATIVE_ONLY`, `NOT_APPLICABLE`, `UNKNOWN`.
 
-- `QUANTIFIED` requires a typed CNY `cash_flow_effect_cny`, an identifiable basis, evidence checks, a decision-usable B4 scenario, and the applicable B4 channel amount. Positive amounts mean an FCF improvement; negative amounts mean an FCF reduction. This sign is **not** the sign of the working-capital balance change.
+- `QUANTIFIED` requires a typed CNY `cash_flow_effect_cny`, an identifiable basis, evidence checks, a decision-usable B4 scenario, and the applicable B4 channel amount. Working-capital and inventory amounts additionally require an identifiable B4 inventory/working-capital reconciliation status. A P&L finance-cost field is not treated as a financing cash-flow amount. Positive amounts mean an FCF improvement; negative amounts mean an FCF reduction. This sign is **not** the sign of the working-capital balance change.
 - Quantified direction must agree with the amount's sign. Incomplete context or direction mismatches withhold the numeric amount from the report.
 - `NO_DIRECT_CASH_EFFECT` is allowed only with direction `NO_DIRECT_EFFECT` and status `NOT_APPLICABLE`. It is an explicit assessment, not a blank default.
 - A cash-flow item must use the same review trigger as its net-profit attribution, and that trigger must name the same driver.
@@ -47,4 +47,4 @@ The cash-flow assessment is **not** itself a normalized FCF forecast. There is n
 
 The research template now includes `operating_driver_forecast.cycle_earnings_monitor.cash_flow_assessments`, and the Round A prompt describes the separate path and its sign/evidence constraints. The evaluated node is nested inside `cycle_earnings_monitor`, already present in `REPLAY_COMPARISON_FIELDS`; no separate handoff or Replay field was added.
 
-Six regression cases were authored for separate profit/cash paths, trigger drift, lack of usable B4 cash context for quantification, missing source evidence, direction/sign mismatch, and source overlap with the review trigger. `tests/test_cycle_earnings_monitor_v01.py` now contains 24 authored tests total. **None were run for this batch.** No Replay, CI, PR, merge, or macOS acceptance was performed. Real macOS two-round full-run + independent Replay remains OPEN / NOT VERIFIED.
+Seven regression cases were authored for separate profit/cash paths, trigger drift, lack of usable B4 cash context for quantification, missing source evidence, direction/sign mismatch, source overlap with the review trigger, and typed quantitative provenance. `tests/test_cycle_earnings_monitor_v01.py` now contains 25 authored tests total. **None were run for this batch.** No Replay, CI, PR, merge, or macOS acceptance was performed. Real macOS two-round full-run + independent Replay remains OPEN / NOT VERIFIED.
