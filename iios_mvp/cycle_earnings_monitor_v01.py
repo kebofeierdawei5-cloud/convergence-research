@@ -591,7 +591,7 @@ def _evaluate_cash_flow_path(
     for scenario in SCENARIOS:
         by_scenario[scenario].sort(key=lambda item: item.get("attribution_id", ""))
     status = (
-        "CASH_FLOW_PATH_RECONCILED_DIAGNOSTIC_ONLY"
+        "CASH_FLOW_PATH_LINKS_COMPLETE_DIAGNOSTIC_ONLY"
         if expected_rows and not global_issues and len(seen) == len(expected_rows)
         else "REVIEW_REQUIRED" if expected_rows else "NOT_COMPARABLE"
     )
