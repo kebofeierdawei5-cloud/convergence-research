@@ -562,7 +562,6 @@ def evaluate_cycle_earnings_monitor(
         _text(row.get("trigger_id")): row for row in raw_review_triggers
         if isinstance(row, Mapping) and _text(row.get("trigger_id"))
     }
-    variance_rows_by_scenario: dict[str, list[Mapping[str, Any]]] = {name: [] for name in SCENARIOS}
     variance_issues: list[str] = []
     normalized_variance_rows: dict[str, list[dict[str, Any]]] = {name: [] for name in SCENARIOS}
     variance_ids: set[tuple[str, str]] = set()
@@ -619,7 +618,6 @@ def evaluate_cycle_earnings_monitor(
             "issues": sorted(set(item_issues)),
         }
         normalized_variance_rows[scenario].append(normalized_row)
-        variance_rows_by_scenario[scenario].append(row)
         variance_issues.extend(f"{scenario.upper()}:{attribution_id or index}:{issue}" for issue in item_issues)
 
     variance_scenarios: dict[str, dict[str, Any]] = {}
