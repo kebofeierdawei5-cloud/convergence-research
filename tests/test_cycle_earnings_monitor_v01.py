@@ -639,3 +639,115 @@ def test_quantified_cash_flow_assessment_preserves_typed_basis_and_evidence() ->
     assert item["cash_flow_effect_evidence_refs"] == ["E_ACTUAL"]
     assert result["cash_flow_path"]["cash_flow_amounts_aggregated"] is False
     assert result["cash_flow_path"]["fcf_variance_reconciled"] is False
+
+
+def test_normalized_fcf_bridge_reconciles_reference_adjustments_and_required_components() -> None:
+    raw, b4, evidence = _valid_case()
+    result = _evaluate(raw, b4, evidence)
+    fcf = result["normalized_fcf_bridge"]
+
+    assert fcf["status"] == "FCF_VARIANCE_RECONCILED_DIAGNOSTIC_ONLY"
+    assert fcf["normalized_fcf"]["status"] == "NORMALIZED_FCF_BRIDGE_RECONCILED_DIAGNOSTIC_ONLY"
+    assert fcf["b4_comparison"]["status"] == "DIAGNOSTIC_ONLY_NOT_A_VALUATION_INPUT"
+    assert fcf["variance_attribution"]["status"] == "ALL_SCENARIOS_RECONCILED_DIAGNOSTIC_ONLY"
+    assert fcf["normalized_fcf_comparison_available"] is True
+    assert fcf["fcf_variance_reconciled"] is True
+    assert fcf["valuation_input_eligible"] is False
+    assert set(row["category"] for row in fcf["normalized_fcf"]["scenarios"]["base"]["adjustments"]) == {
+        "CAPEX", "WORKING_CAPITAL", "INVENTORY_MOVEMENT"
+    }
+
+
+def test_normalized_fcf_reference_plus_adjustments_must_reconcile_within_cny_one() -> None:
+    raw, b4, evidence = _valid_case()
+    raw["normalized_fcf"]["scenarios"]["base"]["point_fcf_cny"] = "55"
+    result = _evaluate(raw, b4, evidence)
+    fcf = result["normalized_fcf_bridge"]
+
+    assert fcf["status"] == "REVIEW_REQUIRED"
+    assert fcf["normalized_fcf"]["scenarios"]["base"]["status"] == "REVIEW_REQUIRED"
+    assert any(
+        "NORMALIZED_FCF_REFERENCE_PLUS_ADJUSTMENTS_DO_NOT_RECONCILE_WITHIN_CNY_1" in issue
+        for issue in fcf["normalized_fcf"]["scenarios"]["base"]["issues"]
+    )
+    assert fcf["valuation_input_eligible"] is False
+
+
+def test_fcf_variance_attribution_residual_blocks_reconciled_status() -> None:
+    raw, b4, evidence = _valid_case()
+    b4["scenarios"]["base"]["unlevered_fcf_proxy_cny"] = "70"
+    for item in raw["fcf_variance_attribution"]:
+        if item["scenario"] == "base":
+            item["amount_cny"] = {
+                "value": "5", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
+                "basis": "测试用差异贡献，明确标记为假设",
+                "evidence_refs": ["E_COUNTER"],
+            }
+    result = _evaluate(raw, b4, evidence)
+    row = result["normalized_fcf_bridge"]["variance_attribution"]["scenarios"]["base"]
+
+    assert row["b4_minus_normalized_fcf_cny"] == "20"
+    assert row["attributed_total_cny"] == "15"
+    assert row["unattributed_residual_cny"] == "5"
+    assert row["status"] == "REVIEW_REQUIRED"
+    assert result["normalized_fcf_bridge"]["fcf_variance_reconciled"] is False
+
+
+def test_fcf_variance_can_reconcile_signed_capex_working_capital_and_inventory_contributions() -> None:
+    raw, b4, evidence = _valid_case()
+    b4["scenarios"]["base"]["unlevered_fcf_proxy_cny"] = "55"
+    signed = {"CAPEX": "8", "WORKING_CAPITAL": "-2", "INVENTORY_MOVEMENT": "-1"}
+    for item in raw["fcf_variance_attribution"]:
+        if item["scenario"] == "base":
+            item["amount_cny"] = {
+                "value": signed[item["category"]], "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
+                "basis": f"测试用 {item['category']} 差异贡献",
+                "evidence_refs": ["E_COUNTER"],
+            }
+    result = _evaluate(raw, b4, evidence)
+    row = result["normalized_fcf_bridge"]["variance_attribution"]["scenarios"]["base"]
+
+    assert row["b4_minus_normalized_fcf_cny"] == "5"
+    assert row["attributed_total_cny"] == "5"
+    assert row["unattributed_residual_cny"] == "0"
+    assert row["status"] == "RECONCILED_DIAGNOSTIC_ONLY"
+    assert result["normalized_fcf_bridge"]["fcf_variance_reconciled"] is True
+
+
+def test_normalized_fcf_period_mismatch_blocks_b4_comparison() -> None:
+    raw, b4, evidence = _valid_case()
+    raw["normalized_fcf"]["period"] = "FY2028"
+    result = _evaluate(raw, b4, evidence)
+    fcf = result["normalized_fcf_bridge"]
+
+    assert fcf["b4_comparison"]["status"] == "NOT_COMPARABLE"
+    assert "NORMALIZED_FCF_PERIOD_MISMATCH_B4" in fcf["b4_comparison"]["issues"]
+    assert fcf["normalized_fcf_comparison_available"] is False
+    assert fcf["fcf_variance_reconciled"] is False
+
+
+def test_normalized_fcf_requires_explicit_capex_working_capital_and_inventory_coverage() -> None:
+    raw, b4, evidence = _valid_case()
+    raw["normalized_fcf"]["scenarios"]["bull"]["adjustments"] = [
+        row for row in raw["normalized_fcf"]["scenarios"]["bull"]["adjustments"]
+        if row["category"] != "INVENTORY_MOVEMENT"
+    ]
+    result = _evaluate(raw, b4, evidence)
+    issues = result["normalized_fcf_bridge"]["normalized_fcf"]["scenarios"]["bull"]["issues"]
+
+    assert result["normalized_fcf_bridge"]["normalized_fcf"]["status"] == "REVIEW_REQUIRED"
+    assert "NORMALIZED_FCF_COMPONENT_COVERAGE_MISSING:INVENTORY_MOVEMENT" in issues
+
+
+def test_fcf_variance_amount_evidence_must_overlap_review_trigger_evidence() -> None:
+    raw, b4, evidence = _valid_case()
+    raw["fcf_variance_attribution"][0]["amount_cny"]["evidence_refs"] = ["E_ACTUAL"]
+    result = _evaluate(raw, b4, evidence)
+    fcf = result["normalized_fcf_bridge"]
+
+    assert fcf["variance_attribution"]["status"] == "REVIEW_REQUIRED"
+    assert any(
+        "FCF_ATTRIBUTION_EVIDENCE_NOT_SHARED_WITH_TRIGGER" in issue
+        for issue in fcf["variance_attribution"]["issues"]
+    )
+    assert fcf["fcf_variance_reconciled"] is False
