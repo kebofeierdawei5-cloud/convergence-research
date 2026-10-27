@@ -331,14 +331,17 @@ def _build_variance_transmission_context(
         row_status = "CONSTANT_PE_SENSITIVITY_DIAGNOSTIC_ONLY" if not row_issues and shares is not None and pe is not None and difference is not None else "NOT_IDENTIFIABLE"
         if row_status != "CONSTANT_PE_SENSITIVITY_DIAGNOSTIC_ONLY":
             all_scenarios_calculated = False
+            # Fail closed: once any upstream, timing, unit, or item issue exists,
+            # do not leave partial numeric sensitivities in the report.
+            item_outputs = []
         results[name] = {
             "scenario": name,
             "status": row_status,
-            "b4_minus_normalized_net_profit_cny": _format(difference),
-            "diluted_shares": _format(shares),
-            "pe_multiple_x": _format(pe),
-            "implied_eps_sensitivity_per_share": _format(difference / shares) if difference is not None and shares is not None and shares > 0 else None,
-            "constant_pe_value_sensitivity_per_share": _format((difference / shares) * pe) if difference is not None and shares is not None and shares > 0 and pe is not None and pe > 0 else None,
+            "b4_minus_normalized_net_profit_cny": _format(difference) if row_status == "CONSTANT_PE_SENSITIVITY_DIAGNOSTIC_ONLY" else None,
+            "diluted_shares": _format(shares) if row_status == "CONSTANT_PE_SENSITIVITY_DIAGNOSTIC_ONLY" else None,
+            "pe_multiple_x": _format(pe) if row_status == "CONSTANT_PE_SENSITIVITY_DIAGNOSTIC_ONLY" else None,
+            "implied_eps_sensitivity_per_share": _format(difference / shares) if row_status == "CONSTANT_PE_SENSITIVITY_DIAGNOSTIC_ONLY" and difference is not None and shares is not None and shares > 0 else None,
+            "constant_pe_value_sensitivity_per_share": _format((difference / shares) * pe) if row_status == "CONSTANT_PE_SENSITIVITY_DIAGNOSTIC_ONLY" and difference is not None and shares is not None and shares > 0 and pe is not None and pe > 0 else None,
             "items": item_outputs,
             "issues": sorted(set(row_issues)),
         }
