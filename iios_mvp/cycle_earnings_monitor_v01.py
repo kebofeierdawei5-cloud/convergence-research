@@ -556,8 +556,13 @@ def _evaluate_cash_flow_path(
                 item_issues.append("B4_CASH_CONTEXT_NOT_DECISION_USABLE")
             if channel in {"WORKING_CAPITAL", "INVENTORY_MOVEMENT"}:
                 reconciliation_status = _text(context_fields.get("inventory_reconciliation_status")).upper()
-                blocked_tokens = ("NOT_IDENTIFIABLE", "UNAVAILABLE", "INVALID", "REQUIRED", "UNKNOWN")
-                if not reconciliation_status or any(token in reconciliation_status for token in blocked_tokens):
+                valid_inventory_statuses = {
+                    "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL",
+                    "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL",
+                    "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED",
+                    "NOT_APPLICABLE_NO_TONNAGE_BASIS",
+                }
+                if reconciliation_status not in valid_inventory_statuses:
                     item_issues.append("B4_INVENTORY_WORKING_CAPITAL_RECONCILIATION_NOT_IDENTIFIABLE")
         elif raw_effect not in (None, ""):
             item_issues.append("UNQUANTIFIED_CASH_FLOW_ASSESSMENT_MUST_NOT_SUPPLY_AMOUNT")
@@ -905,8 +910,13 @@ def _evaluate_normalized_fcf_bridge(
             component_issues.append("NORMALIZED_FCF_INVENTORY_TREATMENT_NOT_IDENTIFIABLE")
         if not _meaningful(inventory_status):
             component_issues.append("NORMALIZED_FCF_INVENTORY_RECONCILIATION_STATUS_NOT_IDENTIFIABLE")
-        blocked_inventory_tokens = ("NOT_IDENTIFIABLE", "UNAVAILABLE", "INVALID", "REQUIRED", "UNKNOWN", "CONTRADICTS")
-        if any(token in inventory_status for token in blocked_inventory_tokens):
+        valid_inventory_statuses = {
+            "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL",
+            "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL",
+            "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED",
+            "NOT_APPLICABLE_NO_TONNAGE_BASIS",
+        }
+        if inventory_status not in valid_inventory_statuses:
             component_issues.append("NORMALIZED_FCF_INVENTORY_RECONCILIATION_NOT_PASS")
         inventory_proxy: Decimal | None = None
         raw_inventory_proxy = components_raw.get("inventory_cash_impact_proxy_cny")
@@ -1054,8 +1064,13 @@ def _evaluate_normalized_fcf_bridge(
         }:
             row_issues.append("B4_INVENTORY_WORKING_CAPITAL_TREATMENT_NOT_IDENTIFIABLE")
         inventory_status = _text(b4_row.get("inventory_reconciliation_status")).upper()
-        blocked_inventory_tokens = ("NOT_IDENTIFIABLE", "UNAVAILABLE", "INVALID", "REQUIRED", "UNKNOWN")
-        if not inventory_status or any(token in inventory_status for token in blocked_inventory_tokens):
+        valid_inventory_statuses = {
+            "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL",
+            "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL",
+            "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED",
+            "NOT_APPLICABLE_NO_TONNAGE_BASIS",
+        }
+        if inventory_status not in valid_inventory_statuses:
             row_issues.append("B4_INVENTORY_WORKING_CAPITAL_RECONCILIATION_NOT_IDENTIFIABLE")
         if inventory_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL":
             try:
