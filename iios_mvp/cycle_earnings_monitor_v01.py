@@ -1051,6 +1051,10 @@ def _evaluate_normalized_fcf_bridge(
 
     b4_rows = operating_driver_forecast.get("scenarios")
     b4_rows = b4_rows if isinstance(b4_rows, Mapping) else {}
+    comparable = (
+        normalized_status == "NORMALIZED_FCF_BRIDGE_RECONCILED_DIAGNOSTIC_ONLY"
+        and scope == b4_scope and period == b4_period
+    )
     comparisons: dict[str, dict[str, Any]] = {}
     comparison_issues: list[str] = []
     b4_component_values: dict[str, dict[str, Any]] = {}
