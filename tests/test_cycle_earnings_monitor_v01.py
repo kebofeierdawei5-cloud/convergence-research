@@ -515,3 +515,16 @@ def test_cash_flow_path_quantified_effect_requires_explicit_fcf_direction_sign()
     assert cash_item["status"] == "REVIEW_REQUIRED"
     assert cash_item["cash_flow_effect_cny"] is None
     assert "NEGATIVE_FCF_EFFECT_DIRECTION_MISMATCH" in cash_item["issues"]
+
+
+def test_cash_flow_evidence_must_overlap_linked_review_trigger_evidence() -> None:
+    raw, b4, evidence = _valid_case()
+    raw["cash_flow_assessments"][0]["evidence_refs"] = ["E_ACTUAL"]
+    result = _evaluate(raw, b4, evidence)
+
+    assert result["cash_flow_path"]["status"] == "REVIEW_REQUIRED"
+    assert any(
+        "CASH_FLOW_EVIDENCE_NOT_SHARED_WITH_REVIEW_TRIGGER" in issue
+        for issue in result["cash_flow_path"]["issues"]
+    )
+    assert result["status"] == "REVIEW_REQUIRED"
