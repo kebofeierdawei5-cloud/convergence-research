@@ -247,19 +247,25 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
         "fcf_variance_attribution": [
             {
                 "scenario": scenario,
-                "fcf_attribution_id": f"{scenario}_{category.lower()}_zero_gap",
+                "fcf_attribution_id": f"{scenario}_{category.lower()}_measured_gap",
                 "driver_id": "demand_growth",
                 "review_trigger_id": "orders_review",
                 "category": category,
-                "rationale": f"测试夹具显式登记 {category} 对 B4 与正常化 FCF 零差异的贡献",
+                "rationale": f"测试夹具显式登记 {category} 实测组件差额；仅验证桥接算术",
                 "amount_cny": {
-                    "value": "0", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
-                    "basis": "测试用零差异，不代表真实公司估计",
+                    "value": amount, "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
+                    "basis": "测试用组件差额，不代表真实公司估计",
                     "evidence_refs": ["E_COUNTER"],
                 },
             }
             for scenario in ("bear", "base", "bull")
-            for category in ("CAPEX", "WORKING_CAPITAL", "INVENTORY_MOVEMENT")
+            for category, amount in (
+                ("OPERATING_CASH_CONVERSION", {"bear": "29", "base": "33", "bull": "39"}[scenario]),
+                ("NON_CASH_EARNINGS", {"bear": "-7", "base": "-8", "bull": "-9"}[scenario]),
+                ("CAPEX", {"bear": "-15", "base": "-17", "bull": "-20"}[scenario]),
+                ("WORKING_CAPITAL", {"bear": "-7", "base": "-8", "bull": "-10"}[scenario]),
+                ("INVENTORY_MOVEMENT", "0"),
+            )
         ],
     }
     b4 = {
@@ -268,6 +274,7 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
         "scenarios": {
             "bear": {
                 "net_profit_cny": "80", "unlevered_fcf_proxy_cny": "40", "financial_outputs_decision_usable": True,
+                "ebit_cny": "86.25", "tax_rate": "0.2",
                 "cash_capex_cny": "20", "change_working_capital_cny": "12", "effective_change_working_capital_cny": "12",
                 "inventory_cash_impact_proxy_cny": "2", "inventory_working_capital_treatment": "INCLUDED_IN_CHANGE_WORKING_CAPITAL",
                 "inventory_reconciliation_status": "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL",
@@ -275,6 +282,7 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
             },
             "base": {
                 "net_profit_cny": "100", "unlevered_fcf_proxy_cny": "50", "financial_outputs_decision_usable": True,
+                "ebit_cny": "101.25", "tax_rate": "0.2",
                 "cash_capex_cny": "22", "change_working_capital_cny": "13", "effective_change_working_capital_cny": "13",
                 "inventory_cash_impact_proxy_cny": "3", "inventory_working_capital_treatment": "INCLUDED_IN_CHANGE_WORKING_CAPITAL",
                 "inventory_reconciliation_status": "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL",
@@ -282,6 +290,7 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
             },
             "bull": {
                 "net_profit_cny": "120", "unlevered_fcf_proxy_cny": "60", "financial_outputs_decision_usable": True,
+                "ebit_cny": "118.75", "tax_rate": "0.2",
                 "cash_capex_cny": "25", "change_working_capital_cny": "15", "effective_change_working_capital_cny": "15",
                 "inventory_cash_impact_proxy_cny": "4", "inventory_working_capital_treatment": "INCLUDED_IN_CHANGE_WORKING_CAPITAL",
                 "inventory_reconciliation_status": "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL",
