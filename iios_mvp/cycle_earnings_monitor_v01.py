@@ -66,6 +66,7 @@ def _unknown(reason: str = "未提供行业周期、正常化盈利和复核触�
         "review_triggers": {"status": "NOT_IDENTIFIABLE", "items": [], "issues": ["REVIEW_TRIGGERS_NOT_PROVIDED"]},
         "summary": reason,
         "b4_comparison": {"status": "NOT_COMPARABLE", "scenarios": {}, "note": "不修改或替代 B4 情景。"},
+        "per_share_value": {"status": "NOT_IDENTIFIABLE", "model_family": "UNKNOWN", "scenarios": {}, "issues": ["PRIMARY_PER_SHARE_VALUE_CONTEXT_NOT_PROVIDED"], "formula_recomputed_from_normalized_earnings": False},
         "valuation_input_eligible": False,
         "formal_forecast_admission_created": False,
         "formal_valuation_admission_created": False,
@@ -132,10 +133,72 @@ def _money(raw: Any, *, field: str, sources_by_id: Mapping[str, Mapping[str, Any
     return (value if not issues else None), issues, refs
 
 
+def _build_per_share_value_context(
+    forecast_valuation: Mapping[str, Any] | None,
+    valuation_model_consistency: Mapping[str, Any] | None,
+    valuation_timing: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Read the existing selected primary-model results; do not recalculate value."""
+    forecast = forecast_valuation if isinstance(forecast_valuation, Mapping) else {}
+    consistency = valuation_model_consistency if isinstance(valuation_model_consistency, Mapping) else {}
+    timing = valuation_timing if isinstance(valuation_timing, Mapping) else {}
+    issues: list[str] = []
+    model_family = _text(forecast.get("model_family") or "UNKNOWN").upper()
+    if model_family in {"", "UNKNOWN"}:
+        issues.append("PRIMARY_VALUATION_MODEL_FAMILY_NOT_IDENTIFIABLE")
+    if consistency.get("primary_model_price_calculation_eligible") is not True:
+        issues.append("PRIMARY_MODEL_PRICE_CALCULATION_NOT_ELIGIBLE")
+    if _text(timing.get("status")).upper() != "PASS":
+        issues.append("VALUATION_TIMING_NOT_PASS")
+    try:
+        entry_anchor = _decimal(forecast.get("entry_value_reference_per_share"), "ENTRY_VALUE_REFERENCE_PER_SHARE")
+        if entry_anchor <= 0:
+            issues.append("ENTRY_VALUE_REFERENCE_NOT_POSITIVE")
+    except ValueError:
+        entry_anchor = None
+        issues.append("ENTRY_VALUE_REFERENCE_NOT_IDENTIFIABLE")
+    raw_scenarios = forecast.get("scenarios") if isinstance(forecast.get("scenarios"), Mapping) else {}
+    scenarios: dict[str, dict[str, Any]] = {}
+    values: dict[str, Decimal] = {}
+    for name in SCENARIOS:
+        row = raw_scenarios.get(name) if isinstance(raw_scenarios.get(name), Mapping) else {}
+        raw_value = row.get("terminal_value_per_share")
+        try:
+            value = _decimal(raw_value, f"{name}.terminal_value_per_share")
+            if value < 0:
+                raise ValueError("TERMINAL_VALUE_PER_SHARE_NEGATIVE")
+            values[name] = value
+        except ValueError:
+            value = None
+            issues.append(f"PRIMARY_MODEL_{name.upper()}_PER_SHARE_VALUE_NOT_IDENTIFIABLE")
+        scenarios[name] = {
+            "scenario": name,
+            "terminal_value_per_share": _format(value),
+            "source_status": "READ_FROM_SELECTED_PRIMARY_MODEL_OUTPUT" if value is not None else "UNKNOWN",
+        }
+    if set(values) == set(SCENARIOS) and not (values["bear"] <= values["base"] <= values["bull"]):
+        issues.append("PRIMARY_MODEL_PER_SHARE_SCENARIO_ORDER_INVALID")
+    status = "IDENTIFIABLE_CURRENT_PRIMARY_VALUE_CONTEXT_NON_ADMITTED" if not issues else "NOT_IDENTIFIABLE"
+    return {
+        "status": status,
+        "model_family": model_family,
+        "model_name": _text(forecast.get("model")) or "UNKNOWN",
+        "entry_value_reference_per_share": _format(entry_anchor),
+        "valuation_timing_status": _text(timing.get("status")) or "UNKNOWN",
+        "scenarios": scenarios,
+        "issues": sorted(set(issues)),
+        "formula_recomputed_from_normalized_earnings": False,
+        "note": "只读取现有主估值结果作为价值节点上下文；本监测器不把正常化盈利重新代入估值公式，也不替代主估值适配器。",
+    }
+
+
 def evaluate_cycle_earnings_monitor(
     raw: Any,
     *,
     operating_driver_forecast: Mapping[str, Any],
+    forecast_valuation: Mapping[str, Any] | None = None,
+    valuation_model_consistency: Mapping[str, Any] | None = None,
+    valuation_timing: Mapping[str, Any] | None = None,
     assessment: Mapping[str, Any] | None = None,
     evidence_register: list[Mapping[str, Any]] | None = None,
     unresolved_evidence_ids: list[str] | None = None,
@@ -474,6 +537,18 @@ def evaluate_cycle_earnings_monitor(
         else "NOT_COMPARABLE_PERIOD_SCOPE_OR_NORMALIZED_EARNINGS_INCOMPLETE"
     )
 
+    per_share_value = _build_per_share_value_context(
+        forecast_valuation, valuation_model_consistency, valuation_timing
+    )
+    if comparison_status != "DIAGNOSTIC_ONLY_NOT_A_VALUATION_INPUT":
+        earnings_issues.append("B4_NORMALIZED_EARNINGS_COMPARISON_NOT_IDENTIFIABLE")
+    if per_share_value.get("status") != "IDENTIFIABLE_CURRENT_PRIMARY_VALUE_CONTEXT_NON_ADMITTED":
+        all_issues_for_value = list(per_share_value.get("issues") or [])
+        if not all_issues_for_value:
+            all_issues_for_value = ["PRIMARY_PER_SHARE_VALUE_CONTEXT_NOT_IDENTIFIABLE"]
+    else:
+        all_issues_for_value = []
+
     # 4) Review triggers must name a known driver and explicitly span the
     # cycle -> earnings -> EPS/FCF -> per-share-value -> position-review chain.
     raw_triggers = raw.get("review_triggers")
@@ -530,7 +605,7 @@ def evaluate_cycle_earnings_monitor(
     trigger_status = "IDENTIFIABLE" if not trigger_issues else "REVIEW_REQUIRED"
     trigger_result = {"status": trigger_status, "items": trigger_rows, "issues": sorted(set(trigger_issues))}
 
-    all_issues = sorted(set(cycle_issues + earnings_issues + trigger_issues))
+    all_issues = sorted(set(cycle_issues + earnings_issues + trigger_issues + all_issues_for_value))
     complete = not all_issues
     result_status = "CHAIN_IDENTIFIABLE_NON_ADMITTED" if complete else "REVIEW_REQUIRED"
     summary = (
@@ -545,6 +620,7 @@ def evaluate_cycle_earnings_monitor(
         "normalized_earnings": earnings_result,
         "review_triggers": trigger_result,
         "b4_comparison": {"status": comparison_status, "scenarios": comparisons, "note": "比较结果仅作诊断，不替代 B4 经营预测。"},
+        "per_share_value": per_share_value,
         "issues": all_issues,
         "summary": summary,
         "valuation_input_eligible": False,
@@ -561,6 +637,7 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
     earnings = data.get("normalized_earnings") if isinstance(data.get("normalized_earnings"), Mapping) else {}
     triggers = data.get("review_triggers") if isinstance(data.get("review_triggers"), Mapping) else {}
     comparison = data.get("b4_comparison") if isinstance(data.get("b4_comparison"), Mapping) else {}
+    value_node = data.get("per_share_value") if isinstance(data.get("per_share_value"), Mapping) else {}
     lines = [
         "",
         "### B44：行业周期 → 正常化盈利 → 每股价值 → 持仓复核",
@@ -625,6 +702,24 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
             f"差额/正常化中枢绝对值 {compare.get('absolute_difference_ratio_of_normalized_point') or 'UNKNOWN'}；"
             f"{compare.get('status', 'NOT_COMPARABLE')}"
         )
+    lines.extend([
+        "",
+        "#### 当前主估值每股价值节点（只读上下文，不重新计算）",
+        f"- 价值节点状态：{value_node.get('status', 'NOT_IDENTIFIABLE')}；主模型：{value_node.get('model_family', 'UNKNOWN')} / {value_node.get('model_name', 'UNKNOWN')}；估值时点状态：{value_node.get('valuation_timing_status', 'UNKNOWN')}",
+        f"- 入场估值锚：{value_node.get('entry_value_reference_per_share') or 'UNKNOWN'}；是否由本节点用正常化盈利重算：{value_node.get('formula_recomputed_from_normalized_earnings', False)}",
+    ])
+    value_scenarios = value_node.get("scenarios") if isinstance(value_node.get("scenarios"), Mapping) else {}
+    for name in SCENARIOS:
+        value_row = value_scenarios.get(name) if isinstance(value_scenarios.get(name), Mapping) else {}
+        compare_row = comparison.get("scenarios", {}).get(name, {}) if isinstance(comparison.get("scenarios"), Mapping) else {}
+        lines.append(
+            f"- {name.upper()} 每股终值：{value_row.get('terminal_value_per_share') or 'UNKNOWN'}；"
+            f"正常化净利润中枢：{compare_row.get('normalized_point_net_profit_cny') or 'UNKNOWN'}；"
+            f"B4 净利润：{compare_row.get('b4_forecast_net_profit_cny') or 'UNKNOWN'}；"
+            f"差额：{compare_row.get('b4_minus_normalized_cny') or 'UNKNOWN'}"
+        )
+    for issue in value_node.get("issues") or []:
+        lines.append(f"- 价值节点待复核：{issue}")
     lines.extend(["", "#### 持仓复核触发器（不是自动交易指令）"])
     trigger_items = triggers.get("items") if isinstance(triggers.get("items"), list) else []
     if not trigger_items:
