@@ -173,14 +173,81 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
             }
             for scenario in ("bear", "base", "bull")
         ],
+        "normalized_fcf": {
+            "metric": "UNLEVERED_FCF_CNY",
+            "scope": "COMPANY_WIDE",
+            "reference_period": "FY2026",
+            "period": "FY2027",
+            "normalization_basis": "以 FY2026 FCF 为参考，逐项说明周期、资本开支与营运资金正常化假设",
+            "scenarios": {
+                scenario: {
+                    "reference_fcf_cny": {
+                        "value": value, "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
+                        "basis": "正常化 FCF 参考基准，须在正式研究中由可审计数据替换或证明",
+                        "evidence_refs": ["E_ACTUAL"],
+                    },
+                    "adjustments": [{
+                        "adjustment_id": f"{scenario}_wc_normalization",
+                        "driver_id": "demand_growth",
+                        "review_trigger_id": "orders_review",
+                        "category": "WORKING_CAPITAL",
+                        "rationale": "该基准夹具显式登记零营运资金调整，不代表真实公司估计",
+                        "amount_cny": {
+                            "value": "0", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
+                            "basis": "测试用零调整，不是实际估计",
+                            "evidence_refs": ["E_COUNTER"],
+                        },
+                    }],
+                    "low_fcf_cny": str(int(value) - 5),
+                    "point_fcf_cny": value,
+                    "high_fcf_cny": str(int(value) + 5),
+                    "scenario_basis": "测试夹具：用于结构和算术验证，不代表公司真实 FCF",
+                }
+                for scenario, value in (("bear", "40"), ("base", "50"), ("bull", "60"))
+            },
+        },
+        "fcf_variance_attribution": [
+            {
+                "scenario": scenario,
+                "fcf_attribution_id": f"{scenario}_fcf_zero_gap",
+                "driver_id": "demand_growth",
+                "review_trigger_id": "orders_review",
+                "category": "WORKING_CAPITAL",
+                "rationale": "测试夹具显式登记 B4 与正常化 FCF 零差异",
+                "amount_cny": {
+                    "value": "0", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
+                    "basis": "测试用零差异，不代表真实公司估计",
+                    "evidence_refs": ["E_COUNTER"],
+                },
+            }
+            for scenario in ("bear", "base", "bull")
+        ],
     }
     b4 = {
         "scope": "COMPANY_WIDE",
         "forecast_period": "FY2027",
         "scenarios": {
-            "bear": {"net_profit_cny": "80"},
-            "base": {"net_profit_cny": "100"},
-            "bull": {"net_profit_cny": "120"},
+            "bear": {
+                "net_profit_cny": "80", "unlevered_fcf_proxy_cny": "40", "financial_outputs_decision_usable": True,
+                "cash_capex_cny": "20", "change_working_capital_cny": "12", "effective_change_working_capital_cny": "12",
+                "inventory_cash_impact_proxy_cny": "2", "inventory_working_capital_treatment": "INCLUDED_IN_CHANGE_WORKING_CAPITAL",
+                "inventory_reconciliation_status": "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL",
+                "depreciation_amortization_cny": "3", "finance_cost_cny": "1",
+            },
+            "base": {
+                "net_profit_cny": "100", "unlevered_fcf_proxy_cny": "50", "financial_outputs_decision_usable": True,
+                "cash_capex_cny": "22", "change_working_capital_cny": "13", "effective_change_working_capital_cny": "13",
+                "inventory_cash_impact_proxy_cny": "3", "inventory_working_capital_treatment": "INCLUDED_IN_CHANGE_WORKING_CAPITAL",
+                "inventory_reconciliation_status": "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL",
+                "depreciation_amortization_cny": "4", "finance_cost_cny": "2",
+            },
+            "bull": {
+                "net_profit_cny": "120", "unlevered_fcf_proxy_cny": "60", "financial_outputs_decision_usable": True,
+                "cash_capex_cny": "25", "change_working_capital_cny": "15", "effective_change_working_capital_cny": "15",
+                "inventory_cash_impact_proxy_cny": "4", "inventory_working_capital_treatment": "INCLUDED_IN_CHANGE_WORKING_CAPITAL",
+                "inventory_reconciliation_status": "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL",
+                "depreciation_amortization_cny": "5", "finance_cost_cny": "3",
+            },
         },
     }
     evidence = [
@@ -476,6 +543,7 @@ def test_cash_flow_path_rejects_trigger_or_driver_drift_from_profit_attribution(
 def test_quantified_working_capital_effect_requires_usable_b4_cash_context() -> None:
     raw, b4, evidence = _valid_case()
     assessment = raw["cash_flow_assessments"][1]
+    b4["scenarios"]["base"]["financial_outputs_decision_usable"] = False
     assessment.update({
         "channel": "WORKING_CAPITAL",
         "direction": "IMPROVES_FCF",
