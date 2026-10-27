@@ -10,7 +10,7 @@ B47 separated cash-flow attribution from net-profit attribution but correctly re
 
 ## Layer 1 — reference FCF to normalized FCF point
 
-The `normalized_fcf` node requires `metric=UNLEVERED_FCF_CNY`, explicit `scope`, `reference_period`, normalized target `period`, and `normalization_basis`. Bear/Base/Bull each require:
+The `normalized_fcf` node requires `metric=UNLEVERED_FCF_PROXY_CNY` and the fixed method identifier `B4_UNLEVERED_FCF_PROXY_EBIT_AFTER_TAX_PLUS_DA_MINUS_CASH_CAPEX_MINUS_EFFECTIVE_WC_V0.1`, explicit `scope`, `reference_period`, normalized target `period`, and `normalization_basis`. Bear/Base/Bull each require:
 
 - typed `reference_fcf_cny` in CNY, with basis and evidence provenance;
 - explicit, signed typed `adjustments`, each carrying an ID, driver, review trigger, category, rationale, and evidence;
