@@ -790,6 +790,13 @@ def _evaluate_normalized_fcf_bridge(
             item_issues.extend(f"ADJUSTMENT:{adjustment_id or index}:{issue}" for issue in row_issues)
         if not raw_adjustments:
             item_issues.append("NORMALIZED_FCF_ADJUSTMENTS_REQUIRED_EVEN_FOR_ZERO_BRIDGE")
+        adjustment_categories = {
+            _text(row.get("category")).upper()
+            for row in raw_adjustments if isinstance(row, Mapping)
+        }
+        for required_category in ("CAPEX", "WORKING_CAPITAL", "INVENTORY_MOVEMENT"):
+            if required_category not in adjustment_categories:
+                item_issues.append(f"NORMALIZED_FCF_COMPONENT_COVERAGE_MISSING:{required_category}")
 
         numeric_fields: dict[str, Decimal | None] = {}
         for key in ("low_fcf_cny", "point_fcf_cny", "high_fcf_cny"):
@@ -979,6 +986,10 @@ def _evaluate_normalized_fcf_bridge(
         rows = attribution_rows[name]
         scenario_issues: list[str] = []
         contributions: list[Decimal] = []
+        attribution_categories = {_text(item.get("category")).upper() for item in rows}
+        for required_category in ("CAPEX", "WORKING_CAPITAL", "INVENTORY_MOVEMENT"):
+            if required_category not in attribution_categories:
+                scenario_issues.append(f"FCF_VARIANCE_COMPONENT_COVERAGE_MISSING:{required_category}")
         if comparison_complete and not rows:
             scenario_issues.append("FCF_ATTRIBUTIONS_REQUIRED_FOR_COMPARABLE_SCENARIO")
         for item in rows:
