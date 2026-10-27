@@ -814,6 +814,165 @@ def _evaluate_normalized_fcf_bridge(
         )
         if low_value is not None and point_value is not None and high_value is not None and not (low_value <= point_value <= high_value):
             item_issues.append("NORMALIZED_FCF_LOW_POINT_HIGH_ORDER_INVALID")
+
+        # Independently re-compute the normalized FCF point from the same B4 proxy
+        # formula, and reconcile raw/effective working capital so inventory is not
+        # silently double-counted or omitted.
+        components_raw = raw_scenario.get("cash_components")
+        components_raw = components_raw if isinstance(components_raw, Mapping) else {}
+        component_values: dict[str, Decimal | None] = {}
+        component_output: dict[str, Any] = {}
+        component_issues: list[str] = []
+        component_contract = (
+            ("ebit_cny", True),
+            ("depreciation_amortization_cny", False),
+            ("cash_capex_cny", False),
+            ("change_working_capital_cny", True),
+            ("effective_change_working_capital_cny", True),
+        )
+        if not components_raw:
+            component_issues.append("NORMALIZED_FCF_CASH_COMPONENTS_REQUIRED")
+        for component_field, allow_negative in component_contract:
+            value, value_issues, value_refs = _money(
+                components_raw.get(component_field),
+                field=f"normalized_fcf.{name}.cash_components.{component_field}",
+                sources_by_id=sources_by_id,
+                unresolved_refs=unresolved_refs,
+                after_cutoff_refs=after_cutoff_refs,
+                uncertain_refs=uncertain_refs,
+                allow_negative=allow_negative,
+            )
+            if not value_refs:
+                value_issues.append(f"NORMALIZED_FCF_CASH_COMPONENT_EVIDENCE_REQUIRED:{component_field}")
+            component_values[component_field] = value if not value_issues else None
+            component_output[component_field] = {
+                "value": _format(value) if value is not None and not value_issues else None,
+                "unit": "CNY",
+                "evidence_refs": value_refs,
+                "issues": sorted(set(value_issues)),
+            }
+            component_issues.extend(value_issues)
+
+        raw_tax = components_raw.get("tax_rate")
+        tax_value: Decimal | None = None
+        tax_refs: list[str] = []
+        tax_issues: list[str] = []
+        if not isinstance(raw_tax, Mapping):
+            tax_issues.append("NORMALIZED_FCF_TAX_RATE_TYPED_RATIO_REQUIRED")
+        else:
+            if _text(raw_tax.get("unit")).lower() != "ratio":
+                tax_issues.append("NORMALIZED_FCF_TAX_RATE_UNIT_MUST_BE_RATIO")
+            tax_class = _text(raw_tax.get("data_class")).upper()
+            if tax_class not in {"OBSERVED_ACTUAL", "ISSUER_FORECAST", "ANALYST_ASSUMPTION"}:
+                tax_issues.append("NORMALIZED_FCF_TAX_RATE_DATA_CLASS_NOT_IDENTIFIABLE")
+            if not _meaningful(raw_tax.get("basis")):
+                tax_issues.append("NORMALIZED_FCF_TAX_RATE_BASIS_NOT_IDENTIFIABLE")
+            try:
+                tax_value = _decimal(raw_tax.get("value"), "NORMALIZED_FCF_TAX_RATE")
+                if tax_value < 0 or tax_value > 1:
+                    tax_issues.append("NORMALIZED_FCF_TAX_RATE_OUTSIDE_ZERO_TO_ONE")
+            except ValueError:
+                tax_value = None
+                tax_issues.append("NORMALIZED_FCF_TAX_RATE_NOT_IDENTIFIABLE")
+            tax_refs, tax_ref_issues = _resolve_refs(
+                raw_tax.get("evidence_refs"),
+                field=f"normalized_fcf.{name}.cash_components.tax_rate",
+                sources_by_id=sources_by_id,
+                unresolved_refs=unresolved_refs,
+                after_cutoff_refs=after_cutoff_refs,
+                uncertain_refs=uncertain_refs,
+                required=tax_class in {"OBSERVED_ACTUAL", "ISSUER_FORECAST"},
+            )
+            tax_issues.extend(tax_ref_issues)
+            if not tax_refs:
+                tax_issues.append("NORMALIZED_FCF_TAX_RATE_EVIDENCE_REQUIRED")
+        component_output["tax_rate"] = {
+            "value": _format(tax_value) if tax_value is not None and not tax_issues else None,
+            "unit": "ratio",
+            "evidence_refs": tax_refs,
+            "issues": sorted(set(tax_issues)),
+        }
+        component_issues.extend(tax_issues)
+
+        treatment = _text(components_raw.get("inventory_working_capital_treatment")).upper()
+        inventory_status = _text(components_raw.get("inventory_reconciliation_status")).upper()
+        if treatment not in {
+            "INCLUDED_IN_CHANGE_WORKING_CAPITAL",
+            "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL",
+            "NOT_APPLICABLE",
+            "NOT_APPLICABLE_NO_TONNAGE_BASIS",
+        }:
+            component_issues.append("NORMALIZED_FCF_INVENTORY_TREATMENT_NOT_IDENTIFIABLE")
+        if not _meaningful(inventory_status):
+            component_issues.append("NORMALIZED_FCF_INVENTORY_RECONCILIATION_STATUS_NOT_IDENTIFIABLE")
+        blocked_inventory_tokens = ("NOT_IDENTIFIABLE", "UNAVAILABLE", "INVALID", "REQUIRED", "UNKNOWN", "CONTRADICTS")
+        if any(token in inventory_status for token in blocked_inventory_tokens):
+            component_issues.append("NORMALIZED_FCF_INVENTORY_RECONCILIATION_NOT_PASS")
+        inventory_proxy: Decimal | None = None
+        raw_inventory_proxy = components_raw.get("inventory_cash_impact_proxy_cny")
+        if raw_inventory_proxy not in (None, ""):
+            inventory_proxy, proxy_issues, proxy_refs = _money(
+                raw_inventory_proxy,
+                field=f"normalized_fcf.{name}.cash_components.inventory_cash_impact_proxy_cny",
+                sources_by_id=sources_by_id,
+                unresolved_refs=unresolved_refs,
+                after_cutoff_refs=after_cutoff_refs,
+                uncertain_refs=uncertain_refs,
+                allow_negative=True,
+            )
+            if not proxy_refs:
+                proxy_issues.append("NORMALIZED_FCF_INVENTORY_PROXY_EVIDENCE_REQUIRED")
+            component_issues.extend(proxy_issues)
+            component_output["inventory_cash_impact_proxy_cny"] = {
+                "value": _format(inventory_proxy) if inventory_proxy is not None and not proxy_issues else None,
+                "unit": "CNY",
+                "evidence_refs": proxy_refs,
+                "issues": sorted(set(proxy_issues)),
+            }
+        elif treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL":
+            component_issues.append("NORMALIZED_FCF_INVENTORY_PROXY_REQUIRED_WHEN_INVENTORY_EXCLUDED")
+        component_output["inventory_working_capital_treatment"] = treatment or "UNKNOWN"
+        component_output["inventory_reconciliation_status"] = inventory_status or "UNKNOWN"
+
+        change_wc = component_values.get("change_working_capital_cny")
+        effective_wc = component_values.get("effective_change_working_capital_cny")
+        if change_wc is not None and effective_wc is not None:
+            if treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL":
+                if "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL" not in inventory_status:
+                    component_issues.append("NORMALIZED_FCF_EXCLUDED_INVENTORY_RECONCILIATION_STATUS_MISMATCH")
+                if inventory_proxy is None:
+                    component_issues.append("NORMALIZED_FCF_INVENTORY_PROXY_NOT_IDENTIFIABLE")
+                elif abs((change_wc + inventory_proxy) - effective_wc) > Decimal("1"):
+                    component_issues.append("NORMALIZED_FCF_NONINVENTORY_WC_PLUS_INVENTORY_PROXY_MISMATCH")
+            elif treatment == "INCLUDED_IN_CHANGE_WORKING_CAPITAL":
+                if "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL" not in inventory_status:
+                    component_issues.append("NORMALIZED_FCF_INCLUDED_INVENTORY_RECONCILIATION_STATUS_MISMATCH")
+                if abs(change_wc - effective_wc) > Decimal("1"):
+                    component_issues.append("NORMALIZED_FCF_INCLUDED_WC_EFFECTIVE_WC_MISMATCH")
+            elif treatment in {"NOT_APPLICABLE", "NOT_APPLICABLE_NO_TONNAGE_BASIS"}:
+                valid_zero_status = (
+                    inventory_status == "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED"
+                    or inventory_status == "NOT_APPLICABLE_NO_TONNAGE_BASIS"
+                )
+                if not valid_zero_status:
+                    component_issues.append("NORMALIZED_FCF_NOT_APPLICABLE_INVENTORY_STATUS_MISMATCH")
+                if abs(change_wc - effective_wc) > Decimal("1"):
+                    component_issues.append("NORMALIZED_FCF_NOT_APPLICABLE_WC_EFFECTIVE_WC_MISMATCH")
+
+        calculated_fcf: Decimal | None = None
+        ebit = component_values.get("ebit_cny")
+        da = component_values.get("depreciation_amortization_cny")
+        capex = component_values.get("cash_capex_cny")
+        if all(value is not None for value in (ebit, da, capex, effective_wc, tax_value)) and not component_issues:
+            calculated_fcf = ebit - max(ebit, Decimal("0")) * tax_value + da - capex - effective_wc
+            if point_value is not None and abs(calculated_fcf - point_value) > Decimal("1"):
+                component_issues.append("NORMALIZED_FCF_CASH_COMPONENT_FORMULA_MISMATCH_WITHIN_CNY_1")
+        else:
+            component_issues.append("NORMALIZED_FCF_CASH_COMPONENT_FORMULA_NOT_IDENTIFIABLE")
+        component_output["calculated_fcf_point_cny"] = _format(calculated_fcf) if calculated_fcf is not None and not component_issues else None
+        component_output["issues"] = sorted(set(component_issues))
+        item_issues.extend(f"CASH_COMPONENT:{issue}" for issue in component_issues)
+
         if reference is not None and point_value is not None and adjustment_values_complete:
             residual = reference + adjustment_total - point_value
             if abs(residual) > Decimal("1"):
@@ -839,6 +998,7 @@ def _evaluate_normalized_fcf_bridge(
             "point_fcf_cny": _format(point_value),
             "high_fcf_cny": _format(high_value),
             "bridge_residual_cny": _format(residual),
+            "cash_components": component_output,
             "adjustments": adjustments,
             "scenario_basis": scenario_basis or "UNKNOWN",
             "issues": sorted(set(item_issues)),
