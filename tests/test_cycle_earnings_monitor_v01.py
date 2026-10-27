@@ -186,18 +186,21 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
                         "basis": "正常化 FCF 参考基准，须在正式研究中由可审计数据替换或证明",
                         "evidence_refs": ["E_ACTUAL"],
                     },
-                    "adjustments": [{
-                        "adjustment_id": f"{scenario}_wc_normalization",
-                        "driver_id": "demand_growth",
-                        "review_trigger_id": "orders_review",
-                        "category": "WORKING_CAPITAL",
-                        "rationale": "该基准夹具显式登记零营运资金调整，不代表真实公司估计",
-                        "amount_cny": {
-                            "value": "0", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
-                            "basis": "测试用零调整，不是实际估计",
-                            "evidence_refs": ["E_COUNTER"],
-                        },
-                    }],
+                    "adjustments": [
+                        {
+                            "adjustment_id": f"{scenario}_{category.lower()}_normalization",
+                            "driver_id": "demand_growth",
+                            "review_trigger_id": "orders_review",
+                            "category": category,
+                            "rationale": f"测试夹具显式登记 {category} 零调整，不代表真实公司估计",
+                            "amount_cny": {
+                                "value": "0", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
+                                "basis": "测试用零调整，不是实际估计",
+                                "evidence_refs": ["E_COUNTER"],
+                            },
+                        }
+                        for category in ("CAPEX", "WORKING_CAPITAL", "INVENTORY_MOVEMENT")
+                    ],
                     "low_fcf_cny": str(int(value) - 5),
                     "point_fcf_cny": value,
                     "high_fcf_cny": str(int(value) + 5),
@@ -209,11 +212,11 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
         "fcf_variance_attribution": [
             {
                 "scenario": scenario,
-                "fcf_attribution_id": f"{scenario}_fcf_zero_gap",
+                "fcf_attribution_id": f"{scenario}_{category.lower()}_zero_gap",
                 "driver_id": "demand_growth",
                 "review_trigger_id": "orders_review",
-                "category": "WORKING_CAPITAL",
-                "rationale": "测试夹具显式登记 B4 与正常化 FCF 零差异",
+                "category": category,
+                "rationale": f"测试夹具显式登记 {category} 对 B4 与正常化 FCF 零差异的贡献",
                 "amount_cny": {
                     "value": "0", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
                     "basis": "测试用零差异，不代表真实公司估计",
@@ -221,6 +224,7 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
                 },
             }
             for scenario in ("bear", "base", "bull")
+            for category in ("CAPEX", "WORKING_CAPITAL", "INVENTORY_MOVEMENT")
         ],
     }
     b4 = {
