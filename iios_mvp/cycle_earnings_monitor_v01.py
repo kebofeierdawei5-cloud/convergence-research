@@ -2313,19 +2313,22 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
     normalized_fcf_node = fcf_node.get("normalized_fcf") if isinstance(fcf_node.get("normalized_fcf"), Mapping) else {}
     fcf_comparison = fcf_node.get("b4_comparison") if isinstance(fcf_node.get("b4_comparison"), Mapping) else {}
     fcf_variance = fcf_node.get("variance_attribution") if isinstance(fcf_node.get("variance_attribution"), Mapping) else {}
+    fcf_component_bridge = fcf_node.get("component_variance_bridge") if isinstance(fcf_node.get("component_variance_bridge"), Mapping) else {}
     lines.extend([
         "",
-        "#### B48：独立正常化 FCF 与差异归因桥",
-        f"- 总状态：{fcf_node.get('status', 'NOT_IDENTIFIABLE')}；正常化 FCF 桥：{normalized_fcf_node.get('status', 'NOT_IDENTIFIABLE')}；B4 比较：{fcf_comparison.get('status', 'NOT_COMPARABLE')}；FCF 差异归因：{fcf_variance.get('status', 'NOT_COMPARABLE')}",
+        "#### B48–B49：独立正常化 FCF、组件差额与逐类归因桥",
+        f"- 总状态：{fcf_node.get('status', 'NOT_IDENTIFIABLE')}；正常化 FCF 桥：{normalized_fcf_node.get('status', 'NOT_IDENTIFIABLE')}；B4 比较：{fcf_comparison.get('status', 'NOT_COMPARABLE')}；组件差额桥：{fcf_component_bridge.get('status', 'NOT_COMPARABLE')}；FCF 差异归因：{fcf_variance.get('status', 'NOT_COMPARABLE')}",
         f"- 口径 / 方法 / 参考期间 / 目标期间：{normalized_fcf_node.get('scope', 'UNKNOWN')} / {normalized_fcf_node.get('method', 'UNKNOWN')} / {normalized_fcf_node.get('reference_period', 'UNKNOWN')} / {normalized_fcf_node.get('period', 'UNKNOWN')}",
         f"- 符号约定：{fcf_node.get('sign_convention', 'UNKNOWN')}；归因容差 {fcf_node.get('tolerance_cny', 'UNKNOWN')} CNY；是否作为估值输入：{fcf_node.get('valuation_input_eligible', False)}",
     ])
     norm_fcf_scenarios = normalized_fcf_node.get("scenarios") if isinstance(normalized_fcf_node.get("scenarios"), Mapping) else {}
     comparison_fcf_scenarios = fcf_comparison.get("scenarios") if isinstance(fcf_comparison.get("scenarios"), Mapping) else {}
+    component_fcf_scenarios = fcf_component_bridge.get("scenarios") if isinstance(fcf_component_bridge.get("scenarios"), Mapping) else {}
     attribution_fcf_scenarios = fcf_variance.get("scenarios") if isinstance(fcf_variance.get("scenarios"), Mapping) else {}
     for name in SCENARIOS:
         norm_row = norm_fcf_scenarios.get(name) if isinstance(norm_fcf_scenarios.get(name), Mapping) else {}
         comp_row = comparison_fcf_scenarios.get(name) if isinstance(comparison_fcf_scenarios.get(name), Mapping) else {}
+        component_row = component_fcf_scenarios.get(name) if isinstance(component_fcf_scenarios.get(name), Mapping) else {}
         var_row = attribution_fcf_scenarios.get(name) if isinstance(attribution_fcf_scenarios.get(name), Mapping) else {}
         lines.append(
             f"- {name.upper()} 正常化 FCF 参考/调整合计/低-中-高："
@@ -2357,10 +2360,27 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
             f"{comp_row.get('normalized_fcf_point_cny') or 'UNKNOWN'} / {comp_row.get('b4_minus_normalized_fcf_cny') or 'UNKNOWN'} CNY；"
             f"{comp_row.get('status', 'NOT_COMPARABLE')}"
         )
+        contributions = component_row.get("contributions_cny") if isinstance(component_row.get("contributions_cny"), Mapping) else {}
+        lines.append(
+            f"  - B49 组件差额贡献（经营现金转换 / 非现金收益 / 资本开支 / 营运资金 / 库存）："
+            f"{contributions.get('OPERATING_CASH_CONVERSION', 'UNKNOWN')} / {contributions.get('NON_CASH_EARNINGS', 'UNKNOWN')} / "
+            f"{contributions.get('CAPEX', 'UNKNOWN')} / {contributions.get('WORKING_CAPITAL', 'UNKNOWN')} / "
+            f"{contributions.get('INVENTORY_MOVEMENT', 'UNKNOWN')} CNY；组件残差 {component_row.get('component_residual_cny') or 'UNKNOWN'}；"
+            f"{component_row.get('status', 'NOT_COMPARABLE')}"
+        )
+        lines.append(f"    - 库存拆分规则：{component_row.get('inventory_component_basis', 'UNKNOWN')}")
         lines.append(
             f"  - FCF 差异归因合计 / 未解释残差：{var_row.get('attributed_total_cny') or 'UNKNOWN'} / "
             f"{var_row.get('unattributed_residual_cny') or 'UNKNOWN'} CNY；{var_row.get('status', 'NOT_COMPARABLE')}"
         )
+        category_checks = var_row.get("component_attribution_reconciliation") if isinstance(var_row.get("component_attribution_reconciliation"), Mapping) else {}
+        for category, category_row in category_checks.items():
+            if isinstance(category_row, Mapping):
+                lines.append(
+                    f"    - 逐类核对 {category}：实测 {category_row.get('measured_component_contribution_cny') or 'UNKNOWN'} / "
+                    f"归因 {category_row.get('attributed_category_total_cny') or 'UNKNOWN'} / "
+                    f"残差 {category_row.get('residual_cny') or 'UNKNOWN'} CNY；{category_row.get('status', 'UNKNOWN')}"
+                )
         for attribution in var_row.get("items") or []:
             lines.append(
                 f"    - {attribution.get('fcf_attribution_id', 'UNKNOWN')} / {attribution.get('category', 'UNKNOWN')} / "
@@ -2371,10 +2391,14 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
             lines.append(f"  - 正常化 FCF 桥未解决：{issue}")
         for issue in comp_row.get("issues") or []:
             lines.append(f"  - B4 FCF 比较未解决：{issue}")
+        for issue in component_row.get("issues") or []:
+            lines.append(f"  - B49 组件差额桥未解决：{issue}")
         for issue in var_row.get("issues") or []:
             lines.append(f"  - FCF 差异归因未解决：{issue}")
+    for issue in fcf_component_bridge.get("issues") or []:
+        lines.append(f"- B49 组件差额桥未解决：{issue}")
     for issue in fcf_node.get("issues") or []:
-        lines.append(f"- B48 FCF 路径未解决：{issue}")
+        lines.append(f"- B48/B49 FCF 路径未解决：{issue}")
     lines.extend([
         "",
         "#### 当前主估值每股价值节点（只读上下文，不重新计算）",
