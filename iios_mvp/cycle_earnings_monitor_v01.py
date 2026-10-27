@@ -62,7 +62,7 @@ def _unknown(reason: str = "未提供行业周期、正常化盈利和复核触�
         "schema_version": CYCLE_EARNINGS_MONITOR_SCHEMA,
         "status": "NOT_IDENTIFIABLE",
         "industry_cycle": {"status": "UNKNOWN", "phase": "UNKNOWN", "issues": ["INDUSTRY_CYCLE_NOT_PROVIDED"]},
-        "normalized_earnings": {"status": "NOT_IDENTIFIABLE", "metric": "NET_PROFIT_CNY", "scenarios": {}, "issues": ["NORMALIZED_EARNINGS_NOT_PROVIDED"]},
+        "normalized_earnings": {"status": "NOT_IDENTIFIABLE", "metric": "NET_PROFIT_CNY", "reference_period": "UNKNOWN", "period": "UNKNOWN", "scenarios": {}, "issues": ["NORMALIZED_EARNINGS_NOT_PROVIDED"]},
         "review_triggers": {"status": "NOT_IDENTIFIABLE", "items": [], "issues": ["REVIEW_TRIGGERS_NOT_PROVIDED"]},
         "summary": reason,
         "b4_comparison": {"status": "NOT_COMPARABLE", "scenarios": {}, "note": "不修改或替代 B4 情景。"},
@@ -320,6 +320,9 @@ def evaluate_cycle_earnings_monitor(
     if earnings_scope not in {"COMPANY_WIDE", "PRODUCT_LINE", "PROJECT_INCREMENTAL"}:
         earnings_issues.append("NORMALIZED_EARNINGS_SCOPE_NOT_IDENTIFIABLE")
     earnings_period = _text(earnings_raw.get("period"))
+    reference_period = _text(earnings_raw.get("reference_period"))
+    if not _meaningful(reference_period):
+        earnings_issues.append("NORMALIZED_EARNINGS_REFERENCE_PERIOD_NOT_IDENTIFIABLE")
     b4_scope = _text(operating_driver_forecast.get("scope") or "UNKNOWN").upper()
     b4_period = _text(operating_driver_forecast.get("forecast_period") or "UNKNOWN")
     if not earnings_period or earnings_period == "UNKNOWN":
@@ -425,6 +428,7 @@ def evaluate_cycle_earnings_monitor(
         "metric": metric,
         "scope": earnings_scope,
         "period": earnings_period or "UNKNOWN",
+        "reference_period": reference_period or "UNKNOWN",
         "normalization_basis": overall_basis or "UNKNOWN",
         "scenarios": earnings_scenarios,
         "issues": sorted(set(earnings_issues)),
@@ -461,8 +465,12 @@ def evaluate_cycle_earnings_monitor(
                 else "NOT_COMPARABLE_PERIOD_SCOPE_OR_INPUT_UNKNOWN"
             ),
         }
+    comparison_rows_complete = (
+        comparison_complete
+        and all(row.get("status") == "DIAGNOSTIC_COMPARISON_ONLY" for row in comparisons.values())
+    )
     comparison_status = (
-        "DIAGNOSTIC_ONLY_NOT_A_VALUATION_INPUT" if comparison_complete
+        "DIAGNOSTIC_ONLY_NOT_A_VALUATION_INPUT" if comparison_rows_complete
         else "NOT_COMPARABLE_PERIOD_SCOPE_OR_NORMALIZED_EARNINGS_INCOMPLETE"
     )
 
@@ -592,7 +600,7 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
     lines.extend([
         "",
         "#### 正常化盈利区间（人民币净利润；非自动估值输入）",
-        f"- 范围/期间/依据：{earnings.get('scope', 'UNKNOWN')} / {earnings.get('period', 'UNKNOWN')} / {earnings.get('normalization_basis', 'UNKNOWN')}",
+        f"- 范围/基准期间/正常化目标期间/依据：{earnings.get('scope', 'UNKNOWN')} / {earnings.get('reference_period', 'UNKNOWN')} / {earnings.get('period', 'UNKNOWN')} / {earnings.get('normalization_basis', 'UNKNOWN')}",
     ])
     scenarios = earnings.get("scenarios") if isinstance(earnings.get("scenarios"), Mapping) else {}
     for name in SCENARIOS:
