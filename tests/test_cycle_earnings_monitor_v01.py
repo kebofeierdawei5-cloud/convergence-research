@@ -203,10 +203,11 @@ def test_reported_base_plus_signed_adjustments_must_reconcile_to_normalized_poin
 
 def test_after_cutoff_evidence_does_not_support_cycle_or_normalized_earnings():
     raw, b4, evidence = _valid_case()
-    result = _evaluate(raw, b4, evidence, after_cutoff_evidence_ids=["E_COUNTER"])
+    result = _evaluate(raw, b4, evidence, after_cutoff_evidence_ids=["E_COUNTER", "E_ACTUAL"])
 
     assert result["status"] == "REVIEW_REQUIRED"
     assert any("EVIDENCE_SOURCE_AFTER_CUTOFF:E_COUNTER" in issue for issue in result["industry_cycle"]["issues"])
+    assert any("EVIDENCE_SOURCE_AFTER_CUTOFF:E_ACTUAL" in issue for issue in result["normalized_earnings"]["issues"])
     assert result["valuation_input_eligible"] is False
 
 
