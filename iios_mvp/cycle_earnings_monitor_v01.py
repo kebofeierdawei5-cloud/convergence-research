@@ -1679,7 +1679,7 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
     variance_node = data.get("variance_attribution") if isinstance(data.get("variance_attribution"), Mapping) else {}
     lines = [
         "",
-        "### B44–B46：行业周期 → 正常化盈利 → 每股价值 → 持仓复核",
+        "### B44–B48：行业周期 → 盈利/现金流桥接 → 每股价值 → 持仓复核",
         "",
         f"- 因果链状态：**{data.get('status', 'NOT_IDENTIFIABLE')}**",
         f"- 研究摘要：{data.get('summary', '未提供。')}",
