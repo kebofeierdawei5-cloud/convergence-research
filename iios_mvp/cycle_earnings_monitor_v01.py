@@ -68,6 +68,7 @@ def _unknown(reason: str = "未提供行业周期、正常化盈利和复核触�
         "b4_comparison": {"status": "NOT_COMPARABLE", "scenarios": {}, "note": "不修改或替代 B4 情景。"},
         "variance_attribution": {"status": "NOT_COMPARABLE", "scenarios": {}, "issues": ["B4_NORMALIZED_COMPARISON_NOT_IDENTIFIABLE"], "sign_convention": "B4_FORECAST_MINUS_NORMALIZED_EARNINGS"},
         "cash_flow_path": {"status": "NOT_COMPARABLE", "scenarios": {}, "issues": ["CASH_FLOW_PATH_NOT_PROVIDED"], "normalized_fcf_comparison_available": False, "fcf_variance_reconciled": False},
+        "normalized_fcf_bridge": {"status": "NOT_IDENTIFIABLE", "normalized_fcf": {"status": "NOT_IDENTIFIABLE", "scenarios": {}, "issues": ["NORMALIZED_FCF_NOT_PROVIDED"]}, "b4_comparison": {"status": "NOT_COMPARABLE", "scenarios": {}, "issues": ["B4_NORMALIZED_FCF_COMPARISON_NOT_IDENTIFIABLE"]}, "variance_attribution": {"status": "NOT_COMPARABLE", "scenarios": {}, "issues": ["FCF_VARIANCE_ATTRIBUTION_NOT_PROVIDED"]}, "issues": ["NORMALIZED_FCF_NOT_PROVIDED"], "normalized_fcf_comparison_available": False, "fcf_variance_reconciled": False, "cash_flow_amounts_aggregated": False, "valuation_input_eligible": False},
         "variance_transmission": {"status": "NOT_IDENTIFIABLE", "scenarios": {}, "issues": ["VARIANCE_TRANSMISSION_CONTEXT_NOT_PROVIDED"], "valuation_input_eligible": False},
         "per_share_value": {"status": "NOT_IDENTIFIABLE", "model_family": "UNKNOWN", "scenarios": {}, "issues": ["PRIMARY_PER_SHARE_VALUE_CONTEXT_NOT_PROVIDED"], "formula_recomputed_from_normalized_earnings": False},
         "valuation_input_eligible": False,
@@ -1612,7 +1613,22 @@ def evaluate_cycle_earnings_monitor(
         after_cutoff_refs=after_cutoff,
         uncertain_refs=uncertain,
     )
-    all_issues = sorted(set(cycle_issues + earnings_issues + comparison_issues + variance_issues + trigger_issues + all_issues_for_value + (cash_flow_path.get("issues") or [])))
+    normalized_fcf_bridge = _evaluate_normalized_fcf_bridge(
+        raw_normalized_fcf=raw.get("normalized_fcf"),
+        raw_fcf_attributions=raw.get("fcf_variance_attribution"),
+        operating_driver_forecast=operating_driver_forecast,
+        known_driver_ids=known_driver_ids,
+        raw_review_triggers=raw_triggers,
+        sources_by_id=sources_by_id,
+        unresolved_refs=unresolved,
+        after_cutoff_refs=after_cutoff,
+        uncertain_refs=uncertain,
+    )
+    all_issues = sorted(set(
+        cycle_issues + earnings_issues + comparison_issues + variance_issues + trigger_issues
+        + all_issues_for_value + (cash_flow_path.get("issues") or [])
+        + (normalized_fcf_bridge.get("issues") or [])
+    ))
     complete = not all_issues
     result_status = "CHAIN_IDENTIFIABLE_NON_ADMITTED" if complete else "REVIEW_REQUIRED"
     summary = (
@@ -1629,6 +1645,7 @@ def evaluate_cycle_earnings_monitor(
         "b4_comparison": {"status": comparison_status, "scenarios": comparisons, "issues": comparison_issues, "note": "比较结果仅作诊断，不替代 B4 经营预测。"},
         "variance_attribution": variance_attribution,
         "cash_flow_path": cash_flow_path,
+        "normalized_fcf_bridge": normalized_fcf_bridge,
         "variance_transmission": variance_transmission,
         "per_share_value": per_share_value,
         "issues": all_issues,
@@ -1779,6 +1796,59 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
                 lines.append(f"  - 未解决：{issue}")
     for issue in cash_node.get("issues") or []:
         lines.append(f"- 现金流路径未解决：{issue}")
+    fcf_node = data.get("normalized_fcf_bridge") if isinstance(data.get("normalized_fcf_bridge"), Mapping) else {}
+    normalized_fcf_node = fcf_node.get("normalized_fcf") if isinstance(fcf_node.get("normalized_fcf"), Mapping) else {}
+    fcf_comparison = fcf_node.get("b4_comparison") if isinstance(fcf_node.get("b4_comparison"), Mapping) else {}
+    fcf_variance = fcf_node.get("variance_attribution") if isinstance(fcf_node.get("variance_attribution"), Mapping) else {}
+    lines.extend([
+        "",
+        "#### B48：独立正常化 FCF 与差异归因桥",
+        f"- 总状态：{fcf_node.get('status', 'NOT_IDENTIFIABLE')}；正常化 FCF 桥：{normalized_fcf_node.get('status', 'NOT_IDENTIFIABLE')}；B4 比较：{fcf_comparison.get('status', 'NOT_COMPARABLE')}；FCF 差异归因：{fcf_variance.get('status', 'NOT_COMPARABLE')}",
+        f"- 口径 / 参考期间 / 目标期间：{normalized_fcf_node.get('scope', 'UNKNOWN')} / {normalized_fcf_node.get('reference_period', 'UNKNOWN')} / {normalized_fcf_node.get('period', 'UNKNOWN')}",
+        f"- 符号约定：{fcf_node.get('sign_convention', 'UNKNOWN')}；归因容差 {fcf_node.get('tolerance_cny', 'UNKNOWN')} CNY；是否作为估值输入：{fcf_node.get('valuation_input_eligible', False)}",
+    ])
+    norm_fcf_scenarios = normalized_fcf_node.get("scenarios") if isinstance(normalized_fcf_node.get("scenarios"), Mapping) else {}
+    comparison_fcf_scenarios = fcf_comparison.get("scenarios") if isinstance(fcf_comparison.get("scenarios"), Mapping) else {}
+    attribution_fcf_scenarios = fcf_variance.get("scenarios") if isinstance(fcf_variance.get("scenarios"), Mapping) else {}
+    for name in SCENARIOS:
+        norm_row = norm_fcf_scenarios.get(name) if isinstance(norm_fcf_scenarios.get(name), Mapping) else {}
+        comp_row = comparison_fcf_scenarios.get(name) if isinstance(comparison_fcf_scenarios.get(name), Mapping) else {}
+        var_row = attribution_fcf_scenarios.get(name) if isinstance(attribution_fcf_scenarios.get(name), Mapping) else {}
+        lines.append(
+            f"- {name.upper()} 正常化 FCF 参考/调整合计/低-中-高："
+            f"{norm_row.get('reference_fcf_cny') or 'UNKNOWN'} / {norm_row.get('adjustment_total_cny') or 'UNKNOWN'} / "
+            f"{norm_row.get('low_fcf_cny') or 'UNKNOWN'}–{norm_row.get('point_fcf_cny') or 'UNKNOWN'}–{norm_row.get('high_fcf_cny') or 'UNKNOWN'} CNY；"
+            f"内部桥残差 {norm_row.get('bridge_residual_cny') or 'UNKNOWN'}；状态 {norm_row.get('status', 'UNKNOWN')}"
+        )
+        for adjustment in norm_row.get("adjustments") or []:
+            lines.append(
+                f"  - 正常化调整 {adjustment.get('adjustment_id', 'UNKNOWN')} / {adjustment.get('category', 'UNKNOWN')} / "
+                f"driver {adjustment.get('driver_id', 'UNKNOWN')}：{adjustment.get('amount_cny') or 'UNKNOWN'} CNY；"
+                f"触发器 {adjustment.get('review_trigger_id', 'UNKNOWN')}；{adjustment.get('rationale', 'UNKNOWN')}"
+            )
+        lines.append(
+            f"  - B4 FCF / 正常化 FCF / B4−正常化：{comp_row.get('b4_unlevered_fcf_proxy_cny') or 'UNKNOWN'} / "
+            f"{comp_row.get('normalized_fcf_point_cny') or 'UNKNOWN'} / {comp_row.get('b4_minus_normalized_fcf_cny') or 'UNKNOWN'} CNY；"
+            f"{comp_row.get('status', 'NOT_COMPARABLE')}"
+        )
+        lines.append(
+            f"  - FCF 差异归因合计 / 未解释残差：{var_row.get('attributed_total_cny') or 'UNKNOWN'} / "
+            f"{var_row.get('unattributed_residual_cny') or 'UNKNOWN'} CNY；{var_row.get('status', 'NOT_COMPARABLE')}"
+        )
+        for attribution in var_row.get("items") or []:
+            lines.append(
+                f"    - {attribution.get('fcf_attribution_id', 'UNKNOWN')} / {attribution.get('category', 'UNKNOWN')} / "
+                f"driver {attribution.get('driver_id', 'UNKNOWN')}：{attribution.get('amount_cny') or 'UNKNOWN'} CNY；"
+                f"触发器 {attribution.get('review_trigger_id', 'UNKNOWN')}；{attribution.get('rationale', 'UNKNOWN')}"
+            )
+        for issue in norm_row.get("issues") or []:
+            lines.append(f"  - 正常化 FCF 桥未解决：{issue}")
+        for issue in comp_row.get("issues") or []:
+            lines.append(f"  - B4 FCF 比较未解决：{issue}")
+        for issue in var_row.get("issues") or []:
+            lines.append(f"  - FCF 差异归因未解决：{issue}")
+    for issue in fcf_node.get("issues") or []:
+        lines.append(f"- B48 FCF 路径未解决：{issue}")
     lines.extend([
         "",
         "#### 当前主估值每股价值节点（只读上下文，不重新计算）",
