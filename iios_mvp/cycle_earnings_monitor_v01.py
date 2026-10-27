@@ -660,6 +660,7 @@ def _evaluate_normalized_fcf_bridge(
         "status": "NOT_IDENTIFIABLE",
         "normalized_fcf": {"status": "NOT_IDENTIFIABLE", "scenarios": {}, "issues": ["NORMALIZED_FCF_NOT_PROVIDED"]},
         "b4_comparison": {"status": "NOT_COMPARABLE", "scenarios": {}, "issues": ["B4_NORMALIZED_FCF_COMPARISON_NOT_IDENTIFIABLE"]},
+        "component_variance_bridge": {"status": "NOT_COMPARABLE", "scenarios": {}, "issues": ["FCF_COMPONENT_VARIANCE_BRIDGE_NOT_IDENTIFIABLE"]},
         "variance_attribution": {"status": "NOT_COMPARABLE", "scenarios": {}, "issues": ["FCF_VARIANCE_ATTRIBUTION_NOT_PROVIDED"]},
         "issues": ["NORMALIZED_FCF_NOT_PROVIDED"],
         "sign_convention": "B4_UNLEVERED_FCF_PROXY_MINUS_NORMALIZED_FCF; positive means B4 FCF is higher",
@@ -680,6 +681,15 @@ def _evaluate_normalized_fcf_bridge(
         "OPERATING_CASH_CONVERSION", "WORKING_CAPITAL", "INVENTORY_MOVEMENT",
         "CAPEX", "NON_CASH_EARNINGS", "TAX_CASH_TIMING", "OTHER",
     }
+    variance_component_categories = {
+        "OPERATING_CASH_CONVERSION", "NON_CASH_EARNINGS", "CAPEX",
+        "WORKING_CAPITAL", "INVENTORY_MOVEMENT",
+    }
+    def _scenario_decimal(value: Any, label: str) -> Decimal:
+        if isinstance(value, Mapping):
+            value = value.get("value")
+        return _decimal(value, label)
+
     monitor_issues: list[str] = []
     norm = raw_normalized_fcf
     metric = _text(norm.get("metric") or "UNLEVERED_FCF_PROXY_CNY").upper()
@@ -1034,53 +1044,116 @@ def _evaluate_normalized_fcf_bridge(
         "formal_forecast_admission_created": False,
     }
 
+
     b4_rows = operating_driver_forecast.get("scenarios")
     b4_rows = b4_rows if isinstance(b4_rows, Mapping) else {}
-    comparable = (
-        normalized_status == "NORMALIZED_FCF_BRIDGE_RECONCILED_DIAGNOSTIC_ONLY"
-        and scope == b4_scope and period == b4_period
-    )
     comparisons: dict[str, dict[str, Any]] = {}
     comparison_issues: list[str] = []
-    if scope != b4_scope:
-        comparison_issues.append("NORMALIZED_FCF_SCOPE_MISMATCH_B4")
-    if period != b4_period:
-        comparison_issues.append("NORMALIZED_FCF_PERIOD_MISMATCH_B4")
+    b4_component_values: dict[str, dict[str, Any]] = {}
+    required_b4_fields = (
+        "ebit_cny", "tax_rate", "depreciation_amortization_cny",
+        "cash_capex_cny", "change_working_capital_cny",
+        "effective_change_working_capital_cny",
+    )
+    valid_inventory_statuses = {
+        "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL",
+        "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL",
+        "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED",
+        "NOT_APPLICABLE_NO_TONNAGE_BASIS",
+    }
     for name in SCENARIOS:
         b4_row = b4_rows.get(name) if isinstance(b4_rows.get(name), Mapping) else {}
-        b4_fcf: Decimal | None = None
         row_issues: list[str] = []
         if b4_row.get("financial_outputs_decision_usable") is not True:
             row_issues.append("B4_FCF_OUTPUT_NOT_DECISION_USABLE")
-        for component_field in ("cash_capex_cny", "effective_change_working_capital_cny"):
+        values: dict[str, Decimal | None] = {}
+        for component_field in required_b4_fields:
             try:
-                _decimal(b4_row.get(component_field), f"b4.{name}.{component_field}")
+                values[component_field] = _scenario_decimal(
+                    b4_row.get(component_field), f"b4.{name}.{component_field}"
+                )
             except ValueError:
+                values[component_field] = None
                 row_issues.append("B4_FCF_COMPONENT_NOT_IDENTIFIABLE:" + component_field)
+        tax_rate = values.get("tax_rate")
+        if tax_rate is not None and not (Decimal("0") <= tax_rate <= Decimal("1")):
+            row_issues.append("B4_FCF_TAX_RATE_OUTSIDE_ZERO_TO_ONE")
+
         inventory_treatment = _text(b4_row.get("inventory_working_capital_treatment")).upper()
+        inventory_status = _text(b4_row.get("inventory_reconciliation_status")).upper()
         if inventory_treatment not in {
             "INCLUDED_IN_CHANGE_WORKING_CAPITAL", "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL",
             "NOT_APPLICABLE", "NOT_APPLICABLE_NO_TONNAGE_BASIS",
         }:
             row_issues.append("B4_INVENTORY_WORKING_CAPITAL_TREATMENT_NOT_IDENTIFIABLE")
-        inventory_status = _text(b4_row.get("inventory_reconciliation_status")).upper()
-        valid_inventory_statuses = {
-            "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL",
-            "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL",
-            "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED",
-            "NOT_APPLICABLE_NO_TONNAGE_BASIS",
-        }
         if inventory_status not in valid_inventory_statuses:
             row_issues.append("B4_INVENTORY_WORKING_CAPITAL_RECONCILIATION_NOT_IDENTIFIABLE")
-        if inventory_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL":
+        inventory_proxy: Decimal | None = None
+        raw_inventory_proxy = b4_row.get("inventory_cash_impact_proxy_cny")
+        if raw_inventory_proxy not in (None, ""):
             try:
-                _decimal(b4_row.get("inventory_cash_impact_proxy_cny"), f"b4.{name}.inventory_cash_impact_proxy_cny")
+                inventory_proxy = _scenario_decimal(
+                    raw_inventory_proxy, f"b4.{name}.inventory_cash_impact_proxy_cny"
+                )
             except ValueError:
+                row_issues.append("B4_INVENTORY_CASH_IMPACT_PROXY_NOT_IDENTIFIABLE")
+
+        change_wc = values.get("change_working_capital_cny")
+        effective_wc = values.get("effective_change_working_capital_cny")
+        if inventory_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL":
+            if inventory_status != "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL":
+                row_issues.append("B4_EXCLUDED_INVENTORY_RECONCILIATION_STATUS_MISMATCH")
+            if inventory_proxy is None:
                 row_issues.append("B4_INVENTORY_CASH_IMPACT_PROXY_REQUIRED_WHEN_INVENTORY_EXCLUDED")
+            elif change_wc is not None and effective_wc is not None and abs(change_wc + inventory_proxy - effective_wc) > Decimal("1"):
+                row_issues.append("B4_NONINVENTORY_WC_PLUS_INVENTORY_PROXY_MISMATCH")
+        elif inventory_treatment == "INCLUDED_IN_CHANGE_WORKING_CAPITAL":
+            if inventory_status != "INVENTORY_MOVEMENT_INCLUDED_IN_TOTAL_WORKING_CAPITAL":
+                row_issues.append("B4_INCLUDED_INVENTORY_RECONCILIATION_STATUS_MISMATCH")
+            if change_wc is not None and effective_wc is not None and abs(change_wc - effective_wc) > Decimal("1"):
+                row_issues.append("B4_INCLUDED_WC_EFFECTIVE_WC_MISMATCH")
+        elif inventory_treatment in {"NOT_APPLICABLE", "NOT_APPLICABLE_NO_TONNAGE_BASIS"}:
+            status_ok = (
+                inventory_status == "NOT_APPLICABLE_NO_TONNAGE_BASIS"
+                if inventory_treatment == "NOT_APPLICABLE_NO_TONNAGE_BASIS"
+                else inventory_status in {
+                    "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED",
+                    "NOT_APPLICABLE_NO_TONNAGE_BASIS",
+                }
+            )
+            if not status_ok:
+                row_issues.append("B4_NOT_APPLICABLE_INVENTORY_STATUS_MISMATCH")
+            if change_wc is not None and effective_wc is not None and abs(change_wc - effective_wc) > Decimal("1"):
+                row_issues.append("B4_NOT_APPLICABLE_WC_EFFECTIVE_WC_MISMATCH")
+
         try:
-            b4_fcf = _decimal(b4_row.get("unlevered_fcf_proxy_cny"), f"b4.{name}.unlevered_fcf_proxy_cny")
+            b4_fcf = _scenario_decimal(
+                b4_row.get("unlevered_fcf_proxy_cny"), f"b4.{name}.unlevered_fcf_proxy_cny"
+            )
         except ValueError:
+            b4_fcf = None
             row_issues.append("B4_FCF_PROXY_NOT_IDENTIFIABLE")
+
+        calculated_b4_fcf: Decimal | None = None
+        ebit = values.get("ebit_cny")
+        da = values.get("depreciation_amortization_cny")
+        capex = values.get("cash_capex_cny")
+        if all(value is not None for value in (ebit, tax_rate, da, capex, effective_wc)):
+            calculated_b4_fcf = ebit - max(ebit, Decimal("0")) * tax_rate + da - capex - effective_wc
+            if b4_fcf is not None and abs(calculated_b4_fcf - b4_fcf) > Decimal("1"):
+                row_issues.append("B4_FCF_CASH_COMPONENT_FORMULA_MISMATCH_WITHIN_CNY_1")
+        else:
+            row_issues.append("B4_FCF_CASH_COMPONENT_FORMULA_NOT_IDENTIFIABLE")
+
+        b4_component_values[name] = {
+            "values": values,
+            "inventory_treatment": inventory_treatment or "UNKNOWN",
+            "inventory_status": inventory_status or "UNKNOWN",
+            "inventory_proxy": inventory_proxy,
+            "b4_fcf": b4_fcf,
+            "calculated_fcf": calculated_b4_fcf,
+            "issues": sorted(set(row_issues)),
+        }
         norm_point = point_values.get(name)
         if norm_point is None:
             row_issues.append("NORMALIZED_FCF_POINT_NOT_IDENTIFIABLE")
@@ -1103,7 +1176,7 @@ def _evaluate_normalized_fcf_bridge(
         "method": method or "UNKNOWN",
         "scenarios": comparisons,
         "issues": sorted(set(comparison_issues)),
-        "note": "B4 FCF 仅在自身财务输出可用于决策且范围/期间一致时比较；不改变 B4 结果。",
+        "note": "B4 FCF 仅在自身财务输出可用于决策且范围/期间一致时比较；并须按同一 FCF 公式复算 B4 组件，不改变 B4 结果。",
     }
 
     raw_attributions = raw_fcf_attributions if isinstance(raw_fcf_attributions, list) else []
