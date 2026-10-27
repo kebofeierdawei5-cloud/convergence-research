@@ -6,7 +6,7 @@ Authority: this file is the **only canonical Current State Index**.
 
 **Current operator direction (2026-10-27):** B33 (PR #585) remains the last merged local-pilot feature and the canonical `main` base remains `2fd009b10bd4b13467ebdd8b2692eab62a772878`; real macOS two-round full-run + independent Replay remains OPEN / NOT VERIFIED. B42/B43 are branch-only inventory/working-capital proposals. B44 is now implemented as a follow-on branch `feat/b44-cycle-normalized-earnings-review-chain-20261027` based on B43: it adds a diagnostic industry-cycle → normalized-earnings → per-share-value → holding-review chain to Round A, JSON analysis and report; requires a separate reference earnings period and normalized target period; verifies all three B4 scenario net profits are present before reporting aggregate comparison; reads the final primary-model per-share outputs only after B5/valuation timing; and includes the new node in Replay comparison. Normalized earnings are not automatically fed into valuation. B42/B43/B44 remain unmerged; tests are authored but deliberately not run, and Replay/CI remain deferred. Nothing here waives Mac acceptance or creates formal Forecast/Valuation admission, a canonical Decision, or execution authority.
 
-## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-26
+## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-27
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
 
