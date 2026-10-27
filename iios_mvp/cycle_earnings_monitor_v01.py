@@ -540,8 +540,10 @@ def evaluate_cycle_earnings_monitor(
     per_share_value = _build_per_share_value_context(
         forecast_valuation, valuation_model_consistency, valuation_timing
     )
-    if comparison_status != "DIAGNOSTIC_ONLY_NOT_A_VALUATION_INPUT":
-        earnings_issues.append("B4_NORMALIZED_EARNINGS_COMPARISON_NOT_IDENTIFIABLE")
+    comparison_issues = (
+        [] if comparison_status == "DIAGNOSTIC_ONLY_NOT_A_VALUATION_INPUT"
+        else ["B4_NORMALIZED_EARNINGS_COMPARISON_NOT_IDENTIFIABLE"]
+    )
     if per_share_value.get("status") != "IDENTIFIABLE_CURRENT_PRIMARY_VALUE_CONTEXT_NON_ADMITTED":
         all_issues_for_value = list(per_share_value.get("issues") or [])
         if not all_issues_for_value:
@@ -605,7 +607,7 @@ def evaluate_cycle_earnings_monitor(
     trigger_status = "IDENTIFIABLE" if not trigger_issues else "REVIEW_REQUIRED"
     trigger_result = {"status": trigger_status, "items": trigger_rows, "issues": sorted(set(trigger_issues))}
 
-    all_issues = sorted(set(cycle_issues + earnings_issues + trigger_issues + all_issues_for_value))
+    all_issues = sorted(set(cycle_issues + earnings_issues + comparison_issues + trigger_issues + all_issues_for_value))
     complete = not all_issues
     result_status = "CHAIN_IDENTIFIABLE_NON_ADMITTED" if complete else "REVIEW_REQUIRED"
     summary = (
@@ -619,7 +621,7 @@ def evaluate_cycle_earnings_monitor(
         "industry_cycle": cycle_result,
         "normalized_earnings": earnings_result,
         "review_triggers": trigger_result,
-        "b4_comparison": {"status": comparison_status, "scenarios": comparisons, "note": "比较结果仅作诊断，不替代 B4 经营预测。"},
+        "b4_comparison": {"status": comparison_status, "scenarios": comparisons, "issues": comparison_issues, "note": "比较结果仅作诊断，不替代 B4 经营预测。"},
         "per_share_value": per_share_value,
         "issues": all_issues,
         "summary": summary,
