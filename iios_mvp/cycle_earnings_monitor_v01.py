@@ -67,6 +67,7 @@ def _unknown(reason: str = "未提供行业周期、正常化盈利和复核触�
         "summary": reason,
         "b4_comparison": {"status": "NOT_COMPARABLE", "scenarios": {}, "note": "不修改或替代 B4 情景。"},
         "variance_attribution": {"status": "NOT_COMPARABLE", "scenarios": {}, "issues": ["B4_NORMALIZED_COMPARISON_NOT_IDENTIFIABLE"], "sign_convention": "B4_FORECAST_MINUS_NORMALIZED_EARNINGS"},
+        "cash_flow_path": {"status": "NOT_COMPARABLE", "scenarios": {}, "issues": ["CASH_FLOW_PATH_NOT_PROVIDED"], "normalized_fcf_comparison_available": False, "fcf_variance_reconciled": False},
         "variance_transmission": {"status": "NOT_IDENTIFIABLE", "scenarios": {}, "issues": ["VARIANCE_TRANSMISSION_CONTEXT_NOT_PROVIDED"], "valuation_input_eligible": False},
         "per_share_value": {"status": "NOT_IDENTIFIABLE", "model_family": "UNKNOWN", "scenarios": {}, "issues": ["PRIMARY_PER_SHARE_VALUE_CONTEXT_NOT_PROVIDED"], "formula_recomputed_from_normalized_earnings": False},
         "valuation_input_eligible": False,
@@ -430,7 +431,7 @@ def _evaluate_cash_flow_path(
         row = row if isinstance(row, Mapping) else {}
         usable = row.get("financial_outputs_decision_usable") is True
         fields = {
-            key: (_text(row.get(key)) or None) if usable else None
+            key: (" ".join(str(row.get(key)).split()) if row.get(key) is not None else None) if usable else None
             for key in cash_context_fields
         }
         b4_cash_context[scenario] = {
@@ -1163,7 +1164,18 @@ def evaluate_cycle_earnings_monitor(
     trigger_status = "IDENTIFIABLE" if not trigger_issues else "REVIEW_REQUIRED"
     trigger_result = {"status": trigger_status, "items": trigger_rows, "issues": sorted(set(trigger_issues))}
 
-    all_issues = sorted(set(cycle_issues + earnings_issues + comparison_issues + variance_issues + trigger_issues + all_issues_for_value))
+    cash_flow_path = _evaluate_cash_flow_path(
+        raw_assessments=raw.get("cash_flow_assessments"),
+        variance_attribution=variance_attribution,
+        operating_driver_forecast=operating_driver_forecast,
+        known_driver_ids=known_driver_ids,
+        raw_review_triggers=raw_triggers,
+        sources_by_id=sources_by_id,
+        unresolved_refs=unresolved,
+        after_cutoff_refs=after_cutoff,
+        uncertain_refs=uncertain,
+    )
+    all_issues = sorted(set(cycle_issues + earnings_issues + comparison_issues + variance_issues + trigger_issues + all_issues_for_value + (cash_flow_path.get("issues") or [])))
     complete = not all_issues
     result_status = "CHAIN_IDENTIFIABLE_NON_ADMITTED" if complete else "REVIEW_REQUIRED"
     summary = (
@@ -1179,6 +1191,7 @@ def evaluate_cycle_earnings_monitor(
         "review_triggers": trigger_result,
         "b4_comparison": {"status": comparison_status, "scenarios": comparisons, "issues": comparison_issues, "note": "比较结果仅作诊断，不替代 B4 经营预测。"},
         "variance_attribution": variance_attribution,
+        "cash_flow_path": cash_flow_path,
         "variance_transmission": variance_transmission,
         "per_share_value": per_share_value,
         "issues": all_issues,
@@ -1289,6 +1302,43 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
             lines.append(f"  - 待复核：{issue}")
     for issue in variance_node.get("issues") or []:
         lines.append(f"- 差异归因未解决：{issue}")
+    cash_node = data.get("cash_flow_path") if isinstance(data.get("cash_flow_path"), Mapping) else {}
+    lines.extend([
+        "",
+        "#### B47：独立现金流/营运资金路径（不与净利润归因混算）",
+        f"- 现金流路径状态：{cash_node.get('status', 'NOT_IDENTIFIABLE')}；正常化 FCF 对照是否存在：{cash_node.get('normalized_fcf_comparison_available', False)}；FCF 差额是否完成对账：{cash_node.get('fcf_variance_reconciled', False)}",
+        f"- 逐项金额是否合计：{cash_node.get('cash_flow_amounts_aggregated', False)}（无独立正常化 FCF 基准，不得将项目金额当作总 FCF 差额）",
+    ])
+    b4_cash_context = cash_node.get("b4_cash_context") if isinstance(cash_node.get("b4_cash_context"), Mapping) else {}
+    for name in SCENARIOS:
+        context = b4_cash_context.get(name) if isinstance(b4_cash_context.get(name), Mapping) else {}
+        fields = context.get("fields") if isinstance(context.get("fields"), Mapping) else {}
+        lines.append(
+            f"- {name.upper()} B4 现金上下文：{context.get('status', 'UNKNOWN')}；"
+            f"FCF 代理 {fields.get('unlevered_fcf_proxy_cny') or 'UNKNOWN'}；"
+            f"资本开支 {fields.get('cash_capex_cny') or 'UNKNOWN'}；"
+            f"有效营运资金变动 {fields.get('effective_change_working_capital_cny') or 'UNKNOWN'}；"
+            f"库存现金影响代理 {fields.get('inventory_cash_impact_proxy_cny') or 'UNKNOWN'}；"
+            f"库存处理 {fields.get('inventory_working_capital_treatment') or 'UNKNOWN'}；"
+            f"库存对账 {fields.get('inventory_reconciliation_status') or 'UNKNOWN'}"
+        )
+    cash_scenarios = cash_node.get("scenarios") if isinstance(cash_node.get("scenarios"), Mapping) else {}
+    for name in SCENARIOS:
+        rows = cash_scenarios.get(name) if isinstance(cash_scenarios.get(name), list) else []
+        if not rows:
+            lines.append(f"- {name.upper()}：没有已链接的现金流路径项目。")
+        for item in rows:
+            lines.append(
+                f"- {name.upper()} / {item.get('attribution_id', 'UNKNOWN')} / driver {item.get('driver_id', 'UNKNOWN')}："
+                f"渠道 {item.get('channel', 'UNKNOWN')}；方向 {item.get('direction', 'UNKNOWN')}；"
+                f"量化状态 {item.get('quantification_status', 'UNKNOWN')}；"
+                f"独立现金流影响 {item.get('cash_flow_effect_cny') or 'UNKNOWN'} CNY；"
+                f"复核触发器 {item.get('review_trigger_id', 'UNKNOWN')}；状态 {item.get('status', 'UNKNOWN')}"
+            )
+            for issue in item.get("issues") or []:
+                lines.append(f"  - 未解决：{issue}")
+    for issue in cash_node.get("issues") or []:
+        lines.append(f"- 现金流路径未解决：{issue}")
     lines.extend([
         "",
         "#### 当前主估值每股价值节点（只读上下文，不重新计算）",
