@@ -1179,6 +1179,185 @@ def _evaluate_normalized_fcf_bridge(
         "note": "B4 FCF 仅在自身财务输出可用于决策且范围/期间一致时比较；并须按同一 FCF 公式复算 B4 组件，不改变 B4 结果。",
     }
 
+    # B49: measure each B4-minus-normalized component contribution independently.
+    # Each contribution uses the sign convention B4 FCF minus normalized FCF.
+    component_bridges: dict[str, dict[str, Any]] = {}
+    component_bridge_issues: list[str] = []
+    not_applicable_treatments = {"NOT_APPLICABLE", "NOT_APPLICABLE_NO_TONNAGE_BASIS"}
+    for name in SCENARIOS:
+        b4_components = b4_component_values.get(name, {})
+        b4_values = b4_components.get("values") if isinstance(b4_components.get("values"), Mapping) else {}
+        norm_row = normalized_scenarios.get(name, {})
+        norm_components = norm_row.get("cash_components") if isinstance(norm_row.get("cash_components"), Mapping) else {}
+        norm_values: dict[str, Decimal | None] = {}
+        local_issues: list[str] = []
+        component_fields = (
+            "ebit_cny", "tax_rate", "depreciation_amortization_cny",
+            "cash_capex_cny", "change_working_capital_cny",
+            "effective_change_working_capital_cny",
+        )
+        for field in component_fields:
+            component = norm_components.get(field) if isinstance(norm_components.get(field), Mapping) else {}
+            try:
+                norm_values[field] = _scenario_decimal(
+                    component.get("value"), f"normalized_fcf.{name}.{field}"
+                )
+            except ValueError:
+                norm_values[field] = None
+                local_issues.append(f"NORMALIZED_FCF_COMPONENT_NOT_IDENTIFIABLE:{field}")
+
+        norm_treatment = _text(norm_components.get("inventory_working_capital_treatment")).upper()
+        norm_status = _text(norm_components.get("inventory_reconciliation_status")).upper()
+        norm_inventory_proxy: Decimal | None = None
+        norm_proxy_component = norm_components.get("inventory_cash_impact_proxy_cny")
+        if isinstance(norm_proxy_component, Mapping) and norm_proxy_component.get("value") not in (None, ""):
+            try:
+                norm_inventory_proxy = _scenario_decimal(
+                    norm_proxy_component.get("value"),
+                    f"normalized_fcf.{name}.inventory_cash_impact_proxy_cny",
+                )
+            except ValueError:
+                local_issues.append("NORMALIZED_FCF_INVENTORY_PROXY_NOT_IDENTIFIABLE")
+
+        b4_treatment = _text(b4_components.get("inventory_treatment")).upper()
+        b4_inventory_proxy = b4_components.get("inventory_proxy")
+        if comparisons.get(name, {}).get("status") != "COMPARABLE_DIAGNOSTIC_ONLY":
+            local_issues.append("B4_AND_NORMALIZED_FCF_COMPONENTS_NOT_COMPARABLE")
+        if b4_treatment != norm_treatment:
+            if not (b4_treatment in not_applicable_treatments and norm_treatment in not_applicable_treatments):
+                local_issues.append("B4_NORMALIZED_INVENTORY_TREATMENT_MISMATCH")
+        allowed_treatments = {
+            "INCLUDED_IN_CHANGE_WORKING_CAPITAL", "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL",
+            "NOT_APPLICABLE", "NOT_APPLICABLE_NO_TONNAGE_BASIS",
+        }
+        if b4_treatment not in allowed_treatments or norm_treatment not in allowed_treatments:
+            local_issues.append("B4_NORMALIZED_INVENTORY_TREATMENT_NOT_IDENTIFIABLE")
+
+        contributions: dict[str, Decimal] = {}
+        required_component_values = (
+            b4_values.get("ebit_cny"), b4_values.get("tax_rate"),
+            b4_values.get("depreciation_amortization_cny"), b4_values.get("cash_capex_cny"),
+            b4_values.get("change_working_capital_cny"), b4_values.get("effective_change_working_capital_cny"),
+            norm_values.get("ebit_cny"), norm_values.get("tax_rate"),
+            norm_values.get("depreciation_amortization_cny"), norm_values.get("cash_capex_cny"),
+            norm_values.get("change_working_capital_cny"), norm_values.get("effective_change_working_capital_cny"),
+        )
+        b4_fcf = b4_components.get("b4_fcf")
+        norm_point = point_values.get(name)
+        if all(value is not None for value in required_component_values):
+            b4_ebit = b4_values["ebit_cny"]
+            b4_tax = b4_values["tax_rate"]
+            norm_ebit = norm_values["ebit_cny"]
+            norm_tax = norm_values["tax_rate"]
+            contributions["OPERATING_CASH_CONVERSION"] = (
+                b4_ebit - max(b4_ebit, Decimal("0")) * b4_tax
+                - (norm_ebit - max(norm_ebit, Decimal("0")) * norm_tax)
+            )
+            contributions["NON_CASH_EARNINGS"] = (
+                b4_values["depreciation_amortization_cny"]
+                - norm_values["depreciation_amortization_cny"]
+            )
+            contributions["CAPEX"] = (
+                norm_values["cash_capex_cny"] - b4_values["cash_capex_cny"]
+            )
+            if b4_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL" and norm_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL":
+                if b4_inventory_proxy is None or norm_inventory_proxy is None:
+                    local_issues.append("FCF_COMPONENT_INVENTORY_PROXY_NOT_IDENTIFIABLE")
+                else:
+                    contributions["WORKING_CAPITAL"] = (
+                        norm_values["change_working_capital_cny"]
+                        - b4_values["change_working_capital_cny"]
+                    )
+                    contributions["INVENTORY_MOVEMENT"] = norm_inventory_proxy - b4_inventory_proxy
+                    effective_wc_delta = (
+                        norm_values["effective_change_working_capital_cny"]
+                        - b4_values["effective_change_working_capital_cny"]
+                    )
+                    if abs(
+                        contributions["WORKING_CAPITAL"]
+                        + contributions["INVENTORY_MOVEMENT"] - effective_wc_delta
+                    ) > Decimal("1"):
+                        local_issues.append("FCF_COMPONENT_WC_PLUS_INVENTORY_DOES_NOT_MATCH_EFFECTIVE_WC_DELTA")
+            elif (
+                b4_treatment == "INCLUDED_IN_CHANGE_WORKING_CAPITAL"
+                and norm_treatment == "INCLUDED_IN_CHANGE_WORKING_CAPITAL"
+            ) or (
+                b4_treatment in not_applicable_treatments
+                and norm_treatment in not_applicable_treatments
+            ):
+                contributions["WORKING_CAPITAL"] = (
+                    norm_values["effective_change_working_capital_cny"]
+                    - b4_values["effective_change_working_capital_cny"]
+                )
+                # Inventory is already embedded in effective working capital, or is not applicable:
+                # a separate inventory contribution must be zero to prevent double counting.
+                contributions["INVENTORY_MOVEMENT"] = Decimal("0")
+            else:
+                local_issues.append("FCF_COMPONENT_INVENTORY_TREATMENT_NOT_COMPARABLE")
+
+        difference = b4_fcf - norm_point if b4_fcf is not None and norm_point is not None else None
+        contribution_total = sum(contributions.values(), Decimal("0")) if len(contributions) == 5 else None
+        residual = difference - contribution_total if difference is not None and contribution_total is not None else None
+        if contribution_total is None:
+            local_issues.append("FCF_COMPONENT_CONTRIBUTIONS_NOT_IDENTIFIABLE")
+        elif residual is not None and abs(residual) > Decimal("1"):
+            local_issues.append("FCF_COMPONENT_CONTRIBUTIONS_DO_NOT_RECONCILE_WITHIN_CNY_1")
+
+        status = (
+            "COMPONENTS_RECONCILED_DIAGNOSTIC_ONLY"
+            if comparison_complete and len(contributions) == 5 and residual is not None
+            and abs(residual) <= Decimal("1") and not local_issues
+            else "REVIEW_REQUIRED" if comparison_complete else "NOT_COMPARABLE"
+        )
+        component_bridges[name] = {
+            "scenario": name,
+            "status": status,
+            "b4_minus_normalized_fcf_cny": _format(difference),
+            "measured_component_total_cny": _format(contribution_total),
+            "component_residual_cny": _format(residual),
+            "b4_cash_components": {
+                **{field: _format(value) if value is not None else None for field, value in b4_values.items()},
+                "inventory_cash_impact_proxy_cny": _format(b4_inventory_proxy) if b4_inventory_proxy is not None else None,
+                "inventory_working_capital_treatment": b4_treatment or "UNKNOWN",
+                "inventory_reconciliation_status": b4_components.get("inventory_status", "UNKNOWN"),
+                "calculated_fcf_point_cny": _format(b4_components.get("calculated_fcf")) if b4_components.get("calculated_fcf") is not None else None,
+            },
+            "normalized_cash_components": {
+                **{field: _format(value) if value is not None else None for field, value in norm_values.items()},
+                "inventory_cash_impact_proxy_cny": _format(norm_inventory_proxy) if norm_inventory_proxy is not None else None,
+                "inventory_working_capital_treatment": norm_treatment or "UNKNOWN",
+                "inventory_reconciliation_status": norm_status or "UNKNOWN",
+                "calculated_fcf_point_cny": norm_components.get("calculated_fcf_point_cny"),
+            },
+            "contributions_cny": {category: _format(amount) for category, amount in contributions.items()},
+            "inventory_component_basis": (
+                "原始营运资金不含库存：WORKING_CAPITAL 使用原始非库存营运资金差额，"
+                "INVENTORY_MOVEMENT 使用库存现金影响代理差额；两项之和须匹配有效营运资金差额。"
+                if b4_treatment == norm_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL"
+                else "库存已包含在有效营运资金，或库存不适用：WORKING_CAPITAL 使用有效营运资金差额，"
+                "INVENTORY_MOVEMENT 固定为 0，避免重复计算。"
+            ),
+            "issues": sorted(set(local_issues)),
+            "valuation_input_eligible": False,
+        }
+        if local_issues:
+            component_bridge_issues.extend(f"{name.upper()}:{issue}" for issue in local_issues)
+
+    component_bridge_complete = comparison_complete and all(
+        row.get("status") == "COMPONENTS_RECONCILED_DIAGNOSTIC_ONLY"
+        for row in component_bridges.values()
+    )
+    component_bridge_result = {
+        "status": "ALL_SCENARIOS_COMPONENTS_RECONCILED_DIAGNOSTIC_ONLY"
+        if component_bridge_complete else ("REVIEW_REQUIRED" if comparison_complete else "NOT_COMPARABLE"),
+        "sign_convention": "B4_UNLEVERED_FCF_PROXY_MINUS_NORMALIZED_FCF; each measured component contribution uses the same sign convention",
+        "tolerance_cny": "1",
+        "scenarios": component_bridges,
+        "issues": sorted(set(component_bridge_issues)),
+        "cash_flow_amounts_aggregated": False,
+        "valuation_input_eligible": False,
+    }
+
     raw_attributions = raw_fcf_attributions if isinstance(raw_fcf_attributions, list) else []
     trigger_map = {
         _text(row.get("trigger_id")): row for row in raw_review_triggers
