@@ -14,7 +14,7 @@ For every evaluated B45 attribution item and scenario, `cash_flow_assessments` m
 
 - `scenario` and `attribution_id` matching the profit-attribution item;
 - identical `driver_id` and `review_trigger_id`;
-- channel, direction, quantification status, a meaningful rationale, and cutoff-compatible `evidence_refs`.
+- channel, direction, quantification status, a meaningful rationale, and cutoff-compatible `evidence_refs`. At least one cash-assessment source reference must overlap the linked review trigger's evidence references.
 
 A missing row, duplicate row, orphan row, changed driver or trigger link, unresolved source, after-cutoff evidence, or timing-uncertain evidence is a review blocker for the cash-flow path and the overall diagnostic chain.
 
@@ -47,4 +47,4 @@ The cash-flow assessment is **not** itself a normalized FCF forecast. There is n
 
 The research template now includes `operating_driver_forecast.cycle_earnings_monitor.cash_flow_assessments`, and the Round A prompt describes the separate path and its sign/evidence constraints. The evaluated node is nested inside `cycle_earnings_monitor`, already present in `REPLAY_COMPARISON_FIELDS`; no separate handoff or Replay field was added.
 
-Five regression cases were authored for separate profit/cash paths, trigger drift, lack of usable B4 cash context for quantification, missing source evidence, and direction/sign mismatch. `tests/test_cycle_earnings_monitor_v01.py` now contains 23 authored tests total. **None were run for this batch.** No Replay, CI, PR, merge, or macOS acceptance was performed. Real macOS two-round full-run + independent Replay remains OPEN / NOT VERIFIED.
+Six regression cases were authored for separate profit/cash paths, trigger drift, lack of usable B4 cash context for quantification, missing source evidence, direction/sign mismatch, and source overlap with the review trigger. `tests/test_cycle_earnings_monitor_v01.py` now contains 24 authored tests total. **None were run for this batch.** No Replay, CI, PR, merge, or macOS acceptance was performed. Real macOS two-round full-run + independent Replay remains OPEN / NOT VERIFIED.
