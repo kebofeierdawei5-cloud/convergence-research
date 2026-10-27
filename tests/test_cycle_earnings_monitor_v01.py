@@ -787,6 +787,89 @@ def test_fcf_variance_can_reconcile_signed_component_deltas_with_excluded_invent
     assert result["normalized_fcf_bridge"]["fcf_variance_reconciled"] is True
 
 
+def test_b4_fcf_proxy_must_reconcile_to_its_cash_components() -> None:
+    raw, b4, evidence = _valid_case()
+    b4["scenarios"]["base"]["unlevered_fcf_proxy_cny"] = "51"
+    result = _evaluate(raw, b4, evidence)
+    fcf = result["normalized_fcf_bridge"]
+
+    assert fcf["b4_comparison"]["status"] == "NOT_COMPARABLE"
+    assert "BASE:B4_FCF_CASH_COMPONENT_FORMULA_MISMATCH_WITHIN_CNY_1" in fcf["b4_comparison"]["issues"]
+    assert fcf["fcf_variance_reconciled"] is False
+
+
+def test_each_attribution_category_must_match_measured_component_contribution() -> None:
+    raw, b4, evidence = _valid_case()
+    result = _evaluate(raw, b4, evidence)
+    fcf = result["normalized_fcf_bridge"]
+    row = fcf["variance_attribution"]["scenarios"]["base"]
+
+    assert row["status"] == "RECONCILED_DIAGNOSTIC_ONLY"
+    assert row["component_attribution_reconciliation"]["OPERATING_CASH_CONVERSION"]["status"] == "RECONCILED"
+    assert row["component_attribution_reconciliation"]["NON_CASH_EARNINGS"]["status"] == "RECONCILED"
+    assert row["component_attribution_reconciliation"]["CAPEX"]["status"] == "RECONCILED"
+    assert row["component_attribution_reconciliation"]["WORKING_CAPITAL"]["status"] == "RECONCILED"
+    assert row["component_attribution_reconciliation"]["INVENTORY_MOVEMENT"]["attributed_category_total_cny"] == "0"
+
+
+def test_included_inventory_is_not_counted_again_outside_effective_working_capital() -> None:
+    raw, b4, evidence = _valid_case()
+    result = _evaluate(raw, b4, evidence)
+    bridge = result["normalized_fcf_bridge"]["component_variance_bridge"]["scenarios"]["base"]
+
+    assert bridge["status"] == "COMPONENTS_RECONCILED_DIAGNOSTIC_ONLY"
+    assert bridge["contributions_cny"]["WORKING_CAPITAL"] == "-8"
+    assert bridge["contributions_cny"]["INVENTORY_MOVEMENT"] == "0"
+    assert "避免重复计算" in bridge["inventory_component_basis"]
+
+
+def test_mixed_inventory_treatments_block_componentwise_fcf_reconciliation() -> None:
+    raw, b4, evidence = _valid_case()
+    normalized_components = raw["normalized_fcf"]["scenarios"]["base"]["cash_components"]
+    normalized_components["inventory_working_capital_treatment"] = "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL"
+    normalized_components["inventory_reconciliation_status"] = "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL"
+    normalized_components["inventory_cash_impact_proxy_cny"]["value"] = "0"
+    result = _evaluate(raw, b4, evidence)
+    fcf = result["normalized_fcf_bridge"]
+    bridge = fcf["component_variance_bridge"]["scenarios"]["base"]
+
+    assert bridge["status"] == "REVIEW_REQUIRED"
+    assert "B4_NORMALIZED_INVENTORY_TREATMENT_MISMATCH" in bridge["issues"]
+    assert fcf["fcf_variance_reconciled"] is False
+
+
+def test_missing_measured_component_category_blocks_fcf_variance_reconciliation() -> None:
+    raw, b4, evidence = _valid_case()
+    raw["fcf_variance_attribution"] = [
+        item for item in raw["fcf_variance_attribution"]
+        if not (item["scenario"] == "base" and item["category"] == "NON_CASH_EARNINGS")
+    ]
+    result = _evaluate(raw, b4, evidence)
+    row = result["normalized_fcf_bridge"]["variance_attribution"]["scenarios"]["base"]
+
+    assert row["status"] == "REVIEW_REQUIRED"
+    assert "FCF_VARIANCE_COMPONENT_COVERAGE_MISSING:NON_CASH_EARNINGS" in row["issues"]
+    assert "FCF_ATTRIBUTED_COMPONENT_TOTAL_MISSING:NON_CASH_EARNINGS" in row["issues"]
+    assert result["normalized_fcf_bridge"]["fcf_variance_reconciled"] is False
+
+
+def test_b4_excluded_inventory_raw_working_capital_plus_proxy_must_match_effective_total() -> None:
+    raw, b4, evidence = _valid_case()
+    b4["scenarios"]["base"].update({
+        "change_working_capital_cny": "10",
+        "effective_change_working_capital_cny": "13",
+        "inventory_cash_impact_proxy_cny": "2",
+        "inventory_working_capital_treatment": "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL",
+        "inventory_reconciliation_status": "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL",
+    })
+    result = _evaluate(raw, b4, evidence)
+    fcf = result["normalized_fcf_bridge"]
+
+    assert fcf["b4_comparison"]["status"] == "NOT_COMPARABLE"
+    assert "BASE:B4_NONINVENTORY_WC_PLUS_INVENTORY_PROXY_MISMATCH" in fcf["b4_comparison"]["issues"]
+    assert fcf["fcf_variance_reconciled"] is False
+
+
 def test_normalized_fcf_period_mismatch_blocks_b4_comparison() -> None:
     raw, b4, evidence = _valid_case()
     raw["normalized_fcf"]["period"] = "FY2028"
