@@ -66,6 +66,7 @@ def _unknown(reason: str = "未提供行业周期、正常化盈利和复核触�
         "review_triggers": {"status": "NOT_IDENTIFIABLE", "items": [], "issues": ["REVIEW_TRIGGERS_NOT_PROVIDED"]},
         "summary": reason,
         "b4_comparison": {"status": "NOT_COMPARABLE", "scenarios": {}, "note": "不修改或替代 B4 情景。"},
+        "variance_attribution": {"status": "NOT_COMPARABLE", "scenarios": {}, "issues": ["B4_NORMALIZED_COMPARISON_NOT_IDENTIFIABLE"], "sign_convention": "B4_FORECAST_MINUS_NORMALIZED_EARNINGS"},
         "per_share_value": {"status": "NOT_IDENTIFIABLE", "model_family": "UNKNOWN", "scenarios": {}, "issues": ["PRIMARY_PER_SHARE_VALUE_CONTEXT_NOT_PROVIDED"], "formula_recomputed_from_normalized_earnings": False},
         "valuation_input_eligible": False,
         "formal_forecast_admission_created": False,
@@ -549,6 +550,135 @@ def evaluate_cycle_earnings_monitor(
         else "NOT_COMPARABLE_PERIOD_SCOPE_OR_NORMALIZED_EARNINGS_INCOMPLETE"
     )
 
+    # B45: every B4-minus-normalized earnings delta must reconcile to named,
+    # driver-linked contributions. Positive means B4 is higher than normalized
+    # earnings; negative means B4 is lower. This is explanation only, not a
+    # new profit forecast or a valuation input.
+    raw_variances = raw.get("variance_attribution")
+    raw_variances = raw_variances if isinstance(raw_variances, list) else []
+    raw_review_triggers = raw.get("review_triggers")
+    raw_review_triggers = raw_review_triggers if isinstance(raw_review_triggers, list) else []
+    triggers_by_id = {
+        _text(row.get("trigger_id")): row for row in raw_review_triggers
+        if isinstance(row, Mapping) and _text(row.get("trigger_id"))
+    }
+    variance_rows_by_scenario: dict[str, list[Mapping[str, Any]]] = {name: [] for name in SCENARIOS}
+    variance_issues: list[str] = []
+    normalized_variance_rows: dict[str, list[dict[str, Any]]] = {name: [] for name in SCENARIOS}
+    variance_ids: set[tuple[str, str]] = set()
+    allowed_variance_categories = {
+        "INDUSTRY_CYCLE", "PRICE_VOLUME_MIX", "UNIT_PRICE", "UNIT_COST_MARGIN",
+        "CAPACITY_UTILIZATION", "FIXED_COST_OPERATING_LEVERAGE", "FINANCE_TAX",
+        "NON_RECURRING", "ACCOUNTING_SCOPE", "PRODUCT_MIX_OR_PERIMETER", "OTHER",
+    }
+    for index, row in enumerate(raw_variances):
+        if not isinstance(row, Mapping):
+            variance_issues.append(f"VARIANCE_ATTRIBUTION_{index}_INVALID")
+            continue
+        scenario = _text(row.get("scenario")).lower()
+        attribution_id = _text(row.get("attribution_id"))
+        driver_id = _text(row.get("driver_id"))
+        trigger_id = _text(row.get("review_trigger_id"))
+        category = _text(row.get("category")).upper()
+        item_issues: list[str] = []
+        if scenario not in SCENARIOS:
+            variance_issues.append(f"VARIANCE_ATTRIBUTION_{index}_SCENARIO_INVALID")
+            continue
+        if not attribution_id:
+            item_issues.append("ATTRIBUTION_ID_REQUIRED")
+        key = (scenario, attribution_id)
+        if key in variance_ids:
+            item_issues.append(f"DUPLICATE_ATTRIBUTION_ID:{attribution_id}")
+        variance_ids.add(key)
+        if driver_id not in known_driver_ids:
+            item_issues.append("ATTRIBUTION_DRIVER_LINK_UNRESOLVED")
+        if category not in allowed_variance_categories:
+            item_issues.append("ATTRIBUTION_CATEGORY_UNSUPPORTED")
+        if not _meaningful(row.get("rationale")):
+            item_issues.append("ATTRIBUTION_RATIONALE_NOT_IDENTIFIABLE")
+        trigger = triggers_by_id.get(trigger_id)
+        if trigger is None:
+            item_issues.append("ATTRIBUTION_REVIEW_TRIGGER_UNRESOLVED")
+        elif _text(trigger.get("driver_id")) != driver_id:
+            item_issues.append("ATTRIBUTION_DRIVER_DOES_NOT_MATCH_REVIEW_TRIGGER")
+        amount, amount_issues, refs = _money(
+            row.get("amount_cny"), field=f"variance_attribution.{scenario}.{attribution_id or index}",
+            sources_by_id=sources_by_id, unresolved_refs=unresolved,
+            after_cutoff_refs=after_cutoff, uncertain_refs=uncertain, allow_negative=True,
+        )
+        item_issues.extend(amount_issues)
+        normalized_row = {
+            "scenario": scenario,
+            "attribution_id": attribution_id or f"UNKNOWN_{index}",
+            "driver_id": driver_id or "UNKNOWN",
+            "review_trigger_id": trigger_id or "UNKNOWN",
+            "category": category or "UNKNOWN",
+            "rationale": _text(row.get("rationale")) or "UNKNOWN",
+            "amount_cny": _format(amount),
+            "evidence_refs": refs,
+            "issues": sorted(set(item_issues)),
+        }
+        normalized_variance_rows[scenario].append(normalized_row)
+        variance_rows_by_scenario[scenario].append(row)
+        variance_issues.extend(f"{scenario.upper()}:{attribution_id or index}:{issue}" for issue in item_issues)
+
+    variance_scenarios: dict[str, dict[str, Any]] = {}
+    variance_scenarios_complete = comparison_rows_complete
+    for name in SCENARIOS:
+        comparison_row = comparisons.get(name, {})
+        difference_raw = comparison_row.get("b4_minus_normalized_cny")
+        try:
+            difference = _decimal(difference_raw, f"{name}.b4_minus_normalized_cny")
+        except ValueError:
+            difference = None
+        rows = normalized_variance_rows[name]
+        scenario_issues: list[str] = []
+        amount_values: list[Decimal] = []
+        for item in rows:
+            if not item["issues"] and item["amount_cny"] is not None:
+                amount_values.append(_decimal(item["amount_cny"], "ATTRIBUTION_AMOUNT"))
+        if comparison_rows_complete and not rows:
+            scenario_issues.append("VARIANCE_ATTRIBUTIONS_REQUIRED_FOR_COMPARABLE_SCENARIO")
+        if comparison_rows_complete and len(amount_values) != len(rows):
+            scenario_issues.append("VARIANCE_ATTRIBUTION_CONTAINS_UNUSABLE_COMPONENTS")
+        total = sum(amount_values, Decimal("0")) if len(amount_values) == len(rows) and rows else None
+        residual = difference - total if difference is not None and total is not None else None
+        if comparison_rows_complete and total is not None and residual is not None and abs(residual) > Decimal("1"):
+            scenario_issues.append("VARIANCE_ATTRIBUTION_DOES_NOT_RECONCILE_TO_B4_MINUS_NORMALIZED")
+        scenario_status = (
+            "RECONCILED_DIAGNOSTIC_ONLY"
+            if comparison_rows_complete and total is not None and residual is not None and not scenario_issues
+            else "REVIEW_REQUIRED" if comparison_rows_complete
+            else "NOT_COMPARABLE"
+        )
+        if scenario_status != "RECONCILED_DIAGNOSTIC_ONLY":
+            variance_scenarios_complete = False
+        variance_issues.extend(f"{name.upper()}:{issue}" for issue in scenario_issues)
+        variance_scenarios[name] = {
+            "scenario": name,
+            "b4_minus_normalized_net_profit_cny": _format(difference),
+            "attributed_total_cny": _format(total),
+            "unattributed_residual_cny": _format(residual),
+            "items": rows,
+            "status": scenario_status,
+            "issues": sorted(set(scenario_issues)),
+        }
+    if not comparison_rows_complete:
+        variance_status = "NOT_COMPARABLE"
+    elif variance_scenarios_complete and not variance_issues:
+        variance_status = "ALL_SCENARIOS_RECONCILED_DIAGNOSTIC_ONLY"
+    else:
+        variance_status = "REVIEW_REQUIRED"
+    variance_attribution = {
+        "status": variance_status,
+        "sign_convention": "B4_FORECAST_MINUS_NORMALIZED_EARNINGS; positive means B4 higher, negative means B4 lower",
+        "tolerance_cny": "1",
+        "scenarios": variance_scenarios,
+        "issues": sorted(set(variance_issues)),
+        "valuation_input_eligible": False,
+        "note": "仅解释 B4 与正常化盈利差异；不修改任一净利润、EPS、FCF、每股估值或决策。",
+    }
+
     per_share_value = _build_per_share_value_context(
         forecast_valuation, valuation_model_consistency, valuation_timing, valuation_transmission
     )
@@ -619,7 +749,7 @@ def evaluate_cycle_earnings_monitor(
     trigger_status = "IDENTIFIABLE" if not trigger_issues else "REVIEW_REQUIRED"
     trigger_result = {"status": trigger_status, "items": trigger_rows, "issues": sorted(set(trigger_issues))}
 
-    all_issues = sorted(set(cycle_issues + earnings_issues + comparison_issues + trigger_issues + all_issues_for_value))
+    all_issues = sorted(set(cycle_issues + earnings_issues + comparison_issues + variance_issues + trigger_issues + all_issues_for_value))
     complete = not all_issues
     result_status = "CHAIN_IDENTIFIABLE_NON_ADMITTED" if complete else "REVIEW_REQUIRED"
     summary = (
@@ -634,6 +764,7 @@ def evaluate_cycle_earnings_monitor(
         "normalized_earnings": earnings_result,
         "review_triggers": trigger_result,
         "b4_comparison": {"status": comparison_status, "scenarios": comparisons, "issues": comparison_issues, "note": "比较结果仅作诊断，不替代 B4 经营预测。"},
+        "variance_attribution": variance_attribution,
         "per_share_value": per_share_value,
         "issues": all_issues,
         "summary": summary,
@@ -652,6 +783,7 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
     triggers = data.get("review_triggers") if isinstance(data.get("review_triggers"), Mapping) else {}
     comparison = data.get("b4_comparison") if isinstance(data.get("b4_comparison"), Mapping) else {}
     value_node = data.get("per_share_value") if isinstance(data.get("per_share_value"), Mapping) else {}
+    variance_node = data.get("variance_attribution") if isinstance(data.get("variance_attribution"), Mapping) else {}
     lines = [
         "",
         "### B44：行业周期 → 正常化盈利 → 每股价值 → 持仓复核",
@@ -716,6 +848,32 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
             f"差额/正常化中枢绝对值 {compare.get('absolute_difference_ratio_of_normalized_point') or 'UNKNOWN'}；"
             f"{compare.get('status', 'NOT_COMPARABLE')}"
         )
+    lines.extend([
+        "",
+        "#### B4 与正常化盈利差异归因（B45；正数表示 B4 高于正常化盈利）",
+        f"- 归因状态：{variance_node.get('status', 'NOT_COMPARABLE')}；规则：{variance_node.get('sign_convention', 'UNKNOWN')}；对账容差 {variance_node.get('tolerance_cny', 'UNKNOWN')} CNY。",
+    ])
+    variance_scenarios = variance_node.get("scenarios") if isinstance(variance_node.get("scenarios"), Mapping) else {}
+    for name in SCENARIOS:
+        variance_row = variance_scenarios.get(name) if isinstance(variance_scenarios.get(name), Mapping) else {}
+        lines.append(
+            f"- {name.upper()}：B4−正常化 {variance_row.get('b4_minus_normalized_net_profit_cny') or 'UNKNOWN'}；"
+            f"归因合计 {variance_row.get('attributed_total_cny') or 'UNKNOWN'}；"
+            f"未解释残差 {variance_row.get('unattributed_residual_cny') or 'UNKNOWN'}；"
+            f"状态 {variance_row.get('status', 'NOT_COMPARABLE')}"
+        )
+        for item in variance_row.get("items") or []:
+            lines.append(
+                f"  - {item.get('attribution_id', 'UNKNOWN')} / {item.get('driver_id', 'UNKNOWN')} / "
+                f"{item.get('category', 'UNKNOWN')}：贡献 {item.get('amount_cny') or 'UNKNOWN'}；"
+                f"复核触发器 {item.get('review_trigger_id', 'UNKNOWN')}；{item.get('rationale', 'UNKNOWN')}"
+            )
+            for issue in item.get("issues") or []:
+                lines.append(f"    - 待复核：{issue}")
+        for issue in variance_row.get("issues") or []:
+            lines.append(f"  - 待复核：{issue}")
+    for issue in variance_node.get("issues") or []:
+        lines.append(f"- 差异归因未解决：{issue}")
     lines.extend([
         "",
         "#### 当前主估值每股价值节点（只读上下文，不重新计算）",
