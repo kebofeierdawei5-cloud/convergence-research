@@ -410,7 +410,8 @@ def _evaluate_cash_flow_path(
         scenario_row = scenarios.get(scenario)
         scenario_row = scenario_row if isinstance(scenario_row, Mapping) else {}
         rows = scenario_row.get("items")
-        for item in rows if isinstance(rows, list) else []:
+        comparable_items = rows if isinstance(rows, list) else []
+        for item in comparable_items:
             if not isinstance(item, Mapping):
                 continue
             key = (scenario, _text(item.get("attribution_id")))
@@ -507,6 +508,14 @@ def _evaluate_cash_flow_path(
             required=True,
         )
         item_issues.extend(ref_issues)
+        trigger_refs = {
+            _text(ref) for ref in (trigger.get("evidence_refs") or [])
+            if _text(ref)
+        } if isinstance(trigger, Mapping) else set()
+        if not trigger_refs:
+            item_issues.append("REVIEW_TRIGGER_EVIDENCE_REQUIRED_FOR_CASH_FLOW_LINK")
+        elif not set(refs).intersection(trigger_refs):
+            item_issues.append("CASH_FLOW_EVIDENCE_NOT_SHARED_WITH_REVIEW_TRIGGER")
 
         raw_effect = row.get("cash_flow_effect_cny")
         effect: Decimal | None = None
