@@ -842,3 +842,32 @@ def test_inventory_excluded_from_working_capital_requires_addback_reconciliation
         for issue in scenario["issues"]
     )
     assert result["normalized_fcf_bridge"]["valuation_input_eligible"] is False
+
+
+def test_zero_inventory_movement_status_is_valid_without_double_counting() -> None:
+    raw, b4, evidence = _valid_case()
+    components = raw["normalized_fcf"]["scenarios"]["base"]["cash_components"]
+    components["inventory_working_capital_treatment"] = "NOT_APPLICABLE"
+    components["inventory_reconciliation_status"] = "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED"
+    b4["scenarios"]["base"]["inventory_working_capital_treatment"] = "NOT_APPLICABLE"
+    b4["scenarios"]["base"]["inventory_reconciliation_status"] = "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED"
+    result = _evaluate(raw, b4, evidence)
+    fcf = result["normalized_fcf_bridge"]
+
+    assert fcf["status"] == "FCF_VARIANCE_RECONCILED_DIAGNOSTIC_ONLY"
+    assert fcf["b4_comparison"]["status"] == "DIAGNOSTIC_ONLY_NOT_A_VALUATION_INPUT"
+    assert fcf["fcf_variance_reconciled"] is True
+
+
+def test_normalized_unlevered_fcf_rejects_financing_flow_as_an_adjustment_category() -> None:
+    raw, b4, evidence = _valid_case()
+    raw["normalized_fcf"]["scenarios"]["base"]["adjustments"][0]["category"] = "FINANCING_CASH_FLOW"
+    result = _evaluate(raw, b4, evidence)
+    row = result["normalized_fcf_bridge"]["normalized_fcf"]["scenarios"]["base"]
+
+    assert row["status"] == "REVIEW_REQUIRED"
+    assert any(
+        "NORMALIZED_FCF_ADJUSTMENT_CATEGORY_UNSUPPORTED" in issue
+        for issue in row["issues"]
+    )
+    assert result["normalized_fcf_bridge"]["valuation_input_eligible"] is False
