@@ -366,6 +366,250 @@ def _build_variance_transmission_context(
     }
 
 
+def _evaluate_cash_flow_path(
+    *,
+    raw_assessments: Any,
+    variance_attribution: Mapping[str, Any],
+    operating_driver_forecast: Mapping[str, Any],
+    known_driver_ids: set[str],
+    raw_review_triggers: list[Any],
+    sources_by_id: Mapping[str, Mapping[str, Any]],
+    unresolved_refs: set[str],
+    after_cutoff_refs: set[str],
+    uncertain_refs: set[str],
+) -> dict[str, Any]:
+    """Keep cash/FCF attribution independent from net-profit attribution; never invent a normalized FCF bridge."""
+    allowed_channels = {
+        "OPERATING_CASH_CONVERSION", "WORKING_CAPITAL", "INVENTORY_MOVEMENT",
+        "CAPEX", "NON_CASH_EARNINGS", "FINANCE_CASH_COST", "TAX_CASH_TIMING",
+        "NO_DIRECT_CASH_EFFECT", "UNKNOWN",
+    }
+    allowed_directions = {
+        "IMPROVES_FCF", "REDUCES_FCF", "MIXED_OR_TIMING_DEPENDENT",
+        "NO_DIRECT_EFFECT", "UNKNOWN",
+    }
+    allowed_quantification = {"QUANTIFIED", "QUALITATIVE_ONLY", "NOT_APPLICABLE", "UNKNOWN"}
+    channel_context_field = {
+        "OPERATING_CASH_CONVERSION": "unlevered_fcf_proxy_cny",
+        "WORKING_CAPITAL": "effective_change_working_capital_cny",
+        "INVENTORY_MOVEMENT": "inventory_cash_impact_proxy_cny",
+        "CAPEX": "cash_capex_cny",
+        "NON_CASH_EARNINGS": "depreciation_amortization_cny",
+        "FINANCE_CASH_COST": "finance_cost_cny",
+        "TAX_CASH_TIMING": None,
+    }
+    triggers_by_id = {
+        _text(row.get("trigger_id")): row for row in raw_review_triggers
+        if isinstance(row, Mapping) and _text(row.get("trigger_id"))
+    }
+    expected_rows: dict[tuple[str, str], Mapping[str, Any]] = {}
+    scenarios = variance_attribution.get("scenarios")
+    scenarios = scenarios if isinstance(scenarios, Mapping) else {}
+    for scenario in SCENARIOS:
+        scenario_row = scenarios.get(scenario)
+        scenario_row = scenario_row if isinstance(scenario_row, Mapping) else {}
+        rows = scenario_row.get("items")
+        for item in rows if isinstance(rows, list) else []:
+            if not isinstance(item, Mapping):
+                continue
+            key = (scenario, _text(item.get("attribution_id")))
+            if key[1]:
+                expected_rows[key] = item
+
+    b4_scenarios = operating_driver_forecast.get("scenarios")
+    b4_scenarios = b4_scenarios if isinstance(b4_scenarios, Mapping) else {}
+    b4_cash_context: dict[str, dict[str, Any]] = {}
+    cash_context_fields = (
+        "cash_capex_cny", "change_working_capital_cny", "effective_change_working_capital_cny",
+        "inventory_cash_impact_proxy_cny", "inventory_working_capital_treatment",
+        "inventory_reconciliation_status", "depreciation_amortization_cny", "finance_cost_cny",
+        "unlevered_fcf_proxy_cny",
+    )
+    for scenario in SCENARIOS:
+        row = b4_scenarios.get(scenario)
+        row = row if isinstance(row, Mapping) else {}
+        usable = row.get("financial_outputs_decision_usable") is True
+        fields = {
+            key: (_text(row.get(key)) or None) if usable else None
+            for key in cash_context_fields
+        }
+        b4_cash_context[scenario] = {
+            "status": "B4_CASH_CONTEXT_DECISION_USABLE" if usable else "B4_CASH_CONTEXT_NOT_DECISION_USABLE",
+            "forecast_period": _text(operating_driver_forecast.get("forecast_period")) or "UNKNOWN",
+            "financial_outputs_decision_usable": usable,
+            "fields": fields,
+            "issues": [] if usable else ["B4_CASH_CONTEXT_NOT_DECISION_USABLE"],
+            "note": "仅复述 B4 自身现金流代理及相关输入；不构造正常化 FCF、不计算盈利差异对应的 FCF 差额。",
+        }
+
+    assessments = raw_assessments if isinstance(raw_assessments, list) else []
+    global_issues: list[str] = []
+    if not assessments and expected_rows:
+        global_issues.append("CASH_FLOW_ASSESSMENTS_REQUIRED_FOR_EACH_PROFIT_ATTRIBUTION")
+    if not expected_rows:
+        global_issues.append("NO_IDENTIFIABLE_PROFIT_ATTRIBUTIONS_TO_LINK_CASH_FLOW_PATH")
+    seen: set[tuple[str, str]] = set()
+    normalized: list[dict[str, Any]] = []
+    by_scenario: dict[str, list[dict[str, Any]]] = {name: [] for name in SCENARIOS}
+
+    for index, row in enumerate(assessments):
+        if not isinstance(row, Mapping):
+            global_issues.append(f"CASH_FLOW_ASSESSMENT_{index}_INVALID")
+            continue
+        scenario = _text(row.get("scenario")).lower()
+        attribution_id = _text(row.get("attribution_id"))
+        driver_id = _text(row.get("driver_id"))
+        trigger_id = _text(row.get("review_trigger_id"))
+        channel = _text(row.get("channel")).upper() or "UNKNOWN"
+        direction = _text(row.get("direction")).upper() or "UNKNOWN"
+        quant_status = _text(row.get("quantification_status")).upper() or "UNKNOWN"
+        rationale = _text(row.get("rationale"))
+        item_issues: list[str] = []
+        key = (scenario, attribution_id)
+        if scenario not in SCENARIOS:
+            item_issues.append("CASH_FLOW_SCENARIO_INVALID")
+        if not attribution_id:
+            item_issues.append("CASH_FLOW_ATTRIBUTION_ID_REQUIRED")
+        if key in seen:
+            item_issues.append("DUPLICATE_CASH_FLOW_ASSESSMENT_FOR_ATTRIBUTION")
+        seen.add(key)
+        profit_item = expected_rows.get(key)
+        if profit_item is None:
+            item_issues.append("CASH_FLOW_ASSESSMENT_HAS_NO_MATCHING_PROFIT_ATTRIBUTION")
+        else:
+            if _text(profit_item.get("driver_id")) != driver_id:
+                item_issues.append("CASH_FLOW_DRIVER_DOES_NOT_MATCH_PROFIT_ATTRIBUTION")
+            if _text(profit_item.get("review_trigger_id")) != trigger_id:
+                item_issues.append("CASH_FLOW_TRIGGER_DOES_NOT_MATCH_PROFIT_ATTRIBUTION")
+        if driver_id not in known_driver_ids:
+            item_issues.append("CASH_FLOW_DRIVER_LINK_UNRESOLVED")
+        if channel not in allowed_channels or channel == "UNKNOWN":
+            item_issues.append("CASH_FLOW_CHANNEL_NOT_IDENTIFIABLE")
+        if direction not in allowed_directions or direction == "UNKNOWN":
+            item_issues.append("CASH_FLOW_DIRECTION_NOT_IDENTIFIABLE")
+        if quant_status not in allowed_quantification or quant_status == "UNKNOWN":
+            item_issues.append("CASH_FLOW_QUANTIFICATION_STATUS_NOT_IDENTIFIABLE")
+        if not _meaningful(rationale):
+            item_issues.append("CASH_FLOW_RATIONALE_NOT_IDENTIFIABLE")
+        trigger = triggers_by_id.get(trigger_id)
+        if trigger is None:
+            item_issues.append("CASH_FLOW_REVIEW_TRIGGER_UNRESOLVED")
+        elif _text(trigger.get("driver_id")) != driver_id:
+            item_issues.append("CASH_FLOW_DRIVER_DOES_NOT_MATCH_REVIEW_TRIGGER")
+        refs, ref_issues = _resolve_refs(
+            row.get("evidence_refs"),
+            field=f"cash_flow_assessment.{scenario}.{attribution_id or index}",
+            sources_by_id=sources_by_id,
+            unresolved_refs=unresolved_refs,
+            after_cutoff_refs=after_cutoff_refs,
+            uncertain_refs=uncertain_refs,
+            required=True,
+        )
+        item_issues.extend(ref_issues)
+
+        raw_effect = row.get("cash_flow_effect_cny")
+        effect: Decimal | None = None
+        if quant_status == "QUANTIFIED":
+            effect, effect_issues, _ = _money(
+                raw_effect,
+                field=f"cash_flow_assessment.{scenario}.{attribution_id or index}.cash_flow_effect_cny",
+                sources_by_id=sources_by_id,
+                unresolved_refs=unresolved_refs,
+                after_cutoff_refs=after_cutoff_refs,
+                uncertain_refs=uncertain_refs,
+                allow_negative=True,
+            )
+            item_issues.extend(effect_issues)
+            if effect is not None:
+                if effect > 0 and direction != "IMPROVES_FCF":
+                    item_issues.append("POSITIVE_FCF_EFFECT_DIRECTION_MISMATCH")
+                elif effect < 0 and direction != "REDUCES_FCF":
+                    item_issues.append("NEGATIVE_FCF_EFFECT_DIRECTION_MISMATCH")
+                elif effect == 0 and direction != "NO_DIRECT_EFFECT":
+                    item_issues.append("ZERO_FCF_EFFECT_DIRECTION_MISMATCH")
+            context_field = channel_context_field.get(channel)
+            context = b4_cash_context.get(scenario, {})
+            context_fields = context.get("fields") if isinstance(context.get("fields"), Mapping) else {}
+            if context_field is None or context_fields.get(context_field) in (None, ""):
+                item_issues.append(f"B4_CASH_CONTEXT_AMOUNT_UNAVAILABLE_FOR_QUANTIFIED_CHANNEL:{channel}")
+            if context.get("financial_outputs_decision_usable") is not True:
+                item_issues.append("B4_CASH_CONTEXT_NOT_DECISION_USABLE")
+        elif raw_effect not in (None, ""):
+            item_issues.append("UNQUANTIFIED_CASH_FLOW_ASSESSMENT_MUST_NOT_SUPPLY_AMOUNT")
+
+        if quant_status == "NOT_APPLICABLE":
+            if channel != "NO_DIRECT_CASH_EFFECT" or direction != "NO_DIRECT_EFFECT":
+                item_issues.append("NOT_APPLICABLE_REQUIRES_EXPLICIT_NO_DIRECT_CASH_EFFECT")
+            if raw_effect not in (None, ""):
+                item_issues.append("NOT_APPLICABLE_CASH_FLOW_ASSESSMENT_MUST_NOT_SUPPLY_AMOUNT")
+        elif channel == "NO_DIRECT_CASH_EFFECT" or direction == "NO_DIRECT_EFFECT":
+            item_issues.append("NO_DIRECT_CASH_EFFECT_REQUIRES_NOT_APPLICABLE_STATUS")
+
+        status = "CLASSIFIED_DIAGNOSTIC_ONLY" if not item_issues else "REVIEW_REQUIRED"
+        item = {
+            "scenario": scenario or "UNKNOWN",
+            "attribution_id": attribution_id or "UNKNOWN",
+            "driver_id": driver_id or "UNKNOWN",
+            "review_trigger_id": trigger_id or "UNKNOWN",
+            "channel": channel,
+            "direction": direction,
+            "quantification_status": quant_status,
+            "cash_flow_effect_cny": _format(effect) if effect is not None and not item_issues else None,
+            "rationale": rationale or "UNKNOWN",
+            "evidence_refs": refs,
+            "status": status,
+            "issues": sorted(set(item_issues)),
+            "note": "本项按 FCF 方向解释：正数表示增加 FCF，负数表示减少 FCF；不得与营运资金余额变化符号混淆。",
+        }
+        normalized.append(item)
+        global_issues.extend(f"{scenario.upper()}:{attribution_id or index}:{issue}" for issue in item_issues)
+        if scenario in SCENARIOS:
+            by_scenario[scenario].append(item)
+
+    missing = sorted(set(expected_rows) - seen)
+    for scenario, attribution_id in missing:
+        issue = f"{scenario.upper()}:{attribution_id}:CASH_FLOW_ASSESSMENT_MISSING"
+        global_issues.append(issue)
+        by_scenario[scenario].append({
+            "scenario": scenario,
+            "attribution_id": attribution_id,
+            "driver_id": _text(expected_rows[(scenario, attribution_id)].get("driver_id")) or "UNKNOWN",
+            "review_trigger_id": _text(expected_rows[(scenario, attribution_id)].get("review_trigger_id")) or "UNKNOWN",
+            "channel": "UNKNOWN",
+            "direction": "UNKNOWN",
+            "quantification_status": "UNKNOWN",
+            "cash_flow_effect_cny": None,
+            "rationale": "UNKNOWN",
+            "evidence_refs": [],
+            "status": "REVIEW_REQUIRED",
+            "issues": ["CASH_FLOW_ASSESSMENT_MISSING"],
+        })
+
+    if variance_attribution.get("status") != "ALL_SCENARIOS_RECONCILED_DIAGNOSTIC_ONLY":
+        global_issues.append("UPSTREAM_PROFIT_VARIANCE_NOT_RECONCILED")
+    for scenario in SCENARIOS:
+        by_scenario[scenario].sort(key=lambda item: item.get("attribution_id", ""))
+    status = (
+        "CASH_FLOW_PATH_RECONCILED_DIAGNOSTIC_ONLY"
+        if expected_rows and not global_issues and len(seen) == len(expected_rows)
+        else "REVIEW_REQUIRED" if expected_rows else "NOT_COMPARABLE"
+    )
+    return {
+        "status": status,
+        "scenarios": by_scenario,
+        "b4_cash_context": b4_cash_context,
+        "issues": sorted(set(global_issues)),
+        "cash_flow_amounts_aggregated": False,
+        "normalized_fcf_comparison_available": False,
+        "fcf_variance_reconciled": False,
+        "valuation_input_eligible": False,
+        "formal_forecast_admission_created": False,
+        "formal_valuation_admission_created": False,
+        "decision_authority": False,
+        "note": "现金流路径与净利润归因分开登记；当前没有独立的正常化 FCF Bear/Base/Bull 基准，因此不把逐项金额合计成 FCF 差额，也不宣称 FCF 对账完成。",
+    }
+
+
 def evaluate_cycle_earnings_monitor(
     raw: Any,
     *,
