@@ -451,7 +451,7 @@ def test_cash_flow_path_is_separate_from_profit_variance_and_not_fcf_reconciled(
     result = _evaluate(raw, b4, evidence)
     cash_path = result["cash_flow_path"]
 
-    assert cash_path["status"] == "CASH_FLOW_PATH_RECONCILED_DIAGNOSTIC_ONLY"
+    assert cash_path["status"] == "CASH_FLOW_PATH_LINKS_COMPLETE_DIAGNOSTIC_ONLY"
     assert cash_path["normalized_fcf_comparison_available"] is False
     assert cash_path["fcf_variance_reconciled"] is False
     assert cash_path["cash_flow_amounts_aggregated"] is False
