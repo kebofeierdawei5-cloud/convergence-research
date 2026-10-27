@@ -969,7 +969,7 @@ def _evaluate_normalized_fcf_bridge(
                 component_issues.append("NORMALIZED_FCF_CASH_COMPONENT_FORMULA_MISMATCH_WITHIN_CNY_1")
         else:
             component_issues.append("NORMALIZED_FCF_CASH_COMPONENT_FORMULA_NOT_IDENTIFIABLE")
-        component_output["calculated_fcf_point_cny"] = _format(calculated_fcf) if calculated_fcf is not None and not component_issues else None
+        component_output["calculated_fcf_point_cny"] = _format(calculated_fcf) if calculated_fcf is not None else None
         component_output["issues"] = sorted(set(component_issues))
         item_issues.extend(f"CASH_COMPONENT:{issue}" for issue in component_issues)
 
@@ -2001,7 +2001,7 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
         "",
         "#### B48：独立正常化 FCF 与差异归因桥",
         f"- 总状态：{fcf_node.get('status', 'NOT_IDENTIFIABLE')}；正常化 FCF 桥：{normalized_fcf_node.get('status', 'NOT_IDENTIFIABLE')}；B4 比较：{fcf_comparison.get('status', 'NOT_COMPARABLE')}；FCF 差异归因：{fcf_variance.get('status', 'NOT_COMPARABLE')}",
-        f"- 口径 / 参考期间 / 目标期间：{normalized_fcf_node.get('scope', 'UNKNOWN')} / {normalized_fcf_node.get('reference_period', 'UNKNOWN')} / {normalized_fcf_node.get('period', 'UNKNOWN')}",
+        f"- 口径 / 方法 / 参考期间 / 目标期间：{normalized_fcf_node.get('scope', 'UNKNOWN')} / {normalized_fcf_node.get('method', 'UNKNOWN')} / {normalized_fcf_node.get('reference_period', 'UNKNOWN')} / {normalized_fcf_node.get('period', 'UNKNOWN')}",
         f"- 符号约定：{fcf_node.get('sign_convention', 'UNKNOWN')}；归因容差 {fcf_node.get('tolerance_cny', 'UNKNOWN')} CNY；是否作为估值输入：{fcf_node.get('valuation_input_eligible', False)}",
     ])
     norm_fcf_scenarios = normalized_fcf_node.get("scenarios") if isinstance(normalized_fcf_node.get("scenarios"), Mapping) else {}
@@ -2016,6 +2016,19 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
             f"{norm_row.get('reference_fcf_cny') or 'UNKNOWN'} / {norm_row.get('adjustment_total_cny') or 'UNKNOWN'} / "
             f"{norm_row.get('low_fcf_cny') or 'UNKNOWN'}–{norm_row.get('point_fcf_cny') or 'UNKNOWN'}–{norm_row.get('high_fcf_cny') or 'UNKNOWN'} CNY；"
             f"内部桥残差 {norm_row.get('bridge_residual_cny') or 'UNKNOWN'}；状态 {norm_row.get('status', 'UNKNOWN')}"
+        )
+        components = norm_row.get("cash_components") if isinstance(norm_row.get("cash_components"), Mapping) else {}
+        def _component_value(key: str) -> str:
+            component = components.get(key) if isinstance(components.get(key), Mapping) else {}
+            return component.get("value") if component.get("value") not in (None, "") else "UNKNOWN"
+        lines.append(
+            f"  - 正常化组件复算（EBIT / 税率 / 折旧摊销 / 现金资本开支 / 原始营运资金 / 有效营运资金）："
+            f"{_component_value('ebit_cny')} / {_component_value('tax_rate')} / "
+            f"{_component_value('depreciation_amortization_cny')} / {_component_value('cash_capex_cny')} / "
+            f"{_component_value('change_working_capital_cny')} / {_component_value('effective_change_working_capital_cny')}；"
+            f"库存处理 {components.get('inventory_working_capital_treatment', 'UNKNOWN')}；"
+            f"库存状态 {components.get('inventory_reconciliation_status', 'UNKNOWN')}；"
+            f"组件公式 FCF {components.get('calculated_fcf_point_cny') or 'UNKNOWN'}"
         )
         for adjustment in norm_row.get("adjustments") or []:
             lines.append(
