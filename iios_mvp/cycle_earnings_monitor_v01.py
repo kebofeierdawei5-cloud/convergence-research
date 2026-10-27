@@ -1388,8 +1388,8 @@ def _evaluate_normalized_fcf_bridge(
         attribution_ids.add(key)
         if driver_id not in known_driver_ids:
             row_issues.append("FCF_ATTRIBUTION_DRIVER_UNRESOLVED")
-        if category not in allowed_categories:
-            row_issues.append("FCF_ATTRIBUTION_CATEGORY_UNSUPPORTED")
+        if category not in variance_component_categories:
+            row_issues.append("FCF_ATTRIBUTION_CATEGORY_NOT_COMPONENT_RECONCILABLE")
         if not _meaningful(rationale):
             row_issues.append("FCF_ATTRIBUTION_RATIONALE_NOT_IDENTIFIABLE")
         trigger = trigger_map.get(trigger_id)
@@ -1429,7 +1429,11 @@ def _evaluate_normalized_fcf_bridge(
         attribution_issues.extend(f"{scenario.upper()}:{attribution_id or index}:{issue}" for issue in row_issues)
 
     variance_scenarios: dict[str, dict[str, Any]] = {}
-    variance_complete = comparison_complete
+    variance_complete = comparison_complete and component_bridge_complete
+    required_variance_categories = (
+        "OPERATING_CASH_CONVERSION", "NON_CASH_EARNINGS", "CAPEX",
+        "WORKING_CAPITAL", "INVENTORY_MOVEMENT",
+    )
     for name in SCENARIOS:
         compare_row = comparisons.get(name, {})
         try:
@@ -1439,24 +1443,67 @@ def _evaluate_normalized_fcf_bridge(
         rows = attribution_rows[name]
         scenario_issues: list[str] = []
         contributions: list[Decimal] = []
+        attributed_by_category: dict[str, Decimal] = {}
         attribution_categories = {_text(item.get("category")).upper() for item in rows}
-        for required_category in ("CAPEX", "WORKING_CAPITAL", "INVENTORY_MOVEMENT"):
+        for required_category in required_variance_categories:
             if required_category not in attribution_categories:
                 scenario_issues.append(f"FCF_VARIANCE_COMPONENT_COVERAGE_MISSING:{required_category}")
         if comparison_complete and not rows:
             scenario_issues.append("FCF_ATTRIBUTIONS_REQUIRED_FOR_COMPARABLE_SCENARIO")
         for item in rows:
             if item.get("issues") or item.get("amount_cny") is None:
-                scenario_issues.extend(f"{item.get('fcf_attribution_id')}:{issue}" for issue in (item.get("issues") or ["FCF_ATTRIBUTION_AMOUNT_NOT_IDENTIFIABLE"]))
-            else:
-                contributions.append(_decimal(item["amount_cny"], "FCF_ATTRIBUTION_AMOUNT"))
+                scenario_issues.extend(
+                    f"{item.get('fcf_attribution_id')}:{issue}"
+                    for issue in (item.get("issues") or ["FCF_ATTRIBUTION_AMOUNT_NOT_IDENTIFIABLE"])
+                )
+                continue
+            amount = _decimal(item["amount_cny"], "FCF_ATTRIBUTION_AMOUNT")
+            contributions.append(amount)
+            category = _text(item.get("category")).upper()
+            attributed_by_category[category] = attributed_by_category.get(category, Decimal("0")) + amount
+
+        component_bridge = component_bridges.get(name, {})
+        measured_components = component_bridge.get("contributions_cny") if isinstance(component_bridge.get("contributions_cny"), Mapping) else {}
+        category_reconciliation: dict[str, dict[str, Any]] = {}
+        if component_bridge.get("status") != "COMPONENTS_RECONCILED_DIAGNOSTIC_ONLY":
+            scenario_issues.append("FCF_COMPONENT_BRIDGE_NOT_RECONCILED")
+            scenario_issues.extend(
+                f"COMPONENT_BRIDGE:{issue}" for issue in (component_bridge.get("issues") or [])
+            )
+        for category in required_variance_categories:
+            measured_raw = measured_components.get(category)
+            try:
+                measured = _decimal(measured_raw, f"{name}.measured_component.{category}")
+            except ValueError:
+                measured = None
+            attributed = attributed_by_category.get(category)
+            category_residual = measured - attributed if measured is not None and attributed is not None else None
+            category_status = (
+                "RECONCILED" if measured is not None and attributed is not None
+                and abs(category_residual) <= Decimal("1")
+                else "REVIEW_REQUIRED"
+            )
+            category_reconciliation[category] = {
+                "measured_component_contribution_cny": _format(measured),
+                "attributed_category_total_cny": _format(attributed),
+                "residual_cny": _format(category_residual),
+                "status": category_status,
+            }
+            if measured is None:
+                scenario_issues.append(f"FCF_MEASURED_COMPONENT_NOT_IDENTIFIABLE:{category}")
+            elif attributed is None:
+                scenario_issues.append(f"FCF_ATTRIBUTED_COMPONENT_TOTAL_MISSING:{category}")
+            elif abs(category_residual) > Decimal("1"):
+                scenario_issues.append(f"FCF_VARIANCE_CATEGORY_CONTRIBUTION_MISMATCH:{category}")
+
         total = sum(contributions, Decimal("0")) if len(contributions) == len(rows) else None
         residual = difference - total if difference is not None and total is not None else None
         if difference is not None and total is not None and residual is not None and abs(residual) > Decimal("1"):
             scenario_issues.append("FCF_VARIANCE_ATTRIBUTIONS_DO_NOT_RECONCILE_WITHIN_CNY_1")
         scenario_status = (
             "RECONCILED_DIAGNOSTIC_ONLY"
-            if comparison_complete and rows and total is not None and residual is not None and not scenario_issues
+            if comparison_complete and component_bridge.get("status") == "COMPONENTS_RECONCILED_DIAGNOSTIC_ONLY"
+            and rows and total is not None and residual is not None and not scenario_issues
             else "REVIEW_REQUIRED" if comparison_complete else "NOT_COMPARABLE"
         )
         if scenario_status != "RECONCILED_DIAGNOSTIC_ONLY":
@@ -1467,6 +1514,7 @@ def _evaluate_normalized_fcf_bridge(
             "attributed_total_cny": _format(total),
             "unattributed_residual_cny": _format(residual),
             "items": rows,
+            "component_attribution_reconciliation": category_reconciliation,
             "status": scenario_status,
             "issues": sorted(set(scenario_issues)),
         }
@@ -1486,11 +1534,11 @@ def _evaluate_normalized_fcf_bridge(
         "cash_flow_amounts_aggregated": False,
         "valuation_input_eligible": False,
     }
-    all_issues = sorted(set(monitor_issues + comparison_issues + attribution_issues))
+    all_issues = sorted(set(monitor_issues + comparison_issues + component_bridge_issues + attribution_issues))
     result_status = (
         "FCF_VARIANCE_RECONCILED_DIAGNOSTIC_ONLY"
         if normalized_status == "NORMALIZED_FCF_BRIDGE_RECONCILED_DIAGNOSTIC_ONLY"
-        and comparison_complete and variance_status == "ALL_SCENARIOS_RECONCILED_DIAGNOSTIC_ONLY"
+        and comparison_complete and component_bridge_complete and variance_status == "ALL_SCENARIOS_RECONCILED_DIAGNOSTIC_ONLY"
         else "REVIEW_REQUIRED" if all_issues or normalized_status != "NORMALIZED_FCF_BRIDGE_RECONCILED_DIAGNOSTIC_ONLY"
         else "NOT_COMPARABLE"
     )
@@ -1498,12 +1546,13 @@ def _evaluate_normalized_fcf_bridge(
         "status": result_status,
         "normalized_fcf": normalized_result,
         "b4_comparison": comparison_result,
+        "component_variance_bridge": component_bridge_result,
         "variance_attribution": variance_result,
         "issues": all_issues,
         "sign_convention": "B4_UNLEVERED_FCF_PROXY_MINUS_NORMALIZED_FCF; positive means B4 FCF is higher",
         "tolerance_cny": "1",
         "normalized_fcf_comparison_available": comparison_complete,
-        "fcf_variance_reconciled": variance_status == "ALL_SCENARIOS_RECONCILED_DIAGNOSTIC_ONLY",
+        "fcf_variance_reconciled": component_bridge_complete and variance_status == "ALL_SCENARIOS_RECONCILED_DIAGNOSTIC_ONLY",
         "cash_flow_amounts_aggregated": False,
         "valuation_input_eligible": False,
         "formal_forecast_admission_created": False,
