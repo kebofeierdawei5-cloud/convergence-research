@@ -307,3 +307,97 @@ def test_missing_variance_attribution_does_not_claim_explanation():
     assert result["variance_attribution"]["status"] == "REVIEW_REQUIRED"
     assert "VARIANCE_ATTRIBUTIONS_REQUIRED_FOR_COMPARABLE_SCENARIO" in result["variance_attribution"]["issues"]
     assert result["status"] == "REVIEW_REQUIRED"
+
+
+def _eps_transmission_inputs() -> tuple[dict, dict]:
+    bridge = {
+        "status": "CALCULATED",
+        "primary_eps_price_calculation_eligible": True,
+        "forecast_period": "FY2027",
+        "valuation_terminal_date": "2027-12-31",
+        "currency": "CNY",
+        "scenarios": {
+            "bear": {"status": "CALCULATED", "eps_match": True, "diluted_shares": {"value": "10", "unit": "shares"}},
+            "base": {"status": "CALCULATED", "eps_match": True, "diluted_shares": {"value": "10", "unit": "shares"}},
+            "bull": {"status": "CALCULATED", "eps_match": True, "diluted_shares": {"value": "10", "unit": "shares"}},
+        },
+    }
+    adapter = {
+        "status": "CALCULATED",
+        "selected_for_primary_model": True,
+        "forecast_period": "FY2027",
+        "valuation_terminal_date": "2027-12-31",
+        "currency": "CNY",
+        "scenarios": {
+            "bear": {"pe_multiple_x": {"value": "10", "unit": "x"}, "terminal_value_per_share": "8"},
+            "base": {"pe_multiple_x": {"value": "10", "unit": "x"}, "terminal_value_per_share": "10"},
+            "bull": {"pe_multiple_x": {"value": "10", "unit": "x"}, "terminal_value_per_share": "12"},
+        },
+    }
+    return bridge, adapter
+
+
+def test_variance_transmission_calculates_only_conditional_eps_and_constant_pe_sensitivity() -> None:
+    raw, b4, evidence = _valid_case()
+    b4["scenarios"]["bear"]["net_profit_cny"] = "85"
+    b4["scenarios"]["base"]["net_profit_cny"] = "95"
+    b4["scenarios"]["bull"]["net_profit_cny"] = "130"
+    amounts = {"bear": "5", "base": "-5", "bull": "10"}
+    for item in raw["variance_attribution"]:
+        item["amount_cny"] = _measure(amounts[item["scenario"]])
+    bridge, adapter = _eps_transmission_inputs()
+
+    result = _evaluate(raw, b4, evidence, eps_earnings_bridge=bridge, eps_multiple_valuation=adapter)
+    transmission = result["variance_transmission"]
+
+    assert transmission["status"] == "ALL_SCENARIOS_CONSTANT_PE_SENSITIVITY_DIAGNOSTIC_ONLY"
+    assert transmission["valuation_input_eligible"] is False
+    assert transmission["scenarios"]["bear"]["implied_eps_sensitivity_per_share"] == "0.5"
+    assert transmission["scenarios"]["bear"]["constant_pe_value_sensitivity_per_share"] == "5.0"
+    assert transmission["scenarios"]["base"]["implied_eps_sensitivity_per_share"] == "-0.5"
+    assert transmission["scenarios"]["base"]["constant_pe_value_sensitivity_per_share"] == "-5.0"
+    assert transmission["scenarios"]["bull"]["implied_eps_sensitivity_per_share"] == "1"
+    assert transmission["scenarios"]["bull"]["constant_pe_value_sensitivity_per_share"] == "10"
+    assert transmission["scenarios"]["bear"]["items"][0]["review_trigger_id"] == "orders_review"
+
+
+def test_variance_transmission_fails_closed_on_cny_hkd_mismatch() -> None:
+    raw, b4, evidence = _valid_case()
+    bridge, adapter = _eps_transmission_inputs()
+    bridge["currency"] = "HKD"
+
+    result = _evaluate(raw, b4, evidence, eps_earnings_bridge=bridge, eps_multiple_valuation=adapter)
+    transmission = result["variance_transmission"]
+
+    assert transmission["status"] == "REVIEW_REQUIRED"
+    assert transmission["scenarios"]["base"]["status"] == "NOT_IDENTIFIABLE"
+    assert transmission["scenarios"]["base"]["implied_eps_sensitivity_per_share"] is None
+    assert transmission["scenarios"]["base"]["constant_pe_value_sensitivity_per_share"] is None
+    assert "EPS_BRIDGE_CURRENCY_MUST_BE_CNY_FOR_CNY_NET_PROFIT_DELTA" in transmission["issues"]
+
+
+def test_variance_transmission_blocked_when_upstream_attribution_is_unreconciled() -> None:
+    raw, b4, evidence = _valid_case()
+    raw["variance_attribution"] = [row for row in raw["variance_attribution"] if row["scenario"] != "base"]
+    bridge, adapter = _eps_transmission_inputs()
+
+    result = _evaluate(raw, b4, evidence, eps_earnings_bridge=bridge, eps_multiple_valuation=adapter)
+    transmission = result["variance_transmission"]
+
+    assert transmission["status"] == "BLOCKED_UPSTREAM_VARIANCE_ATTRIBUTION_NOT_RECONCILED"
+    assert transmission["scenarios"]["base"]["implied_eps_sensitivity_per_share"] is None
+    assert transmission["scenarios"]["base"]["items"] == []
+    assert "UPSTREAM_VARIANCE_ATTRIBUTION_NOT_RECONCILED" in transmission["issues"]
+
+
+def test_variance_transmission_does_not_use_sotp_or_an_unselected_eps_adapter() -> None:
+    raw, b4, evidence = _valid_case()
+    bridge, adapter = _eps_transmission_inputs()
+    adapter["selected_for_primary_model"] = False
+
+    result = _evaluate(raw, b4, evidence, eps_earnings_bridge=bridge, eps_multiple_valuation=adapter)
+    transmission = result["variance_transmission"]
+
+    assert transmission["status"] == "REVIEW_REQUIRED"
+    assert transmission["scenarios"]["bull"]["constant_pe_value_sensitivity_per_share"] is None
+    assert "PRIMARY_EPS_MULTIPLE_ADAPTER_NOT_CALCULATED_AND_SELECTED" in transmission["issues"]
