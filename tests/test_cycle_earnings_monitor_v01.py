@@ -809,3 +809,36 @@ def test_b4_fcf_comparison_requires_cash_capex_and_effective_working_capital_com
     assert fcf["b4_comparison"]["status"] == "NOT_COMPARABLE"
     assert "BASE:B4_FCF_COMPONENT_NOT_IDENTIFIABLE:effective_change_working_capital_cny" in fcf["b4_comparison"]["issues"]
     assert fcf["fcf_variance_reconciled"] is False
+
+
+def test_normalized_fcf_component_formula_must_reconcile_to_reported_point() -> None:
+    raw, b4, evidence = _valid_case()
+    raw["normalized_fcf"]["scenarios"]["base"]["cash_components"]["cash_capex_cny"]["value"] = "15"
+    result = _evaluate(raw, b4, evidence)
+    scenario = result["normalized_fcf_bridge"]["normalized_fcf"]["scenarios"]["base"]
+
+    assert scenario["status"] == "REVIEW_REQUIRED"
+    assert scenario["cash_components"]["calculated_fcf_point_cny"] == "40.0"
+    assert any(
+        "CASH_COMPONENT:NORMALIZED_FCF_CASH_COMPONENT_FORMULA_MISMATCH_WITHIN_CNY_1" in issue
+        for issue in scenario["issues"]
+    )
+    assert result["normalized_fcf_bridge"]["fcf_variance_reconciled"] is False
+
+
+def test_inventory_excluded_from_working_capital_requires_addback_reconciliation() -> None:
+    raw, b4, evidence = _valid_case()
+    components = raw["normalized_fcf"]["scenarios"]["base"]["cash_components"]
+    components["inventory_working_capital_treatment"] = "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL"
+    components["inventory_reconciliation_status"] = "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL"
+    components["inventory_cash_impact_proxy_cny"]["value"] = "3"
+    components["effective_change_working_capital_cny"]["value"] = "6"
+    result = _evaluate(raw, b4, evidence)
+    scenario = result["normalized_fcf_bridge"]["normalized_fcf"]["scenarios"]["base"]
+
+    assert scenario["status"] == "REVIEW_REQUIRED"
+    assert any(
+        "CASH_COMPONENT:NORMALIZED_FCF_NONINVENTORY_WC_PLUS_INVENTORY_PROXY_MISMATCH" in issue
+        for issue in scenario["issues"]
+    )
+    assert result["normalized_fcf_bridge"]["valuation_input_eligible"] is False
