@@ -159,6 +159,20 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
                 "amount_cny": _measure("0"),
             },
         ],
+        "cash_flow_assessments": [
+            {
+                "scenario": scenario,
+                "attribution_id": f"{scenario}_cycle_delta",
+                "driver_id": "demand_growth",
+                "review_trigger_id": "orders_review",
+                "channel": "NO_DIRECT_CASH_EFFECT",
+                "direction": "NO_DIRECT_EFFECT",
+                "quantification_status": "NOT_APPLICABLE",
+                "rationale": "该净利润归因行不声明独立直接现金流贡献；间接现金转换需在独立路径判断",
+                "evidence_refs": ["E_ACTUAL", "E_COUNTER"],
+            }
+            for scenario in ("bear", "base", "bull")
+        ],
     }
     b4 = {
         "scope": "COMPANY_WIDE",
@@ -430,3 +444,74 @@ def test_variance_transmission_is_not_applicable_to_sotp() -> None:
     assert transmission["status"] == "REVIEW_REQUIRED"
     assert transmission["scenarios"]["base"]["constant_pe_value_sensitivity_per_share"] is None
     assert "CURRENT_PRIMARY_MODEL_IS_NOT_EPS_MULTIPLE" in transmission["issues"]
+
+
+def test_cash_flow_path_is_separate_from_profit_variance_and_not_fcf_reconciled() -> None:
+    raw, b4, evidence = _valid_case()
+    result = _evaluate(raw, b4, evidence)
+    cash_path = result["cash_flow_path"]
+
+    assert cash_path["status"] == "CASH_FLOW_PATH_RECONCILED_DIAGNOSTIC_ONLY"
+    assert cash_path["normalized_fcf_comparison_available"] is False
+    assert cash_path["fcf_variance_reconciled"] is False
+    assert cash_path["cash_flow_amounts_aggregated"] is False
+    assert len(cash_path["scenarios"]["bear"]) == 1
+    assert cash_path["scenarios"]["bear"][0]["attribution_id"] == "bear_cycle_delta"
+    assert result["status"] == "CHAIN_IDENTIFIABLE_NON_ADMITTED"
+
+
+def test_cash_flow_path_rejects_trigger_or_driver_drift_from_profit_attribution() -> None:
+    raw, b4, evidence = _valid_case()
+    raw["cash_flow_assessments"][1]["review_trigger_id"] = "orders_reverse"
+    result = _evaluate(raw, b4, evidence)
+
+    assert result["cash_flow_path"]["status"] == "REVIEW_REQUIRED"
+    assert "CASH_FLOW_TRIGGER_DOES_NOT_MATCH_PROFIT_ATTRIBUTION" in result["cash_flow_path"]["issues"][0] or any(
+        "CASH_FLOW_TRIGGER_DOES_NOT_MATCH_PROFIT_ATTRIBUTION" in issue
+        for issue in result["cash_flow_path"]["issues"]
+    )
+    assert result["status"] == "REVIEW_REQUIRED"
+
+
+def test_quantified_working_capital_effect_requires_usable_b4_cash_context() -> None:
+    raw, b4, evidence = _valid_case()
+    assessment = raw["cash_flow_assessments"][1]
+    assessment.update({
+        "channel": "WORKING_CAPITAL",
+        "direction": "IMPROVES_FCF",
+        "quantification_status": "QUANTIFIED",
+        "cash_flow_effect_cny": _measure("5"),
+    })
+    result = _evaluate(raw, b4, evidence)
+    cash_item = result["cash_flow_path"]["scenarios"]["base"][0]
+
+    assert cash_item["status"] == "REVIEW_REQUIRED"
+    assert cash_item["cash_flow_effect_cny"] is None
+    assert "B4_CASH_CONTEXT_NOT_DECISION_USABLE" in cash_item["issues"]
+
+
+def test_cash_flow_path_rejects_missing_or_after_cutoff_evidence() -> None:
+    raw, b4, evidence = _valid_case()
+    raw["cash_flow_assessments"][0]["evidence_refs"] = ["MISSING_SOURCE"]
+    result = _evaluate(raw, b4, evidence)
+
+    assert result["cash_flow_path"]["status"] == "REVIEW_REQUIRED"
+    assert any("EVIDENCE_REFERENCE_UNRESOLVED:MISSING_SOURCE" in issue for issue in result["cash_flow_path"]["issues"])
+    assert result["valuation_input_eligible"] is False
+
+
+def test_cash_flow_path_quantified_effect_requires_explicit_fcf_direction_sign() -> None:
+    raw, b4, evidence = _valid_case()
+    assessment = raw["cash_flow_assessments"][2]
+    assessment.update({
+        "channel": "CAPEX",
+        "direction": "IMPROVES_FCF",
+        "quantification_status": "QUANTIFIED",
+        "cash_flow_effect_cny": _measure("-7"),
+    })
+    result = _evaluate(raw, b4, evidence)
+    cash_item = result["cash_flow_path"]["scenarios"]["bull"][0]
+
+    assert cash_item["status"] == "REVIEW_REQUIRED"
+    assert cash_item["cash_flow_effect_cny"] is None
+    assert "NEGATIVE_FCF_EFFECT_DIRECTION_MISMATCH" in cash_item["issues"]
