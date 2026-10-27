@@ -24,4 +24,4 @@ B44 is a diagnostic chain only. It does not replace B4 net profit/FCF, amend the
 
 ## Deferred verification
 
-`tests/test_cycle_earnings_monitor_v01.py` covers complete diagnostic chain, period mismatch, missing counter-evidence/reversal signals, arithmetic reconciliation, after-cutoff evidence, and unknown input. The tests have **not** been executed. No Replay, CI, PR, merge, or macOS acceptance was performed. The current-main two-round macOS full-run + independent Replay remains OPEN / NOT VERIFIED.
+`tests/test_cycle_earnings_monitor_v01.py` contains authored coverage for a complete diagnostic chain, period mismatch, missing counter-evidence/reversal signals, reference-profit/adjustment reconciliation, after-cutoff source blocking, unknown input, Replay comparison inclusion, missing B4 scenario profit, and primary-model/timing eligibility. The tests have **not** been executed. No Replay, CI, PR, merge, or macOS acceptance was performed. The current-main two-round macOS full-run + independent Replay remains OPEN / NOT VERIFIED.
