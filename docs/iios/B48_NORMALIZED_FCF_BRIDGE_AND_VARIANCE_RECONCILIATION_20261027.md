@@ -16,9 +16,15 @@ The `normalized_fcf` node requires `metric=UNLEVERED_FCF_PROXY_CNY` and the fixe
 - explicit, signed typed `adjustments`, each carrying an ID, driver, review trigger, category, rationale, and evidence;
 - `low_fcf_cny`, `point_fcf_cny`, `high_fcf_cny`, and `scenario_basis`.
 
-For each scenario the monitor reconciles:
+For each scenario the monitor performs two independent checks. First, the reference bridge:
 
 `reference FCF + sum(signed normalization adjustments) = normalized FCF point ± CNY 1`
+
+Second, an explicit component formula using typed inputs:
+
+`EBIT − max(EBIT, 0) × tax rate + depreciation/amortization − cash capex − effective change in working capital`
+
+The component-calculated value must match the normalized FCF point within CNY 1. Tax rate must be a typed ratio; EBIT, depreciation/amortization, capex, raw working-capital change and effective working-capital change are typed CNY measures with evidence. Inventory treatment and reconciliation status are explicit: where inventory is excluded from the reported working-capital change, effective working capital must equal the non-inventory change plus the inventory cash-impact proxy; where inventory is included, effective working capital must match the reported change without adding the proxy again. This avoids both omission and double-counting.
 
 It also requires low ≤ point ≤ high and Bear point ≤ Base point ≤ Bull point. The adjustment list must explicitly cover all three major channels in every scenario: `CAPEX`, `WORKING_CAPITAL`, and `INVENTORY_MOVEMENT`. A non-applicable/zero contribution must be explicitly stated with a reason; omission does not mean zero. Every adjustment amount must resolve to a source that is compatible with the analysis cutoff and overlap the linked same-driver review trigger's evidence references.
 
@@ -49,4 +55,4 @@ The evaluated node is nested under the existing `cycle_earnings_monitor` object,
 
 ## Deferred verification
 
-Nine new regression cases were authored for a reconciled normalized-FCF bridge, an internal bridge residual, an unallocated FCF-variance residual, signed CAPEX/working-capital/inventory contributions, period mismatch, missing component coverage, evidence/trigger mismatch, a pinned-method mismatch, and missing B4 cash components. `tests/test_cycle_earnings_monitor_v01.py` now contains 34 authored tests total. **None were run for this batch.** No Replay, CI, PR, merge, or macOS acceptance was performed. Real macOS two-round full-run + independent Replay remains OPEN / NOT VERIFIED.
+Eleven new regression cases were authored for a reconciled normalized-FCF bridge, internal bridge residual, FCF-variance residual, signed CAPEX/working-capital/inventory contributions, period mismatch, missing component coverage, evidence/trigger mismatch, pinned-method mismatch, missing B4 cash components, normalized component formula mismatch, and excluded-inventory add-back mismatch. `tests/test_cycle_earnings_monitor_v01.py` now contains 36 authored tests total. **None were run for this batch.** No Replay, CI, PR, merge, or macOS acceptance was performed. Real macOS two-round full-run + independent Replay remains OPEN / NOT VERIFIED.
