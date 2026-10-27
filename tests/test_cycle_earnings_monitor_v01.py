@@ -717,44 +717,73 @@ def test_normalized_fcf_reference_plus_adjustments_must_reconcile_within_cny_one
     assert fcf["valuation_input_eligible"] is False
 
 
-def test_fcf_variance_attribution_residual_blocks_reconciled_status() -> None:
+def test_component_mismatches_block_even_when_fcf_total_residual_is_zero() -> None:
     raw, b4, evidence = _valid_case()
-    b4["scenarios"]["base"]["unlevered_fcf_proxy_cny"] = "70"
+    deliberately_misclassified = {
+        "OPERATING_CASH_CONVERSION": "10",
+        "NON_CASH_EARNINGS": "-10",
+        "CAPEX": "5",
+        "WORKING_CAPITAL": "-5",
+        "INVENTORY_MOVEMENT": "0",
+    }
     for item in raw["fcf_variance_attribution"]:
         if item["scenario"] == "base":
             item["amount_cny"] = {
-                "value": "5", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
-                "basis": "测试用差异贡献，明确标记为假设",
+                "value": deliberately_misclassified[item["category"]],
+                "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
+                "basis": "测试用错误分类；总和为零但各组件与实测值不符",
                 "evidence_refs": ["E_COUNTER"],
             }
     result = _evaluate(raw, b4, evidence)
     row = result["normalized_fcf_bridge"]["variance_attribution"]["scenarios"]["base"]
 
-    assert row["b4_minus_normalized_fcf_cny"] == "20"
-    assert row["attributed_total_cny"] == "15"
-    assert row["unattributed_residual_cny"] == "5"
+    assert row["b4_minus_normalized_fcf_cny"] == "0"
+    assert row["attributed_total_cny"] == "0"
+    assert row["unattributed_residual_cny"] == "0"
     assert row["status"] == "REVIEW_REQUIRED"
+    assert any("FCF_VARIANCE_CATEGORY_CONTRIBUTION_MISMATCH" in issue for issue in row["issues"])
     assert result["normalized_fcf_bridge"]["fcf_variance_reconciled"] is False
 
 
-def test_fcf_variance_can_reconcile_signed_capex_working_capital_and_inventory_contributions() -> None:
+def test_fcf_variance_can_reconcile_signed_component_deltas_with_excluded_inventory() -> None:
     raw, b4, evidence = _valid_case()
-    b4["scenarios"]["base"]["unlevered_fcf_proxy_cny"] = "55"
-    signed = {"CAPEX": "8", "WORKING_CAPITAL": "-2", "INVENTORY_MOVEMENT": "-1"}
+    b4["scenarios"]["base"].update({
+        "unlevered_fcf_proxy_cny": "45",
+        "cash_capex_cny": "27",
+        "change_working_capital_cny": "10",
+        "effective_change_working_capital_cny": "13",
+        "inventory_cash_impact_proxy_cny": "3",
+        "inventory_working_capital_treatment": "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL",
+        "inventory_reconciliation_status": "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL",
+    })
+    normalized_components = raw["normalized_fcf"]["scenarios"]["base"]["cash_components"]
+    normalized_components["inventory_working_capital_treatment"] = "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL"
+    normalized_components["inventory_reconciliation_status"] = "INVENTORY_COST_PROXY_ADDED_TO_NONINVENTORY_WORKING_CAPITAL"
+    normalized_components["inventory_cash_impact_proxy_cny"]["value"] = "0"
+    signed = {
+        "OPERATING_CASH_CONVERSION": "33",
+        "NON_CASH_EARNINGS": "-8",
+        "CAPEX": "-22",
+        "WORKING_CAPITAL": "-5",
+        "INVENTORY_MOVEMENT": "-3",
+    }
     for item in raw["fcf_variance_attribution"]:
         if item["scenario"] == "base":
             item["amount_cny"] = {
                 "value": signed[item["category"]], "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
-                "basis": f"测试用 {item['category']} 差异贡献",
+                "basis": f"测试用 {item['category']} 实测组件差额",
                 "evidence_refs": ["E_COUNTER"],
             }
     result = _evaluate(raw, b4, evidence)
     row = result["normalized_fcf_bridge"]["variance_attribution"]["scenarios"]["base"]
+    component_row = result["normalized_fcf_bridge"]["component_variance_bridge"]["scenarios"]["base"]
 
-    assert row["b4_minus_normalized_fcf_cny"] == "5"
-    assert row["attributed_total_cny"] == "5"
+    assert row["b4_minus_normalized_fcf_cny"] == "-5"
+    assert row["attributed_total_cny"] == "-5"
     assert row["unattributed_residual_cny"] == "0"
     assert row["status"] == "RECONCILED_DIAGNOSTIC_ONLY"
+    assert component_row["contributions_cny"]["WORKING_CAPITAL"] == "-5"
+    assert component_row["contributions_cny"]["INVENTORY_MOVEMENT"] == "-3"
     assert result["normalized_fcf_bridge"]["fcf_variance_reconciled"] is True
 
 
