@@ -752,3 +752,26 @@ def test_fcf_variance_amount_evidence_must_overlap_review_trigger_evidence() -> 
         for issue in fcf["variance_attribution"]["issues"]
     )
     assert fcf["fcf_variance_reconciled"] is False
+
+
+def test_normalized_fcf_method_must_match_pinned_b4_proxy_formula() -> None:
+    raw, b4, evidence = _valid_case()
+    raw["normalized_fcf"]["method"] = "UNLEVERED_FCF_FROM_NET_PROFIT"
+    result = _evaluate(raw, b4, evidence)
+    fcf = result["normalized_fcf_bridge"]
+
+    assert fcf["normalized_fcf"]["status"] == "REVIEW_REQUIRED"
+    assert "NORMALIZED_FCF_METHOD_MISMATCH_B4_PROXY_FORMULA" in fcf["normalized_fcf"]["issues"]
+    assert fcf["normalized_fcf_comparison_available"] is False
+    assert fcf["valuation_input_eligible"] is False
+
+
+def test_b4_fcf_comparison_requires_cash_capex_and_effective_working_capital_components() -> None:
+    raw, b4, evidence = _valid_case()
+    b4["scenarios"]["base"]["effective_change_working_capital_cny"] = None
+    result = _evaluate(raw, b4, evidence)
+    fcf = result["normalized_fcf_bridge"]
+
+    assert fcf["b4_comparison"]["status"] == "NOT_COMPARABLE"
+    assert "BASE:B4_FCF_COMPONENT_NOT_IDENTIFIABLE:effective_change_working_capital_cny" in fcf["b4_comparison"]["issues"]
+    assert fcf["fcf_variance_reconciled"] is False
