@@ -12,6 +12,7 @@ from typing import Any, Mapping
 from .operating_driver_forecast_v01 import _is_identifiable_basis
 
 CYCLE_EARNINGS_MONITOR_SCHEMA = "IIOS-CYCLE-EARNINGS-MONITOR-0.1"
+NORMALIZED_FCF_METHOD = "B4_UNLEVERED_FCF_PROXY_EBIT_AFTER_TAX_PLUS_DA_MINUS_CASH_CAPEX_MINUS_EFFECTIVE_WC_V0.1"
 CYCLE_PHASES = {
     "TROUGH",
     "EARLY_RECOVERY",
@@ -672,19 +673,22 @@ def _evaluate_normalized_fcf_bridge(
     allowed_scopes = {"COMPANY_WIDE", "PRODUCT_LINE", "PROJECT_INCREMENTAL"}
     allowed_categories = {
         "OPERATING_CASH_CONVERSION", "WORKING_CAPITAL", "INVENTORY_MOVEMENT",
-        "CAPEX", "NON_CASH_EARNINGS", "FINANCING_CASH_FLOW", "TAX_CASH_TIMING", "OTHER",
+        "CAPEX", "NON_CASH_EARNINGS", "TAX_CASH_TIMING", "OTHER",
     }
     monitor_issues: list[str] = []
     norm = raw_normalized_fcf
-    metric = _text(norm.get("metric") or "UNLEVERED_FCF_CNY").upper()
+    metric = _text(norm.get("metric") or "UNLEVERED_FCF_PROXY_CNY").upper()
+    method = _text(norm.get("method")).upper()
     scope = _text(norm.get("scope") or "UNKNOWN").upper()
     period = _text(norm.get("period"))
     reference_period = _text(norm.get("reference_period"))
     basis = _text(norm.get("normalization_basis"))
     b4_scope = _text(operating_driver_forecast.get("scope") or "UNKNOWN").upper()
     b4_period = _text(operating_driver_forecast.get("forecast_period") or "UNKNOWN")
-    if metric != "UNLEVERED_FCF_CNY":
+    if metric != "UNLEVERED_FCF_PROXY_CNY":
         monitor_issues.append("NORMALIZED_FCF_METRIC_UNSUPPORTED")
+    if method != NORMALIZED_FCF_METHOD:
+        monitor_issues.append("NORMALIZED_FCF_METHOD_MISMATCH_B4_PROXY_FORMULA")
     if scope not in allowed_scopes:
         monitor_issues.append("NORMALIZED_FCF_SCOPE_NOT_IDENTIFIABLE")
     if not _meaningful(period):
@@ -849,6 +853,7 @@ def _evaluate_normalized_fcf_bridge(
     normalized_result = {
         "status": normalized_status,
         "metric": metric,
+        "method": method or "UNKNOWN",
         "scope": scope,
         "reference_period": reference_period or "UNKNOWN",
         "period": period or "UNKNOWN",
@@ -877,6 +882,26 @@ def _evaluate_normalized_fcf_bridge(
         row_issues: list[str] = []
         if b4_row.get("financial_outputs_decision_usable") is not True:
             row_issues.append("B4_FCF_OUTPUT_NOT_DECISION_USABLE")
+        for component_field in ("cash_capex_cny", "effective_change_working_capital_cny"):
+            try:
+                _decimal(b4_row.get(component_field), f"b4.{name}.{component_field}")
+            except ValueError:
+                row_issues.append("B4_FCF_COMPONENT_NOT_IDENTIFIABLE:" + component_field)
+        inventory_treatment = _text(b4_row.get("inventory_working_capital_treatment")).upper()
+        if inventory_treatment not in {
+            "INCLUDED_IN_CHANGE_WORKING_CAPITAL", "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL",
+            "NOT_APPLICABLE", "NOT_APPLICABLE_NO_TONNAGE_BASIS",
+        }:
+            row_issues.append("B4_INVENTORY_WORKING_CAPITAL_TREATMENT_NOT_IDENTIFIABLE")
+        inventory_status = _text(b4_row.get("inventory_reconciliation_status")).upper()
+        blocked_inventory_tokens = ("NOT_IDENTIFIABLE", "UNAVAILABLE", "INVALID", "REQUIRED", "UNKNOWN")
+        if not inventory_status or any(token in inventory_status for token in blocked_inventory_tokens):
+            row_issues.append("B4_INVENTORY_WORKING_CAPITAL_RECONCILIATION_NOT_IDENTIFIABLE")
+        if inventory_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL":
+            try:
+                _decimal(b4_row.get("inventory_cash_impact_proxy_cny"), f"b4.{name}.inventory_cash_impact_proxy_cny")
+            except ValueError:
+                row_issues.append("B4_INVENTORY_CASH_IMPACT_PROXY_REQUIRED_WHEN_INVENTORY_EXCLUDED")
         try:
             b4_fcf = _decimal(b4_row.get("unlevered_fcf_proxy_cny"), f"b4.{name}.unlevered_fcf_proxy_cny")
         except ValueError:
@@ -900,6 +925,7 @@ def _evaluate_normalized_fcf_bridge(
         "status": "DIAGNOSTIC_ONLY_NOT_A_VALUATION_INPUT" if comparison_complete else "NOT_COMPARABLE",
         "scope": scope,
         "period": period,
+        "method": method or "UNKNOWN",
         "scenarios": comparisons,
         "issues": sorted(set(comparison_issues)),
         "note": "B4 FCF 仅在自身财务输出可用于决策且范围/期间一致时比较；不改变 B4 结果。",
