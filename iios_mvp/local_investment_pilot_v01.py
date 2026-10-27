@@ -27,6 +27,11 @@ from .decision_kernel_v03 import evaluate_production_decision
 from .decision_state_machine_v01 import MIE_POLICY_OPTIONAL_EXPLANATORY
 from .local_pilot_portfolio_package_v01 import build_local_pilot_portfolio_package
 from .operating_driver_forecast_v01 import evaluate_operating_driver_forecast, render_operating_driver_section
+from .cycle_earnings_monitor_v01 import (
+    CYCLE_EARNINGS_MONITOR_SCHEMA,
+    evaluate_cycle_earnings_monitor,
+    render_cycle_earnings_monitor_section,
+)
 from .sotp_valuation_v01 import evaluate_sotp_valuation, render_sotp_valuation_section
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
@@ -2527,6 +2532,19 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     operating_driver_forecast["valuation_reconciliation"] = _reconcile_b4_valuation_bridge(
         operating_driver_forecast, forecast
     )
+    raw_cycle_monitor = (
+        raw_driver_forecast.get("cycle_earnings_monitor")
+        if isinstance(raw_driver_forecast, Mapping) else None
+    )
+    cycle_earnings_monitor = evaluate_cycle_earnings_monitor(
+        raw_cycle_monitor,
+        operating_driver_forecast=operating_driver_forecast,
+        assessment=assessment,
+        evidence_register=sources,
+        unresolved_evidence_ids=unknown_refs,
+        after_cutoff_evidence_ids=after_cutoff_refs,
+        uncertain_timing_evidence_ids=uncertain_timing_refs,
+    )
     allowed_model_families = {"EPS_MULTIPLE", "FCF_DCF", "DDM", "SOTP", "RNPV", "OTHER", "UNKNOWN"}
     operator_context_raw = raw_operator_valuation_context if isinstance(raw_operator_valuation_context, Mapping) else {}
     selected_model_family = str(operator_context_raw.get("selected_model_family") or "UNKNOWN").strip().upper()
@@ -2792,6 +2810,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "eps_multiple_valuation": eps_multiple_valuation,
         "eps_earnings_bridge": eps_earnings_bridge,
         "operating_driver_forecast": operating_driver_forecast,
+        "cycle_earnings_monitor": cycle_earnings_monitor,
         "valuation_transmission": valuation_transmission,
         "sotp_valuation": sotp_valuation,
         "operator_valuation_context": operator_valuation_context,
@@ -3864,6 +3883,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         c["currency"],
         valuation_transmission=analysis.get("valuation_transmission") or {},
     ))
+    lines.extend(render_cycle_earnings_monitor_section(analysis.get("cycle_earnings_monitor") or {}))
     assumption_links = b4_report_source.get("cross_node_assumption_links")
     if isinstance(assumption_links, list) and assumption_links:
         lines.extend(["", "#### B4 与估值假设的交叉引用", ""])
@@ -4178,6 +4198,7 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "eps_multiple_valuation": prepared["eps_multiple_valuation"],
         "eps_earnings_bridge": prepared["eps_earnings_bridge"],
         "operating_driver_forecast": prepared["operating_driver_forecast"],
+        "cycle_earnings_monitor": prepared["cycle_earnings_monitor"],
         "valuation_transmission": prepared["valuation_transmission"],
         "sotp_valuation": prepared["sotp_valuation"],
         "operator_valuation_context": prepared["operator_valuation_context"],
@@ -4698,6 +4719,24 @@ def _template(
                 "change_working_capital_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"}
             }
             },
+            "cycle_earnings_monitor": {
+                "schema_version": CYCLE_EARNINGS_MONITOR_SCHEMA,
+                "industry_cycle": {
+                    "cycle_id": "", "phase": "UNKNOWN", "phase_basis": "",
+                    "evidence_refs": [], "counter_evidence_refs": [],
+                    "leading_indicators": [], "reversal_signals": [],
+                },
+                "normalized_earnings": {
+                    "metric": "NET_PROFIT_CNY", "scope": "UNKNOWN", "period": "",
+                    "normalization_basis": "",
+                    "scenarios": {
+                        "bear": {"reference_net_profit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "adjustments": [], "low_cny": None, "point_cny": None, "high_cny": None, "scenario_basis": ""},
+                        "base": {"reference_net_profit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "adjustments": [], "low_cny": None, "point_cny": None, "high_cny": None, "scenario_basis": ""},
+                        "bull": {"reference_net_profit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "adjustments": [], "low_cny": None, "point_cny": None, "high_cny": None, "scenario_basis": ""},
+                    },
+                },
+                "review_triggers": [],
+            },
             "limitations": [],
         },
         "decision_parameters": {
@@ -5075,8 +5114,8 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
         "不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
         "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。"
         "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。"
-        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。Bear/Base/Bull 应来自显式经营假设；未知值保持 UNKNOWN。"
-        "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。"
+        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。Bear/Base/Bull 应来自显式经营假设；未知值保持 UNKNOWN。operating_driver_forecast 内必须附带 cycle_earnings_monitor，明确行业周期阶段/支持证据/反证/领先指标/反转信号；对 Bear/Base/Bull 分别给出带来源的参考净利润、逐项正常化调整及低/中/高区间；每个持仓复核触发器必须含 driver_id 和从 INDUSTRY_CYCLE → NORMALIZED_EARNINGS → EPS_OR_FCF → PER_SHARE_VALUE → POSITION_REVIEW 的因果路径。无法识别的字段不得伪造。"
+        "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。cycle_earnings_monitor 必须位于 operating_driver_forecast 内，不能新增顶层字段。"
         "Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
         "【Round A 允许输入】\n"
         + json.dumps(allowed_input, ensure_ascii=False, indent=2, allow_nan=False)
