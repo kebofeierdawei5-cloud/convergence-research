@@ -636,6 +636,418 @@ def _evaluate_cash_flow_path(
     }
 
 
+def _evaluate_normalized_fcf_bridge(
+    *,
+    raw_normalized_fcf: Any,
+    raw_fcf_attributions: Any,
+    operating_driver_forecast: Mapping[str, Any],
+    known_driver_ids: set[str],
+    raw_review_triggers: list[Any],
+    sources_by_id: Mapping[str, Mapping[str, Any]],
+    unresolved_refs: set[str],
+    after_cutoff_refs: set[str],
+    uncertain_refs: set[str],
+) -> dict[str, Any]:
+    """Build an independent normalized-FCF bridge and reconcile B4-minus-normalized FCF."""
+    empty = {
+        "status": "NOT_IDENTIFIABLE",
+        "normalized_fcf": {"status": "NOT_IDENTIFIABLE", "scenarios": {}, "issues": ["NORMALIZED_FCF_NOT_PROVIDED"]},
+        "b4_comparison": {"status": "NOT_COMPARABLE", "scenarios": {}, "issues": ["B4_NORMALIZED_FCF_COMPARISON_NOT_IDENTIFIABLE"]},
+        "variance_attribution": {"status": "NOT_COMPARABLE", "scenarios": {}, "issues": ["FCF_VARIANCE_ATTRIBUTION_NOT_PROVIDED"]},
+        "issues": ["NORMALIZED_FCF_NOT_PROVIDED"],
+        "sign_convention": "B4_UNLEVERED_FCF_PROXY_MINUS_NORMALIZED_FCF; positive means B4 FCF is higher",
+        "tolerance_cny": "1",
+        "normalized_fcf_comparison_available": False,
+        "fcf_variance_reconciled": False,
+        "cash_flow_amounts_aggregated": False,
+        "valuation_input_eligible": False,
+        "formal_forecast_admission_created": False,
+        "formal_valuation_admission_created": False,
+        "decision_authority": False,
+    }
+    if not isinstance(raw_normalized_fcf, Mapping):
+        return empty
+
+    allowed_scopes = {"COMPANY_WIDE", "PRODUCT_LINE", "PROJECT_INCREMENTAL"}
+    allowed_categories = {
+        "OPERATING_CASH_CONVERSION", "WORKING_CAPITAL", "INVENTORY_MOVEMENT",
+        "CAPEX", "NON_CASH_EARNINGS", "FINANCING_CASH_FLOW", "TAX_CASH_TIMING", "OTHER",
+    }
+    monitor_issues: list[str] = []
+    norm = raw_normalized_fcf
+    metric = _text(norm.get("metric") or "UNLEVERED_FCF_CNY").upper()
+    scope = _text(norm.get("scope") or "UNKNOWN").upper()
+    period = _text(norm.get("period"))
+    reference_period = _text(norm.get("reference_period"))
+    basis = _text(norm.get("normalization_basis"))
+    b4_scope = _text(operating_driver_forecast.get("scope") or "UNKNOWN").upper()
+    b4_period = _text(operating_driver_forecast.get("forecast_period") or "UNKNOWN")
+    if metric != "UNLEVERED_FCF_CNY":
+        monitor_issues.append("NORMALIZED_FCF_METRIC_UNSUPPORTED")
+    if scope not in allowed_scopes:
+        monitor_issues.append("NORMALIZED_FCF_SCOPE_NOT_IDENTIFIABLE")
+    if not _meaningful(period):
+        monitor_issues.append("NORMALIZED_FCF_PERIOD_NOT_IDENTIFIABLE")
+    if not _meaningful(reference_period):
+        monitor_issues.append("NORMALIZED_FCF_REFERENCE_PERIOD_NOT_IDENTIFIABLE")
+    if not _meaningful(basis):
+        monitor_issues.append("NORMALIZED_FCF_NORMALIZATION_BASIS_NOT_IDENTIFIABLE")
+
+    sources_normalized = norm.get("scenarios") if isinstance(norm.get("scenarios"), Mapping) else {}
+    normalized_scenarios: dict[str, dict[str, Any]] = {}
+    point_values: dict[str, Decimal] = {}
+    normalized_complete = not monitor_issues
+    for name in SCENARIOS:
+        raw_scenario = sources_normalized.get(name) if isinstance(sources_normalized.get(name), Mapping) else {}
+        item_issues: list[str] = []
+        scenario_basis = _text(raw_scenario.get("scenario_basis"))
+        if not _meaningful(scenario_basis):
+            item_issues.append("SCENARIO_BASIS_NOT_IDENTIFIABLE")
+        reference, ref_issues, ref_evidence = _money(
+            raw_scenario.get("reference_fcf_cny"),
+            field=f"normalized_fcf.{name}.reference_fcf_cny",
+            sources_by_id=sources_by_id,
+            unresolved_refs=unresolved_refs,
+            after_cutoff_refs=after_cutoff_refs,
+            uncertain_refs=uncertain_refs,
+            allow_negative=True,
+        )
+        item_issues.extend(ref_issues)
+        reference_measure = raw_scenario.get("reference_fcf_cny")
+        if not ref_evidence:
+            item_issues.append("NORMALIZED_FCF_REFERENCE_EVIDENCE_REQUIRED")
+
+        raw_adjustments = raw_scenario.get("adjustments")
+        raw_adjustments = raw_adjustments if isinstance(raw_adjustments, list) else []
+        adjustments: list[dict[str, Any]] = []
+        adjustment_ids: set[str] = set()
+        adjustment_total = Decimal("0")
+        adjustment_values_complete = True
+        for index, row in enumerate(raw_adjustments):
+            if not isinstance(row, Mapping):
+                item_issues.append(f"ADJUSTMENT_{index}_INVALID")
+                adjustment_values_complete = False
+                continue
+            adjustment_id = _text(row.get("adjustment_id"))
+            driver_id = _text(row.get("driver_id"))
+            trigger_id = _text(row.get("review_trigger_id"))
+            category = _text(row.get("category")).upper()
+            rationale = _text(row.get("rationale"))
+            row_issues: list[str] = []
+            if not adjustment_id:
+                row_issues.append("ADJUSTMENT_ID_REQUIRED")
+            elif adjustment_id in adjustment_ids:
+                row_issues.append(f"DUPLICATE_ADJUSTMENT_ID:{adjustment_id}")
+            adjustment_ids.add(adjustment_id)
+            if driver_id not in known_driver_ids:
+                row_issues.append("NORMALIZED_FCF_ADJUSTMENT_DRIVER_UNRESOLVED")
+            if category not in allowed_categories:
+                row_issues.append("NORMALIZED_FCF_ADJUSTMENT_CATEGORY_UNSUPPORTED")
+            if not _meaningful(rationale):
+                row_issues.append("NORMALIZED_FCF_ADJUSTMENT_RATIONALE_NOT_IDENTIFIABLE")
+            trigger = next(
+                (candidate for candidate in raw_review_triggers
+                 if isinstance(candidate, Mapping) and _text(candidate.get("trigger_id")) == trigger_id),
+                None,
+            )
+            if trigger is None:
+                row_issues.append("NORMALIZED_FCF_ADJUSTMENT_REVIEW_TRIGGER_UNRESOLVED")
+            elif _text(trigger.get("driver_id")) != driver_id:
+                row_issues.append("NORMALIZED_FCF_ADJUSTMENT_TRIGGER_DRIVER_MISMATCH")
+            amount, amount_issues, amount_refs = _money(
+                row.get("amount_cny"),
+                field=f"normalized_fcf.{name}.adjustment.{adjustment_id or index}.amount_cny",
+                sources_by_id=sources_by_id,
+                unresolved_refs=unresolved_refs,
+                after_cutoff_refs=after_cutoff_refs,
+                uncertain_refs=uncertain_refs,
+                allow_negative=True,
+            )
+            row_issues.extend(amount_issues)
+            if not amount_refs:
+                row_issues.append("NORMALIZED_FCF_ADJUSTMENT_EVIDENCE_REQUIRED")
+            trigger_refs_raw = trigger.get("evidence_refs") if isinstance(trigger, Mapping) and isinstance(trigger.get("evidence_refs"), list) else []
+            trigger_refs = {_text(ref) for ref in trigger_refs_raw if _text(ref)}
+            if not trigger_refs:
+                row_issues.append("NORMALIZED_FCF_ADJUSTMENT_TRIGGER_EVIDENCE_REQUIRED")
+            elif not set(amount_refs).intersection(trigger_refs):
+                row_issues.append("NORMALIZED_FCF_ADJUSTMENT_EVIDENCE_NOT_SHARED_WITH_TRIGGER")
+            if amount is not None and not row_issues:
+                adjustment_total += amount
+            else:
+                adjustment_values_complete = False
+            adjustments.append({
+                "adjustment_id": adjustment_id or f"UNKNOWN_{index}",
+                "driver_id": driver_id or "UNKNOWN",
+                "review_trigger_id": trigger_id or "UNKNOWN",
+                "category": category or "UNKNOWN",
+                "rationale": rationale or "UNKNOWN",
+                "amount_cny": _format(amount) if amount is not None and not row_issues else None,
+                "evidence_refs": amount_refs,
+                "issues": sorted(set(row_issues)),
+            })
+            item_issues.extend(f"ADJUSTMENT:{adjustment_id or index}:{issue}" for issue in row_issues)
+        if not raw_adjustments:
+            item_issues.append("NORMALIZED_FCF_ADJUSTMENTS_REQUIRED_EVEN_FOR_ZERO_BRIDGE")
+
+        numeric_fields: dict[str, Decimal | None] = {}
+        for key in ("low_fcf_cny", "point_fcf_cny", "high_fcf_cny"):
+            try:
+                numeric_fields[key] = _decimal(raw_scenario.get(key), f"normalized_fcf.{name}.{key}")
+            except ValueError:
+                numeric_fields[key] = None
+                item_issues.append(f"{key.upper()}_NOT_IDENTIFIABLE")
+        low_value, point_value, high_value = (
+            numeric_fields["low_fcf_cny"], numeric_fields["point_fcf_cny"], numeric_fields["high_fcf_cny"]
+        )
+        if low_value is not None and point_value is not None and high_value is not None and not (low_value <= point_value <= high_value):
+            item_issues.append("NORMALIZED_FCF_LOW_POINT_HIGH_ORDER_INVALID")
+        if reference is not None and point_value is not None and adjustment_values_complete:
+            residual = reference + adjustment_total - point_value
+            if abs(residual) > Decimal("1"):
+                item_issues.append("NORMALIZED_FCF_REFERENCE_PLUS_ADJUSTMENTS_DO_NOT_RECONCILE_WITHIN_CNY_1")
+        else:
+            residual = None
+            item_issues.append("NORMALIZED_FCF_BRIDGE_RESIDUAL_NOT_IDENTIFIABLE")
+        if reference is not None and point_value is not None and high_value is not None and low_value is not None and not item_issues:
+            point_values[name] = point_value
+        elif point_value is not None and not item_issues:
+            point_values[name] = point_value
+        else:
+            normalized_complete = False
+        scenario_status = "NORMALIZED_FCF_BRIDGE_RECONCILED_DIAGNOSTIC_ONLY" if not item_issues else "REVIEW_REQUIRED"
+        normalized_scenarios[name] = {
+            "scenario": name,
+            "status": scenario_status,
+            "reference_fcf_cny": _format(reference) if reference is not None and not ref_issues else None,
+            "reference_period": reference_period or "UNKNOWN",
+            "period": period or "UNKNOWN",
+            "adjustment_total_cny": _format(adjustment_total) if adjustment_values_complete else None,
+            "low_fcf_cny": _format(low_value),
+            "point_fcf_cny": _format(point_value),
+            "high_fcf_cny": _format(high_value),
+            "bridge_residual_cny": _format(residual),
+            "adjustments": adjustments,
+            "scenario_basis": scenario_basis or "UNKNOWN",
+            "issues": sorted(set(item_issues)),
+        }
+        if item_issues:
+            monitor_issues.extend(f"{name.upper()}:{issue}" for issue in item_issues)
+
+    if set(point_values) == set(SCENARIOS) and not (point_values["bear"] <= point_values["base"] <= point_values["bull"]):
+        normalized_complete = False
+        monitor_issues.append("NORMALIZED_FCF_BEAR_BASE_BULL_POINT_ORDER_INVALID")
+    normalized_status = "NORMALIZED_FCF_BRIDGE_RECONCILED_DIAGNOSTIC_ONLY" if normalized_complete and not monitor_issues else "REVIEW_REQUIRED"
+    normalized_result = {
+        "status": normalized_status,
+        "metric": metric,
+        "scope": scope,
+        "reference_period": reference_period or "UNKNOWN",
+        "period": period or "UNKNOWN",
+        "normalization_basis": basis or "UNKNOWN",
+        "scenarios": normalized_scenarios,
+        "issues": sorted(set(monitor_issues)),
+        "valuation_input_eligible": False,
+        "formal_forecast_admission_created": False,
+    }
+
+    b4_rows = operating_driver_forecast.get("scenarios")
+    b4_rows = b4_rows if isinstance(b4_rows, Mapping) else {}
+    comparable = (
+        normalized_status == "NORMALIZED_FCF_BRIDGE_RECONCILED_DIAGNOSTIC_ONLY"
+        and scope == b4_scope and period == b4_period
+    )
+    comparisons: dict[str, dict[str, Any]] = {}
+    comparison_issues: list[str] = []
+    if scope != b4_scope:
+        comparison_issues.append("NORMALIZED_FCF_SCOPE_MISMATCH_B4")
+    if period != b4_period:
+        comparison_issues.append("NORMALIZED_FCF_PERIOD_MISMATCH_B4")
+    for name in SCENARIOS:
+        b4_row = b4_rows.get(name) if isinstance(b4_rows.get(name), Mapping) else {}
+        b4_fcf: Decimal | None = None
+        row_issues: list[str] = []
+        if b4_row.get("financial_outputs_decision_usable") is not True:
+            row_issues.append("B4_FCF_OUTPUT_NOT_DECISION_USABLE")
+        try:
+            b4_fcf = _decimal(b4_row.get("unlevered_fcf_proxy_cny"), f"b4.{name}.unlevered_fcf_proxy_cny")
+        except ValueError:
+            row_issues.append("B4_FCF_PROXY_NOT_IDENTIFIABLE")
+        norm_point = point_values.get(name)
+        if norm_point is None:
+            row_issues.append("NORMALIZED_FCF_POINT_NOT_IDENTIFIABLE")
+        difference = b4_fcf - norm_point if b4_fcf is not None and norm_point is not None else None
+        status = "COMPARABLE_DIAGNOSTIC_ONLY" if comparable and not row_issues else "NOT_COMPARABLE_OR_REVIEW_REQUIRED"
+        comparisons[name] = {
+            "b4_unlevered_fcf_proxy_cny": _format(b4_fcf) if b4_fcf is not None and not row_issues else None,
+            "normalized_fcf_point_cny": _format(norm_point),
+            "b4_minus_normalized_fcf_cny": _format(difference) if difference is not None and comparable and not row_issues else None,
+            "status": status,
+            "issues": sorted(set(row_issues)),
+        }
+        if row_issues:
+            comparison_issues.extend(f"{name.upper()}:{issue}" for issue in row_issues)
+    comparison_complete = comparable and all(row.get("status") == "COMPARABLE_DIAGNOSTIC_ONLY" for row in comparisons.values())
+    comparison_result = {
+        "status": "DIAGNOSTIC_ONLY_NOT_A_VALUATION_INPUT" if comparison_complete else "NOT_COMPARABLE",
+        "scope": scope,
+        "period": period,
+        "scenarios": comparisons,
+        "issues": sorted(set(comparison_issues)),
+        "note": "B4 FCF 仅在自身财务输出可用于决策且范围/期间一致时比较；不改变 B4 结果。",
+    }
+
+    raw_attributions = raw_fcf_attributions if isinstance(raw_fcf_attributions, list) else []
+    trigger_map = {
+        _text(row.get("trigger_id")): row for row in raw_review_triggers
+        if isinstance(row, Mapping) and _text(row.get("trigger_id"))
+    }
+    attribution_rows: dict[str, list[dict[str, Any]]] = {name: [] for name in SCENARIOS}
+    attribution_issues: list[str] = []
+    attribution_ids: set[tuple[str, str]] = set()
+    for index, row in enumerate(raw_attributions):
+        if not isinstance(row, Mapping):
+            attribution_issues.append(f"FCF_VARIANCE_ATTRIBUTION_{index}_INVALID")
+            continue
+        scenario = _text(row.get("scenario")).lower()
+        if scenario not in SCENARIOS:
+            attribution_issues.append(f"FCF_VARIANCE_ATTRIBUTION_{index}_SCENARIO_INVALID")
+            continue
+        attribution_id = _text(row.get("fcf_attribution_id"))
+        driver_id = _text(row.get("driver_id"))
+        trigger_id = _text(row.get("review_trigger_id"))
+        category = _text(row.get("category")).upper()
+        rationale = _text(row.get("rationale"))
+        row_issues: list[str] = []
+        key = (scenario, attribution_id)
+        if not attribution_id:
+            row_issues.append("FCF_ATTRIBUTION_ID_REQUIRED")
+        if key in attribution_ids:
+            row_issues.append("DUPLICATE_FCF_ATTRIBUTION_ID")
+        attribution_ids.add(key)
+        if driver_id not in known_driver_ids:
+            row_issues.append("FCF_ATTRIBUTION_DRIVER_UNRESOLVED")
+        if category not in allowed_categories:
+            row_issues.append("FCF_ATTRIBUTION_CATEGORY_UNSUPPORTED")
+        if not _meaningful(rationale):
+            row_issues.append("FCF_ATTRIBUTION_RATIONALE_NOT_IDENTIFIABLE")
+        trigger = trigger_map.get(trigger_id)
+        if trigger is None:
+            row_issues.append("FCF_ATTRIBUTION_REVIEW_TRIGGER_UNRESOLVED")
+        elif _text(trigger.get("driver_id")) != driver_id:
+            row_issues.append("FCF_ATTRIBUTION_TRIGGER_DRIVER_MISMATCH")
+        amount, amount_issues, amount_refs = _money(
+            row.get("amount_cny"),
+            field=f"fcf_variance_attribution.{scenario}.{attribution_id or index}.amount_cny",
+            sources_by_id=sources_by_id,
+            unresolved_refs=unresolved_refs,
+            after_cutoff_refs=after_cutoff_refs,
+            uncertain_refs=uncertain_refs,
+            allow_negative=True,
+        )
+        row_issues.extend(amount_issues)
+        if not amount_refs:
+            row_issues.append("FCF_ATTRIBUTION_EVIDENCE_REQUIRED")
+        trigger_refs_raw = trigger.get("evidence_refs") if isinstance(trigger, Mapping) and isinstance(trigger.get("evidence_refs"), list) else []
+        trigger_refs = {_text(ref) for ref in trigger_refs_raw if _text(ref)}
+        if not trigger_refs:
+            row_issues.append("FCF_ATTRIBUTION_TRIGGER_EVIDENCE_REQUIRED")
+        elif not set(amount_refs).intersection(trigger_refs):
+            row_issues.append("FCF_ATTRIBUTION_EVIDENCE_NOT_SHARED_WITH_TRIGGER")
+        attribution_rows[scenario].append({
+            "scenario": scenario,
+            "fcf_attribution_id": attribution_id or f"UNKNOWN_{index}",
+            "driver_id": driver_id or "UNKNOWN",
+            "review_trigger_id": trigger_id or "UNKNOWN",
+            "category": category or "UNKNOWN",
+            "rationale": rationale or "UNKNOWN",
+            "amount_cny": _format(amount) if amount is not None and not row_issues else None,
+            "evidence_refs": amount_refs,
+            "issues": sorted(set(row_issues)),
+        })
+        attribution_issues.extend(f"{scenario.upper()}:{attribution_id or index}:{issue}" for issue in row_issues)
+
+    variance_scenarios: dict[str, dict[str, Any]] = {}
+    variance_complete = comparison_complete
+    for name in SCENARIOS:
+        compare_row = comparisons.get(name, {})
+        try:
+            difference = _decimal(compare_row.get("b4_minus_normalized_fcf_cny"), f"{name}.b4_minus_normalized_fcf_cny")
+        except ValueError:
+            difference = None
+        rows = attribution_rows[name]
+        scenario_issues: list[str] = []
+        contributions: list[Decimal] = []
+        if comparison_complete and not rows:
+            scenario_issues.append("FCF_ATTRIBUTIONS_REQUIRED_FOR_COMPARABLE_SCENARIO")
+        for item in rows:
+            if item.get("issues") or item.get("amount_cny") is None:
+                scenario_issues.extend(f"{item.get('fcf_attribution_id')}:{issue}" for issue in (item.get("issues") or ["FCF_ATTRIBUTION_AMOUNT_NOT_IDENTIFIABLE"]))
+            else:
+                contributions.append(_decimal(item["amount_cny"], "FCF_ATTRIBUTION_AMOUNT"))
+        total = sum(contributions, Decimal("0")) if len(contributions) == len(rows) else None
+        residual = difference - total if difference is not None and total is not None else None
+        if difference is not None and total is not None and residual is not None and abs(residual) > Decimal("1"):
+            scenario_issues.append("FCF_VARIANCE_ATTRIBUTIONS_DO_NOT_RECONCILE_WITHIN_CNY_1")
+        scenario_status = (
+            "RECONCILED_DIAGNOSTIC_ONLY"
+            if comparison_complete and rows and total is not None and residual is not None and not scenario_issues
+            else "REVIEW_REQUIRED" if comparison_complete else "NOT_COMPARABLE"
+        )
+        if scenario_status != "RECONCILED_DIAGNOSTIC_ONLY":
+            variance_complete = False
+        variance_scenarios[name] = {
+            "scenario": name,
+            "b4_minus_normalized_fcf_cny": _format(difference),
+            "attributed_total_cny": _format(total),
+            "unattributed_residual_cny": _format(residual),
+            "items": rows,
+            "status": scenario_status,
+            "issues": sorted(set(scenario_issues)),
+        }
+        attribution_issues.extend(f"{name.upper()}:{issue}" for issue in scenario_issues)
+    variance_status = (
+        "ALL_SCENARIOS_RECONCILED_DIAGNOSTIC_ONLY"
+        if variance_complete and not attribution_issues
+        else "REVIEW_REQUIRED" if comparison_complete
+        else "NOT_COMPARABLE"
+    )
+    variance_result = {
+        "status": variance_status,
+        "sign_convention": "B4_UNLEVERED_FCF_PROXY_MINUS_NORMALIZED_FCF; positive means B4 FCF is higher, negative means B4 FCF is lower",
+        "tolerance_cny": "1",
+        "scenarios": variance_scenarios,
+        "issues": sorted(set(attribution_issues)),
+        "cash_flow_amounts_aggregated": False,
+        "valuation_input_eligible": False,
+    }
+    all_issues = sorted(set(monitor_issues + comparison_issues + attribution_issues))
+    result_status = (
+        "FCF_VARIANCE_RECONCILED_DIAGNOSTIC_ONLY"
+        if normalized_status == "NORMALIZED_FCF_BRIDGE_RECONCILED_DIAGNOSTIC_ONLY"
+        and comparison_complete and variance_status == "ALL_SCENARIOS_RECONCILED_DIAGNOSTIC_ONLY"
+        else "REVIEW_REQUIRED" if all_issues or normalized_status != "NORMALIZED_FCF_BRIDGE_RECONCILED_DIAGNOSTIC_ONLY"
+        else "NOT_COMPARABLE"
+    )
+    return {
+        "status": result_status,
+        "normalized_fcf": normalized_result,
+        "b4_comparison": comparison_result,
+        "variance_attribution": variance_result,
+        "issues": all_issues,
+        "sign_convention": "B4_UNLEVERED_FCF_PROXY_MINUS_NORMALIZED_FCF; positive means B4 FCF is higher",
+        "tolerance_cny": "1",
+        "normalized_fcf_comparison_available": comparison_complete,
+        "fcf_variance_reconciled": variance_status == "ALL_SCENARIOS_RECONCILED_DIAGNOSTIC_ONLY",
+        "cash_flow_amounts_aggregated": False,
+        "valuation_input_eligible": False,
+        "formal_forecast_admission_created": False,
+        "formal_valuation_admission_created": False,
+        "decision_authority": False,
+        "note": "先独立核对参考 FCF + 逐项调整 = 正常化 FCF 中枢，再对比 B4 FCF；最后由单独的 FCF 归因行对账差异。库存/营运资金/资本开支仍采用各自通道和符号，任何一层失败均不得宣称 FCF 已对账。",
+    }
+
+
 def evaluate_cycle_earnings_monitor(
     raw: Any,
     *,
