@@ -139,6 +139,26 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
             ],
             "evidence_refs": ["E_COUNTER"],
         }],
+        "variance_attribution": [
+            {
+                "scenario": "bear", "attribution_id": "bear_cycle_delta",
+                "driver_id": "demand_growth", "review_trigger_id": "orders_review",
+                "category": "INDUSTRY_CYCLE", "rationale": "B4 与正常化中枢一致，明确记录零差异",
+                "amount_cny": _measure("0"),
+            },
+            {
+                "scenario": "base", "attribution_id": "base_cycle_delta",
+                "driver_id": "demand_growth", "review_trigger_id": "orders_review",
+                "category": "INDUSTRY_CYCLE", "rationale": "B4 与正常化中枢一致，明确记录零差异",
+                "amount_cny": _measure("0"),
+            },
+            {
+                "scenario": "bull", "attribution_id": "bull_cycle_delta",
+                "driver_id": "demand_growth", "review_trigger_id": "orders_review",
+                "category": "INDUSTRY_CYCLE", "rationale": "B4 与正常化中枢一致，明确记录零差异",
+                "amount_cny": _measure("0"),
+            },
+        ],
     }
     b4 = {
         "scope": "COMPANY_WIDE",
@@ -245,4 +265,45 @@ def test_primary_per_share_value_context_requires_eligible_model_and_timing():
     )
     assert result["per_share_value"]["status"] == "NOT_IDENTIFIABLE"
     assert "PRIMARY_MODEL_PRICE_CALCULATION_NOT_ELIGIBLE" in result["per_share_value"]["issues"]
+    assert result["status"] == "REVIEW_REQUIRED"
+
+
+def test_b4_minus_normalized_delta_reconciles_to_named_driver_attributions():
+    raw, b4, evidence = _valid_case()
+    b4["scenarios"]["bear"]["net_profit_cny"] = "85"
+    bear_attribution = next(row for row in raw["variance_attribution"] if row["scenario"] == "bear")
+    bear_attribution["amount_cny"]["value"] = "5"
+    result = _evaluate(raw, b4, evidence)
+    bear = result["variance_attribution"]["scenarios"]["bear"]
+    assert bear["b4_minus_normalized_net_profit_cny"] == "5"
+    assert bear["attributed_total_cny"] == "5"
+    assert bear["unattributed_residual_cny"] == "0"
+    assert bear["status"] == "RECONCILED_DIAGNOSTIC_ONLY"
+    assert result["variance_attribution"]["valuation_input_eligible"] is False
+
+
+def test_unexplained_variance_residual_blocks_chain_pass():
+    raw, b4, evidence = _valid_case()
+    bear_attribution = next(row for row in raw["variance_attribution"] if row["scenario"] == "bear")
+    bear_attribution["amount_cny"]["value"] = "10"
+    result = _evaluate(raw, b4, evidence)
+    assert result["status"] == "REVIEW_REQUIRED"
+    assert result["variance_attribution"]["scenarios"]["bear"]["unattributed_residual_cny"] == "-10"
+    assert "VARIANCE_ATTRIBUTION_DOES_NOT_RECONCILE_TO_B4_MINUS_NORMALIZED" in result["variance_attribution"]["scenarios"]["bear"]["issues"]
+
+
+def test_variance_attribution_must_link_to_matching_review_trigger():
+    raw, b4, evidence = _valid_case()
+    raw["variance_attribution"][0]["review_trigger_id"] = "missing_trigger"
+    result = _evaluate(raw, b4, evidence)
+    assert result["status"] == "REVIEW_REQUIRED"
+    assert any("ATTRIBUTION_REVIEW_TRIGGER_UNRESOLVED" in issue for issue in result["variance_attribution"]["issues"])
+
+
+def test_missing_variance_attribution_does_not_claim_explanation():
+    raw, b4, evidence = _valid_case()
+    raw["variance_attribution"] = []
+    result = _evaluate(raw, b4, evidence)
+    assert result["variance_attribution"]["status"] == "REVIEW_REQUIRED"
+    assert "VARIANCE_ATTRIBUTIONS_REQUIRED_FOR_COMPARABLE_SCENARIO" in result["variance_attribution"]["issues"]
     assert result["status"] == "REVIEW_REQUIRED"
