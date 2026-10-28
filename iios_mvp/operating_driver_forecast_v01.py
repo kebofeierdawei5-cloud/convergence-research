@@ -1355,6 +1355,82 @@ def render_operating_driver_section(
             lines.append(f"  - 产能利用率（产量/年产能）：{Decimal(bridge['production_utilization']) * Decimal('100')}%（仅当期间与容量口径可比时成立）")
         for issue in bridge.get("issues") or []:
             lines.append(f"  - 口径复核项：{issue}")
+    lines.extend(["", "#### B55 当前历史基线 → 前瞻经营变量变化桥", ""])
+    transition = driver.get("baseline_transition") if isinstance(driver.get("baseline_transition"), Mapping) else {}
+    transition_status = str(transition.get("status") or "UNKNOWN")
+    lines.extend([
+        f"- 状态：**{transition_status}**；范围：{transition.get('scope', 'UNKNOWN')}；"
+        f"历史基线期间：{transition.get('baseline_period', 'UNKNOWN')}；前瞻期间：{transition.get('forecast_period', 'UNKNOWN')}",
+        f"- 方法：{transition.get('comparison_method', 'UNKNOWN')}；指标：{transition.get('metric', 'UNKNOWN')}",
+        f"- 结果说明：{transition.get('reason') or '未提供状态说明。'}",
+    ])
+    transition_scenarios = transition.get("scenarios") if isinstance(transition.get("scenarios"), Mapping) else {}
+    for scenario_name in SCENARIOS:
+        row = transition_scenarios.get(scenario_name) if isinstance(transition_scenarios.get(scenario_name), Mapping) else {}
+        lines.append(f"**B55 {scenario_name.upper()} — {row.get('status', 'UNKNOWN')}**")
+        if row.get("status") == "CALCULATED_AND_RECONCILED":
+            lines.extend([
+                f"- 收入：历史 {row.get('baseline_revenue_cny')} → 前瞻 {row.get('forward_revenue_cny')}；变化 {row.get('change_revenue_cny')} CNY",
+                f"- 变动成本：历史 {row.get('baseline_variable_cost_cny')} → 前瞻 {row.get('forward_variable_cost_cny')}；变化 {row.get('change_variable_cost_cny')} CNY",
+                f"- 扣变动成本贡献：历史 {row.get('baseline_contribution_after_variable_cost_cny')} → 前瞻 {row.get('forward_contribution_after_variable_cost_cny')}；变化 {row.get('change_contribution_after_variable_cost_cny')} CNY",
+                f"- 变化归因：销量 {row.get('sales_volume_effect_cny')} CNY；净售价 {row.get('net_asp_effect_cny')} CNY；单位变动成本 {row.get('unit_variable_cost_effect_cny')} CNY；对账残差 {row.get('reconciliation_residual_cny')} CNY（容差 {row.get('tolerance_cny')}）",
+            ])
+        product_rows = row.get("product_lines") if isinstance(row.get("product_lines"), list) else []
+        if not product_rows:
+            if row.get("issues"):
+                lines.append("  - 未闭合：" + "；".join(str(issue) for issue in row.get("issues")[:8]))
+            else:
+                lines.append("  - 产品/业务线贡献变化：UNKNOWN（未形成可比较的产品级行）。")
+        for product_row in product_rows[:8]:
+            if not isinstance(product_row, Mapping):
+                continue
+            if product_row.get("status") != "CALCULATED_AND_RECONCILED":
+                lines.append(
+                    f"  - {product_row.get('product_name') or product_row.get('product_id') or 'UNKNOWN'}："
+                    f"UNKNOWN；未闭合字段 {', '.join(product_row.get('missing_or_unusable_fields') or []) or '范围/映射/对账'}"
+                )
+                continue
+            baseline = product_row.get("historical_baseline") if isinstance(product_row.get("historical_baseline"), Mapping) else {}
+            forward = product_row.get("forward_scenario") if isinstance(product_row.get("forward_scenario"), Mapping) else {}
+            changes = product_row.get("changes") if isinstance(product_row.get("changes"), Mapping) else {}
+            effects = product_row.get("contribution_effects_cny") if isinstance(product_row.get("contribution_effects_cny"), Mapping) else {}
+            lines.append(
+                f"  - {product_row.get('product_name') or product_row.get('product_id')}："
+                f"销量 {baseline.get('sales_volume_tonnes')}→{forward.get('sales_volume_tonnes')} 吨；"
+                f"净售价 {baseline.get('net_asp_cny_per_tonne')}→{forward.get('net_asp_cny_per_tonne')} CNY/吨；"
+                f"单位成本 {baseline.get('variable_cost_cny_per_tonne')}→{forward.get('variable_cost_cny_per_tonne')} CNY/吨"
+            )
+            lines.append(
+                f"    贡献变化 {changes.get('contribution_after_variable_cost_cny')} CNY；"
+                f"销量效应 {effects.get('sales_volume_effect')}；净售价效应 {effects.get('net_asp_effect')}；"
+                f"单位成本效应 {effects.get('unit_variable_cost_effect')}；"
+                f"归因残差 {effects.get('reconciliation_residual')}"
+            )
+            lineage = []
+            baseline_lineage = baseline.get("measure_lineage") if isinstance(baseline.get("measure_lineage"), Mapping) else {}
+            forward_lineage = forward.get("measure_lineage") if isinstance(forward.get("measure_lineage"), Mapping) else {}
+            for field, label in (
+                ("sales_volume_tonnes", "销量"),
+                ("net_asp_cny_per_tonne", "净售价"),
+                ("variable_cost_cny_per_tonne", "单位成本"),
+            ):
+                b = baseline_lineage.get(field) if isinstance(baseline_lineage.get(field), Mapping) else {}
+                fw = forward_lineage.get(field) if isinstance(forward_lineage.get(field), Mapping) else {}
+                b_refs = "、".join(b.get("evidence_refs") or []) or "无显式引用"
+                f_refs = "、".join(fw.get("evidence_refs") or []) or "无显式引用"
+                lineage.append(
+                    f"{label} {b.get('data_class', 'UNKNOWN')}[{b_refs}]→"
+                    f"{fw.get('data_class', 'UNKNOWN')}[{f_refs}]"
+                )
+            lines.append("    数据分类/来源引用：" + "；".join(lineage))
+        if len(product_rows) > 8:
+            lines.append(f"  - 其余 {len(product_rows) - 8} 个产品/业务线未在此摘要展开，仍保留在结构化结果中。")
+    lines.extend([
+        "- 解释边界：该桥只解释产品/业务线“销量 ×（净售价−单位变动成本）”贡献变化，不是完整净利润/FCF 变动归因，更不直接进入 EPS、每股估值或 15% 回报计算。",
+        "- 固定费用、折旧、融资成本、税、少数股东损益及稀释股数若缺少同期间历史基线与可比假设，必须单独研究；不能用本桥残差或贡献变化替代。",
+        "- 产量及产销差额仅作为库存上下文展示，不计入上列贡献归因；库存/营运资金效果继续按 B42/B43 的明确口径处理，避免双重计价。",
+        "",
+    ])
     lines.extend(["", "#### Bear / Base / Bull 经营结果", ""])
     v_scenarios = valuation_scenarios if isinstance(valuation_scenarios, Mapping) else {}
     for name in SCENARIOS:
