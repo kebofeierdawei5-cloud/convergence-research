@@ -1465,6 +1465,7 @@ def _evaluate_normalized_fcf_bridge(
         else:
             required_component_fields = ()
 
+        component_evidence_refs_by_field: dict[str, list[str]] = {}
         for component_field in required_component_fields:
             component_measure = normalized_cash_components.get(component_field)
             component_refs = (
@@ -1473,6 +1474,7 @@ def _evaluate_normalized_fcf_bridge(
                 and isinstance(component_measure.get("evidence_refs"), list)
                 else set()
             )
+            component_evidence_refs_by_field[component_field] = sorted(component_refs)
             if not component_refs:
                 row_issues.append(
                     f"FCF_ATTRIBUTION_COMPONENT_EVIDENCE_NOT_IDENTIFIABLE:{category}:{component_field}"
@@ -1491,6 +1493,7 @@ def _evaluate_normalized_fcf_bridge(
             "rationale": rationale or "UNKNOWN",
             "amount_cny": _format(amount) if amount is not None and not row_issues else None,
             "evidence_refs": amount_refs,
+            "component_evidence_refs_by_field": component_evidence_refs_by_field,
             "issues": sorted(set(row_issues)),
         })
         attribution_issues.extend(f"{scenario.upper()}:{attribution_id or index}:{issue}" for issue in row_issues)
@@ -2486,9 +2489,19 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
                     f"残差 {category_row.get('residual_cny') or 'UNKNOWN'} CNY；{category_row.get('status', 'UNKNOWN')}"
                 )
         for attribution in var_row.get("items") or []:
+            component_refs_by_field = (
+                attribution.get("component_evidence_refs_by_field")
+                if isinstance(attribution.get("component_evidence_refs_by_field"), Mapping) else {}
+            )
+            component_refs_text = "；".join(
+                f"{field}={ '、'.join(refs) if refs else 'UNKNOWN' }"
+                for field, refs in component_refs_by_field.items()
+            ) or "UNKNOWN"
             lines.append(
                 f"    - {attribution.get('fcf_attribution_id', 'UNKNOWN')} / {attribution.get('category', 'UNKNOWN')} / "
                 f"driver {attribution.get('driver_id', 'UNKNOWN')}：{attribution.get('amount_cny') or 'UNKNOWN'} CNY；"
+                f"金额证据 {'、'.join(attribution.get('evidence_refs') or []) or 'UNKNOWN'}；"
+                f"组件证据 {component_refs_text}；"
                 f"触发器 {attribution.get('review_trigger_id', 'UNKNOWN')}；{attribution.get('rationale', 'UNKNOWN')}"
             )
         for issue in norm_row.get("issues") or []:
