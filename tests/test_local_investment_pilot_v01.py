@@ -5100,7 +5100,7 @@ def test_b52_round_b_separates_external_mie_from_conditional_price_inversion() -
     assert "price_implied_analysis" in prompt
     assert "不是外部 MIE" in prompt
     assert "comparison_basis" in prompt
-    assert "不能仅因 price_implied_analysis 存在而升级" in prompt
+    assert "不得升级 MIE status，也不得单独让已验证 expectation_gap PASS" in prompt
 
 
 def test_b52_report_separates_external_mie_price_inversion_and_forward_scenarios() -> None:
