@@ -1383,6 +1383,7 @@ def _evaluate_normalized_fcf_bridge(
     attribution_rows: dict[str, list[dict[str, Any]]] = {name: [] for name in SCENARIOS}
     attribution_issues: list[str] = []
     attribution_ids: set[tuple[str, str]] = set()
+    driver_measure_ids: set[tuple[str, str]] = set()
     for index, row in enumerate(raw_attributions):
         if not isinstance(row, Mapping):
             attribution_issues.append(f"FCF_VARIANCE_ATTRIBUTION_{index}_INVALID")
@@ -1465,6 +1466,114 @@ def _evaluate_normalized_fcf_bridge(
         else:
             required_component_fields = ()
 
+        driver_component_measure_output: dict[str, Any] | None = None
+        driver_component_computed_amount: Decimal | None = None
+        raw_driver_measure = row.get("driver_component_measure")
+        if raw_driver_measure is not None:
+            measure_issues: list[str] = []
+            if not isinstance(raw_driver_measure, Mapping):
+                measure_issues.append("FCF_DRIVER_COMPONENT_MEASURE_MUST_BE_OBJECT")
+                raw_driver_measure = {}
+            measure_id = _text(raw_driver_measure.get("measure_id"))
+            measure_category = _text(raw_driver_measure.get("category")).upper()
+            measure_driver_id = _text(raw_driver_measure.get("driver_id"))
+            component_basis = _text(raw_driver_measure.get("component_basis")).upper()
+            expected_component_basis = {
+                "OPERATING_CASH_CONVERSION": "AFTER_TAX_EBIT_CONTRIBUTION",
+                "NON_CASH_EARNINGS": "DEPRECIATION_AMORTIZATION",
+                "CAPEX": "CASH_CAPEX",
+                "WORKING_CAPITAL": (
+                    "RAW_WORKING_CAPITAL_CHANGE"
+                    if inventory_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL"
+                    else "EFFECTIVE_WORKING_CAPITAL_CHANGE"
+                ),
+                "INVENTORY_MOVEMENT": (
+                    "INVENTORY_CASH_IMPACT_PROXY"
+                    if inventory_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL"
+                    else "UNSUPPORTED_WHEN_INVENTORY_IS_EMBEDDED_OR_NOT_APPLICABLE"
+                ),
+            }.get(category)
+            if not measure_id:
+                measure_issues.append("FCF_DRIVER_COMPONENT_MEASURE_ID_REQUIRED")
+            else:
+                measure_key = (scenario, measure_id)
+                if measure_key in driver_measure_ids:
+                    measure_issues.append("DUPLICATE_FCF_DRIVER_COMPONENT_MEASURE_ID")
+                driver_measure_ids.add(measure_key)
+            if measure_category != category:
+                measure_issues.append("FCF_DRIVER_COMPONENT_MEASURE_CATEGORY_MISMATCH")
+            if measure_driver_id != driver_id:
+                measure_issues.append("FCF_DRIVER_COMPONENT_MEASURE_DRIVER_MISMATCH")
+            if component_basis != expected_component_basis or component_basis.startswith("UNSUPPORTED_"):
+                measure_issues.append("FCF_DRIVER_COMPONENT_MEASURE_BASIS_MISMATCH")
+            component_measure_basis = _text(raw_driver_measure.get("basis"))
+            if not _meaningful(component_measure_basis):
+                measure_issues.append("FCF_DRIVER_COMPONENT_MEASUREMENT_BASIS_NOT_IDENTIFIABLE")
+
+            component_values_allow_negative = category in {
+                "OPERATING_CASH_CONVERSION", "WORKING_CAPITAL", "INVENTORY_MOVEMENT"
+            }
+            b4_driver_value, b4_driver_issues, b4_driver_refs = _money(
+                raw_driver_measure.get("b4_value_cny"),
+                field=f"fcf_variance_attribution.{scenario}.{attribution_id or index}.driver_component_measure.b4_value_cny",
+                sources_by_id=sources_by_id,
+                unresolved_refs=unresolved_refs,
+                after_cutoff_refs=after_cutoff_refs,
+                uncertain_refs=uncertain_refs,
+                allow_negative=component_values_allow_negative,
+            )
+            normalized_driver_value, normalized_driver_issues, normalized_driver_refs = _money(
+                raw_driver_measure.get("normalized_value_cny"),
+                field=f"fcf_variance_attribution.{scenario}.{attribution_id or index}.driver_component_measure.normalized_value_cny",
+                sources_by_id=sources_by_id,
+                unresolved_refs=unresolved_refs,
+                after_cutoff_refs=after_cutoff_refs,
+                uncertain_refs=uncertain_refs,
+                allow_negative=component_values_allow_negative,
+            )
+            measure_issues.extend(b4_driver_issues)
+            measure_issues.extend(normalized_driver_issues)
+            if not b4_driver_refs:
+                measure_issues.append("FCF_DRIVER_COMPONENT_B4_EVIDENCE_REQUIRED")
+            if not normalized_driver_refs:
+                measure_issues.append("FCF_DRIVER_COMPONENT_NORMALIZED_EVIDENCE_REQUIRED")
+            measure_refs = set(b4_driver_refs) | set(normalized_driver_refs)
+            if trigger_refs and not measure_refs.intersection(trigger_refs):
+                measure_issues.append("FCF_DRIVER_COMPONENT_EVIDENCE_NOT_SHARED_WITH_TRIGGER")
+            if measure_refs and not set(amount_refs).intersection(measure_refs):
+                measure_issues.append("FCF_ATTRIBUTION_AMOUNT_EVIDENCE_NOT_LINKED_TO_DRIVER_MEASURES")
+
+            if b4_driver_value is not None and normalized_driver_value is not None and not measure_issues:
+                if category in {"OPERATING_CASH_CONVERSION", "NON_CASH_EARNINGS"}:
+                    driver_component_computed_amount = b4_driver_value - normalized_driver_value
+                else:
+                    # CAPEX, working capital and inventory cash-use amounts are
+                    # subtracted in FCF, so their variance sign is normalized minus B4.
+                    driver_component_computed_amount = normalized_driver_value - b4_driver_value
+                if amount is None:
+                    measure_issues.append("FCF_DRIVER_COMPONENT_DECLARED_AMOUNT_REQUIRED")
+                elif abs(amount - driver_component_computed_amount) > Decimal("1"):
+                    measure_issues.append("FCF_DRIVER_COMPONENT_DECLARED_AMOUNT_MISMATCH_WITHIN_CNY_1")
+            else:
+                driver_component_computed_amount = None
+
+            if measure_issues:
+                row_issues.extend(measure_issues)
+            driver_component_measure_output = {
+                "measure_id": measure_id or "UNKNOWN",
+                "category": measure_category or "UNKNOWN",
+                "driver_id": measure_driver_id or "UNKNOWN",
+                "component_basis": component_basis or "UNKNOWN",
+                "basis": component_measure_basis or "UNKNOWN",
+                "b4_value_cny": _format(b4_driver_value),
+                "normalized_value_cny": _format(normalized_driver_value),
+                "computed_amount_cny": _format(driver_component_computed_amount),
+                "b4_evidence_refs": b4_driver_refs,
+                "normalized_evidence_refs": normalized_driver_refs,
+                "status": "COMPONENT_MEASURE_IDENTIFIABLE" if not measure_issues else "REVIEW_REQUIRED",
+                "issues": sorted(set(measure_issues)),
+            }
+
         component_evidence_refs_by_field: dict[str, list[str]] = {}
         for component_field in required_component_fields:
             component_measure = normalized_cash_components.get(component_field)
@@ -1479,10 +1588,24 @@ def _evaluate_normalized_fcf_bridge(
                 row_issues.append(
                     f"FCF_ATTRIBUTION_COMPONENT_EVIDENCE_NOT_IDENTIFIABLE:{category}:{component_field}"
                 )
-            elif not set(amount_refs).intersection(component_refs):
+            elif driver_component_measure_output is None and not set(amount_refs).intersection(component_refs):
                 row_issues.append(
                     f"FCF_ATTRIBUTION_EVIDENCE_NOT_LINKED_TO_COMPONENT:{category}:{component_field}"
                 )
+
+        if driver_component_measure_output is not None:
+            if (
+                driver_component_measure_output.get("status") == "COMPONENT_MEASURE_IDENTIFIABLE"
+                and driver_component_computed_amount is not None
+                and amount is not None
+                and abs(amount - driver_component_computed_amount) <= Decimal("1")
+                and not row_issues
+            ):
+                # Keep the computed contribution, not the analyst's copied amount,
+                # as the numeric value used by the reconciliation.
+                amount = driver_component_computed_amount
+            else:
+                amount = None
 
         attribution_rows[scenario].append({
             "scenario": scenario,
@@ -1494,6 +1617,7 @@ def _evaluate_normalized_fcf_bridge(
             "amount_cny": _format(amount) if amount is not None and not row_issues else None,
             "evidence_refs": amount_refs,
             "component_evidence_refs_by_field": component_evidence_refs_by_field,
+            "driver_component_measure": driver_component_measure_output,
             "issues": sorted(set(row_issues)),
         })
         attribution_issues.extend(f"{scenario.upper()}:{attribution_id or index}:{issue}" for issue in row_issues)
