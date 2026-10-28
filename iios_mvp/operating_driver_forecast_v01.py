@@ -1431,6 +1431,11 @@ def render_operating_driver_section(
         f"- 方法：{transition.get('comparison_method', 'UNKNOWN')}；指标：{transition.get('metric', 'UNKNOWN')}",
         f"- 结果说明：{transition.get('reason') or '未提供状态说明。'}",
     ])
+    baseline_issues = transition.get("baseline_issues") if isinstance(transition.get("baseline_issues"), list) else []
+    if baseline_issues:
+        lines.append("- 历史基线待复核：" + "；".join(str(issue) for issue in baseline_issues[:8]))
+        if len(baseline_issues) > 8:
+            lines.append(f"  - 另有 {len(baseline_issues) - 8} 项结构化保留，未在摘要中展开。")
     transition_scenarios = transition.get("scenarios") if isinstance(transition.get("scenarios"), Mapping) else {}
     for scenario_name in SCENARIOS:
         row = transition_scenarios.get(scenario_name) if isinstance(transition_scenarios.get(scenario_name), Mapping) else {}
@@ -1462,6 +1467,26 @@ def render_operating_driver_section(
                     lines.append("    显式收入/成本冲突：" + "；".join(str(issue) for issue in conflicts))
                 if row_issues:
                     lines.append("    待复核：" + "；".join(str(issue) for issue in row_issues[:5]))
+                historical_node = product_row.get("historical_baseline") if isinstance(product_row.get("historical_baseline"), Mapping) else {}
+                forward_node = product_row.get("forward_scenario") if isinstance(product_row.get("forward_scenario"), Mapping) else {}
+                historical_measures = historical_node.get("measures") if isinstance(historical_node.get("measures"), Mapping) else {}
+                forward_measures = forward_node.get("measures") if isinstance(forward_node.get("measures"), Mapping) else {}
+                failed_lineage = []
+                for field, label in (
+                    ("sales_volume_tonnes", "销量"),
+                    ("net_asp_cny_per_tonne", "净售价"),
+                    ("variable_cost_cny_per_tonne", "单位成本"),
+                ):
+                    hist = historical_measures.get(field) if isinstance(historical_measures.get(field), Mapping) else {}
+                    fwd = forward_measures.get(field) if isinstance(forward_measures.get(field), Mapping) else {}
+                    hist_refs = "、".join(hist.get("evidence_refs") or []) or "无显式引用"
+                    fwd_refs = "、".join(fwd.get("evidence_refs") or []) or "无显式引用"
+                    failed_lineage.append(
+                        f"{label} {hist.get('data_class', 'UNKNOWN')}[{hist_refs}]→"
+                        f"{fwd.get('data_class', 'UNKNOWN')}[{fwd_refs}]"
+                    )
+                if failed_lineage:
+                    lines.append("    数据分类/来源引用（含未通过输入）：" + "；".join(failed_lineage))
                 continue
             baseline = product_row.get("historical_baseline") if isinstance(product_row.get("historical_baseline"), Mapping) else {}
             forward = product_row.get("forward_scenario") if isinstance(product_row.get("forward_scenario"), Mapping) else {}
