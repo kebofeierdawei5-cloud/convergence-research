@@ -34,7 +34,7 @@ All five categories must be present in `fcf_variance_attribution`, including exp
 
 ## Component → driver → review trigger → evidence contract
 
-Each Bear/Base/Bull component category currently permits **one numeric attribution row only**. This is a conservative constraint: without an independent driver-level component measure, two rows assigned to different drivers could offset one another and make the category total look correct despite unsupported individual allocations. A multi-driver decomposition remains unresolved until the system receives independent, source-backed component measures for each driver; do not split a measured category total into analyst-invented sub-amounts.
+The B49 baseline permits **one numeric attribution row per Bear/Base/Bull component category** when no independently measured driver-level decomposition is available. B50 adds a narrowly bounded exception: multiple rows are permitted only when every row carries typed B4 and normalized component measures, the contribution is independently recomputed, and the driver-level B4 values and normalized values each reconcile separately to their own aggregate component totals. This prevents the category total from passing through offsetting or invented sub-amounts.
 
 The row must still resolve to a known `driver_id`, a review trigger with the same driver, and valid evidence. In addition, the row amount evidence references must overlap the evidence references for the corresponding normalized-FCF component:
 
@@ -44,7 +44,7 @@ The row must still resolve to a known `driver_id`, a review trigger with the sam
 - `WORKING_CAPITAL`: raw working-capital evidence when inventory is excluded, otherwise effective-working-capital evidence;
 - `INVENTORY_MOVEMENT`: inventory cash-impact-proxy evidence when inventory is excluded; otherwise effective-working-capital evidence must support the explicit zero standalone contribution.
 
-The amount evidence must independently overlap the linked trigger evidence as well. A shared driver ID alone, or a total that happens to reconcile, is insufficient. Missing component evidence, a mismatched link, or multiple numeric rows in one category withholds the affected amounts and prevents the scenario from being marked reconciled. The normalized component evidence references used by each row-level gate are preserved in the machine output and rendered beside the attribution amount, driver, and review-trigger ID so the reviewer can inspect the chain.
+The amount evidence must independently overlap the linked trigger evidence as well. A shared driver ID alone, or a total that happens to reconcile, is insufficient. Missing component evidence, a mismatched link, or multiple numeric rows without valid B50 structured measurements withholds the affected amounts and prevents the scenario from being marked reconciled. The normalized component evidence references used by each row-level gate are preserved in the machine output and rendered beside the attribution amount, driver, and review-trigger ID so the reviewer can inspect the chain.
 
 ## Inventory and working-capital treatment
 
