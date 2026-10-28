@@ -3721,6 +3721,308 @@ def _decision(
         "auto_execution": False,
     }
 
+def _build_decision_chain_trace(
+    *,
+    prepared: Mapping[str, Any],
+    metrics: Mapping[str, Any] | None,
+    return_metrics_reason: str | None,
+    stress_review: Mapping[str, Any] | None,
+    portfolio_package: Mapping[str, Any] | None,
+    price_zone_sensitivity: Mapping[str, Any] | None,
+    decision: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build an explanatory dependency trace without recalculating or changing policy."""
+    assessment = prepared.get("assessment") if isinstance(prepared.get("assessment"), Mapping) else {}
+    model = prepared.get("valuation_model_consistency") if isinstance(prepared.get("valuation_model_consistency"), Mapping) else {}
+    timing = prepared.get("valuation_timing") if isinstance(prepared.get("valuation_timing"), Mapping) else {}
+    params = prepared.get("decision_parameters") if isinstance(prepared.get("decision_parameters"), Mapping) else {}
+    risk = assessment.get("risk") if isinstance(assessment.get("risk"), Mapping) else {}
+    package = portfolio_package if isinstance(portfolio_package, Mapping) else {}
+    stress = stress_review if isinstance(stress_review, Mapping) else {}
+    sensitivity = price_zone_sensitivity if isinstance(price_zone_sensitivity, Mapping) else {}
+    core_policy = decision.get("core_policy_evaluation") if isinstance(decision.get("core_policy_evaluation"), Mapping) else {}
+    gating_issues = [str(item) for item in decision.get("gating_issues", []) if str(item).strip()]
+
+    input_issue_codes = {
+        "EVIDENCE_REGISTER_EMPTY",
+        "UNRESOLVED_EVIDENCE_REFERENCES",
+        "DUPLICATE_EVIDENCE_SOURCE_IDS",
+        "UNTRACEABLE_EVIDENCE_SOURCE_RECORDS",
+        "REFERENCED_EVIDENCE_AFTER_CUTOFF",
+        "REFERENCED_EVIDENCE_TIMING_UNCERTAIN",
+        "PRICE_NOT_PIT_QUALIFIED",
+        "OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT",
+        "SCENARIO_WEALTH_ORDERING_INCONSISTENT",
+        "SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED",
+        "CASH_DISTRIBUTION_SOURCE_DOMAIN_CLASS_NOT_ACCEPTED",
+    }
+    input_issue_codes = [item for item in gating_issues if item in input_issue_codes]
+    if not isinstance(prepared.get("evidence_register"), list) or not prepared.get("evidence_register"):
+        if "EVIDENCE_REGISTER_EMPTY" not in input_issue_codes:
+            input_issue_codes.append("EVIDENCE_REGISTER_EMPTY")
+    if prepared.get("unresolved_evidence_references") and "UNRESOLVED_EVIDENCE_REFERENCES" not in input_issue_codes:
+        input_issue_codes.append("UNRESOLVED_EVIDENCE_REFERENCES")
+    if prepared.get("after_cutoff_evidence_references") and "REFERENCED_EVIDENCE_AFTER_CUTOFF" not in input_issue_codes:
+        input_issue_codes.append("REFERENCED_EVIDENCE_AFTER_CUTOFF")
+    if prepared.get("uncertain_timing_evidence_references") and "REFERENCED_EVIDENCE_TIMING_UNCERTAIN" not in input_issue_codes:
+        input_issue_codes.append("REFERENCED_EVIDENCE_TIMING_UNCERTAIN")
+    if prepared.get("notes_price_conflicts") and "OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT" not in input_issue_codes:
+        input_issue_codes.append("OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT")
+
+    model_eligible = model.get("primary_model_price_calculation_eligible") is True
+    model_issues = [str(item) for item in model.get("issues", []) if str(item).strip()]
+    if not model_eligible and not model_issues:
+        model_issues = [str(model.get("status") or "PRIMARY_MODEL_ELIGIBILITY_UNKNOWN")]
+    timing_status = str(timing.get("status") or "UNKNOWN").strip().upper()
+    timing_issues = [str(item) for item in timing.get("issues", []) if str(item).strip()]
+    if timing_status != "PASS" and not timing_issues:
+        timing_issues = [f"VALUATION_TIMING_{timing_status}"]
+
+    return_is_ready = isinstance(metrics, Mapping)
+    if return_is_ready:
+        return_reason = ["回报/风险计算已生成数值结果；是否满足入场门槛另行判断。"]
+    else:
+        return_reason = [str(return_metrics_reason or "回报计算未生成；阻断原因尚未识别。")]
+    if return_reason == ["回报计算未生成；阻断原因尚未识别。"]:
+        return_reason = ["回报计算未生成；阻断原因尚未识别。"]
+
+    price_gate_pass = bool(metrics.get("return_gate_pass")) if return_is_ready else None
+    price_gate_failures: list[str] = []
+    if return_is_ready:
+        for field, label in (
+            ("buy_entry_return_cushion_pass", "15% 入场安全垫未通过"),
+            ("fundamental_target_pass", "15% 年化回报门槛未通过"),
+            ("required_return_pass", "Required Return 门槛未通过"),
+            ("risk_pass", "Bear 损失/风险门槛未通过"),
+        ):
+            if metrics.get(field) is False:
+                price_gate_failures.append(label)
+        if price_gate_pass is False and not price_gate_failures:
+            price_gate_failures.append("综合价格/回报门槛未通过，具体子门槛需结合计算结果复核。")
+
+    risk_status = str(risk.get("status") or "UNKNOWN").strip().upper()
+    stress_status = str(stress.get("status") or "UNKNOWN").strip().upper()
+    risk_reasons = []
+    if risk_status != "PASS":
+        risk_reasons.append(f"Risk={risk_status}")
+    if stress_status != "PASS":
+        risk_reasons.append(f"Thesis-break stress={stress_status}")
+    risk_reasons.extend(str(item) for item in stress.get("issues", []) if str(item).strip())
+
+    package_status = str(package.get("status") or "NOT_PROVIDED").strip().upper()
+    constraint_status = str(package.get("constraint_status") or "UNKNOWN").strip().upper()
+    package_ready = package_status == "CONDITIONAL_PACKAGE_READY_NOT_AUTHORIZED"
+    if constraint_status == "BLOCKED" or package_status.startswith("BLOCKED"):
+        package_chain_status = "BLOCKED"
+    elif package_status == "NOT_PROVIDED" or constraint_status == "UNKNOWN":
+        package_chain_status = "UNKNOWN"
+    elif package_ready:
+        package_chain_status = "CONDITIONAL_READY_NOT_AUTHORIZED"
+    else:
+        package_chain_status = "REVIEW_REQUIRED"
+    package_reasons = [str(package.get("reason") or "").strip()]
+    package_reasons = [item for item in package_reasons if item]
+
+    stages = [
+        {
+            "stage_id": "input_and_evidence",
+            "label": "输入、来源引用与截止时点",
+            "status": "BLOCKED" if input_issue_codes else "NO_KNOWN_BLOCKER",
+            "reason_codes": input_issue_codes,
+            "reasons": input_issue_codes or ["初步一致性检查未检出上述阻断项；这不代表正式证据准入。"],
+            "blocks": ["整体投资结论"] if input_issue_codes else [],
+        },
+        {
+            "stage_id": "primary_valuation",
+            "label": "主估值模型资格",
+            "status": "ELIGIBLE_FOR_PILOT_CALCULATION" if model_eligible else "BLOCKED_OR_UNRESOLVED",
+            "reason_codes": model_issues,
+            "reasons": model_issues or [str(model.get("status") or "UNKNOWN")],
+            "blocks": [] if model_eligible else ["年化回报计算", "目标买入价", "B6 价格区间敏感性"],
+        },
+        {
+            "stage_id": "valuation_timing",
+            "label": "估值终点与年化期限",
+            "status": "PASS" if timing_status == "PASS" else "BLOCKED_OR_UNRESOLVED",
+            "reason_codes": timing_issues,
+            "reasons": timing_issues or [f"估值时间状态={timing_status}"],
+            "blocks": [] if timing_status == "PASS" else ["年化回报计算", "目标买入价", "B6 价格区间敏感性"],
+        },
+        {
+            "stage_id": "return_calculation",
+            "label": "年化回报与收益/风险计算",
+            "status": "CALCULATED" if return_is_ready else "NOT_READY",
+            "reason_codes": [] if return_is_ready else [str(return_metrics_reason or "RETURN_METRICS_NOT_READY")],
+            "reasons": return_reason,
+            "blocks": [] if return_is_ready else ["预期年化回报数值", "可计算的共同约束目标买入价", "B6 价格区间的回报重算"],
+        },
+        {
+            "stage_id": "price_hurdles",
+            "label": "15% 年化收益、Required Return 与 Bear 风险价格门槛",
+            "status": "UNKNOWN" if price_gate_pass is None else "PASS" if price_gate_pass else "FAIL",
+            "reason_codes": [] if price_gate_pass is not False else [
+                f"{field}_FAIL"
+                for field in ("buy_entry_return_cushion_pass", "fundamental_target_pass", "required_return_pass", "risk_pass")
+                if return_is_ready and metrics.get(field) is False
+            ],
+            "reasons": (
+                ["收益/风险价格门槛结果未知，因为回报计算未就绪。"] if price_gate_pass is None
+                else ["所有现有价格/回报子门槛通过。"] if price_gate_pass
+                else price_gate_failures
+            ),
+            "blocks": [] if price_gate_pass is True else ["当前价通过 BUY/ADD 价格筛选"],
+        },
+        {
+            "stage_id": "thesis_risk_stress",
+            "label": "论点风险与独立失效压力情景",
+            "status": "PASS" if risk_status == "PASS" and stress_status == "PASS" else
+                      "BLOCKED" if risk_status == "FAIL" or stress_status == "FAIL" else "UNKNOWN_OR_REVIEW",
+            "reason_codes": [str(item) for item in stress.get("issues", []) if str(item).strip()],
+            "reasons": risk_reasons or ["Risk 与 thesis-break stress 均为 PASS。"],
+            "blocks": [] if risk_status == "PASS" and stress_status == "PASS" else ["新增资金/条件仓位资格"],
+        },
+        {
+            "stage_id": "portfolio_constraints",
+            "label": "组合约束与条件仓位包",
+            "status": package_chain_status,
+            "reason_codes": [],
+            "reasons": package_reasons or [
+                f"组合约束={constraint_status}；仓位包={package_status}；条件仓位包不等于交易授权。"
+            ],
+            "blocks": [] if package_ready else ["条件新增资金/仓位包"],
+        },
+        {
+            "stage_id": "formal_admission",
+            "label": "正式准入与行动授权",
+            "status": "NOT_ADMITTED",
+            "reason_codes": ["FORMAL_THESIS_FORECAST_VALUATION_ADMISSION_NOT_CREATED"],
+            "reasons": ["本地试运行未创建正式 Thesis/Forecast/Valuation Admission、canonical Decision 或交易授权。"],
+            "blocks": ["正式资本行动授权", "实际获准新增仓位"],
+        },
+    ]
+
+    causal_blocks: list[dict[str, Any]] = []
+    if not model_eligible:
+        causal_blocks.append({
+            "from": "primary_valuation",
+            "to": ["return_calculation", "target_entry_price", "b6_price_zone_sensitivity"],
+            "reason": "主估值模型资格未通过；下游价格/回报计算不得使用未获准的候选模型。",
+        })
+    if timing_status != "PASS":
+        causal_blocks.append({
+            "from": "valuation_timing",
+            "to": ["return_calculation", "target_entry_price", "b6_price_zone_sensitivity"],
+            "reason": "估值终点或预测期间对齐未通过；年化期限不成立。",
+        })
+    if not return_is_ready:
+        causal_blocks.append({
+            "from": "return_calculation",
+            "to": ["annualized_return", "target_entry_price", "b6_price_zone_sensitivity"],
+            "reason": str(return_metrics_reason or "RETURN_METRICS_NOT_READY"),
+        })
+    if input_issue_codes:
+        causal_blocks.append({
+            "from": "input_and_evidence",
+            "to": ["overall_investment_action"],
+            "reason": "输入/来源/截止时点存在阻断项：" + "、".join(input_issue_codes),
+        })
+    if price_gate_pass is False:
+        causal_blocks.append({
+            "from": "price_hurdles",
+            "to": ["current_price_buy_add_screen"],
+            "reason": "当前价未满足全部现有收益/风险价格门槛；目标买入价仍可作为条件价格上限参考，不能误解为当前价可买。",
+        })
+    if package_chain_status != "CONDITIONAL_READY_NOT_AUTHORIZED":
+        causal_blocks.append({
+            "from": "portfolio_constraints",
+            "to": ["conditional_position_package", "new_capital_permission"],
+            "reason": str(package.get("reason") or f"组合约束/仓位包状态={package_chain_status}"),
+        })
+    causal_blocks.append({
+        "from": "formal_admission",
+        "to": ["formal_capital_action", "execution_authorization"],
+        "reason": "试运行计算不等于正式准入；实际获准新增仓位固定为 0%。",
+    })
+
+    target_entry = metrics.get("target_entry_price") if return_is_ready else None
+    b6_target = sensitivity.get("target_entry_price")
+    return {
+        "schema_version": "IIOS-DECISION-CHAIN-TRACE-0.1",
+        "status": "EXPLANATORY_TRACE_NOT_POLICY_ENGINE",
+        "primary_decision": decision.get("provisional_action", "UNKNOWN"),
+        "primary_policy_reason": core_policy.get("primary_reason", "UNKNOWN"),
+        "primary_policy_reason_text": decision.get("reason", "UNKNOWN"),
+        "stages": stages,
+        "causal_blocks": causal_blocks,
+        "downstream_availability": {
+            "expected_annualized_return": "AVAILABLE" if return_is_ready and metrics.get("expected_annualized_return") is not None else "UNKNOWN",
+            "common_constraint_target_entry_price": "AVAILABLE" if target_entry is not None else "UNKNOWN",
+            "b6_target_entry_price": "AVAILABLE" if b6_target is not None else "UNKNOWN",
+            "conditional_position_package": "CONDITIONAL_ONLY" if package_ready else "UNKNOWN_OR_NOT_READY",
+            "formal_decision": "NOT_CREATED",
+            "authorized_new_position_pct": "0",
+            "execution_authorized": False,
+        },
+        "price_context": {
+            "required_return_annualized": params.get("required_return_annualized"),
+            "fundamental_target_annualized_return": str(FUNDAMENTAL_TARGET_ANNUALIZED_RETURN),
+            "max_loss_pct": params.get("max_loss_pct"),
+            "expected_annualized_return": metrics.get("expected_annualized_return") if return_is_ready else None,
+            "target_entry_price": target_entry,
+            "b6_target_entry_price": b6_target,
+        },
+        "formal_decision_created": False,
+        "execution_authorized": False,
+        "auto_execution": False,
+    }
+
+
+def _render_decision_chain_trace(trace: Mapping[str, Any] | None) -> list[str]:
+    """Render the dependency trace as an explanatory checklist, never as new policy."""
+    if not isinstance(trace, Mapping):
+        return ["", "### B54 决策链追踪", "", "- 未生成决策链追踪；状态 UNKNOWN。", ""]
+    lines = [
+        "",
+        "### B54 决策链追踪：前置条件 → 阻断点 → 下游可用性",
+        "",
+        "> 本节为现有门禁结果的原因链汇总，不新增或放宽决策规则；正式准入与交易授权始终独立。",
+    ]
+    for stage in trace.get("stages") or []:
+        if not isinstance(stage, Mapping):
+            continue
+        reasons = stage.get("reasons") if isinstance(stage.get("reasons"), list) else []
+        reason_text = "；".join(str(item) for item in reasons if str(item).strip()) or "未提供专门原因"
+        lines.append(f"- **{stage.get('label') or stage.get('stage_id') or 'UNKNOWN'} — {stage.get('status') or 'UNKNOWN'}**：{reason_text}")
+        blocks = stage.get("blocks") if isinstance(stage.get("blocks"), list) else []
+        if blocks:
+            lines.append("  - 下游影响：" + "、".join(str(item) for item in blocks))
+    links = trace.get("causal_blocks") if isinstance(trace.get("causal_blocks"), list) else []
+    if links:
+        lines.extend(["", "#### 阻断传导关系"])
+        for row in links[:8]:
+            if not isinstance(row, Mapping):
+                continue
+            targets = row.get("to") if isinstance(row.get("to"), list) else []
+            lines.append(
+                f"- {row.get('from') or 'UNKNOWN'} → {', '.join(str(item) for item in targets) or 'UNKNOWN'}："
+                f"{row.get('reason') or 'UNKNOWN'}"
+            )
+    outputs = trace.get("downstream_availability") if isinstance(trace.get("downstream_availability"), Mapping) else {}
+    lines.extend([
+        "",
+        "#### 下游结果可用性",
+        f"- 年化回报：{outputs.get('expected_annualized_return', 'UNKNOWN')}；"
+        f"共同约束目标买入价：{outputs.get('common_constraint_target_entry_price', 'UNKNOWN')}；"
+        f"B6 目标买入价：{outputs.get('b6_target_entry_price', 'UNKNOWN')}",
+        f"- 条件仓位包：{outputs.get('conditional_position_package', 'UNKNOWN_OR_NOT_READY')}；"
+        f"正式 Decision：{outputs.get('formal_decision', 'NOT_CREATED')}；"
+        f"实际获准新增仓位：{outputs.get('authorized_new_position_pct', '0')}%；"
+        f"执行授权：{outputs.get('execution_authorized', False)}",
+        "",
+    ])
+    return lines
+
+
 def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
     """Render the three decision-relevant lenses without inventing data or changing gates.
 
@@ -4044,6 +4346,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f"- 理由：{d['reason']}",
         f"- 价格层独立筛选：{d.get('price_screen_action', 'UNKNOWN')}；状态：{d['price_screen_status']}",
         f"- 核心决策策略预演：{d.get('core_policy_evaluation', {}).get('action', 'NOT_RUN')} → 有效试运行建议 {d.get('core_policy_evaluation', {}).get('effective_pilot_action', d['provisional_action'])} / {d.get('core_policy_evaluation', {}).get('primary_reason', 'UNKNOWN')}",
+        *_render_decision_chain_trace(d.get("decision_chain_trace")),
         "- 注意：策略预演使用非正式研究输入；本次未创建正式 Decision。组合约束和仓位包状态见下一节；正式 Thesis Admission 与人工审批仍未完成。",
         f"- 预期年化回报：{calc['expected_annualized_return'] if calc else 'UNKNOWN'}",
         f"- 15% 年化门槛：{calc['fundamental_target_pass'] if calc else 'UNKNOWN'}",
@@ -4525,6 +4828,15 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         uncertain_timing_evidence_ids=prepared["uncertain_timing_evidence_references"],
     )
     decision = _decision(prepared, metrics, reason, stress_review, portfolio_package)
+    decision["decision_chain_trace"] = _build_decision_chain_trace(
+        prepared=prepared,
+        metrics=metrics,
+        return_metrics_reason=reason,
+        stress_review=stress_review,
+        portfolio_package=portfolio_package,
+        price_zone_sensitivity=price_zone_sensitivity,
+        decision=decision,
+    )
     analysis = {
         "schema_version": PILOT_ANALYSIS_SCHEMA,
         "runner_version": "IIOS-LOCAL-PILOT-0.1",
