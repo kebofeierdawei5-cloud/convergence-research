@@ -3637,6 +3637,153 @@ def _decision(
         "auto_execution": False,
     }
 
+def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
+    """Render the three decision-relevant lenses without inventing data or changing gates.
+
+    This summary deliberately separates externally evidenced market expectations
+    from a conditional, model-implied inversion of the operator's current price.
+    All values are read-only projections of existing fields.
+    """
+    case = analysis.get("case") if isinstance(analysis.get("case"), Mapping) else {}
+    price = analysis.get("price_input") if isinstance(analysis.get("price_input"), Mapping) else {}
+    assessment = analysis.get("assessment") if isinstance(analysis.get("assessment"), Mapping) else {}
+    thesis = assessment.get("thesis") if isinstance(assessment.get("thesis"), Mapping) else {}
+    drivers = assessment.get("value_drivers") if isinstance(assessment.get("value_drivers"), list) else []
+    mie = assessment.get("market_implied_expectation") if isinstance(assessment.get("market_implied_expectation"), Mapping) else {}
+    gap = assessment.get("expectation_gap") if isinstance(assessment.get("expectation_gap"), Mapping) else {}
+    operating = analysis.get("operating_driver_forecast") if isinstance(analysis.get("operating_driver_forecast"), Mapping) else {}
+    operating_scenarios = operating.get("scenarios") if isinstance(operating.get("scenarios"), Mapping) else {}
+    cycle = analysis.get("cycle_earnings_monitor") if isinstance(analysis.get("cycle_earnings_monitor"), Mapping) else {}
+    cycle_node = cycle.get("industry_cycle") if isinstance(cycle.get("industry_cycle"), Mapping) else {}
+    valuation = analysis.get("forecast_valuation") if isinstance(analysis.get("forecast_valuation"), Mapping) else {}
+    valuation_scenarios = valuation.get("scenarios") if isinstance(valuation.get("scenarios"), Mapping) else {}
+    returns = analysis.get("return_metrics") if isinstance(analysis.get("return_metrics"), Mapping) else None
+    currency = str(case.get("currency") or price.get("currency") or "UNKNOWN")
+    current_price = price.get("price")
+    lines = [
+        "",
+        "## 核心投资判断总览：当前现实 × 现价隐含要求 × 合理未来推演",
+        "",
+        "> 本节先回答三个投资问题。它是现有研究与计算结果的只读摘要，不替代原有模型、证据门禁、组合约束或决策内核；缺失信息保持 UNKNOWN。",
+        "",
+        "### 1. 当前基本面现实",
+        f"- Trust / Reality / Quality："
+        f"{(assessment.get('trust') or {}).get('status', 'UNKNOWN') if isinstance(assessment.get('trust'), Mapping) else 'UNKNOWN'} / "
+        f"{(assessment.get('reality') or {}).get('status', 'UNKNOWN') if isinstance(assessment.get('reality'), Mapping) else 'UNKNOWN'} / "
+        f"{(assessment.get('quality') or {}).get('status', 'UNKNOWN') if isinstance(assessment.get('quality'), Mapping) else 'UNKNOWN'}",
+        f"- 核心论点：{thesis.get('core_statement') or 'UNKNOWN'}",
+        f"- 行业周期：{cycle_node.get('phase', 'UNKNOWN')}；周期链状态：{cycle.get('status', 'UNKNOWN')}",
+    ]
+    usable_drivers = [row for row in drivers if isinstance(row, Mapping)]
+    if usable_drivers:
+        lines.append("- 最重要的价值驱动（最多展示前三项）：")
+        for row in usable_drivers[:3]:
+            lines.append(
+                f"  - {row.get('driver', 'UNKNOWN')}｜影响 {row.get('impact', 'UNKNOWN')}｜"
+                f"依据 {row.get('historical_evidence') or 'UNKNOWN'}｜"
+                f"传导 {row.get('valuation_transmission') or 'UNKNOWN'}"
+            )
+    else:
+        lines.append("- 最重要的价值驱动：UNKNOWN（没有可展示的结构化 value_drivers）。")
+
+    lines.extend([
+        "",
+        "### 2. 当前价格与市场究竟隐含了什么",
+        f"- 本次唯一计算用价：{current_price if current_price not in (None, '') else 'UNKNOWN'} {currency}；主模型：{valuation.get('model_family') or valuation.get('model') or 'UNKNOWN'}；入场估值锚：{valuation.get('entry_value_reference_per_share') or 'UNKNOWN'} {currency}/股",
+        f"- 外部可验证市场隐含预期（MIE）：{mie.get('status', 'UNKNOWN')} — {mie.get('summary') or 'UNKNOWN'}",
+        "- 外部 MIE 与价格反推是两个不同概念；不得用内部 Base 估值、条件反推或未经核实的一致预期替代外部市场证据。",
+    ])
+    inversion = mie.get("price_implied_analysis") if isinstance(mie.get("price_implied_analysis"), Mapping) else {}
+    if inversion:
+        lines.append(
+            f"- 现价条件反推：{inversion.get('status', 'UNKNOWN')}；"
+            f"方法 {inversion.get('method') or 'UNKNOWN'}；"
+            f"模型族 {inversion.get('model_family') or 'UNKNOWN'}；"
+            f"反推参考价 {inversion.get('reference_price') or 'UNKNOWN'} {currency}"
+        )
+        assumptions = inversion.get("assumptions") if isinstance(inversion.get("assumptions"), list) else []
+        if assumptions:
+            lines.append("- 反推的关键固定假设：")
+            for row in assumptions[:6]:
+                if isinstance(row, Mapping):
+                    lines.append(
+                        f"  - {row.get('name') or row.get('assumption') or 'UNKNOWN'}："
+                        f"{row.get('value') if row.get('value') not in (None, '') else 'UNKNOWN'} "
+                        f"{row.get('unit') or ''}；依据 {row.get('basis') or 'UNKNOWN'}"
+                    )
+                else:
+                    lines.append(f"  - {row}")
+        requirements = inversion.get("implied_requirements")
+        requirements = requirements if isinstance(requirements, list) else []
+        if requirements:
+            lines.append("- 该价格在所列假设下要求的经营/财务结果（条件结果，不是市场共识）：")
+            for row in requirements[:8]:
+                if isinstance(row, Mapping):
+                    refs = row.get("evidence_refs") if isinstance(row.get("evidence_refs"), list) else []
+                    lines.append(
+                        f"  - {row.get('metric') or 'UNKNOWN'}："
+                        f"{row.get('value') if row.get('value') not in (None, '') else 'UNKNOWN'} "
+                        f"{row.get('unit') or ''}；期间 {row.get('period') or 'UNKNOWN'}；"
+                        f"解释 {row.get('interpretation') or row.get('basis') or 'UNKNOWN'}；"
+                        f"引用 {', '.join(str(ref) for ref in refs) if refs else 'UNKNOWN'}"
+                    )
+                else:
+                    lines.append(f"  - {row}")
+        sensitivity = inversion.get("sensitivity") if isinstance(inversion.get("sensitivity"), list) else []
+        for row in sensitivity[:4]:
+            if isinstance(row, Mapping):
+                lines.append(
+                    f"  - 敏感性：{row.get('changed_assumption') or row.get('assumption') or 'UNKNOWN'}；"
+                    f"影响 {row.get('impact') or row.get('result') or 'UNKNOWN'}"
+                )
+        limitations = inversion.get("limitations") if isinstance(inversion.get("limitations"), list) else []
+        if limitations:
+            lines.append("- 反推局限：" + "；".join(str(item) for item in limitations[:5]))
+    else:
+        lines.append("- 现价条件反推：UNKNOWN（未提供结构化 price_implied_analysis；摘要不会自行反推或补造数值）。")
+
+    lines.extend([
+        f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
+        f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
+    ])
+    comparisons = gap.get("comparisons") if isinstance(gap.get("comparisons"), list) else []
+    for row in comparisons[:6]:
+        if isinstance(row, Mapping):
+            lines.append(
+                f"  - {row.get('metric') or row.get('driver') or 'UNKNOWN'}："
+                f"市场/价格隐含 {row.get('market_implied_value') or row.get('price_implied_value') or 'UNKNOWN'}；"
+                f"独立推演 {row.get('independent_forecast_value') or 'UNKNOWN'}；"
+                f"差异 {row.get('difference') or row.get('direction') or 'UNKNOWN'} "
+                f"{row.get('unit') or ''}；期间 {row.get('period') or 'UNKNOWN'}；"
+                f"限制 {row.get('limitations') or 'UNKNOWN'}"
+            )
+
+    lines.extend([
+        "",
+        "### 3. 基于当前事实的未来合理推演",
+        f"- 独立经营预测：范围 {operating.get('scope', 'UNKNOWN')}；期间 {operating.get('forecast_period', 'UNKNOWN')}；状态 {operating.get('status', 'UNKNOWN')}",
+        f"- 所选估值模型与终值日期：{valuation.get('model') or 'UNKNOWN'} / {valuation.get('valuation_terminal_date') or 'UNKNOWN'}",
+    ])
+    for name in ("bear", "base", "bull"):
+        op = operating_scenarios.get(name) if isinstance(operating_scenarios.get(name), Mapping) else {}
+        val = valuation_scenarios.get(name) if isinstance(valuation_scenarios.get(name), Mapping) else {}
+        lines.append(
+            f"- {name.upper()}：经营净利润 {op.get('net_profit_cny') or 'UNKNOWN'} CNY；"
+            f"FCF 代理 {op.get('unlevered_fcf_proxy_cny') or 'UNKNOWN'} CNY；"
+            f"每股终值 {val.get('terminal_value_per_share') or 'UNKNOWN'} {currency}；"
+            f"情景依据 {val.get('rationale') or op.get('scenario_basis') or 'UNKNOWN'}；"
+            f"经营可用性 {op.get('calculation_status') or 'UNKNOWN'}"
+        )
+    lines.extend([
+        f"- 当前年化回报计算：{returns.get('expected_annualized_return') if returns and returns.get('expected_annualized_return') is not None else 'UNKNOWN'}；"
+        f"15% 门槛通过：{returns.get('fundamental_target_pass') if returns else 'UNKNOWN'}；"
+        f"共同约束目标入场价：{returns.get('target_entry_price') if returns else 'UNKNOWN'} {currency}",
+        "- 解释纪律：Bear/Base/Bull 是在已知事实与显式假设上的条件推演，不是事实；由当前价格倒推出的结果不等于它必然发生；未闭合的驱动、期间或估值假设必须保留 UNKNOWN。",
+        "",
+    ])
+    return lines
+
+
 def _render_report(analysis: Mapping[str, Any]) -> str:
     c, p = analysis["case"], analysis["price_input"]
     a, f, calc, d = analysis["assessment"], analysis["forecast_valuation"], analysis["return_metrics"], analysis["decision"]
@@ -3697,7 +3844,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f"- 当前持仓：{c['current_position_pct']}%",
         "",
         "> 这是个人使用的本地试运行报告，不是正式 canonical Decision。人工价格/AI 分析/来源摘要未完成正式证据准入；建议只供人工审阅，不会自动下单。",
-        "",
+        *_render_core_investment_synthesis(analysis),
         "## 一、建议与回报筛选",
         "",
         f"- 试运行建议：**{d['provisional_action']}**",
@@ -4803,7 +4950,7 @@ def create_pilot_template(
         "2. 未来最重要的变化是什么：按价值重要性排序，不要罗列宏观热点；指出未来 1 年（如有明确理由再用 2–3 年）最可能改变收入、单位利润、现金流或每股价值的变量，说明起点、预期变化、时间和可观测指标。写入 assessment.value_drivers 与 operating_driver_forecast。"
         "3. 为什么相信变化会发生：把每个关键变化连接到截止时点前已公开的具体证据、证据日期、业务机制和反证；区分领先指标/结果指标、公司指引/分析师假设/历史事实，不得把管理层目标当成已实现结果。写入 evidence_register、assessment.value_drivers.historical_evidence 与 rationale。"
         "4. 变化如何进入每股价值：明确写出“销量/价格/组合/利用率 → 收入 → 单位毛利与费用 → EBIT/净利润 → 资本开支/营运资金/FCF → 稀释股数与每股盈利 → 估值”的可验证传导链；说明关键假设、量纲、期间、约束、潜在蚕食与稀释，避免重复计价。使用 operating_driver_forecast、valuation_transmission 和 forecast_valuation.scenarios；无法闭合的环节保留 UNKNOWN/NOT_LINKED。"
-        "5. 当前价格已反映多少：price_input.price 是本次唯一现价，不得覆盖。分清外部可验证的市场隐含预期（MIE）、市场可比估值和内部估值；只有存在独立、截止时点兼容的定价/一致预期证据时才量化 MIE。缺少证据就将 assessment.market_implied_expectation 标为 NOT_IDENTIFIABLE，并具体解释哪些隐含增长、利润率、资本回报或估值倍数无法反推；绝不能把自己的 Base 估值伪装成市场预期。assessment.expectation_gap 必须说明市场预期与独立经营推演在方向、规模、时间或概率上有何差异；无法量化时明确方向也不可识别。"
+        "5. 当前估值隐含了什么：price_input.price 是本次唯一现价，不得覆盖。严格分开三类信息：(a) 外部可验证的市场隐含预期/一致预期，存入 assessment.market_implied_expectation 顶层 status/summary/evidence_refs；(b) 在明确估值模型和固定假设下，由当前价格反推出的条件经营要求，另存同一对象下的 price_implied_analysis；(c) Round A 的独立经营推演。price_implied_analysis 至少含 status、method、model_family、reference_price（必须等于结构化现价）、assumptions、implied_requirements 和 limitations；每项 implied_requirement 应说明 metric、value、unit、period、解释及来源引用。模型反推必须写明固定变量与敏感性，不得包装成外部共识或事实。若不能可靠反推，明确 NOT_IDENTIFIABLE，不要猜数。assessment.expectation_gap 应以 comparison_basis 和 comparisons 逐项比较可比的外部/条件价格隐含要求与独立推演，列出 metric、两侧值、单位、期间、差异/方向和局限；两侧指标、期间或单位不一致时不作数值比较。没有可核实外部 MIE 时，其 status 必须保持 NOT_IDENTIFIABLE；不能仅因 price_implied_analysis 存在而升级。"
         "6. 哪些事实要求改变看法：写出会证伪核心论点或使情景切换的可观察指标、阈值/方向、验证时间和对应经营/估值影响；区分暂时波动与结构性恶化。落入 assessment.thesis.break_conditions、assessment.thesis.reassessment_triggers、assessment.risk.items 的监控触发项以及 Bear.failure_trigger / operating_impact / valuation_mechanism。"
         "每个排名靠前的 value driver 都应尽量填写 driver_type、historical_evidence、valuation_transmission、impact、rationale 和其自身的 evidence_refs；证据只证明事实，不自动证明因果，因果需另给机制。Bear/Base/Bull 应由经营驱动假设产生有意义的差异，而不是只改终值或概率；说明情景间销量、净售价、单位成本、利润率、现金转化、资本开支和估值倍数发生哪些变化以及依据。"
         "最终要判断的是“按输入价格是否值得承担风险”，而不是只判断公司是否优秀或值得研究。请提供足以让本地决策引擎复算的输入，不要另造顶层 action/target-price 字段，也不要在研究回答中声称已发出 BUY/ADD/交易指令；15% 年化门槛、共同约束入场价与暂定动作由本地既有计算器独立计算。"
@@ -5130,6 +5277,7 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
     allowed_input = _round_a_prompt_input(template_payload)
     return (
         "IIOS Round A：价格盲的公司事实、质量、论点、价值驱动与独立经营预测。"
+        "【研究优先级】首先给出当前基本面现实与可验证基线：公司靠什么赚钱、产品/客户结构、盈利质量、周期位置、资本占用和现金转换；其次推演未来1年最重要的经营变量及 Bear/Base/Bull 合理区间；最后才填写归因/监测等辅助诊断。不得让细分 FCF 归因挤占核心事实与未来预期分析；没有独立依据的细分金额必须 UNKNOWN 或 REVIEW_REQUIRED，不得为了满足结构做机械拆分。"
         "本轮唯一输入为末尾列出的公司身份、截止时点、证据登记结构和公司侧字段；当前价格、当前持仓、估值选择、市场隐含预期、预期差及组合约束均未提供。"
         "不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
         "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。"
@@ -5170,7 +5318,9 @@ def _build_price_aware_round_b_prompt(*, base_prompt: str, payload: Mapping[str,
         + json.dumps(prompt_input, ensure_ascii=False, indent=2, allow_nan=False)
         + "\n【Round B 输出约束】只返回 IIOS-RESEARCH-PATCH-0.1 紧凑 JSON。research 只允许 evidence_register、assessment、forecast_valuation、eps_multiple_valuation、valuation_transmission、sotp_valuation；assessment 只允许 market_implied_expectation、expectation_gap。"
         + "不得更改 Round A 的公司侧字段。若返回 evidence_register，必须原样保留全部 Round A 来源记录，并可在其后追加新来源。"
-        + "只有存在独立、截止时点兼容、可核验的市场定价/一致预期证据时才量化 MIE/预期差；否则 MIE=NOT_IDENTIFIABLE、预期差=UNKNOWN。内部 Base 估值或条件反推不能冒充市场隐含预期。"
+        + "研究输出顺序必须优先回答：①当前基本面事实与最关键的不确定性；②当前价/当前估值倍数实际要求企业实现什么；③在独立事实、业务机制和显式假设上形成的合理 Bear/Base/Bull 未来推演；④当前价格相对这些预期的差异及风险。不要先铺陈长篇辅助诊断再给核心判断。"
+        + "外部 MIE 必须有独立、截止时点兼容、可核验的市场定价/一致预期证据；否则 assessment.market_implied_expectation.status=NOT_IDENTIFIABLE。价格反推属于条件模型反演，不是外部 MIE：放在 assessment.market_implied_expectation.price_implied_analysis，至少填写 status、method、model_family、reference_price、assumptions、implied_requirements、limitations；reference_price 必须与 price_input.price 完全一致。反推结果必须披露所固定的利润率/EPS/增长/终值倍数/资本回报/现金转换等变量和敏感性；不具备可复算公式或关键假设时，状态为 NOT_IDENTIFIABLE，数值留空。"
+        + "assessment.expectation_gap 使用 comparison_basis 和 comparisons 对齐可比的市场/价格隐含要求与 Round A 独立预测；比较行至少有 metric、market_implied_value 或 price_implied_value、independent_forecast_value、unit、period、difference 或 direction、limitations。单位/期间/定义不一致就不比较，不得把仅方向性的判断伪装成量化预期差。没有外部 MIE 时，条件价格反推仍可单独展示，但不得升级 MIE status，也不得单独让已验证 expectation_gap PASS。"
         + "不要修改人工控制字段，不声称正式准入、实际成交、实际分红或交易授权。"
     )
     return prompt, prompt_input, frozen_sha
