@@ -832,6 +832,18 @@ def _build_baseline_transition_bridge(
             values.setdefault("lineage", {})[field] = lineage or {"data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "issues": ["MEASURE_NOT_USABLE"]}
             if value is None:
                 baseline_issues.append(f"{product_id}.{field}:HISTORICAL_BASELINE_NOT_USABLE")
+        actual_bridge = product.get("historical_actual_bridge") if isinstance(product.get("historical_actual_bridge"), Mapping) else {}
+        raw_actual_bridge_issues = actual_bridge.get("issues")
+        relevant_actual_conflicts = [
+            str(issue) for issue in raw_actual_bridge_issues
+            if issue in {
+                "EXPLICIT_REVENUE_CONFLICTS_WITH_VOLUME_X_ASP",
+                "EXPLICIT_VARIABLE_COST_CONFLICTS_WITH_VOLUME_X_UNIT_COST",
+            }
+        ] if isinstance(raw_actual_bridge_issues, list) else []
+        values["explicit_bridge_conflicts"] = relevant_actual_conflicts
+        if relevant_actual_conflicts:
+            baseline_issues.extend(f"{product_id}:{issue}" for issue in relevant_actual_conflicts)
         baseline_values[product_id] = values
 
     scenario_results: dict[str, Any] = {}
@@ -872,6 +884,14 @@ def _build_baseline_transition_bridge(
             historical = baseline_values.get(product_id, {})
             forward_row = rows_by_id.get(product_id, {})
             forward_inputs = forward_row.get("inputs") if isinstance(forward_row.get("inputs"), Mapping) else {}
+            raw_forward_product_issues = forward_row.get("issues")
+            relevant_forward_conflicts = [
+                str(issue) for issue in raw_forward_product_issues
+                if issue in {
+                    "EXPLICIT_REVENUE_CONFLICTS_WITH_VOLUME_X_ASP",
+                    "EXPLICIT_VARIABLE_COST_CONFLICTS_WITH_VOLUME_X_UNIT_COST",
+                }
+            ] if isinstance(raw_forward_product_issues, list) else []
             lineage_by_field: dict[str, Any] = {}
             forward_values: dict[str, Decimal | None] = {}
             for field in field_names:
@@ -889,17 +909,29 @@ def _build_baseline_transition_bridge(
                 if value is None:
                     scenario_issues.append(f"{scenario_name}.{product_id}.{field}:FORWARD_MEASURE_NOT_USABLE")
             base_values = {field: historical.get(field) for field in field_names}
-            if any(base_values[field] is None for field in field_names) or any(forward_values[field] is None for field in field_names):
+            baseline_conflicts = historical.get("explicit_bridge_conflicts") if isinstance(historical.get("explicit_bridge_conflicts"), list) else []
+            product_conflicts = baseline_conflicts + relevant_forward_conflicts
+            if (
+                any(base_values[field] is None for field in field_names)
+                or any(forward_values[field] is None for field in field_names)
+                or product_conflicts
+            ):
                 all_products_comparable = False
                 missing = [
                     field for field in field_names
                     if base_values[field] is None or forward_values[field] is None
                 ]
+                if product_conflicts:
+                    scenario_issues.extend(
+                        f"{scenario_name}.{product_id}:EXPLICIT_REVENUE_OR_COST_CONFLICT:{issue}"
+                        for issue in product_conflicts
+                    )
                 product_results.append({
                     "product_id": product_id,
                     "product_name": str(product.get("product_name") or product_id),
                     "status": "NOT_IDENTIFIABLE",
                     "missing_or_unusable_fields": missing,
+                    "explicit_bridge_conflicts": product_conflicts,
                     "historical_baseline": {
                         "period": actuals_period,
                         "measures": {field: historical.get("lineage", {}).get(field) for field in field_names},
