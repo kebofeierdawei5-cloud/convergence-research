@@ -977,9 +977,10 @@ def _evaluate_normalized_fcf_bridge(
                 if abs(change_wc - effective_wc) > Decimal("1"):
                     component_issues.append("NORMALIZED_FCF_INCLUDED_WC_EFFECTIVE_WC_MISMATCH")
             elif treatment in {"NOT_APPLICABLE", "NOT_APPLICABLE_NO_TONNAGE_BASIS"}:
-                valid_zero_status = (
-                    inventory_status == "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED"
-                    or inventory_status == "NOT_APPLICABLE_NO_TONNAGE_BASIS"
+                valid_zero_status = inventory_status == (
+                    "NOT_APPLICABLE_NO_TONNAGE_BASIS"
+                    if treatment == "NOT_APPLICABLE_NO_TONNAGE_BASIS"
+                    else "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED"
                 )
                 if not valid_zero_status:
                     component_issues.append("NORMALIZED_FCF_NOT_APPLICABLE_INVENTORY_STATUS_MISMATCH")
@@ -1128,13 +1129,10 @@ def _evaluate_normalized_fcf_bridge(
             if change_wc is not None and effective_wc is not None and abs(change_wc - effective_wc) > Decimal("1"):
                 row_issues.append("B4_INCLUDED_WC_EFFECTIVE_WC_MISMATCH")
         elif inventory_treatment in {"NOT_APPLICABLE", "NOT_APPLICABLE_NO_TONNAGE_BASIS"}:
-            status_ok = (
-                inventory_status == "NOT_APPLICABLE_NO_TONNAGE_BASIS"
+            status_ok = inventory_status == (
+                "NOT_APPLICABLE_NO_TONNAGE_BASIS"
                 if inventory_treatment == "NOT_APPLICABLE_NO_TONNAGE_BASIS"
-                else inventory_status in {
-                    "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED",
-                    "NOT_APPLICABLE_NO_TONNAGE_BASIS",
-                }
+                else "ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED"
             )
             if not status_ok:
                 row_issues.append("B4_NOT_APPLICABLE_INVENTORY_STATUS_MISMATCH")
@@ -1239,8 +1237,12 @@ def _evaluate_normalized_fcf_bridge(
         if comparisons.get(name, {}).get("status") != "COMPARABLE_DIAGNOSTIC_ONLY":
             local_issues.append("B4_AND_NORMALIZED_FCF_COMPONENTS_NOT_COMPARABLE")
         if b4_treatment != norm_treatment:
-            if not (b4_treatment in not_applicable_treatments and norm_treatment in not_applicable_treatments):
-                local_issues.append("B4_NORMALIZED_INVENTORY_TREATMENT_MISMATCH")
+            # Zero inventory movement and unavailable tonnage basis are distinct states,
+            # not interchangeable labels for a comparable inventory treatment.
+            local_issues.append("B4_NORMALIZED_INVENTORY_TREATMENT_MISMATCH")
+        b4_status = _text(b4_components.get("inventory_status")).upper()
+        if b4_status != norm_status:
+            local_issues.append("B4_NORMALIZED_INVENTORY_RECONCILIATION_STATUS_MISMATCH")
         allowed_treatments = {
             "INCLUDED_IN_CHANGE_WORKING_CAPITAL", "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL",
             "NOT_APPLICABLE", "NOT_APPLICABLE_NO_TONNAGE_BASIS",
