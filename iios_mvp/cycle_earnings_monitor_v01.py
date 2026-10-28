@@ -1537,11 +1537,46 @@ def _evaluate_normalized_fcf_bridge(
                 measure_issues.append("FCF_DRIVER_COMPONENT_B4_EVIDENCE_REQUIRED")
             if not normalized_driver_refs:
                 measure_issues.append("FCF_DRIVER_COMPONENT_NORMALIZED_EVIDENCE_REQUIRED")
-            measure_refs = set(b4_driver_refs) | set(normalized_driver_refs)
-            if trigger_refs and not measure_refs.intersection(trigger_refs):
-                measure_issues.append("FCF_DRIVER_COMPONENT_EVIDENCE_NOT_SHARED_WITH_TRIGGER")
-            if measure_refs and not set(amount_refs).intersection(measure_refs):
-                measure_issues.append("FCF_ATTRIBUTION_AMOUNT_EVIDENCE_NOT_LINKED_TO_DRIVER_MEASURES")
+            b4_trigger_evidence_linked = bool(set(b4_driver_refs).intersection(trigger_refs))
+            normalized_trigger_evidence_linked = bool(set(normalized_driver_refs).intersection(trigger_refs))
+            if trigger_refs:
+                if not b4_trigger_evidence_linked:
+                    measure_issues.append("FCF_DRIVER_COMPONENT_B4_EVIDENCE_NOT_SHARED_WITH_TRIGGER")
+                if not normalized_trigger_evidence_linked:
+                    measure_issues.append("FCF_DRIVER_COMPONENT_NORMALIZED_EVIDENCE_NOT_SHARED_WITH_TRIGGER")
+            else:
+                measure_issues.append("FCF_DRIVER_COMPONENT_TRIGGER_EVIDENCE_REQUIRED")
+
+            parent_amount_b4_evidence_linked = bool(set(amount_refs).intersection(b4_driver_refs))
+            parent_amount_normalized_evidence_linked = bool(set(amount_refs).intersection(normalized_driver_refs))
+            if not parent_amount_b4_evidence_linked:
+                measure_issues.append("FCF_ATTRIBUTION_AMOUNT_EVIDENCE_NOT_LINKED_TO_B4_DRIVER_MEASURE")
+            if not parent_amount_normalized_evidence_linked:
+                measure_issues.append("FCF_ATTRIBUTION_AMOUNT_EVIDENCE_NOT_LINKED_TO_NORMALIZED_DRIVER_MEASURE")
+
+            # The normalized-side driver measurement must point back to the
+            # corresponding normalized aggregate component input(s). A shared
+            # trigger or parent-amount citation alone is not sufficient proof
+            # that this side's number belongs to this component.
+            normalized_component_evidence_linkage: dict[str, bool] = {}
+            for component_field in required_component_fields:
+                component_measure = normalized_cash_components.get(component_field)
+                component_refs = (
+                    {_text(ref) for ref in component_measure.get("evidence_refs", []) if _text(ref)}
+                    if isinstance(component_measure, Mapping)
+                    and isinstance(component_measure.get("evidence_refs"), list)
+                    else set()
+                )
+                linked = bool(component_refs.intersection(normalized_driver_refs))
+                normalized_component_evidence_linkage[component_field] = linked
+                if not component_refs:
+                    measure_issues.append(
+                        f"FCF_DRIVER_COMPONENT_NORMALIZED_AGGREGATE_EVIDENCE_REQUIRED:{category}:{component_field}"
+                    )
+                elif not linked:
+                    measure_issues.append(
+                        f"FCF_DRIVER_COMPONENT_NORMALIZED_EVIDENCE_NOT_LINKED_TO_AGGREGATE_COMPONENT:{category}:{component_field}"
+                    )
 
             if b4_driver_value is not None and normalized_driver_value is not None and not measure_issues:
                 if category in {"OPERATING_CASH_CONVERSION", "NON_CASH_EARNINGS"}:
@@ -1586,6 +1621,11 @@ def _evaluate_normalized_fcf_bridge(
                 "computed_amount_cny": _format(driver_component_computed_amount),
                 "b4_evidence_refs": b4_driver_refs,
                 "normalized_evidence_refs": normalized_driver_refs,
+                "b4_evidence_linked_to_review_trigger": b4_trigger_evidence_linked,
+                "normalized_evidence_linked_to_review_trigger": normalized_trigger_evidence_linked,
+                "parent_amount_evidence_linked_to_b4_side": parent_amount_b4_evidence_linked,
+                "parent_amount_evidence_linked_to_normalized_side": parent_amount_normalized_evidence_linked,
+                "normalized_component_evidence_linkage": normalized_component_evidence_linkage,
                 "status": "COMPONENT_MEASURE_IDENTIFIABLE" if not measure_issues else "REVIEW_REQUIRED",
                 "issues": sorted(set(measure_issues)),
             }
@@ -2743,6 +2783,11 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
                     f"按口径复算贡献 {driver_measure.get('computed_amount_cny') or 'UNKNOWN'} CNY；"
                     f"B4 侧证据 {'、'.join(driver_measure.get('b4_evidence_refs') or []) or 'UNKNOWN'}；"
                     f"正常化侧证据 {'、'.join(driver_measure.get('normalized_evidence_refs') or []) or 'UNKNOWN'}；"
+                    f"关联检查：B4→触发器 {driver_measure.get('b4_evidence_linked_to_review_trigger', False)}，"
+                    f"正常化→触发器 {driver_measure.get('normalized_evidence_linked_to_review_trigger', False)}，"
+                    f"金额→B4/正常化两侧 {driver_measure.get('parent_amount_evidence_linked_to_b4_side', False)}/"
+                    f"{driver_measure.get('parent_amount_evidence_linked_to_normalized_side', False)}，"
+                    f"正常化→组件输入 {driver_measure.get('normalized_component_evidence_linkage', {})}；"
                     f"状态 {driver_measure.get('status', 'UNKNOWN')}"
                 )
                 for measure_issue in driver_measure.get("issues") or []:
