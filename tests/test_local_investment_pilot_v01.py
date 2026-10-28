@@ -5165,8 +5165,26 @@ def test_b52_price_implied_inversion_reference_price_mismatch_is_visible() -> No
         ],
         "limitations": ["synthetic only"],
     }
+    payload["assessment"]["expectation_gap"]["comparison_basis"] = (
+        "CONDITIONAL_PRICE_IMPLIED_VS_INDEPENDENT_FORECAST"
+    )
+    payload["assessment"]["expectation_gap"]["comparisons"] = [
+        {
+            "metric": "EPS",
+            "price_implied_value": "4.95",
+            "independent_forecast_value": "4.2",
+            "difference": "0.75",
+            "unit": "CNY/share",
+            "period": "FY2027",
+            "limitations": "synthetic only",
+        }
+    ]
 
-    _analysis, report = _analyse(payload, "TEST-B52-PRICE-REFERENCE-CONFLICT")
+    analysis, report = _analyse(payload, "TEST-B52-PRICE-REFERENCE-CONFLICT")
 
+    assert analysis["assessment"]["expectation_gap"]["status"] == "UNKNOWN"
+    assert analysis["assessment"]["expectation_gap"]["direction"] == "UNKNOWN"
     assert "与结构化唯一现价核对 CONFLICT" in report
     assert "价格反推参考价与本次结构化现价不一致" in report
+    assert "条件预期差数值比较未展示" in report
+    assert "独立推演 4.2" not in report
