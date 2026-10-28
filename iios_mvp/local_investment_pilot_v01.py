@@ -3695,12 +3695,42 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
     ])
     inversion = mie.get("price_implied_analysis") if isinstance(mie.get("price_implied_analysis"), Mapping) else {}
     if inversion:
+        reference_price_status = "UNKNOWN"
+        try:
+            inversion_reference_price = Decimal(str(inversion.get("reference_price")))
+            structured_current_price = Decimal(str(current_price))
+            reference_price_status = (
+                "MATCH" if inversion_reference_price.is_finite()
+                and structured_current_price.is_finite()
+                and inversion_reference_price == structured_current_price
+                else "CONFLICT"
+            )
+        except (InvalidOperation, TypeError, ValueError):
+            reference_price_status = "NOT_IDENTIFIABLE"
+        inversion_assumptions = inversion.get("assumptions")
+        inversion_requirements = inversion.get("implied_requirements")
+        inversion_limitations = inversion.get("limitations")
+        inversion_contract_complete = bool(
+            str(inversion.get("method") or "").strip()
+            and str(inversion.get("model_family") or "").strip()
+            and reference_price_status == "MATCH"
+            and isinstance(inversion_assumptions, list) and inversion_assumptions
+            and isinstance(inversion_requirements, list) and inversion_requirements
+            and isinstance(inversion_limitations, list) and inversion_limitations
+        )
         lines.append(
             f"- 现价条件反推：{inversion.get('status', 'UNKNOWN')}；"
             f"方法 {inversion.get('method') or 'UNKNOWN'}；"
             f"模型族 {inversion.get('model_family') or 'UNKNOWN'}；"
-            f"反推参考价 {inversion.get('reference_price') or 'UNKNOWN'} {currency}"
+            f"反推参考价 {inversion.get('reference_price') or 'UNKNOWN'} {currency}；"
+            f"与结构化唯一现价核对 {reference_price_status}；"
+            f"合同字段完整度 {'COMPLETE' if inversion_contract_complete else 'INCOMPLETE'}"
         )
+        if reference_price_status == "CONFLICT":
+            lines.append("- 阻断提示：价格反推参考价与本次结构化现价不一致；该反推不能用于当前价格比较。")
+        elif not inversion_contract_complete:
+            lines.append("- 限制提示：条件反推缺少方法、固定假设、反推结果、局限说明或参考价匹配；视为未完整识别，不可据此宣称预期差。")
+        lines.append("- 边界：此一致性检查只核对参考价格和必需字段，不独立验证反推公式、假设公允性或来源内容真实性。")
         assumptions = inversion.get("assumptions") if isinstance(inversion.get("assumptions"), list) else []
         if assumptions:
             lines.append("- 反推的关键固定假设：")
