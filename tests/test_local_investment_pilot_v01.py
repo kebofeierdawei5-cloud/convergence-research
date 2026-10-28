@@ -5189,3 +5189,104 @@ def test_b52_price_implied_inversion_reference_price_mismatch_is_visible() -> No
     assert "价格反推参考价与本次结构化现价不一致" in report
     assert "条件预期差数值比较未展示" in report
     assert "独立推演 4.2" not in report
+
+
+def test_b53_company_wide_b4_valuation_bridge_mismatch_blocks_primary_eps_multiple_price_math():
+    result = pilot._build_valuation_model_consistency(
+        operator_model_family="EPS_MULTIPLE",
+        forecast_model_family="EPS_MULTIPLE",
+        model_name="SYNTHETIC EPS x PE",
+        model_rationale="Synthetic primary-model rationale for regression testing.",
+        operating_driver_forecast={
+            "scope": "COMPANY_WIDE",
+            "valuation_reconciliation": {
+                "status": "MISMATCH",
+                "scenarios": {
+                    "base": {
+                        "status": "MISMATCH",
+                        "checks": [{
+                            "driver_field": "net_profit_cny",
+                            "valuation_field": "net_profit_proxy_cny",
+                            "status": "MISMATCH",
+                            "driver_value": "120",
+                            "valuation_value": "100",
+                        }],
+                    },
+                },
+            },
+        },
+        valuation_transmission={
+            "status": "CALCULATED_NOT_APPLIED_BASELINE_ALREADY_INCLUDES_PROJECT",
+            "baseline_includes_project": True,
+        },
+        eps_multiple_calculation_status="CALCULATED",
+    )
+
+    assert result["b4_valuation_reconciliation_status"] == "MISMATCH"
+    assert result["status"] == "B4_VALUATION_BRIDGE_MISMATCH"
+    assert result["primary_model_price_calculation_eligible"] is False
+    assert "B4_VALUATION_BRIDGE_MISMATCH" in result["issues"]
+
+
+def test_b53_incremental_b4_scope_is_not_compared_to_whole_company_valuation_bridge():
+    result = pilot._reconcile_b4_valuation_bridge(
+        {
+            "scope": "PROJECT_INCREMENTAL",
+            "scenarios": {},
+        },
+        {
+            "scenarios": {
+                "bear": {"operating_financial_bridge": {"net_profit_proxy_cny": "10"}},
+                "base": {"operating_financial_bridge": {"net_profit_proxy_cny": "20"}},
+                "bull": {"operating_financial_bridge": {"net_profit_proxy_cny": "30"}},
+            },
+        },
+    )
+
+    assert result["status"] == "NOT_COMPARABLE_SCOPE"
+    assert "B5 transmission path" in result["reason"]
+    assert result["scenarios"] == {}
+
+
+def test_b53_core_synthesis_shows_b4_valuation_bridge_conflicts():
+    lines = pilot._render_core_investment_synthesis({
+        "case": {"currency": "CNY"},
+        "price_input": {"price": "100"},
+        "assessment": {},
+        "operating_driver_forecast": {
+            "scope": "COMPANY_WIDE",
+            "forecast_period": "2027FY",
+            "status": "SCENARIOS_CALCULATED",
+            "scenarios": {},
+            "valuation_reconciliation": {
+                "status": "MISMATCH",
+                "scenarios": {
+                    "base": {
+                        "status": "MISMATCH",
+                        "checks": [{
+                            "driver_field": "net_profit_cny",
+                            "valuation_field": "net_profit_proxy_cny",
+                            "status": "MISMATCH",
+                            "driver_value": "120",
+                            "valuation_value": "100",
+                        }],
+                    },
+                },
+            },
+        },
+        "cycle_earnings_monitor": {},
+        "forecast_valuation": {
+            "model": "SYNTHETIC EPS x PE",
+            "model_family": "EPS_MULTIPLE",
+            "valuation_terminal_date": "2027-12-31",
+            "entry_value_reference_per_share": "150",
+            "scenarios": {},
+        },
+        "return_metrics": None,
+    })
+    report = "\\n".join(lines)
+
+    assert "B4 与主估值经营财务桥对账：MISMATCH" in report
+    assert "BASE net_profit_cny ↔ net_profit_proxy_cny：MISMATCH" in report
+    assert "B4=120；主估值桥=100" in report
+    assert "年化回报与目标买入价保持 UNKNOWN" in report
