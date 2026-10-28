@@ -2131,6 +2131,48 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         gap["consistency_note"] = (
             "市场隐含预期尚未通过可识别性检查，不能把预期差声明当作已验证的市场比较结果。"
         )
+
+    # B52: when a comparison claims to use a conditional price inversion, make
+    # sure that inversion describes this protected current price and has the
+    # minimum explicit method/assumptions/results/limitations contract. It
+    # remains separate from external MIE and never upgrades MIE status.
+    comparison_basis = str(gap.get("comparison_basis") or "").strip().upper()
+    if "PRICE_IMPLIED" in comparison_basis:
+        inversion = assessment["market_implied_expectation"].get("price_implied_analysis")
+        inversion = inversion if isinstance(inversion, Mapping) else {}
+        inversion_issues: list[str] = []
+        if str(inversion.get("status") or "").strip().upper() != "CONDITIONAL_MODEL_INVERSION":
+            inversion_issues.append("PRICE_IMPLIED_INVERSION_STATUS_NOT_IDENTIFIABLE")
+        if not str(inversion.get("method") or "").strip():
+            inversion_issues.append("PRICE_IMPLIED_INVERSION_METHOD_MISSING")
+        if str(inversion.get("model_family") or "").strip().upper() not in {
+            "EPS_MULTIPLE", "FCF_DCF", "DDM", "SOTP", "RNPV", "OTHER"
+        }:
+            inversion_issues.append("PRICE_IMPLIED_INVERSION_MODEL_FAMILY_NOT_IDENTIFIABLE")
+        try:
+            inversion_price = Decimal(str(inversion.get("reference_price")))
+            if not inversion_price.is_finite() or inversion_price != price:
+                inversion_issues.append("PRICE_IMPLIED_INVERSION_REFERENCE_PRICE_MISMATCH")
+        except (InvalidOperation, TypeError, ValueError):
+            inversion_issues.append("PRICE_IMPLIED_INVERSION_REFERENCE_PRICE_NOT_IDENTIFIABLE")
+        for field in ("assumptions", "implied_requirements", "limitations"):
+            value = inversion.get(field)
+            if not isinstance(value, list) or not value:
+                inversion_issues.append(f"PRICE_IMPLIED_INVERSION_{field.upper()}_REQUIRED")
+        if inversion_issues:
+            if gap.get("status") == "PASS":
+                gap["status_input"] = gap.get("status")
+                gap["status"] = "UNKNOWN"
+                gap["direction_input"] = gap.get("direction", "UNKNOWN")
+                gap["direction"] = "UNKNOWN"
+            existing_issues = list(gap.get("status_issues") or [])
+            existing_issues.extend(inversion_issues)
+            gap["status_issues"] = list(dict.fromkeys(existing_issues))
+            gap["consistency_note"] = (
+                "本预期差比较声明依赖的条件价格反推未通过参考价/方法/假设合同检查；"
+                "保留原始声明供审计，但决策可用状态不能为 PASS。"
+            )
+
     assessment["thesis"]["break_conditions"] = _items(assessment["thesis"].get("break_conditions"))
     assessment["thesis"]["reassessment_triggers"] = _items(assessment["thesis"].get("reassessment_triggers"))
     thesis_quality_issues: list[str] = []
@@ -3694,6 +3736,8 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
         "- 外部 MIE 与价格反推是两个不同概念；不得用内部 Base 估值、条件反推或未经核实的一致预期替代外部市场证据。",
     ])
     inversion = mie.get("price_implied_analysis") if isinstance(mie.get("price_implied_analysis"), Mapping) else {}
+    reference_price_status = "NOT_PROVIDED"
+    inversion_contract_complete = False
     if inversion:
         reference_price_status = "UNKNOWN"
         try:
@@ -3777,16 +3821,27 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
     ])
     comparisons = gap.get("comparisons") if isinstance(gap.get("comparisons"), list) else []
-    for row in comparisons[:6]:
-        if isinstance(row, Mapping):
-            lines.append(
-                f"  - {row.get('metric') or row.get('driver') or 'UNKNOWN'}："
-                f"市场/价格隐含 {row.get('market_implied_value') or row.get('price_implied_value') or 'UNKNOWN'}；"
-                f"独立推演 {row.get('independent_forecast_value') or 'UNKNOWN'}；"
-                f"差异 {row.get('difference') or row.get('direction') or 'UNKNOWN'} "
-                f"{row.get('unit') or ''}；期间 {row.get('period') or 'UNKNOWN'}；"
-                f"限制 {row.get('limitations') or 'UNKNOWN'}"
-            )
+    gap_basis_text = str(gap.get("comparison_basis") or "").upper()
+    hide_price_implied_comparisons = (
+        "PRICE_IMPLIED" in gap_basis_text
+        and not (inversion and reference_price_status == "MATCH" and inversion_contract_complete)
+    )
+    if comparisons and hide_price_implied_comparisons:
+        lines.append(
+            "- 条件预期差数值比较未展示：其依赖的现价反推没有通过参考价和基本字段完整性检查；"
+            "先修复反推输入，不将其用于当前价格判断。"
+        )
+    else:
+        for row in comparisons[:6]:
+            if isinstance(row, Mapping):
+                lines.append(
+                    f"  - {row.get('metric') or row.get('driver') or 'UNKNOWN'}："
+                    f"市场/价格隐含 {row.get('market_implied_value') or row.get('price_implied_value') or 'UNKNOWN'}；"
+                    f"独立推演 {row.get('independent_forecast_value') or 'UNKNOWN'}；"
+                    f"差异 {row.get('difference') or row.get('direction') or 'UNKNOWN'} "
+                    f"{row.get('unit') or ''}；期间 {row.get('period') or 'UNKNOWN'}；"
+                    f"限制 {row.get('limitations') or 'UNKNOWN'}"
+                )
 
     lines.extend([
         "",
