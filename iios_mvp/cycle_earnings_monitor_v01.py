@@ -1852,7 +1852,7 @@ def _evaluate_normalized_fcf_bridge(
         "formal_forecast_admission_created": False,
         "formal_valuation_admission_created": False,
         "decision_authority": False,
-        "note": "B48 先核对参考 FCF + 逐项调整 = 正常化 FCF 中枢；B49 再按经营现金转换、非现金收益、资本开支、营运资金、库存五类实测 B4−正常化组件差额并逐类核对归因。库存已包含在营运资金时单列库存贡献必须为零；任一组件、类别或总额不一致均不得宣称 FCF 已对账。",
+        "note": "B48 先核对参考 FCF + 逐项调整 = 正常化 FCF 中枢；B49 按经营现金转换、非现金收益、资本开支、营运资金、库存五类核对实测组件差额；B50 对多驱动分解进一步要求 B4 侧组件总额与正常化侧组件总额分别对账，再核对两侧差额。库存已包含在营运资金时单列库存贡献必须为零；任一组件、类别或总额不一致均不得宣称 FCF 已对账。",
     }
 
 
