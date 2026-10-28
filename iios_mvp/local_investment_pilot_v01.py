@@ -2159,19 +2159,27 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
             value = inversion.get(field)
             if not isinstance(value, list) or not value:
                 inversion_issues.append(f"PRICE_IMPLIED_INVERSION_{field.upper()}_REQUIRED")
-        if inversion_issues:
-            if gap.get("status") == "PASS":
-                gap["status_input"] = gap.get("status")
-                gap["status"] = "UNKNOWN"
-                gap["direction_input"] = gap.get("direction", "UNKNOWN")
-                gap["direction"] = "UNKNOWN"
-            existing_issues = list(gap.get("status_issues") or [])
-            existing_issues.extend(inversion_issues)
-            gap["status_issues"] = list(dict.fromkeys(existing_issues))
-            gap["consistency_note"] = (
-                "本预期差比较声明依赖的条件价格反推未通过参考价/方法/假设合同检查；"
-                "保留原始声明供审计，但决策可用状态不能为 PASS。"
-            )
+        # Even a structurally complete conditional inversion is still a
+        # model-supplied sensitivity, not an independently computed or externally
+        # verified MIE. Keep it visible in the report, but do not let it alone
+        # produce a decision-usable positive expectation-gap gate.
+        gap["direction_input"] = gap.get("direction", gap.get("direction_input", "UNKNOWN"))
+        gap["direction"] = "UNKNOWN"
+        if gap.get("status") == "PASS":
+            gap["status_input"] = gap.get("status")
+            gap["status"] = "UNKNOWN"
+        existing_issues = list(gap.get("status_issues") or [])
+        existing_issues.extend(inversion_issues)
+        if not inversion_issues:
+            existing_issues.append("CONDITIONAL_PRICE_IMPLIED_GAP_NOT_INDEPENDENTLY_VERIFIED")
+        gap["status_issues"] = list(dict.fromkeys(existing_issues))
+        gap["consistency_note"] = (
+            "条件价格反推可以展示与独立推演的差距，但它尚未被本地引擎独立复算，"
+            "不得单独作为已验证的预期差或正向决策门槛。只有直接依赖外部可核验 MIE 的可比项才可能形成该门槛。"
+            if not inversion_issues else
+            "本预期差比较声明依赖的条件价格反推未通过参考价/方法/假设合同检查；"
+            "保留原始声明供审计，但决策可用状态不能为 PASS。"
+        )
 
     assessment["thesis"]["break_conditions"] = _items(assessment["thesis"].get("break_conditions"))
     assessment["thesis"]["reassessment_triggers"] = _items(assessment["thesis"].get("reassessment_triggers"))
@@ -5405,7 +5413,7 @@ def _build_price_aware_round_b_prompt(*, base_prompt: str, payload: Mapping[str,
         + "不得更改 Round A 的公司侧字段。若返回 evidence_register，必须原样保留全部 Round A 来源记录，并可在其后追加新来源。"
         + "研究输出顺序必须优先回答：①当前基本面事实与最关键的不确定性；②当前价/当前估值倍数实际要求企业实现什么；③在独立事实、业务机制和显式假设上形成的合理 Bear/Base/Bull 未来推演；④当前价格相对这些预期的差异及风险。不要先铺陈长篇辅助诊断再给核心判断。"
         + "外部 MIE 必须有独立、截止时点兼容、可核验的市场定价/一致预期证据；否则 assessment.market_implied_expectation.status=NOT_IDENTIFIABLE。价格反推属于条件模型反演，不是外部 MIE：放在 assessment.market_implied_expectation.price_implied_analysis，至少填写 status、method、model_family、reference_price、assumptions、implied_requirements、limitations；reference_price 必须与 price_input.price 完全一致。反推结果必须披露所固定的利润率/EPS/增长/终值倍数/资本回报/现金转换等变量和敏感性；不具备可复算公式或关键假设时，状态为 NOT_IDENTIFIABLE，数值留空。"
-        + "assessment.expectation_gap 使用 comparison_basis 和 comparisons 对齐可比的市场/价格隐含要求与 Round A 独立预测；比较行至少有 metric、market_implied_value 或 price_implied_value、independent_forecast_value、unit、period、difference 或 direction、limitations。单位/期间/定义不一致就不比较，不得把仅方向性的判断伪装成量化预期差。没有外部 MIE 时，条件价格反推仍可单独展示，但不得升级 MIE status，也不得单独让已验证 expectation_gap PASS。"
+        + "assessment.expectation_gap 使用 comparison_basis 和 comparisons 对齐可比的市场/价格隐含要求与 Round A 独立预测；比较行至少有 metric、market_implied_value 或 price_implied_value、independent_forecast_value、unit、period、difference 或 direction、limitations。单位/期间/定义不一致就不比较，不得把仅方向性的判断伪装成量化预期差。任何基于 CONDITIONAL_PRICE_IMPLIED_VS_INDEPENDENT_FORECAST 的结果都只能展示为条件敏感性，决策可用 expectation_gap 必须保持 UNKNOWN，因为本地并未独立复算该反演；只有直接以外部可核验 MIE 为比较端的可比项才可能构成已验证预期差。"
         + "不要修改人工控制字段，不声称正式准入、实际成交、实际分红或交易授权。"
     )
     return prompt, prompt_input, frozen_sha
