@@ -3741,6 +3741,10 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
     cycle_node = cycle.get("industry_cycle") if isinstance(cycle.get("industry_cycle"), Mapping) else {}
     valuation = analysis.get("forecast_valuation") if isinstance(analysis.get("forecast_valuation"), Mapping) else {}
     valuation_scenarios = valuation.get("scenarios") if isinstance(valuation.get("scenarios"), Mapping) else {}
+    model_consistency = (
+        analysis.get("valuation_model_consistency")
+        if isinstance(analysis.get("valuation_model_consistency"), Mapping) else {}
+    )
     returns = analysis.get("return_metrics") if isinstance(analysis.get("return_metrics"), Mapping) else None
     currency = str(case.get("currency") or price.get("currency") or "UNKNOWN")
     current_price = price.get("price")
@@ -3935,10 +3939,20 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             if rendered_checks >= 6:
                 break
         if reconciliation_status == "MISMATCH":
-            lines.append(
-                "- 门禁影响：公司整体范围下的 B4 与主估值经营桥存在已识别数值矛盾；"
-                "主估值资格应被阻断，年化回报与目标买入价保持 UNKNOWN。"
-            )
+            selected_model = str(
+                model_consistency.get("operator_selected_model_family")
+                or valuation.get("model_family") or "UNKNOWN"
+            ).strip().upper()
+            if selected_model == "EPS_MULTIPLE" and str(operating.get("scope") or "").upper() == "COMPANY_WIDE":
+                lines.append(
+                    "- 门禁影响：公司整体范围下的 B4 与主估值经营桥存在已识别数值矛盾；"
+                    "EPS_MULTIPLE 主模型资格应被阻断，年化回报与目标买入价保持 UNKNOWN。"
+                )
+            else:
+                lines.append(
+                    "- 模型适用边界：发现经营桥数值矛盾；B53 的自动阻断仅适用于被选为主模型的 EPS_MULTIPLE "
+                    "且 B4 范围为 COMPANY_WIDE。此处不代表其他模型已通过其独立门禁。"
+                )
         else:
             lines.append(
                 "- 口径边界：部分字段无法直接对账；这不是已识别的数值矛盾，也不能被表述为完全一致。"
