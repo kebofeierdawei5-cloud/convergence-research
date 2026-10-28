@@ -3741,9 +3741,10 @@ def _build_decision_chain_trace(
     stress = stress_review if isinstance(stress_review, Mapping) else {}
     sensitivity = price_zone_sensitivity if isinstance(price_zone_sensitivity, Mapping) else {}
     core_policy = decision.get("core_policy_evaluation") if isinstance(decision.get("core_policy_evaluation"), Mapping) else {}
-    gating_issues = [str(item) for item in decision.get("gating_issues", []) if str(item).strip()]
+    raw_gating_issues = decision.get("gating_issues")
+    gating_issues = [str(item) for item in raw_gating_issues if str(item).strip()] if isinstance(raw_gating_issues, list) else []
 
-    input_issue_codes = {
+    input_issue_code_set = {
         "EVIDENCE_REGISTER_EMPTY",
         "UNRESOLVED_EVIDENCE_REFERENCES",
         "DUPLICATE_EVIDENCE_SOURCE_IDS",
@@ -3756,7 +3757,7 @@ def _build_decision_chain_trace(
         "SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED",
         "CASH_DISTRIBUTION_SOURCE_DOMAIN_CLASS_NOT_ACCEPTED",
     }
-    input_issue_codes = [item for item in gating_issues if item in input_issue_codes]
+    input_issue_codes = [item for item in gating_issues if item in input_issue_code_set]
     if not isinstance(prepared.get("evidence_register"), list) or not prepared.get("evidence_register"):
         if "EVIDENCE_REGISTER_EMPTY" not in input_issue_codes:
             input_issue_codes.append("EVIDENCE_REGISTER_EMPTY")
@@ -3770,11 +3771,13 @@ def _build_decision_chain_trace(
         input_issue_codes.append("OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT")
 
     model_eligible = model.get("primary_model_price_calculation_eligible") is True
-    model_issues = [str(item) for item in model.get("issues", []) if str(item).strip()]
+    raw_model_issues = model.get("issues")
+    model_issues = [str(item) for item in raw_model_issues if str(item).strip()] if isinstance(raw_model_issues, list) else []
     if not model_eligible and not model_issues:
         model_issues = [str(model.get("status") or "PRIMARY_MODEL_ELIGIBILITY_UNKNOWN")]
     timing_status = str(timing.get("status") or "UNKNOWN").strip().upper()
-    timing_issues = [str(item) for item in timing.get("issues", []) if str(item).strip()]
+    raw_timing_issues = timing.get("issues")
+    timing_issues = [str(item) for item in raw_timing_issues if str(item).strip()] if isinstance(raw_timing_issues, list) else []
     if timing_status != "PASS" and not timing_issues:
         timing_issues = [f"VALUATION_TIMING_{timing_status}"]
 
@@ -3807,7 +3810,10 @@ def _build_decision_chain_trace(
         risk_reasons.append(f"Risk={risk_status}")
     if stress_status != "PASS":
         risk_reasons.append(f"Thesis-break stress={stress_status}")
-    risk_reasons.extend(str(item) for item in stress.get("issues", []) if str(item).strip())
+    raw_stress_issues = stress.get("issues")
+    risk_reasons.extend(
+        str(item) for item in raw_stress_issues if str(item).strip()
+    ) if isinstance(raw_stress_issues, list) else None
 
     package_status = str(package.get("status") or "NOT_PROVIDED").strip().upper()
     constraint_status = str(package.get("constraint_status") or "UNKNOWN").strip().upper()
