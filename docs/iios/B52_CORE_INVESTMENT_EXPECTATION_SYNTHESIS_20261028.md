@@ -29,7 +29,7 @@ The conditional object can express:
 - `implied_requirements` with metric, value, unit, period, interpretation/basis and evidence references;
 - `sensitivity` and `limitations`.
 
-The reference price must equal the protected structured `price_input.price`. The report checks this equality, displays completeness of the basic inversion contract, and calls out a mismatch or missing contract fields. This report check does not independently recompute the inversion formula or establish the truth of the submitted assumptions.
+The reference price must equal the protected structured `price_input.price`. The local input normalizer downgrades a declared expectation-gap PASS to UNKNOWN when its `comparison_basis` claims price-implied comparison but the inversion lacks a supported model family/method, reference-price match, assumptions, implied results or limitations. The report checks equality and contract completeness, calls out a mismatch or missing fields, and suppresses the dependent numeric comparison when the inversion is inconsistent. This does not independently recompute the inversion formula or establish the truth of the submitted assumptions.
 
 Crucially, conditional price inversion is **not external MIE**. It cannot upgrade `assessment.market_implied_expectation.status`; where external market evidence is unavailable, that status remains `NOT_IDENTIFIABLE`. Likewise, a model-derived conditional comparison cannot by itself make an externally verified expectation gap PASS.
 
