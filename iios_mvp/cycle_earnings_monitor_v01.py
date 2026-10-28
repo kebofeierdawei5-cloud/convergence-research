@@ -1566,7 +1566,23 @@ def _evaluate_normalized_fcf_bridge(
                 "component_basis": component_basis or "UNKNOWN",
                 "basis": component_measure_basis or "UNKNOWN",
                 "b4_value_cny": _format(b4_driver_value),
+                "b4_data_class": _text(
+                    raw_driver_measure.get("b4_value_cny", {}).get("data_class")
+                    if isinstance(raw_driver_measure.get("b4_value_cny"), Mapping) else "UNKNOWN"
+                ).upper() or "UNKNOWN",
+                "b4_basis": _text(
+                    raw_driver_measure.get("b4_value_cny", {}).get("basis")
+                    if isinstance(raw_driver_measure.get("b4_value_cny"), Mapping) else "UNKNOWN"
+                ) or "UNKNOWN",
                 "normalized_value_cny": _format(normalized_driver_value),
+                "normalized_data_class": _text(
+                    raw_driver_measure.get("normalized_value_cny", {}).get("data_class")
+                    if isinstance(raw_driver_measure.get("normalized_value_cny"), Mapping) else "UNKNOWN"
+                ).upper() or "UNKNOWN",
+                "normalized_basis": _text(
+                    raw_driver_measure.get("normalized_value_cny", {}).get("basis")
+                    if isinstance(raw_driver_measure.get("normalized_value_cny"), Mapping) else "UNKNOWN"
+                ) or "UNKNOWN",
                 "computed_amount_cny": _format(driver_component_computed_amount),
                 "b4_evidence_refs": b4_driver_refs,
                 "normalized_evidence_refs": normalized_driver_refs,
@@ -1655,7 +1671,17 @@ def _evaluate_normalized_fcf_bridge(
                 and item["driver_component_measure"].get("status") == "COMPONENT_MEASURE_IDENTIFIABLE"
                 for item in category_items
             )
-            if not has_independent_measures:
+            category_driver_ids = [_text(item.get("driver_id")) for item in category_items]
+            duplicate_driver_ids = len(set(category_driver_ids)) != len(category_driver_ids)
+            if duplicate_driver_ids:
+                scenario_issues.append("FCF_DUPLICATE_DRIVER_ROWS_WITHIN_COMPONENT_CATEGORY:" + category_key)
+                for item in category_items:
+                    item["amount_cny"] = None
+                    item["issues"] = sorted(set(
+                        list(item.get("issues") or [])
+                        + ["FCF_DRIVER_ID_REPEATED_WITHIN_COMPONENT_CATEGORY"]
+                    ))
+            elif not has_independent_measures:
                 issue_code = (
                     "FCF_MULTIPLE_ATTRIBUTIONS_FOR_COMPONENT_CATEGORY_NOT_INDEPENDENTLY_MEASURED:"
                     + category_key
@@ -2710,8 +2736,10 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
                 lines.append(
                     f"      - 驱动级分解 {driver_measure.get('measure_id', 'UNKNOWN')}："
                     f"口径 {driver_measure.get('component_basis', 'UNKNOWN')}；"
-                    f"B4 组件值 {driver_measure.get('b4_value_cny') or 'UNKNOWN'} / "
-                    f"正常化组件值 {driver_measure.get('normalized_value_cny') or 'UNKNOWN'}；"
+                    f"B4 组件值 {driver_measure.get('b4_value_cny') or 'UNKNOWN'} "
+                    f"({driver_measure.get('b4_data_class', 'UNKNOWN')}；{driver_measure.get('b4_basis', 'UNKNOWN')}) / "
+                    f"正常化组件值 {driver_measure.get('normalized_value_cny') or 'UNKNOWN'} "
+                    f"({driver_measure.get('normalized_data_class', 'UNKNOWN')}；{driver_measure.get('normalized_basis', 'UNKNOWN')})；"
                     f"按口径复算贡献 {driver_measure.get('computed_amount_cny') or 'UNKNOWN'} CNY；"
                     f"B4 侧证据 {'、'.join(driver_measure.get('b4_evidence_refs') or []) or 'UNKNOWN'}；"
                     f"正常化侧证据 {'、'.join(driver_measure.get('normalized_evidence_refs') or []) or 'UNKNOWN'}；"
