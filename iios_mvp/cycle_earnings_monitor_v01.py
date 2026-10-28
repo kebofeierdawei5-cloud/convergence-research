@@ -692,7 +692,7 @@ def _evaluate_normalized_fcf_bridge(
 
     monitor_issues: list[str] = []
     norm = raw_normalized_fcf
-    metric = _text(norm.get("metric") or "UNLEVERED_FCF_PROXY_CNY").upper()
+    metric = _text(norm.get("metric")).upper()
     method = _text(norm.get("method")).upper()
     scope = _text(norm.get("scope") or "UNKNOWN").upper()
     period = _text(norm.get("period"))
@@ -700,7 +700,10 @@ def _evaluate_normalized_fcf_bridge(
     basis = _text(norm.get("normalization_basis"))
     b4_scope = _text(operating_driver_forecast.get("scope") or "UNKNOWN").upper()
     b4_period = _text(operating_driver_forecast.get("forecast_period") or "UNKNOWN")
-    if metric != "UNLEVERED_FCF_PROXY_CNY":
+    if not _meaningful(metric):
+        monitor_issues.append("NORMALIZED_FCF_METRIC_REQUIRED")
+        metric = "UNKNOWN"
+    elif metric != "UNLEVERED_FCF_PROXY_CNY":
         monitor_issues.append("NORMALIZED_FCF_METRIC_UNSUPPORTED")
     if method != NORMALIZED_FCF_METHOD:
         monitor_issues.append("NORMALIZED_FCF_METHOD_MISMATCH_B4_PROXY_FORMULA")
