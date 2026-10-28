@@ -1,6 +1,6 @@
 # B55 — Observed Baseline to Forward Operating Driver Bridge
 
-**Status:** implemented on the feature branch; unmerged and non-canonical. **Validation:** seven B55 regression cases are authored but not run. Replay, CI and real macOS full-run acceptance remain deferred / not verified.
+**Status:** implemented on the feature branch; unmerged and non-canonical. **Validation:** nine B55 regression cases are authored but not run. Replay, CI and real macOS full-run acceptance remain deferred / not verified.
 
 ## Why this batch
 
@@ -25,6 +25,8 @@ The three computed effects must reconcile to the contribution change within CNY 
 
 ## Output placement and report
 
+If B4 is absent or has an invalid schema, the `baseline_transition` node remains present with an explicit `NOT_PROVIDED` or `INVALID_SCHEMA` status; readers need not infer absence from a missing key. The report also shows baseline-level blockers and retains data-class/source-reference lineage for failed rows.
+
 The result is nested in the existing `operating_driver_forecast.baseline_transition` object. The Chinese B4 report now shows:
 
 - comparison status, scope and baseline/forward periods;
@@ -45,7 +47,7 @@ This is an explanatory diagnostic only. It does not change B4's financial result
 
 ## Regression cases and validation status
 
-Seven cases are authored in `tests/test_local_investment_pilot_v01.py`:
+Nine cases are authored in `tests/test_local_investment_pilot_v01.py`:
 
 1. Historical baseline to all three forward contribution scenarios reconciles.
 2. Symmetric decomposition separates ASP and unit-cost effects.
@@ -54,5 +56,7 @@ Seven cases are authored in `tests/test_local_investment_pilot_v01.py`:
 5. Missing historical unit economics blocks contribution comparison.
 6. A direct historical revenue conflict blocks the baseline bridge.
 7. The report preserves observed-vs-assumption labels and explains that the bridge is not a valuation input.
+8. Missing B4 input returns an explicit `NOT_PROVIDED` transition node.
+9. Invalid B4 schema returns an explicit `INVALID_SCHEMA` transition node.
 
 They have **not** been executed. No test pass, Replay match, CI pass, or macOS acceptance is claimed.
