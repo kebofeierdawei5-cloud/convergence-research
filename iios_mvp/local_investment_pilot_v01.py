@@ -3811,15 +3811,17 @@ def _build_decision_chain_trace(
 
     package_status = str(package.get("status") or "NOT_PROVIDED").strip().upper()
     constraint_status = str(package.get("constraint_status") or "UNKNOWN").strip().upper()
-    package_ready = package_status == "CONDITIONAL_PACKAGE_READY_NOT_AUTHORIZED"
+    package_claimed_ready = package_status == "CONDITIONAL_PACKAGE_READY_NOT_AUTHORIZED"
     if constraint_status == "BLOCKED" or package_status.startswith("BLOCKED"):
         package_chain_status = "BLOCKED"
     elif package_status == "NOT_PROVIDED" or constraint_status == "UNKNOWN":
         package_chain_status = "UNKNOWN"
-    elif package_ready:
+    elif package_claimed_ready and constraint_status == "PASS":
         package_chain_status = "CONDITIONAL_READY_NOT_AUTHORIZED"
     else:
         package_chain_status = "REVIEW_REQUIRED"
+    # Treat the integrated status—not the package's claimed status alone—as authoritative.
+    package_ready = package_chain_status == "CONDITIONAL_READY_NOT_AUTHORIZED"
     package_reasons = [str(package.get("reason") or "").strip()]
     package_reasons = [item for item in package_reasons if item]
 
