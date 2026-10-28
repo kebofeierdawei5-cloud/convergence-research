@@ -2163,7 +2163,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         # model-supplied sensitivity, not an independently computed or externally
         # verified MIE. Keep it visible in the report, but do not let it alone
         # produce a decision-usable positive expectation-gap gate.
-        gap["direction_input"] = gap.get("direction", gap.get("direction_input", "UNKNOWN"))
+        gap["direction_input"] = gap.get("direction_input", gap.get("direction", "UNKNOWN"))
         gap["direction"] = "UNKNOWN"
         if gap.get("status") == "PASS":
             gap["status_input"] = gap.get("status")
