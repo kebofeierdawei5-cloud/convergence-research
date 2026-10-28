@@ -1432,6 +1432,56 @@ def _evaluate_normalized_fcf_bridge(
             row_issues.append("FCF_ATTRIBUTION_TRIGGER_EVIDENCE_REQUIRED")
         elif not set(amount_refs).intersection(trigger_refs):
             row_issues.append("FCF_ATTRIBUTION_EVIDENCE_NOT_SHARED_WITH_TRIGGER")
+
+        # Bind each FCF attribution to evidence for the independently measured
+        # normalized-FCF component, not merely to a trigger that happens to share
+        # the same driver ID.
+        normalized_scenario = normalized_scenarios.get(scenario, {})
+        normalized_cash_components = (
+            normalized_scenario.get("cash_components")
+            if isinstance(normalized_scenario.get("cash_components"), Mapping) else {}
+        )
+        inventory_treatment = _text(
+            normalized_cash_components.get("inventory_working_capital_treatment")
+        ).upper()
+        if category == "OPERATING_CASH_CONVERSION":
+            required_component_fields = ("ebit_cny", "tax_rate")
+        elif category == "NON_CASH_EARNINGS":
+            required_component_fields = ("depreciation_amortization_cny",)
+        elif category == "CAPEX":
+            required_component_fields = ("cash_capex_cny",)
+        elif category == "WORKING_CAPITAL":
+            required_component_fields = (
+                ("change_working_capital_cny",)
+                if inventory_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL"
+                else ("effective_change_working_capital_cny",)
+            )
+        elif category == "INVENTORY_MOVEMENT":
+            required_component_fields = (
+                ("inventory_cash_impact_proxy_cny",)
+                if inventory_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL"
+                else ("effective_change_working_capital_cny",)
+            )
+        else:
+            required_component_fields = ()
+
+        for component_field in required_component_fields:
+            component_measure = normalized_cash_components.get(component_field)
+            component_refs = (
+                {_text(ref) for ref in component_measure.get("evidence_refs", []) if _text(ref)}
+                if isinstance(component_measure, Mapping)
+                and isinstance(component_measure.get("evidence_refs"), list)
+                else set()
+            )
+            if not component_refs:
+                row_issues.append(
+                    f"FCF_ATTRIBUTION_COMPONENT_EVIDENCE_NOT_IDENTIFIABLE:{category}:{component_field}"
+                )
+            elif not set(amount_refs).intersection(component_refs):
+                row_issues.append(
+                    f"FCF_ATTRIBUTION_EVIDENCE_NOT_LINKED_TO_COMPONENT:{category}:{component_field}"
+                )
+
         attribution_rows[scenario].append({
             "scenario": scenario,
             "fcf_attribution_id": attribution_id or f"UNKNOWN_{index}",
@@ -1461,6 +1511,29 @@ def _evaluate_normalized_fcf_bridge(
         scenario_issues: list[str] = []
         contributions: list[Decimal] = []
         attributed_by_category: dict[str, Decimal] = {}
+
+        # One numeric attribution row per measured component category is the
+        # conservative boundary until independent driver-level component measures
+        # exist. Multiple rows must not offset one another and masquerade as a
+        # verified component allocation.
+        rows_by_category: dict[str, list[dict[str, Any]]] = {}
+        for item in rows:
+            category_key = _text(item.get("category")).upper()
+            rows_by_category.setdefault(category_key, []).append(item)
+        for category_key, category_items in rows_by_category.items():
+            if category_key in required_variance_categories and len(category_items) > 1:
+                issue_code = (
+                    "FCF_MULTIPLE_ATTRIBUTIONS_FOR_COMPONENT_CATEGORY_NOT_INDEPENDENTLY_MEASURED:"
+                    + category_key
+                )
+                scenario_issues.append(issue_code)
+                for item in category_items:
+                    item["amount_cny"] = None
+                    item["issues"] = sorted(set(
+                        list(item.get("issues") or [])
+                        + ["MULTIPLE_DRIVER_AMOUNTS_NOT_INDEPENDENTLY_MEASURED_FOR_COMPONENT_CATEGORY"]
+                    ))
+
         attribution_categories = {_text(item.get("category")).upper() for item in rows}
         for required_category in required_variance_categories:
             if required_category not in attribution_categories:
