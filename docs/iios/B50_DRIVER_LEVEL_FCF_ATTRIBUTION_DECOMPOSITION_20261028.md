@@ -18,7 +18,7 @@ A row in `fcf_variance_attribution` may include `driver_component_measure`:
 - `basis`: a meaningful explanation of how this driver's contribution was measured;
 - `b4_value_cny` and `normalized_value_cny`: typed CNY measures, each with a supported `data_class`, meaningful basis, non-empty evidence references, and valid cutoff-compatible source provenance.
 
-The driver's trigger must exist and name the same driver. Each side's evidence references are validated; the combined side evidence must overlap the trigger evidence. The parent `amount_cny` remains a typed assertion, its evidence must link to the driver-side measurement evidence and the review trigger, and its amount must match the computed driver contribution within CNY 1. Downstream reconciliation uses the **computed value**, not an unverified copied amount.
+Within the same scenario/category, driver IDs must be unique; two measure IDs do not make repeated rows for the same driver a valid multi-driver decomposition. The driver's trigger must exist and name the same driver. Each side's evidence references are validated; the combined side evidence must overlap the trigger evidence. The parent `amount_cny` remains a typed assertion, its evidence must link to the driver-side measurement evidence and the review trigger, and its amount must match the computed driver contribution within CNY 1. Downstream reconciliation uses the **computed value**, not an unverified copied amount.
 
 ## Component bases and sign conventions
 
@@ -51,8 +51,8 @@ A single row without `driver_component_measure` remains available as the prior B
 
 A driver measure is not created by splitting a company-level category total. The submitting research must have independent, source-backed B4 and normalized component amounts for that driver. Where those source-backed amounts do not exist, keep the category single-row diagnostic or retain `REVIEW_REQUIRED`; do not manufacture an allocation.
 
-The engine retains each driver's measurement fields and evidence references in machine output. The Chinese report prints the measure ID, component basis, B4 value, normalized value, computed contribution, both evidence-reference sets, driver and review-trigger ID.
+The engine retains each driver's measurement fields, each side's data class and basis, and evidence references in machine output. The Chinese report prints the measure ID, component basis, B4 and normalized values with their data classes/bases, computed contribution, both evidence-reference sets, driver and review-trigger ID.
 
 ## Scope and deferred verification
 
-Four regression cases cover a successful two-driver capex decomposition, incorrect gross-side totals despite the same net difference, a claimed amount inconsistent with measured inputs, and multiple rows without independent measures. They are authored in `tests/test_cycle_earnings_monitor_v01.py` but **not run**. No test pass, Replay match, CI pass, macOS acceptance, formal Forecast/Valuation admission or execution authority is claimed.
+Five regression cases cover a successful two-driver capex decomposition, incorrect gross-side totals despite the same net difference, a claimed amount inconsistent with measured inputs, multiple rows without independent measures, and duplicate driver IDs across rows. They are authored in `tests/test_cycle_earnings_monitor_v01.py` but **not run**. No test pass, Replay match, CI pass, macOS acceptance, formal Forecast/Valuation admission or execution authority is claimed.
