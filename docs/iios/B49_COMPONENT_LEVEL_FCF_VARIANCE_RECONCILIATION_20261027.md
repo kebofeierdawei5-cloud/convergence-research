@@ -44,7 +44,7 @@ The row must still resolve to a known `driver_id`, a review trigger with the sam
 - `WORKING_CAPITAL`: raw working-capital evidence when inventory is excluded, otherwise effective-working-capital evidence;
 - `INVENTORY_MOVEMENT`: inventory cash-impact-proxy evidence when inventory is excluded; otherwise effective-working-capital evidence must support the explicit zero standalone contribution.
 
-The amount evidence must independently overlap the linked trigger evidence as well. A shared driver ID alone, or a total that happens to reconcile, is insufficient. Missing component evidence, a mismatched link, or multiple numeric rows in one category withholds the affected amounts and prevents the scenario from being marked reconciled.
+The amount evidence must independently overlap the linked trigger evidence as well. A shared driver ID alone, or a total that happens to reconcile, is insufficient. Missing component evidence, a mismatched link, or multiple numeric rows in one category withholds the affected amounts and prevents the scenario from being marked reconciled. The normalized component evidence references used by each row-level gate are preserved in the machine output and rendered beside the attribution amount, driver, and review-trigger ID so the reviewer can inspect the chain.
 
 ## Inventory and working-capital treatment
 
