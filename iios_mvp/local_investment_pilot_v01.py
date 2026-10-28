@@ -3811,9 +3811,8 @@ def _build_decision_chain_trace(
     if stress_status != "PASS":
         risk_reasons.append(f"Thesis-break stress={stress_status}")
     raw_stress_issues = stress.get("issues")
-    risk_reasons.extend(
-        str(item) for item in raw_stress_issues if str(item).strip()
-    ) if isinstance(raw_stress_issues, list) else None
+    if isinstance(raw_stress_issues, list):
+        risk_reasons.extend(str(item) for item in raw_stress_issues if str(item).strip())
 
     package_status = str(package.get("status") or "NOT_PROVIDED").strip().upper()
     constraint_status = str(package.get("constraint_status") or "UNKNOWN").strip().upper()
