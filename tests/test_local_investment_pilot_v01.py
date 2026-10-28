@@ -5149,3 +5149,24 @@ def test_b52_report_separates_external_mie_price_inversion_and_forward_scenarios
     assert "implied_eps" in report
     assert "独立推演 4" in report
     assert "不代表市场一致预期" in report
+
+
+
+def test_b52_price_implied_inversion_reference_price_mismatch_is_visible() -> None:
+    payload = _payload(price="100")
+    payload["assessment"]["market_implied_expectation"]["price_implied_analysis"] = {
+        "status": "CONDITIONAL_MODEL_INVERSION",
+        "method": "synthetic inversion method",
+        "model_family": "EPS_MULTIPLE",
+        "reference_price": "99",
+        "assumptions": [{"name": "forward PE", "value": "20", "unit": "x", "basis": "synthetic"}],
+        "implied_requirements": [
+            {"metric": "EPS", "value": "4.95", "unit": "CNY/share", "period": "FY2027"}
+        ],
+        "limitations": ["synthetic only"],
+    }
+
+    _analysis, report = _analyse(payload, "TEST-B52-PRICE-REFERENCE-CONFLICT")
+
+    assert "与结构化唯一现价核对 CONFLICT" in report
+    assert "价格反推参考价与本次结构化现价不一致" in report
