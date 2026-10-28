@@ -869,7 +869,7 @@ def _build_baseline_transition_bridge(
         if expected_ids != actual_ids:
             structure_issues.append("FORWARD_PRODUCT_UNIVERSE_MISMATCH")
         product_results: list[dict[str, Any]] = []
-        scenario_issues = list(structure_issues)
+        scenario_issues = list(structure_issues) + list(baseline_issues)
         base_revenue = Decimal("0")
         forward_revenue = Decimal("0")
         base_variable_cost = Decimal("0")
@@ -1432,6 +1432,12 @@ def render_operating_driver_section(
                     f"  - {product_row.get('product_name') or product_row.get('product_id') or 'UNKNOWN'}："
                     f"UNKNOWN；未闭合字段 {', '.join(product_row.get('missing_or_unusable_fields') or []) or '范围/映射/对账'}"
                 )
+                row_issues = product_row.get("issues") if isinstance(product_row.get("issues"), list) else []
+                conflicts = product_row.get("explicit_bridge_conflicts") if isinstance(product_row.get("explicit_bridge_conflicts"), list) else []
+                if conflicts:
+                    lines.append("    显式收入/成本冲突：" + "；".join(str(issue) for issue in conflicts))
+                if row_issues:
+                    lines.append("    待复核：" + "；".join(str(issue) for issue in row_issues[:5]))
                 continue
             baseline = product_row.get("historical_baseline") if isinstance(product_row.get("historical_baseline"), Mapping) else {}
             forward = product_row.get("forward_scenario") if isinstance(product_row.get("forward_scenario"), Mapping) else {}
