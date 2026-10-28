@@ -1648,7 +1648,14 @@ def _evaluate_normalized_fcf_bridge(
             category_key = _text(item.get("category")).upper()
             rows_by_category.setdefault(category_key, []).append(item)
         for category_key, category_items in rows_by_category.items():
-            if category_key in required_variance_categories and len(category_items) > 1:
+            if category_key not in required_variance_categories or len(category_items) <= 1:
+                continue
+            has_independent_measures = all(
+                isinstance(item.get("driver_component_measure"), Mapping)
+                and item["driver_component_measure"].get("status") == "COMPONENT_MEASURE_IDENTIFIABLE"
+                for item in category_items
+            )
+            if not has_independent_measures:
                 issue_code = (
                     "FCF_MULTIPLE_ATTRIBUTIONS_FOR_COMPONENT_CATEGORY_NOT_INDEPENDENTLY_MEASURED:"
                     + category_key
@@ -1687,12 +1694,82 @@ def _evaluate_normalized_fcf_bridge(
             scenario_issues.extend(
                 f"COMPONENT_BRIDGE:{issue}" for issue in (component_bridge.get("issues") or [])
             )
+        b4_side_components = (
+            component_bridge.get("b4_cash_components")
+            if isinstance(component_bridge.get("b4_cash_components"), Mapping) else {}
+        )
+        normalized_side_components = (
+            component_bridge.get("normalized_cash_components")
+            if isinstance(component_bridge.get("normalized_cash_components"), Mapping) else {}
+        )
+        scenario_inventory_treatment = _text(
+            normalized_side_components.get("inventory_working_capital_treatment")
+        ).upper()
+
+        def _aggregate_driver_component_value(side_components: Mapping[str, Any], component_category: str) -> Decimal | None:
+            try:
+                if component_category == "OPERATING_CASH_CONVERSION":
+                    ebit = _decimal(side_components.get("ebit_cny"), f"{name}.{component_category}.ebit")
+                    tax_rate = _decimal(side_components.get("tax_rate"), f"{name}.{component_category}.tax_rate")
+                    if not (Decimal("0") <= tax_rate <= Decimal("1")):
+                        return None
+                    return ebit - max(ebit, Decimal("0")) * tax_rate
+                if component_category == "NON_CASH_EARNINGS":
+                    return _decimal(side_components.get("depreciation_amortization_cny"), f"{name}.{component_category}.da")
+                if component_category == "CAPEX":
+                    return _decimal(side_components.get("cash_capex_cny"), f"{name}.{component_category}.capex")
+                if component_category == "WORKING_CAPITAL":
+                    field = (
+                        "change_working_capital_cny"
+                        if scenario_inventory_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL"
+                        else "effective_change_working_capital_cny"
+                    )
+                    return _decimal(side_components.get(field), f"{name}.{component_category}.{field}")
+                if component_category == "INVENTORY_MOVEMENT":
+                    if scenario_inventory_treatment == "EXCLUDED_FROM_CHANGE_WORKING_CAPITAL":
+                        return _decimal(side_components.get("inventory_cash_impact_proxy_cny"), f"{name}.{component_category}.proxy")
+                    return Decimal("0")
+            except ValueError:
+                return None
+            return None
+
         for category in required_variance_categories:
             measured_raw = measured_components.get(category)
             try:
                 measured = _decimal(measured_raw, f"{name}.measured_component.{category}")
             except ValueError:
                 measured = None
+            category_items = rows_by_category.get(category, [])
+            structured_category_items = [
+                item for item in category_items
+                if isinstance(item.get("driver_component_measure"), Mapping)
+            ]
+            if structured_category_items and len(structured_category_items) == len(category_items):
+                measure_rows = [item["driver_component_measure"] for item in structured_category_items]
+                if all(item.get("status") == "COMPONENT_MEASURE_IDENTIFIABLE" for item in measure_rows):
+                    try:
+                        b4_driver_total = sum(
+                            (_decimal(item.get("b4_value_cny"), f"{name}.{category}.driver_b4") for item in measure_rows),
+                            Decimal("0"),
+                        )
+                        normalized_driver_total = sum(
+                            (_decimal(item.get("normalized_value_cny"), f"{name}.{category}.driver_normalized") for item in measure_rows),
+                            Decimal("0"),
+                        )
+                    except ValueError:
+                        b4_driver_total = None
+                        normalized_driver_total = None
+                    measured_b4_component = _aggregate_driver_component_value(b4_side_components, category)
+                    measured_normalized_component = _aggregate_driver_component_value(normalized_side_components, category)
+                    if measured_b4_component is None or measured_normalized_component is None:
+                        scenario_issues.append(f"FCF_DRIVER_COMPONENT_SIDE_TOTAL_NOT_IDENTIFIABLE:{category}")
+                    else:
+                        if b4_driver_total is None or abs(b4_driver_total - measured_b4_component) > Decimal("1"):
+                            scenario_issues.append(f"FCF_DRIVER_COMPONENT_B4_SIDE_DOES_NOT_RECONCILE:{category}")
+                        if normalized_driver_total is None or abs(normalized_driver_total - measured_normalized_component) > Decimal("1"):
+                            scenario_issues.append(f"FCF_DRIVER_COMPONENT_NORMALIZED_SIDE_DOES_NOT_RECONCILE:{category}")
+                else:
+                    scenario_issues.append(f"FCF_DRIVER_COMPONENT_MEASURE_ROWS_INCOMPLETE:{category}")
             attributed = attributed_by_category.get(category)
             category_residual = measured - attributed if measured is not None and attributed is not None else None
             category_status = (
