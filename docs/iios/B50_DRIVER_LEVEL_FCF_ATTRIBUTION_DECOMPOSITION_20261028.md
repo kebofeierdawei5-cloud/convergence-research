@@ -1,6 +1,6 @@
 # B50 — Driver-Level FCF Component Attribution Decomposition
 
-**Status:** implemented on the feature branch; unmerged and non-canonical. **Validation:** four regression cases have been authored but not run. Replay, CI, and macOS full-run acceptance remain deferred / not verified.
+**Status:** implemented on the feature branch; unmerged and non-canonical. **Validation:** five regression cases have been authored but not run. Replay, CI, and macOS full-run acceptance remain deferred / not verified.
 
 ## Objective
 
@@ -18,7 +18,7 @@ A row in `fcf_variance_attribution` may include `driver_component_measure`:
 - `basis`: a meaningful explanation of how this driver's contribution was measured;
 - `b4_value_cny` and `normalized_value_cny`: typed CNY measures, each with a supported `data_class`, meaningful basis, non-empty evidence references, and valid cutoff-compatible source provenance.
 
-Within the same scenario/category, driver IDs must be unique; two measure IDs do not make repeated rows for the same driver a valid multi-driver decomposition. The driver's trigger must exist and name the same driver. Each side's evidence references are validated; the combined side evidence must overlap the trigger evidence. The parent `amount_cny` remains a typed assertion, its evidence must link to the driver-side measurement evidence and the review trigger, and its amount must match the computed driver contribution within CNY 1. Downstream reconciliation uses the **computed value**, not an unverified copied amount.
+Within the same scenario/category, driver IDs must be unique; two measure IDs do not make repeated rows for the same driver a valid multi-driver decomposition. The driver's trigger must exist and name the same driver. B51 tightens provenance linkage: B4-side and normalized-side evidence must each overlap the same driver's trigger evidence independently; the parent `amount_cny` evidence must overlap both side-measurement evidence sets, not only their union; and normalized-side evidence must overlap every corresponding normalized aggregate input required by that component (both EBIT and tax-rate inputs for after-tax operating cash conversion). A gap on any side blocks the driver row. These are reference-link checks only: they make the evidence chain traceable but do not establish that a source's content semantically supports the claimed amount. The amount must still match the computed driver contribution within CNY 1. Downstream reconciliation uses the **computed value**, not an unverified copied amount.
 
 ## Component bases and sign conventions
 
