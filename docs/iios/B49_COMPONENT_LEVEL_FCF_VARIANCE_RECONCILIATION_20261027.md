@@ -50,6 +50,7 @@ The bridge must fail closed if any of the following occur:
 - B4 FCF does not reconcile to its components within CNY 1.
 - Any required component is absent or invalid.
 - B4 and normalized inventory treatments are not comparable.
+- B4 and normalized FCF must agree on both inventory treatment and reconciliation status; `ZERO_INVENTORY_CHANGE_NO_ADJUSTMENT_REQUIRED` and `NOT_APPLICABLE_NO_TONNAGE_BASIS` are distinct states, not interchangeable evidence.
 - Raw non-inventory working capital plus inventory proxy does not equal effective working capital when inventory is excluded.
 - Any of the five measured categories is missing or misattributed by more than CNY 1.
 - Any scenario total remains unreconciled.
