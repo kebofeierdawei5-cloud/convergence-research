@@ -5284,7 +5284,7 @@ def test_b53_core_synthesis_shows_b4_valuation_bridge_conflicts():
         },
         "return_metrics": None,
     })
-    report = "\\n".join(lines)
+    report = "\n".join(lines)
 
     assert "B4 与主估值经营财务桥对账：MISMATCH" in report
     assert "BASE net_profit_cny ↔ net_profit_proxy_cny：MISMATCH" in report
