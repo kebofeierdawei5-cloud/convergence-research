@@ -5076,3 +5076,76 @@ def test_round_b_prompt_receives_price_only_after_round_a_artifact_is_frozen():
     assert "operator_valuation_context" not in phase_b and "decision_parameters" not in phase_b
 
 
+
+
+
+def test_b52_round_a_prompt_prioritizes_current_fundamentals_and_forward_scenarios() -> None:
+    payload = _payload()
+    prompt = pilot._build_price_blind_round_a_prompt(payload)
+
+    assert "【研究优先级】" in prompt
+    assert "当前基本面现实与可验证基线" in prompt
+    assert "未来1年最重要的经营变量" in prompt
+    assert "不得让细分 FCF 归因挤占核心事实与未来预期分析" in prompt
+
+
+def test_b52_round_b_separates_external_mie_from_conditional_price_inversion() -> None:
+    payload = _payload()
+    prompt, _phase_b, _artifact_sha = pilot._build_price_aware_round_b_prompt(
+        base_prompt="核心投资判断链：必须逐项回答以下六个问题。",
+        payload=payload,
+    )
+
+    assert "当前价/当前估值倍数实际要求企业实现什么" in prompt
+    assert "price_implied_analysis" in prompt
+    assert "不是外部 MIE" in prompt
+    assert "comparison_basis" in prompt
+    assert "不能仅因 price_implied_analysis 存在而升级" in prompt
+
+
+def test_b52_report_separates_external_mie_price_inversion_and_forward_scenarios() -> None:
+    payload = _payload()
+    payload["assessment"]["market_implied_expectation"]["price_implied_analysis"] = {
+        "status": "CONDITIONAL_MODEL_INVERSION",
+        "method": "以结构化现价除以显式前瞻 P/E 得到条件 EPS 要求",
+        "model_family": "EPS_MULTIPLE",
+        "reference_price": "100",
+        "assumptions": [
+            {"name": "前瞻 P/E", "value": "20", "unit": "x", "basis": "仅用于条件反推"}
+        ],
+        "implied_requirements": [
+            {
+                "metric": "implied_eps",
+                "value": "5",
+                "unit": "CNY/share",
+                "period": "FY2027",
+                "interpretation": "在 P/E 固定为20倍时对应的条件 EPS 要求",
+                "evidence_refs": ["E1"],
+            }
+        ],
+        "limitations": ["不代表市场一致预期，也不证明 EPS 能够实现。"],
+    }
+    payload["assessment"]["expectation_gap"]["comparison_basis"] = (
+        "CONDITIONAL_PRICE_IMPLIED_VS_INDEPENDENT_FORECAST"
+    )
+    payload["assessment"]["expectation_gap"]["comparisons"] = [
+        {
+            "metric": "EPS",
+            "price_implied_value": "5",
+            "independent_forecast_value": "4",
+            "difference": "1",
+            "unit": "CNY/share",
+            "period": "FY2027",
+            "limitations": "条件比较，P/E 固定假设可能不成立。",
+        }
+    ]
+
+    analysis, report = _analyse(payload, "TEST-B52-CORE-EXPECTATION-SYNTHESIS")
+
+    assert analysis["assessment"]["market_implied_expectation"]["status"] == "PASS"
+    assert "核心投资判断总览：当前现实 × 现价隐含要求 × 合理未来推演" in report
+    assert "外部可验证市场隐含预期（MIE）" in report
+    assert "现价条件反推：CONDITIONAL_MODEL_INVERSION" in report
+    assert "implied_eps" in report
+    assert "独立推演 4" in report
+    assert "不代表市场一致预期" in report
