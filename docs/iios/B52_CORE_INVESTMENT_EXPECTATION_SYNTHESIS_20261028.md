@@ -37,6 +37,8 @@ Crucially, conditional price inversion is **not external MIE**. It cannot upgrad
 
 The existing `assessment.expectation_gap` can provide `comparison_basis` and `comparisons` rows. Each row should compare like with like—metric definition, unit and period—between an external market observation or explicitly labeled conditional price-implied requirement and the independent forecast. The report shows both sides, their difference/direction, period and limitation. Missing or non-comparable values remain `UNKNOWN`; the report does not manufacture a value or silently infer direction.
 
+A critical decision boundary applies: when `comparison_basis` uses `PRICE_IMPLIED`, the local normalizer leaves the decision-usable expectation-gap status/direction as `UNKNOWN`, even if the conditional inversion's reference-price and field-shape checks pass. The reported difference is useful as a **conditional sensitivity**, not a verified external MIE gap, because the local engine has not independently recomputed the analyst-supplied inversion. Only a comparable gap that directly uses cutoff-compatible external MIE evidence can support the external expectation-gap gate. The original model-submitted status/direction is preserved for audit.
+
 ### 4. One-screen three-lens report summary
 
 A read-only summary now appears at the beginning of the Chinese report and groups existing outputs into:
