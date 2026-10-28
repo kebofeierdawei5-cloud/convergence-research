@@ -5454,3 +5454,140 @@ def test_b54_portfolio_block_does_not_erase_available_return_and_price_math():
     portfolio_stage = next(row for row in trace["stages"] if row["stage_id"] == "portfolio_constraints")
     assert portfolio_stage["status"] == "BLOCKED"
     assert "条件新增资金/仓位包" in portfolio_stage["blocks"]
+
+
+def test_b55_observed_baseline_to_forward_contribution_bridge_reconciles_all_scenarios():
+    raw = _driver_payload()
+    raw["scope"] = "COMPANY_WIDE"
+    raw["actuals_period"] = "2025FY"
+    raw["forecast_period"] = "2026FY"
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+    bridge = result["baseline_transition"]
+
+    assert bridge["status"] == "DIAGNOSTIC_CALCULATED"
+    assert bridge["comparison_method"] == "SYMMETRIC_SHAPLEY_CONTRIBUTION_DECOMPOSITION_VOLUME_ASP_UNIT_COST_V0.1"
+    assert set(bridge["scenarios"]) == {"bear", "base", "bull"}
+    bear = bridge["scenarios"]["bear"]
+    assert bear["status"] == "CALCULATED_AND_RECONCILED"
+    assert bear["baseline_contribution_after_variable_cost_cny"] == "450000"
+    assert bear["forward_contribution_after_variable_cost_cny"] == "390000"
+    assert bear["change_contribution_after_variable_cost_cny"] == "-60000"
+    assert bear["sales_volume_effect_cny"] == "-60000"
+    assert bear["net_asp_effect_cny"] == "0"
+    assert bear["unit_variable_cost_effect_cny"] == "0"
+    assert bear["reconciliation_residual_cny"] == "0"
+    assert result["formal_forecast_admission_created"] is False
+    assert bridge["decision_authority"] is False
+
+
+def test_b55_symmetric_decomposition_separates_asp_and_unit_cost_effects():
+    raw = _driver_payload()
+    raw["scope"] = "COMPANY_WIDE"
+    raw["actuals_period"] = "2025FY"
+    raw["forecast_period"] = "2026FY"
+    base_product = raw["scenarios"]["base"]["product_lines"][0]
+    base_product["net_asp_cny_per_tonne"] = _driver_measure(
+        "1100", "CNY/tonne", "ANALYST_ASSUMPTION", [], "Synthetic base scenario net ASP increase"
+    )
+    base_product["variable_cost_cny_per_tonne"] = _driver_measure(
+        "450", "CNY/tonne", "ANALYST_ASSUMPTION", [], "Synthetic base scenario unit cost increase"
+    )
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+    base = result["baseline_transition"]["scenarios"]["base"]
+
+    assert base["status"] == "CALCULATED_AND_RECONCILED"
+    assert base["baseline_contribution_after_variable_cost_cny"] == "450000"
+    assert base["forward_contribution_after_variable_cost_cny"] == "487500"
+    assert base["change_contribution_after_variable_cost_cny"] == "37500"
+    assert base["sales_volume_effect_cny"] == "0"
+    assert base["net_asp_effect_cny"] == "75000"
+    assert base["unit_variable_cost_effect_cny"] == "-37500"
+    assert base["attribution_sum_cny"] == "37500"
+    assert base["reconciliation_residual_cny"] == "0"
+
+
+def test_b55_partial_year_or_non_forward_period_keeps_transition_unknown():
+    raw = _driver_payload()
+    raw["scope"] = "COMPANY_WIDE"
+    raw["actuals_period"] = "2025H1"
+    raw["forecast_period"] = "2026FY"
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+
+    assert result["baseline_transition"]["status"] == "PERIOD_NOT_COMPARABLE"
+    assert result["baseline_transition"]["scenarios"] == {}
+    assert "完整年度" in result["baseline_transition"]["reason"]
+
+
+def test_b55_project_incremental_forecast_is_not_miscompared_to_existing_business_actuals():
+    raw = _driver_payload()
+    raw["scope"] = "PROJECT_INCREMENTAL"
+    raw["actuals_period"] = "2025FY"
+    raw["forecast_period"] = "2026FY"
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+
+    assert result["baseline_transition"]["status"] == "NOT_COMPARABLE_SCOPE"
+    assert "存量业务历史实际" in result["baseline_transition"]["reason"]
+    assert result["baseline_transition"]["scenarios"] == {}
+
+
+def test_b55_missing_historical_unit_economics_blocks_forward_contribution_comparison():
+    raw = _driver_payload()
+    raw["scope"] = "COMPANY_WIDE"
+    raw["actuals_period"] = "2025FY"
+    raw["forecast_period"] = "2026FY"
+    raw["product_lines"][0]["historical_actuals"]["net_asp_cny_per_tonne"] = _driver_measure(
+        None, "CNY/tonne", "OBSERVED_ACTUAL", ["E1"], "Historical net ASP unavailable"
+    )
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+    transition = result["baseline_transition"]
+
+    assert transition["status"] == "NOT_IDENTIFIABLE"
+    assert transition["scenarios"]["base"]["status"] == "NOT_IDENTIFIABLE"
+    assert transition["scenarios"]["base"]["change_contribution_after_variable_cost_cny"] is None
+    assert any("net_asp_cny_per_tonne" in issue for issue in transition["scenarios"]["base"]["issues"])
+
+
+def test_b55_explicit_historical_revenue_conflict_blocks_baseline_transition():
+    raw = _driver_payload()
+    raw["scope"] = "COMPANY_WIDE"
+    raw["actuals_period"] = "2025FY"
+    raw["forecast_period"] = "2026FY"
+    raw["product_lines"][0]["historical_actuals"]["revenue_cny"] = _driver_measure(
+        "760000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic reported revenue conflicting with volume times ASP"
+    )
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+
+    assert result["baseline_transition"]["status"] == "NOT_IDENTIFIABLE"
+    assert result["baseline_transition"]["scenarios"]["base"]["status"] == "NOT_IDENTIFIABLE"
+    assert any(
+        "EXPLICIT_REVENUE_CONFLICTS_WITH_VOLUME_X_ASP" in issue
+        for issue in result["baseline_transition"]["scenarios"]["base"]["issues"]
+    )
+
+
+def test_b55_report_labels_observed_baseline_and_forward_assumptions():
+    raw = _driver_payload()
+    raw["scope"] = "COMPANY_WIDE"
+    raw["actuals_period"] = "2025FY"
+    raw["forecast_period"] = "2026FY"
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+    report = "\n".join(render_operating_driver_section(result, None, "CNY"))
+
+    assert "B55 当前历史基线 → 前瞻经营变量变化桥" in report
+    assert "DIAGNOSTIC_CALCULATED" in report
+    assert "销量效应" in report and "净售价效应" in report and "单位成本效应" in report
+    assert "OBSERVED_ACTUAL" in report and "ANALYST_ASSUMPTION" in report
+    assert "不直接进入 EPS、每股估值或 15% 回报计算" in report
