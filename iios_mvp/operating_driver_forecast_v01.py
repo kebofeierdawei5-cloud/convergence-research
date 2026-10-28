@@ -730,6 +730,7 @@ def _build_baseline_transition_bridge(
         "forecast_period": forecast_period or "UNKNOWN",
         "comparison_method": "SYMMETRIC_SHAPLEY_CONTRIBUTION_DECOMPOSITION_VOLUME_ASP_UNIT_COST_V0.1",
         "metric": "PRODUCT_LEVEL_CONTRIBUTION_AFTER_VARIABLE_COST_CNY",
+        "baseline_issues": [],
         "scenarios": {},
         "limitations": [
             "该桥只解释已映射产品/业务线的销售贡献减变动成本，不等于公司整体净利润、FCF 或每股价值变化。",
@@ -932,6 +933,9 @@ def _build_baseline_transition_bridge(
                     "status": "NOT_IDENTIFIABLE",
                     "missing_or_unusable_fields": missing,
                     "explicit_bridge_conflicts": product_conflicts,
+                    "baseline_issues": sorted(set(
+                        issue for issue in baseline_issues if issue.startswith(f"{product_id}:")
+                    )),
                     "historical_baseline": {
                         "period": actuals_period,
                         "measures": {field: historical.get("lineage", {}).get(field) for field in field_names},
@@ -967,9 +971,10 @@ def _build_baseline_transition_bridge(
 
             actual_bridge = product.get("historical_actual_bridge") if isinstance(product.get("historical_actual_bridge"), Mapping) else {}
             projected_production = forward_inputs.get("production_tonnes") if isinstance(forward_inputs.get("production_tonnes"), Mapping) else {}
+            raw_historical_actuals = product.get("historical_actuals")
             historical_production = (
-                actuals.get("production_tonnes")
-                if isinstance((actuals := product.get("historical_actuals")), Mapping) else {}
+                raw_historical_actuals.get("production_tonnes")
+                if isinstance(raw_historical_actuals, Mapping) else {}
             )
             inventory_details = {
                 "historical_production_tonnes": historical_production.get("value") if isinstance(historical_production, Mapping) else None,
@@ -1093,7 +1098,13 @@ def _build_baseline_transition_bridge(
     else:
         overall = "NOT_IDENTIFIABLE"
         reason = "至少一个关键范围、期间、历史基线或前瞻经营变量不可识别；贡献变化保持 UNKNOWN。"
-    return {**base, "status": overall, "reason": reason, "scenarios": scenario_results}
+    return {
+        **base,
+        "status": overall,
+        "reason": reason,
+        "baseline_issues": sorted(set(baseline_issues)),
+        "scenarios": scenario_results,
+    }
 
 
 def evaluate_operating_driver_forecast(
