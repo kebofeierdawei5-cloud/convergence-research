@@ -32,6 +32,20 @@ For each Bear/Base/Bull scenario the bridge measures five categories:
 
 All five categories must be present in `fcf_variance_attribution`, including explicit zero rows. For each category, the sum of user-provided attribution rows must match the independently measured category contribution within CNY 1. The five measured component contributions must also sum to B4-minus-normalized FCF within CNY 1, and the full attribution total must reconcile within the same tolerance. A zero total residual cannot override a category mismatch.
 
+## Component → driver → review trigger → evidence contract
+
+Each Bear/Base/Bull component category currently permits **one numeric attribution row only**. This is a conservative constraint: without an independent driver-level component measure, two rows assigned to different drivers could offset one another and make the category total look correct despite unsupported individual allocations. A multi-driver decomposition remains unresolved until the system receives independent, source-backed component measures for each driver; do not split a measured category total into analyst-invented sub-amounts.
+
+The row must still resolve to a known `driver_id`, a review trigger with the same driver, and valid evidence. In addition, the row amount evidence references must overlap the evidence references for the corresponding normalized-FCF component:
+
+- `OPERATING_CASH_CONVERSION`: both EBIT and tax-rate evidence;
+- `NON_CASH_EARNINGS`: depreciation/amortization evidence;
+- `CAPEX`: cash-capex evidence;
+- `WORKING_CAPITAL`: raw working-capital evidence when inventory is excluded, otherwise effective-working-capital evidence;
+- `INVENTORY_MOVEMENT`: inventory cash-impact-proxy evidence when inventory is excluded; otherwise effective-working-capital evidence must support the explicit zero standalone contribution.
+
+The amount evidence must independently overlap the linked trigger evidence as well. A shared driver ID alone, or a total that happens to reconcile, is insufficient. Missing component evidence, a mismatched link, or multiple numeric rows in one category withholds the affected amounts and prevents the scenario from being marked reconciled.
+
 ## Inventory and working-capital treatment
 
 - **Inventory included in reported/raw working capital:** `WORKING_CAPITAL` is measured as normalized effective working capital minus B4 effective working capital. `INVENTORY_MOVEMENT` must be exactly zero as a separate contribution because inventory is already embedded in the effective working-capital total.
