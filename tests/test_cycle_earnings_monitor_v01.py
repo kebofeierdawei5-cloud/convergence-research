@@ -255,7 +255,7 @@ def _valid_case() -> tuple[dict, dict, list[dict]]:
                 "amount_cny": {
                     "value": amount, "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
                     "basis": "测试用组件差额，不代表真实公司估计",
-                    "evidence_refs": ["E_COUNTER"],
+                    "evidence_refs": ["E_ACTUAL", "E_COUNTER"],
                 },
             }
             for scenario in ("bear", "base", "bull")
@@ -992,3 +992,192 @@ def test_normalized_unlevered_fcf_rejects_financing_flow_as_an_adjustment_catego
         for issue in row["issues"]
     )
     assert result["normalized_fcf_bridge"]["valuation_input_eligible"] is False
+
+
+
+def _driver_component_measure(
+    *,
+    measure_id: str,
+    driver_id: str,
+    category: str,
+    component_basis: str,
+    b4_value: str,
+    normalized_value: str,
+) -> dict:
+    return {
+        "measure_id": measure_id,
+        "category": category,
+        "driver_id": driver_id,
+        "component_basis": component_basis,
+        "basis": "用项目明细分别核对 B4 与正常化组件贡献，不从类别总差额倒推分项",
+        "b4_value_cny": {
+            "value": b4_value, "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
+            "basis": "B4 驱动级组件测量；由独立项目明细形成",
+            "evidence_refs": ["E_ACTUAL"],
+        },
+        "normalized_value_cny": {
+            "value": normalized_value, "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
+            "basis": "正常化驱动级组件测量；由独立项目明细形成",
+            "evidence_refs": ["E_COUNTER"],
+        },
+    }
+
+
+def _split_base_capex_into_two_drivers(raw: dict) -> tuple[dict, dict]:
+    raw["industry_cycle"]["leading_indicators"].append({
+        "indicator_id": "capex_upgrade",
+        "name": "扩产项目资本开支",
+        "direction": "MIXED",
+        "observation": "项目建设和投产节奏仍需逐项核对",
+        "threshold_or_reversal": "项目预算或投产日程显著偏离",
+        "review_by": "FY2027Q1",
+        "evidence_refs": ["E_ACTUAL"],
+        "counter_evidence_refs": ["E_COUNTER"],
+    })
+    raw["review_triggers"].append({
+        "trigger_id": "capex_upgrade_review",
+        "driver_id": "capex_upgrade",
+        "condition": "扩产项目预算或投产日程显著偏离",
+        "threshold": "项目预算偏差超过既定容差",
+        "review_by": "FY2027Q1",
+        "expected_operating_impact": "重估投产节奏和维护/扩产资本开支",
+        "valuation_path": "重估 FCF 与每股价值",
+        "review_action": "REBUILD_VALUATION",
+        "causal_path": [
+            "INDUSTRY_CYCLE", "NORMALIZED_EARNINGS", "EPS_OR_FCF",
+            "PER_SHARE_VALUE", "POSITION_REVIEW",
+        ],
+        "evidence_refs": ["E_ACTUAL", "E_COUNTER"],
+    })
+    original = next(
+        row for row in raw["fcf_variance_attribution"]
+        if row["scenario"] == "base" and row["category"] == "CAPEX"
+    )
+    original.update({
+        "fcf_attribution_id": "base_capex_maintenance",
+        "driver_id": "demand_growth",
+        "review_trigger_id": "orders_review",
+        "amount_cny": {
+            "value": "-9", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
+            "basis": "B4 维护性资本开支 12、正常化维护性资本开支 3",
+            "evidence_refs": ["E_ACTUAL", "E_COUNTER"],
+        },
+        "driver_component_measure": _driver_component_measure(
+            measure_id="base_capex_maintenance_measure",
+            driver_id="demand_growth",
+            category="CAPEX",
+            component_basis="CASH_CAPEX",
+            b4_value="12",
+            normalized_value="3",
+        ),
+    })
+    second = {
+        "scenario": "base",
+        "fcf_attribution_id": "base_capex_expansion",
+        "driver_id": "capex_upgrade",
+        "review_trigger_id": "capex_upgrade_review",
+        "category": "CAPEX",
+        "rationale": "独立项目明细显示扩产资本开支差额",
+        "amount_cny": {
+            "value": "-8", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
+            "basis": "B4 扩产资本开支 10、正常化扩产资本开支 2",
+            "evidence_refs": ["E_ACTUAL", "E_COUNTER"],
+        },
+        "driver_component_measure": _driver_component_measure(
+            measure_id="base_capex_expansion_measure",
+            driver_id="capex_upgrade",
+            category="CAPEX",
+            component_basis="CASH_CAPEX",
+            b4_value="10",
+            normalized_value="2",
+        ),
+    }
+    raw["fcf_variance_attribution"].append(second)
+    return raw, second
+
+
+def test_b50_independent_driver_level_component_decomposition_reconciles_both_sides() -> None:
+    raw, b4, evidence = _valid_case()
+    raw, second = _split_base_capex_into_two_drivers(raw)
+    result = _evaluate(raw, b4, evidence)
+    fcf = result["normalized_fcf_bridge"]
+    base = fcf["variance_attribution"]["scenarios"]["base"]
+
+    assert fcf["status"] == "FCF_VARIANCE_RECONCILED_DIAGNOSTIC_ONLY"
+    assert base["status"] == "RECONCILED_DIAGNOSTIC_ONLY"
+    capex = base["component_attribution_reconciliation"]["CAPEX"]
+    assert capex["measured_component_contribution_cny"] == "-17"
+    assert capex["attributed_category_total_cny"] == "-17"
+    assert capex["residual_cny"] == "0"
+    driver_rows = [row for row in base["items"] if row["category"] == "CAPEX"]
+    assert {row["driver_id"] for row in driver_rows} == {"demand_growth", "capex_upgrade"}
+    assert {row["amount_cny"] for row in driver_rows} == {"-9", "-8"}
+    assert all(row["driver_component_measure"]["status"] == "COMPONENT_MEASURE_IDENTIFIABLE" for row in driver_rows)
+    assert fcf["valuation_input_eligible"] is False
+
+
+def test_b50_driver_decomposition_must_reconcile_b4_and_normalized_side_totals_separately() -> None:
+    raw, b4, evidence = _valid_case()
+    raw, second = _split_base_capex_into_two_drivers(raw)
+    # Preserve the net difference (-17), but make both gross side sums wrong:
+    # B4 = 23 instead of 22 and normalized = 6 instead of 5.
+    first = next(
+        row for row in raw["fcf_variance_attribution"]
+        if row["scenario"] == "base" and row["fcf_attribution_id"] == "base_capex_maintenance"
+    )
+    first["driver_component_measure"]["b4_value_cny"]["value"] = "13"
+    first["driver_component_measure"]["normalized_value_cny"]["value"] = "3"
+    first["amount_cny"]["value"] = "-10"
+    second["driver_component_measure"]["b4_value_cny"]["value"] = "10"
+    second["driver_component_measure"]["normalized_value_cny"]["value"] = "3"
+    second["amount_cny"]["value"] = "-7"
+
+    result = _evaluate(raw, b4, evidence)
+    fcf = result["normalized_fcf_bridge"]
+    base = fcf["variance_attribution"]["scenarios"]["base"]
+
+    assert base["b4_minus_normalized_fcf_cny"] == "0"
+    assert base["status"] == "REVIEW_REQUIRED"
+    assert "FCF_DRIVER_COMPONENT_B4_SIDE_DOES_NOT_RECONCILE:CAPEX" in base["issues"]
+    assert "FCF_DRIVER_COMPONENT_NORMALIZED_SIDE_DOES_NOT_RECONCILE:CAPEX" in base["issues"]
+    assert fcf["fcf_variance_reconciled"] is False
+
+
+def test_b50_driver_component_claimed_contribution_must_match_computed_difference() -> None:
+    raw, b4, evidence = _valid_case()
+    raw, second = _split_base_capex_into_two_drivers(raw)
+    second["amount_cny"]["value"] = "-5"
+    result = _evaluate(raw, b4, evidence)
+    base = result["normalized_fcf_bridge"]["variance_attribution"]["scenarios"]["base"]
+
+    assert base["status"] == "REVIEW_REQUIRED"
+    assert any(
+        "FCF_DRIVER_COMPONENT_DECLARED_AMOUNT_MISMATCH_WITHIN_CNY_1" in issue
+        for issue in base["issues"]
+    )
+    assert result["normalized_fcf_bridge"]["fcf_variance_reconciled"] is False
+
+
+def test_b50_multiple_component_rows_without_independent_measurements_remain_blocked() -> None:
+    raw, b4, evidence = _valid_case()
+    original = next(
+        row for row in raw["fcf_variance_attribution"]
+        if row["scenario"] == "base" and row["category"] == "CAPEX"
+    )
+    duplicate = dict(original)
+    duplicate["fcf_attribution_id"] = "base_capex_duplicate_unmeasured"
+    duplicate["amount_cny"] = {
+        "value": "-8", "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
+        "basis": "未附独立驱动级组件测量",
+        "evidence_refs": ["E_ACTUAL", "E_COUNTER"],
+    }
+    raw["fcf_variance_attribution"].append(duplicate)
+    result = _evaluate(raw, b4, evidence)
+    base = result["normalized_fcf_bridge"]["variance_attribution"]["scenarios"]["base"]
+
+    assert base["status"] == "REVIEW_REQUIRED"
+    assert any(
+        "FCF_MULTIPLE_ATTRIBUTIONS_FOR_COMPONENT_CATEGORY_NOT_INDEPENDENTLY_MEASURED:CAPEX" in issue
+        for issue in base["issues"]
+    )
+    assert result["normalized_fcf_bridge"]["fcf_variance_reconciled"] is False
