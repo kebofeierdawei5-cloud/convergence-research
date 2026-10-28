@@ -1018,7 +1018,7 @@ def _driver_component_measure(
         "normalized_value_cny": {
             "value": normalized_value, "unit": "CNY", "data_class": "ANALYST_ASSUMPTION",
             "basis": "正常化驱动级组件测量；由独立项目明细形成",
-            "evidence_refs": ["E_COUNTER"],
+            "evidence_refs": ["E_ACTUAL", "E_COUNTER"],
         },
     }
 
@@ -1049,6 +1049,11 @@ def _split_base_capex_into_two_drivers(raw: dict) -> tuple[dict, dict]:
         ],
         "evidence_refs": ["E_ACTUAL", "E_COUNTER"],
     })
+    orders_trigger = next(
+        row for row in raw["review_triggers"] if row["trigger_id"] == "orders_review"
+    )
+    # Each side's evidence must independently link to the review trigger.
+    orders_trigger["evidence_refs"] = ["E_ACTUAL", "E_COUNTER"]
     original = next(
         row for row in raw["fcf_variance_attribution"]
         if row["scenario"] == "base" and row["category"] == "CAPEX"
@@ -1113,6 +1118,11 @@ def test_b50_independent_driver_level_component_decomposition_reconciles_both_si
     assert {row["driver_id"] for row in driver_rows} == {"demand_growth", "capex_upgrade"}
     assert {row["amount_cny"] for row in driver_rows} == {"-9", "-8"}
     assert all(row["driver_component_measure"]["status"] == "COMPONENT_MEASURE_IDENTIFIABLE" for row in driver_rows)
+    assert all(row["driver_component_measure"]["b4_evidence_linked_to_review_trigger"] is True for row in driver_rows)
+    assert all(row["driver_component_measure"]["normalized_evidence_linked_to_review_trigger"] is True for row in driver_rows)
+    assert all(row["driver_component_measure"]["parent_amount_evidence_linked_to_b4_side"] is True for row in driver_rows)
+    assert all(row["driver_component_measure"]["parent_amount_evidence_linked_to_normalized_side"] is True for row in driver_rows)
+    assert all(row["driver_component_measure"]["normalized_component_evidence_linkage"]["cash_capex_cny"] is True for row in driver_rows)
     assert fcf["valuation_input_eligible"] is False
 
 
@@ -1198,3 +1208,57 @@ def test_b50_duplicate_driver_rows_in_one_category_are_rejected() -> None:
     assert base["status"] == "REVIEW_REQUIRED"
     assert "FCF_DUPLICATE_DRIVER_ROWS_WITHIN_COMPONENT_CATEGORY:CAPEX" in base["issues"]
     assert result["normalized_fcf_bridge"]["fcf_variance_reconciled"] is False
+
+
+def test_b51_each_driver_measure_side_must_link_to_trigger_independently() -> None:
+    raw, b4, evidence = _valid_case()
+    raw, _ = _split_base_capex_into_two_drivers(raw)
+    orders_trigger = next(
+        row for row in raw["review_triggers"] if row["trigger_id"] == "orders_review"
+    )
+    orders_trigger["evidence_refs"] = ["E_COUNTER"]
+    result = _evaluate(raw, b4, evidence)
+    base = result["normalized_fcf_bridge"]["variance_attribution"]["scenarios"]["base"]
+
+    assert base["status"] == "REVIEW_REQUIRED"
+    assert any(
+        "FCF_DRIVER_COMPONENT_B4_EVIDENCE_NOT_SHARED_WITH_TRIGGER" in issue
+        for issue in base["issues"]
+    )
+
+
+def test_b51_parent_amount_evidence_must_link_to_both_measurement_sides() -> None:
+    raw, b4, evidence = _valid_case()
+    raw, _ = _split_base_capex_into_two_drivers(raw)
+    row = next(
+        row for row in raw["fcf_variance_attribution"]
+        if row["scenario"] == "base" and row["fcf_attribution_id"] == "base_capex_maintenance"
+    )
+    row["amount_cny"]["evidence_refs"] = ["E_COUNTER"]
+    result = _evaluate(raw, b4, evidence)
+    base = result["normalized_fcf_bridge"]["variance_attribution"]["scenarios"]["base"]
+
+    assert base["status"] == "REVIEW_REQUIRED"
+    assert any(
+        "FCF_ATTRIBUTION_AMOUNT_EVIDENCE_NOT_LINKED_TO_B4_DRIVER_MEASURE" in issue
+        for issue in base["issues"]
+    )
+
+
+def test_b51_normalized_driver_evidence_must_link_to_aggregate_component_inputs() -> None:
+    raw, b4, evidence = _valid_case()
+    raw, _ = _split_base_capex_into_two_drivers(raw)
+    row = next(
+        row for row in raw["fcf_variance_attribution"]
+        if row["scenario"] == "base" and row["fcf_attribution_id"] == "base_capex_maintenance"
+    )
+    row["driver_component_measure"]["normalized_value_cny"]["evidence_refs"] = ["E_COUNTER"]
+    result = _evaluate(raw, b4, evidence)
+    base = result["normalized_fcf_bridge"]["variance_attribution"]["scenarios"]["base"]
+
+    assert base["status"] == "REVIEW_REQUIRED"
+    assert any(
+        "FCF_DRIVER_COMPONENT_NORMALIZED_EVIDENCE_NOT_LINKED_TO_AGGREGATE_COMPONENT:CAPEX:cash_capex_cny"
+        in issue
+        for issue in base["issues"]
+    )
