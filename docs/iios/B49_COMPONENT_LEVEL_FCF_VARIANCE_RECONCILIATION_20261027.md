@@ -46,6 +46,7 @@ B4 is also independently checked for its own inventory reconciliation and for co
 The new `normalized_fcf_bridge.component_variance_bridge` node contains scenario-level B4 and normalized component values, measured contributions, component residuals, inventory treatment basis, issues, and a diagnostic-only eligibility flag. `variance_attribution.scenarios[*].component_attribution_reconciliation` exposes the measured amount, attributed category total, residual, and status for each required category.
 
 The bridge must fail closed if any of the following occur:
+- `normalized_fcf.metric` is omitted, unknown, or different from `UNLEVERED_FCF_PROXY_CNY`; the evaluator must not silently supply the expected metric identifier.
 - B4 FCF does not reconcile to its components within CNY 1.
 - Any required component is absent or invalid.
 - B4 and normalized inventory treatments are not comparable.
