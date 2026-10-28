@@ -702,6 +702,368 @@ def _calculate_scenario(
     }
 
 
+def _period_year(period: Any) -> int | None:
+    """Return a year only for an explicitly complete fiscal/calendar-year label."""
+    label = "".join(str(period or "").upper().split())
+    if not _is_full_year_period(label):
+        return None
+    match = re.fullmatch(r"(?:(\d{4})FY|FY(\d{4})|(\d{4})(?:年度|全年))", label)
+    if not match:
+        return None
+    return int(next(group for group in match.groups() if group))
+
+
+def _build_baseline_transition_bridge(
+    *,
+    scope: str,
+    actuals_period: str,
+    forecast_period: str,
+    product_lines: list[Mapping[str, Any]],
+    scenarios: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Connect observed product contribution baseline to forward scenarios without implying net profit."""
+    schema = "IIOS-B55-BASELINE-TO-FORWARD-DRIVER-BRIDGE-0.1"
+    base = {
+        "schema_version": schema,
+        "scope": scope,
+        "baseline_period": actuals_period or "UNKNOWN",
+        "forecast_period": forecast_period or "UNKNOWN",
+        "comparison_method": "SYMMETRIC_SHAPLEY_CONTRIBUTION_DECOMPOSITION_VOLUME_ASP_UNIT_COST_V0.1",
+        "metric": "PRODUCT_LEVEL_CONTRIBUTION_AFTER_VARIABLE_COST_CNY",
+        "scenarios": {},
+        "limitations": [
+            "该桥只解释已映射产品/业务线的销售贡献减变动成本，不等于公司整体净利润、FCF 或每股价值变化。",
+            "销量效应、净售价效应和单位成本效应采用对称分解；不代表这些变量具有因果识别或预测确定性。",
+            "没有同口径历史固定现金费用、折旧、融资成本、税率、非控股权益与稀释股数时，不得推导完整净利润/EPS 变化。",
+            "产量与产销差额单独披露，不并入销量贡献效应；库存/营运资金影响沿既有 B42/B43 现金路径处理，避免重复计数。",
+            "历史 OBSERVED_ACTUAL 及前瞻 ISSUER_FORECAST 仍只是来源时点初步匹配的声明，不等于正式 Evidence/PIT 或 Forecast Admission。",
+        ],
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
+    }
+    normalized_scope = str(scope or "UNKNOWN").strip().upper()
+    if normalized_scope not in {"COMPANY_WIDE", "PRODUCT_LINE"}:
+        reason = (
+            "PROJECT_INCREMENTAL 的前瞻输入不能与存量业务历史实际直接对比；"
+            "增量项目必须通过 B5 增量传导及存量业务替代/蚕食桥处理。"
+            if normalized_scope == "PROJECT_INCREMENTAL"
+            else "B4 范围未确认或不可比较；不能把产品基线与未明确范围的未来预测直接相连。"
+        )
+        return {
+            **base,
+            "status": "NOT_COMPARABLE_SCOPE",
+            "reason": reason,
+        }
+
+    baseline_year = _period_year(actuals_period)
+    forecast_year = _period_year(forecast_period)
+    if baseline_year is None or forecast_year is None or forecast_year <= baseline_year:
+        return {
+            **base,
+            "status": "PERIOD_NOT_COMPARABLE",
+            "reason": (
+                "仅允许完整年度且前瞻年度晚于历史年度的比较；半年/季度/滚动期间、"
+                "相同年度、倒序年度或不明确期间均保持 UNKNOWN。"
+            ),
+        }
+    if not product_lines:
+        return {
+            **base,
+            "status": "NOT_IDENTIFIABLE",
+            "reason": "没有可映射的历史产品/业务线基线。",
+        }
+
+    ids = [str(row.get("product_id") or "").strip() for row in product_lines]
+    if not all(ids) or len(set(ids)) != len(ids):
+        return {
+            **base,
+            "status": "NOT_IDENTIFIABLE",
+            "reason": "历史产品/业务线 ID 缺失或重复；无法可靠映射前瞻情景。",
+        }
+
+    def numeric_measure(raw: Any, *, data_classes: set[str]) -> tuple[Decimal | None, dict[str, Any] | None]:
+        if not isinstance(raw, Mapping):
+            return None, None
+        if raw.get("calculation_usable") is not True:
+            return None, {
+                "data_class": str(raw.get("data_class") or "UNKNOWN"),
+                "basis": str(raw.get("basis") or ""),
+                "evidence_refs": list(raw.get("evidence_refs") or []),
+                "issues": list(raw.get("issues") or []),
+            }
+        if str(raw.get("data_class") or "UNKNOWN").strip().upper() not in data_classes:
+            return None, {
+                "data_class": str(raw.get("data_class") or "UNKNOWN"),
+                "basis": str(raw.get("basis") or ""),
+                "evidence_refs": list(raw.get("evidence_refs") or []),
+                "issues": ["DATA_CLASS_NOT_ALLOWED_FOR_BASELINE_TRANSITION"],
+            }
+        try:
+            return _decimal(raw.get("value"), "B55_TYPED_MEASURE"), {
+                "data_class": str(raw.get("data_class") or "UNKNOWN"),
+                "basis": str(raw.get("basis") or ""),
+                "evidence_refs": sorted({str(x).strip() for x in raw.get("evidence_refs", []) if str(x).strip()})
+                if isinstance(raw.get("evidence_refs"), list) else [],
+                "evidence_status": str(raw.get("evidence_status") or "UNKNOWN"),
+                "issues": list(raw.get("issues") or []),
+            }
+        except ValueError:
+            return None, {
+                "data_class": str(raw.get("data_class") or "UNKNOWN"),
+                "basis": str(raw.get("basis") or ""),
+                "evidence_refs": list(raw.get("evidence_refs") or []),
+                "issues": ["VALUE_NOT_NUMERIC"],
+            }
+
+    field_names = {
+        "sales_volume_tonnes": "sales volume",
+        "net_asp_cny_per_tonne": "net ASP",
+        "variable_cost_cny_per_tonne": "unit variable cost",
+    }
+    baseline_values: dict[str, dict[str, Any]] = {}
+    baseline_issues: list[str] = []
+    for product in product_lines:
+        product_id = str(product.get("product_id") or "")
+        actuals = product.get("historical_actuals") if isinstance(product.get("historical_actuals"), Mapping) else {}
+        values: dict[str, Any] = {}
+        for field in field_names:
+            value, lineage = numeric_measure(actuals.get(field), data_classes={"OBSERVED_ACTUAL"})
+            values[field] = value
+            values.setdefault("lineage", {})[field] = lineage or {"data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "issues": ["MEASURE_NOT_USABLE"]}
+            if value is None:
+                baseline_issues.append(f"{product_id}.{field}:HISTORICAL_BASELINE_NOT_USABLE")
+        baseline_values[product_id] = values
+
+    scenario_results: dict[str, Any] = {}
+    for scenario_name in SCENARIOS:
+        scenario = scenarios.get(scenario_name) if isinstance(scenarios.get(scenario_name), Mapping) else {}
+        raw_rows = scenario.get("product_lines") if isinstance(scenario.get("product_lines"), list) else []
+        rows_by_id: dict[str, Mapping[str, Any]] = {}
+        structure_issues: list[str] = []
+        for row in raw_rows:
+            if not isinstance(row, Mapping):
+                structure_issues.append("FORWARD_PRODUCT_ROW_INVALID")
+                continue
+            product_id = str(row.get("product_id") or "").strip()
+            if not product_id:
+                structure_issues.append("FORWARD_PRODUCT_ID_MISSING")
+            elif product_id in rows_by_id:
+                structure_issues.append(f"DUPLICATE_FORWARD_PRODUCT_ID:{product_id}")
+            else:
+                rows_by_id[product_id] = row
+        expected_ids = set(ids)
+        actual_ids = set(rows_by_id)
+        if expected_ids != actual_ids:
+            structure_issues.append("FORWARD_PRODUCT_UNIVERSE_MISMATCH")
+        product_results: list[dict[str, Any]] = []
+        scenario_issues = list(structure_issues)
+        base_revenue = Decimal("0")
+        forward_revenue = Decimal("0")
+        base_variable_cost = Decimal("0")
+        forward_variable_cost = Decimal("0")
+        base_contribution = Decimal("0")
+        forward_contribution = Decimal("0")
+        volume_effect_total = Decimal("0")
+        asp_effect_total = Decimal("0")
+        unit_cost_effect_total = Decimal("0")
+        all_products_comparable = not structure_issues
+        for product in product_lines:
+            product_id = str(product.get("product_id") or "")
+            historical = baseline_values.get(product_id, {})
+            forward_row = rows_by_id.get(product_id, {})
+            forward_inputs = forward_row.get("inputs") if isinstance(forward_row.get("inputs"), Mapping) else {}
+            lineage_by_field: dict[str, Any] = {}
+            forward_values: dict[str, Decimal | None] = {}
+            for field in field_names:
+                value, lineage = numeric_measure(
+                    forward_inputs.get(field),
+                    data_classes={"ISSUER_FORECAST", "ANALYST_ASSUMPTION"},
+                )
+                forward_values[field] = value
+                lineage_by_field[field] = lineage or {
+                    "data_class": "UNKNOWN",
+                    "basis": "",
+                    "evidence_refs": [],
+                    "issues": ["MEASURE_NOT_USABLE"],
+                }
+                if value is None:
+                    scenario_issues.append(f"{scenario_name}.{product_id}.{field}:FORWARD_MEASURE_NOT_USABLE")
+            base_values = {field: historical.get(field) for field in field_names}
+            if any(base_values[field] is None for field in field_names) or any(forward_values[field] is None for field in field_names):
+                all_products_comparable = False
+                missing = [
+                    field for field in field_names
+                    if base_values[field] is None or forward_values[field] is None
+                ]
+                product_results.append({
+                    "product_id": product_id,
+                    "product_name": str(product.get("product_name") or product_id),
+                    "status": "NOT_IDENTIFIABLE",
+                    "missing_or_unusable_fields": missing,
+                    "historical_baseline": {
+                        "period": actuals_period,
+                        "measures": {field: historical.get("lineage", {}).get(field) for field in field_names},
+                    },
+                    "forward_scenario": {
+                        "period": forecast_period,
+                        "measures": lineage_by_field,
+                    },
+                    "issues": [f"{product_id}.{field}:BASELINE_OR_FORECAST_NOT_USABLE" for field in missing],
+                })
+                continue
+
+            q0 = base_values["sales_volume_tonnes"]
+            p0 = base_values["net_asp_cny_per_tonne"]
+            c0 = base_values["variable_cost_cny_per_tonne"]
+            q1 = forward_values["sales_volume_tonnes"]
+            p1 = forward_values["net_asp_cny_per_tonne"]
+            c1 = forward_values["variable_cost_cny_per_tonne"]
+            # Symmetric Shapley decomposition: the three effects sum exactly to
+            # Q1*(P1-C1) - Q0*(P0-C0), regardless of the order of driver changes.
+            volume_effect = (q1 - q0) * ((p0 - c0 + p1 - c1) / Decimal("2"))
+            asp_effect = (p1 - p0) * ((q0 + q1) / Decimal("2"))
+            unit_cost_effect = -(c1 - c0) * ((q0 + q1) / Decimal("2"))
+            baseline_revenue = q0 * p0
+            forward_revenue_value = q1 * p1
+            baseline_cost = q0 * c0
+            forward_cost = q1 * c1
+            baseline_contribution = baseline_revenue - baseline_cost
+            forward_contribution_value = forward_revenue_value - forward_cost
+            delta = forward_contribution_value - baseline_contribution
+            attribution_sum = volume_effect + asp_effect + unit_cost_effect
+            residual = delta - attribution_sum
+
+            actual_bridge = product.get("historical_actual_bridge") if isinstance(product.get("historical_actual_bridge"), Mapping) else {}
+            projected_production = forward_inputs.get("production_tonnes") if isinstance(forward_inputs.get("production_tonnes"), Mapping) else {}
+            historical_production = (
+                actuals.get("production_tonnes")
+                if isinstance((actuals := product.get("historical_actuals")), Mapping) else {}
+            )
+            inventory_details = {
+                "historical_production_tonnes": historical_production.get("value") if isinstance(historical_production, Mapping) else None,
+                "forward_production_tonnes": projected_production.get("value"),
+                "historical_inventory_change_tonnes": actual_bridge.get("inventory_change_tonnes"),
+                "forward_inventory_change_tonnes": forward_row.get("inventory_change_tonnes"),
+                "note": "产量/库存变化单列展示，不纳入基于销售量、净售价与单位变动成本的贡献利润分解。",
+            }
+            status = "CALCULATED_AND_RECONCILED" if abs(residual) <= Decimal("1") else "RECONCILIATION_MISMATCH"
+            if status != "CALCULATED_AND_RECONCILED":
+                all_products_comparable = False
+                scenario_issues.append(f"{scenario_name}.{product_id}:DRIVER_CONTRIBUTIONS_DO_NOT_RECONCILE_WITHIN_CNY_1")
+            base_revenue += baseline_revenue
+            forward_revenue += forward_revenue_value
+            base_variable_cost += baseline_cost
+            forward_variable_cost += forward_cost
+            base_contribution += baseline_contribution
+            forward_contribution += forward_contribution_value
+            volume_effect_total += volume_effect
+            asp_effect_total += asp_effect
+            unit_cost_effect_total += unit_cost_effect
+            product_results.append({
+                "product_id": product_id,
+                "product_name": str(product.get("product_name") or product_id),
+                "status": status,
+                "historical_baseline": {
+                    "period": actuals_period,
+                    "sales_volume_tonnes": _render(q0),
+                    "net_asp_cny_per_tonne": _render(p0),
+                    "variable_cost_cny_per_tonne": _render(c0),
+                    "revenue_cny": _render(baseline_revenue),
+                    "variable_cost_cny": _render(baseline_cost),
+                    "contribution_after_variable_cost_cny": _render(baseline_contribution),
+                    "measure_lineage": historical.get("lineage", {}),
+                },
+                "forward_scenario": {
+                    "period": forecast_period,
+                    "sales_volume_tonnes": _render(q1),
+                    "net_asp_cny_per_tonne": _render(p1),
+                    "variable_cost_cny_per_tonne": _render(c1),
+                    "revenue_cny": _render(forward_revenue_value),
+                    "variable_cost_cny": _render(forward_cost),
+                    "contribution_after_variable_cost_cny": _render(forward_contribution_value),
+                    "measure_lineage": lineage_by_field,
+                },
+                "changes": {
+                    "sales_volume_tonnes": _render(q1 - q0),
+                    "net_asp_cny_per_tonne": _render(p1 - p0),
+                    "variable_cost_cny_per_tonne": _render(c1 - c0),
+                    "revenue_cny": _render(forward_revenue_value - baseline_revenue),
+                    "variable_cost_cny": _render(forward_cost - baseline_cost),
+                    "contribution_after_variable_cost_cny": _render(delta),
+                },
+                "contribution_effects_cny": {
+                    "sales_volume_effect": _render(volume_effect),
+                    "net_asp_effect": _render(asp_effect),
+                    "unit_variable_cost_effect": _render(unit_cost_effect),
+                    "attribution_sum": _render(attribution_sum),
+                    "reconciliation_residual": _render(residual),
+                    "tolerance_cny": "1",
+                },
+                "production_inventory_context": inventory_details,
+                "issues": [],
+            })
+
+        scenario_status = (
+            "RECONCILIATION_MISMATCH"
+            if any(row.get("status") == "RECONCILIATION_MISMATCH" for row in product_results)
+            else "CALCULATED_AND_RECONCILED"
+            if all_products_comparable and len(product_results) == len(ids)
+            else "NOT_IDENTIFIABLE"
+        )
+        if scenario_status == "CALCULATED_AND_RECONCILED":
+            residual_total = (forward_contribution - base_contribution) - (
+                volume_effect_total + asp_effect_total + unit_cost_effect_total
+            )
+            scenario_results[scenario_name] = {
+                "status": scenario_status,
+                "baseline_revenue_cny": _render(base_revenue),
+                "forward_revenue_cny": _render(forward_revenue),
+                "change_revenue_cny": _render(forward_revenue - base_revenue),
+                "baseline_variable_cost_cny": _render(base_variable_cost),
+                "forward_variable_cost_cny": _render(forward_variable_cost),
+                "change_variable_cost_cny": _render(forward_variable_cost - base_variable_cost),
+                "baseline_contribution_after_variable_cost_cny": _render(base_contribution),
+                "forward_contribution_after_variable_cost_cny": _render(forward_contribution),
+                "change_contribution_after_variable_cost_cny": _render(forward_contribution - base_contribution),
+                "sales_volume_effect_cny": _render(volume_effect_total),
+                "net_asp_effect_cny": _render(asp_effect_total),
+                "unit_variable_cost_effect_cny": _render(unit_cost_effect_total),
+                "attribution_sum_cny": _render(volume_effect_total + asp_effect_total + unit_cost_effect_total),
+                "reconciliation_residual_cny": _render(residual_total),
+                "tolerance_cny": "1",
+                "product_lines": product_results,
+                "issues": [],
+            }
+        else:
+            scenario_results[scenario_name] = {
+                "status": scenario_status,
+                "baseline_contribution_after_variable_cost_cny": None,
+                "forward_contribution_after_variable_cost_cny": None,
+                "change_contribution_after_variable_cost_cny": None,
+                "sales_volume_effect_cny": None,
+                "net_asp_effect_cny": None,
+                "unit_variable_cost_effect_cny": None,
+                "reconciliation_residual_cny": None,
+                "product_lines": product_results,
+                "issues": sorted(set(scenario_issues)),
+            }
+
+    statuses = [str(scenario_results[name].get("status") or "UNKNOWN") for name in SCENARIOS]
+    if all(status == "CALCULATED_AND_RECONCILED" for status in statuses):
+        overall = "DIAGNOSTIC_CALCULATED"
+        reason = "三个情景均由同一历史产品基线映射到前瞻经营假设，销量/净售价/单位成本贡献分解在 CNY 1 内对账。"
+    elif any(status == "RECONCILIATION_MISMATCH" for status in statuses):
+        overall = "RECONCILIATION_MISMATCH"
+        reason = "至少一个情景的驱动贡献未能在 CNY 1 容差内对账；不得使用该桥解释前瞻利润变化。"
+    elif any(status == "CALCULATED_AND_RECONCILED" for status in statuses):
+        overall = "PARTIAL"
+        reason = "只有部分情景具备可比较输入；不完整情景保持 UNKNOWN，不能将部分结果误认为完整 Bear/Base/Bull 链。"
+    else:
+        overall = "NOT_IDENTIFIABLE"
+        reason = "至少一个关键范围、期间、历史基线或前瞻经营变量不可识别；贡献变化保持 UNKNOWN。"
+    return {**base, "status": overall, "reason": reason, "scenarios": scenario_results}
+
+
 def evaluate_operating_driver_forecast(
     raw: Any,
     *,
@@ -857,6 +1219,13 @@ def evaluate_operating_driver_forecast(
         "PRODUCT_LINE_ACTUALS_TYPED_NOT_FORMALLY_ADMITTED"
         if actuals_complete else "NOT_IDENTIFIABLE_OR_INCOMPLETE"
     )
+    baseline_transition = _build_baseline_transition_bridge(
+        scope=scope,
+        actuals_period=str(raw.get("actuals_period") or "UNKNOWN"),
+        forecast_period=forecast_period,
+        product_lines=product_lines,
+        scenarios=scenarios,
+    )
     summary = str(raw.get("summary") or "已处理经营驱动输入；所有计算均为非正式试运行，不等同于已实现项目利润。")
     limits = raw.get("limitations")
     limits = [str(x).strip() for x in limits if str(x).strip()] if isinstance(limits, list) else []
@@ -882,6 +1251,7 @@ def evaluate_operating_driver_forecast(
         "scenarios": scenarios,
         "input_issues": sorted(set(input_issues)),
         "historical_actuals_status": historical_status,
+        "baseline_transition": baseline_transition,
         "valuation_transmission": {
             "status": "NOT_LINKED_TO_PER_SHARE_VALUE",
             "reason": "没有可验证的桥接把该经营情景转换为公司归属净利润、每股收益和每股估值；本轮刻意不自动修改估值输入。",
