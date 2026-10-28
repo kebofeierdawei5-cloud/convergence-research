@@ -5290,3 +5290,167 @@ def test_b53_core_synthesis_shows_b4_valuation_bridge_conflicts():
     assert "BASE net_profit_cny ↔ net_profit_proxy_cny：MISMATCH" in report
     assert "B4=120；主估值桥=100" in report
     assert "年化回报与目标买入价保持 UNKNOWN" in report
+
+
+def test_b54_analysis_exposes_ordered_decision_chain_and_authority_boundary():
+    payload = _payload()
+    analysis, report = _analyse(payload, "TEST-B54-DECISION-CHAIN")
+
+    trace = analysis["decision"]["decision_chain_trace"]
+    stage_ids = [row["stage_id"] for row in trace["stages"]]
+
+    assert trace["schema_version"] == "IIOS-DECISION-CHAIN-TRACE-0.1"
+    assert stage_ids == [
+        "input_and_evidence",
+        "primary_valuation",
+        "valuation_timing",
+        "return_calculation",
+        "price_hurdles",
+        "thesis_risk_stress",
+        "portfolio_constraints",
+        "formal_admission",
+    ]
+    assert trace["formal_decision_created"] is False
+    assert trace["execution_authorized"] is False
+    assert trace["downstream_availability"]["authorized_new_position_pct"] == "0"
+    assert "B54 决策链追踪：前置条件 → 阻断点 → 下游可用性" in report
+    assert "实际获准新增仓位：0%" in report
+
+
+def test_b54_primary_model_blocker_propagates_to_return_and_b6_outputs():
+    trace = pilot._build_decision_chain_trace(
+        prepared={
+            "assessment": {"risk": {"status": "PASS"}},
+            "valuation_model_consistency": {
+                "status": "B4_VALUATION_BRIDGE_MISMATCH",
+                "primary_model_price_calculation_eligible": False,
+                "issues": ["B4_VALUATION_BRIDGE_MISMATCH"],
+            },
+            "valuation_timing": {"status": "PASS", "issues": []},
+            "decision_parameters": {"required_return_annualized": "0.15", "max_loss_pct": "25"},
+            "evidence_register": [{"source_id": "E1"}],
+            "unresolved_evidence_references": [],
+            "after_cutoff_evidence_references": [],
+            "uncertain_timing_evidence_references": [],
+            "notes_price_conflicts": [],
+        },
+        metrics=None,
+        return_metrics_reason="PRIMARY_VALUATION_MODEL_NOT_ELIGIBLE:B4_VALUATION_BRIDGE_MISMATCH",
+        stress_review={"status": "PASS", "issues": []},
+        portfolio_package={"status": "NOT_PROVIDED", "constraint_status": "UNKNOWN", "reason": "missing package"},
+        price_zone_sensitivity={"target_entry_price": None},
+        decision={
+            "provisional_action": "REVIEW_REQUIRED",
+            "reason": "primary valuation blocked",
+            "gating_issues": ["PRIMARY_VALUATION_MODEL_NOT_DECISION_ELIGIBLE"],
+            "core_policy_evaluation": {"primary_reason": "RETURN_OR_CASE_VALIDATION_UNRESOLVED"},
+        },
+    )
+
+    assert trace["downstream_availability"]["expected_annualized_return"] == "UNKNOWN"
+    assert trace["downstream_availability"]["common_constraint_target_entry_price"] == "UNKNOWN"
+    assert trace["downstream_availability"]["b6_target_entry_price"] == "UNKNOWN"
+    assert any(
+        row["from"] == "primary_valuation"
+        and "target_entry_price" in row["to"]
+        and "b6_price_zone_sensitivity" in row["to"]
+        for row in trace["causal_blocks"]
+    )
+
+
+def test_b54_price_hurdle_failure_keeps_conditionally_calculated_target_price_visible():
+    trace = pilot._build_decision_chain_trace(
+        prepared={
+            "assessment": {"risk": {"status": "PASS"}},
+            "valuation_model_consistency": {
+                "status": "MATCH",
+                "primary_model_price_calculation_eligible": True,
+                "issues": [],
+            },
+            "valuation_timing": {"status": "PASS", "issues": []},
+            "decision_parameters": {"required_return_annualized": "0.15", "max_loss_pct": "25"},
+            "evidence_register": [{"source_id": "E1"}],
+            "unresolved_evidence_references": [],
+            "after_cutoff_evidence_references": [],
+            "uncertain_timing_evidence_references": [],
+            "notes_price_conflicts": [],
+        },
+        metrics={
+            "return_gate_pass": False,
+            "buy_entry_return_cushion_pass": False,
+            "fundamental_target_pass": False,
+            "required_return_pass": False,
+            "risk_pass": True,
+            "expected_annualized_return": "0.04",
+            "target_entry_price": "50",
+        },
+        return_metrics_reason=None,
+        stress_review={"status": "PASS", "issues": []},
+        portfolio_package={"status": "NOT_PROVIDED", "constraint_status": "UNKNOWN", "reason": "missing package"},
+        price_zone_sensitivity={"target_entry_price": "48"},
+        decision={
+            "provisional_action": "REVIEW_REQUIRED",
+            "reason": "current-price return gate fails",
+            "gating_issues": [],
+            "core_policy_evaluation": {"primary_reason": "CURRENT_PRICE_ABOVE_TARGET_ENTRY_PRICE"},
+        },
+    )
+
+    assert trace["downstream_availability"]["expected_annualized_return"] == "AVAILABLE"
+    assert trace["downstream_availability"]["common_constraint_target_entry_price"] == "AVAILABLE"
+    assert trace["price_context"]["target_entry_price"] == "50"
+    assert trace["price_context"]["b6_target_entry_price"] == "48"
+    price_fail = next(row for row in trace["causal_blocks"] if row["from"] == "price_hurdles")
+    assert price_fail["to"] == ["current_price_buy_add_screen"]
+    assert "目标买入价仍可作为条件价格上限参考" in price_fail["reason"]
+
+
+def test_b54_portfolio_block_does_not_erase_available_return_and_price_math():
+    trace = pilot._build_decision_chain_trace(
+        prepared={
+            "assessment": {"risk": {"status": "PASS"}},
+            "valuation_model_consistency": {
+                "status": "MATCH",
+                "primary_model_price_calculation_eligible": True,
+                "issues": [],
+            },
+            "valuation_timing": {"status": "PASS", "issues": []},
+            "decision_parameters": {"required_return_annualized": "0.15", "max_loss_pct": "25"},
+            "evidence_register": [{"source_id": "E1"}],
+            "unresolved_evidence_references": [],
+            "after_cutoff_evidence_references": [],
+            "uncertain_timing_evidence_references": [],
+            "notes_price_conflicts": [],
+        },
+        metrics={
+            "return_gate_pass": True,
+            "buy_entry_return_cushion_pass": True,
+            "fundamental_target_pass": True,
+            "required_return_pass": True,
+            "risk_pass": True,
+            "expected_annualized_return": "0.18",
+            "target_entry_price": "90",
+        },
+        return_metrics_reason=None,
+        stress_review={"status": "PASS", "issues": []},
+        portfolio_package={
+            "status": "PORTFOLIO_CONSTRAINT_NOT_PASS",
+            "constraint_status": "BLOCKED",
+            "reason": "操作者明确标记组合约束 BLOCKED。",
+        },
+        price_zone_sensitivity={"target_entry_price": "90"},
+        decision={
+            "provisional_action": "REVIEW_REQUIRED",
+            "reason": "portfolio constraint blocks capital action",
+            "gating_issues": [],
+            "core_policy_evaluation": {"primary_reason": "PORTFOLIO_CONSTRAINT_BLOCKED"},
+        },
+    )
+
+    assert trace["downstream_availability"]["expected_annualized_return"] == "AVAILABLE"
+    assert trace["downstream_availability"]["common_constraint_target_entry_price"] == "AVAILABLE"
+    assert trace["downstream_availability"]["conditional_position_package"] == "UNKNOWN_OR_NOT_READY"
+    assert trace["downstream_availability"]["authorized_new_position_pct"] == "0"
+    portfolio_stage = next(row for row in trace["stages"] if row["stage_id"] == "portfolio_constraints")
+    assert portfolio_stage["status"] == "BLOCKED"
+    assert "条件新增资金/仓位包" in portfolio_stage["blocks"]
