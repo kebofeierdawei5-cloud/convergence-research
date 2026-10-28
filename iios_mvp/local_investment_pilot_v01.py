@@ -805,6 +805,21 @@ def _reconcile_b4_valuation_bridge(
             "formal_admission_created": False,
             "decision_authority": False,
         }
+    scope = str(driver_forecast.get("scope") or "UNKNOWN").strip().upper()
+    if scope != "COMPANY_WIDE":
+        return {
+            "schema_version": "IIOS-B4-VALUATION-BRIDGE-RECONCILIATION-0.1",
+            "status": "NOT_COMPARABLE_SCOPE",
+            "reason": (
+                f"B4 scope is {scope}; direct financial-bridge reconciliation is only valid "
+                "for a COMPANY_WIDE forecast. Project/product-line increments must be assessed "
+                "through the explicit B5 transmission path rather than compared as whole-company totals."
+            ),
+            "scenarios": {},
+            "excluded_metrics": [],
+            "formal_admission_created": False,
+            "decision_authority": False,
+        }
     field_pairs = (
         ("revenue_cny", "revenue_cny"),
         ("variable_cost_cny", "cost_of_revenue_cny"),
@@ -1599,6 +1614,24 @@ def _build_valuation_model_consistency(
         if "EPS_MULTIPLE_ADAPTER_NOT_CALCULATED" not in issues:
             issues.append("EPS_MULTIPLE_ADAPTER_NOT_CALCULATED")
         status = "EPS_MULTIPLE_CALCULATION_NOT_ELIGIBLE"
+
+    b4_reconciliation = operating_driver_forecast.get("valuation_reconciliation")
+    b4_reconciliation = b4_reconciliation if isinstance(b4_reconciliation, Mapping) else {}
+    b4_reconciliation_status = str(b4_reconciliation.get("status") or "UNKNOWN").strip().upper()
+    if selected == "EPS_MULTIPLE" and scope == "COMPANY_WIDE":
+        if b4_reconciliation_status == "MISMATCH":
+            if "B4_VALUATION_BRIDGE_MISMATCH" not in issues:
+                issues.append("B4_VALUATION_BRIDGE_MISMATCH")
+            # A known contradictory company-wide bridge invalidates primary price math,
+            # even when the standalone EPS×P/E adapter arithmetic itself calculates.
+            if status == "MATCH":
+                status = "B4_VALUATION_BRIDGE_MISMATCH"
+        elif b4_reconciliation_status == "PARTIAL":
+            # Absence of a comparable value is not a numeric mismatch. Preserve it as
+            # a visible diagnostic without relabeling the independent adapter as failed.
+            if "B4_VALUATION_BRIDGE_RECONCILIATION_PARTIAL_NON_BLOCKING" not in issues:
+                issues.append("B4_VALUATION_BRIDGE_RECONCILIATION_PARTIAL_NON_BLOCKING")
+
     if not model_rationale_identifiable:
         issues.append("FORECAST_VALUATION_MODEL_RATIONALE_NOT_IDENTIFIABLE")
         if status == "MATCH":
@@ -1647,6 +1680,7 @@ def _build_valuation_model_consistency(
         ),
         "operating_forecast_scope": scope,
         "valuation_transmission_status": transmission_status,
+        "b4_valuation_reconciliation_status": b4_reconciliation_status,
         "sotp_calculation_status": str(sotp_calculation_status or "NOT_SELECTED").upper(),
         "eps_multiple_calculation_status": str(eps_multiple_calculation_status or "NOT_SELECTED").upper(),
         "primary_model_price_calculation_eligible": eligible,
@@ -3857,6 +3891,58 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
         f"- 独立经营预测：范围 {operating.get('scope', 'UNKNOWN')}；期间 {operating.get('forecast_period', 'UNKNOWN')}；状态 {operating.get('status', 'UNKNOWN')}",
         f"- 所选估值模型与终值日期：{valuation.get('model') or 'UNKNOWN'} / {valuation.get('valuation_terminal_date') or 'UNKNOWN'}",
     ])
+    reconciliation = operating.get("valuation_reconciliation")
+    reconciliation = reconciliation if isinstance(reconciliation, Mapping) else {}
+    reconciliation_status = str(reconciliation.get("status") or "UNKNOWN").strip().upper()
+    lines.append(f"- B4 与主估值经营财务桥对账：{reconciliation_status}")
+    if reconciliation_status == "NOT_COMPARABLE_SCOPE":
+        lines.append(
+            f"  - 口径说明：{reconciliation.get('reason') or 'B4 与主估值经营桥的范围不可直接比较。'}"
+        )
+    if reconciliation_status in {"MISMATCH", "PARTIAL"}:
+        reconciliation_scenarios = (
+            reconciliation.get("scenarios")
+            if isinstance(reconciliation.get("scenarios"), Mapping) else {}
+        )
+        rendered_checks = 0
+        for scenario_name in ("bear", "base", "bull"):
+            scenario_reconciliation = reconciliation_scenarios.get(scenario_name)
+            if not isinstance(scenario_reconciliation, Mapping):
+                continue
+            checks = scenario_reconciliation.get("checks")
+            if not isinstance(checks, list):
+                continue
+            for check in checks:
+                if not isinstance(check, Mapping):
+                    continue
+                check_status = str(check.get("status") or "UNKNOWN").upper()
+                if (reconciliation_status == "MISMATCH" and check_status != "MISMATCH"):
+                    continue
+                if (reconciliation_status == "PARTIAL" and check_status != "NOT_COMPARABLE"):
+                    continue
+                left = check.get("driver_value")
+                right = check.get("valuation_value")
+                left_text = "UNKNOWN" if left in (None, "") else str(left)
+                right_text = "UNKNOWN" if right in (None, "") else str(right)
+                lines.append(
+                    f"  - {scenario_name.upper()} {check.get('driver_field') or 'UNKNOWN'} ↔ "
+                    f"{check.get('valuation_field') or 'UNKNOWN'}：{check_status}；"
+                    f"B4={left_text}；主估值桥={right_text}"
+                )
+                rendered_checks += 1
+                if rendered_checks >= 6:
+                    break
+            if rendered_checks >= 6:
+                break
+        if reconciliation_status == "MISMATCH":
+            lines.append(
+                "- 门禁影响：公司整体范围下的 B4 与主估值经营桥存在已识别数值矛盾；"
+                "主估值资格应被阻断，年化回报与目标买入价保持 UNKNOWN。"
+            )
+        else:
+            lines.append(
+                "- 口径边界：部分字段无法直接对账；这不是已识别的数值矛盾，也不能被表述为完全一致。"
+            )
     for name in ("bear", "base", "bull"):
         op = operating_scenarios.get(name) if isinstance(operating_scenarios.get(name), Mapping) else {}
         val = valuation_scenarios.get(name) if isinstance(valuation_scenarios.get(name), Mapping) else {}
