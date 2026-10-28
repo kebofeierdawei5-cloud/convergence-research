@@ -5100,7 +5100,7 @@ def test_b52_round_b_separates_external_mie_from_conditional_price_inversion() -
     assert "price_implied_analysis" in prompt
     assert "不是外部 MIE" in prompt
     assert "comparison_basis" in prompt
-    assert "不得升级 MIE status，也不得单独让已验证 expectation_gap PASS" in prompt
+    assert "决策可用 expectation_gap 必须保持 UNKNOWN" in prompt
 
 
 def test_b52_report_separates_external_mie_price_inversion_and_forward_scenarios() -> None:
@@ -5143,6 +5143,7 @@ def test_b52_report_separates_external_mie_price_inversion_and_forward_scenarios
     analysis, report = _analyse(payload, "TEST-B52-CORE-EXPECTATION-SYNTHESIS")
 
     assert analysis["assessment"]["market_implied_expectation"]["status"] == "PASS"
+    assert analysis["assessment"]["expectation_gap"]["status"] == "UNKNOWN"
     assert "核心投资判断总览：当前现实 × 现价隐含要求 × 合理未来推演" in report
     assert "外部可验证市场隐含预期（MIE）" in report
     assert "现价条件反推：CONDITIONAL_MODEL_INVERSION" in report
