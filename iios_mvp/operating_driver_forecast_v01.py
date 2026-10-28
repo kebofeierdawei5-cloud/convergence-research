@@ -1455,6 +1455,14 @@ def render_operating_driver_section(
                 f"单位成本效应 {effects.get('unit_variable_cost_effect')}；"
                 f"归因残差 {effects.get('reconciliation_residual')}"
             )
+            inventory = product_row.get("production_inventory_context") if isinstance(product_row.get("production_inventory_context"), Mapping) else {}
+            lines.append(
+                f"    独立库存上下文（不纳入贡献归因）：产量 "
+                f"{inventory.get('historical_production_tonnes') or 'UNKNOWN'}→"
+                f"{inventory.get('forward_production_tonnes') or 'UNKNOWN'} 吨；"
+                f"产销差额 {inventory.get('historical_inventory_change_tonnes') or 'UNKNOWN'}→"
+                f"{inventory.get('forward_inventory_change_tonnes') or 'UNKNOWN'} 吨"
+            )
             lineage = []
             baseline_lineage = baseline.get("measure_lineage") if isinstance(baseline.get("measure_lineage"), Mapping) else {}
             forward_lineage = forward.get("measure_lineage") if isinstance(forward.get("measure_lineage"), Mapping) else {}
