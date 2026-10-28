@@ -5591,3 +5591,23 @@ def test_b55_report_labels_observed_baseline_and_forward_assumptions():
     assert "销量效应" in report and "净售价效应" in report and "单位成本效应" in report
     assert "OBSERVED_ACTUAL" in report and "ANALYST_ASSUMPTION" in report
     assert "不直接进入 EPS、每股估值或 15% 回报计算" in report
+
+
+def test_b55_missing_b4_input_keeps_transition_node_shape_explicit():
+    result = evaluate_operating_driver_forecast(None)
+
+    assert result["baseline_transition"]["schema_version"] == "IIOS-B55-BASELINE-TO-FORWARD-DRIVER-BRIDGE-0.1"
+    assert result["baseline_transition"]["status"] == "NOT_PROVIDED"
+    assert result["baseline_transition"]["scenarios"] == {}
+    assert result["baseline_transition"]["formal_forecast_admission_created"] is False
+
+
+def test_b55_invalid_b4_schema_keeps_transition_node_shape_explicit():
+    raw = _driver_payload()
+    raw["schema_version"] = "IIOS-OPERATING-DRIVER-FORECAST-OLD"
+    result = evaluate_operating_driver_forecast(raw)
+
+    assert result["baseline_transition"]["schema_version"] == "IIOS-B55-BASELINE-TO-FORWARD-DRIVER-BRIDGE-0.1"
+    assert result["baseline_transition"]["status"] == "INVALID_SCHEMA"
+    assert result["baseline_transition"]["baseline_issues"] == ["OPERATING_DRIVER_SCHEMA_MISMATCH"]
+    assert result["baseline_transition"]["scenarios"] == {}
