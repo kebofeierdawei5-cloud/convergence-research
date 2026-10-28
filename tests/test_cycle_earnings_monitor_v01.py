@@ -1181,3 +1181,20 @@ def test_b50_multiple_component_rows_without_independent_measurements_remain_blo
         for issue in base["issues"]
     )
     assert result["normalized_fcf_bridge"]["fcf_variance_reconciled"] is False
+
+
+
+def test_b50_duplicate_driver_rows_in_one_category_are_rejected() -> None:
+    raw, b4, evidence = _valid_case()
+    raw, second = _split_base_capex_into_two_drivers(raw)
+    # Keep independent typed measurements, but attempt to split the same driver
+    # into two rows with two measure IDs. This must not qualify as multi-driver.
+    second["driver_id"] = "demand_growth"
+    second["review_trigger_id"] = "orders_review"
+    second["driver_component_measure"]["driver_id"] = "demand_growth"
+    result = _evaluate(raw, b4, evidence)
+    base = result["normalized_fcf_bridge"]["variance_attribution"]["scenarios"]["base"]
+
+    assert base["status"] == "REVIEW_REQUIRED"
+    assert "FCF_DUPLICATE_DRIVER_ROWS_WITHIN_COMPONENT_CATEGORY:CAPEX" in base["issues"]
+    assert result["normalized_fcf_bridge"]["fcf_variance_reconciled"] is False
