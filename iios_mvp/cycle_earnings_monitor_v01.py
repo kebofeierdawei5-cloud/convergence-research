@@ -2705,6 +2705,20 @@ def render_cycle_earnings_monitor_section(monitor: Mapping[str, Any] | None) -> 
                 f"组件证据 {component_refs_text}；"
                 f"触发器 {attribution.get('review_trigger_id', 'UNKNOWN')}；{attribution.get('rationale', 'UNKNOWN')}"
             )
+            driver_measure = attribution.get("driver_component_measure")
+            if isinstance(driver_measure, Mapping):
+                lines.append(
+                    f"      - 驱动级分解 {driver_measure.get('measure_id', 'UNKNOWN')}："
+                    f"口径 {driver_measure.get('component_basis', 'UNKNOWN')}；"
+                    f"B4 组件值 {driver_measure.get('b4_value_cny') or 'UNKNOWN'} / "
+                    f"正常化组件值 {driver_measure.get('normalized_value_cny') or 'UNKNOWN'}；"
+                    f"按口径复算贡献 {driver_measure.get('computed_amount_cny') or 'UNKNOWN'} CNY；"
+                    f"B4 侧证据 {'、'.join(driver_measure.get('b4_evidence_refs') or []) or 'UNKNOWN'}；"
+                    f"正常化侧证据 {'、'.join(driver_measure.get('normalized_evidence_refs') or []) or 'UNKNOWN'}；"
+                    f"状态 {driver_measure.get('status', 'UNKNOWN')}"
+                )
+                for measure_issue in driver_measure.get("issues") or []:
+                    lines.append(f"        - 驱动级测量未解决：{measure_issue}")
         for issue in norm_row.get("issues") or []:
             lines.append(f"  - 正常化 FCF 桥未解决：{issue}")
         for issue in comp_row.get("issues") or []:
