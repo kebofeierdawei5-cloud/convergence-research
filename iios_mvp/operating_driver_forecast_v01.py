@@ -758,13 +758,14 @@ def _build_baseline_transition_bridge(
 
     baseline_year = _period_year(actuals_period)
     forecast_year = _period_year(forecast_period)
-    if baseline_year is None or forecast_year is None or forecast_year <= baseline_year:
+    if baseline_year is None or forecast_year is None or forecast_year != baseline_year + 1:
         return {
             **base,
             "status": "PERIOD_NOT_COMPARABLE",
             "reason": (
-                "仅允许完整年度且前瞻年度晚于历史年度的比较；半年/季度/滚动期间、"
-                "相同年度、倒序年度或不明确期间均保持 UNKNOWN。"
+                "本桥用于一年度基线到前瞻情景的经营变量变化解释；只接受相邻的完整年度。"
+                "半年/季度/滚动期间、相同/倒序年度、跨越多个年度或不明确期间均保持 UNKNOWN，"
+                "除非先建立明确的中间年度基线桥。"
             ),
         }
     if not product_lines:
