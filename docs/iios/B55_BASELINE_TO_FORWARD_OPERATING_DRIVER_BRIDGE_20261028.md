@@ -10,7 +10,7 @@ B55 adds a deliberately bounded bridge from the historical observed unit-economi
 
 ## Calculation
 
-The comparison is limited to comparable product/line scopes (`COMPANY_WIDE` or `PRODUCT_LINE`) with identical product IDs and explicit full-year periods. The forecast year must be later than the baseline year. Partial years, rolling periods, same-year labels, reversed periods, unknown scope and `PROJECT_INCREMENTAL` are not directly comparable to existing-business actuals.
+The comparison is limited to comparable product/line scopes (`COMPANY_WIDE` or `PRODUCT_LINE`) with identical product IDs and explicit full-year periods. The forecast must be the **immediately following fiscal/calendar year** after the baseline. Partial years, rolling periods, same-year labels, reversed periods, and multi-year gaps return `PERIOD_NOT_COMPARABLE`; a multi-year raw delta is not mislabeled as a one-year change and requires an intermediate annual baseline bridge. Unknown scope and `PROJECT_INCREMENTAL` are not directly comparable to existing-business actuals.
 
 For each mapped product:
 
@@ -47,11 +47,11 @@ This is an explanatory diagnostic only. It does not change B4's financial result
 
 ## Regression cases and validation status
 
-Nine cases are authored in `tests/test_local_investment_pilot_v01.py`:
+Ten cases are authored in `tests/test_local_investment_pilot_v01.py`:
 
 1. Historical baseline to all three forward contribution scenarios reconciles.
 2. Symmetric decomposition separates ASP and unit-cost effects.
-3. Partial-year / non-forward annual periods block comparison.
+3. Partial-year, non-forward, and multi-year-gap periods block comparison.
 4. `PROJECT_INCREMENTAL` is not miscompared to existing-business actuals.
 5. Missing historical unit economics blocks contribution comparison.
 6. A direct historical revenue conflict blocks the baseline bridge.
@@ -60,3 +60,7 @@ Nine cases are authored in `tests/test_local_investment_pilot_v01.py`:
 9. Invalid B4 schema returns an explicit `INVALID_SCHEMA` transition node.
 
 They have **not** been executed. No test pass, Replay match, CI pass, or macOS acceptance is claimed.
+
+## Follow-up hardening — consecutive-year period gate
+
+A subsequent static review tightened the initial “later full year” rule. B55 is intended to explain a one-year baseline-to-forward transition, so it now accepts only adjacent complete years (for example, 2025FY → 2026FY). A 2025FY → 2027FY comparison remains `PERIOD_NOT_COMPARABLE` until an intermediate annual baseline bridge is provided. This is a source change only; the new regression case is authored but not run.
