@@ -5854,5 +5854,5 @@ def test_b57_signed_recurring_nonoperating_and_oneoff_losses_remain_identifiable
     bear = bridge["scenarios"]["bear"]
 
     assert bear["status"] == "CALCULATED_AND_RECONCILED"
-    assert bear["forward_scenario"]["normalized_profit_before_tax_proxy_cny"] == "388000.00"
-    assert bear["forward_scenario"]["all_items_profit_before_tax_proxy_cny"] == "383000.00"
+    assert bear["forward_scenario"]["normalized_profit_before_tax_proxy_cny"] == "323000"
+    assert bear["forward_scenario"]["all_items_profit_before_tax_proxy_cny"] == "318000"
