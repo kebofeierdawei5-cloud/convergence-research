@@ -5731,3 +5731,104 @@ def test_b56_report_separates_contribution_from_modeled_net_profit_and_eps():
     assert "模型化税后利润代理" in report
     assert "归母净利润" in report
     assert "EPS / 每股价值影响仍为 UNKNOWN" in report
+
+
+def _b57_test_attribution_payload():
+    raw = _driver_payload()
+    raw["scope"] = "COMPANY_WIDE"
+    raw["actuals_period"] = "2025FY"
+    raw["forecast_period"] = "2026FY"
+    raw["historical_financials"] = {
+        "fixed_cash_opex_cny": _driver_measure("40000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical fixed cash opex"),
+        "depreciation_amortization_cny": _driver_measure("8000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical D&A"),
+        "finance_cost_cny": _driver_measure("2000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical finance cost"),
+        "tax_rate": _driver_measure("0.20", "ratio", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical effective tax rate"),
+    }
+    def historical(value, unit):
+        return _driver_measure(value, unit, "OBSERVED_ACTUAL", ["E1"], "Synthetic historical earnings attribution")
+    def assumption(value, unit):
+        return _driver_measure(value, unit, "ANALYST_ASSUMPTION", [], "Explicit synthetic forward earnings assumption")
+    raw["historical_earnings_attribution"] = {
+        "non_operating_pre_tax_cny": historical("5000", "CNY"),
+        "non_recurring_pre_tax_cny": historical("10000", "CNY"),
+        "minority_interest_net_profit_after_tax_cny": historical("5000", "CNY"),
+        "minority_interest_nonrecurring_after_tax_cny": historical("1000", "CNY"),
+        "diluted_weighted_average_shares": historical("100000", "shares"),
+    }
+    for name in ("bear", "base", "bull"):
+        raw["scenarios"][name].update({
+            "non_operating_pre_tax_cny": assumption("6000", "CNY"),
+            "non_recurring_pre_tax_cny": assumption("12000", "CNY"),
+            "minority_interest_net_profit_after_tax_cny": assumption("6500", "CNY"),
+            "minority_interest_nonrecurring_after_tax_cny": assumption("1200", "CNY"),
+            "diluted_weighted_average_shares": assumption("110000", "shares"),
+        })
+    return raw
+
+
+def test_b57_normalized_parent_profit_and_diluted_eps_bridge_reconciles():
+    raw = _b57_test_attribution_payload()
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+    bridge = result["baseline_transition"]["per_share_earnings_bridge"]
+    base = bridge["scenarios"]["base"]
+    assert bridge["status"] == "DIAGNOSTIC_CALCULATED"
+    assert base["status"] == "CALCULATED_AND_RECONCILED"
+    assert base["historical_baseline"]["normalized_parent_attributable_net_profit_cny"] == "320000.00"
+    assert base["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] == "3.2"
+    assert base["forward_scenario"]["normalized_parent_attributable_net_profit_cny"] == "287950.00"
+    assert base["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"].startswith("2.617")
+    assert base["changes"]["normalized_parent_attributable_net_profit_cny"] == "-32050.00"
+    assert base["changes"]["reconciliation_residual_cny"] == "0.00"
+    assert base["eps_growth_status"] == "CALCULATED_HISTORICAL_BASELINE_POSITIVE"
+    assert bridge["per_share_value_impact"] is None
+    assert bridge["formal_forecast_admission_created"] is False
+    assert bridge["decision_authority"] is False
+
+
+def test_b57_product_line_scope_cannot_be_divided_by_company_share_count():
+    raw = _b57_test_attribution_payload()
+    raw["scope"] = "PRODUCT_LINE"
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+    bridge = result["baseline_transition"]["per_share_earnings_bridge"]
+    assert bridge["status"] == "NOT_COMPARABLE_SCOPE"
+    assert all(row["status"] == "NOT_COMPARABLE_SCOPE" for row in bridge["scenarios"].values())
+    assert all(row["changes"] == {} for row in bridge["scenarios"].values())
+
+
+def test_b57_missing_minority_interest_component_or_diluted_shares_keeps_eps_unknown():
+    raw = _b57_test_attribution_payload()
+    raw["historical_earnings_attribution"].pop("minority_interest_nonrecurring_after_tax_cny")
+    raw["scenarios"]["base"]["diluted_weighted_average_shares"] = _driver_measure(
+        "0", "shares", "ANALYST_ASSUMPTION", [], "Zero share denominator must block EPS"
+    )
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+    bridge = result["baseline_transition"]["per_share_earnings_bridge"]
+    assert bridge["scenarios"]["bear"]["status"] == "CALCULATED_AND_RECONCILED"
+    assert bridge["scenarios"]["base"]["status"] == "NOT_IDENTIFIABLE"
+    assert "historical.minority_interest_nonrecurring_after_tax_cny" in bridge["scenarios"]["base"]["missing_inputs"]
+    assert "forward.diluted_weighted_average_shares:MUST_BE_POSITIVE" in bridge["scenarios"]["base"]["missing_inputs"]
+    assert bridge["scenarios"]["base"]["changes"] == {}
+
+
+def test_b57_report_shows_one_off_nci_and_eps_boundaries():
+    raw = _b57_test_attribution_payload()
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+    report = "\n".join(render_operating_driver_section(result, None, "CNY"))
+    assert "B57 正常化归母利润 → 稀释 EPS 桥" in report
+    assert "非经常性项目" in report
+    assert "少数股东" in report
+    assert "正常化稀释 EPS 代理" in report
+    assert "不等于公司正式披露的归母净利润" in report
+
+
+def test_b57_missing_b4_input_returns_explicit_not_provided_shape():
+    result = evaluate_operating_driver_forecast(None)
+    bridge = result["baseline_transition"]["per_share_earnings_bridge"]
+    assert bridge["schema_version"] == "IIOS-B57-PARENT-EARNINGS-DILUTED-EPS-BRIDGE-0.1"
+    assert bridge["status"] == "NOT_PROVIDED"
+    assert bridge["scenarios"] == {}
+    assert bridge["per_share_value_impact"] is None

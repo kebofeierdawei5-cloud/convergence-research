@@ -47,6 +47,20 @@ NET_PROFIT_BRIDGE_MEASURES = {
     "tax_rate": "ratio",
 }
 
+EARNINGS_ATTRIBUTION_MEASURES = {
+    "non_operating_pre_tax_cny": "CNY",
+    "non_recurring_pre_tax_cny": "CNY",
+    "minority_interest_net_profit_after_tax_cny": "CNY",
+    "minority_interest_nonrecurring_after_tax_cny": "CNY",
+    "diluted_weighted_average_shares": "shares",
+}
+EARNINGS_ATTRIBUTION_SIGNED_MEASURES = {
+    "non_operating_pre_tax_cny",
+    "non_recurring_pre_tax_cny",
+    "minority_interest_net_profit_after_tax_cny",
+    "minority_interest_nonrecurring_after_tax_cny",
+}
+
 
 def _decimal(value: Any, field: str) -> Decimal:
     try:
@@ -123,6 +137,7 @@ def _normalise_measure(
     unresolved_refs: set[str],
     after_cutoff_refs: set[str],
     uncertain_refs: set[str],
+    allow_negative_metrics: set[str] | None = None,
 ) -> dict[str, Any]:
     """Normalize one typed scalar and refuse unsupported factual/forecast claims."""
     if not isinstance(raw, Mapping):
@@ -177,7 +192,12 @@ def _normalise_measure(
     # A change in working capital is signed: positive consumes cash, negative releases cash.
     metric_name = field.rsplit(".", 1)[-1]
     if claimed is not None:
-        if metric_name != "change_working_capital_cny" and claimed < 0:
+        signed_metrics = allow_negative_metrics or set()
+        if (
+            metric_name != "change_working_capital_cny"
+            and metric_name not in signed_metrics
+            and claimed < 0
+        ):
             issues.append(f"{field}:NEGATIVE_VALUE_NOT_ALLOWED")
         if metric_name == "tax_rate" and not (Decimal("0") <= claimed <= Decimal("1")):
             issues.append(f"{field}:TAX_RATE_MUST_BE_RATIO_0_TO_1")
@@ -243,6 +263,7 @@ def _normalise_product_measure_set(
     after_cutoff_refs: set[str],
     uncertain_refs: set[str],
     allowed_data_classes: set[str] | None = None,
+    allow_negative_metrics: set[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
     row = raw if isinstance(raw, Mapping) else {}
     result: dict[str, dict[str, Any]] = {}
@@ -256,6 +277,7 @@ def _normalise_product_measure_set(
             unresolved_refs=unresolved_refs,
             after_cutoff_refs=after_cutoff_refs,
             uncertain_refs=uncertain_refs,
+            allow_negative_metrics=allow_negative_metrics,
         )
         # Context matters: history is not allowed to borrow forecast values,
         # and forward scenarios cannot silently relabel an observed actual as a
@@ -1365,6 +1387,290 @@ def _build_baseline_net_profit_bridge(
     return base
 
 
+def _build_per_share_earnings_bridge(
+    *,
+    scope: str,
+    baseline_transition: Mapping[str, Any],
+    historical_attribution_raw: Any,
+    scenarios_raw: Mapping[str, Any],
+    sources_by_id: Mapping[str, Mapping[str, Any]],
+    unresolved_refs: set[str],
+    after_cutoff_refs: set[str],
+    uncertain_refs: set[str],
+) -> dict[str, Any]:
+    """Bridge B56 modeled profit to parent-attributable normalized earnings and diluted EPS."""
+    schema = "IIOS-B57-PARENT-EARNINGS-DILUTED-EPS-BRIDGE-0.1"
+    base = {
+        "schema_version": schema,
+        "status": "NOT_IDENTIFIABLE",
+        "scope": str(scope or "UNKNOWN"),
+        "baseline_period": baseline_transition.get("baseline_period", "UNKNOWN"),
+        "forecast_period": baseline_transition.get("forecast_period", "UNKNOWN"),
+        "method": "B56_PBT_PLUS_RECURRING_NONOPERATING_LESS_NORMALIZED_NCI_OVER_DILUTED_SHARES_V0.1",
+        "metric": "NORMALIZED_PARENT_ATTRIBUTABLE_NET_PROFIT_AND_DILUTED_EPS_PROXY",
+        "historical_baseline_inputs": {},
+        "scenarios": {},
+        "limitations": [
+            "只有 COMPANY_WIDE 范围可计算公司归母利润和 EPS；PRODUCT_LINE、PROJECT_INCREMENTAL 或 UNKNOWN 不能拿局部利润除以公司股数。",
+            "非经营性损益采用带符号税前净额（收入为正、费用为负）；正常化利润保留明确输入的非经常项目之外的非经营项。",
+            "非经常性项目采用带符号税前净额（收益为正、损失为负）；模型化含一次性项目利润用于展示影响，不等于报告净利润。",
+            "少数股东损益采用税后带符号金额；minority_interest_net_profit_after_tax_cny 是包含已披露非经常项目的总额，minority_interest_nonrecurring_after_tax_cny 是其中对应的非经常项目部分。正常化归母利润先从两者差额中剔除少数股东承担的一次性项目。",
+            "税费继续沿用 B56 的简化税率模型；不模拟递延税、亏损抵税、税收优惠、股权激励/可转债具体摊薄条款或不同利润项目的实际税务差异。",
+            "稀释加权平均股数必须单独提供且大于零；EPS 仅为模型代理，不自动成为估值或 15% 年化收益率计算输入。",
+        ],
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
+        "eps_impact": None,
+        "per_share_value_impact": None,
+    }
+    historical_inputs = _normalise_product_measure_set(
+        historical_attribution_raw,
+        EARNINGS_ATTRIBUTION_MEASURES,
+        "historical_earnings_attribution",
+        sources_by_id,
+        unresolved_refs,
+        after_cutoff_refs,
+        uncertain_refs,
+        allowed_data_classes={"OBSERVED_ACTUAL"},
+        allow_negative_metrics=EARNINGS_ATTRIBUTION_SIGNED_MEASURES,
+    )
+    base["historical_baseline_inputs"] = historical_inputs
+    b56 = baseline_transition.get("net_profit_bridge")
+    b56 = b56 if isinstance(b56, Mapping) else {}
+    b56_scenarios = b56.get("scenarios") if isinstance(b56.get("scenarios"), Mapping) else {}
+
+    for scenario_name in SCENARIOS:
+        raw_forward = scenarios_raw.get(scenario_name)
+        raw_forward = raw_forward if isinstance(raw_forward, Mapping) else {}
+        forward_inputs = _normalise_product_measure_set(
+            raw_forward,
+            EARNINGS_ATTRIBUTION_MEASURES,
+            f"B57.{scenario_name}",
+            sources_by_id,
+            unresolved_refs,
+            after_cutoff_refs,
+            uncertain_refs,
+            allowed_data_classes={"ISSUER_FORECAST", "ANALYST_ASSUMPTION"},
+            allow_negative_metrics=EARNINGS_ATTRIBUTION_SIGNED_MEASURES,
+        )
+        b56_row = b56_scenarios.get(scenario_name)
+        b56_row = b56_row if isinstance(b56_row, Mapping) else {}
+        hist_financials = b56_row.get("historical_baseline")
+        hist_financials = hist_financials if isinstance(hist_financials, Mapping) else {}
+        fwd_financials = b56_row.get("forward_scenario")
+        fwd_financials = fwd_financials if isinstance(fwd_financials, Mapping) else {}
+        row: dict[str, Any] = {
+            "scenario": scenario_name,
+            "status": "NOT_IDENTIFIABLE",
+            "historical_baseline": {},
+            "forward_scenario": {},
+            "changes": {},
+            "missing_inputs": [],
+            "issues": [],
+            "eps_growth_status": "UNKNOWN",
+            "eps_growth_rate": None,
+        }
+        if str(scope or "UNKNOWN").strip().upper() != "COMPANY_WIDE":
+            row["status"] = "NOT_COMPARABLE_SCOPE"
+            row["missing_inputs"] = ["COMPANY_WIDE_SCOPE_REQUIRED_FOR_PARENT_EARNINGS_AND_EPS"]
+            base["scenarios"][scenario_name] = row
+            continue
+        if str(b56_row.get("status") or "UNKNOWN") != "CALCULATED_AND_RECONCILED":
+            row["status"] = "BLOCKED_BY_B56"
+            row["missing_inputs"] = ["B56_RECONCILED_NET_PROFIT_PROXY"]
+            row["issues"] = [f"B56_SCENARIO_STATUS:{b56_row.get('status', 'UNKNOWN')}"]
+            base["scenarios"][scenario_name] = row
+            continue
+
+        hist_values = {field: _value(measure) for field, measure in historical_inputs.items()}
+        fwd_values = {field: _value(measure) for field, measure in forward_inputs.items()}
+        history_pbt = hist_financials.get("profit_before_tax_proxy_cny")
+        forward_pbt = fwd_financials.get("profit_before_tax_proxy_cny")
+        historical_base_net_profit = hist_financials.get("net_profit_proxy_cny")
+        forward_base_net_profit = fwd_financials.get("net_profit_proxy_cny")
+        historical_tax_rate = _value({"calculation_usable": True, "value": hist_financials.get("tax_rate")})
+        forward_tax_rate = _value({"calculation_usable": True, "value": fwd_financials.get("tax_rate")})
+        financial_inputs = {
+            "historical.profit_before_tax_proxy_cny": history_pbt,
+            "historical.net_profit_proxy_cny": historical_base_net_profit,
+            "historical.tax_rate": historical_tax_rate,
+            "forward.profit_before_tax_proxy_cny": forward_pbt,
+            "forward.net_profit_proxy_cny": forward_base_net_profit,
+            "forward.tax_rate": forward_tax_rate,
+        }
+        missing = [
+            f"historical.{field}" for field, value in hist_values.items() if value is None
+        ] + [
+            f"forward.{field}" for field, value in fwd_values.items() if value is None
+        ] + [
+            field for field, value in financial_inputs.items() if value in (None, "")
+        ]
+        invalid_inputs: list[str] = []
+        for side, values in (("historical", hist_values), ("forward", fwd_values)):
+            shares = values.get("diluted_weighted_average_shares")
+            if shares is not None and shares <= 0:
+                invalid_inputs.append(f"{side}.diluted_weighted_average_shares:MUST_BE_POSITIVE")
+        row["missing_inputs"] = sorted(set(missing + invalid_inputs))
+        row["issues"] = sorted({
+            f"{side}.{field}:{issue}"
+            for side, measures in (("historical", historical_inputs), ("forward", forward_inputs))
+            for field, measure in measures.items()
+            for issue in (measure.get("issues") or [])
+        })
+        row["historical_baseline"] = {
+            "period": base["baseline_period"],
+            "b56_profit_before_tax_proxy_cny": history_pbt,
+            "non_operating_pre_tax_cny": _render(hist_values.get("non_operating_pre_tax_cny")),
+            "non_recurring_pre_tax_cny": _render(hist_values.get("non_recurring_pre_tax_cny")),
+            "minority_interest_net_profit_after_tax_cny": _render(hist_values.get("minority_interest_net_profit_after_tax_cny")),
+            "minority_interest_nonrecurring_after_tax_cny": _render(hist_values.get("minority_interest_nonrecurring_after_tax_cny")),
+            "diluted_weighted_average_shares": _render(hist_values.get("diluted_weighted_average_shares")),
+            "measure_lineage": historical_inputs,
+            "normalized_parent_attributable_net_profit_cny": None,
+            "all_items_parent_attributable_net_profit_proxy_cny": None,
+            "normalized_diluted_eps_proxy_cny_per_share": None,
+        }
+        row["forward_scenario"] = {
+            "period": base["forecast_period"],
+            "b56_profit_before_tax_proxy_cny": forward_pbt,
+            "non_operating_pre_tax_cny": _render(fwd_values.get("non_operating_pre_tax_cny")),
+            "non_recurring_pre_tax_cny": _render(fwd_values.get("non_recurring_pre_tax_cny")),
+            "minority_interest_net_profit_after_tax_cny": _render(fwd_values.get("minority_interest_net_profit_after_tax_cny")),
+            "minority_interest_nonrecurring_after_tax_cny": _render(fwd_values.get("minority_interest_nonrecurring_after_tax_cny")),
+            "diluted_weighted_average_shares": _render(fwd_values.get("diluted_weighted_average_shares")),
+            "measure_lineage": forward_inputs,
+            "normalized_parent_attributable_net_profit_cny": None,
+            "all_items_parent_attributable_net_profit_proxy_cny": None,
+            "normalized_diluted_eps_proxy_cny_per_share": None,
+        }
+        if row["missing_inputs"]:
+            row["status"] = "NOT_IDENTIFIABLE"
+            base["scenarios"][scenario_name] = row
+            continue
+
+        history_pbt_value = _decimal(history_pbt, "B57_HISTORICAL_PBT")
+        forward_pbt_value = _decimal(forward_pbt, "B57_FORWARD_PBT")
+        hist_net_profit_value = _decimal(historical_base_net_profit, "B57_HISTORICAL_B56_NET_PROFIT")
+        fwd_net_profit_value = _decimal(forward_base_net_profit, "B57_FORWARD_B56_NET_PROFIT")
+        hist_tax, fwd_tax = historical_tax_rate, forward_tax_rate
+
+        def calculate_attribution(
+            b56_pbt: Decimal,
+            b56_net_profit: Decimal,
+            tax_rate: Decimal,
+            amounts: Mapping[str, Decimal],
+        ) -> dict[str, Decimal]:
+            recurring_pbt = b56_pbt + amounts["non_operating_pre_tax_cny"]
+            normalized_tax = max(recurring_pbt, Decimal("0")) * tax_rate
+            normalized_total_np = recurring_pbt - normalized_tax
+            all_items_pbt = recurring_pbt + amounts["non_recurring_pre_tax_cny"]
+            all_items_tax = max(all_items_pbt, Decimal("0")) * tax_rate
+            all_items_total_np = all_items_pbt - all_items_tax
+            nci_total = amounts["minority_interest_net_profit_after_tax_cny"]
+            nci_nonrec = amounts["minority_interest_nonrecurring_after_tax_cny"]
+            normalized_nci = nci_total - nci_nonrec
+            normalized_parent_np = normalized_total_np - normalized_nci
+            all_items_parent_np = all_items_total_np - nci_total
+            return {
+                "b56_net_profit_proxy_cny": b56_net_profit,
+                "normalized_profit_before_tax_proxy_cny": recurring_pbt,
+                "normalized_consolidated_net_profit_proxy_cny": normalized_total_np,
+                "all_items_profit_before_tax_proxy_cny": all_items_pbt,
+                "all_items_consolidated_net_profit_proxy_cny": all_items_total_np,
+                "modeled_tax_expense_normalized_proxy_cny": normalized_tax,
+                "modeled_tax_expense_all_items_proxy_cny": all_items_tax,
+                "non_operating_after_tax_effect_cny": normalized_total_np - b56_net_profit,
+                "non_recurring_after_tax_effect_cny": all_items_total_np - normalized_total_np,
+                "normalized_minority_interest_net_profit_cny": normalized_nci,
+                "minority_interest_nonrecurring_after_tax_cny": nci_nonrec,
+                "all_items_minority_interest_net_profit_cny": nci_total,
+                "normalized_parent_attributable_net_profit_cny": normalized_parent_np,
+                "all_items_parent_attributable_net_profit_proxy_cny": all_items_parent_np,
+                "normalized_diluted_eps_proxy_cny_per_share": normalized_parent_np / amounts["diluted_weighted_average_shares"],
+            }
+
+        historical_result = calculate_attribution(history_pbt_value, hist_net_profit_value, hist_tax, hist_values)
+        forward_result = calculate_attribution(forward_pbt_value, fwd_net_profit_value, fwd_tax, fwd_values)
+        normalized_np_change = (
+            forward_result["normalized_parent_attributable_net_profit_cny"]
+            - historical_result["normalized_parent_attributable_net_profit_cny"]
+        )
+        b56_np_change = fwd_net_profit_value - hist_net_profit_value
+        non_operating_after_tax_change = (
+            forward_result["non_operating_after_tax_effect_cny"]
+            - historical_result["non_operating_after_tax_effect_cny"]
+        )
+        normalized_nci_effect = (
+            historical_result["normalized_minority_interest_net_profit_cny"]
+            - forward_result["normalized_minority_interest_net_profit_cny"]
+        )
+        attribution_sum = b56_np_change + non_operating_after_tax_change + normalized_nci_effect
+        residual = normalized_np_change - attribution_sum
+        eps_delta = (
+            forward_result["normalized_diluted_eps_proxy_cny_per_share"]
+            - historical_result["normalized_diluted_eps_proxy_cny_per_share"]
+        )
+        historical_eps = historical_result["normalized_diluted_eps_proxy_cny_per_share"]
+        forward_eps = forward_result["normalized_diluted_eps_proxy_cny_per_share"]
+        eps_growth = forward_eps / historical_eps - Decimal("1") if historical_eps > 0 else None
+        row["status"] = "CALCULATED_AND_RECONCILED" if abs(residual) <= Decimal("1") else "RECONCILIATION_MISMATCH"
+        row["historical_baseline"].update({
+            **{key: _render(value) for key, value in historical_result.items()},
+            "period": base["baseline_period"],
+            "measure_lineage": historical_inputs,
+        })
+        row["forward_scenario"].update({
+            **{key: _render(value) for key, value in forward_result.items()},
+            "period": base["forecast_period"],
+            "measure_lineage": forward_inputs,
+        })
+        row["changes"] = {
+            "b56_modeled_net_profit_proxy_cny": _render(b56_np_change),
+            "non_operating_after_tax_effect_cny": _render(non_operating_after_tax_change),
+            "normalized_minority_interest_effect_cny": _render(normalized_nci_effect),
+            "normalized_parent_attributable_net_profit_cny": _render(normalized_np_change),
+            "attribution_sum_cny": _render(attribution_sum),
+            "reconciliation_residual_cny": _render(residual),
+            "normalized_diluted_eps_cny_per_share": _render(eps_delta),
+            "normalized_diluted_eps_growth_rate": _render(eps_growth),
+            "all_items_parent_attributable_net_profit_proxy_cny": _render(
+                forward_result["all_items_parent_attributable_net_profit_proxy_cny"]
+                - historical_result["all_items_parent_attributable_net_profit_proxy_cny"]
+            ),
+            "non_recurring_after_tax_effect_cny": _render(
+                forward_result["non_recurring_after_tax_effect_cny"]
+                - historical_result["non_recurring_after_tax_effect_cny"]
+            ),
+            "tolerance_cny": "1",
+        }
+        row["eps_growth_status"] = (
+            "CALCULATED_HISTORICAL_BASELINE_POSITIVE"
+            if historical_eps > 0 else "NOT_MEANINGFUL_NONPOSITIVE_HISTORICAL_EPS"
+        )
+        row["missing_inputs"] = []
+        if row["status"] != "CALCULATED_AND_RECONCILED":
+            row["issues"].append("NORMALIZED_PARENT_NET_PROFIT_ATTRIBUTION_DOES_NOT_RECONCILE_WITHIN_CNY_1")
+        base["scenarios"][scenario_name] = row
+
+    statuses = [str(base["scenarios"][name].get("status") or "UNKNOWN") for name in SCENARIOS]
+    if str(scope or "UNKNOWN").strip().upper() != "COMPANY_WIDE":
+        base["status"] = "NOT_COMPARABLE_SCOPE"
+        base["reason"] = "归母净利润与 EPS 是公司级指标；局部产品线/增量项目不能直接除以公司稀释股数。"
+    elif all(status == "CALCULATED_AND_RECONCILED" for status in statuses):
+        base["status"] = "DIAGNOSTIC_CALCULATED"
+        base["reason"] = "三个情景的正常化归母利润与稀释 EPS 代理均已基于 B56、非经营项、非经常项、少数股东归属和稀释股数计算并完成对账。"
+    elif any(status in {"CALCULATED_AND_RECONCILED", "RECONCILIATION_MISMATCH"} for status in statuses):
+        base["status"] = "PARTIAL"
+        base["reason"] = "只有部分 Bear/Base/Bull 情景具备完整归属和股数输入；其他情景保持 UNKNOWN。"
+    elif all(status == "BLOCKED_BY_B56" for status in statuses):
+        base["status"] = "BLOCKED_BY_B56"
+        base["reason"] = "B56 的模型税后利润代理未闭合，B57 不推导归母利润或 EPS。"
+    else:
+        base["status"] = "NOT_IDENTIFIABLE"
+        base["reason"] = "缺少非经营/非经常项目、少数股东损益组成或正的稀释加权平均股数；归母利润与 EPS 保持 UNKNOWN。"
+    return base
+
+
 def evaluate_operating_driver_forecast(
     raw: Any,
     *,
@@ -1395,6 +1701,20 @@ def evaluate_operating_driver_forecast(
                 "scenarios": {},
                 "baseline_issues": [],
                 "reason": "未提供 B4 经营驱动输入，无法连接当前历史基线与前瞻情景。",
+                "per_share_earnings_bridge": {
+                    "schema_version": "IIOS-B57-PARENT-EARNINGS-DILUTED-EPS-BRIDGE-0.1",
+                    "status": "NOT_PROVIDED",
+                    "scope": "UNKNOWN",
+                    "baseline_period": "UNKNOWN",
+                    "forecast_period": "UNKNOWN",
+                    "historical_baseline_inputs": {},
+                    "scenarios": {},
+                    "reason": "未提供 B4 输入，无法连接公司级归母利润与稀释 EPS。",
+                    "formal_forecast_admission_created": False,
+                    "decision_authority": False,
+                    "eps_impact": None,
+                    "per_share_value_impact": None,
+                },
                 "net_profit_bridge": {
                     "schema_version": "IIOS-B56-BASELINE-TO-FORWARD-NET-PROFIT-BRIDGE-0.1",
                     "status": "NOT_PROVIDED",
@@ -1441,6 +1761,20 @@ def evaluate_operating_driver_forecast(
                 "scenarios": {},
                 "baseline_issues": ["OPERATING_DRIVER_SCHEMA_MISMATCH"],
                 "reason": "B4 输入结构版本不兼容，无法可靠连接历史基线与前瞻情景。",
+                "per_share_earnings_bridge": {
+                    "schema_version": "IIOS-B57-PARENT-EARNINGS-DILUTED-EPS-BRIDGE-0.1",
+                    "status": "INVALID_SCHEMA",
+                    "scope": "UNKNOWN",
+                    "baseline_period": str(raw.get("actuals_period") or "UNKNOWN"),
+                    "forecast_period": str(raw.get("forecast_period") or "UNKNOWN"),
+                    "historical_baseline_inputs": {},
+                    "scenarios": {},
+                    "reason": "B4 输入结构无效，不能计算公司归属利润与稀释 EPS。",
+                    "formal_forecast_admission_created": False,
+                    "decision_authority": False,
+                    "eps_impact": None,
+                    "per_share_value_impact": None,
+                },
                 "net_profit_bridge": {
                     "schema_version": "IIOS-B56-BASELINE-TO-FORWARD-NET-PROFIT-BRIDGE-0.1",
                     "status": "INVALID_SCHEMA",
@@ -1582,6 +1916,16 @@ def evaluate_operating_driver_forecast(
         historical_financials_raw=raw.get("historical_financials"),
         scenarios_raw=scenarios_raw,
         forward_scenarios=scenarios,
+        sources_by_id=sources_by_id,
+        unresolved_refs=unresolved_refs,
+        after_cutoff_refs=after_cutoff_refs,
+        uncertain_refs=uncertain_refs,
+    )
+    baseline_transition["per_share_earnings_bridge"] = _build_per_share_earnings_bridge(
+        scope=scope,
+        baseline_transition=baseline_transition,
+        historical_attribution_raw=raw.get("historical_earnings_attribution"),
+        scenarios_raw=scenarios_raw,
         sources_by_id=sources_by_id,
         unresolved_refs=unresolved_refs,
         after_cutoff_refs=after_cutoff_refs,
@@ -1878,6 +2222,54 @@ def render_operating_driver_section(
     lines.extend([
         "- 模型边界：税费代理=max(税前利润,0)×有效税率，不模拟亏损抵税、递延税、税收优惠或非经常性税项；因此结果不是已报告净利润或归母净利润。",
         "- 尚未连接非控股权益与稀释股数，EPS / 每股价值影响仍为 UNKNOWN；B56 不修改估值输入、15% 年化收益门槛或现有决策状态，也不创建正式准入/交易授权。",
+        "",
+    ])
+    eps_bridge = (
+        transition.get("per_share_earnings_bridge")
+        if isinstance(transition.get("per_share_earnings_bridge"), Mapping) else {}
+    )
+    lines.extend([
+        "",
+        "#### B57 正常化归母利润 → 稀释 EPS 桥",
+        "",
+        f"- 状态：**{eps_bridge.get('status', 'UNKNOWN')}**；范围：{eps_bridge.get('scope', 'UNKNOWN')}；历史基线期间：{eps_bridge.get('baseline_period', 'UNKNOWN')}；前瞻期间：{eps_bridge.get('forecast_period', 'UNKNOWN')}",
+        f"- 方法：{eps_bridge.get('method', 'UNKNOWN')}；指标：{eps_bridge.get('metric', 'UNKNOWN')}",
+    ])
+    historical_eps_inputs = eps_bridge.get("historical_baseline_inputs") if isinstance(eps_bridge.get("historical_baseline_inputs"), Mapping) else {}
+    for field, label in (
+        ("non_operating_pre_tax_cny", "历史非经营性税前净额"),
+        ("non_recurring_pre_tax_cny", "历史非经常性税前净额"),
+        ("minority_interest_net_profit_after_tax_cny", "历史少数股东税后净利润（含非经常项）"),
+        ("minority_interest_nonrecurring_after_tax_cny", "历史少数股东非经常项目税后份额"),
+        ("diluted_weighted_average_shares", "历史稀释加权平均股数"),
+    ):
+        measure = historical_eps_inputs.get(field) if isinstance(historical_eps_inputs.get(field), Mapping) else {}
+        refs = "、".join(measure.get("evidence_refs") or []) or "无显式引用"
+        lines.append(
+            f"- {label}：{_display(measure)}；数据分类 {measure.get('data_class', 'UNKNOWN')}；依据 {measure.get('basis') or 'UNKNOWN'}；来源引用 {refs}"
+        )
+    eps_scenarios = eps_bridge.get("scenarios") if isinstance(eps_bridge.get("scenarios"), Mapping) else {}
+    for scenario_name in SCENARIOS:
+        row = eps_scenarios.get(scenario_name) if isinstance(eps_scenarios.get(scenario_name), Mapping) else {}
+        historical = row.get("historical_baseline") if isinstance(row.get("historical_baseline"), Mapping) else {}
+        forward = row.get("forward_scenario") if isinstance(row.get("forward_scenario"), Mapping) else {}
+        changes = row.get("changes") if isinstance(row.get("changes"), Mapping) else {}
+        lines.append(f"**B57 {scenario_name.upper()} — {row.get('status', 'UNKNOWN')}**")
+        if row.get("status") == "CALCULATED_AND_RECONCILED":
+            lines.extend([
+                f"- 正常化归母净利润代理：历史 {_display_optional_scalar(historical.get('normalized_parent_attributable_net_profit_cny'))} → 前瞻 {_display_optional_scalar(forward.get('normalized_parent_attributable_net_profit_cny'))} CNY；变化 {_display_optional_scalar(changes.get('normalized_parent_attributable_net_profit_cny'))} CNY",
+                f"- 正常化稀释 EPS 代理：历史 {_display_optional_scalar(historical.get('normalized_diluted_eps_proxy_cny_per_share'))} → 前瞻 {_display_optional_scalar(forward.get('normalized_diluted_eps_proxy_cny_per_share'))} CNY/股；变化 {_display_optional_scalar(changes.get('normalized_diluted_eps_cny_per_share'))} CNY/股",
+                f"- EPS 变化率：{_display_optional_scalar(changes.get('normalized_diluted_eps_growth_rate'))}；状态 {row.get('eps_growth_status', 'UNKNOWN')}（仅当历史正常化 EPS 为正时计算增长率）",
+                f"- 非经常性项目的归母利润影响（含税后影响与少数股东归属）：{_display_optional_scalar(changes.get('non_recurring_after_tax_effect_cny'))} CNY；含所有输入项目的归母利润代理变化：{_display_optional_scalar(changes.get('all_items_parent_attributable_net_profit_proxy_cny'))} CNY",
+                f"- 正常化利润变化对账：B56 税后利润代理变化 {_display_optional_scalar(changes.get('b56_modeled_net_profit_proxy_cny'))}；非经营项税后影响变化 {_display_optional_scalar(changes.get('non_operating_after_tax_effect_cny'))}；正常化少数股东归属效应 {_display_optional_scalar(changes.get('normalized_minority_interest_effect_cny'))}；残差 {_display_optional_scalar(changes.get('reconciliation_residual_cny'))} CNY",
+            ])
+        if row.get("missing_inputs"):
+            lines.append("- 保持 UNKNOWN / 阻塞输入：" + "、".join(str(x) for x in row["missing_inputs"]))
+        if row.get("issues"):
+            lines.append("- 来源/口径待复核：" + "；".join(str(x) for x in row["issues"][:8]))
+    lines.extend([
+        "- 解释边界：正常化 EPS 剔除显式列示的非经常项目，但保留已输入的其他非经营性净额；含所有项目的结果仍是模型代理，不等于公司正式披露的归母净利润。",
+        "- 局部产品线、项目增量或未知范围不能直接推导公司 EPS；稀释股数必须显式输入且大于零。该桥不修改估值、B5/B6、15% 年化收益门槛、正式决策或交易授权。",
         "",
     ])
     lines.extend(["", "#### Bear / Base / Bull 经营结果", ""])

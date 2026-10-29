@@ -2925,3 +2925,15 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Calculation:** contribution − fixed cash opex = EBITDA proxy; subtract D&A = EBIT proxy; subtract financing cost = PBT proxy; modeled tax proxy is max(PBT, 0) × tax_rate; subtract tax to obtain modeled net-profit proxy. Contribution, fixed-cost, depreciation, financing and tax effects must reconcile to the net-profit-proxy change within CNY 1.
 - **Output:** nested at operating_driver_forecast.baseline_transition.net_profit_bridge; not a new top-level analysis field. Reported net profit, net profit attributable to owners, FCF, EPS and per-share value are not claimed; NCI and diluted shares remain unmodeled. No B5/B6/valuation input, 15% hurdle, Decision or execution authority changes.
 - **Regression cases:** four new cases authored for a complete reconciled bridge, missing/misclassified historical values, scenario-local missing forward tax rate, and report boundary visibility. Tests, Replay, CI and real macOS acceptance have not been run; this branch remains unmerged.
+
+
+## B57 — Parent-attributable normalized earnings and diluted EPS bridge — 2026-10-29
+
+**Status: BRANCH PROPOSAL ONLY / NOT MERGED / NOT TESTED**
+
+- **Purpose:** extend B56's modeled after-tax profit proxy to company-wide normalized parent-attributable profit and diluted EPS, while exposing recurring non-operating items, one-off items and non-controlling-interest attribution explicitly.
+- **Inputs:** historical_earnings_attribution holds historical OBSERVED_ACTUAL amounts for signed non-operating pre-tax net amount, signed non-recurring pre-tax net amount, after-tax NCI profit including one-offs, NCI's after-tax non-recurring component and positive diluted weighted-average shares. Bear/Base/Bull inputs require explicit ISSUER_FORECAST or ANALYST_ASSUMPTION; no zero defaults.
+- **Scope and calculations:** only COMPANY_WIDE can calculate EPS. Normalized PBT equals B56 PBT plus recurring non-operating net amount; non-recurring pre-tax items are shown separately and excluded from normalized profit. Normalized NCI equals total NCI after-tax profit minus its non-recurring component. Parent normalized profit is normalized consolidated profit after tax less normalized NCI; normalized diluted EPS divides by explicit positive diluted weighted-average shares.
+- **Controls:** the B56 scenario must be reconciled; invalid/absent input or a non-positive share count blocks the relevant scenario. EPS growth is calculated only when historical normalized EPS is positive. The parent-profit attribution must reconcile within CNY 1.
+- **Output:** operating_driver_forecast.baseline_transition.per_share_earnings_bridge; no top-level analysis key, valuation/return input, B5/B6 or 15% hurdle changes. All outputs remain diagnostic model proxies, not reported net profit/EPS, formal admission, Decision or execution authority.
+- **Regression cases:** five new B57 cases authored for successful reconciliation, scope gating, missing NCI/denominator blockers, report visibility/boundaries and missing-input shape. Tests, Replay, CI and real macOS acceptance are not run.
