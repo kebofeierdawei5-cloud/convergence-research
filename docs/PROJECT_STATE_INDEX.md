@@ -2937,3 +2937,14 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Controls:** the B56 scenario must be reconciled; invalid/absent input or a non-positive share count blocks the relevant scenario. EPS growth is calculated only when historical normalized EPS is positive. The parent-profit attribution must reconcile within CNY 1.
 - **Output:** operating_driver_forecast.baseline_transition.per_share_earnings_bridge; no top-level analysis key, valuation/return input, B5/B6 or 15% hurdle changes. All outputs remain diagnostic model proxies, not reported net profit/EPS, formal admission, Decision or execution authority.
 - **Regression cases:** six new B57 cases authored for successful reconciliation, scope gating, missing NCI/denominator blockers, report visibility/boundaries and missing-input shape. Tests, Replay, CI and real macOS acceptance are not run.
+
+
+## B58 — Normalized EPS proxy versus primary EPS consistency — 2026-10-29
+
+**Status: BRANCH PROPOSAL ONLY / NOT MERGED / NOT TESTED**
+
+- Purpose: compare B57's all-items parent-attributable profit proxy divided by its diluted shares against the EPS actually used by the EPS_MULTIPLE adapter, while displaying normalized EPS as a separate metric rather than silently substituting it.
+- Checks: EPS_MULTIPLE is actually selected and calculated; company-wide scope; identical earnings reference periods; CNY currency; exact diluted-share denominator and unit; primary declared/calculated EPS versus B57 all-items EPS within CNY 0.005/share. Valuation terminal date is reported separately and is not used as the earnings period.
+- Fail-closed: non-zero unmapped primary after-tax attribution adjustments become NOT_COMPARABLE_ADJUSTMENT_BASIS; an assumption-only primary EPS remains ASSUMPTION_ONLY; period, denominator, currency, B57 or primary EPS blockers remain explicit. B57's normalized EPS is diagnostic context only when compared with all-items primary EPS.
+- Output: nested at operating_driver_forecast.baseline_transition.primary_eps_consistency; no new top-level analysis key. The attachment occurs after final EPS/B5 revalidation and is read-only for the primary valuation, terminal values, return/entry-price calculation and 15% annualized-return hurdle.
+- Regression cases: six B58 cases authored for match, adjustment-basis blocker, period/share mismatches, assumption-only handling, non-EPS_MULTIPLE non-applicability and report visibility. Tests, Replay, CI and macOS acceptance have not been run.

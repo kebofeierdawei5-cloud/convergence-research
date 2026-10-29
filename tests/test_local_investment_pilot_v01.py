@@ -5856,3 +5856,167 @@ def test_b57_signed_recurring_nonoperating_and_oneoff_losses_remain_identifiable
     assert bear["status"] == "CALCULATED_AND_RECONCILED"
     assert bear["forward_scenario"]["normalized_profit_before_tax_proxy_cny"] == "323000"
     assert bear["forward_scenario"]["all_items_profit_before_tax_proxy_cny"] == "318000"
+
+
+def _b58_test_inputs():
+    scenario_names = ("bear", "base", "bull")
+    b57_rows, primary_rows, valuation_rows = {}, {}, {}
+    for name in scenario_names:
+        b57_rows[name] = {
+            "status": "CALCULATED_AND_RECONCILED",
+            "historical_baseline": {
+                "period": "2025FY",
+                "normalized_diluted_eps_proxy_cny_per_share": "9.5",
+            },
+            "forward_scenario": {
+                "period": "2026FY",
+                "all_items_parent_attributable_net_profit_proxy_cny": "100000",
+                "normalized_parent_attributable_net_profit_cny": "95000",
+                "normalized_diluted_eps_proxy_cny_per_share": "9.5",
+                "diluted_weighted_average_shares": "10000",
+            },
+        }
+        primary_rows[name] = {
+            "status": "CALCULATED",
+            "forecast_period": "2026FY",
+            "valuation_terminal_date": "2026-12-31",
+            "calculated_eps_per_share": "10",
+            "declared_eps_per_share": "10",
+            "diluted_shares": {"value": "10000", "unit": "shares"},
+            "other_after_tax_attribution_adjustment": {"value": "0", "unit": "CNY"},
+        }
+        valuation_rows[name] = {"eps_per_share": {"value": "10", "unit": "CNY/share"}}
+    for name in scenario_names:
+        valuation_rows[name]["earnings_bridge"] = primary_rows[name]
+    driver = {
+        "scope": "COMPANY_WIDE",
+        "forecast_period": "2026FY",
+        "baseline_transition": {
+            "forecast_period": "2026FY",
+            "per_share_earnings_bridge": {
+                "scope": "COMPANY_WIDE",
+                "status": "DIAGNOSTIC_CALCULATED",
+                "scenarios": b57_rows,
+            },
+        },
+    }
+    primary = {
+        "status": "CALCULATED",
+        "forecast_period": "2026FY",
+        "valuation_terminal_date": "2026-12-31",
+        "currency": "CNY",
+        "scenarios": primary_rows,
+    }
+    valuation = {
+        "status": "CALCULATED",
+        "selected_for_primary_model": True,
+        "forecast_period": "2026FY",
+        "valuation_terminal_date": "2026-12-31",
+        "currency": "CNY",
+        "scenarios": valuation_rows,
+    }
+    return driver, primary, valuation
+
+
+def test_b58_primary_eps_and_b57_all_items_eps_match_only_on_same_period_currency_shares():
+    driver, primary, valuation = _b58_test_inputs()
+    result = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    assert result["status"] == "MATCH"
+    assert all(row["status"] == "MATCH" for row in result["scenarios"].values())
+    assert result["scenarios"]["base"]["b57_all_items_eps_proxy_cny_per_share"] == "10"
+    assert result["scenarios"]["base"]["normalized_eps_vs_primary_declared_difference_per_share_diagnostic_only"] == "0.5"
+    assert result["valuation_input_modified"] is False
+    assert result["decision_authority"] is False
+
+
+def test_b58_nonzero_primary_after_tax_adjustment_is_not_silently_called_a_match():
+    driver, primary, valuation = _b58_test_inputs()
+    primary["scenarios"]["base"]["other_after_tax_attribution_adjustment"]["value"] = "1"
+    result = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    assert result["scenarios"]["base"]["status"] == "NOT_COMPARABLE_ADJUSTMENT_BASIS"
+    assert result["status"] == "RECONCILIATION_MISMATCH"
+
+
+def test_b58_period_or_share_denominator_mismatch_is_explicit():
+    driver, primary, valuation = _b58_test_inputs()
+    primary["scenarios"]["base"]["diluted_shares"]["value"] = "9999"
+    result = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    assert result["scenarios"]["base"]["status"] == "SHARE_DENOMINATOR_MISMATCH"
+    driver, primary, valuation = _b58_test_inputs()
+    primary["forecast_period"] = "2027FY"
+    result = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    assert result["scenarios"]["base"]["status"] == "PERIOD_MISMATCH"
+
+
+def test_b58_assumption_only_primary_eps_is_not_promoted_to_independent_reconciliation():
+    driver, primary, valuation = _b58_test_inputs()
+    primary["status"] = "ASSUMPTION_ONLY"
+    for name in ("bear", "base", "bull"):
+        primary["scenarios"][name] = {
+            "status": "ASSUMPTION_ONLY",
+            "forecast_period": "2026FY",
+            "declared_eps_per_share": "10",
+        }
+        valuation["scenarios"][name]["earnings_bridge"] = primary["scenarios"][name]
+    result = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    assert result["status"] == "ASSUMPTION_ONLY"
+    assert all(row["status"] == "PRIMARY_EPS_ASSUMPTION_ONLY" for row in result["scenarios"].values())
+    assert all(row["eps_match"] is True for row in result["scenarios"].values())
+
+
+def test_b58_is_not_applicable_when_primary_model_is_not_eps_multiple():
+    driver, primary, valuation = _b58_test_inputs()
+    result = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="FCF_DCF",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation={**valuation, "status": "NOT_SELECTED", "selected_for_primary_model": False},
+    )
+    assert result["status"] == "NOT_APPLICABLE_NOT_EPS_MULTIPLE"
+    assert result["scenarios"] == {}
+
+
+def test_b58_renderer_exposes_primary_eps_comparison_and_non_replacement_boundary():
+    driver, primary, valuation = _b58_test_inputs()
+    driver["baseline_transition"]["primary_eps_consistency"] = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    report = "\n".join(render_operating_driver_section(driver, None, "CNY"))
+    assert "B58 B57 EPS 代理与主估值 EPS 一致性核对" in report
+    assert "不替换 EPS_MULTIPLE 输入" in report
+    assert "正常化 EPS 差异" in report

@@ -1342,6 +1342,253 @@ def _evaluate_eps_earnings_bridge(
     }
 
 
+def _build_b58_primary_eps_consistency(
+    *,
+    selected_model_family: Any,
+    expected_currency: Any,
+    operating_driver_forecast: Mapping[str, Any],
+    eps_earnings_bridge: Mapping[str, Any],
+    eps_multiple_valuation: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Compare the B57 all-items EPS proxy with the EPS actually used by EPS_MULTIPLE."""
+    schema = "IIOS-B58-NORMALIZED-EPS-PRIMARY-EPS-CONSISTENCY-0.1"
+    currency = str(expected_currency or "").strip().upper()
+    selected_family = str(selected_model_family or "UNKNOWN").strip().upper()
+    driver_period = str(operating_driver_forecast.get("forecast_period") or "").strip().upper()
+    transition = operating_driver_forecast.get("baseline_transition")
+    transition = transition if isinstance(transition, Mapping) else {}
+    b57 = transition.get("per_share_earnings_bridge")
+    b57 = b57 if isinstance(b57, Mapping) else {}
+    b57_scenarios = b57.get("scenarios") if isinstance(b57.get("scenarios"), Mapping) else {}
+    primary_rows = eps_earnings_bridge.get("scenarios") if isinstance(eps_earnings_bridge.get("scenarios"), Mapping) else {}
+    valuation_rows = eps_multiple_valuation.get("scenarios") if isinstance(eps_multiple_valuation.get("scenarios"), Mapping) else {}
+    period = str(eps_earnings_bridge.get("forecast_period") or eps_multiple_valuation.get("forecast_period") or "").strip().upper()
+    terminal_date = str(eps_earnings_bridge.get("valuation_terminal_date") or eps_multiple_valuation.get("valuation_terminal_date") or "").strip()
+
+    base = {
+        "schema_version": schema,
+        "status": "NOT_IDENTIFIABLE",
+        "selected_model_family": selected_family,
+        "currency": currency or "UNKNOWN",
+        "driver_forecast_period": driver_period or "UNKNOWN",
+        "primary_eps_forecast_period": period or "UNKNOWN",
+        "primary_valuation_terminal_date": terminal_date or "UNKNOWN",
+        "primary_eps_earnings_bridge_status": str(eps_earnings_bridge.get("status") or "UNKNOWN"),
+        "primary_eps_multiple_status": str(eps_multiple_valuation.get("status") or "UNKNOWN"),
+        "primary_eps_used_by_model": "eps_multiple_valuation.scenarios[*].eps_per_share",
+        "comparison_metric": "B57_ALL_ITEMS_PARENT_ATTRIBUTABLE_NET_PROFIT_PROXY_DIVIDED_BY_DILUTED_SHARES_VS_PRIMARY_EPS",
+        "eps_tolerance_per_share": format(EPS_EPS_MATCH_TOLERANCE, "f"),
+        "scenarios": {},
+        "limitations": [
+            "B58 compares the B57 all-items parent-attributable profit proxy with the EPS input actually used by the EPS_MULTIPLE adapter; it does not substitute B57's normalized EPS for the primary valuation EPS.",
+            "A non-zero primary other-after-tax attribution adjustment means the two bridges are not demonstrably on the same adjustment basis; that scenario is marked NOT_COMPARABLE_ADJUSTMENT_BASIS even if rounded EPS values happen to match.",
+            "B57's normalized EPS is displayed only as context. Its removal of one-off items means it is not like-for-like with an all-items primary EPS unless a separately normalized primary EPS is supplied.",
+            "EPS forecast period is compared independently from the valuation terminal date. The terminal date is not treated as the earnings reference period.",
+            "B58 is diagnostic only. It does not alter the EPS source, the EPS_MULTIPLE formula, valuation outputs, B5/B6, target price, the 15% annualized return hurdle, formal admission or decision authority.",
+        ],
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
+        "valuation_input_modified": False,
+    }
+
+    if selected_family != "EPS_MULTIPLE":
+        base["status"] = "NOT_APPLICABLE_NOT_EPS_MULTIPLE"
+        base["reason"] = "操作者选择的主估值模型不是 EPS_MULTIPLE；B58 不把其他模型的价值输出误当作 EPS。"
+        return base
+    if currency != "CNY":
+        base["status"] = "NOT_COMPARABLE_CURRENCY"
+        base["reason"] = "B57 当前为 CNY 口径；主估值 EPS 使用非 CNY 币种时，没有明确 FX/每股货币桥，不能直接比较。"
+        return base
+    if str(eps_multiple_valuation.get("status") or "").strip().upper() != "CALCULATED" or eps_multiple_valuation.get("selected_for_primary_model") is not True:
+        base["status"] = "PRIMARY_EPS_NOT_CALCULATED"
+        base["reason"] = "EPS_MULTIPLE 适配器没有产出实际用于主估值的完整 Bear/Base/Bull EPS×P/E 计算结果。"
+        return base
+
+    scenario_statuses = []
+    for name in SCENARIOS:
+        b57_row = b57_scenarios.get(name) if isinstance(b57_scenarios.get(name), Mapping) else {}
+        primary_row = primary_rows.get(name) if isinstance(primary_rows.get(name), Mapping) else {}
+        model_row = valuation_rows.get(name) if isinstance(valuation_rows.get(name), Mapping) else {}
+        b57_forward = b57_row.get("forward_scenario") if isinstance(b57_row.get("forward_scenario"), Mapping) else {}
+        primary_eps_object = model_row.get("eps_per_share") if isinstance(model_row.get("eps_per_share"), Mapping) else {}
+        primary_shares = primary_row.get("diluted_shares") if isinstance(primary_row.get("diluted_shares"), Mapping) else {}
+        primary_other_adjustment = primary_row.get("other_after_tax_attribution_adjustment") if isinstance(primary_row.get("other_after_tax_attribution_adjustment"), Mapping) else {}
+        primary_bridge_status = str(primary_row.get("status") or "NOT_LINKED").strip().upper()
+
+        row: dict[str, Any] = {
+            "scenario": name,
+            "status": "NOT_IDENTIFIABLE",
+            "b57_status": str(b57_row.get("status") or "UNKNOWN"),
+            "primary_eps_bridge_status": primary_bridge_status,
+            "b57_forecast_period": str(b57_forward.get("period") or "UNKNOWN"),
+            "primary_forecast_period": str(primary_row.get("forecast_period") or period or "UNKNOWN"),
+            "primary_terminal_date": str(primary_row.get("valuation_terminal_date") or terminal_date or "UNKNOWN"),
+            "b57_all_items_parent_attributable_net_profit_proxy_cny": b57_forward.get("all_items_parent_attributable_net_profit_proxy_cny"),
+            "b57_normalized_parent_attributable_net_profit_cny": b57_forward.get("normalized_parent_attributable_net_profit_cny"),
+            "b57_normalized_diluted_eps_proxy_cny_per_share": b57_forward.get("normalized_diluted_eps_proxy_cny_per_share"),
+            "b57_diluted_weighted_average_shares": b57_forward.get("diluted_weighted_average_shares"),
+            "primary_declared_eps_per_share": primary_eps_object.get("value"),
+            "primary_calculated_eps_per_share": primary_row.get("calculated_eps_per_share"),
+            "primary_diluted_shares": primary_shares.get("value"),
+            "primary_diluted_shares_unit": primary_shares.get("unit"),
+            "primary_other_after_tax_attribution_adjustment": primary_other_adjustment.get("value"),
+            "primary_other_adjustment_unit": primary_other_adjustment.get("unit"),
+            "b57_all_items_eps_proxy_cny_per_share": None,
+            "all_items_eps_vs_primary_declared_difference_per_share": None,
+            "all_items_eps_vs_primary_calculated_difference_per_share": None,
+            "normalized_eps_vs_primary_declared_difference_per_share_diagnostic_only": None,
+            "diluted_share_denominator_match": None,
+            "forecast_period_match": None,
+            "eps_match": None,
+            "issues": [],
+        }
+
+        if str(operating_driver_forecast.get("scope") or "UNKNOWN").strip().upper() != "COMPANY_WIDE" or str(b57.get("scope") or "UNKNOWN").strip().upper() != "COMPANY_WIDE":
+            row["status"] = "NOT_COMPARABLE_SCOPE"
+            row["issues"] = ["COMPANY_WIDE_SCOPE_REQUIRED"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        if row["b57_status"] != "CALCULATED_AND_RECONCILED":
+            row["status"] = "BLOCKED_BY_B57"
+            row["issues"] = [f"B57_SCENARIO_NOT_RECONCILED:{row['b57_status']}"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        model_bridge = model_row.get("earnings_bridge") if isinstance(model_row.get("earnings_bridge"), Mapping) else {}
+        expected_periods = {
+            driver_period,
+            period,
+            str(b57_forward.get("period") or "").strip().upper(),
+            str(primary_row.get("forecast_period") or period or "").strip().upper(),
+            str(model_bridge.get("forecast_period") or "").strip().upper(),
+        }
+        if not all(expected_periods) or len(expected_periods) != 1:
+            row["status"] = "PERIOD_MISMATCH"
+            row["forecast_period_match"] = False
+            row["issues"] = ["B57_AND_PRIMARY_EPS_FORECAST_PERIODS_NOT_IDENTICAL"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        row["forecast_period_match"] = True
+
+        def as_decimal(raw_value: Any) -> Decimal | None:
+            if raw_value in (None, ""):
+                return None
+            try:
+                return Decimal(str(raw_value))
+            except (InvalidOperation, ValueError, TypeError):
+                return None
+
+        all_items_profit = as_decimal(b57_forward.get("all_items_parent_attributable_net_profit_proxy_cny"))
+        b57_shares = as_decimal(b57_forward.get("diluted_weighted_average_shares"))
+        declared_eps = as_decimal(primary_eps_object.get("value"))
+        primary_calculated_eps = as_decimal(primary_row.get("calculated_eps_per_share"))
+        primary_shares_value = as_decimal(primary_shares.get("value"))
+        normalized_eps = as_decimal(b57_forward.get("normalized_diluted_eps_proxy_cny_per_share"))
+        primary_other_adjustment_value = as_decimal(primary_other_adjustment.get("value"))
+        missing_values = [
+            field for field, value in (
+                ("B57_ALL_ITEMS_PARENT_PROFIT_PROXY", all_items_profit),
+                ("B57_DILUTED_WEIGHTED_AVERAGE_SHARES", b57_shares),
+                ("PRIMARY_DECLARED_EPS", declared_eps),
+            ) if value is None
+        ]
+        if b57_shares is not None and b57_shares <= 0:
+            missing_values.append("B57_DILUTED_WEIGHTED_AVERAGE_SHARES_MUST_BE_POSITIVE")
+        if primary_bridge_status == "CALCULATED" and primary_shares_value is None:
+            missing_values.append("PRIMARY_DILUTED_SHARES_REQUIRED")
+        if row["primary_diluted_shares_unit"] and str(row["primary_diluted_shares_unit"]).strip().lower() != "shares":
+            missing_values.append("PRIMARY_DILUTED_SHARES_UNIT_MUST_BE_SHARES")
+        if missing_values:
+            row["status"] = "NOT_IDENTIFIABLE"
+            row["issues"] = sorted(set(missing_values))
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        b57_all_items_eps = all_items_profit / b57_shares
+        row["b57_all_items_eps_proxy_cny_per_share"] = format(b57_all_items_eps, "f")
+        row["all_items_eps_vs_primary_declared_difference_per_share"] = format(abs(b57_all_items_eps - declared_eps), "f")
+        row["normalized_eps_vs_primary_declared_difference_per_share_diagnostic_only"] = (
+            format(abs(normalized_eps - declared_eps), "f") if normalized_eps is not None else None
+        )
+
+        if primary_bridge_status == "ASSUMPTION_ONLY":
+            row["eps_match"] = abs(b57_all_items_eps - declared_eps) <= EPS_EPS_MATCH_TOLERANCE
+            row["status"] = "PRIMARY_EPS_ASSUMPTION_ONLY"
+            row["issues"] = ["PRIMARY_EPS_HAS_NO_RECALCULABLE_NET_PROFIT_AND_DILUTED_SHARE_BRIDGE"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        if primary_bridge_status != "CALCULATED" or primary_calculated_eps is None:
+            row["status"] = "PRIMARY_EPS_BRIDGE_NOT_CALCULATED"
+            row["issues"] = [f"PRIMARY_EPS_BRIDGE_STATUS:{primary_bridge_status}"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        row["all_items_eps_vs_primary_calculated_difference_per_share"] = format(abs(b57_all_items_eps - primary_calculated_eps), "f")
+        if primary_shares_value <= 0:
+            row["status"] = "NOT_IDENTIFIABLE"
+            row["issues"] = ["PRIMARY_DILUTED_SHARES_MUST_BE_POSITIVE"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        denominator_match = b57_shares == primary_shares_value
+        row["diluted_share_denominator_match"] = denominator_match
+        if not denominator_match:
+            row["status"] = "SHARE_DENOMINATOR_MISMATCH"
+            row["issues"] = ["B57_AND_PRIMARY_DILUTED_SHARE_DENOMINATORS_NOT_IDENTICAL"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        if primary_other_adjustment_value is None:
+            row["status"] = "NOT_IDENTIFIABLE"
+            row["issues"] = ["PRIMARY_OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT_UNKNOWN"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        if primary_other_adjustment_value != 0:
+            row["status"] = "NOT_COMPARABLE_ADJUSTMENT_BASIS"
+            row["issues"] = ["PRIMARY_OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT_NOT_MAPPED_TO_B57"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        eps_match = (
+            abs(b57_all_items_eps - primary_calculated_eps) <= EPS_EPS_MATCH_TOLERANCE
+            and abs(b57_all_items_eps - declared_eps) <= EPS_EPS_MATCH_TOLERANCE
+        )
+        row["eps_match"] = eps_match
+        row["status"] = "MATCH" if eps_match else "EPS_MISMATCH"
+        if not eps_match:
+            row["issues"] = ["B57_ALL_ITEMS_EPS_PROXY_DOES_NOT_MATCH_PRIMARY_CALCULATED_OR_DECLARED_EPS"]
+        base["scenarios"][name] = row
+        scenario_statuses.append(row["status"])
+
+    if scenario_statuses and all(status == "MATCH" for status in scenario_statuses):
+        base["status"] = "MATCH"
+        base["reason"] = "三个情景的期间、公司范围、稀释股数和 B57 all-items EPS 代理均与 EPS_MULTIPLE 主估值实际使用的 EPS 对齐；这是诊断对账，不代表正式准入。"
+    elif scenario_statuses and all(status == "PRIMARY_EPS_ASSUMPTION_ONLY" for status in scenario_statuses):
+        base["status"] = "ASSUMPTION_ONLY"
+        base["reason"] = "主估值使用的是明确的 EPS 分析假设，虽可与 B57 all-items EPS 代理数值比较，但没有主估值自身可复算的利润/稀释股数桥，不能宣称完成独立对账。"
+    elif any(status in {"EPS_MISMATCH", "SHARE_DENOMINATOR_MISMATCH", "PERIOD_MISMATCH", "NOT_COMPARABLE_ADJUSTMENT_BASIS"} for status in scenario_statuses):
+        base["status"] = "RECONCILIATION_MISMATCH"
+        base["reason"] = "至少一个情景发现 EPS、期间、稀释股数或税后归属调整口径不一致；保留两侧数字，不自动覆盖主估值 EPS。"
+    elif any(status == "MATCH" for status in scenario_statuses):
+        base["status"] = "PARTIAL"
+        base["reason"] = "只有部分情景完成 B57 与主 EPS 的可比对账，其余情景保持阻断或 UNKNOWN。"
+    elif all(status == "BLOCKED_BY_B57" for status in scenario_statuses):
+        base["status"] = "BLOCKED_BY_B57"
+        base["reason"] = "B57 正常化归属 / 稀释 EPS 桥未闭合，不能与主估值 EPS 进行可靠对账。"
+    else:
+        base["status"] = "NOT_IDENTIFIABLE"
+        base["reason"] = "主 EPS、B57 all-items EPS、期间或股数等关键口径缺失/不可比；B58 不作通过判断。"
+    return base
+
+
 def _evaluate_primary_eps_multiple_valuation(
     raw: Any, *, selected_model_family: Any, expected_forecast_period: Any,
     expected_terminal_date: Any, expected_currency: Any,
@@ -2834,6 +3081,15 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         forecast["scenarios"] = adjusted_scenarios
         forecast["b5_baseline_entry_value_reference_per_share"] = forecast.get("entry_value_reference_per_share")
         forecast["entry_value_reference_per_share"] = valuation_transmission.get("entry_value_reference_adjusted_per_share")
+    b4_transition = operating_driver_forecast.get("baseline_transition")
+    if isinstance(b4_transition, dict):
+        b4_transition["primary_eps_consistency"] = _build_b58_primary_eps_consistency(
+            selected_model_family=operator_valuation_context["selected_model_family"],
+            expected_currency=currency,
+            operating_driver_forecast=operating_driver_forecast,
+            eps_earnings_bridge=eps_earnings_bridge,
+            eps_multiple_valuation=eps_multiple_valuation,
+        )
     raw_cycle_monitor = (
         raw_driver_forecast.get("cycle_earnings_monitor")
         if isinstance(raw_driver_forecast, Mapping) else None

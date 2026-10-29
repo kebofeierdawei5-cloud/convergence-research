@@ -2272,6 +2272,44 @@ def render_operating_driver_section(
         "- 局部产品线、项目增量或未知范围不能直接推导公司 EPS；稀释股数必须显式输入且大于零。该桥不修改估值、B5/B6、15% 年化收益门槛、正式决策或交易授权。",
         "",
     ])
+    eps_consistency = (
+        transition.get("primary_eps_consistency")
+        if isinstance(transition.get("primary_eps_consistency"), Mapping) else {}
+    )
+    lines.extend([
+        "",
+        "#### B58 B57 EPS 代理与主估值 EPS 一致性核对",
+        "",
+        f"- 状态：**{eps_consistency.get('status', 'UNKNOWN')}**；主估值模型族：{eps_consistency.get('selected_model_family', 'UNKNOWN')}；币种：{eps_consistency.get('currency', 'UNKNOWN')}",
+        f"- B4 预测期间：{eps_consistency.get('driver_forecast_period', 'UNKNOWN')}；主 EPS 期间：{eps_consistency.get('primary_eps_forecast_period', 'UNKNOWN')}；估值终点日期（独立字段）：{eps_consistency.get('primary_valuation_terminal_date', 'UNKNOWN')}",
+        f"- 主 EPS 桥状态：{eps_consistency.get('primary_eps_earnings_bridge_status', 'UNKNOWN')}；EPS_MULTIPLE 复算状态：{eps_consistency.get('primary_eps_multiple_status', 'UNKNOWN')}",
+        f"- 方法：{eps_consistency.get('comparison_metric', 'UNKNOWN')}；每股比较容差：{eps_consistency.get('eps_tolerance_per_share', '0.005')}",
+    ])
+    consistency_scenarios = eps_consistency.get("scenarios") if isinstance(eps_consistency.get("scenarios"), Mapping) else {}
+    for scenario_name in SCENARIOS:
+        row = consistency_scenarios.get(scenario_name) if isinstance(consistency_scenarios.get(scenario_name), Mapping) else {}
+        lines.append(f"**B58 {scenario_name.upper()} — {row.get('status', 'UNKNOWN')}**")
+        lines.append(
+            f"- 期间：B57 {row.get('b57_forecast_period', 'UNKNOWN')} / 主 EPS {row.get('primary_forecast_period', 'UNKNOWN')}；"
+            f"稀释股数：B57 {row.get('b57_diluted_weighted_average_shares', 'UNKNOWN')} / 主 EPS {row.get('primary_diluted_shares', 'UNKNOWN')} {row.get('primary_diluted_shares_unit') or ''}"
+        )
+        lines.append(
+            f"- 主模型声明 EPS：{_display_optional_scalar(row.get('primary_declared_eps_per_share'))}；"
+            f"主桥复算 EPS：{_display_optional_scalar(row.get('primary_calculated_eps_per_share'))}；"
+            f"B57 all-items EPS 代理：{_display_optional_scalar(row.get('b57_all_items_eps_proxy_cny_per_share'))}"
+        )
+        lines.append(
+            f"- all-items EPS 与主声明 EPS 的差异：{_display_optional_scalar(row.get('all_items_eps_vs_primary_declared_difference_per_share'))}；"
+            f"与主桥复算 EPS 的差异：{_display_optional_scalar(row.get('all_items_eps_vs_primary_calculated_difference_per_share'))}；"
+            f"正常化 EPS 差异（仅诊断，不作同口径通过判断）：{_display_optional_scalar(row.get('normalized_eps_vs_primary_declared_difference_per_share_diagnostic_only'))}"
+        )
+        if row.get("issues"):
+            lines.append("- 对账阻塞/差异：" + "；".join(str(issue) for issue in row["issues"][:6]))
+    lines.extend([
+        "- 判读规则：只有主 EPS 计算桥状态为 CALCULATED、同币种/期间/稀释股数一致、主税后归属调整为零且 all-items EPS 在容差内匹配，才标记 MATCH。非零而未映射的主估值税后归属调整将标记不可比。",
+        "- B57 正常化 EPS 剔除非经常性项目，不能直接拿来与含全部项目的主估值 EPS 判定不一致；此处单列其差异供分析。B58 仅作诊断，不替换 EPS_MULTIPLE 输入，不改变终值、回报、目标入场价或 15% 年化收益门槛。",
+        "",
+    ])
     lines.extend(["", "#### Bear / Base / Bull 经营结果", ""])
     v_scenarios = valuation_scenarios if isinstance(valuation_scenarios, Mapping) else {}
     for name in SCENARIOS:
