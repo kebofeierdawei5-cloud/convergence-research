@@ -1462,7 +1462,7 @@ def _build_b58_primary_eps_consistency(
             period,
             str(b57_forward.get("period") or "").strip().upper(),
             str(primary_row.get("forecast_period") or period or "").strip().upper(),
-            str(model_bridge.get("forecast_period") or "").strip().upper(),
+            str(model_bridge.get("forecast_period") or primary_row.get("forecast_period") or period or "").strip().upper(),
         }
         if not all(expected_periods) or len(expected_periods) != 1:
             row["status"] = "PERIOD_MISMATCH"

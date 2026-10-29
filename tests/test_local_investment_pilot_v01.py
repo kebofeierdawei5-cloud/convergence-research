@@ -5978,7 +5978,6 @@ def test_b58_assumption_only_primary_eps_is_not_promoted_to_independent_reconcil
     for name in ("bear", "base", "bull"):
         primary["scenarios"][name] = {
             "status": "ASSUMPTION_ONLY",
-            "forecast_period": "2026FY",
             "declared_eps_per_share": "10",
         }
         valuation["scenarios"][name]["earnings_bridge"] = primary["scenarios"][name]
