@@ -5611,3 +5611,18 @@ def test_b55_invalid_b4_schema_keeps_transition_node_shape_explicit():
     assert result["baseline_transition"]["status"] == "INVALID_SCHEMA"
     assert result["baseline_transition"]["baseline_issues"] == ["OPERATING_DRIVER_SCHEMA_MISMATCH"]
     assert result["baseline_transition"]["scenarios"] == {}
+
+
+def test_b55_multi_year_gap_requires_intermediate_baseline_instead_of_raw_delta():
+    raw = _driver_payload()
+    raw["scope"] = "COMPANY_WIDE"
+    raw["actuals_period"] = "2025FY"
+    raw["forecast_period"] = "2027FY"
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+
+    assert result["baseline_transition"]["status"] == "PERIOD_NOT_COMPARABLE"
+    assert result["baseline_transition"]["scenarios"] == {}
+    assert "相邻的完整年度" in result["baseline_transition"]["reason"]
+    assert "中间年度基线桥" in result["baseline_transition"]["reason"]
