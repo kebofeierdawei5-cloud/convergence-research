@@ -5626,3 +5626,108 @@ def test_b55_multi_year_gap_requires_intermediate_baseline_instead_of_raw_delta(
     assert result["baseline_transition"]["scenarios"] == {}
     assert "相邻的完整年度" in result["baseline_transition"]["reason"]
     assert "中间年度基线桥" in result["baseline_transition"]["reason"]
+
+
+def test_b56_contribution_to_modeled_net_profit_bridge_reconciles_all_scenarios():
+    raw = _driver_payload()
+    raw["scope"] = "COMPANY_WIDE"
+    raw["actuals_period"] = "2025FY"
+    raw["forecast_period"] = "2026FY"
+    raw["historical_financials"] = {
+        "fixed_cash_opex_cny": _driver_measure("40000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical fixed cash opex"),
+        "depreciation_amortization_cny": _driver_measure("8000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical D&A"),
+        "finance_cost_cny": _driver_measure("2000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical finance cost"),
+        "tax_rate": _driver_measure("0.20", "ratio", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical effective tax rate"),
+    }
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+    bridge = result["baseline_transition"]["net_profit_bridge"]
+    base = bridge["scenarios"]["base"]
+
+    assert bridge["status"] == "DIAGNOSTIC_CALCULATED"
+    assert base["status"] == "CALCULATED_AND_RECONCILED"
+    assert base["historical_baseline"]["net_profit_proxy_cny"] == "320000.00"
+    assert base["forward_scenario"]["net_profit_proxy_cny"] == "288750.00"
+    assert base["changes"]["contribution_after_variable_cost_cny"] == "0"
+    assert base["changes"]["fixed_cash_opex_effect_cny"] == "-10000"
+    assert base["changes"]["depreciation_amortization_effect_cny"] == "-2000"
+    assert base["changes"]["finance_cost_effect_cny"] == "-3000"
+    assert base["changes"]["modeled_tax_effect_cny"] == "-16250.00"
+    assert base["changes"]["net_profit_proxy_cny"] == "-31250.00"
+    assert float(base["changes"]["reconciliation_residual_cny"]) == 0
+    assert bridge["eps_impact"] is None
+    assert bridge["per_share_value_impact"] is None
+    assert bridge["formal_forecast_admission_created"] is False
+    assert bridge["decision_authority"] is False
+
+
+def test_b56_missing_or_misclassified_historical_financial_baseline_keeps_profit_unknown():
+    raw = _driver_payload()
+    raw["scope"] = "COMPANY_WIDE"
+    raw["actuals_period"] = "2025FY"
+    raw["forecast_period"] = "2026FY"
+    raw["historical_financials"] = {
+        "fixed_cash_opex_cny": _driver_measure("40000", "CNY", "ANALYST_ASSUMPTION", [], "Not a historical actual"),
+        "depreciation_amortization_cny": _driver_measure("8000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical D&A"),
+        "finance_cost_cny": _driver_measure("2000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical finance cost"),
+        "tax_rate": _driver_measure("0.20", "ratio", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical effective tax rate"),
+    }
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+    bridge = result["baseline_transition"]["net_profit_bridge"]
+    base = bridge["scenarios"]["base"]
+
+    assert result["baseline_transition"]["scenarios"]["base"]["status"] == "CALCULATED_AND_RECONCILED"
+    assert bridge["status"] == "NOT_IDENTIFIABLE"
+    assert base["status"] == "NOT_IDENTIFIABLE"
+    assert base["changes"] == {}
+    assert "historical.fixed_cash_opex_cny" in base["missing_inputs"]
+    assert base["forward_scenario"]["net_profit_proxy_cny"] is None
+
+
+def test_b56_missing_forward_tax_rate_blocks_only_the_affected_scenario():
+    raw = _driver_payload()
+    raw["scope"] = "COMPANY_WIDE"
+    raw["actuals_period"] = "2025FY"
+    raw["forecast_period"] = "2026FY"
+    raw["historical_financials"] = {
+        "fixed_cash_opex_cny": _driver_measure("40000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical fixed cash opex"),
+        "depreciation_amortization_cny": _driver_measure("8000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical D&A"),
+        "finance_cost_cny": _driver_measure("2000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical finance cost"),
+        "tax_rate": _driver_measure("0.20", "ratio", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical effective tax rate"),
+    }
+    raw["scenarios"]["base"]["tax_rate"] = _driver_measure(None, "ratio", "UNKNOWN", [], "Forward tax rate not provided")
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+    bridge = result["baseline_transition"]["net_profit_bridge"]
+
+    assert bridge["status"] == "PARTIAL"
+    assert bridge["scenarios"]["bear"]["status"] == "CALCULATED_AND_RECONCILED"
+    assert bridge["scenarios"]["base"]["status"] == "NOT_IDENTIFIABLE"
+    assert "forward.tax_rate" in bridge["scenarios"]["base"]["missing_inputs"]
+    assert bridge["scenarios"]["base"]["changes"] == {}
+    assert bridge["scenarios"]["bull"]["status"] == "CALCULATED_AND_RECONCILED"
+
+
+def test_b56_report_separates_contribution_from_modeled_net_profit_and_eps():
+    raw = _driver_payload()
+    raw["scope"] = "COMPANY_WIDE"
+    raw["actuals_period"] = "2025FY"
+    raw["forecast_period"] = "2026FY"
+    raw["historical_financials"] = {
+        "fixed_cash_opex_cny": _driver_measure("40000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical fixed cash opex"),
+        "depreciation_amortization_cny": _driver_measure("8000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical D&A"),
+        "finance_cost_cny": _driver_measure("2000", "CNY", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical finance cost"),
+        "tax_rate": _driver_measure("0.20", "ratio", "OBSERVED_ACTUAL", ["E1"], "Synthetic historical effective tax rate"),
+    }
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+    report = "\n".join(render_operating_driver_section(result, None, "CNY"))
+
+    assert "B56 产品贡献 → 模型税后利润变化桥" in report
+    assert "模型化税后利润代理" in report
+    assert "归母净利润" in report
+    assert "EPS / 每股价值影响仍为 UNKNOWN" in report

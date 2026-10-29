@@ -40,6 +40,13 @@ GLOBAL_MEASURES = {
     "change_working_capital_cny": "CNY",
 }
 
+NET_PROFIT_BRIDGE_MEASURES = {
+    "fixed_cash_opex_cny": "CNY",
+    "depreciation_amortization_cny": "CNY",
+    "finance_cost_cny": "CNY",
+    "tax_rate": "ratio",
+}
+
 
 def _decimal(value: Any, field: str) -> Decimal:
     try:
@@ -1108,6 +1115,256 @@ def _build_baseline_transition_bridge(
     }
 
 
+def _build_baseline_net_profit_bridge(
+    *,
+    baseline_transition: Mapping[str, Any],
+    historical_financials_raw: Any,
+    scenarios_raw: Mapping[str, Any],
+    forward_scenarios: Mapping[str, Any],
+    sources_by_id: Mapping[str, Mapping[str, Any]],
+    unresolved_refs: set[str],
+    after_cutoff_refs: set[str],
+    uncertain_refs: set[str],
+) -> dict[str, Any]:
+    """Extend B55 contribution deltas to a modeled, tax-adjusted net-profit proxy."""
+    schema = "IIOS-B56-BASELINE-TO-FORWARD-NET-PROFIT-BRIDGE-0.1"
+    base = {
+        "schema_version": schema,
+        "status": "NOT_IDENTIFIABLE",
+        "baseline_period": baseline_transition.get("baseline_period", "UNKNOWN"),
+        "forecast_period": baseline_transition.get("forecast_period", "UNKNOWN"),
+        "method": "B55_CONTRIBUTION_MINUS_FIXED_OPEX_DA_FINANCE_AND_MODELED_TAX_V0.1",
+        "metric": "MODELED_NET_PROFIT_PROXY_CNY_NOT_REPORTED_OR_PARENT_ATTRIBUTABLE_NET_PROFIT",
+        "historical_baseline_inputs": {},
+        "scenarios": {},
+        "limitations": [
+            "本桥必须逐情景依赖 B55 已对账的同一产品/业务线贡献变化；B55 未闭合时，不推导净利润变化。",
+            "历史固定现金运营费用、折旧摊销、融资成本和有效税率必须分别作为 OBSERVED_ACTUAL 提供；前瞻值必须是有明确依据的 ISSUER_FORECAST 或 ANALYST_ASSUMPTION。",
+            "模型税费代理=max(PBT,0)×有效税率；不模拟亏损抵税、递延税、税收优惠、非经常性税项或其他所得税调整。",
+            "输出是模型化税后利润代理，不是财报报告净利润或归母净利润；非控股权益、稀释股数、EPS 和每股价值仍不在本桥中计算。",
+            "该桥只用于解释假设间的算术变化，不构成正式 Forecast/Valuation Admission、投资决策或执行授权。",
+        ],
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
+        "eps_impact": None,
+        "per_share_value_impact": None,
+    }
+
+    historical_inputs = _normalise_product_measure_set(
+        historical_financials_raw,
+        NET_PROFIT_BRIDGE_MEASURES,
+        "historical_financials",
+        sources_by_id,
+        unresolved_refs,
+        after_cutoff_refs,
+        uncertain_refs,
+        allowed_data_classes={"OBSERVED_ACTUAL"},
+    )
+    base["historical_baseline_inputs"] = historical_inputs
+    transition_scenarios = (
+        baseline_transition.get("scenarios")
+        if isinstance(baseline_transition.get("scenarios"), Mapping) else {}
+    )
+
+    for scenario_name in SCENARIOS:
+        transition_row = (
+            transition_scenarios.get(scenario_name)
+            if isinstance(transition_scenarios.get(scenario_name), Mapping) else {}
+        )
+        raw_forward = (
+            scenarios_raw.get(scenario_name)
+            if isinstance(scenarios_raw.get(scenario_name), Mapping) else {}
+        )
+        forward_inputs = _normalise_product_measure_set(
+            raw_forward,
+            NET_PROFIT_BRIDGE_MEASURES,
+            f"B56.{scenario_name}",
+            sources_by_id,
+            unresolved_refs,
+            after_cutoff_refs,
+            uncertain_refs,
+            allowed_data_classes={"ISSUER_FORECAST", "ANALYST_ASSUMPTION"},
+        )
+        normalized_forward_scenario = (
+            forward_scenarios.get(scenario_name)
+            if isinstance(forward_scenarios.get(scenario_name), Mapping) else {}
+        )
+        row: dict[str, Any] = {
+            "scenario": scenario_name,
+            "status": "NOT_IDENTIFIABLE",
+            "historical_baseline": {},
+            "forward_scenario": {},
+            "changes": {},
+            "missing_inputs": [],
+            "issues": [],
+            "formal_forecast_admission_created": False,
+            "decision_authority": False,
+            "eps_impact": None,
+            "per_share_value_impact": None,
+        }
+
+        b55_status = str(transition_row.get("status") or "UNKNOWN")
+        if b55_status != "CALCULATED_AND_RECONCILED":
+            row["status"] = "BLOCKED_BY_B55"
+            row["missing_inputs"] = ["B55_RECONCILED_CONTRIBUTION_BRIDGE"]
+            row["issues"] = [f"B55_SCENARIO_STATUS:{b55_status}"]
+            base["scenarios"][scenario_name] = row
+            continue
+
+        feasibility = str(normalized_forward_scenario.get("capacity_feasibility_status") or "UNKNOWN")
+        if feasibility == "UNRESOLVED_OVER_NAMEPLATE_CAPACITY":
+            row["status"] = "BLOCKED_BY_OPERATING_CONSTRAINT"
+            row["missing_inputs"] = ["RESOLVED_ANNUAL_CAPACITY_CONSTRAINT"]
+            row["issues"] = ["FORWARD_PRODUCTION_EXCEEDS_REGISTERED_NAMEPLATE_CAPACITY"]
+            base["scenarios"][scenario_name] = row
+            continue
+
+        historical_values = {field: _value(measure) for field, measure in historical_inputs.items()}
+        forward_values = {field: _value(measure) for field, measure in forward_inputs.items()}
+        missing = [
+            f"historical.{field}" for field, value in historical_values.items() if value is None
+        ] + [
+            f"forward.{field}" for field, value in forward_values.items() if value is None
+        ]
+        row["historical_baseline"] = {
+            "period": base["baseline_period"],
+            "contribution_after_variable_cost_cny": transition_row.get("baseline_contribution_after_variable_cost_cny"),
+            "fixed_cash_opex_cny": _render(historical_values.get("fixed_cash_opex_cny")),
+            "depreciation_amortization_cny": _render(historical_values.get("depreciation_amortization_cny")),
+            "finance_cost_cny": _render(historical_values.get("finance_cost_cny")),
+            "tax_rate": _render(historical_values.get("tax_rate")),
+            "ebitda_proxy_cny": None,
+            "ebit_proxy_cny": None,
+            "profit_before_tax_proxy_cny": None,
+            "modeled_tax_expense_proxy_cny": None,
+            "net_profit_proxy_cny": None,
+            "measure_lineage": historical_inputs,
+        }
+        row["forward_scenario"] = {
+            "period": base["forecast_period"],
+            "contribution_after_variable_cost_cny": transition_row.get("forward_contribution_after_variable_cost_cny"),
+            "fixed_cash_opex_cny": _render(forward_values.get("fixed_cash_opex_cny")),
+            "depreciation_amortization_cny": _render(forward_values.get("depreciation_amortization_cny")),
+            "finance_cost_cny": _render(forward_values.get("finance_cost_cny")),
+            "tax_rate": _render(forward_values.get("tax_rate")),
+            "ebitda_proxy_cny": None,
+            "ebit_proxy_cny": None,
+            "profit_before_tax_proxy_cny": None,
+            "modeled_tax_expense_proxy_cny": None,
+            "net_profit_proxy_cny": None,
+            "measure_lineage": forward_inputs,
+        }
+        input_issues = []
+        for side, measures in (("historical", historical_inputs), ("forward", forward_inputs)):
+            for field, measure in measures.items():
+                for issue in measure.get("issues") or []:
+                    input_issues.append(f"{side}.{field}:{issue}")
+        row["missing_inputs"] = missing
+        row["issues"] = sorted(set(input_issues))
+        if missing:
+            row["status"] = "NOT_IDENTIFIABLE"
+            base["scenarios"][scenario_name] = row
+            continue
+
+        baseline_contribution = _decimal(
+            transition_row.get("baseline_contribution_after_variable_cost_cny"),
+            "B56_BASELINE_CONTRIBUTION",
+        )
+        forward_contribution = _decimal(
+            transition_row.get("forward_contribution_after_variable_cost_cny"),
+            "B56_FORWARD_CONTRIBUTION",
+        )
+
+        def calculate_period(contribution: Decimal, values: Mapping[str, Decimal]) -> dict[str, Decimal]:
+            ebitda = contribution - values["fixed_cash_opex_cny"]
+            ebit = ebitda - values["depreciation_amortization_cny"]
+            pbt = ebit - values["finance_cost_cny"]
+            modeled_tax = max(pbt, Decimal("0")) * values["tax_rate"]
+            net_profit_proxy = pbt - modeled_tax
+            return {
+                "contribution_after_variable_cost_cny": contribution,
+                "ebitda_proxy_cny": ebitda,
+                "depreciation_amortization_cny": values["depreciation_amortization_cny"],
+                "ebit_proxy_cny": ebit,
+                "finance_cost_cny": values["finance_cost_cny"],
+                "profit_before_tax_proxy_cny": pbt,
+                "tax_rate": values["tax_rate"],
+                "modeled_tax_expense_proxy_cny": modeled_tax,
+                "net_profit_proxy_cny": net_profit_proxy,
+            }
+
+        historical_financial_values = {
+            field: value for field, value in historical_values.items() if value is not None
+        }
+        forward_financial_values = {
+            field: value for field, value in forward_values.items() if value is not None
+        }
+        historical_period = calculate_period(baseline_contribution, historical_financial_values)
+        forward_period = calculate_period(forward_contribution, forward_financial_values)
+        delta_contribution = forward_contribution - baseline_contribution
+        fixed_effect = -(forward_values["fixed_cash_opex_cny"] - historical_values["fixed_cash_opex_cny"])
+        depreciation_effect = -(
+            forward_values["depreciation_amortization_cny"]
+            - historical_values["depreciation_amortization_cny"]
+        )
+        finance_effect = -(forward_values["finance_cost_cny"] - historical_values["finance_cost_cny"])
+        tax_effect = -(
+            forward_period["modeled_tax_expense_proxy_cny"]
+            - historical_period["modeled_tax_expense_proxy_cny"]
+        )
+        attribution_sum = delta_contribution + fixed_effect + depreciation_effect + finance_effect + tax_effect
+        net_profit_change = forward_period["net_profit_proxy_cny"] - historical_period["net_profit_proxy_cny"]
+        residual = net_profit_change - attribution_sum
+        status = "CALCULATED_AND_RECONCILED" if abs(residual) <= Decimal("1") else "RECONCILIATION_MISMATCH"
+        row.update({
+            "status": status,
+            "historical_baseline": {
+                **{key: _render(value) for key, value in historical_period.items()},
+                "period": base["baseline_period"],
+                "fixed_cash_opex_cny": _render(historical_values["fixed_cash_opex_cny"]),
+                "measure_lineage": historical_inputs,
+            },
+            "forward_scenario": {
+                **{key: _render(value) for key, value in forward_period.items()},
+                "period": base["forecast_period"],
+                "fixed_cash_opex_cny": _render(forward_values["fixed_cash_opex_cny"]),
+                "measure_lineage": forward_inputs,
+            },
+            "changes": {
+                "contribution_after_variable_cost_cny": _render(delta_contribution),
+                "fixed_cash_opex_effect_cny": _render(fixed_effect),
+                "ebitda_proxy_cny": _render(forward_period["ebitda_proxy_cny"] - historical_period["ebitda_proxy_cny"]),
+                "depreciation_amortization_effect_cny": _render(depreciation_effect),
+                "ebit_proxy_cny": _render(forward_period["ebit_proxy_cny"] - historical_period["ebit_proxy_cny"]),
+                "finance_cost_effect_cny": _render(finance_effect),
+                "profit_before_tax_proxy_cny": _render(forward_period["profit_before_tax_proxy_cny"] - historical_period["profit_before_tax_proxy_cny"]),
+                "modeled_tax_effect_cny": _render(tax_effect),
+                "net_profit_proxy_cny": _render(net_profit_change),
+                "attribution_sum_cny": _render(attribution_sum),
+                "reconciliation_residual_cny": _render(residual),
+                "tolerance_cny": "1",
+            },
+            "missing_inputs": [],
+            "issues": [] if status == "CALCULATED_AND_RECONCILED" else ["NET_PROFIT_ATTRIBUTION_DOES_NOT_RECONCILE_WITHIN_CNY_1"],
+        })
+        base["scenarios"][scenario_name] = row
+
+    statuses = [str(base["scenarios"][name].get("status") or "UNKNOWN") for name in SCENARIOS]
+    if all(status == "CALCULATED_AND_RECONCILED" for status in statuses):
+        base["status"] = "DIAGNOSTIC_CALCULATED"
+        base["reason"] = "三个情景均基于 B55 已对账贡献和同期间历史/前瞻费用、折旧、融资成本与税率，模型税后利润变化在 CNY 1 内对账。"
+    elif any(status in {"CALCULATED_AND_RECONCILED", "RECONCILIATION_MISMATCH"} for status in statuses):
+        base["status"] = "PARTIAL"
+        base["reason"] = "只有部分情景的完整历史与前瞻财务输入可用；其余情景保持 UNKNOWN/受阻，不能据此概括完整 Bear/Base/Bull 链。"
+    elif all(status == "BLOCKED_BY_B55" for status in statuses):
+        base["status"] = "BLOCKED_BY_B55"
+        base["reason"] = "B55 的范围、期间或产品贡献桥未闭合，B56 不计算税后利润变化。"
+    else:
+        base["status"] = "NOT_IDENTIFIABLE"
+        base["reason"] = "缺少同口径历史基线或明确的前瞻固定费用、折旧、融资成本或税率假设；税后利润变化保持 UNKNOWN。"
+    return base
+
+
 def evaluate_operating_driver_forecast(
     raw: Any,
     *,
@@ -1138,6 +1395,19 @@ def evaluate_operating_driver_forecast(
                 "scenarios": {},
                 "baseline_issues": [],
                 "reason": "未提供 B4 经营驱动输入，无法连接当前历史基线与前瞻情景。",
+                "net_profit_bridge": {
+                    "schema_version": "IIOS-B56-BASELINE-TO-FORWARD-NET-PROFIT-BRIDGE-0.1",
+                    "status": "NOT_PROVIDED",
+                    "baseline_period": "UNKNOWN",
+                    "forecast_period": "UNKNOWN",
+                    "historical_baseline_inputs": {},
+                    "scenarios": {},
+                    "reason": "未提供 B4 输入，无法连接历史财务基线与前瞻税后利润。",
+                    "formal_forecast_admission_created": False,
+                    "decision_authority": False,
+                    "eps_impact": None,
+                    "per_share_value_impact": None,
+                },
                 "formal_forecast_admission_created": False,
                 "decision_authority": False,
             },
@@ -1171,6 +1441,19 @@ def evaluate_operating_driver_forecast(
                 "scenarios": {},
                 "baseline_issues": ["OPERATING_DRIVER_SCHEMA_MISMATCH"],
                 "reason": "B4 输入结构版本不兼容，无法可靠连接历史基线与前瞻情景。",
+                "net_profit_bridge": {
+                    "schema_version": "IIOS-B56-BASELINE-TO-FORWARD-NET-PROFIT-BRIDGE-0.1",
+                    "status": "INVALID_SCHEMA",
+                    "baseline_period": str(raw.get("actuals_period") or "UNKNOWN"),
+                    "forecast_period": str(raw.get("forecast_period") or "UNKNOWN"),
+                    "historical_baseline_inputs": {},
+                    "scenarios": {},
+                    "reason": "B4 输入结构无效，不能计算历史到前瞻税后利润桥。",
+                    "formal_forecast_admission_created": False,
+                    "decision_authority": False,
+                    "eps_impact": None,
+                    "per_share_value_impact": None,
+                },
                 "formal_forecast_admission_created": False,
                 "decision_authority": False,
             },
@@ -1293,6 +1576,16 @@ def evaluate_operating_driver_forecast(
         forecast_period=forecast_period,
         product_lines=product_lines,
         scenarios=scenarios,
+    )
+    baseline_transition["net_profit_bridge"] = _build_baseline_net_profit_bridge(
+        baseline_transition=baseline_transition,
+        historical_financials_raw=raw.get("historical_financials"),
+        scenarios_raw=scenarios_raw,
+        forward_scenarios=scenarios,
+        sources_by_id=sources_by_id,
+        unresolved_refs=unresolved_refs,
+        after_cutoff_refs=after_cutoff_refs,
+        uncertain_refs=uncertain_refs,
     )
     summary = str(raw.get("summary") or "已处理经营驱动输入；所有计算均为非正式试运行，不等同于已实现项目利润。")
     limits = raw.get("limitations")
@@ -1536,6 +1829,55 @@ def render_operating_driver_section(
         "- 解释边界：该桥只解释产品/业务线“销量 ×（净售价−单位变动成本）”贡献变化，不是完整净利润/FCF 变动归因，更不直接进入 EPS、每股估值或 15% 回报计算。",
         "- 固定费用、折旧、融资成本、税、少数股东损益及稀释股数若缺少同期间历史基线与可比假设，必须单独研究；不能用本桥残差或贡献变化替代。",
         "- 产量及产销差额仅作为库存上下文展示，不计入上列贡献归因；库存/营运资金效果继续按 B42/B43 的明确口径处理，避免双重计价。",
+        "",
+    ])
+    net_profit_bridge = (
+        transition.get("net_profit_bridge")
+        if isinstance(transition.get("net_profit_bridge"), Mapping) else {}
+    )
+    lines.extend([
+        "",
+        "#### B56 产品贡献 → 模型税后利润变化桥",
+        "",
+        f"- 状态：**{net_profit_bridge.get('status', 'UNKNOWN')}**；历史基线期间：{net_profit_bridge.get('baseline_period', 'UNKNOWN')}；前瞻期间：{net_profit_bridge.get('forecast_period', 'UNKNOWN')}",
+        f"- 方法：{net_profit_bridge.get('method', 'UNKNOWN')}；指标：{net_profit_bridge.get('metric', 'UNKNOWN')}",
+    ])
+    historical_financial_inputs = (
+        net_profit_bridge.get("historical_baseline_inputs")
+        if isinstance(net_profit_bridge.get("historical_baseline_inputs"), Mapping) else {}
+    )
+    for field, label in (
+        ("fixed_cash_opex_cny", "固定现金运营费用"),
+        ("depreciation_amortization_cny", "折旧与摊销"),
+        ("finance_cost_cny", "融资成本"),
+        ("tax_rate", "有效税率"),
+    ):
+        measure = historical_financial_inputs.get(field) if isinstance(historical_financial_inputs.get(field), Mapping) else {}
+        refs = "、".join(measure.get("evidence_refs") or []) or "无显式引用"
+        lines.append(
+            f"- 历史 {label}：{_display(measure)}；数据分类 {measure.get('data_class', 'UNKNOWN')}；依据 {measure.get('basis') or 'UNKNOWN'}；来源引用 {refs}"
+        )
+    net_profit_scenarios = net_profit_bridge.get("scenarios") if isinstance(net_profit_bridge.get("scenarios"), Mapping) else {}
+    for scenario_name in SCENARIOS:
+        row = net_profit_scenarios.get(scenario_name) if isinstance(net_profit_scenarios.get(scenario_name), Mapping) else {}
+        historical = row.get("historical_baseline") if isinstance(row.get("historical_baseline"), Mapping) else {}
+        forward = row.get("forward_scenario") if isinstance(row.get("forward_scenario"), Mapping) else {}
+        changes = row.get("changes") if isinstance(row.get("changes"), Mapping) else {}
+        lines.append(f"**B56 {scenario_name.upper()} — {row.get('status', 'UNKNOWN')}**")
+        if row.get("status") == "CALCULATED_AND_RECONCILED":
+            lines.extend([
+                f"- 模型税后利润代理：历史 {_display_optional_scalar(historical.get('net_profit_proxy_cny'))} → 前瞻 {_display_optional_scalar(forward.get('net_profit_proxy_cny'))} CNY；变化 {_display_optional_scalar(changes.get('net_profit_proxy_cny'))} CNY",
+                f"- 中间桥：EBITDA {_display_optional_scalar(historical.get('ebitda_proxy_cny'))} → {_display_optional_scalar(forward.get('ebitda_proxy_cny'))}；EBIT {_display_optional_scalar(historical.get('ebit_proxy_cny'))} → {_display_optional_scalar(forward.get('ebit_proxy_cny'))}；税前利润 {_display_optional_scalar(historical.get('profit_before_tax_proxy_cny'))} → {_display_optional_scalar(forward.get('profit_before_tax_proxy_cny'))}",
+                f"- 净利润变化归因：产品贡献 {_display_optional_scalar(changes.get('contribution_after_variable_cost_cny'))}；固定费用效应 {_display_optional_scalar(changes.get('fixed_cash_opex_effect_cny'))}；折旧效应 {_display_optional_scalar(changes.get('depreciation_amortization_effect_cny'))}；融资成本效应 {_display_optional_scalar(changes.get('finance_cost_effect_cny'))}；模型税费效应 {_display_optional_scalar(changes.get('modeled_tax_effect_cny'))} CNY",
+                f"- 对账：归因合计 {_display_optional_scalar(changes.get('attribution_sum_cny'))}；残差 {_display_optional_scalar(changes.get('reconciliation_residual_cny'))} CNY（容差 {_display_optional_scalar(changes.get('tolerance_cny'))}）",
+            ])
+        if row.get("missing_inputs"):
+            lines.append("- 保持 UNKNOWN / 阻塞输入：" + "、".join(str(x) for x in row["missing_inputs"]))
+        if row.get("issues"):
+            lines.append("- 来源/口径待复核：" + "；".join(str(x) for x in row["issues"][:8]))
+    lines.extend([
+        "- 模型边界：税费代理=max(税前利润,0)×有效税率，不模拟亏损抵税、递延税、税收优惠或非经常性税项；因此结果不是已报告净利润或归母净利润。",
+        "- 尚未连接非控股权益与稀释股数，EPS / 每股价值影响仍为 UNKNOWN；B56 不修改估值输入、15% 年化收益门槛或现有决策状态，也不创建正式准入/交易授权。",
         "",
     ])
     lines.extend(["", "#### Bear / Base / Bull 经营结果", ""])
