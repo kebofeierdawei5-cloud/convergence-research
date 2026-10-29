@@ -53,4 +53,4 @@ Nested at operating_driver_forecast.baseline_transition.per_share_earnings_bridg
 
 ## Regression cases and validation
 
-Five B57 cases are authored: complete parent-attributable profit/EPS bridge and reconciliation, product-line scope refusal, missing NCI/non-recurring share plus zero dilution denominator, report boundary/visibility, and absent B4 shape. They have not been run. No Replay, CI, merge or macOS end-to-end acceptance is claimed.
+Six B57 cases are authored: complete parent-attributable profit/EPS bridge and reconciliation, product-line scope refusal, missing NCI/non-recurring share plus zero dilution denominator, report boundary/visibility, absent B4 shape, and signed recurring non-operating/one-off losses. They have not been run. No Replay, CI, merge or macOS end-to-end acceptance is claimed.

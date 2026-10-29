@@ -2237,7 +2237,7 @@ def render_operating_driver_section(
     ])
     historical_eps_inputs = eps_bridge.get("historical_baseline_inputs") if isinstance(eps_bridge.get("historical_baseline_inputs"), Mapping) else {}
     for field, label in (
-        ("recurring_non_operating_pre_tax_cny", "历史非经营性税前净额"),
+        ("recurring_non_operating_pre_tax_cny", "历史经常性非经营税前净额（不含一次性项）"),
         ("non_recurring_pre_tax_cny", "历史非经常性税前净额"),
         ("minority_interest_net_profit_after_tax_cny", "历史少数股东税后净利润（含非经常项）"),
         ("minority_interest_nonrecurring_after_tax_cny", "历史少数股东非经常项目税后份额"),
