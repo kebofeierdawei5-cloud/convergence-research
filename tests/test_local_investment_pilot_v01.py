@@ -5749,7 +5749,7 @@ def _b57_test_attribution_payload():
     def assumption(value, unit):
         return _driver_measure(value, unit, "ANALYST_ASSUMPTION", [], "Explicit synthetic forward earnings assumption")
     raw["historical_earnings_attribution"] = {
-        "non_operating_pre_tax_cny": historical("5000", "CNY"),
+        "recurring_non_operating_pre_tax_cny": historical("5000", "CNY"),
         "non_recurring_pre_tax_cny": historical("10000", "CNY"),
         "minority_interest_net_profit_after_tax_cny": historical("5000", "CNY"),
         "minority_interest_nonrecurring_after_tax_cny": historical("1000", "CNY"),
@@ -5757,7 +5757,7 @@ def _b57_test_attribution_payload():
     }
     for name in ("bear", "base", "bull"):
         raw["scenarios"][name].update({
-            "non_operating_pre_tax_cny": assumption("6000", "CNY"),
+            "recurring_non_operating_pre_tax_cny": assumption("6000", "CNY"),
             "non_recurring_pre_tax_cny": assumption("12000", "CNY"),
             "minority_interest_net_profit_after_tax_cny": assumption("6500", "CNY"),
             "minority_interest_nonrecurring_after_tax_cny": assumption("1200", "CNY"),
@@ -5832,3 +5832,27 @@ def test_b57_missing_b4_input_returns_explicit_not_provided_shape():
     assert bridge["status"] == "NOT_PROVIDED"
     assert bridge["scenarios"] == {}
     assert bridge["per_share_value_impact"] is None
+
+
+def test_b57_signed_recurring_nonoperating_and_oneoff_losses_remain_identifiable():
+    raw = _b57_test_attribution_payload()
+    raw["scenarios"]["bear"]["recurring_non_operating_pre_tax_cny"] = _driver_measure(
+        "-2000", "CNY", "ANALYST_ASSUMPTION", [], "Explicit recurring non-operating expense"
+    )
+    raw["scenarios"]["bear"]["non_recurring_pre_tax_cny"] = _driver_measure(
+        "-5000", "CNY", "ANALYST_ASSUMPTION", [], "Explicit non-recurring loss"
+    )
+    raw["scenarios"]["bear"]["minority_interest_net_profit_after_tax_cny"] = _driver_measure(
+        "400", "CNY", "ANALYST_ASSUMPTION", [], "NCI total after-tax profit including the one-off loss"
+    )
+    raw["scenarios"]["bear"]["minority_interest_nonrecurring_after_tax_cny"] = _driver_measure(
+        "-200", "CNY", "ANALYST_ASSUMPTION", [], "NCI share of the one-off loss"
+    )
+    evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
+    result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
+    bridge = result["baseline_transition"]["per_share_earnings_bridge"]
+    bear = bridge["scenarios"]["bear"]
+
+    assert bear["status"] == "CALCULATED_AND_RECONCILED"
+    assert bear["forward_scenario"]["normalized_profit_before_tax_proxy_cny"] == "388000.00"
+    assert bear["forward_scenario"]["all_items_profit_before_tax_proxy_cny"] == "383000.00"

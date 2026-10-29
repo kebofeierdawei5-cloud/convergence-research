@@ -12,7 +12,7 @@ B57 extends B56's modeled after-tax profit proxy to a company-wide normalized ne
 At the operating_driver_forecast input level:
 
 - historical_earnings_attribution contains typed OBSERVED_ACTUAL measures:
-  - non_operating_pre_tax_cny: signed net non-operating amount; income positive, expense negative.
+  - recurring_non_operating_pre_tax_cny: signed recurring non-operating net amount, excluding amounts separately entered in the non-recurring field; income positive, expense negative.
   - non_recurring_pre_tax_cny: signed net one-off amount; gain positive, loss negative.
   - minority_interest_net_profit_after_tax_cny: signed after-tax NCI net profit including the entered non-recurring component.
   - minority_interest_nonrecurring_after_tax_cny: signed after-tax NCI share of the non-recurring amount.
@@ -27,7 +27,7 @@ The bridge is company-wide only. A product-line or incremental-project profit ca
 
 For each historical/forward period:
 
-1. B56 PBT proxy + signed recurring non-operating net amount = normalized PBT proxy.
+1. B56 PBT proxy + signed recurring non-operating net amount (excluding amounts in the one-off field) = normalized PBT proxy.
 2. Apply B56's explicit effective tax rate using the existing simplified tax rule (max(PBT, 0) × tax rate) to estimate normalized consolidated profit after tax.
 3. Add the signed non-recurring pre-tax amount to normalized PBT and reapply the tax proxy to expose a modeled all-items result, clearly labeled as a proxy rather than reported profit.
 4. Normalized NCI = total after-tax NCI profit including one-offs − the after-tax NCI share of non-recurring items.

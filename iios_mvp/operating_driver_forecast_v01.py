@@ -48,14 +48,14 @@ NET_PROFIT_BRIDGE_MEASURES = {
 }
 
 EARNINGS_ATTRIBUTION_MEASURES = {
-    "non_operating_pre_tax_cny": "CNY",
+    "recurring_non_operating_pre_tax_cny": "CNY",
     "non_recurring_pre_tax_cny": "CNY",
     "minority_interest_net_profit_after_tax_cny": "CNY",
     "minority_interest_nonrecurring_after_tax_cny": "CNY",
     "diluted_weighted_average_shares": "shares",
 }
 EARNINGS_ATTRIBUTION_SIGNED_MEASURES = {
-    "non_operating_pre_tax_cny",
+    "recurring_non_operating_pre_tax_cny",
     "non_recurring_pre_tax_cny",
     "minority_interest_net_profit_after_tax_cny",
     "minority_interest_nonrecurring_after_tax_cny",
@@ -1520,7 +1520,7 @@ def _build_per_share_earnings_bridge(
         row["historical_baseline"] = {
             "period": base["baseline_period"],
             "b56_profit_before_tax_proxy_cny": history_pbt,
-            "non_operating_pre_tax_cny": _render(hist_values.get("non_operating_pre_tax_cny")),
+            "recurring_non_operating_pre_tax_cny": _render(hist_values.get("recurring_non_operating_pre_tax_cny")),
             "non_recurring_pre_tax_cny": _render(hist_values.get("non_recurring_pre_tax_cny")),
             "minority_interest_net_profit_after_tax_cny": _render(hist_values.get("minority_interest_net_profit_after_tax_cny")),
             "minority_interest_nonrecurring_after_tax_cny": _render(hist_values.get("minority_interest_nonrecurring_after_tax_cny")),
@@ -1533,7 +1533,7 @@ def _build_per_share_earnings_bridge(
         row["forward_scenario"] = {
             "period": base["forecast_period"],
             "b56_profit_before_tax_proxy_cny": forward_pbt,
-            "non_operating_pre_tax_cny": _render(fwd_values.get("non_operating_pre_tax_cny")),
+            "recurring_non_operating_pre_tax_cny": _render(fwd_values.get("recurring_non_operating_pre_tax_cny")),
             "non_recurring_pre_tax_cny": _render(fwd_values.get("non_recurring_pre_tax_cny")),
             "minority_interest_net_profit_after_tax_cny": _render(fwd_values.get("minority_interest_net_profit_after_tax_cny")),
             "minority_interest_nonrecurring_after_tax_cny": _render(fwd_values.get("minority_interest_nonrecurring_after_tax_cny")),
@@ -1560,7 +1560,7 @@ def _build_per_share_earnings_bridge(
             tax_rate: Decimal,
             amounts: Mapping[str, Decimal],
         ) -> dict[str, Decimal]:
-            recurring_pbt = b56_pbt + amounts["non_operating_pre_tax_cny"]
+            recurring_pbt = b56_pbt + amounts["recurring_non_operating_pre_tax_cny"]
             normalized_tax = max(recurring_pbt, Decimal("0")) * tax_rate
             normalized_total_np = recurring_pbt - normalized_tax
             all_items_pbt = recurring_pbt + amounts["non_recurring_pre_tax_cny"]
@@ -2237,7 +2237,7 @@ def render_operating_driver_section(
     ])
     historical_eps_inputs = eps_bridge.get("historical_baseline_inputs") if isinstance(eps_bridge.get("historical_baseline_inputs"), Mapping) else {}
     for field, label in (
-        ("non_operating_pre_tax_cny", "历史非经营性税前净额"),
+        ("recurring_non_operating_pre_tax_cny", "历史非经营性税前净额"),
         ("non_recurring_pre_tax_cny", "历史非经常性税前净额"),
         ("minority_interest_net_profit_after_tax_cny", "历史少数股东税后净利润（含非经常项）"),
         ("minority_interest_nonrecurring_after_tax_cny", "历史少数股东非经常项目税后份额"),
