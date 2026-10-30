@@ -6393,6 +6393,24 @@ def test_b61_sotp_price_inversion_reconstructs_segment_pool_and_one_at_a_time_pr
     assert result["external_mie_status_unchanged"] == "NOT_IDENTIFIABLE"
     assert result["sotp_input_modified"] is False
 
+    # If other segments already exceed the required segment-value pool, preserve
+    # the negative algebraic threshold but never present it as negative real profit.
+    price["price"] = "1"
+    lower_price_result = pilot._build_b61_sotp_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, sotp_valuation=sotp,
+        forecast_valuation=forecast,
+        validated_cash_distribution_events={name: [] for name in ("bear", "base", "bull")},
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    lower_price_segments = {
+        item["segment_id"]: item
+        for item in lower_price_result["scenarios"]["base"]["requirements"]["required_return"]["without_distributions"]["segment_requirements"]
+    }
+    assert Decimal(lower_price_segments["seg_a"]["one_at_a_time_required_attributable_net_profit_cny_signed"]) < 0
+    assert lower_price_segments["seg_a"]["one_at_a_time_required_attributable_net_profit_floor_cny"] == "0"
+    assert lower_price_segments["seg_a"]["other_segments_cover_required_pool_without_this_segment_profit"] is True
+
 
 def test_b61_sotp_includes_only_cash_distributions_validated_by_existing_return_solver():
     price, timing, decision, operator, sotp, forecast = _b61_test_inputs()
