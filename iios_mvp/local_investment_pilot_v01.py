@@ -5475,7 +5475,9 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
                 if segment_rows:
                     lines.append("  - 分部单变量盈利要求（其他分部维持当前情景预测；分部之间不可相加）：")
                     for segment in segment_rows:
-                        required_profit = segment.get("one_at_a_time_required_attributable_net_profit_cny")
+                        required_profit = segment.get("one_at_a_time_required_attributable_net_profit_cny_signed")
+                        required_profit_floor = segment.get("one_at_a_time_required_attributable_net_profit_floor_cny")
+                        other_segments_cover = segment.get("other_segments_cover_required_pool_without_this_segment_profit")
                         incremental = segment.get("one_at_a_time_incremental_profit_required_cny")
                         headroom = segment.get("one_at_a_time_profit_headroom_cny")
                         dividend_row = with_by_id.get(str(segment.get("segment_id")), {})
