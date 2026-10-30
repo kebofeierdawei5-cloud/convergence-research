@@ -2162,6 +2162,284 @@ def _build_b60_local_eps_multiple_price_inversion(
     return result
 
 
+
+
+def _build_b62_sotp_segment_earnings_reconciliation(
+    *,
+    local_sotp_inversion: Mapping[str, Any],
+    sotp_valuation: Mapping[str, Any],
+    operating_driver_forecast: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Compare B4's explicit segment normalized earnings with SOTP inputs and B61 price-implied hurdles."""
+    result: dict[str, Any] = {
+        "schema_version": "IIOS-B62-SOTP-SEGMENT-EARNINGS-RECONCILIATION-0.1",
+        "status": "NOT_IDENTIFIABLE",
+        "qualification": "CONDITIONAL_DIAGNOSTIC_ONLY",
+        "forecast_period": "UNKNOWN",
+        "currency": str(local_sotp_inversion.get("currency") or "UNKNOWN").upper(),
+        "method": "B4_SEGMENT_NORMALIZED_PARENT_EARNINGS_VS_SOTP_SELECTED_PROFIT_AND_B61_LOCAL_PRICE_HURDLE",
+        "scenarios": {},
+        "limitations": [
+            "仅使用 B4 显式 business_segment_id、分部正常化归母利润桥、SOTP 既有分部利润/P-E 和 B61 本地现价反推；不按名称匹配或推断业务归属。",
+            "SOTP 分部 earnings_basis 必须明确为 NORMALIZED_PARENT_ATTRIBUTABLE，且 B4 与 SOTP 必须使用相同 CNY 盈利参考期间。",
+            "B61 分部 Required Profit 是“其他分部保持当前 SOTP 情景预测”的单变量敏感性；不能把各分部单变量阈值或余量相加。",
+            "aggregate B4 segment pool 则使用所有 B4 分部前瞻利润同时替代当前 SOTP 利润，并维持各分部 SOTP P/E 与母公司调整不变；这是全向量条件对比，不是 B61 单变量情景的加总。",
+            "母公司中心成本、净现金/净负债和其他调整没有独立前瞻输入时仅展示现有值及方向敏感性，不能虚构这些调整未来变化的贡献。",
+            "B62 是数学对账，不证明 B4 假设质量、SOTP P/E 公允或外部市场已计价；外部 MIE 与 expectation_gap 不升级。",
+            "不修改 SOTP 主模型、B4/B5/B6、回报计算、目标入场价、15% 回报门槛、formal admission、Decision 或执行权限。",
+        ],
+        "external_mie_modified": False,
+        "sotp_input_modified": False,
+        "valuation_input_modified": False,
+        "formal_mie_admission_created": False,
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
+    }
+
+    selected_family = str(local_sotp_inversion.get("selected_model_family") or "UNKNOWN").strip().upper()
+    result["selected_model_family"] = selected_family
+    if selected_family != "SOTP":
+        result["status"] = "NOT_APPLICABLE_NOT_SOTP"
+        return result
+    if str(local_sotp_inversion.get("currency") or "").strip().upper() != "CNY":
+        result["status"] = "NOT_COMPARABLE_CURRENCY"
+        return result
+    if sotp_valuation.get("status") != "CALCULATED" or sotp_valuation.get("selected_for_primary_model") is not True:
+        result["status"] = "PRIMARY_SOTP_NOT_CALCULATED"
+        return result
+    if str(local_sotp_inversion.get("status") or "").upper() not in {
+        "CONDITIONAL_SENSITIVITY_CALCULATED", "PARTIAL"
+    }:
+        result["status"] = "BLOCKED_BY_B61"
+        return result
+
+    baseline_transition = operating_driver_forecast.get("baseline_transition")
+    baseline_transition = baseline_transition if isinstance(baseline_transition, Mapping) else {}
+    b62 = baseline_transition.get("segment_normalized_earnings_bridge")
+    b62 = b62 if isinstance(b62, Mapping) else {}
+    result["forecast_period"] = str(b62.get("forecast_period") or "UNKNOWN")
+    result["b4_segment_bridge_status"] = str(b62.get("status") or "UNKNOWN")
+    if str(operating_driver_forecast.get("scope") or "").upper() != "COMPANY_WIDE":
+        result["status"] = "NOT_COMPARABLE_SCOPE"
+        return result
+    if str(b62.get("status") or "").upper() != "DIAGNOSTIC_CALCULATED":
+        result["status"] = "BLOCKED_BY_B4_SEGMENT_EARNINGS_BRIDGE"
+        result["reason"] = str(b62.get("reason") or "B4 分部正常化归母利润桥未达到完整情景闭合。")
+        return result
+    if str(b62.get("forecast_period") or "").strip().upper() != str(sotp_valuation.get("forecast_period") or "").strip().upper():
+        result["status"] = "FORECAST_PERIOD_MISMATCH"
+        return result
+    if str(local_sotp_inversion.get("forecast_period") or "").strip().upper() != str(b62.get("forecast_period") or "").strip().upper():
+        result["status"] = "B61_B4_FORECAST_PERIOD_MISMATCH"
+        return result
+
+    def dec(value: Any) -> Decimal | None:
+        try:
+            number = Decimal(str(value))
+            return number if number.is_finite() else None
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+
+    b4_scenarios = b62.get("scenarios") if isinstance(b62.get("scenarios"), Mapping) else {}
+    sotp_scenarios = sotp_valuation.get("scenarios") if isinstance(sotp_valuation.get("scenarios"), Mapping) else {}
+    b61_scenarios = local_sotp_inversion.get("scenarios") if isinstance(local_sotp_inversion.get("scenarios"), Mapping) else {}
+    scenario_statuses: list[str] = []
+
+    for scenario_name in SCENARIOS:
+        b4_scenario = b4_scenarios.get(scenario_name) if isinstance(b4_scenarios.get(scenario_name), Mapping) else {}
+        sotp_scenario = sotp_scenarios.get(scenario_name) if isinstance(sotp_scenarios.get(scenario_name), Mapping) else {}
+        b61_scenario = b61_scenarios.get(scenario_name) if isinstance(b61_scenarios.get(scenario_name), Mapping) else {}
+        row: dict[str, Any] = {
+            "scenario": scenario_name,
+            "status": "NOT_IDENTIFIABLE",
+            "forecast_period": result["forecast_period"],
+            "segment_comparisons": [],
+            "issues": [],
+        }
+        if str(b4_scenario.get("status") or "").upper() != "CALCULATED_AND_RECONCILED":
+            row["issues"].append(f"B4_SEGMENT_SCENARIO_STATUS:{b4_scenario.get('status') or 'UNKNOWN'}")
+        if str(b61_scenario.get("status") or "").upper() != "CALCULATED_CONDITIONAL":
+            row["issues"].append(f"B61_SOTP_SCENARIO_STATUS:{b61_scenario.get('status') or 'UNKNOWN'}")
+        sotp_segments = sotp_scenario.get("segments") if isinstance(sotp_scenario.get("segments"), list) else []
+        b4_segments = b4_scenario.get("segments") if isinstance(b4_scenario.get("segments"), Mapping) else {}
+        b61_req = b61_scenario.get("requirements") if isinstance(b61_scenario.get("requirements"), Mapping) else {}
+        required_return = b61_req.get("required_return") if isinstance(b61_req.get("required_return"), Mapping) else {}
+        required_without_dist = required_return.get("without_distributions") if isinstance(required_return.get("without_distributions"), Mapping) else {}
+        required_pool = dec(required_without_dist.get("required_segment_equity_value_pool_cny"))
+        selected_pool = dec(required_without_dist.get("selected_segment_equity_value_pool_cny"))
+        required_total_equity = dec(required_without_dist.get("required_terminal_equity_value_cny"))
+        required_per_share = dec(required_return.get("required_terminal_value_per_share_without_distributions"))
+        shares = dec(b61_scenario.get("selected_diluted_shares"))
+        central_cost = dec(b61_scenario.get("selected_capitalized_central_cost_cny"))
+        net_cash = dec(b61_scenario.get("selected_net_cash_debt_cny"))
+        other_adjustments = dec(b61_scenario.get("selected_other_adjustments_cny"))
+        if any(value is None for value in (required_pool, selected_pool, required_total_equity, required_per_share, shares, central_cost, net_cash, other_adjustments)):
+            row["issues"].append("B61_REQUIRED_POOL_OR_PARENT_ADJUSTMENT_FIELDS_MISSING")
+        sotp_by_id: dict[str, Mapping[str, Any]] = {}
+        for raw_segment in sotp_segments:
+            if not isinstance(raw_segment, Mapping):
+                row["issues"].append("SOTP_SEGMENT_ROW_INVALID")
+                continue
+            segment_id = str(raw_segment.get("segment_id") or "").strip()
+            if not segment_id or segment_id in sotp_by_id:
+                row["issues"].append(f"SOTP_SEGMENT_ID_MISSING_OR_DUPLICATE:{segment_id or 'UNKNOWN'}")
+                continue
+            sotp_by_id[segment_id] = raw_segment
+
+        b61_req_rows = (
+            required_without_dist.get("segment_requirements")
+            if isinstance(required_without_dist.get("segment_requirements"), list) else []
+        )
+        b61_req_by_id = {
+            str(item.get("segment_id")): item
+            for item in b61_req_rows if isinstance(item, Mapping) and item.get("segment_id") not in (None, "")
+        }
+        if set(sotp_by_id) != set(b4_segments) or set(sotp_by_id) != set(b61_req_by_id):
+            row["issues"].append("B4_SOTP_B61_SEGMENT_UNIVERSE_MISMATCH")
+
+        forecast_segment_pool = Decimal("0")
+        selected_segment_pool_recalculated = Decimal("0")
+        b4_value_changes: list[dict[str, Any]] = []
+        for segment_id in sorted(set(sotp_by_id) & set(b4_segments) & set(b61_req_by_id)):
+            sotp_segment = sotp_by_id[segment_id]
+            b4_segment = b4_segments.get(segment_id) if isinstance(b4_segments.get(segment_id), Mapping) else {}
+            b61_segment = b61_req_by_id[segment_id]
+            earnings_basis = str(sotp_segment.get("earnings_basis") or "UNKNOWN").strip().upper()
+            if earnings_basis != "NORMALIZED_PARENT_ATTRIBUTABLE":
+                row["issues"].append(f"SOTP_EARNINGS_BASIS_NOT_NORMALIZED_PARENT_ATTRIBUTABLE:{segment_id}")
+                continue
+            b4_forecast = b4_segment.get("forward_scenario") if isinstance(b4_segment.get("forward_scenario"), Mapping) else {}
+            if str(b4_segment.get("status") or "").upper() != "CALCULATED_AND_RECONCILED":
+                row["issues"].append(f"B4_SEGMENT_NOT_RECONCILED:{segment_id}")
+                continue
+            if str(b4_forecast.get("period") or "").strip().upper() != result["forecast_period"].upper():
+                row["issues"].append(f"B4_SEGMENT_PERIOD_MISMATCH:{segment_id}")
+                continue
+            b4_profit = dec(b4_forecast.get("normalized_parent_attributable_net_profit_cny"))
+            profit_measure = sotp_segment.get("attributable_net_profit_cny") if isinstance(sotp_segment.get("attributable_net_profit_cny"), Mapping) else {}
+            pe_measure = sotp_segment.get("pe_multiple_x") if isinstance(sotp_segment.get("pe_multiple_x"), Mapping) else {}
+            sotp_profit = dec(profit_measure.get("value"))
+            pe = dec(pe_measure.get("value"))
+            required_profit = dec(b61_segment.get("one_at_a_time_required_attributable_net_profit_cny_signed"))
+            if any(value is None for value in (b4_profit, sotp_profit, pe, required_profit)) or pe <= 0:
+                row["issues"].append(f"SEGMENT_PROFIT_PE_OR_REQUIRED_PROFIT_NOT_NUMERIC:{segment_id}")
+                continue
+            b4_segment_value = b4_profit * pe
+            selected_segment_value = sotp_profit * pe
+            profit_delta = b4_profit - sotp_profit
+            value_delta = profit_delta * pe
+            b4_vs_required_profit = b4_profit - required_profit
+            forecast_segment_pool += b4_segment_value
+            selected_segment_pool_recalculated += selected_segment_value
+            b4_value_changes.append({
+                "segment_id": segment_id,
+                "b4_forecast_parent_attributable_normalized_profit_cny": format(b4_profit, "f"),
+                "sotp_selected_attributable_profit_cny": format(sotp_profit, "f"),
+                "sotp_selected_pe_multiple_x": format(pe, "f"),
+                "earnings_basis": earnings_basis,
+                "b4_minus_sotp_profit_cny": format(profit_delta, "f"),
+                "profit_change_value_effect_at_selected_sotp_pe_cny": format(value_delta, "f"),
+                "b4_forecast_segment_equity_value_at_selected_sotp_pe_cny": format(b4_segment_value, "f"),
+                "sotp_selected_segment_equity_value_cny": format(selected_segment_value, "f"),
+                "b61_one_at_a_time_required_attributable_profit_cny_signed": format(required_profit, "f"),
+                "b4_forecast_profit_minus_b61_one_at_a_time_required_profit_cny": format(b4_vs_required_profit, "f"),
+                "b61_one_at_a_time_interpretation": "ALTERNATIVE_SENSITIVITY_ONLY;OTHER_SEGMENTS_HELD_AT_SELECTED_SOTP_PROFIT;DO_NOT_SUM_SEGMENT_HEADROOM",
+            })
+        if row["issues"]:
+            row["status"] = "NOT_COMPARABLE"
+            row["issues"] = sorted(set(row["issues"]))
+            result["scenarios"][scenario_name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        # P/E sensitivity: other segments remain at the complete B4 forecast vector.
+        # This is separate from B61's profit threshold and is not additive across segments.
+        for segment_row in b4_value_changes:
+            b4_profit = dec(segment_row.get("b4_forecast_parent_attributable_normalized_profit_cny"))
+            b4_segment_value = dec(segment_row.get("b4_forecast_segment_equity_value_at_selected_sotp_pe_cny"))
+            selected_pe = dec(segment_row.get("sotp_selected_pe_multiple_x"))
+            if b4_profit is not None and b4_profit > 0 and b4_segment_value is not None and selected_pe is not None:
+                required_pe = (required_pool - (forecast_segment_pool - b4_segment_value)) / b4_profit
+                segment_row["required_pe_at_b4_forecast_profit_with_other_segments_at_b4_forecast_x"] = format(required_pe, "f")
+                segment_row["selected_pe_minus_required_pe_at_b4_profit_x"] = format(selected_pe - required_pe, "f")
+                segment_row["required_pe_interpretation"] = "OTHER_SEGMENTS_HELD_AT_FULL_B4_FORECAST_VALUES;ONE_SEGMENT_P_E_ONLY;NON_ADDITIVE"
+            else:
+                segment_row["required_pe_at_b4_forecast_profit_with_other_segments_at_b4_forecast_x"] = None
+                segment_row["selected_pe_minus_required_pe_at_b4_profit_x"] = None
+                segment_row["required_pe_interpretation"] = "NOT_IDENTIFIABLE_NONPOSITIVE_OR_MISSING_B4_SEGMENT_PROFIT"
+        if any(value is None for value in (required_pool, selected_pool, required_total_equity, required_per_share, shares, central_cost, net_cash, other_adjustments)) or shares <= 0:
+            row["status"] = "NOT_IDENTIFIABLE"
+            row["issues"] = ["B61_PARENT_ADJUSTMENTS_OR_SHARE_COUNT_INVALID"]
+            result["scenarios"][scenario_name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        pool_residual = selected_segment_pool_recalculated - selected_pool
+        if abs(pool_residual) > Decimal("0.01"):
+            row["status"] = "NOT_COMPARABLE"
+            row["issues"] = ["SOTP_SELECTED_SEGMENT_POOL_RECALCULATION_MISMATCH"]
+            row["selected_segment_pool_recalculation_residual_cny"] = format(pool_residual, "f")
+            result["scenarios"][scenario_name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        forecast_total_equity = forecast_segment_pool - central_cost + net_cash + other_adjustments
+        forecast_terminal_per_share = forecast_total_equity / shares
+        aggregate_pool_headroom = forecast_segment_pool - required_pool
+        break_even_share_count = (
+            forecast_total_equity / required_per_share
+            if forecast_total_equity > 0 and required_per_share > 0 else None
+        )
+        row.update({
+            "status": "CALCULATED_CONDITIONAL",
+            "segment_comparisons": b4_value_changes,
+            "selected_sotp_segment_equity_value_pool_cny": format(selected_pool, "f"),
+            "b4_forecast_segment_equity_value_pool_at_selected_sotp_pe_cny": format(forecast_segment_pool, "f"),
+            "required_segment_equity_value_pool_for_required_return_cny": format(required_pool, "f"),
+            "b4_forecast_segment_pool_minus_required_pool_cny": format(aggregate_pool_headroom, "f"),
+            "b4_forecast_implied_total_equity_value_with_selected_parent_adjustments_cny": format(forecast_total_equity, "f"),
+            "required_terminal_equity_value_for_required_return_cny": format(required_total_equity, "f"),
+            "b4_forecast_implied_terminal_value_per_share_cny": format(forecast_terminal_per_share, "f"),
+            "required_terminal_value_per_share_for_required_return_cny": format(required_per_share, "f"),
+            "selected_diluted_shares": format(shares, "f"),
+            "break_even_diluted_shares_at_b4_forecast_value": format(break_even_share_count, "f") if break_even_share_count is not None else None,
+            "selected_parent_adjustments": {
+                "capitalized_central_cost_cny": format(central_cost, "f"),
+                "net_cash_debt_cny": format(net_cash, "f"),
+                "other_adjustments_cny": format(other_adjustments, "f"),
+                "required_segment_pool_sensitivity_per_plus_one_cny": {
+                    "capitalized_central_cost": "+1 CNY",
+                    "net_cash_debt": "-1 CNY",
+                    "other_adjustments": "-1 CNY",
+                },
+                "future_adjustment_change_attribution": "NOT_IDENTIFIABLE_WITHOUT_EXPLICIT_FORWARD_PARENT_ADJUSTMENT_INPUTS",
+            },
+            "dilution_sensitivity": {
+                "additional_required_equity_per_plus_one_diluted_share_cny": format(required_per_share, "f"),
+                "one_percent_share_count_increase_additional_required_equity_cny": format(required_per_share * shares * Decimal("0.01"), "f"),
+                "interpretation": "Holding price, return hurdle and timing constant, required terminal equity changes linearly with diluted shares.",
+            },
+            "interpretation": {
+                "earnings_vs_sotp": "B4_NORMALIZED_ATTRIBUTABLE_PROFIT_MINUS_SOTP_SELECTED_PROFIT",
+                "earnings_value_effect": "B4_MINUS_SOTP_PROFIT_TIMES_SELECTED_SOTP_PE",
+                "full_vector_hurdle": "SUM(B4_SEGMENT_PROFIT_TIMES_SELECTED_SOTP_PE)-B61_REQUIRED_SEGMENT_POOL",
+                "per_segment_hurdle": "B61_ONE_AT_A_TIME;NOT_ADDITIVE",
+            },
+            "issues": [],
+        })
+        result["scenarios"][scenario_name] = row
+        scenario_statuses.append(row["status"])
+
+    if scenario_statuses and all(status == "CALCULATED_CONDITIONAL" for status in scenario_statuses):
+        result["status"] = "CONDITIONAL_RECONCILIATION_CALCULATED"
+    elif any(status == "CALCULATED_CONDITIONAL" for status in scenario_statuses):
+        result["status"] = "PARTIAL"
+    elif any(status == "NOT_COMPARABLE" for status in scenario_statuses):
+        result["status"] = "NOT_COMPARABLE"
+    else:
+        result["status"] = "NOT_IDENTIFIABLE"
+    result["summary"] = "B62 使用 B4 分部正常化归母利润 × 已选 SOTP P/E 构建全分部前瞻权益价值池，与 B61 当前价格要求比较；分部单变量盈利阈值仍不可相加。"
+    return result
+
+
 def _build_b61_sotp_price_inversion(
     *,
     price_input: Mapping[str, Any],
@@ -5501,6 +5779,56 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
                 lines.append("- 待核查：" + "；".join(scenario_row["issues"][:6]))
         lines.append("- 边界：这是现价、终端分部 P/E、母公司调整与稀释股数条件下的数学反推，不是外部 MIE；没有分部价值驱动分配依据时，不生成多个分部同时应达到的盈利组合，也不修改 SOTP 主估值。")
 
+        local_b62_reconciliation = local_sotp_inversion.get("segment_earnings_reconciliation") if isinstance(local_sotp_inversion.get("segment_earnings_reconciliation"), Mapping) else {}
+        lines.extend([
+            "",
+            "- **B62 B4 分部正常化盈利 ↔ SOTP ↔ 现价要求对账**："
+            + f"{local_b62_reconciliation.get('status', 'UNKNOWN')}；"
+            + f"B4 分部桥 {local_b62_reconciliation.get('b4_segment_bridge_status', 'UNKNOWN')}；"
+            + f"盈利期间 {local_b62_reconciliation.get('forecast_period', 'UNKNOWN')}。",
+            "- B62 全分部对比：将 B4 各分部正常化归母净利润同时代入各自已选 SOTP P/E，形成完整前瞻分部价值池；与 B61 Required Return 所需价值池比较。分部单变量阈值仅作替代敏感性，严禁相加。",
+        ])
+        b62_scenarios = local_b62_reconciliation.get("scenarios") if isinstance(local_b62_reconciliation.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b62_row = b62_scenarios.get(scenario_name) if isinstance(b62_scenarios.get(scenario_name), Mapping) else {}
+            if b62_row.get("status") != "CALCULATED_CONDITIONAL":
+                lines.append(f"  - {scenario_name.upper()}：{b62_row.get('status', 'UNKNOWN')}；{'；'.join(b62_row.get('issues') or []) or '关键口径/字段不可比较'}")
+                continue
+            lines.append(
+                f"  - {scenario_name.upper()}：B4 前瞻分部价值池 {b62_row.get('b4_forecast_segment_equity_value_pool_at_selected_sotp_pe_cny')} CNY；"
+                f"现价 Required Return 所需池 {b62_row.get('required_segment_equity_value_pool_for_required_return_cny')} CNY；"
+                f"差额 {b62_row.get('b4_forecast_segment_pool_minus_required_pool_cny')} CNY；"
+                f"B4 前瞻隐含每股终值 {b62_row.get('b4_forecast_implied_terminal_value_per_share_cny')} CNY；"
+                f"Required Return 每股终值要求 {b62_row.get('required_terminal_value_per_share_for_required_return_cny')} CNY。"
+            )
+            for segment_row in b62_row.get("segment_comparisons", [])[:12]:
+                if not isinstance(segment_row, Mapping):
+                    continue
+                lines.append(
+                    f"    - {segment_row.get('segment_id')}：B4 正常化归母利润 {segment_row.get('b4_forecast_parent_attributable_normalized_profit_cny')} CNY；"
+                    f"SOTP 当前利润 {segment_row.get('sotp_selected_attributable_profit_cny')} CNY；"
+                    f"差异 {segment_row.get('b4_minus_sotp_profit_cny')} CNY；"
+                    f"按当前 P/E 的价值影响 {segment_row.get('profit_change_value_effect_at_selected_sotp_pe_cny')} CNY；"
+                    f"B4 利润减 B61 单变量要求 {segment_row.get('b4_forecast_profit_minus_b61_one_at_a_time_required_profit_cny')} CNY；"
+                    f"保持其他 B4 分部预测不变时所需 P/E {segment_row.get('required_pe_at_b4_forecast_profit_with_other_segments_at_b4_forecast_x')}x；"
+                    f"当前 P/E 与该要求差额 {segment_row.get('selected_pe_minus_required_pe_at_b4_profit_x')}x。"
+                )
+            parent_row = b62_row.get("selected_parent_adjustments") if isinstance(b62_row.get("selected_parent_adjustments"), Mapping) else {}
+            dilution = b62_row.get("dilution_sensitivity") if isinstance(b62_row.get("dilution_sensitivity"), Mapping) else {}
+            lines.append(
+                f"    - 母公司调整固定值：资本化中心成本 {parent_row.get('capitalized_central_cost_cny')} CNY；"
+                f"净现金/净负债 {parent_row.get('net_cash_debt_cny')} CNY；其他调整 {parent_row.get('other_adjustments_cny')} CNY。"
+            )
+            lines.append(
+                f"    - 股数约束：稀释股数 {b62_row.get('selected_diluted_shares')}；"
+                f"B4 估值下满足每股回报门槛的股数上限诊断 {b62_row.get('break_even_diluted_shares_at_b4_forecast_value')}；"
+                f"股数增加 1% 将增加所需终端股权价值 {dilution.get('one_percent_share_count_increase_additional_required_equity_cny')} CNY。"
+            )
+        lines.append(
+            "- B62 归因边界：B4 正常化利润与当前 SOTP 利润差额在当前 P/E 下的价值影响可量化；保持其他 B4 分部利润不变的所需 P/E 是另一项单变量敏感性。若无独立未来母公司调整预测，只展示中心成本/净现金/其他调整的方向敏感性，不能虚构其未来贡献。B61 单变量利润要求不可相加，完整 B4 价值池才是多分部同时变化的情景比较。"
+        )
+
+
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
@@ -6156,6 +6484,11 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         forecast_valuation=prepared.get("forecast_valuation") or {},
         validated_cash_distribution_events=prepared.get("_validated_cash_distribution_events"),
         external_mie_status=mie.get("status"),
+    )
+    local_sotp_inversion["segment_earnings_reconciliation"] = _build_b62_sotp_segment_earnings_reconciliation(
+        local_sotp_inversion=local_sotp_inversion,
+        sotp_valuation=prepared.get("sotp_valuation") or {},
+        operating_driver_forecast=prepared.get("operating_driver_forecast") or {},
     )
     source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion
@@ -7158,7 +7491,8 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
         "B49 增加强制的组件级 FCF 差异对账：B4 FCF 与正常化 FCF 均必须先由 EBIT 税后代理 + 折旧摊销 − 现金资本开支 − 有效营运资金变动公式复算，误差不超过 1 CNY；归因按 OPERATING_CASH_CONVERSION、NON_CASH_EARNINGS、CAPEX、WORKING_CAPITAL、INVENTORY_MOVEMENT 五类逐类对账，不可用类别间错误抵销伪装通过。库存若已包含在有效营运资金，INVENTORY_MOVEMENT 贡献必须为 0；仅当两边均明确排除库存时，才拆开核对原始非库存营运资金差额和库存代理差额，且拆分合计必须等于有效营运资金差额。B4 必须带有可复算的 EBIT、tax_rate、折旧摊销、资本开支、原始/有效营运资金和库存对账输入；输入缺失或处理口径不一致即保持 REVIEW_REQUIRED / NOT_COMPARABLE。"
         "B49 的 fcf_variance_attribution 每个情景每个组件类别仅允许一条数值归因，直到存在可独立核对的驱动级组件测量；不得把多个驱动的相反金额相互抵销后伪装成单项组件已核实。每条归因金额的证据引用必须同时与同驱动复核触发器证据、以及该类别对应的正常化 FCF cash_components 证据有交集：经营现金转换对应 EBIT 与税率；非现金收益对应折旧摊销；资本开支对应现金资本开支；库存排除时营运资金对应原始营运资金、库存类别对应库存现金影响代理；库存已包含或不适用时，营运资金和零库存单列归因对应有效营运资金证据。若一个类别实质上由多个驱动共同形成，但没有独立驱动级金额证据，须保持 REVIEW_REQUIRED，不得人为拆分金额。"
         "B50 允许有独立测量依据的真实多驱动分解：同一 scenario/category 有多行时，每行必须带 driver_component_measure 对象，字段为 measure_id、category、driver_id、component_basis、basis、b4_value_cny、normalized_value_cny。两侧数值都必须是带 unit=CNY、data_class、可识别 basis、非空且截止时点有效 evidence_refs 的 typed measure；measure.category/driver_id 必须分别等于归因行的 category/driver_id，driver_id 还必须与 review_trigger 一致，measure_id 在同一情景内不得重复。component_basis 必须严格按类别指定：OPERATING_CASH_CONVERSION=AFTER_TAX_EBIT_CONTRIBUTION（单驱动两侧值为驱动归属的税后 EBIT 贡献）；NON_CASH_EARNINGS=DEPRECIATION_AMORTIZATION；CAPEX=CASH_CAPEX；WORKING_CAPITAL 在库存从原始营运资金排除时使用 RAW_WORKING_CAPITAL_CHANGE，否则使用 EFFECTIVE_WORKING_CAPITAL_CHANGE；INVENTORY_MOVEMENT 只有双方均排除库存时才允许 INVENTORY_CASH_IMPACT_PROXY。B4−正常化贡献由两侧值复算：经营现金转换/非现金收益为 B4−正常化，资本开支/营运资金/库存代理为正常化−B4；归因行 amount_cny 必须在 ±1 CNY 内匹配复算结果，核对使用复算值而非直接相信声明金额。更重要的是，每类所有驱动的 B4 侧值之和与正常化侧值之和，必须分别在 ±1 CNY 内等于 B4 与正常化 FCF 对应的组件总值，不能只对上差额。证据必须有效且逐侧绑定：B4 侧证据、正常化侧证据必须分别与同驱动复核触发器证据相交；归因金额证据必须分别与 B4 侧和正常化侧测量证据相交；正常化侧驱动测量证据还必须与其所分解的正常化 FCF 组件输入证据逐项相交（经营现金转换需同时覆盖 EBIT 与税率组件）。仅共享任意一条触发器或金额证据不能替代某一侧的证据链接；报告必须显示各项链接检查结果。引用关系只证明引用链可追踪，不等于已证明来源内容在语义上支持该金额。任一侧总和不匹配、驱动/口径不匹配、证据不足或混用无测量行，均保持 REVIEW_REQUIRED。单行旧格式可继续作为单一驱动的诊断路径，但同一类别多行只有全部具备上述结构化测量时才允许。库存已包含于有效营运资金或库存不适用时，库存独立类别必须是单行、明确为零；不得把同一库存影响重复拆分。"
-         "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。cycle_earnings_monitor 必须位于 operating_driver_forecast 内，不能新增顶层字段。"
+                  "【B62 分部正常化盈利输入】若 B4 scope=COMPANY_WIDE 且基线/预测期间为相邻完整年度，必须为每条 product_lines 明确提供稳定的 business_segment_id；多个 product_id 可以归集到同一 business_segment_id，但禁止按产品名称或 SOTP 分部名称模糊推断。历史分部财务输入位于 historical_segment_financials，每个分部恰好一行，键为 business_segment_id；Bear/Base/Bull 每个 scenario 内提供 segment_financials，每个分部恰好一行并复用相同 ID。每行均需提供八个 typed measures：fixed_cash_opex_cny（CNY）、depreciation_amortization_cny（CNY）、finance_cost_cny（CNY）、tax_rate（ratio，0–1）、recurring_non_operating_pre_tax_cny（CNY）、non_recurring_pre_tax_cny（CNY）、minority_interest_net_profit_after_tax_cny（CNY）、minority_interest_nonrecurring_after_tax_cny（CNY）。历史八项必须 data_class=OBSERVED_ACTUAL；前瞻八项必须为 ISSUER_FORECAST 或 ANALYST_ASSUMPTION；每项保留 basis 与 evidence_refs。缺失字段不代表零；只有有明确来源和业务依据的真实零值才可填 0。分部财务必须覆盖完整分部，不得把集团级固定成本/少数股东损益按收入占比擅自分摊；无法获得可靠分部口径时保持缺失，使 B62 显示 NOT_IDENTIFIABLE。该桥仅将已对账 B55 产品贡献汇总到显式分部，再计算模型化正常化归母利润，不修改 B56/B57、B4/B5/B6、估值或决策字段。"
+"只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。cycle_earnings_monitor 必须位于 operating_driver_forecast 内，不能新增顶层字段。"
         "Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
         "【Round A 允许输入】\n"
         + json.dumps(allowed_input, ensure_ascii=False, indent=2, allow_nan=False)
@@ -7189,7 +7523,7 @@ def _build_price_aware_round_b_prompt(*, base_prompt: str, payload: Mapping[str,
         + "\n【Round B 输入模板（此阶段才包含结构化参考价）】\n"
         + json.dumps(prompt_input, ensure_ascii=False, indent=2, allow_nan=False)
         + "\n【Round B 输出约束】只返回 IIOS-RESEARCH-PATCH-0.1 紧凑 JSON。research 只允许 evidence_register、assessment、forecast_valuation、eps_multiple_valuation、valuation_transmission、sotp_valuation；assessment 只允许 market_implied_expectation、expectation_gap。"
-        + "不得更改 Round A 的公司侧字段。若返回 evidence_register，必须原样保留全部 Round A 来源记录，并可在其后追加新来源。"
+        + "不得更改 Round A 的公司侧字段。若返回 evidence_register，必须原样保留全部 Round A 来源记录，并可在其后追加新来源。【B62/SOTP 分部口径】若 Round A operating_driver_forecast 提供 business_segment_id，Round B 每个 SOTP segment_id 必须原样复用对应业务分部 ID，不得按名称模糊匹配、合并或拆分。每个 SOTP 分部显式提供 earnings_basis；仅当 attributable_net_profit_cny 是同一 forecast_period 的正常化归母净利润（已剔除非经常性损益，并按正常化少数股东损益扣除）时，才可声明 NORMALIZED_PARENT_ATTRIBUTABLE；若使用扣非/不扣非或归属口径不同，必须使用不同明确标记或 UNKNOWN，不得为了通过对账改写盈利定义。"
         + "研究输出顺序必须优先回答：①当前基本面事实与最关键的不确定性；②当前价/当前估值倍数实际要求企业实现什么；③在独立事实、业务机制和显式假设上形成的合理 Bear/Base/Bull 未来推演；④当前价格相对这些预期的差异及风险。不要先铺陈长篇辅助诊断再给核心判断。"
         + "外部 MIE 必须有独立、截止时点兼容、可核验的市场定价/一致预期证据；否则 assessment.market_implied_expectation.status=NOT_IDENTIFIABLE。价格反推属于条件模型反演，不是外部 MIE：放在 assessment.market_implied_expectation.price_implied_analysis，至少填写 status、method、model_family、reference_price、assumptions、implied_requirements、limitations；reference_price 必须与 price_input.price 完全一致。反推结果必须披露所固定的利润率/EPS/增长/终值倍数/资本回报/现金转换等变量和敏感性；不具备可复算公式或关键假设时，状态为 NOT_IDENTIFIABLE，数值留空。"
         + "assessment.expectation_gap 使用 comparison_basis 和 comparisons 对齐可比的市场/价格隐含要求与 Round A 独立预测；比较行至少有 metric、market_implied_value 或 price_implied_value、independent_forecast_value、unit、period、difference 或 direction、limitations。单位/期间/定义不一致就不比较，不得把仅方向性的判断伪装成量化预期差。任何基于 CONDITIONAL_PRICE_IMPLIED_VS_INDEPENDENT_FORECAST 的结果都只能展示为条件敏感性，决策可用 expectation_gap 必须保持 UNKNOWN，因为本地并未独立复算该反演；只有直接以外部可核验 MIE 为比较端的可比项才可能构成已验证预期差。"

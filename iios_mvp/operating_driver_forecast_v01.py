@@ -458,6 +458,7 @@ def _calculate_scenario(
         result = _product_profit_bridge(
             product_id, product["product_name"], measures, capacity, period_basis=period_basis
         )
+        result["business_segment_id"] = product.get("business_segment_id")
         product_results.append(result)
         p_volume = _value(measures.get("sales_volume_tonnes"))
         p_production = _value(measures.get("production_tonnes"))
@@ -1029,6 +1030,7 @@ def _build_baseline_transition_bridge(
             product_results.append({
                 "product_id": product_id,
                 "product_name": str(product.get("product_name") or product_id),
+                "business_segment_id": product.get("business_segment_id"),
                 "status": status,
                 "historical_baseline": {
                     "period": actuals_period,
@@ -1671,6 +1673,410 @@ def _build_per_share_earnings_bridge(
     return base
 
 
+
+
+_B62_SEGMENT_EARNINGS_FIELDS = {
+    "fixed_cash_opex_cny": "CNY",
+    "depreciation_amortization_cny": "CNY",
+    "finance_cost_cny": "CNY",
+    "tax_rate": "ratio",
+    "recurring_non_operating_pre_tax_cny": "CNY",
+    "non_recurring_pre_tax_cny": "CNY",
+    "minority_interest_net_profit_after_tax_cny": "CNY",
+    "minority_interest_nonrecurring_after_tax_cny": "CNY",
+}
+_B62_SEGMENT_EARNINGS_ALLOW_NEGATIVE = {
+    "finance_cost_cny",
+    "recurring_non_operating_pre_tax_cny",
+    "non_recurring_pre_tax_cny",
+    "minority_interest_net_profit_after_tax_cny",
+    "minority_interest_nonrecurring_after_tax_cny",
+}
+
+
+def _build_b62_segment_normalized_earnings_bridge(
+    *,
+    scope: str,
+    baseline_transition: Mapping[str, Any],
+    product_lines: list[Mapping[str, Any]],
+    historical_segment_financials_raw: Any,
+    scenarios_raw: Mapping[str, Any],
+    sources_by_id: Mapping[str, Mapping[str, Any]],
+    unresolved_refs: set[str],
+    after_cutoff_refs: set[str],
+    uncertain_refs: set[str],
+) -> dict[str, Any]:
+    """Build company-side segment normalized attributable earnings without using SOTP or price inputs."""
+    result: dict[str, Any] = {
+        "schema_version": "IIOS-B62-SEGMENT-NORMALIZED-EARNINGS-BRIDGE-0.1",
+        "status": "NOT_IDENTIFIABLE",
+        "scope": str(scope or "UNKNOWN").strip().upper(),
+        "baseline_period": baseline_transition.get("baseline_period") or "UNKNOWN",
+        "forecast_period": baseline_transition.get("forecast_period") or "UNKNOWN",
+        "mapping_method": "EXPLICIT_B4_PRODUCT_BUSINESS_SEGMENT_ID;MANY_PRODUCTS_TO_ONE_SEGMENT_ALLOWED;NO_NAME_MATCHING",
+        "metric": "MODELED_NORMALIZED_PARENT_ATTRIBUTABLE_SEGMENT_NET_PROFIT_CNY",
+        "segments": [],
+        "scenarios": {},
+        "limitations": [
+            "每条 B4 产品线必须显式填写 business_segment_id；多个产品线可以归集到同一分部，但不允许按名称模糊匹配。",
+            "每个分部必须单独提供历史 OBSERVED_ACTUAL 与前瞻 ISSUER_FORECAST/ANALYST_ASSUMPTION 的固定费用、折旧、融资、税率、经常性非经营项、非经常项及少数股东归属；缺失值不默认零。",
+            "产品贡献沿用 B55 已对账的销量×净售价−单位变动成本；产量与库存现金影响不在此处重复计入。",
+            "本桥是显式分部财务假设下的模型化正常化归母利润，不是财报披露值，也不构成正式 Forecast/Evidence/PIT Admission。",
+            "B62 不读取价格、SOTP 倍数、市场预期或持仓，不改变 B4/B5/B6、估值、收益门槛或决策权限。",
+        ],
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
+        "valuation_input_modified": False,
+    }
+
+    if result["scope"] != "COMPANY_WIDE":
+        result["status"] = "NOT_COMPARABLE_SCOPE"
+        result["reason"] = "分部归母利润与 SOTP 对账要求 B4 明确覆盖 COMPANY_WIDE；PROJECT_INCREMENTAL 或 PRODUCT_LINE 不可冒充公司完整分部范围。"
+        return result
+
+    products_by_id: dict[str, Mapping[str, Any]] = {}
+    product_to_segment: dict[str, str] = {}
+    mapping_issues: list[str] = []
+    for index, product in enumerate(product_lines):
+        if not isinstance(product, Mapping):
+            mapping_issues.append(f"PRODUCT_ROW_{index}_INVALID")
+            continue
+        product_id = str(product.get("product_id") or "").strip()
+        segment_id = str(product.get("business_segment_id") or "").strip()
+        if not product_id or product_id in products_by_id:
+            mapping_issues.append(f"PRODUCT_ID_MISSING_OR_DUPLICATE:{product_id or index}")
+            continue
+        products_by_id[product_id] = product
+        if not segment_id:
+            mapping_issues.append(f"BUSINESS_SEGMENT_ID_MISSING:{product_id}")
+            continue
+        product_to_segment[product_id] = segment_id
+    segment_ids = sorted(set(product_to_segment.values()))
+    result["segments"] = segment_ids
+    result["mapped_product_count"] = len(product_to_segment)
+    result["product_count"] = len(products_by_id)
+    result["mapping_issues"] = sorted(set(mapping_issues))
+    if not products_by_id or mapping_issues or len(product_to_segment) != len(products_by_id):
+        result["status"] = "SEGMENT_MAPPING_INCOMPLETE"
+        result["reason"] = "至少一条产品线没有明确且唯一的 business_segment_id；不推断其所属分部。"
+        return result
+
+    def index_financial_rows(raw_rows: Any, id_field: str, label: str) -> tuple[dict[str, Mapping[str, Any]], list[str]]:
+        indexed: dict[str, Mapping[str, Any]] = {}
+        issues: list[str] = []
+        if not isinstance(raw_rows, list) or not raw_rows:
+            return {}, [f"{label}_MISSING_OR_EMPTY"]
+        for row_index, raw_row in enumerate(raw_rows):
+            if not isinstance(raw_row, Mapping):
+                issues.append(f"{label}_ROW_{row_index}_INVALID")
+                continue
+            segment_id = str(raw_row.get(id_field) or "").strip()
+            if not segment_id:
+                issues.append(f"{label}_SEGMENT_ID_MISSING:{row_index}")
+            elif segment_id in indexed:
+                issues.append(f"{label}_DUPLICATE_SEGMENT_ID:{segment_id}")
+                indexed[segment_id] = {}
+            else:
+                indexed[segment_id] = raw_row
+        expected, actual = set(segment_ids), set(indexed)
+        for missing_id in sorted(expected - actual):
+            issues.append(f"{label}_SEGMENT_MISSING:{missing_id}")
+        for extra_id in sorted(actual - expected):
+            issues.append(f"{label}_SEGMENT_NOT_MAPPED_TO_B4_PRODUCT:{extra_id}")
+        return indexed, sorted(set(issues))
+
+    historical_rows, historical_mapping_issues = index_financial_rows(
+        historical_segment_financials_raw, "business_segment_id", "HISTORICAL_SEGMENT_FINANCIALS"
+    )
+    result["historical_financial_mapping_issues"] = historical_mapping_issues
+    if historical_mapping_issues:
+        result["status"] = "SEGMENT_FINANCIAL_MAPPING_INCOMPLETE"
+        result["reason"] = "历史分部财务数据必须与 B4 产品线的显式分部映射一一覆盖；重复、缺失或额外分部均不自动归并。"
+        return result
+
+    b55_scenarios = baseline_transition.get("scenarios") if isinstance(baseline_transition.get("scenarios"), Mapping) else {}
+    statuses: list[str] = []
+    scenarios_out: dict[str, Any] = {}
+
+    def measure_set(raw_row: Mapping[str, Any], prefix: str, allowed: set[str]) -> tuple[dict[str, Decimal], dict[str, Any], list[str]]:
+        normalized = _normalise_product_measure_set(
+            raw_row,
+            _B62_SEGMENT_EARNINGS_FIELDS,
+            prefix,
+            sources_by_id,
+            unresolved_refs,
+            after_cutoff_refs,
+            uncertain_refs,
+            allowed_data_classes=allowed,
+            allow_negative_metrics=_B62_SEGMENT_EARNINGS_ALLOW_NEGATIVE,
+        )
+        values: dict[str, Decimal] = {}
+        issues: list[str] = []
+        for field, measure in normalized.items():
+            value = _value(measure)
+            actual_class = str(measure.get("data_class") or "UNKNOWN").strip().upper()
+            if value is None:
+                issues.append(f"{prefix}.{field}:MEASURE_NOT_USABLE")
+            if actual_class not in allowed:
+                issues.append(f"{prefix}.{field}:DATA_CLASS_NOT_ALLOWED")
+            if value is not None:
+                values[field] = value
+        tax_rate = values.get("tax_rate")
+        if tax_rate is not None and (tax_rate < 0 or tax_rate > 1):
+            issues.append(f"{prefix}.tax_rate:MUST_BE_BETWEEN_ZERO_AND_ONE")
+            values.pop("tax_rate", None)
+        return values, normalized, sorted(set(issues))
+
+    def calculate_period(contribution: Decimal, values: Mapping[str, Decimal]) -> dict[str, Decimal]:
+        core_pbt = (
+            contribution
+            - values["fixed_cash_opex_cny"]
+            - values["depreciation_amortization_cny"]
+            - values["finance_cost_cny"]
+        )
+        core_tax = max(core_pbt, Decimal("0")) * values["tax_rate"]
+        core_net_profit = core_pbt - core_tax
+        normalized_pbt = core_pbt + values["recurring_non_operating_pre_tax_cny"]
+        normalized_tax = max(normalized_pbt, Decimal("0")) * values["tax_rate"]
+        normalized_consolidated = normalized_pbt - normalized_tax
+        all_items_pbt = normalized_pbt + values["non_recurring_pre_tax_cny"]
+        all_items_tax = max(all_items_pbt, Decimal("0")) * values["tax_rate"]
+        all_items_consolidated = all_items_pbt - all_items_tax
+        normalized_nci = (
+            values["minority_interest_net_profit_after_tax_cny"]
+            - values["minority_interest_nonrecurring_after_tax_cny"]
+        )
+        return {
+            "contribution_after_variable_cost_cny": contribution,
+            "core_profit_before_tax_proxy_cny": core_pbt,
+            "core_modeled_tax_expense_cny": core_tax,
+            "core_net_profit_proxy_cny": core_net_profit,
+            "fixed_cash_opex_cny": values["fixed_cash_opex_cny"],
+            "depreciation_amortization_cny": values["depreciation_amortization_cny"],
+            "finance_cost_cny": values["finance_cost_cny"],
+            "tax_rate": values["tax_rate"],
+            "recurring_non_operating_pre_tax_cny": values["recurring_non_operating_pre_tax_cny"],
+            "normalized_profit_before_tax_proxy_cny": normalized_pbt,
+            "normalized_modeled_tax_expense_cny": normalized_tax,
+            "normalized_consolidated_net_profit_proxy_cny": normalized_consolidated,
+            "normalized_minority_interest_net_profit_cny": normalized_nci,
+            "normalized_parent_attributable_net_profit_cny": normalized_consolidated - normalized_nci,
+            "non_recurring_pre_tax_cny": values["non_recurring_pre_tax_cny"],
+            "all_items_profit_before_tax_proxy_cny": all_items_pbt,
+            "all_items_modeled_tax_expense_cny": all_items_tax,
+            "all_items_consolidated_net_profit_proxy_cny": all_items_consolidated,
+            "all_items_minority_interest_net_profit_cny": values["minority_interest_net_profit_after_tax_cny"],
+            "all_items_parent_attributable_net_profit_proxy_cny": (
+                all_items_consolidated - values["minority_interest_net_profit_after_tax_cny"]
+            ),
+        }
+
+    scenario_inputs = scenarios_raw if isinstance(scenarios_raw, Mapping) else {}
+    for scenario_name in SCENARIOS:
+        b55_row = b55_scenarios.get(scenario_name) if isinstance(b55_scenarios.get(scenario_name), Mapping) else {}
+        raw_scenario = scenario_inputs.get(scenario_name) if isinstance(scenario_inputs.get(scenario_name), Mapping) else {}
+        row: dict[str, Any] = {
+            "scenario": scenario_name,
+            "status": "NOT_IDENTIFIABLE",
+            "segments": {},
+            "issues": [],
+            "formal_forecast_admission_created": False,
+            "decision_authority": False,
+        }
+        if str(b55_row.get("status") or "UNKNOWN").upper() != "CALCULATED_AND_RECONCILED":
+            row["status"] = "BLOCKED_BY_B55"
+            row["issues"] = [f"B55_STATUS:{b55_row.get('status') or 'UNKNOWN'}"]
+            scenarios_out[scenario_name] = row
+            statuses.append(row["status"])
+            continue
+
+        b55_product_rows = b55_row.get("product_lines") if isinstance(b55_row.get("product_lines"), list) else []
+        b55_by_product: dict[str, Mapping[str, Any]] = {}
+        for item in b55_product_rows:
+            if not isinstance(item, Mapping):
+                continue
+            pid = str(item.get("product_id") or "").strip()
+            if not pid or pid in b55_by_product:
+                row["issues"].append(f"B55_PRODUCT_ID_MISSING_OR_DUPLICATE:{pid or 'UNKNOWN'}")
+            else:
+                b55_by_product[pid] = item
+        if set(b55_by_product) != set(products_by_id):
+            row["issues"].append("B55_PRODUCT_UNIVERSE_MISMATCH")
+        contributions: dict[str, dict[str, Decimal]] = {
+            segment_id: {"historical": Decimal("0"), "forward": Decimal("0")}
+            for segment_id in segment_ids
+        }
+        for product_id, segment_id in product_to_segment.items():
+            product_row = b55_by_product.get(product_id)
+            if not isinstance(product_row, Mapping) or str(product_row.get("status") or "").upper() != "CALCULATED_AND_RECONCILED":
+                row["issues"].append(f"B55_PRODUCT_NOT_RECONCILED:{product_id}")
+                continue
+            if str(product_row.get("business_segment_id") or "").strip() != segment_id:
+                row["issues"].append(f"B55_PRODUCT_SEGMENT_MAPPING_MISMATCH:{product_id}")
+                continue
+            historical = product_row.get("historical_baseline") if isinstance(product_row.get("historical_baseline"), Mapping) else {}
+            forward = product_row.get("forward_scenario") if isinstance(product_row.get("forward_scenario"), Mapping) else {}
+            try:
+                historical_contribution = _decimal(historical.get("contribution_after_variable_cost_cny"), "B62_HISTORICAL_CONTRIBUTION")
+                forward_contribution = _decimal(forward.get("contribution_after_variable_cost_cny"), "B62_FORWARD_CONTRIBUTION")
+            except ValueError:
+                row["issues"].append(f"B55_PRODUCT_CONTRIBUTION_MISSING:{product_id}")
+                continue
+            contributions[segment_id]["historical"] += historical_contribution
+            contributions[segment_id]["forward"] += forward_contribution
+
+        forward_rows, forward_mapping_issues = index_financial_rows(
+            raw_scenario.get("segment_financials"), "business_segment_id", f"{scenario_name.upper()}_SEGMENT_FINANCIALS"
+        )
+        row["financial_mapping_issues"] = forward_mapping_issues
+        if forward_mapping_issues:
+            row["issues"].extend(forward_mapping_issues)
+        if row["issues"]:
+            scenarios_out[scenario_name] = row
+            statuses.append("NOT_IDENTIFIABLE")
+            continue
+
+        segment_statuses: list[str] = []
+        for segment_id in segment_ids:
+            hist_values, hist_measures, hist_issues = measure_set(
+                historical_rows[segment_id], f"B62.history.{segment_id}",
+                {"OBSERVED_ACTUAL"},
+            )
+            fwd_values, fwd_measures, fwd_issues = measure_set(
+                forward_rows[segment_id], f"B62.{scenario_name}.{segment_id}",
+                {"ISSUER_FORECAST", "ANALYST_ASSUMPTION"},
+            )
+            issues = hist_issues + fwd_issues
+            if len(hist_values) != len(_B62_SEGMENT_EARNINGS_FIELDS) or len(fwd_values) != len(_B62_SEGMENT_EARNINGS_FIELDS):
+                segment_statuses.append("NOT_IDENTIFIABLE")
+                row["segments"][segment_id] = {
+                    "business_segment_id": segment_id,
+                    "status": "NOT_IDENTIFIABLE",
+                    "issues": sorted(set(issues)),
+                    "missing_required_financial_measures": sorted(
+                        set(_B62_SEGMENT_EARNINGS_FIELDS) - set(hist_values)
+                    ) + sorted(
+                        f"forward.{field}" for field in set(_B62_SEGMENT_EARNINGS_FIELDS) - set(fwd_values)
+                    ),
+                }
+                continue
+
+            historical_result = calculate_period(contributions[segment_id]["historical"], hist_values)
+            forward_result = calculate_period(contributions[segment_id]["forward"], fwd_values)
+            contribution_change = (
+                forward_result["contribution_after_variable_cost_cny"]
+                - historical_result["contribution_after_variable_cost_cny"]
+            )
+            fixed_opex_effect = -(
+                forward_result["fixed_cash_opex_cny"] - historical_result["fixed_cash_opex_cny"]
+            )
+            depreciation_effect = -(
+                forward_result["depreciation_amortization_cny"]
+                - historical_result["depreciation_amortization_cny"]
+            )
+            finance_effect = -(
+                forward_result["finance_cost_cny"] - historical_result["finance_cost_cny"]
+            )
+            core_tax_effect = -(
+                forward_result["core_modeled_tax_expense_cny"]
+                - historical_result["core_modeled_tax_expense_cny"]
+            )
+            core_net_profit_change = (
+                forward_result["core_net_profit_proxy_cny"]
+                - historical_result["core_net_profit_proxy_cny"]
+            )
+            core_attribution_sum = (
+                contribution_change + fixed_opex_effect + depreciation_effect + finance_effect + core_tax_effect
+            )
+            core_residual = core_net_profit_change - core_attribution_sum
+            historical_non_operating_after_tax = (
+                historical_result["normalized_consolidated_net_profit_proxy_cny"]
+                - historical_result["core_net_profit_proxy_cny"]
+            )
+            forward_non_operating_after_tax = (
+                forward_result["normalized_consolidated_net_profit_proxy_cny"]
+                - forward_result["core_net_profit_proxy_cny"]
+            )
+            non_operating_after_tax_change = forward_non_operating_after_tax - historical_non_operating_after_tax
+            normalized_nci_effect = (
+                historical_result["normalized_minority_interest_net_profit_cny"]
+                - forward_result["normalized_minority_interest_net_profit_cny"]
+            )
+            normalized_parent_profit_change = (
+                forward_result["normalized_parent_attributable_net_profit_cny"]
+                - historical_result["normalized_parent_attributable_net_profit_cny"]
+            )
+            attribution_sum = (
+                core_attribution_sum + non_operating_after_tax_change + normalized_nci_effect
+            )
+            residual = normalized_parent_profit_change - attribution_sum
+            status = (
+                "CALCULATED_AND_RECONCILED"
+                if abs(core_residual) <= Decimal("1") and abs(residual) <= Decimal("1")
+                else "RECONCILIATION_MISMATCH"
+            )
+            segment_statuses.append(status)
+            row["segments"][segment_id] = {
+                "business_segment_id": segment_id,
+                "status": status,
+                "historical_baseline": {
+                    "period": result["baseline_period"],
+                    **{key: _render(value) for key, value in historical_result.items()},
+                    "measure_lineage": hist_measures,
+                },
+                "forward_scenario": {
+                    "period": result["forecast_period"],
+                    **{key: _render(value) for key, value in forward_result.items()},
+                    "measure_lineage": fwd_measures,
+                },
+                "changes": {
+                    "contribution_after_variable_cost_cny": _render(contribution_change),
+                    "fixed_cash_opex_effect_cny": _render(fixed_opex_effect),
+                    "depreciation_amortization_effect_cny": _render(depreciation_effect),
+                    "finance_cost_effect_cny": _render(finance_effect),
+                    "core_tax_effect_cny": _render(core_tax_effect),
+                    "core_net_profit_proxy_change_cny": _render(core_net_profit_change),
+                    "core_attribution_sum_cny": _render(core_attribution_sum),
+                    "core_reconciliation_residual_cny": _render(core_residual),
+                    "recurring_non_operating_after_tax_effect_cny": _render(non_operating_after_tax_change),
+                    "normalized_minority_interest_effect_cny": _render(normalized_nci_effect),
+                    "normalized_parent_attributable_net_profit_change_cny": _render(normalized_parent_profit_change),
+                    "attribution_sum_cny": _render(attribution_sum),
+                    "reconciliation_residual_cny": _render(residual),
+                    "tolerance_cny": "1",
+                },
+                "issues": sorted(set(issues)),
+                "formal_forecast_admission_created": False,
+                "decision_authority": False,
+            }
+
+        if any(status == "RECONCILIATION_MISMATCH" for status in segment_statuses):
+            row["status"] = "RECONCILIATION_MISMATCH"
+        elif segment_statuses and all(status == "CALCULATED_AND_RECONCILED" for status in segment_statuses):
+            row["status"] = "CALCULATED_AND_RECONCILED"
+        elif any(status == "CALCULATED_AND_RECONCILED" for status in segment_statuses):
+            row["status"] = "PARTIAL"
+        else:
+            row["status"] = "NOT_IDENTIFIABLE"
+        scenarios_out[scenario_name] = row
+        statuses.append(row["status"])
+
+    result["scenarios"] = scenarios_out
+    if statuses and all(status == "CALCULATED_AND_RECONCILED" for status in statuses):
+        result["status"] = "DIAGNOSTIC_CALCULATED"
+        result["reason"] = "Bear/Base/Bull 的每个显式分部均完成 B55 产品贡献→分部财务→正常化归母利润桥接并在 CNY 1 内对账。"
+    elif any(status == "RECONCILIATION_MISMATCH" for status in statuses):
+        result["status"] = "RECONCILIATION_MISMATCH"
+        result["reason"] = "至少一个分部的利润桥算术未在 CNY 1 内对账；不得把该分部盈利作为已闭合预测。"
+    elif any(status in {"CALCULATED_AND_RECONCILED", "PARTIAL"} for status in statuses):
+        result["status"] = "PARTIAL"
+        result["reason"] = "仅部分情景/分部完成可核对的正常化归母利润桥；未完成部分保留 UNKNOWN。"
+    else:
+        result["status"] = "NOT_IDENTIFIABLE"
+        result["reason"] = "分部经营贡献、历史/前瞻分部财务数据或数据类别不可识别；未推导分部归母利润。"
+    return result
+
+
 def evaluate_operating_driver_forecast(
     raw: Any,
     *,
@@ -1727,6 +2133,14 @@ def evaluate_operating_driver_forecast(
                     "decision_authority": False,
                     "eps_impact": None,
                     "per_share_value_impact": None,
+                },
+                "segment_normalized_earnings_bridge": {
+                    "schema_version": "IIOS-B62-SEGMENT-NORMALIZED-EARNINGS-BRIDGE-0.1",
+                    "status": "NOT_PROVIDED",
+                    "segments": [],
+                    "scenarios": {},
+                    "formal_forecast_admission_created": False,
+                    "decision_authority": False,
                 },
                 "formal_forecast_admission_created": False,
                 "decision_authority": False,
@@ -1787,6 +2201,14 @@ def evaluate_operating_driver_forecast(
                     "decision_authority": False,
                     "eps_impact": None,
                     "per_share_value_impact": None,
+                },
+                "segment_normalized_earnings_bridge": {
+                    "schema_version": "IIOS-B62-SEGMENT-NORMALIZED-EARNINGS-BRIDGE-0.1",
+                    "status": "INVALID_SCHEMA",
+                    "segments": [],
+                    "scenarios": {},
+                    "formal_forecast_admission_created": False,
+                    "decision_authority": False,
                 },
                 "formal_forecast_admission_created": False,
                 "decision_authority": False,
@@ -1876,6 +2298,7 @@ def evaluate_operating_driver_forecast(
         product_lines.append({
             "product_id": product_id,
             "product_name": product_name,
+            "business_segment_id": str(row.get("business_segment_id") or "").strip() or None,
             "capacity_tonnes_per_year": capacity,
             "historical_actuals": actuals,
             "historical_actual_bridge": actual_bridge,
@@ -1925,6 +2348,17 @@ def evaluate_operating_driver_forecast(
         scope=scope,
         baseline_transition=baseline_transition,
         historical_attribution_raw=raw.get("historical_earnings_attribution"),
+        scenarios_raw=scenarios_raw,
+        sources_by_id=sources_by_id,
+        unresolved_refs=unresolved_refs,
+        after_cutoff_refs=after_cutoff_refs,
+        uncertain_refs=uncertain_refs,
+    )
+    baseline_transition["segment_normalized_earnings_bridge"] = _build_b62_segment_normalized_earnings_bridge(
+        scope=scope,
+        baseline_transition=baseline_transition,
+        product_lines=product_lines,
+        historical_segment_financials_raw=raw.get("historical_segment_financials"),
         scenarios_raw=scenarios_raw,
         sources_by_id=sources_by_id,
         unresolved_refs=unresolved_refs,
@@ -2270,6 +2704,83 @@ def render_operating_driver_section(
     lines.extend([
         "- 解释边界：正常化 EPS 剔除显式列示的非经常项目，但保留已输入的其他非经营性净额；含所有项目的结果仍是模型代理，不等于公司正式披露的归母净利润。",
         "- 局部产品线、项目增量或未知范围不能直接推导公司 EPS；稀释股数必须显式输入且大于零。该桥不修改估值、B5/B6、15% 年化收益门槛、正式决策或交易授权。",
+        "",
+    ])
+    segment_earnings_bridge = (
+        transition.get("segment_normalized_earnings_bridge")
+        if isinstance(transition.get("segment_normalized_earnings_bridge"), Mapping) else {}
+    )
+    lines.extend([
+        "",
+        "#### B62 分部正常化归母利润桥（诊断，不进入估值）",
+        "",
+        f"- 状态：**{segment_earnings_bridge.get('status', 'UNKNOWN')}**；范围：{segment_earnings_bridge.get('scope', 'UNKNOWN')}；历史期间：{segment_earnings_bridge.get('baseline_period', 'UNKNOWN')}；前瞻期间：{segment_earnings_bridge.get('forecast_period', 'UNKNOWN')}",
+        f"- 映射方法：{segment_earnings_bridge.get('mapping_method', 'UNKNOWN')}；产品数/已映射产品数：{segment_earnings_bridge.get('product_count', 'UNKNOWN')} / {segment_earnings_bridge.get('mapped_product_count', 'UNKNOWN')}；分部：{'、'.join(segment_earnings_bridge.get('segments') or []) or 'UNKNOWN'}",
+    ])
+    if segment_earnings_bridge.get("mapping_issues"):
+        lines.append("- 产品→分部映射问题：" + "；".join(str(item) for item in segment_earnings_bridge["mapping_issues"][:10]))
+    if segment_earnings_bridge.get("historical_financial_mapping_issues"):
+        lines.append("- 历史分部财务映射问题：" + "；".join(str(item) for item in segment_earnings_bridge["historical_financial_mapping_issues"][:10]))
+    segment_earnings_scenarios = (
+        segment_earnings_bridge.get("scenarios")
+        if isinstance(segment_earnings_bridge.get("scenarios"), Mapping) else {}
+    )
+    b62_fields = (
+        ("fixed_cash_opex_cny", "固定现金运营费用"),
+        ("depreciation_amortization_cny", "折旧摊销"),
+        ("finance_cost_cny", "融资成本"),
+        ("tax_rate", "有效税率"),
+        ("recurring_non_operating_pre_tax_cny", "经常性非经营税前净额"),
+        ("non_recurring_pre_tax_cny", "非经常性税前净额"),
+        ("minority_interest_net_profit_after_tax_cny", "少数股东税后净利润（含非经常项）"),
+        ("minority_interest_nonrecurring_after_tax_cny", "少数股东非经常项目税后份额"),
+    )
+    for scenario_name in SCENARIOS:
+        scenario_row = segment_earnings_scenarios.get(scenario_name) if isinstance(segment_earnings_scenarios.get(scenario_name), Mapping) else {}
+        lines.append(f"**B62 {scenario_name.upper()} — {scenario_row.get('status', 'UNKNOWN')}**")
+        segment_rows = scenario_row.get("segments") if isinstance(scenario_row.get("segments"), Mapping) else {}
+        for segment_id in sorted(segment_rows):
+            segment = segment_rows.get(segment_id) if isinstance(segment_rows.get(segment_id), Mapping) else {}
+            hist = segment.get("historical_baseline") if isinstance(segment.get("historical_baseline"), Mapping) else {}
+            fwd = segment.get("forward_scenario") if isinstance(segment.get("forward_scenario"), Mapping) else {}
+            changes = segment.get("changes") if isinstance(segment.get("changes"), Mapping) else {}
+            lines.append(
+                f"- {segment_id}：正常化归母利润历史 {_display_optional_scalar(hist.get('normalized_parent_attributable_net_profit_cny'))} → "
+                f"前瞻 {_display_optional_scalar(fwd.get('normalized_parent_attributable_net_profit_cny'))} CNY；"
+                f"变化 {_display_optional_scalar(changes.get('normalized_parent_attributable_net_profit_change_cny'))} CNY；"
+                f"分部状态 {segment.get('status', 'UNKNOWN')}。"
+            )
+            lines.append(
+                f"  - 归因：产品贡献 {_display_optional_scalar(changes.get('contribution_after_variable_cost_cny'))}；"
+                f"固定费用效应 {_display_optional_scalar(changes.get('fixed_cash_opex_effect_cny'))}；"
+                f"折旧效应 {_display_optional_scalar(changes.get('depreciation_amortization_effect_cny'))}；"
+                f"融资效应 {_display_optional_scalar(changes.get('finance_cost_effect_cny'))}；"
+                f"核心税费效应 {_display_optional_scalar(changes.get('core_tax_effect_cny'))}；"
+                f"经常性非经营税后效应 {_display_optional_scalar(changes.get('recurring_non_operating_after_tax_effect_cny'))}；"
+                f"正常化少数股东归属效应 {_display_optional_scalar(changes.get('normalized_minority_interest_effect_cny'))} CNY。"
+            )
+            lines.append(
+                f"  - 对账：核心残差 {_display_optional_scalar(changes.get('core_reconciliation_residual_cny'))}；"
+                f"正常化归母利润残差 {_display_optional_scalar(changes.get('reconciliation_residual_cny'))} CNY（各自容差 CNY 1）。"
+            )
+            for financial_key, financial_label in b62_fields:
+                hist_measure = (hist.get("measure_lineage") or {}).get(financial_key) if isinstance(hist.get("measure_lineage"), Mapping) else {}
+                fwd_measure = (fwd.get("measure_lineage") or {}).get(financial_key) if isinstance(fwd.get("measure_lineage"), Mapping) else {}
+                hist_refs = "、".join(hist_measure.get("evidence_refs") or []) or "无显式引用"
+                fwd_refs = "、".join(fwd_measure.get("evidence_refs") or []) or "无显式引用"
+                lines.append(
+                    f"  - {financial_label}：历史 {_display(hist_measure)}（{hist_measure.get('data_class', 'UNKNOWN')}；{hist_measure.get('basis') or 'UNKNOWN'}；引用 {hist_refs}）"
+                    f" → 前瞻 {_display(fwd_measure)}（{fwd_measure.get('data_class', 'UNKNOWN')}；{fwd_measure.get('basis') or 'UNKNOWN'}；引用 {fwd_refs}）。"
+                )
+            if segment.get("missing_required_financial_measures"):
+                lines.append("  - 缺失分部财务字段：" + "、".join(segment["missing_required_financial_measures"]))
+            if segment.get("issues"):
+                lines.append("  - 分部输入/对账问题：" + "；".join(str(item) for item in segment["issues"][:8]))
+        if scenario_row.get("issues"):
+            lines.append("- 情景问题：" + "；".join(str(item) for item in scenario_row["issues"][:10]))
+    lines.extend([
+        "- 边界：本桥只在 COMPANY_WIDE、显式产品→分部映射、B55 产品贡献完成对账且历史/前瞻八项分部财务数据具备来源与期间口径时计算。分部固定费用与 NCI 不从集团数据按收入比例估算；非经常项目不进入正常化利润。",
+        "- B62 分部利润仅为独立诊断，不自动替换 B57 公司级归母利润/EPS，不进入 B5/B6、SOTP 主估值或外部 MIE。",
         "",
     ])
     eps_consistency = (

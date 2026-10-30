@@ -12,6 +12,7 @@ import time as _time
 import pytest
 
 import iios_mvp.local_investment_pilot_v01 as pilot
+import iios_mvp.operating_driver_forecast_v01 as operating
 from iios_mvp.operating_driver_forecast_v01 import render_operating_driver_section, evaluate_operating_driver_forecast
 
 from iios_mvp.local_investment_pilot_v01 import (
@@ -6509,3 +6510,253 @@ def test_b61_reports_sotp_conditional_inversion_without_changing_top_level_or_ex
     assert result["external_mie_and_expectation_gap_modified"] is False
     assert result["formal_mie_admission_created"] is False
     assert result["decision_authority"] is False
+
+
+def _b62_segment_financial_row(segment_id, values, data_class, refs=None):
+    units = {
+        "fixed_cash_opex_cny": "CNY", "depreciation_amortization_cny": "CNY",
+        "finance_cost_cny": "CNY", "tax_rate": "ratio",
+        "recurring_non_operating_pre_tax_cny": "CNY", "non_recurring_pre_tax_cny": "CNY",
+        "minority_interest_net_profit_after_tax_cny": "CNY",
+        "minority_interest_nonrecurring_after_tax_cny": "CNY",
+    }
+    return {
+        "business_segment_id": segment_id,
+        **{
+            key: _driver_measure(value, units[key], data_class, refs or [], f"Synthetic {data_class} {key}")
+            for key, value in values.items()
+        },
+    }
+
+
+def _b62_segment_bridge_inputs():
+    products = [
+        {"product_id": "product_a1", "business_segment_id": "seg_a"},
+        {"product_id": "product_a2", "business_segment_id": "seg_a"},
+    ]
+    history = {
+        "fixed_cash_opex_cny": "20", "depreciation_amortization_cny": "5",
+        "finance_cost_cny": "2", "tax_rate": "0.20",
+        "recurring_non_operating_pre_tax_cny": "1", "non_recurring_pre_tax_cny": "3",
+        "minority_interest_net_profit_after_tax_cny": "2",
+        "minority_interest_nonrecurring_after_tax_cny": "1",
+    }
+    forward = {
+        "fixed_cash_opex_cny": "22", "depreciation_amortization_cny": "6",
+        "finance_cost_cny": "2.5", "tax_rate": "0.20",
+        "recurring_non_operating_pre_tax_cny": "1.5", "non_recurring_pre_tax_cny": "1",
+        "minority_interest_net_profit_after_tax_cny": "2.5",
+        "minority_interest_nonrecurring_after_tax_cny": "0.5",
+    }
+    historical = [_b62_segment_financial_row("seg_a", history, "OBSERVED_ACTUAL", ["E1"])]
+    scenarios_raw, b55_scenarios = {}, {}
+    for name, first_forward, second_forward in (
+        ("bear", "110", "60"), ("base", "120", "70"), ("bull", "130", "80")
+    ):
+        scenarios_raw[name] = {
+            "segment_financials": [_b62_segment_financial_row("seg_a", forward, "ANALYST_ASSUMPTION", [])]
+        }
+        b55_scenarios[name] = {
+            "status": "CALCULATED_AND_RECONCILED",
+            "product_lines": [
+                {
+                    "product_id": "product_a1", "business_segment_id": "seg_a",
+                    "status": "CALCULATED_AND_RECONCILED",
+                    "historical_baseline": {"contribution_after_variable_cost_cny": "100"},
+                    "forward_scenario": {"contribution_after_variable_cost_cny": first_forward},
+                },
+                {
+                    "product_id": "product_a2", "business_segment_id": "seg_a",
+                    "status": "CALCULATED_AND_RECONCILED",
+                    "historical_baseline": {"contribution_after_variable_cost_cny": "50"},
+                    "forward_scenario": {"contribution_after_variable_cost_cny": second_forward},
+                },
+            ],
+        }
+    transition = {
+        "status": "DIAGNOSTIC_CALCULATED", "baseline_period": "2025FY",
+        "forecast_period": "2026FY", "scenarios": b55_scenarios,
+    }
+    sources = [{
+        "source_id": "E1", "known_at": "2025-12-31",
+        "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED",
+    }]
+    return products, historical, scenarios_raw, transition, sources
+
+
+def test_b62_segment_normalized_earnings_bridge_aggregates_explicit_product_mapping_and_reconciles():
+    products, historical, scenarios_raw, transition, sources = _b62_segment_bridge_inputs()
+    result = operating._build_b62_segment_normalized_earnings_bridge(
+        scope="COMPANY_WIDE", baseline_transition=transition, product_lines=products,
+        historical_segment_financials_raw=historical, scenarios_raw=scenarios_raw,
+        sources_by_id={row["source_id"]: row for row in sources},
+        unresolved_refs=set(), after_cutoff_refs=set(), uncertain_refs=set(),
+    )
+    assert result["status"] == "DIAGNOSTIC_CALCULATED"
+    assert result["segments"] == ["seg_a"]
+    segment = result["scenarios"]["base"]["segments"]["seg_a"]
+    assert segment["status"] == "CALCULATED_AND_RECONCILED"
+    assert segment["historical_baseline"]["contribution_after_variable_cost_cny"] == "150"
+    assert segment["forward_scenario"]["contribution_after_variable_cost_cny"] == "190"
+    assert Decimal(segment["historical_baseline"]["normalized_parent_attributable_net_profit_cny"]) == Decimal("98.2")
+    assert Decimal(segment["forward_scenario"]["normalized_parent_attributable_net_profit_cny"]) == Decimal("126.8")
+    assert Decimal(segment["changes"]["normalized_parent_attributable_net_profit_change_cny"]) == Decimal("28.6")
+    assert Decimal(segment["changes"]["reconciliation_residual_cny"]) == Decimal("0")
+    assert result["formal_forecast_admission_created"] is False
+    assert result["decision_authority"] is False
+    assert result["valuation_input_modified"] is False
+
+
+def test_b62_segment_normalized_earnings_requires_exact_product_to_segment_mapping():
+    products, historical, scenarios_raw, transition, sources = _b62_segment_bridge_inputs()
+    products[1].pop("business_segment_id")
+    result = operating._build_b62_segment_normalized_earnings_bridge(
+        scope="COMPANY_WIDE", baseline_transition=transition, product_lines=products,
+        historical_segment_financials_raw=historical, scenarios_raw=scenarios_raw,
+        sources_by_id={row["source_id"]: row for row in sources},
+        unresolved_refs=set(), after_cutoff_refs=set(), uncertain_refs=set(),
+    )
+    assert result["status"] == "SEGMENT_MAPPING_INCOMPLETE"
+    assert "BUSINESS_SEGMENT_ID_MISSING:product_a2" in result["mapping_issues"]
+
+
+def test_b62_segment_normalized_earnings_does_not_promote_project_incremental_to_company_scope():
+    products, historical, scenarios_raw, transition, sources = _b62_segment_bridge_inputs()
+    result = operating._build_b62_segment_normalized_earnings_bridge(
+        scope="PROJECT_INCREMENTAL", baseline_transition=transition, product_lines=products,
+        historical_segment_financials_raw=historical, scenarios_raw=scenarios_raw,
+        sources_by_id={row["source_id"]: row for row in sources},
+        unresolved_refs=set(), after_cutoff_refs=set(), uncertain_refs=set(),
+    )
+    assert result["status"] == "NOT_COMPARABLE_SCOPE"
+    assert result["scenarios"] == {}
+
+
+def test_b62_segment_normalized_earnings_blocks_wrong_forward_data_class_and_missing_measures():
+    products, historical, scenarios_raw, transition, sources = _b62_segment_bridge_inputs()
+    scenarios_raw["base"]["segment_financials"][0]["tax_rate"]["data_class"] = "OBSERVED_ACTUAL"
+    scenarios_raw["base"]["segment_financials"][0].pop("finance_cost_cny")
+    result = operating._build_b62_segment_normalized_earnings_bridge(
+        scope="COMPANY_WIDE", baseline_transition=transition, product_lines=products,
+        historical_segment_financials_raw=historical, scenarios_raw=scenarios_raw,
+        sources_by_id={row["source_id"]: row for row in sources},
+        unresolved_refs=set(), after_cutoff_refs=set(), uncertain_refs=set(),
+    )
+    segment = result["scenarios"]["base"]["segments"]["seg_a"]
+    assert segment["status"] == "NOT_IDENTIFIABLE"
+    assert "forward.finance_cost_cny" in segment["missing_required_financial_measures"]
+    assert result["status"] == "PARTIAL"
+
+
+def test_b62_segment_normalized_earnings_blocks_b55_product_segment_lineage_mismatch():
+    products, historical, scenarios_raw, transition, sources = _b62_segment_bridge_inputs()
+    transition["scenarios"]["base"]["product_lines"][0]["business_segment_id"] = "seg_wrong"
+    result = operating._build_b62_segment_normalized_earnings_bridge(
+        scope="COMPANY_WIDE", baseline_transition=transition, product_lines=products,
+        historical_segment_financials_raw=historical, scenarios_raw=scenarios_raw,
+        sources_by_id={row["source_id"]: row for row in sources},
+        unresolved_refs=set(), after_cutoff_refs=set(), uncertain_refs=set(),
+    )
+    assert result["scenarios"]["base"]["status"] == "NOT_IDENTIFIABLE"
+    assert "B55_PRODUCT_SEGMENT_MAPPING_MISMATCH:product_a1" in result["scenarios"]["base"]["issues"]
+
+
+def _b62_sotp_reconciliation_inputs():
+    sotp_segments = [
+        {"segment_id": "seg_a", "segment_name": "业务A", "earnings_basis": "NORMALIZED_PARENT_ATTRIBUTABLE",
+         "attributable_net_profit_cny": {"value": "100", "unit": "CNY"},
+         "pe_multiple_x": {"value": "10", "unit": "x"}, "segment_equity_value_cny": "1000"},
+        {"segment_id": "seg_b", "segment_name": "业务B", "earnings_basis": "NORMALIZED_PARENT_ATTRIBUTABLE",
+         "attributable_net_profit_cny": {"value": "50", "unit": "CNY"},
+         "pe_multiple_x": {"value": "20", "unit": "x"}, "segment_equity_value_cny": "1000"},
+    ]
+    b4_scenarios, b61_scenarios, sotp_scenarios = {}, {}, {}
+    for scenario in ("bear", "base", "bull"):
+        b4_scenarios[scenario] = {
+            "status": "CALCULATED_AND_RECONCILED",
+            "segments": {
+                "seg_a": {"status": "CALCULATED_AND_RECONCILED", "forward_scenario": {
+                    "period": "2026FY", "normalized_parent_attributable_net_profit_cny": "120"}},
+                "seg_b": {"status": "CALCULATED_AND_RECONCILED", "forward_scenario": {
+                    "period": "2026FY", "normalized_parent_attributable_net_profit_cny": "60"}},
+            },
+        }
+        sotp_scenarios[scenario] = {"segments": [dict(item) for item in sotp_segments]}
+        b61_scenarios[scenario] = {
+            "status": "CALCULATED_CONDITIONAL", "selected_diluted_shares": "100",
+            "selected_capitalized_central_cost_cny": "100", "selected_net_cash_debt_cny": "200",
+            "selected_other_adjustments_cny": "0",
+            "requirements": {"required_return": {
+                "required_terminal_value_per_share_without_distributions": "115",
+                "without_distributions": {
+                    "required_terminal_equity_value_cny": "11500",
+                    "required_segment_equity_value_pool_cny": "11400",
+                    "selected_segment_equity_value_pool_cny": "2000",
+                    "segment_requirements": [
+                        {"segment_id": "seg_a", "one_at_a_time_required_attributable_net_profit_cny_signed": "1040"},
+                        {"segment_id": "seg_b", "one_at_a_time_required_attributable_net_profit_cny_signed": "520"},
+                    ],
+                },
+            }},
+        }
+    inversion = {
+        "selected_model_family": "SOTP", "currency": "CNY", "forecast_period": "2026FY",
+        "status": "CONDITIONAL_SENSITIVITY_CALCULATED", "scenarios": b61_scenarios,
+    }
+    sotp = {"status": "CALCULATED", "selected_for_primary_model": True,
+            "forecast_period": "2026FY", "scenarios": sotp_scenarios}
+    operating_forecast = {
+        "scope": "COMPANY_WIDE",
+        "baseline_transition": {"segment_normalized_earnings_bridge": {
+            "status": "DIAGNOSTIC_CALCULATED", "forecast_period": "2026FY", "scenarios": b4_scenarios,
+        }},
+    }
+    return inversion, sotp, operating_forecast
+
+
+def test_b62_sotp_reconciliation_compares_full_b4_forecast_pool_and_nonadditive_b61_thresholds():
+    inversion, sotp, operating_forecast = _b62_sotp_reconciliation_inputs()
+    result = pilot._build_b62_sotp_segment_earnings_reconciliation(
+        local_sotp_inversion=inversion, sotp_valuation=sotp,
+        operating_driver_forecast=operating_forecast,
+    )
+    assert result["status"] == "CONDITIONAL_RECONCILIATION_CALCULATED"
+    base = result["scenarios"]["base"]
+    assert base["b4_forecast_segment_equity_value_pool_at_selected_sotp_pe_cny"] == "2400"
+    assert base["required_segment_equity_value_pool_for_required_return_cny"] == "11400"
+    assert base["b4_forecast_segment_pool_minus_required_pool_cny"] == "-9000"
+    assert base["b4_forecast_implied_total_equity_value_with_selected_parent_adjustments_cny"] == "2500"
+    assert base["b4_forecast_implied_terminal_value_per_share_cny"] == "25"
+    assert Decimal(base["break_even_diluted_shares_at_b4_forecast_value"]) == Decimal("2500") / Decimal("115")
+    segment_a = {row["segment_id"]: row for row in base["segment_comparisons"]}["seg_a"]
+    assert segment_a["b4_minus_sotp_profit_cny"] == "20"
+    assert segment_a["profit_change_value_effect_at_selected_sotp_pe_cny"] == "200"
+    assert segment_a["b4_forecast_profit_minus_b61_one_at_a_time_required_profit_cny"] == "-920"
+    assert segment_a["required_pe_at_b4_forecast_profit_with_other_segments_at_b4_forecast_x"] == "85"
+    assert segment_a["selected_pe_minus_required_pe_at_b4_profit_x"] == "-75"
+    assert segment_a["required_pe_interpretation"].endswith("NON_ADDITIVE")
+    assert segment_a["b61_one_at_a_time_interpretation"].endswith("DO_NOT_SUM_SEGMENT_HEADROOM")
+    assert result["external_mie_modified"] is False
+    assert result["sotp_input_modified"] is False
+
+
+def test_b62_sotp_reconciliation_blocks_non_normalized_or_unlabelled_sotp_segment_earnings():
+    inversion, sotp, operating_forecast = _b62_sotp_reconciliation_inputs()
+    sotp["scenarios"]["base"]["segments"][0]["earnings_basis"] = "UNKNOWN"
+    result = pilot._build_b62_sotp_segment_earnings_reconciliation(
+        local_sotp_inversion=inversion, sotp_valuation=sotp,
+        operating_driver_forecast=operating_forecast,
+    )
+    assert result["scenarios"]["base"]["status"] == "NOT_COMPARABLE"
+    assert any("SOTP_EARNINGS_BASIS_NOT_NORMALIZED_PARENT_ATTRIBUTABLE:seg_a" in issue for issue in result["scenarios"]["base"]["issues"])
+
+
+def test_b62_sotp_reconciliation_blocks_period_mismatch_before_comparing_profit():
+    inversion, sotp, operating_forecast = _b62_sotp_reconciliation_inputs()
+    operating_forecast["baseline_transition"]["segment_normalized_earnings_bridge"]["forecast_period"] = "2027FY"
+    result = pilot._build_b62_sotp_segment_earnings_reconciliation(
+        local_sotp_inversion=inversion, sotp_valuation=sotp,
+        operating_driver_forecast=operating_forecast,
+    )
+    assert result["status"] == "FORECAST_PERIOD_MISMATCH"
+

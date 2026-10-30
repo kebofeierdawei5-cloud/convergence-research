@@ -254,6 +254,7 @@ def evaluate_sotp_valuation(
                 normalized_segments.append({
                     "segment_id": segment_id,
                     "segment_name": segment_name,
+                    "earnings_basis": str(segment.get("earnings_basis") or "UNKNOWN").strip().upper(),
                     "attributable_net_profit_cny": profit_norm,
                     "pe_multiple_x": multiple_norm,
                     "segment_equity_value_cny": _fmt(value),
@@ -436,7 +437,7 @@ def render_sotp_valuation_section(result: Mapping[str, Any], currency: str) -> l
             multiple = (segment.get("pe_multiple_x") or {}).get("value", "UNKNOWN")
             lines.append(
                 f"- 分部 {segment.get('segment_id', 'UNKNOWN')} / {segment.get('segment_name', 'UNKNOWN')}："
-                f"归属净利润 {profit} CNY × P/E {multiple} = {segment.get('segment_equity_value_cny', 'UNKNOWN')} CNY"
+                f"归属净利润 {profit} CNY；盈利口径 {segment.get('earnings_basis', 'UNKNOWN')} × P/E {multiple} = {segment.get('segment_equity_value_cny', 'UNKNOWN')} CNY"
             )
         parent = row.get("parent_level_adjustments") if isinstance(row.get("parent_level_adjustments"), Mapping) else {}
         lines.extend([

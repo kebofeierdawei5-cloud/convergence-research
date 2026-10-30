@@ -128,6 +128,11 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - B4/B5 是否把项目增量利润误当成集团净利润或重复加总；B6 绑定约束及 90%/100%/110% 梯度是否与回报和目标入场价一致。
 - 来源时间是否符合截止日；未知事实是否保留 UNKNOWN；报告和 JSON 的判断、价值情景与风险是否一致。
 - governance.formal_decision_created、canonical_run_receipt_created、execution_authorized、auto_execution 必须为 false；这仍然不是正式投资决策或交易授权。
+- B62 分部对账：B4 是否为 COMPANY_WIDE，是否只使用相邻完整年度；每个 B4 产品是否有显式 business_segment_id，多个产品归集是否有业务依据且 ID 一致；历史/前瞻分部财务八项 typed measures 的期间、单位、data_class、basis、source/cutoff 是否合格；缺失字段是否保留 UNKNOWN 而非默认为零。
+- B62 盈利桥：B55 每个产品贡献是否已经 CALCULATED_AND_RECONCILED；产品→分部 ID 是否前后保持一致；分部正常化归母利润是否剔除非经常性项目、按正常化少数股东损益扣除，且分解残差均在 CNY 1 内。
+- B62/SOTP 比较：B4、SOTP、B61 的 forecast_period 是否完全一致；SOTP 每个 segment 是否显式声明 earnings_basis=NORMALIZED_PARENT_ATTRIBUTABLE 并与 B4 business_segment_id 精确对应；当前 SOTP P/E 是否被固定；B4 全分部利润向量形成的价值池是否与 B61 Required Return（未计分红）要求池按同一母公司调整和股数口径比较；单个分部在其他分部按 B4 预测不变时所需的 P/E 是否与当前选定 P/E 分开显示。
+- B61 单变量盈利要求不得相加；它是假设其他分部利润不变的替代敏感性。只有 B62 全分部 B4 预测价值池才代表多个分部同时变化的情景结果。若无独立前瞻母公司成本/净现金/其他调整预测，不得给这些因素虚构变化金额。
+- 报告/analysis.json/Replay 应同时保留 B4 分部利润桥、SOTP earnings_basis、B61 要求、B62 比较与所有 UNKNOWN/NOT_COMPARABLE 标记；不允许以 B62 诊断结果反向覆盖 SOTP 主估值、外部 MIE、expectation_gap、B5/B6 或 Decision。
 
 ## 9. 已发生故障与防重复清单
 
