@@ -2948,3 +2948,15 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - Fail-closed: non-zero unmapped primary after-tax attribution adjustments become NOT_COMPARABLE_ADJUSTMENT_BASIS; an assumption-only primary EPS remains ASSUMPTION_ONLY; period, denominator, currency, B57 or primary EPS blockers remain explicit. B57's normalized EPS is diagnostic context only when compared with all-items primary EPS.
 - Output: nested at operating_driver_forecast.baseline_transition.primary_eps_consistency; no new top-level analysis key. The attachment occurs after final EPS/B5 revalidation and is read-only for the primary valuation, terminal values, return/entry-price calculation and 15% annualized-return hurdle.
 - Regression cases: six B58 cases authored for match, adjustment-basis blocker, period/share mismatches, assumption-only handling, non-EPS_MULTIPLE non-applicability and report visibility. Tests, Replay, CI and macOS acceptance have not been run.
+
+
+## B59 — Primary EPS difference attribution — 2026-10-30
+
+**Status: BRANCH PROPOSAL ONLY / NOT MERGED / NOT TESTED**
+
+- **Purpose:** explain the signed numerical gap between B57 all-items EPS and the EPS actually used by EPS_MULTIPLE, rather than merely reporting a match/mismatch.
+- **Profit numerator attribution:** split B57-minus-primary parent-attributable profit into the B56 modeled net-profit-proxy gap, B57 recurring non-operating after-tax effect, B57 one-off after-tax effect, NCI attribution difference, and the subtractive effect of any unmapped primary other after-tax attribution adjustment. Recalculate both source bridge identities and reconcile the component sum within CNY 1.
+- **Per-share attribution:** split B57 EPS minus the EPS actually used by the adapter into profit-numerator, diluted-share-denominator and primary calculated-versus-declared EPS effects. A symmetric Shapley-style decomposition is used when share counts differ; it is arithmetic only and retains a not-comparable flag.
+- **Gates:** COMPANY_WIDE, CNY, same B58 forecast period, reconciled B57 and a CALCULATED primary EPS bridge. Assumption-only EPS is blocked from fabricated earnings attribution; missing values, invalid units, non-positive shares or mismatched bridge arithmetic stay explicit.
+- **Output:** nested at `operating_driver_forecast.baseline_transition.primary_eps_difference_attribution`; no new top-level key, no EPS replacement and no valuation, return, target-entry-price, B5/B6, 15% hurdle, Decision or execution change.
+- **Regression cases:** four cases authored. Tests, Replay, CI and macOS acceptance have not been executed.
