@@ -41,7 +41,7 @@ For one segment \(i\), with every other segment contribution frozen at the selec
 
 \`RequiredProfit_i = (RequiredSegmentEquityPool − Σ(otherSegmentProfit_j × segmentPE_j)) / segmentPE_i\`
 
-The output also provides the segment's selected attributable profit, P/E, value contribution, incremental profit required or profit headroom, and the alternative standalone profit threshold if that one segment alone supported the required segment pool.
+The output also provides the segment's selected attributable profit, P/E, value contribution, incremental profit required or profit headroom, and the alternative standalone profit threshold if that one segment alone supported the required segment pool. The signed algebraic requirement is preserved for audit; if it is negative because other segment contributions already cover the required pool, a separate non-negative operating-profit floor is shown instead of presenting negative operating profit as a real target.
 
 **These are one-at-a-time sensitivities, not simultaneous operating forecasts.** Segment thresholds must not be summed. B61 does not allocate a total valuation gap across segments without a separately evidenced value-driver allocation rule.
 
