@@ -1946,7 +1946,7 @@ def _build_b60_local_eps_multiple_price_inversion(
     if result["selected_model_family"] != "EPS_MULTIPLE":
         result["status"] = "NOT_APPLICABLE_NOT_EPS_MULTIPLE"
         return result
-    if result["currency"] != "CNY":
+    if result["currency"] != "CNY" or str(eps_multiple_valuation.get("currency") or "").upper() != "CNY":
         result["status"] = "NOT_COMPARABLE_CURRENCY"
         return result
     if eps_multiple_valuation.get("status") != "CALCULATED" or eps_multiple_valuation.get("selected_for_primary_model") is not True:
@@ -1958,6 +1958,9 @@ def _build_b60_local_eps_multiple_price_inversion(
     if valuation_timing.get("status") != "PASS":
         result["status"] = "VALUATION_TIMING_NOT_RESOLVED"
         result["issues"] = list(valuation_timing.get("issues") or [])
+        return result
+    if str(valuation_timing.get("forecast_period") or "").upper() != str(eps_multiple_valuation.get("forecast_period") or "").upper():
+        result["status"] = "EPS_MULTIPLE_VALUATION_PERIOD_MISMATCH"
         return result
 
     def dec(value: Any) -> Decimal | None:
@@ -2023,6 +2026,7 @@ def _build_b60_local_eps_multiple_price_inversion(
             "scenario": name, "status": "NOT_IDENTIFIABLE",
             "selected_terminal_pe": pe_obj.get("value"), "selected_terminal_pe_unit": pe_obj.get("unit"),
             "selected_terminal_pe_basis": pe_obj.get("basis"), "selected_terminal_pe_data_class": pe_obj.get("data_class"),
+            "selected_terminal_pe_evidence_refs": pe_obj.get("evidence_refs") or [],
             "primary_eps_actually_used": eps_obj.get("value"),
             "primary_terminal_value_using_selected_pe": model.get("terminal_value_per_share"),
             "b57_status": b57_row.get("status") or "UNKNOWN",
@@ -2035,6 +2039,7 @@ def _build_b60_local_eps_multiple_price_inversion(
             "validated_cash_distributions_per_share": None,
             "present_value_of_validated_cash_distributions_at_hurdle": None,
             "zero_return_required_terminal_eps_before_distributions": format(price / pe, "f") if pe and pe > 0 else None,
+            "zero_return_required_terminal_eps_with_validated_distributions": None,
             "required_return_eps_without_distributions": None,
             "required_return_eps_with_validated_distributions": None,
             "fundamental_target_eps_without_distributions": None,
@@ -2091,6 +2096,10 @@ def _build_b60_local_eps_multiple_price_inversion(
         if pv_at_hurdle is None:
             every_distribution_validated = False
 
+        if dist_total is not None:
+            row["zero_return_required_terminal_eps_with_validated_distributions"] = format(
+                max(Decimal("0"), price - dist_total) / pe, "f"
+            )
         req_h_no, req_h_yes = required_eps(hurdle, pe, pv_at_hurdle)
         req_t_no, req_t_yes = required_eps(target, pe, pv_at_target)
         row["required_return_eps_without_distributions"] = format(req_h_no, "f")
@@ -5020,12 +5029,13 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             lines.append(
                 f"  - {scenario_name.upper()}：终端 P/E {local_row.get('selected_terminal_pe')}x；"
                 f"现价/主预测 EPS forward P/E {local_row.get('current_price_to_primary_eps_forward_pe')}x；"
-                f"不计分红保本 EPS {local_row.get('zero_return_required_terminal_eps_before_distributions')}；"
+                f"零回报保本 EPS（未计/已验证分红）{local_row.get('zero_return_required_terminal_eps_before_distributions')} / "
+                f"{local_row.get('zero_return_required_terminal_eps_with_validated_distributions') if local_row.get('zero_return_required_terminal_eps_with_validated_distributions') is not None else 'UNKNOWN'}；"
                 f"Required Return EPS（未计/已验证分红）{local_row.get('required_return_eps_without_distributions')} / "
-                f"{local_row.get('required_return_eps_with_validated_distributions') or 'UNKNOWN'}；"
-                f"B57 EPS 余量 {headroom or 'UNKNOWN'} CNY/股；15%目标EPS（未计/已验证分红）"
+                f"{local_row.get('required_return_eps_with_validated_distributions') if local_row.get('required_return_eps_with_validated_distributions') is not None else 'UNKNOWN'}；"
+                f"B57 EPS 余量 {headroom if headroom is not None else 'UNKNOWN'} CNY/股；15%目标EPS（未计/已验证分红）"
                 f"{local_row.get('fundamental_target_eps_without_distributions')} / "
-                f"{local_row.get('fundamental_target_eps_with_validated_distributions') or 'UNKNOWN'}。"
+                f"{local_row.get('fundamental_target_eps_with_validated_distributions') if local_row.get('fundamental_target_eps_with_validated_distributions') is not None else 'UNKNOWN'}。"
             )
             if local_row.get("b57_minus_primary_terminal_value_effect") is not None:
                 lines.append(
