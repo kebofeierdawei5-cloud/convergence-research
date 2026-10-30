@@ -2373,6 +2373,8 @@ def _build_b61_sotp_price_inversion(
         shares_obj = source_row.get("diluted_shares")
         shares = measure_value(shares_obj, "shares")
         central_cost = dec(parent.get("capitalized_central_cost_value_cny"))
+        central_cost_base = measure_value(parent.get("central_cost_after_tax_cny"), "CNY")
+        central_cost_multiple = measure_value(parent.get("central_cost_multiple_x"), "x")
         net_cash_obj = parent.get("net_cash_debt_cny")
         other_obj = parent.get("other_adjustments_cny")
         net_cash = measure_value(net_cash_obj, "CNY")
@@ -2383,8 +2385,20 @@ def _build_b61_sotp_price_inversion(
         issues: list[str] = []
         if shares is None or shares <= 0:
             issues.append("SOTP_DILUTED_SHARES_INVALID_OR_UNIT_MISMATCH")
+        elif shares != shares.to_integral_value():
+            issues.append("SOTP_DILUTED_SHARES_MUST_BE_INTEGER")
         if central_cost is None or central_cost < 0:
             issues.append("SOTP_CAPITALIZED_CENTRAL_COST_NOT_IDENTIFIABLE")
+        if central_cost_base is None or central_cost_base < 0:
+            issues.append("SOTP_CENTRAL_COST_BASE_INVALID_OR_UNIT_MISMATCH")
+        if central_cost_multiple is None or central_cost_multiple < 0:
+            issues.append("SOTP_CENTRAL_COST_MULTIPLE_INVALID_OR_UNIT_MISMATCH")
+        if central_cost_base is not None and central_cost_multiple is not None and central_cost is not None:
+            expected_capitalized_cost = central_cost_base * central_cost_multiple
+            if abs(expected_capitalized_cost - central_cost) > Decimal("0.01"):
+                issues.append("SOTP_CENTRAL_COST_CAPITALIZATION_IDENTITY_MISMATCH")
+            if central_cost_base > 0 and central_cost_multiple <= 0:
+                issues.append("SOTP_CENTRAL_COST_MULTIPLE_MUST_BE_POSITIVE_WHEN_COST_IS_POSITIVE")
         if net_cash is None:
             issues.append("SOTP_NET_CASH_DEBT_INVALID_OR_UNIT_MISMATCH")
         if other is None:
