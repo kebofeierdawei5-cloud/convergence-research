@@ -2972,3 +2972,15 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **B57–B59 linkage:** compare B57 all-items EPS only after company-wide scope, same-period and reconciled-status checks; show primary EPS used by the adapter and current-price / forecast-EPS forward P/E; translate B59 EPS-difference components through the selected terminal P/E into terminal per-share value effects.
 - **Placement and authority:** nested at \`assessment.market_implied_expectation.price_implied_analysis.local_eps_multiple_recalculation\`; no new top-level key. Does not upgrade external MIE or expectation-gap status and does not alter primary EPS, P/E, terminal value, B5/B6, return outputs, target price, the 15% hurdle, Decision or execution authority.
 - **Regression cases:** five new cases authored. Tests, Replay, CI and macOS acceptance are not run.
+
+
+## B61 — Local SOTP current-price and segment earnings requirement inversion — 2026-10-30
+
+**Status: BRANCH PROPOSAL ONLY / NOT MERGED / NOT TESTED**
+
+- **Purpose:** add a SOTP-specific inversion alongside B60; do not run SOTP through EPS_MULTIPLE/B5.
+- **Identity:** reverse the protected current price and annualized return hurdle into required terminal total equity value, then reverse the existing SOTP parent-level adjustments to obtain the required aggregate segment equity value pool. The exact formulas and ACT/365F timing are documented in the B61 specification.
+- **Segment requirements:** for each segment, calculate the attributable net profit required if all other segment equity contributions remain at the selected scenario forecast; also report incremental profit needed/headroom and the alternative standalone threshold. These one-at-a-time sensitivities are alternatives, not additive simultaneous segment forecasts.
+- **Controls:** only selected/calculated CNY SOTP with PIT-compatible price and matching forecast period/terminal date; independently reconcile each segment profit × P/E, aggregate pool, parent-level adjustments, total equity and diluted-share per-share arithmetic. Only already validated dated distributions may enter the distribution-adjusted view.
+- **Placement:** nested at \`assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation\`. External MIE/expectation-gap unchanged; no SOTP or other valuation input, B5/B6, return output, target entry price, 15% hurdle, Decision or execution authority changes.
+- **Regression coverage:** five tests authored but not run. Replay, CI and macOS acceptance remain deferred.
