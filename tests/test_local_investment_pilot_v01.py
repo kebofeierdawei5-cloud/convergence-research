@@ -6386,7 +6386,8 @@ def test_b61_sotp_price_inversion_reconstructs_segment_pool_and_one_at_a_time_pr
     assert required["required_terminal_equity_value_cny"] == "11500.00"
     assert required["required_segment_equity_value_pool_cny"] == "11400.00"
     segments = {item["segment_id"]: item for item in required["segment_requirements"]}
-    assert segments["seg_a"]["one_at_a_time_required_attributable_net_profit_cny"] == "1040"
+    assert segments["seg_a"]["one_at_a_time_required_attributable_net_profit_cny_signed"] == "1040"
+    assert segments["seg_a"]["one_at_a_time_required_attributable_net_profit_floor_cny"] == "1040"
     assert segments["seg_b"]["one_at_a_time_required_attributable_net_profit_cny"] == "520"
     assert segments["seg_a"]["interpretation"].startswith("ONE_SEGMENT_CHANGES_OTHERS_HELD")
     assert result["external_mie_status_unchanged"] == "NOT_IDENTIFIABLE"
