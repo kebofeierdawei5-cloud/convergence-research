@@ -48,7 +48,7 @@ The output also provides the segment's selected attributable profit, P/E, value 
 ## Controls and limitations
 
 - Only selected, locally CALCULATED SOTP with CNY currency, PIT-compatible pilot price, matching forecast period and terminal date is eligible.
-- Segment profits, P/E, segment value, parent adjustments, equity value and diluted-share arithmetic are rechecked; contradictions block the affected scenario.
+- Segment profits, P/E, segment value, parent adjustments, equity value and diluted-share arithmetic are rechecked; the central-cost-after-tax × central-cost-multiple capitalization is recomputed, and diluted shares must remain positive integer shares. Contradictions block the affected scenario.
 - Only cash distributions already validated by the existing return solver enter the distribution-adjusted result; unvalidated distributions remain excluded.
 - The adapter's segment P/Es are conditional terminal valuation assumptions, not external current segment multiples or external MIE.
 - Output is nested in \`assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation\`. External MIE and expectation-gap states are unchanged.
