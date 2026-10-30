@@ -2161,6 +2161,364 @@ def _build_b60_local_eps_multiple_price_inversion(
     result["summary"] = "本地使用唯一结构化现价、主 EPS_MULTIPLE 终端 P/E 和收益门槛独立反推所需终端 EPS；合格分红按实际时间计入。结果为条件敏感性，不是外部 MIE。"
     return result
 
+
+def _build_b61_sotp_price_inversion(
+    *,
+    price_input: Mapping[str, Any],
+    valuation_timing: Mapping[str, Any],
+    decision_parameters: Mapping[str, Any],
+    operator_valuation_context: Mapping[str, Any],
+    sotp_valuation: Mapping[str, Any],
+    forecast_valuation: Mapping[str, Any],
+    validated_cash_distribution_events: Any,
+    external_mie_status: Any,
+) -> dict[str, Any]:
+    """Invert the protected price through the selected SOTP scenario without allocating unsupported segment forecasts."""
+    result: dict[str, Any] = {
+        "schema_version": "IIOS-B61-LOCAL-SOTP-PRICE-INVERSION-0.1",
+        "status": "NOT_IDENTIFIABLE",
+        "qualification": "CONDITIONAL_ONLY",
+        "selected_model_family": str(operator_valuation_context.get("selected_model_family") or "UNKNOWN").strip().upper(),
+        "currency": str(price_input.get("currency") or "UNKNOWN").strip().upper(),
+        "external_mie_status_unchanged": str(external_mie_status or "UNKNOWN").strip().upper(),
+        "reference_price": price_input.get("price"),
+        "price_assurance": price_input.get("assurance_label") or "UNKNOWN",
+        "price_pit_status": price_input.get("pit_time_status") or "UNKNOWN",
+        "forecast_period": sotp_valuation.get("forecast_period") or "UNKNOWN",
+        "valuation_terminal_date": sotp_valuation.get("valuation_terminal_date") or "UNKNOWN",
+        "annualization_year_fraction": valuation_timing.get("annualization_year_fraction"),
+        "day_count_convention": valuation_timing.get("day_count_convention") or "UNKNOWN",
+        "method": "CURRENT_PRICE_INVERTED_THROUGH_SOTP_SEGMENT_EQUITY_VALUE_POOL_AND_PARENT_LEVEL_ADJUSTMENTS",
+        "return_hurdle_role": "ANNUALIZED_RETURN_HURDLE_NOT_VALUATION_DISCOUNT_RATE",
+        "segment_requirement_interpretation": "ONE_SEGMENT_AT_A_TIME; ALL_OTHER_SEGMENT_FORECAST_CONTRIBUTIONS_HELD_AT_SELECTED_SCENARIO",
+        "scenarios": {},
+        "assumptions": [
+            "唯一现价来自结构化 price_input.price；价格保证等级不会因为计算而升级。",
+            "各分部归属净利润与分部 P/E 直接来自已由本地 SOTP 适配器复算的情景，而非自由文本。",
+            "母公司资本化税后成本、净现金/净负债、其他调整与稀释股数保持本地 SOTP 适配器的情景值不变。",
+            "分部盈利要求采用逐个分部单独变化、其余分部维持原情景预测的敏感性；不同分部阈值相互替代，不可相加。",
+            "年化收益门槛只用于持有期未来财富要求；不是 WACC、资本成本或企业价值折现率。",
+            "只有经现有收益求解器确认的税后现金分配事件才参与分红调整要求。",
+        ],
+        "limitations": [
+            "所选分部 P/E 是条件估值假设，不是外部市场观测到的当前分部倍数或市场共识。",
+            "本地反推只说明在当前分部倍数、母公司调整、稀释股数及持有期假设下需要多少终值；不证明这些假设公允或能实现。",
+            "分部一项变化阈值是假设其他分部不变的单变量敏感性，不是将总缺口自动分摊成多分部经营目标。",
+            "外部 MIE 和 expectation_gap 状态不因本计算而升级。",
+            "不修改 SOTP 主估值、分部 EPS/利润/P-E、B5/B6、回报输出、目标入场价、15% 年化收益门槛、Decision 或执行权限。",
+        ],
+        "formal_mie_admission_created": False,
+        "decision_authority": False,
+        "valuation_input_modified": False,
+        "sotp_input_modified": False,
+    }
+    if result["selected_model_family"] != "SOTP":
+        result["status"] = "NOT_APPLICABLE_NOT_SOTP"
+        return result
+    if result["currency"] != "CNY":
+        result["status"] = "NOT_COMPARABLE_CURRENCY"
+        return result
+    if sotp_valuation.get("status") != "CALCULATED" or sotp_valuation.get("selected_for_primary_model") is not True:
+        result["status"] = "PRIMARY_SOTP_NOT_CALCULATED"
+        result["issues"] = list(sotp_valuation.get("issues") or [])
+        return result
+    if price_input.get("pit_time_status") != "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY":
+        result["status"] = "PRICE_NOT_PIT_QUALIFIED"
+        return result
+    if valuation_timing.get("status") != "PASS":
+        result["status"] = "VALUATION_TIMING_NOT_RESOLVED"
+        result["issues"] = list(valuation_timing.get("issues") or [])
+        return result
+    if str(valuation_timing.get("forecast_period") or "").strip().upper() != str(sotp_valuation.get("forecast_period") or "").strip().upper():
+        result["status"] = "SOTP_FORECAST_PERIOD_MISMATCH"
+        return result
+    if str(valuation_timing.get("valuation_terminal_date") or "").strip() != str(sotp_valuation.get("valuation_terminal_date") or "").strip():
+        result["status"] = "SOTP_TERMINAL_DATE_MISMATCH"
+        return result
+
+    def dec(value: Any) -> Decimal | None:
+        try:
+            number = Decimal(str(value))
+            return number if number.is_finite() else None
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+
+    def measure_value(raw: Any, expected_unit: str) -> Decimal | None:
+        if not isinstance(raw, Mapping):
+            return None
+        unit = str(raw.get("unit") or "").strip().lower()
+        if unit != expected_unit.lower():
+            return None
+        return dec(raw.get("value"))
+
+    price = dec(price_input.get("price"))
+    years = dec(valuation_timing.get("annualization_year_fraction"))
+    required_return = dec(decision_parameters.get("required_return_annualized"))
+    fundamental_target = dec(decision_parameters.get("fundamental_target_annualized_return"))
+    if fundamental_target is None:
+        fundamental_target = FUNDAMENTAL_TARGET_ANNUALIZED_RETURN
+    if price is None or price <= 0 or years is None or years <= 0:
+        result["status"] = "PRICE_OR_TERMINAL_HORIZON_NOT_IDENTIFIABLE"
+        return result
+    if required_return is None or required_return <= -1 or fundamental_target <= -1:
+        result["status"] = "RETURN_HURDLE_NOT_IDENTIFIABLE"
+        return result
+
+    scenarios = sotp_valuation.get("scenarios") if isinstance(sotp_valuation.get("scenarios"), Mapping) else {}
+    forecast_scenarios = forecast_valuation.get("scenarios") if isinstance(forecast_valuation.get("scenarios"), Mapping) else {}
+    event_rows = validated_cash_distribution_events if isinstance(validated_cash_distribution_events, Mapping) else {}
+    overall_statuses: list[str] = []
+    all_distributions_validated = True
+
+    def calculate_requirement(
+        *,
+        rate: Decimal,
+        shares: Decimal,
+        central_cost_value: Decimal,
+        net_cash_debt: Decimal,
+        other_adjustments: Decimal,
+        segment_pool: Decimal,
+        segments: list[dict[str, Any]],
+        pv_distributions: Decimal | None,
+    ) -> dict[str, Any]:
+        growth_factor = (Decimal("1") + rate) ** years
+        required_per_share_no_dist = price * growth_factor
+        required_per_share_with_dist = (
+            max(Decimal("0"), (price - pv_distributions) * growth_factor)
+            if pv_distributions is not None else None
+        )
+        required_equity_no_dist = required_per_share_no_dist * shares
+        required_equity_with_dist = (
+            required_per_share_with_dist * shares
+            if required_per_share_with_dist is not None else None
+        )
+
+        def segment_breakdown(required_equity: Decimal) -> dict[str, Any]:
+            required_segment_pool = required_equity + central_cost_value - net_cash_debt - other_adjustments
+            pool_gap = required_segment_pool - segment_pool
+            segment_rows: list[dict[str, Any]] = []
+            for segment in segments:
+                other_contributions = segment_pool - segment["segment_equity_value"]
+                required_profit = (required_segment_pool - other_contributions) / segment["pe_multiple"]
+                incremental = required_profit - segment["attributable_net_profit"]
+                standalone_profit = required_segment_pool / segment["pe_multiple"]
+                required_multiple = (
+                    (required_segment_pool - other_contributions) / segment["attributable_net_profit"]
+                    if segment["attributable_net_profit"] > 0 else None
+                )
+                segment_rows.append({
+                    "segment_id": segment["segment_id"],
+                    "segment_name": segment["segment_name"],
+                    "selected_attributable_net_profit_cny": format(segment["attributable_net_profit"], "f"),
+                    "selected_pe_multiple_x": format(segment["pe_multiple"], "f"),
+                    "selected_segment_equity_value_cny": format(segment["segment_equity_value"], "f"),
+                    "share_of_selected_segment_equity_value": (
+                        format(segment["segment_equity_value"] / segment_pool, "f")
+                        if segment_pool > 0 else None
+                    ),
+                    "one_at_a_time_required_attributable_net_profit_cny": format(required_profit, "f"),
+                    "one_at_a_time_incremental_profit_required_cny": format(max(Decimal("0"), incremental), "f"),
+                    "one_at_a_time_profit_headroom_cny": format(max(Decimal("0"), -incremental), "f"),
+                    "one_at_a_time_required_pe_at_selected_profit_x": (
+                        format(required_multiple, "f") if required_multiple is not None else None
+                    ),
+                    "standalone_profit_if_this_segment_alone_supported_required_pool_cny": format(standalone_profit, "f"),
+                    "interpretation": "ONE_SEGMENT_CHANGES_OTHERS_HELD_AT_SELECTED_SCENARIO;STANDALONE_THRESHOLD_IS_AN_ALTERNATIVE_NOT_ADDITIVE",
+                })
+            return {
+                "required_terminal_equity_value_cny": format(required_equity, "f"),
+                "required_segment_equity_value_pool_cny": format(required_segment_pool, "f"),
+                "selected_segment_equity_value_pool_cny": format(segment_pool, "f"),
+                "additional_segment_equity_value_required_cny": format(max(Decimal("0"), pool_gap), "f"),
+                "segment_equity_value_headroom_cny": format(max(Decimal("0"), -pool_gap), "f"),
+                "segment_requirements": segment_rows,
+                "formula": "REQUIRED_SEGMENT_POOL = REQUIRED_TOTAL_EQUITY_VALUE + CAPITALIZED_PARENT_CENTRAL_COST - NET_CASH_DEBT - OTHER_ADJUSTMENTS",
+            }
+
+        return {
+            "annualized_return_rate": format(rate, "f"),
+            "required_terminal_value_per_share_without_distributions": format(required_per_share_no_dist, "f"),
+            "required_terminal_value_per_share_with_validated_distributions": (
+                format(required_per_share_with_dist, "f") if required_per_share_with_dist is not None else None
+            ),
+            "without_distributions": segment_breakdown(required_equity_no_dist),
+            "with_validated_distributions": (
+                segment_breakdown(required_equity_with_dist)
+                if required_equity_with_dist is not None else None
+            ),
+        }
+
+    for name in SCENARIOS:
+        source_row = scenarios.get(name) if isinstance(scenarios.get(name), Mapping) else {}
+        parent = source_row.get("parent_level_adjustments") if isinstance(source_row.get("parent_level_adjustments"), Mapping) else {}
+        raw_segments = source_row.get("segments") if isinstance(source_row.get("segments"), list) else []
+        row: dict[str, Any] = {
+            "scenario": name,
+            "status": "NOT_IDENTIFIABLE",
+            "forecast_period": result["forecast_period"],
+            "valuation_terminal_date": result["valuation_terminal_date"],
+            "selected_sotp_terminal_value_per_share": source_row.get("terminal_value_per_share"),
+            "selected_total_equity_value_cny": source_row.get("total_equity_value_cny"),
+            "selected_diluted_shares": None,
+            "selected_segment_equity_value_pool_cny": source_row.get("segment_equity_value_cny"),
+            "selected_capitalized_central_cost_cny": parent.get("capitalized_central_cost_value_cny"),
+            "selected_net_cash_debt_cny": None,
+            "selected_other_adjustments_cny": None,
+            "distribution_status": "NOT_VALIDATED_OR_NOT_AVAILABLE",
+            "validated_cash_distributions_per_share": None,
+            "present_value_of_validated_distributions_at_required_return": None,
+            "requirements": {},
+            "issues": [],
+        }
+        shares_obj = source_row.get("diluted_shares")
+        shares = measure_value(shares_obj, "shares")
+        central_cost = dec(parent.get("capitalized_central_cost_value_cny"))
+        net_cash_obj = parent.get("net_cash_debt_cny")
+        other_obj = parent.get("other_adjustments_cny")
+        net_cash = measure_value(net_cash_obj, "CNY")
+        other = measure_value(other_obj, "CNY")
+        segment_pool = dec(source_row.get("segment_equity_value_cny"))
+        reported_equity = dec(source_row.get("total_equity_value_cny"))
+        reported_per_share = dec(source_row.get("terminal_value_per_share"))
+        issues: list[str] = []
+        if shares is None or shares <= 0:
+            issues.append("SOTP_DILUTED_SHARES_INVALID_OR_UNIT_MISMATCH")
+        if central_cost is None or central_cost < 0:
+            issues.append("SOTP_CAPITALIZED_CENTRAL_COST_NOT_IDENTIFIABLE")
+        if net_cash is None:
+            issues.append("SOTP_NET_CASH_DEBT_INVALID_OR_UNIT_MISMATCH")
+        if other is None:
+            issues.append("SOTP_OTHER_ADJUSTMENTS_INVALID_OR_UNIT_MISMATCH")
+        if segment_pool is None or segment_pool < 0:
+            issues.append("SOTP_SEGMENT_EQUITY_VALUE_POOL_INVALID")
+        if reported_equity is None or reported_per_share is None:
+            issues.append("SOTP_REPORTED_EQUITY_OR_PER_SHARE_VALUE_MISSING")
+        segments: list[dict[str, Any]] = []
+        recalc_segment_pool = Decimal("0")
+        for segment_index, segment in enumerate(raw_segments, 1):
+            if not isinstance(segment, Mapping):
+                issues.append(f"SOTP_SEGMENT_{segment_index}_OBJECT_REQUIRED")
+                continue
+            profit_obj = segment.get("attributable_net_profit_cny")
+            multiple_obj = segment.get("pe_multiple_x")
+            profit = measure_value(profit_obj, "CNY")
+            multiple = measure_value(multiple_obj, "x")
+            segment_value = dec(segment.get("segment_equity_value_cny"))
+            segment_id = str(segment.get("segment_id") or "").strip()
+            segment_name = str(segment.get("segment_name") or "").strip()
+            if profit is None or profit < 0:
+                issues.append(f"SOTP_SEGMENT_{segment_index}_ATTRIBUTABLE_PROFIT_INVALID_OR_UNIT_MISMATCH")
+                continue
+            if multiple is None or multiple <= 0:
+                issues.append(f"SOTP_SEGMENT_{segment_index}_PE_INVALID_OR_UNIT_MISMATCH")
+                continue
+            expected_value = profit * multiple
+            if segment_value is None or abs(segment_value - expected_value) > Decimal("0.01"):
+                issues.append(f"SOTP_SEGMENT_{segment_index}_VALUE_RECALCULATION_MISMATCH")
+                continue
+            if not segment_id or not segment_name:
+                issues.append(f"SOTP_SEGMENT_{segment_index}_IDENTITY_NOT_IDENTIFIABLE")
+                continue
+            recalc_segment_pool += expected_value
+            segments.append({
+                "segment_id": segment_id,
+                "segment_name": segment_name,
+                "attributable_net_profit": profit,
+                "pe_multiple": multiple,
+                "segment_equity_value": expected_value,
+            })
+        if not raw_segments:
+            issues.append("SOTP_SEGMENTS_MISSING")
+        if segment_pool is not None and abs(recalc_segment_pool - segment_pool) > Decimal("0.01"):
+            issues.append("SOTP_SEGMENT_POOL_RECONCILIATION_MISMATCH")
+        if shares and central_cost is not None and net_cash is not None and other is not None and segment_pool is not None:
+            recomputed_equity = segment_pool - central_cost + net_cash + other
+            if reported_equity is not None and abs(recomputed_equity - reported_equity) > Decimal("0.01"):
+                issues.append("SOTP_PARENT_ADJUSTMENT_IDENTITY_MISMATCH")
+            if reported_per_share is not None and abs(recomputed_equity / shares - reported_per_share) > Decimal("0.000001"):
+                issues.append("SOTP_PER_SHARE_IDENTITY_MISMATCH")
+        if issues or shares is None or central_cost is None or net_cash is None or other is None or segment_pool is None or reported_equity is None or reported_per_share is None:
+            row["issues"] = list(dict.fromkeys(issues))
+            result["scenarios"][name] = row
+            overall_statuses.append("NOT_IDENTIFIABLE")
+            all_distributions_validated = False
+            continue
+
+        events = event_rows.get(name)
+        forecast_row = forecast_scenarios.get(name) if isinstance(forecast_scenarios.get(name), Mapping) else {}
+        declared_distributions = dec(forecast_row.get("cash_distributions_per_share"))
+        distribution_pv: dict[str, Decimal | None] = {"required_return": None, "fundamental_target": None}
+        dist_total: Decimal | None = None
+        distribution_issues: list[str] = []
+        if isinstance(events, list) and declared_distributions is not None and declared_distributions >= 0:
+            event_total = Decimal("0")
+            pv_required = Decimal("0")
+            pv_target = Decimal("0")
+            for event_index, event in enumerate(events, 1):
+                if not isinstance(event, Mapping):
+                    distribution_issues.append(f"VALIDATED_DISTRIBUTION_EVENT_{event_index}_INVALID")
+                    break
+                amount = dec(event.get("amount_per_share"))
+                event_years = dec(event.get("year_fraction_from_entry"))
+                if amount is None or amount <= 0 or event_years is None or event_years <= 0 or event_years > years:
+                    distribution_issues.append(f"VALIDATED_DISTRIBUTION_EVENT_{event_index}_AMOUNT_OR_DATE_INVALID")
+                    break
+                event_total += amount
+                pv_required += amount / ((Decimal("1") + required_return) ** event_years)
+                pv_target += amount / ((Decimal("1") + fundamental_target) ** event_years)
+            if not distribution_issues and abs(event_total - declared_distributions) <= Decimal("0.000001"):
+                dist_total = event_total
+                distribution_pv["required_return"] = pv_required
+                distribution_pv["fundamental_target"] = pv_target
+                row["distribution_status"] = "VALIDATED_DATED_CASH_FLOWS" if events else "VALIDATED_NO_FUTURE_DISTRIBUTIONS"
+            else:
+                distribution_issues.append("VALIDATED_DISTRIBUTION_TOTAL_MISMATCH")
+        else:
+            distribution_issues.append("DISTRIBUTIONS_NOT_VALIDATED_BY_EXISTING_RETURN_SOLVER")
+        if distribution_pv["required_return"] is None:
+            all_distributions_validated = False
+        row["validated_cash_distributions_per_share"] = format(dist_total, "f") if dist_total is not None else None
+        row["present_value_of_validated_distributions_at_required_return"] = (
+            format(distribution_pv["required_return"], "f")
+            if distribution_pv["required_return"] is not None else None
+        )
+        row["selected_diluted_shares"] = format(shares, "f")
+        row["selected_net_cash_debt_cny"] = format(net_cash, "f")
+        row["selected_other_adjustments_cny"] = format(other, "f")
+
+        row["requirements"] = {
+            "required_return": calculate_requirement(
+                rate=required_return, shares=shares,
+                central_cost_value=central_cost, net_cash_debt=net_cash,
+                other_adjustments=other, segment_pool=segment_pool,
+                segments=segments, pv_distributions=distribution_pv["required_return"],
+            ),
+            "fundamental_target_annualized_return": calculate_requirement(
+                rate=fundamental_target, shares=shares,
+                central_cost_value=central_cost, net_cash_debt=net_cash,
+                other_adjustments=other, segment_pool=segment_pool,
+                segments=segments, pv_distributions=distribution_pv["fundamental_target"],
+            ),
+        }
+        row["status"] = "CALCULATED_CONDITIONAL"
+        row["issues"] = distribution_issues
+        result["scenarios"][name] = row
+        overall_statuses.append(row["status"])
+
+    if overall_statuses and all(status == "CALCULATED_CONDITIONAL" for status in overall_statuses):
+        result["status"] = "CONDITIONAL_SENSITIVITY_CALCULATED"
+    elif any(status == "CALCULATED_CONDITIONAL" for status in overall_statuses):
+        result["status"] = "PARTIAL"
+    else:
+        result["status"] = "NOT_IDENTIFIABLE"
+    result["all_scenario_distribution_cash_flows_validated"] = all_distributions_validated
+    result["external_mie_and_expectation_gap_modified"] = False
+    result["summary"] = (
+        "本地使用唯一现价、已复算 SOTP 分部/母公司调整/稀释股数以及明确持有期收益门槛，"
+        "反推总分部权益价值要求与各分部单独变化时的归属净利润要求；条件敏感性不是外部 MIE。"
+    )
+    return result
+
 def _evaluate_primary_eps_multiple_valuation(
     raw: Any, *, selected_model_family: Any, expected_forecast_period: Any,
     expected_terminal_date: Any, expected_currency: Any,
@@ -5045,6 +5403,54 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
                 )
         lines.append("- 以上是“现价 + 选定终端 P/E + 收益门槛 + 经验证分红时间表”的条件结果，不是外部市场共识，不改变预期差决策状态。")
 
+
+    local_sotp_inversion = inversion.get("local_sotp_recalculation") if isinstance(inversion.get("local_sotp_recalculation"), Mapping) else {}
+    if local_sotp_inversion and local_sotp_inversion.get("selected_model_family") == "SOTP":
+        lines.extend([
+            "",
+            "- **B61 本地 SOTP 现价要求反推**："
+            + f"{local_sotp_inversion.get('status', 'UNKNOWN')}；"
+            + f"外部 MIE 状态仍为 {local_sotp_inversion.get('external_mie_status_unchanged', 'UNKNOWN')}；"
+            + f"期间 {local_sotp_inversion.get('forecast_period', 'UNKNOWN')}；"
+            + f"终点 {local_sotp_inversion.get('valuation_terminal_date', 'UNKNOWN')}。",
+            "- 反推先求满足收益门槛所需的总股权价值，再固定母公司成本/净现金净负债/其他调整/稀释股数，得到所需总分部权益价值池。",
+            "- 分部单项要求均为“其他分部维持本情景预测、只有该分部变化”的独立敏感性；不能将不同分部的单项阈值相加。",
+        ])
+        local_scenarios = local_sotp_inversion.get("scenarios") if isinstance(local_sotp_inversion.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            scenario_row = local_scenarios.get(scenario_name) if isinstance(local_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B61 {scenario_name.upper()} — {scenario_row.get('status', 'UNKNOWN')}**")
+            requirements = scenario_row.get("requirements") if isinstance(scenario_row.get("requirements"), Mapping) else {}
+            for req_key, req_label in (("required_return", "Required Return"), ("fundamental_target_annualized_return", "15% Fundamental Target")):
+                requirement = requirements.get(req_key) if isinstance(requirements.get(req_key), Mapping) else {}
+                without = requirement.get("without_distributions") if isinstance(requirement.get("without_distributions"), Mapping) else {}
+                with_dist = requirement.get("with_validated_distributions") if isinstance(requirement.get("with_validated_distributions"), Mapping) else {}
+                lines.append(
+                    f"- {req_label}：终端每股价值要求（未计/已验证分红）"
+                    f"{requirement.get('required_terminal_value_per_share_without_distributions') or 'UNKNOWN'} / "
+                    f"{requirement.get('required_terminal_value_per_share_with_validated_distributions') or 'UNKNOWN'} CNY；"
+                    f"所需分部权益价值池（未计分红）{without.get('required_segment_equity_value_pool_cny') or 'UNKNOWN'} CNY；"
+                    f"当前分部价值池 {without.get('selected_segment_equity_value_pool_cny') or 'UNKNOWN'} CNY；"
+                    f"缺口 {without.get('additional_segment_equity_value_required_cny') or 'UNKNOWN'} CNY。"
+                )
+                segment_rows = without.get("segment_requirements") if isinstance(without.get("segment_requirements"), list) else []
+                if segment_rows:
+                    lines.append("  - 分部单变量盈利要求（其他分部不变）：")
+                    for segment in segment_rows:
+                        required_profit = segment.get("one_at_a_time_required_attributable_net_profit_cny")
+                        incremental = segment.get("one_at_a_time_incremental_profit_required_cny")
+                        headroom = segment.get("one_at_a_time_profit_headroom_cny")
+                        lines.append(
+                            f"    - {segment.get('segment_id')} / {segment.get('segment_name')}："
+                            f"当前归母净利润 {segment.get('selected_attributable_net_profit_cny')} CNY；"
+                            f"单变量所需 {required_profit} CNY；"
+                            f"需新增 {incremental} CNY；已有余量 {headroom} CNY；"
+                            f"当前分部 P/E {segment.get('selected_pe_multiple_x')}x。"
+                        )
+            if scenario_row.get("issues"):
+                lines.append("- 待核查：" + "；".join(scenario_row["issues"][:6]))
+        lines.append("- 边界：这是现价、终端分部 P/E、母公司调整与稀释股数条件下的数学反推，不是外部 MIE；没有分部价值驱动分配依据时，不生成多个分部同时应达到的盈利组合，也不修改 SOTP 主估值。")
+
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
@@ -5691,6 +6097,17 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
     source_inversion = mie.get("price_implied_analysis")
     source_inversion = dict(source_inversion) if isinstance(source_inversion, Mapping) else {"status": "NOT_PROVIDED"}
     source_inversion["local_eps_multiple_recalculation"] = local_inversion
+    local_sotp_inversion = _build_b61_sotp_price_inversion(
+        price_input=prepared.get("price_input") or {},
+        valuation_timing=prepared.get("valuation_timing") or {},
+        decision_parameters=prepared.get("decision_parameters") or {},
+        operator_valuation_context=prepared.get("operator_valuation_context") or {},
+        sotp_valuation=prepared.get("sotp_valuation") or {},
+        forecast_valuation=prepared.get("forecast_valuation") or {},
+        validated_cash_distribution_events=prepared.get("_validated_cash_distribution_events"),
+        external_mie_status=mie.get("status"),
+    )
+    source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion
     assessment["market_implied_expectation"] = mie
     prepared["assessment"] = assessment
