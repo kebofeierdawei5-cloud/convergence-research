@@ -5870,6 +5870,10 @@ def _b58_test_inputs():
             },
             "forward_scenario": {
                 "period": "2026FY",
+                "b56_net_profit_proxy_cny": "90000",
+                "non_operating_after_tax_effect_cny": "5000",
+                "non_recurring_after_tax_effect_cny": "12000",
+                "all_items_minority_interest_net_profit_cny": "7000",
                 "all_items_parent_attributable_net_profit_proxy_cny": "100000",
                 "normalized_parent_attributable_net_profit_cny": "95000",
                 "normalized_diluted_eps_proxy_cny_per_share": "9.5",
@@ -5882,6 +5886,9 @@ def _b58_test_inputs():
             "valuation_terminal_date": "2026-12-31",
             "calculated_eps_per_share": "10",
             "declared_eps_per_share": "10",
+            "b4_net_profit_proxy_cny": "105000",
+            "non_controlling_interests": {"value": "5000", "unit": "CNY"},
+            "net_profit_attributable_to_listed_shareholders": {"value": "100000", "unit": "CNY"},
             "diluted_shares": {"value": "10000", "unit": "shares"},
             "other_after_tax_attribution_adjustment": {"value": "0", "unit": "CNY"},
         }
@@ -6019,3 +6026,119 @@ def test_b58_renderer_exposes_primary_eps_comparison_and_non_replacement_boundar
     assert "B58 B57 EPS 代理与主估值 EPS 一致性核对" in report
     assert "不替换 EPS_MULTIPLE 输入" in report
     assert "正常化 EPS 差异" in report
+
+
+def test_b59_explains_b57_to_primary_eps_gap_by_profit_components_and_adapter_input_gap():
+    driver, primary, valuation = _b58_test_inputs()
+    b57_forward = driver["baseline_transition"]["per_share_earnings_bridge"]["scenarios"]["base"]["forward_scenario"]
+    b57_forward.update({
+        "b56_net_profit_proxy_cny": "88000",
+        "non_operating_after_tax_effect_cny": "5000",
+        "non_recurring_after_tax_effect_cny": "12000",
+        "all_items_minority_interest_net_profit_cny": "7000",
+        "all_items_parent_attributable_net_profit_proxy_cny": "98000",
+    })
+    valuation["scenarios"]["base"]["eps_per_share"]["value"] = "9.9"
+    b58 = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    result = pilot._build_b59_primary_eps_difference_attribution(
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        primary_eps_consistency=b58,
+    )
+    row = result["scenarios"]["base"]
+    components = row["profit_numerator_components"]
+    eps = row["eps_gap_components_cny_per_share"]
+    assert row["status"] == "ARITHMETICALLY_RECONCILED_NOT_COMPARABLE"
+    assert components["b56_modeled_net_profit_proxy_gap_cny"] == "-17000"
+    assert components["recurring_non_operating_after_tax_effect_cny"] == "5000"
+    assert components["non_recurring_after_tax_effect_cny"] == "12000"
+    assert components["nci_attribution_difference_cny"] == "-2000"
+    assert components["sum_cny"] == "-2000"
+    assert eps["profit_numerator_effect_cny_per_share"] == "-0.2"
+    assert eps["diluted_share_denominator_effect_cny_per_share"] == "0"
+    assert eps["primary_declared_eps_input_effect_cny_per_share"] == "0.1"
+    assert eps["b57_minus_primary_declared_eps_cny_per_share"] == "-0.1"
+    assert result["valuation_input_modified"] is False
+    assert result["primary_eps_input_modified"] is False
+
+
+def test_b59_uses_denominator_effect_and_surfaces_unmapped_primary_adjustment():
+    driver, primary, valuation = _b58_test_inputs()
+    primary_row = primary["scenarios"]["base"]
+    primary_row["diluted_shares"]["value"] = "12500"
+    primary_row["other_after_tax_attribution_adjustment"]["value"] = "2000"
+    primary_row["net_profit_attributable_to_listed_shareholders"]["value"] = "102000"
+    primary_row["calculated_eps_per_share"] = "8.16"
+    valuation["scenarios"]["base"]["eps_per_share"]["value"] = "8.16"
+    b58 = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    result = pilot._build_b59_primary_eps_difference_attribution(
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        primary_eps_consistency=b58,
+    )
+    row = result["scenarios"]["base"]
+    eps = row["eps_gap_components_cny_per_share"]
+    assert row["status"] == "ARITHMETICALLY_RECONCILED_NOT_COMPARABLE"
+    assert "DILUTED_SHARE_DENOMINATOR_MISMATCH" in row["comparability_flags"]
+    assert "UNMAPPED_PRIMARY_OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT" in row["comparability_flags"]
+    assert eps["reconciliation_residual_cny_per_share"] == "0"
+    assert row["profit_numerator_components"]["unmapped_primary_other_after_tax_adjustment_effect_cny"] == "-2000"
+
+
+def test_b59_assumption_only_primary_eps_is_not_given_a_false_profit_attribution():
+    driver, primary, valuation = _b58_test_inputs()
+    primary["status"] = "ASSUMPTION_ONLY"
+    for name in ("bear", "base", "bull"):
+        primary["scenarios"][name] = {
+            "status": "ASSUMPTION_ONLY",
+            "declared_eps_per_share": "10",
+        }
+        valuation["scenarios"][name]["earnings_bridge"] = primary["scenarios"][name]
+    b58 = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    result = pilot._build_b59_primary_eps_difference_attribution(
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        primary_eps_consistency=b58,
+    )
+    assert result["scenarios"]["base"]["status"] == "PRIMARY_EPS_ASSUMPTION_ONLY"
+
+
+def test_b59_renderer_exposes_signed_profit_and_share_gap_attribution():
+    driver, primary, valuation = _b58_test_inputs()
+    b58 = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    driver["baseline_transition"]["primary_eps_consistency"] = b58
+    driver["baseline_transition"]["primary_eps_difference_attribution"] = (
+        pilot._build_b59_primary_eps_difference_attribution(
+            operating_driver_forecast=driver,
+            eps_earnings_bridge=primary,
+            primary_eps_consistency=b58,
+        )
+    )
+    report = "\n".join(render_operating_driver_section(driver, None, "CNY"))
+    assert "B59 主 EPS 差异的利润与每股归因" in report
+    assert "稀释股数分母效应" in report
+    assert "不修正主估值 EPS" in report
