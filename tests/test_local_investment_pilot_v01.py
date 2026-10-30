@@ -6142,3 +6142,156 @@ def test_b59_renderer_exposes_signed_profit_and_share_gap_attribution():
     assert "B59 主 EPS 差异的利润与每股归因" in report
     assert "稀释股数分母效应" in report
     assert "不修正主估值 EPS" in report
+
+
+def _b60_test_inputs():
+    driver, primary, valuation = _b58_test_inputs()
+    for name in ("bear", "base", "bull"):
+        valuation["scenarios"][name]["eps_per_share"]["unit"] = "CNY/share"
+        valuation["scenarios"][name]["pe_multiple_x"] = {
+            "value": "10", "unit": "x", "data_class": "ANALYST_ASSUMPTION",
+            "basis": "Explicit selected terminal multiple", "evidence_refs": [],
+        }
+        valuation["scenarios"][name]["terminal_value_per_share"] = "100"
+    b58 = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE", expected_currency="CNY",
+        operating_driver_forecast=driver, eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    driver["baseline_transition"]["primary_eps_consistency"] = b58
+    driver["baseline_transition"]["primary_eps_difference_attribution"] = {
+        "scenarios": {
+            name: {
+                "status": "ARITHMETICALLY_RECONCILED",
+                "eps_gap_components_cny_per_share": {
+                    "profit_numerator_effect_cny_per_share": "0.4",
+                    "diluted_share_denominator_effect_cny_per_share": "0.1",
+                    "primary_declared_eps_input_effect_cny_per_share": "0",
+                    "b57_minus_primary_declared_eps_cny_per_share": "0.5",
+                    "component_sum_cny_per_share": "0.5",
+                    "reconciliation_residual_cny_per_share": "0",
+                },
+            } for name in ("bear", "base", "bull")
+        }
+    }
+    price = {
+        "price": "100", "currency": "CNY",
+        "assurance_label": "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED",
+        "pit_time_status": "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY",
+        "observation_date": "2026-10-30",
+        "known_at": "2026-10-30T15:00:00+08:00",
+    }
+    timing = {
+        "status": "PASS", "forecast_period": "2026FY",
+        "valuation_terminal_date": "2027-10-30",
+        "elapsed_calendar_days": 365, "annualization_year_fraction": "1",
+        "day_count_convention": "ACT/365F_DATE_ONLY",
+    }
+    decision = {
+        "required_return_annualized": "0.15",
+        "fundamental_target_annualized_return": "0.15",
+    }
+    operator = {"selected_model_family": "EPS_MULTIPLE"}
+    forecast = {
+        "forecast_period": "2026FY",
+        "valuation_terminal_date": "2027-10-30",
+        "scenarios": {
+            name: {"cash_distributions_per_share": "0"}
+            for name in ("bear", "base", "bull")
+        },
+        "cash_distribution_review": {"status": "NO_FUTURE_DISTRIBUTIONS_CONFIRMED"},
+    }
+    return price, timing, decision, operator, valuation, forecast, driver
+
+
+def test_b60_locally_recomputes_return_hurdle_eps_and_keeps_external_mie_unchanged():
+    price, timing, decision, operator, valuation, forecast, driver = _b60_test_inputs()
+    result = pilot._build_b60_local_eps_multiple_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, eps_multiple_valuation=valuation,
+        forecast_valuation=forecast, operating_driver_forecast=driver,
+        validated_cash_distribution_events={name: [] for name in ("bear", "base", "bull")},
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    row = result["scenarios"]["base"]
+    assert result["status"] == "CONDITIONAL_SENSITIVITY_CALCULATED"
+    assert row["required_return_eps_without_distributions"] == "11.50"
+    assert row["fundamental_target_eps_without_distributions"] == "11.50"
+    assert row["b57_eps_headroom_vs_required_return_without_distributions"] == "-1.50"
+    assert row["current_price_to_primary_eps_forward_pe"] == "10"
+    assert row["distribution_status"] == "VALIDATED_NO_FUTURE_DISTRIBUTIONS"
+    assert result["external_mie_status_unchanged"] == "NOT_IDENTIFIABLE"
+    assert result["external_mie_and_expectation_gap_modified"] is False
+
+
+def test_b60_only_counts_dated_distributions_already_validated_by_return_solver():
+    price, timing, decision, operator, valuation, forecast, driver = _b60_test_inputs()
+    forecast["scenarios"]["base"]["cash_distributions_per_share"] = "5"
+    events = {name: [] for name in ("bear", "base", "bull")}
+    events["base"] = [{"amount_per_share": "5", "year_fraction_from_entry": "0.5"}]
+    result = pilot._build_b60_local_eps_multiple_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, eps_multiple_valuation=valuation,
+        forecast_valuation=forecast, operating_driver_forecast=driver,
+        validated_cash_distribution_events=events,
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    row = result["scenarios"]["base"]
+    assert row["distribution_status"] == "VALIDATED_DATED_CASH_FLOWS"
+    assert Decimal(row["required_return_eps_with_validated_distributions"]) < Decimal(
+        row["required_return_eps_without_distributions"]
+    )
+    assert row["validated_cash_distributions_per_share"] == "5"
+
+
+def test_b60_translates_b59_eps_difference_components_into_terminal_value_effects():
+    price, timing, decision, operator, valuation, forecast, driver = _b60_test_inputs()
+    result = pilot._build_b60_local_eps_multiple_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, eps_multiple_valuation=valuation,
+        forecast_valuation=forecast, operating_driver_forecast=driver,
+        validated_cash_distribution_events={name: [] for name in ("bear", "base", "bull")},
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    row = result["scenarios"]["base"]
+    assert row["b59_terminal_value_effects"]["profit_numerator_effect_terminal_value_effect_cny_per_share"] == "4.0"
+    assert row["b59_terminal_value_effects"]["diluted_share_denominator_effect_terminal_value_effect_cny_per_share"] == "1.0"
+    assert row["b57_minus_primary_terminal_value_effect"] == "5.0"
+
+
+def test_b60_requires_eps_multiple_primary_model_and_pit_qualified_price():
+    price, timing, decision, operator, valuation, forecast, driver = _b60_test_inputs()
+    operator["selected_model_family"] = "SOTP"
+    result = pilot._build_b60_local_eps_multiple_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, eps_multiple_valuation=valuation,
+        forecast_valuation=forecast, operating_driver_forecast=driver,
+        validated_cash_distribution_events=None, external_mie_status="NOT_IDENTIFIABLE",
+    )
+    assert result["status"] == "NOT_APPLICABLE_NOT_EPS_MULTIPLE"
+    operator["selected_model_family"] = "EPS_MULTIPLE"
+    price["pit_time_status"] = "PRICE_NOT_PIT_QUALIFIED"
+    result = pilot._build_b60_local_eps_multiple_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, eps_multiple_valuation=valuation,
+        forecast_valuation=forecast, operating_driver_forecast=driver,
+        validated_cash_distribution_events=None, external_mie_status="NOT_IDENTIFIABLE",
+    )
+    assert result["status"] == "PRICE_NOT_PIT_QUALIFIED"
+    assert result["external_mie_status_unchanged"] == "NOT_IDENTIFIABLE"
+
+
+def test_b60_does_not_compare_b57_eps_outside_company_wide_scope():
+    price, timing, decision, operator, valuation, forecast, driver = _b60_test_inputs()
+    driver["scope"] = "PRODUCT_LINE"
+    result = pilot._build_b60_local_eps_multiple_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, eps_multiple_valuation=valuation,
+        forecast_valuation=forecast, operating_driver_forecast=driver,
+        validated_cash_distribution_events={name: [] for name in ("bear", "base", "bull")},
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    row = result["scenarios"]["base"]
+    assert row["status"] == "CALCULATED_CONDITIONAL"
+    assert row["b57_terminal_value_using_selected_pe"] is None
+    assert "B57_EPS_NOT_CONFIRMED_ON_SAME_COMPANY_SCOPE_AND_PERIOD" in row["comparability_flags"]
