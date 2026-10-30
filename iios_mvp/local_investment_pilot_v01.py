@@ -1903,6 +1903,252 @@ def _build_b59_primary_eps_difference_attribution(
         base["status"] = "NOT_IDENTIFIABLE"
     return base
 
+def _build_b60_local_eps_multiple_price_inversion(
+    *, price_input: Mapping[str, Any], valuation_timing: Mapping[str, Any],
+    decision_parameters: Mapping[str, Any], operator_valuation_context: Mapping[str, Any],
+    eps_multiple_valuation: Mapping[str, Any], forecast_valuation: Mapping[str, Any],
+    operating_driver_forecast: Mapping[str, Any], validated_cash_distribution_events: Any,
+    external_mie_status: Any,
+) -> dict[str, Any]:
+    """Independently invert the protected current price through the selected terminal P/E."""
+    result: dict[str, Any] = {
+        "schema_version": "IIOS-B60-LOCAL-EPS-MULTIPLE-PRICE-INVERSION-0.1",
+        "status": "NOT_IDENTIFIABLE", "qualification": "CONDITIONAL_ONLY",
+        "selected_model_family": str(operator_valuation_context.get("selected_model_family") or "UNKNOWN").upper(),
+        "currency": str(price_input.get("currency") or "UNKNOWN").upper(),
+        "external_mie_status_unchanged": str(external_mie_status or "UNKNOWN").upper(),
+        "reference_price": price_input.get("price"),
+        "price_assurance": price_input.get("assurance_label") or "UNKNOWN",
+        "price_pit_status": price_input.get("pit_time_status") or "UNKNOWN",
+        "forecast_period": eps_multiple_valuation.get("forecast_period") or "UNKNOWN",
+        "valuation_terminal_date": valuation_timing.get("valuation_terminal_date") or eps_multiple_valuation.get("valuation_terminal_date") or "UNKNOWN",
+        "annualization_year_fraction": valuation_timing.get("annualization_year_fraction"),
+        "day_count_convention": valuation_timing.get("day_count_convention") or "UNKNOWN",
+        "method": "PROTECTED_CURRENT_PRICE_INVERTED_THROUGH_SELECTED_TERMINAL_PE_AND_ANNUALIZED_RETURN_HURDLE",
+        "return_hurdle_role": "ANNUALIZED_RETURN_HURDLE_NOT_VALUATION_DISCOUNT_RATE",
+        "scenarios": {},
+        "assumptions": [
+            "唯一现价来自结构化 price_input.price；操作员输入仍不等于来源核实。",
+            "终端 P/E 来自实际 EPS_MULTIPLE 适配器；它是终端估值假设，不是外部观测的当前市场 P/E。",
+            "盈利参考期间与估值终点日期分开；终点日期只用于持有期年化。",
+            "年化回报门槛用于推算持有期所需终值，不作为 WACC 或企业资本成本。",
+            "只有通过现有收益求解器验证的定时、税后现金分配才进入分红调整结果。",
+        ],
+        "limitations": [
+            "本结果是现价、终端 P/E、持有期、回报门槛和分红假设下的条件反推，不是外部 MIE。",
+            "所选终端 P/E 并未因此成为市场事实；不能由此证明倍数合理或可实现。",
+            "外部 MIE 状态及 expectation_gap 状态均不因本计算而升级。",
+            "不修改 EPS_MULTIPLE 输入、终值、B5/B6、回报输出、目标价、15%门槛、Decision 或执行权限。",
+        ],
+        "formal_mie_admission_created": False, "decision_authority": False,
+        "valuation_input_modified": False, "primary_eps_input_modified": False,
+    }
+    if result["selected_model_family"] != "EPS_MULTIPLE":
+        result["status"] = "NOT_APPLICABLE_NOT_EPS_MULTIPLE"
+        return result
+    if result["currency"] != "CNY":
+        result["status"] = "NOT_COMPARABLE_CURRENCY"
+        return result
+    if eps_multiple_valuation.get("status") != "CALCULATED" or eps_multiple_valuation.get("selected_for_primary_model") is not True:
+        result["status"] = "PRIMARY_EPS_MULTIPLE_NOT_CALCULATED"
+        return result
+    if price_input.get("pit_time_status") != "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY":
+        result["status"] = "PRICE_NOT_PIT_QUALIFIED"
+        return result
+    if valuation_timing.get("status") != "PASS":
+        result["status"] = "VALUATION_TIMING_NOT_RESOLVED"
+        result["issues"] = list(valuation_timing.get("issues") or [])
+        return result
+
+    def dec(value: Any) -> Decimal | None:
+        try:
+            number = Decimal(str(value))
+            return number if number.is_finite() else None
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+
+    price = dec(price_input.get("price"))
+    years = dec(valuation_timing.get("annualization_year_fraction"))
+    hurdle = dec(decision_parameters.get("required_return_annualized"))
+    target = dec(decision_parameters.get("fundamental_target_annualized_return"))
+    if target is None:
+        target = FUNDAMENTAL_TARGET_ANNUALIZED_RETURN
+    if price is None or price <= 0 or years is None or years <= 0:
+        result["status"] = "PRICE_OR_TERMINAL_HORIZON_NOT_IDENTIFIABLE"
+        return result
+    if hurdle is None or hurdle <= -1 or target <= -1:
+        result["status"] = "RETURN_HURDLE_NOT_IDENTIFIABLE"
+        return result
+
+    valuation_rows = eps_multiple_valuation.get("scenarios") if isinstance(eps_multiple_valuation.get("scenarios"), Mapping) else {}
+    transition = operating_driver_forecast.get("baseline_transition")
+    transition = transition if isinstance(transition, Mapping) else {}
+    b57 = transition.get("per_share_earnings_bridge")
+    b57 = b57 if isinstance(b57, Mapping) else {}
+    b57_rows = b57.get("scenarios") if isinstance(b57.get("scenarios"), Mapping) else {}
+    b58 = transition.get("primary_eps_consistency")
+    b58 = b58 if isinstance(b58, Mapping) else {}
+    b58_rows = b58.get("scenarios") if isinstance(b58.get("scenarios"), Mapping) else {}
+    b59 = transition.get("primary_eps_difference_attribution")
+    b59 = b59 if isinstance(b59, Mapping) else {}
+    b59_rows = b59.get("scenarios") if isinstance(b59.get("scenarios"), Mapping) else {}
+    forward_rows = forecast_valuation.get("scenarios") if isinstance(forecast_valuation.get("scenarios"), Mapping) else {}
+    event_rows = validated_cash_distribution_events if isinstance(validated_cash_distribution_events, Mapping) else {}
+    company_scope = (
+        str(operating_driver_forecast.get("scope") or "").upper() == "COMPANY_WIDE"
+        and str(b57.get("scope") or "").upper() == "COMPANY_WIDE"
+    )
+    statuses: list[str] = []
+    every_distribution_validated = True
+
+    def required_eps(rate: Decimal, pe: Decimal, pv_dividends: Decimal | None) -> tuple[Decimal, Decimal | None]:
+        factor = (Decimal("1") + rate) ** years
+        without_dividends = price * factor / pe
+        with_dividends = None
+        if pv_dividends is not None:
+            with_dividends = max(Decimal("0"), (price - pv_dividends) * factor) / pe
+        return without_dividends, with_dividends
+
+    for name in SCENARIOS:
+        model = valuation_rows.get(name) if isinstance(valuation_rows.get(name), Mapping) else {}
+        pe_obj = model.get("pe_multiple_x") if isinstance(model.get("pe_multiple_x"), Mapping) else {}
+        eps_obj = model.get("eps_per_share") if isinstance(model.get("eps_per_share"), Mapping) else {}
+        b57_row = b57_rows.get(name) if isinstance(b57_rows.get(name), Mapping) else {}
+        b57_forward = b57_row.get("forward_scenario") if isinstance(b57_row.get("forward_scenario"), Mapping) else {}
+        b58_row = b58_rows.get(name) if isinstance(b58_rows.get(name), Mapping) else {}
+        b59_row = b59_rows.get(name) if isinstance(b59_rows.get(name), Mapping) else {}
+        forecast_row = forward_rows.get(name) if isinstance(forward_rows.get(name), Mapping) else {}
+        pe, primary_eps = dec(pe_obj.get("value")), dec(eps_obj.get("value"))
+        row: dict[str, Any] = {
+            "scenario": name, "status": "NOT_IDENTIFIABLE",
+            "selected_terminal_pe": pe_obj.get("value"), "selected_terminal_pe_unit": pe_obj.get("unit"),
+            "selected_terminal_pe_basis": pe_obj.get("basis"), "selected_terminal_pe_data_class": pe_obj.get("data_class"),
+            "primary_eps_actually_used": eps_obj.get("value"),
+            "primary_terminal_value_using_selected_pe": model.get("terminal_value_per_share"),
+            "b57_status": b57_row.get("status") or "UNKNOWN",
+            "b58_status": b58_row.get("status") or "UNKNOWN",
+            "b58_forecast_period_match": b58_row.get("forecast_period_match"),
+            "b59_status": b59_row.get("status") or "UNKNOWN",
+            "b57_all_items_eps_proxy": b58_row.get("b57_all_items_eps_proxy_cny_per_share"),
+            "b57_normalized_eps_proxy_diagnostic_only": b58_row.get("b57_normalized_diluted_eps_proxy_cny_per_share"),
+            "distribution_status": "NOT_VALIDATED_OR_NOT_AVAILABLE",
+            "validated_cash_distributions_per_share": None,
+            "present_value_of_validated_cash_distributions_at_hurdle": None,
+            "zero_return_required_terminal_eps_before_distributions": format(price / pe, "f") if pe and pe > 0 else None,
+            "required_return_eps_without_distributions": None,
+            "required_return_eps_with_validated_distributions": None,
+            "fundamental_target_eps_without_distributions": None,
+            "fundamental_target_eps_with_validated_distributions": None,
+            "b57_eps_headroom_vs_required_return_without_distributions": None,
+            "b57_eps_headroom_vs_required_return_with_validated_distributions": None,
+            "primary_eps_headroom_vs_required_return_without_distributions": None,
+            "primary_eps_headroom_vs_required_return_with_validated_distributions": None,
+            "b57_terminal_value_using_selected_pe": None,
+            "b57_minus_primary_terminal_value_effect": None,
+            "current_price_to_primary_eps_forward_pe": None,
+            "required_terminal_pe_at_b57_eps_for_required_return_without_distributions": None,
+            "b59_terminal_value_effects": {}, "comparability_flags": [], "issues": [],
+        }
+        if pe is None or pe <= 0 or str(pe_obj.get("unit") or "").lower() != "x":
+            row["issues"] = ["SELECTED_TERMINAL_PE_INVALID_OR_UNIT_MISMATCH"]
+            result["scenarios"][name] = row
+            statuses.append(row["status"])
+            every_distribution_validated = False
+            continue
+        if primary_eps is None or primary_eps <= 0 or str(eps_obj.get("unit") or "").lower() != "cny/share":
+            row["issues"] = ["PRIMARY_ADAPTER_EPS_INVALID_OR_UNIT_MISMATCH"]
+            result["scenarios"][name] = row
+            statuses.append(row["status"])
+            every_distribution_validated = False
+            continue
+
+        events = event_rows.get(name)
+        declared_distributions = dec(forecast_row.get("cash_distributions_per_share"))
+        dist_total, pv_at_hurdle, pv_at_target = None, None, None
+        dist_issues: list[str] = []
+        if isinstance(events, list) and declared_distributions is not None and declared_distributions >= 0:
+            total = Decimal("0")
+            pv_h = Decimal("0")
+            pv_t = Decimal("0")
+            for event_no, event in enumerate(events, 1):
+                if not isinstance(event, Mapping):
+                    dist_issues.append(f"VALIDATED_DISTRIBUTION_EVENT_{event_no}_INVALID")
+                    break
+                amount, event_years = dec(event.get("amount_per_share")), dec(event.get("year_fraction_from_entry"))
+                if amount is None or amount <= 0 or event_years is None or event_years <= 0 or event_years > years:
+                    dist_issues.append(f"VALIDATED_DISTRIBUTION_EVENT_{event_no}_AMOUNT_OR_DATE_INVALID")
+                    break
+                total += amount
+                pv_h += amount / ((Decimal("1") + hurdle) ** event_years)
+                pv_t += amount / ((Decimal("1") + target) ** event_years)
+            if not dist_issues and abs(total - declared_distributions) <= Decimal("0.000001"):
+                dist_total, pv_at_hurdle, pv_at_target = total, pv_h, pv_t
+                row["distribution_status"] = "VALIDATED_DATED_CASH_FLOWS" if events else "VALIDATED_NO_FUTURE_DISTRIBUTIONS"
+            else:
+                dist_issues.append("VALIDATED_EVENT_TOTAL_DOES_NOT_MATCH_SCENARIO_DISTRIBUTION")
+        else:
+            dist_issues.append("DISTRIBUTIONS_NOT_VALIDATED_BY_EXISTING_RETURN_SOLVER")
+        if pv_at_hurdle is None:
+            every_distribution_validated = False
+
+        req_h_no, req_h_yes = required_eps(hurdle, pe, pv_at_hurdle)
+        req_t_no, req_t_yes = required_eps(target, pe, pv_at_target)
+        row["required_return_eps_without_distributions"] = format(req_h_no, "f")
+        row["required_return_eps_with_validated_distributions"] = format(req_h_yes, "f") if req_h_yes is not None else None
+        row["fundamental_target_eps_without_distributions"] = format(req_t_no, "f")
+        row["fundamental_target_eps_with_validated_distributions"] = format(req_t_yes, "f") if req_t_yes is not None else None
+        row["validated_cash_distributions_per_share"] = format(dist_total, "f") if dist_total is not None else None
+        row["present_value_of_validated_cash_distributions_at_hurdle"] = format(pv_at_hurdle, "f") if pv_at_hurdle is not None else None
+        row["current_price_to_primary_eps_forward_pe"] = format(price / primary_eps, "f")
+        primary_terminal = dec(model.get("terminal_value_per_share"))
+        if primary_terminal is not None:
+            row["primary_terminal_value_using_selected_pe"] = format(primary_terminal, "f")
+
+        b57_eps = dec(b58_row.get("b57_all_items_eps_proxy_cny_per_share"))
+        b57_comparable = (
+            company_scope and b57_row.get("status") == "CALCULATED_AND_RECONCILED"
+            and b58_row.get("forecast_period_match") is True and b57_eps is not None
+        )
+        if b57_comparable:
+            row["b57_terminal_value_using_selected_pe"] = format(b57_eps * pe, "f")
+            row["b57_minus_primary_terminal_value_effect"] = format((b57_eps - primary_eps) * pe, "f")
+            row["b57_eps_headroom_vs_required_return_without_distributions"] = format(b57_eps - req_h_no, "f")
+            if req_h_yes is not None:
+                row["b57_eps_headroom_vs_required_return_with_validated_distributions"] = format(b57_eps - req_h_yes, "f")
+            if b57_eps > 0:
+                row["required_terminal_pe_at_b57_eps_for_required_return_without_distributions"] = format(
+                    price * ((Decimal("1") + hurdle) ** years) / b57_eps, "f"
+                )
+        else:
+            row["comparability_flags"].append("B57_EPS_NOT_CONFIRMED_ON_SAME_COMPANY_SCOPE_AND_PERIOD")
+        row["primary_eps_headroom_vs_required_return_without_distributions"] = format(primary_eps - req_h_no, "f")
+        if req_h_yes is not None:
+            row["primary_eps_headroom_vs_required_return_with_validated_distributions"] = format(primary_eps - req_h_yes, "f")
+
+        b59_components = b59_row.get("eps_gap_components_cny_per_share") if isinstance(b59_row.get("eps_gap_components_cny_per_share"), Mapping) else {}
+        for component, raw_value in b59_components.items():
+            if component == "reconciliation_residual_cny_per_share":
+                continue
+            amount = dec(raw_value)
+            if amount is not None:
+                row["b59_terminal_value_effects"][component.replace("_cny_per_share", "_terminal_value_effect_cny_per_share")] = format(amount * pe, "f")
+        row["status"] = "CALCULATED_CONDITIONAL"
+        row["issues"] = dist_issues
+        row["comparability_flags"].extend(dist_issues)
+        result["scenarios"][name] = row
+        statuses.append(row["status"])
+
+    if statuses and all(value == "CALCULATED_CONDITIONAL" for value in statuses):
+        result["status"] = "CONDITIONAL_SENSITIVITY_CALCULATED"
+    elif any(value == "CALCULATED_CONDITIONAL" for value in statuses):
+        result["status"] = "PARTIAL"
+    else:
+        result["status"] = "NOT_IDENTIFIABLE"
+    result["all_scenario_distribution_cash_flows_validated"] = every_distribution_validated
+    result["external_mie_and_expectation_gap_modified"] = False
+    result["summary"] = "本地使用唯一结构化现价、主 EPS_MULTIPLE 终端 P/E 和收益门槛独立反推所需终端 EPS；合格分红按实际时间计入。结果为条件敏感性，不是外部 MIE。"
+    return result
+
 def _evaluate_primary_eps_multiple_valuation(
     raw: Any, *, selected_model_family: Any, expected_forecast_period: Any,
     expected_terminal_date: Any, expected_currency: Any,
@@ -4705,7 +4951,7 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             lines.append("- 阻断提示：价格反推参考价与本次结构化现价不一致；该反推不能用于当前价格比较。")
         elif not inversion_contract_complete:
             lines.append("- 限制提示：条件反推缺少方法、固定假设、反推结果、局限说明或参考价匹配；视为未完整识别，不可据此宣称预期差。")
-        lines.append("- 边界：此一致性检查只核对参考价格和必需字段，不独立验证反推公式、假设公允性或来源内容真实性。")
+        lines.append("- 边界：模型提交的原始反推合同只检查输入结构和参考价格；B60 在下方另行独立复算 EPS×终端 P/E 的条件要求，但该结果仍不是外部 MIE。")
         assumptions = inversion.get("assumptions") if isinstance(inversion.get("assumptions"), list) else []
         if assumptions:
             lines.append("- 反推的关键固定假设：")
@@ -4745,7 +4991,44 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
         if limitations:
             lines.append("- 反推局限：" + "；".join(str(item) for item in limitations[:5]))
     else:
-        lines.append("- 现价条件反推：UNKNOWN（未提供结构化 price_implied_analysis；摘要不会自行反推或补造数值）。")
+        lines.append("- 模型提交的现价条件反推：未提供；下方 B60 仅展示本地独立 EPS_MULTIPLE 条件反推。")
+
+
+    local_eps_inversion = inversion.get("local_eps_multiple_recalculation") if isinstance(inversion.get("local_eps_multiple_recalculation"), Mapping) else {}
+    if local_eps_inversion:
+        lines.extend([
+            "",
+            "- **B60 本地 EPS_MULTIPLE 价格反推**："
+            + f"{local_eps_inversion.get('status', 'UNKNOWN')}；"
+            + f"外部 MIE 状态仍为 {local_eps_inversion.get('external_mie_status_unchanged', 'UNKNOWN')}；"
+            + f"盈利期间 {local_eps_inversion.get('forecast_period', 'UNKNOWN')}；"
+            + f"估值终点 {local_eps_inversion.get('valuation_terminal_date', 'UNKNOWN')}。",
+            "- 采用主适配器终端 P/E 反推零回报名义保本 EPS 和年化收益门槛所需 EPS；只有通过既有现金分配校验的定时分红才纳入分红调整结果。",
+        ])
+        local_scenarios = local_eps_inversion.get("scenarios") if isinstance(local_eps_inversion.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            local_row = local_scenarios.get(scenario_name) if isinstance(local_scenarios.get(scenario_name), Mapping) else {}
+            if local_row.get("status") != "CALCULATED_CONDITIONAL":
+                lines.append(f"  - {scenario_name.upper()}：{local_row.get('status', 'UNKNOWN')}；{'；'.join(local_row.get('issues') or []) or '关键输入不可识别'}")
+                continue
+            headroom = local_row.get("b57_eps_headroom_vs_required_return_with_validated_distributions")
+            if headroom is None:
+                headroom = local_row.get("b57_eps_headroom_vs_required_return_without_distributions")
+            lines.append(
+                f"  - {scenario_name.upper()}：终端 P/E {local_row.get('selected_terminal_pe')}x；"
+                f"现价/主预测 EPS forward P/E {local_row.get('current_price_to_primary_eps_forward_pe')}x；"
+                f"保本 EPS {local_row.get('zero_return_required_terminal_eps_before_distributions')}；"
+                f"Required Return EPS（未计/已验证分红）{local_row.get('required_return_eps_without_distributions')} / "
+                f"{local_row.get('required_return_eps_with_validated_distributions') or 'UNKNOWN'}；"
+                f"B57 EPS 余量 {headroom or 'UNKNOWN'} CNY/股。"
+            )
+            if local_row.get("b57_minus_primary_terminal_value_effect") is not None:
+                lines.append(
+                    f"    - B59 差异传导至终端每股价值：{local_row.get('b57_minus_primary_terminal_value_effect')} CNY/股；"
+                    f"分红状态 {local_row.get('distribution_status', 'UNKNOWN')}；"
+                    f"可比性提示 {'、'.join(local_row.get('comparability_flags') or []) or '无额外提示'}。"
+                )
+        lines.append("- 以上是“现价 + 选定终端 P/E + 收益门槛 + 经验证分红时间表”的条件结果，不是外部市场共识，不改变预期差决策状态。")
 
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
@@ -5377,6 +5660,25 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
 def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], str]:
     prepared = _prepare_input(payload)
     metrics, reason = _return_metrics(prepared)
+    assessment = prepared.get("assessment") if isinstance(prepared.get("assessment"), dict) else {}
+    mie = assessment.get("market_implied_expectation") if isinstance(assessment.get("market_implied_expectation"), dict) else {}
+    local_inversion = _build_b60_local_eps_multiple_price_inversion(
+        price_input=prepared.get("price_input") or {},
+        valuation_timing=prepared.get("valuation_timing") or {},
+        decision_parameters=prepared.get("decision_parameters") or {},
+        operator_valuation_context=prepared.get("operator_valuation_context") or {},
+        eps_multiple_valuation=prepared.get("eps_multiple_valuation") or {},
+        forecast_valuation=prepared.get("forecast_valuation") or {},
+        operating_driver_forecast=prepared.get("operating_driver_forecast") or {},
+        validated_cash_distribution_events=prepared.get("_validated_cash_distribution_events"),
+        external_mie_status=mie.get("status"),
+    )
+    source_inversion = mie.get("price_implied_analysis")
+    source_inversion = dict(source_inversion) if isinstance(source_inversion, Mapping) else {"status": "NOT_PROVIDED"}
+    source_inversion["local_eps_multiple_recalculation"] = local_inversion
+    mie["price_implied_analysis"] = source_inversion
+    assessment["market_implied_expectation"] = mie
+    prepared["assessment"] = assessment
     # Persist conditional entitlement metadata to the published scenario JSON
     # only after the return solver validated all dates, tax arithmetic, sources,
     # and hypothetical eligibility. Failed/unknown calculations never promote
