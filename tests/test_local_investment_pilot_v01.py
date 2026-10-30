@@ -6215,9 +6215,9 @@ def test_b60_locally_recomputes_return_hurdle_eps_and_keeps_external_mie_unchang
     )
     row = result["scenarios"]["base"]
     assert result["status"] == "CONDITIONAL_SENSITIVITY_CALCULATED"
-    assert row["required_return_eps_without_distributions"] == "11.50"
-    assert row["fundamental_target_eps_without_distributions"] == "11.50"
-    assert row["b57_eps_headroom_vs_required_return_without_distributions"] == "-1.50"
+    assert row["required_return_eps_without_distributions"] == "11.500"
+    assert row["fundamental_target_eps_without_distributions"] == "11.500"
+    assert row["b57_eps_headroom_vs_required_return_without_distributions"] == "-1.500"
     assert row["current_price_to_primary_eps_forward_pe"] == "10"
     assert row["distribution_status"] == "VALIDATED_NO_FUTURE_DISTRIBUTIONS"
     assert result["external_mie_status_unchanged"] == "NOT_IDENTIFIABLE"
@@ -6246,6 +6246,27 @@ def test_b60_only_counts_dated_distributions_already_validated_by_return_solver(
 
 def test_b60_translates_b59_eps_difference_components_into_terminal_value_effects():
     price, timing, decision, operator, valuation, forecast, driver = _b60_test_inputs()
+    driver["baseline_transition"]["per_share_earnings_bridge"]["scenarios"]["base"]["forward_scenario"]["all_items_parent_attributable_net_profit_proxy_cny"] = "105000"
+    driver["baseline_transition"]["primary_eps_consistency"] = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE", expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge={
+            "status": "CALCULATED",
+            "forecast_period": "2026FY",
+            "valuation_terminal_date": "2026-12-31",
+            "scenarios": {
+                name: {
+                    "status": "CALCULATED", "forecast_period": "2026FY",
+                    "valuation_terminal_date": "2026-12-31",
+                    "calculated_eps_per_share": "10",
+                    "declared_eps_per_share": "10",
+                    "diluted_shares": {"value": "10000", "unit": "shares"},
+                    "other_after_tax_attribution_adjustment": {"value": "0", "unit": "CNY"},
+                } for name in ("bear", "base", "bull")
+            },
+        },
+        eps_multiple_valuation=valuation,
+    )
     result = pilot._build_b60_local_eps_multiple_price_inversion(
         price_input=price, valuation_timing=timing, decision_parameters=decision,
         operator_valuation_context=operator, eps_multiple_valuation=valuation,
