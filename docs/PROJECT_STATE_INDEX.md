@@ -2960,3 +2960,15 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Gates:** COMPANY_WIDE, CNY, same B58 forecast period, reconciled B57 and a CALCULATED primary EPS bridge. Assumption-only EPS is blocked from fabricated earnings attribution; missing values, invalid units, non-positive shares or mismatched bridge arithmetic stay explicit.
 - **Output:** nested at `operating_driver_forecast.baseline_transition.primary_eps_difference_attribution`; no new top-level key, no EPS replacement and no valuation, return, target-entry-price, B5/B6, 15% hurdle, Decision or execution change.
 - **Regression cases:** four cases authored. Tests, Replay, CI and macOS acceptance have not been executed.
+
+
+## B60 — Locally recomputed price-implied EPS requirements — 2026-10-30
+
+**Status: BRANCH PROPOSAL ONLY / NOT MERGED / NOT TESTED**
+
+- **Purpose:** close B52's remaining gap: the submitted \`price_implied_analysis\` was checked for contract shape/reference-price consistency, but its EPS_MULTIPLE inversion formula was not independently recalculated by the local engine.
+- **Method:** for each scenario, invert the protected current price through the selected EPS_MULTIPLE adapter terminal P/E to calculate nominal capital-preservation EPS and terminal EPS required by the annualized return hurdle. Use explicit ACT/365F terminal timing.
+- **Dated distributions:** only cash flows already validated by the existing return solver enter the distribution-adjusted requirement. Each dividend is discounted at the specified annualized hurdle according to its event year fraction. Unknown/unvalidated distributions are excluded, and the pre-distribution EPS requirement remains separately labelled.
+- **B57–B59 linkage:** compare B57 all-items EPS only after company-wide scope, same-period and reconciled-status checks; show primary EPS used by the adapter and current-price / forecast-EPS forward P/E; translate B59 EPS-difference components through the selected terminal P/E into terminal per-share value effects.
+- **Placement and authority:** nested at \`assessment.market_implied_expectation.price_implied_analysis.local_eps_multiple_recalculation\`; no new top-level key. Does not upgrade external MIE or expectation-gap status and does not alter primary EPS, P/E, terminal value, B5/B6, return outputs, target price, the 15% hurdle, Decision or execution authority.
+- **Regression cases:** five new cases authored. Tests, Replay, CI and macOS acceptance are not run.
