@@ -2125,13 +2125,16 @@ def _build_b60_local_eps_multiple_price_inversion(
         if req_h_yes is not None:
             row["primary_eps_headroom_vs_required_return_with_validated_distributions"] = format(primary_eps - req_h_yes, "f")
 
-        b59_components = b59_row.get("eps_gap_components_cny_per_share") if isinstance(b59_row.get("eps_gap_components_cny_per_share"), Mapping) else {}
-        for component, raw_value in b59_components.items():
-            if component == "reconciliation_residual_cny_per_share":
-                continue
-            amount = dec(raw_value)
-            if amount is not None:
-                row["b59_terminal_value_effects"][component.replace("_cny_per_share", "_terminal_value_effect_cny_per_share")] = format(amount * pe, "f")
+        if b59_row.get("status") in {"ARITHMETICALLY_RECONCILED", "ARITHMETICALLY_RECONCILED_NOT_COMPARABLE"}:
+            b59_components = b59_row.get("eps_gap_components_cny_per_share") if isinstance(b59_row.get("eps_gap_components_cny_per_share"), Mapping) else {}
+            for component, raw_value in b59_components.items():
+                if component in {"reconciliation_residual_cny_per_share", "component_sum_cny_per_share"}:
+                    continue
+                amount = dec(raw_value)
+                if amount is not None:
+                    row["b59_terminal_value_effects"][component.replace("_cny_per_share", "_terminal_value_effect_cny_per_share")] = format(amount * pe, "f")
+        else:
+            row["comparability_flags"].append("B59_EPS_GAP_ATTRIBUTION_NOT_RECONCILED")
         row["status"] = "CALCULATED_CONDITIONAL"
         row["issues"] = dist_issues
         row["comparability_flags"].extend(dist_issues)
@@ -5017,10 +5020,12 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             lines.append(
                 f"  - {scenario_name.upper()}：终端 P/E {local_row.get('selected_terminal_pe')}x；"
                 f"现价/主预测 EPS forward P/E {local_row.get('current_price_to_primary_eps_forward_pe')}x；"
-                f"保本 EPS {local_row.get('zero_return_required_terminal_eps_before_distributions')}；"
+                f"不计分红保本 EPS {local_row.get('zero_return_required_terminal_eps_before_distributions')}；"
                 f"Required Return EPS（未计/已验证分红）{local_row.get('required_return_eps_without_distributions')} / "
                 f"{local_row.get('required_return_eps_with_validated_distributions') or 'UNKNOWN'}；"
-                f"B57 EPS 余量 {headroom or 'UNKNOWN'} CNY/股。"
+                f"B57 EPS 余量 {headroom or 'UNKNOWN'} CNY/股；15%目标EPS（未计/已验证分红）"
+                f"{local_row.get('fundamental_target_eps_without_distributions')} / "
+                f"{local_row.get('fundamental_target_eps_with_validated_distributions') or 'UNKNOWN'}。"
             )
             if local_row.get("b57_minus_primary_terminal_value_effect") is not None:
                 lines.append(
