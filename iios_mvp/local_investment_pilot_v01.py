@@ -5421,31 +5421,54 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             scenario_row = local_scenarios.get(scenario_name) if isinstance(local_scenarios.get(scenario_name), Mapping) else {}
             lines.append(f"**B61 {scenario_name.upper()} — {scenario_row.get('status', 'UNKNOWN')}**")
             requirements = scenario_row.get("requirements") if isinstance(scenario_row.get("requirements"), Mapping) else {}
+            lines.append(
+                f"- 当前 SOTP：总股权价值 {scenario_row.get('selected_total_equity_value_cny') if scenario_row.get('selected_total_equity_value_cny') is not None else 'UNKNOWN'} CNY；"
+                f"稀释股数 {scenario_row.get('selected_diluted_shares') if scenario_row.get('selected_diluted_shares') is not None else 'UNKNOWN'} 股；"
+                f"终值 {scenario_row.get('selected_sotp_terminal_value_per_share') if scenario_row.get('selected_sotp_terminal_value_per_share') is not None else 'UNKNOWN'} CNY/股。"
+            )
+            lines.append(
+                f"- 母公司调整固定值：资本化中心成本 {scenario_row.get('selected_capitalized_central_cost_cny') if scenario_row.get('selected_capitalized_central_cost_cny') is not None else 'UNKNOWN'} CNY；"
+                f"净现金/净负债 {scenario_row.get('selected_net_cash_debt_cny') if scenario_row.get('selected_net_cash_debt_cny') is not None else 'UNKNOWN'} CNY；"
+                f"其他调整 {scenario_row.get('selected_other_adjustments_cny') if scenario_row.get('selected_other_adjustments_cny') is not None else 'UNKNOWN'} CNY；"
+                f"分红状态 {scenario_row.get('distribution_status', 'UNKNOWN')}。"
+            )
             for req_key, req_label in (("required_return", "Required Return"), ("fundamental_target_annualized_return", "15% Fundamental Target")):
                 requirement = requirements.get(req_key) if isinstance(requirements.get(req_key), Mapping) else {}
                 without = requirement.get("without_distributions") if isinstance(requirement.get("without_distributions"), Mapping) else {}
                 with_dist = requirement.get("with_validated_distributions") if isinstance(requirement.get("with_validated_distributions"), Mapping) else {}
+                def b61_display(value: Any) -> Any:
+                    return value if value is not None else "UNKNOWN"
                 lines.append(
                     f"- {req_label}：终端每股价值要求（未计/已验证分红）"
-                    f"{requirement.get('required_terminal_value_per_share_without_distributions') or 'UNKNOWN'} / "
-                    f"{requirement.get('required_terminal_value_per_share_with_validated_distributions') or 'UNKNOWN'} CNY；"
-                    f"所需分部权益价值池（未计分红）{without.get('required_segment_equity_value_pool_cny') or 'UNKNOWN'} CNY；"
-                    f"当前分部价值池 {without.get('selected_segment_equity_value_pool_cny') or 'UNKNOWN'} CNY；"
-                    f"缺口 {without.get('additional_segment_equity_value_required_cny') or 'UNKNOWN'} CNY。"
+                    f"{b61_display(requirement.get('required_terminal_value_per_share_without_distributions'))} / "
+                    f"{b61_display(requirement.get('required_terminal_value_per_share_with_validated_distributions'))} CNY；"
+                    f"所需总股权价值（未计分红）{b61_display(without.get('required_terminal_equity_value_cny'))} CNY；"
+                    f"所需分部权益价值池（未计/已验证分红）"
+                    f"{b61_display(without.get('required_segment_equity_value_pool_cny'))} / "
+                    f"{b61_display(with_dist.get('required_segment_equity_value_pool_cny'))} CNY；"
+                    f"当前分部价值池 {b61_display(without.get('selected_segment_equity_value_pool_cny'))} CNY；"
+                    f"未计分红口径的价值池缺口 {b61_display(without.get('additional_segment_equity_value_required_cny'))} CNY。"
                 )
                 segment_rows = without.get("segment_requirements") if isinstance(without.get("segment_requirements"), list) else []
+                with_segment_rows = with_dist.get("segment_requirements") if isinstance(with_dist.get("segment_requirements"), list) else []
+                with_by_id = {
+                    str(item.get("segment_id")): item for item in with_segment_rows if isinstance(item, Mapping)
+                }
                 if segment_rows:
-                    lines.append("  - 分部单变量盈利要求（其他分部不变）：")
+                    lines.append("  - 分部单变量盈利要求（其他分部维持当前情景预测；分部之间不可相加）：")
                     for segment in segment_rows:
                         required_profit = segment.get("one_at_a_time_required_attributable_net_profit_cny")
                         incremental = segment.get("one_at_a_time_incremental_profit_required_cny")
                         headroom = segment.get("one_at_a_time_profit_headroom_cny")
+                        dividend_row = with_by_id.get(str(segment.get("segment_id")), {})
                         lines.append(
                             f"    - {segment.get('segment_id')} / {segment.get('segment_name')}："
-                            f"当前归母净利润 {segment.get('selected_attributable_net_profit_cny')} CNY；"
-                            f"单变量所需 {required_profit} CNY；"
-                            f"需新增 {incremental} CNY；已有余量 {headroom} CNY；"
-                            f"当前分部 P/E {segment.get('selected_pe_multiple_x')}x。"
+                            f"当前归母净利润 {b61_display(segment.get('selected_attributable_net_profit_cny'))} CNY；"
+                            f"单变量所需（未计/已验证分红）{b61_display(required_profit)} / "
+                            f"{b61_display(dividend_row.get('one_at_a_time_required_attributable_net_profit_cny'))} CNY；"
+                            f"未计分红需新增 {b61_display(incremental)} CNY；"
+                            f"已有余量 {b61_display(headroom)} CNY；"
+                            f"当前分部 P/E {b61_display(segment.get('selected_pe_multiple_x'))}x。"
                         )
             if scenario_row.get("issues"):
                 lines.append("- 待核查：" + "；".join(scenario_row["issues"][:6]))
