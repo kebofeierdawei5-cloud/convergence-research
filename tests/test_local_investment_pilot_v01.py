@@ -6443,6 +6443,24 @@ def test_b61_sotp_gates_currency_timing_and_model_family():
         external_mie_status="NOT_IDENTIFIABLE",
     )
     assert result["status"] == "NOT_COMPARABLE_CURRENCY"
+    price["currency"] = "CNY"
+    timing["status"] = "NOT_PASS"
+    result = pilot._build_b61_sotp_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, sotp_valuation=sotp,
+        forecast_valuation=forecast, validated_cash_distribution_events=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    assert result["status"] == "VALUATION_TIMING_NOT_RESOLVED"
+    timing["status"] = "PASS"
+    timing["forecast_period"] = "2027FY"
+    result = pilot._build_b61_sotp_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, sotp_valuation=sotp,
+        forecast_valuation=forecast, validated_cash_distribution_events=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    assert result["status"] == "SOTP_FORECAST_PERIOD_MISMATCH"
 
 
 def test_b61_reports_sotp_conditional_inversion_without_changing_top_level_or_external_mie():
