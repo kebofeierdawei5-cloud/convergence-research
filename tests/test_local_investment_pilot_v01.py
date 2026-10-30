@@ -6347,6 +6347,8 @@ def _b61_test_inputs():
             "segments": segments,
             "segment_equity_value_cny": "2000",
             "parent_level_adjustments": {
+                "central_cost_after_tax_cny": {"value": "10", "unit": "CNY"},
+                "central_cost_multiple_x": {"value": "10", "unit": "x"},
                 "capitalized_central_cost_value_cny": "100",
                 "net_cash_debt_cny": {"value": "200", "unit": "CNY"},
                 "other_adjustments_cny": {"value": "0", "unit": "CNY"},
@@ -6422,6 +6424,19 @@ def test_b61_sotp_refuses_to_invert_mismatched_parent_adjustment_or_share_arithm
     row = result["scenarios"]["base"]
     assert row["status"] == "NOT_IDENTIFIABLE"
     assert "SOTP_PARENT_ADJUSTMENT_IDENTITY_MISMATCH" in row["issues"]
+    sotp["scenarios"]["base"]["total_equity_value_cny"] = "2100"
+    sotp["scenarios"]["base"]["terminal_value_per_share"] = "21"
+    sotp["scenarios"]["base"]["parent_level_adjustments"]["capitalized_central_cost_value_cny"] = "150"
+    result = pilot._build_b61_sotp_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, sotp_valuation=sotp,
+        forecast_valuation=forecast,
+        validated_cash_distribution_events={name: [] for name in ("bear", "base", "bull")},
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    row = result["scenarios"]["base"]
+    assert row["status"] == "NOT_IDENTIFIABLE"
+    assert "SOTP_CENTRAL_COST_CAPITALIZATION_IDENTITY_MISMATCH" in row["issues"]
 
 
 def test_b61_sotp_gates_currency_timing_and_model_family():
