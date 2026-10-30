@@ -5481,11 +5481,18 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
                         incremental = segment.get("one_at_a_time_incremental_profit_required_cny")
                         headroom = segment.get("one_at_a_time_profit_headroom_cny")
                         dividend_row = with_by_id.get(str(segment.get("segment_id")), {})
+                        dividend_required_signed = dividend_row.get("one_at_a_time_required_attributable_net_profit_cny_signed")
+                        dividend_required_floor = dividend_row.get("one_at_a_time_required_attributable_net_profit_floor_cny")
+                        dividend_others_cover = dividend_row.get("other_segments_cover_required_pool_without_this_segment_profit")
                         lines.append(
                             f"    - {segment.get('segment_id')} / {segment.get('segment_name')}："
                             f"当前归母净利润 {b61_display(segment.get('selected_attributable_net_profit_cny'))} CNY；"
-                            f"单变量所需（未计/已验证分红）{b61_display(required_profit)} / "
-                            f"{b61_display(dividend_row.get('one_at_a_time_required_attributable_net_profit_cny'))} CNY；"
+                            f"单变量所需有符号代数值（未计/已验证分红）{b61_display(required_profit)} / "
+                            f"{b61_display(dividend_required_signed)} CNY；"
+                            f"非负经营利润下限（未计/已验证分红）{b61_display(required_profit_floor)} / "
+                            f"{b61_display(dividend_required_floor)} CNY；"
+                            f"其他分部单独覆盖要求（未计/已验证分红）{b61_display(other_segments_cover)} / "
+                            f"{b61_display(dividend_others_cover)}；"
                             f"未计分红需新增 {b61_display(incremental)} CNY；"
                             f"已有余量 {b61_display(headroom)} CNY；"
                             f"当前分部 P/E {b61_display(segment.get('selected_pe_multiple_x'))}x。"
