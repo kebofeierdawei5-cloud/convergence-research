@@ -2299,12 +2299,13 @@ def _build_b61_sotp_price_inversion(
             segment_rows: list[dict[str, Any]] = []
             for segment in segments:
                 other_contributions = segment_pool - segment["segment_equity_value"]
-                required_profit = (required_segment_pool - other_contributions) / segment["pe_multiple"]
+                required_segment_value = required_segment_pool - other_contributions
+                required_profit = required_segment_value / segment["pe_multiple"]
                 incremental = required_profit - segment["attributable_net_profit"]
                 standalone_profit = required_segment_pool / segment["pe_multiple"]
                 required_multiple = (
-                    (required_segment_pool - other_contributions) / segment["attributable_net_profit"]
-                    if segment["attributable_net_profit"] > 0 else None
+                    required_segment_value / segment["attributable_net_profit"]
+                    if segment["attributable_net_profit"] > 0 and required_segment_value >= 0 else None
                 )
                 segment_rows.append({
                     "segment_id": segment["segment_id"],
@@ -2316,13 +2317,16 @@ def _build_b61_sotp_price_inversion(
                         format(segment["segment_equity_value"] / segment_pool, "f")
                         if segment_pool > 0 else None
                     ),
-                    "one_at_a_time_required_attributable_net_profit_cny": format(required_profit, "f"),
+                    "one_at_a_time_required_attributable_net_profit_cny_signed": format(required_profit, "f"),
+                    "one_at_a_time_required_attributable_net_profit_floor_cny": format(max(Decimal("0"), required_profit), "f"),
+                    "other_segments_cover_required_pool_without_this_segment_profit": required_segment_value <= 0,
                     "one_at_a_time_incremental_profit_required_cny": format(max(Decimal("0"), incremental), "f"),
                     "one_at_a_time_profit_headroom_cny": format(max(Decimal("0"), -incremental), "f"),
                     "one_at_a_time_required_pe_at_selected_profit_x": (
                         format(required_multiple, "f") if required_multiple is not None else None
                     ),
-                    "standalone_profit_if_this_segment_alone_supported_required_pool_cny": format(standalone_profit, "f"),
+                    "standalone_profit_if_this_segment_alone_supported_required_pool_cny_signed": format(standalone_profit, "f"),
+                    "standalone_profit_floor_at_zero_cny": format(max(Decimal("0"), standalone_profit), "f"),
                     "interpretation": "ONE_SEGMENT_CHANGES_OTHERS_HELD_AT_SELECTED_SCENARIO;STANDALONE_THRESHOLD_IS_AN_ALTERNATIVE_NOT_ADDITIVE",
                 })
             return {
