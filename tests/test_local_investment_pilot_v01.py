@@ -6316,3 +6316,144 @@ def test_b60_does_not_compare_b57_eps_outside_company_wide_scope():
     assert row["status"] == "CALCULATED_CONDITIONAL"
     assert row["b57_terminal_value_using_selected_pe"] is None
     assert "B57_EPS_NOT_CONFIRMED_ON_SAME_COMPANY_SCOPE_AND_PERIOD" in row["comparability_flags"]
+
+
+def _b61_test_inputs():
+    price = {
+        "price": "100", "currency": "CNY",
+        "assurance_label": "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED",
+        "pit_time_status": "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY",
+    }
+    timing = {
+        "status": "PASS", "forecast_period": "2026FY",
+        "valuation_terminal_date": "2027-10-30",
+        "annualization_year_fraction": "1", "day_count_convention": "ACT/365F_DATE_ONLY",
+        "elapsed_calendar_days": 365,
+    }
+    decision = {"required_return_annualized": "0.15", "fundamental_target_annualized_return": "0.15"}
+    operator = {"selected_model_family": "SOTP"}
+    def scenario():
+        segments = [
+            {"segment_id": "seg_a", "segment_name": "业务A",
+             "attributable_net_profit_cny": {"value": "100", "unit": "CNY"},
+             "pe_multiple_x": {"value": "10", "unit": "x"},
+             "segment_equity_value_cny": "1000"},
+            {"segment_id": "seg_b", "segment_name": "业务B",
+             "attributable_net_profit_cny": {"value": "50", "unit": "CNY"},
+             "pe_multiple_x": {"value": "20", "unit": "x"},
+             "segment_equity_value_cny": "1000"},
+        ]
+        return {
+            "segments": segments,
+            "segment_equity_value_cny": "2000",
+            "parent_level_adjustments": {
+                "capitalized_central_cost_value_cny": "100",
+                "net_cash_debt_cny": {"value": "200", "unit": "CNY"},
+                "other_adjustments_cny": {"value": "0", "unit": "CNY"},
+            },
+            "diluted_shares": {"value": "100", "unit": "shares"},
+            "total_equity_value_cny": "2100",
+            "terminal_value_per_share": "21",
+        }
+    sotp = {
+        "status": "CALCULATED", "selected_for_primary_model": True,
+        "forecast_period": "2026FY", "valuation_terminal_date": "2027-10-30",
+        "scenarios": {name: scenario() for name in ("bear", "base", "bull")},
+    }
+    forecast = {
+        "scenarios": {
+            name: {"cash_distributions_per_share": "0"}
+            for name in ("bear", "base", "bull")
+        }
+    }
+    return price, timing, decision, operator, sotp, forecast
+
+
+def test_b61_sotp_price_inversion_reconstructs_segment_pool_and_one_at_a_time_profit_requirements():
+    price, timing, decision, operator, sotp, forecast = _b61_test_inputs()
+    result = pilot._build_b61_sotp_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, sotp_valuation=sotp,
+        forecast_valuation=forecast,
+        validated_cash_distribution_events={name: [] for name in ("bear", "base", "bull")},
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    row = result["scenarios"]["base"]
+    required = row["requirements"]["required_return"]["without_distributions"]
+    assert result["status"] == "CONDITIONAL_SENSITIVITY_CALCULATED"
+    assert required["required_terminal_equity_value_cny"] == "11500.00"
+    assert required["required_segment_equity_value_pool_cny"] == "11400.00"
+    segments = {item["segment_id"]: item for item in required["segment_requirements"]}
+    assert segments["seg_a"]["one_at_a_time_required_attributable_net_profit_cny"] == "1040"
+    assert segments["seg_b"]["one_at_a_time_required_attributable_net_profit_cny"] == "520"
+    assert segments["seg_a"]["interpretation"].startswith("ONE_SEGMENT_CHANGES_OTHERS_HELD")
+    assert result["external_mie_status_unchanged"] == "NOT_IDENTIFIABLE"
+    assert result["sotp_input_modified"] is False
+
+
+def test_b61_sotp_includes_only_cash_distributions_validated_by_existing_return_solver():
+    price, timing, decision, operator, sotp, forecast = _b61_test_inputs()
+    forecast["scenarios"]["base"]["cash_distributions_per_share"] = "5"
+    events = {name: [] for name in ("bear", "base", "bull")}
+    events["base"] = [{"amount_per_share": "5", "year_fraction_from_entry": "0.5"}]
+    result = pilot._build_b61_sotp_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, sotp_valuation=sotp,
+        forecast_valuation=forecast, validated_cash_distribution_events=events,
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    row = result["scenarios"]["base"]
+    no_dist = row["requirements"]["required_return"]["without_distributions"]
+    with_dist = row["requirements"]["required_return"]["with_validated_distributions"]
+    assert row["distribution_status"] == "VALIDATED_DATED_CASH_FLOWS"
+    assert Decimal(with_dist["required_terminal_equity_value_cny"]) < Decimal(no_dist["required_terminal_equity_value_cny"])
+
+
+def test_b61_sotp_refuses_to_invert_mismatched_parent_adjustment_or_share_arithmetic():
+    price, timing, decision, operator, sotp, forecast = _b61_test_inputs()
+    sotp["scenarios"]["base"]["total_equity_value_cny"] = "9999"
+    result = pilot._build_b61_sotp_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, sotp_valuation=sotp,
+        forecast_valuation=forecast,
+        validated_cash_distribution_events={name: [] for name in ("bear", "base", "bull")},
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    row = result["scenarios"]["base"]
+    assert row["status"] == "NOT_IDENTIFIABLE"
+    assert "SOTP_PARENT_ADJUSTMENT_IDENTITY_MISMATCH" in row["issues"]
+
+
+def test_b61_sotp_gates_currency_timing_and_model_family():
+    price, timing, decision, operator, sotp, forecast = _b61_test_inputs()
+    operator["selected_model_family"] = "EPS_MULTIPLE"
+    result = pilot._build_b61_sotp_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, sotp_valuation=sotp,
+        forecast_valuation=forecast, validated_cash_distribution_events=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    assert result["status"] == "NOT_APPLICABLE_NOT_SOTP"
+    operator["selected_model_family"] = "SOTP"
+    price["currency"] = "HKD"
+    result = pilot._build_b61_sotp_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, sotp_valuation=sotp,
+        forecast_valuation=forecast, validated_cash_distribution_events=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    assert result["status"] == "NOT_COMPARABLE_CURRENCY"
+
+
+def test_b61_reports_sotp_conditional_inversion_without_changing_top_level_or_external_mie():
+    price, timing, decision, operator, sotp, forecast = _b61_test_inputs()
+    result = pilot._build_b61_sotp_price_inversion(
+        price_input=price, valuation_timing=timing, decision_parameters=decision,
+        operator_valuation_context=operator, sotp_valuation=sotp,
+        forecast_valuation=forecast,
+        validated_cash_distribution_events={name: [] for name in ("bear", "base", "bull")},
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    assert result["external_mie_and_expectation_gap_modified"] is False
+    assert result["formal_mie_admission_created"] is False
+    assert result["decision_authority"] is False
