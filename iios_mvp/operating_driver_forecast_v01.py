@@ -2310,6 +2310,54 @@ def render_operating_driver_section(
         "- B57 正常化 EPS 剔除非经常性项目，不能直接拿来与含全部项目的主估值 EPS 判定不一致；此处单列其差异供分析。B58 仅作诊断，不替换 EPS_MULTIPLE 输入，不改变终值、回报、目标入场价或 15% 年化收益门槛。",
         "",
     ])
+
+    eps_difference_attribution = (
+        transition.get("primary_eps_difference_attribution")
+        if isinstance(transition.get("primary_eps_difference_attribution"), Mapping) else {}
+    )
+    lines.extend([
+        "",
+        "#### B59 主 EPS 差异的利润与每股归因",
+        "",
+        f"- 状态：**{eps_difference_attribution.get('status', 'UNKNOWN')}**；方法：{eps_difference_attribution.get('method', 'UNKNOWN')}",
+        "- 符号约定：利润差 = B57 all-items 归母利润代理 − 主 EPS 桥归母利润；EPS 差 = B57 all-items EPS − EPS_MULTIPLE 实际使用的 EPS。",
+    ])
+    difference_scenarios = (
+        eps_difference_attribution.get("scenarios")
+        if isinstance(eps_difference_attribution.get("scenarios"), Mapping) else {}
+    )
+    for scenario_name in SCENARIOS:
+        row = difference_scenarios.get(scenario_name) if isinstance(difference_scenarios.get(scenario_name), Mapping) else {}
+        components = row.get("profit_numerator_components") if isinstance(row.get("profit_numerator_components"), Mapping) else {}
+        eps_components = row.get("eps_gap_components_cny_per_share") if isinstance(row.get("eps_gap_components_cny_per_share"), Mapping) else {}
+        lines.append(f"**B59 {scenario_name.upper()} — {row.get('status', 'UNKNOWN')}**")
+        if row.get("profit_numerator_gap_cny") is not None:
+            lines.extend([
+                f"- 归母利润差：{_display_optional_scalar(row.get('profit_numerator_gap_cny'))} CNY；"
+                f"分子归因合计：{_display_optional_scalar(components.get('sum_cny'))}；残差：{_display_optional_scalar(components.get('reconciliation_residual_cny'))} CNY",
+                "- 分子组成：B56 税后利润代理差 "
+                f"{_display_optional_scalar(components.get('b56_modeled_net_profit_proxy_gap_cny'))}；"
+                f"经常性非经营项税后效应 {_display_optional_scalar(components.get('recurring_non_operating_after_tax_effect_cny'))}；"
+                f"一次性项目税后效应 {_display_optional_scalar(components.get('non_recurring_after_tax_effect_cny'))}；"
+                f"少数股东归属差 {_display_optional_scalar(components.get('nci_attribution_difference_cny'))}；"
+                f"主桥未映射其他税后归属调整效应 {_display_optional_scalar(components.get('unmapped_primary_other_after_tax_adjustment_effect_cny'))} CNY",
+                "- 每股差异分解：利润分子效应 "
+                f"{_display_optional_scalar(eps_components.get('profit_numerator_effect_cny_per_share'))}；"
+                f"稀释股数分母效应 {_display_optional_scalar(eps_components.get('diluted_share_denominator_effect_cny_per_share'))}；"
+                f"主模型声明 EPS 与主桥复算 EPS 的偏差效应 {_display_optional_scalar(eps_components.get('primary_declared_eps_input_effect_cny_per_share'))}；"
+                f"总差异 {_display_optional_scalar(eps_components.get('b57_minus_primary_declared_eps_cny_per_share'))} CNY/股",
+                f"- 可比性：{row.get('comparability_status', 'UNKNOWN')}；提示：{'、'.join(row.get('comparability_flags') or []) or '无已识别的分母/归属口径偏差'}",
+            ])
+        if row.get("missing_inputs"):
+            lines.append("- 不可计算的缺失项：" + "、".join(row["missing_inputs"]))
+        if row.get("issues"):
+            lines.append("- 对账问题：" + "；".join(row["issues"][:6]))
+    lines.extend([
+        "- 解释边界：B59 只解释两个已存在模型路径之间的算术差额，不判断哪一边更正确；B56 差额不等于独立证明经营预测差异。分母不同采用对称分解，但仍标为不可比；未映射的主桥税后归属调整单独列示，不静默合并。",
+        "- B59 只读展示，不修正主估值 EPS、不改 P/E 或终值，不传导 B5/B6、回报、目标入场价、15% 年化收益门槛、正式决策或交易权限。",
+        "",
+    ])
+
     lines.extend(["", "#### Bear / Base / Bull 经营结果", ""])
     v_scenarios = valuation_scenarios if isinstance(valuation_scenarios, Mapping) else {}
     for name in SCENARIOS:
