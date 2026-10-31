@@ -162,6 +162,13 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - B67 现价要求：selected pool → B4 earnings effect → B4 forecast pool → B63 common P/E scaling → B61 Required Return pool 应闭合；逐分部 Required Common P/E 应等于本分部 selected P/E × common scale factor；明确为不含分红的条件回报门槛反推，不是外部 MIE 或市场共识。
 - B67 母公司/稀释：中心成本、净现金/净负债、其他调整的带符号合计应闭合；Required Equity 应等于 Required Per Share × Diluted Shares；无独立前瞻预测不得推定未来调整或股数变化。
 - B67 决策边界：不得改写 SOTP、B61–B66、15% 年化要求、目标入场价、MIE、expectation_gap、组合约束或 Decision；B67 不是 BUY/SELL 指令。
+- B68 双利润门槛：B61 单分部门槛是否明确保持其他分部在 selected SOTP 利润；B63 全 B4 向量门槛是否保持其他分部在 B4 预测并固定 selected P/E；两类门槛不得相加。
+- B68 利润反解：分部归母正常化利润目标是否使用 B62 完整输入，固定费用、折旧、融资、税率、经常性非经营项和正常化 NCI；是否先复算当前 B4 利润；正利润与非正利润税额分支是否正确；缺失或 100% 税率等不可逆情况是否保留 UNKNOWN。
+- B68 产品映射：B55 product_id / business_segment_id 是否与 B4/B62 显式映射一致；产品贡献合计是否闭合到 B62 分部当前贡献。
+- B68 单变量反推：销量-only / ASP-only / 单位成本-only 是否各自只改变一个驱动、其他驱动与其他产品保持不变；分母非正、销量/售价非正、成本为负是否正确标记不可行/不可识别；三个结果不得累加。
+- B68 来源链：每条产品前瞻销量、净售价、单位成本及 B4 固定财务参数是否保留 data_class、basis、evidence_refs；不得把分析师假设改写为发行人指引或正式准入。
+- B68 产量库存边界：是否明确销售量不等于产量；没有独立产销库存政策时，不得把销量要求标为生产/库存可行。
+- B68 决策边界：不改变 B4/B55/B62/B63、SOTP、B61、15% 年化门槛、目标入场价、外部 MIE、expectation_gap、组合约束和 Decision。
 
 ## 9. 已发生故障与防重复清单
 

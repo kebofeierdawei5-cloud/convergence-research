@@ -3075,3 +3075,17 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Placement:** new module iios_mvp/sotp_value_credibility_audit_v01.py; nested output assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.value_credibility_price_audit. The local pilot report displays per-segment value and evidence, reference/adjustment value bridge, parent adjustments, dilution and current-price hurdle.
 - **No-change boundary:** no change to SOTP, B4/B5/B6, B61–B66, external MIE, expectation_gap, 15% annualized hurdle, target entry price, portfolio constraints, Decision, Evidence/PIT admission or execution authority.
 - **Regression coverage:** ten cases authored in tests/test_sotp_value_credibility_audit_v01.py. Tests have not been executed. Replay, CI, unified test suite and Mac acceptance remain deferred.
+
+
+## B68 — SOTP price-implied operating requirement reverse engineering — 2026-10-31
+
+**Status: BRANCH PROPOSAL ONLY / NOT MERGED / NOT TESTED**
+
+- **Purpose:** translate B61 one-segment-at-a-time and B63 full-B4-vector Required Return profit thresholds into B4 segment contribution requirements and B55 product-level driver sensitivities.
+- **Two requirement bases:** B61 holds all other segments at selected SOTP profits; B63 holds all other segments at the full B4 forecast and keeps selected P/Es unchanged. Both are alternative, non-additive thresholds.
+- **Profit-to-contribution inversion:** reuses B62's normalized parent-attributable profit equation, holding B4 forward fixed cash opex, D&A, finance cost, tax, recurring non-operating income and normalized NCI fixed. It first recalculates current B4 normalized profit; mismatch blocks inversion.
+- **Product driver sensitivities:** for each product, calculates separate volume-only, net-ASP-only and unit-cost-only alternatives, holding the other two product drivers and all other products fixed. Products join to segments only through explicit business_segment_id / product_id. Results are not additive or independent forecasts.
+- **Production / inventory:** sales volume is not production. Required sales volume remains operationally unverified without an explicit production/inventory release policy; B68 does not bypass B42/B43.
+- **Placement:** new module iios_mvp/sotp_operating_requirement_reverse_engineering_v01.py; nested output assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.operating_requirement_reverse_engineering. Local pilot reports both profit threshold lenses and the three product-level alternatives.
+- **No-change boundary:** does not change B4/B55/B62/B63, SOTP, B61, external MIE, expectation_gap, 15% annualized hurdle, target entry price, portfolio constraints, Decision, formal forecast admission or execution authority.
+- **Regression coverage:** eleven cases authored in tests/test_sotp_operating_requirement_reverse_engineering_v01.py. Tests have not been executed. Replay, CI, unified test suite and Mac acceptance remain deferred.

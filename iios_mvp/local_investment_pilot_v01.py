@@ -38,6 +38,7 @@ from .sotp_evidence_grade_v01 import build_sotp_evidence_grade_assessment
 from .sotp_comparability_audit_v01 import build_sotp_comparability_audit
 from .sotp_multiple_calibration_v01 import build_sotp_multiple_calibration_assessment
 from .sotp_value_credibility_audit_v01 import build_sotp_value_credibility_price_audit
+from .sotp_operating_requirement_reverse_engineering_v01 import build_sotp_operating_requirement_reverse_engineering
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
     evaluate_valuation_transmission,
@@ -6186,6 +6187,73 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             "B4 与共同倍数缩放均为条件模型，不是预测保证；不修改估值、目标价或 Decision。"
         )
 
+    local_b68 = local_sotp_inversion.get("operating_requirement_reverse_engineering") if isinstance(local_sotp_inversion.get("operating_requirement_reverse_engineering"), Mapping) else {}
+    if local_b68:
+        lines.extend([
+            "",
+            "### B68 — 现价隐含经营要求反向工程",
+            f"- 总体状态：{local_b68.get('status', 'UNKNOWN')}；{local_b68.get('summary') or 'UNKNOWN'}",
+            "- 说明：B61 与 B63 是两个不同的非加总门槛；每条产品销量、净售价、单位变动成本是互相替代的单变量敏感性，不是同时要实现的经营目标。",
+        ])
+        b68_scenarios = local_b68.get("scenarios") if isinstance(local_b68.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b68_row = b68_scenarios.get(scenario_name) if isinstance(b68_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B68 {scenario_name.upper()} — {b68_row.get('status', 'UNKNOWN')}**")
+            for segment in (b68_row.get("segments") or [])[:20]:
+                if not isinstance(segment, Mapping):
+                    continue
+                lines.append(
+                    f"- {segment.get('segment_id')} / {segment.get('segment_name')}："
+                    f"B4 当前归母正常化利润 {segment.get('b4_forecast_normalized_parent_attributable_profit_cny') or 'UNKNOWN'} CNY；"
+                    f"选定 P/E {segment.get('selected_sotp_pe_x') or 'UNKNOWN'}x；"
+                    f"当前分部贡献 {segment.get('b4_forecast_contribution_after_variable_cost_cny') or 'UNKNOWN'} CNY。"
+                )
+                for lens_key, lens_label in (
+                    ("b61_required_profit_lens", "B61：其他分部维持当前选定 SOTP 利润"),
+                    ("b63_full_b4_vector_lens", "B63：其他分部维持完整 B4 前瞻利润"),
+                ):
+                    lens = segment.get(lens_key) if isinstance(segment.get(lens_key), Mapping) else {}
+                    reverse = lens.get("reverse_engineering") if isinstance(lens.get("reverse_engineering"), Mapping) else {}
+                    inversion = reverse.get("contribution_inversion") if isinstance(reverse.get("contribution_inversion"), Mapping) else {}
+                    lines.append(
+                        f"  - {lens_label}：要求归母利润 {lens.get('required_parent_attributable_profit_cny') or 'UNKNOWN'} CNY；"
+                        f"利润差 {reverse.get('profit_gap_cny') or 'UNKNOWN'} CNY；"
+                        f"要求分部贡献 {inversion.get('required_contribution_after_variable_cost_cny') or 'UNKNOWN'} CNY；"
+                        f"贡献缺口 {inversion.get('contribution_gap_cny') or 'UNKNOWN'} CNY；状态 {reverse.get('status', 'UNKNOWN')}。"
+                    )
+                    for product in (reverse.get("product_driver_alternatives") or [])[:10]:
+                        if not isinstance(product, Mapping):
+                            continue
+                        alternatives = product.get("single_driver_alternatives") if isinstance(product.get("single_driver_alternatives"), Mapping) else {}
+                        volume = alternatives.get("sales_volume_only") if isinstance(alternatives.get("sales_volume_only"), Mapping) else {}
+                        asp = alternatives.get("net_asp_only") if isinstance(alternatives.get("net_asp_only"), Mapping) else {}
+                        unit_cost = alternatives.get("unit_variable_cost_only") if isinstance(alternatives.get("unit_variable_cost_only"), Mapping) else {}
+                        lines.append(
+                            f"    - {product.get('product_name') or product.get('product_id')}："
+                            f"销量单变量 {volume.get('required_sales_volume_tonnes') or 'UNKNOWN'} 吨 "
+                            f"({volume.get('change_pct') or 'UNKNOWN'}%)；"
+                            f"净售价单变量 {asp.get('required_net_asp_cny_per_tonne') or 'UNKNOWN'} CNY/吨 "
+                            f"({asp.get('change_pct') or 'UNKNOWN'}%)；"
+                            f"单位成本单变量 {unit_cost.get('required_variable_cost_cny_per_tonne') or 'UNKNOWN'} CNY/吨 "
+                            f"({unit_cost.get('change_pct') or 'UNKNOWN'}%)。"
+                        )
+                        if product.get("production_inventory_context"):
+                            context = product["production_inventory_context"]
+                            lines.append(
+                                f"      - 生产/库存上下文：前瞻产量 {context.get('forward_production_tonnes') or 'UNKNOWN'} 吨；"
+                                f"产销差额 {context.get('forward_inventory_change_tonnes') or 'UNKNOWN'} 吨；"
+                                "销售量反推不自动等于生产可行，需单独核对产能与库存。"
+                            )
+                if segment.get("issues"):
+                    lines.append("  - 核查事项：" + "；".join(str(x) for x in segment["issues"][:8]))
+            if b68_row.get("issues"):
+                lines.append("- 情景级阻断/待补：" + "；".join(str(x) for x in b68_row["issues"][:10]))
+        lines.append(
+            "- B68 边界：销量、售价、单位成本三种结果是不同替代方案，不可相加；"
+            "不考虑需求弹性、产品替代、规模效应、生产产能和库存释放的完整可行性；"
+            "不反向修改 B4、SOTP、15% 年化要求、目标价或 Decision。"
+        )
+
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
@@ -6874,6 +6942,11 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         valuation_gap_attribution=local_sotp_inversion.get("valuation_gap_attribution") or {},
         evidence_grade_assessment=local_sotp_inversion.get("evidence_grade_assessment") or {},
         multiple_calibration_assessment=local_sotp_inversion.get("multiple_calibration_assessment") or {},
+    )
+    local_sotp_inversion["operating_requirement_reverse_engineering"] = build_sotp_operating_requirement_reverse_engineering(
+        operating_driver_forecast=prepared.get("operating_driver_forecast") or {},
+        segment_earnings_reconciliation=local_sotp_inversion.get("segment_earnings_reconciliation") or {},
+        valuation_gap_attribution=local_sotp_inversion.get("valuation_gap_attribution") or {},
     )
     source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion
