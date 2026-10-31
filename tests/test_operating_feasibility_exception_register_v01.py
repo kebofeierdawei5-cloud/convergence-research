@@ -449,3 +449,19 @@ def test_b72_blocks_non_unique_b70_lens_product_join():
     ]
     assert rows
     assert rows[0]["exception_status"] == "AMBIGUOUS_DUPLICATE_CLAIMS_NOT_SUMMED"
+
+
+def test_b72_does_not_fallback_to_a_different_record_when_comparison_record_id_is_wrong():
+    valid_sales = _sales_record(record_id="R-SALES")
+    wrong_type = _sales_record(
+        record_id="R-WRONG",
+        claim_type="SUPPORTED_NET_ASP",
+    )
+    b70 = _b70(sales_record=valid_sales)
+    b70["records"].append(wrong_type)
+    for lens in b70["scenarios"]["base"]["requirement_lenses"]:
+        lens["products"][0]["comparisons"][0]["record_id"] = "R-WRONG"
+    result = _run(b70=b70)
+    row = _base_sale_rows(result)[0]
+    assert row["exception_status"] == "EVIDENCE_RECORD_SCOPE_MISMATCH"
+    assert row["b70_record_ids"] == []
