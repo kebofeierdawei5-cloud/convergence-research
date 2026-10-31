@@ -83,20 +83,34 @@ def _records_for_claim(
         candidates: list[Mapping[str, Any]] = []
         if record_ids:
             for record_id in record_ids:
+                id_rows = by_id.get(record_id, [])
+                if not id_rows:
+                    scope_mismatch = True
+                    continue
                 typed_rows = [
-                    row for row in by_id.get(record_id, [])
+                    row for row in id_rows
                     if _txt(row.get("claim_type")).upper() == claim_type
                 ]
+                requested_type_rows = [
+                    row for row in id_rows
+                    if _txt(row.get("claim_type")).upper() in claim_types
+                ]
+                if not typed_rows:
+                    # A paired funding row may legitimately point at the other
+                    # claim type in claim_types. Any unrelated type is a scope error.
+                    if not requested_type_rows:
+                        scope_mismatch = True
+                    continue
                 matching_rows = [
                     row for row in typed_rows
                     if _txt(row.get("scenario")).lower() == scenario
                     and _txt(row.get("product_id")) == product_id
                     and _txt(row.get("forecast_period")) == period
                 ]
-                if typed_rows and len(matching_rows) != len(typed_rows):
+                if len(matching_rows) != len(typed_rows):
                     scope_mismatch = True
                 candidates.extend(matching_rows)
-        if not candidates and not scope_mismatch:
+        else:
             candidates.extend(
                 by_key.get((scenario, product_id, period, claim_type), [])
             )
