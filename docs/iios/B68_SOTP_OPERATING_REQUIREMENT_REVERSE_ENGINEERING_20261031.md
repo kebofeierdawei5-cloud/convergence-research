@@ -64,7 +64,7 @@ If a denominator is zero/non-positive, or a required ASP, sales volume, or varia
 
 ### Production, capacity and inventory
 
-Sales volume is not production volume. A volume-required output is not considered operationally feasible without an explicit production/inventory release policy. B68 displays existing production/inventory context and nameplate capacity where present, but it does not convert required sales into required production or ignore B42/B43 inventory/working-capital treatment.
+Sales volume is not production volume. A volume-required output is not considered operationally feasible without an explicit production/inventory release policy. B68 carries the B4 product-master nameplate capacity into the report when present and displays existing production/inventory context, but it does not convert required sales into required production or ignore B42/B43 inventory/working-capital treatment.
 
 ## 5. Source and authority handling
 

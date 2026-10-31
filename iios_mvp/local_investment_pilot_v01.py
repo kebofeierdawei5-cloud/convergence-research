@@ -6204,9 +6204,9 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
                     continue
                 lines.append(
                     f"- {segment.get('segment_id')} / {segment.get('segment_name')}："
-                    f"B4 当前归母正常化利润 {segment.get('b4_forecast_normalized_parent_attributable_profit_cny') or 'UNKNOWN'} CNY；"
-                    f"选定 P/E {segment.get('selected_sotp_pe_x') or 'UNKNOWN'}x；"
-                    f"当前分部贡献 {segment.get('b4_forecast_contribution_after_variable_cost_cny') or 'UNKNOWN'} CNY。"
+                    f"B4 当前归母正常化利润 {str(segment.get('b4_forecast_normalized_parent_attributable_profit_cny')) if segment.get('b4_forecast_normalized_parent_attributable_profit_cny') is not None else 'UNKNOWN'} CNY；"
+                    f"选定 P/E {str(segment.get('selected_sotp_pe_x')) if segment.get('selected_sotp_pe_x') is not None else 'UNKNOWN'}x；"
+                    f"当前分部贡献 {str(segment.get('b4_forecast_contribution_after_variable_cost_cny')) if segment.get('b4_forecast_contribution_after_variable_cost_cny') is not None else 'UNKNOWN'} CNY。"
                 )
                 for lens_key, lens_label in (
                     ("b61_required_profit_lens", "B61：其他分部维持当前选定 SOTP 利润"),
@@ -6216,10 +6216,10 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
                     reverse = lens.get("reverse_engineering") if isinstance(lens.get("reverse_engineering"), Mapping) else {}
                     inversion = reverse.get("contribution_inversion") if isinstance(reverse.get("contribution_inversion"), Mapping) else {}
                     lines.append(
-                        f"  - {lens_label}：要求归母利润 {lens.get('required_parent_attributable_profit_cny') or 'UNKNOWN'} CNY；"
-                        f"利润差 {reverse.get('profit_gap_cny') or 'UNKNOWN'} CNY；"
-                        f"要求分部贡献 {inversion.get('required_contribution_after_variable_cost_cny') or 'UNKNOWN'} CNY；"
-                        f"贡献缺口 {inversion.get('contribution_gap_cny') or 'UNKNOWN'} CNY；状态 {reverse.get('status', 'UNKNOWN')}。"
+                        f"  - {lens_label}：要求归母利润 {str(lens.get('required_parent_attributable_profit_cny')) if lens.get('required_parent_attributable_profit_cny') is not None else 'UNKNOWN'} CNY；"
+                        f"利润差 {str(reverse.get('profit_gap_cny')) if reverse.get('profit_gap_cny') is not None else 'UNKNOWN'} CNY；"
+                        f"要求分部贡献 {str(inversion.get('required_contribution_after_variable_cost_cny')) if inversion.get('required_contribution_after_variable_cost_cny') is not None else 'UNKNOWN'} CNY；"
+                        f"贡献缺口 {str(inversion.get('contribution_gap_cny')) if inversion.get('contribution_gap_cny') is not None else 'UNKNOWN'} CNY；状态 {reverse.get('status', 'UNKNOWN')}。"
                     )
                     for product in (reverse.get("product_driver_alternatives") or [])[:10]:
                         if not isinstance(product, Mapping):
@@ -6230,18 +6230,20 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
                         unit_cost = alternatives.get("unit_variable_cost_only") if isinstance(alternatives.get("unit_variable_cost_only"), Mapping) else {}
                         lines.append(
                             f"    - {product.get('product_name') or product.get('product_id')}："
-                            f"销量单变量 {volume.get('required_sales_volume_tonnes') or 'UNKNOWN'} 吨 "
-                            f"({volume.get('change_pct') or 'UNKNOWN'}%)；"
-                            f"净售价单变量 {asp.get('required_net_asp_cny_per_tonne') or 'UNKNOWN'} CNY/吨 "
-                            f"({asp.get('change_pct') or 'UNKNOWN'}%)；"
-                            f"单位成本单变量 {unit_cost.get('required_variable_cost_cny_per_tonne') or 'UNKNOWN'} CNY/吨 "
-                            f"({unit_cost.get('change_pct') or 'UNKNOWN'}%)。"
+                            f"销量单变量 {str(volume.get('required_sales_volume_tonnes')) if volume.get('required_sales_volume_tonnes') is not None else 'UNKNOWN'} 吨 "
+                            f"({str(volume.get('change_pct')) if volume.get('change_pct') is not None else 'UNKNOWN'}%)；"
+                            f"净售价单变量 {str(asp.get('required_net_asp_cny_per_tonne')) if asp.get('required_net_asp_cny_per_tonne') is not None else 'UNKNOWN'} CNY/吨 "
+                            f"({str(asp.get('change_pct')) if asp.get('change_pct') is not None else 'UNKNOWN'}%)；"
+                            f"单位成本单变量 {str(unit_cost.get('required_variable_cost_cny_per_tonne')) if unit_cost.get('required_variable_cost_cny_per_tonne') is not None else 'UNKNOWN'} CNY/吨 "
+                            f"({str(unit_cost.get('change_pct')) if unit_cost.get('change_pct') is not None else 'UNKNOWN'}%)。"
                         )
                         if product.get("production_inventory_context"):
                             context = product["production_inventory_context"]
+                            capacity = context.get("nameplate_capacity_tonnes_per_year")
                             lines.append(
-                                f"      - 生产/库存上下文：前瞻产量 {context.get('forward_production_tonnes') or 'UNKNOWN'} 吨；"
-                                f"产销差额 {context.get('forward_inventory_change_tonnes') or 'UNKNOWN'} 吨；"
+                                f"      - 生产/库存上下文：前瞻产量 {str(context.get('forward_production_tonnes')) if context.get('forward_production_tonnes') is not None else 'UNKNOWN'} 吨；"
+                                f"名义产能 {str(capacity) if capacity is not None else 'UNKNOWN'} 吨/年；"
+                                f"产销差额 {str(context.get('forward_inventory_change_tonnes')) if context.get('forward_inventory_change_tonnes') is not None else 'UNKNOWN'} 吨；"
                                 "销售量反推不自动等于生产可行，需单独核对产能与库存。"
                             )
                 if segment.get("issues"):

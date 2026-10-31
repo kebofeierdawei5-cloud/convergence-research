@@ -520,10 +520,14 @@ def _audit_scenario(
 
     products_by_segment: dict[str, list[Mapping[str, Any]]] = {}
     seen_products: set[str] = set()
-    b4_product_map = {
-        _txt(row.get("product_id")): _txt(row.get("business_segment_id"))
+    b4_product_rows = {
+        _txt(row.get("product_id")): row
         for row in (operating_driver_forecast.get("product_lines") or [])
         if isinstance(row, Mapping) and _txt(row.get("product_id"))
+    }
+    b4_product_map = {
+        product_id: _txt(row.get("business_segment_id"))
+        for product_id, row in b4_product_rows.items()
     }
     for product in (b55_scenario.get("product_lines") or []):
         if not isinstance(product, Mapping):
@@ -538,7 +542,11 @@ def _audit_scenario(
         if b4_product_map.get(product_id) != segment_id:
             out["issues"].append(f"B68_B4_B55_PRODUCT_SEGMENT_MAPPING_MISMATCH:{product_id}")
             continue
-        products_by_segment.setdefault(segment_id, []).append(product)
+        enriched_product = dict(product)
+        if not isinstance(enriched_product.get("capacity_tonnes_per_year"), Mapping):
+            capacity_measure = _map(_map(b4_product_rows.get(product_id)).get("capacity_tonnes_per_year"))
+            enriched_product["capacity_tonnes_per_year"] = dict(capacity_measure) if capacity_measure else None
+        products_by_segment.setdefault(segment_id, []).append(enriched_product)
 
     waterfall = _map(b63_scenario.get("value_pool_waterfall"))
     b4_pool = _num(waterfall.get("step_3_b4_forecast_pool_at_selected_pes_cny"))
