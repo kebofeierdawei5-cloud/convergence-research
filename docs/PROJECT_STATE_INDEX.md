@@ -3089,3 +3089,17 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Placement:** new module iios_mvp/sotp_operating_requirement_reverse_engineering_v01.py; nested output assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.operating_requirement_reverse_engineering. Local pilot reports both profit threshold lenses and the three product-level alternatives.
 - **No-change boundary:** does not change B4/B55/B62/B63, SOTP, B61, external MIE, expectation_gap, 15% annualized hurdle, target entry price, portfolio constraints, Decision, formal forecast admission or execution authority.
 - **Regression coverage:** fifteen cases authored in tests/test_sotp_operating_requirement_reverse_engineering_v01.py. Tests have not been executed. Replay, CI, unified test suite and Mac acceptance remain deferred.
+
+
+## B69 — Price-implied operating feasibility audit — 2026-10-31
+
+**Status: BRANCH PROPOSAL ONLY / NOT MERGED / NOT TESTED**
+
+- **Purpose:** independently audit the operational feasibility of B68's current-price-implied segment profit and product-driver requirements; retain a strict distinction between a mathematical condition and an executable operating plan.
+- **Capacity check:** keep B61 single-segment and B63 full-B4-vector thresholds separate and non-additive. For each product volume-only requirement, reconcile B4 production minus sales to its forward inventory change, then calculate conditional required production as required sales plus the unchanged B4 forward inventory change. Compare only against positive annual nameplate capacity on an explicitly full-year forecast period.
+- **Fail-closed behavior:** mismatched/unknown inventory movement, missing capacity or non-full-year periods cannot produce a capacity pass. An overrun is reported as EXCEEDS_NAMEPLATE_CAPACITY; a numeric fit is only WITHIN_NAMEPLATE_CAPACITY_CONDITIONAL, not an operational feasibility approval.
+- **Missing operating evidence:** the current typed B4 contract does not provide a complete order-book/customer-demand, price-elasticity, cost-curve/savings-project, expansion commissioning/ramp, or project-level incremental-capex/working-capital dataset. Those constraints remain NOT_IDENTIFIABLE; B69 does not infer demand from required sales or savings from algebra.
+- **Cash and inventory boundary:** displays B4 inventory reconciliation, effective working capital, cash capex and FCF without recalculating FCF or double-counting B42 inventory cash proxy. Incremental funding for additional volume/expansion remains unknown.
+- **Placement:** new module iios_mvp/sotp_operating_feasibility_audit_v01.py; nested output assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.operating_feasibility_audit; local pilot and Chinese report integration completed.
+- **No-change boundary:** does not modify B4/B55/B61–B68, SOTP, external MIE, expectation_gap, 15% annualized return hurdle, target entry price, portfolio constraints, Decision, formal Evidence/PIT admission or execution authority.
+- **Regression coverage:** eight cases authored in tests/test_sotp_operating_feasibility_audit_v01.py. Tests have not been executed. Replay, CI, unified test suite and Mac acceptance remain deferred.
