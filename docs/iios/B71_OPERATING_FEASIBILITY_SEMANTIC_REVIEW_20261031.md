@@ -144,11 +144,11 @@ Even when an individual record passes the human checklist, overall operational f
 
 ## 7. Regression coverage and acceptance
 
-Twenty-seven regression cases are authored in \`tests/test_operating_feasibility_semantic_review_v01.py\`, covering:
+Thirty regression cases are authored in \`tests/test_operating_feasibility_semantic_review_v01.py\`, covering:
 - missing/invalid input and B70 record eligibility;
 - complete and incomplete checklists;
 - exact evidence-reference set and per-check source linkage;
-- reviewer identity, method, notes and timezone-aware review timestamp;
+- reviewer/preparer separation, role, conflict declaration, method, notes and timezone-aware review timestamp;
 - PASS/FAIL/UNKNOWN/NOT_APPLICABLE behavior;
 - contradiction, not-supported, partial and unable-to-verify distinctions;
 - duplicate B70 record reviews and duplicate review IDs; and
