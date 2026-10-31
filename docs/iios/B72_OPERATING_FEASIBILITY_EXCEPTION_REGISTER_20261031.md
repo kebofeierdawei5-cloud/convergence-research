@@ -52,7 +52,8 @@ The B70 comparison is retained with its original value and status. B72 distingui
 - evidence is missing;
 - evidence linkage is not eligible;
 - analyst assumption only;
-- duplicate / ambiguous claims; and
+- duplicate / ambiguous claims;
+- record ID scope mismatches across scenario, product, forecast period or claim type; and
 - required or evidence values remain unidentified.
 
 A numerical requirement gap is not the same as a false source claim. It means the linked value, if accepted, does not reach the price-implied threshold.
@@ -132,10 +133,10 @@ B72 generates the closure criteria but does not mark tasks closed. Closure requi
 
 ## 7. Regression coverage and acceptance
 
-Twenty regression cases are authored in:
+Twenty-one regression cases are authored in:
 
 tests/test_operating_feasibility_exception_register_v01.py
 
-Coverage includes schema blockers, numerical-vs-semantic separation, conditional support, human contradiction, quantified threshold gaps, missing evidence vs analyst assumptions, duplicate claim handling, reviewer independence, funding shortfall, late capacity, B69 nameplate constraints, unmodeled dimensions, B61/B63 non-additivity, governance boundaries, remediation closure criteria and input immutability.
+Coverage includes schema blockers, numerical-vs-semantic separation, conditional support, human contradiction, quantified threshold gaps, missing evidence vs analyst assumptions, duplicate claim handling, cross-scenario record-ID isolation, reviewer independence, funding shortfall, late capacity, B69 nameplate constraints, unmodeled dimensions, B61/B63 non-additivity, governance boundaries, remediation closure criteria and input immutability.
 
 Tests have **not** been executed. Replay, CI, unified tests and real macOS acceptance have **not** been run or verified. No PASS is claimed.
