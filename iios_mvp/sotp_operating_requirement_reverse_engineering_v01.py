@@ -124,8 +124,8 @@ def _financial_lineage(forward_segment: Mapping[str, Any]) -> dict[str, Any]:
     })
     nci_issues = list(total_nci.get("issues") or []) + list(nonrec_nci.get("issues") or [])
     nci_ok = (
-        nci_classes.issubset({"ISSUER_FORECAST", "ANALYST_ASSUMPTION"})
-        and len(nci_classes) == 2
+        _txt(total_nci.get("data_class")).upper() in {"ISSUER_FORECAST", "ANALYST_ASSUMPTION"}
+        and _txt(nonrec_nci.get("data_class")).upper() in {"ISSUER_FORECAST", "ANALYST_ASSUMPTION"}
         and bool(_txt(total_nci.get("basis")))
         and bool(_txt(nonrec_nci.get("basis")))
         and not nci_issues
@@ -548,6 +548,9 @@ def _audit_scenario(
             enriched_product["capacity_tonnes_per_year"] = dict(capacity_measure) if capacity_measure else None
         products_by_segment.setdefault(segment_id, []).append(enriched_product)
 
+    if seen_products != set(b4_product_rows):
+        out["issues"].append("B68_B4_B55_PRODUCT_UNIVERSE_MISMATCH")
+
     waterfall = _map(b63_scenario.get("value_pool_waterfall"))
     b4_pool = _num(waterfall.get("step_3_b4_forecast_pool_at_selected_pes_cny"))
     required_pool = _num(waterfall.get("step_5_required_segment_pool_cny"))
@@ -573,15 +576,24 @@ def _audit_scenario(
         forward = _map(b4_segment.get("forward_scenario"))
         current_profit = _num(forward.get("normalized_parent_attributable_net_profit_cny"))
         b4_b62_profit = _num(b62_segment.get("b4_forecast_parent_attributable_normalized_profit_cny"))
-        b63_b4_profit = _num(b63_segment.get("b4_normalized_parent_attributable_net_profit_cny"))
+        selected_sotp_profit = _num(b62_segment.get("sotp_selected_attributable_profit_cny"))
+        b63_profit_change = _num(b63_segment.get("normalized_profit_change_cny"))
+        b63_earnings_effect = _num(b63_segment.get("earnings_effect_at_selected_pe_cny"))
+        b63_selected_value = _num(b63_segment.get("selected_sotp_segment_value_cny"))
+        b63_b4_value = _num(b63_segment.get("b4_forecast_segment_value_at_selected_pe_cny"))
         selected_pe = _num(b63_segment.get("selected_sotp_pe_x"))
         if (
-            current_profit is None or b4_b62_profit is None or b63_b4_profit is None
+            current_profit is None or b4_b62_profit is None or selected_sotp_profit is None
+            or b63_profit_change is None or b63_earnings_effect is None
+            or b63_selected_value is None or b63_b4_value is None
             or selected_pe is None or selected_pe <= 0
             or not _eq(current_profit, b4_b62_profit, _PRICE_POOL_TOL)
-            or not _eq(current_profit, b63_b4_profit, _PRICE_POOL_TOL)
+            or not _eq(current_profit - selected_sotp_profit, b63_profit_change, _PRICE_POOL_TOL)
+            or not _eq(b63_profit_change * selected_pe, b63_earnings_effect, _PRICE_POOL_TOL)
+            or not _eq(selected_sotp_profit * selected_pe, b63_selected_value, _PRICE_POOL_TOL)
+            or not _eq(current_profit * selected_pe, b63_b4_value, _PRICE_POOL_TOL)
         ):
-            out["issues"].append(f"B68_B4_B62_B63_SEGMENT_PROFIT_OR_PE_MISMATCH:{segment_id}")
+            out["issues"].append(f"B68_B4_B62_B63_SEGMENT_PROFIT_VALUE_BRIDGE_MISMATCH:{segment_id}")
             continue
 
         products = products_by_segment.get(segment_id, [])
@@ -626,9 +638,7 @@ def _audit_scenario(
             product_rows=products,
         ) if products else {"status": "NOT_IDENTIFIABLE", "issues": ["B68_NO_COMPLETE_B55_PRODUCT_MAPPING_FOR_SEGMENT"]}
 
-        selected_sotp_profit = _num(b63_segment.get("selected_sotp_segment_profit_cny"))
-        if selected_sotp_profit is None:
-            selected_sotp_profit = _num(b62_segment.get("sotp_selected_attributable_profit_cny"))
+        selected_sotp_profit = _num(b62_segment.get("sotp_selected_attributable_profit_cny"))
         segment_rows.append({
             "segment_id": segment_id,
             "segment_name": _txt(b62_segment.get("segment_name")) or segment_id,

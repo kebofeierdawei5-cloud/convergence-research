@@ -100,10 +100,11 @@ def _fixtures():
                     "status": "CONDITIONAL_ATTRIBUTION_CALCULATED",
                     "earnings_effect_by_segment": [{
                         "segment_id": "SEG_A",
-                        "b4_normalized_parent_attributable_net_profit_cny": "400",
+                        "normalized_profit_change_cny": "100",
                         "selected_sotp_pe_x": "10",
+                        "earnings_effect_at_selected_pe_cny": "1000",
+                        "selected_sotp_segment_value_cny": "3000",
                         "b4_forecast_segment_value_at_selected_pe_cny": "4000",
-                        "selected_sotp_segment_profit_cny": "300",
                     }],
                     "value_pool_waterfall": {
                         "step_3_b4_forecast_pool_at_selected_pes_cny": "4000",
@@ -196,6 +197,23 @@ def test_b68_rejects_segment_universe_mismatch():
     data = _fixtures()
     data["valuation_gap_attribution"]["scenarios"]["base"]["earnings_effect_by_segment"][0]["segment_id"] = "SEG_B"
     assert _run(data)["scenarios"]["base"]["status"] == "RECONCILIATION_MISMATCH"
+
+
+def test_b68_rechecks_actual_b63_profit_and_value_bridge_fields():
+    data = _fixtures()
+    row = data["valuation_gap_attribution"]["scenarios"]["base"]["earnings_effect_by_segment"][0]
+    row["earnings_effect_at_selected_pe_cny"] = "999"
+    result = _run(data)
+    assert result["scenarios"]["base"]["status"] == "PARTIAL"
+    assert "B68_B4_B62_B63_SEGMENT_PROFIT_VALUE_BRIDGE_MISMATCH:SEG_A" in result["scenarios"]["base"]["issues"]
+
+
+def test_b68_requires_exact_b4_b55_product_universe():
+    data = _fixtures()
+    data["operating_driver_forecast"]["baseline_transition"]["scenarios"]["base"]["product_lines"] = []
+    result = _run(data)
+    assert result["scenarios"]["base"]["status"] == "PARTIAL"
+    assert "B68_B4_B55_PRODUCT_UNIVERSE_MISMATCH" in result["scenarios"]["base"]["issues"]
 
 
 def test_b68_missing_product_driver_keeps_segment_reverse_engineering_unknown():
