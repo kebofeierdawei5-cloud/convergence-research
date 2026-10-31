@@ -3102,7 +3102,7 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Cash and inventory boundary:** displays B4 inventory reconciliation, effective working capital, cash capex and FCF without recalculating FCF or double-counting B42 inventory cash proxy. Does not independently rerun B43's effective-working-capital to valuation-bridge reconciliation; B43 remains a separate gate. Incremental funding for additional volume/expansion remains unknown.
 - **Placement:** new module iios_mvp/sotp_operating_feasibility_audit_v01.py; nested output assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.operating_feasibility_audit; local pilot and Chinese report integration completed.
 - **No-change boundary:** does not modify B4/B55/B61–B68, SOTP, external MIE, expectation_gap, 15% annualized return hurdle, target entry price, portfolio constraints, Decision, formal Evidence/PIT admission or execution authority.
-- **Regression coverage:** eight cases authored in tests/test_sotp_operating_feasibility_audit_v01.py. Tests have not been executed. Replay, CI, unified test suite and Mac acceptance remain deferred.
+- **Regression coverage:** nine cases authored in tests/test_sotp_operating_feasibility_audit_v01.py. Tests have not been executed. Replay, CI, unified test suite and Mac acceptance remain deferred.
 
 
 ## B70 — Operating feasibility evidence contract and threshold linkage — 2026-10-31
