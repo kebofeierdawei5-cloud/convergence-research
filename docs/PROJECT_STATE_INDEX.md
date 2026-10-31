@@ -3119,3 +3119,20 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Overall status remains conservative:** numeric coverage does not independently verify source content. The overall operating-feasibility status remains NOT_IDENTIFIABLE pending human source-content review and complete coverage.
 - **No-change boundary:** does not modify B4/B42/B43/B55/B61–B69, SOTP, external MIE, expectation_gap, 15% annualized hurdle, target entry price, portfolio constraints, Decision, formal Evidence/PIT admission or execution authority.
 - **Regression coverage:** eighteen cases authored in `tests/test_operating_feasibility_evidence_v01.py`. Tests have not been executed. Replay, CI, unified tests and Mac acceptance remain deferred.
+
+
+## B71 — Operating feasibility evidence semantic review — 2026-10-31
+
+**Status: BRANCH PROPOSAL ONLY / NOT MERGED / NOT TESTED**
+
+- **Purpose:** add an optional operating_feasibility_semantic_reviews input to record claim-specific human source-content review for B70 evidence-linked operating claims.
+- **Reviewer record:** each review is tied to exactly one B70 record_id and requires unique review_id, reviewer identifier, timezone-aware review timestamp, explicit HUMAN_SOURCE_CONTENT_REVIEW method, decision, exact reviewed evidence-reference set, descriptive review notes and a complete claim-specific checklist.
+- **Sales-volume semantics:** future issuer forecasts require firm-order/cancellation-right review, while observed actual sales require invoice, shipment and customer-acceptance quantity reconciliation. Duplicate/overlapping orders, customer identity, product scope and delivery period are explicit checks.
+- **Net-price semantics:** actual prices require invoice net-price reconciliation against credits/receipts; future forecast prices require contractual price terms and volume rebates. Tax, freight, discount, rebate and product/time basis are reviewed.
+- **Unit-cost semantics:** actual unit costs require a reconciled cost baseline/allocation; issuer forecast improvements require a named executable savings action, owner and milestones. A cost-reduction target alone is insufficient.
+- **Capacity/project/funding semantics:** checks distinguish nameplate from effective capacity, inspect bottlenecks/yield/maintenance, and require permit/construction/commissioning/qualified-output dates. Incremental capex and working-capital requirements/funding are checked against B4 on an explicitly incremental basis.
+- **Fail-closed:** B70-ineligible claims, missing/extra checks, unreviewed/mismatched sources, duplicate review IDs/claim reviews, missing reviewer/method/notes/timezone, required NOT_APPLICABLE, unknown checks or PASS without a source reference block conditional support. Contradictions, unsupported, partial and unable-to-verify outcomes remain distinct.
+- **Placement:** new module iios_mvp/operating_feasibility_semantic_review_v01.py; nested output assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.operating_feasibility_semantic_review. Local pilot, Chinese report and Replay comparison binding integrated.
+- **Governance:** human review is a recorded assertion; automated identity/content truth verification is false. B71 does not create formal Evidence/PIT admission, Forecast/Valuation admission or decision authority. Overall operational feasibility remains NOT_IDENTIFIABLE pending complete coverage and independent governance.
+- **No-change boundary:** no change to B4/B42/B43/B55/B61–B70, selected SOTP, external MIE, expectation_gap, 15% annualized hurdle, target entry price, portfolio constraints or Decision.
+- **Regression coverage:** twenty-seven cases authored in tests/test_operating_feasibility_semantic_review_v01.py. Tests have not been executed. Replay, CI, unified tests and Mac acceptance remain deferred.
