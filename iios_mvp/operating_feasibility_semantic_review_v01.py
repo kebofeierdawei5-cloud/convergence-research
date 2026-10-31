@@ -142,6 +142,7 @@ def _review_one(
     b70_records: Mapping[str, Mapping[str, Any]],
     duplicate_b70_ids: set[str],
     duplicate_reviews: set[str],
+    duplicate_review_ids: set[str],
 ) -> dict[str, Any]:
     review = raw if isinstance(raw, Mapping) else {}
     review_id = _txt(review.get("review_id"))
@@ -159,6 +160,8 @@ def _review_one(
     issues: list[str] = []
     if not review_id:
         issues.append("REVIEW_ID_REQUIRED")
+    if review_id in duplicate_review_ids:
+        issues.append("DUPLICATE_REVIEW_ID")
     if not record_id:
         issues.append("B70_RECORD_ID_REQUIRED")
     if record_id in duplicate_reviews:
@@ -184,6 +187,8 @@ def _review_one(
     claim_type = _txt(_map(b70_record).get("claim_type")).upper()
     data_class = _txt(_map(b70_record).get("data_class")).upper()
     required = set(_requirements(claim_type, data_class))
+    if not required:
+        issues.append("B70_CLAIM_TYPE_HAS_NO_SEMANTIC_REVIEW_CHECKLIST")
     b70_refs = set(
         str(item).strip()
         for item in (_map(b70_record).get("evidence_refs") if isinstance(_map(b70_record).get("evidence_refs"), list) else [])
@@ -269,6 +274,10 @@ def _review_one(
 
     if issues:
         status = "SEMANTIC_REVIEW_BLOCKED_OR_INCOMPLETE"
+    elif any_failed and decision == "SUPPORTS":
+        status = "SEMANTIC_REVIEW_CHECK_FAILURE_CONFLICTS_WITH_SUPPORT_DECISION"
+    elif any_failed:
+        status = "SEMANTIC_REVIEW_CHECKS_FAILED"
     elif decision == "CONTRADICTS":
         status = "SEMANTIC_REVIEW_CONTRADICTED"
     elif decision == "DOES_NOT_SUPPORT":
@@ -352,6 +361,13 @@ def build_operating_feasibility_semantic_review(
             if rid:
                 counts[rid] = counts.get(rid, 0) + 1
     duplicate_reviews = {key for key, count in counts.items() if count > 1}
+    review_id_counts: dict[str, int] = {}
+    for row in raw_rows:
+        if isinstance(row, Mapping):
+            review_id = _txt(row.get("review_id"))
+            if review_id:
+                review_id_counts[review_id] = review_id_counts.get(review_id, 0) + 1
+    duplicate_review_ids = {key for key, count in review_id_counts.items() if count > 1}
 
     normalized = [
         _review_one(
@@ -359,6 +375,7 @@ def build_operating_feasibility_semantic_review(
             b70_records=b70_records,
             duplicate_b70_ids=duplicate_b70_ids,
             duplicate_reviews=duplicate_reviews,
+            duplicate_review_ids=duplicate_review_ids,
         )
         for row in raw_rows
     ]
@@ -388,5 +405,6 @@ def build_operating_feasibility_semantic_review(
         "不证明审核人身份或原始来源内容真实，也不创建正式证据准入。"
     )
     result["duplicate_reviewed_record_ids"] = sorted(duplicate_reviews)
+    result["duplicate_review_ids"] = sorted(duplicate_review_ids)
     result["duplicate_b70_record_ids"] = sorted(duplicate_b70_ids)
     return result
