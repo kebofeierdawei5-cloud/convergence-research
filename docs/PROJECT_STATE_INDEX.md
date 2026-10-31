@@ -3149,3 +3149,15 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Placement:** new module iios_mvp/operating_feasibility_exception_register_v01.py; nested output assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.operating_feasibility_exception_register. Local pilot invokes B72 after B71 and renders the B72 Chinese report section. No new raw input or Replay binding was introduced.
 - **No-change boundary:** no changes to B4/B42/B43/B55/B61-B71, SOTP, external MIE, expectation gap, the 15% annualized return hurdle, target entry price, portfolio constraints, Decision, formal Evidence/PIT admission, Forecast/Valuation admission, or execution authority. Overall operational feasibility remains NOT_IDENTIFIABLE pending complete coverage and formal admission.
 - **Regression coverage:** twenty-four test cases authored in tests/test_operating_feasibility_exception_register_v01.py; not executed. Replay, CI, unified tests, and real macOS acceptance remain deferred / not verified. No PASS is claimed.
+
+## B73 — Evidence-driven remediation reassessment — 2026-10-31
+
+**Status: CODE/DOC COMMITTED TO PROPOSAL BRANCH / NOT MERGED / NOT TESTED.**
+
+- **Purpose:** reassess operator-submitted remediation against the current run's freshly computed B69/B70/B71/B72 outputs, bound to the exact B72 requirement_id and action_id.
+- **Input:** optional operating_feasibility_remediation_submissions. Existing B70 evidence and B71 review contracts remain the only inputs for current claims/reviews; B73 does not duplicate them.
+- **Lineage:** prior and superseded record IDs are operator-declared. B73 verifies declared superseded IDs are absent from current B70/B71 outputs, but does not claim historical authentication.
+- **Reassessment:** exact B72 requirement/action match; unique B70/B71 identifiers; scenario/product/period/claim scope; one conditional B71 review per current B70 record; evidence-reference consistency; and current B72 conditional-support state.
+- **Close boundary:** B73 emits only REASSESSMENT_PASSED_PENDING_FORMAL_ADMISSION at best. It never emits CLOSED_VERIFIED, creates no formal Evidence/PIT admission, and has no manual close, Decision or execution authority. Unmodelled demand/price elasticity and cost-curve questions remain upstream blockers.
+- **Placement:** iios_mvp/operating_feasibility_remediation_v01.py; output under assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.operating_feasibility_remediation_assessment. Pilot report displays the result.
+- **Regression coverage:** twenty-one cases authored in tests/test_operating_feasibility_remediation_v01.py; not executed. Replay, CI, unified tests and real macOS acceptance are not run or verified. No PASS is claimed.

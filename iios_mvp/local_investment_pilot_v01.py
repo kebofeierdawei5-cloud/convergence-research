@@ -43,6 +43,7 @@ from .sotp_operating_feasibility_audit_v01 import build_sotp_operating_feasibili
 from .operating_feasibility_evidence_v01 import build_operating_feasibility_evidence_assessment
 from .operating_feasibility_semantic_review_v01 import build_operating_feasibility_semantic_review
 from .operating_feasibility_exception_register_v01 import build_operating_feasibility_exception_register
+from .operating_feasibility_remediation_v01 import build_operating_feasibility_remediation_assessment
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
     evaluate_valuation_transmission,
@@ -3897,6 +3898,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     raw_driver_forecast = payload.get("operating_driver_forecast")
     raw_operating_feasibility_evidence = payload.get("operating_feasibility_evidence")
     raw_operating_feasibility_semantic_reviews = payload.get("operating_feasibility_semantic_reviews")
+    raw_operating_feasibility_remediation_submissions = payload.get("operating_feasibility_remediation_submissions")
     raw_valuation_transmission = payload.get("valuation_transmission")
     raw_sotp_valuation = payload.get("sotp_valuation")
     raw_eps_multiple_valuation = payload.get("eps_multiple_valuation")
@@ -4407,6 +4409,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "operating_driver_forecast": operating_driver_forecast,
         "operating_feasibility_evidence": raw_operating_feasibility_evidence,
         "operating_feasibility_semantic_reviews": raw_operating_feasibility_semantic_reviews,
+        "operating_feasibility_remediation_submissions": raw_operating_feasibility_remediation_submissions,
         "cycle_earnings_monitor": cycle_earnings_monitor,
         "valuation_transmission": valuation_transmission,
         "sotp_valuation": sotp_valuation,
@@ -6448,6 +6451,30 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             "B61 与 B63 仍是替代门槛，不相加、不平均、不赋概率；所有整改项保持 OPEN，需操作者提交材料后重新复核。"
         )
 
+    local_b73 = local_sotp_inversion.get("operating_feasibility_remediation_assessment") if isinstance(local_sotp_inversion.get("operating_feasibility_remediation_assessment"), Mapping) else {}
+    if local_b73:
+        summary_b73 = local_b73.get("summary") if isinstance(local_b73.get("summary"), Mapping) else {}
+        lines.extend([
+            "",
+            "### B73 — 证据驱动整改复核",
+            f"- 复核状态：{local_b73.get('status', 'UNKNOWN')}；提交 {summary_b73.get('submission_count', 0)} 项；复核通过但待正式 Evidence/PIT 准入 {summary_b73.get('reassessment_passed_pending_formal_admission_count', 0)} 项；失败 {summary_b73.get('reassessment_failed_count', 0)} 项；阻断 {summary_b73.get('reassessment_blocked_count', 0)} 项。",
+            f"- 正式 Evidence/PIT 准入={local_b73.get('formal_evidence_pit_admission_created', False)}；人工关闭权限={local_b73.get('manual_close_allowed', False)}；CLOSED_VERIFIED 数量={summary_b73.get('closed_verified_count', 0)}。",
+        ])
+        for row in (local_b73.get("submissions") or [])[:120]:
+            if not isinstance(row, Mapping):
+                continue
+            lines.append(
+                f"- {row.get('requirement_id') or 'UNKNOWN'} / {row.get('action_id') or 'UNKNOWN'}："
+                f"{row.get('status', 'UNKNOWN')}；当前 B72={row.get('current_b72_exception_status', 'UNKNOWN')}；"
+                f"B70 记录={len(row.get('current_b70_record_ids') or [])}；B71 审核={len(row.get('current_b71_review_ids') or [])}。"
+            )
+            if row.get("issues"):
+                lines.append("  - 阻断/缺项：" + "；".join(str(item) for item in row["issues"][:12]))
+        lines.append(
+            "- B73 纪律：只按本轮重新计算的 B69/B70/B71/B72 结果复核；历史记录 ID 是操作者声明，不能冒充已认证的历史事实。"
+            "条件性支持只代表复核通过、仍待正式 Evidence/PIT 准入；本模块绝不发出 CLOSED_VERIFIED，也不改变预测、估值或投资决策。"
+        )
+
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
@@ -7163,6 +7190,13 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         b70_assessment=local_sotp_inversion.get("operating_feasibility_evidence_assessment") or {},
         b71_review=local_sotp_inversion.get("operating_feasibility_semantic_review") or {},
     )
+    local_sotp_inversion["operating_feasibility_remediation_assessment"] = build_operating_feasibility_remediation_assessment(
+        raw_submissions=prepared.get("operating_feasibility_remediation_submissions"),
+        b69_audit=local_sotp_inversion.get("operating_feasibility_audit") or {},
+        b70_assessment=local_sotp_inversion.get("operating_feasibility_evidence_assessment") or {},
+        b71_review=local_sotp_inversion.get("operating_feasibility_semantic_review") or {},
+        b72_register=local_sotp_inversion.get("operating_feasibility_exception_register") or {},
+    )
     source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion
     assessment["market_implied_expectation"] = mie
@@ -7230,6 +7264,7 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "eps_multiple_valuation": prepared["eps_multiple_valuation"],
         "eps_earnings_bridge": prepared["eps_earnings_bridge"],
         "operating_driver_forecast": prepared["operating_driver_forecast"],
+        "operating_feasibility_remediation_submissions": prepared["operating_feasibility_remediation_submissions"],
         "cycle_earnings_monitor": prepared["cycle_earnings_monitor"],
         "valuation_transmission": prepared["valuation_transmission"],
         "sotp_valuation": prepared["sotp_valuation"],
