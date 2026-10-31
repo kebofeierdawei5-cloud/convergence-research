@@ -60,7 +60,7 @@ def _fmt(value: Decimal | None) -> str | None:
 
 def _full_year_end(period: Any) -> str | None:
     label = "".join(str(period or "").upper().split())
-    match = re.fullmatch(r"(?:FY(\\d{4})|(\\d{4})FY|(\\d{4})年度|(\\d{4})全年)", label)
+    match = re.fullmatch(r"(?:FY(\d{4})|(\d{4})FY|(\d{4})年度|(\d{4})全年)", label)
     if not match:
         return None
     year = next(group for group in match.groups() if group)
