@@ -423,7 +423,15 @@ def build_operating_feasibility_semantic_review(
         for row in normalized
     )
     result["blocked_or_incomplete_claim_count"] = sum(
-        row.get("status") in {"SEMANTIC_REVIEW_BLOCKED_OR_INCOMPLETE", "SEMANTIC_REVIEW_NOT_COMPLETE", "SEMANTIC_REVIEW_PARTIAL", "SEMANTIC_REVIEW_UNABLE_TO_VERIFY"}
+        row.get("status") in {
+            "SEMANTIC_REVIEW_BLOCKED_OR_INCOMPLETE",
+            "SEMANTIC_REVIEW_NOT_COMPLETE",
+            "SEMANTIC_REVIEW_PARTIAL",
+            "SEMANTIC_REVIEW_UNABLE_TO_VERIFY",
+            "SEMANTIC_REVIEW_INDEPENDENCE_UNRESOLVED",
+            "SEMANTIC_REVIEW_CHECK_FAILURE_CONFLICTS_WITH_SUPPORT_DECISION",
+            "SEMANTIC_REVIEW_CHECKS_FAILED",
+        }
         for row in normalized
     )
     result["contradicted_claim_count"] = sum(
