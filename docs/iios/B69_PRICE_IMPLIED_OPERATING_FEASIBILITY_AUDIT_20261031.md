@@ -57,11 +57,11 @@ Status vocabulary:
 - \`NOT_IDENTIFIABLE\`: no usable capacity conclusion.
 - \`BLOCKED_BY_B68_SCHEMA\`: B68 result schema is not the expected contract.
 
-B61 and B63 required-profit lenses remain separate and are explicitly tagged non-additive. No composite score, probability of success or automatic risk haircut is introduced.
+B61 and B63 required-profit lenses remain separate and are explicitly tagged non-additive. Overall operational feasibility is always NOT_IDENTIFIABLE while typed demand, pricing, cost-curve and incremental-funding evidence is absent. No composite score, probability of success or automatic risk haircut is introduced.
 
 ## 6. Regression coverage and acceptance
 
-Eight cases are authored in \`tests/test_sotp_operating_feasibility_audit_v01.py\`:
+Nine cases are authored in \`tests/test_sotp_operating_feasibility_audit_v01.py\`:
 1. required production exceeds nameplate capacity;
 2. required production conditionally fits capacity;
 3. missing inventory movement blocks production inversion;
@@ -69,6 +69,7 @@ Eight cases are authored in \`tests/test_sotp_operating_feasibility_audit_v01.py
 5. missing nameplate capacity remains unidentified;
 6. demand, price elasticity, cost curve and incremental funding are not inferred;
 7. B61/B63 thresholds remain separate and non-additive; and
-8. production-sales balance is independently rechecked, while B4 capex / effective working capital / FCF remain unchanged.
+8. production-sales balance is independently rechecked against the B4 scenario row and mismatches block the capacity result; and
+9. B4 capex / effective working capital / FCF remain unchanged.
 
 Per the operator's development preference, tests have not been executed. Replay, CI, unified test suite and real macOS acceptance remain deferred / not verified. No PASS is claimed.
