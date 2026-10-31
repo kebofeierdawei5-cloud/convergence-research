@@ -178,6 +178,14 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - B69 库存与现金：是否原样显示 B4 inventory_reconciliation_status、effective_change_working_capital、cash_capex、FCF；不得重复加 B42 inventory_cash_impact_proxy 或在缺乏项目级资金输入时将扩产增量资金默认为零；B69 不得被误认为已替代/通过 B43 有效营运资金与主估值经营桥对账。
 - B69 决策边界：不改变 B4/B55/B61–B68、SOTP、MIE、expectation_gap、15% 年化门槛、目标入场价、组合约束、Decision、正式 Evidence/PIT 准入或执行权限。
 
+
+- B70 证据主张结构：每条记录是否具备唯一 record_id、claim_type、product_id、scenario、forecast_period、value/unit、data_class、basis 和 evidence_refs；不得从 B68 反推值自动生成支持性证据。
+- B70 来源核验：引用是否在同一 case evidence_register 唯一存在、截止日兼容且主张类别为 ISSUER_PRIMARY / EXCHANGE_PRIMARY / REGULATOR_PRIMARY；未知时点、截止后、重复 ID、来源类别非 primary、域名类别冲突和 ANALYST_ASSUMPTION 均不得进入条件数值比较；不把 PIT 时间兼容称为正式证据准入。
+- B70 精确匹配：product_id / scenario / forecast_period 是否与 B69 目标一致；不跨期间、不跨场景借用证据；同一场景/产品/期间/claim_type 只允许一个汇总主张，重复主张不得相加。
+- B70 数值门槛：销量与净售价支持值是否达到 B68 反推门槛；单位成本是否不高于要求；有效可用产能是否覆盖所需产量；扩产可用日期是否仅与完整年度末比较；缺乏可比字段时保留 NOT_IDENTIFIABLE。
+- B70 增量资金：INCREMENTAL_CAPEX_REQUIRED / FUNDED 与 INCREMENTAL_WORKING_CAPITAL_REQUIRED / FUNDED 是否分别配对；comparison_basis 是否明确为 INCREMENTAL_TO_B4_FORWARD_PLAN；不得把 B4 既有资本开支/WC 冒充增量资金。
+- B70 治理：报告是否保留每条 record/status/evidence_refs；数值覆盖仅为链接主张的算术比较，不等于来源内容语义独立核实；overall operational feasibility 不得自动升级为 PASS，不得影响 Decision、估值或投资权限。
+
 ## 9. 已发生故障与防重复清单
 
 | 历史故障 | 当前防护 | 遇到时该怎么做 |
