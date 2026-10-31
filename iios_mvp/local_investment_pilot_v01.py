@@ -41,6 +41,7 @@ from .sotp_value_credibility_audit_v01 import build_sotp_value_credibility_price
 from .sotp_operating_requirement_reverse_engineering_v01 import build_sotp_operating_requirement_reverse_engineering
 from .sotp_operating_feasibility_audit_v01 import build_sotp_operating_feasibility_audit
 from .operating_feasibility_evidence_v01 import build_operating_feasibility_evidence_assessment
+from .operating_feasibility_semantic_review_v01 import build_operating_feasibility_semantic_review
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
     evaluate_valuation_transmission,
@@ -94,6 +95,7 @@ REPLAY_COMPARISON_FIELDS = (
     "forecast_valuation",
     "operating_driver_forecast",
     "operating_feasibility_evidence",
+    "operating_feasibility_semantic_reviews",
     "cycle_earnings_monitor",
     "valuation_transmission",
     "sotp_valuation",
@@ -657,7 +659,7 @@ def _collect_refs(value: Any) -> set[str]:
     result: set[str] = set()
     if isinstance(value, Mapping):
         for key, item in value.items():
-            if key in {"evidence_refs", "source_refs", "evidence_ids", "source_ids"} and isinstance(item, list):
+            if key in {"evidence_refs", "source_refs", "evidence_ids", "source_ids", "reviewed_evidence_refs"} and isinstance(item, list):
                 result.update(str(row).strip() for row in item if str(row).strip())
             else:
                 result.update(_collect_refs(item))
@@ -3893,6 +3895,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     )
     raw_driver_forecast = payload.get("operating_driver_forecast")
     raw_operating_feasibility_evidence = payload.get("operating_feasibility_evidence")
+    raw_operating_feasibility_semantic_reviews = payload.get("operating_feasibility_semantic_reviews")
     raw_valuation_transmission = payload.get("valuation_transmission")
     raw_sotp_valuation = payload.get("sotp_valuation")
     raw_eps_multiple_valuation = payload.get("eps_multiple_valuation")
@@ -3975,6 +3978,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "forecast_valuation": forecast_raw,
         "operating_driver_forecast": raw_driver_forecast,
         "operating_feasibility_evidence": raw_operating_feasibility_evidence,
+        "operating_feasibility_semantic_reviews": raw_operating_feasibility_semantic_reviews,
         "valuation_transmission": raw_valuation_transmission,
         "sotp_valuation": raw_sotp_valuation,
     })
@@ -4401,6 +4405,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "eps_earnings_bridge": eps_earnings_bridge,
         "operating_driver_forecast": operating_driver_forecast,
         "operating_feasibility_evidence": raw_operating_feasibility_evidence,
+        "operating_feasibility_semantic_reviews": raw_operating_feasibility_semantic_reviews,
         "cycle_earnings_monitor": cycle_earnings_monitor,
         "valuation_transmission": valuation_transmission,
         "sotp_valuation": sotp_valuation,
@@ -6367,6 +6372,37 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             "分析师假设不能作为经营证据；重复订单/主张不求和；没有人工审核和完整覆盖时，整体经营可实现性仍为 NOT_IDENTIFIABLE。"
         )
 
+    local_b71 = local_sotp_inversion.get("operating_feasibility_semantic_review") if isinstance(local_sotp_inversion.get("operating_feasibility_semantic_review"), Mapping) else {}
+    if local_b71:
+        lines.extend([
+            "",
+            "### B71 — 经营可行性证据语义审核",
+            f"- 审核状态：{local_b71.get('status', 'UNKNOWN')}；记录数 {local_b71.get('reviewed_claim_count', 0)}；条件性审核支持 {local_b71.get('conditionally_supported_claim_count', 0)}；部分/未完成/阻断 {local_b71.get('blocked_or_incomplete_claim_count', 0)}；不支持/矛盾 {local_b71.get('contradicted_claim_count', 0)}。",
+            f"- 总体经营可实现性：{local_b71.get('overall_operational_feasibility_status', 'UNKNOWN')}；审核人身份独立验证={False}；来源内容由自动程序语义验证={False}；正式 Evidence/PIT 准入={local_b71.get('formal_evidence_pit_admission_created', False)}。",
+        ])
+        for review in (local_b71.get("reviews") or [])[:60]:
+            if not isinstance(review, Mapping):
+                continue
+            lines.append(
+                f"- 审核 {review.get('review_id') or 'UNKNOWN'} / 记录 {review.get('record_id')}："
+                f"{review.get('claim_type')} / {review.get('product_id')} / {review.get('scenario')} / {review.get('forecast_period')}；"
+                f"审核人 {review.get('reviewer_id')}；审核时间 {review.get('reviewed_at') or 'UNKNOWN'}；"
+                f"结论 {review.get('decision')}；状态 {review.get('status')}。"
+            )
+            for check in (review.get("checks") or []):
+                if isinstance(check, Mapping):
+                    lines.append(
+                        f"  - {check.get('check_id')}：{check.get('status')}；"
+                        f"审核依据 {check.get('basis') or 'UNKNOWN'}；"
+                        f"来源 {','.join(check.get('evidence_refs') or []) or 'NONE'}。"
+                    )
+            if review.get("issues"):
+                lines.append("  - 阻断/缺项：" + "；".join(str(x) for x in review["issues"][:10]))
+        lines.append(
+            "- B71 纪律：只有 B70 已通过来源/PIT 初检的记录才能进入语义审核；每种主张必须完成其专属必检项，且逐条引用原始材料。"
+            "审核记录是操作者声明，不证明身份真实性或来源内容本身；系统不自动授予证据准入、预测准入或投资决策权限。"
+        )
+
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
@@ -7072,6 +7108,10 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         unresolved_evidence_refs=prepared.get("unresolved_evidence_references") or [],
         after_cutoff_evidence_refs=prepared.get("after_cutoff_evidence_references") or [],
         uncertain_timing_evidence_refs=prepared.get("uncertain_timing_evidence_references") or [],
+    )
+    local_sotp_inversion["operating_feasibility_semantic_review"] = build_operating_feasibility_semantic_review(
+        raw_reviews=prepared.get("operating_feasibility_semantic_reviews"),
+        b70_assessment=local_sotp_inversion.get("operating_feasibility_evidence_assessment") or {},
     )
     source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion
