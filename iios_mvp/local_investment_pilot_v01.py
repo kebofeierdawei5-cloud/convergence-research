@@ -6363,7 +6363,7 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
         if local_b70.get("duplicate_claim_keys"):
             lines.append(f"- 重复主张键（未求和）：{len(local_b70['duplicate_claim_keys'])} 组。")
         lines.append(
-            "- B70 纪律：证据引用可解析且截止日兼容，只表示来源可追溯；数值覆盖比较不等于来源材料语义已独立核实。"
+            "- B70 纪律：销量、售价和单位成本分别对照三个替代性单变量门槛，不是同时需要实现的经营预测，也不可相加；证据引用可解析且截止日兼容，只表示来源可追溯，数值覆盖不等于来源材料语义已独立核实。"
             "分析师假设不能作为经营证据；重复订单/主张不求和；没有人工审核和完整覆盖时，整体经营可实现性仍为 NOT_IDENTIFIABLE。"
         )
 
