@@ -241,5 +241,7 @@ def test_b63_keeps_multiple_sensitivity_explicit_when_forecast_value_pool_cannot
         sotp_valuation=sotp,
         segment_earnings_reconciliation=b62,
     )
+    assert result["status"] == "PARTIAL"
+    assert result["scenarios"]["base"]["status"] == "PARTIAL"
     assert result["scenarios"]["base"]["multiple_attribution"]["status"] == "NOT_IDENTIFIABLE"
     assert result["scenarios"]["base"]["multiple_attribution"]["common_pe_scale_factor_required"] is None

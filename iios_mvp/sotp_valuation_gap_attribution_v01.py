@@ -174,7 +174,8 @@ def build_sotp_valuation_gap_attribution(
         b62_required_per_share = _dec(b62.get("required_terminal_value_per_share_for_required_return_cny"))
 
         required_fields = (
-            central_cost, net_cash, other, diluted_shares, selected_segment_pool,
+            central_cost, central_cost_after_tax, central_cost_multiple,
+            net_cash, other, diluted_shares, selected_segment_pool,
             selected_total_equity, selected_terminal_per_share, required_per_share,
             required_total_equity, required_segment_pool, selected_pool_from_b61,
             b61_central_cost, b61_net_cash, b61_other, b61_shares,
@@ -452,7 +453,7 @@ def build_sotp_valuation_gap_attribution(
     elif any(status == "RECONCILIATION_MISMATCH" for status in statuses):
         result["status"] = "RECONCILIATION_MISMATCH"
     elif any(status in {"CONDITIONAL_ATTRIBUTION_CALCULATED", "PARTIAL"} for status in statuses):
-        result["status"] = "RECONCILIATION_MISMATCH"
+        result["status"] = "PARTIAL"
     else:
         result["status"] = "NOT_IDENTIFIABLE"
     result["summary"] = (
