@@ -133,10 +133,10 @@ B72 generates the closure criteria but does not mark tasks closed. Closure requi
 
 ## 7. Regression coverage and acceptance
 
-Twenty-three regression cases are authored in:
+Twenty-four regression cases are authored in:
 
 tests/test_operating_feasibility_exception_register_v01.py
 
-Coverage includes schema blockers, numerical-vs-semantic separation, conditional support, human contradiction, quantified threshold gaps, missing evidence vs analyst assumptions, duplicate claim handling, cross-scenario record-ID isolation, compatibility with B70's actual lens/product output shape, ambiguous lens/product join blocking, reviewer independence, funding shortfall, late capacity, B69 nameplate constraints, unmodeled dimensions, B61/B63 non-additivity, governance boundaries, remediation closure criteria and input immutability.
+Coverage includes schema blockers, numerical-vs-semantic separation, conditional support, human contradiction, quantified threshold gaps, missing evidence vs analyst assumptions, duplicate claim handling, cross-scenario record-ID isolation, compatibility with B70's actual lens/product output shape, ambiguous lens/product join blocking, wrong record-ID / claim-type substitution blocking, reviewer independence, funding shortfall, late capacity, B69 nameplate constraints, unmodeled dimensions, B61/B63 non-additivity, governance boundaries, remediation closure criteria and input immutability.
 
 Tests have **not** been executed. Replay, CI, unified tests and real macOS acceptance have **not** been run or verified. No PASS is claimed.
