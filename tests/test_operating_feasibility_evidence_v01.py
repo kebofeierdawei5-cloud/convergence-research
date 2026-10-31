@@ -262,3 +262,19 @@ def test_b70_late_expansion_date_overrides_sufficient_capacity_quantity():
     result = _run(records)
     capacity = _product(result)["comparisons"][3]
     assert capacity["status"] == "LINKED_CAPACITY_AVAILABLE_AFTER_FORECAST_END_NOT_COVERAGE"
+
+
+def test_b70_claim_from_another_scenario_cannot_support_base_requirement():
+    record = _record("R1", "SUPPORTED_SALES_VOLUME", "110", "S1", scenario="bull")
+    result = _run([record])
+    assert _product(result)["comparisons"][0]["status"] == "EVIDENCE_NOT_PROVIDED"
+
+
+def test_b70_unresolved_source_reference_blocks_claim():
+    record = _record("R1", "SUPPORTED_SALES_VOLUME", "110", "MISSING-SOURCE")
+    data = _fixture([record])
+    data["evidence_register"] = []
+    data["unresolved_evidence_refs"] = ["MISSING-SOURCE"]
+    result = build_operating_feasibility_evidence_assessment(**data)
+    assert result["records"][0]["status"] == "NOT_IDENTIFIABLE"
+    assert "EVIDENCE_REFERENCE_UNRESOLVED:MISSING-SOURCE" in result["records"][0]["issues"]
