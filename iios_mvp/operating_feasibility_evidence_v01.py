@@ -504,6 +504,8 @@ def build_operating_feasibility_evidence_assessment(
                     "comparisons": comparisons,
                     "capacity_available_date_comparison": date_comparison,
                     "incremental_funding_comparisons": funding_comparisons,
+                    "comparison_interpretation": "SUPPORTED_SALES_VOLUME_NET_ASP_AND_UNIT_COST_ARE_ALTERNATIVE_ONE_DRIVER_THRESHOLDS_NOT_SIMULTANEOUS_FORECASTS",
+                    "comparisons_are_additive": False,
                     "all_claims_are_non_additive": True,
                 })
             lenses_out.append({
