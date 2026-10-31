@@ -117,21 +117,25 @@ def _product_audit(
     b4_production = _num(b4_scenario_product.get("production_tonnes"))
     b4_sales = _num(b4_scenario_product.get("sales_volume_tonnes"))
     b4_inventory_change = _num(b4_scenario_product.get("inventory_change_tonnes"))
-    context_production = _num(context.get("forward_production_tonnes"))
     context_inventory_change = _num(context.get("forward_inventory_change_tonnes"))
-
-    production = b4_production if b4_production is not None else context_production
-    inventory_change = b4_inventory_change if b4_inventory_change is not None else context_inventory_change
     issues: list[str] = []
 
-    if production is not None and b4_sales is not None:
+    # B69 independently rechecks the B4 scenario row; B68-carried context is
+    # a cross-check only and cannot replace a missing B4 product row.
+    b4_row_present = bool(b4_scenario_product) and _txt(b4_scenario_product.get("product_id")) == product_id
+    production = b4_production if b4_row_present else None
+    inventory_change = None
+    if not b4_row_present:
+        issues.append("B69_B4_SCENARIO_PRODUCT_ROW_MISSING")
+    elif production is not None and b4_sales is not None:
         recalculated_inventory_change = production - b4_sales
-        if inventory_change is not None and abs(recalculated_inventory_change - inventory_change) > _TOL:
+        if b4_inventory_change is not None and abs(recalculated_inventory_change - b4_inventory_change) > _TOL:
+            issues.append("B69_B4_PRODUCTION_SALES_INVENTORY_BALANCE_MISMATCH")
+        elif context_inventory_change is not None and abs(recalculated_inventory_change - context_inventory_change) > _TOL:
             issues.append("B69_B4_B68_PRODUCTION_SALES_BALANCE_MISMATCH")
-            inventory_change = None
         else:
             inventory_change = recalculated_inventory_change
-    elif inventory_change is None:
+    else:
         issues.append("FORWARD_PRODUCTION_SALES_INVENTORY_DELTA_UNKNOWN")
 
     required_production = (
@@ -142,17 +146,8 @@ def _product_audit(
     capacity_measure = _map(b4_master.get("capacity_tonnes_per_year"))
     capacity = _num(capacity_measure)
     capacity_lineage = _lineage(capacity_measure)
-    if capacity is None:
-        capacity = _num(context.get("nameplate_capacity_tonnes_per_year"))
-        if capacity is not None:
-            capacity_lineage = {
-                "data_class": "UNKNOWN",
-                "basis": "B68_CARRIED_CAPACITY_VALUE_WITHOUT_B4_MEASURE_LINEAGE",
-                "evidence_refs": [],
-                "status": "NOT_IDENTIFIABLE",
-                "issues": ["CAPACITY_MEASURE_LINEAGE_MISSING"],
-                "formal_evidence_admitted": False,
-            }
+    if not b4_master:
+        issues.append("B69_B4_MASTER_PRODUCT_ROW_MISSING")
 
     capacity_status = "NOT_IDENTIFIABLE"
     required_utilization = None
@@ -356,9 +351,10 @@ def build_sotp_operating_feasibility_audit(
         "portfolio_constraints_modified": False,
         "decision_authority": False,
         "formal_forecast_admission_created": False,
+        "overall_operational_feasibility_status": "NOT_IDENTIFIABLE_REQUIRED_DEMAND_PRICING_COST_AND_INCREMENTAL_FUNDING_EVIDENCE",
         "summary": (
             "B69 只对 B68 的现价隐含经营要求进行条件约束检查；产能通过不等于需求、价格、成本或扩产可实现。"
-            "B61 与 B63 门槛继续分开，不相加。"
+            "B61 与 B63 门槛继续分开，不相加；整体经营可实现性仍为 NOT_IDENTIFIABLE。"
         ),
         "limitations": [
             "产能只按 B4 年度名义产能与前瞻产销差额不变的条件检查；不代表有效产能、良率、爬坡或库存政策已核实。",
