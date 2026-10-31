@@ -753,6 +753,14 @@ def build_operating_feasibility_exception_register(
                     result["requirement_rows"].append(row)
 
                 date_comparison = _map(b70_product.get("capacity_available_date_comparison"))
+                if not date_comparison and (b70_product_ambiguous or not b70_product_matches):
+                    date_comparison = {
+                        "claim_type": "CAPACITY_AVAILABLE_DATE",
+                        "status": (
+                            "AMBIGUOUS_B70_PRODUCT_LENS_MATCH"
+                            if b70_product_ambiguous else "EVIDENCE_NOT_PROVIDED"
+                        ),
+                    }
                 if date_comparison:
                     row = _make_requirement_row(
                         scenario=scenario,
@@ -776,7 +784,17 @@ def build_operating_feasibility_exception_register(
                     lens_rows.append(row)
                     result["requirement_rows"].append(row)
 
-                for funding in _rows(b70_product.get("incremental_funding_comparisons")):
+                funding_rows = _rows(b70_product.get("incremental_funding_comparisons"))
+                if not funding_rows and (b70_product_ambiguous or not b70_product_matches):
+                    missing_status = (
+                        "AMBIGUOUS_B70_PRODUCT_LENS_MATCH"
+                        if b70_product_ambiguous else "FUNDING_REQUIREMENT_OR_AVAILABLE_AMOUNT_NOT_IDENTIFIABLE"
+                    )
+                    funding_rows = [
+                        {"funding_type": "INCREMENTAL_CAPEX_REQUIRED", "status": missing_status},
+                        {"funding_type": "INCREMENTAL_WORKING_CAPITAL_REQUIRED", "status": missing_status},
+                    ]
+                for funding in funding_rows:
                     funding_type = _txt(funding.get("funding_type")).upper()
                     if funding_type == "INCREMENTAL_CAPEX_REQUIRED":
                         claim_types = ("INCREMENTAL_CAPEX_REQUIRED", "INCREMENTAL_CAPEX_FUNDED")
