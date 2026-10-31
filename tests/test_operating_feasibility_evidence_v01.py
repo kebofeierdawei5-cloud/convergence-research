@@ -234,3 +234,21 @@ def test_b70_requires_source_domain_class_not_to_mismatch():
     result = build_operating_feasibility_evidence_assessment(**data)
     assert result["records"][0]["status"] == "NOT_IDENTIFIABLE"
     assert "EVIDENCE_REFERENCE_SOURCE_DOMAIN_CLASS_MISMATCH:S1" in result["records"][0]["issues"]
+
+
+def test_b70_capacity_available_date_requires_full_year_forecast_period():
+    record = _record("R1", "CAPACITY_AVAILABLE_DATE", "2027-06-30", "S1", period="2027H1")
+    data = _fixture([record])
+    data["b69_audit"]["forecast_period"] = "2027H1"
+    result = build_operating_feasibility_evidence_assessment(**data)
+    comparison = _product(result)["capacity_available_date_comparison"]
+    assert comparison["status"] == "FORECAST_PERIOD_END_NOT_IDENTIFIABLE"
+
+
+def test_b70_duplicate_evidence_register_source_ids_are_not_accepted():
+    record = _record("R1", "SUPPORTED_SALES_VOLUME", "110", "S1")
+    data = _fixture([record])
+    data["evidence_register"] = [_source("S1"), _source("S1")]
+    result = build_operating_feasibility_evidence_assessment(**data)
+    assert result["records"][0]["status"] == "NOT_IDENTIFIABLE"
+    assert "EVIDENCE_REFERENCE_DUPLICATE_SOURCE_ID:S1" in result["records"][0]["issues"]
