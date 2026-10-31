@@ -42,6 +42,7 @@ from .sotp_operating_requirement_reverse_engineering_v01 import build_sotp_opera
 from .sotp_operating_feasibility_audit_v01 import build_sotp_operating_feasibility_audit
 from .operating_feasibility_evidence_v01 import build_operating_feasibility_evidence_assessment
 from .operating_feasibility_semantic_review_v01 import build_operating_feasibility_semantic_review
+from .operating_feasibility_exception_register_v01 import build_operating_feasibility_exception_register
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
     evaluate_valuation_transmission,
@@ -6405,6 +6406,48 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             "审核记录是操作者声明，不证明身份真实性或来源内容本身；系统不自动授予证据准入、预测准入或投资决策权限。"
         )
 
+    local_b72 = local_sotp_inversion.get("operating_feasibility_exception_register") if isinstance(local_sotp_inversion.get("operating_feasibility_exception_register"), Mapping) else {}
+    if local_b72:
+        summary_b72 = local_b72.get("summary") if isinstance(local_b72.get("summary"), Mapping) else {}
+        lines.extend([
+            "",
+            "### B72 — 经营可行性例外清单与整改闭环",
+            f"- 汇总状态：{local_b72.get('status', 'UNKNOWN')}；逐项要求记录 {summary_b72.get('requirement_row_count_including_alternative_lenses', 0)} 条（包含 B61/B63 两套非加总视角）。",
+            f"- 总体经营可实现性仍为 {local_b72.get('overall_operational_feasibility_status', 'UNKNOWN')}；正式 Evidence/PIT 准入={local_b72.get('formal_evidence_pit_admission_created', False)}；自动关闭整改项={summary_b72.get('no_exception_is_automatically_closed', True)}。",
+        ])
+        for scenario_name in ("bear", "base", "bull"):
+            scenario_b72 = local_b72.get("scenarios", {}).get(scenario_name) if isinstance(local_b72.get("scenarios"), Mapping) else {}
+            scenario_b72 = scenario_b72 if isinstance(scenario_b72, Mapping) else {}
+            for lens_b72 in (scenario_b72.get("requirement_lenses") or []):
+                if not isinstance(lens_b72, Mapping):
+                    continue
+                lens_summary = lens_b72.get("summary") if isinstance(lens_b72.get("summary"), Mapping) else {}
+                status_counts = lens_summary.get("status_counts") if isinstance(lens_summary.get("status_counts"), Mapping) else {}
+                status_text = "；".join(f"{key}={value}" for key, value in sorted(status_counts.items())) or "无结构化要求记录"
+                lines.append(
+                    f"**B72 {scenario_name.upper()} / {lens_b72.get('lens', 'UNKNOWN')}** — "
+                    f"要求 {lens_summary.get('requirement_row_count', 0)} 项；{status_text}。"
+                )
+        for row in (local_b72.get("requirement_rows") or [])[:120]:
+            if not isinstance(row, Mapping):
+                continue
+            remediation = row.get("remediation") if isinstance(row.get("remediation"), Mapping) else {}
+            lines.append(
+                f"- {row.get('scenario')} / {row.get('lens')} / {row.get('product_id')} / {row.get('requirement_type')}："
+                f"{row.get('exception_status')}；门槛={row.get('required_value') if row.get('required_value') is not None else 'UNKNOWN'} "
+                f"{row.get('unit') or ''}；证据值={row.get('evidence_value') if row.get('evidence_value') is not None else 'UNKNOWN'}；"
+                f"B70={row.get('evidence_linkage_status')}；B71={row.get('semantic_review_status')}。"
+            )
+            lines.append(
+                f"  - 整改 {remediation.get('status', 'UNKNOWN')} / {remediation.get('owner_role', 'UNKNOWN')}："
+                f"{remediation.get('next_action') or 'UNKNOWN'}；关闭凭证："
+                f"{'；'.join(str(item) for item in (remediation.get('closure_evidence_required') or [])) or 'UNKNOWN'}。"
+            )
+        lines.append(
+            "- B72 纪律：数值覆盖与人工语义审核分轴呈现；缺失/未覆盖是 UNKNOWN，不是反证；名义产能算术通过不等于经营可执行。"
+            "B61 与 B63 仍是替代门槛，不相加、不平均、不赋概率；所有整改项保持 OPEN，需操作者提交材料后重新复核。"
+        )
+
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
@@ -7114,6 +7157,11 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
     local_sotp_inversion["operating_feasibility_semantic_review"] = build_operating_feasibility_semantic_review(
         raw_reviews=prepared.get("operating_feasibility_semantic_reviews"),
         b70_assessment=local_sotp_inversion.get("operating_feasibility_evidence_assessment") or {},
+    )
+    local_sotp_inversion["operating_feasibility_exception_register"] = build_operating_feasibility_exception_register(
+        b69_audit=local_sotp_inversion.get("operating_feasibility_audit") or {},
+        b70_assessment=local_sotp_inversion.get("operating_feasibility_evidence_assessment") or {},
+        b71_review=local_sotp_inversion.get("operating_feasibility_semantic_review") or {},
     )
     source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion
