@@ -40,7 +40,7 @@ Accordingly, B69 displays the required ASP and unit-cost changes but labels thei
 
 ## 4. Inventory, working capital and cash
 
-B69 reads the B4 inventory reconciliation status, effective working-capital amount, cash capex and FCF proxy. It does not add the B42 inventory cash proxy a second time, recompute FCF, or assume incremental expansion capex is zero.
+B69 reads the B4 inventory reconciliation status, effective working-capital amount, cash capex and FCF proxy. It does not add the B42 inventory cash proxy a second time, recompute FCF, or assume incremental expansion capex is zero. B69 does not independently rerun B43's cross-node comparison between effective B4 working capital and the valuation operating-financial bridge; that existing reconciliation remains a separate check and is not implied to pass by B69.
 
 If B4 inventory/working-capital treatment is not reconciled, B69 records the blocker. Even when B4's current FCF bridge is usable, the additional cash requirements of the B68-implied volume, capacity expansion or working-capital build remain unidentified unless separately evidenced.
 
