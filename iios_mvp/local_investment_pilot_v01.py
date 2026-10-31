@@ -40,6 +40,7 @@ from .sotp_multiple_calibration_v01 import build_sotp_multiple_calibration_asses
 from .sotp_value_credibility_audit_v01 import build_sotp_value_credibility_price_audit
 from .sotp_operating_requirement_reverse_engineering_v01 import build_sotp_operating_requirement_reverse_engineering
 from .sotp_operating_feasibility_audit_v01 import build_sotp_operating_feasibility_audit
+from .operating_feasibility_evidence_v01 import build_operating_feasibility_evidence_assessment
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
     evaluate_valuation_transmission,
@@ -92,6 +93,7 @@ REPLAY_COMPARISON_FIELDS = (
     "assessment",
     "forecast_valuation",
     "operating_driver_forecast",
+    "operating_feasibility_evidence",
     "cycle_earnings_monitor",
     "valuation_transmission",
     "sotp_valuation",
@@ -3890,6 +3892,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         forecast_raw.get("cash_distribution_review"), sources
     )
     raw_driver_forecast = payload.get("operating_driver_forecast")
+    raw_operating_feasibility_evidence = payload.get("operating_feasibility_evidence")
     raw_valuation_transmission = payload.get("valuation_transmission")
     raw_sotp_valuation = payload.get("sotp_valuation")
     raw_eps_multiple_valuation = payload.get("eps_multiple_valuation")
@@ -3971,6 +3974,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "assessment": raw_assessment,
         "forecast_valuation": forecast_raw,
         "operating_driver_forecast": raw_driver_forecast,
+        "operating_feasibility_evidence": raw_operating_feasibility_evidence,
         "valuation_transmission": raw_valuation_transmission,
         "sotp_valuation": raw_sotp_valuation,
     })
@@ -4396,6 +4400,7 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "eps_multiple_valuation": eps_multiple_valuation,
         "eps_earnings_bridge": eps_earnings_bridge,
         "operating_driver_forecast": operating_driver_forecast,
+        "operating_feasibility_evidence": raw_operating_feasibility_evidence,
         "cycle_earnings_monitor": cycle_earnings_monitor,
         "valuation_transmission": valuation_transmission,
         "sotp_valuation": sotp_valuation,
@@ -6309,6 +6314,59 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             "B69 不修改 B4 FCF、库存现金代理、估值、MIE、15% 年化门槛、目标入场价或 Decision。"
         )
 
+    local_b70 = local_sotp_inversion.get("operating_feasibility_evidence_assessment") if isinstance(local_sotp_inversion.get("operating_feasibility_evidence_assessment"), Mapping) else {}
+    if local_b70:
+        lines.extend([
+            "",
+            "### B70 — 经营可行性证据绑定与门槛核对",
+            f"- 总体状态：{local_b70.get('status', 'UNKNOWN')}；整体经营可实现性：{local_b70.get('overall_operational_feasibility_status', 'UNKNOWN')}",
+            f"- 证据记录：{local_b70.get('input_record_count', 0)} 条；可进入条件数值比较的记录：{local_b70.get('eligible_linked_record_count', 0)} 条；来源内容语义已核实：{local_b70.get('source_content_semantically_verified', False)}；正式 Evidence/PIT 准入：{local_b70.get('formal_evidence_pit_admission_created', False)}。",
+        ])
+        b70_scenarios = local_b70.get("scenarios") if isinstance(local_b70.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b70_row = b70_scenarios.get(scenario_name) if isinstance(b70_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B70 {scenario_name.upper()} — {b70_row.get('status', 'UNKNOWN')}**")
+            for lens in (b70_row.get("requirement_lenses") or []):
+                if not isinstance(lens, Mapping):
+                    continue
+                lines.append(f"- {lens.get('lens')}（非加总）")
+                for product in (lens.get("products") or []):
+                    if not isinstance(product, Mapping):
+                        continue
+                    comparisons = product.get("comparisons") if isinstance(product.get("comparisons"), list) else []
+                    comparison_text = "；".join(
+                        f"{row.get('claim_type')}={row.get('status')}"
+                        for row in comparisons if isinstance(row, Mapping)
+                    )
+                    date_comparison = product.get("capacity_available_date_comparison") if isinstance(product.get("capacity_available_date_comparison"), Mapping) else {}
+                    funding = product.get("incremental_funding_comparisons") if isinstance(product.get("incremental_funding_comparisons"), list) else []
+                    funding_text = "；".join(
+                        f"{row.get('funding_type')}={row.get('status')}"
+                        for row in funding if isinstance(row, Mapping)
+                    )
+                    lines.append(
+                        f"  - {product.get('product_id')}：{comparison_text}；"
+                        f"扩产可用日期={date_comparison.get('status', 'UNKNOWN')}；"
+                        f"增量资金={funding_text or 'UNKNOWN'}。"
+                    )
+        for record in (local_b70.get("records") or [])[:40]:
+            if not isinstance(record, Mapping):
+                continue
+            lines.append(
+                f"- 证据记录 {record.get('record_id') or 'UNKNOWN'}：{record.get('claim_type')} / "
+                f"{record.get('product_id')} / {record.get('scenario')} / {record.get('forecast_period')}；"
+                f"数值 {record.get('value') if record.get('value') is not None else 'UNKNOWN'} {record.get('unit') or ''}；"
+                f"状态 {record.get('status', 'UNKNOWN')}；引用 {','.join(record.get('evidence_refs') or []) or 'NONE'}。"
+            )
+            if record.get("issues"):
+                lines.append("  - 证据问题：" + "；".join(str(x) for x in record["issues"][:6]))
+        if local_b70.get("duplicate_claim_keys"):
+            lines.append(f"- 重复主张键（未求和）：{len(local_b70['duplicate_claim_keys'])} 组。")
+        lines.append(
+            "- B70 纪律：证据引用可解析且截止日兼容，只表示来源可追溯；数值覆盖比较不等于来源材料语义已独立核实。"
+            "分析师假设不能作为经营证据；重复订单/主张不求和；没有人工审核和完整覆盖时，整体经营可实现性仍为 NOT_IDENTIFIABLE。"
+        )
+
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
@@ -7006,6 +7064,14 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
     local_sotp_inversion["operating_feasibility_audit"] = build_sotp_operating_feasibility_audit(
         operating_driver_forecast=prepared.get("operating_driver_forecast") or {},
         operating_requirement_reverse_engineering=local_sotp_inversion.get("operating_requirement_reverse_engineering") or {},
+    )
+    local_sotp_inversion["operating_feasibility_evidence_assessment"] = build_operating_feasibility_evidence_assessment(
+        raw_evidence=prepared.get("operating_feasibility_evidence"),
+        b69_audit=local_sotp_inversion.get("operating_feasibility_audit") or {},
+        evidence_register=prepared.get("evidence_register") or [],
+        unresolved_evidence_refs=prepared.get("unresolved_evidence_references") or [],
+        after_cutoff_evidence_refs=prepared.get("after_cutoff_evidence_references") or [],
+        uncertain_timing_evidence_refs=prepared.get("uncertain_timing_evidence_references") or [],
     )
     source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion
