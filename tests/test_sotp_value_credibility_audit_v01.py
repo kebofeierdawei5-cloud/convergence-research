@@ -39,7 +39,11 @@ def _fixtures():
             },
             "multiple_attribution": {
                 "common_pe_scale_factor_required": str(1200 / 1100),
-                "required_common_pe_by_segment": [{"segment_id": "SEG_A", "required_pe_under_common_scale_x": str(10 * 1200 / 1100)}],
+                "required_common_pe_by_segment": [{
+                    "segment_id": "SEG_A", "selected_sotp_pe_x": "10",
+                    "required_pe_under_common_scale_x": str(10 * 1200 / 1100),
+                    "common_scale_factor": str(1200 / 1100),
+                }],
             },
         }
         b64[name] = {
