@@ -44,6 +44,10 @@ def _review(b70=None, *, decision="SUPPORTS", checks=None, refs=None, reviewed_a
             "review_id": review_id,
             "record_id": record_id,
             "reviewer_id": reviewer_id,
+            "claim_preparer_id": "analyst-preparer-01",
+            "reviewer_role": "INDEPENDENT_REVIEWER",
+            "reviewer_relationship_status": "INDEPENDENT_OF_CLAIM_PREPARER",
+            "conflict_of_interest_status": "NO_KNOWN_CONFLICT",
             "reviewed_at": reviewed_at,
             "review_method": method,
             "decision": decision,
@@ -275,3 +279,28 @@ def test_b71_explicit_not_supported_is_distinct_from_failed_check_status():
     raw["reviews"][0]["checks"][0]["status"] = "FAIL"
     result = _run(raw, b70)
     assert result["reviews"][0]["status"] == "SEMANTIC_REVIEW_NOT_SUPPORTED"
+
+
+def test_b71_self_review_cannot_be_conditionally_supported():
+    raw, b70 = _review()
+    raw["reviews"][0]["claim_preparer_id"] = raw["reviews"][0]["reviewer_id"]
+    raw["reviews"][0]["reviewer_relationship_status"] = "SAME_PERSON"
+    result = _run(raw, b70)
+    assert result["reviews"][0]["status"] == "SEMANTIC_REVIEW_INDEPENDENCE_UNRESOLVED"
+    assert result["reviews"][0]["review_independence_conditionally_declared"] is False
+
+
+def test_b71_disclosed_conflict_cannot_be_conditionally_supported():
+    raw, b70 = _review()
+    raw["reviews"][0]["conflict_of_interest_status"] = "CONFLICT_DISCLOSED"
+    result = _run(raw, b70)
+    assert result["reviews"][0]["status"] == "SEMANTIC_REVIEW_INDEPENDENCE_UNRESOLVED"
+
+
+def test_b71_requires_claim_preparer_and_reviewer_role():
+    raw, b70 = _review()
+    raw["reviews"][0]["claim_preparer_id"] = ""
+    raw["reviews"][0]["reviewer_role"] = ""
+    result = _run(raw, b70)
+    assert "CLAIM_PREPARER_ID_REQUIRED" in result["reviews"][0]["issues"]
+    assert "REVIEWER_ROLE_REQUIRED" in result["reviews"][0]["issues"]
