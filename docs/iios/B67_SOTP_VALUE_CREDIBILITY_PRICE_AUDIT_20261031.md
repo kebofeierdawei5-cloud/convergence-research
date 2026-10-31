@@ -73,7 +73,7 @@ B67 presents B63's waterfall:
 4. residual common-P/E scaling effect;
 5. B61 Required Return required segment pool.
 
-It checks the common P/E scale factor against required pool ÷ B4 forecast pool and preserves the segment-level conditional common-P/E values. The common P/E is calculated from the full B4 normalized-profit vector; it is not a standalone fair P/E for an individual segment.
+It checks the common P/E scale factor against required pool ÷ B4 forecast pool, independently recalculates each segment's required common P/E from its unchanged selected P/E × the common factor, and preserves the resulting segment-level conditional values. The common P/E is calculated from the full B4 normalized-profit vector; it is not a standalone fair P/E for an individual segment.
 
 The displayed hurdle is B61 Required Return without distributions as carried by B63. It is a conditional price-implied return hurdle, not external MIE, broker consensus, or an observed market expectation. Whether B4 meets the hurdle is a conditional model comparison, not a BUY/SELL instruction.
 
@@ -100,6 +100,6 @@ B67 does not modify SOTP inputs or values, B4/B5/B6, B61–B66, external MIE, ex
 
 ## 8. Regression coverage and acceptance
 
-Ten regression cases are authored in tests/test_sotp_value_credibility_audit_v01.py. They cover the value and hurdle waterfall, B4 earnings contribution, reference-plus-adjustment decomposition, separate grades, missing reference coverage, B63 mismatch/blocking, parent adjustment mismatch, missing evidence grades, segment-universe mismatch, SOTP non-applicability, and an independent recheck of a falsely reconciled B66 bridge.
+Eleven regression cases are authored in tests/test_sotp_value_credibility_audit_v01.py. They cover the value and hurdle waterfall, B4 earnings contribution, reference-plus-adjustment decomposition, separate grades, missing reference coverage, B63 mismatch/blocking, parent adjustment mismatch, missing evidence grades, segment-universe mismatch, SOTP non-applicability, and an independent recheck of a falsely reconciled B66 bridge, and per-segment recalculation of Required Common P/E.
 
 Tests have not been executed. Replay, CI, unified test suite and real macOS acceptance remain deferred.

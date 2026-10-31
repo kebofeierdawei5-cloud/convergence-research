@@ -384,10 +384,24 @@ def _audit_scenario(name: str, sotp: Mapping[str, Any], b63: Mapping[str, Any],
     multiple = _map(b63.get("multiple_attribution"))
     factor = _num(multiple.get("common_pe_scale_factor_required"))
     required_rows = _index(multiple.get("required_common_pe_by_segment"), "B63_REQUIRED_PE", out["issues"])
+    required_pe_rows_ok = bool(required_rows) and set(required_rows) == set(sotp_rows)
+    if required_pe_rows_ok and factor is not None:
+        for segment_id, required_row in required_rows.items():
+            selected_pe_for_hurdle = _num(required_row.get("selected_sotp_pe_x"))
+            required_pe_for_hurdle = _num(required_row.get("required_pe_under_common_scale_x"))
+            row_factor = _num(required_row.get("common_scale_factor"))
+            if (
+                not _eq(selected_pe_for_hurdle, _num(_map(sotp_rows[segment_id].get("pe_multiple_x"))))
+                or not _eq(row_factor, factor)
+                or selected_pe_for_hurdle is None
+                or not _eq(required_pe_for_hurdle, selected_pe_for_hurdle * factor)
+            ):
+                out["issues"].append(f"B67_REQUIRED_COMMON_PE_SEGMENT_RECALCULATION_MISMATCH:{segment_id}")
+                required_pe_rows_ok = False
     requirement_ok = (
         step3 is not None and step5 is not None and step3 > 0 and step5 > 0
         and factor is not None and _eq(factor, step5 / step3)
-        and set(required_rows) == set(sotp_rows)
+        and required_pe_rows_ok
     )
     out["current_price_required_return"] = {
         "status": "CONDITIONAL_REQUIREMENT_IDENTIFIED" if requirement_ok else "RECONCILIATION_MISMATCH",

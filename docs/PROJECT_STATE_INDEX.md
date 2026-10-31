@@ -3045,7 +3045,7 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **No mechanical multiple adjustment:** directional target premium/discount labels remain qualitative. No peer mean/median, numerical premium, adjustment coefficient or selected P/E change is produced. The selected terminal multiple remains unchanged.
 - **Placement:** new module \`iios_mvp/sotp_comparability_audit_v01.py\`; nested output at \`assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.comparable_company_audit\`. B64 preserves target/peer profiles, dimension assessments and date-alignment rationale for B65. Local pilot invokes B65 after B64.
 - **No-change boundary:** B65 does not change SOTP or B4/B5/B6/B61/B62/B63/B64 calculations, MIE, expectation_gap, the 15% annualized hurdle, target entry price, portfolio constraints, Decision, formal evidence admission or execution authority.
-- **Regression coverage:** ten cases authored in \`tests/test_sotp_comparability_audit_v01.py\`. They have not been executed. Replay, CI, unified tests and Mac acceptance remain deferred.
+- **Regression coverage:** eleven cases authored in \`tests/test_sotp_comparability_audit_v01.py\`. They have not been executed. Replay, CI, unified tests and Mac acceptance remain deferred.
 
 
 ## B66 — SOTP terminal P/E independent calibration and sensitivity — 2026-10-31
@@ -3067,7 +3067,7 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 
 **Status: BRANCH PROPOSAL ONLY / NOT MERGED / NOT TESTED**
 
-- **Purpose:** consolidate B61–B66 into a read-only value-source structure and price-hurdle audit. B67 rechecks selected SOTP segment values, B63's B4 earnings contribution and Required Return waterfall, B66's reference-multiple plus explicit-adjustment value decomposition, parent-level adjustment arithmetic, and diluted-share translation.
+- **Purpose:** consolidate B61–B66 into a read-only value-source structure and price-hurdle audit. B67 rechecks selected SOTP segment values, B63's B4 earnings contribution and Required Return waterfall, B66's reference-multiple plus explicit-adjustment value decomposition, parent-level adjustment arithmetic, diluted-share translation, and each required common P/E under the B63 scale factor.
 - **Profit and multiple evidence:** B64 profit grade and multiple grade remain separate per segment. No combined score, probability, confidence value, evidence-weighted valuation discount or automatic multiple adjustment is created.
 - **Multiple value attribution:** B67 calculates profit × reference P/E and profit × explicit adjustment sum only when B66's bridge is reconciled and B67 independently reproduces it. Full-company totals require reference coverage for every segment; missing references remain PARTIAL, never zero.
 - **Current-price requirement:** reuses B63's selected SOTP pool → B4 earnings effect at fixed selected P/Es → B4 forecast pool → conditional common P/E scale effect → B61 Required Return pool. The result is price-implied Required Return without distributions, not external MIE or broker consensus.

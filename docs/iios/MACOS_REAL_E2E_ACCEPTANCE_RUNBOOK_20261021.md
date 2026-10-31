@@ -159,7 +159,7 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - B67 独立盈利贡献：B4 − selected SOTP normalized profit 是否仅按未改变的 selected P/E 计算；分部贡献是否闭合到 B63 earnings effect，且 selected pool + earnings effect = B4 forecast pool。
 - B67 倍数价值拆解：只在 B66 reference + explicit adjustment bridge 闭合且 B67 再复算通过时输出金额；全公司汇总要求所有分部均有参考锚，缺失参考不得当成零。
 - B67 证据等级：B64 profit G1–G5 与 multiple G4/G5 分别展示；不得合并成可信度总分、概率、置信区间或估值折扣。
-- B67 现价要求：selected pool → B4 earnings effect → B4 forecast pool → B63 common P/E scaling → B61 Required Return pool 应闭合；明确为不含分红的条件回报门槛反推，不是外部 MIE 或市场共识。
+- B67 现价要求：selected pool → B4 earnings effect → B4 forecast pool → B63 common P/E scaling → B61 Required Return pool 应闭合；逐分部 Required Common P/E 应等于本分部 selected P/E × common scale factor；明确为不含分红的条件回报门槛反推，不是外部 MIE 或市场共识。
 - B67 母公司/稀释：中心成本、净现金/净负债、其他调整的带符号合计应闭合；Required Equity 应等于 Required Per Share × Diluted Shares；无独立前瞻预测不得推定未来调整或股数变化。
 - B67 决策边界：不得改写 SOTP、B61–B66、15% 年化要求、目标入场价、MIE、expectation_gap、组合约束或 Decision；B67 不是 BUY/SELL 指令。
 

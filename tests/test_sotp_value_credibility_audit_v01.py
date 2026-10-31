@@ -159,6 +159,15 @@ def test_b67_is_not_applicable_when_sotp_is_not_selected():
     assert _run(data)["status"] == "NOT_APPLICABLE_SOTP_NOT_SELECTED_OR_CALCULATED"
 
 
+def test_b67_recalculates_each_required_common_pe_from_its_selected_pe_and_scale():
+    data = _fixtures()
+    data["valuation_gap_attribution"]["scenarios"]["base"]["multiple_attribution"]["required_common_pe_by_segment"][0]["required_pe_under_common_scale_x"] = "99"
+    result = _run(data)
+    base = result["scenarios"]["base"]
+    assert base["current_price_required_return"]["status"] == "RECONCILIATION_MISMATCH"
+    assert "B67_REQUIRED_COMMON_PE_SEGMENT_RECALCULATION_MISMATCH:SEG_A" in base["issues"]
+
+
 def test_b67_independently_rechecks_b66_multiple_bridge():
     data = _fixtures()
     data["multiple_calibration_assessment"]["scenarios"]["base"]["segments"][0]["explicit_selected_multiple_bridge"]["explicit_adjustment_sum_x"] = "3"
