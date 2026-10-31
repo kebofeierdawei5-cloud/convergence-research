@@ -304,3 +304,11 @@ def test_b71_requires_claim_preparer_and_reviewer_role():
     result = _run(raw, b70)
     assert "CLAIM_PREPARER_ID_REQUIRED" in result["reviews"][0]["issues"]
     assert "REVIEWER_ROLE_REQUIRED" in result["reviews"][0]["issues"]
+
+
+def test_b71_every_b70_source_reference_must_map_to_a_specific_check():
+    b70 = _b70(refs=["E1", "E2"])
+    raw, _ = _review(b70=b70)
+    result = _run(raw, b70)
+    assert result["reviews"][0]["status"] == "SEMANTIC_REVIEW_BLOCKED_OR_INCOMPLETE"
+    assert "REVIEWED_SOURCE_NOT_MAPPED_TO_ANY_SEMANTIC_CHECK:E2" in result["reviews"][0]["issues"]
