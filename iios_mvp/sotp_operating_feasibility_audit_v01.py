@@ -96,6 +96,7 @@ def _product_audit(
     product: Mapping[str, Any],
     b4_master: Mapping[str, Any],
     b4_scenario_product: Mapping[str, Any],
+    b4_scenario_capacity_status: Any,
     forecast_period: str,
 ) -> dict[str, Any]:
     product_id = _txt(product.get("product_id")) or "UNKNOWN"
@@ -213,9 +214,8 @@ def _product_audit(
         "required_capacity_utilization": _fmt(required_utilization),
         "remaining_nameplate_capacity_tonnes": _fmt(capacity_headroom),
         "capacity_status": capacity_status,
-        "current_b4_capacity_status": _txt(b4_scenario_product.get("capacity_feasibility_status"))
-        or _txt(b4_scenario_product.get("production_sales_balance_status"))
-        or "UNKNOWN",
+        "b4_capacity_feasibility_status": _txt(b4_scenario_capacity_status) or "UNKNOWN",
+        "b4_production_sales_balance_status": _txt(b4_scenario_product.get("production_sales_balance_status")) or "UNKNOWN",
         "required_net_asp_cny_per_tonne": _fmt(required_asp),
         "required_net_asp_change_pct": _fmt(asp_change_pct),
         "pricing_feasibility_status": pricing_status,
@@ -246,6 +246,7 @@ def _scenario_audit(
         "status": "NOT_IDENTIFIABLE",
         "b4_existing_financial_plan": {
             "inventory_reconciliation_status": _txt(b4_scenario.get("inventory_reconciliation_status")) or "UNKNOWN",
+            "capacity_feasibility_status": _txt(b4_scenario.get("capacity_feasibility_status")) or "UNKNOWN",
             "inventory_working_capital_treatment": _txt(b4_scenario.get("inventory_working_capital_treatment")) or "UNKNOWN",
             "effective_change_working_capital_cny": b4_scenario.get("effective_change_working_capital_cny"),
             "cash_capex_cny": b4_scenario.get("cash_capex_cny"),
@@ -289,6 +290,7 @@ def _scenario_audit(
                     product=product,
                     b4_master=master,
                     b4_scenario_product=b4_product,
+                    b4_scenario_capacity_status=b4_scenario.get("capacity_feasibility_status"),
                     forecast_period=forecast_period,
                 ))
             out["requirement_lenses"].append({
