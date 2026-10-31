@@ -6386,8 +6386,10 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             lines.append(
                 f"- 审核 {review.get('review_id') or 'UNKNOWN'} / 记录 {review.get('record_id')}："
                 f"{review.get('claim_type')} / {review.get('product_id')} / {review.get('scenario')} / {review.get('forecast_period')}；"
-                f"审核人 {review.get('reviewer_id')}；审核时间 {review.get('reviewed_at') or 'UNKNOWN'}；"
-                f"结论 {review.get('decision')}；状态 {review.get('status')}。"
+                f"编制人 {review.get('claim_preparer_id', 'UNKNOWN')}；审核人 {review.get('reviewer_id')} / {review.get('reviewer_role', 'UNKNOWN')}；"
+                f"关系 {review.get('reviewer_relationship_status', 'UNKNOWN')}；利益冲突 {review.get('conflict_of_interest_status', 'UNKNOWN')}；"
+                f"独立性声明满足={review.get('review_independence_conditionally_declared', False)}；"
+                f"审核时间 {review.get('reviewed_at') or 'UNKNOWN'}；结论 {review.get('decision')}；状态 {review.get('status')}。"
             )
             for check in (review.get("checks") or []):
                 if isinstance(check, Mapping):
