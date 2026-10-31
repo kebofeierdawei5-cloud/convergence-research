@@ -275,6 +275,12 @@ def _remediation(
             "核实有效产能、产品线映射、检修、良率、瓶颈、切换和爬坡；名义产能内不等于有效产能通过。",
             ["有效产能口径", "产线/产品映射与瓶颈", "预测期内有效产能及良率依据"],
         ),
+        "INVALID_NEGATIVE_REQUIRED_PRODUCTION": (
+            "RECONCILE_PRODUCTION_AND_INVENTORY_ARITHMETIC",
+            "OPERATIONS_OWNER_AND_RESEARCHER",
+            "核查所需销量、产销库存差额和生产口径；负数所需产量不能解释为可实现的经营能力。",
+            ["产量与销量的原始口径", "库存变动及库存政策依据", "重新核对后的非负所需产量"],
+        ),
         "NAMEPLATE_CAPACITY_CONSTRAINT": (
             "REMEDIATE_NAMEPLATE_CAPACITY_CONSTRAINT",
             "OPERATIONS_OWNER_AND_PROJECT_OWNER",
@@ -492,6 +498,8 @@ def _capacity_arithmetic_row(
     status = _txt(product.get("capacity_status")).upper()
     if status == "EXCEEDS_NAMEPLATE_CAPACITY":
         final_status = "NAMEPLATE_CAPACITY_CONSTRAINT"
+    elif status == "NOT_FEASIBLE_NEGATIVE_REQUIRED_PRODUCTION":
+        final_status = "INVALID_NEGATIVE_REQUIRED_PRODUCTION"
     elif status == "WITHIN_NAMEPLATE_CAPACITY_CONDITIONAL":
         final_status = "CONDITIONAL_NAMEPLATE_FIT_ONLY"
     else:
