@@ -158,6 +158,10 @@ def _review_one(
     review_id = _txt(review.get("review_id"))
     record_id = _txt(review.get("record_id"))
     reviewer_id = _txt(review.get("reviewer_id"))
+    claim_preparer_id = _txt(review.get("claim_preparer_id"))
+    reviewer_role = _txt(review.get("reviewer_role"))
+    independence_status = _txt(review.get("reviewer_relationship_status")).upper()
+    conflict_status = _txt(review.get("conflict_of_interest_status")).upper()
     reviewed_at, datetime_issue = _datetime(review.get("reviewed_at"))
     method = _txt(review.get("review_method")).upper()
     decision = _txt(review.get("decision")).upper()
@@ -183,6 +187,14 @@ def _review_one(
         issues.append("B70_RECORD_NOT_FOUND")
     if not reviewer_id:
         issues.append("REVIEWER_ID_REQUIRED")
+    if not claim_preparer_id:
+        issues.append("CLAIM_PREPARER_ID_REQUIRED")
+    if not reviewer_role:
+        issues.append("REVIEWER_ROLE_REQUIRED")
+    if independence_status not in {"INDEPENDENT_OF_CLAIM_PREPARER", "SAME_PERSON", "RELATED_PARTY", "UNKNOWN"}:
+        issues.append("REVIEWER_RELATIONSHIP_STATUS_INVALID")
+    if conflict_status not in {"NO_KNOWN_CONFLICT", "CONFLICT_DISCLOSED", "UNKNOWN"}:
+        issues.append("CONFLICT_OF_INTEREST_STATUS_INVALID")
     if datetime_issue:
         issues.append(datetime_issue)
     if method != "HUMAN_SOURCE_CONTENT_REVIEW":
@@ -292,6 +304,12 @@ def _review_one(
         status = "SEMANTIC_REVIEW_UNABLE_TO_VERIFY"
     elif decision == "PARTIALLY_SUPPORTS":
         status = "SEMANTIC_REVIEW_PARTIAL"
+    elif decision == "SUPPORTS" and (
+        reviewer_id == claim_preparer_id
+        or independence_status != "INDEPENDENT_OF_CLAIM_PREPARER"
+        or conflict_status != "NO_KNOWN_CONFLICT"
+    ):
+        status = "SEMANTIC_REVIEW_INDEPENDENCE_UNRESOLVED"
     elif any_failed and decision == "SUPPORTS":
         status = "SEMANTIC_REVIEW_CHECK_FAILURE_CONFLICTS_WITH_SUPPORT_DECISION"
     elif any_failed:
@@ -309,6 +327,15 @@ def _review_one(
         "scenario": _txt(_map(b70_record).get("scenario")) or "UNKNOWN",
         "forecast_period": _txt(_map(b70_record).get("forecast_period")) or "UNKNOWN",
         "reviewer_id": reviewer_id or "UNKNOWN",
+        "claim_preparer_id": claim_preparer_id or "UNKNOWN",
+        "reviewer_role": reviewer_role or "UNKNOWN",
+        "reviewer_relationship_status": independence_status or "UNKNOWN",
+        "conflict_of_interest_status": conflict_status or "UNKNOWN",
+        "review_independence_conditionally_declared": (
+            bool(reviewer_id and claim_preparer_id and reviewer_id != claim_preparer_id
+                 and independence_status == "INDEPENDENT_OF_CLAIM_PREPARER"
+                 and conflict_status == "NO_KNOWN_CONFLICT")
+        ),
         "reviewed_at": reviewed_at,
         "review_time_is_pit_evidence": False,
         "review_method": method or "UNKNOWN",
@@ -345,7 +372,7 @@ def build_operating_feasibility_semantic_review(
         "formal_evidence_pit_admission_created": False,
         "decision_authority": False,
         "limitations": [
-            "B71 记录人工审核声明和逐项检查结果，不验证审核人真实身份、独立性、利益冲突或本机是否实际打开原始材料。",
+            "B71 记录人工审核声明和逐项检查结果；审核人/主张编制人分离与无已知利益冲突只是声明，不验证真实身份、组织关系、独立性或本机是否实际打开原始材料。",
             "自动程序不能证明合同法律效力、订单不重叠、客户真实性、净售价可实现、成本项目可执行或资金无抵押/重复占用；这些需要人工查看原始材料并承担审核责任。",
             "只有 B70 已通过来源引用和 PIT 时间初检的记录才允许进行语义审核；B71 不修复 B70 的缺失来源或时间问题。",
             "语义审核结果仍不是正式 Evidence/PIT admission、预测准入、估值准入或投资决策。",
