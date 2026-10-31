@@ -82,7 +82,10 @@ def _records_for_claim(
         candidates: list[Mapping[str, Any]] = []
         if record_ids:
             for record_id in record_ids:
-                candidates.extend(by_id.get(record_id, []))
+                candidates.extend(
+                    row for row in by_id.get(record_id, [])
+                    if _txt(row.get("claim_type")).upper() == claim_type
+                )
         if not candidates:
             candidates.extend(
                 by_key.get((scenario, product_id, period, claim_type), [])
