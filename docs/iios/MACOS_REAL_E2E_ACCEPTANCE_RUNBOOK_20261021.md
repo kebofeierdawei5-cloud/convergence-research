@@ -187,7 +187,7 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - B70 治理：报告是否保留每条 record/status/evidence_refs；数值覆盖仅为链接主张的算术比较，不等于来源内容语义独立核实；overall operational feasibility 不得自动升级为 PASS，不得影响 Decision、估值或投资权限。
 
 - B71 审核记录：每条人工审核是否精确绑定一个 B70 record_id，具备唯一 review_id、claim_preparer_id、reviewer_id/role、reviewer_relationship_status、conflict_of_interest_status、带时区 reviewed_at、HUMAN_SOURCE_CONTENT_REVIEW 方法、决策、review_notes，以及与 B70 完全一致的 reviewed_evidence_refs；同一人自审、相关方或利益冲突未明确解决时，不得标记条件性支持。
-- B71 清单完整性：每种 claim_type/data_class 是否加载对应必检清单；缺失、未知、重复或多出的 check_id 是否阻断支持；PASS 是否具备原始来源引用；必检项是否被错误标记 NOT_APPLICABLE。
+- B71 清单完整性：每种 claim_type/data_class 是否加载对应必检清单；缺失、未知、重复或多出的 check_id 是否阻断支持；PASS 是否具备原始来源引用；B70 每个来源是否至少映射一条具体检查；必检项是否被错误标记 NOT_APPLICABLE。
 - B71 销量语义：ISSUER_FORECAST 是否核对 firm order/取消权/客户/交付期/重复订单；OBSERVED_ACTUAL 是否核对发票、发货和客户验收数量，而非把订单当成已实现销售。
 - B71 净售价语义：实际开票净价是否扣除折扣返利、红字/贷项、税费与运费；未来预测是否有合同价格条款、返利条件和量价组合支持；不能把产品 mix 当作可比价格上涨。
 - B71 单位成本语义：实际成本是否复核成本项目和分摊基线；发行人预测降本是否有明确项目、负责人、执行里程碑、良率/能源/投入基础；单纯降本目标不能算支持。
