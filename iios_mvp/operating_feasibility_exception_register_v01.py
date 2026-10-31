@@ -174,7 +174,10 @@ def _evidence_state(
     data_classes = {_txt(row.get("data_class")).upper() for row in records}
     if scope_mismatch:
         return "EVIDENCE_RECORD_SCOPE_MISMATCH"
-    if ambiguous or status == "AMBIGUOUS_DUPLICATE_CLAIMS_NOT_SUMMED":
+    if ambiguous or status in {
+        "AMBIGUOUS_DUPLICATE_CLAIMS_NOT_SUMMED",
+        "AMBIGUOUS_B70_PRODUCT_LENS_MATCH",
+    }:
         return "AMBIGUOUS_DUPLICATE_CLAIMS_NOT_SUMMED"
     if "ANALYST_ASSUMPTION" in data_classes:
         return "ANALYST_ASSUMPTION_ONLY_NOT_CORROBORATION"
@@ -675,24 +678,50 @@ def build_operating_feasibility_exception_register(
         for b69_lens in b69_lenses:
             lens_name = _txt(b69_lens.get("lens")) or "UNKNOWN"
             segment_id = _txt(b69_lens.get("segment_id")) or "UNKNOWN"
-            b70_lens_matches = [
-                row for row in b70_lenses
-                if _txt(row.get("lens")) == lens_name
-                and _txt(row.get("segment_id")) == segment_id
+            # B70's current public assessment contract does not emit segment_id
+            # on requirement_lenses. Join through its actual stable keys:
+            # lens + product_id. A non-unique product match is explicitly blocked.
+            b70_lens_candidates = [
+                row for row in b70_lenses if _txt(row.get("lens")) == lens_name
             ]
-            b70_lens = b70_lens_matches[0] if len(b70_lens_matches) == 1 else {}
-            b70_products = {
-                _txt(row.get("product_id")): row
-                for row in _rows(b70_lens.get("products"))
-                if _txt(row.get("product_id"))
-            }
             products_out: list[dict[str, Any]] = []
             lens_rows: list[Mapping[str, Any]] = []
             for b69_product in _rows(b69_lens.get("products")):
                 product_id = _txt(b69_product.get("product_id")) or "UNKNOWN"
-                b70_product = _map(b70_products.get(product_id))
+                b70_product_matches = [
+                    product_row
+                    for lens_row in b70_lens_candidates
+                    for product_row in _rows(lens_row.get("products"))
+                    if _txt(product_row.get("product_id")) == product_id
+                ]
+                b70_product_ambiguous = len(b70_product_matches) > 1
+                b70_product = (
+                    _map(b70_product_matches[0])
+                    if len(b70_product_matches) == 1 else {}
+                )
                 product_rows: list[dict[str, Any]] = []
-                for comparison in _rows(b70_product.get("comparisons")):
+                comparisons = _rows(b70_product.get("comparisons"))
+                if b70_product_ambiguous:
+                    comparisons = [
+                        {"claim_type": claim_type, "status": "AMBIGUOUS_B70_PRODUCT_LENS_MATCH"}
+                        for claim_type in (
+                            "SUPPORTED_SALES_VOLUME",
+                            "SUPPORTED_NET_ASP",
+                            "SUPPORTED_UNIT_VARIABLE_COST",
+                            "EFFECTIVE_CAPACITY_AVAILABLE",
+                        )
+                    ]
+                elif not b70_product_matches:
+                    comparisons = [
+                        {"claim_type": claim_type, "status": "EVIDENCE_NOT_PROVIDED"}
+                        for claim_type in (
+                            "SUPPORTED_SALES_VOLUME",
+                            "SUPPORTED_NET_ASP",
+                            "SUPPORTED_UNIT_VARIABLE_COST",
+                            "EFFECTIVE_CAPACITY_AVAILABLE",
+                        )
+                    ]
+                for comparison in comparisons:
                     claim_type = _txt(comparison.get("claim_type")).upper() or "UNKNOWN"
                     if claim_type not in _CLAIM_UNITS:
                         continue
