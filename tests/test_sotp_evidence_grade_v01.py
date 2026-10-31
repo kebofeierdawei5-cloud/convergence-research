@@ -84,6 +84,9 @@ def _fixtures():
                 "support_type": "COMPARABLE_MULTIPLES",
                 "support_summary": "Two dated peers are recorded as reference observations, not as proof of fair value.",
                 "support_evidence_refs": ["E2", "E5"],
+                "target_comparability_profile": {
+                    "business_model": "Industrial valve design and manufacture",
+                },
                 "comparable_observations": [
                     {
                         "entity": "Peer A",
@@ -91,6 +94,9 @@ def _fixtures():
                         "observed_pe_x": "11",
                         "evidence_ref": "E2",
                         "comparability_adjustment": "Peer has lower recurring service revenue and lower ROIC.",
+                        "date_alignment_rationale": "Historical reference date is retained for structural pass-through coverage.",
+                        "peer_comparability_profile": {"business_model": "Industrial valve manufacturing"},
+                        "dimension_assessments": {"business_model": {"comparison": "DIFFERENT"}},
                     },
                     {
                         "entity": "Peer B",
@@ -181,6 +187,12 @@ def test_b64_distinguishes_disclosure_linked_profit_and_multiple_assumption():
     assert segments["seg_a"]["profit_evidence_assessment"]["grade"] == "G1_DISCLOSURE_LINKED_TO_PROFIT"
     assert segments["seg_a"]["multiple_evidence_assessment"]["grade"] == "G4_MULTIPLE_ASSUMPTION_ONLY"
     assert segments["seg_a"]["multiple_evidence_assessment"]["comparable_set_status"] == "COMPARABLE_SET_CAPTURED_NOT_INDEPENDENTLY_VERIFIED"
+    multiple = segments["seg_a"]["multiple_evidence_assessment"]
+    assert multiple["target_comparability_profile"]["business_model"] == "Industrial valve design and manufacture"
+    peer_a = next(row for row in multiple["comparable_observations"] if row["entity"] == "Peer A")
+    assert peer_a["peer_comparability_profile"]["business_model"] == "Industrial valve manufacturing"
+    assert peer_a["dimension_assessments"]["business_model"]["comparison"] == "DIFFERENT"
+    assert peer_a["date_alignment_rationale"] == "Historical reference date is retained for structural pass-through coverage."
     assert result["sotp_input_modified"] is False
     assert result["valuation_values_modified"] is False
     assert result["external_mie_modified"] is False

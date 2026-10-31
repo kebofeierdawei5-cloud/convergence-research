@@ -335,12 +335,17 @@ def _grade_multiple_measure(
                     issues.append(f"COMPARABLE_REFERENCE_NOT_CUTOFF_COMPATIBLE:{index}")
                     continue
                 seen_entities.add(entity)
+                peer_profile = row.get("peer_comparability_profile")
+                dimensions = row.get("dimension_assessments")
                 validated_comparables.append({
                     "entity": entity,
                     "as_of_date": as_of,
                     "observed_pe_x": format(multiple, "f"),
                     "evidence_ref": evidence_ref,
                     "comparability_adjustment": adjustment,
+                    "date_alignment_rationale": _text(row.get("date_alignment_rationale")) or None,
+                    "peer_comparability_profile": dict(peer_profile) if isinstance(peer_profile, Mapping) else None,
+                    "dimension_assessments": dict(dimensions) if isinstance(dimensions, Mapping) else None,
                 })
             if len(validated_comparables) >= 2 and len(seen_entities) >= 2:
                 comparable_status = "COMPARABLE_SET_CAPTURED_NOT_INDEPENDENTLY_VERIFIED"
@@ -385,6 +390,10 @@ def _grade_multiple_measure(
         "support_summary": _text(support.get("support_summary")) or "UNKNOWN",
         "support_evidence_refs": support_refs,
         "support_evidence_audit": support_audit,
+        "target_comparability_profile": (
+            dict(support.get("target_comparability_profile"))
+            if isinstance(support.get("target_comparability_profile"), Mapping) else None
+        ),
         "comparable_set_status": comparable_status,
         "comparable_observations": validated_comparables,
         "issues": sorted(set(issues)),

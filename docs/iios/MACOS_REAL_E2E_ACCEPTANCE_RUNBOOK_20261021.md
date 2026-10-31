@@ -138,6 +138,13 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - B63 若任一 SOTP/B61/B62 股数、母公司调整、分部价值池、期间或每股值交叉复算不一致，须标记 RECONCILIATION_MISMATCH，不得输出“归因通过”。
 - B61 单变量盈利要求不得相加；它是假设其他分部利润不变的替代敏感性。只有 B62 全分部 B4 预测价值池才代表多个分部同时变化的情景结果。若无独立前瞻母公司成本/净现金/其他调整预测，不得给这些因素虚构变化金额。
 - 报告/analysis.json/Replay 应同时保留 B4 分部利润桥、SOTP earnings_basis、B61 要求、B62 比较与所有 UNKNOWN/NOT_COMPARABLE 标记；不允许以 B62 诊断结果反向覆盖 SOTP 主估值、外部 MIE、expectation_gap、B5/B6 或 Decision。
+- B64 证据等级：利润输入 G1/G2 是否只被解释为“结构化披露/机制关联”，没有被宣称为已核实原始证据；G3 分析师盈利假设、G4 P/E 假设是否分开显示；G5 是否保留 UNKNOWN；不得把两个等级合并成综合评分。
+- B65 同行可比性：每个 SOTP 分部是否逐同行提供 13 项画像（商业模式、收入结构、终端客户、成长阶段、行业周期、利润质量、ROIC、资本强度、杠杆、FCF 转换、会计口径、盈利期间、P/E 口径）；target_value/peer_value 是否与双方画像逐项一致。
+- B65 差异处理：SIMILAR 是否仅标 NEUTRAL + NO_NUMERIC_ADJUSTMENT；DIFFERENT 是否有定性方向、调整处理与理由；NOT_COMPARABLE 是否明确排除；UNKNOWN/缺少证据是否不能被计为已完成可比同行。
+- B65 估值时点：同行估值日期是否不晚于案例截止日；较早日期是否提供 date_alignment_rationale；TTM/NTM/正常化 P/E 是否明确区分，不能混合后直接取平均。
+- B65 证据链接：每个比较维度的 evidence_refs 是否属于该 P/E measure 自身 evidence_refs，来源是否存在且时间兼容；时间兼容不得被误称为正式证据准入。
+- B65 同行集合：至少两家不同同行均通过全部 13 维度且未被排除，才可标记 COMPARABILITY_REVIEW_COMPLETE_NOT_VALUATION_APPROVED；同行不足、差异未解释或资料缺失时保持 PEER_SET_INSUFFICIENTLY_COMPARABLE / PARTIAL。
+- B65 决策边界：TARGET_PREMIUM/TARGET_DISCOUNT 仅是相对方向判断；不得将差异相加、生成数值溢价/折价、同行平均 P/E 或新的终值 P/E；analysis.json 与报告中的 selected P/E 必须与 B63 输入保持不变。
 
 ## 9. 已发生故障与防重复清单
 

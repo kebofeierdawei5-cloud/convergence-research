@@ -35,6 +35,7 @@ from .cycle_earnings_monitor_v01 import (
 from .sotp_valuation_v01 import evaluate_sotp_valuation, render_sotp_valuation_section
 from .sotp_valuation_gap_attribution_v01 import build_sotp_valuation_gap_attribution
 from .sotp_evidence_grade_v01 import build_sotp_evidence_grade_assessment
+from .sotp_comparability_audit_v01 import build_sotp_comparability_audit
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
     evaluate_valuation_transmission,
@@ -5944,6 +5945,85 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             "不合并成综合分、不参与估值加权，也不自动改变估值、MIE 或 Decision。"
         )
 
+    local_b65_audit = local_sotp_inversion.get("comparable_company_audit") if isinstance(local_sotp_inversion.get("comparable_company_audit"), Mapping) else {}
+    if local_b65_audit:
+        lines.extend([
+            "",
+            "- **B65 SOTP 可比公司可比性审计**："
+            + f"{local_b65_audit.get('status', 'UNKNOWN')}；"
+            + f"估值观察截止日 {local_b65_audit.get('valuation_as_of_date', 'UNKNOWN')}。",
+            "- 逐项审计业务模式/收入结构/终端市场、成长阶段/周期、利润质量、ROIC/资本强度、杠杆、现金流转换、会计口径和盈利/估值期间；"
+            "不计算数值溢价/折价，不自动修改终值 P/E。",
+        ])
+        b65_scenarios = local_b65_audit.get("scenarios") if isinstance(local_b65_audit.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b65_row = b65_scenarios.get(scenario_name) if isinstance(b65_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B65 {scenario_name.upper()} — {b65_row.get('status', 'UNKNOWN')}**")
+            for segment in (b65_row.get("segments") or [])[:20]:
+                if not isinstance(segment, Mapping):
+                    continue
+                lines.append(
+                    f"- {segment.get('segment_id')} / {segment.get('segment_name')}："
+                    f"选定 P/E {segment.get('selected_terminal_pe_x') or 'UNKNOWN'}x 保持不变；"
+                    f"候选同行 {segment.get('candidate_peer_count', 0)} 家；"
+                    f"完整可比 {segment.get('eligible_peer_count', 0)} 家；"
+                    f"排除 {segment.get('excluded_peer_count', 0)} 家；"
+                    f"待补资料 {segment.get('partial_peer_count', 0)} 家；"
+                    f"审计状态 {segment.get('peer_set_status', 'UNKNOWN')}。"
+                )
+                for peer in (segment.get("peers") or [])[:10]:
+                    if not isinstance(peer, Mapping):
+                        continue
+                    lines.append(
+                        f"  - 同行 {peer.get('entity')}｜P/E {peer.get('observed_pe_x')}x｜"
+                        f"估值日期 {peer.get('as_of_date')}｜距案例截止 {peer.get('days_before_case_cutoff')} 天｜"
+                        f"{peer.get('status')}。"
+                    )
+                    directions = peer.get("directional_dimension_summary") if isinstance(peer.get("directional_dimension_summary"), Mapping) else {}
+                    premium = directions.get("target_premium_dimensions") or []
+                    discount = directions.get("target_discount_dimensions") or []
+                    neutral = directions.get("neutral_dimensions") or []
+                    if premium or discount or neutral:
+                        lines.append(
+                            f"    - 定性差异：目标公司可能溢价维度 {', '.join(premium) or '无'}；"
+                            f"可能折价维度 {', '.join(discount) or '无'}；"
+                            f"中性维度 {', '.join(neutral) or '无'}。"
+                        )
+                    missing = peer.get("unknown_dimensions") or []
+                    excluded = peer.get("excluded_dimensions") or []
+                    if missing or excluded:
+                        lines.append(
+                            f"    - UNKNOWN 维度：{', '.join(missing) or '无'}；"
+                            f"不可比维度：{', '.join(excluded) or '无'}。"
+                        )
+                    dimension_review = peer.get("dimension_review") if isinstance(peer.get("dimension_review"), list) else []
+                    non_similar = [
+                        item for item in dimension_review
+                        if isinstance(item, Mapping) and item.get("comparison") != "SIMILAR"
+                    ]
+                    if not non_similar and dimension_review:
+                        lines.append(f"    - 其余 {len(dimension_review)} 项维度均被声明为 SIMILAR；仅代表结构化判断完整，不代表独立事实核验。")
+                    for dimension in non_similar:
+                        lines.append(
+                            f"    - 维度 {dimension.get('dimension')}："
+                            f"{dimension.get('comparison')}；目标={dimension.get('target_value')}；"
+                            f"同行={dimension.get('peer_value')}；"
+                            f"定性方向={dimension.get('target_multiple_implication')}；"
+                            f"处理={dimension.get('multiple_adjustment_treatment')}。"
+                        )
+                        lines.append(
+                            f"      判断依据：{dimension.get('rationale') or 'UNKNOWN'}；"
+                            f"调整依据：{dimension.get('adjustment_rationale') or 'UNKNOWN'}。"
+                        )
+                    if peer.get("issues"):
+                        lines.append("    - 核查事项：" + "；".join(str(item) for item in peer["issues"][:6]))
+                if segment.get("issues"):
+                    lines.append("  - 分部可比性阻断/待补：" + "；".join(str(item) for item in segment["issues"][:10]))
+        lines.append(
+            "- B65 边界：TARGET_PREMIUM / TARGET_DISCOUNT 只是定性方向判断；不将维度差异相加、不产生数值 P/E 调整系数，"
+            "不自动筛选同行或改写 SOTP 估值。可比性审计通过只代表资料结构完整，不代表同行选择或估值合理性已获验证。"
+        )
+
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
@@ -6614,6 +6694,12 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         sotp_valuation=prepared.get("sotp_valuation") or {},
         evidence_register=prepared.get("evidence_register") or [],
         valuation_gap_attribution=local_sotp_inversion.get("valuation_gap_attribution") or {},
+    )
+    case_context = prepared.get("case") if isinstance(prepared.get("case"), Mapping) else {}
+    local_sotp_inversion["comparable_company_audit"] = build_sotp_comparability_audit(
+        evidence_grade_assessment=local_sotp_inversion.get("evidence_grade_assessment") or {},
+        evidence_register=prepared.get("evidence_register") or [],
+        valuation_as_of_date=case_context.get("as_of_date"),
     )
     source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion
@@ -7320,6 +7406,11 @@ def create_pilot_template(
         "sotp_valuation.forecast_period 必须与 operating_driver_forecast.forecast_period 一致，valuation_terminal_date 必须与 forecast_valuation.valuation_terminal_date 一致。数值、证据、期间、分部集合或 Bear≤Base≤Bull 任一项不成立时，不要在 forecast_valuation 中用手填每股终值冒充已计算 SOTP；保留缺口，系统会阻断回报、目标入场价与 B6。"
         "此 SOTP 算术仍为 PILOT_NON_CANONICAL，并不代表正式证据或估值准入。B5 的 EPS_MULTIPLE 增量适配器不能用于 SOTP。"
         "【B64 证据分级字段】每个分部 attributable_net_profit_cny 与 pe_multiple_x measure 均应另附 support_assessment 对象，包含 support_type、support_summary、support_evidence_refs、mechanism_chain、key_operating_indicators、derivation_steps、counter_evidence_refs、reversal_signals、comparable_observations。利润 support_type 只允许 DISCLOSED_FACTS、ISSUER_GUIDANCE、BUSINESS_MECHANISM、ANALYST_DERIVATION、UNKNOWN；P/E support_type 只允许 COMPARABLE_MULTIPLES、PURE_MULTIPLE_ASSUMPTION、UNKNOWN。support_evidence_refs 必须是该 measure 自身 evidence_refs 的子集；不可把泛行业材料冒充直接支持某一分部利润。DISCLOSED_FACTS/ISSUER_GUIDANCE 要写清具体事实/指引及如何连接到该利润输入；BUSINESS_MECHANISM 至少列出 2 个因果环节、1 个可观测经营指标、1 个反转/证伪信号，并引用时点兼容的证据；ANALYST_DERIVATION 写明推导步骤；不能识别就明确 UNKNOWN，不要编造。counter_evidence_refs 应指向反证来源；若没有找到，说明检索范围和缺口，不要虚构。P/E 可比样本每条包含 entity、as_of_date、observed_pe_x、evidence_ref、comparability_adjustment；至少两家不同对象才形成候选可比组。即使有可比组，所选终值 P/E 仍是分析师估值假设，不代表公平价值。此标注仅用于 B64 结构化审计；来源内容、因果关系、可比性均需人工核查，不能将 G1/G2 宣称为正式证据准入。"
+        "【B65 同行可比性画像】P/E measure 的 support_assessment 另提供 target_comparability_profile，包含 13 个维度：business_model、revenue_mix、end_market_customer、growth_stage、cycle_phase、profit_quality、roic、capital_intensity、leverage、cash_flow_conversion、accounting_basis、earnings_reference_period、pe_measurement_basis。每个维度使用可识别的简短描述或数值区间，不知道时写 UNKNOWN，不得编造目标公司资料。"
+        "每个 comparable_observations 元素除 B64 原有字段外，提供 peer_comparability_profile（同样 13 个维度）、date_alignment_rationale（同行估值观察日期早于案例截止日时，说明时点差异为何仍可用/如何重估）和 dimension_assessments 对象；dimension_assessments 必须逐一包含全部 13 个维度。"
+        "每个维度对象必须包含 target_value、peer_value、comparison（SIMILAR/DIFFERENT/NOT_COMPARABLE/UNKNOWN）、target_multiple_implication（TARGET_PREMIUM/TARGET_DISCOUNT/NEUTRAL/UNKNOWN）、multiple_adjustment_treatment（SELECTED_PE_ADJUSTED/NO_NUMERIC_ADJUSTMENT/PEER_EXCLUDED/UNKNOWN）、rationale、adjustment_rationale、evidence_refs。target_value 与 peer_value 必须与两边画像对应维度一致。"
+        "SIMILAR 只能标 NEUTRAL + NO_NUMERIC_ADJUSTMENT；DIFFERENT 必须解释差异，并说明所选 P/E 是否已考虑（SELECTED_PE_ADJUSTED）或未量化调整（NO_NUMERIC_ADJUSTMENT）；NOT_COMPARABLE 必须标 PEER_EXCLUDED，不得留在有效可比样本集合。TARGET_PREMIUM/TARGET_DISCOUNT 表示目标分部相对该同行的定性方向，不是数值调整。dimension evidence_refs 必须引用 P/E measure 自身 evidence_refs 中的截止时点兼容来源。"
+        "同行 observed_pe_x 必须解释是 TTM/NTM/正常化等哪一种口径；同行 as_of_date 不得晚于案例 cutoff，早于 cutoff 必须有 date_alignment_rationale。业务模式、收入结构、终端市场、成长、周期、利润质量、ROIC、资本强度、杠杆、FCF 转换、会计与期间定义缺资料则标 UNKNOWN。不要把不相同的会计或盈利口径简单并列。B65 只审计画像完整性、差异、证据引用和时间一致性，不会自动选择同行、计算溢价/折价、做 P/E 数值调整或改变 SOTP 估值。"
     )
     driver_instructions = (
         "\n\n经营驱动因素树要求（IIOS-OPERATING-DRIVER-FORECAST-0.1）："

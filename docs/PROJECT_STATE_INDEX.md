@@ -3031,3 +3031,18 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Placement:** new module \`iios_mvp/sotp_evidence_grade_v01.py\`; nested output at \`assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.evidence_grade_assessment\`. The report displays grade-by-segment after B63.
 - **No-change boundary:** B64 does not alter SOTP values/P/Es, B4/B5/B6, B61/B62/B63 arithmetic, external MIE, expectation_gap, the 15% annualized hurdle, target entry price, portfolio constraints, Decision, formal admission or execution authority.
 - **Regression coverage:** nine cases authored in \`tests/test_sotp_evidence_grade_v01.py\`, including all five grades, reference-subset control, peer-observation boundary, B63 blocker and SOTP-adapter metadata preservation. They have not been executed. Replay, CI, unified tests and Mac acceptance remain deferred.
+
+
+## B65 — SOTP peer comparability audit — 2026-10-31
+
+**Status: BRANCH PROPOSAL ONLY / NOT MERGED / NOT TESTED**
+
+- **Purpose:** move beyond the existence of two or more peer P/E observations and audit whether each peer has comparable business economics, earnings quality, capital returns, capital structure, cash conversion, accounting scope and valuation timing.
+- **Thirteen dimensions:** business model; revenue mix; end market/customer mix; growth stage; cycle phase; profit quality; ROIC; capital intensity; leverage; FCF conversion; accounting basis; earnings reference period; and P/E measurement basis (TTM/NTM/normalized).
+- **Dimension contract:** every peer must provide target and peer values plus SIMILAR/DIFFERENT/NOT_COMPARABLE/UNKNOWN, a qualitative target-multiple implication, an adjustment treatment, rationale and cutoff-compatible evidence refs. Similar must be neutral/no numeric adjustment; different requires an explained directional view and explicit treatment; NOT_COMPARABLE must be excluded; UNKNOWN cannot count as complete.
+- **Valuation-date controls:** peer observations after the case cutoff are blocked. Earlier observations require an explicit date-alignment/rebase rationale. Accounting and earnings-period bases are compared explicitly rather than silently mixing TTM reported, NTM forecast and normalized P/E.
+- **Peer-set status:** at least two distinct peers must pass all dimensions and not be excluded before the candidate peer set can be labelled COMPARABILITY_REVIEW_COMPLETE_NOT_VALUATION_APPROVED. Fewer than two is PEER_SET_INSUFFICIENTLY_COMPARABLE; missing or conflicting dimensions remain PARTIAL.
+- **No mechanical multiple adjustment:** directional target premium/discount labels remain qualitative. No peer mean/median, numerical premium, adjustment coefficient or selected P/E change is produced. The selected terminal multiple remains unchanged.
+- **Placement:** new module \`iios_mvp/sotp_comparability_audit_v01.py\`; nested output at \`assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.comparable_company_audit\`. B64 preserves target/peer profiles, dimension assessments and date-alignment rationale for B65. Local pilot invokes B65 after B64.
+- **No-change boundary:** B65 does not change SOTP or B4/B5/B6/B61/B62/B63/B64 calculations, MIE, expectation_gap, the 15% annualized hurdle, target entry price, portfolio constraints, Decision, formal evidence admission or execution authority.
+- **Regression coverage:** ten cases authored in \`tests/test_sotp_comparability_audit_v01.py\`. They have not been executed. Replay, CI, unified tests and Mac acceptance remain deferred.
