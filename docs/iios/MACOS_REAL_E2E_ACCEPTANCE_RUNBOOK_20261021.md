@@ -186,6 +186,14 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - B70 增量资金：INCREMENTAL_CAPEX_REQUIRED / FUNDED 与 INCREMENTAL_WORKING_CAPITAL_REQUIRED / FUNDED 是否分别配对；comparison_basis 是否明确为 INCREMENTAL_TO_B4_FORWARD_PLAN；不得把 B4 既有资本开支/WC 冒充增量资金。
 - B70 治理：报告是否保留每条 record/status/evidence_refs；数值覆盖仅为链接主张的算术比较，不等于来源内容语义独立核实；overall operational feasibility 不得自动升级为 PASS，不得影响 Decision、估值或投资权限。
 
+- B71 审核记录：每条人工审核是否精确绑定一个 B70 record_id，具备唯一 review_id、reviewer_id、带时区 reviewed_at、HUMAN_SOURCE_CONTENT_REVIEW 方法、决策、review_notes，以及与 B70 完全一致的 reviewed_evidence_refs。
+- B71 清单完整性：每种 claim_type/data_class 是否加载对应必检清单；缺失、未知、重复或多出的 check_id 是否阻断支持；PASS 是否具备原始来源引用；必检项是否被错误标记 NOT_APPLICABLE。
+- B71 销量语义：ISSUER_FORECAST 是否核对 firm order/取消权/客户/交付期/重复订单；OBSERVED_ACTUAL 是否核对发票、发货和客户验收数量，而非把订单当成已实现销售。
+- B71 净售价语义：实际开票净价是否扣除折扣返利、红字/贷项、税费与运费；未来预测是否有合同价格条款、返利条件和量价组合支持；不能把产品 mix 当作可比价格上涨。
+- B71 单位成本语义：实际成本是否复核成本项目和分摊基线；发行人预测降本是否有明确项目、负责人、执行里程碑、良率/能源/投入基础；单纯降本目标不能算支持。
+- B71 产能/扩建/资金：是否区分名义与有效产能；审核检修、良率、瓶颈、共享产线；扩产是否核验许可、建设、设备、试车、验收与合格产品爬坡；增量资本开支/WC 是否相对 B4 前瞻计划明确增量且排除重复占用。
+- B71 审核结果：SUPPORTS 只有必检项全部 PASS 且来源引用完整才可标条件性支持；CONTRADICTS、DOES_NOT_SUPPORT、PARTIALLY_SUPPORTS、UNABLE_TO_VERIFY 应分别呈现；SUPPORTS 与 FAIL 并存必须阻断。
+- B71 反冒充：reviewer_id/审核时间/审核结论均为记录的人工声明，不等于身份、独立性、源文件内容或法律效力已自动验证；overall operational feasibility 不得升级为 PASS，也不得创建正式 Evidence/PIT/Forecast/Valuation admission 或 Decision 权限。
 ## 9. 已发生故障与防重复清单
 
 | 历史故障 | 当前防护 | 遇到时该怎么做 |
