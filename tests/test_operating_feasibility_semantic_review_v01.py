@@ -27,8 +27,8 @@ def _b70(claim_type="SUPPORTED_SALES_VOLUME", data_class="ISSUER_FORECAST", reco
 def _review(b70=None, *, decision="SUPPORTS", checks=None, refs=None, reviewed_at="2026-10-31T10:00:00+08:00", method="HUMAN_SOURCE_CONTENT_REVIEW", reviewer_id="analyst-01", review_id="RV1", record_id="R1"):
     claim = _b70() if b70 is None else b70
     row = claim["records"][0]
-    from iios_mvp.operating_feasibility_semantic_review_v01 import _REQUIRED_CHECKS
-    required = _REQUIRED_CHECKS.get(row["claim_type"], ())
+    from iios_mvp.operating_feasibility_semantic_review_v01 import _requirements
+    required = _requirements(row["claim_type"], row["data_class"])
     normalized_checks = checks if checks is not None else [
         {
             "check_id": check_id,
@@ -245,3 +245,33 @@ def test_b71_unknown_b70_claim_type_cannot_be_semantically_approved():
     result = _run(raw, b70)
     assert result["reviews"][0]["status"] == "SEMANTIC_REVIEW_BLOCKED_OR_INCOMPLETE"
     assert "B70_CLAIM_TYPE_HAS_NO_SEMANTIC_REVIEW_CHECKLIST" in result["reviews"][0]["issues"]
+
+
+def test_b71_future_sales_claim_requires_firm_order_and_cancellation_review():
+    b70 = _b70(claim_type="SUPPORTED_SALES_VOLUME", data_class="ISSUER_FORECAST")
+    raw, _ = _review(b70=b70)
+    ids = [item["check_id"] for item in raw["reviews"][0]["checks"]]
+    assert "FIRM_ORDER_AND_CANCELLATION_RIGHTS_VERIFIED" in ids
+    assert "INVOICED_SHIPPED_AND_CUSTOMER_ACCEPTED_QUANTITY_RECONCILED" not in ids
+
+
+def test_b71_observed_sales_claim_requires_invoice_shipment_and_acceptance_review():
+    b70 = _b70(claim_type="SUPPORTED_SALES_VOLUME", data_class="OBSERVED_ACTUAL")
+    raw, _ = _review(b70=b70)
+    ids = [item["check_id"] for item in raw["reviews"][0]["checks"]]
+    assert "INVOICED_SHIPPED_AND_CUSTOMER_ACCEPTED_QUANTITY_RECONCILED" in ids
+    assert "FIRM_ORDER_AND_CANCELLATION_RIGHTS_VERIFIED" not in ids
+
+
+def test_b71_explicit_contradiction_is_not_hidden_as_generic_check_failure():
+    raw, b70 = _review(decision="CONTRADICTS")
+    raw["reviews"][0]["checks"][0]["status"] = "FAIL"
+    result = _run(raw, b70)
+    assert result["reviews"][0]["status"] == "SEMANTIC_REVIEW_CONTRADICTED"
+
+
+def test_b71_explicit_not_supported_is_distinct_from_failed_check_status():
+    raw, b70 = _review(decision="DOES_NOT_SUPPORT")
+    raw["reviews"][0]["checks"][0]["status"] = "FAIL"
+    result = _run(raw, b70)
+    assert result["reviews"][0]["status"] == "SEMANTIC_REVIEW_NOT_SUPPORTED"
