@@ -285,6 +285,17 @@ def _review_one(
     missing_refs = sorted(ref for ref in refs if b70_record and ref not in b70_refs)
     if missing_refs:
         issues.extend(f"REVIEW_REFERENCE_NOT_IN_B70_CLAIM:{ref}" for ref in missing_refs)
+    check_reference_coverage = {
+        ref
+        for check in normalized_checks
+        for ref in (check.get("evidence_refs") or [])
+    }
+    unallocated_review_refs = sorted(set(refs) - check_reference_coverage)
+    if unallocated_review_refs:
+        issues.extend(
+            f"REVIEWED_SOURCE_NOT_MAPPED_TO_ANY_SEMANTIC_CHECK:{ref}"
+            for ref in unallocated_review_refs
+        )
 
     all_required_pass = bool(required) and len(check_states) == len(required) and all(
         state == "PASS" for state in check_states
