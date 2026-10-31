@@ -33,6 +33,7 @@ from .cycle_earnings_monitor_v01 import (
     render_cycle_earnings_monitor_section,
 )
 from .sotp_valuation_v01 import evaluate_sotp_valuation, render_sotp_valuation_section
+from .sotp_valuation_gap_attribution_v01 import build_sotp_valuation_gap_attribution
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
     evaluate_valuation_transmission,
@@ -5829,6 +5830,63 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
         )
 
 
+    local_b63_attribution = local_sotp_inversion.get("valuation_gap_attribution") if isinstance(local_sotp_inversion.get("valuation_gap_attribution"), Mapping) else {}
+    if local_b63_attribution:
+        lines.extend([
+            "",
+            "- **B63 SOTP 估值缺口归因**："
+            + f"{local_b63_attribution.get('status', 'UNKNOWN')}；"
+            + f"期间 {local_b63_attribution.get('forecast_period', 'UNKNOWN')}。",
+            "- 价值池瀑布先计算 B4 分部盈利变化在原 SOTP P/E 下的影响，再计算满足 B61 Required Return 所需的统一 P/E 缩放敏感性；这不是公平价值或市场交易倍数判断。",
+        ])
+        b63_scenarios = local_b63_attribution.get("scenarios") if isinstance(local_b63_attribution.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b63_row = b63_scenarios.get(scenario_name) if isinstance(b63_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B63 {scenario_name.upper()} — {b63_row.get('status', 'UNKNOWN')}**")
+            if b63_row.get("status") not in {"CONDITIONAL_ATTRIBUTION_CALCULATED", "PARTIAL"}:
+                if b63_row.get("issues"):
+                    lines.append("- 对账阻断：" + "；".join(str(item) for item in b63_row["issues"][:10]))
+                continue
+            waterfall = b63_row.get("value_pool_waterfall") if isinstance(b63_row.get("value_pool_waterfall"), Mapping) else {}
+            lines.append(
+                f"- 价值池：当前 SOTP {waterfall.get('step_1_selected_sotp_segment_pool_cny')} CNY；"
+                f"B4 盈利变化影响 {waterfall.get('step_2_b4_earnings_effect_at_selected_pes_cny')} CNY；"
+                f"B4 盈利按原 P/E 计价后 {waterfall.get('step_3_b4_forecast_pool_at_selected_pes_cny')} CNY；"
+                f"统一倍数缩放所需增量 {waterfall.get('step_4_common_pe_scale_effect_to_required_pool_cny')} CNY；"
+                f"Required Return 价值池 {waterfall.get('step_5_required_segment_pool_cny')} CNY。"
+            )
+            multiple = b63_row.get("multiple_attribution") if isinstance(b63_row.get("multiple_attribution"), Mapping) else {}
+            lines.append(f"- 统一 P/E 缩放系数：{multiple.get('common_pe_scale_factor_required') or 'UNKNOWN'}；此为全分部 P/E 同比例变化的条件敏感性，不是市场共识。")
+            for pe_row in multiple.get("required_common_pe_by_segment") or []:
+                if not isinstance(pe_row, Mapping):
+                    continue
+                lines.append(
+                    f"  - {pe_row.get('segment_id')}：当前选定 P/E {pe_row.get('selected_sotp_pe_x')}x；"
+                    f"要求 P/E {pe_row.get('required_pe_under_common_scale_x')}x；"
+                    f"倍数依据 {pe_row.get('selected_pe_basis') or 'UNKNOWN'}；"
+                    f"数据分类 {pe_row.get('selected_pe_data_class') or 'UNKNOWN'}；"
+                    f"证据引用 {'、'.join(pe_row.get('selected_pe_evidence_refs') or []) or '无显式引用'}。"
+                )
+            parent_attribution = b63_row.get("parent_adjustment_attribution") if isinstance(b63_row.get("parent_adjustment_attribution"), Mapping) else {}
+            lines.append(
+                f"- 母公司调整对所需分部价值池的影响：中心成本 +{parent_attribution.get('capitalized_central_cost_load_on_required_segment_pool_cny')} CNY；"
+                f"净现金/净负债抵减 {parent_attribution.get('net_cash_debt_offset_to_required_segment_pool_cny')} CNY；"
+                f"其他调整抵减 {parent_attribution.get('other_adjustments_offset_to_required_segment_pool_cny')} CNY；"
+                f"净调整负担 {parent_attribution.get('net_parent_adjustment_load_cny')} CNY。"
+            )
+            lines.append(
+                f"- 稀释股数：{(b63_row.get('dilution_attribution') or {}).get('selected_diluted_shares')}；"
+                f"Required Return 每股终值要求 {(b63_row.get('dilution_attribution') or {}).get('required_terminal_value_per_share_cny')} CNY；"
+                f"B4 预测股权价值 {(b63_row.get('dilution_attribution') or {}).get('b4_forecast_total_equity_value_cny')} CNY；"
+                f"盈亏平衡股数 {(b63_row.get('dilution_attribution') or {}).get('break_even_diluted_shares_at_b4_forecast_equity')}；"
+                f"股数增加 1% 所增加的终端股权要求 {(b63_row.get('dilution_attribution') or {}).get('additional_required_equity_for_plus_one_percent_shares_cny')} CNY。"
+            )
+            if b63_row.get("issues"):
+                lines.append("- 待核查：" + "；".join(str(item) for item in b63_row["issues"][:8]))
+        lines.append(
+            "- B63 边界：盈利影响、统一 P/E 缩放、母公司调整负担与稀释股数分别展示；无独立母公司前瞻调整/股数预测时，不将其变化编造为缺口归因。不能由“要求 P/E 高”推出“市场低估”，也不能据此自动修改 SOTP 倍数。"
+        )
+
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
@@ -6489,6 +6547,11 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         local_sotp_inversion=local_sotp_inversion,
         sotp_valuation=prepared.get("sotp_valuation") or {},
         operating_driver_forecast=prepared.get("operating_driver_forecast") or {},
+    )
+    local_sotp_inversion["valuation_gap_attribution"] = build_sotp_valuation_gap_attribution(
+        local_sotp_inversion=local_sotp_inversion,
+        sotp_valuation=prepared.get("sotp_valuation") or {},
+        segment_earnings_reconciliation=local_sotp_inversion.get("segment_earnings_reconciliation") or {},
     )
     source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion

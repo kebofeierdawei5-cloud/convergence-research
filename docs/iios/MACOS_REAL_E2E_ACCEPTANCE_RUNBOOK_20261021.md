@@ -131,6 +131,11 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - B62 分部对账：B4 是否为 COMPANY_WIDE，是否只使用相邻完整年度；每个 B4 产品是否有显式 business_segment_id，多个产品归集是否有业务依据且 ID 一致；历史/前瞻分部财务八项 typed measures 的期间、单位、data_class、basis、source/cutoff 是否合格；缺失字段是否保留 UNKNOWN 而非默认为零。
 - B62 盈利桥：B55 每个产品贡献是否已经 CALCULATED_AND_RECONCILED；产品→分部 ID 是否前后保持一致；分部正常化归母利润是否剔除非经常性项目、按正常化少数股东损益扣除，且分解残差均在 CNY 1 内。
 - B62/SOTP 比较：B4、SOTP、B61 的 forecast_period 是否完全一致；SOTP 每个 segment 是否显式声明 earnings_basis=NORMALIZED_PARENT_ATTRIBUTABLE 并与 B4 business_segment_id 精确对应；当前 SOTP P/E 是否被固定；B4 全分部利润向量形成的价值池是否与 B61 Required Return（未计分红）要求池按同一母公司调整和股数口径比较；单个分部在其他分部按 B4 预测不变时所需的 P/E 是否与当前选定 P/E 分开显示。
+- B63 价值池瀑布：当前 SOTP 价值池 + B4 盈利变化（固定所选 SOTP P/E）是否闭合到 B4 全分部预测池；剩余缺口是否单列为统一 P/E 同比例缩放敏感性；不得将该系数描述为市场实际倍数或公平估值。
+- B63 P/E 依据：每个分部选定 P/E 的 basis、data_class、evidence_refs 是否展示；来源是否支持相应终值倍数，是否误将分析师假设说成外部共识；非正价值池下的共同 P/E 缩放是否保持 NOT_IDENTIFIABLE。
+- B63 母公司调整：资本化中心成本是否等于税后中心成本×倍数；Required Pool 是否严格等于 Required Equity + 资本化中心成本 − 净现金/净负债 − 其他调整；未来母公司调整变化没有独立预测时是否保持 UNKNOWN。
+- B63 稀释股数：Required Equity 是否等于 Required Per-Share × Diluted Shares；SOTP、B61、B62 股数是否一致；盈亏平衡股数和 1% 稀释敏感性是否只是条件算术，未被误称为 EPS 预测。
+- B63 若任一 SOTP/B61/B62 股数、母公司调整、分部价值池、期间或每股值交叉复算不一致，须标记 RECONCILIATION_MISMATCH，不得输出“归因通过”。
 - B61 单变量盈利要求不得相加；它是假设其他分部利润不变的替代敏感性。只有 B62 全分部 B4 预测价值池才代表多个分部同时变化的情景结果。若无独立前瞻母公司成本/净现金/其他调整预测，不得给这些因素虚构变化金额。
 - 报告/analysis.json/Replay 应同时保留 B4 分部利润桥、SOTP earnings_basis、B61 要求、B62 比较与所有 UNKNOWN/NOT_COMPARABLE 标记；不允许以 B62 诊断结果反向覆盖 SOTP 主估值、外部 MIE、expectation_gap、B5/B6 或 Decision。
 
