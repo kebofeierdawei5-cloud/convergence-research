@@ -37,6 +37,7 @@ from .sotp_valuation_gap_attribution_v01 import build_sotp_valuation_gap_attribu
 from .sotp_evidence_grade_v01 import build_sotp_evidence_grade_assessment
 from .sotp_comparability_audit_v01 import build_sotp_comparability_audit
 from .sotp_multiple_calibration_v01 import build_sotp_multiple_calibration_assessment
+from .sotp_value_credibility_audit_v01 import build_sotp_value_credibility_price_audit
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
     evaluate_valuation_transmission,
@@ -6108,6 +6109,83 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             "不将同行中位数视为公平倍数，也不修改任何选定 SOTP P/E 或投资决策。"
         )
 
+    local_b67_audit = local_sotp_inversion.get("value_credibility_price_audit") if isinstance(local_sotp_inversion.get("value_credibility_price_audit"), Mapping) else {}
+    if local_b67_audit:
+        lines.extend([
+            "",
+            "### B67 — SOTP 价值来源可信度与现价要求审计",
+            f"- 总体状态：{local_b67_audit.get('status', 'UNKNOWN')}；{local_b67_audit.get('summary') or 'UNKNOWN'}",
+            "- 不生成综合可信度分数；盈利证据等级与终值倍数等级分别显示。",
+        ])
+        b67_scenarios = local_b67_audit.get("scenarios") if isinstance(local_b67_audit.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b67_row = b67_scenarios.get(scenario_name) if isinstance(b67_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B67 {scenario_name.upper()} — {b67_row.get('status', 'UNKNOWN')}**")
+            selected = b67_row.get("selected_value_bridge") if isinstance(b67_row.get("selected_value_bridge"), Mapping) else {}
+            earnings = b67_row.get("independent_earnings_bridge") if isinstance(b67_row.get("independent_earnings_bridge"), Mapping) else {}
+            multiple = b67_row.get("multiple_reference_bridge") if isinstance(b67_row.get("multiple_reference_bridge"), Mapping) else {}
+            parent = b67_row.get("parent_adjustment_bridge") if isinstance(b67_row.get("parent_adjustment_bridge"), Mapping) else {}
+            dilution = b67_row.get("dilution_bridge") if isinstance(b67_row.get("dilution_bridge"), Mapping) else {}
+            requirement = b67_row.get("current_price_required_return") if isinstance(b67_row.get("current_price_required_return"), Mapping) else {}
+            lines.append(
+                f"- 选定 SOTP 分部价值池：{selected.get('selected_segment_pool_recalculated_cny') or 'UNKNOWN'} CNY；"
+                f"B4 盈利变化贡献：{earnings.get('b4_earnings_effect_at_unchanged_selected_pes_cny') or 'UNKNOWN'} CNY；"
+                f"B4 固定 P/E 预测价值池：{earnings.get('b4_forecast_segment_pool_at_selected_pes_cny') or 'UNKNOWN'} CNY。"
+            )
+            lines.append(
+                f"- 参考倍数价值 + 显式倍数调整价值："
+                f"{multiple.get('reference_segment_pool_cny') or multiple.get('identified_reference_value_subtotal_cny') or 'UNKNOWN'} + "
+                f"{multiple.get('explicit_multiple_adjustment_value_cny') or multiple.get('identified_multiple_adjustment_value_subtotal_cny') or 'UNKNOWN'} CNY；"
+                f"状态 {multiple.get('status', 'UNKNOWN')}；覆盖 {multiple.get('reference_coverage') or 'UNKNOWN'}。"
+            )
+            for segment in (b67_row.get("segments") or [])[:20]:
+                if not isinstance(segment, Mapping):
+                    continue
+                profit_grade = segment.get("profit_evidence") if isinstance(segment.get("profit_evidence"), Mapping) else {}
+                multiple_grade = segment.get("multiple_evidence") if isinstance(segment.get("multiple_evidence"), Mapping) else {}
+                bridge = segment.get("multiple_reference_bridge") if isinstance(segment.get("multiple_reference_bridge"), Mapping) else {}
+                lines.append(
+                    f"  - {segment.get('segment_id')} / {segment.get('segment_name')}："
+                    f"正常化归母利润 {segment.get('normalized_parent_attributable_profit_cny') or 'UNKNOWN'} CNY × "
+                    f"选定 P/E {segment.get('selected_terminal_pe_x') or 'UNKNOWN'}x = "
+                    f"{segment.get('selected_segment_equity_value_cny') or 'UNKNOWN'} CNY；"
+                    f"盈利等级 {profit_grade.get('grade', 'G5_UNKNOWN')}；倍数等级 {multiple_grade.get('grade', 'G5_UNKNOWN')}。"
+                )
+                lines.append(
+                    f"    - 参考锚 {bridge.get('reference_method') or 'UNKNOWN'}；"
+                    f"参考 P/E {bridge.get('reference_multiple_x') or 'UNKNOWN'}x；"
+                    f"显式调整 {bridge.get('explicit_adjustment_sum_x') or 'UNKNOWN'}x；"
+                    f"调整价值 {bridge.get('multiple_adjustment_value_cny') or 'UNKNOWN'} CNY；"
+                    f"{bridge.get('status', 'UNKNOWN')}。"
+                )
+                lines.append(
+                    f"    - B4 盈利变化价值贡献：{segment.get('b4_forecast_value_effect_at_selected_pe_cny') or 'UNKNOWN'} CNY。"
+                )
+            lines.append(
+                f"- 母公司调整净负担：{parent.get('net_parent_adjustment_load_cny') or 'UNKNOWN'} CNY；"
+                f"中心成本 {parent.get('capitalized_central_cost_load_cny') or 'UNKNOWN'}；"
+                f"净现金/净负债抵减 {parent.get('net_cash_debt_offset_cny') or 'UNKNOWN'}；"
+                f"其他调整 {parent.get('other_adjustments_offset_cny') or 'UNKNOWN'}。"
+            )
+            lines.append(
+                f"- 稀释股数 {dilution.get('selected_diluted_shares') or 'UNKNOWN'}；"
+                f"Required Equity {dilution.get('required_total_equity_value_cny') or 'UNKNOWN'} CNY；"
+                f"要求每股终值 {dilution.get('required_terminal_value_per_share_cny') or 'UNKNOWN'} CNY；"
+                f"B4 条件每股价值 {dilution.get('b4_forecast_implied_value_per_share_cny') or 'UNKNOWN'} CNY。"
+            )
+            lines.append(
+                f"- 现价隐含 Required Return：B4 价值池 {requirement.get('b4_forecast_segment_pool_at_selected_pes_cny') or 'UNKNOWN'} CNY；"
+                f"要求价值池 {requirement.get('required_segment_pool_for_return_hurdle_cny') or 'UNKNOWN'} CNY；"
+                f"剩余缺口 {requirement.get('remaining_value_pool_requirement_after_b4_earnings_cny') or 'UNKNOWN'} CNY；"
+                f"共同 P/E 缩放 {requirement.get('required_common_pe_scale_factor') or 'UNKNOWN'}。"
+            )
+            if b67_row.get("issues"):
+                lines.append("- 核查事项：" + "；".join(str(x) for x in b67_row["issues"][:12]))
+        lines.append(
+            "- B67 边界：这是不含分红的条件 Required Return 反推，不是外部 MIE/市场共识；"
+            "B4 与共同倍数缩放均为条件模型，不是预测保证；不修改估值、目标价或 Decision。"
+        )
+
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
@@ -6790,6 +6868,12 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         evidence_register=prepared.get("evidence_register") or [],
         valuation_gap_attribution=local_sotp_inversion.get("valuation_gap_attribution") or {},
         comparable_company_audit=local_sotp_inversion.get("comparable_company_audit") or {},
+    )
+    local_sotp_inversion["value_credibility_price_audit"] = build_sotp_value_credibility_price_audit(
+        sotp_valuation=prepared.get("sotp_valuation") or {},
+        valuation_gap_attribution=local_sotp_inversion.get("valuation_gap_attribution") or {},
+        evidence_grade_assessment=local_sotp_inversion.get("evidence_grade_assessment") or {},
+        multiple_calibration_assessment=local_sotp_inversion.get("multiple_calibration_assessment") or {},
     )
     source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion

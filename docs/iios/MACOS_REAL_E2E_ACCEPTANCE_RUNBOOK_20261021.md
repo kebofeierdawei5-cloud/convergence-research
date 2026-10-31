@@ -155,6 +155,13 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - B66 估值传导：每个分部低/选定/高 P/E 是否只乘该场景归母正常化利润；全部分部同时取低/高区间时，selected SOTP equity/per share 是否先复算闭合，母公司调整和稀释股数是否保持不变。
 - B66 B63 对比：Required Common P/E 是否明确是 B63 在全分部 B4 盈利向量下的统一倍数缩放敏感性，而不是单一分部的公平 P/E；B63、B65 的 selected P/E 是否与当前 SOTP 输入一致。
 - B66 决策边界：任何同行中位数、显式调整桥或低/高区间都不得自动覆盖 selected SOTP P/E；不得改变 MIE、expectation_gap、15% 年化要求回报、目标买入价、组合政策或 Decision。
+- B67 分部价值池：每个分部正常化归母利润 × selected P/E 是否复算为 selected SOTP segment value；全分部合计是否与 B63 selected segment pool 一致；segment_id 是否一一匹配。
+- B67 独立盈利贡献：B4 − selected SOTP normalized profit 是否仅按未改变的 selected P/E 计算；分部贡献是否闭合到 B63 earnings effect，且 selected pool + earnings effect = B4 forecast pool。
+- B67 倍数价值拆解：只在 B66 reference + explicit adjustment bridge 闭合且 B67 再复算通过时输出金额；全公司汇总要求所有分部均有参考锚，缺失参考不得当成零。
+- B67 证据等级：B64 profit G1–G5 与 multiple G4/G5 分别展示；不得合并成可信度总分、概率、置信区间或估值折扣。
+- B67 现价要求：selected pool → B4 earnings effect → B4 forecast pool → B63 common P/E scaling → B61 Required Return pool 应闭合；明确为不含分红的条件回报门槛反推，不是外部 MIE 或市场共识。
+- B67 母公司/稀释：中心成本、净现金/净负债、其他调整的带符号合计应闭合；Required Equity 应等于 Required Per Share × Diluted Shares；无独立前瞻预测不得推定未来调整或股数变化。
+- B67 决策边界：不得改写 SOTP、B61–B66、15% 年化要求、目标入场价、MIE、expectation_gap、组合约束或 Decision；B67 不是 BUY/SELL 指令。
 
 ## 9. 已发生故障与防重复清单
 

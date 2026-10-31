@@ -3061,3 +3061,17 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Placement:** new module \`iios_mvp/sotp_multiple_calibration_v01.py\`; nested output at \`assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.multiple_calibration_assessment\`. Local pilot invokes B66 after B65.
 - **No-change boundary:** B66 does not modify selected SOTP P/Es or segment profits, B4/B5/B6, B61–B65, MIE, expectation_gap, the 15% annualized hurdle, target entry price, portfolio constraints, Decision, formal evidence admission or execution authority.
 - **Regression coverage:** eighteen cases authored in \`tests/test_sotp_multiple_calibration_v01.py\`. They have not been executed. Replay, CI, unified tests and Mac acceptance remain deferred.
+
+
+## B67 — SOTP value-source credibility and current-price requirement audit — 2026-10-31
+
+**Status: BRANCH PROPOSAL ONLY / NOT MERGED / NOT TESTED**
+
+- **Purpose:** consolidate B61–B66 into a read-only value-source structure and price-hurdle audit. B67 rechecks selected SOTP segment values, B63's B4 earnings contribution and Required Return waterfall, B66's reference-multiple plus explicit-adjustment value decomposition, parent-level adjustment arithmetic, and diluted-share translation.
+- **Profit and multiple evidence:** B64 profit grade and multiple grade remain separate per segment. No combined score, probability, confidence value, evidence-weighted valuation discount or automatic multiple adjustment is created.
+- **Multiple value attribution:** B67 calculates profit × reference P/E and profit × explicit adjustment sum only when B66's bridge is reconciled and B67 independently reproduces it. Full-company totals require reference coverage for every segment; missing references remain PARTIAL, never zero.
+- **Current-price requirement:** reuses B63's selected SOTP pool → B4 earnings effect at fixed selected P/Es → B4 forecast pool → conditional common P/E scale effect → B61 Required Return pool. The result is price-implied Required Return without distributions, not external MIE or broker consensus.
+- **Parent and dilution:** carries current selected central-cost, net cash/debt and other adjustments, checks their signed identity, and rechecks required equity = required per-share value × diluted shares. No future parent adjustment or share-count change is invented.
+- **Placement:** new module iios_mvp/sotp_value_credibility_audit_v01.py; nested output assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.value_credibility_price_audit. The local pilot report displays per-segment value and evidence, reference/adjustment value bridge, parent adjustments, dilution and current-price hurdle.
+- **No-change boundary:** no change to SOTP, B4/B5/B6, B61–B66, external MIE, expectation_gap, 15% annualized hurdle, target entry price, portfolio constraints, Decision, Evidence/PIT admission or execution authority.
+- **Regression coverage:** ten cases authored in tests/test_sotp_value_credibility_audit_v01.py. Tests have not been executed. Replay, CI, unified test suite and Mac acceptance remain deferred.
