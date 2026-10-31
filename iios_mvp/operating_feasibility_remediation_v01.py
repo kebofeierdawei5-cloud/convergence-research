@@ -14,7 +14,8 @@ _SCHEMAS = {
     "b72": "IIOS-OPERATING-FEASIBILITY-EXCEPTION-REGISTER-0.1",
 }
 _PASS = "CONDITIONALLY_SUPPORTED_NOT_FORMALLY_ADMITTED"
-_UNMODELED = {
+_UPSTREAM_ONLY = {
+    "B69_NAMEPLATE_CAPACITY_ARITHMETIC",
     "CUSTOMER_DEMAND_SUSTAINABILITY_AND_ELASTICITY",
     "PRICE_ELASTICITY_AND_COMPETITIVE_RESPONSE",
     "COST_CURVE_AND_SAVINGS_EXECUTION",
@@ -136,7 +137,7 @@ def _assess_one(
     scenario = _txt(requirement.get("scenario")).lower()
     product_id = _txt(requirement.get("product_id"))
     requirement_type = _txt(requirement.get("requirement_type")).upper()
-    upstream_block = requirement_type in _UNMODELED
+    upstream_block = requirement_type in _UPSTREAM_ONLY
     if upstream_block:
         issues.append("UPSTREAM_OPERATING_MODEL_SCOPE_REQUIRED")
 

@@ -220,3 +220,15 @@ def test_closed_verified_is_never_emitted():
     result = _run(submissions, b69, b70, b71, b72)
     assert result["summary"]["closed_verified_count"] == 0
     assert all(row["status"] != "CLOSED_VERIFIED" for row in result["submissions"])
+
+
+def test_b69_nameplate_capacity_requires_upstream_rebuild():
+    submissions, b69, b70, b71, b72 = _case()
+    requirement = b72["requirement_rows"][0]
+    requirement["requirement_type"] = "B69_NAMEPLATE_CAPACITY_ARITHMETIC"
+    requirement["requirement_id"] = "base:B63_FULL_B4_VECTOR_THRESHOLD:SEG-P1:P1:B69_NAMEPLATE_CAPACITY_ARITHMETIC"
+    requirement["remediation"]["action_id"] = "B72:B69_NAMEPLATE_CAPACITY_ARITHMETIC:UPSTREAM"
+    submissions["submissions"][0]["requirement_id"] = requirement["requirement_id"]
+    submissions["submissions"][0]["action_id"] = requirement["remediation"]["action_id"]
+    row = _run(submissions, b69, b70, b71, b72)["submissions"][0]
+    assert row["status"] == "REASSESSMENT_BLOCKED_UPSTREAM_SCOPE_REQUIRED"

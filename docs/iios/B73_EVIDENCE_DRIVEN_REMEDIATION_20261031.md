@@ -56,11 +56,11 @@ No B4/B68/B69, SOTP, external MIE, expectation gap, 15% annualized return hurdle
 
 - Superseded IDs are operator-declared. B73 verifies that they are absent from the current output; it cannot authenticate that they existed in a previous run.
 - B71 reviewer identity, real independence, source-document content and enforceability remain human assertions, not automated facts.
-- Demand sustainability/elasticity, competitive price response, cost curves/savings execution, B69 capacity arithmetic and other upstream model changes cannot be repaired solely by replacing B70/B71 records. Upstream B4/B68/B69 assumptions must be corrected and the full pipeline rerun.
+- Demand sustainability/elasticity, competitive price response, cost curves/savings execution, B69 nameplate-capacity arithmetic and other upstream model changes cannot be repaired solely by replacing B70/B71 records. B69 capacity-arithmetic rows are explicitly classified as upstream-only. Upstream B4/B68/B69 assumptions must be corrected and the full pipeline rerun.
 - The current pilot execution recalculates B69, B70, B71 and B72 before B73. The operator-owned B73 submission field is excluded from the Round B model prompt and is read only by the local rules engine. B73 itself does not fetch sources or schedule asynchronous work.
 
 ## 6. Regression coverage and acceptance
 
-Twenty-one regression cases are authored in tests/test_operating_feasibility_remediation_v01.py. Coverage includes exact requirement/action binding, duplicate IDs, stale and superseded versions, scope/period/claim matching, B71 review coverage and independence declarations, evidence-reference consistency, unresolved numerical gaps, unmodeled dimensions, timezone validation and manual-close prohibition.
+Twenty-two regression cases are authored in tests/test_operating_feasibility_remediation_v01.py. Coverage includes exact requirement/action binding, duplicate IDs, stale and superseded versions, scope/period/claim matching, B71 review coverage and independence declarations, evidence-reference consistency, unresolved numerical gaps, unmodeled dimensions, timezone validation and manual-close prohibition.
 
 Tests have **not** been executed. Replay, CI, unified tests and real macOS acceptance have **not** been run or verified. No PASS is claimed.
