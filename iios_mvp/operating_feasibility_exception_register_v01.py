@@ -75,18 +75,28 @@ def _records_for_claim(
     product_id: str,
     period: str,
     claim_types: tuple[str, ...],
-) -> tuple[list[Mapping[str, Any]], bool]:
+) -> tuple[list[Mapping[str, Any]], bool, bool]:
     found: list[Mapping[str, Any]] = []
     ambiguous = False
+    scope_mismatch = False
     for claim_type in claim_types:
         candidates: list[Mapping[str, Any]] = []
         if record_ids:
             for record_id in record_ids:
-                candidates.extend(
+                typed_rows = [
                     row for row in by_id.get(record_id, [])
                     if _txt(row.get("claim_type")).upper() == claim_type
-                )
-        if not candidates:
+                ]
+                matching_rows = [
+                    row for row in typed_rows
+                    if _txt(row.get("scenario")).lower() == scenario
+                    and _txt(row.get("product_id")) == product_id
+                    and _txt(row.get("forecast_period")) == period
+                ]
+                if typed_rows and len(matching_rows) != len(typed_rows):
+                    scope_mismatch = True
+                candidates.extend(matching_rows)
+        if not candidates and not scope_mismatch:
             candidates.extend(
                 by_key.get((scenario, product_id, period, claim_type), [])
             )
@@ -98,7 +108,7 @@ def _records_for_claim(
     for index, row in enumerate(found):
         key = _txt(row.get("record_id")) or f"__row_{index}"
         unique[key] = row
-    return list(unique.values()), ambiguous
+    return list(unique.values()), ambiguous, scope_mismatch
 
 
 def _semantic_review_state(
@@ -158,9 +168,12 @@ def _evidence_state(
     *,
     records: list[Mapping[str, Any]],
     ambiguous: bool,
+    scope_mismatch: bool = False,
 ) -> str:
     status = _txt(raw_status).upper()
     data_classes = {_txt(row.get("data_class")).upper() for row in records}
+    if scope_mismatch:
+        return "EVIDENCE_RECORD_SCOPE_MISMATCH"
     if ambiguous or status == "AMBIGUOUS_DUPLICATE_CLAIMS_NOT_SUMMED":
         return "AMBIGUOUS_DUPLICATE_CLAIMS_NOT_SUMMED"
     if "ANALYST_ASSUMPTION" in data_classes:
@@ -269,6 +282,12 @@ def _remediation(
             "查明重复记录是重复合同、订单重叠还是不同范围；按净额和唯一经济事项整理，禁止把重复记录求和。",
             ["唯一主张键", "订单/合同重叠与取消核对", "明确去重或分拆口径"],
         ),
+        "EVIDENCE_RECORD_SCOPE_MISMATCH": (
+            "RESOLVE_EVIDENCE_RECORD_SCOPE_MISMATCH",
+            "EVIDENCE_OWNER",
+            "证据记录的情景、产品、预测期或主张类型与当前要求不一致；重新绑定精确匹配的记录，禁止跨情景或跨产品复用。",
+            ["情景/产品/预测期/主张类型完全匹配的唯一 record_id", "原始证据范围与经营主张一致", "重新生成的 B70/B71 记录"],
+        ),
         "CAPACITY_NOT_IDENTIFIABLE": (
             "VERIFY_EFFECTIVE_CAPACITY",
             "OPERATIONS_OWNER",
@@ -371,6 +390,8 @@ def _semantic_final_status(evidence_state: str, semantic_state: str) -> str:
         return "EVIDENCE_NOT_PROVIDED"
     if evidence_state == "EVIDENCE_LINKAGE_NOT_ELIGIBLE":
         return "EVIDENCE_LINKAGE_NOT_ELIGIBLE"
+    if evidence_state == "EVIDENCE_RECORD_SCOPE_MISMATCH":
+        return "EVIDENCE_RECORD_SCOPE_MISMATCH"
     if evidence_state == "AMBIGUOUS_DUPLICATE_CLAIMS_NOT_SUMMED":
         return "AMBIGUOUS_DUPLICATE_CLAIMS_NOT_SUMMED"
     if evidence_state == "REQUIRED_OR_EVIDENCE_VALUE_NOT_IDENTIFIABLE":
@@ -425,7 +446,7 @@ def _make_requirement_row(
 ) -> dict[str, Any]:
     record_ids = [item for item in (record_ids or []) if _txt(item)]
     claim_types = (requirement_type,) if requirement_type in _CLAIM_UNITS else ()
-    records, ambiguous = _records_for_claim(
+    records, ambiguous, scope_mismatch = _records_for_claim(
         record_ids=record_ids,
         by_id=by_id,
         by_key=by_key,
@@ -437,7 +458,9 @@ def _make_requirement_row(
     semantic_state, reviews = _semantic_review_state(
         records, reviews_by_record, b71_available=b71_available
     )
-    evidence_state = _evidence_state(raw_status, records=records, ambiguous=ambiguous)
+    evidence_state = _evidence_state(
+        raw_status, records=records, ambiguous=ambiguous, scope_mismatch=scope_mismatch
+    )
     final_status = _semantic_final_status(evidence_state, semantic_state)
     record_ids_out = sorted({
         _txt(row.get("record_id")) for row in records if _txt(row.get("record_id"))
@@ -739,7 +762,7 @@ def build_operating_feasibility_exception_register(
                         _txt(funding.get("required_record_id")),
                         _txt(funding.get("funded_record_id")),
                     ]
-                    records, ambiguous = _records_for_claim(
+                    records, ambiguous, scope_mismatch = _records_for_claim(
                         record_ids=[item for item in record_ids if item],
                         by_id=by_id,
                         by_key=by_key,
@@ -752,7 +775,8 @@ def build_operating_feasibility_exception_register(
                         records, reviews_by_record, b71_available=True
                     )
                     evidence_state = _evidence_state(
-                        funding.get("status"), records=records, ambiguous=ambiguous
+                        funding.get("status"), records=records, ambiguous=ambiguous,
+                        scope_mismatch=scope_mismatch,
                     )
                     final_status = _semantic_final_status(evidence_state, semantic_state)
                     label = f"{scenario}:{lens_name}:{segment_id}:{product_id}:{funding_type}"
@@ -795,8 +819,11 @@ def build_operating_feasibility_exception_register(
                             requirement_label=label,
                         ),
                     }
-                    if ambiguous:
-                        row["details"] = {"duplicate_record_scope": "AMBIGUOUS_NOT_SUMMED"}
+                    if ambiguous or scope_mismatch:
+                        row["details"] = {
+                            "duplicate_record_scope": "AMBIGUOUS_NOT_SUMMED" if ambiguous else None,
+                            "evidence_record_scope_mismatch": scope_mismatch,
+                        }
                     product_rows.append(row)
                     lens_rows.append(row)
                     result["requirement_rows"].append(row)
