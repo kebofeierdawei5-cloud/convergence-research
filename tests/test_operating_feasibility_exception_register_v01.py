@@ -20,7 +20,6 @@ def _b69(*, capacity_status="WITHIN_NAMEPLATE_CAPACITY_CONDITIONAL", lenses=None
         scenarios[scenario] = {
             "requirement_lenses": [
                 {
-                    "segment_id": "SEG1",
                     "lens": lens,
                     "products": [{
                         "product_id": "P1",
@@ -420,3 +419,33 @@ def test_b72_rejects_record_id_reused_for_a_different_scenario():
     ]
     assert bear_rows
     assert all(row["exception_status"] == "EVIDENCE_RECORD_SCOPE_MISMATCH" for row in bear_rows)
+
+
+def test_b72_matches_actual_b70_lens_product_contract_without_segment_id():
+    record = _sales_record()
+    b70 = _b70(sales_record=record)
+    assert all(
+        "segment_id" not in lens
+        for scenario in b70["scenarios"].values()
+        for lens in scenario["requirement_lenses"]
+    )
+    result = _run(b70=b70)
+    row = _base_sale_rows(result)[0]
+    assert row["exception_status"] == "CONDITIONALLY_SUPPORTED_NOT_FORMALLY_ADMITTED"
+    assert row["b70_record_ids"] == ["R-SALES"]
+
+
+def test_b72_blocks_non_unique_b70_lens_product_join():
+    record = _sales_record()
+    b70 = _b70(sales_record=record)
+    base_lenses = b70["scenarios"]["base"]["requirement_lenses"]
+    base_lenses.append(deepcopy(base_lenses[0]))
+    result = _run(b70=b70)
+    rows = [
+        row for row in result["requirement_rows"]
+        if row["scenario"] == "base"
+        and row["lens"] == "B61_SINGLE_SEGMENT_THRESHOLD"
+        and row["requirement_type"] == "SUPPORTED_SALES_VOLUME"
+    ]
+    assert rows
+    assert rows[0]["exception_status"] == "AMBIGUOUS_DUPLICATE_CLAIMS_NOT_SUMMED"
