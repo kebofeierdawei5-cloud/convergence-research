@@ -118,12 +118,12 @@ B70 is optional and backward-compatible when omitted. It does not modify B4/B42/
 
 ## 8. Regression coverage and acceptance
 
-Sixteen regression cases are authored in \`tests/test_operating_feasibility_evidence_v01.py\`, covering:
+Eighteen regression cases are authored in \`tests/test_operating_feasibility_evidence_v01.py\`, covering:
 - missing/invalid evidence input;
 - exact numeric comparison of supported sales, net ASP, unit cost and effective capacity;
 - linked-claim shortfall;
 - after-cutoff, non-primary, domain-mismatch, analyst-only, duplicate-source and duplicate-record blocking;
-- strict scenario/period alignment;
+- strict scenario/period alignment and unresolved-reference blocking;
 - non-additive duplicate claim handling;
 - full-year-only capacity availability date;
 - late capacity commissioning overriding a sufficient capacity quantity; and
