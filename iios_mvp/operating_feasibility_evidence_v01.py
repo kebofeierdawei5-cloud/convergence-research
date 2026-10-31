@@ -458,6 +458,13 @@ def build_operating_feasibility_evidence_assessment(
                 else:
                     date_comparison = {"claim_type": "CAPACITY_AVAILABLE_DATE", "status": "FORECAST_PERIOD_END_NOT_IDENTIFIABLE"}
 
+                # An expansion quantity that arrives after the forecast period
+                # cannot cover that period's production requirement.
+                if date_comparison.get("status") == "LINKED_CLAIM_AVAILABLE_AFTER_FORECAST_END":
+                    for capacity_comparison in comparisons:
+                        if capacity_comparison.get("claim_type") == "EFFECTIVE_CAPACITY_AVAILABLE" and capacity_comparison.get("status") == "LINKED_CLAIM_NUMERICALLY_COVERS_REQUIREMENT":
+                            capacity_comparison["status"] = "LINKED_CAPACITY_AVAILABLE_AFTER_FORECAST_END_NOT_COVERAGE"
+
                 funding_comparisons = []
                 for required_claim, funded_claim in (
                     ("INCREMENTAL_CAPEX_REQUIRED", "INCREMENTAL_CAPEX_FUNDED"),
@@ -531,6 +538,7 @@ def build_operating_feasibility_evidence_assessment(
         "LINKED_CLAIM_NUMERICALLY_BELOW_REQUIREMENT",
         "LINKED_CLAIM_NUMERICALLY_ABOVE_ALLOWED_COST",
         "LINKED_CLAIM_AVAILABLE_AFTER_FORECAST_END",
+        "LINKED_CAPACITY_AVAILABLE_AFTER_FORECAST_END_NOT_COVERAGE",
         "LINKED_FUNDING_CLAIM_SHORTFALL",
     } for status in all_scenario_comparisons):
         result["status"] = "LINKED_EVIDENCE_IDENTIFIES_CONDITION_GAP"
