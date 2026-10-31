@@ -252,3 +252,13 @@ def test_b70_duplicate_evidence_register_source_ids_are_not_accepted():
     result = build_operating_feasibility_evidence_assessment(**data)
     assert result["records"][0]["status"] == "NOT_IDENTIFIABLE"
     assert "EVIDENCE_REFERENCE_DUPLICATE_SOURCE_ID:S1" in result["records"][0]["issues"]
+
+
+def test_b70_late_expansion_date_overrides_sufficient_capacity_quantity():
+    records = [
+        _record("R1", "EFFECTIVE_CAPACITY_AVAILABLE", "200", "S1"),
+        _record("R2", "CAPACITY_AVAILABLE_DATE", "2028-03-31", "S2"),
+    ]
+    result = _run(records)
+    capacity = _product(result)["comparisons"][3]
+    assert capacity["status"] == "LINKED_CAPACITY_AVAILABLE_AFTER_FORECAST_END_NOT_COVERAGE"
