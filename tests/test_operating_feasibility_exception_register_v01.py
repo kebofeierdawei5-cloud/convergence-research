@@ -67,6 +67,12 @@ def _b70(
         records.append(sales_record)
     scenarios = {}
     for scenario in ("bear", "base", "bull"):
+        scenario_record = (
+            sales_record
+            if sales_record is not None and sales_record.get("scenario", "base") == scenario
+            else None
+        )
+        scenario_sales_status = sales_status if scenario_record is not None else "EVIDENCE_NOT_PROVIDED"
         scenarios[scenario] = {
             "requirement_lenses": [
                 {
@@ -77,10 +83,10 @@ def _b70(
                         "comparisons": [
                             {
                                 "claim_type": "SUPPORTED_SALES_VOLUME",
-                                "status": sales_status,
+                                "status": scenario_sales_status,
                                 "required_value": "100",
-                                "evidence_value": "120" if sales_status == "LINKED_CLAIM_NUMERICALLY_COVERS_REQUIREMENT" else "80",
-                                "record_id": (sales_record or {}).get("record_id"),
+                                "evidence_value": "120" if scenario_sales_status == "LINKED_CLAIM_NUMERICALLY_COVERS_REQUIREMENT" else None,
+                                "record_id": (scenario_record or {}).get("record_id"),
                                 "comparison_direction": "AT_LEAST",
                             },
                             {
@@ -395,3 +401,22 @@ def test_b72_does_not_create_weighted_scores_or_scenario_probabilities():
     assert "composite_score" not in result
     assert "weighted_feasibility_score" not in result
     assert result["summary"]["cross_lens_aggregation_performed"] is False
+
+
+def test_b72_rejects_record_id_reused_for_a_different_scenario():
+    b70 = _b70(sales_record=_sales_record())
+    for lens in b70["scenarios"]["bear"]["requirement_lenses"]:
+        comparison = lens["products"][0]["comparisons"][0]
+        comparison["status"] = "LINKED_CLAIM_NUMERICALLY_COVERS_REQUIREMENT"
+        comparison["record_id"] = "R-SALES"
+        comparison["evidence_value"] = "120"
+    result = _run(
+        b70=b70,
+        b71=_b71(),
+    )
+    bear_rows = [
+        row for row in result["requirement_rows"]
+        if row["scenario"] == "bear" and row["requirement_type"] == "SUPPORTED_SALES_VOLUME"
+    ]
+    assert bear_rows
+    assert all(row["exception_status"] == "EVIDENCE_RECORD_SCOPE_MISMATCH" for row in bear_rows)
