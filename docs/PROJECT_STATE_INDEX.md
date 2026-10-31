@@ -3046,3 +3046,18 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Placement:** new module \`iios_mvp/sotp_comparability_audit_v01.py\`; nested output at \`assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.comparable_company_audit\`. B64 preserves target/peer profiles, dimension assessments and date-alignment rationale for B65. Local pilot invokes B65 after B64.
 - **No-change boundary:** B65 does not change SOTP or B4/B5/B6/B61/B62/B63/B64 calculations, MIE, expectation_gap, the 15% annualized hurdle, target entry price, portfolio constraints, Decision, formal evidence admission or execution authority.
 - **Regression coverage:** ten cases authored in \`tests/test_sotp_comparability_audit_v01.py\`. They have not been executed. Replay, CI, unified tests and Mac acceptance remain deferred.
+
+
+## B66 — SOTP terminal P/E independent calibration and sensitivity — 2026-10-31
+
+**Status: BRANCH PROPOSAL ONLY / NOT MERGED / NOT TESTED**
+
+- **Purpose:** explain each selected segment terminal P/E using a same-basis peer reference or other explicit anchor, a transparent analyst adjustment bridge, and a low/selected/high multiple range. B66 does not compute a fair P/E from generic ROIC/growth/cycle weights.
+- **Peer anchor:** descriptive median/minimum/maximum are calculated only from B65 complete peers whose accounting basis, earnings reference period and P/E measurement basis are all identifiable and SIMILAR to the target. At least two such peers are required. TTM, NTM and normalized P/Es are not mixed.
+- **Alternative reference:** historical self-range or another explicit reference requires a positive multiple, clear explanation and cutoff-compatible evidence refs attached to the selected P/E measure. No reliable reference remains NO_COMPARABLE_REFERENCE / PARTIAL.
+- **Explicit P/E bridge:** selected P/E = reference multiple + sum of per-dimension explicit analyst adjustments, reconciled within 0.01x. Premium adjustments are positive, discounts negative and neutral zero; duplicate dimensions, conflicting B65 direction, unsupported direction, unresolved reference or arithmetic mismatch block reconciliation. Selected terminal P/E must be ANALYST_ASSUMPTION.
+- **Sensitivity:** per-segment low/selected/high P/E multiplied by normalized segment profit; only if all segment ranges and selected SOTP cross-checks pass, calculate all-lower/all-selected/all-upper SOTP per-share sensitivities while parent adjustments and diluted shares remain fixed. The range is analyst stress sensitivity, not a confidence interval or probability distribution.
+- **B63 comparison:** selected P/E is shown next to B63's Required Common P/E, which is based on the full B4 segment profit vector and a parallel common-multiple scaling assumption—not a standalone required fair P/E for an individual segment. B66 cross-checks B63/B65 selected P/E against the SOTP input.
+- **Placement:** new module \`iios_mvp/sotp_multiple_calibration_v01.py\`; nested output at \`assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.multiple_calibration_assessment\`. Local pilot invokes B66 after B65.
+- **No-change boundary:** B66 does not modify selected SOTP P/Es or segment profits, B4/B5/B6, B61–B65, MIE, expectation_gap, the 15% annualized hurdle, target entry price, portfolio constraints, Decision, formal evidence admission or execution authority.
+- **Regression coverage:** eighteen cases authored in \`tests/test_sotp_multiple_calibration_v01.py\`. They have not been executed. Replay, CI, unified tests and Mac acceptance remain deferred.

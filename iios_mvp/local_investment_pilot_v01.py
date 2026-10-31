@@ -36,6 +36,7 @@ from .sotp_valuation_v01 import evaluate_sotp_valuation, render_sotp_valuation_s
 from .sotp_valuation_gap_attribution_v01 import build_sotp_valuation_gap_attribution
 from .sotp_evidence_grade_v01 import build_sotp_evidence_grade_assessment
 from .sotp_comparability_audit_v01 import build_sotp_comparability_audit
+from .sotp_multiple_calibration_v01 import build_sotp_multiple_calibration_assessment
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
     evaluate_valuation_transmission,
@@ -6024,6 +6025,89 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             "不自动筛选同行或改写 SOTP 估值。可比性审计通过只代表资料结构完整，不代表同行选择或估值合理性已获验证。"
         )
 
+    local_b66_assessment = local_sotp_inversion.get("multiple_calibration_assessment") if isinstance(local_sotp_inversion.get("multiple_calibration_assessment"), Mapping) else {}
+    if local_b66_assessment:
+        lines.extend([
+            "",
+            "- **B66 SOTP 终值 P/E 独立校准与敏感性**："
+            + f"{local_b66_assessment.get('status', 'UNKNOWN')}。",
+            "- 同行中位数仅取 B65 完整可比且会计口径、盈利期间、P/E 口径均与目标可比的样本；"
+            "目标选定 P/E 必须由参考倍数 + 分部差异显式调整复算闭合。",
+        ])
+        b66_scenarios = local_b66_assessment.get("scenarios") if isinstance(local_b66_assessment.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b66_row = b66_scenarios.get(scenario_name) if isinstance(b66_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B66 {scenario_name.upper()} — {b66_row.get('status', 'UNKNOWN')}**")
+            if b66_row.get("issues"):
+                lines.append("- 场景级核查：" + "；".join(str(item) for item in b66_row["issues"][:12]))
+            for segment in (b66_row.get("segments") or [])[:20]:
+                if not isinstance(segment, Mapping):
+                    continue
+                peer_band = segment.get("same_basis_peer_reference") if isinstance(segment.get("same_basis_peer_reference"), Mapping) else {}
+                selected_vs_peer = segment.get("selected_pe_vs_peer_median") if isinstance(segment.get("selected_pe_vs_peer_median"), Mapping) else {}
+                bridge = segment.get("explicit_selected_multiple_bridge") if isinstance(segment.get("explicit_selected_multiple_bridge"), Mapping) else {}
+                sensitivity_range = segment.get("analyst_multiple_range") if isinstance(segment.get("analyst_multiple_range"), Mapping) else {}
+                hurdle = segment.get("b63_required_common_pe_sensitivity") if isinstance(segment.get("b63_required_common_pe_sensitivity"), Mapping) else {}
+                lines.append(
+                    f"- {segment.get('segment_id')} / {segment.get('segment_name')}："
+                    f"选定 P/E {segment.get('selected_terminal_pe_x')}x "
+                    f"({segment.get('selected_pe_data_class') or 'UNKNOWN'}；{segment.get('selected_pe_basis') or 'UNKNOWN'})；"
+                    f"同口径同行 {peer_band.get('peer_count', 0)} 家；"
+                    f"同行范围 {peer_band.get('minimum_pe_x') or 'UNKNOWN'}x / "
+                    f"{peer_band.get('median_pe_x') or 'UNKNOWN'}x / "
+                    f"{peer_band.get('maximum_pe_x') or 'UNKNOWN'}x；"
+                    f"选定值相对中位数差异 {selected_vs_peer.get('premium_discount_pct') or 'UNKNOWN'}%；"
+                    f"依据引用 {', '.join(segment.get('selected_pe_evidence_refs') or []) or 'UNKNOWN'}。"
+                )
+                lines.append(
+                    f"  - P/E 论证桥：{bridge.get('status', 'UNKNOWN')}；"
+                    f"参考倍数 {bridge.get('reference_multiple_x') or 'UNKNOWN'}x；"
+                    f"显式调整合计 {bridge.get('explicit_adjustment_sum_x') or 'UNKNOWN'}x；"
+                    f"复算选定倍数 {bridge.get('calculated_selected_pe_x') or 'UNKNOWN'}x；"
+                    f"残差 {bridge.get('reconciliation_residual_x') or 'UNKNOWN'}x。"
+                )
+                for adjustment in (bridge.get("adjustments") or [])[:10]:
+                    if not isinstance(adjustment, Mapping):
+                        continue
+                    lines.append(
+                        f"    - {adjustment.get('dimension')} / {adjustment.get('direction')}："
+                        f"{adjustment.get('adjustment_x')}x；{adjustment.get('rationale') or 'UNKNOWN'}。"
+                    )
+                lines.append(
+                    f"  - 分析师 P/E 区间：{sensitivity_range.get('lower_bound_pe_x') or 'UNKNOWN'}x — "
+                    f"{sensitivity_range.get('selected_pe_x') or 'UNKNOWN'}x — "
+                    f"{sensitivity_range.get('upper_bound_pe_x') or 'UNKNOWN'}x；"
+                    f"状态 {sensitivity_range.get('status', 'UNKNOWN')}。"
+                )
+                lines.append(
+                    f"  - B63 Required Return 条件倍数：{hurdle.get('required_common_pe_x') or 'UNKNOWN'}x；"
+                    f"选定倍数与要求差额 {hurdle.get('selected_minus_required_pe_x') or 'UNKNOWN'}x；"
+                    "这是全分部 B4 盈利向量下的统一倍数敏感性，不是本分部独立公平倍数。"
+                )
+                value_sensitivity = segment.get("segment_equity_value_sensitivity_cny") if isinstance(segment.get("segment_equity_value_sensitivity_cny"), Mapping) else {}
+                lines.append(
+                    f"  - 分部权益价值敏感性：低端 {value_sensitivity.get('lower_range') or 'UNKNOWN'} CNY；"
+                    f"选定 {value_sensitivity.get('selected') or 'UNKNOWN'} CNY；"
+                    f"高端 {value_sensitivity.get('upper_range') or 'UNKNOWN'} CNY。"
+                )
+                if segment.get("issues"):
+                    lines.append("  - 核查事项：" + "；".join(str(item) for item in segment["issues"][:10]))
+            aggregate = b66_row.get("aggregate_sensitivity") if isinstance(b66_row.get("aggregate_sensitivity"), Mapping) else {}
+            if aggregate.get("status") == "CONDITIONAL_ALL_SEGMENT_MULTIPLE_RANGE_SENSITIVITY":
+                lines.append(
+                    f"- 全部分部区间同时变化的 SOTP 每股敏感性："
+                    f"{aggregate.get('lower_terminal_value_per_share_cny')} — "
+                    f"{aggregate.get('selected_terminal_value_per_share_cny')} — "
+                    f"{aggregate.get('upper_terminal_value_per_share_cny')} CNY/share；"
+                    "母公司调整及稀释股数固定；不是置信区间。"
+                )
+            elif aggregate.get("issues"):
+                lines.append("- 全部 SOTP 区间敏感性不可识别：" + "；".join(str(item) for item in aggregate["issues"][:6]))
+        lines.append(
+            "- B66 边界：分析师明确输入的倍数调整只做方向、来源及算术闭合检查；不从 ROIC/成长/周期自动换算 P/E，"
+            "不将同行中位数视为公平倍数，也不修改任何选定 SOTP P/E 或投资决策。"
+        )
+
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
@@ -6700,6 +6784,12 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         evidence_grade_assessment=local_sotp_inversion.get("evidence_grade_assessment") or {},
         evidence_register=prepared.get("evidence_register") or [],
         valuation_as_of_date=case_context.get("as_of_date"),
+    )
+    local_sotp_inversion["multiple_calibration_assessment"] = build_sotp_multiple_calibration_assessment(
+        sotp_valuation=prepared.get("sotp_valuation") or {},
+        evidence_register=prepared.get("evidence_register") or [],
+        valuation_gap_attribution=local_sotp_inversion.get("valuation_gap_attribution") or {},
+        comparable_company_audit=local_sotp_inversion.get("comparable_company_audit") or {},
     )
     source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion
@@ -7411,6 +7501,12 @@ def create_pilot_template(
         "每个维度对象必须包含 target_value、peer_value、comparison（SIMILAR/DIFFERENT/NOT_COMPARABLE/UNKNOWN）、target_multiple_implication（TARGET_PREMIUM/TARGET_DISCOUNT/NEUTRAL/UNKNOWN）、multiple_adjustment_treatment（SELECTED_PE_ADJUSTED/NO_NUMERIC_ADJUSTMENT/PEER_EXCLUDED/UNKNOWN）、rationale、adjustment_rationale、evidence_refs。target_value 与 peer_value 必须与两边画像对应维度一致。"
         "SIMILAR 只能标 NEUTRAL + NO_NUMERIC_ADJUSTMENT；DIFFERENT 必须解释差异，并说明所选 P/E 是否已考虑（SELECTED_PE_ADJUSTED）或未量化调整（NO_NUMERIC_ADJUSTMENT）；NOT_COMPARABLE 必须标 PEER_EXCLUDED，不得留在有效可比样本集合。TARGET_PREMIUM/TARGET_DISCOUNT 表示目标分部相对该同行的定性方向，不是数值调整。dimension evidence_refs 必须引用 P/E measure 自身 evidence_refs 中的截止时点兼容来源。"
         "同行 observed_pe_x 必须解释是 TTM/NTM/正常化等哪一种口径；同行 as_of_date 不得晚于案例 cutoff，早于 cutoff 必须有 date_alignment_rationale。业务模式、收入结构、终端市场、成长、周期、利润质量、ROIC、资本强度、杠杆、FCF 转换、会计与期间定义缺资料则标 UNKNOWN。不要把不相同的会计或盈利口径简单并列。B65 只审计画像完整性、差异、证据引用和时间一致性，不会自动选择同行、计算溢价/折价、做 P/E 数值调整或改变 SOTP 估值。"
+        "【B66 终值 P/E 独立论证】每个分部 pe_multiple_x.support_assessment 必须另含 selected_multiple_bridge 与 selected_multiple_range。selected_multiple_bridge 包含 reference_method（PEER_MEDIAN/HISTORICAL_SELF_RANGE/OTHER_EXPLICIT_REFERENCE/NO_COMPARABLE_REFERENCE）、reference_description、reference_multiple_x（PEER_MEDIAN 时可留空，由本地从 B65 同口径可比同行独立复算）、reference_evidence_refs、adjustments 数组、selected_multiple_explanation。"
+        "PEER_MEDIAN 只使用 B65 完整可比同行，且 accounting_basis、earnings_reference_period、pe_measurement_basis 三项必须均标 SIMILAR 且非 UNKNOWN；至少两家才计算中位数/范围。不能把 TTM、NTM、正常化 P/E 混合取中位数。HISTORICAL_SELF_RANGE/OTHER_EXPLICIT_REFERENCE 必须提供 reference_multiple_x、明确来源说明和截止时点兼容证据引用。没有参考锚时必须标 NO_COMPARABLE_REFERENCE，不得伪造同行倍数；如果 B65 已识别至少两家同口径完整同行，则不能同时声明 NO_COMPARABLE_REFERENCE，必须用 PEER_MEDIAN 或提供其他明确独立参考。"
+        "adjustments 每项包含 dimension（B65 的 13 维度之一）、direction（TARGET_PREMIUM/TARGET_DISCOUNT/NEUTRAL）、adjustment_x、rationale、evidence_refs。TARGET_PREMIUM 的数值调整必须为正，TARGET_DISCOUNT 必须为负，NEUTRAL 必须为 0；方向必须与 B65 至少一项已通过且属于同口径参考样本的同行维度判断一致；adjustment.evidence_refs 还必须与 B65 对应 dimension + direction 的 evidence_refs 有交集，不能用该 P/E 节点下无关来源支持特定溢价/折价；每个维度不重复。所有调整合计必须使 reference_multiple_x + Σ adjustment_x = 当前 scenario 的 selected pe_multiple_x（±0.01x），否则 B66 标 PARTIAL，不能宣称倍数推导闭合。选定终值 P/E 必须是 ANALYST_ASSUMPTION。"
+        "selected_multiple_range 包含 data_class=ANALYST_ASSUMPTION、lower_bound_pe_x、upper_bound_pe_x、basis、downside_rationale、upside_rationale、evidence_refs；范围必须为正数、lower≤selected P/E≤upper。此区间是显式敏感性假设，不是置信区间或概率分布。"
+        "本地 B66 计算 selected P/E 相对同口径同行中位数的描述性差异、逐项显式调整桥、对每个分部利润的低/选定/高倍数权益价值敏感性，并在全部分部区间完整时，固定母公司调整和稀释股数计算全部分部倍数区间同时变化的 SOTP 每股敏感性。不得把同时变化的上下界称为统计区间或概率加权估值。"
+        "B66 还展示 B63 的 Required Common P/E 条件敏感性，但必须说明其基于全分部 B4 正常化盈利向量与统一倍数变化，不是该单一分部的独立公平 P/E。不能从 ROIC、增长、周期、质量标签自动换算数值倍数；无法量化时保留 UNKNOWN，不要为了完成算术桥强行造数。"
     )
     driver_instructions = (
         "\n\n经营驱动因素树要求（IIOS-OPERATING-DRIVER-FORECAST-0.1）："

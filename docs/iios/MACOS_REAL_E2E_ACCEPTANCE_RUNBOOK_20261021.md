@@ -145,6 +145,16 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - B65 证据链接：每个比较维度的 evidence_refs 是否属于该 P/E measure 自身 evidence_refs，来源是否存在且时间兼容；时间兼容不得被误称为正式证据准入。
 - B65 同行集合：至少两家不同同行均通过全部 13 维度且未被排除，才可标记 COMPARABILITY_REVIEW_COMPLETE_NOT_VALUATION_APPROVED；同行不足、差异未解释或资料缺失时保持 PEER_SET_INSUFFICIENTLY_COMPARABLE / PARTIAL。
 - B65 决策边界：TARGET_PREMIUM/TARGET_DISCOUNT 仅是相对方向判断；不得将差异相加、生成数值溢价/折价、同行平均 P/E 或新的终值 P/E；analysis.json 与报告中的 selected P/E 必须与 B63 输入保持不变。
+- B66 同口径同行锚：同行 P/E 中位数是否只来自 B65 完整可比同行，且 accounting_basis、earnings_reference_period、pe_measurement_basis 三项均可识别并标记 SIMILAR；至少两家才计算，不混合 TTM/NTM/正常化口径。
+- B66 替代参考锚：若使用 HISTORICAL_SELF_RANGE / OTHER_EXPLICIT_REFERENCE，是否提供正数参考倍数、清楚来源说明和 cutoff 前证据；没有可靠参考时是否如实保留 NO_COMPARABLE_REFERENCE / PARTIAL。
+- B66 无参考声明：若 B65 已有至少两家同口径完整同行，selected_multiple_bridge 不得同时声明 NO_COMPARABLE_REFERENCE；应使用 PEER_MEDIAN 或另提供可审计的历史/独立参考锚。
+- B66 显式倍数桥：selected P/E 是否等于 reference multiple + 所有 adjustment_x（±0.01x）；每项是否有 B65 维度、方向、正/负/零符号、理由和同 P/E measure 证据引用；premium/discount 方向是否与 B65 已完成且适用的同行判断一致；同一维度是否重复调整。
+- B66 维度证据链接：每个调整项的 evidence_refs 是否不仅属于 P/E measure 的总来源引用，而且与 B65 对应 dimension + direction 的具体证据引用相交；不得用无关来源支持成长溢价或周期折价。
+- B66 分部价值池复算：全部分部低/选定/高区间同时变化时，当前选定分部池是否等于 Σ（分部归母利润×选定 P/E），总股权价值、每股终值是否与母公司调整和稀释股数一致。
+- B66 估值区间：lower_bound_pe_x / selected PE / upper_bound_pe_x 是否满足正数和顺序约束，均有分析依据、下行/上行理由及时间兼容证据；是否明确只是分析师敏感性，不是概率置信区间。
+- B66 估值传导：每个分部低/选定/高 P/E 是否只乘该场景归母正常化利润；全部分部同时取低/高区间时，selected SOTP equity/per share 是否先复算闭合，母公司调整和稀释股数是否保持不变。
+- B66 B63 对比：Required Common P/E 是否明确是 B63 在全分部 B4 盈利向量下的统一倍数缩放敏感性，而不是单一分部的公平 P/E；B63、B65 的 selected P/E 是否与当前 SOTP 输入一致。
+- B66 决策边界：任何同行中位数、显式调整桥或低/高区间都不得自动覆盖 selected SOTP P/E；不得改变 MIE、expectation_gap、15% 年化要求回报、目标买入价、组合政策或 Decision。
 
 ## 9. 已发生故障与防重复清单
 
