@@ -3103,3 +3103,19 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Placement:** new module iios_mvp/sotp_operating_feasibility_audit_v01.py; nested output assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.operating_feasibility_audit; local pilot and Chinese report integration completed.
 - **No-change boundary:** does not modify B4/B55/B61–B68, SOTP, external MIE, expectation_gap, 15% annualized return hurdle, target entry price, portfolio constraints, Decision, formal Evidence/PIT admission or execution authority.
 - **Regression coverage:** eight cases authored in tests/test_sotp_operating_feasibility_audit_v01.py. Tests have not been executed. Replay, CI, unified test suite and Mac acceptance remain deferred.
+
+
+## B70 — Operating feasibility evidence contract and threshold linkage — 2026-10-31
+
+**Status: BRANCH PROPOSAL ONLY / NOT MERGED / NOT TESTED**
+
+- **Purpose:** add an optional typed \`operating_feasibility_evidence\` input, linking product-level operating claims to the existing evidence register and comparing them with the B69 scenario/period requirements.
+- **Claim types:** supported sales volume, supported net ASP, supported unit variable cost, effective capacity available, capacity availability date, incremental capex required/funded, and incremental working capital required/funded.
+- **Strict identity:** every row requires a unique record ID, exact product ID, exact Bear/Base/Bull scenario, exact forecast period, value/unit, data class, basis and evidence refs. Claim records are never generated from B68 requirements themselves.
+- **PIT/source checks:** refs must resolve uniquely to the existing evidence register, be cutoff-compatible and declare an issuer/exchange/regulator primary source class; after-cutoff, uncertain, duplicated, unresolved, non-primary, domain-mismatched and analyst-assumption records cannot support numeric comparison. Compatibility does not mean formal Evidence/PIT admission or source-content semantic verification.
+- **Comparison rules:** sales and supported ASP must meet or exceed B68 thresholds; unit variable cost must be no higher than its required threshold; effective capacity must cover B69 required production; expansion availability date must be no later than an explicitly full-year forecast end; incremental capex and working capital are compared only against their respective funded amounts.
+- **Anti-double-counting:** duplicate record IDs or duplicate scenario/product/period/claim keys are ambiguous; duplicate claims are never summed. Funding values require \`INCREMENTAL_TO_B4_FORWARD_PLAN\`.
+- **Placement:** new module \`iios_mvp/operating_feasibility_evidence_v01.py\`; nested output \`assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.operating_feasibility_evidence_assessment\`. Local pilot, report and replay comparison input binding are integrated.
+- **Overall status remains conservative:** numeric coverage does not independently verify source content. The overall operating-feasibility status remains NOT_IDENTIFIABLE pending human source-content review and complete coverage.
+- **No-change boundary:** does not modify B4/B42/B43/B55/B61–B69, SOTP, external MIE, expectation_gap, 15% annualized hurdle, target entry price, portfolio constraints, Decision, formal Evidence/PIT admission or execution authority.
+- **Regression coverage:** fifteen cases authored in \`tests/test_operating_feasibility_evidence_v01.py\`. Tests have not been executed. Replay, CI, unified tests and Mac acceptance remain deferred.
