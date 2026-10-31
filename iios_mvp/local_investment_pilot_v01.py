@@ -34,6 +34,7 @@ from .cycle_earnings_monitor_v01 import (
 )
 from .sotp_valuation_v01 import evaluate_sotp_valuation, render_sotp_valuation_section
 from .sotp_valuation_gap_attribution_v01 import build_sotp_valuation_gap_attribution
+from .sotp_evidence_grade_v01 import build_sotp_evidence_grade_assessment
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
     evaluate_valuation_transmission,
@@ -5887,6 +5888,62 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             "- B63 边界：盈利影响、统一 P/E 缩放、母公司调整负担与稀释股数分别展示；无独立母公司前瞻调整/股数预测时，不将其变化编造为缺口归因。不能由“要求 P/E 高”推出“市场低估”，也不能据此自动修改 SOTP 倍数。"
         )
 
+    local_b64_assessment = local_sotp_inversion.get("evidence_grade_assessment") if isinstance(local_sotp_inversion.get("evidence_grade_assessment"), Mapping) else {}
+    if local_b64_assessment:
+        lines.extend([
+            "",
+            "- **B64 SOTP 分部盈利与终值倍数证据等级**："
+            + f"{local_b64_assessment.get('status', 'UNKNOWN')}；"
+            + f"期间 {local_b64_assessment.get('forecast_period', 'UNKNOWN')}。",
+            "- G1=披露事实/指引与利润输入建立引用关联；G2=业务机制、指标、证据与反转信号可追踪；"
+            "G3=分析师盈利假设；G4=终值 P/E 假设；G5=UNKNOWN。G1/G2 仍须人工核对原始文件内容。",
+        ])
+        b64_scenarios = local_b64_assessment.get("scenarios") if isinstance(local_b64_assessment.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b64_row = b64_scenarios.get(scenario_name) if isinstance(b64_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B64 {scenario_name.upper()} — {b64_row.get('status', 'UNKNOWN')}**")
+            if b64_row.get("status") not in {"ASSESSED_DIAGNOSTIC_ONLY", "PARTIAL"}:
+                if b64_row.get("issues"):
+                    lines.append("- 评级阻断：" + "；".join(str(item) for item in b64_row["issues"][:8]))
+                continue
+            for segment in (b64_row.get("segments") or [])[:20]:
+                if not isinstance(segment, Mapping):
+                    continue
+                profit_grade = segment.get("profit_evidence_assessment") if isinstance(segment.get("profit_evidence_assessment"), Mapping) else {}
+                multiple_grade = segment.get("multiple_evidence_assessment") if isinstance(segment.get("multiple_evidence_assessment"), Mapping) else {}
+                lines.append(
+                    f"- {segment.get('segment_id')} / {segment.get('segment_name')}："
+                    f"分部归母利润 {segment.get('sotp_selected_attributable_profit_cny')} CNY，"
+                    f"{profit_grade.get('grade', 'G5_UNKNOWN')}（{profit_grade.get('grade_label', 'UNKNOWN')}）；"
+                    f"P/E {segment.get('selected_terminal_pe_x')}x，"
+                    f"{multiple_grade.get('grade', 'G5_UNKNOWN')}（{multiple_grade.get('grade_label', 'UNKNOWN')}）。"
+                )
+                if profit_grade.get("support_summary") not in (None, "", "UNKNOWN"):
+                    lines.append(f"  - 盈利支持声明：{profit_grade.get('support_summary')}")
+                mechanism = profit_grade.get("mechanism_chain") if isinstance(profit_grade.get("mechanism_chain"), list) else []
+                indicators = profit_grade.get("key_operating_indicators") if isinstance(profit_grade.get("key_operating_indicators"), list) else []
+                reversals = profit_grade.get("reversal_signals") if isinstance(profit_grade.get("reversal_signals"), list) else []
+                if mechanism:
+                    lines.append("  - 经营机制链：" + " → ".join(str(item) for item in mechanism[:5]))
+                if indicators:
+                    lines.append("  - 可观测指标：" + "；".join(str(item) for item in indicators[:5]))
+                if reversals:
+                    lines.append("  - 反转/证伪信号：" + "；".join(str(item) for item in reversals[:5]))
+                if multiple_grade.get("comparable_set_status") not in (None, "NOT_PROVIDED"):
+                    lines.append(
+                        f"  - 可比样本状态：{multiple_grade.get('comparable_set_status')}；"
+                        f"记录数量 {len(multiple_grade.get('comparable_observations') or [])}；"
+                        "样本记录不等同于倍数公允性结论。"
+                    )
+                combined_issues = list(profit_grade.get("issues") or []) + list(multiple_grade.get("issues") or [])
+                if combined_issues:
+                    lines.append("  - 待核查：" + "；".join(str(item) for item in combined_issues[:6]))
+        lines.append(
+            "- B64 边界：来源类别、引用解析和时间检查不证明来源内容与利润数值的语义关系；"
+            "G1/G2 是结构化关联声明，不是原始文件核实或正式证据准入。各分部盈利等级与 P/E 等级分开显示，"
+            "不合并成综合分、不参与估值加权，也不自动改变估值、MIE 或 Decision。"
+        )
+
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
@@ -6552,6 +6609,11 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         local_sotp_inversion=local_sotp_inversion,
         sotp_valuation=prepared.get("sotp_valuation") or {},
         segment_earnings_reconciliation=local_sotp_inversion.get("segment_earnings_reconciliation") or {},
+    )
+    local_sotp_inversion["evidence_grade_assessment"] = build_sotp_evidence_grade_assessment(
+        sotp_valuation=prepared.get("sotp_valuation") or {},
+        evidence_register=prepared.get("evidence_register") or [],
+        valuation_gap_attribution=local_sotp_inversion.get("valuation_gap_attribution") or {},
     )
     source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion
@@ -7257,6 +7319,7 @@ def create_pilot_template(
         "计算公式必须是 Σ（已归属于上市公司股东的分部净利润 × 分部 P/E）−（母公司税后成本 × 母公司成本倍数）+ 不重复计价的净现金/净负债 + 其他显式调整，再除以稀释后股数；结果生成 Bear/Base/Bull 终值，Base 每股值作为主估值参考锚。每个分部利润应与上市公司股东权益口径一致，不能再次扣同一分部的少数股东权益。所有分部、期间、股数、现金/债务及母公司成本须避免重复计价。"
         "sotp_valuation.forecast_period 必须与 operating_driver_forecast.forecast_period 一致，valuation_terminal_date 必须与 forecast_valuation.valuation_terminal_date 一致。数值、证据、期间、分部集合或 Bear≤Base≤Bull 任一项不成立时，不要在 forecast_valuation 中用手填每股终值冒充已计算 SOTP；保留缺口，系统会阻断回报、目标入场价与 B6。"
         "此 SOTP 算术仍为 PILOT_NON_CANONICAL，并不代表正式证据或估值准入。B5 的 EPS_MULTIPLE 增量适配器不能用于 SOTP。"
+        "【B64 证据分级字段】每个分部 attributable_net_profit_cny 与 pe_multiple_x measure 均应另附 support_assessment 对象，包含 support_type、support_summary、support_evidence_refs、mechanism_chain、key_operating_indicators、derivation_steps、counter_evidence_refs、reversal_signals、comparable_observations。利润 support_type 只允许 DISCLOSED_FACTS、ISSUER_GUIDANCE、BUSINESS_MECHANISM、ANALYST_DERIVATION、UNKNOWN；P/E support_type 只允许 COMPARABLE_MULTIPLES、PURE_MULTIPLE_ASSUMPTION、UNKNOWN。support_evidence_refs 必须是该 measure 自身 evidence_refs 的子集；不可把泛行业材料冒充直接支持某一分部利润。DISCLOSED_FACTS/ISSUER_GUIDANCE 要写清具体事实/指引及如何连接到该利润输入；BUSINESS_MECHANISM 至少列出 2 个因果环节、1 个可观测经营指标、1 个反转/证伪信号，并引用时点兼容的证据；ANALYST_DERIVATION 写明推导步骤；不能识别就明确 UNKNOWN，不要编造。counter_evidence_refs 应指向反证来源；若没有找到，说明检索范围和缺口，不要虚构。P/E 可比样本每条包含 entity、as_of_date、observed_pe_x、evidence_ref、comparability_adjustment；至少两家不同对象才形成候选可比组。即使有可比组，所选终值 P/E 仍是分析师估值假设，不代表公平价值。此标注仅用于 B64 结构化审计；来源内容、因果关系、可比性均需人工核查，不能将 G1/G2 宣称为正式证据准入。"
     )
     driver_instructions = (
         "\n\n经营驱动因素树要求（IIOS-OPERATING-DRIVER-FORECAST-0.1）："

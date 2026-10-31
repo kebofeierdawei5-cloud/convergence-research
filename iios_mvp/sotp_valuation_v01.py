@@ -249,6 +249,14 @@ def evaluate_sotp_valuation(
                     allow_negative=False,
                     allow_zero=False,
                 )
+                # B64 metadata is copied for read-only evidence grading only.
+                # It is deliberately excluded from SOTP arithmetic and admission.
+                for raw_measure, normalized_measure in (
+                    (segment.get("attributable_net_profit_cny"), profit_norm),
+                    (segment.get("pe_multiple_x"), multiple_norm),
+                ):
+                    raw_support = raw_measure.get("support_assessment") if isinstance(raw_measure, Mapping) else None
+                    normalized_measure["support_assessment"] = dict(raw_support) if isinstance(raw_support, Mapping) else None
                 value = profit * multiple
                 segment_equity_value += value
                 normalized_segments.append({
