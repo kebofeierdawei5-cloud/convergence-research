@@ -8225,6 +8225,7 @@ def _round_b_prompt_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "_local_research_response_provenance", "_local_operator_controlled_field_recovery",
         "_local_research_round_a_provenance", "_local_research_round_b_provenance",
         "operator_valuation_context", "decision_parameters", "operator_portfolio_context",
+        "operating_feasibility_remediation_submissions",
     ):
         view.pop(key, None)
     return view

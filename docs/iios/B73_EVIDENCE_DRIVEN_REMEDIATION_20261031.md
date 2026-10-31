@@ -57,7 +57,7 @@ No B4/B68/B69, SOTP, external MIE, expectation gap, 15% annualized return hurdle
 - Superseded IDs are operator-declared. B73 verifies that they are absent from the current output; it cannot authenticate that they existed in a previous run.
 - B71 reviewer identity, real independence, source-document content and enforceability remain human assertions, not automated facts.
 - Demand sustainability/elasticity, competitive price response, cost curves/savings execution, B69 capacity arithmetic and other upstream model changes cannot be repaired solely by replacing B70/B71 records. Upstream B4/B68/B69 assumptions must be corrected and the full pipeline rerun.
-- The current pilot execution recalculates B69, B70, B71 and B72 before B73. B73 itself does not fetch sources or schedule asynchronous work.
+- The current pilot execution recalculates B69, B70, B71 and B72 before B73. The operator-owned B73 submission field is excluded from the Round B model prompt and is read only by the local rules engine. B73 itself does not fetch sources or schedule asynchronous work.
 
 ## 6. Regression coverage and acceptance
 
