@@ -208,6 +208,29 @@ def test_b68_rechecks_actual_b63_profit_and_value_bridge_fields():
     assert "B68_B4_B62_B63_SEGMENT_PROFIT_VALUE_BRIDGE_MISMATCH:SEG_A" in result["scenarios"]["base"]["issues"]
 
 
+def test_b68_rechecks_b62_selected_pe_against_b63_selected_pe():
+    data = _fixtures()
+    data["segment_earnings_reconciliation"]["scenarios"]["base"]["segment_comparisons"][0]["sotp_selected_pe_multiple_x"] = "11"
+    result = _run(data)
+    assert result["scenarios"]["base"]["status"] == "PARTIAL"
+    assert "B68_B4_B62_B63_SEGMENT_PROFIT_VALUE_BRIDGE_MISMATCH:SEG_A" in result["scenarios"]["base"]["issues"]
+
+
+def test_b68_accepts_two_nci_measures_with_the_same_typed_data_class():
+    data = _fixtures()
+    forward = data["operating_driver_forecast"]["baseline_transition"]["segment_normalized_earnings_bridge"]["scenarios"]["base"]["segments"]["SEG_A"]["forward_scenario"]
+    forward["measure_lineage"]["minority_interest_net_profit_after_tax_cny"] = {
+        "data_class": "ISSUER_FORECAST", "basis": "FY2027 total NCI", "evidence_refs": ["F6"], "issues": []
+    }
+    forward["measure_lineage"]["minority_interest_nonrecurring_after_tax_cny"] = {
+        "data_class": "ISSUER_FORECAST", "basis": "FY2027 non-recurring NCI", "evidence_refs": ["F7"], "issues": []
+    }
+    result = _run(data)
+    base = result["scenarios"]["base"]
+    reverse = base["segments"][0]["b63_full_b4_vector_lens"]["reverse_engineering"]
+    assert reverse["contribution_inversion"]["financial_measure_lineage"]["normalized_minority_interest_net_profit_cny"]["status"] == "DERIVED_FROM_TWO_TYPED_NCI_MEASURES"
+
+
 def test_b68_requires_exact_b4_b55_product_universe():
     data = _fixtures()
     data["operating_driver_forecast"]["baseline_transition"]["scenarios"]["base"]["product_lines"] = []

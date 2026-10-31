@@ -84,7 +84,7 @@ Local pilot invokes B68 after B63/B67 and adds a Chinese report section with the
 
 ## 7. Regression coverage and acceptance
 
-Thirteen regression cases are authored in tests/test_sotp_operating_requirement_reverse_engineering_v01.py, covering:
+Fifteen regression cases are authored in tests/test_sotp_operating_requirement_reverse_engineering_v01.py, covering:
 
 - profit-to-contribution inversion under the positive-tax branch;
 - volume / ASP / unit-cost alternatives;
@@ -98,6 +98,8 @@ Thirteen regression cases are authored in tests/test_sotp_operating_requirement_
 - segment-universe mismatch;
 - independent recheck of the real B63 profit / value effect fields; and
 - exact B4/B55 product-universe coverage;
+- B62/B63 selected-P/E cross-check; and
+- derived normalized-NCI lineage when both underlying typed measures use the same data class.
 - missing product driver preservation.
 
 Tests have not been executed. Replay, CI, unified tests and real macOS acceptance remain deferred.

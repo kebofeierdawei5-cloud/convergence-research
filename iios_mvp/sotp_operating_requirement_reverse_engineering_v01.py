@@ -582,11 +582,13 @@ def _audit_scenario(
         b63_selected_value = _num(b63_segment.get("selected_sotp_segment_value_cny"))
         b63_b4_value = _num(b63_segment.get("b4_forecast_segment_value_at_selected_pe_cny"))
         selected_pe = _num(b63_segment.get("selected_sotp_pe_x"))
+        b62_selected_pe = _num(b62_segment.get("sotp_selected_pe_multiple_x"))
         if (
             current_profit is None or b4_b62_profit is None or selected_sotp_profit is None
             or b63_profit_change is None or b63_earnings_effect is None
             or b63_selected_value is None or b63_b4_value is None
-            or selected_pe is None or selected_pe <= 0
+            or selected_pe is None or selected_pe <= 0 or b62_selected_pe is None
+            or not _eq(selected_pe, b62_selected_pe, _PRICE_POOL_TOL)
             or not _eq(current_profit, b4_b62_profit, _PRICE_POOL_TOL)
             or not _eq(current_profit - selected_sotp_profit, b63_profit_change, _PRICE_POOL_TOL)
             or not _eq(b63_profit_change * selected_pe, b63_earnings_effect, _PRICE_POOL_TOL)
