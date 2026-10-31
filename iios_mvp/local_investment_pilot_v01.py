@@ -39,6 +39,7 @@ from .sotp_comparability_audit_v01 import build_sotp_comparability_audit
 from .sotp_multiple_calibration_v01 import build_sotp_multiple_calibration_assessment
 from .sotp_value_credibility_audit_v01 import build_sotp_value_credibility_price_audit
 from .sotp_operating_requirement_reverse_engineering_v01 import build_sotp_operating_requirement_reverse_engineering
+from .sotp_operating_feasibility_audit_v01 import build_sotp_operating_feasibility_audit
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
     evaluate_valuation_transmission,
@@ -6256,6 +6257,57 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             "不反向修改 B4、SOTP、15% 年化要求、目标价或 Decision。"
         )
 
+    local_b69 = local_sotp_inversion.get("operating_feasibility_audit") if isinstance(local_sotp_inversion.get("operating_feasibility_audit"), Mapping) else {}
+    if local_b69:
+        lines.extend([
+            "",
+            "### B69 — 现价隐含经营要求可实现性审计",
+            f"- 总体状态：{local_b69.get('status', 'UNKNOWN')}；{local_b69.get('summary') or 'UNKNOWN'}",
+            "- 产能口径：按 B68 所需销量 + B4 前瞻产销库存差额计算条件所需产量；只有完整年度和正数名义产能才比较，产能内也不等于需求/爬坡/有效产能已验证。",
+        ])
+        b69_scenarios = local_b69.get("scenarios") if isinstance(local_b69.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b69_row = b69_scenarios.get(scenario_name) if isinstance(b69_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B69 {scenario_name.upper()} — {b69_row.get('status', 'UNKNOWN')}**")
+            plan = b69_row.get("b4_existing_financial_plan") if isinstance(b69_row.get("b4_existing_financial_plan"), Mapping) else {}
+            lines.append(
+                f"- B4 既有资金桥：库存/WC 对账 {plan.get('inventory_reconciliation_status', 'UNKNOWN')}；"
+                f"有效营运资金 {plan.get('effective_change_working_capital_cny') if plan.get('effective_change_working_capital_cny') is not None else 'UNKNOWN'} CNY；"
+                f"现金资本开支 {plan.get('cash_capex_cny') if plan.get('cash_capex_cny') is not None else 'UNKNOWN'} CNY；"
+                f"FCF 代理 {plan.get('unlevered_fcf_proxy_cny') if plan.get('unlevered_fcf_proxy_cny') is not None else 'UNKNOWN'} CNY。"
+            )
+            for lens in (b69_row.get("requirement_lenses") or [])[:20]:
+                if not isinstance(lens, Mapping):
+                    continue
+                lines.append(
+                    f"- {lens.get('segment_id')} / {lens.get('lens')}（非加总）："
+                    f"要求归母利润 {lens.get('required_parent_attributable_profit_cny') if lens.get('required_parent_attributable_profit_cny') is not None else 'UNKNOWN'} CNY；"
+                    f"B68 反解状态 {lens.get('reverse_engineering_status', 'UNKNOWN')}。"
+                )
+                for product in (lens.get("products") or [])[:10]:
+                    if not isinstance(product, Mapping):
+                        continue
+                    lines.append(
+                        f"  - {product.get('product_name') or product.get('product_id')}："
+                        f"要求销量 {product.get('required_sales_volume_tonnes') if product.get('required_sales_volume_tonnes') is not None else 'UNKNOWN'} 吨；"
+                        f"在 B4 库存差额不变下要求产量 {product.get('required_production_tonnes_under_unchanged_inventory_movement') if product.get('required_production_tonnes_under_unchanged_inventory_movement') is not None else 'UNKNOWN'} 吨；"
+                        f"名义产能 {product.get('nameplate_capacity_tonnes_per_year') if product.get('nameplate_capacity_tonnes_per_year') is not None else 'UNKNOWN'} 吨/年；"
+                        f"所需产能利用率 {product.get('required_capacity_utilization') if product.get('required_capacity_utilization') is not None else 'UNKNOWN'}；"
+                        f"状态 {product.get('capacity_status', 'UNKNOWN')}。"
+                    )
+                    lines.append(
+                        f"    - 需求：{product.get('demand_feasibility_status', 'UNKNOWN')}；"
+                        f"价格：{product.get('pricing_feasibility_status', 'UNKNOWN')}；"
+                        f"单位成本：{product.get('unit_cost_feasibility_status', 'UNKNOWN')}；"
+                        f"增量扩产资金：{product.get('incremental_capex_and_working_capital_status', 'UNKNOWN')}。"
+                    )
+                    if product.get("issues"):
+                        lines.append("    - 阻断： " + "；".join(str(x) for x in product["issues"][:6]))
+        lines.append(
+            "- B69 边界：名义产能内仅表示在“B4 产销库存差额不变”的假设下算术上未超产；没有订单/需求、价格弹性、成本曲线、扩建投产和项目级增量资金证据时，经营可实现性仍未通过。"
+            "B69 不修改 B4 FCF、库存现金代理、估值、MIE、15% 年化门槛、目标入场价或 Decision。"
+        )
+
     lines.extend([
         f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
         f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
@@ -6949,6 +7001,10 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         operating_driver_forecast=prepared.get("operating_driver_forecast") or {},
         segment_earnings_reconciliation=local_sotp_inversion.get("segment_earnings_reconciliation") or {},
         valuation_gap_attribution=local_sotp_inversion.get("valuation_gap_attribution") or {},
+    )
+    local_sotp_inversion["operating_feasibility_audit"] = build_sotp_operating_feasibility_audit(
+        operating_driver_forecast=prepared.get("operating_driver_forecast") or {},
+        operating_requirement_reverse_engineering=local_sotp_inversion.get("operating_requirement_reverse_engineering") or {},
     )
     source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion
