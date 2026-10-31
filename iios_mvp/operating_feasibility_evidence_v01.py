@@ -8,6 +8,7 @@ They are never treated as formal evidence admission or source-content verificati
 
 from datetime import date
 from decimal import Decimal, InvalidOperation
+import re
 from typing import Any, Mapping
 
 B70_SCHEMA = "IIOS-OPERATING-FEASIBILITY-EVIDENCE-ASSESSMENT-0.1"
@@ -55,6 +56,15 @@ def _num(value: Any) -> Decimal | None:
 
 def _fmt(value: Decimal | None) -> str | None:
     return None if value is None else format(value, "f")
+
+
+def _full_year_end(period: Any) -> str | None:
+    label = "".join(str(period or "").upper().split())
+    match = re.fullmatch(r"(?:FY(\\d{4})|(\\d{4})FY|(\\d{4})年度|(\\d{4})全年)", label)
+    if not match:
+        return None
+    year = next(group for group in match.groups() if group)
+    return f"{year}-12-31"
 
 
 def _index_sources(rows: Any) -> tuple[dict[str, Mapping[str, Any]], set[str]]:
@@ -431,11 +441,7 @@ def build_operating_feasibility_evidence_assessment(
                         direction="AT_LEAST",
                     ),
                 ]
-                required_date = None
-                if forecast_period.upper().startswith("FY") and forecast_period[2:6].isdigit():
-                    required_date = f"{forecast_period[2:6]}-12-31"
-                elif len(forecast_period) >= 4 and forecast_period[:4].isdigit():
-                    required_date = f"{forecast_period[:4]}-12-31"
+                required_date = _full_year_end(forecast_period)
                 date_record = indexed.get((scenario, product_id, forecast_period, "CAPACITY_AVAILABLE_DATE"))
                 if date_record is None:
                     date_comparison = {"claim_type": "CAPACITY_AVAILABLE_DATE", "status": "EVIDENCE_NOT_PROVIDED"}
