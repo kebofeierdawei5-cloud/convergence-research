@@ -6271,7 +6271,8 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             lines.append(f"**B69 {scenario_name.upper()} — {b69_row.get('status', 'UNKNOWN')}**")
             plan = b69_row.get("b4_existing_financial_plan") if isinstance(b69_row.get("b4_existing_financial_plan"), Mapping) else {}
             lines.append(
-                f"- B4 既有资金桥：库存/WC 对账 {plan.get('inventory_reconciliation_status', 'UNKNOWN')}；"
+                f"- B4 既有经营/资金桥：产能状态 {plan.get('capacity_feasibility_status', 'UNKNOWN')}；"
+                f"库存/WC 对账 {plan.get('inventory_reconciliation_status', 'UNKNOWN')}；"
                 f"有效营运资金 {plan.get('effective_change_working_capital_cny') if plan.get('effective_change_working_capital_cny') is not None else 'UNKNOWN'} CNY；"
                 f"现金资本开支 {plan.get('cash_capex_cny') if plan.get('cash_capex_cny') is not None else 'UNKNOWN'} CNY；"
                 f"FCF 代理 {plan.get('unlevered_fcf_proxy_cny') if plan.get('unlevered_fcf_proxy_cny') is not None else 'UNKNOWN'} CNY。"
