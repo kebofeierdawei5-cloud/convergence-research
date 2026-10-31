@@ -144,6 +144,8 @@ def test_b69_requires_full_year_period_for_annual_capacity_comparison():
 def test_b69_missing_capacity_remains_not_identifiable():
     data = _fixtures()
     data["operating_driver_forecast"]["product_lines"][0]["capacity_tonnes_per_year"] = None
+    for lens_key in ("b61_required_profit_lens", "b63_full_b4_vector_lens"):
+        data["operating_requirement_reverse_engineering"]["scenarios"]["base"]["segments"][0][lens_key]["reverse_engineering"]["product_driver_alternatives"][0]["production_inventory_context"]["nameplate_capacity_tonnes_per_year"] = None
     result = _run(data)
     product = _base_product(result)
     assert product["capacity_status"] == "NOT_IDENTIFIABLE_NAMEPLATE_CAPACITY"
