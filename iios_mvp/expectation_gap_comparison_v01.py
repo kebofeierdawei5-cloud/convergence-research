@@ -1,0 +1,317 @@
+from __future__ import annotations
+
+"""B76 read-only comparison of independent B4 forecast and B61/B63 price hurdles.
+
+This adapter compares already-computed, same-period SOTP requirements with the
+independent B4 forecast. It does not identify external MIE, calibrate win rates,
+or modify any upstream forecast, valuation, return gate, or decision.
+"""
+
+from decimal import Decimal, InvalidOperation
+from typing import Any, Mapping
+
+B76_SCHEMA = "IIOS-B76-PRICE-CONDITIONED-EXPECTATION-COMPARISON-0.1"
+_SCENARIOS = ("bear", "base", "bull")
+_TOL = Decimal("0.01")
+
+
+def _map(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _dec(value: Any) -> Decimal | None:
+    if value in (None, ""):
+        return None
+    try:
+        result = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    return result if result.is_finite() else None
+
+
+def _fmt(value: Decimal | None) -> str | None:
+    return None if value is None else format(value, "f")
+
+
+def _difference(left: Any, right: Any) -> dict[str, Any]:
+    a, b = _dec(left), _dec(right)
+    if a is None or b is None:
+        return {"status": "NOT_IDENTIFIABLE", "difference": None, "unit": "CNY"}
+    return {"status": "CALCULATED", "difference": _fmt(a - b), "unit": "CNY"}
+
+
+def _driver_row(product: Mapping[str, Any]) -> dict[str, Any]:
+    current = _map(product.get("current_forward_assumptions"))
+    alternatives = _map(product.get("single_driver_alternatives"))
+    volume = _map(alternatives.get("sales_volume_only"))
+    asp = _map(alternatives.get("net_asp_only"))
+    cost = _map(alternatives.get("unit_variable_cost_only"))
+    return {
+        "product_id": product.get("product_id"),
+        "product_name": product.get("product_name"),
+        "current_independent_forecast": {
+            "sales_volume_tonnes": current.get("sales_volume_tonnes"),
+            "net_asp_cny_per_tonne": current.get("net_asp_cny_per_tonne"),
+            "variable_cost_cny_per_tonne": current.get("variable_cost_cny_per_tonne"),
+        },
+        "price_conditioned_single_driver_alternatives": {
+            "sales_volume_only": {
+                "status": volume.get("status", "UNKNOWN"),
+                "required_sales_volume_tonnes": volume.get("required_sales_volume_tonnes"),
+                "change_pct": volume.get("change_pct"),
+                "unit_contribution_margin_cny_per_tonne_held_fixed": volume.get("unit_contribution_margin_cny_per_tonne_held_fixed"),
+                "production_inventory_feasibility": volume.get("production_and_inventory_feasibility", "UNKNOWN"),
+            },
+            "net_asp_only": {
+                "status": asp.get("status", "UNKNOWN"),
+                "required_net_asp_cny_per_tonne": asp.get("required_net_asp_cny_per_tonne"),
+                "change_pct": asp.get("change_pct"),
+                "sales_volume_tonnes_held_fixed": asp.get("sales_volume_tonnes_held_fixed"),
+            },
+            "unit_variable_cost_only": {
+                "status": cost.get("status", "UNKNOWN"),
+                "required_variable_cost_cny_per_tonne": cost.get("required_variable_cost_cny_per_tonne"),
+                "change_pct": cost.get("change_pct"),
+                "sales_volume_tonnes_held_fixed": cost.get("sales_volume_tonnes_held_fixed"),
+            },
+        },
+        "interpretation": "ALTERNATIVE_ONE_VARIABLE_SENSITIVITIES_NOT_SIMULTANEOUS_FORECAST_TARGETS",
+    }
+
+
+def _scenario_comparison(
+    name: str,
+    *,
+    b62_scenario: Mapping[str, Any],
+    b63_scenario: Mapping[str, Any],
+    b68_scenario: Mapping[str, Any],
+) -> dict[str, Any]:
+    waterfall = _map(b63_scenario.get("value_pool_waterfall"))
+    b4_pool = _dec(waterfall.get("step_3_b4_forecast_pool_at_selected_pes_cny"))
+    required_pool = _dec(waterfall.get("step_5_required_segment_pool_cny"))
+    pool_gap = b4_pool - required_pool if b4_pool is not None and required_pool is not None else None
+    pool_gap_pct = (
+        (b4_pool / required_pool - Decimal("1")) * Decimal("100")
+        if b4_pool is not None and required_pool is not None and required_pool > 0
+        else None
+    )
+    b4_per_share = _dec(b62_scenario.get("b4_forecast_implied_terminal_value_per_share_cny"))
+    required_per_share = _dec(b62_scenario.get("required_terminal_value_per_share_for_required_return_cny"))
+    per_share_gap = (
+        b4_per_share - required_per_share
+        if b4_per_share is not None and required_per_share is not None else None
+    )
+
+    required_pe_rows = _map(_map(b63_scenario.get("multiple_attribution")).get("required_common_pe_by_segment"))
+    if isinstance(required_pe_rows, list):
+        required_pe_by_id = {
+            str(row.get("segment_id")): row for row in required_pe_rows if isinstance(row, Mapping)
+        }
+    else:
+        required_pe_by_id = {}
+    segment_rows: list[dict[str, Any]] = []
+    for segment in b68_scenario.get("segments") or []:
+        if not isinstance(segment, Mapping):
+            continue
+        segment_id = str(segment.get("segment_id") or "")
+        b4_profit = segment.get("b4_forecast_normalized_parent_attributable_profit_cny")
+        b61_lens = _map(segment.get("b61_required_profit_lens"))
+        b63_lens = _map(segment.get("b63_full_b4_vector_lens"))
+        b61_reverse = _map(b61_lens.get("reverse_engineering"))
+        b63_reverse = _map(b63_lens.get("reverse_engineering"))
+        b61_required = b61_lens.get("required_parent_attributable_profit_cny")
+        b63_required = b63_lens.get("required_parent_attributable_profit_cny")
+        b4_minus_b61 = _difference(b4_profit, b61_required)
+        b4_minus_b63 = _difference(b4_profit, b63_required)
+        required_pe = _map(required_pe_by_id.get(segment_id))
+        selected_pe = _dec(segment.get("selected_sotp_pe_x"))
+        required_common_pe = _dec(required_pe.get("required_pe_under_common_scale_x"))
+        segment_rows.append({
+            "segment_id": segment_id,
+            "segment_name": segment.get("segment_name"),
+            "forecast_period": b62_scenario.get("forecast_period", "UNKNOWN"),
+            "b4_independent_forecast_parent_attributable_profit_cny": b4_profit,
+            "b61_one_segment_at_a_time_required_profit_cny": b61_required,
+            "b4_forecast_minus_b61_requirement_cny": b4_minus_b61,
+            "b61_lens_status": b61_reverse.get("status", "UNKNOWN"),
+            "b63_full_b4_vector_one_segment_sensitivity_required_profit_cny": b63_required,
+            "b4_forecast_minus_b63_segment_sensitivity_cny": b4_minus_b63,
+            "b63_lens_status": b63_reverse.get("status", "UNKNOWN"),
+            "selected_sotp_pe_x": _fmt(selected_pe),
+            "b63_required_common_pe_x": _fmt(required_common_pe),
+            "selected_minus_required_common_pe_x": (
+                _fmt(selected_pe - required_common_pe)
+                if selected_pe is not None and required_common_pe is not None else None
+            ),
+            "b61_driver_alternatives": [
+                _driver_row(row) for row in (b61_reverse.get("product_driver_alternatives") or [])
+                if isinstance(row, Mapping)
+            ],
+            "b63_driver_alternatives": [
+                _driver_row(row) for row in (b63_reverse.get("product_driver_alternatives") or [])
+                if isinstance(row, Mapping)
+            ],
+            "non_additive_warning": "B61/B63 单分部利润阈值及产品销量/售价/成本单变量解均为替代敏感性，不可相加。",
+        })
+
+    issues: list[str] = []
+    if b63_scenario.get("status") != "CONDITIONAL_ATTRIBUTION_CALCULATED":
+        issues.append("B63_SCENARIO_NOT_FULLY_RECONCILED")
+    if b68_scenario.get("status") not in {
+        "CONDITIONAL_OPERATING_REQUIREMENT_REVERSE_ENGINEERED", "PARTIAL"
+    }:
+        issues.append("B68_SCENARIO_NOT_FULLY_REVERSE_ENGINEERED")
+    if b4_pool is None or required_pool is None:
+        issues.append("B63_FULL_VECTOR_POOL_VALUES_MISSING")
+    if b4_per_share is None or required_per_share is None:
+        issues.append("B62_PER_SHARE_COMPARISON_VALUES_MISSING")
+    return {
+        "scenario": name,
+        "status": "PARTIAL" if issues else "CONDITIONAL_PRICE_COMPARISON_CALCULATED",
+        "issues": issues,
+        "forecast_period": b62_scenario.get("forecast_period", "UNKNOWN"),
+        "earnings_gap": {
+            "comparison_basis": "B4_FULL_FORECAST_SEGMENT_PROFIT_VECTOR_AT_SELECTED_SOTP_PES_VS_B61_REQUIRED_RETURN_POOL",
+            "b4_independent_forecast_segment_value_pool_cny": _fmt(b4_pool),
+            "required_segment_value_pool_for_required_return_cny": _fmt(required_pool),
+            "b4_forecast_pool_minus_required_pool_cny": _fmt(pool_gap),
+            "headroom_vs_required_pool_pct": _fmt(pool_gap_pct),
+            "direction": (
+                "FORECAST_POOL_ABOVE_REQUIRED_POOL" if pool_gap is not None and pool_gap > _TOL
+                else "FORECAST_POOL_BELOW_REQUIRED_POOL" if pool_gap is not None and pool_gap < -_TOL
+                else "AT_OR_WITHIN_TOLERANCE" if pool_gap is not None
+                else "UNKNOWN"
+            ),
+            "b4_forecast_implied_terminal_value_per_share_cny": _fmt(b4_per_share),
+            "required_terminal_value_per_share_for_required_return_cny": _fmt(required_per_share),
+            "per_share_terminal_value_headroom_cny": _fmt(per_share_gap),
+            "parent_adjustments_and_diluted_shares": "HELD_AT_B61_SELECTED_VALUES",
+            "meaning": "仅表示独立 B4 预测在当前 SOTP 假设下相对 Required Return 条件要求的数学余量；不是外部 MIE，也不是独立概率判断。",
+        },
+        "segment_comparisons": segment_rows,
+        "valuation_gap": {
+            "basis": "B63_PARALLEL_COMMON_PE_SCALE_REQUIRED_IF_FULL_B4_EARNINGS_ARE_ACHIEVED",
+            "status": _map(b63_scenario.get("multiple_attribution")).get("status", "UNKNOWN"),
+            "required_common_pe_by_segment": list(required_pe_by_id.values()),
+            "interpretation": "条件倍数敏感性，不是单一分部公平 P/E，也不是市场交易倍数或外部 MIE。",
+        },
+        "event_timing_gap": {
+            "status": "NOT_IDENTIFIABLE",
+            "reason": "B61/B63/B68 的 Required Return 反推按估值终点和预测期间计算，没有独立的逐事件市场定价时间要求可供比较。",
+        },
+    }
+
+
+def build_expectation_gap_comparison(
+    *,
+    local_sotp_recalculation: Mapping[str, Any],
+    return_metrics: Mapping[str, Any] | None,
+    price_input: Mapping[str, Any],
+    forecast_valuation: Mapping[str, Any],
+    thesis_break_stress_review: Mapping[str, Any] | None,
+    external_mie_status: str,
+) -> dict[str, Any]:
+    """Compare B4 independent forecasts with B61/B63 requirements without changing MIE."""
+    local = _map(local_sotp_recalculation)
+    result: dict[str, Any] = {
+        "schema_version": B76_SCHEMA,
+        "status": "NOT_IDENTIFIABLE",
+        "classification": "PRICE_CONDITIONED_REQUIREMENT_VS_INDEPENDENT_FORECAST_NOT_EXTERNAL_MIE",
+        "external_mie_status_unchanged": external_mie_status or "UNKNOWN",
+        "external_mie_modified": False,
+        "expectation_gap_modified": False,
+        "b4_forecast_modified": False,
+        "b61_b63_b68_modified": False,
+        "valuation_modified": False,
+        "decision_authority": False,
+        "win_odds": {
+            "win_probability_status": "NOT_IDENTIFIABLE",
+            "win_probability_range": None,
+            "probability_basis": "现有 Bear/Base/Bull 权重及概率加权回报不等于经过校准的投资胜率；本批不生成胜率。",
+            "probability_weighted_return_interpretation": "仅为既有回报计算器按提交权重得到的机械结果，不是胜率或概率校准证明。",
+            "payoff_asymmetry": {},
+            "thesis_break_stress": {},
+        },
+        "scenarios": {},
+        "limitations": [
+            "价格条件性比较不是外部市场隐含预期 MIE；MIE 与 expectation_gap 原状态不变。",
+            "B61/B63 单分部阈值及 B68 产品销量/售价/成本解是单变量替代敏感性，不可相加。",
+            "B63 full-vector pool 对比使用完整 B4 分部利润向量与既定 SOTP P/E；母公司调整和稀释股数固定。",
+            "B68 反推结果不是独立预测，不得把反推值当作公司将实现的经营结果。",
+            "15% Fundamental Target 与 Required Return 保持原有独立口径；本模块只展示 B63 的 Required Return 价值池要求。",
+        ],
+    }
+    if str(local.get("selected_model_family") or "").upper() != "SOTP":
+        result["status"] = "NOT_APPLICABLE_NON_SOTP"
+        return result
+    b63 = _map(local.get("valuation_gap_attribution"))
+    b62 = _map(local.get("segment_earnings_reconciliation"))
+    b68 = _map(local.get("operating_requirement_reverse_engineering"))
+    if b63.get("status") != "CONDITIONAL_ATTRIBUTION_CALCULATED":
+        result["status"] = "BLOCKED_BY_B63"
+        return result
+    if b62.get("status") not in {"CONDITIONAL_RECONCILIATION_CALCULATED", "PARTIAL"}:
+        result["status"] = "BLOCKED_BY_B62"
+        return result
+    if b68.get("status") not in {"CONDITIONAL_OPERATING_REQUIREMENT_REVERSE_ENGINEERED", "PARTIAL"}:
+        result["status"] = "BLOCKED_BY_B68"
+        return result
+
+    b62_scenarios = _map(b62.get("scenarios"))
+    b63_scenarios = _map(b63.get("scenarios"))
+    b68_scenarios = _map(b68.get("scenarios"))
+    statuses = []
+    for name in _SCENARIOS:
+        row = _scenario_comparison(
+            name,
+            b62_scenario=_map(b62_scenarios.get(name)),
+            b63_scenario=_map(b63_scenarios.get(name)),
+            b68_scenario=_map(b68_scenarios.get(name)),
+        )
+        result["scenarios"][name] = row
+        statuses.append(row["status"])
+    if statuses and all(status == "CONDITIONAL_PRICE_COMPARISON_CALCULATED" for status in statuses):
+        result["status"] = "CONDITIONAL_PRICE_COMPARISON_CALCULATED"
+    elif any(status in {"CONDITIONAL_PRICE_COMPARISON_CALCULATED", "PARTIAL"} for status in statuses):
+        result["status"] = "PARTIAL"
+    else:
+        result["status"] = "NOT_IDENTIFIABLE"
+
+    metrics = _map(return_metrics)
+    entry = _dec(_map(price_input).get("price"))
+    wealth = _map(metrics.get("scenario_terminal_wealth"))
+    scenario_returns: dict[str, Decimal] = {}
+    if entry is not None and entry > 0:
+        for name in _SCENARIOS:
+            terminal_wealth = _dec(wealth.get(name))
+            if terminal_wealth is not None:
+                scenario_returns[name] = terminal_wealth / entry - Decimal("1")
+    bear = scenario_returns.get("bear")
+    base = scenario_returns.get("base")
+    bull = scenario_returns.get("bull")
+    result["win_odds"]["payoff_asymmetry"] = {
+        "holding_period_total_return_by_scenario": {name: _fmt(value * Decimal("100")) for name, value in scenario_returns.items()},
+        "base_upside_to_bear_downside_ratio": (
+            _fmt(base / abs(bear)) if base is not None and bear is not None and base > 0 and bear < 0 else None
+        ),
+        "bull_upside_to_bear_downside_ratio": (
+            _fmt(bull / abs(bear)) if bull is not None and bear is not None and bull > 0 and bear < 0 else None
+        ),
+        "ratio_basis": "同一输入价格、同一估值终点/持有期的情景总回报；不含概率含义。",
+        "expected_annualized_return_under_submitted_weights": metrics.get("expected_annualized_return"),
+    }
+    stress = _map(thesis_break_stress_review)
+    result["win_odds"]["thesis_break_stress"] = {
+        "status": stress.get("status", "UNKNOWN"),
+        "stress_total_return": _fmt(_dec(stress.get("stress_total_return"))),
+        "stress_downside_pct": _fmt(_dec(stress.get("stress_downside_pct"))),
+        "probability_weighted": False,
+        "interpretation": "独立 thesis-break stress 是失败代价参照，不赋予概率，不并入 Bear/Base/Bull 权重。",
+    }
+    result["win_odds"]["probability_weighted_return"] = {
+        "value": metrics.get("expected_annualized_return"),
+        "method": metrics.get("expected_annualized_return_method"),
+        "scenario_probabilities_calibrated": forecast_valuation.get("probabilities_calibrated") is True,
+        "interpretation": "现有计算器按输入情景权重的算术结果；除非另有经证据校准的胜率模型，否则不得解读为投资胜率。",
+    }
+    return result
