@@ -102,7 +102,7 @@ def _scenario_comparison(
         if b4_per_share is not None and required_per_share is not None else None
     )
 
-    required_pe_rows = _map(_map(b63_scenario.get("multiple_attribution")).get("required_common_pe_by_segment"))
+    required_pe_rows = _map(b63_scenario.get("multiple_attribution")).get("required_common_pe_by_segment")
     if isinstance(required_pe_rows, list):
         required_pe_by_id = {
             str(row.get("segment_id")): row for row in required_pe_rows if isinstance(row, Mapping)
