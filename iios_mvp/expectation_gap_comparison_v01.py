@@ -84,11 +84,15 @@ def _driver_row(product: Mapping[str, Any]) -> dict[str, Any]:
 def _scenario_comparison(
     name: str,
     *,
+    b61_scenario: Mapping[str, Any],
     b62_scenario: Mapping[str, Any],
     b63_scenario: Mapping[str, Any],
     b68_scenario: Mapping[str, Any],
 ) -> dict[str, Any]:
     waterfall = _map(b63_scenario.get("value_pool_waterfall"))
+    b61_requirements = _map(b61_scenario.get("requirements"))
+    required_return_requirement = _map(b61_requirements.get("required_return"))
+    fundamental_target_requirement = _map(b61_requirements.get("fundamental_target_annualized_return"))
     b4_pool = _dec(waterfall.get("step_3_b4_forecast_pool_at_selected_pes_cny"))
     required_pool = _dec(waterfall.get("step_5_required_segment_pool_cny"))
     pool_gap = b4_pool - required_pool if b4_pool is not None and required_pool is not None else None
@@ -175,6 +179,8 @@ def _scenario_comparison(
         "issues": issues,
         "forecast_period": b62_scenario.get("forecast_period", "UNKNOWN"),
         "earnings_gap": {
+            "required_return_annualized_rate": required_return_requirement.get("annualized_return_rate"),
+            "fundamental_target_annualized_rate": fundamental_target_requirement.get("annualized_return_rate"),
             "comparison_basis": "B4_FULL_FORECAST_SEGMENT_PROFIT_VECTOR_AT_SELECTED_SOTP_PES_VS_B61_REQUIRED_RETURN_POOL",
             "b4_independent_forecast_segment_value_pool_cny": _fmt(b4_pool),
             "required_segment_value_pool_for_required_return_cny": _fmt(required_pool),
@@ -282,6 +288,7 @@ def build_expectation_gap_comparison(
         result["status"] = "BLOCKED_BY_B68"
         return result
 
+    b61_scenarios = _map(local.get("scenarios"))
     b62_scenarios = _map(b62.get("scenarios"))
     b63_scenarios = _map(b63.get("scenarios"))
     b68_scenarios = _map(b68.get("scenarios"))
@@ -289,6 +296,7 @@ def build_expectation_gap_comparison(
     for name in _SCENARIOS:
         row = _scenario_comparison(
             name,
+            b61_scenario=_map(b61_scenarios.get(name)),
             b62_scenario=_map(b62_scenarios.get(name)),
             b63_scenario=_map(b63_scenarios.get(name)),
             b68_scenario=_map(b68_scenarios.get(name)),
