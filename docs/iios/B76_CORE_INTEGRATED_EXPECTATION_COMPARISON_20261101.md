@@ -34,6 +34,8 @@ B73 分支较 main 超前 321 个提交。**本批仅在该分支上继续开发
 
 新文件：`iios_mvp/expectation_gap_comparison_v01.py`
 
+**适用范围：**本批 B76 数值对照聚焦操作者选定且本地成功复算的 SOTP 路径（B61/B62/B63/B68）。非 SOTP 主模型返回 `NOT_APPLICABLE_NON_SOTP`；EPS_MULTIPLE 的 B60 现价 EPS 反推保留原有展示和计算，本批没有新增 B60 与 B4 的独立数值对照。
+
 输入复用现有结果：
 - B62 `segment_earnings_reconciliation`
 - B63 `valuation_gap_attribution`
