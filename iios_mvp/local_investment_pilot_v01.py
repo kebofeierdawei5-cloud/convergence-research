@@ -5748,6 +5748,8 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             lines.append(
                 f"- **{scenario_name.upper()}**（{b76_row.get('status', 'UNKNOWN')}）："
                 f"B4 前瞻分部价值池 {earnings_gap.get('b4_independent_forecast_segment_value_pool_cny') or 'UNKNOWN'} CNY；"
+                f"Required Return 年化门槛 {earnings_gap.get('required_return_annualized_rate') or 'UNKNOWN'}；"
+                f"Fundamental Target 年化门槛 {earnings_gap.get('fundamental_target_annualized_rate') or 'UNKNOWN'}；"
                 f"Required Return 所需价值池 {earnings_gap.get('required_segment_value_pool_for_required_return_cny') or 'UNKNOWN'} CNY；"
                 f"价值池余量 {earnings_gap.get('b4_forecast_pool_minus_required_pool_cny') or 'UNKNOWN'} CNY "
                 f"（相对要求 {earnings_gap.get('headroom_vs_required_pool_pct') or 'UNKNOWN'}%）；"
