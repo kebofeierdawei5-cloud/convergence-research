@@ -1,6 +1,6 @@
 # B74 — Core Contradiction Research Priority
 
-**Status:** implemented on an isolated feature branch; unmerged and non-canonical.  
+**Status:** original implementation was on a main-based isolated branch; this implementation is ported onto `feat/b76-core-integrated-20261101` atop the B73 proposal chain. Unmerged and non-canonical.  
 **Validation:** regression assertions were added but not executed. Replay, CI, and real macOS acceptance were not run.
 
 ## Objective
