@@ -123,6 +123,9 @@ def test_b76_does_not_convert_scenario_weights_or_payoff_ratio_into_win_probabil
     odds = result["win_odds"]
     assert odds["win_probability_status"] == "NOT_IDENTIFIABLE"
     assert odds["win_probability_range"] is None
+    assert odds["probability_weighted_return"]["scenario_probabilities_calibrated"] is False
+    assert odds["probability_weighted_return"]["model_declared_probabilities_calibrated"] is True
+    assert odds["probability_weighted_return"]["calibration_status"] == "NOT_INDEPENDENTLY_VERIFIED"
     assert odds["payoff_asymmetry"]["base_upside_to_bear_downside_ratio"] == "1.5"
     assert odds["payoff_asymmetry"]["bull_upside_to_bear_downside_ratio"] == "3"
     assert odds["thesis_break_stress"]["probability_weighted"] is False
