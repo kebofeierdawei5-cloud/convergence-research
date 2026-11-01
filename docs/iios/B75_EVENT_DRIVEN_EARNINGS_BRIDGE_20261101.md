@@ -1,6 +1,6 @@
 # B75 — Event-driven future operating and earnings bridge
 
-**Status:** implemented on an isolated branch based on B74; not merged.  
+**Status:** original implementation was on a main-based isolated branch; this implementation is ported onto `feat/b76-core-integrated-20261101` atop the B73 proposal chain. Unmerged and non-canonical.  
 **Validation:** regression assertions added but not executed. No Replay, CI, or macOS acceptance is claimed.
 
 ## Objective
