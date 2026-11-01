@@ -95,6 +95,8 @@ def test_b76_compares_b4_full_vector_with_b61_b63_price_requirements():
         external_mie_status="NOT_IDENTIFIABLE",
     )
     assert result["status"] == "CONDITIONAL_PRICE_COMPARISON_CALCULATED"
+    assert result["price_conditioned_comparison_status"] == "CONDITIONAL_PRICE_COMPARISON_CALCULATED"
+    assert result["coverage_status"] == "PARTIAL_WIN_PROBABILITY_AND_EVENT_TIMING_NOT_IDENTIFIABLE"
     base = result["scenarios"]["base"]
     assert base["earnings_gap"]["b4_forecast_pool_minus_required_pool_cny"] == "50"
     assert base["earnings_gap"]["headroom_vs_required_pool_pct"] == "4.166666666666666666666666667"
