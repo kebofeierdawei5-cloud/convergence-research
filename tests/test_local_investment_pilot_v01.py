@@ -1159,6 +1159,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert "【B76：三类预期严格分开】" in round_b_text
     assert "【B76：胜率与赔率】" in round_b_text
     assert "可比投资案例的历史胜负样本" in round_b_text
+    assert "B63 full-vector value-pool 反推使用 Required Return" in round_b_text
     assert "当前价格已反映多少" in round_b_text
     assert "绝不能把自己的 Base 估值伪装成市场预期" in round_b_text
     assert "IIOS-RESEARCH-PATCH-0.1" in round_a_text and "IIOS-RESEARCH-PATCH-0.1" in round_b_text
