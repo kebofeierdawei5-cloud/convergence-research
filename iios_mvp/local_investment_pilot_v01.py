@@ -7925,6 +7925,10 @@ def create_pilot_template(
         "6. 哪些事实要求改变看法：写出会证伪核心论点或使情景切换的可观察指标、阈值/方向、验证时间和对应经营/估值影响；区分暂时波动与结构性恶化。落入 assessment.thesis.break_conditions、assessment.thesis.reassessment_triggers、assessment.risk.items 的监控触发项以及 Bear.failure_trigger / operating_impact / valuation_mechanism。"
         "每个排名靠前的 value driver 都应尽量填写 driver_type、historical_evidence、valuation_transmission、impact、rationale 和其自身的 evidence_refs；证据只证明事实，不自动证明因果，因果需另给机制。Bear/Base/Bull 应由经营驱动假设产生有意义的差异，而不是只改终值或概率；说明情景间销量、净售价、单位成本、利润率、现金转化、资本开支和估值倍数发生哪些变化以及依据。"
         "最终要判断的是“按输入价格是否值得承担风险”，而不是只判断公司是否优秀或值得研究。请提供足以让本地决策引擎复算的输入，不要另造顶层 action/target-price 字段，也不要在研究回答中声称已发出 BUY/ADD/交易指令；15% 年化门槛、共同约束入场价与暂定动作由本地既有计算器独立计算。"
+        "【B74：主要矛盾优先】必须从所有可能影响公司价值的因素中选出1个当前主要矛盾，最多保留2个确实重要的次要矛盾；说明主要矛盾为何比其他因素更重要。复用 assessment.thesis.core_statement 描述主要矛盾、当前基线、经济意义与每股价值影响；assessment.value_drivers 按重要性排序，rank=1 必须是主要矛盾背后的首要决定因素，最多另列2项次要因素。"
+        "【B74：决定因素证据】主要矛盾需明确当前可核验基线、1–3个真正决定方向的变量、支持证据和反证、变量变化机制、领先指标、证伪条件与验证时间。事实、公司指引、分析师假设和未知严格区分；每个关键驱动使用自己的 evidence_refs。rank=1 的 valuation_transmission 说明主要矛盾如何传导到收入、单位利润/费用、归母净利润、必要时现金流、稀释股数、EPS 和每股价值。只展开影响投资结果的少数变量，不要机械完成所有财务归因。"
+        "【B75：未来事件链】从主要矛盾推导未来1年最重要的2–4个事件/阶段，按最可能的先后顺序写入 assessment.thesis.drivers（复用现有列表，不新增字段）。每项说明事件及时间窗口、前置条件/可观察触发信号、截止时点前支持证据和关键反证、事件发生后哪一项经营变量如何变化、映射到 operating_driver_forecast 的具体产品线/销量/净售价/单位成本/产量/固定费用/资本开支/营运资金输入、对收入利润现金流的方向影响，以及失败时哪个情景/预测需要改变。事件之间须明确先后、依赖或并行关系，不能把互不相关的新闻拼成事件链。"
+        "【B75：概率与现实约束】事件概率只有存在相关基准率、历史频率、合同/建设/认证/客户导入进度或可观测先行指标时才给数值；否则定性说明依据，不伪造概率。Bear/Base/Bull 必须体现事件不同发生路径、时间和强度。检查产能、订单转收入周期、供需、价格竞争、产品结构、原料、良率、资金、库存和营运资金等与主要矛盾直接相关的约束；销量路径不可行不代表售价/结构路径也不可行，须逐条评估。复用 B4 计算和现有 B5/B6/B55-B62 传导，不新建预测引擎。"
     )
     eps_multiple_instructions = (
         "\n\nEPS_MULTIPLE 主估值计算契约（IIOS-EPS-MULTIPLE-VALUATION-0.1 / B27 EPS earnings bridge）："
@@ -8306,6 +8310,9 @@ def _build_price_aware_round_b_prompt(*, base_prompt: str, payload: Mapping[str,
         + "研究输出顺序必须优先回答：①当前基本面事实与最关键的不确定性；②当前价/当前估值倍数实际要求企业实现什么；③在独立事实、业务机制和显式假设上形成的合理 Bear/Base/Bull 未来推演；④当前价格相对这些预期的差异及风险。不要先铺陈长篇辅助诊断再给核心判断。"
         + "外部 MIE 必须有独立、截止时点兼容、可核验的市场定价/一致预期证据；否则 assessment.market_implied_expectation.status=NOT_IDENTIFIABLE。价格反推属于条件模型反演，不是外部 MIE：放在 assessment.market_implied_expectation.price_implied_analysis，至少填写 status、method、model_family、reference_price、assumptions、implied_requirements、limitations；reference_price 必须与 price_input.price 完全一致。反推结果必须披露所固定的利润率/EPS/增长/终值倍数/资本回报/现金转换等变量和敏感性；不具备可复算公式或关键假设时，状态为 NOT_IDENTIFIABLE，数值留空。"
         + "assessment.expectation_gap 使用 comparison_basis 和 comparisons 对齐可比的市场/价格隐含要求与 Round A 独立预测；比较行至少有 metric、market_implied_value 或 price_implied_value、independent_forecast_value、unit、period、difference 或 direction、limitations。单位/期间/定义不一致就不比较，不得把仅方向性的判断伪装成量化预期差。任何基于 CONDITIONAL_PRICE_IMPLIED_VS_INDEPENDENT_FORECAST 的结果都只能展示为条件敏感性，决策可用 expectation_gap 必须保持 UNKNOWN，因为本地并未独立复算该反演；只有直接以外部可核验 MIE 为比较端的可比项才可能构成已验证预期差。"
+        + "【B76：三类预期严格分开】Round A 冻结的独立预测、B61/B63/B68 本地复算的现价条件性经营要求、外部 MIE 是三类不同信息。B61/B63/B68 计算发生在 Round B 之后，当前 Round B 输入不包含其数值；不得自行编造反推值或宣称已经完成数值差额比较。真正的数值对照由本地后置 B76 只读模块基于 B4/B61/B62/B63/B68 输出完成。"
+        + "【B76：预期差拆分】外部 MIE 可识别时才可论证已验证市场预期差；MIE=NOT_IDENTIFIABLE 时只允许描述价格条件性比较，不得把 expectation_gap 升级为 PASS/POSITIVE/NEGATIVE。经营/盈利/估值/事件时间差必须分别比较，期间、单位、范围或口径不一致时标为 UNKNOWN/NOT_COMPARABLE。B61 单分部利润阈值、B63 单变量共同 P/E 敏感性及 B68 产品销量/售价/成本替代解不可相加。"
+        + "【B76：胜率与赔率】胜率、赔率、概率加权收益分开。Bear/Base/Bull 输入权重不是天然校准概率，概率加权回报不是胜率；缺乏历史基准率/校准证据时 win_probability=UNKNOWN。赔率只能基于同一入场价、同一持有期的上行与下行幅度比较；失败代价还要展示独立 thesis-break stress 和时间成本。事件概率不得直接当作投资胜率。15% 年化门槛是新资金收益要求，不是折现率。"
         + "不要修改人工控制字段，不声称正式准入、实际成交、实际分红或交易授权。"
     )
     return prompt, prompt_input, frozen_sha
