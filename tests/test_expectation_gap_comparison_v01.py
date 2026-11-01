@@ -22,6 +22,7 @@ def _inputs():
     }
     for name in ("bear", "base", "bull"):
         local["scenarios"][name] = {
+            "status": "CALCULATED_CONDITIONAL",
             "requirements": {
                 "required_return": {"annualized_return_rate": "0.12"},
                 "fundamental_target_annualized_return": {"annualized_return_rate": "0.15"},
