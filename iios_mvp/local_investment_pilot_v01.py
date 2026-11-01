@@ -3927,6 +3927,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
         "- 独立预测：来自冻结的 Round A 现实证据/主要矛盾/事件推演及现有 B4–B68 传导，不等于市场预期。",
         "- 价格条件性要求：B61/B63 等反推仅说明当前价格和既定回报/风险约束要求什么经营结果，不是外部 MIE。",
+        "- 数值对照限制：当前 Round B Prompt 不会把本地计算器生成的 B61/B63 数值输出自动注入研究上下文；未明确提供对应数值、期间和单位时，经营/盈利预期差的价格要求端必须保持 UNKNOWN，不得声称已完成数值差额计算。",
         "- 外部 MIE：仅接受截止时点兼容、可核验的市场定价/一致预期证据；不可识别时保持 NOT_IDENTIFIABLE。",
         "- MIE 不可识别时，独立预测与价格条件性要求的差异只能称为价格条件比较，不能声称已验证市场正/负预期差。",
     ]
@@ -5167,6 +5168,7 @@ def _build_price_aware_round_b_prompt(*, base_prompt: str, payload: Mapping[str,
         + "【B76：三种预期必须分开】(1) 独立预测：只来自已冻结的 Round A 现实证据、主要矛盾、事件链和 B4–B68 盈利/每股价值推演；(2) 现价条件性经营要求：只表示在当前输入价格、既定持有期和回报/风险约束下，价格反推所要求的经营结果，可引用 B61/B63，但必须标注 PRICE_CONDITIONED_REQUIREMENT，不是市场共识；(3) 外部 MIE：只有截止时点兼容、可核验的分析师一致预期/市场定价证据才能识别。三者不可互相替代。"
         + "【B76：预期差拆解】在 assessment.expectation_gap 内复用现有对象，可增加 operating_gap、earnings_gap、valuation_gap、event_timing_gap 四个子对象；每个对象仅填写有依据的 driver/metric、independent_forecast、price_conditioned_requirement、difference、unit、period、evidence_refs、note。经营预期差比较销量/净售价/结构/成本/产能/资本开支等关键变量；盈利预期差比较同期间归母净利润/EPS/FCF；估值预期差只比较可核验的市场估值预期与独立价值判断；事件/时间差比较事件兑现窗口与价格条件性要求的时间窗口。不能比较的字段明确 UNKNOWN/NOT_COMPARABLE，不得填造差额。"
         + "【B76：MIE 不可识别时的边界】若 MIE=NOT_IDENTIFIABLE，仍可描述独立预测与现价条件性经营要求之间的差异，但必须称为价格条件比较，不得称为已验证的市场正/负预期差，不得将 expectation_gap.status 标为 PASS 或 direction 标为 POSITIVE/NEGATIVE 来绕过现有门禁。不得把 B61/B63 的反推称为市场一致预期。"
+        + "【B76：数值对照可用性】仅当本轮输入明确包含 B61/B63 已计算的价格条件性经营要求及其口径/期间/单位时，才可填入 operating_gap/earnings_gap 的 price_conditioned_requirement 并计算差额；若未提供，必须写 UNKNOWN/NOT_PROVIDED，不得自行伪造 B61/B63 输出，也不得仅凭当前股价或 Base 估值猜测所需经营指标。"
         + "【B76：胜率、赔率、期望值分开】在 assessment.expectation_gap.win_odds 内复用现有字段承载 win_probability_range、probability_basis、payoff_ratio、upside_reference、downside_reference、failure_cost、time_cost、catalyst_window、summary。胜率是投资判断在给定期限内获得正回报的概率，必须有可核验基准率、历史样本、事件进度或其他明确概率依据；没有依据就填 UNKNOWN/定性等级，不得伪造精确百分比。赔率比较同一入场价格、同一持有期下的潜在上行与下行；失败代价须覆盖 Bear 与独立 thesis-break stress、永久资本损失和时间成本。概率加权期望回报不是胜率；Bear/Base/Bull 权重不是天然的胜率，只有互斥、穷尽且概率校准有证据时才可用于概率计算。forecast_valuation.probabilities_calibrated=false 时，不得把情景权重表述为校准概率或胜率。"
         + "【B76：决策纪律】明确主要矛盾对应的正面催化剂、验证窗口、证伪信号和可能失败路径。15% 年化收益门槛是新资金回报要求，不是折现率。胜率高不代表赔率好，赔率高不代表胜率高；若正预期差、胜率、赔率或失败代价任何关键项不可识别，明确说明不确定性，不用一个综合分数掩盖。不要越权输出 BUY/ADD/HOLD 等正式动作，不改现有估值和决策计算。"
         + "不要修改人工控制字段，不声称正式准入、实际成交、实际分红或交易授权。"
