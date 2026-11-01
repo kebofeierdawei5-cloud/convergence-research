@@ -6,6 +6,7 @@ from iios_mvp.expectation_gap_comparison_v01 import build_expectation_gap_compar
 def _inputs():
     local = {
         "selected_model_family": "SOTP",
+        "scenarios": {},
         "valuation_gap_attribution": {
             "status": "CONDITIONAL_ATTRIBUTION_CALCULATED",
             "scenarios": {},
@@ -20,6 +21,12 @@ def _inputs():
         },
     }
     for name in ("bear", "base", "bull"):
+        local["scenarios"][name] = {
+            "requirements": {
+                "required_return": {"annualized_return_rate": "0.12"},
+                "fundamental_target_annualized_return": {"annualized_return_rate": "0.15"},
+            }
+        }
         local["valuation_gap_attribution"]["scenarios"][name] = {
             "status": "CONDITIONAL_ATTRIBUTION_CALCULATED",
             "value_pool_waterfall": {
@@ -99,6 +106,8 @@ def test_b76_compares_b4_full_vector_with_b61_b63_price_requirements():
     assert result["coverage_status"] == "PARTIAL_WIN_PROBABILITY_AND_EVENT_TIMING_NOT_IDENTIFIABLE"
     base = result["scenarios"]["base"]
     assert base["earnings_gap"]["b4_forecast_pool_minus_required_pool_cny"] == "50"
+    assert base["earnings_gap"]["required_return_annualized_rate"] == "0.12"
+    assert base["earnings_gap"]["fundamental_target_annualized_rate"] == "0.15"
     assert base["earnings_gap"]["headroom_vs_required_pool_pct"] == "4.166666666666666666666666667"
     assert base["operating_gap"]["status"] == "CONDITIONAL_PRICE_CONDITIONED_OPERATING_ALTERNATIVES"
     segment = base["segment_comparisons"][0]
