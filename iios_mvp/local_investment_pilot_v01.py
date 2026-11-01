@@ -3699,6 +3699,18 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
     ]
     lines.extend(_format_text_block(a["thesis"].get("core_statement")))
+    lines.extend(["", "### 主要矛盾驱动的未来关键事件链", "", "- 以下为基于截止时点证据的条件性研究推演，不代表事件已经发生或公司承诺；事件顺序不等于确定性。"])
+    thesis_events = a["thesis"].get("drivers") if isinstance(a["thesis"].get("drivers"), list) else []
+    if thesis_events:
+        for event_index, event in enumerate(thesis_events[:4], start=1):
+            if isinstance(event, Mapping):
+                event_text = json.dumps(event, ensure_ascii=False, sort_keys=True)
+            else:
+                event_text = str(event).strip()
+            if event_text:
+                lines.append(f"{event_index}. {event_text}")
+    else:
+        lines.append("- 未来事件链未提供：不得仅凭 Bear/Base/Bull 数值反推事件已经得到识别。")
     lines.extend(["", "### 主要矛盾的决定因素（按重要性排序）", "", "- 排名第一项是研究输出的主要矛盾决定因素候选；排名仅代表分析优先级，不代表系统已独立验证因果或预测。", ""])
     drivers = sorted(a["value_drivers"], key=lambda x: (x["rank"], x["driver"]))
     driver_issue_explanations = {
