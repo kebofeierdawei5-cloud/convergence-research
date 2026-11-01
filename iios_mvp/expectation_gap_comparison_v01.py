@@ -161,6 +161,8 @@ def _scenario_comparison(
         })
 
     issues: list[str] = []
+    if b61_scenario.get("status") != "CALCULATED_CONDITIONAL":
+        issues.append("B61_SCENARIO_NOT_FULLY_CALCULATED")
     if b62_scenario.get("status") != "CALCULATED_CONDITIONAL":
         issues.append("B62_SCENARIO_NOT_FULLY_RECONCILED")
     if b63_scenario.get("status") != "CONDITIONAL_ATTRIBUTION_CALCULATED":
@@ -177,6 +179,12 @@ def _scenario_comparison(
         "scenario": name,
         "status": "PARTIAL" if issues else "CONDITIONAL_PRICE_COMPARISON_CALCULATED",
         "issues": issues,
+        "upstream_statuses": {
+            "b61": b61_scenario.get("status", "UNKNOWN"),
+            "b62": b62_scenario.get("status", "UNKNOWN"),
+            "b63": b63_scenario.get("status", "UNKNOWN"),
+            "b68": b68_scenario.get("status", "UNKNOWN"),
+        },
         "forecast_period": b62_scenario.get("forecast_period", "UNKNOWN"),
         "earnings_gap": {
             "required_return_annualized_rate": required_return_requirement.get("annualized_return_rate"),
