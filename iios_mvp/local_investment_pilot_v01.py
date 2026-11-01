@@ -3715,8 +3715,13 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     }
     if drivers:
         for display_rank, item in enumerate(drivers, start=1):
+            driver_label = (
+                "主要矛盾首要决定因素候选"
+                if display_rank == 1
+                else f"次要价值驱动因素 {display_rank - 1}"
+            )
             lines.append(
-                f"**{'主要矛盾首要决定因素候选' if display_rank == 1 else f'次要价值驱动因素 {display_rank - 1}'}：{item['driver']}**"
+                f"**{driver_label}：{item['driver']}**"
                 f"（影响：{item['impact']}；内容门禁：{item.get('status', 'UNKNOWN')}）"
             )
             if item.get("driver_type"):
@@ -5078,7 +5083,7 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
         "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。公司靠什么赚钱、产品/客户结构、盈利质量、周期位置、资本占用和现金转换只作为判断主要矛盾所需的现实基线，不作为无差别的完整性清单。"
         "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。已有 operating_driver_forecast、B4/B42/B55–B62 等计算与诊断结构继续复用；只有当细分归因直接影响主要矛盾、且存在独立依据时才展开。不得为填满 FCF、营运资金或差异归因结构而机械拆分或编造金额；辅助诊断不得挤占主要矛盾、证据和盈利传导分析。"
         "本轮唯一输入为末尾列出的公司身份、截止时点、证据登记结构和公司侧字段；当前价格、当前持仓、估值选择、市场隐含预期、预期差及组合约束均未提供。不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
-        "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\\n\\n"
+        "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
         "【Round A 允许输入】\\n"
         + json.dumps(allowed_input, ensure_ascii=False, indent=2, allow_nan=False)
     )
