@@ -39,6 +39,7 @@ from .sotp_comparability_audit_v01 import build_sotp_comparability_audit
 from .sotp_multiple_calibration_v01 import build_sotp_multiple_calibration_assessment
 from .sotp_value_credibility_audit_v01 import build_sotp_value_credibility_price_audit
 from .sotp_operating_requirement_reverse_engineering_v01 import build_sotp_operating_requirement_reverse_engineering
+from .expectation_gap_comparison_v01 import build_expectation_gap_comparison
 from .sotp_operating_feasibility_audit_v01 import build_sotp_operating_feasibility_audit
 from .operating_feasibility_evidence_v01 import build_operating_feasibility_evidence_assessment
 from .operating_feasibility_semantic_review_v01 import build_operating_feasibility_semantic_review
@@ -7219,6 +7220,20 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
                         dict(event) for event in normalized_events if isinstance(event, Mapping)
                     ]
     stress_review = _thesis_break_stress_review(prepared)
+    # B76 compares the already-computed B4 forecast against B61/B63/B68
+    # conditional price requirements. It is read-only and never upgrades MIE.
+    local_sotp_inversion["expectation_gap_comparison"] = build_expectation_gap_comparison(
+        local_sotp_recalculation=local_sotp_inversion,
+        return_metrics=metrics,
+        price_input=prepared.get("price_input") or {},
+        forecast_valuation=prepared.get("forecast_valuation") or {},
+        thesis_break_stress_review=stress_review,
+        external_mie_status=str(mie.get("status") or "UNKNOWN"),
+    )
+    source_inversion["local_sotp_recalculation"] = local_sotp_inversion
+    mie["price_implied_analysis"] = source_inversion
+    assessment["market_implied_expectation"] = mie
+    prepared["assessment"] = assessment
     price_zone_sensitivity = _price_zone_sensitivity(prepared, metrics, reason)
     portfolio_package = build_local_pilot_portfolio_package(
         operator_context=prepared.get("operator_portfolio_context"),
