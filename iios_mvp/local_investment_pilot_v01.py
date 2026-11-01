@@ -5723,6 +5723,49 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
 
 
     local_sotp_inversion = inversion.get("local_sotp_recalculation") if isinstance(inversion.get("local_sotp_recalculation"), Mapping) else {}
+    local_b76 = local_sotp_inversion.get("expectation_gap_comparison") if isinstance(local_sotp_inversion.get("expectation_gap_comparison"), Mapping) else {}
+    if local_b76:
+        lines.extend([
+            "",
+            "### B76：独立预测与现价条件性要求的数值对照",
+            f"- 对照状态：{local_b76.get('status', 'UNKNOWN')}；类别：{local_b76.get('classification', 'UNKNOWN')}；外部 MIE 状态保持 {local_b76.get('external_mie_status_unchanged', 'UNKNOWN')}。",
+            "- 本节对照 B4 全分部独立盈利预测与 B61/B63 Required Return 条件要求；仅为价格条件比较，不代表外部市场共识或已验证的市场正预期差。",
+        ])
+        b76_scenarios = local_b76.get("scenarios") if isinstance(local_b76.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b76_row = b76_scenarios.get(scenario_name) if isinstance(b76_scenarios.get(scenario_name), Mapping) else {}
+            earnings_gap = b76_row.get("earnings_gap") if isinstance(b76_row.get("earnings_gap"), Mapping) else {}
+            lines.append(
+                f"- **{scenario_name.upper()}**（{b76_row.get('status', 'UNKNOWN')}）："
+                f"B4 前瞻分部价值池 {earnings_gap.get('b4_independent_forecast_segment_value_pool_cny') or 'UNKNOWN'} CNY；"
+                f"Required Return 所需价值池 {earnings_gap.get('required_segment_value_pool_for_required_return_cny') or 'UNKNOWN'} CNY；"
+                f"价值池余量 {earnings_gap.get('b4_forecast_pool_minus_required_pool_cny') or 'UNKNOWN'} CNY "
+                f"（相对要求 {earnings_gap.get('headroom_vs_required_pool_pct') or 'UNKNOWN'}%）；"
+                f"每股终值余量 {earnings_gap.get('per_share_terminal_value_headroom_cny') or 'UNKNOWN'} CNY/股。"
+            )
+            for segment in (b76_row.get("segment_comparisons") or [])[:5]:
+                if not isinstance(segment, Mapping):
+                    continue
+                lines.append(
+                    f"  - {segment.get('segment_name') or segment.get('segment_id')}："
+                    f"B4 独立预测归母利润 {segment.get('b4_independent_forecast_parent_attributable_profit_cny') or 'UNKNOWN'} CNY；"
+                    f"B61 单变量要求 {segment.get('b61_one_segment_at_a_time_required_profit_cny') or 'UNKNOWN'} CNY；"
+                    f"B4−B61 {((segment.get('b4_forecast_minus_b61_requirement') or {}).get('difference')) or 'UNKNOWN'} CNY；"
+                    f"B63 单变量要求 {segment.get('b63_full_b4_vector_one_segment_sensitivity_required_profit_cny') or 'UNKNOWN'} CNY；"
+                    f"B4−B63 {((segment.get('b4_forecast_minus_b63_segment_sensitivity') or {}).get('difference')) or 'UNKNOWN'} CNY；"
+                    f"选定/Required Common P/E {segment.get('selected_sotp_pe_x') or 'UNKNOWN'}x / "
+                    f"{segment.get('b63_required_common_pe_x') or 'UNKNOWN'}x。"
+                )
+        win_odds = local_b76.get("win_odds") if isinstance(local_b76.get("win_odds"), Mapping) else {}
+        payoff = win_odds.get("payoff_asymmetry") if isinstance(win_odds.get("payoff_asymmetry"), Mapping) else {}
+        stress = win_odds.get("thesis_break_stress") if isinstance(win_odds.get("thesis_break_stress"), Mapping) else {}
+        lines.extend([
+            f"- 胜率：{win_odds.get('win_probability_status', 'UNKNOWN')}；本批不把 Bear/Base/Bull 权重当作胜率。",
+            f"- 同期限上行/下行赔率参照：Base 上行 / Bear 下行 {payoff.get('base_upside_to_bear_downside_ratio') or 'UNKNOWN'}；Bull 上行 / Bear 下行 {payoff.get('bull_upside_to_bear_downside_ratio') or 'UNKNOWN'}。这只是回报幅度比，不是概率。",
+            f"- Thesis-break stress 失败代价：{stress.get('stress_total_return') or 'UNKNOWN'} 总回报；下行 {stress.get('stress_downside_pct') or 'UNKNOWN'}%；状态 {stress.get('status', 'UNKNOWN')}。",
+            "- 事件兑现时间与价格隐含时间差：NOT_IDENTIFIABLE；B61/B63/B68 没有独立逐事件定价窗口。",
+            "- 边界：B61/B63 单分部利润门槛及 B68 产品销量/售价/成本解均为单变量替代敏感性，不可相加；B63 全向量价值池余量才是多分部同时变化的整体比较。",
+        ])
     if local_sotp_inversion and local_sotp_inversion.get("selected_model_family") == "SOTP":
         lines.extend([
             "",
