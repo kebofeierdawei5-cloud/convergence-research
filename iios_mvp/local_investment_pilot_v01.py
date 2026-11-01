@@ -5578,20 +5578,30 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
         f"{(assessment.get('trust') or {}).get('status', 'UNKNOWN') if isinstance(assessment.get('trust'), Mapping) else 'UNKNOWN'} / "
         f"{(assessment.get('reality') or {}).get('status', 'UNKNOWN') if isinstance(assessment.get('reality'), Mapping) else 'UNKNOWN'} / "
         f"{(assessment.get('quality') or {}).get('status', 'UNKNOWN') if isinstance(assessment.get('quality'), Mapping) else 'UNKNOWN'}",
-        f"- 核心论点：{thesis.get('core_statement') or 'UNKNOWN'}",
+        f"- 当前主要矛盾/核心论点：{thesis.get('core_statement') or 'UNKNOWN'}",
         f"- 行业周期：{cycle_node.get('phase', 'UNKNOWN')}；周期链状态：{cycle.get('status', 'UNKNOWN')}",
     ]
+    thesis_events = thesis.get("drivers") if isinstance(thesis.get("drivers"), list) else []
+    lines.append("- 主要矛盾驱动的未来关键事件链：")
+    if thesis_events:
+        for event_index, event in enumerate(thesis_events[:4], start=1):
+            event_text = json.dumps(event, ensure_ascii=False, sort_keys=True) if isinstance(event, Mapping) else str(event).strip()
+            if event_text:
+                lines.append(f"  {event_index}. {event_text}")
+    else:
+        lines.append("  - UNKNOWN：未提供可审计的事件链，不从情景数字反推事件。")
     usable_drivers = [row for row in drivers if isinstance(row, Mapping)]
     if usable_drivers:
-        lines.append("- 最重要的价值驱动（最多展示前三项）：")
-        for row in usable_drivers[:3]:
+        lines.append("- 主要矛盾决定因素（最多展示前三项）：")
+        for index, row in enumerate(usable_drivers[:3]):
+            label = "主要矛盾首要决定因素候选" if index == 0 else f"次要价值驱动 {index}"
             lines.append(
-                f"  - {row.get('driver', 'UNKNOWN')}｜影响 {row.get('impact', 'UNKNOWN')}｜"
+                f"  - {label}：{row.get('driver', 'UNKNOWN')}｜影响 {row.get('impact', 'UNKNOWN')}｜"
                 f"依据 {row.get('historical_evidence') or 'UNKNOWN'}｜"
                 f"传导 {row.get('valuation_transmission') or 'UNKNOWN'}"
             )
     else:
-        lines.append("- 最重要的价值驱动：UNKNOWN（没有可展示的结构化 value_drivers）。")
+        lines.append("- 主要矛盾决定因素：UNKNOWN（没有可展示的结构化 value_drivers）。")
 
     lines.extend([
         "",
