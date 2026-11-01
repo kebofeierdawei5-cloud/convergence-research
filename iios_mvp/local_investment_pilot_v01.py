@@ -3920,13 +3920,47 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         analysis.get("valuation_transmission") or {},
         c["currency"],
     ))
+    gap = a["expectation_gap"]
+    gap_detail_lines = [
+        "",
+        "### B76：独立预测、价格条件性要求与外部 MIE",
+        "",
+        "- 独立预测：来自冻结的 Round A 现实证据/主要矛盾/事件推演及现有 B4–B68 传导，不等于市场预期。",
+        "- 价格条件性要求：B61/B63 等反推仅说明当前价格和既定回报/风险约束要求什么经营结果，不是外部 MIE。",
+        "- 外部 MIE：仅接受截止时点兼容、可核验的市场定价/一致预期证据；不可识别时保持 NOT_IDENTIFIABLE。",
+        "- MIE 不可识别时，独立预测与价格条件性要求的差异只能称为价格条件比较，不能声称已验证市场正/负预期差。",
+    ]
+    for key, label in (
+        ("operating_gap", "经营预期差拆解"),
+        ("earnings_gap", "盈利预期差拆解"),
+        ("valuation_gap", "估值预期差拆解"),
+        ("event_timing_gap", "事件/时间差拆解"),
+        ("win_odds", "胜率、赔率与失败代价"),
+    ):
+        detail = gap.get(key)
+        if isinstance(detail, Mapping) and detail:
+            gap_detail_lines.append("")
+            gap_detail_lines.append(f"- **{label}**")
+            for detail_key, detail_value in detail.items():
+                if detail_value not in (None, "", [], {}):
+                    rendered = json.dumps(detail_value, ensure_ascii=False, sort_keys=True) if isinstance(detail_value, (Mapping, list)) else str(detail_value)
+                    gap_detail_lines.append(f"  - {detail_key}: {rendered}")
+        else:
+            gap_detail_lines.append(f"- {label}：未提供 / UNKNOWN。")
+    gap_detail_lines.extend([
+        "",
+        "- 胜率不等于 Bull 情景权重；赔率不等于概率加权收益；二者均须基于同一入场价和持有期分别论证。",
+        "- 若情景概率未校准，不得将 Bear/Base/Bull 权重称为校准概率或投资胜率；概率加权收益不能替代胜率。",
+        "- 失败代价应同时考虑 Bear、独立 thesis-break stress、永久资本损失与时间成本；缺乏依据时保持 UNKNOWN。",
+    ])
     lines.extend([
         "",
         "## 五、MIE 与预期差",
         "",
         f"- MIE：{a['market_implied_expectation']['status']} — {a['market_implied_expectation'].get('summary') or '未知'}",
-        f"- 预期差：{_assessment_status_for_report(a['expectation_gap'])} / {a['expectation_gap']['direction']}{'（输入方向标签 ' + str(a['expectation_gap'].get('direction_input')) + '）' if a['expectation_gap'].get('direction_input') and str(a['expectation_gap'].get('direction_input')).upper() != str(a['expectation_gap']['direction']).upper() else ''} — {a['expectation_gap'].get('summary') or '未知'}",
+        f"- 预期差：{_assessment_status_for_report(gap)} / {gap['direction']}{'（输入方向标签 ' + str(gap.get('direction_input')) + '）' if gap.get('direction_input') and str(gap.get('direction_input')).upper() != str(gap['direction']).upper() else ''} — {gap.get('summary') or '未知'}",
         "- 若 MIE 无法识别或缺乏历史支持，不以内部估值代替市场隐含预期。",
+        *gap_detail_lines,
         "",
         "## 六、风险与证据引用核对",
         "",
@@ -5130,6 +5164,11 @@ def _build_price_aware_round_b_prompt(*, base_prompt: str, payload: Mapping[str,
         + "\n【Round B 输出约束】只返回 IIOS-RESEARCH-PATCH-0.1 紧凑 JSON。research 只允许 evidence_register、assessment、forecast_valuation、eps_multiple_valuation、valuation_transmission、sotp_valuation；assessment 只允许 market_implied_expectation、expectation_gap。"
         + "不得更改 Round A 的公司侧字段。若返回 evidence_register，必须原样保留全部 Round A 来源记录，并可在其后追加新来源。"
         + "只有存在独立、截止时点兼容、可核验的市场定价/一致预期证据时才量化 MIE/预期差；否则 MIE=NOT_IDENTIFIABLE、预期差=UNKNOWN。内部 Base 估值或条件反推不能冒充市场隐含预期。"
+        + "【B76：三种预期必须分开】(1) 独立预测：只来自已冻结的 Round A 现实证据、主要矛盾、事件链和 B4–B68 盈利/每股价值推演；(2) 现价条件性经营要求：只表示在当前输入价格、既定持有期和回报/风险约束下，价格反推所要求的经营结果，可引用 B61/B63，但必须标注 PRICE_CONDITIONED_REQUIREMENT，不是市场共识；(3) 外部 MIE：只有截止时点兼容、可核验的分析师一致预期/市场定价证据才能识别。三者不可互相替代。"
+        + "【B76：预期差拆解】在 assessment.expectation_gap 内复用现有对象，可增加 operating_gap、earnings_gap、valuation_gap、event_timing_gap 四个子对象；每个对象仅填写有依据的 driver/metric、independent_forecast、price_conditioned_requirement、difference、unit、period、evidence_refs、note。经营预期差比较销量/净售价/结构/成本/产能/资本开支等关键变量；盈利预期差比较同期间归母净利润/EPS/FCF；估值预期差只比较可核验的市场估值预期与独立价值判断；事件/时间差比较事件兑现窗口与价格条件性要求的时间窗口。不能比较的字段明确 UNKNOWN/NOT_COMPARABLE，不得填造差额。"
+        + "【B76：MIE 不可识别时的边界】若 MIE=NOT_IDENTIFIABLE，仍可描述独立预测与现价条件性经营要求之间的差异，但必须称为价格条件比较，不得称为已验证的市场正/负预期差，不得将 expectation_gap.status 标为 PASS 或 direction 标为 POSITIVE/NEGATIVE 来绕过现有门禁。不得把 B61/B63 的反推称为市场一致预期。"
+        + "【B76：胜率、赔率、期望值分开】在 assessment.expectation_gap.win_odds 内复用现有字段承载 win_probability_range、probability_basis、payoff_ratio、upside_reference、downside_reference、failure_cost、time_cost、catalyst_window、summary。胜率是投资判断在给定期限内获得正回报的概率，必须有可核验基准率、历史样本、事件进度或其他明确概率依据；没有依据就填 UNKNOWN/定性等级，不得伪造精确百分比。赔率比较同一入场价格、同一持有期下的潜在上行与下行；失败代价须覆盖 Bear 与独立 thesis-break stress、永久资本损失和时间成本。概率加权期望回报不是胜率；Bear/Base/Bull 权重不是天然的胜率，只有互斥、穷尽且概率校准有证据时才可用于概率计算。forecast_valuation.probabilities_calibrated=false 时，不得把情景权重表述为校准概率或胜率。"
+        + "【B76：决策纪律】明确主要矛盾对应的正面催化剂、验证窗口、证伪信号和可能失败路径。15% 年化收益门槛是新资金回报要求，不是折现率。胜率高不代表赔率好，赔率高不代表胜率高；若正预期差、胜率、赔率或失败代价任何关键项不可识别，明确说明不确定性，不用一个综合分数掩盖。不要越权输出 BUY/ADD/HOLD 等正式动作，不改现有估值和决策计算。"
         + "不要修改人工控制字段，不声称正式准入、实际成交、实际分红或交易授权。"
     )
     return prompt, prompt_input, frozen_sha
