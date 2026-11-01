@@ -4935,6 +4935,10 @@ def test_price_blind_round_a_projection_excludes_price_position_and_valuation():
     assert "rank=1 必须对应主要矛盾" in prompt
     assert "支持证据与反证分别是什么" in prompt
     assert "不得为填满 FCF、营运资金或差异归因结构而机械拆分" in prompt
+    assert "未来1年最重要的2–4个事件/阶段" in prompt
+    assert "事件之间必须明确先后、依赖或并行关系" in prompt
+    assert "operating_driver_forecast.summary" in prompt
+    assert "不得把项目利润直接当作公司归母净利润、EPS 或股东价值" in prompt
 
 
 def test_round_a_patch_rejects_price_aware_assessment_fields():
