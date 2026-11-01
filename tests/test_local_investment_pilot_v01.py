@@ -1153,6 +1153,10 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     for prohibited_key in ('"price_input"', '"current_position_pct"', '"operator_valuation_context"', '"market_implied_expectation"', '"expectation_gap"'):
         assert prohibited_key not in phase_a_text
     assert "核心投资判断链：必须逐项回答以下六个问题" in round_b_text
+    assert "【B74：主要矛盾优先】" in round_a_text
+    assert "【B75：未来事件链】" in round_a_text
+    assert "【B76：三类预期严格分开】" in round_b_text
+    assert "【B76：胜率与赔率】" in round_b_text
     assert "当前价格已反映多少" in round_b_text
     assert "绝不能把自己的 Base 估值伪装成市场预期" in round_b_text
     assert "IIOS-RESEARCH-PATCH-0.1" in round_a_text and "IIOS-RESEARCH-PATCH-0.1" in round_b_text
@@ -1164,6 +1168,10 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert analysis["research_rounds"]["price_blind_round_a_verified"] is True
     assert analysis["research_rounds"]["round_a"]["response_sha256"]
     assert analysis["research_rounds"]["round_b"]["response_sha256"]
+    b76 = analysis["assessment"]["market_implied_expectation"]["price_implied_analysis"]["local_sotp_recalculation"]["expectation_gap_comparison"]
+    assert b76["classification"] == "PRICE_CONDITIONED_REQUIREMENT_VS_INDEPENDENT_FORECAST_NOT_EXTERNAL_MIE"
+    assert b76["external_mie_modified"] is False
+    assert "B76：独立预测与现价条件性要求的数值对照" in (run_dir / "report.md").read_text(encoding="utf-8")
     assert receipt["research_rounds"] == analysis["research_rounds"]
     assert pilot.verify_local_pilot_bundle(run_dir)["status"] == "PILOT_BUNDLE_HASH_CHECK_PASS"
     replay = pilot.run_local_investment_pilot(
