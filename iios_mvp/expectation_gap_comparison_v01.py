@@ -54,6 +54,8 @@ def _driver_row(product: Mapping[str, Any]) -> dict[str, Any]:
             "net_asp_cny_per_tonne": current.get("net_asp_cny_per_tonne"),
             "variable_cost_cny_per_tonne": current.get("variable_cost_cny_per_tonne"),
         },
+        "production_inventory_context": _map(product.get("production_inventory_context")),
+        "driver_measure_lineage": _map(product.get("driver_measure_lineage")),
         "price_conditioned_single_driver_alternatives": {
             "sales_volume_only": {
                 "status": volume.get("status", "UNKNOWN"),
@@ -231,6 +233,8 @@ def build_expectation_gap_comparison(
     result: dict[str, Any] = {
         "schema_version": B76_SCHEMA,
         "status": "NOT_IDENTIFIABLE",
+        "price_conditioned_comparison_status": "NOT_IDENTIFIABLE",
+        "coverage_status": "PARTIAL_WIN_PROBABILITY_AND_EVENT_TIMING_NOT_IDENTIFIABLE",
         "classification": "PRICE_CONDITIONED_REQUIREMENT_VS_INDEPENDENT_FORECAST_NOT_EXTERNAL_MIE",
         "external_mie_status_unchanged": external_mie_status or "UNKNOWN",
         "external_mie_modified": False,
@@ -297,6 +301,7 @@ def build_expectation_gap_comparison(
         result["status"] = "PARTIAL"
     else:
         result["status"] = "NOT_IDENTIFIABLE"
+    result["price_conditioned_comparison_status"] = result["status"]
 
     metrics = _map(return_metrics)
     entry = _dec(_map(price_input).get("price"))
