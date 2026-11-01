@@ -1154,6 +1154,11 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert "核心投资判断链：必须逐项回答以下六个问题" in round_b_text
     assert "当前价格已反映多少" in round_b_text
     assert "绝不能把自己的 Base 估值伪装成市场预期" in round_b_text
+    assert "PRICE_CONDITIONED_REQUIREMENT" in round_b_text
+    assert "operating_gap、earnings_gap、valuation_gap、event_timing_gap" in round_b_text
+    assert "概率加权期望回报不是胜率" in round_b_text
+    assert "Bear/Base/Bull 权重不是天然的胜率" in round_b_text
+    assert "15% 年化收益门槛是新资金回报要求，不是折现率" in round_b_text
     assert "IIOS-RESEARCH-PATCH-0.1" in round_a_text and "IIOS-RESEARCH-PATCH-0.1" in round_b_text
 
     run_dir = Path(result["run_dir"])
@@ -1327,6 +1332,9 @@ def test_candidate_driven_pilot_uses_existing_return_solver_and_outputs_chinese_
     assert analysis["return_metrics"]["annualization_year_fraction"] == str(year_fraction)
     assert "PILOT_NON_CANONICAL" in report
     assert "MIE" in report
+    assert "独立预测、价格条件性要求与外部 MIE" in report
+    assert "胜率不等于 Bull 情景权重" in report
+    assert "失败代价应同时考虑 Bear" in report
     assert analysis["governance"]["formal_decision_created"] is False
     assert analysis["governance"]["canonical_run_receipt_created"] is False
     assert analysis["governance"]["auto_execution"] is False
