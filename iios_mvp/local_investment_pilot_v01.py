@@ -5084,7 +5084,7 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
         "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。已有 operating_driver_forecast、B4/B42/B55–B62 等计算与诊断结构继续复用；只有当细分归因直接影响主要矛盾、且存在独立依据时才展开。不得为填满 FCF、营运资金或差异归因结构而机械拆分或编造金额；辅助诊断不得挤占主要矛盾、证据和盈利传导分析。"
         "本轮唯一输入为末尾列出的公司身份、截止时点、证据登记结构和公司侧字段；当前价格、当前持仓、估值选择、市场隐含预期、预期差及组合约束均未提供。不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
         "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
-        "【Round A 允许输入】\\n"
+        "【Round A 允许输入】\n"
         + json.dumps(allowed_input, ensure_ascii=False, indent=2, allow_nan=False)
     )
 
