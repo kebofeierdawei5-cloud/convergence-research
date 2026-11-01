@@ -337,7 +337,9 @@ def build_expectation_gap_comparison(
     result["win_odds"]["probability_weighted_return"] = {
         "value": metrics.get("expected_annualized_return"),
         "method": metrics.get("expected_annualized_return_method"),
-        "scenario_probabilities_calibrated": forecast_valuation.get("probabilities_calibrated") is True,
-        "interpretation": "现有计算器按输入情景权重的算术结果；除非另有经证据校准的胜率模型，否则不得解读为投资胜率。",
+        "scenario_probabilities_calibrated": False,
+        "model_declared_probabilities_calibrated": forecast_valuation.get("probabilities_calibrated"),
+        "calibration_status": "NOT_INDEPENDENTLY_VERIFIED",
+        "interpretation": "模型自报的概率校准标记不被本地视为已验证；现有计算器按输入情景权重得到的算术结果，不得解读为投资胜率。",
     }
     return result
