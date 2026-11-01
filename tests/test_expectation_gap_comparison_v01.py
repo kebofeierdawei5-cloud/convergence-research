@@ -98,6 +98,7 @@ def test_b76_compares_b4_full_vector_with_b61_b63_price_requirements():
     base = result["scenarios"]["base"]
     assert base["earnings_gap"]["b4_forecast_pool_minus_required_pool_cny"] == "50"
     assert base["earnings_gap"]["headroom_vs_required_pool_pct"] == "4.166666666666666666666666667"
+    assert base["operating_gap"]["status"] == "CONDITIONAL_PRICE_CONDITIONED_OPERATING_ALTERNATIVES"
     segment = base["segment_comparisons"][0]
     assert segment["b4_forecast_minus_b61_requirement_cny"]["difference"] == "10"
     assert segment["b4_forecast_minus_b63_segment_sensitivity_cny"]["difference"] == "5"
