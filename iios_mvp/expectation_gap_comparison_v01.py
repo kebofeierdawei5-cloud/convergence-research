@@ -155,11 +155,13 @@ def _scenario_comparison(
         })
 
     issues: list[str] = []
+    if b62_scenario.get("status") != "CALCULATED_CONDITIONAL":
+        issues.append("B62_SCENARIO_NOT_FULLY_RECONCILED")
     if b63_scenario.get("status") != "CONDITIONAL_ATTRIBUTION_CALCULATED":
         issues.append("B63_SCENARIO_NOT_FULLY_RECONCILED")
-    if b68_scenario.get("status") not in {
-        "CONDITIONAL_OPERATING_REQUIREMENT_REVERSE_ENGINEERED", "PARTIAL"
-    }:
+    if b68_scenario.get("status") == "PARTIAL":
+        issues.append("B68_SCENARIO_PARTIAL")
+    elif b68_scenario.get("status") != "CONDITIONAL_OPERATING_REQUIREMENT_REVERSE_ENGINEERED":
         issues.append("B68_SCENARIO_NOT_FULLY_REVERSE_ENGINEERED")
     if b4_pool is None or required_pool is None:
         issues.append("B63_FULL_VECTOR_POOL_VALUES_MISSING")
@@ -231,6 +233,12 @@ def build_expectation_gap_comparison(
             "probability_weighted_return_interpretation": "仅为既有回报计算器按提交权重得到的机械结果，不是胜率或概率校准证明。",
             "payoff_asymmetry": {},
             "thesis_break_stress": {},
+            "time_cost": {
+                "holding_period_year_fraction": _fmt(_dec(_map(return_metrics).get("annualization_year_fraction"))),
+                "horizon_years": _fmt(_dec(_map(return_metrics).get("horizon_years"))),
+                "opportunity_cost_quantification": "NOT_PROVIDED",
+                "interpretation": "展示资金占用期限；没有独立替代投资回报基准时，不伪造机会成本金额。",
+            },
         },
         "scenarios": {},
         "limitations": [
