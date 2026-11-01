@@ -5067,18 +5067,21 @@ def _round_a_frozen_artifact(payload: Mapping[str, Any]) -> dict[str, Any]:
 def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> str:
     allowed_input = _round_a_prompt_input(template_payload)
     return (
-        "IIOS Round A：价格盲的公司事实、质量、论点、价值驱动与独立经营预测。"
-        "本轮唯一输入为末尾列出的公司身份、截止时点、证据登记结构和公司侧字段；当前价格、当前持仓、估值选择、市场隐含预期、预期差及组合约束均未提供。"
-        "不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
-        "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。"
-        "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。"
-        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。Bear/Base/Bull 应来自显式经营假设；未知值保持 UNKNOWN。"
-        "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。"
-        "Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
-        "【Round A 允许输入】\n"
+        "IIOS Round A：价格盲的公司现实、主要矛盾、关键决定因素与独立经营推演。"
+        "【最高研究优先级】先回答当前公司最重要的一个基本面矛盾：它是什么，为什么此时最重要，正在向有利还是不利方向演变；不要先罗列财务指标、行业热点或一般性风险。"
+        "必须在若干可能影响公司价值的因素中作取舍：只确定1个主要矛盾，最多保留2个确实可能改变投资结果的次要矛盾；解释主要矛盾为何比其他因素更重要。若证据不足以判断，明确写 UNKNOWN/REVIEW_REQUIRED，不得为了给出答案而猜测。"
+        "【现有字段映射，不新增字段】assessment.thesis.core_statement 用简洁文字说明主要矛盾、当前基线、矛盾的经济意义及其对未来盈利/每股价值的核心影响；assessment.value_drivers 按重要性排序，rank=1 必须对应主要矛盾背后的首要决定因素，其余只保留最多2项次要因素。不得把普通指标清单伪装成价值驱动排序。"
+        "【决定因素与现实证据】对主要矛盾说明：当前可核验基线是什么；真正决定它的1–3个变量是什么；变量为何变化、受什么约束；支持证据与反证分别是什么；哪些是已发生事实、公司指引、分析师假设或未知。证据须截止时点兼容，并使用 evidence_register 与每个 driver 自己的 evidence_refs；历史依据写入 historical_evidence，重要性判断及正反证综合写入 rationale。证据证明事实不自动证明因果。"
+        "【盈利与每股价值传导】在 rank=1 的 valuation_transmission 中，说明主要矛盾如何经由关键经营变量传导至收入、单位利润/费用、归母净利润、现金流（仅在确有重要性且有依据时）、稀释股数、EPS 和每股价值；明确方向、时间窗口、关键约束及可能的反向作用。只展开真正决定投资结果的环节，不要求对所有经营科目作机械归因；无法闭合的环节保留 UNKNOWN/NOT_LINKED。"
+        "【未来推演】以当前可核验经营基线为起点，围绕主要矛盾给出未来1年 Bear/Base/Bull 的关键变量变化与经营结果。情景差异必须来自主要决定因素及其现实约束，不得只改变估值倍数或概率；假设与事实分开，概率没有可靠依据时不伪造精确数值。"
+        "【证伪与监控】写出能推翻主要矛盾判断、改变其方向或导致情景切换的领先指标、反证、阈值/方向和验证时间；优先监控少数高信息量指标，不要把所有财务指标都列为触发器。"
+        "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。公司靠什么赚钱、产品/客户结构、盈利质量、周期位置、资本占用和现金转换只作为判断主要矛盾所需的现实基线，不作为无差别的完整性清单。"
+        "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。已有 operating_driver_forecast、B4/B42/B55–B62 等计算与诊断结构继续复用；只有当细分归因直接影响主要矛盾、且存在独立依据时才展开。不得为填满 FCF、营运资金或差异归因结构而机械拆分或编造金额；辅助诊断不得挤占主要矛盾、证据和盈利传导分析。"
+        "本轮唯一输入为末尾列出的公司身份、截止时点、证据登记结构和公司侧字段；当前价格、当前持仓、估值选择、市场隐含预期、预期差及组合约束均未提供。不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
+        "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\\n\\n"
+        "【Round A 允许输入】\\n"
         + json.dumps(allowed_input, ensure_ascii=False, indent=2, allow_nan=False)
     )
-
 
 def _round_b_prompt_input(payload: Mapping[str, Any]) -> dict[str, Any]:
     view = copy.deepcopy(dict(payload))
