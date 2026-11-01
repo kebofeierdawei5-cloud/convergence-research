@@ -5739,8 +5739,11 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             "",
             "### B76：独立预测与现价条件性要求的数值对照",
             f"- 对照状态：{local_b76.get('status', 'UNKNOWN')}；类别：{local_b76.get('classification', 'UNKNOWN')}；外部 MIE 状态保持 {local_b76.get('external_mie_status_unchanged', 'UNKNOWN')}。",
-            "- 本节对照 B4 全分部独立盈利预测与 B61/B63 Required Return 条件要求；仅为价格条件比较，不代表外部市场共识或已验证的市场正预期差。",
         ])
+        if local_b76.get("status") == "NOT_APPLICABLE_NON_SOTP":
+            lines.append("- 本次主估值模型不是 SOTP，B61/B63/B68 SOTP 条件要求对照不适用；EPS_MULTIPLE 的 B60 现价 EPS 反推仍按原有路径展示，本批未扩展其独立预测数值对照。")
+        else:
+            lines.append("- 本节对照 B4 全分部独立盈利预测与 B61/B63 Required Return 条件要求；仅为价格条件比较，不代表外部市场共识或已验证的市场正预期差。")
         b76_scenarios = local_b76.get("scenarios") if isinstance(local_b76.get("scenarios"), Mapping) else {}
         for scenario_name in ("bear", "base", "bull"):
             b76_row = b76_scenarios.get(scenario_name) if isinstance(b76_scenarios.get(scenario_name), Mapping) else {}
