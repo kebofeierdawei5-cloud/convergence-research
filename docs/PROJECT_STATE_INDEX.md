@@ -1,12 +1,12 @@
 # IIOS Project State Index
 
 State classification: **BRANCH PROPOSAL — NOT CANONICAL**
-Snapshot: 2026-10-31
+Snapshot: 2026-11-01
 Authority: the canonical Current State Index is on `main`; this branch copy describes unmerged proposals only and does not replace canonical state.
 
 ## CURRENT CORE RESEARCH DEVELOPMENT — B76 INTEGRATED ON B73 PROPOSAL BASE
 
-**Development branch:** `feat/b76-core-integrated-20261101`, created from B73 head `faeee544238dd4b6154e2b0a7a4a53c8a88a6815). This branch intentionally retains the existing B60–B73 calculation chain, including B61/B63/B68, and ports the B74/B75 primary-contradiction/event-chain research changes plus the B76 read-only numerical comparison. It is a development-only branch; it is **not merged to main**, and the 321-commit B73 proposal history must not be merged wholesale.
+**Development branch:** `feat/b76-core-integrated-20261101`, created from B73 head `faeee544238dd4b6154e2b0a7a4a53c8a88a6815`. This branch intentionally retains the existing B60–B73 calculation chain, including B61/B63/B68, and ports the B74/B75 primary-contradiction/event-chain research changes plus the B76 read-only numerical comparison. It is a development-only branch; it is **not merged to main**, and the 321-commit B73 proposal history must not be merged wholesale.
 
 **B76 core change:** new `iios_mvp/expectation_gap_comparison_v01.py` compares B4 independent Bear/Base/Bull segment earnings and full-vector value pool with B61/B63 Required Return price-conditioned requirements, and displays B68 single-variable sales-volume / net-ASP / unit-cost alternatives. It also displays same-entry-price/same-horizon Base/Bull upside-to-Bear downside payoff ratios and the independent thesis-break stress. Win probability remains NOT_IDENTIFIABLE; submitted scenario weights and probability-weighted annualized return are not treated as win rate. Event timing gap remains NOT_IDENTIFIABLE where no independently specified market-implied event window exists.
 
