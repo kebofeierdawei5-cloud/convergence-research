@@ -190,6 +190,19 @@ def _scenario_comparison(
             "parent_adjustments_and_diluted_shares": "HELD_AT_B61_SELECTED_VALUES",
             "meaning": "仅表示独立 B4 预测在当前 SOTP 假设下相对 Required Return 条件要求的数学余量；不是外部 MIE，也不是独立概率判断。",
         },
+        "operating_gap": {
+            "status": "CONDITIONAL_PRICE_CONDITIONED_OPERATING_ALTERNATIVES" if segment_rows else "NOT_IDENTIFIABLE",
+            "comparison_basis": "B68_PRODUCT_SALES_VOLUME_NET_ASP_UNIT_VARIABLE_COST_SINGLE_DRIVER_ALTERNATIVES",
+            "segments": [
+                {
+                    "segment_id": row.get("segment_id"),
+                    "b61_one_segment_at_a_time_alternatives": row.get("b61_driver_alternatives") or [],
+                    "b63_full_b4_vector_alternatives": row.get("b63_driver_alternatives") or [],
+                }
+                for row in segment_rows
+            ],
+            "limitation": "销量、净售价、单位成本是不同的替代敏感性，不是同时要实现的经营目标；销售量反推不自动证明产能/库存可行。",
+        },
         "segment_comparisons": segment_rows,
         "valuation_gap": {
             "basis": "B63_PARALLEL_COMMON_PE_SCALE_REQUIRED_IF_FULL_B4_EARNINGS_ARE_ACHIEVED",
