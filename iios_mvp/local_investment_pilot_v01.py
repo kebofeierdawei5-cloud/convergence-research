@@ -5769,10 +5769,12 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
         win_odds = local_b76.get("win_odds") if isinstance(local_b76.get("win_odds"), Mapping) else {}
         payoff = win_odds.get("payoff_asymmetry") if isinstance(win_odds.get("payoff_asymmetry"), Mapping) else {}
         stress = win_odds.get("thesis_break_stress") if isinstance(win_odds.get("thesis_break_stress"), Mapping) else {}
+        time_cost = win_odds.get("time_cost") if isinstance(win_odds.get("time_cost"), Mapping) else {}
         lines.extend([
             f"- 胜率：{win_odds.get('win_probability_status', 'UNKNOWN')}；本批不把 Bear/Base/Bull 权重当作胜率。",
             f"- 同期限上行/下行赔率参照：Base 上行 / Bear 下行 {payoff.get('base_upside_to_bear_downside_ratio') or 'UNKNOWN'}；Bull 上行 / Bear 下行 {payoff.get('bull_upside_to_bear_downside_ratio') or 'UNKNOWN'}。这只是回报幅度比，不是概率。",
             f"- Thesis-break stress 失败代价：{stress.get('stress_total_return') or 'UNKNOWN'} 总回报；下行 {stress.get('stress_downside_pct') or 'UNKNOWN'}%；状态 {stress.get('status', 'UNKNOWN')}。",
+            f"- 时间成本：资金占用 {time_cost.get('holding_period_year_fraction') or 'UNKNOWN'} 年（决策期限 {time_cost.get('horizon_years') or 'UNKNOWN'} 年）；机会成本金额 {time_cost.get('opportunity_cost_quantification', 'UNKNOWN')}。",
             "- 事件兑现时间与价格隐含时间差：NOT_IDENTIFIABLE；B61/B63/B68 没有独立逐事件定价窗口。",
             "- 边界：B61/B63 单分部利润门槛及 B68 产品销量/售价/成本解均为单变量替代敏感性，不可相加；B63 全向量价值池余量才是多分部同时变化的整体比较。",
         ])
