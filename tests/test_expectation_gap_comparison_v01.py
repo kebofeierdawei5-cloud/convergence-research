@@ -37,6 +37,7 @@ def _inputs():
             },
         }
         local["segment_earnings_reconciliation"]["scenarios"][name] = {
+            "status": "CALCULATED_CONDITIONAL",
             "forecast_period": "2027FY",
             "b4_forecast_implied_terminal_value_per_share_cny": "12.5",
             "required_terminal_value_per_share_for_required_return_cny": "12",
@@ -122,6 +123,7 @@ def test_b76_does_not_convert_scenario_weights_or_payoff_ratio_into_win_probabil
     assert odds["payoff_asymmetry"]["base_upside_to_bear_downside_ratio"] == "1.5"
     assert odds["payoff_asymmetry"]["bull_upside_to_bear_downside_ratio"] == "3"
     assert odds["thesis_break_stress"]["probability_weighted"] is False
+    assert odds["time_cost"]["holding_period_year_fraction"] is None
     assert result["scenarios"]["base"]["event_timing_gap"]["status"] == "NOT_IDENTIFIABLE"
 
 
