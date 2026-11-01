@@ -3695,11 +3695,11 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         "",
         f"- Thesis 状态：{_assessment_status_for_report(a['thesis'])}",
         "",
-        "### 核心论点",
+        "### 当前主要矛盾与核心论点",
         "",
     ]
     lines.extend(_format_text_block(a["thesis"].get("core_statement")))
-    lines.extend(["", "### 价值驱动因素", ""])
+    lines.extend(["", "### 主要矛盾的决定因素（按重要性排序）", "", "- 排名第一项是研究输出的主要矛盾决定因素候选；排名仅代表分析优先级，不代表系统已独立验证因果或预测。", ""])
     drivers = sorted(a["value_drivers"], key=lambda x: (x["rank"], x["driver"]))
     driver_issue_explanations = {
         "DRIVER_NAME_NOT_IDENTIFIABLE": "驱动因素名称为空或仅为占位文本。",
@@ -3716,7 +3716,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
     if drivers:
         for display_rank, item in enumerate(drivers, start=1):
             lines.append(
-                f"**价值驱动因素 {display_rank}：{item['driver']}**"
+                f"**{'主要矛盾首要决定因素候选' if display_rank == 1 else f'次要价值驱动因素 {display_rank - 1}'}：{item['driver']}**"
                 f"（影响：{item['impact']}；内容门禁：{item.get('status', 'UNKNOWN')}）"
             )
             if item.get("driver_type"):
