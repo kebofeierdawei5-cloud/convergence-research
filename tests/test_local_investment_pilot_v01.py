@@ -4931,6 +4931,10 @@ def test_price_blind_round_a_projection_excludes_price_position_and_valuation():
     for prohibited_key in ('"price_input"', '"current_position_pct"', '"operator_valuation_context"', '"market_implied_expectation"', '"expectation_gap"'):
         assert prohibited_key not in serialized
     assert serialized in prompt
+    assert "只确定1个主要矛盾" in prompt
+    assert "rank=1 必须对应主要矛盾" in prompt
+    assert "支持证据与反证分别是什么" in prompt
+    assert "不得为填满 FCF、营运资金或差异归因结构而机械拆分" in prompt
 
 
 def test_round_a_patch_rejects_price_aware_assessment_fields():
