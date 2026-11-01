@@ -157,3 +157,20 @@ def test_b76_fails_closed_when_b63_or_b68_is_not_available():
     assert result["status"] == "BLOCKED_BY_B63"
     assert result["scenarios"] == {}
     assert result["external_mie_modified"] is False
+
+
+def test_b76_sotp_comparison_is_not_applied_to_eps_multiple_primary_model():
+    local = _inputs()
+    local["selected_model_family"] = "EPS_MULTIPLE"
+    result = build_expectation_gap_comparison(
+        local_sotp_recalculation=local,
+        return_metrics={"scenario_terminal_wealth": {"bear": "8", "base": "13", "bull": "16"}},
+        price_input={"price": "10"},
+        forecast_valuation={},
+        thesis_break_stress_review=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    assert result["status"] == "NOT_APPLICABLE_NON_SOTP"
+    assert result["scenarios"] == {}
+    assert result["external_mie_modified"] is False
+    assert result["win_odds"]["win_probability_status"] == "NOT_IDENTIFIABLE"
