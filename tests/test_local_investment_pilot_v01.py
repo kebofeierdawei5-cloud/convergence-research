@@ -1155,6 +1155,8 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert "当前价格已反映多少" in round_b_text
     assert "绝不能把自己的 Base 估值伪装成市场预期" in round_b_text
     assert "PRICE_CONDITIONED_REQUIREMENT" in round_b_text
+    assert "本轮输入明确包含 B61/B63 已计算的价格条件性经营要求" in round_b_text
+    assert "不得自行伪造 B61/B63 输出" in round_b_text
     assert "operating_gap、earnings_gap、valuation_gap、event_timing_gap" in round_b_text
     assert "概率加权期望回报不是胜率" in round_b_text
     assert "Bear/Base/Bull 权重不是天然的胜率" in round_b_text
