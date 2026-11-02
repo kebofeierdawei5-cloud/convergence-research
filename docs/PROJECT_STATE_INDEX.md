@@ -1,7 +1,7 @@
 # IIOS Project State Index
 
 State classification: **BRANCH PROPOSAL — NOT CANONICAL**
-Snapshot: 2026-11-01
+Snapshot: 2026-11-02
 Authority: the canonical Current State Index is on `main`; this branch copy describes unmerged proposals only and does not replace canonical state.
 
 ## CURRENT CORE RESEARCH DEVELOPMENT — B76 INTEGRATED ON B73 PROPOSAL BASE
