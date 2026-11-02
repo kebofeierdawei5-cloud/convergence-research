@@ -499,7 +499,13 @@ def build_expectation_gap_comparison(
     result["eps_multiple_comparison"] = eps_comparison
     result["eps_multiple_comparison_status"] = eps_comparison.get("status", "UNKNOWN")
     if str(local.get("selected_model_family") or "").upper() != "SOTP":
-        result["status"] = "NOT_APPLICABLE_NON_SOTP"
+        # EPS_MULTIPLE is a first-class B76 comparison path; other model families
+        # remain not applicable until they have a comparable local inversion contract.
+        if str(local.get("selected_model_family") or "").upper() == "EPS_MULTIPLE":
+            result["status"] = eps_comparison.get("status", "NOT_IDENTIFIABLE")
+            result["price_conditioned_comparison_status"] = result["status"]
+        else:
+            result["status"] = "NOT_APPLICABLE_NON_SOTP"
         return result
     b63 = _map(local.get("valuation_gap_attribution"))
     b62 = _map(local.get("segment_earnings_reconciliation"))
