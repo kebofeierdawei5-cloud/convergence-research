@@ -84,7 +84,7 @@ EPS_MULTIPLE 对照的 fail-closed 条件：B60 计算成功、主模型族为 E
 - 只有分红经过既有收益求解器验证时，才展示分红调整后的 Required Return 对照；
 - Fundamental Target EPS 单列展示，不能与 Required Return EPS 合并。
 
-**期间/口径守门：**仅接受 B60 场景状态 `CALCULATED_CONDITIONAL`、B57 `CALCULATED_AND_RECONCILED`、B58 `forecast_period_match=True)。B58 已核对 B4 驱动预测期间、B57 前瞻期间、主 EPS bridge 期间和 EPS_MULTIPLE 盈利期间一致；B60 的 `valuation_terminal_date` 只用于持有期年化，单独保留。币种必须为 CNY，EPS 单位为 CNY/share。
+**期间/口径守门：**仅接受 B60 场景状态 `CALCULATED_CONDITIONAL`、B57 `CALCULATED_AND_RECONCILED`、B58 `forecast_period_match=True`）。B58 已核对 B4 驱动预测期间、B57 前瞻期间、主 EPS bridge 期间和 EPS_MULTIPLE 盈利期间一致；B60 的 `valuation_terminal_date` 只用于持有期年化，单独保留。币种必须为 CNY，EPS 单位为 CNY/share。
 
 **关键区分：**比较对象是 B4/B57 all-items 归母稀释 EPS proxy，不是 B57 normalized EPS，也不是 EPS_MULTIPLE 主适配器自报 EPS。后者只属于原主估值链，不代表独立预测。
 
@@ -120,7 +120,7 @@ EPS_MULTIPLE 对照的 fail-closed 条件：B60 计算成功、主模型族为 E
 1. B63 waterfall 的 step 3/step 5 是否与 B62/B61 期间、口径和金额精确一致；
 2. B68 的 B61/B63 两类 driver alternatives 是否被正确展示为替代敏感性；
 3. Decimal 计算和小数输出；
-4. EPS_MULTIPLE 非 SOTP 路径是否明确 NOT_APPLICABLE，不受影响；
+4. EPS_MULTIPLE 主路径是否读取 B60 并完成 B4/B57 数值对照；其他无对应反推合同的模型族是否继续 NOT_APPLICABLE；
 5. MIE 与 decision-usable expectation_gap 原值是否保持不变；
 6. Return Metrics、thesis-break stress 与 payoff asymmetry 是否同价、同期间；
 7. Replay 完整性和真实 macOS 一键流程。
