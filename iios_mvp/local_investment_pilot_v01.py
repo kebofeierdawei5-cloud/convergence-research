@@ -5741,11 +5741,13 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             f"- 对照状态：{local_b76.get('status', 'UNKNOWN')}；类别：{local_b76.get('classification', 'UNKNOWN')}；外部 MIE 状态保持 {local_b76.get('external_mie_status_unchanged', 'UNKNOWN')}。",
         ])
         if local_b76.get("status") == "NOT_APPLICABLE_NON_SOTP":
-            lines.append("- 本次主估值模型不是 SOTP，B61/B63/B68 SOTP 条件要求对照不适用；EPS_MULTIPLE 的 B60 现价 EPS 反推仍按原有路径展示，本批未扩展其独立预测数值对照。")
+            lines.append("- 本次主估值模型不是 SOTP，B61/B63/B68 分部价值池对照不适用；下方另行展示 B4/B57 独立 EPS 预测与 B60 现价条件要求的对照。")
         else:
             lines.append("- 本节对照 B4 全分部独立盈利预测与 B61/B63 Required Return 条件要求；仅为价格条件比较，不代表外部市场共识或已验证的市场正预期差。")
         b76_scenarios = local_b76.get("scenarios") if isinstance(local_b76.get("scenarios"), Mapping) else {}
         for scenario_name in ("bear", "base", "bull"):
+            if not b76_scenarios:
+                break
             b76_row = b76_scenarios.get(scenario_name) if isinstance(b76_scenarios.get(scenario_name), Mapping) else {}
             earnings_gap = b76_row.get("earnings_gap") if isinstance(b76_row.get("earnings_gap"), Mapping) else {}
             lines.append(
@@ -5771,6 +5773,52 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
                     f"选定/Required Common P/E {segment.get('selected_sotp_pe_x') or 'UNKNOWN'}x / "
                     f"{segment.get('b63_required_common_pe_x') or 'UNKNOWN'}x。"
                 )
+        eps_b76 = local_b76.get("eps_multiple_comparison") if isinstance(local_b76.get("eps_multiple_comparison"), Mapping) else {}
+        if eps_b76 and eps_b76.get("status") != "NOT_APPLICABLE_NOT_EPS_MULTIPLE":
+            lines.extend([
+                "",
+                f"- **EPS_MULTIPLE：B4/B57 独立预测 ↔ B60 现价 Required Return 要求**：{eps_b76.get('status', 'UNKNOWN')}；"
+                f"币种/单位 {eps_b76.get('currency', 'UNKNOWN')} / {eps_b76.get('unit', 'UNKNOWN')}；"
+                f"盈利期间 {eps_b76.get('forecast_period', 'UNKNOWN')}；"
+                f"估值终点 {eps_b76.get('valuation_terminal_date', 'UNKNOWN')}（单独处理）；"
+                f"持有期年化因子 {eps_b76.get('annualization_year_fraction', 'UNKNOWN')} 年。",
+            ])
+            for scenario_name in ("bear", "base", "bull"):
+                eps_row = eps_b76.get("scenarios", {}).get(scenario_name, {}) if isinstance(eps_b76.get("scenarios"), Mapping) else {}
+                if not isinstance(eps_row, Mapping):
+                    eps_row = {}
+                if eps_row.get("status") != "CALCULATED":
+                    lines.append(
+                        f"  - {scenario_name.upper()}：{eps_row.get('status', 'UNKNOWN')}；"
+                        f"{'；'.join(eps_row.get('issues') or []) or 'B4/B57 EPS 或 B60 要求不可比'}"
+                    )
+                    continue
+                req = eps_row.get("required_return") if isinstance(eps_row.get("required_return"), Mapping) else {}
+                req_no = req.get("without_distributions") if isinstance(req.get("without_distributions"), Mapping) else {}
+                req_yes = req.get("with_validated_distributions") if isinstance(req.get("with_validated_distributions"), Mapping) else {}
+                target = eps_row.get("fundamental_target") if isinstance(eps_row.get("fundamental_target"), Mapping) else {}
+                target_no = target.get("without_distributions") if isinstance(target.get("without_distributions"), Mapping) else {}
+                lines.append(
+                    f"  - {scenario_name.upper()}：B4/B57 all-items EPS {eps_row.get('b4_independent_all_items_eps_proxy_cny_per_share', 'UNKNOWN')} CNY/股；"
+                    f"Required Return 所需 EPS（未计分红）{req_no.get('required_eps_cny_per_share', 'UNKNOWN')} CNY/股；"
+                    f"差额 {req_no.get('forecast_minus_required_cny_per_share', 'UNKNOWN')} CNY/股；"
+                    f"相对余量 {req_no.get('headroom_vs_required_pct', 'UNKNOWN')}%；"
+                    f"方向 {req_no.get('direction', 'UNKNOWN')}。"
+                )
+                lines.append(
+                    f"    - 已验证分红调整：状态 {req_yes.get('status', 'UNKNOWN')}；"
+                    f"Required Return 所需 EPS {req_yes.get('required_eps_cny_per_share', 'UNKNOWN')}；"
+                    f"预测余量 {req_yes.get('forecast_minus_required_cny_per_share', 'UNKNOWN')} CNY/股。"
+                )
+                lines.append(
+                    f"    - Fundamental Target（独立目标门槛，非 Required Return）："
+                    f"所需 EPS {target_no.get('required_eps_cny_per_share', 'UNKNOWN')} CNY/股；"
+                    f"预测余量 {target_no.get('forecast_minus_required_cny_per_share', 'UNKNOWN')} CNY/股。"
+                )
+            lines.append(
+                "- EPS 对照边界：B4/B57 使用公司整体 all-items 归母 EPS proxy；B58 必须确认 B4、B57、主 EPS bridge 与 B60 期间一致。"
+                "未验证分红不进入调整值；15% Fundamental Target 与 Required Return 分开比较。"
+            )
         win_odds = local_b76.get("win_odds") if isinstance(local_b76.get("win_odds"), Mapping) else {}
         payoff = win_odds.get("payoff_asymmetry") if isinstance(win_odds.get("payoff_asymmetry"), Mapping) else {}
         stress = win_odds.get("thesis_break_stress") if isinstance(win_odds.get("thesis_break_stress"), Mapping) else {}
@@ -7289,6 +7337,7 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         forecast_valuation=prepared.get("forecast_valuation") or {},
         thesis_break_stress_review=stress_review,
         external_mie_status=str(mie.get("status") or "UNKNOWN"),
+        local_eps_multiple_recalculation=local_inversion,
     )
     source_inversion["local_sotp_recalculation"] = local_sotp_inversion
     mie["price_implied_analysis"] = source_inversion
