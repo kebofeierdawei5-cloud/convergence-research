@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-"""B76 read-only comparison of independent B4 forecast and B61/B63 price hurdles.
+"""B76 read-only comparison of independent B4 forecasts and price-conditioned requirements.
 
-This adapter compares already-computed, same-period SOTP requirements with the
-independent B4 forecast. It does not identify external MIE, calibrate win rates,
+This adapter compares already-computed EPS_MULTIPLE/B60 and SOTP/B61/B63
+requirements with the independent B4 forecast. It does not identify external MIE, calibrate win rates,
 or modify any upstream forecast, valuation, return gate, or decision.
 """
 
