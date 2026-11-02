@@ -159,7 +159,7 @@ def test_b76_fails_closed_when_b63_or_b68_is_not_available():
     assert result["external_mie_modified"] is False
 
 
-def test_b76_sotp_comparison_is_not_applied_to_eps_multiple_primary_model():
+def test_b76_eps_multiple_blocks_when_b60_result_is_missing():
     local = _inputs()
     local["selected_model_family"] = "EPS_MULTIPLE"
     result = build_expectation_gap_comparison(
