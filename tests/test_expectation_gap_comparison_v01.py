@@ -170,7 +170,8 @@ def test_b76_sotp_comparison_is_not_applied_to_eps_multiple_primary_model():
         thesis_break_stress_review=None,
         external_mie_status="NOT_IDENTIFIABLE",
     )
-    assert result["status"] == "NOT_APPLICABLE_NON_SOTP"
+    assert result["status"] == "BLOCKED_BY_B60_RESULT_MISSING"
+    assert result["price_conditioned_comparison_status"] == "BLOCKED_BY_B60_RESULT_MISSING"
     assert result["scenarios"] == {}
     assert result["external_mie_modified"] is False
     assert result["win_odds"]["win_probability_status"] == "NOT_IDENTIFIABLE"
@@ -224,7 +225,8 @@ def test_b76_eps_multiple_compares_b4_all_items_eps_with_b60_hurdle_eps():
         external_mie_status="NOT_IDENTIFIABLE",
         local_eps_multiple_recalculation=b60,
     )
-    assert result["status"] == "NOT_APPLICABLE_NON_SOTP"
+    assert result["status"] == "CONDITIONAL_PRICE_COMPARISON_CALCULATED"
+    assert result["price_conditioned_comparison_status"] == "CONDITIONAL_PRICE_COMPARISON_CALCULATED"
     comparison = result["eps_multiple_comparison"]
     assert comparison["status"] == "CONDITIONAL_PRICE_COMPARISON_CALCULATED"
     assert comparison["forecast_period"] == "2027FY"
