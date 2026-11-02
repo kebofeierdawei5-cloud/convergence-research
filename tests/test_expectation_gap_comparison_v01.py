@@ -193,10 +193,10 @@ def _eps_multiple_inputs():
         "external_mie_status_unchanged": "NOT_IDENTIFIABLE",
         "scenarios": {},
     }
-    for name, eps, hurdle, target in (
-        ("bear", "1.60", "1.80", "1.85"),
-        ("base", "2.35", "2.00", "2.10"),
-        ("bull", "2.80", "2.20", "2.30"),
+    for name, eps, hurdle, hurdle_with_distributions, target, target_with_distributions in (
+        ("bear", "1.60", "1.80", "1.70", "1.85", "1.75"),
+        ("base", "2.35", "2.00", "1.90", "2.10", "2.00"),
+        ("bull", "2.80", "2.20", "2.10", "2.30", "2.20"),
     ):
         b60["scenarios"][name] = {
             "status": "CALCULATED_CONDITIONAL",
@@ -206,9 +206,9 @@ def _eps_multiple_inputs():
             "b57_all_items_eps_proxy": eps,
             "selected_terminal_pe": "15",
             "required_return_eps_without_distributions": hurdle,
-            "required_return_eps_with_validated_distributions": str(float(hurdle) - 0.10),
+            "required_return_eps_with_validated_distributions": hurdle_with_distributions,
             "fundamental_target_eps_without_distributions": target,
-            "fundamental_target_eps_with_validated_distributions": str(float(target) - 0.10),
+            "fundamental_target_eps_with_validated_distributions": target_with_distributions,
             "distribution_status": "VALIDATED_DATED_CASH_FLOWS",
         }
     return local, b60
