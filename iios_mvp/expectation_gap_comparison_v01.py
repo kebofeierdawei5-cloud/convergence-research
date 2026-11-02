@@ -233,6 +233,217 @@ def _scenario_comparison(
     }
 
 
+
+def _eps_requirement_pair(
+    forecast_eps: Any,
+    required_eps: Any,
+    *,
+    basis: str,
+) -> dict[str, Any]:
+    forecast = _dec(forecast_eps)
+    required = _dec(required_eps)
+    if forecast is None or required is None or required <= 0:
+        return {
+            "status": "NOT_IDENTIFIABLE",
+            "basis": basis,
+            "forecast_eps_cny_per_share": _fmt(forecast),
+            "required_eps_cny_per_share": _fmt(required),
+            "forecast_minus_required_cny_per_share": None,
+            "headroom_vs_required_pct": None,
+            "direction": "UNKNOWN",
+            "unit": "CNY/share",
+        }
+    gap = forecast - required
+    return {
+        "status": "CALCULATED",
+        "basis": basis,
+        "forecast_eps_cny_per_share": _fmt(forecast),
+        "required_eps_cny_per_share": _fmt(required),
+        "forecast_minus_required_cny_per_share": _fmt(gap),
+        "headroom_vs_required_pct": _fmt((forecast / required - Decimal("1")) * Decimal("100")),
+        "direction": (
+            "B4_FORECAST_ABOVE_REQUIREMENT" if gap > 0
+            else "B4_FORECAST_BELOW_REQUIREMENT" if gap < 0
+            else "B4_FORECAST_EQUALS_REQUIREMENT"
+        ),
+        "unit": "CNY/share",
+    }
+
+
+def _eps_multiple_comparison(
+    local_eps_multiple_recalculation: Mapping[str, Any] | None,
+    *,
+    selected_model_family: str,
+) -> dict[str, Any]:
+    """Compare B4/B57 company-wide EPS with B60 price-conditioned EPS requirements."""
+    b60 = _map(local_eps_multiple_recalculation)
+    family = str(selected_model_family or "UNKNOWN").strip().upper()
+    result: dict[str, Any] = {
+        "status": "NOT_IDENTIFIABLE",
+        "classification": "B4_INDEPENDENT_EPS_VS_B60_PRICE_CONDITIONED_REQUIRED_EPS_NOT_EXTERNAL_MIE",
+        "selected_model_family": family,
+        "currency": str(b60.get("currency") or "UNKNOWN").upper(),
+        "unit": "CNY/share",
+        "comparison_basis": "B4_B57_COMPANY_WIDE_ALL_ITEMS_DILUTED_EPS_PROXY_VS_B60_REQUIRED_TERMINAL_EPS",
+        "forecast_period": b60.get("forecast_period") or "UNKNOWN",
+        "valuation_terminal_date": b60.get("valuation_terminal_date") or "UNKNOWN",
+        "annualization_year_fraction": b60.get("annualization_year_fraction"),
+        "reference_price": b60.get("reference_price"),
+        "price_assurance": b60.get("price_assurance") or "UNKNOWN",
+        "price_pit_status": b60.get("price_pit_status") or "UNKNOWN",
+        "b60_status": b60.get("status") or "UNKNOWN",
+        "external_mie_status_unchanged": b60.get("external_mie_status_unchanged") or "UNKNOWN",
+        "external_mie_modified": False,
+        "expectation_gap_modified": False,
+        "b4_forecast_modified": False,
+        "b60_calculation_modified": False,
+        "valuation_modified": False,
+        "decision_authority": False,
+        "period_alignment_contract": (
+            "仅接受 B60 场景的 b58_forecast_period_match=True；B58 已核对 B4 forecast_period、B57 forward period、"
+            "primary EPS bridge period 与 EPS_MULTIPLE forecast_period。valuation_terminal_date 单独展示，不作为盈利期间。"
+        ),
+        "earnings_basis": (
+            "只使用 B60 携带的 B57 all-items parent-attributable EPS proxy；不使用 B57 normalized EPS，"
+            "也不把 EPS_MULTIPLE 主适配器自报 EPS 当成独立 B4 预测。"
+        ),
+        "distribution_treatment": (
+            "不含分红的 Required Return EPS 为主比较；只有 B60 标记为已验证的定时现金分配时，"
+            "才单独展示分红调整比较。"
+        ),
+        "scenarios": {},
+        "limitations": [
+            "这是当前结构化价格、B60 终端 P/E、持有期和回报门槛下的条件性 EPS 要求，不是外部 MIE。",
+            "B4/B57 EPS 是公司整体 all-items EPS proxy；它不等于已审计实际 EPS，也不证明预测质量。",
+            "Required Return 与 Fundamental Target 分开呈现；二者不能互相替代，也不能把 15%目标 EPS 当作 Required Return EPS。",
+            "只有 B57 已完成公司整体利润归属/稀释股数桥且 B58 期间匹配为 true，才进行数值比较。",
+        ],
+    }
+    if family != "EPS_MULTIPLE":
+        result["status"] = "NOT_APPLICABLE_NOT_EPS_MULTIPLE"
+        return result
+    if not b60:
+        result["status"] = "BLOCKED_BY_B60_RESULT_MISSING"
+        return result
+    if str(b60.get("selected_model_family") or "").strip().upper() != "EPS_MULTIPLE":
+        result["status"] = "BLOCKED_BY_B60_MODEL_FAMILY_MISMATCH"
+        return result
+    if result["currency"] != "CNY":
+        result["status"] = "NOT_COMPARABLE_CURRENCY"
+        return result
+    if result["b60_status"] not in {"CONDITIONAL_SENSITIVITY_CALCULATED", "PARTIAL"}:
+        result["status"] = "BLOCKED_BY_B60"
+        return result
+
+    raw_scenarios = _map(b60.get("scenarios"))
+    statuses: list[str] = []
+    validated_distribution_statuses = {
+        "VALIDATED_DATED_CASH_FLOWS",
+        "VALIDATED_NO_FUTURE_DISTRIBUTIONS",
+    }
+    for name in _SCENARIOS:
+        raw = _map(raw_scenarios.get(name))
+        b57_status = str(raw.get("b57_status") or "UNKNOWN")
+        period_match = raw.get("b58_forecast_period_match") is True
+        b4_eps = raw.get("b57_all_items_eps_proxy")
+        row: dict[str, Any] = {
+            "scenario": name,
+            "status": "NOT_IDENTIFIABLE",
+            "b60_scenario_status": raw.get("status") or "UNKNOWN",
+            "b57_status": b57_status,
+            "b58_forecast_period_match": period_match,
+            "b4_forecast_period": result["forecast_period"] if period_match else "UNKNOWN",
+            "b60_eps_forecast_period": result["forecast_period"],
+            "valuation_terminal_date": result["valuation_terminal_date"],
+            "b4_independent_all_items_eps_proxy_cny_per_share": b4_eps,
+            "selected_terminal_pe_x": raw.get("selected_terminal_pe"),
+            "required_return": {},
+            "fundamental_target": {},
+            "issues": [],
+        }
+        if raw.get("status") != "CALCULATED_CONDITIONAL":
+            row["issues"].append("B60_SCENARIO_NOT_CALCULATED")
+        if b57_status != "CALCULATED_AND_RECONCILED":
+            row["issues"].append("B57_COMPANY_WIDE_EARNINGS_EPS_BRIDGE_NOT_RECONCILED")
+        if not period_match:
+            row["issues"].append("B4_B57_B58_B60_FORECAST_PERIOD_NOT_CONFIRMED_MATCH")
+        if str(b60.get("forecast_period") or "").strip().upper() in {"", "UNKNOWN"}:
+            row["issues"].append("B60_EPS_FORECAST_PERIOD_UNKNOWN")
+        if _dec(b4_eps) is None:
+            row["issues"].append("B4_B57_ALL_ITEMS_EPS_PROXY_MISSING")
+        if row["issues"]:
+            row["status"] = "NOT_IDENTIFIABLE"
+            result["scenarios"][name] = row
+            statuses.append(row["status"])
+            continue
+
+        row["required_return"] = {
+            "without_distributions": _eps_requirement_pair(
+                b4_eps,
+                raw.get("required_return_eps_without_distributions"),
+                basis="B4_B57_ALL_ITEMS_EPS_VS_B60_REQUIRED_RETURN_EPS_WITHOUT_DISTRIBUTIONS",
+            )
+        }
+        distribution_status = str(raw.get("distribution_status") or "UNKNOWN").upper()
+        if distribution_status in validated_distribution_statuses:
+            row["required_return"]["with_validated_distributions"] = _eps_requirement_pair(
+                b4_eps,
+                raw.get("required_return_eps_with_validated_distributions"),
+                basis="B4_B57_ALL_ITEMS_EPS_VS_B60_REQUIRED_RETURN_EPS_WITH_VALIDATED_DISTRIBUTIONS",
+            )
+        else:
+            row["required_return"]["with_validated_distributions"] = {
+                "status": "NOT_IDENTIFIABLE",
+                "basis": "VALIDATED_DISTRIBUTION_CASH_FLOWS_REQUIRED",
+                "distribution_status": distribution_status,
+                "forecast_eps_cny_per_share": _fmt(_dec(b4_eps)),
+                "required_eps_cny_per_share": None,
+                "forecast_minus_required_cny_per_share": None,
+                "headroom_vs_required_pct": None,
+                "direction": "UNKNOWN",
+                "unit": "CNY/share",
+            }
+        row["fundamental_target"] = {
+            "without_distributions": _eps_requirement_pair(
+                b4_eps,
+                raw.get("fundamental_target_eps_without_distributions"),
+                basis="B4_B57_ALL_ITEMS_EPS_VS_B60_FUNDAMENTAL_TARGET_EPS_WITHOUT_DISTRIBUTIONS",
+            )
+        }
+        if distribution_status in validated_distribution_statuses:
+            row["fundamental_target"]["with_validated_distributions"] = _eps_requirement_pair(
+                b4_eps,
+                raw.get("fundamental_target_eps_with_validated_distributions"),
+                basis="B4_B57_ALL_ITEMS_EPS_VS_B60_FUNDAMENTAL_TARGET_EPS_WITH_VALIDATED_DISTRIBUTIONS",
+            )
+        else:
+            row["fundamental_target"]["with_validated_distributions"] = {
+                "status": "NOT_IDENTIFIABLE",
+                "basis": "VALIDATED_DISTRIBUTION_CASH_FLOWS_REQUIRED",
+                "distribution_status": distribution_status,
+                "forecast_eps_cny_per_share": _fmt(_dec(b4_eps)),
+                "required_eps_cny_per_share": None,
+                "forecast_minus_required_cny_per_share": None,
+                "headroom_vs_required_pct": None,
+                "direction": "UNKNOWN",
+                "unit": "CNY/share",
+            }
+        if row["required_return"]["without_distributions"]["status"] != "CALCULATED":
+            row["issues"].append("B60_REQUIRED_RETURN_EPS_NOT_IDENTIFIABLE")
+            row["status"] = "NOT_IDENTIFIABLE"
+        else:
+            row["status"] = "CALCULATED"
+        result["scenarios"][name] = row
+        statuses.append(row["status"])
+
+    if statuses and all(status == "CALCULATED" for status in statuses):
+        result["status"] = "CONDITIONAL_PRICE_COMPARISON_CALCULATED"
+    elif any(status == "CALCULATED" for status in statuses):
+        result["status"] = "PARTIAL"
+    else:
+        result["status"] = "NOT_IDENTIFIABLE"
+    return result
+
 def build_expectation_gap_comparison(
     *,
     local_sotp_recalculation: Mapping[str, Any],
@@ -241,8 +452,9 @@ def build_expectation_gap_comparison(
     forecast_valuation: Mapping[str, Any],
     thesis_break_stress_review: Mapping[str, Any] | None,
     external_mie_status: str,
+    local_eps_multiple_recalculation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Compare B4 independent forecasts with B61/B63 requirements without changing MIE."""
+    """Compare B4 independent forecasts with B61/B63/B60 requirements without changing MIE."""
     local = _map(local_sotp_recalculation)
     result: dict[str, Any] = {
         "schema_version": B76_SCHEMA,
@@ -280,6 +492,12 @@ def build_expectation_gap_comparison(
             "15% Fundamental Target 与 Required Return 保持原有独立口径；本模块只展示 B63 的 Required Return 价值池要求。",
         ],
     }
+    eps_comparison = _eps_multiple_comparison(
+        local_eps_multiple_recalculation,
+        selected_model_family=str(local.get("selected_model_family") or "UNKNOWN"),
+    )
+    result["eps_multiple_comparison"] = eps_comparison
+    result["eps_multiple_comparison_status"] = eps_comparison.get("status", "UNKNOWN")
     if str(local.get("selected_model_family") or "").upper() != "SOTP":
         result["status"] = "NOT_APPLICABLE_NON_SOTP"
         return result
