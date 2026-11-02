@@ -234,7 +234,7 @@ def test_b76_eps_multiple_compares_b4_all_items_eps_with_b60_hurdle_eps():
     assert required["forecast_eps_cny_per_share"] == "2.35"
     assert required["required_eps_cny_per_share"] == "2.00"
     assert required["forecast_minus_required_cny_per_share"] == "0.35"
-    assert required["headroom_vs_required_pct"] == "17.50"
+    assert required["headroom_vs_required_pct"] == "17.500"
     assert required["direction"] == "B4_FORECAST_ABOVE_REQUIREMENT"
     assert base["required_return"]["with_validated_distributions"]["required_eps_cny_per_share"] == "1.9"
     assert base["fundamental_target"]["without_distributions"]["required_eps_cny_per_share"] == "2.10"
