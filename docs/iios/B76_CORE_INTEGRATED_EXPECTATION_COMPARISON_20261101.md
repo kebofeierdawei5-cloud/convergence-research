@@ -39,7 +39,7 @@ B73 分支较 main 超前 321 个提交。**本批仅在该分支上继续开发
 - **SOTP：**比较 B4 独立 Bear/Base/Bull 分部正常化归母利润与 B61/B62/B63/B68 的现价条件要求。
 - **EPS_MULTIPLE：**新增 `eps_multiple_comparison`，读取已经本地计算完成的 B60 与 B57/B58 结果，将 B4/B57 公司整体 all-items 归母稀释 EPS 与 B60 Required Return 所需终端 EPS 在相同期间、CNY/share 单位和同一利润口径下比较。
 
-EPS_MULTIPLE 对照的 fail-closed 条件：B60 计算成功、主模型族为 EPS_MULTIPLE、币种为 CNY、B57 状态为 `CALCULATED_AND_RECONCILED`、B58 的 `forecast_period_match=True)，且 B4 EPS / B60 所需 EPS 都有有效数值。B58 的期间核验覆盖 B4 forecast period、B57 forward period、主 EPS bridge period 和 EPS_MULTIPLE forecast period。估值终点日期独立展示，不得代替盈利参考期间。任何条件不满足时，差额和余量保持 UNKNOWN，不由 Round B 猜测。
+EPS_MULTIPLE 对照的 fail-closed 条件：B60 计算成功、主模型族为 EPS_MULTIPLE、币种为 CNY、B57 状态为 `CALCULATED_AND_RECONCILED`、B58 的 `forecast_period_match=True`，且 B4 EPS / B60 所需 EPS 都有有效数值。B58 的期间核验覆盖 B4 forecast period、B57 forward period、主 EPS bridge period 和 EPS_MULTIPLE forecast period。估值终点日期独立展示，不得代替盈利参考期间。任何条件不满足时，差额和余量保持 UNKNOWN，不由 Round B 猜测。
 
 主比较使用不含分红的 B60 Required Return EPS；只有 B60 的分红状态为 `VALIDATED_DATED_CASH_FLOWS` 或 `VALIDATED_NO_FUTURE_DISTRIBUTIONS` 时，才额外展示分红调整口径。B60 Fundamental Target EPS 单独列示，不与 Required Return 混用。B57 normalized EPS 不作为 all-items 比较值；EPS_MULTIPLE 适配器自报 EPS 也不冒充 B4 独立预测。
 
@@ -84,7 +84,7 @@ EPS_MULTIPLE 对照的 fail-closed 条件：B60 计算成功、主模型族为 E
 - 只有分红经过既有收益求解器验证时，才展示分红调整后的 Required Return 对照；
 - Fundamental Target EPS 单列展示，不能与 Required Return EPS 合并。
 
-**期间/口径守门：**仅接受 B60 场景状态 `CALCULATED_CONDITIONAL`、B57 `CALCULATED_AND_RECONCILED`、B58 `forecast_period_match=True`）。B58 已核对 B4 驱动预测期间、B57 前瞻期间、主 EPS bridge 期间和 EPS_MULTIPLE 盈利期间一致；B60 的 `valuation_terminal_date` 只用于持有期年化，单独保留。币种必须为 CNY，EPS 单位为 CNY/share。
+**期间/口径守门：**仅接受 B60 场景状态 `CALCULATED_CONDITIONAL`、B57 `CALCULATED_AND_RECONCILED`、B58 `forecast_period_match=True`。B58 已核对 B4 驱动预测期间、B57 前瞻期间、主 EPS bridge 期间和 EPS_MULTIPLE 盈利期间一致；B60 的 `valuation_terminal_date` 只用于持有期年化，单独保留。币种必须为 CNY，EPS 单位为 CNY/share。
 
 **关键区分：**比较对象是 B4/B57 all-items 归母稀释 EPS proxy，不是 B57 normalized EPS，也不是 EPS_MULTIPLE 主适配器自报 EPS。后者只属于原主估值链，不代表独立预测。
 
