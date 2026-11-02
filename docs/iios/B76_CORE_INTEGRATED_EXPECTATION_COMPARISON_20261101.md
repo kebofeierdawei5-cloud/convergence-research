@@ -34,7 +34,14 @@ B73 分支较 main 超前 321 个提交。**本批仅在该分支上继续开发
 
 新文件：`iios_mvp/expectation_gap_comparison_v01.py`
 
-**适用范围：**本批 B76 数值对照聚焦操作者选定且本地成功复算的 SOTP 路径（B61/B62/B63/B68）。非 SOTP 主模型返回 `NOT_APPLICABLE_NON_SOTP`；EPS_MULTIPLE 的 B60 现价 EPS 反推保留原有展示和计算，本批没有新增 B60 与 B4 的独立数值对照。
+**适用范围：**B76 现在分别支持两条互不混用的主估值对照路径：
+
+- **SOTP：**比较 B4 独立 Bear/Base/Bull 分部正常化归母利润与 B61/B62/B63/B68 的现价条件要求。
+- **EPS_MULTIPLE：**新增 `eps_multiple_comparison`，读取已经本地计算完成的 B60 与 B57/B58 结果，将 B4/B57 公司整体 all-items 归母稀释 EPS 与 B60 Required Return 所需终端 EPS 在相同期间、CNY/share 单位和同一利润口径下比较。
+
+EPS_MULTIPLE 对照的 fail-closed 条件：B60 计算成功、主模型族为 EPS_MULTIPLE、币种为 CNY、B57 状态为 `CALCULATED_AND_RECONCILED`、B58 的 `forecast_period_match=True)，且 B4 EPS / B60 所需 EPS 都有有效数值。B58 的期间核验覆盖 B4 forecast period、B57 forward period、主 EPS bridge period 和 EPS_MULTIPLE forecast period。估值终点日期独立展示，不得代替盈利参考期间。任何条件不满足时，差额和余量保持 UNKNOWN，不由 Round B 猜测。
+
+主比较使用不含分红的 B60 Required Return EPS；只有 B60 的分红状态为 `VALIDATED_DATED_CASH_FLOWS` 或 `VALIDATED_NO_FUTURE_DISTRIBUTIONS` 时，才额外展示分红调整口径。B60 Fundamental Target EPS 单独列示，不与 Required Return 混用。B57 normalized EPS 不作为 all-items 比较值；EPS_MULTIPLE 适配器自报 EPS 也不冒充 B4 独立预测。
 
 输入复用现有结果：
 - B62 `segment_earnings_reconciliation`
@@ -65,6 +72,24 @@ B73 分支较 main 超前 321 个提交。**本批仅在该分支上继续开发
 - B63 Required Common P/E 是全分部统一倍数缩放条件敏感性，不是单一分部公平 P/E。
 - B76 不修改 B4、B61、B62、B63、B68、SOTP、MIE、expectation_gap、15% 收益门槛、Required Return、目标入场价、组合约束或 Decision。
 
+
+## 3A. EPS_MULTIPLE：B4/B57 与 B60 数值对照（2026-11-02 follow-up）
+
+新增只读输出：`eps_multiple_comparison`。B76 在本地 B60 完成计算后再读取它，不把价格、Required Return EPS 或主估值倍数要求提前给 Round A / B4 预测使用。
+
+每个 Bear/Base/Bull 情景展示：
+- B4/B57 all-items parent-attributable diluted EPS proxy（CNY/share）；
+- B60 Required Return 所需终端 EPS（不含分红）；
+- 两者差额、相对所需 EPS 的余量百分比和方向；
+- 只有分红经过既有收益求解器验证时，才展示分红调整后的 Required Return 对照；
+- Fundamental Target EPS 单列展示，不能与 Required Return EPS 合并。
+
+**期间/口径守门：**仅接受 B60 场景状态 `CALCULATED_CONDITIONAL`、B57 `CALCULATED_AND_RECONCILED`、B58 `forecast_period_match=True)。B58 已核对 B4 驱动预测期间、B57 前瞻期间、主 EPS bridge 期间和 EPS_MULTIPLE 盈利期间一致；B60 的 `valuation_terminal_date` 只用于持有期年化，单独保留。币种必须为 CNY，EPS 单位为 CNY/share。
+
+**关键区分：**比较对象是 B4/B57 all-items 归母稀释 EPS proxy，不是 B57 normalized EPS，也不是 EPS_MULTIPLE 主适配器自报 EPS。后者只属于原主估值链，不代表独立预测。
+
+本比较仅用于说明在 B60 既定现价、终端 P/E、持有期限和 Required Return 下，B4 EPS 预测是否高于所需 EPS。它既不是外部 MIE，也不证明 B4 假设可靠；不修改 B60、B4、B5/B6、估值、回报、目标价、MIE、正式 expectation_gap 或 Decision 权限。
+
 ## 4. 胜率、赔率与失败代价
 
 - 胜率固定为 `NOT_IDENTIFIABLE`。只有可比投资案例的历史胜负样本或经独立验证的概率校准模型，才可能支持投资胜率量化；事件概率、管理层目标、分析师主观判断和 Bear/Base/Bull 权重均不足以单独证明投资胜率。
@@ -83,14 +108,15 @@ B73 分支较 main 超前 321 个提交。**本批仅在该分支上继续开发
 
 ## 6. 验证与剩余风险
 
-本批新增：
-- `iios_mvp/expectation_gap_comparison_v01.py`
-- `tests/test_expectation_gap_comparison_v01.py`
+本批新增/更新：
+- `iios_mvp/expectation_gap_comparison_v01.py`：增加 EPS_MULTIPLE 的 B4/B57 ↔ B60 Required Return EPS 比较。
+- `iios_mvp/local_investment_pilot_v01.py`：将 B60 实际结果传入 B76 并在第一屏展示数值对照。
+- `tests/test_expectation_gap_comparison_v01.py`：新增 4 个 EPS_MULTIPLE 对照及 fail-closed 测试；原 SOTP 测试保留。
 - B76 本地报告一屏摘要；
 - B74/B75 Prompt 与报告表达移植；
 - 回归断言更新。
 
-**测试没有运行。** 不能声称 Python 导入、算术、报告、Replay、CI 或 macOS 运行通过。下一次统一验证应重点核对：
+**测试没有运行。** 本轮尝试从本地运行环境拉取远端代码时网络 DNS 不可用，未能建立本地执行副本；因此不能声称 Python 导入、算术、报告、Replay、CI 或 macOS 运行通过。下一次统一验证应重点核对：
 1. B63 waterfall 的 step 3/step 5 是否与 B62/B61 期间、口径和金额精确一致；
 2. B68 的 B61/B63 两类 driver alternatives 是否被正确展示为替代敏感性；
 3. Decimal 计算和小数输出；
