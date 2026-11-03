@@ -197,6 +197,31 @@ def _scenario_comparison(
             if not passed:
                 b63_mismatches.append(key.upper())
 
+    # Independently sum the B68 carried B4 full-vector segment profits at the
+    # same selected SOTP P/Es. This must reproduce B63 step 3, not a single-segment
+    # alternative from B61/B63.
+    b68_segments = b68_scenario.get("segments") if isinstance(b68_scenario.get("segments"), list) else []
+    b68_full_vector_pool = Decimal("0")
+    b68_vector_complete = bool(b68_segments)
+    for segment in b68_segments:
+        if not isinstance(segment, Mapping):
+            b68_vector_complete = False
+            break
+        profit = _dec(segment.get("b4_forecast_normalized_parent_attributable_profit_cny"))
+        pe = _dec(segment.get("selected_sotp_pe_x"))
+        if profit is None or pe is None or pe <= 0:
+            b68_vector_complete = False
+            break
+        b68_full_vector_pool += profit * pe
+    if b68_vector_complete and step3 is not None:
+        b68_vector_ok = _close(b68_full_vector_pool, step3, b63_tol)
+        b63_checks["b68_full_vector_recomputed_pool_matches_b63_step_3"] = "PASS" if b68_vector_ok else "MISMATCH"
+        if not b68_vector_ok:
+            b63_mismatches.append("B68_FULL_VECTOR_POOL_DOES_NOT_MATCH_B63_STEP_3")
+    else:
+        b63_checks["b68_full_vector_recomputed_pool_matches_b63_step_3"] = "NOT_IDENTIFIABLE"
+        b63_issues.append("B68_FULL_VECTOR_RECOMPUTATION_INPUT_MISSING")
+
     b63_checks["status"] = (
         "MISMATCH" if b63_mismatches else "NOT_IDENTIFIABLE" if b63_issues else "PASS"
     )
