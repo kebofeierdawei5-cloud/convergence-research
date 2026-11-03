@@ -108,6 +108,102 @@ def _scenario_comparison(
         if b4_per_share is not None and required_per_share is not None else None
     )
 
+    # Independent B76 second-pass audit of B63's full-vector two-step waterfall
+    # and B62/B61 parent-adjustment and per-share transmission.
+    b63_checks: dict[str, str] = {}
+    b63_issues: list[str] = []
+    b63_mismatches: list[str] = []
+    b63_tol = Decimal("0.01")
+    step1 = _dec(waterfall.get("step_1_selected_sotp_segment_pool_cny"))
+    step2 = _dec(waterfall.get("step_2_b4_earnings_effect_at_selected_pes_cny"))
+    step3 = _dec(waterfall.get("step_3_b4_forecast_pool_at_selected_pes_cny"))
+    step4 = _dec(waterfall.get("step_4_common_pe_scale_effect_to_required_pool_cny"))
+    step5 = _dec(waterfall.get("step_5_required_segment_pool_cny"))
+    waterfall_residual = _dec(waterfall.get("waterfall_reconciliation_residual_cny"))
+    b62_b4_pool = _dec(b62_scenario.get("b4_forecast_segment_equity_value_pool_at_selected_sotp_pe_cny"))
+    b62_required_pool = _dec(b62_scenario.get("required_segment_equity_value_pool_for_required_return_cny"))
+    if any(v is None for v in (step1, step2, step3, step4, step5, waterfall_residual, b62_b4_pool, b62_required_pool)):
+        b63_issues.append("B63_WATERFALL_OR_B62_VALUE_POOL_ARITHMETIC_INPUT_MISSING")
+        for key in ("step_1_plus_step_2_equals_step_3", "step_3_plus_step_4_equals_step_5",
+                    "declared_waterfall_residual", "step_3_matches_b62_b4_pool", "step_5_matches_b62_required_pool"):
+            b63_checks[key] = "NOT_IDENTIFIABLE"
+    else:
+        pairs = {
+            "step_1_plus_step_2_equals_step_3": (step1 + step2, step3),
+            "step_3_plus_step_4_equals_step_5": (step3 + step4, step5),
+            "declared_waterfall_residual": (step1 + step2 + step4 - step5, waterfall_residual),
+            "step_3_matches_b62_b4_pool": (step3, b62_b4_pool),
+            "step_5_matches_b62_required_pool": (step5, b62_required_pool),
+        }
+        for key, (left, right) in pairs.items():
+            passed = _close(left, right, b63_tol)
+            b63_checks[key] = "PASS" if passed else "MISMATCH"
+            if not passed:
+                b63_mismatches.append(key.upper())
+
+    dilution = _map(b63_scenario.get("dilution_attribution"))
+    parent_attr = _map(b63_scenario.get("parent_adjustment_attribution"))
+    b62_parent = _map(b62_scenario.get("selected_parent_adjustments"))
+    b62_shares = _dec(b62_scenario.get("selected_diluted_shares"))
+    b62_b4_equity = _dec(b62_scenario.get("b4_forecast_implied_total_equity_value_with_selected_parent_adjustments_cny"))
+    b62_required_equity = _dec(b62_scenario.get("required_terminal_equity_value_for_required_return_cny"))
+    b63_b4_equity = _dec(dilution.get("b4_forecast_total_equity_value_cny"))
+    b63_required_equity = _dec(dilution.get("required_total_equity_value_cny"))
+    b63_shares = _dec(dilution.get("selected_diluted_shares"))
+    b63_required_per_share = _dec(dilution.get("required_terminal_value_per_share_cny"))
+    b63_per_share_gap = _dec(dilution.get("per_share_gap_cny"))
+    b63_required_pool_parent_identity = (
+        _dec(parent_attr.get("capitalized_central_cost_load_on_required_segment_pool_cny")),
+        _dec(parent_attr.get("net_cash_debt_offset_to_required_segment_pool_cny")),
+        _dec(parent_attr.get("other_adjustments_offset_to_required_segment_pool_cny")),
+    )
+    critical_b63_equity_inputs = (
+        b62_shares, b62_b4_equity, b62_required_equity,
+        b63_b4_equity, b63_required_equity, b63_shares,
+        b63_required_per_share, b63_per_share_gap,
+        *b63_required_pool_parent_identity,
+    )
+    if any(v is None for v in critical_b63_equity_inputs):
+        b63_issues.append("B63_PARENT_ADJUSTMENT_OR_PER_SHARE_ARITHMETIC_INPUT_MISSING")
+        for key in ("b62_b4_equity_divided_by_shares_equals_b4_per_share",
+                    "b62_required_equity_divided_by_shares_equals_required_per_share",
+                    "b63_vs_b62_diluted_shares", "b63_b4_equity_matches_b62",
+                    "b63_required_equity_matches_b62", "b63_per_share_gap_sign_and_amount",
+                    "required_pool_parent_adjustment_identity"):
+            b63_checks[key] = "NOT_IDENTIFIABLE"
+    else:
+        equity_pairs = {
+            "b62_b4_equity_divided_by_shares_equals_b4_per_share": (
+                b62_b4_equity / b62_shares, b4_per_share
+            ),
+            "b62_required_equity_divided_by_shares_equals_required_per_share": (
+                b62_required_equity / b62_shares, required_per_share
+            ),
+            "b63_vs_b62_diluted_shares": (b63_shares, b62_shares),
+            "b63_b4_equity_matches_b62": (b63_b4_equity, b62_b4_equity),
+            "b63_required_equity_matches_b62": (b63_required_equity, b62_required_equity),
+            "b63_per_share_gap_sign_and_amount": (b63_per_share_gap, -per_share_gap if per_share_gap is not None else None),
+            "required_pool_parent_adjustment_identity": (
+                b63_required_equity
+                + b63_required_pool_parent_identity[0]
+                + b63_required_pool_parent_identity[1]
+                + b63_required_pool_parent_identity[2],
+                step5,
+            ),
+        }
+        for key, (left, right) in equity_pairs.items():
+            passed = _close(left, right, b63_tol)
+            b63_checks[key] = "PASS" if passed else "MISMATCH"
+            if not passed:
+                b63_mismatches.append(key.upper())
+
+    b63_checks["status"] = (
+        "MISMATCH" if b63_mismatches else "NOT_IDENTIFIABLE" if b63_issues else "PASS"
+    )
+    b63_issues.extend(b63_mismatches)
+    reconciliation_failed = bool(b63_mismatches)
+    reconciliation_not_identifiable = bool(b63_issues) and not reconciliation_failed
+
     required_pe_rows = _map(b63_scenario.get("multiple_attribution")).get("required_common_pe_by_segment")
     if isinstance(required_pe_rows, list):
         required_pe_by_id = {
@@ -165,8 +261,12 @@ def _scenario_comparison(
         issues.append("B61_SCENARIO_NOT_FULLY_CALCULATED")
     if b62_scenario.get("status") != "CALCULATED_CONDITIONAL":
         issues.append("B62_SCENARIO_NOT_FULLY_RECONCILED")
-    if b63_scenario.get("status") != "CONDITIONAL_ATTRIBUTION_CALCULATED":
+    if b63_scenario.get("status") == "PARTIAL":
+        issues.append("B63_COMMON_PE_OR_SECONDARY_LENS_PARTIAL")
+    elif b63_scenario.get("status") != "CONDITIONAL_ATTRIBUTION_CALCULATED":
         issues.append("B63_SCENARIO_NOT_FULLY_RECONCILED")
+    if b63_issues:
+        issues.extend(b63_issues)
     if b68_scenario.get("status") == "PARTIAL":
         issues.append("B68_SCENARIO_PARTIAL")
     elif b68_scenario.get("status") != "CONDITIONAL_OPERATING_REQUIREMENT_REVERSE_ENGINEERED":
@@ -175,10 +275,25 @@ def _scenario_comparison(
         issues.append("B63_FULL_VECTOR_POOL_VALUES_MISSING")
     if b4_per_share is None or required_per_share is None:
         issues.append("B62_PER_SHARE_COMPARISON_VALUES_MISSING")
+    row_status = (
+        "RECONCILIATION_MISMATCH" if reconciliation_failed
+        else "NOT_IDENTIFIABLE" if reconciliation_not_identifiable
+        else "PARTIAL" if issues
+        else "CONDITIONAL_PRICE_COMPARISON_CALCULATED"
+    )
+    gap_allowed = row_status in {"PARTIAL", "CONDITIONAL_PRICE_COMPARISON_CALCULATED"}
     return {
         "scenario": name,
-        "status": "PARTIAL" if issues else "CONDITIONAL_PRICE_COMPARISON_CALCULATED",
+        "status": row_status,
         "issues": issues,
+        "arithmetic_reconciliation": {
+            "status": b63_checks.get("status", "NOT_IDENTIFIABLE"),
+            "checks": b63_checks,
+            "limitations": [
+                "B63 全向量 step 3 与 step 5 分别对照 B62 B4 forecast pool 与 B61 required pool。",
+                "稀释股数、母公司调整与每股终值/缺口由 B76 独立复核；共同 P/E 缩放不识别不等于价值池算术失败。",
+            ],
+        },
         "upstream_statuses": {
             "b61": b61_scenario.get("status", "UNKNOWN"),
             "b62": b62_scenario.get("status", "UNKNOWN"),
@@ -190,19 +305,19 @@ def _scenario_comparison(
             "required_return_annualized_rate": required_return_requirement.get("annualized_return_rate"),
             "fundamental_target_annualized_rate": fundamental_target_requirement.get("annualized_return_rate"),
             "comparison_basis": "B4_FULL_FORECAST_SEGMENT_PROFIT_VECTOR_AT_SELECTED_SOTP_PES_VS_B61_REQUIRED_RETURN_POOL",
-            "b4_independent_forecast_segment_value_pool_cny": _fmt(b4_pool),
-            "required_segment_value_pool_for_required_return_cny": _fmt(required_pool),
-            "b4_forecast_pool_minus_required_pool_cny": _fmt(pool_gap),
-            "headroom_vs_required_pool_pct": _fmt(pool_gap_pct),
+            "b4_independent_forecast_segment_value_pool_cny": _fmt(b4_pool) if gap_allowed else None,
+            "required_segment_value_pool_for_required_return_cny": _fmt(required_pool) if gap_allowed else None,
+            "b4_forecast_pool_minus_required_pool_cny": _fmt(pool_gap) if gap_allowed else None,
+            "headroom_vs_required_pool_pct": _fmt(pool_gap_pct) if gap_allowed else None,
             "direction": (
-                "FORECAST_POOL_ABOVE_REQUIRED_POOL" if pool_gap is not None and pool_gap > _TOL
-                else "FORECAST_POOL_BELOW_REQUIRED_POOL" if pool_gap is not None and pool_gap < -_TOL
-                else "AT_OR_WITHIN_TOLERANCE" if pool_gap is not None
+                "FORECAST_POOL_ABOVE_REQUIRED_POOL" if gap_allowed and pool_gap is not None and pool_gap > _TOL
+                else "FORECAST_POOL_BELOW_REQUIRED_POOL" if gap_allowed and pool_gap is not None and pool_gap < -_TOL
+                else "AT_OR_WITHIN_TOLERANCE" if gap_allowed and pool_gap is not None
                 else "UNKNOWN"
             ),
-            "b4_forecast_implied_terminal_value_per_share_cny": _fmt(b4_per_share),
-            "required_terminal_value_per_share_for_required_return_cny": _fmt(required_per_share),
-            "per_share_terminal_value_headroom_cny": _fmt(per_share_gap),
+            "b4_forecast_implied_terminal_value_per_share_cny": _fmt(b4_per_share) if gap_allowed else None,
+            "required_terminal_value_per_share_for_required_return_cny": _fmt(required_per_share) if gap_allowed else None,
+            "per_share_terminal_value_headroom_cny": _fmt(per_share_gap) if gap_allowed else None,
             "parent_adjustments_and_diluted_shares": "HELD_AT_B61_SELECTED_VALUES",
             "meaning": "仅表示独立 B4 预测在当前 SOTP 假设下相对 Required Return 条件要求的数学余量；不是外部 MIE，也不是独立概率判断。",
         },
@@ -222,7 +337,10 @@ def _scenario_comparison(
         "segment_comparisons": segment_rows,
         "valuation_gap": {
             "basis": "B63_PARALLEL_COMMON_PE_SCALE_REQUIRED_IF_FULL_B4_EARNINGS_ARE_ACHIEVED",
-            "status": _map(b63_scenario.get("multiple_attribution")).get("status", "UNKNOWN"),
+            "status": (
+                _map(b63_scenario.get("multiple_attribution")).get("status", "UNKNOWN")
+                if b63_scenario.get("status") != "PARTIAL" else "NOT_IDENTIFIABLE_OR_PARTIAL"
+            ),
             "required_common_pe_by_segment": list(required_pe_by_id.values()),
             "interpretation": "条件倍数敏感性，不是单一分部公平 P/E，也不是市场交易倍数或外部 MIE。",
         },
