@@ -349,6 +349,8 @@ def _scenario_comparison(
     gap_allowed = row_status in {"PARTIAL", "CONDITIONAL_PRICE_COMPARISON_CALCULATED"}
     return {
         "scenario": name,
+        "forecast_period": b62_scenario.get("forecast_period", "UNKNOWN"),
+        "valuation_terminal_date": b62_scenario.get("valuation_terminal_date", "UNKNOWN"),
         "status": row_status,
         "issues": issues,
         "arithmetic_reconciliation": {
@@ -871,9 +873,36 @@ def build_expectation_gap_comparison(
         else:
             result["status"] = "NOT_APPLICABLE_NON_SOTP"
         return result
+    structured_price = _dec(_map(price_input).get("price"))
+    b61_reference_price = _dec(local.get("reference_price"))
+    result["structured_current_price"] = _fmt(structured_price)
+    result["b61_reference_price"] = _fmt(b61_reference_price)
+    result["price_reference_status"] = (
+        "MATCH" if structured_price is not None and structured_price > 0
+        and b61_reference_price is not None and structured_price == b61_reference_price
+        else "MISMATCH" if structured_price is not None and b61_reference_price is not None
+        else "NOT_IDENTIFIABLE"
+    )
+    if result["price_reference_status"] != "MATCH":
+        result["status"] = (
+            "PRICE_REFERENCE_MISMATCH" if result["price_reference_status"] == "MISMATCH"
+            else "PRICE_REFERENCE_NOT_IDENTIFIABLE"
+        )
+        result["price_conditioned_comparison_status"] = result["status"]
+        return result
+    if str(local.get("currency") or "").upper() != "CNY":
+        result["status"] = "NOT_COMPARABLE_CURRENCY"
+        result["price_conditioned_comparison_status"] = result["status"]
+        return result
+
     b63 = _map(local.get("valuation_gap_attribution"))
     b62 = _map(local.get("segment_earnings_reconciliation"))
     b68 = _map(local.get("operating_requirement_reverse_engineering"))
+    result["forecast_period"] = b62.get("forecast_period") or local.get("forecast_period") or "UNKNOWN"
+    result["valuation_terminal_date"] = (
+        b62.get("valuation_terminal_date") or local.get("valuation_terminal_date") or "UNKNOWN"
+    )
+    result["currency"] = str(local.get("currency") or "UNKNOWN").upper()
     if b63.get("status") not in {"CONDITIONAL_ATTRIBUTION_CALCULATED", "PARTIAL"}:
         result["status"] = "BLOCKED_BY_B63"
         return result
