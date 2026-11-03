@@ -5763,6 +5763,7 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             "",
             "### B76：独立预测与现价条件性要求的数值对照",
             f"- 对照状态：{local_b76.get('status', 'UNKNOWN')}；类别：{local_b76.get('classification', 'UNKNOWN')}；外部 MIE 状态保持 {local_b76.get('external_mie_status_unchanged', 'UNKNOWN')}。",
+            f"- 结构化现价 / B61 反推参考价：{local_b76.get('structured_current_price', 'UNKNOWN')} / {local_b76.get('b61_reference_price', 'UNKNOWN')} {local_b76.get('currency', 'UNKNOWN')}；价格核对 {local_b76.get('price_reference_status', 'UNKNOWN')}；盈利期间 {local_b76.get('forecast_period', 'UNKNOWN')}；估值终点 {local_b76.get('valuation_terminal_date', 'UNKNOWN')}。",
         ])
         if str(local_sotp_inversion.get("selected_model_family") or "").upper() == "SOTP":
             lines.append("- 本节对照 B4 全分部独立盈利预测与 B61/B63 Required Return 条件要求；仅为价格条件比较，不代表外部市场共识或已验证的市场正预期差。")
