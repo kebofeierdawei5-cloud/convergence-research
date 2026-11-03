@@ -147,6 +147,10 @@ def _scenario_comparison(
     b62_shares = _dec(b62_scenario.get("selected_diluted_shares"))
     b62_b4_equity = _dec(b62_scenario.get("b4_forecast_implied_total_equity_value_with_selected_parent_adjustments_cny"))
     b62_required_equity = _dec(b62_scenario.get("required_terminal_equity_value_for_required_return_cny"))
+    b62_selected_pool = _dec(b62_scenario.get("selected_sotp_segment_equity_value_pool_cny"))
+    b62_central_cost = _dec(b62_parent.get("capitalized_central_cost_cny"))
+    b62_net_cash = _dec(b62_parent.get("net_cash_debt_cny"))
+    b62_other = _dec(b62_parent.get("other_adjustments_cny"))
     b63_b4_equity = _dec(dilution.get("b4_forecast_total_equity_value_cny"))
     b63_required_equity = _dec(dilution.get("required_total_equity_value_cny"))
     b63_shares = _dec(dilution.get("selected_diluted_shares"))
@@ -157,45 +161,74 @@ def _scenario_comparison(
         _dec(parent_attr.get("net_cash_debt_offset_to_required_segment_pool_cny")),
         _dec(parent_attr.get("other_adjustments_offset_to_required_segment_pool_cny")),
     )
+    b61_required_without = _map(required_return_requirement.get("without_distributions"))
+    b61_required_pool = _dec(b61_required_without.get("required_segment_equity_value_pool_cny"))
+    b61_required_equity = _dec(b61_required_without.get("required_terminal_equity_value_cny"))
+    b61_shares = _dec(b61_scenario.get("selected_diluted_shares"))
+    b61_central_cost = _dec(b61_scenario.get("selected_capitalized_central_cost_cny"))
+    b61_net_cash = _dec(b61_scenario.get("selected_net_cash_debt_cny"))
+    b61_other = _dec(b61_scenario.get("selected_other_adjustments_cny"))
     critical_b63_equity_inputs = (
-        b62_shares, b62_b4_equity, b62_required_equity,
-        b63_b4_equity, b63_required_equity, b63_shares,
-        b63_required_per_share, b63_per_share_gap,
+        b62_shares, b62_b4_equity, b62_required_equity, b62_selected_pool,
+        b62_central_cost, b62_net_cash, b62_other, b4_per_share, required_per_share,
+        b63_b4_equity, b63_required_equity, b63_shares, b63_required_per_share, b63_per_share_gap,
+        b61_required_pool, b61_required_equity, b61_shares, b61_central_cost, b61_net_cash, b61_other,
         *b63_required_pool_parent_identity,
     )
+    equity_pairs: dict[str, tuple[Decimal | None, Decimal | None]] = {
+        "step_1_selected_pool_matches_b62": (step1, b62_selected_pool),
+        "step_5_required_pool_matches_b61": (step5, b61_required_pool),
+        "b61_required_pool_matches_b62": (b61_required_pool, b62_required_pool),
+        "b61_required_equity_matches_b62": (b61_required_equity, b62_required_equity),
+        "b61_b62_share_counts_match": (b61_shares, b62_shares),
+        "b61_b62_capitalized_central_cost_matches": (b61_central_cost, b62_central_cost),
+        "b61_b62_net_cash_debt_matches": (b61_net_cash, b62_net_cash),
+        "b61_b62_other_adjustments_match": (b61_other, b62_other),
+        "b62_b4_equity_divided_by_shares_equals_b4_per_share": (
+            b62_b4_equity / b62_shares if b62_shares else None, b4_per_share
+        ),
+        "b62_required_equity_divided_by_shares_equals_required_per_share": (
+            b62_required_equity / b62_shares if b62_shares else None, required_per_share
+        ),
+        "b63_vs_b62_diluted_shares": (b63_shares, b62_shares),
+        "b63_b4_equity_matches_b62": (b63_b4_equity, b62_b4_equity),
+        "b63_required_equity_matches_b62": (b63_required_equity, b62_required_equity),
+        "b63_required_per_share_matches_b61": (b63_required_per_share, required_per_share),
+        "b63_per_share_gap_sign_and_amount": (
+            b63_per_share_gap, -per_share_gap if per_share_gap is not None else None
+        ),
+        "b63_parent_central_cost_matches_b62": (b63_required_pool_parent_identity[0], b62_central_cost),
+        "b63_parent_net_cash_offset_matches_b62": (
+            b63_required_pool_parent_identity[1], -b62_net_cash if b62_net_cash is not None else None
+        ),
+        "b63_parent_other_adjustment_offset_matches_b62": (
+            b63_required_pool_parent_identity[2], -b62_other if b62_other is not None else None
+        ),
+        "required_pool_parent_adjustment_identity": (
+            b63_required_equity
+            + b63_required_pool_parent_identity[0]
+            + b63_required_pool_parent_identity[1]
+            + b63_required_pool_parent_identity[2],
+            step5,
+        ),
+        "b4_equity_parent_adjustment_identity": (
+            b62_selected_pool - b62_central_cost + b62_net_cash + b62_other
+            if all(v is not None for v in (b62_selected_pool, b62_central_cost, b62_net_cash, b62_other)) else None,
+            b62_b4_equity - (b62_b4_pool if (b62_b4_pool := _dec(b62_scenario.get("b4_forecast_segment_equity_value_pool_at_selected_sotp_pe_cny"))) is not None else Decimal("0")),
+        ),
+    }
     if any(v is None for v in critical_b63_equity_inputs):
         b63_issues.append("B63_PARENT_ADJUSTMENT_OR_PER_SHARE_ARITHMETIC_INPUT_MISSING")
-        for key in ("b62_b4_equity_divided_by_shares_equals_b4_per_share",
-                    "b62_required_equity_divided_by_shares_equals_required_per_share",
-                    "b63_vs_b62_diluted_shares", "b63_b4_equity_matches_b62",
-                    "b63_required_equity_matches_b62", "b63_per_share_gap_sign_and_amount",
-                    "required_pool_parent_adjustment_identity"):
+    for key, (left, right) in equity_pairs.items():
+        if left is None or right is None:
             b63_checks[key] = "NOT_IDENTIFIABLE"
-    else:
-        equity_pairs = {
-            "b62_b4_equity_divided_by_shares_equals_b4_per_share": (
-                b62_b4_equity / b62_shares, b4_per_share
-            ),
-            "b62_required_equity_divided_by_shares_equals_required_per_share": (
-                b62_required_equity / b62_shares, required_per_share
-            ),
-            "b63_vs_b62_diluted_shares": (b63_shares, b62_shares),
-            "b63_b4_equity_matches_b62": (b63_b4_equity, b62_b4_equity),
-            "b63_required_equity_matches_b62": (b63_required_equity, b62_required_equity),
-            "b63_per_share_gap_sign_and_amount": (b63_per_share_gap, -per_share_gap if per_share_gap is not None else None),
-            "required_pool_parent_adjustment_identity": (
-                b63_required_equity
-                + b63_required_pool_parent_identity[0]
-                + b63_required_pool_parent_identity[1]
-                + b63_required_pool_parent_identity[2],
-                step5,
-            ),
-        }
-        for key, (left, right) in equity_pairs.items():
-            passed = _close(left, right, b63_tol)
-            b63_checks[key] = "PASS" if passed else "MISMATCH"
-            if not passed:
-                b63_mismatches.append(key.upper())
+            if "B63_PARENT_ADJUSTMENT_OR_PER_SHARE_ARITHMETIC_INPUT_MISSING" not in b63_issues:
+                b63_issues.append(f"{key.upper()}_ARITHMETIC_INPUT_MISSING")
+            continue
+        passed = _close(left, right, b63_tol)
+        b63_checks[key] = "PASS" if passed else "MISMATCH"
+        if not passed:
+            b63_mismatches.append(key.upper())
 
     # Independently sum the B68 carried B4 full-vector segment profits at the
     # same selected SOTP P/Es. This must reproduce B63 step 3, not a single-segment
