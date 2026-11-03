@@ -216,7 +216,8 @@ def _scenario_comparison(
             b62_b4_pool - b62_central_cost + b62_net_cash + b62_other
             if all(v is not None for v in (b62_b4_pool, b62_central_cost, b62_net_cash, b62_other)) else None,
             b62_b4_equity,
-        ),    }
+        ),
+    }
     if any(v is None for v in critical_b63_equity_inputs):
         b63_issues.append("B63_PARENT_ADJUSTMENT_OR_PER_SHARE_ARITHMETIC_INPUT_MISSING")
     for key, (left, right) in equity_pairs.items():
