@@ -148,6 +148,7 @@ def _scenario_comparison(
     b62_b4_equity = _dec(b62_scenario.get("b4_forecast_implied_total_equity_value_with_selected_parent_adjustments_cny"))
     b62_required_equity = _dec(b62_scenario.get("required_terminal_equity_value_for_required_return_cny"))
     b62_selected_pool = _dec(b62_scenario.get("selected_sotp_segment_equity_value_pool_cny"))
+    b62_b4_pool = _dec(b62_scenario.get("b4_forecast_segment_equity_value_pool_at_selected_sotp_pe_cny"))
     b62_central_cost = _dec(b62_parent.get("capitalized_central_cost_cny"))
     b62_net_cash = _dec(b62_parent.get("net_cash_debt_cny"))
     b62_other = _dec(b62_parent.get("other_adjustments_cny"))
@@ -169,7 +170,7 @@ def _scenario_comparison(
     b61_net_cash = _dec(b61_scenario.get("selected_net_cash_debt_cny"))
     b61_other = _dec(b61_scenario.get("selected_other_adjustments_cny"))
     critical_b63_equity_inputs = (
-        b62_shares, b62_b4_equity, b62_required_equity, b62_selected_pool,
+        b62_shares, b62_b4_equity, b62_required_equity, b62_selected_pool, b62_b4_pool,
         b62_central_cost, b62_net_cash, b62_other, b4_per_share, required_per_share,
         b63_b4_equity, b63_required_equity, b63_shares, b63_required_per_share, b63_per_share_gap,
         b61_required_pool, b61_required_equity, b61_shares, b61_central_cost, b61_net_cash, b61_other,
@@ -212,11 +213,10 @@ def _scenario_comparison(
             step5,
         ),
         "b4_equity_parent_adjustment_identity": (
-            b62_selected_pool - b62_central_cost + b62_net_cash + b62_other
-            if all(v is not None for v in (b62_selected_pool, b62_central_cost, b62_net_cash, b62_other)) else None,
-            b62_b4_equity - (b62_b4_pool if (b62_b4_pool := _dec(b62_scenario.get("b4_forecast_segment_equity_value_pool_at_selected_sotp_pe_cny"))) is not None else Decimal("0")),
-        ),
-    }
+            b62_b4_pool - b62_central_cost + b62_net_cash + b62_other
+            if all(v is not None for v in (b62_b4_pool, b62_central_cost, b62_net_cash, b62_other)) else None,
+            b62_b4_equity,
+        ),    }
     if any(v is None for v in critical_b63_equity_inputs):
         b63_issues.append("B63_PARENT_ADJUSTMENT_OR_PER_SHARE_ARITHMETIC_INPUT_MISSING")
     for key, (left, right) in equity_pairs.items():
@@ -844,6 +844,7 @@ def build_expectation_gap_comparison(
     eps_comparison = _eps_multiple_comparison(
         local_eps_multiple_recalculation,
         selected_model_family=str(local.get("selected_model_family") or "UNKNOWN"),
+        expected_current_price=_map(price_input).get("price"),
     )
     result["eps_multiple_comparison"] = eps_comparison
     result["eps_multiple_comparison_status"] = eps_comparison.get("status", "UNKNOWN")
