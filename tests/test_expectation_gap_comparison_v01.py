@@ -142,6 +142,7 @@ def test_b76_compares_b4_full_vector_with_b61_b63_price_requirements():
     assert result["coverage_status"] == "PARTIAL_WIN_PROBABILITY_AND_EVENT_TIMING_NOT_IDENTIFIABLE"
     base = result["scenarios"]["base"]
     assert base["earnings_gap"]["b4_forecast_pool_minus_required_pool_cny"] == "50"
+    assert base["arithmetic_reconciliation"]["status"] == "PASS"
     assert base["earnings_gap"]["required_return_annualized_rate"] == "0.12"
     assert base["earnings_gap"]["fundamental_target_annualized_rate"] == "0.15"
     assert base["earnings_gap"]["headroom_vs_required_pool_pct"] == "4.166666666666666666666666667"
@@ -271,10 +272,16 @@ def test_b76_eps_multiple_compares_b4_all_items_eps_with_b60_hurdle_eps():
     local, b60 = _eps_multiple_inputs()
     result = build_expectation_gap_comparison(
         local_sotp_recalculation=local,
-        return_metrics=None,
+        return_metrics={
+            "scenario_terminal_wealth": {"bear": "24", "base": "33", "bull": "42"},
+            "annualization_year_fraction": "1",
+            "horizon_years": "1",
+            "expected_annualized_return": "0.12",
+            "expected_annualized_return_method": "SUBMITTED_SCENARIO_WEIGHTS",
+        },
         price_input={"price": "30"},
         forecast_valuation={},
-        thesis_break_stress_review=None,
+        thesis_break_stress_review={"status": "PASS", "stress_total_return": "-0.4", "stress_downside_pct": "40"},
         external_mie_status="NOT_IDENTIFIABLE",
         local_eps_multiple_recalculation=b60,
     )
@@ -287,12 +294,18 @@ def test_b76_eps_multiple_compares_b4_all_items_eps_with_b60_hurdle_eps():
     base = comparison["scenarios"]["base"]
     required = base["required_return"]["without_distributions"]
     assert required["forecast_eps_cny_per_share"] == "2.35"
-    assert required["required_eps_cny_per_share"] == "2.00"
-    assert required["forecast_minus_required_cny_per_share"] == "0.35"
-    assert required["headroom_vs_required_pct"] == "17.500"
+    assert required["required_eps_cny_per_share"] == "2.2"
+    assert required["forecast_minus_required_cny_per_share"] == "0.15"
+    assert required["headroom_vs_required_pct"] == "6.818181818181818181818181820"
     assert required["direction"] == "B4_FORECAST_ABOVE_REQUIREMENT"
-    assert base["required_return"]["with_validated_distributions"]["required_eps_cny_per_share"] == "1.9"
-    assert base["fundamental_target"]["without_distributions"]["required_eps_cny_per_share"] == "2.10"
+    assert base["required_return"]["with_validated_distributions"]["required_eps_cny_per_share"] == "2.133333333333333333333333333"
+    assert base["fundamental_target"]["without_distributions"]["required_eps_cny_per_share"] == "2.30"
+    assert base["arithmetic_reconciliation"]["status"] == "PASS"
+    assert result["win_odds"]["win_probability_status"] == "NOT_IDENTIFIABLE"
+    assert result["win_odds"]["payoff_asymmetry"]["base_upside_to_bear_downside_ratio"] == "0.5"
+    assert result["win_odds"]["payoff_asymmetry"]["bull_upside_to_bear_downside_ratio"] == "2"
+    assert result["win_odds"]["thesis_break_stress"]["stress_downside_pct"] == "40"
+    assert result["win_odds"]["time_cost"]["holding_period_year_fraction"] == "1"
     assert comparison["external_mie_modified"] is False
     assert comparison["decision_authority"] is False
 
@@ -352,3 +365,98 @@ def test_b76_eps_multiple_blocks_non_reconciled_b57_eps():
     assert base["status"] == "NOT_IDENTIFIABLE"
     assert "B57_COMPANY_WIDE_EARNINGS_EPS_BRIDGE_NOT_RECONCILED" in base["issues"]
     assert base["required_return"] == {}
+
+
+def test_b76_eps_multiple_blocks_price_reference_mismatch():
+    local, b60 = _eps_multiple_inputs()
+    result = build_expectation_gap_comparison(
+        local_sotp_recalculation=local,
+        return_metrics=None,
+        price_input={"price": "31"},
+        forecast_valuation={},
+        thesis_break_stress_review=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+        local_eps_multiple_recalculation=b60,
+    )
+    comparison = result["eps_multiple_comparison"]
+    assert result["status"] == "PRICE_REFERENCE_MISMATCH"
+    assert comparison["price_reference_status"] == "MISMATCH"
+    assert comparison["scenarios"] == {}
+
+
+def test_b76_eps_multiple_recomputes_b57_profit_over_diluted_shares():
+    local, b60 = _eps_multiple_inputs()
+    b60["scenarios"]["base"]["b57_all_items_parent_attributable_net_profit_proxy_cny"] = "236000"
+    result = build_expectation_gap_comparison(
+        local_sotp_recalculation=local,
+        return_metrics=None,
+        price_input={"price": "30"},
+        forecast_valuation={},
+        thesis_break_stress_review=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+        local_eps_multiple_recalculation=b60,
+    )
+    base = result["eps_multiple_comparison"]["scenarios"]["base"]
+    assert base["status"] == "ARITHMETIC_RECONCILIATION_MISMATCH"
+    assert base["arithmetic_reconciliation"]["b57_profit_divided_by_shares"] == "MISMATCH"
+    assert base["required_return"] == {}
+
+
+def test_b76_eps_multiple_recomputes_required_return_eps():
+    local, b60 = _eps_multiple_inputs()
+    b60["scenarios"]["base"]["required_return_eps_without_distributions"] = "2.25"
+    result = build_expectation_gap_comparison(
+        local_sotp_recalculation=local,
+        return_metrics=None,
+        price_input={"price": "30"},
+        forecast_valuation={},
+        thesis_break_stress_review=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+        local_eps_multiple_recalculation=b60,
+    )
+    base = result["eps_multiple_comparison"]["scenarios"]["base"]
+    assert base["status"] == "ARITHMETIC_RECONCILIATION_MISMATCH"
+    assert base["arithmetic_reconciliation"]["required_return_eps"] == "MISMATCH"
+    assert base["required_return"] == {}
+
+
+def test_b76_sotp_partial_common_multiple_does_not_block_value_pool_comparison():
+    local = _inputs()
+    local["valuation_gap_attribution"]["status"] = "PARTIAL"
+    local["valuation_gap_attribution"]["scenarios"]["base"]["status"] = "PARTIAL"
+    local["valuation_gap_attribution"]["scenarios"]["base"]["multiple_attribution"] = {
+        "status": "NOT_IDENTIFIABLE",
+        "required_common_pe_by_segment": [],
+    }
+    result = build_expectation_gap_comparison(
+        local_sotp_recalculation=local,
+        return_metrics=None,
+        price_input={"price": "10"},
+        forecast_valuation={},
+        thesis_break_stress_review=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    base = result["scenarios"]["base"]
+    assert result["status"] == "PARTIAL"
+    assert base["status"] == "PARTIAL"
+    assert base["earnings_gap"]["b4_forecast_pool_minus_required_pool_cny"] == "50"
+    assert base["earnings_gap"]["headroom_vs_required_pool_pct"] == "4.166666666666666666666666667"
+    assert base["valuation_gap"]["status"] == "NOT_IDENTIFIABLE_OR_PARTIAL"
+
+
+def test_b76_sotp_waterfall_mismatch_keeps_value_gap_unknown():
+    local = _inputs()
+    local["valuation_gap_attribution"]["scenarios"]["base"]["value_pool_waterfall"]["step_4_common_pe_scale_effect_to_required_pool_cny"] = "-49"
+    result = build_expectation_gap_comparison(
+        local_sotp_recalculation=local,
+        return_metrics=None,
+        price_input={"price": "10"},
+        forecast_valuation={},
+        thesis_break_stress_review=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    base = result["scenarios"]["base"]
+    assert base["status"] == "RECONCILIATION_MISMATCH"
+    assert base["arithmetic_reconciliation"]["status"] == "MISMATCH"
+    assert base["earnings_gap"]["b4_forecast_pool_minus_required_pool_cny"] is None
+    assert base["earnings_gap"]["direction"] == "UNKNOWN"
