@@ -90,6 +90,41 @@ EPS_MULTIPLE 对照的 fail-closed 条件：B60 计算成功、主模型族为 E
 
 本比较仅用于说明在 B60 既定现价、终端 P/E、持有期限和 Required Return 下，B4 EPS 预测是否高于所需 EPS。它既不是外部 MIE，也不证明 B4 假设可靠；不修改 B60、B4、B5/B6、估值、回报、目标价、MIE、正式 expectation_gap 或 Decision 权限。
 
+
+## 3B. 统一算术与口径二次核查（2026-11-03）
+
+本轮不是重算或替换上游估值，而是在 B76 只读比较层对 B57/B58/B60 及 B61/B62/B63/B68 做独立复核；任何关键算术输入缺失或不一致，预测余量必须保持 UNKNOWN。
+
+### EPS_MULTIPLE：B57 → B58 → B60 → B76
+
+B76 对每个 Bear/Base/Bull 情景复核：
+
+1. **B57 分母链：**`B57 all-items 归母净利润 ÷ 加权平均稀释股数 = B57 all-items EPS`。只接受公司整体范围、B57 `CALCULATED_AND_RECONCILED` 和 B58 `forecast_period_match=True`；同时要求 B57 forward period 与 B60 earnings forecast period 明确一致。
+2. **主适配器终值：**`主估值 EPS × 选定终端 P/E = EPS_MULTIPLE adapter terminal value/share`。这是主模型内部算术对账，不把主适配器 EPS 充当独立预测。
+3. **Required Return：**使用与 B60 相同的结构化现价、ACT 年化期间、终端 P/E 和 Required Return 年化门槛，独立复算不含分红的所需 EPS。
+4. **Fundamental Target：**按单独目标收益率复算；不与 Required Return 混用。
+5. **分红调整：**只有 B60 已验证定时现金分配时，才复核 hurdle / target 各自的现金分配现值及调整后 Required Return / Fundamental Target EPS。未经验证的分红值不参与余量计算。
+6. **唯一价格：**B60 reference price 必须与本次结构化 `price_input.price` 一致；不一致时整个 EPS 价格比较返回 `PRICE_REFERENCE_MISMATCH`。
+
+任一项算术复核失败时，该情景返回 `ARITHMETIC_RECONCILIATION_MISMATCH`，保留输入来源值供审计，但不输出预测 EPS 与所需 EPS 的数值差额/余量。期间、分母、单位或数值缺失则保持 `NOT_IDENTIFIABLE`。EPS 余量均以 CNY/share 表示，估值终点日期独立展示，不与盈利期间互换。
+
+### SOTP：B61 → B62 → B63 → B68
+
+B76 对每个 Bear/Base/Bull 情景独立复核以下恒等式和交叉节点：
+
+- B63 waterfall：`step 1 selected SOTP pool + step 2 B4 earnings effect = step 3 B4 full-vector pool`；`step 3 + step 4 residual requirement = step 5 B61 Required Return pool`；同时核对 B63 声明的 waterfall residual。
+- 交叉 B62：step 1 对应 B62 selected SOTP pool；step 3 对应 B62 完整 B4 前瞻分部价值池；step 5 对应 B61 / B62 Required Return 所需分部价值池。
+- 再从 B68 的每个分部 B4 正常化归母利润 × 该分部选定 SOTP P/E 重新求和，必须与 B63 step 3 相等。B61/B63 单分部利润敏感性不能加入这个全向量求和。
+- 母公司调整：分别核对资本化中心成本、净现金/净负债、其他调整在 B61、B62、B63 之间的符号、金额和桥接恒等式。
+- 稀释股数与每股传导：核对 B61/B62/B63 股数一致；B4 总股权价值 ÷ 稀释股数 = B4 每股终值；Required Return 总股权价值 ÷ 股数 = 所需每股终值；B63 每股差额方向与 B76 的 B4 减 Required Return 余量相反且金额一致。
+- 价格/期间：B61 reference price 必须与结构化唯一现价相等；B62 必须同时保留 forecast period 与 valuation terminal date，后者须与 B61/SOTP 对齐。
+
+**B63 PARTIAL 的窄例外：**若 B63 情景唯一问题是 `COMMON_PE_SCALE_NOT_IDENTIFIABLE_NONPOSITIVE_VALUE_POOL`，但上述价值池、母公司调整、股数、每股传导和 B68 全向量复核全部通过，则 B76 保留可识别的 B4 pool / Required Return pool / per-share 比较，状态标记 PARTIAL，公共倍数敏感性仍为 NOT_IDENTIFIABLE。其他 PARTIAL 原因、关键字段缺失或算术不一致不享受此例外；禁止显示假余量。
+
+### 两条估值路径共用的结果
+
+EPS_MULTIPLE 不再因早期分支返回而漏掉 payoff、thesis-break stress 和 time-cost 摘要。两种估值模型共用同一套已计算的赔率幅度比、独立失败压力和期限展示；胜率始终 NOT_IDENTIFIABLE，情景权重不升级为胜率。该共享层只读，不改变 MIE、decision-usable expectation_gap、估值、回报门槛或 Decision 权限。
+
 ## 4. 胜率、赔率与失败代价
 
 - 胜率固定为 `NOT_IDENTIFIABLE`。只有可比投资案例的历史胜负样本或经独立验证的概率校准模型，才可能支持投资胜率量化；事件概率、管理层目标、分析师主观判断和 Bear/Base/Bull 权重均不足以单独证明投资胜率。
@@ -111,12 +146,13 @@ EPS_MULTIPLE 对照的 fail-closed 条件：B60 计算成功、主模型族为 E
 本批新增/更新：
 - `iios_mvp/expectation_gap_comparison_v01.py`：增加 EPS_MULTIPLE 的 B4/B57 ↔ B60 Required Return EPS 比较。
 - `iios_mvp/local_investment_pilot_v01.py`：将 B60 实际结果传入 B76 并在第一屏展示数值对照。
-- `tests/test_expectation_gap_comparison_v01.py`：新增 4 个 EPS_MULTIPLE 对照及 fail-closed 测试；原 SOTP 测试保留。
+- `tests/test_expectation_gap_comparison_v01.py`：现有 SOTP 对照 + 16 个 EPS_MULTIPLE / 价格 / B63 部分状态 / waterfall / B68 向量 fail-closed 回归场景。
+- `tests/test_local_investment_pilot_v01.py`：增加 EPS_MULTIPLE 与 SOTP 两种第一屏报告输出测试。
 - B76 本地报告一屏摘要；
 - B74/B75 Prompt 与报告表达移植；
 - 回归断言更新。
 
-**测试没有运行。** 本轮尝试从本地运行环境拉取远端代码时网络 DNS 不可用，未能建立本地执行副本；因此不能声称 Python 导入、算术、报告、Replay、CI 或 macOS 运行通过。下一次统一验证应重点核对：
+**截至本次文档更新，测试尚未运行。** 当前环境未能通过本地 DNS 建立代码执行副本；已扩展 GitHub Actions 的 Local Investment Pilot 工作流，等待后续精确分支 CI 结果。因此当前不能声称 Python 导入、算术、报告、Replay、CI 或 macOS 运行通过。
 1. B63 waterfall 的 step 3/step 5 是否与 B62/B61 期间、口径和金额精确一致；
 2. B68 的 B61/B63 两类 driver alternatives 是否被正确展示为替代敏感性；
 3. Decimal 计算和小数输出；
@@ -124,6 +160,17 @@ EPS_MULTIPLE 对照的 fail-closed 条件：B60 计算成功、主模型族为 E
 5. MIE 与 decision-usable expectation_gap 原值是否保持不变；
 6. Return Metrics、thesis-break stress 与 payoff asymmetry 是否同价、同期间；
 7. Replay 完整性和真实 macOS 一键流程。
+
+
+## 6A. 真实案例覆盖边界
+
+已检查仓库 `examples/real_cases`。目前存在的 002001、002422、300750 案例文件属于既有/前序输入链，不是已完成 B4/B57/B58/B60 与 B61/B62/B63/B68 的当前 local-pilot 一体化输入包。现有真实公司端到端测试也没有一份已经完成、且同时具备 EPS_MULTIPLE 与 SOTP 两种主估值族的 B76-ready 真实输入。
+
+因此：
+- 本轮新增的 EPS / SOTP 算术测试使用明确标记的合成数值夹具，不把它们报告为真实公司结果；
+- 现有两轮研究 / bundle / Replay 集成测试仍保留，但不能替代 B76-ready 真实公司样例；
+- 后续必须分别补一份可复算的 EPS_MULTIPLE 实际公司包和 SOTP 实际公司包，才可声称真实案例双路径验收通过；
+- 在真实案例包到位前，报告对缺失字段应输出 UNKNOWN / NOT_IDENTIFIABLE，不通过继承旧案例数值或模型猜测补齐。
 
 ## 7. 决策权限
 
