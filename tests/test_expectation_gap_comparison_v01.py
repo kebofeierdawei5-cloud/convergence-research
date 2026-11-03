@@ -23,32 +23,68 @@ def _inputs():
     for name in ("bear", "base", "bull"):
         local["scenarios"][name] = {
             "status": "CALCULATED_CONDITIONAL",
+            "selected_diluted_shares": "100",
+            "selected_capitalized_central_cost_cny": "0",
+            "selected_net_cash_debt_cny": "0",
+            "selected_other_adjustments_cny": "0",
             "requirements": {
-                "required_return": {"annualized_return_rate": "0.12"},
+                "required_return": {
+                    "annualized_return_rate": "0.12",
+                    "without_distributions": {
+                        "required_terminal_equity_value_cny": "1200",
+                        "required_segment_equity_value_pool_cny": "1200",
+                        "selected_segment_equity_value_pool_cny": "1000",
+                    },
+                },
                 "fundamental_target_annualized_return": {"annualized_return_rate": "0.15"},
-            }
+            },
         }
         local["valuation_gap_attribution"]["scenarios"][name] = {
             "status": "CONDITIONAL_ATTRIBUTION_CALCULATED",
             "value_pool_waterfall": {
+                "step_1_selected_sotp_segment_pool_cny": "1000",
+                "step_2_b4_earnings_effect_at_selected_pes_cny": "250",
                 "step_3_b4_forecast_pool_at_selected_pes_cny": "1250",
+                "step_4_common_pe_scale_effect_to_required_pool_cny": "-50",
                 "step_5_required_segment_pool_cny": "1200",
+                "waterfall_reconciliation_residual_cny": "0",
+            },
+            "parent_adjustment_attribution": {
+                "capitalized_central_cost_load_on_required_segment_pool_cny": "0",
+                "net_cash_debt_offset_to_required_segment_pool_cny": "0",
+                "other_adjustments_offset_to_required_segment_pool_cny": "0",
+            },
+            "dilution_attribution": {
+                "selected_diluted_shares": "100",
+                "required_terminal_value_per_share_cny": "12",
+                "required_total_equity_value_cny": "1200",
+                "b4_forecast_total_equity_value_cny": "1250",
+                "total_equity_gap_cny": "-50",
+                "per_share_gap_cny": "-0.5",
             },
             "multiple_attribution": {
                 "status": "CONDITIONAL_SENSITIVITY_CALCULATED",
                 "required_common_pe_by_segment": [
-                    {
-                        "segment_id": "seg_a",
-                        "required_pe_under_common_scale_x": "15",
-                    }
+                    {"segment_id": "seg_a", "required_pe_under_common_scale_x": "15"}
                 ],
             },
         }
         local["segment_earnings_reconciliation"]["scenarios"][name] = {
             "status": "CALCULATED_CONDITIONAL",
             "forecast_period": "2027FY",
+            "selected_diluted_shares": "100",
+            "selected_sotp_segment_equity_value_pool_cny": "1000",
+            "b4_forecast_segment_equity_value_pool_at_selected_sotp_pe_cny": "1250",
+            "required_segment_equity_value_pool_for_required_return_cny": "1200",
+            "b4_forecast_implied_total_equity_value_with_selected_parent_adjustments_cny": "1250",
+            "required_terminal_equity_value_for_required_return_cny": "1200",
             "b4_forecast_implied_terminal_value_per_share_cny": "12.5",
             "required_terminal_value_per_share_for_required_return_cny": "12",
+            "selected_parent_adjustments": {
+                "capitalized_central_cost_cny": "0",
+                "net_cash_debt_cny": "0",
+                "other_adjustments_cny": "0",
+            },
         }
         local["operating_requirement_reverse_engineering"]["scenarios"][name] = {
             "status": "CONDITIONAL_OPERATING_REQUIREMENT_REVERSE_ENGINEERED",
@@ -57,7 +93,7 @@ def _inputs():
                     "segment_id": "seg_a",
                     "segment_name": "Segment A",
                     "b4_forecast_normalized_parent_attributable_profit_cny": "100",
-                    "selected_sotp_pe_x": "13",
+                    "selected_sotp_pe_x": "12.5",
                     "b61_required_profit_lens": {
                         "required_parent_attributable_profit_cny": "90",
                         "reverse_engineering": {
@@ -91,7 +127,6 @@ def _inputs():
             ],
         }
     return local
-
 
 def test_b76_compares_b4_full_vector_with_b61_b63_price_requirements():
     result = build_expectation_gap_comparison(
@@ -145,7 +180,7 @@ def test_b76_does_not_convert_scenario_weights_or_payoff_ratio_into_win_probabil
 
 def test_b76_fails_closed_when_b63_or_b68_is_not_available():
     local = _inputs()
-    local["valuation_gap_attribution"]["status"] = "PARTIAL"
+    local["valuation_gap_attribution"]["status"] = "NOT_IDENTIFIABLE"
     result = build_expectation_gap_comparison(
         local_sotp_recalculation=local,
         return_metrics=None,
@@ -186,30 +221,48 @@ def _eps_multiple_inputs():
         "currency": "CNY",
         "forecast_period": "2027FY",
         "valuation_terminal_date": "2027-12-31",
-        "annualization_year_fraction": "1.25",
+        "annualization_year_fraction": "1",
+        "required_return_annualized_rate": "0.10",
+        "fundamental_target_annualized_rate": "0.15",
         "reference_price": "30",
         "price_assurance": "OPERATOR_ATTESTED",
         "price_pit_status": "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY",
         "external_mie_status_unchanged": "NOT_IDENTIFIABLE",
         "scenarios": {},
     }
-    for name, eps, hurdle, hurdle_with_distributions, target, target_with_distributions in (
-        ("bear", "1.60", "1.80", "1.70", "1.85", "1.75"),
-        ("base", "2.35", "2.00", "1.90", "2.10", "2.00"),
-        ("bull", "2.80", "2.20", "2.10", "2.30", "2.20"),
-    ):
+    scenarios = (
+        ("bear", "1.60", "160000", "12", "1.50", "18", "2.75", "2.875", "0", "0", "VALIDATED_NO_FUTURE_DISTRIBUTIONS"),
+        ("base", "2.35", "235000", "15", "2.30", "34.5", "2.20", "2.30",
+         "0.9090909090909090909090909091", "0.8695652173913043478260869565", "VALIDATED_DATED_CASH_FLOWS"),
+        ("bull", "2.80", "280000", "18", "2.70", "48.6",
+         "1.833333333333333333333333333", "1.916666666666666666666666667", "0", "0",
+         "VALIDATED_NO_FUTURE_DISTRIBUTIONS"),
+    )
+    for name, eps, profit, pe, primary_eps, primary_terminal, hurdle, target, pv_hurdle, pv_target, dist_status in scenarios:
+        hurdle_adjusted = hurdle
+        target_adjusted = target
+        if name == "base":
+            hurdle_adjusted = "2.133333333333333333333333333"
+            target_adjusted = "2.233333333333333333333333333"
         b60["scenarios"][name] = {
             "status": "CALCULATED_CONDITIONAL",
             "b57_status": "CALCULATED_AND_RECONCILED",
-            "b58_status": "MATCH",
+            "b58_status": "EPS_MISMATCH",
             "b58_forecast_period_match": True,
+            "b57_forward_period": "2027FY",
+            "b57_all_items_parent_attributable_net_profit_proxy_cny": profit,
+            "b57_diluted_weighted_average_shares": "100000",
             "b57_all_items_eps_proxy": eps,
-            "selected_terminal_pe": "15",
+            "selected_terminal_pe": pe,
+            "primary_eps_actually_used": primary_eps,
+            "primary_terminal_value_using_selected_pe": primary_terminal,
             "required_return_eps_without_distributions": hurdle,
-            "required_return_eps_with_validated_distributions": hurdle_with_distributions,
+            "required_return_eps_with_validated_distributions": hurdle_adjusted,
             "fundamental_target_eps_without_distributions": target,
-            "fundamental_target_eps_with_validated_distributions": target_with_distributions,
-            "distribution_status": "VALIDATED_DATED_CASH_FLOWS",
+            "fundamental_target_eps_with_validated_distributions": target_adjusted,
+            "present_value_of_validated_cash_distributions_at_hurdle": pv_hurdle,
+            "present_value_of_validated_cash_distributions_at_fundamental_target": pv_target,
+            "distribution_status": dist_status,
         }
     return local, b60
 
