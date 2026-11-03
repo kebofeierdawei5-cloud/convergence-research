@@ -5776,13 +5776,21 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             earnings_gap = b76_row.get("earnings_gap") if isinstance(b76_row.get("earnings_gap"), Mapping) else {}
             lines.append(
                 f"- **{scenario_name.upper()}**（{b76_row.get('status', 'UNKNOWN')}）："
-                f"B4 前瞻分部价值池 {earnings_gap.get('b4_independent_forecast_segment_value_pool_cny') or 'UNKNOWN'} CNY；"
+                f"B4 前瞻分部价值池 {earnings_gap.get('b4_independent_forecast_segment_value_pool_cny') if earnings_gap.get('b4_independent_forecast_segment_value_pool_cny') is not None else 'UNKNOWN'} CNY；"
                 f"Required Return 年化门槛 {earnings_gap.get('required_return_annualized_rate') or 'UNKNOWN'}；"
                 f"Fundamental Target 年化门槛 {earnings_gap.get('fundamental_target_annualized_rate') or 'UNKNOWN'}；"
-                f"Required Return 所需价值池 {earnings_gap.get('required_segment_value_pool_for_required_return_cny') or 'UNKNOWN'} CNY；"
-                f"价值池余量 {earnings_gap.get('b4_forecast_pool_minus_required_pool_cny') or 'UNKNOWN'} CNY "
-                f"（相对要求 {earnings_gap.get('headroom_vs_required_pool_pct') or 'UNKNOWN'}%）；"
-                f"每股终值余量 {earnings_gap.get('per_share_terminal_value_headroom_cny') or 'UNKNOWN'} CNY/股。"
+                f"Required Return 所需价值池 {earnings_gap.get('required_segment_value_pool_for_required_return_cny') if earnings_gap.get('required_segment_value_pool_for_required_return_cny') is not None else 'UNKNOWN'} CNY；"
+                f"价值池余量 {earnings_gap.get('b4_forecast_pool_minus_required_pool_cny') if earnings_gap.get('b4_forecast_pool_minus_required_pool_cny') is not None else 'UNKNOWN'} CNY "
+                f"（相对要求 {earnings_gap.get('headroom_vs_required_pool_pct') if earnings_gap.get('headroom_vs_required_pool_pct') is not None else 'UNKNOWN'}%）；"
+                f"每股终值余量 {earnings_gap.get('per_share_terminal_value_headroom_cny') if earnings_gap.get('per_share_terminal_value_headroom_cny') is not None else 'UNKNOWN'} CNY/股。"
+            )
+            arithmetic = b76_row.get("arithmetic_reconciliation") if isinstance(b76_row.get("arithmetic_reconciliation"), Mapping) else {}
+            lines.append(
+                f"  - B61/B62/B63/B68 二次算术核对：{arithmetic.get('status', 'UNKNOWN')}；"
+                f"step1+step2=step3 {arithmetic.get('checks', {}).get('step_1_plus_step_2_equals_step_3', 'UNKNOWN')}；"
+                f"step3+step4=step5 {arithmetic.get('checks', {}).get('step_3_plus_step_4_equals_step_5', 'UNKNOWN')}；"
+                f"B68完整B4分部向量复算step3 {arithmetic.get('checks', {}).get('b68_full_vector_recomputed_pool_matches_b63_step_3', 'UNKNOWN')}；"
+                f"母公司调整、稀释股数、每股价值传导见逐项审计状态。"
             )
             for segment in (b76_row.get("segment_comparisons") or [])[:5]:
                 if not isinstance(segment, Mapping):
@@ -5802,21 +5810,35 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             lines.extend([
                 "",
                 f"- **EPS_MULTIPLE：B4/B57 独立预测 ↔ B60 现价 Required Return 要求**：{eps_b76.get('status', 'UNKNOWN')}；"
-                f"币种/单位 {eps_b76.get('currency', 'UNKNOWN')} / {eps_b76.get('unit', 'UNKNOWN')}；"
+                f"结构化现价/B60反推现价 {eps_b76.get('structured_current_price', 'UNKNOWN')} / {eps_b76.get('b60_reference_price', 'UNKNOWN')} CNY（{eps_b76.get('price_reference_status', 'UNKNOWN')}）；"
+                f"终端币种/单位 {eps_b76.get('currency', 'UNKNOWN')} / {eps_b76.get('unit', 'UNKNOWN')}；"
                 f"盈利期间 {eps_b76.get('forecast_period', 'UNKNOWN')}；"
                 f"估值终点 {eps_b76.get('valuation_terminal_date', 'UNKNOWN')}（单独处理）；"
-                f"持有期年化因子 {eps_b76.get('annualization_year_fraction', 'UNKNOWN')} 年。",
+                f"持有期 {eps_b76.get('annualization_year_fraction', 'UNKNOWN')} 年；"
+                f"Required Return {eps_b76.get('required_return_annualized_rate', 'UNKNOWN')}；"
+                f"Fundamental Target {eps_b76.get('fundamental_target_annualized_rate', 'UNKNOWN')}。",
             ])
             for scenario_name in ("bear", "base", "bull"):
                 eps_row = eps_b76.get("scenarios", {}).get(scenario_name, {}) if isinstance(eps_b76.get("scenarios"), Mapping) else {}
                 if not isinstance(eps_row, Mapping):
                     eps_row = {}
+                arithmetic = eps_row.get("arithmetic_reconciliation") if isinstance(eps_row.get("arithmetic_reconciliation"), Mapping) else {}
                 if eps_row.get("status") != "CALCULATED":
                     lines.append(
                         f"  - {scenario_name.upper()}：{eps_row.get('status', 'UNKNOWN')}；"
+                        f"算术复核 {arithmetic.get('status', 'UNKNOWN')}；"
                         f"{'；'.join(eps_row.get('issues') or []) or 'B4/B57 EPS 或 B60 要求不可比'}"
                     )
                     continue
+                lines.append(
+                    f"  - {scenario_name.upper()} 算术核对：B57利润÷稀释股数 {arithmetic.get('b57_profit_divided_by_shares', 'UNKNOWN')}；"
+                    f"主适配器EPS×P/E {arithmetic.get('primary_eps_times_pe', 'UNKNOWN')}；"
+                    f"Required Return EPS {arithmetic.get('required_return_eps', 'UNKNOWN')}；"
+                    f"15%目标EPS {arithmetic.get('fundamental_target_eps', 'UNKNOWN')}；"
+                    f"分红调整 Required Return/Target "
+                    f"{arithmetic.get('distribution_adjusted_required_return_eps', 'UNKNOWN')} / "
+                    f"{arithmetic.get('distribution_adjusted_fundamental_target_eps', 'UNKNOWN')}。"
+                )
                 req = eps_row.get("required_return") if isinstance(eps_row.get("required_return"), Mapping) else {}
                 req_no = req.get("without_distributions") if isinstance(req.get("without_distributions"), Mapping) else {}
                 req_yes = req.get("with_validated_distributions") if isinstance(req.get("with_validated_distributions"), Mapping) else {}
@@ -5824,6 +5846,9 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
                 target_no = target.get("without_distributions") if isinstance(target.get("without_distributions"), Mapping) else {}
                 lines.append(
                     f"  - {scenario_name.upper()}：B4/B57 all-items EPS {eps_row.get('b4_independent_all_items_eps_proxy_cny_per_share', 'UNKNOWN')} CNY/股；"
+                    f"主估值 EPS×终端 P/E {eps_row.get('primary_adapter_eps_cny_per_share', 'UNKNOWN')} × "
+                    f"{eps_row.get('selected_terminal_pe_x', 'UNKNOWN')} = "
+                    f"{eps_row.get('primary_adapter_terminal_value_cny_per_share', 'UNKNOWN')} CNY/股；"
                     f"Required Return 所需 EPS（未计分红）{req_no.get('required_eps_cny_per_share', 'UNKNOWN')} CNY/股；"
                     f"差额 {req_no.get('forecast_minus_required_cny_per_share', 'UNKNOWN')} CNY/股；"
                     f"相对余量 {req_no.get('headroom_vs_required_pct', 'UNKNOWN')}%；"
