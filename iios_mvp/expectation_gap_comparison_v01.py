@@ -560,6 +560,63 @@ def _eps_multiple_comparison(
         result["status"] = "NOT_IDENTIFIABLE"
     return result
 
+
+def _populate_win_odds(
+    result: dict[str, Any],
+    *,
+    return_metrics: Mapping[str, Any] | None,
+    price_input: Mapping[str, Any],
+    forecast_valuation: Mapping[str, Any],
+    thesis_break_stress_review: Mapping[str, Any] | None,
+) -> None:
+    """Populate shared payoff, failure-cost and time-cost diagnostics for every model family."""
+    metrics = _map(return_metrics)
+    entry = _dec(_map(price_input).get("price"))
+    wealth = _map(metrics.get("scenario_terminal_wealth"))
+    scenario_returns: dict[str, Decimal] = {}
+    if entry is not None and entry > 0:
+        for name in _SCENARIOS:
+            terminal_wealth = _dec(wealth.get(name))
+            if terminal_wealth is not None:
+                scenario_returns[name] = terminal_wealth / entry - Decimal("1")
+    bear = scenario_returns.get("bear")
+    base = scenario_returns.get("base")
+    bull = scenario_returns.get("bull")
+    odds = result["win_odds"]
+    odds["payoff_asymmetry"] = {
+        "holding_period_total_return_by_scenario": {
+            name: _fmt(value * Decimal("100")) for name, value in scenario_returns.items()
+        },
+        "base_upside_to_bear_downside_ratio": (
+            _fmt(base / abs(bear))
+            if base is not None and bear is not None and base > 0 and bear < 0 else None
+        ),
+        "bull_upside_to_bear_downside_ratio": (
+            _fmt(bull / abs(bear))
+            if bull is not None and bear is not None and bull > 0 and bear < 0 else None
+        ),
+        "ratio_basis": "同一输入价格、同一估值终点/持有期的情景总回报；不含概率含义。",
+        "expected_annualized_return_under_submitted_weights": metrics.get("expected_annualized_return"),
+    }
+    stress = _map(thesis_break_stress_review)
+    odds["thesis_break_stress"] = {
+        "status": stress.get("status", "UNKNOWN"),
+        "stress_total_return": _fmt(_dec(stress.get("stress_total_return"))),
+        "stress_downside_pct": _fmt(_dec(stress.get("stress_downside_pct"))),
+        "probability_weighted": False,
+        "interpretation": "独立 thesis-break stress 是失败代价参照，不赋予概率，不并入 Bear/Base/Bull 权重。",
+    }
+    odds["probability_weighted_return"] = {
+        "value": metrics.get("expected_annualized_return"),
+        "method": metrics.get("expected_annualized_return_method"),
+        "scenario_probabilities_calibrated": False,
+        "model_declared_probabilities_calibrated": forecast_valuation.get("probabilities_calibrated"),
+        "calibration_status": "NOT_INDEPENDENTLY_VERIFIED",
+        "interpretation": "模型自报的概率校准标记不被本地视为已验证；现有计算器按输入情景权重得到的算术结果，不得解读为投资胜率。",
+    }
+    odds["time_cost"]["holding_period_year_fraction"] = _fmt(_dec(metrics.get("annualization_year_fraction")))
+    odds["time_cost"]["horizon_years"] = _fmt(_dec(metrics.get("horizon_years")))
+
 def build_expectation_gap_comparison(
     *,
     local_sotp_recalculation: Mapping[str, Any],
@@ -614,6 +671,13 @@ def build_expectation_gap_comparison(
     )
     result["eps_multiple_comparison"] = eps_comparison
     result["eps_multiple_comparison_status"] = eps_comparison.get("status", "UNKNOWN")
+    _populate_win_odds(
+        result,
+        return_metrics=return_metrics,
+        price_input=price_input,
+        forecast_valuation=forecast_valuation,
+        thesis_break_stress_review=thesis_break_stress_review,
+    )
     if str(local.get("selected_model_family") or "").upper() != "SOTP":
         # EPS_MULTIPLE is a first-class B76 comparison path; other model families
         # remain not applicable until they have a comparable local inversion contract.
@@ -626,7 +690,7 @@ def build_expectation_gap_comparison(
     b63 = _map(local.get("valuation_gap_attribution"))
     b62 = _map(local.get("segment_earnings_reconciliation"))
     b68 = _map(local.get("operating_requirement_reverse_engineering"))
-    if b63.get("status") != "CONDITIONAL_ATTRIBUTION_CALCULATED":
+    if b63.get("status") not in {"CONDITIONAL_ATTRIBUTION_CALCULATED", "PARTIAL"}:
         result["status"] = "BLOCKED_BY_B63"
         return result
     if b62.get("status") not in {"CONDITIONAL_RECONCILIATION_CALCULATED", "PARTIAL"}:
@@ -659,43 +723,4 @@ def build_expectation_gap_comparison(
         result["status"] = "NOT_IDENTIFIABLE"
     result["price_conditioned_comparison_status"] = result["status"]
 
-    metrics = _map(return_metrics)
-    entry = _dec(_map(price_input).get("price"))
-    wealth = _map(metrics.get("scenario_terminal_wealth"))
-    scenario_returns: dict[str, Decimal] = {}
-    if entry is not None and entry > 0:
-        for name in _SCENARIOS:
-            terminal_wealth = _dec(wealth.get(name))
-            if terminal_wealth is not None:
-                scenario_returns[name] = terminal_wealth / entry - Decimal("1")
-    bear = scenario_returns.get("bear")
-    base = scenario_returns.get("base")
-    bull = scenario_returns.get("bull")
-    result["win_odds"]["payoff_asymmetry"] = {
-        "holding_period_total_return_by_scenario": {name: _fmt(value * Decimal("100")) for name, value in scenario_returns.items()},
-        "base_upside_to_bear_downside_ratio": (
-            _fmt(base / abs(bear)) if base is not None and bear is not None and base > 0 and bear < 0 else None
-        ),
-        "bull_upside_to_bear_downside_ratio": (
-            _fmt(bull / abs(bear)) if bull is not None and bear is not None and bull > 0 and bear < 0 else None
-        ),
-        "ratio_basis": "同一输入价格、同一估值终点/持有期的情景总回报；不含概率含义。",
-        "expected_annualized_return_under_submitted_weights": metrics.get("expected_annualized_return"),
-    }
-    stress = _map(thesis_break_stress_review)
-    result["win_odds"]["thesis_break_stress"] = {
-        "status": stress.get("status", "UNKNOWN"),
-        "stress_total_return": _fmt(_dec(stress.get("stress_total_return"))),
-        "stress_downside_pct": _fmt(_dec(stress.get("stress_downside_pct"))),
-        "probability_weighted": False,
-        "interpretation": "独立 thesis-break stress 是失败代价参照，不赋予概率，不并入 Bear/Base/Bull 权重。",
-    }
-    result["win_odds"]["probability_weighted_return"] = {
-        "value": metrics.get("expected_annualized_return"),
-        "method": metrics.get("expected_annualized_return_method"),
-        "scenario_probabilities_calibrated": False,
-        "model_declared_probabilities_calibrated": forecast_valuation.get("probabilities_calibrated"),
-        "calibration_status": "NOT_INDEPENDENTLY_VERIFIED",
-        "interpretation": "模型自报的概率校准标记不被本地视为已验证；现有计算器按输入情景权重得到的算术结果，不得解读为投资胜率。",
-    }
     return result
