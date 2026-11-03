@@ -321,7 +321,13 @@ def _scenario_comparison(
     if b62_scenario.get("status") != "CALCULATED_CONDITIONAL":
         issues.append("B62_SCENARIO_NOT_FULLY_RECONCILED")
     if b63_scenario.get("status") == "PARTIAL":
-        issues.append("B63_COMMON_PE_OR_SECONDARY_LENS_PARTIAL")
+        b63_partial_issues = b63_scenario.get("issues") if isinstance(b63_scenario.get("issues"), list) else []
+        if b63_partial_issues and set(str(item) for item in b63_partial_issues) <= {
+            "COMMON_PE_SCALE_NOT_IDENTIFIABLE_NONPOSITIVE_VALUE_POOL"
+        }:
+            issues.append("B63_COMMON_PE_SCALE_ONLY_NOT_IDENTIFIABLE")
+        else:
+            issues.append("B63_PARTIAL_NOT_LIMITED_TO_COMMON_PE_SCALE")
     elif b63_scenario.get("status") != "CONDITIONAL_ATTRIBUTION_CALCULATED":
         issues.append("B63_SCENARIO_NOT_FULLY_RECONCILED")
     if b63_issues:
