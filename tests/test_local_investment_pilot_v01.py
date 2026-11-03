@@ -6771,3 +6771,147 @@ def test_b62_sotp_reconciliation_blocks_period_mismatch_before_comparing_profit(
     )
     assert result["status"] == "FORECAST_PERIOD_MISMATCH"
 
+
+
+def test_b76_eps_multiple_first_screen_report_shows_reconciled_price_hurdle():
+    analysis = {
+        "case": {"currency": "CNY"},
+        "price_input": {"price": "30"},
+        "assessment": {
+            "market_implied_expectation": {
+                "status": "NOT_IDENTIFIABLE",
+                "price_implied_analysis": {
+                    "reference_price": "30",
+                    "local_eps_multiple_recalculation": {
+                        "status": "CONDITIONAL_SENSITIVITY_CALCULATED",
+                        "selected_model_family": "EPS_MULTIPLE",
+                        "currency": "CNY",
+                        "reference_price": "30",
+                        "forecast_period": "2027FY",
+                        "valuation_terminal_date": "2027-12-31",
+                        "scenarios": {},
+                    },
+                    "local_sotp_recalculation": {
+                        "selected_model_family": "EPS_MULTIPLE",
+                        "expectation_gap_comparison": {
+                            "status": "CONDITIONAL_PRICE_COMPARISON_CALCULATED",
+                            "classification": "PRICE_CONDITIONED_REQUIREMENT_VS_INDEPENDENT_FORECAST_NOT_EXTERNAL_MIE",
+                            "external_mie_status_unchanged": "NOT_IDENTIFIABLE",
+                            "eps_multiple_comparison": {
+                                "status": "CONDITIONAL_PRICE_COMPARISON_CALCULATED",
+                                "currency": "CNY",
+                                "unit": "CNY/share",
+                                "forecast_period": "2027FY",
+                                "valuation_terminal_date": "2027-12-31",
+                                "annualization_year_fraction": "1",
+                                "required_return_annualized_rate": "0.10",
+                                "fundamental_target_annualized_rate": "0.15",
+                                "structured_current_price": "30",
+                                "b60_reference_price": "30",
+                                "price_reference_status": "MATCH",
+                                "scenarios": {
+                                    "bear": {
+                                        "status": "CALCULATED",
+                                        "b4_independent_all_items_eps_proxy_cny_per_share": "1.6",
+                                        "primary_adapter_eps_cny_per_share": "1.5",
+                                        "selected_terminal_pe_x": "12",
+                                        "primary_adapter_terminal_value_cny_per_share": "18",
+                                        "arithmetic_reconciliation": {
+                                            "status": "PASS",
+                                            "b57_profit_divided_by_shares": "PASS",
+                                            "primary_eps_times_pe": "PASS",
+                                            "required_return_eps": "PASS",
+                                            "fundamental_target_eps": "PASS",
+                                        },
+                                        "required_return": {
+                                            "without_distributions": {
+                                                "required_eps_cny_per_share": "2.75",
+                                                "forecast_minus_required_cny_per_share": "-1.15",
+                                                "headroom_vs_required_pct": "-41.818",
+                                                "direction": "B4_FORECAST_BELOW_REQUIREMENT",
+                                            },
+                                            "with_validated_distributions": {"status": "NOT_IDENTIFIABLE"},
+                                        },
+                                        "fundamental_target": {
+                                            "without_distributions": {
+                                                "required_eps_cny_per_share": "2.875",
+                                                "forecast_minus_required_cny_per_share": "-1.275",
+                                            }
+                                        },
+                                    },
+                                    "base": {"status": "NOT_IDENTIFIABLE", "issues": ["BASE_INPUT_UNKNOWN"]},
+                                    "bull": {"status": "NOT_IDENTIFIABLE", "issues": ["BULL_INPUT_UNKNOWN"]},
+                                },
+                            },
+                            "win_odds": {"win_probability_status": "NOT_IDENTIFIABLE"},
+                        },
+                    },
+                },
+            }
+        },
+        "forecast_valuation": {},
+    }
+    report = "\\n".join(pilot._render_core_investment_synthesis(analysis))
+    assert "结构化现价/B60反推现价 30 / 30 CNY（MATCH）" in report
+    assert "Required Return 0.10" in report
+    assert "Fundamental Target 0.15" in report
+    assert "B57利润÷稀释股数 PASS" in report
+    assert "主估值 EPS×P/E PASS" in report
+    assert "1.5 × 12 = 18 CNY/股" in report
+    assert "B4/B57 all-items EPS 1.6 CNY/股" in report
+    assert "Required Return 所需 EPS（未计分红）2.75 CNY/股" in report
+
+
+def test_b76_sotp_first_screen_report_shows_waterfall_reconciliation():
+    analysis = {
+        "case": {"currency": "CNY"},
+        "price_input": {"price": "10"},
+        "assessment": {
+            "market_implied_expectation": {
+                "status": "NOT_IDENTIFIABLE",
+                "price_implied_analysis": {
+                    "reference_price": "10",
+                    "local_sotp_recalculation": {
+                        "selected_model_family": "SOTP",
+                        "expectation_gap_comparison": {
+                            "status": "CONDITIONAL_PRICE_COMPARISON_CALCULATED",
+                            "classification": "PRICE_CONDITIONED_REQUIREMENT_VS_INDEPENDENT_FORECAST_NOT_EXTERNAL_MIE",
+                            "external_mie_status_unchanged": "NOT_IDENTIFIABLE",
+                            "scenarios": {
+                                "bear": {
+                                    "status": "CONDITIONAL_PRICE_COMPARISON_CALCULATED",
+                                    "earnings_gap": {
+                                        "b4_independent_forecast_segment_value_pool_cny": "1250",
+                                        "required_return_annualized_rate": "0.12",
+                                        "fundamental_target_annualized_rate": "0.15",
+                                        "required_segment_value_pool_for_required_return_cny": "1200",
+                                        "b4_forecast_pool_minus_required_pool_cny": "50",
+                                        "headroom_vs_required_pool_pct": "4.1667",
+                                        "per_share_terminal_value_headroom_cny": "0.5",
+                                    },
+                                    "arithmetic_reconciliation": {
+                                        "status": "PASS",
+                                        "checks": {
+                                            "step_1_plus_step_2_equals_step_3": "PASS",
+                                            "step_3_plus_step_4_equals_step_5": "PASS",
+                                            "b68_full_vector_recomputed_pool_matches_b63_step_3": "PASS",
+                                        },
+                                    },
+                                    "segment_comparisons": [],
+                                },
+                            },
+                            "win_odds": {"win_probability_status": "NOT_IDENTIFIABLE"},
+                        },
+                    },
+                },
+            }
+        },
+        "forecast_valuation": {},
+    }
+    report = "\\n".join(pilot._render_core_investment_synthesis(analysis))
+    assert "B4 前瞻分部价值池 1250 CNY" in report
+    assert "价值池余量 50 CNY" in report
+    assert "B61/B62/B63/B68 二次算术核对：PASS" in report
+    assert "step1+step2=step3 PASS" in report
+    assert "step3+step4=step5 PASS" in report
+    assert "B68完整B4分部向量复算step3 PASS" in report
