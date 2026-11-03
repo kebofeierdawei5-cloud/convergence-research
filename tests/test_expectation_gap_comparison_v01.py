@@ -424,6 +424,9 @@ def test_b76_sotp_partial_common_multiple_does_not_block_value_pool_comparison()
     local = _inputs()
     local["valuation_gap_attribution"]["status"] = "PARTIAL"
     local["valuation_gap_attribution"]["scenarios"]["base"]["status"] = "PARTIAL"
+    local["valuation_gap_attribution"]["scenarios"]["base"]["issues"] = [
+        "COMMON_PE_SCALE_NOT_IDENTIFIABLE_NONPOSITIVE_VALUE_POOL"
+    ]
     local["valuation_gap_attribution"]["scenarios"]["base"]["multiple_attribution"] = {
         "status": "NOT_IDENTIFIABLE",
         "required_common_pe_by_segment": [],
