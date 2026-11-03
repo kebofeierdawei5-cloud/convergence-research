@@ -1938,6 +1938,12 @@ def _build_b60_local_eps_multiple_price_inversion(
         "valuation_terminal_date": valuation_timing.get("valuation_terminal_date") or eps_multiple_valuation.get("valuation_terminal_date") or "UNKNOWN",
         "annualization_year_fraction": valuation_timing.get("annualization_year_fraction"),
         "day_count_convention": valuation_timing.get("day_count_convention") or "UNKNOWN",
+        "required_return_annualized_rate": decision_parameters.get("required_return_annualized"),
+        "fundamental_target_annualized_rate": (
+            decision_parameters.get("fundamental_target_annualized_return")
+            if decision_parameters.get("fundamental_target_annualized_return") not in (None, "")
+            else str(FUNDAMENTAL_TARGET_ANNUALIZED_RETURN)
+        ),
         "method": "PROTECTED_CURRENT_PRICE_INVERTED_THROUGH_SELECTED_TERMINAL_PE_AND_ANNUALIZED_RETURN_HURDLE",
         "return_hurdle_role": "ANNUALIZED_RETURN_HURDLE_NOT_VALUATION_DISCOUNT_RATE",
         "scenarios": {},
@@ -2047,11 +2053,15 @@ def _build_b60_local_eps_multiple_price_inversion(
             "b58_status": b58_row.get("status") or "UNKNOWN",
             "b58_forecast_period_match": b58_row.get("forecast_period_match"),
             "b59_status": b59_row.get("status") or "UNKNOWN",
+            "b57_forward_period": b57_forward.get("period"),
+            "b57_all_items_parent_attributable_net_profit_proxy_cny": b57_forward.get("all_items_parent_attributable_net_profit_proxy_cny"),
+            "b57_diluted_weighted_average_shares": b57_forward.get("diluted_weighted_average_shares"),
             "b57_all_items_eps_proxy": b58_row.get("b57_all_items_eps_proxy_cny_per_share"),
             "b57_normalized_eps_proxy_diagnostic_only": b58_row.get("b57_normalized_diluted_eps_proxy_cny_per_share"),
             "distribution_status": "NOT_VALIDATED_OR_NOT_AVAILABLE",
             "validated_cash_distributions_per_share": None,
             "present_value_of_validated_cash_distributions_at_hurdle": None,
+            "present_value_of_validated_cash_distributions_at_fundamental_target": None,
             "zero_return_required_terminal_eps_before_distributions": format(price / pe, "f") if pe and pe > 0 else None,
             "zero_return_required_terminal_eps_with_validated_distributions": None,
             "required_return_eps_without_distributions": None,
@@ -2122,6 +2132,7 @@ def _build_b60_local_eps_multiple_price_inversion(
         row["fundamental_target_eps_with_validated_distributions"] = format(req_t_yes, "f") if req_t_yes is not None else None
         row["validated_cash_distributions_per_share"] = format(dist_total, "f") if dist_total is not None else None
         row["present_value_of_validated_cash_distributions_at_hurdle"] = format(pv_at_hurdle, "f") if pv_at_hurdle is not None else None
+        row["present_value_of_validated_cash_distributions_at_fundamental_target"] = format(pv_at_target, "f") if pv_at_target is not None else None
         row["current_price_to_primary_eps_forward_pe"] = format(price / primary_eps, "f")
         primary_terminal = dec(model.get("terminal_value_per_share"))
         if primary_terminal is not None:
@@ -2232,6 +2243,11 @@ def _build_b62_sotp_segment_earnings_reconciliation(
     b62 = baseline_transition.get("segment_normalized_earnings_bridge")
     b62 = b62 if isinstance(b62, Mapping) else {}
     result["forecast_period"] = str(b62.get("forecast_period") or "UNKNOWN")
+    result["valuation_terminal_date"] = str(
+        local_sotp_inversion.get("valuation_terminal_date")
+        or sotp_valuation.get("valuation_terminal_date")
+        or "UNKNOWN"
+    )
     result["b4_segment_bridge_status"] = str(b62.get("status") or "UNKNOWN")
     if str(operating_driver_forecast.get("scope") or "").upper() != "COMPANY_WIDE":
         result["status"] = "NOT_COMPARABLE_SCOPE"
@@ -2245,6 +2261,14 @@ def _build_b62_sotp_segment_earnings_reconciliation(
         return result
     if str(local_sotp_inversion.get("forecast_period") or "").strip().upper() != str(b62.get("forecast_period") or "").strip().upper():
         result["status"] = "B61_B4_FORECAST_PERIOD_MISMATCH"
+        return result
+    terminal_dates = {
+        str(local_sotp_inversion.get("valuation_terminal_date") or "").strip(),
+        str(sotp_valuation.get("valuation_terminal_date") or "").strip(),
+    }
+    if not all(terminal_dates) or len(terminal_dates) != 1:
+        result["status"] = "B61_SOTP_TERMINAL_DATE_MISMATCH"
+        result["valuation_terminal_date"] = "UNKNOWN"
         return result
 
     def dec(value: Any) -> Decimal | None:
