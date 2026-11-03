@@ -6,6 +6,10 @@ from iios_mvp.expectation_gap_comparison_v01 import build_expectation_gap_compar
 def _inputs():
     local = {
         "selected_model_family": "SOTP",
+        "currency": "CNY",
+        "reference_price": "10",
+        "forecast_period": "2027FY",
+        "valuation_terminal_date": "2027-12-31",
         "scenarios": {},
         "valuation_gap_attribution": {
             "status": "CONDITIONAL_ATTRIBUTION_CALCULATED",
@@ -13,6 +17,8 @@ def _inputs():
         },
         "segment_earnings_reconciliation": {
             "status": "CONDITIONAL_RECONCILIATION_CALCULATED",
+            "forecast_period": "2027FY",
+            "valuation_terminal_date": "2027-12-31",
             "scenarios": {},
         },
         "operating_requirement_reverse_engineering": {
@@ -502,3 +508,18 @@ def test_b76_sotp_b68_vector_mismatch_keeps_value_gap_unknown():
         "b68_full_vector_recomputed_pool_matches_b63_step_3"
     ] == "MISMATCH"
     assert base["earnings_gap"]["b4_forecast_pool_minus_required_pool_cny"] is None
+
+
+def test_b76_sotp_blocks_when_b61_reference_price_differs_from_structured_price():
+    local = _inputs()
+    result = build_expectation_gap_comparison(
+        local_sotp_recalculation=local,
+        return_metrics=None,
+        price_input={"price": "11"},
+        forecast_valuation={},
+        thesis_break_stress_review=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    assert result["status"] == "PRICE_REFERENCE_MISMATCH"
+    assert result["price_reference_status"] == "MISMATCH"
+    assert result["scenarios"] == {}
