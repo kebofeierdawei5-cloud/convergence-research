@@ -270,14 +270,24 @@ def _eps_requirement_pair(
     }
 
 
+def _close(left: Decimal | None, right: Decimal | None, tolerance: Decimal) -> bool:
+    return left is not None and right is not None and abs(left - right) <= tolerance
+
+
 def _eps_multiple_comparison(
     local_eps_multiple_recalculation: Mapping[str, Any] | None,
     *,
     selected_model_family: str,
+    expected_current_price: Any,
 ) -> dict[str, Any]:
-    """Compare B4/B57 company-wide EPS with B60 price-conditioned EPS requirements."""
+    """Independently reconcile B60 arithmetic and compare B57 EPS with the price hurdle."""
     b60 = _map(local_eps_multiple_recalculation)
     family = str(selected_model_family or "UNKNOWN").strip().upper()
+    current_price = _dec(expected_current_price)
+    b60_price = _dec(b60.get("reference_price"))
+    years = _dec(b60.get("annualization_year_fraction"))
+    hurdle = _dec(b60.get("required_return_annualized_rate"))
+    target = _dec(b60.get("fundamental_target_annualized_rate"))
     result: dict[str, Any] = {
         "status": "NOT_IDENTIFIABLE",
         "classification": "B4_INDEPENDENT_EPS_VS_B60_PRICE_CONDITIONED_REQUIRED_EPS_NOT_EXTERNAL_MIE",
@@ -287,8 +297,12 @@ def _eps_multiple_comparison(
         "comparison_basis": "B4_B57_COMPANY_WIDE_ALL_ITEMS_DILUTED_EPS_PROXY_VS_B60_REQUIRED_TERMINAL_EPS",
         "forecast_period": b60.get("forecast_period") or "UNKNOWN",
         "valuation_terminal_date": b60.get("valuation_terminal_date") or "UNKNOWN",
-        "annualization_year_fraction": b60.get("annualization_year_fraction"),
-        "reference_price": b60.get("reference_price"),
+        "annualization_year_fraction": _fmt(years),
+        "required_return_annualized_rate": _fmt(hurdle),
+        "fundamental_target_annualized_rate": _fmt(target),
+        "structured_current_price": _fmt(current_price),
+        "b60_reference_price": _fmt(b60_price),
+        "price_reference_status": "UNKNOWN",
         "price_assurance": b60.get("price_assurance") or "UNKNOWN",
         "price_pit_status": b60.get("price_pit_status") or "UNKNOWN",
         "b60_status": b60.get("status") or "UNKNOWN",
@@ -311,12 +325,14 @@ def _eps_multiple_comparison(
             "不含分红的 Required Return EPS 为主比较；只有 B60 标记为已验证的定时现金分配时，"
             "才单独展示分红调整比较。"
         ),
+        "arithmetic_tolerance": "0.000001 CNY/share",
         "scenarios": {},
         "limitations": [
             "这是当前结构化价格、B60 终端 P/E、持有期和回报门槛下的条件性 EPS 要求，不是外部 MIE。",
             "B4/B57 EPS 是公司整体 all-items EPS proxy；它不等于已审计实际 EPS，也不证明预测质量。",
             "Required Return 与 Fundamental Target 分开呈现；二者不能互相替代，也不能把 15%目标 EPS 当作 Required Return EPS。",
             "只有 B57 已完成公司整体利润归属/稀释股数桥且 B58 期间匹配为 true，才进行数值比较。",
+            "B76 对 B60 的复核只验证输入之间的算术一致性，不验证终端 P/E 是否公允或可实现。",
         ],
     }
     if family != "EPS_MULTIPLE":
@@ -334,6 +350,17 @@ def _eps_multiple_comparison(
     if result["b60_status"] not in {"CONDITIONAL_SENSITIVITY_CALCULATED", "PARTIAL"}:
         result["status"] = "BLOCKED_BY_B60"
         return result
+    if current_price is None or current_price <= 0 or b60_price is None:
+        result["status"] = "PRICE_REFERENCE_NOT_IDENTIFIABLE"
+        return result
+    if current_price != b60_price:
+        result["price_reference_status"] = "MISMATCH"
+        result["status"] = "PRICE_REFERENCE_MISMATCH"
+        return result
+    result["price_reference_status"] = "MATCH"
+    if years is None or years <= 0 or hurdle is None or target is None or hurdle <= -1 or target <= -1:
+        result["status"] = "RETURN_HURDLE_OR_HORIZON_NOT_IDENTIFIABLE"
+        return result
 
     raw_scenarios = _map(b60.get("scenarios"))
     statuses: list[str] = []
@@ -341,54 +368,147 @@ def _eps_multiple_comparison(
         "VALIDATED_DATED_CASH_FLOWS",
         "VALIDATED_NO_FUTURE_DISTRIBUTIONS",
     }
+    tolerance = Decimal("0.000001")
+    required_factor = (Decimal("1") + hurdle) ** years
+    target_factor = (Decimal("1") + target) ** years
     for name in _SCENARIOS:
         raw = _map(raw_scenarios.get(name))
         b57_status = str(raw.get("b57_status") or "UNKNOWN")
         period_match = raw.get("b58_forecast_period_match") is True
-        b4_eps = raw.get("b57_all_items_eps_proxy")
+        b4_eps = _dec(raw.get("b57_all_items_eps_proxy"))
+        b57_profit = _dec(raw.get("b57_all_items_parent_attributable_net_profit_proxy_cny"))
+        b57_shares = _dec(raw.get("b57_diluted_weighted_average_shares"))
+        terminal_pe = _dec(raw.get("selected_terminal_pe"))
+        primary_eps = _dec(raw.get("primary_eps_actually_used"))
+        primary_terminal = _dec(raw.get("primary_terminal_value_using_selected_pe"))
         row: dict[str, Any] = {
             "scenario": name,
             "status": "NOT_IDENTIFIABLE",
             "b60_scenario_status": raw.get("status") or "UNKNOWN",
             "b57_status": b57_status,
+            "b58_status": raw.get("b58_status") or "UNKNOWN",
             "b58_forecast_period_match": period_match,
-            "b4_forecast_period": result["forecast_period"] if period_match else "UNKNOWN",
+            "b4_forecast_period": raw.get("b57_forward_period") or ("UNKNOWN" if not period_match else result["forecast_period"]),
             "b60_eps_forecast_period": result["forecast_period"],
             "valuation_terminal_date": result["valuation_terminal_date"],
-            "b4_independent_all_items_eps_proxy_cny_per_share": b4_eps,
-            "selected_terminal_pe_x": raw.get("selected_terminal_pe"),
+            "b4_all_items_parent_attributable_profit_cny": _fmt(b57_profit),
+            "b4_diluted_weighted_average_shares": _fmt(b57_shares),
+            "b4_independent_all_items_eps_proxy_cny_per_share": _fmt(b4_eps),
+            "primary_adapter_eps_cny_per_share": _fmt(primary_eps),
+            "selected_terminal_pe_x": _fmt(terminal_pe),
+            "primary_adapter_terminal_value_cny_per_share": _fmt(primary_terminal),
+            "arithmetic_reconciliation": {
+                "b57_profit_divided_by_shares": "NOT_IDENTIFIABLE",
+                "primary_eps_times_pe": "NOT_IDENTIFIABLE",
+                "required_return_eps": "NOT_IDENTIFIABLE",
+                "fundamental_target_eps": "NOT_IDENTIFIABLE",
+                "distribution_adjusted_required_return_eps": "NOT_IDENTIFIABLE",
+                "distribution_adjusted_fundamental_target_eps": "NOT_IDENTIFIABLE",
+                "issues": [],
+            },
             "required_return": {},
             "fundamental_target": {},
             "issues": [],
         }
+        arithmetic_issues: list[str] = []
         if raw.get("status") != "CALCULATED_CONDITIONAL":
             row["issues"].append("B60_SCENARIO_NOT_CALCULATED")
         if b57_status != "CALCULATED_AND_RECONCILED":
             row["issues"].append("B57_COMPANY_WIDE_EARNINGS_EPS_BRIDGE_NOT_RECONCILED")
         if not period_match:
             row["issues"].append("B4_B57_B58_B60_FORECAST_PERIOD_NOT_CONFIRMED_MATCH")
+        if str(raw.get("b57_forward_period") or "").strip().upper() != str(b60.get("forecast_period") or "").strip().upper():
+            row["issues"].append("B57_FORWARD_PERIOD_DIFFERS_FROM_B60_EARNINGS_PERIOD")
         if str(b60.get("forecast_period") or "").strip().upper() in {"", "UNKNOWN"}:
             row["issues"].append("B60_EPS_FORECAST_PERIOD_UNKNOWN")
-        if _dec(b4_eps) is None:
-            row["issues"].append("B4_B57_ALL_ITEMS_EPS_PROXY_MISSING")
+        if b57_profit is None or b57_shares is None or b57_shares <= 0 or b4_eps is None:
+            row["issues"].append("B57_ALL_ITEMS_PROFIT_SHARE_DENOMINATOR_OR_EPS_MISSING")
+        if terminal_pe is None or terminal_pe <= 0 or primary_eps is None or primary_eps <= 0 or primary_terminal is None:
+            row["issues"].append("B60_SELECTED_PE_PRIMARY_EPS_OR_TERMINAL_VALUE_MISSING")
         if row["issues"]:
             row["status"] = "NOT_IDENTIFIABLE"
+            row["arithmetic_reconciliation"]["issues"] = list(row["issues"])
             result["scenarios"][name] = row
             statuses.append(row["status"])
             continue
 
+        # Recalculate the B57 all-items EPS using the explicit parent-attributable
+        # profit numerator and the same-period weighted-average diluted-share denominator.
+        b57_eps_recalculated = b57_profit / b57_shares
+        b57_eps_ok = _close(b57_eps_recalculated, b4_eps, tolerance)
+        row["arithmetic_reconciliation"]["b57_profit_divided_by_shares"] = (
+            "PASS" if b57_eps_ok else "MISMATCH"
+        )
+        if not b57_eps_ok:
+            arithmetic_issues.append("B57_ALL_ITEMS_EPS_DOES_NOT_EQUAL_PARENT_PROFIT_DIVIDED_BY_DILUTED_SHARES")
+
+        # Reconcile the actual EPS_MULTIPLE adapter's EPS × P/E to its saved terminal value.
+        primary_terminal_recalculated = primary_eps * terminal_pe
+        primary_terminal_ok = _close(primary_terminal_recalculated, primary_terminal, tolerance)
+        row["arithmetic_reconciliation"]["primary_eps_times_pe"] = (
+            "PASS" if primary_terminal_ok else "MISMATCH"
+        )
+        if not primary_terminal_ok:
+            arithmetic_issues.append("PRIMARY_EPS_TIMES_PE_DOES_NOT_EQUAL_ADAPTER_TERMINAL_VALUE")
+
+        hurdle_required_eps = current_price * required_factor / terminal_pe
+        target_required_eps = current_price * target_factor / terminal_pe
+        b60_hurdle_eps = _dec(raw.get("required_return_eps_without_distributions"))
+        b60_target_eps = _dec(raw.get("fundamental_target_eps_without_distributions"))
+        hurdle_ok = _close(hurdle_required_eps, b60_hurdle_eps, tolerance)
+        target_ok = _close(target_required_eps, b60_target_eps, tolerance)
+        row["arithmetic_reconciliation"]["required_return_eps"] = "PASS" if hurdle_ok else "MISMATCH"
+        row["arithmetic_reconciliation"]["fundamental_target_eps"] = "PASS" if target_ok else "MISMATCH"
+        if not hurdle_ok:
+            arithmetic_issues.append("B60_REQUIRED_RETURN_EPS_FORMULA_MISMATCH")
+        if not target_ok:
+            arithmetic_issues.append("B60_FUNDAMENTAL_TARGET_EPS_FORMULA_MISMATCH")
+
+        distribution_status = str(raw.get("distribution_status") or "UNKNOWN").upper()
+        pv_hurdle = _dec(raw.get("present_value_of_validated_cash_distributions_at_hurdle"))
+        pv_target = _dec(raw.get("present_value_of_validated_cash_distributions_at_fundamental_target"))
+        if distribution_status in validated_distribution_statuses:
+            adjusted_hurdle = _dec(raw.get("required_return_eps_with_validated_distributions"))
+            adjusted_target = _dec(raw.get("fundamental_target_eps_with_validated_distributions"))
+            if pv_hurdle is None or pv_target is None or adjusted_hurdle is None or adjusted_target is None:
+                arithmetic_issues.append("VALIDATED_DISTRIBUTION_ADJUSTED_EPS_OR_PRESENT_VALUE_MISSING")
+                row["arithmetic_reconciliation"]["distribution_adjusted_required_return_eps"] = "NOT_IDENTIFIABLE"
+                row["arithmetic_reconciliation"]["distribution_adjusted_fundamental_target_eps"] = "NOT_IDENTIFIABLE"
+            else:
+                hurdle_adjusted_expected = max(Decimal("0"), (current_price - pv_hurdle) * required_factor) / terminal_pe
+                target_adjusted_expected = max(Decimal("0"), (current_price - pv_target) * target_factor) / terminal_pe
+                hurdle_adjusted_ok = _close(hurdle_adjusted_expected, adjusted_hurdle, tolerance)
+                target_adjusted_ok = _close(target_adjusted_expected, adjusted_target, tolerance)
+                row["arithmetic_reconciliation"]["distribution_adjusted_required_return_eps"] = "PASS" if hurdle_adjusted_ok else "MISMATCH"
+                row["arithmetic_reconciliation"]["distribution_adjusted_fundamental_target_eps"] = "PASS" if target_adjusted_ok else "MISMATCH"
+                if not hurdle_adjusted_ok:
+                    arithmetic_issues.append("B60_DISTRIBUTION_ADJUSTED_REQUIRED_RETURN_EPS_FORMULA_MISMATCH")
+                if not target_adjusted_ok:
+                    arithmetic_issues.append("B60_DISTRIBUTION_ADJUSTED_FUNDAMENTAL_TARGET_EPS_FORMULA_MISMATCH")
+        else:
+            row["arithmetic_reconciliation"]["distribution_adjusted_required_return_eps"] = "UNKNOWN_UNVALIDATED_DISTRIBUTIONS"
+            row["arithmetic_reconciliation"]["distribution_adjusted_fundamental_target_eps"] = "UNKNOWN_UNVALIDATED_DISTRIBUTIONS"
+
+        if arithmetic_issues:
+            row["status"] = "ARITHMETIC_RECONCILIATION_MISMATCH"
+            row["issues"] = arithmetic_issues
+            row["arithmetic_reconciliation"]["issues"] = arithmetic_issues
+            # Keep source operands visible for audit, but never expose a numeric
+            # forecast-to-requirement headroom from an internally inconsistent chain.
+            result["scenarios"][name] = row
+            statuses.append(row["status"])
+            continue
+
+        row["arithmetic_reconciliation"]["issues"] = []
         row["required_return"] = {
             "without_distributions": _eps_requirement_pair(
-                b4_eps,
-                raw.get("required_return_eps_without_distributions"),
+                b4_eps, hurdle_required_eps,
                 basis="B4_B57_ALL_ITEMS_EPS_VS_B60_REQUIRED_RETURN_EPS_WITHOUT_DISTRIBUTIONS",
             )
         }
-        distribution_status = str(raw.get("distribution_status") or "UNKNOWN").upper()
         if distribution_status in validated_distribution_statuses:
             row["required_return"]["with_validated_distributions"] = _eps_requirement_pair(
-                b4_eps,
-                raw.get("required_return_eps_with_validated_distributions"),
+                b4_eps, raw.get("required_return_eps_with_validated_distributions"),
                 basis="B4_B57_ALL_ITEMS_EPS_VS_B60_REQUIRED_RETURN_EPS_WITH_VALIDATED_DISTRIBUTIONS",
             )
         else:
@@ -396,7 +516,7 @@ def _eps_multiple_comparison(
                 "status": "NOT_IDENTIFIABLE",
                 "basis": "VALIDATED_DISTRIBUTION_CASH_FLOWS_REQUIRED",
                 "distribution_status": distribution_status,
-                "forecast_eps_cny_per_share": _fmt(_dec(b4_eps)),
+                "forecast_eps_cny_per_share": _fmt(b4_eps),
                 "required_eps_cny_per_share": None,
                 "forecast_minus_required_cny_per_share": None,
                 "headroom_vs_required_pct": None,
@@ -405,15 +525,13 @@ def _eps_multiple_comparison(
             }
         row["fundamental_target"] = {
             "without_distributions": _eps_requirement_pair(
-                b4_eps,
-                raw.get("fundamental_target_eps_without_distributions"),
+                b4_eps, target_required_eps,
                 basis="B4_B57_ALL_ITEMS_EPS_VS_B60_FUNDAMENTAL_TARGET_EPS_WITHOUT_DISTRIBUTIONS",
             )
         }
         if distribution_status in validated_distribution_statuses:
             row["fundamental_target"]["with_validated_distributions"] = _eps_requirement_pair(
-                b4_eps,
-                raw.get("fundamental_target_eps_with_validated_distributions"),
+                b4_eps, raw.get("fundamental_target_eps_with_validated_distributions"),
                 basis="B4_B57_ALL_ITEMS_EPS_VS_B60_FUNDAMENTAL_TARGET_EPS_WITH_VALIDATED_DISTRIBUTIONS",
             )
         else:
@@ -421,18 +539,14 @@ def _eps_multiple_comparison(
                 "status": "NOT_IDENTIFIABLE",
                 "basis": "VALIDATED_DISTRIBUTION_CASH_FLOWS_REQUIRED",
                 "distribution_status": distribution_status,
-                "forecast_eps_cny_per_share": _fmt(_dec(b4_eps)),
+                "forecast_eps_cny_per_share": _fmt(b4_eps),
                 "required_eps_cny_per_share": None,
                 "forecast_minus_required_cny_per_share": None,
                 "headroom_vs_required_pct": None,
                 "direction": "UNKNOWN",
                 "unit": "CNY/share",
             }
-        if row["required_return"]["without_distributions"]["status"] != "CALCULATED":
-            row["issues"].append("B60_REQUIRED_RETURN_EPS_NOT_IDENTIFIABLE")
-            row["status"] = "NOT_IDENTIFIABLE"
-        else:
-            row["status"] = "CALCULATED"
+        row["status"] = "CALCULATED"
         result["scenarios"][name] = row
         statuses.append(row["status"])
 
@@ -440,6 +554,8 @@ def _eps_multiple_comparison(
         result["status"] = "CONDITIONAL_PRICE_COMPARISON_CALCULATED"
     elif any(status == "CALCULATED" for status in statuses):
         result["status"] = "PARTIAL"
+    elif any(status == "ARITHMETIC_RECONCILIATION_MISMATCH" for status in statuses):
+        result["status"] = "ARITHMETIC_RECONCILIATION_MISMATCH"
     else:
         result["status"] = "NOT_IDENTIFIABLE"
     return result
