@@ -5788,7 +5788,7 @@ def test_b57_normalized_parent_profit_and_diluted_eps_bridge_reconciles():
     assert bridge["status"] == "DIAGNOSTIC_CALCULATED"
     assert base["status"] == "CALCULATED_AND_RECONCILED"
     assert base["historical_baseline"]["normalized_parent_attributable_net_profit_cny"] == "320000.00"
-    assert base["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] == "3.2"
+    assert Decimal(base["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"]) == Decimal("3.2")
     assert base["forward_scenario"]["normalized_parent_attributable_net_profit_cny"] == "287950.00"
     assert base["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"].startswith("2.617")
     assert base["changes"]["normalized_parent_attributable_net_profit_cny"] == "-32050.00"
@@ -6073,8 +6073,8 @@ def test_b59_explains_b57_to_primary_eps_gap_by_profit_components_and_adapter_in
     assert components["non_recurring_after_tax_effect_cny"] == "12000"
     assert components["nci_attribution_difference_cny"] == "-2000"
     assert components["sum_cny"] == "-2000"
-    assert eps["profit_numerator_effect_cny_per_share"] == "-0.2"
-    assert eps["diluted_share_denominator_effect_cny_per_share"] == "0"
+    assert Decimal(eps["profit_numerator_effect_cny_per_share"]) == Decimal("-0.2")
+    assert Decimal(eps["diluted_share_denominator_effect_cny_per_share"]) == Decimal("0")
     assert eps["primary_declared_eps_input_effect_cny_per_share"] == "0.1"
     assert eps["b57_minus_primary_declared_eps_cny_per_share"] == "-0.1"
     assert result["valuation_input_modified"] is False
@@ -6106,7 +6106,7 @@ def test_b59_uses_denominator_effect_and_surfaces_unmapped_primary_adjustment():
     assert row["status"] == "ARITHMETICALLY_RECONCILED_NOT_COMPARABLE"
     assert "DILUTED_SHARE_DENOMINATOR_MISMATCH" in row["comparability_flags"]
     assert "UNMAPPED_PRIMARY_OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT" in row["comparability_flags"]
-    assert eps["reconciliation_residual_cny_per_share"] == "0"
+    assert Decimal(eps["reconciliation_residual_cny_per_share"]) == Decimal("0")
     assert row["profit_numerator_components"]["unmapped_primary_other_after_tax_adjustment_effect_cny"] == "-2000"
 
 
@@ -6228,8 +6228,8 @@ def test_b60_locally_recomputes_return_hurdle_eps_and_keeps_external_mie_unchang
     )
     row = result["scenarios"]["base"]
     assert result["status"] == "CONDITIONAL_SENSITIVITY_CALCULATED"
-    assert row["required_return_eps_without_distributions"] == "11.500"
-    assert row["fundamental_target_eps_without_distributions"] == "11.500"
+    assert Decimal(row["required_return_eps_without_distributions"]) == Decimal("11.500")
+    assert Decimal(row["fundamental_target_eps_without_distributions"]) == Decimal("11.500")
     assert row["b57_eps_headroom_vs_required_return_without_distributions"] == "-1.500"
     assert row["current_price_to_primary_eps_forward_pe"] == "10"
     assert row["distribution_status"] == "VALIDATED_NO_FUTURE_DISTRIBUTIONS"
@@ -6399,8 +6399,8 @@ def test_b61_sotp_price_inversion_reconstructs_segment_pool_and_one_at_a_time_pr
     assert required["required_terminal_equity_value_cny"] == "11500.00"
     assert required["required_segment_equity_value_pool_cny"] == "11400.00"
     segments = {item["segment_id"]: item for item in required["segment_requirements"]}
-    assert segments["seg_a"]["one_at_a_time_required_attributable_net_profit_cny_signed"] == "1040"
-    assert segments["seg_a"]["one_at_a_time_required_attributable_net_profit_floor_cny"] == "1040"
+    assert Decimal(segments["seg_a"]["one_at_a_time_required_attributable_net_profit_cny_signed"]) == Decimal("1040")
+    assert Decimal(segments["seg_a"]["one_at_a_time_required_attributable_net_profit_floor_cny"]) == Decimal("1040")
     assert segments["seg_b"]["one_at_a_time_required_attributable_net_profit_cny"] == "520"
     assert segments["seg_a"]["interpretation"].startswith("ONE_SEGMENT_CHANGES_OTHERS_HELD")
     assert result["external_mie_status_unchanged"] == "NOT_IDENTIFIABLE"
