@@ -7117,7 +7117,7 @@ def test_macos_prompt_clipboard_failure_is_nonfatal(monkeypatch, capsys):
         "prompt", fallback="Round A 提示未能自动复制"
     ) is False
     output = capsys.readouterr().out
-    assert "提示文件仍已保存在本机" in output
+    assert "请直接从已保存的提示文件或当前终端输出复制内容" in output
 
 
 def test_macos_app_launch_is_asynchronous(monkeypatch):

@@ -9285,8 +9285,8 @@ def _copy_macos_prompt_best_effort(prompt: str, *, fallback: str) -> bool:
         return True
     except (OSError, subprocess.SubprocessError) as exc:
         print(
-            f"\n{fallback}（{type(exc).__name__}）。提示文件仍已保存在本机；"
-            "请手动打开提示文件并复制内容。",
+            f"\n{fallback}（{type(exc).__name__}）；"
+            "请直接从已保存的提示文件或当前终端输出复制内容。",
             flush=True,
         )
         return False

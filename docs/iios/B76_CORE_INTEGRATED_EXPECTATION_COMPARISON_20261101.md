@@ -3,7 +3,7 @@
 **开发分支：** `feat/b76-core-integrated-20261101`  
 **开发基线：** B73 `faeee544238dd4b6154e2b0a7a4a53c8a88a6815`  
 **最新批次提交：** 见本分支 HEAD。  
-**状态：** B76 核心代码已提交到隔离集成分支；2026-11-04 精确 HEAD 验收发现 macOS GUI 等待与 C0 分支范围两项非算术阻塞，已启动独立修复；修复后的精确 HEAD 验证待完成。未合并 main。
+**状态：** B76 核心与执行恢复修复已提交到隔离集成分支；精确 HEAD `6ee0d2bae159f42481b4836f893be5a842993f1d` 的 15/15 关联工作流通过，macOS/Ubuntu 组合测试各 451 passed。未合并 main；真实用户 Mac 全流程 + Replay 仍未验收，真实公司 B76-ready 数值输入包仍缺。
 
 ## 1. 为什么重建正确开发基线
 
@@ -211,7 +211,12 @@ EPS_MULTIPLE 不再因早期分支返回而漏掉 payoff、thesis-break stress �
 2. C0 的 canonical state 检查只适用于 `main` 目标 PR 和既有主线 push。非 main 提案 PR 仍执行编译和 diff 检查，但不要求其状态索引伪装为 CANONICAL。
 3. 不放宽 B76 算术/口径 fail-closed 规则，不跳过 B76 核心测试，不把 GUI 验证失败解释成计算失败。
 
-修复代码与回归测试提交后，必须重新验证 B76 算术、Legacy real-case fail-closed、Local Pilot/Replay，并确认 C0 对非 main 目标为正确 skip。真实用户 macOS 桌面操作仍需与 GitHub headless runner 区分，CI 通过不代表真实 Mac 使用验收完成。
+修复代码与回归测试已提交并完成精确 HEAD 验证：
+- 首轮执行恢复提交：`cbb3c991211499e0a2d9769d8b7ad9d7ef7766f1`。
+- Round A / Round B GUI handoff 加固提交：`6ee0d2bae159f42481b4836f893be5a842993f1d`。
+- B76 EPS_MULTIPLE、SOTP、legacy real-case fail-closed、Local Pilot 和 Replay 组合测试：macOS 451 passed（7.71s）；Ubuntu 451 passed（4.17s）。
+- 15/15 关联 GitHub Actions 全部 success；C0 对非 main 目标跳过 canonical 内容断言，compile/diff 仍通过。
+- 该结果是 GitHub-hosted macOS Runner 的 headless 验证，不是用户真实 Mac 双轮操作 + 独立 Replay。真实 Mac 接受仍 OPEN / NOT VERIFIED；真实公司 B76-ready 数值输入包也仍缺。
 
 ## 7. 决策权限
 
