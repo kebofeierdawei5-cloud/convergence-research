@@ -2724,13 +2724,6 @@ def render_operating_driver_section(
                 f"- 净利润变化归因：产品贡献 {_display_optional_scalar(changes.get('contribution_after_variable_cost_cny'))}；固定费用效应 {_display_optional_scalar(changes.get('fixed_cash_opex_effect_cny'))}；折旧效应 {_display_optional_scalar(changes.get('depreciation_amortization_effect_cny'))}；融资成本效应 {_display_optional_scalar(changes.get('finance_cost_effect_cny'))}；模型税费效应 {_display_optional_scalar(changes.get('modeled_tax_effect_cny'))} CNY",
                 f"- 对账：归因合计 {_display_optional_scalar(changes.get('attribution_sum_cny'))}；残差 {_display_optional_scalar(changes.get('reconciliation_residual_cny'))} CNY（容差 {_display_optional_scalar(changes.get('tolerance_cny'))}）",
             ])
-        elif row.get("status") == "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE":
-            lines.extend([
-                f"- 前瞻 all-items 归母净利润代理：{_display_optional_scalar(forward.get('all_items_parent_attributable_net_profit_proxy_cny'))} CNY；"
-                f"稀释股数：{_display_optional_scalar(forward.get('diluted_weighted_average_shares'))} 股；"
-                f"前瞻 all-items 稀释 EPS：{_display_optional_scalar(forward.get('all_items_diluted_eps_proxy_cny_per_share'))} CNY/股。",
-                "- 历史正常化归母利润 / EPS 与 EPS 增长率保持 UNKNOWN；不把前瞻 all-items EPS 误称为正常化 EPS。",
-            ])
         if row.get("missing_inputs"):
             lines.append("- 保持 UNKNOWN / 阻塞输入：" + "、".join(str(x) for x in row["missing_inputs"]))
         if row.get("issues"):
@@ -2778,6 +2771,13 @@ def render_operating_driver_section(
                 f"- EPS 变化率：{_display_optional_scalar(changes.get('normalized_diluted_eps_growth_rate'))}；状态 {row.get('eps_growth_status', 'UNKNOWN')}（仅当历史正常化 EPS 为正时计算增长率）",
                 f"- 非经常性项目的归母利润影响（含税后影响与少数股东归属）：{_display_optional_scalar(changes.get('non_recurring_after_tax_effect_cny'))} CNY；含所有输入项目的归母利润代理变化：{_display_optional_scalar(changes.get('all_items_parent_attributable_net_profit_proxy_cny'))} CNY",
                 f"- 正常化利润变化对账：B56 税后利润代理变化 {_display_optional_scalar(changes.get('b56_modeled_net_profit_proxy_cny'))}；非经营项税后影响变化 {_display_optional_scalar(changes.get('non_operating_after_tax_effect_cny'))}；正常化少数股东归属效应 {_display_optional_scalar(changes.get('normalized_minority_interest_effect_cny'))}；残差 {_display_optional_scalar(changes.get('reconciliation_residual_cny'))} CNY",
+            ])
+        elif row.get("status") == "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE":
+            lines.extend([
+                f"- 前瞻 all-items 归母净利润代理：{_display_optional_scalar(forward.get('all_items_parent_attributable_net_profit_proxy_cny'))} CNY；"
+                f"稀释股数：{_display_optional_scalar(forward.get('diluted_weighted_average_shares'))} 股；"
+                f"前瞻 all-items 稀释 EPS：{_display_optional_scalar(forward.get('all_items_diluted_eps_proxy_cny_per_share'))} CNY/股。",
+                "- 历史正常化归母利润 / EPS 与 EPS 增长率保持 UNKNOWN；不把前瞻 all-items EPS 误称为正常化 EPS。",
             ])
         if row.get("missing_inputs"):
             lines.append("- 保持 UNKNOWN / 阻塞输入：" + "、".join(str(x) for x in row["missing_inputs"]))
