@@ -127,6 +127,11 @@ B57 不再把历史正常化归属输入缺失与前瞻 all-items EPS 计算混�
 - B60 / B76 仅继承 B58 已核对的前瞻 EPS；不以历史归属缺项补零，也不把部分桥升级为完整 B57 通过。
 - 前瞻利润、总少数股东归属、税率、期间或正稀释股数任一缺失时，B57 前瞻 EPS 仍 UNKNOWN，B76 不显示数值余量。
 
+### B59 差异诊断与 Required Return 余量的边界
+
+B58 未确认 `MATCH` 时，B60 不得输出 B57 EPS 相对 Required Return 的 headroom；B76 同样不得展示预测 EPS 与 Required EPS 的差额。  
+但如 B59 已独立把 B57 与主 EPS bridge 的归母利润分子差、稀释股数分母差、主估值实际使用 EPS 输入差拆解并算术对账，则 B60 可以保留 `B59 EPS difference × selected terminal P/E` 的每股终值影响诊断。该值必须标记 `diagnostic_only=True`，并显示“不是 Required Return 余量”；不得参与买入判断、估值覆盖或正式 expectation_gap。
+
 ### SOTP：B61 → B62 → B63 → B68
 
 B76 对每个 Bear/Base/Bull 情景独立复核以下恒等式和交叉节点：
