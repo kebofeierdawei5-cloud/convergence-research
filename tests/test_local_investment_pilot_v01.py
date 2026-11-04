@@ -2617,6 +2617,7 @@ def test_b43_b4_reconciliation_compares_effective_not_raw_working_capital():
     from iios_mvp.local_investment_pilot_v01 import _reconcile_b4_valuation_bridge
 
     driver = {
+        "scope": "COMPANY_WIDE",
         "scenarios": {
             name: {
                 "change_working_capital_cny": "3000",
