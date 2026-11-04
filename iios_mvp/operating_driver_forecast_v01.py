@@ -1377,7 +1377,11 @@ def _build_baseline_net_profit_bridge(
     if all(status == "CALCULATED_AND_RECONCILED" for status in statuses):
         base["status"] = "DIAGNOSTIC_CALCULATED"
         base["reason"] = "三个情景均基于 B55 已对账贡献和同期间历史/前瞻费用、折旧、融资成本与税率，模型税后利润变化在 CNY 1 内对账。"
-    elif any(status in {"CALCULATED_AND_RECONCILED", "RECONCILIATION_MISMATCH"} for status in statuses):
+    elif any(status in {
+        "CALCULATED_AND_RECONCILED",
+        "RECONCILIATION_MISMATCH",
+        "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE",
+    } for status in statuses):
         base["status"] = "PARTIAL"
         base["reason"] = "只有部分情景的完整历史与前瞻财务输入可用；其余情景保持 UNKNOWN/受阻，不能据此概括完整 Bear/Base/Bull 链。"
     elif all(status == "BLOCKED_BY_B55" for status in statuses):
@@ -1500,19 +1504,34 @@ def _build_per_share_earnings_bridge(
             "forward.net_profit_proxy_cny": forward_base_net_profit,
             "forward.tax_rate": forward_tax_rate,
         }
-        missing = [
+        historical_missing = [
             f"historical.{field}" for field, value in hist_values.items() if value is None
         ] + [
-            f"forward.{field}" for field, value in fwd_values.items() if value is None
+            field for field, value in financial_inputs.items()
+            if field.startswith("historical.") and value in (None, "")
+        ]
+        # The forecast all-items EPS is independent of the historical one-off NCI split.
+        # Missing historical normalization inputs must not erase a computable forward
+        # parent-attributable EPS, but must never be replaced with zero.
+        forward_all_items_required_fields = {
+            "recurring_non_operating_pre_tax_cny",
+            "non_recurring_pre_tax_cny",
+            "minority_interest_net_profit_after_tax_cny",
+            "diluted_weighted_average_shares",
+        }
+        forward_all_items_missing = [
+            f"forward.{field}" for field in sorted(forward_all_items_required_fields)
+            if fwd_values.get(field) is None
         ] + [
-            field for field, value in financial_inputs.items() if value in (None, "")
+            field for field, value in financial_inputs.items()
+            if field.startswith("forward.") and value in (None, "")
         ]
         invalid_inputs: list[str] = []
         for side, values in (("historical", hist_values), ("forward", fwd_values)):
             shares = values.get("diluted_weighted_average_shares")
             if shares is not None and shares <= 0:
                 invalid_inputs.append(f"{side}.diluted_weighted_average_shares:MUST_BE_POSITIVE")
-        row["missing_inputs"] = sorted(set(missing + invalid_inputs))
+        row["missing_inputs"] = sorted(set(historical_missing + forward_all_items_missing + invalid_inputs))
         row["issues"] = sorted({
             f"{side}.{field}:{issue}"
             for side, measures in (("historical", historical_inputs), ("forward", forward_inputs))
@@ -1545,8 +1564,53 @@ def _build_per_share_earnings_bridge(
             "all_items_parent_attributable_net_profit_proxy_cny": None,
             "normalized_diluted_eps_proxy_cny_per_share": None,
         }
-        if row["missing_inputs"]:
+        forward_all_items_ready = not forward_all_items_missing and (
+            fwd_values.get("diluted_weighted_average_shares") is not None
+            and fwd_values["diluted_weighted_average_shares"] > 0
+        )
+        if not forward_all_items_ready:
             row["status"] = "NOT_IDENTIFIABLE"
+            row["issues"] = sorted(set(row["issues"] + forward_all_items_missing + invalid_inputs))
+            base["scenarios"][scenario_name] = row
+            continue
+
+        forward_pbt_value = _decimal(forward_pbt, "B57_FORWARD_PBT")
+        fwd_net_profit_value = _decimal(forward_base_net_profit, "B57_FORWARD_B56_NET_PROFIT")
+        fwd_tax = forward_tax_rate
+        fwd_nci_total = fwd_values["minority_interest_net_profit_after_tax_cny"]
+        fwd_shares = fwd_values["diluted_weighted_average_shares"]
+        forward_recurring_pbt = (
+            forward_pbt_value + fwd_values["recurring_non_operating_pre_tax_cny"]
+        )
+        forward_all_items_pbt = (
+            forward_recurring_pbt + fwd_values["non_recurring_pre_tax_cny"]
+        )
+        forward_all_items_consolidated_np = (
+            forward_all_items_pbt - max(forward_all_items_pbt, Decimal("0")) * fwd_tax
+        )
+        forward_all_items_parent_np = forward_all_items_consolidated_np - fwd_nci_total
+        forward_all_items_eps = forward_all_items_parent_np / fwd_shares
+        row["forward_scenario"].update({
+            "all_items_profit_before_tax_proxy_cny": _render(forward_all_items_pbt),
+            "all_items_consolidated_net_profit_proxy_cny": _render(forward_all_items_consolidated_np),
+            "all_items_minority_interest_net_profit_cny": _render(fwd_nci_total),
+            "all_items_parent_attributable_net_profit_proxy_cny": _render(forward_all_items_parent_np),
+            "diluted_weighted_average_shares": _render(fwd_shares),
+            "all_items_diluted_eps_proxy_cny_per_share": _render(forward_all_items_eps),
+        })
+        row["all_items_eps_status"] = "CALCULATED_AND_RECONCILED"
+        normalized_only_forward_missing = (
+            fwd_values.get("minority_interest_nonrecurring_after_tax_cny") is None
+        )
+        if historical_missing or normalized_only_forward_missing:
+            partial_missing = historical_missing + (
+                ["forward.minority_interest_nonrecurring_after_tax_cny"]
+                if normalized_only_forward_missing else []
+            )
+            row["status"] = "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+            row["missing_inputs"] = sorted(set(partial_missing))
+            row["eps_growth_status"] = "NOT_IDENTIFIABLE_HISTORICAL_NORMALIZED_BASELINE"
+            row["issues"] = sorted(set(row["issues"] + partial_missing))
             base["scenarios"][scenario_name] = row
             continue
 
@@ -1588,6 +1652,7 @@ def _build_per_share_earnings_bridge(
                 "all_items_minority_interest_net_profit_cny": nci_total,
                 "normalized_parent_attributable_net_profit_cny": normalized_parent_np,
                 "all_items_parent_attributable_net_profit_proxy_cny": all_items_parent_np,
+                "all_items_diluted_eps_proxy_cny_per_share": all_items_parent_np / amounts["diluted_weighted_average_shares"],
                 "normalized_diluted_eps_proxy_cny_per_share": normalized_parent_np / amounts["diluted_weighted_average_shares"],
             }
 
