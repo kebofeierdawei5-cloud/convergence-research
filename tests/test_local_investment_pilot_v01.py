@@ -5853,6 +5853,12 @@ def test_b57_report_shows_one_off_nci_and_eps_boundaries():
     partial_report = "\\n".join(render_operating_driver_section(partial, None, "CNY"))
     assert "前瞻 all-items 稀释 EPS" in partial_report
     assert "历史正常化归母利润 / EPS 与 EPS 增长率保持 UNKNOWN" in partial_report
+    raw_partial = _b57_test_attribution_payload()
+    raw_partial["historical_earnings_attribution"].pop("minority_interest_nonrecurring_after_tax_cny")
+    partial = evaluate_operating_driver_forecast(raw_partial, evidence_register=evidence)
+    partial_report = "\\n".join(render_operating_driver_section(partial, None, "CNY"))
+    assert "前瞻 all-items 稀释 EPS" in partial_report
+    assert "历史正常化归母利润 / EPS 与 EPS 增长率保持 UNKNOWN" in partial_report
 
 
 def test_b57_missing_b4_input_returns_explicit_not_provided_shape():
@@ -5970,6 +5976,30 @@ def test_b58_primary_eps_and_b57_all_items_eps_match_only_on_same_period_currenc
     assert result["scenarios"]["base"]["normalized_eps_vs_primary_declared_difference_per_share_diagnostic_only"] == "0.5"
     assert result["valuation_input_modified"] is False
     assert result["decision_authority"] is False
+
+
+def test_b58_accepts_forward_all_items_eps_when_historical_normalization_is_unknown():
+    driver, primary, valuation = _b58_test_inputs()
+    b57 = driver["baseline_transition"]["per_share_earnings_bridge"]
+    b57["status"] = "PARTIAL"
+    for name in ("bear", "base", "bull"):
+        b57["scenarios"][name]["status"] = (
+            "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+        )
+        b57["scenarios"][name]["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] = None
+        b57["scenarios"][name]["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"] = None
+    result = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    assert result["status"] == "MATCH"
+    assert all(row["status"] == "MATCH" for row in result["scenarios"].values())
+    assert result["scenarios"]["base"]["b57_all_items_eps_proxy_cny_per_share"] == "10"
+    assert result["scenarios"]["base"]["b57_normalized_diluted_eps_proxy_cny_per_share"] is None
+    assert result["valuation_input_modified"] is False
 
 
 def test_b58_accepts_forward_all_items_eps_when_historical_normalization_is_unknown():
@@ -6276,6 +6306,33 @@ def test_b60_locally_recomputes_return_hurdle_eps_and_keeps_external_mie_unchang
     assert row["distribution_status"] == "VALIDATED_NO_FUTURE_DISTRIBUTIONS"
     assert result["external_mie_status_unchanged"] == "NOT_IDENTIFIABLE"
     assert result["external_mie_and_expectation_gap_modified"] is False
+
+
+def test_b60_uses_forward_all_items_eps_when_historical_normalization_is_unknown():
+    price, timing, decision, operator, valuation, forecast, driver = _b60_test_inputs()
+    b57_rows = driver["baseline_transition"]["per_share_earnings_bridge"]["scenarios"]
+    for row in b57_rows.values():
+        row["status"] = (
+            "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+        )
+        row["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] = None
+        row["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"] = None
+    result = pilot._build_b60_local_eps_multiple_price_inversion(
+        price_input=price,
+        valuation_timing=timing,
+        decision_parameters=decision,
+        operator_valuation_context=operator,
+        eps_multiple_valuation=valuation,
+        forecast_valuation=forecast,
+        operating_driver_forecast=driver,
+        validated_cash_distribution_events={name: [] for name in ("bear", "base", "bull")},
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    base = result["scenarios"]["base"]
+    assert base["status"] == "CALCULATED_CONDITIONAL"
+    assert base["b57_terminal_value_using_selected_pe"] == "100"
+    assert base["b57_eps_headroom_vs_required_return_without_distributions"] == "-1.50"
+    assert "B57_EPS_NOT_CONFIRMED_ON_SAME_COMPANY_SCOPE_AND_PERIOD" not in base["comparability_flags"]
 
 
 def test_b60_uses_forward_all_items_eps_when_historical_normalization_is_unknown():
