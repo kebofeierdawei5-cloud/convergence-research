@@ -583,6 +583,7 @@ def _eps_multiple_comparison(
             "selected_terminal_pe_x": _fmt(terminal_pe),
             "primary_adapter_terminal_value_cny_per_share": _fmt(primary_terminal),
             "arithmetic_reconciliation": {
+                "status": "NOT_IDENTIFIABLE",
                 "b57_profit_divided_by_shares": "NOT_IDENTIFIABLE",
                 "primary_eps_times_pe": "NOT_IDENTIFIABLE",
                 "required_return_eps": "NOT_IDENTIFIABLE",
@@ -598,8 +599,11 @@ def _eps_multiple_comparison(
         arithmetic_issues: list[str] = []
         if raw.get("status") != "CALCULATED_CONDITIONAL":
             row["issues"].append("B60_SCENARIO_NOT_CALCULATED")
-        if b57_status != "CALCULATED_AND_RECONCILED":
-            row["issues"].append("B57_COMPANY_WIDE_EARNINGS_EPS_BRIDGE_NOT_RECONCILED")
+        if b57_status not in {
+            "CALCULATED_AND_RECONCILED",
+            "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE",
+        }:
+            row["issues"].append("B57_COMPANY_WIDE_FORWARD_ALL_ITEMS_EPS_BRIDGE_NOT_RECONCILED")
         if not period_match:
             row["issues"].append("B4_B57_B58_B60_FORECAST_PERIOD_NOT_CONFIRMED_MATCH")
         if str(raw.get("b57_forward_period") or "").strip().upper() != str(b60.get("forecast_period") or "").strip().upper():
@@ -675,7 +679,14 @@ def _eps_multiple_comparison(
             row["arithmetic_reconciliation"]["distribution_adjusted_fundamental_target_eps"] = "UNKNOWN_UNVALIDATED_DISTRIBUTIONS"
 
         if arithmetic_issues:
-            row["status"] = "ARITHMETIC_RECONCILIATION_MISMATCH"
+            mismatch_issues = [
+                issue for issue in arithmetic_issues
+                if "MISMATCH" in issue or "DOES_NOT_EQUAL" in issue or "DOES_NOT_RECONCILE" in issue
+            ]
+            row["arithmetic_reconciliation"]["status"] = (
+                "MISMATCH" if mismatch_issues else "NOT_IDENTIFIABLE"
+            )
+            row["status"] = "ARITHMETIC_RECONCILIATION_MISMATCH" if mismatch_issues else "NOT_IDENTIFIABLE"
             row["issues"] = arithmetic_issues
             row["arithmetic_reconciliation"]["issues"] = arithmetic_issues
             # Keep source operands visible for audit, but never expose a numeric
@@ -685,6 +696,10 @@ def _eps_multiple_comparison(
             continue
 
         row["arithmetic_reconciliation"]["issues"] = []
+        row["arithmetic_reconciliation"]["status"] = (
+            "PASS" if distribution_status in validated_distribution_statuses
+            else "PASS_CORE_DISTRIBUTION_ADJUSTMENT_NOT_VALIDATED"
+        )
         row["required_return"] = {
             "without_distributions": _eps_requirement_pair(
                 b4_eps, hurdle_required_eps,
