@@ -5621,6 +5621,7 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
         "## 核心投资判断总览：当前现实 × 现价隐含要求 × 合理未来推演",
         "",
         "> 本节先回答三个投资问题。它是现有研究与计算结果的只读摘要，不替代原有模型、证据门禁、组合约束或决策内核；缺失信息保持 UNKNOWN。",
+        f"- 案例：{case.get('company') or 'UNKNOWN'}（{case.get('symbol') or 'UNKNOWN'}）；截止日 {case.get('as_of_date') or case.get('cutoff_date') or 'UNKNOWN'}。",
         "",
         "### 1. 当前基本面现实",
         f"- Trust / Reality / Quality："
