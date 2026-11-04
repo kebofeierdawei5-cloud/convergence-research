@@ -525,3 +525,23 @@ def test_b76_sotp_blocks_when_b61_reference_price_differs_from_structured_price(
     assert result["status"] == "PRICE_REFERENCE_MISMATCH"
     assert result["price_reference_status"] == "MISMATCH"
     assert result["scenarios"] == {}
+
+
+def test_b76_eps_multiple_accepts_reconciled_forward_eps_with_unknown_history():
+    local, b60 = _eps_multiple_inputs()
+    for row in b60["scenarios"].values():
+        row["b57_status"] = "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+        row["b58_status"] = "MATCH"
+    result = build_expectation_gap_comparison(
+        local_sotp_recalculation=local,
+        return_metrics=None,
+        price_input={"price": "30"},
+        forecast_valuation={},
+        thesis_break_stress_review=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+        local_eps_multiple_recalculation=b60,
+    )
+    comparison = result["eps_multiple_comparison"]
+    assert comparison["status"] == "CONDITIONAL_PRICE_COMPARISON_CALCULATED"
+    assert comparison["scenarios"]["base"]["status"] == "CALCULATED"
+    assert comparison["scenarios"]["base"]["arithmetic_reconciliation"]["status"] == "PASS"
