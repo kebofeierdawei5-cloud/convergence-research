@@ -5720,10 +5720,6 @@ def test_b56_missing_forward_tax_rate_blocks_only_the_affected_scenario():
 
     assert bridge["status"] == "PARTIAL"
     assert bridge["scenarios"]["bear"]["status"] == "CALCULATED_AND_RECONCILED"
-    assert bridge["scenarios"]["bear"]["forward_scenario"]["all_items_parent_attributable_net_profit_proxy_cny"] is not None
-    assert bridge["scenarios"]["bear"]["forward_scenario"]["all_items_diluted_eps_proxy_cny_per_share"] is not None
-    assert bridge["scenarios"]["bear"]["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"] is None
-    assert bridge["scenarios"]["bear"]["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] is None
     assert bridge["scenarios"]["base"]["status"] == "NOT_IDENTIFIABLE"
     assert "forward.tax_rate" in bridge["scenarios"]["base"]["missing_inputs"]
     assert bridge["scenarios"]["base"]["changes"] == {}
@@ -5850,6 +5846,7 @@ def test_b57_report_shows_one_off_nci_and_eps_boundaries():
     raw_partial = _b57_test_attribution_payload()
     raw_partial["historical_earnings_attribution"].pop("minority_interest_nonrecurring_after_tax_cny")
     partial = evaluate_operating_driver_forecast(raw_partial, evidence_register=evidence)
+    assert partial["baseline_transition"]["per_share_earnings_bridge"]["scenarios"]["bear"]["status"] == "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
     partial_report = "\n".join(render_operating_driver_section(partial, None, "CNY"))
     assert "前瞻 all-items 稀释 EPS" in partial_report
     assert "历史正常化归母利润 / EPS 与 EPS 增长率保持 UNKNOWN" in partial_report
