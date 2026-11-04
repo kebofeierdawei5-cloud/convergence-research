@@ -5853,10 +5853,7 @@ def test_b57_report_shows_one_off_nci_and_eps_boundaries():
     partial_report = "\n".join(render_operating_driver_section(partial, None, "CNY"))
     assert "前瞻 all-items 稀释 EPS" in partial_report
     assert "历史正常化归母利润 / EPS 与 EPS 增长率保持 UNKNOWN" in partial_report
-    raw_partial["historical_earnings_attribution"].pop("minority_interest_nonrecurring_after_tax_cny")
-    partial = evaluate_operating_driver_forecast(raw_partial, evidence_register=evidence)
-    assert "前瞻 all-items 稀释 EPS" in partial_report
-    assert "历史正常化归母利润 / EPS 与 EPS 增长率保持 UNKNOWN" in partial_report
+
 
 
 def test_b57_missing_b4_input_returns_explicit_not_provided_shape():
@@ -6414,6 +6411,9 @@ def test_b60_translates_b59_eps_difference_components_into_terminal_value_effect
     assert row["b59_terminal_value_effects"]["profit_numerator_effect_terminal_value_effect_cny_per_share"] == "4.0"
     assert row["b59_terminal_value_effects"]["diluted_share_denominator_effect_terminal_value_effect_cny_per_share"] == "1.0"
     assert row["b57_minus_primary_terminal_value_effect"] == "5.0"
+    assert row["b57_minus_primary_terminal_value_effect_is_diagnostic_only"] is True
+    assert row["b57_minus_primary_terminal_value_effect_basis"].endswith("NOT_REQUIRED_RETURN_HEADROOM")
+    assert row["b57_eps_headroom_vs_required_return_without_distributions"] is None
 
 
 def test_b60_requires_eps_multiple_primary_model_and_pit_qualified_price():
