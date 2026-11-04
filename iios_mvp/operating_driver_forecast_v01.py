@@ -1602,8 +1602,11 @@ def _build_per_share_earnings_bridge(
         normalized_only_forward_missing = (
             fwd_values.get("minority_interest_nonrecurring_after_tax_cny") is None
         )
-        if historical_missing or normalized_only_forward_missing:
-            partial_missing = historical_missing + (
+        historical_invalid_inputs = [
+            issue for issue in invalid_inputs if issue.startswith("historical.")
+        ]
+        if historical_missing or historical_invalid_inputs or normalized_only_forward_missing:
+            partial_missing = historical_missing + historical_invalid_inputs + (
                 ["forward.minority_interest_nonrecurring_after_tax_cny"]
                 if normalized_only_forward_missing else []
             )
@@ -1681,6 +1684,9 @@ def _build_per_share_earnings_bridge(
         forward_eps = forward_result["normalized_diluted_eps_proxy_cny_per_share"]
         eps_growth = forward_eps / historical_eps - Decimal("1") if historical_eps > 0 else None
         row["status"] = "CALCULATED_AND_RECONCILED" if abs(residual) <= Decimal("1") else "RECONCILIATION_MISMATCH"
+        row["all_items_eps_status"] = (
+            "CALCULATED_AND_RECONCILED" if abs(residual) <= Decimal("1") else "NOT_RECONCILED"
+        )
         row["historical_baseline"].update({
             **{key: _render(value) for key, value in historical_result.items()},
             "period": base["baseline_period"],
@@ -1726,7 +1732,11 @@ def _build_per_share_earnings_bridge(
     elif all(status == "CALCULATED_AND_RECONCILED" for status in statuses):
         base["status"] = "DIAGNOSTIC_CALCULATED"
         base["reason"] = "三个情景的正常化归母利润与稀释 EPS 代理均已基于 B56、非经营项、非经常项、少数股东归属和稀释股数计算并完成对账。"
-    elif any(status in {"CALCULATED_AND_RECONCILED", "RECONCILIATION_MISMATCH"} for status in statuses):
+    elif any(status in {
+        "CALCULATED_AND_RECONCILED",
+        "RECONCILIATION_MISMATCH",
+        "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE",
+    } for status in statuses):
         base["status"] = "PARTIAL"
         base["reason"] = "只有部分 Bear/Base/Bull 情景具备完整归属和股数输入；其他情景保持 UNKNOWN。"
     elif all(status == "BLOCKED_BY_B56" for status in statuses):
@@ -2713,6 +2723,13 @@ def render_operating_driver_section(
                 f"- 中间桥：EBITDA {_display_optional_scalar(historical.get('ebitda_proxy_cny'))} → {_display_optional_scalar(forward.get('ebitda_proxy_cny'))}；EBIT {_display_optional_scalar(historical.get('ebit_proxy_cny'))} → {_display_optional_scalar(forward.get('ebit_proxy_cny'))}；税前利润 {_display_optional_scalar(historical.get('profit_before_tax_proxy_cny'))} → {_display_optional_scalar(forward.get('profit_before_tax_proxy_cny'))}",
                 f"- 净利润变化归因：产品贡献 {_display_optional_scalar(changes.get('contribution_after_variable_cost_cny'))}；固定费用效应 {_display_optional_scalar(changes.get('fixed_cash_opex_effect_cny'))}；折旧效应 {_display_optional_scalar(changes.get('depreciation_amortization_effect_cny'))}；融资成本效应 {_display_optional_scalar(changes.get('finance_cost_effect_cny'))}；模型税费效应 {_display_optional_scalar(changes.get('modeled_tax_effect_cny'))} CNY",
                 f"- 对账：归因合计 {_display_optional_scalar(changes.get('attribution_sum_cny'))}；残差 {_display_optional_scalar(changes.get('reconciliation_residual_cny'))} CNY（容差 {_display_optional_scalar(changes.get('tolerance_cny'))}）",
+            ])
+        elif row.get("status") == "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE":
+            lines.extend([
+                f"- 前瞻 all-items 归母净利润代理：{_display_optional_scalar(forward.get('all_items_parent_attributable_net_profit_proxy_cny'))} CNY；"
+                f"稀释股数：{_display_optional_scalar(forward.get('diluted_weighted_average_shares'))} 股；"
+                f"前瞻 all-items 稀释 EPS：{_display_optional_scalar(forward.get('all_items_diluted_eps_proxy_cny_per_share'))} CNY/股。",
+                "- 历史正常化归母利润 / EPS 与 EPS 增长率保持 UNKNOWN；不把前瞻 all-items EPS 误称为正常化 EPS。",
             ])
         if row.get("missing_inputs"):
             lines.append("- 保持 UNKNOWN / 阻塞输入：" + "、".join(str(x) for x in row["missing_inputs"]))
