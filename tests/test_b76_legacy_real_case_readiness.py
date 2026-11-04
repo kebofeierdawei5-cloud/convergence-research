@@ -74,7 +74,7 @@ def test_real_xinhecheng_eps_multiple_legacy_case_is_visible_but_not_promoted_to
     assert b76["status"] == "BLOCKED_BY_B60_RESULT_MISSING"
     assert b76["eps_multiple_comparison"]["status"] == "BLOCKED_BY_B60_RESULT_MISSING"
     assert b76["eps_multiple_comparison"]["scenarios"] == {}
-    assert "002001" in report
+    assert case["company"] in report and "002001" in report
     assert "EPS_MULTIPLE" in report
     assert "BLOCKED_BY_B60_RESULT_MISSING" in report
     assert "B4/B57 all-items EPS" not in report
@@ -96,7 +96,7 @@ def test_real_kolun_sotp_legacy_case_is_visible_but_missing_segment_profit_bridg
     assert b76["price_reference_status"] == "NOT_IDENTIFIABLE"
     assert b76["scenarios"] == {}
     assert b76["external_mie_modified"] is False
-    assert "002422" in report
+    assert case["company"] in report and "002422" in report
     assert "SOTP" in report
     assert "PRICE_REFERENCE_NOT_IDENTIFIABLE" in report
     assert "B4 前瞻分部价值池" not in report
