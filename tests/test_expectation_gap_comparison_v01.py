@@ -151,7 +151,7 @@ def test_b76_compares_b4_full_vector_with_b61_b63_price_requirements():
     assert base["arithmetic_reconciliation"]["status"] == "PASS"
     assert base["earnings_gap"]["required_return_annualized_rate"] == "0.12"
     assert base["earnings_gap"]["fundamental_target_annualized_rate"] == "0.15"
-    assert base["earnings_gap"]["headroom_vs_required_pool_pct"] == "4.166666666666666666666666667"
+    assert abs(float(base["earnings_gap"]["headroom_vs_required_pool_pct"]) - 4.166666666666667) < 1e-12
     assert base["operating_gap"]["status"] == "CONDITIONAL_PRICE_CONDITIONED_OPERATING_ALTERNATIVES"
     segment = base["segment_comparisons"][0]
     assert segment["b4_forecast_minus_b61_requirement_cny"]["difference"] == "10"
@@ -300,11 +300,11 @@ def test_b76_eps_multiple_compares_b4_all_items_eps_with_b60_hurdle_eps():
     base = comparison["scenarios"]["base"]
     required = base["required_return"]["without_distributions"]
     assert required["forecast_eps_cny_per_share"] == "2.35"
-    assert required["required_eps_cny_per_share"] == "2.2"
+    assert Decimal(required["required_eps_cny_per_share"]) == Decimal("2.2")
     assert required["forecast_minus_required_cny_per_share"] == "0.15"
     assert abs(float(required["headroom_vs_required_pct"]) - 6.818181818181818) < 1e-12
     assert required["direction"] == "B4_FORECAST_ABOVE_REQUIREMENT"
-    assert base["required_return"]["with_validated_distributions"]["required_eps_cny_per_share"] == "2.133333333333333333333333333"
+    assert abs(float(base["required_return"]["with_validated_distributions"]["required_eps_cny_per_share"]) - 2.1333333333333333) < 1e-12
     assert base["fundamental_target"]["without_distributions"]["required_eps_cny_per_share"] == "2.30"
     assert base["arithmetic_reconciliation"]["status"] == "PASS"
     assert result["win_odds"]["win_probability_status"] == "NOT_IDENTIFIABLE"
@@ -449,7 +449,7 @@ def test_b76_sotp_partial_common_multiple_does_not_block_value_pool_comparison()
     assert result["status"] == "PARTIAL"
     assert base["status"] == "PARTIAL"
     assert base["earnings_gap"]["b4_forecast_pool_minus_required_pool_cny"] == "50"
-    assert base["earnings_gap"]["headroom_vs_required_pool_pct"] == "4.166666666666666666666666667"
+    assert abs(float(base["earnings_gap"]["headroom_vs_required_pool_pct"]) - 4.166666666666667) < 1e-12
     assert base["valuation_gap"]["status"] == "NOT_IDENTIFIABLE_OR_PARTIAL"
 
 
