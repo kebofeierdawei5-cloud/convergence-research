@@ -2178,6 +2178,20 @@ def _build_b60_local_eps_multiple_price_inversion(
                     row["b59_terminal_value_effects"][component.replace("_cny_per_share", "_terminal_value_effect_cny_per_share")] = format(amount * pe, "f")
         else:
             row["comparability_flags"].append("B59_EPS_GAP_ATTRIBUTION_NOT_RECONCILED")
+        if b59_row.get("status") in {"ARITHMETICALLY_RECONCILED", "ARITHMETICALLY_RECONCILED_NOT_COMPARABLE"}:
+            b59_components = b59_row.get("eps_gap_components_cny_per_share") if isinstance(b59_row.get("eps_gap_components_cny_per_share"), Mapping) else {}
+            b59_declared_eps_gap = dec(b59_components.get("b57_minus_primary_declared_eps_cny_per_share"))
+            if b59_declared_eps_gap is not None:
+                # B59 is an arithmetic-difference diagnostic, not a like-for-like
+                # forecast comparison. Preserve its terminal-value attribution even
+                # when B58 does not certify same-basis EPS headroom.
+                row["b57_minus_primary_terminal_value_effect"] = format(
+                    b59_declared_eps_gap * pe, "f"
+                )
+                row["b57_minus_primary_terminal_value_effect_basis"] = (
+                    "B59_RECONCILED_EPS_DIFFERENCE_TIMES_SELECTED_PE_DIAGNOSTIC_ONLY_NOT_REQUIRED_RETURN_HEADROOM"
+                )
+                row["b57_minus_primary_terminal_value_effect_is_diagnostic_only"] = True
         row["status"] = "CALCULATED_CONDITIONAL"
         row["issues"] = dist_issues
         row["comparability_flags"].extend(dist_issues)
