@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from iios_mvp.expectation_gap_comparison_v01 import build_expectation_gap_comparison
 
 
