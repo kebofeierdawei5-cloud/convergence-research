@@ -6235,7 +6235,7 @@ def test_b60_locally_recomputes_return_hurdle_eps_and_keeps_external_mie_unchang
     assert result["status"] == "CONDITIONAL_SENSITIVITY_CALCULATED"
     assert Decimal(row["required_return_eps_without_distributions"]) == Decimal("11.500")
     assert Decimal(row["fundamental_target_eps_without_distributions"]) == Decimal("11.500")
-    assert Decimal(row["b57_eps_headroom_vs_required_return_without_distributions"]) == Decimal("-1.500")
+    assert Decimal(row["b57_eps_headroom_vs_required_return_without_distributions"]) == Decimal("-1.50")
     assert row["current_price_to_primary_eps_forward_pe"] == "10"
     assert row["distribution_status"] == "VALIDATED_NO_FUTURE_DISTRIBUTIONS"
     assert result["external_mie_status_unchanged"] == "NOT_IDENTIFIABLE"
