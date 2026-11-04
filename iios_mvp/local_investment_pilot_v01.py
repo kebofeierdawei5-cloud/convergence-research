@@ -2149,6 +2149,7 @@ def _build_b60_local_eps_multiple_price_inversion(
                 "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE",
             }
             and b58_row.get("forecast_period_match") is True
+            and b58_row.get("status") == "MATCH"
             and b57_eps is not None
         )
         if b57_comparable:
