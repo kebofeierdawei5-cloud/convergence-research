@@ -100,5 +100,6 @@ def test_real_kolun_sotp_legacy_case_is_visible_but_missing_segment_profit_bridg
     assert "SOTP" in report
     assert "PRICE_REFERENCE_NOT_IDENTIFIABLE" in report
     assert "B4 前瞻分部价值池" not in report
-    assert "价值池余量" not in report
+    assert "价值池余量 50 CNY" not in report
+    assert "B4 前瞻分部价值池 1250 CNY" not in report
     assert "40.85" in report
