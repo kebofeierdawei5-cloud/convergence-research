@@ -371,7 +371,7 @@ def test_b76_eps_multiple_blocks_non_reconciled_b57_eps():
     )
     base = result["eps_multiple_comparison"]["scenarios"]["base"]
     assert base["status"] == "NOT_IDENTIFIABLE"
-    assert "B57_COMPANY_WIDE_EARNINGS_EPS_BRIDGE_NOT_RECONCILED" in base["issues"]
+    assert "B57_COMPANY_WIDE_FORWARD_ALL_ITEMS_EPS_BRIDGE_NOT_RECONCILED" in base["issues"]
     assert base["required_return"] == {}
 
 
