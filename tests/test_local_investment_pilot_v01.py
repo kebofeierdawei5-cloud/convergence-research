@@ -1140,7 +1140,15 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert saved["price_input"]["assurance_label"] == "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
     assert result["formal_decision_created"] is False and result["auto_execution"] is False
     output = capsys.readouterr().out
-    assert "Round A 价格盲研究提示" in output and "Round B 价格感知估值/MIE/预期差提示" in output
+    linux_prompt_output = (
+        "Round A 价格盲研究提示" in output
+        and "Round B 价格感知估值/MIE/预期差提示" in output
+    )
+    macos_clipboard_output = (
+        "Round A 已准备" in output
+        and "Round B 价格感知估值/MIE/预期差提示已复制到剪贴板" in output
+    )
+    assert linux_prompt_output or macos_clipboard_output
     round_a_paths = list((tmp_path / "inputs").glob("pilot-prompt-round-a-*.md"))
     round_b_paths = list((tmp_path / "inputs").glob("pilot-prompt-round-b-*.md"))
     assert len(round_a_paths) == 1 and len(round_b_paths) == 1
