@@ -1463,7 +1463,10 @@ def _build_b58_primary_eps_consistency(
             base["scenarios"][name] = row
             scenario_statuses.append(row["status"])
             continue
-        if row["b57_status"] != "CALCULATED_AND_RECONCILED":
+        if row["b57_status"] not in {
+            "CALCULATED_AND_RECONCILED",
+            "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE",
+        }:
             row["status"] = "BLOCKED_BY_B57"
             row["issues"] = [f"B57_SCENARIO_NOT_RECONCILED:{row['b57_status']}"]
             base["scenarios"][name] = row
@@ -2140,8 +2143,13 @@ def _build_b60_local_eps_multiple_price_inversion(
 
         b57_eps = dec(b58_row.get("b57_all_items_eps_proxy_cny_per_share"))
         b57_comparable = (
-            company_scope and b57_row.get("status") == "CALCULATED_AND_RECONCILED"
-            and b58_row.get("forecast_period_match") is True and b57_eps is not None
+            company_scope
+            and b57_row.get("status") in {
+                "CALCULATED_AND_RECONCILED",
+                "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE",
+            }
+            and b58_row.get("forecast_period_match") is True
+            and b57_eps is not None
         )
         if b57_comparable:
             row["b57_terminal_value_using_selected_pe"] = format(b57_eps * pe, "f")
