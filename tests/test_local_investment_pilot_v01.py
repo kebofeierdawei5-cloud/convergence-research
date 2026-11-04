@@ -7087,3 +7087,51 @@ def test_report_auto_open_is_nonblocking_and_best_effort(monkeypatch, capsys):
     monkeypatch.setattr(pilot.subprocess, "Popen", failing_popen)
     pilot._open_report_best_effort("report.md")
     assert "报告已生成，但系统无法自动打开" in capsys.readouterr().out
+
+
+
+def test_macos_gui_handoff_helpers_are_skipped_in_ci(monkeypatch):
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    monkeypatch.setenv("CI", "true")
+
+    def unexpected(*_args, **_kwargs):
+        raise AssertionError("GUI/clipboard command must be skipped in CI")
+
+    monkeypatch.setattr(pilot.subprocess, "Popen", unexpected)
+    monkeypatch.setattr(pilot.subprocess, "run", unexpected)
+    assert pilot._launch_macos_target_best_effort(
+        ["open", "https://chatgpt.com/"], fallback="fallback"
+    ) is False
+    assert pilot._copy_macos_prompt_best_effort("prompt", fallback="fallback") is False
+
+
+def test_macos_prompt_clipboard_failure_is_nonfatal(monkeypatch, capsys):
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    monkeypatch.delenv("CI", raising=False)
+
+    def timeout(*_args, **_kwargs):
+        raise pilot.subprocess.TimeoutExpired(["pbcopy"], timeout=5)
+
+    monkeypatch.setattr(pilot.subprocess, "run", timeout)
+    assert pilot._copy_macos_prompt_best_effort(
+        "prompt", fallback="Round A 提示未能自动复制"
+    ) is False
+    output = capsys.readouterr().out
+    assert "提示文件仍已保存在本机" in output
+
+
+def test_macos_app_launch_is_asynchronous(monkeypatch):
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    monkeypatch.delenv("CI", raising=False)
+    calls = []
+
+    def fake_popen(args, **kwargs):
+        calls.append((args, kwargs))
+        return object()
+
+    monkeypatch.setattr(pilot.subprocess, "Popen", fake_popen)
+    assert pilot._launch_macos_target_best_effort(
+        ["open", "https://chatgpt.com/"], fallback="fallback"
+    ) is True
+    assert len(calls) == 1
+    assert calls[0][1]["start_new_session"] is True

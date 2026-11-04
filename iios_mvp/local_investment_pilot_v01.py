@@ -9247,29 +9247,57 @@ def _ask_operator_valuation_context() -> dict[str, Any]:
     }
 
 
-def _open_report_best_effort(report_path: str | Path) -> None:
-    """Open a completed report without blocking the investment workflow.
-
-    GUI launching is a convenience only: it is skipped in CI/headless runs,
-    runs asynchronously on a local macOS desktop, and never invalidates a
-    report that has already been generated.
-    """
+def _launch_macos_target_best_effort(arguments: list[str], *, fallback: str) -> bool:
+    """Launch a macOS GUI target asynchronously; never block analysis."""
     if sys.platform != "darwin" or os.environ.get("CI"):
-        return
+        return False
     try:
         subprocess.Popen(
-            ["open", str(report_path)],
+            arguments,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
+        return True
     except (OSError, subprocess.SubprocessError) as exc:
         print(
-            f"\n报告已生成，但系统无法自动打开（{type(exc).__name__}）；"
-            f"请按路径手动打开：{report_path}",
+            f"\n{fallback}（{type(exc).__name__}）；请按提示手动继续。",
             flush=True,
         )
+        return False
+
+
+def _copy_macos_prompt_best_effort(prompt: str, *, fallback: str) -> bool:
+    """Copy a prompt when possible; clipboard failure must not abort the run."""
+    if sys.platform != "darwin" or os.environ.get("CI"):
+        return False
+    try:
+        subprocess.run(
+            ["pbcopy"],
+            input=prompt,
+            text=True,
+            check=True,
+            timeout=5,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return True
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(
+            f"\n{fallback}（{type(exc).__name__}）。提示文件仍已保存在本机；"
+            "请手动打开提示文件并复制内容。",
+            flush=True,
+        )
+        return False
+
+
+def _open_report_best_effort(report_path: str | Path) -> None:
+    """Open a completed report without blocking the investment workflow."""
+    _launch_macos_target_best_effort(
+        ["open", str(report_path)],
+        fallback=f"报告已生成，但系统无法自动打开：{report_path}",
+    )
 
 
 def run_guided_wizard(
@@ -9418,11 +9446,20 @@ def run_guided_wizard(
     _write_local(round_a_response_path, "")
     initial_response_signature = _response_file_signature(round_a_response_path)
 
-    if sys.platform == "darwin":
-        subprocess.run(["pbcopy"], input=prompt, text=True, check=True, timeout=5)
-        subprocess.run(["open", "https://chatgpt.com/"], check=False, timeout=5)
-        subprocess.run(["open", "-a", "TextEdit", str(round_a_response_path)], check=False, timeout=5)
-        print("\nRound A 已准备：价格盲研究提示与专用 JSON 文件已打开；此阶段不会显示结构化股价、持仓或估值字段。")
+    if sys.platform == "darwin" and not os.environ.get("CI"):
+        copied = _copy_macos_prompt_best_effort(
+            prompt, fallback="Round A 提示未能自动复制"
+        )
+        _launch_macos_target_best_effort(
+            ["open", "https://chatgpt.com/"],
+            fallback="Round A ChatGPT 页面未能自动打开；请手动访问 https://chatgpt.com/",
+        )
+        _launch_macos_target_best_effort(
+            ["open", "-a", "TextEdit", str(round_a_response_path)],
+            fallback=f"Round A 响应文件未能自动打开：{round_a_response_path}",
+        )
+        clipboard_note = "提示已复制到剪贴板" if copied else f"提示文件：{round_a_prompt_path}"
+        print(f"\nRound A 已准备：{clipboard_note}；专用 JSON 响应文件已创建。此阶段不会显示结构化股价、持仓或估值字段。")
     else:
         print("\nRound A 价格盲研究提示：\n" + prompt)
     print(f"\nRound A 原始响应保存位置：\n{round_a_response_path}")
@@ -9457,12 +9494,10 @@ def run_guided_wizard(
             print(f"Round A 暂未继续：{exc}", flush=True)
             if isinstance(exc, LocalInvestmentPilotError) and not str(exc).startswith(("CHATGPT_RESPONSE_FILE_READ_FAILED", "CHATGPT_RESPONSE_FILE_NOT_FOUND")):
                 repair_prompt = _build_response_repair_prompt(original_prompt=prompt, response_path=response_path, validation_error=str(exc))
-                if sys.platform == "darwin":
-                    try:
-                        subprocess.run(["pbcopy"], input=repair_prompt, text=True, check=True, timeout=5)
-                        print("\nRound A 修复提示已复制。请切回 ChatGPT 粘贴发送，再覆盖保存同一个 Round A 响应文件。")
-                    except (OSError, subprocess.SubprocessError):
-                        print("\n无法自动复制 Round A 修复提示；请按错误内容修正本阶段响应。")
+                if _copy_macos_prompt_best_effort(
+                    repair_prompt, fallback="Round A 修复提示未能自动复制"
+                ):
+                    print("\nRound A 修复提示已复制。请切回 ChatGPT 粘贴发送，再覆盖保存同一个 Round A 响应文件。")
                 else:
                     print("\nRound A 修复提示：\n" + repair_prompt, flush=True)
             print(f"Round A 当前响应文件：{response_path}", flush=True)
@@ -9504,10 +9539,16 @@ def run_guided_wizard(
     _write_local(round_b_response_path, "")
     round_b_initial_signature = _response_file_signature(round_b_response_path)
 
-    if sys.platform == "darwin":
-        subprocess.run(["pbcopy"], input=round_b_prompt, text=True, check=True, timeout=5)
-        subprocess.run(["open", "-a", "TextEdit", str(round_b_response_path)], check=False, timeout=5)
-        print("\nRound A 已冻结。Round B 价格感知估值/MIE/预期差提示已复制到剪贴板；请在 ChatGPT 中发送，并保存到单独的 Round B JSON 文件。")
+    if sys.platform == "darwin" and not os.environ.get("CI"):
+        copied = _copy_macos_prompt_best_effort(
+            round_b_prompt, fallback="Round B 提示未能自动复制"
+        )
+        _launch_macos_target_best_effort(
+            ["open", "-a", "TextEdit", str(round_b_response_path)],
+            fallback=f"Round B 响应文件未能自动打开：{round_b_response_path}",
+        )
+        clipboard_note = "已复制到剪贴板" if copied else f"提示文件：{round_b_prompt_path}"
+        print(f"\nRound A 已冻结。Round B 价格感知估值/MIE/预期差提示{clipboard_note}；请在 ChatGPT 中发送，并保存到单独的 Round B JSON 文件。")
     else:
         print("\nRound B 价格感知估值/MIE/预期差提示：\n" + round_b_prompt)
     print(f"\nRound B 原始响应保存位置：\n{round_b_response_path}")
@@ -9559,12 +9600,10 @@ def run_guided_wizard(
             print(f"Round B 暂未继续：{exc}", flush=True)
             if isinstance(exc, LocalInvestmentPilotError) and not str(exc).startswith(("CHATGPT_RESPONSE_FILE_READ_FAILED", "CHATGPT_RESPONSE_FILE_NOT_FOUND")):
                 repair_prompt = _build_response_repair_prompt(original_prompt=prompt, response_path=response_path, validation_error=str(exc))
-                if sys.platform == "darwin":
-                    try:
-                        subprocess.run(["pbcopy"], input=repair_prompt, text=True, check=True, timeout=5)
-                        print("\nRound B 修复提示已复制。请切回 ChatGPT 粘贴发送，再覆盖保存同一个 Round B 响应文件。")
-                    except (OSError, subprocess.SubprocessError):
-                        print("\n无法自动复制 Round B 修复提示；请按错误内容修正本阶段响应。")
+                if _copy_macos_prompt_best_effort(
+                    repair_prompt, fallback="Round B 修复提示未能自动复制"
+                ):
+                    print("\nRound B 修复提示已复制。请切回 ChatGPT 粘贴发送，再覆盖保存同一个 Round B 响应文件。")
                 else:
                     print("\nRound B 修复提示：\n" + repair_prompt, flush=True)
             print(f"Round B 当前响应文件：{response_path}", flush=True)
