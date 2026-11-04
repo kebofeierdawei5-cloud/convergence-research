@@ -39,7 +39,7 @@ B73 分支较 main 超前 321 个提交。**本批仅在该分支上继续开发
 - **SOTP：**比较 B4 独立 Bear/Base/Bull 分部正常化归母利润与 B61/B62/B63/B68 的现价条件要求。
 - **EPS_MULTIPLE：**新增 `eps_multiple_comparison`，读取已经本地计算完成的 B60 与 B57/B58 结果，将 B4/B57 公司整体 all-items 归母稀释 EPS 与 B60 Required Return 所需终端 EPS 在相同期间、CNY/share 单位和同一利润口径下比较。
 
-EPS_MULTIPLE 对照的 fail-closed 条件：B60 计算成功、主模型族为 EPS_MULTIPLE、币种为 CNY、B57 状态为 `CALCULATED_AND_RECONCILED`、B58 的 `forecast_period_match=True`，且 B4 EPS / B60 所需 EPS 都有有效数值。B58 的期间核验覆盖 B4 forecast period、B57 forward period、主 EPS bridge period 和 EPS_MULTIPLE forecast period。估值终点日期独立展示，不得代替盈利参考期间。任何条件不满足时，差额和余量保持 UNKNOWN，不由 Round B 猜测。
+EPS_MULTIPLE 对照的 fail-closed 条件：B60 计算成功、主模型族为 EPS_MULTIPLE、币种为 CNY、B58 的 `forecast_period_match=True`，且 B4 EPS / B60 所需 EPS 都有有效数值。B57 完整正常化桥可为 `CALCULATED_AND_RECONCILED`；若历史正常化基线缺失，但 B56 前瞻利润/税率、前瞻经常与非经常税前项目、前瞻少数股东总额和正的前瞻稀释股数齐全，B57 可明确标记 `FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE`。这一部分状态只证明前瞻 all-items EPS 可复算，不代表历史正常化桥通过；B58 仍须重新核对公司范围、相同期间、相同稀释股数和税后归属调整。历史正常化 EPS / 增长率必须继续 UNKNOWN。若前瞻分母或 all-items 利润输入缺失/无效，仍完全阻断。B58 的期间核验覆盖 B4 forecast period、B57 forward period、主 EPS bridge period 和 EPS_MULTIPLE forecast period。估值终点日期独立展示，不得代替盈利参考期间。任何条件不满足时，差额和余量保持 UNKNOWN，不由 Round B 猜测。
 
 主比较使用不含分红的 B60 Required Return EPS；只有 B60 的分红状态为 `VALIDATED_DATED_CASH_FLOWS` 或 `VALIDATED_NO_FUTURE_DISTRIBUTIONS` 时，才额外展示分红调整口径。B60 Fundamental Target EPS 单独列示，不与 Required Return 混用。B57 normalized EPS 不作为 all-items 比较值；EPS_MULTIPLE 适配器自报 EPS 也不冒充 B4 独立预测。
 
@@ -117,6 +117,16 @@ B57 now separates the historical normalized-profit bridge from the forward all-i
 - B60 and B76 may use the forward all-items EPS only after B58 confirms the same-period bridge; the historical normalized EPS proxy is never substituted.
 - Missing/zero forward diluted shares or missing forward all-items profit inputs still block the forward EPS and all dependent numerical headroom.
 
+
+### B57 前瞻 all-items EPS 与历史正常化基线的独立可用性
+
+B57 不再把历史正常化归属输入缺失与前瞻 all-items EPS 计算混为一谈：
+- 若历史少数股东非经常项目份额或历史稀释股数等正常化基线输入缺失，但 B56 前瞻利润/税率、前瞻经常/非经常非经营项目、前瞻少数股东总额及正的前瞻稀释股数齐全，B57 可输出 `FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE`。
+- 该状态只提供前瞻 all-items 归母利润 / EPS；历史正常化归母利润、历史正常化 EPS、正常化 EPS 增长率与历史至前瞻的正常化利润归因全部 UNKNOWN。
+- B58 只在公司整体范围、前瞻期间、币种、稀释股数及税后归属调整与主 EPS bridge 一致时，才可使用这项前瞻 all-items EPS。
+- B60 / B76 仅继承 B58 已核对的前瞻 EPS；不以历史归属缺项补零，也不把部分桥升级为完整 B57 通过。
+- 前瞻利润、总少数股东归属、税率、期间或正稀释股数任一缺失时，B57 前瞻 EPS 仍 UNKNOWN，B76 不显示数值余量。
+
 ### SOTP：B61 → B62 → B63 → B68
 
 B76 对每个 Bear/Base/Bull 情景独立复核以下恒等式和交叉节点：
@@ -155,8 +165,8 @@ EPS_MULTIPLE 不再因早期分支返回而漏掉 payoff、thesis-break stress �
 本批新增/更新：
 - `iios_mvp/expectation_gap_comparison_v01.py`：增加 EPS_MULTIPLE 的 B4/B57 ↔ B60 Required Return EPS 比较。
 - `iios_mvp/local_investment_pilot_v01.py`：将 B60 实际结果传入 B76 并在第一屏展示数值对照。
-- `tests/test_expectation_gap_comparison_v01.py`：现有 SOTP 对照 + 16 个 EPS_MULTIPLE / 价格 / B63 部分状态 / waterfall / B68 向量 fail-closed 回归场景。
-- `tests/test_local_investment_pilot_v01.py`：增加 EPS_MULTIPLE 与 SOTP 两种第一屏报告输出测试。
+- `tests/test_expectation_gap_comparison_v01.py`：现有 SOTP 对照 + 17 个 EPS_MULTIPLE / 价格 / B63 部分状态 / waterfall / B68 向量 fail-closed 回归场景，包括通过 B58 口径核验后的前瞻-only EPS。
+- `tests/test_local_investment_pilot_v01.py`：增加 EPS_MULTIPLE 与 SOTP 两种第一屏报告测试，以及 B57 forward-only → B58 → B60 传导回归。
 - B76 本地报告一屏摘要；
 - B74/B75 Prompt 与报告表达移植；
 - 回归断言更新。
