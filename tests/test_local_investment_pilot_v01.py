@@ -6712,10 +6712,12 @@ def _b62_sotp_reconciliation_inputs():
         }
     inversion = {
         "selected_model_family": "SOTP", "currency": "CNY", "forecast_period": "2026FY",
+        "valuation_terminal_date": "2026-12-31",
         "status": "CONDITIONAL_SENSITIVITY_CALCULATED", "scenarios": b61_scenarios,
     }
     sotp = {"status": "CALCULATED", "selected_for_primary_model": True,
-            "forecast_period": "2026FY", "scenarios": sotp_scenarios}
+            "forecast_period": "2026FY", "valuation_terminal_date": "2026-12-31",
+            "scenarios": sotp_scenarios}
     operating_forecast = {
         "scope": "COMPANY_WIDE",
         "baseline_transition": {"segment_normalized_earnings_bridge": {
@@ -6856,7 +6858,7 @@ def test_b76_eps_multiple_first_screen_report_shows_reconciled_price_hurdle():
     assert "Required Return 0.10" in report
     assert "Fundamental Target 0.15" in report
     assert "B57利润÷稀释股数 PASS" in report
-    assert "主估值 EPS×P/E PASS" in report
+    assert "主适配器EPS×P/E PASS" in report
     assert "1.5 × 12 = 18 CNY/股" in report
     assert "B4/B57 all-items EPS 1.6 CNY/股" in report
     assert "Required Return 所需 EPS（未计分红）2.75 CNY/股" in report
