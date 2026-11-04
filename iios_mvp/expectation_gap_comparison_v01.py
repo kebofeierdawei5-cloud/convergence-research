@@ -606,6 +606,8 @@ def _eps_multiple_comparison(
             row["issues"].append("B57_COMPANY_WIDE_FORWARD_ALL_ITEMS_EPS_BRIDGE_NOT_RECONCILED")
         if not period_match:
             row["issues"].append("B4_B57_B58_B60_FORECAST_PERIOD_NOT_CONFIRMED_MATCH")
+        if row["b58_status"] != "MATCH":
+            row["issues"].append("B58_PRIMARY_EPS_ACCOUNTING_AND_DILUTED_SHARE_BASIS_NOT_RECONCILED")
         if str(raw.get("b57_forward_period") or "").strip().upper() != str(b60.get("forecast_period") or "").strip().upper():
             row["issues"].append("B57_FORWARD_PERIOD_DIFFERS_FROM_B60_EARNINGS_PERIOD")
         if str(b60.get("forecast_period") or "").strip().upper() in {"", "UNKNOWN"}:
