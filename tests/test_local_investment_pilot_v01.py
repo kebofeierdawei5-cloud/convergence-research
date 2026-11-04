@@ -5719,7 +5719,11 @@ def test_b56_missing_forward_tax_rate_blocks_only_the_affected_scenario():
     bridge = result["baseline_transition"]["net_profit_bridge"]
 
     assert bridge["status"] == "PARTIAL"
-    assert bridge["scenarios"]["bear"]["status"] == "CALCULATED_AND_RECONCILED"
+    assert bridge["scenarios"]["bear"]["status"] == "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+    assert bridge["scenarios"]["bear"]["forward_scenario"]["all_items_parent_attributable_net_profit_proxy_cny"] is not None
+    assert bridge["scenarios"]["bear"]["forward_scenario"]["all_items_diluted_eps_proxy_cny_per_share"] is not None
+    assert bridge["scenarios"]["bear"]["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"] is None
+    assert bridge["scenarios"]["bear"]["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] is None
     assert bridge["scenarios"]["base"]["status"] == "NOT_IDENTIFIABLE"
     assert "forward.tax_rate" in bridge["scenarios"]["base"]["missing_inputs"]
     assert bridge["scenarios"]["base"]["changes"] == {}
@@ -6231,7 +6235,7 @@ def test_b60_locally_recomputes_return_hurdle_eps_and_keeps_external_mie_unchang
     assert result["status"] == "CONDITIONAL_SENSITIVITY_CALCULATED"
     assert Decimal(row["required_return_eps_without_distributions"]) == Decimal("11.500")
     assert Decimal(row["fundamental_target_eps_without_distributions"]) == Decimal("11.500")
-    assert row["b57_eps_headroom_vs_required_return_without_distributions"] == "-1.500"
+    assert Decimal(row["b57_eps_headroom_vs_required_return_without_distributions"]) == Decimal("-1.500")
     assert row["current_price_to_primary_eps_forward_pe"] == "10"
     assert row["distribution_status"] == "VALIDATED_NO_FUTURE_DISTRIBUTIONS"
     assert result["external_mie_status_unchanged"] == "NOT_IDENTIFIABLE"
@@ -6402,7 +6406,7 @@ def test_b61_sotp_price_inversion_reconstructs_segment_pool_and_one_at_a_time_pr
     segments = {item["segment_id"]: item for item in required["segment_requirements"]}
     assert Decimal(segments["seg_a"]["one_at_a_time_required_attributable_net_profit_cny_signed"]) == Decimal("1040")
     assert Decimal(segments["seg_a"]["one_at_a_time_required_attributable_net_profit_floor_cny"]) == Decimal("1040")
-    assert segments["seg_b"]["one_at_a_time_required_attributable_net_profit_cny"] == "520"
+    assert Decimal(segments["seg_b"]["one_at_a_time_required_attributable_net_profit_cny_signed"]) == Decimal("520")
     assert segments["seg_a"]["interpretation"].startswith("ONE_SEGMENT_CHANGES_OTHERS_HELD")
     assert result["external_mie_status_unchanged"] == "NOT_IDENTIFIABLE"
     assert result["sotp_input_modified"] is False
