@@ -9247,6 +9247,31 @@ def _ask_operator_valuation_context() -> dict[str, Any]:
     }
 
 
+def _open_report_best_effort(report_path: str | Path) -> None:
+    """Open a completed report without blocking the investment workflow.
+
+    GUI launching is a convenience only: it is skipped in CI/headless runs,
+    runs asynchronously on a local macOS desktop, and never invalidates a
+    report that has already been generated.
+    """
+    if sys.platform != "darwin" or os.environ.get("CI"):
+        return
+    try:
+        subprocess.Popen(
+            ["open", str(report_path)],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(
+            f"\n报告已生成，但系统无法自动打开（{type(exc).__name__}）；"
+            f"请按路径手动打开：{report_path}",
+            flush=True,
+        )
+
+
 def run_guided_wizard(
     *,
     template_root: str | Path | None = None,
@@ -9566,8 +9591,8 @@ def run_guided_wizard(
     print("\n分析完成：")
     print(json.dumps(_safe(result), ensure_ascii=False, indent=2))
     report_path = result.get("report_path")
-    if report_path and sys.platform == "darwin":
-        subprocess.run(["open", str(report_path)], check=False, timeout=5)
+    if report_path:
+        _open_report_best_effort(report_path)
     print("\n下次分析另一个标的，只需双击同一个启动器。")
     return result
 

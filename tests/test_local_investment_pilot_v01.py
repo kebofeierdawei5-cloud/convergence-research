@@ -1095,6 +1095,8 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     import builtins
     import iios_mvp.local_investment_pilot_v01 as pilot
 
+    # The wizard's GUI convenience must never launch applications in test/CI runs.
+    monkeypatch.setenv("CI", "true")
     source_claim = "用户手动提供的 19.74；按 收盘价 15:00 处理；未从交易所或行情供应商独立核验"
     answers = iter(["山东赫达", "SZ002810", "1", "2026-10-12", "2", "0", "19.74", "2026-10-12", "1", "1", "0", "0"])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
@@ -7046,3 +7048,42 @@ def test_b76_sotp_first_screen_report_shows_waterfall_reconciliation():
     assert "step1+step2=step3 PASS" in report
     assert "step3+step4=step5 PASS" in report
     assert "B68完整B4分部向量复算step3 PASS" in report
+
+
+
+def test_report_auto_open_is_skipped_in_ci(monkeypatch):
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    monkeypatch.setenv("CI", "true")
+
+    def unexpected_popen(*_args, **_kwargs):
+        raise AssertionError("GUI launch must be skipped in CI")
+
+    monkeypatch.setattr(pilot.subprocess, "Popen", unexpected_popen)
+    pilot._open_report_best_effort("report.md")
+
+
+def test_report_auto_open_is_nonblocking_and_best_effort(monkeypatch, capsys):
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    monkeypatch.delenv("CI", raising=False)
+    calls = []
+
+    def fake_popen(args, **kwargs):
+        calls.append((args, kwargs))
+        return object()
+
+    monkeypatch.setattr(pilot.subprocess, "Popen", fake_popen)
+    pilot._open_report_best_effort("report.md")
+
+    assert len(calls) == 1
+    assert calls[0][0] == ["open", "report.md"]
+    assert calls[0][1]["start_new_session"] is True
+    assert calls[0][1]["stdin"] == pilot.subprocess.DEVNULL
+    assert calls[0][1]["stdout"] == pilot.subprocess.DEVNULL
+    assert calls[0][1]["stderr"] == pilot.subprocess.DEVNULL
+
+    def failing_popen(*_args, **_kwargs):
+        raise OSError("LaunchServices unavailable")
+
+    monkeypatch.setattr(pilot.subprocess, "Popen", failing_popen)
+    pilot._open_report_best_effort("report.md")
+    assert "报告已生成，但系统无法自动打开" in capsys.readouterr().out

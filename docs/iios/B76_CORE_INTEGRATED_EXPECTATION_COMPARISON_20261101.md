@@ -3,7 +3,7 @@
 **开发分支：** `feat/b76-core-integrated-20261101`  
 **开发基线：** B73 `faeee544238dd4b6154e2b0a7a4a53c8a88a6815`  
 **最新批次提交：** 见本分支 HEAD。  
-**状态：** 已完成代码与文档提交；未运行测试；未 Replay / CI / macOS 验收；未合并 main。
+**状态：** B76 核心代码已提交到隔离集成分支；2026-11-04 精确 HEAD 验收发现 macOS GUI 等待与 C0 分支范围两项非算术阻塞，已启动独立修复；修复后的精确 HEAD 验证待完成。未合并 main。
 
 ## 1. 为什么重建正确开发基线
 
@@ -195,6 +195,23 @@ EPS_MULTIPLE 不再因早期分支返回而漏掉 payoff、thesis-break stress �
 - 这两项是真实案例的**旧契约 fail-closed 展示验收**，不是两条数值 B76 路径已在真实案例中完成。合成数值夹具仍只用于算术回归，不冒充真实公司结果。
 - 要声称真实案例 EPS_MULTIPLE 和 SOTP 数值路径验收通过，仍分别需要补齐 B57/B58/B60-ready 的公司整体 all-items 预测包和 B61/B62/B63/B68-ready 的完整分部盈利/估值包，并保留期间、价格、利润、股数及倍数来源。
 - 在真实 B76-ready 案例包到位前，报告对缺失字段输出 UNKNOWN / NOT_IDENTIFIABLE，不通过继承旧案例数值或模型猜测补齐。
+
+## 6B. 执行超时与提案分支验收修复（2026-11-04）
+
+对精确提交 `90f444dfb98d8264b8e1f407b0fe79d280ccde63` 的工作流日志完成定位：
+
+- Ubuntu Local Investment Pilot 作业通过。
+- macOS 作业的 445 项测试中 444 项通过；唯一失败发生在向导已完成、报告已写出后，同步等待 `open report.md` 的 5 秒超时。该失败不涉及 B76 算术、Replay 对账或分析结果生成。
+- C0 Governance Hygiene 在提案分支要求 `docs/PROJECT_STATE_INDEX.md` 声明 CANONICAL，与本开发分支必须标识为 BRANCH PROPOSAL 的治理边界冲突。
+- Investment Core CI、MVP Pilot、B00-B、B2、Post-B04 Red-team、State Hygiene 等本次关联工作流通过；不能据此宣称全部验收通过。
+
+修复原则：
+
+1. 报告自动打开是 GUI 便利功能，不是投资分析成功条件。macOS 本地使用异步 `Popen`，不等待桌面应用退出；CI/无 GUI 环境跳过；启动异常只提示报告路径，不能覆盖已生成的结果。
+2. C0 的 canonical state 检查只适用于 `main` 目标 PR 和既有主线 push。非 main 提案 PR 仍执行编译和 diff 检查，但不要求其状态索引伪装为 CANONICAL。
+3. 不放宽 B76 算术/口径 fail-closed 规则，不跳过 B76 核心测试，不把 GUI 验证失败解释成计算失败。
+
+修复代码与回归测试提交后，必须重新验证 B76 算术、Legacy real-case fail-closed、Local Pilot/Replay，并确认 C0 对非 main 目标为正确 skip。真实用户 macOS 桌面操作仍需与 GitHub headless runner 区分，CI 通过不代表真实 Mac 使用验收完成。
 
 ## 7. 决策权限
 
