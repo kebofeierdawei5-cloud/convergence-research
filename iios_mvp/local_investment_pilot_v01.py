@@ -2262,11 +2262,13 @@ def _build_b62_sotp_segment_earnings_reconciliation(
     if str(local_sotp_inversion.get("forecast_period") or "").strip().upper() != str(b62.get("forecast_period") or "").strip().upper():
         result["status"] = "B61_B4_FORECAST_PERIOD_MISMATCH"
         return result
-    terminal_dates = {
-        str(local_sotp_inversion.get("valuation_terminal_date") or "").strip(),
-        str(sotp_valuation.get("valuation_terminal_date") or "").strip(),
-    }
-    if not all(terminal_dates) or len(terminal_dates) != 1:
+    b61_terminal_date = str(local_sotp_inversion.get("valuation_terminal_date") or "").strip()
+    sotp_terminal_date = str(sotp_valuation.get("valuation_terminal_date") or "").strip()
+    if not b61_terminal_date or not sotp_terminal_date:
+        result["status"] = "B61_SOTP_TERMINAL_DATE_NOT_IDENTIFIABLE"
+        result["valuation_terminal_date"] = "UNKNOWN"
+        return result
+    if b61_terminal_date != sotp_terminal_date:
         result["status"] = "B61_SOTP_TERMINAL_DATE_MISMATCH"
         result["valuation_terminal_date"] = "UNKNOWN"
         return result
