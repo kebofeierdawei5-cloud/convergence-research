@@ -5775,6 +5775,7 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
             if local_row.get("b57_minus_primary_terminal_value_effect") is not None:
                 lines.append(
                     f"    - B59 差异传导至终端每股价值：{local_row.get('b57_minus_primary_terminal_value_effect')} CNY/股；"
+                    f"{'仅为差异算术诊断，不是 Required Return 余量' if local_row.get('b57_minus_primary_terminal_value_effect_is_diagnostic_only') else '与主 EPS 同口径的差异展示'}；"
                     f"分红状态 {local_row.get('distribution_status', 'UNKNOWN')}；"
                     f"可比性提示 {'、'.join(local_row.get('comparability_flags') or []) or '无额外提示'}。"
                 )
