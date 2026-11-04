@@ -108,6 +108,15 @@ B76 对每个 Bear/Base/Bull 情景复核：
 
 任一项算术复核失败时，该情景返回 `ARITHMETIC_RECONCILIATION_MISMATCH`，保留输入来源值供审计，但不输出预测 EPS 与所需 EPS 的数值差额/余量。期间、分母、单位或数值缺失则保持 `NOT_IDENTIFIABLE`。EPS 余量均以 CNY/share 表示，估值终点日期独立展示，不与盈利期间互换。
 
+### B57 historical / forward EPS partial semantics
+
+B57 now separates the historical normalized-profit bridge from the forward all-items parent-attributable EPS calculation. When historical one-off NCI attribution or another historical normalization input is missing, but B56 forward profit/tax, forward recurring/non-recurring non-operating components, forward total NCI and positive forward diluted shares are complete, B57 may return `FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE`. In this state:
+- Forward all-items parent-attributable profit and diluted EPS are calculated explicitly.
+- Historical normalized parent profit/EPS, normalized EPS growth and historical-to-forward normalized profit attribution remain UNKNOWN.
+- B58 may compare only that forward all-items EPS with the primary EPS on identical scope, period, currency, share denominator and tax attribution basis.
+- B60 and B76 may use the forward all-items EPS only after B58 confirms the same-period bridge; the historical normalized EPS proxy is never substituted.
+- Missing/zero forward diluted shares or missing forward all-items profit inputs still block the forward EPS and all dependent numerical headroom.
+
 ### SOTP：B61 → B62 → B63 → B68
 
 B76 对每个 Bear/Base/Bull 情景独立复核以下恒等式和交叉节点：
