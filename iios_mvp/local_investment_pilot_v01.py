@@ -5844,6 +5844,7 @@ def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
                     continue
                 lines.append(
                     f"  - {scenario_name.upper()} 算术核对：B57利润÷稀释股数 {arithmetic.get('b57_profit_divided_by_shares', 'UNKNOWN')}；"
+                    f"B58主EPS口径/稀释股数 {eps_row.get('b58_status', 'UNKNOWN')}；"
                     f"主适配器EPS×P/E {arithmetic.get('primary_eps_times_pe', 'UNKNOWN')}；"
                     f"Required Return EPS {arithmetic.get('required_return_eps', 'UNKNOWN')}；"
                     f"15%目标EPS {arithmetic.get('fundamental_target_eps', 'UNKNOWN')}；"
