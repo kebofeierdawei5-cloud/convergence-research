@@ -256,7 +256,7 @@ def _eps_multiple_inputs():
         b60["scenarios"][name] = {
             "status": "CALCULATED_CONDITIONAL",
             "b57_status": "CALCULATED_AND_RECONCILED",
-            "b58_status": "EPS_MISMATCH",
+            "b58_status": "MATCH",
             "b58_forecast_period_match": True,
             "b57_forward_period": "2027FY",
             "b57_all_items_parent_attributable_net_profit_proxy_cny": profit,
@@ -545,3 +545,23 @@ def test_b76_eps_multiple_accepts_reconciled_forward_eps_with_unknown_history():
     assert comparison["status"] == "CONDITIONAL_PRICE_COMPARISON_CALCULATED"
     assert comparison["scenarios"]["base"]["status"] == "CALCULATED"
     assert comparison["scenarios"]["base"]["arithmetic_reconciliation"]["status"] == "PASS"
+
+
+def test_b76_eps_multiple_requires_b58_share_and_accounting_basis_match():
+    local, b60 = _eps_multiple_inputs()
+    b60["scenarios"]["base"]["b58_status"] = "SHARE_DENOMINATOR_MISMATCH"
+    result = build_expectation_gap_comparison(
+        local_sotp_recalculation=local,
+        return_metrics=None,
+        price_input={"price": "30"},
+        forecast_valuation={},
+        thesis_break_stress_review=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+        local_eps_multiple_recalculation=b60,
+    )
+    base = result["eps_multiple_comparison"]["scenarios"]["base"]
+    assert base["status"] == "NOT_IDENTIFIABLE"
+    assert "B58_PRIMARY_EPS_ACCOUNTING_AND_DILUTED_SHARE_BASIS_NOT_RECONCILED" in base["issues"]
+    assert base["required_return"] == {}
+
+
