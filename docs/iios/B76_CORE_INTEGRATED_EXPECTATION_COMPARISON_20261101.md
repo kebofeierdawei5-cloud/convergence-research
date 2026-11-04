@@ -188,13 +188,13 @@ EPS_MULTIPLE 不再因早期分支返回而漏掉 payoff、thesis-break stress �
 
 ## 6A. 真实案例覆盖边界
 
-已检查仓库 `examples/real_cases`。目前存在的 002001、002422、300750 案例文件属于既有/前序输入链，不是已完成 B4/B57/B58/B60 与 B61/B62/B63/B68 的当前 local-pilot 一体化输入包。现有真实公司端到端测试也没有一份已经完成、且同时具备 EPS_MULTIPLE 与 SOTP 两种主估值族的 B76-ready 真实输入。
+已检查仓库 `examples/real_cases`。002001、002422 案例文件仍是早期输入契约，不具备 B4/B57/B58/B60 与 B61/B62/B63/B68 当前 local-pilot 一体化计算所需的全链字段。已新增 `tests/test_b76_legacy_real_case_readiness.py`，直接读取这两份真实公司旧案例，验证：
 
-因此：
-- 本轮新增的 EPS / SOTP 算术测试使用明确标记的合成数值夹具，不把它们报告为真实公司结果；
-- 现有两轮研究 / bundle / Replay 集成测试仍保留，但不能替代 B76-ready 真实公司样例；
-- 后续必须分别补一份可复算的 EPS_MULTIPLE 实际公司包和 SOTP 实际公司包，才可声称真实案例双路径验收通过；
-- 在真实案例包到位前，报告对缺失字段应输出 UNKNOWN / NOT_IDENTIFIABLE，不通过继承旧案例数值或模型猜测补齐。
+- 新和成 002001 的历史 normalized EPS/P/E 情景不会被误当作 B57 all-items EPS + B58 同口径对账 + B60 现价反推；B76 明确 `BLOCKED_BY_B60_RESULT_MISSING`，不显示 EPS 差额/余量。
+- 科伦药业 002422 的历史 SOTP 每股估值组件不会被误当作分部归母盈利、选定 P/E 和 B61/B62/B63 价值池反推；缺 B61 参考反推时明确 `PRICE_REFERENCE_NOT_IDENTIFIABLE`，不显示价值池或每股余量。
+- 这两项是真实案例的**旧契约 fail-closed 展示验收**，不是两条数值 B76 路径已在真实案例中完成。合成数值夹具仍只用于算术回归，不冒充真实公司结果。
+- 要声称真实案例 EPS_MULTIPLE 和 SOTP 数值路径验收通过，仍分别需要补齐 B57/B58/B60-ready 的公司整体 all-items 预测包和 B61/B62/B63/B68-ready 的完整分部盈利/估值包，并保留期间、价格、利润、股数及倍数来源。
+- 在真实 B76-ready 案例包到位前，报告对缺失字段输出 UNKNOWN / NOT_IDENTIFIABLE，不通过继承旧案例数值或模型猜测补齐。
 
 ## 7. 决策权限
 
