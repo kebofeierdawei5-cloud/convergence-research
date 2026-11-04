@@ -3855,6 +3855,7 @@ def test_b4_report_preserves_numeric_zero_in_operating_bridge_fields():
         "net_profit_cny": 0,
         "cash_capex_cny": 0,
         "change_working_capital_cny": 0,
+        "effective_change_working_capital_cny": 0,
         "unlevered_fcf_proxy_cny": 0,
     }
     forecast = {
@@ -3887,7 +3888,7 @@ def test_b4_report_preserves_numeric_zero_in_operating_bridge_fields():
     assert "- 产量 / 销量：0 / 0 吨" in report
     assert "- 收入：0；变动成本：0；扣变动成本贡献：0" in report
     assert "- EBITDA / EBIT / 税前利润 / 净利润：0 / 0 / 0 / 0" in report
-    assert "- 资本开支 / 营运资金变动 / 自由现金流代理：0 / 0 / 0" in report
+    assert "- 资本开支 / 声明营运资金变动 / 纳入 FCF 的有效营运资金变动 / 自由现金流代理：0 / 0 / 0 / 0" in report
     assert "未应用 B5 增量的每股估值情景终值：0 CNY" in report
 
 
@@ -3938,7 +3939,7 @@ def test_b4_report_renders_missing_operating_bridge_fields_as_unknown():
     assert "- 产量 / 销量：UNKNOWN / UNKNOWN 吨" in report
     assert "- 收入：UNKNOWN；变动成本：UNKNOWN；扣变动成本贡献：UNKNOWN" in report
     assert "- EBITDA / EBIT / 税前利润 / 净利润：UNKNOWN / UNKNOWN / UNKNOWN / UNKNOWN" in report
-    assert "- 资本开支 / 营运资金变动 / 自由现金流代理：UNKNOWN / UNKNOWN / UNKNOWN" in report
+    assert "- 资本开支 / 声明营运资金变动 / 纳入 FCF 的有效营运资金变动 / 自由现金流代理：UNKNOWN / UNKNOWN / UNKNOWN / UNKNOWN" in report
     assert "未应用 B5 增量的每股估值情景终值：UNKNOWN CNY" in report
 
 def test_b5_incomplete_counterfactual_does_not_block_confirmed_project_inclusive_primary_valuation():
