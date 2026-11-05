@@ -307,7 +307,8 @@
     "q4_forecast": {
       "forecast_period": "2026FY",
       "actual_period": "2026Q1-Q3",
-      "scenarios": {}
+      "scenarios": {},
+      "input_template_path": "examples/real_cases/RC-CN-A-002001-20261105_q4_scenario_template.json"
     }
   }
 }

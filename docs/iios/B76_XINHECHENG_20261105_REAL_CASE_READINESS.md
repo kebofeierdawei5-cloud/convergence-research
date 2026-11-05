@@ -166,3 +166,8 @@ Q4 接口要求实际期间严格为 `YYYYQ1-Q3`、预测期间为同一年度 `
 条件性 Q4 输出现在保留每项假设原始值、单位、分类、basis 与引用；年度加权平均稀释股数单独回显。真实案例仍未提供 Q4 假设和年度稀释股数，所以真实 Q4 / FY EPS 维持 UNKNOWN / NOT_PROVIDED。测试用合成值不构成新和成预测。
 
 一个无 Job 的独立 P0 incident workflow failure 与本批改动路径无关。真实用户 Mac 双轮操作 + 独立 Replay 仍 OPEN / NOT VERIFIED。
+
+
+## 14. Q4 情景填写模板
+
+机器可读模板：`examples/real_cases/RC-CN-A-002001-20261105_q4_scenario_template.json`。模板按 Bear/Base/Bull 预置 17 个报表金额/NCI 行项目和独立年度加权平均稀释股数对象，但所有数字和 basis 初始为空。将模板接入金额桥时会被明确阻断，不能将空白理解为零。填写完成后，每项必须提供 ANALYST_ASSUMPTION、单位和可识别依据；年度股数不得从两位小数 EPS 反推。

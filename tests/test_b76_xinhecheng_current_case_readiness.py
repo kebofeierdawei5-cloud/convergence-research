@@ -229,3 +229,29 @@ def test_q4_financial_statement_scenarios_require_exact_bear_base_bull_set():
     bridge = _build_financial_statement_amount_bridge(raw)
     assert bridge["forecast_status"] == "BLOCKED_SCENARIO_SET_INCOMPLETE_OR_INVALID"
     assert bridge["forecast_scenarios"] == {}
+
+
+
+def test_xinhecheng_q4_input_template_is_complete_in_shape_but_numerically_blocked():
+    template_path = ROOT / "examples" / "real_cases" / "RC-CN-A-002001-20261105_q4_scenario_template.json"
+    template = json.loads(template_path.read_text(encoding="utf-8"))
+    from iios_mvp.operating_driver_forecast_v01 import _build_financial_statement_amount_bridge
+
+    assert set(template["scenarios"]) == {"bear", "base", "bull"}
+    for scenario in template["scenarios"].values():
+        assert len(scenario["q4_line_items"]) == 17
+        assert all(row["value"] is None for row in scenario["q4_line_items"].values())
+        assert scenario["annual_weighted_average_diluted_shares"]["value"] is None
+
+    raw = _case()["financial_statement_amount_bridge"]
+    raw["q4_forecast"]["scenarios"] = template["scenarios"]
+    bridge = _build_financial_statement_amount_bridge(raw)
+    assert bridge["forecast_status"] == "NOT_IDENTIFIABLE_OR_BLOCKED"
+    assert all(
+        row["status"] == "BLOCKED_Q4_ASSUMPTIONS_INCOMPLETE"
+        for row in bridge["forecast_scenarios"].values()
+    )
+    assert all(
+        row["conditional_fy_all_items_parent_attributable_eps_cny_per_share"] is None
+        for row in bridge["forecast_scenarios"].values()
+    )

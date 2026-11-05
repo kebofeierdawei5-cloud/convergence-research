@@ -300,3 +300,8 @@ Q4 条件金额桥仅接受同一年度 `YYYYQ1-Q3` 实际 + `YYYYFY` 前瞻，�
 - 精确 HEAD 的 Local Pilot / B76 / Xinhecheng / Q4 bridge / Replay 测试 Ubuntu 与 macOS 各 **461 passed**（4.09s / 5.93s）；15/15 相关工作流 success。
 - 真实案例没有 Q4 假设或年度稀释股数假设，因此无真实 FY2026 EPS；Q4 测试值只验证算术与 fail-closed 规则。
 - 一个独立 P0 incident push workflow failure 没有 Job，已单列，不属于 B76 测试失败。真实 Mac 全流程 + 独立 Replay 仍未验收。未合并 main。
+
+
+## 6K. 新和成 Q4 操作员输入模板
+
+新增 `examples/real_cases/RC-CN-A-002001-20261105_q4_scenario_template.json`，预置 Bear/Base/Bull 每套 17 个 Q4 报表行项目（含少数股东税后利润）及独立年度加权平均稀释股数。模板数字与依据全部为空；新增回归验证其接入金额桥后三个情景均 BLOCKED 且不输出条件 EPS。它降低 JSON 结构准备成本，不提供任何预测数字。
