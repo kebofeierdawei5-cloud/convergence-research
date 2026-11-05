@@ -2483,8 +2483,8 @@ def _build_financial_statement_amount_bridge(raw: Any) -> dict[str, Any]:
     elif actual_period not in periods or periods[actual_period].get("status") != "RECONCILED_REPORTED_ACTUAL":
         forecast_status = "BLOCKED_ACTUAL_PERIOD_NOT_RECONCILED"
     else:
-        actual_year_match = re.fullmatch(r"(\\d{4})Q1-Q3", actual_period)
-        forecast_year_match = re.fullmatch(r"(\\d{4})FY", forecast_period)
+        actual_year_match = re.fullmatch(r"(\d{4})Q1-Q3", actual_period)
+        forecast_year_match = re.fullmatch(r"(\d{4})FY", forecast_period)
         if (
             actual_year_match is None
             or forecast_year_match is None
