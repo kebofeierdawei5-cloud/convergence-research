@@ -19,6 +19,8 @@ on:
       - "tests/test_expectation_gap_comparison_v01.py"
       - "tests/test_sotp_valuation_gap_attribution_v01.py"
       - "tests/test_b76_legacy_real_case_readiness.py"
+      - "examples/real_cases/RC-CN-A-002001-20261105_b76_readiness.json"
+      - "tests/test_b76_xinhecheng_current_case_readiness.py"
       - "tests/test_local_investment_pilot_v01.py"
       - ".github/workflows/iios_local_investment_pilot_v01.yml"
       - "docs/iios/LOCAL_INVESTMENT_PILOT_V01_GUIDE_20261011.md"
@@ -42,6 +44,8 @@ on:
       - "tests/test_expectation_gap_comparison_v01.py"
       - "tests/test_sotp_valuation_gap_attribution_v01.py"
       - "tests/test_b76_legacy_real_case_readiness.py"
+      - "examples/real_cases/RC-CN-A-002001-20261105_b76_readiness.json"
+      - "tests/test_b76_xinhecheng_current_case_readiness.py"
       - "tests/test_local_investment_pilot_v01.py"
       - ".github/workflows/iios_local_investment_pilot_v01.yml"
       - "docs/iios/LOCAL_INVESTMENT_PILOT_V01_GUIDE_20261011.md"
@@ -76,7 +80,7 @@ jobs:
       - name: Validate local-main updater syntax
         run: bash -n tools/iios_update_local_main_v01.sh
       - name: Run B76 arithmetic, real-case readiness, local pilot and Replay acceptance tests
-        run: PYTHONPATH=. python -m pytest -q tests/test_expectation_gap_comparison_v01.py tests/test_sotp_valuation_gap_attribution_v01.py tests/test_b76_legacy_real_case_readiness.py tests/test_local_investment_pilot_v01.py tests/test_local_run_replay_acceptance_v01.py
+        run: PYTHONPATH=. python -m pytest -q tests/test_expectation_gap_comparison_v01.py tests/test_sotp_valuation_gap_attribution_v01.py tests/test_b76_legacy_real_case_readiness.py tests/test_local_investment_pilot_v01.py tests/test_b76_xinhecheng_current_case_readiness.py tests/test_local_run_replay_acceptance_v01.py
       - name: Check diff formatting
         run: git diff --check
 
@@ -107,6 +111,6 @@ jobs:
       - name: Compile the IIOS package
         run: python -m compileall -q iios_mvp
       - name: Run B76 arithmetic, real-case readiness, local pilot and Replay acceptance tests on macOS
-        run: PYTHONPATH=. python -m pytest -q tests/test_expectation_gap_comparison_v01.py tests/test_sotp_valuation_gap_attribution_v01.py tests/test_b76_legacy_real_case_readiness.py tests/test_local_investment_pilot_v01.py tests/test_local_run_replay_acceptance_v01.py
+        run: PYTHONPATH=. python -m pytest -q tests/test_expectation_gap_comparison_v01.py tests/test_sotp_valuation_gap_attribution_v01.py tests/test_b76_legacy_real_case_readiness.py tests/test_local_investment_pilot_v01.py tests/test_b76_xinhecheng_current_case_readiness.py tests/test_local_run_replay_acceptance_v01.py
       - name: Check diff formatting
         run: git diff --check
