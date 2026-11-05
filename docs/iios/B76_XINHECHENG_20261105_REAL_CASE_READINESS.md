@@ -117,3 +117,14 @@ B4 可选输入节点 `financial_statement_amount_bridge` 已加入 `operating_d
 真实案例 2025FY 与 2026Q1-Q3 均在 CNY 1 容差内对账。Q4 2026 情景目前没有任何输入，前瞻状态明确为 `Q4_SCENARIOS_NOT_PROVIDED`，不输出 FY2026 预测或 EPS。
 
 该金额桥不推导产品销量、净 ASP、单位变动成本，不修改 B55/B56/B57/B58/B60，不创建正式 Forecast Admission，也不改变 MIE、估值或决策权限。
+
+
+## 8. 本批代码交付与验收状态（2026-11-05）
+
+- B4 可选的 `financial_statement_amount_bridge` 已实现并接入经营驱动输出与本地报告。
+- 2025FY 和 2026Q1-Q3 的真实报表金额行项目在 CNY 1 容差内复算闭合。
+- 457 项 Local Pilot / B76 / 真实案例 / Replay 组合测试在 Ubuntu 与 macOS 分别通过；15 个相关工作流全部成功。
+- 一项独立 P0 incident workflow 有 failure 记录但没有 Job；其监控路径不是本批改动，故不计入 B76 失败。
+- 用户真实 Mac 双轮操作 + Replay 仍未验收；Q4 2026 情景、操作员现价、真实公司前瞻 EPS 分母均未提供。B55/B56/B57/B58/B60/MIE 状态不升级。
+
+下一批合理顺序：先定义并审查新和成 2026Q4 情景假设输入的最小清单（营业收入、营业成本、期间费用、财务费用、其他收益/投资/公允价值/减值/营业外与所得税、少数股东损益），再把每项作为明确的 ANALYST_ASSUMPTION 接入 FY2026；年度稀释加权平均股数需要单独来源或单独标成假设。未取得这些输入前，不生成 FY EPS 或 B60 现价反推。

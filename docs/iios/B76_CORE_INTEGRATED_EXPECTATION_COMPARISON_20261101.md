@@ -247,3 +247,15 @@ EPS_MULTIPLE 不再因早期分支返回而漏掉 payoff、thesis-break stress �
 新增可选输入 `financial_statement_amount_bridge`，在经营驱动结果中单独输出并在本地报告展示。对 2025FY 与 2026Q1-Q3 报告行项目按原始符号复算营业总成本、营业利润、利润总额、所得税后合并净利润及归母/NCI 分配；容差 CNY 1。
 
 此桥只证明报告金额的算术闭合，不把营业成本转化为单位变动成本，不取代 B55 的物理量价归因。缺少 Q4 情景时前瞻状态保持 `Q4_SCENARIOS_NOT_PROVIDED`，不会估算 FY2026 EPS。原 B55/B56/B57/B58/B60、MIE 和 Decision gate 保持不变。
+
+
+## 6E. 财报金额桥代码与精确 HEAD 验收（2026-11-05）
+
+代码提交：`7470dd37a55b619171f3b3925491ebe13b78ca30`。
+
+- 在 `operating_driver_forecast_v01.py` 中新增可选 B4 输出 `financial_statement_amount_bridge`；本地报告单独展示，不与 B55 Shapley 量价成本归因混合。
+- 真实 2025FY 审计年报、2026Q1-Q3 未审计三季报分别对账总营业成本、营业利润、利润总额、合并净利润和归母/NCI 分配。每期所有残差均不超过 CNY 1。
+- 缺报表必填行项目时返回 `BLOCKED_REQUIRED_REPORTED_LINE_ITEMS_MISSING`；不会以 0 补齐，也不会将营业成本改标为单位变动成本。
+- 当前没有 Q4 2026 Bear/Base/Bull 输入，输出 `Q4_SCENARIOS_NOT_PROVIDED`；没有生成 FY2026 EPS、B57/B58/MIE、B60 或投资决策。
+
+**精确 HEAD 验收：** Local Pilot / B76 / Xinhecheng / Replay 组合测试在 Ubuntu 与 macOS 各 **457 passed**（4.18s / 5.04s）；15/15 相关工作流 success。一个无 Job 的 P0 incident workflow failure 单列记录，不属于本批路径变更或 B76 验收测试。真实用户 Mac 完整双轮 + 独立 Replay 仍 OPEN / NOT VERIFIED。未合并 main。
