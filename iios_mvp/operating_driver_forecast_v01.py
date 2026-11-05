@@ -2195,6 +2195,163 @@ def _financial_statement_amount_bridge_not_provided(status: str = "NOT_PROVIDED"
     }
 
 
+def _financial_statement_analyst_assumption(raw: Any, *, field: str, unit: str) -> Decimal:
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"{field}_TYPED_ANALYST_ASSUMPTION_REQUIRED")
+    if str(raw.get("unit") or "").strip().lower() != unit.lower():
+        raise ValueError(f"{field}_UNIT_MISMATCH")
+    if str(raw.get("data_class") or "").strip().upper() != "ANALYST_ASSUMPTION":
+        raise ValueError(f"{field}_DATA_CLASS_MUST_BE_ANALYST_ASSUMPTION")
+    if not _is_identifiable_basis(raw.get("basis")):
+        raise ValueError(f"{field}_BASIS_NOT_IDENTIFIABLE")
+    try:
+        value = Decimal(str(raw.get("value")))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError(f"{field}_MUST_BE_NUMERIC") from exc
+    if not value.is_finite():
+        raise ValueError(f"{field}_MUST_BE_FINITE")
+    return value
+
+
+def _build_q4_financial_statement_scenario(
+    raw_scenario: Any,
+    *,
+    actual_ytd: Mapping[str, Any],
+    forecast_period: str,
+    scenario_name: str,
+) -> dict[str, Any]:
+    if not isinstance(raw_scenario, Mapping):
+        return {
+            "scenario": scenario_name,
+            "status": "BLOCKED_Q4_SCENARIO_MISSING",
+            "missing_inputs": ["scenario_object"],
+            "issues": [],
+            "conditional_fy_all_items_parent_attributable_eps_cny_per_share": None,
+            "formal_forecast_admission_created": False,
+            "decision_authority": False,
+        }
+    actual_line_items = actual_ytd.get("reported_line_items_cny")
+    reported_ytd = actual_ytd.get("reported_totals_cny")
+    if not isinstance(actual_line_items, Mapping) or not isinstance(reported_ytd, Mapping):
+        return {
+            "scenario": scenario_name,
+            "status": "BLOCKED_ACTUAL_YTD_NOT_RECONCILED",
+            "missing_inputs": ["RECONCILED_ACTUAL_YTD_LINE_ITEMS_AND_TOTALS"],
+            "issues": [],
+            "conditional_fy_all_items_parent_attributable_eps_cny_per_share": None,
+            "formal_forecast_admission_created": False,
+            "decision_authority": False,
+        }
+
+    q4_raw = raw_scenario.get("q4_line_items")
+    q4_raw = q4_raw if isinstance(q4_raw, Mapping) else {}
+    required_q4 = list(_FINANCIAL_STATEMENT_FIELDS) + ["minority_interest_net_profit_after_tax"]
+    missing = [f"q4_line_items.{field}" for field in required_q4 if q4_raw.get(field) is None]
+    shares_raw = raw_scenario.get("annual_weighted_average_diluted_shares")
+    if shares_raw is None:
+        missing.append("annual_weighted_average_diluted_shares")
+    if missing:
+        return {
+            "scenario": scenario_name,
+            "status": "BLOCKED_Q4_ASSUMPTIONS_INCOMPLETE",
+            "missing_inputs": sorted(set(missing)),
+            "issues": [],
+            "conditional_fy_all_items_parent_attributable_eps_cny_per_share": None,
+            "formal_forecast_admission_created": False,
+            "decision_authority": False,
+        }
+    try:
+        q4_values = {
+            field: _financial_statement_analyst_assumption(
+                q4_raw[field], field=f"{scenario_name.upper()}_Q4_{field}", unit="CNY"
+            )
+            for field in required_q4
+        }
+        annual_shares = _financial_statement_analyst_assumption(
+            shares_raw,
+            field=f"{scenario_name.upper()}_ANNUAL_WEIGHTED_AVERAGE_DILUTED_SHARES",
+            unit="shares",
+        )
+        if annual_shares <= 0:
+            raise ValueError("ANNUAL_WEIGHTED_AVERAGE_DILUTED_SHARES_MUST_BE_POSITIVE")
+    except ValueError as exc:
+        return {
+            "scenario": scenario_name,
+            "status": "INVALID_Q4_ANALYST_ASSUMPTION",
+            "missing_inputs": [],
+            "issues": [str(exc)],
+            "conditional_fy_all_items_parent_attributable_eps_cny_per_share": None,
+            "formal_forecast_admission_created": False,
+            "decision_authority": False,
+        }
+
+    q4_items = {field: q4_values[field] for field in _FINANCIAL_STATEMENT_FIELDS}
+    q4_cost = sum((q4_items[field] for field in _FINANCIAL_STATEMENT_COST_FIELDS), Decimal("0"))
+    q4_operating_profit = (
+        q4_items["revenue"] - q4_cost
+        + sum((q4_items[field] for field in _FINANCIAL_STATEMENT_OPERATING_ADJUSTMENTS), Decimal("0"))
+    )
+    q4_pbt = q4_operating_profit + q4_items["non_operating_income"] - q4_items["non_operating_expense"]
+    q4_net_profit = q4_pbt - q4_items["income_tax_expense"]
+    q4_nci = q4_values["minority_interest_net_profit_after_tax"]
+    q4_parent = q4_net_profit - q4_nci
+
+    fy_items = {
+        field: Decimal(str(actual_line_items[field])) + q4_items[field]
+        for field in _FINANCIAL_STATEMENT_FIELDS
+    }
+    fy_cost = sum((fy_items[field] for field in _FINANCIAL_STATEMENT_COST_FIELDS), Decimal("0"))
+    fy_operating_profit = (
+        fy_items["revenue"] - fy_cost
+        + sum((fy_items[field] for field in _FINANCIAL_STATEMENT_OPERATING_ADJUSTMENTS), Decimal("0"))
+    )
+    fy_pbt = fy_operating_profit + fy_items["non_operating_income"] - fy_items["non_operating_expense"]
+    fy_net_profit = fy_pbt - fy_items["income_tax_expense"]
+    fy_nci = Decimal(str(reported_ytd["minority_interest_net_profit_after_tax"])) + q4_nci
+    fy_parent = fy_net_profit - fy_nci
+    fy_eps = fy_parent / annual_shares
+    ownership_residual = fy_parent + fy_nci - fy_net_profit
+
+    return {
+        "scenario": scenario_name,
+        "status": "CONDITIONAL_ANALYST_ASSUMPTION_CALCULATED",
+        "data_class": "ANALYST_ASSUMPTION",
+        "forecast_period": forecast_period,
+        "actual_base_period": actual_ytd.get("period"),
+        "q4_calculated_totals_cny": {
+            "total_operating_cost": format(q4_cost, "f"),
+            "operating_profit": format(q4_operating_profit, "f"),
+            "profit_before_tax": format(q4_pbt, "f"),
+            "consolidated_net_profit": format(q4_net_profit, "f"),
+            "parent_attributable_net_profit": format(q4_parent, "f"),
+            "minority_interest_net_profit_after_tax": format(q4_nci, "f"),
+        },
+        "fy_calculated_totals_cny": {
+            "revenue": format(fy_items["revenue"], "f"),
+            "total_operating_cost": format(fy_cost, "f"),
+            "operating_profit": format(fy_operating_profit, "f"),
+            "profit_before_tax": format(fy_pbt, "f"),
+            "income_tax_expense": format(fy_items["income_tax_expense"], "f"),
+            "consolidated_net_profit": format(fy_net_profit, "f"),
+            "parent_attributable_net_profit": format(fy_parent, "f"),
+            "minority_interest_net_profit_after_tax": format(fy_nci, "f"),
+        },
+        "annual_weighted_average_diluted_shares": format(annual_shares, "f"),
+        "annual_weighted_average_diluted_shares_data_class": "ANALYST_ASSUMPTION",
+        "conditional_fy_all_items_parent_attributable_eps_cny_per_share": format(fy_eps, "f"),
+        "ownership_reconciliation_residual_cny": format(ownership_residual, "f"),
+        "limitations": [
+            "Q1-Q3 are reported actuals; every Q4 line item and full-year weighted-average diluted share count is an analyst assumption.",
+            "This is conditional all-items EPS, not normalized EPS, issuer guidance, formal B57 admission or an EPS_MULTIPLE primary EPS match.",
+            "No B55 physical volume/ASP/unit variable cost attribution is inferred.",
+            "No B58/B60/MIE/valuation/Decision authority is created.",
+        ],
+        "formal_evidence_pit_admission_created": False,
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
+    }
+
+
 def _build_financial_statement_amount_bridge(raw: Any) -> dict[str, Any]:
     """Reconcile reported income-statement amounts without pretending to have B55 physical drivers."""
     if not isinstance(raw, Mapping):
@@ -2294,6 +2451,7 @@ def _build_financial_statement_amount_bridge(raw: Any) -> dict[str, Any]:
                 "profit_before_tax": format(pbt, "f"),
                 "consolidated_net_profit": format(consolidated_np, "f"),
             },
+            "reported_line_items_cny": {key: format(value, "f") for key, value in values.items()},
             "reported_totals_cny": {key: format(value, "f") for key, value in reported.items()},
             "reconciliation_residuals_cny": {key: format(value, "f") for key, value in residuals.items()},
             "failed_reconciliations": failed,
@@ -2316,13 +2474,40 @@ def _build_financial_statement_amount_bridge(raw: Any) -> dict[str, Any]:
         actual_status = "PARTIAL_OR_BLOCKED"
 
     q4 = raw.get("q4_forecast")
-    q4_scenarios = q4.get("scenarios") if isinstance(q4, Mapping) and isinstance(q4.get("scenarios"), Mapping) else {}
-    forecast_status = "Q4_SCENARIOS_NOT_PROVIDED" if not q4_scenarios else "Q4_SCENARIO_INPUTS_PENDING_IMPLEMENTATION"
+    q4_scenarios_raw = q4.get("scenarios") if isinstance(q4, Mapping) and isinstance(q4.get("scenarios"), Mapping) else {}
+    forecast_period = str(q4.get("forecast_period") or "UNKNOWN").strip().upper() if isinstance(q4, Mapping) else "UNKNOWN"
+    actual_period = str(q4.get("actual_period") or "").strip().upper() if isinstance(q4, Mapping) else ""
+    forecast_scenarios: dict[str, Any] = {}
+    if not q4_scenarios_raw:
+        forecast_status = "Q4_SCENARIOS_NOT_PROVIDED"
+    elif actual_period not in periods or periods[actual_period].get("status") != "RECONCILED_REPORTED_ACTUAL":
+        forecast_status = "BLOCKED_ACTUAL_PERIOD_NOT_RECONCILED"
+    else:
+        for scenario_name in SCENARIOS:
+            forecast_scenarios[scenario_name] = _build_q4_financial_statement_scenario(
+                q4_scenarios_raw.get(scenario_name),
+                actual_ytd=periods[actual_period],
+                forecast_period=forecast_period,
+                scenario_name=scenario_name,
+            )
+        scenario_statuses = [
+            str((forecast_scenarios.get(name) or {}).get("status") or "UNKNOWN")
+            for name in SCENARIOS
+        ]
+        if all(status == "CONDITIONAL_ANALYST_ASSUMPTION_CALCULATED" for status in scenario_statuses):
+            forecast_status = "CONDITIONAL_ANALYST_SCENARIOS_CALCULATED"
+        elif any(status == "CONDITIONAL_ANALYST_ASSUMPTION_CALCULATED" for status in scenario_statuses):
+            forecast_status = "PARTIAL"
+        else:
+            forecast_status = "NOT_IDENTIFIABLE_OR_BLOCKED"
+
     overall = (
         "ACTUALS_RECONCILED_FORECAST_NOT_PROVIDED"
-        if actual_status == "ALL_ACTUAL_PERIODS_RECONCILED" and not q4_scenarios
-        else "ACTUALS_RECONCILED_FORECAST_INPUT_PENDING"
-        if actual_status == "ALL_ACTUAL_PERIODS_RECONCILED"
+        if actual_status == "ALL_ACTUAL_PERIODS_RECONCILED" and forecast_status == "Q4_SCENARIOS_NOT_PROVIDED"
+        else "ACTUALS_RECONCILED_WITH_CONDITIONAL_FORECAST"
+        if actual_status == "ALL_ACTUAL_PERIODS_RECONCILED" and forecast_status == "CONDITIONAL_ANALYST_SCENARIOS_CALCULATED"
+        else "ACTUALS_RECONCILED_FORECAST_PARTIAL"
+        if actual_status == "ALL_ACTUAL_PERIODS_RECONCILED" and forecast_status == "PARTIAL"
         else "ACTUALS_RECONCILIATION_FAILED"
         if actual_status == "RECONCILIATION_MISMATCH"
         else "PARTIAL_OR_BLOCKED"
@@ -2334,8 +2519,8 @@ def _build_financial_statement_amount_bridge(raw: Any) -> dict[str, Any]:
         "actual_period_status": actual_status,
         "actual_periods": periods,
         "forecast_status": forecast_status,
-        "forecast_scenarios": {},
-        "forecast_period": q4.get("forecast_period", "UNKNOWN") if isinstance(q4, Mapping) else "UNKNOWN",
+        "forecast_scenarios": forecast_scenarios,
+        "forecast_period": forecast_period,
         "separation_from_b55": "REPORTED_STATEMENT_AMOUNT_RECONCILIATION_NOT_PHYSICAL_VOLUME_ASP_OR_UNIT_VARIABLE_COST_ATTRIBUTION",
         "financial_outputs_decision_usable": False,
         "formal_evidence_pit_admission_created": False,

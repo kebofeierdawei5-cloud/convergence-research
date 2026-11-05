@@ -128,3 +128,12 @@ B4 可选输入节点 `financial_statement_amount_bridge` 已加入 `operating_d
 - 用户真实 Mac 双轮操作 + Replay 仍未验收；Q4 2026 情景、操作员现价、真实公司前瞻 EPS 分母均未提供。B55/B56/B57/B58/B60/MIE 状态不升级。
 
 下一批合理顺序：先定义并审查新和成 2026Q4 情景假设输入的最小清单（营业收入、营业成本、期间费用、财务费用、其他收益/投资/公允价值/减值/营业外与所得税、少数股东损益），再把每项作为明确的 ANALYST_ASSUMPTION 接入 FY2026；年度稀释加权平均股数需要单独来源或单独标成假设。未取得这些输入前，不生成 FY EPS 或 B60 现价反推。
+
+
+## 9. FY2026 Q4 条件情景接口（代码已实现，真实情景仍待输入）
+
+财报金额桥现支持把 Q1-Q3 已对账实际与 Q4 Bear/Base/Bull 分项分析假设合并。每个 Q4 情景必须对 16 个利润表金额行和少数股东税后损益逐项提供 `value/unit/data_class/basis`；每项均须为 `ANALYST_ASSUMPTION`、单位 CNY、basis 可识别。全年加权平均稀释股数需要独立提供为正数、单位 shares 的 ANALYST_ASSUMPTION。
+
+系统仅在三套情景齐全时生成条件性 FY2026 归母利润与 all-items diluted EPS；缺少任何输入则该情景保持 BLOCKED，不把空值默认为 0。条件 EPS 不等于发行人预测、正式 B57、B58 primary EPS MATCH 或决策输入。
+
+当前真实案例没有提供 Q4 数字和年度稀释股数假设，因此真实案例状态仍为 `Q4_SCENARIOS_NOT_PROVIDED`，没有新增真实预测结果。测试中的 Q4 数值仅是算术合成夹具。

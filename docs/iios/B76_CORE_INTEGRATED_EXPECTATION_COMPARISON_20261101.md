@@ -259,3 +259,10 @@ EPS_MULTIPLE 不再因早期分支返回而漏掉 payoff、thesis-break stress �
 - 当前没有 Q4 2026 Bear/Base/Bull 输入，输出 `Q4_SCENARIOS_NOT_PROVIDED`；没有生成 FY2026 EPS、B57/B58/MIE、B60 或投资决策。
 
 **精确 HEAD 验收：** Local Pilot / B76 / Xinhecheng / Replay 组合测试在 Ubuntu 与 macOS 各 **457 passed**（4.18s / 5.04s）；15/15 相关工作流 success。一个无 Job 的 P0 incident workflow failure 单列记录，不属于本批路径变更或 B76 验收测试。真实用户 Mac 完整双轮 + 独立 Replay 仍 OPEN / NOT VERIFIED。未合并 main。
+
+
+## 6F. FY2026 Q4 逐项假设接口
+
+金额桥支持 2026Q1-Q3 实际 + Q4 Bear/Base/Bull 条件情景。Q4 各损益行和少数股东损益必须逐项采用 typed `ANALYST_ASSUMPTION`（CNY + identifiable basis）；全年加权平均稀释股数另行采用正数 shares 假设。三套均完整时才输出条件性 FY2026 归母利润和 all-items diluted EPS；缺项不会默认 0。该输出不写入 B57/B58/B60、估值或 Decision，也不会升级正式 Forecast Admission。
+
+真实新和成案例尚未提供任何 Q4 情景或年度加权平均稀释股数，因此真实案例仍无 FY2026 EPS。

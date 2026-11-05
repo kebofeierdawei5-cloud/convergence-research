@@ -127,3 +127,67 @@ def test_operating_driver_financial_statement_amount_bridge_does_not_upgrade_b55
     assert result["baseline_transition"]["status"] == "NOT_IDENTIFIABLE"
     assert result["baseline_transition"]["net_profit_bridge"]["status"] == "BLOCKED_BY_B55"
     assert result["valuation_transmission"]["status"] == "NOT_LINKED_TO_PER_SHARE_VALUE"
+
+
+
+def test_q4_financial_statement_scenarios_require_typed_assumptions_and_annual_diluted_shares():
+    from iios_mvp.operating_driver_forecast_v01 import _build_financial_statement_amount_bridge
+
+    raw = _case()["financial_statement_amount_bridge"]
+    raw["q4_forecast"]["scenarios"] = {"bear": {"q4_line_items": {}}}
+    bridge = _build_financial_statement_amount_bridge(raw)
+    row = bridge["forecast_scenarios"]["bear"]
+    assert row["status"] == "BLOCKED_Q4_ASSUMPTIONS_INCOMPLETE"
+    assert "q4_line_items.revenue" in row["missing_inputs"]
+    assert "annual_weighted_average_diluted_shares" in row["missing_inputs"]
+    assert bridge["forecast_status"] == "NOT_IDENTIFIABLE_OR_BLOCKED"
+
+
+def test_q4_financial_statement_scenarios_calculate_conditional_eps_only_from_complete_analyst_assumptions():
+    from iios_mvp.operating_driver_forecast_v01 import _build_financial_statement_amount_bridge
+
+    raw = _case()["financial_statement_amount_bridge"]
+    q4_values = {
+        "revenue": "6500000000",
+        "cost_of_revenue": "3700000000",
+        "taxes_and_surcharges": "80000000",
+        "selling_expense": "45000000",
+        "administrative_expense": "155000000",
+        "rd_expense": "300000000",
+        "financial_expense": "100000000",
+        "other_income": "55000000",
+        "investment_income": "30000000",
+        "fair_value_change": "0",
+        "credit_impairment_gain_loss": "-10000000",
+        "asset_impairment_gain_loss": "-5000000",
+        "asset_disposal_gain_loss": "1000000",
+        "non_operating_income": "1000000",
+        "non_operating_expense": "5000000",
+        "income_tax_expense": "450000000",
+        "minority_interest_net_profit_after_tax": "5000000",
+    }
+    def assumption(value, unit="CNY"):
+        return {
+            "value": value,
+            "unit": unit,
+            "data_class": "ANALYST_ASSUMPTION",
+            "basis": "Synthetic test-only explicit Q4 scenario assumption.",
+            "evidence_refs": [],
+        }
+    scenario = {
+        "q4_line_items": {key: assumption(value) for key, value in q4_values.items()},
+        "annual_weighted_average_diluted_shares": assumption("3073421680", "shares"),
+    }
+    raw["q4_forecast"]["scenarios"] = {"bear": scenario, "base": scenario, "bull": scenario}
+    bridge = _build_financial_statement_amount_bridge(raw)
+    assert bridge["forecast_status"] == "CONDITIONAL_ANALYST_SCENARIOS_CALCULATED"
+    row = bridge["forecast_scenarios"]["base"]
+    assert row["status"] == "CONDITIONAL_ANALYST_ASSUMPTION_CALCULATED"
+    assert Decimal(row["q4_calculated_totals_cny"]["consolidated_net_profit"]) == Decimal("1737000000")
+    expected_parent = Decimal("5867744277.98") + Decimal("1732000000")
+    assert Decimal(row["fy_calculated_totals_cny"]["parent_attributable_net_profit"]) == expected_parent
+    expected_eps = expected_parent / Decimal("3073421680")
+    assert Decimal(row["conditional_fy_all_items_parent_attributable_eps_cny_per_share"]) == expected_eps
+    assert row["annual_weighted_average_diluted_shares_data_class"] == "ANALYST_ASSUMPTION"
+    assert row["formal_forecast_admission_created"] is False
+    assert row["decision_authority"] is False
