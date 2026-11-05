@@ -2246,9 +2246,19 @@ def _build_q4_financial_statement_scenario(
     q4_raw = raw_scenario.get("q4_line_items")
     q4_raw = q4_raw if isinstance(q4_raw, Mapping) else {}
     required_q4 = list(_FINANCIAL_STATEMENT_FIELDS) + ["minority_interest_net_profit_after_tax"]
-    missing = [f"q4_line_items.{field}" for field in required_q4 if q4_raw.get(field) is None]
+    missing = [
+        f"q4_line_items.{field}"
+        for field in required_q4
+        if (
+            not isinstance(q4_raw.get(field), Mapping)
+            or q4_raw[field].get("value") in (None, "")
+        )
+    ]
     shares_raw = raw_scenario.get("annual_weighted_average_diluted_shares")
-    if shares_raw is None:
+    if (
+        not isinstance(shares_raw, Mapping)
+        or shares_raw.get("value") in (None, "")
+    ):
         missing.append("annual_weighted_average_diluted_shares")
     if missing:
         return {
