@@ -152,3 +152,8 @@ Q4 接口要求实际期间严格为 `YYYYQ1-Q3`、预测期间为同一年度 `
 - 新增两项回归验证同年度期间约束和完整 Bear/Base/Bull 集合。
 - 真实案例未填入任何 Q4 假设或年度加权平均稀释股数，因此实际输出仍为 `Q4_SCENARIOS_NOT_PROVIDED`；未生成 FY2026 EPS，也没有升级 B55/B56/B57/B58/B60/MIE/Decision。
 - 独立 P0 incident workflow 出现 failure 但无 Job；与本批修改路径无关。真实 Mac 双轮交接 + Replay 仍未验收。
+
+
+## 12. Q4 假设逐项回显（2026-11-05）
+
+条件情景计算结果现保留全部 Q4 假设行项目的 value、unit、data_class、basis 与 evidence_refs；年度加权平均稀释股数也以独立 typed assumption 对象回显。审核者可以从输出逐项复核计算输入，不需要只相信汇总 EPS。该回显不把 analyst assumptions 升级为证据或正式预测。

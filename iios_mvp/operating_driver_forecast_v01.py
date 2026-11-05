@@ -2336,6 +2336,23 @@ def _build_q4_financial_statement_scenario(
             "parent_attributable_net_profit": format(fy_parent, "f"),
             "minority_interest_net_profit_after_tax": format(fy_nci, "f"),
         },
+        "q4_assumption_inputs": {
+            field: {
+                "value": format(q4_values[field], "f"),
+                "unit": "CNY",
+                "data_class": "ANALYST_ASSUMPTION",
+                "basis": str(q4_raw[field].get("basis") or "").strip(),
+                "evidence_refs": list(q4_raw[field].get("evidence_refs") or []),
+            }
+            for field in required_q4
+        },
+        "annual_weighted_average_diluted_shares_assumption": {
+            "value": format(annual_shares, "f"),
+            "unit": "shares",
+            "data_class": "ANALYST_ASSUMPTION",
+            "basis": str(shares_raw.get("basis") or "").strip(),
+            "evidence_refs": list(shares_raw.get("evidence_refs") or []),
+        },
         "annual_weighted_average_diluted_shares": format(annual_shares, "f"),
         "annual_weighted_average_diluted_shares_data_class": "ANALYST_ASSUMPTION",
         "conditional_fy_all_items_parent_attributable_eps_cny_per_share": format(fy_eps, "f"),

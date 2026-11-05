@@ -189,6 +189,20 @@ def test_q4_financial_statement_scenarios_calculate_conditional_eps_only_from_co
     expected_eps = expected_parent / Decimal("3073421680")
     assert Decimal(row["conditional_fy_all_items_parent_attributable_eps_cny_per_share"]) == expected_eps
     assert row["annual_weighted_average_diluted_shares_data_class"] == "ANALYST_ASSUMPTION"
+    assert row["q4_assumption_inputs"]["financial_expense"] == {
+        "value": "100000000",
+        "unit": "CNY",
+        "data_class": "ANALYST_ASSUMPTION",
+        "basis": "Synthetic test-only explicit Q4 scenario assumption.",
+        "evidence_refs": [],
+    }
+    assert row["annual_weighted_average_diluted_shares_assumption"] == {
+        "value": "3073421680",
+        "unit": "shares",
+        "data_class": "ANALYST_ASSUMPTION",
+        "basis": "Synthetic test-only explicit Q4 scenario assumption.",
+        "evidence_refs": [],
+    }
     assert row["formal_forecast_admission_created"] is False
     assert row["decision_authority"] is False
 
