@@ -73,3 +73,57 @@ def test_xinhecheng_b76_readiness_does_not_promote_partial_disclosures_to_eps_or
     assert readiness["formal_valuation_admission_created"] is False
     assert readiness["decision_created"] is False
     assert readiness["execution_authorized"] is False
+
+
+
+def test_xinhecheng_financial_statement_amount_bridge_reconciles_2025_and_2026_ytd():
+    from iios_mvp.operating_driver_forecast_v01 import _build_financial_statement_amount_bridge
+
+    bridge = _build_financial_statement_amount_bridge(_case()["financial_statement_amount_bridge"])
+    assert bridge["status"] == "ACTUALS_RECONCILED_FORECAST_NOT_PROVIDED"
+    assert bridge["actual_period_status"] == "ALL_ACTUAL_PERIODS_RECONCILED"
+    assert bridge["actual_periods"]["2025FY"]["status"] == "RECONCILED_REPORTED_ACTUAL"
+    assert bridge["actual_periods"]["2026Q1-Q3"]["status"] == "RECONCILED_REPORTED_ACTUAL"
+    for period in bridge["actual_periods"].values():
+        assert max(abs(Decimal(value)) for value in period["reconciliation_residuals_cny"].values()) <= Decimal("1")
+    assert bridge["forecast_status"] == "Q4_SCENARIOS_NOT_PROVIDED"
+    assert bridge["formal_forecast_admission_created"] is False
+    assert bridge["decision_authority"] is False
+
+
+def test_xinhecheng_financial_statement_amount_bridge_fails_closed_when_reported_lines_are_missing():
+    from iios_mvp.operating_driver_forecast_v01 import _build_financial_statement_amount_bridge
+
+    raw = _case()["financial_statement_amount_bridge"]
+    raw["actual_periods"][0]["line_items"].pop("financial_expense")
+    bridge = _build_financial_statement_amount_bridge(raw)
+    row = bridge["actual_periods"]["2025FY"]
+    assert row["status"] == "BLOCKED_REQUIRED_REPORTED_LINE_ITEMS_MISSING"
+    assert "line_items.financial_expense" in row["missing_inputs"]
+    assert bridge["actual_period_status"] == "PARTIAL_OR_BLOCKED"
+
+
+def test_operating_driver_financial_statement_amount_bridge_does_not_upgrade_b55_or_b56():
+    from iios_mvp.operating_driver_forecast_v01 import (
+        OPERATING_DRIVER_SCHEMA,
+        evaluate_operating_driver_forecast,
+    )
+
+    case = _case()
+    raw = {
+        "schema_version": OPERATING_DRIVER_SCHEMA,
+        "scope": "COMPANY_WIDE",
+        "actuals_period": "2025FY",
+        "forecast_period": "2026FY",
+        "summary": "Actual-only statement amount bridge test.",
+        "product_lines": [],
+        "historical_financials": {},
+        "historical_earnings_attribution": {},
+        "scenarios": {"bear": {}, "base": {}, "bull": {}},
+        "financial_statement_amount_bridge": case["financial_statement_amount_bridge"],
+    }
+    result = evaluate_operating_driver_forecast(raw)
+    assert result["financial_statement_amount_bridge"]["actual_period_status"] == "ALL_ACTUAL_PERIODS_RECONCILED"
+    assert result["baseline_transition"]["status"] == "NOT_IDENTIFIABLE"
+    assert result["baseline_transition"]["net_profit_bridge"]["status"] == "BLOCKED_BY_B55"
+    assert result["valuation_transmission"]["status"] == "NOT_LINKED_TO_PER_SHARE_VALUE"

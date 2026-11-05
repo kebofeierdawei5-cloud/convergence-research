@@ -2152,6 +2152,205 @@ def _build_b62_segment_normalized_earnings_bridge(
     return result
 
 
+FINANCIAL_STATEMENT_AMOUNT_INPUT_SCHEMA = "IIOS-FINANCIAL-STATEMENT-AMOUNT-BRIDGE-INPUT-0.1"
+FINANCIAL_STATEMENT_AMOUNT_BRIDGE_SCHEMA = "IIOS-FINANCIAL-STATEMENT-AMOUNT-BRIDGE-0.1"
+_FINANCIAL_STATEMENT_FIELDS = (
+    "revenue", "cost_of_revenue", "taxes_and_surcharges", "selling_expense",
+    "administrative_expense", "rd_expense", "financial_expense", "other_income",
+    "investment_income", "fair_value_change", "credit_impairment_gain_loss",
+    "asset_impairment_gain_loss", "asset_disposal_gain_loss",
+    "non_operating_income", "non_operating_expense", "income_tax_expense",
+)
+_FINANCIAL_STATEMENT_COST_FIELDS = (
+    "cost_of_revenue", "taxes_and_surcharges", "selling_expense",
+    "administrative_expense", "rd_expense", "financial_expense",
+)
+_FINANCIAL_STATEMENT_OPERATING_ADJUSTMENTS = (
+    "other_income", "investment_income", "fair_value_change",
+    "credit_impairment_gain_loss", "asset_impairment_gain_loss",
+    "asset_disposal_gain_loss",
+)
+
+
+def _financial_statement_amount_bridge_not_provided(status: str = "NOT_PROVIDED") -> dict[str, Any]:
+    return {
+        "schema_version": FINANCIAL_STATEMENT_AMOUNT_BRIDGE_SCHEMA,
+        "status": status,
+        "actual_period_status": status,
+        "actual_periods": {},
+        "forecast_status": "Q4_SCENARIOS_NOT_PROVIDED",
+        "forecast_scenarios": {},
+        "separation_from_b55": "REPORTED_STATEMENT_AMOUNT_RECONCILIATION_NOT_PHYSICAL_VOLUME_ASP_OR_UNIT_VARIABLE_COST_ATTRIBUTION",
+        "financial_outputs_decision_usable": False,
+        "formal_evidence_pit_admission_created": False,
+        "formal_forecast_admission_created": False,
+        "b55_modified": False,
+        "b56_modified": False,
+        "b57_modified": False,
+        "b58_modified": False,
+        "b60_modified": False,
+        "valuation_input_modified": False,
+        "external_mie_modified": False,
+        "decision_authority": False,
+    }
+
+
+def _build_financial_statement_amount_bridge(raw: Any) -> dict[str, Any]:
+    """Reconcile reported income-statement amounts without pretending to have B55 physical drivers."""
+    if not isinstance(raw, Mapping):
+        return _financial_statement_amount_bridge_not_provided()
+    if raw.get("schema_version") != FINANCIAL_STATEMENT_AMOUNT_INPUT_SCHEMA:
+        return _financial_statement_amount_bridge_not_provided("INVALID_SCHEMA")
+
+    raw_periods = raw.get("actual_periods")
+    raw_periods = raw_periods if isinstance(raw_periods, list) else []
+    periods: dict[str, Any] = {}
+    for period_raw in raw_periods:
+        if not isinstance(period_raw, Mapping):
+            continue
+        period = str(period_raw.get("period") or "UNKNOWN").strip().upper()
+        source_id = str(period_raw.get("source_id") or "").strip()
+        publication_date = str(period_raw.get("publication_date") or "").strip()
+        line_items_raw = period_raw.get("line_items")
+        line_items_raw = line_items_raw if isinstance(line_items_raw, Mapping) else {}
+        totals_raw = period_raw.get("reported_totals")
+        totals_raw = totals_raw if isinstance(totals_raw, Mapping) else {}
+        required_totals = (
+            "total_operating_cost", "operating_profit", "profit_before_tax",
+            "consolidated_net_profit", "parent_attributable_net_profit",
+            "minority_interest_net_profit_after_tax",
+        )
+        missing = [
+            f"line_items.{field}" for field in _FINANCIAL_STATEMENT_FIELDS
+            if line_items_raw.get(field) in (None, "")
+        ]
+        missing.extend(
+            f"reported_totals.{field}" for field in required_totals
+            if totals_raw.get(field) in (None, "")
+        )
+        if not source_id:
+            missing.append("source_id")
+        if not publication_date:
+            missing.append("publication_date")
+        if str(period_raw.get("data_class") or "").upper() != "OBSERVED_ACTUAL":
+            missing.append("data_class_OBSERVED_ACTUAL_REQUIRED")
+        if missing:
+            periods[period] = {
+                "period": period,
+                "status": "BLOCKED_REQUIRED_REPORTED_LINE_ITEMS_MISSING",
+                "missing_inputs": sorted(missing),
+                "formal_evidence_pit_admission_created": False,
+            }
+            continue
+        try:
+            values = {key: Decimal(str(line_items_raw[key])) for key in _FINANCIAL_STATEMENT_FIELDS}
+            reported = {key: Decimal(str(totals_raw[key])) for key in required_totals}
+            if any(not value.is_finite() for value in [*values.values(), *reported.values()]):
+                raise InvalidOperation
+        except (InvalidOperation, ValueError, TypeError):
+            periods[period] = {
+                "period": period,
+                "status": "INVALID_REPORTED_LINE_ITEM",
+                "issues": ["REPORTED_LINE_ITEM_MUST_BE_FINITE_DECIMAL"],
+                "formal_evidence_pit_admission_created": False,
+            }
+            continue
+
+        total_cost = sum((values[key] for key in _FINANCIAL_STATEMENT_COST_FIELDS), Decimal("0"))
+        gross_profit = values["revenue"] - values["cost_of_revenue"]
+        operating_profit = (
+            values["revenue"] - total_cost
+            + sum((values[key] for key in _FINANCIAL_STATEMENT_OPERATING_ADJUSTMENTS), Decimal("0"))
+        )
+        pbt = operating_profit + values["non_operating_income"] - values["non_operating_expense"]
+        consolidated_np = pbt - values["income_tax_expense"]
+        residuals = {
+            "total_operating_cost": total_cost - reported["total_operating_cost"],
+            "operating_profit": operating_profit - reported["operating_profit"],
+            "profit_before_tax": pbt - reported["profit_before_tax"],
+            "consolidated_net_profit": consolidated_np - reported["consolidated_net_profit"],
+            "parent_plus_nci_vs_consolidated": (
+                reported["parent_attributable_net_profit"]
+                + reported["minority_interest_net_profit_after_tax"]
+                - reported["consolidated_net_profit"]
+            ),
+        }
+        failed = {key: format(value, "f") for key, value in residuals.items() if abs(value) > Decimal("1")}
+        periods[period] = {
+            "period": period,
+            "status": "RECONCILED_REPORTED_ACTUAL" if not failed else "RECONCILIATION_MISMATCH",
+            "audit_status": str(period_raw.get("audit_status") or "UNKNOWN"),
+            "data_class": "OBSERVED_ACTUAL",
+            "currency": str(period_raw.get("currency") or "UNKNOWN"),
+            "source_id": source_id,
+            "source_url": period_raw.get("source_url"),
+            "publication_date": publication_date,
+            "known_at_upper_bound": period_raw.get("known_at_upper_bound"),
+            "source_admission_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_FORMALLY_ADMITTED",
+            "calculated_totals_cny": {
+                "gross_profit": format(gross_profit, "f"),
+                "total_operating_cost": format(total_cost, "f"),
+                "operating_profit": format(operating_profit, "f"),
+                "profit_before_tax": format(pbt, "f"),
+                "consolidated_net_profit": format(consolidated_np, "f"),
+            },
+            "reported_totals_cny": {key: format(value, "f") for key, value in reported.items()},
+            "reconciliation_residuals_cny": {key: format(value, "f") for key, value in residuals.items()},
+            "failed_reconciliations": failed,
+            "tolerance_cny": "1",
+            "gross_profit_margin_pct": (
+                format(gross_profit / values["revenue"] * Decimal("100"), ".4f")
+                if values["revenue"] else None
+            ),
+            "gross_profit_margin_limitation": "REPORTED_REVENUE_MINUS_REPORTED_COST_OF_REVENUE_NOT_B55_UNIT_VARIABLE_COST_CONTRIBUTION_MARGIN",
+            "formal_evidence_pit_admission_created": False,
+        }
+
+    if not periods:
+        actual_status = "NOT_PROVIDED"
+    elif all(row.get("status") == "RECONCILED_REPORTED_ACTUAL" for row in periods.values()):
+        actual_status = "ALL_ACTUAL_PERIODS_RECONCILED"
+    elif any(row.get("status") == "RECONCILIATION_MISMATCH" for row in periods.values()):
+        actual_status = "RECONCILIATION_MISMATCH"
+    else:
+        actual_status = "PARTIAL_OR_BLOCKED"
+
+    q4 = raw.get("q4_forecast")
+    q4_scenarios = q4.get("scenarios") if isinstance(q4, Mapping) and isinstance(q4.get("scenarios"), Mapping) else {}
+    forecast_status = "Q4_SCENARIOS_NOT_PROVIDED" if not q4_scenarios else "Q4_SCENARIO_INPUTS_PENDING_IMPLEMENTATION"
+    overall = (
+        "ACTUALS_RECONCILED_FORECAST_NOT_PROVIDED"
+        if actual_status == "ALL_ACTUAL_PERIODS_RECONCILED" and not q4_scenarios
+        else "ACTUALS_RECONCILED_FORECAST_INPUT_PENDING"
+        if actual_status == "ALL_ACTUAL_PERIODS_RECONCILED"
+        else "ACTUALS_RECONCILIATION_FAILED"
+        if actual_status == "RECONCILIATION_MISMATCH"
+        else "PARTIAL_OR_BLOCKED"
+    )
+    return {
+        "schema_version": FINANCIAL_STATEMENT_AMOUNT_BRIDGE_SCHEMA,
+        "status": overall,
+        "method": "REPORTED_INCOME_STATEMENT_LINE_ITEMS_WITH_SIGNED_RECONCILIATION_V0.1",
+        "actual_period_status": actual_status,
+        "actual_periods": periods,
+        "forecast_status": forecast_status,
+        "forecast_scenarios": {},
+        "forecast_period": q4.get("forecast_period", "UNKNOWN") if isinstance(q4, Mapping) else "UNKNOWN",
+        "separation_from_b55": "REPORTED_STATEMENT_AMOUNT_RECONCILIATION_NOT_PHYSICAL_VOLUME_ASP_OR_UNIT_VARIABLE_COST_ATTRIBUTION",
+        "financial_outputs_decision_usable": False,
+        "formal_evidence_pit_admission_created": False,
+        "formal_forecast_admission_created": False,
+        "b55_modified": False,
+        "b56_modified": False,
+        "b57_modified": False,
+        "b58_modified": False,
+        "b60_modified": False,
+        "valuation_input_modified": False,
+        "external_mie_modified": False,
+        "decision_authority": False,
+    }
+
+
 def evaluate_operating_driver_forecast(
     raw: Any,
     *,
@@ -2220,6 +2419,8 @@ def evaluate_operating_driver_forecast(
                 "formal_forecast_admission_created": False,
                 "decision_authority": False,
             },
+            "financial_statement_amount_bridge": _financial_statement_amount_bridge_not_provided(),
+            "financial_statement_amount_bridge": _financial_statement_amount_bridge_not_provided("INVALID_OPERATING_DRIVER_SCHEMA"),
             "valuation_transmission": {
                 "status": "NOT_LINKED_TO_PER_SHARE_VALUE",
                 "reason": "尚未建立从经营结果到公司归属净利润、股数/摊薄与每股价值的可验证桥接。",
@@ -2453,6 +2654,7 @@ def evaluate_operating_driver_forecast(
     ])
     if scope == "PROJECT_INCREMENTAL":
         limits.append("项目增量收入/利润必须与既有产品/液体形态转粉体的内部转换区分，不能把收入形态迁移误认为集团新增需求。")
+    financial_statement_amount_bridge = _build_financial_statement_amount_bridge(raw.get("financial_statement_amount_bridge"))
     return {
         "schema_version": OPERATING_DRIVER_SCHEMA,
         "input_status": "PROVIDED",
@@ -2466,6 +2668,7 @@ def evaluate_operating_driver_forecast(
         "input_issues": sorted(set(input_issues)),
         "historical_actuals_status": historical_status,
         "baseline_transition": baseline_transition,
+        "financial_statement_amount_bridge": financial_statement_amount_bridge,
         "valuation_transmission": {
             "status": "NOT_LINKED_TO_PER_SHARE_VALUE",
             "reason": "没有可验证的桥接把该经营情景转换为公司归属净利润、每股收益和每股估值；本轮刻意不自动修改估值输入。",
@@ -2531,6 +2734,27 @@ def render_operating_driver_section(
         "#### 产品/业务线与历史实际",
         "",
     ]
+    statement_bridge = driver.get("financial_statement_amount_bridge")
+    if isinstance(statement_bridge, Mapping):
+        lines.extend([
+            "",
+            "#### 公开财报金额桥（独立于 B55 物理量价成本归因）",
+            "",
+            f"- 状态：**{statement_bridge.get('status', 'UNKNOWN')}**；历史期间：{statement_bridge.get('actual_period_status', 'UNKNOWN')}；Q4 前瞻：{statement_bridge.get('forecast_status', 'NOT_PROVIDED')}",
+        ])
+        statement_periods = statement_bridge.get("actual_periods") if isinstance(statement_bridge.get("actual_periods"), Mapping) else {}
+        for period_name, period_row in statement_periods.items():
+            if not isinstance(period_row, Mapping):
+                continue
+            totals = period_row.get("calculated_totals_cny") if isinstance(period_row.get("calculated_totals_cny"), Mapping) else {}
+            residuals = period_row.get("reconciliation_residuals_cny") if isinstance(period_row.get("reconciliation_residuals_cny"), Mapping) else {}
+            max_residual = max((abs(Decimal(str(value))) for value in residuals.values()), default=Decimal("0"))
+            lines.append(
+                f"- {period_name}：{period_row.get('status', 'UNKNOWN')}；营业利润 {totals.get('operating_profit', 'UNKNOWN')}；"
+                f"利润总额 {totals.get('profit_before_tax', 'UNKNOWN')}；合并净利润 {totals.get('consolidated_net_profit', 'UNKNOWN')}；"
+                f"最大对账残差 {max_residual} CNY。"
+            )
+        lines.append("- 口径边界：该桥复算财报金额行项目，不推导销量、净 ASP 或单位变动成本；不改变 B55/B56/B57/B58/B60、估值、MIE 或 Decision。")
     products = driver.get("product_lines") if isinstance(driver.get("product_lines"), list) else []
     if not products:
         lines.append("- 产品线未提供：实际产量、销量、净售价及单位成本保持 UNKNOWN，不用公司整体收入除以产量替代实际售价。")

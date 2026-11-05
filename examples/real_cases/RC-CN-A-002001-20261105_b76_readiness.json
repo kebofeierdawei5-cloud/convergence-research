@@ -220,5 +220,94 @@
     "publication_created": false,
     "run_receipt_created": false,
     "execution_authorized": false
+  },
+  "financial_statement_amount_bridge": {
+    "schema_version": "IIOS-FINANCIAL-STATEMENT-AMOUNT-BRIDGE-INPUT-0.1",
+    "currency": "CNY",
+    "limitations": [
+      "This is a reported financial-statement amount reconciliation, separate from B55 physical-volume/net-ASP/unit-variable-cost attribution.",
+      "Cost of revenue is not relabelled as unit variable cost. Expense rows remain separately classified and retain their reported signs.",
+      "Historical sources are PIT-compatible working references only; no formal Evidence/PIT admission is created.",
+      "No Q4 2026 scenario assumptions are supplied. The bridge must not manufacture a FY2026 EPS forecast."
+    ],
+    "actual_periods": [
+      {
+        "period": "2025FY",
+        "currency": "CNY",
+        "data_class": "OBSERVED_ACTUAL",
+        "audit_status": "AUDITED",
+        "source_id": "SZSE-2025-ANNUAL-REPORT-20260416",
+        "source_url": "https://disc.static.szse.cn/disc/disk03/finalpage/2026-04-16/496f3ed8-d4eb-425b-80c3-c2096a1f3806.PDF",
+        "publication_date": "2026-04-16",
+        "known_at_upper_bound": "2026-04-16T23:59:59+08:00",
+        "line_items": {
+          "revenue": "22251361880.58",
+          "cost_of_revenue": "12310807989.89",
+          "taxes_and_surcharges": "274458460.85",
+          "selling_expense": "186625106.77",
+          "administrative_expense": "656845768.83",
+          "rd_expense": "1099437900.40",
+          "financial_expense": "-14746421.76",
+          "other_income": "252983451.94",
+          "investment_income": "140560163.60",
+          "fair_value_change": "-53391170.13",
+          "credit_impairment_gain_loss": "12879377.53",
+          "asset_impairment_gain_loss": "-235426877.98",
+          "asset_disposal_gain_loss": "-1494406.52",
+          "non_operating_income": "18284909.92",
+          "non_operating_expense": "22811106.04",
+          "income_tax_expense": "1047430680.77"
+        },
+        "reported_totals": {
+          "total_operating_cost": "14513428804.98",
+          "operating_profit": "7854043614.04",
+          "profit_before_tax": "7849517417.92",
+          "consolidated_net_profit": "6802086737.15",
+          "parent_attributable_net_profit": "6764199225.29",
+          "minority_interest_net_profit_after_tax": "37887511.86"
+        }
+      },
+      {
+        "period": "2026Q1-Q3",
+        "currency": "CNY",
+        "data_class": "OBSERVED_ACTUAL",
+        "audit_status": "UNAUDITED",
+        "source_id": "ISSUER-Q3-2026-REPORT-20261028",
+        "source_url": "https://vip.stock.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=12666114&stockid=002001",
+        "publication_date": "2026-10-28",
+        "known_at_upper_bound": "2026-10-28T23:59:59+08:00",
+        "line_items": {
+          "revenue": "19231333213.52",
+          "cost_of_revenue": "10711869441.51",
+          "taxes_and_surcharges": "220521548.20",
+          "selling_expense": "135338978.21",
+          "administrative_expense": "464249234.41",
+          "rd_expense": "903719945.87",
+          "financial_expense": "395612195.39",
+          "other_income": "169206057.94",
+          "investment_income": "285168511.75",
+          "fair_value_change": "110674615.82",
+          "credit_impairment_gain_loss": "-42074280.17",
+          "asset_impairment_gain_loss": "-33923192.36",
+          "asset_disposal_gain_loss": "4978850.87",
+          "non_operating_income": "3141883.58",
+          "non_operating_expense": "48892008.26",
+          "income_tax_expense": "952725228.70"
+        },
+        "reported_totals": {
+          "total_operating_cost": "12831311343.59",
+          "operating_profit": "6894052433.78",
+          "profit_before_tax": "6848302309.10",
+          "consolidated_net_profit": "5895577080.40",
+          "parent_attributable_net_profit": "5867744277.98",
+          "minority_interest_net_profit_after_tax": "27832802.42"
+        }
+      }
+    ],
+    "q4_forecast": {
+      "forecast_period": "2026FY",
+      "actual_period": "2026Q1-Q3",
+      "scenarios": {}
+    }
   }
 }

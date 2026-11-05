@@ -240,3 +240,10 @@ EPS_MULTIPLE 不再因早期分支返回而漏掉 payoff、thesis-break stress �
 下一批拟只加一个与 B55 物理驱动链并列、但口径独立的 Public Financial-Statement Bridge：按报表行项目计算 gross profit → operating profit → PBT → tax → consolidated net profit → parent-attributable profit；2026FY 采用 9M 实际 + Q4 Bear/Base/Bull 显式假设。不得把金额桥标成销量/ASP/单位成本归因，不能重复扣减营业成本中已经包含的折旧/制造费用；B57 仍需独立归母调整和稀释股数，B58/B60 的同期间、同分母与价格门槛保持不变。
 
 本次工作包的唯一结论：**真实公司经营事实有可用披露，但现有 B55 物理驱动合同对新和成及大量只披露财务金额的上市公司不适配；解决办法是新增独立金额桥，而不是放宽 B55 或伪造物理量。**
+
+
+## 6D. B4 独立财报金额桥（2026-11-05）
+
+新增可选输入 `financial_statement_amount_bridge`，在经营驱动结果中单独输出并在本地报告展示。对 2025FY 与 2026Q1-Q3 报告行项目按原始符号复算营业总成本、营业利润、利润总额、所得税后合并净利润及归母/NCI 分配；容差 CNY 1。
+
+此桥只证明报告金额的算术闭合，不把营业成本转化为单位变动成本，不取代 B55 的物理量价归因。缺少 Q4 情景时前瞻状态保持 `Q4_SCENARIOS_NOT_PROVIDED`，不会估算 FY2026 EPS。原 B55/B56/B57/B58/B60、MIE 和 Decision gate 保持不变。

@@ -108,3 +108,12 @@
 回归测试：`tests/test_b76_xinhecheng_current_case_readiness.py`
 
 该测试只验证披露数字之间的算术关系和 B55—B60 的阻断状态，不声称真实公司 EPS_MULTIPLE 数值链已闭合。
+
+
+## 7. 独立公开财报金额桥首轮落地（2026-11-05）
+
+B4 可选输入节点 `financial_statement_amount_bridge` 已加入 `operating_driver_forecast_v01.py`，并显示在本地报告。它以合并利润表报告行项目为输入，按原始符号复算营业总成本、营业利润、利润总额、所得税后合并净利润及归母/NCI 分配。
+
+真实案例 2025FY 与 2026Q1-Q3 均在 CNY 1 容差内对账。Q4 2026 情景目前没有任何输入，前瞻状态明确为 `Q4_SCENARIOS_NOT_PROVIDED`，不输出 FY2026 预测或 EPS。
+
+该金额桥不推导产品销量、净 ASP、单位变动成本，不修改 B55/B56/B57/B58/B60，不创建正式 Forecast Admission，也不改变 MIE、估值或决策权限。
