@@ -289,3 +289,14 @@ Q4 条件金额桥仅接受同一年度 `YYYYQ1-Q3` 实际 + `YYYYFY` 前瞻，�
 ## 6I. Q4 假设输入可审计回显
 
 条件 FY2026 情景计算结果逐项回显全部 Q4 报表行项目的数值、单位、`ANALYST_ASSUMPTION` 分类、basis 和引用；年度加权平均稀释股数也以独立对象回显。报告结果因此能够追溯所使用的每一项假设，而不把假设误标为发行人预测或证据。
+
+
+## 6J. Q4 假设输入回显与精确 HEAD 验收（2026-11-05）
+
+代码提交：`6a047722aebe6669ffccbfd55bdf6d167f4801fc`。
+
+- Q4 条件场景输出回显全部 17 个损益/NCI假设的 value、unit、`ANALYST_ASSUMPTION`、basis 和 evidence_refs。
+- 年度加权平均稀释股数以独立 typed assumption 对象回显，不从两位小数报告 EPS 反推。
+- 精确 HEAD 的 Local Pilot / B76 / Xinhecheng / Q4 bridge / Replay 测试 Ubuntu 与 macOS 各 **461 passed**（4.09s / 5.93s）；15/15 相关工作流 success。
+- 真实案例没有 Q4 假设或年度稀释股数假设，因此无真实 FY2026 EPS；Q4 测试值只验证算术与 fail-closed 规则。
+- 一个独立 P0 incident push workflow failure 没有 Job，已单列，不属于 B76 测试失败。真实 Mac 全流程 + 独立 Replay 仍未验收。未合并 main。

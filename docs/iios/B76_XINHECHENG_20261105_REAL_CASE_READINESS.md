@@ -157,3 +157,12 @@ Q4 接口要求实际期间严格为 `YYYYQ1-Q3`、预测期间为同一年度 `
 ## 12. Q4 假设逐项回显（2026-11-05）
 
 条件情景计算结果现保留全部 Q4 假设行项目的 value、unit、data_class、basis 与 evidence_refs；年度加权平均稀释股数也以独立 typed assumption 对象回显。审核者可以从输出逐项复核计算输入，不需要只相信汇总 EPS。该回显不把 analyst assumptions 升级为证据或正式预测。
+
+
+## 13. Q4 假设回显与本轮精确 HEAD 验收（2026-11-05）
+
+代码 HEAD `6a047722aebe6669ffccbfd55bdf6d167f4801fc` 的 Local Pilot / B76 / Xinhecheng / Q4 / Replay 组合测试在 Ubuntu 与 macOS 分别为 **461 passed**（4.09 秒 / 5.93 秒），15 个相关工作流全部成功。
+
+条件性 Q4 输出现在保留每项假设原始值、单位、分类、basis 与引用；年度加权平均稀释股数单独回显。真实案例仍未提供 Q4 假设和年度稀释股数，所以真实 Q4 / FY EPS 维持 UNKNOWN / NOT_PROVIDED。测试用合成值不构成新和成预测。
+
+一个无 Job 的独立 P0 incident workflow failure 与本批改动路径无关。真实用户 Mac 双轮操作 + 独立 Replay 仍 OPEN / NOT VERIFIED。
