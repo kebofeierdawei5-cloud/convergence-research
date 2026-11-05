@@ -134,7 +134,7 @@ def test_q4_financial_statement_scenarios_require_typed_assumptions_and_annual_d
     from iios_mvp.operating_driver_forecast_v01 import _build_financial_statement_amount_bridge
 
     raw = _case()["financial_statement_amount_bridge"]
-    raw["q4_forecast"]["scenarios"] = {"bear": {"q4_line_items": {}}}
+    raw["q4_forecast"]["scenarios"] = {"bear": {"q4_line_items": {}}, "base": None, "bull": None}
     bridge = _build_financial_statement_amount_bridge(raw)
     row = bridge["forecast_scenarios"]["bear"]
     assert row["status"] == "BLOCKED_Q4_ASSUMPTIONS_INCOMPLETE"
