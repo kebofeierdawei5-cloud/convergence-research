@@ -142,3 +142,13 @@ B4 可选输入节点 `financial_statement_amount_bridge` 已加入 `operating_d
 ## 10. 期间与情景集合守门（2026-11-05）
 
 Q4 接口要求实际期间严格为 `YYYYQ1-Q3`、预测期间为同一年度 `YYYYFY`，不允许跨年或使用年度实际冒充前三季度实际。情景集合必须恰好包含 Bear/Base/Bull 三项；缺项或额外项均阻断。新增两项回归覆盖期间错配与情景集合不完整。
+
+
+## 11. Q4 期间与情景守门验收（2026-11-05）
+
+最新代码 HEAD `11f691df2efef4ec94d81e84f621e5ed12a22231`：
+- Local Pilot / B76 / Xinhecheng / Q4 amount bridge / Replay：Ubuntu 461 passed，4.63 秒；macOS 461 passed，5.06 秒。
+- 15 个相关 GitHub Actions 全部成功。
+- 新增两项回归验证同年度期间约束和完整 Bear/Base/Bull 集合。
+- 真实案例未填入任何 Q4 假设或年度加权平均稀释股数，因此实际输出仍为 `Q4_SCENARIOS_NOT_PROVIDED`；未生成 FY2026 EPS，也没有升级 B55/B56/B57/B58/B60/MIE/Decision。
+- 独立 P0 incident workflow 出现 failure 但无 Job；与本批修改路径无关。真实 Mac 双轮交接 + Replay 仍未验收。

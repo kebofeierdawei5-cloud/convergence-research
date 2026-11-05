@@ -271,3 +271,16 @@ EPS_MULTIPLE 不再因早期分支返回而漏掉 payoff、thesis-break stress �
 ## 6G. Q4 合并期间和情景集合守门
 
 Q4 条件金额桥仅接受同一年度 `YYYYQ1-Q3` 实际 + `YYYYFY` 前瞻，且 Bear/Base/Bull 集合必须完整且无额外情景。错期返回 `BLOCKED_PERIOD_ALIGNMENT`，情景集合错误返回 `BLOCKED_SCENARIO_SET_INCOMPLETE_OR_INVALID`；不在错误期间上生成数值。
+
+
+## 6H. Q4 接口精确 HEAD 验收（2026-11-05）
+
+期间和情景集合加固提交及测试夹具修正后，精确 HEAD `11f691df2efef4ec94d81e84f621e5ed12a22231` 的 Local Pilot / B76 / Xinhecheng readiness / Q4 bridge / Replay 组合测试在 Ubuntu 与 macOS 各 **461 passed**（4.63s / 5.06s）。15/15 相关 GitHub Actions 全部 success。
+
+本轮新增回归证明：
+- 非同年度 `YYYYQ1-Q3` → `YYYYFY` 不计算；
+- Bear/Base/Bull 必须恰好齐全，无缺项/额外项；
+- 完整情景的所有 Q4 行项目与年度稀释股数必须是带单位、basis 的 ANALYST_ASSUMPTION；
+- 任何缺项不默认 0。
+
+真实案例没有提供 Q4 情景或年度稀释股数输入，所以仍没有真实 FY2026 EPS。P0 incident workflow 的无 Job failure 单独记载，不是本批 B76 测试失败。未合并 main；真实用户 Mac 双轮 + 独立 Replay 仍 OPEN / NOT VERIFIED。
