@@ -1,0 +1,224 @@
+{
+  "schema_version": "IIOS-B76-REAL-CASE-READINESS-0.1",
+  "record_class": "REAL_COMPANY_DISCLOSURE_READINESS_DIAGNOSTIC_NOT_FORMAL_EVIDENCE_ADMISSION",
+  "case_id": "RC-CN-A-002001-20261105",
+  "company": "浙江新和成股份有限公司",
+  "symbol": "002001",
+  "market": "CN-A",
+  "currency": "CNY",
+  "as_of_date": "2026-11-05",
+  "cutoff_date": "2026-11-05",
+  "selected_model_family": "EPS_MULTIPLE",
+  "source_records": [
+    {
+      "source_id": "SZSE-2025-ANNUAL-REPORT-20260416",
+      "document": "浙江新和成股份有限公司2025年年度报告全文",
+      "publication_date": "2026-04-16",
+      "known_at_upper_bound": "2026-04-16T23:59:59+08:00",
+      "source_authority": "SZSE_OFFICIAL_STATIC_DOCUMENT_HOST",
+      "source_url": "https://disc.static.szse.cn/disc/disk03/finalpage/2026-04-16/496f3ed8-d4eb-425b-80c3-c2096a1f3806.PDF",
+      "audit_status": "AUDITED_ANNUAL_REPORT",
+      "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_FORMALLY_ADMITTED",
+      "use_status": "WORKING_RESEARCH_FACT_REFERENCE_ONLY",
+      "raw_bytes_persisted_in_repository": false
+    },
+    {
+      "source_id": "ISSUER-Q3-2026-REPORT-20261028",
+      "document": "浙江新和成股份有限公司2026年第三季度报告",
+      "announcement_no": "2026-042",
+      "publication_date": "2026-10-28",
+      "known_at_upper_bound": "2026-10-28T23:59:59+08:00",
+      "source_authority": "ISSUER_REPORT_CONTENT_SERVED_BY_SINA_FINANCE_MIRROR",
+      "source_url": "https://file.finance.sina.com.cn/211.154.219.97:9494/MRGG/CNSESZ_STOCK/2026/2026-10/2026-10-28/12666114.PDF",
+      "audit_status": "UNAUDITED_THIRD_QUARTER_REPORT",
+      "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_FORMALLY_ADMITTED",
+      "use_status": "WORKING_RESEARCH_FACT_REFERENCE_ONLY; RETRIEVE_DESIGNATED_CNINFO_ORIGINAL_AND_CAPTURE_HASH_BEFORE_FORMAL_ADMISSION",
+      "raw_bytes_persisted_in_repository": false
+    }
+  ],
+  "observed_actuals": {
+    "2025FY": {
+      "period": "2025FY",
+      "audit_status": "AUDITED",
+      "revenue_cny": "22251361880.58",
+      "consolidated_net_profit_cny": "6802086737.15",
+      "parent_attributable_net_profit_cny": "6764199225.29",
+      "minority_interest_net_profit_after_tax_cny": "37887511.86",
+      "adjusted_parent_attributable_net_profit_cny": "6737938475.03",
+      "operating_cash_flow_cny": "8797431340.92",
+      "basic_eps_cny_per_share_reported_2dp": "2.21",
+      "diluted_eps_cny_per_share_reported_2dp": "2.21",
+      "weighted_average_diluted_shares_exact": null,
+      "weighted_average_diluted_shares_status": "NOT_EXTRACTED_AS_EXACT_NUMERATOR_DENOMINATOR_FROM_REVIEWED_ANNUAL_REPORT",
+      "business_type_revenue_and_cost_of_revenue": [
+        {
+          "business_line_id": "nutrition",
+          "revenue_cny": "14784368525.95",
+          "cost_of_revenue_cny": "7721928084.89",
+          "disclosed_measure": "REPORTED_REVENUE_AND_COST_OF_REVENUE",
+          "physical_sales_volume_tonnes": null,
+          "blended_net_asp_cny_per_tonne": null,
+          "variable_cost_cny_per_tonne": null
+        },
+        {
+          "business_line_id": "flavors_fragrances",
+          "revenue_cny": "3865554569.03",
+          "cost_of_revenue_cny": "1811221331.14",
+          "disclosed_measure": "REPORTED_REVENUE_AND_COST_OF_REVENUE",
+          "physical_sales_volume_tonnes": null,
+          "blended_net_asp_cny_per_tonne": null,
+          "variable_cost_cny_per_tonne": null
+        },
+        {
+          "business_line_id": "new_materials",
+          "revenue_cny": "2114793685.42",
+          "cost_of_revenue_cny": "1490792237.71",
+          "disclosed_measure": "REPORTED_REVENUE_AND_COST_OF_REVENUE",
+          "physical_sales_volume_tonnes": null,
+          "blended_net_asp_cny_per_tonne": null,
+          "variable_cost_cny_per_tonne": null
+        },
+        {
+          "business_line_id": "other",
+          "revenue_cny": "1480475260.47",
+          "cost_of_revenue_cny": "1286322589.32",
+          "disclosed_measure": "REPORTED_REVENUE_AND_COST_OF_REVENUE",
+          "physical_sales_volume_tonnes": null,
+          "blended_net_asp_cny_per_tonne": null,
+          "variable_cost_cny_per_tonne": null
+        }
+      ],
+      "product_category_disclosure_scope": "REVENUE_FROM_CONTRACTS_WITH_CUSTOMERS; SUMS_TO_22245192040.87_CNY_NOT_TOTAL_REVENUE_22251361880.58_CNY",
+      "reporting_segments": [
+        "医药化工：生产及销售营养品、香精香料",
+        "其他：生产及销售新材料、其他"
+      ]
+    },
+    "2026Q1-Q3": {
+      "period": "2026Q1-Q3",
+      "report_date": "2026-10-28",
+      "audit_status": "UNAUDITED",
+      "revenue_cny": "19231333213.52",
+      "q3_revenue_cny": "6102032952.63",
+      "consolidated_net_profit_cny": "5895577080.40",
+      "parent_attributable_net_profit_cny": "5867744277.98",
+      "minority_interest_net_profit_after_tax_cny": "27832802.42",
+      "adjusted_parent_attributable_net_profit_cny": "5715514757.97",
+      "non_recurring_profit_effect_after_tax_and_minority_cny": "152229520.01",
+      "operating_cash_flow_cny": "5227614698.17",
+      "basic_eps_cny_per_share_reported_2dp": "1.90",
+      "diluted_eps_cny_per_share_reported_2dp": "1.90",
+      "weighted_average_diluted_shares_exact": null,
+      "weighted_average_diluted_shares_status": "NOT_EXTRACTED_AS_EXACT_VALUE_FROM_REVIEWED_Q3_REPORT; DO_NOT_BACKSOLVE_FROM_2DP_EPS",
+      "year_over_year": {
+        "revenue_pct": "15.56",
+        "parent_attributable_net_profit_pct": "10.28",
+        "adjusted_parent_attributable_net_profit_pct": "7.17",
+        "operating_cash_flow_pct": "-7.35"
+      },
+      "management_explanations_and_reported_drivers": [
+        "前三季度财务费用同比上升423.43%，公司解释主要系汇兑损失同比增加",
+        "前三季度投资收益同比上升271.05%，包括权益法确认的联营/合营企业投资收益增加及处置交易性金融资产收益增加",
+        "前三季度公允价值变动收益同比上升225.28%，公司解释与汇率波动导致远期结售汇产品公允价值变化有关",
+        "前三季度信用减值损失同比上升313.99%，公司解释与销售增加导致应收账款变动计提增加有关"
+      ],
+      "balance_sheet_2026_09_30_cny": {
+        "cash_and_cash_equivalents": "8885013764.16",
+        "trading_financial_assets": "2990349455.46",
+        "accounts_receivable": "3847450534.41",
+        "prepayments": "378173770.75",
+        "inventory": "5585033824.69",
+        "total_assets": "49258662771.37",
+        "parent_attributable_equity": "36548803725.76",
+        "construction_in_progress": "1670233823.64"
+      },
+      "balance_sheet_2025_12_31_comparators_cny": {
+        "cash_and_cash_equivalents": "7966270131.17",
+        "accounts_receivable": "3331434677.27",
+        "prepayments": "178450145.87",
+        "inventory": "4648749467.43"
+      }
+    }
+  },
+  "derived_diagnostics": {
+    "classification": "ARITHMETIC_DERIVED_FROM_REPORTED_ACTUALS_NOT_A_FORECAST",
+    "2026Q1-Q3_revenue_as_pct_of_2025FY_revenue": "86.43",
+    "2026Q1-Q3_parent_profit_as_pct_of_2025FY_parent_profit": "86.75",
+    "2026Q1-Q3_adjusted_parent_profit_as_pct_of_2025FY_adjusted_parent_profit": "84.83",
+    "2026Q1-Q3_operating_cash_flow_as_pct_of_2025FY_operating_cash_flow": "59.42",
+    "2026Q1-Q3_nonrecurring_profit_effect_as_pct_of_parent_profit": "2.59",
+    "2026Q1-Q3_operating_cash_flow_to_parent_profit_pct": "89.09",
+    "2026Q1-Q3_inventory_increase_cny": "936284357.26",
+    "2026Q1-Q3_inventory_increase_pct": "20.14",
+    "2026Q1-Q3_accounts_receivable_increase_cny": "516015857.14",
+    "2026Q1-Q3_accounts_receivable_increase_pct": "15.49",
+    "2026Q1-Q3_prepayments_increase_cny": "199723624.88",
+    "2026Q1-Q3_prepayments_increase_pct": "111.92",
+    "2026Q4_parent_profit_required_to_equal_2025FY_cny": "896454947.31",
+    "2026Q4_revenue_required_to_equal_2025FY_cny": "3020028667.06",
+    "note": "The last two figures are arithmetic thresholds, not Q4 forecasts or probability-weighted estimates."
+  },
+  "b76_readiness": {
+    "B55": {
+      "status": "BLOCKED_HISTORICAL_PHYSICAL_DRIVER_BASELINE_MISSING",
+      "required_historical_fields_per_business_line": [
+        "sales_volume_tonnes",
+        "net_asp_cny_per_tonne",
+        "variable_cost_cny_per_tonne"
+      ],
+      "reported_available_fields": [
+        "revenue_cny",
+        "cost_of_revenue_cny"
+      ],
+      "missing_or_non_equivalent_fields": [
+        "sales_volume_tonnes",
+        "net_asp_cny_per_tonne",
+        "variable_cost_cny_per_tonne"
+      ],
+      "explicit_non_equivalence": "Reported cost_of_revenue includes the accounting cost-of-sales basis; it is not the same as variable cost per tonne. Feeding it into B55/B56 as variable cost and subsequently subtracting fixed opex/depreciation can double count embedded manufacturing overhead/depreciation.",
+      "no_synthetic_substitution": true
+    },
+    "B56": {
+      "status": "BLOCKED_BY_B55",
+      "additional_needed": [
+        "Comparable full-year company-wide forward scenario",
+        "Explicit, typed fixed cash opex / depreciation / finance cost / tax assumptions without double counting cost-of-revenue components",
+        "2026FY Q4 scenario inputs anchored to the actual Q1-Q3 reported period"
+      ]
+    },
+    "B57": {
+      "status": "BLOCKED_BY_B56",
+      "additional_needed": [
+        "Forward all-items parent-attributable earnings bridge",
+        "Forward tax-after attribution adjustments",
+        "Scenario-specific weighted-average diluted shares or an explicitly labelled analyst assumption accepted by the contract"
+      ],
+      "reported_eps_is_not_forward_eps": true
+    },
+    "B58": {
+      "status": "NOT_COMPARABLE_NO_VALID_FORWARD_B57_AND_PRIMARY_EPS_PAIR",
+      "additional_needed": [
+        "Same-period B57 all-items EPS",
+        "Primary EPS actually used by EPS_MULTIPLE",
+        "Matching diluted-share denominator and tax/attribution basis"
+      ]
+    },
+    "B60": {
+      "status": "BLOCKED_OPERATOR_ATTESTED_CURRENT_PRICE_MISSING",
+      "required_price_class": "OPERATOR_ATTESTED_MARKET_DATA_OR_FORMALLY_ADMITTED_SOURCE",
+      "current_price": null,
+      "note": "Do not reuse the 2026-10-07 pilot price context as a 2026-11-05 current price."
+    },
+    "external_mie": {
+      "status": "NOT_IDENTIFIABLE",
+      "reason": "This readiness package contains no verified market consensus/expectation dataset."
+    },
+    "formal_evidence_pit_admission_created": false,
+    "formal_forecast_admission_created": false,
+    "formal_valuation_admission_created": false,
+    "decision_created": false,
+    "publication_created": false,
+    "run_receipt_created": false,
+    "execution_authorized": false
+  }
+}

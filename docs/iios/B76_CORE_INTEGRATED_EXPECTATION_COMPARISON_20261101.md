@@ -3,7 +3,7 @@
 **开发分支：** `feat/b76-core-integrated-20261101`  
 **开发基线：** B73 `faeee544238dd4b6154e2b0a7a4a53c8a88a6815`  
 **最新批次提交：** 见本分支 HEAD。  
-**状态：** B76 核心与执行恢复修复已提交到隔离集成分支；精确 HEAD `6ee0d2bae159f42481b4836f893be5a842993f1d` 的 15/15 关联工作流通过，macOS/Ubuntu 组合测试各 451 passed。未合并 main；真实用户 Mac 全流程 + Replay 仍未验收，真实公司 B76-ready 数值输入包仍缺。
+**状态：** B76 代码与执行恢复已在 `b388411783f3787e2b5e826f3c27f0edf30d0870` 完成 15/15 关联工作流验证；本轮补入新和成 002001 的 2025FY / 2026Q1-Q3 真实披露就绪度工作包。真实公司 B76 数值链尚未闭合：B55 物理量价成本历史基线缺失，B56/B57/B58 依赖阻断，B60 缺少 2026-11-05 操作员现价；下一批需要独立的公开财报金额桥。未合并 main，真实用户 Mac + Replay 仍未验收。
 
 ## 1. 为什么重建正确开发基线
 
@@ -229,3 +229,14 @@ EPS_MULTIPLE 不再因早期分支返回而漏掉 payoff、thesis-break stress �
 - `decision_authority=False`
 
 不会生成 BUY/ADD/HOLD/REDUCE/EXIT，不创建正式证据/预测/估值准入，不授权交易或自动下单。
+
+
+## 6C. 新和成 002001 真实披露就绪度审计（2026-11-05）
+
+已新增 `examples/real_cases/RC-CN-A-002001-20261105_b76_readiness.json`、`docs/iios/B76_XINHECHENG_20261105_REAL_CASE_READINESS.md` 与 `tests/test_b76_xinhecheng_current_case_readiness.py`。这批只做披露事实对账与 fail-closed 就绪度测试，不生成 2026FY 预测、EPS 余量、估值或决策。
+
+审计发现：2025 年报披露四类业务的合同收入与营业成本，但没有 B55 要求的逐线历史销量、净 ASP 和单位变动成本。营业成本不等于单位变动成本，不能直接填入 B55，否则制造费用/折旧可能在 B56 重复扣减。因此 B55 保持 UNKNOWN/阻断，B56/B57/B58 不得升级。2026Q1-Q3 已有 1.90 元稀释 EPS，但它是九个月已实现 EPS，不是全年或下一预测期 EPS；报告未在本轮提取到精确加权平均稀释股数，不能由两位小数 EPS 反算。当前价未取得操作员声明，B60 不运行。
+
+下一批拟只加一个与 B55 物理驱动链并列、但口径独立的 Public Financial-Statement Bridge：按报表行项目计算 gross profit → operating profit → PBT → tax → consolidated net profit → parent-attributable profit；2026FY 采用 9M 实际 + Q4 Bear/Base/Bull 显式假设。不得把金额桥标成销量/ASP/单位成本归因，不能重复扣减营业成本中已经包含的折旧/制造费用；B57 仍需独立归母调整和稀释股数，B58/B60 的同期间、同分母与价格门槛保持不变。
+
+本次工作包的唯一结论：**真实公司经营事实有可用披露，但现有 B55 物理驱动合同对新和成及大量只披露财务金额的上市公司不适配；解决办法是新增独立金额桥，而不是放宽 B55 或伪造物理量。**
