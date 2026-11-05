@@ -137,3 +137,8 @@ B4 可选输入节点 `financial_statement_amount_bridge` 已加入 `operating_d
 系统仅在三套情景齐全时生成条件性 FY2026 归母利润与 all-items diluted EPS；缺少任何输入则该情景保持 BLOCKED，不把空值默认为 0。条件 EPS 不等于发行人预测、正式 B57、B58 primary EPS MATCH 或决策输入。
 
 当前真实案例没有提供 Q4 数字和年度稀释股数假设，因此真实案例状态仍为 `Q4_SCENARIOS_NOT_PROVIDED`，没有新增真实预测结果。测试中的 Q4 数值仅是算术合成夹具。
+
+
+## 10. 期间与情景集合守门（2026-11-05）
+
+Q4 接口要求实际期间严格为 `YYYYQ1-Q3`、预测期间为同一年度 `YYYYFY`，不允许跨年或使用年度实际冒充前三季度实际。情景集合必须恰好包含 Bear/Base/Bull 三项；缺项或额外项均阻断。新增两项回归覆盖期间错配与情景集合不完整。

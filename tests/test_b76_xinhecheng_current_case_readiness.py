@@ -191,3 +191,27 @@ def test_q4_financial_statement_scenarios_calculate_conditional_eps_only_from_co
     assert row["annual_weighted_average_diluted_shares_data_class"] == "ANALYST_ASSUMPTION"
     assert row["formal_forecast_admission_created"] is False
     assert row["decision_authority"] is False
+
+
+
+def test_q4_financial_statement_scenarios_reject_cross_year_or_non_q1_q3_actual_periods():
+    from iios_mvp.operating_driver_forecast_v01 import _build_financial_statement_amount_bridge
+
+    raw = _case()["financial_statement_amount_bridge"]
+    scenario = {"q4_line_items": {}, "annual_weighted_average_diluted_shares": {}}
+    raw["q4_forecast"]["scenarios"] = {"bear": scenario, "base": scenario, "bull": scenario}
+    raw["q4_forecast"]["actual_period"] = "2025FY"
+    raw["q4_forecast"]["forecast_period"] = "2026FY"
+    bridge = _build_financial_statement_amount_bridge(raw)
+    assert bridge["forecast_status"] == "BLOCKED_PERIOD_ALIGNMENT"
+    assert bridge["forecast_scenarios"] == {}
+
+
+def test_q4_financial_statement_scenarios_require_exact_bear_base_bull_set():
+    from iios_mvp.operating_driver_forecast_v01 import _build_financial_statement_amount_bridge
+
+    raw = _case()["financial_statement_amount_bridge"]
+    raw["q4_forecast"]["scenarios"] = {"bear": {}, "base": {}}
+    bridge = _build_financial_statement_amount_bridge(raw)
+    assert bridge["forecast_status"] == "BLOCKED_SCENARIO_SET_INCOMPLETE_OR_INVALID"
+    assert bridge["forecast_scenarios"] == {}

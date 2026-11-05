@@ -2483,23 +2483,34 @@ def _build_financial_statement_amount_bridge(raw: Any) -> dict[str, Any]:
     elif actual_period not in periods or periods[actual_period].get("status") != "RECONCILED_REPORTED_ACTUAL":
         forecast_status = "BLOCKED_ACTUAL_PERIOD_NOT_RECONCILED"
     else:
-        for scenario_name in SCENARIOS:
-            forecast_scenarios[scenario_name] = _build_q4_financial_statement_scenario(
-                q4_scenarios_raw.get(scenario_name),
-                actual_ytd=periods[actual_period],
-                forecast_period=forecast_period,
-                scenario_name=scenario_name,
-            )
-        scenario_statuses = [
-            str((forecast_scenarios.get(name) or {}).get("status") or "UNKNOWN")
-            for name in SCENARIOS
-        ]
-        if all(status == "CONDITIONAL_ANALYST_ASSUMPTION_CALCULATED" for status in scenario_statuses):
-            forecast_status = "CONDITIONAL_ANALYST_SCENARIOS_CALCULATED"
-        elif any(status == "CONDITIONAL_ANALYST_ASSUMPTION_CALCULATED" for status in scenario_statuses):
-            forecast_status = "PARTIAL"
+        actual_year_match = re.fullmatch(r"(\\d{4})Q1-Q3", actual_period)
+        forecast_year_match = re.fullmatch(r"(\\d{4})FY", forecast_period)
+        if (
+            actual_year_match is None
+            or forecast_year_match is None
+            or actual_year_match.group(1) != forecast_year_match.group(1)
+        ):
+            forecast_status = "BLOCKED_PERIOD_ALIGNMENT"
+        elif set(q4_scenarios_raw) != set(SCENARIOS):
+            forecast_status = "BLOCKED_SCENARIO_SET_INCOMPLETE_OR_INVALID"
         else:
-            forecast_status = "NOT_IDENTIFIABLE_OR_BLOCKED"
+            for scenario_name in SCENARIOS:
+                forecast_scenarios[scenario_name] = _build_q4_financial_statement_scenario(
+                    q4_scenarios_raw.get(scenario_name),
+                    actual_ytd=periods[actual_period],
+                    forecast_period=forecast_period,
+                    scenario_name=scenario_name,
+                )
+            scenario_statuses = [
+                str((forecast_scenarios.get(name) or {}).get("status") or "UNKNOWN")
+                for name in SCENARIOS
+            ]
+            if all(status == "CONDITIONAL_ANALYST_ASSUMPTION_CALCULATED" for status in scenario_statuses):
+                forecast_status = "CONDITIONAL_ANALYST_SCENARIOS_CALCULATED"
+            elif any(status == "CONDITIONAL_ANALYST_ASSUMPTION_CALCULATED" for status in scenario_statuses):
+                forecast_status = "PARTIAL"
+            else:
+                forecast_status = "NOT_IDENTIFIABLE_OR_BLOCKED"
 
     overall = (
         "ACTUALS_RECONCILED_FORECAST_NOT_PROVIDED"

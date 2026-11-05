@@ -266,3 +266,8 @@ EPS_MULTIPLE 不再因早期分支返回而漏掉 payoff、thesis-break stress �
 金额桥支持 2026Q1-Q3 实际 + Q4 Bear/Base/Bull 条件情景。Q4 各损益行和少数股东损益必须逐项采用 typed `ANALYST_ASSUMPTION`（CNY + identifiable basis）；全年加权平均稀释股数另行采用正数 shares 假设。三套均完整时才输出条件性 FY2026 归母利润和 all-items diluted EPS；缺项不会默认 0。该输出不写入 B57/B58/B60、估值或 Decision，也不会升级正式 Forecast Admission。
 
 真实新和成案例尚未提供任何 Q4 情景或年度加权平均稀释股数，因此真实案例仍无 FY2026 EPS。
+
+
+## 6G. Q4 合并期间和情景集合守门
+
+Q4 条件金额桥仅接受同一年度 `YYYYQ1-Q3` 实际 + `YYYYFY` 前瞻，且 Bear/Base/Bull 集合必须完整且无额外情景。错期返回 `BLOCKED_PERIOD_ALIGNMENT`，情景集合错误返回 `BLOCKED_SCENARIO_SET_INCOMPLETE_OR_INVALID`；不在错误期间上生成数值。
