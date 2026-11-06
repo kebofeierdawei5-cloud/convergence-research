@@ -1481,6 +1481,81 @@ def _build_per_share_earnings_bridge(
             return "MIXED_ISSUER_FORECAST_AND_ANALYST_ASSUMPTION"
         return "MIXED_OBSERVED_ACTUAL_ISSUER_FORECAST_AND_ANALYST_ASSUMPTION"
 
+    def build_source_lineage_assessment(*values: Any) -> dict[str, Any]:
+        found_classes: set[str] = set()
+        evidence_statuses: set[str] = set()
+        claimed_evidence_refs: set[str] = set()
+        source_issues: set[str] = set()
+
+        def visit(value: Any) -> None:
+            if isinstance(value, Mapping):
+                data_class = str(value.get("data_class") or "").strip().upper()
+                if data_class in {"OBSERVED_ACTUAL", "ISSUER_FORECAST", "ANALYST_ASSUMPTION"}:
+                    found_classes.add(data_class)
+                evidence_status = str(value.get("evidence_status") or "").strip().upper()
+                if evidence_status:
+                    evidence_statuses.add(evidence_status)
+                refs = value.get("evidence_refs")
+                if isinstance(refs, list):
+                    claimed_evidence_refs.update(
+                        str(item).strip() for item in refs if str(item).strip()
+                    )
+                issues = value.get("issues")
+                if isinstance(issues, list):
+                    source_issues.update(str(item) for item in issues if str(item))
+                for child in value.values():
+                    visit(child)
+            elif isinstance(value, (list, tuple)):
+                for child in value:
+                    visit(child)
+
+        for value in values:
+            visit(value)
+
+        has_external_source = bool(found_classes & {"OBSERVED_ACTUAL", "ISSUER_FORECAST"})
+        unresolved_markers = (
+            "SOURCE_REFERENCE_UNRESOLVED",
+            "SOURCE_AFTER_CUTOFF",
+            "SOURCE_TIMING_UNCERTAIN",
+            "DATA_CLASS_NOT_ALLOWED_FOR_CONTEXT",
+        )
+        unresolved = any(
+            marker in issue for issue in source_issues for marker in unresolved_markers
+        ) or bool(evidence_statuses & {
+            "SOURCE_REFERENCE_MISSING",
+            "SOURCE_REFERENCE_UNRESOLVED",
+            "SOURCE_AFTER_CUTOFF",
+            "SOURCE_TIMING_UNCERTAIN",
+        })
+        if not found_classes:
+            lineage_status = "SOURCE_LINEAGE_NOT_IDENTIFIABLE"
+        elif unresolved:
+            lineage_status = "SOURCE_REFERENCE_VALIDATION_BLOCKED_OR_UNRESOLVED"
+        elif has_external_source and evidence_statuses == {"PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}:
+            lineage_status = "PIT_TIME_PRECHECK_ONLY_NOT_FORMALLY_ADMITTED"
+        elif has_external_source:
+            lineage_status = "SOURCE_REFERENCE_PRESENT_NOT_FORMALLY_ADMITTED"
+        elif found_classes == {"ANALYST_ASSUMPTION"}:
+            lineage_status = "ANALYST_ASSUMPTIONS_NOT_EVIDENCE_ADMISSION"
+        else:
+            lineage_status = "MIXED_SOURCE_LINEAGE_NOT_FORMALLY_ADMITTED"
+
+        return {
+            "status": lineage_status,
+            "source_data_classes": sorted(found_classes),
+            "source_evidence_statuses": sorted(evidence_statuses),
+            "claimed_evidence_refs": sorted(claimed_evidence_refs),
+            "source_reference_validation_issues": sorted(source_issues),
+            "formal_evidence_pit_admission_status": (
+                "NOT_FORMALLY_ADMITTED" if has_external_source
+                else "NOT_APPLICABLE_NO_EXTERNAL_EVIDENCE_SOURCE"
+            ),
+            "formal_forecast_admission_status": "NOT_CREATED_BY_LOCAL_PILOT",
+            "formal_evidence_pit_admission_created": False,
+            "formal_forecast_admission_created": False,
+            "decision_grade_forecast_eligible": False,
+        }
+
     for scenario_name in SCENARIOS:
         raw_forward = scenarios_raw.get(scenario_name)
         raw_forward = raw_forward if isinstance(raw_forward, Mapping) else {}
@@ -1589,6 +1664,26 @@ def _build_per_share_earnings_bridge(
                         "reported_actual_periods": {
                             "data_class": "OBSERVED_ACTUAL",
                             "status": statement_amount_bridge.get("actual_period_status"),
+                            "source_reference_status": "PRESENT_NOT_PIT_VALIDATED",
+                            "periods": [
+                                {
+                                    "period": period_name,
+                                    "bridge_status": period_row.get("status"),
+                                    "source_reference_id": period_row.get("source_id"),
+                                    "source_url": period_row.get("source_url"),
+                                    "publication_date": period_row.get("publication_date"),
+                                    "source_admission_status": period_row.get("source_admission_status"),
+                                    "evidence_ids": list(period_row.get("evidence_ids") or []),
+                                    "raw_bytes_verified": period_row.get("raw_bytes_verified") is True,
+                                    "pit_validation_performed": period_row.get("pit_validation_performed") is True,
+                                }
+                                for period_name, period_row in (
+                                    statement_amount_bridge.get("actual_periods", {}).items()
+                                    if isinstance(statement_amount_bridge.get("actual_periods"), Mapping)
+                                    else []
+                                )
+                                if isinstance(period_row, Mapping)
+                            ],
                         },
                         "q4_forecast_line_items": {
                             "data_class": "ANALYST_ASSUMPTION",
@@ -1600,6 +1695,31 @@ def _build_per_share_earnings_bridge(
                         },
                     },
                     "data_class_semantics": "LEGACY_FIELD_DESCRIBES_CONDITIONAL_FORECAST_INPUTS_ONLY; COMBINED_OUTPUT_DATA_CLASS_DESCRIBES_ACTUAL_PLUS_ASSUMPTION_PROVENANCE",
+                    "source_lineage_assessment": {
+                        "status": "REPORTED_ACTUAL_SOURCE_REFERENCES_PRESENT_NOT_PIT_VALIDATED_PLUS_ANALYST_ASSUMPTIONS",
+                        "source_data_classes": ["OBSERVED_ACTUAL", "ANALYST_ASSUMPTION"],
+                        "reported_source_reference_ids": sorted({
+                            str(period_row.get("source_id")).strip()
+                            for period_row in (
+                                statement_amount_bridge.get("actual_periods", {}).values()
+                                if isinstance(statement_amount_bridge.get("actual_periods"), Mapping)
+                                else []
+                            )
+                            if isinstance(period_row, Mapping) and str(period_row.get("source_id") or "").strip()
+                        }),
+                        "claimed_evidence_refs": [],
+                        "formal_evidence_pit_admission_status": "NOT_FORMALLY_ADMITTED",
+                        "formal_forecast_admission_status": "NOT_CREATED_BY_LOCAL_PILOT",
+                        "pit_validation_performed": False,
+                        "raw_bytes_verified": False,
+                        "formal_evidence_pit_admission_created": False,
+                        "formal_forecast_admission_created": False,
+                        "decision_grade_forecast_eligible": False,
+                        "issues": [
+                            "FINANCIAL_STATEMENT_AMOUNT_BRIDGE_PERFORMS_ARITHMETIC_RECONCILIATION_ONLY",
+                            "SOURCE_ID_AND_PUBLICATION_DATE_ARE_NOT_SIGNED_EVIDENCE_PIT_ADMISSION",
+                        ],
+                    },
                     "financial_statement_amount_bridge_status": statement_amount_bridge.get("status"),
                     "financial_statement_amount_bridge_scenario_status": statement_status,
                     "financial_statement_amount_assumption_inputs": statement_row.get("q4_assumption_inputs"),
@@ -1745,6 +1865,11 @@ def _build_per_share_earnings_bridge(
         )
         row["forward_scenario"]["source_data_classes"] = sorted(source_classes)
         row["forward_scenario"]["combined_output_data_class"] = combine_forward_data_classes(source_classes)
+        row["forward_scenario"]["source_lineage_assessment"] = build_source_lineage_assessment(
+            b55_forward_measures,
+            b56_forward_lineage,
+            forward_inputs,
+        )
         row["all_items_eps_status"] = "CALCULATED_AND_RECONCILED"
         normalized_only_forward_missing = (
             fwd_values.get("minority_interest_nonrecurring_after_tax_cny") is None
@@ -2617,7 +2742,11 @@ def _build_financial_statement_amount_bridge(raw: Any) -> dict[str, Any]:
             "source_url": period_raw.get("source_url"),
             "publication_date": publication_date,
             "known_at_upper_bound": period_raw.get("known_at_upper_bound"),
-            "source_admission_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_FORMALLY_ADMITTED",
+            "source_reference_status": "SOURCE_ID_AND_PUBLICATION_DATE_PRESENT_ONLY",
+            "source_admission_status": "SOURCE_REFERENCE_PRESENT_NOT_PIT_VALIDATED_NOT_FORMALLY_ADMITTED",
+            "evidence_ids": [],
+            "raw_bytes_verified": False,
+            "pit_validation_performed": False,
             "calculated_totals_cny": {
                 "gross_profit": format(gross_profit, "f"),
                 "total_operating_cost": format(total_cost, "f"),

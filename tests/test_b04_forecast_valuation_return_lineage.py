@@ -143,7 +143,7 @@ def _evidence_admission_bundle(tmp_path: Path):
     registry_path = tmp_path / "signer-registry.json"
     registry_path.write_text(json.dumps({
         "schema_version": SIGNER_REGISTRY_SCHEMA,
-        "registry_status": "TEST_ONLY",
+        "registry_status": "ACTIVE",
         "signers": [{
             "signer_key_id": "b04-test-owner",
             "public_key_b64": base64.b64encode(public_raw).decode("ascii"),

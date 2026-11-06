@@ -497,6 +497,10 @@ def _eps_multiple_comparison(
         "b4_forecast_modified": False,
         "b60_calculation_modified": False,
         "valuation_modified": False,
+        "formal_evidence_pit_admission_created": False,
+        "formal_forecast_admission_created": False,
+        "decision_grade_forecast_eligible": False,
+        "decision_grade_status": "NOT_ADMITTED_CONDITIONAL_ARITHMETIC_ONLY",
         "decision_authority": False,
         "period_alignment_contract": (
             "仅接受 B60 场景的 b58_forecast_period_match=True；B58 已核对 B4 forecast_period、B57 forward period、"
@@ -507,6 +511,7 @@ def _eps_multiple_comparison(
             "不把 EPS_MULTIPLE 主适配器自报 EPS 当成独立 B4 预测；每个情景必须保留 B57 与主 EPS 的来源分类。"
         ),
         "b58_confirmation_semantics": "B58 MATCH means arithmetic period/share/accounting reconciliation only; it is not independent source confirmation or formal admission.",
+        "source_trust_semantics": "B57 source class and PIT-compatible prechecks are provenance metadata only; B76 does not create signed Evidence/PIT admission or formal Forecast Admission. Arithmetic PASS remains conditional, not decision-grade.",
         "required_return_rate_source": "B60 receives decision_parameters.required_return_annualized; B76 rechecks the supplied rate and never substitutes the Fundamental Target.",
         "fundamental_target_rate_source": "B60 receives the separately configured decision_parameters.fundamental_target_annualized_return.",
         "target_entry_price_source": "EXISTING_RETURN_SOLVER_ONLY",
@@ -586,6 +591,10 @@ def _eps_multiple_comparison(
             "primary_adapter_eps_cny_per_share": _fmt(primary_eps),
             "b57_forward_data_class": str(raw.get("b57_forward_data_class") or "SOURCE_CLASS_NOT_IDENTIFIABLE"),
             "b57_source_data_classes": list(raw.get("b57_source_data_classes") or []) if isinstance(raw.get("b57_source_data_classes"), list) else [],
+            "b57_source_lineage_assessment": dict(raw.get("b57_source_lineage_assessment") or {}) if isinstance(raw.get("b57_source_lineage_assessment"), Mapping) else {},
+            "formal_evidence_pit_admission_created": False,
+            "formal_forecast_admission_created": False,
+            "decision_grade_forecast_eligible": False,
             "primary_eps_data_class": str(raw.get("primary_eps_data_class") or "SOURCE_CLASS_NOT_IDENTIFIABLE"),
             "primary_eps_evidence_refs": list(raw.get("primary_eps_evidence_refs") or []) if isinstance(raw.get("primary_eps_evidence_refs"), list) else [],
             "independent_confirmation_status": "NOT_ESTABLISHED_BY_B58_NUMERICAL_RECONCILIATION",
