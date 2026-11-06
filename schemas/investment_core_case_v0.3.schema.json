@@ -507,11 +507,21 @@
             "FORECAST"
           ],
           "properties": {
-            "REALITY": {"$ref": "#/$defs/canonicalAdmissionReference"},
-            "QUALITY": {"$ref": "#/$defs/canonicalAdmissionReference"},
-            "VALUE_DRIVER": {"$ref": "#/$defs/canonicalAdmissionReference"},
-            "VALUATION": {"$ref": "#/$defs/canonicalAdmissionReference"},
-            "FORECAST": {"$ref": "#/$defs/canonicalAdmissionReference"}
+            "REALITY": {
+              "$ref": "#/$defs/canonicalAdmissionReference"
+            },
+            "QUALITY": {
+              "$ref": "#/$defs/canonicalAdmissionReference"
+            },
+            "VALUE_DRIVER": {
+              "$ref": "#/$defs/canonicalAdmissionReference"
+            },
+            "VALUATION": {
+              "$ref": "#/$defs/canonicalAdmissionReference"
+            },
+            "FORECAST": {
+              "$ref": "#/$defs/canonicalAdmissionReference"
+            }
           }
         }
       }
@@ -627,6 +637,34 @@
             },
             "bull": {
               "$ref": "#/$defs/scenario"
+            }
+          }
+        },
+        "canonical_evidence_admission_ref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "envelope_sha256",
+            "manifest_sha256",
+            "rights_record_sha256",
+            "permission_evidence_sha256"
+          ],
+          "properties": {
+            "envelope_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "manifest_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "rights_record_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "permission_evidence_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
             }
           }
         }
@@ -1539,15 +1577,41 @@
         "cutoff_date"
       ],
       "properties": {
-        "admission_id": {"type": "string", "minLength": 1},
-        "admission_record_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-        "contract_version": {"const": "IIOS-CANONICAL-INVESTMENT-ADMISSION-0.1"},
-        "domain": {"type": "string", "minLength": 1},
-        "case_id": {"type": "string", "minLength": 1},
-        "market": {"type": "string", "minLength": 1},
-        "symbol": {"type": "string", "minLength": 1},
-        "company": {"type": "string", "minLength": 1},
-        "cutoff_date": {"type": "string", "format": "date"}
+        "admission_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "admission_record_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "contract_version": {
+          "const": "IIOS-CANONICAL-INVESTMENT-ADMISSION-0.1"
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "market": {
+          "type": "string",
+          "minLength": 1
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1
+        },
+        "company": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cutoff_date": {
+          "type": "string",
+          "format": "date"
+        }
       }
     },
     "scenario": {
@@ -1617,16 +1681,22 @@
         "properties": {
           "decision_upstream_admission": {
             "properties": {
-              "schema_version": {"const": "IIOS-CORE-04-UPSTREAM-ADMISSION-0.2"}
+              "schema_version": {
+                "const": "IIOS-CORE-04-UPSTREAM-ADMISSION-0.2"
+              }
             },
-            "required": ["schema_version"]
+            "required": [
+              "schema_version"
+            ]
           }
         }
       },
       "then": {
         "properties": {
           "decision_upstream_admission": {
-            "required": ["canonical_admission_refs"]
+            "required": [
+              "canonical_admission_refs"
+            ]
           }
         }
       }

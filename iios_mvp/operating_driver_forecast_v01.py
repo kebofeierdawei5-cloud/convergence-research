@@ -1586,7 +1586,9 @@ def _build_per_share_earnings_bridge(
             "issues": [],
             "eps_growth_status": "UNKNOWN",
             "eps_growth_rate": None,
+            "formal_evidence_pit_admission_created": False,
             "formal_forecast_admission_created": False,
+            "decision_grade_forecast_eligible": False,
             "decision_authority": False,
         }
         if str(scope or "UNKNOWN").strip().upper() != "COMPANY_WIDE":

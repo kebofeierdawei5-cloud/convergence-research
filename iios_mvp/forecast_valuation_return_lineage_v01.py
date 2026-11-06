@@ -289,15 +289,15 @@ def validate_forecast_valuation_return_lineage(
     return_gate: Mapping[str, Any],
     canonical_forecast_ref: Mapping[str, Any],
     canonical_valuation_ref: Mapping[str, Any],
-    canonical_evidence_admission_ref: Mapping[str, Any],
     independent_forecast_resolver: CanonicalIndependentForecastResolver,
-    evidence_admission_resolver: CanonicalSignedEvidenceAdmissionResolver,
     valuation_output_resolver: CanonicalValuationOutputResolver,
     case_id: str,
     market: str,
     symbol: str,
     company: str,
     cutoff_date: date,
+    canonical_evidence_admission_ref: Mapping[str, Any] | None = None,
+    evidence_admission_resolver: CanonicalSignedEvidenceAdmissionResolver | None = None,
 ) -> dict[str, Any]:
     if return_gate.get("lineage_version") != FORECAST_VALUATION_RETURN_LINEAGE_VERSION:
         raise ValueError("return gate lineage version mismatch")
@@ -325,33 +325,50 @@ def validate_forecast_valuation_return_lineage(
     if valuation_forecast_ref != forecast_ref:
         raise ValueError("valuation.forecast_ref does not equal return gate canonical_forecast_ref")
 
-    evidence_admission_ref = CanonicalSignedEvidenceAdmissionReference.from_mapping(
-        canonical_evidence_admission_ref
-    ).to_dict()
-    declared_evidence_ref = CanonicalSignedEvidenceAdmissionReference.from_mapping(
-        return_gate.get("canonical_evidence_admission_ref")
-    ).to_dict()
-    if declared_evidence_ref != evidence_admission_ref:
-        raise ValueError("return_gate canonical_evidence_admission_ref does not equal supplied Evidence/PIT reference")
     required_evidence_ids = sorted(set(
         [str(item) for item in forecast.get("evidence_ids", [])]
         + [str(item) for item in valuation.get("evidence_ids", [])]
     ))
-    evidence_admission = evidence_admission_resolver.resolve_signed_evidence_admission(
-        evidence_admission_ref,
-        case_id=case_id,
-        market=market,
-        symbol=symbol,
-        cutoff_date=cutoff_date,
-        required_evidence_ids=required_evidence_ids,
+    declared_evidence_ref = return_gate.get("canonical_evidence_admission_ref")
+    evidence_refs_supplied = (
+        canonical_evidence_admission_ref is not None
+        or declared_evidence_ref is not None
+        or evidence_admission_resolver is not None
     )
-    if (
-        evidence_admission.get("status") != "FORMALLY_ADMITTED"
-        or evidence_admission.get("decision") != "ADMIT"
-        or evidence_admission.get("core_pit_validation") != "PASS"
-        or sorted(evidence_admission.get("evidence_ids_verified") or []) != required_evidence_ids
-    ):
-        raise ValueError("forecast and valuation Evidence/PIT references are not formally admitted")
+    evidence_formally_admitted = False
+    evidence_admission_ref = None
+    evidence_admission = None
+    evidence_ids_verified: list[str] = []
+    if evidence_refs_supplied:
+        if canonical_evidence_admission_ref is None or declared_evidence_ref is None:
+            raise ValueError("signed Evidence/PIT reference must be supplied both in return_gate and runtime resolver inputs")
+        if evidence_admission_resolver is None:
+            raise ValueError("signed Evidence/PIT resolver is required when canonical_evidence_admission_ref is supplied")
+        evidence_admission_ref = CanonicalSignedEvidenceAdmissionReference.from_mapping(
+            canonical_evidence_admission_ref
+        ).to_dict()
+        declared_evidence_ref = CanonicalSignedEvidenceAdmissionReference.from_mapping(
+            declared_evidence_ref
+        ).to_dict()
+        if declared_evidence_ref != evidence_admission_ref:
+            raise ValueError("return_gate canonical_evidence_admission_ref does not equal supplied Evidence/PIT reference")
+        evidence_admission = evidence_admission_resolver.resolve_signed_evidence_admission(
+            evidence_admission_ref,
+            case_id=case_id,
+            market=market,
+            symbol=symbol,
+            cutoff_date=cutoff_date,
+            required_evidence_ids=required_evidence_ids,
+        )
+        if (
+            evidence_admission.get("status") != "FORMALLY_ADMITTED"
+            or evidence_admission.get("decision") != "ADMIT"
+            or evidence_admission.get("core_pit_validation") != "PASS"
+            or sorted(evidence_admission.get("evidence_ids_verified") or []) != required_evidence_ids
+        ):
+            raise ValueError("forecast and valuation Evidence/PIT references are not formally admitted")
+        evidence_formally_admitted = True
+        evidence_ids_verified = required_evidence_ids
 
     expected_horizon = _dec(return_gate["horizon_years"], "return_gate.horizon_years")
     valuation_horizon = _dec(valuation["horizon_years"], "valuation.horizon_years")
@@ -400,11 +417,24 @@ def validate_forecast_valuation_return_lineage(
         "valuation_primary_model": valuation.get("primary_model"),
         "horizon_years": str(valuation_horizon),
         "reference_value_per_share": str(canonical_reference),
-        "binding": "FORECAST_REF_EQUALITY_EVIDENCE_ID_SUBSET_AND_CANONICAL_VALUATION_SCENARIO_EQUALITY",
+        "binding": (
+            "FORECAST_REF_EQUALITY_EVIDENCE_ID_SUBSET_CANONICAL_VALUATION_SCENARIO_EQUALITY_AND_SIGNED_EVIDENCE_PIT"
+            if evidence_formally_admitted
+            else "FORECAST_REF_EQUALITY_AND_CANONICAL_VALUATION_SCENARIO_EQUALITY_ONLY"
+        ),
         "canonical_evidence_admission_ref": evidence_admission_ref,
-        "evidence_pit_admission_status": "FORMALLY_ADMITTED",
+        "evidence_pit_admission_status": (
+            "FORMALLY_ADMITTED" if evidence_formally_admitted else "NOT_FORMALLY_ADMITTED"
+        ),
         "evidence_pit_admission": evidence_admission,
-        "evidence_ids_verified": required_evidence_ids,
+        "evidence_ids_declared": required_evidence_ids,
+        "evidence_ids_verified": evidence_ids_verified,
+        "formal_return_lineage_status": (
+            "FORMALLY_EVIDENCE_BOUND" if evidence_formally_admitted else "CONDITIONAL_NOT_FORMALLY_EVIDENCE_ADMITTED"
+        ),
+        "formal_evidence_pit_admission_created": False,
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
         # Retain exact resolver-returned payloads so formal write authorization
         # can revalidate them after the process that performed admission exits.
         "forecast_record": dict(forecast),
