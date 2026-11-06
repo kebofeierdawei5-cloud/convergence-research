@@ -1,7 +1,7 @@
 # IIOS Project State Index
 
 State classification: **BRANCH PROPOSAL — NOT CANONICAL**
-Snapshot: 2026-11-05
+Snapshot: 2026-11-06
 Authority: the canonical Current State Index is on `main`; this branch copy describes unmerged proposals only and does not replace canonical state.
 
 ## CURRENT CORE RESEARCH DEVELOPMENT — B76 INTEGRATED ON B73 PROPOSAL BASE
@@ -3192,3 +3192,16 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Placement:** iios_mvp/operating_feasibility_remediation_v01.py; output under assessment.market_implied_expectation.price_implied_analysis.local_sotp_recalculation.operating_feasibility_remediation_assessment. Pilot report displays the result.
 - **Prompt isolation:** operating_feasibility_remediation_submissions is retained for local analysis but excluded from the Round B model prompt; only the local B73 rules engine consumes it.
 - **Regression coverage:** twenty-two cases authored in tests/test_operating_feasibility_remediation_v01.py; not executed. Replay, CI, unified tests and real macOS acceptance are not run or verified. No PASS is claimed.
+
+
+## 6N. B78 — EPS_MULTIPLE 来源谱系与 B57→B58→B60→B76 准入边界（2026-11-06）
+
+**状态：代码已提交到本 Draft 提案分支；未合并 main。** 本批只闭合来源分类传导和诊断状态语义，不改变任何 EPS、P/E、回报率、终值、目标价或 Decision 算术。
+
+- B57 标记前瞻 EPS 实际来源类别。常规 B55/B56 路径从同情景的前瞻产品驱动、费用/税率及 B57 归属调整输入收集 OBSERVED_ACTUAL / ISSUER_FORECAST / ANALYST_ASSUMPTION；B77 独立财报金额路径明确输出 MIXED_OBSERVED_ACTUAL_AND_ANALYST_ASSUMPTION，并分别标记前三季度报告实际、Q4 分项假设和年度稀释股数假设。保留旧 data_class=ANALYST_ASSUMPTION 字段以兼容旧消费者，但增加 combined_output_data_class 和分项谱系，禁止将其解释为整条输出纯分析假设或发行人预测。
+- B58 回显 B57 综合来源类别、主估值 EPS 的来源类别和证据引用。MATCH 只表示期间、稀释股数及利润归属算术对账，不等于独立来源确认、PIT 或正式准入。对于 ASSUMPTION_ONLY，数值接近另列 numeric_similarity_to_primary_declared_eps，eps_match=null，状态保持 PRIMARY_EPS_ASSUMPTION_ONLY。
+- B60 将 B57/B58/主 EPS 来源类别继续传递给反推链。B76 要求 B58=MATCH、期间一致、B57 来源类别可识别、主估值 EPS 来源类别可识别；任何 ASSUMPTION_ONLY 或来源类别缺失均不输出所需 EPS 差额或门槛余量。
+- B76 明确 B58 MATCH 仅是算术对账；外部 MIE 不被改写。Required Return 仍读取既有 decision_parameters.required_return_annualized；Fundamental Target 仍从独立参数读取，两者不互相替代。目标入场价只回显现有 Return Solver 输出，不另造计算路径。
+- 新增回归：B76 对 B58 PRIMARY_EPS_ASSUMPTION_ONLY fail-closed；B76 对 B57 来源分类缺失 fail-closed；B77 mixed actual/assumption 来源分项回显；B58 不再将假设值的数值接近错误标记为 eps_match=true。
+- 真实新和成案例仍没有 Q4 假设、全年加权平均稀释股数及操作员确认现价；没有生成真实 FY2026 EPS / B60 / BUY 或 NO-BUY。B55/B56、历史正常化 EPS、正式 Forecast/Valuation Admission、MIE 与 Decision 权限均未放宽。
+- 本批自动化测试需以新精确 HEAD 的 Linux 工作流结果为准；真实用户 macOS 完整验收仍为独立 NOT VERIFIED，取消不计为 PASS 或 pytest failure。

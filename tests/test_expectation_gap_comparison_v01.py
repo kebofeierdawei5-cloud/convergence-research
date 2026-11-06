@@ -258,6 +258,10 @@ def _eps_multiple_inputs():
             "b57_status": "CALCULATED_AND_RECONCILED",
             "b58_status": "MATCH",
             "b58_forecast_period_match": True,
+            "b57_forward_data_class": "MIXED_OBSERVED_ACTUAL_AND_ANALYST_ASSUMPTION",
+            "b57_source_data_classes": ["ANALYST_ASSUMPTION", "OBSERVED_ACTUAL"],
+            "primary_eps_data_class": "ANALYST_ASSUMPTION",
+            "primary_eps_evidence_refs": [],
             "b57_forward_period": "2027FY",
             "b57_all_items_parent_attributable_net_profit_proxy_cny": profit,
             "b57_diluted_weighted_average_shares": "100000",
@@ -286,6 +290,7 @@ def test_b76_eps_multiple_compares_b4_all_items_eps_with_b60_hurdle_eps():
             "horizon_years": "1",
             "expected_annualized_return": "0.12",
             "expected_annualized_return_method": "SUBMITTED_SCENARIO_WEIGHTS",
+            "target_entry_price": "24",
         },
         price_input={"price": "30"},
         forecast_valuation={},
@@ -316,6 +321,11 @@ def test_b76_eps_multiple_compares_b4_all_items_eps_with_b60_hurdle_eps():
     assert result["win_odds"]["time_cost"]["holding_period_year_fraction"] == "1"
     assert comparison["external_mie_modified"] is False
     assert comparison["decision_authority"] is False
+    assert comparison["scenarios"]["base"]["b57_forward_data_class"] == "MIXED_OBSERVED_ACTUAL_AND_ANALYST_ASSUMPTION"
+    assert comparison["scenarios"]["base"]["primary_eps_data_class"] == "ANALYST_ASSUMPTION"
+    assert comparison["scenarios"]["base"]["independent_confirmation_status"] == "NOT_ESTABLISHED_BY_B58_NUMERICAL_RECONCILIATION"
+    assert result["return_solver_target_entry_price"] == "24"
+    assert result["target_entry_price_modified"] is False
 
 
 def test_b76_eps_multiple_period_mismatch_keeps_gap_unknown():
@@ -565,3 +575,40 @@ def test_b76_eps_multiple_requires_b58_share_and_accounting_basis_match():
     assert base["required_return"] == {}
 
 
+
+
+def test_b76_eps_multiple_blocks_b58_assumption_only_primary_eps_bridge():
+    local, b60 = _eps_multiple_inputs()
+    b60["scenarios"]["base"]["b58_status"] = "PRIMARY_EPS_ASSUMPTION_ONLY"
+    result = build_expectation_gap_comparison(
+        local_sotp_recalculation=local,
+        return_metrics=None,
+        price_input={"price": "30"},
+        forecast_valuation={},
+        thesis_break_stress_review=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+        local_eps_multiple_recalculation=b60,
+    )
+    base = result["eps_multiple_comparison"]["scenarios"]["base"]
+    assert base["status"] == "NOT_IDENTIFIABLE"
+    assert "B58_PRIMARY_EPS_ACCOUNTING_AND_DILUTED_SHARE_BASIS_NOT_RECONCILED" in base["issues"]
+    assert base["required_return"] == {}
+    assert base["fundamental_target"] == {}
+
+
+def test_b76_eps_multiple_blocks_missing_b57_forward_source_class():
+    local, b60 = _eps_multiple_inputs()
+    b60["scenarios"]["base"]["b57_forward_data_class"] = "SOURCE_CLASS_NOT_IDENTIFIABLE"
+    result = build_expectation_gap_comparison(
+        local_sotp_recalculation=local,
+        return_metrics=None,
+        price_input={"price": "30"},
+        forecast_valuation={},
+        thesis_break_stress_review=None,
+        external_mie_status="NOT_IDENTIFIABLE",
+        local_eps_multiple_recalculation=b60,
+    )
+    base = result["eps_multiple_comparison"]["scenarios"]["base"]
+    assert base["status"] == "NOT_IDENTIFIABLE"
+    assert "B57_FORWARD_DATA_CLASS_NOT_IDENTIFIABLE" in base["issues"]
+    assert base["required_return"] == {}

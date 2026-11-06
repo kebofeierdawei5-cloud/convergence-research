@@ -329,6 +329,10 @@ def test_b57_accepts_forward_all_items_eps_from_statement_amount_bridge_without_
         row = b57["scenarios"][name]
         assert row["status"] == "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
         assert row["forward_scenario"]["data_class"] == "ANALYST_ASSUMPTION"
+        assert row["forward_scenario"]["source_data_classes"] == ["ANALYST_ASSUMPTION", "OBSERVED_ACTUAL"]
+        assert row["forward_scenario"]["combined_output_data_class"] == "MIXED_OBSERVED_ACTUAL_AND_ANALYST_ASSUMPTION"
+        assert row["forward_scenario"]["provenance_components"]["reported_actual_periods"]["data_class"] == "OBSERVED_ACTUAL"
+        assert row["forward_scenario"]["provenance_components"]["q4_forecast_line_items"]["data_class"] == "ANALYST_ASSUMPTION"
         assert row["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"] is None
         assert Decimal(row["forward_scenario"]["all_items_diluted_eps_proxy_cny_per_share"]) > 0
         assert row["formal_forecast_admission_created"] is False

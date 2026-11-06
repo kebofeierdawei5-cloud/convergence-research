@@ -475,11 +475,11 @@ def _eps_multiple_comparison(
     target = _dec(b60.get("fundamental_target_annualized_rate"))
     result: dict[str, Any] = {
         "status": "NOT_IDENTIFIABLE",
-        "classification": "B4_INDEPENDENT_EPS_VS_B60_PRICE_CONDITIONED_REQUIRED_EPS_NOT_EXTERNAL_MIE",
+        "classification": "B4_B57_CONDITIONAL_FORWARD_EPS_VS_B60_PRICE_CONDITIONED_REQUIRED_EPS_NOT_EXTERNAL_MIE",
         "selected_model_family": family,
         "currency": str(b60.get("currency") or "UNKNOWN").upper(),
         "unit": "CNY/share",
-        "comparison_basis": "B4_B57_COMPANY_WIDE_ALL_ITEMS_DILUTED_EPS_PROXY_VS_B60_REQUIRED_TERMINAL_EPS",
+        "comparison_basis": "B4_B57_COMPANY_WIDE_FORWARD_ALL_ITEMS_DILUTED_EPS_PROXY_VS_B60_REQUIRED_TERMINAL_EPS_WITH_EXPLICIT_SOURCE_CLASS",
         "forecast_period": b60.get("forecast_period") or "UNKNOWN",
         "valuation_terminal_date": b60.get("valuation_terminal_date") or "UNKNOWN",
         "annualization_year_fraction": _fmt(years),
@@ -504,8 +504,12 @@ def _eps_multiple_comparison(
         ),
         "earnings_basis": (
             "只使用 B60 携带的 B57 all-items parent-attributable EPS proxy；不使用 B57 normalized EPS，"
-            "也不把 EPS_MULTIPLE 主适配器自报 EPS 当成独立 B4 预测。"
+            "不把 EPS_MULTIPLE 主适配器自报 EPS 当成独立 B4 预测；每个情景必须保留 B57 与主 EPS 的来源分类。"
         ),
+        "b58_confirmation_semantics": "B58 MATCH means arithmetic period/share/accounting reconciliation only; it is not independent source confirmation or formal admission.",
+        "required_return_rate_source": "B60 receives decision_parameters.required_return_annualized; B76 rechecks the supplied rate and never substitutes the Fundamental Target.",
+        "fundamental_target_rate_source": "B60 receives the separately configured decision_parameters.fundamental_target_annualized_return.",
+        "target_entry_price_source": "EXISTING_RETURN_SOLVER_ONLY",
         "distribution_treatment": (
             "不含分红的 Required Return EPS 为主比较；只有 B60 标记为已验证的定时现金分配时，"
             "才单独展示分红调整比较。"
@@ -580,6 +584,11 @@ def _eps_multiple_comparison(
             "b4_diluted_weighted_average_shares": _fmt(b57_shares),
             "b4_independent_all_items_eps_proxy_cny_per_share": _fmt(b4_eps),
             "primary_adapter_eps_cny_per_share": _fmt(primary_eps),
+            "b57_forward_data_class": str(raw.get("b57_forward_data_class") or "SOURCE_CLASS_NOT_IDENTIFIABLE"),
+            "b57_source_data_classes": list(raw.get("b57_source_data_classes") or []) if isinstance(raw.get("b57_source_data_classes"), list) else [],
+            "primary_eps_data_class": str(raw.get("primary_eps_data_class") or "SOURCE_CLASS_NOT_IDENTIFIABLE"),
+            "primary_eps_evidence_refs": list(raw.get("primary_eps_evidence_refs") or []) if isinstance(raw.get("primary_eps_evidence_refs"), list) else [],
+            "independent_confirmation_status": "NOT_ESTABLISHED_BY_B58_NUMERICAL_RECONCILIATION",
             "selected_terminal_pe_x": _fmt(terminal_pe),
             "primary_adapter_terminal_value_cny_per_share": _fmt(primary_terminal),
             "arithmetic_reconciliation": {
@@ -608,6 +617,19 @@ def _eps_multiple_comparison(
             row["issues"].append("B4_B57_B58_B60_FORECAST_PERIOD_NOT_CONFIRMED_MATCH")
         if row["b58_status"] != "MATCH":
             row["issues"].append("B58_PRIMARY_EPS_ACCOUNTING_AND_DILUTED_SHARE_BASIS_NOT_RECONCILED")
+        allowed_b57_source_classes = {
+            "OBSERVED_ACTUAL",
+            "ISSUER_FORECAST",
+            "ANALYST_ASSUMPTION",
+            "MIXED_OBSERVED_ACTUAL_AND_ANALYST_ASSUMPTION",
+            "MIXED_OBSERVED_ACTUAL_AND_ISSUER_FORECAST",
+            "MIXED_ISSUER_FORECAST_AND_ANALYST_ASSUMPTION",
+            "MIXED_OBSERVED_ACTUAL_ISSUER_FORECAST_AND_ANALYST_ASSUMPTION",
+        }
+        if row["b57_forward_data_class"] not in allowed_b57_source_classes:
+            row["issues"].append("B57_FORWARD_DATA_CLASS_NOT_IDENTIFIABLE")
+        if row["primary_eps_data_class"] not in {"ISSUER_FORECAST", "ANALYST_ASSUMPTION"}:
+            row["issues"].append("PRIMARY_EPS_DATA_CLASS_NOT_IDENTIFIABLE")
         if str(raw.get("b57_forward_period") or "").strip().upper() != str(b60.get("forecast_period") or "").strip().upper():
             row["issues"].append("B57_FORWARD_PERIOD_DIFFERS_FROM_B60_EARNINGS_PERIOD")
         if str(b60.get("forecast_period") or "").strip().upper() in {"", "UNKNOWN"}:

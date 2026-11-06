@@ -1398,6 +1398,8 @@ def _build_b58_primary_eps_consistency(
             "A non-zero primary other-after-tax attribution adjustment means the two bridges are not demonstrably on the same adjustment basis; that scenario is marked NOT_COMPARABLE_ADJUSTMENT_BASIS even if rounded EPS values happen to match.",
             "B57's normalized EPS is displayed only as context. Its removal of one-off items means it is not like-for-like with an all-items primary EPS unless a separately normalized primary EPS is supplied.",
             "EPS forecast period is compared independently from the valuation terminal date. The terminal date is not treated as the earnings reference period.",
+            "B58 MATCH means numerical period/share/accounting reconciliation only; it is not independent source confirmation, Evidence/PIT admission, or Forecast Admission.",
+            "B58 ASSUMPTION_ONLY may show numerical proximity for diagnosis, but eps_match remains null because no two-sided profit/share bridge exists.",
             "B58 is diagnostic only. It does not alter the EPS source, the EPS_MULTIPLE formula, valuation outputs, B5/B6, target price, the 15% annualized return hurdle, formal admission or decision authority.",
         ],
         "formal_forecast_admission_created": False,
@@ -1447,6 +1449,12 @@ def _build_b58_primary_eps_consistency(
             "primary_diluted_shares_unit": primary_shares.get("unit"),
             "primary_other_after_tax_attribution_adjustment": primary_other_adjustment.get("value"),
             "primary_other_adjustment_unit": primary_other_adjustment.get("unit"),
+            "b57_forward_data_class": str(b57_forward.get("combined_output_data_class") or b57_forward.get("data_class") or "SOURCE_CLASS_NOT_IDENTIFIABLE"),
+            "b57_source_data_classes": list(b57_forward.get("source_data_classes") or []) if isinstance(b57_forward.get("source_data_classes"), list) else [],
+            "primary_eps_data_class": str(primary_eps_object.get("data_class") or "SOURCE_CLASS_NOT_IDENTIFIABLE"),
+            "primary_eps_evidence_refs": list(primary_eps_object.get("evidence_refs") or []) if isinstance(primary_eps_object.get("evidence_refs"), list) else [],
+            "independent_confirmation_status": "NOT_ESTABLISHED_BY_B58_NUMERICAL_RECONCILIATION",
+            "numeric_similarity_to_primary_declared_eps": None,
             "b57_all_items_eps_proxy_cny_per_share": None,
             "all_items_eps_vs_primary_declared_difference_per_share": None,
             "all_items_eps_vs_primary_calculated_difference_per_share": None,
@@ -1531,9 +1539,13 @@ def _build_b58_primary_eps_consistency(
         row["normalized_eps_vs_primary_declared_difference_per_share_diagnostic_only"] = (
             format(abs(normalized_eps - declared_eps), "f") if normalized_eps is not None else None
         )
+        row["numeric_similarity_to_primary_declared_eps"] = (
+            abs(b57_all_items_eps - declared_eps) <= EPS_EPS_MATCH_TOLERANCE
+        )
 
         if primary_bridge_status == "ASSUMPTION_ONLY":
-            row["eps_match"] = abs(b57_all_items_eps - declared_eps) <= EPS_EPS_MATCH_TOLERANCE
+            row["eps_match"] = None
+            row["independent_confirmation_status"] = "NOT_ESTABLISHED_PRIMARY_EPS_ASSUMPTION_ONLY"
             row["status"] = "PRIMARY_EPS_ASSUMPTION_ONLY"
             row["issues"] = ["PRIMARY_EPS_HAS_NO_RECALCULABLE_NET_PROFIT_AND_DILUTED_SHARE_BRIDGE"]
             base["scenarios"][name] = row
@@ -1579,6 +1591,7 @@ def _build_b58_primary_eps_consistency(
             and abs(b57_all_items_eps - declared_eps) <= EPS_EPS_MATCH_TOLERANCE
         )
         row["eps_match"] = eps_match
+        row["independent_confirmation_status"] = "ARITHMETIC_RECONCILIATION_ONLY_NOT_INDEPENDENT_SOURCE_CONFIRMATION"
         row["status"] = "MATCH" if eps_match else "EPS_MISMATCH"
         if not eps_match:
             row["issues"] = ["B57_ALL_ITEMS_EPS_PROXY_DOES_NOT_MATCH_PRIMARY_CALCULATED_OR_DECLARED_EPS"]
@@ -1587,7 +1600,7 @@ def _build_b58_primary_eps_consistency(
 
     if scenario_statuses and all(status == "MATCH" for status in scenario_statuses):
         base["status"] = "MATCH"
-        base["reason"] = "三个情景的期间、公司范围、稀释股数和 B57 all-items EPS 代理均与 EPS_MULTIPLE 主估值实际使用的 EPS 对齐；这是诊断对账，不代表正式准入。"
+        base["reason"] = "三个情景的期间、公司范围、稀释股数和 EPS 数值完成算术对账；这不构成独立来源确认或正式准入。"
     elif scenario_statuses and all(status == "PRIMARY_EPS_ASSUMPTION_ONLY" for status in scenario_statuses):
         base["status"] = "ASSUMPTION_ONLY"
         base["reason"] = "主估值使用的是明确的 EPS 分析假设，虽可与 B57 all-items EPS 代理数值比较，但没有主估值自身可复算的利润/稀释股数桥，不能宣称完成独立对账。"
@@ -2061,6 +2074,11 @@ def _build_b60_local_eps_multiple_price_inversion(
             "b57_diluted_weighted_average_shares": b57_forward.get("diluted_weighted_average_shares"),
             "b57_all_items_eps_proxy": b58_row.get("b57_all_items_eps_proxy_cny_per_share"),
             "b57_normalized_eps_proxy_diagnostic_only": b58_row.get("b57_normalized_diluted_eps_proxy_cny_per_share"),
+            "b57_forward_data_class": b58_row.get("b57_forward_data_class") or "SOURCE_CLASS_NOT_IDENTIFIABLE",
+            "b57_source_data_classes": list(b58_row.get("b57_source_data_classes") or []) if isinstance(b58_row.get("b57_source_data_classes"), list) else [],
+            "primary_eps_data_class": b58_row.get("primary_eps_data_class") or eps_obj.get("data_class") or "SOURCE_CLASS_NOT_IDENTIFIABLE",
+            "primary_eps_evidence_refs": list(b58_row.get("primary_eps_evidence_refs") or eps_obj.get("evidence_refs") or []) if isinstance(b58_row.get("primary_eps_evidence_refs") or eps_obj.get("evidence_refs") or [], list) else [],
+            "independent_confirmation_status": b58_row.get("independent_confirmation_status") or "NOT_ESTABLISHED_BY_B58_NUMERICAL_RECONCILIATION",
             "distribution_status": "NOT_VALIDATED_OR_NOT_AVAILABLE",
             "validated_cash_distributions_per_share": None,
             "present_value_of_validated_cash_distributions_at_hurdle": None,

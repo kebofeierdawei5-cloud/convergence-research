@@ -1454,6 +1454,33 @@ def _build_per_share_earnings_bridge(
         if isinstance(statement_amount_bridge.get("forecast_scenarios"), Mapping) else {}
     )
 
+    def collect_forward_data_classes(value: Any) -> set[str]:
+        allowed = {"OBSERVED_ACTUAL", "ISSUER_FORECAST", "ANALYST_ASSUMPTION"}
+        found: set[str] = set()
+        if isinstance(value, Mapping):
+            raw_class = str(value.get("data_class") or "").strip().upper()
+            if raw_class in allowed:
+                found.add(raw_class)
+            for child in value.values():
+                found.update(collect_forward_data_classes(child))
+        elif isinstance(value, (list, tuple)):
+            for child in value:
+                found.update(collect_forward_data_classes(child))
+        return found
+
+    def combine_forward_data_classes(classes: set[str]) -> str:
+        if not classes:
+            return "SOURCE_CLASS_NOT_IDENTIFIABLE"
+        if len(classes) == 1:
+            return next(iter(classes))
+        if classes == {"OBSERVED_ACTUAL", "ANALYST_ASSUMPTION"}:
+            return "MIXED_OBSERVED_ACTUAL_AND_ANALYST_ASSUMPTION"
+        if classes == {"OBSERVED_ACTUAL", "ISSUER_FORECAST"}:
+            return "MIXED_OBSERVED_ACTUAL_AND_ISSUER_FORECAST"
+        if classes == {"ISSUER_FORECAST", "ANALYST_ASSUMPTION"}:
+            return "MIXED_ISSUER_FORECAST_AND_ANALYST_ASSUMPTION"
+        return "MIXED_OBSERVED_ACTUAL_ISSUER_FORECAST_AND_ANALYST_ASSUMPTION"
+
     for scenario_name in SCENARIOS:
         raw_forward = scenarios_raw.get(scenario_name)
         raw_forward = raw_forward if isinstance(raw_forward, Mapping) else {}
@@ -1556,6 +1583,23 @@ def _build_per_share_earnings_bridge(
                     "normalized_parent_attributable_net_profit_cny": None,
                     "normalized_diluted_eps_proxy_cny_per_share": None,
                     "data_class": "ANALYST_ASSUMPTION",
+                    "source_data_classes": ["ANALYST_ASSUMPTION", "OBSERVED_ACTUAL"],
+                    "combined_output_data_class": "MIXED_OBSERVED_ACTUAL_AND_ANALYST_ASSUMPTION",
+                    "provenance_components": {
+                        "reported_actual_periods": {
+                            "data_class": "OBSERVED_ACTUAL",
+                            "status": statement_amount_bridge.get("actual_period_status"),
+                        },
+                        "q4_forecast_line_items": {
+                            "data_class": "ANALYST_ASSUMPTION",
+                            "assumptions": statement_row.get("q4_assumption_inputs"),
+                        },
+                        "annual_weighted_average_diluted_shares": {
+                            "data_class": "ANALYST_ASSUMPTION",
+                            "assumption": statement_row.get("annual_weighted_average_diluted_shares_assumption"),
+                        },
+                    },
+                    "data_class_semantics": "LEGACY_FIELD_DESCRIBES_CONDITIONAL_FORECAST_INPUTS_ONLY; COMBINED_OUTPUT_DATA_CLASS_DESCRIBES_ACTUAL_PLUS_ASSUMPTION_PROVENANCE",
                     "financial_statement_amount_bridge_status": statement_amount_bridge.get("status"),
                     "financial_statement_amount_bridge_scenario_status": statement_status,
                     "financial_statement_amount_assumption_inputs": statement_row.get("q4_assumption_inputs"),
@@ -1680,6 +1724,27 @@ def _build_per_share_earnings_bridge(
             "diluted_weighted_average_shares": _render(fwd_shares),
             "all_items_diluted_eps_proxy_cny_per_share": _render(forward_all_items_eps),
         })
+        b55_scenario_map = baseline_transition.get("scenarios")
+        b55_scenario_map = b55_scenario_map if isinstance(b55_scenario_map, Mapping) else {}
+        b55_scenario = b55_scenario_map.get(scenario_name)
+        b55_scenario = b55_scenario if isinstance(b55_scenario, Mapping) else {}
+        b55_product_rows = b55_scenario.get("product_lines")
+        b55_product_rows = b55_product_rows if isinstance(b55_product_rows, list) else []
+        b55_forward_measures = []
+        for product_row in b55_product_rows:
+            if not isinstance(product_row, Mapping):
+                continue
+            product_forward = product_row.get("forward_scenario")
+            product_forward = product_forward if isinstance(product_forward, Mapping) else {}
+            b55_forward_measures.append(product_forward.get("measures"))
+        b56_forward_lineage = fwd_financials.get("measure_lineage")
+        source_classes = (
+            collect_forward_data_classes(b55_forward_measures)
+            | collect_forward_data_classes(b56_forward_lineage)
+            | collect_forward_data_classes(forward_inputs)
+        )
+        row["forward_scenario"]["source_data_classes"] = sorted(source_classes)
+        row["forward_scenario"]["combined_output_data_class"] = combine_forward_data_classes(source_classes)
         row["all_items_eps_status"] = "CALCULATED_AND_RECONCILED"
         normalized_only_forward_missing = (
             fwd_values.get("minority_interest_nonrecurring_after_tax_cny") is None

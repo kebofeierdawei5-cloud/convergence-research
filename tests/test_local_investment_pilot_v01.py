@@ -6083,7 +6083,9 @@ def test_b58_assumption_only_primary_eps_is_not_promoted_to_independent_reconcil
     )
     assert result["status"] == "ASSUMPTION_ONLY"
     assert all(row["status"] == "PRIMARY_EPS_ASSUMPTION_ONLY" for row in result["scenarios"].values())
-    assert all(row["eps_match"] is True for row in result["scenarios"].values())
+    assert all(row["eps_match"] is None for row in result["scenarios"].values())
+    assert all(row["numeric_similarity_to_primary_declared_eps"] is True for row in result["scenarios"].values())
+    assert all(row["independent_confirmation_status"] == "NOT_ESTABLISHED_PRIMARY_EPS_ASSUMPTION_ONLY" for row in result["scenarios"].values())
 
 
 def test_b58_is_not_applicable_when_primary_model_is_not_eps_multiple():
