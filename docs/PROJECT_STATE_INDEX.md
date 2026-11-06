@@ -3205,3 +3205,19 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - 新增回归：B76 对 B58 PRIMARY_EPS_ASSUMPTION_ONLY fail-closed；B76 对 B57 来源分类缺失 fail-closed；B77 mixed actual/assumption 来源分项回显；B58 不再将假设值的数值接近错误标记为 eps_match=true。
 - 真实新和成案例仍没有 Q4 假设、全年加权平均稀释股数及操作员确认现价；没有生成真实 FY2026 EPS / B60 / BUY 或 NO-BUY。B55/B56、历史正常化 EPS、正式 Forecast/Valuation Admission、MIE 与 Decision 权限均未放宽。
 - 本批自动化测试需以新精确 HEAD 的 Linux 工作流结果为准；真实用户 macOS 完整验收仍为独立 NOT VERIFIED，取消不计为 PASS 或 pytest failure。
+
+
+## 6O. B79 — Source trust, Evidence/PIT and formal Forecast lineage closure (2026-11-06)
+
+**状态：代码已提交至 B73 proposal base 的 PR #587 Draft；未合并 main。**
+
+- **来源标签不等于信任准入。** B79 将公开财报金额桥的历史行项目状态由 `PIT_TIME_COMPATIBLE_ONLY_NOT_FORMALLY_ADMITTED` 更正为 `SOURCE_REFERENCE_PRESENT_NOT_PIT_VALIDATED_NOT_FORMALLY_ADMITTED`；只记录 source_id / publication_date，不把 source_id 冒充 Evidence ID，不声称原始字节核验或 PIT 检查已执行。
+- **B57 来源谱系贯通。** 常规 B55/B56/B57 路径汇总来源类别、claimed evidence refs、evidence_status 和来源问题；B77 金额桥路径分别回显报告实际的 source reference ID、发布时间、Q4 分项分析假设和年度稀释股数假设。两条路径均明确 `formal_evidence_pit_admission_created=false`、`formal_forecast_admission_created=false`、`decision_grade_forecast_eligible=false`。
+- **B58/B60/B76 只传递、不升级。** B58、B60 回显 B57 source_lineage_assessment；B76 可以继续执行条件性算术比较，但顶层与情景明确不具决策级预测准入，不会把算术 PASS 变成 Evidence/PIT 或正式 Forecast Admission。
+- **签名注册表 authority gate。** `verify_signed_admission` 只有在签名注册表状态为 `ACTIVE` 且包含可信签名者时才返回正式准入；`TEST_ONLY`、`NO_TRUSTED_SIGNERS_REGISTERED`、缺失/其他状态全部 fail closed。仓库当前权威注册表保持空（`NO_TRUSTED_SIGNERS_REGISTERED`），因此真实案例没有被升级。
+- **正式 Forecast→Valuation→Return Evidence 绑定。** 新增 `canonical_forecast_evidence_binding_v01.py`：使用内容寻址的签名 envelope / manifest / rights / permission instrument 引用，重新验证签名、精确字节、rights、Core/PIT、case/market/symbol/cutoff，并逐一确认 Forecast 与 Valuation 引用的 Evidence IDs 存在于同一已正式准入 manifest。B04 Return Lineage 必须提供相同的 Evidence/PIT reference 与 resolver；仅仅非空 Evidence ID 或自洽 hash 不再足够。
+- **时间边界。** Evidence known_at 按证券市场本地截止日（上海时间 00:00）比较，不按 UTC 午夜放宽截止窗口。
+- **回归覆盖。** B04 增加完整签名 Evidence/PIT 合成 fixture、Forecast evidence ID 不存在于签名 manifest 时阻断、签名 envelope 字节被篡改时阻断；签名 Admission 新增 TEST_ONLY 注册表和空信任库不能得到 FORMALLY_ADMITTED 的回归。
+- **真实案例边界。** 新和成仍缺 Q4 分项假设、年度加权平均稀释股数和操作员确认现价；仓库正式 signer registry 仍为空。B79 未创建任何真实 Forecast/PIT/Valuation Admission、Decision 或交易授权。
+
+**验收要求：** B79 以新精确 HEAD 的 Investment Core CI 与 B04/Local Pilot 工作流结果为准；macOS job 取消仍为 NOT VERIFIED，不得计为 PASS。PR #587 保持 Draft，禁止合并 B73 proposal 或 main。

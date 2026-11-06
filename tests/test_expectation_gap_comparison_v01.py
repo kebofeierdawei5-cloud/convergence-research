@@ -260,6 +260,12 @@ def _eps_multiple_inputs():
             "b58_forecast_period_match": True,
             "b57_forward_data_class": "MIXED_OBSERVED_ACTUAL_AND_ANALYST_ASSUMPTION",
             "b57_source_data_classes": ["ANALYST_ASSUMPTION", "OBSERVED_ACTUAL"],
+            "b57_source_lineage_assessment": {
+                "status": "REPORTED_ACTUAL_SOURCE_REFERENCES_PRESENT_NOT_PIT_VALIDATED_PLUS_ANALYST_ASSUMPTIONS",
+                "formal_evidence_pit_admission_status": "NOT_FORMALLY_ADMITTED",
+                "formal_forecast_admission_status": "NOT_CREATED_BY_LOCAL_PILOT",
+                "decision_grade_forecast_eligible": False,
+            },
             "primary_eps_data_class": "ANALYST_ASSUMPTION",
             "primary_eps_evidence_refs": [],
             "b57_forward_period": "2027FY",
@@ -324,6 +330,12 @@ def test_b76_eps_multiple_compares_b4_all_items_eps_with_b60_hurdle_eps():
     assert comparison["scenarios"]["base"]["b57_forward_data_class"] == "MIXED_OBSERVED_ACTUAL_AND_ANALYST_ASSUMPTION"
     assert comparison["scenarios"]["base"]["primary_eps_data_class"] == "ANALYST_ASSUMPTION"
     assert comparison["scenarios"]["base"]["independent_confirmation_status"] == "NOT_ESTABLISHED_BY_B58_NUMERICAL_RECONCILIATION"
+    assert comparison["scenarios"]["base"]["b57_source_lineage_assessment"]["formal_evidence_pit_admission_status"] == "NOT_FORMALLY_ADMITTED"
+    assert comparison["scenarios"]["base"]["decision_grade_forecast_eligible"] is False
+    assert comparison["formal_evidence_pit_admission_created"] is False
+    assert comparison["formal_forecast_admission_created"] is False
+    assert comparison["decision_grade_forecast_eligible"] is False
+    assert comparison["decision_grade_status"] == "NOT_ADMITTED_CONDITIONAL_ARITHMETIC_ONLY"
     assert result["return_solver_target_entry_price"] == "24"
     assert result["target_entry_price_modified"] is False
 

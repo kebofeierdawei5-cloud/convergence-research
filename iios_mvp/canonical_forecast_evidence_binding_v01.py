@@ -3,7 +3,7 @@ from __future__ import annotations
 """Bind canonical forecasts and valuations to a signed, PIT-verified evidence manifest."""
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -191,8 +191,10 @@ class FileSystemCanonicalSignedEvidenceAdmissionResolver:
                 raise ValueError("admitted Evidence/PIT manifest contains missing or duplicate evidence IDs")
             by_id[evidence_id] = row
 
-        cutoff_utc = datetime.combine(cutoff_date, datetime.min.time()).replace(
-            tzinfo=datetime.fromisoformat("2000-01-01T00:00:00+00:00").tzinfo
+        cutoff_local = datetime.combine(
+            cutoff_date,
+            datetime.min.time(),
+            tzinfo=timezone(timedelta(hours=8)),
         )
         for evidence_id in requested:
             row = by_id.get(evidence_id)
@@ -206,7 +208,7 @@ class FileSystemCanonicalSignedEvidenceAdmissionResolver:
                 known_at = datetime.fromisoformat(str(row.get("known_at")).replace("Z", "+00:00"))
             except ValueError as exc:
                 raise ValueError(f"forecast or valuation evidence known_at is invalid: {evidence_id}") from exc
-            if known_at.tzinfo is None or known_at.astimezone(cutoff_utc.tzinfo) > cutoff_utc:
+            if known_at.tzinfo is None or known_at.astimezone(cutoff_local.tzinfo) > cutoff_local:
                 raise ValueError(f"forecast or valuation evidence is after PIT cutoff: {evidence_id}")
 
         return {

@@ -86,6 +86,11 @@ def test_xinhecheng_financial_statement_amount_bridge_reconciles_2025_and_2026_y
     assert bridge["actual_periods"]["2026Q1-Q3"]["status"] == "RECONCILED_REPORTED_ACTUAL"
     for period in bridge["actual_periods"].values():
         assert max(abs(Decimal(value)) for value in period["reconciliation_residuals_cny"].values()) <= Decimal("1")
+        assert period["source_admission_status"] == "SOURCE_REFERENCE_PRESENT_NOT_PIT_VALIDATED_NOT_FORMALLY_ADMITTED"
+        assert period["source_reference_status"] == "SOURCE_ID_AND_PUBLICATION_DATE_PRESENT_ONLY"
+        assert period["evidence_ids"] == []
+        assert period["raw_bytes_verified"] is False
+        assert period["pit_validation_performed"] is False
     assert bridge["forecast_status"] == "Q4_SCENARIOS_NOT_PROVIDED"
     assert bridge["formal_forecast_admission_created"] is False
     assert bridge["decision_authority"] is False
@@ -333,12 +338,23 @@ def test_b57_accepts_forward_all_items_eps_from_statement_amount_bridge_without_
         assert row["forward_scenario"]["combined_output_data_class"] == "MIXED_OBSERVED_ACTUAL_AND_ANALYST_ASSUMPTION"
         assert row["forward_scenario"]["provenance_components"]["reported_actual_periods"]["data_class"] == "OBSERVED_ACTUAL"
         assert row["forward_scenario"]["provenance_components"]["q4_forecast_line_items"]["data_class"] == "ANALYST_ASSUMPTION"
+        lineage = row["forward_scenario"]["source_lineage_assessment"]
+        assert lineage["status"] == "REPORTED_ACTUAL_SOURCE_REFERENCES_PRESENT_NOT_PIT_VALIDATED_PLUS_ANALYST_ASSUMPTIONS"
+        assert lineage["formal_evidence_pit_admission_status"] == "NOT_FORMALLY_ADMITTED"
+        assert lineage["formal_forecast_admission_status"] == "NOT_CREATED_BY_LOCAL_PILOT"
+        assert lineage["pit_validation_performed"] is False
+        assert lineage["raw_bytes_verified"] is False
+        assert lineage["decision_grade_forecast_eligible"] is False
+        assert lineage["claimed_evidence_refs"] == []
         assert row["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"] is None
         assert Decimal(row["forward_scenario"]["all_items_diluted_eps_proxy_cny_per_share"]) > 0
         assert row["formal_forecast_admission_created"] is False
     assert result["valuation_transmission"]["status"] == "NOT_LINKED_TO_PER_SHARE_VALUE"
     assert result["formal_forecast_admission_created"] is False
     assert result["decision_authority"] is False
+    assert all(row["formal_evidence_pit_admission_created"] is False for row in b57["scenarios"].values())
+    assert all(row["formal_forecast_admission_created"] is False for row in b57["scenarios"].values())
+    assert all(row["decision_grade_forecast_eligible"] is False for row in b57["scenarios"].values())
 
 
 def test_b58_can_compare_statement_amount_b57_forward_eps_to_primary_eps_assumption_without_claiming_match():
@@ -403,3 +419,11 @@ def test_b58_can_compare_statement_amount_b57_forward_eps_to_primary_eps_assumpt
     assert all(row["eps_match"] is None for row in result["scenarios"].values())
     assert all(row["numeric_similarity_to_primary_declared_eps"] is True for row in result["scenarios"].values())
     assert all(row["independent_confirmation_status"] == "NOT_ESTABLISHED_PRIMARY_EPS_ASSUMPTION_ONLY" for row in result["scenarios"].values())
+    assert all(
+        row["b57_source_lineage_assessment"]["status"]
+        == "REPORTED_ACTUAL_SOURCE_REFERENCES_PRESENT_NOT_PIT_VALIDATED_PLUS_ANALYST_ASSUMPTIONS"
+        for row in result["scenarios"].values()
+    )
+    assert all(row["formal_evidence_pit_admission_created"] is False for row in result["scenarios"].values())
+    assert all(row["formal_forecast_admission_created"] is False for row in result["scenarios"].values())
+    assert all(row["decision_grade_forecast_eligible"] is False for row in result["scenarios"].values())
