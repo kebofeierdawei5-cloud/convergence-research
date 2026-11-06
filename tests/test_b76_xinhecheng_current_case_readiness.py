@@ -255,3 +255,145 @@ def test_xinhecheng_q4_input_template_is_complete_in_shape_but_numerically_block
         row["conditional_fy_all_items_parent_attributable_eps_cny_per_share"] is None
         for row in bridge["forecast_scenarios"].values()
     )
+
+
+
+def _complete_q4_statement_amount_scenario_fixture():
+    from iios_mvp.operating_driver_forecast_v01 import _build_financial_statement_amount_bridge
+
+    raw = _case()["financial_statement_amount_bridge"]
+    q4_values = {
+        "revenue": "6500000000",
+        "cost_of_revenue": "3700000000",
+        "taxes_and_surcharges": "80000000",
+        "selling_expense": "45000000",
+        "administrative_expense": "155000000",
+        "rd_expense": "300000000",
+        "financial_expense": "100000000",
+        "other_income": "55000000",
+        "investment_income": "30000000",
+        "fair_value_change": "0",
+        "credit_impairment_gain_loss": "-10000000",
+        "asset_impairment_gain_loss": "-5000000",
+        "asset_disposal_gain_loss": "1000000",
+        "non_operating_income": "1000000",
+        "non_operating_expense": "5000000",
+        "income_tax_expense": "450000000",
+        "minority_interest_net_profit_after_tax": "5000000",
+    }
+
+    def assumption(value, unit="CNY"):
+        return {
+            "value": value,
+            "unit": unit,
+            "data_class": "ANALYST_ASSUMPTION",
+            "basis": "Synthetic test-only explicit Q4 statement amount assumption.",
+            "evidence_refs": [],
+        }
+
+    scenario = {
+        "q4_line_items": {key: assumption(value) for key, value in q4_values.items()},
+        "annual_weighted_average_diluted_shares": assumption("3073421680", "shares"),
+    }
+    raw["q4_forecast"]["scenarios"] = {
+        "bear": scenario, "base": scenario, "bull": scenario
+    }
+    return raw
+
+
+def test_b57_accepts_forward_all_items_eps_from_statement_amount_bridge_without_upgrading_b55_b56():
+    from iios_mvp.operating_driver_forecast_v01 import (
+        OPERATING_DRIVER_SCHEMA,
+        evaluate_operating_driver_forecast,
+    )
+
+    raw = {
+        "schema_version": OPERATING_DRIVER_SCHEMA,
+        "scope": "COMPANY_WIDE",
+        "actuals_period": "2026Q1-Q3",
+        "forecast_period": "2026FY",
+        "summary": "B77 synthetic B57 forward-only EPS integration test.",
+        "product_lines": [],
+        "historical_financials": {},
+        "historical_earnings_attribution": {},
+        "scenarios": {"bear": {}, "base": {}, "bull": {}},
+        "financial_statement_amount_bridge": _complete_q4_statement_amount_scenario_fixture(),
+    }
+    result = evaluate_operating_driver_forecast(raw)
+    transition = result["baseline_transition"]
+    b57 = transition["per_share_earnings_bridge"]
+    assert transition["status"] == "NOT_IDENTIFIABLE"
+    assert transition["net_profit_bridge"]["scenarios"]["base"]["status"] == "BLOCKED_BY_B55"
+    assert b57["status"] == "PARTIAL"
+    for name in ("bear", "base", "bull"):
+        row = b57["scenarios"][name]
+        assert row["status"] == "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+        assert row["forward_scenario"]["data_class"] == "ANALYST_ASSUMPTION"
+        assert row["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"] is None
+        assert Decimal(row["forward_scenario"]["all_items_diluted_eps_proxy_cny_per_share"]) > 0
+        assert row["formal_forecast_admission_created"] is False
+    assert result["valuation_transmission"]["status"] == "NOT_LINKED_TO_PER_SHARE_VALUE"
+    assert result["formal_forecast_admission_created"] is False
+    assert result["decision_authority"] is False
+
+
+def test_b58_can_compare_statement_amount_b57_forward_eps_to_primary_eps_assumption_without_claiming_match():
+    from iios_mvp.operating_driver_forecast_v01 import (
+        OPERATING_DRIVER_SCHEMA,
+        evaluate_operating_driver_forecast,
+    )
+    from iios_mvp.local_investment_pilot_v01 import _build_b58_primary_eps_consistency
+
+    raw = {
+        "schema_version": OPERATING_DRIVER_SCHEMA,
+        "scope": "COMPANY_WIDE",
+        "actuals_period": "2026Q1-Q3",
+        "forecast_period": "2026FY",
+        "summary": "B77 synthetic B58 assumption-only comparison test.",
+        "product_lines": [],
+        "historical_financials": {},
+        "historical_earnings_attribution": {},
+        "scenarios": {"bear": {}, "base": {}, "bull": {}},
+        "financial_statement_amount_bridge": _complete_q4_statement_amount_scenario_fixture(),
+    }
+    operating = evaluate_operating_driver_forecast(raw)
+    b57_rows = operating["baseline_transition"]["per_share_earnings_bridge"]["scenarios"]
+    declared_eps = b57_rows["base"]["forward_scenario"]["all_items_diluted_eps_proxy_cny_per_share"]
+    eps_bridge = {
+        "status": "ASSUMPTION_ONLY",
+        "forecast_period": "2026FY",
+        "valuation_terminal_date": "2026-12-31",
+        "scenarios": {
+            name: {
+                "status": "ASSUMPTION_ONLY",
+                "declared_eps_per_share": declared_eps,
+                "calculated_eps_per_share": None,
+                "diluted_shares": None,
+                "other_after_tax_attribution_adjustment": None,
+            }
+            for name in ("bear", "base", "bull")
+        },
+    }
+    eps_valuation = {
+        "status": "CALCULATED",
+        "selected_for_primary_model": True,
+        "forecast_period": "2026FY",
+        "valuation_terminal_date": "2026-12-31",
+        "scenarios": {
+            name: {"eps_per_share": {"value": declared_eps}}
+            for name in ("bear", "base", "bull")
+        },
+    }
+    result = _build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=operating,
+        eps_earnings_bridge=eps_bridge,
+        eps_multiple_valuation=eps_valuation,
+    )
+    assert result["status"] == "ASSUMPTION_ONLY"
+    assert all(
+        row["status"] == "PRIMARY_EPS_ASSUMPTION_ONLY"
+        for row in result["scenarios"].values()
+    )
+    assert all(row["eps_match"] is True for row in result["scenarios"].values())

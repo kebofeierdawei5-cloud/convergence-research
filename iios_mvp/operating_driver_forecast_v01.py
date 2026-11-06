@@ -1403,8 +1403,9 @@ def _build_per_share_earnings_bridge(
     unresolved_refs: set[str],
     after_cutoff_refs: set[str],
     uncertain_refs: set[str],
+    financial_statement_amount_bridge: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Bridge B56 modeled profit to parent-attributable normalized earnings and diluted EPS."""
+    """Bridge B56 modeled profit to normalized EPS, or forward-only all-items EPS from the separate statement bridge."""
     schema = "IIOS-B57-PARENT-EARNINGS-DILUTED-EPS-BRIDGE-0.1"
     base = {
         "schema_version": schema,
@@ -1444,6 +1445,14 @@ def _build_per_share_earnings_bridge(
     b56 = baseline_transition.get("net_profit_bridge")
     b56 = b56 if isinstance(b56, Mapping) else {}
     b56_scenarios = b56.get("scenarios") if isinstance(b56.get("scenarios"), Mapping) else {}
+    statement_amount_bridge = (
+        financial_statement_amount_bridge
+        if isinstance(financial_statement_amount_bridge, Mapping) else {}
+    )
+    statement_forecast_scenarios = (
+        statement_amount_bridge.get("forecast_scenarios")
+        if isinstance(statement_amount_bridge.get("forecast_scenarios"), Mapping) else {}
+    )
 
     for scenario_name in SCENARIOS:
         raw_forward = scenarios_raw.get(scenario_name)
@@ -1482,6 +1491,77 @@ def _build_per_share_earnings_bridge(
             base["scenarios"][scenario_name] = row
             continue
         if str(b56_row.get("status") or "UNKNOWN") != "CALCULATED_AND_RECONCILED":
+            statement_row = statement_forecast_scenarios.get(scenario_name)
+            statement_row = statement_row if isinstance(statement_row, Mapping) else {}
+            statement_status = str(statement_row.get("status") or "UNKNOWN").strip().upper()
+            statement_totals = (
+                statement_row.get("fy_calculated_totals_cny")
+                if isinstance(statement_row.get("fy_calculated_totals_cny"), Mapping) else {}
+            )
+            statement_period = str(statement_row.get("forecast_period") or statement_amount_bridge.get("forecast_period") or "").strip().upper()
+            expected_period = str(baseline_transition.get("forecast_period") or "").strip().upper()
+            if (
+                statement_amount_bridge.get("actual_period_status") == "ALL_ACTUAL_PERIODS_RECONCILED"
+                and statement_status == "CONDITIONAL_ANALYST_ASSUMPTION_CALCULATED"
+                and statement_row.get("data_class") == "ANALYST_ASSUMPTION"
+                and statement_period
+                and statement_period == expected_period
+            ):
+                try:
+                    parent_profit = Decimal(str(statement_totals.get("parent_attributable_net_profit")))
+                    consolidated_profit = Decimal(str(statement_totals.get("consolidated_net_profit")))
+                    minority_profit = Decimal(str(statement_totals.get("minority_interest_net_profit_after_tax")))
+                    shares = Decimal(str(statement_row.get("annual_weighted_average_diluted_shares")))
+                    declared_eps = Decimal(str(statement_row.get(
+                        "conditional_fy_all_items_parent_attributable_eps_cny_per_share"
+                    )))
+                    calculated_eps = parent_profit / shares if shares > 0 else None
+                    residual = parent_profit + minority_profit - consolidated_profit
+                    if (
+                        not all(value.is_finite() for value in (
+                            parent_profit, consolidated_profit, minority_profit, shares, declared_eps
+                        ))
+                        or shares <= 0
+                        or calculated_eps is None
+                        or parent_profit <= 0
+                        or abs(residual) > Decimal("1")
+                        or abs(calculated_eps - declared_eps) > Decimal("0.0000000001")
+                    ):
+                        raise ValueError("STATEMENT_AMOUNT_FORWARD_EPS_RECONCILIATION_FAILED")
+                except (InvalidOperation, ValueError, TypeError, ZeroDivisionError) as exc:
+                    row["status"] = "NOT_IDENTIFIABLE"
+                    row["missing_inputs"] = []
+                    row["issues"] = [str(exc)]
+                    base["scenarios"][scenario_name] = row
+                    continue
+
+                row["status"] = "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+                row["all_items_eps_status"] = "CALCULATED_FROM_FINANCIAL_STATEMENT_AMOUNT_BRIDGE_ANALYST_ASSUMPTIONS"
+                row["eps_growth_status"] = "NOT_IDENTIFIABLE_HISTORICAL_NORMALIZED_BASELINE"
+                row["missing_inputs"] = ["HISTORICAL_NORMALIZED_EARNINGS_AND_DILUTED_SHARE_BASELINE_NOT_IDENTIFIABLE"]
+                row["issues"] = [
+                    f"B56_PHYSICAL_DRIVER_BRIDGE_REMAINS:{b56_row.get('status', 'UNKNOWN')}",
+                    "FORWARD_ALL_ITEMS_EPS_COMES_FROM_SEPARATE_PUBLIC_FINANCIAL_STATEMENT_AMOUNT_BRIDGE",
+                ]
+                row["forward_scenario"] = {
+                    "period": statement_period,
+                    "all_items_profit_before_tax_proxy_cny": statement_totals.get("profit_before_tax"),
+                    "all_items_consolidated_net_profit_proxy_cny": statement_totals.get("consolidated_net_profit"),
+                    "all_items_minority_interest_net_profit_cny": statement_totals.get("minority_interest_net_profit_after_tax"),
+                    "all_items_parent_attributable_net_profit_proxy_cny": statement_totals.get("parent_attributable_net_profit"),
+                    "diluted_weighted_average_shares": statement_row.get("annual_weighted_average_diluted_shares"),
+                    "all_items_diluted_eps_proxy_cny_per_share": format(calculated_eps, "f"),
+                    "normalized_parent_attributable_net_profit_cny": None,
+                    "normalized_diluted_eps_proxy_cny_per_share": None,
+                    "data_class": "ANALYST_ASSUMPTION",
+                    "financial_statement_amount_bridge_status": statement_amount_bridge.get("status"),
+                    "financial_statement_amount_bridge_scenario_status": statement_status,
+                    "financial_statement_amount_assumption_inputs": statement_row.get("q4_assumption_inputs"),
+                    "annual_weighted_average_diluted_shares_assumption": statement_row.get("annual_weighted_average_diluted_shares_assumption"),
+                }
+                base["scenarios"][scenario_name] = row
+                continue
+
             row["status"] = "BLOCKED_BY_B56"
             row["missing_inputs"] = ["B56_RECONCILED_NET_PROFIT_PROXY"]
             row["issues"] = [f"B56_SCENARIO_STATUS:{b56_row.get('status', 'UNKNOWN')}"]
@@ -2843,6 +2923,7 @@ def evaluate_operating_driver_forecast(
         after_cutoff_refs=after_cutoff_refs,
         uncertain_refs=uncertain_refs,
     )
+    financial_statement_amount_bridge = _build_financial_statement_amount_bridge(raw.get("financial_statement_amount_bridge"))
     baseline_transition["per_share_earnings_bridge"] = _build_per_share_earnings_bridge(
         scope=scope,
         baseline_transition=baseline_transition,
@@ -2852,6 +2933,7 @@ def evaluate_operating_driver_forecast(
         unresolved_refs=unresolved_refs,
         after_cutoff_refs=after_cutoff_refs,
         uncertain_refs=uncertain_refs,
+        financial_statement_amount_bridge=financial_statement_amount_bridge,
     )
     baseline_transition["segment_normalized_earnings_bridge"] = _build_b62_segment_normalized_earnings_bridge(
         scope=scope,
@@ -2877,7 +2959,6 @@ def evaluate_operating_driver_forecast(
     ])
     if scope == "PROJECT_INCREMENTAL":
         limits.append("项目增量收入/利润必须与既有产品/液体形态转粉体的内部转换区分，不能把收入形态迁移误认为集团新增需求。")
-    financial_statement_amount_bridge = _build_financial_statement_amount_bridge(raw.get("financial_statement_amount_bridge"))
     return {
         "schema_version": OPERATING_DRIVER_SCHEMA,
         "input_status": "PROVIDED",

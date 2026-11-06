@@ -305,3 +305,15 @@ Q4 条件金额桥仅接受同一年度 `YYYYQ1-Q3` 实际 + `YYYYFY` 前瞻，�
 ## 6K. 新和成 Q4 操作员输入模板
 
 新增 `examples/real_cases/RC-CN-A-002001-20261105_q4_scenario_template.json`，预置 Bear/Base/Bull 每套 17 个 Q4 报表行项目（含少数股东税后利润）及独立年度加权平均稀释股数。模板数字与依据全部为空；新增回归验证其接入金额桥后三个情景均 BLOCKED 且不输出条件 EPS。它降低 JSON 结构准备成本，不提供任何预测数字。
+
+
+## 6L. B77 — 财报金额桥到 B57 forward-only EPS
+
+B4 独立财报金额桥现在可为 B57 提供一条受限的 forward-only all-items EPS 来源。只有三情景 Q4 金额、税后少数股东损益及年度加权平均稀释股数完整、同年度期间合法、且归属/除股数算术复算闭合时才计算。若 B55/B56 仍未闭合：
+- B55 仍为 UNKNOWN/NOT_IDENTIFIABLE；
+- B56 仍为 BLOCKED_BY_B55；
+- B57 最多标记为 `FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE`；
+- B58 对主 EPS 分析假设最多为 `PRIMARY_EPS_ASSUMPTION_ONLY`，不宣称独立 MATCH；
+- 不生成正常化 EPS、历史 EPS 增长、正式准入、估值授权或 Decision。
+
+新和成真实案例缺少 Q4 输入和年度稀释股数假设，因此此路径在真实案例中尚不触发。

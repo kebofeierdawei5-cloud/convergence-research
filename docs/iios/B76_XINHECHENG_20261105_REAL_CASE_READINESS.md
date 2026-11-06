@@ -171,3 +171,12 @@ Q4 接口要求实际期间严格为 `YYYYQ1-Q3`、预测期间为同一年度 `
 ## 14. Q4 情景填写模板
 
 机器可读模板：`examples/real_cases/RC-CN-A-002001-20261105_q4_scenario_template.json`。模板按 Bear/Base/Bull 预置 17 个报表金额/NCI 行项目和独立年度加权平均稀释股数对象，但所有数字和 basis 初始为空。将模板接入金额桥时会被明确阻断，不能将空白理解为零。填写完成后，每项必须提供 ANALYST_ASSUMPTION、单位和可识别依据；年度股数不得从两位小数 EPS 反推。
+
+
+## 15. B77：公开财报金额桥接入 B57 前瞻 EPS（2026-11-06）
+
+新增一条严格隔离的 B57 forward-only 路径：当传统 B56 仍因 B55 物理驱动数据缺失而阻断时，若独立财报金额桥的 2025/2026Q1-Q3 披露事实已对账、Q4 Bear/Base/Bull 三情景完整、每个 Q4 假设及年度稀释股数均合格，并且 FY 归母利润 + 少数股东损益 = 合并净利润、归母利润/稀释股数 = 条件 EPS，B57 可输出前瞻 all-items EPS。
+
+该输出状态为 `FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE`。不生成历史正常化 EPS/增长率，不更改 B55/B56 状态、不构成正式 Forecast Admission。B58 可以把该 B57 EPS 与 EPS_MULTIPLE 使用的主 EPS 分析假设作数值比较，但必须保持 `PRIMARY_EPS_ASSUMPTION_ONLY`，不能称为独立计算 MATCH。
+
+本案例仍没有真实 Q4 假设，故新和成真实 B57 状态仍保持 `BLOCKED_BY_B56`。本批回归中的数值仅为合成测试夹具。
