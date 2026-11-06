@@ -725,7 +725,7 @@ def test_empty_signer_registry_cannot_formally_admit(tmp_path):
         "schema_version": SIGNER_REGISTRY_SCHEMA,
         "registry_status": "ACTIVE",
         "signers": [],
-    }, sort_keys=True, indent=2) + "\\n", encoding="utf-8")
+    }, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     envelope = {"schema_version": SIGNED_ADMISSION_SCHEMA, "payload": payload, "signatures": []}
     with pytest.raises(SignedAdmissionError, match="NO_TRUSTED_SIGNERS_REGISTERED"):
         verify_signed_admission(

@@ -10,8 +10,6 @@ from pathlib import Path
 import re
 from typing import Any, Mapping, Protocol
 
-from .canonical_signed_evidence_admission_v01 import verify_signed_admission
-
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _REFERENCE_FIELDS = {
     "envelope_sha256",
@@ -150,6 +148,8 @@ class FileSystemCanonicalSignedEvidenceAdmissionResolver:
             raise ValueError("signed Evidence/PIT bundle contains invalid JSON") from exc
         if not isinstance(envelope, Mapping) or not isinstance(manifest, Mapping):
             raise ValueError("signed Evidence/PIT envelope and manifest must be JSON objects")
+
+        from .canonical_signed_evidence_admission_v01 import verify_signed_admission
 
         verified = verify_signed_admission(
             envelope,

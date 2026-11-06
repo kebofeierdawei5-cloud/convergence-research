@@ -107,7 +107,7 @@ def _evidence_admission_bundle(tmp_path: Path):
     }
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(
-        json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+        json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -128,7 +128,7 @@ def _evidence_admission_bundle(tmp_path: Path):
         "expires_at": "2027-01-01T00:00:00+00:00",
     }
     rights_path.write_text(
-        json.dumps(rights, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+        json.dumps(rights, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -139,7 +139,7 @@ def _evidence_admission_bundle(tmp_path: Path):
         format=serialization.PublicFormat.Raw,
     )
     private_path = tmp_path / "admission.key"
-    private_path.write_text(base64.b64encode(private_raw).decode("ascii") + "\\n", encoding="ascii")
+    private_path.write_text(base64.b64encode(private_raw).decode("ascii") + "\n", encoding="ascii")
     registry_path = tmp_path / "signer-registry.json"
     registry_path.write_text(json.dumps({
         "schema_version": SIGNER_REGISTRY_SCHEMA,
@@ -154,7 +154,7 @@ def _evidence_admission_bundle(tmp_path: Path):
             "valid_until": None,
             "revoked_at": None,
         }],
-    }, sort_keys=True, indent=2) + "\\n", encoding="utf-8")
+    }, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 
     payload = build_admission_payload(
         manifest_path=manifest_path,
@@ -173,7 +173,7 @@ def _evidence_admission_bundle(tmp_path: Path):
     )
     envelope_path = tmp_path / "signed-admission.json"
     envelope_path.write_text(
-        json.dumps(envelope, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+        json.dumps(envelope, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
         encoding="utf-8",
     )
 
