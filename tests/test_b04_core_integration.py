@@ -281,7 +281,9 @@ def test_b04_core_accepts_canonical_lineage(tmp_path):
     forecast_registry, forecast_ref = _forecast()
     valuation_resolver, valuation_ref = _valuation(forecast_ref)
     price_registry, price_ref = _price()
-    evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(tmp_path)
+    evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(
+        tmp_path, case_id=CASE_ID, market=MARKET, symbol=SYMBOL, company=COMPANY, cutoff_date=CUTOFF
+    )
     result = validate_case_v03(
         _case(_return_gate(forecast_ref, valuation_ref, evidence_ref), price_ref),
         current_price_resolver=price_registry,

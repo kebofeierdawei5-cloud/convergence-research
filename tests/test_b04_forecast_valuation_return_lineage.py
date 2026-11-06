@@ -52,7 +52,15 @@ def _canonical(value) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
 
-def _evidence_admission_bundle(tmp_path: Path):
+def _evidence_admission_bundle(
+    tmp_path: Path,
+    *,
+    case_id: str = CASE_ID,
+    market: str = MARKET,
+    symbol: str = SYMBOL,
+    company: str = COMPANY,
+    cutoff_date: date = CUTOFF,
+):
     """Build a synthetic but fully signed Evidence/PIT bundle; no real source data."""
     raw_root = tmp_path / "raw"
     raw_root.mkdir()
@@ -68,7 +76,7 @@ def _evidence_admission_bundle(tmp_path: Path):
         field_group = REQUIRED_FIELD_GROUPS[(idx - 1) % len(REQUIRED_FIELD_GROUPS)]
         evidence_rows.append({
             "evidence_id": evidence_id,
-            "subject_id": CASE_ID,
+            "subject_id": case_id,
             "field_id": f"{field_group}.b04_fixture_fact_{idx}",
             "claim_type": "B04_SYNTHETIC_FIXTURE",
             "known_at": "2026-10-03T12:00:00+00:00",
@@ -90,11 +98,11 @@ def _evidence_admission_bundle(tmp_path: Path):
 
     manifest_body = {
         "schema_version": "IIOS-COMPANY-EVIDENCE-MANIFEST-0.1",
-        "case_id": CASE_ID,
-        "market": MARKET,
-        "symbol": SYMBOL,
-        "company": COMPANY,
-        "cutoff_date": CUTOFF.isoformat(),
+        "case_id": case_id,
+        "market": market,
+        "symbol": symbol,
+        "company": company,
+        "cutoff_date": cutoff_date.isoformat(),
         "required_field_groups": list(REQUIRED_FIELD_GROUPS),
         "evidence": evidence_rows,
         "raw_artifacts": raw_artifacts,
@@ -141,7 +149,6 @@ def _evidence_admission_bundle(tmp_path: Path):
     private_path = tmp_path / "admission.key"
     private_path.write_text(base64.b64encode(private_raw).decode("ascii") + "\n", encoding="ascii")
     private_path.chmod(0o600)
-    private_path.chmod(0o600)
     registry_path = tmp_path / "signer-registry.json"
     registry_path.write_text(json.dumps({
         "schema_version": SIGNER_REGISTRY_SCHEMA,
@@ -151,7 +158,7 @@ def _evidence_admission_bundle(tmp_path: Path):
             "public_key_b64": base64.b64encode(public_raw).decode("ascii"),
             "roles": ["EVIDENCE_ADMISSION_SIGNER"],
             "status": "ACTIVE",
-            "case_scopes": [CASE_ID],
+            "case_scopes": [case_id],
             "valid_from": "2026-01-01T00:00:00+00:00",
             "valid_until": None,
             "revoked_at": None,
