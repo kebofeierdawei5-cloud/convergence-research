@@ -310,7 +310,7 @@ def test_b57_accepts_forward_all_items_eps_from_statement_amount_bridge_without_
     raw = {
         "schema_version": OPERATING_DRIVER_SCHEMA,
         "scope": "COMPANY_WIDE",
-        "actuals_period": "2026Q1-Q3",
+        "actuals_period": "2025FY",
         "forecast_period": "2026FY",
         "summary": "B77 synthetic B57 forward-only EPS integration test.",
         "product_lines": [],
