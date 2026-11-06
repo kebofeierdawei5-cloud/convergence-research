@@ -1,9 +1,28 @@
 from __future__ import annotations
 
 from datetime import date
+import base64
+import hashlib
+import json
+from pathlib import Path
+
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from iios_mvp.canonical_independent_forecast import InMemoryCanonicalIndependentForecastRegistry
+from iios_mvp.canonical_forecast_evidence_binding_v01 import (
+    FileSystemCanonicalSignedEvidenceAdmissionResolver,
+    build_canonical_signed_evidence_admission_reference,
+)
+from iios_mvp.canonical_signed_evidence_admission_v01 import (
+    RIGHTS_SCHEMA,
+    SIGNED_ADMISSION_SCHEMA,
+    SIGNER_REGISTRY_SCHEMA,
+    add_signature,
+    build_admission_payload,
+)
+from iios_mvp.canonical_evidence_admission_v01 import REQUIRED_FIELD_GROUPS
 from iios_mvp.canonical_investment_admission_v01 import (
     InMemoryCanonicalInvestmentAdmissionRegistry,
     build_canonical_investment_admission,
@@ -22,9 +41,160 @@ MARKET = "CN-A"
 SYMBOL = "300750"
 COMPANY = "CATL"
 CUTOFF = date(2026, 10, 4)
+SIGNED_AT = "2026-10-05T12:00:00+00:00"
 
 
-def _forecast(forecast_id: str = "forecast-b04-001", registry=None):
+def _sha(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _canonical(value) -> bytes:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+
+
+def _evidence_admission_bundle(tmp_path: Path):
+    """Build a synthetic but fully signed Evidence/PIT bundle; no real source data."""
+    raw_root = tmp_path / "raw"
+    raw_root.mkdir()
+    raw_bytes = b"B04 signed Evidence/PIT fixture; synthetic bytes only.\\n"
+    (raw_root / "source.bin").write_bytes(raw_bytes)
+    raw_hash = _sha(raw_bytes)
+
+    evidence_ids = ["b04-forecast-evidence", "b04-valuation-evidence"]
+    evidence_ids.extend(f"B04-CORE-E-{idx:02d}" for idx in range(1, len(REQUIRED_FIELD_GROUPS) + 1))
+    evidence_rows = []
+    raw_artifacts = []
+    for idx, evidence_id in enumerate(evidence_ids, start=1):
+        field_group = REQUIRED_FIELD_GROUPS[(idx - 1) % len(REQUIRED_FIELD_GROUPS)]
+        evidence_rows.append({
+            "evidence_id": evidence_id,
+            "subject_id": CASE_ID,
+            "field_id": f"{field_group}.b04_fixture_fact_{idx}",
+            "claim_type": "B04_SYNTHETIC_FIXTURE",
+            "known_at": "2026-10-03T12:00:00+00:00",
+            "retrieved_at": "2026-10-05T12:00:00+00:00",
+            "published_at": "2026-10-03T10:00:00+00:00",
+            "source_ref": "https://example.invalid/b04-fixture",
+            "artifact_id": f"B04-ARTIFACT-{idx:02d}",
+            "content_sha256": raw_hash,
+            "exact_bytes": True,
+            "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+            "status": "ADMITTED",
+        })
+        raw_artifacts.append({
+            "evidence_id": evidence_id,
+            "relative_path": "source.bin",
+            "expected_sha256": raw_hash,
+            "expected_size_bytes": len(raw_bytes),
+        })
+
+    manifest_body = {
+        "schema_version": "IIOS-COMPANY-EVIDENCE-MANIFEST-0.1",
+        "case_id": CASE_ID,
+        "market": MARKET,
+        "symbol": SYMBOL,
+        "company": COMPANY,
+        "cutoff_date": CUTOFF.isoformat(),
+        "required_field_groups": list(REQUIRED_FIELD_GROUPS),
+        "evidence": evidence_rows,
+        "raw_artifacts": raw_artifacts,
+    }
+    manifest = {
+        **manifest_body,
+        "audit": {"manifest_sha256": _sha(_canonical(manifest_body))},
+        "status": "PASS",
+        "validation_errors": [],
+    }
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+
+    permission_path = tmp_path / "permission-instrument.bin"
+    permission_bytes = b"Synthetic written permission instrument; fixture only.\\n"
+    permission_path.write_bytes(permission_bytes)
+    rights_path = tmp_path / "rights.json"
+    rights = {
+        "schema_version": RIGHTS_SCHEMA,
+        "case_id": CASE_ID,
+        "source_class": "EXCHANGE_MARKET_DATA",
+        "status": "ALLOWED",
+        "basis_kind": "EXPLICIT_WRITTEN_PERMISSION",
+        "permission_instrument_id": "B04-TEST-PERMISSION",
+        "permission_evidence_sha256": _sha(permission_bytes),
+        "allowed_uses": ["PRIVATE_STORAGE", "LOCAL_COMPUTATION", "INTERNAL_DISPLAY"],
+        "required_signer_roles": ["EVIDENCE_ADMISSION_SIGNER"],
+        "expires_at": "2027-01-01T00:00:00+00:00",
+    }
+    rights_path.write_text(
+        json.dumps(rights, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+
+    private_raw = bytes(range(32))
+    private_key = Ed25519PrivateKey.from_private_bytes(private_raw)
+    public_raw = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    private_path = tmp_path / "admission.key"
+    private_path.write_text(base64.b64encode(private_raw).decode("ascii") + "\\n", encoding="ascii")
+    registry_path = tmp_path / "signer-registry.json"
+    registry_path.write_text(json.dumps({
+        "schema_version": SIGNER_REGISTRY_SCHEMA,
+        "registry_status": "TEST_ONLY",
+        "signers": [{
+            "signer_key_id": "b04-test-owner",
+            "public_key_b64": base64.b64encode(public_raw).decode("ascii"),
+            "roles": ["EVIDENCE_ADMISSION_SIGNER"],
+            "status": "ACTIVE",
+            "case_scopes": [CASE_ID],
+            "valid_from": "2026-01-01T00:00:00+00:00",
+            "valid_until": None,
+            "revoked_at": None,
+        }],
+    }, sort_keys=True, indent=2) + "\\n", encoding="utf-8")
+
+    payload = build_admission_payload(
+        manifest_path=manifest_path,
+        raw_root=raw_root,
+        rights_record_path=rights_path,
+        permission_evidence_path=permission_path,
+        decision="ADMIT",
+        signed_at=SIGNED_AT,
+    )
+    envelope = add_signature(
+        {"schema_version": SIGNED_ADMISSION_SCHEMA, "payload": payload, "signatures": []},
+        signer_registry_path=registry_path,
+        signer_key_id="b04-test-owner",
+        private_key_path=private_path,
+        signed_at=SIGNED_AT,
+    )
+    envelope_path = tmp_path / "signed-admission.json"
+    envelope_path.write_text(
+        json.dumps(envelope, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+
+    reference = build_canonical_signed_evidence_admission_reference(
+        envelope_path=envelope_path,
+        manifest_path=manifest_path,
+        rights_record_path=rights_path,
+        permission_evidence_path=permission_path,
+    )
+    resolver = FileSystemCanonicalSignedEvidenceAdmissionResolver(
+        envelope_path=envelope_path,
+        manifest_path=manifest_path,
+        raw_root=raw_root,
+        rights_record_path=rights_path,
+        permission_evidence_path=permission_path,
+        signer_registry_path=registry_path,
+    )
+    return reference, resolver, envelope_path, evidence_ids
+
+
+def _forecast(forecast_id: str = "forecast-b04-001", registry=None, evidence_ids=None):
     if registry is None:
         registry = InMemoryCanonicalIndependentForecastRegistry()
     ref = registry.admit_independent_forecast({
@@ -43,7 +213,7 @@ def _forecast(forecast_id: str = "forecast-b04-001", registry=None):
         "forecast_origin": "2026-10-04T12:00:00+00:00",
         "known_at": "2026-10-04T15:00:00+00:00",
         "prepared_without_current_price": True,
-        "evidence_ids": ["b04-forecast-evidence"],
+        "evidence_ids": evidence_ids or ["b04-forecast-evidence"],
     })
     return registry, ref.to_dict()
 
@@ -61,21 +231,9 @@ def _valuation(forecast_ref):
         "horizon_years": "3",
         "reference_value_per_share": "430",
         "scenarios": {
-            "bear": {
-                "probability": "0.25",
-                "value_per_share": "280",
-                "cash_distributions_per_share": "0",
-            },
-            "base": {
-                "probability": "0.50",
-                "value_per_share": "430",
-                "cash_distributions_per_share": "10",
-            },
-            "bull": {
-                "probability": "0.25",
-                "value_per_share": "650",
-                "cash_distributions_per_share": "15",
-            },
+            "bear": {"probability": "0.25", "value_per_share": "280", "cash_distributions_per_share": "0"},
+            "base": {"probability": "0.50", "value_per_share": "430", "cash_distributions_per_share": "10"},
+            "bull": {"probability": "0.25", "value_per_share": "650", "cash_distributions_per_share": "15"},
         },
         "evidence_ids": ["b04-valuation-evidence"],
     })
@@ -110,11 +268,12 @@ def _valuation(forecast_ref):
     return resolver, ref, output
 
 
-def _return_gate(forecast_ref, valuation_ref):
+def _return_gate(forecast_ref, valuation_ref, evidence_ref):
     return {
         "lineage_version": FORECAST_VALUATION_RETURN_LINEAGE_VERSION,
         "canonical_forecast_ref": forecast_ref,
         "canonical_valuation_ref": valuation_ref,
+        "canonical_evidence_admission_ref": evidence_ref,
         "entry_price": "291.11",
         "entry_value_reference": "430",
         "horizon_years": "3",
@@ -125,36 +284,21 @@ def _return_gate(forecast_ref, valuation_ref):
         "fundamental_target_annualized_return": "0.15",
         "required_return_annualized": "0.10",
         "scenarios": {
-            "bear": {
-                "probability": "0.25",
-                "terminal_value_per_share": "280",
-                "cash_distributions_per_share": "0",
-                "probability_rationale": "canonical valuation",
-            },
-            "base": {
-                "probability": "0.50",
-                "terminal_value_per_share": "430",
-                "cash_distributions_per_share": "10",
-                "probability_rationale": "canonical valuation",
-            },
-            "bull": {
-                "probability": "0.25",
-                "terminal_value_per_share": "650",
-                "cash_distributions_per_share": "15",
-                "probability_rationale": "canonical valuation",
-            },
+            "bear": {"probability": "0.25", "terminal_value_per_share": "280", "cash_distributions_per_share": "0", "probability_rationale": "canonical valuation"},
+            "base": {"probability": "0.50", "terminal_value_per_share": "430", "cash_distributions_per_share": "10", "probability_rationale": "canonical valuation"},
+            "bull": {"probability": "0.25", "terminal_value_per_share": "650", "cash_distributions_per_share": "15", "probability_rationale": "canonical valuation"},
         },
     }
 
 
-def test_b04_lineage_accepts_canonical_forecast_and_valuation():
-    forecast_registry, forecast_ref = _forecast()
-    valuation_resolver, valuation_ref, _ = _valuation(forecast_ref)
-    result = validate_forecast_valuation_return_lineage(
-        return_gate=_return_gate(forecast_ref, valuation_ref),
+def _validate_lineage(forecast_registry, forecast_ref, valuation_resolver, valuation_ref, evidence_ref, evidence_resolver):
+    return validate_forecast_valuation_return_lineage(
+        return_gate=_return_gate(forecast_ref, valuation_ref, evidence_ref),
         canonical_forecast_ref=forecast_ref,
         canonical_valuation_ref=valuation_ref,
+        canonical_evidence_admission_ref=evidence_ref,
         independent_forecast_resolver=forecast_registry,
+        evidence_admission_resolver=evidence_resolver,
         valuation_output_resolver=valuation_resolver,
         case_id=CASE_ID,
         market=MARKET,
@@ -162,8 +306,20 @@ def test_b04_lineage_accepts_canonical_forecast_and_valuation():
         company=COMPANY,
         cutoff_date=CUTOFF,
     )
+
+
+def test_b04_lineage_accepts_forecast_valuation_and_signed_evidence_pit(tmp_path):
+    forecast_registry, forecast_ref = _forecast()
+    valuation_resolver, valuation_ref, _ = _valuation(forecast_ref)
+    evidence_ref, evidence_resolver, _envelope, _evidence_ids = _evidence_admission_bundle(tmp_path)
+    result = _validate_lineage(
+        forecast_registry, forecast_ref, valuation_resolver, valuation_ref, evidence_ref, evidence_resolver
+    )
     assert result["status"] == "PASS"
-    assert result["binding"] == "FORECAST_REF_EQUALITY_AND_CANONICAL_VALUATION_SCENARIO_EQUALITY"
+    assert result["binding"] == "FORECAST_REF_EQUALITY_EVIDENCE_ID_SUBSET_AND_CANONICAL_VALUATION_SCENARIO_EQUALITY"
+    assert result["evidence_pit_admission_status"] == "FORMALLY_ADMITTED"
+    assert result["evidence_ids_verified"] == ["b04-forecast-evidence", "b04-valuation-evidence"]
+    assert result["evidence_pit_admission"]["core_pit_validation"] == "PASS"
 
 
 @pytest.mark.parametrize(
@@ -174,10 +330,11 @@ def test_b04_lineage_accepts_canonical_forecast_and_valuation():
         (("cash_distributions_per_share", "bull", "999"), "is not canonical"),
     ],
 )
-def test_b04_return_gate_cannot_substitute_economic_inputs(mutation, expected):
+def test_b04_return_gate_cannot_substitute_economic_inputs(mutation, expected, tmp_path):
     forecast_registry, forecast_ref = _forecast()
     valuation_resolver, valuation_ref, _ = _valuation(forecast_ref)
-    gate = _return_gate(forecast_ref, valuation_ref)
+    evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(tmp_path)
+    gate = _return_gate(forecast_ref, valuation_ref, evidence_ref)
     field, scenario, value = mutation
     gate["scenarios"][scenario][field] = value
     with pytest.raises(ValueError, match=expected):
@@ -185,7 +342,9 @@ def test_b04_return_gate_cannot_substitute_economic_inputs(mutation, expected):
             return_gate=gate,
             canonical_forecast_ref=forecast_ref,
             canonical_valuation_ref=valuation_ref,
+            canonical_evidence_admission_ref=evidence_ref,
             independent_forecast_resolver=forecast_registry,
+            evidence_admission_resolver=evidence_resolver,
             valuation_output_resolver=valuation_resolver,
             case_id=CASE_ID,
             market=MARKET,
@@ -195,61 +354,77 @@ def test_b04_return_gate_cannot_substitute_economic_inputs(mutation, expected):
         )
 
 
-def test_b04_return_gate_reference_value_and_horizon_are_bound():
+def test_b04_return_gate_reference_value_and_horizon_are_bound(tmp_path):
     forecast_registry, forecast_ref = _forecast()
     valuation_resolver, valuation_ref, _ = _valuation(forecast_ref)
+    evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(tmp_path)
+    gate = _return_gate(forecast_ref, valuation_ref, evidence_ref)
 
-    gate = _return_gate(forecast_ref, valuation_ref)
     gate["entry_value_reference"] = "500"
     with pytest.raises(ValueError, match="reference value"):
         validate_forecast_valuation_return_lineage(
             return_gate=gate,
             canonical_forecast_ref=forecast_ref,
             canonical_valuation_ref=valuation_ref,
+            canonical_evidence_admission_ref=evidence_ref,
             independent_forecast_resolver=forecast_registry,
+            evidence_admission_resolver=evidence_resolver,
             valuation_output_resolver=valuation_resolver,
-            case_id=CASE_ID,
-            market=MARKET,
-            symbol=SYMBOL,
-            company=COMPANY,
-            cutoff_date=CUTOFF,
+            case_id=CASE_ID, market=MARKET, symbol=SYMBOL, company=COMPANY, cutoff_date=CUTOFF,
         )
 
-    gate = _return_gate(forecast_ref, valuation_ref)
+    gate = _return_gate(forecast_ref, valuation_ref, evidence_ref)
     gate["horizon_years"] = "2"
     with pytest.raises(ValueError, match="horizon"):
         validate_forecast_valuation_return_lineage(
             return_gate=gate,
             canonical_forecast_ref=forecast_ref,
             canonical_valuation_ref=valuation_ref,
+            canonical_evidence_admission_ref=evidence_ref,
             independent_forecast_resolver=forecast_registry,
+            evidence_admission_resolver=evidence_resolver,
             valuation_output_resolver=valuation_resolver,
-            case_id=CASE_ID,
-            market=MARKET,
-            symbol=SYMBOL,
-            company=COMPANY,
-            cutoff_date=CUTOFF,
+            case_id=CASE_ID, market=MARKET, symbol=SYMBOL, company=COMPANY, cutoff_date=CUTOFF,
         )
 
 
-def test_b04_forecast_to_valuation_binding_is_strict():
+def test_b04_forecast_to_valuation_binding_is_strict(tmp_path):
     forecast_registry, forecast_ref = _forecast()
-    valuation_resolver, valuation_ref, valuation = _valuation(forecast_ref)
+    valuation_resolver, valuation_ref, _ = _valuation(forecast_ref)
     _, unrelated_ref = _forecast("forecast-b04-002", registry=forecast_registry)
-    _ = valuation
-    gate = _return_gate(unrelated_ref, valuation_ref)
+    evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(tmp_path)
     with pytest.raises(ValueError, match="valuation.forecast_ref"):
         validate_forecast_valuation_return_lineage(
-            return_gate=gate,
+            return_gate=_return_gate(unrelated_ref, valuation_ref, evidence_ref),
             canonical_forecast_ref=unrelated_ref,
             canonical_valuation_ref=valuation_ref,
+            canonical_evidence_admission_ref=evidence_ref,
             independent_forecast_resolver=forecast_registry,
+            evidence_admission_resolver=evidence_resolver,
             valuation_output_resolver=valuation_resolver,
-            case_id=CASE_ID,
-            market=MARKET,
-            symbol=SYMBOL,
-            company=COMPANY,
-            cutoff_date=CUTOFF,
+            case_id=CASE_ID, market=MARKET, symbol=SYMBOL, company=COMPANY, cutoff_date=CUTOFF,
         )
 
 
+def test_b04_lineage_blocks_forecast_evidence_id_absent_from_signed_manifest(tmp_path):
+    forecast_registry, invalid_ref = _forecast(
+        "forecast-with-unsupported-evidence",
+        evidence_ids=["not-in-signed-manifest"],
+    )
+    valuation_resolver, valuation_ref, _ = _valuation(invalid_ref)
+    evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(tmp_path)
+    with pytest.raises(ValueError, match="absent from signed manifest"):
+        _validate_lineage(
+            forecast_registry, invalid_ref, valuation_resolver, valuation_ref, evidence_ref, evidence_resolver
+        )
+
+
+def test_b04_lineage_rejects_tampered_signed_evidence_envelope(tmp_path):
+    forecast_registry, forecast_ref = _forecast()
+    valuation_resolver, valuation_ref, _ = _valuation(forecast_ref)
+    evidence_ref, evidence_resolver, envelope_path, _ids = _evidence_admission_bundle(tmp_path)
+    envelope_path.write_text(envelope_path.read_text(encoding="utf-8") + " ", encoding="utf-8")
+    with pytest.raises(ValueError, match="envelope bytes differ from reference"):
+        _validate_lineage(
+            forecast_registry, forecast_ref, valuation_resolver, valuation_ref, evidence_ref, evidence_resolver
+        )
