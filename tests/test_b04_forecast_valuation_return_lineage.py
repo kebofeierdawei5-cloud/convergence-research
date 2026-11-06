@@ -125,7 +125,7 @@ def _evidence_admission_bundle(
     rights_path = tmp_path / "rights.json"
     rights = {
         "schema_version": RIGHTS_SCHEMA,
-        "case_id": CASE_ID,
+        "case_id": case_id,
         "source_class": "EXCHANGE_MARKET_DATA",
         "status": "ALLOWED",
         "basis_kind": "EXPLICIT_WRITTEN_PERMISSION",
