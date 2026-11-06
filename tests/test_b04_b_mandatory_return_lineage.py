@@ -69,3 +69,17 @@ def test_b04_b_canonical_lineage_matches_runtime_version():
     assert c["return_gate"]["lineage_version"] == REQUIRED_RUNTIME_RETURN_LINEAGE_VERSION
     result = _validate(c)
     assert result["status"] == "PASS", result
+
+
+
+def test_b04_b_return_lineage_ref_and_resolver_must_be_supplied_together():
+    c = case()
+    c["return_gate"]["canonical_evidence_admission_ref"] = {
+        "envelope_sha256": "a" * 64,
+        "manifest_sha256": "b" * 64,
+        "rights_record_sha256": "c" * 64,
+        "permission_evidence_sha256": "d" * 64,
+    }
+    result = _validate(c)
+    assert result["status"] == "BLOCKED"
+    assert any(error["code"] == "V03-RETURN-LINEAGE-EVIDENCE-PIT-PAIR" for error in result["errors"])
