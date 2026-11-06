@@ -29,6 +29,7 @@ class CanonicalRuntimeBindings:
     independent_forecast_resolver: Any
     upstream_authority_resolver: Any
     valuation_output_resolver: Any
+    evidence_admission_resolver: Any
     # Optional for existing canonical-price runs; required only when a case
     # explicitly selects OPERATOR_ATTESTED_MARKET_DATA.
     operator_price_input_resolver: Any | None = None
@@ -43,6 +44,7 @@ RUNTIME_REQUIRED_BINDINGS = (
     "independent_forecast_resolver",
     "upstream_authority_resolver",
     "valuation_output_resolver",
+    "evidence_admission_resolver",
 )
 
 
@@ -116,6 +118,7 @@ def validate_canonical_runtime_bindings(runtime: Any) -> CanonicalRuntimeBinding
         "independent_forecast_resolver": "resolve_independent_forecast",
         "upstream_authority_resolver": "resolve",
         "valuation_output_resolver": "resolve_valuation_output",
+        "evidence_admission_resolver": "resolve_signed_evidence_admission",
     }
     for binding_name, method_name in resolver_methods.items():
         resolver = getattr(runtime, binding_name)
