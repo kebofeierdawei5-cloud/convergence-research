@@ -180,3 +180,12 @@ Q4 接口要求实际期间严格为 `YYYYQ1-Q3`、预测期间为同一年度 `
 该输出状态为 `FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE`。不生成历史正常化 EPS/增长率，不更改 B55/B56 状态、不构成正式 Forecast Admission。B58 可以把该 B57 EPS 与 EPS_MULTIPLE 使用的主 EPS 分析假设作数值比较，但必须保持 `PRIMARY_EPS_ASSUMPTION_ONLY`，不能称为独立计算 MATCH。
 
 本案例仍没有真实 Q4 假设，故新和成真实 B57 状态仍保持 `BLOCKED_BY_B56`。本批回归中的数值仅为合成测试夹具。
+
+
+## 16. B77：财报金额桥接入 B57 的前瞻 EPS 路径（2026-11-06）
+
+B77 新增的 B57 forward-only 路径已经在 Linux 验收：464 passed，4.04 秒。它允许完整的财报金额桥条件情景在 B55/B56 物理驱动桥仍阻断时提供 B57 all-items EPS，但必须保持历史正常化 UNKNOWN；B58 对主 EPS 分析假设最多为 `PRIMARY_EPS_ASSUMPTION_ONLY`。
+
+macOS 对应 job 连续被 GitHub Actions 标记为 cancelled，没有测试日志可据以判断代码失败或通过；因此本轮 macOS 状态是 NOT VERIFIED。其他 14 个相关工作流通过。一个单独 P0 incident push run failure 没有 Job，单独记录。
+
+本公司真实输入仍未包含 Q4 Bear/Base/Bull 数字与年度加权平均稀释股数。B77 新路径目前只由合成夹具验证，不能据此报告新和成 FY2026 EPS、估值或 BUY/ADD 决策。

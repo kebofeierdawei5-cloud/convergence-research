@@ -317,3 +317,19 @@ B4 独立财报金额桥现在可为 B57 提供一条受限的 forward-only all-
 - 不生成正常化 EPS、历史 EPS 增长、正式准入、估值授权或 Decision。
 
 新和成真实案例缺少 Q4 输入和年度稀释股数假设，因此此路径在真实案例中尚不触发。
+
+
+## 6M. B77：公开财报金额桥 → B57 forward-only EPS（2026-11-06）
+
+代码 HEAD：`9783ce339df6bf1c526a2fd5b7396261b8a10625`。
+
+当传统 B55/B56 物理驱动链不能闭合时，若独立财报金额桥已对账，且 Q4 Bear/Base/Bull 全部假设完整、同年度 Q1-Q3 → FY 期间匹配、年度稀释股数为正、归母 + 少数股东 = 合并净利润、归母利润 / 股数 = 条件 EPS，B57 可以提供 forward all-items EPS，状态限定为 `FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE`。
+
+这条路径不改变 B55/B56，不生成历史正常化 EPS/增长率，不创建正式 Forecast Admission。B58 对主 EPS 分析假设最多标记 `PRIMARY_EPS_ASSUMPTION_ONLY`，不宣称独立计算 MATCH。
+
+**精确 HEAD 验收：**
+- Linux Local Pilot / B76 / Xinhecheng / Q4 / Replay：**464 passed / 4.04s**。
+- 其余 14 个相关工作流通过。
+- 同一 Local Pilot workflow 的 macOS job 被 GitHub Actions cancelled；不报告 macOS PASS。重复取消未见 pytest 失败日志，因此列为 Runner/job 调度未验证。
+- 独立 P0 incident push workflow failure 无 Job，且路径过滤无本批变更文件；不计为 B77 代码失败。
+- 新和成真实案例缺少 Q4 假设和年度稀释股数，故真实 B57 仍阻断，无 FY2026 EPS。
