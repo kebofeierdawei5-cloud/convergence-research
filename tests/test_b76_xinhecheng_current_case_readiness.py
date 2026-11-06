@@ -400,4 +400,6 @@ def test_b58_can_compare_statement_amount_b57_forward_eps_to_primary_eps_assumpt
         row["status"] == "PRIMARY_EPS_ASSUMPTION_ONLY"
         for row in result["scenarios"].values()
     )
-    assert all(row["eps_match"] is True for row in result["scenarios"].values())
+    assert all(row["eps_match"] is None for row in result["scenarios"].values())
+    assert all(row["numeric_similarity_to_primary_declared_eps"] is True for row in result["scenarios"].values())
+    assert all(row["independent_confirmation_status"] == "NOT_ESTABLISHED_PRIMARY_EPS_ASSUMPTION_ONLY" for row in result["scenarios"].values())
