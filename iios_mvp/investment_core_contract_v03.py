@@ -429,6 +429,7 @@ def _risk_status(case: dict[str, Any]) -> str:
 
 def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None, valuation_output_resolver: Any | None = None, operator_price_input_resolver: Any | None = None, evidence_admission_resolver: CanonicalSignedEvidenceAdmissionResolver | None = None) -> dict[str, Any]:
     errors: list[dict[str, str]] = []
+    return_lineage_assessment: dict[str, Any] | None = None
     if not isinstance(case, dict):
         return {"status": "BLOCKED", "errors": [_err("V03-SCHEMA-TYPE", "$", "case must be an object")]}
     required = (
@@ -641,7 +642,7 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
                  or (isinstance(evidence_ref, dict) and evidence_admission_resolver is not None))
         ):
             try:
-                validate_forecast_valuation_return_lineage(
+                return_lineage_assessment = validate_forecast_valuation_return_lineage(
                     return_gate=return_gate,
                     canonical_forecast_ref=return_gate["canonical_forecast_ref"],
                     canonical_valuation_ref=return_gate["canonical_valuation_ref"],
@@ -930,7 +931,11 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
                 errors.append(_err("V03-ACTION", "decision.action", f"invalid action: {action}"))
             if status not in DECISION_STATUSES:
                 errors.append(_err("V03-DECISION-STATUS", "decision.decision_status", f"invalid status: {status}"))
-    return {"status": "PASS" if not errors else "BLOCKED", "errors": errors}
+    return {
+        "status": "PASS" if not errors else "BLOCKED",
+        "errors": errors,
+        "return_lineage": return_lineage_assessment,
+    }
 
 def _canonical_expectation_gap(payload: Any, case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None) -> dict[str, Any]:
     mie_ref = case.get("market_implied_expectation_snapshot_ref")

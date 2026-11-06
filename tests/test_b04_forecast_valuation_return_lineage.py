@@ -141,6 +141,7 @@ def _evidence_admission_bundle(tmp_path: Path):
     private_path = tmp_path / "admission.key"
     private_path.write_text(base64.b64encode(private_raw).decode("ascii") + "\n", encoding="ascii")
     private_path.chmod(0o600)
+    private_path.chmod(0o600)
     registry_path = tmp_path / "signer-registry.json"
     registry_path.write_text(json.dumps({
         "schema_version": SIGNER_REGISTRY_SCHEMA,
