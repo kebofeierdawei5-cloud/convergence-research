@@ -318,7 +318,7 @@ def test_b04_lineage_accepts_forecast_valuation_and_signed_evidence_pit(tmp_path
         forecast_registry, forecast_ref, valuation_resolver, valuation_ref, evidence_ref, evidence_resolver
     )
     assert result["status"] == "PASS"
-    assert result["binding"] == "FORECAST_REF_EQUALITY_EVIDENCE_ID_SUBSET_AND_CANONICAL_VALUATION_SCENARIO_EQUALITY"
+    assert result["binding"] == "FORECAST_REF_EQUALITY_EVIDENCE_ID_SUBSET_CANONICAL_VALUATION_SCENARIO_EQUALITY_AND_SIGNED_EVIDENCE_PIT"
     assert result["evidence_pit_admission_status"] == "FORMALLY_ADMITTED"
     assert result["evidence_ids_verified"] == ["b04-forecast-evidence", "b04-valuation-evidence"]
     assert result["evidence_pit_admission"]["core_pit_validation"] == "PASS"

@@ -290,7 +290,7 @@ def test_b04_core_accepts_canonical_lineage(tmp_path):
         valuation_output_resolver=valuation_resolver,
         evidence_admission_resolver=evidence_resolver,
     )
-    assert result["status"] == "PASS"
+    assert result["status"] == "PASS", result["errors"]
     assert result["return_lineage"]["evidence_pit_admission_status"] == "FORMALLY_ADMITTED"
     assert result["return_lineage"]["evidence_ids_verified"] == ["b04-forecast-evidence", "b04-valuation-evidence"]
 
