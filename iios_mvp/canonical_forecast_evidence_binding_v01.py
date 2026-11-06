@@ -217,6 +217,7 @@ class FileSystemCanonicalSignedEvidenceAdmissionResolver:
             "core_pit_validation": "PASS",
             **expected_identity,
             "manifest_sha256": ref.manifest_sha256,
+            "evidence_manifest_audit_sha256": str((manifest.get("audit") or {}).get("manifest_sha256") or ""),
             "rights_record_sha256": ref.rights_record_sha256,
             "permission_evidence_sha256": ref.permission_evidence_sha256,
             "envelope_sha256": ref.envelope_sha256,
