@@ -1377,7 +1377,11 @@ def _build_baseline_net_profit_bridge(
     if all(status == "CALCULATED_AND_RECONCILED" for status in statuses):
         base["status"] = "DIAGNOSTIC_CALCULATED"
         base["reason"] = "三个情景均基于 B55 已对账贡献和同期间历史/前瞻费用、折旧、融资成本与税率，模型税后利润变化在 CNY 1 内对账。"
-    elif any(status in {"CALCULATED_AND_RECONCILED", "RECONCILIATION_MISMATCH"} for status in statuses):
+    elif any(status in {
+        "CALCULATED_AND_RECONCILED",
+        "RECONCILIATION_MISMATCH",
+        "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE",
+    } for status in statuses):
         base["status"] = "PARTIAL"
         base["reason"] = "只有部分情景的完整历史与前瞻财务输入可用；其余情景保持 UNKNOWN/受阻，不能据此概括完整 Bear/Base/Bull 链。"
     elif all(status == "BLOCKED_BY_B55" for status in statuses):
@@ -1399,8 +1403,9 @@ def _build_per_share_earnings_bridge(
     unresolved_refs: set[str],
     after_cutoff_refs: set[str],
     uncertain_refs: set[str],
+    financial_statement_amount_bridge: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Bridge B56 modeled profit to parent-attributable normalized earnings and diluted EPS."""
+    """Bridge B56 modeled profit to normalized EPS, or forward-only all-items EPS from the separate statement bridge."""
     schema = "IIOS-B57-PARENT-EARNINGS-DILUTED-EPS-BRIDGE-0.1"
     base = {
         "schema_version": schema,
@@ -1440,6 +1445,116 @@ def _build_per_share_earnings_bridge(
     b56 = baseline_transition.get("net_profit_bridge")
     b56 = b56 if isinstance(b56, Mapping) else {}
     b56_scenarios = b56.get("scenarios") if isinstance(b56.get("scenarios"), Mapping) else {}
+    statement_amount_bridge = (
+        financial_statement_amount_bridge
+        if isinstance(financial_statement_amount_bridge, Mapping) else {}
+    )
+    statement_forecast_scenarios = (
+        statement_amount_bridge.get("forecast_scenarios")
+        if isinstance(statement_amount_bridge.get("forecast_scenarios"), Mapping) else {}
+    )
+
+    def collect_forward_data_classes(value: Any) -> set[str]:
+        allowed = {"OBSERVED_ACTUAL", "ISSUER_FORECAST", "ANALYST_ASSUMPTION"}
+        found: set[str] = set()
+        if isinstance(value, Mapping):
+            raw_class = str(value.get("data_class") or "").strip().upper()
+            if raw_class in allowed:
+                found.add(raw_class)
+            for child in value.values():
+                found.update(collect_forward_data_classes(child))
+        elif isinstance(value, (list, tuple)):
+            for child in value:
+                found.update(collect_forward_data_classes(child))
+        return found
+
+    def combine_forward_data_classes(classes: set[str]) -> str:
+        if not classes:
+            return "SOURCE_CLASS_NOT_IDENTIFIABLE"
+        if len(classes) == 1:
+            return next(iter(classes))
+        if classes == {"OBSERVED_ACTUAL", "ANALYST_ASSUMPTION"}:
+            return "MIXED_OBSERVED_ACTUAL_AND_ANALYST_ASSUMPTION"
+        if classes == {"OBSERVED_ACTUAL", "ISSUER_FORECAST"}:
+            return "MIXED_OBSERVED_ACTUAL_AND_ISSUER_FORECAST"
+        if classes == {"ISSUER_FORECAST", "ANALYST_ASSUMPTION"}:
+            return "MIXED_ISSUER_FORECAST_AND_ANALYST_ASSUMPTION"
+        return "MIXED_OBSERVED_ACTUAL_ISSUER_FORECAST_AND_ANALYST_ASSUMPTION"
+
+    def build_source_lineage_assessment(*values: Any) -> dict[str, Any]:
+        found_classes: set[str] = set()
+        evidence_statuses: set[str] = set()
+        claimed_evidence_refs: set[str] = set()
+        source_issues: set[str] = set()
+
+        def visit(value: Any) -> None:
+            if isinstance(value, Mapping):
+                data_class = str(value.get("data_class") or "").strip().upper()
+                if data_class in {"OBSERVED_ACTUAL", "ISSUER_FORECAST", "ANALYST_ASSUMPTION"}:
+                    found_classes.add(data_class)
+                evidence_status = str(value.get("evidence_status") or "").strip().upper()
+                if evidence_status:
+                    evidence_statuses.add(evidence_status)
+                refs = value.get("evidence_refs")
+                if isinstance(refs, list):
+                    claimed_evidence_refs.update(
+                        str(item).strip() for item in refs if str(item).strip()
+                    )
+                issues = value.get("issues")
+                if isinstance(issues, list):
+                    source_issues.update(str(item) for item in issues if str(item))
+                for child in value.values():
+                    visit(child)
+            elif isinstance(value, (list, tuple)):
+                for child in value:
+                    visit(child)
+
+        for value in values:
+            visit(value)
+
+        has_external_source = bool(found_classes & {"OBSERVED_ACTUAL", "ISSUER_FORECAST"})
+        unresolved_markers = (
+            "SOURCE_REFERENCE_UNRESOLVED",
+            "SOURCE_AFTER_CUTOFF",
+            "SOURCE_TIMING_UNCERTAIN",
+            "DATA_CLASS_NOT_ALLOWED_FOR_CONTEXT",
+        )
+        unresolved = any(
+            marker in issue for issue in source_issues for marker in unresolved_markers
+        ) or bool(evidence_statuses & {
+            "SOURCE_REFERENCE_MISSING",
+            "SOURCE_REFERENCE_UNRESOLVED",
+            "SOURCE_AFTER_CUTOFF",
+            "SOURCE_TIMING_UNCERTAIN",
+        })
+        if not found_classes:
+            lineage_status = "SOURCE_LINEAGE_NOT_IDENTIFIABLE"
+        elif unresolved:
+            lineage_status = "SOURCE_REFERENCE_VALIDATION_BLOCKED_OR_UNRESOLVED"
+        elif has_external_source and evidence_statuses == {"PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}:
+            lineage_status = "PIT_TIME_PRECHECK_ONLY_NOT_FORMALLY_ADMITTED"
+        elif has_external_source:
+            lineage_status = "SOURCE_REFERENCE_PRESENT_NOT_FORMALLY_ADMITTED"
+        elif found_classes == {"ANALYST_ASSUMPTION"}:
+            lineage_status = "ANALYST_ASSUMPTIONS_NOT_EVIDENCE_ADMISSION"
+        else:
+            lineage_status = "MIXED_SOURCE_LINEAGE_NOT_FORMALLY_ADMITTED"
+
+        return {
+            "status": lineage_status,
+            "source_data_classes": sorted(found_classes),
+            "source_evidence_statuses": sorted(evidence_statuses),
+            "claimed_evidence_refs": sorted(claimed_evidence_refs),
+            "source_reference_validation_issues": sorted(source_issues),
+            "formal_evidence_pit_admission_status": (
+                "NOT_FORMALLY_ADMITTED" if has_external_source
+                else "NOT_APPLICABLE_NO_EXTERNAL_EVIDENCE_SOURCE"
+            ),
+            "formal_forecast_admission_status": "NOT_CREATED_BY_LOCAL_PILOT",
+            "formal_evidence_pit_admission_created": False,
+            "formal_forecast_admission_created": False,
+            "decision_grade_forecast_eligible": False,
+        }
 
     for scenario_name in SCENARIOS:
         raw_forward = scenarios_raw.get(scenario_name)
@@ -1471,6 +1586,10 @@ def _build_per_share_earnings_bridge(
             "issues": [],
             "eps_growth_status": "UNKNOWN",
             "eps_growth_rate": None,
+            "formal_evidence_pit_admission_created": False,
+            "formal_forecast_admission_created": False,
+            "decision_grade_forecast_eligible": False,
+            "decision_authority": False,
         }
         if str(scope or "UNKNOWN").strip().upper() != "COMPANY_WIDE":
             row["status"] = "NOT_COMPARABLE_SCOPE"
@@ -1478,6 +1597,139 @@ def _build_per_share_earnings_bridge(
             base["scenarios"][scenario_name] = row
             continue
         if str(b56_row.get("status") or "UNKNOWN") != "CALCULATED_AND_RECONCILED":
+            statement_row = statement_forecast_scenarios.get(scenario_name)
+            statement_row = statement_row if isinstance(statement_row, Mapping) else {}
+            statement_status = str(statement_row.get("status") or "UNKNOWN").strip().upper()
+            statement_totals = (
+                statement_row.get("fy_calculated_totals_cny")
+                if isinstance(statement_row.get("fy_calculated_totals_cny"), Mapping) else {}
+            )
+            statement_period = str(statement_row.get("forecast_period") or statement_amount_bridge.get("forecast_period") or "").strip().upper()
+            expected_period = str(baseline_transition.get("forecast_period") or "").strip().upper()
+            if (
+                statement_amount_bridge.get("actual_period_status") == "ALL_ACTUAL_PERIODS_RECONCILED"
+                and statement_status == "CONDITIONAL_ANALYST_ASSUMPTION_CALCULATED"
+                and statement_row.get("data_class") == "ANALYST_ASSUMPTION"
+                and statement_period
+                and statement_period == expected_period
+            ):
+                try:
+                    parent_profit = Decimal(str(statement_totals.get("parent_attributable_net_profit")))
+                    consolidated_profit = Decimal(str(statement_totals.get("consolidated_net_profit")))
+                    minority_profit = Decimal(str(statement_totals.get("minority_interest_net_profit_after_tax")))
+                    shares = Decimal(str(statement_row.get("annual_weighted_average_diluted_shares")))
+                    declared_eps = Decimal(str(statement_row.get(
+                        "conditional_fy_all_items_parent_attributable_eps_cny_per_share"
+                    )))
+                    calculated_eps = parent_profit / shares if shares > 0 else None
+                    residual = parent_profit + minority_profit - consolidated_profit
+                    if (
+                        not all(value.is_finite() for value in (
+                            parent_profit, consolidated_profit, minority_profit, shares, declared_eps
+                        ))
+                        or shares <= 0
+                        or calculated_eps is None
+                        or parent_profit <= 0
+                        or abs(residual) > Decimal("1")
+                        or abs(calculated_eps - declared_eps) > Decimal("0.0000000001")
+                    ):
+                        raise ValueError("STATEMENT_AMOUNT_FORWARD_EPS_RECONCILIATION_FAILED")
+                except (InvalidOperation, ValueError, TypeError, ZeroDivisionError) as exc:
+                    row["status"] = "NOT_IDENTIFIABLE"
+                    row["missing_inputs"] = []
+                    row["issues"] = [str(exc)]
+                    base["scenarios"][scenario_name] = row
+                    continue
+
+                row["status"] = "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+                row["all_items_eps_status"] = "CALCULATED_FROM_FINANCIAL_STATEMENT_AMOUNT_BRIDGE_ANALYST_ASSUMPTIONS"
+                row["eps_growth_status"] = "NOT_IDENTIFIABLE_HISTORICAL_NORMALIZED_BASELINE"
+                row["missing_inputs"] = ["HISTORICAL_NORMALIZED_EARNINGS_AND_DILUTED_SHARE_BASELINE_NOT_IDENTIFIABLE"]
+                row["issues"] = [
+                    f"B56_PHYSICAL_DRIVER_BRIDGE_REMAINS:{b56_row.get('status', 'UNKNOWN')}",
+                    "FORWARD_ALL_ITEMS_EPS_COMES_FROM_SEPARATE_PUBLIC_FINANCIAL_STATEMENT_AMOUNT_BRIDGE",
+                ]
+                row["forward_scenario"] = {
+                    "period": statement_period,
+                    "all_items_profit_before_tax_proxy_cny": statement_totals.get("profit_before_tax"),
+                    "all_items_consolidated_net_profit_proxy_cny": statement_totals.get("consolidated_net_profit"),
+                    "all_items_minority_interest_net_profit_cny": statement_totals.get("minority_interest_net_profit_after_tax"),
+                    "all_items_parent_attributable_net_profit_proxy_cny": statement_totals.get("parent_attributable_net_profit"),
+                    "diluted_weighted_average_shares": statement_row.get("annual_weighted_average_diluted_shares"),
+                    "all_items_diluted_eps_proxy_cny_per_share": format(calculated_eps, "f"),
+                    "normalized_parent_attributable_net_profit_cny": None,
+                    "normalized_diluted_eps_proxy_cny_per_share": None,
+                    "data_class": "ANALYST_ASSUMPTION",
+                    "source_data_classes": ["ANALYST_ASSUMPTION", "OBSERVED_ACTUAL"],
+                    "combined_output_data_class": "MIXED_OBSERVED_ACTUAL_AND_ANALYST_ASSUMPTION",
+                    "provenance_components": {
+                        "reported_actual_periods": {
+                            "data_class": "OBSERVED_ACTUAL",
+                            "status": statement_amount_bridge.get("actual_period_status"),
+                            "source_reference_status": "PRESENT_NOT_PIT_VALIDATED",
+                            "periods": [
+                                {
+                                    "period": period_name,
+                                    "bridge_status": period_row.get("status"),
+                                    "source_reference_id": period_row.get("source_id"),
+                                    "source_url": period_row.get("source_url"),
+                                    "publication_date": period_row.get("publication_date"),
+                                    "source_admission_status": period_row.get("source_admission_status"),
+                                    "evidence_ids": list(period_row.get("evidence_ids") or []),
+                                    "raw_bytes_verified": period_row.get("raw_bytes_verified") is True,
+                                    "pit_validation_performed": period_row.get("pit_validation_performed") is True,
+                                }
+                                for period_name, period_row in (
+                                    statement_amount_bridge.get("actual_periods", {}).items()
+                                    if isinstance(statement_amount_bridge.get("actual_periods"), Mapping)
+                                    else []
+                                )
+                                if isinstance(period_row, Mapping)
+                            ],
+                        },
+                        "q4_forecast_line_items": {
+                            "data_class": "ANALYST_ASSUMPTION",
+                            "assumptions": statement_row.get("q4_assumption_inputs"),
+                        },
+                        "annual_weighted_average_diluted_shares": {
+                            "data_class": "ANALYST_ASSUMPTION",
+                            "assumption": statement_row.get("annual_weighted_average_diluted_shares_assumption"),
+                        },
+                    },
+                    "data_class_semantics": "LEGACY_FIELD_DESCRIBES_CONDITIONAL_FORECAST_INPUTS_ONLY; COMBINED_OUTPUT_DATA_CLASS_DESCRIBES_ACTUAL_PLUS_ASSUMPTION_PROVENANCE",
+                    "source_lineage_assessment": {
+                        "status": "REPORTED_ACTUAL_SOURCE_REFERENCES_PRESENT_NOT_PIT_VALIDATED_PLUS_ANALYST_ASSUMPTIONS",
+                        "source_data_classes": ["OBSERVED_ACTUAL", "ANALYST_ASSUMPTION"],
+                        "reported_source_reference_ids": sorted({
+                            str(period_row.get("source_id")).strip()
+                            for period_row in (
+                                statement_amount_bridge.get("actual_periods", {}).values()
+                                if isinstance(statement_amount_bridge.get("actual_periods"), Mapping)
+                                else []
+                            )
+                            if isinstance(period_row, Mapping) and str(period_row.get("source_id") or "").strip()
+                        }),
+                        "claimed_evidence_refs": [],
+                        "formal_evidence_pit_admission_status": "NOT_FORMALLY_ADMITTED",
+                        "formal_forecast_admission_status": "NOT_CREATED_BY_LOCAL_PILOT",
+                        "pit_validation_performed": False,
+                        "raw_bytes_verified": False,
+                        "formal_evidence_pit_admission_created": False,
+                        "formal_forecast_admission_created": False,
+                        "decision_grade_forecast_eligible": False,
+                        "issues": [
+                            "FINANCIAL_STATEMENT_AMOUNT_BRIDGE_PERFORMS_ARITHMETIC_RECONCILIATION_ONLY",
+                            "SOURCE_ID_AND_PUBLICATION_DATE_ARE_NOT_SIGNED_EVIDENCE_PIT_ADMISSION",
+                        ],
+                    },
+                    "financial_statement_amount_bridge_status": statement_amount_bridge.get("status"),
+                    "financial_statement_amount_bridge_scenario_status": statement_status,
+                    "financial_statement_amount_assumption_inputs": statement_row.get("q4_assumption_inputs"),
+                    "annual_weighted_average_diluted_shares_assumption": statement_row.get("annual_weighted_average_diluted_shares_assumption"),
+                }
+                base["scenarios"][scenario_name] = row
+                continue
+
             row["status"] = "BLOCKED_BY_B56"
             row["missing_inputs"] = ["B56_RECONCILED_NET_PROFIT_PROXY"]
             row["issues"] = [f"B56_SCENARIO_STATUS:{b56_row.get('status', 'UNKNOWN')}"]
@@ -1500,19 +1752,34 @@ def _build_per_share_earnings_bridge(
             "forward.net_profit_proxy_cny": forward_base_net_profit,
             "forward.tax_rate": forward_tax_rate,
         }
-        missing = [
+        historical_missing = [
             f"historical.{field}" for field, value in hist_values.items() if value is None
         ] + [
-            f"forward.{field}" for field, value in fwd_values.items() if value is None
+            field for field, value in financial_inputs.items()
+            if field.startswith("historical.") and value in (None, "")
+        ]
+        # The forecast all-items EPS is independent of the historical one-off NCI split.
+        # Missing historical normalization inputs must not erase a computable forward
+        # parent-attributable EPS, but must never be replaced with zero.
+        forward_all_items_required_fields = {
+            "recurring_non_operating_pre_tax_cny",
+            "non_recurring_pre_tax_cny",
+            "minority_interest_net_profit_after_tax_cny",
+            "diluted_weighted_average_shares",
+        }
+        forward_all_items_missing = [
+            f"forward.{field}" for field in sorted(forward_all_items_required_fields)
+            if fwd_values.get(field) is None
         ] + [
-            field for field, value in financial_inputs.items() if value in (None, "")
+            field for field, value in financial_inputs.items()
+            if field.startswith("forward.") and value in (None, "")
         ]
         invalid_inputs: list[str] = []
         for side, values in (("historical", hist_values), ("forward", fwd_values)):
             shares = values.get("diluted_weighted_average_shares")
             if shares is not None and shares <= 0:
                 invalid_inputs.append(f"{side}.diluted_weighted_average_shares:MUST_BE_POSITIVE")
-        row["missing_inputs"] = sorted(set(missing + invalid_inputs))
+        row["missing_inputs"] = sorted(set(historical_missing + forward_all_items_missing + invalid_inputs))
         row["issues"] = sorted({
             f"{side}.{field}:{issue}"
             for side, measures in (("historical", historical_inputs), ("forward", forward_inputs))
@@ -1545,8 +1812,82 @@ def _build_per_share_earnings_bridge(
             "all_items_parent_attributable_net_profit_proxy_cny": None,
             "normalized_diluted_eps_proxy_cny_per_share": None,
         }
-        if row["missing_inputs"]:
+        forward_all_items_ready = not forward_all_items_missing and (
+            fwd_values.get("diluted_weighted_average_shares") is not None
+            and fwd_values["diluted_weighted_average_shares"] > 0
+        )
+        if not forward_all_items_ready:
             row["status"] = "NOT_IDENTIFIABLE"
+            row["issues"] = sorted(set(row["issues"] + forward_all_items_missing + invalid_inputs))
+            base["scenarios"][scenario_name] = row
+            continue
+
+        forward_pbt_value = _decimal(forward_pbt, "B57_FORWARD_PBT")
+        fwd_net_profit_value = _decimal(forward_base_net_profit, "B57_FORWARD_B56_NET_PROFIT")
+        fwd_tax = forward_tax_rate
+        fwd_nci_total = fwd_values["minority_interest_net_profit_after_tax_cny"]
+        fwd_shares = fwd_values["diluted_weighted_average_shares"]
+        forward_recurring_pbt = (
+            forward_pbt_value + fwd_values["recurring_non_operating_pre_tax_cny"]
+        )
+        forward_all_items_pbt = (
+            forward_recurring_pbt + fwd_values["non_recurring_pre_tax_cny"]
+        )
+        forward_all_items_consolidated_np = (
+            forward_all_items_pbt - max(forward_all_items_pbt, Decimal("0")) * fwd_tax
+        )
+        forward_all_items_parent_np = forward_all_items_consolidated_np - fwd_nci_total
+        forward_all_items_eps = forward_all_items_parent_np / fwd_shares
+        row["forward_scenario"].update({
+            "all_items_profit_before_tax_proxy_cny": _render(forward_all_items_pbt),
+            "all_items_consolidated_net_profit_proxy_cny": _render(forward_all_items_consolidated_np),
+            "all_items_minority_interest_net_profit_cny": _render(fwd_nci_total),
+            "all_items_parent_attributable_net_profit_proxy_cny": _render(forward_all_items_parent_np),
+            "diluted_weighted_average_shares": _render(fwd_shares),
+            "all_items_diluted_eps_proxy_cny_per_share": _render(forward_all_items_eps),
+        })
+        b55_scenario_map = baseline_transition.get("scenarios")
+        b55_scenario_map = b55_scenario_map if isinstance(b55_scenario_map, Mapping) else {}
+        b55_scenario = b55_scenario_map.get(scenario_name)
+        b55_scenario = b55_scenario if isinstance(b55_scenario, Mapping) else {}
+        b55_product_rows = b55_scenario.get("product_lines")
+        b55_product_rows = b55_product_rows if isinstance(b55_product_rows, list) else []
+        b55_forward_measures = []
+        for product_row in b55_product_rows:
+            if not isinstance(product_row, Mapping):
+                continue
+            product_forward = product_row.get("forward_scenario")
+            product_forward = product_forward if isinstance(product_forward, Mapping) else {}
+            b55_forward_measures.append(product_forward.get("measures"))
+        b56_forward_lineage = fwd_financials.get("measure_lineage")
+        source_classes = (
+            collect_forward_data_classes(b55_forward_measures)
+            | collect_forward_data_classes(b56_forward_lineage)
+            | collect_forward_data_classes(forward_inputs)
+        )
+        row["forward_scenario"]["source_data_classes"] = sorted(source_classes)
+        row["forward_scenario"]["combined_output_data_class"] = combine_forward_data_classes(source_classes)
+        row["forward_scenario"]["source_lineage_assessment"] = build_source_lineage_assessment(
+            b55_forward_measures,
+            b56_forward_lineage,
+            forward_inputs,
+        )
+        row["all_items_eps_status"] = "CALCULATED_AND_RECONCILED"
+        normalized_only_forward_missing = (
+            fwd_values.get("minority_interest_nonrecurring_after_tax_cny") is None
+        )
+        historical_invalid_inputs = [
+            issue for issue in invalid_inputs if issue.startswith("historical.")
+        ]
+        if historical_missing or historical_invalid_inputs or normalized_only_forward_missing:
+            partial_missing = historical_missing + historical_invalid_inputs + (
+                ["forward.minority_interest_nonrecurring_after_tax_cny"]
+                if normalized_only_forward_missing else []
+            )
+            row["status"] = "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+            row["missing_inputs"] = sorted(set(partial_missing))
+            row["eps_growth_status"] = "NOT_IDENTIFIABLE_HISTORICAL_NORMALIZED_BASELINE"
+            row["issues"] = sorted(set(row["issues"] + partial_missing))
             base["scenarios"][scenario_name] = row
             continue
 
@@ -1588,6 +1929,7 @@ def _build_per_share_earnings_bridge(
                 "all_items_minority_interest_net_profit_cny": nci_total,
                 "normalized_parent_attributable_net_profit_cny": normalized_parent_np,
                 "all_items_parent_attributable_net_profit_proxy_cny": all_items_parent_np,
+                "all_items_diluted_eps_proxy_cny_per_share": all_items_parent_np / amounts["diluted_weighted_average_shares"],
                 "normalized_diluted_eps_proxy_cny_per_share": normalized_parent_np / amounts["diluted_weighted_average_shares"],
             }
 
@@ -1616,6 +1958,9 @@ def _build_per_share_earnings_bridge(
         forward_eps = forward_result["normalized_diluted_eps_proxy_cny_per_share"]
         eps_growth = forward_eps / historical_eps - Decimal("1") if historical_eps > 0 else None
         row["status"] = "CALCULATED_AND_RECONCILED" if abs(residual) <= Decimal("1") else "RECONCILIATION_MISMATCH"
+        row["all_items_eps_status"] = (
+            "CALCULATED_AND_RECONCILED" if abs(residual) <= Decimal("1") else "NOT_RECONCILED"
+        )
         row["historical_baseline"].update({
             **{key: _render(value) for key, value in historical_result.items()},
             "period": base["baseline_period"],
@@ -1661,7 +2006,11 @@ def _build_per_share_earnings_bridge(
     elif all(status == "CALCULATED_AND_RECONCILED" for status in statuses):
         base["status"] = "DIAGNOSTIC_CALCULATED"
         base["reason"] = "三个情景的正常化归母利润与稀释 EPS 代理均已基于 B56、非经营项、非经常项、少数股东归属和稀释股数计算并完成对账。"
-    elif any(status in {"CALCULATED_AND_RECONCILED", "RECONCILIATION_MISMATCH"} for status in statuses):
+    elif any(status in {
+        "CALCULATED_AND_RECONCILED",
+        "RECONCILIATION_MISMATCH",
+        "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE",
+    } for status in statuses):
         base["status"] = "PARTIAL"
         base["reason"] = "只有部分 Bear/Base/Bull 情景具备完整归属和股数输入；其他情景保持 UNKNOWN。"
     elif all(status == "BLOCKED_BY_B56" for status in statuses):
@@ -2077,6 +2426,432 @@ def _build_b62_segment_normalized_earnings_bridge(
     return result
 
 
+FINANCIAL_STATEMENT_AMOUNT_INPUT_SCHEMA = "IIOS-FINANCIAL-STATEMENT-AMOUNT-BRIDGE-INPUT-0.1"
+FINANCIAL_STATEMENT_AMOUNT_BRIDGE_SCHEMA = "IIOS-FINANCIAL-STATEMENT-AMOUNT-BRIDGE-0.1"
+_FINANCIAL_STATEMENT_FIELDS = (
+    "revenue", "cost_of_revenue", "taxes_and_surcharges", "selling_expense",
+    "administrative_expense", "rd_expense", "financial_expense", "other_income",
+    "investment_income", "fair_value_change", "credit_impairment_gain_loss",
+    "asset_impairment_gain_loss", "asset_disposal_gain_loss",
+    "non_operating_income", "non_operating_expense", "income_tax_expense",
+)
+_FINANCIAL_STATEMENT_COST_FIELDS = (
+    "cost_of_revenue", "taxes_and_surcharges", "selling_expense",
+    "administrative_expense", "rd_expense", "financial_expense",
+)
+_FINANCIAL_STATEMENT_OPERATING_ADJUSTMENTS = (
+    "other_income", "investment_income", "fair_value_change",
+    "credit_impairment_gain_loss", "asset_impairment_gain_loss",
+    "asset_disposal_gain_loss",
+)
+
+
+def _financial_statement_amount_bridge_not_provided(status: str = "NOT_PROVIDED") -> dict[str, Any]:
+    return {
+        "schema_version": FINANCIAL_STATEMENT_AMOUNT_BRIDGE_SCHEMA,
+        "status": status,
+        "actual_period_status": status,
+        "actual_periods": {},
+        "forecast_status": "Q4_SCENARIOS_NOT_PROVIDED",
+        "forecast_scenarios": {},
+        "separation_from_b55": "REPORTED_STATEMENT_AMOUNT_RECONCILIATION_NOT_PHYSICAL_VOLUME_ASP_OR_UNIT_VARIABLE_COST_ATTRIBUTION",
+        "financial_outputs_decision_usable": False,
+        "formal_evidence_pit_admission_created": False,
+        "formal_forecast_admission_created": False,
+        "b55_modified": False,
+        "b56_modified": False,
+        "b57_modified": False,
+        "b58_modified": False,
+        "b60_modified": False,
+        "valuation_input_modified": False,
+        "external_mie_modified": False,
+        "decision_authority": False,
+    }
+
+
+def _financial_statement_analyst_assumption(raw: Any, *, field: str, unit: str) -> Decimal:
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"{field}_TYPED_ANALYST_ASSUMPTION_REQUIRED")
+    if str(raw.get("unit") or "").strip().lower() != unit.lower():
+        raise ValueError(f"{field}_UNIT_MISMATCH")
+    if str(raw.get("data_class") or "").strip().upper() != "ANALYST_ASSUMPTION":
+        raise ValueError(f"{field}_DATA_CLASS_MUST_BE_ANALYST_ASSUMPTION")
+    if not _is_identifiable_basis(raw.get("basis")):
+        raise ValueError(f"{field}_BASIS_NOT_IDENTIFIABLE")
+    try:
+        value = Decimal(str(raw.get("value")))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError(f"{field}_MUST_BE_NUMERIC") from exc
+    if not value.is_finite():
+        raise ValueError(f"{field}_MUST_BE_FINITE")
+    return value
+
+
+def _build_q4_financial_statement_scenario(
+    raw_scenario: Any,
+    *,
+    actual_ytd: Mapping[str, Any],
+    forecast_period: str,
+    scenario_name: str,
+) -> dict[str, Any]:
+    if not isinstance(raw_scenario, Mapping):
+        return {
+            "scenario": scenario_name,
+            "status": "BLOCKED_Q4_SCENARIO_MISSING",
+            "missing_inputs": ["scenario_object"],
+            "issues": [],
+            "conditional_fy_all_items_parent_attributable_eps_cny_per_share": None,
+            "formal_forecast_admission_created": False,
+            "decision_authority": False,
+        }
+    actual_line_items = actual_ytd.get("reported_line_items_cny")
+    reported_ytd = actual_ytd.get("reported_totals_cny")
+    if not isinstance(actual_line_items, Mapping) or not isinstance(reported_ytd, Mapping):
+        return {
+            "scenario": scenario_name,
+            "status": "BLOCKED_ACTUAL_YTD_NOT_RECONCILED",
+            "missing_inputs": ["RECONCILED_ACTUAL_YTD_LINE_ITEMS_AND_TOTALS"],
+            "issues": [],
+            "conditional_fy_all_items_parent_attributable_eps_cny_per_share": None,
+            "formal_forecast_admission_created": False,
+            "decision_authority": False,
+        }
+
+    q4_raw = raw_scenario.get("q4_line_items")
+    q4_raw = q4_raw if isinstance(q4_raw, Mapping) else {}
+    required_q4 = list(_FINANCIAL_STATEMENT_FIELDS) + ["minority_interest_net_profit_after_tax"]
+    missing = [
+        f"q4_line_items.{field}"
+        for field in required_q4
+        if (
+            not isinstance(q4_raw.get(field), Mapping)
+            or q4_raw[field].get("value") in (None, "")
+        )
+    ]
+    shares_raw = raw_scenario.get("annual_weighted_average_diluted_shares")
+    if (
+        not isinstance(shares_raw, Mapping)
+        or shares_raw.get("value") in (None, "")
+    ):
+        missing.append("annual_weighted_average_diluted_shares")
+    if missing:
+        return {
+            "scenario": scenario_name,
+            "status": "BLOCKED_Q4_ASSUMPTIONS_INCOMPLETE",
+            "missing_inputs": sorted(set(missing)),
+            "issues": [],
+            "conditional_fy_all_items_parent_attributable_eps_cny_per_share": None,
+            "formal_forecast_admission_created": False,
+            "decision_authority": False,
+        }
+    try:
+        q4_values = {
+            field: _financial_statement_analyst_assumption(
+                q4_raw[field], field=f"{scenario_name.upper()}_Q4_{field}", unit="CNY"
+            )
+            for field in required_q4
+        }
+        annual_shares = _financial_statement_analyst_assumption(
+            shares_raw,
+            field=f"{scenario_name.upper()}_ANNUAL_WEIGHTED_AVERAGE_DILUTED_SHARES",
+            unit="shares",
+        )
+        if annual_shares <= 0:
+            raise ValueError("ANNUAL_WEIGHTED_AVERAGE_DILUTED_SHARES_MUST_BE_POSITIVE")
+    except ValueError as exc:
+        return {
+            "scenario": scenario_name,
+            "status": "INVALID_Q4_ANALYST_ASSUMPTION",
+            "missing_inputs": [],
+            "issues": [str(exc)],
+            "conditional_fy_all_items_parent_attributable_eps_cny_per_share": None,
+            "formal_forecast_admission_created": False,
+            "decision_authority": False,
+        }
+
+    q4_items = {field: q4_values[field] for field in _FINANCIAL_STATEMENT_FIELDS}
+    q4_cost = sum((q4_items[field] for field in _FINANCIAL_STATEMENT_COST_FIELDS), Decimal("0"))
+    q4_operating_profit = (
+        q4_items["revenue"] - q4_cost
+        + sum((q4_items[field] for field in _FINANCIAL_STATEMENT_OPERATING_ADJUSTMENTS), Decimal("0"))
+    )
+    q4_pbt = q4_operating_profit + q4_items["non_operating_income"] - q4_items["non_operating_expense"]
+    q4_net_profit = q4_pbt - q4_items["income_tax_expense"]
+    q4_nci = q4_values["minority_interest_net_profit_after_tax"]
+    q4_parent = q4_net_profit - q4_nci
+
+    fy_items = {
+        field: Decimal(str(actual_line_items[field])) + q4_items[field]
+        for field in _FINANCIAL_STATEMENT_FIELDS
+    }
+    fy_cost = sum((fy_items[field] for field in _FINANCIAL_STATEMENT_COST_FIELDS), Decimal("0"))
+    fy_operating_profit = (
+        fy_items["revenue"] - fy_cost
+        + sum((fy_items[field] for field in _FINANCIAL_STATEMENT_OPERATING_ADJUSTMENTS), Decimal("0"))
+    )
+    fy_pbt = fy_operating_profit + fy_items["non_operating_income"] - fy_items["non_operating_expense"]
+    fy_net_profit = fy_pbt - fy_items["income_tax_expense"]
+    fy_nci = Decimal(str(reported_ytd["minority_interest_net_profit_after_tax"])) + q4_nci
+    fy_parent = fy_net_profit - fy_nci
+    fy_eps = fy_parent / annual_shares
+    ownership_residual = fy_parent + fy_nci - fy_net_profit
+
+    return {
+        "scenario": scenario_name,
+        "status": "CONDITIONAL_ANALYST_ASSUMPTION_CALCULATED",
+        "data_class": "ANALYST_ASSUMPTION",
+        "forecast_period": forecast_period,
+        "actual_base_period": actual_ytd.get("period"),
+        "q4_calculated_totals_cny": {
+            "total_operating_cost": format(q4_cost, "f"),
+            "operating_profit": format(q4_operating_profit, "f"),
+            "profit_before_tax": format(q4_pbt, "f"),
+            "consolidated_net_profit": format(q4_net_profit, "f"),
+            "parent_attributable_net_profit": format(q4_parent, "f"),
+            "minority_interest_net_profit_after_tax": format(q4_nci, "f"),
+        },
+        "fy_calculated_totals_cny": {
+            "revenue": format(fy_items["revenue"], "f"),
+            "total_operating_cost": format(fy_cost, "f"),
+            "operating_profit": format(fy_operating_profit, "f"),
+            "profit_before_tax": format(fy_pbt, "f"),
+            "income_tax_expense": format(fy_items["income_tax_expense"], "f"),
+            "consolidated_net_profit": format(fy_net_profit, "f"),
+            "parent_attributable_net_profit": format(fy_parent, "f"),
+            "minority_interest_net_profit_after_tax": format(fy_nci, "f"),
+        },
+        "q4_assumption_inputs": {
+            field: {
+                "value": format(q4_values[field], "f"),
+                "unit": "CNY",
+                "data_class": "ANALYST_ASSUMPTION",
+                "basis": str(q4_raw[field].get("basis") or "").strip(),
+                "evidence_refs": list(q4_raw[field].get("evidence_refs") or []),
+            }
+            for field in required_q4
+        },
+        "annual_weighted_average_diluted_shares_assumption": {
+            "value": format(annual_shares, "f"),
+            "unit": "shares",
+            "data_class": "ANALYST_ASSUMPTION",
+            "basis": str(shares_raw.get("basis") or "").strip(),
+            "evidence_refs": list(shares_raw.get("evidence_refs") or []),
+        },
+        "annual_weighted_average_diluted_shares": format(annual_shares, "f"),
+        "annual_weighted_average_diluted_shares_data_class": "ANALYST_ASSUMPTION",
+        "conditional_fy_all_items_parent_attributable_eps_cny_per_share": format(fy_eps, "f"),
+        "ownership_reconciliation_residual_cny": format(ownership_residual, "f"),
+        "limitations": [
+            "Q1-Q3 are reported actuals; every Q4 line item and full-year weighted-average diluted share count is an analyst assumption.",
+            "This is conditional all-items EPS, not normalized EPS, issuer guidance, formal B57 admission or an EPS_MULTIPLE primary EPS match.",
+            "No B55 physical volume/ASP/unit variable cost attribution is inferred.",
+            "No B58/B60/MIE/valuation/Decision authority is created.",
+        ],
+        "formal_evidence_pit_admission_created": False,
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
+    }
+
+
+def _build_financial_statement_amount_bridge(raw: Any) -> dict[str, Any]:
+    """Reconcile reported income-statement amounts without pretending to have B55 physical drivers."""
+    if not isinstance(raw, Mapping):
+        return _financial_statement_amount_bridge_not_provided()
+    if raw.get("schema_version") != FINANCIAL_STATEMENT_AMOUNT_INPUT_SCHEMA:
+        return _financial_statement_amount_bridge_not_provided("INVALID_SCHEMA")
+
+    raw_periods = raw.get("actual_periods")
+    raw_periods = raw_periods if isinstance(raw_periods, list) else []
+    periods: dict[str, Any] = {}
+    for period_raw in raw_periods:
+        if not isinstance(period_raw, Mapping):
+            continue
+        period = str(period_raw.get("period") or "UNKNOWN").strip().upper()
+        source_id = str(period_raw.get("source_id") or "").strip()
+        publication_date = str(period_raw.get("publication_date") or "").strip()
+        line_items_raw = period_raw.get("line_items")
+        line_items_raw = line_items_raw if isinstance(line_items_raw, Mapping) else {}
+        totals_raw = period_raw.get("reported_totals")
+        totals_raw = totals_raw if isinstance(totals_raw, Mapping) else {}
+        required_totals = (
+            "total_operating_cost", "operating_profit", "profit_before_tax",
+            "consolidated_net_profit", "parent_attributable_net_profit",
+            "minority_interest_net_profit_after_tax",
+        )
+        missing = [
+            f"line_items.{field}" for field in _FINANCIAL_STATEMENT_FIELDS
+            if line_items_raw.get(field) in (None, "")
+        ]
+        missing.extend(
+            f"reported_totals.{field}" for field in required_totals
+            if totals_raw.get(field) in (None, "")
+        )
+        if not source_id:
+            missing.append("source_id")
+        if not publication_date:
+            missing.append("publication_date")
+        if str(period_raw.get("data_class") or "").upper() != "OBSERVED_ACTUAL":
+            missing.append("data_class_OBSERVED_ACTUAL_REQUIRED")
+        if missing:
+            periods[period] = {
+                "period": period,
+                "status": "BLOCKED_REQUIRED_REPORTED_LINE_ITEMS_MISSING",
+                "missing_inputs": sorted(missing),
+                "formal_evidence_pit_admission_created": False,
+            }
+            continue
+        try:
+            values = {key: Decimal(str(line_items_raw[key])) for key in _FINANCIAL_STATEMENT_FIELDS}
+            reported = {key: Decimal(str(totals_raw[key])) for key in required_totals}
+            if any(not value.is_finite() for value in [*values.values(), *reported.values()]):
+                raise InvalidOperation
+        except (InvalidOperation, ValueError, TypeError):
+            periods[period] = {
+                "period": period,
+                "status": "INVALID_REPORTED_LINE_ITEM",
+                "issues": ["REPORTED_LINE_ITEM_MUST_BE_FINITE_DECIMAL"],
+                "formal_evidence_pit_admission_created": False,
+            }
+            continue
+
+        total_cost = sum((values[key] for key in _FINANCIAL_STATEMENT_COST_FIELDS), Decimal("0"))
+        gross_profit = values["revenue"] - values["cost_of_revenue"]
+        operating_profit = (
+            values["revenue"] - total_cost
+            + sum((values[key] for key in _FINANCIAL_STATEMENT_OPERATING_ADJUSTMENTS), Decimal("0"))
+        )
+        pbt = operating_profit + values["non_operating_income"] - values["non_operating_expense"]
+        consolidated_np = pbt - values["income_tax_expense"]
+        residuals = {
+            "total_operating_cost": total_cost - reported["total_operating_cost"],
+            "operating_profit": operating_profit - reported["operating_profit"],
+            "profit_before_tax": pbt - reported["profit_before_tax"],
+            "consolidated_net_profit": consolidated_np - reported["consolidated_net_profit"],
+            "parent_plus_nci_vs_consolidated": (
+                reported["parent_attributable_net_profit"]
+                + reported["minority_interest_net_profit_after_tax"]
+                - reported["consolidated_net_profit"]
+            ),
+        }
+        failed = {key: format(value, "f") for key, value in residuals.items() if abs(value) > Decimal("1")}
+        periods[period] = {
+            "period": period,
+            "status": "RECONCILED_REPORTED_ACTUAL" if not failed else "RECONCILIATION_MISMATCH",
+            "audit_status": str(period_raw.get("audit_status") or "UNKNOWN"),
+            "data_class": "OBSERVED_ACTUAL",
+            "currency": str(period_raw.get("currency") or "UNKNOWN"),
+            "source_id": source_id,
+            "source_url": period_raw.get("source_url"),
+            "publication_date": publication_date,
+            "known_at_upper_bound": period_raw.get("known_at_upper_bound"),
+            "source_reference_status": "SOURCE_ID_AND_PUBLICATION_DATE_PRESENT_ONLY",
+            "source_admission_status": "SOURCE_REFERENCE_PRESENT_NOT_PIT_VALIDATED_NOT_FORMALLY_ADMITTED",
+            "evidence_ids": [],
+            "raw_bytes_verified": False,
+            "pit_validation_performed": False,
+            "calculated_totals_cny": {
+                "gross_profit": format(gross_profit, "f"),
+                "total_operating_cost": format(total_cost, "f"),
+                "operating_profit": format(operating_profit, "f"),
+                "profit_before_tax": format(pbt, "f"),
+                "consolidated_net_profit": format(consolidated_np, "f"),
+            },
+            "reported_line_items_cny": {key: format(value, "f") for key, value in values.items()},
+            "reported_totals_cny": {key: format(value, "f") for key, value in reported.items()},
+            "reconciliation_residuals_cny": {key: format(value, "f") for key, value in residuals.items()},
+            "failed_reconciliations": failed,
+            "tolerance_cny": "1",
+            "gross_profit_margin_pct": (
+                format(gross_profit / values["revenue"] * Decimal("100"), ".4f")
+                if values["revenue"] else None
+            ),
+            "gross_profit_margin_limitation": "REPORTED_REVENUE_MINUS_REPORTED_COST_OF_REVENUE_NOT_B55_UNIT_VARIABLE_COST_CONTRIBUTION_MARGIN",
+            "formal_evidence_pit_admission_created": False,
+        }
+
+    if not periods:
+        actual_status = "NOT_PROVIDED"
+    elif all(row.get("status") == "RECONCILED_REPORTED_ACTUAL" for row in periods.values()):
+        actual_status = "ALL_ACTUAL_PERIODS_RECONCILED"
+    elif any(row.get("status") == "RECONCILIATION_MISMATCH" for row in periods.values()):
+        actual_status = "RECONCILIATION_MISMATCH"
+    else:
+        actual_status = "PARTIAL_OR_BLOCKED"
+
+    q4 = raw.get("q4_forecast")
+    q4_scenarios_raw = q4.get("scenarios") if isinstance(q4, Mapping) and isinstance(q4.get("scenarios"), Mapping) else {}
+    forecast_period = str(q4.get("forecast_period") or "UNKNOWN").strip().upper() if isinstance(q4, Mapping) else "UNKNOWN"
+    actual_period = str(q4.get("actual_period") or "").strip().upper() if isinstance(q4, Mapping) else ""
+    forecast_scenarios: dict[str, Any] = {}
+    if not q4_scenarios_raw:
+        forecast_status = "Q4_SCENARIOS_NOT_PROVIDED"
+    elif actual_period not in periods or periods[actual_period].get("status") != "RECONCILED_REPORTED_ACTUAL":
+        forecast_status = "BLOCKED_ACTUAL_PERIOD_NOT_RECONCILED"
+    else:
+        actual_year_match = re.fullmatch(r"(\d{4})Q1-Q3", actual_period)
+        forecast_year_match = re.fullmatch(r"(\d{4})FY", forecast_period)
+        if (
+            actual_year_match is None
+            or forecast_year_match is None
+            or actual_year_match.group(1) != forecast_year_match.group(1)
+        ):
+            forecast_status = "BLOCKED_PERIOD_ALIGNMENT"
+        elif set(q4_scenarios_raw) != set(SCENARIOS):
+            forecast_status = "BLOCKED_SCENARIO_SET_INCOMPLETE_OR_INVALID"
+        else:
+            for scenario_name in SCENARIOS:
+                forecast_scenarios[scenario_name] = _build_q4_financial_statement_scenario(
+                    q4_scenarios_raw.get(scenario_name),
+                    actual_ytd=periods[actual_period],
+                    forecast_period=forecast_period,
+                    scenario_name=scenario_name,
+                )
+            scenario_statuses = [
+                str((forecast_scenarios.get(name) or {}).get("status") or "UNKNOWN")
+                for name in SCENARIOS
+            ]
+            if all(status == "CONDITIONAL_ANALYST_ASSUMPTION_CALCULATED" for status in scenario_statuses):
+                forecast_status = "CONDITIONAL_ANALYST_SCENARIOS_CALCULATED"
+            elif any(status == "CONDITIONAL_ANALYST_ASSUMPTION_CALCULATED" for status in scenario_statuses):
+                forecast_status = "PARTIAL"
+            else:
+                forecast_status = "NOT_IDENTIFIABLE_OR_BLOCKED"
+
+    overall = (
+        "ACTUALS_RECONCILED_FORECAST_NOT_PROVIDED"
+        if actual_status == "ALL_ACTUAL_PERIODS_RECONCILED" and forecast_status == "Q4_SCENARIOS_NOT_PROVIDED"
+        else "ACTUALS_RECONCILED_WITH_CONDITIONAL_FORECAST"
+        if actual_status == "ALL_ACTUAL_PERIODS_RECONCILED" and forecast_status == "CONDITIONAL_ANALYST_SCENARIOS_CALCULATED"
+        else "ACTUALS_RECONCILED_FORECAST_PARTIAL"
+        if actual_status == "ALL_ACTUAL_PERIODS_RECONCILED" and forecast_status == "PARTIAL"
+        else "ACTUALS_RECONCILIATION_FAILED"
+        if actual_status == "RECONCILIATION_MISMATCH"
+        else "PARTIAL_OR_BLOCKED"
+    )
+    return {
+        "schema_version": FINANCIAL_STATEMENT_AMOUNT_BRIDGE_SCHEMA,
+        "status": overall,
+        "method": "REPORTED_INCOME_STATEMENT_LINE_ITEMS_WITH_SIGNED_RECONCILIATION_V0.1",
+        "actual_period_status": actual_status,
+        "actual_periods": periods,
+        "forecast_status": forecast_status,
+        "forecast_scenarios": forecast_scenarios,
+        "forecast_period": forecast_period,
+        "separation_from_b55": "REPORTED_STATEMENT_AMOUNT_RECONCILIATION_NOT_PHYSICAL_VOLUME_ASP_OR_UNIT_VARIABLE_COST_ATTRIBUTION",
+        "financial_outputs_decision_usable": False,
+        "formal_evidence_pit_admission_created": False,
+        "formal_forecast_admission_created": False,
+        "b55_modified": False,
+        "b56_modified": False,
+        "b57_modified": False,
+        "b58_modified": False,
+        "b60_modified": False,
+        "valuation_input_modified": False,
+        "external_mie_modified": False,
+        "decision_authority": False,
+    }
+
+
 def evaluate_operating_driver_forecast(
     raw: Any,
     *,
@@ -2145,6 +2920,8 @@ def evaluate_operating_driver_forecast(
                 "formal_forecast_admission_created": False,
                 "decision_authority": False,
             },
+            "financial_statement_amount_bridge": _financial_statement_amount_bridge_not_provided(),
+            "financial_statement_amount_bridge": _financial_statement_amount_bridge_not_provided("INVALID_OPERATING_DRIVER_SCHEMA"),
             "valuation_transmission": {
                 "status": "NOT_LINKED_TO_PER_SHARE_VALUE",
                 "reason": "尚未建立从经营结果到公司归属净利润、股数/摊薄与每股价值的可验证桥接。",
@@ -2344,6 +3121,7 @@ def evaluate_operating_driver_forecast(
         after_cutoff_refs=after_cutoff_refs,
         uncertain_refs=uncertain_refs,
     )
+    financial_statement_amount_bridge = _build_financial_statement_amount_bridge(raw.get("financial_statement_amount_bridge"))
     baseline_transition["per_share_earnings_bridge"] = _build_per_share_earnings_bridge(
         scope=scope,
         baseline_transition=baseline_transition,
@@ -2353,6 +3131,7 @@ def evaluate_operating_driver_forecast(
         unresolved_refs=unresolved_refs,
         after_cutoff_refs=after_cutoff_refs,
         uncertain_refs=uncertain_refs,
+        financial_statement_amount_bridge=financial_statement_amount_bridge,
     )
     baseline_transition["segment_normalized_earnings_bridge"] = _build_b62_segment_normalized_earnings_bridge(
         scope=scope,
@@ -2391,6 +3170,7 @@ def evaluate_operating_driver_forecast(
         "input_issues": sorted(set(input_issues)),
         "historical_actuals_status": historical_status,
         "baseline_transition": baseline_transition,
+        "financial_statement_amount_bridge": financial_statement_amount_bridge,
         "valuation_transmission": {
             "status": "NOT_LINKED_TO_PER_SHARE_VALUE",
             "reason": "没有可验证的桥接把该经营情景转换为公司归属净利润、每股收益和每股估值；本轮刻意不自动修改估值输入。",
@@ -2456,6 +3236,27 @@ def render_operating_driver_section(
         "#### 产品/业务线与历史实际",
         "",
     ]
+    statement_bridge = driver.get("financial_statement_amount_bridge")
+    if isinstance(statement_bridge, Mapping):
+        lines.extend([
+            "",
+            "#### 公开财报金额桥（独立于 B55 物理量价成本归因）",
+            "",
+            f"- 状态：**{statement_bridge.get('status', 'UNKNOWN')}**；历史期间：{statement_bridge.get('actual_period_status', 'UNKNOWN')}；Q4 前瞻：{statement_bridge.get('forecast_status', 'NOT_PROVIDED')}",
+        ])
+        statement_periods = statement_bridge.get("actual_periods") if isinstance(statement_bridge.get("actual_periods"), Mapping) else {}
+        for period_name, period_row in statement_periods.items():
+            if not isinstance(period_row, Mapping):
+                continue
+            totals = period_row.get("calculated_totals_cny") if isinstance(period_row.get("calculated_totals_cny"), Mapping) else {}
+            residuals = period_row.get("reconciliation_residuals_cny") if isinstance(period_row.get("reconciliation_residuals_cny"), Mapping) else {}
+            max_residual = max((abs(Decimal(str(value))) for value in residuals.values()), default=Decimal("0"))
+            lines.append(
+                f"- {period_name}：{period_row.get('status', 'UNKNOWN')}；营业利润 {totals.get('operating_profit', 'UNKNOWN')}；"
+                f"利润总额 {totals.get('profit_before_tax', 'UNKNOWN')}；合并净利润 {totals.get('consolidated_net_profit', 'UNKNOWN')}；"
+                f"最大对账残差 {max_residual} CNY。"
+            )
+        lines.append("- 口径边界：该桥复算财报金额行项目，不推导销量、净 ASP 或单位变动成本；不改变 B55/B56/B57/B58/B60、估值、MIE 或 Decision。")
     products = driver.get("product_lines") if isinstance(driver.get("product_lines"), list) else []
     if not products:
         lines.append("- 产品线未提供：实际产量、销量、净售价及单位成本保持 UNKNOWN，不用公司整体收入除以产量替代实际售价。")
@@ -2696,6 +3497,13 @@ def render_operating_driver_section(
                 f"- EPS 变化率：{_display_optional_scalar(changes.get('normalized_diluted_eps_growth_rate'))}；状态 {row.get('eps_growth_status', 'UNKNOWN')}（仅当历史正常化 EPS 为正时计算增长率）",
                 f"- 非经常性项目的归母利润影响（含税后影响与少数股东归属）：{_display_optional_scalar(changes.get('non_recurring_after_tax_effect_cny'))} CNY；含所有输入项目的归母利润代理变化：{_display_optional_scalar(changes.get('all_items_parent_attributable_net_profit_proxy_cny'))} CNY",
                 f"- 正常化利润变化对账：B56 税后利润代理变化 {_display_optional_scalar(changes.get('b56_modeled_net_profit_proxy_cny'))}；非经营项税后影响变化 {_display_optional_scalar(changes.get('non_operating_after_tax_effect_cny'))}；正常化少数股东归属效应 {_display_optional_scalar(changes.get('normalized_minority_interest_effect_cny'))}；残差 {_display_optional_scalar(changes.get('reconciliation_residual_cny'))} CNY",
+            ])
+        elif row.get("status") == "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE":
+            lines.extend([
+                f"- 前瞻 all-items 归母净利润代理：{_display_optional_scalar(forward.get('all_items_parent_attributable_net_profit_proxy_cny'))} CNY；"
+                f"稀释股数：{_display_optional_scalar(forward.get('diluted_weighted_average_shares'))} 股；"
+                f"前瞻 all-items 稀释 EPS：{_display_optional_scalar(forward.get('all_items_diluted_eps_proxy_cny_per_share'))} CNY/股。",
+                "- 历史正常化归母利润 / EPS 与 EPS 增长率保持 UNKNOWN；不把前瞻 all-items EPS 误称为正常化 EPS。",
             ])
         if row.get("missing_inputs"):
             lines.append("- 保持 UNKNOWN / 阻塞输入：" + "、".join(str(x) for x in row["missing_inputs"]))

@@ -13,6 +13,14 @@ on:
       - "tests/test_canonical_signed_evidence_admission_v01.py"
       - "iios_mvp/research_intake.py"
       - "iios_mvp/investment_core_contract_v03.py"
+      - "iios_mvp/expectation_gap_comparison_v01.py"
+      - "iios_mvp/sotp_valuation_gap_attribution_v01.py"
+      - "iios_mvp/sotp_valuation_v01.py"
+      - "tests/test_expectation_gap_comparison_v01.py"
+      - "tests/test_sotp_valuation_gap_attribution_v01.py"
+      - "tests/test_b76_legacy_real_case_readiness.py"
+      - "examples/real_cases/RC-CN-A-002001-20261105_b76_readiness.json"
+      - "tests/test_b76_xinhecheng_current_case_readiness.py"
       - "tests/test_local_investment_pilot_v01.py"
       - ".github/workflows/iios_local_investment_pilot_v01.yml"
       - "docs/iios/LOCAL_INVESTMENT_PILOT_V01_GUIDE_20261011.md"
@@ -30,6 +38,14 @@ on:
       - "docs/iios/MACOS_FULL_RUN_AND_REPLAY_ACCEPTANCE_20261015.md"
       - "iios_mvp/research_intake.py"
       - "iios_mvp/investment_core_contract_v03.py"
+      - "iios_mvp/expectation_gap_comparison_v01.py"
+      - "iios_mvp/sotp_valuation_gap_attribution_v01.py"
+      - "iios_mvp/sotp_valuation_v01.py"
+      - "tests/test_expectation_gap_comparison_v01.py"
+      - "tests/test_sotp_valuation_gap_attribution_v01.py"
+      - "tests/test_b76_legacy_real_case_readiness.py"
+      - "examples/real_cases/RC-CN-A-002001-20261105_b76_readiness.json"
+      - "tests/test_b76_xinhecheng_current_case_readiness.py"
       - "tests/test_local_investment_pilot_v01.py"
       - ".github/workflows/iios_local_investment_pilot_v01.yml"
       - "docs/iios/LOCAL_INVESTMENT_PILOT_V01_GUIDE_20261011.md"
@@ -57,13 +73,53 @@ jobs:
           python-version: "3.12"
       - name: Install test dependency
         run: python -m pip install --disable-pip-version-check pytest
-      - name: Compile the local pilot, acceptance driver, and reused IIOS core
-        run: python -m compileall -q iios_mvp/local_investment_pilot_v01.py iios_mvp/local_run_replay_acceptance_v01.py iios_mvp/research_intake.py iios_mvp/investment_core_contract_v03.py
+      - name: Compile local pilot and B76/B61/B63 arithmetic chain
+        run: python -m compileall -q iios_mvp
       - name: Validate macOS double-click launcher syntax
         run: bash -n "验收IIOS全流程与Replay.command"
       - name: Validate local-main updater syntax
         run: bash -n tools/iios_update_local_main_v01.sh
-      - name: Run local pilot and acceptance-wrapper tests
-        run: PYTHONPATH=. python -m pytest -q tests/test_local_investment_pilot_v01.py tests/test_local_run_replay_acceptance_v01.py
+      - name: Run B76 arithmetic, real-case readiness, local pilot and Replay acceptance tests
+        run: PYTHONPATH=. python -m pytest -q tests/test_expectation_gap_comparison_v01.py tests/test_sotp_valuation_gap_attribution_v01.py tests/test_b76_legacy_real_case_readiness.py tests/test_local_investment_pilot_v01.py tests/test_b76_xinhecheng_current_case_readiness.py tests/test_local_run_replay_acceptance_v01.py
+      - name: Check diff formatting
+        run: git diff --check
+
+  macos-acceptance:
+    # macos-14 was retired by GitHub on 2026-11-02.
+    # Keep the previous Apple Silicon runner family on supported macos-15.
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact PR head checkout
+        if: github.event_name == 'pull_request'
+        run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+      - name: Report macOS runner identity
+        run: |
+          sw_vers
+          printf 'architecture='
+          uname -m
+          printf 'arm64_capable='
+          sysctl -n hw.optional.arm64 || true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Verify double-click launchers are executable and shell-valid
+        run: |
+          test -x "./验收IIOS全流程与Replay.command"
+          test -x "./启动IIOS投资分析.command"
+          bash -n "./验收IIOS全流程与Replay.command"
+          bash -n "./启动IIOS投资分析.command"
+          bash -n "tools/iios_update_local_main_v01.sh"
+      - name: Compile the IIOS package
+        run: python -m compileall -q iios_mvp
+      - name: Run B76 arithmetic, real-case readiness, local pilot and Replay acceptance tests on macOS
+        run: PYTHONPATH=. python -m pytest -q tests/test_expectation_gap_comparison_v01.py tests/test_sotp_valuation_gap_attribution_v01.py tests/test_b76_legacy_real_case_readiness.py tests/test_local_investment_pilot_v01.py tests/test_b76_xinhecheng_current_case_readiness.py tests/test_local_run_replay_acceptance_v01.py
       - name: Check diff formatting
         run: git diff --check

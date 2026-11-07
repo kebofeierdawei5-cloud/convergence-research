@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import deepcopy
+
 from decimal import Decimal
 
 import pytest
@@ -54,7 +56,7 @@ def _b63_inputs():
         "status": "CALCULATED",
         "selected_for_primary_model": True,
         "forecast_period": "2026FY",
-        "scenarios": {name: dict(sotp_scenario) for name in ("bear", "base", "bull")},
+        "scenarios": {name: deepcopy(sotp_scenario) for name in ("bear", "base", "bull")},
     }
     b61_scenario = {
         "status": "CALCULATED_CONDITIONAL",
@@ -80,7 +82,7 @@ def _b63_inputs():
         "currency": "CNY",
         "forecast_period": "2026FY",
         "status": "CONDITIONAL_SENSITIVITY_CALCULATED",
-        "scenarios": {name: dict(b61_scenario) for name in ("bear", "base", "bull")},
+        "scenarios": {name: deepcopy(b61_scenario) for name in ("bear", "base", "bull")},
         "external_mie_status_unchanged": "NOT_IDENTIFIABLE",
     }
     b62_scenario = {
@@ -112,7 +114,7 @@ def _b63_inputs():
     b62 = {
         "status": "CONDITIONAL_RECONCILIATION_CALCULATED",
         "forecast_period": "2026FY",
-        "scenarios": {name: dict(b62_scenario) for name in ("bear", "base", "bull")},
+        "scenarios": {name: deepcopy(b62_scenario) for name in ("bear", "base", "bull")},
     }
     return inversion, sotp, b62
 
@@ -241,7 +243,7 @@ def test_b63_keeps_multiple_sensitivity_explicit_when_forecast_value_pool_cannot
         sotp_valuation=sotp,
         segment_earnings_reconciliation=b62,
     )
-    assert result["status"] == "PARTIAL"
+    assert result["status"] == "PARTIAL", result["scenarios"]["base"]["issues"]
     assert result["scenarios"]["base"]["status"] == "PARTIAL"
     assert result["scenarios"]["base"]["multiple_attribution"]["status"] == "NOT_IDENTIFIABLE"
     assert result["scenarios"]["base"]["multiple_attribution"]["common_pe_scale_factor_required"] is None

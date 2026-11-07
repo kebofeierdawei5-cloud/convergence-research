@@ -128,6 +128,8 @@ def _transition_pre_decision(
     valuation_output_resolver: Any,
     created_at: str,
     operator_price_input_binding: Mapping[str, Any] | None = None,
+    canonical_evidence_admission_ref: Mapping[str, Any] | None = None,
+    evidence_admission_resolver: Any | None = None,
 ) -> dict[str, Any]:
     return_gate = case.get("return_gate")
     if not isinstance(return_gate, Mapping):
@@ -140,6 +142,8 @@ def _transition_pre_decision(
             canonical_valuation_ref=return_gate.get("canonical_valuation_ref"),
             independent_forecast_resolver=independent_forecast_resolver,
             valuation_output_resolver=valuation_output_resolver,
+            canonical_evidence_admission_ref=canonical_evidence_admission_ref,
+            evidence_admission_resolver=evidence_admission_resolver,
             case_id=str(case["case_id"]),
             market=str(case["market"]).upper(),
             symbol=str(case["symbol"]).upper(),
@@ -300,6 +304,8 @@ def run_b2e_conformance(
     run_root: str | None = None,
     evidence_manifest: Mapping[str, Any] | None = None,
     evidence_root: str | None = None,
+    canonical_evidence_admission_ref: Mapping[str, Any] | None = None,
+    evidence_admission_resolver: Any | None = None,
 ) -> B2EConformanceResult:
     orchestrator = (
         PersistedCanonicalResearchOrchestrator(run_root)
@@ -317,6 +323,19 @@ def run_b2e_conformance(
     )
 
     case = deepcopy(dict(case))
+    if (canonical_evidence_admission_ref is None) != (evidence_admission_resolver is None):
+        raise B2EE2EError(
+            "signed Evidence/PIT reference and resolver must be supplied together"
+        )
+    if canonical_evidence_admission_ref is not None:
+        if not isinstance(case.get("return_gate"), Mapping):
+            raise B2EE2EError("canonical return_gate is required for signed Evidence/PIT binding")
+        return_gate = dict(case["return_gate"])
+        declared_ref = return_gate.get("canonical_evidence_admission_ref")
+        if declared_ref is not None and dict(declared_ref) != dict(canonical_evidence_admission_ref):
+            raise B2EE2EError("case return_gate signed Evidence/PIT reference conflicts with runtime binding")
+        return_gate["canonical_evidence_admission_ref"] = dict(canonical_evidence_admission_ref)
+        case["return_gate"] = return_gate
     operator_price_binding: dict[str, Any] | None = None
     current_price_observation = case.get("current_price_observation")
 
@@ -438,6 +457,48 @@ def run_b2e_conformance(
         if len(admitted_manifest_hash) != 64 or any(c not in "0123456789abcdef" for c in admitted_manifest_hash):
             orchestrator.block(run_id, "B2_EVIDENCE_MANIFEST_HASH_INVALID")
             raise B2EE2EError("BLOCKED: admitted Evidence Manifest hash is invalid")
+    if canonical_evidence_admission_ref is None or evidence_admission_resolver is None:
+        if run_root is not None:
+            orchestrator.block(run_id, "SIGNED_EVIDENCE_PIT_ADMISSION_REQUIRED")
+        raise B2EE2EError(
+            "BLOCKED: B2-E Decision Admission requires signed Evidence/PIT reference and resolver"
+        )
+    try:
+        signed_evidence_admission = evidence_admission_resolver.resolve_signed_evidence_admission(
+            canonical_evidence_admission_ref,
+            case_id=str(case["case_id"]),
+            market=str(case["market"]).upper(),
+            symbol=str(case["symbol"]).upper(),
+            cutoff_date=__import__("datetime").date.fromisoformat(str(case["cutoff_date"])),
+            required_evidence_ids=sorted(set(str(item) for item in evidence_refs)),
+        )
+    except (KeyError, TypeError, ValueError, OSError) as exc:
+        if run_root is not None:
+            orchestrator.block(run_id, "SIGNED_EVIDENCE_PIT_ADMISSION_FAILED")
+        raise B2EE2EError(f"BLOCKED: signed Evidence/PIT admission failed: {exc}") from exc
+    if (
+        signed_evidence_admission.get("status") != "FORMALLY_ADMITTED"
+        or signed_evidence_admission.get("decision") != "ADMIT"
+        or signed_evidence_admission.get("core_pit_validation") != "PASS"
+    ):
+        if run_root is not None:
+            orchestrator.block(run_id, "SIGNED_EVIDENCE_PIT_ADMISSION_FAILED")
+        raise B2EE2EError("BLOCKED: signed Evidence/PIT resolver did not return FORMALLY_ADMITTED")
+    expected_signed_manifest = (
+        admitted_manifest if admitted_manifest is not None
+        else evidence_manifest if isinstance(evidence_manifest, Mapping)
+        else None
+    )
+    if expected_signed_manifest is None or (
+        signed_evidence_admission.get("evidence_manifest_audit_sha256")
+        != str((expected_signed_manifest.get("audit") or {}).get("manifest_sha256") or "")
+    ):
+        if run_root is not None:
+            orchestrator.block(run_id, "SIGNED_EVIDENCE_MANIFEST_IDENTITY_MISMATCH")
+        raise B2EE2EError(
+            "BLOCKED: signed Evidence/PIT manifest is not the exact B2 admitted manifest"
+        )
+
     case_identity = {
         "case_id": case.get("case_id"),
         "market": str(case.get("market", "")).upper(),
@@ -528,6 +589,8 @@ def run_b2e_conformance(
         valuation_output_resolver=valuation_output_resolver,
         created_at=created_at,
         operator_price_input_binding=operator_price_binding,
+        canonical_evidence_admission_ref=canonical_evidence_admission_ref,
+        evidence_admission_resolver=evidence_admission_resolver,
     )
 
     canonical_decision = decide_v03(
@@ -537,6 +600,7 @@ def run_b2e_conformance(
         upstream_authority_resolver=upstream_authority_resolver,
         valuation_output_resolver=valuation_output_resolver,
         operator_price_input_resolver=operator_price_input_resolver,
+        evidence_admission_resolver=evidence_admission_resolver,
     )
     snapshot = _build_snapshot(case=projected_case, decision=canonical_decision)
     decision_admission = admit_canonical_decision(
@@ -547,6 +611,7 @@ def run_b2e_conformance(
         upstream_authority_resolver=upstream_authority_resolver,
         valuation_output_resolver=valuation_output_resolver,
         operator_price_input_resolver=operator_price_input_resolver,
+        evidence_admission_resolver=evidence_admission_resolver,
     )
 
     return_metrics_hash = sha256(canonical_decision.get("return_metrics") or {})

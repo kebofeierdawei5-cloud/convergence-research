@@ -1095,6 +1095,8 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     import builtins
     import iios_mvp.local_investment_pilot_v01 as pilot
 
+    # The wizard's GUI convenience must never launch applications in test/CI runs.
+    monkeypatch.setenv("CI", "true")
     source_claim = "用户手动提供的 19.74；按 收盘价 15:00 处理；未从交易所或行情供应商独立核验"
     answers = iter(["山东赫达", "SZ002810", "1", "2026-10-12", "2", "0", "19.74", "2026-10-12", "1", "1", "0", "0"])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
@@ -1140,7 +1142,15 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert saved["price_input"]["assurance_label"] == "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
     assert result["formal_decision_created"] is False and result["auto_execution"] is False
     output = capsys.readouterr().out
-    assert "Round A 价格盲研究提示" in output and "Round B 价格感知估值/MIE/预期差提示" in output
+    linux_prompt_output = (
+        "Round A 价格盲研究提示" in output
+        and "Round B 价格感知估值/MIE/预期差提示" in output
+    )
+    macos_clipboard_output = (
+        "Round A 已准备" in output
+        and "Round B 价格感知估值/MIE/预期差提示已复制到剪贴板" in output
+    )
+    assert linux_prompt_output or macos_clipboard_output
     round_a_paths = list((tmp_path / "inputs").glob("pilot-prompt-round-a-*.md"))
     round_b_paths = list((tmp_path / "inputs").glob("pilot-prompt-round-b-*.md"))
     assert len(round_a_paths) == 1 and len(round_b_paths) == 1
@@ -1153,6 +1163,13 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     for prohibited_key in ('"price_input"', '"current_position_pct"', '"operator_valuation_context"', '"market_implied_expectation"', '"expectation_gap"'):
         assert prohibited_key not in phase_a_text
     assert "核心投资判断链：必须逐项回答以下六个问题" in round_b_text
+    assert "【B74：主要矛盾优先】" in round_a_text
+    assert "【B74：辅助诊断优先级】" in round_a_text
+    assert "【B75：未来事件链】" in round_a_text
+    assert "【B76：三类预期严格分开】" in round_b_text
+    assert "【B76：胜率与赔率】" in round_b_text
+    assert "可比投资案例的历史胜负样本" in round_b_text
+    assert "B63 full-vector value-pool 反推使用 Required Return" in round_b_text
     assert "当前价格已反映多少" in round_b_text
     assert "绝不能把自己的 Base 估值伪装成市场预期" in round_b_text
     assert "IIOS-RESEARCH-PATCH-0.1" in round_a_text and "IIOS-RESEARCH-PATCH-0.1" in round_b_text
@@ -1164,6 +1181,10 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert analysis["research_rounds"]["price_blind_round_a_verified"] is True
     assert analysis["research_rounds"]["round_a"]["response_sha256"]
     assert analysis["research_rounds"]["round_b"]["response_sha256"]
+    b76 = analysis["assessment"]["market_implied_expectation"]["price_implied_analysis"]["local_sotp_recalculation"]["expectation_gap_comparison"]
+    assert b76["classification"] == "PRICE_CONDITIONED_REQUIREMENT_VS_INDEPENDENT_FORECAST_NOT_EXTERNAL_MIE"
+    assert b76["external_mie_modified"] is False
+    assert "B76：独立预测与现价条件性要求的数值对照" in (run_dir / "report.md").read_text(encoding="utf-8")
     assert receipt["research_rounds"] == analysis["research_rounds"]
     assert pilot.verify_local_pilot_bundle(run_dir)["status"] == "PILOT_BUNDLE_HASH_CHECK_PASS"
     replay = pilot.run_local_investment_pilot(
@@ -2606,6 +2627,7 @@ def test_b43_b4_reconciliation_compares_effective_not_raw_working_capital():
     from iios_mvp.local_investment_pilot_v01 import _reconcile_b4_valuation_bridge
 
     driver = {
+        "scope": "COMPANY_WIDE",
         "scenarios": {
             name: {
                 "change_working_capital_cny": "3000",
@@ -3843,6 +3865,7 @@ def test_b4_report_preserves_numeric_zero_in_operating_bridge_fields():
         "net_profit_cny": 0,
         "cash_capex_cny": 0,
         "change_working_capital_cny": 0,
+        "effective_change_working_capital_cny": 0,
         "unlevered_fcf_proxy_cny": 0,
     }
     forecast = {
@@ -3875,7 +3898,7 @@ def test_b4_report_preserves_numeric_zero_in_operating_bridge_fields():
     assert "- 产量 / 销量：0 / 0 吨" in report
     assert "- 收入：0；变动成本：0；扣变动成本贡献：0" in report
     assert "- EBITDA / EBIT / 税前利润 / 净利润：0 / 0 / 0 / 0" in report
-    assert "- 资本开支 / 营运资金变动 / 自由现金流代理：0 / 0 / 0" in report
+    assert "- 资本开支 / 声明营运资金变动 / 纳入 FCF 的有效营运资金变动 / 自由现金流代理：0 / 0 / 0 / 0" in report
     assert "未应用 B5 增量的每股估值情景终值：0 CNY" in report
 
 
@@ -3926,7 +3949,7 @@ def test_b4_report_renders_missing_operating_bridge_fields_as_unknown():
     assert "- 产量 / 销量：UNKNOWN / UNKNOWN 吨" in report
     assert "- 收入：UNKNOWN；变动成本：UNKNOWN；扣变动成本贡献：UNKNOWN" in report
     assert "- EBITDA / EBIT / 税前利润 / 净利润：UNKNOWN / UNKNOWN / UNKNOWN / UNKNOWN" in report
-    assert "- 资本开支 / 营运资金变动 / 自由现金流代理：UNKNOWN / UNKNOWN / UNKNOWN" in report
+    assert "- 资本开支 / 声明营运资金变动 / 纳入 FCF 的有效营运资金变动 / 自由现金流代理：UNKNOWN / UNKNOWN / UNKNOWN / UNKNOWN" in report
     assert "未应用 B5 增量的每股估值情景终值：UNKNOWN CNY" in report
 
 def test_b5_incomplete_counterfactual_does_not_block_confirmed_project_inclusive_primary_valuation():
@@ -5776,7 +5799,7 @@ def test_b57_normalized_parent_profit_and_diluted_eps_bridge_reconciles():
     assert bridge["status"] == "DIAGNOSTIC_CALCULATED"
     assert base["status"] == "CALCULATED_AND_RECONCILED"
     assert base["historical_baseline"]["normalized_parent_attributable_net_profit_cny"] == "320000.00"
-    assert base["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] == "3.2"
+    assert Decimal(base["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"]) == Decimal("3.2")
     assert base["forward_scenario"]["normalized_parent_attributable_net_profit_cny"] == "287950.00"
     assert base["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"].startswith("2.617")
     assert base["changes"]["normalized_parent_attributable_net_profit_cny"] == "-32050.00"
@@ -5807,7 +5830,13 @@ def test_b57_missing_minority_interest_component_or_diluted_shares_keeps_eps_unk
     evidence = [{"source_id": "E1", "known_at": "2026-08-30", "time_status": "PIT_TIME_COMPATIBLE_ONLY_NOT_ADMITTED"}]
     result = evaluate_operating_driver_forecast(raw, evidence_register=evidence)
     bridge = result["baseline_transition"]["per_share_earnings_bridge"]
-    assert bridge["scenarios"]["bear"]["status"] == "CALCULATED_AND_RECONCILED"
+    assert bridge["status"] == "PARTIAL"
+    assert bridge["scenarios"]["bear"]["status"] == "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+    bear_forward = bridge["scenarios"]["bear"]["forward_scenario"]
+    assert bear_forward["all_items_parent_attributable_net_profit_proxy_cny"] is not None
+    assert bear_forward["all_items_diluted_eps_proxy_cny_per_share"] is not None
+    assert bear_forward["normalized_diluted_eps_proxy_cny_per_share"] is None
+    assert bridge["scenarios"]["bear"]["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] is None
     assert bridge["scenarios"]["base"]["status"] == "NOT_IDENTIFIABLE"
     assert "historical.minority_interest_nonrecurring_after_tax_cny" in bridge["scenarios"]["base"]["missing_inputs"]
     assert "forward.diluted_weighted_average_shares:MUST_BE_POSITIVE" in bridge["scenarios"]["base"]["missing_inputs"]
@@ -5824,6 +5853,14 @@ def test_b57_report_shows_one_off_nci_and_eps_boundaries():
     assert "少数股东" in report
     assert "正常化稀释 EPS 代理" in report
     assert "不等于公司正式披露的归母净利润" in report
+    raw_partial = _b57_test_attribution_payload()
+    raw_partial["historical_earnings_attribution"].pop("minority_interest_nonrecurring_after_tax_cny")
+    partial = evaluate_operating_driver_forecast(raw_partial, evidence_register=evidence)
+    assert partial["baseline_transition"]["per_share_earnings_bridge"]["scenarios"]["bear"]["status"] == "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+    partial_report = "\n".join(render_operating_driver_section(partial, None, "CNY"))
+    assert "前瞻 all-items 稀释 EPS" in partial_report
+    assert "历史正常化归母利润 / EPS 与 EPS 增长率保持 UNKNOWN" in partial_report
+
 
 
 def test_b57_missing_b4_input_returns_explicit_not_provided_shape():
@@ -5943,6 +5980,54 @@ def test_b58_primary_eps_and_b57_all_items_eps_match_only_on_same_period_currenc
     assert result["decision_authority"] is False
 
 
+def test_b58_accepts_forward_all_items_eps_when_historical_normalization_is_unknown():
+    driver, primary, valuation = _b58_test_inputs()
+    b57 = driver["baseline_transition"]["per_share_earnings_bridge"]
+    b57["status"] = "PARTIAL"
+    for name in ("bear", "base", "bull"):
+        b57["scenarios"][name]["status"] = (
+            "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+        )
+        b57["scenarios"][name]["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] = None
+        b57["scenarios"][name]["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"] = None
+    result = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    assert result["status"] == "MATCH"
+    assert all(row["status"] == "MATCH" for row in result["scenarios"].values())
+    assert result["scenarios"]["base"]["b57_all_items_eps_proxy_cny_per_share"] == "10"
+    assert result["scenarios"]["base"]["b57_normalized_diluted_eps_proxy_cny_per_share"] is None
+    assert result["valuation_input_modified"] is False
+
+
+def test_b58_accepts_forward_all_items_eps_when_historical_normalization_is_unknown():
+    driver, primary, valuation = _b58_test_inputs()
+    b57 = driver["baseline_transition"]["per_share_earnings_bridge"]
+    b57["status"] = "PARTIAL"
+    for name in ("bear", "base", "bull"):
+        b57["scenarios"][name]["status"] = (
+            "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+        )
+        b57["scenarios"][name]["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] = None
+        b57["scenarios"][name]["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"] = None
+    result = pilot._build_b58_primary_eps_consistency(
+        selected_model_family="EPS_MULTIPLE",
+        expected_currency="CNY",
+        operating_driver_forecast=driver,
+        eps_earnings_bridge=primary,
+        eps_multiple_valuation=valuation,
+    )
+    assert result["status"] == "MATCH"
+    assert all(row["status"] == "MATCH" for row in result["scenarios"].values())
+    assert result["scenarios"]["base"]["b57_all_items_eps_proxy_cny_per_share"] == "10"
+    assert result["scenarios"]["base"]["b57_normalized_diluted_eps_proxy_cny_per_share"] is None
+    assert result["valuation_input_modified"] is False
+
+
 def test_b58_nonzero_primary_after_tax_adjustment_is_not_silently_called_a_match():
     driver, primary, valuation = _b58_test_inputs()
     primary["scenarios"]["base"]["other_after_tax_attribution_adjustment"]["value"] = "1"
@@ -5998,7 +6083,9 @@ def test_b58_assumption_only_primary_eps_is_not_promoted_to_independent_reconcil
     )
     assert result["status"] == "ASSUMPTION_ONLY"
     assert all(row["status"] == "PRIMARY_EPS_ASSUMPTION_ONLY" for row in result["scenarios"].values())
-    assert all(row["eps_match"] is True for row in result["scenarios"].values())
+    assert all(row["eps_match"] is None for row in result["scenarios"].values())
+    assert all(row["numeric_similarity_to_primary_declared_eps"] is True for row in result["scenarios"].values())
+    assert all(row["independent_confirmation_status"] == "NOT_ESTABLISHED_PRIMARY_EPS_ASSUMPTION_ONLY" for row in result["scenarios"].values())
 
 
 def test_b58_is_not_applicable_when_primary_model_is_not_eps_multiple():
@@ -6061,8 +6148,8 @@ def test_b59_explains_b57_to_primary_eps_gap_by_profit_components_and_adapter_in
     assert components["non_recurring_after_tax_effect_cny"] == "12000"
     assert components["nci_attribution_difference_cny"] == "-2000"
     assert components["sum_cny"] == "-2000"
-    assert eps["profit_numerator_effect_cny_per_share"] == "-0.2"
-    assert eps["diluted_share_denominator_effect_cny_per_share"] == "0"
+    assert Decimal(eps["profit_numerator_effect_cny_per_share"]) == Decimal("-0.2")
+    assert Decimal(eps["diluted_share_denominator_effect_cny_per_share"]) == Decimal("0")
     assert eps["primary_declared_eps_input_effect_cny_per_share"] == "0.1"
     assert eps["b57_minus_primary_declared_eps_cny_per_share"] == "-0.1"
     assert result["valuation_input_modified"] is False
@@ -6094,7 +6181,7 @@ def test_b59_uses_denominator_effect_and_surfaces_unmapped_primary_adjustment():
     assert row["status"] == "ARITHMETICALLY_RECONCILED_NOT_COMPARABLE"
     assert "DILUTED_SHARE_DENOMINATOR_MISMATCH" in row["comparability_flags"]
     assert "UNMAPPED_PRIMARY_OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT" in row["comparability_flags"]
-    assert eps["reconciliation_residual_cny_per_share"] == "0"
+    assert Decimal(eps["reconciliation_residual_cny_per_share"]) == Decimal("0")
     assert row["profit_numerator_components"]["unmapped_primary_other_after_tax_adjustment_effect_cny"] == "-2000"
 
 
@@ -6216,13 +6303,67 @@ def test_b60_locally_recomputes_return_hurdle_eps_and_keeps_external_mie_unchang
     )
     row = result["scenarios"]["base"]
     assert result["status"] == "CONDITIONAL_SENSITIVITY_CALCULATED"
-    assert row["required_return_eps_without_distributions"] == "11.500"
-    assert row["fundamental_target_eps_without_distributions"] == "11.500"
-    assert row["b57_eps_headroom_vs_required_return_without_distributions"] == "-1.500"
+    assert Decimal(row["required_return_eps_without_distributions"]) == Decimal("11.500")
+    assert Decimal(row["fundamental_target_eps_without_distributions"]) == Decimal("11.500")
+    assert Decimal(row["b57_eps_headroom_vs_required_return_without_distributions"]) == Decimal("-1.50")
     assert row["current_price_to_primary_eps_forward_pe"] == "10"
     assert row["distribution_status"] == "VALIDATED_NO_FUTURE_DISTRIBUTIONS"
     assert result["external_mie_status_unchanged"] == "NOT_IDENTIFIABLE"
     assert result["external_mie_and_expectation_gap_modified"] is False
+
+
+def test_b60_uses_forward_all_items_eps_when_historical_normalization_is_unknown():
+    price, timing, decision, operator, valuation, forecast, driver = _b60_test_inputs()
+    b57_rows = driver["baseline_transition"]["per_share_earnings_bridge"]["scenarios"]
+    for row in b57_rows.values():
+        row["status"] = (
+            "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+        )
+        row["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] = None
+        row["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"] = None
+    result = pilot._build_b60_local_eps_multiple_price_inversion(
+        price_input=price,
+        valuation_timing=timing,
+        decision_parameters=decision,
+        operator_valuation_context=operator,
+        eps_multiple_valuation=valuation,
+        forecast_valuation=forecast,
+        operating_driver_forecast=driver,
+        validated_cash_distribution_events={name: [] for name in ("bear", "base", "bull")},
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    base = result["scenarios"]["base"]
+    assert base["status"] == "CALCULATED_CONDITIONAL"
+    assert base["b57_terminal_value_using_selected_pe"] == "100"
+    assert base["b57_eps_headroom_vs_required_return_without_distributions"] == "-1.50"
+    assert "B57_EPS_NOT_CONFIRMED_ON_SAME_COMPANY_SCOPE_AND_PERIOD" not in base["comparability_flags"]
+
+
+def test_b60_uses_forward_all_items_eps_when_historical_normalization_is_unknown():
+    price, timing, decision, operator, valuation, forecast, driver = _b60_test_inputs()
+    b57_rows = driver["baseline_transition"]["per_share_earnings_bridge"]["scenarios"]
+    for row in b57_rows.values():
+        row["status"] = (
+            "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
+        )
+        row["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] = None
+        row["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"] = None
+    result = pilot._build_b60_local_eps_multiple_price_inversion(
+        price_input=price,
+        valuation_timing=timing,
+        decision_parameters=decision,
+        operator_valuation_context=operator,
+        eps_multiple_valuation=valuation,
+        forecast_valuation=forecast,
+        operating_driver_forecast=driver,
+        validated_cash_distribution_events={name: [] for name in ("bear", "base", "bull")},
+        external_mie_status="NOT_IDENTIFIABLE",
+    )
+    base = result["scenarios"]["base"]
+    assert base["status"] == "CALCULATED_CONDITIONAL"
+    assert base["b57_terminal_value_using_selected_pe"] == "100"
+    assert base["b57_eps_headroom_vs_required_return_without_distributions"] == "-1.50"
+    assert "B57_EPS_NOT_CONFIRMED_ON_SAME_COMPANY_SCOPE_AND_PERIOD" not in base["comparability_flags"]
 
 
 def test_b60_only_counts_dated_distributions_already_validated_by_return_solver():
@@ -6279,6 +6420,9 @@ def test_b60_translates_b59_eps_difference_components_into_terminal_value_effect
     assert row["b59_terminal_value_effects"]["profit_numerator_effect_terminal_value_effect_cny_per_share"] == "4.0"
     assert row["b59_terminal_value_effects"]["diluted_share_denominator_effect_terminal_value_effect_cny_per_share"] == "1.0"
     assert row["b57_minus_primary_terminal_value_effect"] == "5.0"
+    assert row["b57_minus_primary_terminal_value_effect_is_diagnostic_only"] is True
+    assert row["b57_minus_primary_terminal_value_effect_basis"].endswith("NOT_REQUIRED_RETURN_HEADROOM")
+    assert row["b57_eps_headroom_vs_required_return_without_distributions"] is None
 
 
 def test_b60_requires_eps_multiple_primary_model_and_pit_qualified_price():
@@ -6387,9 +6531,9 @@ def test_b61_sotp_price_inversion_reconstructs_segment_pool_and_one_at_a_time_pr
     assert required["required_terminal_equity_value_cny"] == "11500.00"
     assert required["required_segment_equity_value_pool_cny"] == "11400.00"
     segments = {item["segment_id"]: item for item in required["segment_requirements"]}
-    assert segments["seg_a"]["one_at_a_time_required_attributable_net_profit_cny_signed"] == "1040"
-    assert segments["seg_a"]["one_at_a_time_required_attributable_net_profit_floor_cny"] == "1040"
-    assert segments["seg_b"]["one_at_a_time_required_attributable_net_profit_cny"] == "520"
+    assert Decimal(segments["seg_a"]["one_at_a_time_required_attributable_net_profit_cny_signed"]) == Decimal("1040")
+    assert Decimal(segments["seg_a"]["one_at_a_time_required_attributable_net_profit_floor_cny"]) == Decimal("1040")
+    assert Decimal(segments["seg_b"]["one_at_a_time_required_attributable_net_profit_cny_signed"]) == Decimal("520")
     assert segments["seg_a"]["interpretation"].startswith("ONE_SEGMENT_CHANGES_OTHERS_HELD")
     assert result["external_mie_status_unchanged"] == "NOT_IDENTIFIABLE"
     assert result["sotp_input_modified"] is False
@@ -6701,10 +6845,12 @@ def _b62_sotp_reconciliation_inputs():
         }
     inversion = {
         "selected_model_family": "SOTP", "currency": "CNY", "forecast_period": "2026FY",
+        "valuation_terminal_date": "2026-12-31",
         "status": "CONDITIONAL_SENSITIVITY_CALCULATED", "scenarios": b61_scenarios,
     }
     sotp = {"status": "CALCULATED", "selected_for_primary_model": True,
-            "forecast_period": "2026FY", "scenarios": sotp_scenarios}
+            "forecast_period": "2026FY", "valuation_terminal_date": "2026-12-31",
+            "scenarios": sotp_scenarios}
     operating_forecast = {
         "scope": "COMPANY_WIDE",
         "baseline_transition": {"segment_normalized_earnings_bridge": {
@@ -6760,3 +6906,234 @@ def test_b62_sotp_reconciliation_blocks_period_mismatch_before_comparing_profit(
     )
     assert result["status"] == "FORECAST_PERIOD_MISMATCH"
 
+
+
+def test_b76_eps_multiple_first_screen_report_shows_reconciled_price_hurdle():
+    analysis = {
+        "case": {"currency": "CNY"},
+        "price_input": {"price": "30"},
+        "assessment": {
+            "market_implied_expectation": {
+                "status": "NOT_IDENTIFIABLE",
+                "price_implied_analysis": {
+                    "reference_price": "30",
+                    "local_eps_multiple_recalculation": {
+                        "status": "CONDITIONAL_SENSITIVITY_CALCULATED",
+                        "selected_model_family": "EPS_MULTIPLE",
+                        "currency": "CNY",
+                        "reference_price": "30",
+                        "forecast_period": "2027FY",
+                        "valuation_terminal_date": "2027-12-31",
+                        "scenarios": {},
+                    },
+                    "local_sotp_recalculation": {
+                        "selected_model_family": "EPS_MULTIPLE",
+                        "expectation_gap_comparison": {
+                            "status": "CONDITIONAL_PRICE_COMPARISON_CALCULATED",
+                            "classification": "PRICE_CONDITIONED_REQUIREMENT_VS_INDEPENDENT_FORECAST_NOT_EXTERNAL_MIE",
+                            "external_mie_status_unchanged": "NOT_IDENTIFIABLE",
+                            "eps_multiple_comparison": {
+                                "status": "CONDITIONAL_PRICE_COMPARISON_CALCULATED",
+                                "currency": "CNY",
+                                "unit": "CNY/share",
+                                "forecast_period": "2027FY",
+                                "valuation_terminal_date": "2027-12-31",
+                                "annualization_year_fraction": "1",
+                                "required_return_annualized_rate": "0.10",
+                                "fundamental_target_annualized_rate": "0.15",
+                                "structured_current_price": "30",
+                                "b60_reference_price": "30",
+                                "price_reference_status": "MATCH",
+                                "scenarios": {
+                                    "bear": {
+                                        "status": "CALCULATED",
+                                        "b4_independent_all_items_eps_proxy_cny_per_share": "1.6",
+                                        "primary_adapter_eps_cny_per_share": "1.5",
+                                        "selected_terminal_pe_x": "12",
+                                        "primary_adapter_terminal_value_cny_per_share": "18",
+                                        "arithmetic_reconciliation": {
+                                            "status": "PASS",
+                                            "b57_profit_divided_by_shares": "PASS",
+                                            "primary_eps_times_pe": "PASS",
+                                            "required_return_eps": "PASS",
+                                            "fundamental_target_eps": "PASS",
+                                        },
+                                        "required_return": {
+                                            "without_distributions": {
+                                                "required_eps_cny_per_share": "2.75",
+                                                "forecast_minus_required_cny_per_share": "-1.15",
+                                                "headroom_vs_required_pct": "-41.818",
+                                                "direction": "B4_FORECAST_BELOW_REQUIREMENT",
+                                            },
+                                            "with_validated_distributions": {"status": "NOT_IDENTIFIABLE"},
+                                        },
+                                        "fundamental_target": {
+                                            "without_distributions": {
+                                                "required_eps_cny_per_share": "2.875",
+                                                "forecast_minus_required_cny_per_share": "-1.275",
+                                            }
+                                        },
+                                    },
+                                    "base": {"status": "NOT_IDENTIFIABLE", "issues": ["BASE_INPUT_UNKNOWN"]},
+                                    "bull": {"status": "NOT_IDENTIFIABLE", "issues": ["BULL_INPUT_UNKNOWN"]},
+                                },
+                            },
+                            "win_odds": {"win_probability_status": "NOT_IDENTIFIABLE"},
+                        },
+                    },
+                },
+            }
+        },
+        "forecast_valuation": {},
+    }
+    report = "\\n".join(pilot._render_core_investment_synthesis(analysis))
+    assert "结构化现价/B60反推现价 30 / 30 CNY（MATCH）" in report
+    assert "Required Return 0.10" in report
+    assert "Fundamental Target 0.15" in report
+    assert "B57利润÷稀释股数 PASS" in report
+    assert "主适配器EPS×P/E PASS" in report
+    assert "1.5 × 12 = 18 CNY/股" in report
+    assert "B4/B57 all-items EPS 1.6 CNY/股" in report
+    assert "Required Return 所需 EPS（未计分红）2.75 CNY/股" in report
+
+
+def test_b76_sotp_first_screen_report_shows_waterfall_reconciliation():
+    analysis = {
+        "case": {"currency": "CNY"},
+        "price_input": {"price": "10"},
+        "assessment": {
+            "market_implied_expectation": {
+                "status": "NOT_IDENTIFIABLE",
+                "price_implied_analysis": {
+                    "reference_price": "10",
+                    "local_sotp_recalculation": {
+                        "selected_model_family": "SOTP",
+                        "expectation_gap_comparison": {
+                            "status": "CONDITIONAL_PRICE_COMPARISON_CALCULATED",
+                            "classification": "PRICE_CONDITIONED_REQUIREMENT_VS_INDEPENDENT_FORECAST_NOT_EXTERNAL_MIE",
+                            "external_mie_status_unchanged": "NOT_IDENTIFIABLE",
+                            "scenarios": {
+                                "bear": {
+                                    "status": "CONDITIONAL_PRICE_COMPARISON_CALCULATED",
+                                    "earnings_gap": {
+                                        "b4_independent_forecast_segment_value_pool_cny": "1250",
+                                        "required_return_annualized_rate": "0.12",
+                                        "fundamental_target_annualized_rate": "0.15",
+                                        "required_segment_value_pool_for_required_return_cny": "1200",
+                                        "b4_forecast_pool_minus_required_pool_cny": "50",
+                                        "headroom_vs_required_pool_pct": "4.1667",
+                                        "per_share_terminal_value_headroom_cny": "0.5",
+                                    },
+                                    "arithmetic_reconciliation": {
+                                        "status": "PASS",
+                                        "checks": {
+                                            "step_1_plus_step_2_equals_step_3": "PASS",
+                                            "step_3_plus_step_4_equals_step_5": "PASS",
+                                            "b68_full_vector_recomputed_pool_matches_b63_step_3": "PASS",
+                                        },
+                                    },
+                                    "segment_comparisons": [],
+                                },
+                            },
+                            "win_odds": {"win_probability_status": "NOT_IDENTIFIABLE"},
+                        },
+                    },
+                },
+            }
+        },
+        "forecast_valuation": {},
+    }
+    report = "\\n".join(pilot._render_core_investment_synthesis(analysis))
+    assert "B4 前瞻分部价值池 1250 CNY" in report
+    assert "价值池余量 50 CNY" in report
+    assert "B61/B62/B63/B68 二次算术核对：PASS" in report
+    assert "step1+step2=step3 PASS" in report
+    assert "step3+step4=step5 PASS" in report
+    assert "B68完整B4分部向量复算step3 PASS" in report
+
+
+
+def test_report_auto_open_is_skipped_in_ci(monkeypatch):
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    monkeypatch.setenv("CI", "true")
+
+    def unexpected_popen(*_args, **_kwargs):
+        raise AssertionError("GUI launch must be skipped in CI")
+
+    monkeypatch.setattr(pilot.subprocess, "Popen", unexpected_popen)
+    pilot._open_report_best_effort("report.md")
+
+
+def test_report_auto_open_is_nonblocking_and_best_effort(monkeypatch, capsys):
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    monkeypatch.delenv("CI", raising=False)
+    calls = []
+
+    def fake_popen(args, **kwargs):
+        calls.append((args, kwargs))
+        return object()
+
+    monkeypatch.setattr(pilot.subprocess, "Popen", fake_popen)
+    pilot._open_report_best_effort("report.md")
+
+    assert len(calls) == 1
+    assert calls[0][0] == ["open", "report.md"]
+    assert calls[0][1]["start_new_session"] is True
+    assert calls[0][1]["stdin"] == pilot.subprocess.DEVNULL
+    assert calls[0][1]["stdout"] == pilot.subprocess.DEVNULL
+    assert calls[0][1]["stderr"] == pilot.subprocess.DEVNULL
+
+    def failing_popen(*_args, **_kwargs):
+        raise OSError("LaunchServices unavailable")
+
+    monkeypatch.setattr(pilot.subprocess, "Popen", failing_popen)
+    pilot._open_report_best_effort("report.md")
+    assert "报告已生成，但系统无法自动打开" in capsys.readouterr().out
+
+
+
+def test_macos_gui_handoff_helpers_are_skipped_in_ci(monkeypatch):
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    monkeypatch.setenv("CI", "true")
+
+    def unexpected(*_args, **_kwargs):
+        raise AssertionError("GUI/clipboard command must be skipped in CI")
+
+    monkeypatch.setattr(pilot.subprocess, "Popen", unexpected)
+    monkeypatch.setattr(pilot.subprocess, "run", unexpected)
+    assert pilot._launch_macos_target_best_effort(
+        ["open", "https://chatgpt.com/"], fallback="fallback"
+    ) is False
+    assert pilot._copy_macos_prompt_best_effort("prompt", fallback="fallback") is False
+
+
+def test_macos_prompt_clipboard_failure_is_nonfatal(monkeypatch, capsys):
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    monkeypatch.delenv("CI", raising=False)
+
+    def timeout(*_args, **_kwargs):
+        raise pilot.subprocess.TimeoutExpired(["pbcopy"], timeout=5)
+
+    monkeypatch.setattr(pilot.subprocess, "run", timeout)
+    assert pilot._copy_macos_prompt_best_effort(
+        "prompt", fallback="Round A 提示未能自动复制"
+    ) is False
+    output = capsys.readouterr().out
+    assert "请直接从已保存的提示文件或当前终端输出复制内容" in output
+
+
+def test_macos_app_launch_is_asynchronous(monkeypatch):
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    monkeypatch.delenv("CI", raising=False)
+    calls = []
+
+    def fake_popen(args, **kwargs):
+        calls.append((args, kwargs))
+        return object()
+
+    monkeypatch.setattr(pilot.subprocess, "Popen", fake_popen)
+    assert pilot._launch_macos_target_best_effort(
+        ["open", "https://chatgpt.com/"], fallback="fallback"
+    ) is True
+    assert len(calls) == 1
+    assert calls[0][1]["start_new_session"] is True

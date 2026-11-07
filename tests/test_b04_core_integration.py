@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from iios_mvp.canonical_current_price import InMemoryCanonicalCurrentPriceRegistry
+from tests.test_b04_forecast_valuation_return_lineage import _evidence_admission_bundle
 from iios_mvp.canonical_independent_forecast import InMemoryCanonicalIndependentForecastRegistry
 from iios_mvp.canonical_investment_admission_v01 import (
     InMemoryCanonicalInvestmentAdmissionRegistry,
@@ -49,10 +50,10 @@ def _forecast():
         "unit": "CNY/share",
         "basis": "2026A_to_2029E",
         "horizon_years": "3",
-        "forecast_origin": "2026-10-04T12:00:00+00:00",
-        "known_at": "2026-10-04T15:00:00+00:00",
+        "forecast_origin": "2026-10-03T10:00:00+08:00",
+        "known_at": "2026-10-03T18:00:00+08:00",
         "prepared_without_current_price": True,
-        "evidence_ids": ["b04-core-forecast-evidence"],
+        "evidence_ids": ["b04-forecast-evidence"],
     })
     return registry, ref.to_dict()
 
@@ -74,7 +75,7 @@ def _valuation(forecast_ref):
             "base": {"probability": "0.50", "value_per_share": "430", "cash_distributions_per_share": "10"},
             "bull": {"probability": "0.25", "value_per_share": "650", "cash_distributions_per_share": "15"},
         },
-        "evidence_ids": ["b04-core-valuation-evidence"],
+        "evidence_ids": ["b04-valuation-evidence"],
     })
     admissions = InMemoryCanonicalInvestmentAdmissionRegistry()
     admission = build_canonical_investment_admission(
@@ -90,7 +91,7 @@ def _valuation(forecast_ref):
         source_record_hash="a" * 64,
         output_hash=output["output_hash"],
         producer_version="B04-VALUATION-PRODUCER-0.1",
-        evidence_ids=["b04-core-valuation-evidence"],
+        evidence_ids=["b04-valuation-evidence"],
         admitted_at="2026-10-04T16:00:00+00:00",
     )
     valuation_ref = admissions.admit(admission).to_dict()
@@ -253,11 +254,12 @@ def _case(return_gate, price_ref):
     }
 
 
-def _return_gate(forecast_ref, valuation_ref):
+def _return_gate(forecast_ref, valuation_ref, evidence_ref):
     return {
         "lineage_version": FORECAST_VALUATION_RETURN_LINEAGE_VERSION,
         "canonical_forecast_ref": forecast_ref,
         "canonical_valuation_ref": valuation_ref,
+        "canonical_evidence_admission_ref": evidence_ref,
         "entry_price": "291.11",
         "entry_value_reference": "430",
         "horizon_years": "3",
@@ -275,31 +277,39 @@ def _return_gate(forecast_ref, valuation_ref):
     }
 
 
-def test_b04_core_accepts_canonical_lineage():
+def test_b04_core_accepts_canonical_lineage(tmp_path):
     forecast_registry, forecast_ref = _forecast()
     valuation_resolver, valuation_ref = _valuation(forecast_ref)
     price_registry, price_ref = _price()
+    evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(
+        tmp_path, case_id=CASE_ID, market=MARKET, symbol=SYMBOL, company=COMPANY, cutoff_date=CUTOFF
+    )
     result = validate_case_v03(
-        _case(_return_gate(forecast_ref, valuation_ref), price_ref),
+        _case(_return_gate(forecast_ref, valuation_ref, evidence_ref), price_ref),
         current_price_resolver=price_registry,
         independent_forecast_resolver=forecast_registry,
         upstream_authority_resolver=UPSTREAM_AUTHORITY_REGISTRY,
         valuation_output_resolver=valuation_resolver,
+        evidence_admission_resolver=evidence_resolver,
     )
-    assert result["status"] == "PASS"
+    assert result["status"] == "PASS", result["errors"]
+    assert result["return_lineage"]["evidence_pit_admission_status"] == "FORMALLY_ADMITTED"
+    assert result["return_lineage"]["evidence_ids_verified"] == ["b04-forecast-evidence", "b04-valuation-evidence"]
 
 
-def test_b04_core_blocks_modified_probability_before_return_calculation():
+def test_b04_core_blocks_modified_probability_before_return_calculation(tmp_path):
     forecast_registry, forecast_ref = _forecast()
     valuation_resolver, valuation_ref = _valuation(forecast_ref)
     price_registry, price_ref = _price()
-    gate = _return_gate(forecast_ref, valuation_ref)
+    evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(tmp_path)
+    gate = _return_gate(forecast_ref, valuation_ref, evidence_ref)
     gate["scenarios"]["base"]["probability"] = "0.99"
     result = validate_case_v03(
         _case(gate, price_ref),
         current_price_resolver=price_registry,
         independent_forecast_resolver=forecast_registry,
         valuation_output_resolver=valuation_resolver,
+        evidence_admission_resolver=evidence_resolver,
     )
     assert result["status"] == "BLOCKED"
     assert any(error["code"] == "V03-RETURN-LINEAGE-CANONICAL" for error in result["errors"])

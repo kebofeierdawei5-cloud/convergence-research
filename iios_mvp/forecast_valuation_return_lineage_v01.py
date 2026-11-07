@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
@@ -13,6 +13,10 @@ from .canonical_investment_admission_v01 import (
 from .canonical_independent_forecast import (
     CanonicalIndependentForecastReference,
     CanonicalIndependentForecastResolver,
+)
+from .canonical_forecast_evidence_binding_v01 import (
+    CanonicalSignedEvidenceAdmissionReference,
+    CanonicalSignedEvidenceAdmissionResolver,
 )
 
 CANONICAL_VALUATION_OUTPUT_VERSION = "IIOS-VALUATION-OUTPUT-0.1"
@@ -44,6 +48,38 @@ def _date(value: Any, path: str) -> date:
         return date.fromisoformat(str(value))
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{path} must be ISO date") from exc
+
+
+def _aware_datetime(value: Any, path: str) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{path} must be a timezone-aware ISO datetime")
+    try:
+        result = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"{path} must be a timezone-aware ISO datetime") from exc
+    if result.tzinfo is None or result.utcoffset() is None:
+        raise ValueError(f"{path} must be timezone-aware")
+    return result
+
+
+def _validate_forecast_pit_timestamps(
+    forecast: Mapping[str, Any],
+    signed_cutoff_instant: Any,
+) -> datetime:
+    cutoff = _aware_datetime(
+        signed_cutoff_instant,
+        "signed Evidence/PIT cutoff_instant",
+    )
+    for field in ("forecast_origin", "known_at"):
+        observed = _aware_datetime(
+            forecast.get(field),
+            f"canonical independent forecast {field}",
+        )
+        if observed > cutoff:
+            raise ValueError(
+                f"canonical independent forecast {field} is after signed Evidence/PIT cutoff"
+            )
+    return cutoff
 
 
 def _strict_ref(value: Any, path: str) -> dict[str, Any]:
@@ -292,6 +328,8 @@ def validate_forecast_valuation_return_lineage(
     symbol: str,
     company: str,
     cutoff_date: date,
+    canonical_evidence_admission_ref: Mapping[str, Any] | None = None,
+    evidence_admission_resolver: CanonicalSignedEvidenceAdmissionResolver | None = None,
 ) -> dict[str, Any]:
     if return_gate.get("lineage_version") != FORECAST_VALUATION_RETURN_LINEAGE_VERSION:
         raise ValueError("return gate lineage version mismatch")
@@ -318,6 +356,59 @@ def validate_forecast_valuation_return_lineage(
     valuation_forecast_ref = _forecast_ref(valuation["forecast_ref"], "valuation.forecast_ref")
     if valuation_forecast_ref != forecast_ref:
         raise ValueError("valuation.forecast_ref does not equal return gate canonical_forecast_ref")
+
+    required_evidence_ids = sorted(set(
+        [str(item) for item in forecast.get("evidence_ids", [])]
+        + [str(item) for item in valuation.get("evidence_ids", [])]
+    ))
+    declared_evidence_ref = return_gate.get("canonical_evidence_admission_ref")
+    evidence_refs_supplied = (
+        canonical_evidence_admission_ref is not None
+        or declared_evidence_ref is not None
+        or evidence_admission_resolver is not None
+    )
+    evidence_formally_admitted = False
+    evidence_admission_ref = None
+    evidence_admission = None
+    evidence_ids_verified: list[str] = []
+    evidence_pit_cutoff_instant: str | None = None
+    forecast_pit_temporal_status = "NOT_VERIFIED_WITHOUT_SIGNED_EVIDENCE_PIT_CUTOFF"
+    if evidence_refs_supplied:
+        if canonical_evidence_admission_ref is None or declared_evidence_ref is None:
+            raise ValueError("signed Evidence/PIT reference must be supplied both in return_gate and runtime resolver inputs")
+        if evidence_admission_resolver is None:
+            raise ValueError("signed Evidence/PIT resolver is required when canonical_evidence_admission_ref is supplied")
+        evidence_admission_ref = CanonicalSignedEvidenceAdmissionReference.from_mapping(
+            canonical_evidence_admission_ref
+        ).to_dict()
+        declared_evidence_ref = CanonicalSignedEvidenceAdmissionReference.from_mapping(
+            declared_evidence_ref
+        ).to_dict()
+        if declared_evidence_ref != evidence_admission_ref:
+            raise ValueError("return_gate canonical_evidence_admission_ref does not equal supplied Evidence/PIT reference")
+        evidence_admission = evidence_admission_resolver.resolve_signed_evidence_admission(
+            evidence_admission_ref,
+            case_id=case_id,
+            market=market,
+            symbol=symbol,
+            cutoff_date=cutoff_date,
+            required_evidence_ids=required_evidence_ids,
+        )
+        if (
+            evidence_admission.get("status") != "FORMALLY_ADMITTED"
+            or evidence_admission.get("decision") != "ADMIT"
+            or evidence_admission.get("core_pit_validation") != "PASS"
+            or sorted(evidence_admission.get("evidence_ids_verified") or []) != required_evidence_ids
+        ):
+            raise ValueError("forecast and valuation Evidence/PIT references are not formally admitted")
+        signed_cutoff = _validate_forecast_pit_timestamps(
+            forecast,
+            evidence_admission.get("cutoff_instant"),
+        )
+        evidence_pit_cutoff_instant = signed_cutoff.isoformat()
+        forecast_pit_temporal_status = "PASS_EXACT_SIGNED_CUTOFF"
+        evidence_formally_admitted = True
+        evidence_ids_verified = required_evidence_ids
 
     expected_horizon = _dec(return_gate["horizon_years"], "return_gate.horizon_years")
     valuation_horizon = _dec(valuation["horizon_years"], "valuation.horizon_years")
@@ -366,7 +457,28 @@ def validate_forecast_valuation_return_lineage(
         "valuation_primary_model": valuation.get("primary_model"),
         "horizon_years": str(valuation_horizon),
         "reference_value_per_share": str(canonical_reference),
-        "binding": "FORECAST_REF_EQUALITY_AND_CANONICAL_VALUATION_SCENARIO_EQUALITY",
+        "binding": (
+            "FORECAST_REF_EQUALITY_EVIDENCE_ID_SUBSET_CANONICAL_VALUATION_SCENARIO_EQUALITY_AND_SIGNED_EVIDENCE_PIT"
+            if evidence_formally_admitted
+            else "FORECAST_REF_EQUALITY_AND_CANONICAL_VALUATION_SCENARIO_EQUALITY_ONLY"
+        ),
+        "canonical_evidence_admission_ref": evidence_admission_ref,
+        "evidence_pit_admission_status": (
+            "FORMALLY_ADMITTED" if evidence_formally_admitted else "NOT_FORMALLY_ADMITTED"
+        ),
+        "evidence_pit_admission": evidence_admission,
+        "evidence_pit_cutoff_instant": evidence_pit_cutoff_instant,
+        "forecast_pit_temporal_status": forecast_pit_temporal_status,
+        "forecast_origin": forecast.get("forecast_origin"),
+        "forecast_known_at": forecast.get("known_at"),
+        "evidence_ids_declared": required_evidence_ids,
+        "evidence_ids_verified": evidence_ids_verified,
+        "formal_return_lineage_status": (
+            "FORMALLY_EVIDENCE_BOUND" if evidence_formally_admitted else "CONDITIONAL_NOT_FORMALLY_EVIDENCE_ADMITTED"
+        ),
+        "formal_evidence_pit_admission_created": False,
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
         # Retain exact resolver-returned payloads so formal write authorization
         # can revalidate them after the process that performed admission exits.
         "forecast_record": dict(forecast),
