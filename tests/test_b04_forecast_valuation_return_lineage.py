@@ -205,7 +205,14 @@ def _evidence_admission_bundle(
     return reference, resolver, envelope_path, evidence_ids
 
 
-def _forecast(forecast_id: str = "forecast-b04-001", registry=None, evidence_ids=None):
+def _forecast(
+    forecast_id: str = "forecast-b04-001",
+    registry=None,
+    evidence_ids=None,
+    *,
+    forecast_origin: str = "2026-10-03T10:00:00+08:00",
+    known_at: str = "2026-10-03T18:00:00+08:00",
+):
     if registry is None:
         registry = InMemoryCanonicalIndependentForecastRegistry()
     ref = registry.admit_independent_forecast({
@@ -221,8 +228,8 @@ def _forecast(forecast_id: str = "forecast-b04-001", registry=None, evidence_ids
         "unit": "CNY/share",
         "basis": "2026A_to_2029E",
         "horizon_years": "3",
-        "forecast_origin": "2026-10-04T12:00:00+00:00",
-        "known_at": "2026-10-04T15:00:00+00:00",
+        "forecast_origin": forecast_origin,
+        "known_at": known_at,
         "prepared_without_current_price": True,
         "evidence_ids": evidence_ids or ["b04-forecast-evidence"],
     })
@@ -464,6 +471,87 @@ def test_b04_lineage_rejects_tampered_signed_evidence_envelope(tmp_path):
     evidence_ref, evidence_resolver, envelope_path, _ids = _evidence_admission_bundle(tmp_path)
     envelope_path.write_text(envelope_path.read_text(encoding="utf-8") + " ", encoding="utf-8")
     with pytest.raises(ValueError, match="envelope bytes differ from reference"):
+        _validate_lineage(
+            forecast_registry, forecast_ref, valuation_resolver, valuation_ref, evidence_ref, evidence_resolver
+        )
+
+
+
+def test_b80_exact_signed_cutoff_accepts_equal_instant_and_normalizes_timezone_offsets(tmp_path):
+    forecast_registry, forecast_ref = _forecast(
+        forecast_origin="2026-10-04T11:30:00+08:00",
+        known_at="2026-10-04T04:00:00Z",
+    )
+    valuation_resolver, valuation_ref, _ = _valuation(forecast_ref)
+    evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(
+        tmp_path,
+        manifest_cutoff_value="2026-10-04T12:00:00+08:00",
+        known_at_value="2026-10-04T12:00:00+08:00",
+    )
+
+    result = _validate_lineage(
+        forecast_registry, forecast_ref, valuation_resolver, valuation_ref, evidence_ref, evidence_resolver
+    )
+
+    assert result["status"] == "PASS"
+    assert result["evidence_pit_cutoff_instant"] == "2026-10-04T12:00:00+08:00"
+    assert result["forecast_pit_temporal_status"] == "PASS_EXACT_SIGNED_CUTOFF"
+    assert result["forecast_known_at"] == "2026-10-04T04:00:00+00:00"
+
+
+@pytest.mark.parametrize(
+    "forecast_origin, known_at, field",
+    [
+        (
+            "2026-10-04T12:00:01+08:00",
+            "2026-10-04T11:00:00+08:00",
+            "forecast_origin",
+        ),
+        (
+            "2026-10-04T11:00:00+08:00",
+            "2026-10-04T12:00:01+08:00",
+            "known_at",
+        ),
+    ],
+)
+def test_b80_forecast_timestamp_after_intraday_signed_cutoff_is_rejected(
+    tmp_path, forecast_origin, known_at, field
+):
+    forecast_registry, forecast_ref = _forecast(
+        forecast_origin=forecast_origin,
+        known_at=known_at,
+    )
+    valuation_resolver, valuation_ref, _ = _valuation(forecast_ref)
+    evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(
+        tmp_path,
+        manifest_cutoff_value="2026-10-04T12:00:00+08:00",
+        known_at_value="2026-10-04T11:00:00+08:00",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=f"canonical independent forecast {field} is after signed Evidence/PIT cutoff",
+    ):
+        _validate_lineage(
+            forecast_registry, forecast_ref, valuation_resolver, valuation_ref, evidence_ref, evidence_resolver
+        )
+
+
+def test_b80_date_only_signed_cutoff_uses_shanghai_midnight_for_forecast_timestamps(tmp_path):
+    forecast_registry, forecast_ref = _forecast(
+        forecast_origin="2026-10-04T00:00:01+08:00",
+        known_at="2026-10-03T23:30:00+08:00",
+    )
+    valuation_resolver, valuation_ref, _ = _valuation(forecast_ref)
+    evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(
+        tmp_path,
+        manifest_cutoff_value="2026-10-04",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="canonical independent forecast forecast_origin is after signed Evidence/PIT cutoff",
+    ):
         _validate_lineage(
             forecast_registry, forecast_ref, valuation_resolver, valuation_ref, evidence_ref, evidence_resolver
         )
