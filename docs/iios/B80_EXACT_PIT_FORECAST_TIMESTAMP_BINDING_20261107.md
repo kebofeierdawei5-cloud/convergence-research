@@ -36,7 +36,7 @@ This was reproducible in the old B04 positive fixture: its forecast `known_at` o
 
 ## Final validation — 2026-11-07
 
-**Validated code commit:** `bb668cb5694bd36584988e204a5dad29fcee580e`. The current PR head `328e481cfdf70bfcba6398661e801104db808e2e` contains only subsequent B80 documentation/state-index commits; no runtime or test code changed after the validated code commit.
+**Validated code commit:** `bb668cb5694bd36584988e204a5dad29fcee580e`. The validated code commit is the latest B80 runtime/test-code change. All commits after it modify only B80 documentation and the branch state index.
 
 - **35** pull-request workflow runs: **34 success, 0 failure, 1 cancelled**.
 - B04 Forecast-Valuation-Return Lineage: **16 passed**.
