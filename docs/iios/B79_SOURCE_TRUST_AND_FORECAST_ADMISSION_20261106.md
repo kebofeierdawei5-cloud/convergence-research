@@ -60,3 +60,12 @@ The market-local PIT boundary uses Shanghai 00:00 on cutoff date, matching the e
 Xinhecheng still lacks Q4 Bear/Base/Bull assumptions, annual weighted-average diluted shares and operator-attested current price. The repository's canonical signer registry remains empty. No real FY2026 EPS, formal Forecast/Evidence/Valuation admission, B60 current-price inversion or BUY/NO-BUY decision is created.
 
 PR #587 must remain Draft. Do not merge to the B73 proposal base or canonical main. Real operator macOS end-to-end acceptance remains separately NOT VERIFIED.
+
+
+## B79 follow-through — signed fixture, lifecycle replay, and report CI (2026-11-07)
+
+- Lifecycle/report/replay tests no longer use unsigned synthetic upstream bundles. `tests/decision_admission_fixture.py` creates an ephemeral, case-scoped ACTIVE Ed25519 registry, permission instrument, rights record and signed Evidence/PIT envelope under the temporary test run root; it resolves the bundle with the same production resolver. No fixture key is added to the production signer registry.
+- Date-only `known_at` is interpreted at Shanghai 00:00, matching Core Evidence/PIT; timestamp cutoffs use the signed manifest instant. The real CATL 2026-10-04 end-of-day cutoff is accepted without changing signed manifest bytes.
+- The lifecycle fixture requires `cryptography`; C8, C1, DR-02, TR-01/02/03, Investor Report v0.2 and MVP Pilot workflows install it explicitly. C2 Human Report also installs it because its downstream persistence fixtures use the same signed test helper.
+- Investor Review Report v0.2's report tests passed (28 tests) on the prior CI run; its post-test failure was a stale historical Actions artifact ID (run 37730232684, no artifact remained). The workflow now creates a small local Publication fixture missing `canonical_run_ref` and asserts the formal writer rejects it without producing report files; this test is self-contained and no longer depends on expired cross-run artifacts.
+- B79 remains a Draft PR proposal. Real authority signer registry remains empty. Local Pilot macOS acceptance is still unverified when the macOS job is cancelled.

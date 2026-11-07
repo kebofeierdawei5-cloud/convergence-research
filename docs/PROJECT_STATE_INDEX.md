@@ -3221,3 +3221,11 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **真实案例边界。** 新和成仍缺 Q4 分项假设、年度加权平均稀释股数和操作员确认现价；仓库正式 signer registry 仍为空。B79 未创建任何真实 Forecast/PIT/Valuation Admission、Decision 或交易授权。
 
 **验收要求：** B79 以新精确 HEAD 的 Investment Core CI 与 B04/Local Pilot 工作流结果为准；macOS job 取消仍为 NOT VERIFIED，不得计为 PASS。PR #587 保持 Draft，禁止合并 B73 proposal 或 main。
+
+
+## 6P. B79 CI and lifecycle-fixture follow-through (2026-11-07)
+
+- Updated the shared lifecycle test fixture to generate real ephemeral signed Evidence/PIT bundles, preserving production fail-closed semantics while allowing persistence, approval, monitoring, replay, publication and report tests to continue.
+- Added `cryptography` to the CI jobs that use that fixture, including C2 Human Report.
+- Removed Investor Report v0.2's expired cross-run artifact ID. Its negative Publication trust test now constructs a local fixture without `canonical_run_ref`, verifies formal rejection and asserts no report side effects.
+- Latest verified code at time of this update: see PR #587 branch HEAD. PR remains Draft/unmerged; production signer registry remains empty. macOS acceptance remains NOT VERIFIED if cancelled.
