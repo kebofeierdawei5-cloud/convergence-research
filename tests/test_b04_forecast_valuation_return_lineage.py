@@ -60,6 +60,7 @@ def _evidence_admission_bundle(
     symbol: str = SYMBOL,
     company: str = COMPANY,
     cutoff_date: date = CUTOFF,
+    manifest_cutoff_value: str | None = None,
 ):
     """Build a synthetic but fully signed Evidence/PIT bundle; no real source data."""
     raw_root = tmp_path / "raw"
@@ -102,7 +103,7 @@ def _evidence_admission_bundle(
         "market": market,
         "symbol": symbol,
         "company": company,
-        "cutoff_date": cutoff_date.isoformat(),
+        "cutoff_date": manifest_cutoff_value or cutoff_date.isoformat(),
         "required_field_groups": list(REQUIRED_FIELD_GROUPS),
         "evidence": evidence_rows,
         "raw_artifacts": raw_artifacts,
@@ -412,6 +413,33 @@ def test_b04_forecast_to_valuation_binding_is_strict(tmp_path):
             evidence_admission_resolver=evidence_resolver,
             valuation_output_resolver=valuation_resolver,
             case_id=CASE_ID, market=MARKET, symbol=SYMBOL, company=COMPANY, cutoff_date=CUTOFF,
+        )
+
+
+def test_b04_signed_manifest_end_of_day_timestamp_matches_local_cutoff_date(tmp_path):
+    forecast_registry, forecast_ref = _forecast()
+    valuation_resolver, valuation_ref, _ = _valuation(forecast_ref)
+    evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(
+        tmp_path,
+        manifest_cutoff_value="2026-10-04T23:59:59+08:00",
+    )
+    result = _validate_lineage(
+        forecast_registry, forecast_ref, valuation_resolver, valuation_ref, evidence_ref, evidence_resolver
+    )
+    assert result["status"] == "PASS"
+    assert result["evidence_pit_admission_status"] == "FORMALLY_ADMITTED"
+
+
+def test_b04_signed_manifest_next_local_day_does_not_match_cutoff(tmp_path):
+    forecast_registry, forecast_ref = _forecast()
+    valuation_resolver, valuation_ref, _ = _valuation(forecast_ref)
+    evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(
+        tmp_path,
+        manifest_cutoff_value="2026-10-05T00:00:00+08:00",
+    )
+    with pytest.raises(ValueError, match="cutoff_date does not match forecast lineage"):
+        _validate_lineage(
+            forecast_registry, forecast_ref, valuation_resolver, valuation_ref, evidence_ref, evidence_resolver
         )
 
 

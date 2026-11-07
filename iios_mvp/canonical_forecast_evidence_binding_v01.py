@@ -170,7 +170,6 @@ class FileSystemCanonicalSignedEvidenceAdmissionResolver:
             "case_id": case_id,
             "market": market,
             "symbol": symbol,
-            "cutoff_date": cutoff_date.isoformat(),
         }
         payload = envelope.get("payload")
         if not isinstance(payload, Mapping):
@@ -178,6 +177,32 @@ class FileSystemCanonicalSignedEvidenceAdmissionResolver:
         for field, expected in expected_identity.items():
             if payload.get(field) != expected or manifest.get(field) != expected:
                 raise ValueError(f"signed Evidence/PIT {field} does not match forecast lineage")
+
+        # Preserve the signed cutoff representation exactly, but compare its
+        # Shanghai-local calendar day to the canonical forecast cutoff date.
+        manifest_cutoff_raw = manifest.get("cutoff_date")
+        payload_cutoff_raw = payload.get("cutoff_date")
+        if not isinstance(manifest_cutoff_raw, str) or not isinstance(payload_cutoff_raw, str):
+            raise ValueError("signed Evidence/PIT cutoff_date must be a date or ISO-8601 timestamp")
+        if payload_cutoff_raw != manifest_cutoff_raw:
+            raise ValueError("signed Evidence/PIT payload cutoff_date differs from exact manifest cutoff_date")
+        try:
+            if len(manifest_cutoff_raw) == 10:
+                manifest_cutoff_date = date.fromisoformat(manifest_cutoff_raw)
+            else:
+                parsed_cutoff = datetime.fromisoformat(
+                    manifest_cutoff_raw.replace("Z", "+00:00")
+                )
+                if parsed_cutoff.tzinfo is None:
+                    raise ValueError("timezone is required")
+                manifest_cutoff_date = parsed_cutoff.astimezone(
+                    timezone(timedelta(hours=8))
+                ).date()
+        except ValueError as exc:
+            raise ValueError("signed Evidence/PIT cutoff_date is invalid") from exc
+        if manifest_cutoff_date != cutoff_date:
+            raise ValueError("signed Evidence/PIT cutoff_date does not match forecast lineage")
+        expected_identity["cutoff_date"] = cutoff_date.isoformat()
 
         evidence_rows = manifest.get("evidence")
         if not isinstance(evidence_rows, list):
