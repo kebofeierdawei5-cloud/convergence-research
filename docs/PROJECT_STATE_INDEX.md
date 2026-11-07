@@ -3251,3 +3251,5 @@ B79 exposed and verified the signed Evidence/PIT manifest's exact cutoff instant
 
 
 **B80 exact-head correction (2026-11-07):** The first PR validation exposed one old B04 core-integration positive fixture whose Forecast timestamps were later than the date-only Shanghai-midnight cutoff. The new guard correctly blocked it. The fixture was changed to pre-cutoff timestamps; no production threshold or fail-closed rule was relaxed. Re-validation is pending on the corrected exact HEAD.
+
+**B80 shared-fixture correction (2026-11-07):** Trusted Host CLI integration exposed the same inherited B04B fixture defect. The shared fixture now calculates Forecast origin/known_at relative to Shanghai 00:00 on date-only cutoffs (−2h/−1h); runtime validation remains exact and unchanged. The first exact-head B04 workflow now passes after the separate core-integration fixture correction. Shared-helper correction has triggered a fresh workflow matrix; overall B80 validation remains pending.
