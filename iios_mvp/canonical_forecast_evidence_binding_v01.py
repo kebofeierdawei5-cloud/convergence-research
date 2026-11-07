@@ -187,17 +187,20 @@ class FileSystemCanonicalSignedEvidenceAdmissionResolver:
         if payload_cutoff_raw != manifest_cutoff_raw:
             raise ValueError("signed Evidence/PIT payload cutoff_date differs from exact manifest cutoff_date")
         try:
+            shanghai_tz = timezone(timedelta(hours=8))
             if len(manifest_cutoff_raw) == 10:
                 manifest_cutoff_date = date.fromisoformat(manifest_cutoff_raw)
+                cutoff_local = datetime.combine(
+                    manifest_cutoff_date, datetime.min.time(), tzinfo=shanghai_tz
+                )
             else:
                 parsed_cutoff = datetime.fromisoformat(
                     manifest_cutoff_raw.replace("Z", "+00:00")
                 )
                 if parsed_cutoff.tzinfo is None:
                     raise ValueError("timezone is required")
-                manifest_cutoff_date = parsed_cutoff.astimezone(
-                    timezone(timedelta(hours=8))
-                ).date()
+                cutoff_local = parsed_cutoff.astimezone(shanghai_tz)
+                manifest_cutoff_date = cutoff_local.date()
         except ValueError as exc:
             raise ValueError("signed Evidence/PIT cutoff_date is invalid") from exc
         if manifest_cutoff_date != cutoff_date:
@@ -216,11 +219,6 @@ class FileSystemCanonicalSignedEvidenceAdmissionResolver:
                 raise ValueError("admitted Evidence/PIT manifest contains missing or duplicate evidence IDs")
             by_id[evidence_id] = row
 
-        cutoff_local = datetime.combine(
-            cutoff_date,
-            datetime.min.time(),
-            tzinfo=timezone(timedelta(hours=8)),
-        )
         for evidence_id in requested:
             row = by_id.get(evidence_id)
             if row is None:

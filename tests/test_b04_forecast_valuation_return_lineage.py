@@ -61,6 +61,7 @@ def _evidence_admission_bundle(
     company: str = COMPANY,
     cutoff_date: date = CUTOFF,
     manifest_cutoff_value: str | None = None,
+    known_at_value: str = "2026-10-03T12:00:00+00:00",
 ):
     """Build a synthetic but fully signed Evidence/PIT bundle; no real source data."""
     raw_root = tmp_path / "raw"
@@ -80,7 +81,7 @@ def _evidence_admission_bundle(
             "subject_id": case_id,
             "field_id": f"{field_group}.b04_fixture_fact_{idx}",
             "claim_type": "B04_SYNTHETIC_FIXTURE",
-            "known_at": "2026-10-03T12:00:00+00:00",
+            "known_at": known_at_value,
             "retrieved_at": "2026-10-05T12:00:00+00:00",
             "published_at": "2026-10-03T10:00:00+00:00",
             "source_ref": "https://example.invalid/b04-fixture",
@@ -422,6 +423,7 @@ def test_b04_signed_manifest_end_of_day_timestamp_matches_local_cutoff_date(tmp_
     evidence_ref, evidence_resolver, _envelope, _ids = _evidence_admission_bundle(
         tmp_path,
         manifest_cutoff_value="2026-10-04T23:59:59+08:00",
+        known_at_value="2026-10-04T10:00:00+08:00",
     )
     result = _validate_lineage(
         forecast_registry, forecast_ref, valuation_resolver, valuation_ref, evidence_ref, evidence_resolver
