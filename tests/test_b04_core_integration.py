@@ -50,8 +50,8 @@ def _forecast():
         "unit": "CNY/share",
         "basis": "2026A_to_2029E",
         "horizon_years": "3",
-        "forecast_origin": "2026-10-04T12:00:00+00:00",
-        "known_at": "2026-10-04T15:00:00+00:00",
+        "forecast_origin": "2026-10-03T10:00:00+08:00",
+        "known_at": "2026-10-03T18:00:00+08:00",
         "prepared_without_current_price": True,
         "evidence_ids": ["b04-forecast-evidence"],
     })
