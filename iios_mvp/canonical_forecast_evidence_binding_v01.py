@@ -227,8 +227,19 @@ class FileSystemCanonicalSignedEvidenceAdmissionResolver:
                 raise ValueError(f"forecast or valuation evidence ID is not admitted: {evidence_id}")
             if row.get("exact_bytes") is not True:
                 raise ValueError(f"forecast or valuation evidence ID lacks exact bytes: {evidence_id}")
+            known_at_raw = str(row.get("known_at") or "").strip()
             try:
-                known_at = datetime.fromisoformat(str(row.get("known_at")).replace("Z", "+00:00"))
+                if len(known_at_raw) == 10:
+                    # Match Core Evidence/PIT semantics: date-only known_at
+                    # means 00:00 at the China/HK local timezone.
+                    known_date = date.fromisoformat(known_at_raw)
+                    known_at = datetime.combine(
+                        known_date,
+                        datetime.min.time(),
+                        tzinfo=cutoff_local.tzinfo,
+                    )
+                else:
+                    known_at = datetime.fromisoformat(known_at_raw.replace("Z", "+00:00"))
             except ValueError as exc:
                 raise ValueError(f"forecast or valuation evidence known_at is invalid: {evidence_id}") from exc
             if known_at.tzinfo is None or known_at.astimezone(cutoff_local.tzinfo) > cutoff_local:
