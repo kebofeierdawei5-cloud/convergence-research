@@ -5,13 +5,28 @@ import hashlib
 import json
 from jsonschema import Draft202012Validator
 from pathlib import Path
+import tempfile
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from iios_mvp import operator_entered_price_decision_input_v01 as operator_price_input
 from iios_mvp.b2e_nl_semantic_decision_e2e_v01 import (
     B2EE2EError,
-    run_b2e_conformance,
+    run_b2e_conformance as _run_b2e_conformance,
 )
+from iios_mvp.canonical_forecast_evidence_binding_v01 import (
+    FileSystemCanonicalSignedEvidenceAdmissionResolver,
+    build_canonical_signed_evidence_admission_reference,
+)
+from iios_mvp.canonical_signed_evidence_admission_v01 import (
+    RIGHTS_SCHEMA,
+    SIGNED_ADMISSION_SCHEMA,
+    SIGNER_REGISTRY_SCHEMA,
+    add_signature,
+    build_admission_payload,
+)
+from iios_mvp.canonical_evidence_admission_v01 import validate_company_evidence_manifest
 from iios_mvp.canonical_natural_language_entry_v01 import (
     RequestInterpreterRegistration,
     RequestInterpreterRegistry,
@@ -686,6 +701,255 @@ def _admitted_synthetic_manifest(tmp_path, case):
     path = tmp_path / "B2_COMPANY_EVIDENCE_MANIFEST.json"
     path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
     return root, manifest, path
+
+
+def _lineage_evidence_ids(case):
+    forecast = case.get("forecast") if isinstance(case, dict) else {}
+    scenarios = forecast.get("scenarios") if isinstance(forecast, dict) else {}
+    ids = {
+        str(evidence_id).strip()
+        for scenario in (scenarios or {}).values()
+        if isinstance(scenario, dict)
+        for evidence_id in (scenario.get("evidence_ids") or [])
+        if str(evidence_id).strip()
+    }
+    return sorted(ids)
+
+
+def _expand_synthetic_manifest_with_lineage_ids(tmp_path, case, root, manifest):
+    """Add forecast/valuation evidence anchors only to explicitly synthetic test manifests."""
+    rows = list(manifest.get("evidence") or [])
+    raw_artifacts = list(manifest.get("raw_artifacts") or [])
+    existing = {str(row.get("evidence_id")) for row in rows if isinstance(row, dict)}
+    required = _lineage_evidence_ids(case)
+    missing = [item for item in required if item not in existing]
+    synthetic = any(
+        "SYNTHETIC_TEST_ONLY" in (row.get("quality_notes") or [])
+        for row in rows if isinstance(row, dict)
+    )
+    if missing and not synthetic:
+        raise ValueError(
+            "real Evidence/PIT manifest does not contain forecast/valuation evidence IDs: "
+            + ", ".join(missing)
+        )
+    if not missing:
+        return manifest
+
+    for index, evidence_id in enumerate(missing, start=1):
+        safe_id = hashlib.sha256(evidence_id.encode("utf-8")).hexdigest()[:16]
+        payload = f"SYNTHETIC_TEST_ONLY:{case['case_id']}:lineage:{evidence_id}".encode("utf-8")
+        digest = hashlib.sha256(payload).hexdigest()
+        relpath = f"raw/lineage-{safe_id}.bin"
+        target = Path(root) / relpath
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+        rows.append({
+            "evidence_id": evidence_id,
+            "subject_id": case["case_id"],
+            "field_id": f"financial_reality.lineage_binding_{safe_id}",
+            "claim_type": "OBSERVED_FACT",
+            "value": "SYNTHETIC_TEST_ONLY_NOT_REAL_FACT",
+            "observation_date": "2026-09-30",
+            "period": "TEST_PERIOD",
+            "published_at": "2026-09-30T15:00:00+08:00",
+            "known_at": "2026-09-30T16:00:00+08:00",
+            "retrieved_at": CREATED,
+            "effective_from": "2026-09-01",
+            "effective_to": None,
+            "source_ref": "SYNTHETIC_TEST_ONLY:forecast-valuation-lineage",
+            "source_version": "fixture-v1",
+            "source_locator": "synthetic lineage evidence bytes",
+            "artifact_id": f"fixture:lineage:{safe_id}",
+            "content_sha256": digest,
+            "capture_sha256": digest,
+            "exact_bytes": True,
+            "provenance_class": "SOURCE_VINTAGE_VERIFIED",
+            "status": "ADMITTED",
+            "transformation": {"type": "DIRECT", "code_ref": None, "code_sha256": None, "formula_id": None},
+            "parents": [],
+            "quality_notes": ["SYNTHETIC_TEST_ONLY"],
+            "license_status": "TEST_ONLY",
+        })
+        raw_artifacts.append({
+            "evidence_id": evidence_id,
+            "relative_path": relpath,
+            "expected_size_bytes": len(payload),
+            "expected_sha256": digest,
+        })
+
+    expanded = build_company_evidence_manifest(
+        case_id=str(case["case_id"]),
+        market=str(case["market"]),
+        symbol=str(case["symbol"]),
+        company=str(case["company"]),
+        cutoff_date=str(case["cutoff_date"]),
+        evidence=rows,
+        raw_artifacts=raw_artifacts,
+        required_field_groups=list(manifest.get("required_field_groups") or REQUIRED_COMPANY_FIELD_GROUPS),
+        raw_root=Path(root),
+    )
+    assert expanded.get("status") == "PASS", expanded.get("validation_errors")
+    if isinstance(manifest, dict):
+        manifest.clear()
+        manifest.update(expanded)
+    return expanded
+
+
+def _signed_evidence_binding(tmp_path, case, root, manifest):
+    """Create a temporary, case-scoped Ed25519 Evidence/PIT trust fixture."""
+    manifest_path = Path(tmp_path) / "signed-evidence-manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+    permission_path = Path(tmp_path) / "permission-instrument.bin"
+    permission_bytes = b"Synthetic written permission instrument; test fixture only.\\n"
+    permission_path.write_bytes(permission_bytes)
+    rights_path = Path(tmp_path) / "rights.json"
+    rights = {
+        "schema_version": RIGHTS_SCHEMA,
+        "case_id": str(case["case_id"]),
+        "source_class": "EXCHANGE_MARKET_DATA",
+        "status": "ALLOWED",
+        "basis_kind": "EXPLICIT_WRITTEN_PERMISSION",
+        "permission_instrument_id": "B2E-TEST-PERMISSION",
+        "permission_evidence_sha256": hashlib.sha256(permission_bytes).hexdigest(),
+        "allowed_uses": ["PRIVATE_STORAGE", "LOCAL_COMPUTATION", "INTERNAL_DISPLAY"],
+        "required_signer_roles": ["EVIDENCE_ADMISSION_SIGNER"],
+        "expires_at": "2027-12-31T00:00:00+00:00",
+    }
+    rights_path.write_text(
+        json.dumps(rights, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+
+    private_raw = bytes(range(32))
+    private_key = Ed25519PrivateKey.from_private_bytes(private_raw)
+    public_raw = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    private_path = Path(tmp_path) / "b2e-test-admission.key"
+    private_path.write_text(base64.b64encode(private_raw).decode("ascii") + "\\n", encoding="ascii")
+    private_path.chmod(0o600)
+    registry_path = Path(tmp_path) / "b2e-test-signer-registry.json"
+    registry_path.write_text(json.dumps({
+        "schema_version": SIGNER_REGISTRY_SCHEMA,
+        "registry_status": "ACTIVE",
+        "signers": [{
+            "signer_key_id": "b2e-test-owner",
+            "public_key_b64": base64.b64encode(public_raw).decode("ascii"),
+            "roles": ["EVIDENCE_ADMISSION_SIGNER"],
+            "status": "ACTIVE",
+            "case_scopes": [str(case["case_id"])],
+            "valid_from": "2026-01-01T00:00:00+00:00",
+            "valid_until": None,
+            "revoked_at": None,
+        }],
+        "fixture_class": "TEST_ONLY_EPHEMERAL_NOT_PRODUCTION_AUTHORITY",
+    }, sort_keys=True, indent=2) + "\\n", encoding="utf-8")
+
+    signed_at = "2026-10-08T00:00:00+00:00"
+    payload = build_admission_payload(
+        manifest_path=manifest_path,
+        raw_root=root,
+        rights_record_path=rights_path,
+        permission_evidence_path=permission_path,
+        decision="ADMIT",
+        signed_at=signed_at,
+    )
+    envelope = add_signature(
+        {"schema_version": SIGNED_ADMISSION_SCHEMA, "payload": payload, "signatures": []},
+        signer_registry_path=registry_path,
+        signer_key_id="b2e-test-owner",
+        private_key_path=private_path,
+        signed_at=signed_at,
+    )
+    envelope_path = Path(tmp_path) / "signed-admission-envelope.json"
+    envelope_path.write_text(
+        json.dumps(envelope, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+    reference = build_canonical_signed_evidence_admission_reference(
+        envelope_path=envelope_path,
+        manifest_path=manifest_path,
+        rights_record_path=rights_path,
+        permission_evidence_path=permission_path,
+    )
+    resolver = FileSystemCanonicalSignedEvidenceAdmissionResolver(
+        envelope_path=envelope_path,
+        manifest_path=manifest_path,
+        raw_root=root,
+        rights_record_path=rights_path,
+        permission_evidence_path=permission_path,
+        signer_registry_path=registry_path,
+    )
+    return reference, resolver
+
+
+def run_b2e_conformance(**kwargs):
+    """Test adapter: sign the exact temporary B2 manifest; never touches production trust."""
+    if kwargs.get("canonical_evidence_admission_ref") is not None:
+        return _run_b2e_conformance(**kwargs)
+
+    run_root = kwargs.get("run_root")
+    manifest = kwargs.get("evidence_manifest")
+    evidence_root = kwargs.get("evidence_root")
+    case = kwargs.get("case")
+    with tempfile.TemporaryDirectory(prefix="iios-b2e-signed-fixture-") as temp:
+        temp_root = Path(temp)
+        if not isinstance(manifest, dict) or not evidence_root:
+            # Non-persisted conformance calls still require a real signed bundle;
+            # persisted runs without a caller manifest must exercise the blocker.
+            if run_root is not None:
+                return _run_b2e_conformance(**kwargs)
+            evidence_root, manifest, _manifest_path = _admitted_synthetic_manifest(
+                temp_root, case
+            )
+            kwargs["evidence_root"] = str(evidence_root)
+            kwargs["evidence_manifest"] = manifest
+            kwargs["evidence_refs"] = tuple(row["evidence_id"] for row in manifest["evidence"])
+            kwargs["evidence_hashes"] = tuple(row["content_sha256"] for row in manifest["evidence"])
+            kwargs["semantic_facts"] = tuple({
+                "evidence_id": row["evidence_id"],
+                "statement": "SYNTHETIC_TEST_ONLY_NOT_A_REAL_COMPANY_FACT",
+            } for row in manifest["evidence"])
+        else:
+            manifest_errors = validate_company_evidence_manifest(
+                manifest, raw_root=Path(evidence_root), require_raw_verification=True
+            )
+            if manifest_errors:
+                # Let the production path emit its native B2 Evidence/PIT failure
+                # and persist the BLOCKED run state where requested.
+                return _run_b2e_conformance(**kwargs)
+            original_refs = tuple(kwargs.get("evidence_refs") or ())
+            original_hashes = tuple(kwargs.get("evidence_hashes") or ())
+            manifest_rows = list(manifest.get("evidence") or [])
+            manifest_refs = tuple(str(row.get("evidence_id") or "") for row in manifest_rows)
+            manifest_hashes = tuple(str(row.get("content_sha256") or "") for row in manifest_rows)
+            if original_refs != manifest_refs or original_hashes != manifest_hashes:
+                return _run_b2e_conformance(**kwargs)
+
+        expanded = _expand_synthetic_manifest_with_lineage_ids(
+            temp_root, case, evidence_root, manifest
+        )
+        if kwargs.get("evidence_refs") == tuple(row["evidence_id"] for row in manifest.get("evidence", [])[:-len(_lineage_evidence_ids(case))]):
+            pass
+        # Expand the B2 stage evidence set only when it exactly represented the
+        # original manifest; otherwise preserve the caller's deliberately altered refs.
+        if isinstance(kwargs.get("evidence_manifest"), dict) and kwargs.get("run_root") is None:
+            kwargs["evidence_refs"] = tuple(row["evidence_id"] for row in expanded["evidence"])
+            kwargs["evidence_hashes"] = tuple(row["content_sha256"] for row in expanded["evidence"])
+        elif kwargs.get("run_root") is not None:
+            kwargs["evidence_refs"] = tuple(row["evidence_id"] for row in expanded["evidence"])
+            kwargs["evidence_hashes"] = tuple(row["content_sha256"] for row in expanded["evidence"])
+
+        reference, resolver = _signed_evidence_binding(
+            temp_root, case, evidence_root, expanded
+        )
+        kwargs["canonical_evidence_admission_ref"] = reference
+        kwargs["evidence_admission_resolver"] = resolver
+        return _run_b2e_conformance(**kwargs)
 
 
 def _private_operator_price_bundle(
