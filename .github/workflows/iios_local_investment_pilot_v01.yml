@@ -85,7 +85,9 @@ jobs:
         run: git diff --check
 
   macos-acceptance:
-    runs-on: macos-14
+    # macos-14 was retired by GitHub on 2026-11-02.
+    # Keep the previous Apple Silicon runner family on supported macos-15.
+    runs-on: macos-15
     timeout-minutes: 15
     steps:
       - name: Checkout exact PR head
@@ -95,6 +97,13 @@ jobs:
       - name: Assert exact PR head checkout
         if: github.event_name == 'pull_request'
         run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+      - name: Report macOS runner identity
+        run: |
+          sw_vers
+          printf 'architecture='
+          uname -m
+          printf 'arm64_capable='
+          sysctl -n hw.optional.arm64 || true
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
