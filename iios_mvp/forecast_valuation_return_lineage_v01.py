@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
@@ -48,6 +48,38 @@ def _date(value: Any, path: str) -> date:
         return date.fromisoformat(str(value))
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{path} must be ISO date") from exc
+
+
+def _aware_datetime(value: Any, path: str) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{path} must be a timezone-aware ISO datetime")
+    try:
+        result = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"{path} must be a timezone-aware ISO datetime") from exc
+    if result.tzinfo is None or result.utcoffset() is None:
+        raise ValueError(f"{path} must be timezone-aware")
+    return result
+
+
+def _validate_forecast_pit_timestamps(
+    forecast: Mapping[str, Any],
+    signed_cutoff_instant: Any,
+) -> datetime:
+    cutoff = _aware_datetime(
+        signed_cutoff_instant,
+        "signed Evidence/PIT cutoff_instant",
+    )
+    for field in ("forecast_origin", "known_at"):
+        observed = _aware_datetime(
+            forecast.get(field),
+            f"canonical independent forecast {field}",
+        )
+        if observed > cutoff:
+            raise ValueError(
+                f"canonical independent forecast {field} is after signed Evidence/PIT cutoff"
+            )
+    return cutoff
 
 
 def _strict_ref(value: Any, path: str) -> dict[str, Any]:
@@ -339,6 +371,8 @@ def validate_forecast_valuation_return_lineage(
     evidence_admission_ref = None
     evidence_admission = None
     evidence_ids_verified: list[str] = []
+    evidence_pit_cutoff_instant: str | None = None
+    forecast_pit_temporal_status = "NOT_VERIFIED_WITHOUT_SIGNED_EVIDENCE_PIT_CUTOFF"
     if evidence_refs_supplied:
         if canonical_evidence_admission_ref is None or declared_evidence_ref is None:
             raise ValueError("signed Evidence/PIT reference must be supplied both in return_gate and runtime resolver inputs")
@@ -367,6 +401,12 @@ def validate_forecast_valuation_return_lineage(
             or sorted(evidence_admission.get("evidence_ids_verified") or []) != required_evidence_ids
         ):
             raise ValueError("forecast and valuation Evidence/PIT references are not formally admitted")
+        signed_cutoff = _validate_forecast_pit_timestamps(
+            forecast,
+            evidence_admission.get("cutoff_instant"),
+        )
+        evidence_pit_cutoff_instant = signed_cutoff.isoformat()
+        forecast_pit_temporal_status = "PASS_EXACT_SIGNED_CUTOFF"
         evidence_formally_admitted = True
         evidence_ids_verified = required_evidence_ids
 
@@ -427,6 +467,10 @@ def validate_forecast_valuation_return_lineage(
             "FORMALLY_ADMITTED" if evidence_formally_admitted else "NOT_FORMALLY_ADMITTED"
         ),
         "evidence_pit_admission": evidence_admission,
+        "evidence_pit_cutoff_instant": evidence_pit_cutoff_instant,
+        "forecast_pit_temporal_status": forecast_pit_temporal_status,
+        "forecast_origin": forecast.get("forecast_origin"),
+        "forecast_known_at": forecast.get("known_at"),
         "evidence_ids_declared": required_evidence_ids,
         "evidence_ids_verified": evidence_ids_verified,
         "formal_return_lineage_status": (
