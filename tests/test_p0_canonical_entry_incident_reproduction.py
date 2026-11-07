@@ -199,6 +199,9 @@ def test_p0_ce_01c_explicit_runtime_factory_is_trusted_host_input(monkeypatch, t
         independent_forecast_resolver=types.SimpleNamespace(resolve_independent_forecast=lambda *args, **kwargs: {}),
         upstream_authority_resolver=types.SimpleNamespace(resolve=lambda *args, **kwargs: {}),
         valuation_output_resolver=types.SimpleNamespace(resolve_valuation_output=lambda *args, **kwargs: {}),
+        evidence_admission_resolver=types.SimpleNamespace(
+            resolve_signed_evidence_admission=lambda *args, **kwargs: {}
+        ),
     )
 
     def build_runtime(*, bundle, output_root):

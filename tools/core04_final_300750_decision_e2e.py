@@ -244,7 +244,17 @@ def build_case(
         },
     }
     global FORECAST_REGISTRY, VALUATION_OUTPUT_RESOLVER
-    payload, FORECAST_REGISTRY, VALUATION_OUTPUT_RESOLVER = bind_return_lineage(payload)
+    forecast_evidence_ids = sorted({
+        str(evidence_id)
+        for scenario in (core03["forecast"].get("scenarios") or {}).values()
+        if isinstance(scenario, dict)
+        for evidence_id in (scenario.get("evidence_ids") or [])
+        if str(evidence_id).strip()
+    })
+    payload, FORECAST_REGISTRY, VALUATION_OUTPUT_RESOLVER = bind_return_lineage(
+        payload,
+        evidence_ids=forecast_evidence_ids,
+    )
     return payload
 
 

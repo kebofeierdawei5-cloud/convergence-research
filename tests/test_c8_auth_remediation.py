@@ -45,39 +45,22 @@ def _canonical_kolun_case():
     return c3_e2e.build_case(fixture, price_ref), registry
 
 
-def test_c8_auth_001_admission_reexecutes_kernel_and_rejects_forged_decision():
+def test_c8_auth_001_formal_decision_admission_requires_signed_evidence_pit():
     case, registry = _canonical_kolun_case()
-    canonical_decision = decide_v03(case, current_price_resolver=registry, independent_forecast_resolver=c3_e2e.FORECAST_REGISTRY, upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY, valuation_output_resolver=c3_e2e.VALUATION_OUTPUT_RESOLVER)
-    valid_snapshot = _snapshot(case, canonical_decision)
-
-    receipt = admit_canonical_decision(
-        case=case,
-        snapshot=valid_snapshot,
+    canonical_decision = decide_v03(
+        case,
         current_price_resolver=registry,
         independent_forecast_resolver=c3_e2e.FORECAST_REGISTRY,
         upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY,
         valuation_output_resolver=c3_e2e.VALUATION_OUTPUT_RESOLVER,
     )
-    assert receipt["status"] == "ADMITTED"
-    assert receipt["admission_method"] == "CANONICAL_DECIDE_V03_REEXECUTED"
-    assert receipt["canonical_action"] == canonical_decision["action"]
+    valid_snapshot = _snapshot(case, canonical_decision)
 
-    forged = deepcopy(valid_snapshot)
-    forged["decision"] = deepcopy(forged["decision"])
-    forged["decision"]["action"] = "BUY"
-    forged["snapshot_hash"] = hashlib.sha256(
-        json.dumps(
-            {k: forged[k] for k in ("snapshot_schema", "engine_version", "input", "decision")},
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-    ).hexdigest()
-
-    with pytest.raises(ValueError, match="does not equal freshly re-executed"):
+    assert "canonical_evidence_admission_ref" not in case["return_gate"]
+    with pytest.raises(ValueError, match="requires canonical_evidence_admission_ref and signed Evidence/PIT resolver"):
         admit_canonical_decision(
             case=case,
-            snapshot=forged,
+            snapshot=valid_snapshot,
             current_price_resolver=registry,
             independent_forecast_resolver=c3_e2e.FORECAST_REGISTRY,
             upstream_authority_resolver=c3_e2e.AUTHORITY_REGISTRY,
