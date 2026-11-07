@@ -36,7 +36,7 @@ This was reproducible in the old B04 positive fixture: its forecast `known_at` o
 
 ## Final validation — 2026-11-07
 
-**Validated code commit:** `bb668cb5694bd36584988e204a5dad29fcee580e`. The current PR head `c3fbfa8251fca86d71eb7500bd77f827030aa03c` contains only subsequent B80 documentation/state-index commits; no runtime or test code changed after the validated code commit.
+**Validated code commit:** `bb668cb5694bd36584988e204a5dad29fcee580e`. The current PR head `328e481cfdf70bfcba6398661e801104db808e2e` contains only subsequent B80 documentation/state-index commits; no runtime or test code changed after the validated code commit.
 
 - **35** pull-request workflow runs: **34 success, 0 failure, 1 cancelled**.
 - B04 Forecast-Valuation-Return Lineage: **16 passed**.
@@ -53,12 +53,12 @@ PR #587 remains **Open + Draft + Unmerged**, targeting the B73 proposal branch. 
 
 ## First exact-head CI correction — 2026-11-07
 
-The first exact PR validation correctly rejected a legacy positive B04 core-integration fixture whose Forecast `forecast_origin` and `known_at` were later than the date-only Shanghai-midnight cutoff. The B80 guard was not relaxed. The fixture in `tests/test_b04_core_integration.py` was corrected to place both timestamps before the cutoff. Re-run exact-head B04 lineage, core integration and full pilot checks before treating B80 as validated.
+The first exact PR validation correctly rejected a legacy positive B04 core-integration fixture whose Forecast `forecast_origin` and `known_at` were later than the date-only Shanghai-midnight cutoff. The B80 guard was not relaxed. The fixture in `tests/test_b04_core_integration.py` was corrected to place both timestamps before the cutoff. That correction was followed by a fresh matrix; B04 lineage, B04-B, Host, Core and Linux Pilot all passed as recorded in Final validation.
 
 
 ## Shared lineage-fixture correction — 2026-11-07
 
-A second downstream failure exposed that the shared `tests/b04b_return_lineage_fixture.py` helper generated `forecast_origin` at cutoff-day 12:00 UTC and `known_at` at 15:00 UTC. That was invalid under date-only Shanghai-midnight semantics and affected the Trusted Host CLI integration as well as other consumers. The helper now derives both timestamps from the case cutoff: origin at Shanghai midnight minus two hours and known_at minus one hour. This keeps all shared positive fixtures PIT-valid without weakening runtime validation. The separate B04 core-integration local fixture was also aligned. Re-run the exact-head workflow matrix after these fixture-only corrections.
+A second downstream failure exposed that the shared `tests/b04b_return_lineage_fixture.py` helper generated `forecast_origin` at cutoff-day 12:00 UTC and `known_at` at 15:00 UTC. That was invalid under date-only Shanghai-midnight semantics and affected the Trusted Host CLI integration as well as other consumers. The helper now derives both timestamps from the case cutoff: origin at Shanghai midnight minus two hours and known_at minus one hour. This keeps all shared positive fixtures PIT-valid without weakening runtime validation. The separate B04 core-integration local fixture was also aligned. The fresh matrix passed except for the separately cancelled macOS acceptance job; see Final validation.
 
 
 **Final state:** the final validation block above supersedes the earlier pending-validation notes recorded during the B80 repair sequence.
