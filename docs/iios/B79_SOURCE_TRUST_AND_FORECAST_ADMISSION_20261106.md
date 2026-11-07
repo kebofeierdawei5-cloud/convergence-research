@@ -43,7 +43,7 @@ Added canonical_forecast_evidence_binding_v01.py and a content-addressed signed-
 
 The formal forecast-valuation-return lineage now requires the evidence reference and resolver. A non-empty evidence_ids list or a self-consistent forecast hash is insufficient.
 
-The market-local PIT boundary uses Shanghai 00:00 on cutoff date, matching the existing A-share evidence contract.
+The market-local PIT boundary follows the signed manifest's exact cutoff instant. A date-only cutoff or date-only `known_at` uses Shanghai 00:00, matching Core Evidence/PIT; a signed timestamp such as `2026-10-04T23:59:59+08:00` is honored as the actual cutoff instant. Payload and manifest cutoff strings must still match exactly; the resolver only normalizes the parsed instant for comparison with the forecast's calendar-date identity.
 
 ## Regression coverage
 
@@ -69,3 +69,21 @@ PR #587 must remain Draft. Do not merge to the B73 proposal base or canonical ma
 - The lifecycle fixture requires `cryptography`; C8, C1, DR-02, TR-01/02/03, Investor Report v0.2 and MVP Pilot workflows install it explicitly. C2 Human Report also installs it because its downstream persistence fixtures use the same signed test helper.
 - Investor Review Report v0.2's report tests passed (28 tests) on the prior CI run; its post-test failure was a stale historical Actions artifact ID (run 37730232684, no artifact remained). The workflow now creates a small local Publication fixture missing `canonical_run_ref` and asserts the formal writer rejects it without producing report files; this test is self-contained and no longer depends on expired cross-run artifacts.
 - B79 remains a Draft PR proposal. Real authority signer registry remains empty. Local Pilot macOS acceptance is still unverified when the macOS job is cancelled.
+
+
+## B79 final verification — exact PR head 849ccea (2026-11-07)
+
+**GitHub PR #587:** open, Draft, unmerged; base `feat/b73-evidence-driven-remediation-20261031`.  
+**Exact verified HEAD:** `849ccea69086c9cef28f728d12532cf58ffce3a7`.
+
+- **PR workflow summary:** 29 success, 1 cancelled, 0 failure.
+- **Investment Core CI:** 444 passed.
+- **B2-E Natural Language Semantic Decision E2E:** 24 passed in the primary suite plus 8 additional checks.
+- **B04-B Mandatory Forecast-Valuation-Return Lineage:** 126 passed.
+- **Signed Evidence Admission Gate:** 46 passed.
+- **P0 Trusted Runtime Factory:** 37 passed.
+- **Investor Review Report v0.2:** 28 passed; the self-contained legacy Publication test was also accepted and the report workflow completed successfully.
+- **Local Investment Pilot Linux:** 466 passed. The separate macOS acceptance job was cancelled and remains **NOT VERIFIED**, not PASS.
+- Other core production-integration, trust, replay, authority-threat and fresh Xinhecheng jobs also completed successfully on this exact HEAD.
+
+The production signer registry remains empty (`NO_TRUSTED_SIGNERS_REGISTERED`). This is intentional: the signed test registries are ephemeral and case-scoped; no real-company Evidence/PIT/Forecast/Valuation Admission was manufactured by B79. Xinhecheng still needs its Q4 line-item assumptions, annual weighted-average diluted shares and operator-attested current price before its FY2026 EPS / B60 price-implied inversion can be completed.

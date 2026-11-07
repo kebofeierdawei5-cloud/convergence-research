@@ -3229,3 +3229,13 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - Added `cryptography` to the CI jobs that use that fixture, including C2 Human Report.
 - Removed Investor Report v0.2's expired cross-run artifact ID. Its negative Publication trust test now constructs a local fixture without `canonical_run_ref`, verifies formal rejection and asserts no report side effects.
 - Latest verified code at time of this update: see PR #587 branch HEAD. PR remains Draft/unmerged; production signer registry remains empty. macOS acceptance remains NOT VERIFIED if cancelled.
+
+
+## 6Q. B79 exact-head validation and remaining boundary (2026-11-07)
+
+- Latest verified PR #587 HEAD: `849ccea69086c9cef28f728d12532cf58ffce3a7`; PR remains Draft/open/unmerged against the B73 proposal branch.
+- Exact-head PR workflow summary: 29 success, 1 cancelled, 0 failure. Investment Core CI 444 passed; B2-E 24 + 8 passed; B04-B 126 passed; Signed Evidence Admission 46 passed; P0 Runtime Factory 37 passed; Investor Review Report v0.2 28 passed; Local Pilot Linux 466 passed.
+- Local Pilot macOS acceptance was cancelled again. Mark it NOT VERIFIED, not PASS.
+- Investor Report no longer depends on expired cross-run artifact IDs. It generates a local publication fixture without `canonical_run_ref`, confirms formal report generation is rejected and checks no report side effects.
+- The exact signed-manifest cutoff timestamp is preserved and honored for PIT `known_at` checks; date-only cutoff / date-only `known_at` uses Shanghai 00:00. The manifest/payload raw cutoff strings must remain identical.
+- The canonical production signer registry remains empty; temporary ACTIVE signers exist only in synthetic tests. No real case was promoted to formally admitted by test fixtures.
