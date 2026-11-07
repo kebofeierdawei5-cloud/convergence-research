@@ -42,3 +42,8 @@ Pending exact-head GitHub Actions after this commit. The PR remains Draft and va
 ## First exact-head CI correction — 2026-11-07
 
 The first exact PR validation correctly rejected a legacy positive B04 core-integration fixture whose Forecast `forecast_origin` and `known_at` were later than the date-only Shanghai-midnight cutoff. The B80 guard was not relaxed. The fixture in `tests/test_b04_core_integration.py` was corrected to place both timestamps before the cutoff. Re-run exact-head B04 lineage, core integration and full pilot checks before treating B80 as validated.
+
+
+## Shared lineage-fixture correction — 2026-11-07
+
+A second downstream failure exposed that the shared `tests/b04b_return_lineage_fixture.py` helper generated `forecast_origin` at cutoff-day 12:00 UTC and `known_at` at 15:00 UTC. That was invalid under date-only Shanghai-midnight semantics and affected the Trusted Host CLI integration as well as other consumers. The helper now derives both timestamps from the case cutoff: origin at Shanghai midnight minus two hours and known_at minus one hour. This keeps all shared positive fixtures PIT-valid without weakening runtime validation. The separate B04 core-integration local fixture was also aligned. Re-run the exact-head workflow matrix after these fixture-only corrections.
