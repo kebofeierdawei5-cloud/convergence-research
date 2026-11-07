@@ -1,5 +1,7 @@
 # IIOS Project State Index
 
+Snapshot: 2026-11-07 (branch proposal; not canonical main).
+
 State classification: **BRANCH PROPOSAL — NOT CANONICAL**
 Snapshot: 2026-11-06
 Authority: the canonical Current State Index is on `main`; this branch copy describes unmerged proposals only and does not replace canonical state.
@@ -3239,3 +3241,10 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - Investor Report no longer depends on expired cross-run artifact IDs. It generates a local publication fixture without `canonical_run_ref`, confirms formal report generation is rejected and checks no report side effects.
 - The exact signed-manifest cutoff timestamp is preserved and honored for PIT `known_at` checks; date-only cutoff / date-only `known_at` uses Shanghai 00:00. The manifest/payload raw cutoff strings must remain identical.
 - The canonical production signer registry remains empty; temporary ACTIVE signers exist only in synthetic tests. No real case was promoted to formally admitted by test fixtures.
+
+
+## B80 — Exact signed PIT cutoff binding for Forecast timestamps (2026-11-07)
+
+**State: IMPLEMENTATION COMMITTED; EXACT-HEAD CI PENDING. Draft proposal only; not canonical main.**
+
+B79 exposed and verified the signed Evidence/PIT manifest's exact cutoff instant, but Forecast `forecast_origin` and `known_at` were still checked only by calendar date. B80 binds both Forecast timestamps to the exact normalized signed cutoff (date-only = Shanghai 00:00; timestamp = its actual instant converted to Shanghai). Equality is accepted; later, naive or malformed timestamps fail closed. The return-lineage report records the cutoff and temporal-binding status. The B04 fixture timestamps were corrected to be before the date-only cutoff; regression coverage includes exact equality across UTC/+08 offsets, each Forecast timestamp after an intraday cutoff, and same-date-after-midnight rejection. No investment arithmetic, 15% return hurdle, MIE, formal source-rights gate or decision authority changed. Production signer registry remains empty; real Mac E2E + Replay remains NOT VERIFIED.
