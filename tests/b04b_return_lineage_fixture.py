@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
 from typing import Any, Mapping
@@ -41,6 +41,16 @@ def bind_return_lineage(
     InMemoryCanonicalValuationOutputResolver,
 ]:
     cutoff = date.fromisoformat(str(case["cutoff_date"]))
+    # A date-only case cutoff is Shanghai 00:00, not the end of that date.
+    # Keep the shared positive fixture strictly before that instant so tests
+    # exercise valid lineage instead of relying on the old calendar-day bypass.
+    cutoff_instant = datetime.combine(
+        cutoff,
+        datetime.min.time(),
+        tzinfo=timezone(timedelta(hours=8)),
+    )
+    forecast_origin = (cutoff_instant - timedelta(hours=2)).isoformat()
+    forecast_known_at = (cutoff_instant - timedelta(hours=1)).isoformat()
     forecast_registry = independent_forecast_resolver or InMemoryCanonicalIndependentForecastRegistry()
     gap = case.get("expectation_gap")
     if isinstance(gap, Mapping) and isinstance(gap.get("independent_forecast_ref"), Mapping):
@@ -68,8 +78,8 @@ def bind_return_lineage(
             "unit": "CNY/share",
             "basis": "B04B fixture",
             "horizon_years": str(case["return_gate"]["horizon_years"]),
-            "forecast_origin": f"{cutoff.isoformat()}T12:00:00+00:00",
-            "known_at": f"{cutoff.isoformat()}T15:00:00+00:00",
+            "forecast_origin": forecast_origin,
+            "known_at": forecast_known_at,
             "prepared_without_current_price": True,
             "evidence_ids": list(evidence_ids or ["B04B-FORECAST-EVIDENCE"]),
         }).to_dict()
