@@ -34,6 +34,7 @@ def bind_return_lineage(
     independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None,
     valuation_admission_registry: InMemoryCanonicalInvestmentAdmissionRegistry | None = None,
     valuation_output_resolver: InMemoryCanonicalValuationOutputResolver | None = None,
+    evidence_ids: list[str] | tuple[str, ...] | None = None,
 ) -> tuple[
     dict[str, Any],
     InMemoryCanonicalIndependentForecastRegistry | CanonicalIndependentForecastResolver,
@@ -70,7 +71,7 @@ def bind_return_lineage(
             "forecast_origin": f"{cutoff.isoformat()}T12:00:00+00:00",
             "known_at": f"{cutoff.isoformat()}T15:00:00+00:00",
             "prepared_without_current_price": True,
-            "evidence_ids": ["B04B-FORECAST-EVIDENCE"],
+            "evidence_ids": list(evidence_ids or ["B04B-FORECAST-EVIDENCE"]),
         }).to_dict()
 
     gate = case["return_gate"]
@@ -93,7 +94,7 @@ def bind_return_lineage(
             }
             for name in ("bear", "base", "bull")
         },
-        "evidence_ids": ["B04B-VALUATION-EVIDENCE"],
+        "evidence_ids": list(evidence_ids or ["B04B-VALUATION-EVIDENCE"]),
     })
 
     admissions = valuation_admission_registry or InMemoryCanonicalInvestmentAdmissionRegistry()
@@ -110,7 +111,7 @@ def bind_return_lineage(
         source_record_hash=_sha({"valuation": valuation_output}),
         output_hash=valuation_output["output_hash"],
         producer_version="B04B-VALUATION-PRODUCER-0.1",
-        evidence_ids=["B04B-VALUATION-EVIDENCE"],
+        evidence_ids=list(evidence_ids or ["B04B-VALUATION-EVIDENCE"]),
         admitted_at=f"{cutoff.isoformat()}T16:00:00+00:00",
     )
     valuation_ref = admissions.admit(admission).to_dict()

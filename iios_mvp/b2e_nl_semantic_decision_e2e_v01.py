@@ -484,9 +484,14 @@ def run_b2e_conformance(
         if run_root is not None:
             orchestrator.block(run_id, "SIGNED_EVIDENCE_PIT_ADMISSION_FAILED")
         raise B2EE2EError("BLOCKED: signed Evidence/PIT resolver did not return FORMALLY_ADMITTED")
-    if admitted_manifest is not None and (
+    expected_signed_manifest = (
+        admitted_manifest if admitted_manifest is not None
+        else evidence_manifest if isinstance(evidence_manifest, Mapping)
+        else None
+    )
+    if expected_signed_manifest is None or (
         signed_evidence_admission.get("evidence_manifest_audit_sha256")
-        != str((admitted_manifest.get("audit") or {}).get("manifest_sha256") or "")
+        != str((expected_signed_manifest.get("audit") or {}).get("manifest_sha256") or "")
     ):
         if run_root is not None:
             orchestrator.block(run_id, "SIGNED_EVIDENCE_MANIFEST_IDENTITY_MISMATCH")
