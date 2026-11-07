@@ -37,3 +37,8 @@ This was reproducible in the old B04 positive fixture: its forecast `known_at` o
 ## Validation status
 
 Pending exact-head GitHub Actions after this commit. The PR remains Draft and validation-only.
+
+
+## First exact-head CI correction — 2026-11-07
+
+The first exact PR validation correctly rejected a legacy positive B04 core-integration fixture whose Forecast `forecast_origin` and `known_at` were later than the date-only Shanghai-midnight cutoff. The B80 guard was not relaxed. The fixture in `tests/test_b04_core_integration.py` was corrected to place both timestamps before the cutoff. Re-run exact-head B04 lineage, core integration and full pilot checks before treating B80 as validated.
