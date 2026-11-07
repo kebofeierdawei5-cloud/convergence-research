@@ -699,7 +699,7 @@ def _admitted_synthetic_manifest(tmp_path, case):
     )
     assert manifest["status"] == "PASS", manifest.get("validation_errors")
     path = tmp_path / "B2_COMPANY_EVIDENCE_MANIFEST.json"
-    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return root, manifest, path
 
 
@@ -799,11 +799,11 @@ def _signed_evidence_binding(tmp_path, case, root, manifest):
     """Create a temporary, case-scoped Ed25519 Evidence/PIT trust fixture."""
     manifest_path = Path(tmp_path) / "signed-evidence-manifest.json"
     manifest_path.write_text(
-        json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+        json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
         encoding="utf-8",
     )
     permission_path = Path(tmp_path) / "permission-instrument.bin"
-    permission_bytes = b"Synthetic written permission instrument; test fixture only.\\n"
+    permission_bytes = b"Synthetic written permission instrument; test fixture only.\n"
     permission_path.write_bytes(permission_bytes)
     rights_path = Path(tmp_path) / "rights.json"
     rights = {
@@ -819,7 +819,7 @@ def _signed_evidence_binding(tmp_path, case, root, manifest):
         "expires_at": "2027-12-31T00:00:00+00:00",
     }
     rights_path.write_text(
-        json.dumps(rights, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+        json.dumps(rights, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -830,7 +830,7 @@ def _signed_evidence_binding(tmp_path, case, root, manifest):
         format=serialization.PublicFormat.Raw,
     )
     private_path = Path(tmp_path) / "b2e-test-admission.key"
-    private_path.write_text(base64.b64encode(private_raw).decode("ascii") + "\\n", encoding="ascii")
+    private_path.write_text(base64.b64encode(private_raw).decode("ascii") + "\n", encoding="ascii")
     private_path.chmod(0o600)
     registry_path = Path(tmp_path) / "b2e-test-signer-registry.json"
     registry_path.write_text(json.dumps({
@@ -847,7 +847,7 @@ def _signed_evidence_binding(tmp_path, case, root, manifest):
             "revoked_at": None,
         }],
         "fixture_class": "TEST_ONLY_EPHEMERAL_NOT_PRODUCTION_AUTHORITY",
-    }, sort_keys=True, indent=2) + "\\n", encoding="utf-8")
+    }, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 
     signed_at = "2026-10-08T00:00:00+00:00"
     payload = build_admission_payload(
@@ -867,7 +867,7 @@ def _signed_evidence_binding(tmp_path, case, root, manifest):
     )
     envelope_path = Path(tmp_path) / "signed-admission-envelope.json"
     envelope_path.write_text(
-        json.dumps(envelope, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+        json.dumps(envelope, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
         encoding="utf-8",
     )
     reference = build_canonical_signed_evidence_admission_reference(
@@ -933,8 +933,6 @@ def run_b2e_conformance(**kwargs):
         expanded = _expand_synthetic_manifest_with_lineage_ids(
             temp_root, case, evidence_root, manifest
         )
-        if kwargs.get("evidence_refs") == tuple(row["evidence_id"] for row in manifest.get("evidence", [])[:-len(_lineage_evidence_ids(case))]):
-            pass
         # Expand the B2 stage evidence set only when it exactly represented the
         # original manifest; otherwise preserve the caller's deliberately altered refs.
         if isinstance(kwargs.get("evidence_manifest"), dict) and kwargs.get("run_root") is None:
