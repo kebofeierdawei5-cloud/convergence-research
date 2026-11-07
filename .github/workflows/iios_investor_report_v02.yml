@@ -112,13 +112,6 @@ jobs:
           if-no-files-found: error
 
 
-      - name: Upload rejection evidence for historical Publication
-        uses: actions/upload-artifact@v4
-        with:
-          name: iios-investor-review-v02-rejected-historical-xinhecheng
-          path: /tmp/iios-xhc/formal-writer/blocked-receipt.json
-          if-no-files-found: error
-
       - run: python -m json.tool schemas/investor_review_report_v0.2.schema.json >/dev/null
       - run: python -m json.tool schemas/investor_review_qa_v0.2.schema.json >/dev/null
       - run: python -m json.tool schemas/human_auditability_v0.2.schema.json >/dev/null
