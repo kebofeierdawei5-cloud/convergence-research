@@ -96,10 +96,14 @@ def _capture_or_reuse_response(
 def _wait_for_corrected_response(
     session: GuidedTaskSession, pilot: Any, phase: str, response_path: Path
 ) -> tuple[bytes, tuple[int, int, str]]:
-    previous = pilot._response_file_signature(response_path)
-    signature = pilot._wait_for_response_file_change(
-        response_path, previous_signature=previous
-    )
+    _latest_name, latest_raw = _latest_response_attempt(session, phase)
+    current = pilot._response_file_signature(response_path)
+    if current is not None and current[0] > 0 and response_path.read_bytes() != latest_raw:
+        signature = current
+    else:
+        signature = pilot._wait_for_response_file_change(
+            response_path, previous_signature=current
+        )
     raw = response_path.read_bytes()
     if pilot._response_file_signature(response_path) != signature:
         raise TaskWorkspaceError(f"GUIDED_TASK_{phase}_RESPONSE_CHANGED_DURING_CAPTURE")
