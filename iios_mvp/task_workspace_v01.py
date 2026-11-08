@@ -167,7 +167,7 @@ def _manifest_from_events(task_id: str, events: list[dict[str, Any]]) -> dict[st
         "task_status": latest["task_status"],
         "last_event_sha256": latest["event_sha256"],
         "artifacts": artifacts,
-        "resume_stage": _next_stage(latest["stage"], latest["task_status"]),
+        "resume_stage": _resume_action(latest["stage"], latest["task_status"]),
         "formal_decision_created": False,
         "execution_authorized": False,
         "auto_execution": False,
@@ -175,12 +175,31 @@ def _manifest_from_events(task_id: str, events: list[dict[str, Any]]) -> dict[st
 
 
 def _next_stage(stage: str, status: str) -> str:
+    """Return the next journal stage allowed after the current completed event."""
     if status == "BLOCKED" or stage in TERMINAL_STAGES:
         return "NO_AUTOMATIC_RESUME"
     if stage not in STAGES:
         return "REVIEW_REQUIRED"
     index = STAGES.index(stage)
     return STAGES[min(index + 1, len(STAGES) - 1)]
+
+
+def _resume_action(stage: str, status: str) -> str:
+    """Return the operation to resume, not merely the next event name."""
+    if status == "BLOCKED" or stage in TERMINAL_STAGES:
+        return "NO_AUTOMATIC_RESUME"
+    actions = {
+        "TASK_CREATED": "ROUND_A_PROMPT_PENDING",
+        "ROUND_A_PROMPT_READY": "ROUND_A_RESPONSE_PENDING",
+        "ROUND_A_RESPONSE_CAPTURED": "ROUND_A_VALIDATION_PENDING",
+        "ROUND_A_VALIDATED": "ROUND_B_PROMPT_PENDING",
+        "ROUND_B_PROMPT_READY": "ROUND_B_RESPONSE_PENDING",
+        "ROUND_B_RESPONSE_CAPTURED": "ROUND_B_VALIDATION_PENDING",
+        "ROUND_B_VALIDATED": "OPERATOR_CONTEXT_PENDING",
+        "OPERATOR_CONTEXT_CAPTURED": "RUN_CREATION_PENDING",
+        "RUN_CREATED": "RUN_VERIFICATION_PENDING",
+    }
+    return actions.get(stage, "REVIEW_REQUIRED")
 
 
 def _verify_artifacts(task_dir: Path, manifest: Mapping[str, Any]) -> None:
@@ -236,7 +255,7 @@ class TaskWorkspace:
             # The append-only journal is authoritative. A crash after fsync of
             # the event but before snapshot replacement leaves a stale manifest;
             # rebuild that derived file rather than losing the committed event.
-            _atomic_snapshot(manifest_path, _canonical(expected) + b"\\n")
+            _atomic_snapshot(manifest_path, _canonical(expected) + b"\n)
         if verify_artifacts:
             _verify_artifacts(self.path, expected)
         return expected
