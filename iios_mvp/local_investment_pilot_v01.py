@@ -4404,6 +4404,8 @@ def _write_run(
     # append must verify and reuse a complete same-input bundle before analysis.
     # This prevents recomputing a potentially expensive research valuation.
     run_dir = output_root / run_id
+    if run_dir.is_symlink():
+        raise LocalInvestmentPilotError("PILOT_RUN_DIRECTORY_MUST_NOT_BE_SYMLINK")
     if run_dir.exists():
         try:
             existing_receipt, _existing_manifest = _verify_run_bundle(run_dir)
