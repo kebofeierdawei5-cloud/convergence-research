@@ -87,6 +87,31 @@ def _atomic_snapshot(path: Path, data: bytes) -> None:
         path.chmod(0o600)
 
 
+def _write_immutable(path: Path, data: bytes) -> None:
+    """Adopt an identical orphan after a crash; never replace different bytes."""
+    if path.is_symlink():
+        raise TaskWorkspaceError(f"IMMUTABLE_FILE_IS_SYMLINK:{path.name}")
+    if path.exists():
+        try:
+            existing = path.read_bytes()
+        except OSError as exc:
+            raise TaskWorkspaceError(f"IMMUTABLE_FILE_UNREADABLE:{path.name}") from exc
+        if existing != data:
+            raise TaskWorkspaceError(f"IMMUTABLE_FILE_ALREADY_EXISTS:{path.name}")
+        return
+    try:
+        _write_new(path, data)
+    except TaskWorkspaceError:
+        if path.is_symlink() or not path.is_file():
+            raise
+        try:
+            existing = path.read_bytes()
+        except OSError as exc:
+            raise TaskWorkspaceError(f"IMMUTABLE_FILE_UNREADABLE:{path.name}") from exc
+        if existing != data:
+            raise TaskWorkspaceError(f"IMMUTABLE_FILE_ALREADY_EXISTS:{path.name}")
+
+
 def _safe_artifact_name(name: str) -> str:
     if not isinstance(name, str) or not ARTIFACT_NAME_RE.fullmatch(name):
         raise TaskWorkspaceError("ARTIFACT_NAME_INVALID")
@@ -207,15 +232,15 @@ def _verify_artifacts(task_dir: Path, manifest: Mapping[str, Any]) -> None:
     if not isinstance(artifacts, Mapping):
         raise TaskWorkspaceError("TASK_ARTIFACT_INDEX_INVALID")
     for name, record in artifacts.items():
-        safe_name = _safe_artifact_name(name)
-        if not isinstance(record, Mapping):
+        if not isinstance(name, str) or not isinstance(record, Mapping):
             raise TaskWorkspaceError(f"TASK_ARTIFACT_RECORD_INVALID:{safe_name}")
         rel = record.get("path")
-        if not isinstance(rel, str):
+        if not isinstance(rel, str) or rel != name:
             raise TaskWorkspaceError(f"TASK_ARTIFACT_PATH_INVALID:{safe_name}")
         posix = PurePosixPath(rel)
         if posix.is_absolute() or any(part in {"", ".", ".."} for part in posix.parts) or not rel.startswith(ARTIFACT_DIRNAME + "/"):
             raise TaskWorkspaceError(f"TASK_ARTIFACT_PATH_UNSAFE:{safe_name}")
+        _safe_artifact_name(posix.name)
         path = task_dir.joinpath(*posix.parts)
         if path.is_symlink() or not path.is_file():
             raise TaskWorkspaceError(f"TASK_ARTIFACT_MISSING_OR_SYMLINK:{safe_name}")
@@ -284,8 +309,8 @@ class TaskWorkspace:
             content = raw_content.encode("utf-8") if isinstance(raw_content, str) else bytes(raw_content)
             rel = f"{ARTIFACT_DIRNAME}/{stage.lower()}/{name}"
             target = self.path / rel
-            _write_new(target, content)
-            artifact_records[name] = {
+            _write_immutable(target, content)
+            artifact_records[rel] = {
                 "path": rel,
                 "sha256": _sha(content),
                 "byte_size": len(content),
