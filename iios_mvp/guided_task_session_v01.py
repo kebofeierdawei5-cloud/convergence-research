@@ -48,6 +48,26 @@ class GuidedTaskSession:
     def inspect(self) -> dict[str, Any]:
         return self.workspace.inspect(verify_artifacts=True)
 
+    def checkpoint_context(self, context: Mapping[str, Any]) -> dict[str, Any]:
+        """Persist the immutable operator-confirmed task context at TASK_CREATED."""
+        current = self.inspect()
+        if current["current_stage"] != "TASK_CREATED":
+            raise TaskWorkspaceError("GUIDED_TASK_CONTEXT_ALREADY_FROZEN")
+        return self.workspace.record(
+            "TASK_CREATED",
+            artifacts={"task_context.json": _json_bytes(context)},
+            details={"context": "operator_confirmed_immutable"},
+        )
+
+    def load_json_artifact(self, relative_path: str) -> dict[str, Any]:
+        try:
+            value = json.loads(self.load_artifact(relative_path).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise TaskWorkspaceError(f"GUIDED_TASK_JSON_ARTIFACT_INVALID:{relative_path}") from exc
+        if not isinstance(value, dict):
+            raise TaskWorkspaceError(f"GUIDED_TASK_JSON_ARTIFACT_NOT_OBJECT:{relative_path}")
+        return value
+
     def _next_attempt_name(self, phase: str, suffix: str) -> str:
         manifest = self.inspect()
         prefix = f"artifacts/{phase.lower()}/"
