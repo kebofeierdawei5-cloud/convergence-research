@@ -60,6 +60,8 @@ class GuidedTaskSession:
     def checkpoint_prompt(self, phase: str, prompt: str, *, response_filename: str) -> dict[str, Any]:
         if phase not in {"ROUND_A", "ROUND_B"}:
             raise TaskWorkspaceError("GUIDED_TASK_PHASE_UNSUPPORTED")
+        if not isinstance(response_filename, str) or not response_filename or Path(response_filename).name != response_filename or "/" in response_filename or "\\" in response_filename:
+            raise TaskWorkspaceError("GUIDED_TASK_RESPONSE_FILENAME_INVALID")
         stage = f"{phase}_PROMPT_READY"
         current = self.inspect()
         if current["resume_stage"] not in {
@@ -75,6 +77,8 @@ class GuidedTaskSession:
     def capture_response(self, phase: str, raw_response: bytes) -> dict[str, Any]:
         if phase not in {"ROUND_A", "ROUND_B"}:
             raise TaskWorkspaceError("GUIDED_TASK_PHASE_UNSUPPORTED")
+        if not isinstance(raw_response, bytes) or not raw_response.strip():
+            raise TaskWorkspaceError("GUIDED_TASK_RAW_RESPONSE_EMPTY_OR_INVALID")
         stage = f"{phase}_RESPONSE_CAPTURED"
         current = self.inspect()
         expected = f"{phase}_RESPONSE_PENDING"
@@ -147,12 +151,16 @@ class GuidedTaskSession:
             required = ["artifacts/round_a_prompt_ready/prompt.md"]
         elif action == "ROUND_A_VALIDATION_PENDING":
             required = [name for name in manifest["artifacts"] if name.startswith("artifacts/round_a_response_captured/")]
+            if not required:
+                raise TaskWorkspaceError("GUIDED_TASK_ROUND_A_RESPONSE_ATTEMPT_MISSING")
         elif action == "ROUND_B_PROMPT_PENDING":
             required = ["artifacts/round_a_validated/round_a_validated_payload.json"]
         elif action == "ROUND_B_RESPONSE_PENDING":
             required = ["artifacts/round_b_prompt_ready/prompt.md", "artifacts/round_a_validated/round_a_validated_payload.json"]
         elif action == "ROUND_B_VALIDATION_PENDING":
             required = [name for name in manifest["artifacts"] if name.startswith("artifacts/round_b_response_captured/")]
+            if not required:
+                raise TaskWorkspaceError("GUIDED_TASK_ROUND_B_RESPONSE_ATTEMPT_MISSING")
         elif action == "OPERATOR_CONTEXT_PENDING":
             required = ["artifacts/round_a_validated/round_a_validated_payload.json", "artifacts/round_b_validated/round_b_validated_payload.json"]
         elif action == "RUN_CREATION_PENDING":
