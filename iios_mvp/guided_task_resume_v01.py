@@ -387,8 +387,41 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                     "artifacts/round_b_validated/round_b_validated_payload.json"
                 )
                 pilot._prepare_input(payload)
-                portfolio = pilot._ask_operator_portfolio_context()
-                valuation = pilot._ask_operator_valuation_context()
+
+                portfolio_path = work / "operator_portfolio_context.json"
+                if portfolio_path.is_symlink():
+                    raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_PORTFOLIO_FILE_IS_SYMLINK")
+                if portfolio_path.is_file():
+                    try:
+                        portfolio = json.loads(portfolio_path.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError) as exc:
+                        raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_PORTFOLIO_FILE_UNREADABLE") from exc
+                else:
+                    portfolio = pilot._ask_operator_portfolio_context()
+                    _write_private_once(
+                        portfolio_path,
+                        (json.dumps(portfolio, ensure_ascii=False, sort_keys=True, allow_nan=False) + "\n").encode("utf-8"),
+                    )
+
+                valuation_path = work / "operator_valuation_context.json"
+                if valuation_path.is_symlink():
+                    raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_VALUATION_FILE_IS_SYMLINK")
+                if valuation_path.is_file():
+                    try:
+                        valuation = json.loads(valuation_path.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError) as exc:
+                        raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_VALUATION_FILE_UNREADABLE") from exc
+                else:
+                    valuation = pilot._ask_operator_valuation_context()
+                    _write_private_once(
+                        valuation_path,
+                        (json.dumps(valuation, ensure_ascii=False, sort_keys=True, allow_nan=False) + "\n").encode("utf-8"),
+                    )
+
+                if portfolio is not None and not isinstance(portfolio, Mapping):
+                    raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_PORTFOLIO_VALUE_INVALID")
+                if not isinstance(valuation, Mapping):
+                    raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_VALUATION_VALUE_INVALID")
                 session.checkpoint_operator_context({
                     "operator_portfolio_context": portfolio,
                     "operator_valuation_context": valuation,
