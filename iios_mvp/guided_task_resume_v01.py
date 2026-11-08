@@ -333,9 +333,13 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                     response_filename=response_a.name,
                     prompt_context={"prompt_input_payload": pilot._round_a_prompt_input(template_payload)},
                 )
-                _show_prompt(prompt, response_a, phase="Round A")
                 continue
             if action in {"ROUND_A_RESPONSE_PENDING", "ROUND_A_VALIDATION_PENDING"}:
+                if state["current_stage"] == "ROUND_A_PROMPT_READY":
+                    saved_prompt = session.load_artifact(
+                        "artifacts/round_a_prompt_ready/prompt.md"
+                    ).decode("utf-8")
+                    _show_prompt(saved_prompt, response_a, phase="Round A")
                 _validate_round(session, pilot, "ROUND_A", context, response_a)
                 continue
             if action == "ROUND_B_PROMPT_PENDING":
@@ -369,9 +373,13 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                         "frozen_artifact_sha256": built_frozen_sha,
                     },
                 )
-                _show_prompt(round_b_prompt, response_b, phase="Round B")
                 continue
             if action in {"ROUND_B_RESPONSE_PENDING", "ROUND_B_VALIDATION_PENDING"}:
+                if state["current_stage"] == "ROUND_B_PROMPT_READY":
+                    saved_prompt = session.load_artifact(
+                        "artifacts/round_b_prompt_ready/prompt.md"
+                    ).decode("utf-8")
+                    _show_prompt(saved_prompt, response_b, phase="Round B")
                 _validate_round(session, pilot, "ROUND_B", context, response_b)
                 continue
             if action == "OPERATOR_CONTEXT_PENDING":
