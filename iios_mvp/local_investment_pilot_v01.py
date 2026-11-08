@@ -5509,7 +5509,15 @@ def _capture_clipboard_response_once(path: str | Path) -> bool:
             stream.write(raw)
             stream.flush()
             os.fsync(stream.fileno())
-        if response_path.is_symlink() or response_path.read_bytes().strip():
+        if response_path.is_symlink():
+            temporary.unlink(missing_ok=True)
+            print("响应目标在写入前变成符号链接；未覆盖。", flush=True)
+            return False
+        try:
+            populated = response_path.read_bytes().strip()
+        except FileNotFoundError:
+            populated = b""
+        if populated:
             temporary.unlink(missing_ok=True)
             print("响应文件在写入前已被填充；未覆盖。", flush=True)
             return False
