@@ -120,9 +120,17 @@ def _validate_round(
     response_path: Path,
 ) -> dict[str, Any]:
     """Validate the latest immutable attempt, allowing append-only repair attempts."""
-    template_path = Path(str(context["template_path"]))
-    prompt_path = Path(str(context["analysis_prompt_path"]))
-    template_payload = json.loads(template_path.read_text(encoding="utf-8"))
+    template_path = work / "template_snapshot.json"
+    prompt_path = work / "analysis_prompt_snapshot.md"
+    template_payload = context.get("template_payload")
+    prompt_text = context.get("analysis_prompt_text")
+    if not isinstance(template_payload, dict) or not isinstance(prompt_text, str):
+        raise TaskWorkspaceError("GUIDED_TASK_CONTEXT_SNAPSHOT_MISSING")
+    _write_private_once(
+        template_path,
+        (json.dumps(template_payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8"),
+    )
+    _write_private_once(prompt_path, prompt_text.encode("utf-8"))
     while True:
         raw, signature = _capture_or_reuse_response(session, pilot, phase, response_path)
         try:
