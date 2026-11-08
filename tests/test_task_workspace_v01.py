@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
+import os
 from pathlib import Path
 
 import pytest
@@ -12,6 +14,13 @@ from iios_mvp.task_workspace_v01 import (
     task_lock,
 )
 
+
+
+
+def _crash_while_holding_task_lock(root: str, task_id: str) -> None:
+    workspace, _ = open_task(root, task_id)
+    with task_lock(workspace):
+        os._exit(17)
 
 def test_create_task_persists_private_manifest_and_initial_journal(tmp_path: Path) -> None:
     workspace = create_task(tmp_path / "tasks", metadata={"symbol": "603699.SH"})
@@ -109,3 +118,18 @@ def test_resume_open_validates_artifacts_and_lock_is_exclusive(tmp_path: Path) -
                 pass
     with task_lock(opened):
         pass
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX advisory-lock crash-release contract")
+def test_posix_task_lock_is_released_by_kernel_after_process_crash(tmp_path: Path) -> None:
+    workspace = create_task(tmp_path / "tasks")
+    process = multiprocessing.Process(
+        target=_crash_while_holding_task_lock,
+        args=(str(tmp_path / "tasks"), workspace.task_id),
+    )
+    process.start()
+    process.join(timeout=10)
+    assert process.exitcode == 17
+    reopened, _ = open_task(tmp_path / "tasks", workspace.task_id)
+    with task_lock(reopened):
+        assert reopened.inspect()["current_stage"] == "TASK_CREATED"
