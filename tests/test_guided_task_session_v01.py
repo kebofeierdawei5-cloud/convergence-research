@@ -434,8 +434,9 @@ def test_operator_portfolio_input_is_reused_after_interruption_before_valuation_
     with pytest.raises(KeyboardInterrupt):
         run_guided_task(session, output_root=output_root)
 
-    portfolio_file = session.workspace.path / "working" / "operator_portfolio_context.json"
-    assert json.loads(portfolio_file.read_text(encoding="utf-8")) == portfolio
+    portfolio_artifact = "artifacts/round_b_validated/operator_portfolio_context.json"
+    assert portfolio_artifact in session.inspect()["artifacts"]
+    assert session.load_partial_operator_context("portfolio") == portfolio
     assert session.inspect()["resume_stage"] == "OPERATOR_CONTEXT_PENDING"
 
     reopened, _manifest = GuidedTaskSession.open(inputs / "tasks", session.task_id)
