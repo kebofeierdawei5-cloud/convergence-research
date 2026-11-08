@@ -120,17 +120,9 @@ def _validate_round(
     response_path: Path,
 ) -> dict[str, Any]:
     """Validate the latest immutable attempt, allowing append-only repair attempts."""
-    template_path = work / "template_snapshot.json"
-    prompt_path = work / "analysis_prompt_snapshot.md"
-    template_payload = context.get("template_payload")
-    prompt_text = context.get("analysis_prompt_text")
-    if not isinstance(template_payload, dict) or not isinstance(prompt_text, str):
-        raise TaskWorkspaceError("GUIDED_TASK_CONTEXT_SNAPSHOT_MISSING")
-    _write_private_once(
-        template_path,
-        (json.dumps(template_payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8"),
-    )
-    _write_private_once(prompt_path, prompt_text.encode("utf-8"))
+    template_path = Path(str(context["template_path"]))
+    prompt_path = Path(str(context["analysis_prompt_path"]))
+    template_payload = json.loads(template_path.read_text(encoding="utf-8"))
     while True:
         raw, signature = _capture_or_reuse_response(session, pilot, phase, response_path)
         try:
@@ -254,10 +246,25 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
     context = session.load_json_artifact("artifacts/task_created/task_context.json")
     template_root = Path(str(context["template_root"]))
     work = session.workspace.path / "working"
+    if work.is_symlink():
+        raise TaskWorkspaceError("GUIDED_TASK_WORKING_DIRECTORY_IS_SYMLINK")
     work.mkdir(parents=True, exist_ok=True, mode=0o700)
-    template_path = Path(str(context["template_path"]))
-    prompt_path = Path(str(context["analysis_prompt_path"]))
-    template_payload = json.loads(template_path.read_text(encoding="utf-8"))
+    if os.name != "nt":
+        work.chmod(0o700)
+    template_path = work / "template_snapshot.json"
+    prompt_path = work / "analysis_prompt_snapshot.md"
+    template_payload = context.get("template_payload")
+    prompt_text = context.get("analysis_prompt_text")
+    if not isinstance(template_payload, dict) or not isinstance(prompt_text, str):
+        raise TaskWorkspaceError("GUIDED_TASK_CONTEXT_SNAPSHOT_MISSING")
+    _write_private_once(
+        template_path,
+        (json.dumps(template_payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8"),
+    )
+    _write_private_once(prompt_path, prompt_text.encode("utf-8"))
+    context = dict(context)
+    context["template_path"] = str(template_path)
+    context["analysis_prompt_path"] = str(prompt_path)
     symbol = str((template_payload.get("case") or {}).get("symbol") or "candidate")
     response_a = work / "round_a_response.json"
     response_b = work / "round_b_response.json"
