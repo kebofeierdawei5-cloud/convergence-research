@@ -376,6 +376,8 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                 verification = pilot.verify_local_pilot_bundle(run_dir)
                 session.complete(verification=verification)
                 result = dict(verification)
+                result["verification_status"] = verification["status"]
+                result["status"] = "PILOT_CREATED"
                 result["run_dir"] = str(run_dir)
                 result["report_path"] = str(run_dir / "report.md")
                 result["task_id"] = session.task_id
