@@ -47,7 +47,12 @@ def _latest_response_attempt(session: GuidedTaskSession, phase: str) -> tuple[st
 
 
 def _show_prompt(prompt: str, response_path: Path, *, phase: str) -> None:
-    print(f"\n{phase} 提示词已持久化；请发送给 ChatGPT。")
+    heading = (
+        "Round A 价格盲研究提示"
+        if phase == "Round A"
+        else "Round B 价格感知估值/MIE/预期差提示"
+    )
+    print(f"\n{heading} 已持久化；请发送给 ChatGPT。")
     if sys.platform == "darwin":
         try:
             subprocess.run(["pbcopy"], input=prompt, text=True, check=True, timeout=5)
