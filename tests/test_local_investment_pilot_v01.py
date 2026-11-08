@@ -1174,6 +1174,12 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     accepted_response = task_dirs[0] / "working" / "round-b-response-accepted.json"
     accepted_bytes = accepted_response.read_bytes()
     import hashlib
+    original_analyse = pilot._analyse
+    monkeypatch.setattr(
+        pilot,
+        "_analyse",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("analysis must not rerun on idempotent resume")),
+    )
     reused = pilot.run_local_investment_pilot(
         input_path=completed_files[0],
         output_root=tmp_path / "runs",
@@ -1182,6 +1188,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
         expected_research_response_byte_size=len(accepted_bytes),
         run_id_override=result["pilot_id"],
     )
+    monkeypatch.setattr(pilot, "_analyse", original_analyse)
     assert reused["idempotent_reuse"] is True
     assert reused["pilot_id"] == result["pilot_id"]
     replay = pilot.run_local_investment_pilot(
