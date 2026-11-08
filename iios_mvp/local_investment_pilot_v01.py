@@ -4400,6 +4400,43 @@ def _write_run(
         response_provenance["origin_pilot_id"] = run_id
         response_provenance["source_pilot_id"] = run_id
 
+    # Resume after a crash between bundle creation and the RUN_CREATED journal
+    # append must verify and reuse a complete same-input bundle before analysis.
+    # This prevents recomputing a potentially expensive research valuation.
+    run_dir = output_root / run_id
+    if run_dir.exists():
+        try:
+            existing_receipt, _existing_manifest = _verify_run_bundle(run_dir)
+            existing_input = (run_dir / "input.json").read_bytes()
+            existing_raw = (
+                (run_dir / RAW_RESEARCH_RESPONSE_FILENAME).read_bytes()
+                if response_bytes is not None else None
+            )
+        except (LocalInvestmentPilotError, OSError) as exc:
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_COLLISION_OR_PARTIAL_BUNDLE") from exc
+        if existing_input != input_text.encode("utf-8") or (
+            response_bytes is not None and existing_raw != response_bytes
+        ):
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_ALREADY_BOUND_TO_DIFFERENT_INPUT")
+        try:
+            existing_analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_EXISTING_ANALYSIS_UNREADABLE") from exc
+        return {
+            "status": "PILOT_CREATED",
+            "pilot_id": run_id,
+            "provisional_action": existing_analysis["decision"]["provisional_action"],
+            "replay_of": existing_receipt.get("replay_of"),
+            "replay_comparison": existing_receipt.get("replay_comparison"),
+            "research_response_provenance_status": (existing_receipt.get("research_response_provenance") or {}).get("status"),
+            "run_dir": str(run_dir),
+            "report_path": str(run_dir / "report.md"),
+            "formal_decision_created": False,
+            "canonical_run_receipt_created": False,
+            "auto_execution": False,
+            "idempotent_reuse": True,
+        }
+
     analysis, report = _analyse(payload_for_analysis, run_id)
     analysis["research_rounds"] = _build_research_rounds_summary(payload)
     report = _render_report(analysis)
@@ -4431,32 +4468,6 @@ def _write_run(
             "- 本节只证明响应文本与本地输入之间的字节级关联，不证明响应中的事实/来源真实，也不构成正式 Evidence/PIT 准入。\n"
         )
     run_dir = output_root / run_id
-    if run_dir.exists():
-        try:
-            existing_receipt, _existing_manifest = _verify_run_bundle(run_dir)
-            existing_input = (run_dir / "input.json").read_bytes()
-            existing_raw = (run_dir / RAW_RESEARCH_RESPONSE_FILENAME).read_bytes() if response_bytes is not None else None
-        except (LocalInvestmentPilotError, OSError) as exc:
-            raise LocalInvestmentPilotError("PILOT_RUN_ID_COLLISION_OR_PARTIAL_BUNDLE") from exc
-        if existing_input != input_text.encode("utf-8") or (
-            response_bytes is not None and existing_raw != response_bytes
-        ):
-            raise LocalInvestmentPilotError("PILOT_RUN_ID_ALREADY_BOUND_TO_DIFFERENT_INPUT")
-        existing_analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
-        return {
-            "status": "PILOT_CREATED",
-            "pilot_id": run_id,
-            "provisional_action": existing_analysis["decision"]["provisional_action"],
-            "replay_of": existing_receipt.get("replay_of"),
-            "replay_comparison": existing_receipt.get("replay_comparison"),
-            "research_response_provenance_status": (existing_receipt.get("research_response_provenance") or {}).get("status"),
-            "run_dir": str(run_dir),
-            "report_path": str(run_dir / "report.md"),
-            "formal_decision_created": False,
-            "canonical_run_receipt_created": False,
-            "auto_execution": False,
-            "idempotent_reuse": True,
-        }
     run_dir.mkdir(parents=True, exist_ok=False, mode=0o700)
     _write_local(run_dir / "input.json", input_text)
     _write_local(run_dir / "analysis.json", json.dumps(_safe(analysis), ensure_ascii=False, indent=2, allow_nan=False))
