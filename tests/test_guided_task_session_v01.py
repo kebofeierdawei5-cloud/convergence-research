@@ -88,3 +88,18 @@ def test_corrupted_task_fails_closed_on_reopen(tmp_path: Path) -> None:
     artifact.write_bytes(b"tampered")
     with pytest.raises(TaskWorkspaceError, match="ARTIFACT_HASH_MISMATCH"):
         GuidedTaskSession.open(tmp_path / "tasks", session.task_id)
+
+
+def test_empty_response_cannot_advance_the_durable_stage(tmp_path: Path) -> None:
+    session = GuidedTaskSession.create(tmp_path / "tasks", metadata={})
+    session.checkpoint_prompt("ROUND_A", "prompt", response_filename="round-a.json")
+    with pytest.raises(TaskWorkspaceError, match="RAW_RESPONSE_EMPTY"):
+        session.capture_response("ROUND_A", b"")
+    assert session.inspect()["current_stage"] == "ROUND_A_PROMPT_READY"
+
+
+def test_response_validation_resume_requires_a_captured_attempt(tmp_path: Path) -> None:
+    session = GuidedTaskSession.create(tmp_path / "tasks", metadata={})
+    session.checkpoint_prompt("ROUND_A", "prompt", response_filename="round-a.json")
+    # A prompt-ready task is waiting for an operator response, not validation.
+    assert session.resume_contract()["resume_action"] == "ROUND_A_RESPONSE_PENDING"
