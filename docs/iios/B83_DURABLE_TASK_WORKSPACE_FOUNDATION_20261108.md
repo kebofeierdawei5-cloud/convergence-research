@@ -3,7 +3,7 @@
 **Date:** 2026-11-08  
 **Baseline:** canonical `main@2fd009b10bd4b13467ebdd8b2692eab62a772878`  
 **Branch:** `feat/b83-durable-task-resume-20261108`  
-**Scope:** B83-1 persistence primitives plus B83-2 guided workflow integration; source implementation is complete on this feature branch, validation remains pending.
+**Scope:** B83-1 persistence primitives plus B83-2 guided workflow integration; GitHub CI passed on code head `f55b1e90efdc8aad08fcec65b18e8b0660920e21`; macOS real-user acceptance remains open.
 
 ## Why this slice exists
 
@@ -86,7 +86,7 @@ The next slice must wire each adapter call into the real wizard at the exact suc
 - Existing run_guided_wizard integration: subsequently implemented in the next B83-2 milestone below.
 - --resume-task: subsequently implemented in the next B83-2 milestone below.
 - Python / pytest / hosted CI / real-company run / macOS acceptance: not run.
-## B83-2 — End-to-end guided workflow wiring (source complete; validation pending)
+## B83-2 — End-to-end guided workflow wiring (historical pre-CI milestone; current validation follows below)
 
 The durable runner is now wired into the existing local_investment_pilot_v01 entry point:
 
