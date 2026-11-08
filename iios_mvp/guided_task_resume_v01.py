@@ -68,6 +68,8 @@ def _capture_or_reuse_response(
     session: GuidedTaskSession, pilot: Any, phase: str, response_path: Path
 ) -> tuple[bytes, tuple[int, int, str]]:
     """Capture every stable saved version as an immutable attempt."""
+    if response_path.is_symlink():
+        raise TaskWorkspaceError(f"GUIDED_TASK_{phase}_RESPONSE_FILE_IS_SYMLINK")
     manifest = session.inspect()
     prompt_stage = f"{phase}_PROMPT_READY"
     response_stage = f"{phase}_RESPONSE_CAPTURED"
