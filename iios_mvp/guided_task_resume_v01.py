@@ -202,7 +202,7 @@ def _validate_round(
                 merged["_local_research_response_provenance"] = {
                     "schema_version": pilot.LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
                     "status": "CAPTURED_RAW_CHATGPT_RESPONSE",
-                    "source_filename": response_path.name,
+                    "source_filename": "round_b_response_accepted.json",
                     "sha256": signature[2],
                     "byte_size": signature[0],
                     "capture_stage": "ROUND_B_RAW_RESPONSE_HASHED_ON_STABLE_SAVE_BEFORE_LOCAL_TEMPLATE_MERGE_AND_OPERATOR_FIELD_RECOVERY",
@@ -249,6 +249,8 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
     frozen_path = work / "round_a_frozen.json"
     context = dict(context)
     context["round_a_frozen_path"] = str(frozen_path)
+    run_root = Path(str(output_root or context["output_root"])).expanduser().resolve()
+    context["output_root"] = str(run_root)
 
     with session.locked():
         while True:
@@ -319,13 +321,15 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                     completed_path,
                     (json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8"),
                 )
-                response = response_b.read_bytes()
+                _attempt_name, response = _latest_response_attempt(session, "ROUND_B")
+                accepted_response_path = work / "round_b_response_accepted.json"
+                _write_private_once(accepted_response_path, response)
                 import hashlib
                 response_sha = hashlib.sha256(response).hexdigest()
                 result = pilot.run_local_investment_pilot(
                     input_path=completed_path,
-                    output_root=output_root or context["output_root"],
-                    research_response_path=response_b,
+                    output_root=run_root,
+                    research_response_path=accepted_response_path,
                     expected_research_response_sha256=response_sha,
                     expected_research_response_byte_size=len(response),
                     run_id_override=f"local-pilot-{symbol.replace('.', '-')}-{session.task_id}",
@@ -339,7 +343,7 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                 receipt = session.load_json_artifact(
                     "artifacts/run_created/run_receipt.json"
                 )
-                run_dir = Path(str(context["output_root"])) / str(receipt["pilot_id"])
+                run_dir = run_root / str(receipt["pilot_id"])
                 verification = pilot.verify_local_pilot_bundle(run_dir)
                 session.complete(verification=verification)
                 result = dict(verification)
