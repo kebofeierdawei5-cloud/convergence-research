@@ -32,13 +32,22 @@ def test_append_only_transitions_and_artifact_hashes(tmp_path: Path) -> None:
         details={"price_supplied": False},
     )
     assert state["current_stage"] == "ROUND_A_PROMPT_READY"
-    assert state["artifacts"]["round_a_prompt.md"]["byte_size"] == len(prompt)
+    assert state["artifacts"]["artifacts/round_a_prompt_ready/round_a_prompt.md"]["byte_size"] == len(prompt)
     assert workspace.inspect()["revision"] == 2
     with pytest.raises(TaskWorkspaceError, match="IMMUTABLE_FILE_ALREADY_EXISTS"):
         workspace.record(
             "ROUND_A_PROMPT_READY",
             artifacts={"round_a_prompt.md": b"overwritten"},
         )
+
+
+def test_identical_orphan_artifact_is_adopted_after_interrupted_write(tmp_path: Path) -> None:
+    workspace = create_task(tmp_path / "tasks")
+    orphan = workspace.path / "artifacts" / "round_a_prompt_ready" / "prompt.md"
+    orphan.parent.mkdir(parents=True)
+    orphan.write_bytes(b"same bytes")
+    state = workspace.record("ROUND_A_PROMPT_READY", artifacts={"prompt.md": b"same bytes"})
+    assert state["artifacts"]["artifacts/round_a_prompt_ready/prompt.md"]["sha256"]
 
 
 def test_stale_manifest_is_rebuilt_from_durable_journal(tmp_path: Path) -> None:
