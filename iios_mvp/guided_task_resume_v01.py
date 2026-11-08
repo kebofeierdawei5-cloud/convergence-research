@@ -129,6 +129,13 @@ def _validate_round(
     """Validate the latest immutable attempt, allowing append-only repair attempts."""
     template_path = Path(str(context["template_path"]))
     prompt_path = Path(str(context["analysis_prompt_path"]))
+    expected_template = (
+        json.dumps(context["template_payload"], ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+    ).encode("utf-8")
+    if template_path.is_symlink() or template_path.read_bytes() != expected_template:
+        raise TaskWorkspaceError("GUIDED_TASK_TEMPLATE_SNAPSHOT_HASH_MISMATCH")
+    if prompt_path.is_symlink() or prompt_path.read_bytes() != str(context["analysis_prompt_text"]).encode("utf-8"):
+        raise TaskWorkspaceError("GUIDED_TASK_ANALYSIS_PROMPT_SNAPSHOT_MISMATCH")
     template_payload = json.loads(template_path.read_text(encoding="utf-8"))
     while True:
         raw, signature = _capture_or_reuse_response(session, pilot, phase, response_path)
@@ -137,6 +144,16 @@ def _validate_round(
             base_path = template_path
             if phase == "ROUND_B":
                 base_path = Path(str(context["round_a_frozen_path"]))
+                if base_path.is_symlink():
+                    raise TaskWorkspaceError("GUIDED_TASK_ROUND_A_FROZEN_FILE_IS_SYMLINK")
+                frozen_payload = session.load_json_artifact(
+                    "artifacts/round_a_validated/round_a_validated_payload.json"
+                )
+                expected_frozen_bytes = (
+                    json.dumps(frozen_payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+                ).encode("utf-8")
+                if base_path.read_bytes() != expected_frozen_bytes:
+                    raise TaskWorkspaceError("GUIDED_TASK_ROUND_A_FROZEN_FILE_HASH_MISMATCH")
             base_payload = json.loads(base_path.read_text(encoding="utf-8"))
             pilot._validate_research_round_patch(
                 response_object, phase=phase, base_payload=base_payload
