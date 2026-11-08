@@ -255,7 +255,7 @@ class TaskWorkspace:
             # The append-only journal is authoritative. A crash after fsync of
             # the event but before snapshot replacement leaves a stale manifest;
             # rebuild that derived file rather than losing the committed event.
-            _atomic_snapshot(manifest_path, _canonical(expected) + b"\n)
+            _atomic_snapshot(manifest_path, _canonical(expected) + b"\n")
         if verify_artifacts:
             _verify_artifacts(self.path, expected)
         return expected
