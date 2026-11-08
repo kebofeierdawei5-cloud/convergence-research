@@ -68,14 +68,33 @@ class GuidedTaskSession:
             raise TaskWorkspaceError(f"GUIDED_TASK_JSON_ARTIFACT_NOT_OBJECT:{relative_path}")
         return value
 
-    def _next_attempt_name(self, phase: str, suffix: str) -> str:
+    def _next_attempt_name(self, phase: str, suffix: str, content: bytes) -> str:
         manifest = self.inspect()
         prefix = f"artifacts/{phase.lower()}/"
-        attempts = [
-            name for name in manifest["artifacts"]
-            if name.startswith(prefix) and name.endswith(suffix)
-        ]
-        return f"{phase.lower()}_attempt_{len(attempts) + 1:03d}{suffix}"
+        indexed = set(manifest["artifacts"])
+        attempt = 1
+        while True:
+            name = f"{phase.lower()}_attempt_{attempt:03d}{suffix}"
+            relative = prefix + name
+            candidate = self.workspace.path / relative
+            if relative in indexed:
+                attempt += 1
+                continue
+            if candidate.is_symlink():
+                raise TaskWorkspaceError("GUIDED_TASK_RESPONSE_ATTEMPT_IS_SYMLINK")
+            if candidate.exists():
+                try:
+                    orphan_bytes = candidate.read_bytes()
+                except OSError as exc:
+                    raise TaskWorkspaceError("GUIDED_TASK_ORPHAN_ATTEMPT_UNREADABLE") from exc
+                if orphan_bytes == content:
+                    # The immutable artifact write may have completed just
+                    # before a crash interrupted its journal append. Reuse the
+                    # exact orphan so the normal record() operation can adopt it.
+                    return name
+                attempt += 1
+                continue
+            return name
 
     def checkpoint_prompt(
         self,
@@ -114,7 +133,7 @@ class GuidedTaskSession:
         expected = f"{phase}_RESPONSE_PENDING"
         if current["resume_stage"] != expected and current["current_stage"] != stage:
             raise TaskWorkspaceError("GUIDED_TASK_RESPONSE_STAGE_MISMATCH")
-        name = self._next_attempt_name(stage, ".json")
+        name = self._next_attempt_name(stage, ".json", raw_response)
         return self.workspace.record(
             stage,
             artifacts={name: raw_response},
