@@ -149,3 +149,30 @@ def test_offline_response_correction_becomes_a_new_attempt_before_validation(tmp
     assert len(attempts) == 2
     assert session.load_artifact(attempts[0]) == first
     assert session.load_artifact(attempts[1]) == corrected
+
+
+def test_response_capture_skips_conflicting_orphan_attempt_after_prejournal_crash(tmp_path: Path) -> None:
+    session = GuidedTaskSession.create(tmp_path / "tasks", metadata={})
+    session.checkpoint_prompt(
+        "ROUND_A",
+        "prompt",
+        response_filename="round-a.json",
+        prompt_context={"prompt_input_payload": {}},
+    )
+    orphan_dir = session.workspace.path / "artifacts" / "round_a_response_captured"
+    orphan_dir.mkdir(parents=True)
+    orphan = orphan_dir / "round_a_response_captured_attempt_001.json"
+    orphan.write_bytes(b"orphaned bytes from interrupted previous write")
+    accepted = b'{"new_attempt": true}'
+
+    session.capture_response("ROUND_A", accepted)
+
+    manifest = session.inspect()
+    recorded = [
+        name for name in manifest["artifacts"]
+        if name.startswith("artifacts/round_a_response_captured/")
+    ]
+    assert len(recorded) == 1
+    assert recorded[0].endswith("round_a_response_captured_attempt_002.json")
+    assert orphan.read_bytes() == b"orphaned bytes from interrupted previous write"
+    assert session.load_artifact(recorded[0]) == accepted
