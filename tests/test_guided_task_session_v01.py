@@ -11,7 +11,7 @@ from iios_mvp.task_workspace_v01 import TaskWorkspaceError
 
 def test_round_a_interruption_resumes_at_response_without_regenerating_prompt(tmp_path: Path) -> None:
     session = GuidedTaskSession.create(tmp_path / "tasks", metadata={"symbol": "603699.SH"})
-    session.checkpoint_prompt("ROUND_A", "exact prompt bytes", response_filename="round-a.json")
+    session.checkpoint_prompt("ROUND_A", "exact prompt bytes", response_filename="round-a.json", prompt_context={"prompt_input_payload": {}})
     resumed, contract = GuidedTaskSession.open(tmp_path / "tasks", session.task_id)
     assert contract["resume_stage"] == "ROUND_A_RESPONSE_PENDING"
     instruction = resumed.resume_contract()
@@ -21,7 +21,7 @@ def test_round_a_interruption_resumes_at_response_without_regenerating_prompt(tm
 
 def test_invalid_response_attempt_is_preserved_and_new_attempt_is_append_only(tmp_path: Path) -> None:
     session = GuidedTaskSession.create(tmp_path / "tasks", metadata={})
-    session.checkpoint_prompt("ROUND_A", "prompt", response_filename="round-a.json")
+    session.checkpoint_prompt("ROUND_A", "prompt", response_filename="round-a.json", prompt_context={"prompt_input_payload": {}})
     session.capture_response("ROUND_A", b'{"invalid":')
     session.capture_response("ROUND_A", b'{"corrected": true}')
     manifest = session.inspect()
@@ -36,7 +36,7 @@ def test_invalid_response_attempt_is_preserved_and_new_attempt_is_append_only(tm
 
 def test_round_a_validated_resumes_directly_at_round_b(tmp_path: Path) -> None:
     session = GuidedTaskSession.create(tmp_path / "tasks", metadata={})
-    session.checkpoint_prompt("ROUND_A", "A prompt", response_filename="a.json")
+    session.checkpoint_prompt("ROUND_A", "A prompt", response_filename="a.json", prompt_context={"prompt_input_payload": {}})
     session.capture_response("ROUND_A", b'{"patch":"A"}')
     session.accept_validated_payload("ROUND_A", {"frozen": {"earnings": 100}})
     resumed, _ = GuidedTaskSession.open(tmp_path / "tasks", session.task_id)
@@ -50,10 +50,10 @@ def test_round_a_validated_resumes_directly_at_round_b(tmp_path: Path) -> None:
 
 def test_round_b_validation_and_operator_context_are_distinct_boundaries(tmp_path: Path) -> None:
     session = GuidedTaskSession.create(tmp_path / "tasks", metadata={})
-    session.checkpoint_prompt("ROUND_A", "A", response_filename="a.json")
+    session.checkpoint_prompt("ROUND_A", "A", response_filename="a.json", prompt_context={"prompt_input_payload": {}})
     session.capture_response("ROUND_A", b'{"a":1}')
     session.accept_validated_payload("ROUND_A", {"frozen": True})
-    session.checkpoint_prompt("ROUND_B", "B", response_filename="b.json")
+    session.checkpoint_prompt("ROUND_B", "B", response_filename="b.json", prompt_context={"prompt_input_payload": {}, "frozen_artifact_sha256": "test-hash"})
     session.capture_response("ROUND_B", b'{"b":1}')
     assert session.resume_contract()["resume_action"] == "ROUND_B_VALIDATION_PENDING"
     session.accept_validated_payload("ROUND_B", {"accepted": True})
@@ -64,10 +64,10 @@ def test_round_b_validation_and_operator_context_are_distinct_boundaries(tmp_pat
 
 def test_run_receipt_requires_matching_id_and_completion_requires_hash_verification(tmp_path: Path) -> None:
     session = GuidedTaskSession.create(tmp_path / "tasks", metadata={})
-    session.checkpoint_prompt("ROUND_A", "A", response_filename="a.json")
+    session.checkpoint_prompt("ROUND_A", "A", response_filename="a.json", prompt_context={"prompt_input_payload": {}})
     session.capture_response("ROUND_A", b'{"a":1}')
     session.accept_validated_payload("ROUND_A", {"frozen": True})
-    session.checkpoint_prompt("ROUND_B", "B", response_filename="b.json")
+    session.checkpoint_prompt("ROUND_B", "B", response_filename="b.json", prompt_context={"prompt_input_payload": {}, "frozen_artifact_sha256": "test-hash"})
     session.capture_response("ROUND_B", b'{"b":1}')
     session.accept_validated_payload("ROUND_B", {"accepted": True})
     session.checkpoint_operator_context({"max_loss_pct": 25})
@@ -83,7 +83,7 @@ def test_run_receipt_requires_matching_id_and_completion_requires_hash_verificat
 
 def test_corrupted_task_fails_closed_on_reopen(tmp_path: Path) -> None:
     session = GuidedTaskSession.create(tmp_path / "tasks", metadata={})
-    session.checkpoint_prompt("ROUND_A", "A", response_filename="a.json")
+    session.checkpoint_prompt("ROUND_A", "A", response_filename="a.json", prompt_context={"prompt_input_payload": {}})
     artifact = session.workspace.path / "artifacts" / "round_a_prompt_ready" / "prompt.md"
     artifact.write_bytes(b"tampered")
     with pytest.raises(TaskWorkspaceError, match="ARTIFACT_HASH_MISMATCH"):
@@ -92,7 +92,7 @@ def test_corrupted_task_fails_closed_on_reopen(tmp_path: Path) -> None:
 
 def test_empty_response_cannot_advance_the_durable_stage(tmp_path: Path) -> None:
     session = GuidedTaskSession.create(tmp_path / "tasks", metadata={})
-    session.checkpoint_prompt("ROUND_A", "prompt", response_filename="round-a.json")
+    session.checkpoint_prompt("ROUND_A", "prompt", response_filename="round-a.json", prompt_context={"prompt_input_payload": {}})
     with pytest.raises(TaskWorkspaceError, match="RAW_RESPONSE_EMPTY"):
         session.capture_response("ROUND_A", b"")
     assert session.inspect()["current_stage"] == "ROUND_A_PROMPT_READY"
@@ -100,7 +100,7 @@ def test_empty_response_cannot_advance_the_durable_stage(tmp_path: Path) -> None
 
 def test_response_validation_resume_requires_a_captured_attempt(tmp_path: Path) -> None:
     session = GuidedTaskSession.create(tmp_path / "tasks", metadata={})
-    session.checkpoint_prompt("ROUND_A", "prompt", response_filename="round-a.json")
+    session.checkpoint_prompt("ROUND_A", "prompt", response_filename="round-a.json", prompt_context={"prompt_input_payload": {}})
     # A prompt-ready task is waiting for an operator response, not validation.
     assert session.resume_contract()["resume_action"] == "ROUND_A_RESPONSE_PENDING"
 
