@@ -22,8 +22,12 @@ _PHASE_ARTIFACTS = {
 }
 
 
-def _json_bytes(value: Mapping[str, Any]) -> bytes:
+def _json_value_bytes(value: Any) -> bytes:
     return (json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n").encode("utf-8")
+
+
+def _json_bytes(value: Mapping[str, Any]) -> bytes:
+    return _json_value_bytes(dict(value))
 
 
 class GuidedTaskSession:
@@ -153,6 +157,46 @@ class GuidedTaskSession:
         return self.workspace.record(stage, artifacts={
             _PHASE_ARTIFACTS[stage]: _json_bytes(payload)
         }, details={"validation": "caller_asserted_success"})
+
+    def has_partial_operator_context(self, section: str) -> bool:
+        if section not in {"portfolio", "valuation"}:
+            raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_CONTEXT_SECTION_UNSUPPORTED")
+        name = f"artifacts/round_b_validated/operator_{section}_context.json"
+        return name in self.inspect()["artifacts"]
+
+    def checkpoint_partial_operator_context(self, section: str, value: Any) -> dict[str, Any]:
+        if section not in {"portfolio", "valuation"}:
+            raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_CONTEXT_SECTION_UNSUPPORTED")
+        if section == "portfolio" and value is not None and not isinstance(value, Mapping):
+            raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_PORTFOLIO_VALUE_INVALID")
+        if section == "valuation" and not isinstance(value, Mapping):
+            raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_VALUATION_VALUE_INVALID")
+        current = self.inspect()
+        if current["resume_stage"] != "OPERATOR_CONTEXT_PENDING":
+            raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_CONTEXT_STAGE_MISMATCH")
+        artifact_name = f"operator_{section}_context.json"
+        relative = f"artifacts/round_b_validated/{artifact_name}"
+        if relative in current["artifacts"]:
+            raise TaskWorkspaceError(f"GUIDED_TASK_OPERATOR_CONTEXT_ALREADY_CAPTURED:{section}")
+        return self.workspace.record(
+            "ROUND_B_VALIDATED",
+            artifacts={artifact_name: _json_value_bytes(value)},
+            details={"partial_operator_context": section, "capture": "operator_owned"},
+        )
+
+    def load_partial_operator_context(self, section: str) -> Any:
+        if section not in {"portfolio", "valuation"}:
+            raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_CONTEXT_SECTION_UNSUPPORTED")
+        relative = f"artifacts/round_b_validated/operator_{section}_context.json"
+        try:
+            value = json.loads(self.load_artifact(relative).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise TaskWorkspaceError(f"GUIDED_TASK_OPERATOR_CONTEXT_ARTIFACT_INVALID:{section}") from exc
+        if section == "portfolio" and value is not None and not isinstance(value, Mapping):
+            raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_PORTFOLIO_VALUE_INVALID")
+        if section == "valuation" and not isinstance(value, Mapping):
+            raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_VALUATION_VALUE_INVALID")
+        return value
 
     def checkpoint_operator_context(self, context: Mapping[str, Any]) -> dict[str, Any]:
         current = self.inspect()
