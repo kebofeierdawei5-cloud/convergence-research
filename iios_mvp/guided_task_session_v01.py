@@ -77,7 +77,14 @@ class GuidedTaskSession:
         ]
         return f"{phase.lower()}_attempt_{len(attempts) + 1:03d}{suffix}"
 
-    def checkpoint_prompt(self, phase: str, prompt: str, *, response_filename: str) -> dict[str, Any]:
+    def checkpoint_prompt(
+        self,
+        phase: str,
+        prompt: str,
+        *,
+        response_filename: str,
+        prompt_context: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         if phase not in {"ROUND_A", "ROUND_B"}:
             raise TaskWorkspaceError("GUIDED_TASK_PHASE_UNSUPPORTED")
         if not isinstance(response_filename, str) or not response_filename or Path(response_filename).name != response_filename or "/" in response_filename or "\\" in response_filename:
@@ -88,9 +95,12 @@ class GuidedTaskSession:
             f"{phase}_PROMPT_PENDING", f"{phase}_RESPONSE_PENDING"
         } and current["current_stage"] != stage:
             raise TaskWorkspaceError("GUIDED_TASK_PROMPT_STAGE_MISMATCH")
+        artifacts: dict[str, bytes] = {"prompt.md": prompt.encode("utf-8")}
+        if prompt_context is not None:
+            artifacts["prompt_context.json"] = _json_bytes(prompt_context)
         return self.workspace.record(
             stage,
-            artifacts={"prompt.md": prompt.encode("utf-8")},
+            artifacts=artifacts,
             details={"response_filename": response_filename, "prompt_encoding": "utf-8"},
         )
 
