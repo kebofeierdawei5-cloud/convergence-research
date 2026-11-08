@@ -5448,6 +5448,85 @@ def _choose_saved_response_file(target_path: str | Path) -> bool:
     return True
 
 
+def _capture_clipboard_response_once(path: str | Path) -> bool:
+    """Capture macOS clipboard only after an explicit Enter keypress.
+
+    This is deliberately a one-shot read: no clipboard polling, background
+    monitor, browser access, Accessibility permission, or content logging.
+    Existing non-empty response files are never overwritten.
+    """
+    if sys.platform != "darwin":
+        print("当前平台不支持剪贴板接收；请使用原有响应文件方式。", flush=True)
+        return False
+    response_path = Path(path).expanduser()
+    try:
+        if response_path.is_symlink():
+            print("响应目标是符号链接，已拒绝写入。", flush=True)
+            return False
+        existing = response_path.read_bytes()
+    except FileNotFoundError:
+        existing = b""
+    except OSError as exc:
+        print(f"无法检查响应目标：{type(exc).__name__}。", flush=True)
+        return False
+    if existing.strip():
+        print("响应文件已有内容，不会用剪贴板覆盖；继续校验现有文件。", flush=True)
+        return True
+    try:
+        result = subprocess.run(
+            ["pbpaste"], check=True, capture_output=True, timeout=5
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f"无法读取剪贴板：{type(exc).__name__}。", flush=True)
+        return False
+    raw = result.stdout
+    if not raw.strip():
+        print("剪贴板为空；请先复制 ChatGPT 的完整回复，再按回车。", flush=True)
+        return False
+    if len(raw) > 2 * 1024 * 1024:
+        print("剪贴板内容超过 2 MiB 安全上限，未写入。", flush=True)
+        return False
+    try:
+        raw.decode("utf-8")
+    except UnicodeDecodeError:
+        print("剪贴板内容不是有效 UTF-8，未写入。", flush=True)
+        return False
+    # Recheck immediately before writing; never replace a file populated by
+    # another process while pbpaste was running.
+    try:
+        if response_path.is_symlink() or response_path.read_bytes().strip():
+            print("响应文件在接收期间发生变化；为避免覆盖，已停止。", flush=True)
+            return False
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        print(f"无法复核响应目标：{type(exc).__name__}。", flush=True)
+        return False
+    temporary = response_path.with_name(response_path.name + f".capture-{os.getpid()}.tmp")
+    try:
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if response_path.is_symlink() or response_path.read_bytes().strip():
+            temporary.unlink(missing_ok=True)
+            print("响应文件在写入前已被填充；未覆盖。", flush=True)
+            return False
+        os.replace(temporary, response_path)
+        if os.name != "nt":
+            response_path.chmod(0o600)
+    except OSError as exc:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        print(f"剪贴板内容写入失败：{type(exc).__name__}。", flush=True)
+        return False
+    print(f"已接收剪贴板文本（{len(raw)} 字节）；正在进入原有内容校验。", flush=True)
+    return True
+
+
 def _wait_for_response_file_change(
     path: str | Path,
     *,
@@ -5457,8 +5536,9 @@ def _wait_for_response_file_change(
 ) -> tuple[int, int, str]:
     """Wait until a non-empty response file changes and remains stable.
 
-    The operator can save the ChatGPT JSON in TextEdit and the wizard resumes
-    automatically. Pressing Enter is optional; Ctrl-C cancels the wait.
+    The operator may save a response file as before, or copy the ChatGPT
+    response and press Enter for a one-shot macOS clipboard capture.
+    Clipboard contents are never polled or logged; Ctrl-C cancels the wait.
     """
     response_path = Path(path).expanduser()
     candidate: tuple[int, int, str] | None = None
@@ -5493,11 +5573,15 @@ def _wait_for_response_file_change(
                 sys.stdin.readline()
                 latest = _response_file_signature(response_path)
                 if latest is None or latest[0] == 0:
-                    print("按回车触发了文件检查，但指定结果路径当前没有可读取的非空内容。", flush=True)
+                    print("正在尝试一次性接收当前剪贴板（仅因你刚刚按下回车）。", flush=True)
+                    if _capture_clipboard_response_once(response_path):
+                        captured = _response_file_signature(response_path)
+                        if captured is not None and captured[0] > 0:
+                            return captured
                     print(_response_file_diagnostic(response_path), flush=True)
                     print(
-                        "现在打开文件选择窗口，可选择你实际保存的 JSON；"
-                        "导入时会保留原文件，不需要重新研究或重新填写标的。",
+                        "如不使用剪贴板，可继续按原方式保存 JSON 文件；"
+                        "系统不会持续读取剪贴板。",
                         flush=True,
                     )
                     _choose_saved_response_file(response_path)
