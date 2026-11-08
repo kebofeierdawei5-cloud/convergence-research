@@ -280,11 +280,12 @@ def test_response_file_reader_rejects_empty_file_with_actionable_error(tmp_path)
         _read_json_response_file(response_path)
 
 
-def test_guided_wizard_uses_separate_files_for_two_chatgpt_responses_not_pbpaste():
+def test_guided_wizard_uses_separate_response_files_and_explicit_one_shot_clipboard():
     root = Path(__file__).resolve().parents[1] / "iios_mvp"
     pilot_source = (root / "local_investment_pilot_v01.py").read_text(encoding="utf-8")
     resume_source = (root / "guided_task_resume_v01.py").read_text(encoding="utf-8")
-    assert "pbpaste" not in pilot_source.lower()
+    assert 'subprocess.run(\n            ["pbpaste"]' in pilot_source
+    assert "_capture_clipboard_response_once" in pilot_source
     assert "pbpaste" not in resume_source.lower()
     assert 'pilot._extract_json_object(raw.decode("utf-8"))' in resume_source
     assert '"round-a-response.json"' in resume_source
@@ -292,6 +293,37 @@ def test_guided_wizard_uses_separate_files_for_two_chatgpt_responses_not_pbpaste
     assert "_capture_or_reuse_response" in resume_source
     assert "ROUND_A_PROVENANCE_SCHEMA" in pilot_source
     assert "ROUND_B_PROVENANCE_SCHEMA" in pilot_source
+
+
+def test_clipboard_capture_is_one_shot_and_does_not_log_response(monkeypatch, tmp_path, capsys):
+    response_path = tmp_path / "response.json"
+    secret_response = b'{"research":"private-test-value"}'
+    calls = []
+
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout=secret_response, stderr=b"")
+
+    monkeypatch.setattr(pilot.subprocess, "run", fake_run)
+    assert pilot._capture_clipboard_response_once(response_path) is True
+    assert calls == [["pbpaste"]]
+    assert response_path.read_bytes() == secret_response
+    assert "private-test-value" not in capsys.readouterr().out
+
+
+def test_clipboard_capture_never_overwrites_existing_response(monkeypatch, tmp_path):
+    response_path = tmp_path / "response.json"
+    response_path.write_text('{"existing":true}', encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        pilot.subprocess, "run",
+        lambda command, **kwargs: calls.append(command),
+    )
+    assert pilot._capture_clipboard_response_once(response_path) is True
+    assert calls == []
+    assert response_path.read_text(encoding="utf-8") == '{"existing":true}'
 
 
 def test_evidence_references_in_assessment_and_valuation_are_resolved_or_explicitly_unresolved():
