@@ -6294,7 +6294,13 @@ def _main(argv: list[str] | None = None) -> int:
         elif args.resume_task:
             task_root = _private_dir(args.template_root, "PILOT_TEMPLATE_ROOT") / "tasks"
             session, _manifest = GuidedTaskSession.open(task_root, args.resume_task)
-            result = run_guided_task(session, output_root=args.output_root)
+            default_output_root = Path.home() / ".iios-private" / "local-pilot" / "runs"
+            resume_output_root = (
+                None
+                if Path(args.output_root).expanduser() == default_output_root
+                else args.output_root
+            )
+            result = run_guided_task(session, output_root=resume_output_root)
         elif args.create_template:
             required = {
                 "--company": args.company, "--symbol": args.symbol, "--as-of": args.as_of,
