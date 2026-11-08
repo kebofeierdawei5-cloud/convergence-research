@@ -217,6 +217,8 @@ def _validate_round(
                 }
             session.accept_validated_payload(phase, merged)
             return merged
+        except TaskWorkspaceError:
+            raise
         except (OSError, UnicodeDecodeError, ValueError, KeyError, TypeError) as exc:
             print(f"{phase} 尚未通过校验：{exc}", flush=True)
             repair = pilot._build_response_repair_prompt(
