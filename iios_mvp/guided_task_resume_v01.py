@@ -209,7 +209,7 @@ def _validate_round(
                 merged["_local_research_response_provenance"] = {
                     "schema_version": pilot.LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA,
                     "status": "CAPTURED_RAW_CHATGPT_RESPONSE",
-                    "source_filename": "round_b_response_accepted.json",
+                    "source_filename": "round-b-response-accepted.json",
                     "sha256": signature[2],
                     "byte_size": signature[0],
                     "capture_stage": "ROUND_B_RAW_RESPONSE_HASHED_ON_STABLE_SAVE_BEFORE_LOCAL_TEMPLATE_MERGE_AND_OPERATOR_FIELD_RECOVERY",
@@ -268,8 +268,8 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
     context["template_path"] = str(template_path)
     context["analysis_prompt_path"] = str(prompt_path)
     symbol = str((template_payload.get("case") or {}).get("symbol") or "candidate")
-    response_a = work / "round_a_response.json"
-    response_b = work / "round_b_response.json"
+    response_a = work / "round-a-response.json"
+    response_b = work / "round-b-response.json"
     frozen_path = work / "round_a_frozen.json"
     context = dict(context)
     context["round_a_frozen_path"] = str(frozen_path)
@@ -346,7 +346,7 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                     (json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8"),
                 )
                 _attempt_name, response = _latest_response_attempt(session, "ROUND_B")
-                accepted_response_path = work / "round_b_response_accepted.json"
+                accepted_response_path = work / "round-b-response-accepted.json"
                 _write_private_once(accepted_response_path, response)
                 import hashlib
                 response_sha = hashlib.sha256(response).hexdigest()
