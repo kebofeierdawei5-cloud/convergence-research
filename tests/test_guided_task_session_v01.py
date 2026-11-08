@@ -103,3 +103,18 @@ def test_response_validation_resume_requires_a_captured_attempt(tmp_path: Path) 
     session.checkpoint_prompt("ROUND_A", "prompt", response_filename="round-a.json")
     # A prompt-ready task is waiting for an operator response, not validation.
     assert session.resume_contract()["resume_action"] == "ROUND_A_RESPONSE_PENDING"
+
+
+def test_operator_confirmed_context_is_immutable_and_survives_reopen(tmp_path: Path) -> None:
+    session = GuidedTaskSession.create(tmp_path / "tasks", metadata={"symbol": "002810.SZ"})
+    context = {
+        "symbol": "002810.SZ",
+        "template_payload": {"case": {"symbol": "002810.SZ"}, "price_input": {"price": "19.74"}},
+        "analysis_prompt_text": "immutable base prompt",
+    }
+    session.checkpoint_context(context)
+    reopened, manifest = GuidedTaskSession.open(tmp_path / "tasks", session.task_id)
+    assert manifest["resume_stage"] == "ROUND_A_PROMPT_PENDING"
+    assert reopened.load_json_artifact("artifacts/task_created/task_context.json") == context
+    with pytest.raises(TaskWorkspaceError, match="CONTEXT_ALREADY_FROZEN"):
+        reopened.checkpoint_context(context)
