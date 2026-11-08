@@ -3,7 +3,7 @@
 **Date:** 2026-11-08  
 **Baseline:** canonical `main@2fd009b10bd4b13467ebdd8b2692eab62a772878`  
 **Branch:** `feat/b83-durable-task-resume-20261108`  
-**Scope:** persistence primitives only; not yet an end-to-end resume claim.
+**Scope:** B83-1 persistence primitives plus B83-2 guided workflow integration; source implementation is complete on this feature branch, validation remains pending.
 
 ## Why this slice exists
 
@@ -24,7 +24,7 @@ The current guided Pilot has durable Round A/B response files and run receipts, 
 
 ## Deliberate limitations of B83-1
 
-This slice does **not** yet wire the task workspace into `run_guided_wizard`, persist Round A/B artifacts from the live workflow, or provide a user-facing `--resume-task` CLI continuation. Those are required before B83 can be called complete. A stale lock recovery policy also remains to be specified; do not delete a lock automatically based only on a PID.
+Historical B83-1 status at the time this section was first written: the workflow was not yet wired. This was superseded by the B83-2 integration section below. POSIX/macOS stale-lock handling was subsequently replaced with a kernel advisory lock that is released on process exit; see B83-2.
 
 ## Required next implementation slice
 
@@ -56,7 +56,7 @@ This slice does **not** yet wire the task workspace into `run_guided_wizard`, pe
 - An interrupted/ambiguous/corrupt task blocks and asks for review; it never guesses a resume point.
 - Research output remains `PILOT_NON_CANONICAL`.
 
-## B83-2 — Guided phase persistence adapter (partial)
+## B83-2 — Guided phase persistence adapter (historical intermediate milestone; superseded below)
 
 A separate guided_task_session_v01.py adapter now maps the existing guided workflow's semantic boundaries onto the durable workspace without importing or invoking investment calculations.
 
@@ -74,7 +74,7 @@ Targeted adapter tests have been authored for interruption after Round A prompt,
 
 ### Important non-completion boundary
 
-B83-2 is **not yet end-to-end wired** into run_guided_wizard or _main. There is no --resume-task user entry point yet, and the current wizard still runs its Round A/B loops in one process. The adapter is a persistence contract and test seam, not a claim that the existing CLI can resume today.
+At this intermediate commit the adapter was not yet wired into the live wizard. The following end-to-end integration section supersedes this status.
 
 The next slice must wire each adapter call into the real wizard at the exact successful phase boundary, then implement --resume-task TASK_ID as a true branch into the pending phase. It must preserve the current prompt bytes, response file path, frozen Round A payload and validation behavior. It must also handle the existing response-repair loop without overwriting raw captured attempts. Only after that wiring and interruption tests can the feature be described as end-to-end resumable.
 
@@ -83,8 +83,8 @@ The next slice must wire each adapter call into the real wizard at the exact suc
 - B83-1 persistence primitive: source authored.
 - B83-2 guided phase adapter: source authored.
 - B83-2 targeted tests: authored, not run.
-- Existing run_guided_wizard integration: not done.
-- --resume-task: not implemented.
+- Existing run_guided_wizard integration: subsequently implemented in the next B83-2 milestone below.
+- --resume-task: subsequently implemented in the next B83-2 milestone below.
 - Python / pytest / hosted CI / real-company run / macOS acceptance: not run.
 ## B83-2 — End-to-end guided workflow wiring (source complete; validation pending)
 
