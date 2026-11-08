@@ -4431,6 +4431,32 @@ def _write_run(
             "- 本节只证明响应文本与本地输入之间的字节级关联，不证明响应中的事实/来源真实，也不构成正式 Evidence/PIT 准入。\n"
         )
     run_dir = output_root / run_id
+    if run_dir.exists():
+        try:
+            existing_receipt, _existing_manifest = _verify_run_bundle(run_dir)
+            existing_input = (run_dir / "input.json").read_bytes()
+            existing_raw = (run_dir / RAW_RESEARCH_RESPONSE_FILENAME).read_bytes() if response_bytes is not None else None
+        except (LocalInvestmentPilotError, OSError) as exc:
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_COLLISION_OR_PARTIAL_BUNDLE") from exc
+        if existing_input != input_text.encode("utf-8") or (
+            response_bytes is not None and existing_raw != response_bytes
+        ):
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_ALREADY_BOUND_TO_DIFFERENT_INPUT")
+        existing_analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
+        return {
+            "status": "PILOT_CREATED",
+            "pilot_id": run_id,
+            "provisional_action": existing_analysis["decision"]["provisional_action"],
+            "replay_of": existing_receipt.get("replay_of"),
+            "replay_comparison": existing_receipt.get("replay_comparison"),
+            "research_response_provenance_status": (existing_receipt.get("research_response_provenance") or {}).get("status"),
+            "run_dir": str(run_dir),
+            "report_path": str(run_dir / "report.md"),
+            "formal_decision_created": False,
+            "canonical_run_receipt_created": False,
+            "auto_execution": False,
+            "idempotent_reuse": True,
+        }
     run_dir.mkdir(parents=True, exist_ok=False, mode=0o700)
     _write_local(run_dir / "input.json", input_text)
     _write_local(run_dir / "analysis.json", json.dumps(_safe(analysis), ensure_ascii=False, indent=2, allow_nan=False))
@@ -6022,6 +6048,26 @@ def run_guided_wizard(
         template_root=template_root,
         as_of_timestamp=cutoff_timestamp,
     )
+    private_task_root = _private_dir(template_root, "PILOT_TEMPLATE_ROOT") / "tasks"
+    session = GuidedTaskSession.create(
+        private_task_root,
+        metadata={"symbol": symbol, "company": company, "market": market},
+    )
+    session.checkpoint_context({
+        "company": company,
+        "symbol": symbol,
+        "market": market,
+        "template_path": str(Path(template_result["input_template"]).resolve()),
+        "analysis_prompt_path": str(Path(template_result["analysis_prompt"]).resolve()),
+        "template_root": str(Path(template_root).expanduser().resolve()),
+        "output_root": str(Path(output_root).expanduser().resolve()),
+    })
+    print(f"\n已创建可恢复研究任务：{session.task_id}")
+    result = run_guided_task(session, output_root=output_root)
+    print("\n研究任务完成：")
+    print(json.dumps(_safe(result), ensure_ascii=False, indent=2))
+    return result
+
     template_path = Path(template_result["input_template"])
     prompt_path = Path(template_result["analysis_prompt"])
     template_payload = json.loads(template_path.read_text(encoding="utf-8"))
