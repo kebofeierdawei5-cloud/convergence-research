@@ -162,7 +162,14 @@ class GuidedTaskSession:
         if section not in {"portfolio", "valuation"}:
             raise TaskWorkspaceError("GUIDED_TASK_OPERATOR_CONTEXT_SECTION_UNSUPPORTED")
         name = f"artifacts/round_b_validated/operator_{section}_context.json"
-        return name in self.inspect()["artifacts"]
+        if name in self.inspect()["artifacts"]:
+            return True
+        orphan = self.workspace.path / name
+        if orphan.is_symlink() or orphan.exists():
+            raise TaskWorkspaceError(
+                f"GUIDED_TASK_OPERATOR_CONTEXT_ORPHAN_REQUIRES_REVIEW:{section}"
+            )
+        return False
 
     def checkpoint_partial_operator_context(self, section: str, value: Any) -> dict[str, Any]:
         if section not in {"portfolio", "valuation"}:
