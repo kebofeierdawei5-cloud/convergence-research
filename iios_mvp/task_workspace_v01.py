@@ -396,8 +396,42 @@ def open_task(root: str | Path, task_id: str, *, verify_artifacts: bool = True) 
 
 @contextmanager
 def task_lock(workspace: TaskWorkspace) -> Iterator[None]:
-    """Exclusive per-task process lock; stale locks fail closed and require operator review."""
+    """Exclusive process lock; POSIX kernels release it automatically after crashes."""
     lock_path = workspace.path / ".resume.lock"
+    if os.name != "nt":
+        import fcntl
+
+        flags = os.O_RDWR | os.O_CREAT
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        try:
+            fd = os.open(lock_path, flags, 0o600)
+        except OSError as exc:
+            raise TaskWorkspaceError("TASK_LOCK_FILE_UNAVAILABLE") from exc
+        try:
+            if lock_path.is_symlink():
+                raise TaskWorkspaceError("TASK_LOCK_FILE_MUST_NOT_BE_SYMLINK")
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise TaskWorkspaceError("TASK_ALREADY_OPEN_IN_ANOTHER_PROCESS") from exc
+            with os.fdopen(fd, "r+", encoding="utf-8") as stream:
+                stream.seek(0)
+                stream.truncate()
+                stream.write(json.dumps({"pid": os.getpid(), "created_at": _now()}))
+                stream.flush()
+                os.fsync(stream.fileno())
+                yield
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+        finally:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+        return
+
+    # Windows fallback: exclusive-create lock. A process crash can leave a
+    # stale marker, so recovery remains fail-closed rather than guessing.
     try:
         fd = os.open(lock_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError as exc:
