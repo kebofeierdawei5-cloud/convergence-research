@@ -1167,6 +1167,23 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert analysis["research_rounds"]["round_b"]["response_sha256"]
     assert receipt["research_rounds"] == analysis["research_rounds"]
     assert pilot.verify_local_pilot_bundle(run_dir)["status"] == "PILOT_BUNDLE_HASH_CHECK_PASS"
+    task_id = task_dirs[0].name
+    task_manifest = json.loads((task_dirs[0] / "task_manifest.json").read_text(encoding="utf-8"))
+    assert task_manifest["current_stage"] == "COMPLETED"
+    assert task_manifest["task_status"] == "COMPLETED"
+    accepted_response = task_dirs[0] / "working" / "round-b-response-accepted.json"
+    accepted_bytes = accepted_response.read_bytes()
+    import hashlib
+    reused = pilot.run_local_investment_pilot(
+        input_path=completed_files[0],
+        output_root=tmp_path / "runs",
+        research_response_path=accepted_response,
+        expected_research_response_sha256=hashlib.sha256(accepted_bytes).hexdigest(),
+        expected_research_response_byte_size=len(accepted_bytes),
+        run_id_override=result["pilot_id"],
+    )
+    assert reused["idempotent_reuse"] is True
+    assert reused["pilot_id"] == result["pilot_id"]
     replay = pilot.run_local_investment_pilot(
         input_path=run_dir / "input.json",
         output_root=tmp_path / "runs",
