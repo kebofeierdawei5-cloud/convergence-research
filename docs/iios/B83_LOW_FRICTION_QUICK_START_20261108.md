@@ -11,7 +11,7 @@
 3. If several unfinished tasks exist, it asks for one numbered choice and shows company, ticker and current stage; it does not guess.
 4. If no unfinished task exists, it starts the existing guided wizard.
 5. Completed tasks are ignored. A blocked task, symlinked private path, invalid task entry, or corrupt/unverifiable task stops quick start rather than being silently skipped.
-6. `IIOS.command` is a local macOS launcher. It uses the repository's `.venv/bin/python` when present, otherwise the existing `python3`; it does not install dependencies, contact a server, request elevated privileges, or run an updater.
+6. After the durable runner verifies the completed report bundle, quick start opens that report locally (macOS only) and only when the resolved report path is inside the private output root.\n7. `IIOS.command` is a local macOS launcher. It uses the repository's `.venv/bin/python` when present, otherwise the existing `python3`; it does not install dependencies, contact a server, request elevated privileges, or run an updater.
 
 ## First-time launcher setup
 
@@ -28,7 +28,7 @@ After that, double-click `IIOS.command` in Finder to launch IIOS. The launcher r
 - One unfinished task: launch; IIOS continues from the verified journal-derived phase.
 - Multiple unfinished tasks: launch; choose the numbered company/ticker entry.
 - No unfinished task: launch; enter a new research case.
-- At Round A/B: send the copied prompt in ChatGPT, copy the complete answer, return to the IIOS terminal and press Enter once. Existing B83-3 clipboard intake reads the clipboard once only after that explicit Enter action. No TextEdit or JSON file editing is needed on the normal path.
+- At Round A/B: send the copied prompt in ChatGPT, copy the complete answer, return to the IIOS terminal and press Enter once. Existing B83-3 clipboard intake reads the clipboard once only after that explicit Enter action. IIOS opens ChatGPT but no longer launches TextEdit; no JSON file editing is needed on the normal path. After verified completion, IIOS opens the local report.
 - Invalid/incomplete answers continue through the existing repair and validation path; they do not advance the durable task.
 
 ## Security boundary
