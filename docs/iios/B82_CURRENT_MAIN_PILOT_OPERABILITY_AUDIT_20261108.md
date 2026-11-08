@@ -33,8 +33,8 @@ The product architecture should remain a local deterministic runner plus a small
 
 ### B73–B81 proposal chain / PR #587
 
-- PR #587 is a validation-only draft against the B73 proposal branch; its own description says not to merge the proposal chain as a whole.
-- The branch feat/b76-core-integrated-20261101 is 515 commits ahead of main. This is a large ancestry/delta, not a safe single-batch integration unit.
+- PR #587 was re-fetched during B82: **Open / Draft / Unmerged**, base `feat/b73-evidence-driven-remediation-20261031` at `faeee544238dd4b6154e2b0a7a4a53c8a88a6815`, head `feat/b76-core-integrated-20261101` at `d092355aba29476624925c15d82a42d9b1f30354`; GitHub reports `merged=false`. Its own body says validation-only and explicitly says do not merge the proposal chain as a whole.
+- Comparing the proposal head with current `main@2fd009b10bd4b13467ebdd8b2692eab62a772878` reports 515 commits ahead, 0 behind. The 515 is branch ancestry/delta, not 515 commits uniquely authored by PR #587. The compare lists a broad cross-cutting change set, not a safe single-batch integration unit.
 - Its changed-file list includes B42–B81 research documents and modules, the Pilot source, authority/runtime code, schemas and tests. It is materially broader than an operability-only patch.
 - B74 and B75 documents on that branch explicitly state their regression assertions were added but not executed, and no Replay, CI or real Mac acceptance is claimed for those batches.
 - The B79 document says the production signer registry remains empty and the Xinhecheng case still lacks Q4 assumptions, annual weighted-average diluted shares and operator-attested current price.
