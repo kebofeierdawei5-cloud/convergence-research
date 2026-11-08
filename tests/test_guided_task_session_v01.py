@@ -118,3 +118,34 @@ def test_operator_confirmed_context_is_immutable_and_survives_reopen(tmp_path: P
     assert reopened.load_json_artifact("artifacts/task_created/task_context.json") == context
     with pytest.raises(TaskWorkspaceError, match="CONTEXT_ALREADY_FROZEN"):
         reopened.checkpoint_context(context)
+
+
+def test_offline_response_correction_becomes_a_new_attempt_before_validation(tmp_path: Path) -> None:
+    import iios_mvp.local_investment_pilot_v01 as pilot
+    from iios_mvp.guided_task_resume_v01 import _capture_or_reuse_response
+
+    session = GuidedTaskSession.create(tmp_path / "tasks", metadata={})
+    session.checkpoint_prompt(
+        "ROUND_A",
+        "prompt",
+        response_filename="round-a.json",
+        prompt_context={"prompt_input_payload": {}},
+    )
+    response_path = tmp_path / "round-a.json"
+    first = b'{"attempt": 1}'
+    corrected = b'{"attempt": 2}'
+    response_path.write_bytes(first)
+    session.capture_response("ROUND_A", first)
+    response_path.write_bytes(corrected)
+
+    selected, _signature = _capture_or_reuse_response(
+        session, pilot, "ROUND_A", response_path
+    )
+    assert selected == corrected
+    attempts = sorted(
+        name for name in session.inspect()["artifacts"]
+        if name.startswith("artifacts/round_a_response_captured/")
+    )
+    assert len(attempts) == 2
+    assert session.load_artifact(attempts[0]) == first
+    assert session.load_artifact(attempts[1]) == corrected
