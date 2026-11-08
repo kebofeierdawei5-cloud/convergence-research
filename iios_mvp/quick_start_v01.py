@@ -116,6 +116,7 @@ def main() -> int:
             + str(manifest.get("current_stage") or "状态未知")
         )
         result = run_guided_task(session, output_root=OUTPUT_ROOT)
+        _open_verified_report(result)
         print("\n研究任务完成：")
         print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
         return 0
