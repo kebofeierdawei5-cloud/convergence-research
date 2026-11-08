@@ -18,7 +18,8 @@ from .guided_task_resume_v01 import run_guided_task
 from .local_investment_pilot_v01 import run_guided_wizard
 from .task_workspace_v01 import TaskWorkspaceError
 
-PRIVATE_ROOT = Path.home() / ".iios-private" / "local-pilot"
+PRIVATE_PARENT = Path.home() / ".iios-private"
+PRIVATE_ROOT = PRIVATE_PARENT / "local-pilot"
 INPUT_ROOT = PRIVATE_ROOT / "inputs"
 TASK_ROOT = INPUT_ROOT / "tasks"
 OUTPUT_ROOT = PRIVATE_ROOT / "runs"
@@ -26,7 +27,7 @@ OUTPUT_ROOT = PRIVATE_ROOT / "runs"
 
 def _discover_unfinished_tasks() -> list[tuple[GuidedTaskSession, dict[str, Any], dict[str, Any]]]:
     """Return verified active tasks; corruption and blocked tasks fail closed."""
-    if PRIVATE_ROOT.is_symlink() or INPUT_ROOT.is_symlink() or TASK_ROOT.is_symlink():
+    if PRIVATE_PARENT.is_symlink() or PRIVATE_ROOT.is_symlink() or INPUT_ROOT.is_symlink() or TASK_ROOT.is_symlink():
         raise TaskWorkspaceError("QUICK_START_PRIVATE_PATH_IS_SYMLINK")
     if not TASK_ROOT.exists():
         return []
@@ -84,7 +85,7 @@ def _open_verified_report(result: dict[str, Any]) -> bool:
     if not isinstance(raw_path, str) or not raw_path:
         return False
     candidate = Path(raw_path).expanduser()
-    if candidate.is_symlink():
+    if PRIVATE_PARENT.is_symlink() or PRIVATE_ROOT.is_symlink() or OUTPUT_ROOT.is_symlink() or candidate.is_symlink():
         return False
     try:
         report = candidate.resolve(strict=True)
