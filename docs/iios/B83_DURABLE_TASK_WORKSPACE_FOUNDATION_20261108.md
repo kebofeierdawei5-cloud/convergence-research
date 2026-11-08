@@ -86,3 +86,34 @@ The next slice must wire each adapter call into the real wizard at the exact suc
 - Existing run_guided_wizard integration: not done.
 - --resume-task: not implemented.
 - Python / pytest / hosted CI / real-company run / macOS acceptance: not run.
+## B83-2 — End-to-end guided workflow wiring (source complete; validation pending)
+
+The durable runner is now wired into the existing local_investment_pilot_v01 entry point:
+
+- A new task is created only after the operator confirms the company, symbol, cutoff, position and manually attested price.
+- The task context freezes the original template payload and analysis prompt. Resume reconstructs task-local snapshots rather than trusting mutable files at their original paths.
+- The existing guided workflow delegates Round A/B, operator-owned context, run creation and final bundle verification to guided_task_resume_v01.py.
+- --resume-task TASK_ID reopens the task under the same --template-root and continues from the journal-derived resume_action.
+- Round A accepted payload is persisted before Round B prompt generation. A resumed Round B therefore does not rerun Round A or regenerate its accepted result.
+- Each stable raw response is captured as an immutable attempt. A correction saved while the process is offline is detected on resume and captured as a new attempt; prior attempts remain intact.
+- The final Round B response is copied from its immutable accepted attempt into a task-local stable snapshot before run creation. The run input provenance and raw response hash are bound to that exact snapshot.
+- Run IDs are deterministic per task. If the process exits after a complete run bundle is written but before the task journal records RUN_CREATED, resume verifies the existing bundle and reuses it only when input and raw-response bytes match. A partial or conflicting bundle fails closed.
+- On POSIX/macOS, task exclusivity uses an advisory OS lock released automatically when a process exits or crashes. The lock marker file may remain; it is not itself a stale lock. Windows retains a conservative exclusive-create fallback.
+
+### Operator usage
+
+Start normally with the existing launcher / --wizard. The task ID is printed after confirmation. If the terminal closes or the process stops, rerun the same module with:
+
+    python -m iios_mvp.local_investment_pilot_v01 --resume-task TASK_ID
+
+If the original task used a non-default --template-root, supply that same root when resuming. The persisted output root is used unless an explicit non-default --output-root is supplied.
+
+### Remaining validation boundary
+
+- Source integration and resume entry point: implemented on this feature branch.
+- Unit tests: authored in the B83-1/B83-2 test files but **not run**.
+- No GitHub Actions result is claimed.
+- No real company Round A/B interruption-resume run has been performed.
+- No macOS launcher / clipboard / TextEdit acceptance has been performed.
+- A process crash during a partially written run bundle intentionally blocks with a partial-bundle error; it does not delete or overwrite ambiguous output. This requires explicit operator review.
+- This remains PILOT_NON_CANONICAL; it does not create a formal investment decision or authorize execution.
