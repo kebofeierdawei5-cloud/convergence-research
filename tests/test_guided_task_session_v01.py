@@ -372,3 +372,97 @@ def test_guided_runner_resumes_round_b_without_rebuilding_frozen_round_a(tmp_pat
     assert reopened.load_artifact(
         "artifacts/round_b_prompt_ready/prompt.md"
     ) == prompt_before_resume
+
+
+def test_operator_portfolio_input_is_reused_after_interruption_before_valuation_context(tmp_path: Path, monkeypatch) -> None:
+    import json
+
+    import iios_mvp.local_investment_pilot_v01 as pilot
+    from iios_mvp.guided_task_resume_v01 import run_guided_task
+
+    inputs = tmp_path / "inputs"
+    output_root = tmp_path / "runs"
+    template_result = pilot.create_pilot_template(
+        company="山东赫达",
+        symbol="002810.SZ",
+        market="CN-A",
+        as_of_date="2026-10-12",
+        current_position_pct="0",
+        price="19.74",
+        price_observation_date="2026-10-09",
+        price_known_at="2026-10-09T15:00:00+08:00",
+        price_source_claim="operator supplied test price; not source verified",
+        template_root=inputs,
+    )
+    template_path = Path(template_result["input_template"])
+    prompt_path = Path(template_result["analysis_prompt"])
+    template_payload = json.loads(template_path.read_text(encoding="utf-8"))
+    session = GuidedTaskSession.create(inputs / "tasks", metadata={"symbol": "002810.SZ"})
+    session.checkpoint_context({
+        "company": "山东赫达",
+        "symbol": "002810.SZ",
+        "market": "CN-A",
+        "template_path": str(template_path.resolve()),
+        "analysis_prompt_path": str(prompt_path.resolve()),
+        "template_payload": template_payload,
+        "analysis_prompt_text": prompt_path.read_text(encoding="utf-8"),
+        "template_root": str(inputs.resolve()),
+        "output_root": str(output_root.resolve()),
+    })
+    session.checkpoint_prompt(
+        "ROUND_A", "Round A", response_filename="round-a-response.json",
+        prompt_context={"prompt_input_payload": pilot._round_a_prompt_input(template_payload)},
+    )
+    session.capture_response("ROUND_A", b'{"round":"A"}')
+    session.accept_validated_payload("ROUND_A", {"case": template_payload["case"], "round": "A"})
+    session.checkpoint_prompt(
+        "ROUND_B", "Round B", response_filename="round-b-response.json",
+        prompt_context={"prompt_input_payload": {"price_input": template_payload["price_input"]},
+                        "frozen_artifact_sha256": "test-only"},
+    )
+    session.capture_response("ROUND_B", b'{"round":"B"}')
+    session.accept_validated_payload("ROUND_B", {"case": template_payload["case"], "round": "B"})
+
+    portfolio = {"constraint_status": "UNKNOWN", "can_add": False}
+    monkeypatch.setattr(pilot, "_prepare_input", lambda _payload: None)
+    monkeypatch.setattr(pilot, "_ask_operator_portfolio_context", lambda: portfolio)
+    monkeypatch.setattr(
+        pilot,
+        "_ask_operator_valuation_context",
+        lambda: (_ for _ in ()).throw(KeyboardInterrupt()),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        run_guided_task(session, output_root=output_root)
+
+    portfolio_file = session.workspace.path / "working" / "operator_portfolio_context.json"
+    assert json.loads(portfolio_file.read_text(encoding="utf-8")) == portfolio
+    assert session.inspect()["resume_stage"] == "OPERATOR_CONTEXT_PENDING"
+
+    reopened, _manifest = GuidedTaskSession.open(inputs / "tasks", session.task_id)
+    monkeypatch.setattr(
+        pilot,
+        "_ask_operator_portfolio_context",
+        lambda: (_ for _ in ()).throw(AssertionError("completed portfolio input must not be requested again")),
+    )
+    valuation = {
+        "selected_model_family": "EPS_MULTIPLE",
+        "baseline_includes_project": None,
+        "input_owner": "OPERATOR",
+        "selection_source": "INTERACTIVE_OPERATOR_PROMPT",
+        "selection_confirmed": True,
+    }
+    monkeypatch.setattr(pilot, "_ask_operator_valuation_context", lambda: valuation)
+    monkeypatch.setattr(
+        pilot,
+        "run_local_investment_pilot",
+        lambda **_kwargs: (_ for _ in ()).throw(KeyboardInterrupt()),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        run_guided_task(reopened, output_root=output_root)
+
+    assert reopened.inspect()["current_stage"] == "OPERATOR_CONTEXT_CAPTURED"
+    saved_context = reopened.load_json_artifact(
+        "artifacts/operator_context_captured/operator_context.json"
+    )
+    assert saved_context["operator_portfolio_context"] == portfolio
+    assert saved_context["operator_valuation_context"] == valuation
