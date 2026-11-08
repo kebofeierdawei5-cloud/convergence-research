@@ -52,7 +52,8 @@ def _show_prompt(prompt: str, response_path: Path, *, phase: str) -> None:
         try:
             subprocess.run(["pbcopy"], input=prompt, text=True, check=True, timeout=5)
         except (OSError, subprocess.SubprocessError):
-            print("剪贴板复制失败；提示词已在任务目录持久化，请从下方路径读取。")
+            print("剪贴板复制失败；以下是持久化提示词，请手动复制：")
+            print(prompt)
         try:
             subprocess.run(["open", "https://chatgpt.com/"], check=False, timeout=5)
             subprocess.run(["open", "-a", "TextEdit", str(response_path)], check=False, timeout=5)
