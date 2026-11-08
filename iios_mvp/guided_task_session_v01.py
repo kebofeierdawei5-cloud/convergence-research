@@ -51,7 +51,10 @@ class GuidedTaskSession:
     def checkpoint_context(self, context: Mapping[str, Any]) -> dict[str, Any]:
         """Persist the immutable operator-confirmed task context at TASK_CREATED."""
         current = self.inspect()
-        if current["current_stage"] != "TASK_CREATED":
+        if (
+            current["current_stage"] != "TASK_CREATED"
+            or "artifacts/task_created/task_context.json" in current["artifacts"]
+        ):
             raise TaskWorkspaceError("GUIDED_TASK_CONTEXT_ALREADY_FROZEN")
         return self.workspace.record(
             "TASK_CREATED",
