@@ -150,7 +150,7 @@ def _validate_round(
                     "artifacts/round_a_validated/round_a_validated_payload.json"
                 )
                 expected_frozen_bytes = (
-                    json.dumps(frozen_payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+                    json.dumps(frozen_payload, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n"
                 ).encode("utf-8")
                 if base_path.read_bytes() != expected_frozen_bytes:
                     raise TaskWorkspaceError("GUIDED_TASK_ROUND_A_FROZEN_FILE_HASH_MISMATCH")
@@ -203,7 +203,7 @@ def _validate_round(
                 }
                 _write_private_once(
                     Path(str(context["round_a_frozen_path"])),
-                    (json.dumps(merged, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8"),
+                    (json.dumps(merged, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n").encode("utf-8"),
                 )
             else:
                 pilot._prepare_input(merged)
@@ -337,7 +337,7 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                 )
                 _write_private_once(
                     frozen_path,
-                    (json.dumps(round_a_payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode("utf-8"),
+                    (json.dumps(round_a_payload, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n").encode("utf-8"),
                 )
                 base_prompt = prompt_path.read_text(encoding="utf-8")
                 round_b_prompt, round_b_prompt_input, built_frozen_sha = pilot._build_price_aware_round_b_prompt(
