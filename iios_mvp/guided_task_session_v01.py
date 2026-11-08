@@ -178,18 +178,34 @@ class GuidedTaskSession:
         action = manifest["resume_stage"]
         required: list[str] = []
         if action == "ROUND_A_RESPONSE_PENDING":
-            required = ["artifacts/round_a_prompt_ready/prompt.md"]
+            required = [
+                "artifacts/round_a_prompt_ready/prompt.md",
+                "artifacts/round_a_prompt_ready/prompt_context.json",
+            ]
         elif action == "ROUND_A_VALIDATION_PENDING":
-            required = [name for name in manifest["artifacts"] if name.startswith("artifacts/round_a_response_captured/")]
-            if not required:
+            required = [
+                "artifacts/round_a_prompt_ready/prompt.md",
+                "artifacts/round_a_prompt_ready/prompt_context.json",
+                *[name for name in manifest["artifacts"] if name.startswith("artifacts/round_a_response_captured/")],
+            ]
+            if len(required) <= 2:
                 raise TaskWorkspaceError("GUIDED_TASK_ROUND_A_RESPONSE_ATTEMPT_MISSING")
         elif action == "ROUND_B_PROMPT_PENDING":
             required = ["artifacts/round_a_validated/round_a_validated_payload.json"]
         elif action == "ROUND_B_RESPONSE_PENDING":
-            required = ["artifacts/round_b_prompt_ready/prompt.md", "artifacts/round_a_validated/round_a_validated_payload.json"]
+            required = [
+                "artifacts/round_b_prompt_ready/prompt.md",
+                "artifacts/round_b_prompt_ready/prompt_context.json",
+                "artifacts/round_a_validated/round_a_validated_payload.json",
+            ]
         elif action == "ROUND_B_VALIDATION_PENDING":
-            required = [name for name in manifest["artifacts"] if name.startswith("artifacts/round_b_response_captured/")]
-            if not required:
+            required = [
+                "artifacts/round_b_prompt_ready/prompt.md",
+                "artifacts/round_b_prompt_ready/prompt_context.json",
+                "artifacts/round_a_validated/round_a_validated_payload.json",
+                *[name for name in manifest["artifacts"] if name.startswith("artifacts/round_b_response_captured/")],
+            ]
+            if len(required) <= 3:
                 raise TaskWorkspaceError("GUIDED_TASK_ROUND_B_RESPONSE_ATTEMPT_MISSING")
         elif action == "OPERATOR_CONTEXT_PENDING":
             required = ["artifacts/round_a_validated/round_a_validated_payload.json", "artifacts/round_b_validated/round_b_validated_payload.json"]
