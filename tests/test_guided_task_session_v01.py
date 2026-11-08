@@ -176,3 +176,87 @@ def test_response_capture_skips_conflicting_orphan_attempt_after_prejournal_cras
     assert recorded[0].endswith("round_a_response_captured_attempt_002.json")
     assert orphan.read_bytes() == b"orphaned bytes from interrupted previous write"
     assert session.load_artifact(recorded[0]) == accepted
+
+
+def test_guided_runner_reopens_same_round_a_prompt_and_captures_offline_response(tmp_path: Path, monkeypatch) -> None:
+    import json
+
+    import iios_mvp.local_investment_pilot_v01 as pilot
+    from iios_mvp.guided_task_resume_v01 import run_guided_task
+
+    inputs = tmp_path / "inputs"
+    output_root = tmp_path / "runs"
+    template_result = pilot.create_pilot_template(
+        company="山东赫达",
+        symbol="002810.SZ",
+        market="CN-A",
+        as_of_date="2026-10-12",
+        current_position_pct="0",
+        price="19.74",
+        price_observation_date="2026-10-09",
+        price_known_at="2026-10-09T15:00:00+08:00",
+        price_source_claim="operator supplied test price; not source verified",
+        template_root=inputs,
+    )
+    template_path = Path(template_result["input_template"])
+    prompt_path = Path(template_result["analysis_prompt"])
+    template_payload = json.loads(template_path.read_text(encoding="utf-8"))
+    session = GuidedTaskSession.create(inputs / "tasks", metadata={"symbol": "002810.SZ"})
+    session.checkpoint_context({
+        "company": "山东赫达",
+        "symbol": "002810.SZ",
+        "market": "CN-A",
+        "template_path": str(template_path.resolve()),
+        "analysis_prompt_path": str(prompt_path.resolve()),
+        "template_payload": template_payload,
+        "analysis_prompt_text": prompt_path.read_text(encoding="utf-8"),
+        "template_root": str(inputs.resolve()),
+        "output_root": str(output_root.resolve()),
+    })
+
+    monkeypatch.setattr(
+        pilot,
+        "_wait_for_response_file_change",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(KeyboardInterrupt()),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        run_guided_task(session, output_root=output_root)
+
+    first_state = session.inspect()
+    assert first_state["current_stage"] == "ROUND_A_PROMPT_READY"
+    original_prompt = session.load_artifact(
+        "artifacts/round_a_prompt_ready/prompt.md"
+    )
+    response_path = session.workspace.path / "working" / "round-a-response.json"
+    assert response_path.is_file()
+    assert response_path.read_bytes() == b""
+
+    # Simulate the operator saving the ChatGPT response while the runner is
+    # offline. Reopening must reuse the prompt bytes and capture the response
+    # before trying to validate it; it must not rebuild Round A.
+    raw_response = b'{"response_mode":"IIOS-RESEARCH-PATCH-0.1","research":{}}'
+    response_path.write_bytes(raw_response)
+    reopened, manifest = GuidedTaskSession.open(inputs / "tasks", session.task_id)
+    assert manifest["resume_stage"] == "ROUND_A_RESPONSE_PENDING"
+    monkeypatch.setattr(
+        pilot,
+        "_build_price_blind_round_a_prompt",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Round A prompt must not be regenerated")),
+    )
+    monkeypatch.setattr(
+        pilot,
+        "_validate_research_round_patch",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(KeyboardInterrupt()),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        run_guided_task(reopened, output_root=output_root)
+
+    resumed_state = reopened.inspect()
+    assert resumed_state["current_stage"] == "ROUND_A_RESPONSE_CAPTURED"
+    assert reopened.load_artifact("artifacts/round_a_prompt_ready/prompt.md") == original_prompt
+    attempts = [
+        name for name in resumed_state["artifacts"]
+        if name.startswith("artifacts/round_a_response_captured/")
+    ]
+    assert len(attempts) == 1
+    assert reopened.load_artifact(attempts[0]) == raw_response
