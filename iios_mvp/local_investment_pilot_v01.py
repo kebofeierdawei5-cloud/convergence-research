@@ -6059,6 +6059,8 @@ def run_guided_wizard(
         "market": market,
         "template_path": str(Path(template_result["input_template"]).resolve()),
         "analysis_prompt_path": str(Path(template_result["analysis_prompt"]).resolve()),
+        "template_payload": json.loads(Path(template_result["input_template"]).read_text(encoding="utf-8")),
+        "analysis_prompt_text": Path(template_result["analysis_prompt"]).read_text(encoding="utf-8"),
         "template_root": str(Path(template_root).expanduser().resolve()),
         "output_root": str(Path(output_root).expanduser().resolve()),
     })
