@@ -260,3 +260,115 @@ def test_guided_runner_reopens_same_round_a_prompt_and_captures_offline_response
     ]
     assert len(attempts) == 1
     assert reopened.load_artifact(attempts[0]) == raw_response
+
+
+def test_guided_runner_resumes_round_b_without_rebuilding_frozen_round_a(tmp_path: Path, monkeypatch) -> None:
+    import copy
+    import json
+
+    import iios_mvp.local_investment_pilot_v01 as pilot
+    from iios_mvp.guided_task_resume_v01 import run_guided_task
+
+    inputs = tmp_path / "inputs"
+    output_root = tmp_path / "runs"
+    template_result = pilot.create_pilot_template(
+        company="山东赫达",
+        symbol="002810.SZ",
+        market="CN-A",
+        as_of_date="2026-10-12",
+        current_position_pct="0",
+        price="19.74",
+        price_observation_date="2026-10-09",
+        price_known_at="2026-10-09T15:00:00+08:00",
+        price_source_claim="operator supplied test price; not source verified",
+        template_root=inputs,
+    )
+    template_path = Path(template_result["input_template"])
+    prompt_path = Path(template_result["analysis_prompt"])
+    template_payload = json.loads(template_path.read_text(encoding="utf-8"))
+    round_a_prompt = pilot._build_price_blind_round_a_prompt(template_payload)
+    round_a_raw = '{"response_mode":"IIOS-RESEARCH-PATCH-0.1","research":{}}'
+    round_a_prompt_fp = pilot._text_fingerprint(round_a_prompt)
+    round_a_response_fp = pilot._text_fingerprint(round_a_raw)
+    frozen_artifact = pilot._round_a_frozen_artifact(template_payload)
+    frozen_sha = pilot._canonical_json_sha256(frozen_artifact)
+    round_a_payload = copy.deepcopy(template_payload)
+    round_a_payload["_local_research_round_a_provenance"] = {
+        "schema_version": pilot.ROUND_A_PROVENANCE_SCHEMA,
+        "phase": "PRICE_BLIND_COMPANY_RESEARCH",
+        "prompt_filename": "round-a-prompt.md",
+        "prompt_text": round_a_prompt,
+        "prompt_sha256": round_a_prompt_fp["sha256"],
+        "prompt_byte_size": round_a_prompt_fp["byte_size"],
+        "prompt_input_payload": pilot._round_a_prompt_input(template_payload),
+        "response_filename": "round-a-response.json",
+        "raw_response_text": round_a_raw,
+        "response_sha256": round_a_response_fp["sha256"],
+        "response_byte_size": round_a_response_fp["byte_size"],
+        "frozen_company_side_artifact": frozen_artifact,
+        "frozen_artifact_sha256": frozen_sha,
+        "formal_forecast_admission": "NOT_ADMITTED",
+        "formal_valuation_admission": "NOT_ADMITTED",
+    }
+
+    session = GuidedTaskSession.create(inputs / "tasks", metadata={"symbol": "002810.SZ"})
+    session.checkpoint_context({
+        "company": "山东赫达",
+        "symbol": "002810.SZ",
+        "market": "CN-A",
+        "template_path": str(template_path.resolve()),
+        "analysis_prompt_path": str(prompt_path.resolve()),
+        "template_payload": template_payload,
+        "analysis_prompt_text": prompt_path.read_text(encoding="utf-8"),
+        "template_root": str(inputs.resolve()),
+        "output_root": str(output_root.resolve()),
+    })
+    session.checkpoint_prompt(
+        "ROUND_A",
+        round_a_prompt,
+        response_filename="round-a-response.json",
+        prompt_context={"prompt_input_payload": pilot._round_a_prompt_input(template_payload)},
+    )
+    session.capture_response("ROUND_A", round_a_raw.encode("utf-8"))
+    session.accept_validated_payload("ROUND_A", round_a_payload)
+
+    monkeypatch.setattr(
+        pilot,
+        "_build_price_blind_round_a_prompt",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("frozen Round A must not be regenerated")),
+    )
+    monkeypatch.setattr(
+        pilot,
+        "_wait_for_response_file_change",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(KeyboardInterrupt()),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        run_guided_task(session, output_root=output_root)
+
+    first_state = session.inspect()
+    assert first_state["current_stage"] == "ROUND_B_PROMPT_READY"
+    frozen_before_resume = session.load_artifact(
+        "artifacts/round_a_validated/round_a_validated_payload.json"
+    )
+    prompt_before_resume = session.load_artifact(
+        "artifacts/round_b_prompt_ready/prompt.md"
+    )
+
+    reopened, manifest = GuidedTaskSession.open(inputs / "tasks", session.task_id)
+    assert manifest["resume_stage"] == "ROUND_B_RESPONSE_PENDING"
+    monkeypatch.setattr(
+        pilot,
+        "_build_price_aware_round_b_prompt",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("saved Round B prompt must not be regenerated")),
+    )
+    with pytest.raises(KeyboardInterrupt):
+        run_guided_task(reopened, output_root=output_root)
+
+    resumed_state = reopened.inspect()
+    assert resumed_state["current_stage"] == "ROUND_B_PROMPT_READY"
+    assert reopened.load_artifact(
+        "artifacts/round_a_validated/round_a_validated_payload.json"
+    ) == frozen_before_resume
+    assert reopened.load_artifact(
+        "artifacts/round_b_prompt_ready/prompt.md"
+    ) == prompt_before_resume
