@@ -40,6 +40,8 @@ from .investment_core_contract_v03 import (
     calculate_return_metrics,
 )
 from .research_intake import build_research_case
+from .guided_task_session_v01 import GuidedTaskSession
+from .guided_task_resume_v01 import run_guided_task
 
 PILOT_SCHEMA = "IIOS-LOCAL-INVESTMENT-PILOT-0.1"
 PILOT_ANALYSIS_SCHEMA = "IIOS-LOCAL-INVESTMENT-PILOT-ANALYSIS-0.1"
@@ -4210,6 +4212,7 @@ def _write_run(
     research_response_path: str | Path | None = None,
     expected_research_response_sha256: str | None = None,
     expected_research_response_byte_size: int | None = None,
+    run_id_override: str | None = None,
 ) -> dict[str, Any]:
     try:
         input_text = input_path.read_text(encoding="utf-8")
@@ -4390,7 +4393,9 @@ def _write_run(
     payload_for_analysis.pop("_local_research_round_b_provenance", None)
     symbol = str((payload_for_analysis.get("case") or {}).get("symbol") or "candidate").replace(".", "-")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    run_id = f"local-pilot-{symbol}-{stamp}"
+    run_id = run_id_override or f"local-pilot-{symbol}-{stamp}"
+    if not run_id or Path(run_id).name != run_id or "/" in run_id or "\\" in run_id:
+        raise LocalInvestmentPilotError("PILOT_RUN_ID_INVALID")
     if response_provenance.get("status") == "CAPTURED_RAW_CHATGPT_RESPONSE":
         response_provenance["origin_pilot_id"] = run_id
         response_provenance["source_pilot_id"] = run_id
@@ -4493,6 +4498,7 @@ def run_local_investment_pilot(
     research_response_path: str | Path | None = None,
     expected_research_response_sha256: str | None = None,
     expected_research_response_byte_size: int | None = None,
+    run_id_override: str | None = None,
 ) -> dict[str, Any]:
     source = _outside_repo(input_path, "PILOT_INPUT_PATH", must_exist=True)
     root = _private_dir(output_root, "PILOT_OUTPUT_ROOT")
@@ -4503,6 +4509,7 @@ def run_local_investment_pilot(
         research_response_path=research_response_path,
         expected_research_response_sha256=expected_research_response_sha256,
         expected_research_response_byte_size=expected_research_response_byte_size,
+        run_id_override=run_id_override,
     )
 
 
@@ -6221,6 +6228,7 @@ def _main(argv: list[str] | None = None) -> int:
     modes.add_argument("--input", help="run a completed private pilot input JSON")
     modes.add_argument("--replay-run", help="verify a prior bundle then recompute and compare decision-material fields")
     modes.add_argument("--check-run", help="read-only SHA-256 check of a local run bundle")
+    modes.add_argument("--resume-task", help="resume a durable guided Pilot task by TASK_ID")
     parser.add_argument("--template-root", default=str(Path.home() / ".iios-private" / "local-pilot" / "inputs"))
     parser.add_argument("--output-root", default=str(Path.home() / ".iios-private" / "local-pilot" / "runs"))
     parser.add_argument("--company")
@@ -6237,6 +6245,10 @@ def _main(argv: list[str] | None = None) -> int:
     try:
         if args.wizard:
             result = run_guided_wizard(template_root=args.template_root, output_root=args.output_root)
+        elif args.resume_task:
+            task_root = _private_dir(args.template_root, "PILOT_TEMPLATE_ROOT") / "tasks"
+            session, _manifest = GuidedTaskSession.open(task_root, args.resume_task)
+            result = run_guided_task(session, output_root=args.output_root)
         elif args.create_template:
             required = {
                 "--company": args.company, "--symbol": args.symbol, "--as-of": args.as_of,
