@@ -232,6 +232,7 @@ def _verify_artifacts(task_dir: Path, manifest: Mapping[str, Any]) -> None:
     if not isinstance(artifacts, Mapping):
         raise TaskWorkspaceError("TASK_ARTIFACT_INDEX_INVALID")
     for name, record in artifacts.items():
+        safe_name = str(name)
         if not isinstance(name, str) or not isinstance(record, Mapping):
             raise TaskWorkspaceError(f"TASK_ARTIFACT_RECORD_INVALID:{safe_name}")
         rel = record.get("path")
