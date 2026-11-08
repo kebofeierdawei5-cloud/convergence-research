@@ -1,7 +1,7 @@
 # IIOS Post-B81 Operability and Real-Use Acceptance Roadmap
 
 **Date:** 2026-11-08  
-**Status:** Planning baseline; B82 audit not yet executed  
+**Status:** B82 source/workflow audit complete; local Mac acceptance remains open  
 **Branch:** `docs/iios-operability-roadmap-20261108`  
 **Scope:** Personal-investor workflow reliability, low manual operation, low environment dependence, and real-case acceptance.
 
@@ -20,9 +20,11 @@ Two acceptance dimensions must remain separate:
 
 Passing one does not imply passing the other.
 
+**B82 audit outcome (2026-11-08):** the canonical-main Pilot already has the guided CLI, two-round Web handoff, patch validation, protected operator-field restoration, private persistence, hash receipts and Replay. The next engineering gap is durable cross-process stage resumption, not a second input UI. See [B82 current-main Pilot operability audit](B82_CURRENT_MAIN_PILOT_OPERABILITY_AUDIT_20261108.md). Audited main SHA: `2fd009b10bd4b13467ebdd8b2692eab62a772878`. The audit was source-level only; no local tests or user-Mac workflow were run.
+
 ## 2. Known project context and cautions
 
-The following is the project context available when this plan was written. It is not a fresh code audit:
+The following combines prior context with the source-level B82 audit. B82 is not a local execution or Mac acceptance:
 
 - The original decision core has prior accepted real-company cases for CATL (300750) and Kolon Pharma (002422). These historical acceptances should not be confused with validation of later B42-B81 research additions.
 - B42-B81 added or developed research capabilities, but the complete newer workflow has not yet been accepted through end-to-end real-company cases.
@@ -33,6 +35,12 @@ The following is the project context available when this plan was written. It is
 - Newhe Cheng (002001) has known source-data gaps in historical physical sales, net selling prices, and unit variable costs. Do not infer these from accounting cost data. Preserve UNKNOWN where evidence is insufficient.
 - MIE remains optional explanatory context under the stated v0.3 policy; its absence alone must not veto an otherwise valid opportunity.
 - ChatGPT Free Web plus local scripts remains a pilot workflow, not an accepted canonical end-user workflow.
+- The current-main CLI already implements separate Round A and Round B response files, stable-save detection, phase-specific validation, a frozen Round A artifact and Replay lineage. Do not recreate these capabilities.
+- The current wizard has no supported cross-process `--resume-task` mode. Its task stages are written to files, but a terminated process cannot be resumed through a durable task-state interface.
+- macOS `pbcopy` is invoked as a required command for both prompts; a clipboard failure can abort an otherwise recoverable workflow. Treat clipboard as optional.
+- The local template starts with an empty evidence register and relies on ChatGPT Web research; original official filing bytes are not locally acquired and archived by the basic wizard.
+- README still points to the 2026-10-11 quick guide, whose handoff description predates the current two-round workflow. The current 2026-10-21 runbook documents the two-round process.
+- The current-main B34 Mac acceptance remains OPEN / NOT VERIFIED. Source inspection and hosted CI do not close that gate.
 
 **Mandatory precondition for implementation:** Before coding each batch, re-read the current canonical main state index, relevant source files, current PR metadata, and actual local-pilot implementation. Treat the bullets above as leads to verify, not as permission to assume the repository has not changed.
 
@@ -64,107 +72,99 @@ The Web interactions are intentionally retained. A dependable two-import workflo
 
 ### B82 — Existing workflow audit and minimal architecture decision
 
-**Priority:** Immediate; first execution batch  
-**Purpose:** Establish what already exists, what fails, what users actually do, and what should be reused.
+<badge>COMPLETE — SOURCE AUDIT</badge>
 
-Audit:
-- Pilot entry points, shell scripts, Python launch path, installation path, and dependency handling;
-- task input templates, system configuration, schemas, and default-value behavior;
-- Round A/B prompt generation and evidence packaging;
-- Round A/B response import, parsing, schema validation, and error reporting;
-- task state, manifest, file layout, logs, resume/retry, and replay;
-- clipboard, GUI, browser, network, and filesystem dependencies;
-- relevant B73-B81 code, documents, tests, and unresolved regressions;
-- current main, PR #587 base/head/state, branch ancestry, and merge risks.
+**Audited baseline:** canonical `main@2fd009b10bd4b13467ebdd8b2692eab62a772878` (2026-11-08 GitHub inspection).  
+**Audit artifact:** [B82 current-main Pilot operability audit](B82_CURRENT_MAIN_PILOT_OPERABILITY_AUDIT_20261108.md).
 
-Deliverables:
-1. End-to-end current-state workflow diagram;
-2. step-by-step human-operation inventory;
-3. failure register with trigger, root cause, impact, and recovery;
-4. capability reuse/delete/modify/build matrix;
-5. minimal target architecture and batch implementation plan;
-6. baseline measurement plan for user time and failure frequency.
+Completed:
+- Reconstructed the real CLI → Round A → frozen company artifact → Round B → local validation → report/receipt → Replay workflow from current-main source and user documentation.
+- Inventoried human inputs and mechanical operations.
+- Reviewed current-main Pilot entry/response/persistence code, targeted test coverage and local Pilot GitHub workflow.
+- Re-checked current PR #587 metadata, changed-file inventory, proposal branch and its large ancestry relative to `main`.
+- Produced failure register F82-01 through F82-09 and a capability reuse/build matrix.
+- Revised the minimal architecture and B83-B89 plan based on verified current-main behavior.
 
-Exit criteria:
-- Every human step has a documented reason;
-- every known failure has a proposed containment or fix;
-- every proposed feature maps to a verified user problem;
-- existing components and contracts are identified for reuse;
-- no broad rewrite is proposed without evidence.
+Key decisions:
+- Reuse the existing guided wizard, prompt builders, patch validator, response parser, operator-field protection, private storage, run receipt and Replay.
+- Do not build another input UI or duplicate research pipeline.
+- Prioritize durable task state/resume; make clipboard optional; then add bounded official-source intake and update stale instructions.
+- Keep B34 current-main real Mac acceptance OPEN / NOT VERIFIED.
 
-**B82 is an audit batch, not a feature-building batch.**
+Limitations: source inspection only. Local pytest, actual Mac GUI/browser/clipboard execution and B34 acceptance were NOT RUN. No runtime code changed.
 
-### B83 — Unified task entry and input contract
+**B82 is complete as an audit batch only; it does not claim operational acceptance.**
 
-**Purpose:** Eliminate routine manual JSON editing and task-file assembly.
+### B83 — Durable task workspace, stage manifest and resume
+
+**Purpose:** Let the user recover the same research task after Terminal closure, process failure or Mac restart without repeating completed Web research or re-entering protected operator inputs.
+
+Reuse the existing wizard/template and `~/.iios-private/local-pilot/{inputs,runs}` conventions. Do not create a second input interface or a parallel research engine.
 
 Deliver:
-- one task-creation interface or the smallest viable guided entry point;
-- canonical task object and versioned JSON Schema;
-- automatic JSON generation and validation;
-- versioned defaults for required annualized return, max-loss policy, horizon, valuation mode, and research rules;
-- task ID and isolated workspace creation;
-- explicit distinction between user-supplied values, system defaults, operator-attested values, and unknown values;
-- immutable or versioned task-input snapshots.
+- stable task ID and one private workspace per research task;
+- versioned task manifest containing input snapshot hash, source SHA, schema/prompt versions and current stage;
+- append-only stage-transition journal with timestamp, state, artifact path, byte size and SHA-256;
+- immutable/versioned Round A prompt, raw response, validated patch and frozen company artifact;
+- immutable/versioned Round B prompt, raw response and validated merged input;
+- an explicit `--resume-task <task_id>` or equivalently simple resume entry that validates the manifest and resumes the first incomplete stage;
+- safe handling of duplicate, incomplete, tampered, mismatched or missing artifacts;
+- no-clobber behavior for prior valid inputs and responses.
+
+Minimum states: `TASK_INPUT_READY`, `ROUND_A_PROMPT_READY`, `ROUND_A_RESPONSE_CAPTURED`, `ROUND_A_VALIDATED`, `ROUND_A_FROZEN`, `ROUND_B_PROMPT_READY`, `ROUND_B_RESPONSE_CAPTURED`, `ROUND_B_VALIDATED`, `RUN_WRITTEN`, `REPLAY_VERIFIED`.
+
+Do not let LLM output write or advance task state. Deterministic local code alone advances the manifest after validation succeeds.
 
 Exit criteria:
-- User can create a valid task without editing JSON;
-- invalid input is rejected before research begins;
-- null/unknown values are not silently coerced to zero;
-- changes create traceable revisions rather than overwriting prior task history.
+- Simulated process interruption at every stage resumes the same task from the last valid stage;
+- previously completed Round A is not repeated when Round B is pending;
+- protected price, cutoff, position and policy inputs are not re-entered or rewritten during resume;
+- tampered/missing/hash-mismatched artifacts stop safely with an actionable error;
+- prior valid artifacts remain byte-identical.
 
-### B84 — Local runtime and environment reliability
+### B84 — One supported launch path and local runtime preflight
 
-**Purpose:** Remove recurring Python, shell, permission, and dependency friction.
-
-Preferred minimal design:
-- retain the current Python application entry point where viable;
-- one-time installer/bootstrapper creates an isolated environment and installs pinned dependencies;
-- fixed supported Python version and dependency lock;
-- daily launcher performs preflight checks and starts the workflow;
-- terminal command remains a fallback, not the normal user path;
-- logs are retained, but user-facing errors are concise and actionable;
-- no daily chmod, manual venv activation, shell-profile editing, dependency installation, or interpreter selection;
-- clipboard and GUI integrations remain optional.
-
-Preflight checks should cover supported OS/Python, required dependencies, configuration/schema compatibility, workspace permissions, disk space, and required paths.
-
-Exit criteria:
-- Clean supported macOS environment can be installed from documented steps;
-- routine runs do not require developer-level environment operations;
-- startup failures are diagnosed before task execution;
-- failure messages identify a concrete next action;
-- the workflow does not depend on clipboard or GUI synchronization.
-
-Do not rewrite the desktop application or add signing/notarization complexity unless the audit demonstrates it is necessary.
-
-### B85 — Round A/B handoff and recovery
-
-**Purpose:** Preserve ChatGPT Web while removing manual prompt assembly, file juggling, and format repair.
+**Purpose:** Remove avoidable source-version, Python and environment ambiguity without replacing the existing Pilot.
 
 Deliver:
-- deterministic Round A/B input-pack generation;
-- prompt generation tied to task, schema, and prompt versions;
-- a documented response contract;
-- robust import for the supported output formats;
-- task ID, schema version, period, and required-field validation;
-- preservation of raw Web responses;
-- no overwrite of last valid result on failed import;
-- actionable validation errors with field/path context;
-- automatic next-stage package generation;
-- stage state machine and resumable execution.
+- decide and document one normal daily launch/update path, separately from the packaged full-acceptance launcher;
+- preflight displays source SHA/version, supported Python version, dependency readiness, required paths, private workspace permissions and available disk space before asking for case inputs;
+- detect stale source or unsupported runtime before the user starts a research task;
+- keep concise actionable logs and a safe recovery path;
+- remove routine manual Git commands, chmod, venv activation, shell-profile edits and dependency repair where the existing distribution path can handle them safely.
 
-Important rule:
-- Do not rely on ChatGPT always emitting perfect JSON.
-- Parse only supported formats; validate before accepting.
-- Never silently discard unknown or required fields.
-- Never auto-fill missing investment facts to make a schema pass.
+Do not introduce a new desktop framework, complex installer, signing/notarization work or pinned environment machinery unless B82 evidence shows the current Python entry path cannot meet the requirement. Do not make the daily workflow dependent on GitHub availability after a verified source copy has been installed.
 
 Exit criteria:
-- A real task completes both Web rounds with no manual JSON editing;
-- no more than one deliberate import action per round;
-- failed imports preserve the raw response and prior valid artifacts;
-- interrupted tasks resume from the last valid stage.
+- one documented daily launch path and one clearly labeled acceptance path;
+- stale source and unsupported runtime are detected before user input;
+- clean supported Mac setup and routine startup have concrete, low-operations steps;
+- no unnecessary rewrite of the Python application entry point.
+
+### B85 — Round A/B handoff resilience and documentation alignment
+
+**Purpose:** Make the existing two-round Web handoff tolerant of local clipboard/GUI failures and easy to follow without adding browser automation.
+
+Deliver:
+- keep the existing phase-specific prompt builders, patch allowlists, frozen Round A artifact and response parser;
+- make `pbcopy` best-effort; the prompt file is always authoritative and must be shown/openable with clear manual copy instructions;
+- browser and TextEdit opening are best-effort with explicit visible fallback instructions;
+- preserve separate Round A/Round B response files, stable-save detection, file chooser and concise repair prompts;
+- bind each response attempt to B83 task ID/stage and never overwrite the last valid response;
+- reconcile README and quick guide with the current two-round main workflow and 2026-10-21 acceptance runbook.
+
+Important rules:
+- retain ChatGPT Web as the research interface;
+- no clipboard, GUI or browser-automation dependency in the correctness-critical path;
+- preserve raw failed responses for diagnosis but do not accept them as validated stage artifacts;
+- never auto-fill missing investment facts or weaken phase/UNKNOWN controls.
+
+Exit criteria:
+- clipboard failure does not terminate the task;
+- user can manually open/copy the exact prompt and save/import the response;
+- no more than one deliberate response import per round;
+- failed imports preserve the raw response and last valid state;
+- instructions match the exact current implementation.
 
 ### B86 — Official evidence preparation automation
 
@@ -278,43 +278,43 @@ Exit criteria:
 
 Recommended sequence:
 
-`B82 -> (B83 + B84) -> B85 -> B86 -> B87 -> B88 -> B89`
+`B82 (complete) -> B83 -> B84 -> B85 -> B86 -> B87 -> B88 -> B89`
 
-B83 and B84 may be designed or implemented in parallel after B82, but must share one task contract, configuration model, and workspace protocol.
+B83 establishes the durable task/workspace contract first. B84 and B85 then build around that same task ID and stage manifest; do not implement competing state or handoff models.
 
-B86 is not a prerequisite for first proving B85. Use an existing verified evidence pack to validate the Round A/B handoff, then improve automated source preparation.
+The existing current-main B34 acceptance is a separate prerequisite for deciding whether the unchanged B33 workflow is operationally accepted. Do not confuse B34 with B89: B34 validates the already-merged current-main workflow, while B89 validates the modified B83-B88 product.
 
-Do not start B83-B86 implementation until B82 identifies the actual reusable components and the smallest safe change set.
+B86 may be developed after the task/workspace contract exists. Use a verified manually assembled official evidence pack to validate handoff/recovery before depending on automated retrieval.
+
+Do not start a broad rewrite. Every code change must map to a verified B82 failure or a real-case acceptance finding.
 
 ## 7. Unified task workspace and provenance contract
 
-Proposed logical layout (adapt to existing repository conventions; do not duplicate an existing equivalent):
+Proposed logical layout (adapt to existing private Pilot paths and do not duplicate an existing equivalent):
 
 ```text
-IIOS/
-├── app/
-├── config/
-│   ├── system_config.json
-│   └── schemas/
-├── workspace/
-│   └── <ticker>/<asof>/
-│       ├── input/
-│       ├── evidence/
-│       ├── round_a/
-│       ├── round_b/
-│       ├── output/
-│       └── manifest.json
-├── logs/
-└── launcher/
+~/.iios-private/local-pilot/
+├── tasks/<task_id>/
+│   ├── task_manifest.json
+│   ├── transitions.jsonl
+│   ├── input/                 # immutable operator task snapshot / revisions
+│   ├── round_a/               # prompt, raw response, validated patch, frozen artifact
+│   ├── round_b/               # prompt, raw response, validated patch
+│   ├── output/                # analysis, report, receipt, replay
+│   └── evidence/              # optional original-source pack
+├── runs/                      # existing run bundles retained for compatibility
+└── logs/
 ```
 
-Suggested source-of-truth responsibilities:
-- JSON: machine-readable task inputs, states, and structured outputs;
-- PDF/XBRL and original disclosure files: immutable source evidence;
-- Markdown: prompts, readable reports, exception explanations;
-- manifest: task identity, versions, hashes, stage states, timestamps, and recovery point.
+The layout is a target logical contract, not a claim that these directories already exist. Preserve compatibility with existing `inputs/` and `runs/` until a migration decision is supported by the code audit.
 
-Do not maintain duplicate Excel/Markdown/JSON copies as competing sources of truth.
+Suggested source-of-truth responsibilities:
+- JSON: machine-readable task inputs, stage state and structured outputs;
+- PDF/XBRL/HTML original disclosures: immutable source evidence;
+- Markdown: exact prompt text, readable reports and exception explanations;
+- manifest/journal: task identity, source SHA, schema/prompt versions, hashes, transitions and resume point.
+
+Keep original raw responses immutable. New attempts create versioned candidate artifacts; only a successfully validated response becomes the current accepted stage artifact. Do not maintain duplicate competing sources of truth.
 
 ## 8. Validation strategy
 
@@ -402,8 +402,8 @@ No claim of completion without the corresponding evidence.
 
 ## 12. Immediate next action
 
-Start B82 only.
+Start B83 only: implement the durable task workspace, stage manifest, immutable artifacts and `--resume-task` entry described above. Reuse the existing wizard and Round A/B pipeline; do not build a second input UI.
 
-First inspect the current canonical main state index, current PR #587 metadata and diff, and actual Pilot entry/input/handoff/import/runtime files. Produce the audit artifacts and a minimal implementation map. Do not modify runtime code until the audit is complete.
+Before coding, re-check the exact main HEAD, Pilot source and tests, then define the manifest schema and stage-transition contract. Add narrow interruption/resume and tamper-rejection tests. Do not modify investment formulas, Trust/forecast admission, formal Decision authority or execution permissions.
 
-**Current status of this roadmap:** persisted as a planning document on a dedicated documentation branch. It is not merged into main, and no B82 code audit or implementation is claimed by this document.
+**Current status:** B82 source/workflow audit is persisted on this dedicated documentation branch. No runtime code was changed, no local tests or user-Mac workflow were run, and the roadmap has not been merged to `main`.
