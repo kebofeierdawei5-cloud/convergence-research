@@ -9,11 +9,13 @@ It never guesses when task state is corrupt or blocked.
 
 import json
 from pathlib import Path
+import subprocess
+import sys
 from typing import Any
 
 from .guided_task_session_v01 import GuidedTaskSession
 from .guided_task_resume_v01 import run_guided_task
-from .local_investment_pilot_v01 import _main as _pilot_main
+from .local_investment_pilot_v01 import run_guided_wizard
 from .task_workspace_v01 import TaskWorkspaceError
 
 PRIVATE_ROOT = Path.home() / ".iios-private" / "local-pilot"
@@ -74,12 +76,36 @@ def _choose_task(
         print("序号无效，请重新输入。")
 
 
+def _open_verified_report(result: dict[str, Any]) -> bool:
+    """Open only the report returned after the runner's bundle verification."""
+    if sys.platform != "darwin" or result.get("status") != "PILOT_CREATED":
+        return False
+    raw_path = result.get("report_path")
+    if not isinstance(raw_path, str) or not raw_path:
+        return False
+    candidate = Path(raw_path).expanduser()
+    if candidate.is_symlink():
+        return False
+    try:
+        report = candidate.resolve(strict=True)
+        output_root = OUTPUT_ROOT.resolve(strict=True)
+        report.relative_to(output_root)
+        if not report.is_file():
+            return False
+        subprocess.run(["open", str(report)], check=False, timeout=5)
+        return True
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return False
+
+
 def main() -> int:
     try:
         tasks = _discover_unfinished_tasks()
         if not tasks:
             print("没有未完成研究，开始新的 IIOS 研究。")
-            return _pilot_main(["--wizard"])
+            result = run_guided_wizard()
+            _open_verified_report(result)
+            return 0
         session, manifest, context = _choose_task(tasks)
         print(
             "正在继续："
