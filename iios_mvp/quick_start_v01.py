@@ -24,8 +24,8 @@ OUTPUT_ROOT = PRIVATE_ROOT / "runs"
 
 def _discover_unfinished_tasks() -> list[tuple[GuidedTaskSession, dict[str, Any], dict[str, Any]]]:
     """Return verified active tasks; corruption and blocked tasks fail closed."""
-    if TASK_ROOT.is_symlink():
-        raise TaskWorkspaceError("QUICK_START_TASK_ROOT_IS_SYMLINK")
+    if PRIVATE_ROOT.is_symlink() or INPUT_ROOT.is_symlink() or TASK_ROOT.is_symlink():
+        raise TaskWorkspaceError("QUICK_START_PRIVATE_PATH_IS_SYMLINK")
     if not TASK_ROOT.exists():
         return []
     if not TASK_ROOT.is_dir():
