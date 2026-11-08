@@ -154,3 +154,24 @@ Use the same private template root used when the task was created:
     python -m iios_mvp.local_investment_pilot_v01 --resume-task TASK_ID
 
 The task ID is printed after the initial operator confirmation. The research output remains PILOT_NON_CANONICAL; no formal decision or order execution is created.
+
+## B83-3 — low-friction explicit clipboard intake
+
+**Implementation commit:** `a1da61ede5d39a7962e222aee22b62e980f81047`
+
+The guided response wait now supports a one-shot macOS clipboard capture. The operator copies the complete ChatGPT answer and presses Enter in the waiting IIOS terminal. Only then does IIOS invoke `pbpaste` once and write the captured UTF-8 bytes to the existing task response file. The existing response parser, validation, immutable attempt capture and durable resume flow remain the authority.
+
+Security constraints:
+- No clipboard polling, daemon, background monitor, browser integration or Accessibility permission.
+- Clipboard content is never printed or logged.
+- Capture is capped at 2 MiB and requires valid UTF-8.
+- A non-empty response file is never overwritten; symlink targets are rejected.
+- A private temporary file is created with mode 0600, flushed and fsynced before atomic replacement.
+- If clipboard capture fails, the existing file-based workflow remains available.
+
+This removes TextEdit and manual response-file saving from the normal macOS path, but does not remove the user's explicit copy action or manual ChatGPT send action.
+
+### Validation boundary
+
+This source change is committed to the B83 feature branch. It is not yet evidence of successful macOS acceptance. The capture helper still requires automated tests and a real Mac run covering clipboard permission behavior, empty/oversized/non-UTF-8 content, pre-existing response files, interruption and subsequent task resume. B34 macOS acceptance remains open.
+
