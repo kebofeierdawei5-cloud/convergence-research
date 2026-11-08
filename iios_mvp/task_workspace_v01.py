@@ -242,9 +242,13 @@ def _verify_artifacts(task_dir: Path, manifest: Mapping[str, Any]) -> None:
         if posix.is_absolute() or any(part in {"", ".", ".."} for part in posix.parts) or not rel.startswith(ARTIFACT_DIRNAME + "/"):
             raise TaskWorkspaceError(f"TASK_ARTIFACT_PATH_UNSAFE:{safe_name}")
         _safe_artifact_name(posix.name)
-        path = task_dir.joinpath(*posix.parts)
-        if path.is_symlink() or not path.is_file():
-            raise TaskWorkspaceError(f"TASK_ARTIFACT_MISSING_OR_SYMLINK:{safe_name}")
+        path = task_dir
+        for part in posix.parts:
+            path = path / part
+            if path.is_symlink():
+                raise TaskWorkspaceError(f"TASK_ARTIFACT_PATH_COMPONENT_IS_SYMLINK:{safe_name}")
+        if not path.is_file():
+            raise TaskWorkspaceError(f"TASK_ARTIFACT_MISSING:{safe_name}")
         try:
             data = path.read_bytes()
         except OSError as exc:
@@ -309,6 +313,10 @@ class TaskWorkspace:
             name = _safe_artifact_name(raw_name)
             content = raw_content.encode("utf-8") if isinstance(raw_content, str) else bytes(raw_content)
             rel = f"{ARTIFACT_DIRNAME}/{stage.lower()}/{name}"
+            artifact_root = self.path / ARTIFACT_DIRNAME
+            stage_root = artifact_root / stage.lower()
+            if artifact_root.is_symlink() or stage_root.is_symlink():
+                raise TaskWorkspaceError("TASK_ARTIFACT_DIRECTORY_MUST_NOT_BE_SYMLINK")
             target = self.path / rel
             _write_immutable(target, content)
             artifact_records[rel] = {
