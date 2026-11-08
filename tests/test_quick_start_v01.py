@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 import iios_mvp.quick_start_v01 as quick_start
+import iios_mvp.guided_task_resume_v01 as guided_resume
 from iios_mvp.task_workspace_v01 import TaskWorkspaceError
 
 
@@ -55,3 +56,38 @@ def test_discovery_fails_closed_on_symlinked_task_root(monkeypatch, tmp_path):
 
     with pytest.raises(TaskWorkspaceError, match="QUICK_START_TASK_ROOT_IS_SYMLINK"):
         quick_start._discover_unfinished_tasks()
+
+
+
+def test_quick_start_opens_only_verified_report_inside_private_output_root(monkeypatch, tmp_path):
+    report = tmp_path / "run-1" / "report.md"
+    report.parent.mkdir()
+    report.write_text("# verified", encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(quick_start.sys, "platform", "darwin")
+    monkeypatch.setattr(quick_start, "OUTPUT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        quick_start.subprocess, "run",
+        lambda command, **kwargs: calls.append(command),
+    )
+
+    assert quick_start._open_verified_report({
+        "status": "PILOT_CREATED",
+        "report_path": str(report),
+    }) is True
+    assert calls == [["open", str(report.resolve())]]
+
+
+def test_prompt_handoff_does_not_open_textedit(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(guided_resume.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        guided_resume.subprocess, "run",
+        lambda command, **kwargs: calls.append(command),
+    )
+
+    guided_resume._show_prompt("safe prompt", tmp_path / "response.json", phase="Round A")
+
+    assert calls[0] == ["pbcopy"]
+    assert calls[1] == ["open", "https://chatgpt.com/"]
+    assert all("TextEdit" not in part for command in calls for part in command)
