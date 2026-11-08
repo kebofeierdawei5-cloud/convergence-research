@@ -41,14 +41,15 @@ def test_append_only_transitions_and_artifact_hashes(tmp_path: Path) -> None:
         )
 
 
-def test_journal_rebuild_detects_manifest_divergence(tmp_path: Path) -> None:
+def test_stale_manifest_is_rebuilt_from_durable_journal(tmp_path: Path) -> None:
     workspace = create_task(tmp_path / "tasks")
     workspace.record("ROUND_A_PROMPT_READY")
     manifest = json.loads(workspace.manifest_path.read_text())
     manifest["current_stage"] = "ROUND_B_PROMPT_READY"
     workspace.manifest_path.write_text(json.dumps(manifest))
-    with pytest.raises(TaskWorkspaceError, match="MANIFEST_JOURNAL_DIVERGENCE"):
-        workspace.inspect()
+    recovered = workspace.inspect()
+    assert recovered["current_stage"] == "ROUND_A_PROMPT_READY"
+    assert json.loads(workspace.manifest_path.read_text()) == recovered
 
 
 def test_tampered_artifact_is_rejected(tmp_path: Path) -> None:
