@@ -18,7 +18,7 @@ def test_create_task_persists_private_manifest_and_initial_journal(tmp_path: Pat
     manifest = workspace.inspect()
     assert manifest["task_id"] == workspace.task_id
     assert manifest["current_stage"] == "TASK_CREATED"
-    assert manifest["resume_stage"] == "ROUND_A_PROMPT_READY"
+    assert manifest["resume_stage"] == "ROUND_A_PROMPT_PENDING"
     assert manifest["formal_decision_created"] is False
     assert workspace.path.stat().st_mode & 0o077 == 0
 
