@@ -5204,6 +5204,20 @@ def _validate_round_a_prompt_projection(value: Any) -> bool:
     )
 
 
+def _prompt_json_after_marker(prompt: str, marker: str, error_code: str) -> dict[str, Any]:
+    """Extract the first JSON object after one unique prompt marker, ignoring key order."""
+    if not isinstance(prompt, str) or prompt.count(marker) != 1:
+        raise LocalInvestmentPilotError(error_code)
+    suffix = prompt.split(marker, 1)[1].lstrip()
+    try:
+        value, _end = json.JSONDecoder().raw_decode(suffix)
+    except json.JSONDecodeError as exc:
+        raise LocalInvestmentPilotError(error_code) from exc
+    if not isinstance(value, dict):
+        raise LocalInvestmentPilotError(error_code)
+    return value
+
+
 def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]:
     a, b = payload.get("_local_research_round_a_provenance"), payload.get("_local_research_round_b_provenance")
     if a is None and b is None:
@@ -5222,7 +5236,10 @@ def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]
         fp = _text_fingerprint(value)
         if fp["sha256"] != sha or fp["byte_size"] != size:
             raise LocalInvestmentPilotError(f"ROUND_A_{label}_FINGERPRINT_MISMATCH")
-    if json.dumps(ai, ensure_ascii=False, indent=2, allow_nan=False) not in ap:
+    embedded_round_a_input = _prompt_json_after_marker(
+        ap, "【Round A 允许输入】", "ROUND_A_PROMPT_CONTEXT_NOT_BOUND"
+    )
+    if embedded_round_a_input != ai:
         raise LocalInvestmentPilotError("ROUND_A_PROMPT_CONTEXT_NOT_BOUND")
     actual_sha = _canonical_json_sha256(artifact) if isinstance(artifact, Mapping) else None
     if actual_sha != a.get("frozen_artifact_sha256") or set(artifact or {}) != {"schema_version", "case", "evidence_register", "assessment", "operating_driver_forecast"}:
@@ -5239,7 +5256,12 @@ def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]
     bfp = _text_fingerprint(bp)
     if bfp["sha256"] != b.get("prompt_sha256") or bfp["byte_size"] != b.get("prompt_byte_size"):
         raise LocalInvestmentPilotError("ROUND_B_PROMPT_FINGERPRINT_MISMATCH")
-    if json.dumps(bi, ensure_ascii=False, indent=2, allow_nan=False) not in bp:
+    embedded_round_b_input = _prompt_json_after_marker(
+        bp,
+        "【Round B 输入模板（此阶段才包含结构化参考价）】",
+        "ROUND_B_PROMPT_CONTEXT_NOT_BOUND",
+    )
+    if embedded_round_b_input != bi:
         raise LocalInvestmentPilotError("ROUND_B_PROMPT_CONTEXT_NOT_BOUND")
     if b.get("frozen_artifact_sha256") != actual_sha:
         raise LocalInvestmentPilotError("ROUND_B_DID_NOT_CONSUME_FROZEN_ROUND_A_ARTIFACT")
