@@ -1131,7 +1131,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     result = run_guided_wizard(template_root=tmp_path / "inputs", output_root=tmp_path / "runs")
 
     assert result["status"] == "PILOT_CREATED"
-    completed_files = list((tmp_path / "inputs").glob("pilot-completed-*.json"))
+    completed_files = list((tmp_path / "inputs" / "tasks").glob("*/working/completed_input.json"))
     assert len(completed_files) == 1
     saved = json.loads(completed_files[0].read_text(encoding="utf-8"))
     assert saved["price_input"]["price"] == "19.74"
@@ -1140,8 +1140,10 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert result["formal_decision_created"] is False and result["auto_execution"] is False
     output = capsys.readouterr().out
     assert "Round A 价格盲研究提示" in output and "Round B 价格感知估值/MIE/预期差提示" in output
-    round_a_paths = list((tmp_path / "inputs").glob("pilot-prompt-round-a-*.md"))
-    round_b_paths = list((tmp_path / "inputs").glob("pilot-prompt-round-b-*.md"))
+    task_dirs = list((tmp_path / "inputs" / "tasks").glob("task-*"))
+    assert len(task_dirs) == 1
+    round_a_paths = [task_dirs[0] / "artifacts" / "round_a_prompt_ready" / "prompt.md"]
+    round_b_paths = [task_dirs[0] / "artifacts" / "round_b_prompt_ready" / "prompt.md"]
     assert len(round_a_paths) == 1 and len(round_b_paths) == 1
     round_a_text = round_a_paths[0].read_text(encoding="utf-8")
     round_b_text = round_b_paths[0].read_text(encoding="utf-8")
