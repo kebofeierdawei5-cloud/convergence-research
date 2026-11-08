@@ -117,3 +117,40 @@ If the original task used a non-default --template-root, supply that same root w
 - No macOS launcher / clipboard / TextEdit acceptance has been performed.
 - A process crash during a partially written run bundle intentionally blocks with a partial-bundle error; it does not delete or overwrite ambiguous output. This requires explicit operator review.
 - This remains PILOT_NON_CANONICAL; it does not create a formal investment decision or authorize execution.
+## Current B83-2 status — authoritative update (2026-11-08)
+
+The historical intermediate status blocks above are retained as an audit trail. This section is the current status and supersedes earlier statements that integration or CI validation was pending.
+
+### Implemented and integrated on this branch
+
+- The normal --wizard path creates a task only after operator confirmation and delegates research phases to the durable runner.
+- --resume-task TASK_ID reopens a task and resumes from the hash-verified journal-derived stage.
+- Round A and Round B prompts, prompt projections, raw response attempts and accepted payloads are persisted independently.
+- Round A is frozen before Round B; a restarted Round B reuses the accepted Round A payload and the exact persisted Round B prompt.
+- Offline response corrections are captured as new immutable attempts rather than overwriting prior responses.
+- The two operator-controlled input substeps (portfolio constraints and valuation-model context) are now journaled separately. An interruption after one input is captured can resume without asking for that input again.
+- A completed run bundle is hash-verified and reused before calling analysis if the process stopped before journaling RUN_CREATED. Partial or conflicting run bundles fail closed.
+- POSIX/macOS task locks are kernel advisory locks released after a process exits or crashes.
+
+### Automated validation
+
+- GitHub Actions commit: f55b1e90efdc8aad08fcec65b18e8b0660920e21.
+- B83 Pilot workflow: **374 passed**; compileall, bash syntax checks and git diff --check passed.
+- All 8 check runs attached to that PR head completed successfully.
+- The added cross-instance tests exercise restart during Round A response wait, restart after Round A freeze while Round B is pending, and restart between operator portfolio and valuation input capture.
+- CI runs on Ubuntu / Python 3.12. It does not replace macOS GUI/clipboard/TextEdit acceptance or a real-company user acceptance.
+
+### Still open
+
+- Real macOS `.command` launcher, `pbcopy`, ChatGPT browser and TextEdit save/reopen acceptance: **OPEN / NOT VERIFIED**.
+- Full real-company task interrupted at each phase and resumed manually end to end: **NOT YET PERFORMED**.
+- Canonical main integration: **NOT MERGED**. PR #588 remains Draft.
+- B34 macOS acceptance and B89 full acceptance remain open.
+
+### Operator recovery command
+
+Use the same private template root used when the task was created:
+
+    python -m iios_mvp.local_investment_pilot_v01 --resume-task TASK_ID
+
+The task ID is printed after the initial operator confirmation. The research output remains PILOT_NON_CANONICAL; no formal decision or order execution is created.
