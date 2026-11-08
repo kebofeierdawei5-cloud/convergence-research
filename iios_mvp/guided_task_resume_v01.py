@@ -93,8 +93,21 @@ def _capture_or_reuse_response(
 
     if manifest["current_stage"] == response_stage:
         _name, raw = _latest_response_attempt(session, phase)
-        # Recompute signature from immutable captured bytes; never trust a mutable
-        # working response file to represent the captured attempt.
+        # A correction may have been saved while the process was offline,
+        # after the previous raw attempt was journaled but before validation.
+        # Capture that changed file as a new immutable attempt before selecting
+        # which bytes to validate; never silently ignore an offline correction.
+        current = pilot._response_file_signature(response_path)
+        if current is not None and current[0] > 0:
+            working_bytes = response_path.read_bytes()
+            if working_bytes != raw:
+                stable = pilot._response_file_signature(response_path)
+                if stable != current:
+                    raise TaskWorkspaceError(f"GUIDED_TASK_{phase}_RESPONSE_CHANGED_DURING_CAPTURE")
+                session.capture_response(phase, working_bytes)
+                return working_bytes, stable
+        # No new working-file version exists. Recompute the fingerprint from
+        # the immutable accepted attempt rather than trusting mutable metadata.
         import hashlib
         return raw, (len(raw), 0, hashlib.sha256(raw).hexdigest())
 
