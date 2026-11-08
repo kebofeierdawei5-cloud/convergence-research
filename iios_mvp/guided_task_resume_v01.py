@@ -61,7 +61,6 @@ def _show_prompt(prompt: str, response_path: Path, *, phase: str) -> None:
             print(prompt)
         try:
             subprocess.run(["open", "https://chatgpt.com/"], check=False, timeout=5)
-            subprocess.run(["open", "-a", "TextEdit", str(response_path)], check=False, timeout=5)
         except (OSError, subprocess.SubprocessError):
             pass
     else:
