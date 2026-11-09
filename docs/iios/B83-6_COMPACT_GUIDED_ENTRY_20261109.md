@@ -60,7 +60,12 @@ New tests cover:
 - launcher isolation, Python version and no-bootstrap boundaries;
 - the new compact wizard sequence and interruption-safe existing guided workflow.
 
-Latest observed prior B83-5 validation: 394 passed. The first B83-6 CI run on commit `185caccc10ac52e1425d193001afd1920b65a516` reported 409 passed and 2 failed: a bare five-digit HK ticker was not inferred, and one acceptance fixture still used the old multi-prompt input sequence. Both defects were corrected in subsequent commits. A fresh CI result for the latest branch head `2876f66080a7c38c369c8f8e900d66967ed63172` has not yet been returned; B83-6 remains code-complete but test-unverified on its final head.
+The first B83-6 CI run on commit `185caccc10ac52e1425d193001afd1920b65a516` reported 409 passed and 2 failed: a bare five-digit HK ticker was not inferred, and one acceptance fixture still used the old multi-prompt input sequence. Both defects were corrected. A later CI run exposed one false-positive launcher test: the test matched the words `shell eval` in a comment rather than checking executable lines. The test was narrowed to ignore comment lines and reject an actual executable `eval` command.
+
+**Final post-fix verification commit:** `ba8091fd2a2948d89951a199686947dfb8e83a0b`.
+- Local Investment Pilot workflow #710: **413 passed**, all steps successful.
+- All 7 PR-triggered GitHub Actions workflows associated with this commit completed successfully.
+- This is CI evidence for the code/tests on Ubuntu / Python 3.12, not a substitute for macOS Finder, actual clipboard permission or end-to-end user acceptance.
 
 CI runs Ubuntu / Python 3.12. It does not establish real macOS Finder, local virtualenv, clipboard permission or full real-company acceptance. B34 macOS acceptance and B89 full acceptance remain open.
 
