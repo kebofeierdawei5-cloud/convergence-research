@@ -432,7 +432,7 @@ def test_operator_portfolio_input_is_reused_after_interruption_before_valuation_
     monkeypatch.setattr(
         pilot,
         "_ask_operator_valuation_context",
-        lambda: (_ for _ in ()).throw(KeyboardInterrupt()),
+        lambda **_kwargs: (_ for _ in ()).throw(KeyboardInterrupt()),
     )
     with pytest.raises(KeyboardInterrupt):
         run_guided_task(session, output_root=output_root)
@@ -631,3 +631,53 @@ def test_operator_profile_rejects_corrupt_json_without_resetting_it(monkeypatch,
     with pytest.raises(profile_store.OperatorProfileError, match="SCHEMA_OR_FIELDS_MISMATCH"):
         profile_store.load_operator_profile(path=profile_path)
     assert profile_path.read_text(encoding="utf-8") == '{"profile_schema":"wrong"}'
+
+
+def test_operator_profile_reuse_still_requires_current_company_entry_zone(monkeypatch):
+    import iios_mvp.guided_task_resume_v01 as guided_resume
+    import iios_mvp.local_investment_pilot_v01 as pilot
+
+    preferences = {
+        "constraint_status": "PASS",
+        "can_add": True,
+        "risk_budget_pct_nav": "1",
+        "initial_position_pct": "1",
+        "target_position_pct": "4",
+        "max_position_pct": "8",
+    }
+    profile = {
+        "portfolio_preferences": preferences,
+        "preferred_valuation_model_family": "EPS_MULTIPLE",
+    }
+    monkeypatch.setattr(pilot, "_ask", lambda *_args, **_kwargs: "1")
+    monkeypatch.setattr(
+        pilot, "_ask_operator_portfolio_context",
+        lambda: (_ for _ in ()).throw(AssertionError("generic guardrails should be reused")),
+    )
+    monkeypatch.setattr(
+        pilot, "_ask_operator_entry_zone",
+        lambda: {"entry_zone_low": "19", "entry_zone_high": "22"},
+    )
+
+    result = guided_resume._resolve_operator_context_section(
+        pilot, section="portfolio", profile=profile
+    )
+    assert result["risk_budget_pct_nav"] == "1"
+    assert result["entry_zone_low"] == "19"
+    assert result["entry_zone_high"] == "22"
+
+
+def test_profile_model_family_is_only_the_default_for_this_company(monkeypatch):
+    import iios_mvp.local_investment_pilot_v01 as pilot
+
+    defaults = []
+    answers = iter(["4"])
+    monkeypatch.setattr(
+        pilot, "_ask",
+        lambda _prompt, default=None: defaults.append(default) or next(answers),
+    )
+    result = pilot._ask_operator_valuation_context(preferred_model_family="SOTP")
+
+    assert defaults == ["4"]
+    assert result["selected_model_family"] == "SOTP"
+    assert result["baseline_includes_project"] is None
