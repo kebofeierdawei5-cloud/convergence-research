@@ -162,6 +162,96 @@ def _datetime(value: Any, field: str, *, allow_date_only: bool = True) -> dateti
     return parsed.astimezone(SHANGHAI)
 
 
+def _infer_guided_market(value: Any) -> str:
+    """Infer A/H market only from unambiguous ticker syntax or code length."""
+    raw = str(value or "").strip().upper().replace(" ", "")
+    if re.fullmatch(r"HK\d{4,5}|\d{4,5}\.HK", raw):
+        return "HK"
+    if re.fullmatch(r"(?:SH|SZ|BJ)\d{6}|\d{6}\.(?:SH|SZ|BJ)|\d{6}", raw):
+        return "CN-A"
+    raise LocalInvestmentPilotError(
+        "MARKET_CANNOT_BE_INFERRED: 股票代码请使用 002810.SZ、SZ002810、600000.SH、"
+        "00700.HK 或明确的 6 位 A 股 / 4–5 位港股代码。"
+    )
+
+
+def _parse_guided_cutoff_input(
+    raw: str, *, default_date: date
+) -> tuple[date, datetime, str]:
+    """One input: date means China close 15:30; a full ISO instant preserves exact cutoff."""
+    value = str(raw or "").strip()
+    if not value:
+        cutoff = default_date
+        timestamp_raw = datetime.combine(
+            cutoff, time(15, 30), tzinfo=SHANGHAI
+        ).isoformat()
+    elif re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        cutoff = _date(value, "AS_OF_DATE")
+        timestamp_raw = datetime.combine(
+            cutoff, time(15, 30), tzinfo=SHANGHAI
+        ).isoformat()
+    else:
+        instant = _datetime(value, "AS_OF_TIMESTAMP", allow_date_only=False)
+        cutoff = instant.date()
+        timestamp_raw = instant.isoformat()
+
+    cutoff_instant, normalized_timestamp = _resolve_cutoff_timestamp(
+        {"as_of_timestamp": timestamp_raw}, cutoff
+    )
+    if normalized_timestamp is None:
+        raise LocalInvestmentPilotError("GUIDED_CUTOFF_TIMESTAMP_REQUIRED")
+    return cutoff, cutoff_instant, normalized_timestamp
+
+
+def _default_guided_price_date(
+    cutoff: date, cutoff_instant: datetime
+) -> date:
+    """Use same-day close only when the cutoff is at/after 15:00 China time."""
+    if cutoff.weekday() < 5 and cutoff_instant.timetz().replace(tzinfo=None) >= time(15, 0):
+        return cutoff
+    return _previous_weekday(cutoff)
+
+
+def _parse_guided_price_input(
+    raw: str,
+    *,
+    default_observation_date: date,
+    cutoff: date,
+    cutoff_instant: datetime,
+) -> tuple[str, date, str, str]:
+    """Parse PRICE, PRICE@DATE or PRICE@ISO-INSTANT in one operator input."""
+    value = str(raw or "").strip()
+    if value.count("@") > 1:
+        raise LocalInvestmentPilotError("GUIDED_PRICE_INPUT_FORMAT_INVALID")
+    if "@" in value:
+        price_text, observed_text = (part.strip() for part in value.split("@", 1))
+        if not observed_text:
+            raise LocalInvestmentPilotError("GUIDED_PRICE_OBSERVATION_REQUIRED")
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", observed_text):
+            observation = _date(observed_text, "PRICE_OBSERVATION_DATE")
+            known_at_dt = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI)
+            input_mode = "DATE_CLOSE"
+        else:
+            known_at_dt = _datetime(
+                observed_text, "PRICE_KNOWN_AT", allow_date_only=False
+            )
+            observation = known_at_dt.date()
+            input_mode = "EXACT_INSTANT"
+    else:
+        price_text = value
+        observation = default_observation_date
+        known_at_dt = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI)
+        input_mode = "DEFAULT_CLOSE"
+
+    price = format(_positive(price_text, "CURRENT_PRICE"), "f")
+    _validate_guided_observation_date(
+        observation, cutoff, cutoff_timestamp=cutoff_instant
+    )
+    if known_at_dt > cutoff_instant:
+        raise LocalInvestmentPilotError("PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP")
+    return price, observation, known_at_dt.isoformat(), input_mode
+
+
 def _normalize_guided_symbol(value: Any, market: str) -> str:
     """Normalize common retail quote prefixes without weakening the core symbol contract."""
     raw = str(value or "").strip().upper().replace(" ", "")
