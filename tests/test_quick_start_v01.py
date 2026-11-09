@@ -57,7 +57,7 @@ def test_discovery_fails_closed_on_symlinked_task_root(monkeypatch, tmp_path):
     link.symlink_to(target, target_is_directory=True)
     monkeypatch.setattr(quick_start, "TASK_ROOT", link)
 
-    with pytest.raises(TaskWorkspaceError, match="QUICK_START_TASK_ROOT_IS_SYMLINK"):
+    with pytest.raises(TaskWorkspaceError, match="QUICK_START_PRIVATE_PATH_IS_SYMLINK"):
         quick_start._discover_unfinished_tasks()
 
 
