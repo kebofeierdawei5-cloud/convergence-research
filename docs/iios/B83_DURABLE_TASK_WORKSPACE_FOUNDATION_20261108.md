@@ -175,3 +175,55 @@ This removes TextEdit and manual response-file saving from the normal macOS path
 
 This source change is committed to the B83 feature branch. It is not yet evidence of successful macOS acceptance. The capture helper still requires automated tests and a real Mac run covering clipboard permission behavior, empty/oversized/non-UTF-8 content, pre-existing response files, interruption and subsequent task resume. B34 macOS acceptance remains open.
 
+
+
+## B83-4 — low-friction local quick start (2026-11-08)
+
+**Implementation:** `iios_mvp/quick_start_v01.py`, `IIOS.command`, and the TextEdit-free explicit clipboard handoff.
+
+- A single unfinished task resumes automatically; multiple unfinished tasks require one numbered choice; no unfinished task starts the existing new-research wizard.
+- Corrupt, blocked, symlinked or unverifiable tasks fail closed. No task ID is exposed to normal usage.
+- Normal macOS prompt handoff now opens ChatGPT without launching TextEdit. The copied answer is captured only after the user presses Enter once; no clipboard polling or browser automation.
+- A local report is opened only after run-bundle hash verification and after its resolved path is confirmed under the private output root.
+- Launcher does not request sudo, install dependencies, run a network updater or alter browser sessions.
+- The GitHub contents API does not set the executable bit on `IIOS.command`; a one-time `chmod +x IIOS.command` is required after checkout.
+
+## B83-5 — opt-in local operator profile (2026-11-09)
+
+**Implementation:** `iios_mvp/operator_profile_v01.py`, integrated into the guided post-Round-B operator-input phase.
+
+The profile exists only to reduce repeated manual entry. Its final schema is `IIOS-LOCAL-OPERATOR-PROFILE-0.2`.
+
+### What is reusable
+
+- Cross-company portfolio guardrails: constraint status, add-risk permission, risk budget and initial/target/maximum position percentages.
+- The last selected primary valuation-model family, used only as the default suggestion in the next company's model-selection prompt.
+
+### What deliberately remains company-specific
+
+- Entry-price band: re-entered for every company, even when the general portfolio guardrails are reused.
+- For EPS_MULTIPLE, whether the project/expansion value is already included in the baseline: re-confirmed for every company.
+- The prior model-family choice is a preselection only; the operator confirms or changes it for every company.
+
+### Storage and safety
+
+- Local path: `~/.iios-private/local-pilot/profile/operator-defaults.json`.
+- Profile save/update requires explicit opt-in; the save prompt defaults to no. Updating an existing profile also defaults to no.
+- Private directories use POSIX mode 0700; profile/lock files use 0600. Writes are validated, size-limited, symlink-resistant, atomic and protected by a local process lock.
+- Unknown fields, malformed schema, corrupted JSON, unsafe paths and invalid numeric ranges fail closed. The profile is not silently reset.
+- Permissions are not encryption. The file is not committed to Git or sent by IIOS, but whole-home backup/synchronization may copy it. FileVault and backup/sync settings remain the user's responsibility.
+
+### Current automated validation
+
+- Latest code validation commit: `313c18fb2866754108fb5d8df05aa04d68536a5a`.
+- Local Investment Pilot workflow: **394 passed**; compileall, launcher syntax, and diff checks passed.
+- All 7 GitHub Actions workflow runs associated with that code commit completed successfully.
+- CI is Ubuntu / Python 3.12. It does not constitute macOS Finder, actual clipboard-permission or end-to-end user acceptance.
+
+### Remaining acceptance and repository state
+
+- Real macOS double-click launcher, one-time executable permission, actual clipboard capture, ChatGPT handoff and task interruption/resume remain **OPEN / NOT VERIFIED**.
+- Full real-company interruption/resume acceptance remains **NOT YET PERFORMED**.
+- PR #588 remains Draft and unmerged; canonical `main` is unchanged.
+- B34 macOS acceptance and B89 full acceptance remain open.
+- B83-4/B83-5 change only local operator interaction and persistence. Research prompts, evidence admission, valuation calculations, return hurdle, decision gates and order-execution authority are unchanged.
