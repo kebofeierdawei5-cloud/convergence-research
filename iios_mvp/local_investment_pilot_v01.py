@@ -175,6 +175,16 @@ def _infer_guided_market(value: Any) -> str:
     )
 
 
+def _default_guided_cutoff_date(now: datetime) -> date:
+    """Default to the latest weekday close that is not in the future, in Shanghai time."""
+    if now.tzinfo is None:
+        raise LocalInvestmentPilotError("GUIDED_DEFAULT_CUTOFF_REQUIRES_TIMEZONE")
+    shanghai_now = now.astimezone(SHANGHAI)
+    if shanghai_now.weekday() < 5 and shanghai_now.time() >= time(15, 30):
+        return shanghai_now.date()
+    return _previous_weekday(shanghai_now.date())
+
+
 def _parse_guided_cutoff_input(
     raw: str, *, default_date: date
 ) -> tuple[date, datetime, str]:
@@ -6178,7 +6188,7 @@ def run_guided_wizard(
     """Run a compact guided workflow; operator-attested prices remain explicitly unverified."""
     template_root = template_root or (Path.home() / ".iios-private" / "local-pilot" / "inputs")
     output_root = output_root or (Path.home() / ".iios-private" / "local-pilot" / "runs")
-    today_shanghai = datetime.now(SHANGHAI).date()
+    default_cutoff_date = _default_guided_cutoff_date(datetime.now(SHANGHAI))
 
     print("\nIIOS 投资分析｜简化入口")
     print("股票代码可自动识别 A 股/港股；价格仍由你核实输入，不会自动抓取或伪装成行情源已验证。")
@@ -6188,12 +6198,12 @@ def run_guided_wizard(
     symbol = _normalize_guided_symbol(symbol_input, market)
 
     cutoff_raw = _ask(
-        "分析截止时点（回车=中国当前日期 15:30；输入 YYYY-MM-DD 默认收盘后；"
+        "分析截止时点（回车=最近一个已完成工作日 15:30，中国时区；输入 YYYY-MM-DD 默认该日收盘后；"
         "精确时点请输入带时区的 ISO 时间）",
         "",
     )
     cutoff, cutoff_instant, cutoff_timestamp = _parse_guided_cutoff_input(
-        cutoff_raw, default_date=today_shanghai
+        cutoff_raw, default_date=default_cutoff_date
     )
 
     while True:
