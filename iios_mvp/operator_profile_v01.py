@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-"""Private, opt-in, local-only defaults for operator-owned Pilot context.
+"""Private, opt-in defaults for reusable operator preferences.
 
-This module stores only the user's portfolio constraints and valuation-model
-selection. It never stores research responses, holdings lists, credentials or
-browser data. File permissions are access controls, not encryption.
+Only cross-company portfolio guardrails and a suggested valuation model are
+stored. Per-company entry-price zones and project-in-baseline scope are
+intentionally excluded. File permissions are access controls, not encryption.
 """
 
 from contextlib import contextmanager
@@ -22,7 +22,7 @@ DEFAULT_PROFILE_PATH = (
     Path.home() / ".iios-private" / "local-pilot" / "profile" / "operator-defaults.json"
 )
 _MAX_PROFILE_BYTES = 64 * 1024
-_PORTFOLIO_KEYS = {
+_PORTFOLIO_CONTEXT_KEYS = {
     "constraint_status",
     "can_add",
     "risk_budget_pct_nav",
@@ -32,12 +32,13 @@ _PORTFOLIO_KEYS = {
     "target_position_pct",
     "max_position_pct",
 }
-_VALUATION_KEYS = {
-    "selected_model_family",
-    "baseline_includes_project",
-    "input_owner",
-    "selection_source",
-    "selection_confirmed",
+_PORTFOLIO_PREFERENCE_KEYS = {
+    "constraint_status",
+    "can_add",
+    "risk_budget_pct_nav",
+    "initial_position_pct",
+    "target_position_pct",
+    "max_position_pct",
 }
 _MODEL_FAMILIES = {"EPS_MULTIPLE", "FCF_DCF", "DDM", "SOTP", "RNPV", "OTHER", "UNKNOWN"}
 
@@ -61,7 +62,7 @@ def _decimal(value: Any, field: str) -> Decimal:
 
 
 def validate_portfolio_context(value: Any) -> dict[str, Any] | None:
-    """Validate the exact operator-owned shape emitted by the current wizard."""
+    """Validate the exact per-task operator input emitted by the current wizard."""
     if value is None:
         return None
     if not isinstance(value, Mapping):
@@ -74,77 +75,117 @@ def validate_portfolio_context(value: Any) -> dict[str, Any] | None:
         if can_add or set(value) != {"constraint_status", "can_add"}:
             raise OperatorProfileError("OPERATOR_PROFILE_NONPASS_PORTFOLIO_MUST_NOT_CARRY_BUDGET")
         return {"constraint_status": status, "can_add": False}
-    if set(value) != _PORTFOLIO_KEYS:
+    if set(value) != _PORTFOLIO_CONTEXT_KEYS:
         raise OperatorProfileError("OPERATOR_PROFILE_PORTFOLIO_FIELDS_MISMATCH")
 
-    percentages = (
+    percentages: dict[str, str] = {}
+    for field in (
         "risk_budget_pct_nav",
         "initial_position_pct",
         "target_position_pct",
         "max_position_pct",
-    )
-    normalized: dict[str, str] = {}
-    for field in percentages:
+    ):
         number = _decimal(value.get(field), field)
         if number < 0 or number > 100:
             raise OperatorProfileError("OPERATOR_PROFILE_PERCENT_OUT_OF_RANGE:" + field)
-        normalized[field] = format(number, "f")
+        percentages[field] = format(number, "f")
 
     low = _decimal(value.get("entry_zone_low"), "entry_zone_low")
     high = _decimal(value.get("entry_zone_high"), "entry_zone_high")
     if low <= 0 or high <= 0 or low > high:
         raise OperatorProfileError("OPERATOR_PROFILE_ENTRY_ZONE_INVALID")
-    initial = Decimal(normalized["initial_position_pct"])
-    target = Decimal(normalized["target_position_pct"])
-    maximum = Decimal(normalized["max_position_pct"])
+    initial = Decimal(percentages["initial_position_pct"])
+    target = Decimal(percentages["target_position_pct"])
+    maximum = Decimal(percentages["max_position_pct"])
     if not initial <= target <= maximum:
         raise OperatorProfileError("OPERATOR_PROFILE_POSITION_LIMIT_ORDER_INVALID")
-
     return {
         "constraint_status": "PASS",
         "can_add": can_add,
-        "risk_budget_pct_nav": normalized["risk_budget_pct_nav"],
+        "risk_budget_pct_nav": percentages["risk_budget_pct_nav"],
         "entry_zone_low": format(low, "f"),
         "entry_zone_high": format(high, "f"),
-        "initial_position_pct": normalized["initial_position_pct"],
-        "target_position_pct": normalized["target_position_pct"],
-        "max_position_pct": normalized["max_position_pct"],
+        "initial_position_pct": percentages["initial_position_pct"],
+        "target_position_pct": percentages["target_position_pct"],
+        "max_position_pct": percentages["max_position_pct"],
     }
 
 
-def validate_valuation_context(value: Any) -> dict[str, Any]:
-    if not isinstance(value, Mapping) or set(value) != _VALUATION_KEYS:
-        raise OperatorProfileError("OPERATOR_PROFILE_VALUATION_FIELDS_MISMATCH")
-    family = value.get("selected_model_family")
-    confirmed = value.get("selection_confirmed")
-    baseline = value.get("baseline_includes_project")
-    if not isinstance(family, str) or family not in _MODEL_FAMILIES or not isinstance(confirmed, bool):
-        raise OperatorProfileError("OPERATOR_PROFILE_VALUATION_SELECTION_INVALID")
-    if value.get("input_owner") != "OPERATOR" or value.get("selection_source") != "INTERACTIVE_OPERATOR_PROMPT":
-        raise OperatorProfileError("OPERATOR_PROFILE_VALUATION_PROVENANCE_INVALID")
-    if family == "UNKNOWN":
-        if confirmed or baseline is not None:
-            raise OperatorProfileError("OPERATOR_PROFILE_UNKNOWN_MODEL_MUST_REMAIN_UNCONFIRMED")
-    else:
-        if not confirmed:
-            raise OperatorProfileError("OPERATOR_PROFILE_SELECTED_MODEL_NOT_CONFIRMED")
-        if baseline is not None and not isinstance(baseline, bool):
-            raise OperatorProfileError("OPERATOR_PROFILE_PROJECT_SCOPE_INVALID")
-        if family != "EPS_MULTIPLE" and baseline is not None:
-            raise OperatorProfileError("OPERATOR_PROFILE_PROJECT_SCOPE_ONLY_FOR_EPS_MULTIPLE")
+def portfolio_preferences_from_context(value: Any) -> dict[str, Any] | None:
+    """Strip case-specific entry-price range; retain only cross-company guardrails."""
+    context = validate_portfolio_context(value)
+    if context is None:
+        return None
+    if context["constraint_status"] != "PASS":
+        return {"constraint_status": context["constraint_status"], "can_add": False}
     return {
-        "selected_model_family": family,
-        "baseline_includes_project": baseline,
-        "input_owner": "OPERATOR",
-        "selection_source": "INTERACTIVE_OPERATOR_PROMPT",
-        "selection_confirmed": confirmed,
+        "constraint_status": "PASS",
+        "can_add": context["can_add"],
+        "risk_budget_pct_nav": context["risk_budget_pct_nav"],
+        "initial_position_pct": context["initial_position_pct"],
+        "target_position_pct": context["target_position_pct"],
+        "max_position_pct": context["max_position_pct"],
     }
+
+
+def validate_portfolio_preferences(value: Any) -> dict[str, Any] | None:
+    """Validate the reduced profile form; entry-price bands are forbidden here."""
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise OperatorProfileError("OPERATOR_PROFILE_PORTFOLIO_PREFERENCES_NOT_OBJECT")
+    status = value.get("constraint_status")
+    can_add = value.get("can_add")
+    if not isinstance(status, str) or status not in {"PASS", "BLOCKED", "UNKNOWN"} or not isinstance(can_add, bool):
+        raise OperatorProfileError("OPERATOR_PROFILE_PORTFOLIO_STATUS_INVALID")
+    if status != "PASS":
+        if can_add or set(value) != {"constraint_status", "can_add"}:
+            raise OperatorProfileError("OPERATOR_PROFILE_NONPASS_PORTFOLIO_MUST_NOT_CARRY_BUDGET")
+        return {"constraint_status": status, "can_add": False}
+    if set(value) != _PORTFOLIO_PREFERENCE_KEYS:
+        raise OperatorProfileError("OPERATOR_PROFILE_PORTFOLIO_PREFERENCE_FIELDS_MISMATCH")
+    percentages: dict[str, str] = {}
+    for field in (
+        "risk_budget_pct_nav",
+        "initial_position_pct",
+        "target_position_pct",
+        "max_position_pct",
+    ):
+        number = _decimal(value.get(field), field)
+        if number < 0 or number > 100:
+            raise OperatorProfileError("OPERATOR_PROFILE_PERCENT_OUT_OF_RANGE:" + field)
+        percentages[field] = format(number, "f")
+    initial = Decimal(percentages["initial_position_pct"])
+    target = Decimal(percentages["target_position_pct"])
+    maximum = Decimal(percentages["max_position_pct"])
+    if not initial <= target <= maximum:
+        raise OperatorProfileError("OPERATOR_PROFILE_POSITION_LIMIT_ORDER_INVALID")
+    return {
+        "constraint_status": "PASS",
+        "can_add": can_add,
+        "risk_budget_pct_nav": percentages["risk_budget_pct_nav"],
+        "initial_position_pct": percentages["initial_position_pct"],
+        "target_position_pct": percentages["target_position_pct"],
+        "max_position_pct": percentages["max_position_pct"],
+    }
+
+
+def validate_preferred_model_family(value: Any) -> str:
+    if not isinstance(value, str) or value not in _MODEL_FAMILIES:
+        raise OperatorProfileError("OPERATOR_PROFILE_PREFERRED_MODEL_FAMILY_INVALID")
+    return value
 
 
 def _validate_profile(value: Any) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise OperatorProfileError("OPERATOR_PROFILE_ROOT_NOT_OBJECT")
-    expected = {"profile_schema", "created_at", "updated_at", "portfolio_context", "valuation_context"}
+    expected = {
+        "profile_schema",
+        "created_at",
+        "updated_at",
+        "portfolio_preferences",
+        "preferred_valuation_model_family",
+    }
     if set(value) != expected or value.get("profile_schema") != PROFILE_SCHEMA:
         raise OperatorProfileError("OPERATOR_PROFILE_SCHEMA_OR_FIELDS_MISMATCH")
     for field in ("created_at", "updated_at"):
@@ -161,8 +202,10 @@ def _validate_profile(value: Any) -> dict[str, Any]:
         "profile_schema": PROFILE_SCHEMA,
         "created_at": value["created_at"],
         "updated_at": value["updated_at"],
-        "portfolio_context": validate_portfolio_context(value["portfolio_context"]),
-        "valuation_context": validate_valuation_context(value["valuation_context"]),
+        "portfolio_preferences": validate_portfolio_preferences(value["portfolio_preferences"]),
+        "preferred_valuation_model_family": validate_preferred_model_family(
+            value["preferred_valuation_model_family"]
+        ),
     }
 
 
@@ -278,10 +321,12 @@ def save_operator_profile(
     valuation_context: Any,
     path: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Atomically replace local defaults; caller must obtain explicit user consent."""
+    """Atomically save reduced preferences; caller must obtain explicit consent."""
     target, parent = _ensure_private_directory(Path(path) if path is not None else DEFAULT_PROFILE_PATH)
-    portfolio = validate_portfolio_context(portfolio_context)
-    valuation = validate_valuation_context(valuation_context)
+    portfolio_preferences = portfolio_preferences_from_context(portfolio_context)
+    if not isinstance(valuation_context, Mapping):
+        raise OperatorProfileError("OPERATOR_PROFILE_VALUATION_CONTEXT_NOT_OBJECT")
+    family = validate_preferred_model_family(valuation_context.get("selected_model_family"))
     with _profile_lock(parent):
         existing = _read_unlocked(target)
         now = datetime.now(timezone.utc).isoformat()
@@ -289,8 +334,8 @@ def save_operator_profile(
             "profile_schema": PROFILE_SCHEMA,
             "created_at": existing["created_at"] if existing else now,
             "updated_at": now,
-            "portfolio_context": portfolio,
-            "valuation_context": valuation,
+            "portfolio_preferences": portfolio_preferences,
+            "preferred_valuation_model_family": family,
         }
         encoded = (json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n").encode("utf-8")
         temporary = parent / (target.name + ".tmp-" + secrets.token_hex(8))
@@ -324,23 +369,22 @@ def save_operator_profile(
 
 def profile_section_summary(section: str, value: Any) -> str:
     if section == "portfolio":
-        context = validate_portfolio_context(value)
+        context = validate_portfolio_preferences(value)
         if context is None:
-            return "组合风险约束：不填写，保持 UNKNOWN"
+            return "跨公司组合约束：未保存，保持 UNKNOWN"
         if context["constraint_status"] != "PASS":
-            return "组合风险约束：" + context["constraint_status"] + "；禁止按通过状态新增风险"
+            return "组合风险约束：" + context["constraint_status"] + "；不会按 PASS 允许新增风险"
         return (
-            "组合约束 PASS；单股风险预算 "
-            + context["risk_budget_pct_nav"] + "%；入场区间 "
-            + context["entry_zone_low"] + "–" + context["entry_zone_high"]
-            + "；初始/目标/最大仓位 "
+            "跨公司组合约束 PASS；单股风险预算 "
+            + context["risk_budget_pct_nav"] + "%；初始/目标/最大仓位 "
             + context["initial_position_pct"] + "%/"
             + context["target_position_pct"] + "%/"
             + context["max_position_pct"] + "%"
         )
     if section == "valuation":
-        context = validate_valuation_context(value)
-        scope = context["baseline_includes_project"]
-        scope_text = "已包含项目" if scope is True else "明确不含项目" if scope is False else "项目范围未确认"
-        return "主估值模型：" + context["selected_model_family"] + "；" + scope_text
+        family = validate_preferred_model_family(value)
+        return (
+            "上次选择的估值模型：" + family
+            + "（仅作为本次预选提示；仍需按当前公司重新确认）"
+        )
     raise OperatorProfileError("OPERATOR_PROFILE_SECTION_UNSUPPORTED")
