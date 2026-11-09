@@ -14,6 +14,14 @@ import sys
 from typing import Any, Mapping
 
 from .guided_task_session_v01 import GuidedTaskSession
+from .operator_profile_v01 import (
+    OperatorProfileError,
+    load_operator_profile,
+    profile_section_summary,
+    save_operator_profile,
+    validate_portfolio_context,
+    validate_valuation_context,
+)
 from .task_workspace_v01 import TaskWorkspaceError
 
 
@@ -283,6 +291,81 @@ def _validate_round(
             _wait_for_corrected_response(session, pilot, phase, response_path)
 
 
+def _resolve_operator_context_section(
+    pilot: Any,
+    *,
+    section: str,
+    profile: Mapping[str, Any] | None,
+) -> Any:
+    """Reuse an explicitly opted-in local default, or run the existing operator prompt."""
+    key = "portfolio_context" if section == "portfolio" else "valuation_context"
+    saved = profile.get(key) if isinstance(profile, Mapping) else None
+    has_saved_value = isinstance(profile, Mapping) and key in profile
+    if has_saved_value:
+        print("\\n发现本机个人默认设置：" + profile_section_summary(section, saved), flush=True)
+        while True:
+            choice = pilot._ask(
+                "1 = 复用上次设置（默认）；2 = 修改设置；0 = 本次手动填写、不使用旧设置",
+                "1",
+            )
+            if choice in {"0", "1", "2"}:
+                break
+            print("请输入 0、1 或 2。")
+        if choice == "1":
+            return validate_portfolio_context(saved) if section == "portfolio" else validate_valuation_context(saved)
+
+    if section == "portfolio":
+        return validate_portfolio_context(pilot._ask_operator_portfolio_context())
+    if section == "valuation":
+        return validate_valuation_context(pilot._ask_operator_valuation_context())
+    raise OperatorProfileError("OPERATOR_PROFILE_SECTION_UNSUPPORTED")
+
+
+def _maybe_persist_operator_profile(
+    pilot: Any,
+    *,
+    profile: Mapping[str, Any] | None,
+    portfolio_context: Any,
+    valuation_context: Mapping[str, Any],
+) -> None:
+    """Save/update defaults only after an explicit opt-in; profile failure never blocks research."""
+    portfolio = validate_portfolio_context(portfolio_context)
+    valuation = validate_valuation_context(valuation_context)
+    changed = (
+        profile is None
+        or profile.get("portfolio_context") != portfolio
+        or profile.get("valuation_context") != valuation
+    )
+    if not changed:
+        return
+
+    if profile is None:
+        prompt = (
+            "是否将本次组合约束和主估值模型保存为本机默认设置，供以后研究复用？"
+            "文件权限为目录 0700 / 文件 0600；文件未加密，不会提交到 GitHub。"
+            "请自行确认本机备份或云同步策略。1 = 保存，0 = 仅本次使用"
+        )
+    else:
+        prompt = (
+            "本次设置与已保存的个人默认设置不同。是否更新本机默认设置，供以后研究复用？"
+            "文件未加密，不会提交到 GitHub。1 = 更新，0 = 保留旧设置"
+        )
+    choice = pilot._ask(prompt, "0")
+    if choice != "1":
+        return
+    try:
+        save_operator_profile(
+            portfolio_context=portfolio,
+            valuation_context=valuation,
+        )
+        print("个人默认设置已安全保存到本机私有目录。", flush=True)
+    except (OperatorProfileError, OSError) as exc:
+        print(
+            "个人默认设置未能保存；本次研究继续使用已记录的输入。原因：" + str(exc),
+            flush=True,
+        )
+
+
 def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | None = None) -> dict[str, Any]:
     """Continue the task from its verified durable phase; safe to invoke after restart."""
     from . import local_investment_pilot_v01 as pilot
@@ -387,17 +470,34 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                 )
                 pilot._prepare_input(payload)
 
-                if session.has_partial_operator_context("portfolio"):
+                has_portfolio = session.has_partial_operator_context("portfolio")
+                has_valuation = session.has_partial_operator_context("valuation")
+                profile_checked = not (has_portfolio and has_valuation)
+                profile = load_operator_profile() if profile_checked else None
+
+                if has_portfolio:
                     portfolio = session.load_partial_operator_context("portfolio")
                 else:
-                    portfolio = pilot._ask_operator_portfolio_context()
+                    portfolio = _resolve_operator_context_section(
+                        pilot, section="portfolio", profile=profile
+                    )
                     session.checkpoint_partial_operator_context("portfolio", portfolio)
 
-                if session.has_partial_operator_context("valuation"):
+                if has_valuation:
                     valuation = session.load_partial_operator_context("valuation")
                 else:
-                    valuation = pilot._ask_operator_valuation_context()
+                    valuation = _resolve_operator_context_section(
+                        pilot, section="valuation", profile=profile
+                    )
                     session.checkpoint_partial_operator_context("valuation", valuation)
+
+                if profile_checked:
+                    _maybe_persist_operator_profile(
+                        pilot,
+                        profile=profile,
+                        portfolio_context=portfolio,
+                        valuation_context=valuation,
+                    )
 
                 session.checkpoint_operator_context({
                     "operator_portfolio_context": portfolio,
