@@ -60,7 +60,7 @@ New tests cover:
 - launcher isolation, Python version and no-bootstrap boundaries;
 - the new compact wizard sequence and interruption-safe existing guided workflow.
 
-Latest observed prior B83-5 validation: 394 passed. B83-6 introduced a first CI run with 409 passing and 2 failing (bare 5-digit HK inference and one test still using the old prompt sequence). Both issues have been corrected in subsequent commits; the corrected branch run is pending / not yet confirmed at the time this document was authored.
+Latest observed prior B83-5 validation: 394 passed. The first B83-6 CI run on commit `185caccc10ac52e1425d193001afd1920b65a516` reported 409 passed and 2 failed: a bare five-digit HK ticker was not inferred, and one acceptance fixture still used the old multi-prompt input sequence. Both defects were corrected in subsequent commits. A fresh CI result for the latest branch head `2876f66080a7c38c369c8f8e900d66967ed63172` has not yet been returned; B83-6 remains code-complete but test-unverified on its final head.
 
 CI runs Ubuntu / Python 3.12. It does not establish real macOS Finder, local virtualenv, clipboard permission or full real-company acceptance. B34 macOS acceptance and B89 full acceptance remain open.
 
