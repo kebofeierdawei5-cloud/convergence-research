@@ -17,9 +17,12 @@ from .guided_task_session_v01 import GuidedTaskSession
 from .operator_profile_v01 import (
     OperatorProfileError,
     load_operator_profile,
+    portfolio_preferences_from_context,
     profile_section_summary,
     save_operator_profile,
     validate_portfolio_context,
+    validate_portfolio_preferences,
+    validate_preferred_model_family,
     validate_valuation_context,
 )
 from .task_workspace_v01 import TaskWorkspaceError
@@ -297,27 +300,41 @@ def _resolve_operator_context_section(
     section: str,
     profile: Mapping[str, Any] | None,
 ) -> Any:
-    """Reuse an explicitly opted-in local default, or run the existing operator prompt."""
-    key = "portfolio_context" if section == "portfolio" else "valuation_context"
-    saved = profile.get(key) if isinstance(profile, Mapping) else None
-    has_saved_value = isinstance(profile, Mapping) and key in profile
-    if has_saved_value:
-        print("\n发现本机个人默认设置：" + profile_section_summary(section, saved), flush=True)
-        while True:
-            choice = pilot._ask(
-                "1 = 复用上次设置（默认）；2 = 修改设置；0 = 本次手动填写、不使用旧设置",
-                "1",
-            )
-            if choice in {"0", "1", "2"}:
-                break
-            print("请输入 0、1 或 2。")
-        if choice == "1":
-            return validate_portfolio_context(saved) if section == "portfolio" else validate_valuation_context(saved)
-
+    """Reuse only cross-company guardrails; keep entry-price and project scope case-specific."""
     if section == "portfolio":
+        has_saved = isinstance(profile, Mapping) and "portfolio_preferences" in profile
+        if has_saved:
+            saved = profile["portfolio_preferences"]
+            print("\n发现本机跨公司组合默认设置：" + profile_section_summary("portfolio", saved), flush=True)
+            while True:
+                choice = pilot._ask(
+                    "1 = 复用组合约束（默认）；2 = 修改设置；0 = 本次手动填写、不使用旧设置",
+                    "1",
+                )
+                if choice in {"0", "1", "2"}:
+                    break
+                print("请输入 0、1 或 2。")
+            if choice == "1":
+                preferences = validate_portfolio_preferences(saved)
+                if preferences is None or preferences["constraint_status"] != "PASS":
+                    return validate_portfolio_context(preferences)
+                # Entry-price zones are specific to this company and are always re-entered.
+                entry_zone = pilot._ask_operator_entry_zone()
+                return validate_portfolio_context({**preferences, **entry_zone})
         return validate_portfolio_context(pilot._ask_operator_portfolio_context())
+
     if section == "valuation":
-        return validate_valuation_context(pilot._ask_operator_valuation_context())
+        preferred = None
+        if isinstance(profile, Mapping):
+            preferred = validate_preferred_model_family(
+                profile.get("preferred_valuation_model_family", "UNKNOWN")
+            )
+        # The prior model is only a preselection. The operator confirms this company
+        # and re-enters project-in-baseline scope for each new task.
+        return validate_valuation_context(
+            pilot._ask_operator_valuation_context(preferred_model_family=preferred)
+        )
+
     raise OperatorProfileError("OPERATOR_PROFILE_SECTION_UNSUPPORTED")
 
 
@@ -328,26 +345,29 @@ def _maybe_persist_operator_profile(
     portfolio_context: Any,
     valuation_context: Mapping[str, Any],
 ) -> None:
-    """Save/update defaults only after an explicit opt-in; profile failure never blocks research."""
-    portfolio = validate_portfolio_context(portfolio_context)
+    """Save reusable preferences only after explicit opt-in; never persist case-specific fields."""
+    portfolio_preferences = portfolio_preferences_from_context(portfolio_context)
     valuation = validate_valuation_context(valuation_context)
+    preferred_family = validate_preferred_model_family(valuation["selected_model_family"])
     changed = (
         profile is None
-        or profile.get("portfolio_context") != portfolio
-        or profile.get("valuation_context") != valuation
+        or profile.get("portfolio_preferences") != portfolio_preferences
+        or profile.get("preferred_valuation_model_family") != preferred_family
     )
     if not changed:
         return
 
     if profile is None:
         prompt = (
-            "是否将本次组合约束和主估值模型保存为本机默认设置，供以后研究复用？"
+            "是否将跨公司组合约束和上次估值模型选择（仅作以后研究的默认提示）"
+            "保存为本机默认设置？本标的入场区间和项目估值范围不会保存。"
             "文件权限为目录 0700 / 文件 0600；文件未加密，不会提交到 GitHub。"
             "请自行确认本机备份或云同步策略。1 = 保存，0 = 仅本次使用"
         )
     else:
         prompt = (
-            "本次设置与已保存的个人默认设置不同。是否更新本机默认设置，供以后研究复用？"
+            "本次跨公司组合约束或默认估值模型提示与已保存设置不同。"
+            "是否更新本机默认设置？本标的入场区间和项目估值范围不会保存。"
             "文件未加密，不会提交到 GitHub。1 = 更新，0 = 保留旧设置"
         )
     choice = pilot._ask(prompt, "0")
@@ -355,16 +375,15 @@ def _maybe_persist_operator_profile(
         return
     try:
         save_operator_profile(
-            portfolio_context=portfolio,
+            portfolio_context=portfolio_context,
             valuation_context=valuation,
         )
-        print("个人默认设置已安全保存到本机私有目录。", flush=True)
+        print("个人默认设置已保存到本机私有目录。", flush=True)
     except (OperatorProfileError, OSError) as exc:
         print(
             "个人默认设置未能保存；本次研究继续使用已记录的输入。原因：" + str(exc),
             flush=True,
         )
-
 
 def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | None = None) -> dict[str, Any]:
     """Continue the task from its verified durable phase; safe to invoke after restart."""
