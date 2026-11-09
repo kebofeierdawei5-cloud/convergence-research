@@ -6170,113 +6170,72 @@ def run_guided_wizard(
     template_root: str | Path | None = None,
     output_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Run guided research using a dedicated file for the potentially large ChatGPT JSON."""
+    """Run a compact guided workflow; operator-attested prices remain explicitly unverified."""
     template_root = template_root or (Path.home() / ".iios-private" / "local-pilot" / "inputs")
     output_root = output_root or (Path.home() / ".iios-private" / "local-pilot" / "runs")
-    today = date.today()
-    print("\nIIOS 投资分析｜简易向导")
-    print("填写标的和价格后，程序会打开 ChatGPT；完成回答后保存到指定 JSON 文件，报告自动生成。")
+    today_shanghai = datetime.now(SHANGHAI).date()
+
+    print("\nIIOS 投资分析｜简化入口")
+    print("股票代码可自动识别 A 股/港股；价格仍由你核实输入，不会自动抓取或伪装成行情源已验证。")
     company = _ask("公司名称")
-    symbol_input = _ask("股票代码（可输入 SZ002810、002810.SZ 或 002810）")
-    market_choice = _ask("市场：1 = A 股，2 = 港股", "1")
-    if market_choice not in {"1", "2"}:
-        raise LocalInvestmentPilotError("MARKET_CHOICE_MUST_BE_1_OR_2")
-    market = "CN-A" if market_choice == "1" else "HK"
+    symbol_input = _ask("股票代码（如 002810.SZ、SZ002810、600000.SH、00700.HK 或裸代码）")
+    market = _infer_guided_market(symbol_input)
     symbol = _normalize_guided_symbol(symbol_input, market)
-    while True:
-        try:
-            cutoff = _date(_ask("分析截止日 YYYY-MM-DD", today.isoformat()), "AS_OF_DATE")
-            break
-        except LocalInvestmentPilotError as exc:
-            print(f"日期格式错误：{exc}。请按 YYYY-MM-DD 输入，例如 2026-10-12。")
 
-    print("\n请选择分析截止口径（默认按收盘后分析，无需手写时区）：")
-    print("  1 = 严格日期级截止：截止日 00:00（+08:00），只能使用此前日期已知的信息")
-    print("  2 = 收盘后分析（推荐默认）：自动使用截止日 15:30（+08:00），允许截止日收盘价")
-    print("  3 = 自定义时点：仅特殊情况使用，例如 2026-10-12T15:30:00+08:00")
-    while True:
-        cutoff_mode = _ask("分析截止口径 1/2/3", "2")
-        custom_cutoff = ""
-        if cutoff_mode == "3":
-            custom_cutoff = _ask(
-                "自定义截止时点（必须含时区，例如 2026-10-12T15:30:00+08:00）"
-            )
-        try:
-            cutoff_instant, cutoff_timestamp = _guided_cutoff_timestamp(
-                cutoff, cutoff_mode, custom_cutoff
-            )
-            break
-        except LocalInvestmentPilotError as exc:
-            print(f"截止口径输入有误：{exc}")
-            print("请选 1、2 或 3；普通收盘后分析通常选择 2，不要只输入日期。")
+    cutoff_raw = _ask(
+        "分析截止时点（回车=中国当前日期 15:30；输入 YYYY-MM-DD 默认收盘后；"
+        "精确时点请输入带时区的 ISO 时间）",
+        "",
+    )
+    cutoff, cutoff_instant, cutoff_timestamp = _parse_guided_cutoff_input(
+        cutoff_raw, default_date=today_shanghai
+    )
 
     while True:
-        position = _ask("当前持仓百分比（例如空仓填 0）", "0")
+        position = _ask("当前持仓百分比（空仓填 0）", "0")
         try:
             build_research_case(symbol, cutoff.isoformat(), position, market=market)
             break
         except (LocalInvestmentPilotError, ValueError, TypeError) as exc:
             print(f"持仓比例不合法：{exc}。请按百分比填写，例如 0 或 10。")
 
+    default_price_date = _default_guided_price_date(cutoff, cutoff_instant)
     while True:
-        price = _ask("你核实的股价（必须大于 0）")
-        try:
-            _positive(price, "CURRENT_PRICE")
-            break
-        except LocalInvestmentPilotError as exc:
-            print(f"股价输入不合法：{exc}。请只输入价格数字，例如 19.74。")
-
-    # No holiday-calendar lookup is performed; weekends are rejected below.
-    default_price_date = (
-        _latest_weekday_on_or_before(cutoff)
-        if cutoff_timestamp else _previous_weekday(cutoff)
-    ).isoformat()
-    while True:
-        date_rule = (
-            "不得晚于截止日；选择 2 时可以填写截止日当天"
-            if cutoff_timestamp else "必须早于分析截止日"
+        price_entry = _ask(
+            "你核实的股价（单行输入：19.74；或 19.74@YYYY-MM-DD；"
+            "非收盘时点输入 19.74@YYYY-MM-DDTHH:MM:SS+08:00）"
         )
         try:
-            observation = _date(
-                _ask(f"该价格观察日期 YYYY-MM-DD（{date_rule}）", default_price_date),
-                "PRICE_OBSERVATION_DATE",
-            )
-            _validate_guided_observation_date(
-                observation, cutoff, cutoff_timestamp=cutoff_instant if cutoff_timestamp else None
+            price, observation, known_at, price_input_mode = _parse_guided_price_input(
+                price_entry,
+                default_observation_date=default_price_date,
+                cutoff=cutoff,
+                cutoff_instant=cutoff_instant,
             )
             break
         except LocalInvestmentPilotError as exc:
-            print(f"价格观察日期不合法：{exc}")
-            print("请填写真实交易日；本程序不会把周末自动改成交易日，也不会自动修改截止日期。")
-    default_known_at = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI).isoformat()
-    print("\n价格时点：1 = 收盘价/按 15:00 处理（默认）；2 = 非收盘价/指定实际时点")
-    time_mode = _ask("价格时点 1/2", "1")
-    if time_mode == "1":
-        known_at = default_known_at
-    else:
-        while True:
-            known_at = _ask(
-                "价格可获得时间（必须包含时区，例如 2026-10-12T13:30:00+08:00）"
-            )
-            try:
-                parsed_known_at = _datetime(known_at, "PRICE_KNOWN_AT", allow_date_only=False)
-                if parsed_known_at.date() != observation:
-                    raise LocalInvestmentPilotError("PRICE_KNOWN_AT_DATE_MUST_MATCH_OBSERVATION_DATE")
-                if parsed_known_at > cutoff_instant:
-                    raise LocalInvestmentPilotError("PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP")
-                known_at = parsed_known_at.isoformat()
-                break
-            except LocalInvestmentPilotError as exc:
-                print(f"价格可获得时点不符合截止约束：{exc}")
-                print("请检查日期与截止时点。")
-    source_claim = f"用户手动提供的 {price}；按 {'收盘价 15:00' if time_mode == '1' else '操作者指定时点'} 处理；未从交易所或行情供应商独立核验"
+            print(f"价格输入不合法：{exc}")
+            print("请确认价格为正数、观察日为工作日且价格可获得时点不晚于分析截止时点。")
+
+    source_time_claim = (
+        "收盘价 15:00"
+        if price_input_mode in {"DEFAULT_CLOSE", "DATE_CLOSE"}
+        else f"操作者指定实际时点 {known_at}"
+    )
+    source_claim = (
+        f"用户手动提供的 {price}；按 {source_time_claim} 处理；"
+        "未从交易所或行情供应商独立核验"
+    )
+
     print("\n请核对：")
     print(f"  {company} / {symbol} / {market}")
     if symbol != symbol_input.strip().upper().replace(" ", ""):
         print(f"  股票代码已规范化：{symbol_input} → {symbol}")
-    cutoff_display = cutoff_timestamp or (cutoff.isoformat() + " 00:00:00+08:00（日期级截止）")
-    print(f"  分析截止 {cutoff_display}；价格 {price}；观察日 {observation.isoformat()}；持仓 {position}%")
-    print(f"  价格时间：{known_at}；价格来源：人工输入、未独立核验。")
+    print(
+        f"  分析截止 {cutoff_timestamp}；价格 {price}；"
+        f"观察日 {observation.isoformat()}；价格时间 {known_at}；持仓 {position}%"
+    )
+    print("  价格来源：人工输入、未独立核验；交易日历不自动校验节假日。")
     if _ask("确认并继续？1 = 继续，0 = 退出", "1") != "1":
         return {"status": "CANCELLED", "formal_decision_created": False}
 
@@ -6314,7 +6273,6 @@ def run_guided_wizard(
     print("\n研究任务完成：")
     print(json.dumps(_safe(result), ensure_ascii=False, indent=2))
     return result
-
 
 
 
