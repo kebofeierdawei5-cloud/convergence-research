@@ -17,7 +17,7 @@ import secrets
 import stat
 from typing import Any, Iterator, Mapping
 
-PROFILE_SCHEMA = "IIOS-LOCAL-OPERATOR-PROFILE-0.1"
+PROFILE_SCHEMA = "IIOS-LOCAL-OPERATOR-PROFILE-0.2"
 DEFAULT_PROFILE_PATH = (
     Path.home() / ".iios-private" / "local-pilot" / "profile" / "operator-defaults.json"
 )
