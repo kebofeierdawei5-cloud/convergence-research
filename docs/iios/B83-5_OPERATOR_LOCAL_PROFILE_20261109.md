@@ -22,7 +22,7 @@ When a later task reaches operator context capture, IIOS displays a concise summ
 
 If manually entered values differ from the current profile, IIOS asks separately whether to update the default. The default is **0 = keep the old profile**. It never silently rewrites saved settings.
 
-An interrupted task continues to use its own journaled partial inputs. A later profile edit does not retroactively alter an existing task.
+An interrupted task continues to use its own journaled partial inputs. A later profile edit does not retroactively alter an existing task. The profile update date is shown before reuse so stale portfolio assumptions are visible.
 
 ## Stored data and location
 
@@ -33,10 +33,10 @@ Path:
 ```
 
 Only these operator-owned values are stored:
-- Portfolio constraint status, add-risk permission, risk budget, entry-price band and initial/target/maximum position percentages. A deliberate `UNKNOWN` / `BLOCKED` / no-portfolio-input state can also be stored.
-- Operator-selected valuation model family and, for EPS_MULTIPLE only, whether the baseline already includes the relevant project.
+- Cross-company portfolio guardrails: constraint status, add-risk permission, risk budget and initial/target/maximum position percentages. A deliberate `UNKNOWN` / `BLOCKED` / no-portfolio-input state can also be stored.
+- The last selected valuation model family is stored only as a suggested default for the next company-specific model prompt. The operator must still confirm the model for every new company.
 
-No company research, ChatGPT response, holdings list, account identifier, credential, browser data or market-data API key is stored in this profile.
+No per-company entry-price band, valuation project-scope decision, company research, ChatGPT response, holdings list, account identifier, credential, browser data or market-data API key is stored in this profile. The entry-price band must be entered separately for each company. For EPS_MULTIPLE, the question of whether the project/expansion value is already included in the baseline must be answered again for each company.
 
 ## Security and failure behavior
 
