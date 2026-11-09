@@ -68,7 +68,7 @@ def validate_portfolio_context(value: Any) -> dict[str, Any] | None:
         raise OperatorProfileError("OPERATOR_PROFILE_PORTFOLIO_CONTEXT_NOT_OBJECT")
     status = value.get("constraint_status")
     can_add = value.get("can_add")
-    if status not in {"PASS", "BLOCKED", "UNKNOWN"} or not isinstance(can_add, bool):
+    if not isinstance(status, str) or status not in {"PASS", "BLOCKED", "UNKNOWN"} or not isinstance(can_add, bool):
         raise OperatorProfileError("OPERATOR_PROFILE_PORTFOLIO_STATUS_INVALID")
     if status != "PASS":
         if can_add or set(value) != {"constraint_status", "can_add"}:
@@ -118,7 +118,7 @@ def validate_valuation_context(value: Any) -> dict[str, Any]:
     family = value.get("selected_model_family")
     confirmed = value.get("selection_confirmed")
     baseline = value.get("baseline_includes_project")
-    if family not in _MODEL_FAMILIES or not isinstance(confirmed, bool):
+    if not isinstance(family, str) or family not in _MODEL_FAMILIES or not isinstance(confirmed, bool):
         raise OperatorProfileError("OPERATOR_PROFILE_VALUATION_SELECTION_INVALID")
     if value.get("input_owner") != "OPERATOR" or value.get("selection_source") != "INTERACTIVE_OPERATOR_PROMPT":
         raise OperatorProfileError("OPERATOR_PROFILE_VALUATION_PROVENANCE_INVALID")
@@ -175,6 +175,8 @@ def _ensure_private_directory(profile_path: Path) -> tuple[Path, Path]:
         relative_parent = target.parent.relative_to(home)
     except ValueError as exc:
         raise OperatorProfileError("OPERATOR_PROFILE_MUST_REMAIN_UNDER_HOME") from exc
+    if any(part in {".", ".."} for part in relative_parent.parts):
+        raise OperatorProfileError("OPERATOR_PROFILE_PATH_TRAVERSAL_REJECTED")
 
     current = home
     for part in relative_parent.parts:
@@ -238,6 +240,8 @@ def _read_unlocked(profile_path: Path) -> dict[str, Any] | None:
         flags = os.O_RDONLY
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
+        if hasattr(os, "O_NONBLOCK"):
+            flags |= os.O_NONBLOCK
         fd = os.open(profile_path, flags)
     except FileNotFoundError:
         return None
