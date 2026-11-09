@@ -595,7 +595,8 @@ def test_operator_profile_save_requires_explicit_opt_in(monkeypatch, tmp_path: P
     import iios_mvp.local_investment_pilot_v01 as pilot
     import iios_mvp.operator_profile_v01 as profile_store
 
-    profile_path = tmp_path / "operator-defaults.json"
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    profile_path = tmp_path / ".iios-private" / "local-pilot" / "profile" / "operator-defaults.json"
     monkeypatch.setattr(profile_store, "DEFAULT_PROFILE_PATH", profile_path)
     monkeypatch.setattr(pilot, "_ask", lambda *_args, **_kwargs: "0")
     guided_resume._maybe_persist_operator_profile(
@@ -611,3 +612,16 @@ def test_operator_profile_save_requires_explicit_opt_in(monkeypatch, tmp_path: P
         },
     )
     assert not profile_path.exists()
+
+
+def test_operator_profile_rejects_corrupt_json_without_resetting_it(monkeypatch, tmp_path: Path):
+    import iios_mvp.operator_profile_v01 as profile_store
+
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    profile_path = tmp_path / ".iios-private" / "local-pilot" / "profile" / "operator-defaults.json"
+    profile_path.parent.mkdir(parents=True, mode=0o700)
+    profile_path.write_text('{"profile_schema":"wrong"}', encoding="utf-8")
+
+    with pytest.raises(profile_store.OperatorProfileError, match="SCHEMA_OR_FIELDS_MISMATCH"):
+        profile_store.load_operator_profile(path=profile_path)
+    assert profile_path.read_text(encoding="utf-8") == '{"profile_schema":"wrong"}'
