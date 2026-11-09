@@ -424,6 +424,9 @@ def test_operator_portfolio_input_is_reused_after_interruption_before_valuation_
     session.accept_validated_payload("ROUND_B", {"case": template_payload["case"], "round": "B"})
 
     portfolio = {"constraint_status": "UNKNOWN", "can_add": False}
+    import iios_mvp.guided_task_resume_v01 as guided_resume
+    monkeypatch.setattr(guided_resume, "load_operator_profile", lambda: None)
+    monkeypatch.setattr(pilot, "_ask", lambda *_args, **_kwargs: "0")
     monkeypatch.setattr(pilot, "_prepare_input", lambda _payload: None)
     monkeypatch.setattr(pilot, "_ask_operator_portfolio_context", lambda: portfolio)
     monkeypatch.setattr(
@@ -467,3 +470,144 @@ def test_operator_portfolio_input_is_reused_after_interruption_before_valuation_
     )
     assert saved_context["operator_portfolio_context"] == portfolio
     assert saved_context["operator_valuation_context"] == valuation
+
+
+
+def test_operator_profile_round_trip_and_private_permissions(monkeypatch, tmp_path: Path) -> None:
+    import stat
+
+    import iios_mvp.operator_profile_v01 as profile_store
+
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    profile_path = tmp_path / ".iios-private" / "local-pilot" / "profile" / "operator-defaults.json"
+    portfolio = {
+        "constraint_status": "PASS",
+        "can_add": True,
+        "risk_budget_pct_nav": "1",
+        "entry_zone_low": "18.5",
+        "entry_zone_high": "21",
+        "initial_position_pct": "1",
+        "target_position_pct": "4",
+        "max_position_pct": "8",
+    }
+    valuation = {
+        "selected_model_family": "EPS_MULTIPLE",
+        "baseline_includes_project": False,
+        "input_owner": "OPERATOR",
+        "selection_source": "INTERACTIVE_OPERATOR_PROMPT",
+        "selection_confirmed": True,
+    }
+
+    saved = profile_store.save_operator_profile(
+        portfolio_context=portfolio,
+        valuation_context=valuation,
+        path=profile_path,
+    )
+    loaded = profile_store.load_operator_profile(path=profile_path)
+
+    assert loaded == saved
+    assert stat.S_IMODE(profile_path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(profile_path.parent.stat().st_mode) == 0o700
+    assert stat.S_IMODE(profile_path.parent.parent.stat().st_mode) == 0o700
+
+
+def test_operator_profile_rejects_invalid_portfolio_and_valuation_values():
+    import iios_mvp.operator_profile_v01 as profile_store
+
+    invalid_portfolio = {
+        "constraint_status": "PASS",
+        "can_add": True,
+        "risk_budget_pct_nav": "1",
+        "entry_zone_low": "18",
+        "entry_zone_high": "21",
+        "initial_position_pct": "5",
+        "target_position_pct": "4",
+        "max_position_pct": "8",
+    }
+    with pytest.raises(profile_store.OperatorProfileError, match="POSITION_LIMIT_ORDER_INVALID"):
+        profile_store.validate_portfolio_context(invalid_portfolio)
+
+    invalid_valuation = {
+        "selected_model_family": "UNKNOWN",
+        "baseline_includes_project": True,
+        "input_owner": "OPERATOR",
+        "selection_source": "INTERACTIVE_OPERATOR_PROMPT",
+        "selection_confirmed": False,
+    }
+    with pytest.raises(profile_store.OperatorProfileError, match="UNKNOWN_MODEL_MUST_REMAIN_UNCONFIRMED"):
+        profile_store.validate_valuation_context(invalid_valuation)
+
+
+def test_operator_profile_rejects_symlinked_private_parent(monkeypatch, tmp_path: Path):
+    import iios_mvp.operator_profile_v01 as profile_store
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".iios-private").symlink_to(outside, target_is_directory=True)
+    monkeypatch.setattr(Path, "home", lambda: home)
+    profile_path = home / ".iios-private" / "local-pilot" / "profile" / "operator-defaults.json"
+
+    with pytest.raises(profile_store.OperatorProfileError, match="DIRECTORY_IS_SYMLINK"):
+        profile_store.load_operator_profile(path=profile_path)
+
+
+def test_operator_profile_reuse_skips_manual_prompts(monkeypatch):
+    import iios_mvp.guided_task_resume_v01 as guided_resume
+    import iios_mvp.local_investment_pilot_v01 as pilot
+
+    portfolio = {
+        "constraint_status": "UNKNOWN",
+        "can_add": False,
+    }
+    valuation = {
+        "selected_model_family": "EPS_MULTIPLE",
+        "baseline_includes_project": None,
+        "input_owner": "OPERATOR",
+        "selection_source": "INTERACTIVE_OPERATOR_PROMPT",
+        "selection_confirmed": True,
+    }
+    profile = {
+        "portfolio_context": portfolio,
+        "valuation_context": valuation,
+    }
+    monkeypatch.setattr(pilot, "_ask", lambda *_args, **_kwargs: "1")
+    monkeypatch.setattr(
+        pilot, "_ask_operator_portfolio_context",
+        lambda: (_ for _ in ()).throw(AssertionError("portfolio profile should be reused")),
+    )
+    monkeypatch.setattr(
+        pilot, "_ask_operator_valuation_context",
+        lambda: (_ for _ in ()).throw(AssertionError("valuation profile should be reused")),
+    )
+
+    assert guided_resume._resolve_operator_context_section(
+        pilot, section="portfolio", profile=profile
+    ) == portfolio
+    assert guided_resume._resolve_operator_context_section(
+        pilot, section="valuation", profile=profile
+    ) == valuation
+
+
+def test_operator_profile_save_requires_explicit_opt_in(monkeypatch, tmp_path: Path):
+    import iios_mvp.guided_task_resume_v01 as guided_resume
+    import iios_mvp.local_investment_pilot_v01 as pilot
+    import iios_mvp.operator_profile_v01 as profile_store
+
+    profile_path = tmp_path / "operator-defaults.json"
+    monkeypatch.setattr(profile_store, "DEFAULT_PROFILE_PATH", profile_path)
+    monkeypatch.setattr(pilot, "_ask", lambda *_args, **_kwargs: "0")
+    guided_resume._maybe_persist_operator_profile(
+        pilot,
+        profile=None,
+        portfolio_context={"constraint_status": "UNKNOWN", "can_add": False},
+        valuation_context={
+            "selected_model_family": "EPS_MULTIPLE",
+            "baseline_includes_project": None,
+            "input_owner": "OPERATOR",
+            "selection_source": "INTERACTIVE_OPERATOR_PROMPT",
+            "selection_confirmed": True,
+        },
+    )
+    assert not profile_path.exists()
