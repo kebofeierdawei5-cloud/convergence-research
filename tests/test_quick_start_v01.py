@@ -94,3 +94,17 @@ def test_prompt_handoff_does_not_open_textedit(monkeypatch, tmp_path):
     assert calls[0] == ["pbcopy"]
     assert calls[1] == ["open", "https://chatgpt.com/"]
     assert all("TextEdit" not in part for command in calls for part in command)
+
+
+
+def test_double_click_launcher_is_local_and_checks_python_environment():
+    root = Path(__file__).resolve().parents[1]
+    launcher = (root / "IIOS.command").read_text(encoding="utf-8")
+
+    assert "umask 077" in launcher
+    assert "PYTHONNOUSERSITE=1" in launcher
+    assert "sys.version_info >= (3, 10)" in launcher
+    assert "iios_mvp.quick_start_v01" in launcher
+    assert "pip install" not in launcher
+    assert "curl " not in launcher
+    assert "eval " not in launcher
