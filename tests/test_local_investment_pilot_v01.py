@@ -22,6 +22,7 @@ from iios_mvp.local_investment_pilot_v01 import (
     _parse_guided_cutoff_input,
     _parse_guided_price_input,
     _default_guided_price_date,
+    _default_guided_cutoff_date,
     _previous_weekday,
     _read_json_response_file,
     _response_file_signature,
@@ -302,6 +303,15 @@ def test_guided_cutoff_date_defaults_to_shanghai_close_and_exact_instant_is_pres
     )
     assert cutoff2 == date(2026, 10, 12)
     assert instant2.hour == 0 and normalized2.endswith("T00:00:00+08:00")
+
+
+def test_default_cutoff_never_points_to_future_close():
+    before_close = pilot.datetime(2026, 11, 9, 14, 30, tzinfo=pilot.SHANGHAI)
+    after_close = pilot.datetime(2026, 11, 9, 15, 30, tzinfo=pilot.SHANGHAI)
+    saturday = pilot.datetime(2026, 11, 14, 18, 0, tzinfo=pilot.SHANGHAI)
+    assert _default_guided_cutoff_date(before_close) == date(2026, 11, 6)
+    assert _default_guided_cutoff_date(after_close) == date(2026, 11, 9)
+    assert _default_guided_cutoff_date(saturday) == date(2026, 11, 13)
 
 
 def test_guided_cutoff_empty_default_uses_supplied_shanghai_date():
