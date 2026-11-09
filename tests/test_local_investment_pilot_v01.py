@@ -1361,14 +1361,10 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
     answers = iter([
         "山东赫达",
         "SZ002810",
-        "1",
-        "2026-10-12",
-        "1",
+        "2026-10-12T00:00:00+08:00",
         "0",
-        "19.74",
-        "2026-10-12",
-        "2026-10-09",
-        "",
+        "19.74@2026-10-12",
+        "19.74@2026-10-09",
         "0",
     ])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
@@ -1378,8 +1374,8 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
     )
     output = capsys.readouterr().out
     assert result["status"] == "CANCELLED"
-    assert "价格观察日期不合法" in output
-    assert "PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF" in output
+    assert "价格输入不合法" in output
+    assert "PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP" in output
     assert "观察日 2026-10-09" in output
     assert not (tmp_path / "inputs").exists()
 
