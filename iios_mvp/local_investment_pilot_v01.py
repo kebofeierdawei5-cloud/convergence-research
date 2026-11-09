@@ -262,7 +262,12 @@ def _normalize_guided_symbol(value: Any, market: str) -> str:
     elif market == "HK":
         match = re.fullmatch(r"HK(\d{4,5})", raw)
         if match:
-            return f"{match.group(1)}.HK"
+            return f"{match.group(1).zfill(5)}.HK"
+        match = re.fullmatch(r"(\d{4})\.HK", raw)
+        if match:
+            return f"{match.group(1).zfill(5)}.HK"
+        if re.fullmatch(r"\d{4}", raw):
+            return raw.zfill(5)
     return raw
 
 
