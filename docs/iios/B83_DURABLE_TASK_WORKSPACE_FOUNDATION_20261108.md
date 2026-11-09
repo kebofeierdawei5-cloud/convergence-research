@@ -252,8 +252,9 @@ The new-research wizard now removes the separate market selector, cutoff-mode ch
 ### Validation status
 
 - First B83-6 local-pilot CI run at `185caccc10ac52e1425d193001afd1920b65a516`: **409 passed / 2 failed**. One was bare five-digit HK market inference; one acceptance fixture used the pre-B83-6 prompt order.
-- Both issues were corrected in subsequent commits and new tests were added for Shanghai cutoff defaults, intraday price handling and launcher environment checks.
-- No fresh CI result has yet been observed for the latest post-fix branch head. Therefore B83-6 is **implemented, but final CI verification is pending / not claimed**.
-- CI runs Ubuntu/Python 3.12 and does not replace macOS Finder or actual clipboard acceptance.
+- Both issues were corrected. A subsequent run exposed a false-positive launcher test because it matched `shell eval` in a comment; the test now checks executable lines only.
+- Post-fix verification commit: `ba8091fd2a2948d89951a199686947dfb8e83a0b`.
+- Local Investment Pilot workflow #710: **413 passed**; all 7 PR-triggered workflows for this commit completed successfully.
+- CI runs Ubuntu/Python 3.12 and does not replace macOS Finder, actual clipboard permission or end-to-end interruption/resume acceptance.
 
 B34 macOS acceptance and B89 full acceptance remain open. PR #588 remains Draft/unmerged; canonical `main` is unchanged.
