@@ -493,6 +493,13 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                 has_valuation = session.has_partial_operator_context("valuation")
                 profile_checked = not (has_portfolio and has_valuation)
                 profile = load_operator_profile() if profile_checked else None
+                if profile is not None:
+                    print(
+                        "本机个人默认档案最后更新日期："
+                        + str(profile.get("updated_at", "UNKNOWN"))[:10]
+                        + "；请确认这些偏好仍适用于当前组合。",
+                        flush=True,
+                    )
 
                 if has_portfolio:
                     portfolio = session.load_partial_operator_context("portfolio")
