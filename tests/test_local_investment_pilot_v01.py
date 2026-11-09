@@ -1130,7 +1130,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     import iios_mvp.local_investment_pilot_v01 as pilot
 
     source_claim = "用户手动提供的 19.74；按 收盘价 15:00 处理；未从交易所或行情供应商独立核验"
-    answers = iter(["山东赫达", "SZ002810", "1", "2026-10-12", "2", "0", "19.74", "2026-10-12", "1", "1", "0", "0"])
+    answers = iter(["山东赫达", "SZ002810", "1", "2026-10-12", "2", "0", "19.74", "2026-10-12", "1", "1", "0", "0", "0"])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
 
     def simulate_saved_response(response_path, *, previous_signature):
