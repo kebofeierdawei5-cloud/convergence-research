@@ -302,7 +302,7 @@ def _resolve_operator_context_section(
     saved = profile.get(key) if isinstance(profile, Mapping) else None
     has_saved_value = isinstance(profile, Mapping) and key in profile
     if has_saved_value:
-        print("\\n发现本机个人默认设置：" + profile_section_summary(section, saved), flush=True)
+        print("\n发现本机个人默认设置：" + profile_section_summary(section, saved), flush=True)
         while True:
             choice = pilot._ask(
                 "1 = 复用上次设置（默认）；2 = 修改设置；0 = 本次手动填写、不使用旧设置",
