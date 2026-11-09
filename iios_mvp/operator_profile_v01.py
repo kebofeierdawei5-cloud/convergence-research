@@ -170,7 +170,7 @@ def validate_portfolio_preferences(value: Any) -> dict[str, Any] | None:
     }
 
 
-def _validate_operator_valuation_context(value: Any) -> dict[str, Any]:
+def validate_valuation_context(value: Any) -> dict[str, Any]:
     expected = {
         "selected_model_family",
         "baseline_includes_project",
@@ -363,7 +363,7 @@ def save_operator_profile(
     if not isinstance(valuation_context, Mapping):
         raise OperatorProfileError("OPERATOR_PROFILE_VALUATION_CONTEXT_NOT_OBJECT")
     # Validate all per-task valuation inputs even though only the model hint is persisted.
-    normalized_valuation = _validate_operator_valuation_context(valuation_context)
+    normalized_valuation = validate_valuation_context(valuation_context)
     family = validate_preferred_model_family(normalized_valuation["selected_model_family"])
     with _profile_lock(parent):
         existing = _read_unlocked(target)
