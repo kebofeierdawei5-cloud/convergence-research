@@ -1,4 +1,4 @@
-name: IIOS Local Investment Pilot v0.1
+name: IIOS Local Investment Pilot v0.1 — B83 local UX
 
 on:
   pull_request:
