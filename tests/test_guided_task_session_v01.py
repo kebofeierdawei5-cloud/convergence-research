@@ -455,7 +455,7 @@ def test_operator_portfolio_input_is_reused_after_interruption_before_valuation_
         "selection_source": "INTERACTIVE_OPERATOR_PROMPT",
         "selection_confirmed": True,
     }
-    monkeypatch.setattr(pilot, "_ask_operator_valuation_context", lambda: valuation)
+    monkeypatch.setattr(pilot, "_ask_operator_valuation_context", lambda **_kwargs: valuation)
     monkeypatch.setattr(
         pilot,
         "run_local_investment_pilot",
@@ -506,6 +506,10 @@ def test_operator_profile_round_trip_and_private_permissions(monkeypatch, tmp_pa
     loaded = profile_store.load_operator_profile(path=profile_path)
 
     assert loaded == saved
+    assert "entry_zone_low" not in saved["portfolio_preferences"]
+    assert "entry_zone_high" not in saved["portfolio_preferences"]
+    assert "baseline_includes_project" not in saved
+    assert saved["preferred_valuation_model_family"] == "EPS_MULTIPLE"
     assert stat.S_IMODE(profile_path.stat().st_mode) == 0o600
     assert stat.S_IMODE(profile_path.parent.stat().st_mode) == 0o700
     assert stat.S_IMODE(profile_path.parent.parent.stat().st_mode) == 0o700
@@ -569,17 +573,18 @@ def test_operator_profile_reuse_skips_manual_prompts(monkeypatch):
         "selection_confirmed": True,
     }
     profile = {
-        "portfolio_context": portfolio,
-        "valuation_context": valuation,
+        "portfolio_preferences": portfolio,
+        "preferred_valuation_model_family": "EPS_MULTIPLE",
     }
     monkeypatch.setattr(pilot, "_ask", lambda *_args, **_kwargs: "1")
     monkeypatch.setattr(
         pilot, "_ask_operator_portfolio_context",
         lambda: (_ for _ in ()).throw(AssertionError("portfolio profile should be reused")),
     )
+    valuation_calls = []
     monkeypatch.setattr(
         pilot, "_ask_operator_valuation_context",
-        lambda: (_ for _ in ()).throw(AssertionError("valuation profile should be reused")),
+        lambda *, preferred_model_family=None: valuation_calls.append(preferred_model_family) or valuation,
     )
 
     assert guided_resume._resolve_operator_context_section(
@@ -588,6 +593,7 @@ def test_operator_profile_reuse_skips_manual_prompts(monkeypatch):
     assert guided_resume._resolve_operator_context_section(
         pilot, section="valuation", profile=profile
     ) == valuation
+    assert valuation_calls == ["EPS_MULTIPLE"]
 
 
 def test_operator_profile_save_requires_explicit_opt_in(monkeypatch, tmp_path: Path):
