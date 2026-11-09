@@ -170,6 +170,42 @@ def validate_portfolio_preferences(value: Any) -> dict[str, Any] | None:
     }
 
 
+def _validate_operator_valuation_context(value: Any) -> dict[str, Any]:
+    expected = {
+        "selected_model_family",
+        "baseline_includes_project",
+        "input_owner",
+        "selection_source",
+        "selection_confirmed",
+    }
+    if not isinstance(value, Mapping) or set(value) != expected:
+        raise OperatorProfileError("OPERATOR_PROFILE_VALUATION_FIELDS_MISMATCH")
+    family = value.get("selected_model_family")
+    baseline = value.get("baseline_includes_project")
+    confirmed = value.get("selection_confirmed")
+    if not isinstance(family, str) or family not in _MODEL_FAMILIES or not isinstance(confirmed, bool):
+        raise OperatorProfileError("OPERATOR_PROFILE_VALUATION_SELECTION_INVALID")
+    if value.get("input_owner") != "OPERATOR" or value.get("selection_source") != "INTERACTIVE_OPERATOR_PROMPT":
+        raise OperatorProfileError("OPERATOR_PROFILE_VALUATION_PROVENANCE_INVALID")
+    if family == "UNKNOWN":
+        if confirmed or baseline is not None:
+            raise OperatorProfileError("OPERATOR_PROFILE_UNKNOWN_MODEL_MUST_REMAIN_UNCONFIRMED")
+    else:
+        if not confirmed:
+            raise OperatorProfileError("OPERATOR_PROFILE_SELECTED_MODEL_NOT_CONFIRMED")
+        if baseline is not None and not isinstance(baseline, bool):
+            raise OperatorProfileError("OPERATOR_PROFILE_PROJECT_SCOPE_INVALID")
+        if family != "EPS_MULTIPLE" and baseline is not None:
+            raise OperatorProfileError("OPERATOR_PROFILE_PROJECT_SCOPE_ONLY_FOR_EPS_MULTIPLE")
+    return {
+        "selected_model_family": family,
+        "baseline_includes_project": baseline,
+        "input_owner": "OPERATOR",
+        "selection_source": "INTERACTIVE_OPERATOR_PROMPT",
+        "selection_confirmed": confirmed,
+    }
+
+
 def validate_preferred_model_family(value: Any) -> str:
     if not isinstance(value, str) or value not in _MODEL_FAMILIES:
         raise OperatorProfileError("OPERATOR_PROFILE_PREFERRED_MODEL_FAMILY_INVALID")
@@ -326,7 +362,9 @@ def save_operator_profile(
     portfolio_preferences = portfolio_preferences_from_context(portfolio_context)
     if not isinstance(valuation_context, Mapping):
         raise OperatorProfileError("OPERATOR_PROFILE_VALUATION_CONTEXT_NOT_OBJECT")
-    family = validate_preferred_model_family(valuation_context.get("selected_model_family"))
+    # Validate all per-task valuation inputs even though only the model hint is persisted.
+    normalized_valuation = _validate_operator_valuation_context(valuation_context)
+    family = validate_preferred_model_family(normalized_valuation["selected_model_family"])
     with _profile_lock(parent):
         existing = _read_unlocked(target)
         now = datetime.now(timezone.utc).isoformat()
