@@ -165,7 +165,7 @@ def _datetime(value: Any, field: str, *, allow_date_only: bool = True) -> dateti
 def _infer_guided_market(value: Any) -> str:
     """Infer A/H market only from unambiguous ticker syntax or code length."""
     raw = str(value or "").strip().upper().replace(" ", "")
-    if re.fullmatch(r"HK\d{4,5}|\d{4,5}\.HK", raw):
+    if re.fullmatch(r"HK\d{4,5}|\d{4,5}(?:\.HK)?", raw):
         return "HK"
     if re.fullmatch(r"(?:SH|SZ|BJ)\d{6}|\d{6}\.(?:SH|SZ|BJ)|\d{6}", raw):
         return "CN-A"
