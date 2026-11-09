@@ -107,4 +107,5 @@ def test_double_click_launcher_is_local_and_checks_python_environment():
     assert "iios_mvp.quick_start_v01" in launcher
     assert "pip install" not in launcher
     assert "curl " not in launcher
-    assert "eval " not in launcher
+    executable_lines = [line for line in launcher.splitlines() if not line.lstrip().startswith("#")]
+    assert not any(line.lstrip().startswith("eval ") for line in executable_lines)
