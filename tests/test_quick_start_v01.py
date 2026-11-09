@@ -12,10 +12,13 @@ from iios_mvp.task_workspace_v01 import TaskWorkspaceError
 def test_quick_start_starts_new_wizard_when_no_unfinished_tasks(monkeypatch):
     calls = []
     monkeypatch.setattr(quick_start, "_discover_unfinished_tasks", lambda: [])
-    monkeypatch.setattr(quick_start, "_pilot_main", lambda args: calls.append(args) or 0)
+    monkeypatch.setattr(
+        quick_start, "run_guided_wizard",
+        lambda: calls.append("wizard") or {"status": "CANCELLED"},
+    )
 
     assert quick_start.main() == 0
-    assert calls == [["--wizard"]]
+    assert calls == ["wizard"]
 
 
 def test_quick_start_resumes_the_only_unfinished_task_without_task_id(monkeypatch):
