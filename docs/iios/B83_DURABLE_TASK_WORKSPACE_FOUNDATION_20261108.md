@@ -227,3 +227,33 @@ The profile exists only to reduce repeated manual entry. Its final schema is `II
 - PR #588 remains Draft and unmerged; canonical `main` is unchanged.
 - B34 macOS acceptance and B89 full acceptance remain open.
 - B83-4/B83-5 change only local operator interaction and persistence. Research prompts, evidence admission, valuation calculations, return hurdle, decision gates and order-execution authority are unchanged.
+
+
+## B83-6 — compact new-research entry and launcher checks (2026-11-09)
+
+**Implementation commits:** `090d53371263c810440b54c887dfcdbd57ca1b4a`, `ded4750c30a323020bf142636de278eec031683c`, `ab49e2e6904f079bedc94c57c4caf6e6fc6dfb6a`, `ea9e090e91fc437e3041e75504bbc2c60d63f666`; launcher: `185caccc10ac52e1425d193001afd1920b65a516`.
+
+### User input reduction
+
+The new-research wizard now removes the separate market selector, cutoff-mode choice, price-observation-date question and price-time-mode question.
+
+- Market is inferred from explicit A/H suffix/prefix or unambiguous code length. Invalid/ambiguous input fails with instructions instead of silently selecting a market.
+- Blank cutoff uses the latest weekday close that is not in the future, based on Asia/Shanghai. A plain date means 15:30 Shanghai time; an exact ISO timestamp with timezone supports intraday or strict date-level cutoff.
+- One price field accepts `19.74`, `19.74@YYYY-MM-DD`, or `19.74@YYYY-MM-DDTHH:MM:SS+08:00`.
+- The default price observation date is chosen relative to the cutoff clock. If cutoff is before 15:00, the same-day close is not used.
+- Price remains operator-attested and unverified against an exchange/market-data source; holiday calendars are not fetched.
+
+### Launcher
+
+- `umask 077`; checks project entry file; uses the project `.venv` if present or existing Python 3 otherwise.
+- Requires Python 3.10+, isolates user-site packages with `PYTHONNOUSERSITE=1` and uses explicit project `PYTHONPATH`.
+- A broken existing project venv fails with a clear message; no silent fallback to a different Python and no automatic package/network installation.
+
+### Validation status
+
+- First B83-6 local-pilot CI run at `185caccc10ac52e1425d193001afd1920b65a516`: **409 passed / 2 failed**. One was bare five-digit HK market inference; one acceptance fixture used the pre-B83-6 prompt order.
+- Both issues were corrected in subsequent commits and new tests were added for Shanghai cutoff defaults, intraday price handling and launcher environment checks.
+- No fresh CI result has yet been observed for the latest post-fix branch head. Therefore B83-6 is **implemented, but final CI verification is pending / not claimed**.
+- CI runs Ubuntu/Python 3.12 and does not replace macOS Finder or actual clipboard acceptance.
+
+B34 macOS acceptance and B89 full acceptance remain open. PR #588 remains Draft/unmerged; canonical `main` is unchanged.
