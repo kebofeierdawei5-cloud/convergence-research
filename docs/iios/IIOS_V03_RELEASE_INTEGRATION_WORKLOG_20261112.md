@@ -56,7 +56,7 @@ No changes have been made to canonical main. No PR has been merged.
 - Integrated B76's full research/calculation/report pilot implementation as the base and ported B83's guided market/cutoff/price parsing, one-shot clipboard intake, current-company entry-zone prompt, compact guided wizard and `--resume-task` CLI.
 - Added B83 durable task workspace/session/resume, operator profile, quick-start modules, launcher and their four dedicated test files.
 - Ported the B76 net changed file set (115 paths excluding the four overlapping files handled separately), including B42–B81 research modules, schemas, examples, docs and regression suites.
-- Reconciled the overlapping Local Pilot test file: retained B76 tests, added 13 B83-only tests, and used B83 versions of the three overlapping guided-entry tests. The combined file contains 307 test functions.
+- Reconciled the overlapping Local Pilot test file: retained B76 tests, added 13 B83-only tests, and used B83 versions of the three overlapping guided-entry tests. The combined file contains 298 uniquely named test functions after duplicate-definition cleanup.
 - Reconciled the Local Pilot workflow: retains B76 Ubuntu + macOS 15 jobs and adds B83 module/test path triggers, launcher syntax and B83 test files.
 - Reconciled `docs/PROJECT_STATE_INDEX.md`: canonical authority marker and canonical snapshot date are preserved; release integration is explicitly recorded as non-canonical proposal state.
 - Set `IIOS.command` Git mode to `100755` using the Git tree API; verified exact candidate tree mode.
@@ -84,3 +84,27 @@ At the corrected head, the PR-triggered workflow matrix was observed as 35 workf
 - Real EPS_MULTIPLE run / Replay, SOTP if source data allows.
 - Operator's own Mac Finder / clipboard / interruption / resume acceptance.
 - Formal Evidence/PIT and Forecast admission remain unavailable while production signer registry is empty.
+
+
+## I1 — integrated exact-head acceptance (2026-11-12)
+
+<status>PASS — hosted CI / operator Mac still open</status>
+
+- Exact code-tested integration HEAD: `f62d9beeeac01d5661244ac256c36233fab17c88`.
+- **35/35** PR-triggered GitHub Actions workflows succeeded on that exact code-tested HEAD; zero failures, zero cancellations.
+- Local Investment Pilot + B76 arithmetic / Xinhecheng readiness / Replay + B83 task/clipboard/quick-start suite: **538 passed on Ubuntu** (5.57s) and **538 passed on hosted macOS 15** (19.78s).
+- The same exact-head matrix includes Investment Core CI, C0 Governance Hygiene, State Hygiene, Signed Evidence Admission Gate, TR-03 Replay, Post-B04 Independent Red-team, B2-F fresh independent red-team, and the B76/B83 Local Investment Pilot workflow.
+- Hosted macOS validates the CI runner and launcher syntax/mode; it does not substitute for the user's own Finder launch, clipboard handoff, interruption/relaunch and private bundle Replay.
+- The tested code head was followed only by this worklog documentation update; no code or workflow changes were made after `f62d9be`.
+
+### I1 exit status
+
+- B76 research/calculation/report source and B83 durable local task workflow are integrated in one tree.
+- Ubuntu + hosted macOS Local Pilot suites are green on the same exact code head.
+- Full triggered workflow and red-team matrix is green on the same exact code head.
+- I1 code integration and hosted validation: **CLOSED**.
+- I4 real operator Mac acceptance: **OPEN**.
+- Real EPS_MULTIPLE user-run E2E and deterministic Replay: **OPEN**.
+- Real-company SOTP E2E: **UNVERIFIED / conditional on complete segment data**.
+- Formal Evidence/PIT and Forecast Admission: **NOT AVAILABLE** while production signer registry is empty.
+- Release merge: **NOT AUTHORIZED** until operator acceptance and final PR diff/base review.
