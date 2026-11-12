@@ -47,3 +47,40 @@ Run one real EPS_MULTIPLE task end-to-end with Round A/B, interruption/Finder re
 - I4 operator Mac acceptance: NOT VERIFIED.
 
 No changes have been made to canonical main. No PR has been merged.
+
+
+## I1 — pilot adapter and B76/B83 source integration (2026-11-12)
+
+**Code integration: COMPLETE on candidate branch. Exact-head validation: RUNNING.**
+
+- Integrated B76's full research/calculation/report pilot implementation as the base and ported B83's guided market/cutoff/price parsing, one-shot clipboard intake, current-company entry-zone prompt, compact guided wizard and `--resume-task` CLI.
+- Added B83 durable task workspace/session/resume, operator profile, quick-start modules, launcher and their four dedicated test files.
+- Ported the B76 net changed file set (115 paths excluding the four overlapping files handled separately), including B42–B81 research modules, schemas, examples, docs and regression suites.
+- Reconciled the overlapping Local Pilot test file: retained B76 tests, added 13 B83-only tests, and used B83 versions of the three overlapping guided-entry tests. The combined file contains 307 test functions.
+- Reconciled the Local Pilot workflow: retains B76 Ubuntu + macOS 15 jobs and adds B83 module/test path triggers, launcher syntax and B83 test files.
+- Reconciled `docs/PROJECT_STATE_INDEX.md`: canonical authority marker and canonical snapshot date are preserved; release integration is explicitly recorded as non-canonical proposal state.
+- Set `IIOS.command` Git mode to `100755` using the Git tree API; verified exact candidate tree mode.
+
+### First exact-head validation and corrections
+
+The initial PR #589 head `1cd8d7734afda16e578b861dfbe97fe703d2a073` exposed four integration defects:
+1. State index canonical marker/date were overwritten, failing C0, State Hygiene and Investment Core authority checks.
+2. Test merge left a pytest parametrization decorator detached from its intended function, causing collection failure.
+3. The Contents API stored `IIOS.command` as mode `100644`, failing the hosted macOS executable check.
+4. Local Pilot Ubuntu/macOS suites stopped at test collection / launcher validation, so no investment-suite pass was obtained on that head.
+
+Corrections were applied:
+- Canonical state header restored, with release branch recorded separately as non-canonical.
+- Combined test file rebuilt from the two source versions with decorators preserved.
+- `IIOS.command` changed to mode `100755`.
+- Corrected exact candidate head: `d8f9dbcf3161e8524c046358a32bd37b60a1f635`.
+
+At the corrected head, the PR-triggered workflow matrix was observed as 35 workflows: 1 completed success, 0 failures, 34 queued/in progress at the last check. This is a live intermediate snapshot, not final validation.
+
+### Still open
+
+- Exact-head 307-test combined Local Pilot suite + dedicated task/clipboard tests on Ubuntu and macOS 15.
+- Full 35-workflow matrix and red-team completion.
+- Real EPS_MULTIPLE run / Replay, SOTP if source data allows.
+- Operator's own Mac Finder / clipboard / interruption / resume acceptance.
+- Formal Evidence/PIT and Forecast admission remain unavailable while production signer registry is empty.
