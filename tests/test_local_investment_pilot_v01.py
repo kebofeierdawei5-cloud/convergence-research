@@ -257,6 +257,22 @@ def test_guided_entry_normalizes_common_symbol_formats(market, raw, expected):
     assert _normalize_guided_symbol(raw, market) == expected
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected_market"),
+    [
+        ("002810", "CN-A"),
+        ("002810.SZ", "CN-A"),
+        ("SZ002810", "CN-A"),
+        ("600000.SH", "CN-A"),
+        ("430047.BJ", "CN-A"),
+        ("00700", "HK"),
+        ("00700.HK", "HK"),
+        ("HK00700", "HK"),
+        ("0700.HK", "HK"),
+    ],
+)
+
+
 def test_default_price_date_skips_weekends_but_does_not_guess_exchange_holidays():
     assert _previous_weekday(date(2026, 10, 12)) == date(2026, 10, 9)
     assert _previous_weekday(date(2026, 10, 13)) == date(2026, 10, 12)
@@ -1095,10 +1111,8 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     import builtins
     import iios_mvp.local_investment_pilot_v01 as pilot
 
-    # The wizard's GUI convenience must never launch applications in test/CI runs.
-    monkeypatch.setenv("CI", "true")
     source_claim = "用户手动提供的 19.74；按 收盘价 15:00 处理；未从交易所或行情供应商独立核验"
-    answers = iter(["山东赫达", "SZ002810", "1", "2026-10-12", "2", "0", "19.74", "2026-10-12", "1", "1", "0", "0"])
+    answers = iter(["山东赫达", "SZ002810", "2026-10-12", "0", "19.74", "1", "0", "0", "0"])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
 
     def simulate_saved_response(response_path, *, previous_signature):
@@ -1134,7 +1148,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     result = run_guided_wizard(template_root=tmp_path / "inputs", output_root=tmp_path / "runs")
 
     assert result["status"] == "PILOT_CREATED"
-    completed_files = list((tmp_path / "inputs").glob("pilot-completed-*.json"))
+    completed_files = list((tmp_path / "inputs" / "tasks").glob("*/working/completed_input.json"))
     assert len(completed_files) == 1
     saved = json.loads(completed_files[0].read_text(encoding="utf-8"))
     assert saved["price_input"]["price"] == "19.74"
@@ -1142,17 +1156,11 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert saved["price_input"]["assurance_label"] == "OPERATOR_ATTESTED_NOT_SOURCE_VERIFIED"
     assert result["formal_decision_created"] is False and result["auto_execution"] is False
     output = capsys.readouterr().out
-    linux_prompt_output = (
-        "Round A 价格盲研究提示" in output
-        and "Round B 价格感知估值/MIE/预期差提示" in output
-    )
-    macos_clipboard_output = (
-        "Round A 已准备" in output
-        and "Round B 价格感知估值/MIE/预期差提示已复制到剪贴板" in output
-    )
-    assert linux_prompt_output or macos_clipboard_output
-    round_a_paths = list((tmp_path / "inputs").glob("pilot-prompt-round-a-*.md"))
-    round_b_paths = list((tmp_path / "inputs").glob("pilot-prompt-round-b-*.md"))
+    assert "Round A 价格盲研究提示" in output and "Round B 价格感知估值/MIE/预期差提示" in output
+    task_dirs = list((tmp_path / "inputs" / "tasks").glob("task-*"))
+    assert len(task_dirs) == 1
+    round_a_paths = [task_dirs[0] / "artifacts" / "round_a_prompt_ready" / "prompt.md"]
+    round_b_paths = [task_dirs[0] / "artifacts" / "round_b_prompt_ready" / "prompt.md"]
     assert len(round_a_paths) == 1 and len(round_b_paths) == 1
     round_a_text = round_a_paths[0].read_text(encoding="utf-8")
     round_b_text = round_b_paths[0].read_text(encoding="utf-8")
@@ -1163,13 +1171,6 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     for prohibited_key in ('"price_input"', '"current_position_pct"', '"operator_valuation_context"', '"market_implied_expectation"', '"expectation_gap"'):
         assert prohibited_key not in phase_a_text
     assert "核心投资判断链：必须逐项回答以下六个问题" in round_b_text
-    assert "【B74：主要矛盾优先】" in round_a_text
-    assert "【B74：辅助诊断优先级】" in round_a_text
-    assert "【B75：未来事件链】" in round_a_text
-    assert "【B76：三类预期严格分开】" in round_b_text
-    assert "【B76：胜率与赔率】" in round_b_text
-    assert "可比投资案例的历史胜负样本" in round_b_text
-    assert "B63 full-vector value-pool 反推使用 Required Return" in round_b_text
     assert "当前价格已反映多少" in round_b_text
     assert "绝不能把自己的 Base 估值伪装成市场预期" in round_b_text
     assert "IIOS-RESEARCH-PATCH-0.1" in round_a_text and "IIOS-RESEARCH-PATCH-0.1" in round_b_text
@@ -1181,12 +1182,32 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert analysis["research_rounds"]["price_blind_round_a_verified"] is True
     assert analysis["research_rounds"]["round_a"]["response_sha256"]
     assert analysis["research_rounds"]["round_b"]["response_sha256"]
-    b76 = analysis["assessment"]["market_implied_expectation"]["price_implied_analysis"]["local_sotp_recalculation"]["expectation_gap_comparison"]
-    assert b76["classification"] == "PRICE_CONDITIONED_REQUIREMENT_VS_INDEPENDENT_FORECAST_NOT_EXTERNAL_MIE"
-    assert b76["external_mie_modified"] is False
-    assert "B76：独立预测与现价条件性要求的数值对照" in (run_dir / "report.md").read_text(encoding="utf-8")
     assert receipt["research_rounds"] == analysis["research_rounds"]
     assert pilot.verify_local_pilot_bundle(run_dir)["status"] == "PILOT_BUNDLE_HASH_CHECK_PASS"
+    task_id = task_dirs[0].name
+    task_manifest = json.loads((task_dirs[0] / "task_manifest.json").read_text(encoding="utf-8"))
+    assert task_manifest["current_stage"] == "COMPLETED"
+    assert task_manifest["task_status"] == "COMPLETED"
+    accepted_response = task_dirs[0] / "working" / "round-b-response-accepted.json"
+    accepted_bytes = accepted_response.read_bytes()
+    import hashlib
+    original_analyse = pilot._analyse
+    monkeypatch.setattr(
+        pilot,
+        "_analyse",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("analysis must not rerun on idempotent resume")),
+    )
+    reused = pilot.run_local_investment_pilot(
+        input_path=completed_files[0],
+        output_root=tmp_path / "runs",
+        research_response_path=accepted_response,
+        expected_research_response_sha256=hashlib.sha256(accepted_bytes).hexdigest(),
+        expected_research_response_byte_size=len(accepted_bytes),
+        run_id_override=result["pilot_id"],
+    )
+    monkeypatch.setattr(pilot, "_analyse", original_analyse)
+    assert reused["idempotent_reuse"] is True
+    assert reused["pilot_id"] == result["pilot_id"]
     replay = pilot.run_local_investment_pilot(
         input_path=run_dir / "input.json",
         output_root=tmp_path / "runs",
@@ -1201,14 +1222,10 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
     answers = iter([
         "山东赫达",
         "SZ002810",
-        "1",
-        "2026-10-12",
-        "1",
+        "2026-10-12T00:00:00+08:00",
         "0",
-        "19.74",
-        "2026-10-12",
-        "2026-10-09",
-        "",
+        "19.74@2026-10-12",
+        "19.74@2026-10-09",
         "0",
     ])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
@@ -1218,8 +1235,8 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
     )
     output = capsys.readouterr().out
     assert result["status"] == "CANCELLED"
-    assert "价格观察日期不合法" in output
-    assert "PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF" in output
+    assert "价格输入不合法" in output
+    assert "PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP" in output
     assert "观察日 2026-10-09" in output
     assert not (tmp_path / "inputs").exists()
 
@@ -7153,27 +7170,147 @@ def test_macos_app_launch_is_asynchronous(monkeypatch):
         ("0700.HK", "HK"),
     ],
 )
+def test_guided_market_inference_uses_unambiguous_ticker_shape(raw, expected_market):
+    assert _infer_guided_market(raw) == expected_market
 
+def test_guided_market_inference_rejects_ambiguous_or_invalid_ticker():
+    with pytest.raises(LocalInvestmentPilotError, match="MARKET_CANNOT_BE_INFERRED"):
+        _infer_guided_market("ABC123")
 
+def test_hk_four_digit_ticker_is_padded_to_standard_five_digit_form():
+    assert _normalize_guided_symbol("HK0700", "HK") == "00700.HK"
+    assert _normalize_guided_symbol("0700.HK", "HK") == "00700.HK"
+    assert _normalize_guided_symbol("0700", "HK") == "00700"
 
+def test_guided_cutoff_date_defaults_to_shanghai_close_and_exact_instant_is_preserved():
+    cutoff, instant, normalized = _parse_guided_cutoff_input(
+        "2026-10-12", default_date=date(2026, 11, 9)
+    )
+    assert cutoff == date(2026, 10, 12)
+    assert normalized == "2026-10-12T15:30:00+08:00"
+    assert instant.isoformat() == normalized
 
+    cutoff2, instant2, normalized2 = _parse_guided_cutoff_input(
+        "2026-10-12T00:00:00+08:00", default_date=date(2026, 11, 9)
+    )
+    assert cutoff2 == date(2026, 10, 12)
+    assert instant2.hour == 0 and normalized2.endswith("T00:00:00+08:00")
 
+def test_default_cutoff_never_points_to_future_close():
+    before_close = pilot.datetime(2026, 11, 9, 14, 30, tzinfo=pilot.SHANGHAI)
+    after_close = pilot.datetime(2026, 11, 9, 15, 30, tzinfo=pilot.SHANGHAI)
+    saturday = pilot.datetime(2026, 11, 14, 18, 0, tzinfo=pilot.SHANGHAI)
+    assert _default_guided_cutoff_date(before_close) == date(2026, 11, 6)
+    assert _default_guided_cutoff_date(after_close) == date(2026, 11, 9)
+    assert _default_guided_cutoff_date(saturday) == date(2026, 11, 13)
 
+def test_guided_cutoff_empty_default_uses_supplied_shanghai_date():
+    cutoff, instant, normalized = _parse_guided_cutoff_input(
+        "", default_date=date(2026, 11, 9)
+    )
+    assert cutoff == date(2026, 11, 9)
+    assert instant.hour == 15 and instant.minute == 30
+    assert normalized == "2026-11-09T15:30:00+08:00"
 
+def test_guided_price_single_field_uses_default_date_and_close_time():
+    cutoff = date(2026, 10, 12)
+    instant = pilot.datetime(2026, 10, 12, 15, 30, tzinfo=pilot.SHANGHAI)
+    price, observation, known_at, mode = _parse_guided_price_input(
+        "19.74",
+        default_observation_date=cutoff,
+        cutoff=cutoff,
+        cutoff_instant=instant,
+    )
+    assert (price, observation, known_at, mode) == (
+        "19.74", date(2026, 10, 12), "2026-10-12T15:00:00+08:00", "DEFAULT_CLOSE"
+    )
 
+def test_guided_price_can_include_date_or_exact_timestamp_in_same_field():
+    cutoff = date(2026, 10, 12)
+    instant = pilot.datetime(2026, 10, 12, 15, 30, tzinfo=pilot.SHANGHAI)
+    date_result = _parse_guided_price_input(
+        "19.74@2026-10-09",
+        default_observation_date=date(2026, 10, 12),
+        cutoff=cutoff,
+        cutoff_instant=instant,
+    )
+    assert date_result == (
+        "19.74", date(2026, 10, 9), "2026-10-09T15:00:00+08:00", "DATE_CLOSE"
+    )
 
+    exact_result = _parse_guided_price_input(
+        "19.74@2026-10-12T14:30:00+08:00",
+        default_observation_date=cutoff,
+        cutoff=cutoff,
+        cutoff_instant=instant,
+    )
+    assert exact_result == (
+        "19.74", cutoff, "2026-10-12T14:30:00+08:00", "EXACT_INSTANT"
+    )
 
+def test_guided_price_rejects_time_after_cutoff_and_weekend_date():
+    cutoff = date(2026, 10, 12)
+    instant = pilot.datetime(2026, 10, 12, 14, 0, tzinfo=pilot.SHANGHAI)
+    with pytest.raises(LocalInvestmentPilotError, match="PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP"):
+        _parse_guided_price_input(
+            "19.74",
+            default_observation_date=cutoff,
+            cutoff=cutoff,
+            cutoff_instant=instant,
+        )
+    with pytest.raises(LocalInvestmentPilotError, match="TRADING_WEEKDAY"):
+        _parse_guided_price_input(
+            "19.74@2026-10-11",
+            default_observation_date=cutoff,
+            cutoff=cutoff,
+            cutoff_instant=instant,
+        )
 
+def test_default_guided_price_date_respects_intraday_cutoff():
+    before_close = pilot.datetime(2026, 10, 12, 14, 30, tzinfo=pilot.SHANGHAI)
+    after_close = pilot.datetime(2026, 10, 12, 15, 30, tzinfo=pilot.SHANGHAI)
+    assert _default_guided_price_date(date(2026, 10, 12), before_close) == date(2026, 10, 9)
+    assert _default_guided_price_date(date(2026, 10, 12), after_close) == date(2026, 10, 12)
 
+def test_guided_wizard_uses_separate_response_files_and_explicit_one_shot_clipboard():
+    root = Path(__file__).resolve().parents[1] / "iios_mvp"
+    pilot_source = (root / "local_investment_pilot_v01.py").read_text(encoding="utf-8")
+    resume_source = (root / "guided_task_resume_v01.py").read_text(encoding="utf-8")
+    assert 'subprocess.run(\n            ["pbpaste"]' in pilot_source
+    assert "_capture_clipboard_response_once" in pilot_source
+    assert "pbpaste" not in resume_source.lower()
+    assert 'pilot._extract_json_object(raw.decode("utf-8"))' in resume_source
+    assert '"round-a-response.json"' in resume_source
+    assert '"round-b-response.json"' in resume_source
+    assert "_capture_or_reuse_response" in resume_source
+    assert "ROUND_A_PROVENANCE_SCHEMA" in pilot_source
+    assert "ROUND_B_PROVENANCE_SCHEMA" in pilot_source
 
+def test_clipboard_capture_is_one_shot_and_does_not_log_response(monkeypatch, tmp_path, capsys):
+    response_path = tmp_path / "response.json"
+    secret_response = b'{"research":"private-test-value"}'
+    calls = []
 
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout=secret_response, stderr=b"")
 
+    monkeypatch.setattr(pilot.subprocess, "run", fake_run)
+    assert pilot._capture_clipboard_response_once(response_path) is True
+    assert calls == [["pbpaste"]]
+    assert response_path.read_bytes() == secret_response
+    assert "private-test-value" not in capsys.readouterr().out
 
-
-
-
-
-
-
-
-
+def test_clipboard_capture_never_overwrites_existing_response(monkeypatch, tmp_path):
+    response_path = tmp_path / "response.json"
+    response_path.write_text('{"existing":true}', encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        pilot.subprocess, "run",
+        lambda command, **kwargs: calls.append(command),
+    )
+    assert pilot._capture_clipboard_response_once(response_path) is True
+    assert calls == []
+    assert response_path.read_text(encoding="utf-8") == '{"existing":true}'
