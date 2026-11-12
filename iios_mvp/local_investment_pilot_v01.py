@@ -40,6 +40,8 @@ from .investment_core_contract_v03 import (
     calculate_return_metrics,
 )
 from .research_intake import build_research_case
+from .guided_task_session_v01 import GuidedTaskSession
+from .guided_task_resume_v01 import run_guided_task
 
 PILOT_SCHEMA = "IIOS-LOCAL-INVESTMENT-PILOT-0.1"
 PILOT_ANALYSIS_SCHEMA = "IIOS-LOCAL-INVESTMENT-PILOT-ANALYSIS-0.1"
@@ -160,6 +162,106 @@ def _datetime(value: Any, field: str, *, allow_date_only: bool = True) -> dateti
     return parsed.astimezone(SHANGHAI)
 
 
+def _infer_guided_market(value: Any) -> str:
+    """Infer A/H market only from unambiguous ticker syntax or code length."""
+    raw = str(value or "").strip().upper().replace(" ", "")
+    if re.fullmatch(r"HK\d{4,5}|\d{4,5}(?:\.HK)?", raw):
+        return "HK"
+    if re.fullmatch(r"(?:SH|SZ|BJ)\d{6}|\d{6}\.(?:SH|SZ|BJ)|\d{6}", raw):
+        return "CN-A"
+    raise LocalInvestmentPilotError(
+        "MARKET_CANNOT_BE_INFERRED: 股票代码请使用 002810.SZ、SZ002810、600000.SH、"
+        "00700.HK 或明确的 6 位 A 股 / 4–5 位港股代码。"
+    )
+
+
+def _default_guided_cutoff_date(now: datetime) -> date:
+    """Default to the latest weekday close that is not in the future, in Shanghai time."""
+    if now.tzinfo is None:
+        raise LocalInvestmentPilotError("GUIDED_DEFAULT_CUTOFF_REQUIRES_TIMEZONE")
+    shanghai_now = now.astimezone(SHANGHAI)
+    if shanghai_now.weekday() < 5 and shanghai_now.time() >= time(15, 30):
+        return shanghai_now.date()
+    return _previous_weekday(shanghai_now.date())
+
+
+def _parse_guided_cutoff_input(
+    raw: str, *, default_date: date
+) -> tuple[date, datetime, str]:
+    """One input: date means China close 15:30; a full ISO instant preserves exact cutoff."""
+    value = str(raw or "").strip()
+    if not value:
+        cutoff = default_date
+        timestamp_raw = datetime.combine(
+            cutoff, time(15, 30), tzinfo=SHANGHAI
+        ).isoformat()
+    elif re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        cutoff = _date(value, "AS_OF_DATE")
+        timestamp_raw = datetime.combine(
+            cutoff, time(15, 30), tzinfo=SHANGHAI
+        ).isoformat()
+    else:
+        instant = _datetime(value, "AS_OF_TIMESTAMP", allow_date_only=False)
+        cutoff = instant.date()
+        timestamp_raw = instant.isoformat()
+
+    cutoff_instant, normalized_timestamp = _resolve_cutoff_timestamp(
+        {"as_of_timestamp": timestamp_raw}, cutoff
+    )
+    if normalized_timestamp is None:
+        raise LocalInvestmentPilotError("GUIDED_CUTOFF_TIMESTAMP_REQUIRED")
+    return cutoff, cutoff_instant, normalized_timestamp
+
+
+def _default_guided_price_date(
+    cutoff: date, cutoff_instant: datetime
+) -> date:
+    """Use same-day close only when the cutoff is at/after 15:00 China time."""
+    if cutoff.weekday() < 5 and cutoff_instant.timetz().replace(tzinfo=None) >= time(15, 0):
+        return cutoff
+    return _previous_weekday(cutoff)
+
+
+def _parse_guided_price_input(
+    raw: str,
+    *,
+    default_observation_date: date,
+    cutoff: date,
+    cutoff_instant: datetime,
+) -> tuple[str, date, str, str]:
+    """Parse PRICE, PRICE@DATE or PRICE@ISO-INSTANT in one operator input."""
+    value = str(raw or "").strip()
+    if value.count("@") > 1:
+        raise LocalInvestmentPilotError("GUIDED_PRICE_INPUT_FORMAT_INVALID")
+    if "@" in value:
+        price_text, observed_text = (part.strip() for part in value.split("@", 1))
+        if not observed_text:
+            raise LocalInvestmentPilotError("GUIDED_PRICE_OBSERVATION_REQUIRED")
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", observed_text):
+            observation = _date(observed_text, "PRICE_OBSERVATION_DATE")
+            known_at_dt = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI)
+            input_mode = "DATE_CLOSE"
+        else:
+            known_at_dt = _datetime(
+                observed_text, "PRICE_KNOWN_AT", allow_date_only=False
+            )
+            observation = known_at_dt.date()
+            input_mode = "EXACT_INSTANT"
+    else:
+        price_text = value
+        observation = default_observation_date
+        known_at_dt = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI)
+        input_mode = "DEFAULT_CLOSE"
+
+    price = format(_positive(price_text, "CURRENT_PRICE"), "f")
+    _validate_guided_observation_date(
+        observation, cutoff, cutoff_timestamp=cutoff_instant
+    )
+    if known_at_dt > cutoff_instant:
+        raise LocalInvestmentPilotError("PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP")
+    return price, observation, known_at_dt.isoformat(), input_mode
+
+
 def _normalize_guided_symbol(value: Any, market: str) -> str:
     """Normalize common retail quote prefixes without weakening the core symbol contract."""
     raw = str(value or "").strip().upper().replace(" ", "")
@@ -170,7 +272,12 @@ def _normalize_guided_symbol(value: Any, market: str) -> str:
     elif market == "HK":
         match = re.fullmatch(r"HK(\d{4,5})", raw)
         if match:
-            return f"{match.group(1)}.HK"
+            return f"{match.group(1).zfill(5)}.HK"
+        match = re.fullmatch(r"(\d{4})\.HK", raw)
+        if match:
+            return f"{match.group(1).zfill(5)}.HK"
+        if re.fullmatch(r"\d{4}", raw):
+            return raw.zfill(5)
     return raw
 
 
@@ -4210,6 +4317,7 @@ def _write_run(
     research_response_path: str | Path | None = None,
     expected_research_response_sha256: str | None = None,
     expected_research_response_byte_size: int | None = None,
+    run_id_override: str | None = None,
 ) -> dict[str, Any]:
     try:
         input_text = input_path.read_text(encoding="utf-8")
@@ -4390,10 +4498,51 @@ def _write_run(
     payload_for_analysis.pop("_local_research_round_b_provenance", None)
     symbol = str((payload_for_analysis.get("case") or {}).get("symbol") or "candidate").replace(".", "-")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    run_id = f"local-pilot-{symbol}-{stamp}"
+    run_id = run_id_override or f"local-pilot-{symbol}-{stamp}"
+    if not run_id or Path(run_id).name != run_id or "/" in run_id or "\\" in run_id:
+        raise LocalInvestmentPilotError("PILOT_RUN_ID_INVALID")
     if response_provenance.get("status") == "CAPTURED_RAW_CHATGPT_RESPONSE":
         response_provenance["origin_pilot_id"] = run_id
         response_provenance["source_pilot_id"] = run_id
+
+    # Resume after a crash between bundle creation and the RUN_CREATED journal
+    # append must verify and reuse a complete same-input bundle before analysis.
+    # This prevents recomputing a potentially expensive research valuation.
+    run_dir = output_root / run_id
+    if run_dir.is_symlink():
+        raise LocalInvestmentPilotError("PILOT_RUN_DIRECTORY_MUST_NOT_BE_SYMLINK")
+    if run_dir.exists():
+        try:
+            existing_receipt, _existing_manifest = _verify_run_bundle(run_dir)
+            existing_input = (run_dir / "input.json").read_bytes()
+            existing_raw = (
+                (run_dir / RAW_RESEARCH_RESPONSE_FILENAME).read_bytes()
+                if response_bytes is not None else None
+            )
+        except (LocalInvestmentPilotError, OSError) as exc:
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_COLLISION_OR_PARTIAL_BUNDLE") from exc
+        if existing_input != input_text.encode("utf-8") or (
+            response_bytes is not None and existing_raw != response_bytes
+        ):
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_ALREADY_BOUND_TO_DIFFERENT_INPUT")
+        try:
+            existing_analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_EXISTING_ANALYSIS_UNREADABLE") from exc
+        return {
+            "status": "PILOT_CREATED",
+            "pilot_id": run_id,
+            "provisional_action": existing_analysis["decision"]["provisional_action"],
+            "replay_of": existing_receipt.get("replay_of"),
+            "replay_comparison": existing_receipt.get("replay_comparison"),
+            "research_response_provenance_status": (existing_receipt.get("research_response_provenance") or {}).get("status"),
+            "run_dir": str(run_dir),
+            "report_path": str(run_dir / "report.md"),
+            "formal_decision_created": False,
+            "canonical_run_receipt_created": False,
+            "auto_execution": False,
+            "idempotent_reuse": True,
+        }
 
     analysis, report = _analyse(payload_for_analysis, run_id)
     analysis["research_rounds"] = _build_research_rounds_summary(payload)
@@ -4493,6 +4642,7 @@ def run_local_investment_pilot(
     research_response_path: str | Path | None = None,
     expected_research_response_sha256: str | None = None,
     expected_research_response_byte_size: int | None = None,
+    run_id_override: str | None = None,
 ) -> dict[str, Any]:
     source = _outside_repo(input_path, "PILOT_INPUT_PATH", must_exist=True)
     root = _private_dir(output_root, "PILOT_OUTPUT_ROOT")
@@ -4503,6 +4653,7 @@ def run_local_investment_pilot(
         research_response_path=research_response_path,
         expected_research_response_sha256=expected_research_response_sha256,
         expected_research_response_byte_size=expected_research_response_byte_size,
+        run_id_override=run_id_override,
     )
 
 
@@ -5158,6 +5309,20 @@ def _validate_round_a_prompt_projection(value: Any) -> bool:
     )
 
 
+def _prompt_json_after_marker(prompt: str, marker: str, error_code: str) -> dict[str, Any]:
+    """Extract the first JSON object after one unique prompt marker, ignoring key order."""
+    if not isinstance(prompt, str) or prompt.count(marker) != 1:
+        raise LocalInvestmentPilotError(error_code)
+    suffix = prompt.split(marker, 1)[1].lstrip()
+    try:
+        value, _end = json.JSONDecoder().raw_decode(suffix)
+    except json.JSONDecodeError as exc:
+        raise LocalInvestmentPilotError(error_code) from exc
+    if not isinstance(value, dict):
+        raise LocalInvestmentPilotError(error_code)
+    return value
+
+
 def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]:
     a, b = payload.get("_local_research_round_a_provenance"), payload.get("_local_research_round_b_provenance")
     if a is None and b is None:
@@ -5176,7 +5341,10 @@ def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]
         fp = _text_fingerprint(value)
         if fp["sha256"] != sha or fp["byte_size"] != size:
             raise LocalInvestmentPilotError(f"ROUND_A_{label}_FINGERPRINT_MISMATCH")
-    if json.dumps(ai, ensure_ascii=False, indent=2, allow_nan=False) not in ap:
+    embedded_round_a_input = _prompt_json_after_marker(
+        ap, "【Round A 允许输入】", "ROUND_A_PROMPT_CONTEXT_NOT_BOUND"
+    )
+    if embedded_round_a_input != ai:
         raise LocalInvestmentPilotError("ROUND_A_PROMPT_CONTEXT_NOT_BOUND")
     actual_sha = _canonical_json_sha256(artifact) if isinstance(artifact, Mapping) else None
     if actual_sha != a.get("frozen_artifact_sha256") or set(artifact or {}) != {"schema_version", "case", "evidence_register", "assessment", "operating_driver_forecast"}:
@@ -5193,7 +5361,12 @@ def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]
     bfp = _text_fingerprint(bp)
     if bfp["sha256"] != b.get("prompt_sha256") or bfp["byte_size"] != b.get("prompt_byte_size"):
         raise LocalInvestmentPilotError("ROUND_B_PROMPT_FINGERPRINT_MISMATCH")
-    if json.dumps(bi, ensure_ascii=False, indent=2, allow_nan=False) not in bp:
+    embedded_round_b_input = _prompt_json_after_marker(
+        bp,
+        "【Round B 输入模板（此阶段才包含结构化参考价）】",
+        "ROUND_B_PROMPT_CONTEXT_NOT_BOUND",
+    )
+    if embedded_round_b_input != bi:
         raise LocalInvestmentPilotError("ROUND_B_PROMPT_CONTEXT_NOT_BOUND")
     if b.get("frozen_artifact_sha256") != actual_sha:
         raise LocalInvestmentPilotError("ROUND_B_DID_NOT_CONSUME_FROZEN_ROUND_A_ARTIFACT")
@@ -5380,6 +5553,93 @@ def _choose_saved_response_file(target_path: str | Path) -> bool:
     return True
 
 
+def _capture_clipboard_response_once(path: str | Path) -> bool:
+    """Capture macOS clipboard only after an explicit Enter keypress.
+
+    This is deliberately a one-shot read: no clipboard polling, background
+    monitor, browser access, Accessibility permission, or content logging.
+    Existing non-empty response files are never overwritten.
+    """
+    if sys.platform != "darwin":
+        print("当前平台不支持剪贴板接收；请使用原有响应文件方式。", flush=True)
+        return False
+    response_path = Path(path).expanduser()
+    try:
+        if response_path.is_symlink():
+            print("响应目标是符号链接，已拒绝写入。", flush=True)
+            return False
+        existing = response_path.read_bytes()
+    except FileNotFoundError:
+        existing = b""
+    except OSError as exc:
+        print(f"无法检查响应目标：{type(exc).__name__}。", flush=True)
+        return False
+    if existing.strip():
+        print("响应文件已有内容，不会用剪贴板覆盖；继续校验现有文件。", flush=True)
+        return True
+    try:
+        result = subprocess.run(
+            ["pbpaste"], check=True, capture_output=True, timeout=5
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f"无法读取剪贴板：{type(exc).__name__}。", flush=True)
+        return False
+    raw = result.stdout
+    if not raw.strip():
+        print("剪贴板为空；请先复制 ChatGPT 的完整回复，再按回车。", flush=True)
+        return False
+    if len(raw) > 2 * 1024 * 1024:
+        print("剪贴板内容超过 2 MiB 安全上限，未写入。", flush=True)
+        return False
+    try:
+        raw.decode("utf-8")
+    except UnicodeDecodeError:
+        print("剪贴板内容不是有效 UTF-8，未写入。", flush=True)
+        return False
+    # Recheck immediately before writing; never replace a file populated by
+    # another process while pbpaste was running.
+    try:
+        if response_path.is_symlink() or response_path.read_bytes().strip():
+            print("响应文件在接收期间发生变化；为避免覆盖，已停止。", flush=True)
+            return False
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        print(f"无法复核响应目标：{type(exc).__name__}。", flush=True)
+        return False
+    temporary = response_path.with_name(response_path.name + f".capture-{os.getpid()}.tmp")
+    try:
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if response_path.is_symlink():
+            temporary.unlink(missing_ok=True)
+            print("响应目标在写入前变成符号链接；未覆盖。", flush=True)
+            return False
+        try:
+            populated = response_path.read_bytes().strip()
+        except FileNotFoundError:
+            populated = b""
+        if populated:
+            temporary.unlink(missing_ok=True)
+            print("响应文件在写入前已被填充；未覆盖。", flush=True)
+            return False
+        os.replace(temporary, response_path)
+        if os.name != "nt":
+            response_path.chmod(0o600)
+    except OSError as exc:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        print(f"剪贴板内容写入失败：{type(exc).__name__}。", flush=True)
+        return False
+    print(f"已接收剪贴板文本（{len(raw)} 字节）；正在进入原有内容校验。", flush=True)
+    return True
+
+
 def _wait_for_response_file_change(
     path: str | Path,
     *,
@@ -5389,8 +5649,9 @@ def _wait_for_response_file_change(
 ) -> tuple[int, int, str]:
     """Wait until a non-empty response file changes and remains stable.
 
-    The operator can save the ChatGPT JSON in TextEdit and the wizard resumes
-    automatically. Pressing Enter is optional; Ctrl-C cancels the wait.
+    The operator may save a response file as before, or copy the ChatGPT
+    response and press Enter for a one-shot macOS clipboard capture.
+    Clipboard contents are never polled or logged; Ctrl-C cancels the wait.
     """
     response_path = Path(path).expanduser()
     candidate: tuple[int, int, str] | None = None
@@ -5425,11 +5686,15 @@ def _wait_for_response_file_change(
                 sys.stdin.readline()
                 latest = _response_file_signature(response_path)
                 if latest is None or latest[0] == 0:
-                    print("按回车触发了文件检查，但指定结果路径当前没有可读取的非空内容。", flush=True)
+                    print("正在尝试一次性接收当前剪贴板（仅因你刚刚按下回车）。", flush=True)
+                    if _capture_clipboard_response_once(response_path):
+                        captured = _response_file_signature(response_path)
+                        if captured is not None and captured[0] > 0:
+                            return captured
                     print(_response_file_diagnostic(response_path), flush=True)
                     print(
-                        "现在打开文件选择窗口，可选择你实际保存的 JSON；"
-                        "导入时会保留原文件，不需要重新研究或重新填写标的。",
+                        "如不使用剪贴板，可继续按原方式保存 JSON 文件；"
+                        "系统不会持续读取剪贴板。",
                         flush=True,
                     )
                     _choose_saved_response_file(response_path)
@@ -5836,9 +6101,31 @@ def _ask_operator_portfolio_context() -> dict[str, Any] | None:
     }
 
 
-def _ask_operator_valuation_context() -> dict[str, Any]:
-    """Collect the primary model choice and project-in-baseline scope from the operator, not the AI."""
-    print("\nB5 主估值模型确认（由你选择，不让 AI 替你选模型）")
+def _ask_operator_entry_zone() -> dict[str, Any]:
+    """Collect the current company's entry-price band; never treat it as a global default."""
+    print("\n本标的专属入场价格区间（不会保存到跨公司个人档案）")
+
+    def ask_positive(prompt: str) -> str:
+        while True:
+            raw = _ask(prompt)
+            try:
+                return format(_positive(raw, "PRICE_ZONE"), "f")
+            except LocalInvestmentPilotError as exc:
+                print(f"输入无效：{exc}。请填写大于 0 的价格。")
+
+    while True:
+        low = ask_positive("本标的入场区间下沿")
+        high = ask_positive("本标的入场区间上沿")
+        if Decimal(low) <= Decimal(high):
+            return {"entry_zone_low": low, "entry_zone_high": high}
+        print("入场区间下沿不得高于上沿，请重新输入两个价格。")
+
+
+def _ask_operator_valuation_context(
+    *, preferred_model_family: str | None = None
+) -> dict[str, Any]:
+    """Collect this company's primary model and project scope; saved model is only a default hint."""
+    print("\nB5 主估值模型确认（由你按当前公司重新判断，不让 AI 替你选模型）")
     print("  1 = EPS / 市盈率倍数（本批支持项目增量传导）")
     print("  2 = DCF / 自由现金流折现")
     print("  3 = DDM / 股利折现")
@@ -5855,8 +6142,15 @@ def _ask_operator_valuation_context() -> dict[str, Any]:
         "6": "OTHER",
         "0": "UNKNOWN",
     }
+    default_by_family = {value: key for key, value in choices.items()}
+    default_choice = default_by_family.get(str(preferred_model_family or "UNKNOWN").upper(), "0")
+    if preferred_model_family and preferred_model_family != "UNKNOWN":
+        print(
+            f"上次选择 {preferred_model_family} 仅作为本次默认项；"
+            "估值模型必须针对当前公司的业务结构和盈利来源重新确认。"
+        )
     while True:
-        choice = _ask("你确认本次主估值模型类型 0–6", "0")
+        choice = _ask("你确认本次主估值模型类型 0–6", default_choice)
         if choice in choices:
             break
         print("请输入 0 到 6。")
@@ -5886,119 +6180,77 @@ def _ask_operator_valuation_context() -> dict[str, Any]:
         "selection_confirmed": confirmed,
     }
 
-
 def run_guided_wizard(
     *,
     template_root: str | Path | None = None,
     output_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Run guided research using a dedicated file for the potentially large ChatGPT JSON."""
+    """Run a compact guided workflow; operator-attested prices remain explicitly unverified."""
     template_root = template_root or (Path.home() / ".iios-private" / "local-pilot" / "inputs")
     output_root = output_root or (Path.home() / ".iios-private" / "local-pilot" / "runs")
-    today = date.today()
-    print("\nIIOS 投资分析｜简易向导")
-    print("填写标的和价格后，程序会打开 ChatGPT；完成回答后保存到指定 JSON 文件，报告自动生成。")
+    default_cutoff_date = _default_guided_cutoff_date(datetime.now(SHANGHAI))
+
+    print("\nIIOS 投资分析｜简化入口")
+    print("股票代码可自动识别 A 股/港股；价格仍由你核实输入，不会自动抓取或伪装成行情源已验证。")
     company = _ask("公司名称")
-    symbol_input = _ask("股票代码（可输入 SZ002810、002810.SZ 或 002810）")
-    market_choice = _ask("市场：1 = A 股，2 = 港股", "1")
-    if market_choice not in {"1", "2"}:
-        raise LocalInvestmentPilotError("MARKET_CHOICE_MUST_BE_1_OR_2")
-    market = "CN-A" if market_choice == "1" else "HK"
+    symbol_input = _ask("股票代码（如 002810.SZ、SZ002810、600000.SH、00700.HK 或裸代码）")
+    market = _infer_guided_market(symbol_input)
     symbol = _normalize_guided_symbol(symbol_input, market)
-    while True:
-        try:
-            cutoff = _date(_ask("分析截止日 YYYY-MM-DD", today.isoformat()), "AS_OF_DATE")
-            break
-        except LocalInvestmentPilotError as exc:
-            print(f"日期格式错误：{exc}。请按 YYYY-MM-DD 输入，例如 2026-10-12。")
 
-    print("\n请选择分析截止口径（默认按收盘后分析，无需手写时区）：")
-    print("  1 = 严格日期级截止：截止日 00:00（+08:00），只能使用此前日期已知的信息")
-    print("  2 = 收盘后分析（推荐默认）：自动使用截止日 15:30（+08:00），允许截止日收盘价")
-    print("  3 = 自定义时点：仅特殊情况使用，例如 2026-10-12T15:30:00+08:00")
-    while True:
-        cutoff_mode = _ask("分析截止口径 1/2/3", "2")
-        custom_cutoff = ""
-        if cutoff_mode == "3":
-            custom_cutoff = _ask(
-                "自定义截止时点（必须含时区，例如 2026-10-12T15:30:00+08:00）"
-            )
-        try:
-            cutoff_instant, cutoff_timestamp = _guided_cutoff_timestamp(
-                cutoff, cutoff_mode, custom_cutoff
-            )
-            break
-        except LocalInvestmentPilotError as exc:
-            print(f"截止口径输入有误：{exc}")
-            print("请选 1、2 或 3；普通收盘后分析通常选择 2，不要只输入日期。")
+    cutoff_raw = _ask(
+        "分析截止时点（回车=最近一个已完成工作日 15:30，中国时区；输入 YYYY-MM-DD 默认该日收盘后；"
+        "精确时点请输入带时区的 ISO 时间）",
+        "",
+    )
+    cutoff, cutoff_instant, cutoff_timestamp = _parse_guided_cutoff_input(
+        cutoff_raw, default_date=default_cutoff_date
+    )
 
     while True:
-        position = _ask("当前持仓百分比（例如空仓填 0）", "0")
+        position = _ask("当前持仓百分比（空仓填 0）", "0")
         try:
             build_research_case(symbol, cutoff.isoformat(), position, market=market)
             break
         except (LocalInvestmentPilotError, ValueError, TypeError) as exc:
             print(f"持仓比例不合法：{exc}。请按百分比填写，例如 0 或 10。")
 
+    default_price_date = _default_guided_price_date(cutoff, cutoff_instant)
     while True:
-        price = _ask("你核实的股价（必须大于 0）")
-        try:
-            _positive(price, "CURRENT_PRICE")
-            break
-        except LocalInvestmentPilotError as exc:
-            print(f"股价输入不合法：{exc}。请只输入价格数字，例如 19.74。")
-
-    # No holiday-calendar lookup is performed; weekends are rejected below.
-    default_price_date = (
-        _latest_weekday_on_or_before(cutoff)
-        if cutoff_timestamp else _previous_weekday(cutoff)
-    ).isoformat()
-    while True:
-        date_rule = (
-            "不得晚于截止日；选择 2 时可以填写截止日当天"
-            if cutoff_timestamp else "必须早于分析截止日"
+        price_entry = _ask(
+            "你核实的股价（单行输入：19.74；或 19.74@YYYY-MM-DD；"
+            "非收盘时点输入 19.74@YYYY-MM-DDTHH:MM:SS+08:00）"
         )
         try:
-            observation = _date(
-                _ask(f"该价格观察日期 YYYY-MM-DD（{date_rule}）", default_price_date),
-                "PRICE_OBSERVATION_DATE",
-            )
-            _validate_guided_observation_date(
-                observation, cutoff, cutoff_timestamp=cutoff_instant if cutoff_timestamp else None
+            price, observation, known_at, price_input_mode = _parse_guided_price_input(
+                price_entry,
+                default_observation_date=default_price_date,
+                cutoff=cutoff,
+                cutoff_instant=cutoff_instant,
             )
             break
         except LocalInvestmentPilotError as exc:
-            print(f"价格观察日期不合法：{exc}")
-            print("请填写真实交易日；本程序不会把周末自动改成交易日，也不会自动修改截止日期。")
-    default_known_at = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI).isoformat()
-    print("\n价格时点：1 = 收盘价/按 15:00 处理（默认）；2 = 非收盘价/指定实际时点")
-    time_mode = _ask("价格时点 1/2", "1")
-    if time_mode == "1":
-        known_at = default_known_at
-    else:
-        while True:
-            known_at = _ask(
-                "价格可获得时间（必须包含时区，例如 2026-10-12T13:30:00+08:00）"
-            )
-            try:
-                parsed_known_at = _datetime(known_at, "PRICE_KNOWN_AT", allow_date_only=False)
-                if parsed_known_at.date() != observation:
-                    raise LocalInvestmentPilotError("PRICE_KNOWN_AT_DATE_MUST_MATCH_OBSERVATION_DATE")
-                if parsed_known_at > cutoff_instant:
-                    raise LocalInvestmentPilotError("PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP")
-                known_at = parsed_known_at.isoformat()
-                break
-            except LocalInvestmentPilotError as exc:
-                print(f"价格可获得时点不符合截止约束：{exc}")
-                print("请检查日期与截止时点。")
-    source_claim = f"用户手动提供的 {price}；按 {'收盘价 15:00' if time_mode == '1' else '操作者指定时点'} 处理；未从交易所或行情供应商独立核验"
+            print(f"价格输入不合法：{exc}")
+            print("请确认价格为正数、观察日为工作日且价格可获得时点不晚于分析截止时点。")
+
+    source_time_claim = (
+        "收盘价 15:00"
+        if price_input_mode in {"DEFAULT_CLOSE", "DATE_CLOSE"}
+        else f"操作者指定实际时点 {known_at}"
+    )
+    source_claim = (
+        f"用户手动提供的 {price}；按 {source_time_claim} 处理；"
+        "未从交易所或行情供应商独立核验"
+    )
+
     print("\n请核对：")
     print(f"  {company} / {symbol} / {market}")
     if symbol != symbol_input.strip().upper().replace(" ", ""):
         print(f"  股票代码已规范化：{symbol_input} → {symbol}")
-    cutoff_display = cutoff_timestamp or (cutoff.isoformat() + " 00:00:00+08:00（日期级截止）")
-    print(f"  分析截止 {cutoff_display}；价格 {price}；观察日 {observation.isoformat()}；持仓 {position}%")
-    print(f"  价格时间：{known_at}；价格来源：人工输入、未独立核验。")
+    print(
+        f"  分析截止 {cutoff_timestamp}；价格 {price}；"
+        f"观察日 {observation.isoformat()}；价格时间 {known_at}；持仓 {position}%"
+    )
+    print("  价格来源：人工输入、未独立核验；交易日历不自动校验节假日。")
     if _ask("确认并继续？1 = 继续，0 = 退出", "1") != "1":
         return {"status": "CANCELLED", "formal_decision_created": False}
 
@@ -6015,200 +6267,26 @@ def run_guided_wizard(
         template_root=template_root,
         as_of_timestamp=cutoff_timestamp,
     )
-    template_path = Path(template_result["input_template"])
-    prompt_path = Path(template_result["analysis_prompt"])
-    template_payload = json.loads(template_path.read_text(encoding="utf-8"))
-    private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    safe_symbol = symbol.replace(".", "-")
-
-    # Round A uses an explicit allowlist. The full price-bearing template is never sent in this stage.
-    round_a_prompt_input = _round_a_prompt_input(template_payload)
-    prompt = _build_price_blind_round_a_prompt(template_payload)
-    round_a_prompt_path = private_inputs / f"pilot-prompt-round-a-{safe_symbol}-{stamp}.md"
-    _write_local(round_a_prompt_path, prompt)
-    prompt = round_a_prompt_path.read_text(encoding="utf-8")
-    round_a_prompt_fp = _text_fingerprint(prompt)
-    round_a_response_path = private_inputs / f"pilot-chatgpt-round-a-response-{safe_symbol}-{stamp}.json"
-    _write_local(round_a_response_path, "")
-    initial_response_signature = _response_file_signature(round_a_response_path)
-
-    if sys.platform == "darwin":
-        subprocess.run(["pbcopy"], input=prompt, text=True, check=True, timeout=5)
-        subprocess.run(["open", "https://chatgpt.com/"], check=False, timeout=5)
-        subprocess.run(["open", "-a", "TextEdit", str(round_a_response_path)], check=False, timeout=5)
-        print("\nRound A 已准备：价格盲研究提示与专用 JSON 文件已打开；此阶段不会显示结构化股价、持仓或估值字段。")
-    else:
-        print("\nRound A 价格盲研究提示：\n" + prompt)
-    print(f"\nRound A 原始响应保存位置：\n{round_a_response_path}")
-    print("Round A 只研究公司现实、质量、论点、价值驱动、风险与独立经营预测。保存并通过校验后，程序才会生成 Round B。")
-
-    # --- Round A: price-blind company-side research ---
-    response_path = round_a_response_path
-    previous_response_signature = initial_response_signature
-    while True:
-        print("\n等待 Round A ChatGPT 研究补丁保存并完成校验……", flush=True)
-        response_signature = _wait_for_response_file_change(response_path, previous_signature=previous_response_signature)
-        print("检测到 Round A 响应已保存，正在验证阶段边界……", flush=True)
-        try:
-            response_object = _read_json_response_file(response_path)
-            _validate_research_round_patch(response_object, phase="ROUND_A", base_payload=template_payload)
-            payload, response_format, merged_top_level_fields = _expand_research_patch_with_template(template_path, response_object)
-            if _response_file_signature(response_path) != response_signature:
-                raise LocalInvestmentPilotError("ROUND_A_RESPONSE_CHANGED_DURING_VALIDATION")
-            payload.pop("_local_operator_controlled_field_recovery", None)
-            payload.pop("_local_research_response_provenance", None)
-            restored_fields = _restore_operator_controlled_fields_from_template(template_path, payload)
-            if restored_fields:
-                payload["_local_operator_controlled_field_recovery"] = {
-                    "status": "RESTORED_BEFORE_VALIDATION", "fields": restored_fields,
-                    "source_template": Path(template_path).name,
-                    "method": "LOCAL_TEMPLATE_OVERRIDES_AI_RESPONSE", "raw_response_file_modified": False,
-                }
-            _assert_response_preserves_operator_inputs(template_path, payload)
-            break
-        except (OSError, ValueError, KeyError, TypeError) as exc:
-            previous_response_signature = response_signature
-            print(f"Round A 暂未继续：{exc}", flush=True)
-            if isinstance(exc, LocalInvestmentPilotError) and not str(exc).startswith(("CHATGPT_RESPONSE_FILE_READ_FAILED", "CHATGPT_RESPONSE_FILE_NOT_FOUND")):
-                repair_prompt = _build_response_repair_prompt(original_prompt=prompt, response_path=response_path, validation_error=str(exc))
-                if sys.platform == "darwin":
-                    try:
-                        subprocess.run(["pbcopy"], input=repair_prompt, text=True, check=True, timeout=5)
-                        print("\nRound A 修复提示已复制。请切回 ChatGPT 粘贴发送，再覆盖保存同一个 Round A 响应文件。")
-                    except (OSError, subprocess.SubprocessError):
-                        print("\n无法自动复制 Round A 修复提示；请按错误内容修正本阶段响应。")
-                else:
-                    print("\nRound A 修复提示：\n" + repair_prompt, flush=True)
-            print(f"Round A 当前响应文件：{response_path}", flush=True)
-            print("修正后保存会自动重试；无需重新填写标的或价格。按 Control-C 可退出。", flush=True)
-
-    try:
-        round_a_raw_response = response_path.read_bytes().decode("utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        raise LocalInvestmentPilotError("ROUND_A_RAW_RESPONSE_READ_FAILED") from exc
-    round_a_response_fp = _text_fingerprint(round_a_raw_response)
-    if round_a_response_fp["sha256"] != response_signature[2] or round_a_response_fp["byte_size"] != response_signature[0]:
-        raise LocalInvestmentPilotError("ROUND_A_RAW_RESPONSE_FINGERPRINT_CHANGED")
-    frozen_artifact = _round_a_frozen_artifact(payload)
-    frozen_sha = _canonical_json_sha256(frozen_artifact)
-    round_a_provenance = {
-        "schema_version": ROUND_A_PROVENANCE_SCHEMA, "phase": "PRICE_BLIND_COMPANY_RESEARCH",
-        "prompt_filename": round_a_prompt_path.name, "prompt_text": prompt,
-        "prompt_sha256": round_a_prompt_fp["sha256"], "prompt_byte_size": round_a_prompt_fp["byte_size"],
-        "prompt_input_payload": round_a_prompt_input,
-        "response_filename": round_a_response_path.name, "raw_response_text": round_a_raw_response,
-        "response_sha256": round_a_response_fp["sha256"], "response_byte_size": round_a_response_fp["byte_size"],
-        "frozen_company_side_artifact": frozen_artifact, "frozen_artifact_sha256": frozen_sha,
-        "formal_forecast_admission": "NOT_ADMITTED", "formal_valuation_admission": "NOT_ADMITTED",
-    }
-    payload["_local_research_round_a_provenance"] = round_a_provenance
-    round_a_completed_path = private_inputs / f"pilot-round-a-frozen-{safe_symbol}-{stamp}.json"
-    _write_local(round_a_completed_path, json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False))
-
-    # --- Round B: only now introduce the protected reference price ---
-    base_prompt = prompt_path.read_text(encoding="utf-8")
-    round_b_prompt, round_b_prompt_input, round_b_frozen_sha = _build_price_aware_round_b_prompt(base_prompt=base_prompt, payload=payload)
-    if round_b_frozen_sha != frozen_sha:
-        raise LocalInvestmentPilotError("ROUND_B_FROZEN_ARTIFACT_HASH_CHANGED_DURING_PROMPT_BUILD")
-    round_b_prompt_path = private_inputs / f"pilot-prompt-round-b-{safe_symbol}-{stamp}.md"
-    _write_local(round_b_prompt_path, round_b_prompt)
-    round_b_prompt = round_b_prompt_path.read_text(encoding="utf-8")
-    round_b_prompt_fp = _text_fingerprint(round_b_prompt)
-    round_b_response_path = private_inputs / f"pilot-chatgpt-round-b-response-{safe_symbol}-{stamp}.json"
-    _write_local(round_b_response_path, "")
-    round_b_initial_signature = _response_file_signature(round_b_response_path)
-
-    if sys.platform == "darwin":
-        subprocess.run(["pbcopy"], input=round_b_prompt, text=True, check=True, timeout=5)
-        subprocess.run(["open", "-a", "TextEdit", str(round_b_response_path)], check=False, timeout=5)
-        print("\nRound A 已冻结。Round B 价格感知估值/MIE/预期差提示已复制到剪贴板；请在 ChatGPT 中发送，并保存到单独的 Round B JSON 文件。")
-    else:
-        print("\nRound B 价格感知估值/MIE/预期差提示：\n" + round_b_prompt)
-    print(f"\nRound B 原始响应保存位置：\n{round_b_response_path}")
-    prompt, response_path = round_b_prompt, round_b_response_path
-    round_a_base_payload = json.loads(round_a_completed_path.read_text(encoding="utf-8"))
-    previous_response_signature = round_b_initial_signature
-
-    while True:
-        print("\n等待 Round B ChatGPT 研究补丁保存并完成完整 IIOS 字段校验……", flush=True)
-        response_signature = _wait_for_response_file_change(response_path, previous_signature=previous_response_signature)
-        print("检测到 Round B 响应已保存，正在验证阶段边界和研究内容……", flush=True)
-        try:
-            response_object = _read_json_response_file(response_path)
-            _validate_research_round_patch(response_object, phase="ROUND_B", base_payload=round_a_base_payload)
-            payload, response_format, merged_top_level_fields = _expand_research_patch_with_template(round_a_completed_path, response_object)
-            if _response_file_signature(response_path) != response_signature:
-                raise LocalInvestmentPilotError("ROUND_B_RESPONSE_CHANGED_DURING_VALIDATION")
-            payload.pop("_local_operator_controlled_field_recovery", None)
-            payload.pop("_local_research_response_provenance", None)
-            restored_fields = _restore_operator_controlled_fields_from_template(template_path, payload)
-            if restored_fields:
-                payload["_local_operator_controlled_field_recovery"] = {
-                    "status": "RESTORED_BEFORE_VALIDATION", "fields": restored_fields,
-                    "source_template": Path(template_path).name,
-                    "method": "LOCAL_TEMPLATE_OVERRIDES_AI_RESPONSE", "raw_response_file_modified": False,
-                }
-            _assert_response_preserves_operator_inputs(template_path, payload)
-            _prepare_input(payload)
-            _validate_guided_research_response(payload)
-            payload["_local_research_round_a_provenance"] = round_a_provenance
-            payload["_local_research_round_b_provenance"] = {
-                "schema_version": ROUND_B_PROVENANCE_SCHEMA, "phase": "PRICE_AWARE_VALUATION_MIE_EXPECTATION_GAP",
-                "prompt_filename": round_b_prompt_path.name, "prompt_text": round_b_prompt,
-                "prompt_sha256": round_b_prompt_fp["sha256"], "prompt_byte_size": round_b_prompt_fp["byte_size"],
-                "prompt_input_payload": round_b_prompt_input, "frozen_artifact_sha256": round_b_frozen_sha,
-                "response_filename": round_b_response_path.name, "response_sha256": response_signature[2],
-                "response_byte_size": response_signature[0],
-            }
-            payload["_local_research_response_provenance"] = {
-                "schema_version": LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA, "status": "CAPTURED_RAW_CHATGPT_RESPONSE",
-                "source_filename": response_path.name, "sha256": response_signature[2], "byte_size": response_signature[0],
-                "capture_stage": "ROUND_B_RAW_RESPONSE_HASHED_ON_STABLE_SAVE_BEFORE_LOCAL_TEMPLATE_MERGE_AND_OPERATOR_FIELD_RECOVERY",
-                "validation_status": "ROUND_A_PRICE_BLIND_STAGE_FROZEN; JSON_OBJECT_PARSE_PASSED; RESPONSE_FORMAT=" + response_format + "; MERGED_FIELDS=" + ",".join(merged_top_level_fields) + "; FULL_RESEARCH_REQUIRED_FIELDS_PASSED_AFTER_OPERATOR_FIELD_RESTORATION",
-                "raw_response_file_modified_by_runner": False,
-            }
-            break
-        except (OSError, ValueError, KeyError, TypeError) as exc:
-            previous_response_signature = response_signature
-            print(f"Round B 暂未继续：{exc}", flush=True)
-            if isinstance(exc, LocalInvestmentPilotError) and not str(exc).startswith(("CHATGPT_RESPONSE_FILE_READ_FAILED", "CHATGPT_RESPONSE_FILE_NOT_FOUND")):
-                repair_prompt = _build_response_repair_prompt(original_prompt=prompt, response_path=response_path, validation_error=str(exc))
-                if sys.platform == "darwin":
-                    try:
-                        subprocess.run(["pbcopy"], input=repair_prompt, text=True, check=True, timeout=5)
-                        print("\nRound B 修复提示已复制。请切回 ChatGPT 粘贴发送，再覆盖保存同一个 Round B 响应文件。")
-                    except (OSError, subprocess.SubprocessError):
-                        print("\n无法自动复制 Round B 修复提示；请按错误内容修正本阶段响应。")
-                else:
-                    print("\nRound B 修复提示：\n" + repair_prompt, flush=True)
-            print(f"Round B 当前响应文件：{response_path}", flush=True)
-            print("修正后保存会自动重试；Round A 已冻结，无需重新填写标的或重做第一轮。按 Control-C 可退出。", flush=True)
-
-    # Validate the response before collecting any optional operator-only
-    # portfolio inputs. AI research output never gets to author these limits.
-    _prepare_input(payload)
-    portfolio_context = _ask_operator_portfolio_context()
-    if portfolio_context is not None:
-        payload["operator_portfolio_context"] = portfolio_context
-    payload["operator_valuation_context"] = _ask_operator_valuation_context()
-    private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    completed = private_inputs / f"pilot-completed-{symbol.replace('.', '-')}-{stamp}.json"
-    _write_local(completed, json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False))
-    result = run_local_investment_pilot(
-        input_path=completed,
-        output_root=output_root,
-        research_response_path=response_path,
-        expected_research_response_sha256=response_signature[2],
-        expected_research_response_byte_size=response_signature[0],
+    private_task_root = _private_dir(template_root, "PILOT_TEMPLATE_ROOT") / "tasks"
+    session = GuidedTaskSession.create(
+        private_task_root,
+        metadata={"symbol": symbol, "company": company, "market": market},
     )
-    print("\n分析完成：")
+    session.checkpoint_context({
+        "company": company,
+        "symbol": symbol,
+        "market": market,
+        "template_path": str(Path(template_result["input_template"]).resolve()),
+        "analysis_prompt_path": str(Path(template_result["analysis_prompt"]).resolve()),
+        "template_payload": json.loads(Path(template_result["input_template"]).read_text(encoding="utf-8")),
+        "analysis_prompt_text": Path(template_result["analysis_prompt"]).read_text(encoding="utf-8"),
+        "template_root": str(Path(template_root).expanduser().resolve()),
+        "output_root": str(Path(output_root).expanduser().resolve()),
+    })
+    print(f"\n已创建可恢复研究任务：{session.task_id}")
+    result = run_guided_task(session, output_root=output_root)
+    print("\n研究任务完成：")
     print(json.dumps(_safe(result), ensure_ascii=False, indent=2))
-    report_path = result.get("report_path")
-    if report_path and sys.platform == "darwin":
-        subprocess.run(["open", str(report_path)], check=False, timeout=5)
-    print("\n下次分析另一个标的，只需双击同一个启动器。")
     return result
 
 
@@ -6221,6 +6299,7 @@ def _main(argv: list[str] | None = None) -> int:
     modes.add_argument("--input", help="run a completed private pilot input JSON")
     modes.add_argument("--replay-run", help="verify a prior bundle then recompute and compare decision-material fields")
     modes.add_argument("--check-run", help="read-only SHA-256 check of a local run bundle")
+    modes.add_argument("--resume-task", help="resume a durable guided Pilot task by TASK_ID")
     parser.add_argument("--template-root", default=str(Path.home() / ".iios-private" / "local-pilot" / "inputs"))
     parser.add_argument("--output-root", default=str(Path.home() / ".iios-private" / "local-pilot" / "runs"))
     parser.add_argument("--company")
@@ -6237,6 +6316,16 @@ def _main(argv: list[str] | None = None) -> int:
     try:
         if args.wizard:
             result = run_guided_wizard(template_root=args.template_root, output_root=args.output_root)
+        elif args.resume_task:
+            task_root = _private_dir(args.template_root, "PILOT_TEMPLATE_ROOT") / "tasks"
+            session, _manifest = GuidedTaskSession.open(task_root, args.resume_task)
+            default_output_root = Path.home() / ".iios-private" / "local-pilot" / "runs"
+            resume_output_root = (
+                None
+                if Path(args.output_root).expanduser() == default_output_root
+                else args.output_root
+            )
+            result = run_guided_task(session, output_root=resume_output_root)
         elif args.create_template:
             required = {
                 "--company": args.company, "--symbol": args.symbol, "--as-of": args.as_of,
