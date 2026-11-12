@@ -428,7 +428,7 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                 prompt = pilot._build_price_blind_round_a_prompt(template_payload)
                 _write_private_once(work / "round_a_prompt.md", prompt.encode("utf-8"))
                 _write_private_once(response_a, b"")
-                round_a_marker = "【Round A 允许输入】\\n"
+                round_a_marker = "【Round A 允许输入】\n"
                 if prompt.count(round_a_marker) != 1:
                     raise TaskWorkspaceError("GUIDED_TASK_ROUND_A_PROMPT_INPUT_MARKER_INVALID")
                 try:
@@ -470,8 +470,8 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                 )
                 if built_frozen_sha != frozen_sha:
                     raise TaskWorkspaceError("GUIDED_TASK_ROUND_A_FROZEN_HASH_MISMATCH")
-                round_b_marker = "【Round B 输入模板（此阶段才包含结构化参考价）】\\n"
-                round_b_end_marker = "\\n【Round B 输出约束】"
+                round_b_marker = "【Round B 输入模板（此阶段才包含结构化参考价）】\n"
+                round_b_end_marker = "\n【Round B 输出约束】"
                 if round_b_prompt.count(round_b_marker) != 1 or round_b_prompt.count(round_b_end_marker) != 1:
                     raise TaskWorkspaceError("GUIDED_TASK_ROUND_B_PROMPT_INPUT_MARKER_INVALID")
                 try:
