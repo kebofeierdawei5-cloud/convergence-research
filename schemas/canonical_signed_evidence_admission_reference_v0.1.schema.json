@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://iios.local/schemas/canonical-signed-evidence-admission-reference-v0.1.schema.json",
+  "title": "IIOS Canonical Signed Evidence/PIT Admission Reference v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "envelope_sha256",
+    "manifest_sha256",
+    "rights_record_sha256",
+    "permission_evidence_sha256"
+  ],
+  "properties": {
+    "envelope_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rights_record_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "permission_evidence_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
