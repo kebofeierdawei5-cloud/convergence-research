@@ -36,6 +36,7 @@ STAGES = (
 )
 TERMINAL_STAGES = {"COMPLETED", "BLOCKED"}
 TASK_ID_RE = re.compile(r"^task-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{8}$")
+TASK_STATUSES = {"ACTIVE", "INTERRUPTED", "BLOCKED", "COMPLETED"}
 ARTIFACT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 
 
@@ -139,6 +140,25 @@ def _event_hash(event_without_hash: Mapping[str, Any]) -> str:
     return _sha(_canonical(dict(event_without_hash)))
 
 
+def _validate_stage_status(stage: Any, status: Any) -> None:
+    if stage not in STAGES and stage != "BLOCKED":
+        raise TaskWorkspaceError("TASK_JOURNAL_STAGE_UNSUPPORTED")
+    if status not in TASK_STATUSES:
+        raise TaskWorkspaceError("TASK_JOURNAL_STATUS_UNSUPPORTED")
+    if (stage == "BLOCKED") != (status == "BLOCKED"):
+        raise TaskWorkspaceError("TASK_STAGE_STATUS_MISMATCH")
+    if (stage == "COMPLETED") != (status == "COMPLETED"):
+        raise TaskWorkspaceError("TASK_STAGE_STATUS_MISMATCH")
+
+
+def _validate_transition(previous: Mapping[str, Any], stage: str, status: str) -> None:
+    if previous.get("task_status") in {"BLOCKED", "COMPLETED"}:
+        raise TaskWorkspaceError("TASK_JOURNAL_EVENT_AFTER_TERMINAL")
+    expected_next = _next_stage(str(previous.get("stage")), str(previous.get("task_status")))
+    if stage not in {expected_next, previous.get("stage"), "BLOCKED"}:
+        raise TaskWorkspaceError("TASK_JOURNAL_TRANSITION_INVALID")
+
+
 def _read_journal(task_dir: Path) -> list[dict[str, Any]]:
     path = task_dir / JOURNAL_FILENAME
     if path.is_symlink() or not path.is_file():
@@ -151,6 +171,7 @@ def _read_journal(task_dir: Path) -> list[dict[str, Any]]:
         raise TaskWorkspaceError("TASK_JOURNAL_TRAILING_PARTIAL_RECORD")
     events: list[dict[str, Any]] = []
     previous_hash = "0" * 64
+    task_id: str | None = None
     for expected_sequence, line in enumerate(raw.splitlines(), start=1):
         try:
             event = json.loads(line.decode("utf-8"))
@@ -168,13 +189,26 @@ def _read_journal(task_dir: Path) -> list[dict[str, Any]]:
         calculated = _event_hash(event)
         if supplied_hash != calculated:
             raise TaskWorkspaceError(f"TASK_JOURNAL_HASH_MISMATCH:{expected_sequence}")
+        current_task_id = event.get("task_id")
+        if not isinstance(current_task_id, str) or not TASK_ID_RE.fullmatch(current_task_id):
+            raise TaskWorkspaceError("TASK_JOURNAL_TASK_ID_INVALID")
+        if task_id is None:
+            task_id = current_task_id
+        elif current_task_id != task_id:
+            raise TaskWorkspaceError("TASK_JOURNAL_TASK_ID_MISMATCH")
+        stage, status = event.get("stage"), event.get("task_status")
+        _validate_stage_status(stage, status)
+        if expected_sequence == 1:
+            if stage != "TASK_CREATED" or status != "ACTIVE":
+                raise TaskWorkspaceError("TASK_JOURNAL_INITIAL_EVENT_INVALID")
+        else:
+            _validate_transition(events[-1], stage, status)
         event["event_sha256"] = supplied_hash
         previous_hash = supplied_hash
         events.append(event)
     if not events or events[0].get("stage") != "TASK_CREATED":
         raise TaskWorkspaceError("TASK_JOURNAL_INITIAL_EVENT_MISSING")
     return events
-
 
 def _manifest_from_events(task_id: str, events: list[dict[str, Any]]) -> dict[str, Any]:
     latest = events[-1]
@@ -300,8 +334,9 @@ class TaskWorkspace:
     ) -> dict[str, Any]:
         if stage not in STAGES and stage != "BLOCKED":
             raise TaskWorkspaceError("TASK_STAGE_UNSUPPORTED")
-        if task_status not in {"ACTIVE", "INTERRUPTED", "BLOCKED", "COMPLETED"}:
+        if task_status not in TASK_STATUSES:
             raise TaskWorkspaceError("TASK_STATUS_UNSUPPORTED")
+        _validate_stage_status(stage, task_status)
         current = self.inspect()
         if current["task_status"] in {"BLOCKED", "COMPLETED"}:
             raise TaskWorkspaceError("TASK_ALREADY_TERMINAL")
