@@ -97,3 +97,45 @@ A release candidate is acceptable only when:
 7. no private run bundle or raw response is committed.
 
 **Current verdict: NOT RELEASED.** The main obstacle is no longer a need for more feature batches. It is integrating two proposal branches safely and proving the integrated local workflow end to end.
+
+
+## 8. Reconciliation addendum — live GitHub audit, 2026-11-12
+
+This section supersedes stale branch-count / validation statements above where they conflict.
+
+### 8.1 Current branch graph and net diff
+
+- Canonical `main` observed at `2fd009b10bd4b13467ebdd8b2692eab62a772878`.
+- B83 branch `feat/b83-durable-task-resume-20261108` compares as **139 commits ahead / 0 behind**, with **21 net changed paths**. This differs from the earlier 136 / 19 snapshot. Its net changes include the local launcher, durable task workspace/session/resume modules, operator profile, quick start, pilot/workflow changes and B83 tests/docs.
+- Deep-research branch `feat/b76-core-integrated-20261101` compares as **515 commits ahead / 0 behind**, with approximately **110 net changed paths**. It includes B42–B81 docs and runtime modules, changes to the existing local pilot, canonical forecast/evidence lineage, schemas, workflows and broad regression suites.
+- PR #587 is explicitly validation-only, Draft, and targets `feat/b73-evidence-driven-remediation-20261031`; it is not a release PR and must not be merged to main.
+- PR #588 is Draft and targets main, but contains only the B83 net diff. It does not contain the B42–B81 net diff.
+
+### 8.2 Validation evidence refined
+
+- B76/B80 recorded exact Linux Local Pilot suite: **466 passed**. At the B80 exact code commit `bb668cb5694bd36584988e204a5dad29fcee580e`, the combined Local Investment Pilot workflow was cancelled because its macOS acceptance job was cancelled; the other listed workflows succeeded. Do not count this as a macOS pass.
+- B81 exact code commit `7fb679835a71e25572dc6db701e24e6dddb59bdf` has **35/35 associated workflow runs successful**, including the hosted macOS 15 arm64 Local Investment Pilot job and 466 tests. This closes the hosted-runner image retirement/cancellation defect. It does not prove the operator's own Finder / clipboard / real-task acceptance.
+- B79 explicitly records the production signer registry as `NO_TRUSTED_SIGNERS_REGISTERED`. Signed test fixtures are ephemeral and do not establish real-company formal Evidence/PIT or Forecast admission. The product must either preserve the non-canonical pilot boundary or separately complete authorized signer enrollment; no fixture-based promotion is allowed.
+- Xinhecheng 002001 remains a valid UNKNOWN / not-ready case: physical business-line tonnes / ASP / unit variable cost are missing; annual diluted-share assumption and Q4 scenario assumptions are missing; the dated operator price for that readiness package is missing. This is a data dependency, not a reason to weaken B55–B60.
+- SOTP real-company acceptance remains unproven. The code path is distinct and has test evidence, but a suitable real case with attributable segment earnings, segment multiples, parent adjustments, net cash/debt and diluted shares has not been demonstrated.
+
+### 8.3 Integration conflict that must be resolved explicitly
+
+The two release branches both modify:
+- `iios_mvp/local_investment_pilot_v01.py`;
+- `.github/workflows/iios_local_investment_pilot_v01.yml`;
+- `tests/test_local_investment_pilot_v01.py`;
+- `docs/PROJECT_STATE_INDEX.md`.
+
+The B76 branch substantially expands the existing pilot (roughly +3,500 lines in its net file diff), while B83 rewrites/refactors portions of the same pilot to add durable guided-task orchestration. A blind file copy from either branch would discard functionality from the other. These overlapping files require a deliberate three-way integration, followed by exact integrated-tree tests. The B83-only task modules can be layered separately once the pilot adapter seam is defined.
+
+### 8.4 Updated blocker order
+
+1. **P0 — Integration design:** create a clean branch from current main; define the pilot orchestration seam; integrate B76 research adapters without replacing B83 durable task/session control, and reconcile the workflow and tests.
+2. **P0 — Exact integrated validation:** run the complete Local Pilot + Replay, Investment Core, signed Evidence/PIT, B76 arithmetic and red-team suites on the same integrated commit. Separate branch passes are insufficient.
+3. **P0 — Operator Mac acceptance:** one real Round A/B task, explicit clipboard capture, interruption/Finder relaunch, private bundle integrity and Replay MATCH.
+4. **P0 — Truthful authority boundary:** ship explicitly as `PILOT_NON_CANONICAL` while production signer registry is empty; do not claim formal Evidence/PIT, Forecast or Decision admission.
+5. **P1 — SOTP real case:** conditional; either demonstrate a data-sufficient real case or document code-tested / real-case-unverified.
+6. **Not a release blocker:** missing Xinhecheng source inputs; preserve UNKNOWN.
+
+**Execution decision:** do not merge PR #587 or #588 as-is. The next engineering unit is a clean integration branch and the pilot orchestration seam, not another B-batch feature.
