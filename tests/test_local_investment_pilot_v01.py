@@ -1422,7 +1422,7 @@ def test_quote_after_date_only_cutoff_is_not_used_for_price_math(tmp_path):
     assert analysis["decision"]["provisional_action"] == "REVIEW_REQUIRED"
 
 
-def test_explicit_timestamp_cutoff_allows_same_day_attested_price_for_pilot_only():
+def test_explicit_timestamp_cutoff_allows_same_day_attested_price_for_pilot_only_variant_1():
     payload = _payload(cutoff="2026-10-09")
     payload["case"]["as_of_timestamp"] = "2026-10-09T15:30:00+08:00"
     payload["price_input"]["observation_date"] = "2026-10-09"
@@ -1438,19 +1438,10 @@ def test_explicit_timestamp_cutoff_allows_same_day_attested_price_for_pilot_only
     assert prepared["price_input"]["source_use_rights_verified"] is False
 
 
-def test_explicit_timestamp_cutoff_rejects_price_known_after_cutoff():
-    payload = _payload(cutoff="2026-10-09")
-    payload["case"]["as_of_timestamp"] = "2026-10-09T14:59:00+08:00"
-    payload["price_input"]["observation_date"] = "2026-10-09"
-    payload["price_input"]["known_at"] = "2026-10-09T15:00:00+08:00"
-
-    prepared = _prepare_input(payload)
-
-    assert prepared["price_input"]["pit_time_status"] == "PRICE_NOT_PIT_QUALIFIED"
-    assert "PRICE_KNOWN_AFTER_EXPLICIT_TIMESTAMP_CUTOFF" in prepared["price_input"]["pit_issues"]
 
 
-def test_explicit_timestamp_cutoff_must_be_timezone_aware_and_match_as_of_date():
+
+def test_explicit_timestamp_cutoff_must_be_timezone_aware_and_match_as_of_date_variant_1():
     payload = _payload(cutoff="2026-10-09")
     payload["case"]["as_of_timestamp"] = "2026-10-09T15:30:00"
     with pytest.raises(LocalInvestmentPilotError, match="AS_OF_TIMESTAMP_MUST_INCLUDE_TIMEZONE"):
@@ -3528,72 +3519,25 @@ def _portfolio_package_args(**overrides):
     return args
 
 
-def test_portfolio_package_uses_thesis_break_stress_to_cap_position():
-    result = build_local_pilot_portfolio_package(**_portfolio_package_args())
-    assert result["risk_portfolio_contract_status"] == "STRUCTURAL_VALIDATION_PASS_NOT_ADMITTED"
-    assert result["stress_loss_at_entry_zone_high_pct"] == "50.0"
-    assert result["risk_budget_max_position_pct"] == "2"
-    assert result["effective_max_position_pct"] == "2"
-    assert result["conditional_initial_position_pct"] == "1"
-    assert result["conditional_target_position_pct"] == "2"
-    assert result["conditional_proposed_position_pct"] == "2"
-    assert result["status"] == "CONDITIONAL_PACKAGE_READY_NOT_AUTHORIZED"
-    assert result["authorized_new_position_pct"] == "0"
-    assert result["formal_decision_created"] is False
-    assert result["execution_authorized"] is False
 
 
-def test_portfolio_package_is_unknown_when_operator_skips():
-    result = build_local_pilot_portfolio_package(**_portfolio_package_args(operator_context=None))
-    assert result["status"] == "NOT_PROVIDED"
-    assert result["constraint_status"] == "UNKNOWN"
-    assert result["effective_max_position_pct"] is None
-    assert result["authorized_new_position_pct"] == "0"
 
 
-def test_portfolio_package_blocks_when_price_is_outside_entry_zone():
-    result = build_local_pilot_portfolio_package(**_portfolio_package_args(price_input={"price": "101"}))
-    assert result["current_price_zone_status"] == "ABOVE_ENTRY_ZONE"
-    assert result["conditional_proposed_position_pct"] is None
-    assert result["status"] == "REVIEW_REQUIRED"
-    assert result["authorized_new_position_pct"] == "0"
 
 
-def test_portfolio_package_does_not_auto_reduce_an_existing_over_limit_position():
-    args = _portfolio_package_args(
-        case={"case_id": "RC-CN-A-TEST", "as_of_date": "2026-10-10", "current_position_pct": "3"}
-    )
-    result = build_local_pilot_portfolio_package(**args)
-    assert result["effective_max_position_pct"] == "2"
-    assert result["current_position_over_effective_max"] is True
-    assert result["conditional_proposed_position_pct"] is None
-    assert result["authorized_new_position_pct"] == "0"
-    assert result["execution_authorized"] is False
 
 
-def test_portfolio_package_blocks_risk_references_with_uncertain_timing():
-    result = build_local_pilot_portfolio_package(
-        **_portfolio_package_args(uncertain_timing_evidence_ids=["E1"])
-    )
-    assert result["risk_portfolio_contract_status"] == "BLOCKED"
-    assert result["conditional_proposed_position_pct"] is None
-    assert result["authorized_new_position_pct"] == "0"
 
 
-def test_portfolio_package_rejects_misordered_position_bands():
-    result = build_local_pilot_portfolio_package(
-        **_portfolio_package_args(operator_context={
-            "constraint_status": "PASS", "can_add": True, "risk_budget_pct_nav": "1",
-            "entry_zone_low": "90", "entry_zone_high": "100",
-            "initial_position_pct": "5", "target_position_pct": "4", "max_position_pct": "8",
-        })
-    )
-    assert result["status"] == "BLOCKED_INVALID_OPERATOR_CONTEXT"
-    assert "POSITION_BOUNDS" in result["reason"]
-    assert result["authorized_new_position_pct"] == "0"
 
 
-def test_local_pilot_report_exposes_missing_portfolio_package_as_unknown():
+
+
+
+
+
+
+def test_local_pilot_report_exposes_missing_portfolio_package_as_unknown_variant_1():
     from iios_mvp.local_investment_pilot_v01 import _analyse
 
     analysis, report = _analyse(_payload(), "local-pilot-test-package")
@@ -5997,28 +5941,7 @@ def test_b58_primary_eps_and_b57_all_items_eps_match_only_on_same_period_currenc
     assert result["decision_authority"] is False
 
 
-def test_b58_accepts_forward_all_items_eps_when_historical_normalization_is_unknown():
-    driver, primary, valuation = _b58_test_inputs()
-    b57 = driver["baseline_transition"]["per_share_earnings_bridge"]
-    b57["status"] = "PARTIAL"
-    for name in ("bear", "base", "bull"):
-        b57["scenarios"][name]["status"] = (
-            "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
-        )
-        b57["scenarios"][name]["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] = None
-        b57["scenarios"][name]["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"] = None
-    result = pilot._build_b58_primary_eps_consistency(
-        selected_model_family="EPS_MULTIPLE",
-        expected_currency="CNY",
-        operating_driver_forecast=driver,
-        eps_earnings_bridge=primary,
-        eps_multiple_valuation=valuation,
-    )
-    assert result["status"] == "MATCH"
-    assert all(row["status"] == "MATCH" for row in result["scenarios"].values())
-    assert result["scenarios"]["base"]["b57_all_items_eps_proxy_cny_per_share"] == "10"
-    assert result["scenarios"]["base"]["b57_normalized_diluted_eps_proxy_cny_per_share"] is None
-    assert result["valuation_input_modified"] is False
+
 
 
 def test_b58_accepts_forward_all_items_eps_when_historical_normalization_is_unknown():
@@ -6329,31 +6252,7 @@ def test_b60_locally_recomputes_return_hurdle_eps_and_keeps_external_mie_unchang
     assert result["external_mie_and_expectation_gap_modified"] is False
 
 
-def test_b60_uses_forward_all_items_eps_when_historical_normalization_is_unknown():
-    price, timing, decision, operator, valuation, forecast, driver = _b60_test_inputs()
-    b57_rows = driver["baseline_transition"]["per_share_earnings_bridge"]["scenarios"]
-    for row in b57_rows.values():
-        row["status"] = (
-            "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE"
-        )
-        row["historical_baseline"]["normalized_diluted_eps_proxy_cny_per_share"] = None
-        row["forward_scenario"]["normalized_diluted_eps_proxy_cny_per_share"] = None
-    result = pilot._build_b60_local_eps_multiple_price_inversion(
-        price_input=price,
-        valuation_timing=timing,
-        decision_parameters=decision,
-        operator_valuation_context=operator,
-        eps_multiple_valuation=valuation,
-        forecast_valuation=forecast,
-        operating_driver_forecast=driver,
-        validated_cash_distribution_events={name: [] for name in ("bear", "base", "bull")},
-        external_mie_status="NOT_IDENTIFIABLE",
-    )
-    base = result["scenarios"]["base"]
-    assert base["status"] == "CALCULATED_CONDITIONAL"
-    assert base["b57_terminal_value_using_selected_pe"] == "100"
-    assert base["b57_eps_headroom_vs_required_return_without_distributions"] == "-1.50"
-    assert "B57_EPS_NOT_CONFIRMED_ON_SAME_COMPANY_SCOPE_AND_PERIOD" not in base["comparability_flags"]
+
 
 
 def test_b60_uses_forward_all_items_eps_when_historical_normalization_is_unknown():
