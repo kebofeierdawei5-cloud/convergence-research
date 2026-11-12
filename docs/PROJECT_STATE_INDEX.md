@@ -2878,3 +2878,16 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Regression coverage:** verify existing gate statuses are preserved, missing sections stay `UNKNOWN`, and first-run and Replay are rendered side-by-side including `BLOCKED`, `NOT_LINKED`, and `NOT_READY` states.
 - **Verification:** exact PR head `0a2c85ed7dc8a304fafedfa021f223dbb4ed040c` passed the Local Investment Pilot + Replay/acceptance suite (**343 tests**) and **15/15** triggered PR workflows; squash merge commit `bbf3d6e4129a904c2cb1ddb03e75dc5eff007b88`.
 - **Boundary:** the new table does not recalculate metrics, inspect or alter the raw research response, override replay comparison, infer market expectations, admit Evidence/PIT, or create formal Decision/execution authority. Fresh macOS full-run + Replay remain OPEN / NOT VERIFIED.
+
+
+## B83-7 — Durable task state-machine consistency — 2026-11-12
+
+Status: **IMPLEMENTED ON PR #588 / CI NOT YET VERIFIED / MAC ACCEPTANCE OPEN**
+
+- Found that journal reopen validated sequence and hash-chain integrity but did not independently replay the legal stage-transition contract; the low-level record API also permitted mismatched terminal stage/status combinations.
+- Added stage/status compatibility checks, stable Task ID validation, replay-time transition validation, terminal-event closure, and directory/journal Task ID binding before manifest repair.
+- Added regression tests for invalid stage/status pairs, no journal mutation after rejected writes, and a semantically illegal transition whose event hash is recomputed (so rejection is not merely a hash-mismatch side effect).
+- Implementation and tests are committed on the existing Draft PR #588 branch. The final code head is **not yet CI-verified**; no test-pass claim is made.
+- No research, evidence/PIT, forecast, valuation, return hurdle, risk, Decision or execution semantics changed.
+- macOS Finder, clipboard and real-company interruption/resume acceptance remain OPEN. PR #588 remains Draft/unmerged; canonical main is unchanged.
+- Design record: `docs/iios/B83-7_TASK_STATE_MACHINE_INVARIANTS_20261112.md`.
