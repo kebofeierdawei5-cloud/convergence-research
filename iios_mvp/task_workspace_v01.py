@@ -141,9 +141,9 @@ def _event_hash(event_without_hash: Mapping[str, Any]) -> str:
 
 
 def _validate_stage_status(stage: Any, status: Any) -> None:
-    if stage not in STAGES and stage != "BLOCKED":
+    if not isinstance(stage, str) or (stage not in STAGES and stage != "BLOCKED"):
         raise TaskWorkspaceError("TASK_JOURNAL_STAGE_UNSUPPORTED")
-    if status not in TASK_STATUSES:
+    if not isinstance(status, str) or status not in TASK_STATUSES:
         raise TaskWorkspaceError("TASK_JOURNAL_STATUS_UNSUPPORTED")
     if (stage == "BLOCKED") != (status == "BLOCKED"):
         raise TaskWorkspaceError("TASK_STAGE_STATUS_MISMATCH")
@@ -307,6 +307,8 @@ class TaskWorkspace:
 
     def inspect(self, *, verify_artifacts: bool = True) -> dict[str, Any]:
         events = _read_journal(self.path)
+        if events[0].get("task_id") != self.task_id:
+            raise TaskWorkspaceError("TASK_JOURNAL_TASK_ID_MISMATCH")
         expected = _manifest_from_events(self.task_id, events)
         manifest_path = self.manifest_path
         if manifest_path.is_symlink() or not manifest_path.is_file():
