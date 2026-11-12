@@ -1,20 +1,17 @@
 # IIOS Project State Index
 
-Snapshot: 2026-11-12 (release integration branch; not canonical main).
+State classification: **CANONICAL**
+Snapshot: 2026-10-25
+Authority: this file is the **only canonical Current State Index**.
 
-State classification: **RELEASE INTEGRATION — NOT CANONICAL / NOT RELEASED**
-Authority: canonical `main` remains unchanged. This branch is a clean integration candidate and must pass exact-head CI and operator acceptance before release.
+## RELEASE INTEGRATION CANDIDATE — 2026-11-12 (NON-CANONICAL)
 
-## CURRENT RELEASE INTEGRATION STATUS — 2026-11-12
-
-- Integration branch: `release/v03-integration-20261112`, based on canonical main `2fd009b10bd4b13467ebdd8b2692eab62a772878`.
-- Integrated source roles: B76 is the research/calculation/report source of truth; B83 supplies durable task journal/session/resume, compact entry, one-shot clipboard capture, private operator profile and local launcher.
-- Integration method: preserve B76 calculation/report functions; port B83 task workflow and CLI into the B76 pilot adapter. Do not merge either historical source branch wholesale.
-- B76 modules, schemas, examples, milestone documents and regression files have been ported into this candidate. The overlapping pilot, test, workflow and state-index files were handled separately.
-- Product authority remains `PILOT_NON_CANONICAL`; the production signer registry remains empty. No formal Evidence/PIT, Forecast, Valuation or Decision authority is claimed.
-- Real Mac Finder / clipboard / interruption / Replay acceptance is still NOT VERIFIED. Hosted macOS CI is necessary but not sufficient.
-- Release gates: same-commit integrated tests and red-team; real EPS_MULTIPLE end-to-end; SOTP real case only if inputs are sufficient; task interruption/relaunch; bundle integrity and Replay MATCH.
-- Do not merge PR #587 or #588 as-is. No changes to canonical main.
+- Candidate branch: `release/v03-integration-20261112`; Draft PR #589 targets `main`.
+- Canonical `main` remains unchanged. The canonical state above remains the only authority; the release candidate below is proposal history only.
+- B76 supplies the research, operating bridge, EPS_MULTIPLE/SOTP, price inversion, expectation-gap and report calculation path. B83 supplies durable local task/session/resume, compact operator entry, one-shot clipboard intake, private operator profile and local launcher.
+- The B76 and B83 source branches are not merged wholesale. The pilot, tests, workflow and state index were reconciled explicitly in this candidate.
+- Output remains `PILOT_NON_CANONICAL`. The production signer registry is empty; no formal Evidence/PIT, Forecast, Valuation or Decision admission is claimed.
+- User's real Mac Finder/clipboard/interruption/Replay acceptance remains NOT VERIFIED. This branch is not releasable until exact-head CI and operator acceptance gates pass.
 
 ## CURRENT CORE RESEARCH DEVELOPMENT — B76 INTEGRATED ON B73 PROPOSAL BASE
 ## CURRENT CORE RESEARCH DEVELOPMENT — B76 INTEGRATED ON B73 PROPOSAL BASE
