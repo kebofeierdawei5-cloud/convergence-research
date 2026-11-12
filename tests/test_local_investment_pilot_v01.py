@@ -292,7 +292,8 @@ def test_response_file_reader_rejects_empty_file_with_actionable_error(tmp_path)
 def test_guided_wizard_uses_separate_files_for_two_chatgpt_responses_not_pbpaste():
     source = Path(__file__).resolve().parents[1] / "iios_mvp" / "local_investment_pilot_v01.py"
     content = source.read_text(encoding="utf-8")
-    assert "pbpaste" not in content
+    assert "_capture_clipboard_response_once(response_path)" in content
+    assert 'subprocess.run(\\n            ["pbpaste"]' in content
     assert "_read_json_response_file(response_path)" in content
     assert 'str(round_a_response_path)]' in content
     assert 'str(round_b_response_path)]' in content
