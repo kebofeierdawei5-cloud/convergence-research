@@ -8990,8 +8990,9 @@ def _wait_for_response_file_change(
 ) -> tuple[int, int, str]:
     """Wait until a non-empty response file changes and remains stable.
 
-    The operator can save the ChatGPT JSON in TextEdit and the wizard resumes
-    automatically. Pressing Enter is optional; Ctrl-C cancels the wait.
+    The operator may save a response file as before, or copy the ChatGPT
+    response and press Enter for a one-shot macOS clipboard capture.
+    Clipboard contents are never polled or logged; Ctrl-C cancels the wait.
     """
     response_path = Path(path).expanduser()
     candidate: tuple[int, int, str] | None = None
@@ -9026,11 +9027,15 @@ def _wait_for_response_file_change(
                 sys.stdin.readline()
                 latest = _response_file_signature(response_path)
                 if latest is None or latest[0] == 0:
-                    print("按回车触发了文件检查，但指定结果路径当前没有可读取的非空内容。", flush=True)
+                    print("正在尝试一次性接收当前剪贴板（仅因你刚刚按下回车）。", flush=True)
+                    if _capture_clipboard_response_once(response_path):
+                        captured = _response_file_signature(response_path)
+                        if captured is not None and captured[0] > 0:
+                            return captured
                     print(_response_file_diagnostic(response_path), flush=True)
                     print(
-                        "现在打开文件选择窗口，可选择你实际保存的 JSON；"
-                        "导入时会保留原文件，不需要重新研究或重新填写标的。",
+                        "如不使用剪贴板，可继续按原方式保存 JSON 文件；"
+                        "系统不会持续读取剪贴板。",
                         flush=True,
                     )
                     _choose_saved_response_file(response_path)
