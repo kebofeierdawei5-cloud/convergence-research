@@ -8827,7 +8827,7 @@ def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]
         fp = _text_fingerprint(value)
         if fp["sha256"] != sha or fp["byte_size"] != size:
             raise LocalInvestmentPilotError(f"ROUND_A_{label}_FINGERPRINT_MISMATCH")
-    round_a_marker = "【Round A 允许输入】\\n"
+    round_a_marker = "【Round A 允许输入】\n"
     if ap.count(round_a_marker) != 1:
         raise LocalInvestmentPilotError("ROUND_A_PROMPT_CONTEXT_NOT_BOUND")
     try:
@@ -8851,8 +8851,8 @@ def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]
     bfp = _text_fingerprint(bp)
     if bfp["sha256"] != b.get("prompt_sha256") or bfp["byte_size"] != b.get("prompt_byte_size"):
         raise LocalInvestmentPilotError("ROUND_B_PROMPT_FINGERPRINT_MISMATCH")
-    round_b_marker = "【Round B 输入模板（此阶段才包含结构化参考价）】\\n"
-    round_b_end_marker = "\\n【Round B 输出约束】"
+    round_b_marker = "【Round B 输入模板（此阶段才包含结构化参考价）】\n"
+    round_b_end_marker = "\n【Round B 输出约束】"
     if bp.count(round_b_marker) != 1 or bp.count(round_b_end_marker) != 1:
         raise LocalInvestmentPilotError("ROUND_B_PROMPT_CONTEXT_NOT_BOUND")
     try:
