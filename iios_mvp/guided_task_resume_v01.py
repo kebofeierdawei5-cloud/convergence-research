@@ -428,11 +428,18 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                 prompt = pilot._build_price_blind_round_a_prompt(template_payload)
                 _write_private_once(work / "round_a_prompt.md", prompt.encode("utf-8"))
                 _write_private_once(response_a, b"")
+                round_a_marker = "【Round A 允许输入】\\n"
+                if prompt.count(round_a_marker) != 1:
+                    raise TaskWorkspaceError("GUIDED_TASK_ROUND_A_PROMPT_INPUT_MARKER_INVALID")
+                try:
+                    round_a_prompt_input = json.loads(prompt.split(round_a_marker, 1)[1].strip())
+                except json.JSONDecodeError as exc:
+                    raise TaskWorkspaceError("GUIDED_TASK_ROUND_A_PROMPT_INPUT_JSON_INVALID") from exc
                 session.checkpoint_prompt(
                     "ROUND_A",
                     prompt,
                     response_filename=response_a.name,
-                    prompt_context={"prompt_input_payload": pilot._round_a_prompt_input(template_payload)},
+                    prompt_context={"prompt_input_payload": round_a_prompt_input},
                 )
                 continue
             if action in {"ROUND_A_RESPONSE_PENDING", "ROUND_A_VALIDATION_PENDING"}:
@@ -463,6 +470,19 @@ def run_guided_task(session: GuidedTaskSession, *, output_root: str | Path | Non
                 )
                 if built_frozen_sha != frozen_sha:
                     raise TaskWorkspaceError("GUIDED_TASK_ROUND_A_FROZEN_HASH_MISMATCH")
+                round_b_marker = "【Round B 输入模板（此阶段才包含结构化参考价）】\\n"
+                round_b_end_marker = "\\n【Round B 输出约束】"
+                if round_b_prompt.count(round_b_marker) != 1 or round_b_prompt.count(round_b_end_marker) != 1:
+                    raise TaskWorkspaceError("GUIDED_TASK_ROUND_B_PROMPT_INPUT_MARKER_INVALID")
+                try:
+                    embedded_round_b_input = json.loads(
+                        round_b_prompt.split(round_b_marker, 1)[1].split(round_b_end_marker, 1)[0].strip()
+                    )
+                except (IndexError, json.JSONDecodeError) as exc:
+                    raise TaskWorkspaceError("GUIDED_TASK_ROUND_B_PROMPT_INPUT_JSON_INVALID") from exc
+                if embedded_round_b_input != round_b_prompt_input:
+                    raise TaskWorkspaceError("GUIDED_TASK_ROUND_B_PROMPT_INPUT_MISMATCH")
+                round_b_prompt_input = embedded_round_b_input
                 _write_private_once(work / "round_b_prompt.md", round_b_prompt.encode("utf-8"))
                 _write_private_once(response_b, b"")
                 session.checkpoint_prompt(
