@@ -2882,12 +2882,12 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 
 ## B83-7 — Durable task state-machine consistency — 2026-11-12
 
-Status: **IMPLEMENTED ON PR #588 / CI NOT YET VERIFIED / MAC ACCEPTANCE OPEN**
+Status: **IMPLEMENTED ON PR #588 / 418 TARGETED TESTS PASS / 6 OF 6 WORKFLOWS PASS / MAC ACCEPTANCE OPEN**
 
 - Found that journal reopen validated sequence and hash-chain integrity but did not independently replay the legal stage-transition contract; the low-level record API also permitted mismatched terminal stage/status combinations.
 - Added stage/status compatibility checks, stable Task ID validation, replay-time transition validation, terminal-event closure, and directory/journal Task ID binding before manifest repair.
 - Added regression tests for invalid stage/status pairs, no journal mutation after rejected writes, and a semantically illegal transition whose event hash is recomputed (so rejection is not merely a hash-mismatch side effect).
-- Implementation and tests are committed on the existing Draft PR #588 branch. The final code head is **not yet CI-verified**; no test-pass claim is made.
+- Implementation and tests are committed on the existing Draft PR #588 branch. Exact PR-head Local Investment Pilot workflow #718 passed **418 tests**; all **6/6 triggered workflows** passed, including Investment Core CI, State Hygiene, C0 Governance and independent Post-B04 red-team. CI is Ubuntu-based and does not close macOS acceptance.
 - No research, evidence/PIT, forecast, valuation, return hurdle, risk, Decision or execution semantics changed.
 - macOS Finder, clipboard and real-company interruption/resume acceptance remain OPEN. PR #588 remains Draft/unmerged; canonical main is unchanged.
 - Design record: `docs/iios/B83-7_TASK_STATE_MACHINE_INVARIANTS_20261112.md`.
