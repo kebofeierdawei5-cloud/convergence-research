@@ -12,6 +12,7 @@ from iios_mvp.task_workspace_v01 import (
     create_task,
     open_task,
     task_lock,
+    _event_hash,
 )
 
 
@@ -133,3 +134,38 @@ def test_posix_task_lock_is_released_by_kernel_after_process_crash(tmp_path: Pat
     reopened, _ = open_task(tmp_path / "tasks", workspace.task_id)
     with task_lock(reopened):
         assert reopened.inspect()["current_stage"] == "TASK_CREATED"
+
+
+@pytest.mark.parametrize(
+    ("stage", "task_status"),
+    [
+        ("TASK_CREATED", "COMPLETED"),
+        ("ROUND_A_PROMPT_READY", "BLOCKED"),
+        ("COMPLETED", "ACTIVE"),
+        ("BLOCKED", "ACTIVE"),
+    ],
+)
+def test_stage_and_task_status_must_be_consistent(
+    tmp_path: Path, stage: str, task_status: str
+) -> None:
+    workspace = create_task(tmp_path / "tasks")
+    with pytest.raises(TaskWorkspaceError, match="TASK_STAGE_STATUS_MISMATCH"):
+        workspace.record(stage, task_status=task_status)
+    assert workspace.inspect()["revision"] == 1
+
+
+def test_journal_replay_rejects_semantically_invalid_transition_even_with_valid_hash(
+    tmp_path: Path,
+) -> None:
+    workspace = create_task(tmp_path / "tasks")
+    workspace.record("ROUND_A_PROMPT_READY")
+    lines = workspace.journal_path.read_text(encoding="utf-8").splitlines()
+    event = json.loads(lines[1])
+    event["stage"] = "ROUND_B_PROMPT_READY"
+    event.pop("event_sha256")
+    event["event_sha256"] = _event_hash(event)
+    lines[1] = json.dumps(event, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    workspace.journal_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    with pytest.raises(TaskWorkspaceError, match="TASK_JOURNAL_TRANSITION_INVALID"):
+        workspace.inspect()
