@@ -139,3 +139,24 @@ The B76 branch substantially expands the existing pilot (roughly +3,500 lines in
 6. **Not a release blocker:** missing Xinhecheng source inputs; preserve UNKNOWN.
 
 **Execution decision:** do not merge PR #587 or #588 as-is. The next engineering unit is a clean integration branch and the pilot orchestration seam, not another B-batch feature.
+
+
+### 8.5 Pilot adapter seam — source-level interface check
+
+The B83 durable orchestrator is intentionally thin: `guided_task_resume_v01.run_guided_task()` imports `local_investment_pilot_v01` and delegates research prompts, response validation, trusted-input restoration, final analysis, bundle verification and report paths to that module. This is the correct integration seam; the task journal must not duplicate investment calculations.
+
+A source-level symbol check against the two branch versions found:
+
+- The B83 resume driver references **26** pilot symbols (constants + functions).
+- The B76 pilot implementation already provides the core research/analysis/validation/run/replay functions needed by the resume driver, but does not provide B83's `_ask_operator_entry_zone` helper.
+- The B83 pilot has compact market/cutoff/price parsers and one-shot clipboard capture helpers that are absent from the B76 pilot.
+- The B76 pilot contains the B42–B81 calculation and report functions absent from the B83 pilot, including B58/B59/B60, B61/B62 and the decision-chain synthesis/report projections.
+
+This narrows integration to a controlled adapter merge rather than two independent engines:
+1. Use the B76 pilot as the research/calculation/report source of truth.
+2. Port B83 durable task orchestration imports and CLI resume mode into that pilot.
+3. Port B83 compact entry parsers and the one-shot clipboard capture path, while retaining B76's B42–B81 calculation/report functions.
+4. Supply or explicitly remove the single missing operator-entry-zone helper from the resume-driver contract; do not silently skip valuation context.
+5. Run the combined Local Pilot + Replay and full B76 regression set on the resulting exact tree before layering the launcher and profile modules.
+
+This is a source/interface audit only. It is not yet a merged implementation or test pass.
