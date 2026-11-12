@@ -289,16 +289,17 @@ def test_response_file_reader_rejects_empty_file_with_actionable_error(tmp_path)
         _read_json_response_file(response_path)
 
 
-def test_guided_wizard_uses_separate_files_for_two_chatgpt_responses_not_pbpaste():
-    source = Path(__file__).resolve().parents[1] / "iios_mvp" / "local_investment_pilot_v01.py"
-    content = source.read_text(encoding="utf-8")
-    assert "_capture_clipboard_response_once(response_path)" in content
-    assert '["pbpaste"]' in content
-    assert "_read_json_response_file(response_path)" in content
-    assert 'str(round_a_response_path)]' in content
-    assert 'str(round_b_response_path)]' in content
-    assert "ROUND_A_PROVENANCE_SCHEMA" in content
-    assert "ROUND_B_PROVENANCE_SCHEMA" in content
+def test_guided_wizard_uses_separate_files_with_explicit_one_shot_clipboard():
+    root = Path(__file__).resolve().parents[1] / "iios_mvp"
+    pilot_source = (root / "local_investment_pilot_v01.py").read_text(encoding="utf-8")
+    resume_source = (root / "guided_task_resume_v01.py").read_text(encoding="utf-8")
+    assert "_capture_clipboard_response_once(response_path)" in pilot_source
+    assert '["pbpaste"]' in pilot_source
+    assert "if _capture_clipboard_response_once(response_path)" in pilot_source
+    assert '"round-a-response.json"' in resume_source
+    assert '"round-b-response.json"' in resume_source
+    assert "_capture_or_reuse_response" in resume_source
+    assert 'pilot._extract_json_object(raw.decode("utf-8"))' in resume_source
 
 
 def test_evidence_references_in_assessment_and_valuation_are_resolved_or_explicitly_unresolved():
