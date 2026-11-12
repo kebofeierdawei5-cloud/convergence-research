@@ -36,6 +36,9 @@ from .canonical_runtime_registry_v01 import (
     CanonicalRuntimeBindings,
     validate_canonical_runtime_bindings,
 )
+from .canonical_forecast_evidence_binding_v01 import (
+    FileSystemCanonicalSignedEvidenceAdmissionResolver,
+)
 from .forecast_valuation_return_lineage_v01 import (
     _validate_valuation_output,
     _strict_ref,
@@ -660,6 +663,30 @@ def build_canonical_runtime(
         ),
     ))
     upstream_resolver = FileSystemCanonicalInvestmentAdmissionResolver(admission_root)
+    evidence_bundle_root = Path(str(
+        values.get(
+            "IIOS_EVIDENCE_ADMISSION_ROOT",
+            str(admission_root / "signed-evidence-admissions"),
+        )
+    )).expanduser()
+    # The case directory is selected by trusted runtime context, not by an
+    # arbitrary request-bundle path. The configured production signer registry
+    # remains a separate trust anchor; an empty/non-ACTIVE registry fails closed.
+    evidence_case_root = evidence_bundle_root / _safe_hash(context.case_id)[:32]
+    evidence_signer_registry = Path(str(
+        values.get(
+            "IIOS_EVIDENCE_ADMISSION_SIGNER_REGISTRY",
+            str(project_root / "evidence/authority/IIOS_EVIDENCE_ADMISSION_SIGNER_REGISTRY_v01.json"),
+        )
+    )).expanduser()
+    evidence_admission_resolver = FileSystemCanonicalSignedEvidenceAdmissionResolver(
+        envelope_path=evidence_case_root / "signed-admission.json",
+        manifest_path=evidence_case_root / "manifest.json",
+        raw_root=evidence_case_root / "raw",
+        rights_record_path=evidence_case_root / "rights.json",
+        permission_evidence_path=evidence_case_root / "permission-instrument.bin",
+        signer_registry_path=evidence_signer_registry,
+    )
     runtime = CanonicalRuntimeBindings(
         request_interpreter=request_interpreter,
         request_registry=request_registry,
@@ -671,6 +698,7 @@ def build_canonical_runtime(
         valuation_output_resolver=FileSystemCanonicalValuationOutputResolver(
             admission_root, admission_resolver=upstream_resolver
         ),
+        evidence_admission_resolver=evidence_admission_resolver,
         operator_price_input_resolver=FileSystemOperatorPriceInputResolver(
             Path(str(values.get("IIOS_OPERATOR_PRICE_INPUT_ROOT", "~/.iios-private/operator-entered-prices"))).expanduser()
         ),

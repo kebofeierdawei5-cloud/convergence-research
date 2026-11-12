@@ -233,7 +233,11 @@ def _build_record(forecast: Mapping[str, Any]) -> dict[str, Any]:
 
 
 class FileSystemCanonicalIndependentForecastRegistry:
-    """Trusted immutable store for canonical independent forecast records."""
+    """Immutable forecast-record store; Evidence/PIT binding is required at formal lineage validation.
+
+    ADMITTED here means the forecast record itself is schema/hash/cutoff validated
+    and immutably registered. It does not mean its evidence_ids were signed-admitted.
+    """
 
     def __init__(self, root: str | Path):
         self.root = Path(root)
@@ -326,7 +330,7 @@ class FileSystemCanonicalIndependentForecastRegistry:
 
 
 class InMemoryCanonicalIndependentForecastRegistry:
-    """Deterministic resolver double using the same canonical record contract."""
+    """Test resolver for record-level admission; not a substitute for Evidence/PIT binding."""
 
     def __init__(self) -> None:
         self._records: dict[str, dict[str, Any]] = {}
