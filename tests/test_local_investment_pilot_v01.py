@@ -257,22 +257,6 @@ def test_guided_entry_normalizes_common_symbol_formats(market, raw, expected):
     assert _normalize_guided_symbol(raw, market) == expected
 
 
-@pytest.mark.parametrize(
-    ("raw", "expected_market"),
-    [
-        ("002810", "CN-A"),
-        ("002810.SZ", "CN-A"),
-        ("SZ002810", "CN-A"),
-        ("600000.SH", "CN-A"),
-        ("430047.BJ", "CN-A"),
-        ("00700", "HK"),
-        ("00700.HK", "HK"),
-        ("HK00700", "HK"),
-        ("0700.HK", "HK"),
-    ],
-)
-
-
 def test_default_price_date_skips_weekends_but_does_not_guess_exchange_holidays():
     assert _previous_weekday(date(2026, 10, 12)) == date(2026, 10, 9)
     assert _previous_weekday(date(2026, 10, 13)) == date(2026, 10, 12)
