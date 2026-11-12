@@ -8827,7 +8827,14 @@ def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]
         fp = _text_fingerprint(value)
         if fp["sha256"] != sha or fp["byte_size"] != size:
             raise LocalInvestmentPilotError(f"ROUND_A_{label}_FINGERPRINT_MISMATCH")
-    if json.dumps(ai, ensure_ascii=False, indent=2, allow_nan=False) not in ap:
+    round_a_marker = "【Round A 允许输入】\\n"
+    if ap.count(round_a_marker) != 1:
+        raise LocalInvestmentPilotError("ROUND_A_PROMPT_CONTEXT_NOT_BOUND")
+    try:
+        bound_round_a_input = json.loads(ap.split(round_a_marker, 1)[1].strip())
+    except json.JSONDecodeError as exc:
+        raise LocalInvestmentPilotError("ROUND_A_PROMPT_CONTEXT_NOT_BOUND") from exc
+    if bound_round_a_input != ai:
         raise LocalInvestmentPilotError("ROUND_A_PROMPT_CONTEXT_NOT_BOUND")
     actual_sha = _canonical_json_sha256(artifact) if isinstance(artifact, Mapping) else None
     if actual_sha != a.get("frozen_artifact_sha256") or set(artifact or {}) != {"schema_version", "case", "evidence_register", "assessment", "operating_driver_forecast"}:
@@ -8844,7 +8851,16 @@ def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]
     bfp = _text_fingerprint(bp)
     if bfp["sha256"] != b.get("prompt_sha256") or bfp["byte_size"] != b.get("prompt_byte_size"):
         raise LocalInvestmentPilotError("ROUND_B_PROMPT_FINGERPRINT_MISMATCH")
-    if json.dumps(bi, ensure_ascii=False, indent=2, allow_nan=False) not in bp:
+    round_b_marker = "【Round B 输入模板（此阶段才包含结构化参考价）】\\n"
+    round_b_end_marker = "\\n【Round B 输出约束】"
+    if bp.count(round_b_marker) != 1 or bp.count(round_b_end_marker) != 1:
+        raise LocalInvestmentPilotError("ROUND_B_PROMPT_CONTEXT_NOT_BOUND")
+    try:
+        round_b_section = bp.split(round_b_marker, 1)[1].split(round_b_end_marker, 1)[0]
+        bound_round_b_input = json.loads(round_b_section.strip())
+    except (IndexError, json.JSONDecodeError) as exc:
+        raise LocalInvestmentPilotError("ROUND_B_PROMPT_CONTEXT_NOT_BOUND") from exc
+    if bound_round_b_input != bi:
         raise LocalInvestmentPilotError("ROUND_B_PROMPT_CONTEXT_NOT_BOUND")
     if b.get("frozen_artifact_sha256") != actual_sha:
         raise LocalInvestmentPilotError("ROUND_B_DID_NOT_CONSUME_FROZEN_ROUND_A_ARTIFACT")
