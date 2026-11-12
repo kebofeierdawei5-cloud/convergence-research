@@ -2891,3 +2891,17 @@ Status: **IMPLEMENTED ON PR #588 / 418 TARGETED TESTS PASS / 6 OF 6 WORKFLOWS PA
 - No research, evidence/PIT, forecast, valuation, return hurdle, risk, Decision or execution semantics changed.
 - macOS Finder, clipboard and real-company interruption/resume acceptance remain OPEN. PR #588 remains Draft/unmerged; canonical main is unchanged.
 - Design record: `docs/iios/B83-7_TASK_STATE_MACHINE_INVARIANTS_20261112.md`.
+
+
+## IIOS v0.3 final delivery plan — 2026-11-12
+
+Status: **DELIVERY SCOPE FROZEN / FINALIZATION MODE**
+
+- Development is now managed by release gates, not by sequential B-batch expansion. The target is a usable local single-user A/H research workflow; not a SaaS, broker terminal or automatic trading system.
+- Frozen scope: local macOS launcher/private workspace; manual company/cutoff/price/position; free-first official/public evidence and PIT/Trust; explicit ChatGPT manual handoff with raw-response provenance; independent operating forecast; EPS_MULTIPLE and SOTP; price-implied requirements/expectation gap when identifiable; 15% annualized return hurdle; risk/portfolio constraints; human approval; report, run bundle, integrity verification and deterministic Replay; durable resume.
+- Out of scope: paid APIs, screeners, auto-ordering, programmatic browser/ChatGPT control, clipboard polling, Accessibility automation, daemons, multi-user/SaaS and forced MIE values.
+- Remaining B42–B81 work is to be audited as one integrated decision chain. Only release blockers affecting decision correctness, evidence/provenance, calculation integrity, report parity, resume or replay are to be fixed. Missing source data remains UNKNOWN; completed work is not to be rebuilt.
+- Release requires exact-head CI/red-team, representative EPS_MULTIPLE and (where inputs exist) SOTP real tasks, Finder relaunch/interruption/resume, Round A/B raw response provenance, bundle integrity, deterministic Replay MATCH, and explicit fail-closed negative cases.
+- PR #588 remains Draft/unmerged pending release gates. On 2026-11-12 compare reports 136 commits ahead / 0 behind, while PR diff lists 19 files; reconcile history/diff before merge.
+- B83-7 exact-head Local Investment Pilot: 418 passed; 6/6 triggered workflows passed. This is Ubuntu CI, not Mac acceptance.
+- Detailed plan: `docs/iios/IIOS_V03_FINAL_DELIVERY_PLAN_20261112.md`.
