@@ -334,9 +334,9 @@ class TaskWorkspace:
         artifacts: Mapping[str, bytes | str] | None = None,
         details: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        if stage not in STAGES and stage != "BLOCKED":
+        if not isinstance(stage, str) or (stage not in STAGES and stage != "BLOCKED"):
             raise TaskWorkspaceError("TASK_STAGE_UNSUPPORTED")
-        if task_status not in TASK_STATUSES:
+        if not isinstance(task_status, str) or task_status not in TASK_STATUSES:
             raise TaskWorkspaceError("TASK_STATUS_UNSUPPORTED")
         _validate_stage_status(stage, task_status)
         current = self.inspect()
