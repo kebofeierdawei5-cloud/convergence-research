@@ -405,7 +405,12 @@ def _normalize_guided_symbol(value: Any, market: str) -> str:
     elif market == "HK":
         match = re.fullmatch(r"HK(\d{4,5})", raw)
         if match:
-            return f"{match.group(1)}.HK"
+            return f"{match.group(1).zfill(5)}.HK"
+        match = re.fullmatch(r"(\d{4})\.HK", raw)
+        if match:
+            return f"{match.group(1).zfill(5)}.HK"
+        if re.fullmatch(r"\d{4}", raw):
+            return raw.zfill(5)
     return raw
 
 
@@ -9442,9 +9447,11 @@ def _ask_operator_portfolio_context() -> dict[str, Any] | None:
     }
 
 
-def _ask_operator_valuation_context() -> dict[str, Any]:
-    """Collect the primary model choice and project-in-baseline scope from the operator, not the AI."""
-    print("\nB5 主估值模型确认（由你选择，不让 AI 替你选模型）")
+def _ask_operator_valuation_context(
+    *, preferred_model_family: str | None = None
+) -> dict[str, Any]:
+    """Collect this company's primary model and project scope; saved model is only a default hint."""
+    print("\nB5 主估值模型确认（由你按当前公司重新判断，不让 AI 替你选模型）")
     print("  1 = EPS / 市盈率倍数（本批支持项目增量传导）")
     print("  2 = DCF / 自由现金流折现")
     print("  3 = DDM / 股利折现")
@@ -9461,8 +9468,15 @@ def _ask_operator_valuation_context() -> dict[str, Any]:
         "6": "OTHER",
         "0": "UNKNOWN",
     }
+    default_by_family = {value: key for key, value in choices.items()}
+    default_choice = default_by_family.get(str(preferred_model_family or "UNKNOWN").upper(), "0")
+    if preferred_model_family and preferred_model_family != "UNKNOWN":
+        print(
+            f"上次选择 {preferred_model_family} 仅作为本次默认项；"
+            "估值模型必须针对当前公司的业务结构和盈利来源重新确认。"
+        )
     while True:
-        choice = _ask("你确认本次主估值模型类型 0–6", "0")
+        choice = _ask("你确认本次主估值模型类型 0–6", default_choice)
         if choice in choices:
             break
         print("请输入 0 到 6。")
