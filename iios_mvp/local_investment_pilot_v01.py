@@ -7748,6 +7748,7 @@ def _write_run(
     research_response_path: str | Path | None = None,
     expected_research_response_sha256: str | None = None,
     expected_research_response_byte_size: int | None = None,
+    run_id_override: str | None = None,
 ) -> dict[str, Any]:
     try:
         input_text = input_path.read_text(encoding="utf-8")
@@ -7928,10 +7929,52 @@ def _write_run(
     payload_for_analysis.pop("_local_research_round_b_provenance", None)
     symbol = str((payload_for_analysis.get("case") or {}).get("symbol") or "candidate").replace(".", "-")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    run_id = f"local-pilot-{symbol}-{stamp}"
+    run_id = run_id_override or f"local-pilot-{symbol}-{stamp}"
+    if not run_id or run_id in {".", ".."} or Path(run_id).name != run_id or "/" in run_id or "\\" in run_id:
+        raise LocalInvestmentPilotError("PILOT_RUN_ID_INVALID")
     if response_provenance.get("status") == "CAPTURED_RAW_CHATGPT_RESPONSE":
         response_provenance["origin_pilot_id"] = run_id
         response_provenance["source_pilot_id"] = run_id
+
+    # A crash after writing the complete bundle but before the task journal
+    # records RUN_CREATED must reuse the exact same bundle, never duplicate work.
+    run_dir = output_root / run_id
+    if run_dir.is_symlink():
+        raise LocalInvestmentPilotError("PILOT_RUN_DIRECTORY_MUST_NOT_BE_SYMLINK")
+    if run_dir.exists():
+        try:
+            existing_receipt, _existing_manifest = _verify_run_bundle(run_dir)
+            existing_input = (run_dir / "input.json").read_bytes()
+            existing_raw = (
+                (run_dir / RAW_RESEARCH_RESPONSE_FILENAME).read_bytes()
+                if response_bytes is not None else None
+            )
+        except (LocalInvestmentPilotError, OSError) as exc:
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_COLLISION_OR_PARTIAL_BUNDLE") from exc
+        if existing_input != input_text.encode("utf-8") or (
+            response_bytes is not None and existing_raw != response_bytes
+        ):
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_ALREADY_BOUND_TO_DIFFERENT_INPUT")
+        try:
+            existing_analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_EXISTING_ANALYSIS_UNREADABLE") from exc
+        if not isinstance(existing_analysis, dict) or not isinstance(existing_analysis.get("decision"), Mapping):
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_EXISTING_ANALYSIS_INVALID")
+        return {
+            "status": "PILOT_CREATED",
+            "pilot_id": run_id,
+            "provisional_action": existing_analysis["decision"].get("provisional_action"),
+            "replay_of": existing_receipt.get("replay_of"),
+            "replay_comparison": existing_receipt.get("replay_comparison"),
+            "research_response_provenance_status": (existing_receipt.get("research_response_provenance") or {}).get("status"),
+            "run_dir": str(run_dir),
+            "report_path": str(run_dir / "report.md"),
+            "formal_decision_created": False,
+            "canonical_run_receipt_created": False,
+            "auto_execution": False,
+            "idempotent_reuse": True,
+        }
 
     analysis, report = _analyse(payload_for_analysis, run_id)
     analysis["research_rounds"] = _build_research_rounds_summary(payload)
@@ -8031,6 +8074,7 @@ def run_local_investment_pilot(
     research_response_path: str | Path | None = None,
     expected_research_response_sha256: str | None = None,
     expected_research_response_byte_size: int | None = None,
+    run_id_override: str | None = None,
 ) -> dict[str, Any]:
     source = _outside_repo(input_path, "PILOT_INPUT_PATH", must_exist=True)
     root = _private_dir(output_root, "PILOT_OUTPUT_ROOT")
@@ -8041,6 +8085,7 @@ def run_local_investment_pilot(
         research_response_path=research_response_path,
         expected_research_response_sha256=expected_research_response_sha256,
         expected_research_response_byte_size=expected_research_response_byte_size,
+        run_id_override=run_id_override,
     )
 
 
