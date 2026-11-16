@@ -44,30 +44,35 @@ for path in "$PRIVATE_ROOT" "$SOURCE_ROOT"; do
 done
 
 printf '正在取得 B83 历史包迁移修复版本……\n'
-REMOTE_SHA="$(git ls-remote "$REPO_URL" "refs/heads/$B83_BRANCH" | awk 'NR == 1 {print $1}')"
+REMOTE_LIST=""
+if ! REMOTE_LIST="$(git ls-remote "$REPO_URL" "refs/heads/$B83_BRANCH")"; then
+  fail '无法连接 GitHub 查询 B83 分支。请检查网络后重试。'
+fi
+REMOTE_SHA="$(printf '%s\n' "$REMOTE_LIST" | awk 'NR == 1 {print $1}')"
 if [[ ! "$REMOTE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
-  fail '无法从 GitHub 取得 B83 分支的准确提交 SHA。请检查网络后重试。'
+  fail 'GitHub 未返回有效的 B83 分支提交 SHA。'
 fi
 REMOTE_SHA="$(printf '%s' "$REMOTE_SHA" | tr 'A-F' 'a-f')"
 TARGET="$SOURCE_ROOT/convergence-research-b83-$REMOTE_SHA"
+TARGET_REPO="$TARGET/repo"
 
 if [[ -L "$TARGET" ]]; then
   fail "检测到同名代码目录是符号链接，为避免跟随路径写入已停止：$TARGET"
 fi
 
 if [[ -e "$TARGET" ]]; then
-  if [[ ! -d "$TARGET" ]]; then
-    fail "目标代码路径已存在但不是目录，未覆盖：$TARGET"
+  if [[ -L "$TARGET_REPO" || ! -d "$TARGET_REPO" ]]; then
+    fail "同名隔离代码目录结构不符合预期，未覆盖：$TARGET"
   fi
-  LOCAL_SHA="$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || true)"
-  LOCAL_ORIGIN="$(git -C "$TARGET" remote get-url origin 2>/dev/null || true)"
-  LOCAL_STATUS="$(git -C "$TARGET" status --porcelain --untracked-files=all 2>/dev/null || true)"
+  LOCAL_SHA="$(git -C "$TARGET_REPO" rev-parse HEAD 2>/dev/null || true)"
+  LOCAL_ORIGIN="$(git -C "$TARGET_REPO" remote get-url origin 2>/dev/null || true)"
+  LOCAL_STATUS="$(git -C "$TARGET_REPO" status --porcelain --untracked-files=all 2>/dev/null || true)"
   if [[ "$LOCAL_SHA" != "$REMOTE_SHA" || "$LOCAL_ORIGIN" != "$REPO_URL" || -n "$LOCAL_STATUS" ]]; then
-    fail "已有隔离代码副本与预期提交不一致或含本地改动；未覆盖：$TARGET"
+    fail "已有隔离代码副本与预期提交不一致或含本地改动；未覆盖：$TARGET_REPO"
   fi
-  printf '复用已校验的隔离代码副本：%s\n' "$TARGET"
+  printf '复用已校验的隔离代码副本：%s\n' "$TARGET_REPO"
 else
-  STAGING="$SOURCE_ROOT/.b83-legacy-bootstrap-$$"
+  STAGING="$SOURCE_ROOT/.b83-legacy-bootstrap-$"
   if [[ -e "$STAGING" || -L "$STAGING" ]]; then
     fail "临时克隆路径已存在，未覆盖：$STAGING"
   fi
@@ -83,16 +88,18 @@ else
   if [[ -e "$TARGET" || -L "$TARGET" ]]; then
     fail "创建期间目标代码目录已出现，未覆盖：$TARGET"
   fi
-  mv "$STAGING" "$TARGET" || fail "无法原子建立私有代码副本。临时目录如已生成将保留。"
+  mkdir "$TARGET" || fail "无法为隔离代码副本保留唯一目标目录：$TARGET"
   chmod 700 "$TARGET" || fail "无法限制隔离代码目录权限：$TARGET"
-  printf '已建立隔离代码副本：%s\n' "$TARGET"
+  mv "$STAGING" "$TARGET_REPO" || fail "无法将已校验的代码副本放入隔离目录；原始运行包未修改。"
+  chmod 700 "$TARGET_REPO" || fail "无法限制隔离代码副本权限：$TARGET_REPO"
+  printf '已建立隔离代码副本：%s\n' "$TARGET_REPO"
 fi
 
-if [[ ! -f "$TARGET/iios_mvp/local_run_replay_acceptance_v01.py" || ! -f "$TARGET/iios_mvp/legacy_pilot_bundle_migration_v01.py" ]]; then
+if [[ ! -f "$TARGET_REPO/iios_mvp/local_run_replay_acceptance_v01.py" || ! -f "$TARGET_REPO/iios_mvp/legacy_pilot_bundle_migration_v01.py" ]]; then
   fail '隔离副本缺少历史包迁移/验收模块。'
 fi
 
-VERIFIED_SHA="$(git -C "$TARGET" rev-parse HEAD)"
+VERIFIED_SHA="$(git -C "$TARGET_REPO" rev-parse HEAD)"
 if [[ "$VERIFIED_SHA" != "$REMOTE_SHA" ]]; then
   fail '隔离副本的最终提交 SHA 与远端分支不一致。'
 fi
@@ -102,8 +109,8 @@ printf '固定旧运行：%s\n' "$PILOT_ID"
 printf '原始运行包和失败日志将保留；历史哈希不会补造。\n'
 printf '即将执行：迁移快照 → 当前版本重建 → 首轮哈希 → Replay → Replay 哈希 → 私有审计 ZIP。\n\n'
 
-cd "$TARGET"
-export PYTHONPATH="$TARGET"
+cd "$TARGET_REPO"
+export PYTHONPATH="$TARGET_REPO"
 export PYTHONUNBUFFERED=1
 export IIOS_ACCEPTANCE_EXISTING_RUN_ID="$PILOT_ID"
 
