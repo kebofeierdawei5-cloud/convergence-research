@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import zipfile
 from decimal import Decimal
 from datetime import date
 from pathlib import Path
