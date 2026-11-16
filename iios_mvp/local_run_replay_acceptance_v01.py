@@ -18,6 +18,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from .legacy_pilot_bundle_migration_v01 import (
+    LegacyPilotMigrationError,
+    classify_legacy_pilot_bundle,
+    create_legacy_pilot_migration_snapshot,
+    verify_legacy_pilot_migration_snapshot,
+)
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 PRIVATE_ROOT = Path.home() / ".iios-private"
 PILOT_ROOT = PRIVATE_ROOT / "local-pilot"
@@ -358,6 +365,19 @@ def _render_audit_summary_markdown(summary: Mapping[str, Any]) -> str:
             replay_value = "UNKNOWN"
         lines.append(f"| {label} | {first_value} | {replay_value} |")
 
+    migration = summary.get("legacy_migration")
+    if isinstance(migration, dict):
+        lines.extend([
+            "",
+            "## 历史运行包迁移",
+            "",
+            f"- 原始运行 ID：{migration.get('source_pilot_id') or 'UNKNOWN'}",
+            f"- 历史哈希验证：**{migration.get('historical_hash_verification') or 'UNKNOWN'}**",
+            f"- 迁移快照哈希：**{migration.get('snapshot_integrity') or 'UNKNOWN'}**",
+            "- 当前首轮运行：从迁移快照中的 input.json 使用当前代码重新计算；不代表历史运行哈希验证通过。",
+            "",
+        ])
+
     lines.extend([
         "",
         f"- Replay 比较：**{comparison.get('status', 'UNKNOWN')}**",
@@ -463,6 +483,7 @@ def _create_acceptance_bundle(
     log_paths: Iterable[Path],
     comparison: dict[str, Any],
     prompt_issues: list[str],
+    legacy_snapshot: Path | None = None,
 ) -> Path:
     """Create a private audit ZIP containing both runs and their full acceptance evidence."""
     original_dir = original_dir.expanduser().resolve(strict=True)
@@ -585,6 +606,43 @@ def _create_acceptance_bundle(
             ),
         }
 
+    legacy_migration_summary: dict[str, Any] | None = None
+    if legacy_snapshot is not None:
+        legacy_snapshot = legacy_snapshot.expanduser().resolve(strict=True)
+        try:
+            migration_check = verify_legacy_pilot_migration_snapshot(legacy_snapshot)
+            migration_manifest = _read_json(
+                legacy_snapshot / "migration_manifest.json", "LEGACY_MIGRATION_MANIFEST"
+            )
+        except (LegacyPilotMigrationError, OSError) as exc:
+            raise AcceptanceError(f"ACCEPTANCE_BUNDLE_LEGACY_SNAPSHOT_INVALID:{exc}") from exc
+        migration_files = migration_manifest.get("files")
+        if not isinstance(migration_files, dict):
+            raise AcceptanceError("ACCEPTANCE_BUNDLE_LEGACY_SNAPSHOT_MANIFEST_INVALID")
+        prefix = f"legacy_migration/{legacy_snapshot.name}"
+        for filename, expected in migration_files.items():
+            source_path = legacy_snapshot / filename
+            if source_path.is_symlink() or not source_path.is_file():
+                raise AcceptanceError(f"ACCEPTANCE_BUNDLE_LEGACY_SNAPSHOT_FILE_MISSING:{filename}")
+            payload = source_path.read_bytes()
+            if (
+                not isinstance(expected, dict)
+                or len(payload) != expected.get("byte_size")
+                or hashlib.sha256(payload).hexdigest() != expected.get("sha256")
+            ):
+                raise AcceptanceError(f"ACCEPTANCE_BUNDLE_LEGACY_SNAPSHOT_HASH_MISMATCH:{filename}")
+            entries[f"{prefix}/{filename}"] = payload
+        manifest_payload = (legacy_snapshot / "migration_manifest.json").read_bytes()
+        entries[f"{prefix}/migration_manifest.json"] = manifest_payload
+        legacy_migration_summary = {
+            "snapshot_id": legacy_snapshot.name,
+            "source_pilot_id": migration_check.get("pilot_id"),
+            "historical_hash_verification": migration_check.get("historical_hash_verification"),
+            "snapshot_integrity": migration_check.get("snapshot_integrity"),
+            "snapshot_verified_files": migration_check.get("verified_files"),
+            "rebuild_source": "CURRENT_VERSION_RECOMPUTED_FROM_SNAPSHOT_INPUT",
+        }
+
     log_root = LOG_ROOT.resolve(strict=True)
     log_entries: list[str] = []
     for supplied_path in log_paths:
@@ -614,6 +672,7 @@ def _create_acceptance_bundle(
         "first_run": run_summaries["first_run"],
         "replay_run": run_summaries["replay_run"],
         "replay_comparison": comparison,
+        "legacy_migration": legacy_migration_summary,
         "acceptance_log_files": sorted(log_entries),
         "formal_decision_created": False,
         "canonical_run_receipt_created": False,
@@ -985,6 +1044,102 @@ def _select_run(*, original_only: bool) -> Path:
         print("编号无效，请输入列表中的编号。")
 
 
+def _find_rebuilt_run_for_legacy_snapshot(snapshot_dir: Path) -> Path | None:
+    """Find a prior current-format reconstruction by exact frozen-input bytes."""
+    verify_legacy_pilot_migration_snapshot(snapshot_dir)
+    manifest = _read_json(snapshot_dir / "migration_manifest.json", "LEGACY_MIGRATION_MANIFEST")
+    files = manifest.get("files")
+    expected = files.get("input.json") if isinstance(files, dict) else None
+    if not isinstance(expected, dict):
+        raise AcceptanceError("LEGACY_MIGRATION_INPUT_FINGERPRINT_MISSING")
+    expected_hash = expected.get("sha256")
+    expected_size = expected.get("byte_size")
+    if not isinstance(expected_hash, str) or not isinstance(expected_size, int) or isinstance(expected_size, bool):
+        raise AcceptanceError("LEGACY_MIGRATION_INPUT_FINGERPRINT_INVALID")
+    matches: list[Path] = []
+    if not RUN_ROOT.is_dir():
+        return None
+    for candidate in RUN_ROOT.iterdir():
+        if candidate.is_symlink() or not candidate.is_dir() or not RESULT_ID_PATTERN.fullmatch(candidate.name):
+            continue
+        input_path = candidate / "input.json"
+        receipt_path = candidate / "pilot_receipt.json"
+        if input_path.is_symlink() or receipt_path.is_symlink() or not input_path.is_file() or not receipt_path.is_file():
+            continue
+        try:
+            input_bytes = input_path.read_bytes()
+            receipt = _read_json(receipt_path, "LEGACY_REBUILD_CANDIDATE_RECEIPT")
+        except (OSError, AcceptanceError):
+            continue
+        if (
+            len(input_bytes) == expected_size
+            and hashlib.sha256(input_bytes).hexdigest() == expected_hash
+            and receipt.get("receipt_schema") == RECEIPT_SCHEMA
+            and receipt.get("status") == PILOT_STATUS
+            and receipt.get("pilot_id") == candidate.name
+            and receipt.get("replay_of") is None
+            and isinstance(receipt.get("file_manifest"), dict)
+        ):
+            matches.append(candidate.resolve())
+    if len(matches) > 1:
+        raise AcceptanceError("LEGACY_MIGRATION_MULTIPLE_CURRENT_REBUILDS_MATCH_INPUT")
+    return matches[0] if matches else None
+
+
+def _prepare_replay_source(
+    original_dir: Path,
+    *,
+    audit_logs: list[Path],
+) -> tuple[Path, Path | None]:
+    """Return a current-format first run; legacy source files are snapshotted, never edited."""
+    try:
+        classification = classify_legacy_pilot_bundle(original_dir)
+    except LegacyPilotMigrationError as exc:
+        raise AcceptanceError(f"LEGACY_RUN_CLASSIFICATION_FAILED:{exc}") from exc
+
+    if classification.get("classification") != "LEGACY_UNVERIFIABLE":
+        return original_dir, None
+
+    print("\n[历史格式兼容] 原始 Receipt 未记录 file_manifest。")
+    print("历史文件完整性无法追溯验证；不修改原包，不补写历史哈希。")
+    migration_root = ACCEPTANCE_BUNDLE_ROOT / "legacy-migrations"
+    try:
+        snapshot_result = create_legacy_pilot_migration_snapshot(original_dir, migration_root)
+        snapshot_dir = Path(str(snapshot_result["snapshot_path"])).resolve(strict=True)
+        snapshot_check = verify_legacy_pilot_migration_snapshot(snapshot_dir)
+    except (LegacyPilotMigrationError, OSError, KeyError) as exc:
+        raise AcceptanceError(f"LEGACY_MIGRATION_SNAPSHOT_FAILED:{exc}") from exc
+
+    print(f"  历史归档：{snapshot_dir}")
+    print("  历史哈希状态：UNVERIFIABLE_NO_ORIGINAL_FILE_MANIFEST")
+    print("  迁移快照状态：LEGACY_MIGRATION_SNAPSHOT_HASH_CHECK_PASS")
+
+    # Re-use an exact-input current-format run created by a prior interrupted
+    # attempt. This prevents duplicate recalculation after a process restart.
+    rebuilt_dir = _find_rebuilt_run_for_legacy_snapshot(snapshot_dir)
+    if rebuilt_dir is None:
+        migration_log = _new_log(f"rebuild-legacy-{original_dir.name}")
+        audit_logs.append(migration_log)
+        result = _run_cli(
+            ["--input", str(snapshot_dir / "input.json"), "--output-root", str(RUN_ROOT)],
+            stage=f"rebuild-legacy-{original_dir.name}",
+            expected_statuses={"PILOT_CREATED"},
+            log_paths=audit_logs,
+        )
+        pilot_id = str(result.get("pilot_id") or "")
+        if not RESULT_ID_PATTERN.fullmatch(pilot_id):
+            raise AcceptanceError("LEGACY_REBUILD_PILOT_ID_INVALID")
+        rebuilt_dir = Path(str(result.get("run_dir") or "")).expanduser().resolve(strict=True)
+        if rebuilt_dir != (RUN_ROOT / pilot_id).resolve() or rebuilt_dir.name == original_dir.name:
+            raise AcceptanceError("LEGACY_REBUILD_RUN_PATH_OR_ID_INVALID")
+    else:
+        print(f"  检测到同一输入已生成当前版本运行包，安全复用：{rebuilt_dir.name}")
+
+    print(f"  当前版本重新计算：{rebuilt_dir}")
+    print("  注意：该运行包是使用当前代码从迁移快照 input.json 重新计算，不是历史运行结果。")
+    return rebuilt_dir, snapshot_dir
+
+
 def _verify_and_replay(
     original_dir: Path,
     *,
@@ -997,7 +1152,13 @@ def _verify_and_replay(
     if not RESULT_ID_PATTERN.fullmatch(original_dir.name):
         raise AcceptanceError("PILOT_ID_FORMAT_INVALID")
 
-    print("\n[1/4] 校验首次运行包：input.json / analysis.json / report.md 与 receipt 的哈希和字节数")
+    legacy_source_dir = original_dir
+    original_dir, legacy_snapshot = _prepare_replay_source(
+        original_dir,
+        audit_logs=audit_logs,
+    )
+
+    print("\n[1/4] 校验当前版本首轮运行包：input.json / analysis.json / report.md 与 receipt 的哈希和字节数")
     _run_cli(
         ["--check-run", str(original_dir)],
         stage=f"check-original-{original_dir.name}",
@@ -1063,10 +1224,15 @@ def _verify_and_replay(
         log_paths=audit_logs,
         comparison=comparison,
         prompt_issues=prompt_issues,
+        legacy_snapshot=legacy_snapshot,
     )
 
     print("\n[4/4] 全流程结果")
     print(f"  首次运行：{original_dir}")
+    if legacy_snapshot is not None:
+        print(f"  原始历史运行包（未修改）：{legacy_source_dir}")
+        print(f"  历史迁移快照（单独归档）：{legacy_snapshot}")
+        print("  历史哈希：无法追溯验证；当前首轮和 Replay 的哈希验证独立完成。")
     print(f"  Replay 运行：{replay_dir}")
     print(f"  首次报告：{original_dir / 'report.md'}")
     print(f"  首次分析：{original_dir / 'analysis.json'}")
