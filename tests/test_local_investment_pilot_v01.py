@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import zipfile
 from decimal import Decimal
 from datetime import date
 from pathlib import Path
@@ -12,12 +14,18 @@ import time as _time
 import pytest
 
 import iios_mvp.local_investment_pilot_v01 as pilot
+from iios_mvp import local_run_replay_acceptance_v01 as acceptance
 from iios_mvp.operating_driver_forecast_v01 import render_operating_driver_section, evaluate_operating_driver_forecast
 
 from iios_mvp.local_investment_pilot_v01 import (
     LocalInvestmentPilotError,
     PILOT_SCHEMA,
     _normalize_guided_symbol,
+    _infer_guided_market,
+    _parse_guided_cutoff_input,
+    _parse_guided_price_input,
+    _default_guided_price_date,
+    _default_guided_cutoff_date,
     _previous_weekday,
     _read_json_response_file,
     _response_file_signature,
@@ -256,6 +264,132 @@ def test_guided_entry_normalizes_common_symbol_formats(market, raw, expected):
     assert _normalize_guided_symbol(raw, market) == expected
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected_market"),
+    [
+        ("002810", "CN-A"),
+        ("002810.SZ", "CN-A"),
+        ("SZ002810", "CN-A"),
+        ("600000.SH", "CN-A"),
+        ("430047.BJ", "CN-A"),
+        ("00700", "HK"),
+        ("00700.HK", "HK"),
+        ("HK00700", "HK"),
+        ("0700.HK", "HK"),
+    ],
+)
+def test_guided_market_inference_uses_unambiguous_ticker_shape(raw, expected_market):
+    assert _infer_guided_market(raw) == expected_market
+
+
+def test_guided_market_inference_rejects_ambiguous_or_invalid_ticker():
+    with pytest.raises(LocalInvestmentPilotError, match="MARKET_CANNOT_BE_INFERRED"):
+        _infer_guided_market("ABC123")
+
+
+def test_hk_four_digit_ticker_is_padded_to_standard_five_digit_form():
+    assert _normalize_guided_symbol("HK0700", "HK") == "00700.HK"
+    assert _normalize_guided_symbol("0700.HK", "HK") == "00700.HK"
+    assert _normalize_guided_symbol("0700", "HK") == "00700"
+
+
+def test_guided_cutoff_date_defaults_to_shanghai_close_and_exact_instant_is_preserved():
+    cutoff, instant, normalized = _parse_guided_cutoff_input(
+        "2026-10-12", default_date=date(2026, 11, 9)
+    )
+    assert cutoff == date(2026, 10, 12)
+    assert normalized == "2026-10-12T15:30:00+08:00"
+    assert instant.isoformat() == normalized
+
+    cutoff2, instant2, normalized2 = _parse_guided_cutoff_input(
+        "2026-10-12T00:00:00+08:00", default_date=date(2026, 11, 9)
+    )
+    assert cutoff2 == date(2026, 10, 12)
+    assert instant2.hour == 0 and normalized2.endswith("T00:00:00+08:00")
+
+
+def test_default_cutoff_never_points_to_future_close():
+    before_close = pilot.datetime(2026, 11, 9, 14, 30, tzinfo=pilot.SHANGHAI)
+    after_close = pilot.datetime(2026, 11, 9, 15, 30, tzinfo=pilot.SHANGHAI)
+    saturday = pilot.datetime(2026, 11, 14, 18, 0, tzinfo=pilot.SHANGHAI)
+    assert _default_guided_cutoff_date(before_close) == date(2026, 11, 6)
+    assert _default_guided_cutoff_date(after_close) == date(2026, 11, 9)
+    assert _default_guided_cutoff_date(saturday) == date(2026, 11, 13)
+
+
+def test_guided_cutoff_empty_default_uses_supplied_shanghai_date():
+    cutoff, instant, normalized = _parse_guided_cutoff_input(
+        "", default_date=date(2026, 11, 9)
+    )
+    assert cutoff == date(2026, 11, 9)
+    assert instant.hour == 15 and instant.minute == 30
+    assert normalized == "2026-11-09T15:30:00+08:00"
+
+
+def test_guided_price_single_field_uses_default_date_and_close_time():
+    cutoff = date(2026, 10, 12)
+    instant = pilot.datetime(2026, 10, 12, 15, 30, tzinfo=pilot.SHANGHAI)
+    price, observation, known_at, mode = _parse_guided_price_input(
+        "19.74",
+        default_observation_date=cutoff,
+        cutoff=cutoff,
+        cutoff_instant=instant,
+    )
+    assert (price, observation, known_at, mode) == (
+        "19.74", date(2026, 10, 12), "2026-10-12T15:00:00+08:00", "DEFAULT_CLOSE"
+    )
+
+
+def test_guided_price_can_include_date_or_exact_timestamp_in_same_field():
+    cutoff = date(2026, 10, 12)
+    instant = pilot.datetime(2026, 10, 12, 15, 30, tzinfo=pilot.SHANGHAI)
+    date_result = _parse_guided_price_input(
+        "19.74@2026-10-09",
+        default_observation_date=date(2026, 10, 12),
+        cutoff=cutoff,
+        cutoff_instant=instant,
+    )
+    assert date_result == (
+        "19.74", date(2026, 10, 9), "2026-10-09T15:00:00+08:00", "DATE_CLOSE"
+    )
+
+    exact_result = _parse_guided_price_input(
+        "19.74@2026-10-12T14:30:00+08:00",
+        default_observation_date=cutoff,
+        cutoff=cutoff,
+        cutoff_instant=instant,
+    )
+    assert exact_result == (
+        "19.74", cutoff, "2026-10-12T14:30:00+08:00", "EXACT_INSTANT"
+    )
+
+
+def test_guided_price_rejects_time_after_cutoff_and_weekend_date():
+    cutoff = date(2026, 10, 12)
+    instant = pilot.datetime(2026, 10, 12, 14, 0, tzinfo=pilot.SHANGHAI)
+    with pytest.raises(LocalInvestmentPilotError, match="PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP"):
+        _parse_guided_price_input(
+            "19.74",
+            default_observation_date=cutoff,
+            cutoff=cutoff,
+            cutoff_instant=instant,
+        )
+    with pytest.raises(LocalInvestmentPilotError, match="TRADING_WEEKDAY"):
+        _parse_guided_price_input(
+            "19.74@2026-10-11",
+            default_observation_date=cutoff,
+            cutoff=cutoff,
+            cutoff_instant=instant,
+        )
+
+
+def test_default_guided_price_date_respects_intraday_cutoff():
+    before_close = pilot.datetime(2026, 10, 12, 14, 30, tzinfo=pilot.SHANGHAI)
+    after_close = pilot.datetime(2026, 10, 12, 15, 30, tzinfo=pilot.SHANGHAI)
+    assert _default_guided_price_date(date(2026, 10, 12), before_close) == date(2026, 10, 9)
+    assert _default_guided_price_date(date(2026, 10, 12), after_close) == date(2026, 10, 12)
+
+
 def test_default_price_date_skips_weekends_but_does_not_guess_exchange_holidays():
     assert _previous_weekday(date(2026, 10, 12)) == date(2026, 10, 9)
     assert _previous_weekday(date(2026, 10, 13)) == date(2026, 10, 12)
@@ -280,15 +414,50 @@ def test_response_file_reader_rejects_empty_file_with_actionable_error(tmp_path)
         _read_json_response_file(response_path)
 
 
-def test_guided_wizard_uses_separate_files_for_two_chatgpt_responses_not_pbpaste():
-    source = Path(__file__).resolve().parents[1] / "iios_mvp" / "local_investment_pilot_v01.py"
-    content = source.read_text(encoding="utf-8")
-    assert "pbpaste" not in content
-    assert "_read_json_response_file(response_path)" in content
-    assert 'str(round_a_response_path)]' in content
-    assert 'str(round_b_response_path)]' in content
-    assert "ROUND_A_PROVENANCE_SCHEMA" in content
-    assert "ROUND_B_PROVENANCE_SCHEMA" in content
+def test_guided_wizard_uses_separate_response_files_and_explicit_one_shot_clipboard():
+    root = Path(__file__).resolve().parents[1] / "iios_mvp"
+    pilot_source = (root / "local_investment_pilot_v01.py").read_text(encoding="utf-8")
+    resume_source = (root / "guided_task_resume_v01.py").read_text(encoding="utf-8")
+    assert 'subprocess.run(\n            ["pbpaste"]' in pilot_source
+    assert "_capture_clipboard_response_once" in pilot_source
+    assert "pbpaste" not in resume_source.lower()
+    assert 'pilot._extract_json_object(raw.decode("utf-8"))' in resume_source
+    assert '"round-a-response.json"' in resume_source
+    assert '"round-b-response.json"' in resume_source
+    assert "_capture_or_reuse_response" in resume_source
+    assert "ROUND_A_PROVENANCE_SCHEMA" in pilot_source
+    assert "ROUND_B_PROVENANCE_SCHEMA" in pilot_source
+
+
+def test_clipboard_capture_is_one_shot_and_does_not_log_response(monkeypatch, tmp_path, capsys):
+    response_path = tmp_path / "response.json"
+    secret_response = b'{"research":"private-test-value"}'
+    calls = []
+
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout=secret_response, stderr=b"")
+
+    monkeypatch.setattr(pilot.subprocess, "run", fake_run)
+    assert pilot._capture_clipboard_response_once(response_path) is True
+    assert calls == [["pbpaste"]]
+    assert response_path.read_bytes() == secret_response
+    assert "private-test-value" not in capsys.readouterr().out
+
+
+def test_clipboard_capture_never_overwrites_existing_response(monkeypatch, tmp_path):
+    response_path = tmp_path / "response.json"
+    response_path.write_text('{"existing":true}', encoding="utf-8")
+    calls = []
+    monkeypatch.setattr(pilot.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        pilot.subprocess, "run",
+        lambda command, **kwargs: calls.append(command),
+    )
+    assert pilot._capture_clipboard_response_once(response_path) is True
+    assert calls == []
+    assert response_path.read_text(encoding="utf-8") == '{"existing":true}'
 
 
 def test_evidence_references_in_assessment_and_valuation_are_resolved_or_explicitly_unresolved():
@@ -1095,7 +1264,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     import iios_mvp.local_investment_pilot_v01 as pilot
 
     source_claim = "用户手动提供的 19.74；按 收盘价 15:00 处理；未从交易所或行情供应商独立核验"
-    answers = iter(["山东赫达", "SZ002810", "1", "2026-10-12", "2", "0", "19.74", "2026-10-12", "1", "1", "0", "0"])
+    answers = iter(["山东赫达", "SZ002810", "2026-10-12", "0", "19.74", "1", "0", "0", "0"])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
 
     def simulate_saved_response(response_path, *, previous_signature):
@@ -1131,7 +1300,7 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     result = run_guided_wizard(template_root=tmp_path / "inputs", output_root=tmp_path / "runs")
 
     assert result["status"] == "PILOT_CREATED"
-    completed_files = list((tmp_path / "inputs").glob("pilot-completed-*.json"))
+    completed_files = list((tmp_path / "inputs" / "tasks").glob("*/working/completed_input.json"))
     assert len(completed_files) == 1
     saved = json.loads(completed_files[0].read_text(encoding="utf-8"))
     assert saved["price_input"]["price"] == "19.74"
@@ -1140,8 +1309,10 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert result["formal_decision_created"] is False and result["auto_execution"] is False
     output = capsys.readouterr().out
     assert "Round A 价格盲研究提示" in output and "Round B 价格感知估值/MIE/预期差提示" in output
-    round_a_paths = list((tmp_path / "inputs").glob("pilot-prompt-round-a-*.md"))
-    round_b_paths = list((tmp_path / "inputs").glob("pilot-prompt-round-b-*.md"))
+    task_dirs = list((tmp_path / "inputs" / "tasks").glob("task-*"))
+    assert len(task_dirs) == 1
+    round_a_paths = [task_dirs[0] / "artifacts" / "round_a_prompt_ready" / "prompt.md"]
+    round_b_paths = [task_dirs[0] / "artifacts" / "round_b_prompt_ready" / "prompt.md"]
     assert len(round_a_paths) == 1 and len(round_b_paths) == 1
     round_a_text = round_a_paths[0].read_text(encoding="utf-8")
     round_b_text = round_b_paths[0].read_text(encoding="utf-8")
@@ -1165,6 +1336,30 @@ def test_guided_wizard_collects_manual_price_source_claim_and_completes(tmp_path
     assert analysis["research_rounds"]["round_b"]["response_sha256"]
     assert receipt["research_rounds"] == analysis["research_rounds"]
     assert pilot.verify_local_pilot_bundle(run_dir)["status"] == "PILOT_BUNDLE_HASH_CHECK_PASS"
+    task_id = task_dirs[0].name
+    task_manifest = json.loads((task_dirs[0] / "task_manifest.json").read_text(encoding="utf-8"))
+    assert task_manifest["current_stage"] == "COMPLETED"
+    assert task_manifest["task_status"] == "COMPLETED"
+    accepted_response = task_dirs[0] / "working" / "round-b-response-accepted.json"
+    accepted_bytes = accepted_response.read_bytes()
+    import hashlib
+    original_analyse = pilot._analyse
+    monkeypatch.setattr(
+        pilot,
+        "_analyse",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("analysis must not rerun on idempotent resume")),
+    )
+    reused = pilot.run_local_investment_pilot(
+        input_path=completed_files[0],
+        output_root=tmp_path / "runs",
+        research_response_path=accepted_response,
+        expected_research_response_sha256=hashlib.sha256(accepted_bytes).hexdigest(),
+        expected_research_response_byte_size=len(accepted_bytes),
+        run_id_override=result["pilot_id"],
+    )
+    monkeypatch.setattr(pilot, "_analyse", original_analyse)
+    assert reused["idempotent_reuse"] is True
+    assert reused["pilot_id"] == result["pilot_id"]
     replay = pilot.run_local_investment_pilot(
         input_path=run_dir / "input.json",
         output_root=tmp_path / "runs",
@@ -1179,14 +1374,10 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
     answers = iter([
         "山东赫达",
         "SZ002810",
-        "1",
-        "2026-10-12",
-        "1",
+        "2026-10-12T00:00:00+08:00",
         "0",
-        "19.74",
-        "2026-10-12",
-        "2026-10-09",
-        "",
+        "19.74@2026-10-12",
+        "19.74@2026-10-09",
         "0",
     ])
     monkeypatch.setattr(builtins, "input", lambda _prompt: next(answers))
@@ -1196,8 +1387,8 @@ def test_guided_wizard_reprompts_same_day_price_before_confirming(tmp_path, monk
     )
     output = capsys.readouterr().out
     assert result["status"] == "CANCELLED"
-    assert "价格观察日期不合法" in output
-    assert "PRICE_OBSERVATION_MUST_PRECEDE_DATE_ONLY_CUTOFF" in output
+    assert "价格输入不合法" in output
+    assert "PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP" in output
     assert "观察日 2026-10-09" in output
     assert not (tmp_path / "inputs").exists()
 
@@ -4957,3 +5148,141 @@ def test_round_b_prompt_receives_price_only_after_round_a_artifact_is_frozen():
     assert "operator_valuation_context" not in phase_b and "decision_parameters" not in phase_b
 
 
+
+
+
+def test_manifestless_legacy_migration_runs_real_calculation_and_replay_engine(tmp_path, monkeypatch):
+    """Use the real pilot calculation/replay functions; stub only the CLI transport."""
+    input_path = _write_input(tmp_path)
+    run_root = tmp_path / "private-runs"
+    log_root = tmp_path / "acceptance-logs"
+    bundle_root = tmp_path / "acceptance-bundles"
+    for directory in (run_root, log_root, bundle_root):
+        directory.mkdir(mode=0o700)
+        if os.name != "nt":
+            directory.chmod(0o700)
+
+    original = run_local_investment_pilot(input_path=input_path, output_root=run_root)
+    original_dir = Path(original["run_dir"])
+    receipt_path = original_dir / "pilot_receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert isinstance(receipt.get("file_manifest"), dict)
+    receipt.pop("file_manifest")
+    receipt_path.write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding="utf-8")
+    if os.name != "nt":
+        receipt_path.chmod(0o600)
+    legacy_receipt_bytes = receipt_path.read_bytes()
+    original_input_bytes = (original_dir / "input.json").read_bytes()
+
+    prior_failure_log = log_root / f"20261116T151205782281Z-check-original-{original_dir.name}.log"
+    prior_failure_log.write_text(
+        '{"status":"BLOCKED","reason":"RUN_BUNDLE_HASH_MANIFEST_MISSING"}\n',
+        encoding="utf-8",
+    )
+    if os.name != "nt":
+        prior_failure_log.chmod(0o600)
+
+    monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
+    monkeypatch.setattr(acceptance, "LOG_ROOT", log_root)
+    monkeypatch.setattr(acceptance, "ACCEPTANCE_BUNDLE_ROOT", bundle_root)
+    monkeypatch.setattr(acceptance, "_prompt_completion_issues", lambda analysis: [])
+    monkeypatch.setattr(acceptance, "_open_audit_summary_sidecar", lambda sidecar: False)
+    monkeypatch.setattr(
+        acceptance,
+        "_new_log",
+        lambda stage: log_root / f"{stage}.log",
+    )
+
+    engine_calls: list[str] = []
+
+    def real_engine_cli_adapter(command, *, stage, expected_statuses, log_paths=None):
+        log_path = acceptance._new_log(stage)
+        log_path.write_text(f"actual local pilot function invoked for {stage}\n", encoding="utf-8")
+        if os.name != "nt":
+            log_path.chmod(0o600)
+        if log_paths is not None:
+            log_paths.append(log_path)
+
+        if command[0] == "--input":
+            engine_calls.append("FIRST_RUN_CALCULATION")
+            return run_local_investment_pilot(
+                input_path=Path(command[1]),
+                output_root=run_root,
+            )
+
+        if command[0] == "--check-run":
+            engine_calls.append("STRICT_BUNDLE_VERIFICATION")
+            return verify_local_pilot_bundle(Path(command[1]))
+
+        if command[0] == "--replay-run":
+            first_dir = Path(command[1])
+            engine_calls.append("REPLAY_CALCULATION")
+            return run_local_investment_pilot(
+                input_path=first_dir / "input.json",
+                output_root=run_root,
+                replay_of=first_dir.name,
+            )
+
+        raise AssertionError(f"unexpected acceptance CLI command: {command!r}")
+
+    monkeypatch.setattr(acceptance, "_run_cli", real_engine_cli_adapter)
+
+    result = acceptance._verify_and_replay(original_dir)
+
+    assert result == 0
+    assert engine_calls == [
+        "FIRST_RUN_CALCULATION",
+        "STRICT_BUNDLE_VERIFICATION",
+        "REPLAY_CALCULATION",
+        "STRICT_BUNDLE_VERIFICATION",
+    ]
+    assert receipt_path.read_bytes() == legacy_receipt_bytes
+    assert (original_dir / "input.json").read_bytes() == original_input_bytes
+    assert "file_manifest" not in json.loads(legacy_receipt_bytes.decode("utf-8"))
+
+    migration_dirs = list((bundle_root / "legacy-migrations").iterdir())
+    assert len(migration_dirs) == 1
+    snapshot = migration_dirs[0]
+    from iios_mvp.legacy_pilot_bundle_migration_v01 import verify_legacy_pilot_migration_snapshot
+
+    snapshot_result = verify_legacy_pilot_migration_snapshot(snapshot)
+    assert snapshot_result["status"] == "LEGACY_MIGRATION_SNAPSHOT_HASH_CHECK_PASS"
+    assert snapshot_result["historical_hash_verification"] == "UNVERIFIABLE_NO_ORIGINAL_FILE_MANIFEST"
+
+    first_dirs = [
+        path for path in run_root.iterdir()
+        if path.is_dir() and path.name != original_dir.name and (path / "pilot_receipt.json").is_file()
+        and json.loads((path / "pilot_receipt.json").read_text(encoding="utf-8")).get("replay_of") is None
+    ]
+    replay_dirs = [
+        path for path in run_root.iterdir()
+        if path.is_dir() and (path / "pilot_receipt.json").is_file()
+        and json.loads((path / "pilot_receipt.json").read_text(encoding="utf-8")).get("replay_of") is not None
+    ]
+    assert len(first_dirs) == 1
+    assert len(replay_dirs) == 1
+    first_dir, replay_dir = first_dirs[0], replay_dirs[0]
+    first_analysis = json.loads((first_dir / "analysis.json").read_text(encoding="utf-8"))
+    replay_analysis = json.loads((replay_dir / "analysis.json").read_text(encoding="utf-8"))
+    replay_receipt = json.loads((replay_dir / "pilot_receipt.json").read_text(encoding="utf-8"))
+    assert replay_receipt["replay_of"] == first_dir.name
+    assert replay_receipt["replay_comparison"]["status"] == "MATCH"
+    assert replay_receipt["replay_comparison"]["hash_verification"] == "PASS"
+    assert replay_receipt["replay_comparison"]["mismatched_fields"] == []
+    assert replay_analysis["return_metrics"] == first_analysis["return_metrics"]
+    assert replay_analysis["decision"] == first_analysis["decision"]
+    assert verify_local_pilot_bundle(first_dir)["status"] == "PILOT_BUNDLE_HASH_CHECK_PASS"
+    assert verify_local_pilot_bundle(replay_dir)["status"] == "PILOT_BUNDLE_HASH_CHECK_PASS"
+
+    archives = list(bundle_root.glob("*.zip"))
+    assert len(archives) == 1
+    with zipfile.ZipFile(archives[0], "r") as archive:
+        assert archive.testzip() is None
+        names = set(archive.namelist())
+        assert any(name.endswith(f"/{prior_failure_log.name}") for name in names)
+        assert any(name.endswith(f"/{snapshot.name}/migration_manifest.json") for name in names)
+        summary = json.loads(archive.read("acceptance_summary.json"))
+        assert summary["overall_status"] == "PASS"
+        assert summary["technical_status"] == "PASS"
+        assert summary["legacy_migration"]["historical_hash_verification"] == "UNVERIFIABLE_NO_ORIGINAL_FILE_MANIFEST"
+        assert summary["legacy_migration"]["snapshot_integrity"] == "VERIFIED_AT_MIGRATION_TIME"

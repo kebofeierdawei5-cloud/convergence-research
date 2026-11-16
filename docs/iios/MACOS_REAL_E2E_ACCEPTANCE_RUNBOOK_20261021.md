@@ -2,6 +2,28 @@
 
 > **本手册是当前执行入口。** 权限故障与 ChatGPT JSON 交接问题的处理方式以本文件为准；若旧指南与本文冲突，使用本文。验收必须在操作者自己的 Mac 上完成。GitHub CI 通过不等于 Mac 验收通过。
 
+## 0. 本次专用：2026-10-12 旧运行包迁移验收
+
+本节只适用于旧运行 ID：
+
+`local-pilot-002810-20261012T141631129796Z`
+
+此次修复在 B83 开发分支，尚未进入 canonical `main`。**不要使用普通的 `验收IIOS全流程与Replay.command` 或当前主线一键启动器**来处理这份旧包：它们会先把工作区更新到 `origin/main`，可能切换到尚不包含本次修复的代码。
+
+使用专用、固定目标的一键发行包：
+
+1. 打开 [IIOS B83 legacy-run migration launcher 工作流](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/workflows/b83-legacy-migration-launcher.yml)，选择 B83 分支最新一次成功运行，下载名称为 `IIOS-B83-legacy-migration-launcher-<提交 SHA>` 的 artifact。
+2. 解压下载的外层 ZIP，再解压里面的发行 ZIP。
+3. 双击唯一启动文件 **B83_旧运行包迁移验收.command**。若 macOS 提示没有执行权限，按本手册第 1 节的 `/bin/bash` 回退方法运行，不要反复 chmod，也不要关闭 Gatekeeper。
+
+这个启动器会从公开 GitHub 仓库核对 B83 分支准确 SHA，在 `~/.iios-private/source/` 建立或复用独立代码副本；不会切换、reset、stash、覆盖或清理现有项目目录。它通过 `IIOS_ACCEPTANCE_EXISTING_RUN_ID` 把上述固定旧运行 ID 传给验收器，不展示新研究向导，不新建研究任务，也不要求重做 Round A / Round B。若该运行 ID 不存在或与私有运行目录边界不一致，程序会 BLOCKED，不会退回新建流程。
+
+本次预期流程为：旧包只读分类 → 迁移快照 → 当前版本从快照 input.json 重建首次运行 → 首次包哈希校验 → 真正 Replay → Replay 包哈希校验 → 私有审计 ZIP。原始运行包、原始 Receipt 和旧失败日志应保持不变并纳入最终审计 ZIP。
+
+结果必须区分：原始历史哈希 `UNVERIFIABLE_NO_ORIGINAL_FILE_MANIFEST`；迁移快照 `VERIFIED_AT_MIGRATION_TIME`；当前版本首次运行与 Replay 的哈希和比较结果各自独立验收。**不得把旧包标记为历史哈希 PASS。**
+
+若固定运行目录不存在、Receipt 结构异常、私有权限检查失败或 B83 代码副本校验不匹配，启动器会停止，不会退回新建研究流程。保存完整终端输出和私有验收日志后再处理。
+
 ## 1. 只使用一个入口：当前主线安全启动器
 
 推荐从 GitHub Actions 获取带权限元数据的启动器 ZIP，而不是逐个下载 .command 文本文件：
@@ -115,6 +137,22 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - 当前主线独立代码副本：**~/.iios-private/source/convergence-research-main-<SHA>/**
 
 遇到失败请保留原始文件，不要直接改 analysis.json、report.md、pilot_receipt.json 或 input.json 来修饰结果。记下终端的完整错误、退出码和日志路径。可先直接打开同目录的独立 `.AUDIT_SUMMARY.md` 查看状态，无需解压 ZIP；完整审计时仍以 ZIP 内文件、manifest 和收据为准。可以将验收交接 ZIP 提供给审计者检查；不要把含价格、完整研究输入和组合细节的文件提交到 GitHub。
+
+## 7.1 历史格式运行包（无原始 file_manifest）的兼容处理
+
+2026-11-16 起，验收器识别到旧版 Receipt **完全没有** `file_manifest` 字段时，不会再把它误判为当前版本格式，也不会把它标记为哈希 PASS。
+
+选择“对已有首次运行执行校验 + Replay”时，流程自动执行：
+
+1. 只读检查旧 Receipt、`input.json`、`analysis.json` 和 `report.md`。若旧 Receipt 缺少 `file_manifest`，分类为 `LEGACY_UNVERIFIABLE`。
+2. 将原始文件复制到 `~/.iios-private/local-pilot/acceptance-bundles/legacy-migrations/` 下独立归档，并生成迁移时 SHA-256/字节数清单。原始目录和原始 Receipt 不修改。
+3. 用迁移快照中的原始 `input.json` 调用当前版本重新计算，生成一个新的、带原生 `file_manifest` 的首次运行包。
+4. 对新运行包执行严格 SHA-256 校验，再从该新包执行真正 Replay，最后校验 Replay 包。
+5. 最终私有验收 ZIP 将旧包迁移快照作为独立的 `legacy_migration/` 文件组一并保存。
+
+**必须区分两个结论：** 旧包历史哈希仍为 `UNVERIFIABLE_NO_ORIGINAL_FILE_MANIFEST`；迁移快照只证明复制时的字节完整性；当前版本新运行包与 Replay 的哈希/比较结果则单独验收。旧包不会因兼容处理变成 PASS，也不会被用作未经验证的 Replay 父包。
+
+如果 Receipt 已经包含 `file_manifest`，但清单结构损坏、文件缺失或哈希不匹配，仍然严格 BLOCKED，不允许降级到历史兼容路径。迁移后的同一输入若已产生当前格式运行包，会按输入字节指纹安全复用，避免重复运行。
 
 ## 8. 人工红队复核清单
 

@@ -6,6 +6,8 @@ Authority: this file is the **only canonical Current State Index**.
 
 **Current operator direction (2026-10-25):** B28–B32 are merged; B33 (PR #585) is now merged as `9162a6adadbeacda984d2253ce1f776b9c00cd60`. B33 separates the guided personal pilot into a price-blind Round A and price-aware Round B, freezes/hash-binds the company-side forecast artifact, restricts each phase's patch schema, and places phase lineage in the private input, analysis, report, receipt and Replay comparison. Exact tested B33 head `d364bb3ede436cd8cd7151bc63ff8e480442ceda`: **350 Local Investment Pilot + Replay/acceptance tests passed** and **6/6 triggered workflows passed** after one retry of a transient external-source timeout in PILOT-02. B32 calculation/admission semantics and MIE/gap coherence fixes remain in force. Investment formulas, 15% hurdle, Required Return, horizon semantics, optional/explanatory MIE policy, and no-auto-execution boundary are unchanged. **Current-main real macOS two-round full-run + independent Replay remains OPEN / NOT VERIFIED.**
 
+**B83 — manifestless historical local-pilot recovery (2026-11-16): MIGRATION CODE + REAL ENGINE REPLAY + ONE-CLICK ARTIFACT READY / MAC ACCEPTANCE OPEN.** Implementation PR [#590](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/590), full acceptance orchestration regression PR [#591](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/591), real calculation/Replay regression PR [#592](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/592), and isolated one-click launcher PR [#593](https://github.com/kebofeierdawei5-cloud/convergence-research/pull/593) are merged into the B83 development branch (latest branch head `78000ad173cdd8d8abc414524d45cf8e10122fee`; canonical `main` remains unchanged at `2fd009b10bd4b13467ebdd8b2692eab62a772878`). Exact-head Local Pilot workflow [#43899629777](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/43899629777) passed **441 tests**, compileall, both launcher syntax checks, updater syntax and `git diff --check`. Coverage includes full legacy-migration orchestration and a synthetic fixture using the actual local pilot calculation, Replay computation, strict first-run and Replay bundle hash verification, and audit ZIP construction. B83-only launcher distribution workflow [#43899629047](https://github.com/kebofeierdawei5-cloud/convergence-research/actions/runs/43899629047) succeeded and uploaded artifact `IIOS-B83-legacy-migration-launcher-78000ad173cdd8d8abc414524d45cf8e10122fee` (artifact ID `14240377455`, SHA-256 `f9422809770122b1f3c6c39947574e9053ebca6720d322e137a3e67f73937f5f`, expires 2026-12-16). The ZIP contains the B83 fixed-run launcher and short README; its launcher POSIX mode is `100755`. The launcher verifies and clones the current B83 head into a separate private source directory, selects only `local-pilot-002810-20261012T141631129796Z`, and does not update or reset the user's existing checkout. Historical hash status remains `UNVERIFIABLE_NO_ORIGINAL_FILE_MANIFEST`; migration-time hashes prove only the snapshot, never the original 2026-10-12 state. The original run/receipt and previous BLOCKED acceptance log remain unchanged and are preserved in the handoff. **Real Mac execution against the operator's local files, resulting private ZIP and human review remain OPEN / NOT VERIFIED.**
+
 ## CURRENT ACTIVE DEVELOPMENT AUTHORITY — 2026-10-25
 
 **Current canonical main:** Git ref `main` (resolve the SHA from Git; do not duplicate a fixed SHA in this document).
@@ -2878,3 +2880,30 @@ Status: **MERGED PR #581 / EXACT-HEAD CI PASS / REAL MAC ACCEPTANCE OPEN**
 - **Regression coverage:** verify existing gate statuses are preserved, missing sections stay `UNKNOWN`, and first-run and Replay are rendered side-by-side including `BLOCKED`, `NOT_LINKED`, and `NOT_READY` states.
 - **Verification:** exact PR head `0a2c85ed7dc8a304fafedfa021f223dbb4ed040c` passed the Local Investment Pilot + Replay/acceptance suite (**343 tests**) and **15/15** triggered PR workflows; squash merge commit `bbf3d6e4129a904c2cb1ddb03e75dc5eff007b88`.
 - **Boundary:** the new table does not recalculate metrics, inspect or alter the raw research response, override replay comparison, infer market expectations, admit Evidence/PIT, or create formal Decision/execution authority. Fresh macOS full-run + Replay remain OPEN / NOT VERIFIED.
+
+
+## B83-7 — Durable task state-machine consistency — 2026-11-12
+
+Status: **IMPLEMENTED ON PR #588 / 418 TARGETED TESTS PASS / 6 OF 6 WORKFLOWS PASS / MAC ACCEPTANCE OPEN**
+
+- Found that journal reopen validated sequence and hash-chain integrity but did not independently replay the legal stage-transition contract; the low-level record API also permitted mismatched terminal stage/status combinations.
+- Added stage/status compatibility checks, stable Task ID validation, replay-time transition validation, terminal-event closure, and directory/journal Task ID binding before manifest repair.
+- Added regression tests for invalid stage/status pairs, no journal mutation after rejected writes, and a semantically illegal transition whose event hash is recomputed (so rejection is not merely a hash-mismatch side effect).
+- Implementation and tests are committed on the existing Draft PR #588 branch. Exact PR-head Local Investment Pilot workflow #718 passed **418 tests**; all **6/6 triggered workflows** passed, including Investment Core CI, State Hygiene, C0 Governance and independent Post-B04 red-team. CI is Ubuntu-based and does not close macOS acceptance.
+- No research, evidence/PIT, forecast, valuation, return hurdle, risk, Decision or execution semantics changed.
+- macOS Finder, clipboard and real-company interruption/resume acceptance remain OPEN. PR #588 remains Draft/unmerged; canonical main is unchanged.
+- Design record: `docs/iios/B83-7_TASK_STATE_MACHINE_INVARIANTS_20261112.md`.
+
+
+## IIOS v0.3 final delivery plan — 2026-11-12
+
+Status: **DELIVERY SCOPE FROZEN / FINALIZATION MODE**
+
+- Development is now managed by release gates, not by sequential B-batch expansion. The target is a usable local single-user A/H research workflow; not a SaaS, broker terminal or automatic trading system.
+- Frozen scope: local macOS launcher/private workspace; manual company/cutoff/price/position; free-first official/public evidence and PIT/Trust; explicit ChatGPT manual handoff with raw-response provenance; independent operating forecast; EPS_MULTIPLE and SOTP; price-implied requirements/expectation gap when identifiable; 15% annualized return hurdle; risk/portfolio constraints; human approval; report, run bundle, integrity verification and deterministic Replay; durable resume.
+- Out of scope: paid APIs, screeners, auto-ordering, programmatic browser/ChatGPT control, clipboard polling, Accessibility automation, daemons, multi-user/SaaS and forced MIE values.
+- Remaining B42–B81 work is to be audited as one integrated decision chain. Only release blockers affecting decision correctness, evidence/provenance, calculation integrity, report parity, resume or replay are to be fixed. Missing source data remains UNKNOWN; completed work is not to be rebuilt.
+- Release requires exact-head CI/red-team, representative EPS_MULTIPLE and (where inputs exist) SOTP real tasks, Finder relaunch/interruption/resume, Round A/B raw response provenance, bundle integrity, deterministic Replay MATCH, and explicit fail-closed negative cases.
+- PR #588 remains Draft/unmerged pending release gates. On 2026-11-12 compare reports 136 commits ahead / 0 behind, while PR diff lists 19 files; reconcile history/diff before merge.
+- B83-7 exact-head Local Investment Pilot: 418 passed; 6/6 triggered workflows passed. This is Ubuntu CI, not Mac acceptance.
+- Detailed plan: `docs/iios/IIOS_V03_FINAL_DELIVERY_PLAN_20261112.md`.
