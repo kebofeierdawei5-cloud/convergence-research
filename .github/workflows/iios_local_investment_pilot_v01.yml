@@ -28,7 +28,7 @@ on:
       - "docs/PROJECT_STATE_INDEX.md"
       - "README.md"
   push:
-    branches: [main]
+    branches: [main, "feat/**", "fix/**"]
     paths:
       - "iios_mvp/local_investment_pilot_v01.py"
       - "iios_mvp/task_workspace_v01.py"
