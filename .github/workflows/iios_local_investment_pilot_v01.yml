@@ -23,7 +23,6 @@ on:
       - "验收IIOS全流程与Replay.command"
       - "B83_旧运行包迁移验收.command"
       - "tools/package_b83_legacy_migration_launcher_v01.py"
-      - "tests/test_b83_legacy_migration_launcher_v01.py"
       - "启动IIOS投资分析.command"
       - "IIOS.command"
       - ".github/workflows/iios_local_investment_pilot_v01.yml"
