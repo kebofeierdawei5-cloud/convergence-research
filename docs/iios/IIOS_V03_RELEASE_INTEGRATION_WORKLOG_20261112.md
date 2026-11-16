@@ -108,3 +108,14 @@ At the corrected head, the PR-triggered workflow matrix was observed as 35 workf
 - Real-company SOTP E2E: **UNVERIFIED / conditional on complete segment data**.
 - Formal Evidence/PIT and Forecast Admission: **NOT AVAILABLE** while production signer registry is empty.
 - Release merge: **NOT AUTHORIZED** until operator acceptance and final PR diff/base review.
+
+
+## I4 — minimum operator acceptance handoff (2026-11-16)
+
+- Added `docs/iios/B83_MINIMAL_MACOS_OPERATOR_ACCEPTANCE_20261116.md` as the single current candidate-branch operator handoff.
+- The handoff explicitly warns not to use the older `验收IIOS全流程与Replay.command` during PR #589 acceptance: that legacy wrapper updates `origin/main`, not the candidate branch.
+- One terminal line fetches/switches/fast-forward updates the candidate, restores the local executable bit, and opens `IIOS.command`. No force reset, sudo, dependency bootstrap or system-Python modification.
+- The B83 interaction is now explicitly described: Round A / Round B prompts are copied to clipboard; after copying ChatGPT's full response, one Enter triggers a one-shot `pbpaste` capture into the private response file. No clipboard polling or TextEdit requirement.
+- Resume test point: interrupt while waiting for Round B, relaunch `IIOS.command`, verify the same unfinished Task ID and frozen Round A are reused.
+- After the pilot run, launch `iios_mvp.local_run_replay_acceptance_v01` directly and select menu option 2 to verify/replay the B83-created run. Do not invoke the old wrapper that updates main.
+- Operator execution is still pending; no claim of real Mac acceptance is made.
