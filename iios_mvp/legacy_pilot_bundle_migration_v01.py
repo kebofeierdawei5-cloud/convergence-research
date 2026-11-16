@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 import tempfile
@@ -38,7 +39,7 @@ def _outside_repository(path: str | Path, field: str, *, must_exist: bool) -> Pa
         raise LegacyPilotMigrationError(f"{field}_MUST_NOT_BE_SYMLINK")
     try:
         resolved = raw.resolve(strict=must_exist)
-    except OSError as exc:
+    except (OSError, RuntimeError) as exc:
         raise LegacyPilotMigrationError(f"{field}_PATH_UNAVAILABLE") from exc
     try:
         resolved.relative_to(_repo_root())
@@ -89,6 +90,15 @@ def _json_object(payload: bytes, field: str) -> dict[str, Any]:
 
 def _fingerprint(payload: bytes) -> dict[str, Any]:
     return {"sha256": hashlib.sha256(payload).hexdigest(), "byte_size": len(payload)}
+
+
+def _write_all(descriptor: int, payload: bytes) -> None:
+    view = memoryview(payload)
+    while view:
+        written = os.write(descriptor, view)
+        if written <= 0:
+            raise LegacyPilotMigrationError("MIGRATION_SNAPSHOT_WRITE_FAILED")
+        view = view[written:]
 
 
 def _private_directory(path: Path, field: str) -> None:
@@ -178,32 +188,74 @@ def verify_legacy_pilot_migration_snapshot(snapshot_path: str | Path) -> dict[st
     snapshot_dir = _outside_repository(snapshot_path, "MIGRATION_SNAPSHOT_DIRECTORY", must_exist=True)
     if not snapshot_dir.is_dir():
         raise LegacyPilotMigrationError("MIGRATION_SNAPSHOT_DIRECTORY_REQUIRED")
+    if os.name != "nt" and snapshot_dir.stat().st_mode & 0o077:
+        raise LegacyPilotMigrationError("MIGRATION_SNAPSHOT_DIRECTORY_PERMISSIONS_NOT_PRIVATE")
     manifest_bytes = _read_regular_file(snapshot_dir / SNAPSHOT_MANIFEST, "MIGRATION_MANIFEST")
+    manifest_path = snapshot_dir / SNAPSHOT_MANIFEST
+    if os.name != "nt" and manifest_path.stat().st_mode & 0o077:
+        raise LegacyPilotMigrationError("MIGRATION_MANIFEST_PERMISSIONS_NOT_PRIVATE")
     manifest = _json_object(manifest_bytes, "MIGRATION_MANIFEST")
     if manifest.get("schema_version") != SNAPSHOT_SCHEMA:
         raise LegacyPilotMigrationError("MIGRATION_MANIFEST_SCHEMA_MISMATCH")
     if manifest.get("snapshot_integrity") != "VERIFIED_AT_MIGRATION_TIME":
         raise LegacyPilotMigrationError("MIGRATION_SNAPSHOT_STATUS_INVALID")
+    if manifest.get("snapshot_hash_algorithm") != "SHA-256":
+        raise LegacyPilotMigrationError("MIGRATION_SNAPSHOT_HASH_ALGORITHM_INVALID")
+    if manifest.get("historical_hash_verification") != "UNVERIFIABLE_NO_ORIGINAL_FILE_MANIFEST":
+        raise LegacyPilotMigrationError("MIGRATION_HISTORICAL_STATUS_INVALID")
+    source_pilot_id = manifest.get("source_pilot_id")
+    if not isinstance(source_pilot_id, str) or not source_pilot_id:
+        raise LegacyPilotMigrationError("MIGRATION_SOURCE_PILOT_ID_INVALID")
     file_manifest = manifest.get("files")
     if not isinstance(file_manifest, Mapping) or not set(REQUIRED_FILES).issubset(file_manifest):
         raise LegacyPilotMigrationError("MIGRATION_SNAPSHOT_FILE_MANIFEST_INVALID")
     allowed = set(REQUIRED_FILES) | set(OPTIONAL_FILES)
     if set(file_manifest) - allowed:
         raise LegacyPilotMigrationError("MIGRATION_SNAPSHOT_UNEXPECTED_FILE_ENTRY")
+    expected_names = set(file_manifest) | {SNAPSHOT_MANIFEST}
+    actual_names = {item.name for item in snapshot_dir.iterdir()}
+    if actual_names != expected_names:
+        raise LegacyPilotMigrationError("MIGRATION_SNAPSHOT_DIRECTORY_CONTENT_MISMATCH")
 
     verified: list[dict[str, Any]] = []
     for name, expected in file_manifest.items():
         if not isinstance(expected, Mapping):
             raise LegacyPilotMigrationError(f"MIGRATION_SNAPSHOT_FILE_RECORD_INVALID:{name}")
+        if (
+            not isinstance(expected.get("sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", expected["sha256"])
+            or not isinstance(expected.get("byte_size"), int)
+            or isinstance(expected.get("byte_size"), bool)
+            or expected["byte_size"] < 0
+        ):
+            raise LegacyPilotMigrationError(f"MIGRATION_SNAPSHOT_FILE_RECORD_INVALID:{name}")
         payload = _read_regular_file(snapshot_dir / name, f"MIGRATION_SNAPSHOT_FILE_{name}")
+        if os.name != "nt" and (snapshot_dir / name).stat().st_mode & 0o077:
+            raise LegacyPilotMigrationError(f"MIGRATION_SNAPSHOT_FILE_PERMISSIONS_NOT_PRIVATE:{name}")
         actual = _fingerprint(payload)
         if actual != {"sha256": expected.get("sha256"), "byte_size": expected.get("byte_size")}:
             raise LegacyPilotMigrationError(f"MIGRATION_SNAPSHOT_HASH_MISMATCH:{name}")
         verified.append({"name": name, **actual})
 
     receipt_fp = file_manifest.get("pilot_receipt.json")
-    if not isinstance(receipt_fp, Mapping) or manifest.get("source_receipt_sha256") != receipt_fp.get("sha256"):
+    if (
+        not isinstance(receipt_fp, Mapping)
+        or manifest.get("source_receipt_sha256") != receipt_fp.get("sha256")
+        or not isinstance(manifest.get("source_receipt_sha256"), str)
+        or not re.fullmatch(r"[0-9a-f]{64}", manifest["source_receipt_sha256"])
+    ):
         raise LegacyPilotMigrationError("MIGRATION_SOURCE_RECEIPT_BINDING_MISMATCH")
+    receipt = _json_object(
+        _read_regular_file(snapshot_dir / "pilot_receipt.json", "MIGRATION_SNAPSHOT_RECEIPT"),
+        "MIGRATION_SNAPSHOT_RECEIPT",
+    )
+    if (
+        receipt.get("receipt_schema") != PILOT_RECEIPT_SCHEMA
+        or receipt.get("status") != PILOT_STATUS
+        or receipt.get("pilot_id") != source_pilot_id
+        or "file_manifest" in receipt
+    ):
+        raise LegacyPilotMigrationError("MIGRATION_SNAPSHOT_SOURCE_RECEIPT_INVALID")
     return {
         "status": "LEGACY_MIGRATION_SNAPSHOT_HASH_CHECK_PASS",
         "pilot_id": manifest.get("source_pilot_id"),
@@ -303,7 +355,7 @@ def create_legacy_pilot_migration_snapshot(
             0o600,
         )
         try:
-            os.write(descriptor, manifest_payload)
+            _write_all(descriptor, manifest_payload)
             os.fsync(descriptor)
         finally:
             os.close(descriptor)
