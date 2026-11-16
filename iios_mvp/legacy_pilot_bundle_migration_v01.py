@@ -158,7 +158,7 @@ def classify_legacy_pilot_bundle(run_path: str | Path) -> dict[str, Any]:
         ("analysis_file", "analysis.json"),
         ("report_file", "report.md"),
     ):
-        if field in receipt and receipt[field] != expected:
+        if receipt.get(field) != expected:
             raise LegacyPilotMigrationError(f"LEGACY_RECEIPT_FILENAME_MISMATCH:{field}")
 
     if "file_manifest" in receipt:
