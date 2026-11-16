@@ -1040,3 +1040,92 @@ def test_standalone_current_main_bootstrap_is_syntax_valid_and_non_destructive()
     assert "git reset --hard" not in content
     assert "git clean -fd" not in content
     assert "rm -rf" not in content
+
+
+
+def _legacy_bundle_for_migration(tmp_path: Path, pilot_id: str = "local-pilot-OLD-20261012T141631Z") -> Path:
+    run_dir = tmp_path / pilot_id
+    run_dir.mkdir(mode=0o700)
+    (run_dir / "input.json").write_text('{"schema_version":"legacy","case":{"symbol":"002810.SZ"}}', encoding="utf-8")
+    (run_dir / "analysis.json").write_text(json.dumps({"schema_version": "legacy-analysis", "pilot_id": pilot_id}), encoding="utf-8")
+    (run_dir / "report.md").write_text("# Old report\n", encoding="utf-8")
+    _write_json(
+        run_dir / "pilot_receipt.json",
+        {
+            "receipt_schema": acceptance.RECEIPT_SCHEMA,
+            "status": acceptance.PILOT_STATUS,
+            "pilot_id": pilot_id,
+            "input_file": "input.json",
+            "analysis_file": "analysis.json",
+            "report_file": "report.md",
+        },
+    )
+    if os.name != "nt":
+        for path in run_dir.iterdir():
+            path.chmod(0o600)
+        run_dir.chmod(0o700)
+    return run_dir
+
+
+def test_manifestless_original_is_snapshotted_and_rebuilt_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    legacy_dir = _legacy_bundle_for_migration(tmp_path)
+    run_root = tmp_path / "runs"
+    run_root.mkdir(mode=0o700)
+    archive_root = tmp_path / "acceptance-bundles"
+    archive_root.mkdir(mode=0o700)
+    log_root = tmp_path / "logs"
+    log_root.mkdir(mode=0o700)
+    monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
+    monkeypatch.setattr(acceptance, "ACCEPTANCE_BUNDLE_ROOT", archive_root)
+    monkeypatch.setattr(acceptance, "_new_log", lambda stage: log_root / f"{stage}.log")
+
+    calls: list[list[str]] = []
+
+    def fake_run_cli(command, *, stage, expected_statuses, log_paths=None):
+        calls.append(list(command))
+        assert command[0] == "--input"
+        frozen_input = Path(command[1]).read_bytes()
+        run_dir = _bundle(
+            run_root,
+            run_dir_name="local-pilot-REBUILT-20261116T120000Z",
+        )
+        (run_dir / "input.json").write_bytes(frozen_input)
+        receipt_path = run_dir / "pilot_receipt.json"
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["file_manifest"]["input.json"] = {
+            "sha256": hashlib.sha256(frozen_input).hexdigest(),
+            "byte_size": len(frozen_input),
+        }
+        _write_json(receipt_path, receipt)
+        return {"status": "PILOT_CREATED", "pilot_id": run_dir.name, "run_dir": str(run_dir)}
+
+    monkeypatch.setattr(acceptance, "_run_cli", fake_run_cli)
+    audit_logs: list[Path] = []
+
+    rebuilt, snapshot = acceptance._prepare_replay_source(legacy_dir, audit_logs=audit_logs)
+
+    assert rebuilt.parent == run_root
+    assert rebuilt.name == "local-pilot-REBUILT-20261116T120000Z"
+    assert snapshot is not None and snapshot.is_dir()
+    assert (snapshot / "migration_manifest.json").is_file()
+    assert len(calls) == 1
+    assert "file_manifest" not in json.loads((legacy_dir / "pilot_receipt.json").read_text(encoding="utf-8"))
+
+    rebuilt_again, snapshot_again = acceptance._prepare_replay_source(legacy_dir, audit_logs=audit_logs)
+    assert rebuilt_again == rebuilt
+    assert snapshot_again == snapshot
+    assert len(calls) == 1
+
+
+def test_manifest_bearing_original_is_not_migrated_or_rebuilt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    current = _bundle(tmp_path, run_dir_name="local-pilot-CURRENT-20261116T120000Z")
+    monkeypatch.setattr(acceptance, "RUN_ROOT", tmp_path)
+    monkeypatch.setattr(acceptance, "ACCEPTANCE_BUNDLE_ROOT", tmp_path / "archive")
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("current-format run must not enter legacy migration")
+
+    monkeypatch.setattr(acceptance, "_run_cli", fail_if_called)
+    result, snapshot = acceptance._prepare_replay_source(current, audit_logs=[])
+    assert result == current
+    assert snapshot is None
