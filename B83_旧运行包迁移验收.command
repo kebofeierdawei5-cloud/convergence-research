@@ -70,6 +70,7 @@ if [[ -e "$TARGET" ]]; then
   if [[ "$LOCAL_SHA" != "$REMOTE_SHA" || "$LOCAL_ORIGIN" != "$REPO_URL" || -n "$LOCAL_STATUS" ]]; then
     fail "已有隔离代码副本与预期提交不一致或含本地改动；未覆盖：$TARGET_REPO"
   fi
+  chmod 700 "$TARGET" "$TARGET_REPO" || fail "无法复核隔离代码目录的私有权限：$TARGET"
   printf '复用已校验的隔离代码副本：%s\n' "$TARGET_REPO"
 else
   STAGING="$SOURCE_ROOT/.b83-legacy-bootstrap-$"
