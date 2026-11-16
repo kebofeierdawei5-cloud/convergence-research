@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import zipfile
 from decimal import Decimal
 from datetime import date
 from pathlib import Path
@@ -12,6 +14,7 @@ import time as _time
 import pytest
 
 import iios_mvp.local_investment_pilot_v01 as pilot
+from iios_mvp import local_run_replay_acceptance_v01 as acceptance
 from iios_mvp.operating_driver_forecast_v01 import render_operating_driver_section, evaluate_operating_driver_forecast
 
 from iios_mvp.local_investment_pilot_v01 import (
@@ -5145,3 +5148,141 @@ def test_round_b_prompt_receives_price_only_after_round_a_artifact_is_frozen():
     assert "operator_valuation_context" not in phase_b and "decision_parameters" not in phase_b
 
 
+
+
+
+def test_manifestless_legacy_migration_runs_real_calculation_and_replay_engine(tmp_path, monkeypatch):
+    """Use the real pilot calculation/replay functions; stub only the CLI transport."""
+    input_path = _write_input(tmp_path)
+    run_root = tmp_path / "private-runs"
+    log_root = tmp_path / "acceptance-logs"
+    bundle_root = tmp_path / "acceptance-bundles"
+    for directory in (run_root, log_root, bundle_root):
+        directory.mkdir(mode=0o700)
+        if os.name != "nt":
+            directory.chmod(0o700)
+
+    original = run_local_investment_pilot(input_path=input_path, output_root=run_root)
+    original_dir = Path(original["run_dir"])
+    receipt_path = original_dir / "pilot_receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert isinstance(receipt.get("file_manifest"), dict)
+    receipt.pop("file_manifest")
+    receipt_path.write_text(json.dumps(receipt, ensure_ascii=False, indent=2), encoding="utf-8")
+    if os.name != "nt":
+        receipt_path.chmod(0o600)
+    legacy_receipt_bytes = receipt_path.read_bytes()
+    original_input_bytes = (original_dir / "input.json").read_bytes()
+
+    prior_failure_log = log_root / f"20261116T151205782281Z-check-original-{original_dir.name}.log"
+    prior_failure_log.write_text(
+        '{"status":"BLOCKED","reason":"RUN_BUNDLE_HASH_MANIFEST_MISSING"}\n',
+        encoding="utf-8",
+    )
+    if os.name != "nt":
+        prior_failure_log.chmod(0o600)
+
+    monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
+    monkeypatch.setattr(acceptance, "LOG_ROOT", log_root)
+    monkeypatch.setattr(acceptance, "ACCEPTANCE_BUNDLE_ROOT", bundle_root)
+    monkeypatch.setattr(acceptance, "_prompt_completion_issues", lambda analysis: [])
+    monkeypatch.setattr(acceptance, "_open_audit_summary_sidecar", lambda sidecar: False)
+    monkeypatch.setattr(
+        acceptance,
+        "_new_log",
+        lambda stage: log_root / f"{stage}.log",
+    )
+
+    engine_calls: list[str] = []
+
+    def real_engine_cli_adapter(command, *, stage, expected_statuses, log_paths=None):
+        log_path = acceptance._new_log(stage)
+        log_path.write_text(f"actual local pilot function invoked for {stage}\n", encoding="utf-8")
+        if os.name != "nt":
+            log_path.chmod(0o600)
+        if log_paths is not None:
+            log_paths.append(log_path)
+
+        if command[0] == "--input":
+            engine_calls.append("FIRST_RUN_CALCULATION")
+            return run_local_investment_pilot(
+                input_path=Path(command[1]),
+                output_root=run_root,
+            )
+
+        if command[0] == "--check-run":
+            engine_calls.append("STRICT_BUNDLE_VERIFICATION")
+            return verify_local_pilot_bundle(Path(command[1]))
+
+        if command[0] == "--replay-run":
+            first_dir = Path(command[1])
+            engine_calls.append("REPLAY_CALCULATION")
+            return run_local_investment_pilot(
+                input_path=first_dir / "input.json",
+                output_root=run_root,
+                replay_of=first_dir.name,
+            )
+
+        raise AssertionError(f"unexpected acceptance CLI command: {command!r}")
+
+    monkeypatch.setattr(acceptance, "_run_cli", real_engine_cli_adapter)
+
+    result = acceptance._verify_and_replay(original_dir)
+
+    assert result == 0
+    assert engine_calls == [
+        "FIRST_RUN_CALCULATION",
+        "STRICT_BUNDLE_VERIFICATION",
+        "REPLAY_CALCULATION",
+        "STRICT_BUNDLE_VERIFICATION",
+    ]
+    assert receipt_path.read_bytes() == legacy_receipt_bytes
+    assert (original_dir / "input.json").read_bytes() == original_input_bytes
+    assert "file_manifest" not in json.loads(legacy_receipt_bytes.decode("utf-8"))
+
+    migration_dirs = list((bundle_root / "legacy-migrations").iterdir())
+    assert len(migration_dirs) == 1
+    snapshot = migration_dirs[0]
+    from iios_mvp.legacy_pilot_bundle_migration_v01 import verify_legacy_pilot_migration_snapshot
+
+    snapshot_result = verify_legacy_pilot_migration_snapshot(snapshot)
+    assert snapshot_result["status"] == "LEGACY_MIGRATION_SNAPSHOT_HASH_CHECK_PASS"
+    assert snapshot_result["historical_hash_verification"] == "UNVERIFIABLE_NO_ORIGINAL_FILE_MANIFEST"
+
+    first_dirs = [
+        path for path in run_root.iterdir()
+        if path.is_dir() and path.name != original_dir.name and (path / "pilot_receipt.json").is_file()
+        and json.loads((path / "pilot_receipt.json").read_text(encoding="utf-8")).get("replay_of") is None
+    ]
+    replay_dirs = [
+        path for path in run_root.iterdir()
+        if path.is_dir() and (path / "pilot_receipt.json").is_file()
+        and json.loads((path / "pilot_receipt.json").read_text(encoding="utf-8")).get("replay_of") is not None
+    ]
+    assert len(first_dirs) == 1
+    assert len(replay_dirs) == 1
+    first_dir, replay_dir = first_dirs[0], replay_dirs[0]
+    first_analysis = json.loads((first_dir / "analysis.json").read_text(encoding="utf-8"))
+    replay_analysis = json.loads((replay_dir / "analysis.json").read_text(encoding="utf-8"))
+    replay_receipt = json.loads((replay_dir / "pilot_receipt.json").read_text(encoding="utf-8"))
+    assert replay_receipt["replay_of"] == first_dir.name
+    assert replay_receipt["replay_comparison"]["status"] == "MATCH"
+    assert replay_receipt["replay_comparison"]["hash_verification"] == "PASS"
+    assert replay_receipt["replay_comparison"]["mismatched_fields"] == []
+    assert replay_analysis["return_metrics"] == first_analysis["return_metrics"]
+    assert replay_analysis["decision"] == first_analysis["decision"]
+    assert verify_local_pilot_bundle(first_dir)["status"] == "PILOT_BUNDLE_HASH_CHECK_PASS"
+    assert verify_local_pilot_bundle(replay_dir)["status"] == "PILOT_BUNDLE_HASH_CHECK_PASS"
+
+    archives = list(bundle_root.glob("*.zip"))
+    assert len(archives) == 1
+    with zipfile.ZipFile(archives[0], "r") as archive:
+        assert archive.testzip() is None
+        names = set(archive.namelist())
+        assert any(name.endswith(f"/{prior_failure_log.name}") for name in names)
+        assert any(name.endswith(f"/{snapshot.name}/migration_manifest.json") for name in names)
+        summary = json.loads(archive.read("acceptance_summary.json"))
+        assert summary["overall_status"] == "PASS"
+        assert summary["technical_status"] == "PASS"
+        assert summary["legacy_migration"]["historical_hash_verification"] == "UNVERIFIABLE_NO_ORIGINAL_FILE_MANIFEST"
+        assert summary["legacy_migration"]["snapshot_integrity"] == "VERIFIED_AT_MIGRATION_TIME"
