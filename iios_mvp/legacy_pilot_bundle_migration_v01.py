@@ -118,8 +118,13 @@ def classify_legacy_pilot_bundle(run_path: str | Path) -> dict[str, Any]:
     run_dir = _outside_repository(run_path, "LEGACY_RUN_DIRECTORY", must_exist=True)
     if not run_dir.is_dir():
         raise LegacyPilotMigrationError("LEGACY_RUN_DIRECTORY_REQUIRED")
+    if os.name != "nt" and run_dir.stat().st_mode & 0o077:
+        raise LegacyPilotMigrationError("LEGACY_RUN_DIRECTORY_PERMISSIONS_NOT_PRIVATE")
 
-    receipt_bytes = _read_regular_file(run_dir / "pilot_receipt.json", "LEGACY_RECEIPT")
+    receipt_path = run_dir / "pilot_receipt.json"
+    if os.name != "nt" and receipt_path.stat().st_mode & 0o077:
+        raise LegacyPilotMigrationError("LEGACY_RECEIPT_PERMISSIONS_NOT_PRIVATE")
+    receipt_bytes = _read_regular_file(receipt_path, "LEGACY_RECEIPT")
     receipt = _json_object(receipt_bytes, "LEGACY_RECEIPT")
     if receipt.get("receipt_schema") != PILOT_RECEIPT_SCHEMA:
         raise LegacyPilotMigrationError("LEGACY_RECEIPT_SCHEMA_MISMATCH")
@@ -130,9 +135,17 @@ def classify_legacy_pilot_bundle(run_path: str | Path) -> dict[str, Any]:
 
     files: dict[str, bytes] = {}
     for name in REQUIRED_FILES:
-        files[name] = _read_regular_file(run_dir / name, f"LEGACY_FILE_{name}")
+        source_file = run_dir / name
+        if os.name != "nt" and source_file.stat().st_mode & 0o077:
+            raise LegacyPilotMigrationError(f"LEGACY_FILE_PERMISSIONS_NOT_PRIVATE:{name}")
+        files[name] = _read_regular_file(source_file, f"LEGACY_FILE_{name}")
     if not files["report.md"].strip():
         raise LegacyPilotMigrationError("LEGACY_REPORT_EMPTY")
+    try:
+        files["report.md"].decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise LegacyPilotMigrationError("LEGACY_REPORT_NOT_UTF8") from exc
+    observed_files = {name: _fingerprint(payload) for name, payload in files.items()}
     input_payload = _json_object(files["input.json"], "LEGACY_INPUT")
     analysis_payload = _json_object(files["analysis.json"], "LEGACY_ANALYSIS")
 
@@ -158,13 +171,17 @@ def classify_legacy_pilot_bundle(run_path: str | Path) -> dict[str, Any]:
                 else "NOT_CAPTURED_OR_UNKNOWN"
             ),
             "files": list(REQUIRED_FILES),
+            "observed_files": observed_files,
         }
 
     optional_present: list[str] = []
     for name in OPTIONAL_FILES:
         candidate = run_dir / name
         if candidate.exists() or candidate.is_symlink():
-            _read_regular_file(candidate, f"LEGACY_FILE_{name}")
+            if os.name != "nt" and candidate.stat().st_mode & 0o077:
+                raise LegacyPilotMigrationError(f"LEGACY_FILE_PERMISSIONS_NOT_PRIVATE:{name}")
+            payload = _read_regular_file(candidate, f"LEGACY_FILE_{name}")
+            observed_files[name] = _fingerprint(payload)
             optional_present.append(name)
 
     rounds_present = (
@@ -180,6 +197,7 @@ def classify_legacy_pilot_bundle(run_path: str | Path) -> dict[str, Any]:
         "migration_snapshot_integrity": "NOT_YET_CREATED",
         "research_rounds_status": "PRESENT_BUT_UNVERIFIED" if rounds_present else "NOT_CAPTURED_OR_UNKNOWN",
         "files": [*REQUIRED_FILES, *optional_present],
+        "observed_files": observed_files,
     }
 
 
@@ -289,19 +307,24 @@ def create_legacy_pilot_migration_snapshot(
         raise LegacyPilotMigrationError("LEGACY_RECEIPT_FORMAT_CHANGED_DURING_MIGRATION")
 
     fingerprints = {name: _fingerprint(payload) for name, payload in payloads.items()}
+    if fingerprints != classification.get("observed_files"):
+        raise LegacyPilotMigrationError("LEGACY_FILES_CHANGED_DURING_MIGRATION")
     source_receipt_sha = fingerprints["pilot_receipt.json"]["sha256"]
     snapshot_id = f"{run_dir.name}__{source_receipt_sha[:12]}"
     target = archive_dir / snapshot_id
 
     if target.exists() or target.is_symlink():
         existing = verify_legacy_pilot_migration_snapshot(target)
+        existing_manifest = _json_object(
+            _read_regular_file(target / SNAPSHOT_MANIFEST, "MIGRATION_MANIFEST"),
+            "MIGRATION_MANIFEST",
+        )
         if (
             existing.get("pilot_id") != run_dir.name
-            or not (target / SNAPSHOT_MANIFEST).is_file()
-            or _json_object((target / SNAPSHOT_MANIFEST).read_bytes(), "MIGRATION_MANIFEST").get("source_receipt_sha256")
-            != source_receipt_sha
+            or existing_manifest.get("source_receipt_sha256") != source_receipt_sha
+            or existing_manifest.get("files") != fingerprints
         ):
-            raise LegacyPilotMigrationError("MIGRATION_SNAPSHOT_TARGET_CONFLICT")
+            raise LegacyPilotMigrationError("MIGRATION_SOURCE_CHANGED_SINCE_SNAPSHOT")
         return {
             **existing,
             "status": "LEGACY_MIGRATION_SNAPSHOT_REUSED",
