@@ -147,3 +147,54 @@ def test_empty_legacy_report_is_not_snapshotted(tmp_path: Path) -> None:
 
     with pytest.raises(LegacyPilotMigrationError, match="LEGACY_REPORT_EMPTY"):
         create_legacy_pilot_migration_snapshot(run_dir, tmp_path / "archive")
+
+
+def test_existing_snapshot_rejects_changed_original_files(tmp_path: Path) -> None:
+    run_dir = _legacy_bundle(tmp_path)
+    archive_root = tmp_path / "archive"
+    first = create_legacy_pilot_migration_snapshot(run_dir, archive_root)
+
+    (run_dir / "analysis.json").write_text('{"changed":true}\n', encoding="utf-8")
+    if os.name != "nt":
+        (run_dir / "analysis.json").chmod(0o600)
+
+    with pytest.raises(LegacyPilotMigrationError, match="MIGRATION_SOURCE_CHANGED_SINCE_SNAPSHOT|LEGACY_FILES_CHANGED_DURING_MIGRATION"):
+        create_legacy_pilot_migration_snapshot(run_dir, archive_root)
+    assert verify_legacy_pilot_migration_snapshot(Path(first["snapshot_path"]))["status"] == "LEGACY_MIGRATION_SNAPSHOT_HASH_CHECK_PASS"
+
+
+def test_legacy_bundle_with_public_file_permissions_is_blocked(tmp_path: Path) -> None:
+    if os.name == "nt":
+        pytest.skip("POSIX permission semantics are required for this security test")
+    run_dir = _legacy_bundle(tmp_path)
+    (run_dir / "analysis.json").chmod(0o644)
+
+    with pytest.raises(LegacyPilotMigrationError, match="LEGACY_FILE_PERMISSIONS_NOT_PRIVATE:analysis.json"):
+        classify_legacy_pilot_bundle(run_dir)
+
+
+def test_legacy_receipt_must_bind_required_filenames(tmp_path: Path) -> None:
+    run_dir = _legacy_bundle(tmp_path)
+    receipt_path = run_dir / "pilot_receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt.pop("report_file")
+    _write_json(receipt_path, receipt)
+
+    with pytest.raises(LegacyPilotMigrationError, match="LEGACY_RECEIPT_FILENAME_MISMATCH:report_file"):
+        classify_legacy_pilot_bundle(run_dir)
+
+
+def test_optional_raw_response_is_preserved_as_separate_snapshot_file(tmp_path: Path) -> None:
+    run_dir = _legacy_bundle(tmp_path)
+    response_bytes = b'{"raw":"original response"}\n'
+    (run_dir / "chatgpt_response_raw.txt").write_bytes(response_bytes)
+    if os.name != "nt":
+        (run_dir / "chatgpt_response_raw.txt").chmod(0o600)
+
+    result = create_legacy_pilot_migration_snapshot(run_dir, tmp_path / "archive")
+    snapshot = Path(result["snapshot_path"])
+
+    assert (snapshot / "chatgpt_response_raw.txt").read_bytes() == response_bytes
+    assert "chatgpt_response_raw.txt" in {
+        item["name"] for item in verify_legacy_pilot_migration_snapshot(snapshot)["verified_files"]
+    }
