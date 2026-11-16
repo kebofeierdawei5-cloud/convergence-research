@@ -18,7 +18,7 @@
 
 这个启动器会从公开 GitHub 仓库核对 B83 分支准确 SHA，在 `~/.iios-private/source/` 建立或复用独立代码副本；不会切换、reset、stash、覆盖或清理现有项目目录。它通过 `IIOS_ACCEPTANCE_EXISTING_RUN_ID` 把上述固定旧运行 ID 传给验收器，不展示新研究向导，不新建研究任务，也不要求重做 Round A / Round B。若该运行 ID 不存在或与私有运行目录边界不一致，程序会 BLOCKED，不会退回新建流程。
 
-本次预期流程为：旧包只读分类 → 迁移快照 → 当前版本从快照 input.json 重建首次运行 → 首次包哈希校验 → 真正 Replay → Replay 包哈希校验 → 私有审计 ZIP。原始包、原始 Receipt 和旧失败日志应保持不变并纳入最终审计 ZIP。
+本次预期流程为：旧包只读分类 → 迁移快照 → 当前版本从快照 input.json 重建首次运行 → 首次包哈希校验 → 真正 Replay → Replay 包哈希校验 → 私有审计 ZIP。原始运行包、原始 Receipt 和旧失败日志应保持不变并纳入最终审计 ZIP。
 
 结果必须区分：原始历史哈希 `UNVERIFIABLE_NO_ORIGINAL_FILE_MANIFEST`；迁移快照 `VERIFIED_AT_MIGRATION_TIME`；当前版本首次运行与 Replay 的哈希和比较结果各自独立验收。**不得把旧包标记为历史哈希 PASS。**
 
