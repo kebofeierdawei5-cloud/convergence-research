@@ -1142,3 +1142,165 @@ def test_manifest_bearing_original_is_not_migrated_or_rebuilt(tmp_path: Path, mo
     result, snapshot = acceptance._prepare_replay_source(current, audit_logs=[])
     assert result == current
     assert snapshot is None
+
+
+
+def test_manifestless_legacy_run_completes_strict_replay_and_audit_bundle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = tmp_path / "runs"
+    run_root.mkdir(mode=0o700)
+    archive_root = tmp_path / "acceptance-bundles"
+    log_root = tmp_path / "acceptance-logs"
+    log_root.mkdir(mode=0o700)
+    legacy = _legacy_bundle_for_migration(
+        run_root,
+        pilot_id="local-pilot-LEGACY-E2E-20261012T141631Z",
+    )
+    original_receipt_bytes = (legacy / "pilot_receipt.json").read_bytes()
+    original_input_bytes = (legacy / "input.json").read_bytes()
+    prior_failure_log = log_root / f"20261116T151205Z-check-original-{legacy.name}.log"
+    prior_failure_log.write_text(
+        '{"status":"BLOCKED","reason":"RUN_BUNDLE_HASH_MANIFEST_MISSING"}\n',
+        encoding="utf-8",
+    )
+    if os.name != "nt":
+        prior_failure_log.chmod(0o600)
+
+    monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
+    monkeypatch.setattr(acceptance, "ACCEPTANCE_BUNDLE_ROOT", archive_root)
+    monkeypatch.setattr(acceptance, "LOG_ROOT", log_root)
+    monkeypatch.setattr(acceptance, "_prompt_completion_issues", lambda analysis: [])
+    monkeypatch.setattr(acceptance, "_open_audit_summary_sidecar", lambda sidecar: False)
+
+    cli_calls: list[list[str]] = []
+    generated: dict[str, Path] = {}
+
+    def log_for(stage: str, log_paths: list[Path] | None) -> None:
+        log_path = log_root / f"{stage}.log"
+        log_path.write_text(f"synthetic acceptance log: {stage}\n", encoding="utf-8")
+        if os.name != "nt":
+            log_path.chmod(0o600)
+        if log_paths is not None:
+            log_paths.append(log_path)
+
+    def copy_input_and_update_manifest(run_dir: Path, source_input: Path) -> None:
+        input_bytes = source_input.read_bytes()
+        (run_dir / "input.json").write_bytes(input_bytes)
+        if os.name != "nt":
+            (run_dir / "input.json").chmod(0o600)
+        receipt_path = run_dir / "pilot_receipt.json"
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["file_manifest"]["input.json"] = {
+            "sha256": hashlib.sha256(input_bytes).hexdigest(),
+            "byte_size": len(input_bytes),
+        }
+        _write_json(receipt_path, receipt)
+
+    def fake_run_cli(command, *, stage, expected_statuses, log_paths=None):
+        cli_calls.append(list(command))
+        log_for(stage, log_paths)
+
+        if command[0] == "--input":
+            snapshot_input = Path(command[1])
+            run_dir = _bundle(
+                run_root,
+                run_dir_name="local-pilot-CURRENT-REBUILT-20261116T160000Z",
+            )
+            copy_input_and_update_manifest(run_dir, snapshot_input)
+            generated["first_run"] = run_dir
+            return {
+                "status": "PILOT_CREATED",
+                "pilot_id": run_dir.name,
+                "run_dir": str(run_dir),
+            }
+
+        if command[0] == "--check-run":
+            from iios_mvp import local_investment_pilot_v01 as pilot
+
+            run_dir = Path(command[1])
+            verified = pilot.verify_local_pilot_bundle(run_dir)
+            return {
+                **verified,
+                "status": "PILOT_BUNDLE_HASH_CHECK_PASS",
+                "pilot_id": run_dir.name,
+                "run_dir": str(run_dir),
+            }
+
+        if command[0] == "--replay-run":
+            first_dir = Path(command[1])
+            replay_dir = _bundle(
+                run_root,
+                replay_of=first_dir.name,
+                run_dir_name="local-pilot-REPLAY-20261116T160100Z",
+            )
+            copy_input_and_update_manifest(replay_dir, first_dir / "input.json")
+            comparison = {
+                "mode": "DECISION_MATERIAL_FIELDS_V1",
+                "status": "MATCH",
+                "hash_verification": "PASS",
+                "prior_pilot_id": first_dir.name,
+                "compared_fields": ["decision", "valuation_timing"],
+                "mismatched_fields": [],
+            }
+            receipt_path = replay_dir / "pilot_receipt.json"
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            receipt["replay_comparison"] = comparison
+            _write_json(receipt_path, receipt)
+            generated["replay_run"] = replay_dir
+            return {
+                "status": "PILOT_REPLAY_MATCHED",
+                "pilot_id": replay_dir.name,
+                "run_dir": str(replay_dir),
+                "replay_of": first_dir.name,
+                "replay_comparison": comparison,
+            }
+
+        raise AssertionError(f"unexpected CLI command: {command!r}")
+
+    monkeypatch.setattr(acceptance, "_run_cli", fake_run_cli)
+
+    result = acceptance._verify_and_replay(legacy)
+
+    assert result == 0
+    assert [call[0] for call in cli_calls] == [
+        "--input",
+        "--check-run",
+        "--replay-run",
+        "--check-run",
+    ]
+    first_run = generated["first_run"]
+    replay_run = generated["replay_run"]
+    assert first_run.parent == run_root
+    assert replay_run.parent == run_root
+    assert replay_run != legacy
+    assert (legacy / "pilot_receipt.json").read_bytes() == original_receipt_bytes
+    assert (legacy / "input.json").read_bytes() == original_input_bytes
+    assert "file_manifest" not in json.loads(original_receipt_bytes.decode("utf-8"))
+
+    snapshots = list((archive_root / "legacy-migrations").iterdir())
+    assert len(snapshots) == 1
+    snapshot = snapshots[0]
+    from iios_mvp.legacy_pilot_bundle_migration_v01 import (
+        verify_legacy_pilot_migration_snapshot,
+    )
+
+    assert verify_legacy_pilot_migration_snapshot(snapshot)["status"] == "LEGACY_MIGRATION_SNAPSHOT_HASH_CHECK_PASS"
+
+    archives = list(archive_root.glob("*.zip"))
+    assert len(archives) == 1
+    with zipfile.ZipFile(archives[0], "r") as archive:
+        assert archive.testzip() is None
+        names = set(archive.namelist())
+        prefix = f"legacy_migration/{snapshot.name}"
+        assert f"{prefix}/migration_manifest.json" in names
+        assert f"{prefix}/pilot_receipt.json" in names
+        assert f"first_run/{first_run.name}/pilot_receipt.json" in names
+        assert f"replay_run/{replay_run.name}/pilot_receipt.json" in names
+        assert any(name.endswith(prior_failure_log.name) for name in names)
+        summary = json.loads(archive.read("acceptance_summary.json"))
+        assert summary["overall_status"] == "PASS"
+        assert summary["technical_status"] == "PASS"
+        assert summary["legacy_migration"]["historical_hash_verification"] == "UNVERIFIABLE_NO_ORIGINAL_FILE_MANIFEST"
+        assert summary["legacy_migration"]["snapshot_integrity"] == "VERIFIED_AT_MIGRATION_TIME"
