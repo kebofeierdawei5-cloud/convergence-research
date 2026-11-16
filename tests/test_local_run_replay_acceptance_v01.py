@@ -1304,3 +1304,77 @@ def test_manifestless_legacy_run_completes_strict_replay_and_audit_bundle(
         assert summary["technical_status"] == "PASS"
         assert summary["legacy_migration"]["historical_hash_verification"] == "UNVERIFIABLE_NO_ORIGINAL_FILE_MANIFEST"
         assert summary["legacy_migration"]["snapshot_integrity"] == "VERIFIED_AT_MIGRATION_TIME"
+
+
+
+def test_main_uses_explicit_existing_run_id_without_showing_research_menu(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = tmp_path / "runs"
+    run_root.mkdir(mode=0o700)
+    pilot_id = "local-pilot-002810-20261012T141631129796Z"
+    existing_run = run_root / pilot_id
+    existing_run.mkdir(mode=0o700)
+    monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
+    monkeypatch.setattr(acceptance, "_prepare_private_roots", lambda: None)
+    monkeypatch.setenv("IIOS_ACCEPTANCE_EXISTING_RUN_ID", pilot_id)
+    monkeypatch.delenv("IIOS_ACCEPTANCE_AUTO_START", raising=False)
+
+    observed: list[Path] = []
+    monkeypatch.setattr(
+        acceptance,
+        "_verify_and_replay",
+        lambda path: observed.append(path) or 0,
+    )
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt="": pytest.fail("fixed-run mode must not display the interactive research menu"),
+    )
+
+    assert acceptance.main() == 0
+    assert observed == [existing_run.resolve()]
+
+
+def test_main_fails_closed_for_invalid_or_missing_fixed_run_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = tmp_path / "runs"
+    run_root.mkdir(mode=0o700)
+    monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
+    monkeypatch.setattr(acceptance, "_prepare_private_roots", lambda: None)
+    monkeypatch.setenv("IIOS_ACCEPTANCE_EXISTING_RUN_ID", "../outside")
+    monkeypatch.delenv("IIOS_ACCEPTANCE_AUTO_START", raising=False)
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt="": pytest.fail("invalid fixed-run mode must not fall back to the menu"),
+    )
+
+    assert acceptance.main() == 2
+
+    monkeypatch.setenv(
+        "IIOS_ACCEPTANCE_EXISTING_RUN_ID",
+        "local-pilot-002810-20261012T141631129796Z",
+    )
+    assert acceptance.main() == 2
+
+
+def test_main_rejects_conflicting_new_analysis_auto_start_and_fixed_run_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = tmp_path / "runs"
+    run_root.mkdir(mode=0o700)
+    pilot_id = "local-pilot-002810-20261012T141631129796Z"
+    (run_root / pilot_id).mkdir(mode=0o700)
+    monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
+    monkeypatch.setattr(acceptance, "_prepare_private_roots", lambda: None)
+    monkeypatch.setenv("IIOS_ACCEPTANCE_EXISTING_RUN_ID", pilot_id)
+    monkeypatch.setenv("IIOS_ACCEPTANCE_AUTO_START", "1")
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt="": pytest.fail("conflicting auto-start modes must fail closed"),
+    )
+
+    assert acceptance.main() == 2

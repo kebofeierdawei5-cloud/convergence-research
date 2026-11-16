@@ -1298,6 +1298,26 @@ def _check_only(run_dir: Path) -> int:
     return 0
 
 
+def _configured_existing_run_from_environment() -> Path | None:
+    """Resolve one explicitly configured, existing run ID; never create a new analysis."""
+    raw_id = os.environ.get("IIOS_ACCEPTANCE_EXISTING_RUN_ID", "").strip()
+    if not raw_id:
+        return None
+    if not RESULT_ID_PATTERN.fullmatch(raw_id):
+        raise AcceptanceError("CONFIGURED_EXISTING_PILOT_ID_INVALID")
+    run_root = RUN_ROOT.expanduser().resolve()
+    candidate = RUN_ROOT / raw_id
+    if candidate.is_symlink():
+        raise AcceptanceError("CONFIGURED_EXISTING_PILOT_RUN_MUST_NOT_BE_SYMLINK")
+    try:
+        resolved = candidate.resolve(strict=True)
+    except OSError as exc:
+        raise AcceptanceError(f"CONFIGURED_EXISTING_PILOT_RUN_NOT_FOUND:{raw_id}") from exc
+    if resolved.parent != run_root or not resolved.is_dir():
+        raise AcceptanceError("CONFIGURED_EXISTING_PILOT_RUN_PATH_INVALID")
+    return resolved
+
+
 def main() -> int:
     if sys.version_info < (3, 10):
         print("需要 Python 3.10 或更新版本。", file=sys.stderr)
@@ -1314,6 +1334,14 @@ def main() -> int:
         print(f"私有运行目录：{RUN_ROOT}")
         print(f"私有日志目录：{LOG_ROOT}")
         print("本脚本只编排已有本地试运行与 Replay，不访问付费 API，不使用本地模型，不下单。\n")
+        configured_run = _configured_existing_run_from_environment()
+        if configured_run is not None:
+            if os.environ.get("IIOS_ACCEPTANCE_AUTO_START") == "1":
+                raise AcceptanceError("EXISTING_RUN_MODE_CONFLICTS_WITH_NEW_ANALYSIS_AUTO_START")
+            print("固定历史运行迁移模式：只对指定旧运行包进行只读归档、当前版本重建与 Replay。")
+            print(f"指定原始运行：{configured_run.name}")
+            print("不会启动新研究向导，不会要求重做 Round A / Round B。")
+            return _verify_and_replay(configured_run)
         if os.environ.get("IIOS_ACCEPTANCE_AUTO_START") == "1":
             # Distribution launcher skips the secondary menu and starts full acceptance.
             print("一键启动模式：自动进入完整分析 → 首轮包哈希校验 → Replay → Replay 包哈希校验。")
