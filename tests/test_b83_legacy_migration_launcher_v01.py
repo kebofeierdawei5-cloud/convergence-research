@@ -74,7 +74,7 @@ def test_b83_packager_preserves_single_launcher_posix_mode_and_readme(tmp_path: 
 
 def test_launcher_and_runbook_do_not_recommend_changing_existing_checkout() -> None:
     source = LAUNCHER.read_text(encoding="utf-8")
-    assert "~/.iios-private/source/" in source
+    assert 'SOURCE_ROOT="$PRIVATE_ROOT/source"' in source
     runbook = (
         REPO_ROOT
         / "docs"
