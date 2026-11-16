@@ -1052,10 +1052,14 @@ def _find_rebuilt_run_for_legacy_snapshot(snapshot_dir: Path) -> Path | None:
     expected = files.get("input.json") if isinstance(files, dict) else None
     if not isinstance(expected, dict):
         raise AcceptanceError("LEGACY_MIGRATION_INPUT_FINGERPRINT_MISSING")
-    expected_hash = expected.get("sha256")
-    expected_size = expected.get("byte_size")
-    if not isinstance(expected_hash, str) or not isinstance(expected_size, int) or isinstance(expected_size, bool):
-        raise AcceptanceError("LEGACY_MIGRATION_INPUT_FINGERPRINT_INVALID")
+    try:
+        # The pilot reads text with universal-newline normalization before
+        # writing its new input.json. Match those exact resulting bytes.
+        expected_input = (snapshot_dir / "input.json").read_text(encoding="utf-8").encode("utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise AcceptanceError("LEGACY_MIGRATION_INPUT_UNREADABLE") from exc
+    expected_hash = hashlib.sha256(expected_input).hexdigest()
+    expected_size = len(expected_input)
     matches: list[Path] = []
     if not RUN_ROOT.is_dir():
         return None
@@ -1067,9 +1071,9 @@ def _find_rebuilt_run_for_legacy_snapshot(snapshot_dir: Path) -> Path | None:
         if input_path.is_symlink() or receipt_path.is_symlink() or not input_path.is_file() or not receipt_path.is_file():
             continue
         try:
-            input_bytes = input_path.read_bytes()
+            input_bytes = input_path.read_text(encoding="utf-8").encode("utf-8")
             receipt = _read_json(receipt_path, "LEGACY_REBUILD_CANDIDATE_RECEIPT")
-        except (OSError, AcceptanceError):
+        except (OSError, UnicodeError, AcceptanceError):
             continue
         if (
             len(input_bytes) == expected_size
@@ -1106,7 +1110,7 @@ def _prepare_replay_source(
     try:
         snapshot_result = create_legacy_pilot_migration_snapshot(original_dir, migration_root)
         snapshot_dir = Path(str(snapshot_result["snapshot_path"])).resolve(strict=True)
-        snapshot_check = verify_legacy_pilot_migration_snapshot(snapshot_dir)
+        verify_legacy_pilot_migration_snapshot(snapshot_dir)
     except (LegacyPilotMigrationError, OSError, KeyError) as exc:
         raise AcceptanceError(f"LEGACY_MIGRATION_SNAPSHOT_FAILED:{exc}") from exc
 
