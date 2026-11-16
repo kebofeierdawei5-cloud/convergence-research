@@ -1084,6 +1084,13 @@ def _find_rebuilt_run_for_legacy_snapshot(snapshot_dir: Path) -> Path | None:
             and receipt.get("replay_of") is None
             and isinstance(receipt.get("file_manifest"), dict)
         ):
+            # A matching input is necessary but not sufficient: only reuse a
+            # fully valid current-format run, never a partial/corrupt artifact.
+            try:
+                from . import local_investment_pilot_v01 as pilot
+                pilot.verify_local_pilot_bundle(candidate)
+            except (ValueError, OSError, KeyError, TypeError):
+                continue
             matches.append(candidate.resolve())
     if len(matches) > 1:
         raise AcceptanceError("LEGACY_MIGRATION_MULTIPLE_CURRENT_REBUILDS_MATCH_INPUT")
