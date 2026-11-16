@@ -13,13 +13,16 @@ on:
       - "iios_mvp/legacy_pilot_bundle_migration_v01.py"
       - "tools/iios_update_local_main_v01.sh"
       - "tests/test_local_run_replay_acceptance_v01.py"
-      - "tests/test_legacy_pilot_bundle_migration_v01.py"
+      - "tests/test_legacy_pilot_bundle_migration_v01.py tests/test_b83_legacy_migration_launcher_v01.py"
       - "tests/test_local_investment_pilot_v01.py"
       - "tests/test_guided_task_session_v01.py"
       - "tests/test_quick_start_v01.py"
       - "tests/test_b83_clipboard_intake_v01.py"
       - "tests/test_task_workspace_v01.py"
       - "验收IIOS全流程与Replay.command"
+      - "B83_旧运行包迁移验收.command"
+      - "tools/package_b83_legacy_migration_launcher_v01.py"
+      - "tests/test_b83_legacy_migration_launcher_v01.py"
       - "启动IIOS投资分析.command"
       - "IIOS.command"
       - ".github/workflows/iios_local_investment_pilot_v01.yml"
@@ -47,6 +50,9 @@ on:
       - "tests/test_b83_clipboard_intake_v01.py"
       - "tests/test_task_workspace_v01.py"
       - "验收IIOS全流程与Replay.command"
+      - "B83_旧运行包迁移验收.command"
+      - "tools/package_b83_legacy_migration_launcher_v01.py"
+      - "tests/test_b83_legacy_migration_launcher_v01.py"
       - "启动IIOS投资分析.command"
       - "IIOS.command"
       - ".github/workflows/iios_local_investment_pilot_v01.yml"
@@ -77,9 +83,9 @@ jobs:
       - name: Install test dependency
         run: python -m pip install --disable-pip-version-check pytest
       - name: Compile the local pilot, profile, quick start and reused IIOS core
-        run: python -m compileall -q iios_mvp/local_investment_pilot_v01.py iios_mvp/legacy_pilot_bundle_migration_v01.py iios_mvp/guided_task_resume_v01.py iios_mvp/guided_task_session_v01.py iios_mvp/operator_profile_v01.py iios_mvp/quick_start_v01.py iios_mvp/task_workspace_v01.py iios_mvp/local_run_replay_acceptance_v01.py iios_mvp/research_intake.py iios_mvp/investment_core_contract_v03.py
+        run: python -m compileall -q tools/package_b83_legacy_migration_launcher_v01.py iios_mvp/local_investment_pilot_v01.py iios_mvp/legacy_pilot_bundle_migration_v01.py iios_mvp/guided_task_resume_v01.py iios_mvp/guided_task_session_v01.py iios_mvp/operator_profile_v01.py iios_mvp/quick_start_v01.py iios_mvp/task_workspace_v01.py iios_mvp/local_run_replay_acceptance_v01.py iios_mvp/research_intake.py iios_mvp/investment_core_contract_v03.py
       - name: Validate macOS double-click launcher syntax
-        run: bash -n "验收IIOS全流程与Replay.command" && bash -n IIOS.command
+        run: bash -n "验收IIOS全流程与Replay.command" && bash -n "B83_旧运行包迁移验收.command" && bash -n IIOS.command
       - name: Validate local-main updater syntax
         run: bash -n tools/iios_update_local_main_v01.sh
       - name: Run local pilot, quick-start, clipboard and acceptance tests
