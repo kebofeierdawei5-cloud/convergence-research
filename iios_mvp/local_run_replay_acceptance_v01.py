@@ -1113,6 +1113,15 @@ def _prepare_replay_source(
 
     print("\n[历史格式兼容] 原始 Receipt 未记录 file_manifest。")
     print("历史文件完整性无法追溯验证；不修改原包，不补写历史哈希。")
+    # Preserve the exact earlier BLOCKED acceptance log in the final handoff.
+    # Read-only inclusion keeps the diagnostic history attached to the migration.
+    prior_failure_logs = sorted(
+        LOG_ROOT.glob(f"*-check-original-{original_dir.name}.log")
+    )
+    for prior_log in prior_failure_logs:
+        if prior_log not in audit_logs:
+            audit_logs.append(prior_log)
+            print(f"  原始失败日志（保留并纳入审计包）：{prior_log}")
     migration_root = ACCEPTANCE_BUNDLE_ROOT / "legacy-migrations"
     try:
         snapshot_result = create_legacy_pilot_migration_snapshot(original_dir, migration_root)
