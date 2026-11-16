@@ -671,6 +671,11 @@ def _validate_canonical_upstream_admissions(
             "BLOCKED: semantic producer identity/version/policy is not admitted"
         )
     evidence_stage = _receipt_for_stage(record, Stage.EVIDENCE_ADMITTED)[1]
+    admitted_manifest_refs = set(
+        str(item) for item in evidence_stage.get("output_refs", [])[1:]
+    )
+    admitted_manifest_hashes = list(evidence_stage.get("output_hashes", []))
+    admitted_manifest_hash = str(admitted_manifest_hashes[0]) if admitted_manifest_hashes else ""
     admitted_input_pairs = list(zip(
         evidence_stage["output_refs"][1:],
         evidence_stage["output_hashes"][1:],
@@ -871,6 +876,36 @@ def _validate_canonical_upstream_admissions(
             "BLOCKED: DECISION_PENDING does not bind admitted Forecast and Valuation records"
         )
     validated_lineage = bundle["validated_lineage"]
+    evidence_pit_admission = (
+        validated_lineage.get("evidence_pit_admission")
+        if isinstance(validated_lineage, Mapping) else None
+    )
+    evidence_ref = (
+        validated_lineage.get("canonical_evidence_admission_ref")
+        if isinstance(validated_lineage, Mapping) else None
+    )
+    required_evidence_ids = sorted(set(
+        [str(item) for item in forecast_record.get("evidence_ids", [])]
+        + [str(item) for item in valuation_output.get("evidence_ids", [])]
+    ))
+    evidence_binding_valid = (
+        isinstance(evidence_pit_admission, Mapping)
+        and isinstance(evidence_ref, Mapping)
+        and set(evidence_ref) == {
+            "envelope_sha256", "manifest_sha256",
+            "rights_record_sha256", "permission_evidence_sha256",
+        }
+        and all(is_sha256(str(value)) for value in evidence_ref.values())
+        and evidence_pit_admission.get("status") == "FORMALLY_ADMITTED"
+        and evidence_pit_admission.get("decision") == "ADMIT"
+        and evidence_pit_admission.get("core_pit_validation") == "PASS"
+        and evidence_pit_admission.get("formal_evidence_pit_admission_created") is True
+        and evidence_pit_admission.get("decision_authority") is False
+        and evidence_pit_admission.get("evidence_manifest_audit_sha256") == admitted_manifest_hash
+        and sorted(evidence_pit_admission.get("evidence_ids_verified") or []) == required_evidence_ids
+        and set(required_evidence_ids).issubset(admitted_manifest_refs)
+        and sorted(validated_lineage.get("evidence_ids_verified") or []) == required_evidence_ids
+    )
     if (
         not isinstance(validated_lineage, Mapping)
         or validated_lineage.get("status") != "PASS"
@@ -879,10 +914,13 @@ def _validate_canonical_upstream_admissions(
         or validated_lineage.get("canonical_valuation_ref") != dict(valuation_ref)
         or validated_lineage.get("forecast_id") != forecast_record.get("forecast_id")
         or validated_lineage.get("valuation_id") != valuation_output.get("valuation_id")
-        or validated_lineage.get("binding") != "FORECAST_REF_EQUALITY_AND_CANONICAL_VALUATION_SCENARIO_EQUALITY"
+        or validated_lineage.get("binding") != "FORECAST_REF_EQUALITY_EVIDENCE_ID_SUBSET_CANONICAL_VALUATION_SCENARIO_EQUALITY_AND_SIGNED_EVIDENCE_PIT"
+        or validated_lineage.get("evidence_pit_admission_status") != "FORMALLY_ADMITTED"
+        or validated_lineage.get("formal_return_lineage_status") != "FORMALLY_EVIDENCE_BOUND"
+        or not evidence_binding_valid
     ):
         raise CanonicalRunAuthorizationError(
-            "BLOCKED: persisted Forecast/Valuation return-lineage admission is inconsistent"
+            "BLOCKED: persisted Forecast/Valuation/Evidence-PIT return-lineage admission is inconsistent"
         )
     return dict(bundle)
 

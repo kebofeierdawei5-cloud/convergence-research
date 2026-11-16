@@ -230,6 +230,112 @@ def prepare_authorized_test_run(
     orchestrator.transition(run_id, Stage.EVIDENCE_PENDING, created_at="2026-10-09T00:00:03+00:00")
     evidence_ids = [str(x["evidence_id"]) for x in manifest["evidence"]]
     evidence_hashes = [str(x["content_sha256"]) for x in manifest["evidence"]]
+
+    # A test-only, case-scoped Ed25519 signer gives the downstream lifecycle
+    # writer tests a real signed Evidence/PIT bundle. The key and ACTIVE registry
+    # are ephemeral under this test root; the production authority registry is
+    # never modified and no test signer is registered for real cases.
+    import base64
+    from datetime import date
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from iios_mvp.canonical_forecast_evidence_binding_v01 import (
+        FileSystemCanonicalSignedEvidenceAdmissionResolver,
+        build_canonical_signed_evidence_admission_reference,
+    )
+    from iios_mvp.canonical_signed_evidence_admission_v01 import (
+        RIGHTS_SCHEMA,
+        SIGNED_ADMISSION_SCHEMA,
+        SIGNER_REGISTRY_SCHEMA,
+        add_signature,
+        build_admission_payload,
+    )
+
+    permission_path = root_path / "canonical-artifacts" / f"{run_id}.permission-instrument.bin"
+    permission_bytes = f"SYNTHETIC_TEST_ONLY_PERMISSION:{run_id}".encode("utf-8")
+    permission_path.write_bytes(permission_bytes)
+    rights_path = root_path / "canonical-artifacts" / f"{run_id}.rights.json"
+    rights = {
+        "schema_version": RIGHTS_SCHEMA,
+        "case_id": case_id,
+        "source_class": "EXCHANGE_MARKET_DATA",
+        "status": "ALLOWED",
+        "basis_kind": "EXPLICIT_WRITTEN_PERMISSION",
+        "permission_instrument_id": f"TEST-PERMISSION-{hashlib.sha256(run_id.encode()).hexdigest()[:16]}",
+        "permission_evidence_sha256": hashlib.sha256(permission_bytes).hexdigest(),
+        "allowed_uses": ["PRIVATE_STORAGE", "LOCAL_COMPUTATION", "INTERNAL_DISPLAY"],
+        "required_signer_roles": ["EVIDENCE_ADMISSION_SIGNER"],
+        "expires_at": "2027-12-31T00:00:00+00:00",
+    }
+    rights_path.write_text(json.dumps(rights, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+    private_raw = hashlib.sha256(("IIOS-TEST-ONLY-SIGNER:" + run_id).encode("utf-8")).digest()
+    private_key = Ed25519PrivateKey.from_private_bytes(private_raw)
+    public_raw = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    signer_key_id = "test-owner-" + hashlib.sha256(run_id.encode("utf-8")).hexdigest()[:16]
+    private_path = root_path / "canonical-artifacts" / f"{run_id}.admission.key"
+    private_path.write_text(base64.b64encode(private_raw).decode("ascii") + "\n", encoding="ascii")
+    private_path.chmod(0o600)
+    registry_path = root_path / "canonical-artifacts" / f"{run_id}.signer-registry.json"
+    registry_path.write_text(json.dumps({
+        "schema_version": SIGNER_REGISTRY_SCHEMA,
+        "registry_status": "ACTIVE",
+        "signers": [{
+            "signer_key_id": signer_key_id,
+            "public_key_b64": base64.b64encode(public_raw).decode("ascii"),
+            "roles": ["EVIDENCE_ADMISSION_SIGNER"],
+            "status": "ACTIVE",
+            "case_scopes": [case_id],
+            "valid_from": "2026-01-01T00:00:00+00:00",
+            "valid_until": None,
+            "revoked_at": None,
+        }],
+    }, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+    signed_at = f"{cutoff}T00:00:00+08:00"
+    admission_payload = build_admission_payload(
+        manifest_path=manifest_path,
+        raw_root=evidence_root,
+        rights_record_path=rights_path,
+        permission_evidence_path=permission_path,
+        decision="ADMIT",
+        signed_at=signed_at,
+    )
+    signed_envelope = add_signature(
+        {"schema_version": SIGNED_ADMISSION_SCHEMA, "payload": admission_payload, "signatures": []},
+        signer_registry_path=registry_path,
+        signer_key_id=signer_key_id,
+        private_key_path=private_path,
+        signed_at=signed_at,
+    )
+    envelope_path = root_path / "canonical-artifacts" / f"{run_id}.signed-admission.json"
+    envelope_path.write_text(json.dumps(signed_envelope, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    signed_evidence_ref = build_canonical_signed_evidence_admission_reference(
+        envelope_path=envelope_path,
+        manifest_path=manifest_path,
+        rights_record_path=rights_path,
+        permission_evidence_path=permission_path,
+    )
+    signed_evidence_resolver = FileSystemCanonicalSignedEvidenceAdmissionResolver(
+        envelope_path=envelope_path,
+        manifest_path=manifest_path,
+        raw_root=evidence_root,
+        rights_record_path=rights_path,
+        permission_evidence_path=permission_path,
+        signer_registry_path=registry_path,
+    )
+    signed_evidence_result = signed_evidence_resolver.resolve_signed_evidence_admission(
+        signed_evidence_ref,
+        case_id=case_id,
+        market=market,
+        symbol=symbol,
+        cutoff_date=date.fromisoformat(cutoff),
+        required_evidence_ids=sorted(set(evidence_ids)),
+    )
+
     orchestrator.transition(
         run_id, Stage.EVIDENCE_ADMITTED,
         output_refs=(f"evidence-manifest:{manifest_hash}", *evidence_ids),
@@ -443,7 +549,16 @@ def prepare_authorized_test_run(
         "valuation_primary_model": "TEST_FIXTURE_ONLY",
         "horizon_years": "1",
         "reference_value_per_share": "10",
-        "binding": "FORECAST_REF_EQUALITY_AND_CANONICAL_VALUATION_SCENARIO_EQUALITY",
+        "binding": "FORECAST_REF_EQUALITY_EVIDENCE_ID_SUBSET_CANONICAL_VALUATION_SCENARIO_EQUALITY_AND_SIGNED_EVIDENCE_PIT",
+        "canonical_evidence_admission_ref": signed_evidence_ref,
+        "evidence_pit_admission_status": "FORMALLY_ADMITTED",
+        "evidence_pit_admission": signed_evidence_result,
+        "evidence_ids_declared": sorted(set(evidence_ids)),
+        "evidence_ids_verified": sorted(set(evidence_ids)),
+        "formal_return_lineage_status": "FORMALLY_EVIDENCE_BOUND",
+        "formal_evidence_pit_admission_created": False,
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
         "valuation_admission_record": valuation_admission,
     }
     upstream_core = {

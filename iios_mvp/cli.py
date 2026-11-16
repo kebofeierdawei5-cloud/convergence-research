@@ -200,6 +200,7 @@ def cmd_canonical_run(args: argparse.Namespace) -> int:
         required = (
             "raw_request", "request_id", "run_id", "company",
             "investment_case", "evidence_manifest_path", "evidence_root",
+            "canonical_evidence_admission_ref",
             "artifact_type", "semantic_prompt", "decision_relevance",
         )
         missing = [key for key in required if key not in bundle or bundle[key] in (None, "")]
@@ -241,6 +242,8 @@ def cmd_canonical_run(args: argparse.Namespace) -> int:
             valuation_output_resolver=runtime.valuation_output_resolver,
             operator_price_input_resolver=getattr(runtime, "operator_price_input_resolver", None),
             operator_price_input_ref=bundle.get("operator_price_input_ref"),
+            canonical_evidence_admission_ref=bundle["canonical_evidence_admission_ref"],
+            evidence_admission_resolver=runtime.evidence_admission_resolver,
             run_root=args.out,
             evidence_manifest=manifest,
             evidence_root=str(bundle["evidence_root"]),

@@ -249,11 +249,20 @@ def evaluate_sotp_valuation(
                     allow_negative=False,
                     allow_zero=False,
                 )
+                # B64 metadata is copied for read-only evidence grading only.
+                # It is deliberately excluded from SOTP arithmetic and admission.
+                for raw_measure, normalized_measure in (
+                    (segment.get("attributable_net_profit_cny"), profit_norm),
+                    (segment.get("pe_multiple_x"), multiple_norm),
+                ):
+                    raw_support = raw_measure.get("support_assessment") if isinstance(raw_measure, Mapping) else None
+                    normalized_measure["support_assessment"] = dict(raw_support) if isinstance(raw_support, Mapping) else None
                 value = profit * multiple
                 segment_equity_value += value
                 normalized_segments.append({
                     "segment_id": segment_id,
                     "segment_name": segment_name,
+                    "earnings_basis": str(segment.get("earnings_basis") or "UNKNOWN").strip().upper(),
                     "attributable_net_profit_cny": profit_norm,
                     "pe_multiple_x": multiple_norm,
                     "segment_equity_value_cny": _fmt(value),
@@ -436,7 +445,7 @@ def render_sotp_valuation_section(result: Mapping[str, Any], currency: str) -> l
             multiple = (segment.get("pe_multiple_x") or {}).get("value", "UNKNOWN")
             lines.append(
                 f"- 分部 {segment.get('segment_id', 'UNKNOWN')} / {segment.get('segment_name', 'UNKNOWN')}："
-                f"归属净利润 {profit} CNY × P/E {multiple} = {segment.get('segment_equity_value_cny', 'UNKNOWN')} CNY"
+                f"归属净利润 {profit} CNY；盈利口径 {segment.get('earnings_basis', 'UNKNOWN')} × P/E {multiple} = {segment.get('segment_equity_value_cny', 'UNKNOWN')} CNY"
             )
         parent = row.get("parent_level_adjustments") if isinstance(row.get("parent_level_adjustments"), Mapping) else {}
         lines.extend([

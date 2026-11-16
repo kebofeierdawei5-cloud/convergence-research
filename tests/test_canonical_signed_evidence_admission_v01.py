@@ -124,7 +124,7 @@ def _write_rights(tmp_path: Path, *, source_class="EXCHANGE_MARKET_DATA", status
     return rights_path, permission_path
 
 
-def _make_registry(tmp_path: Path, roles_by_key=None):
+def _make_registry(tmp_path: Path, roles_by_key=None, *, registry_status="ACTIVE"):
     roles_by_key = roles_by_key or {
         "owner-test": ["EVIDENCE_ADMISSION_SIGNER"],
         "reviewer-test": ["INDEPENDENT_REVIEWER"],
@@ -154,7 +154,7 @@ def _make_registry(tmp_path: Path, roles_by_key=None):
     registry_path = tmp_path / "signer-registry.json"
     registry_path.write_text(json.dumps({
         "schema_version": SIGNER_REGISTRY_SCHEMA,
-        "registry_status": "TEST_ONLY",
+        "registry_status": registry_status,
         "signers": entries,
     }, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     return registry_path, key_paths
@@ -694,3 +694,45 @@ def test_review_packet_never_allows_output_inside_repository():
     with pytest.raises(ReviewPacketError, match="REVIEW_PACKET_OUTPUT_MUST_BE_OUTSIDE_REPOSITORY"):
         _ensure_private_output_path(candidate)
     assert not candidate.exists()
+
+
+def test_test_only_signer_registry_cannot_formally_admit_even_with_valid_signature(tmp_path):
+    payload, manifest, raw_root, rights, permission = _create_envelope(tmp_path)
+    registry, keys = _make_registry(tmp_path, registry_status="TEST_ONLY")
+    envelope = {"schema_version": SIGNED_ADMISSION_SCHEMA, "payload": payload, "signatures": []}
+    envelope = add_signature(
+        envelope,
+        signer_registry_path=registry,
+        signer_key_id="owner-test",
+        private_key_path=keys["owner-test"],
+        signed_at=SIGNED_AT,
+    )
+    with pytest.raises(SignedAdmissionError, match="SIGNER_REGISTRY_NOT_ACTIVE_TRUST_AUTHORITY"):
+        verify_signed_admission(
+            envelope,
+            manifest_path=manifest,
+            raw_root=raw_root,
+            rights_record_path=rights,
+            permission_evidence_path=permission,
+            signer_registry_path=registry,
+        )
+
+
+def test_empty_signer_registry_cannot_formally_admit(tmp_path):
+    payload, manifest, raw_root, rights, permission = _create_envelope(tmp_path)
+    registry = tmp_path / "empty-registry.json"
+    registry.write_text(json.dumps({
+        "schema_version": SIGNER_REGISTRY_SCHEMA,
+        "registry_status": "ACTIVE",
+        "signers": [],
+    }, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    envelope = {"schema_version": SIGNED_ADMISSION_SCHEMA, "payload": payload, "signatures": []}
+    with pytest.raises(SignedAdmissionError, match="NO_TRUSTED_SIGNERS_REGISTERED"):
+        verify_signed_admission(
+            envelope,
+            manifest_path=manifest,
+            raw_root=raw_root,
+            rights_record_path=rights,
+            permission_evidence_path=permission,
+            signer_registry_path=registry,
+        )

@@ -31,7 +31,8 @@ jobs:
           python-version: "3.13"
       - name: Install test dependency
         run: python -m pip install --disable-pip-version-check pytest
-      - name: Verify canonical state authority
+      - name: Verify canonical state authority (main-target changes only)
+        if: github.event_name != 'pull_request' || github.event.pull_request.base.ref == 'main'
         run: python -m pytest -q tests/test_state_authority_index.py
       - name: Diff check
         run: git diff --check

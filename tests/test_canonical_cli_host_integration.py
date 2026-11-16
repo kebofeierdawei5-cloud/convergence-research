@@ -23,6 +23,8 @@ from tests.test_b2e_nl_semantic_decision_e2e import (
     _admitted_synthetic_manifest,
     _case_and_resolvers,
     _registries,
+    _expand_synthetic_manifest_with_lineage_ids,
+    _signed_evidence_binding,
 )
 
 
@@ -32,6 +34,12 @@ def test_cli_host_routes_natural_language_request_through_canonical_run(
     """A fresh request through the supported host persists run and stage receipts."""
     case, current_price, forecast, upstream, valuation = _case_and_resolvers()
     evidence_root, manifest, manifest_path = _admitted_synthetic_manifest(tmp_path, case)
+    manifest = _expand_synthetic_manifest_with_lineage_ids(
+        tmp_path, case, evidence_root, manifest
+    )
+    evidence_ref, evidence_resolver = _signed_evidence_binding(
+        tmp_path, case, evidence_root, manifest
+    )
     # Materialize standards-compliant JSON for the real CLI file loader. The
     # helper's returned mapping is fixture evidence; the CLI receives only the
     # serialized manifest path, exactly as a host deployment would.
@@ -55,6 +63,7 @@ def test_cli_host_routes_natural_language_request_through_canonical_run(
         independent_forecast_resolver=forecast,
         upstream_authority_resolver=upstream,
         valuation_output_resolver=valuation,
+        evidence_admission_resolver=evidence_resolver,
     )
 
     factory_module_name = "iios_test_host_b1_runtime_factory"
@@ -81,6 +90,7 @@ def test_cli_host_routes_natural_language_request_through_canonical_run(
         "investment_case": case,
         "evidence_manifest_path": str(manifest_path),
         "evidence_root": str(evidence_root),
+        "canonical_evidence_admission_ref": evidence_ref,
         "artifact_type": "THESIS_ASSESSMENT",
         "semantic_prompt": (
             "SYNTHETIC_TEST_ONLY: assess the thesis from admitted fixture inputs; "

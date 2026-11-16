@@ -27,7 +27,24 @@ from .decision_kernel_v03 import evaluate_production_decision
 from .decision_state_machine_v01 import MIE_POLICY_OPTIONAL_EXPLANATORY
 from .local_pilot_portfolio_package_v01 import build_local_pilot_portfolio_package
 from .operating_driver_forecast_v01 import evaluate_operating_driver_forecast, render_operating_driver_section
+from .cycle_earnings_monitor_v01 import (
+    CYCLE_EARNINGS_MONITOR_SCHEMA,
+    evaluate_cycle_earnings_monitor,
+    render_cycle_earnings_monitor_section,
+)
 from .sotp_valuation_v01 import evaluate_sotp_valuation, render_sotp_valuation_section
+from .sotp_valuation_gap_attribution_v01 import build_sotp_valuation_gap_attribution
+from .sotp_evidence_grade_v01 import build_sotp_evidence_grade_assessment
+from .sotp_comparability_audit_v01 import build_sotp_comparability_audit
+from .sotp_multiple_calibration_v01 import build_sotp_multiple_calibration_assessment
+from .sotp_value_credibility_audit_v01 import build_sotp_value_credibility_price_audit
+from .sotp_operating_requirement_reverse_engineering_v01 import build_sotp_operating_requirement_reverse_engineering
+from .expectation_gap_comparison_v01 import build_expectation_gap_comparison
+from .sotp_operating_feasibility_audit_v01 import build_sotp_operating_feasibility_audit
+from .operating_feasibility_evidence_v01 import build_operating_feasibility_evidence_assessment
+from .operating_feasibility_semantic_review_v01 import build_operating_feasibility_semantic_review
+from .operating_feasibility_exception_register_v01 import build_operating_feasibility_exception_register
+from .operating_feasibility_remediation_v01 import build_operating_feasibility_remediation_assessment
 from .valuation_transmission_v01 import (
     VALUATION_TRANSMISSION_SCHEMA,
     evaluate_valuation_transmission,
@@ -40,6 +57,8 @@ from .investment_core_contract_v03 import (
     calculate_return_metrics,
 )
 from .research_intake import build_research_case
+from .guided_task_session_v01 import GuidedTaskSession
+from .guided_task_resume_v01 import run_guided_task
 
 PILOT_SCHEMA = "IIOS-LOCAL-INVESTMENT-PILOT-0.1"
 PILOT_ANALYSIS_SCHEMA = "IIOS-LOCAL-INVESTMENT-PILOT-ANALYSIS-0.1"
@@ -80,6 +99,9 @@ REPLAY_COMPARISON_FIELDS = (
     "assessment",
     "forecast_valuation",
     "operating_driver_forecast",
+    "operating_feasibility_evidence",
+    "operating_feasibility_semantic_reviews",
+    "cycle_earnings_monitor",
     "valuation_transmission",
     "sotp_valuation",
     "eps_multiple_valuation",
@@ -101,6 +123,219 @@ REPLAY_COMPARISON_FIELDS = (
     "notes",
 )
 
+
+def _infer_guided_market(value: Any) -> str:
+    """Infer A/H market only from unambiguous ticker syntax or code length."""
+    raw = str(value or "").strip().upper().replace(" ", "")
+    if re.fullmatch(r"HK\d{4,5}|\d{4,5}(?:\.HK)?", raw):
+        return "HK"
+    if re.fullmatch(r"(?:SH|SZ|BJ)\d{6}|\d{6}\.(?:SH|SZ|BJ)|\d{6}", raw):
+        return "CN-A"
+    raise LocalInvestmentPilotError(
+        "MARKET_CANNOT_BE_INFERRED: 股票代码请使用 002810.SZ、SZ002810、600000.SH、"
+        "00700.HK 或明确的 6 位 A 股 / 4–5 位港股代码。"
+    )
+
+def _default_guided_cutoff_date(now: datetime) -> date:
+    """Default to the latest weekday close that is not in the future, in Shanghai time."""
+    if now.tzinfo is None:
+        raise LocalInvestmentPilotError("GUIDED_DEFAULT_CUTOFF_REQUIRES_TIMEZONE")
+    shanghai_now = now.astimezone(SHANGHAI)
+    if shanghai_now.weekday() < 5 and shanghai_now.time() >= time(15, 30):
+        return shanghai_now.date()
+    return _previous_weekday(shanghai_now.date())
+
+def _parse_guided_cutoff_input(
+    raw: str, *, default_date: date
+) -> tuple[date, datetime, str]:
+    """One input: date means China close 15:30; a full ISO instant preserves exact cutoff."""
+    value = str(raw or "").strip()
+    if not value:
+        cutoff = default_date
+        timestamp_raw = datetime.combine(
+            cutoff, time(15, 30), tzinfo=SHANGHAI
+        ).isoformat()
+    elif re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        cutoff = _date(value, "AS_OF_DATE")
+        timestamp_raw = datetime.combine(
+            cutoff, time(15, 30), tzinfo=SHANGHAI
+        ).isoformat()
+    else:
+        instant = _datetime(value, "AS_OF_TIMESTAMP", allow_date_only=False)
+        cutoff = instant.date()
+        timestamp_raw = instant.isoformat()
+
+    cutoff_instant, normalized_timestamp = _resolve_cutoff_timestamp(
+        {"as_of_timestamp": timestamp_raw}, cutoff
+    )
+    if normalized_timestamp is None:
+        raise LocalInvestmentPilotError("GUIDED_CUTOFF_TIMESTAMP_REQUIRED")
+    return cutoff, cutoff_instant, normalized_timestamp
+
+def _default_guided_price_date(
+    cutoff: date, cutoff_instant: datetime
+) -> date:
+    """Use same-day close only when the cutoff is at/after 15:00 China time."""
+    if cutoff.weekday() < 5 and cutoff_instant.timetz().replace(tzinfo=None) >= time(15, 0):
+        return cutoff
+    return _previous_weekday(cutoff)
+
+def _parse_guided_price_input(
+    raw: str,
+    *,
+    default_observation_date: date,
+    cutoff: date,
+    cutoff_instant: datetime,
+) -> tuple[str, date, str, str]:
+    """Parse PRICE, PRICE@DATE or PRICE@ISO-INSTANT in one operator input."""
+    value = str(raw or "").strip()
+    if value.count("@") > 1:
+        raise LocalInvestmentPilotError("GUIDED_PRICE_INPUT_FORMAT_INVALID")
+    if "@" in value:
+        price_text, observed_text = (part.strip() for part in value.split("@", 1))
+        if not observed_text:
+            raise LocalInvestmentPilotError("GUIDED_PRICE_OBSERVATION_REQUIRED")
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", observed_text):
+            observation = _date(observed_text, "PRICE_OBSERVATION_DATE")
+            known_at_dt = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI)
+            input_mode = "DATE_CLOSE"
+        else:
+            known_at_dt = _datetime(
+                observed_text, "PRICE_KNOWN_AT", allow_date_only=False
+            )
+            observation = known_at_dt.date()
+            input_mode = "EXACT_INSTANT"
+    else:
+        price_text = value
+        observation = default_observation_date
+        known_at_dt = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI)
+        input_mode = "DEFAULT_CLOSE"
+
+    price = format(_positive(price_text, "CURRENT_PRICE"), "f")
+    _validate_guided_observation_date(
+        observation, cutoff, cutoff_timestamp=cutoff_instant
+    )
+    if known_at_dt > cutoff_instant:
+        raise LocalInvestmentPilotError("PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP")
+    return price, observation, known_at_dt.isoformat(), input_mode
+
+def _prompt_json_after_marker(prompt: str, marker: str, error_code: str) -> dict[str, Any]:
+    """Extract the first JSON object after one unique prompt marker, ignoring key order."""
+    if not isinstance(prompt, str) or prompt.count(marker) != 1:
+        raise LocalInvestmentPilotError(error_code)
+    suffix = prompt.split(marker, 1)[1].lstrip()
+    try:
+        value, _end = json.JSONDecoder().raw_decode(suffix)
+    except json.JSONDecodeError as exc:
+        raise LocalInvestmentPilotError(error_code) from exc
+    if not isinstance(value, dict):
+        raise LocalInvestmentPilotError(error_code)
+    return value
+
+def _capture_clipboard_response_once(path: str | Path) -> bool:
+    """Capture macOS clipboard only after an explicit Enter keypress.
+
+    This is deliberately a one-shot read: no clipboard polling, background
+    monitor, browser access, Accessibility permission, or content logging.
+    Existing non-empty response files are never overwritten.
+    """
+    if sys.platform != "darwin":
+        print("当前平台不支持剪贴板接收；请使用原有响应文件方式。", flush=True)
+        return False
+    response_path = Path(path).expanduser()
+    try:
+        if response_path.is_symlink():
+            print("响应目标是符号链接，已拒绝写入。", flush=True)
+            return False
+        existing = response_path.read_bytes()
+    except FileNotFoundError:
+        existing = b""
+    except OSError as exc:
+        print(f"无法检查响应目标：{type(exc).__name__}。", flush=True)
+        return False
+    if existing.strip():
+        print("响应文件已有内容，不会用剪贴板覆盖；继续校验现有文件。", flush=True)
+        return True
+    try:
+        result = subprocess.run(
+            ["pbpaste"], check=True, capture_output=True, timeout=5
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f"无法读取剪贴板：{type(exc).__name__}。", flush=True)
+        return False
+    raw = result.stdout
+    if not raw.strip():
+        print("剪贴板为空；请先复制 ChatGPT 的完整回复，再按回车。", flush=True)
+        return False
+    if len(raw) > 2 * 1024 * 1024:
+        print("剪贴板内容超过 2 MiB 安全上限，未写入。", flush=True)
+        return False
+    try:
+        raw.decode("utf-8")
+    except UnicodeDecodeError:
+        print("剪贴板内容不是有效 UTF-8，未写入。", flush=True)
+        return False
+    # Recheck immediately before writing; never replace a file populated by
+    # another process while pbpaste was running.
+    try:
+        if response_path.is_symlink() or response_path.read_bytes().strip():
+            print("响应文件在接收期间发生变化；为避免覆盖，已停止。", flush=True)
+            return False
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        print(f"无法复核响应目标：{type(exc).__name__}。", flush=True)
+        return False
+    temporary = response_path.with_name(response_path.name + f".capture-{os.getpid()}.tmp")
+    try:
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if response_path.is_symlink():
+            temporary.unlink(missing_ok=True)
+            print("响应目标在写入前变成符号链接；未覆盖。", flush=True)
+            return False
+        try:
+            populated = response_path.read_bytes().strip()
+        except FileNotFoundError:
+            populated = b""
+        if populated:
+            temporary.unlink(missing_ok=True)
+            print("响应文件在写入前已被填充；未覆盖。", flush=True)
+            return False
+        os.replace(temporary, response_path)
+        if os.name != "nt":
+            response_path.chmod(0o600)
+    except OSError as exc:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+        print(f"剪贴板内容写入失败：{type(exc).__name__}。", flush=True)
+        return False
+    print(f"已接收剪贴板文本（{len(raw)} 字节）；正在进入原有内容校验。", flush=True)
+    return True
+
+def _ask_operator_entry_zone() -> dict[str, Any]:
+    """Collect the current company's entry-price band; never treat it as a global default."""
+    print("\n本标的专属入场价格区间（不会保存到跨公司个人档案）")
+
+    def ask_positive(prompt: str) -> str:
+        while True:
+            raw = _ask(prompt)
+            try:
+                return format(_positive(raw, "PRICE_ZONE"), "f")
+            except LocalInvestmentPilotError as exc:
+                print(f"输入无效：{exc}。请填写大于 0 的价格。")
+
+    while True:
+        low = ask_positive("本标的入场区间下沿")
+        high = ask_positive("本标的入场区间上沿")
+        if Decimal(low) <= Decimal(high):
+            return {"entry_zone_low": low, "entry_zone_high": high}
+        print("入场区间下沿不得高于上沿，请重新输入两个价格。")
 
 _ORIGINAL_INPUT = input
 
@@ -170,7 +405,12 @@ def _normalize_guided_symbol(value: Any, market: str) -> str:
     elif market == "HK":
         match = re.fullmatch(r"HK(\d{4,5})", raw)
         if match:
-            return f"{match.group(1)}.HK"
+            return f"{match.group(1).zfill(5)}.HK"
+        match = re.fullmatch(r"(\d{4})\.HK", raw)
+        if match:
+            return f"{match.group(1).zfill(5)}.HK"
+        if re.fullmatch(r"\d{4}", raw):
+            return raw.zfill(5)
     return raw
 
 
@@ -642,7 +882,7 @@ def _collect_refs(value: Any) -> set[str]:
     result: set[str] = set()
     if isinstance(value, Mapping):
         for key, item in value.items():
-            if key in {"evidence_refs", "source_refs", "evidence_ids", "source_ids"} and isinstance(item, list):
+            if key in {"evidence_refs", "source_refs", "evidence_ids", "source_ids", "reviewed_evidence_refs"} and isinstance(item, list):
                 result.update(str(row).strip() for row in item if str(row).strip())
             else:
                 result.update(_collect_refs(item))
@@ -782,7 +1022,7 @@ def _link_b4_cost_ratio_assumptions(
 def _reconcile_b4_valuation_bridge(
     driver_forecast: Mapping[str, Any], forecast_valuation: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Cross-check overlapping aggregate operating metrics without conflating FCF definitions."""
+    """Cross-check overlapping metrics and reconcile valuation WC to B4's FCF-effective total."""
     driver_scenarios = driver_forecast.get("scenarios")
     driver_scenarios = driver_scenarios if isinstance(driver_scenarios, Mapping) else {}
     valuation_scenarios = forecast_valuation.get("scenarios")
@@ -794,6 +1034,21 @@ def _reconcile_b4_valuation_bridge(
         return {
             "schema_version": "IIOS-B4-VALUATION-BRIDGE-RECONCILIATION-0.1",
             "status": "NOT_PROVIDED",
+            "scenarios": {},
+            "excluded_metrics": [],
+            "formal_admission_created": False,
+            "decision_authority": False,
+        }
+    scope = str(driver_forecast.get("scope") or "UNKNOWN").strip().upper()
+    if scope != "COMPANY_WIDE":
+        return {
+            "schema_version": "IIOS-B4-VALUATION-BRIDGE-RECONCILIATION-0.1",
+            "status": "NOT_COMPARABLE_SCOPE",
+            "reason": (
+                f"B4 scope is {scope}; direct financial-bridge reconciliation is only valid "
+                "for a COMPANY_WIDE forecast. Project/product-line increments must be assessed "
+                "through the explicit B5 transmission path rather than compared as whole-company totals."
+            ),
             "scenarios": {},
             "excluded_metrics": [],
             "formal_admission_created": False,
@@ -812,7 +1067,9 @@ def _reconcile_b4_valuation_bridge(
         ("tax_rate", "tax_rate"),
         ("net_profit_cny", "net_profit_proxy_cny"),
         ("cash_capex_cny", "cash_capex_cny"),
-        ("change_working_capital_cny", "change_working_capital_cny"),
+        # Compare the FCF-effective total, not the raw B4 input which may exclude
+        # the inventory proxy when inventory_working_capital_treatment=EXCLUDED.
+        ("effective_change_working_capital_cny", "change_working_capital_cny"),
     )
     scenario_results: dict[str, Any] = {}
     all_match = True
@@ -1319,6 +1576,1554 @@ def _evaluate_eps_earnings_bridge(
     }
 
 
+def _build_b58_primary_eps_consistency(
+    *,
+    selected_model_family: Any,
+    expected_currency: Any,
+    operating_driver_forecast: Mapping[str, Any],
+    eps_earnings_bridge: Mapping[str, Any],
+    eps_multiple_valuation: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Compare the B57 all-items EPS proxy with the EPS actually used by EPS_MULTIPLE."""
+    schema = "IIOS-B58-NORMALIZED-EPS-PRIMARY-EPS-CONSISTENCY-0.1"
+    currency = str(expected_currency or "").strip().upper()
+    selected_family = str(selected_model_family or "UNKNOWN").strip().upper()
+    driver_period = str(operating_driver_forecast.get("forecast_period") or "").strip().upper()
+    transition = operating_driver_forecast.get("baseline_transition")
+    transition = transition if isinstance(transition, Mapping) else {}
+    b57 = transition.get("per_share_earnings_bridge")
+    b57 = b57 if isinstance(b57, Mapping) else {}
+    b57_scenarios = b57.get("scenarios") if isinstance(b57.get("scenarios"), Mapping) else {}
+    primary_rows = eps_earnings_bridge.get("scenarios") if isinstance(eps_earnings_bridge.get("scenarios"), Mapping) else {}
+    valuation_rows = eps_multiple_valuation.get("scenarios") if isinstance(eps_multiple_valuation.get("scenarios"), Mapping) else {}
+    period = str(eps_earnings_bridge.get("forecast_period") or eps_multiple_valuation.get("forecast_period") or "").strip().upper()
+    terminal_date = str(eps_earnings_bridge.get("valuation_terminal_date") or eps_multiple_valuation.get("valuation_terminal_date") or "").strip()
+
+    base = {
+        "schema_version": schema,
+        "status": "NOT_IDENTIFIABLE",
+        "selected_model_family": selected_family,
+        "currency": currency or "UNKNOWN",
+        "driver_forecast_period": driver_period or "UNKNOWN",
+        "primary_eps_forecast_period": period or "UNKNOWN",
+        "primary_valuation_terminal_date": terminal_date or "UNKNOWN",
+        "primary_eps_earnings_bridge_status": str(eps_earnings_bridge.get("status") or "UNKNOWN"),
+        "primary_eps_multiple_status": str(eps_multiple_valuation.get("status") or "UNKNOWN"),
+        "primary_eps_used_by_model": "eps_multiple_valuation.scenarios[*].eps_per_share",
+        "comparison_metric": "B57_ALL_ITEMS_PARENT_ATTRIBUTABLE_NET_PROFIT_PROXY_DIVIDED_BY_DILUTED_SHARES_VS_PRIMARY_EPS",
+        "eps_tolerance_per_share": format(EPS_EPS_MATCH_TOLERANCE, "f"),
+        "scenarios": {},
+        "limitations": [
+            "B58 compares the B57 all-items parent-attributable profit proxy with the EPS input actually used by the EPS_MULTIPLE adapter; it does not substitute B57's normalized EPS for the primary valuation EPS.",
+            "A non-zero primary other-after-tax attribution adjustment means the two bridges are not demonstrably on the same adjustment basis; that scenario is marked NOT_COMPARABLE_ADJUSTMENT_BASIS even if rounded EPS values happen to match.",
+            "B57's normalized EPS is displayed only as context. Its removal of one-off items means it is not like-for-like with an all-items primary EPS unless a separately normalized primary EPS is supplied.",
+            "EPS forecast period is compared independently from the valuation terminal date. The terminal date is not treated as the earnings reference period.",
+            "B58 MATCH means numerical period/share/accounting reconciliation only; it is not independent source confirmation, Evidence/PIT admission, or Forecast Admission.",
+            "B58 ASSUMPTION_ONLY may show numerical proximity for diagnosis, but eps_match remains null because no two-sided profit/share bridge exists.",
+            "B58 is diagnostic only. It does not alter the EPS source, the EPS_MULTIPLE formula, valuation outputs, B5/B6, target price, the 15% annualized return hurdle, formal admission or decision authority.",
+        ],
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
+        "valuation_input_modified": False,
+    }
+
+    if selected_family != "EPS_MULTIPLE":
+        base["status"] = "NOT_APPLICABLE_NOT_EPS_MULTIPLE"
+        base["reason"] = "操作者选择的主估值模型不是 EPS_MULTIPLE；B58 不把其他模型的价值输出误当作 EPS。"
+        return base
+    if currency != "CNY":
+        base["status"] = "NOT_COMPARABLE_CURRENCY"
+        base["reason"] = "B57 当前为 CNY 口径；主估值 EPS 使用非 CNY 币种时，没有明确 FX/每股货币桥，不能直接比较。"
+        return base
+    if str(eps_multiple_valuation.get("status") or "").strip().upper() != "CALCULATED" or eps_multiple_valuation.get("selected_for_primary_model") is not True:
+        base["status"] = "PRIMARY_EPS_NOT_CALCULATED"
+        base["reason"] = "EPS_MULTIPLE 适配器没有产出实际用于主估值的完整 Bear/Base/Bull EPS×P/E 计算结果。"
+        return base
+
+    scenario_statuses = []
+    for name in SCENARIOS:
+        b57_row = b57_scenarios.get(name) if isinstance(b57_scenarios.get(name), Mapping) else {}
+        primary_row = primary_rows.get(name) if isinstance(primary_rows.get(name), Mapping) else {}
+        model_row = valuation_rows.get(name) if isinstance(valuation_rows.get(name), Mapping) else {}
+        b57_forward = b57_row.get("forward_scenario") if isinstance(b57_row.get("forward_scenario"), Mapping) else {}
+        primary_eps_object = model_row.get("eps_per_share") if isinstance(model_row.get("eps_per_share"), Mapping) else {}
+        primary_shares = primary_row.get("diluted_shares") if isinstance(primary_row.get("diluted_shares"), Mapping) else {}
+        primary_other_adjustment = primary_row.get("other_after_tax_attribution_adjustment") if isinstance(primary_row.get("other_after_tax_attribution_adjustment"), Mapping) else {}
+        primary_bridge_status = str(primary_row.get("status") or "NOT_LINKED").strip().upper()
+
+        row: dict[str, Any] = {
+            "scenario": name,
+            "status": "NOT_IDENTIFIABLE",
+            "b57_status": str(b57_row.get("status") or "UNKNOWN"),
+            "primary_eps_bridge_status": primary_bridge_status,
+            "b57_forecast_period": str(b57_forward.get("period") or "UNKNOWN"),
+            "primary_forecast_period": str(primary_row.get("forecast_period") or period or "UNKNOWN"),
+            "primary_terminal_date": str(primary_row.get("valuation_terminal_date") or terminal_date or "UNKNOWN"),
+            "b57_all_items_parent_attributable_net_profit_proxy_cny": b57_forward.get("all_items_parent_attributable_net_profit_proxy_cny"),
+            "b57_normalized_parent_attributable_net_profit_cny": b57_forward.get("normalized_parent_attributable_net_profit_cny"),
+            "b57_normalized_diluted_eps_proxy_cny_per_share": b57_forward.get("normalized_diluted_eps_proxy_cny_per_share"),
+            "b57_diluted_weighted_average_shares": b57_forward.get("diluted_weighted_average_shares"),
+            "primary_declared_eps_per_share": primary_eps_object.get("value"),
+            "primary_calculated_eps_per_share": primary_row.get("calculated_eps_per_share"),
+            "primary_diluted_shares": primary_shares.get("value"),
+            "primary_diluted_shares_unit": primary_shares.get("unit"),
+            "primary_other_after_tax_attribution_adjustment": primary_other_adjustment.get("value"),
+            "primary_other_adjustment_unit": primary_other_adjustment.get("unit"),
+            "b57_forward_data_class": str(b57_forward.get("combined_output_data_class") or b57_forward.get("data_class") or "SOURCE_CLASS_NOT_IDENTIFIABLE"),
+            "b57_source_data_classes": list(b57_forward.get("source_data_classes") or []) if isinstance(b57_forward.get("source_data_classes"), list) else [],
+            "b57_source_lineage_assessment": dict(b57_forward.get("source_lineage_assessment") or {}) if isinstance(b57_forward.get("source_lineage_assessment"), Mapping) else {},
+            "formal_evidence_pit_admission_created": False,
+            "formal_forecast_admission_created": False,
+            "decision_grade_forecast_eligible": False,
+            "primary_eps_data_class": str(primary_eps_object.get("data_class") or "SOURCE_CLASS_NOT_IDENTIFIABLE"),
+            "primary_eps_evidence_refs": list(primary_eps_object.get("evidence_refs") or []) if isinstance(primary_eps_object.get("evidence_refs"), list) else [],
+            "independent_confirmation_status": "NOT_ESTABLISHED_BY_B58_NUMERICAL_RECONCILIATION",
+            "numeric_similarity_to_primary_declared_eps": None,
+            "b57_all_items_eps_proxy_cny_per_share": None,
+            "all_items_eps_vs_primary_declared_difference_per_share": None,
+            "all_items_eps_vs_primary_calculated_difference_per_share": None,
+            "normalized_eps_vs_primary_declared_difference_per_share_diagnostic_only": None,
+            "diluted_share_denominator_match": None,
+            "forecast_period_match": None,
+            "eps_match": None,
+            "issues": [],
+        }
+
+        if str(operating_driver_forecast.get("scope") or "UNKNOWN").strip().upper() != "COMPANY_WIDE" or str(b57.get("scope") or "UNKNOWN").strip().upper() != "COMPANY_WIDE":
+            row["status"] = "NOT_COMPARABLE_SCOPE"
+            row["issues"] = ["COMPANY_WIDE_SCOPE_REQUIRED"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        if row["b57_status"] not in {
+            "CALCULATED_AND_RECONCILED",
+            "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE",
+        }:
+            row["status"] = "BLOCKED_BY_B57"
+            row["issues"] = [f"B57_SCENARIO_NOT_RECONCILED:{row['b57_status']}"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        model_bridge = model_row.get("earnings_bridge") if isinstance(model_row.get("earnings_bridge"), Mapping) else {}
+        expected_periods = {
+            driver_period,
+            period,
+            str(b57_forward.get("period") or "").strip().upper(),
+            str(primary_row.get("forecast_period") or period or "").strip().upper(),
+            str(model_bridge.get("forecast_period") or primary_row.get("forecast_period") or period or "").strip().upper(),
+        }
+        if not all(expected_periods) or len(expected_periods) != 1:
+            row["status"] = "PERIOD_MISMATCH"
+            row["forecast_period_match"] = False
+            row["issues"] = ["B57_AND_PRIMARY_EPS_FORECAST_PERIODS_NOT_IDENTICAL"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        row["forecast_period_match"] = True
+
+        def as_decimal(raw_value: Any) -> Decimal | None:
+            if raw_value in (None, ""):
+                return None
+            try:
+                return Decimal(str(raw_value))
+            except (InvalidOperation, ValueError, TypeError):
+                return None
+
+        all_items_profit = as_decimal(b57_forward.get("all_items_parent_attributable_net_profit_proxy_cny"))
+        b57_shares = as_decimal(b57_forward.get("diluted_weighted_average_shares"))
+        declared_eps = as_decimal(primary_eps_object.get("value"))
+        primary_calculated_eps = as_decimal(primary_row.get("calculated_eps_per_share"))
+        primary_shares_value = as_decimal(primary_shares.get("value"))
+        normalized_eps = as_decimal(b57_forward.get("normalized_diluted_eps_proxy_cny_per_share"))
+        primary_other_adjustment_value = as_decimal(primary_other_adjustment.get("value"))
+        missing_values = [
+            field for field, value in (
+                ("B57_ALL_ITEMS_PARENT_PROFIT_PROXY", all_items_profit),
+                ("B57_DILUTED_WEIGHTED_AVERAGE_SHARES", b57_shares),
+                ("PRIMARY_DECLARED_EPS", declared_eps),
+            ) if value is None
+        ]
+        if b57_shares is not None and b57_shares <= 0:
+            missing_values.append("B57_DILUTED_WEIGHTED_AVERAGE_SHARES_MUST_BE_POSITIVE")
+        if primary_bridge_status == "CALCULATED" and primary_shares_value is None:
+            missing_values.append("PRIMARY_DILUTED_SHARES_REQUIRED")
+        if row["primary_diluted_shares_unit"] and str(row["primary_diluted_shares_unit"]).strip().lower() != "shares":
+            missing_values.append("PRIMARY_DILUTED_SHARES_UNIT_MUST_BE_SHARES")
+        if missing_values:
+            row["status"] = "NOT_IDENTIFIABLE"
+            row["issues"] = sorted(set(missing_values))
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        b57_all_items_eps = all_items_profit / b57_shares
+        row["b57_all_items_eps_proxy_cny_per_share"] = format(b57_all_items_eps, "f")
+        row["all_items_eps_vs_primary_declared_difference_per_share"] = format(abs(b57_all_items_eps - declared_eps), "f")
+        row["normalized_eps_vs_primary_declared_difference_per_share_diagnostic_only"] = (
+            format(abs(normalized_eps - declared_eps), "f") if normalized_eps is not None else None
+        )
+        row["numeric_similarity_to_primary_declared_eps"] = (
+            abs(b57_all_items_eps - declared_eps) <= EPS_EPS_MATCH_TOLERANCE
+        )
+
+        if primary_bridge_status == "ASSUMPTION_ONLY":
+            row["eps_match"] = None
+            row["independent_confirmation_status"] = "NOT_ESTABLISHED_PRIMARY_EPS_ASSUMPTION_ONLY"
+            row["status"] = "PRIMARY_EPS_ASSUMPTION_ONLY"
+            row["issues"] = ["PRIMARY_EPS_HAS_NO_RECALCULABLE_NET_PROFIT_AND_DILUTED_SHARE_BRIDGE"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        if primary_bridge_status != "CALCULATED" or primary_calculated_eps is None:
+            row["status"] = "PRIMARY_EPS_BRIDGE_NOT_CALCULATED"
+            row["issues"] = [f"PRIMARY_EPS_BRIDGE_STATUS:{primary_bridge_status}"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        row["all_items_eps_vs_primary_calculated_difference_per_share"] = format(abs(b57_all_items_eps - primary_calculated_eps), "f")
+        if primary_shares_value <= 0:
+            row["status"] = "NOT_IDENTIFIABLE"
+            row["issues"] = ["PRIMARY_DILUTED_SHARES_MUST_BE_POSITIVE"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        denominator_match = b57_shares == primary_shares_value
+        row["diluted_share_denominator_match"] = denominator_match
+        if not denominator_match:
+            row["status"] = "SHARE_DENOMINATOR_MISMATCH"
+            row["issues"] = ["B57_AND_PRIMARY_DILUTED_SHARE_DENOMINATORS_NOT_IDENTICAL"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        if primary_other_adjustment_value is None:
+            row["status"] = "NOT_IDENTIFIABLE"
+            row["issues"] = ["PRIMARY_OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT_UNKNOWN"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        if primary_other_adjustment_value != 0:
+            row["status"] = "NOT_COMPARABLE_ADJUSTMENT_BASIS"
+            row["issues"] = ["PRIMARY_OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT_NOT_MAPPED_TO_B57"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        eps_match = (
+            abs(b57_all_items_eps - primary_calculated_eps) <= EPS_EPS_MATCH_TOLERANCE
+            and abs(b57_all_items_eps - declared_eps) <= EPS_EPS_MATCH_TOLERANCE
+        )
+        row["eps_match"] = eps_match
+        row["independent_confirmation_status"] = "ARITHMETIC_RECONCILIATION_ONLY_NOT_INDEPENDENT_SOURCE_CONFIRMATION"
+        row["status"] = "MATCH" if eps_match else "EPS_MISMATCH"
+        if not eps_match:
+            row["issues"] = ["B57_ALL_ITEMS_EPS_PROXY_DOES_NOT_MATCH_PRIMARY_CALCULATED_OR_DECLARED_EPS"]
+        base["scenarios"][name] = row
+        scenario_statuses.append(row["status"])
+
+    if scenario_statuses and all(status == "MATCH" for status in scenario_statuses):
+        base["status"] = "MATCH"
+        base["reason"] = "三个情景的期间、公司范围、稀释股数和 EPS 数值完成算术对账；这不构成独立来源确认或正式准入。"
+    elif scenario_statuses and all(status == "PRIMARY_EPS_ASSUMPTION_ONLY" for status in scenario_statuses):
+        base["status"] = "ASSUMPTION_ONLY"
+        base["reason"] = "主估值使用的是明确的 EPS 分析假设，虽可与 B57 all-items EPS 代理数值比较，但没有主估值自身可复算的利润/稀释股数桥，不能宣称完成独立对账。"
+    elif any(status in {"EPS_MISMATCH", "SHARE_DENOMINATOR_MISMATCH", "PERIOD_MISMATCH", "NOT_COMPARABLE_ADJUSTMENT_BASIS"} for status in scenario_statuses):
+        base["status"] = "RECONCILIATION_MISMATCH"
+        base["reason"] = "至少一个情景发现 EPS、期间、稀释股数或税后归属调整口径不一致；保留两侧数字，不自动覆盖主估值 EPS。"
+    elif any(status == "MATCH" for status in scenario_statuses):
+        base["status"] = "PARTIAL"
+        base["reason"] = "只有部分情景完成 B57 与主 EPS 的可比对账，其余情景保持阻断或 UNKNOWN。"
+    elif all(status == "BLOCKED_BY_B57" for status in scenario_statuses):
+        base["status"] = "BLOCKED_BY_B57"
+        base["reason"] = "B57 正常化归属 / 稀释 EPS 桥未闭合，不能与主估值 EPS 进行可靠对账。"
+    else:
+        base["status"] = "NOT_IDENTIFIABLE"
+        base["reason"] = "主 EPS、B57 all-items EPS、期间或股数等关键口径缺失/不可比；B58 不作通过判断。"
+    return base
+
+
+
+def _build_b59_primary_eps_difference_attribution(
+    *,
+    operating_driver_forecast: Mapping[str, Any],
+    eps_earnings_bridge: Mapping[str, Any],
+    primary_eps_consistency: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Attribute the B57-to-primary EPS gap without changing the primary EPS input."""
+    schema = "IIOS-B59-PRIMARY-EPS-DIFFERENCE-ATTRIBUTION-0.1"
+    currency = str(primary_eps_consistency.get("currency") or "UNKNOWN").strip().upper()
+    selected_family = str(primary_eps_consistency.get("selected_model_family") or "UNKNOWN").strip().upper()
+    transition = operating_driver_forecast.get("baseline_transition")
+    transition = transition if isinstance(transition, Mapping) else {}
+    b57 = transition.get("per_share_earnings_bridge")
+    b57 = b57 if isinstance(b57, Mapping) else {}
+    b57_rows = b57.get("scenarios") if isinstance(b57.get("scenarios"), Mapping) else {}
+    primary_rows = eps_earnings_bridge.get("scenarios") if isinstance(eps_earnings_bridge.get("scenarios"), Mapping) else {}
+    b58_rows = primary_eps_consistency.get("scenarios") if isinstance(primary_eps_consistency.get("scenarios"), Mapping) else {}
+
+    base: dict[str, Any] = {
+        "schema_version": schema,
+        "status": "NOT_IDENTIFIABLE",
+        "selected_model_family": selected_family,
+        "currency": currency,
+        "method": "B57_TO_PRIMARY_PARENT_PROFIT_COMPONENT_BRIDGE_PLUS_SYMMETRIC_NUMERATOR_DENOMINATOR_EPS_ATTRIBUTION",
+        "profit_difference_sign": "B57_MINUS_PRIMARY_EPS_BRIDGE",
+        "eps_difference_sign": "B57_ALL_ITEMS_EPS_MINUS_PRIMARY_EPS_ACTUALLY_USED",
+        "scenarios": {},
+        "limitations": [
+            "B59 explains the arithmetic gap between two existing model paths; it does not decide which path is economically correct or formally admitted.",
+            "The B56 profit-proxy gap is an arithmetic bridge item, not proof that all underlying operating assumptions are independently comparable.",
+            "The B57 recurring non-operating and non-recurring effects are after-tax modeled effects; the primary bridge's other after-tax adjustment is displayed as a separate, unmapped term.",
+            "When diluted-share denominators differ, the EPS numerator/denominator effects use a symmetric Shapley-style decomposition; the scenario remains explicitly not like-for-like.",
+            "A mathematically reconciled decomposition is not a MATCH, not a valuation override, and not a substitute for source, PIT, accounting-policy or forecast-quality review.",
+            "B59 never changes EPS_MULTIPLE EPS, P/E, terminal value, B5/B6, return metrics, target entry price, the 15% annualized-return hurdle, Decision or execution authority.",
+        ],
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
+        "valuation_input_modified": False,
+        "primary_eps_input_modified": False,
+    }
+
+    if selected_family != "EPS_MULTIPLE":
+        base["status"] = "NOT_APPLICABLE_NOT_EPS_MULTIPLE"
+        return base
+    if currency != "CNY":
+        base["status"] = "NOT_COMPARABLE_CURRENCY"
+        return base
+    if str(primary_eps_consistency.get("primary_eps_multiple_status") or "").strip().upper() != "CALCULATED":
+        base["status"] = "PRIMARY_EPS_NOT_CALCULATED"
+        return base
+
+    def decimal_or_none(value: Any) -> Decimal | None:
+        if value in (None, ""):
+            return None
+        try:
+            number = Decimal(str(value))
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+        return number if number.is_finite() else None
+
+    def measure_value(row: Mapping[str, Any], field: str) -> Decimal | None:
+        measure = row.get(field)
+        if not isinstance(measure, Mapping):
+            return None
+        return decimal_or_none(measure.get("value"))
+
+    scenario_statuses: list[str] = []
+    for name in SCENARIOS:
+        b57_row = b57_rows.get(name) if isinstance(b57_rows.get(name), Mapping) else {}
+        b57_forward = b57_row.get("forward_scenario") if isinstance(b57_row.get("forward_scenario"), Mapping) else {}
+        primary_row = primary_rows.get(name) if isinstance(primary_rows.get(name), Mapping) else {}
+        b58_row = b58_rows.get(name) if isinstance(b58_rows.get(name), Mapping) else {}
+        row: dict[str, Any] = {
+            "scenario": name,
+            "status": "NOT_IDENTIFIABLE",
+            "b58_status": str(b58_row.get("status") or "UNKNOWN"),
+            "b57_status": str(b57_row.get("status") or "UNKNOWN"),
+            "primary_eps_bridge_status": str(primary_row.get("status") or "UNKNOWN"),
+            "forecast_period": b58_row.get("b57_forecast_period"),
+            "primary_terminal_date": b58_row.get("primary_terminal_date"),
+            "comparability_status": "NOT_IDENTIFIABLE",
+            "comparability_flags": [],
+            "missing_inputs": [],
+            "profit_numerator_components": {},
+            "eps_gap_components_cny_per_share": {},
+            "issues": [],
+        }
+
+        if (
+            str(operating_driver_forecast.get("scope") or "UNKNOWN").strip().upper() != "COMPANY_WIDE"
+            or str(b57.get("scope") or "UNKNOWN").strip().upper() != "COMPANY_WIDE"
+        ):
+            row["status"] = "NOT_COMPARABLE_SCOPE"
+            row["issues"] = ["COMPANY_WIDE_SCOPE_REQUIRED"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        if row["b57_status"] != "CALCULATED_AND_RECONCILED":
+            row["status"] = "BLOCKED_BY_B57"
+            row["issues"] = [f"B57_SCENARIO_NOT_RECONCILED:{row['b57_status']}"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        if row["primary_eps_bridge_status"] != "CALCULATED":
+            row["status"] = (
+                "PRIMARY_EPS_ASSUMPTION_ONLY"
+                if row["primary_eps_bridge_status"] == "ASSUMPTION_ONLY"
+                else "BLOCKED_BY_PRIMARY_EPS_BRIDGE"
+            )
+            row["issues"] = [f"PRIMARY_EPS_BRIDGE_NOT_CALCULATED:{row['primary_eps_bridge_status']}"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        if b58_row.get("forecast_period_match") is not True:
+            row["status"] = "PERIOD_OR_BASIS_NOT_COMPARABLE"
+            row["issues"] = ["B58_DID_NOT_CONFIRM_IDENTICAL_FORECAST_PERIOD"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        b57_parent = decimal_or_none(b57_forward.get("all_items_parent_attributable_net_profit_proxy_cny"))
+        b57_base_profit = decimal_or_none(b57_forward.get("b56_net_profit_proxy_cny"))
+        b57_recurring_after_tax = decimal_or_none(b57_forward.get("non_operating_after_tax_effect_cny"))
+        b57_nonrecurring_after_tax = decimal_or_none(b57_forward.get("non_recurring_after_tax_effect_cny"))
+        b57_nci = decimal_or_none(b57_forward.get("all_items_minority_interest_net_profit_cny"))
+        b57_shares = decimal_or_none(b57_forward.get("diluted_weighted_average_shares"))
+
+        primary_b4_profit = decimal_or_none(primary_row.get("b4_net_profit_proxy_cny"))
+        primary_nci = measure_value(primary_row, "non_controlling_interests")
+        primary_other_adjustment = measure_value(primary_row, "other_after_tax_attribution_adjustment")
+        primary_parent_object = primary_row.get("net_profit_attributable_to_listed_shareholders")
+        primary_parent = (
+            decimal_or_none(primary_parent_object.get("value"))
+            if isinstance(primary_parent_object, Mapping) else None
+        )
+        primary_shares = measure_value(primary_row, "diluted_shares")
+        primary_calculated_eps = decimal_or_none(primary_row.get("calculated_eps_per_share"))
+        primary_declared_eps = decimal_or_none(b58_row.get("primary_declared_eps_per_share"))
+
+        required = {
+            "B57_ALL_ITEMS_PARENT_PROFIT": b57_parent,
+            "B57_B56_NET_PROFIT_PROXY": b57_base_profit,
+            "B57_RECURRING_NON_OPERATING_AFTER_TAX_EFFECT": b57_recurring_after_tax,
+            "B57_NON_RECURRING_AFTER_TAX_EFFECT": b57_nonrecurring_after_tax,
+            "B57_ALL_ITEMS_NCI_AFTER_TAX": b57_nci,
+            "B57_DILUTED_SHARES": b57_shares,
+            "PRIMARY_B4_NET_PROFIT_PROXY": primary_b4_profit,
+            "PRIMARY_NCI_AFTER_TAX": primary_nci,
+            "PRIMARY_OTHER_AFTER_TAX_ADJUSTMENT": primary_other_adjustment,
+            "PRIMARY_PARENT_ATTRIBUTABLE_NET_PROFIT": primary_parent,
+            "PRIMARY_DILUTED_SHARES": primary_shares,
+            "PRIMARY_CALCULATED_EPS": primary_calculated_eps,
+            "PRIMARY_EPS_ACTUALLY_USED_BY_ADAPTER": primary_declared_eps,
+        }
+        missing = sorted(field for field, value in required.items() if value is None)
+        if b57_shares is not None and b57_shares <= 0:
+            missing.append("B57_DILUTED_SHARES_MUST_BE_POSITIVE")
+        if primary_shares is not None and primary_shares <= 0:
+            missing.append("PRIMARY_DILUTED_SHARES_MUST_BE_POSITIVE")
+        if missing:
+            row["status"] = "NOT_IDENTIFIABLE"
+            row["missing_inputs"] = sorted(set(missing))
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        primary_nci_object = primary_row.get("non_controlling_interests")
+        primary_other_object = primary_row.get("other_after_tax_attribution_adjustment")
+        primary_share_object = primary_row.get("diluted_shares")
+        unit_issues = []
+        for label, measure, expected in (
+            ("PRIMARY_NCI", primary_nci_object, "CNY"),
+            ("PRIMARY_OTHER_ADJUSTMENT", primary_other_object, "CNY"),
+            ("PRIMARY_DILUTED_SHARES", primary_share_object, "shares"),
+        ):
+            actual = str(measure.get("unit") or "").strip().lower() if isinstance(measure, Mapping) else ""
+            if actual and actual != expected.lower():
+                unit_issues.append(f"{label}_UNIT_MISMATCH:{actual}")
+        if unit_issues:
+            row["status"] = "NOT_IDENTIFIABLE"
+            row["issues"] = unit_issues
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        b57_profit_identity = b57_base_profit + b57_recurring_after_tax + b57_nonrecurring_after_tax - b57_nci
+        primary_profit_identity = primary_b4_profit - primary_nci + primary_other_adjustment
+        b57_profit_residual = b57_parent - b57_profit_identity
+        primary_profit_residual = primary_parent - primary_profit_identity
+        if abs(b57_profit_residual) > Decimal("1") or abs(primary_profit_residual) > Decimal("1"):
+            row["status"] = "INPUT_BRIDGE_RECONCILIATION_MISMATCH"
+            row["issues"] = [
+                "B57_PARENT_PROFIT_COMPONENTS_DO_NOT_RECONCILE_WITHIN_CNY_1"
+                if abs(b57_profit_residual) > Decimal("1") else "",
+                "PRIMARY_PARENT_PROFIT_COMPONENTS_DO_NOT_RECONCILE_WITHIN_CNY_1"
+                if abs(primary_profit_residual) > Decimal("1") else "",
+            ]
+            row["issues"] = [item for item in row["issues"] if item]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        shares_match = b57_shares == primary_shares
+        primary_eps_from_numerator = primary_parent / primary_shares
+        b57_eps_from_numerator = b57_parent / b57_shares
+        primary_eps_bridge_residual = primary_calculated_eps - primary_eps_from_numerator
+        if abs(primary_eps_bridge_residual) > EPS_EPS_MATCH_TOLERANCE:
+            row["status"] = "PRIMARY_BRIDGE_EPS_ARITHMETIC_MISMATCH"
+            row["issues"] = ["PRIMARY_CALCULATED_EPS_DOES_NOT_MATCH_PARENT_PROFIT_DIVIDED_BY_DILUTED_SHARES"]
+            base["scenarios"][name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        profit_gap = b57_parent - primary_parent
+        components = {
+            "b56_modeled_net_profit_proxy_gap_cny": b57_base_profit - primary_b4_profit,
+            "recurring_non_operating_after_tax_effect_cny": b57_recurring_after_tax,
+            "non_recurring_after_tax_effect_cny": b57_nonrecurring_after_tax,
+            "nci_attribution_difference_cny": primary_nci - b57_nci,
+            "unmapped_primary_other_after_tax_adjustment_effect_cny": -primary_other_adjustment,
+        }
+        component_sum = sum(components.values(), Decimal("0"))
+        profit_residual = profit_gap - component_sum
+
+        reciprocal_average = (Decimal("1") / b57_shares + Decimal("1") / primary_shares) / Decimal("2")
+        numerator_eps_effect = profit_gap * reciprocal_average
+        denominator_eps_effect = (
+            (Decimal("1") / b57_shares - Decimal("1") / primary_shares)
+            * (b57_parent + primary_parent) / Decimal("2")
+        )
+        primary_input_eps_effect = primary_calculated_eps - primary_declared_eps
+        eps_gap = b57_eps_from_numerator - primary_declared_eps
+        eps_component_sum = numerator_eps_effect + denominator_eps_effect + primary_input_eps_effect
+        eps_residual = eps_gap - eps_component_sum
+
+        flags = []
+        if not shares_match:
+            flags.append("DILUTED_SHARE_DENOMINATOR_MISMATCH")
+        if primary_other_adjustment != 0:
+            flags.append("UNMAPPED_PRIMARY_OTHER_AFTER_TAX_ATTRIBUTION_ADJUSTMENT")
+        if abs(primary_input_eps_effect) > EPS_EPS_MATCH_TOLERANCE:
+            flags.append("PRIMARY_EPS_USED_BY_ADAPTER_DIFFERS_FROM_PRIMARY_BRIDGE_CALCULATED_EPS")
+
+        average_reciprocal = reciprocal_average
+        component_rows = {
+            field: format(value, "f") for field, value in components.items()
+        }
+        component_rows["sum_cny"] = format(component_sum, "f")
+        component_rows["reconciliation_residual_cny"] = format(profit_residual, "f")
+        component_rows["per_share_effects_cny_per_share"] = {
+            field.replace("_cny", "_cny_per_share"): format(value * average_reciprocal, "f")
+            for field, value in components.items()
+        }
+        component_rows["per_share_effects_cny_per_share"]["sum_cny_per_share"] = format(
+            component_sum * average_reciprocal, "f"
+        )
+
+        row.update({
+            "b57_all_items_parent_profit_cny": format(b57_parent, "f"),
+            "primary_parent_attributable_profit_cny": format(primary_parent, "f"),
+            "profit_numerator_gap_cny": format(profit_gap, "f"),
+            "b57_profit_component_identity_residual_cny": format(b57_profit_residual, "f"),
+            "primary_profit_component_identity_residual_cny": format(primary_profit_residual, "f"),
+            "primary_calculated_eps_arithmetic_residual_cny_per_share": format(primary_eps_bridge_residual, "f"),
+            "b57_diluted_shares": format(b57_shares, "f"),
+            "primary_diluted_shares": format(primary_shares, "f"),
+            "diluted_share_denominator_match": shares_match,
+            "b57_all_items_eps_proxy_cny_per_share": format(b57_eps_from_numerator, "f"),
+            "primary_calculated_eps_per_share": format(primary_calculated_eps, "f"),
+            "primary_eps_actually_used_by_adapter_cny_per_share": format(primary_declared_eps, "f"),
+            "primary_calculated_minus_declared_eps_cny_per_share": format(primary_input_eps_effect, "f"),
+            "profit_numerator_components": component_rows,
+            "eps_gap_components_cny_per_share": {
+                "profit_numerator_effect_cny_per_share": format(numerator_eps_effect, "f"),
+                "diluted_share_denominator_effect_cny_per_share": format(denominator_eps_effect, "f"),
+                "primary_declared_eps_input_effect_cny_per_share": format(primary_input_eps_effect, "f"),
+                "b57_minus_primary_declared_eps_cny_per_share": format(eps_gap, "f"),
+                "component_sum_cny_per_share": format(eps_component_sum, "f"),
+                "reconciliation_residual_cny_per_share": format(eps_residual, "f"),
+            },
+            "comparability_flags": flags,
+            "comparability_status": (
+                "MATHEMATICALLY_RECONCILED_BUT_NOT_LIKE_FOR_LIKE"
+                if flags else "SAME_PERIOD_CURRENCY_SCOPE_DENOMINATOR_AND_ADJUSTMENT_BASIS"
+            ),
+            "issues": [],
+        })
+        if abs(profit_residual) > Decimal("1") or abs(eps_residual) > Decimal("0.0000000001"):
+            row["status"] = "ARITHMETIC_RECONCILIATION_MISMATCH"
+            row["issues"] = ["B59_COMPONENTS_DO_NOT_RECONCILE_TO_OBSERVED_EPS_GAP"]
+        else:
+            row["status"] = (
+                "ARITHMETICALLY_RECONCILED_NOT_COMPARABLE"
+                if flags else "ARITHMETICALLY_RECONCILED"
+            )
+        base["scenarios"][name] = row
+        scenario_statuses.append(row["status"])
+
+    if scenario_statuses and all(status == "ARITHMETICALLY_RECONCILED" for status in scenario_statuses):
+        base["status"] = "ARITHMETICALLY_RECONCILED"
+    elif scenario_statuses and all(
+        status in {"ARITHMETICALLY_RECONCILED", "ARITHMETICALLY_RECONCILED_NOT_COMPARABLE"}
+        for status in scenario_statuses
+    ):
+        base["status"] = "ARITHMETICALLY_RECONCILED_WITH_LIMITATIONS"
+    elif any(status.startswith("ARITHMETICALLY_RECONCILED") for status in scenario_statuses):
+        base["status"] = "PARTIAL"
+    elif all(status in {"BLOCKED_BY_B57", "BLOCKED_BY_PRIMARY_EPS_BRIDGE", "PRIMARY_EPS_ASSUMPTION_ONLY"} for status in scenario_statuses):
+        base["status"] = "BLOCKED_BY_UPSTREAM_EPS_BRIDGE"
+    else:
+        base["status"] = "NOT_IDENTIFIABLE"
+    return base
+
+def _build_b60_local_eps_multiple_price_inversion(
+    *, price_input: Mapping[str, Any], valuation_timing: Mapping[str, Any],
+    decision_parameters: Mapping[str, Any], operator_valuation_context: Mapping[str, Any],
+    eps_multiple_valuation: Mapping[str, Any], forecast_valuation: Mapping[str, Any],
+    operating_driver_forecast: Mapping[str, Any], validated_cash_distribution_events: Any,
+    external_mie_status: Any,
+) -> dict[str, Any]:
+    """Independently invert the protected current price through the selected terminal P/E."""
+    result: dict[str, Any] = {
+        "schema_version": "IIOS-B60-LOCAL-EPS-MULTIPLE-PRICE-INVERSION-0.1",
+        "status": "NOT_IDENTIFIABLE", "qualification": "CONDITIONAL_ONLY",
+        "selected_model_family": str(operator_valuation_context.get("selected_model_family") or "UNKNOWN").upper(),
+        "currency": str(price_input.get("currency") or "UNKNOWN").upper(),
+        "external_mie_status_unchanged": str(external_mie_status or "UNKNOWN").upper(),
+        "reference_price": price_input.get("price"),
+        "price_assurance": price_input.get("assurance_label") or "UNKNOWN",
+        "price_pit_status": price_input.get("pit_time_status") or "UNKNOWN",
+        "forecast_period": eps_multiple_valuation.get("forecast_period") or "UNKNOWN",
+        "valuation_terminal_date": valuation_timing.get("valuation_terminal_date") or eps_multiple_valuation.get("valuation_terminal_date") or "UNKNOWN",
+        "annualization_year_fraction": valuation_timing.get("annualization_year_fraction"),
+        "day_count_convention": valuation_timing.get("day_count_convention") or "UNKNOWN",
+        "required_return_annualized_rate": decision_parameters.get("required_return_annualized"),
+        "fundamental_target_annualized_rate": (
+            decision_parameters.get("fundamental_target_annualized_return")
+            if decision_parameters.get("fundamental_target_annualized_return") not in (None, "")
+            else str(FUNDAMENTAL_TARGET_ANNUALIZED_RETURN)
+        ),
+        "method": "PROTECTED_CURRENT_PRICE_INVERTED_THROUGH_SELECTED_TERMINAL_PE_AND_ANNUALIZED_RETURN_HURDLE",
+        "return_hurdle_role": "ANNUALIZED_RETURN_HURDLE_NOT_VALUATION_DISCOUNT_RATE",
+        "scenarios": {},
+        "assumptions": [
+            "唯一现价来自结构化 price_input.price；操作员输入仍不等于来源核实。",
+            "终端 P/E 来自实际 EPS_MULTIPLE 适配器；它是终端估值假设，不是外部观测的当前市场 P/E。",
+            "盈利参考期间与估值终点日期分开；终点日期只用于持有期年化。",
+            "年化回报门槛用于推算持有期所需终值，不作为 WACC 或企业资本成本。",
+            "只有通过现有收益求解器验证的定时、税后现金分配才进入分红调整结果。",
+        ],
+        "limitations": [
+            "本结果是现价、终端 P/E、持有期、回报门槛和分红假设下的条件反推，不是外部 MIE。",
+            "所选终端 P/E 并未因此成为市场事实；不能由此证明倍数合理或可实现。",
+            "外部 MIE 状态及 expectation_gap 状态均不因本计算而升级。",
+            "不修改 EPS_MULTIPLE 输入、终值、B5/B6、回报输出、目标价、15%门槛、Decision 或执行权限。",
+        ],
+        "formal_mie_admission_created": False, "decision_authority": False,
+        "valuation_input_modified": False, "primary_eps_input_modified": False,
+    }
+    if result["selected_model_family"] != "EPS_MULTIPLE":
+        result["status"] = "NOT_APPLICABLE_NOT_EPS_MULTIPLE"
+        return result
+    if result["currency"] != "CNY" or str(eps_multiple_valuation.get("currency") or "").upper() != "CNY":
+        result["status"] = "NOT_COMPARABLE_CURRENCY"
+        return result
+    if eps_multiple_valuation.get("status") != "CALCULATED" or eps_multiple_valuation.get("selected_for_primary_model") is not True:
+        result["status"] = "PRIMARY_EPS_MULTIPLE_NOT_CALCULATED"
+        return result
+    if price_input.get("pit_time_status") != "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY":
+        result["status"] = "PRICE_NOT_PIT_QUALIFIED"
+        return result
+    if valuation_timing.get("status") != "PASS":
+        result["status"] = "VALUATION_TIMING_NOT_RESOLVED"
+        result["issues"] = list(valuation_timing.get("issues") or [])
+        return result
+    if str(valuation_timing.get("forecast_period") or "").upper() != str(eps_multiple_valuation.get("forecast_period") or "").upper():
+        result["status"] = "EPS_MULTIPLE_VALUATION_PERIOD_MISMATCH"
+        return result
+
+    def dec(value: Any) -> Decimal | None:
+        try:
+            number = Decimal(str(value))
+            return number if number.is_finite() else None
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+
+    price = dec(price_input.get("price"))
+    years = dec(valuation_timing.get("annualization_year_fraction"))
+    hurdle = dec(decision_parameters.get("required_return_annualized"))
+    target = dec(decision_parameters.get("fundamental_target_annualized_return"))
+    if target is None:
+        target = FUNDAMENTAL_TARGET_ANNUALIZED_RETURN
+    if price is None or price <= 0 or years is None or years <= 0:
+        result["status"] = "PRICE_OR_TERMINAL_HORIZON_NOT_IDENTIFIABLE"
+        return result
+    if hurdle is None or hurdle <= -1 or target <= -1:
+        result["status"] = "RETURN_HURDLE_NOT_IDENTIFIABLE"
+        return result
+
+    valuation_rows = eps_multiple_valuation.get("scenarios") if isinstance(eps_multiple_valuation.get("scenarios"), Mapping) else {}
+    transition = operating_driver_forecast.get("baseline_transition")
+    transition = transition if isinstance(transition, Mapping) else {}
+    b57 = transition.get("per_share_earnings_bridge")
+    b57 = b57 if isinstance(b57, Mapping) else {}
+    b57_rows = b57.get("scenarios") if isinstance(b57.get("scenarios"), Mapping) else {}
+    b58 = transition.get("primary_eps_consistency")
+    b58 = b58 if isinstance(b58, Mapping) else {}
+    b58_rows = b58.get("scenarios") if isinstance(b58.get("scenarios"), Mapping) else {}
+    b59 = transition.get("primary_eps_difference_attribution")
+    b59 = b59 if isinstance(b59, Mapping) else {}
+    b59_rows = b59.get("scenarios") if isinstance(b59.get("scenarios"), Mapping) else {}
+    forward_rows = forecast_valuation.get("scenarios") if isinstance(forecast_valuation.get("scenarios"), Mapping) else {}
+    event_rows = validated_cash_distribution_events if isinstance(validated_cash_distribution_events, Mapping) else {}
+    company_scope = (
+        str(operating_driver_forecast.get("scope") or "").upper() == "COMPANY_WIDE"
+        and str(b57.get("scope") or "").upper() == "COMPANY_WIDE"
+    )
+    statuses: list[str] = []
+    every_distribution_validated = True
+
+    def required_eps(rate: Decimal, pe: Decimal, pv_dividends: Decimal | None) -> tuple[Decimal, Decimal | None]:
+        factor = (Decimal("1") + rate) ** years
+        without_dividends = price * factor / pe
+        with_dividends = None
+        if pv_dividends is not None:
+            with_dividends = max(Decimal("0"), (price - pv_dividends) * factor) / pe
+        return without_dividends, with_dividends
+
+    for name in SCENARIOS:
+        model = valuation_rows.get(name) if isinstance(valuation_rows.get(name), Mapping) else {}
+        pe_obj = model.get("pe_multiple_x") if isinstance(model.get("pe_multiple_x"), Mapping) else {}
+        eps_obj = model.get("eps_per_share") if isinstance(model.get("eps_per_share"), Mapping) else {}
+        b57_row = b57_rows.get(name) if isinstance(b57_rows.get(name), Mapping) else {}
+        b57_forward = b57_row.get("forward_scenario") if isinstance(b57_row.get("forward_scenario"), Mapping) else {}
+        b58_row = b58_rows.get(name) if isinstance(b58_rows.get(name), Mapping) else {}
+        b59_row = b59_rows.get(name) if isinstance(b59_rows.get(name), Mapping) else {}
+        forecast_row = forward_rows.get(name) if isinstance(forward_rows.get(name), Mapping) else {}
+        pe, primary_eps = dec(pe_obj.get("value")), dec(eps_obj.get("value"))
+        row: dict[str, Any] = {
+            "scenario": name, "status": "NOT_IDENTIFIABLE",
+            "selected_terminal_pe": pe_obj.get("value"), "selected_terminal_pe_unit": pe_obj.get("unit"),
+            "selected_terminal_pe_basis": pe_obj.get("basis"), "selected_terminal_pe_data_class": pe_obj.get("data_class"),
+            "selected_terminal_pe_evidence_refs": pe_obj.get("evidence_refs") or [],
+            "primary_eps_actually_used": eps_obj.get("value"),
+            "primary_terminal_value_using_selected_pe": model.get("terminal_value_per_share"),
+            "b57_status": b57_row.get("status") or "UNKNOWN",
+            "b58_status": b58_row.get("status") or "UNKNOWN",
+            "b58_forecast_period_match": b58_row.get("forecast_period_match"),
+            "b59_status": b59_row.get("status") or "UNKNOWN",
+            "b57_forward_period": b57_forward.get("period"),
+            "b57_all_items_parent_attributable_net_profit_proxy_cny": b57_forward.get("all_items_parent_attributable_net_profit_proxy_cny"),
+            "b57_diluted_weighted_average_shares": b57_forward.get("diluted_weighted_average_shares"),
+            "b57_all_items_eps_proxy": b58_row.get("b57_all_items_eps_proxy_cny_per_share"),
+            "b57_normalized_eps_proxy_diagnostic_only": b58_row.get("b57_normalized_diluted_eps_proxy_cny_per_share"),
+            "b57_forward_data_class": b58_row.get("b57_forward_data_class") or "SOURCE_CLASS_NOT_IDENTIFIABLE",
+            "b57_source_data_classes": list(b58_row.get("b57_source_data_classes") or []) if isinstance(b58_row.get("b57_source_data_classes"), list) else [],
+            "b57_source_lineage_assessment": dict(b58_row.get("b57_source_lineage_assessment") or {}) if isinstance(b58_row.get("b57_source_lineage_assessment"), Mapping) else {},
+            "formal_evidence_pit_admission_created": False,
+            "formal_forecast_admission_created": False,
+            "decision_grade_forecast_eligible": False,
+            "primary_eps_data_class": b58_row.get("primary_eps_data_class") or eps_obj.get("data_class") or "SOURCE_CLASS_NOT_IDENTIFIABLE",
+            "primary_eps_evidence_refs": list(b58_row.get("primary_eps_evidence_refs") or eps_obj.get("evidence_refs") or []) if isinstance(b58_row.get("primary_eps_evidence_refs") or eps_obj.get("evidence_refs") or [], list) else [],
+            "independent_confirmation_status": b58_row.get("independent_confirmation_status") or "NOT_ESTABLISHED_BY_B58_NUMERICAL_RECONCILIATION",
+            "distribution_status": "NOT_VALIDATED_OR_NOT_AVAILABLE",
+            "validated_cash_distributions_per_share": None,
+            "present_value_of_validated_cash_distributions_at_hurdle": None,
+            "present_value_of_validated_cash_distributions_at_fundamental_target": None,
+            "zero_return_required_terminal_eps_before_distributions": format(price / pe, "f") if pe and pe > 0 else None,
+            "zero_return_required_terminal_eps_with_validated_distributions": None,
+            "required_return_eps_without_distributions": None,
+            "required_return_eps_with_validated_distributions": None,
+            "fundamental_target_eps_without_distributions": None,
+            "fundamental_target_eps_with_validated_distributions": None,
+            "b57_eps_headroom_vs_required_return_without_distributions": None,
+            "b57_eps_headroom_vs_required_return_with_validated_distributions": None,
+            "primary_eps_headroom_vs_required_return_without_distributions": None,
+            "primary_eps_headroom_vs_required_return_with_validated_distributions": None,
+            "b57_terminal_value_using_selected_pe": None,
+            "b57_minus_primary_terminal_value_effect": None,
+            "current_price_to_primary_eps_forward_pe": None,
+            "required_terminal_pe_at_b57_eps_for_required_return_without_distributions": None,
+            "b59_terminal_value_effects": {}, "comparability_flags": [], "issues": [],
+        }
+        if pe is None or pe <= 0 or str(pe_obj.get("unit") or "").lower() != "x":
+            row["issues"] = ["SELECTED_TERMINAL_PE_INVALID_OR_UNIT_MISMATCH"]
+            result["scenarios"][name] = row
+            statuses.append(row["status"])
+            every_distribution_validated = False
+            continue
+        if primary_eps is None or primary_eps <= 0 or str(eps_obj.get("unit") or "").lower() != "cny/share":
+            row["issues"] = ["PRIMARY_ADAPTER_EPS_INVALID_OR_UNIT_MISMATCH"]
+            result["scenarios"][name] = row
+            statuses.append(row["status"])
+            every_distribution_validated = False
+            continue
+
+        events = event_rows.get(name)
+        declared_distributions = dec(forecast_row.get("cash_distributions_per_share"))
+        dist_total, pv_at_hurdle, pv_at_target = None, None, None
+        dist_issues: list[str] = []
+        if isinstance(events, list) and declared_distributions is not None and declared_distributions >= 0:
+            total = Decimal("0")
+            pv_h = Decimal("0")
+            pv_t = Decimal("0")
+            for event_no, event in enumerate(events, 1):
+                if not isinstance(event, Mapping):
+                    dist_issues.append(f"VALIDATED_DISTRIBUTION_EVENT_{event_no}_INVALID")
+                    break
+                amount, event_years = dec(event.get("amount_per_share")), dec(event.get("year_fraction_from_entry"))
+                if amount is None or amount <= 0 or event_years is None or event_years <= 0 or event_years > years:
+                    dist_issues.append(f"VALIDATED_DISTRIBUTION_EVENT_{event_no}_AMOUNT_OR_DATE_INVALID")
+                    break
+                total += amount
+                pv_h += amount / ((Decimal("1") + hurdle) ** event_years)
+                pv_t += amount / ((Decimal("1") + target) ** event_years)
+            if not dist_issues and abs(total - declared_distributions) <= Decimal("0.000001"):
+                dist_total, pv_at_hurdle, pv_at_target = total, pv_h, pv_t
+                row["distribution_status"] = "VALIDATED_DATED_CASH_FLOWS" if events else "VALIDATED_NO_FUTURE_DISTRIBUTIONS"
+            else:
+                dist_issues.append("VALIDATED_EVENT_TOTAL_DOES_NOT_MATCH_SCENARIO_DISTRIBUTION")
+        else:
+            dist_issues.append("DISTRIBUTIONS_NOT_VALIDATED_BY_EXISTING_RETURN_SOLVER")
+        if pv_at_hurdle is None:
+            every_distribution_validated = False
+
+        if dist_total is not None:
+            row["zero_return_required_terminal_eps_with_validated_distributions"] = format(
+                max(Decimal("0"), price - dist_total) / pe, "f"
+            )
+        req_h_no, req_h_yes = required_eps(hurdle, pe, pv_at_hurdle)
+        req_t_no, req_t_yes = required_eps(target, pe, pv_at_target)
+        row["required_return_eps_without_distributions"] = format(req_h_no, "f")
+        row["required_return_eps_with_validated_distributions"] = format(req_h_yes, "f") if req_h_yes is not None else None
+        row["fundamental_target_eps_without_distributions"] = format(req_t_no, "f")
+        row["fundamental_target_eps_with_validated_distributions"] = format(req_t_yes, "f") if req_t_yes is not None else None
+        row["validated_cash_distributions_per_share"] = format(dist_total, "f") if dist_total is not None else None
+        row["present_value_of_validated_cash_distributions_at_hurdle"] = format(pv_at_hurdle, "f") if pv_at_hurdle is not None else None
+        row["present_value_of_validated_cash_distributions_at_fundamental_target"] = format(pv_at_target, "f") if pv_at_target is not None else None
+        row["current_price_to_primary_eps_forward_pe"] = format(price / primary_eps, "f")
+        primary_terminal = dec(model.get("terminal_value_per_share"))
+        if primary_terminal is not None:
+            row["primary_terminal_value_using_selected_pe"] = format(primary_terminal, "f")
+
+        b57_eps = dec(b58_row.get("b57_all_items_eps_proxy_cny_per_share"))
+        b57_comparable = (
+            company_scope
+            and b57_row.get("status") in {
+                "CALCULATED_AND_RECONCILED",
+                "FORWARD_ALL_ITEMS_EPS_CALCULATED_HISTORICAL_NORMALIZATION_NOT_IDENTIFIABLE",
+            }
+            and b58_row.get("forecast_period_match") is True
+            and b58_row.get("status") == "MATCH"
+            and b57_eps is not None
+        )
+        if b57_comparable:
+            row["b57_terminal_value_using_selected_pe"] = format(b57_eps * pe, "f")
+            row["b57_minus_primary_terminal_value_effect"] = format((b57_eps - primary_eps) * pe, "f")
+            row["b57_eps_headroom_vs_required_return_without_distributions"] = format(b57_eps - req_h_no, "f")
+            if req_h_yes is not None:
+                row["b57_eps_headroom_vs_required_return_with_validated_distributions"] = format(b57_eps - req_h_yes, "f")
+            if b57_eps > 0:
+                row["required_terminal_pe_at_b57_eps_for_required_return_without_distributions"] = format(
+                    price * ((Decimal("1") + hurdle) ** years) / b57_eps, "f"
+                )
+        else:
+            row["comparability_flags"].append("B57_EPS_NOT_CONFIRMED_ON_SAME_COMPANY_SCOPE_AND_PERIOD")
+        row["primary_eps_headroom_vs_required_return_without_distributions"] = format(primary_eps - req_h_no, "f")
+        if req_h_yes is not None:
+            row["primary_eps_headroom_vs_required_return_with_validated_distributions"] = format(primary_eps - req_h_yes, "f")
+
+        if b59_row.get("status") in {"ARITHMETICALLY_RECONCILED", "ARITHMETICALLY_RECONCILED_NOT_COMPARABLE"}:
+            b59_components = b59_row.get("eps_gap_components_cny_per_share") if isinstance(b59_row.get("eps_gap_components_cny_per_share"), Mapping) else {}
+            for component, raw_value in b59_components.items():
+                if component in {"reconciliation_residual_cny_per_share", "component_sum_cny_per_share"}:
+                    continue
+                amount = dec(raw_value)
+                if amount is not None:
+                    row["b59_terminal_value_effects"][component.replace("_cny_per_share", "_terminal_value_effect_cny_per_share")] = format(amount * pe, "f")
+        else:
+            row["comparability_flags"].append("B59_EPS_GAP_ATTRIBUTION_NOT_RECONCILED")
+        if b59_row.get("status") in {"ARITHMETICALLY_RECONCILED", "ARITHMETICALLY_RECONCILED_NOT_COMPARABLE"}:
+            b59_components = b59_row.get("eps_gap_components_cny_per_share") if isinstance(b59_row.get("eps_gap_components_cny_per_share"), Mapping) else {}
+            b59_declared_eps_gap = dec(b59_components.get("b57_minus_primary_declared_eps_cny_per_share"))
+            if b59_declared_eps_gap is not None:
+                # B59 is an arithmetic-difference diagnostic, not a like-for-like
+                # forecast comparison. Preserve its terminal-value attribution even
+                # when B58 does not certify same-basis EPS headroom.
+                row["b57_minus_primary_terminal_value_effect"] = format(
+                    b59_declared_eps_gap * pe, "f"
+                )
+                row["b57_minus_primary_terminal_value_effect_basis"] = (
+                    "B59_RECONCILED_EPS_DIFFERENCE_TIMES_SELECTED_PE_DIAGNOSTIC_ONLY_NOT_REQUIRED_RETURN_HEADROOM"
+                )
+                row["b57_minus_primary_terminal_value_effect_is_diagnostic_only"] = True
+        row["status"] = "CALCULATED_CONDITIONAL"
+        row["issues"] = dist_issues
+        row["comparability_flags"].extend(dist_issues)
+        result["scenarios"][name] = row
+        statuses.append(row["status"])
+
+    if statuses and all(value == "CALCULATED_CONDITIONAL" for value in statuses):
+        result["status"] = "CONDITIONAL_SENSITIVITY_CALCULATED"
+    elif any(value == "CALCULATED_CONDITIONAL" for value in statuses):
+        result["status"] = "PARTIAL"
+    else:
+        result["status"] = "NOT_IDENTIFIABLE"
+    result["all_scenario_distribution_cash_flows_validated"] = every_distribution_validated
+    result["external_mie_and_expectation_gap_modified"] = False
+    result["summary"] = "本地使用唯一结构化现价、主 EPS_MULTIPLE 终端 P/E 和收益门槛独立反推所需终端 EPS；合格分红按实际时间计入。结果为条件敏感性，不是外部 MIE。"
+    return result
+
+
+
+
+def _build_b62_sotp_segment_earnings_reconciliation(
+    *,
+    local_sotp_inversion: Mapping[str, Any],
+    sotp_valuation: Mapping[str, Any],
+    operating_driver_forecast: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Compare B4's explicit segment normalized earnings with SOTP inputs and B61 price-implied hurdles."""
+    result: dict[str, Any] = {
+        "schema_version": "IIOS-B62-SOTP-SEGMENT-EARNINGS-RECONCILIATION-0.1",
+        "status": "NOT_IDENTIFIABLE",
+        "qualification": "CONDITIONAL_DIAGNOSTIC_ONLY",
+        "forecast_period": "UNKNOWN",
+        "currency": str(local_sotp_inversion.get("currency") or "UNKNOWN").upper(),
+        "method": "B4_SEGMENT_NORMALIZED_PARENT_EARNINGS_VS_SOTP_SELECTED_PROFIT_AND_B61_LOCAL_PRICE_HURDLE",
+        "scenarios": {},
+        "limitations": [
+            "仅使用 B4 显式 business_segment_id、分部正常化归母利润桥、SOTP 既有分部利润/P-E 和 B61 本地现价反推；不按名称匹配或推断业务归属。",
+            "SOTP 分部 earnings_basis 必须明确为 NORMALIZED_PARENT_ATTRIBUTABLE，且 B4 与 SOTP 必须使用相同 CNY 盈利参考期间。",
+            "B61 分部 Required Profit 是“其他分部保持当前 SOTP 情景预测”的单变量敏感性；不能把各分部单变量阈值或余量相加。",
+            "aggregate B4 segment pool 则使用所有 B4 分部前瞻利润同时替代当前 SOTP 利润，并维持各分部 SOTP P/E 与母公司调整不变；这是全向量条件对比，不是 B61 单变量情景的加总。",
+            "母公司中心成本、净现金/净负债和其他调整没有独立前瞻输入时仅展示现有值及方向敏感性，不能虚构这些调整未来变化的贡献。",
+            "B62 是数学对账，不证明 B4 假设质量、SOTP P/E 公允或外部市场已计价；外部 MIE 与 expectation_gap 不升级。",
+            "不修改 SOTP 主模型、B4/B5/B6、回报计算、目标入场价、15% 回报门槛、formal admission、Decision 或执行权限。",
+        ],
+        "external_mie_modified": False,
+        "sotp_input_modified": False,
+        "valuation_input_modified": False,
+        "formal_mie_admission_created": False,
+        "formal_forecast_admission_created": False,
+        "decision_authority": False,
+    }
+
+    selected_family = str(local_sotp_inversion.get("selected_model_family") or "UNKNOWN").strip().upper()
+    result["selected_model_family"] = selected_family
+    if selected_family != "SOTP":
+        result["status"] = "NOT_APPLICABLE_NOT_SOTP"
+        return result
+    if str(local_sotp_inversion.get("currency") or "").strip().upper() != "CNY":
+        result["status"] = "NOT_COMPARABLE_CURRENCY"
+        return result
+    if sotp_valuation.get("status") != "CALCULATED" or sotp_valuation.get("selected_for_primary_model") is not True:
+        result["status"] = "PRIMARY_SOTP_NOT_CALCULATED"
+        return result
+    if str(local_sotp_inversion.get("status") or "").upper() not in {
+        "CONDITIONAL_SENSITIVITY_CALCULATED", "PARTIAL"
+    }:
+        result["status"] = "BLOCKED_BY_B61"
+        return result
+
+    baseline_transition = operating_driver_forecast.get("baseline_transition")
+    baseline_transition = baseline_transition if isinstance(baseline_transition, Mapping) else {}
+    b62 = baseline_transition.get("segment_normalized_earnings_bridge")
+    b62 = b62 if isinstance(b62, Mapping) else {}
+    result["forecast_period"] = str(b62.get("forecast_period") or "UNKNOWN")
+    result["valuation_terminal_date"] = str(
+        local_sotp_inversion.get("valuation_terminal_date")
+        or sotp_valuation.get("valuation_terminal_date")
+        or "UNKNOWN"
+    )
+    result["b4_segment_bridge_status"] = str(b62.get("status") or "UNKNOWN")
+    if str(operating_driver_forecast.get("scope") or "").upper() != "COMPANY_WIDE":
+        result["status"] = "NOT_COMPARABLE_SCOPE"
+        return result
+    if str(b62.get("status") or "").upper() != "DIAGNOSTIC_CALCULATED":
+        result["status"] = "BLOCKED_BY_B4_SEGMENT_EARNINGS_BRIDGE"
+        result["reason"] = str(b62.get("reason") or "B4 分部正常化归母利润桥未达到完整情景闭合。")
+        return result
+    if str(b62.get("forecast_period") or "").strip().upper() != str(sotp_valuation.get("forecast_period") or "").strip().upper():
+        result["status"] = "FORECAST_PERIOD_MISMATCH"
+        return result
+    if str(local_sotp_inversion.get("forecast_period") or "").strip().upper() != str(b62.get("forecast_period") or "").strip().upper():
+        result["status"] = "B61_B4_FORECAST_PERIOD_MISMATCH"
+        return result
+    b61_terminal_date = str(local_sotp_inversion.get("valuation_terminal_date") or "").strip()
+    sotp_terminal_date = str(sotp_valuation.get("valuation_terminal_date") or "").strip()
+    if not b61_terminal_date or not sotp_terminal_date:
+        result["status"] = "B61_SOTP_TERMINAL_DATE_NOT_IDENTIFIABLE"
+        result["valuation_terminal_date"] = "UNKNOWN"
+        return result
+    if b61_terminal_date != sotp_terminal_date:
+        result["status"] = "B61_SOTP_TERMINAL_DATE_MISMATCH"
+        result["valuation_terminal_date"] = "UNKNOWN"
+        return result
+
+    def dec(value: Any) -> Decimal | None:
+        try:
+            number = Decimal(str(value))
+            return number if number.is_finite() else None
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+
+    b4_scenarios = b62.get("scenarios") if isinstance(b62.get("scenarios"), Mapping) else {}
+    sotp_scenarios = sotp_valuation.get("scenarios") if isinstance(sotp_valuation.get("scenarios"), Mapping) else {}
+    b61_scenarios = local_sotp_inversion.get("scenarios") if isinstance(local_sotp_inversion.get("scenarios"), Mapping) else {}
+    scenario_statuses: list[str] = []
+
+    for scenario_name in SCENARIOS:
+        b4_scenario = b4_scenarios.get(scenario_name) if isinstance(b4_scenarios.get(scenario_name), Mapping) else {}
+        sotp_scenario = sotp_scenarios.get(scenario_name) if isinstance(sotp_scenarios.get(scenario_name), Mapping) else {}
+        b61_scenario = b61_scenarios.get(scenario_name) if isinstance(b61_scenarios.get(scenario_name), Mapping) else {}
+        row: dict[str, Any] = {
+            "scenario": scenario_name,
+            "status": "NOT_IDENTIFIABLE",
+            "forecast_period": result["forecast_period"],
+            "segment_comparisons": [],
+            "issues": [],
+        }
+        if str(b4_scenario.get("status") or "").upper() != "CALCULATED_AND_RECONCILED":
+            row["issues"].append(f"B4_SEGMENT_SCENARIO_STATUS:{b4_scenario.get('status') or 'UNKNOWN'}")
+        if str(b61_scenario.get("status") or "").upper() != "CALCULATED_CONDITIONAL":
+            row["issues"].append(f"B61_SOTP_SCENARIO_STATUS:{b61_scenario.get('status') or 'UNKNOWN'}")
+        sotp_segments = sotp_scenario.get("segments") if isinstance(sotp_scenario.get("segments"), list) else []
+        b4_segments = b4_scenario.get("segments") if isinstance(b4_scenario.get("segments"), Mapping) else {}
+        b61_req = b61_scenario.get("requirements") if isinstance(b61_scenario.get("requirements"), Mapping) else {}
+        required_return = b61_req.get("required_return") if isinstance(b61_req.get("required_return"), Mapping) else {}
+        required_without_dist = required_return.get("without_distributions") if isinstance(required_return.get("without_distributions"), Mapping) else {}
+        required_pool = dec(required_without_dist.get("required_segment_equity_value_pool_cny"))
+        selected_pool = dec(required_without_dist.get("selected_segment_equity_value_pool_cny"))
+        required_total_equity = dec(required_without_dist.get("required_terminal_equity_value_cny"))
+        required_per_share = dec(required_return.get("required_terminal_value_per_share_without_distributions"))
+        shares = dec(b61_scenario.get("selected_diluted_shares"))
+        central_cost = dec(b61_scenario.get("selected_capitalized_central_cost_cny"))
+        net_cash = dec(b61_scenario.get("selected_net_cash_debt_cny"))
+        other_adjustments = dec(b61_scenario.get("selected_other_adjustments_cny"))
+        if any(value is None for value in (required_pool, selected_pool, required_total_equity, required_per_share, shares, central_cost, net_cash, other_adjustments)):
+            row["issues"].append("B61_REQUIRED_POOL_OR_PARENT_ADJUSTMENT_FIELDS_MISSING")
+        sotp_by_id: dict[str, Mapping[str, Any]] = {}
+        for raw_segment in sotp_segments:
+            if not isinstance(raw_segment, Mapping):
+                row["issues"].append("SOTP_SEGMENT_ROW_INVALID")
+                continue
+            segment_id = str(raw_segment.get("segment_id") or "").strip()
+            if not segment_id or segment_id in sotp_by_id:
+                row["issues"].append(f"SOTP_SEGMENT_ID_MISSING_OR_DUPLICATE:{segment_id or 'UNKNOWN'}")
+                continue
+            sotp_by_id[segment_id] = raw_segment
+
+        b61_req_rows = (
+            required_without_dist.get("segment_requirements")
+            if isinstance(required_without_dist.get("segment_requirements"), list) else []
+        )
+        b61_req_by_id = {
+            str(item.get("segment_id")): item
+            for item in b61_req_rows if isinstance(item, Mapping) and item.get("segment_id") not in (None, "")
+        }
+        if set(sotp_by_id) != set(b4_segments) or set(sotp_by_id) != set(b61_req_by_id):
+            row["issues"].append("B4_SOTP_B61_SEGMENT_UNIVERSE_MISMATCH")
+
+        forecast_segment_pool = Decimal("0")
+        selected_segment_pool_recalculated = Decimal("0")
+        b4_value_changes: list[dict[str, Any]] = []
+        for segment_id in sorted(set(sotp_by_id) & set(b4_segments) & set(b61_req_by_id)):
+            sotp_segment = sotp_by_id[segment_id]
+            b4_segment = b4_segments.get(segment_id) if isinstance(b4_segments.get(segment_id), Mapping) else {}
+            b61_segment = b61_req_by_id[segment_id]
+            earnings_basis = str(sotp_segment.get("earnings_basis") or "UNKNOWN").strip().upper()
+            if earnings_basis != "NORMALIZED_PARENT_ATTRIBUTABLE":
+                row["issues"].append(f"SOTP_EARNINGS_BASIS_NOT_NORMALIZED_PARENT_ATTRIBUTABLE:{segment_id}")
+                continue
+            b4_forecast = b4_segment.get("forward_scenario") if isinstance(b4_segment.get("forward_scenario"), Mapping) else {}
+            if str(b4_segment.get("status") or "").upper() != "CALCULATED_AND_RECONCILED":
+                row["issues"].append(f"B4_SEGMENT_NOT_RECONCILED:{segment_id}")
+                continue
+            if str(b4_forecast.get("period") or "").strip().upper() != result["forecast_period"].upper():
+                row["issues"].append(f"B4_SEGMENT_PERIOD_MISMATCH:{segment_id}")
+                continue
+            b4_profit = dec(b4_forecast.get("normalized_parent_attributable_net_profit_cny"))
+            profit_measure = sotp_segment.get("attributable_net_profit_cny") if isinstance(sotp_segment.get("attributable_net_profit_cny"), Mapping) else {}
+            pe_measure = sotp_segment.get("pe_multiple_x") if isinstance(sotp_segment.get("pe_multiple_x"), Mapping) else {}
+            sotp_profit = dec(profit_measure.get("value"))
+            pe = dec(pe_measure.get("value"))
+            required_profit = dec(b61_segment.get("one_at_a_time_required_attributable_net_profit_cny_signed"))
+            if any(value is None for value in (b4_profit, sotp_profit, pe, required_profit)) or pe <= 0:
+                row["issues"].append(f"SEGMENT_PROFIT_PE_OR_REQUIRED_PROFIT_NOT_NUMERIC:{segment_id}")
+                continue
+            b4_segment_value = b4_profit * pe
+            selected_segment_value = sotp_profit * pe
+            profit_delta = b4_profit - sotp_profit
+            value_delta = profit_delta * pe
+            b4_vs_required_profit = b4_profit - required_profit
+            forecast_segment_pool += b4_segment_value
+            selected_segment_pool_recalculated += selected_segment_value
+            b4_value_changes.append({
+                "segment_id": segment_id,
+                "b4_forecast_parent_attributable_normalized_profit_cny": format(b4_profit, "f"),
+                "sotp_selected_attributable_profit_cny": format(sotp_profit, "f"),
+                "sotp_selected_pe_multiple_x": format(pe, "f"),
+                "earnings_basis": earnings_basis,
+                "b4_minus_sotp_profit_cny": format(profit_delta, "f"),
+                "profit_change_value_effect_at_selected_sotp_pe_cny": format(value_delta, "f"),
+                "b4_forecast_segment_equity_value_at_selected_sotp_pe_cny": format(b4_segment_value, "f"),
+                "sotp_selected_segment_equity_value_cny": format(selected_segment_value, "f"),
+                "b61_one_at_a_time_required_attributable_profit_cny_signed": format(required_profit, "f"),
+                "b4_forecast_profit_minus_b61_one_at_a_time_required_profit_cny": format(b4_vs_required_profit, "f"),
+                "b61_one_at_a_time_interpretation": "ALTERNATIVE_SENSITIVITY_ONLY;OTHER_SEGMENTS_HELD_AT_SELECTED_SOTP_PROFIT;DO_NOT_SUM_SEGMENT_HEADROOM",
+            })
+        if row["issues"]:
+            row["status"] = "NOT_COMPARABLE"
+            row["issues"] = sorted(set(row["issues"]))
+            result["scenarios"][scenario_name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        # P/E sensitivity: other segments remain at the complete B4 forecast vector.
+        # This is separate from B61's profit threshold and is not additive across segments.
+        for segment_row in b4_value_changes:
+            b4_profit = dec(segment_row.get("b4_forecast_parent_attributable_normalized_profit_cny"))
+            b4_segment_value = dec(segment_row.get("b4_forecast_segment_equity_value_at_selected_sotp_pe_cny"))
+            selected_pe = dec(segment_row.get("sotp_selected_pe_multiple_x"))
+            if b4_profit is not None and b4_profit > 0 and b4_segment_value is not None and selected_pe is not None:
+                required_pe = (required_pool - (forecast_segment_pool - b4_segment_value)) / b4_profit
+                segment_row["required_pe_at_b4_forecast_profit_with_other_segments_at_b4_forecast_x"] = format(required_pe, "f")
+                segment_row["selected_pe_minus_required_pe_at_b4_profit_x"] = format(selected_pe - required_pe, "f")
+                segment_row["required_pe_interpretation"] = "OTHER_SEGMENTS_HELD_AT_FULL_B4_FORECAST_VALUES;ONE_SEGMENT_P_E_ONLY;NON_ADDITIVE"
+            else:
+                segment_row["required_pe_at_b4_forecast_profit_with_other_segments_at_b4_forecast_x"] = None
+                segment_row["selected_pe_minus_required_pe_at_b4_profit_x"] = None
+                segment_row["required_pe_interpretation"] = "NOT_IDENTIFIABLE_NONPOSITIVE_OR_MISSING_B4_SEGMENT_PROFIT"
+        if any(value is None for value in (required_pool, selected_pool, required_total_equity, required_per_share, shares, central_cost, net_cash, other_adjustments)) or shares <= 0:
+            row["status"] = "NOT_IDENTIFIABLE"
+            row["issues"] = ["B61_PARENT_ADJUSTMENTS_OR_SHARE_COUNT_INVALID"]
+            result["scenarios"][scenario_name] = row
+            scenario_statuses.append(row["status"])
+            continue
+        pool_residual = selected_segment_pool_recalculated - selected_pool
+        if abs(pool_residual) > Decimal("0.01"):
+            row["status"] = "NOT_COMPARABLE"
+            row["issues"] = ["SOTP_SELECTED_SEGMENT_POOL_RECALCULATION_MISMATCH"]
+            row["selected_segment_pool_recalculation_residual_cny"] = format(pool_residual, "f")
+            result["scenarios"][scenario_name] = row
+            scenario_statuses.append(row["status"])
+            continue
+
+        forecast_total_equity = forecast_segment_pool - central_cost + net_cash + other_adjustments
+        forecast_terminal_per_share = forecast_total_equity / shares
+        aggregate_pool_headroom = forecast_segment_pool - required_pool
+        break_even_share_count = (
+            forecast_total_equity / required_per_share
+            if forecast_total_equity > 0 and required_per_share > 0 else None
+        )
+        row.update({
+            "status": "CALCULATED_CONDITIONAL",
+            "segment_comparisons": b4_value_changes,
+            "selected_sotp_segment_equity_value_pool_cny": format(selected_pool, "f"),
+            "b4_forecast_segment_equity_value_pool_at_selected_sotp_pe_cny": format(forecast_segment_pool, "f"),
+            "required_segment_equity_value_pool_for_required_return_cny": format(required_pool, "f"),
+            "b4_forecast_segment_pool_minus_required_pool_cny": format(aggregate_pool_headroom, "f"),
+            "b4_forecast_implied_total_equity_value_with_selected_parent_adjustments_cny": format(forecast_total_equity, "f"),
+            "required_terminal_equity_value_for_required_return_cny": format(required_total_equity, "f"),
+            "b4_forecast_implied_terminal_value_per_share_cny": format(forecast_terminal_per_share, "f"),
+            "required_terminal_value_per_share_for_required_return_cny": format(required_per_share, "f"),
+            "selected_diluted_shares": format(shares, "f"),
+            "break_even_diluted_shares_at_b4_forecast_value": format(break_even_share_count, "f") if break_even_share_count is not None else None,
+            "selected_parent_adjustments": {
+                "capitalized_central_cost_cny": format(central_cost, "f"),
+                "net_cash_debt_cny": format(net_cash, "f"),
+                "other_adjustments_cny": format(other_adjustments, "f"),
+                "required_segment_pool_sensitivity_per_plus_one_cny": {
+                    "capitalized_central_cost": "+1 CNY",
+                    "net_cash_debt": "-1 CNY",
+                    "other_adjustments": "-1 CNY",
+                },
+                "future_adjustment_change_attribution": "NOT_IDENTIFIABLE_WITHOUT_EXPLICIT_FORWARD_PARENT_ADJUSTMENT_INPUTS",
+            },
+            "dilution_sensitivity": {
+                "additional_required_equity_per_plus_one_diluted_share_cny": format(required_per_share, "f"),
+                "one_percent_share_count_increase_additional_required_equity_cny": format(required_per_share * shares * Decimal("0.01"), "f"),
+                "interpretation": "Holding price, return hurdle and timing constant, required terminal equity changes linearly with diluted shares.",
+            },
+            "interpretation": {
+                "earnings_vs_sotp": "B4_NORMALIZED_ATTRIBUTABLE_PROFIT_MINUS_SOTP_SELECTED_PROFIT",
+                "earnings_value_effect": "B4_MINUS_SOTP_PROFIT_TIMES_SELECTED_SOTP_PE",
+                "full_vector_hurdle": "SUM(B4_SEGMENT_PROFIT_TIMES_SELECTED_SOTP_PE)-B61_REQUIRED_SEGMENT_POOL",
+                "per_segment_hurdle": "B61_ONE_AT_A_TIME;NOT_ADDITIVE",
+            },
+            "issues": [],
+        })
+        result["scenarios"][scenario_name] = row
+        scenario_statuses.append(row["status"])
+
+    if scenario_statuses and all(status == "CALCULATED_CONDITIONAL" for status in scenario_statuses):
+        result["status"] = "CONDITIONAL_RECONCILIATION_CALCULATED"
+    elif any(status == "CALCULATED_CONDITIONAL" for status in scenario_statuses):
+        result["status"] = "PARTIAL"
+    elif any(status == "NOT_COMPARABLE" for status in scenario_statuses):
+        result["status"] = "NOT_COMPARABLE"
+    else:
+        result["status"] = "NOT_IDENTIFIABLE"
+    result["summary"] = "B62 使用 B4 分部正常化归母利润 × 已选 SOTP P/E 构建全分部前瞻权益价值池，与 B61 当前价格要求比较；分部单变量盈利阈值仍不可相加。"
+    return result
+
+
+def _build_b61_sotp_price_inversion(
+    *,
+    price_input: Mapping[str, Any],
+    valuation_timing: Mapping[str, Any],
+    decision_parameters: Mapping[str, Any],
+    operator_valuation_context: Mapping[str, Any],
+    sotp_valuation: Mapping[str, Any],
+    forecast_valuation: Mapping[str, Any],
+    validated_cash_distribution_events: Any,
+    external_mie_status: Any,
+) -> dict[str, Any]:
+    """Invert the protected price through the selected SOTP scenario without allocating unsupported segment forecasts."""
+    result: dict[str, Any] = {
+        "schema_version": "IIOS-B61-LOCAL-SOTP-PRICE-INVERSION-0.1",
+        "status": "NOT_IDENTIFIABLE",
+        "qualification": "CONDITIONAL_ONLY",
+        "selected_model_family": str(operator_valuation_context.get("selected_model_family") or "UNKNOWN").strip().upper(),
+        "currency": str(price_input.get("currency") or "UNKNOWN").strip().upper(),
+        "external_mie_status_unchanged": str(external_mie_status or "UNKNOWN").strip().upper(),
+        "reference_price": price_input.get("price"),
+        "price_assurance": price_input.get("assurance_label") or "UNKNOWN",
+        "price_pit_status": price_input.get("pit_time_status") or "UNKNOWN",
+        "forecast_period": sotp_valuation.get("forecast_period") or "UNKNOWN",
+        "valuation_terminal_date": sotp_valuation.get("valuation_terminal_date") or "UNKNOWN",
+        "annualization_year_fraction": valuation_timing.get("annualization_year_fraction"),
+        "day_count_convention": valuation_timing.get("day_count_convention") or "UNKNOWN",
+        "method": "CURRENT_PRICE_INVERTED_THROUGH_SOTP_SEGMENT_EQUITY_VALUE_POOL_AND_PARENT_LEVEL_ADJUSTMENTS",
+        "return_hurdle_role": "ANNUALIZED_RETURN_HURDLE_NOT_VALUATION_DISCOUNT_RATE",
+        "segment_requirement_interpretation": "ONE_SEGMENT_AT_A_TIME; ALL_OTHER_SEGMENT_FORECAST_CONTRIBUTIONS_HELD_AT_SELECTED_SCENARIO",
+        "scenarios": {},
+        "assumptions": [
+            "唯一现价来自结构化 price_input.price；价格保证等级不会因为计算而升级。",
+            "各分部归属净利润与分部 P/E 直接来自已由本地 SOTP 适配器复算的情景，而非自由文本。",
+            "母公司资本化税后成本、净现金/净负债、其他调整与稀释股数保持本地 SOTP 适配器的情景值不变。",
+            "分部盈利要求采用逐个分部单独变化、其余分部维持原情景预测的敏感性；不同分部阈值相互替代，不可相加。",
+            "年化收益门槛只用于持有期未来财富要求；不是 WACC、资本成本或企业价值折现率。",
+            "只有经现有收益求解器确认的税后现金分配事件才参与分红调整要求。",
+        ],
+        "limitations": [
+            "所选分部 P/E 是条件估值假设，不是外部市场观测到的当前分部倍数或市场共识。",
+            "本地反推只说明在当前分部倍数、母公司调整、稀释股数及持有期假设下需要多少终值；不证明这些假设公允或能实现。",
+            "分部一项变化阈值是假设其他分部不变的单变量敏感性，不是将总缺口自动分摊成多分部经营目标。",
+            "外部 MIE 和 expectation_gap 状态不因本计算而升级。",
+            "不修改 SOTP 主估值、分部 EPS/利润/P-E、B5/B6、回报输出、目标入场价、15% 年化收益门槛、Decision 或执行权限。",
+        ],
+        "formal_mie_admission_created": False,
+        "decision_authority": False,
+        "valuation_input_modified": False,
+        "sotp_input_modified": False,
+    }
+    if result["selected_model_family"] != "SOTP":
+        result["status"] = "NOT_APPLICABLE_NOT_SOTP"
+        return result
+    if result["currency"] != "CNY":
+        result["status"] = "NOT_COMPARABLE_CURRENCY"
+        return result
+    if sotp_valuation.get("status") != "CALCULATED" or sotp_valuation.get("selected_for_primary_model") is not True:
+        result["status"] = "PRIMARY_SOTP_NOT_CALCULATED"
+        result["issues"] = list(sotp_valuation.get("issues") or [])
+        return result
+    if price_input.get("pit_time_status") != "PIT_TIME_COMPATIBLE_FOR_PILOT_ONLY":
+        result["status"] = "PRICE_NOT_PIT_QUALIFIED"
+        return result
+    if valuation_timing.get("status") != "PASS":
+        result["status"] = "VALUATION_TIMING_NOT_RESOLVED"
+        result["issues"] = list(valuation_timing.get("issues") or [])
+        return result
+    if str(valuation_timing.get("forecast_period") or "").strip().upper() != str(sotp_valuation.get("forecast_period") or "").strip().upper():
+        result["status"] = "SOTP_FORECAST_PERIOD_MISMATCH"
+        return result
+    if str(valuation_timing.get("valuation_terminal_date") or "").strip() != str(sotp_valuation.get("valuation_terminal_date") or "").strip():
+        result["status"] = "SOTP_TERMINAL_DATE_MISMATCH"
+        return result
+
+    def dec(value: Any) -> Decimal | None:
+        try:
+            number = Decimal(str(value))
+            return number if number.is_finite() else None
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+
+    def measure_value(raw: Any, expected_unit: str) -> Decimal | None:
+        if not isinstance(raw, Mapping):
+            return None
+        unit = str(raw.get("unit") or "").strip().lower()
+        if unit != expected_unit.lower():
+            return None
+        return dec(raw.get("value"))
+
+    price = dec(price_input.get("price"))
+    years = dec(valuation_timing.get("annualization_year_fraction"))
+    required_return = dec(decision_parameters.get("required_return_annualized"))
+    fundamental_target = dec(decision_parameters.get("fundamental_target_annualized_return"))
+    if fundamental_target is None:
+        fundamental_target = FUNDAMENTAL_TARGET_ANNUALIZED_RETURN
+    if price is None or price <= 0 or years is None or years <= 0:
+        result["status"] = "PRICE_OR_TERMINAL_HORIZON_NOT_IDENTIFIABLE"
+        return result
+    if required_return is None or required_return <= -1 or fundamental_target <= -1:
+        result["status"] = "RETURN_HURDLE_NOT_IDENTIFIABLE"
+        return result
+
+    scenarios = sotp_valuation.get("scenarios") if isinstance(sotp_valuation.get("scenarios"), Mapping) else {}
+    forecast_scenarios = forecast_valuation.get("scenarios") if isinstance(forecast_valuation.get("scenarios"), Mapping) else {}
+    event_rows = validated_cash_distribution_events if isinstance(validated_cash_distribution_events, Mapping) else {}
+    overall_statuses: list[str] = []
+    all_distributions_validated = True
+
+    def calculate_requirement(
+        *,
+        rate: Decimal,
+        shares: Decimal,
+        central_cost_value: Decimal,
+        net_cash_debt: Decimal,
+        other_adjustments: Decimal,
+        segment_pool: Decimal,
+        segments: list[dict[str, Any]],
+        pv_distributions: Decimal | None,
+    ) -> dict[str, Any]:
+        growth_factor = (Decimal("1") + rate) ** years
+        required_per_share_no_dist = price * growth_factor
+        required_per_share_with_dist = (
+            max(Decimal("0"), (price - pv_distributions) * growth_factor)
+            if pv_distributions is not None else None
+        )
+        required_equity_no_dist = required_per_share_no_dist * shares
+        required_equity_with_dist = (
+            required_per_share_with_dist * shares
+            if required_per_share_with_dist is not None else None
+        )
+
+        def segment_breakdown(required_equity: Decimal) -> dict[str, Any]:
+            required_segment_pool = required_equity + central_cost_value - net_cash_debt - other_adjustments
+            pool_gap = required_segment_pool - segment_pool
+            segment_rows: list[dict[str, Any]] = []
+            for segment in segments:
+                other_contributions = segment_pool - segment["segment_equity_value"]
+                required_segment_value = required_segment_pool - other_contributions
+                required_profit = required_segment_value / segment["pe_multiple"]
+                incremental = required_profit - segment["attributable_net_profit"]
+                standalone_profit = required_segment_pool / segment["pe_multiple"]
+                required_multiple = (
+                    required_segment_value / segment["attributable_net_profit"]
+                    if segment["attributable_net_profit"] > 0 and required_segment_value >= 0 else None
+                )
+                segment_rows.append({
+                    "segment_id": segment["segment_id"],
+                    "segment_name": segment["segment_name"],
+                    "selected_attributable_net_profit_cny": format(segment["attributable_net_profit"], "f"),
+                    "selected_pe_multiple_x": format(segment["pe_multiple"], "f"),
+                    "selected_segment_equity_value_cny": format(segment["segment_equity_value"], "f"),
+                    "share_of_selected_segment_equity_value": (
+                        format(segment["segment_equity_value"] / segment_pool, "f")
+                        if segment_pool > 0 else None
+                    ),
+                    "one_at_a_time_required_attributable_net_profit_cny_signed": format(required_profit, "f"),
+                    "one_at_a_time_required_attributable_net_profit_floor_cny": format(max(Decimal("0"), required_profit), "f"),
+                    "other_segments_cover_required_pool_without_this_segment_profit": required_segment_value <= 0,
+                    "one_at_a_time_incremental_profit_required_cny": format(max(Decimal("0"), incremental), "f"),
+                    "one_at_a_time_profit_headroom_cny": format(max(Decimal("0"), -incremental), "f"),
+                    "one_at_a_time_required_pe_at_selected_profit_x": (
+                        format(required_multiple, "f") if required_multiple is not None else None
+                    ),
+                    "standalone_profit_if_this_segment_alone_supported_required_pool_cny_signed": format(standalone_profit, "f"),
+                    "standalone_profit_floor_at_zero_cny": format(max(Decimal("0"), standalone_profit), "f"),
+                    "interpretation": "ONE_SEGMENT_CHANGES_OTHERS_HELD_AT_SELECTED_SCENARIO;STANDALONE_THRESHOLD_IS_AN_ALTERNATIVE_NOT_ADDITIVE",
+                })
+            return {
+                "required_terminal_equity_value_cny": format(required_equity, "f"),
+                "required_segment_equity_value_pool_cny": format(required_segment_pool, "f"),
+                "selected_segment_equity_value_pool_cny": format(segment_pool, "f"),
+                "additional_segment_equity_value_required_cny": format(max(Decimal("0"), pool_gap), "f"),
+                "segment_equity_value_headroom_cny": format(max(Decimal("0"), -pool_gap), "f"),
+                "segment_requirements": segment_rows,
+                "formula": "REQUIRED_SEGMENT_POOL = REQUIRED_TOTAL_EQUITY_VALUE + CAPITALIZED_PARENT_CENTRAL_COST - NET_CASH_DEBT - OTHER_ADJUSTMENTS",
+            }
+
+        return {
+            "annualized_return_rate": format(rate, "f"),
+            "required_terminal_value_per_share_without_distributions": format(required_per_share_no_dist, "f"),
+            "required_terminal_value_per_share_with_validated_distributions": (
+                format(required_per_share_with_dist, "f") if required_per_share_with_dist is not None else None
+            ),
+            "without_distributions": segment_breakdown(required_equity_no_dist),
+            "with_validated_distributions": (
+                segment_breakdown(required_equity_with_dist)
+                if required_equity_with_dist is not None else None
+            ),
+        }
+
+    for name in SCENARIOS:
+        source_row = scenarios.get(name) if isinstance(scenarios.get(name), Mapping) else {}
+        parent = source_row.get("parent_level_adjustments") if isinstance(source_row.get("parent_level_adjustments"), Mapping) else {}
+        raw_segments = source_row.get("segments") if isinstance(source_row.get("segments"), list) else []
+        row: dict[str, Any] = {
+            "scenario": name,
+            "status": "NOT_IDENTIFIABLE",
+            "forecast_period": result["forecast_period"],
+            "valuation_terminal_date": result["valuation_terminal_date"],
+            "selected_sotp_terminal_value_per_share": source_row.get("terminal_value_per_share"),
+            "selected_total_equity_value_cny": source_row.get("total_equity_value_cny"),
+            "selected_diluted_shares": None,
+            "selected_segment_equity_value_pool_cny": source_row.get("segment_equity_value_cny"),
+            "selected_capitalized_central_cost_cny": parent.get("capitalized_central_cost_value_cny"),
+            "selected_net_cash_debt_cny": None,
+            "selected_other_adjustments_cny": None,
+            "distribution_status": "NOT_VALIDATED_OR_NOT_AVAILABLE",
+            "validated_cash_distributions_per_share": None,
+            "present_value_of_validated_distributions_at_required_return": None,
+            "requirements": {},
+            "issues": [],
+        }
+        shares_obj = source_row.get("diluted_shares")
+        shares = measure_value(shares_obj, "shares")
+        central_cost = dec(parent.get("capitalized_central_cost_value_cny"))
+        central_cost_base = measure_value(parent.get("central_cost_after_tax_cny"), "CNY")
+        central_cost_multiple = measure_value(parent.get("central_cost_multiple_x"), "x")
+        net_cash_obj = parent.get("net_cash_debt_cny")
+        other_obj = parent.get("other_adjustments_cny")
+        net_cash = measure_value(net_cash_obj, "CNY")
+        other = measure_value(other_obj, "CNY")
+        segment_pool = dec(source_row.get("segment_equity_value_cny"))
+        reported_equity = dec(source_row.get("total_equity_value_cny"))
+        reported_per_share = dec(source_row.get("terminal_value_per_share"))
+        issues: list[str] = []
+        if shares is None or shares <= 0:
+            issues.append("SOTP_DILUTED_SHARES_INVALID_OR_UNIT_MISMATCH")
+        elif shares != shares.to_integral_value():
+            issues.append("SOTP_DILUTED_SHARES_MUST_BE_INTEGER")
+        if central_cost is None or central_cost < 0:
+            issues.append("SOTP_CAPITALIZED_CENTRAL_COST_NOT_IDENTIFIABLE")
+        if central_cost_base is None or central_cost_base < 0:
+            issues.append("SOTP_CENTRAL_COST_BASE_INVALID_OR_UNIT_MISMATCH")
+        if central_cost_multiple is None or central_cost_multiple < 0:
+            issues.append("SOTP_CENTRAL_COST_MULTIPLE_INVALID_OR_UNIT_MISMATCH")
+        if central_cost_base is not None and central_cost_multiple is not None and central_cost is not None:
+            expected_capitalized_cost = central_cost_base * central_cost_multiple
+            if abs(expected_capitalized_cost - central_cost) > Decimal("0.01"):
+                issues.append("SOTP_CENTRAL_COST_CAPITALIZATION_IDENTITY_MISMATCH")
+            if central_cost_base > 0 and central_cost_multiple <= 0:
+                issues.append("SOTP_CENTRAL_COST_MULTIPLE_MUST_BE_POSITIVE_WHEN_COST_IS_POSITIVE")
+        if net_cash is None:
+            issues.append("SOTP_NET_CASH_DEBT_INVALID_OR_UNIT_MISMATCH")
+        if other is None:
+            issues.append("SOTP_OTHER_ADJUSTMENTS_INVALID_OR_UNIT_MISMATCH")
+        if segment_pool is None or segment_pool < 0:
+            issues.append("SOTP_SEGMENT_EQUITY_VALUE_POOL_INVALID")
+        if reported_equity is None or reported_per_share is None:
+            issues.append("SOTP_REPORTED_EQUITY_OR_PER_SHARE_VALUE_MISSING")
+        segments: list[dict[str, Any]] = []
+        recalc_segment_pool = Decimal("0")
+        for segment_index, segment in enumerate(raw_segments, 1):
+            if not isinstance(segment, Mapping):
+                issues.append(f"SOTP_SEGMENT_{segment_index}_OBJECT_REQUIRED")
+                continue
+            profit_obj = segment.get("attributable_net_profit_cny")
+            multiple_obj = segment.get("pe_multiple_x")
+            profit = measure_value(profit_obj, "CNY")
+            multiple = measure_value(multiple_obj, "x")
+            segment_value = dec(segment.get("segment_equity_value_cny"))
+            segment_id = str(segment.get("segment_id") or "").strip()
+            segment_name = str(segment.get("segment_name") or "").strip()
+            if profit is None or profit < 0:
+                issues.append(f"SOTP_SEGMENT_{segment_index}_ATTRIBUTABLE_PROFIT_INVALID_OR_UNIT_MISMATCH")
+                continue
+            if multiple is None or multiple <= 0:
+                issues.append(f"SOTP_SEGMENT_{segment_index}_PE_INVALID_OR_UNIT_MISMATCH")
+                continue
+            expected_value = profit * multiple
+            if segment_value is None or abs(segment_value - expected_value) > Decimal("0.01"):
+                issues.append(f"SOTP_SEGMENT_{segment_index}_VALUE_RECALCULATION_MISMATCH")
+                continue
+            if not segment_id or not segment_name:
+                issues.append(f"SOTP_SEGMENT_{segment_index}_IDENTITY_NOT_IDENTIFIABLE")
+                continue
+            recalc_segment_pool += expected_value
+            segments.append({
+                "segment_id": segment_id,
+                "segment_name": segment_name,
+                "attributable_net_profit": profit,
+                "pe_multiple": multiple,
+                "segment_equity_value": expected_value,
+            })
+        if not raw_segments:
+            issues.append("SOTP_SEGMENTS_MISSING")
+        if segment_pool is not None and abs(recalc_segment_pool - segment_pool) > Decimal("0.01"):
+            issues.append("SOTP_SEGMENT_POOL_RECONCILIATION_MISMATCH")
+        if shares and central_cost is not None and net_cash is not None and other is not None and segment_pool is not None:
+            recomputed_equity = segment_pool - central_cost + net_cash + other
+            if reported_equity is not None and abs(recomputed_equity - reported_equity) > Decimal("0.01"):
+                issues.append("SOTP_PARENT_ADJUSTMENT_IDENTITY_MISMATCH")
+            if reported_per_share is not None and abs(recomputed_equity / shares - reported_per_share) > Decimal("0.000001"):
+                issues.append("SOTP_PER_SHARE_IDENTITY_MISMATCH")
+        if issues or shares is None or central_cost is None or net_cash is None or other is None or segment_pool is None or reported_equity is None or reported_per_share is None:
+            row["issues"] = list(dict.fromkeys(issues))
+            result["scenarios"][name] = row
+            overall_statuses.append("NOT_IDENTIFIABLE")
+            all_distributions_validated = False
+            continue
+
+        events = event_rows.get(name)
+        forecast_row = forecast_scenarios.get(name) if isinstance(forecast_scenarios.get(name), Mapping) else {}
+        declared_distributions = dec(forecast_row.get("cash_distributions_per_share"))
+        distribution_pv: dict[str, Decimal | None] = {"required_return": None, "fundamental_target": None}
+        dist_total: Decimal | None = None
+        distribution_issues: list[str] = []
+        if isinstance(events, list) and declared_distributions is not None and declared_distributions >= 0:
+            event_total = Decimal("0")
+            pv_required = Decimal("0")
+            pv_target = Decimal("0")
+            for event_index, event in enumerate(events, 1):
+                if not isinstance(event, Mapping):
+                    distribution_issues.append(f"VALIDATED_DISTRIBUTION_EVENT_{event_index}_INVALID")
+                    break
+                amount = dec(event.get("amount_per_share"))
+                event_years = dec(event.get("year_fraction_from_entry"))
+                if amount is None or amount <= 0 or event_years is None or event_years <= 0 or event_years > years:
+                    distribution_issues.append(f"VALIDATED_DISTRIBUTION_EVENT_{event_index}_AMOUNT_OR_DATE_INVALID")
+                    break
+                event_total += amount
+                pv_required += amount / ((Decimal("1") + required_return) ** event_years)
+                pv_target += amount / ((Decimal("1") + fundamental_target) ** event_years)
+            if not distribution_issues and abs(event_total - declared_distributions) <= Decimal("0.000001"):
+                dist_total = event_total
+                distribution_pv["required_return"] = pv_required
+                distribution_pv["fundamental_target"] = pv_target
+                row["distribution_status"] = "VALIDATED_DATED_CASH_FLOWS" if events else "VALIDATED_NO_FUTURE_DISTRIBUTIONS"
+            else:
+                distribution_issues.append("VALIDATED_DISTRIBUTION_TOTAL_MISMATCH")
+        else:
+            distribution_issues.append("DISTRIBUTIONS_NOT_VALIDATED_BY_EXISTING_RETURN_SOLVER")
+        if distribution_pv["required_return"] is None:
+            all_distributions_validated = False
+        row["validated_cash_distributions_per_share"] = format(dist_total, "f") if dist_total is not None else None
+        row["present_value_of_validated_distributions_at_required_return"] = (
+            format(distribution_pv["required_return"], "f")
+            if distribution_pv["required_return"] is not None else None
+        )
+        row["selected_diluted_shares"] = format(shares, "f")
+        row["selected_net_cash_debt_cny"] = format(net_cash, "f")
+        row["selected_other_adjustments_cny"] = format(other, "f")
+
+        row["requirements"] = {
+            "required_return": calculate_requirement(
+                rate=required_return, shares=shares,
+                central_cost_value=central_cost, net_cash_debt=net_cash,
+                other_adjustments=other, segment_pool=segment_pool,
+                segments=segments, pv_distributions=distribution_pv["required_return"],
+            ),
+            "fundamental_target_annualized_return": calculate_requirement(
+                rate=fundamental_target, shares=shares,
+                central_cost_value=central_cost, net_cash_debt=net_cash,
+                other_adjustments=other, segment_pool=segment_pool,
+                segments=segments, pv_distributions=distribution_pv["fundamental_target"],
+            ),
+        }
+        row["status"] = "CALCULATED_CONDITIONAL"
+        row["issues"] = distribution_issues
+        result["scenarios"][name] = row
+        overall_statuses.append(row["status"])
+
+    if overall_statuses and all(status == "CALCULATED_CONDITIONAL" for status in overall_statuses):
+        result["status"] = "CONDITIONAL_SENSITIVITY_CALCULATED"
+    elif any(status == "CALCULATED_CONDITIONAL" for status in overall_statuses):
+        result["status"] = "PARTIAL"
+    else:
+        result["status"] = "NOT_IDENTIFIABLE"
+    result["all_scenario_distribution_cash_flows_validated"] = all_distributions_validated
+    result["external_mie_and_expectation_gap_modified"] = False
+    result["summary"] = (
+        "本地使用唯一现价、已复算 SOTP 分部/母公司调整/稀释股数以及明确持有期收益门槛，"
+        "反推总分部权益价值要求与各分部单独变化时的归属净利润要求；条件敏感性不是外部 MIE。"
+    )
+    return result
+
 def _evaluate_primary_eps_multiple_valuation(
     raw: Any, *, selected_model_family: Any, expected_forecast_period: Any,
     expected_terminal_date: Any, expected_currency: Any,
@@ -1591,6 +3396,24 @@ def _build_valuation_model_consistency(
         if "EPS_MULTIPLE_ADAPTER_NOT_CALCULATED" not in issues:
             issues.append("EPS_MULTIPLE_ADAPTER_NOT_CALCULATED")
         status = "EPS_MULTIPLE_CALCULATION_NOT_ELIGIBLE"
+
+    b4_reconciliation = operating_driver_forecast.get("valuation_reconciliation")
+    b4_reconciliation = b4_reconciliation if isinstance(b4_reconciliation, Mapping) else {}
+    b4_reconciliation_status = str(b4_reconciliation.get("status") or "UNKNOWN").strip().upper()
+    if selected == "EPS_MULTIPLE" and scope == "COMPANY_WIDE":
+        if b4_reconciliation_status == "MISMATCH":
+            if "B4_VALUATION_BRIDGE_MISMATCH" not in issues:
+                issues.append("B4_VALUATION_BRIDGE_MISMATCH")
+            # A known contradictory company-wide bridge invalidates primary price math,
+            # even when the standalone EPS×P/E adapter arithmetic itself calculates.
+            if status == "MATCH":
+                status = "B4_VALUATION_BRIDGE_MISMATCH"
+        elif b4_reconciliation_status == "PARTIAL":
+            # Absence of a comparable value is not a numeric mismatch. Preserve it as
+            # a visible diagnostic without relabeling the independent adapter as failed.
+            if "B4_VALUATION_BRIDGE_RECONCILIATION_PARTIAL_NON_BLOCKING" not in issues:
+                issues.append("B4_VALUATION_BRIDGE_RECONCILIATION_PARTIAL_NON_BLOCKING")
+
     if not model_rationale_identifiable:
         issues.append("FORECAST_VALUATION_MODEL_RATIONALE_NOT_IDENTIFIABLE")
         if status == "MATCH":
@@ -1639,6 +3462,7 @@ def _build_valuation_model_consistency(
         ),
         "operating_forecast_scope": scope,
         "valuation_transmission_status": transmission_status,
+        "b4_valuation_reconciliation_status": b4_reconciliation_status,
         "sotp_calculation_status": str(sotp_calculation_status or "NOT_SELECTED").upper(),
         "eps_multiple_calculation_status": str(eps_multiple_calculation_status or "NOT_SELECTED").upper(),
         "primary_model_price_calculation_eligible": eligible,
@@ -2123,6 +3947,56 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         gap["consistency_note"] = (
             "市场隐含预期尚未通过可识别性检查，不能把预期差声明当作已验证的市场比较结果。"
         )
+
+    # B52: when a comparison claims to use a conditional price inversion, make
+    # sure that inversion describes this protected current price and has the
+    # minimum explicit method/assumptions/results/limitations contract. It
+    # remains separate from external MIE and never upgrades MIE status.
+    comparison_basis = str(gap.get("comparison_basis") or "").strip().upper()
+    if "PRICE_IMPLIED" in comparison_basis:
+        inversion = assessment["market_implied_expectation"].get("price_implied_analysis")
+        inversion = inversion if isinstance(inversion, Mapping) else {}
+        inversion_issues: list[str] = []
+        if str(inversion.get("status") or "").strip().upper() != "CONDITIONAL_MODEL_INVERSION":
+            inversion_issues.append("PRICE_IMPLIED_INVERSION_STATUS_NOT_IDENTIFIABLE")
+        if not str(inversion.get("method") or "").strip():
+            inversion_issues.append("PRICE_IMPLIED_INVERSION_METHOD_MISSING")
+        if str(inversion.get("model_family") or "").strip().upper() not in {
+            "EPS_MULTIPLE", "FCF_DCF", "DDM", "SOTP", "RNPV", "OTHER"
+        }:
+            inversion_issues.append("PRICE_IMPLIED_INVERSION_MODEL_FAMILY_NOT_IDENTIFIABLE")
+        try:
+            inversion_price = Decimal(str(inversion.get("reference_price")))
+            if not inversion_price.is_finite() or inversion_price != price:
+                inversion_issues.append("PRICE_IMPLIED_INVERSION_REFERENCE_PRICE_MISMATCH")
+        except (InvalidOperation, TypeError, ValueError):
+            inversion_issues.append("PRICE_IMPLIED_INVERSION_REFERENCE_PRICE_NOT_IDENTIFIABLE")
+        for field in ("assumptions", "implied_requirements", "limitations"):
+            value = inversion.get(field)
+            if not isinstance(value, list) or not value:
+                inversion_issues.append(f"PRICE_IMPLIED_INVERSION_{field.upper()}_REQUIRED")
+        # Even a structurally complete conditional inversion is still a
+        # model-supplied sensitivity, not an independently computed or externally
+        # verified MIE. Keep it visible in the report, but do not let it alone
+        # produce a decision-usable positive expectation-gap gate.
+        gap["direction_input"] = gap.get("direction_input", gap.get("direction", "UNKNOWN"))
+        gap["direction"] = "UNKNOWN"
+        if gap.get("status") == "PASS":
+            gap["status_input"] = gap.get("status")
+            gap["status"] = "UNKNOWN"
+        existing_issues = list(gap.get("status_issues") or [])
+        existing_issues.extend(inversion_issues)
+        if not inversion_issues:
+            existing_issues.append("CONDITIONAL_PRICE_IMPLIED_GAP_NOT_INDEPENDENTLY_VERIFIED")
+        gap["status_issues"] = list(dict.fromkeys(existing_issues))
+        gap["consistency_note"] = (
+            "条件价格反推可以展示与独立推演的差距，但它尚未被本地引擎独立复算，"
+            "不得单独作为已验证的预期差或正向决策门槛。只有直接依赖外部可核验 MIE 的可比项才可能形成该门槛。"
+            if not inversion_issues else
+            "本预期差比较声明依赖的条件价格反推未通过参考价/方法/假设合同检查；"
+            "保留原始声明供审计，但决策可用状态不能为 PASS。"
+        )
+
     assessment["thesis"]["break_conditions"] = _items(assessment["thesis"].get("break_conditions"))
     assessment["thesis"]["reassessment_triggers"] = _items(assessment["thesis"].get("reassessment_triggers"))
     thesis_quality_issues: list[str] = []
@@ -2318,6 +4192,9 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         forecast_raw.get("cash_distribution_review"), sources
     )
     raw_driver_forecast = payload.get("operating_driver_forecast")
+    raw_operating_feasibility_evidence = payload.get("operating_feasibility_evidence")
+    raw_operating_feasibility_semantic_reviews = payload.get("operating_feasibility_semantic_reviews")
+    raw_operating_feasibility_remediation_submissions = payload.get("operating_feasibility_remediation_submissions")
     raw_valuation_transmission = payload.get("valuation_transmission")
     raw_sotp_valuation = payload.get("sotp_valuation")
     raw_eps_multiple_valuation = payload.get("eps_multiple_valuation")
@@ -2399,6 +4276,8 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "assessment": raw_assessment,
         "forecast_valuation": forecast_raw,
         "operating_driver_forecast": raw_driver_forecast,
+        "operating_feasibility_evidence": raw_operating_feasibility_evidence,
+        "operating_feasibility_semantic_reviews": raw_operating_feasibility_semantic_reviews,
         "valuation_transmission": raw_valuation_transmission,
         "sotp_valuation": raw_sotp_valuation,
     })
@@ -2742,6 +4621,40 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         forecast["scenarios"] = adjusted_scenarios
         forecast["b5_baseline_entry_value_reference_per_share"] = forecast.get("entry_value_reference_per_share")
         forecast["entry_value_reference_per_share"] = valuation_transmission.get("entry_value_reference_adjusted_per_share")
+    b4_transition = operating_driver_forecast.get("baseline_transition")
+    if isinstance(b4_transition, dict):
+        primary_eps_consistency = _build_b58_primary_eps_consistency(
+            selected_model_family=operator_valuation_context["selected_model_family"],
+            expected_currency=currency,
+            operating_driver_forecast=operating_driver_forecast,
+            eps_earnings_bridge=eps_earnings_bridge,
+            eps_multiple_valuation=eps_multiple_valuation,
+        )
+        b4_transition["primary_eps_consistency"] = primary_eps_consistency
+        b4_transition["primary_eps_difference_attribution"] = _build_b59_primary_eps_difference_attribution(
+            operating_driver_forecast=operating_driver_forecast,
+            eps_earnings_bridge=eps_earnings_bridge,
+            primary_eps_consistency=primary_eps_consistency,
+        )
+    raw_cycle_monitor = (
+        raw_driver_forecast.get("cycle_earnings_monitor")
+        if isinstance(raw_driver_forecast, Mapping) else None
+    )
+    cycle_earnings_monitor = evaluate_cycle_earnings_monitor(
+        raw_cycle_monitor,
+        operating_driver_forecast=operating_driver_forecast,
+        forecast_valuation=forecast,
+        valuation_model_consistency=valuation_model_consistency,
+        valuation_timing=valuation_timing,
+        valuation_transmission=valuation_transmission,
+        eps_earnings_bridge=eps_earnings_bridge,
+        eps_multiple_valuation=eps_multiple_valuation,
+        assessment=assessment,
+        evidence_register=sources,
+        unresolved_evidence_ids=unknown_refs,
+        after_cutoff_evidence_ids=after_cutoff_refs,
+        uncertain_timing_evidence_ids=uncertain_timing_refs,
+    )
     return {
         "case": {
             "case_id": case["case_id"], "company": company, "market": normalized_market,
@@ -2790,6 +4703,10 @@ def _prepare_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "eps_multiple_valuation": eps_multiple_valuation,
         "eps_earnings_bridge": eps_earnings_bridge,
         "operating_driver_forecast": operating_driver_forecast,
+        "operating_feasibility_evidence": raw_operating_feasibility_evidence,
+        "operating_feasibility_semantic_reviews": raw_operating_feasibility_semantic_reviews,
+        "operating_feasibility_remediation_submissions": raw_operating_feasibility_remediation_submissions,
+        "cycle_earnings_monitor": cycle_earnings_monitor,
         "valuation_transmission": valuation_transmission,
         "sotp_valuation": sotp_valuation,
         "operator_valuation_context": operator_valuation_context,
@@ -3609,6 +5526,1503 @@ def _decision(
         "auto_execution": False,
     }
 
+def _build_decision_chain_trace(
+    *,
+    prepared: Mapping[str, Any],
+    metrics: Mapping[str, Any] | None,
+    return_metrics_reason: str | None,
+    stress_review: Mapping[str, Any] | None,
+    portfolio_package: Mapping[str, Any] | None,
+    price_zone_sensitivity: Mapping[str, Any] | None,
+    decision: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build an explanatory dependency trace without recalculating or changing policy."""
+    assessment = prepared.get("assessment") if isinstance(prepared.get("assessment"), Mapping) else {}
+    model = prepared.get("valuation_model_consistency") if isinstance(prepared.get("valuation_model_consistency"), Mapping) else {}
+    timing = prepared.get("valuation_timing") if isinstance(prepared.get("valuation_timing"), Mapping) else {}
+    params = prepared.get("decision_parameters") if isinstance(prepared.get("decision_parameters"), Mapping) else {}
+    risk = assessment.get("risk") if isinstance(assessment.get("risk"), Mapping) else {}
+    package = portfolio_package if isinstance(portfolio_package, Mapping) else {}
+    stress = stress_review if isinstance(stress_review, Mapping) else {}
+    sensitivity = price_zone_sensitivity if isinstance(price_zone_sensitivity, Mapping) else {}
+    core_policy = decision.get("core_policy_evaluation") if isinstance(decision.get("core_policy_evaluation"), Mapping) else {}
+    raw_gating_issues = decision.get("gating_issues")
+    gating_issues = [str(item) for item in raw_gating_issues if str(item).strip()] if isinstance(raw_gating_issues, list) else []
+
+    input_issue_code_set = {
+        "EVIDENCE_REGISTER_EMPTY",
+        "UNRESOLVED_EVIDENCE_REFERENCES",
+        "DUPLICATE_EVIDENCE_SOURCE_IDS",
+        "UNTRACEABLE_EVIDENCE_SOURCE_RECORDS",
+        "REFERENCED_EVIDENCE_AFTER_CUTOFF",
+        "REFERENCED_EVIDENCE_TIMING_UNCERTAIN",
+        "PRICE_NOT_PIT_QUALIFIED",
+        "OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT",
+        "SCENARIO_WEALTH_ORDERING_INCONSISTENT",
+        "SCENARIO_CASH_DISTRIBUTIONS_UNRESOLVED",
+        "CASH_DISTRIBUTION_SOURCE_DOMAIN_CLASS_NOT_ACCEPTED",
+    }
+    input_issue_codes = [item for item in gating_issues if item in input_issue_code_set]
+    if not isinstance(prepared.get("evidence_register"), list) or not prepared.get("evidence_register"):
+        if "EVIDENCE_REGISTER_EMPTY" not in input_issue_codes:
+            input_issue_codes.append("EVIDENCE_REGISTER_EMPTY")
+    if prepared.get("unresolved_evidence_references") and "UNRESOLVED_EVIDENCE_REFERENCES" not in input_issue_codes:
+        input_issue_codes.append("UNRESOLVED_EVIDENCE_REFERENCES")
+    if prepared.get("after_cutoff_evidence_references") and "REFERENCED_EVIDENCE_AFTER_CUTOFF" not in input_issue_codes:
+        input_issue_codes.append("REFERENCED_EVIDENCE_AFTER_CUTOFF")
+    if prepared.get("uncertain_timing_evidence_references") and "REFERENCED_EVIDENCE_TIMING_UNCERTAIN" not in input_issue_codes:
+        input_issue_codes.append("REFERENCED_EVIDENCE_TIMING_UNCERTAIN")
+    if prepared.get("notes_price_conflicts") and "OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT" not in input_issue_codes:
+        input_issue_codes.append("OPERATOR_NOTE_PRICE_CONFLICTS_WITH_PRICE_INPUT")
+
+    model_eligible = model.get("primary_model_price_calculation_eligible") is True
+    raw_model_issues = model.get("issues")
+    model_issues = [str(item) for item in raw_model_issues if str(item).strip()] if isinstance(raw_model_issues, list) else []
+    if not model_eligible and not model_issues:
+        model_issues = [str(model.get("status") or "PRIMARY_MODEL_ELIGIBILITY_UNKNOWN")]
+    timing_status = str(timing.get("status") or "UNKNOWN").strip().upper()
+    raw_timing_issues = timing.get("issues")
+    timing_issues = [str(item) for item in raw_timing_issues if str(item).strip()] if isinstance(raw_timing_issues, list) else []
+    if timing_status != "PASS" and not timing_issues:
+        timing_issues = [f"VALUATION_TIMING_{timing_status}"]
+
+    return_is_ready = isinstance(metrics, Mapping)
+    if return_is_ready:
+        return_reason = ["回报/风险计算已生成数值结果；是否满足入场门槛另行判断。"]
+    else:
+        return_reason = [str(return_metrics_reason or "回报计算未生成；阻断原因尚未识别。")]
+    if return_reason == ["回报计算未生成；阻断原因尚未识别。"]:
+        return_reason = ["回报计算未生成；阻断原因尚未识别。"]
+
+    price_gate_pass = bool(metrics.get("return_gate_pass")) if return_is_ready else None
+    price_gate_failures: list[str] = []
+    if return_is_ready:
+        for field, label in (
+            ("buy_entry_return_cushion_pass", "15% 入场安全垫未通过"),
+            ("fundamental_target_pass", "15% 年化回报门槛未通过"),
+            ("required_return_pass", "Required Return 门槛未通过"),
+            ("risk_pass", "Bear 损失/风险门槛未通过"),
+        ):
+            if metrics.get(field) is False:
+                price_gate_failures.append(label)
+        if price_gate_pass is False and not price_gate_failures:
+            price_gate_failures.append("综合价格/回报门槛未通过，具体子门槛需结合计算结果复核。")
+
+    risk_status = str(risk.get("status") or "UNKNOWN").strip().upper()
+    stress_status = str(stress.get("status") or "UNKNOWN").strip().upper()
+    risk_reasons = []
+    if risk_status != "PASS":
+        risk_reasons.append(f"Risk={risk_status}")
+    if stress_status != "PASS":
+        risk_reasons.append(f"Thesis-break stress={stress_status}")
+    raw_stress_issues = stress.get("issues")
+    if isinstance(raw_stress_issues, list):
+        risk_reasons.extend(str(item) for item in raw_stress_issues if str(item).strip())
+
+    package_status = str(package.get("status") or "NOT_PROVIDED").strip().upper()
+    constraint_status = str(package.get("constraint_status") or "UNKNOWN").strip().upper()
+    package_claimed_ready = package_status == "CONDITIONAL_PACKAGE_READY_NOT_AUTHORIZED"
+    if constraint_status == "BLOCKED" or package_status.startswith("BLOCKED"):
+        package_chain_status = "BLOCKED"
+    elif package_status == "NOT_PROVIDED" or constraint_status == "UNKNOWN":
+        package_chain_status = "UNKNOWN"
+    elif package_claimed_ready and constraint_status == "PASS":
+        package_chain_status = "CONDITIONAL_READY_NOT_AUTHORIZED"
+    else:
+        package_chain_status = "REVIEW_REQUIRED"
+    # Treat the integrated status—not the package's claimed status alone—as authoritative.
+    package_ready = package_chain_status == "CONDITIONAL_READY_NOT_AUTHORIZED"
+    package_reasons = [str(package.get("reason") or "").strip()]
+    package_reasons = [item for item in package_reasons if item]
+
+    stages = [
+        {
+            "stage_id": "input_and_evidence",
+            "label": "输入、来源引用与截止时点",
+            "status": "BLOCKED" if input_issue_codes else "NO_KNOWN_BLOCKER",
+            "reason_codes": input_issue_codes,
+            "reasons": input_issue_codes or ["初步一致性检查未检出上述阻断项；这不代表正式证据准入。"],
+            "blocks": ["整体投资结论"] if input_issue_codes else [],
+        },
+        {
+            "stage_id": "primary_valuation",
+            "label": "主估值模型资格",
+            "status": "ELIGIBLE_FOR_PILOT_CALCULATION" if model_eligible else "BLOCKED_OR_UNRESOLVED",
+            "reason_codes": model_issues,
+            "reasons": model_issues or [str(model.get("status") or "UNKNOWN")],
+            "blocks": [] if model_eligible else ["年化回报计算", "目标买入价", "B6 价格区间敏感性"],
+        },
+        {
+            "stage_id": "valuation_timing",
+            "label": "估值终点与年化期限",
+            "status": "PASS" if timing_status == "PASS" else "BLOCKED_OR_UNRESOLVED",
+            "reason_codes": timing_issues,
+            "reasons": timing_issues or [f"估值时间状态={timing_status}"],
+            "blocks": [] if timing_status == "PASS" else ["年化回报计算", "目标买入价", "B6 价格区间敏感性"],
+        },
+        {
+            "stage_id": "return_calculation",
+            "label": "年化回报与收益/风险计算",
+            "status": "CALCULATED" if return_is_ready else "NOT_READY",
+            "reason_codes": [] if return_is_ready else [str(return_metrics_reason or "RETURN_METRICS_NOT_READY")],
+            "reasons": return_reason,
+            "blocks": [] if return_is_ready else ["预期年化回报数值", "可计算的共同约束目标买入价", "B6 价格区间的回报重算"],
+        },
+        {
+            "stage_id": "price_hurdles",
+            "label": "15% 年化收益、Required Return 与 Bear 风险价格门槛",
+            "status": "UNKNOWN" if price_gate_pass is None else "PASS" if price_gate_pass else "FAIL",
+            "reason_codes": [] if price_gate_pass is not False else [
+                f"{field}_FAIL"
+                for field in ("buy_entry_return_cushion_pass", "fundamental_target_pass", "required_return_pass", "risk_pass")
+                if return_is_ready and metrics.get(field) is False
+            ],
+            "reasons": (
+                ["收益/风险价格门槛结果未知，因为回报计算未就绪。"] if price_gate_pass is None
+                else ["所有现有价格/回报子门槛通过。"] if price_gate_pass
+                else price_gate_failures
+            ),
+            "blocks": [] if price_gate_pass is True else ["当前价通过 BUY/ADD 价格筛选"],
+        },
+        {
+            "stage_id": "thesis_risk_stress",
+            "label": "论点风险与独立失效压力情景",
+            "status": "PASS" if risk_status == "PASS" and stress_status == "PASS" else
+                      "BLOCKED" if risk_status == "FAIL" or stress_status == "FAIL" else "UNKNOWN_OR_REVIEW",
+            "reason_codes": [str(item) for item in stress.get("issues", []) if str(item).strip()],
+            "reasons": risk_reasons or ["Risk 与 thesis-break stress 均为 PASS。"],
+            "blocks": [] if risk_status == "PASS" and stress_status == "PASS" else ["新增资金/条件仓位资格"],
+        },
+        {
+            "stage_id": "portfolio_constraints",
+            "label": "组合约束与条件仓位包",
+            "status": package_chain_status,
+            "reason_codes": [],
+            "reasons": package_reasons or [
+                f"组合约束={constraint_status}；仓位包={package_status}；条件仓位包不等于交易授权。"
+            ],
+            "blocks": [] if package_ready else ["条件新增资金/仓位包"],
+        },
+        {
+            "stage_id": "formal_admission",
+            "label": "正式准入与行动授权",
+            "status": "NOT_ADMITTED",
+            "reason_codes": ["FORMAL_THESIS_FORECAST_VALUATION_ADMISSION_NOT_CREATED"],
+            "reasons": ["本地试运行未创建正式 Thesis/Forecast/Valuation Admission、canonical Decision 或交易授权。"],
+            "blocks": ["正式资本行动授权", "实际获准新增仓位"],
+        },
+    ]
+
+    causal_blocks: list[dict[str, Any]] = []
+    if not model_eligible:
+        causal_blocks.append({
+            "from": "primary_valuation",
+            "to": ["return_calculation", "target_entry_price", "b6_price_zone_sensitivity"],
+            "reason": "主估值模型资格未通过；下游价格/回报计算不得使用未获准的候选模型。",
+        })
+    if timing_status != "PASS":
+        causal_blocks.append({
+            "from": "valuation_timing",
+            "to": ["return_calculation", "target_entry_price", "b6_price_zone_sensitivity"],
+            "reason": "估值终点或预测期间对齐未通过；年化期限不成立。",
+        })
+    if not return_is_ready:
+        causal_blocks.append({
+            "from": "return_calculation",
+            "to": ["annualized_return", "target_entry_price", "b6_price_zone_sensitivity"],
+            "reason": str(return_metrics_reason or "RETURN_METRICS_NOT_READY"),
+        })
+    if input_issue_codes:
+        causal_blocks.append({
+            "from": "input_and_evidence",
+            "to": ["overall_investment_action"],
+            "reason": "输入/来源/截止时点存在阻断项：" + "、".join(input_issue_codes),
+        })
+    if price_gate_pass is False:
+        causal_blocks.append({
+            "from": "price_hurdles",
+            "to": ["current_price_buy_add_screen"],
+            "reason": "当前价未满足全部现有收益/风险价格门槛；目标买入价仍可作为条件价格上限参考，不能误解为当前价可买。",
+        })
+    if package_chain_status != "CONDITIONAL_READY_NOT_AUTHORIZED":
+        causal_blocks.append({
+            "from": "portfolio_constraints",
+            "to": ["conditional_position_package", "new_capital_permission"],
+            "reason": str(package.get("reason") or f"组合约束/仓位包状态={package_chain_status}"),
+        })
+    causal_blocks.append({
+        "from": "formal_admission",
+        "to": ["formal_capital_action", "execution_authorization"],
+        "reason": "试运行计算不等于正式准入；实际获准新增仓位固定为 0%。",
+    })
+
+    target_entry = metrics.get("target_entry_price") if return_is_ready else None
+    b6_target = sensitivity.get("target_entry_price")
+    return {
+        "schema_version": "IIOS-DECISION-CHAIN-TRACE-0.1",
+        "status": "EXPLANATORY_TRACE_NOT_POLICY_ENGINE",
+        "primary_decision": decision.get("provisional_action", "UNKNOWN"),
+        "primary_policy_reason": core_policy.get("primary_reason", "UNKNOWN"),
+        "primary_policy_reason_text": decision.get("reason", "UNKNOWN"),
+        "stages": stages,
+        "causal_blocks": causal_blocks,
+        "downstream_availability": {
+            "expected_annualized_return": "AVAILABLE" if return_is_ready and metrics.get("expected_annualized_return") is not None else "UNKNOWN",
+            "common_constraint_target_entry_price": "AVAILABLE" if target_entry is not None else "UNKNOWN",
+            "b6_target_entry_price": "AVAILABLE" if b6_target is not None else "UNKNOWN",
+            "conditional_position_package": "CONDITIONAL_ONLY" if package_ready else "UNKNOWN_OR_NOT_READY",
+            "formal_decision": "NOT_CREATED",
+            "authorized_new_position_pct": "0",
+            "execution_authorized": False,
+        },
+        "price_context": {
+            "required_return_annualized": params.get("required_return_annualized"),
+            "fundamental_target_annualized_return": str(FUNDAMENTAL_TARGET_ANNUALIZED_RETURN),
+            "max_loss_pct": params.get("max_loss_pct"),
+            "expected_annualized_return": metrics.get("expected_annualized_return") if return_is_ready else None,
+            "target_entry_price": target_entry,
+            "b6_target_entry_price": b6_target,
+        },
+        "formal_decision_created": False,
+        "execution_authorized": False,
+        "auto_execution": False,
+    }
+
+
+def _render_decision_chain_trace(trace: Mapping[str, Any] | None) -> list[str]:
+    """Render the dependency trace as an explanatory checklist, never as new policy."""
+    if not isinstance(trace, Mapping):
+        return ["", "### B54 决策链追踪", "", "- 未生成决策链追踪；状态 UNKNOWN。", ""]
+    lines = [
+        "",
+        "### B54 决策链追踪：前置条件 → 阻断点 → 下游可用性",
+        "",
+        "> 本节为现有门禁结果的原因链汇总，不新增或放宽决策规则；正式准入与交易授权始终独立。",
+    ]
+    for stage in trace.get("stages") or []:
+        if not isinstance(stage, Mapping):
+            continue
+        reasons = stage.get("reasons") if isinstance(stage.get("reasons"), list) else []
+        reason_text = "；".join(str(item) for item in reasons if str(item).strip()) or "未提供专门原因"
+        lines.append(f"- **{stage.get('label') or stage.get('stage_id') or 'UNKNOWN'} — {stage.get('status') or 'UNKNOWN'}**：{reason_text}")
+        blocks = stage.get("blocks") if isinstance(stage.get("blocks"), list) else []
+        if blocks:
+            lines.append("  - 下游影响：" + "、".join(str(item) for item in blocks))
+    links = trace.get("causal_blocks") if isinstance(trace.get("causal_blocks"), list) else []
+    if links:
+        lines.extend(["", "#### 阻断传导关系"])
+        for row in links[:8]:
+            if not isinstance(row, Mapping):
+                continue
+            targets = row.get("to") if isinstance(row.get("to"), list) else []
+            lines.append(
+                f"- {row.get('from') or 'UNKNOWN'} → {', '.join(str(item) for item in targets) or 'UNKNOWN'}："
+                f"{row.get('reason') or 'UNKNOWN'}"
+            )
+    outputs = trace.get("downstream_availability") if isinstance(trace.get("downstream_availability"), Mapping) else {}
+    lines.extend([
+        "",
+        "#### 下游结果可用性",
+        f"- 年化回报：{outputs.get('expected_annualized_return', 'UNKNOWN')}；"
+        f"共同约束目标买入价：{outputs.get('common_constraint_target_entry_price', 'UNKNOWN')}；"
+        f"B6 目标买入价：{outputs.get('b6_target_entry_price', 'UNKNOWN')}",
+        f"- 条件仓位包：{outputs.get('conditional_position_package', 'UNKNOWN_OR_NOT_READY')}；"
+        f"正式 Decision：{outputs.get('formal_decision', 'NOT_CREATED')}；"
+        f"实际获准新增仓位：{outputs.get('authorized_new_position_pct', '0')}%；"
+        f"执行授权：{outputs.get('execution_authorized', False)}",
+        "",
+    ])
+    return lines
+
+
+def _render_core_investment_synthesis(analysis: Mapping[str, Any]) -> list[str]:
+    """Render the three decision-relevant lenses without inventing data or changing gates.
+
+    This summary deliberately separates externally evidenced market expectations
+    from a conditional, model-implied inversion of the operator's current price.
+    All values are read-only projections of existing fields.
+    """
+    case = analysis.get("case") if isinstance(analysis.get("case"), Mapping) else {}
+    price = analysis.get("price_input") if isinstance(analysis.get("price_input"), Mapping) else {}
+    assessment = analysis.get("assessment") if isinstance(analysis.get("assessment"), Mapping) else {}
+    thesis = assessment.get("thesis") if isinstance(assessment.get("thesis"), Mapping) else {}
+    drivers = assessment.get("value_drivers") if isinstance(assessment.get("value_drivers"), list) else []
+    mie = assessment.get("market_implied_expectation") if isinstance(assessment.get("market_implied_expectation"), Mapping) else {}
+    gap = assessment.get("expectation_gap") if isinstance(assessment.get("expectation_gap"), Mapping) else {}
+    operating = analysis.get("operating_driver_forecast") if isinstance(analysis.get("operating_driver_forecast"), Mapping) else {}
+    operating_scenarios = operating.get("scenarios") if isinstance(operating.get("scenarios"), Mapping) else {}
+    cycle = analysis.get("cycle_earnings_monitor") if isinstance(analysis.get("cycle_earnings_monitor"), Mapping) else {}
+    cycle_node = cycle.get("industry_cycle") if isinstance(cycle.get("industry_cycle"), Mapping) else {}
+    valuation = analysis.get("forecast_valuation") if isinstance(analysis.get("forecast_valuation"), Mapping) else {}
+    valuation_scenarios = valuation.get("scenarios") if isinstance(valuation.get("scenarios"), Mapping) else {}
+    model_consistency = (
+        analysis.get("valuation_model_consistency")
+        if isinstance(analysis.get("valuation_model_consistency"), Mapping) else {}
+    )
+    returns = analysis.get("return_metrics") if isinstance(analysis.get("return_metrics"), Mapping) else None
+    currency = str(case.get("currency") or price.get("currency") or "UNKNOWN")
+    current_price = price.get("price")
+    lines = [
+        "",
+        "## 核心投资判断总览：当前现实 × 现价隐含要求 × 合理未来推演",
+        "",
+        "> 本节先回答三个投资问题。它是现有研究与计算结果的只读摘要，不替代原有模型、证据门禁、组合约束或决策内核；缺失信息保持 UNKNOWN。",
+        f"- 案例：{case.get('company') or 'UNKNOWN'}（{case.get('symbol') or 'UNKNOWN'}）；截止日 {case.get('as_of_date') or case.get('cutoff_date') or 'UNKNOWN'}。",
+        "",
+        "### 1. 当前基本面现实",
+        f"- Trust / Reality / Quality："
+        f"{(assessment.get('trust') or {}).get('status', 'UNKNOWN') if isinstance(assessment.get('trust'), Mapping) else 'UNKNOWN'} / "
+        f"{(assessment.get('reality') or {}).get('status', 'UNKNOWN') if isinstance(assessment.get('reality'), Mapping) else 'UNKNOWN'} / "
+        f"{(assessment.get('quality') or {}).get('status', 'UNKNOWN') if isinstance(assessment.get('quality'), Mapping) else 'UNKNOWN'}",
+        f"- 当前主要矛盾/核心论点：{thesis.get('core_statement') or 'UNKNOWN'}",
+        f"- 行业周期：{cycle_node.get('phase', 'UNKNOWN')}；周期链状态：{cycle.get('status', 'UNKNOWN')}",
+    ]
+    thesis_events = thesis.get("drivers") if isinstance(thesis.get("drivers"), list) else []
+    lines.append("- 主要矛盾驱动的未来关键事件链：")
+    if thesis_events:
+        for event_index, event in enumerate(thesis_events[:4], start=1):
+            event_text = json.dumps(event, ensure_ascii=False, sort_keys=True) if isinstance(event, Mapping) else str(event).strip()
+            if event_text:
+                lines.append(f"  {event_index}. {event_text}")
+    else:
+        lines.append("  - UNKNOWN：未提供可审计的事件链，不从情景数字反推事件。")
+    usable_drivers = [row for row in drivers if isinstance(row, Mapping)]
+    if usable_drivers:
+        lines.append("- 主要矛盾决定因素（最多展示前三项）：")
+        for index, row in enumerate(usable_drivers[:3]):
+            label = "主要矛盾首要决定因素候选" if index == 0 else f"次要价值驱动 {index}"
+            lines.append(
+                f"  - {label}：{row.get('driver', 'UNKNOWN')}｜影响 {row.get('impact', 'UNKNOWN')}｜"
+                f"依据 {row.get('historical_evidence') or 'UNKNOWN'}｜"
+                f"传导 {row.get('valuation_transmission') or 'UNKNOWN'}"
+            )
+    else:
+        lines.append("- 主要矛盾决定因素：UNKNOWN（没有可展示的结构化 value_drivers）。")
+
+    lines.extend([
+        "",
+        "### 2. 当前价格与市场究竟隐含了什么",
+        f"- 本次唯一计算用价：{current_price if current_price not in (None, '') else 'UNKNOWN'} {currency}；主模型：{valuation.get('model_family') or valuation.get('model') or 'UNKNOWN'}；入场估值锚：{valuation.get('entry_value_reference_per_share') or 'UNKNOWN'} {currency}/股",
+        f"- 外部可验证市场隐含预期（MIE）：{mie.get('status', 'UNKNOWN')} — {mie.get('summary') or 'UNKNOWN'}",
+        "- 外部 MIE 与价格反推是两个不同概念；不得用内部 Base 估值、条件反推或未经核实的一致预期替代外部市场证据。",
+    ])
+    inversion = mie.get("price_implied_analysis") if isinstance(mie.get("price_implied_analysis"), Mapping) else {}
+    reference_price_status = "NOT_PROVIDED"
+    inversion_contract_complete = False
+    if inversion:
+        reference_price_status = "UNKNOWN"
+        try:
+            inversion_reference_price = Decimal(str(inversion.get("reference_price")))
+            structured_current_price = Decimal(str(current_price))
+            reference_price_status = (
+                "MATCH" if inversion_reference_price.is_finite()
+                and structured_current_price.is_finite()
+                and inversion_reference_price == structured_current_price
+                else "CONFLICT"
+            )
+        except (InvalidOperation, TypeError, ValueError):
+            reference_price_status = "NOT_IDENTIFIABLE"
+        inversion_assumptions = inversion.get("assumptions")
+        inversion_requirements = inversion.get("implied_requirements")
+        inversion_limitations = inversion.get("limitations")
+        inversion_contract_complete = bool(
+            str(inversion.get("method") or "").strip()
+            and str(inversion.get("model_family") or "").strip()
+            and reference_price_status == "MATCH"
+            and isinstance(inversion_assumptions, list) and inversion_assumptions
+            and isinstance(inversion_requirements, list) and inversion_requirements
+            and isinstance(inversion_limitations, list) and inversion_limitations
+        )
+        lines.append(
+            f"- 现价条件反推：{inversion.get('status', 'UNKNOWN')}；"
+            f"方法 {inversion.get('method') or 'UNKNOWN'}；"
+            f"模型族 {inversion.get('model_family') or 'UNKNOWN'}；"
+            f"反推参考价 {inversion.get('reference_price') or 'UNKNOWN'} {currency}；"
+            f"与结构化唯一现价核对 {reference_price_status}；"
+            f"合同字段完整度 {'COMPLETE' if inversion_contract_complete else 'INCOMPLETE'}"
+        )
+        if reference_price_status == "CONFLICT":
+            lines.append("- 阻断提示：价格反推参考价与本次结构化现价不一致；该反推不能用于当前价格比较。")
+        elif not inversion_contract_complete:
+            lines.append("- 限制提示：条件反推缺少方法、固定假设、反推结果、局限说明或参考价匹配；视为未完整识别，不可据此宣称预期差。")
+        lines.append("- 边界：模型提交的原始反推合同只检查输入结构和参考价格；B60 在下方另行独立复算 EPS×终端 P/E 的条件要求，但该结果仍不是外部 MIE。")
+        assumptions = inversion.get("assumptions") if isinstance(inversion.get("assumptions"), list) else []
+        if assumptions:
+            lines.append("- 反推的关键固定假设：")
+            for row in assumptions[:6]:
+                if isinstance(row, Mapping):
+                    lines.append(
+                        f"  - {row.get('name') or row.get('assumption') or 'UNKNOWN'}："
+                        f"{row.get('value') if row.get('value') not in (None, '') else 'UNKNOWN'} "
+                        f"{row.get('unit') or ''}；依据 {row.get('basis') or 'UNKNOWN'}"
+                    )
+                else:
+                    lines.append(f"  - {row}")
+        requirements = inversion.get("implied_requirements")
+        requirements = requirements if isinstance(requirements, list) else []
+        if requirements:
+            lines.append("- 该价格在所列假设下要求的经营/财务结果（条件结果，不是市场共识）：")
+            for row in requirements[:8]:
+                if isinstance(row, Mapping):
+                    refs = row.get("evidence_refs") if isinstance(row.get("evidence_refs"), list) else []
+                    lines.append(
+                        f"  - {row.get('metric') or 'UNKNOWN'}："
+                        f"{row.get('value') if row.get('value') not in (None, '') else 'UNKNOWN'} "
+                        f"{row.get('unit') or ''}；期间 {row.get('period') or 'UNKNOWN'}；"
+                        f"解释 {row.get('interpretation') or row.get('basis') or 'UNKNOWN'}；"
+                        f"引用 {', '.join(str(ref) for ref in refs) if refs else 'UNKNOWN'}"
+                    )
+                else:
+                    lines.append(f"  - {row}")
+        sensitivity = inversion.get("sensitivity") if isinstance(inversion.get("sensitivity"), list) else []
+        for row in sensitivity[:4]:
+            if isinstance(row, Mapping):
+                lines.append(
+                    f"  - 敏感性：{row.get('changed_assumption') or row.get('assumption') or 'UNKNOWN'}；"
+                    f"影响 {row.get('impact') or row.get('result') or 'UNKNOWN'}"
+                )
+        limitations = inversion.get("limitations") if isinstance(inversion.get("limitations"), list) else []
+        if limitations:
+            lines.append("- 反推局限：" + "；".join(str(item) for item in limitations[:5]))
+    else:
+        lines.append("- 模型提交的现价条件反推：未提供；下方 B60 仅展示本地独立 EPS_MULTIPLE 条件反推。")
+
+
+    local_eps_inversion = inversion.get("local_eps_multiple_recalculation") if isinstance(inversion.get("local_eps_multiple_recalculation"), Mapping) else {}
+    if local_eps_inversion:
+        lines.extend([
+            "",
+            "- **B60 本地 EPS_MULTIPLE 价格反推**："
+            + f"{local_eps_inversion.get('status', 'UNKNOWN')}；"
+            + f"外部 MIE 状态仍为 {local_eps_inversion.get('external_mie_status_unchanged', 'UNKNOWN')}；"
+            + f"盈利期间 {local_eps_inversion.get('forecast_period', 'UNKNOWN')}；"
+            + f"估值终点 {local_eps_inversion.get('valuation_terminal_date', 'UNKNOWN')}。",
+            "- 采用主适配器终端 P/E 反推零回报名义保本 EPS 和年化收益门槛所需 EPS；只有通过既有现金分配校验的定时分红才纳入分红调整结果。",
+        ])
+        local_scenarios = local_eps_inversion.get("scenarios") if isinstance(local_eps_inversion.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            local_row = local_scenarios.get(scenario_name) if isinstance(local_scenarios.get(scenario_name), Mapping) else {}
+            if local_row.get("status") != "CALCULATED_CONDITIONAL":
+                lines.append(f"  - {scenario_name.upper()}：{local_row.get('status', 'UNKNOWN')}；{'；'.join(local_row.get('issues') or []) or '关键输入不可识别'}")
+                continue
+            headroom = local_row.get("b57_eps_headroom_vs_required_return_with_validated_distributions")
+            if headroom is None:
+                headroom = local_row.get("b57_eps_headroom_vs_required_return_without_distributions")
+            lines.append(
+                f"  - {scenario_name.upper()}：终端 P/E {local_row.get('selected_terminal_pe')}x；"
+                f"现价/主预测 EPS forward P/E {local_row.get('current_price_to_primary_eps_forward_pe')}x；"
+                f"零回报保本 EPS（未计/已验证分红）{local_row.get('zero_return_required_terminal_eps_before_distributions')} / "
+                f"{local_row.get('zero_return_required_terminal_eps_with_validated_distributions') if local_row.get('zero_return_required_terminal_eps_with_validated_distributions') is not None else 'UNKNOWN'}；"
+                f"Required Return EPS（未计/已验证分红）{local_row.get('required_return_eps_without_distributions')} / "
+                f"{local_row.get('required_return_eps_with_validated_distributions') if local_row.get('required_return_eps_with_validated_distributions') is not None else 'UNKNOWN'}；"
+                f"B57 EPS 余量 {headroom if headroom is not None else 'UNKNOWN'} CNY/股；15%目标EPS（未计/已验证分红）"
+                f"{local_row.get('fundamental_target_eps_without_distributions')} / "
+                f"{local_row.get('fundamental_target_eps_with_validated_distributions') if local_row.get('fundamental_target_eps_with_validated_distributions') is not None else 'UNKNOWN'}。"
+            )
+            if local_row.get("b57_minus_primary_terminal_value_effect") is not None:
+                lines.append(
+                    f"    - B59 差异传导至终端每股价值：{local_row.get('b57_minus_primary_terminal_value_effect')} CNY/股；"
+                    f"{'仅为差异算术诊断，不是 Required Return 余量' if local_row.get('b57_minus_primary_terminal_value_effect_is_diagnostic_only') else '与主 EPS 同口径的差异展示'}；"
+                    f"分红状态 {local_row.get('distribution_status', 'UNKNOWN')}；"
+                    f"可比性提示 {'、'.join(local_row.get('comparability_flags') or []) or '无额外提示'}。"
+                )
+        lines.append("- 以上是“现价 + 选定终端 P/E + 收益门槛 + 经验证分红时间表”的条件结果，不是外部市场共识，不改变预期差决策状态。")
+
+
+    local_sotp_inversion = inversion.get("local_sotp_recalculation") if isinstance(inversion.get("local_sotp_recalculation"), Mapping) else {}
+    local_b76 = local_sotp_inversion.get("expectation_gap_comparison") if isinstance(local_sotp_inversion.get("expectation_gap_comparison"), Mapping) else {}
+    if local_b76:
+        lines.extend([
+            "",
+            "### B76：独立预测与现价条件性要求的数值对照",
+            f"- 对照状态：{local_b76.get('status', 'UNKNOWN')}；类别：{local_b76.get('classification', 'UNKNOWN')}；外部 MIE 状态保持 {local_b76.get('external_mie_status_unchanged', 'UNKNOWN')}。",
+            f"- 结构化现价 / B61 反推参考价：{local_b76.get('structured_current_price', 'UNKNOWN')} / {local_b76.get('b61_reference_price', 'UNKNOWN')} {local_b76.get('currency', 'UNKNOWN')}；价格核对 {local_b76.get('price_reference_status', 'UNKNOWN')}；盈利期间 {local_b76.get('forecast_period', 'UNKNOWN')}；估值终点 {local_b76.get('valuation_terminal_date', 'UNKNOWN')}。",
+        ])
+        if str(local_sotp_inversion.get("selected_model_family") or "").upper() == "SOTP":
+            lines.append("- 本节对照 B4 全分部独立盈利预测与 B61/B63 Required Return 条件要求；仅为价格条件比较，不代表外部市场共识或已验证的市场正预期差。")
+        else:
+            lines.append("- 本次主估值模型不是 SOTP，B61/B63/B68 分部价值池对照不适用；下方单独呈现 EPS_MULTIPLE 的 B4/B57 与 B60 数值比较（如可识别）。")
+        b76_scenarios = local_b76.get("scenarios") if isinstance(local_b76.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            if not b76_scenarios:
+                break
+            b76_row = b76_scenarios.get(scenario_name) if isinstance(b76_scenarios.get(scenario_name), Mapping) else {}
+            earnings_gap = b76_row.get("earnings_gap") if isinstance(b76_row.get("earnings_gap"), Mapping) else {}
+            lines.append(
+                f"- **{scenario_name.upper()}**（{b76_row.get('status', 'UNKNOWN')}）："
+                f"B4 前瞻分部价值池 {earnings_gap.get('b4_independent_forecast_segment_value_pool_cny') if earnings_gap.get('b4_independent_forecast_segment_value_pool_cny') is not None else 'UNKNOWN'} CNY；"
+                f"Required Return 年化门槛 {earnings_gap.get('required_return_annualized_rate') or 'UNKNOWN'}；"
+                f"Fundamental Target 年化门槛 {earnings_gap.get('fundamental_target_annualized_rate') or 'UNKNOWN'}；"
+                f"Required Return 所需价值池 {earnings_gap.get('required_segment_value_pool_for_required_return_cny') if earnings_gap.get('required_segment_value_pool_for_required_return_cny') is not None else 'UNKNOWN'} CNY；"
+                f"价值池余量 {earnings_gap.get('b4_forecast_pool_minus_required_pool_cny') if earnings_gap.get('b4_forecast_pool_minus_required_pool_cny') is not None else 'UNKNOWN'} CNY "
+                f"（相对要求 {earnings_gap.get('headroom_vs_required_pool_pct') if earnings_gap.get('headroom_vs_required_pool_pct') is not None else 'UNKNOWN'}%）；"
+                f"每股终值余量 {earnings_gap.get('per_share_terminal_value_headroom_cny') if earnings_gap.get('per_share_terminal_value_headroom_cny') is not None else 'UNKNOWN'} CNY/股。"
+            )
+            arithmetic = b76_row.get("arithmetic_reconciliation") if isinstance(b76_row.get("arithmetic_reconciliation"), Mapping) else {}
+            lines.append(
+                f"  - B61/B62/B63/B68 二次算术核对：{arithmetic.get('status', 'UNKNOWN')}；"
+                f"step1+step2=step3 {arithmetic.get('checks', {}).get('step_1_plus_step_2_equals_step_3', 'UNKNOWN')}；"
+                f"step3+step4=step5 {arithmetic.get('checks', {}).get('step_3_plus_step_4_equals_step_5', 'UNKNOWN')}；"
+                f"B68完整B4分部向量复算step3 {arithmetic.get('checks', {}).get('b68_full_vector_recomputed_pool_matches_b63_step_3', 'UNKNOWN')}；"
+                f"母公司调整、稀释股数、每股价值传导见逐项审计状态。"
+            )
+            for segment in (b76_row.get("segment_comparisons") or [])[:5]:
+                if not isinstance(segment, Mapping):
+                    continue
+                lines.append(
+                    f"  - {segment.get('segment_name') or segment.get('segment_id')}："
+                    f"B4 独立预测归母利润 {segment.get('b4_independent_forecast_parent_attributable_profit_cny') or 'UNKNOWN'} CNY；"
+                    f"B61 单变量要求 {segment.get('b61_one_segment_at_a_time_required_profit_cny') or 'UNKNOWN'} CNY；"
+                    f"B4−B61 {((segment.get('b4_forecast_minus_b61_requirement') or {}).get('difference')) or 'UNKNOWN'} CNY；"
+                    f"B63 单变量要求 {segment.get('b63_full_b4_vector_one_segment_sensitivity_required_profit_cny') or 'UNKNOWN'} CNY；"
+                    f"B4−B63 {((segment.get('b4_forecast_minus_b63_segment_sensitivity') or {}).get('difference')) or 'UNKNOWN'} CNY；"
+                    f"选定/Required Common P/E {segment.get('selected_sotp_pe_x') or 'UNKNOWN'}x / "
+                    f"{segment.get('b63_required_common_pe_x') or 'UNKNOWN'}x。"
+                )
+        eps_b76 = local_b76.get("eps_multiple_comparison") if isinstance(local_b76.get("eps_multiple_comparison"), Mapping) else {}
+        if eps_b76 and eps_b76.get("status") != "NOT_APPLICABLE_NOT_EPS_MULTIPLE":
+            lines.extend([
+                "",
+                f"- **EPS_MULTIPLE：B4/B57 独立预测 ↔ B60 现价 Required Return 要求**：{eps_b76.get('status', 'UNKNOWN')}；"
+                f"结构化现价/B60反推现价 {eps_b76.get('structured_current_price', 'UNKNOWN')} / {eps_b76.get('b60_reference_price', 'UNKNOWN')} CNY（{eps_b76.get('price_reference_status', 'UNKNOWN')}）；"
+                f"终端币种/单位 {eps_b76.get('currency', 'UNKNOWN')} / {eps_b76.get('unit', 'UNKNOWN')}；"
+                f"盈利期间 {eps_b76.get('forecast_period', 'UNKNOWN')}；"
+                f"估值终点 {eps_b76.get('valuation_terminal_date', 'UNKNOWN')}（单独处理）；"
+                f"持有期 {eps_b76.get('annualization_year_fraction', 'UNKNOWN')} 年；"
+                f"Required Return {eps_b76.get('required_return_annualized_rate', 'UNKNOWN')}；"
+                f"Fundamental Target {eps_b76.get('fundamental_target_annualized_rate', 'UNKNOWN')}。",
+            ])
+            for scenario_name in ("bear", "base", "bull"):
+                eps_row = eps_b76.get("scenarios", {}).get(scenario_name, {}) if isinstance(eps_b76.get("scenarios"), Mapping) else {}
+                if not isinstance(eps_row, Mapping):
+                    eps_row = {}
+                arithmetic = eps_row.get("arithmetic_reconciliation") if isinstance(eps_row.get("arithmetic_reconciliation"), Mapping) else {}
+                if eps_row.get("status") != "CALCULATED":
+                    lines.append(
+                        f"  - {scenario_name.upper()}：{eps_row.get('status', 'UNKNOWN')}；"
+                        f"算术复核 {arithmetic.get('status', 'UNKNOWN')}；"
+                        f"{'；'.join(eps_row.get('issues') or []) or 'B4/B57 EPS 或 B60 要求不可比'}"
+                    )
+                    continue
+                lines.append(
+                    f"  - {scenario_name.upper()} 算术核对：B57利润÷稀释股数 {arithmetic.get('b57_profit_divided_by_shares', 'UNKNOWN')}；"
+                    f"B58主EPS口径/稀释股数 {eps_row.get('b58_status', 'UNKNOWN')}；"
+                    f"主适配器EPS×P/E {arithmetic.get('primary_eps_times_pe', 'UNKNOWN')}；"
+                    f"Required Return EPS {arithmetic.get('required_return_eps', 'UNKNOWN')}；"
+                    f"15%目标EPS {arithmetic.get('fundamental_target_eps', 'UNKNOWN')}；"
+                    f"分红调整 Required Return/Target "
+                    f"{arithmetic.get('distribution_adjusted_required_return_eps', 'UNKNOWN')} / "
+                    f"{arithmetic.get('distribution_adjusted_fundamental_target_eps', 'UNKNOWN')}。"
+                )
+                req = eps_row.get("required_return") if isinstance(eps_row.get("required_return"), Mapping) else {}
+                req_no = req.get("without_distributions") if isinstance(req.get("without_distributions"), Mapping) else {}
+                req_yes = req.get("with_validated_distributions") if isinstance(req.get("with_validated_distributions"), Mapping) else {}
+                target = eps_row.get("fundamental_target") if isinstance(eps_row.get("fundamental_target"), Mapping) else {}
+                target_no = target.get("without_distributions") if isinstance(target.get("without_distributions"), Mapping) else {}
+                lines.append(
+                    f"  - {scenario_name.upper()}：B4/B57 all-items EPS {eps_row.get('b4_independent_all_items_eps_proxy_cny_per_share', 'UNKNOWN')} CNY/股；"
+                    f"主估值 EPS×终端 P/E {eps_row.get('primary_adapter_eps_cny_per_share', 'UNKNOWN')} × "
+                    f"{eps_row.get('selected_terminal_pe_x', 'UNKNOWN')} = "
+                    f"{eps_row.get('primary_adapter_terminal_value_cny_per_share', 'UNKNOWN')} CNY/股；"
+                    f"Required Return 所需 EPS（未计分红）{req_no.get('required_eps_cny_per_share', 'UNKNOWN')} CNY/股；"
+                    f"差额 {req_no.get('forecast_minus_required_cny_per_share', 'UNKNOWN')} CNY/股；"
+                    f"相对余量 {req_no.get('headroom_vs_required_pct', 'UNKNOWN')}%；"
+                    f"方向 {req_no.get('direction', 'UNKNOWN')}。"
+                )
+                lines.append(
+                    f"    - 已验证分红调整：状态 {req_yes.get('status', 'UNKNOWN')}；"
+                    f"Required Return 所需 EPS {req_yes.get('required_eps_cny_per_share', 'UNKNOWN')}；"
+                    f"预测余量 {req_yes.get('forecast_minus_required_cny_per_share', 'UNKNOWN')} CNY/股。"
+                )
+                lines.append(
+                    f"    - Fundamental Target（独立目标门槛，非 Required Return）："
+                    f"所需 EPS {target_no.get('required_eps_cny_per_share', 'UNKNOWN')} CNY/股；"
+                    f"预测余量 {target_no.get('forecast_minus_required_cny_per_share', 'UNKNOWN')} CNY/股。"
+                )
+            lines.append(
+                "- EPS 对照边界：B4/B57 使用公司整体 all-items 归母 EPS proxy；B58 必须确认 B4、B57、主 EPS bridge 与 B60 期间一致。"
+                "未验证分红不进入调整值；15% Fundamental Target 与 Required Return 分开比较。"
+            )
+        win_odds = local_b76.get("win_odds") if isinstance(local_b76.get("win_odds"), Mapping) else {}
+        payoff = win_odds.get("payoff_asymmetry") if isinstance(win_odds.get("payoff_asymmetry"), Mapping) else {}
+        stress = win_odds.get("thesis_break_stress") if isinstance(win_odds.get("thesis_break_stress"), Mapping) else {}
+        time_cost = win_odds.get("time_cost") if isinstance(win_odds.get("time_cost"), Mapping) else {}
+        lines.extend([
+            f"- 胜率：{win_odds.get('win_probability_status', 'UNKNOWN')}；本批不把 Bear/Base/Bull 权重当作胜率。",
+            f"- 同期限上行/下行赔率参照：Base 上行 / Bear 下行 {payoff.get('base_upside_to_bear_downside_ratio') or 'UNKNOWN'}；Bull 上行 / Bear 下行 {payoff.get('bull_upside_to_bear_downside_ratio') or 'UNKNOWN'}。这只是回报幅度比，不是概率。",
+            f"- Thesis-break stress 失败代价：{stress.get('stress_total_return') or 'UNKNOWN'} 总回报；下行 {stress.get('stress_downside_pct') or 'UNKNOWN'}%；状态 {stress.get('status', 'UNKNOWN')}。",
+            f"- 时间成本：资金占用 {time_cost.get('holding_period_year_fraction') or 'UNKNOWN'} 年（决策期限 {time_cost.get('horizon_years') or 'UNKNOWN'} 年）；机会成本金额 {time_cost.get('opportunity_cost_quantification', 'UNKNOWN')}。",
+            "- 事件兑现时间与价格隐含时间差：NOT_IDENTIFIABLE；B61/B63/B68 没有独立逐事件定价窗口。",
+            "- 边界：B61/B63 单分部利润门槛及 B68 产品销量/售价/成本解均为单变量替代敏感性，不可相加；B63 全向量价值池余量才是多分部同时变化的整体比较。",
+        ])
+    if local_sotp_inversion and local_sotp_inversion.get("selected_model_family") == "SOTP":
+        lines.extend([
+            "",
+            "- **B61 本地 SOTP 现价要求反推**："
+            + f"{local_sotp_inversion.get('status', 'UNKNOWN')}；"
+            + f"外部 MIE 状态仍为 {local_sotp_inversion.get('external_mie_status_unchanged', 'UNKNOWN')}；"
+            + f"期间 {local_sotp_inversion.get('forecast_period', 'UNKNOWN')}；"
+            + f"终点 {local_sotp_inversion.get('valuation_terminal_date', 'UNKNOWN')}。",
+            "- 反推先求满足收益门槛所需的总股权价值，再固定母公司成本/净现金净负债/其他调整/稀释股数，得到所需总分部权益价值池。",
+            "- 分部单项要求均为“其他分部维持本情景预测、只有该分部变化”的独立敏感性；不能将不同分部的单项阈值相加。",
+        ])
+        local_scenarios = local_sotp_inversion.get("scenarios") if isinstance(local_sotp_inversion.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            scenario_row = local_scenarios.get(scenario_name) if isinstance(local_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B61 {scenario_name.upper()} — {scenario_row.get('status', 'UNKNOWN')}**")
+            requirements = scenario_row.get("requirements") if isinstance(scenario_row.get("requirements"), Mapping) else {}
+            lines.append(
+                f"- 当前 SOTP：总股权价值 {scenario_row.get('selected_total_equity_value_cny') if scenario_row.get('selected_total_equity_value_cny') is not None else 'UNKNOWN'} CNY；"
+                f"稀释股数 {scenario_row.get('selected_diluted_shares') if scenario_row.get('selected_diluted_shares') is not None else 'UNKNOWN'} 股；"
+                f"终值 {scenario_row.get('selected_sotp_terminal_value_per_share') if scenario_row.get('selected_sotp_terminal_value_per_share') is not None else 'UNKNOWN'} CNY/股。"
+            )
+            lines.append(
+                f"- 母公司调整固定值：资本化中心成本 {scenario_row.get('selected_capitalized_central_cost_cny') if scenario_row.get('selected_capitalized_central_cost_cny') is not None else 'UNKNOWN'} CNY；"
+                f"净现金/净负债 {scenario_row.get('selected_net_cash_debt_cny') if scenario_row.get('selected_net_cash_debt_cny') is not None else 'UNKNOWN'} CNY；"
+                f"其他调整 {scenario_row.get('selected_other_adjustments_cny') if scenario_row.get('selected_other_adjustments_cny') is not None else 'UNKNOWN'} CNY；"
+                f"分红状态 {scenario_row.get('distribution_status', 'UNKNOWN')}。"
+            )
+            for req_key, req_label in (("required_return", "Required Return"), ("fundamental_target_annualized_return", "15% Fundamental Target")):
+                requirement = requirements.get(req_key) if isinstance(requirements.get(req_key), Mapping) else {}
+                without = requirement.get("without_distributions") if isinstance(requirement.get("without_distributions"), Mapping) else {}
+                with_dist = requirement.get("with_validated_distributions") if isinstance(requirement.get("with_validated_distributions"), Mapping) else {}
+                def b61_display(value: Any) -> Any:
+                    return value if value is not None else "UNKNOWN"
+                lines.append(
+                    f"- {req_label}：终端每股价值要求（未计/已验证分红）"
+                    f"{b61_display(requirement.get('required_terminal_value_per_share_without_distributions'))} / "
+                    f"{b61_display(requirement.get('required_terminal_value_per_share_with_validated_distributions'))} CNY；"
+                    f"所需总股权价值（未计分红）{b61_display(without.get('required_terminal_equity_value_cny'))} CNY；"
+                    f"所需分部权益价值池（未计/已验证分红）"
+                    f"{b61_display(without.get('required_segment_equity_value_pool_cny'))} / "
+                    f"{b61_display(with_dist.get('required_segment_equity_value_pool_cny'))} CNY；"
+                    f"当前分部价值池 {b61_display(without.get('selected_segment_equity_value_pool_cny'))} CNY；"
+                    f"未计分红口径的价值池缺口 {b61_display(without.get('additional_segment_equity_value_required_cny'))} CNY。"
+                )
+                segment_rows = without.get("segment_requirements") if isinstance(without.get("segment_requirements"), list) else []
+                with_segment_rows = with_dist.get("segment_requirements") if isinstance(with_dist.get("segment_requirements"), list) else []
+                with_by_id = {
+                    str(item.get("segment_id")): item for item in with_segment_rows if isinstance(item, Mapping)
+                }
+                if segment_rows:
+                    lines.append("  - 分部单变量盈利要求（其他分部维持当前情景预测；分部之间不可相加）：")
+                    for segment in segment_rows:
+                        required_profit = segment.get("one_at_a_time_required_attributable_net_profit_cny_signed")
+                        required_profit_floor = segment.get("one_at_a_time_required_attributable_net_profit_floor_cny")
+                        other_segments_cover = segment.get("other_segments_cover_required_pool_without_this_segment_profit")
+                        incremental = segment.get("one_at_a_time_incremental_profit_required_cny")
+                        headroom = segment.get("one_at_a_time_profit_headroom_cny")
+                        dividend_row = with_by_id.get(str(segment.get("segment_id")), {})
+                        dividend_required_signed = dividend_row.get("one_at_a_time_required_attributable_net_profit_cny_signed")
+                        dividend_required_floor = dividend_row.get("one_at_a_time_required_attributable_net_profit_floor_cny")
+                        dividend_others_cover = dividend_row.get("other_segments_cover_required_pool_without_this_segment_profit")
+                        lines.append(
+                            f"    - {segment.get('segment_id')} / {segment.get('segment_name')}："
+                            f"当前归母净利润 {b61_display(segment.get('selected_attributable_net_profit_cny'))} CNY；"
+                            f"单变量所需有符号代数值（未计/已验证分红）{b61_display(required_profit)} / "
+                            f"{b61_display(dividend_required_signed)} CNY；"
+                            f"非负经营利润下限（未计/已验证分红）{b61_display(required_profit_floor)} / "
+                            f"{b61_display(dividend_required_floor)} CNY；"
+                            f"其他分部单独覆盖要求（未计/已验证分红）{b61_display(other_segments_cover)} / "
+                            f"{b61_display(dividend_others_cover)}；"
+                            f"未计分红需新增 {b61_display(incremental)} CNY；"
+                            f"已有余量 {b61_display(headroom)} CNY；"
+                            f"当前分部 P/E {b61_display(segment.get('selected_pe_multiple_x'))}x。"
+                        )
+            if scenario_row.get("issues"):
+                lines.append("- 待核查：" + "；".join(scenario_row["issues"][:6]))
+        lines.append("- 边界：这是现价、终端分部 P/E、母公司调整与稀释股数条件下的数学反推，不是外部 MIE；没有分部价值驱动分配依据时，不生成多个分部同时应达到的盈利组合，也不修改 SOTP 主估值。")
+
+        local_b62_reconciliation = local_sotp_inversion.get("segment_earnings_reconciliation") if isinstance(local_sotp_inversion.get("segment_earnings_reconciliation"), Mapping) else {}
+        lines.extend([
+            "",
+            "- **B62 B4 分部正常化盈利 ↔ SOTP ↔ 现价要求对账**："
+            + f"{local_b62_reconciliation.get('status', 'UNKNOWN')}；"
+            + f"B4 分部桥 {local_b62_reconciliation.get('b4_segment_bridge_status', 'UNKNOWN')}；"
+            + f"盈利期间 {local_b62_reconciliation.get('forecast_period', 'UNKNOWN')}。",
+            "- B62 全分部对比：将 B4 各分部正常化归母净利润同时代入各自已选 SOTP P/E，形成完整前瞻分部价值池；与 B61 Required Return 所需价值池比较。分部单变量阈值仅作替代敏感性，严禁相加。",
+        ])
+        b62_scenarios = local_b62_reconciliation.get("scenarios") if isinstance(local_b62_reconciliation.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b62_row = b62_scenarios.get(scenario_name) if isinstance(b62_scenarios.get(scenario_name), Mapping) else {}
+            if b62_row.get("status") != "CALCULATED_CONDITIONAL":
+                lines.append(f"  - {scenario_name.upper()}：{b62_row.get('status', 'UNKNOWN')}；{'；'.join(b62_row.get('issues') or []) or '关键口径/字段不可比较'}")
+                continue
+            lines.append(
+                f"  - {scenario_name.upper()}：B4 前瞻分部价值池 {b62_row.get('b4_forecast_segment_equity_value_pool_at_selected_sotp_pe_cny')} CNY；"
+                f"现价 Required Return 所需池 {b62_row.get('required_segment_equity_value_pool_for_required_return_cny')} CNY；"
+                f"差额 {b62_row.get('b4_forecast_segment_pool_minus_required_pool_cny')} CNY；"
+                f"B4 前瞻隐含每股终值 {b62_row.get('b4_forecast_implied_terminal_value_per_share_cny')} CNY；"
+                f"Required Return 每股终值要求 {b62_row.get('required_terminal_value_per_share_for_required_return_cny')} CNY。"
+            )
+            for segment_row in b62_row.get("segment_comparisons", [])[:12]:
+                if not isinstance(segment_row, Mapping):
+                    continue
+                lines.append(
+                    f"    - {segment_row.get('segment_id')}：B4 正常化归母利润 {segment_row.get('b4_forecast_parent_attributable_normalized_profit_cny')} CNY；"
+                    f"SOTP 当前利润 {segment_row.get('sotp_selected_attributable_profit_cny')} CNY；"
+                    f"差异 {segment_row.get('b4_minus_sotp_profit_cny')} CNY；"
+                    f"按当前 P/E 的价值影响 {segment_row.get('profit_change_value_effect_at_selected_sotp_pe_cny')} CNY；"
+                    f"B4 利润减 B61 单变量要求 {segment_row.get('b4_forecast_profit_minus_b61_one_at_a_time_required_profit_cny')} CNY；"
+                    f"保持其他 B4 分部预测不变时所需 P/E {segment_row.get('required_pe_at_b4_forecast_profit_with_other_segments_at_b4_forecast_x')}x；"
+                    f"当前 P/E 与该要求差额 {segment_row.get('selected_pe_minus_required_pe_at_b4_profit_x')}x。"
+                )
+            parent_row = b62_row.get("selected_parent_adjustments") if isinstance(b62_row.get("selected_parent_adjustments"), Mapping) else {}
+            dilution = b62_row.get("dilution_sensitivity") if isinstance(b62_row.get("dilution_sensitivity"), Mapping) else {}
+            lines.append(
+                f"    - 母公司调整固定值：资本化中心成本 {parent_row.get('capitalized_central_cost_cny')} CNY；"
+                f"净现金/净负债 {parent_row.get('net_cash_debt_cny')} CNY；其他调整 {parent_row.get('other_adjustments_cny')} CNY。"
+            )
+            lines.append(
+                f"    - 股数约束：稀释股数 {b62_row.get('selected_diluted_shares')}；"
+                f"B4 估值下满足每股回报门槛的股数上限诊断 {b62_row.get('break_even_diluted_shares_at_b4_forecast_value')}；"
+                f"股数增加 1% 将增加所需终端股权价值 {dilution.get('one_percent_share_count_increase_additional_required_equity_cny')} CNY。"
+            )
+        lines.append(
+            "- B62 归因边界：B4 正常化利润与当前 SOTP 利润差额在当前 P/E 下的价值影响可量化；保持其他 B4 分部利润不变的所需 P/E 是另一项单变量敏感性。若无独立未来母公司调整预测，只展示中心成本/净现金/其他调整的方向敏感性，不能虚构其未来贡献。B61 单变量利润要求不可相加，完整 B4 价值池才是多分部同时变化的情景比较。"
+        )
+
+
+    local_b63_attribution = local_sotp_inversion.get("valuation_gap_attribution") if isinstance(local_sotp_inversion.get("valuation_gap_attribution"), Mapping) else {}
+    if local_b63_attribution:
+        lines.extend([
+            "",
+            "- **B63 SOTP 估值缺口归因**："
+            + f"{local_b63_attribution.get('status', 'UNKNOWN')}；"
+            + f"期间 {local_b63_attribution.get('forecast_period', 'UNKNOWN')}。",
+            "- 价值池瀑布先计算 B4 分部盈利变化在原 SOTP P/E 下的影响，再计算满足 B61 Required Return 所需的统一 P/E 缩放敏感性；这不是公平价值或市场交易倍数判断。",
+        ])
+        b63_scenarios = local_b63_attribution.get("scenarios") if isinstance(local_b63_attribution.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b63_row = b63_scenarios.get(scenario_name) if isinstance(b63_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B63 {scenario_name.upper()} — {b63_row.get('status', 'UNKNOWN')}**")
+            if b63_row.get("status") not in {"CONDITIONAL_ATTRIBUTION_CALCULATED", "PARTIAL"}:
+                if b63_row.get("issues"):
+                    lines.append("- 对账阻断：" + "；".join(str(item) for item in b63_row["issues"][:10]))
+                continue
+            waterfall = b63_row.get("value_pool_waterfall") if isinstance(b63_row.get("value_pool_waterfall"), Mapping) else {}
+            lines.append(
+                f"- 价值池：当前 SOTP {waterfall.get('step_1_selected_sotp_segment_pool_cny')} CNY；"
+                f"B4 盈利变化影响 {waterfall.get('step_2_b4_earnings_effect_at_selected_pes_cny')} CNY；"
+                f"B4 盈利按原 P/E 计价后 {waterfall.get('step_3_b4_forecast_pool_at_selected_pes_cny')} CNY；"
+                f"统一倍数缩放所需增量 {waterfall.get('step_4_common_pe_scale_effect_to_required_pool_cny')} CNY；"
+                f"Required Return 价值池 {waterfall.get('step_5_required_segment_pool_cny')} CNY。"
+            )
+            multiple = b63_row.get("multiple_attribution") if isinstance(b63_row.get("multiple_attribution"), Mapping) else {}
+            lines.append(f"- 统一 P/E 缩放系数：{multiple.get('common_pe_scale_factor_required') or 'UNKNOWN'}；此为全分部 P/E 同比例变化的条件敏感性，不是市场共识。")
+            for pe_row in multiple.get("required_common_pe_by_segment") or []:
+                if not isinstance(pe_row, Mapping):
+                    continue
+                lines.append(
+                    f"  - {pe_row.get('segment_id')}：当前选定 P/E {pe_row.get('selected_sotp_pe_x')}x；"
+                    f"要求 P/E {pe_row.get('required_pe_under_common_scale_x')}x；"
+                    f"倍数依据 {pe_row.get('selected_pe_basis') or 'UNKNOWN'}；"
+                    f"数据分类 {pe_row.get('selected_pe_data_class') or 'UNKNOWN'}；"
+                    f"证据引用 {'、'.join(pe_row.get('selected_pe_evidence_refs') or []) or '无显式引用'}。"
+                )
+            parent_attribution = b63_row.get("parent_adjustment_attribution") if isinstance(b63_row.get("parent_adjustment_attribution"), Mapping) else {}
+            lines.append(
+                f"- 母公司调整对所需分部价值池的影响：中心成本 +{parent_attribution.get('capitalized_central_cost_load_on_required_segment_pool_cny')} CNY；"
+                f"净现金/净负债抵减 {parent_attribution.get('net_cash_debt_offset_to_required_segment_pool_cny')} CNY；"
+                f"其他调整抵减 {parent_attribution.get('other_adjustments_offset_to_required_segment_pool_cny')} CNY；"
+                f"净调整负担 {parent_attribution.get('net_parent_adjustment_load_cny')} CNY。"
+            )
+            lines.append(
+                f"- 稀释股数：{(b63_row.get('dilution_attribution') or {}).get('selected_diluted_shares')}；"
+                f"Required Return 每股终值要求 {(b63_row.get('dilution_attribution') or {}).get('required_terminal_value_per_share_cny')} CNY；"
+                f"B4 预测股权价值 {(b63_row.get('dilution_attribution') or {}).get('b4_forecast_total_equity_value_cny')} CNY；"
+                f"盈亏平衡股数 {(b63_row.get('dilution_attribution') or {}).get('break_even_diluted_shares_at_b4_forecast_equity')}；"
+                f"股数增加 1% 所增加的终端股权要求 {(b63_row.get('dilution_attribution') or {}).get('additional_required_equity_for_plus_one_percent_shares_cny')} CNY。"
+            )
+            if b63_row.get("issues"):
+                lines.append("- 待核查：" + "；".join(str(item) for item in b63_row["issues"][:8]))
+        lines.append(
+            "- B63 边界：盈利影响、统一 P/E 缩放、母公司调整负担与稀释股数分别展示；无独立母公司前瞻调整/股数预测时，不将其变化编造为缺口归因。不能由“要求 P/E 高”推出“市场低估”，也不能据此自动修改 SOTP 倍数。"
+        )
+
+    local_b64_assessment = local_sotp_inversion.get("evidence_grade_assessment") if isinstance(local_sotp_inversion.get("evidence_grade_assessment"), Mapping) else {}
+    if local_b64_assessment:
+        lines.extend([
+            "",
+            "- **B64 SOTP 分部盈利与终值倍数证据等级**："
+            + f"{local_b64_assessment.get('status', 'UNKNOWN')}；"
+            + f"期间 {local_b64_assessment.get('forecast_period', 'UNKNOWN')}。",
+            "- G1=披露事实/指引与利润输入建立引用关联；G2=业务机制、指标、证据与反转信号可追踪；"
+            "G3=分析师盈利假设；G4=终值 P/E 假设；G5=UNKNOWN。G1/G2 仍须人工核对原始文件内容。",
+        ])
+        b64_scenarios = local_b64_assessment.get("scenarios") if isinstance(local_b64_assessment.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b64_row = b64_scenarios.get(scenario_name) if isinstance(b64_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B64 {scenario_name.upper()} — {b64_row.get('status', 'UNKNOWN')}**")
+            if b64_row.get("status") not in {"ASSESSED_DIAGNOSTIC_ONLY", "PARTIAL"}:
+                if b64_row.get("issues"):
+                    lines.append("- 评级阻断：" + "；".join(str(item) for item in b64_row["issues"][:8]))
+                continue
+            for segment in (b64_row.get("segments") or [])[:20]:
+                if not isinstance(segment, Mapping):
+                    continue
+                profit_grade = segment.get("profit_evidence_assessment") if isinstance(segment.get("profit_evidence_assessment"), Mapping) else {}
+                multiple_grade = segment.get("multiple_evidence_assessment") if isinstance(segment.get("multiple_evidence_assessment"), Mapping) else {}
+                lines.append(
+                    f"- {segment.get('segment_id')} / {segment.get('segment_name')}："
+                    f"分部归母利润 {segment.get('sotp_selected_attributable_profit_cny')} CNY，"
+                    f"{profit_grade.get('grade', 'G5_UNKNOWN')}（{profit_grade.get('grade_label', 'UNKNOWN')}）；"
+                    f"P/E {segment.get('selected_terminal_pe_x')}x，"
+                    f"{multiple_grade.get('grade', 'G5_UNKNOWN')}（{multiple_grade.get('grade_label', 'UNKNOWN')}）。"
+                )
+                if profit_grade.get("support_summary") not in (None, "", "UNKNOWN"):
+                    lines.append(f"  - 盈利支持声明：{profit_grade.get('support_summary')}")
+                mechanism = profit_grade.get("mechanism_chain") if isinstance(profit_grade.get("mechanism_chain"), list) else []
+                indicators = profit_grade.get("key_operating_indicators") if isinstance(profit_grade.get("key_operating_indicators"), list) else []
+                reversals = profit_grade.get("reversal_signals") if isinstance(profit_grade.get("reversal_signals"), list) else []
+                if mechanism:
+                    lines.append("  - 经营机制链：" + " → ".join(str(item) for item in mechanism[:5]))
+                if indicators:
+                    lines.append("  - 可观测指标：" + "；".join(str(item) for item in indicators[:5]))
+                if reversals:
+                    lines.append("  - 反转/证伪信号：" + "；".join(str(item) for item in reversals[:5]))
+                if multiple_grade.get("comparable_set_status") not in (None, "NOT_PROVIDED"):
+                    lines.append(
+                        f"  - 可比样本状态：{multiple_grade.get('comparable_set_status')}；"
+                        f"记录数量 {len(multiple_grade.get('comparable_observations') or [])}；"
+                        "样本记录不等同于倍数公允性结论。"
+                    )
+                combined_issues = list(profit_grade.get("issues") or []) + list(multiple_grade.get("issues") or [])
+                if combined_issues:
+                    lines.append("  - 待核查：" + "；".join(str(item) for item in combined_issues[:6]))
+        lines.append(
+            "- B64 边界：来源类别、引用解析和时间检查不证明来源内容与利润数值的语义关系；"
+            "G1/G2 是结构化关联声明，不是原始文件核实或正式证据准入。各分部盈利等级与 P/E 等级分开显示，"
+            "不合并成综合分、不参与估值加权，也不自动改变估值、MIE 或 Decision。"
+        )
+
+    local_b65_audit = local_sotp_inversion.get("comparable_company_audit") if isinstance(local_sotp_inversion.get("comparable_company_audit"), Mapping) else {}
+    if local_b65_audit:
+        lines.extend([
+            "",
+            "- **B65 SOTP 可比公司可比性审计**："
+            + f"{local_b65_audit.get('status', 'UNKNOWN')}；"
+            + f"估值观察截止日 {local_b65_audit.get('valuation_as_of_date', 'UNKNOWN')}。",
+            "- 逐项审计业务模式/收入结构/终端市场、成长阶段/周期、利润质量、ROIC/资本强度、杠杆、现金流转换、会计口径和盈利/估值期间；"
+            "不计算数值溢价/折价，不自动修改终值 P/E。",
+        ])
+        b65_scenarios = local_b65_audit.get("scenarios") if isinstance(local_b65_audit.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b65_row = b65_scenarios.get(scenario_name) if isinstance(b65_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B65 {scenario_name.upper()} — {b65_row.get('status', 'UNKNOWN')}**")
+            for segment in (b65_row.get("segments") or [])[:20]:
+                if not isinstance(segment, Mapping):
+                    continue
+                lines.append(
+                    f"- {segment.get('segment_id')} / {segment.get('segment_name')}："
+                    f"选定 P/E {segment.get('selected_terminal_pe_x') or 'UNKNOWN'}x 保持不变；"
+                    f"候选同行 {segment.get('candidate_peer_count', 0)} 家；"
+                    f"完整可比 {segment.get('eligible_peer_count', 0)} 家；"
+                    f"排除 {segment.get('excluded_peer_count', 0)} 家；"
+                    f"待补资料 {segment.get('partial_peer_count', 0)} 家；"
+                    f"审计状态 {segment.get('peer_set_status', 'UNKNOWN')}。"
+                )
+                for peer in (segment.get("peers") or [])[:10]:
+                    if not isinstance(peer, Mapping):
+                        continue
+                    lines.append(
+                        f"  - 同行 {peer.get('entity')}｜P/E {peer.get('observed_pe_x')}x｜"
+                        f"估值日期 {peer.get('as_of_date')}｜距案例截止 {peer.get('days_before_case_cutoff')} 天｜"
+                        f"{peer.get('status')}。"
+                    )
+                    directions = peer.get("directional_dimension_summary") if isinstance(peer.get("directional_dimension_summary"), Mapping) else {}
+                    premium = directions.get("target_premium_dimensions") or []
+                    discount = directions.get("target_discount_dimensions") or []
+                    neutral = directions.get("neutral_dimensions") or []
+                    if premium or discount or neutral:
+                        lines.append(
+                            f"    - 定性差异：目标公司可能溢价维度 {', '.join(premium) or '无'}；"
+                            f"可能折价维度 {', '.join(discount) or '无'}；"
+                            f"中性维度 {', '.join(neutral) or '无'}。"
+                        )
+                    missing = peer.get("unknown_dimensions") or []
+                    excluded = peer.get("excluded_dimensions") or []
+                    if missing or excluded:
+                        lines.append(
+                            f"    - UNKNOWN 维度：{', '.join(missing) or '无'}；"
+                            f"不可比维度：{', '.join(excluded) or '无'}。"
+                        )
+                    dimension_review = peer.get("dimension_review") if isinstance(peer.get("dimension_review"), list) else []
+                    non_similar = [
+                        item for item in dimension_review
+                        if isinstance(item, Mapping) and item.get("comparison") != "SIMILAR"
+                    ]
+                    if not non_similar and dimension_review:
+                        lines.append(f"    - 其余 {len(dimension_review)} 项维度均被声明为 SIMILAR；仅代表结构化判断完整，不代表独立事实核验。")
+                    for dimension in non_similar:
+                        lines.append(
+                            f"    - 维度 {dimension.get('dimension')}："
+                            f"{dimension.get('comparison')}；目标={dimension.get('target_value')}；"
+                            f"同行={dimension.get('peer_value')}；"
+                            f"定性方向={dimension.get('target_multiple_implication')}；"
+                            f"处理={dimension.get('multiple_adjustment_treatment')}。"
+                        )
+                        lines.append(
+                            f"      判断依据：{dimension.get('rationale') or 'UNKNOWN'}；"
+                            f"调整依据：{dimension.get('adjustment_rationale') or 'UNKNOWN'}。"
+                        )
+                    if peer.get("issues"):
+                        lines.append("    - 核查事项：" + "；".join(str(item) for item in peer["issues"][:6]))
+                if segment.get("issues"):
+                    lines.append("  - 分部可比性阻断/待补：" + "；".join(str(item) for item in segment["issues"][:10]))
+        lines.append(
+            "- B65 边界：TARGET_PREMIUM / TARGET_DISCOUNT 只是定性方向判断；不将维度差异相加、不产生数值 P/E 调整系数，"
+            "不自动筛选同行或改写 SOTP 估值。可比性审计通过只代表资料结构完整，不代表同行选择或估值合理性已获验证。"
+        )
+
+    local_b66_assessment = local_sotp_inversion.get("multiple_calibration_assessment") if isinstance(local_sotp_inversion.get("multiple_calibration_assessment"), Mapping) else {}
+    if local_b66_assessment:
+        lines.extend([
+            "",
+            "- **B66 SOTP 终值 P/E 独立校准与敏感性**："
+            + f"{local_b66_assessment.get('status', 'UNKNOWN')}。",
+            "- 同行中位数仅取 B65 完整可比且会计口径、盈利期间、P/E 口径均与目标可比的样本；"
+            "目标选定 P/E 必须由参考倍数 + 分部差异显式调整复算闭合。",
+        ])
+        b66_scenarios = local_b66_assessment.get("scenarios") if isinstance(local_b66_assessment.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b66_row = b66_scenarios.get(scenario_name) if isinstance(b66_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B66 {scenario_name.upper()} — {b66_row.get('status', 'UNKNOWN')}**")
+            if b66_row.get("issues"):
+                lines.append("- 场景级核查：" + "；".join(str(item) for item in b66_row["issues"][:12]))
+            for segment in (b66_row.get("segments") or [])[:20]:
+                if not isinstance(segment, Mapping):
+                    continue
+                peer_band = segment.get("same_basis_peer_reference") if isinstance(segment.get("same_basis_peer_reference"), Mapping) else {}
+                selected_vs_peer = segment.get("selected_pe_vs_peer_median") if isinstance(segment.get("selected_pe_vs_peer_median"), Mapping) else {}
+                bridge = segment.get("explicit_selected_multiple_bridge") if isinstance(segment.get("explicit_selected_multiple_bridge"), Mapping) else {}
+                sensitivity_range = segment.get("analyst_multiple_range") if isinstance(segment.get("analyst_multiple_range"), Mapping) else {}
+                hurdle = segment.get("b63_required_common_pe_sensitivity") if isinstance(segment.get("b63_required_common_pe_sensitivity"), Mapping) else {}
+                lines.append(
+                    f"- {segment.get('segment_id')} / {segment.get('segment_name')}："
+                    f"选定 P/E {segment.get('selected_terminal_pe_x')}x "
+                    f"({segment.get('selected_pe_data_class') or 'UNKNOWN'}；{segment.get('selected_pe_basis') or 'UNKNOWN'})；"
+                    f"同口径同行 {peer_band.get('peer_count', 0)} 家；"
+                    f"同行范围 {peer_band.get('minimum_pe_x') or 'UNKNOWN'}x / "
+                    f"{peer_band.get('median_pe_x') or 'UNKNOWN'}x / "
+                    f"{peer_band.get('maximum_pe_x') or 'UNKNOWN'}x；"
+                    f"选定值相对中位数差异 {selected_vs_peer.get('premium_discount_pct') or 'UNKNOWN'}%；"
+                    f"依据引用 {', '.join(segment.get('selected_pe_evidence_refs') or []) or 'UNKNOWN'}。"
+                )
+                lines.append(
+                    f"  - P/E 论证桥：{bridge.get('status', 'UNKNOWN')}；"
+                    f"参考倍数 {bridge.get('reference_multiple_x') or 'UNKNOWN'}x；"
+                    f"显式调整合计 {bridge.get('explicit_adjustment_sum_x') or 'UNKNOWN'}x；"
+                    f"复算选定倍数 {bridge.get('calculated_selected_pe_x') or 'UNKNOWN'}x；"
+                    f"残差 {bridge.get('reconciliation_residual_x') or 'UNKNOWN'}x。"
+                )
+                for adjustment in (bridge.get("adjustments") or [])[:10]:
+                    if not isinstance(adjustment, Mapping):
+                        continue
+                    lines.append(
+                        f"    - {adjustment.get('dimension')} / {adjustment.get('direction')}："
+                        f"{adjustment.get('adjustment_x')}x；{adjustment.get('rationale') or 'UNKNOWN'}。"
+                    )
+                lines.append(
+                    f"  - 分析师 P/E 区间：{sensitivity_range.get('lower_bound_pe_x') or 'UNKNOWN'}x — "
+                    f"{sensitivity_range.get('selected_pe_x') or 'UNKNOWN'}x — "
+                    f"{sensitivity_range.get('upper_bound_pe_x') or 'UNKNOWN'}x；"
+                    f"状态 {sensitivity_range.get('status', 'UNKNOWN')}。"
+                )
+                lines.append(
+                    f"  - B63 Required Return 条件倍数：{hurdle.get('required_common_pe_x') or 'UNKNOWN'}x；"
+                    f"选定倍数与要求差额 {hurdle.get('selected_minus_required_pe_x') or 'UNKNOWN'}x；"
+                    "这是全分部 B4 盈利向量下的统一倍数敏感性，不是本分部独立公平倍数。"
+                )
+                value_sensitivity = segment.get("segment_equity_value_sensitivity_cny") if isinstance(segment.get("segment_equity_value_sensitivity_cny"), Mapping) else {}
+                lines.append(
+                    f"  - 分部权益价值敏感性：低端 {value_sensitivity.get('lower_range') or 'UNKNOWN'} CNY；"
+                    f"选定 {value_sensitivity.get('selected') or 'UNKNOWN'} CNY；"
+                    f"高端 {value_sensitivity.get('upper_range') or 'UNKNOWN'} CNY。"
+                )
+                if segment.get("issues"):
+                    lines.append("  - 核查事项：" + "；".join(str(item) for item in segment["issues"][:10]))
+            aggregate = b66_row.get("aggregate_sensitivity") if isinstance(b66_row.get("aggregate_sensitivity"), Mapping) else {}
+            if aggregate.get("status") == "CONDITIONAL_ALL_SEGMENT_MULTIPLE_RANGE_SENSITIVITY":
+                lines.append(
+                    f"- 全部分部区间同时变化的 SOTP 每股敏感性："
+                    f"{aggregate.get('lower_terminal_value_per_share_cny')} — "
+                    f"{aggregate.get('selected_terminal_value_per_share_cny')} — "
+                    f"{aggregate.get('upper_terminal_value_per_share_cny')} CNY/share；"
+                    "母公司调整及稀释股数固定；不是置信区间。"
+                )
+            elif aggregate.get("issues"):
+                lines.append("- 全部 SOTP 区间敏感性不可识别：" + "；".join(str(item) for item in aggregate["issues"][:6]))
+        lines.append(
+            "- B66 边界：分析师明确输入的倍数调整只做方向、来源及算术闭合检查；不从 ROIC/成长/周期自动换算 P/E，"
+            "不将同行中位数视为公平倍数，也不修改任何选定 SOTP P/E 或投资决策。"
+        )
+
+    local_b67_audit = local_sotp_inversion.get("value_credibility_price_audit") if isinstance(local_sotp_inversion.get("value_credibility_price_audit"), Mapping) else {}
+    if local_b67_audit:
+        lines.extend([
+            "",
+            "### B67 — SOTP 价值来源可信度与现价要求审计",
+            f"- 总体状态：{local_b67_audit.get('status', 'UNKNOWN')}；{local_b67_audit.get('summary') or 'UNKNOWN'}",
+            "- 不生成综合可信度分数；盈利证据等级与终值倍数等级分别显示。",
+        ])
+        b67_scenarios = local_b67_audit.get("scenarios") if isinstance(local_b67_audit.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b67_row = b67_scenarios.get(scenario_name) if isinstance(b67_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B67 {scenario_name.upper()} — {b67_row.get('status', 'UNKNOWN')}**")
+            selected = b67_row.get("selected_value_bridge") if isinstance(b67_row.get("selected_value_bridge"), Mapping) else {}
+            earnings = b67_row.get("independent_earnings_bridge") if isinstance(b67_row.get("independent_earnings_bridge"), Mapping) else {}
+            multiple = b67_row.get("multiple_reference_bridge") if isinstance(b67_row.get("multiple_reference_bridge"), Mapping) else {}
+            parent = b67_row.get("parent_adjustment_bridge") if isinstance(b67_row.get("parent_adjustment_bridge"), Mapping) else {}
+            dilution = b67_row.get("dilution_bridge") if isinstance(b67_row.get("dilution_bridge"), Mapping) else {}
+            requirement = b67_row.get("current_price_required_return") if isinstance(b67_row.get("current_price_required_return"), Mapping) else {}
+            lines.append(
+                f"- 选定 SOTP 分部价值池：{selected.get('selected_segment_pool_recalculated_cny') or 'UNKNOWN'} CNY；"
+                f"B4 盈利变化贡献：{earnings.get('b4_earnings_effect_at_unchanged_selected_pes_cny') or 'UNKNOWN'} CNY；"
+                f"B4 固定 P/E 预测价值池：{earnings.get('b4_forecast_segment_pool_at_selected_pes_cny') or 'UNKNOWN'} CNY。"
+            )
+            lines.append(
+                f"- 参考倍数价值 + 显式倍数调整价值："
+                f"{multiple.get('reference_segment_pool_cny') or multiple.get('identified_reference_value_subtotal_cny') or 'UNKNOWN'} + "
+                f"{multiple.get('explicit_multiple_adjustment_value_cny') or multiple.get('identified_multiple_adjustment_value_subtotal_cny') or 'UNKNOWN'} CNY；"
+                f"状态 {multiple.get('status', 'UNKNOWN')}；覆盖 {multiple.get('reference_coverage') or 'UNKNOWN'}。"
+            )
+            for segment in (b67_row.get("segments") or [])[:20]:
+                if not isinstance(segment, Mapping):
+                    continue
+                profit_grade = segment.get("profit_evidence") if isinstance(segment.get("profit_evidence"), Mapping) else {}
+                multiple_grade = segment.get("multiple_evidence") if isinstance(segment.get("multiple_evidence"), Mapping) else {}
+                bridge = segment.get("multiple_reference_bridge") if isinstance(segment.get("multiple_reference_bridge"), Mapping) else {}
+                lines.append(
+                    f"  - {segment.get('segment_id')} / {segment.get('segment_name')}："
+                    f"正常化归母利润 {segment.get('normalized_parent_attributable_profit_cny') or 'UNKNOWN'} CNY × "
+                    f"选定 P/E {segment.get('selected_terminal_pe_x') or 'UNKNOWN'}x = "
+                    f"{segment.get('selected_segment_equity_value_cny') or 'UNKNOWN'} CNY；"
+                    f"盈利等级 {profit_grade.get('grade', 'G5_UNKNOWN')}；倍数等级 {multiple_grade.get('grade', 'G5_UNKNOWN')}。"
+                )
+                lines.append(
+                    f"    - 参考锚 {bridge.get('reference_method') or 'UNKNOWN'}；"
+                    f"参考 P/E {bridge.get('reference_multiple_x') or 'UNKNOWN'}x；"
+                    f"显式调整 {bridge.get('explicit_adjustment_sum_x') or 'UNKNOWN'}x；"
+                    f"调整价值 {bridge.get('multiple_adjustment_value_cny') or 'UNKNOWN'} CNY；"
+                    f"{bridge.get('status', 'UNKNOWN')}。"
+                )
+                lines.append(
+                    f"    - B4 盈利变化价值贡献：{segment.get('b4_forecast_value_effect_at_selected_pe_cny') or 'UNKNOWN'} CNY。"
+                )
+            lines.append(
+                f"- 母公司调整净负担：{parent.get('net_parent_adjustment_load_cny') or 'UNKNOWN'} CNY；"
+                f"中心成本 {parent.get('capitalized_central_cost_load_cny') or 'UNKNOWN'}；"
+                f"净现金/净负债抵减 {parent.get('net_cash_debt_offset_cny') or 'UNKNOWN'}；"
+                f"其他调整 {parent.get('other_adjustments_offset_cny') or 'UNKNOWN'}。"
+            )
+            lines.append(
+                f"- 稀释股数 {dilution.get('selected_diluted_shares') or 'UNKNOWN'}；"
+                f"Required Equity {dilution.get('required_total_equity_value_cny') or 'UNKNOWN'} CNY；"
+                f"要求每股终值 {dilution.get('required_terminal_value_per_share_cny') or 'UNKNOWN'} CNY；"
+                f"B4 条件每股价值 {dilution.get('b4_forecast_implied_value_per_share_cny') or 'UNKNOWN'} CNY。"
+            )
+            lines.append(
+                f"- 现价隐含 Required Return：B4 价值池 {requirement.get('b4_forecast_segment_pool_at_selected_pes_cny') or 'UNKNOWN'} CNY；"
+                f"要求价值池 {requirement.get('required_segment_pool_for_return_hurdle_cny') or 'UNKNOWN'} CNY；"
+                f"剩余缺口 {requirement.get('remaining_value_pool_requirement_after_b4_earnings_cny') or 'UNKNOWN'} CNY；"
+                f"共同 P/E 缩放 {requirement.get('required_common_pe_scale_factor') or 'UNKNOWN'}。"
+            )
+            if b67_row.get("issues"):
+                lines.append("- 核查事项：" + "；".join(str(x) for x in b67_row["issues"][:12]))
+        lines.append(
+            "- B67 边界：这是不含分红的条件 Required Return 反推，不是外部 MIE/市场共识；"
+            "B4 与共同倍数缩放均为条件模型，不是预测保证；不修改估值、目标价或 Decision。"
+        )
+
+    local_b68 = local_sotp_inversion.get("operating_requirement_reverse_engineering") if isinstance(local_sotp_inversion.get("operating_requirement_reverse_engineering"), Mapping) else {}
+    if local_b68:
+        lines.extend([
+            "",
+            "### B68 — 现价隐含经营要求反向工程",
+            f"- 总体状态：{local_b68.get('status', 'UNKNOWN')}；{local_b68.get('summary') or 'UNKNOWN'}",
+            "- 说明：B61 与 B63 是两个不同的非加总门槛；每条产品销量、净售价、单位变动成本是互相替代的单变量敏感性，不是同时要实现的经营目标。",
+        ])
+        b68_scenarios = local_b68.get("scenarios") if isinstance(local_b68.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b68_row = b68_scenarios.get(scenario_name) if isinstance(b68_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B68 {scenario_name.upper()} — {b68_row.get('status', 'UNKNOWN')}**")
+            for segment in (b68_row.get("segments") or [])[:20]:
+                if not isinstance(segment, Mapping):
+                    continue
+                lines.append(
+                    f"- {segment.get('segment_id')} / {segment.get('segment_name')}："
+                    f"B4 当前归母正常化利润 {str(segment.get('b4_forecast_normalized_parent_attributable_profit_cny')) if segment.get('b4_forecast_normalized_parent_attributable_profit_cny') is not None else 'UNKNOWN'} CNY；"
+                    f"选定 P/E {str(segment.get('selected_sotp_pe_x')) if segment.get('selected_sotp_pe_x') is not None else 'UNKNOWN'}x；"
+                    f"当前分部贡献 {str(segment.get('b4_forecast_contribution_after_variable_cost_cny')) if segment.get('b4_forecast_contribution_after_variable_cost_cny') is not None else 'UNKNOWN'} CNY。"
+                )
+                for lens_key, lens_label in (
+                    ("b61_required_profit_lens", "B61：其他分部维持当前选定 SOTP 利润"),
+                    ("b63_full_b4_vector_lens", "B63：其他分部维持完整 B4 前瞻利润"),
+                ):
+                    lens = segment.get(lens_key) if isinstance(segment.get(lens_key), Mapping) else {}
+                    reverse = lens.get("reverse_engineering") if isinstance(lens.get("reverse_engineering"), Mapping) else {}
+                    inversion = reverse.get("contribution_inversion") if isinstance(reverse.get("contribution_inversion"), Mapping) else {}
+                    lines.append(
+                        f"  - {lens_label}：要求归母利润 {str(lens.get('required_parent_attributable_profit_cny')) if lens.get('required_parent_attributable_profit_cny') is not None else 'UNKNOWN'} CNY；"
+                        f"利润差 {str(reverse.get('profit_gap_cny')) if reverse.get('profit_gap_cny') is not None else 'UNKNOWN'} CNY；"
+                        f"要求分部贡献 {str(inversion.get('required_contribution_after_variable_cost_cny')) if inversion.get('required_contribution_after_variable_cost_cny') is not None else 'UNKNOWN'} CNY；"
+                        f"贡献缺口 {str(inversion.get('contribution_gap_cny')) if inversion.get('contribution_gap_cny') is not None else 'UNKNOWN'} CNY；状态 {reverse.get('status', 'UNKNOWN')}。"
+                    )
+                    for product in (reverse.get("product_driver_alternatives") or [])[:10]:
+                        if not isinstance(product, Mapping):
+                            continue
+                        alternatives = product.get("single_driver_alternatives") if isinstance(product.get("single_driver_alternatives"), Mapping) else {}
+                        volume = alternatives.get("sales_volume_only") if isinstance(alternatives.get("sales_volume_only"), Mapping) else {}
+                        asp = alternatives.get("net_asp_only") if isinstance(alternatives.get("net_asp_only"), Mapping) else {}
+                        unit_cost = alternatives.get("unit_variable_cost_only") if isinstance(alternatives.get("unit_variable_cost_only"), Mapping) else {}
+                        lines.append(
+                            f"    - {product.get('product_name') or product.get('product_id')}："
+                            f"销量单变量 {str(volume.get('required_sales_volume_tonnes')) if volume.get('required_sales_volume_tonnes') is not None else 'UNKNOWN'} 吨 "
+                            f"({str(volume.get('change_pct')) if volume.get('change_pct') is not None else 'UNKNOWN'}%)；"
+                            f"净售价单变量 {str(asp.get('required_net_asp_cny_per_tonne')) if asp.get('required_net_asp_cny_per_tonne') is not None else 'UNKNOWN'} CNY/吨 "
+                            f"({str(asp.get('change_pct')) if asp.get('change_pct') is not None else 'UNKNOWN'}%)；"
+                            f"单位成本单变量 {str(unit_cost.get('required_variable_cost_cny_per_tonne')) if unit_cost.get('required_variable_cost_cny_per_tonne') is not None else 'UNKNOWN'} CNY/吨 "
+                            f"({str(unit_cost.get('change_pct')) if unit_cost.get('change_pct') is not None else 'UNKNOWN'}%)。"
+                        )
+                        if product.get("production_inventory_context"):
+                            context = product["production_inventory_context"]
+                            capacity = context.get("nameplate_capacity_tonnes_per_year")
+                            lines.append(
+                                f"      - 生产/库存上下文：前瞻产量 {str(context.get('forward_production_tonnes')) if context.get('forward_production_tonnes') is not None else 'UNKNOWN'} 吨；"
+                                f"名义产能 {str(capacity) if capacity is not None else 'UNKNOWN'} 吨/年；"
+                                f"产销差额 {str(context.get('forward_inventory_change_tonnes')) if context.get('forward_inventory_change_tonnes') is not None else 'UNKNOWN'} 吨；"
+                                "销售量反推不自动等于生产可行，需单独核对产能与库存。"
+                            )
+                if segment.get("issues"):
+                    lines.append("  - 核查事项：" + "；".join(str(x) for x in segment["issues"][:8]))
+            if b68_row.get("issues"):
+                lines.append("- 情景级阻断/待补：" + "；".join(str(x) for x in b68_row["issues"][:10]))
+        lines.append(
+            "- B68 边界：销量、售价、单位成本三种结果是不同替代方案，不可相加；"
+            "不考虑需求弹性、产品替代、规模效应、生产产能和库存释放的完整可行性；"
+            "不反向修改 B4、SOTP、15% 年化要求、目标价或 Decision。"
+        )
+
+    local_b69 = local_sotp_inversion.get("operating_feasibility_audit") if isinstance(local_sotp_inversion.get("operating_feasibility_audit"), Mapping) else {}
+    if local_b69:
+        lines.extend([
+            "",
+            "### B69 — 现价隐含经营要求可实现性审计",
+            f"- 总体状态：{local_b69.get('status', 'UNKNOWN')}；{local_b69.get('summary') or 'UNKNOWN'}",
+            "- 产能口径：按 B68 所需销量 + B4 前瞻产销库存差额计算条件所需产量；只有完整年度和正数名义产能才比较，产能内也不等于需求/爬坡/有效产能已验证。",
+        ])
+        b69_scenarios = local_b69.get("scenarios") if isinstance(local_b69.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b69_row = b69_scenarios.get(scenario_name) if isinstance(b69_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B69 {scenario_name.upper()} — {b69_row.get('status', 'UNKNOWN')}**")
+            plan = b69_row.get("b4_existing_financial_plan") if isinstance(b69_row.get("b4_existing_financial_plan"), Mapping) else {}
+            lines.append(
+                f"- B4 既有经营/资金桥：产能状态 {plan.get('capacity_feasibility_status', 'UNKNOWN')}；"
+                f"库存/WC 对账 {plan.get('inventory_reconciliation_status', 'UNKNOWN')}；"
+                f"有效营运资金 {plan.get('effective_change_working_capital_cny') if plan.get('effective_change_working_capital_cny') is not None else 'UNKNOWN'} CNY；"
+                f"现金资本开支 {plan.get('cash_capex_cny') if plan.get('cash_capex_cny') is not None else 'UNKNOWN'} CNY；"
+                f"FCF 代理 {plan.get('unlevered_fcf_proxy_cny') if plan.get('unlevered_fcf_proxy_cny') is not None else 'UNKNOWN'} CNY。"
+            )
+            for lens in (b69_row.get("requirement_lenses") or [])[:20]:
+                if not isinstance(lens, Mapping):
+                    continue
+                lines.append(
+                    f"- {lens.get('segment_id')} / {lens.get('lens')}（非加总）："
+                    f"要求归母利润 {lens.get('required_parent_attributable_profit_cny') if lens.get('required_parent_attributable_profit_cny') is not None else 'UNKNOWN'} CNY；"
+                    f"B68 反解状态 {lens.get('reverse_engineering_status', 'UNKNOWN')}。"
+                )
+                for product in (lens.get("products") or [])[:10]:
+                    if not isinstance(product, Mapping):
+                        continue
+                    lines.append(
+                        f"  - {product.get('product_name') or product.get('product_id')}："
+                        f"要求销量 {product.get('required_sales_volume_tonnes') if product.get('required_sales_volume_tonnes') is not None else 'UNKNOWN'} 吨；"
+                        f"在 B4 库存差额不变下要求产量 {product.get('required_production_tonnes_under_unchanged_inventory_movement') if product.get('required_production_tonnes_under_unchanged_inventory_movement') is not None else 'UNKNOWN'} 吨；"
+                        f"名义产能 {product.get('nameplate_capacity_tonnes_per_year') if product.get('nameplate_capacity_tonnes_per_year') is not None else 'UNKNOWN'} 吨/年；"
+                        f"所需产能利用率 {product.get('required_capacity_utilization') if product.get('required_capacity_utilization') is not None else 'UNKNOWN'}；"
+                        f"状态 {product.get('capacity_status', 'UNKNOWN')}。"
+                    )
+                    lines.append(
+                        f"    - 需求：{product.get('demand_feasibility_status', 'UNKNOWN')}；"
+                        f"价格：{product.get('pricing_feasibility_status', 'UNKNOWN')}；"
+                        f"单位成本：{product.get('unit_cost_feasibility_status', 'UNKNOWN')}；"
+                        f"增量扩产资金：{product.get('incremental_capex_and_working_capital_status', 'UNKNOWN')}。"
+                    )
+                    if product.get("issues"):
+                        lines.append("    - 阻断： " + "；".join(str(x) for x in product["issues"][:6]))
+        lines.append(
+            "- B69 边界：名义产能内仅表示在“B4 产销库存差额不变”的假设下算术上未超产；没有订单/需求、价格弹性、成本曲线、扩建投产和项目级增量资金证据时，经营可实现性仍未通过。"
+            "B69 不修改 B4 FCF、库存现金代理、估值、MIE、15% 年化门槛、目标入场价或 Decision。"
+        )
+
+    local_b70 = local_sotp_inversion.get("operating_feasibility_evidence_assessment") if isinstance(local_sotp_inversion.get("operating_feasibility_evidence_assessment"), Mapping) else {}
+    if local_b70:
+        lines.extend([
+            "",
+            "### B70 — 经营可行性证据绑定与门槛核对",
+            f"- 总体状态：{local_b70.get('status', 'UNKNOWN')}；整体经营可实现性：{local_b70.get('overall_operational_feasibility_status', 'UNKNOWN')}",
+            f"- 证据记录：{local_b70.get('input_record_count', 0)} 条；可进入条件数值比较的记录：{local_b70.get('eligible_linked_record_count', 0)} 条；来源内容语义已核实：{local_b70.get('source_content_semantically_verified', False)}；正式 Evidence/PIT 准入：{local_b70.get('formal_evidence_pit_admission_created', False)}。",
+        ])
+        b70_scenarios = local_b70.get("scenarios") if isinstance(local_b70.get("scenarios"), Mapping) else {}
+        for scenario_name in ("bear", "base", "bull"):
+            b70_row = b70_scenarios.get(scenario_name) if isinstance(b70_scenarios.get(scenario_name), Mapping) else {}
+            lines.append(f"**B70 {scenario_name.upper()} — {b70_row.get('status', 'UNKNOWN')}**")
+            for lens in (b70_row.get("requirement_lenses") or []):
+                if not isinstance(lens, Mapping):
+                    continue
+                lines.append(f"- {lens.get('lens')}（非加总）")
+                for product in (lens.get("products") or []):
+                    if not isinstance(product, Mapping):
+                        continue
+                    comparisons = product.get("comparisons") if isinstance(product.get("comparisons"), list) else []
+                    comparison_text = "；".join(
+                        f"{row.get('claim_type')}={row.get('status')}"
+                        for row in comparisons if isinstance(row, Mapping)
+                    )
+                    date_comparison = product.get("capacity_available_date_comparison") if isinstance(product.get("capacity_available_date_comparison"), Mapping) else {}
+                    funding = product.get("incremental_funding_comparisons") if isinstance(product.get("incremental_funding_comparisons"), list) else []
+                    funding_text = "；".join(
+                        f"{row.get('funding_type')}={row.get('status')}"
+                        for row in funding if isinstance(row, Mapping)
+                    )
+                    lines.append(
+                        f"  - {product.get('product_id')}：{comparison_text}；"
+                        f"扩产可用日期={date_comparison.get('status', 'UNKNOWN')}；"
+                        f"增量资金={funding_text or 'UNKNOWN'}。"
+                    )
+        for record in (local_b70.get("records") or [])[:40]:
+            if not isinstance(record, Mapping):
+                continue
+            lines.append(
+                f"- 证据记录 {record.get('record_id') or 'UNKNOWN'}：{record.get('claim_type')} / "
+                f"{record.get('product_id')} / {record.get('scenario')} / {record.get('forecast_period')}；"
+                f"数值 {record.get('value') if record.get('value') is not None else 'UNKNOWN'} {record.get('unit') or ''}；"
+                f"状态 {record.get('status', 'UNKNOWN')}；引用 {','.join(record.get('evidence_refs') or []) or 'NONE'}。"
+            )
+            if record.get("issues"):
+                lines.append("  - 证据问题：" + "；".join(str(x) for x in record["issues"][:6]))
+        if local_b70.get("duplicate_claim_keys"):
+            lines.append(f"- 重复主张键（未求和）：{len(local_b70['duplicate_claim_keys'])} 组。")
+        lines.append(
+            "- B70 纪律：销量、售价和单位成本分别对照三个替代性单变量门槛，不是同时需要实现的经营预测，也不可相加；证据引用可解析且截止日兼容，只表示来源可追溯，数值覆盖不等于来源材料语义已独立核实。"
+            "分析师假设不能作为经营证据；重复订单/主张不求和；没有人工审核和完整覆盖时，整体经营可实现性仍为 NOT_IDENTIFIABLE。"
+        )
+
+    local_b71 = local_sotp_inversion.get("operating_feasibility_semantic_review") if isinstance(local_sotp_inversion.get("operating_feasibility_semantic_review"), Mapping) else {}
+    if local_b71:
+        lines.extend([
+            "",
+            "### B71 — 经营可行性证据语义审核",
+            f"- 审核状态：{local_b71.get('status', 'UNKNOWN')}；记录数 {local_b71.get('reviewed_claim_count', 0)}；条件性审核支持 {local_b71.get('conditionally_supported_claim_count', 0)}；部分/未完成/阻断 {local_b71.get('blocked_or_incomplete_claim_count', 0)}；不支持/矛盾 {local_b71.get('contradicted_claim_count', 0)}。",
+            f"- 总体经营可实现性：{local_b71.get('overall_operational_feasibility_status', 'UNKNOWN')}；审核人身份独立验证={False}；来源内容由自动程序语义验证={False}；正式 Evidence/PIT 准入={local_b71.get('formal_evidence_pit_admission_created', False)}。",
+        ])
+        for review in (local_b71.get("reviews") or [])[:60]:
+            if not isinstance(review, Mapping):
+                continue
+            lines.append(
+                f"- 审核 {review.get('review_id') or 'UNKNOWN'} / 记录 {review.get('record_id')}："
+                f"{review.get('claim_type')} / {review.get('product_id')} / {review.get('scenario')} / {review.get('forecast_period')}；"
+                f"编制人 {review.get('claim_preparer_id', 'UNKNOWN')}；审核人 {review.get('reviewer_id')} / {review.get('reviewer_role', 'UNKNOWN')}；"
+                f"关系 {review.get('reviewer_relationship_status', 'UNKNOWN')}；利益冲突 {review.get('conflict_of_interest_status', 'UNKNOWN')}；"
+                f"独立性声明满足={review.get('review_independence_conditionally_declared', False)}；"
+                f"审核时间 {review.get('reviewed_at') or 'UNKNOWN'}；结论 {review.get('decision')}；状态 {review.get('status')}。"
+            )
+            for check in (review.get("checks") or []):
+                if isinstance(check, Mapping):
+                    lines.append(
+                        f"  - {check.get('check_id')}：{check.get('status')}；"
+                        f"审核依据 {check.get('basis') or 'UNKNOWN'}；"
+                        f"来源 {','.join(check.get('evidence_refs') or []) or 'NONE'}。"
+                    )
+            if review.get("issues"):
+                lines.append("  - 阻断/缺项：" + "；".join(str(x) for x in review["issues"][:10]))
+        lines.append(
+            "- B71 纪律：只有 B70 已通过来源/PIT 初检的记录才能进入语义审核；每种主张必须完成其专属必检项，且逐条引用原始材料。"
+            "审核记录是操作者声明，不证明身份真实性或来源内容本身；系统不自动授予证据准入、预测准入或投资决策权限。"
+        )
+
+    local_b72 = local_sotp_inversion.get("operating_feasibility_exception_register") if isinstance(local_sotp_inversion.get("operating_feasibility_exception_register"), Mapping) else {}
+    if local_b72:
+        summary_b72 = local_b72.get("summary") if isinstance(local_b72.get("summary"), Mapping) else {}
+        lines.extend([
+            "",
+            "### B72 — 经营可行性例外清单与整改闭环",
+            f"- 汇总状态：{local_b72.get('status', 'UNKNOWN')}；逐项要求记录 {summary_b72.get('requirement_row_count_including_alternative_lenses', 0)} 条（包含 B61/B63 两套非加总视角）。",
+            f"- 总体经营可实现性仍为 {local_b72.get('overall_operational_feasibility_status', 'UNKNOWN')}；正式 Evidence/PIT 准入={local_b72.get('formal_evidence_pit_admission_created', False)}；自动关闭整改项={summary_b72.get('no_exception_is_automatically_closed', True)}。",
+        ])
+        for scenario_name in ("bear", "base", "bull"):
+            scenario_b72 = local_b72.get("scenarios", {}).get(scenario_name) if isinstance(local_b72.get("scenarios"), Mapping) else {}
+            scenario_b72 = scenario_b72 if isinstance(scenario_b72, Mapping) else {}
+            for lens_b72 in (scenario_b72.get("requirement_lenses") or []):
+                if not isinstance(lens_b72, Mapping):
+                    continue
+                lens_summary = lens_b72.get("summary") if isinstance(lens_b72.get("summary"), Mapping) else {}
+                status_counts = lens_summary.get("status_counts") if isinstance(lens_summary.get("status_counts"), Mapping) else {}
+                status_text = "；".join(f"{key}={value}" for key, value in sorted(status_counts.items())) or "无结构化要求记录"
+                lines.append(
+                    f"**B72 {scenario_name.upper()} / {lens_b72.get('lens', 'UNKNOWN')}** — "
+                    f"要求 {lens_summary.get('requirement_row_count', 0)} 项；{status_text}。"
+                )
+        for row in (local_b72.get("requirement_rows") or [])[:120]:
+            if not isinstance(row, Mapping):
+                continue
+            remediation = row.get("remediation") if isinstance(row.get("remediation"), Mapping) else {}
+            lines.append(
+                f"- {row.get('scenario')} / {row.get('lens')} / {row.get('product_id')} / {row.get('requirement_type')}："
+                f"{row.get('exception_status')}；门槛={row.get('required_value') if row.get('required_value') is not None else 'UNKNOWN'} "
+                f"{row.get('unit') or ''}；证据值={row.get('evidence_value') if row.get('evidence_value') is not None else 'UNKNOWN'}；"
+                f"B70={row.get('evidence_linkage_status')}；B71={row.get('semantic_review_status')}。"
+            )
+            lines.append(
+                f"  - 整改 {remediation.get('status', 'UNKNOWN')} / {remediation.get('owner_role', 'UNKNOWN')}："
+                f"{remediation.get('next_action') or 'UNKNOWN'}；关闭凭证："
+                f"{'；'.join(str(item) for item in (remediation.get('closure_evidence_required') or [])) or 'UNKNOWN'}。"
+            )
+        lines.append(
+            "- B72 纪律：数值覆盖与人工语义审核分轴呈现；缺失/未覆盖是 UNKNOWN，不是反证；名义产能算术通过不等于经营可执行。"
+            "B61 与 B63 仍是替代门槛，不相加、不平均、不赋概率；所有整改项保持 OPEN，需操作者提交材料后重新复核。"
+        )
+
+    local_b73 = local_sotp_inversion.get("operating_feasibility_remediation_assessment") if isinstance(local_sotp_inversion.get("operating_feasibility_remediation_assessment"), Mapping) else {}
+    if local_b73:
+        summary_b73 = local_b73.get("summary") if isinstance(local_b73.get("summary"), Mapping) else {}
+        lines.extend([
+            "",
+            "### B73 — 证据驱动整改复核",
+            f"- 复核状态：{local_b73.get('status', 'UNKNOWN')}；提交 {summary_b73.get('submission_count', 0)} 项；复核通过但待正式 Evidence/PIT 准入 {summary_b73.get('reassessment_passed_pending_formal_admission_count', 0)} 项；失败 {summary_b73.get('reassessment_failed_count', 0)} 项；阻断 {summary_b73.get('reassessment_blocked_count', 0)} 项。",
+            f"- 正式 Evidence/PIT 准入={local_b73.get('formal_evidence_pit_admission_created', False)}；人工关闭权限={local_b73.get('manual_close_allowed', False)}；CLOSED_VERIFIED 数量={summary_b73.get('closed_verified_count', 0)}。",
+        ])
+        for row in (local_b73.get("submissions") or [])[:120]:
+            if not isinstance(row, Mapping):
+                continue
+            lines.append(
+                f"- {row.get('requirement_id') or 'UNKNOWN'} / {row.get('action_id') or 'UNKNOWN'}："
+                f"{row.get('status', 'UNKNOWN')}；当前 B72={row.get('current_b72_exception_status', 'UNKNOWN')}；"
+                f"B70 记录={len(row.get('current_b70_record_ids') or [])}；B71 审核={len(row.get('current_b71_review_ids') or [])}。"
+            )
+            if row.get("issues"):
+                lines.append("  - 阻断/缺项：" + "；".join(str(item) for item in row["issues"][:12]))
+        lines.append(
+            "- B73 纪律：只按本轮重新计算的 B69/B70/B71/B72 结果复核；历史记录 ID 是操作者声明，不能冒充已认证的历史事实。"
+            "条件性支持只代表复核通过、仍待正式 Evidence/PIT 准入；本模块绝不发出 CLOSED_VERIFIED，也不改变预测、估值或投资决策。"
+        )
+
+    lines.extend([
+        f"- 预期差：{gap.get('status', 'UNKNOWN')} / {gap.get('direction', 'UNKNOWN')} — {gap.get('summary') or 'UNKNOWN'}",
+        f"- 预期差比较口径：{gap.get('comparison_basis') or 'UNKNOWN'}",
+    ])
+    comparisons = gap.get("comparisons") if isinstance(gap.get("comparisons"), list) else []
+    gap_basis_text = str(gap.get("comparison_basis") or "").upper()
+    hide_price_implied_comparisons = (
+        "PRICE_IMPLIED" in gap_basis_text
+        and not (inversion and reference_price_status == "MATCH" and inversion_contract_complete)
+    )
+    if comparisons and hide_price_implied_comparisons:
+        lines.append(
+            "- 条件预期差数值比较未展示：其依赖的现价反推没有通过参考价和基本字段完整性检查；"
+            "先修复反推输入，不将其用于当前价格判断。"
+        )
+    else:
+        for row in comparisons[:6]:
+            if isinstance(row, Mapping):
+                lines.append(
+                    f"  - {row.get('metric') or row.get('driver') or 'UNKNOWN'}："
+                    f"市场/价格隐含 {row.get('market_implied_value') or row.get('price_implied_value') or 'UNKNOWN'}；"
+                    f"独立推演 {row.get('independent_forecast_value') or 'UNKNOWN'}；"
+                    f"差异 {row.get('difference') or row.get('direction') or 'UNKNOWN'} "
+                    f"{row.get('unit') or ''}；期间 {row.get('period') or 'UNKNOWN'}；"
+                    f"限制 {row.get('limitations') or 'UNKNOWN'}"
+                )
+
+    lines.extend([
+        "",
+        "### 3. 基于当前事实的未来合理推演",
+        f"- 独立经营预测：范围 {operating.get('scope', 'UNKNOWN')}；期间 {operating.get('forecast_period', 'UNKNOWN')}；状态 {operating.get('status', 'UNKNOWN')}",
+        f"- 所选估值模型与终值日期：{valuation.get('model') or 'UNKNOWN'} / {valuation.get('valuation_terminal_date') or 'UNKNOWN'}",
+    ])
+    reconciliation = operating.get("valuation_reconciliation")
+    reconciliation = reconciliation if isinstance(reconciliation, Mapping) else {}
+    reconciliation_status = str(reconciliation.get("status") or "UNKNOWN").strip().upper()
+    lines.append(f"- B4 与主估值经营财务桥对账：{reconciliation_status}")
+    if reconciliation_status == "NOT_COMPARABLE_SCOPE":
+        lines.append(
+            f"  - 口径说明：{reconciliation.get('reason') or 'B4 与主估值经营桥的范围不可直接比较。'}"
+        )
+    if reconciliation_status in {"MISMATCH", "PARTIAL"}:
+        reconciliation_scenarios = (
+            reconciliation.get("scenarios")
+            if isinstance(reconciliation.get("scenarios"), Mapping) else {}
+        )
+        rendered_checks = 0
+        for scenario_name in ("bear", "base", "bull"):
+            scenario_reconciliation = reconciliation_scenarios.get(scenario_name)
+            if not isinstance(scenario_reconciliation, Mapping):
+                continue
+            checks = scenario_reconciliation.get("checks")
+            if not isinstance(checks, list):
+                continue
+            for check in checks:
+                if not isinstance(check, Mapping):
+                    continue
+                check_status = str(check.get("status") or "UNKNOWN").upper()
+                if (reconciliation_status == "MISMATCH" and check_status != "MISMATCH"):
+                    continue
+                if (reconciliation_status == "PARTIAL" and check_status != "NOT_COMPARABLE"):
+                    continue
+                left = check.get("driver_value")
+                right = check.get("valuation_value")
+                left_text = "UNKNOWN" if left in (None, "") else str(left)
+                right_text = "UNKNOWN" if right in (None, "") else str(right)
+                lines.append(
+                    f"  - {scenario_name.upper()} {check.get('driver_field') or 'UNKNOWN'} ↔ "
+                    f"{check.get('valuation_field') or 'UNKNOWN'}：{check_status}；"
+                    f"B4={left_text}；主估值桥={right_text}"
+                )
+                rendered_checks += 1
+                if rendered_checks >= 6:
+                    break
+            if rendered_checks >= 6:
+                break
+        if reconciliation_status == "MISMATCH":
+            selected_model = str(
+                model_consistency.get("operator_selected_model_family")
+                or valuation.get("model_family") or "UNKNOWN"
+            ).strip().upper()
+            if selected_model == "EPS_MULTIPLE" and str(operating.get("scope") or "").upper() == "COMPANY_WIDE":
+                lines.append(
+                    "- 门禁影响：公司整体范围下的 B4 与主估值经营桥存在已识别数值矛盾；"
+                    "EPS_MULTIPLE 主模型资格应被阻断，年化回报与目标买入价保持 UNKNOWN。"
+                )
+            else:
+                lines.append(
+                    "- 模型适用边界：发现经营桥数值矛盾；B53 的自动阻断仅适用于被选为主模型的 EPS_MULTIPLE "
+                    "且 B4 范围为 COMPANY_WIDE。此处不代表其他模型已通过其独立门禁。"
+                )
+        else:
+            lines.append(
+                "- 口径边界：部分字段无法直接对账；这不是已识别的数值矛盾，也不能被表述为完全一致。"
+            )
+    for name in ("bear", "base", "bull"):
+        op = operating_scenarios.get(name) if isinstance(operating_scenarios.get(name), Mapping) else {}
+        val = valuation_scenarios.get(name) if isinstance(valuation_scenarios.get(name), Mapping) else {}
+        lines.append(
+            f"- {name.upper()}：经营净利润 {op.get('net_profit_cny') or 'UNKNOWN'} CNY；"
+            f"FCF 代理 {op.get('unlevered_fcf_proxy_cny') or 'UNKNOWN'} CNY；"
+            f"每股终值 {val.get('terminal_value_per_share') or 'UNKNOWN'} {currency}；"
+            f"情景依据 {val.get('rationale') or op.get('scenario_basis') or 'UNKNOWN'}；"
+            f"经营可用性 {op.get('calculation_status') or 'UNKNOWN'}"
+        )
+    lines.extend([
+        f"- 当前年化回报计算：{returns.get('expected_annualized_return') if returns and returns.get('expected_annualized_return') is not None else 'UNKNOWN'}；"
+        f"15% 门槛通过：{returns.get('fundamental_target_pass') if returns else 'UNKNOWN'}；"
+        f"共同约束目标入场价：{returns.get('target_entry_price') if returns else 'UNKNOWN'} {currency}",
+        "- 解释纪律：Bear/Base/Bull 是在已知事实与显式假设上的条件推演，不是事实；由当前价格倒推出的结果不等于它必然发生；未闭合的驱动、期间或估值假设必须保留 UNKNOWN。",
+        "",
+    ])
+    return lines
+
+
 def _render_report(analysis: Mapping[str, Any]) -> str:
     c, p = analysis["case"], analysis["price_input"]
     a, f, calc, d = analysis["assessment"], analysis["forecast_valuation"], analysis["return_metrics"], analysis["decision"]
@@ -3669,13 +7083,14 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         f"- 当前持仓：{c['current_position_pct']}%",
         "",
         "> 这是个人使用的本地试运行报告，不是正式 canonical Decision。人工价格/AI 分析/来源摘要未完成正式证据准入；建议只供人工审阅，不会自动下单。",
-        "",
+        *_render_core_investment_synthesis(analysis),
         "## 一、建议与回报筛选",
         "",
         f"- 试运行建议：**{d['provisional_action']}**",
         f"- 理由：{d['reason']}",
         f"- 价格层独立筛选：{d.get('price_screen_action', 'UNKNOWN')}；状态：{d['price_screen_status']}",
         f"- 核心决策策略预演：{d.get('core_policy_evaluation', {}).get('action', 'NOT_RUN')} → 有效试运行建议 {d.get('core_policy_evaluation', {}).get('effective_pilot_action', d['provisional_action'])} / {d.get('core_policy_evaluation', {}).get('primary_reason', 'UNKNOWN')}",
+        *_render_decision_chain_trace(d.get("decision_chain_trace")),
         "- 注意：策略预演使用非正式研究输入；本次未创建正式 Decision。组合约束和仓位包状态见下一节；正式 Thesis Admission 与人工审批仍未完成。",
         f"- 预期年化回报：{calc['expected_annualized_return'] if calc else 'UNKNOWN'}",
         f"- 15% 年化门槛：{calc['fundamental_target_pass'] if calc else 'UNKNOWN'}",
@@ -3862,6 +7277,7 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
         c["currency"],
         valuation_transmission=analysis.get("valuation_transmission") or {},
     ))
+    lines.extend(render_cycle_earnings_monitor_section(analysis.get("cycle_earnings_monitor") or {}))
     assumption_links = b4_report_source.get("cross_node_assumption_links")
     if isinstance(assumption_links, list) and assumption_links:
         lines.extend(["", "#### B4 与估值假设的交叉引用", ""])
@@ -4122,6 +7538,102 @@ def _render_report(analysis: Mapping[str, Any]) -> str:
 def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], str]:
     prepared = _prepare_input(payload)
     metrics, reason = _return_metrics(prepared)
+    assessment = prepared.get("assessment") if isinstance(prepared.get("assessment"), dict) else {}
+    mie = assessment.get("market_implied_expectation") if isinstance(assessment.get("market_implied_expectation"), dict) else {}
+    local_inversion = _build_b60_local_eps_multiple_price_inversion(
+        price_input=prepared.get("price_input") or {},
+        valuation_timing=prepared.get("valuation_timing") or {},
+        decision_parameters=prepared.get("decision_parameters") or {},
+        operator_valuation_context=prepared.get("operator_valuation_context") or {},
+        eps_multiple_valuation=prepared.get("eps_multiple_valuation") or {},
+        forecast_valuation=prepared.get("forecast_valuation") or {},
+        operating_driver_forecast=prepared.get("operating_driver_forecast") or {},
+        validated_cash_distribution_events=prepared.get("_validated_cash_distribution_events"),
+        external_mie_status=mie.get("status"),
+    )
+    source_inversion = mie.get("price_implied_analysis")
+    source_inversion = dict(source_inversion) if isinstance(source_inversion, Mapping) else {"status": "NOT_PROVIDED"}
+    source_inversion["local_eps_multiple_recalculation"] = local_inversion
+    local_sotp_inversion = _build_b61_sotp_price_inversion(
+        price_input=prepared.get("price_input") or {},
+        valuation_timing=prepared.get("valuation_timing") or {},
+        decision_parameters=prepared.get("decision_parameters") or {},
+        operator_valuation_context=prepared.get("operator_valuation_context") or {},
+        sotp_valuation=prepared.get("sotp_valuation") or {},
+        forecast_valuation=prepared.get("forecast_valuation") or {},
+        validated_cash_distribution_events=prepared.get("_validated_cash_distribution_events"),
+        external_mie_status=mie.get("status"),
+    )
+    local_sotp_inversion["segment_earnings_reconciliation"] = _build_b62_sotp_segment_earnings_reconciliation(
+        local_sotp_inversion=local_sotp_inversion,
+        sotp_valuation=prepared.get("sotp_valuation") or {},
+        operating_driver_forecast=prepared.get("operating_driver_forecast") or {},
+    )
+    local_sotp_inversion["valuation_gap_attribution"] = build_sotp_valuation_gap_attribution(
+        local_sotp_inversion=local_sotp_inversion,
+        sotp_valuation=prepared.get("sotp_valuation") or {},
+        segment_earnings_reconciliation=local_sotp_inversion.get("segment_earnings_reconciliation") or {},
+    )
+    local_sotp_inversion["evidence_grade_assessment"] = build_sotp_evidence_grade_assessment(
+        sotp_valuation=prepared.get("sotp_valuation") or {},
+        evidence_register=prepared.get("evidence_register") or [],
+        valuation_gap_attribution=local_sotp_inversion.get("valuation_gap_attribution") or {},
+    )
+    case_context = prepared.get("case") if isinstance(prepared.get("case"), Mapping) else {}
+    local_sotp_inversion["comparable_company_audit"] = build_sotp_comparability_audit(
+        evidence_grade_assessment=local_sotp_inversion.get("evidence_grade_assessment") or {},
+        evidence_register=prepared.get("evidence_register") or [],
+        valuation_as_of_date=case_context.get("as_of_date"),
+    )
+    local_sotp_inversion["multiple_calibration_assessment"] = build_sotp_multiple_calibration_assessment(
+        sotp_valuation=prepared.get("sotp_valuation") or {},
+        evidence_register=prepared.get("evidence_register") or [],
+        valuation_gap_attribution=local_sotp_inversion.get("valuation_gap_attribution") or {},
+        comparable_company_audit=local_sotp_inversion.get("comparable_company_audit") or {},
+    )
+    local_sotp_inversion["value_credibility_price_audit"] = build_sotp_value_credibility_price_audit(
+        sotp_valuation=prepared.get("sotp_valuation") or {},
+        valuation_gap_attribution=local_sotp_inversion.get("valuation_gap_attribution") or {},
+        evidence_grade_assessment=local_sotp_inversion.get("evidence_grade_assessment") or {},
+        multiple_calibration_assessment=local_sotp_inversion.get("multiple_calibration_assessment") or {},
+    )
+    local_sotp_inversion["operating_requirement_reverse_engineering"] = build_sotp_operating_requirement_reverse_engineering(
+        operating_driver_forecast=prepared.get("operating_driver_forecast") or {},
+        segment_earnings_reconciliation=local_sotp_inversion.get("segment_earnings_reconciliation") or {},
+        valuation_gap_attribution=local_sotp_inversion.get("valuation_gap_attribution") or {},
+    )
+    local_sotp_inversion["operating_feasibility_audit"] = build_sotp_operating_feasibility_audit(
+        operating_driver_forecast=prepared.get("operating_driver_forecast") or {},
+        operating_requirement_reverse_engineering=local_sotp_inversion.get("operating_requirement_reverse_engineering") or {},
+    )
+    local_sotp_inversion["operating_feasibility_evidence_assessment"] = build_operating_feasibility_evidence_assessment(
+        raw_evidence=prepared.get("operating_feasibility_evidence"),
+        b69_audit=local_sotp_inversion.get("operating_feasibility_audit") or {},
+        evidence_register=prepared.get("evidence_register") or [],
+        unresolved_evidence_refs=prepared.get("unresolved_evidence_references") or [],
+        after_cutoff_evidence_refs=prepared.get("after_cutoff_evidence_references") or [],
+        uncertain_timing_evidence_refs=prepared.get("uncertain_timing_evidence_references") or [],
+    )
+    local_sotp_inversion["operating_feasibility_semantic_review"] = build_operating_feasibility_semantic_review(
+        raw_reviews=prepared.get("operating_feasibility_semantic_reviews"),
+        b70_assessment=local_sotp_inversion.get("operating_feasibility_evidence_assessment") or {},
+    )
+    local_sotp_inversion["operating_feasibility_exception_register"] = build_operating_feasibility_exception_register(
+        b69_audit=local_sotp_inversion.get("operating_feasibility_audit") or {},
+        b70_assessment=local_sotp_inversion.get("operating_feasibility_evidence_assessment") or {},
+        b71_review=local_sotp_inversion.get("operating_feasibility_semantic_review") or {},
+    )
+    local_sotp_inversion["operating_feasibility_remediation_assessment"] = build_operating_feasibility_remediation_assessment(
+        raw_submissions=prepared.get("operating_feasibility_remediation_submissions"),
+        b69_audit=local_sotp_inversion.get("operating_feasibility_audit") or {},
+        b70_assessment=local_sotp_inversion.get("operating_feasibility_evidence_assessment") or {},
+        b71_review=local_sotp_inversion.get("operating_feasibility_semantic_review") or {},
+        b72_register=local_sotp_inversion.get("operating_feasibility_exception_register") or {},
+    )
+    source_inversion["local_sotp_recalculation"] = local_sotp_inversion
+    mie["price_implied_analysis"] = source_inversion
+    assessment["market_implied_expectation"] = mie
+    prepared["assessment"] = assessment
     # Persist conditional entitlement metadata to the published scenario JSON
     # only after the return solver validated all dates, tax arithmetic, sources,
     # and hypothetical eligibility. Failed/unknown calculations never promote
@@ -4140,6 +7652,21 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
                         dict(event) for event in normalized_events if isinstance(event, Mapping)
                     ]
     stress_review = _thesis_break_stress_review(prepared)
+    # B76 compares the already-computed B4 forecast against B61/B63/B68
+    # conditional price requirements. It is read-only and never upgrades MIE.
+    local_sotp_inversion["expectation_gap_comparison"] = build_expectation_gap_comparison(
+        local_sotp_recalculation=local_sotp_inversion,
+        return_metrics=metrics,
+        price_input=prepared.get("price_input") or {},
+        forecast_valuation=prepared.get("forecast_valuation") or {},
+        thesis_break_stress_review=stress_review,
+        external_mie_status=str(mie.get("status") or "UNKNOWN"),
+        local_eps_multiple_recalculation=local_inversion,
+    )
+    source_inversion["local_sotp_recalculation"] = local_sotp_inversion
+    mie["price_implied_analysis"] = source_inversion
+    assessment["market_implied_expectation"] = mie
+    prepared["assessment"] = assessment
     price_zone_sensitivity = _price_zone_sensitivity(prepared, metrics, reason)
     portfolio_package = build_local_pilot_portfolio_package(
         operator_context=prepared.get("operator_portfolio_context"),
@@ -4156,6 +7683,15 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         uncertain_timing_evidence_ids=prepared["uncertain_timing_evidence_references"],
     )
     decision = _decision(prepared, metrics, reason, stress_review, portfolio_package)
+    decision["decision_chain_trace"] = _build_decision_chain_trace(
+        prepared=prepared,
+        metrics=metrics,
+        return_metrics_reason=reason,
+        stress_review=stress_review,
+        portfolio_package=portfolio_package,
+        price_zone_sensitivity=price_zone_sensitivity,
+        decision=decision,
+    )
     analysis = {
         "schema_version": PILOT_ANALYSIS_SCHEMA,
         "runner_version": "IIOS-LOCAL-PILOT-0.1",
@@ -4176,6 +7712,8 @@ def _analyse(payload: Mapping[str, Any], run_id: str) -> tuple[dict[str, Any], s
         "eps_multiple_valuation": prepared["eps_multiple_valuation"],
         "eps_earnings_bridge": prepared["eps_earnings_bridge"],
         "operating_driver_forecast": prepared["operating_driver_forecast"],
+        "operating_feasibility_remediation_submissions": prepared["operating_feasibility_remediation_submissions"],
+        "cycle_earnings_monitor": prepared["cycle_earnings_monitor"],
         "valuation_transmission": prepared["valuation_transmission"],
         "sotp_valuation": prepared["sotp_valuation"],
         "operator_valuation_context": prepared["operator_valuation_context"],
@@ -4210,6 +7748,7 @@ def _write_run(
     research_response_path: str | Path | None = None,
     expected_research_response_sha256: str | None = None,
     expected_research_response_byte_size: int | None = None,
+    run_id_override: str | None = None,
 ) -> dict[str, Any]:
     try:
         input_text = input_path.read_text(encoding="utf-8")
@@ -4390,10 +7929,52 @@ def _write_run(
     payload_for_analysis.pop("_local_research_round_b_provenance", None)
     symbol = str((payload_for_analysis.get("case") or {}).get("symbol") or "candidate").replace(".", "-")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    run_id = f"local-pilot-{symbol}-{stamp}"
+    run_id = run_id_override or f"local-pilot-{symbol}-{stamp}"
+    if not run_id or run_id in {".", ".."} or Path(run_id).name != run_id or "/" in run_id or "\\" in run_id:
+        raise LocalInvestmentPilotError("PILOT_RUN_ID_INVALID")
     if response_provenance.get("status") == "CAPTURED_RAW_CHATGPT_RESPONSE":
         response_provenance["origin_pilot_id"] = run_id
         response_provenance["source_pilot_id"] = run_id
+
+    # A crash after writing the complete bundle but before the task journal
+    # records RUN_CREATED must reuse the exact same bundle, never duplicate work.
+    run_dir = output_root / run_id
+    if run_dir.is_symlink():
+        raise LocalInvestmentPilotError("PILOT_RUN_DIRECTORY_MUST_NOT_BE_SYMLINK")
+    if run_dir.exists():
+        try:
+            existing_receipt, _existing_manifest = _verify_run_bundle(run_dir)
+            existing_input = (run_dir / "input.json").read_bytes()
+            existing_raw = (
+                (run_dir / RAW_RESEARCH_RESPONSE_FILENAME).read_bytes()
+                if response_bytes is not None else None
+            )
+        except (LocalInvestmentPilotError, OSError) as exc:
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_COLLISION_OR_PARTIAL_BUNDLE") from exc
+        if existing_input != input_text.encode("utf-8") or (
+            response_bytes is not None and existing_raw != response_bytes
+        ):
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_ALREADY_BOUND_TO_DIFFERENT_INPUT")
+        try:
+            existing_analysis = json.loads((run_dir / "analysis.json").read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_EXISTING_ANALYSIS_UNREADABLE") from exc
+        if not isinstance(existing_analysis, dict) or not isinstance(existing_analysis.get("decision"), Mapping):
+            raise LocalInvestmentPilotError("PILOT_RUN_ID_EXISTING_ANALYSIS_INVALID")
+        return {
+            "status": "PILOT_CREATED",
+            "pilot_id": run_id,
+            "provisional_action": existing_analysis["decision"].get("provisional_action"),
+            "replay_of": existing_receipt.get("replay_of"),
+            "replay_comparison": existing_receipt.get("replay_comparison"),
+            "research_response_provenance_status": (existing_receipt.get("research_response_provenance") or {}).get("status"),
+            "run_dir": str(run_dir),
+            "report_path": str(run_dir / "report.md"),
+            "formal_decision_created": False,
+            "canonical_run_receipt_created": False,
+            "auto_execution": False,
+            "idempotent_reuse": True,
+        }
 
     analysis, report = _analyse(payload_for_analysis, run_id)
     analysis["research_rounds"] = _build_research_rounds_summary(payload)
@@ -4493,6 +8074,7 @@ def run_local_investment_pilot(
     research_response_path: str | Path | None = None,
     expected_research_response_sha256: str | None = None,
     expected_research_response_byte_size: int | None = None,
+    run_id_override: str | None = None,
 ) -> dict[str, Any]:
     source = _outside_repo(input_path, "PILOT_INPUT_PATH", must_exist=True)
     root = _private_dir(output_root, "PILOT_OUTPUT_ROOT")
@@ -4503,6 +8085,7 @@ def run_local_investment_pilot(
         research_response_path=research_response_path,
         expected_research_response_sha256=expected_research_response_sha256,
         expected_research_response_byte_size=expected_research_response_byte_size,
+        run_id_override=run_id_override,
     )
 
 
@@ -4696,6 +8279,36 @@ def _template(
                 "change_working_capital_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": [], "note": "未知；不得猜测"}
             }
             },
+            "cycle_earnings_monitor": {
+                "schema_version": CYCLE_EARNINGS_MONITOR_SCHEMA,
+                "industry_cycle": {
+                    "cycle_id": "", "phase": "UNKNOWN", "phase_basis": "",
+                    "evidence_refs": [], "counter_evidence_refs": [],
+                    "leading_indicators": [], "reversal_signals": [],
+                },
+                "normalized_earnings": {
+                    "metric": "NET_PROFIT_CNY", "scope": "UNKNOWN", "reference_period": "", "period": "",
+                    "normalization_basis": "",
+                    "scenarios": {
+                        "bear": {"reference_net_profit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "adjustments": [], "low_cny": None, "point_cny": None, "high_cny": None, "scenario_basis": ""},
+                        "base": {"reference_net_profit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "adjustments": [], "low_cny": None, "point_cny": None, "high_cny": None, "scenario_basis": ""},
+                        "bull": {"reference_net_profit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "adjustments": [], "low_cny": None, "point_cny": None, "high_cny": None, "scenario_basis": ""},
+                    },
+                },
+                "review_triggers": [],
+                "variance_attribution": [],
+                "cash_flow_assessments": [],
+                "normalized_fcf": {
+                    "metric": "UNLEVERED_FCF_PROXY_CNY", "method": "B4_UNLEVERED_FCF_PROXY_EBIT_AFTER_TAX_PLUS_DA_MINUS_CASH_CAPEX_MINUS_EFFECTIVE_WC_V0.1", "scope": "UNKNOWN",
+                    "reference_period": "", "period": "", "normalization_basis": "",
+                    "scenarios": {
+                        "bear": {"reference_fcf_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "cash_components": {"ebit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "tax_rate": {"value": None, "unit": "ratio", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "depreciation_amortization_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "cash_capex_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "change_working_capital_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "effective_change_working_capital_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "inventory_cash_impact_proxy_cny": None, "inventory_working_capital_treatment": "UNKNOWN", "inventory_reconciliation_status": "UNKNOWN"}, "adjustments": [], "low_fcf_cny": None, "point_fcf_cny": None, "high_fcf_cny": None, "scenario_basis": ""},
+                        "base": {"reference_fcf_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "cash_components": {"ebit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "tax_rate": {"value": None, "unit": "ratio", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "depreciation_amortization_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "cash_capex_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "change_working_capital_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "effective_change_working_capital_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "inventory_cash_impact_proxy_cny": None, "inventory_working_capital_treatment": "UNKNOWN", "inventory_reconciliation_status": "UNKNOWN"}, "adjustments": [], "low_fcf_cny": None, "point_fcf_cny": None, "high_fcf_cny": None, "scenario_basis": ""},
+                        "bull": {"reference_fcf_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "cash_components": {"ebit_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "tax_rate": {"value": None, "unit": "ratio", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "depreciation_amortization_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "cash_capex_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "change_working_capital_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "effective_change_working_capital_cny": {"value": None, "unit": "CNY", "data_class": "UNKNOWN", "basis": "", "evidence_refs": []}, "inventory_cash_impact_proxy_cny": None, "inventory_working_capital_treatment": "UNKNOWN", "inventory_reconciliation_status": "UNKNOWN"}, "adjustments": [], "low_fcf_cny": None, "point_fcf_cny": None, "high_fcf_cny": None, "scenario_basis": ""},
+                    },
+                },
+                "fcf_variance_attribution": [],
+            },
             "limitations": [],
         },
         "decision_parameters": {
@@ -4743,10 +8356,15 @@ def create_pilot_template(
         "2. 未来最重要的变化是什么：按价值重要性排序，不要罗列宏观热点；指出未来 1 年（如有明确理由再用 2–3 年）最可能改变收入、单位利润、现金流或每股价值的变量，说明起点、预期变化、时间和可观测指标。写入 assessment.value_drivers 与 operating_driver_forecast。"
         "3. 为什么相信变化会发生：把每个关键变化连接到截止时点前已公开的具体证据、证据日期、业务机制和反证；区分领先指标/结果指标、公司指引/分析师假设/历史事实，不得把管理层目标当成已实现结果。写入 evidence_register、assessment.value_drivers.historical_evidence 与 rationale。"
         "4. 变化如何进入每股价值：明确写出“销量/价格/组合/利用率 → 收入 → 单位毛利与费用 → EBIT/净利润 → 资本开支/营运资金/FCF → 稀释股数与每股盈利 → 估值”的可验证传导链；说明关键假设、量纲、期间、约束、潜在蚕食与稀释，避免重复计价。使用 operating_driver_forecast、valuation_transmission 和 forecast_valuation.scenarios；无法闭合的环节保留 UNKNOWN/NOT_LINKED。"
-        "5. 当前价格已反映多少：price_input.price 是本次唯一现价，不得覆盖。分清外部可验证的市场隐含预期（MIE）、市场可比估值和内部估值；只有存在独立、截止时点兼容的定价/一致预期证据时才量化 MIE。缺少证据就将 assessment.market_implied_expectation 标为 NOT_IDENTIFIABLE，并具体解释哪些隐含增长、利润率、资本回报或估值倍数无法反推；绝不能把自己的 Base 估值伪装成市场预期。assessment.expectation_gap 必须说明市场预期与独立经营推演在方向、规模、时间或概率上有何差异；无法量化时明确方向也不可识别。"
+        "5. 当前估值隐含了什么：price_input.price 是本次唯一现价，不得覆盖。严格分开三类信息：(a) 外部可验证的市场隐含预期/一致预期，存入 assessment.market_implied_expectation 顶层 status/summary/evidence_refs；(b) 在明确估值模型和固定假设下，由当前价格反推出的条件经营要求，另存同一对象下的 price_implied_analysis；(c) Round A 的独立经营推演。price_implied_analysis 至少含 status、method、model_family、reference_price（必须等于结构化现价）、assumptions、implied_requirements 和 limitations；每项 implied_requirement 应说明 metric、value、unit、period、解释及来源引用。模型反推必须写明固定变量与敏感性，不得包装成外部共识或事实。若不能可靠反推，明确 NOT_IDENTIFIABLE，不要猜数。assessment.expectation_gap 应以 comparison_basis 和 comparisons 逐项比较可比的外部/条件价格隐含要求与独立推演，列出 metric、两侧值、单位、期间、差异/方向和局限；两侧指标、期间或单位不一致时不作数值比较。没有可核实外部 MIE 时，其 status 必须保持 NOT_IDENTIFIABLE；不能仅因 price_implied_analysis 存在而升级。"
         "6. 哪些事实要求改变看法：写出会证伪核心论点或使情景切换的可观察指标、阈值/方向、验证时间和对应经营/估值影响；区分暂时波动与结构性恶化。落入 assessment.thesis.break_conditions、assessment.thesis.reassessment_triggers、assessment.risk.items 的监控触发项以及 Bear.failure_trigger / operating_impact / valuation_mechanism。"
         "每个排名靠前的 value driver 都应尽量填写 driver_type、historical_evidence、valuation_transmission、impact、rationale 和其自身的 evidence_refs；证据只证明事实，不自动证明因果，因果需另给机制。Bear/Base/Bull 应由经营驱动假设产生有意义的差异，而不是只改终值或概率；说明情景间销量、净售价、单位成本、利润率、现金转化、资本开支和估值倍数发生哪些变化以及依据。"
         "最终要判断的是“按输入价格是否值得承担风险”，而不是只判断公司是否优秀或值得研究。请提供足以让本地决策引擎复算的输入，不要另造顶层 action/target-price 字段，也不要在研究回答中声称已发出 BUY/ADD/交易指令；15% 年化门槛、共同约束入场价与暂定动作由本地既有计算器独立计算。"
+        "【B74：主要矛盾优先】必须从所有可能影响公司价值的因素中选出1个当前主要矛盾，最多保留2个确实重要的次要矛盾；说明主要矛盾为何比其他因素更重要。复用 assessment.thesis.core_statement 描述主要矛盾、当前基线、经济意义与每股价值影响；assessment.value_drivers 按重要性排序，rank=1 必须是主要矛盾背后的首要决定因素，最多另列2项次要因素。"
+        "【B74：决定因素证据】主要矛盾需明确当前可核验基线、1–3个真正决定方向的变量、支持证据和反证、变量变化机制、领先指标、证伪条件与验证时间。事实、公司指引、分析师假设和未知严格区分；每个关键驱动使用自己的 evidence_refs。rank=1 的 valuation_transmission 说明主要矛盾如何传导到收入、单位利润/费用、归母净利润、必要时现金流、稀释股数、EPS 和每股价值。只展开影响投资结果的少数变量，不要机械完成所有财务归因。"
+        "【B74：辅助诊断优先级】若模板或既有研究要求完整 FCF、营运资金、库存或差异归因，只有当该项直接影响主要矛盾、且有独立证据与可比口径时才展开；否则保留 UNKNOWN/NOT_LINKED 或不适用说明，不得为了填满结构而机械拆分、编造金额或让辅助诊断挤占主要矛盾研究。"
+        "【B75：未来事件链】从主要矛盾推导未来1年最重要的2–4个事件/阶段，按最可能的先后顺序写入 assessment.thesis.drivers（复用现有列表，不新增字段）。每项说明事件及时间窗口、前置条件/可观察触发信号、截止时点前支持证据和关键反证、事件发生后哪一项经营变量如何变化、映射到 operating_driver_forecast 的具体产品线/销量/净售价/单位成本/产量/固定费用/资本开支/营运资金输入、对收入利润现金流的方向影响，以及失败时哪个情景/预测需要改变。事件之间须明确先后、依赖或并行关系，不能把互不相关的新闻拼成事件链。"
+        "【B75：概率与现实约束】事件概率只有存在相关基准率、历史频率、合同/建设/认证/客户导入进度或可观测先行指标时才给数值；否则定性说明依据，不伪造概率。Bear/Base/Bull 必须体现事件不同发生路径、时间和强度。检查产能、订单转收入周期、供需、价格竞争、产品结构、原料、良率、资金、库存和营运资金等与主要矛盾直接相关的约束；销量路径不可行不代表售价/结构路径也不可行，须逐条评估。复用 B4 计算和现有 B5/B6/B55-B62 传导，不新建预测引擎。"
     )
     eps_multiple_instructions = (
         "\n\nEPS_MULTIPLE 主估值计算契约（IIOS-EPS-MULTIPLE-VALUATION-0.1 / B27 EPS earnings bridge）："
@@ -4782,6 +8400,18 @@ def create_pilot_template(
         "计算公式必须是 Σ（已归属于上市公司股东的分部净利润 × 分部 P/E）−（母公司税后成本 × 母公司成本倍数）+ 不重复计价的净现金/净负债 + 其他显式调整，再除以稀释后股数；结果生成 Bear/Base/Bull 终值，Base 每股值作为主估值参考锚。每个分部利润应与上市公司股东权益口径一致，不能再次扣同一分部的少数股东权益。所有分部、期间、股数、现金/债务及母公司成本须避免重复计价。"
         "sotp_valuation.forecast_period 必须与 operating_driver_forecast.forecast_period 一致，valuation_terminal_date 必须与 forecast_valuation.valuation_terminal_date 一致。数值、证据、期间、分部集合或 Bear≤Base≤Bull 任一项不成立时，不要在 forecast_valuation 中用手填每股终值冒充已计算 SOTP；保留缺口，系统会阻断回报、目标入场价与 B6。"
         "此 SOTP 算术仍为 PILOT_NON_CANONICAL，并不代表正式证据或估值准入。B5 的 EPS_MULTIPLE 增量适配器不能用于 SOTP。"
+        "【B64 证据分级字段】每个分部 attributable_net_profit_cny 与 pe_multiple_x measure 均应另附 support_assessment 对象，包含 support_type、support_summary、support_evidence_refs、mechanism_chain、key_operating_indicators、derivation_steps、counter_evidence_refs、reversal_signals、comparable_observations。利润 support_type 只允许 DISCLOSED_FACTS、ISSUER_GUIDANCE、BUSINESS_MECHANISM、ANALYST_DERIVATION、UNKNOWN；P/E support_type 只允许 COMPARABLE_MULTIPLES、PURE_MULTIPLE_ASSUMPTION、UNKNOWN。support_evidence_refs 必须是该 measure 自身 evidence_refs 的子集；不可把泛行业材料冒充直接支持某一分部利润。DISCLOSED_FACTS/ISSUER_GUIDANCE 要写清具体事实/指引及如何连接到该利润输入；BUSINESS_MECHANISM 至少列出 2 个因果环节、1 个可观测经营指标、1 个反转/证伪信号，并引用时点兼容的证据；ANALYST_DERIVATION 写明推导步骤；不能识别就明确 UNKNOWN，不要编造。counter_evidence_refs 应指向反证来源；若没有找到，说明检索范围和缺口，不要虚构。P/E 可比样本每条包含 entity、as_of_date、observed_pe_x、evidence_ref、comparability_adjustment；至少两家不同对象才形成候选可比组。即使有可比组，所选终值 P/E 仍是分析师估值假设，不代表公平价值。此标注仅用于 B64 结构化审计；来源内容、因果关系、可比性均需人工核查，不能将 G1/G2 宣称为正式证据准入。"
+        "【B65 同行可比性画像】P/E measure 的 support_assessment 另提供 target_comparability_profile，包含 13 个维度：business_model、revenue_mix、end_market_customer、growth_stage、cycle_phase、profit_quality、roic、capital_intensity、leverage、cash_flow_conversion、accounting_basis、earnings_reference_period、pe_measurement_basis。每个维度使用可识别的简短描述或数值区间，不知道时写 UNKNOWN，不得编造目标公司资料。"
+        "每个 comparable_observations 元素除 B64 原有字段外，提供 peer_comparability_profile（同样 13 个维度）、date_alignment_rationale（同行估值观察日期早于案例截止日时，说明时点差异为何仍可用/如何重估）和 dimension_assessments 对象；dimension_assessments 必须逐一包含全部 13 个维度。"
+        "每个维度对象必须包含 target_value、peer_value、comparison（SIMILAR/DIFFERENT/NOT_COMPARABLE/UNKNOWN）、target_multiple_implication（TARGET_PREMIUM/TARGET_DISCOUNT/NEUTRAL/UNKNOWN）、multiple_adjustment_treatment（SELECTED_PE_ADJUSTED/NO_NUMERIC_ADJUSTMENT/PEER_EXCLUDED/UNKNOWN）、rationale、adjustment_rationale、evidence_refs。target_value 与 peer_value 必须与两边画像对应维度一致。"
+        "SIMILAR 只能标 NEUTRAL + NO_NUMERIC_ADJUSTMENT；DIFFERENT 必须解释差异，并说明所选 P/E 是否已考虑（SELECTED_PE_ADJUSTED）或未量化调整（NO_NUMERIC_ADJUSTMENT）；NOT_COMPARABLE 必须标 PEER_EXCLUDED，不得留在有效可比样本集合。TARGET_PREMIUM/TARGET_DISCOUNT 表示目标分部相对该同行的定性方向，不是数值调整。dimension evidence_refs 必须引用 P/E measure 自身 evidence_refs 中的截止时点兼容来源。"
+        "同行 observed_pe_x 必须解释是 TTM/NTM/正常化等哪一种口径；同行 as_of_date 不得晚于案例 cutoff，早于 cutoff 必须有 date_alignment_rationale。业务模式、收入结构、终端市场、成长、周期、利润质量、ROIC、资本强度、杠杆、FCF 转换、会计与期间定义缺资料则标 UNKNOWN。不要把不相同的会计或盈利口径简单并列。B65 只审计画像完整性、差异、证据引用和时间一致性，不会自动选择同行、计算溢价/折价、做 P/E 数值调整或改变 SOTP 估值。"
+        "【B66 终值 P/E 独立论证】每个分部 pe_multiple_x.support_assessment 必须另含 selected_multiple_bridge 与 selected_multiple_range。selected_multiple_bridge 包含 reference_method（PEER_MEDIAN/HISTORICAL_SELF_RANGE/OTHER_EXPLICIT_REFERENCE/NO_COMPARABLE_REFERENCE）、reference_description、reference_multiple_x（PEER_MEDIAN 时可留空，由本地从 B65 同口径可比同行独立复算）、reference_evidence_refs、adjustments 数组、selected_multiple_explanation。"
+        "PEER_MEDIAN 只使用 B65 完整可比同行，且 accounting_basis、earnings_reference_period、pe_measurement_basis 三项必须均标 SIMILAR 且非 UNKNOWN；至少两家才计算中位数/范围。不能把 TTM、NTM、正常化 P/E 混合取中位数。HISTORICAL_SELF_RANGE/OTHER_EXPLICIT_REFERENCE 必须提供 reference_multiple_x、明确来源说明和截止时点兼容证据引用。没有参考锚时必须标 NO_COMPARABLE_REFERENCE，不得伪造同行倍数；如果 B65 已识别至少两家同口径完整同行，则不能同时声明 NO_COMPARABLE_REFERENCE，必须用 PEER_MEDIAN 或提供其他明确独立参考。"
+        "adjustments 每项包含 dimension（B65 的 13 维度之一）、direction（TARGET_PREMIUM/TARGET_DISCOUNT/NEUTRAL）、adjustment_x、rationale、evidence_refs。TARGET_PREMIUM 的数值调整必须为正，TARGET_DISCOUNT 必须为负，NEUTRAL 必须为 0；方向必须与 B65 至少一项已通过且属于同口径参考样本的同行维度判断一致；adjustment.evidence_refs 还必须与 B65 对应 dimension + direction 的 evidence_refs 有交集，不能用该 P/E 节点下无关来源支持特定溢价/折价；每个维度不重复。所有调整合计必须使 reference_multiple_x + Σ adjustment_x = 当前 scenario 的 selected pe_multiple_x（±0.01x），否则 B66 标 PARTIAL，不能宣称倍数推导闭合。选定终值 P/E 必须是 ANALYST_ASSUMPTION。"
+        "selected_multiple_range 包含 data_class=ANALYST_ASSUMPTION、lower_bound_pe_x、upper_bound_pe_x、basis、downside_rationale、upside_rationale、evidence_refs；范围必须为正数、lower≤selected P/E≤upper。此区间是显式敏感性假设，不是置信区间或概率分布。"
+        "本地 B66 计算 selected P/E 相对同口径同行中位数的描述性差异、逐项显式调整桥、对每个分部利润的低/选定/高倍数权益价值敏感性，并在全部分部区间完整时，固定母公司调整和稀释股数计算全部分部倍数区间同时变化的 SOTP 每股敏感性。不得把同时变化的上下界称为统计区间或概率加权估值。"
+        "B66 还展示 B63 的 Required Common P/E 条件敏感性，但必须说明其基于全分部 B4 正常化盈利向量与统一倍数变化，不是该单一分部的独立公平 P/E。不能从 ROIC、增长、周期、质量标签自动换算数值倍数；无法量化时保留 UNKNOWN，不要为了完成算术桥强行造数。"
     )
     driver_instructions = (
         "\n\n经营驱动因素树要求（IIOS-OPERATING-DRIVER-FORECAST-0.1）："
@@ -4792,12 +8422,14 @@ def create_pilot_template(
         "每个度量都使用对象 {value,unit,data_class,basis,evidence_refs,note}；data_class 只能为 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION、UNKNOWN。"
         "未知值必须 value=null 且 data_class=UNKNOWN；事实/发行人预测必须列出能直接支撑该数字的 evidence_refs，无法把来源和口径对齐时不要把数字标成事实。"
         "产品容量单位 tonnes/year；产量与销量 tonnes；净售价和单位变动成本 CNY/tonne；现金费用/折旧/融资成本/资本开支/营运资金变动 CNY；tax_rate 是 0 至 1 之间的比例。"
-        "Bear/Base/Bull 另含 fixed_cash_opex_cny、depreciation_amortization_cny、finance_cost_cny、tax_rate、cash_capex_cny、change_working_capital_cny。固定现金运营费用不得重复包含折旧。"
-        "收入按销售量×净售价，不得用产量或总产品收入反推净售价；变动成本按销售量×单位变动成本。change_working_capital_cny 为正表示占用现金，负数表示释放。"
+        "Bear/Base/Bull 另含 fixed_cash_opex_cny、depreciation_amortization_cny、finance_cost_cny、tax_rate、cash_capex_cny、change_working_capital_cny，以及 inventory_working_capital_treatment。固定现金运营费用不得重复包含折旧。"
+        "inventory_working_capital_treatment 只能为 INCLUDED_IN_CHANGE_WORKING_CAPITAL、EXCLUDED_FROM_CHANGE_WORKING_CAPITAL、UNKNOWN 或 NOT_APPLICABLE。INCLUDED 表示 change_working_capital_cny 已包含库存变动，不能再次相加；EXCLUDED 表示它只代表非库存营运资金，必须在产销量差额与单位变动成本可识别时加上（产量−销量）×单位变动成本的库存现金影响代理。"
+        "收入按销售量×净售价，不得用产量或总产品收入反推净售价；变动成本按销售量×单位变动成本。change_working_capital_cny 为正表示占用现金，负数表示释放。产量−销量为正表示库存增加/潜在占资，为负表示库存减少/潜在释放；库存代理不是完整会计存货估值。若非零或无法识别的产销差额没有明确的库存营运资金处理，FCF 与下游可用状态必须保持 UNKNOWN/不可用。"
         "产能利用率只有在 actuals_period/forecast_period 明确为完整年度（例如 2026FY）且产量与年度产能口径一致时才计算；季度、半年、多年度或口径不明一律 UNKNOWN，不能拿部分期间产量直接除以年度产能。"
         "若没有同口径产销量、实际净售价或单位成本，务必保留 UNKNOWN；可以另列清晰标记为 ISSUER_FORECAST 或 ANALYST_ASSUMPTION 的情景值，但不得将这些值称为已实现结果。"
         "报告产品收入结构、产能利用率（只有同期间产量与年产能可比时才计算）、EBITDA、EBIT、税前利润、净利润和自由现金流代理，并列出缺失驱动与估值传导限制。"
         "该经营桥不会自动替代每股 Bear/Base/Bull 估值；不清楚项目增量利润、存量业务替代/蚕食、税后归属利润和稀释股数时，不计算项目 EPS 或每股估值贡献。"
+        "B49 还要求逐组件核对 B4 与正常化 FCF 差额，不能只核归因总额。必须提供 B4 的 EBIT、tax_rate、折旧摊销、现金资本开支、原始营运资金变动、有效营运资金变动和库存处理/对账字段；B4 自由现金流代理须复算为 EBIT − max(EBIT,0) × tax_rate + 折旧摊销 − 现金资本开支 − 有效营运资金变动，并在 ±1 CNY 内一致。FCF 差异归因必须逐情景覆盖 OPERATING_CASH_CONVERSION、NON_CASH_EARNINGS、CAPEX、WORKING_CAPITAL、INVENTORY_MOVEMENT 五类；每一类的归因合计必须与实测组件贡献在 ±1 CNY 内匹配。库存已包含在营运资金时，库存单列贡献必须为 0；库存排除时，把原始非库存营运资金差额与库存代理差额分开，并核对两者之和等于有效营运资金差额；库存处理不匹配或组件未知时，不得宣称已对账。"
     )
     if symbol.replace(".SH", "").replace(".SZ", "") == "605016":
         driver_instructions += (
@@ -5068,12 +8700,24 @@ def _build_price_blind_round_a_prompt(template_payload: Mapping[str, Any]) -> st
     allowed_input = _round_a_prompt_input(template_payload)
     return (
         "IIOS Round A：价格盲的公司事实、质量、论点、价值驱动与独立经营预测。"
+        "【研究优先级】首先给出当前基本面现实与可验证基线：公司靠什么赚钱、产品/客户结构、盈利质量、周期位置、资本占用和现金转换；其次推演未来1年最重要的经营变量及 Bear/Base/Bull 合理区间；最后才填写归因/监测等辅助诊断。不得让细分 FCF 归因挤占核心事实与未来预期分析；没有独立依据的细分金额必须 UNKNOWN 或 REVIEW_REQUIRED，不得为了满足结构做机械拆分。"
         "本轮唯一输入为末尾列出的公司身份、截止时点、证据登记结构和公司侧字段；当前价格、当前持仓、估值选择、市场隐含预期、预期差及组合约束均未提供。"
         "不得搜索、请求或推断当前股价、市场估值倍数或分析师一致预期；不得输出 BUY/ADD/HOLD/REDUCE/EXIT、目标价、入场价、年化回报或价格敏感性。"
         "优先核对截止时点前公司公告/财报、交易所和监管披露；严格区分 OBSERVED_ACTUAL、ISSUER_FORECAST、ANALYST_ASSUMPTION 和 UNKNOWN。"
         "回答：公司靠什么赚钱；未来最重要的经营变化及可观察指标；为何相信变化会发生以及反证；销量/净售价/产品组合/单位成本/产能/费用/资本开支/营运资金到利润与现金的传导；哪些事实会证伪论点。"
         "提供 Trust、Reality、Quality、Thesis、value_drivers、risk、evidence_register 和 operating_driver_forecast。Bear/Base/Bull 应来自显式经营假设；未知值保持 UNKNOWN。"
-        "只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。"
+        "【B74：主要矛盾优先】必须从所有可能影响公司价值的因素中选出1个当前主要矛盾，最多保留2个确实重要的次要矛盾，并说明主要矛盾为何更重要。复用 assessment.thesis.core_statement 描述主要矛盾、当前基线、经济意义与每股价值影响；assessment.value_drivers 按重要性排序，rank=1 必须是主要矛盾背后的首要决定因素，最多另列2项次要因素。"
+        "【B74：决定因素证据】主要矛盾需明确当前可核验基线、1–3个真正决定方向的变量、支持证据和反证、变量变化机制、领先指标、证伪条件与验证时间。事实、公司指引、分析师假设和未知严格区分；每个关键驱动使用自己的 evidence_refs。rank=1 的 valuation_transmission 说明主要矛盾如何传导到收入、单位利润/费用、归母净利润、必要时现金流、稀释股数、EPS 和每股价值。只展开影响投资结果的少数变量，不要机械完成所有财务归因。"
+        "【B74：辅助诊断优先级】完整 FCF、营运资金、库存与差异归因只有在直接影响主要矛盾且有独立证据和可比口径时才展开；否则保留 UNKNOWN/NOT_LINKED 或不适用说明，不得为了填满结构而机械拆分、编造金额或让辅助诊断挤占主要矛盾研究。"
+        "【B75：未来事件链】从主要矛盾推导未来1年最重要的2–4个事件/阶段，按先后顺序写入 assessment.thesis.drivers（复用现有列表，不新增字段）。每项说明时间窗口、前置条件/可观察触发信号、截止时点前支持证据与关键反证、发生后哪一项经营变量变化、对应 operating_driver_forecast 的具体产品线/销量/净售价/单位成本/产量/固定费用/资本开支/营运资金输入、对收入利润现金流的方向影响以及失败时哪个情景/预测应改变。事件之间明确先后、依赖或并行关系，不能拼接互不相关的新闻。"
+        "【B75：概率与现实约束】事件概率只有存在相关基准率、历史频率、合同/建设/认证/客户导入进度或可观测先行指标时才给数值；否则定性说明，不伪造概率。Bear/Base/Bull 必须体现不同事件发生路径、时间和强度。检查与主要矛盾直接相关的产能、订单转收入周期、供需、价格竞争、产品结构、原料、良率、资金、库存和营运资金约束；销量路径不可行不代表售价/结构路径也不可行，须逐条评估。"
+        "Round A 的主要矛盾、决定因素、事件链及其证据在本轮完成后冻结；Round B 不得因看到价格/MIE 而改写或倒灌这些独立研究输入。"
+        "operating_driver_forecast 内必须附带 cycle_earnings_monitor，明确行业周期阶段/支持证据/反证/领先指标/反转信号；对 Bear/Base/Bull 分别给出带来源的参考净利润、明确的 reference_period（参考盈利期间）、逐项正常化调整及低/中/高区间；参考期间与正常化目标期间需分别填写，不得混用；每个持仓复核触发器必须含 driver_id 和从 INDUSTRY_CYCLE → NORMALIZED_EARNINGS → EPS_OR_FCF → PER_SHARE_VALUE → POSITION_REVIEW 的因果路径。还必须提供 variance_attribution：对 Bear/Base/Bull 分别解释“B4 净利润 − 正常化净利润中枢”的差额；正数表示 B4 较高，负数表示 B4 较低；每项贡献须包含 attribution_id、scenario、driver_id、category、rationale、typed amount_cny 和 review_trigger_id，且触发器 driver_id 必须匹配。各情景贡献合计须在 ±1 元内对账差额，不可解释残差不得伪装为已归因。即使差额为 0，也须明确给出有理由的零差异确认行。此归因只作诊断，不能改写 B4/B5/B6 或成为估值输入。紧接着必须提供 cash_flow_assessments，将每个 variance_attribution 项分别连接到现金流/营运资金路径，字段含 scenario、attribution_id、driver_id、review_trigger_id、channel、direction、quantification_status、rationale、evidence_refs；driver_id、attribution_id、review_trigger_id 必须与净利润归因及同驱动复核触发器完全一致。channel 取 OPERATING_CASH_CONVERSION、WORKING_CAPITAL、INVENTORY_MOVEMENT、CAPEX、NON_CASH_EARNINGS、FINANCING_CASH_FLOW、TAX_CASH_TIMING、NO_DIRECT_CASH_EFFECT、UNKNOWN；direction 取 IMPROVES_FCF、REDUCES_FCF、MIXED_OR_TIMING_DEPENDENT、NO_DIRECT_EFFECT、UNKNOWN；quantification_status 取 QUANTIFIED、QUALITATIVE_ONLY、NOT_APPLICABLE、UNKNOWN。每项必须有截止时点可用的 evidence_refs。仅当确有根据时才用 QUANTIFIED 并提供 typed cash_flow_effect_cny（单位 CNY、data_class、basis、evidence_refs）；basis 必须说明比较基准与经济机制；量化金额自己的 evidence_refs 必须非空、通过截止时点检查，并与关联 review_trigger 的 evidence_refs 至少有一项重叠；金额正数表示提高 FCF，负数表示降低 FCF，不代表营运资金变动本身的符号。NO_DIRECT_CASH_EFFECT 必须配 NO_DIRECT_EFFECT 和 NOT_APPLICABLE。不要把盈利改善直接推断为现金改善。还必须提供独立的 normalized_fcf，metric=UNLEVERED_FCF_PROXY_CNY，method 必须固定为 B4_UNLEVERED_FCF_PROXY_EBIT_AFTER_TAX_PLUS_DA_MINUS_CASH_CAPEX_MINUS_EFFECTIVE_WC_V0.1（EBIT 税后代理 + 折旧摊销 − 现金资本开支 − 有效营运资金变动），显式填写 scope、reference_period、period、normalization_basis；Bear/Base/Bull 各自须有 typed reference_fcf_cny、cash_components、逐项 adjustments、low_fcf_cny、point_fcf_cny、high_fcf_cny 和 scenario_basis。cash_components 必须按同一 B4 代理公式计算并对账：EBIT − max(EBIT,0) × tax_rate + 折旧摊销 − 现金资本开支 − 有效营运资金变动；EBIT、tax_rate、折旧摊销、现金资本开支、原始营运资金变动和有效营运资金变动均须使用 typed measures 和证据引用。必须明确 inventory_working_capital_treatment、inventory_reconciliation_status；若库存从原始营运资金排除，有效营运资金必须等于原始营运资金 + inventory_cash_impact_proxy_cny；若已包含，则有效值必须与原始值一致。正常化 FCF 中枢还须与组件公式输出在 ±1 CNY 内一致。每项调整包含 adjustment_id、driver_id、review_trigger_id、category、rationale、typed amount_cny；类别须区分 OPERATING_CASH_CONVERSION、WORKING_CAPITAL、INVENTORY_MOVEMENT、CAPEX、NON_CASH_EARNINGS、TAX_CASH_TIMING、OTHER；无杠杆 FCF 桥不得把融资现金流/利息支付混进来。参考 FCF + 调整项合计须在 ±1 CNY 内等于正常化 FCF 中枢，低≤中≤高，Bear≤Base≤Bull；每项调整均须证据、且金额证据至少与同驱动复核触发器证据有一项重合。若没有独立正常化 FCF 基准，明确 UNKNOWN，不准用净利润推算或编造 FCF。还须提供 fcf_variance_attribution：对每个可比较情景解释 B4 unlevered_fcf_proxy_cny − normalized_fcf point 的差额，正数表示 B4 FCF 更高、负数表示更低；每行含 scenario、fcf_attribution_id、driver_id、review_trigger_id、category、rationale、typed amount_cny，并同样要求 driver 与触发器匹配、证据有效且重合。各情景归因合计须在 ±1 CNY 内对账，零差额也需明确零贡献行。B4 FCF 只在公司范围、预测期间和 financial_outputs_decision_usable=true 时比较。没有独立正常化 FCF Bear/Base/Bull 基准或任一层对账失败时，不得宣称 FCF 差异已对账，不得将现金流归因用于估值或改写 B4/B5/B6、目标入场价和决策。该独立现金流路径是诊断，不改写任何决策/估值字段。无法识别的字段不得伪造。"
+        "B49 增加强制的组件级 FCF 差异对账：B4 FCF 与正常化 FCF 均必须先由 EBIT 税后代理 + 折旧摊销 − 现金资本开支 − 有效营运资金变动公式复算，误差不超过 1 CNY；归因按 OPERATING_CASH_CONVERSION、NON_CASH_EARNINGS、CAPEX、WORKING_CAPITAL、INVENTORY_MOVEMENT 五类逐类对账，不可用类别间错误抵销伪装通过。库存若已包含在有效营运资金，INVENTORY_MOVEMENT 贡献必须为 0；仅当两边均明确排除库存时，才拆开核对原始非库存营运资金差额和库存代理差额，且拆分合计必须等于有效营运资金差额。B4 必须带有可复算的 EBIT、tax_rate、折旧摊销、资本开支、原始/有效营运资金和库存对账输入；输入缺失或处理口径不一致即保持 REVIEW_REQUIRED / NOT_COMPARABLE。"
+        "B49 的 fcf_variance_attribution 每个情景每个组件类别仅允许一条数值归因，直到存在可独立核对的驱动级组件测量；不得把多个驱动的相反金额相互抵销后伪装成单项组件已核实。每条归因金额的证据引用必须同时与同驱动复核触发器证据、以及该类别对应的正常化 FCF cash_components 证据有交集：经营现金转换对应 EBIT 与税率；非现金收益对应折旧摊销；资本开支对应现金资本开支；库存排除时营运资金对应原始营运资金、库存类别对应库存现金影响代理；库存已包含或不适用时，营运资金和零库存单列归因对应有效营运资金证据。若一个类别实质上由多个驱动共同形成，但没有独立驱动级金额证据，须保持 REVIEW_REQUIRED，不得人为拆分金额。"
+        "B50 允许有独立测量依据的真实多驱动分解：同一 scenario/category 有多行时，每行必须带 driver_component_measure 对象，字段为 measure_id、category、driver_id、component_basis、basis、b4_value_cny、normalized_value_cny。两侧数值都必须是带 unit=CNY、data_class、可识别 basis、非空且截止时点有效 evidence_refs 的 typed measure；measure.category/driver_id 必须分别等于归因行的 category/driver_id，driver_id 还必须与 review_trigger 一致，measure_id 在同一情景内不得重复。component_basis 必须严格按类别指定：OPERATING_CASH_CONVERSION=AFTER_TAX_EBIT_CONTRIBUTION（单驱动两侧值为驱动归属的税后 EBIT 贡献）；NON_CASH_EARNINGS=DEPRECIATION_AMORTIZATION；CAPEX=CASH_CAPEX；WORKING_CAPITAL 在库存从原始营运资金排除时使用 RAW_WORKING_CAPITAL_CHANGE，否则使用 EFFECTIVE_WORKING_CAPITAL_CHANGE；INVENTORY_MOVEMENT 只有双方均排除库存时才允许 INVENTORY_CASH_IMPACT_PROXY。B4−正常化贡献由两侧值复算：经营现金转换/非现金收益为 B4−正常化，资本开支/营运资金/库存代理为正常化−B4；归因行 amount_cny 必须在 ±1 CNY 内匹配复算结果，核对使用复算值而非直接相信声明金额。更重要的是，每类所有驱动的 B4 侧值之和与正常化侧值之和，必须分别在 ±1 CNY 内等于 B4 与正常化 FCF 对应的组件总值，不能只对上差额。证据必须有效且逐侧绑定：B4 侧证据、正常化侧证据必须分别与同驱动复核触发器证据相交；归因金额证据必须分别与 B4 侧和正常化侧测量证据相交；正常化侧驱动测量证据还必须与其所分解的正常化 FCF 组件输入证据逐项相交（经营现金转换需同时覆盖 EBIT 与税率组件）。仅共享任意一条触发器或金额证据不能替代某一侧的证据链接；报告必须显示各项链接检查结果。引用关系只证明引用链可追踪，不等于已证明来源内容在语义上支持该金额。任一侧总和不匹配、驱动/口径不匹配、证据不足或混用无测量行，均保持 REVIEW_REQUIRED。单行旧格式可继续作为单一驱动的诊断路径，但同一类别多行只有全部具备上述结构化测量时才允许。库存已包含于有效营运资金或库存不适用时，库存独立类别必须是单行、明确为零；不得把同一库存影响重复拆分。"
+                  "【B62 分部正常化盈利输入】若 B4 scope=COMPANY_WIDE 且基线/预测期间为相邻完整年度，必须为每条 product_lines 明确提供稳定的 business_segment_id；多个 product_id 可以归集到同一 business_segment_id，但禁止按产品名称或 SOTP 分部名称模糊推断。历史分部财务输入位于 historical_segment_financials，每个分部恰好一行，键为 business_segment_id；Bear/Base/Bull 每个 scenario 内提供 segment_financials，每个分部恰好一行并复用相同 ID。每行均需提供八个 typed measures：fixed_cash_opex_cny（CNY）、depreciation_amortization_cny（CNY）、finance_cost_cny（CNY）、tax_rate（ratio，0–1）、recurring_non_operating_pre_tax_cny（CNY）、non_recurring_pre_tax_cny（CNY）、minority_interest_net_profit_after_tax_cny（CNY）、minority_interest_nonrecurring_after_tax_cny（CNY）。历史八项必须 data_class=OBSERVED_ACTUAL；前瞻八项必须为 ISSUER_FORECAST 或 ANALYST_ASSUMPTION；每项保留 basis 与 evidence_refs。缺失字段不代表零；只有有明确来源和业务依据的真实零值才可填 0。分部财务必须覆盖完整分部，不得把集团级固定成本/少数股东损益按收入占比擅自分摊；无法获得可靠分部口径时保持缺失，使 B62 显示 NOT_IDENTIFIABLE。该桥仅将已对账 B55 产品贡献汇总到显式分部，再计算模型化正常化归母利润，不修改 B56/B57、B4/B5/B6、估值或决策字段。"
+"只输出单一紧凑 JSON 对象，顶层仅 response_mode 与 research，response_mode=IIOS-RESEARCH-PATCH-0.1。research 仅允许 evidence_register、assessment、operating_driver_forecast；assessment 只允许 trust、reality、quality、thesis、value_drivers、risk。cycle_earnings_monitor 必须位于 operating_driver_forecast 内，不能新增顶层字段。"
         "Round A 不允许返回估值、MIE 或 expectation_gap 字段。不得输出 Markdown 围栏或其他解释文字。\n\n"
         "【Round A 允许输入】\n"
         + json.dumps(allowed_input, ensure_ascii=False, indent=2, allow_nan=False)
@@ -5086,6 +8730,7 @@ def _round_b_prompt_input(payload: Mapping[str, Any]) -> dict[str, Any]:
         "_local_research_response_provenance", "_local_operator_controlled_field_recovery",
         "_local_research_round_a_provenance", "_local_research_round_b_provenance",
         "operator_valuation_context", "decision_parameters", "operator_portfolio_context",
+        "operating_feasibility_remediation_submissions",
     ):
         view.pop(key, None)
     return view
@@ -5104,8 +8749,14 @@ def _build_price_aware_round_b_prompt(*, base_prompt: str, payload: Mapping[str,
         + "\n【Round B 输入模板（此阶段才包含结构化参考价）】\n"
         + json.dumps(prompt_input, ensure_ascii=False, indent=2, allow_nan=False)
         + "\n【Round B 输出约束】只返回 IIOS-RESEARCH-PATCH-0.1 紧凑 JSON。research 只允许 evidence_register、assessment、forecast_valuation、eps_multiple_valuation、valuation_transmission、sotp_valuation；assessment 只允许 market_implied_expectation、expectation_gap。"
-        + "不得更改 Round A 的公司侧字段。若返回 evidence_register，必须原样保留全部 Round A 来源记录，并可在其后追加新来源。"
-        + "只有存在独立、截止时点兼容、可核验的市场定价/一致预期证据时才量化 MIE/预期差；否则 MIE=NOT_IDENTIFIABLE、预期差=UNKNOWN。内部 Base 估值或条件反推不能冒充市场隐含预期。"
+        + "不得更改 Round A 的公司侧字段。若返回 evidence_register，必须原样保留全部 Round A 来源记录，并可在其后追加新来源。【B62/SOTP 分部口径】若 Round A operating_driver_forecast 提供 business_segment_id，Round B 每个 SOTP segment_id 必须原样复用对应业务分部 ID，不得按名称模糊匹配、合并或拆分。每个 SOTP 分部显式提供 earnings_basis；仅当 attributable_net_profit_cny 是同一 forecast_period 的正常化归母净利润（已剔除非经常性损益，并按正常化少数股东损益扣除）时，才可声明 NORMALIZED_PARENT_ATTRIBUTABLE；若使用扣非/不扣非或归属口径不同，必须使用不同明确标记或 UNKNOWN，不得为了通过对账改写盈利定义。"
+        + "研究输出顺序必须优先回答：①当前基本面事实与最关键的不确定性；②当前价/当前估值倍数实际要求企业实现什么；③在独立事实、业务机制和显式假设上形成的合理 Bear/Base/Bull 未来推演；④当前价格相对这些预期的差异及风险。不要先铺陈长篇辅助诊断再给核心判断。"
+        + "外部 MIE 必须有独立、截止时点兼容、可核验的市场定价/一致预期证据；否则 assessment.market_implied_expectation.status=NOT_IDENTIFIABLE。价格反推属于条件模型反演，不是外部 MIE：放在 assessment.market_implied_expectation.price_implied_analysis，至少填写 status、method、model_family、reference_price、assumptions、implied_requirements、limitations；reference_price 必须与 price_input.price 完全一致。反推结果必须披露所固定的利润率/EPS/增长/终值倍数/资本回报/现金转换等变量和敏感性；不具备可复算公式或关键假设时，状态为 NOT_IDENTIFIABLE，数值留空。"
+        + "assessment.expectation_gap 使用 comparison_basis 和 comparisons 对齐可比的市场/价格隐含要求与 Round A 独立预测；比较行至少有 metric、market_implied_value 或 price_implied_value、independent_forecast_value、unit、period、difference 或 direction、limitations。单位/期间/定义不一致就不比较，不得把仅方向性的判断伪装成量化预期差。任何基于 CONDITIONAL_PRICE_IMPLIED_VS_INDEPENDENT_FORECAST 的结果都只能展示为条件敏感性，决策可用 expectation_gap 必须保持 UNKNOWN，因为本地并未独立复算该反演；只有直接以外部可核验 MIE 为比较端的可比项才可能构成已验证预期差。"
+        + "【当前价格已反映多少】必须正面回答：在可复算、口径一致的情况下，当前价格对应的利润/EPS/分部价值池/终端倍数要求是什么；若缺少独立且可核验的输入、期间或公式，就明确回答 NOT_IDENTIFIABLE，并列出缺失项。绝不能把自己的 Base 估值伪装成市场预期；不得把内部 Base 估值、情景权重或未经验证的一致预期包装成价格已反映的市场共识。"
+        + "【B76：三类预期严格分开】Round A 冻结的独立预测、B61/B63/B68 本地复算的现价条件性经营要求、外部 MIE 是三类不同信息。B61/B63/B68 计算发生在 Round B 之后，当前 Round B 输入不包含其数值；不得自行编造反推值或宣称已经完成数值差额比较。真正的数值对照由本地后置 B76 只读模块基于 B4/B61/B62/B63/B68 输出完成。"
+        + "【B76：预期差拆分】外部 MIE 可识别时才可论证已验证市场预期差；MIE=NOT_IDENTIFIABLE 时只允许描述价格条件性比较，不得把 expectation_gap 升级为 PASS/POSITIVE/NEGATIVE。经营/盈利/估值/事件时间差必须分别比较，期间、单位、范围或口径不一致时标为 UNKNOWN/NOT_COMPARABLE。B61 单分部利润阈值、B63 单变量共同 P/E 敏感性及 B68 产品销量/售价/成本替代解不可相加。"
+        + "【B76：胜率与赔率】胜率、赔率、概率加权收益分开。Bear/Base/Bull 输入权重不是天然校准概率，概率加权回报不是胜率；投资胜率只有在存在可比投资案例的历史胜负样本或经独立验证的概率校准模型时才可量化，并须说明样本选择、观察期限和失效边界；仅有事件概率、管理层目标、分析师主观判断或情景权重时，投资胜率必须 UNKNOWN。赔率只能基于同一入场价、同一持有期的上行与下行幅度比较；失败代价还要展示独立 thesis-break stress 和时间成本。事件概率不得直接当作投资胜率。15% 年化门槛是新资金收益要求，不是折现率。B61 中 Required Return 与 Fundamental Target Annualized Return 是两个独立参数；B63 full-vector value-pool 反推使用 Required Return，不得将其误称为 15% Fundamental Target，除非两项输入数值恰好相同。"
         + "不要修改人工控制字段，不声称正式准入、实际成交、实际分红或交易授权。"
     )
     return prompt, prompt_input, frozen_sha
@@ -5176,7 +8827,14 @@ def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]
         fp = _text_fingerprint(value)
         if fp["sha256"] != sha or fp["byte_size"] != size:
             raise LocalInvestmentPilotError(f"ROUND_A_{label}_FINGERPRINT_MISMATCH")
-    if json.dumps(ai, ensure_ascii=False, indent=2, allow_nan=False) not in ap:
+    round_a_marker = "【Round A 允许输入】\n"
+    if ap.count(round_a_marker) != 1:
+        raise LocalInvestmentPilotError("ROUND_A_PROMPT_CONTEXT_NOT_BOUND")
+    try:
+        bound_round_a_input = json.loads(ap.split(round_a_marker, 1)[1].strip())
+    except json.JSONDecodeError as exc:
+        raise LocalInvestmentPilotError("ROUND_A_PROMPT_CONTEXT_NOT_BOUND") from exc
+    if bound_round_a_input != ai:
         raise LocalInvestmentPilotError("ROUND_A_PROMPT_CONTEXT_NOT_BOUND")
     actual_sha = _canonical_json_sha256(artifact) if isinstance(artifact, Mapping) else None
     if actual_sha != a.get("frozen_artifact_sha256") or set(artifact or {}) != {"schema_version", "case", "evidence_register", "assessment", "operating_driver_forecast"}:
@@ -5193,7 +8851,16 @@ def _build_research_rounds_summary(payload: Mapping[str, Any]) -> dict[str, Any]
     bfp = _text_fingerprint(bp)
     if bfp["sha256"] != b.get("prompt_sha256") or bfp["byte_size"] != b.get("prompt_byte_size"):
         raise LocalInvestmentPilotError("ROUND_B_PROMPT_FINGERPRINT_MISMATCH")
-    if json.dumps(bi, ensure_ascii=False, indent=2, allow_nan=False) not in bp:
+    round_b_marker = "【Round B 输入模板（此阶段才包含结构化参考价）】\n"
+    round_b_end_marker = "\n【Round B 输出约束】"
+    if bp.count(round_b_marker) != 1 or bp.count(round_b_end_marker) != 1:
+        raise LocalInvestmentPilotError("ROUND_B_PROMPT_CONTEXT_NOT_BOUND")
+    try:
+        round_b_section = bp.split(round_b_marker, 1)[1].split(round_b_end_marker, 1)[0]
+        bound_round_b_input = json.loads(round_b_section.strip())
+    except (IndexError, json.JSONDecodeError) as exc:
+        raise LocalInvestmentPilotError("ROUND_B_PROMPT_CONTEXT_NOT_BOUND") from exc
+    if bound_round_b_input != bi:
         raise LocalInvestmentPilotError("ROUND_B_PROMPT_CONTEXT_NOT_BOUND")
     if b.get("frozen_artifact_sha256") != actual_sha:
         raise LocalInvestmentPilotError("ROUND_B_DID_NOT_CONSUME_FROZEN_ROUND_A_ARTIFACT")
@@ -5389,8 +9056,9 @@ def _wait_for_response_file_change(
 ) -> tuple[int, int, str]:
     """Wait until a non-empty response file changes and remains stable.
 
-    The operator can save the ChatGPT JSON in TextEdit and the wizard resumes
-    automatically. Pressing Enter is optional; Ctrl-C cancels the wait.
+    The operator may save a response file as before, or copy the ChatGPT
+    response and press Enter for a one-shot macOS clipboard capture.
+    Clipboard contents are never polled or logged; Ctrl-C cancels the wait.
     """
     response_path = Path(path).expanduser()
     candidate: tuple[int, int, str] | None = None
@@ -5425,11 +9093,15 @@ def _wait_for_response_file_change(
                 sys.stdin.readline()
                 latest = _response_file_signature(response_path)
                 if latest is None or latest[0] == 0:
-                    print("按回车触发了文件检查，但指定结果路径当前没有可读取的非空内容。", flush=True)
+                    print("正在尝试一次性接收当前剪贴板（仅因你刚刚按下回车）。", flush=True)
+                    if _capture_clipboard_response_once(response_path):
+                        captured = _response_file_signature(response_path)
+                        if captured is not None and captured[0] > 0:
+                            return captured
                     print(_response_file_diagnostic(response_path), flush=True)
                     print(
-                        "现在打开文件选择窗口，可选择你实际保存的 JSON；"
-                        "导入时会保留原文件，不需要重新研究或重新填写标的。",
+                        "如不使用剪贴板，可继续按原方式保存 JSON 文件；"
+                        "系统不会持续读取剪贴板。",
                         flush=True,
                     )
                     _choose_saved_response_file(response_path)
@@ -5836,9 +9508,11 @@ def _ask_operator_portfolio_context() -> dict[str, Any] | None:
     }
 
 
-def _ask_operator_valuation_context() -> dict[str, Any]:
-    """Collect the primary model choice and project-in-baseline scope from the operator, not the AI."""
-    print("\nB5 主估值模型确认（由你选择，不让 AI 替你选模型）")
+def _ask_operator_valuation_context(
+    *, preferred_model_family: str | None = None
+) -> dict[str, Any]:
+    """Collect this company's primary model and project scope; saved model is only a default hint."""
+    print("\nB5 主估值模型确认（由你按当前公司重新判断，不让 AI 替你选模型）")
     print("  1 = EPS / 市盈率倍数（本批支持项目增量传导）")
     print("  2 = DCF / 自由现金流折现")
     print("  3 = DDM / 股利折现")
@@ -5855,8 +9529,15 @@ def _ask_operator_valuation_context() -> dict[str, Any]:
         "6": "OTHER",
         "0": "UNKNOWN",
     }
+    default_by_family = {value: key for key, value in choices.items()}
+    default_choice = default_by_family.get(str(preferred_model_family or "UNKNOWN").upper(), "0")
+    if preferred_model_family and preferred_model_family != "UNKNOWN":
+        print(
+            f"上次选择 {preferred_model_family} 仅作为本次默认项；"
+            "估值模型必须针对当前公司的业务结构和盈利来源重新确认。"
+        )
     while True:
-        choice = _ask("你确认本次主估值模型类型 0–6", "0")
+        choice = _ask("你确认本次主估值模型类型 0–6", default_choice)
         if choice in choices:
             break
         print("请输入 0 到 6。")
@@ -5887,118 +9568,130 @@ def _ask_operator_valuation_context() -> dict[str, Any]:
     }
 
 
+def _launch_macos_target_best_effort(arguments: list[str], *, fallback: str) -> bool:
+    """Launch a macOS GUI target asynchronously; never block analysis."""
+    if sys.platform != "darwin" or os.environ.get("CI"):
+        return False
+    try:
+        subprocess.Popen(
+            arguments,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return True
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(
+            f"\n{fallback}（{type(exc).__name__}）；请按提示手动继续。",
+            flush=True,
+        )
+        return False
+
+
+def _copy_macos_prompt_best_effort(prompt: str, *, fallback: str) -> bool:
+    """Copy a prompt when possible; clipboard failure must not abort the run."""
+    if sys.platform != "darwin" or os.environ.get("CI"):
+        return False
+    try:
+        subprocess.run(
+            ["pbcopy"],
+            input=prompt,
+            text=True,
+            check=True,
+            timeout=5,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return True
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(
+            f"\n{fallback}（{type(exc).__name__}）；"
+            "请直接从已保存的提示文件或当前终端输出复制内容。",
+            flush=True,
+        )
+        return False
+
+
+def _open_report_best_effort(report_path: str | Path) -> None:
+    """Open a completed report without blocking the investment workflow."""
+    _launch_macos_target_best_effort(
+        ["open", str(report_path)],
+        fallback=f"报告已生成，但系统无法自动打开：{report_path}",
+    )
+
+
 def run_guided_wizard(
     *,
     template_root: str | Path | None = None,
     output_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Run guided research using a dedicated file for the potentially large ChatGPT JSON."""
+    """Run a compact guided workflow; operator-attested prices remain explicitly unverified."""
     template_root = template_root or (Path.home() / ".iios-private" / "local-pilot" / "inputs")
     output_root = output_root or (Path.home() / ".iios-private" / "local-pilot" / "runs")
-    today = date.today()
-    print("\nIIOS 投资分析｜简易向导")
-    print("填写标的和价格后，程序会打开 ChatGPT；完成回答后保存到指定 JSON 文件，报告自动生成。")
+    default_cutoff_date = _default_guided_cutoff_date(datetime.now(SHANGHAI))
+
+    print("\nIIOS 投资分析｜简化入口")
+    print("股票代码可自动识别 A 股/港股；价格仍由你核实输入，不会自动抓取或伪装成行情源已验证。")
     company = _ask("公司名称")
-    symbol_input = _ask("股票代码（可输入 SZ002810、002810.SZ 或 002810）")
-    market_choice = _ask("市场：1 = A 股，2 = 港股", "1")
-    if market_choice not in {"1", "2"}:
-        raise LocalInvestmentPilotError("MARKET_CHOICE_MUST_BE_1_OR_2")
-    market = "CN-A" if market_choice == "1" else "HK"
+    symbol_input = _ask("股票代码（如 002810.SZ、SZ002810、600000.SH、00700.HK 或裸代码）")
+    market = _infer_guided_market(symbol_input)
     symbol = _normalize_guided_symbol(symbol_input, market)
-    while True:
-        try:
-            cutoff = _date(_ask("分析截止日 YYYY-MM-DD", today.isoformat()), "AS_OF_DATE")
-            break
-        except LocalInvestmentPilotError as exc:
-            print(f"日期格式错误：{exc}。请按 YYYY-MM-DD 输入，例如 2026-10-12。")
 
-    print("\n请选择分析截止口径（默认按收盘后分析，无需手写时区）：")
-    print("  1 = 严格日期级截止：截止日 00:00（+08:00），只能使用此前日期已知的信息")
-    print("  2 = 收盘后分析（推荐默认）：自动使用截止日 15:30（+08:00），允许截止日收盘价")
-    print("  3 = 自定义时点：仅特殊情况使用，例如 2026-10-12T15:30:00+08:00")
-    while True:
-        cutoff_mode = _ask("分析截止口径 1/2/3", "2")
-        custom_cutoff = ""
-        if cutoff_mode == "3":
-            custom_cutoff = _ask(
-                "自定义截止时点（必须含时区，例如 2026-10-12T15:30:00+08:00）"
-            )
-        try:
-            cutoff_instant, cutoff_timestamp = _guided_cutoff_timestamp(
-                cutoff, cutoff_mode, custom_cutoff
-            )
-            break
-        except LocalInvestmentPilotError as exc:
-            print(f"截止口径输入有误：{exc}")
-            print("请选 1、2 或 3；普通收盘后分析通常选择 2，不要只输入日期。")
+    cutoff_raw = _ask(
+        "分析截止时点（回车=最近一个已完成工作日 15:30，中国时区；输入 YYYY-MM-DD 默认该日收盘后；"
+        "精确时点请输入带时区的 ISO 时间）",
+        "",
+    )
+    cutoff, cutoff_instant, cutoff_timestamp = _parse_guided_cutoff_input(
+        cutoff_raw, default_date=default_cutoff_date
+    )
 
     while True:
-        position = _ask("当前持仓百分比（例如空仓填 0）", "0")
+        position = _ask("当前持仓百分比（空仓填 0）", "0")
         try:
             build_research_case(symbol, cutoff.isoformat(), position, market=market)
             break
         except (LocalInvestmentPilotError, ValueError, TypeError) as exc:
             print(f"持仓比例不合法：{exc}。请按百分比填写，例如 0 或 10。")
 
+    default_price_date = _default_guided_price_date(cutoff, cutoff_instant)
     while True:
-        price = _ask("你核实的股价（必须大于 0）")
-        try:
-            _positive(price, "CURRENT_PRICE")
-            break
-        except LocalInvestmentPilotError as exc:
-            print(f"股价输入不合法：{exc}。请只输入价格数字，例如 19.74。")
-
-    # No holiday-calendar lookup is performed; weekends are rejected below.
-    default_price_date = (
-        _latest_weekday_on_or_before(cutoff)
-        if cutoff_timestamp else _previous_weekday(cutoff)
-    ).isoformat()
-    while True:
-        date_rule = (
-            "不得晚于截止日；选择 2 时可以填写截止日当天"
-            if cutoff_timestamp else "必须早于分析截止日"
+        price_entry = _ask(
+            "你核实的股价（单行输入：19.74；或 19.74@YYYY-MM-DD；"
+            "非收盘时点输入 19.74@YYYY-MM-DDTHH:MM:SS+08:00）"
         )
         try:
-            observation = _date(
-                _ask(f"该价格观察日期 YYYY-MM-DD（{date_rule}）", default_price_date),
-                "PRICE_OBSERVATION_DATE",
-            )
-            _validate_guided_observation_date(
-                observation, cutoff, cutoff_timestamp=cutoff_instant if cutoff_timestamp else None
+            price, observation, known_at, price_input_mode = _parse_guided_price_input(
+                price_entry,
+                default_observation_date=default_price_date,
+                cutoff=cutoff,
+                cutoff_instant=cutoff_instant,
             )
             break
         except LocalInvestmentPilotError as exc:
-            print(f"价格观察日期不合法：{exc}")
-            print("请填写真实交易日；本程序不会把周末自动改成交易日，也不会自动修改截止日期。")
-    default_known_at = datetime.combine(observation, time(15, 0), tzinfo=SHANGHAI).isoformat()
-    print("\n价格时点：1 = 收盘价/按 15:00 处理（默认）；2 = 非收盘价/指定实际时点")
-    time_mode = _ask("价格时点 1/2", "1")
-    if time_mode == "1":
-        known_at = default_known_at
-    else:
-        while True:
-            known_at = _ask(
-                "价格可获得时间（必须包含时区，例如 2026-10-12T13:30:00+08:00）"
-            )
-            try:
-                parsed_known_at = _datetime(known_at, "PRICE_KNOWN_AT", allow_date_only=False)
-                if parsed_known_at.date() != observation:
-                    raise LocalInvestmentPilotError("PRICE_KNOWN_AT_DATE_MUST_MATCH_OBSERVATION_DATE")
-                if parsed_known_at > cutoff_instant:
-                    raise LocalInvestmentPilotError("PRICE_KNOWN_AFTER_CUTOFF_TIMESTAMP")
-                known_at = parsed_known_at.isoformat()
-                break
-            except LocalInvestmentPilotError as exc:
-                print(f"价格可获得时点不符合截止约束：{exc}")
-                print("请检查日期与截止时点。")
-    source_claim = f"用户手动提供的 {price}；按 {'收盘价 15:00' if time_mode == '1' else '操作者指定时点'} 处理；未从交易所或行情供应商独立核验"
+            print(f"价格输入不合法：{exc}")
+            print("请确认价格为正数、观察日为工作日且价格可获得时点不晚于分析截止时点。")
+
+    source_time_claim = (
+        "收盘价 15:00"
+        if price_input_mode in {"DEFAULT_CLOSE", "DATE_CLOSE"}
+        else f"操作者指定实际时点 {known_at}"
+    )
+    source_claim = (
+        f"用户手动提供的 {price}；按 {source_time_claim} 处理；"
+        "未从交易所或行情供应商独立核验"
+    )
+
     print("\n请核对：")
     print(f"  {company} / {symbol} / {market}")
     if symbol != symbol_input.strip().upper().replace(" ", ""):
         print(f"  股票代码已规范化：{symbol_input} → {symbol}")
-    cutoff_display = cutoff_timestamp or (cutoff.isoformat() + " 00:00:00+08:00（日期级截止）")
-    print(f"  分析截止 {cutoff_display}；价格 {price}；观察日 {observation.isoformat()}；持仓 {position}%")
-    print(f"  价格时间：{known_at}；价格来源：人工输入、未独立核验。")
+    print(
+        f"  分析截止 {cutoff_timestamp}；价格 {price}；"
+        f"观察日 {observation.isoformat()}；价格时间 {known_at}；持仓 {position}%"
+    )
+    print("  价格来源：人工输入、未独立核验；交易日历不自动校验节假日。")
     if _ask("确认并继续？1 = 继续，0 = 退出", "1") != "1":
         return {"status": "CANCELLED", "formal_decision_created": False}
 
@@ -6015,200 +9708,26 @@ def run_guided_wizard(
         template_root=template_root,
         as_of_timestamp=cutoff_timestamp,
     )
-    template_path = Path(template_result["input_template"])
-    prompt_path = Path(template_result["analysis_prompt"])
-    template_payload = json.loads(template_path.read_text(encoding="utf-8"))
-    private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    safe_symbol = symbol.replace(".", "-")
-
-    # Round A uses an explicit allowlist. The full price-bearing template is never sent in this stage.
-    round_a_prompt_input = _round_a_prompt_input(template_payload)
-    prompt = _build_price_blind_round_a_prompt(template_payload)
-    round_a_prompt_path = private_inputs / f"pilot-prompt-round-a-{safe_symbol}-{stamp}.md"
-    _write_local(round_a_prompt_path, prompt)
-    prompt = round_a_prompt_path.read_text(encoding="utf-8")
-    round_a_prompt_fp = _text_fingerprint(prompt)
-    round_a_response_path = private_inputs / f"pilot-chatgpt-round-a-response-{safe_symbol}-{stamp}.json"
-    _write_local(round_a_response_path, "")
-    initial_response_signature = _response_file_signature(round_a_response_path)
-
-    if sys.platform == "darwin":
-        subprocess.run(["pbcopy"], input=prompt, text=True, check=True, timeout=5)
-        subprocess.run(["open", "https://chatgpt.com/"], check=False, timeout=5)
-        subprocess.run(["open", "-a", "TextEdit", str(round_a_response_path)], check=False, timeout=5)
-        print("\nRound A 已准备：价格盲研究提示与专用 JSON 文件已打开；此阶段不会显示结构化股价、持仓或估值字段。")
-    else:
-        print("\nRound A 价格盲研究提示：\n" + prompt)
-    print(f"\nRound A 原始响应保存位置：\n{round_a_response_path}")
-    print("Round A 只研究公司现实、质量、论点、价值驱动、风险与独立经营预测。保存并通过校验后，程序才会生成 Round B。")
-
-    # --- Round A: price-blind company-side research ---
-    response_path = round_a_response_path
-    previous_response_signature = initial_response_signature
-    while True:
-        print("\n等待 Round A ChatGPT 研究补丁保存并完成校验……", flush=True)
-        response_signature = _wait_for_response_file_change(response_path, previous_signature=previous_response_signature)
-        print("检测到 Round A 响应已保存，正在验证阶段边界……", flush=True)
-        try:
-            response_object = _read_json_response_file(response_path)
-            _validate_research_round_patch(response_object, phase="ROUND_A", base_payload=template_payload)
-            payload, response_format, merged_top_level_fields = _expand_research_patch_with_template(template_path, response_object)
-            if _response_file_signature(response_path) != response_signature:
-                raise LocalInvestmentPilotError("ROUND_A_RESPONSE_CHANGED_DURING_VALIDATION")
-            payload.pop("_local_operator_controlled_field_recovery", None)
-            payload.pop("_local_research_response_provenance", None)
-            restored_fields = _restore_operator_controlled_fields_from_template(template_path, payload)
-            if restored_fields:
-                payload["_local_operator_controlled_field_recovery"] = {
-                    "status": "RESTORED_BEFORE_VALIDATION", "fields": restored_fields,
-                    "source_template": Path(template_path).name,
-                    "method": "LOCAL_TEMPLATE_OVERRIDES_AI_RESPONSE", "raw_response_file_modified": False,
-                }
-            _assert_response_preserves_operator_inputs(template_path, payload)
-            break
-        except (OSError, ValueError, KeyError, TypeError) as exc:
-            previous_response_signature = response_signature
-            print(f"Round A 暂未继续：{exc}", flush=True)
-            if isinstance(exc, LocalInvestmentPilotError) and not str(exc).startswith(("CHATGPT_RESPONSE_FILE_READ_FAILED", "CHATGPT_RESPONSE_FILE_NOT_FOUND")):
-                repair_prompt = _build_response_repair_prompt(original_prompt=prompt, response_path=response_path, validation_error=str(exc))
-                if sys.platform == "darwin":
-                    try:
-                        subprocess.run(["pbcopy"], input=repair_prompt, text=True, check=True, timeout=5)
-                        print("\nRound A 修复提示已复制。请切回 ChatGPT 粘贴发送，再覆盖保存同一个 Round A 响应文件。")
-                    except (OSError, subprocess.SubprocessError):
-                        print("\n无法自动复制 Round A 修复提示；请按错误内容修正本阶段响应。")
-                else:
-                    print("\nRound A 修复提示：\n" + repair_prompt, flush=True)
-            print(f"Round A 当前响应文件：{response_path}", flush=True)
-            print("修正后保存会自动重试；无需重新填写标的或价格。按 Control-C 可退出。", flush=True)
-
-    try:
-        round_a_raw_response = response_path.read_bytes().decode("utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        raise LocalInvestmentPilotError("ROUND_A_RAW_RESPONSE_READ_FAILED") from exc
-    round_a_response_fp = _text_fingerprint(round_a_raw_response)
-    if round_a_response_fp["sha256"] != response_signature[2] or round_a_response_fp["byte_size"] != response_signature[0]:
-        raise LocalInvestmentPilotError("ROUND_A_RAW_RESPONSE_FINGERPRINT_CHANGED")
-    frozen_artifact = _round_a_frozen_artifact(payload)
-    frozen_sha = _canonical_json_sha256(frozen_artifact)
-    round_a_provenance = {
-        "schema_version": ROUND_A_PROVENANCE_SCHEMA, "phase": "PRICE_BLIND_COMPANY_RESEARCH",
-        "prompt_filename": round_a_prompt_path.name, "prompt_text": prompt,
-        "prompt_sha256": round_a_prompt_fp["sha256"], "prompt_byte_size": round_a_prompt_fp["byte_size"],
-        "prompt_input_payload": round_a_prompt_input,
-        "response_filename": round_a_response_path.name, "raw_response_text": round_a_raw_response,
-        "response_sha256": round_a_response_fp["sha256"], "response_byte_size": round_a_response_fp["byte_size"],
-        "frozen_company_side_artifact": frozen_artifact, "frozen_artifact_sha256": frozen_sha,
-        "formal_forecast_admission": "NOT_ADMITTED", "formal_valuation_admission": "NOT_ADMITTED",
-    }
-    payload["_local_research_round_a_provenance"] = round_a_provenance
-    round_a_completed_path = private_inputs / f"pilot-round-a-frozen-{safe_symbol}-{stamp}.json"
-    _write_local(round_a_completed_path, json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False))
-
-    # --- Round B: only now introduce the protected reference price ---
-    base_prompt = prompt_path.read_text(encoding="utf-8")
-    round_b_prompt, round_b_prompt_input, round_b_frozen_sha = _build_price_aware_round_b_prompt(base_prompt=base_prompt, payload=payload)
-    if round_b_frozen_sha != frozen_sha:
-        raise LocalInvestmentPilotError("ROUND_B_FROZEN_ARTIFACT_HASH_CHANGED_DURING_PROMPT_BUILD")
-    round_b_prompt_path = private_inputs / f"pilot-prompt-round-b-{safe_symbol}-{stamp}.md"
-    _write_local(round_b_prompt_path, round_b_prompt)
-    round_b_prompt = round_b_prompt_path.read_text(encoding="utf-8")
-    round_b_prompt_fp = _text_fingerprint(round_b_prompt)
-    round_b_response_path = private_inputs / f"pilot-chatgpt-round-b-response-{safe_symbol}-{stamp}.json"
-    _write_local(round_b_response_path, "")
-    round_b_initial_signature = _response_file_signature(round_b_response_path)
-
-    if sys.platform == "darwin":
-        subprocess.run(["pbcopy"], input=round_b_prompt, text=True, check=True, timeout=5)
-        subprocess.run(["open", "-a", "TextEdit", str(round_b_response_path)], check=False, timeout=5)
-        print("\nRound A 已冻结。Round B 价格感知估值/MIE/预期差提示已复制到剪贴板；请在 ChatGPT 中发送，并保存到单独的 Round B JSON 文件。")
-    else:
-        print("\nRound B 价格感知估值/MIE/预期差提示：\n" + round_b_prompt)
-    print(f"\nRound B 原始响应保存位置：\n{round_b_response_path}")
-    prompt, response_path = round_b_prompt, round_b_response_path
-    round_a_base_payload = json.loads(round_a_completed_path.read_text(encoding="utf-8"))
-    previous_response_signature = round_b_initial_signature
-
-    while True:
-        print("\n等待 Round B ChatGPT 研究补丁保存并完成完整 IIOS 字段校验……", flush=True)
-        response_signature = _wait_for_response_file_change(response_path, previous_signature=previous_response_signature)
-        print("检测到 Round B 响应已保存，正在验证阶段边界和研究内容……", flush=True)
-        try:
-            response_object = _read_json_response_file(response_path)
-            _validate_research_round_patch(response_object, phase="ROUND_B", base_payload=round_a_base_payload)
-            payload, response_format, merged_top_level_fields = _expand_research_patch_with_template(round_a_completed_path, response_object)
-            if _response_file_signature(response_path) != response_signature:
-                raise LocalInvestmentPilotError("ROUND_B_RESPONSE_CHANGED_DURING_VALIDATION")
-            payload.pop("_local_operator_controlled_field_recovery", None)
-            payload.pop("_local_research_response_provenance", None)
-            restored_fields = _restore_operator_controlled_fields_from_template(template_path, payload)
-            if restored_fields:
-                payload["_local_operator_controlled_field_recovery"] = {
-                    "status": "RESTORED_BEFORE_VALIDATION", "fields": restored_fields,
-                    "source_template": Path(template_path).name,
-                    "method": "LOCAL_TEMPLATE_OVERRIDES_AI_RESPONSE", "raw_response_file_modified": False,
-                }
-            _assert_response_preserves_operator_inputs(template_path, payload)
-            _prepare_input(payload)
-            _validate_guided_research_response(payload)
-            payload["_local_research_round_a_provenance"] = round_a_provenance
-            payload["_local_research_round_b_provenance"] = {
-                "schema_version": ROUND_B_PROVENANCE_SCHEMA, "phase": "PRICE_AWARE_VALUATION_MIE_EXPECTATION_GAP",
-                "prompt_filename": round_b_prompt_path.name, "prompt_text": round_b_prompt,
-                "prompt_sha256": round_b_prompt_fp["sha256"], "prompt_byte_size": round_b_prompt_fp["byte_size"],
-                "prompt_input_payload": round_b_prompt_input, "frozen_artifact_sha256": round_b_frozen_sha,
-                "response_filename": round_b_response_path.name, "response_sha256": response_signature[2],
-                "response_byte_size": response_signature[0],
-            }
-            payload["_local_research_response_provenance"] = {
-                "schema_version": LOCAL_RESEARCH_RESPONSE_PROVENANCE_SCHEMA, "status": "CAPTURED_RAW_CHATGPT_RESPONSE",
-                "source_filename": response_path.name, "sha256": response_signature[2], "byte_size": response_signature[0],
-                "capture_stage": "ROUND_B_RAW_RESPONSE_HASHED_ON_STABLE_SAVE_BEFORE_LOCAL_TEMPLATE_MERGE_AND_OPERATOR_FIELD_RECOVERY",
-                "validation_status": "ROUND_A_PRICE_BLIND_STAGE_FROZEN; JSON_OBJECT_PARSE_PASSED; RESPONSE_FORMAT=" + response_format + "; MERGED_FIELDS=" + ",".join(merged_top_level_fields) + "; FULL_RESEARCH_REQUIRED_FIELDS_PASSED_AFTER_OPERATOR_FIELD_RESTORATION",
-                "raw_response_file_modified_by_runner": False,
-            }
-            break
-        except (OSError, ValueError, KeyError, TypeError) as exc:
-            previous_response_signature = response_signature
-            print(f"Round B 暂未继续：{exc}", flush=True)
-            if isinstance(exc, LocalInvestmentPilotError) and not str(exc).startswith(("CHATGPT_RESPONSE_FILE_READ_FAILED", "CHATGPT_RESPONSE_FILE_NOT_FOUND")):
-                repair_prompt = _build_response_repair_prompt(original_prompt=prompt, response_path=response_path, validation_error=str(exc))
-                if sys.platform == "darwin":
-                    try:
-                        subprocess.run(["pbcopy"], input=repair_prompt, text=True, check=True, timeout=5)
-                        print("\nRound B 修复提示已复制。请切回 ChatGPT 粘贴发送，再覆盖保存同一个 Round B 响应文件。")
-                    except (OSError, subprocess.SubprocessError):
-                        print("\n无法自动复制 Round B 修复提示；请按错误内容修正本阶段响应。")
-                else:
-                    print("\nRound B 修复提示：\n" + repair_prompt, flush=True)
-            print(f"Round B 当前响应文件：{response_path}", flush=True)
-            print("修正后保存会自动重试；Round A 已冻结，无需重新填写标的或重做第一轮。按 Control-C 可退出。", flush=True)
-
-    # Validate the response before collecting any optional operator-only
-    # portfolio inputs. AI research output never gets to author these limits.
-    _prepare_input(payload)
-    portfolio_context = _ask_operator_portfolio_context()
-    if portfolio_context is not None:
-        payload["operator_portfolio_context"] = portfolio_context
-    payload["operator_valuation_context"] = _ask_operator_valuation_context()
-    private_inputs = _private_dir(template_root, "PILOT_TEMPLATE_ROOT")
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    completed = private_inputs / f"pilot-completed-{symbol.replace('.', '-')}-{stamp}.json"
-    _write_local(completed, json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False))
-    result = run_local_investment_pilot(
-        input_path=completed,
-        output_root=output_root,
-        research_response_path=response_path,
-        expected_research_response_sha256=response_signature[2],
-        expected_research_response_byte_size=response_signature[0],
+    private_task_root = _private_dir(template_root, "PILOT_TEMPLATE_ROOT") / "tasks"
+    session = GuidedTaskSession.create(
+        private_task_root,
+        metadata={"symbol": symbol, "company": company, "market": market},
     )
-    print("\n分析完成：")
+    session.checkpoint_context({
+        "company": company,
+        "symbol": symbol,
+        "market": market,
+        "template_path": str(Path(template_result["input_template"]).resolve()),
+        "analysis_prompt_path": str(Path(template_result["analysis_prompt"]).resolve()),
+        "template_payload": json.loads(Path(template_result["input_template"]).read_text(encoding="utf-8")),
+        "analysis_prompt_text": Path(template_result["analysis_prompt"]).read_text(encoding="utf-8"),
+        "template_root": str(Path(template_root).expanduser().resolve()),
+        "output_root": str(Path(output_root).expanduser().resolve()),
+    })
+    print(f"\n已创建可恢复研究任务：{session.task_id}")
+    result = run_guided_task(session, output_root=output_root)
+    print("\n研究任务完成：")
     print(json.dumps(_safe(result), ensure_ascii=False, indent=2))
-    report_path = result.get("report_path")
-    if report_path and sys.platform == "darwin":
-        subprocess.run(["open", str(report_path)], check=False, timeout=5)
-    print("\n下次分析另一个标的，只需双击同一个启动器。")
     return result
 
 
@@ -6221,6 +9740,7 @@ def _main(argv: list[str] | None = None) -> int:
     modes.add_argument("--input", help="run a completed private pilot input JSON")
     modes.add_argument("--replay-run", help="verify a prior bundle then recompute and compare decision-material fields")
     modes.add_argument("--check-run", help="read-only SHA-256 check of a local run bundle")
+    modes.add_argument("--resume-task", help="resume a durable guided Pilot task by TASK_ID")
     parser.add_argument("--template-root", default=str(Path.home() / ".iios-private" / "local-pilot" / "inputs"))
     parser.add_argument("--output-root", default=str(Path.home() / ".iios-private" / "local-pilot" / "runs"))
     parser.add_argument("--company")
@@ -6237,6 +9757,16 @@ def _main(argv: list[str] | None = None) -> int:
     try:
         if args.wizard:
             result = run_guided_wizard(template_root=args.template_root, output_root=args.output_root)
+        elif args.resume_task:
+            task_root = _private_dir(args.template_root, "PILOT_TEMPLATE_ROOT") / "tasks"
+            session, _manifest = GuidedTaskSession.open(task_root, args.resume_task)
+            default_output_root = Path.home() / ".iios-private" / "local-pilot" / "runs"
+            resume_output_root = (
+                None
+                if Path(args.output_root).expanduser() == default_output_root
+                else args.output_root
+            )
+            result = run_guided_task(session, output_root=resume_output_root)
         elif args.create_template:
             required = {
                 "--company": args.company, "--symbol": args.symbol, "--as-of": args.as_of,

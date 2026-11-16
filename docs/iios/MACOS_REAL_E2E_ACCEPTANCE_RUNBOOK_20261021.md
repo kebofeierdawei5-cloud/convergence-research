@@ -128,7 +128,72 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 - B4/B5 是否把项目增量利润误当成集团净利润或重复加总；B6 绑定约束及 90%/100%/110% 梯度是否与回报和目标入场价一致。
 - 来源时间是否符合截止日；未知事实是否保留 UNKNOWN；报告和 JSON 的判断、价值情景与风险是否一致。
 - governance.formal_decision_created、canonical_run_receipt_created、execution_authorized、auto_execution 必须为 false；这仍然不是正式投资决策或交易授权。
+- B62 分部对账：B4 是否为 COMPANY_WIDE，是否只使用相邻完整年度；每个 B4 产品是否有显式 business_segment_id，多个产品归集是否有业务依据且 ID 一致；历史/前瞻分部财务八项 typed measures 的期间、单位、data_class、basis、source/cutoff 是否合格；缺失字段是否保留 UNKNOWN 而非默认为零。
+- B62 盈利桥：B55 每个产品贡献是否已经 CALCULATED_AND_RECONCILED；产品→分部 ID 是否前后保持一致；分部正常化归母利润是否剔除非经常性项目、按正常化少数股东损益扣除，且分解残差均在 CNY 1 内。
+- B62/SOTP 比较：B4、SOTP、B61 的 forecast_period 是否完全一致；SOTP 每个 segment 是否显式声明 earnings_basis=NORMALIZED_PARENT_ATTRIBUTABLE 并与 B4 business_segment_id 精确对应；当前 SOTP P/E 是否被固定；B4 全分部利润向量形成的价值池是否与 B61 Required Return（未计分红）要求池按同一母公司调整和股数口径比较；单个分部在其他分部按 B4 预测不变时所需的 P/E 是否与当前选定 P/E 分开显示。
+- B63 价值池瀑布：当前 SOTP 价值池 + B4 盈利变化（固定所选 SOTP P/E）是否闭合到 B4 全分部预测池；剩余缺口是否单列为统一 P/E 同比例缩放敏感性；不得将该系数描述为市场实际倍数或公平估值。
+- B63 P/E 依据：每个分部选定 P/E 的 basis、data_class、evidence_refs 是否展示；来源是否支持相应终值倍数，是否误将分析师假设说成外部共识；非正价值池下的共同 P/E 缩放是否保持 NOT_IDENTIFIABLE。
+- B63 母公司调整：资本化中心成本是否等于税后中心成本×倍数；Required Pool 是否严格等于 Required Equity + 资本化中心成本 − 净现金/净负债 − 其他调整；未来母公司调整变化没有独立预测时是否保持 UNKNOWN。
+- B63 稀释股数：Required Equity 是否等于 Required Per-Share × Diluted Shares；SOTP、B61、B62 股数是否一致；盈亏平衡股数和 1% 稀释敏感性是否只是条件算术，未被误称为 EPS 预测。
+- B63 若任一 SOTP/B61/B62 股数、母公司调整、分部价值池、期间或每股值交叉复算不一致，须标记 RECONCILIATION_MISMATCH，不得输出“归因通过”。
+- B61 单变量盈利要求不得相加；它是假设其他分部利润不变的替代敏感性。只有 B62 全分部 B4 预测价值池才代表多个分部同时变化的情景结果。若无独立前瞻母公司成本/净现金/其他调整预测，不得给这些因素虚构变化金额。
+- 报告/analysis.json/Replay 应同时保留 B4 分部利润桥、SOTP earnings_basis、B61 要求、B62 比较与所有 UNKNOWN/NOT_COMPARABLE 标记；不允许以 B62 诊断结果反向覆盖 SOTP 主估值、外部 MIE、expectation_gap、B5/B6 或 Decision。
+- B64 证据等级：利润输入 G1/G2 是否只被解释为“结构化披露/机制关联”，没有被宣称为已核实原始证据；G3 分析师盈利假设、G4 P/E 假设是否分开显示；G5 是否保留 UNKNOWN；不得把两个等级合并成综合评分。
+- B65 同行可比性：每个 SOTP 分部是否逐同行提供 13 项画像（商业模式、收入结构、终端客户、成长阶段、行业周期、利润质量、ROIC、资本强度、杠杆、FCF 转换、会计口径、盈利期间、P/E 口径）；target_value/peer_value 是否与双方画像逐项一致。
+- B65 差异处理：SIMILAR 是否仅标 NEUTRAL + NO_NUMERIC_ADJUSTMENT；DIFFERENT 是否有定性方向、调整处理与理由；NOT_COMPARABLE 是否明确排除；UNKNOWN/缺少证据是否不能被计为已完成可比同行。
+- B65 估值时点：同行估值日期是否不晚于案例截止日；较早日期是否提供 date_alignment_rationale；TTM/NTM/正常化 P/E 是否明确区分，不能混合后直接取平均。
+- B65 证据链接：每个比较维度的 evidence_refs 是否属于该 P/E measure 自身 evidence_refs，来源是否存在且时间兼容；时间兼容不得被误称为正式证据准入。
+- B65 同行集合：至少两家不同同行均通过全部 13 维度且未被排除，才可标记 COMPARABILITY_REVIEW_COMPLETE_NOT_VALUATION_APPROVED；同行不足、差异未解释或资料缺失时保持 PEER_SET_INSUFFICIENTLY_COMPARABLE / PARTIAL。
+- B65 决策边界：TARGET_PREMIUM/TARGET_DISCOUNT 仅是相对方向判断；不得将差异相加、生成数值溢价/折价、同行平均 P/E 或新的终值 P/E；analysis.json 与报告中的 selected P/E 必须与 B63 输入保持不变。
+- B66 同口径同行锚：同行 P/E 中位数是否只来自 B65 完整可比同行，且 accounting_basis、earnings_reference_period、pe_measurement_basis 三项均可识别并标记 SIMILAR；至少两家才计算，不混合 TTM/NTM/正常化口径。
+- B66 替代参考锚：若使用 HISTORICAL_SELF_RANGE / OTHER_EXPLICIT_REFERENCE，是否提供正数参考倍数、清楚来源说明和 cutoff 前证据；没有可靠参考时是否如实保留 NO_COMPARABLE_REFERENCE / PARTIAL。
+- B66 无参考声明：若 B65 已有至少两家同口径完整同行，selected_multiple_bridge 不得同时声明 NO_COMPARABLE_REFERENCE；应使用 PEER_MEDIAN 或另提供可审计的历史/独立参考锚。
+- B66 显式倍数桥：selected P/E 是否等于 reference multiple + 所有 adjustment_x（±0.01x）；每项是否有 B65 维度、方向、正/负/零符号、理由和同 P/E measure 证据引用；premium/discount 方向是否与 B65 已完成且适用的同行判断一致；同一维度是否重复调整。
+- B66 维度证据链接：每个调整项的 evidence_refs 是否不仅属于 P/E measure 的总来源引用，而且与 B65 对应 dimension + direction 的具体证据引用相交；不得用无关来源支持成长溢价或周期折价。
+- B66 分部价值池复算：全部分部低/选定/高区间同时变化时，当前选定分部池是否等于 Σ（分部归母利润×选定 P/E），总股权价值、每股终值是否与母公司调整和稀释股数一致。
+- B66 估值区间：lower_bound_pe_x / selected PE / upper_bound_pe_x 是否满足正数和顺序约束，均有分析依据、下行/上行理由及时间兼容证据；是否明确只是分析师敏感性，不是概率置信区间。
+- B66 估值传导：每个分部低/选定/高 P/E 是否只乘该场景归母正常化利润；全部分部同时取低/高区间时，selected SOTP equity/per share 是否先复算闭合，母公司调整和稀释股数是否保持不变。
+- B66 B63 对比：Required Common P/E 是否明确是 B63 在全分部 B4 盈利向量下的统一倍数缩放敏感性，而不是单一分部的公平 P/E；B63、B65 的 selected P/E 是否与当前 SOTP 输入一致。
+- B66 决策边界：任何同行中位数、显式调整桥或低/高区间都不得自动覆盖 selected SOTP P/E；不得改变 MIE、expectation_gap、15% 年化要求回报、目标买入价、组合政策或 Decision。
+- B67 分部价值池：每个分部正常化归母利润 × selected P/E 是否复算为 selected SOTP segment value；全分部合计是否与 B63 selected segment pool 一致；segment_id 是否一一匹配。
+- B67 独立盈利贡献：B4 − selected SOTP normalized profit 是否仅按未改变的 selected P/E 计算；分部贡献是否闭合到 B63 earnings effect，且 selected pool + earnings effect = B4 forecast pool。
+- B67 倍数价值拆解：只在 B66 reference + explicit adjustment bridge 闭合且 B67 再复算通过时输出金额；全公司汇总要求所有分部均有参考锚，缺失参考不得当成零。
+- B67 证据等级：B64 profit G1–G5 与 multiple G4/G5 分别展示；不得合并成可信度总分、概率、置信区间或估值折扣。
+- B67 现价要求：selected pool → B4 earnings effect → B4 forecast pool → B63 common P/E scaling → B61 Required Return pool 应闭合；逐分部 Required Common P/E 应等于本分部 selected P/E × common scale factor；明确为不含分红的条件回报门槛反推，不是外部 MIE 或市场共识。
+- B67 母公司/稀释：中心成本、净现金/净负债、其他调整的带符号合计应闭合；Required Equity 应等于 Required Per Share × Diluted Shares；无独立前瞻预测不得推定未来调整或股数变化。
+- B67 决策边界：不得改写 SOTP、B61–B66、15% 年化要求、目标入场价、MIE、expectation_gap、组合约束或 Decision；B67 不是 BUY/SELL 指令。
+- B68 双利润门槛：B61 单分部门槛是否明确保持其他分部在 selected SOTP 利润；B63 全 B4 向量门槛是否保持其他分部在 B4 预测并固定 selected P/E；两类门槛不得相加。
+- B68 利润反解：分部归母正常化利润目标是否使用 B62 完整输入，固定费用、折旧、融资、税率、经常性非经营项和正常化 NCI；是否先复算当前 B4 利润；正利润与非正利润税额分支是否正确；缺失或 100% 税率等不可逆情况是否保留 UNKNOWN。
+- B68 产品映射：B55 product_id / business_segment_id 是否与 B4/B62 显式映射一致；产品贡献合计是否闭合到 B62 分部当前贡献。
+- B68 单变量反推：销量-only / ASP-only / 单位成本-only 是否各自只改变一个驱动、其他驱动与其他产品保持不变；分母非正、销量/售价非正、成本为负是否正确标记不可行/不可识别；三个结果不得累加。
+- B68 来源链：每条产品前瞻销量、净售价、单位成本及 B4 固定财务参数是否保留 data_class、basis、evidence_refs；不得把分析师假设改写为发行人指引或正式准入。
+- B68 产量库存边界：是否明确销售量不等于产量；没有独立产销库存政策时，不得把销量要求标为生产/库存可行。
+- B68 决策边界：不改变 B4/B55/B62/B63、SOTP、B61、15% 年化门槛、目标入场价、外部 MIE、expectation_gap、组合约束和 Decision。
 
+
+- B69 现价隐含经营可行性：B61 与 B63 门槛是否分别输出且明确非加总；销量-only 目标是否来自 B68 原始条件敏感性，而非被重新预测。
+- B69 产销库存约束：B4 前瞻产量 − 销量是否复算为库存变动；任何差异是否阻断所需产量反推；所需产量是否按“B4 前瞻库存产销差额不变”计算，未假定库存可无限释放。
+- B69 产能约束：年度名义产能是否有正数、类型/来源、期间完整性；只在完整年度期间比较；所需产量超过名义产能时标记 EXCEEDS_NAMEPLATE_CAPACITY；在名义产能内也只能标 CONDITIONAL，不得声称有效产能/爬坡已验证。
+- B69 未识别约束：无独立订单/客户需求、价格弹性/竞争价格、成本曲线/节约项目、扩建投产日期/爬坡、项目级增量资本开支和营运资金证据时，必须保持 NOT_IDENTIFIABLE；不得用需求假设证明销量、用成本反推证明降本。
+- B69 库存与现金：是否原样显示 B4 inventory_reconciliation_status、effective_change_working_capital、cash_capex、FCF；不得重复加 B42 inventory_cash_impact_proxy 或在缺乏项目级资金输入时将扩产增量资金默认为零；B69 不得被误认为已替代/通过 B43 有效营运资金与主估值经营桥对账。
+- B69 决策边界：不改变 B4/B55/B61–B68、SOTP、MIE、expectation_gap、15% 年化门槛、目标入场价、组合约束、Decision、正式 Evidence/PIT 准入或执行权限。
+
+
+- B70 证据主张结构：每条记录是否具备唯一 record_id、claim_type、product_id、scenario、forecast_period、value/unit、data_class、basis 和 evidence_refs；不得从 B68 反推值自动生成支持性证据。
+- B70 来源核验：引用是否在同一 case evidence_register 唯一存在、截止日兼容且主张类别为 ISSUER_PRIMARY / EXCHANGE_PRIMARY / REGULATOR_PRIMARY；未知时点、截止后、重复 ID、来源类别非 primary、域名类别冲突和 ANALYST_ASSUMPTION 均不得进入条件数值比较；不把 PIT 时间兼容称为正式证据准入。
+- B70 精确匹配：product_id / scenario / forecast_period 是否与 B69 目标一致；不跨期间、不跨场景借用证据；同一场景/产品/期间/claim_type 只允许一个汇总主张，重复主张不得相加。
+- B70 数值门槛：销量与净售价支持值是否达到 B68 反推门槛；单位成本是否不高于要求；有效可用产能是否覆盖所需产量；扩产可用日期是否仅与完整年度末比较；若投产晚于年度末，即使产能数量足够也不得计入该年度可用产能；缺乏可比字段时保留 NOT_IDENTIFIABLE。
+- B70 增量资金：INCREMENTAL_CAPEX_REQUIRED / FUNDED 与 INCREMENTAL_WORKING_CAPITAL_REQUIRED / FUNDED 是否分别配对；comparison_basis 是否明确为 INCREMENTAL_TO_B4_FORWARD_PLAN；不得把 B4 既有资本开支/WC 冒充增量资金。
+- B70 治理：报告是否保留每条 record/status/evidence_refs；数值覆盖仅为链接主张的算术比较，不等于来源内容语义独立核实；overall operational feasibility 不得自动升级为 PASS，不得影响 Decision、估值或投资权限。
+
+- B71 审核记录：每条人工审核是否精确绑定一个 B70 record_id，具备唯一 review_id、claim_preparer_id、reviewer_id/role、reviewer_relationship_status、conflict_of_interest_status、带时区 reviewed_at、HUMAN_SOURCE_CONTENT_REVIEW 方法、决策、review_notes，以及与 B70 完全一致的 reviewed_evidence_refs；同一人自审、相关方或利益冲突未明确解决时，不得标记条件性支持。
+- B71 清单完整性：每种 claim_type/data_class 是否加载对应必检清单；缺失、未知、重复或多出的 check_id 是否阻断支持；PASS 是否具备原始来源引用；B70 每个来源是否至少映射一条具体检查；必检项是否被错误标记 NOT_APPLICABLE。
+- B71 销量语义：ISSUER_FORECAST 是否核对 firm order/取消权/客户/交付期/重复订单；OBSERVED_ACTUAL 是否核对发票、发货和客户验收数量，而非把订单当成已实现销售。
+- B71 净售价语义：实际开票净价是否扣除折扣返利、红字/贷项、税费与运费；未来预测是否有合同价格条款、返利条件和量价组合支持；不能把产品 mix 当作可比价格上涨。
+- B71 单位成本语义：实际成本是否复核成本项目和分摊基线；发行人预测降本是否有明确项目、负责人、执行里程碑、良率/能源/投入基础；单纯降本目标不能算支持。
+- B71 产能/扩建/资金：是否区分名义与有效产能；审核检修、良率、瓶颈、共享产线；扩产是否核验许可、建设、设备、试车、验收与合格产品爬坡；增量资本开支/WC 是否相对 B4 前瞻计划明确增量且排除重复占用。
+- B71 审核结果：SUPPORTS 只有必检项全部 PASS 且来源引用完整才可标条件性支持；CONTRADICTS、DOES_NOT_SUPPORT、PARTIALLY_SUPPORTS、UNABLE_TO_VERIFY 应分别呈现；SUPPORTS 与 FAIL 并存必须阻断。
+- B71 反冒充：reviewer_id/审核时间/关系/利益冲突/审核结论均为记录的人工声明，不等于身份、独立性、源文件内容或法律效力已自动验证；overall operational feasibility 不得升级为 PASS，也不得创建正式 Evidence/PIT/Forecast/Valuation admission 或 Decision 权限。
 ## 9. 已发生故障与防重复清单
 
 | 历史故障 | 当前防护 | 遇到时该怎么做 |

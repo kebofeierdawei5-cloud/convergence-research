@@ -85,7 +85,7 @@ def _bundle():
     }
 
 
-def test_trusted_factory_builds_all_eight_validated_bindings_without_paid_api_key(tmp_path, monkeypatch):
+def test_trusted_factory_builds_all_nine_validated_bindings_without_paid_api_key(tmp_path, monkeypatch):
     env, _, out = _env(tmp_path, monkeypatch)
     env.pop("IIOS_LLM_PROVIDER_API_KEY", None)
     runtime = build_canonical_runtime(bundle=_bundle(), output_root=out, env=env)

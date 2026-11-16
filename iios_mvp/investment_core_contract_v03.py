@@ -344,6 +344,12 @@ def calculate_return_metrics(
         "return_gate_pass": entry_pass and target_pass and rr_pass and risk_pass,
     }
 
+from .canonical_forecast_evidence_binding_v01 import (
+    CanonicalSignedEvidenceAdmissionReference,
+    CanonicalSignedEvidenceAdmissionResolver,
+)
+
+
 def validate_return_gate_v03(return_gate: Any, path: str = "return_gate") -> list[dict[str, str]]:
     errors: list[dict[str, str]] = []
     if not isinstance(return_gate, dict):
@@ -358,6 +364,17 @@ def validate_return_gate_v03(return_gate: Any, path: str = "return_gate") -> lis
     _required(return_gate, fields, path, errors)
     if errors:
         return errors
+    if return_gate.get("canonical_evidence_admission_ref") is not None:
+        try:
+            CanonicalSignedEvidenceAdmissionReference.from_mapping(
+                return_gate["canonical_evidence_admission_ref"]
+            )
+        except (TypeError, ValueError) as exc:
+            errors.append(_err(
+                "V03-RETURN-LINEAGE-EVIDENCE-PIT-REF",
+                f"{path}.canonical_evidence_admission_ref",
+                str(exc),
+            ))
     scenarios = return_gate["scenarios"]
     if not isinstance(scenarios, dict):
         return [_err("V03-SCHEMA-TYPE", f"{path}.scenarios", "must be an object")]
@@ -410,8 +427,9 @@ def _portfolio_status(case: dict[str, Any]) -> str:
 def _risk_status(case: dict[str, Any]) -> str:
     return str((case.get("risk") or {}).get("status", "UNKNOWN")).upper()
 
-def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None, valuation_output_resolver: Any | None = None, operator_price_input_resolver: Any | None = None) -> dict[str, Any]:
+def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None, valuation_output_resolver: Any | None = None, operator_price_input_resolver: Any | None = None, evidence_admission_resolver: CanonicalSignedEvidenceAdmissionResolver | None = None) -> dict[str, Any]:
     errors: list[dict[str, str]] = []
+    return_lineage_assessment: dict[str, Any] | None = None
     if not isinstance(case, dict):
         return {"status": "BLOCKED", "errors": [_err("V03-SCHEMA-TYPE", "$", "case must be an object")]}
     required = (
@@ -608,19 +626,30 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
                 "return_gate.canonical_valuation_ref",
                 "canonical valuation output resolver is required for lineage-bound return gate",
             ))
+        evidence_ref = return_gate.get("canonical_evidence_admission_ref")
+        if (evidence_ref is None) != (evidence_admission_resolver is None):
+            errors.append(_err(
+                "V03-RETURN-LINEAGE-EVIDENCE-PIT-PAIR",
+                "return_gate.canonical_evidence_admission_ref",
+                "canonical Evidence/PIT reference and signed admission resolver must be supplied together",
+            ))
         if (
             isinstance(return_gate.get("canonical_forecast_ref"), dict)
             and isinstance(return_gate.get("canonical_valuation_ref"), dict)
             and independent_forecast_resolver is not None
             and valuation_output_resolver is not None
+            and ((evidence_ref is None and evidence_admission_resolver is None)
+                 or (isinstance(evidence_ref, dict) and evidence_admission_resolver is not None))
         ):
             try:
-                validate_forecast_valuation_return_lineage(
+                return_lineage_assessment = validate_forecast_valuation_return_lineage(
                     return_gate=return_gate,
                     canonical_forecast_ref=return_gate["canonical_forecast_ref"],
                     canonical_valuation_ref=return_gate["canonical_valuation_ref"],
                     independent_forecast_resolver=independent_forecast_resolver,
                     valuation_output_resolver=valuation_output_resolver,
+                    canonical_evidence_admission_ref=evidence_ref,
+                    evidence_admission_resolver=evidence_admission_resolver,
                     case_id=case["case_id"],
                     market=case["market"],
                     symbol=case["symbol"],
@@ -902,7 +931,11 @@ def validate_case_v03(case: Any, *, evidence_root_resolver: EvidenceRootResolver
                 errors.append(_err("V03-ACTION", "decision.action", f"invalid action: {action}"))
             if status not in DECISION_STATUSES:
                 errors.append(_err("V03-DECISION-STATUS", "decision.decision_status", f"invalid status: {status}"))
-    return {"status": "PASS" if not errors else "BLOCKED", "errors": errors}
+    return {
+        "status": "PASS" if not errors else "BLOCKED",
+        "errors": errors,
+        "return_lineage": return_lineage_assessment,
+    }
 
 def _canonical_expectation_gap(payload: Any, case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None) -> dict[str, Any]:
     mie_ref = case.get("market_implied_expectation_snapshot_ref")
@@ -944,8 +977,8 @@ def _expectation_gap(case: dict[str, Any], *, evidence_root_resolver: EvidenceRo
     return status, gap if isinstance(gap, Decimal) else None
 
 
-def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None, valuation_output_resolver: Any | None = None, operator_price_input_resolver: Any | None = None) -> dict[str, Any]:
-    validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver, independent_forecast_resolver=independent_forecast_resolver, upstream_authority_resolver=upstream_authority_resolver, valuation_output_resolver=valuation_output_resolver, operator_price_input_resolver=operator_price_input_resolver)
+def decide_v03(case: dict[str, Any], *, evidence_root_resolver: EvidenceRootResolver | None = None, current_price_resolver: CanonicalCurrentPriceResolver | None = None, independent_forecast_resolver: CanonicalIndependentForecastResolver | None = None, upstream_authority_resolver: Any | None = None, valuation_output_resolver: Any | None = None, operator_price_input_resolver: Any | None = None, evidence_admission_resolver: CanonicalSignedEvidenceAdmissionResolver | None = None) -> dict[str, Any]:
+    validation = validate_case_v03(case, evidence_root_resolver=evidence_root_resolver, current_price_resolver=current_price_resolver, independent_forecast_resolver=independent_forecast_resolver, upstream_authority_resolver=upstream_authority_resolver, valuation_output_resolver=valuation_output_resolver, operator_price_input_resolver=operator_price_input_resolver, evidence_admission_resolver=evidence_admission_resolver)
     position = _position(case) if isinstance(case.get("portfolio"), dict) else Decimal("0")
     trust_status = str((case.get("trust") or {}).get("status", "UNKNOWN")).upper()
     upstream = (

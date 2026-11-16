@@ -172,9 +172,19 @@ def admit_canonical_decision(
     upstream_authority_resolver: Any | None = None,
     valuation_output_resolver: Any | None = None,
     operator_price_input_resolver: Any | None = None,
+    evidence_admission_resolver: Any | None = None,
 ) -> dict[str, Any]:
-    """Re-run the canonical v0.3 Decision Kernel and issue a binding admission receipt."""
+    """Issue a binding Decision receipt only after signed Evidence/PIT lineage is reverified."""
     from .investment_core_contract_v03 import decide_v03, validate_case_v03
+
+    return_gate = case.get("return_gate") if isinstance(case.get("return_gate"), Mapping) else {}
+    if (
+        not isinstance(return_gate.get("canonical_evidence_admission_ref"), Mapping)
+        or evidence_admission_resolver is None
+    ):
+        raise ValueError(
+            "formal Decision Admission requires canonical_evidence_admission_ref and signed Evidence/PIT resolver"
+        )
 
     validation = validate_case_v03(
         case,
@@ -184,6 +194,7 @@ def admit_canonical_decision(
         upstream_authority_resolver=upstream_authority_resolver,
         valuation_output_resolver=valuation_output_resolver,
         operator_price_input_resolver=operator_price_input_resolver,
+        evidence_admission_resolver=evidence_admission_resolver,
     )
     if validation["status"] != "PASS":
         raise ValueError(
@@ -198,6 +209,7 @@ def admit_canonical_decision(
         upstream_authority_resolver=upstream_authority_resolver,
         valuation_output_resolver=valuation_output_resolver,
         operator_price_input_resolver=operator_price_input_resolver,
+        evidence_admission_resolver=evidence_admission_resolver,
     )
     snapshot_core = _snapshot_core(snapshot)
     snapshot_identity = _identity_from_input(snapshot_core["input"])

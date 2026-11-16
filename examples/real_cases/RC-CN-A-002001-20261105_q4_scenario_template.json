@@ -1,0 +1,464 @@
+{
+  "schema_version": "IIOS-XINHECHENG-Q4-FINANCIAL-STATEMENT-SCENARIO-TEMPLATE-0.1",
+  "record_class": "OPERATOR_FILL_IN_TEMPLATE_NOT_FORECAST_NOT_EVIDENCE",
+  "company": "浙江新和成股份有限公司",
+  "symbol": "002001",
+  "currency": "CNY",
+  "actual_period": "2026Q1-Q3",
+  "forecast_period": "2026FY",
+  "purpose": "Combine frozen 2026Q1-Q3 reported actuals with explicit Q4 Bear/Base/Bull analyst assumptions; no automatic admission or decision.",
+  "scenario_rationale_required": true,
+  "scenarios": {
+    "bear": {
+      "q4_line_items": {
+        "revenue": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "cost_of_revenue": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "taxes_and_surcharges": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "selling_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "administrative_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "rd_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "financial_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "other_income": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "investment_income": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "fair_value_change": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "credit_impairment_gain_loss": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "asset_impairment_gain_loss": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "asset_disposal_gain_loss": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "non_operating_income": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "non_operating_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "income_tax_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "minority_interest_net_profit_after_tax": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        }
+      },
+      "annual_weighted_average_diluted_shares": {
+        "value": null,
+        "unit": "shares",
+        "data_class": "ANALYST_ASSUMPTION",
+        "basis": "",
+        "evidence_refs": [],
+        "note": "Full-year weighted-average diluted shares; provide independently. Do not backsolve from two-decimal reported EPS."
+      }
+    },
+    "base": {
+      "q4_line_items": {
+        "revenue": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "cost_of_revenue": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "taxes_and_surcharges": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "selling_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "administrative_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "rd_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "financial_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "other_income": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "investment_income": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "fair_value_change": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "credit_impairment_gain_loss": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "asset_impairment_gain_loss": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "asset_disposal_gain_loss": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "non_operating_income": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "non_operating_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "income_tax_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "minority_interest_net_profit_after_tax": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        }
+      },
+      "annual_weighted_average_diluted_shares": {
+        "value": null,
+        "unit": "shares",
+        "data_class": "ANALYST_ASSUMPTION",
+        "basis": "",
+        "evidence_refs": [],
+        "note": "Full-year weighted-average diluted shares; provide independently. Do not backsolve from two-decimal reported EPS."
+      }
+    },
+    "bull": {
+      "q4_line_items": {
+        "revenue": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "cost_of_revenue": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "taxes_and_surcharges": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "selling_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "administrative_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "rd_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "financial_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "other_income": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "investment_income": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "fair_value_change": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "credit_impairment_gain_loss": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "asset_impairment_gain_loss": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "asset_disposal_gain_loss": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "non_operating_income": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "non_operating_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "income_tax_expense": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        },
+        "minority_interest_net_profit_after_tax": {
+          "value": null,
+          "unit": "CNY",
+          "data_class": "ANALYST_ASSUMPTION",
+          "basis": "",
+          "evidence_refs": [],
+          "note": "Fill only after stating the assumption basis; retain the reported income-statement line sign."
+        }
+      },
+      "annual_weighted_average_diluted_shares": {
+        "value": null,
+        "unit": "shares",
+        "data_class": "ANALYST_ASSUMPTION",
+        "basis": "",
+        "evidence_refs": [],
+        "note": "Full-year weighted-average diluted shares; provide independently. Do not backsolve from two-decimal reported EPS."
+      }
+    }
+  },
+  "limitations": [
+    "All value fields are intentionally null. This template must remain blocked until values and identifiable basis are supplied.",
+    "Every one of the 17 Q4 P&L/NCI fields is an ANALYST_ASSUMPTION in CNY; preserve the income-statement sign convention.",
+    "Annual weighted-average diluted shares is an independent ANALYST_ASSUMPTION in shares. Never derive it from 1.90 CNY Q1-Q3 diluted EPS rounded to two decimals.",
+    "This amount bridge is not B55 physical volume/ASP/unit-variable-cost attribution.",
+    "A calculated conditional FY EPS is not issuer guidance, formal B57 admission, B58 primary-EPS match, B60 return inversion, MIE, valuation or Decision."
+  ]
+}

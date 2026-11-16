@@ -33,7 +33,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install verification dependencies
-        run: python -m pip install --disable-pip-version-check pytest jsonschema
+        run: python -m pip install --disable-pip-version-check pytest jsonschema cryptography
       - name: Run B2 admission tests
         run: python -m pytest -q tests/test_b2_semantic_producer_admission.py
       - name: Run independent B2 clean-room red-team

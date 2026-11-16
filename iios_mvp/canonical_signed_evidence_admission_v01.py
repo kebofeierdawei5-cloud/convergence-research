@@ -662,6 +662,11 @@ def verify_signed_admission(
             raise SignedAdmissionError("SIGNED_PAYLOAD_FIELD_MISMATCH:" + key)
 
     registry = _load_registry(signer_registry_path)
+    registry_status = str(registry.get("registry_status") or "").strip().upper()
+    if registry_status != "ACTIVE":
+        raise SignedAdmissionError("SIGNER_REGISTRY_NOT_ACTIVE_TRUST_AUTHORITY")
+    if not registry.get("signers"):
+        raise SignedAdmissionError("NO_TRUSTED_SIGNERS_REGISTERED")
     seen_keys: set[str] = set()
     covered_roles: set[str] = set()
     roles_by_signer: dict[str, set[str]] = {}
