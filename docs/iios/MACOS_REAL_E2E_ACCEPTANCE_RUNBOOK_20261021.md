@@ -116,6 +116,22 @@ JSON 通过后，向导会要求你回答组合/风险上下文，并独立确�
 
 遇到失败请保留原始文件，不要直接改 analysis.json、report.md、pilot_receipt.json 或 input.json 来修饰结果。记下终端的完整错误、退出码和日志路径。可先直接打开同目录的独立 `.AUDIT_SUMMARY.md` 查看状态，无需解压 ZIP；完整审计时仍以 ZIP 内文件、manifest 和收据为准。可以将验收交接 ZIP 提供给审计者检查；不要把含价格、完整研究输入和组合细节的文件提交到 GitHub。
 
+## 7.1 历史格式运行包（无原始 file_manifest）的兼容处理
+
+2026-11-16 起，验收器识别到旧版 Receipt **完全没有** `file_manifest` 字段时，不会再把它误判为当前版本格式，也不会把它标记为哈希 PASS。
+
+选择“对已有首次运行执行校验 + Replay”时，流程自动执行：
+
+1. 只读检查旧 Receipt、`input.json`、`analysis.json` 和 `report.md`。若旧 Receipt 缺少 `file_manifest`，分类为 `LEGACY_UNVERIFIABLE`。
+2. 将原始文件复制到 `~/.iios-private/local-pilot/acceptance-bundles/legacy-migrations/` 下独立归档，并生成迁移时 SHA-256/字节数清单。原始目录和原始 Receipt 不修改。
+3. 用迁移快照中的原始 `input.json` 调用当前版本重新计算，生成一个新的、带原生 `file_manifest` 的首次运行包。
+4. 对新运行包执行严格 SHA-256 校验，再从该新包执行真正 Replay，最后校验 Replay 包。
+5. 最终私有验收 ZIP 将旧包迁移快照作为独立的 `legacy_migration/` 文件组一并保存。
+
+**必须区分两个结论：** 旧包历史哈希仍为 `UNVERIFIABLE_NO_ORIGINAL_FILE_MANIFEST`；迁移快照只证明复制时的字节完整性；当前版本新运行包与 Replay 的哈希/比较结果则单独验收。旧包不会因兼容处理变成 PASS，也不会被用作未经验证的 Replay 父包。
+
+如果 Receipt 已经包含 `file_manifest`，但清单结构损坏、文件缺失或哈希不匹配，仍然严格 BLOCKED，不允许降级到历史兼容路径。迁移后的同一输入若已产生当前格式运行包，会按输入字节指纹安全复用，避免重复运行。
+
 ## 8. 人工红队复核清单
 
 即使 Replay 完全 MATCH，仍需查看首次运行和 Replay 两份中文报告及 analysis.json：
