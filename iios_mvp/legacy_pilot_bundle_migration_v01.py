@@ -122,6 +122,8 @@ def classify_legacy_pilot_bundle(run_path: str | Path) -> dict[str, Any]:
         raise LegacyPilotMigrationError("LEGACY_RUN_DIRECTORY_PERMISSIONS_NOT_PRIVATE")
 
     receipt_path = run_dir / "pilot_receipt.json"
+    if receipt_path.is_symlink():
+        _read_regular_file(receipt_path, "LEGACY_RECEIPT")
     if os.name != "nt" and receipt_path.stat().st_mode & 0o077:
         raise LegacyPilotMigrationError("LEGACY_RECEIPT_PERMISSIONS_NOT_PRIVATE")
     receipt_bytes = _read_regular_file(receipt_path, "LEGACY_RECEIPT")
@@ -136,6 +138,8 @@ def classify_legacy_pilot_bundle(run_path: str | Path) -> dict[str, Any]:
     files: dict[str, bytes] = {}
     for name in REQUIRED_FILES:
         source_file = run_dir / name
+        if source_file.is_symlink():
+            _read_regular_file(source_file, f"LEGACY_FILE_{name}")
         if os.name != "nt" and source_file.stat().st_mode & 0o077:
             raise LegacyPilotMigrationError(f"LEGACY_FILE_PERMISSIONS_NOT_PRIVATE:{name}")
         files[name] = _read_regular_file(source_file, f"LEGACY_FILE_{name}")
@@ -177,7 +181,9 @@ def classify_legacy_pilot_bundle(run_path: str | Path) -> dict[str, Any]:
     optional_present: list[str] = []
     for name in OPTIONAL_FILES:
         candidate = run_dir / name
-        if candidate.exists() or candidate.is_symlink():
+        if candidate.is_symlink():
+            _read_regular_file(candidate, f"LEGACY_FILE_{name}")
+        if candidate.exists():
             if os.name != "nt" and candidate.stat().st_mode & 0o077:
                 raise LegacyPilotMigrationError(f"LEGACY_FILE_PERMISSIONS_NOT_PRIVATE:{name}")
             payload = _read_regular_file(candidate, f"LEGACY_FILE_{name}")
