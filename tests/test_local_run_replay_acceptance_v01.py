@@ -1077,7 +1077,15 @@ def test_manifestless_original_is_snapshotted_and_rebuilt_once(tmp_path: Path, m
     log_root.mkdir(mode=0o700)
     monkeypatch.setattr(acceptance, "RUN_ROOT", run_root)
     monkeypatch.setattr(acceptance, "ACCEPTANCE_BUNDLE_ROOT", archive_root)
+    monkeypatch.setattr(acceptance, "LOG_ROOT", log_root)
     monkeypatch.setattr(acceptance, "_new_log", lambda stage: log_root / f"{stage}.log")
+    prior_failure_log = log_root / f"20261116T151205Z-check-original-{legacy_dir.name}.log"
+    prior_failure_log.write_text(
+        '{"status":"BLOCKED","reason":"RUN_BUNDLE_HASH_MANIFEST_MISSING"}\\n',
+        encoding="utf-8",
+    )
+    if os.name != "nt":
+        prior_failure_log.chmod(0o600)
 
     calls: list[list[str]] = []
 
@@ -1108,6 +1116,8 @@ def test_manifestless_original_is_snapshotted_and_rebuilt_once(tmp_path: Path, m
     assert rebuilt.name == "local-pilot-REBUILT-20261116T120000Z"
     assert snapshot is not None and snapshot.is_dir()
     assert (snapshot / "migration_manifest.json").is_file()
+    assert prior_failure_log in audit_logs
+    assert prior_failure_log.read_text(encoding="utf-8").find("RUN_BUNDLE_HASH_MANIFEST_MISSING") >= 0
     assert len(calls) == 1
     assert "file_manifest" not in json.loads((legacy_dir / "pilot_receipt.json").read_text(encoding="utf-8"))
 
