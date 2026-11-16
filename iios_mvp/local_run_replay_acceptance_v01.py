@@ -1118,8 +1118,6 @@ def _prepare_replay_source(
     # attempt. This prevents duplicate recalculation after a process restart.
     rebuilt_dir = _find_rebuilt_run_for_legacy_snapshot(snapshot_dir)
     if rebuilt_dir is None:
-        migration_log = _new_log(f"rebuild-legacy-{original_dir.name}")
-        audit_logs.append(migration_log)
         result = _run_cli(
             ["--input", str(snapshot_dir / "input.json"), "--output-root", str(RUN_ROOT)],
             stage=f"rebuild-legacy-{original_dir.name}",
