@@ -9082,6 +9082,7 @@ def _wait_for_response_file_change(
     previous_signature: tuple[int, int, str] | None,
     poll_interval: float = 0.25,
     stable_seconds: float = 0.75,
+    allow_clipboard_replacement: bool = False,
 ) -> tuple[int, int, str]:
     """Wait until a non-empty response file changes and remains stable.
 
@@ -9134,11 +9135,17 @@ def _wait_for_response_file_change(
                         flush=True,
                     )
                     _choose_saved_response_file(response_path)
-                elif latest == previous_signature:
-                    # During a repair wait, Enter means the operator has copied
-                    # a corrected ChatGPT answer and explicitly authorizes one
-                    # clipboard read. Replace only this exact working-file
-                    # version; the previous response is already immutable in
+                elif latest == previous_signature and not allow_clipboard_replacement:
+                    # Normal saved-file path: an unchanged non-empty response
+                    # is explicitly revalidated, never replaced by clipboard.
+                    print(
+                        "指定响应文件已有内容且未变化；按回车重新校验当前文件，不读取剪贴板。",
+                        flush=True,
+                    )
+                    return latest
+                elif latest == previous_signature and allow_clipboard_replacement:
+                    # Only the explicit validation-repair path enables this
+                    # replacement. The current bytes are already retained in
                     # the task's append-only attempt history.
                     print(
                         "检测到本轮修正等待。按回车将尝试一次性接收剪贴板中的新回答；"
