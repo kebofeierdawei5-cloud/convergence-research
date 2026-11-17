@@ -152,7 +152,9 @@ def _wait_for_corrected_response(
         signature = current
     else:
         signature = pilot._wait_for_response_file_change(
-            response_path, previous_signature=current
+            response_path,
+            previous_signature=current,
+            allow_clipboard_replacement=True,
         )
     raw = response_path.read_bytes()
     if pilot._response_file_signature(response_path) != signature:
