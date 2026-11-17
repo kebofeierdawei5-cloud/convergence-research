@@ -110,8 +110,39 @@ def test_enter_during_repair_wait_captures_corrected_clipboard_once(tmp_path, mo
             previous_signature=previous,
             poll_interval=0,
             stable_seconds=0,
+            allow_clipboard_replacement=True,
         )
     run.assert_called_once()
     assert target.read_bytes() == b'{"corrected":true}'
     assert corrected_signature == _response_file_signature(target)
     assert corrected_signature != previous
+
+
+
+def test_unchanged_saved_response_enter_revalidates_without_reading_clipboard(tmp_path, monkeypatch):
+    class FakeStdin:
+        def isatty(self):
+            return True
+
+        def readline(self):
+            return "\\n"
+
+    target = tmp_path / "response.json"
+    target.write_bytes(b'{"saved":true}')
+    previous = _response_file_signature(target)
+    fake_stdin = FakeStdin()
+    monkeypatch.setattr("iios_mvp.local_investment_pilot_v01.sys.stdin", fake_stdin)
+    monkeypatch.setattr(
+        "iios_mvp.local_investment_pilot_v01.select.select",
+        lambda *_args, **_kwargs: ([fake_stdin], [], []),
+    )
+    with patch("iios_mvp.local_investment_pilot_v01.subprocess.run") as run:
+        result = _wait_for_response_file_change(
+            target,
+            previous_signature=previous,
+            poll_interval=0,
+            stable_seconds=0,
+        )
+    run.assert_not_called()
+    assert result == previous
+    assert target.read_bytes() == b'{"saved":true}'
