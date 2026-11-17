@@ -232,15 +232,21 @@ def _prompt_json_after_marker(prompt: str, marker: str, error_code: str) -> dict
         raise LocalInvestmentPilotError(error_code)
     return value
 
-def _capture_clipboard_response_once(path: str | Path) -> bool:
-    """Capture macOS clipboard only after an explicit Enter keypress.
+def _capture_clipboard_response_once(
+    path: str | Path,
+    *,
+    expected_existing_signature: tuple[int, int, str] | None = None,
+) -> bool:
+    """Read macOS clipboard once after Enter and safely capture a new response.
 
-    This is deliberately a one-shot read: no clipboard polling, background
-    monitor, browser access, Accessibility permission, or content logging.
-    Existing non-empty response files are never overwritten.
+    A populated response target is never overwritten during initial intake.
+    During an explicit repair wait, replacement is allowed only when its
+    current content-aware signature still matches the immutable prior target
+    observed by the caller. The previous raw response remains in an append-only
+    task artifact before this mutable working file is replaced.
     """
     if sys.platform != "darwin":
-        print("当前平台不支持剪贴板接收；请使用原有响应文件方式。", flush=True)
+        print("当前平台不支持剪贴板接收；请使用已保存的 JSON 文件。", flush=True)
         return False
     response_path = Path(path).expanduser()
     try:
@@ -253,9 +259,21 @@ def _capture_clipboard_response_once(path: str | Path) -> bool:
     except OSError as exc:
         print(f"无法检查响应目标：{type(exc).__name__}。", flush=True)
         return False
+
+    replacing_expected = False
     if existing.strip():
-        print("响应文件已有内容，不会用剪贴板覆盖；继续校验现有文件。", flush=True)
-        return True
+        current_signature = _response_file_signature(response_path)
+        if expected_existing_signature is None:
+            print("响应文件已有内容；首次接收不会覆盖，继续校验现有文件。", flush=True)
+            return True
+        if current_signature != expected_existing_signature:
+            print("响应文件在修正期间已变化；为避免覆盖新内容，本次未写入。", flush=True)
+            return False
+        replacing_expected = True
+    elif expected_existing_signature is not None:
+        print("原响应文件在修正期间已变为空或消失；本次未覆盖。", flush=True)
+        return False
+
     try:
         result = subprocess.run(
             ["pbpaste"], check=True, capture_output=True, timeout=5
@@ -265,7 +283,7 @@ def _capture_clipboard_response_once(path: str | Path) -> bool:
         return False
     raw = result.stdout
     if not raw.strip():
-        print("剪贴板为空；请先复制 ChatGPT 的完整回复，再按回车。", flush=True)
+        print("剪贴板为空；请先复制 ChatGPT 的完整回答，再回到终端按回车。", flush=True)
         return False
     if len(raw) > 2 * 1024 * 1024:
         print("剪贴板内容超过 2 MiB 安全上限，未写入。", flush=True)
@@ -275,17 +293,25 @@ def _capture_clipboard_response_once(path: str | Path) -> bool:
     except UnicodeDecodeError:
         print("剪贴板内容不是有效 UTF-8，未写入。", flush=True)
         return False
-    # Recheck immediately before writing; never replace a file populated by
-    # another process while pbpaste was running.
+
+    # Immediately before replacement, prove the target is still the exact
+    # empty target or the exact prior version explicitly approved for repair.
     try:
-        if response_path.is_symlink() or response_path.read_bytes().strip():
-            print("响应文件在接收期间发生变化；为避免覆盖，已停止。", flush=True)
+        if response_path.is_symlink():
+            print("响应目标在接收期间变成符号链接；未写入。", flush=True)
             return False
-    except FileNotFoundError:
-        pass
+        latest = _response_file_signature(response_path)
+        if replacing_expected:
+            if latest != expected_existing_signature:
+                print("响应文件在剪贴板读取期间发生变化；为避免覆盖，已停止。", flush=True)
+                return False
+        elif latest is not None and latest[0] > 0:
+            print("响应文件在剪贴板读取期间被填充；为避免覆盖，已停止。", flush=True)
+            return False
     except OSError as exc:
         print(f"无法复核响应目标：{type(exc).__name__}。", flush=True)
         return False
+
     temporary = response_path.with_name(response_path.name + f".capture-{os.getpid()}.tmp")
     try:
         fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -297,13 +323,15 @@ def _capture_clipboard_response_once(path: str | Path) -> bool:
             temporary.unlink(missing_ok=True)
             print("响应目标在写入前变成符号链接；未覆盖。", flush=True)
             return False
-        try:
-            populated = response_path.read_bytes().strip()
-        except FileNotFoundError:
-            populated = b""
-        if populated:
+        latest = _response_file_signature(response_path)
+        if replacing_expected:
+            if latest != expected_existing_signature:
+                temporary.unlink(missing_ok=True)
+                print("响应文件在写入前再次发生变化；为避免覆盖，已停止。", flush=True)
+                return False
+        elif latest is not None and latest[0] > 0:
             temporary.unlink(missing_ok=True)
-            print("响应文件在写入前已被填充；未覆盖。", flush=True)
+            print("响应文件在写入前已被填充；为避免覆盖，已停止。", flush=True)
             return False
         os.replace(temporary, response_path)
         if os.name != "nt":
@@ -317,6 +345,7 @@ def _capture_clipboard_response_once(path: str | Path) -> bool:
         return False
     print(f"已接收剪贴板文本（{len(raw)} 字节）；正在进入原有内容校验。", flush=True)
     return True
+
 
 def _ask_operator_entry_zone() -> dict[str, Any]:
     """Collect the current company's entry-price band; never treat it as a global default."""
@@ -9106,14 +9135,30 @@ def _wait_for_response_file_change(
                     )
                     _choose_saved_response_file(response_path)
                 elif latest == previous_signature:
-                    # Explicit Enter means the operator requests a fresh validation
-                    # even when file metadata/content did not change since the prior read.
+                    # During a repair wait, Enter means the operator has copied
+                    # a corrected ChatGPT answer and explicitly authorizes one
+                    # clipboard read. Replace only this exact working-file
+                    # version; the previous response is already immutable in
+                    # the task's append-only attempt history.
                     print(
-                        "指定结果文件当前非空，但内容签名与上次读取相同；"
-                        "按回车请求重新校验当前文件。",
+                        "检测到本轮修正等待。按回车将尝试一次性接收剪贴板中的新回答；"
+                        "此前的原始回答仍保存在不可变历史记录中。",
                         flush=True,
                     )
-                    return latest
+                    if _capture_clipboard_response_once(
+                        response_path,
+                        expected_existing_signature=latest,
+                    ):
+                        captured = _response_file_signature(response_path)
+                        if captured is not None and captured[0] > 0 and captured != latest:
+                            return captured
+                    print(_response_file_diagnostic(response_path), flush=True)
+                    print(
+                        "如剪贴板方式不可用，可在文件选择窗口选择已保存的修正 JSON；"
+                        "系统不会在后台读取剪贴板。",
+                        flush=True,
+                    )
+                    _choose_saved_response_file(response_path)
         else:
             _time.sleep(poll_interval)
 
