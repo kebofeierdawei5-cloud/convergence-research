@@ -3,7 +3,11 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from iios_mvp.local_investment_pilot_v01 import (\n    _capture_clipboard_response_once,\n    _response_file_signature,\n    _wait_for_response_file_change,\n)
+from iios_mvp.local_investment_pilot_v01 import (
+    _capture_clipboard_response_once,
+    _response_file_signature,
+    _wait_for_response_file_change,
+)
 
 
 def test_clipboard_capture_is_one_shot_and_writes_private_response(tmp_path, monkeypatch):
@@ -85,7 +89,7 @@ def test_enter_during_repair_wait_captures_corrected_clipboard_once(tmp_path, mo
             return True
 
         def readline(self):
-            return "\\n"
+            return "\n"
 
     target = tmp_path / "response.json"
     target.write_bytes(b'{"invalid":')
