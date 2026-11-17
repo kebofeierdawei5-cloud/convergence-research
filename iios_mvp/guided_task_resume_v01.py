@@ -63,20 +63,39 @@ def _show_prompt(prompt: str, response_path: Path, *, phase: str) -> None:
         if phase == "Round A"
         else "Round B 价格感知估值/MIE/预期差提示"
     )
-    print(f"\n{heading} 已持久化；请发送给 ChatGPT。")
+    print(f"\\n{heading} 已持久化；系统正在准备 ChatGPT 交接。", flush=True)
     if sys.platform == "darwin":
         try:
             subprocess.run(["pbcopy"], input=prompt, text=True, check=True, timeout=5)
+            print("提示词已自动复制。", flush=True)
         except (OSError, subprocess.SubprocessError):
-            print("剪贴板复制失败；以下是持久化提示词，请手动复制：")
-            print(prompt)
+            print("提示词自动复制失败；请从下面显示的文本中手动复制提示词。", flush=True)
+            print(prompt, flush=True)
         try:
             subprocess.run(["open", "https://chatgpt.com/"], check=False, timeout=5)
         except (OSError, subprocess.SubprocessError):
-            pass
+            print("无法自动打开 ChatGPT；请自行打开 https://chatgpt.com/ 。", flush=True)
+
+        print(
+            "\\n【请按以下顺序操作：答案不填写在终端】\\n"
+            "1. 切换到 ChatGPT 输入框；按 Command+V 粘贴刚复制的 IIOS 提示词并发送。\\n"
+            "2. 等待 ChatGPT 完整回答生成；点击该回答下方的“复制”按钮，复制完整回答（包括 JSON）。\\n"
+            "3. 切回当前 IIOS Terminal 窗口，在这里按一次回车。不要把回答粘贴到终端。\\n"
+            "4. IIOS 只在这次回车后读取一次剪贴板，把回答写入本轮响应文件并自动校验。\\n"
+            "5. 校验通过后会自动进入下一阶段；校验未通过时会显示修正提示，按相同方法重试。",
+            flush=True,
+        )
+        print(
+            f"系统内部响应目标：{response_path}\\n"
+            "这只是程序接收位置，正常情况下不需要你打开、查找或编辑这个文件。",
+            flush=True,
+        )
+        print(f"现在请先完成 ChatGPT 的 {phase}，复制完整回答后再回到本窗口按回车。", flush=True)
     else:
-        print(prompt)
-    print(f"{phase} 响应文件：{response_path}")
+        print("当前系统不支持 macOS 剪贴板一键接收。请将 ChatGPT 的完整 JSON 回答保存到下列响应文件：")
+        print(str(response_path), flush=True)
+        print("不要把 JSON 粘贴到终端；保存文件后程序会读取并校验。", flush=True)
+        print(prompt, flush=True)
 
 
 def _capture_or_reuse_response(
@@ -284,13 +303,39 @@ def _validate_round(
                 response_path=response_path,
                 validation_error=str(exc),
             )
+            repair_copied = False
             if sys.platform == "darwin":
                 try:
                     subprocess.run(["pbcopy"], input=repair, text=True, check=True, timeout=5)
+                    repair_copied = True
                 except (OSError, subprocess.SubprocessError):
-                    print("修复提示复制失败；请从终端复制下方提示。")
+                    print("修正提示自动复制失败；请从终端下面显示的文本中手动复制。", flush=True)
             print(repair, flush=True)
-            print(f"请修正同一个响应文件；历史响应已作为独立 attempt 保存：{response_path}")
+            if sys.platform == "darwin":
+                if repair_copied:
+                    print(
+                        "\\n【修正本轮回答】修正提示已复制到剪贴板。切回 ChatGPT 同一对话，"
+                        "按 Command+V 发送；等新的完整 JSON 回答生成后，点击回答下方“复制”。\\n"
+                        "再切回当前 IIOS 终端按一次回车。IIOS 会把剪贴板中的新回答写入本轮临时响应文件并重新校验。\\n"
+                        "上一版错误回答已经保存在不可变历史 attempt 中，不会被删除。",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        "\\n【修正本轮回答】请将上面的修正提示复制到 ChatGPT 同一对话并发送。"
+                        "复制新的完整回答后，回到本终端按一次回车。",
+                        flush=True,
+                    )
+            else:
+                print(
+                    "\\n请将修正后的完整 JSON 保存到本轮响应文件，系统会重新校验；"
+                    "历史回答保留在独立 attempt 中。",
+                    flush=True,
+                )
+            print(
+                f"本轮响应文件接收位置：{response_path}（仅供排障；正常不需要手工打开或编辑）",
+                flush=True,
+            )
             _wait_for_corrected_response(session, pilot, phase, response_path)
 
 
