@@ -146,3 +146,40 @@ def test_unchanged_saved_response_enter_revalidates_without_reading_clipboard(tm
     run.assert_not_called()
     assert result == previous
     assert target.read_bytes() == b'{"saved":true}'
+
+def test_clipboard_repair_does_not_capture_the_copied_repair_prompt(tmp_path, monkeypatch):
+    target = tmp_path / "response.json"
+    original = b'{"invalid":'
+    target.write_bytes(original)
+    expected = _response_file_signature(target)
+    monkeypatch.setattr("iios_mvp.local_investment_pilot_v01.sys.platform", "darwin")
+    repair_prompt = "【本地校验反馈】请返回一个 JSON 对象，不要复制此提示本身。".encode("utf-8")
+    with patch(
+        "iios_mvp.local_investment_pilot_v01.subprocess.run",
+        return_value=SimpleNamespace(stdout=repair_prompt),
+    ) as run:
+        assert _capture_clipboard_response_once(
+            target,
+            expected_existing_signature=expected,
+        ) is False
+    run.assert_called_once()
+    assert target.read_bytes() == original
+
+
+def test_clipboard_repair_does_not_recapture_the_same_failed_answer(tmp_path, monkeypatch):
+    target = tmp_path / "response.json"
+    original = b'{"invalid":'
+    target.write_bytes(original)
+    expected = _response_file_signature(target)
+    monkeypatch.setattr("iios_mvp.local_investment_pilot_v01.sys.platform", "darwin")
+    with patch(
+        "iios_mvp.local_investment_pilot_v01.subprocess.run",
+        return_value=SimpleNamespace(stdout=original),
+    ) as run:
+        assert _capture_clipboard_response_once(
+            target,
+            expected_existing_signature=expected,
+        ) is False
+    run.assert_called_once()
+    assert target.read_bytes() == original
+
