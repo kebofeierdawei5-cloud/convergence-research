@@ -182,9 +182,20 @@ def _validate_round(
         raise TaskWorkspaceError("GUIDED_TASK_ANALYSIS_PROMPT_SNAPSHOT_MISMATCH")
     template_payload = json.loads(template_path.read_text(encoding="utf-8"))
     while True:
+        manifest_before = session.inspect()
+        attempt_prefix = f"artifacts/{phase.lower()}_response_captured/"
+        attempt_count = sum(
+            1 for name in manifest_before["artifacts"] if name.startswith(attempt_prefix)
+        )
+        print(
+            f"\n[{phase}] 正在校验已接收回答（历史尝试 {attempt_count} 份；不会删除旧回答）...",
+            flush=True,
+        )
         raw, signature = _capture_or_reuse_response(session, pilot, phase, response_path)
+        print(f"[{phase}] 已读取本轮回答，开始检查 JSON 语法。", flush=True)
         try:
             response_object = pilot._extract_json_object(raw.decode("utf-8"))
+            print(f"[{phase}] 第 1/3 步通过：JSON 对象可解析。", flush=True)
             base_path = template_path
             if phase == "ROUND_B":
                 base_path = Path(str(context["round_a_frozen_path"]))
@@ -202,9 +213,11 @@ def _validate_round(
             pilot._validate_research_round_patch(
                 response_object, phase=phase, base_payload=base_payload
             )
+            print(f"[{phase}] 第 2/3 步通过：补丁协议和字段白名单正确。", flush=True)
             merged, response_format, merged_fields = pilot._expand_research_patch_with_template(
                 base_path, response_object
             )
+            print(f"[{phase}] 第 3/3 步通过：补丁已合并到本地原始模板。", flush=True)
             merged.pop("_local_operator_controlled_field_recovery", None)
             merged.pop("_local_research_response_provenance", None)
             restored = pilot._restore_operator_controlled_fields_from_template(
@@ -293,11 +306,19 @@ def _validate_round(
                     "raw_response_file_modified_by_runner": False,
                 }
             session.accept_validated_payload(phase, merged)
+            print(
+                f"[{phase}] PASS：本轮校验通过，任务阶段已安全推进。",
+                flush=True,
+            )
             return merged
         except TaskWorkspaceError:
             raise
         except (OSError, UnicodeDecodeError, ValueError, KeyError, TypeError) as exc:
-            print(f"{phase} 尚未通过校验：{exc}", flush=True)
+            print(f"[{phase}] 未通过校验：{exc}", flush=True)
+            print(
+                f"[{phase}] 阶段没有推进；当前失败回答仍保留在历史记录中。正在准备修正提示。",
+                flush=True,
+            )
             repair = pilot._build_response_repair_prompt(
                 original_prompt=session.load_artifact(
                     f"artifacts/{phase.lower()}_prompt_ready/prompt.md"
@@ -316,10 +337,11 @@ def _validate_round(
             if sys.platform == "darwin":
                 if repair_copied:
                     print(
-                        "\n【修正本轮回答】修正提示已复制到剪贴板。切回 ChatGPT 同一对话，"
-                        "按 Command+V 发送；等新的完整 JSON 回答生成后，点击回答下方“复制”。\n"
-                        "再切回当前 IIOS 终端按一次回车。IIOS 会把剪贴板中的新回答写入本轮临时响应文件并重新校验。\n"
-                        "上一版错误回答已经保存在不可变历史 attempt 中，不会被删除。",
+                        "\n【现在只做以下 3 个动作】\n"
+                        "1. ChatGPT：切回同一对话输入框，按 Command+V，把刚复制的修正提示发送出去。\n"
+                        "2. ChatGPT：等待这次新回答完整生成，点击“新回答”下方的复制按钮。不要复制上面的修正提示或旧回答。\n"
+                        "3. IIOS：切回当前这个终端窗口，确认已复制新回答后再按一次回车。不要把 JSON 粘贴到终端。\n"
+                        "保护机制：如果剪贴板仍是修正提示或上一份失败回答，IIOS 会拒绝覆盖并继续等待；旧回答一直保留。\n",
                         flush=True,
                     )
                 else:
