@@ -8592,6 +8592,43 @@ def _remove_json_trailing_commas(text: str) -> str:
     return "".join(output)
 
 
+def _normalize_json_presentation(text: str) -> str:
+    """Normalize typographic JSON delimiters and separators outside JSON strings."""
+    quote_pairs = {"“": "”", "‘": "’", "＂": "＂"}
+    output: list[str] = []
+    index = 0
+    in_string = False
+    escaped = False
+    while index < len(text):
+        char = text[index]
+        if in_string:
+            output.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+            output.append(char)
+            index += 1
+            continue
+        closing = quote_pairs.get(char)
+        if closing is not None:
+            closing_index = text.find(closing, index + 1)
+            if closing_index >= 0:
+                output.append(json.dumps(text[index + 1 : closing_index], ensure_ascii=False))
+                index = closing_index + 1
+                continue
+        replacements = {"：": ":", "，": ",", "｛": "{", "｝": "}", "\u00a0": " "}
+        output.append(replacements.get(char, char))
+        index += 1
+    return "".join(output)
+
+
 def _quote_unquoted_json_keys(text: str) -> str:
     """Quote bare object keys only when an identifier is immediately followed by a colon."""
     output: list[str] = []
@@ -8639,9 +8676,11 @@ def _quote_unquoted_json_keys(text: str) -> str:
 
 def _extract_json_object(text: str) -> dict[str, Any]:
     """Accept one JSON object, optionally fenced, and reject every non-whitespace suffix."""
-    raw = str(text or "").strip()
+    raw = str(text or "").replace("\ufeff", "").strip()
     if not raw:
         raise LocalInvestmentPilotError("CHATGPT_JSON_EMPTY")
+    if raw.startswith("<escape>") and raw.endswith("</escape>"):
+        raw = raw[len("<escape>") : -len("</escape>")].strip()
     has_leading_fence = bool(re.match(r"^\s*```(?:json)?\s*", raw, flags=re.IGNORECASE))
     if has_leading_fence:
         raw = re.sub(r"^\s*```(?:json)?\s*", "", raw, count=1, flags=re.IGNORECASE)
@@ -8675,9 +8714,7 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     # ChatGPT may render JSON punctuation with typographic/full-width quotes.
     # Strict JSON is attempted first; these presentation-only variants are
     # tried only after strict parsing fails and never modify the raw attempt.
-    presentation_normalized = candidate.translate(
-        str.maketrans({"“": '"', "”": '"', "‘": '"', "’": '"', "＂": '"', "：": ":", "，": ","})
-    )
+    presentation_normalized = _normalize_json_presentation(candidate)
     presentation_normalized = _quote_unquoted_json_keys(presentation_normalized)
     candidates = [candidate]
     if presentation_normalized != candidate:
